@@ -44,8 +44,10 @@ dependencies {
   implementation(libs.kafka.clients)
   implementation(libs.slf4j.api)
 
+  testImplementation(libs.awaitility)
   testImplementation(libs.commons.io)
   testImplementation(libs.curator.test)
+  testImplementation(libs.commons.lang3)
   testImplementation(libs.junit.jupiter.api)
   testImplementation(libs.kafka)
   testImplementation(libs.mockito.core)

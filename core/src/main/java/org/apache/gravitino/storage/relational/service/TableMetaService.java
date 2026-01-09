@@ -27,7 +27,10 @@ import java.util.Objects;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Function;
+import java.util.stream.Collectors;
 import org.apache.gravitino.Entity;
+import org.apache.gravitino.Entity.EntityType;
+import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.HasIdentifier;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.NameIdentifier;
@@ -83,13 +86,8 @@ public class TableMetaService {
       metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME,
       baseMetricName = "getTableByIdentifier")
   public TableEntity getTableByIdentifier(NameIdentifier identifier) {
-    NameIdentifierUtil.checkTable(identifier);
+    TablePO tablePO = getTablePOByIdentifier(identifier);
 
-    Long schemaId =
-        EntityIdService.getEntityId(
-            NameIdentifier.of(identifier.namespace().levels()), Entity.EntityType.SCHEMA);
-
-    TablePO tablePO = getTablePOBySchemaIdAndName(schemaId, identifier.name());
     List<ColumnPO> columnPOs =
         TableColumnMetaService.getInstance()
             .getColumnsByTableIdAndVersion(tablePO.getTableId(), tablePO.getCurrentVersion());
@@ -103,14 +101,7 @@ public class TableMetaService {
   public List<TableEntity> listTablesByNamespace(Namespace namespace) {
     NamespaceUtil.checkTable(namespace);
 
-    Long schemaId =
-        EntityIdService.getEntityId(
-            NameIdentifier.of(namespace.levels()), Entity.EntityType.SCHEMA);
-
-    List<TablePO> tablePOs =
-        SessionUtils.getWithoutCommit(
-            TableMetaMapper.class, mapper -> mapper.listTablePOsBySchemaId(schemaId));
-
+    List<TablePO> tablePOs = listTablePOs(namespace);
     return POConverters.fromTablePOs(tablePOs, namespace);
   }
 
@@ -170,15 +161,7 @@ public class TableMetaService {
   @Monitored(metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME, baseMetricName = "updateTable")
   public <E extends Entity & HasIdentifier> TableEntity updateTable(
       NameIdentifier identifier, Function<E, E> updater) throws IOException {
-    NameIdentifierUtil.checkTable(identifier);
-
-    String tableName = identifier.name();
-
-    Long schemaId =
-        EntityIdService.getEntityId(
-            NameIdentifier.of(identifier.namespace().levels()), Entity.EntityType.SCHEMA);
-
-    TablePO oldTablePO = getTablePOBySchemaIdAndName(schemaId, tableName);
+    TablePO oldTablePO = getTablePOByIdentifier(identifier);
     List<ColumnPO> oldTableColumns =
         TableColumnMetaService.getInstance()
             .getColumnsByTableIdAndVersion(oldTablePO.getTableId(), oldTablePO.getCurrentVersion());
@@ -197,7 +180,7 @@ public class TableMetaService {
         isSchemaChanged
             ? EntityIdService.getEntityId(
                 NameIdentifier.of(newTableEntity.namespace().levels()), Entity.EntityType.SCHEMA)
-            : schemaId;
+            : oldTablePO.getSchemaId();
 
     TablePO newTablePO =
         POConverters.updateTablePOWithVersionAndSchemaId(oldTablePO, newTableEntity, newSchemaId);
@@ -240,60 +223,48 @@ public class TableMetaService {
 
   @Monitored(metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME, baseMetricName = "deleteTable")
   public boolean deleteTable(NameIdentifier identifier) {
-    NameIdentifierUtil.checkTable(identifier);
-
-    NamespacedEntityId namespacedEntityId =
-        EntityIdService.getEntityIds(identifier, Entity.EntityType.TABLE);
+    TablePO tablePO = getTablePOByIdentifier(identifier);
 
     AtomicInteger deleteResult = new AtomicInteger(0);
-    TablePO[] tablePOHolder = new TablePO[1];
     SessionUtils.doMultipleWithCommit(
-        () -> {
-          tablePOHolder[0] =
-              getTablePOBySchemaIdAndName(namespacedEntityId.namespaceIds()[2], identifier.name());
-        },
         () ->
             deleteResult.set(
                 SessionUtils.getWithoutCommit(
                     TableMetaMapper.class,
-                    mapper -> mapper.softDeleteTableMetasByTableId(namespacedEntityId.entityId()))),
+                    mapper -> mapper.softDeleteTableMetasByTableId(tablePO.getTableId()))),
         () -> {
           if (deleteResult.get() > 0) {
             SessionUtils.doWithoutCommit(
                 OwnerMetaMapper.class,
                 mapper ->
                     mapper.softDeleteOwnerRelByMetadataObjectIdAndType(
-                        namespacedEntityId.entityId(), MetadataObject.Type.TABLE.name()));
-            TableColumnMetaService.getInstance()
-                .deleteColumnsByTableId(namespacedEntityId.entityId());
+                        tablePO.getTableId(), MetadataObject.Type.TABLE.name()));
+            TableColumnMetaService.getInstance().deleteColumnsByTableId(tablePO.getTableId());
             SessionUtils.doWithoutCommit(
                 SecurableObjectMapper.class,
                 mapper ->
                     mapper.softDeleteObjectRelsByMetadataObject(
-                        namespacedEntityId.entityId(), MetadataObject.Type.TABLE.name()));
+                        tablePO.getTableId(), MetadataObject.Type.TABLE.name()));
             SessionUtils.doWithoutCommit(
                 TagMetadataObjectRelMapper.class,
                 mapper ->
                     mapper.softDeleteTagMetadataObjectRelsByMetadataObject(
-                        namespacedEntityId.entityId(), MetadataObject.Type.TABLE.name()));
+                        tablePO.getTableId(), MetadataObject.Type.TABLE.name()));
             SessionUtils.doWithoutCommit(
                 TagMetadataObjectRelMapper.class,
-                mapper ->
-                    mapper.softDeleteTagMetadataObjectRelsByTableId(namespacedEntityId.entityId()));
+                mapper -> mapper.softDeleteTagMetadataObjectRelsByTableId(tablePO.getTableId()));
 
             SessionUtils.doWithoutCommit(
                 StatisticMetaMapper.class,
-                mapper -> mapper.softDeleteStatisticsByEntityId(namespacedEntityId.entityId()));
+                mapper -> mapper.softDeleteStatisticsByEntityId(tablePO.getTableId()));
             SessionUtils.doWithoutCommit(
                 PolicyMetadataObjectRelMapper.class,
-                mapper ->
-                    mapper.softDeletePolicyMetadataObjectRelsByTableId(
-                        namespacedEntityId.entityId()));
+                mapper -> mapper.softDeletePolicyMetadataObjectRelsByTableId(tablePO.getTableId()));
             SessionUtils.doWithoutCommit(
                 TableVersionMapper.class,
                 mapper ->
                     mapper.softDeleteTableVersionByTableIdAndVersion(
-                        namespacedEntityId.entityId(), tablePOHolder[0].getCurrentVersion()));
+                        tablePO.getTableId(), tablePO.getCurrentVersion()));
           }
         });
 
@@ -329,6 +300,12 @@ public class TableMetaService {
     builder.withSchemaId(namespacedEntityId.entityId());
   }
 
+  private TablePO getTablePOByIdentifier(NameIdentifier identifier) {
+    NameIdentifierUtil.checkTable(identifier);
+
+    return tablePOFetcher().apply(identifier);
+  }
+
   private TablePO getTablePOBySchemaIdAndName(Long schemaId, String tableName) {
     TablePO tablePO =
         SessionUtils.getWithoutCommit(
@@ -341,5 +318,94 @@ public class TableMetaService {
           tableName);
     }
     return tablePO;
+  }
+
+  private TablePO getTableByFullQualifiedName(
+      String metalakeName, String catalogName, String schemaName, String tableName) {
+    TablePO tablePO =
+        SessionUtils.getWithoutCommit(
+            TableMetaMapper.class,
+            mapper ->
+                mapper.selectTableByFullQualifiedName(
+                    metalakeName, catalogName, schemaName, tableName));
+    if (tablePO == null) {
+      throw new NoSuchEntityException(
+          NoSuchEntityException.NO_SUCH_ENTITY_MESSAGE,
+          Entity.EntityType.TABLE.name().toLowerCase(),
+          tableName);
+    }
+
+    return tablePO;
+  }
+
+  private List<TablePO> listTablePOs(Namespace namespace) {
+    return tableListFetcher().apply(namespace);
+  }
+
+  private List<TablePO> listTablePOsBySchemaId(Namespace namespace) {
+    Long schemaId =
+        EntityIdService.getEntityId(
+            NameIdentifier.of(namespace.levels()), Entity.EntityType.SCHEMA);
+    return SessionUtils.getWithoutCommit(
+        TableMetaMapper.class, mapper -> mapper.listTablePOsBySchemaId(schemaId));
+  }
+
+  private List<TablePO> listTablePOsByFullQualifiedName(Namespace namespace) {
+    String[] namespaceLevels = namespace.levels();
+    List<TablePO> tablePOs =
+        SessionUtils.getWithoutCommit(
+            TableMetaMapper.class,
+            mapper ->
+                mapper.listTablePOsByFullQualifiedName(
+                    namespaceLevels[0], namespaceLevels[1], namespaceLevels[2]));
+    if (tablePOs.isEmpty() || tablePOs.get(0).getSchemaId() == null) {
+      throw new NoSuchEntityException(
+          NoSuchEntityException.NO_SUCH_ENTITY_MESSAGE,
+          EntityType.SCHEMA.name().toLowerCase(),
+          namespaceLevels[2]);
+    }
+    return tablePOs.stream().filter(po -> po.getTableId() != null).collect(Collectors.toList());
+  }
+
+  private TablePO getTablePOBySchemaId(NameIdentifier identifier) {
+    Long schemaId =
+        EntityIdService.getEntityId(
+            NameIdentifier.of(identifier.namespace().levels()), Entity.EntityType.SCHEMA);
+    return getTablePOBySchemaIdAndName(schemaId, identifier.name());
+  }
+
+  private TablePO getTablePOByFullQualifiedName(NameIdentifier identifier) {
+    String[] namespaceLevels = identifier.namespace().levels();
+    TablePO tablePO =
+        getTableByFullQualifiedName(
+            namespaceLevels[0], namespaceLevels[1], namespaceLevels[2], identifier.name());
+
+    if (tablePO.getSchemaId() == null) {
+      throw new NoSuchEntityException(
+          NoSuchEntityException.NO_SUCH_ENTITY_MESSAGE,
+          EntityType.SCHEMA.name().toLowerCase(),
+          namespaceLevels[2]);
+    }
+
+    if (tablePO.getTableId() == null) {
+      throw new NoSuchEntityException(
+          NoSuchEntityException.NO_SUCH_ENTITY_MESSAGE,
+          EntityType.TABLE.name().toLowerCase(),
+          identifier.name());
+    }
+
+    return tablePO;
+  }
+
+  private Function<Namespace, List<TablePO>> tableListFetcher() {
+    return GravitinoEnv.getInstance().cacheEnabled()
+        ? this::listTablePOsBySchemaId
+        : this::listTablePOsByFullQualifiedName;
+  }
+
+  private Function<NameIdentifier, TablePO> tablePOFetcher() {
+    return GravitinoEnv.getInstance().cacheEnabled()
+        ? this::getTablePOBySchemaId
+        : this::getTablePOByFullQualifiedName;
   }
 }

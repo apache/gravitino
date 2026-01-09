@@ -40,6 +40,14 @@ public interface TopicMetaMapper {
   @SelectProvider(type = TopicMetaSQLProviderFactory.class, method = "listTopicPOsBySchemaId")
   List<TopicPO> listTopicPOsBySchemaId(@Param("schemaId") Long schemaId);
 
+  @SelectProvider(
+      type = TopicMetaSQLProviderFactory.class,
+      method = "listTopicPOsByFullQualifiedName")
+  List<TopicPO> listTopicPOsByFullQualifiedName(
+      @Param("metalakeName") String metalakeName,
+      @Param("catalogName") String catalogName,
+      @Param("schemaName") String schemaName);
+
   @SelectProvider(type = TopicMetaSQLProviderFactory.class, method = "listTopicPOsByTopicIds")
   List<TopicPO> listTopicPOsByTopicIds(@Param("topicIds") List<Long> topicIds);
 
@@ -48,6 +56,15 @@ public interface TopicMetaMapper {
       method = "selectTopicMetaBySchemaIdAndName")
   TopicPO selectTopicMetaBySchemaIdAndName(
       @Param("schemaId") Long schemaId, @Param("topicName") String topicName);
+
+  @SelectProvider(
+      type = TopicMetaSQLProviderFactory.class,
+      method = "selectTopicByFullQualifiedName")
+  TopicPO selectTopicByFullQualifiedName(
+      @Param("metalakeName") String metalakeName,
+      @Param("catalogName") String catalogName,
+      @Param("schemaName") String schemaName,
+      @Param("topicName") String topicName);
 
   @SelectProvider(type = TopicMetaSQLProviderFactory.class, method = "selectTopicMetaById")
   TopicPO selectTopicMetaById(@Param("topicId") Long topicId);

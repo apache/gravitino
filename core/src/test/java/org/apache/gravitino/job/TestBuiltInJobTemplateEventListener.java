@@ -42,6 +42,7 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.ServiceLoader;
 import java.util.function.Consumer;
+import org.apache.commons.lang3.reflect.FieldUtils;
 import org.apache.gravitino.Config;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.EntityStore;
@@ -66,7 +67,6 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.MockedStatic;
 import org.mockito.Mockito;
-import org.testcontainers.shaded.org.apache.commons.lang3.reflect.FieldUtils;
 
 public class TestBuiltInJobTemplateEventListener {
 
