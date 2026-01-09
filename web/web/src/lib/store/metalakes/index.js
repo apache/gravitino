@@ -555,9 +555,7 @@ export const fetchCatalogs = createAsyncThunk(
 export const getCatalogDetails = createAsyncThunk(
   'appMetalakes/getCatalogDetails',
   async ({ init, metalake, catalog }, { dispatch }) => {
-    init && dispatch(setActivatedDetailsLoading(true))
     const [err, res] = await to(getCatalogDetailsApi({ metalake, catalog }))
-    init && dispatch(setActivatedDetailsLoading(false))
 
     if (err || !res) {
       throw new Error(err)
@@ -732,9 +730,7 @@ export const fetchSchemas = createAsyncThunk(
 export const getSchemaDetails = createAsyncThunk(
   'appMetalakes/getSchemaDetails',
   async ({ init, metalake, catalog, schema }, { dispatch }) => {
-    init && dispatch(setActivatedDetailsLoading(true))
     const [err, res] = await to(getSchemaDetailsApi({ metalake, catalog, schema }))
-    init && dispatch(setActivatedDetailsLoading(false))
 
     if (err || !res) {
       throw new Error(err)
@@ -1031,9 +1027,7 @@ export const updateTable = createAsyncThunk(
     }
 
     if (init) {
-      await dispatch(setActivatedDetailsLoading(true))
       await dispatch(getTableDetails({ init, metalake, catalog, catalogType, schema, table }))
-      await dispatch(setActivatedDetailsLoading(false))
     } else {
       await dispatch(fetchTables({ metalake, catalog, catalogType, schema, page: 'schemas', init: true }))
     }
@@ -1126,11 +1120,9 @@ export const getFilesetDetails = createAsyncThunk(
     if (init) {
       await dispatch(resetTableData())
       await dispatch(setTableLoading(true))
-      await dispatch(setActivatedDetailsLoading(true))
     }
     const [err, res] = await to(getFilesetDetailsApi({ metalake, catalog, schema, fileset }))
     init && (await dispatch(setTableLoading(false)))
-    init && (await dispatch(setActivatedDetailsLoading(false)))
 
     if (err || !res) {
       throw new Error(err)
@@ -1436,9 +1428,7 @@ export const fetchModels = createAsyncThunk(
 export const getModelDetails = createAsyncThunk(
   'appMetalakes/getModelDetails',
   async ({ init, metalake, catalog, schema, model }, { getState, dispatch }) => {
-    await dispatch(setActivatedDetailsLoading(true))
     const [err, res] = await to(getModelDetailsApi({ metalake, catalog, schema, model }))
-    await dispatch(setActivatedDetailsLoading(false))
 
     if (err || !res) {
       throw new Error(err)
@@ -1707,6 +1697,13 @@ export const appMetalakesSlice = createSlice({
     },
     setTreeLoading(state, action) {
       state.treeLoading = action.payload
+    },
+    resetActivatedDetails(state, action) {
+      state.activatedDetails = null
+
+      // Also clear table-related data to avoid stale content when switching details
+      state.tableData = []
+      state.tableProps = []
     },
     setActivatedDetailsLoading(state, action) {
       state.activatedDetailsLoading = action.payload
@@ -2147,7 +2144,8 @@ export const {
   setCatalogInUse,
   setMetalakeInUse,
   removeCatalogFromTree,
-  setTableProps
+  setTableProps,
+  resetActivatedDetails
 } = appMetalakesSlice.actions
 
 export default appMetalakesSlice.reducer
