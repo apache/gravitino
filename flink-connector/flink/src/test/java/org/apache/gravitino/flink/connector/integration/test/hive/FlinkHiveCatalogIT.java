@@ -44,9 +44,11 @@ import org.apache.flink.table.catalog.DefaultCatalogTable;
 import org.apache.flink.table.catalog.ObjectPath;
 import org.apache.flink.table.catalog.exceptions.TableNotExistException;
 import org.apache.flink.table.catalog.hive.factories.HiveCatalogFactoryOptions;
+import org.apache.flink.table.catalog.hive.util.Constants;
 import org.apache.flink.types.Row;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.catalog.hive.HiveConstants;
+import org.apache.gravitino.catalog.hive.HiveStorageConstants;
 import org.apache.gravitino.flink.connector.CatalogPropertiesConverter;
 import org.apache.gravitino.flink.connector.hive.GravitinoHiveCatalog;
 import org.apache.gravitino.flink.connector.hive.GravitinoHiveCatalogFactoryOptions;
@@ -59,6 +61,9 @@ import org.apache.gravitino.rel.expressions.transforms.Transforms;
 import org.apache.gravitino.rel.types.Types;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hive.conf.HiveConf;
+import org.apache.hadoop.hive.ql.io.RCFileStorageFormatDescriptor;
+import org.apache.hadoop.hive.ql.io.StorageFormatDescriptor;
+import org.apache.hadoop.hive.ql.io.StorageFormatFactory;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.Assertions;
@@ -469,6 +474,108 @@ public class FlinkHiveCatalogIT extends FlinkCommonIT {
               };
           assertColumns(columns, table.columns());
           Assertions.assertArrayEquals(EMPTY_TRANSFORM, table.partitioning());
+        },
+        true);
+  }
+
+  @Test
+  public void testRowFormatSerdeOverridesDefaultFormat() {
+    String databaseName = "test_hive_row_format_precedence_db";
+    String tableName = "test_row_format_overrides_default";
+    String customSerde = "com.acme.CustomSerde";
+
+    doWithSchema(
+        currentCatalog(),
+        databaseName,
+        catalog -> {
+          TestUtils.assertTableResult(
+              sql(
+                  "CREATE TABLE %s (id INT) WITH ('%s'='%s')",
+                  tableName, Constants.SERDE_LIB_CLASS_NAME, customSerde),
+              ResultKind.SUCCESS);
+          Table tableWithRowFormat =
+              catalog.asTableCatalog().loadTable(NameIdentifier.of(databaseName, tableName));
+          Assertions.assertEquals(
+              HiveStorageConstants.TEXT_INPUT_FORMAT_CLASS,
+              tableWithRowFormat.properties().get(HiveConstants.INPUT_FORMAT));
+          Assertions.assertEquals(
+              "org.apache.hadoop.hive.ql.io.IgnoreKeyTextOutputFormat",
+              tableWithRowFormat.properties().get(HiveConstants.OUTPUT_FORMAT));
+          Assertions.assertEquals(
+              customSerde, tableWithRowFormat.properties().get(HiveConstants.SERDE_LIB));
+        },
+        true);
+  }
+
+  @Test
+  public void testStoredAsOverridesRowFormatSerde() {
+    String databaseName = "test_hive_stored_as_precedence_db";
+    String tableName = "test_stored_as_overrides_row_format";
+    String customSerde = "com.acme.CustomSerde";
+
+    doWithSchema(
+        currentCatalog(),
+        databaseName,
+        catalog -> {
+          TestUtils.assertTableResult(
+              sql(
+                  "CREATE TABLE %s (id INT) WITH ('%s'='%s', '%s'='%s')",
+                  tableName,
+                  Constants.SERDE_LIB_CLASS_NAME,
+                  customSerde,
+                  Constants.STORED_AS_FILE_FORMAT,
+                  "ORC"),
+              ResultKind.SUCCESS);
+          Table tableWithStoredAs =
+              catalog.asTableCatalog().loadTable(NameIdentifier.of(databaseName, tableName));
+          Assertions.assertEquals(
+              HiveStorageConstants.ORC_SERDE_CLASS,
+              tableWithStoredAs.properties().get(HiveConstants.SERDE_LIB));
+          Assertions.assertEquals(
+              HiveStorageConstants.ORC_INPUT_FORMAT_CLASS,
+              tableWithStoredAs.properties().get(HiveConstants.INPUT_FORMAT));
+          Assertions.assertEquals(
+              HiveStorageConstants.ORC_OUTPUT_FORMAT_CLASS,
+              tableWithStoredAs.properties().get(HiveConstants.OUTPUT_FORMAT));
+        },
+        true);
+  }
+
+  @Test
+  public void testDefaultFormatAndSerdeApplied() {
+    String databaseName = "test_hive_default_format_db";
+    String tableName = "test_default_format_and_serde";
+
+    doWithSchema(
+        currentCatalog(),
+        databaseName,
+        catalog -> {
+          Optional<Catalog> flinkCatalog = tableEnv.getCatalog(catalog.name());
+          Assertions.assertTrue(flinkCatalog.isPresent());
+          HiveConf hiveConf = ((GravitinoHiveCatalog) flinkCatalog.get()).getHiveConf();
+          TestUtils.assertTableResult(
+              sql("CREATE TABLE %s (id INT)", tableName), ResultKind.SUCCESS);
+          Table tableWithDefaults =
+              catalog.asTableCatalog().loadTable(NameIdentifier.of(databaseName, tableName));
+          StorageFormatFactory storageFormatFactory = new StorageFormatFactory();
+          String defaultFormat = hiveConf.getVar(HiveConf.ConfVars.HIVEDEFAULTFILEFORMAT);
+          StorageFormatDescriptor descriptor = storageFormatFactory.get(defaultFormat);
+          Assertions.assertNotNull(descriptor);
+          Assertions.assertEquals(
+              descriptor.getInputFormat(),
+              tableWithDefaults.properties().get(HiveConstants.INPUT_FORMAT));
+          Assertions.assertEquals(
+              descriptor.getOutputFormat(),
+              tableWithDefaults.properties().get(HiveConstants.OUTPUT_FORMAT));
+          String expectedSerde = descriptor.getSerde();
+          if (expectedSerde == null && descriptor instanceof RCFileStorageFormatDescriptor) {
+            expectedSerde = hiveConf.getVar(HiveConf.ConfVars.HIVEDEFAULTRCFILESERDE);
+          }
+          if (expectedSerde == null) {
+            expectedSerde = hiveConf.getVar(HiveConf.ConfVars.HIVEDEFAULTSERDE);
+          }
+          Assertions.assertEquals(
+              expectedSerde, tableWithDefaults.properties().get(HiveConstants.SERDE_LIB));
         },
         true);
   }
