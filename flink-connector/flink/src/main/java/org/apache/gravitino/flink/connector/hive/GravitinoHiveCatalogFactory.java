@@ -62,7 +62,7 @@ public class GravitinoHiveCatalogFactory implements BaseCatalogFactory {
     // Put the hadoop properties managed by Gravitino into the hiveConf
     PropertyUtils.getHadoopAndHiveProperties(context.getOptions()).forEach(hiveConf::set);
     SchemaAndTablePropertiesConverter tablePropertiesConverter =
-        new HivePropertiesConverter(hiveConf);
+        new HiveSchemaAndTablePropertiesConverter(hiveConf);
     return new GravitinoHiveCatalog(
         context.getName(),
         helper.getOptions().get(HiveCatalogFactoryOptions.DEFAULT_DATABASE),
@@ -113,12 +113,12 @@ public class GravitinoHiveCatalogFactory implements BaseCatalogFactory {
 
   @Override
   public CatalogPropertiesConverter catalogPropertiesConverter() {
-    return HivePropertiesConverter.INSTANCE;
+    return HiveCatalogPropertiesConverter.INSTANCE;
   }
 
   @Override
   public SchemaAndTablePropertiesConverter schemaAndTablePropertiesConverter() {
-    return HivePropertiesConverter.INSTANCE;
+    return HiveSchemaAndTablePropertiesConverter.INSTANCE;
   }
 
   /**

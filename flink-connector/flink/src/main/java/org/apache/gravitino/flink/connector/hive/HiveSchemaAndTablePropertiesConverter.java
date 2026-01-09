@@ -19,7 +19,7 @@
 
 package org.apache.gravitino.flink.connector.hive;
 
-import com.google.common.collect.ImmutableMap;
+import com.google.common.base.Preconditions;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.stream.Collectors;
@@ -27,36 +27,23 @@ import javax.annotation.Nullable;
 import org.apache.flink.table.catalog.ObjectPath;
 import org.apache.flink.table.catalog.hive.util.Constants;
 import org.apache.gravitino.catalog.hive.HiveConstants;
-import org.apache.gravitino.flink.connector.CatalogPropertiesConverter;
 import org.apache.gravitino.flink.connector.SchemaAndTablePropertiesConverter;
 import org.apache.hadoop.hive.conf.HiveConf;
 import org.apache.hadoop.hive.ql.io.RCFileStorageFormatDescriptor;
 import org.apache.hadoop.hive.ql.io.StorageFormatDescriptor;
 import org.apache.hadoop.hive.ql.io.StorageFormatFactory;
 
-public class HivePropertiesConverter
-    implements CatalogPropertiesConverter, SchemaAndTablePropertiesConverter {
+public class HiveSchemaAndTablePropertiesConverter
+    implements SchemaAndTablePropertiesConverter {
 
-  public static final HivePropertiesConverter INSTANCE = new HivePropertiesConverter(null);
-  private static final Map<String, String> HIVE_CATALOG_CONFIG_TO_GRAVITINO =
-      ImmutableMap.of(HiveConf.ConfVars.METASTOREURIS.varname, HiveConstants.METASTORE_URIS);
-  private static final Map<String, String> GRAVITINO_CONFIG_TO_HIVE =
-      ImmutableMap.of(HiveConstants.METASTORE_URIS, HiveConf.ConfVars.METASTOREURIS.varname);
+  public static final HiveSchemaAndTablePropertiesConverter INSTANCE =
+      new HiveSchemaAndTablePropertiesConverter(null);
+
   private static final StorageFormatFactory STORAGE_FORMAT_FACTORY = new StorageFormatFactory();
   private final HiveConf hiveConf;
 
-  HivePropertiesConverter(@Nullable HiveConf hiveConf) {
+  HiveSchemaAndTablePropertiesConverter(@Nullable HiveConf hiveConf) {
     this.hiveConf = hiveConf;
-  }
-
-  @Override
-  public String transformPropertyToGravitinoCatalog(String configKey) {
-    return HIVE_CATALOG_CONFIG_TO_GRAVITINO.get(configKey);
-  }
-
-  @Override
-  public String transformPropertyToFlinkCatalog(String configKey) {
-    return GRAVITINO_CONFIG_TO_HIVE.get(configKey);
   }
 
   @Override
@@ -102,6 +89,7 @@ public class HivePropertiesConverter
     properties.putAll(serdeParameters);
 
     HiveConf effectiveHiveConf = hiveConf == null ? new HiveConf() : hiveConf;
+    validateStorageFormat(specifiedStorageFormat);
     if (specifiedStorageFormat == null && specifiedInputFormat != null) {
       properties.put(HiveConstants.INPUT_FORMAT, specifiedInputFormat);
     }
@@ -110,10 +98,7 @@ public class HivePropertiesConverter
     }
 
     String serdeToUse =
-        resolveSerdeLib(
-            specifiedStorageFormat,
-            specifiedSerdeLib,
-            effectiveHiveConf);
+        resolveSerdeLib(specifiedStorageFormat, specifiedSerdeLib, effectiveHiveConf);
     if (serdeToUse != null) {
       properties.put(HiveConstants.SERDE_LIB, serdeToUse);
     }
@@ -123,11 +108,6 @@ public class HivePropertiesConverter
       properties.put(HiveConstants.FORMAT, formatRaw);
     }
     return properties;
-  }
-
-  @Override
-  public String getFlinkCatalogType() {
-    return GravitinoHiveCatalogFactoryOptions.IDENTIFIER;
   }
 
   private static String resolveStorageFormat(String storedAsFileFormat, HiveConf hiveConf) {
@@ -147,9 +127,7 @@ public class HivePropertiesConverter
   // 4. use the default serde in hive conf
   // please refer to  org.apache.flink.table.catalog.hive.util.HiveTableUtils for more details
   private static String resolveSerdeLib(
-      String specifiedStorageFormat,
-      @Nullable String specifiedSerde,
-      HiveConf hiveConf) {
+      String specifiedStorageFormat, @Nullable String specifiedSerde, HiveConf hiveConf) {
     String formatSerde = getSerdeForFormat(specifiedStorageFormat, hiveConf);
     if (formatSerde != null) {
       return formatSerde;
@@ -182,5 +160,13 @@ public class HivePropertiesConverter
       serdeLib = hiveConf.getVar(HiveConf.ConfVars.HIVEDEFAULTRCFILESERDE);
     }
     return serdeLib;
+  }
+
+  private static void validateStorageFormat(String format) {
+    if (format == null) {
+      return;
+    }
+    StorageFormatDescriptor descriptor = STORAGE_FORMAT_FACTORY.get(format);
+    Preconditions.checkArgument(descriptor != null, "Unknown storage format %s", format);
   }
 }
