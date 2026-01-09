@@ -264,7 +264,7 @@ public class LanceTableOperations extends ManagedTableOperations {
     Map<String, String> storageProps = LancePropertiesUtils.getLanceStorageOptions(properties);
     if (register) {
       // Try to check if the Lance dataset exists at the location and then extract the schema.
-      // Note: We will ignore the columns parameter in this case.
+      // Note: We will ignore the column parameter in this case.
       LOG.warn(
           "Registering existing Lance table at location {}. The provided schema will be ignored. columns: {}",
           location,

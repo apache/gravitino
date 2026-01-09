@@ -708,7 +708,7 @@ public class LanceRESTServiceIT extends BaseIT {
     try (Dataset dataset =
         Dataset.create(allocator, location, schema, new WriteParams.Builder().build())) {
     } catch (Exception e) {
-      throw new RuntimeException(e);
+      throw new RuntimeException("Failed to create Lance dataset at location: " + location, e);
     }
   }
 

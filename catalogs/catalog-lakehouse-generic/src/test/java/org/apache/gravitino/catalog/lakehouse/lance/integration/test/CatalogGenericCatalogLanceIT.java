@@ -932,7 +932,7 @@ public class CatalogGenericCatalogLanceIT extends BaseIT {
                 newTableIdentifier,
                 new Column[0],
                 TABLE_COMMENT,
-                properties,
+                newCreateProperties,
                 Transforms.EMPTY_TRANSFORM,
                 Distributions.NONE,
                 new SortOrder[0]);
