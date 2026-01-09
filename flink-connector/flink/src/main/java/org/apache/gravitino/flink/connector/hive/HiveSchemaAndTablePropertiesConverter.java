@@ -84,22 +84,27 @@ public class HiveSchemaAndTablePropertiesConverter implements SchemaAndTableProp
     properties.keySet().removeIf(k -> k.startsWith(Constants.SERDE_INFO_PROP_PREFIX));
     properties.putAll(serdeParameters);
 
-    HiveConf effectiveHiveConf = hiveConf == null ? new HiveConf() : hiveConf;
     validateStorageFormat(specifiedStorageFormat);
-    if (specifiedStorageFormat == null && specifiedInputFormat != null) {
-      properties.put(HiveConstants.INPUT_FORMAT, specifiedInputFormat);
+    InputOutputFormat storageFormatIo =
+        resolveInputOutputFormat(
+            specifiedStorageFormat,
+            specifiedInputFormat,
+            specifiedOutputFormat,
+            properties,
+            hiveConf);
+    if (storageFormatIo.inputFormat != null) {
+      properties.put(HiveConstants.INPUT_FORMAT, storageFormatIo.inputFormat);
     }
-    if (specifiedStorageFormat == null && specifiedOutputFormat != null) {
-      properties.put(HiveConstants.OUTPUT_FORMAT, specifiedOutputFormat);
+    if (storageFormatIo.outputFormat != null) {
+      properties.put(HiveConstants.OUTPUT_FORMAT, storageFormatIo.outputFormat);
     }
 
-    String serdeToUse =
-        resolveSerdeLib(specifiedStorageFormat, specifiedSerdeLib, effectiveHiveConf);
+    String serdeToUse = resolveSerdeLib(specifiedStorageFormat, specifiedSerdeLib, hiveConf);
     if (serdeToUse != null) {
       properties.put(HiveConstants.SERDE_LIB, serdeToUse);
     }
 
-    String formatRaw = resolveStorageFormat(specifiedStorageFormat, effectiveHiveConf);
+    String formatRaw = resolveStorageFormat(specifiedStorageFormat, hiveConf);
     if (formatRaw != null) {
       properties.put(HiveConstants.FORMAT, formatRaw);
     }
@@ -117,11 +122,11 @@ public class HiveSchemaAndTablePropertiesConverter implements SchemaAndTableProp
     return hiveConf.getVar(HiveConf.ConfVars.HIVEDEFAULTFILEFORMAT);
   }
 
-  // 1. use the serde lib in the format
-  // 2. for rc format, use `hive.default.rcfile.serde` in hive conf
-  // 3. use the serde lib specified in the properties
+  // 1. use the serde lib in the stored-as format
+  // 2. use the serde lib specified in the properties
+  // 3. use the serde lib from default file format
   // 4. use the default serde in hive conf
-  // please refer to  org.apache.flink.table.catalog.hive.util.HiveTableUtils for more details
+  // please refer to org.apache.flink.table.catalog.hive.util.HiveTableUtils for more details
   private static String resolveSerdeLib(
       String specifiedStorageFormat, @Nullable String specifiedSerde, HiveConf hiveConf) {
     String formatSerde = getSerdeForFormat(specifiedStorageFormat, hiveConf);
@@ -164,5 +169,53 @@ public class HiveSchemaAndTablePropertiesConverter implements SchemaAndTableProp
     }
     StorageFormatDescriptor descriptor = STORAGE_FORMAT_FACTORY.get(format);
     Preconditions.checkArgument(descriptor != null, "Unknown storage format %s", format);
+  }
+
+  private static InputOutputFormat resolveInputOutputFormat(
+      String specifiedStorageFormat,
+      @Nullable String specifiedInputFormat,
+      @Nullable String specifiedOutputFormat,
+      Map<String, String> properties,
+      HiveConf hiveConf) {
+    // 1. use input/output from storage format (STORED AS)
+    // 2. use input/output from table properties
+    // 3. use input/output from default file format
+    if (specifiedStorageFormat != null) {
+      StorageFormatDescriptor descriptor = STORAGE_FORMAT_FACTORY.get(specifiedStorageFormat);
+      return new InputOutputFormat(descriptor.getInputFormat(), descriptor.getOutputFormat());
+    }
+
+    String inputFormat = specifiedInputFormat;
+    String outputFormat = specifiedOutputFormat;
+    if (inputFormat == null) {
+      inputFormat = properties.get(HiveConstants.INPUT_FORMAT);
+    }
+    if (outputFormat == null) {
+      outputFormat = properties.get(HiveConstants.OUTPUT_FORMAT);
+    }
+
+    if (inputFormat == null || outputFormat == null) {
+      String defaultFormat = getDefaultStorageFormat(hiveConf);
+      StorageFormatDescriptor descriptor = STORAGE_FORMAT_FACTORY.get(defaultFormat);
+      if (descriptor != null) {
+        if (inputFormat == null) {
+          inputFormat = descriptor.getInputFormat();
+        }
+        if (outputFormat == null) {
+          outputFormat = descriptor.getOutputFormat();
+        }
+      }
+    }
+    return new InputOutputFormat(inputFormat, outputFormat);
+  }
+
+  private static class InputOutputFormat {
+    private final String inputFormat;
+    private final String outputFormat;
+
+    private InputOutputFormat(String inputFormat, String outputFormat) {
+      this.inputFormat = inputFormat;
+      this.outputFormat = outputFormat;
+    }
   }
 }
