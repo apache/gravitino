@@ -49,7 +49,9 @@ import {
   getVersionDetails,
   setSelectedNodes,
   getCurrentEntityTags,
-  getCurrentEntityPolicies
+  getCurrentEntityPolicies,
+  resetActivatedDetails,
+  setActivatedDetailsLoading
 } from '@/lib/store/metalakes'
 
 import { fetchTags } from '@/lib/store/tags'
@@ -84,6 +86,7 @@ const CatalogsListPage = () => {
     async function fetchDependsData() {
       if ([...searchParams.keys()].length) {
         const { metalake, catalog, catalogType, schema, table, fileset, topic, model, version } = routeParams
+        await dispatch(setActivatedDetailsLoading(true))
 
         if (metalake) {
           dispatch(fetchTags({ metalake, details: true }))
@@ -171,6 +174,7 @@ const CatalogsListPage = () => {
           switch (catalogType) {
             case 'relational':
               await dispatch(fetchTables({ init: true, page: 'schemas', metalake, catalog, schema }))
+              await dispatch(resetActivatedDetails())
               await dispatch(getTableDetails({ init: true, metalake, catalog, schema, table }))
               await dispatch(
                 getCurrentEntityTags({
@@ -269,6 +273,7 @@ const CatalogsListPage = () => {
           }
           dispatch(getVersionDetails({ init: true, metalake, catalog, schema, model, version }))
         }
+        await dispatch(setActivatedDetailsLoading(false))
       }
     }
     fetchDependsData()

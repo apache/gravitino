@@ -439,7 +439,7 @@ export const TreeComponent = forwardRef(function TreeComponent(props, ref) {
 
   const onExpand = (keys, { expanded, node }) => {
     if (node.inUse === 'false') return
-    dispatch(setExpandedNodes(keys))
+    dispatch(setExpanded(keys))
     setAutoExpandParent(false)
   }
 
