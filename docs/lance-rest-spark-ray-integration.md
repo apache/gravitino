@@ -20,9 +20,9 @@ This guide shows how to use the Lance REST service from Apache Gravitino with th
 |--------------------------------|--------------------------------|------------------------------|
 | 1.1.1                          | 0.0.10 – 0.0.15                | 0.0.6 – 0.0.8                |
 
+These version ranges represent combinations that are expected to be compatible. Only a subset of versions within each range may have been explicitly tested, so you should verify a specific connector version in your own environment.
 :::note
-- Update this matrix when newer Gravitino versions (for example 1.2.0) are released.
-- Align connector versions with the Lance REST service bundled in the target release.
+The compatibility information in this section applies to Gravitino 1.1.1. For newer Gravitino versions, refer to that release's documentation and ensure that your `lance-spark` and `lance-ray` versions are compatible with the Lance REST service bundled with your Gravitino distribution.
 :::
 
 ## Prerequisites
@@ -79,7 +79,7 @@ spark.sql("select * from schema.sample").show()
 - Add your own JVM debugging flags only when needed.
 :::
 
-The storage location in the example above is local path, if you want to use cloud storage, please refer to the following Minio example:
+The storage location in the example above is local path, if you want to use cloud storage, please refer to the following MinIO example:
 
 ```python
 spark.sql("""
@@ -91,8 +91,8 @@ TBLPROPERTIES (
   'lance.storage.access_key_id' = 'ak',
   'lance.storage.endpoint' = 'http://minio:9000',
   'lance.storage.secret_access_key' = 'sk',
-  'lance.storage.allow_http'= 'true'
- )
+  'lance.storage.allow_http' = 'true'
+ )""")
 ```
 
 ## Using Lance REST with Ray
@@ -102,8 +102,9 @@ The snippet below writes and reads a Lance dataset through the Lance REST namesp
 ```shell
 pip install lance-ray
 ```
-Please note that ray will also be installed if not already present. Currently lance-ray only tested with ray version 2.50.0, please
-ensure ray version compatibility in your environment.
+Please note that Ray will also be installed if not already present. Currently lance-ray is only tested with Ray version 2.41.0 to 2.50.0, please ensure Ray version compatibility in your environment.
+
+After installing `lance-ray`, you can run the following Ray script:
 
 ```python
 import ray
