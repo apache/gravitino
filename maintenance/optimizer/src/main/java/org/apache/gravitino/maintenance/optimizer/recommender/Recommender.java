@@ -19,6 +19,7 @@
 
 package org.apache.gravitino.maintenance.optimizer.recommender;
 
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -102,10 +103,21 @@ public class Recommender implements AutoCloseable {
     this.tableMetadataProvider.initialize(optimizerEnv);
     this.jobSubmitter.initialize(optimizerEnv);
 
-    closeableGroup.register(strategyProvider, "strategy provider");
-    closeableGroup.register(statisticsProvider, "statistics provider");
-    closeableGroup.register(tableMetadataProvider, "table metadata provider");
-    closeableGroup.register(jobSubmitter, "job submitter");
+    addToCloseableGroup();
+  }
+
+  @VisibleForTesting
+  Recommender(
+      StrategyProvider strategyProvider,
+      StatisticsProvider statisticsProvider,
+      TableMetadataProvider tableMetadataProvider,
+      JobSubmitter jobSubmitter) {
+    this.strategyProvider = strategyProvider;
+    this.statisticsProvider = statisticsProvider;
+    this.tableMetadataProvider = tableMetadataProvider;
+    this.jobSubmitter = jobSubmitter;
+
+    addToCloseableGroup();
   }
 
   /**
@@ -141,6 +153,13 @@ public class Recommender implements AutoCloseable {
   @Override
   public void close() throws Exception {
     closeableGroup.close();
+  }
+
+  private void addToCloseableGroup() {
+    closeableGroup.register(strategyProvider, "strategy provider");
+    closeableGroup.register(statisticsProvider, "statistics provider");
+    closeableGroup.register(tableMetadataProvider, "table metadata provider");
+    closeableGroup.register(jobSubmitter, "job submitter");
   }
 
   private List<JobExecutionContext> recommendForOneStrategy(

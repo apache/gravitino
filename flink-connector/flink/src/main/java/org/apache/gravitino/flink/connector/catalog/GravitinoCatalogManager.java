@@ -25,9 +25,7 @@ import java.security.PrivilegedAction;
 import java.util.Arrays;
 import java.util.Map;
 import java.util.Set;
-import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.Catalog;
-import org.apache.gravitino.auth.AuthenticatorType;
 import org.apache.gravitino.client.DefaultOAuth2TokenProvider;
 import org.apache.gravitino.client.GravitinoAdminClient;
 import org.apache.gravitino.client.GravitinoMetalake;
@@ -66,7 +64,7 @@ public class GravitinoCatalogManager {
 
     // Only OAuth is explicitly configured; otherwise follow Flink security (Kerberos if enabled,
     // simple auth otherwise).
-    if (AuthenticatorType.OAUTH.name().equalsIgnoreCase(authType)) {
+    if (GravitinoCatalogStoreFactoryOptions.OAUTH2.equalsIgnoreCase(authType)) {
       this.gravitinoClient = buildOAuthClient(gravitinoUri, gravitinoClientConfig);
     } else {
       if (authType != null) {
@@ -75,6 +73,11 @@ public class GravitinoCatalogManager {
                 "Unsupported auth type '%s'. Only OAUTH is supported; leave %s unset to use Flink Kerberos settings (or simple auth if security is disabled).",
                 authType, GravitinoCatalogStoreFactoryOptions.AUTH_TYPE));
       }
+
+      LOG.info(
+          "Flink security enabled: {}, Current user: {}",
+          UserGroupInformation.isSecurityEnabled(),
+          getUgi().getUserName());
 
       if (UserGroupInformation.isSecurityEnabled()) {
         if (getUgi().getAuthenticationMethod()
@@ -247,14 +250,21 @@ public class GravitinoCatalogManager {
     String credential = config.get(GravitinoCatalogStoreFactoryOptions.OAUTH2_CREDENTIAL);
     String path = config.get(GravitinoCatalogStoreFactoryOptions.OAUTH2_TOKEN_PATH);
     String scope = config.get(GravitinoCatalogStoreFactoryOptions.OAUTH2_SCOPE);
-    Preconditions.checkArgument(
-        StringUtils.isNoneBlank(serverUri, credential, path, scope),
-        String.format(
-            "OAuth2 authentication requires: %s, %s, %s, and %s",
+
+    // Remove OAuth-specific config entries from the client config map. These keys are only
+    // used to construct the OAuth2 token provider and are not valid GravitinoAdminClient
+    // client configuration options; passing them to withClientConfig() could cause validation
+    // errors or other unexpected behavior.
+    Set<String> oauthConfigKeys =
+        Sets.newHashSet(
+            GravitinoCatalogStoreFactoryOptions.AUTH_TYPE,
             GravitinoCatalogStoreFactoryOptions.OAUTH2_SERVER_URI,
             GravitinoCatalogStoreFactoryOptions.OAUTH2_CREDENTIAL,
             GravitinoCatalogStoreFactoryOptions.OAUTH2_TOKEN_PATH,
-            GravitinoCatalogStoreFactoryOptions.OAUTH2_SCOPE));
+            GravitinoCatalogStoreFactoryOptions.OAUTH2_SCOPE);
+    for (String key : oauthConfigKeys) {
+      config.remove(key);
+    }
 
     DefaultOAuth2TokenProvider provider =
         DefaultOAuth2TokenProvider.builder()

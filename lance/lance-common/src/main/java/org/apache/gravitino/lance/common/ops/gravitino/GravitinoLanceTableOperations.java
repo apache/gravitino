@@ -21,9 +21,11 @@ package org.apache.gravitino.lance.common.ops.gravitino;
 
 import static org.apache.gravitino.lance.common.utils.LanceConstants.LANCE_CREATION_MODE;
 import static org.apache.gravitino.lance.common.utils.LanceConstants.LANCE_LOCATION;
+import static org.apache.gravitino.lance.common.utils.LanceConstants.LANCE_TABLE_CREATE_EMPTY;
 import static org.apache.gravitino.lance.common.utils.LanceConstants.LANCE_TABLE_FORMAT;
 
 import com.google.common.base.Preconditions;
+import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
 import com.lancedb.lance.namespace.LanceNamespaceException;
@@ -146,8 +148,16 @@ public class GravitinoLanceTableOperations implements LanceTableOperations {
   @Override
   public CreateEmptyTableResponse createEmptyTable(
       String tableId, String delimiter, String tableLocation, Map<String, String> tableProperties) {
+    // Empty table creation only supports CREATE mode (not EXIST_OK or OVERWRITE).
+    ImmutableMap<String, String> props =
+        ImmutableMap.<String, String>builder()
+            .putAll(tableProperties)
+            .put(LANCE_TABLE_CREATE_EMPTY, "true")
+            .put(Table.PROPERTY_EXTERNAL, "true")
+            .build();
+
     CreateTableResponse response =
-        createTable(tableId, ModeEnum.CREATE, delimiter, tableLocation, tableProperties, null);
+        createTable(tableId, ModeEnum.CREATE, delimiter, tableLocation, props, null);
     CreateEmptyTableResponse emptyTableResponse = new CreateEmptyTableResponse();
     emptyTableResponse.setProperties(response.getProperties());
     emptyTableResponse.setLocation(response.getLocation());

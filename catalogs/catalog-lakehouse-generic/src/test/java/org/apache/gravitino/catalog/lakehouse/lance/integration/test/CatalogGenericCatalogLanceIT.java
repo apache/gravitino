@@ -19,6 +19,7 @@
 package org.apache.gravitino.catalog.lakehouse.lance.integration.test;
 
 import static org.apache.gravitino.lance.common.utils.LanceConstants.LANCE_CREATION_MODE;
+import static org.apache.gravitino.lance.common.utils.LanceConstants.LANCE_TABLE_CREATE_EMPTY;
 import static org.apache.gravitino.lance.common.utils.LanceConstants.LANCE_TABLE_FORMAT;
 import static org.apache.gravitino.lance.common.utils.LanceConstants.LANCE_TABLE_REGISTER;
 
@@ -63,6 +64,7 @@ import org.apache.gravitino.integration.test.util.BaseIT;
 import org.apache.gravitino.integration.test.util.GravitinoITUtils;
 import org.apache.gravitino.rel.Column;
 import org.apache.gravitino.rel.Table;
+import org.apache.gravitino.rel.TableChange;
 import org.apache.gravitino.rel.expressions.NamedReference;
 import org.apache.gravitino.rel.expressions.distributions.Distribution;
 import org.apache.gravitino.rel.expressions.distributions.Distributions;
@@ -149,6 +151,46 @@ public class CatalogGenericCatalogLanceIT extends BaseIT {
   public void resetSchema() throws InterruptedException {
     catalog.asSchemas().dropSchema(schemaName, true);
     createSchema();
+  }
+
+  @Test
+  public void testCrateEmptyTable() {
+    String emptyTableName = GravitinoITUtils.genRandomName(TABLE_PREFIX);
+    NameIdentifier nameIdentifier = NameIdentifier.of(schemaName, emptyTableName);
+
+    Map<String, String> properties = createProperties();
+    String tableLocation = tempDirectory + "/" + tableName;
+    properties.put("format", "lance");
+    properties.put("location", tableLocation);
+    properties.put(LANCE_TABLE_CREATE_EMPTY, "true");
+    properties.put(Table.PROPERTY_EXTERNAL, "true");
+
+    Table createdTable =
+        catalog
+            .asTableCatalog()
+            .createTable(
+                nameIdentifier,
+                new Column[0],
+                TABLE_COMMENT,
+                properties,
+                Transforms.EMPTY_TRANSFORM,
+                null,
+                null);
+    Assertions.assertEquals(createdTable.name(), emptyTableName);
+
+    // Now try to alter the property LANCE_TABLE_CREATE_EMPTY
+    IllegalArgumentException e =
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () ->
+                catalog
+                    .asTableCatalog()
+                    .alterTable(
+                        nameIdentifier,
+                        TableChange.setProperty(LANCE_TABLE_CREATE_EMPTY, "false")));
+
+    Assertions.assertTrue(
+        e.getMessage().contains("Property lance.create-empty is immutable or reserved"));
   }
 
   @Test

@@ -26,10 +26,29 @@ plugins {
 
 dependencies {
   implementation(project(":api"))
-  implementation(project(":common"))
+  implementation(project(":catalogs:catalog-common"))
+  implementation(project(":clients:client-java"))
+  implementation(project(":core")) {
+    exclude("*")
+  }
+  implementation(project(":common")) {
+    exclude("*")
+  }
+  implementation(libs.bundles.log4j)
   implementation(libs.commons.lang3)
+  implementation(libs.jackson.databind)
+  implementation(libs.jackson.annotations)
   implementation(libs.guava)
-  implementation(libs.slf4j.api)
+
+  annotationProcessor(libs.lombok)
+  compileOnly(libs.lombok)
+
+  testImplementation(libs.junit.jupiter.api)
+  testImplementation(libs.junit.jupiter.params)
+  testAnnotationProcessor(libs.lombok)
+  testCompileOnly(libs.lombok)
+
+  testRuntimeOnly(libs.junit.jupiter.engine)
 }
 
 tasks {
