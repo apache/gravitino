@@ -50,12 +50,13 @@ public class HDFSFileSystemProxy implements MethodInterceptor {
   public static final String GRAVITINO_KEYTAB_FORMAT = "keytabs/gravitino-%s";
   private static final String GRAVITINO_ID_KEY = "gravitino.identifier";
 
-  private final UserGroupInformation initUgi;
-  private final FileSystem fs;
-  private final Configuration configuration;
-  private final boolean impersonationEnabled;
-  private String kerberosRealm;
-  private FileSystemProvider.ProxyUserHandler proxyUserHandler;
+  protected UserGroupInformation initUgi;
+  private FileSystem fs;
+  private Configuration configuration;
+  protected boolean impersonationEnabled;
+  protected String kerberosRealm;
+
+  protected HDFSFileSystemProxy() {}
 
   /**
    * Create a HDFSAuthenticationFileSystem with the given path and configuration. Supports both
@@ -65,20 +66,18 @@ public class HDFSFileSystemProxy implements MethodInterceptor {
    * @param conf the Hadoop configuration
    * @param config the configuration map of Gravitino
    */
-  public HDFSFileSystemProxy(
-      Path path,
-      Configuration conf,
-      Map<String, String> config,
-      FileSystemProvider.ProxyUserHandler handler) {
+  public HDFSFileSystemProxy(Path path, Configuration conf, Map<String, String> config) {
+    initFileSystem(path, conf, config);
+  }
+
+  protected void initFileSystem(Path path, Configuration conf, Map<String, String> config) {
     try {
       conf.setBoolean(FS_DISABLE_CACHE, true);
       conf.setBoolean(IPC_FALLBACK_TO_SIMPLE_AUTH_ALLOWED, true);
       this.configuration = conf;
-      this.proxyUserHandler = handler;
 
       AuthenticationConfig authenticationConfig = new AuthenticationConfig(config, configuration);
       this.impersonationEnabled = authenticationConfig.isImpersonationEnabled();
-
       String authType = authenticationConfig.getAuthType();
       if (AUTH_KERBEROS.equalsIgnoreCase(authType)) {
         this.configuration.set(
@@ -139,25 +138,12 @@ public class HDFSFileSystemProxy implements MethodInterceptor {
     }
   }
 
-  private UserGroupInformation getRequestUser() {
-    UserGroupInformation requestUgi = initUgi;
-    if (impersonationEnabled) {
-      if (proxyUserHandler != null) {
-        String proxyUserName = proxyUserHandler.getProxyUser();
-        if (!proxyUserName.contains("@")) {
-          proxyUserName = String.format("%s@%s", proxyUserName, kerberosRealm);
-        }
-        requestUgi = UserGroupInformation.createProxyUser(proxyUserName, initUgi);
-        LOG.debug("Using login user with impersonation: {}", initUgi.getUserName());
-      }
-    } else {
-      LOG.debug("Using login user without impersonation: {}", initUgi.getUserName());
-    }
-    return requestUgi;
+  protected UserGroupInformation getRequestUser() {
+    return initUgi;
   }
 
   /** Invoke the method on the underlying FileSystem using ugi.doAs. */
-  private Object invokeWithUgi(MethodProxy methodProxy, Object[] objects) throws Throwable {
+  protected Object invokeWithUgi(MethodProxy methodProxy, Object[] objects) throws Throwable {
     UserGroupInformation currentUgi = getRequestUser();
     return currentUgi.doAs(
         (PrivilegedExceptionAction<Object>)

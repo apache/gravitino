@@ -49,7 +49,12 @@ public class HDFSFileSystemProvider implements FileSystemProvider {
     Configuration configuration =
         FileSystemUtils.createConfiguration(GRAVITINO_BYPASS, hadoopConfMap);
 
-    HDFSFileSystemProxy proxy = new HDFSFileSystemProxy(path, configuration, config, handler);
+    HDFSFileSystemProxy proxy;
+    if (handler != null) {
+      proxy = new ImpersonationHDFSFileSystemProxy(path, configuration, config, handler);
+    } else {
+      proxy = new HDFSFileSystemProxy(path, configuration, config);
+    }
     return proxy.getProxy();
   }
 
