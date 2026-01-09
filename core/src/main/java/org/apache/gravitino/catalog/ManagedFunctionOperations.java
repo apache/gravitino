@@ -33,7 +33,6 @@ import org.apache.gravitino.Namespace;
 import org.apache.gravitino.exceptions.FunctionAlreadyExistsException;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.exceptions.NoSuchFunctionException;
-import org.apache.gravitino.exceptions.NoSuchFunctionVersionException;
 import org.apache.gravitino.exceptions.NoSuchSchemaException;
 import org.apache.gravitino.function.Function;
 import org.apache.gravitino.function.FunctionCatalog;
@@ -105,32 +104,10 @@ public class ManagedFunctionOperations implements FunctionCatalog {
 
   @Override
   public Function getFunction(NameIdentifier ident) throws NoSuchFunctionException {
-    return getFunction(ident, FunctionEntity.LATEST_VERSION);
-  }
-
-  @Override
-  public Function getFunction(NameIdentifier ident, int version)
-      throws NoSuchFunctionException, NoSuchFunctionVersionException {
-    NameIdentifier versionedIdent = toVersionedIdent(ident, version);
     try {
-      return store.get(versionedIdent, Entity.EntityType.FUNCTION, FunctionEntity.class);
-
+      return store.get(ident, Entity.EntityType.FUNCTION, FunctionEntity.class);
     } catch (NoSuchEntityException e) {
-      if (version == FunctionEntity.LATEST_VERSION) {
-        throw new NoSuchFunctionException(e, "Function %s does not exist", ident);
-      }
-      // Check if the function exists at all
-      try {
-        store.get(
-            toVersionedIdent(ident, FunctionEntity.LATEST_VERSION),
-            Entity.EntityType.FUNCTION,
-            FunctionEntity.class);
-        // Function exists, but version doesn't
-        throw new NoSuchFunctionVersionException(
-            e, "Function %s version %d does not exist", ident, version);
-      } catch (NoSuchEntityException | IOException ex) {
-        throw new NoSuchFunctionException(e, "Function %s does not exist", ident);
-      }
+      throw new NoSuchFunctionException(e, "Function %s does not exist", ident);
     } catch (IOException e) {
       throw new RuntimeException("Failed to get function " + ident, e);
     }
@@ -177,23 +154,6 @@ public class ManagedFunctionOperations implements FunctionCatalog {
     } catch (IOException e) {
       throw new RuntimeException("Failed to drop function " + ident, e);
     }
-  }
-
-  /**
-   * Converts a function identifier to a versioned identifier. The versioned identifier uses the
-   * version number as the name to allow the store to retrieve specific versions.
-   *
-   * @param ident The function identifier.
-   * @param version The version number, or {@link FunctionEntity#LATEST_VERSION} for the latest.
-   * @return The versioned identifier.
-   */
-  private NameIdentifier toVersionedIdent(NameIdentifier ident, int version) {
-    return NameIdentifier.of(
-        ident.namespace().level(0),
-        ident.namespace().level(1),
-        ident.namespace().level(2),
-        ident.name(),
-        String.valueOf(version));
   }
 
   private Function doRegisterFunction(
