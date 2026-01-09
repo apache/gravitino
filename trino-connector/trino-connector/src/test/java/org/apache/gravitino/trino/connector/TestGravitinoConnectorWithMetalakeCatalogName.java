@@ -18,91 +18,48 @@
  */
 package org.apache.gravitino.trino.connector;
 
-import static io.trino.testing.TestingSession.testSessionBuilder;
 import static java.lang.String.format;
 import static org.assertj.core.api.Assertions.assertThat;
 
-import io.trino.Session;
-import io.trino.plugin.memory.MemoryPlugin;
-import io.trino.testing.AbstractTestQueryFramework;
 import io.trino.testing.DistributedQueryRunner;
 import io.trino.testing.MaterializedResult;
 import io.trino.testing.MaterializedRow;
-import io.trino.testing.QueryRunner;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
-import java.util.concurrent.TimeUnit;
 import org.apache.gravitino.client.GravitinoAdminClient;
-import org.apache.gravitino.trino.connector.catalog.CatalogConnectorManager;
-import org.awaitility.Awaitility;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 
 @Disabled
-public class TestGravitinoConnectorWithMetalakeCatalogName extends AbstractTestQueryFramework {
-
-  GravitinoMockServer server;
+public class TestGravitinoConnectorWithMetalakeCatalogName extends AbstractGravitinoConnectorTest {
 
   @Override
-  protected QueryRunner createQueryRunner() throws Exception {
-    server = closeAfterClass(new GravitinoMockServer());
-    GravitinoAdminClient gravitinoClient = server.createGravitinoClient();
+  protected void configureCatalogs(
+      DistributedQueryRunner queryRunner, GravitinoAdminClient gravitinoClient) {
+    // create a gravitino connector named gravitino using metalake test
+    HashMap<String, String> properties = new HashMap<>();
+    properties.put("gravitino.metalake", "test");
+    properties.put("gravitino.uri", "http://127.0.0.1:8090");
+    properties.put("gravitino.simplify-catalog-names", "false");
+    properties.put("trino.catalog.store", queryRunner.getCoordinator().getBaseDataDir().toString());
+    properties.put(
+        "trino.jdbc.uri",
+        queryRunner.getCoordinator().getBaseUrl().toString().replace("http", "jdbc:trino"));
+    queryRunner.createCatalog("gravitino", "gravitino", properties);
 
-    Session session = testSessionBuilder().setCatalog("gravitino").build();
-
-    try {
-      DistributedQueryRunner queryRunner =
-          DistributedQueryRunner.builder(session).setNodeCount(1).build();
-
-      TestGravitinoPlugin gravitinoPlugin = new TestGravitinoPlugin(gravitinoClient);
-      queryRunner.installPlugin(gravitinoPlugin);
-
-      {
-        // create a gravitino connector named gravitino using metalake test
-        HashMap<String, String> properties = new HashMap<>();
-        properties.put("gravitino.metalake", "test");
-        properties.put("gravitino.uri", "http://127.0.0.1:8090");
-        properties.put("gravitino.simplify-catalog-names", "false");
-        properties.put(
-            "trino.catalog.store", queryRunner.getCoordinator().getBaseDataDir().toString());
-        properties.put(
-            "trino.jdbc.uri",
-            queryRunner.getCoordinator().getBaseUrl().toString().replace("http", "jdbc:trino"));
-        queryRunner.createCatalog("gravitino", "gravitino", properties);
-      }
-
-      {
-        // create a gravitino connector named test1 using metalake gravitino1
-        HashMap<String, String> properties = new HashMap<>();
-        properties.put("gravitino.metalake", "test1");
-        properties.put("gravitino.uri", "http://127.0.0.1:8090");
-        properties.put("gravitino.simplify-catalog-names", "false");
-        properties.put(
-            "trino.catalog.store", queryRunner.getCoordinator().getBaseDataDir().toString());
-        properties.put(
-            "trino.jdbc.uri",
-            queryRunner.getCoordinator().getBaseUrl().toString().replace("http", "jdbc:trino"));
-        queryRunner.createCatalog("gravitino1", "gravitino", properties);
-      }
-
-      GravitinoConnectorPluginManager.instance(this.getClass().getClassLoader())
-          .installPlugin("memory", new MemoryPlugin());
-      CatalogConnectorManager catalogConnectorManager =
-          gravitinoPlugin.getCatalogConnectorManager();
-      server.setCatalogConnectorManager(catalogConnectorManager);
-
-      // Wait for the catalog to be created. Wait for at least 30 seconds.
-      Awaitility.await()
-          .atMost(30, TimeUnit.SECONDS)
-          .pollInterval(1, TimeUnit.SECONDS)
-          .until(() -> !catalogConnectorManager.getCatalogs().isEmpty());
-      return queryRunner;
-
-    } catch (Exception e) {
-      throw new RuntimeException("Create query runner failed", e);
-    }
+    // create a gravitino connector named test1 using metalake gravitino1
+    HashMap<String, String> secondProperties = new HashMap<>();
+    secondProperties.put("gravitino.metalake", "test1");
+    secondProperties.put("gravitino.uri", "http://127.0.0.1:8090");
+    secondProperties.put("gravitino.simplify-catalog-names", "false");
+    secondProperties.put(
+        "trino.catalog.store", queryRunner.getCoordinator().getBaseDataDir().toString());
+    secondProperties.put(
+        "trino.jdbc.uri",
+        queryRunner.getCoordinator().getBaseUrl().toString().replace("http", "jdbc:trino"));
+    queryRunner.createCatalog("gravitino1", "gravitino", secondProperties);
   }
 
   @Test

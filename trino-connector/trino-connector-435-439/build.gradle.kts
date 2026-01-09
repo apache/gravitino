@@ -42,6 +42,10 @@ sourceSets {
   main {
     java.srcDirs("../trino-connector/src/main/java")
   }
+  test {
+    java.srcDirs("../trino-connector/src/test/java")
+    resources.srcDirs("../trino-connector/src/test/resources")
+  }
 }
 
 plugins.withId("com.diffplug.spotless") {
