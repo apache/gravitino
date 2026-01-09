@@ -86,7 +86,6 @@ dependencies {
     exclude(group = "com.lancedb", module = "lance-namespace-core") // This is unnecessary in the core module
   }
 
-
   testImplementation(libs.junit.jupiter.api)
   testImplementation(libs.mockito.inline)
   testImplementation(libs.mysql.driver)
