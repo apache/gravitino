@@ -107,7 +107,7 @@ public class TestGravitinoConnectorWithMetalakeCatalogName extends AbstractGravi
 
   @Test
   public void testCreateTable() {
-    String fullSchemaName = "\\\\\\\"test.memory\\\\\\\".db_01";
+    String fullSchemaName = "\"\"\"test.memory\"\"\".db_01";
     String tableName = "tb_01";
     String fullTableName = fullSchemaName + "." + tableName;
 
