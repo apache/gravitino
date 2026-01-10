@@ -23,19 +23,18 @@ import com.google.common.collect.Maps;
 import java.util.Map;
 import org.apache.flink.configuration.Configuration;
 import org.apache.flink.table.catalog.CommonCatalogOptions;
-import org.apache.flink.table.catalog.ObjectPath;
 
 /**
- * PropertiesConverter is used to convert properties between Flink properties and Apache Gravitino
- * properties
+ * CatalogPropertiesConverter converts properties between Flink catalog properties and Apache
+ * Gravitino catalog properties.
  */
-public interface PropertiesConverter {
+public interface CatalogPropertiesConverter {
 
   String FLINK_PROPERTY_PREFIX = "flink.bypass.";
 
   /**
    * Converts properties from application provided properties and Flink connector properties to
-   * Gravitino properties.This method processes the Flink configuration and transforms it into a
+   * Gravitino properties. This method processes the Flink configuration and transforms it into a
    * format suitable for the Gravitino catalog.
    *
    * @param flinkConf The Flink configuration containing connector properties. This includes both
@@ -75,8 +74,9 @@ public interface PropertiesConverter {
     gravitinoProperties.forEach(
         (key, value) -> {
           String flinkConfigKey = key;
-          if (key.startsWith(PropertiesConverter.FLINK_PROPERTY_PREFIX)) {
-            flinkConfigKey = key.substring(PropertiesConverter.FLINK_PROPERTY_PREFIX.length());
+          if (key.startsWith(CatalogPropertiesConverter.FLINK_PROPERTY_PREFIX)) {
+            flinkConfigKey =
+                key.substring(CatalogPropertiesConverter.FLINK_PROPERTY_PREFIX.length());
             allProperties.put(flinkConfigKey, value);
           } else {
             String convertedKey = transformPropertyToFlinkCatalog(flinkConfigKey);
@@ -110,54 +110,6 @@ public interface PropertiesConverter {
    *     invalid.
    */
   String transformPropertyToFlinkCatalog(String configKey);
-
-  /**
-   * Converts properties from Flink connector schema properties to Gravitino schema properties.
-   *
-   * @param flinkProperties The schema properties provided by Flink.
-   * @return The schema properties for the Gravitino.
-   */
-  default Map<String, String> toGravitinoSchemaProperties(Map<String, String> flinkProperties) {
-    return flinkProperties;
-  }
-
-  /**
-   * Converts properties from Gravitino database properties to Flink connector schema properties.
-   *
-   * @param gravitinoProperties The schema properties provided by Gravitino.
-   * @return The database properties for the Flink connector.
-   */
-  default Map<String, String> toFlinkDatabaseProperties(Map<String, String> gravitinoProperties) {
-    return gravitinoProperties;
-  }
-
-  /**
-   * Converts properties from Gravitino table properties to Flink connector table properties.
-   *
-   * @param flinkCatalogProperties The flinkCatalogProperties are either the converted properties
-   *     obtained through the toFlinkCatalogProperties method in GravitinoCatalogStore, or the
-   *     options passed when writing a CREATE CATALOG statement in Flink SQL.
-   * @param gravitinoTableProperties The table properties provided by Gravitino.
-   * @param tablePath The tablePath provides the database and table for some catalogs, such as the
-   *     {@link org.apache.gravitino.flink.connector.jdbc.GravitinoJdbcCatalog}.
-   * @return The table properties for the Flink connector.
-   */
-  default Map<String, String> toFlinkTableProperties(
-      Map<String, String> flinkCatalogProperties,
-      Map<String, String> gravitinoTableProperties,
-      ObjectPath tablePath) {
-    return gravitinoTableProperties;
-  }
-
-  /**
-   * Converts properties from Flink connector table properties to Gravitino table properties.
-   *
-   * @param flinkProperties The table properties provided by Flink.
-   * @return The table properties for the Gravitino.
-   */
-  default Map<String, String> toGravitinoTableProperties(Map<String, String> flinkProperties) {
-    return flinkProperties;
-  }
 
   /**
    * Retrieves the Flink catalog type associated with this converter. This method is used to
