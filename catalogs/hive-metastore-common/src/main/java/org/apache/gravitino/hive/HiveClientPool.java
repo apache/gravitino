@@ -41,7 +41,7 @@ public class HiveClientPool extends ClientPoolImpl<HiveClient, GravitinoRuntimeE
    * @param properties The configuration used to initialize the Hive Metastore clients.
    */
   public HiveClientPool(String name, int poolSize, Properties properties) {
-    // Do not allow retry by default as we rely on RetryingHiveClient
+    // Do not allow retry by default as we rely on RetryingMetaStoreClient
     super(poolSize, GravitinoRuntimeException.class, false);
     this.clientFactory = new HiveClientFactory(properties, name);
   }
@@ -58,17 +58,20 @@ public class HiveClientPool extends ClientPoolImpl<HiveClient, GravitinoRuntimeE
 
   @Override
   protected HiveClient reconnect(HiveClient client) {
+    // No-op reconnect: RetryingMetaStoreClient handles reconnect logic.
     LOG.warn("Reconnecting to Hive Metastore");
     return client;
   }
 
   @Override
   protected boolean isConnectionException(Exception e) {
+    // Pool-level reconnection is not required by design.
     return false;
   }
 
   @Override
   protected void close(HiveClient client) {
     LOG.info("Closing Hive Metastore client");
+    client.close();
   }
 }
