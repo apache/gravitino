@@ -26,16 +26,20 @@ import static org.mockito.Mockito.when;
 
 import io.trino.spi.connector.Connector;
 import io.trino.spi.transaction.IsolationLevel;
-import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.trino.connector.catalog.CatalogConnectorContext;
+import org.apache.gravitino.trino.connector.metadata.GravitinoCatalog;
 import org.junit.jupiter.api.Test;
 
 class TestGravitinoConnectorNullChecks {
   @Test
   void testBeginTransactionThrowsIfInternalConnectorIsNull() {
+    GravitinoCatalog mockCatalog = mock(GravitinoCatalog.class);
+    when(mockCatalog.geNameIdentifier()).thenReturn(null);
+
     CatalogConnectorContext mockContext = mock(CatalogConnectorContext.class);
+    when(mockContext.getCatalog()).thenReturn(mockCatalog);
     when(mockContext.getInternalConnector()).thenReturn(null);
-    GravitinoConnector connector = new GravitinoConnector(mock(NameIdentifier.class), mockContext);
+    GravitinoConnector connector = new GravitinoConnector(mockContext);
     assertThrows(
         IllegalArgumentException.class,
         () -> connector.beginTransaction(IsolationLevel.READ_COMMITTED, true, true));
@@ -43,12 +47,17 @@ class TestGravitinoConnectorNullChecks {
 
   @Test
   void testBeginTransactionThrowsIfInternalTransactionHandleIsNull() {
+    GravitinoCatalog mockCatalog = mock(GravitinoCatalog.class);
+    when(mockCatalog.geNameIdentifier()).thenReturn(null);
+
     CatalogConnectorContext mockContext = mock(CatalogConnectorContext.class);
+    when(mockContext.getCatalog()).thenReturn(mockCatalog);
+
     Connector mockInternalConnector = mock(Connector.class);
     when(mockContext.getInternalConnector()).thenReturn(mockInternalConnector);
     when(mockInternalConnector.beginTransaction(any(), anyBoolean(), anyBoolean()))
         .thenReturn(null);
-    GravitinoConnector connector = new GravitinoConnector(mock(NameIdentifier.class), mockContext);
+    GravitinoConnector connector = new GravitinoConnector(mockContext);
     assertThrows(
         IllegalArgumentException.class,
         () -> connector.beginTransaction(IsolationLevel.READ_COMMITTED, true, true));

@@ -18,28 +18,25 @@
  */
 package org.apache.gravitino.trino.connector;
 
-import com.google.common.collect.ImmutableList;
-import io.trino.spi.connector.ConnectorFactory;
 import org.apache.gravitino.client.GravitinoAdminClient;
-import org.apache.gravitino.trino.connector.catalog.CatalogConnectorManager;
+import org.apache.gravitino.trino.connector.catalog.CatalogConnectorContext;
+import org.apache.gravitino.trino.connector.system.GravitinoSystemConnector;
+import org.apache.gravitino.trino.connector.system.storedprocedure.GravitinoStoredProcedureFactory;
 
-public class TestGravitinoPlugin extends GravitinoPlugin {
-  private TestGravitinoConnectorFactory factory;
+public class GravitinoConnectorFactory435 extends GravitinoConnectorFactory {
 
-  private final GravitinoAdminClient gravitinoClient;
-
-  public TestGravitinoPlugin(GravitinoAdminClient gravitinoClient) {
-    this.gravitinoClient = gravitinoClient;
+  public GravitinoConnectorFactory435(GravitinoAdminClient client) {
+    super(client);
   }
 
   @Override
-  public Iterable<ConnectorFactory> getConnectorFactories() {
-    factory = new TestGravitinoConnectorFactory();
-    factory.setGravitinoClient(gravitinoClient);
-    return ImmutableList.of(factory);
+  protected GravitinoConnector createConnector(CatalogConnectorContext connectorContext) {
+    return new GravitinoConnector435(connectorContext);
   }
 
-  public CatalogConnectorManager getCatalogConnectorManager() {
-    return factory.getCatalogConnectorManager();
+  @Override
+  public GravitinoSystemConnector createSystemConnector(
+      GravitinoStoredProcedureFactory gravitinoStoredProcedureFactory) {
+    return new GravitinoSystemConnector435(gravitinoStoredProcedureFactory);
   }
 }

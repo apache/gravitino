@@ -16,20 +16,15 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.gravitino.trino.connector;
 
-import java.util.function.Supplier;
 import org.apache.gravitino.client.GravitinoAdminClient;
+import org.apache.gravitino.trino.connector.GravitinoPlugin;
+import org.apache.gravitino.trino.connector.GravitinoPlugin435;
+import org.apache.gravitino.trino.connector.TestGravitinoConnector;
 
-public class TestGravitinoConnectorFactory extends GravitinoConnectorFactory {
-  private GravitinoAdminClient gravitinoClient;
-
-  public void setGravitinoClient(GravitinoAdminClient client) {
-    this.gravitinoClient = client;
-  }
-
+public class TestGravitinoConnector435 extends TestGravitinoConnector {
   @Override
-  Supplier<GravitinoAdminClient> clientProvider() {
-    return () -> gravitinoClient;
+  protected GravitinoPlugin createGravitinoPulgin(GravitinoAdminClient client) {
+    return new GravitinoPlugin435(client);
   }
 }

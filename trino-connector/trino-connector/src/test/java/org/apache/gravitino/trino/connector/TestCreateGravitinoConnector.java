@@ -41,7 +41,7 @@ public class TestCreateGravitinoConnector {
     QueryRunner queryRunner = DistributedQueryRunner.builder(session).setNodeCount(1).build();
 
     GravitinoAdminClient gravitinoClient = server.createGravitinoClient();
-    TestGravitinoPlugin gravitinoPlugin = new TestGravitinoPlugin(gravitinoClient);
+    GravitinoPlugin gravitinoPlugin = new GravitinoPlugin(gravitinoClient);
     queryRunner.installPlugin(gravitinoPlugin);
 
     // test create two connector and set gravitino.simplify-catalog-names = true
@@ -77,7 +77,7 @@ public class TestCreateGravitinoConnector {
     QueryRunner queryRunner = DistributedQueryRunner.builder(session).setNodeCount(1).build();
 
     GravitinoAdminClient gravitinoClient = server.createGravitinoClient();
-    TestGravitinoPlugin gravitinoPlugin = new TestGravitinoPlugin(gravitinoClient);
+    GravitinoPlugin gravitinoPlugin = new GravitinoPlugin(gravitinoClient);
     queryRunner.installPlugin(gravitinoPlugin);
 
     // test create two connector and set gravitino.simplify-catalog-names = false

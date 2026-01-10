@@ -38,6 +38,7 @@ import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.client.GravitinoMetalake;
 import org.apache.gravitino.trino.connector.catalog.CatalogConnectorContext;
 import org.apache.gravitino.trino.connector.catalog.CatalogConnectorMetadata;
+import org.apache.gravitino.trino.connector.catalog.CatalogConnectorMetadataAdapter;
 
 /**
  * GravitinoConnector serves as the entry point for operations on the connector managed by Trino and
@@ -53,12 +54,10 @@ public class GravitinoConnector implements Connector {
    * Constructs a new GravitinoConnector with the specified catalog identifier and catalog connector
    * context.
    *
-   * @param catalogIdentifier the catalog identifier
    * @param catalogConnectorContext the catalog connector context
    */
-  public GravitinoConnector(
-      NameIdentifier catalogIdentifier, CatalogConnectorContext catalogConnectorContext) {
-    this.catalogIdentifier = catalogIdentifier;
+  public GravitinoConnector(CatalogConnectorContext catalogConnectorContext) {
+    this.catalogIdentifier = catalogConnectorContext.getCatalog().geNameIdentifier();
     this.catalogConnectorContext = catalogConnectorContext;
   }
 
@@ -92,8 +91,15 @@ public class GravitinoConnector implements Connector {
     CatalogConnectorMetadata catalogConnectorMetadata =
         new CatalogConnectorMetadata(metalake, catalogIdentifier);
 
-    return new GravitinoMetadata(
+    return createGravitinoMetadata(
         catalogConnectorMetadata, catalogConnectorContext.getMetadataAdapter(), internalMetadata);
+  }
+
+  protected GravitinoMetadata createGravitinoMetadata(
+      CatalogConnectorMetadata catalogConnectorMetadata,
+      CatalogConnectorMetadataAdapter metadataAdapter,
+      ConnectorMetadata internalMetadata) {
+    return new GravitinoMetadata(catalogConnectorMetadata, metadataAdapter, internalMetadata);
   }
 
   @Override
