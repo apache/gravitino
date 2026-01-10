@@ -28,7 +28,7 @@ The compatibility information in this section applies to Gravitino 1.1.1. For ne
 ## Prerequisites
 
 - Gravitino server running with Lance REST service enabled (default endpoint: `http://localhost:9101/lance`).
-- A Lance catalog created in Gravitino, for example `lance_catalog`.
+- A Lance catalog created in Gravitino or via Lance REST namespace API(see `CreateNamespace` in [docs](./lance-rest-service.md)) for example `lance_catalog`.
 - Downloaded `lance-spark` bundle JAR that matches your Spark version (set the absolute path in the examples below).
 - Python environments with required packages:
   - Spark: `pyspark`
@@ -117,6 +117,7 @@ namespace = ln.connect("rest", {"uri": "http://localhost:9101/lance"})
 
 data = ray.data.range(1000).map(lambda row: {"id": row["id"], "value": row["id"] * 2})
 
+# Please note that namespace `schema` should also be created via Lance REST API or Gravitino API beforehand.
 write_lance(data, namespace=namespace, table_id=["lance_catalog", "schema", "my_table"])
 ray_dataset = read_lance(namespace=namespace, table_id=["lance_catalog", "schema", "my_table"])
 
