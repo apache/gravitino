@@ -19,16 +19,23 @@
 package org.apache.gravitino.flink.connector.hive;
 
 import com.google.common.collect.ImmutableMap;
+import java.util.Collections;
 import java.util.Map;
 import org.apache.flink.configuration.Configuration;
+import org.apache.flink.table.catalog.ObjectPath;
+import org.apache.flink.table.catalog.hive.util.Constants;
 import org.apache.gravitino.catalog.hive.HiveConstants;
 import org.apache.hadoop.hive.conf.HiveConf;
+import org.apache.hadoop.hive.ql.io.RCFileStorageFormatDescriptor;
+import org.apache.hadoop.hive.ql.io.StorageFormatDescriptor;
+import org.apache.hadoop.hive.ql.io.StorageFormatFactory;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
 public class TestHivePropertiesConverter {
 
-  private static final HivePropertiesConverter CONVERTER = HivePropertiesConverter.INSTANCE;
+  private static final HivePropertiesConverter CONVERTER =
+      new HivePropertiesConverter(new HiveConf());
 
   @Test
   public void testToGravitinoCatalogProperties() {
@@ -66,5 +73,56 @@ public class TestHivePropertiesConverter {
     Assertions.assertEquals(
         GravitinoHiveCatalogFactoryOptions.IDENTIFIER, flinkCatalogProperties.get("type"));
     Assertions.assertEquals("thrift://xxx", flinkCatalogProperties.get("hive.metastore.uris"));
+  }
+
+  @Test
+  public void testToGravitinoTablePropertiesDefaultStorageFormat() {
+    HiveConf hiveConf = new HiveConf();
+    HivePropertiesConverter converter = new HivePropertiesConverter(hiveConf);
+    Map<String, String> properties = converter.toGravitinoTableProperties(Collections.emptyMap());
+
+    String defaultFormat = hiveConf.getVar(HiveConf.ConfVars.HIVEDEFAULTFILEFORMAT);
+    StorageFormatDescriptor descriptor = new StorageFormatFactory().get(defaultFormat);
+    String expectedSerde = descriptor.getSerde();
+    if (expectedSerde == null && descriptor instanceof RCFileStorageFormatDescriptor) {
+      expectedSerde = hiveConf.getVar(HiveConf.ConfVars.HIVEDEFAULTRCFILESERDE);
+    }
+    if (expectedSerde == null) {
+      expectedSerde = hiveConf.getVar(HiveConf.ConfVars.HIVEDEFAULTSERDE);
+    }
+
+    Assertions.assertEquals(defaultFormat, properties.get(HiveConstants.FORMAT));
+    Assertions.assertEquals(
+        descriptor.getInputFormat(), properties.get(HiveConstants.INPUT_FORMAT));
+    Assertions.assertEquals(
+        descriptor.getOutputFormat(), properties.get(HiveConstants.OUTPUT_FORMAT));
+    Assertions.assertEquals(expectedSerde, properties.get(HiveConstants.SERDE_LIB));
+  }
+
+  @Test
+  public void testToFlinkTablePropertiesDefaultStorageFormat() {
+    HiveConf hiveConf = new HiveConf();
+    HivePropertiesConverter converter = new HivePropertiesConverter(hiveConf);
+    Map<String, String> properties =
+        converter.toFlinkTableProperties(
+            Collections.emptyMap(), Collections.emptyMap(), new ObjectPath("default", "test"));
+
+    String defaultFormat = hiveConf.getVar(HiveConf.ConfVars.HIVEDEFAULTFILEFORMAT);
+    StorageFormatDescriptor descriptor = new StorageFormatFactory().get(defaultFormat);
+    String expectedSerde = descriptor.getSerde();
+    if (expectedSerde == null && descriptor instanceof RCFileStorageFormatDescriptor) {
+      expectedSerde = hiveConf.getVar(HiveConf.ConfVars.HIVEDEFAULTRCFILESERDE);
+    }
+    if (expectedSerde == null) {
+      expectedSerde = hiveConf.getVar(HiveConf.ConfVars.HIVEDEFAULTSERDE);
+    }
+
+    Assertions.assertEquals(Constants.IDENTIFIER, properties.get("connector"));
+    Assertions.assertEquals(defaultFormat, properties.get(Constants.STORED_AS_FILE_FORMAT));
+    Assertions.assertEquals(
+        descriptor.getInputFormat(), properties.get(Constants.STORED_AS_INPUT_FORMAT));
+    Assertions.assertEquals(
+        descriptor.getOutputFormat(), properties.get(Constants.STORED_AS_OUTPUT_FORMAT));
+    Assertions.assertEquals(expectedSerde, properties.get(Constants.SERDE_LIB_CLASS_NAME));
   }
 }
