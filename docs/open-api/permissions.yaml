@@ -357,6 +357,53 @@ paths:
         "5xx":
           $ref: "./openapi.yaml#/components/responses/ServerErrorResponse"
 
+  /metalakes/{metalake}/permissions/roles/{role}:
+    parameters:
+      - $ref: "./openapi.yaml#/components/parameters/metalake"
+      - $ref: "./openapi.yaml#/components/parameters/role"
+    put:
+      tags:
+        - access control
+      summary: override role privileges
+      operationId: overrideRolePrivileges
+      description: |
+        Override the privileges of the bulk securable objects for a specific role in a metalake.
+
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PrivilegeOverrideRequest"
+
+      responses:
+        "200":
+          description: Returns the updated role
+          content:
+            application/vnd.gravitino.v1+json:
+              schema:
+                $ref: "./roles.yaml#/components/responses/RoleResponse"
+        "400":
+          description: Parameter is invalid - The specified privilege is invalid
+          content:
+            application/vnd.gravitino.v1+json:
+              schema:
+                $ref: "./openapi.yaml#/components/schemas/ErrorModel"
+                examples:
+                  IllegalPrivilegeException:
+                    $ref: "#/components/examples/IllegalPrivilegeException"
+        "404":
+          description: Not Found - The target role does not exist
+          content:
+            application/vnd.gravitino.v1+json:
+              schema:
+                $ref: "./openapi.yaml#/components/schemas/ErrorModel"
+              examples:
+                NoSuchMetalakeException:
+                  $ref: "./metalakes.yaml#/components/examples/NoSuchMetalakeException"
+                NoSuchRoleException:
+                  $ref: "./roles.yaml#/components/examples/NoSuchRoleException"
+        "5xx":
+          $ref: "./openapi.yaml#/components/responses/ServerErrorResponse"
 
 components:
 
@@ -405,6 +452,15 @@ components:
           items:
             $ref: "./roles.yaml#/components/schemas/Privilege"
 
+    PrivilegeOverrideRequest:
+      type: object
+      properties:
+        overrides:
+          type: array
+          description: A list of securable objects to update
+          items:
+            $ref: "./roles.yaml#/components/schemas/SecurableObject"
+
   examples:
 
     RoleGrantRequest:
@@ -433,6 +489,22 @@ components:
             "name": "SELECT_TABLE",
             "condition": "ALLOW"
           } ]
+      }
+
+    PrivilegeOverrideRequest:
+      value: {
+        "overrides": [
+          {
+            "fullName": "catalog1.schema1.table1",
+            "type": "TABLE",
+            "privileges": [
+              {
+                name: "SELECT_TABLE",
+                condition: "ALLOW"
+              }
+            ]
+          }
+        ]
       }
 
     IllegalRoleException:

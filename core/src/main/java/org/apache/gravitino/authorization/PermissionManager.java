@@ -24,10 +24,12 @@ import static org.apache.gravitino.authorization.AuthorizationUtils.USER_DOES_NO
 import static org.apache.gravitino.authorization.AuthorizationUtils.filterSecurableObjects;
 
 import com.google.common.collect.Lists;
+import com.google.common.collect.Maps;
 import com.google.common.collect.Sets;
 import java.io.IOException;
 import java.time.Instant;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.function.Function;
 import java.util.stream.Collectors;
@@ -35,6 +37,7 @@ import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.EntityStore;
 import org.apache.gravitino.MetadataObject;
+import org.apache.gravitino.MetadataObjects;
 import org.apache.gravitino.exceptions.IllegalRoleException;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.exceptions.NoSuchGroupException;
@@ -594,6 +597,134 @@ class PermissionManager {
     } catch (IOException ioe) {
       LOG.error("Revoke privileges from {} failed due to storage issues", role, ioe);
       throw new RuntimeException(ioe);
+    }
+  }
+
+  Role overridePrivilegesInRole(
+      String metalake, String role, List<SecurableObject> securableObjectsToOverride) {
+    try {
+      AuthorizationPluginCallbackWrapper authorizationCallbackWrapper =
+          new AuthorizationPluginCallbackWrapper();
+      Role updatedRole =
+          store.update(
+              AuthorizationUtils.ofRole(metalake, role),
+              RoleEntity.class,
+              Entity.EntityType.ROLE,
+              roleEntity -> {
+                List<SecurableObject> currentSecurableObjects =
+                    Lists.newArrayList(roleEntity.securableObjects());
+
+                // This is used for recording the original state of the role before update.
+                // We use this to find which objects existed before update
+                Map<MetadataObject, SecurableObject> originObjectMap = Maps.newHashMap();
+                for (SecurableObject securableObject : currentSecurableObjects) {
+                  originObjectMap.put(
+                      MetadataObjects.parse(securableObject.fullName(), securableObject.type()),
+                      securableObject);
+                }
+
+                // This is used for recording the updated state of the role after update.
+                Map<MetadataObject, SecurableObject> updatedObjectMap = Maps.newHashMap();
+                for (SecurableObject securableObject : securableObjectsToOverride) {
+                  updatedObjectMap.put(
+                      MetadataObjects.parse(securableObject.fullName(), securableObject.type()),
+                      securableObject);
+                }
+
+                // These sets will be used for tracking which objects are created, updated or
+                // deleted.
+                Set<MetadataObject> authzPluginCreatedObjects =
+                    Sets.newHashSet(updatedObjectMap.keySet());
+                authzPluginCreatedObjects.removeAll(originObjectMap.keySet());
+
+                Set<MetadataObject> authzPluginUpdateObjects =
+                    Sets.newHashSet(updatedObjectMap.keySet());
+                authzPluginUpdateObjects.retainAll(originObjectMap.keySet());
+
+                Set<MetadataObject> authzPluginDeletedObjects =
+                    Sets.newHashSet(originObjectMap.keySet());
+                authzPluginDeletedObjects.removeAll(updatedObjectMap.keySet());
+
+                // We set authorization callback here, we won't execute this callback in this
+                // place. We will execute the callback after we execute the SQL transaction.
+                authorizationCallbackWrapper.setCallback(
+                    () -> {
+                      authzPluginCreatedObjects.forEach(
+                          object -> {
+                            AuthorizationUtils.callAuthorizationPluginForMetadataObject(
+                                metalake,
+                                object,
+                                authorizationPlugin -> {
+                                  authorizationPlugin.onRoleUpdated(
+                                      roleEntity,
+                                      RoleChange.addSecurableObject(
+                                          role, updatedObjectMap.get(object)));
+                                });
+                          });
+                      authzPluginUpdateObjects.forEach(
+                          object -> {
+                            SecurableObject existingObject = originObjectMap.get(object);
+                            SecurableObject newSecurableObject = updatedObjectMap.get(object);
+                            // If the updated role is the same as the existing one, we don't
+                            // need to call the authorization plugin.
+                            if (existingObject != null
+                                && newSecurableObject != null
+                                && !existingObject
+                                    .privileges()
+                                    .equals(newSecurableObject.privileges())) {
+                              AuthorizationUtils.callAuthorizationPluginForMetadataObject(
+                                  metalake,
+                                  object,
+                                  authorizationPlugin -> {
+                                    authorizationPlugin.onRoleUpdated(
+                                        roleEntity,
+                                        RoleChange.updateSecurableObject(
+                                            role, existingObject, newSecurableObject));
+                                  });
+                            }
+                          });
+                      authzPluginDeletedObjects.forEach(
+                          object -> {
+                            AuthorizationUtils.callAuthorizationPluginForMetadataObject(
+                                metalake,
+                                object,
+                                authorizationPlugin -> {
+                                  authorizationPlugin.onRoleUpdated(
+                                      roleEntity,
+                                      RoleChange.removeSecurableObject(
+                                          role, originObjectMap.get(object)));
+                                });
+                          });
+                    });
+
+                AuditInfo auditInfo =
+                    AuditInfo.builder()
+                        .withCreator(roleEntity.auditInfo().creator())
+                        .withCreateTime(roleEntity.auditInfo().createTime())
+                        .withLastModifier(PrincipalUtils.getCurrentPrincipal().getName())
+                        .withLastModifiedTime(Instant.now())
+                        .build();
+
+                return RoleEntity.builder()
+                    .withId(roleEntity.id())
+                    .withName(roleEntity.name())
+                    .withNamespace(roleEntity.namespace())
+                    .withProperties(roleEntity.properties())
+                    .withAuditInfo(auditInfo)
+                    .withSecurableObjects(Lists.newArrayList(updatedObjectMap.values()))
+                    .build();
+              });
+      authorizationCallbackWrapper.execute();
+
+      return updatedRole;
+    } catch (IOException ioe) {
+      LOG.error(
+          "Updating role {} in the metalake {} failed due to storage issues", role, metalake, ioe);
+      throw new RuntimeException(ioe);
+    } catch (NoSuchEntityException nse) {
+      LOG.error(
+          "Failed to override, role {} does not exist in the metalake {}", role, metalake, nse);
+      throw new NoSuchRoleException(ROLE_DOES_NOT_EXIST_MSG, role, metalake);
     }
   }
 
