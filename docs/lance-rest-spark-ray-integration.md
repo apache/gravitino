@@ -12,7 +12,7 @@ license: "This software is licensed under the Apache License version 2."
 
 ## Overview
 
-This guide shows how to use the Lance REST service from Apache Gravitino with the Lance Spark connector (`lance-spark`) and the Lance Ray connector (`lance-ray`). It builds on the Lance REST service setup described in [Lance REST service](./lance-rest-service).
+This guide shows how to use the Lance REST service from Apache Gravitino with the [Lance Spark connector](https://lance.org/integrations/spark/) (`lance-spark`) and the [Lance Ray connector](https://lance.org/integrations/ray/) (`lance-ray`). It builds on the Lance REST service setup described in [Lance REST service](./lance-rest-service).
 
 ## Compatibility matrix
 
@@ -73,12 +73,6 @@ insert into schema.sample values(1, 1.1)
 spark.sql("select * from schema.sample").show()
 ```
 
-:::note
-- Keep the Lance REST service reachable from Spark executors.
-- Replace the JAR path with the actual location on your machine or cluster.
-- Add your own JVM debugging flags only when needed.
-:::
-
 The storage location in the example above is local path, if you want to use cloud storage, please refer to the following MinIO example:
 
 ```python
@@ -129,3 +123,8 @@ print(f"Filtered count: {result}")
 - Ensure the target Lance catalog (`lance_catalog`) and schema (`schema`) already exist in Gravitino.
 - The table path is represented as `["catalog", "schema", "table"]` when using Lance Ray helpers.
 :::
+
+
+## Other engines
+
+Lance REST can also be used with other engines that support Lance format, such as DuckDB and Pandas. Please refer to the respective [integration documentation](https://lance.org/integrations/datafusion/) for details on how to connect to Lance REST from those engines.
