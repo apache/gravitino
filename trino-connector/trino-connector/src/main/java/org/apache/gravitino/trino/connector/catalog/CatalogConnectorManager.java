@@ -130,15 +130,13 @@ public class CatalogConnectorManager {
    * @throws Exception if the catalog connector manager fails to start
    */
   public void start(ConnectorContext context) throws Exception {
-    catalogRegister.init(context, config);
-    if (catalogRegister.isCoordinator()) {
-      executorService.scheduleWithFixedDelay(
-          this::loadMetalake,
-          metadataUpdateIntervalSecond,
-          metadataUpdateIntervalSecond,
-          TimeUnit.SECONDS);
-    }
-
+    catalogRegister.init(config);
+    executorService.scheduleWithFixedDelay(
+        this::loadMetalake,
+        metadataUpdateIntervalSecond,
+        metadataUpdateIntervalSecond,
+        TimeUnit.SECONDS);
+    gravitinoClient.close();
     LOG.info("Gravitino CatalogConnectorManager started.");
   }
 
@@ -329,6 +327,10 @@ public class CatalogConnectorManager {
   /** Shuts down the catalog connector manager. */
   public void shutdown() {
     LOG.info("Gravitino CatalogConnectorManager shutdown.");
+    if (catalogRegister != null) {
+      catalogRegister.close();
+    }
+    executorService.shutdown();
     throw new NotImplementedException();
   }
 

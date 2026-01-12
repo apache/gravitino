@@ -25,16 +25,17 @@ plugins {
   `maven-publish`
 }
 
-val connectorRange = "435-439"
-val trinoVersion = "435"
+val connectorRange = "440-4xx"
+val trinoVersion = "440"
 
 java {
-  toolchain.languageVersion.set(JavaLanguageVersion.of(17))
+  toolchain.languageVersion.set(JavaLanguageVersion.of(21))
 }
 
 dependencies {
   implementation(project(":catalogs:catalog-common"))
   implementation(project(":clients:client-java-runtime", configuration = "shadow"))
+  implementation(project(":trino-connector:trino-connector-435-439"))
   implementation(libs.airlift.json)
   implementation(libs.bundles.log4j)
   implementation(libs.commons.collections4)

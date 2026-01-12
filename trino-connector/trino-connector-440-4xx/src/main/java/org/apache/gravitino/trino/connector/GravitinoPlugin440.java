@@ -19,34 +19,16 @@
 package org.apache.gravitino.trino.connector;
 
 import org.apache.gravitino.client.GravitinoAdminClient;
-import org.apache.gravitino.trino.connector.catalog.CatalogConnectorContext;
-import org.apache.gravitino.trino.connector.system.GravitinoSystemConnector;
-import org.apache.gravitino.trino.connector.system.storedprocedure.GravitinoStoredProcedureFactory;
 
-public class GravitinoConnectorFactory435 extends GravitinoConnectorFactory {
+/** Trino plugin endpoint, using java spi mechanism */
+public class GravitinoPlugin440 extends GravitinoPlugin435 {
 
-  public GravitinoConnectorFactory435(GravitinoAdminClient client) {
+  public GravitinoPlugin440(GravitinoAdminClient client) {
     super(client);
   }
 
   @Override
-  protected int getMinSupportTrinoSpiVersion() {
-    return 435;
-  }
-
-  @Override
-  protected int getMaxSupportTrinoSpiVersion() {
-    return 439;
-  }
-
-  @Override
-  protected GravitinoConnector createConnector(CatalogConnectorContext connectorContext) {
-    return new GravitinoConnector435(connectorContext);
-  }
-
-  @Override
-  public GravitinoSystemConnector createSystemConnector(
-      GravitinoStoredProcedureFactory gravitinoStoredProcedureFactory) {
-    return new GravitinoSystemConnector435(gravitinoStoredProcedureFactory);
+  protected GravitinoConnectorFactory createConnectorFactory(GravitinoAdminClient client) {
+    return new GravitinoConnectorFactory440(client);
   }
 }

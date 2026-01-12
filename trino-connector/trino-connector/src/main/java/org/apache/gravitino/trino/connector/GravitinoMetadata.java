@@ -254,6 +254,7 @@ public class GravitinoMetadata implements ConnectorMetadata {
   }
 
   @Override
+  @Deprecated
   public Optional<ConnectorOutputMetadata> finishInsert(
       ConnectorSession session,
       ConnectorInsertTableHandle insertHandle,

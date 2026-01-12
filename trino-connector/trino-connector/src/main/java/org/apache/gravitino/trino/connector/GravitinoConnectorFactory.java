@@ -45,6 +45,8 @@ import org.slf4j.LoggerFactory;
 public class GravitinoConnectorFactory implements ConnectorFactory {
 
   private static final Logger LOG = LoggerFactory.getLogger(GravitinoConnectorFactory.class);
+  private static final int MIN_SUPPORT_TRINO_SPI_VERSION = 435;
+  private static final int MAX_SUPPORT_TRINO_SPI_VERSION = 440;
   /** The default connector name. */
   public static final String DEFAULT_CONNECTOR_NAME = "gravitino";
 
@@ -92,6 +94,7 @@ public class GravitinoConnectorFactory implements ConnectorFactory {
 
     synchronized (this) {
       if (catalogConnectorManager == null) {
+        checkTrinoSpiVersion(trinoConnectorContext, config);
         try {
           CatalogRegister catalogRegister = new CatalogRegister();
 
@@ -99,7 +102,10 @@ public class GravitinoConnectorFactory implements ConnectorFactory {
           catalogConnectorManager =
               new CatalogConnectorManager(catalogRegister, catalogConnectorFactory);
           catalogConnectorManager.config(config, client);
-          catalogConnectorManager.start(trinoConnectorContext);
+
+          if (isCoordinator(trinoConnectorContext)) {
+            catalogConnectorManager.start(trinoConnectorContext);
+          }
 
           gravitinoSystemTableFactory = new GravitinoSystemTableFactory(catalogConnectorManager);
         } catch (Exception e) {
@@ -140,6 +146,39 @@ public class GravitinoConnectorFactory implements ConnectorFactory {
   protected GravitinoSystemConnector createSystemConnector(
       GravitinoStoredProcedureFactory storedProcedureFactory) {
     return new GravitinoSystemConnector(storedProcedureFactory);
+  }
+
+  private void checkTrinoSpiVersion(ConnectorContext context, GravitinoConfig config) {
+    String trinoVersion = context.getSpiVersion();
+
+    int version = Integer.parseInt(trinoVersion);
+    if (version < getMinSupportTrinoSpiVersion() || version > getMaxSupportTrinoSpiVersion()) {
+      Boolean skipTrinoVersionValidation = config.isSkipTrinoVersionValidation();
+      if (!skipTrinoVersionValidation) {
+        String errmsg =
+            String.format(
+                "Unsupported Trino-%s version. The Supported version for the Gravitino-Trino-connector from Trino-%d to Trino-%d."
+                    + "Maybe you can set gravitino.trino.skip-version-validation to skip version validation.",
+                trinoVersion, getMinSupportTrinoSpiVersion(), getMaxSupportTrinoSpiVersion());
+        throw new TrinoException(GravitinoErrorCode.GRAVITINO_UNSUPPORTED_TRINO_VERSION, errmsg);
+      } else {
+        LOG.warn(
+            "The version %s has not undergone thorough testing with Gravitino, there may be compatiablity problem.",
+            trinoVersion);
+      }
+    }
+  }
+
+  protected int getMinSupportTrinoSpiVersion() {
+    return MIN_SUPPORT_TRINO_SPI_VERSION;
+  }
+
+  protected int getMaxSupportTrinoSpiVersion() {
+    return MAX_SUPPORT_TRINO_SPI_VERSION;
+  }
+
+  protected boolean isCoordinator(ConnectorContext connectorContext) {
+    return connectorContext.getNodeManager().getCurrentNode().isCoordinator();
   }
 
   private CatalogConnectorFactory createCatalogConnectorFactory(GravitinoConfig config) {
