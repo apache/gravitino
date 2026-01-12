@@ -21,9 +21,9 @@ This guide shows how to use the Lance REST service from Apache Gravitino with th
 | 1.1.1                          | 0.0.10 – 0.0.15                | 0.0.6 – 0.0.8                |
 
 These version ranges represent combinations that are expected to be compatible. Only a subset of versions within each range may have been explicitly tested, so you should verify a specific connector version in your own environment.
-:::note
-The compatibility information in this section applies to Gravitino 1.1.1. For newer Gravitino versions, refer to that release's documentation and ensure that your `lance-spark` and `lance-ray` versions are compatible with the Lance REST service bundled with your Gravitino distribution.
-:::
+
+Why does we need to maintain compatibility matrix? As Lance and Lance connectors are actively developed, some APIs and features may change over time. Gravitino's Lance REST service relies on specific versions of these connectors to ensure seamless integration and functionality. Using incompatible versions may lead to unexpected behavior or errors.
+
 
 ## Prerequisites
 

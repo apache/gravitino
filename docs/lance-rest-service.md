@@ -399,6 +399,6 @@ ns.create_table(create_table_request, body)
 </TabItem>
 </Tabs>
 
-## Integration with Spark and Ray
+## Integration with Lance REST
 
-Please refer to [lance-rest-spark-ray-integration](./lance-rest-spark-ray-integration.md) for detailed instructions on using Lance REST service with Apache Spark and Ray.
+About using Lance REST service with Apache Spark, Ray and other engine, please refer to [lance-rest-integration](./lance-rest-integration.md) for more details.
