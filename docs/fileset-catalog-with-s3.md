@@ -28,14 +28,14 @@ Once the server is up and running, you can proceed to configure the Fileset cata
 
 In addition to the basic configurations mentioned in [Fileset-catalog-catalog-configuration](./fileset-catalog.md#catalog-properties), the following properties are necessary to configure a Fileset catalog with S3:
 
-| Configuration item             | Description                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    | Default value   | Required | Since version    |
-|--------------------------------|----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|-----------------|----------|------------------|
-| `filesystem-providers`         | The file system providers to add. Set it to `s3` if it's a S3 fileset, or a comma separated string that contains `s3` like `gs,s3` to support multiple kinds of fileset including `s3`.                                                                                                                                                                                                                                                                                                                        | (none)          | Yes      | 0.7.0-incubating |
-| `default-filesystem-provider`  | The name default filesystem providers of this Fileset catalog if users do not specify the scheme in the URI. Default value is `builtin-local`, for S3, if we set this value, we can omit the prefix 's3a://' in the location.                                                                                                                                                                                                                                                                                  | `builtin-local` | No       | 0.7.0-incubating |
-| `s3-endpoint`                  | The endpoint of the AWS S3.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    | (none)          | Yes      | 0.7.0-incubating |
-| `s3-access-key-id`             | The access key of the AWS S3.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  | (none)          | Yes      | 0.7.0-incubating |
-| `s3-secret-access-key`         | The secret key of the AWS S3.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  | (none)          | Yes      | 0.7.0-incubating |
-| `credential-providers`         | The credential provider types, separated by comma, possible value can be `s3-token`, `s3-secret-key`. As the default authentication type is using AKSK as the above, this configuration can enable credential vending provided by Gravitino server and client will no longer need to provide authentication information like AKSK to access S3 by GVFS. Once it's set, more configuration items are needed to make it works, please see [s3-credential-vending](security/credential-vending.md#s3-credentials) | (none)          | No       | 0.8.0-incubating |
+| Configuration item            | Description                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    | Default value   | Required | Since version    |
+|-------------------------------|----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|-----------------|----------|------------------|
+| `filesystem-providers`        | (deprected) The file system providers to add. Set it to `s3` if it's a S3 fileset, or a comma separated string that contains `s3` like `gs,s3` to support multiple kinds of fileset including `s3`.                                                                                                                                                                                                                                                                                                            | (none)          | Yes      | 0.7.0-incubating |
+| `default-filesystem-provider` | (deprected) The name default filesystem providers of this Fileset catalog if users do not specify the scheme in the URI. Default value is `builtin-local`, for S3, if we set this value, we can omit the prefix 's3a://' in the location.                                                                                                                                                                                                                                                                      | `builtin-local` | No       | 0.7.0-incubating |
+| `s3-endpoint`                 | The endpoint of the AWS S3.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    | (none)          | Yes      | 0.7.0-incubating |
+| `s3-access-key-id`            | The access key of the AWS S3.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  | (none)          | Yes      | 0.7.0-incubating |
+| `s3-secret-access-key`        | The secret key of the AWS S3.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  | (none)          | Yes      | 0.7.0-incubating |
+| `credential-providers`        | The credential provider types, separated by comma, possible value can be `s3-token`, `s3-secret-key`. As the default authentication type is using AKSK as the above, this configuration can enable credential vending provided by Gravitino server and client will no longer need to provide authentication information like AKSK to access S3 by GVFS. Once it's set, more configuration items are needed to make it works, please see [s3-credential-vending](security/credential-vending.md#s3-credentials) | (none)          | No       | 0.8.0-incubating |
 
 ### Configurations for a schema
 
@@ -66,8 +66,7 @@ curl -X POST -H "Accept: application/vnd.gravitino.v1+json" \
     "location": "s3a://bucket/root",
     "s3-access-key-id": "access_key",
     "s3-secret-access-key": "secret_key",
-    "s3-endpoint": "http://s3.ap-northeast-1.amazonaws.com",
-    "filesystem-providers": "s3"
+    "s3-endpoint": "http://s3.ap-northeast-1.amazonaws.com"
   }
 }' http://localhost:8090/api/metalakes/metalake/catalogs
 ```
@@ -86,7 +85,6 @@ Map<String, String> s3Properties = ImmutableMap.<String, String>builder()
     .put("s3-access-key-id", "access_key")
     .put("s3-secret-access-key", "secret_key")
     .put("s3-endpoint", "http://s3.ap-northeast-1.amazonaws.com")
-    .put("filesystem-providers", "s3")
     .build();
 
 Catalog s3Catalog = gravitinoClient.createCatalog("test_catalog",
@@ -106,8 +104,7 @@ s3_properties = {
     "location": "s3a://bucket/root",
     "s3-access-key-id": "access_key"
     "s3-secret-access-key": "secret_key",
-    "s3-endpoint": "http://s3.ap-northeast-1.amazonaws.com",
-    "filesystem-providers": "s3"
+    "s3-endpoint": "http://s3.ap-northeast-1.amazonaws.com"
 }
 
 s3_catalog = gravitino_client.create_catalog(name="test_catalog",
@@ -517,7 +514,6 @@ curl -X POST -H "Accept: application/vnd.gravitino.v1+json" \
     "s3-access-key-id": "access_key",
     "s3-secret-access-key": "secret_key",
     "s3-endpoint": "http://s3.ap-northeast-1.amazonaws.com",
-    "filesystem-providers": "s3",
     "credential-providers": "s3-token",
     "s3-region":"ap-northeast-1",
     "s3-role-arn":"The ARN of the role to access the S3 data"

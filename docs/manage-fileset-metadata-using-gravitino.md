@@ -473,7 +473,6 @@ curl -X POST -H "Accept: application/vnd.gravitino.v1+json" \
   "type": "FILESET",
   "comment": "comment",
   "properties": {
-    "filesystem-providers": "builtin-local,builtin-hdfs,s3,gcs",
     "location-l1": "file:///{{catalog}}/{{schema}}/workspace_{{project}}/{{user}}",
     "location-l2": "hdfs:///{{catalog}}/{{schema}}/workspace_{{project}}/{{user}}"
   }
@@ -539,7 +538,6 @@ Catalog catalog = gravitinoClient.createCatalog(
     Type.FILESET,
     "comment",
     ImmutableMap.of(
-        "filesystem-providers", "builtin-local,builtin-hdfs,s3,gcs",
         "location-l1", "file:///{{catalog}}/{{schema}}/workspace_{{project}}/{{user}}",
         "location-l2", "hdfs:///{{catalog}}/{{schema}}/workspace_{{project}}/{{user}}"));
 FilesetCatalog filesetCatalog = catalog.asFilesetCatalog();
@@ -595,7 +593,6 @@ catalog: Catalog = gravitino_client.create_catalog(
    provider=None,
    comment="comment",
    properties={
-      "filesystem-providers": "builtin-local,builtin-hdfs,s3,gcs",
       "location-l1": "file:///{{catalog}}/{{schema}}/workspace_{{project}}/{{user}}",
       "location-l2": "hdfs:///{{catalog}}/{{schema}}/workspace_{{project}}/{{user}}",
     }
