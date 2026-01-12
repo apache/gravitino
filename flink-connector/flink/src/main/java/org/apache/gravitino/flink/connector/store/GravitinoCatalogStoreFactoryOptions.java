@@ -48,6 +48,7 @@ public class GravitinoCatalogStoreFactoryOptions {
           .withDescription("The config of Gravitino client");
 
   public static final String AUTH_TYPE = "gravitino.client.auth.type";
+  public static final String OAUTH2 = "oauth2";
 
   // OAuth2 config keys
   public static final String OAUTH2_SERVER_URI = "gravitino.client.oauth2.serverUri";

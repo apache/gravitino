@@ -144,4 +144,48 @@ public class TestIcebergTableOperationExecutor {
     String actualOwner = requestCaptor.getValue().properties().get(IcebergConstants.OWNER);
     Assertions.assertEquals(clientProvidedOwner, actualOwner);
   }
+
+  @Test
+  public void testCreateTablePreservesStageCreateTrue() {
+    when(mockContext.userName()).thenReturn("user@example.com");
+    LoadTableResponse mockResponse = mock(LoadTableResponse.class);
+    when(mockCatalogWrapper.createTable(any(), any(), anyBoolean())).thenReturn(mockResponse);
+
+    CreateTableRequest stagedRequest =
+        CreateTableRequest.builder()
+            .withName("test_table")
+            .withSchema(TABLE_SCHEMA)
+            .stageCreate()
+            .build();
+
+    executor.createTable(mockContext, Namespace.of("test_namespace"), stagedRequest);
+
+    ArgumentCaptor<CreateTableRequest> requestCaptor =
+        ArgumentCaptor.forClass(CreateTableRequest.class);
+    verify(mockCatalogWrapper).createTable(any(), requestCaptor.capture(), anyBoolean());
+
+    Assertions.assertTrue(
+        requestCaptor.getValue().stageCreate(),
+        "stageCreate=true must be preserved when rebuilding request");
+  }
+
+  @Test
+  public void testCreateTablePreservesStageCreateFalse() {
+    when(mockContext.userName()).thenReturn("user@example.com");
+    LoadTableResponse mockResponse = mock(LoadTableResponse.class);
+    when(mockCatalogWrapper.createTable(any(), any(), anyBoolean())).thenReturn(mockResponse);
+
+    CreateTableRequest normalRequest =
+        CreateTableRequest.builder().withName("test_table").withSchema(TABLE_SCHEMA).build();
+
+    executor.createTable(mockContext, Namespace.of("test_namespace"), normalRequest);
+
+    ArgumentCaptor<CreateTableRequest> requestCaptor =
+        ArgumentCaptor.forClass(CreateTableRequest.class);
+    verify(mockCatalogWrapper).createTable(any(), requestCaptor.capture(), anyBoolean());
+
+    Assertions.assertFalse(
+        requestCaptor.getValue().stageCreate(),
+        "stageCreate=false must remain false when rebuilding request");
+  }
 }

@@ -95,7 +95,7 @@ public class TestSchemaAuthorizationExpression {
   public void testListSchema() throws NoSuchFieldException, IllegalAccessException, OgnlException {
     Field loadTableAuthorizationExpressionField =
         AuthorizationExpressionConstants.class.getDeclaredField(
-            "loadSchemaAuthorizationExpression");
+            "LOAD_SCHEMA_AUTHORIZATION_EXPRESSION");
     loadTableAuthorizationExpressionField.setAccessible(true);
     String loadTableAuthExpression = (String) loadTableAuthorizationExpressionField.get(null);
     MockAuthorizationExpressionEvaluator mockEvaluator =

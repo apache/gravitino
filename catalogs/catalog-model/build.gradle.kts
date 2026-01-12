@@ -45,6 +45,7 @@ dependencies {
   testImplementation(project(":integration-test-common", "testArtifacts"))
   testImplementation(project(":server"))
   testImplementation(project(":server-common"))
+  testImplementation(libs.awaitility)
   testImplementation(libs.bundles.log4j)
   testImplementation(libs.commons.io)
   testImplementation(libs.commons.lang3)

@@ -53,6 +53,7 @@ dependencies {
   testImplementation(project(":server"))
   testImplementation(project(":server-common"))
 
+  testImplementation(libs.awaitility)
   testImplementation(libs.junit.jupiter.api)
   testImplementation(libs.junit.jupiter.params)
   testImplementation(libs.lance) // Included in the test runtime classpath for test only

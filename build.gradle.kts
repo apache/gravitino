@@ -154,6 +154,11 @@ allprojects {
           "import\\s+.*\\.(Logger|LoggerFactory);",
           "import org.slf4j.${'$'}1;"
         )
+        replaceRegex(
+          "Remove Testcontainers shading",
+          "import\\s+org\\.testcontainers\\.shaded\\.([^;]+);",
+          "import $1;"
+        )
 
         targetExclude("**/build/**", "**/.pnpm/***")
       }
@@ -995,6 +1000,7 @@ tasks {
         !it.name.startsWith("flink") &&
         !it.name.startsWith("iceberg") &&
         !it.name.startsWith("lance") &&
+        !it.name.startsWith("optimizer") &&
         !it.name.startsWith("spark") &&
         !it.name.startsWith("hive-metastore") &&
         it.name != "hadoop-common" &&
@@ -1042,6 +1048,7 @@ tasks {
         !it.name.startsWith("trino-connector") &&
         it.name != "hive-metastore2-libs" &&
         it.name != "hive-metastore3-libs" &&
+        !it.name.startsWith("optimizer") &&
         it.name != "hive-metastore-common" &&
         it.name != "docs" &&
         it.name != "hadoop-common" &&

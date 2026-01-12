@@ -93,6 +93,7 @@ dependencies {
     exclude("com.fasterxml.jackson")
   }
 
+  testImplementation(libs.awaitility)
   testImplementation(libs.hive2.common) {
     exclude("com.sun.jersey")
     exclude("org.apache.curator")

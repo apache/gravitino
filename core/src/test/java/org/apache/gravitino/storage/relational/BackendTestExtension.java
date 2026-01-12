@@ -19,6 +19,7 @@
 
 package org.apache.gravitino.storage.relational;
 
+import static org.apache.gravitino.Configs.CACHE_ENABLED;
 import static org.apache.gravitino.Configs.DEFAULT_ENTITY_RELATIONAL_STORE;
 import static org.apache.gravitino.Configs.DEFAULT_RELATIONAL_JDBC_BACKEND_MAX_CONNECTIONS;
 import static org.apache.gravitino.Configs.DEFAULT_RELATIONAL_JDBC_BACKEND_MAX_WAIT_MILLISECONDS;
@@ -40,8 +41,10 @@ import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.Stream;
 import org.apache.commons.io.FileUtils;
+import org.apache.commons.lang3.reflect.FieldUtils;
 import org.apache.gravitino.Config;
 import org.apache.gravitino.Configs;
+import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.integration.test.util.BaseIT;
 import org.apache.gravitino.storage.relational.service.EntityIdService;
 import org.junit.jupiter.api.extension.AfterAllCallback;
@@ -171,6 +174,10 @@ public class BackendTestExtension
           .thenReturn(DEFAULT_RELATIONAL_JDBC_BACKEND_MAX_CONNECTIONS);
       Mockito.when(config.get(ENTITY_RELATIONAL_JDBC_BACKEND_WAIT_MILLISECONDS))
           .thenReturn(DEFAULT_RELATIONAL_JDBC_BACKEND_MAX_WAIT_MILLISECONDS);
+
+      Mockito.when(config.get(CACHE_ENABLED)).thenReturn(true);
+
+      FieldUtils.writeField(GravitinoEnv.getInstance(), "config", config, true);
 
       RelationalBackend backend = new JDBCBackend();
       if ("mysql".equals(type)) {

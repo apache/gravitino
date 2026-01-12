@@ -19,7 +19,6 @@
 package org.apache.gravitino;
 
 import com.google.common.base.Preconditions;
-import java.lang.reflect.Proxy;
 import org.apache.gravitino.audit.AuditLogManager;
 import org.apache.gravitino.authorization.AccessControlDispatcher;
 import org.apache.gravitino.authorization.AccessControlManager;
@@ -41,7 +40,6 @@ import org.apache.gravitino.catalog.FunctionOperationDispatcher;
 import org.apache.gravitino.catalog.ModelDispatcher;
 import org.apache.gravitino.catalog.ModelNormalizeDispatcher;
 import org.apache.gravitino.catalog.ModelOperationDispatcher;
-import org.apache.gravitino.catalog.OperationDispatcherInterceptor;
 import org.apache.gravitino.catalog.PartitionDispatcher;
 import org.apache.gravitino.catalog.PartitionNormalizeDispatcher;
 import org.apache.gravitino.catalog.PartitionOperationDispatcher;
@@ -444,6 +442,10 @@ public class GravitinoEnv {
     return statisticDispatcher;
   }
 
+  public boolean cacheEnabled() {
+    return config.get(Configs.CACHE_ENABLED);
+  }
+
   public void start() {
     metricsSystem.start();
     eventListenerManager.start();
@@ -555,28 +557,14 @@ public class GravitinoEnv {
 
     SchemaOperationDispatcher schemaOperationDispatcher =
         new SchemaOperationDispatcher(catalogManager, entityStore, idGenerator);
-    SchemaDispatcher schemaDispatcherProxy =
-        (SchemaDispatcher)
-            Proxy.newProxyInstance(
-                SchemaDispatcher.class.getClassLoader(),
-                new Class[] {SchemaDispatcher.class},
-                new OperationDispatcherInterceptor(
-                    schemaOperationDispatcher, catalogManager, entityStore));
-    SchemaHookDispatcher schemaHookDispatcher = new SchemaHookDispatcher(schemaDispatcherProxy);
+    SchemaHookDispatcher schemaHookDispatcher = new SchemaHookDispatcher(schemaOperationDispatcher);
     SchemaNormalizeDispatcher schemaNormalizeDispatcher =
         new SchemaNormalizeDispatcher(schemaHookDispatcher, catalogManager);
     this.schemaDispatcher = new SchemaEventDispatcher(eventBus, schemaNormalizeDispatcher);
 
     TableOperationDispatcher tableOperationDispatcher =
         new TableOperationDispatcher(catalogManager, entityStore, idGenerator);
-    TableDispatcher tableDispatcherProxy =
-        (TableDispatcher)
-            Proxy.newProxyInstance(
-                TableDispatcher.class.getClassLoader(),
-                new Class[] {TableDispatcher.class},
-                new OperationDispatcherInterceptor(
-                    tableOperationDispatcher, catalogManager, entityStore));
-    TableHookDispatcher tableHookDispatcher = new TableHookDispatcher(tableDispatcherProxy);
+    TableHookDispatcher tableHookDispatcher = new TableHookDispatcher(tableOperationDispatcher);
     TableNormalizeDispatcher tableNormalizeDispatcher =
         new TableNormalizeDispatcher(tableHookDispatcher, catalogManager);
     this.tableDispatcher = new TableEventDispatcher(eventBus, tableNormalizeDispatcher);
@@ -585,55 +573,28 @@ public class GravitinoEnv {
     //  partition doesn't have ownership, so we don't need it now.
     PartitionOperationDispatcher partitionOperationDispatcher =
         new PartitionOperationDispatcher(catalogManager, entityStore, idGenerator);
-    PartitionDispatcher partitionDispatcherProxy =
-        (PartitionDispatcher)
-            Proxy.newProxyInstance(
-                PartitionDispatcher.class.getClassLoader(),
-                new Class[] {PartitionDispatcher.class},
-                new OperationDispatcherInterceptor(
-                    partitionOperationDispatcher, catalogManager, entityStore));
     PartitionNormalizeDispatcher partitionNormalizeDispatcher =
-        new PartitionNormalizeDispatcher(partitionDispatcherProxy, catalogManager);
+        new PartitionNormalizeDispatcher(partitionOperationDispatcher, catalogManager);
     this.partitionDispatcher = new PartitionEventDispatcher(eventBus, partitionNormalizeDispatcher);
 
     FilesetOperationDispatcher filesetOperationDispatcher =
         new FilesetOperationDispatcher(catalogManager, entityStore, idGenerator);
-    FilesetDispatcher filesetDispatcherProxy =
-        (FilesetDispatcher)
-            Proxy.newProxyInstance(
-                FilesetDispatcher.class.getClassLoader(),
-                new Class[] {FilesetDispatcher.class},
-                new OperationDispatcherInterceptor(
-                    filesetOperationDispatcher, catalogManager, entityStore));
-    FilesetHookDispatcher filesetHookDispatcher = new FilesetHookDispatcher(filesetDispatcherProxy);
+    FilesetHookDispatcher filesetHookDispatcher =
+        new FilesetHookDispatcher(filesetOperationDispatcher);
     FilesetNormalizeDispatcher filesetNormalizeDispatcher =
         new FilesetNormalizeDispatcher(filesetHookDispatcher, catalogManager);
     this.filesetDispatcher = new FilesetEventDispatcher(eventBus, filesetNormalizeDispatcher);
 
     TopicOperationDispatcher topicOperationDispatcher =
         new TopicOperationDispatcher(catalogManager, entityStore, idGenerator);
-    TopicDispatcher topicDispatcherProxy =
-        (TopicDispatcher)
-            Proxy.newProxyInstance(
-                TopicDispatcher.class.getClassLoader(),
-                new Class[] {TopicDispatcher.class},
-                new OperationDispatcherInterceptor(
-                    topicOperationDispatcher, catalogManager, entityStore));
-    TopicHookDispatcher topicHookDispatcher = new TopicHookDispatcher(topicDispatcherProxy);
+    TopicHookDispatcher topicHookDispatcher = new TopicHookDispatcher(topicOperationDispatcher);
     TopicNormalizeDispatcher topicNormalizeDispatcher =
         new TopicNormalizeDispatcher(topicHookDispatcher, catalogManager);
     this.topicDispatcher = new TopicEventDispatcher(eventBus, topicNormalizeDispatcher);
 
     ModelOperationDispatcher modelOperationDispatcher =
         new ModelOperationDispatcher(catalogManager, entityStore, idGenerator);
-    ModelDispatcher modelDispatcherProxy =
-        (ModelDispatcher)
-            Proxy.newProxyInstance(
-                ModelDispatcher.class.getClassLoader(),
-                new Class[] {ModelDispatcher.class},
-                new OperationDispatcherInterceptor(
-                    modelOperationDispatcher, catalogManager, entityStore));
-    ModelHookDispatcher modelHookDispatcher = new ModelHookDispatcher(modelDispatcherProxy);
+    ModelHookDispatcher modelHookDispatcher = new ModelHookDispatcher(modelOperationDispatcher);
     ModelNormalizeDispatcher modelNormalizeDispatcher =
         new ModelNormalizeDispatcher(modelHookDispatcher, catalogManager);
     this.modelDispatcher = new ModelEventDispatcher(eventBus, modelNormalizeDispatcher);
