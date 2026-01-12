@@ -340,10 +340,16 @@ public class GravitinoLanceNameSpaceOperations implements LanceNamespaceOperatio
         }
         return new DropNamespaceResponse(); // SKIP mode
       }
-    } catch (NonEmptyCatalogException | CatalogInUseException e) {
+    } catch (NonEmptyCatalogException e) {
       throw LanceNamespaceException.badRequest(
-          String.format("Catalog %s is not empty or in used", catalogName),
+          String.format("Catalog %s is not empty", catalogName),
           NonEmptyCatalogException.class.getSimpleName(),
+          catalogName,
+          CommonUtil.formatCurrentStackTrace());
+    } catch (CatalogInUseException e) {
+      throw LanceNamespaceException.badRequest(
+          String.format("Catalog %s is in use", catalogName),
+          CatalogInUseException.class.getSimpleName(),
           catalogName,
           CommonUtil.formatCurrentStackTrace());
     }
