@@ -1,6 +1,6 @@
 ---
 title: "Lance REST integration with Spark and Ray"
-slug: /lance-rest-spark-ray-integration
+slug: /lance-rest-integration
 keywords:
   - lance
   - lance-rest
@@ -64,7 +64,6 @@ spark.sql("create database schema")
 spark.sql("""
 create table schema.sample(id int, score float)
 USING lance
-LOCATION '/tmp/schema/sample.lance/'
 TBLPROPERTIES ('format' = 'lance')
 """)
 spark.sql("""
