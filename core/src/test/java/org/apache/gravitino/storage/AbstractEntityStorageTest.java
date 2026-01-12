@@ -53,6 +53,7 @@ import java.util.UUID;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.reflect.FieldUtils;
+import org.apache.commons.lang3.tuple.Pair;
 import org.apache.gravitino.Catalog;
 import org.apache.gravitino.Config;
 import org.apache.gravitino.Configs;
@@ -61,6 +62,7 @@ import org.apache.gravitino.Entity.EntityType;
 import org.apache.gravitino.EntityAlreadyExistsException;
 import org.apache.gravitino.EntityStore;
 import org.apache.gravitino.EntityStoreFactory;
+import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.authorization.AuthorizationUtils;
@@ -101,7 +103,6 @@ import org.junit.jupiter.api.Assertions;
 import org.mockito.Mockito;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.testcontainers.shaded.org.apache.commons.lang3.tuple.Pair;
 
 abstract class AbstractEntityStorageTest {
   protected static final Logger LOG = LoggerFactory.getLogger(AbstractEntityStorageTest.class);
@@ -111,8 +112,15 @@ abstract class AbstractEntityStorageTest {
   protected static final String DB_DIR = JDBC_STORE_PATH + "/testdb";
   protected static final String H2_FILE = DB_DIR + ".mv.db";
 
-  protected static Object[] storageProvider() {
-    return new Object[] {"h2", "mysql", "postgresql"};
+  static Object[][] storageProvider() {
+    return new Object[][] {
+      {"h2", true},
+      {"h2", false},
+      {"mysql", true},
+      {"mysql", false},
+      {"postgresql", true},
+      {"postgresql", false}
+    };
   }
 
   @AfterEach
@@ -122,7 +130,7 @@ abstract class AbstractEntityStorageTest {
     ContainerSuite.getInstance().close();
   }
 
-  protected void init(String type, Config config) {
+  protected void init(String type, Config config) throws IllegalAccessException {
     Preconditions.checkArgument(StringUtils.isNotBlank(type));
     File dir = new File(DB_DIR);
     if (dir.exists() || !dir.isDirectory()) {
@@ -144,6 +152,8 @@ abstract class AbstractEntityStorageTest {
     Mockito.when(config.get(Configs.CACHE_STATS_ENABLED)).thenReturn(false);
     Mockito.when(config.get(Configs.CACHE_IMPLEMENTATION)).thenReturn("caffeine");
     Mockito.when(config.get(Configs.CACHE_LOCK_SEGMENTS)).thenReturn(16);
+
+    FieldUtils.writeField(GravitinoEnv.getInstance(), "config", config, true);
 
     BaseIT baseIT = new BaseIT();
 

@@ -27,6 +27,7 @@ import java.util.Collections;
 import java.util.List;
 import java.util.stream.Collectors;
 import org.apache.gravitino.Config;
+import org.apache.gravitino.Configs;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.EntityStore;
 import org.apache.gravitino.EntityStoreFactory;
@@ -70,8 +71,9 @@ public class TestEntityStorageRelationCache extends AbstractEntityStorageTest {
 
   @ParameterizedTest
   @MethodSource("storageProvider")
-  void testInvalidRelationCache(String type) throws Exception {
+  void testInvalidRelationCache(String type, boolean enableCache) throws Exception {
     Config config = Mockito.mock(Config.class);
+    Mockito.when(config.get(Configs.CACHE_ENABLED)).thenReturn(enableCache);
     init(type, config);
 
     AuditInfo auditInfo =
@@ -306,8 +308,9 @@ public class TestEntityStorageRelationCache extends AbstractEntityStorageTest {
 
   @ParameterizedTest
   @MethodSource("storageProvider")
-  void testTagRelationCache(String type) throws Exception {
+  void testTagRelationCache(String type, boolean enableCache) throws Exception {
     Config config = Mockito.mock(Config.class);
+    Mockito.when(config.get(Configs.CACHE_ENABLED)).thenReturn(enableCache);
     init(type, config);
 
     AuditInfo auditInfo =
@@ -539,8 +542,9 @@ public class TestEntityStorageRelationCache extends AbstractEntityStorageTest {
 
   @ParameterizedTest
   @MethodSource("storageProvider")
-  void testTagRelationMultipleBindings(String type) throws Exception {
+  void testTagRelationMultipleBindings(String type, boolean enableCache) throws Exception {
     Config config = Mockito.mock(Config.class);
+    Mockito.when(config.get(Configs.CACHE_ENABLED)).thenReturn(enableCache);
     init(type, config);
 
     AuditInfo auditInfo =
@@ -655,8 +659,9 @@ public class TestEntityStorageRelationCache extends AbstractEntityStorageTest {
 
   @ParameterizedTest
   @MethodSource("storageProvider")
-  void testPolicyRelationMultipleBindings(String type) throws Exception {
+  void testPolicyRelationMultipleBindings(String type, boolean enableCache) throws Exception {
     Config config = Mockito.mock(Config.class);
+    Mockito.when(config.get(Configs.CACHE_ENABLED)).thenReturn(enableCache);
     init(type, config);
 
     AuditInfo auditInfo =

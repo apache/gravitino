@@ -25,6 +25,7 @@ import java.io.IOException;
 import java.time.Instant;
 import org.apache.gravitino.Catalog;
 import org.apache.gravitino.Config;
+import org.apache.gravitino.Configs;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.EntityStore;
 import org.apache.gravitino.EntityStoreFactory;
@@ -47,8 +48,10 @@ public class TestEntityStorageForLance extends AbstractEntityStorageTest {
 
   @ParameterizedTest
   @MethodSource("storageProvider")
-  void testLanceTableCreateAndUpdate(String type) {
+  void testLanceTableCreateAndUpdate(String type, boolean enableCache)
+      throws IllegalAccessException {
     Config config = Mockito.mock(Config.class);
+    Mockito.when(config.get(Configs.CACHE_ENABLED)).thenReturn(enableCache);
     init(type, config);
 
     AuditInfo auditInfo =
