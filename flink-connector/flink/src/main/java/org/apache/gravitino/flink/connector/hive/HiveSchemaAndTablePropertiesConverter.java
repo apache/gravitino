@@ -24,6 +24,7 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.stream.Collectors;
 import javax.annotation.Nullable;
+import org.apache.flink.table.catalog.CatalogPropertiesUtil;
 import org.apache.flink.table.catalog.ObjectPath;
 import org.apache.flink.table.catalog.hive.util.Constants;
 import org.apache.gravitino.catalog.hive.HiveConstants;
@@ -108,6 +109,18 @@ public class HiveSchemaAndTablePropertiesConverter implements SchemaAndTableProp
     if (formatRaw != null) {
       properties.put(HiveConstants.FORMAT, formatRaw);
     }
+
+    String connector = properties.get(FlinkGenericTableUtil.CONNECTOR);
+
+    // remove connector from properties to keep compatibility with Flink's behavior
+    if (connector != null) {
+      Preconditions.checkArgument(
+          "hive".equalsIgnoreCase(connector),
+          "The connector type must be hive, but get %s",
+          FlinkGenericTableUtil.CONNECTOR);
+      properties.remove(FlinkGenericTableUtil.CONNECTOR);
+    }
+    properties.put(CatalogPropertiesUtil.IS_GENERIC, "false");
     return properties;
   }
 
