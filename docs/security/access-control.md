@@ -914,6 +914,51 @@ Role role = client.revokePrivilegesFromRole("role1", table, Lists.newArrayList(P
 </TabItem>
 </Tabs>
 
+### Override privileges in a role
+
+You can override all privileges in a role with a new set of securable objects and their privileges. This operation completely replaces the role's entire privilege configuration - any securable objects not included in the request will be removed from the role.
+
+The request path for REST API is `/api/metalakes/{metalake}/permissions/roles/{role}/`.
+
+```shell
+curl -X PUT -H "Accept: application/vnd.gravitino.v1+json" \
+-H "Content-Type: application/json" -d '{
+    "overrides": [
+      {
+        "fullName": "catalog1.schema1.table1",
+        "type": "TABLE",
+        "privileges": [
+          {
+            "name": "SELECT_TABLE",
+            "condition": "ALLOW"
+          }
+        ]
+      },
+      {
+        "fullName": "catalog1.schema1.table2",
+        "type": "TABLE",
+        "privileges": [
+          {
+            "name": "MODIFY_TABLE",
+            "condition": "ALLOW"
+          }
+        ]
+      }
+    ]
+}' http://localhost:8090/api/metalakes/test/permissions/roles/role1/
+```
+
+:::warning
+This operation completely replaces **all privileges** in the role. The role will contain only the securable objects and privileges specified in the request. Any securable objects that existed in the role but are not included in the request will be removed from the role.
+
+**Example scenario:**
+- Before: `role1` has privileges on `table1`, `table2`, and `table3`
+- Request: Override with privileges for `table1` and `table4` only
+- After: `role1` has privileges only on `table1` and `table4` (table2 and table3 are removed, table4 is added)
+
+Use this operation when you want to set the exact privilege configuration for a role, replacing its entire state.
+:::
+
 ### Grant roles to a user
 
 You can grant specific roles to a user.
@@ -1174,8 +1219,9 @@ The following table lists the required privileges for each API.
 | list roles                        | `MANAGE_GRANTS` on the metalake or the owner of the metalake can see all the roles. Others can see his granted roles or owned roles.                                                                                                          |
 | grant role                        | `MANAGE_GRANTS` on the metalake                                                                                                                                                                                                               |
 | revoke role                       | `MANAGE_GRANTS` on the metalake                                                                                                                                                                                                               |
-| grant privilege                   | `MANAGE_GRANTS` on the metalake or the owner of the securable object                                                                                                                                                                          |
-| revoke privilege                  | `MANAGE_GRANTS` on the metalake or the owner of the securable object                                                                                                                                                                          |
+| grant privilege                   | `MANAGE_GRANTS` on the metalake or the owner of the securable object or the metalake                                                                                                                                                          |
+| revoke privilege                  | `MANAGE_GRANTS` on the metalake or the owner of the securable object or the metalake                                                                                                                                                          |
+| override privilege                | `MANAGE_GRANTS` on the metalake or the owner of the metalake                                                                                                                                                                                  |
 | set owner                         | The owner of the securable object                                                                                                                                                                                                             |
 | list tags                         | The owner of the metalake can see all the tags, others can see the tags which they can load.                                                                                                                                                  |
 | create tag                        | `CREATE_TAG` on the metalake or the owner of the metalake.                                                                                                                                                                                    |
