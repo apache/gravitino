@@ -124,4 +124,5 @@ public enum TestDatabaseName {
       return this.name().toLowerCase();
     }
   },
+  FLINK_HIVE_CATALOG_IT,
 }

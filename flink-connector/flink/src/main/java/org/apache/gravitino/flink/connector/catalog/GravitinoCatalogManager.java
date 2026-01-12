@@ -277,6 +277,7 @@ public class GravitinoCatalogManager {
     return GravitinoAdminClient.builder(gravitinoUri)
         .withOAuth(provider)
         .withClientConfig(config)
+        .withVersionCheckDisabled()
         .build();
   }
 
@@ -290,6 +291,7 @@ public class GravitinoCatalogManager {
                     GravitinoAdminClient.builder(gravitinoUri)
                         .withKerberosAuth(KerberosTokenProvider.builder().build())
                         .withClientConfig(config)
+                        .withVersionCheckDisabled()
                         .build());
   }
 
@@ -299,6 +301,7 @@ public class GravitinoCatalogManager {
     return GravitinoAdminClient.builder(gravitinoUri)
         .withSimpleAuth(userName)
         .withClientConfig(config)
+        .withVersionCheckDisabled()
         .build();
   }
 
