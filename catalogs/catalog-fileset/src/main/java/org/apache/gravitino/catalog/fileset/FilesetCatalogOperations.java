@@ -18,6 +18,7 @@
  */
 package org.apache.gravitino.catalog.fileset;
 
+import static org.apache.gravitino.catalog.hadoop.fs.HDFSFileSystemProvider.SCHEME_HDFS;
 import static org.apache.gravitino.file.Fileset.LOCATION_NAME_UNKNOWN;
 import static org.apache.gravitino.file.Fileset.PROPERTY_CATALOG_PLACEHOLDER;
 import static org.apache.gravitino.file.Fileset.PROPERTY_DEFAULT_LOCATION_NAME;
@@ -1378,7 +1379,15 @@ public class FilesetCatalogOperations extends ManagedSchemaOperations
 
     Future<FileSystem> fileSystemFuture =
         fileSystemExecutor.submit(
-            () -> provider.getFileSystem(path, config, PrincipalUtils::getCurrentUserName));
+            () -> {
+              if (scheme.equals(SCHEME_HDFS)) {
+                return new ImpersonationHDFSFileSystemProxy(
+                        path, config, PrincipalUtils::getCurrentUserName)
+                    .getProxy();
+              } else {
+                return provider.getFileSystem(path, config);
+              }
+            });
 
     try {
       return fileSystemFuture.get(timeoutSeconds, TimeUnit.SECONDS);

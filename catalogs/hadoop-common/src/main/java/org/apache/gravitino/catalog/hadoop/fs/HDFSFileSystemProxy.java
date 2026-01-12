@@ -20,7 +20,9 @@ package org.apache.gravitino.catalog.hadoop.fs;
 
 import static org.apache.gravitino.catalog.hadoop.fs.Constants.AUTH_KERBEROS;
 import static org.apache.gravitino.catalog.hadoop.fs.Constants.FS_DISABLE_CACHE;
+import static org.apache.gravitino.catalog.hadoop.fs.FileSystemProvider.GRAVITINO_BYPASS;
 import static org.apache.gravitino.catalog.hadoop.fs.HDFSFileSystemProvider.IPC_FALLBACK_TO_SIMPLE_AUTH_ALLOWED;
+import static org.apache.gravitino.catalog.hadoop.fs.HDFSFileSystemProvider.additionalHDFSConfig;
 import static org.apache.hadoop.fs.CommonConfigurationKeysPublic.HADOOP_SECURITY_AUTHENTICATION;
 
 import java.io.File;
@@ -59,15 +61,17 @@ public class HDFSFileSystemProxy implements MethodInterceptor {
    * simple and Kerberos authentication.
    *
    * @param path the HDFS path
-   * @param conf the Hadoop configuration
    * @param config the configuration map of Gravitino
    */
-  public HDFSFileSystemProxy(Path path, Configuration conf, Map<String, String> config) {
-    initFileSystem(path, conf, config);
+  public HDFSFileSystemProxy(Path path, Map<String, String> config) {
+    initFileSystem(path, config);
   }
 
-  protected void initFileSystem(Path path, Configuration conf, Map<String, String> config) {
+  protected void initFileSystem(Path path, Map<String, String> config) {
     try {
+      Map<String, String> hadoopConfMap = additionalHDFSConfig(config);
+      Configuration conf = FileSystemUtils.createConfiguration(GRAVITINO_BYPASS, hadoopConfMap);
+
       conf.setBoolean(FS_DISABLE_CACHE, true);
       conf.setBoolean(IPC_FALLBACK_TO_SIMPLE_AUTH_ALLOWED, true);
       this.configuration = conf;

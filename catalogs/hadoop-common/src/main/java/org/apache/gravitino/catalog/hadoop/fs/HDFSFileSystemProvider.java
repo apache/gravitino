@@ -42,20 +42,12 @@ public class HDFSFileSystemProvider implements FileSystemProvider {
   public static final String SCHEME_HDFS = "hdfs";
 
   @Override
-  public FileSystem getFileSystem(
-      @Nonnull Path path, @Nonnull Map<String, String> config, ProxyUserHandler handler)
+  public FileSystem getFileSystem(@Nonnull Path path, @Nonnull Map<String, String> config)
       throws IOException {
     Map<String, String> hadoopConfMap = additionalHDFSConfig(config);
     Configuration configuration =
         FileSystemUtils.createConfiguration(GRAVITINO_BYPASS, hadoopConfMap);
-
-    HDFSFileSystemProxy proxy;
-    if (handler != null) {
-      proxy = new ImpersonationHDFSFileSystemProxy(path, configuration, config, handler);
-    } else {
-      proxy = new HDFSFileSystemProxy(path, configuration, config);
-    }
-    return proxy.getProxy();
+    return FileSystem.newInstance(path.toUri(), configuration);
   }
 
   @Override
@@ -89,7 +81,7 @@ public class HDFSFileSystemProvider implements FileSystemProvider {
    * @param configs Original configurations.
    * @return Configurations with additional HDFS specific configurations.
    */
-  private Map<String, String> additionalHDFSConfig(Map<String, String> configs) {
+  public static Map<String, String> additionalHDFSConfig(Map<String, String> configs) {
     Map<String, String> additionalConfigs = Maps.newHashMap(configs);
 
     // Avoid multiple retries to speed up failure in test cases.
