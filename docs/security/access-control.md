@@ -455,6 +455,73 @@ gravitino.authorization.enable = true
 gravitino.authorization.serviceAdmins = admin1,admin2
 ```
 
+## Migration Guide
+
+If you have metalakes that were created before authorization was enabled, you need to perform a migration to ensure proper access control.
+
+### Migrating Existing Metalakes
+
+When you created metalakes with `gravitino.authorization.enable = false`, those metalakes don't have owners assigned. To enable authorization for these existing metalakes:
+
+**Step 1: Configure PassThrough Authorization**
+
+Temporarily set the authorization implementation to pass-through mode:
+
+```properties
+gravitino.authorization.enable = true
+gravitino.authorization.serviceAdmins = admin1,admin2
+gravitino.authorization.impl = org.apache.gravitino.server.authorization.PassThroughAuthorizer
+```
+
+**Step 2: Set Metalake Owners**
+
+Set the owner for each existing metalake using the Gravitino API:
+
+<Tabs groupId='language' queryString>
+<TabItem value="shell" label="Shell">
+
+```shell
+curl -X PUT -H "Accept: application/vnd.gravitino.v1+json" \
+-H "Content-Type: application/json" -d '{
+  "owner": "admin1",
+  "ownerType": "USER"
+}' http://localhost:8090/api/metalakes/{metalake}/owners
+```
+
+</TabItem>
+<TabItem value="java" label="Java">
+
+```java
+GravitinoClient client = GravitinoClient.builder("http://localhost:8090")
+    .build();
+
+MetadataObject metalake = MetadataObjects.of(null, "metalake_name", MetadataObject.Type.METALAKE);
+client.setOwner(metalake, "admin1", Owner.Type.USER);
+```
+
+</TabItem>
+</Tabs>
+
+**Step 3: Enable Full Authorization**
+
+After setting owners for all metalakes, remove the `gravitino.authorization.impl` configuration to enable full authorization:
+
+```properties
+gravitino.authorization.enable = true
+gravitino.authorization.serviceAdmins = admin1,admin2
+# Remove: gravitino.authorization.impl = org.apache.gravitino.server.authorization.PassThroughAuthorizer
+```
+
+**Step 4: Restart Gravitino**
+
+Restart the Gravitino server for the configuration changes to take effect.
+
+:::caution
+**Important Migration Notes:**
+- Set owners for **all** existing metalakes before removing the `gravitino.authorization.impl` configuration
+- Without assigned owners, operations on these metalakes will fail after full authorization is enabled
+:::
+
 ## Operations
 
 The following sections demonstrate how to perform common access control operations using both the REST API (Shell) and Java client.
@@ -1252,3 +1319,4 @@ The following table lists the required privileges for each API.
 | get a job                         | The owner of the metalake or the job.                                                                                                                                                                                                         |
 | cancel a job                      | The owner of the metalake or the job.                                                                                                                                                                                                         |
 | get credential                    | If you can load the metadata object, you can get its credential.                                                                                                                                                                              | 
+
