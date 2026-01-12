@@ -115,4 +115,5 @@ public enum TestDatabaseName {
     }
   },
   PG_ICEBERG_AUTHZ_IT,
+  FLINK_HIVE_CATALOG_IT,
 }
