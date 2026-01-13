@@ -18,27 +18,22 @@
  */
 package org.apache.gravitino.trino.connector;
 
-import org.apache.gravitino.client.GravitinoAdminClient;
+import io.trino.spi.connector.ConnectorMetadata;
 import org.apache.gravitino.trino.connector.catalog.CatalogConnectorContext;
+import org.apache.gravitino.trino.connector.catalog.CatalogConnectorMetadata;
+import org.apache.gravitino.trino.connector.catalog.CatalogConnectorMetadataAdapter;
 
-public class GravitinoConnectorFactory435 extends GravitinoConnectorFactory {
+public class GravitinoConnector440 extends GravitinoConnector {
 
-  public GravitinoConnectorFactory435(GravitinoAdminClient client) {
-    super(client);
+  public GravitinoConnector440(CatalogConnectorContext connectorContext) {
+    super(connectorContext);
   }
 
   @Override
-  protected int getMinSupportTrinoSpiVersion() {
-    return 435;
-  }
-
-  @Override
-  protected int getMaxSupportTrinoSpiVersion() {
-    return 439;
-  }
-
-  @Override
-  protected GravitinoConnector createConnector(CatalogConnectorContext connectorContext) {
-    return new GravitinoConnector435(connectorContext);
+  protected GravitinoMetadata createGravitinoMetadata(
+      CatalogConnectorMetadata catalogConnectorMetadata,
+      CatalogConnectorMetadataAdapter metadataAdapter,
+      ConnectorMetadata internalMetadata) {
+    return new GravitinoMetadata440(catalogConnectorMetadata, metadataAdapter, internalMetadata);
   }
 }

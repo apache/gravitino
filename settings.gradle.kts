@@ -67,7 +67,7 @@ include(
   "trino-connector:trino-connector",
   "trino-connector:integration-test",
   "trino-connector:trino-connector-435-439",
-  "trino-connector:trino-connector-440-4xx"
+  "trino-connector:trino-connector-440-445"
   // "trino-connector:trino-connector-470-478"
 )
 include("spark-connector:spark-common")

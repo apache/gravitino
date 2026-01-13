@@ -39,7 +39,7 @@ public class TestGravitinoConnector440 {
     @Override
     protected DistributedQueryRunner createTrinoQueryRunner() throws Exception {
       Session session = testSessionBuilder().setCatalog("gravitino").build();
-      return DistributedQueryRunner.builder(session).setWorkerCount(1).build();
+      return DistributedQueryRunner.builder(session).setNodeCount(1).build();
     }
   }
 
@@ -53,7 +53,7 @@ public class TestGravitinoConnector440 {
     @Override
     protected DistributedQueryRunner createTrinoQueryRunner() throws Exception {
       Session session = testSessionBuilder().setCatalog("gravitino").build();
-      return DistributedQueryRunner.builder(session).setWorkerCount(1).build();
+      return DistributedQueryRunner.builder(session).setNodeCount(1).build();
     }
   }
 }

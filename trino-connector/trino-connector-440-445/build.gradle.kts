@@ -25,8 +25,9 @@ plugins {
   `maven-publish`
 }
 
-val connectorRange = "440-4xx"
-val trinoVersion = "450"
+val trinoVersionProvider =
+  providers.gradleProperty("trinoVersion").map { it.toInt() }.orElse(440)
+val trinoVersion = trinoVersionProvider.get()
 
 java {
   toolchain.languageVersion.set(JavaLanguageVersion.of(24))
@@ -35,7 +36,6 @@ java {
 dependencies {
   implementation(project(":catalogs:catalog-common"))
   implementation(project(":clients:client-java-runtime", configuration = "shadow"))
-  implementation(project(":trino-connector:trino-connector-435-439"))
   implementation(libs.airlift.json)
   implementation(libs.bundles.log4j)
   implementation(libs.commons.collections4)

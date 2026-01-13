@@ -25,8 +25,9 @@ plugins {
   `maven-publish`
 }
 
-val connectorRange = "435-439"
-val trinoVersion = "435"
+val trinoVersionProvider =
+  providers.gradleProperty("trinoVersion").map { it.toInt() }.orElse(435)
+val trinoVersion = trinoVersionProvider.get()
 
 java {
   toolchain.languageVersion.set(JavaLanguageVersion.of(24))

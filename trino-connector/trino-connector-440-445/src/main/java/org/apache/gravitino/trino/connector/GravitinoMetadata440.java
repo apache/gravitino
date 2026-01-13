@@ -22,15 +22,18 @@ import io.airlift.slice.Slice;
 import io.trino.spi.connector.ConnectorInsertTableHandle;
 import io.trino.spi.connector.ConnectorOutputMetadata;
 import io.trino.spi.connector.ConnectorSession;
+import io.trino.spi.connector.ConnectorTableHandle;
 import io.trino.spi.statistics.ComputedStatistics;
 import java.util.Collection;
+import java.util.List;
 import java.util.Optional;
+import java.util.stream.Collectors;
 import org.apache.gravitino.trino.connector.catalog.CatalogConnectorMetadata;
 import org.apache.gravitino.trino.connector.catalog.CatalogConnectorMetadataAdapter;
 
-public class GravitinoMetadata435 extends GravitinoMetadata {
+public class GravitinoMetadata440 extends GravitinoMetadata {
 
-  public GravitinoMetadata435(
+  public GravitinoMetadata440(
       CatalogConnectorMetadata catalogConnectorMetadata,
       CatalogConnectorMetadataAdapter metadataAdapter,
       io.trino.spi.connector.ConnectorMetadata internalMetadata) {
@@ -41,9 +44,14 @@ public class GravitinoMetadata435 extends GravitinoMetadata {
   public Optional<ConnectorOutputMetadata> finishInsert(
       ConnectorSession session,
       ConnectorInsertTableHandle insertHandle,
+      List<ConnectorTableHandle> sourceTableHandles,
       Collection<Slice> fragments,
       Collection<ComputedStatistics> computedStatistics) {
     return internalMetadata.finishInsert(
-        session, GravitinoHandle.unWrap(insertHandle), fragments, computedStatistics);
+        session,
+        GravitinoHandle.unWrap(insertHandle),
+        sourceTableHandles.stream().map(GravitinoHandle::unWrap).collect(Collectors.toList()),
+        fragments,
+        computedStatistics);
   }
 }

@@ -33,7 +33,6 @@ import io.trino.spi.connector.ColumnMetadata;
 import io.trino.spi.connector.ConnectorInsertTableHandle;
 import io.trino.spi.connector.ConnectorMergeTableHandle;
 import io.trino.spi.connector.ConnectorMetadata;
-import io.trino.spi.connector.ConnectorOutputMetadata;
 import io.trino.spi.connector.ConnectorPartitioningHandle;
 import io.trino.spi.connector.ConnectorSession;
 import io.trino.spi.connector.ConnectorTableHandle;
@@ -91,7 +90,7 @@ public class GravitinoMetadata implements ConnectorMetadata {
   // Transform different metadata format
   private final CatalogConnectorMetadataAdapter metadataAdapter;
 
-  private final ConnectorMetadata internalMetadata;
+  protected final ConnectorMetadata internalMetadata;
 
   /**
    * Constructs a new GravitinoMetadata instance.
@@ -251,49 +250,6 @@ public class GravitinoMetadata implements ConnectorMetadata {
             GravitinoHandle.unWrap(columns),
             retryMode);
     return new GravitinoInsertTableHandle(insertTableHandle);
-  }
-
-  @Override
-  @Deprecated
-  public Optional<ConnectorOutputMetadata> finishInsert(
-      ConnectorSession session,
-      ConnectorInsertTableHandle insertHandle,
-      Collection<Slice> fragments,
-      Collection<ComputedStatistics> computedStatistics) {
-    return finishInsert(session, insertHandle, List.of(), fragments, computedStatistics);
-  }
-
-  public Optional<ConnectorOutputMetadata> finishInsert(
-      ConnectorSession session,
-      ConnectorInsertTableHandle insertHandle,
-      List<ConnectorTableHandle> sourceTableHandles,
-      Collection<Slice> fragments,
-      Collection<ComputedStatistics> computedStatistics) {
-    try {
-      return (Optional<ConnectorOutputMetadata>)
-          internalMetadata
-              .getClass()
-              .getMethod(
-                  "finishInsert",
-                  ConnectorSession.class,
-                  ConnectorInsertTableHandle.class,
-                  List.class,
-                  Collection.class,
-                  Collection.class)
-              .invoke(
-                  internalMetadata,
-                  session,
-                  GravitinoHandle.unWrap(insertHandle),
-                  GravitinoHandle.unWrap(sourceTableHandles),
-                  fragments,
-                  computedStatistics);
-    } catch (NoSuchMethodException e) {
-      return internalMetadata.finishInsert(
-          session, GravitinoHandle.unWrap(insertHandle), fragments, computedStatistics);
-    } catch (Exception e) {
-      throw new TrinoException(
-          GravitinoErrorCode.GRAVITINO_RUNTIME_ERROR, "Finish insert failed: " + e.getMessage(), e);
-    }
   }
 
   @Override

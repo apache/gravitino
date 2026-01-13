@@ -16,4 +16,4 @@
 # specific language governing permissions and limitations
 # under the License.
 #
-org.apache.gravitino.trino.connector.GravitinoPlugin440
+org.apache.gravitino.trino.connector.GravitinoPlugin435
