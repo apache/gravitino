@@ -1890,8 +1890,7 @@ public class TestFilesetCatalogOperations {
     try (FilesetCatalogOperations filesetCatalogOperations = new FilesetCatalogOperations()) {
       LocalFileSystemProvider localFileSystemProvider = Mockito.mock(LocalFileSystemProvider.class);
       when(localFileSystemProvider.scheme()).thenReturn("file");
-      when(localFileSystemProvider.getFileSystem(
-              Mockito.any(Path.class), Mockito.anyMap(), Mockito.any()))
+      when(localFileSystemProvider.getFileSystem(Mockito.any(Path.class), Mockito.anyMap()))
           .thenAnswer(
               invocation -> {
                 // Block 100s, however, the timeout is set to 6s by default in
