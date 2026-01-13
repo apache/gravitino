@@ -82,6 +82,12 @@ tasks.withType<JavaCompile>().configureEach {
   options.release.set(17)
 }
 
+tasks.withType<Test>().configureEach {
+  extensions
+    .findByType(org.gradle.testing.jacoco.plugins.JacocoTaskExtension::class.java)
+    ?.isEnabled = false
+}
+
 tasks {
   val copyRuntimeLibs by registering(Copy::class) {
     dependsOn("jar")

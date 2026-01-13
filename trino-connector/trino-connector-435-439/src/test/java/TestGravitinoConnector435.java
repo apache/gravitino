@@ -25,18 +25,35 @@ import org.apache.gravitino.client.GravitinoAdminClient;
 import org.apache.gravitino.trino.connector.GravitinoPlugin;
 import org.apache.gravitino.trino.connector.GravitinoPlugin435;
 import org.apache.gravitino.trino.connector.TestGravitinoConnector;
+import org.apache.gravitino.trino.connector.TestGravitinoConnectorWithMetalakeCatalogName;
+import org.junit.jupiter.api.Nested;
 
-public class TestGravitinoConnector435 extends TestGravitinoConnector {
-  @Override
-  protected GravitinoPlugin createGravitinoPulgin(GravitinoAdminClient client) {
-    return new GravitinoPlugin435(client);
+public class TestGravitinoConnector435 {
+  @Nested
+  class SingleMetalake extends TestGravitinoConnector {
+    @Override
+    protected GravitinoPlugin createGravitinoPulgin(GravitinoAdminClient client) {
+      return new GravitinoPlugin435(client);
+    }
+
+    @Override
+    protected DistributedQueryRunner createTrinoQueryRunner() throws Exception {
+      Session session = testSessionBuilder().setCatalog("gravitino").build();
+      return DistributedQueryRunner.builder(session).setNodeCount(1).build();
+    }
   }
 
-  @Override
-  protected DistributedQueryRunner createTrinoQueryRunner() throws Exception {
-    Session session = testSessionBuilder().setCatalog("gravitino").build();
-    DistributedQueryRunner queryRunner =
-        DistributedQueryRunner.builder(session).setNodeCount(1).build();
-    return queryRunner;
+  @Nested
+  class MultiMetalake extends TestGravitinoConnectorWithMetalakeCatalogName {
+    @Override
+    protected GravitinoPlugin createGravitinoPulgin(GravitinoAdminClient client) {
+      return new GravitinoPlugin435(client);
+    }
+
+    @Override
+    protected DistributedQueryRunner createTrinoQueryRunner() throws Exception {
+      Session session = testSessionBuilder().setCatalog("gravitino").build();
+      return DistributedQueryRunner.builder(session).setNodeCount(1).build();
+    }
   }
 }

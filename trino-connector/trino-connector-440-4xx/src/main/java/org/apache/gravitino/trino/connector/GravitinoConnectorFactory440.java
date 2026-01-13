@@ -20,7 +20,7 @@ package org.apache.gravitino.trino.connector;
 
 import org.apache.gravitino.client.GravitinoAdminClient;
 
-public class GravitinoConnectorFactory440 extends GravitinoConnectorFactory {
+public class GravitinoConnectorFactory440 extends GravitinoConnectorFactory435 {
 
   public GravitinoConnectorFactory440(GravitinoAdminClient client) {
     super(client);

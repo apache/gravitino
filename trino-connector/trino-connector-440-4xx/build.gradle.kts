@@ -87,24 +87,6 @@ tasks.withType<Test>().configureEach {
   extensions
     .findByType(org.gradle.testing.jacoco.plugins.JacocoTaskExtension::class.java)
     ?.isEnabled = false
-  doFirst {
-    val args = jvmArgs?.toMutableList() ?: mutableListOf()
-    val cleaned = mutableListOf<String>()
-    var i = 0
-    while (i < args.size) {
-      val current = args[i]
-      if (current == "--add-opens" &&
-        i + 1 < args.size &&
-        args[i + 1] == "java.base/sun.security.action=ALL-UNNAMED"
-      ) {
-        i += 2
-        continue
-      }
-      cleaned.add(current)
-      i += 1
-    }
-    jvmArgs = cleaned
-  }
 }
 
 tasks {
