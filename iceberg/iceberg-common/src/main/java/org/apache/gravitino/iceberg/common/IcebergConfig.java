@@ -286,7 +286,7 @@ public class IcebergConfig extends Config implements OverwriteDefaultConfig {
   public static final ConfigEntry<String> SCAN_PLAN_CACHE_IMPL =
       new ConfigBuilder(IcebergConstants.SCAN_PLAN_CACHE_IMPL)
           .doc("The implementation of the scan plan cache")
-          .version(ConfigConstants.VERSION_1_1_0)
+          .version(ConfigConstants.VERSION_1_2_0)
           .stringConf()
           .create();
 
