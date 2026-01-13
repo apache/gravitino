@@ -26,10 +26,10 @@ plugins {
 }
 
 val connectorRange = "440-4xx"
-val trinoVersion = "440"
+val trinoVersion = "450"
 
 java {
-  toolchain.languageVersion.set(JavaLanguageVersion.of(21))
+  toolchain.languageVersion.set(JavaLanguageVersion.of(24))
 }
 
 dependencies {
@@ -80,6 +80,13 @@ plugins.withId("com.diffplug.spotless") {
 tasks.withType<JavaCompile>().configureEach {
   // Error Prone is incompatible with the JDK 24 toolchain required by this Trino range.
   options.errorprone.isEnabled.set(false)
+  options.release.set(17)
+}
+
+tasks.withType<Test>().configureEach {
+  useJUnitPlatform {
+    includeTags("trino-440")
+  }
 }
 
 tasks {

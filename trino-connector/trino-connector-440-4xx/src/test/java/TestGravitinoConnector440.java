@@ -17,14 +17,28 @@
  * under the License.
  */
 
+import static io.trino.testing.TestingSession.testSessionBuilder;
+
+import io.trino.Session;
+import io.trino.testing.DistributedQueryRunner;
 import org.apache.gravitino.client.GravitinoAdminClient;
 import org.apache.gravitino.trino.connector.GravitinoPlugin;
 import org.apache.gravitino.trino.connector.GravitinoPlugin440;
 import org.apache.gravitino.trino.connector.TestGravitinoConnector;
+import org.junit.jupiter.api.Tag;
 
+@Tag("trino-440")
 public class TestGravitinoConnector440 extends TestGravitinoConnector {
   @Override
   protected GravitinoPlugin createGravitinoPulgin(GravitinoAdminClient client) {
     return new GravitinoPlugin440(client);
+  }
+
+  @Override
+  protected DistributedQueryRunner createTrinoQueryRunner() throws Exception {
+    Session session = testSessionBuilder().setCatalog("gravitino").build();
+    DistributedQueryRunner queryRunner =
+        DistributedQueryRunner.builder(session).setWorkerCount(1).build();
+    return queryRunner;
   }
 }

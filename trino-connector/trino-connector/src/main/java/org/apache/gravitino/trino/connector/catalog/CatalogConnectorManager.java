@@ -19,6 +19,7 @@
 package org.apache.gravitino.trino.connector.catalog;
 
 import com.google.common.base.Preconditions;
+import com.google.common.base.Strings;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import io.trino.spi.TrinoException;
 import io.trino.spi.connector.ConnectorContext;
@@ -378,6 +379,13 @@ public class CatalogConnectorManager {
       String catalogConfig = config.getCatalogConfig();
 
       GravitinoCatalog catalog = GravitinoCatalog.fromJson(catalogConfig);
+      if (this.config.singleMetalakeMode()
+          && !Strings.isNullOrEmpty(targetMetalake)
+          && !targetMetalake.equals(catalog.getMetalake())) {
+        throw new TrinoException(
+            GravitinoErrorCode.GRAVITINO_UNSUPPORTED_OPERATION,
+            "Multiple metalakes are not supported");
+      }
       CatalogConnectorContext.Builder builder =
           catalogConnectorFactory.createCatalogConnectorContextBuilder(catalog);
       builder

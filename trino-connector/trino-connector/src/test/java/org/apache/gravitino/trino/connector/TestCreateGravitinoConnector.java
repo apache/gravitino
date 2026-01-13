@@ -18,87 +18,53 @@
  */
 package org.apache.gravitino.trino.connector;
 
-import static io.trino.testing.TestingSession.testSessionBuilder;
-import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.mockito.Mockito.mock;
 
-import io.trino.Session;
-import io.trino.testing.DistributedQueryRunner;
-import io.trino.testing.QueryRunner;
-import java.util.HashMap;
+import com.google.common.collect.ImmutableMap;
 import org.apache.gravitino.client.GravitinoAdminClient;
-import org.junit.jupiter.api.Disabled;
+import org.apache.gravitino.trino.connector.catalog.CatalogConnectorFactory;
+import org.apache.gravitino.trino.connector.catalog.CatalogConnectorManager;
+import org.apache.gravitino.trino.connector.catalog.CatalogRegister;
 import org.junit.jupiter.api.Test;
 
-@Disabled
 public class TestCreateGravitinoConnector {
 
-  GravitinoMockServer server;
-
   @Test
-  public void testCreateConnectorsWithEnableSimpleCatalog() throws Exception {
-    server = new GravitinoMockServer();
-    Session session = testSessionBuilder().setCatalog("gravitino").build();
-    QueryRunner queryRunner = DistributedQueryRunner.builder(session).setNodeCount(1).build();
+  public void testSingleMetalakeCatalogNaming() throws Exception {
+    CatalogConnectorManager manager =
+        createManager(
+            ImmutableMap.of(
+                "gravitino.uri",
+                "http://127.0.0.1:8090",
+                "gravitino.metalake",
+                "test",
+                "gravitino.use-single-metalake",
+                "true"));
 
-    GravitinoAdminClient gravitinoClient = server.createGravitinoClient();
-    GravitinoPlugin gravitinoPlugin = new GravitinoPlugin(gravitinoClient);
-    queryRunner.installPlugin(gravitinoPlugin);
-
-    // test create two connector and set gravitino.simplify-catalog-names = true
-    {
-      // create a gravitino connector named gravitino using metalake test
-      HashMap<String, String> properties = new HashMap<>();
-      properties.put("gravitino.metalake", "test");
-      properties.put("gravitino.uri", "http://127.0.0.1:8090");
-      properties.put("gravitino.simplify-catalog-names", "true");
-      queryRunner.createCatalog("test0", "gravitino", properties);
-    }
-
-    {
-      // Test failed to create catalog with different metalake
-      HashMap<String, String> properties = new HashMap<>();
-      properties.put("gravitino.metalake", "test1");
-      properties.put("gravitino.uri", "http://127.0.0.1:8090");
-      properties.put("gravitino.simplify-catalog-names", "true");
-      try {
-        queryRunner.createCatalog("test1", "gravitino", properties);
-      } catch (Exception e) {
-        assertThat(e.getMessage()).contains("Multiple metalakes are not supported");
-      }
-    }
-
-    server.close();
+    assertEquals("memory", manager.getTrinoCatalogName("test", "memory"));
   }
 
   @Test
-  public void testCreateConnectorsWithDisableSimpleCatalog() throws Exception {
-    server = new GravitinoMockServer();
-    Session session = testSessionBuilder().setCatalog("gravitino").build();
-    QueryRunner queryRunner = DistributedQueryRunner.builder(session).setNodeCount(1).build();
+  public void testMultiMetalakeCatalogNaming() throws Exception {
+    CatalogConnectorManager manager =
+        createManager(
+            ImmutableMap.of(
+                "gravitino.uri",
+                "http://127.0.0.1:8090",
+                "gravitino.metalake",
+                "test",
+                "gravitino.use-single-metalake",
+                "false"));
 
-    GravitinoAdminClient gravitinoClient = server.createGravitinoClient();
-    GravitinoPlugin gravitinoPlugin = new GravitinoPlugin(gravitinoClient);
-    queryRunner.installPlugin(gravitinoPlugin);
+    assertEquals("\"test.memory\"", manager.getTrinoCatalogName("test", "memory"));
+  }
 
-    // test create two connector and set gravitino.simplify-catalog-names = false
-    {
-      // create a gravitino connector named gravitino using metalake test
-      HashMap<String, String> properties = new HashMap<>();
-      properties.put("gravitino.metalake", "test");
-      properties.put("gravitino.uri", "http://127.0.0.1:8090");
-      properties.put("gravitino.simplify-catalog-names", "false");
-      queryRunner.createCatalog("test0", "gravitino", properties);
-    }
-
-    {
-      // Test failed to create catalog with different metalake
-      HashMap<String, String> properties = new HashMap<>();
-      properties.put("gravitino.metalake", "test1");
-      properties.put("gravitino.uri", "http://127.0.0.1:8090");
-      properties.put("gravitino.simplify-catalog-names", "false");
-      queryRunner.createCatalog("test1", "gravitino", properties);
-    }
-
-    server.close();
+  private CatalogConnectorManager createManager(ImmutableMap<String, String> configMap) {
+    CatalogRegister catalogRegister = mock(CatalogRegister.class);
+    CatalogConnectorFactory catalogFactory = mock(CatalogConnectorFactory.class);
+    CatalogConnectorManager manager = new CatalogConnectorManager(catalogRegister, catalogFactory);
+    manager.config(new GravitinoConfig(configMap), mock(GravitinoAdminClient.class));
+    return manager;
   }
 }

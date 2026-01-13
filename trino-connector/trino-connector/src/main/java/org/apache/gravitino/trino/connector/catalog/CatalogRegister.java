@@ -23,7 +23,6 @@ import static org.apache.gravitino.trino.connector.GravitinoConfig.GRAVITINO_DYN
 
 import io.trino.jdbc.TrinoDriver;
 import io.trino.spi.TrinoException;
-import io.trino.spi.connector.ConnectorContext;
 import java.io.File;
 import java.nio.file.Files;
 import java.nio.file.Path;

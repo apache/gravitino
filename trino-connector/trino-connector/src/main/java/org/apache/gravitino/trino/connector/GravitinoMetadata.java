@@ -628,6 +628,7 @@ public class GravitinoMetadata implements ConnectorMetadata {
         tableName.getSchemaName(), tableName.getTableName(), connectorMergeTableHandle);
   }
 
+  @SuppressWarnings("deprecation")
   @Override
   public void finishMerge(
       ConnectorSession session,
