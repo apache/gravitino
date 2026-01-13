@@ -561,6 +561,37 @@ INSERT INTO dml.test VALUES (1), (2);
 SELECT * FROM dml.test;
 ```
 
+## Apache Flink Integration
+
+You can use Apache Flink to connect to the Gravitino Iceberg REST catalog service. Below is an example of how to create a catalog and access tables using Flink SQL:
+
+```
+CREATE CATALOG my_catalog WITH (
+  'type' = 'iceberg',
+  'catalog-type' = 'rest',
+  'uri' = 'http://localhost:9001/iceberg/',
+  'header.X-Iceberg-Access-Delegation' = 'vended-credentials',
+  'rest.auth.type' = 'basic',
+  'rest.auth.basic.username' = 'manager',
+  'rest.auth.basic.password' = 'mock'
+);
+```
+
+After creating the catalog, you can use standard Flink SQL commands to explore and manage your Iceberg tables:
+
+```
+USE CATALOG my_catalog;
+SHOW DATABASES;
+USE default;
+SHOW TABLES;
+CREATE TABLE `my_catalog`.`default`.`sample`  (
+     id BIGINT COMMENT 'unique id',
+     data STRING
+);
+INSERT INTO `my_catalog`.`default`.`sample` VALUES (1, 'a');
+SELECT * FROM `my_catalog`.`default`.`sample`;
+```
+
 ## Exploring the Apache Gravitino Iceberg REST catalog service with Trino
 
 ### Deploying Trino with Apache Iceberg support
