@@ -31,7 +31,8 @@ import org.apache.gravitino.client.GravitinoAdminClient;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
-public class TestGravitinoConnectorWithMetalakeCatalogName extends AbstractGravitinoConnectorTest {
+public abstract class TestGravitinoConnectorWithMetalakeCatalogName
+    extends AbstractGravitinoConnectorTest {
 
   @Override
   protected void configureCatalogs(

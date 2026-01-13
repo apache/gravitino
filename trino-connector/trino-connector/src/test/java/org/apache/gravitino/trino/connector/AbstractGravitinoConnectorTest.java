@@ -18,9 +18,6 @@
  */
 package org.apache.gravitino.trino.connector;
 
-import static io.trino.testing.TestingSession.testSessionBuilder;
-
-import io.trino.Session;
 import io.trino.plugin.memory.MemoryPlugin;
 import io.trino.testing.AbstractTestQueryFramework;
 import io.trino.testing.DistributedQueryRunner;
@@ -37,11 +34,9 @@ abstract class AbstractGravitinoConnectorTest extends AbstractTestQueryFramework
   @Override
   protected QueryRunner createQueryRunner() throws Exception {
     GravitinoAdminClient gravitinoClient = createGravitinoClient();
-    Session session = testSessionBuilder().setCatalog("gravitino").build();
-
     try {
-      DistributedQueryRunner queryRunner =
-          DistributedQueryRunner.builder(session).setNodeCount(1).build();
+
+      DistributedQueryRunner queryRunner = createTrinoQueryRunner();
 
       GravitinoPlugin gravitinoPlugin = createGravitinoPulgin(gravitinoClient);
       queryRunner.installPlugin(gravitinoPlugin);
@@ -69,6 +64,8 @@ abstract class AbstractGravitinoConnectorTest extends AbstractTestQueryFramework
   protected GravitinoPlugin createGravitinoPulgin(GravitinoAdminClient client) {
     return new GravitinoPlugin(client);
   }
+
+  protected abstract DistributedQueryRunner createTrinoQueryRunner() throws Exception;
 
   protected GravitinoAdminClient createGravitinoClient() {
     server = closeAfterClass(new GravitinoMockServer());

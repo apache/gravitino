@@ -260,8 +260,40 @@ public class GravitinoMetadata implements ConnectorMetadata {
       ConnectorInsertTableHandle insertHandle,
       Collection<Slice> fragments,
       Collection<ComputedStatistics> computedStatistics) {
-    return internalMetadata.finishInsert(
-        session, GravitinoHandle.unWrap(insertHandle), fragments, computedStatistics);
+    return finishInsert(session, insertHandle, List.of(), fragments, computedStatistics);
+  }
+
+  public Optional<ConnectorOutputMetadata> finishInsert(
+      ConnectorSession session,
+      ConnectorInsertTableHandle insertHandle,
+      List<ConnectorTableHandle> sourceTableHandles,
+      Collection<Slice> fragments,
+      Collection<ComputedStatistics> computedStatistics) {
+    try {
+      return (Optional<ConnectorOutputMetadata>)
+          internalMetadata
+              .getClass()
+              .getMethod(
+                  "finishInsert",
+                  ConnectorSession.class,
+                  ConnectorInsertTableHandle.class,
+                  List.class,
+                  Collection.class,
+                  Collection.class)
+              .invoke(
+                  internalMetadata,
+                  session,
+                  GravitinoHandle.unWrap(insertHandle),
+                  GravitinoHandle.unWrap(sourceTableHandles),
+                  fragments,
+                  computedStatistics);
+    } catch (NoSuchMethodException e) {
+      return internalMetadata.finishInsert(
+          session, GravitinoHandle.unWrap(insertHandle), fragments, computedStatistics);
+    } catch (Exception e) {
+      throw new TrinoException(
+          GravitinoErrorCode.GRAVITINO_RUNTIME_ERROR, "Finish insert failed: " + e.getMessage(), e);
+    }
   }
 
   @Override

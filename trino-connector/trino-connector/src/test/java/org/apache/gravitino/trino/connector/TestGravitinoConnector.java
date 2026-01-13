@@ -33,7 +33,7 @@ import java.util.regex.Pattern;
 import org.apache.gravitino.client.GravitinoAdminClient;
 import org.junit.jupiter.api.Test;
 
-public class TestGravitinoConnector extends AbstractGravitinoConnectorTest {
+public abstract class TestGravitinoConnector extends AbstractGravitinoConnectorTest {
 
   @Override
   protected void configureCatalogs(

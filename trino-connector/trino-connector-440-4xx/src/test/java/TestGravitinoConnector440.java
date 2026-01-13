@@ -25,9 +25,7 @@ import org.apache.gravitino.client.GravitinoAdminClient;
 import org.apache.gravitino.trino.connector.GravitinoPlugin;
 import org.apache.gravitino.trino.connector.GravitinoPlugin440;
 import org.apache.gravitino.trino.connector.TestGravitinoConnector;
-import org.junit.jupiter.api.Tag;
 
-@Tag("trino-440")
 public class TestGravitinoConnector440 extends TestGravitinoConnector {
   @Override
   protected GravitinoPlugin createGravitinoPulgin(GravitinoAdminClient client) {
