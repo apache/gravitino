@@ -46,7 +46,6 @@ import static org.mockserver.model.HttpRequest.request;
 import static org.mockserver.model.HttpResponse.response;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
-import com.github.benmanes.caffeine.cache.Cache;
 import com.google.common.collect.ImmutableMap;
 import java.io.FileNotFoundException;
 import java.io.IOException;
@@ -63,6 +62,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
 import org.apache.gravitino.NameIdentifier;
+import org.apache.gravitino.catalog.hadoop.fs.FileSystemCache;
 import org.apache.gravitino.Version;
 import org.apache.gravitino.dto.AuditDTO;
 import org.apache.gravitino.dto.CatalogDTO;
@@ -346,7 +346,7 @@ public class TestGvfsBase extends GravitinoMockServerBase {
       FileSystemTestUtils.mkdirs(managedFilesetPath, gravitinoFileSystem);
 
       // Verify the internal cache contains a FileSystem for the local scheme
-      Cache<BaseGVFSOperations.FileSystemCacheKey, FileSystem> cache =
+      FileSystemCache cache =
           ((GravitinoVirtualFileSystem) gravitinoFileSystem)
               .getOperations()
               .internalFileSystemCache();
@@ -454,7 +454,7 @@ public class TestGvfsBase extends GravitinoMockServerBase {
       // Access first fileset
       FileSystemTestUtils.mkdirs(filesetPath1, fs);
 
-      Cache<BaseGVFSOperations.FileSystemCacheKey, FileSystem> cache =
+      FileSystemCache cache =
           ((GravitinoVirtualFileSystem) fs).getOperations().internalFileSystemCache();
 
       // Should have one cached filesystem for the local scheme
