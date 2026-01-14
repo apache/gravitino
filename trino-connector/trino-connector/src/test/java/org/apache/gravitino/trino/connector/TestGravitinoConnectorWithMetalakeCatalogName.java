@@ -73,42 +73,49 @@ public abstract class TestGravitinoConnectorWithMetalakeCatalogName
     // testing the catalogs
     assertThat(computeActual("show catalogs").getOnlyColumnAsSet()).contains("gravitino");
     assertThat(computeActual("show catalogs").getOnlyColumnAsSet()).contains("gravitino1");
-    assertThat(computeActual("show catalogs").getOnlyColumnAsSet()).contains("\"test.memory\"");
+    assertThat(computeActual("show catalogs").getOnlyColumnAsSet())
+        .contains(getTrinoCliCatalogName("test", "memory"));
 
     // testing the gravitino connector framework works.
     assertThat(computeActual("select * from system.jdbc.tables").getRowCount()).isGreaterThan(1);
 
     // test metalake named test. the connector name is gravitino
     assertUpdate("call gravitino.system.create_catalog('memory1', 'memory', Map())");
-    assertThat(computeActual("show catalogs").getOnlyColumnAsSet()).contains("\"test.memory1\"");
+    assertThat(computeActual("show catalogs").getOnlyColumnAsSet())
+        .contains(getTrinoCliCatalogName("test", "memory1"));
     assertUpdate("call gravitino.system.drop_catalog('memory1')");
     assertThat(computeActual("show catalogs").getOnlyColumnAsSet())
-        .doesNotContain("\"test.memory1\"");
+        .doesNotContain(getTrinoCliCatalogName("test", "memory1"));
 
     assertUpdate(
         "call gravitino.system.create_catalog("
             + "catalog=>'memory1', provider=>'memory', properties => Map(array['max_ttl'], array['10']), ignore_exist => true)");
-    assertThat(computeActual("show catalogs").getOnlyColumnAsSet()).contains("\"test.memory1\"");
+    assertThat(computeActual("show catalogs").getOnlyColumnAsSet())
+        .contains(getTrinoCliCatalogName("test", "memory1"));
 
     assertUpdate(
         "call gravitino.system.drop_catalog(catalog => 'memory1', ignore_not_exist => true)");
     assertThat(computeActual("show catalogs").getOnlyColumnAsSet())
-        .doesNotContain("\"test.memory1\"");
+        .doesNotContain(getTrinoCliCatalogName("test", "memory1"));
 
     // test metalake named test1. the connector name is gravitino1
     GravitinoAdminClient gravitinoClient = server.createGravitinoClient();
     gravitinoClient.createMetalake("test1", "", Collections.emptyMap());
 
     assertUpdate("call gravitino1.system.create_catalog('memory1', 'memory', Map())");
-    assertThat(computeActual("show catalogs").getOnlyColumnAsSet()).contains("\"test1.memory1\"");
+    assertThat(computeActual("show catalogs").getOnlyColumnAsSet())
+        .contains(getTrinoCliCatalogName("test1", "memory1"));
     assertUpdate("call gravitino1.system.drop_catalog('memory1')");
     assertThat(computeActual("show catalogs").getOnlyColumnAsSet())
-        .doesNotContain("\"test1.memory1\"");
+        .doesNotContain(getTrinoCliCatalogName("test1", "memory1"));
   }
 
   @Test
   public void testCreateTable() {
-    String fullSchemaName = "\"\"\"test.memory\"\"\".db_01";
+    assertThat(computeActual("show catalogs").getOnlyColumnAsSet())
+        .contains(getTrinoCliCatalogName("test", "memory"));
+
+    String fullSchemaName = getTrinoSqlCatalogName("test", "memory") + ".db_01";
     String tableName = "tb_01";
     String fullTableName = fullSchemaName + "." + tableName;
 
@@ -129,5 +136,13 @@ public abstract class TestGravitinoConnectorWithMetalakeCatalogName
     // cleanup
     assertUpdate("drop table " + fullTableName);
     assertUpdate("drop schema " + fullSchemaName);
+  }
+
+  protected String getTrinoCliCatalogName(String metalakeName, String catalogName) {
+    return "\"" + metalakeName + "." + catalogName + "\"";
+  }
+
+  protected String getTrinoSqlCatalogName(String metalakeName, String catalogName) {
+    return "\"\"\"" + metalakeName + "." + catalogName + "\"\"\"";
   }
 }

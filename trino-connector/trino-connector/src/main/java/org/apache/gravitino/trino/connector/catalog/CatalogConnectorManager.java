@@ -76,6 +76,7 @@ public class CatalogConnectorManager {
 
   private GravitinoAdminClient gravitinoClient;
   private GravitinoConfig config;
+  private TrinoCatalogNameHandler trinoCatalogNameHandler;
 
   /**
    * Constructs a new CatalogConnectorManager with the specified catalog register and catalog
@@ -85,10 +86,13 @@ public class CatalogConnectorManager {
    * @param catalogFactory the catalog connector factory
    */
   public CatalogConnectorManager(
-      CatalogRegister catalogRegister, CatalogConnectorFactory catalogFactory) {
+      CatalogRegister catalogRegister,
+      CatalogConnectorFactory catalogFactory,
+      TrinoCatalogNameHandler trinoCatalogNameHandler) {
     this.catalogRegister = catalogRegister;
     this.catalogConnectorFactory = catalogFactory;
     this.executorService = createScheduledThreadPoolExecutor();
+    this.trinoCatalogNameHandler = trinoCatalogNameHandler;
   }
 
   private static ScheduledThreadPoolExecutor createScheduledThreadPoolExecutor() {
@@ -343,7 +347,9 @@ public class CatalogConnectorManager {
    * @return the Trino catalog name
    */
   public String getTrinoCatalogName(String metalake, String catalog) {
-    return config.singleMetalakeMode() ? catalog : String.format("\"%s.%s\"", metalake, catalog);
+    return config.singleMetalakeMode()
+        ? catalog
+        : trinoCatalogNameHandler.getCatalogName(metalake, catalog);
   }
 
   /**
@@ -393,7 +399,8 @@ public class CatalogConnectorManager {
           .withContext(context);
 
       CatalogConnectorContext connectorContext = builder.build();
-      catalogConnectors.put(connectorName, connectorContext);
+      String fullCatalogName = getTrinoCatalogName(catalog);
+      catalogConnectors.put(fullCatalogName, connectorContext);
       LOG.info("Create connector {} successful", connectorName);
       return connectorContext;
     } catch (Exception e) {
@@ -441,5 +448,9 @@ public class CatalogConnectorManager {
       }
     }
     return false;
+  }
+
+  public interface TrinoCatalogNameHandler {
+    String getCatalogName(String metalake, String catalog);
   }
 }

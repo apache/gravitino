@@ -25,9 +25,10 @@ plugins {
   `maven-publish`
 }
 
+var trinoVersion = 440
 val trinoVersionProvider =
-  providers.gradleProperty("trinoVersion").map { it.toInt() }.orElse(440)
-val trinoVersion = trinoVersionProvider.get()
+  providers.gradleProperty("trinoVersion").map { it.toInt() }.orElse(trinoVersion)
+trinoVersion = trinoVersionProvider.get()
 
 java {
   toolchain.languageVersion.set(JavaLanguageVersion.of(24))

@@ -20,6 +20,8 @@ package org.apache.gravitino.trino.connector;
 
 import org.apache.gravitino.client.GravitinoAdminClient;
 import org.apache.gravitino.trino.connector.catalog.CatalogConnectorContext;
+import org.apache.gravitino.trino.connector.system.GravitinoSystemConnector;
+import org.apache.gravitino.trino.connector.system.storedprocedure.GravitinoStoredProcedureFactory;
 
 public class GravitinoConnectorFactory440 extends GravitinoConnectorFactory {
 
@@ -40,5 +42,11 @@ public class GravitinoConnectorFactory440 extends GravitinoConnectorFactory {
   @Override
   protected GravitinoConnector createConnector(CatalogConnectorContext connectorContext) {
     return new GravitinoConnector440(connectorContext);
+  }
+
+  @Override
+  protected GravitinoSystemConnector createSystemConnector(
+      GravitinoStoredProcedureFactory storedProcedureFactory) {
+    return new GravitinoSystemConnector440(storedProcedureFactory);
   }
 }

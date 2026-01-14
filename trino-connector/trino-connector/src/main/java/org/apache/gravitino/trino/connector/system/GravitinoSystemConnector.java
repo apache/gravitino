@@ -149,13 +149,14 @@ public class GravitinoSystemConnector implements Connector {
     }
 
     protected ConnectorSplit createSplit(SchemaTableName tableName) {
-      return new Split(tableName);
+      throw new RuntimeException("Should be overridden in subclass");
     }
   }
 
   /** The split. */
-  public static class Split implements ConnectorSplit {
-    private final SchemaTableName tableName;
+  public abstract static class Split implements ConnectorSplit {
+
+    protected final SchemaTableName tableName;
 
     /**
      * Constructs a new Split with the specified table name.
@@ -185,12 +186,6 @@ public class GravitinoSystemConnector implements Connector {
     @Override
     public List<HostAddress> getAddresses() {
       return Collections.emptyList();
-    }
-
-    @SuppressWarnings("removal")
-    @Override
-    public Object getInfo() {
-      return this;
     }
   }
 

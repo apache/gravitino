@@ -148,7 +148,16 @@ public class TestCatalogConnectorManager {
   private CatalogConnectorManager createManager(
       CatalogConnectorFactory catalogFactory, ImmutableMap<String, String> configMap) {
     CatalogRegister catalogRegister = mock(CatalogRegister.class);
-    CatalogConnectorManager manager = new CatalogConnectorManager(catalogRegister, catalogFactory);
+
+    boolean singleMetalakeMode =
+        configMap.getOrDefault("gravitino.use-single-metalake", "true").equals("true");
+    CatalogConnectorManager manager =
+        new CatalogConnectorManager(
+            catalogRegister,
+            catalogFactory,
+            singleMetalakeMode
+                ? null
+                : (metalake, catalog) -> String.format("\"%s.%s\"", metalake, catalog));
     manager.config(new GravitinoConfig(configMap), mock(GravitinoAdminClient.class));
     return manager;
   }

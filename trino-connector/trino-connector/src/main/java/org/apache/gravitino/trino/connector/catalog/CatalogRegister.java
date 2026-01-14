@@ -152,6 +152,8 @@ public class CatalogRegister {
       String createCatalogCommand = generateCreateCatalogCommand(name, catalog);
       executeSql(createCatalogCommand);
       LOG.info("Register catalog {} successfully: {}", name, createCatalogCommand);
+    } catch (SQLException e) {
+      throw new TrinoException(GravitinoErrorCode.GRAVITINO_RUNTIME_ERROR, e.getMessage(), e);
     } catch (Exception e) {
       String message = String.format("Failed to register catalog %s", name);
       LOG.error(message);
@@ -160,7 +162,7 @@ public class CatalogRegister {
   }
 
   private boolean checkCatalogExist(String name) {
-    String showCatalogCommand = String.format("SHOW CATALOGS like '%s'", name);
+    String showCatalogCommand = "SHOW CATALOGS";
     Exception failedException = null;
     try {
       int retries = EXECUTE_QUERY_MAX_RETRIES;
@@ -171,7 +173,7 @@ public class CatalogRegister {
           ResultSet rs = statement.getResultSet();
           while (rs.next()) {
             String catalogName = rs.getString(1);
-            if (catalogName.equals(name) || catalogName.equals("\"" + name + "\"")) {
+            if (name.equals(catalogName) || name.equals("\"" + catalogName + "\"")) {
               return true;
             }
           }

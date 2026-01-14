@@ -20,6 +20,7 @@ package org.apache.gravitino.trino.connector;
 
 import io.airlift.slice.Slice;
 import io.trino.spi.connector.ConnectorInsertTableHandle;
+import io.trino.spi.connector.ConnectorMergeTableHandle;
 import io.trino.spi.connector.ConnectorOutputMetadata;
 import io.trino.spi.connector.ConnectorSession;
 import io.trino.spi.statistics.ComputedStatistics;
@@ -45,5 +46,15 @@ public class GravitinoMetadata435 extends GravitinoMetadata {
       Collection<ComputedStatistics> computedStatistics) {
     return internalMetadata.finishInsert(
         session, GravitinoHandle.unWrap(insertHandle), fragments, computedStatistics);
+  }
+
+  @Override
+  public void finishMerge(
+      ConnectorSession session,
+      ConnectorMergeTableHandle mergeTableHandle,
+      Collection<Slice> fragments,
+      Collection<ComputedStatistics> computedStatistics) {
+    internalMetadata.finishMerge(
+        session, GravitinoHandle.unWrap(mergeTableHandle), fragments, computedStatistics);
   }
 }

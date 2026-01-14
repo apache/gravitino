@@ -151,38 +151,51 @@ public abstract class TestGravitinoConnector extends AbstractGravitinoConnectorT
 
     createTestTable(fullTableName1);
 
-    // test add column and drop column, but the memory connector is not supported these operations.
-    assertQueryFails(
-        String.format("alter table %s add column if not exists c varchar", fullTableName1),
-        format("This connector does not support adding columns"));
-
-    assertQueryFails(
-        String.format("alter table %s drop column a", fullTableName1),
-        format("This connector does not support dropping columns"));
-
     // test set table comment
     assertUpdate(String.format("comment on table %s is 'test table comments'", fullTableName1));
     assertThat((String) computeScalar("show create table " + fullTableName1))
         .contains("COMMENT 'test table comments'");
-
-    // test rename column, but the memory connector is not supported these operations.
-    assertQueryFails(
-        String.format("alter table %s rename column a to c ", fullTableName1),
-        format("This connector does not support renaming columns"));
-
-    assertQueryFails(
-        String.format("alter table %s alter column a set DATA TYPE int", fullTableName1),
-        format("This connector does not support setting column types"));
 
     // test set column comment
     assertUpdate(String.format("comment on column %s.a is 'test column comments'", fullTableName1));
     assertThat((String) computeScalar("show create table " + fullTableName1))
         .contains("COMMENT 'test column comments'");
 
+    // test add column and drop column, but the memory connector is not supported these operations.
+    if (trinoVersion < 452) {
+      assertQueryFails(
+          String.format("alter table %s add column if not exists c varchar", fullTableName1),
+          "This connector does not support adding columns");
+    } else {
+      assertUpdate(
+          String.format("alter table %s add column if not exists c varchar", fullTableName1));
+      assertThat((String) computeScalar("show create table " + fullTableName1))
+          .contains("c varchar");
+    }
+
+    assertQueryFails(
+        String.format("alter table %s drop column a", fullTableName1),
+        "This connector does not support dropping columns");
+
+    // test rename column, but the memory connector is not supported these operations.
+    if (trinoVersion < 452) {
+      assertQueryFails(
+          String.format("alter table %s rename column a to c ", fullTableName1),
+          "This connector does not support renaming columns");
+    } else {
+      assertUpdate(String.format("alter table %s rename column c to d ", fullTableName1));
+      assertThat((String) computeScalar("show create table " + fullTableName1))
+          .contains("d varchar");
+    }
+
+    assertQueryFails(
+        String.format("alter table %s alter column a set DATA TYPE int", fullTableName1),
+        "This connector does not support setting column types");
+
     // test set table properties, but the memory connector is not supported these operations.
     assertQueryFails(
         String.format("alter table %s set properties \"max_ttl\" = 20", fullTableName1),
-        format("This connector does not support setting table properties"));
+        "This connector does not support setting table properties");
 
     dropTestTable(fullTableName1);
   }

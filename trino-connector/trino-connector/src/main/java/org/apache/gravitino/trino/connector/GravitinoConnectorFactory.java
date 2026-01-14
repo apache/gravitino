@@ -56,6 +56,7 @@ public class GravitinoConnectorFactory implements ConnectorFactory {
   private CatalogConnectorManager catalogConnectorManager;
 
   private GravitinoAdminClient client;
+  private int trinoVersion;
 
   public GravitinoConnectorFactory(GravitinoAdminClient client) {
     this.client = client;
@@ -100,7 +101,8 @@ public class GravitinoConnectorFactory implements ConnectorFactory {
 
           CatalogConnectorFactory catalogConnectorFactory = createCatalogConnectorFactory(config);
           catalogConnectorManager =
-              new CatalogConnectorManager(catalogRegister, catalogConnectorFactory);
+              new CatalogConnectorManager(
+                  catalogRegister, catalogConnectorFactory, this::getTrinoCatalogName);
           catalogConnectorManager.config(config, client);
 
           if (isCoordinator(trinoConnectorContext)) {
@@ -148,11 +150,16 @@ public class GravitinoConnectorFactory implements ConnectorFactory {
     return new GravitinoSystemConnector(storedProcedureFactory);
   }
 
-  private void checkTrinoSpiVersion(ConnectorContext context, GravitinoConfig config) {
-    String trinoVersion = context.getSpiVersion();
+  protected String getTrinoCatalogName(String metalakeName, String catalogName) {
+    return "\"" + metalakeName + "." + catalogName + "\"";
+  }
 
-    int version = Integer.parseInt(trinoVersion);
-    if (version < getMinSupportTrinoSpiVersion() || version > getMaxSupportTrinoSpiVersion()) {
+  private void checkTrinoSpiVersion(ConnectorContext context, GravitinoConfig config) {
+    String spiVersion = context.getSpiVersion();
+
+    trinoVersion = Integer.parseInt(spiVersion);
+    if (trinoVersion < getMinSupportTrinoSpiVersion()
+        || trinoVersion > getMaxSupportTrinoSpiVersion()) {
       Boolean skipTrinoVersionValidation = config.isSkipTrinoVersionValidation();
       if (!skipTrinoVersionValidation) {
         String errmsg =
@@ -163,10 +170,24 @@ public class GravitinoConnectorFactory implements ConnectorFactory {
         throw new TrinoException(GravitinoErrorCode.GRAVITINO_UNSUPPORTED_TRINO_VERSION, errmsg);
       } else {
         LOG.warn(
-            "The version %s has not undergone thorough testing with Gravitino, there may be compatiablity problem.",
+            "The version {} has not undergone thorough testing with Gravitino, there may be compatiablity problem.",
             trinoVersion);
       }
     }
+
+    if (!config.singleMetalakeMode()) {
+      if (!supportCatalogNameWithMetalake()) {
+        String errmsg =
+            String.format(
+                "The trino-connector-%s-%s does not support catalog name with metalake.",
+                getMinSupportTrinoSpiVersion(), getMaxSupportTrinoSpiVersion());
+        throw new TrinoException(GravitinoErrorCode.GRAVITINO_UNSUPPORTED_TRINO_VERSION, errmsg);
+      }
+    }
+  }
+
+  protected boolean supportCatalogNameWithMetalake() {
+    return true;
   }
 
   protected int getMinSupportTrinoSpiVersion() {
@@ -199,5 +220,9 @@ public class GravitinoConnectorFactory implements ConnectorFactory {
       throw new TrinoException(
           GRAVITINO_RUNTIME_ERROR, "Can not create CatalogConnectorFactory ", e);
     }
+  }
+
+  public int getTrinoVersion() {
+    return trinoVersion;
   }
 }

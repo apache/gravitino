@@ -23,7 +23,6 @@ import static org.apache.gravitino.trino.connector.GravitinoErrorCode.GRAVITINO_
 
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
-import io.airlift.slice.Slice;
 import io.trino.spi.TrinoException;
 import io.trino.spi.connector.AggregateFunction;
 import io.trino.spi.connector.AggregationApplicationResult;
@@ -57,10 +56,8 @@ import io.trino.spi.expression.ConnectorExpression;
 import io.trino.spi.expression.Constant;
 import io.trino.spi.security.TrinoPrincipal;
 import io.trino.spi.statistics.ColumnStatistics;
-import io.trino.spi.statistics.ComputedStatistics;
 import io.trino.spi.statistics.TableStatistics;
 import io.trino.spi.type.Type;
-import java.util.Collection;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -614,17 +611,6 @@ public class GravitinoMetadata implements ConnectorMetadata {
 
     return new GravitinoMergeTableHandle(
         tableName.getSchemaName(), tableName.getTableName(), connectorMergeTableHandle);
-  }
-
-  @SuppressWarnings("deprecation")
-  @Override
-  public void finishMerge(
-      ConnectorSession session,
-      ConnectorMergeTableHandle mergeTableHandle,
-      Collection<Slice> fragments,
-      Collection<ComputedStatistics> computedStatistics) {
-    internalMetadata.finishMerge(
-        session, GravitinoHandle.unWrap(mergeTableHandle), fragments, computedStatistics);
   }
 
   @Override

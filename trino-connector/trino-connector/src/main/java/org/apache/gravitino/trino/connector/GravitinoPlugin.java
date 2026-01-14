@@ -50,4 +50,9 @@ public class GravitinoPlugin implements Plugin {
   CatalogConnectorManager getCatalogConnectorManager() {
     return factory.getCatalogConnectorManager();
   }
+
+  @VisibleForTesting
+  int getTrinoVersion() {
+    return factory.getTrinoVersion();
+  }
 }

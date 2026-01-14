@@ -30,6 +30,7 @@ import org.awaitility.Awaitility;
 abstract class AbstractGravitinoConnectorTest extends AbstractTestQueryFramework {
 
   GravitinoMockServer server;
+  int trinoVersion;
 
   @Override
   protected QueryRunner createQueryRunner() throws Exception {
@@ -48,6 +49,7 @@ abstract class AbstractGravitinoConnectorTest extends AbstractTestQueryFramework
       CatalogConnectorManager catalogConnectorManager =
           gravitinoPlugin.getCatalogConnectorManager();
       server.setCatalogConnectorManager(catalogConnectorManager);
+      trinoVersion = gravitinoPlugin.getTrinoVersion();
 
       // Wait for the catalog to be created. Wait for at least 30 seconds.
       Awaitility.await()
