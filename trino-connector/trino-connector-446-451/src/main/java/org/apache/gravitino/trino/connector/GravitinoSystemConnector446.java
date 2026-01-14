@@ -20,6 +20,9 @@ package org.apache.gravitino.trino.connector;
 
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonProperty;
+import io.trino.spi.Page;
+import io.trino.spi.connector.ConnectorPageSource;
+import io.trino.spi.connector.ConnectorPageSourceProvider;
 import io.trino.spi.connector.ConnectorSplit;
 import io.trino.spi.connector.ConnectorSplitManager;
 import io.trino.spi.connector.SchemaTableName;
@@ -38,10 +41,34 @@ public class GravitinoSystemConnector446 extends GravitinoSystemConnector {
     return new GravitinoSplitManager446();
   }
 
+  @Override
+  protected ConnectorPageSourceProvider createPageSourceProvider() {
+    return new DatasourceProvider446();
+  }
+
+  static class DatasourceProvider446 extends DatasourceProvider {
+
+    @Override
+    protected ConnectorPageSource createPageSource(Page page) {
+      return new SystemTablePageSource446(page);
+    }
+  }
+
   static class GravitinoSplitManager446 extends SplitManager {
 
     protected ConnectorSplit createSplit(SchemaTableName tableName) {
       return new Split446(tableName);
+    }
+  }
+
+  static class SystemTablePageSource446 extends SystemTablePageSource {
+
+    public SystemTablePageSource446(Page page) {
+      super(page);
+    }
+
+    public Page getNextPage() {
+      return nextPage();
     }
   }
 
