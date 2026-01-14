@@ -19,6 +19,7 @@
 package org.apache.gravitino.trino.connector;
 
 import io.trino.spi.connector.ConnectorMetadata;
+import io.trino.spi.connector.ConnectorNodePartitioningProvider;
 import io.trino.spi.connector.ConnectorSplitManager;
 import org.apache.gravitino.trino.connector.catalog.CatalogConnectorContext;
 import org.apache.gravitino.trino.connector.catalog.CatalogConnectorMetadata;
@@ -43,5 +44,12 @@ public class GravitinoConnector440 extends GravitinoConnector {
     ConnectorSplitManager splitManager =
         catalogConnectorContext.getInternalConnector().getSplitManager();
     return new GravitinoSplitManager440(splitManager);
+  }
+
+  @Override
+  public ConnectorNodePartitioningProvider getNodePartitioningProvider() {
+    ConnectorNodePartitioningProvider nodePartitioningProvider =
+        catalogConnectorContext.getInternalConnector().getNodePartitioningProvider();
+    return new GravitinoNodePartitioningProvider440(nodePartitioningProvider);
   }
 }
