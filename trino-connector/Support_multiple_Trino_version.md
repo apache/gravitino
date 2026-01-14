@@ -148,3 +148,35 @@ Gravitino Trino connector，需要自行编译旧版本段的 trino-connector。
 
 对于 Trino 478 以上的版本，建议优先选择最新版本段的插件包。
 如遇新版本或冷门版本尚未被正式标记为支持，也可以先选择版本号相近的版本段，并通过配置参数 `gravitino.trino.skip-version-validation=true` 临时跳过版本校验，以便进行验证测试。
+
+## 457-465 适配过程摘要
+
+### 目标范围确认
+- 使用 `-PtrinoVersion` 二分验证：465 通过，466/467/469/470 失败。
+- 最终确定版本段为 457–465，并将模块与目录改名为 `trino-connector-457-465`。
+- 在 `GravitinoConnectorFactory457` 中将最大支持版本设为 465。
+
+### 关键代码调整
+- Split 适配：新增 `GravitinoSplitManager457`，并在 `GravitinoConnector457.getSplitManager()` 中返回该 manager。
+- System connector 适配：在 `GravitinoConnectorFactory457` 中返回 `GravitinoSystemConnector457`，避免 system split 走到基类默认实现。
+- 版本校验：更新 `GravitinoConnectorFactory457` 的版本范围为 457–465。
+
+### 验证方式
+- 使用命令验证边界版本：
+  - `./gradlew :trino-connector:trino-connector-457-465:build -PtrinoVersion=457`
+  - `./gradlew :trino-connector:trino-connector-457-465:build -PtrinoVersion=465`
+
+## 466 适配方案（处理 SPI deprecated 和 removal）
+
+### 背景
+从 466 开始，部分 SPI 方法被标记为 `@Deprecated`，在开启 `-Werror` 的构建中会导致编译失败。
+
+### 处理原则
+- 公共模块不再保留被 `@Deprecated` 的方法实现，避免对新版本编译时触发告警。
+- 版本模块负责重新实现这些方法，并在需要时使用 `@SuppressWarnings("deprecation")`。
+
+### 步骤（以 466 为例）
+1) 使用 `-PtrinoVersion=466` 编译，列出触发 `-Werror` 的方法位置（例如 `GravitinoMetadata.beginMerge(...)`）。
+2) 从公共模块中移除这些 `@Deprecated` 方法的实现。
+3) 在 466 版本模块中新增 `GravitinoMetadata466`（或对应段子类），重新实现这些方法，并在 `GravitinoConnector466.createGravitinoMetadata()` 返回该子类。
+4) 用 `-PtrinoVersion=466` 进行构建验证。
