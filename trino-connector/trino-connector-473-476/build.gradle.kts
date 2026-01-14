@@ -25,20 +25,10 @@ plugins {
   `maven-publish`
 }
 
-val connectorRange = "470-478"
-val trinoVersion = "478"
-val propagateVersion = providers
-  .gradleProperty("trinoConnectorPropagateVersion")
-  .map(String::toBoolean)
-  .getOrElse(true)
-
-if (propagateVersion) {
-  gradle.beforeProject {
-    if (path == ":trino-connector:trino-connector") {
-      extensions.extraProperties["trinoConnectorTrinoVersion"] = trinoVersion
-    }
-  }
-}
+var trinoVersion = 473
+val trinoVersionProvider =
+  providers.gradleProperty("trinoVersion").map { it.toInt() }.orElse(trinoVersion)
+trinoVersion = trinoVersionProvider.get()
 
 java {
   toolchain.languageVersion.set(JavaLanguageVersion.of(24))
@@ -66,13 +56,17 @@ dependencies {
   testImplementation("io.trino:trino-testing:$trinoVersion") {
     exclude("org.apache.logging.log4j")
   }
+  testRuntimeOnly("org.junit.platform:junit-platform-launcher:1.12.0")
   testRuntimeOnly(libs.junit.jupiter.engine)
 }
 
 sourceSets {
   main {
     java.srcDirs("../trino-connector/src/main/java")
-    resources.srcDirs("../trino-connector/src/main/resources")
+  }
+  test {
+    java.srcDirs("../trino-connector/src/test/java")
+    resources.srcDirs("../trino-connector/src/test/resources")
   }
 }
 
@@ -80,7 +74,7 @@ plugins.withId("com.diffplug.spotless") {
   configure<SpotlessExtension> {
     java {
       // Keep Spotless within this module to avoid cross-project target errors.
-      target("$projectDir/src/**/*.java")
+      target(project.fileTree("src") { include("**/*.java") })
     }
   }
 }
@@ -88,6 +82,13 @@ plugins.withId("com.diffplug.spotless") {
 tasks.withType<JavaCompile>().configureEach {
   // Error Prone is incompatible with the JDK 24 toolchain required by this Trino range.
   options.errorprone.isEnabled.set(false)
+  options.release.set(17)
+}
+
+tasks.withType<Test>().configureEach {
+  extensions
+    .findByType(org.gradle.testing.jacoco.plugins.JacocoTaskExtension::class.java)
+    ?.isEnabled = false
 }
 
 tasks {

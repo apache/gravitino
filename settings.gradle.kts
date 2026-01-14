@@ -74,8 +74,8 @@ include(
   "trino-connector:trino-connector-457-465",
   "trino-connector:trino-connector-466-467",
   "trino-connector:trino-connector-468-468",
-  "trino-connector:trino-connector-469-472"
-  // "trino-connector:trino-connector-470-478"
+  "trino-connector:trino-connector-469-472",
+  "trino-connector:trino-connector-473-476"
 )
 include("spark-connector:spark-common")
 if (scalaVersion == "2.12") {

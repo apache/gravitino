@@ -88,7 +88,8 @@ public class GravitinoMockServer implements AutoCloseable {
     createCatalog(testMetalake, testCatalog, ImmutableMap.of());
   }
 
-  public void setCatalogConnectorManager(CatalogConnectorManager catalogConnectorManager, int trinoVersion) {
+  public void setCatalogConnectorManager(
+      CatalogConnectorManager catalogConnectorManager, int trinoVersion) {
     this.catalogConnectorManager = catalogConnectorManager;
     this.trinoVersion = trinoVersion;
   }
