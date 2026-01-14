@@ -130,7 +130,7 @@ public class GravitinoSystemConnector implements Connector {
     }
 
     protected ConnectorPageSource createPageSource(Page page) {
-      return new SystemTablePageSource(page);
+      throw new RuntimeException("Should be overridden in subclass");
     }
   }
 
@@ -192,7 +192,7 @@ public class GravitinoSystemConnector implements Connector {
   }
 
   /** The system table page source. */
-  public static class SystemTablePageSource implements ConnectorPageSource {
+  public static abstract class SystemTablePageSource implements ConnectorPageSource {
 
     protected boolean isFinished = false;
     protected final Page page;

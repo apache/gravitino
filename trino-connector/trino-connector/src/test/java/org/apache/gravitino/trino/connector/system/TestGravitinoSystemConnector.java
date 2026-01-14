@@ -28,7 +28,11 @@ public class TestGravitinoSystemConnector {
   public void testSystemTablePageSourceReturnsPageOnlyOnce() throws Exception {
     Page page = new Page(0);
     try (GravitinoSystemConnector.SystemTablePageSource pageSource =
-        new GravitinoSystemConnector.SystemTablePageSource(page)) {
+        Mockito.mock(
+            GravitinoSystemConnector.SystemTablePageSource.class,
+            Mockito.withSettings()
+                .useConstructor(page)
+                .defaultAnswer(Mockito.CALLS_REAL_METHODS))) {
 
       Assertions.assertFalse(pageSource.isFinished());
       Assertions.assertSame(page, pageSource.nextPage());
