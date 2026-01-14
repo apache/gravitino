@@ -175,7 +175,7 @@ export default function CreateRoleDialog({ ...props }) {
             })
         }
         if (editRole) {
-          const reqData = { updates: submitData.securableObjects }
+          const reqData = { overrides: submitData.securableObjects }
           await dispatch(updateRolePrivileges({ metalake, role: editRole, data: reqData }))
         } else {
           await dispatch(createRole({ metalake, data: submitData }))

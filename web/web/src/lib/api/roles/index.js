@@ -25,7 +25,7 @@ const Apis = {
     `/api/metalakes/${encodeURIComponent(metalake)}/roles/${encodeURIComponent(role)}`,
   CREATE: ({ metalake }) => `/api/metalakes/${encodeURIComponent(metalake)}/roles`,
   UPDATE: ({ metalake, role }) =>
-    `/api/web/security/metalakes/${encodeURIComponent(metalake)}/roles/${encodeURIComponent(role)}`,
+    `/api/metalakes/${encodeURIComponent(metalake)}/permissions/roles/${encodeURIComponent(role)}`,
   DELETE: ({ metalake, role }) => `/api/metalakes/${encodeURIComponent(metalake)}/roles/${encodeURIComponent(role)}`,
   GRANT_PRIVILEGE: ({ metalake, role, metadataObjectType, metadataObjectFullName }) =>
     `/api/metalakes/${encodeURIComponent(metalake)}/permissions/roles/${encodeURIComponent(role)}/${encodeURIComponent(metadataObjectType)}/${encodeURIComponent(metadataObjectFullName)}/grant`,
