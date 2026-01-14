@@ -23,12 +23,10 @@ import io.trino.spi.connector.ConnectorBucketNodeMap;
 import io.trino.spi.connector.ConnectorNodePartitioningProvider;
 import io.trino.spi.connector.ConnectorPartitioningHandle;
 import io.trino.spi.connector.ConnectorSession;
-import io.trino.spi.connector.ConnectorSplit;
 import io.trino.spi.connector.ConnectorTransactionHandle;
 import io.trino.spi.type.Type;
 import java.util.List;
 import java.util.Optional;
-import java.util.function.ToIntFunction;
 
 /**
  * This class provides a ConnectorNodePartitioningProvider for Trino to decide data partitioning
@@ -54,17 +52,6 @@ public class GravitinoNodePartitioningProvider implements ConnectorNodePartition
       ConnectorSession session,
       ConnectorPartitioningHandle partitioningHandle) {
     return nodePartitioningProvider.getBucketNodeMapping(
-        GravitinoHandle.unWrap(transactionHandle),
-        session,
-        GravitinoHandle.unWrap(partitioningHandle));
-  }
-
-  @Override
-  public ToIntFunction<ConnectorSplit> getSplitBucketFunction(
-      ConnectorTransactionHandle transactionHandle,
-      ConnectorSession session,
-      ConnectorPartitioningHandle partitioningHandle) {
-    return nodePartitioningProvider.getSplitBucketFunction(
         GravitinoHandle.unWrap(transactionHandle),
         session,
         GravitinoHandle.unWrap(partitioningHandle));

@@ -30,7 +30,6 @@ import io.trino.spi.connector.Assignment;
 import io.trino.spi.connector.ColumnHandle;
 import io.trino.spi.connector.ColumnMetadata;
 import io.trino.spi.connector.ConnectorInsertTableHandle;
-import io.trino.spi.connector.ConnectorMergeTableHandle;
 import io.trino.spi.connector.ConnectorMetadata;
 import io.trino.spi.connector.ConnectorPartitioningHandle;
 import io.trino.spi.connector.ConnectorSession;
@@ -67,7 +66,6 @@ import java.util.stream.Collectors;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.trino.connector.catalog.CatalogConnectorMetadata;
 import org.apache.gravitino.trino.connector.catalog.CatalogConnectorMetadataAdapter;
-import org.apache.gravitino.trino.connector.metadata.GravitinoColumn;
 import org.apache.gravitino.trino.connector.metadata.GravitinoSchema;
 import org.apache.gravitino.trino.connector.metadata.GravitinoTable;
 
@@ -82,10 +80,10 @@ public abstract class GravitinoMetadata implements ConnectorMetadata {
   public static final String MERGE_ROW_ID = "$row_id";
 
   // Handling metadata operations on gravitino server
-  private final CatalogConnectorMetadata catalogConnectorMetadata;
+  protected final CatalogConnectorMetadata catalogConnectorMetadata;
 
   // Transform different metadata format
-  private final CatalogConnectorMetadataAdapter metadataAdapter;
+  protected final CatalogConnectorMetadataAdapter metadataAdapter;
 
   protected final ConnectorMetadata internalMetadata;
 
@@ -277,13 +275,6 @@ public abstract class GravitinoMetadata implements ConnectorMetadata {
             .collect(Collectors.toMap(Map.Entry::getKey, e -> e.getValue().get()));
     Map<String, String> allProps = metadataAdapter.toGravitinoTableProperties(resultMap);
     catalogConnectorMetadata.setTableProperties(getTableName(tableHandle), allProps);
-  }
-
-  @Override
-  public void addColumn(
-      ConnectorSession session, ConnectorTableHandle tableHandle, ColumnMetadata column) {
-    GravitinoColumn gravitinoColumn = metadataAdapter.createColumn(column);
-    catalogConnectorMetadata.addColumn(getTableName(tableHandle), gravitinoColumn);
   }
 
   @Override
@@ -667,7 +658,7 @@ public abstract class GravitinoMetadata implements ConnectorMetadata {
                     : new ConnectorTableLayout(result.getPartitionColumns()));
   }
 
-  private SchemaTableName getTableName(ConnectorTableHandle tableHandle) {
+  protected SchemaTableName getTableName(ConnectorTableHandle tableHandle) {
     return ((GravitinoTableHandle) tableHandle).toSchemaTableName();
   }
 

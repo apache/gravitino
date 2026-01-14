@@ -102,7 +102,6 @@ public class GravitinoConnector implements Connector {
     throw new RuntimeException("Should be overridden in subclass");
   }
 
-
   @Override
   public List<PropertyMetadata<?>> getTableProperties() {
     return catalogConnectorContext.getTableProperties();
