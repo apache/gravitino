@@ -160,7 +160,7 @@ export default function CreateJobDialog({ ...props }) {
   return (
     <>
       <Modal
-        title='Create Job'
+        title='Run Job'
         open={open}
         onOk={handleSubmit}
         okText='Submit'
@@ -221,7 +221,7 @@ export default function CreateJobDialog({ ...props }) {
                             <Form.Item
                               {...restField}
                               name={[name, 'key']}
-                              rules={[{ required: true, message: 'Please input the job config key!' }]}
+                              rules={[{ required: true, message: 'Please enter the job config key!' }]}
                               className='mb-0 w-full grow'
                             >
                               <Input disabled placeholder='Job Config Key' />
@@ -229,7 +229,7 @@ export default function CreateJobDialog({ ...props }) {
                             <Form.Item
                               {...restField}
                               name={[name, 'value']}
-                              rules={[{ required: true, message: 'Please input the job config value!' }]}
+                              rules={[{ required: true, message: 'Please enter the job config value!' }]}
                               className='mb-0 w-full grow'
                             >
                               <Input

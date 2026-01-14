@@ -22,7 +22,7 @@ export const dialogContentMaxHeigth = 500
 export const maxTreeWidth = 700
 
 export const mismatchName =
-  'Must start with a letter/underscore(_), contain only alphanumeric characters (Aa-Zz,0-9) or underscores (_)!'
+  'Must start with a letter, digit, or underscore, can include alphanumeric characters, underscores, slashes (/), equal signs (=), or hyphens (-), and must be between 1 and 64 characters long!'
 
 export const mismatchUsername =
   'Must start with a letter/underscore (_), contain only alphanumeric characters (Aa-Zz,0-9), underscore (_), center (-), dot (.) or the ‘@’ character.'
@@ -31,7 +31,7 @@ export const mismatchForKey =
   'Must start with a letter/underscore(_), contain only alphanumeric characters (Aa-Zz,0-9) or underscores (_), hyphens(-), or dots(.)!'
 
 export const validateMessages = () => ({
-  required: `Please input the ${label}!`,
+  required: `Please enter the ${label}!`,
   string: {
     max: `The ${label} must be less than ${max} characters!`
   },

@@ -99,9 +99,19 @@ export default function UserSetting() {
                 data-refer={`select-option-${metalake.name}`}
                 className='flex w-[200px] justify-between'
                 onClick={() => {
-                  if (metalake.properties['in-use'] === 'true') {
-                    router.push(`/catalogs?metalake=${metalake.name}&catalogType=relational`)
+                  const isCatalogsPage = pathname.includes('/catalogs')
+
+                  // If on catalogs page, check if metalake is in-use
+                  if (isCatalogsPage && metalake.properties['in-use'] !== 'true') {
+                    return
                   }
+
+                  // Build new searchParams with updated metalake, preserving other params
+                  const params = new URLSearchParams(searchParams.toString())
+                  params.set('metalake', metalake.name)
+
+                  // Preserve pathname and only update metalake in query string
+                  router.push(`${pathname}?${params.toString()}`)
                 }}
               >
                 <span
@@ -131,12 +141,15 @@ export default function UserSetting() {
           ]
         : [])
     ],
-    [authUser, serviceAdmins, store.metalakes, currentMetalake, anthEnable]
+    [authUser, serviceAdmins, store.metalakes, currentMetalake, anthEnable, searchParams]
   )
 
   return (
     <>
-      <Dropdown menu={{ items }}>
+      <Dropdown
+        menu={{ items }}
+        overlayClassName='[&_.ant-dropdown-menu-item-group-list]:max-h-[300px] [&_.ant-dropdown-menu-item-group-list]:overflow-y-auto'
+      >
         <div role={'button'} tabIndex={0} data-refer='select-metalake'>
           <Avatar
             shape='square'

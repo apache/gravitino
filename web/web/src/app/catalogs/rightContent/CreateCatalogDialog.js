@@ -42,7 +42,7 @@ import {
   regionOptions,
   relationalProviders
 } from '@/config/catalog'
-import { nameRegex } from '@/config/regex'
+import { nameRegex } from '@/lib/utils/regex'
 import { useResetFormOnCloseModal } from '@/lib/hooks/use-reset'
 import { genUpdates } from '@/lib/utils'
 import { cn } from '@/lib/utils/tailwind'
@@ -75,6 +75,7 @@ export default function CreateCatalogDialog({ ...props }) {
   const authType = Form.useWatch('authentication.type', { form, preserve: true })
   const values = Form.useWatch([], form)
   const dispatch = useAppDispatch()
+  const isShowTestConnect = ['fileset', 'model'].includes(catalogType) || currentProvider === 'lakehouse-generic'
 
   const defaultValues = {
     name: '',
@@ -82,6 +83,18 @@ export default function CreateCatalogDialog({ ...props }) {
     provider: '',
     comment: '',
     properties: []
+  }
+
+  const getDialogDescription = () => {
+    if (editCatalog) {
+      return `Edit the catalog ${editCatalog}.`
+    }
+
+    if (step === 0 && !['model', 'fileset'].includes(catalogType)) {
+      return 'Select a data source provider to create the data catalog.'
+    }
+
+    return 'Fill-in the information into the following fields to create a data catalog.'
   }
 
   useResetFormOnCloseModal(
@@ -413,13 +426,7 @@ export default function CreateCatalogDialog({ ...props }) {
         onCancel={handleCancel}
         footer={null}
       >
-        <Paragraph type='secondary'>
-          {step === 0
-            ? 'Select a data source provider to create the data catalog.'
-            : !editCatalog
-              ? 'Fill-in the information into the following fields to create a data catalog.'
-              : `Edit the catalog ${editCatalog}.`}
-        </Paragraph>
+        <Paragraph type='secondary'>{getDialogDescription()}</Paragraph>
         <Flex gap='middle' align='start'>
           <Steps
             current={step}
@@ -538,7 +545,7 @@ export default function CreateCatalogDialog({ ...props }) {
                         )}
                       </Form.List>
                     </Form.Item>
-                    {!editCatalog && !['fileset', 'model'].includes(catalogType) && (
+                    {!editCatalog && !isShowTestConnect && (
                       <Tooltip
                         title='Test the connection to the source system with the given information.'
                         placement='right'
@@ -554,7 +561,7 @@ export default function CreateCatalogDialog({ ...props }) {
                         </Button>
                       </Tooltip>
                     )}
-                    {testResult.code !== -1 && !['fileset', 'model'].includes(catalogType) && (
+                    {testResult.code !== -1 && !isShowTestConnect && (
                       <p
                         ref={testRef}
                         style={{ color: testResult.code === 0 ? token.colorSuccessText : token.colorWarningText }}

@@ -90,7 +90,7 @@ export default function GrantRolesForUserDialog({ ...props }) {
         confirmLoading={confirmLoading}
         onCancel={handleCancel}
       >
-        <Paragraph type='secondary'>{`Grant the role to user group ${user.name}.`}</Paragraph>
+        <Paragraph type='secondary'>{`Grant the role to user ${user.name}.`}</Paragraph>
         <Form
           form={form}
           initialValues={defaultValues}

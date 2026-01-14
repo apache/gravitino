@@ -21,6 +21,7 @@ import _, { intersectionWith, isEqual, mergeWith, unionWith } from 'lodash-es'
 import { isArray, isObject } from './is'
 import { ColumnSpesicalType } from '@/config'
 import dayjs from 'dayjs'
+import { original } from '@reduxjs/toolkit'
 
 const DATE_TIME_FORMAT = 'YYYY-MM-DD HH:mm:ss'
 
@@ -112,6 +113,13 @@ export const genUpdates = (originalData, newData, disableUpdate = false) => {
     updates.push({ '@type': 'updateComment', newComment: newData.comment })
   }
 
+  const originalContent = originalData.content || {}
+  const newContent = newData.content || {}
+
+  if (JSON.stringify(originalContent) !== JSON.stringify(newContent)) {
+    updates.push({ '@type': 'updateContent', policyType: 'custom', newContent: newContent })
+  }
+
   const originalProperties = originalData.properties || {}
   const newProperties = newData.properties || {}
 
@@ -173,6 +181,13 @@ export const genUpdates = (originalData, newData, disableUpdate = false) => {
           '@type': 'updateColumnNullability',
           fieldName: [newColumnsMap[key].name],
           nullable: newColumnsMap[key].nullable
+        })
+      }
+      if (JSON.stringify(originalColumnsMap[key].defaultValue) !== JSON.stringify(newColumnsMap[key].defaultValue)) {
+        updates.push({
+          '@type': 'updateColumnDefaultValue',
+          fieldName: [newColumnsMap[key].name],
+          newDefaultValue: newColumnsMap[key].defaultValue
         })
       }
       if (

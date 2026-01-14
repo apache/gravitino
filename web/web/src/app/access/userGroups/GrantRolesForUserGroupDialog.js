@@ -94,7 +94,7 @@ export default function CreateRoleDialog({ ...props }) {
         confirmLoading={confirmLoading}
         onCancel={handleCancel}
       >
-        <Paragraph type='secondary'>Grant the role to user {userGroup.name}.</Paragraph>
+        <Paragraph type='secondary'>Grant the role to user group {userGroup.name}.</Paragraph>
         <Form
           form={form}
           initialValues={defaultValues}

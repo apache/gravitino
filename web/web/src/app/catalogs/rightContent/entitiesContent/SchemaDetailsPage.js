@@ -129,7 +129,7 @@ export default function SchemaDetailsPage() {
             : [{ label: 'Tables', key: 'Tables' }]
         )
         setTabKey('Tables')
-        setCreateBtn('Create table')
+        setCreateBtn('Create Table')
         setNameCol('Table Name')
         setEntityType('table')
         break

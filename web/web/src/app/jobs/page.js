@@ -329,7 +329,7 @@ export default function JobsPage() {
           >
             <>
               <div className='my-4'>
-                <div className='text-sm text-slate-400'>Job Id</div>
+                <div className='text-sm text-slate-400'>Job ID</div>
                 <span className='break-words text-base'>{currentJob?.jobId}</span>
               </div>
               <div className='my-4'>

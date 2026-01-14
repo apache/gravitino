@@ -88,6 +88,7 @@ export default function CatalogsPage() {
       }) || []
 
   const providerFitlers = [...store.tableData]
+    .filter(catalog => catalog.type === catalogType)
     ?.map(catalog => catalog.provider)
     .filter((value, index, self) => self.indexOf(value) === index)
     .map(p => {
