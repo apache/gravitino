@@ -22,7 +22,7 @@ import { PlusOutlined } from '@ant-design/icons'
 import { Button, Form, Input, Pagination, Switch } from 'antd'
 import Icons from '@/components/Icons'
 import ColumnTypeComponent from '@/components/ColumnTypeComponent'
-import { nameRegex } from '@/config/regex'
+import { nameRegex } from '@/lib/utils/regex'
 import { cn } from '@/lib/utils/tailwind'
 
 export default function SpecialColumnTypeComponent({ ...props }) {

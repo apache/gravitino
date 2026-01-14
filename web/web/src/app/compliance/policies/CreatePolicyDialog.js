@@ -23,7 +23,7 @@ import { Button, Flex, Form, Input, Modal, Select, Switch, Typography } from 'an
 import Icons from '@/components/Icons'
 import RenderPropertiesFormItem from '@/components/EntityPropertiesFormItem'
 import { validateMessages, supportedObjectTypesMap, mismatchName } from '@/config'
-import { nameRegex } from '@/config/regex'
+import { nameRegex } from '@/lib/utils/regex'
 import { useResetFormOnCloseModal } from '@/lib/hooks/use-reset'
 import { genUpdates } from '@/lib/utils'
 import { cn } from '@/lib/utils/tailwind'
@@ -205,7 +205,7 @@ export default function CreatePolicyDialog({ ...props }) {
                           <Form.Item
                             {...restField}
                             name={[name, 'ruleName']}
-                            rules={[{ required: true, message: 'Please input the rule name!' }]}
+                            rules={[{ required: true, message: 'Please enter the rule name!' }]}
                             className='mb-0 w-full grow'
                           >
                             <Input placeholder='Rule Name' />
@@ -213,7 +213,7 @@ export default function CreatePolicyDialog({ ...props }) {
                           <Form.Item
                             {...restField}
                             name={[name, 'ruleContent']}
-                            rules={[{ required: true, message: 'Please input the rule content!' }]}
+                            rules={[{ required: true, message: 'Please enter the rule content!' }]}
                             className='mb-0 w-full grow'
                           >
                             <Input placeholder='Rule Content' />

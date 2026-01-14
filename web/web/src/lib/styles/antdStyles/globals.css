@@ -63,9 +63,9 @@
     }
   }
   .step-icon-default-theme {
-    @apply bg-[color:theme(colors.defaultPrimary)] text-white;
+    @apply bg-gray-100 text-defaultPrimary;
     &:hover {
-      @apply text-white;
+      @apply text-defaultPrimary;
     }
   }
 }

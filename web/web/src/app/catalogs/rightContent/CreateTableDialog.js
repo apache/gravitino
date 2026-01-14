@@ -67,7 +67,7 @@ import {
   transformsLimitMap
 } from '@/config'
 import { tableDefaultProps } from '@/config/catalog'
-import { nameRegex } from '@/config/regex'
+import { nameRegex } from '@/lib/utils/regex'
 import { capitalizeFirstLetter, genUpdates } from '@/lib/utils'
 import { cn } from '@/lib/utils/tailwind'
 import { createTable, updateTable, getTableDetails } from '@/lib/store/metalakes'
@@ -584,7 +584,7 @@ export default function CreateTableDialog({ ...props }) {
                 default:
                   column['defaultValue'] = {
                     type: 'literal',
-                    dataType: 'string',
+                    dataType: col.defaultValue?.dataType || 'string',
                     value: col.defaultValue?.value
                   }
               }
@@ -857,7 +857,7 @@ export default function CreateTableDialog({ ...props }) {
                               if (autoIncrementInfo.uniqueCheck) {
                                 const names = form
                                   .getFieldValue('indexes')
-                                  ?.filter(idx => idx?.indexType?.toLowerCase() === 'unique_key')
+                                  ?.filter(idx => ['unique_key', 'primary_key'].includes(idx?.indexType?.toLowerCase()))
                                   .map(col => col?.fieldName)
                                   ?.flat()
                                 if (!names?.includes(form.getFieldValue('columns')[subField.name].name)) {
@@ -1299,7 +1299,11 @@ export default function CreateTableDialog({ ...props }) {
                 <Form.Item
                   name='name'
                   label='Table Name'
-                  rules={[{ required: true }, { type: 'string', max: 64 }, { pattern: new RegExp(nameRegex) }]}
+                  rules={[
+                    { required: true, message: `Please enter the table name!` },
+                    { type: 'string', max: 64 },
+                    { pattern: new RegExp(nameRegex) }
+                  ]}
                 >
                   <Input data-refer='table-name-field' placeholder={mismatchName} disabled={init} />
                 </Form.Item>

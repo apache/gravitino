@@ -75,7 +75,7 @@ function DefaultLogin() {
             rules={[{ required: true, message: 'Grant Type is required' }]}
             className='mt-4'
           >
-            <Input disabled placeholder='' />
+            <Input disabled placeholder='Please enter the grant type' />
           </Form.Item>
 
           <Form.Item

@@ -23,7 +23,7 @@ import { Button, Flex, Form, Input, Modal, Radio, Select, Spin, Typography } fro
 import { useScrolling } from 'react-use'
 import Icons from '@/components/Icons'
 import { dialogContentMaxHeigth, validateMessages, mismatchName } from '@/config'
-import { nameRegex } from '@/config/regex'
+import { nameRegex } from '@/lib/utils/regex'
 import { useResetFormOnCloseModal } from '@/lib/hooks/use-reset'
 import { genUpdates } from '@/lib/utils'
 import { cn } from '@/lib/utils/tailwind'
@@ -253,7 +253,7 @@ export default function RegisterJobTemplateDialog({ ...props }) {
                 </Form.Item>
                 <Form.Item
                   name='executable'
-                  rules={[{ required: true, message: 'Please input the executable!' }]}
+                  rules={[{ required: true, message: 'Please enter the executable!' }]}
                   label='Executable'
                 >
                   <Input />
@@ -272,7 +272,7 @@ export default function RegisterJobTemplateDialog({ ...props }) {
                                 <Form.Item
                                   {...restField}
                                   name={[name, 'envName']}
-                                  rules={[{ required: true, message: 'Please input environment variable name!' }]}
+                                  rules={[{ required: true, message: 'Please enter environment variable name!' }]}
                                   className='mb-0 w-full grow'
                                 >
                                   <Input placeholder='Env Var Name' />
@@ -280,7 +280,7 @@ export default function RegisterJobTemplateDialog({ ...props }) {
                                 <Form.Item
                                   {...restField}
                                   name={[name, 'envValue']}
-                                  rules={[{ required: true, message: 'Please input environment variable value!' }]}
+                                  rules={[{ required: true, message: 'Please enter environment variable value!' }]}
                                   className='mb-0 w-full grow'
                                 >
                                   <Input placeholder='Env Var Value' />
@@ -313,7 +313,7 @@ export default function RegisterJobTemplateDialog({ ...props }) {
                                 <Form.Item
                                   {...restField}
                                   name={[name, 'fieldName']}
-                                  rules={[{ required: true, message: 'Please input custom field name!' }]}
+                                  rules={[{ required: true, message: 'Please enter custom field name!' }]}
                                   className='mb-0 w-full grow'
                                 >
                                   <Input placeholder='Field Name' />
@@ -321,7 +321,7 @@ export default function RegisterJobTemplateDialog({ ...props }) {
                                 <Form.Item
                                   {...restField}
                                   name={[name, 'fieldValue']}
-                                  rules={[{ required: true, message: 'Please input custom field value!' }]}
+                                  rules={[{ required: true, message: 'Please enter custom field value!' }]}
                                   className='mb-0 w-full grow'
                                 >
                                   <Input placeholder='Field Value' />
@@ -352,7 +352,7 @@ export default function RegisterJobTemplateDialog({ ...props }) {
                   <>
                     <Form.Item
                       name='className'
-                      rules={[{ required: true, message: 'Please input the class name!' }]}
+                      rules={[{ required: true, message: 'Please enter the class name!' }]}
                       label='Class Name'
                     >
                       <Input />
@@ -377,7 +377,7 @@ export default function RegisterJobTemplateDialog({ ...props }) {
                                     <Form.Item
                                       {...restField}
                                       name={[name, 'configName']}
-                                      rules={[{ required: true, message: 'Please input config name!' }]}
+                                      rules={[{ required: true, message: 'Please enter config name!' }]}
                                       className='mb-0 w-full grow'
                                     >
                                       <Input placeholder='Config Name' />
@@ -385,7 +385,7 @@ export default function RegisterJobTemplateDialog({ ...props }) {
                                     <Form.Item
                                       {...restField}
                                       name={[name, 'configValue']}
-                                      rules={[{ required: true, message: 'Please input config value!' }]}
+                                      rules={[{ required: true, message: 'Please enter config value!' }]}
                                       className='mb-0 w-full grow'
                                     >
                                       <Input placeholder='Config Value' />

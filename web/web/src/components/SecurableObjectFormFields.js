@@ -95,7 +95,7 @@ export default function SecurableObjectFormFields({ fieldName, fieldKey, metalak
       } else if (t === 'job_template' || t === 'job template') {
         const [err, r] = await to(dispatch(fetchJobTemplates({ metalake, details: true })))
         if (err || !r) return
-        res = (r?.payload?.jobTemplates || []).map(j => ({ label: j.name, value: j.name }))
+        res = (r?.payload?.jobTemplatesRes?.jobTemplates || []).map(j => ({ label: j.name, value: j.name }))
       }
 
       if (res) setLocalRemoteOptions(prev => ({ ...prev, [t]: res }))
@@ -290,8 +290,12 @@ export default function SecurableObjectFormFields({ fieldName, fieldKey, metalak
     setLocalSchemaVal(schemaSelected || undefined)
     setLocalResourceVal(resourceSelected || undefined)
 
-    if (catalogSelected) loadSchemasForCatalog(catalogSelected)
-    else setSchemasOptions([])
+    const shouldLoadSchemas = ['schema', 'table', 'topic', 'fileset', 'model'].includes(currentType)
+    if (shouldLoadSchemas && catalogSelected) {
+      loadSchemasForCatalog(catalogSelected)
+    } else {
+      setSchemasOptions([])
+    }
 
     // clear privileges when type changes
   }, [catalogSelected])
@@ -765,7 +769,7 @@ export default function SecurableObjectFormFields({ fieldName, fieldKey, metalak
 
             return (
               <Input
-                placeholder={`Please input ${currentType} name`}
+                placeholder={`Please enter ${currentType || ''} name`}
                 value={displayValue}
                 onChange={e => {
                   const v = e.target.value

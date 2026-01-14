@@ -30,7 +30,7 @@ import { useEffect } from 'react'
 const { Paragraph } = Typography
 
 export default function SetOwnerDialog({ ...props }) {
-  const { open, setOpen, metalake, metadataObjectType, metadataObjectFullName } = props
+  const { open, setOpen, metalake, metadataObjectType, metadataObjectFullName, mutateOwner } = props
   const [confirmLoading, setConfirmLoading] = useState(false)
   const cascaderOwnerRef = useRef(null)
   const dispatch = useAppDispatch()
@@ -45,9 +45,14 @@ export default function SetOwnerDialog({ ...props }) {
   })
 
   useEffect(() => {
-    if (open) {
-      const { payload } = dispatch(getCurrentEntityOwner({ metalake, metadataObjectType, metadataObjectFullName }))
+    const initLoad = async () => {
+      const { payload } = await dispatch(
+        getCurrentEntityOwner({ metalake, metadataObjectType, metadataObjectFullName })
+      )
       setOwnerData(payload?.owner)
+    }
+    if (open) {
+      initLoad()
     }
   }, [open])
 
@@ -70,7 +75,8 @@ export default function SetOwnerDialog({ ...props }) {
 
         await dispatch(setEntityOwner({ metalake, metadataObjectType, metadataObjectFullName, data: submitData }))
         setConfirmLoading(false)
-        setOpen(false, true)
+        mutateOwner && mutateOwner()
+        setOpen(false)
       })
       .catch(info => {
         console.error(info)
@@ -79,7 +85,7 @@ export default function SetOwnerDialog({ ...props }) {
   }
 
   const handleCancel = () => {
-    setOpen(false, false)
+    setOpen(false)
   }
 
   return (

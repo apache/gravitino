@@ -20,7 +20,7 @@
 import React, { useState } from 'react'
 import { Form, Input, Modal, Typography } from 'antd'
 import { validateMessages, mismatchName } from '@/config'
-import { nameRegex } from '@/config/regex'
+import { nameRegex } from '@/lib/utils/regex'
 import { useResetFormOnCloseModal } from '@/lib/hooks/use-reset'
 import { createUserGroup } from '@/lib/store/userGroups'
 import { useAppDispatch } from '@/lib/hooks/useStore'

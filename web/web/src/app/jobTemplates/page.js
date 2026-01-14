@@ -235,7 +235,7 @@ export default function JobTemplatesPage() {
           <div className='flex w-1/3 gap-4'>
             <Search name='searchCatalogInput' placeholder='Search...' onChange={onSearchTable} />
             <Button type='primary' icon={<PlusOutlined />} onClick={handleJobTemplate}>
-              Create a new job template
+              Register Job Template
             </Button>
           </div>
         </Flex>
@@ -416,6 +416,21 @@ export default function JobTemplatesPage() {
                   </div>
                 </>
               )}
+              <div className='my-4'>
+                <div className='text-sm text-slate-400'>Details</div>
+                <div className='flex justify-between'>
+                  <span className='text-sm'>Creator: </span>
+                  <span className='text-sm'>{currentJobTemplate?.audit?.creator}</span>
+                </div>
+                <div className='flex justify-between'>
+                  <span className='text-sm'>Created At: </span>
+                  <span className='text-sm'>{formatToDateTime(currentJobTemplate?.audit?.createTime)}</span>
+                </div>
+                <div className='flex justify-between'>
+                  <span className='text-sm'>Updated At: </span>
+                  <span className='text-sm'>{formatToDateTime(currentJobTemplate?.audit?.lastModifiedTime)}</span>
+                </div>
+              </div>
             </>
           </Drawer>
         )}

@@ -302,7 +302,7 @@ export const providerBase = {
         select: ['hive', 'jdbc']
       },
       {
-        label: 'Uri',
+        label: 'URI',
         key: 'uri',
         value: '',
         required: true,
@@ -316,7 +316,7 @@ export const providerBase = {
         description: 'Apache Iceberg catalog warehouse config'
       },
       {
-        label: 'Jdbc Driver',
+        label: 'JDBC Driver',
         key: 'jdbc-driver',
         value: '',
         required: true,
@@ -326,7 +326,7 @@ export const providerBase = {
           '"com.mysql.jdbc.Driver" or "com.mysql.cj.jdbc.Driver" for MySQL, "org.postgresql.Driver" for PostgreSQL'
       },
       {
-        label: 'Jdbc User',
+        label: 'JDBC User',
         key: 'jdbc-user',
         value: '',
         required: true,
@@ -334,7 +334,7 @@ export const providerBase = {
         hide: ['hive']
       },
       {
-        label: 'Jdbc Password',
+        label: 'JDBC Password',
         key: 'jdbc-password',
         value: '',
         required: true,
@@ -374,27 +374,27 @@ export const providerBase = {
     label: 'MySQL',
     defaultProps: [
       {
-        label: 'Jdbc Driver',
+        label: 'JDBC Driver',
         key: 'jdbc-driver',
         value: '',
         required: true,
         description: 'e.g. com.mysql.jdbc.Driver or com.mysql.cj.jdbc.Driver'
       },
       {
-        label: 'Jdbc Url',
+        label: 'JDBC Url',
         key: 'jdbc-url',
         value: '',
         required: true,
         description: 'e.g. jdbc:mysql://localhost:3306'
       },
       {
-        label: 'Jdbc User',
+        label: 'JDBC User',
         key: 'jdbc-user',
         value: '',
         required: true
       },
       {
-        label: 'Jdbc Password',
+        label: 'JDBC Password',
         key: 'jdbc-password',
         value: '',
         required: true
@@ -405,33 +405,33 @@ export const providerBase = {
     label: 'PostgreSQL',
     defaultProps: [
       {
-        label: 'Jdbc Driver',
+        label: 'JDBC Driver',
         key: 'jdbc-driver',
         value: '',
         required: true,
         description: 'e.g. org.postgresql.Driver'
       },
       {
-        label: 'Jdbc Url',
+        label: 'JDBC Url',
         key: 'jdbc-url',
         value: '',
         required: true,
         description: 'e.g. jdbc:postgresql://localhost:5432/your_database'
       },
       {
-        label: 'Jdbc User',
+        label: 'JDBC User',
         key: 'jdbc-user',
         value: '',
         required: true
       },
       {
-        label: 'Jdbc Password',
+        label: 'JDBC Password',
         key: 'jdbc-password',
         value: '',
         required: true
       },
       {
-        label: 'Jdbc Database',
+        label: 'JDBC Database',
         key: 'jdbc-database',
         value: '',
         required: true
@@ -442,27 +442,27 @@ export const providerBase = {
     label: 'Apache Doris',
     defaultProps: [
       {
-        label: 'Jdbc Driver',
+        label: 'JDBC Driver',
         key: 'jdbc-driver',
         value: '',
         required: true,
         description: 'e.g. com.mysql.jdbc.Driver or com.mysql.cj.jdbc.Driver'
       },
       {
-        label: 'Jdbc Url',
+        label: 'JDBC Url',
         key: 'jdbc-url',
         value: '',
         required: true,
         description: 'e.g. jdbc:mysql://localhost:9030'
       },
       {
-        label: 'Jdbc User',
+        label: 'JDBC User',
         key: 'jdbc-user',
         value: '',
         required: true
       },
       {
-        label: 'Jdbc Password',
+        label: 'JDBC Password',
         key: 'jdbc-password',
         value: '',
         required: true
@@ -473,27 +473,27 @@ export const providerBase = {
     label: 'StarRocks',
     defaultProps: [
       {
-        label: 'Jdbc Driver',
+        label: 'JDBC Driver',
         key: 'jdbc-driver',
         value: '',
         required: true,
         description: 'e.g. com.mysql.jdbc.Driver or com.mysql.cj.jdbc.Driver'
       },
       {
-        label: 'Jdbc Url',
+        label: 'JDBC Url',
         key: 'jdbc-url',
         value: '',
         required: true,
         description: 'e.g. jdbc:mysql://localhost:9030'
       },
       {
-        label: 'Jdbc User',
+        label: 'JDBC User',
         key: 'jdbc-user',
         value: '',
         required: true
       },
       {
-        label: 'Jdbc Password',
+        label: 'JDBC Password',
         key: 'jdbc-password',
         value: '',
         required: true
@@ -512,7 +512,7 @@ export const providerBase = {
         description: 'paimonBackendDesc'
       },
       {
-        label: 'Uri',
+        label: 'URI',
         key: 'uri',
         value: '',
         required: true,
@@ -528,7 +528,7 @@ export const providerBase = {
         description: 'e.g. file:/user/hive/warehouse-paimon/ or hdfs://namespace/hdfs/path'
       },
       {
-        label: 'Jdbc Driver',
+        label: 'JDBC Driver',
         key: 'jdbc-driver',
         value: '',
         required: true,
@@ -538,7 +538,7 @@ export const providerBase = {
           '"com.mysql.jdbc.Driver" or "com.mysql.cj.jdbc.Driver" for MySQL, "org.postgresql.Driver" for PostgreSQL'
       },
       {
-        label: 'Jdbc User',
+        label: 'JDBC User',
         key: 'jdbc-user',
         value: '',
         required: true,
@@ -546,7 +546,7 @@ export const providerBase = {
         hide: ['hive', 'filesystem']
       },
       {
-        label: 'Jdbc Password',
+        label: 'JDBC Password',
         key: 'jdbc-password',
         value: '',
         required: true,
@@ -582,6 +582,10 @@ export const providerBase = {
       }
     ]
   },
+  'lakehouse-generic': {
+    label: 'Lakehouse Generic',
+    defaultProps: []
+  },
   'lakehouse-hudi': {
     label: 'Apache Hudi',
     defaultProps: [
@@ -594,7 +598,7 @@ export const providerBase = {
         select: ['hms']
       },
       {
-        label: 'Uri',
+        label: 'URI',
         key: 'uri',
         value: '',
         required: true,
@@ -606,27 +610,27 @@ export const providerBase = {
     label: 'OceanBase',
     defaultProps: [
       {
-        label: 'Jdbc Driver',
+        label: 'JDBC Driver',
         key: 'jdbc-driver',
         value: '',
         required: true,
         description: 'e.g. com.mysql.jdbc.Driver or com.mysql.cj.jdbc.Driver or com.oceanbase.jdbc.Driver'
       },
       {
-        label: 'Jdbc Url',
+        label: 'JDBC Url',
         key: 'jdbc-url',
         value: '',
         required: true,
         description: 'e.g. jdbc:mysql://localhost:2881 or jdbc:oceanbase://localhost:2881'
       },
       {
-        label: 'Jdbc User',
+        label: 'JDBC User',
         key: 'jdbc-user',
         value: '',
         required: true
       },
       {
-        label: 'Jdbc Password',
+        label: 'JDBC Password',
         key: 'jdbc-password',
         value: '',
         required: true
