@@ -56,6 +56,7 @@ dependencies {
   testImplementation("io.trino:trino-testing:$trinoVersion") {
     exclude("org.apache.logging.log4j")
   }
+  testRuntimeOnly("org.junit.platform:junit-platform-launcher:1.12.0")
   testRuntimeOnly(libs.junit.jupiter.engine)
 }
 

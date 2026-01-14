@@ -162,7 +162,7 @@ public abstract class TestGravitinoConnector extends AbstractGravitinoConnectorT
         .contains("COMMENT 'test column comments'");
 
     // test add column and drop column, but the memory connector is not supported these operations.
-    if (trinoVersion < 452) {
+    if (trinoVersion < 496) {
       assertQueryFails(
           String.format("alter table %s add column if not exists c varchar", fullTableName1),
           "This connector does not support adding columns");
@@ -180,12 +180,12 @@ public abstract class TestGravitinoConnector extends AbstractGravitinoConnectorT
     // test rename column, but the memory connector is not supported these operations.
     if (trinoVersion < 452) {
       assertQueryFails(
-          String.format("alter table %s rename column a to c ", fullTableName1),
+          String.format("alter table %s rename column c to d ", fullTableName1),
           "This connector does not support renaming columns");
     } else {
-      assertUpdate(String.format("alter table %s rename column c to d ", fullTableName1));
+      assertUpdate(String.format("alter table %s rename column b to d ", fullTableName1));
       assertThat((String) computeScalar("show create table " + fullTableName1))
-          .contains("d varchar");
+          .contains("d integer");
     }
 
     assertQueryFails(

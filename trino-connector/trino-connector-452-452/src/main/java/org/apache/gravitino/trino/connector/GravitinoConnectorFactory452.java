@@ -36,7 +36,7 @@ public class GravitinoConnectorFactory452 extends GravitinoConnectorFactory {
 
   @Override
   protected int getMaxSupportTrinoSpiVersion() {
-    return 452;
+    return 498;
   }
 
   @Override
