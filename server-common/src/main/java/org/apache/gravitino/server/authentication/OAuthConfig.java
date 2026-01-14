@@ -61,7 +61,8 @@ public interface OAuthConfig {
 
   ConfigEntry<String> DEFAULT_SERVER_URI =
       new ConfigBuilder(OAUTH_CONFIG_PREFIX + "serverUri")
-          .doc("The uri of the default OAuth server")
+          .doc(
+              "The uri of the default OAuth server. Required when using StaticSignKeyValidator, not required for JWKS-based validators")
           .version(ConfigConstants.VERSION_0_3_0)
           .stringConf()
           .checkValue(StringUtils::isNotBlank, ConfigConstants.NOT_BLANK_ERROR_MSG)
@@ -69,7 +70,8 @@ public interface OAuthConfig {
 
   ConfigEntry<String> DEFAULT_TOKEN_PATH =
       new ConfigBuilder(OAUTH_CONFIG_PREFIX + "tokenPath")
-          .doc("The path for token of the default OAuth server")
+          .doc(
+              "The path for token of the default OAuth server. Required when using StaticSignKeyValidator, not required for JWKS-based validators")
           .version(ConfigConstants.VERSION_0_3_0)
           .stringConf()
           .checkValue(StringUtils::isNotBlank, ConfigConstants.NOT_BLANK_ERROR_MSG)
