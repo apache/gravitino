@@ -35,7 +35,6 @@ import io.trino.spi.transaction.IsolationLevel;
 import java.util.List;
 import java.util.Set;
 import org.apache.gravitino.NameIdentifier;
-import org.apache.gravitino.client.GravitinoMetalake;
 import org.apache.gravitino.trino.connector.catalog.CatalogConnectorContext;
 import org.apache.gravitino.trino.connector.catalog.CatalogConnectorMetadata;
 import org.apache.gravitino.trino.connector.catalog.CatalogConnectorMetadataAdapter;

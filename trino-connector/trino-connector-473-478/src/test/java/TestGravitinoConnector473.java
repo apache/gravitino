@@ -23,17 +23,17 @@ import io.trino.Session;
 import io.trino.testing.DistributedQueryRunner;
 import org.apache.gravitino.client.GravitinoAdminClient;
 import org.apache.gravitino.trino.connector.GravitinoPlugin;
-import org.apache.gravitino.trino.connector.GravitinoPlugin477;
+import org.apache.gravitino.trino.connector.GravitinoPlugin473;
 import org.apache.gravitino.trino.connector.TestGravitinoConnector;
 import org.apache.gravitino.trino.connector.TestGravitinoConnectorWithMetalakeCatalogName;
 import org.junit.jupiter.api.Nested;
 
-public class TestGravitinoConnector477 {
+public class TestGravitinoConnector473 {
   @Nested
   class SingleMetalake extends TestGravitinoConnector {
     @Override
     protected GravitinoPlugin createGravitinoPulgin(GravitinoAdminClient client) {
-      return new GravitinoPlugin477(client);
+      return new GravitinoPlugin473(client);
     }
 
     @Override
@@ -47,7 +47,7 @@ public class TestGravitinoConnector477 {
   class MultiMetalake extends TestGravitinoConnectorWithMetalakeCatalogName {
     @Override
     protected GravitinoPlugin createGravitinoPulgin(GravitinoAdminClient client) {
-      return new GravitinoPlugin477(client);
+      return new GravitinoPlugin473(client);
     }
 
     @Override

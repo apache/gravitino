@@ -18,10 +18,16 @@
  */
 package org.apache.gravitino.trino.connector;
 
+import com.google.common.annotations.VisibleForTesting;
+import java.util.ArrayList;
+import java.util.List;
 import org.apache.gravitino.client.GravitinoAdminClient;
+import org.apache.gravitino.trino.connector.catalog.CatalogConnectorManager;
 
 /** Trino plugin endpoint, using java spi mechanism */
 public class GravitinoPlugin473 extends GravitinoPlugin {
+
+  private List<GravitinoConnectorFactory> factorys = new ArrayList<>();
 
   public GravitinoPlugin473(GravitinoAdminClient client) {
     super(client);
@@ -29,6 +35,30 @@ public class GravitinoPlugin473 extends GravitinoPlugin {
 
   @Override
   protected GravitinoConnectorFactory createConnectorFactory(GravitinoAdminClient client) {
-    return new GravitinoConnectorFactory473(client);
+    GravitinoConnectorFactory factory = new GravitinoConnectorFactory473(client);
+    factorys.add(factory);
+    return factory;
+  }
+
+  @VisibleForTesting
+  @Override
+  CatalogConnectorManager getCatalogConnectorManager() {
+    for (GravitinoConnectorFactory factory : factorys) {
+      if (factory.getCatalogConnectorManager() != null) {
+        return factory.getCatalogConnectorManager();
+      }
+    }
+    throw new RuntimeException("Failed to get CatalogConnectorManager");
+  }
+
+  @VisibleForTesting
+  @Override
+  int getTrinoVersion() {
+    for (GravitinoConnectorFactory factory : factorys) {
+      if (factory.getCatalogConnectorManager() != null) {
+        return factory.getTrinoVersion();
+      }
+    }
+    throw new RuntimeException("Failed to get TrinoVersion");
   }
 }

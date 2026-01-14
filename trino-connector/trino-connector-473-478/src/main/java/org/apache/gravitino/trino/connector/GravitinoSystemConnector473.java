@@ -30,50 +30,55 @@ import io.trino.spi.connector.SourcePage;
 import org.apache.gravitino.trino.connector.system.GravitinoSystemConnector;
 import org.apache.gravitino.trino.connector.system.storedprocedure.GravitinoStoredProcedureFactory;
 
-public class GravitinoSystemConnector477 extends GravitinoSystemConnector {
+public class GravitinoSystemConnector473 extends GravitinoSystemConnector {
 
-  public GravitinoSystemConnector477(
+  public GravitinoSystemConnector473(
       GravitinoStoredProcedureFactory gravitinoStoredProcedureFactory) {
     super(gravitinoStoredProcedureFactory);
   }
 
   @Override
   protected ConnectorSplitManager createSplitManager() {
-    return new GravitinoSplitManager477();
+    return new GravitinoSplitManager473();
   }
 
   @Override
   protected ConnectorPageSourceProvider createPageSourceProvider() {
-    return new GravitinoPageSourceProvider477();
+    return new GravitinoPageSourceProvider473();
   }
 
-  static class GravitinoSplitManager477 extends SplitManager {
+  static class GravitinoSplitManager473 extends SplitManager {
 
     protected ConnectorSplit createSplit(SchemaTableName tableName) {
-      return new Split477(tableName);
+      return new Split473(tableName);
     }
   }
 
-  static class GravitinoPageSourceProvider477 extends DatasourceProvider {
+  static class GravitinoPageSourceProvider473 extends DatasourceProvider {
 
     @Override
     protected ConnectorPageSource createPageSource(Page page) {
-      return new GravitinoPageSource477(page);
+      return new GravitinoPageSource473(page);
     }
   }
 
-  public static class Split477 extends Split {
+  public static class Split473 extends Split {
 
     @JsonCreator
-    public Split477(@JsonProperty("tableName") SchemaTableName tableName) {
+    public Split473(@JsonProperty("tableName") SchemaTableName tableName) {
       super(tableName);
     }
   }
 
-  static class GravitinoPageSource477 extends SystemTablePageSource {
+  static class GravitinoPageSource473 extends SystemTablePageSource {
 
-    public GravitinoPageSource477(Page page) {
+    public GravitinoPageSource473(Page page) {
       super(page);
+    }
+
+    @SuppressWarnings("removal")
+    public Page getNextPage() {
+      return nextPage();
     }
 
     @Override

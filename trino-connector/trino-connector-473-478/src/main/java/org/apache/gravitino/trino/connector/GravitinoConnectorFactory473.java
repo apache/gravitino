@@ -23,20 +23,20 @@ import org.apache.gravitino.trino.connector.catalog.CatalogConnectorContext;
 import org.apache.gravitino.trino.connector.system.GravitinoSystemConnector;
 import org.apache.gravitino.trino.connector.system.storedprocedure.GravitinoStoredProcedureFactory;
 
-public class GravitinoConnectorFactory477 extends GravitinoConnectorFactory {
+public class GravitinoConnectorFactory473 extends GravitinoConnectorFactory {
 
-  public GravitinoConnectorFactory477(GravitinoAdminClient client) {
+  public GravitinoConnectorFactory473(GravitinoAdminClient client) {
     super(client);
   }
 
   @Override
   protected int getMinSupportTrinoSpiVersion() {
-    return 477;
+    return 473;
   }
 
   @Override
   protected int getMaxSupportTrinoSpiVersion() {
-    return 479;
+    return 478;
   }
 
   @Override
@@ -46,12 +46,12 @@ public class GravitinoConnectorFactory477 extends GravitinoConnectorFactory {
 
   @Override
   protected GravitinoConnector createConnector(CatalogConnectorContext connectorContext) {
-    return new GravitinoConnector477(connectorContext);
+    return new GravitinoConnector473(connectorContext);
   }
 
   @Override
   protected GravitinoSystemConnector createSystemConnector(
       GravitinoStoredProcedureFactory storedProcedureFactory) {
-    return new GravitinoSystemConnector477(storedProcedureFactory);
+    return new GravitinoSystemConnector473(storedProcedureFactory);
   }
 }
