@@ -48,7 +48,7 @@ import org.apache.gravitino.trino.connector.catalog.CatalogConnectorMetadataAdap
 public class GravitinoConnector implements Connector {
 
   private final NameIdentifier catalogIdentifier;
-  private final CatalogConnectorContext catalogConnectorContext;
+  protected final CatalogConnectorContext catalogConnectorContext;
 
   /**
    * Constructs a new GravitinoConnector with the specified catalog identifier and catalog connector
@@ -101,6 +101,7 @@ public class GravitinoConnector implements Connector {
       ConnectorMetadata internalMetadata) {
     return new GravitinoMetadata(catalogConnectorMetadata, metadataAdapter, internalMetadata);
   }
+
 
   @Override
   public List<PropertyMetadata<?>> getTableProperties() {

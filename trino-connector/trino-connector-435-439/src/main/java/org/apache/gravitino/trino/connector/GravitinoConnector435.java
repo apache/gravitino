@@ -26,11 +26,8 @@ import org.apache.gravitino.trino.connector.catalog.CatalogConnectorMetadataAdap
 
 public class GravitinoConnector435 extends GravitinoConnector {
 
-  private final CatalogConnectorContext connectorContext;
-
   public GravitinoConnector435(CatalogConnectorContext connectorContext) {
     super(connectorContext);
-    this.connectorContext = connectorContext;
   }
 
   @Override
@@ -43,7 +40,8 @@ public class GravitinoConnector435 extends GravitinoConnector {
 
   @Override
   public ConnectorSplitManager getSplitManager() {
-    ConnectorSplitManager splitManager = connectorContext.getInternalConnector().getSplitManager();
+    ConnectorSplitManager splitManager =
+        catalogConnectorContext.getInternalConnector().getSplitManager();
     return new GravitinoSplitManager435(splitManager);
   }
 }

@@ -28,23 +28,13 @@ repositories {
   mavenCentral()
 }
 
+var trinoVersion = 435
 val trinoVersionProvider =
   providers.gradleProperty("trinoVersion").map { it.toInt() }.orElse(435)
-val trinoVersion = trinoVersionProvider.get()
+trinoVersion = trinoVersionProvider.get()
 
 java {
-  println("Building Trino Connector for Trino version: $trinoVersion")
-  if (trinoVersion.toInt() >= 478) {
-    toolchain.languageVersion.set(JavaLanguageVersion.of(24))
-  } else if (trinoVersion.toInt() >= 468) {
-    toolchain.languageVersion.set(JavaLanguageVersion.of(17))
-  } else if (trinoVersion.toInt() >= 448) {
-    toolchain.languageVersion.set(JavaLanguageVersion.of(17))
-  } else if (trinoVersion.toInt() >= 436) {
-    toolchain.languageVersion.set(JavaLanguageVersion.of(21))
-  } else if (trinoVersion.toInt() >= 435) {
-    toolchain.languageVersion.set(JavaLanguageVersion.of(17))
-  }
+  toolchain.languageVersion.set(JavaLanguageVersion.of(24))
 }
 
 dependencies {
@@ -86,6 +76,7 @@ tasks {
 }
 
 tasks.withType<JavaCompile>().configureEach {
-  // Error Prone still crashes on the JDK 24 toolchain required by Trino 478.
+  // Error Prone is incompatible with the JDK 24 toolchain required by this Trino range.
   options.errorprone.isEnabled.set(false)
+  options.release.set(17)
 }
