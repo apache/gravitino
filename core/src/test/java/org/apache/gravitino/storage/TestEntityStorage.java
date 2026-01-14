@@ -54,6 +54,9 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.MethodSource;
 import org.mockito.Mockito;
 
+// Note: Do not add more tests in this class as it's already getting too large. If needed, please
+// just extend AbstractEntityStoreTest and add a new test class. More, please refer to
+// `TestEntityStoreForLance` or `TestEntityStoreRelationCache`.
 @Tag("gravitino-docker-test")
 public class TestEntityStorage extends AbstractEntityStorageTest {
 
@@ -1179,4 +1182,7 @@ public class TestEntityStorage extends AbstractEntityStorageTest {
       destroy(type);
     }
   }
+  // Note: Do not add more tests in this class as it's already getting too large. If needed, please
+  // just extend AbstractEntityStoreTest and add a new test class. More, please refer to
+  // `TestEntityStoreForLance` or `TestEntityStoreRelationCache`.
 }
