@@ -198,6 +198,7 @@ public class GravitinoConnectorFactory implements ConnectorFactory {
     return MAX_SUPPORT_TRINO_SPI_VERSION;
   }
 
+  @SuppressWarnings("deprecation")
   protected boolean isCoordinator(ConnectorContext connectorContext) {
     return connectorContext.getNodeManager().getCurrentNode().isCoordinator();
   }

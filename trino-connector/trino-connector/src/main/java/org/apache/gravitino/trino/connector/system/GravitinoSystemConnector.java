@@ -96,6 +96,8 @@ public class GravitinoSystemConnector implements Connector {
     return createPageSourceProvider();
   }
 
+  public void shutdown() {}
+
   protected ConnectorSplitManager createSplitManager() {
     return new SplitManager();
   }

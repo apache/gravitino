@@ -20,39 +20,52 @@ package org.apache.gravitino.trino.connector;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.ImmutableList;
-import io.trino.spi.Plugin;
 import io.trino.spi.connector.ConnectorFactory;
+import java.util.ArrayList;
+import java.util.List;
 import org.apache.gravitino.client.GravitinoAdminClient;
 import org.apache.gravitino.trino.connector.catalog.CatalogConnectorManager;
 
 /** Trino plugin endpoint, using java spi mechanism */
-public class GravitinoPlugin implements Plugin {
-  private GravitinoConnectorFactory factory;
-  protected GravitinoAdminClient client;
+public class GravitinoPlugin477 extends GravitinoPlugin {
 
-  public GravitinoPlugin() {}
+  private List<GravitinoConnectorFactory> factorys = new ArrayList<>();
 
-  public GravitinoPlugin(GravitinoAdminClient client) {
-    this.client = client;
+  public GravitinoPlugin477(GravitinoAdminClient client) {
+    super(client);
   }
 
   @Override
   public Iterable<ConnectorFactory> getConnectorFactories() {
-    factory = createConnectorFactory(client);
+    GravitinoConnectorFactory factory = createConnectorFactory(client);
+    factorys.add(factory);
     return ImmutableList.of(factory);
   }
 
+  @Override
   protected GravitinoConnectorFactory createConnectorFactory(GravitinoAdminClient client) {
-    return new GravitinoConnectorFactory(client);
+    return new GravitinoConnectorFactory477(client);
   }
 
   @VisibleForTesting
+  @Override
   CatalogConnectorManager getCatalogConnectorManager() {
-    return factory.getCatalogConnectorManager();
+    for (GravitinoConnectorFactory factory : factorys) {
+      if (factory.getCatalogConnectorManager() != null) {
+        return factory.getCatalogConnectorManager();
+      }
+    }
+    throw new RuntimeException("Failed to get CatalogConnectorManager");
   }
 
   @VisibleForTesting
+  @Override
   int getTrinoVersion() {
-    return factory.getTrinoVersion();
+    for (GravitinoConnectorFactory factory : factorys) {
+      if (factory.getCatalogConnectorManager() != null) {
+        return factory.getTrinoVersion();
+      }
+    }
+    throw new RuntimeException("Failed to get TrinoVersion");
   }
 }

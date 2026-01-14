@@ -49,6 +49,7 @@ public class GravitinoConnector implements Connector {
 
   private final NameIdentifier catalogIdentifier;
   protected final CatalogConnectorContext catalogConnectorContext;
+  private final CatalogConnectorMetadata connectorMetadata;
 
   /**
    * Constructs a new GravitinoConnector with the specified catalog identifier and catalog connector
@@ -59,6 +60,8 @@ public class GravitinoConnector implements Connector {
   public GravitinoConnector(CatalogConnectorContext catalogConnectorContext) {
     this.catalogIdentifier = catalogConnectorContext.getCatalog().geNameIdentifier();
     this.catalogConnectorContext = catalogConnectorContext;
+    this.connectorMetadata =
+        new CatalogConnectorMetadata(catalogConnectorContext.getMetalake(), this.catalogIdentifier);
   }
 
   @Override
@@ -85,14 +88,8 @@ public class GravitinoConnector implements Connector {
     ConnectorMetadata internalMetadata =
         internalConnector.getMetadata(session, gravitinoTransactionHandle.getInternalHandle());
     Preconditions.checkArgument(internalMetadata != null, "Internal metadata must not be null");
-
-    GravitinoMetalake metalake = catalogConnectorContext.getMetalake();
-
-    CatalogConnectorMetadata catalogConnectorMetadata =
-        new CatalogConnectorMetadata(metalake, catalogIdentifier);
-
     return createGravitinoMetadata(
-        catalogConnectorMetadata, catalogConnectorContext.getMetadataAdapter(), internalMetadata);
+        connectorMetadata, catalogConnectorContext.getMetadataAdapter(), internalMetadata);
   }
 
   protected GravitinoMetadata createGravitinoMetadata(
@@ -177,5 +174,11 @@ public class GravitinoConnector implements Connector {
     ConnectorNodePartitioningProvider nodePartitioningProvider =
         internalConnector.getNodePartitioningProvider();
     return new GravitinoNodePartitioningProvider(nodePartitioningProvider);
+  }
+
+  public void shutdown() {
+    Connector internalConnector = catalogConnectorContext.getInternalConnector();
+    internalConnector.shutdown();
+    catalogConnectorContext.close();
   }
 }
