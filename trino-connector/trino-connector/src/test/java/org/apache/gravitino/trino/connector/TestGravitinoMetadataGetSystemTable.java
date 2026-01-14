@@ -51,7 +51,7 @@ public class TestGravitinoMetadataGetSystemTable {
         .thenReturn(Optional.of(mockSystemTable));
 
     GravitinoMetadata gravitinoMetadata =
-        new GravitinoMetadata(catalogConnectorMetadata, metadataAdapter, internalMetadata);
+        new TestGravitinoMetadata(catalogConnectorMetadata, metadataAdapter, internalMetadata);
 
     Optional<SystemTable> result = gravitinoMetadata.getSystemTable(session, tableName);
 
@@ -73,11 +73,20 @@ public class TestGravitinoMetadataGetSystemTable {
         .thenReturn(Optional.empty());
 
     GravitinoMetadata gravitinoMetadata =
-        new GravitinoMetadata(catalogConnectorMetadata, metadataAdapter, internalMetadata);
+        new TestGravitinoMetadata(catalogConnectorMetadata, metadataAdapter, internalMetadata);
 
     Optional<SystemTable> result = gravitinoMetadata.getSystemTable(session, tableName);
 
     assertFalse(result.isPresent());
     verify(internalMetadata).getSystemTable(session, tableName);
+  }
+
+  private static final class TestGravitinoMetadata extends GravitinoMetadata {
+    private TestGravitinoMetadata(
+        CatalogConnectorMetadata catalogConnectorMetadata,
+        CatalogConnectorMetadataAdapter metadataAdapter,
+        ConnectorMetadata internalMetadata) {
+      super(catalogConnectorMetadata, metadataAdapter, internalMetadata);
+    }
   }
 }

@@ -76,7 +76,7 @@ import org.apache.gravitino.trino.connector.metadata.GravitinoTable;
  * server. It also transforms the different metadata formats between Trino and Gravitino.
  * Additionally, it wraps the internal connector metadata for accessing data.
  */
-public class GravitinoMetadata implements ConnectorMetadata {
+public abstract class GravitinoMetadata implements ConnectorMetadata {
 
   // The column handle name that will generate row IDs for the merge operation.
   public static final String MERGE_ROW_ID = "$row_id";
@@ -600,17 +600,6 @@ public class GravitinoMetadata implements ConnectorMetadata {
     Optional<ConnectorPartitioningHandle> updateLayout =
         internalMetadata.getUpdateLayout(session, GravitinoHandle.unWrap(tableHandle));
     return updateLayout.map(GravitinoPartitioningHandle::new);
-  }
-
-  @Override
-  public ConnectorMergeTableHandle beginMerge(
-      ConnectorSession session, ConnectorTableHandle tableHandle, RetryMode retryMode) {
-    ConnectorMergeTableHandle connectorMergeTableHandle =
-        internalMetadata.beginMerge(session, GravitinoHandle.unWrap(tableHandle), retryMode);
-    SchemaTableName tableName = getTableName(tableHandle);
-
-    return new GravitinoMergeTableHandle(
-        tableName.getSchemaName(), tableName.getTableName(), connectorMergeTableHandle);
   }
 
   @Override

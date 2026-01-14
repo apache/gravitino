@@ -99,7 +99,7 @@ public class GravitinoConnector implements Connector {
       CatalogConnectorMetadata catalogConnectorMetadata,
       CatalogConnectorMetadataAdapter metadataAdapter,
       ConnectorMetadata internalMetadata) {
-    return new GravitinoMetadata(catalogConnectorMetadata, metadataAdapter, internalMetadata);
+    throw new RuntimeException("Should be overridden in subclass");
   }
 
 
