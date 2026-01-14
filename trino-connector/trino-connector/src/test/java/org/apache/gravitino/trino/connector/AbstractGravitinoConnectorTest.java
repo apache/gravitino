@@ -48,8 +48,8 @@ abstract class AbstractGravitinoConnectorTest extends AbstractTestQueryFramework
           .installPlugin("memory", new MemoryPlugin());
       CatalogConnectorManager catalogConnectorManager =
           gravitinoPlugin.getCatalogConnectorManager();
-      server.setCatalogConnectorManager(catalogConnectorManager);
       trinoVersion = gravitinoPlugin.getTrinoVersion();
+      server.setCatalogConnectorManager(catalogConnectorManager, trinoVersion);
 
       // Wait for the catalog to be created. Wait for at least 30 seconds.
       Awaitility.await()
