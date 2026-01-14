@@ -192,7 +192,7 @@ public class GravitinoSystemConnector implements Connector {
   }
 
   /** The system table page source. */
-  public static abstract class SystemTablePageSource implements ConnectorPageSource {
+  public abstract static class SystemTablePageSource implements ConnectorPageSource {
 
     protected boolean isFinished = false;
     protected final Page page;
