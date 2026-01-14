@@ -122,6 +122,10 @@ public class LanceTableOperations {
     }
   }
 
+  /**
+   * According to the spec of lance-namespace with version 0.0.20 to 0.31, createEmptyTable only
+   * stores the table metadata including its location, and will never touch lance storage.
+   */
   @POST
   @Path("/create-empty")
   @Produces("application/json")
@@ -167,7 +171,8 @@ public class LanceTableOperations {
               : Maps.newHashMap(registerTableRequest.getProperties());
       props.put(LANCE_LOCATION, registerTableRequest.getLocation());
       props.put(LanceConstants.LANCE_TABLE_REGISTER, "true");
-      ModeEnum mode = registerTableRequest.getMode();
+      ModeEnum mode =
+          registerTableRequest.getMode() == null ? ModeEnum.CREATE : registerTableRequest.getMode();
 
       RegisterTableResponse response =
           lanceNamespace.asTableOps().registerTable(tableId, mode, delimiter, props);

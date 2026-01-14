@@ -19,7 +19,10 @@
 package org.apache.gravitino.storage.relational.mapper.provider.base;
 
 import java.util.List;
+import org.apache.gravitino.storage.relational.mapper.CatalogMetaMapper;
+import org.apache.gravitino.storage.relational.mapper.MetalakeMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.ModelMetaMapper;
+import org.apache.gravitino.storage.relational.mapper.SchemaMetaMapper;
 import org.apache.gravitino.storage.relational.po.ModelPO;
 import org.apache.ibatis.annotations.Param;
 
@@ -67,6 +70,46 @@ public class ModelMetaBaseSQLProvider {
         + " WHERE schema_id = #{schemaId} AND deleted_at = 0";
   }
 
+  public String listModelPOsByFullQualifiedName(
+      @Param("metalakeName") String metalakeName,
+      @Param("catalogName") String catalogName,
+      @Param("schemaName") String schemaName) {
+    return """
+        SELECT
+            mm.metalake_id AS metalakeId,
+            cm.catalog_id AS catalogId,
+            sm.schema_id AS schemaId,
+            mo.model_id AS modelId,
+            mo.model_name AS modelName,
+            mo.model_comment AS modelComment,
+            mo.model_properties AS modelProperties,
+            mo.model_latest_version AS modelLatestVersion,
+            mo.audit_info AS auditInfo,
+            mo.deleted_at AS deletedAt
+        FROM
+            %s mm
+        INNER JOIN
+            %s cm ON mm.metalake_id = cm.metalake_id
+            AND cm.catalog_name = #{catalogName}
+            AND cm.deleted_at = 0
+        LEFT JOIN
+            %s sm ON cm.catalog_id = sm.catalog_id
+            AND sm.schema_name = #{schemaName}
+            AND sm.deleted_at = 0
+        LEFT JOIN
+            %s mo ON sm.schema_id = mo.schema_id
+            AND mo.deleted_at = 0
+        WHERE
+            mm.metalake_name = #{metalakeName}
+            AND mm.deleted_at = 0;
+            """
+        .formatted(
+            MetalakeMetaMapper.TABLE_NAME,
+            CatalogMetaMapper.TABLE_NAME,
+            SchemaMetaMapper.TABLE_NAME,
+            ModelMetaMapper.TABLE_NAME);
+  }
+
   public String listModelPOsByModelIds(List<Long> modelIds) {
     return "<script>"
         + " SELECT model_id AS modelId, model_name AS modelName, metalake_id AS metalakeId,"
@@ -93,6 +136,48 @@ public class ModelMetaBaseSQLProvider {
         + " FROM "
         + ModelMetaMapper.TABLE_NAME
         + " WHERE schema_id = #{schemaId} AND model_name = #{modelName} AND deleted_at = 0";
+  }
+
+  public String selectModelByFullQualifiedName(
+      @Param("metalakeName") String metalakeName,
+      @Param("catalogName") String catalogName,
+      @Param("schemaName") String schemaName,
+      @Param("modelName") String modelName) {
+    return """
+        SELECT
+            mm.metalake_id AS metalakeId,
+            cm.catalog_id AS catalogId,
+            sm.schema_id AS schemaId,
+            mo.model_id AS modelId,
+            mo.model_name AS modelName,
+            mo.model_comment AS modelComment,
+            mo.model_properties AS modelProperties,
+            mo.model_latest_version AS modelLatestVersion,
+            mo.audit_info AS auditInfo,
+            mo.deleted_at AS deletedAt
+        FROM
+            %s mm
+        INNER JOIN
+            %s cm ON mm.metalake_id = cm.metalake_id
+            AND cm.catalog_name = #{catalogName}
+            AND cm.deleted_at = 0
+        LEFT JOIN
+            %s sm ON cm.catalog_id = sm.catalog_id
+            AND sm.schema_name = #{schemaName}
+            AND sm.deleted_at = 0
+        LEFT JOIN
+            %s mo ON sm.schema_id = mo.schema_id
+            AND mo.model_name = #{modelName}
+            AND mo.deleted_at = 0
+        WHERE
+            mm.metalake_name = #{metalakeName}
+            AND mm.deleted_at = 0;
+            """
+        .formatted(
+            MetalakeMetaMapper.TABLE_NAME,
+            CatalogMetaMapper.TABLE_NAME,
+            SchemaMetaMapper.TABLE_NAME,
+            ModelMetaMapper.TABLE_NAME);
   }
 
   public String selectModelIdBySchemaIdAndModelName(

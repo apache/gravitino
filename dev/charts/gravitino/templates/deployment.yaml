@@ -52,120 +52,120 @@ spec:
         {{- toYaml . | nindent 8 }}
       {{- end }}    
       initContainers:
-      - name: sqlfile
-        image: {{ include "gravitino.image" . }}
-        imagePullPolicy: "{{ .Values.image.pullPolicy }}"
-        command:
-        - /bin/bash
-        - -c
-        - |
-          cp -r /root/gravitino/scripts/*  /tmp/scripts/
-          VERSION=$(ls /root/gravitino/libs/gravitino-server-* | grep -oP '[0-9]+\.[0-9]+\.[0-9]+'|head -1)
-          echo $VERSION > /tmp/scripts/version.txt
-        resources:
-          {{- toYaml .Values.initResources | nindent 10 }}
-        volumeMounts:
-          - mountPath: /tmp/scripts/
-            name: scripts-emptydir
+        - name: sqlfile
+          image: {{ include "gravitino.image" . }}
+          imagePullPolicy: "{{ .Values.image.pullPolicy }}"
+          command:
+            - /bin/bash
+            - -c
+            - |
+              cp -r /root/gravitino/scripts/*  /tmp/scripts/
+              VERSION=$(ls /root/gravitino/libs/gravitino-server-* | grep -oP '[0-9]+\.[0-9]+\.[0-9]+'|head -1)
+              echo $VERSION > /tmp/scripts/version.txt
+          resources:
+            {{- toYaml .Values.initResources | nindent 12 }}
+          volumeMounts:
+            - mountPath: /tmp/scripts/
+              name: scripts-emptydir
       {{- if .Values.mysql.enabled }}
-      - name: init-mysql
-        image: {{ include "init-mysql.image" . }}
-        imagePullPolicy: "{{ .Values.image.pullPolicy }}"
-        command:
-          - /bin/bash
-          - -c
-          - |
-            while ! mysql -h {{ .Release.Name }}-mysql -u root -e "SELECT 1"; do
-              echo "Waiting for MySQL to be ready..."
-              sleep 2
-            done
-            VERSION=$(cat /scripts/version.txt)
-            if [ -z "$VERSION" ]; then
-              echo "ERROR:Please set VERSION"
-              exit 1
-            fi
-            dir="/scripts/mysql"
-            schema_file=$(ls $dir/schema-*-mysql.sql | sort -V | awk -F'[-]' '$2 <= '$VERSION' {print $0}' | tail -n 1)
-            if [ ! -f "$schema_file" ]; then
-              echo "ERROR:Failed to find schema file $schema_file"
-              exit 1
-            fi
-            upgrade_file=$(ls $dir/upgrade-*-to-*-mysql.sql | sort -V | awk -F'[-]' '$4 <= '$VERSION' {print $0}' | tail -n 1)
-            if [ ! -f "$upgrade_file" ]; then
-              echo "ERROR:Failed to find upgrade file $upgrade_file"
-              exit 1
-            fi
-            echo "Schema file: $schema_file"
-            echo "Upgrade file: $upgrade_file"
-            if ! mysql -h {{ .Release.Name }}-mysql -u root -D $GRAVITINO_DB <"$upgrade_file"; then
-              echo "WARNING: Upgrade script failed: $upgrade_file" >&2
-              echo "Continuing with schema script..." >&2
-            fi
-            mysql -h {{ .Release.Name }}-mysql -u root -D $GRAVITINO_DB <$schema_file
-        resources:
-          {{- toYaml .Values.initResources | nindent 10 }}
-        env:
-          - name: MYSQL_PWD
-            valueFrom:
-              secretKeyRef:
-                name: {{ .Release.Name }}-mysql
-                key: mysql-root-password
-          - name: GRAVITINO_DB
-            value: {{ .Values.mysql.auth.database }}
-        volumeMounts:
-          - mountPath: /scripts
-            name: scripts-emptydir
+        - name: init-mysql
+          image: {{ include "init-mysql.image" . }}
+          imagePullPolicy: "{{ .Values.image.pullPolicy }}"
+          command:
+            - /bin/bash
+            - -c
+            - |
+              while ! mysql -h {{ .Release.Name }}-mysql -u root -e "SELECT 1"; do
+                echo "Waiting for MySQL to be ready..."
+                sleep 2
+              done
+              VERSION=$(cat /scripts/version.txt)
+              if [ -z "$VERSION" ]; then
+                echo "ERROR:Please set VERSION"
+                exit 1
+              fi
+              dir="/scripts/mysql"
+              schema_file=$(ls $dir/schema-*-mysql.sql | sort -V | awk -F'[-]' '$2 <= '$VERSION' {print $0}' | tail -n 1)
+              if [ ! -f "$schema_file" ]; then
+                echo "ERROR:Failed to find schema file $schema_file"
+                exit 1
+              fi
+              upgrade_file=$(ls $dir/upgrade-*-to-*-mysql.sql | sort -V | awk -F'[-]' '$4 <= '$VERSION' {print $0}' | tail -n 1)
+              if [ ! -f "$upgrade_file" ]; then
+                echo "ERROR:Failed to find upgrade file $upgrade_file"
+                exit 1
+              fi
+              echo "Schema file: $schema_file"
+              echo "Upgrade file: $upgrade_file"
+              if ! mysql -h {{ .Release.Name }}-mysql -u root -D $GRAVITINO_DB <"$upgrade_file"; then
+                echo "WARNING: Upgrade script failed: $upgrade_file" >&2
+                echo "Continuing with schema script..." >&2
+              fi
+              mysql -h {{ .Release.Name }}-mysql -u root -D $GRAVITINO_DB <$schema_file
+          resources:
+            {{- toYaml .Values.initResources | nindent 12 }}
+          env:
+            - name: MYSQL_PWD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Release.Name }}-mysql
+                  key: mysql-root-password
+            - name: GRAVITINO_DB
+              value: {{ .Values.mysql.auth.database }}
+          volumeMounts:
+            - mountPath: /scripts
+              name: scripts-emptydir
       {{- end }}
       {{- if .Values.postgresql.enabled }}
-      - name: init-postgresql
-        image: {{ include "init-postgresql.image" . }}
-        imagePullPolicy: "{{ .Values.image.pullPolicy }}"
-        command:
-          - /bin/bash
-          - -c
-          - |
-            while ! PGPASSWORD=$POSTGRES_PASSWORD psql -h {{ .Release.Name }}-postgresql -U $POSTGRES_USER -c "SELECT 1"; do
-              echo "Waiting for PostgreSQL to be ready..."
-              sleep 2
-            done
-            VERSION=$(cat /scripts/version.txt)
-            if [ -z "$VERSION" ]; then
-              echo "ERROR:Please set VERSION"
-              exit 1
-            fi
-            dir="/scripts/postgresql"
-            schema_file=$(ls $dir/schema-*-postgresql.sql | sort -V | awk -F'[-]' '$2 <= '$VERSION' {print $0}' | tail -n 1)
-            if [ ! -f "$schema_file" ]; then
-              echo "ERROR:Failed to find schema file $schema_file"
-              exit 1
-            fi
-            upgrade_file=$(ls $dir/upgrade-*-to-*-postgresql.sql | sort -V | awk -F'[-]' '$4 <= '$VERSION' {print $0}' | tail -n 1)
-            if [ ! -f "$upgrade_file" ]; then
-              echo "ERROR:Failed to find upgrade file $upgrade_file"
-              exit 1
-            fi
-            echo "Schema file: $schema_file"
-            echo "Upgrade file: $upgrade_file"
-            if ! PGPASSWORD=$POSTGRES_PASSWORD psql -h {{ .Release.Name }}-postgresql -U $POSTGRES_USER -d $GRAVITINO_DB -f "$upgrade_file"; then
-              echo "WARNING: Upgrade script failed: $upgrade_file" >&2
-              echo "Continuing with schema script..." >&2 
-            fi
-            PGPASSWORD=$POSTGRES_PASSWORD psql -h {{ .Release.Name }}-postgresql -U $POSTGRES_USER -d $GRAVITINO_DB -f "$schema_file"
-        resources:
-          {{- toYaml .Values.initResources | nindent 10 }}
-        env:
-          - name: POSTGRES_USER
-            value: {{ .Values.postgresql.auth.username }}
-          - name: GRAVITINO_DB
-            value: {{ .Values.postgresql.auth.database }}
-          - name: POSTGRES_PASSWORD
-            valueFrom:
-              secretKeyRef:
-                name: {{ .Release.Name }}-postgresql
-                key: password
-        volumeMounts:
-          - mountPath: /scripts
-            name: scripts-emptydir
+        - name: init-postgresql
+          image: {{ include "init-postgresql.image" . }}
+          imagePullPolicy: "{{ .Values.image.pullPolicy }}"
+          command:
+            - /bin/bash
+            - -c
+            - |
+              while ! PGPASSWORD=$POSTGRES_PASSWORD psql -h {{ .Release.Name }}-postgresql -U $POSTGRES_USER -c "SELECT 1"; do
+                echo "Waiting for PostgreSQL to be ready..."
+                sleep 2
+              done
+              VERSION=$(cat /scripts/version.txt)
+              if [ -z "$VERSION" ]; then
+                echo "ERROR:Please set VERSION"
+                exit 1
+              fi
+              dir="/scripts/postgresql"
+              schema_file=$(ls $dir/schema-*-postgresql.sql | sort -V | awk -F'[-]' '$2 <= '$VERSION' {print $0}' | tail -n 1)
+              if [ ! -f "$schema_file" ]; then
+                echo "ERROR:Failed to find schema file $schema_file"
+                exit 1
+              fi
+              upgrade_file=$(ls $dir/upgrade-*-to-*-postgresql.sql | sort -V | awk -F'[-]' '$4 <= '$VERSION' {print $0}' | tail -n 1)
+              if [ ! -f "$upgrade_file" ]; then
+                echo "ERROR:Failed to find upgrade file $upgrade_file"
+                exit 1
+              fi
+              echo "Schema file: $schema_file"
+              echo "Upgrade file: $upgrade_file"
+              if ! PGPASSWORD=$POSTGRES_PASSWORD psql -h {{ .Release.Name }}-postgresql -U $POSTGRES_USER -d $GRAVITINO_DB -f "$upgrade_file"; then
+                echo "WARNING: Upgrade script failed: $upgrade_file" >&2
+                echo "Continuing with schema script..." >&2 
+              fi
+              PGPASSWORD=$POSTGRES_PASSWORD psql -h {{ .Release.Name }}-postgresql -U $POSTGRES_USER -d $GRAVITINO_DB -f "$schema_file"
+          resources:
+            {{- toYaml .Values.initResources | nindent 12 }}
+          env:
+            - name: POSTGRES_USER
+              value: {{ .Values.postgresql.auth.username }}
+            - name: GRAVITINO_DB
+              value: {{ .Values.postgresql.auth.database }}
+            - name: POSTGRES_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Release.Name }}-postgresql
+                  key: password
+          volumeMounts:
+            - mountPath: /scripts
+              name: scripts-emptydir
         {{- end }}
       containers:
         - name: {{ include "gravitino.name" . }}
@@ -182,7 +182,7 @@ spec:
             {{- toYaml .Values.resources | nindent 12 }}
           securityContext:
             {{- toYaml .Values.containerSecurityContext | nindent 12 }}
-        {{- if or .Values.env .Values.envWithTpl }}
+          {{- if or .Values.env .Values.envWithTpl }}
           env:
           {{- with .Values.env }}
             {{- toYaml . | nindent 12 }}
@@ -191,11 +191,11 @@ spec:
             - name: {{ $item.name }}
               value: {{ tpl $item.value $ | quote }}
           {{- end }}
-        {{- end }}
-        {{- if .Values.envFrom }}
+          {{- end }}
+          {{- if .Values.envFrom }}
           envFrom:
             {{- toYaml .Values.envFrom | nindent 12 }}
-        {{- end }}            
+          {{- end }}
           ports:
             - name: {{ .Values.service.portName }}
               containerPort: {{ .Values.service.targetPort }}
@@ -206,15 +206,15 @@ spec:
               containerPort: {{ $item.targetPort }}
               protocol: {{ $item.protocol }}
             {{- end }}
-            {{- end }}              
+            {{- end }}
           volumeMounts:
             - name: gravitino-conf
               mountPath: /tmp/conf
             - name: storage
               mountPath: {{ .Values.entity.storagePath }}
-        {{- if .Values.extraVolumeMounts }}
-              {{- toYaml .Values.extraVolumeMounts | nindent 12 }}
-            {{- end }}  
+          {{- if .Values.extraVolumeMounts }}
+            {{- toYaml .Values.extraVolumeMounts | nindent 12 }}
+          {{- end }}  
       nodeSelector:
         {{- toYaml .Values.nodeSelector | nindent 8 }}
       affinity:

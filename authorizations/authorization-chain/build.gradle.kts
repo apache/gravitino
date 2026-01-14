@@ -60,6 +60,7 @@ dependencies {
   testImplementation(project(":integration-test-common", "testArtifacts"))
   testImplementation(project(":authorizations:authorization-ranger"))
   testImplementation(project(":authorizations:authorization-ranger", "testArtifacts"))
+  testImplementation(libs.awaitility)
   testImplementation(libs.junit.jupiter.api)
   testImplementation(libs.mockito.core)
   testImplementation(libs.testcontainers)

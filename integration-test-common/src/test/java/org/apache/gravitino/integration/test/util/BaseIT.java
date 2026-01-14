@@ -57,6 +57,7 @@ import org.apache.gravitino.Configs;
 import org.apache.gravitino.auth.AuthenticatorType;
 import org.apache.gravitino.auxiliary.AuxiliaryServiceManager;
 import org.apache.gravitino.client.GravitinoAdminClient;
+import org.apache.gravitino.client.KerberosTokenProvider;
 import org.apache.gravitino.config.ConfigConstants;
 import org.apache.gravitino.integration.test.MiniGravitino;
 import org.apache.gravitino.integration.test.MiniGravitinoContext;
@@ -67,13 +68,13 @@ import org.apache.gravitino.server.GravitinoServer;
 import org.apache.gravitino.server.ServerConfig;
 import org.apache.gravitino.server.web.JettyServerConfig;
 import org.apache.hadoop.security.UserGroupInformation;
+import org.awaitility.Awaitility;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.TestInstance;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.testcontainers.shaded.org.awaitility.Awaitility;
 
 /**
  * BaseIT can be used as a base class for integration tests. It will automatically start a Gravitino
@@ -136,6 +137,21 @@ public class BaseIT {
 
   public void registerCustomConfigs(Map<String, String> configs) {
     customConfigs.putAll(configs);
+  }
+
+  /**
+   * Creates a KerberosTokenProvider with the given principal and keytab file path.
+   *
+   * @param principal The Kerberos principal (e.g., "client@EXAMPLE.COM")
+   * @param keytabPath The path to the keytab file
+   * @return A configured KerberosTokenProvider instance
+   */
+  protected static KerberosTokenProvider createKerberosTokenProvider(
+      String principal, String keytabPath) {
+    return KerberosTokenProvider.builder()
+        .withClientPrincipal(principal)
+        .withKeyTabFile(new File(keytabPath))
+        .build();
   }
 
   protected int getLanceRESTServerPort() {
@@ -406,7 +422,20 @@ public class BaseIT {
       }
     } else if (authenticators.contains(AuthenticatorType.KERBEROS.name().toLowerCase())) {
       serverUri = "http://localhost:" + jettyServerConfig.getHttpPort();
-      client = null;
+      // Get Kerberos configuration from custom configs
+      String principal = customConfigs.get("client.kerberos.principal");
+      String keytabPath = customConfigs.get("client.kerberos.keytab");
+
+      if (principal != null && keytabPath != null) {
+        KerberosTokenProvider kerberosTokenProvider =
+            createKerberosTokenProvider(principal, keytabPath);
+        client =
+            GravitinoAdminClient.builder(serverUri).withKerberosAuth(kerberosTokenProvider).build();
+      } else {
+        LOG.warn(
+            "Kerberos authentication configured but principal or keytab not provided. Client will be null.");
+        client = null;
+      }
     } else {
       client = GravitinoAdminClient.builder(serverUri).build();
     }

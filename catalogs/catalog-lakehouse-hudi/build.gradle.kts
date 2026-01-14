@@ -75,6 +75,7 @@ dependencies {
     exclude("org.apache.logging.log4j")
   }
 
+  testImplementation(libs.awaitility)
   testImplementation(libs.bundles.jetty)
   testImplementation(libs.bundles.jersey)
   testImplementation(libs.commons.collections3)

@@ -247,4 +247,15 @@ public class AccessControlManager implements AccessControlDispatcher {
         LockType.WRITE,
         () -> permissionManager.revokePrivilegesFromRole(metalake, role, object, privileges));
   }
+
+  @Override
+  public Role overridePrivilegesInRole(
+      String metalake, String role, List<SecurableObject> securableObjectsToOverride)
+      throws NoSuchRoleException, NoSuchMetalakeException {
+    return TreeLockUtils.doWithTreeLock(
+        AuthorizationUtils.ofRole(metalake, role),
+        LockType.WRITE,
+        () ->
+            permissionManager.overridePrivilegesInRole(metalake, role, securableObjectsToOverride));
+  }
 }

@@ -95,6 +95,7 @@ dependencies {
     exclude("org.rocksdb")
   }
 
+  testImplementation(libs.awaitility)
   testImplementation(libs.h2db)
   testImplementation(libs.mysql.driver)
   testImplementation(libs.postgresql.driver)

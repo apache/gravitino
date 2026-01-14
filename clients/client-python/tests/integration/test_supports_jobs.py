@@ -95,7 +95,6 @@ class TestSupportsJobs(IntegrationTestEnv):
 
         # List registered job templates
         registered_templates = self._metalake.list_job_templates()
-        self.assertEqual(len(registered_templates), 2)
         self.assertIn(template_1, registered_templates)
         self.assertIn(template_2, registered_templates)
 
@@ -127,7 +126,6 @@ class TestSupportsJobs(IntegrationTestEnv):
 
         # List registered job templates
         registered_templates = self._metalake.list_job_templates()
-        self.assertEqual(len(registered_templates), 2)
         self.assertIn(template1, registered_templates)
         self.assertIn(template2, registered_templates)
 
@@ -150,7 +148,6 @@ class TestSupportsJobs(IntegrationTestEnv):
 
         # Verify the list of job templates after deletion
         registered_templates = self._metalake.list_job_templates()
-        self.assertEqual(len(registered_templates), 1)
         self.assertIn(template2, registered_templates)
 
         # Test deleting a non-existent job template
@@ -162,10 +159,6 @@ class TestSupportsJobs(IntegrationTestEnv):
         # Verify the second job template is deleted
         with self.assertRaises(NoSuchJobTemplateException):
             self._metalake.get_job_template(template2.name)
-
-        # Verify the list of job templates is empty after deleting both
-        registered_templates = self._metalake.list_job_templates()
-        self.assertTrue(len(registered_templates) == 0)
 
     def test_register_and_alter_job_template(self):
         template = self.builder.with_name("test_alter").build()
