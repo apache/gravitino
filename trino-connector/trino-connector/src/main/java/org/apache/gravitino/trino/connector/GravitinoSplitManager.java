@@ -53,6 +53,10 @@ public class GravitinoSplitManager implements ConnectorSplitManager {
             GravitinoHandle.unWrap(connectorTableHandle),
             new GravitinoDynamicFilter(dynamicFilter),
             constraint);
+    return createSplitSource(splits);
+  }
+
+  protected ConnectorSplitSource createSplitSource(ConnectorSplitSource splits) {
     return new GravitinoSplitSource(splits);
   }
 }

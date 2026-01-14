@@ -49,9 +49,13 @@ public class GravitinoSplitSource implements ConnectorSplitSource {
         .thenApply(
             batch -> {
               List<ConnectorSplit> list =
-                  batch.getSplits().stream().map(GravitinoSplit::new).collect(Collectors.toList());
+                  batch.getSplits().stream().map(this::createSplit).collect(Collectors.toList());
               return new ConnectorSplitBatch(list, batch.isNoMoreSplits());
             });
+  }
+
+  protected ConnectorSplit createSplit(ConnectorSplit split) {
+    throw new RuntimeException("Should be overridden in subclass");
   }
 
   @Override
