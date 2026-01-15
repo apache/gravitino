@@ -12,7 +12,7 @@ license: "This software is licensed under the Apache License version 2."
 
 ## Overview
 
-This guide shows how to use the Lance REST service from Apache Gravitino with the [Lance Spark connector](https://lance.org/integrations/spark/) (`lance-spark`) and the [Lance Ray connector](https://lance.org/integrations/ray/) (`lance-ray`). It builds on the Lance REST service setup described in [Lance REST service](./lance-rest-service).
+This guide shows how to use the Lance REST service from Apache Gravitino with the [Lance Spark connector](https://lance.org/integrations/spark/) (`lance-spark`), the [Lance Ray connector](https://lance.org/integrations/ray/) (`lance-ray`) and other data processing engines that support Lance format . It builds on the Lance REST service setup described in [Lance REST service](./lance-rest-service).
 
 ## Compatibility matrix
 
@@ -64,6 +64,7 @@ spark.sql("create database schema")
 spark.sql("""
 create table schema.sample(id int, score float)
 USING lance
+LOCATION '/tmp/schema/sample.lance/'
 TBLPROPERTIES ('format' = 'lance')
 """)
 spark.sql("""
@@ -71,6 +72,10 @@ insert into schema.sample values(1, 1.1)
 """)
 spark.sql("select * from schema.sample").show()
 ```
+
+:::note
+The line `LOCATION '/tmp/schema/sample.lance/'` is optional, if not specified, lance-spark will use try to calculate the location automatically. About the location resolution logic, please refer to the [documentation](./lakehouse-generic-catalog.md#catalog-properties)
+:::
 
 The storage location in the example above is local path, if you want to use cloud storage, please refer to the following MinIO example:
 
