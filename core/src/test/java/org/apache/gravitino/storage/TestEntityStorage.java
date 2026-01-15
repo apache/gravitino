@@ -358,6 +358,7 @@ public class TestEntityStorage extends AbstractEntityStorageTest {
       Assertions.assertFalse(store.exists(anotherGroup.nameIdentifier(), Entity.EntityType.GROUP));
       Assertions.assertFalse(store.exists(oneRole.nameIdentifier(), Entity.EntityType.ROLE));
       Assertions.assertFalse(store.exists(anotherRole.nameIdentifier(), Entity.EntityType.ROLE));
+      destroy(type);
     }
   }
 
