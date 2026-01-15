@@ -170,6 +170,7 @@ export default function CreatePolicyDialog({ ...props }) {
             name='name'
             label='Policy Name'
             rules={[{ required: true }, { type: 'string', max: 64 }, { pattern: new RegExp(nameRegex) }]}
+            messageVariables={{ label: 'policy name' }}
           >
             <Input placeholder={mismatchName} />
           </Form.Item>

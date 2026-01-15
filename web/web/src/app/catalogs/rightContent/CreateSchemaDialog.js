@@ -215,6 +215,7 @@ export default function CreateSchemaDialog({ ...props }) {
                   label='Schema Name'
                   data-refer='schema-name-field'
                   rules={[{ required: true }, { type: 'string', max: 64 }, { pattern: new RegExp(nameRegex) }]}
+                  messageVariables={{ label: 'schema name' }}
                 >
                   <Input placeholder={mismatchName} disabled={editSchema} />
                 </Form.Item>

@@ -20,7 +20,7 @@
 import React, { useEffect, useLayoutEffect, useState, useRef } from 'react'
 import { Form, Input, Select, Checkbox, Spin } from 'antd'
 import { to } from '@/lib/utils'
-import { useAppDispatch } from '@/lib/hooks/useStore'
+import { useAppDispatch, useAppSelector } from '@/lib/hooks/useStore'
 import {
   fetchCatalogs,
   fetchSchemas,
@@ -45,6 +45,7 @@ export default function SecurableObjectFormFields({ fieldName, fieldKey, metalak
   const currentFull = String(currentFullRaw || '')
   const displayValue = currentFull
   const dispatch = useAppDispatch()
+  const store = useAppSelector(state => state.metalakes)
 
   const parts = String(currentFull || '')
     .split('.')
@@ -70,6 +71,36 @@ export default function SecurableObjectFormFields({ fieldName, fieldKey, metalak
   const [localRemoteOptions, setLocalRemoteOptions] = useState({})
   const [localRemoteLoading, setLocalRemoteLoading] = useState({})
   const catalogOptions = localRemoteOptions['catalog'] || []
+  const rootRef = useRef(null)
+
+  const isElementVisibleInViewport = el => {
+    if (!el) return true
+    const rect = el.getBoundingClientRect()
+
+    return rect.top >= 0 && rect.bottom <= (window.innerHeight || document.documentElement.clientHeight)
+  }
+
+  useEffect(() => {
+    const handleScrollOrResize = () => {
+      const activeEl = document.activeElement
+      if (!activeEl || !rootRef.current) return
+
+      const isFormControl =
+        activeEl.getAttribute?.('role') === 'combobox' || ['INPUT', 'TEXTAREA'].includes(activeEl.tagName)
+
+      if (isFormControl && rootRef.current.contains(activeEl) && !isElementVisibleInViewport(activeEl)) {
+        activeEl.blur()
+      }
+    }
+
+    window.addEventListener('scroll', handleScrollOrResize, true)
+    window.addEventListener('resize', handleScrollOrResize, true)
+
+    return () => {
+      window.removeEventListener('scroll', handleScrollOrResize, true)
+      window.removeEventListener('resize', handleScrollOrResize, true)
+    }
+  }, [])
 
   const loadOptionsForType = async type => {
     if (!metalake) return
@@ -123,6 +154,30 @@ export default function SecurableObjectFormFields({ fieldName, fieldKey, metalak
     }
   }
 
+  const getCatalogTypeForName = async catalogName => {
+    if (!catalogName) return null
+
+    const cachedType =
+      catalogOptions.find(c => c.value === catalogName)?.catalogType ||
+      store.catalogs.find(c => c.value === catalogName)?.catalogType
+    if (cachedType) return cachedType
+
+    const [err, res] = await to(dispatch(fetchCatalogs({ metalake })))
+    if (err || !res) return null
+
+    const catalogs = res?.payload?.catalogs || []
+    const matched = catalogs.find(c => c.name === catalogName)
+
+    if (matched?.type) {
+      setLocalRemoteOptions(prev => ({
+        ...prev,
+        catalog: catalogs.map(c => ({ label: c.name, value: c.name, catalogType: c.type }))
+      }))
+    }
+
+    return matched?.type || null
+  }
+
   const getPrivilegeGroupsForType = async (type, catalogName) => {
     if (!type) return []
 
@@ -147,7 +202,8 @@ export default function SecurableObjectFormFields({ fieldName, fieldKey, metalak
       if (schemaGroup) groups.push(schemaGroup)
 
       // If we have a cached catalog type, append the corresponding resource group
-      const catalogType = catalogName ? catalogOptions.filter(c => c.value === catalogName)[0]?.catalogType : null
+      const catalogType = await getCatalogTypeForName(catalogName)
+
       if (catalogType) {
         if (catalogType === 'relational') {
           const tableGroup = privilegeOptions.find(g => g.label === 'Table privileges')
@@ -174,7 +230,7 @@ export default function SecurableObjectFormFields({ fieldName, fieldKey, metalak
         if (useSchemaOptions.length > 0) groups.push({ label: schemaGroup.label, options: useSchemaOptions })
       }
 
-      const catalogType = catalogName ? catalogOptions.filter(c => c.value === catalogName)[0]?.catalogType : null
+      const catalogType = await getCatalogTypeForName(catalogName)
       if (catalogType) {
         if (catalogType === 'relational') {
           const tableGroup = privilegeOptions.find(g => g.label === 'Table privileges')
@@ -490,15 +546,26 @@ export default function SecurableObjectFormFields({ fieldName, fieldKey, metalak
   const denyAllOptionValues = getAllOptionValues('denyPrivileges')
 
   return (
-    <div className='flex flex-col gap-2'>
+    <div className='flex flex-col gap-2' ref={rootRef}>
       <div>
-        <Form.Item name={[fieldName, 'type']} label='Type' rules={[{ required: true }]} style={{ marginBottom: 8 }}>
+        <Form.Item
+          name={[fieldName, 'type']}
+          label='Type'
+          rules={[{ required: true }]}
+          messageVariables={{ label: 'type' }}
+          style={{ marginBottom: 8 }}
+        >
           <Select placeholder='Please select type' options={privilegeTypes} />
         </Form.Item>
       </div>
 
       <div>
-        <Form.Item name={[fieldName, 'fullName']} label='Full Name' rules={[{ required: true }]}>
+        <Form.Item
+          name={[fieldName, 'fullName']}
+          label='Full Name'
+          rules={[{ required: true }]}
+          messageVariables={{ label: 'full name' }}
+        >
           {(() => {
             if (currentType === 'metalake') {
               return <Input value={metalake} disabled />

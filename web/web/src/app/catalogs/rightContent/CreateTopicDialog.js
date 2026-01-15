@@ -187,6 +187,7 @@ export default function CreateTopicDialog({ ...props }) {
                   name='name'
                   label='Topic Name'
                   rules={[{ required: true }, { type: 'string', max: 64 }, { pattern: new RegExp(nameRegex) }]}
+                  messageVariables={{ label: 'topic name' }}
                 >
                   <Input data-refer='topic-name-field' placeholder={mismatchName} disabled={!!editTopic} />
                 </Form.Item>

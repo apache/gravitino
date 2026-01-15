@@ -76,7 +76,7 @@ export default function SetOwnerDialog({ ...props }) {
         await dispatch(setEntityOwner({ metalake, metadataObjectType, metadataObjectFullName, data: submitData }))
         setConfirmLoading(false)
         mutateOwner && mutateOwner()
-        setOpen(false)
+        setOpen(false, true)
       })
       .catch(info => {
         console.error(info)
@@ -85,7 +85,7 @@ export default function SetOwnerDialog({ ...props }) {
   }
 
   const handleCancel = () => {
-    setOpen(false)
+    setOpen(false, false)
   }
 
   return (

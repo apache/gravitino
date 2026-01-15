@@ -30,17 +30,17 @@ export const mismatchUsername =
 export const mismatchForKey =
   'Must start with a letter/underscore(_), contain only alphanumeric characters (Aa-Zz,0-9) or underscores (_), hyphens(-), or dots(.)!'
 
-export const validateMessages = () => ({
-  required: `Please enter the ${label}!`,
+export const validateMessages = {
+  required: 'Please enter the ${label}!',
   string: {
-    max: `The ${label} must be less than ${max} characters!`
+    max: 'The ${label} must be less than ${max} characters!'
   },
   pattern: {
     mismatch: mismatchName,
     mismatchusername: mismatchUsername,
     mismatchforkey: mismatchForKey
   }
-})
+}
 
 export const supportedObjectTypesMap = {
   CATALOG: 'catalog',

@@ -153,6 +153,7 @@ export default function CreateTagDialog({ ...props }) {
             name='name'
             label='Tag Name'
             rules={[{ required: true }, { type: 'string', max: 64 }, { pattern: new RegExp(nameRegex) }]}
+            messageVariables={{ label: 'tag name' }}
           >
             <Input placeholder={mismatchName} />
           </Form.Item>

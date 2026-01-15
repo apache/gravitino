@@ -489,6 +489,7 @@ export default function CreateCatalogDialog({ ...props }) {
                       name='name'
                       label='Catalog Name'
                       rules={[{ required: true }, { type: 'string', max: 64 }, { pattern: new RegExp(nameRegex) }]}
+                      messageVariables={{ label: 'catalog name' }}
                       data-refer='catalog-name-field'
                     >
                       <Input placeholder={mismatchName} disabled={!init} />
@@ -502,6 +503,7 @@ export default function CreateCatalogDialog({ ...props }) {
                             label={prop.label}
                             key={idx}
                             rules={[{ required: prop.required }]}
+                            messageVariables={{ label: prop.label.toLowerCase() }}
                             initialValue={prop.value}
                           >
                             {prop.select ? (

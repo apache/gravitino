@@ -246,6 +246,7 @@ export default function CreateFilesetDialog({ ...props }) {
                   name='name'
                   label='Fileset Name'
                   rules={[{ required: true }, { type: 'string', max: 64 }, { pattern: new RegExp(nameRegex) }]}
+                  messageVariables={{ label: 'fileset name' }}
                 >
                   <Input data-refer='fileset-name-field' placeholder={mismatchName} disabled={init} />
                 </Form.Item>

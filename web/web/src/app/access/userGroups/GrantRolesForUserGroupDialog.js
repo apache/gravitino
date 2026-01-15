@@ -23,7 +23,7 @@ import { validateMessages } from '@/config'
 import { useResetFormOnCloseModal } from '@/lib/hooks/use-reset'
 import { useAppSelector, useAppDispatch } from '@/lib/hooks/useStore'
 import { fetchRoles } from '@/lib/store/roles'
-import { fetchUserGroups, grantRolesForUserGroup } from '@/lib/store/userGroups'
+import { grantRolesForUserGroup, revokeRolesForUserGroup } from '@/lib/store/userGroups'
 
 const { Paragraph } = Typography
 const { Option } = Select
