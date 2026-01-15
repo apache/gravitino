@@ -19,17 +19,13 @@
 package org.apache.gravitino.trino.connector;
 
 import io.airlift.slice.Slice;
-import io.trino.spi.connector.ColumnHandle;
 import io.trino.spi.connector.ConnectorInsertTableHandle;
-import io.trino.spi.connector.ConnectorMergeTableHandle;
 import io.trino.spi.connector.ConnectorOutputMetadata;
 import io.trino.spi.connector.ConnectorSession;
 import io.trino.spi.connector.ConnectorTableHandle;
-import io.trino.spi.connector.RetryMode;
 import io.trino.spi.statistics.ComputedStatistics;
 import java.util.Collection;
 import java.util.List;
-import java.util.Map;
 import java.util.Optional;
 import java.util.stream.Collectors;
 import org.apache.gravitino.trino.connector.catalog.CatalogConnectorMetadata;
@@ -59,6 +55,7 @@ public class GravitinoMetadata466 extends GravitinoMetadata {
         computedStatistics);
   }
 
+  /*
   @Override
   public ConnectorMergeTableHandle beginMerge(
       ConnectorSession session,
@@ -68,4 +65,5 @@ public class GravitinoMetadata466 extends GravitinoMetadata {
     return internalMetadata.beginMerge(
         session, GravitinoHandle.unWrap(tableHandle), updateCaseColumns, retryMode);
   }
+   */
 }
