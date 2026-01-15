@@ -657,27 +657,6 @@ print(table.scan().to_arrow())
 Ray Data only supports reading from and writing to existing Iceberg tables. It does not support DDL operations such as creating, dropping, or altering tables, schemas, or catalogs. You need to use other tools like Spark or PyIceberg to manage table metadata.
 :::
 
-#### Reading Iceberg tables with Ray
-
-```python
-import ray
-
-ds = ray.data.read_iceberg(
-    table_identifier="default.sample",
-    catalog_kwargs={
-        "name": "default",
-        "type": "rest",
-        "uri": "http://localhost:9001/iceberg/",
-        "header.X-Iceberg-Access-Delegation": "vended-credentials",
-        "auth": {
-            "type": "basic",
-            "basic": {"username": "manager", "password": "mock"}
-        }
-    }
-)
-ds.show(limit=1)
-```
-
 #### Writing to Iceberg tables with Ray
 
 ```python
@@ -699,6 +678,27 @@ ds.write_iceberg(
         }
     }
 )
+```
+
+#### Reading Iceberg tables with Ray
+
+```python
+import ray
+
+ds = ray.data.read_iceberg(
+    table_identifier="default.sample",
+    catalog_kwargs={
+        "name": "default",
+        "type": "rest",
+        "uri": "http://localhost:9001/iceberg/",
+        "header.X-Iceberg-Access-Delegation": "vended-credentials",
+        "auth": {
+            "type": "basic",
+            "basic": {"username": "manager", "password": "mock"}
+        }
+    }
+)
+ds.show(limit=1)
 ```
 
 ## Docker instructions
