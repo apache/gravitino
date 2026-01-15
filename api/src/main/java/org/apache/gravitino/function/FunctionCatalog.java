@@ -51,16 +51,12 @@ public interface FunctionCatalog {
   /**
    * Get a function by {@link NameIdentifier} from the catalog. The identifier only contains the
    * schema and function name. A function may include multiple definitions (overloads) in the
-   * result. This method returns the current version of the function.
-   *
-   * <p>Note: Currently, the current version is always the latest version. In the future, when
-   * rollback functionality is supported, the current version may differ from the latest version.
+   * result.
    *
    * @param ident A function identifier.
-   * @return The current version of the function with the given name.
+   * @return The function with the given name.
    * @throws NoSuchFunctionException If the function does not exist.
    */
-  // todo: update the the JavaDoc when function rollback is supported
   Function getFunction(NameIdentifier ident) throws NoSuchFunctionException;
 
   /**

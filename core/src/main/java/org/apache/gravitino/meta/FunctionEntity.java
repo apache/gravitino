@@ -68,8 +68,6 @@ public class FunctionEntity implements Entity, Auditable, HasIdentifier, Functio
           "The output columns for table-valued functions.");
   public static final Field DEFINITIONS =
       Field.required("definitions", FunctionDefinition[].class, "The definitions of the function.");
-  public static final Field VERSION =
-      Field.required("version", Integer.class, "The version of the function entity.");
   public static final Field AUDIT_INFO =
       Field.required("audit_info", AuditInfo.class, "The audit details of the function entity.");
 
@@ -82,7 +80,6 @@ public class FunctionEntity implements Entity, Auditable, HasIdentifier, Functio
   private Type returnType;
   private FunctionColumn[] returnColumns;
   private FunctionDefinition[] definitions;
-  private Integer version;
   private AuditInfo auditInfo;
 
   private FunctionEntity() {}
@@ -98,7 +95,6 @@ public class FunctionEntity implements Entity, Auditable, HasIdentifier, Functio
     fields.put(RETURN_TYPE, returnType);
     fields.put(RETURN_COLUMNS, returnColumns);
     fields.put(DEFINITIONS, definitions);
-    fields.put(VERSION, version);
     fields.put(AUDIT_INFO, auditInfo);
 
     return Collections.unmodifiableMap(fields);
@@ -150,11 +146,6 @@ public class FunctionEntity implements Entity, Auditable, HasIdentifier, Functio
   }
 
   @Override
-  public int version() {
-    return version;
-  }
-
-  @Override
   public AuditInfo auditInfo() {
     return auditInfo;
   }
@@ -184,7 +175,6 @@ public class FunctionEntity implements Entity, Auditable, HasIdentifier, Functio
         && Objects.equals(returnType, that.returnType)
         && Arrays.equals(returnColumns, that.returnColumns)
         && Arrays.equals(definitions, that.definitions)
-        && Objects.equals(version, that.version)
         && Objects.equals(auditInfo, that.auditInfo);
   }
 
@@ -192,15 +182,7 @@ public class FunctionEntity implements Entity, Auditable, HasIdentifier, Functio
   public int hashCode() {
     int result =
         Objects.hash(
-            id,
-            name,
-            namespace,
-            comment,
-            functionType,
-            deterministic,
-            returnType,
-            version,
-            auditInfo);
+            id, name, namespace, comment, functionType, deterministic, returnType, auditInfo);
     result = 31 * result + Arrays.hashCode(returnColumns);
     result = 31 * result + Arrays.hashCode(definitions);
     return result;
@@ -319,17 +301,6 @@ public class FunctionEntity implements Entity, Auditable, HasIdentifier, Functio
      */
     public Builder withDefinitions(FunctionDefinition[] definitions) {
       functionEntity.definitions = definitions;
-      return this;
-    }
-
-    /**
-     * Sets the version of the function entity.
-     *
-     * @param version The version number.
-     * @return This builder instance.
-     */
-    public Builder withVersion(Integer version) {
-      functionEntity.version = version;
       return this;
     }
 

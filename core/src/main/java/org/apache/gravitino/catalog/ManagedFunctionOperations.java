@@ -22,10 +22,13 @@ import com.google.common.base.Preconditions;
 import java.io.IOException;
 import java.time.Instant;
 import java.util.Arrays;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
+import java.util.stream.Collectors;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.EntityAlreadyExistsException;
 import org.apache.gravitino.EntityStore;
@@ -64,11 +67,7 @@ import org.apache.gravitino.utils.PrincipalUtils;
  * </ul>
  */
 public class ManagedFunctionOperations implements FunctionCatalog {
-
-  private static final int INIT_VERSION = 0;
-
   private final EntityStore store;
-
   private final IdGenerator idGenerator;
 
   /**
@@ -198,7 +197,6 @@ public class ManagedFunctionOperations implements FunctionCatalog {
             .withReturnType(returnType.orElse(null))
             .withReturnColumns(returnColumns.orElse(null))
             .withDefinitions(definitions)
-            .withVersion(INIT_VERSION)
             .withAuditInfo(auditInfo)
             .build();
 
@@ -228,20 +226,20 @@ public class ManagedFunctionOperations implements FunctionCatalog {
    *
    * @param definitions The array of definitions to validate.
    * @throws IllegalArgumentException If any two definitions have overlapping arities.
+   * @see #computeArities(FunctionDefinition) for details on how arity signatures are computed
    */
   private void validateDefinitionsNoArityOverlap(FunctionDefinition[] definitions) {
+    // Track each arity signature with its source definition index
+    Map<String, Integer> seenArities = new HashMap<>();
     for (int i = 0; i < definitions.length; i++) {
-      Set<String> aritiesI = computeArities(definitions[i]);
-      for (int j = i + 1; j < definitions.length; j++) {
-        Set<String> aritiesJ = computeArities(definitions[j]);
-        for (String arity : aritiesI) {
-          if (aritiesJ.contains(arity)) {
-            throw new IllegalArgumentException(
-                String.format(
-                    "Cannot register function: definitions at index %d and %d have overlapping "
-                        + "arity '%s'. This would create ambiguous function invocations.",
-                    i, j, arity));
-          }
+      for (String arity : computeArities(definitions[i])) {
+        Integer existingIndex = seenArities.put(arity, i);
+        if (existingIndex != null) {
+          throw new IllegalArgumentException(
+              String.format(
+                  "Cannot register function: definitions at index %d and %d have overlapping "
+                      + "arity '%s'. This would create ambiguous function invocations.",
+                  existingIndex, i, arity));
         }
       }
     }
@@ -266,19 +264,36 @@ public class ManagedFunctionOperations implements FunctionCatalog {
    * @return A set of arity signatures (e.g., "int", "int,float", "").
    */
   private Set<String> computeArities(FunctionDefinition definition) {
-    Set<String> arities = new HashSet<>();
     FunctionParam[] params = definition.parameters();
+    int firstOptionalIndex = findFirstOptionalParamIndex(params);
 
-    // Validate parameter order and find the first parameter with a default value in a single pass.
-    // Optional parameters must come last to prevent incorrect arity computation.
-    // Without this check, func(a=1, b) would wrongly generate arity "" (0 args),
-    // but 0-arg calls are invalid since 'b' is required.
-    int firstDefaultIndex = params.length;
-    boolean foundDefault = false;
+    // Generate all possible arities from firstOptionalIndex to params.length
+    Set<String> arities = new HashSet<>();
+    for (int paramCount = firstOptionalIndex; paramCount <= params.length; paramCount++) {
+      String arity =
+          Arrays.stream(params, 0, paramCount)
+              .map(p -> p.dataType().simpleString())
+              .collect(Collectors.joining(","));
+      arities.add(arity);
+    }
+    return arities;
+  }
+
+  /**
+   * Finds the index of the first optional parameter (one with a default value). Also validates that
+   * all optional parameters appear at the end of the parameter list.
+   *
+   * @param params The function parameters.
+   * @return The index of the first optional parameter, or params.length if all are required.
+   * @throws IllegalArgumentException If a required parameter follows an optional one.
+   */
+  private int findFirstOptionalParamIndex(FunctionParam[] params) {
+    int firstOptionalIndex = params.length;
     for (int i = 0; i < params.length; i++) {
-      Expression defaultValue = params[i].defaultValue();
-      boolean hasDefault = defaultValue != null && defaultValue != Column.DEFAULT_VALUE_NOT_SET;
-      if (foundDefault && !hasDefault) {
+      boolean hasDefault = hasDefaultValue(params[i]);
+
+      if (firstOptionalIndex < params.length && !hasDefault) {
+        // Found a required param after an optional one - invalid order
         throw new IllegalArgumentException(
             String.format(
                 "Invalid parameter order: required parameter '%s' at position %d "
@@ -286,24 +301,16 @@ public class ManagedFunctionOperations implements FunctionCatalog {
                     + "must appear at the end of the parameter list.",
                 params[i].name(), i));
       }
-      if (hasDefault && !foundDefault) {
-        foundDefault = true;
-        firstDefaultIndex = i;
+
+      if (hasDefault && firstOptionalIndex == params.length) {
+        firstOptionalIndex = i;
       }
     }
+    return firstOptionalIndex;
+  }
 
-    // Generate all possible arities from firstDefaultIndex to params.length
-    for (int i = firstDefaultIndex; i <= params.length; i++) {
-      StringBuilder arity = new StringBuilder();
-      for (int j = 0; j < i; j++) {
-        if (j > 0) {
-          arity.append(",");
-        }
-        arity.append(params[j].dataType().simpleString());
-      }
-      arities.add(arity.toString());
-    }
-
-    return arities;
+  private boolean hasDefaultValue(FunctionParam param) {
+    Expression defaultValue = param.defaultValue();
+    return defaultValue != null && defaultValue != Column.DEFAULT_VALUE_NOT_SET;
   }
 }

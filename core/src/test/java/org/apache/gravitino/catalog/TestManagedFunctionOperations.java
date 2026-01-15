@@ -134,9 +134,8 @@ public class TestManagedFunctionOperations {
     Assertions.assertEquals(FunctionType.SCALAR, newFunc.functionType());
     Assertions.assertTrue(newFunc.deterministic());
     Assertions.assertEquals(Types.IntegerType.get(), newFunc.returnType());
-    Assertions.assertEquals(0, newFunc.version());
 
-    // Get function (latest version)
+    // Get function
     Function loadedFunc = functionOperations.getFunction(funcIdent);
     Assertions.assertEquals(newFunc.name(), loadedFunc.name());
     Assertions.assertEquals(newFunc.comment(), loadedFunc.comment());
@@ -450,10 +449,10 @@ public class TestManagedFunctionOperations {
   }
 
   /**
-   * Finds an entity by identifier. This method handles both versioned identifiers (used by
-   * getFunction) and original identifiers (used by alterFunction and dropFunction).
+   * Finds an entity by identifier. This method handles both the internal store identifier format
+   * (used by getFunction) and original identifiers (used by alterFunction and dropFunction).
    *
-   * <p>Versioned identifier format: namespace = original_namespace + function_name, name = version
+   * <p>Store identifier format: namespace = original_namespace + function_name, name = internal id
    * Original identifier format: namespace = schema_namespace, name = function_name
    */
   private FunctionEntity findEntityByIdent(NameIdentifier ident) {
@@ -463,7 +462,7 @@ public class TestManagedFunctionOperations {
       return directMatch;
     }
 
-    // If not found, try to interpret as versioned identifier
+    // If not found, try to interpret as store identifier
     String[] levels = ident.namespace().levels();
     if (levels.length < 1) {
       return null;

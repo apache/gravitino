@@ -34,8 +34,7 @@ import org.apache.gravitino.rel.types.Type;
  * <p>A function is characterized by its name, type (scalar for row-by-row operations, aggregate for
  * group operations, or table-valued for set-returning operations), whether it is deterministic, its
  * return type or columns (for table function), and its definitions that contain parameters and
- * implementations for different runtime engines. Each function maintains a version number starting
- * from 0, which increments with each alteration.
+ * implementations for different runtime engines.
  */
 @Evolving
 public interface Function extends Auditable {
@@ -93,14 +92,4 @@ public interface Function extends Auditable {
    * @return The definitions of the function.
    */
   FunctionDefinition[] definitions();
-
-  /**
-   * Returns the internal revision version of the function.
-   *
-   * <p>This version is a 0-based counter, where {@code 0} represents the initial definition of the
-   * function, and the value is incremented by 1 on each later alteration.
-   *
-   * @return The 0-based revision version of the function.
-   */
-  int version();
 }
