@@ -35,18 +35,9 @@ import org.apache.gravitino.function.FunctionDefinition;
 import org.apache.gravitino.function.FunctionType;
 import org.apache.gravitino.rel.types.Type;
 
-/**
- * A class representing a function entity in the metadata store.
- *
- * <p>This entity stores both the function metadata and its version information together, avoiding
- * the need for separate FunctionEntity and FunctionVersionEntity. When retrieving, if version is
- * set to the special value {@link #LATEST_VERSION}, the store should return the latest version.
- */
+/** A class representing a function entity in the metadata store. */
 @ToString
 public class FunctionEntity implements Entity, Auditable, HasIdentifier, Function {
-
-  /** Special version value indicating the latest version should be retrieved. */
-  public static final int LATEST_VERSION = -1;
 
   public static final Field ID =
       Field.required("id", Long.class, "The unique id of the function entity.");
