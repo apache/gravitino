@@ -23,6 +23,8 @@ import io.trino.spi.connector.ConnectorInsertTableHandle;
 import io.trino.spi.connector.ConnectorMergeTableHandle;
 import io.trino.spi.connector.ConnectorOutputMetadata;
 import io.trino.spi.connector.ConnectorSession;
+import io.trino.spi.connector.ConnectorTableHandle;
+import io.trino.spi.connector.RetryMode;
 import io.trino.spi.statistics.ComputedStatistics;
 import java.util.Collection;
 import java.util.Optional;
@@ -46,6 +48,12 @@ public class GravitinoMetadata435 extends GravitinoMetadata {
       Collection<ComputedStatistics> computedStatistics) {
     return internalMetadata.finishInsert(
         session, GravitinoHandle.unWrap(insertHandle), fragments, computedStatistics);
+  }
+
+  @Override
+  public ConnectorMergeTableHandle beginMerge(
+      ConnectorSession session, ConnectorTableHandle tableHandle, RetryMode retryMode) {
+    return internalMetadata.beginMerge(session, GravitinoHandle.unWrap(tableHandle), retryMode);
   }
 
   @Override

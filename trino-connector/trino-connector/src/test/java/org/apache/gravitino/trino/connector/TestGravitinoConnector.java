@@ -180,7 +180,7 @@ public abstract class TestGravitinoConnector extends AbstractGravitinoConnectorT
     // test rename column, but the memory connector is not supported these operations.
     if (trinoVersion < 452) {
       assertQueryFails(
-          String.format("alter table %s rename column c to d ", fullTableName1),
+          String.format("alter table %s rename column b to d ", fullTableName1),
           "This connector does not support renaming columns");
     } else {
       assertUpdate(String.format("alter table %s rename column b to d ", fullTableName1));
