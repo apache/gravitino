@@ -62,8 +62,10 @@ public class TestEntityStorage extends AbstractEntityStorageTest {
 
   @ParameterizedTest
   @MethodSource("storageProvider")
-  void testRestart(String type) throws IOException {
+  void testRestart(String type, boolean enableCache) throws IOException, IllegalAccessException {
     Config config = Mockito.mock(Config.class);
+    Mockito.when(config.get(Configs.CACHE_ENABLED)).thenReturn(enableCache);
+
     init(type, config);
     AuditInfo auditInfo =
         AuditInfo.builder().withCreator("creator").withCreateTime(Instant.now()).build();
@@ -361,7 +363,7 @@ public class TestEntityStorage extends AbstractEntityStorageTest {
 
   @ParameterizedTest
   @MethodSource("storageProvider")
-  void testEntityDelete(String type) throws IOException {
+  void testEntityDelete(String type, boolean enableCache) throws IOException, IllegalAccessException {
     Config config = Mockito.mock(Config.class);
     Mockito.when(config.get(Configs.CACHE_ENABLED)).thenReturn(enableCache);
     init(type, config);
