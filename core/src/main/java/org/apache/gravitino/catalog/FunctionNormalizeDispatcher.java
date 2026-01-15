@@ -28,7 +28,6 @@ import org.apache.gravitino.Namespace;
 import org.apache.gravitino.connector.capability.Capability;
 import org.apache.gravitino.exceptions.FunctionAlreadyExistsException;
 import org.apache.gravitino.exceptions.NoSuchFunctionException;
-import org.apache.gravitino.exceptions.NoSuchFunctionVersionException;
 import org.apache.gravitino.exceptions.NoSuchSchemaException;
 import org.apache.gravitino.function.Function;
 import org.apache.gravitino.function.FunctionChange;
@@ -65,12 +64,6 @@ public class FunctionNormalizeDispatcher implements FunctionDispatcher {
   @Override
   public Function getFunction(NameIdentifier ident) throws NoSuchFunctionException {
     return dispatcher.getFunction(normalizeCaseSensitive(ident));
-  }
-
-  @Override
-  public Function getFunction(NameIdentifier ident, int version)
-      throws NoSuchFunctionException, NoSuchFunctionVersionException {
-    return dispatcher.getFunction(normalizeCaseSensitive(ident), version);
   }
 
   @Override

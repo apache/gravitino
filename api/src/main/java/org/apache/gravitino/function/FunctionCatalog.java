@@ -23,7 +23,6 @@ import org.apache.gravitino.Namespace;
 import org.apache.gravitino.annotation.Evolving;
 import org.apache.gravitino.exceptions.FunctionAlreadyExistsException;
 import org.apache.gravitino.exceptions.NoSuchFunctionException;
-import org.apache.gravitino.exceptions.NoSuchFunctionVersionException;
 import org.apache.gravitino.exceptions.NoSuchSchemaException;
 import org.apache.gravitino.rel.types.Type;
 
@@ -52,28 +51,17 @@ public interface FunctionCatalog {
   /**
    * Get a function by {@link NameIdentifier} from the catalog. The identifier only contains the
    * schema and function name. A function may include multiple definitions (overloads) in the
-   * result. This method returns the latest version of the function.
+   * result. This method returns the current version of the function.
+   *
+   * <p>Note: Currently, the current version is always the latest version. In the future, when
+   * rollback functionality is supported, the current version may differ from the latest version.
    *
    * @param ident A function identifier.
-   * @return The latest version of the function with the given name.
+   * @return The current version of the function with the given name.
    * @throws NoSuchFunctionException If the function does not exist.
    */
+  // todo: update the the JavaDoc when function rollback is supported
   Function getFunction(NameIdentifier ident) throws NoSuchFunctionException;
-
-  /**
-   * Get a function by {@link NameIdentifier} and version from the catalog. The identifier only
-   * contains the schema and function name. A function may include multiple definitions (overloads)
-   * in the result.
-   *
-   * @param ident A function identifier.
-   * @param version The zero-based function version index (0 for the first created version), as
-   *     returned by {@link Function#version()}.
-   * @return The function with the given name and version.
-   * @throws NoSuchFunctionException If the function does not exist.
-   * @throws NoSuchFunctionVersionException If the function version does not exist.
-   */
-  Function getFunction(NameIdentifier ident, int version)
-      throws NoSuchFunctionException, NoSuchFunctionVersionException;
 
   /**
    * Check if a function with the given name exists in the catalog.
