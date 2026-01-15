@@ -57,6 +57,7 @@ public class GravitinoMetadata452 extends GravitinoMetadata {
         computedStatistics);
   }
 
+  @SuppressWarnings("deprecation")
   @Override
   public ConnectorMergeTableHandle beginMerge(
       ConnectorSession session, ConnectorTableHandle tableHandle, RetryMode retryMode) {

@@ -162,7 +162,7 @@ public abstract class TestGravitinoConnector extends AbstractGravitinoConnectorT
         .contains("COMMENT 'test column comments'");
 
     // test add column and drop column, but the memory connector is not supported these operations.
-    if (trinoVersion < 473) {
+    if (trinoVersion < 469) {
       assertQueryFails(
           String.format("alter table %s add column if not exists c varchar", fullTableName1),
           "This connector does not support adding columns");

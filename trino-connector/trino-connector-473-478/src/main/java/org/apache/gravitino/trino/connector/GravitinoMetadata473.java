@@ -78,6 +78,21 @@ public class GravitinoMetadata473 extends GravitinoMetadata {
   }
 
   @Override
+  public void finishMerge(
+      ConnectorSession session,
+      ConnectorMergeTableHandle mergeTableHandle,
+      List<ConnectorTableHandle> sourceTableHandles,
+      Collection<Slice> fragments,
+      Collection<ComputedStatistics> computedStatistics) {
+    internalMetadata.finishMerge(
+        session,
+        GravitinoHandle.unWrap(mergeTableHandle),
+        sourceTableHandles.stream().map(GravitinoHandle::unWrap).collect(Collectors.toList()),
+        fragments,
+        computedStatistics);
+  }
+
+  @Override
   public void addColumn(
       ConnectorSession session,
       ConnectorTableHandle tableHandle,
