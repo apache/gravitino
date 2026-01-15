@@ -94,6 +94,7 @@ export default function AddUserGroupDialog({ ...props }) {
             name='name'
             label='User Group Name'
             rules={[{ required: true }, { type: 'string', max: 64 }, { pattern: new RegExp(nameRegex) }]}
+            messageVariables={{ label: 'user group name' }}
           >
             <Input placeholder={mismatchName} />
           </Form.Item>

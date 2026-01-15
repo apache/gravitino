@@ -239,6 +239,7 @@ export default function RegisterJobTemplateDialog({ ...props }) {
                   name='name'
                   label='Template Name'
                   rules={[{ required: true }, { type: 'string', max: 64 }, { pattern: new RegExp(nameRegex) }]}
+                  messageVariables={{ label: 'template name' }}
                 >
                   <Input placeholder={mismatchName} />
                 </Form.Item>
@@ -256,10 +257,10 @@ export default function RegisterJobTemplateDialog({ ...props }) {
                   rules={[{ required: true, message: 'Please enter the executable!' }]}
                   label='Executable'
                 >
-                  <Input />
+                  <Input placeholder='e.g. /path/to/my_script.sh' />
                 </Form.Item>
                 <Form.Item name='arguments' label='Arguments'>
-                  <Select mode='tags' tokenSeparators={[',']} />
+                  <Select mode='tags' tokenSeparators={[',']} placeholder='e.g. {{arg1}},{{arg2}}' />
                 </Form.Item>
                 <Form.Item label='Environment Variables'>
                   <div className='flex flex-col gap-2'>
@@ -355,16 +356,28 @@ export default function RegisterJobTemplateDialog({ ...props }) {
                       rules={[{ required: true, message: 'Please enter the class name!' }]}
                       label='Class Name'
                     >
-                      <Input />
+                      <Input placeholder='e.g. com.example.MySparkApp' />
                     </Form.Item>
                     <Form.Item name='jars' label='Jars'>
-                      <Select mode='tags' tokenSeparators={[',']} />
+                      <Select
+                        mode='tags'
+                        tokenSeparators={[',']}
+                        placeholder='e.g. /path/to/dependency1.jar,/path/to/dependency2.jar'
+                      />
                     </Form.Item>
                     <Form.Item name='files' label='Files'>
-                      <Select mode='tags' tokenSeparators={[',']} />
+                      <Select
+                        mode='tags'
+                        tokenSeparators={[',']}
+                        placeholder='e.g. /path/to/file1.txt,/path/to/file2.txt'
+                      />
                     </Form.Item>
                     <Form.Item name='archives' label='Archives'>
-                      <Select mode='tags' tokenSeparators={[',']} />
+                      <Select
+                        mode='tags'
+                        tokenSeparators={[',']}
+                        placeholder='e.g. /path/to/archive1.zip,/path/to/archive2.zip'
+                      />
                     </Form.Item>
                     <Form.Item label='Configs'>
                       <div className='flex flex-col gap-2'>

@@ -55,6 +55,7 @@ export default function LinkVersionDialog({ ...props }) {
   const [form] = Form.useForm()
   const values = Form.useWatch([], form)
   const urisItems = Form.useWatch(['uris'], form)
+  const aliasesItems = Form.useWatch(['aliases'], form)
   const defaultUriName = Form.useWatch(['properties'], form)?.filter(item => item?.key === 'default-uri-name')[0]
   const dispatch = useAppDispatch()
 
@@ -235,7 +236,7 @@ export default function LinkVersionDialog({ ...props }) {
                       <div className='flex flex-col gap-2'>
                         {fields.map(({ key, name, ...restField }) => (
                           <Form.Item label={null} className='align-items-center mb-1' key={key}>
-                            <Flex gap='small' align='start'>
+                            <Flex gap='small' align='center'>
                               <Form.Item
                                 className='mb-0 w-full grow'
                                 name={[name, 'name']}
@@ -281,21 +282,36 @@ export default function LinkVersionDialog({ ...props }) {
                                   </Tooltip>
                                 </Form.Item>
                               )}
-                              {name === 0 ? (
-                                <Icons.Plus
-                                  className='size-8 cursor-pointer text-gray-400 hover:text-defaultPrimary'
-                                  onClick={() => {
-                                    subOpt.add({ name: '', uri: '', defaultUri: false })
-                                  }}
-                                />
-                              ) : (
-                                <Icons.Minus
-                                  className='size-8 cursor-pointer text-gray-400 hover:text-defaultPrimary'
-                                  onClick={() => {
-                                    subOpt.remove(name)
-                                  }}
-                                />
-                              )}
+                              <div className='flex w-10 shrink-0 items-center justify-start gap-2'>
+                                {name === 0 ? (
+                                  <>
+                                    <Icons.Plus
+                                      className='size-4 cursor-pointer text-gray-400 hover:text-defaultPrimary'
+                                      onClick={() => {
+                                        subOpt.add({ name: '', uri: '', defaultUri: false })
+                                      }}
+                                    />
+                                    {urisItems?.length > 1 && (
+                                      <Icons.Minus
+                                        className='size-4 cursor-pointer text-gray-400 hover:text-defaultPrimary'
+                                        onClick={() => {
+                                          subOpt.remove(name)
+                                        }}
+                                      />
+                                    )}
+                                  </>
+                                ) : (
+                                  <>
+                                    <span className='inline-block size-4' />
+                                    <Icons.Minus
+                                      className='size-4 cursor-pointer text-gray-400 hover:text-defaultPrimary'
+                                      onClick={() => {
+                                        subOpt.remove(name)
+                                      }}
+                                    />
+                                  </>
+                                )}
+                              </div>
                             </Flex>
                           </Form.Item>
                         ))}
@@ -309,7 +325,7 @@ export default function LinkVersionDialog({ ...props }) {
                       <div className='flex flex-col gap-2'>
                         {fields.map(({ key, name, ...restField }) => (
                           <Form.Item label={null} className='align-items-center mb-1' key={key}>
-                            <div className='flex items-start gap-2'>
+                            <Flex gap='small' align='center'>
                               <Form.Item
                                 {...restField}
                                 className='mb-0 w-full grow'
@@ -339,24 +355,37 @@ export default function LinkVersionDialog({ ...props }) {
                               >
                                 <Input placeholder={`Alias ${name + 1}`} />
                               </Form.Item>
-                              <Form.Item className='mb-0 grow-0'>
+                              <div className='flex w-10 shrink-0 items-center justify-start gap-2'>
                                 {name === 0 ? (
-                                  <Icons.Plus
-                                    className='size-4 cursor-pointer text-gray-400 hover:text-defaultPrimary'
-                                    onClick={() => {
-                                      subOpt.add()
-                                    }}
-                                  />
+                                  <>
+                                    <Icons.Plus
+                                      className='size-4 cursor-pointer text-gray-400 hover:text-defaultPrimary'
+                                      onClick={() => {
+                                        subOpt.add()
+                                      }}
+                                    />
+                                    {aliasesItems?.length > 1 && (
+                                      <Icons.Minus
+                                        className='size-4 cursor-pointer text-gray-400 hover:text-defaultPrimary'
+                                        onClick={() => {
+                                          subOpt.remove(name)
+                                        }}
+                                      />
+                                    )}
+                                  </>
                                 ) : (
-                                  <Icons.Minus
-                                    className='size-4 cursor-pointer text-gray-400 hover:text-defaultPrimary'
-                                    onClick={() => {
-                                      subOpt.remove(name)
-                                    }}
-                                  />
+                                  <>
+                                    <span className='inline-block size-4' />
+                                    <Icons.Minus
+                                      className='size-4 cursor-pointer text-gray-400 hover:text-defaultPrimary'
+                                      onClick={() => {
+                                        subOpt.remove(name)
+                                      }}
+                                    />
+                                  </>
                                 )}
-                              </Form.Item>
-                            </div>
+                              </div>
+                            </Flex>
                           </Form.Item>
                         ))}
                       </div>

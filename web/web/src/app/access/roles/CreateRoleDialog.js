@@ -47,7 +47,10 @@ export default function CreateRoleDialog({ ...props }) {
   const [confirmLoading, setConfirmLoading] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
   const [privilegeErrorTips, setPrivilegeErrorTips] = useState('')
+  const [activeCollapseKeys, setActiveCollapseKeys] = useState([])
   const loadedRef = useRef(false)
+  const prevSecurableLenRef = useRef(0)
+  const editInitRef = useRef(false)
   const scrollRef = useRef(null)
   const scrolling = useScrolling(scrollRef)
   const [bottomShadow, setBottomShadow] = useState(false)
@@ -56,6 +59,14 @@ export default function CreateRoleDialog({ ...props }) {
 
   const [form] = Form.useForm()
   const values = Form.useWatch([], form)
+
+  const isElementVisibleInContainer = (el, container) => {
+    if (!el || !container) return true
+    const elRect = el.getBoundingClientRect()
+    const containerRect = container.getBoundingClientRect()
+
+    return elRect.top >= containerRect.top && elRect.bottom <= containerRect.bottom
+  }
 
   const handScroll = () => {
     if (scrollRef.current) {
@@ -69,6 +80,18 @@ export default function CreateRoleDialog({ ...props }) {
       } else {
         setTopShadow(false)
         setBottomShadow(false)
+      }
+
+      const activeEl = document.activeElement
+
+      const isFormControl =
+        activeEl && (activeEl.getAttribute?.('role') === 'combobox' || ['INPUT', 'TEXTAREA'].includes(activeEl.tagName))
+      if (
+        isFormControl &&
+        scrollRef.current.contains(activeEl) &&
+        !isElementVisibleInContainer(activeEl, scrollRef.current)
+      ) {
+        activeEl.blur()
       }
     }
   }
@@ -85,6 +108,7 @@ export default function CreateRoleDialog({ ...props }) {
   useEffect(() => {
     if (open && editRole && !loadedRef.current) {
       loadedRef.current = true
+      editInitRef.current = true
 
       const init = async () => {
         setIsLoading(true)
@@ -119,6 +143,7 @@ export default function CreateRoleDialog({ ...props }) {
           // normal side-effects now.
           setTimeout(() => {
             form.setFieldsValue({ __init_in_progress: false })
+            editInitRef.current = false
           }, 100)
           setIsLoading(false)
         } catch (e) {
@@ -139,6 +164,33 @@ export default function CreateRoleDialog({ ...props }) {
   useEffect(() => {
     setPrivilegeErrorTips('')
   }, [values?.securableObjects])
+
+  useEffect(() => {
+    const currentLen = values?.securableObjects?.length || 0
+
+    if (currentLen === 0) {
+      setActiveCollapseKeys([])
+      prevSecurableLenRef.current = 0
+
+      return
+    }
+
+    if (prevSecurableLenRef.current === 0 && activeCollapseKeys.length === 0) {
+      if (editRole) {
+        setActiveCollapseKeys(['0'])
+      } else {
+        setActiveCollapseKeys(Array.from({ length: currentLen }, (_, idx) => String(idx)))
+      }
+    } else if (currentLen > prevSecurableLenRef.current) {
+      if (!editRole || !editInitRef.current) {
+        setActiveCollapseKeys(keys => Array.from(new Set([...(keys || []), String(currentLen - 1)])))
+      }
+    } else if (currentLen < prevSecurableLenRef.current) {
+      setActiveCollapseKeys(keys => (keys || []).filter(k => Number(k) < currentLen))
+    }
+
+    prevSecurableLenRef.current = currentLen
+  }, [values?.securableObjects?.length, editRole])
 
   const handleSubmit = e => {
     e.preventDefault()
@@ -208,11 +260,9 @@ export default function CreateRoleDialog({ ...props }) {
   }
 
   const renderSecurableObjectItems = (fields, subOpt) => {
-    const activeKeys = fields.map(f => String(f.key))
-
     const items = fields.map(field => {
       const fname = field.name
-      const fkey = String(field.key)
+      const fkey = String(fname)
 
       // Lightweight internal check: avoid emitting debug logs in production
       const titleValue = form.getFieldValue(['securableObjects', fname, 'fullName'])
@@ -247,7 +297,16 @@ export default function CreateRoleDialog({ ...props }) {
 
     return (
       <>
-        <Collapse defaultActiveKey={activeKeys} accordion={false} items={items} onChange={handleChangeCollapse} />
+        <Collapse
+          activeKey={activeCollapseKeys}
+          accordion={false}
+          items={items}
+          onChange={keys => {
+            const nextKeys = Array.isArray(keys) ? keys : [keys]
+            setActiveCollapseKeys(nextKeys)
+            handleChangeCollapse()
+          }}
+        />
 
         <div className='text-center mt-2'>
           <Button
@@ -301,6 +360,7 @@ export default function CreateRoleDialog({ ...props }) {
                   name='name'
                   label='Role Name'
                   rules={[{ required: true }, { type: 'string', max: 64 }, { pattern: new RegExp(nameRegex) }]}
+                  messageVariables={{ label: 'role name' }}
                 >
                   <Input placeholder={mismatchName} disabled={!!editRole} />
                 </Form.Item>

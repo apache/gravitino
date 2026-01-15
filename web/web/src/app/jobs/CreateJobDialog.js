@@ -41,6 +41,7 @@ export default function CreateJobDialog({ ...props }) {
   const { open, setOpen, metalake, router, jobTemplateNames } = props
   const [confirmLoading, setConfirmLoading] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
+  const [jobTemplateDetail, setJobTemplateDetail] = useState(null)
   const [form] = Form.useForm()
   const values = Form.useWatch([], form)
   const currentJobTemplate = Form.useWatch('jobTemplateName', form)
@@ -64,24 +65,80 @@ export default function CreateJobDialog({ ...props }) {
   }, [open, jobTemplateNames, currentJobTemplate])
 
   const updateOnChange = (index, newValue) => {
-    const changedTemplate = jobConfValues[index].template
-    if (!changedTemplate) return
+    const changedKey = jobConfValues?.[index]?.confKey
+    if (!changedKey) return
 
-    const updatedJobConf = [...jobConfValues]
+    const updatedJobConf = (jobConfValues || []).map(conf =>
+      conf?.confKey === changedKey ? { ...conf, value: newValue } : conf
+    )
 
-    jobConfValues.forEach(index => {
-      let hasChange = false
-      updatedJobConf.forEach((conf, i) => {
-        if (i !== index && conf?.template === changedTemplate) {
-          updatedJobConf[i] = { ...conf, value: newValue }
-          hasChange = true
-        }
-      })
+    form.setFieldsValue({ jobConf: updatedJobConf })
+  }
 
-      if (hasChange) {
-        form.setFieldsValue({ jobConf: updatedJobConf })
+  const getPlaceholderEntries = templateDetail => {
+    if (!templateDetail) return []
+
+    const jobType = String(templateDetail.jobType || '').toLowerCase()
+    const stringValues = []
+
+    const pushString = value => {
+      if (typeof value === 'string' && value) {
+        stringValues.push(value)
       }
-    })
+    }
+
+    const pushArray = values => {
+      ;(values || []).forEach(val => pushString(val))
+    }
+
+    const pushObjectValues = obj => {
+      Object.values(obj || {}).forEach(val => pushString(val))
+    }
+
+    pushString(templateDetail.jobType)
+    pushString(templateDetail.comment)
+    pushString(templateDetail.executable)
+    pushArray(templateDetail.arguments)
+    pushObjectValues(templateDetail.environments)
+    pushObjectValues(templateDetail.customFields)
+
+    if (jobType === 'spark') {
+      pushString(templateDetail.className)
+      pushArray(templateDetail.jars)
+      pushArray(templateDetail.files)
+      pushArray(templateDetail.archives)
+      pushObjectValues(templateDetail.configs)
+    }
+
+    if (jobType === 'shell') {
+      pushArray(templateDetail.scripts)
+    }
+
+    const placeholders = stringValues.flatMap(template => getJobParamValues(template) || []).filter(Boolean)
+    const uniquePlaceholders = Array.from(new Set(placeholders))
+
+    return uniquePlaceholders.map(name => ({
+      key: name,
+      value: '',
+      confKey: name,
+      template: `{{${name}}}`
+    }))
+  }
+
+  const getPlaceholderValueMap = () =>
+    (jobConfValues || []).reduce((acc, item) => {
+      if (item?.confKey) {
+        acc[item.confKey] = item.value || ''
+      }
+
+      return acc
+    }, {})
+
+  const renderTemplateValue = template => {
+    if (!template) return ''
+    const valueMap = getPlaceholderValueMap()
+
+    return template.replace(/\{\{([^}]+)\}\}/g, (_, key) => valueMap[key] || `{{${key}}}`)
   }
 
   useEffect(() => {
@@ -90,32 +147,9 @@ export default function CreateJobDialog({ ...props }) {
       try {
         const { payload: jobTemplate } = await dispatch(getJobTemplate({ metalake, jobTemplate: currentJobTemplate }))
         setIsLoading(false)
-        form.setFieldValue('jobConf', [])
-        const { arguments: args, environments, customFields } = jobTemplate
-        args.forEach((conf, index) => {
-          form.setFieldValue(['jobConf', index], {
-            key: getJobParamValues(conf)?.[0],
-            value: '',
-            confKey: getJobParamValues(conf)?.[0],
-            template: conf
-          })
-        })
-        Object.entries(environments).forEach(([key, value], index) => {
-          form.setFieldValue(['jobConf', args.length + index], {
-            key,
-            value: '',
-            confKey: getJobParamValues(value)?.[0],
-            template: value
-          })
-        })
-        Object.entries(customFields).forEach(([key, value], index) => {
-          form.setFieldValue(['jobConf', args.length + Object.keys(environments).length + index], {
-            key,
-            value: '',
-            confKey: getJobParamValues(value)?.[0],
-            template: value
-          })
-        })
+        setJobTemplateDetail(jobTemplate)
+        const placeholderEntries = getPlaceholderEntries(jobTemplate)
+        form.setFieldsValue({ jobConf: placeholderEntries })
       } catch (error) {
         console.log(error)
         setIsLoading(false)
@@ -166,7 +200,7 @@ export default function CreateJobDialog({ ...props }) {
         okText='Submit'
         maskClosable={false}
         keyboard={false}
-        width={800}
+        width={1000}
         confirmLoading={confirmLoading}
         onCancel={handleCancel}
       >
@@ -179,7 +213,12 @@ export default function CreateJobDialog({ ...props }) {
             name='policyForm'
             validateMessages={validateMessages}
           >
-            <Form.Item name='jobTemplateName' label='Template Name' rules={[{ required: true }]}>
+            <Form.Item
+              name='jobTemplateName'
+              label='Template Name'
+              rules={[{ required: true }]}
+              messageVariables={{ label: 'template name' }}
+            >
               <Select
                 popupRender={menu => (
                   <>
@@ -210,47 +249,211 @@ export default function CreateJobDialog({ ...props }) {
                 options={jobTemplateNames.map(template => ({ label: template, value: template }))}
               />
             </Form.Item>
-            <Form.Item label='Job Configuration'>
-              <div className='flex flex-col gap-2'>
-                <Form.List name='jobConf'>
-                  {(fields, { add, remove }) => (
+            <div className='relative rounded border border-gray-200'>
+              <div className='pointer-events-none absolute inset-y-0 left-1/2 w-px -translate-x-1/2 bg-gray-200' />
+              <div className='pointer-events-none absolute left-1/2 top-1/2 flex size-6 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full border border-gray-200 bg-white text-gray-500'>
+                <Icons.iconify icon='mdi:arrow-left' className='size-4' />
+              </div>
+              <div className='grid grid-cols-2 gap-6 p-4'>
+                <div className='space-y-2 max-h-[320px] overflow-y-auto pr-2'>
+                  <Paragraph className='text-sm !mb-0'>Template Parameters</Paragraph>
+                  <div>
+                    <Paragraph className='text-[12px] mb-1'>Basic Fields</Paragraph>
+                    <div className='pl-4 space-y-1'>
+                      <div className='text-[12px] text-gray-700'>
+                        <span className='text-gray-400'>Job Type:</span> {jobTemplateDetail?.jobType || '-'}
+                      </div>
+                      <div className='text-[12px] text-gray-700'>
+                        <span className='text-gray-400'>Comment:</span> {jobTemplateDetail?.comment || '-'}
+                      </div>
+                      <div className='text-[12px] text-gray-700'>
+                        <span className='text-gray-400'>Executable:</span>{' '}
+                        {renderTemplateValue(jobTemplateDetail?.executable || '') || '-'}
+                      </div>
+                      {jobTemplateDetail?.jobType === 'spark' && (
+                        <div className='text-[12px] text-gray-700'>
+                          <span className='text-gray-400'>Class Name:</span>{' '}
+                          {renderTemplateValue(jobTemplateDetail?.className || '') || '-'}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                  <div>
+                    <Paragraph className='text-[12px] mb-1'>Arguments</Paragraph>
+                    <div className='pl-4'>
+                      {(jobTemplateDetail?.arguments || []).length > 0 ? (
+                        <div className='space-y-1'>
+                          {(jobTemplateDetail?.arguments || []).map((arg, index) => (
+                            <div key={`arg-${index}`} className='text-sm text-gray-700'>
+                              {renderTemplateValue(arg)}
+                            </div>
+                          ))}
+                        </div>
+                      ) : (
+                        <div className='text-sm text-gray-400'>No arguments</div>
+                      )}
+                    </div>
+                  </div>
+                  <div>
+                    <Paragraph className='text-[12px] mb-1'>Environment Variables</Paragraph>
+                    <div className='pl-4'>
+                      {Object.keys(jobTemplateDetail?.environments || {}).length > 0 ? (
+                        <div className='space-y-1'>
+                          {Object.entries(jobTemplateDetail?.environments || {}).map(([key, value]) => (
+                            <div key={`env-${key}`} className='text-sm text-gray-700'>
+                              <span className='text-gray-400'>{key}:</span> {renderTemplateValue(value)}
+                            </div>
+                          ))}
+                        </div>
+                      ) : (
+                        <div className='text-[12px] text-gray-400'>No environment variables</div>
+                      )}
+                    </div>
+                  </div>
+                  <div>
+                    <Paragraph className='text-[12px] mb-1'>Custom Fields</Paragraph>
+                    <div className='pl-4'>
+                      {Object.keys(jobTemplateDetail?.customFields || {}).length > 0 ? (
+                        <div className='space-y-1'>
+                          {Object.entries(jobTemplateDetail?.customFields || {}).map(([key, value]) => (
+                            <div key={`custom-${key}`} className='text-sm text-gray-700'>
+                              <span className='text-gray-400'>{key}:</span> {renderTemplateValue(value)}
+                            </div>
+                          ))}
+                        </div>
+                      ) : (
+                        <div className='text-[12px] text-gray-400'>No custom fields</div>
+                      )}
+                    </div>
+                  </div>
+                  {jobTemplateDetail?.jobType === 'spark' && (
                     <>
-                      {fields.map(({ key, name, ...restField }) => (
-                        <Form.Item label={null} className='align-items-center mb-1' key={key}>
-                          <Flex gap='small' align='start' key={key}>
-                            <Form.Item
-                              {...restField}
-                              name={[name, 'key']}
-                              rules={[{ required: true, message: 'Please enter the job config key!' }]}
-                              className='mb-0 w-full grow'
-                            >
-                              <Input disabled placeholder='Job Config Key' />
-                            </Form.Item>
-                            <Form.Item
-                              {...restField}
-                              name={[name, 'value']}
-                              rules={[{ required: true, message: 'Please enter the job config value!' }]}
-                              className='mb-0 w-full grow'
-                            >
-                              <Input
-                                placeholder={form.getFieldValue(['jobConf', name, 'template']) || 'Job Config Value'}
-                                onChange={e => updateOnChange(name, e.target.value)}
-                              />
-                            </Form.Item>
-                            <Form.Item className='mb-0 grow-0'>
-                              <Icons.Minus
-                                className='size-8 cursor-pointer text-gray-400 hover:text-defaultPrimary'
-                                onClick={() => remove(name)}
-                              />
-                            </Form.Item>
-                          </Flex>
-                        </Form.Item>
-                      ))}
+                      <div>
+                        <Paragraph className='text-[12px] mb-1'>Jars</Paragraph>
+                        <div className='pl-4'>
+                          {(jobTemplateDetail?.jars || []).length > 0 ? (
+                            <div className='space-y-1'>
+                              {(jobTemplateDetail?.jars || []).map((item, index) => (
+                                <div key={`jar-${index}`} className='text-sm text-gray-700'>
+                                  {renderTemplateValue(item)}
+                                </div>
+                              ))}
+                            </div>
+                          ) : (
+                            <div className='text-[12px] text-gray-400'>No jars</div>
+                          )}
+                        </div>
+                      </div>
+                      <div>
+                        <Paragraph className='text-[12px] mb-1'>Files</Paragraph>
+                        <div className='pl-4'>
+                          {(jobTemplateDetail?.files || []).length > 0 ? (
+                            <div className='space-y-1'>
+                              {(jobTemplateDetail?.files || []).map((item, index) => (
+                                <div key={`file-${index}`} className='text-sm text-gray-700'>
+                                  {renderTemplateValue(item)}
+                                </div>
+                              ))}
+                            </div>
+                          ) : (
+                            <div className='text-[12px] text-gray-400'>No files</div>
+                          )}
+                        </div>
+                      </div>
+                      <div>
+                        <Paragraph className='text-[12px] mb-1'>Archives</Paragraph>
+                        <div className='pl-4'>
+                          {(jobTemplateDetail?.archives || []).length > 0 ? (
+                            <div className='space-y-1'>
+                              {(jobTemplateDetail?.archives || []).map((item, index) => (
+                                <div key={`archive-${index}`} className='text-sm text-gray-700'>
+                                  {renderTemplateValue(item)}
+                                </div>
+                              ))}
+                            </div>
+                          ) : (
+                            <div className='text-[12px] text-gray-400'>No archives</div>
+                          )}
+                        </div>
+                      </div>
+                      <div>
+                        <Paragraph className='text-[12px] mb-1'>Configs</Paragraph>
+                        <div className='pl-4'>
+                          {Object.keys(jobTemplateDetail?.configs || {}).length > 0 ? (
+                            <div className='space-y-1'>
+                              {Object.entries(jobTemplateDetail?.configs || {}).map(([key, value]) => (
+                                <div key={`config-${key}`} className='text-[12px] text-gray-700'>
+                                  <span className='text-gray-400'>{key}:</span> {renderTemplateValue(value)}
+                                </div>
+                              ))}
+                            </div>
+                          ) : (
+                            <div className='text-[12px] text-gray-400'>No configs</div>
+                          )}
+                        </div>
+                      </div>
                     </>
                   )}
-                </Form.List>
+                  {jobTemplateDetail?.jobType === 'shell' && (
+                    <div>
+                      <Paragraph className='text-[12px] mb-1'>Scripts</Paragraph>
+                      <div className='pl-4'>
+                        {(jobTemplateDetail?.scripts || []).length > 0 ? (
+                          <div className='space-y-1'>
+                            {(jobTemplateDetail?.scripts || []).map((item, index) => (
+                              <div key={`script-${index}`} className='text-sm text-gray-700'>
+                                {renderTemplateValue(item)}
+                              </div>
+                            ))}
+                          </div>
+                        ) : (
+                          <div className='text-[12px] text-gray-400'>No scripts</div>
+                        )}
+                      </div>
+                    </div>
+                  )}
+                </div>
+                <div className='pl-2 max-h-[320px] overflow-y-auto pr-2'>
+                  <Form.Item label='Job Configuration'>
+                    <div className='flex flex-col gap-2'>
+                      <Form.List name='jobConf'>
+                        {fields => (
+                          <>
+                            {fields.map(({ key, name, ...restField }) => (
+                              <Form.Item label={null} className='align-items-center mb-0' key={key}>
+                                <Flex gap='small' align='start' key={key}>
+                                  <Form.Item
+                                    {...restField}
+                                    name={[name, 'key']}
+                                    rules={[{ required: true, message: 'Please enter the job config key!' }]}
+                                    className='mb-0 w-full grow'
+                                  >
+                                    <Input disabled placeholder='Job Config Key' />
+                                  </Form.Item>
+                                  <Form.Item
+                                    {...restField}
+                                    name={[name, 'value']}
+                                    rules={[{ required: true, message: 'Please enter the job config value!' }]}
+                                    className='mb-0 w-full grow'
+                                  >
+                                    <Input
+                                      placeholder={
+                                        form.getFieldValue(['jobConf', name, 'template']) || 'Job Config Value'
+                                      }
+                                      onChange={e => updateOnChange(name, e.target.value)}
+                                    />
+                                  </Form.Item>
+                                </Flex>
+                              </Form.Item>
+                            ))}
+                          </>
+                        )}
+                      </Form.List>
+                    </div>
+                  </Form.Item>
+                </div>
               </div>
-            </Form.Item>
+            </div>
           </Form>
         </Spin>
         {openTemplate && (

@@ -275,7 +275,7 @@ export default function ModelDetailsPage({ ...props }) {
         }
       }
     ],
-    [currentMetalake]
+    [currentMetalake, catalog, schema, model]
   )
 
   const { resizableColumns, components, tableWidth } = useAntdColumnResize(() => {

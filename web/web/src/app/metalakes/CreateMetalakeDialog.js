@@ -144,6 +144,7 @@ export default function CreateMetalakeDialog({ ...props }) {
               label='Name'
               data-refer='metalake-name-field'
               rules={[{ required: true }, { type: 'string', max: 64 }, { pattern: new RegExp(nameRegex) }]}
+              messageVariables={{ label: 'name' }}
             >
               <Input placeholder={validateMessages.pattern?.mismatch} />
             </Form.Item>

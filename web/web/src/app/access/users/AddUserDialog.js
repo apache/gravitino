@@ -99,6 +99,7 @@ export default function AddUserDialog({ ...props }) {
               { type: 'string', max: 64 },
               { pattern: new RegExp(usernameRegex), message: mismatchName }
             ]}
+            messageVariables={{ label: 'name' }}
           >
             <Input placeholder={mismatchName} />
           </Form.Item>

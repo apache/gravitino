@@ -190,6 +190,7 @@ export default function RegisterModelDialog({ ...props }) {
                   name='name'
                   label='Model Name'
                   rules={[{ required: true }, { type: 'string', max: 64 }, { pattern: new RegExp(nameRegex) }]}
+                  messageVariables={{ label: 'model name' }}
                 >
                   <Input placeholder={mismatchName} disabled={init} />
                 </Form.Item>

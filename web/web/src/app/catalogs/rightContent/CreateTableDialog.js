@@ -72,6 +72,7 @@ import { capitalizeFirstLetter, genUpdates } from '@/lib/utils'
 import { cn } from '@/lib/utils/tailwind'
 import { createTable, updateTable, getTableDetails } from '@/lib/store/metalakes'
 import { useAppDispatch } from '@/lib/hooks/useStore'
+import { includes } from 'lodash-es'
 
 const { Paragraph } = Typography
 const { TextArea } = Input
@@ -585,7 +586,7 @@ export default function CreateTableDialog({ ...props }) {
                   column['defaultValue'] = {
                     type: 'literal',
                     dataType: col.defaultValue?.dataType || 'string',
-                    value: col.defaultValue?.value
+                    value: ['', 'NULL', undefined].includes(col.defaultValue?.value) ? 'NULL' : col.defaultValue?.value
                   }
               }
             }
@@ -1299,11 +1300,8 @@ export default function CreateTableDialog({ ...props }) {
                 <Form.Item
                   name='name'
                   label='Table Name'
-                  rules={[
-                    { required: true, message: `Please enter the table name!` },
-                    { type: 'string', max: 64 },
-                    { pattern: new RegExp(nameRegex) }
-                  ]}
+                  messageVariables={{ label: 'table name' }}
+                  rules={[{ required: true }, { type: 'string', max: 64 }, { pattern: new RegExp(nameRegex) }]}
                 >
                   <Input data-refer='table-name-field' placeholder={mismatchName} disabled={init} />
                 </Form.Item>

@@ -26,7 +26,7 @@ import { usePathname, useSearchParams, useRouter } from 'next/navigation'
 import { cn } from '@/lib/utils/tailwind'
 import { useAppSelector, useAppDispatch } from '@/lib/hooks/useStore'
 import Loading from '@/components/Loading'
-import { fetchMetalakes } from '@/lib/store/metalakes'
+import { fetchMetalakes, resetMetalakeStore } from '@/lib/store/metalakes'
 import { logoutAction } from '@/lib/store/auth'
 import { oauthProviderFactory } from '@/lib/auth/providers/factory'
 
@@ -109,6 +109,9 @@ export default function UserSetting() {
                   // Build new searchParams with updated metalake, preserving other params
                   const params = new URLSearchParams(searchParams.toString())
                   params.set('metalake', metalake.name)
+
+                  // Reset metalake store to avoid data inconsistency
+                  dispatch(resetMetalakeStore())
 
                   // Preserve pathname and only update metalake in query string
                   router.push(`${pathname}?${params.toString()}`)
