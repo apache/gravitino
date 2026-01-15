@@ -29,11 +29,10 @@ import org.apache.flink.table.factories.FactoryUtil;
 import org.apache.flink.table.factories.ManagedTableFactory;
 import org.apache.gravitino.rel.Table;
 
+@SuppressWarnings("deprecation")
 final class FlinkGenericTableUtil {
   public static final String CONNECTOR = FactoryUtil.CONNECTOR.key();
   private static final String CONNECTOR_TYPE = "connector.type";
-
-  @SuppressWarnings("deprecation")
   private static final String MANAGED_TABLE_IDENTIFIER = ManagedTableFactory.DEFAULT_IDENTIFIER;
 
   private FlinkGenericTableUtil() {}
