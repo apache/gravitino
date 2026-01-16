@@ -16,14 +16,25 @@
  * specific language governing permissions and limitations
  * under the License.
  */
+
+import net.ltgt.gradle.errorprone.errorprone
+
 plugins {
-  `maven-publish`
   id("java")
   id("idea")
 }
 
 repositories {
   mavenCentral()
+}
+
+var trinoVersion = 435
+val trinoVersionProvider =
+  providers.gradleProperty("trinoVersion").map { it.toInt() }.orElse(435)
+trinoVersion = trinoVersionProvider.get()
+
+java {
+  toolchain.languageVersion.set(JavaLanguageVersion.of(24))
 }
 
 dependencies {
@@ -33,40 +44,39 @@ dependencies {
   implementation(libs.bundles.log4j)
   implementation(libs.commons.collections4)
   implementation(libs.commons.lang3)
-  implementation(libs.trino.jdbc)
+  implementation("io.trino:trino-jdbc:$trinoVersion")
   compileOnly(libs.airlift.resolver)
-  compileOnly(libs.trino.spi) {
+  compileOnly("io.trino:trino-spi:$trinoVersion") {
     exclude("org.apache.logging.log4j")
   }
   testImplementation(libs.awaitility)
   testImplementation(libs.mockito.core)
   testImplementation(libs.mysql.driver)
-  testImplementation(libs.trino.memory) {
+  testImplementation("io.trino:trino-memory:$trinoVersion") {
     exclude("org.antlr")
     exclude("org.apache.logging.log4j")
   }
-  testImplementation(libs.trino.testing) {
+  testImplementation("io.trino:trino-testing:$trinoVersion") {
     exclude("org.apache.logging.log4j")
   }
   testRuntimeOnly(libs.junit.jupiter.engine)
 }
 
 tasks.named("generateMetadataFileForMavenJavaPublication") {
-  dependsOn(":trino-connector:trino-connector:copyDepends")
+  // No extra dependencies required now that runtime artifacts are copied directly during distribution tasks.
 }
 
 tasks {
-  val copyDepends by registering(Copy::class) {
-    from(configurations.runtimeClasspath)
-    into("build/libs")
-  }
-  jar {
-    finalizedBy(copyDepends)
-  }
-
   register("copyLibs", Copy::class) {
-    dependsOn(copyDepends, "build")
+    dependsOn("build")
     from("build/libs")
+    from({ configurations.runtimeClasspath.get().filter(File::isFile) })
     into("$rootDir/distribution/${rootProject.name}-trino-connector")
   }
+}
+
+tasks.withType<JavaCompile>().configureEach {
+  // Error Prone is incompatible with the JDK 24 toolchain required by this Trino range.
+  options.errorprone.isEnabled.set(false)
+  options.release.set(17)
 }
