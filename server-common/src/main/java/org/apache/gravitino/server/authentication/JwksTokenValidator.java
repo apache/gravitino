@@ -103,7 +103,7 @@ public class JwksTokenValidator implements OAuthTokenValidator {
       DefaultJWTProcessor<SecurityContext> jwtProcessor = new DefaultJWTProcessor<>();
       jwtProcessor.setJWSKeySelector(keySelector);
 
-      // Build accepted audience set for RFC 7519 compliant validation (at-least-one match)
+      // Audience validation per RFC 7519 (at-least-one match)
       Set<String> acceptedAudiences = null;
       if (StringUtils.isNotBlank(serviceAudience)) {
         acceptedAudiences = Collections.singleton(serviceAudience);
@@ -116,13 +116,8 @@ public class JwksTokenValidator implements OAuthTokenValidator {
       }
       JWTClaimsSet exactMatchClaims = exactMatchBuilder.build();
 
-      // Use acceptedAudienceValues parameter to support multi-audience tokens per RFC 7519
       DefaultJWTClaimsVerifier<SecurityContext> claimsVerifier =
-          new DefaultJWTClaimsVerifier<>(
-              acceptedAudiences, // Audience validation (at-least-one match)
-              exactMatchClaims, // Exact match claims (issuer)
-              null, // Required claims
-              null); // Prohibited claims
+          new DefaultJWTClaimsVerifier<>(acceptedAudiences, exactMatchClaims, null, null);
 
       // Set clock skew tolerance
       claimsVerifier.setMaxClockSkew((int) allowSkewSeconds);
