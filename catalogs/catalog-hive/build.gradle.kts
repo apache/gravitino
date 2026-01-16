@@ -65,6 +65,7 @@ dependencies {
   annotationProcessor(libs.immutables.value)
   annotationProcessor(libs.lombok)
 
+  testImplementation(libs.awaitility)
   testImplementation(project(":catalogs:hive-metastore-common", "testArtifacts"))
   testImplementation(project(":common"))
   testImplementation(project(":clients:client-java"))

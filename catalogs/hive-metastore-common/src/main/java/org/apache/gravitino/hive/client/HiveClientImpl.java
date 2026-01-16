@@ -165,6 +165,11 @@ public class HiveClientImpl implements HiveClient {
   }
 
   @Override
+  public void createCatalog(String catalogName, String location, String description) {
+    shim.createCatalog(catalogName, location, description);
+  }
+
+  @Override
   public void close() {
     try {
       shim.close();

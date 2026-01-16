@@ -455,6 +455,73 @@ gravitino.authorization.enable = true
 gravitino.authorization.serviceAdmins = admin1,admin2
 ```
 
+## Migration Guide
+
+If you have metalakes that were created before authorization was enabled, you need to perform a migration to ensure proper access control.
+
+### Migrating Existing Metalakes
+
+When you created metalakes with `gravitino.authorization.enable = false`, those metalakes don't have owners assigned. To enable authorization for these existing metalakes:
+
+**Step 1: Configure PassThrough Authorization**
+
+Temporarily set the authorization implementation to pass-through mode:
+
+```properties
+gravitino.authorization.enable = true
+gravitino.authorization.serviceAdmins = admin1,admin2
+gravitino.authorization.impl = org.apache.gravitino.server.authorization.PassThroughAuthorizer
+```
+
+**Step 2: Set Metalake Owners**
+
+Set the owner for each existing metalake using the Gravitino API:
+
+<Tabs groupId='language' queryString>
+<TabItem value="shell" label="Shell">
+
+```shell
+curl -X PUT -H "Accept: application/vnd.gravitino.v1+json" \
+-H "Content-Type: application/json" -d '{
+  "owner": "admin1",
+  "ownerType": "USER"
+}' http://localhost:8090/api/metalakes/{metalake}/owners
+```
+
+</TabItem>
+<TabItem value="java" label="Java">
+
+```java
+GravitinoClient client = GravitinoClient.builder("http://localhost:8090")
+    .build();
+
+MetadataObject metalake = MetadataObjects.of(null, "metalake_name", MetadataObject.Type.METALAKE);
+client.setOwner(metalake, "admin1", Owner.Type.USER);
+```
+
+</TabItem>
+</Tabs>
+
+**Step 3: Enable Full Authorization**
+
+After setting owners for all metalakes, remove the `gravitino.authorization.impl` configuration to enable full authorization:
+
+```properties
+gravitino.authorization.enable = true
+gravitino.authorization.serviceAdmins = admin1,admin2
+# Remove: gravitino.authorization.impl = org.apache.gravitino.server.authorization.PassThroughAuthorizer
+```
+
+**Step 4: Restart Gravitino**
+
+Restart the Gravitino server for the configuration changes to take effect.
+
+:::caution
+**Important Migration Notes:**
+- Set owners for **all** existing metalakes before removing the `gravitino.authorization.impl` configuration
+- Without assigned owners, operations on these metalakes will fail after full authorization is enabled
+:::
+
 ## Operations
 
 The following sections demonstrate how to perform common access control operations using both the REST API (Shell) and Java client.
@@ -914,6 +981,51 @@ Role role = client.revokePrivilegesFromRole("role1", table, Lists.newArrayList(P
 </TabItem>
 </Tabs>
 
+### Override privileges in a role
+
+You can override all privileges in a role with a new set of securable objects and their privileges. This operation completely replaces the role's entire privilege configuration - any securable objects not included in the request will be removed from the role.
+
+The request path for REST API is `/api/metalakes/{metalake}/permissions/roles/{role}/`.
+
+```shell
+curl -X PUT -H "Accept: application/vnd.gravitino.v1+json" \
+-H "Content-Type: application/json" -d '{
+    "overrides": [
+      {
+        "fullName": "catalog1.schema1.table1",
+        "type": "TABLE",
+        "privileges": [
+          {
+            "name": "SELECT_TABLE",
+            "condition": "ALLOW"
+          }
+        ]
+      },
+      {
+        "fullName": "catalog1.schema1.table2",
+        "type": "TABLE",
+        "privileges": [
+          {
+            "name": "MODIFY_TABLE",
+            "condition": "ALLOW"
+          }
+        ]
+      }
+    ]
+}' http://localhost:8090/api/metalakes/test/permissions/roles/role1/
+```
+
+:::warning
+This operation completely replaces **all privileges** in the role. The role will contain only the securable objects and privileges specified in the request. Any securable objects that existed in the role but are not included in the request will be removed from the role.
+
+**Example scenario:**
+- Before: `role1` has privileges on `table1`, `table2`, and `table3`
+- Request: Override with privileges for `table1` and `table4` only
+- After: `role1` has privileges only on `table1` and `table4` (table2 and table3 are removed, table4 is added)
+
+Use this operation when you want to set the exact privilege configuration for a role, replacing its entire state.
+:::
+
 ### Grant roles to a user
 
 You can grant specific roles to a user.
@@ -1174,8 +1286,9 @@ The following table lists the required privileges for each API.
 | list roles                        | `MANAGE_GRANTS` on the metalake or the owner of the metalake can see all the roles. Others can see his granted roles or owned roles.                                                                                                          |
 | grant role                        | `MANAGE_GRANTS` on the metalake                                                                                                                                                                                                               |
 | revoke role                       | `MANAGE_GRANTS` on the metalake                                                                                                                                                                                                               |
-| grant privilege                   | `MANAGE_GRANTS` on the metalake or the owner of the securable object                                                                                                                                                                          |
-| revoke privilege                  | `MANAGE_GRANTS` on the metalake or the owner of the securable object                                                                                                                                                                          |
+| grant privilege                   | `MANAGE_GRANTS` on the metalake or the owner of the securable object or the metalake                                                                                                                                                          |
+| revoke privilege                  | `MANAGE_GRANTS` on the metalake or the owner of the securable object or the metalake                                                                                                                                                          |
+| override privilege                | `MANAGE_GRANTS` on the metalake or the owner of the metalake                                                                                                                                                                                  |
 | set owner                         | The owner of the securable object                                                                                                                                                                                                             |
 | list tags                         | The owner of the metalake can see all the tags, others can see the tags which they can load.                                                                                                                                                  |
 | create tag                        | `CREATE_TAG` on the metalake or the owner of the metalake.                                                                                                                                                                                    |
@@ -1206,3 +1319,4 @@ The following table lists the required privileges for each API.
 | get a job                         | The owner of the metalake or the job.                                                                                                                                                                                                         |
 | cancel a job                      | The owner of the metalake or the job.                                                                                                                                                                                                         |
 | get credential                    | If you can load the metadata object, you can get its credential.                                                                                                                                                                              | 
+

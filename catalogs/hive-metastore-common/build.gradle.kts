@@ -120,7 +120,10 @@ dependencies {
     exclude("org.slf4j")
   }
   testImplementation(libs.junit.jupiter.api)
+  testImplementation(libs.mockito.core)
   testImplementation(libs.woodstox.core)
+  testImplementation(libs.testcontainers)
+  testImplementation(project(":integration-test-common", "testArtifacts"))
 
   testRuntimeOnly(libs.junit.jupiter.engine)
 }

@@ -23,7 +23,9 @@ import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
 import com.google.common.collect.ImmutableList;
+import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Maps;
+import com.google.common.collect.Sets;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -35,6 +37,7 @@ import org.apache.gravitino.MetadataObjects;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.authorization.Owner;
+import org.apache.gravitino.authorization.Privilege;
 import org.apache.gravitino.authorization.Privileges;
 import org.apache.gravitino.authorization.SecurableObject;
 import org.apache.gravitino.authorization.SecurableObjects;
@@ -231,6 +234,15 @@ public class TableAuthorizationIT extends BaseRestApiAuthorizationIT {
         MetadataObjects.of(ImmutableList.of(CATALOG, SCHEMA), MetadataObject.Type.SCHEMA),
         ImmutableList.of(Privileges.SelectTable.allow()));
     tableCatalogNormalUser.loadTable(NameIdentifier.of(SCHEMA, "table1"));
+
+    assertThrows(
+        String.format("Can not access metadata {%s.%s.%s}.", CATALOG, SCHEMA, "table1"),
+        ForbiddenException.class,
+        () -> {
+          tableCatalogNormalUser.loadTable(
+              NameIdentifier.of(SCHEMA, "table1"), Sets.newHashSet(Privilege.Name.MODIFY_TABLE));
+        });
+
     gravitinoMetalake.grantPrivilegesToRole(
         role,
         MetadataObjects.of(ImmutableList.of(CATALOG, SCHEMA, "table1"), MetadataObject.Type.TABLE),
@@ -241,6 +253,17 @@ public class TableAuthorizationIT extends BaseRestApiAuthorizationIT {
         () -> {
           tableCatalogNormalUser.loadTable(NameIdentifier.of(SCHEMA, "table1"));
         });
+
+    gravitinoMetalake.grantPrivilegesToRole(
+        role,
+        MetadataObjects.of(ImmutableList.of(CATALOG, SCHEMA, "table1"), MetadataObject.Type.TABLE),
+        ImmutableList.of(Privileges.ModifyTable.allow()));
+    tableCatalogNormalUser.loadTable(
+        NameIdentifier.of(SCHEMA, "table1"), Sets.newHashSet(Privilege.Name.MODIFY_TABLE));
+    gravitinoMetalake.revokePrivilegesFromRole(
+        role,
+        MetadataObjects.of(ImmutableList.of(CATALOG, SCHEMA, "table1"), MetadataObject.Type.TABLE),
+        ImmutableSet.of(Privileges.SelectTable.deny(), Privileges.ModifyTable.allow()));
   }
 
   @Test

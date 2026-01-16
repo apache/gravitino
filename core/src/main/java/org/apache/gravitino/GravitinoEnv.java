@@ -34,6 +34,9 @@ import org.apache.gravitino.catalog.CatalogNormalizeDispatcher;
 import org.apache.gravitino.catalog.FilesetDispatcher;
 import org.apache.gravitino.catalog.FilesetNormalizeDispatcher;
 import org.apache.gravitino.catalog.FilesetOperationDispatcher;
+import org.apache.gravitino.catalog.FunctionDispatcher;
+import org.apache.gravitino.catalog.FunctionNormalizeDispatcher;
+import org.apache.gravitino.catalog.FunctionOperationDispatcher;
 import org.apache.gravitino.catalog.ModelDispatcher;
 import org.apache.gravitino.catalog.ModelNormalizeDispatcher;
 import org.apache.gravitino.catalog.ModelOperationDispatcher;
@@ -61,8 +64,10 @@ import org.apache.gravitino.hook.SchemaHookDispatcher;
 import org.apache.gravitino.hook.TableHookDispatcher;
 import org.apache.gravitino.hook.TagHookDispatcher;
 import org.apache.gravitino.hook.TopicHookDispatcher;
+import org.apache.gravitino.job.BuiltInJobTemplateEventListener;
 import org.apache.gravitino.job.JobManager;
 import org.apache.gravitino.job.JobOperationDispatcher;
+import org.apache.gravitino.job.JobTemplateValidationDispatcher;
 import org.apache.gravitino.listener.AccessControlEventDispatcher;
 import org.apache.gravitino.listener.CatalogEventDispatcher;
 import org.apache.gravitino.listener.EventBus;
@@ -125,6 +130,8 @@ public class GravitinoEnv {
   private TopicDispatcher topicDispatcher;
 
   private ModelDispatcher modelDispatcher;
+
+  private FunctionDispatcher functionDispatcher;
 
   private MetalakeDispatcher metalakeDispatcher;
 
@@ -251,6 +258,15 @@ public class GravitinoEnv {
    */
   public ModelDispatcher modelDispatcher() {
     return modelDispatcher;
+  }
+
+  /**
+   * Get the FunctionDispatcher associated with the Gravitino environment.
+   *
+   * @return The FunctionDispatcher instance.
+   */
+  public FunctionDispatcher functionDispatcher() {
+    return functionDispatcher;
   }
 
   /**
@@ -426,6 +442,10 @@ public class GravitinoEnv {
     return statisticDispatcher;
   }
 
+  public boolean cacheEnabled() {
+    return config.get(Configs.CACHE_ENABLED);
+  }
+
   public void start() {
     metricsSystem.start();
     eventListenerManager.start();
@@ -578,6 +598,17 @@ public class GravitinoEnv {
     ModelNormalizeDispatcher modelNormalizeDispatcher =
         new ModelNormalizeDispatcher(modelHookDispatcher, catalogManager);
     this.modelDispatcher = new ModelEventDispatcher(eventBus, modelNormalizeDispatcher);
+
+    // TODO: Add FunctionHookDispatcher and FunctionEventDispatcher when needed
+    // The operation chain should be:
+    // FunctionEventDispatcher -> FunctionNormalizeDispatcher -> FunctionHookDispatcher ->
+    // FunctionOperationDispatcher
+    FunctionOperationDispatcher functionOperationDispatcher =
+        new FunctionOperationDispatcher(
+            catalogManager, schemaOperationDispatcher, entityStore, idGenerator);
+    this.functionDispatcher =
+        new FunctionNormalizeDispatcher(functionOperationDispatcher, catalogManager);
+
     this.statisticDispatcher =
         new StatisticEventDispatcher(
             eventBus, new StatisticManager(entityStore, idGenerator, config));
@@ -612,8 +643,16 @@ public class GravitinoEnv {
         new PolicyEventDispatcher(eventBus, new PolicyManager(idGenerator, entityStore));
     this.policyDispatcher = new PolicyHookDispatcher(policyEventDispatcher);
 
+    JobManager jobManager = new JobManager(config, entityStore, idGenerator);
+    JobTemplateValidationDispatcher validationDispatcher =
+        new JobTemplateValidationDispatcher(jobManager);
     this.jobOperationDispatcher =
-        new JobEventDispatcher(
-            eventBus, new JobHookDispatcher(new JobManager(config, entityStore, idGenerator)));
+        new JobEventDispatcher(eventBus, new JobHookDispatcher(validationDispatcher));
+
+    // Register built-in job template event listener to automatically register templates
+    // when metalakes are created
+    BuiltInJobTemplateEventListener builtInJobTemplateListener =
+        new BuiltInJobTemplateEventListener(jobManager, entityStore, idGenerator);
+    eventListenerManager.addEventListener("builtin-job-template", builtInJobTemplateListener);
   }
 }

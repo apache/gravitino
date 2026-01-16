@@ -39,13 +39,13 @@ import org.apache.gravitino.job.JobHandle;
 import org.apache.gravitino.job.JobTemplate;
 import org.apache.gravitino.job.JobTemplateChange;
 import org.apache.gravitino.job.ShellJobTemplate;
+import org.awaitility.Awaitility;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.testcontainers.shaded.org.awaitility.Awaitility;
 
 public class JobIT extends BaseIT {
 
@@ -110,7 +110,6 @@ public class JobIT extends BaseIT {
     Assertions.assertDoesNotThrow(() -> metalake.registerJobTemplate(template2));
 
     List<JobTemplate> registeredTemplates = metalake.listJobTemplates();
-    Assertions.assertEquals(2, registeredTemplates.size());
     Assertions.assertTrue(registeredTemplates.contains(template1));
     Assertions.assertTrue(registeredTemplates.contains(template2));
 
@@ -140,7 +139,6 @@ public class JobIT extends BaseIT {
     Assertions.assertDoesNotThrow(() -> metalake.registerJobTemplate(template2));
 
     List<JobTemplate> registeredTemplates = metalake.listJobTemplates();
-    Assertions.assertEquals(2, registeredTemplates.size());
     Assertions.assertTrue(registeredTemplates.contains(template1));
     Assertions.assertTrue(registeredTemplates.contains(template2));
 
@@ -160,7 +158,6 @@ public class JobIT extends BaseIT {
 
     // Verify the list of job templates after deletion
     registeredTemplates = metalake.listJobTemplates();
-    Assertions.assertEquals(1, registeredTemplates.size());
     Assertions.assertTrue(registeredTemplates.contains(template2));
 
     // Test deleting a non-existent job template
@@ -172,10 +169,6 @@ public class JobIT extends BaseIT {
     // Verify the second job template is deleted
     Assertions.assertThrows(
         NoSuchJobTemplateException.class, () -> metalake.getJobTemplate(template2.name()));
-
-    // Verify the list of job templates is empty after deleting both
-    registeredTemplates = metalake.listJobTemplates();
-    Assertions.assertTrue(registeredTemplates.isEmpty());
   }
 
   @Test

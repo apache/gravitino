@@ -24,6 +24,7 @@ import org.apache.gravitino.annotation.Evolving;
 import org.apache.gravitino.authorization.SupportsRoles;
 import org.apache.gravitino.credential.SupportsCredentials;
 import org.apache.gravitino.file.FilesetCatalog;
+import org.apache.gravitino.function.FunctionCatalog;
 import org.apache.gravitino.messaging.TopicCatalog;
 import org.apache.gravitino.model.ModelCatalog;
 import org.apache.gravitino.policy.SupportsPolicies;
@@ -235,6 +236,14 @@ public interface Catalog extends Auditable {
    */
   default ModelCatalog asModelCatalog() throws UnsupportedOperationException {
     throw new UnsupportedOperationException("Catalog does not support model operations");
+  }
+
+  /**
+   * @return the {@link FunctionCatalog} if the catalog supports function operations.
+   * @throws UnsupportedOperationException if the catalog does not support function operations.
+   */
+  default FunctionCatalog asFunctionCatalog() throws UnsupportedOperationException {
+    throw new UnsupportedOperationException("Catalog does not support function operations");
   }
 
   /**

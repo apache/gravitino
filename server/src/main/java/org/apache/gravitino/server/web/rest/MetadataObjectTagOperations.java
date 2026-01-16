@@ -215,7 +215,7 @@ public class MetadataObjectTagOperations {
               tagDTOS =
                   MetadataAuthzHelper.filterByExpression(
                       metalake,
-                      AuthorizationExpressionConstants.loadTagAuthorizationExpression,
+                      AuthorizationExpressionConstants.LOAD_TAG_AUTHORIZATION_EXPRESSION,
                       Entity.EntityType.TAG,
                       tagDTOS,
                       tagDTO -> NameIdentifierUtil.ofTag(metalake, tagDTO.name()));
@@ -227,7 +227,7 @@ public class MetadataObjectTagOperations {
               tagNames =
                   MetadataAuthzHelper.filterByExpression(
                       metalake,
-                      AuthorizationExpressionConstants.loadTagAuthorizationExpression,
+                      AuthorizationExpressionConstants.LOAD_TAG_AUTHORIZATION_EXPRESSION,
                       Entity.EntityType.TAG,
                       tagNames,
                       tagName -> NameIdentifierUtil.ofTag(metalake, tagName));

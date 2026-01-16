@@ -1,0 +1,184 @@
+#
+# Licensed to the Apache Software Foundation (ASF) under one
+# or more contributor license agreements.  See the NOTICE file
+# distributed with this work for additional information
+# regarding copyright ownership.  The ASF licenses this file
+# to you under the Apache License, Version 2.0 (the
+# "License"); you may not use this file except in compliance
+# with the License.  You may obtain a copy of the License at
+#
+#  http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing,
+# software distributed under the License is distributed on an
+# "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+# KIND, either express or implied.  See the License for the
+# specific language governing permissions and limitations
+# under the License.
+#
+
+# Default values for gravitino-lance-rest-server.
+# This is a YAML-formatted file.
+# Declare variables to be passed into your templates.
+
+replicaCount: 1
+
+image:
+  repository: apache/gravitino-lance-rest
+  pullPolicy: IfNotPresent
+  # Overrides the image tag whose default is the chart appVersion.
+  tag: 1.2.0-SNAPSHOT
+
+imagePullSecrets: []
+nameOverride: ""
+fullnameOverride: ""
+
+annotations: {}
+
+## Lance REST server configuration
+lanceRest:
+  shutdownTimeout: 3000
+  host: 0.0.0.0
+  httpPort: 9101
+  minThreads: 24
+  maxThreads: 200
+  stopTimeout: 30000
+  idleTimeout: 30000
+  threadPoolWorkQueueSize: 100
+  requestHeaderSize: 131072
+  responseHeaderSize: 131072
+  # Lance namespace backend settings
+  namespaceBackend: gravitino
+  gravitinoUri: http://gravitino-server:8090
+  # Name of the target metalake; must be set for your environment.
+  gravitinoMetalake: ""
+# Rest backend configs.
+additionalConfigItems: {}
+
+## Log4j2 configuration items
+log4j2Properties:
+  status: warn
+additionalLog4j2Properties:
+  appender.console.type: Console
+  appender.console.name: consoleLogger
+  appender.console.layout.type: PatternLayout
+  appender.console.layout.pattern: "%d{yyyy-MM-dd HH:mm:ss} %-5p [%t] %c{1}:%L - %m%n"
+  rootLogger.appenderRef.console.ref: consoleLogger
+
+initScript: |
+  echo "Override config."
+  cp /tmp/conf/* ${GRAVITINO_HOME}/conf
+  echo "Start the Gravitino Lance Rest Server"
+  /bin/bash ${GRAVITINO_HOME}/bin/gravitino-lance-rest-server.sh run
+
+## Optional volumes for logs
+volumes:
+  - name: gravitino-rest-catalog-server-log
+    emptyDir: {}
+
+volumeMounts:
+  - name: gravitino-rest-catalog-server-log
+    mountPath: /root/gravitino-lance-rest-server/logs
+
+env:
+  - name: GRAVITINO_HOME
+    value: /root/gravitino-lance-rest-server
+  - name: GRAVITINO_MEM
+    value: "-Xms1024m -Xmx1024m -XX:MaxMetaspaceSize=512m"
+
+envFrom: []
+
+serviceAccount:
+  # Specifies whether a service account should be created
+  create: false
+  # Automatically mount a ServiceAccount's API credentials
+  automount: true
+  # Annotations to add to the service account
+  annotations: {}
+  # The name of the service account to use.
+  # If not set and create is true, a name is generated using the fullname template
+  name: ""
+
+podAnnotations: {}
+podLabels: {}
+
+podSecurityContext: {}
+  # fsGroup: 2000
+
+securityContext: {}
+  # capabilities:
+  #   drop:
+  #   - ALL
+  # readOnlyRootFilesystem: true
+  # runAsNonRoot: true
+  # runAsUser: 1000
+
+service:
+  name: gravitino-lance-rest-server
+  type: ClusterIP
+  port: 9101
+  targetPort: 9101
+  annotations: {}
+  labels: {}
+  portName: http
+  nodePort: ""
+
+livenessProbe:
+  httpGet:
+    path: /lance/v1/namespace/%24/list
+    port: http
+  initialDelaySeconds: 60
+  timeoutSeconds: 10
+  periodSeconds: 30
+  failureThreshold: 5
+
+readinessProbe:
+  httpGet:
+    path: /lance/v1/namespace/%24/list
+    port: http
+  initialDelaySeconds: 30
+  timeoutSeconds: 10
+  periodSeconds: 10
+  failureThreshold: 3
+
+ingress:
+  enabled: false
+  className: "nginx"
+  annotations: {}
+    # kubernetes.io/ingress.class: nginx
+    # kubernetes.io/tls-acme: "true"
+  hosts:
+    - host: chart-example.local
+      paths:
+        - path: /
+          pathType: ImplementationSpecific
+  tls: []
+  #  - secretName: chart-example-tls
+  #    hosts:
+  #      - chart-example.local
+
+## PodDisruptionBudget settings
+podDisruptionBudget:
+  enabled: false
+  minAvailable: 1
+  maxUnavailable: ""
+  labels: {}
+  annotations: {}
+
+resources: {}
+  # We usually recommend not to specify default resources and to leave this as a conscious
+  # choice for the user. This also increases chances charts run on environments with little
+  # resources, such as Minikube. If you do want to specify resources, uncomment the following
+  # lines, adjust them as necessary, and remove the curly braces after 'resources:'.
+  # limits:
+  #   cpu: 100m
+  #   memory: 128Mi
+  # requests:
+  #   cpu: 100m
+  #   memory: 128Mi
+
+nodeSelector: {}
+
+tolerations: []
+
+affinity: {}

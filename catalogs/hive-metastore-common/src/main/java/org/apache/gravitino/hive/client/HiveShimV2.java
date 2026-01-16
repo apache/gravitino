@@ -274,6 +274,12 @@ class HiveShimV2 extends HiveShim {
   }
 
   @Override
+  public void createCatalog(String catalogName, String location, String description) {
+    throw new UnsupportedOperationException(
+        "Catalog creation is not supported in Hive 2.x. Please upgrade to Hive 3.x.");
+  }
+
+  @Override
   public void close() throws Exception {
     client.close();
   }

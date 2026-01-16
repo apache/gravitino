@@ -59,6 +59,13 @@ public class TableMetaSQLProviderFactory {
     return getProvider().listTablePOsByTableIds(tableIds);
   }
 
+  public static String listTablePOsByFullQualifiedName(
+      @Param("metalakeName") String metalakeName,
+      @Param("catalogName") String catalogName,
+      @Param("schemaName") String schemaName) {
+    return getProvider().listTablePOsByFullQualifiedName(metalakeName, catalogName, schemaName);
+  }
+
   public static String selectTableIdBySchemaIdAndName(
       @Param("schemaId") Long schemaId, @Param("tableName") String name) {
     return getProvider().selectTableIdBySchemaIdAndName(schemaId, name);
@@ -67,6 +74,15 @@ public class TableMetaSQLProviderFactory {
   public static String selectTableMetaBySchemaIdAndName(
       @Param("schemaId") Long schemaId, @Param("tableName") String name) {
     return getProvider().selectTableMetaBySchemaIdAndName(schemaId, name);
+  }
+
+  public static String selectTableByFullQualifiedName(
+      @Param("metalakeName") String metalakeName,
+      @Param("catalogName") String catalogName,
+      @Param("schemaName") String schemaName,
+      @Param("tableName") String tableName) {
+    return getProvider()
+        .selectTableByFullQualifiedName(metalakeName, catalogName, schemaName, tableName);
   }
 
   public static String selectTableMetaById(@Param("tableId") Long tableId) {

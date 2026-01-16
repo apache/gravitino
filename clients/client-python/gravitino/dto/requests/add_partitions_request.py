@@ -19,6 +19,9 @@ from dataclasses import dataclass, field
 
 from dataclasses_json import config
 
+from gravitino.dto.rel.partitions.json_serdes.partition_dto_serdes import (
+    PartitionDTOSerdes,
+)
 from gravitino.dto.rel.partitions.partition_dto import PartitionDTO
 from gravitino.rest.rest_message import RESTRequest
 from gravitino.utils.precondition import Precondition
@@ -28,7 +31,17 @@ from gravitino.utils.precondition import Precondition
 class AddPartitionsRequest(RESTRequest):
     """Request to add partitions to a table."""
 
-    _partitions: list[PartitionDTO] = field(metadata=config(field_name="partitions"))
+    _partitions: list[PartitionDTO] = field(
+        metadata=config(
+            field_name="partitions",
+            encoder=lambda items: [
+                PartitionDTOSerdes.serialize(item) for item in items
+            ],
+            decoder=lambda values: [
+                PartitionDTOSerdes.deserialize(value) for value in values
+            ],
+        )
+    )
 
     def validate(self):
         Precondition.check_argument(
