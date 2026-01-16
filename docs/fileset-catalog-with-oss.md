@@ -37,6 +37,10 @@ In addition to the basic configurations mentioned in [Fileset-catalog-catalog-co
 | `oss-secret-access-key`       | The secret key of the Aliyun OSS.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   | (none)          | Yes      | 0.7.0-incubating |
 | `credential-providers`        | The credential provider types, separated by comma, possible value can be `oss-token`, `oss-secret-key`. As the default authentication type is using AKSK as the above, this configuration can enable credential vending provided by Gravitino server and client will no longer need to provide authentication information like AKSK to access OSS by GVFS. Once it's set, more configuration items are needed to make it works, please see [oss-credential-vending](security/credential-vending.md#oss-credentials) | (none)          | No       | 0.8.0-incubating |
 
+:::note
+`default-filesystem-provider` and `filesystem-providers` are deprecated since 1.1.0. The fileset catalog automatically loads filesystem providers on the classpath, including buildin filesystem provider and cloud providers when the corresponding bundle jar is present (for example, `gravitino-aliyun-bundle`).
+:::
+
 ### Configurations for a schema
 
 To create a schema, refer to [Schema configurations](./fileset-catalog.md#schema-properties).
@@ -557,5 +561,4 @@ spark = SparkSession.builder
 ```
 
 Python client and Hadoop command are similar to the above examples.
-
 

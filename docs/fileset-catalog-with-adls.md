@@ -36,6 +36,10 @@ Apart from configurations mentioned in [fileset-catalog-catalog-configuration](.
 | `azure-storage-account-key`   | The account key of Azure Blob Storage.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 | (none)          | Yes      | 0.8.0-incubating |
 | `credential-providers`        | The credential provider types, separated by comma, possible value can be `adls-token`, `azure-account-key`. As the default authentication type is using account name and account key as the above, this configuration can enable credential vending provided by Gravitino server and client will no longer need to provide authentication information like account_name/account_key to access ADLS by GVFS. Once it's set, more configuration items are needed to make it works, please see [adls-credential-vending](security/credential-vending.md#adls-credentials) | (none)          | No       | 0.8.0-incubating |
 
+:::note
+`default-filesystem-provider` and `filesystem-providers` are deprecated since 1.1.0. The fileset catalog automatically loads filesystem providers on the classpath, including buildin filesystem provider and cloud providers when the corresponding bundle jar is present (for example, `gravitino-azure-bundle`).
+:::
+
 ### Configurations for a schema
 
 Refer to [Schema configurations](./fileset-catalog.md#schema-properties) for more details.

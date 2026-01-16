@@ -34,6 +34,10 @@ Apart from configurations mentioned in [Fileset-catalog-catalog-configuration](.
 | `gcs-service-account-file`    | The path of GCS service account JSON file.                                                                                                                                                                                                                                                                                                                                                                                                                                                                              | (none)          | Yes      | 0.7.0-incubating |
 | `credential-providers`        | The credential provider types, separated by comma, possible value can be `gcs-token`. As the default authentication type is using service account as the above, this configuration can enable credential vending provided by Gravitino server and client will no longer need to provide authentication information like service account to access GCS by GVFS. Once it's set, more configuration items are needed to make it works, please see [gcs-credential-vending](security/credential-vending.md#gcs-credentials) | (none)          | No       | 0.8.0-incubating |
 
+:::note
+`default-filesystem-provider` and `filesystem-providers` are deprecated since 1.1.0. The fileset catalog automatically loads filesystem providers on the classpath, including buildin filesystem provider and cloud providers when the corresponding bundle jar is present (for example, `gravitino-gcp-bundle`).
+:::
+
 ### Configurations for a schema
 
 Refer to [Schema configurations](./fileset-catalog.md#schema-properties) for more details.

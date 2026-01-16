@@ -37,6 +37,10 @@ In addition to the basic configurations mentioned in [Fileset-catalog-catalog-co
 | `s3-secret-access-key`        | The secret key of the AWS S3.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  | (none)          | Yes      | 0.7.0-incubating |
 | `credential-providers`        | The credential provider types, separated by comma, possible value can be `s3-token`, `s3-secret-key`. As the default authentication type is using AKSK as the above, this configuration can enable credential vending provided by Gravitino server and client will no longer need to provide authentication information like AKSK to access S3 by GVFS. Once it's set, more configuration items are needed to make it works, please see [s3-credential-vending](security/credential-vending.md#s3-credentials) | (none)          | No       | 0.8.0-incubating |
 
+:::note
+`default-filesystem-provider` and `filesystem-providers` are deprecated since 1.1.0. The fileset catalog automatically loads filesystem providers on the classpath, including buildin filesystem provider and cloud providers when the corresponding bundle jar is present (for example, `gravitino-aws-bundle`).
+:::
+
 ### Configurations for a schema
 
 To learn how to create a schema, refer to [Schema configurations](./fileset-catalog.md#schema-properties).
@@ -559,5 +563,4 @@ spark = SparkSession.builder
 ```
 
 Python client and Hadoop command are similar to the above examples.
-
 

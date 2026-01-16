@@ -42,6 +42,10 @@ the Fileset catalog has the following properties:
 | `config.resources`                   | The configuration resources, separated by comma. For example, `hdfs-site.xml,core-site.xml`.                                                                                                                                                                                                                                    | (none)          | No       | 1.1.0            |
 | `fs.path.config.<name>`              | Defines a logical location entry. Set `fs.path.config.<name>` to the real base URI (for example, `hdfs://cluster1/`). Any key that starts with the same prefix (such as `fs.path.config.<name>.config.resource`) is treated as a location-scoped property and will be forwarded to the underlying filesystem client.            | (none)          | No       | 1.2.0            |
 
+:::note
+`default-filesystem-provider` and `filesystem-providers` are deprecated since 1.1.0. The fileset catalog automatically loads filesystem providers on the classpath, including buildin filesystem provider and cloud providers when the corresponding bundle jar is present (for example, `gravitino-aws-bundle`, `gravitino-azure-bundle`, `gravitino-aliyun-bundle`, or `gravitino-gcp-bundle`).
+:::
+
 Please refer to [Credential vending](./security/credential-vending.md) for more details about credential vending.
 
 ### HDFS fileset
