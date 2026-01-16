@@ -84,7 +84,8 @@ os.environ["PYSPARK_SUBMIT_ARGS"] = (
 )
 
 # Initialize Spark session with Lance REST catalog configuration
-# Note: The catalog "lance_catalog" must exist in Gravitino before running this code
+# Note: The catalog "lance_catalog" must exist in Gravitino before running this code, you can create
+# it via Lance REST API `CreateNameSpace` or Gravitino REST API `CreateCatalog`.
 spark = SparkSession.builder \
     .appName("lance_rest_integration") \
     .config("spark.sql.catalog.lance", "com.lancedb.lance. spark.LanceNamespaceSparkCatalog") \
@@ -98,24 +99,24 @@ spark = SparkSession.builder \
 spark.sparkContext.setLogLevel("DEBUG")
 
 # Create schema (database)
-spark.sql("CREATE DATABASE IF NOT EXISTS schema")
+spark.sql("CREATE DATABASE IF NOT EXISTS sales")
 
 # Create Lance table with explicit location
 spark.sql("""
-    CREATE TABLE schema.sample (
+    CREATE TABLE sales.orders (
         id INT,
         score FLOAT
     )
     USING lance
-    LOCATION '/tmp/schema/sample.lance/'
+    LOCATION '/tmp/sales/orders.lance/'
     TBLPROPERTIES ('format' = 'lance')
 """)
 
 # Insert sample data
-spark.sql("INSERT INTO schema.sample VALUES (1, 1.1)")
+spark.sql("INSERT INTO sales.orders VALUES (1, 1.1)")
 
 # Query data
-spark.sql("SELECT * FROM schema.sample").show()
+spark.sql("SELECT * FROM sales.orders").show()
 ```
 
 ### Storage Location Configuration
@@ -131,12 +132,12 @@ For cloud storage backends such as Amazon S3 or MinIO, specify credentials and e
 
 ```python
 spark.sql("""
-    CREATE TABLE schema.sample (
+    CREATE TABLE sales.orders (
         id INT,
         score FLOAT
     )
     USING lance
-    LOCATION 's3://bucket/tmp/schema/sample.lance/'
+    LOCATION 's3://bucket/tmp/sales/orders.lance/'
     TBLPROPERTIES (
         'format' = 'lance',
         'lance.storage.access_key_id' = 'your_access_key',
@@ -188,17 +189,18 @@ data = ray.data.range(1000).map(
 )
 
 # Write dataset to Lance table
-# Note: Both the catalog "lance_catalog" and schema "schema" must exist in Gravitino
+# Note: Both the catalog "lance_catalog" and schema "sales" must exist in Gravitino, you can create
+# them via Lance REST API `CreateNameSpace` or Gravitino REST API `CreateCatalog` and `CreateSchema`.
 write_lance(
     data, 
     namespace=namespace, 
-    table_id=["lance_catalog", "schema", "my_table"]
+    table_id=["lance_catalog", "sales", "orders"]
 )
 
 # Read dataset from Lance table
 ray_dataset = read_lance(
     namespace=namespace, 
-    table_id=["lance_catalog", "schema", "my_table"]
+    table_id=["lance_catalog", "sales", "orders"]
 )
 
 # Perform filtering operation
@@ -208,8 +210,8 @@ print(f"Filtered row count: {result}")
 
 ### Important Considerations
 
-- **Namespace Hierarchy**: The `table_id` parameter uses a hierarchical structure:  `["catalog_name", "schema_name", "table_name"]`
-- **Pre-requisites**: Both the target catalog (`lance_catalog`) and schema (`schema`) must be created in Gravitino before executing write operations
+- **Namespace Hierarchy**: The `table_id` parameter uses a hierarchical structure:  `["catalog_name", "sales", "orders"]`
+- **Pre-requisites**: Both the target catalog (`lance_catalog`) and schema (`sales`) must be created in Gravitino before executing write operations
 - **Error Handling**:  Implement appropriate error handling for network failures and authentication issues in production environments
 
 ## Additional Engine Support
@@ -219,6 +221,8 @@ The Lance REST service is compatible with other data processing engines that sup
 - **DuckDB**: For analytical SQL queries
 - **Pandas**: For Python-based data manipulation
 - **DataFusion**: For Rust-based query execution
+
+Note: These three engines does not support Lance REST natively yet, but can still interact with Lance datasets through table location paths retrieved from the Lance REST service.
 
 For engine-specific integration instructions, consult the [Lance Integration Documentation](https://lance.org/integrations/datafusion/).
 
