@@ -24,7 +24,6 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.fail;
 
-import java.util.HashMap;
 import java.util.Map;
 import org.apache.gravitino.job.JobTemplateProvider;
 import org.apache.gravitino.job.SparkJobTemplate;
@@ -708,79 +707,5 @@ public class TestIcebergRewriteDataFilesJob {
     } catch (IllegalArgumentException e) {
       assertTrue(e.getMessage().contains("Failed to parse Spark configurations JSON"));
     }
-  }
-
-  @Test
-  public void testValidateSparkConfigsWithValidConfigs() {
-    Map<String, String> configs = new HashMap<>();
-    configs.put("spark.sql.shuffle.partitions", "200");
-    configs.put("spark.executor.memory", "4g");
-    configs.put("spark.dynamicAllocation.enabled", "true");
-
-    // Should not throw exception
-    IcebergRewriteDataFilesJob.validateSparkConfigs(configs);
-  }
-
-  @Test
-  public void testValidateSparkConfigsRejectsCatalogOverride() {
-    Map<String, String> configs = new HashMap<>();
-    configs.put("spark.sql.catalog.my_catalog", "some.catalog.Class");
-
-    try {
-      IcebergRewriteDataFilesJob.validateSparkConfigs(configs);
-      fail("Expected IllegalArgumentException for catalog config override");
-    } catch (IllegalArgumentException e) {
-      assertTrue(e.getMessage().contains("cannot be overridden"));
-      assertTrue(e.getMessage().contains("spark.sql.catalog."));
-    }
-  }
-
-  @Test
-  public void testValidateSparkConfigsRejectsExtensionsOverride() {
-    Map<String, String> configs = new HashMap<>();
-    configs.put("spark.sql.extensions", "some.other.Extension");
-
-    try {
-      IcebergRewriteDataFilesJob.validateSparkConfigs(configs);
-      fail("Expected IllegalArgumentException for extensions config override");
-    } catch (IllegalArgumentException e) {
-      assertTrue(e.getMessage().contains("cannot be overridden"));
-      assertTrue(e.getMessage().contains("spark.sql.extensions"));
-    }
-  }
-
-  @Test
-  public void testValidateSparkConfigsRejectsAppNameOverride() {
-    Map<String, String> configs = new HashMap<>();
-    configs.put("spark.app.name", "MyCustomApp");
-
-    try {
-      IcebergRewriteDataFilesJob.validateSparkConfigs(configs);
-      fail("Expected IllegalArgumentException for app name override");
-    } catch (IllegalArgumentException e) {
-      assertTrue(e.getMessage().contains("cannot be overridden"));
-      assertTrue(e.getMessage().contains("spark.app.name"));
-    }
-  }
-
-  @Test
-  public void testValidateSparkConfigsRejectsNonSparkPrefix() {
-    Map<String, String> configs = new HashMap<>();
-    configs.put("hadoop.fs.defaultFS", "hdfs://namenode:9000");
-
-    try {
-      IcebergRewriteDataFilesJob.validateSparkConfigs(configs);
-      fail("Expected IllegalArgumentException for non-spark config");
-    } catch (IllegalArgumentException e) {
-      assertTrue(e.getMessage().contains("must start with 'spark.'"));
-      assertTrue(e.getMessage().contains("hadoop.fs.defaultFS"));
-    }
-  }
-
-  @Test
-  public void testValidateSparkConfigsWithEmptyMap() {
-    Map<String, String> configs = new HashMap<>();
-    // Should not throw exception
-    IcebergRewriteDataFilesJob.validateSparkConfigs(configs);
   }
 }

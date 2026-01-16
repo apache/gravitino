@@ -64,15 +64,45 @@ public class IcebergRewriteDataFilesJob implements BuiltInJob {
   /**
    * Main entry point for the rewrite data files job.
    *
-   * <p>Uses named arguments for flexibility: --catalog &lt;catalog_name&gt; Required. Iceberg
-   * catalog name --table &lt;table_identifier&gt; Required. Table name (db.table) --strategy
-   * &lt;strategy&gt; Optional. binpack or sort --sort-order &lt;sort_order&gt; Optional. Sort order
-   * specification --where &lt;where_clause&gt; Optional. Filter predicate --options
-   * &lt;options_json&gt; Optional. JSON map of options --spark-conf &lt;spark_conf_json&gt;
-   * Optional. JSON map of custom Spark configurations
+   * <p>Uses named arguments for flexibility:
    *
-   * <p>Example: --catalog iceberg_catalog --table db.sample --strategy binpack --options
-   * '{"min-input-files":"2"}' --spark-conf '{"spark.sql.shuffle.partitions":"200"}'
+   * <ul>
+   *   <li>--catalog &lt;catalog_name&gt; Required. Iceberg catalog name.
+   *   <li>--table &lt;table_identifier&gt; Required. Table name (db.table)
+   *   <li>--strategy &lt;strategy&gt; Optional. binpack or sort
+   *   <li>--sort-order &lt;sort_order&gt; Optional. Sort order specification
+   *   <li>--where &lt;where_clause&gt; Optional. Filter predicate
+   *   <li>--options &lt;options_json&gt; Optional. JSON map of options
+   *   <li>--spark-conf &lt;spark_conf_json&gt; Optional. JSON map of custom Spark configurations
+   * </ul>
+   *
+   * <p><b>Important Notes on Special Characters:</b>
+   *
+   * <ul>
+   *   <li><b>Via Gravitino API:</b> Pass values as-is without shell escaping. Example: {@code
+   *       jobConf.put("options", "{\"a\":\"b\"}")} - Gravitino handles escaping internally via
+   *       ProcessBuilder.
+   *   <li><b>Via Command Line:</b> Use shell quoting. Example: {@code --options
+   *       '{"min-input-files":"2"}'}
+   *   <li><b>SQL Single Quotes:</b> Use as-is in where clauses. Example: {@code --where "status =
+   *       'active'"} - Single quotes are automatically escaped for SQL.
+   *   <li><b>JSON Values:</b> Must be valid JSON strings. The job parses and validates JSON before
+   *       use.
+   * </ul>
+   *
+   * <p>Example via command line: --catalog iceberg_catalog --table db.sample --strategy binpack
+   * --options '{"min-input-files":"2"}' --spark-conf '{"spark.sql.shuffle.partitions":"200"}'
+   *
+   * <p>Example via Gravitino API:
+   *
+   * <pre>{@code
+   * Map<String, String> jobConf = new HashMap<>();
+   * jobConf.put("catalog_name", "iceberg_catalog");
+   * jobConf.put("table_identifier", "db.sample");
+   * jobConf.put("options", "{\"min-input-files\":\"2\"}");  // No shell escaping needed
+   * jobConf.put("where_clause", "year = 2024 and status = 'active'");  // SQL quotes handled
+   * metalake.runJob("builtin-iceberg-rewrite-data-files", jobConf);
+   * }</pre>
    */
   public static void main(String[] args) {
     if (args.length < 4) {
@@ -117,7 +147,6 @@ public class IcebergRewriteDataFilesJob implements BuiltInJob {
     if (sparkConfJson != null && !sparkConfJson.isEmpty()) {
       try {
         Map<String, String> customConfigs = parseCustomSparkConfigs(sparkConfJson);
-        validateSparkConfigs(customConfigs);
         for (Map.Entry<String, String> entry : customConfigs.entrySet()) {
           sparkBuilder.config(entry.getKey(), entry.getValue());
         }
@@ -353,48 +382,6 @@ public class IcebergRewriteDataFilesJob implements BuiltInJob {
               + ". Error: "
               + e.getMessage(),
           e);
-    }
-  }
-
-  /**
-   * Validate custom Spark configurations to prevent dangerous overrides.
-   *
-   * <p>This method checks that users don't override critical configurations that could break the
-   * job or cause security issues.
-   *
-   * @param configs map of Spark configurations to validate
-   * @throws IllegalArgumentException if any configuration is not allowed
-   */
-  static void validateSparkConfigs(Map<String, String> configs) {
-    // Define configurations that should not be overridden by users
-    // These are critical for the job to function correctly
-    String[] forbiddenPrefixes = {
-      "spark.sql.catalog.", // Catalog configs are managed by the template
-      "spark.sql.extensions", // Extensions must include Iceberg extensions
-      "spark.app.name" // App name is set by the job
-    };
-
-    for (String configKey : configs.keySet()) {
-      // Check if config key starts with any forbidden prefix
-      for (String forbiddenPrefix : forbiddenPrefixes) {
-        if (configKey.startsWith(forbiddenPrefix)) {
-          throw new IllegalArgumentException(
-              "Configuration '"
-                  + configKey
-                  + "' cannot be overridden. "
-                  + "Configs starting with '"
-                  + forbiddenPrefix
-                  + "' are managed by the job template.");
-        }
-      }
-
-      // Validate that config keys follow Spark naming convention
-      if (!configKey.startsWith("spark.")) {
-        throw new IllegalArgumentException(
-            "Invalid Spark configuration key '"
-                + configKey
-                + "'. All Spark configs must start with 'spark.'");
-      }
     }
   }
 
