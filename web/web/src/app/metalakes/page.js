@@ -28,11 +28,18 @@ import { useAppSelector, useAppDispatch } from '@/lib/hooks/useStore'
 import { Button, Dropdown, Flex, Input, Modal, Popover, Space, Spin, Table, Tooltip, Typography } from 'antd'
 import { ExclamationCircleFilled, PlusOutlined } from '@ant-design/icons'
 import { useAntdColumnResize } from 'react-antd-column-resize'
-import { fetchMetalakes, deleteMetalake, resetTree, switchMetalakeInUse } from '@/lib/store/metalakes'
+import {
+  fetchMetalakes,
+  deleteMetalake,
+  resetTree,
+  switchMetalakeInUse,
+  resetMetalakeStore
+} from '@/lib/store/metalakes'
 import { to } from '@/lib/utils'
 import { formatToDateTime } from '@/lib/utils/date'
 import Icons from '@/components/Icons'
 import GetOwner from '@/components/GetOwner'
+import PropertiesContent from '@/components/PropertiesContent'
 
 const CreateMetalakeDialog = dynamic(() => import('./CreateMetalakeDialog'), {
   loading: () => <Loading />,
@@ -69,6 +76,7 @@ const MetalakeList = () => {
 
   useEffect(() => {
     dispatch(fetchMetalakes())
+    dispatch(resetMetalakeStore())
   }, [dispatch])
 
   useEffect(() => {
@@ -109,32 +117,7 @@ const MetalakeList = () => {
     if (refresh) setOwnerRefreshKey(k => k + 1)
   }
 
-  const propertyContent = properties => {
-    return (
-      <Flex className='max-h-80 overflow-auto'>
-        <Space.Compact direction='vertical' className='grow divide-y border-gray-100'>
-          <span className='bg-gray-100 p-1'>Key</span>
-          {properties
-            ? Object.keys(properties).map((key, index) => (
-                <span key={index} className='p-1'>
-                  {key}
-                </span>
-              ))
-            : null}
-        </Space.Compact>
-        <Space.Compact direction='vertical' className='grow divide-y border-gray-100'>
-          <span className='bg-gray-100 p-1'>Value</span>
-          {properties
-            ? Object.values(properties).map((value, index) => (
-                <span key={index} className='p-1'>
-                  {value}
-                </span>
-              ))
-            : null}
-        </Space.Compact>
-      </Flex>
-    )
-  }
+  const propertyContent = properties => <PropertiesContent properties={properties} />
 
   const showDeleteConfirm = (NameContext, metalake, type, isInUse = false) => {
     let confirmInput = ''

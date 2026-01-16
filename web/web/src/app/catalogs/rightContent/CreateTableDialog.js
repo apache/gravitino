@@ -586,7 +586,7 @@ export default function CreateTableDialog({ ...props }) {
                   column['defaultValue'] = {
                     type: 'literal',
                     dataType: col.defaultValue?.dataType || 'string',
-                    value: ['', 'NULL', undefined].includes(col.defaultValue?.value) ? 'NULL' : col.defaultValue?.value
+                    value: col.defaultValue?.value
                   }
               }
             }

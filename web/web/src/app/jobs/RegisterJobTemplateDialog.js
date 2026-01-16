@@ -346,7 +346,11 @@ export default function RegisterJobTemplateDialog({ ...props }) {
                 </Form.Item>
                 {jobType === 'shell' && (
                   <Form.Item name='scripts' label='Script(s)'>
-                    <Select mode='tags' tokenSeparators={[',']} />
+                    <Select
+                      mode='tags'
+                      tokenSeparators={[',']}
+                      placeholder='e.g. /path/to/script1.sh,/path/to/script2.sh'
+                    />
                   </Form.Item>
                 )}
                 {jobType === 'spark' && (
