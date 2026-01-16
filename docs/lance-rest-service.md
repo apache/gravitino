@@ -401,4 +401,4 @@ ns.create_table(create_table_request, body)
 
 ## Integration with Lance REST
 
-About using Lance REST service with Apache Spark, Ray and other engine, please refer to [lance-rest-integration](./lance-rest-integration.md) for more details.
+To use the Lance REST service with Apache Spark, Ray and other engines, please refer to [lance-rest-integration](./lance-rest-integration.md) for more details.
