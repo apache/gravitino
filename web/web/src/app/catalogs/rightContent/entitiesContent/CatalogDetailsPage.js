@@ -46,6 +46,7 @@ import ConfirmInput from '@/components/ConfirmInput'
 import Tags from '@/components/CustomTags'
 import Icons from '@/components/Icons'
 import Policies from '@/components/PolicyTag'
+import PropertiesContent from '@/components/PropertiesContent'
 import { checkCatalogIcon } from '@/config/catalog'
 import Link from 'next/link'
 import { cn } from '@/lib/utils/tailwind'
@@ -166,33 +167,7 @@ export default function CatalogDetailsPage() {
   )
 
   const properties = store.activatedDetails?.properties
-
-  const propertyContent = () => {
-    return (
-      <Space.Compact className='max-h-80 overflow-auto'>
-        <Space.Compact direction='vertical' className='divide-y border-gray-100'>
-          <span className='min-w-24 bg-gray-100 p-1'>Key</span>
-          {properties
-            ? Object.keys(properties).map((key, index) => (
-                <span className='p-1' key={index}>
-                  {key}
-                </span>
-              ))
-            : null}
-        </Space.Compact>
-        <Space.Compact direction='vertical' className='divide-y border-gray-100'>
-          <span className='min-w-24 bg-gray-100 p-1'>Value</span>
-          {properties
-            ? Object.values(properties).map((value, index) => (
-                <span className='p-1' key={index}>
-                  {value || '-'}
-                </span>
-              ))
-            : null}
-        </Space.Compact>
-      </Space.Compact>
-    )
-  }
+  const propertyContent = <PropertiesContent properties={properties} />
 
   const tabOptions = anthEnable
     ? [

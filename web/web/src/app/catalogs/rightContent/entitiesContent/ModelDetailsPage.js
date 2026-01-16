@@ -46,6 +46,7 @@ import ConfirmInput from '@/components/ConfirmInput'
 import Tags from '@/components/CustomTags'
 import Policies from '@/components/PolicyTag'
 import Icons from '@/components/Icons'
+import PropertiesContent from '@/components/PropertiesContent'
 import { cn } from '@/lib/utils/tailwind'
 import { useAppSelector, useAppDispatch } from '@/lib/hooks/useStore'
 import { useSearchParams } from 'next/navigation'
@@ -129,33 +130,7 @@ export default function ModelDetailsPage({ ...props }) {
   )
 
   const properties = store.activatedDetails?.properties
-
-  const propertyContent = () => {
-    return (
-      <Space.Compact className='max-h-80 overflow-auto'>
-        <Space.Compact direction='vertical' className='divide-y border-gray-100'>
-          <span className='min-w-24 bg-gray-100 p-1'>Key</span>
-          {properties
-            ? Object.keys(properties).map(key => (
-                <span key={key} className='p-1'>
-                  {key}
-                </span>
-              ))
-            : null}
-        </Space.Compact>
-        <Space.Compact direction='vertical' className='divide-y border-gray-100'>
-          <span className='min-w-24 bg-gray-100 p-1'>Value</span>
-          {properties
-            ? Object.entries(properties).map(([key, value]) => (
-                <span key={key} className='p-1'>
-                  {value || '-'}
-                </span>
-              ))
-            : null}
-        </Space.Compact>
-      </Space.Compact>
-    )
-  }
+  const propertyContent = <PropertiesContent properties={properties} />
 
   const tabOptions = [
     { label: 'Versions', key: 'Versions' },

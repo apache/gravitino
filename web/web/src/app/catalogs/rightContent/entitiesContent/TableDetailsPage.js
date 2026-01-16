@@ -30,13 +30,13 @@ import Policies from '@/components/PolicyTag'
 import DataPreview from './DataPreview'
 import Icons from '@/components/Icons'
 import { ColumnTypeColorEnum } from '@/config'
-import { sanitizeText } from '@/lib/utils/index'
 import { cn } from '@/lib/utils/tailwind'
 import { useAppSelector, useAppDispatch } from '@/lib/hooks/useStore'
 import { useSearchParams } from 'next/navigation'
 import { getCatalogDetails, getCurrentEntityOwner } from '@/lib/store/metalakes'
 import CreateTableDialog from '../CreateTableDialog'
 import Loading from '@/components/Loading'
+import PropertiesContent from '@/components/PropertiesContent'
 
 const SetOwnerDialog = dynamic(() => import('@/components/SetOwnerDialog'), {
   loading: () => <Loading />,
@@ -138,33 +138,7 @@ export default function TableDetailsPage({ ...props }) {
     </div>
   )
   const properties = store.activatedDetails?.properties
-
-  const propertyContent = () => {
-    return (
-      <Space.Compact className='max-h-80 overflow-auto'>
-        <Space.Compact direction='vertical' className='divide-y border-gray-100'>
-          <span className='min-w-24 bg-gray-100 p-1'>Key</span>
-          {properties
-            ? Object.keys(properties).map((key, index) => (
-                <span className='p-1' key={index}>
-                  {key}
-                </span>
-              ))
-            : null}
-        </Space.Compact>
-        <Space.Compact direction='vertical' className='divide-y border-gray-100'>
-          <span className='min-w-24 bg-gray-100 p-1'>Value</span>
-          {properties
-            ? Object.values(properties).map((value, index) => (
-                <span className='p-1' key={index}>
-                  {sanitizeText(value) || '-'}
-                </span>
-              ))
-            : null}
-        </Space.Compact>
-      </Space.Compact>
-    )
-  }
+  const propertyContent = <PropertiesContent properties={properties} />
 
   const partitioning = store.activatedDetails?.partitioning?.map((i, index) => {
     let fields = i.fieldName || []

@@ -27,6 +27,7 @@ import AssociatedTable from '@/components/AssociatedTable'
 import Tags from '@/components/CustomTags'
 import Policies from '@/components/PolicyTag'
 import Icons from '@/components/Icons'
+import PropertiesGrid from '@/components/PropertiesContent'
 import { cn } from '@/lib/utils/tailwind'
 import { useAppSelector, useAppDispatch } from '@/lib/hooks/useStore'
 import { useSearchParams } from 'next/navigation'
@@ -88,32 +89,9 @@ export default function TopicDetailsPage({ ...props }) {
   )
   const properties = store.activatedDetails?.properties
 
-  const propertyContent = () => {
-    return (
-      <Space.Compact className='max-h-80 overflow-auto' data-refer='properties-popover-content'>
-        <Space.Compact direction='vertical' className='divide-y border-gray-100'>
-          <span className='min-w-24 bg-gray-100 p-1'>Key</span>
-          {properties
-            ? Object.keys(properties).map((key, index) => (
-                <span className='p-1' key={index} data-refer={`props-key-${key}`}>
-                  {key}
-                </span>
-              ))
-            : null}
-        </Space.Compact>
-        <Space.Compact direction='vertical' className='divide-y border-gray-100'>
-          <span className='min-w-24 bg-gray-100 p-1'>Value</span>
-          {properties
-            ? Object.keys(properties).map((key, index) => (
-                <span className='p-1' key={index} data-refer={`props-value-${key}`}>
-                  {properties[key] || '-'}
-                </span>
-              ))
-            : null}
-        </Space.Compact>
-      </Space.Compact>
-    )
-  }
+  const propertyContent = (
+    <PropertiesGrid properties={properties} dataReferPrefix='props' contentDataRefer='properties-popover-content' />
+  )
   const tabOptions = [{ label: 'Associated roles', key: 'Associated roles' }]
 
   const handleEditTable = () => {

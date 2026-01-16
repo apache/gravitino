@@ -78,7 +78,7 @@ export default function JobsPage() {
     .map(job => {
       return {
         ...job,
-        key: job.id
+        key: job.jobId
       }
     })
 

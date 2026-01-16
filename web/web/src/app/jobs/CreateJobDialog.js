@@ -95,11 +95,17 @@ export default function CreateJobDialog({ ...props }) {
       Object.values(obj || {}).forEach(val => pushString(val))
     }
 
+    const pushObjectKeys = obj => {
+      Object.keys(obj || {}).forEach(key => pushString(key))
+    }
+
     pushString(templateDetail.jobType)
     pushString(templateDetail.comment)
     pushString(templateDetail.executable)
     pushArray(templateDetail.arguments)
+    pushObjectKeys(templateDetail.environments)
     pushObjectValues(templateDetail.environments)
+    pushObjectKeys(templateDetail.customFields)
     pushObjectValues(templateDetail.customFields)
 
     if (jobType === 'spark') {
@@ -107,6 +113,7 @@ export default function CreateJobDialog({ ...props }) {
       pushArray(templateDetail.jars)
       pushArray(templateDetail.files)
       pushArray(templateDetail.archives)
+      pushObjectKeys(templateDetail.configs)
       pushObjectValues(templateDetail.configs)
     }
 
@@ -301,7 +308,8 @@ export default function CreateJobDialog({ ...props }) {
                         <div className='space-y-1'>
                           {Object.entries(jobTemplateDetail?.environments || {}).map(([key, value]) => (
                             <div key={`env-${key}`} className='text-sm text-gray-700'>
-                              <span className='text-gray-400'>{key}:</span> {renderTemplateValue(value)}
+                              <span className='text-gray-400'>{renderTemplateValue(key)}:</span>{' '}
+                              {renderTemplateValue(value)}
                             </div>
                           ))}
                         </div>
@@ -317,7 +325,8 @@ export default function CreateJobDialog({ ...props }) {
                         <div className='space-y-1'>
                           {Object.entries(jobTemplateDetail?.customFields || {}).map(([key, value]) => (
                             <div key={`custom-${key}`} className='text-sm text-gray-700'>
-                              <span className='text-gray-400'>{key}:</span> {renderTemplateValue(value)}
+                              <span className='text-gray-400'>{renderTemplateValue(key)}:</span>{' '}
+                              {renderTemplateValue(value)}
                             </div>
                           ))}
                         </div>
@@ -383,7 +392,8 @@ export default function CreateJobDialog({ ...props }) {
                             <div className='space-y-1'>
                               {Object.entries(jobTemplateDetail?.configs || {}).map(([key, value]) => (
                                 <div key={`config-${key}`} className='text-[12px] text-gray-700'>
-                                  <span className='text-gray-400'>{key}:</span> {renderTemplateValue(value)}
+                                  <span className='text-gray-400'>{renderTemplateValue(key)}:</span>{' '}
+                                  {renderTemplateValue(value)}
                                 </div>
                               ))}
                             </div>
