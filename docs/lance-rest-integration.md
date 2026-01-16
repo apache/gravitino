@@ -1,5 +1,5 @@
 ---
-title: "Lance REST Integration with Spark and Ray"
+title: "Lance REST Integration"
 slug: /lance-rest-integration
 keywords:
   - lance
@@ -25,10 +25,10 @@ The following table outlines the tested compatibility between Gravitino versions
 | 1.1.1                          | 0.0.10 – 0.0.15                | 0.0.6 – 0.0.8                |
 
 :::note
-- These version ranges represent combinations expected to be compatible based on API stability and feature sets.
-- While broad compatibility is anticipated within these ranges, only select versions have been explicitly tested.
-- We strongly recommend validating specific connector versions in your development environment before production deployment.
-- As the Lance ecosystem evolves rapidly, API changes may introduce breaking changes between versions.
+- These version ranges show which versions are expected to work together.
+- Not all versions in these ranges have been tested. Only some versions were tested.
+- Before using in production, please test the exact connector versions in your own environment.
+- The Lance ecosystem is changing quickly, so some versions may introduce breaking changes.
 :::
 
 ### Why Maintain a Compatibility Matrix?
@@ -90,8 +90,8 @@ spark = SparkSession.builder \
     .appName("lance_rest_integration") \
     .config("spark.sql.catalog.lance", "com.lancedb.lance. spark.LanceNamespaceSparkCatalog") \
     .config("spark.sql.catalog.lance.impl", "rest") \
-    .config("spark. sql.catalog.lance.uri", "http://localhost:9101/lance") \
-    .config("spark.sql.catalog.lance. parent", "lance_catalog") \
+    .config("spark.sql.catalog.lance.uri", "http://localhost:9101/lance") \
+    .config("spark.sql.catalog.lance.parent", "lance_catalog") \
     .config("spark.sql.defaultCatalog", "lance") \
     .getOrCreate()
 
@@ -121,12 +121,8 @@ spark.sql("SELECT * FROM sales.orders").show()
 
 ### Storage Location Configuration
 
-#### Local Storage
-
 The `LOCATION` clause in the `CREATE TABLE` statement is optional. When omitted, lance-spark automatically determines an appropriate storage location based on catalog properties.
 For detailed information on location resolution logic, refer to the [Lakehouse Generic Catalog documentation](./lakehouse-generic-catalog.md#key-property-location).
-
-#### Cloud Storage (S3-Compatible)
 
 For cloud storage backends such as Amazon S3 or MinIO, specify credentials and endpoint configuration in the table properties:
 
@@ -147,10 +143,6 @@ spark.sql("""
     )
 """)
 ```
-
-:::warning
-Never hardcode credentials in production code. Use environment variables, secret management systems, or IAM roles for credential management.
-:::
 
 ## Ray Integration
 
@@ -208,12 +200,6 @@ result = ray_dataset.filter(lambda row: row["value"] < 100).count()
 print(f"Filtered row count: {result}")
 ```
 
-### Important Considerations
-
-- **Namespace Hierarchy**: The `table_id` parameter uses a hierarchical structure:  `["catalog_name", "sales", "orders"]`
-- **Pre-requisites**: Both the target catalog (`lance_catalog`) and schema (`sales`) must be created in Gravitino before executing write operations
-- **Error Handling**:  Implement appropriate error handling for network failures and authentication issues in production environments
-
 ## Additional Engine Support
 
 The Lance REST service is compatible with other data processing engines that support the Lance format, including:
@@ -224,7 +210,7 @@ The Lance REST service is compatible with other data processing engines that sup
 
 Note: These three engines does not support Lance REST natively yet, but can still interact with Lance datasets through table location paths retrieved from the Lance REST service.
 
-For engine-specific integration instructions, consult the [Lance Integration Documentation](https://lance.org/integrations/datafusion/).
+For engine-specific integration instructions, consult the [Lance Integration Documentation](https://lance.org/integrations).
 
 ### General Integration Pattern
 
@@ -235,7 +221,7 @@ Most Lance-compatible engines follow this general pattern:
 3. Reference tables using the hierarchical namespace structure
 4. Execute read/write operations using engine-native APIs
 
-Refer to each engine's specific documentation for detailed configuration parameters and code examples.
+Refer to each engine's the specific documentation for detailed configuration parameters and code examples.
 
 ## Additional Resources
 
