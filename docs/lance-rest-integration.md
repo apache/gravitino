@@ -72,14 +72,14 @@ import os
 import logging
 
 # Configure logging for debugging
-logging. basicConfig(level=logging.INFO)
+logging.basicConfig(level=logging.INFO)
 
 # Configure Spark to use the lance-spark bundle
 # Replace /path/to/lance-spark-bundle-3.5_2.12-0.0.15.jar with your actual JAR path
 os.environ["PYSPARK_SUBMIT_ARGS"] = (
     "--jars /path/to/lance-spark-bundle-3.5_2.12-0.0.15.jar "
     "--conf \"spark.driver.extraJavaOptions=--add-opens=java.base/sun.nio.ch=ALL-UNNAMED\" "
-    "--conf \"spark.executor.extraJavaOptions=--add-opens=java. base/sun.nio.ch=ALL-UNNAMED\" "
+    "--conf \"spark.executor.extraJavaOptions=--add-opens=java.base/sun.nio.ch=ALL-UNNAMED\" "
     "--master local[1] pyspark-shell"
 )
 
@@ -88,7 +88,7 @@ os.environ["PYSPARK_SUBMIT_ARGS"] = (
 # it via Lance REST API `CreateNameSpace` or Gravitino REST API `CreateCatalog`.
 spark = SparkSession.builder \
     .appName("lance_rest_integration") \
-    .config("spark.sql.catalog.lance", "com.lancedb.lance. spark.LanceNamespaceSparkCatalog") \
+    .config("spark.sql.catalog.lance", "com.lancedb.lance.spark.LanceNamespaceSparkCatalog") \
     .config("spark.sql.catalog.lance.impl", "rest") \
     .config("spark.sql.catalog.lance.uri", "http://localhost:9101/lance") \
     .config("spark.sql.catalog.lance.parent", "lance_catalog") \
@@ -208,7 +208,7 @@ The Lance REST service is compatible with other data processing engines that sup
 - **Pandas**: For Python-based data manipulation
 - **DataFusion**: For Rust-based query execution
 
-Note: These three engines does not support Lance REST natively yet, but can still interact with Lance datasets through table location paths retrieved from the Lance REST service.
+Note: These three engines do not support Lance REST natively yet, but can still interact with Lance datasets through table location paths retrieved from the Lance REST service.
 
 For engine-specific integration instructions, consult the [Lance Integration Documentation](https://lance.org/integrations).
 
@@ -221,7 +221,7 @@ Most Lance-compatible engines follow this general pattern:
 3. Reference tables using the hierarchical namespace structure
 4. Execute read/write operations using engine-native APIs
 
-Refer to each engine's the specific documentation for detailed configuration parameters and code examples.
+Refer to each engine's specific documentation for detailed configuration parameters and code examples.
 
 ## Additional Resources
 
