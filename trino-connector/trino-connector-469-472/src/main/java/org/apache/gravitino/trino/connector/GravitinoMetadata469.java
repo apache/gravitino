@@ -19,7 +19,6 @@
 package org.apache.gravitino.trino.connector;
 
 import io.airlift.slice.Slice;
-import io.trino.spi.TrinoException;
 import io.trino.spi.connector.ColumnHandle;
 import io.trino.spi.connector.ColumnMetadata;
 import io.trino.spi.connector.ColumnPosition;
@@ -38,8 +37,6 @@ import java.util.stream.Collectors;
 import org.apache.gravitino.trino.connector.catalog.CatalogConnectorMetadata;
 import org.apache.gravitino.trino.connector.catalog.CatalogConnectorMetadataAdapter;
 import org.apache.gravitino.trino.connector.metadata.GravitinoColumn;
-
-import static io.trino.spi.StandardErrorCode.GENERIC_INTERNAL_ERROR;
 
 public class GravitinoMetadata469 extends GravitinoMetadata {
 
