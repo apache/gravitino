@@ -299,7 +299,8 @@ public class ManagedFunctionOperations implements FunctionCatalog {
         newDefinitions = removeImplFromDefinition(newDefinitions, targetParams, runtime);
 
       } else {
-        throw new IllegalArgumentException("Unknown function change: " + change.getClass().getSimpleName());
+        throw new IllegalArgumentException(
+            "Unknown function change: " + change.getClass().getSimpleName());
       }
     }
 

@@ -46,6 +46,7 @@ import org.apache.gravitino.function.FunctionImpls;
 import org.apache.gravitino.function.FunctionParam;
 import org.apache.gravitino.function.FunctionParams;
 import org.apache.gravitino.function.FunctionType;
+import org.apache.gravitino.function.JavaImpl;
 import org.apache.gravitino.meta.FunctionEntity;
 import org.apache.gravitino.rel.expressions.literals.Literals;
 import org.apache.gravitino.rel.types.Types;
@@ -625,6 +626,11 @@ public class TestManagedFunctionOperations {
             FunctionChange.updateImpl(params, FunctionImpl.RuntimeType.SPARK, newSparkImpl));
 
     Assertions.assertEquals(1, updatedFunc.definitions()[0].impls().length);
+    // Verify the implementation was actually updated to the new class
+    FunctionImpl updatedImpl = updatedFunc.definitions()[0].impls()[0];
+    Assertions.assertEquals(FunctionImpl.RuntimeType.SPARK, updatedImpl.runtime());
+    Assertions.assertInstanceOf(JavaImpl.class, updatedImpl);
+    Assertions.assertEquals("com.example.NewSparkUDF", ((JavaImpl) updatedImpl).className());
   }
 
   @Test
@@ -732,6 +738,48 @@ public class TestManagedFunctionOperations {
         () ->
             functionOperations.alterFunction(
                 nonExistingIdent, FunctionChange.updateComment("new comment")));
+  }
+
+  @Test
+  public void testParameterOrderValidationInAlterFunction() {
+    // Test that parameter validation also works when altering functions
+    NameIdentifier funcIdent = getFunctionIdent("func_alter_invalid_params");
+
+    // First register a valid function
+    FunctionParam[] initialParams =
+        new FunctionParam[] {FunctionParams.of("a", Types.IntegerType.get())};
+    FunctionDefinition[] initialDefinitions =
+        new FunctionDefinition[] {createSimpleDefinition(initialParams)};
+
+    functionOperations.registerFunction(
+        funcIdent,
+        "Initial function",
+        FunctionType.SCALAR,
+        true,
+        Types.StringType.get(),
+        initialDefinitions);
+
+    // Try to add a definition with invalid parameter order
+    FunctionParam[] invalidParams =
+        new FunctionParam[] {
+          FunctionParams.of("x", Types.IntegerType.get(), "param x", Literals.integerLiteral(1)),
+          FunctionParams.of("y", Types.StringType.get()), // Required after optional
+        };
+
+    IllegalArgumentException ex =
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () ->
+                functionOperations.alterFunction(
+                    funcIdent,
+                    FunctionChange.addDefinition(createSimpleDefinition(invalidParams))));
+
+    Assertions.assertTrue(
+        ex.getMessage().contains("Invalid parameter order"),
+        "Expected error about invalid parameter order, got: " + ex.getMessage());
+    Assertions.assertTrue(
+        ex.getMessage().contains("required parameter 'y'"),
+        "Expected error to mention parameter 'y', got: " + ex.getMessage());
   }
 
   @SuppressWarnings("unchecked")
@@ -858,48 +906,6 @@ public class TestManagedFunctionOperations {
   private FunctionDefinition createSimpleDefinition(FunctionParam[] params) {
     FunctionImpl impl = FunctionImpls.ofJava(FunctionImpl.RuntimeType.SPARK, "com.example.TestUDF");
     return FunctionDefinitions.of(params, new FunctionImpl[] {impl});
-  }
-
-  @Test
-  public void testParameterOrderValidationInAlterFunction() {
-    // Test that parameter validation also works when altering functions
-    NameIdentifier funcIdent = getFunctionIdent("func_alter_invalid_params");
-
-    // First register a valid function
-    FunctionParam[] initialParams =
-        new FunctionParam[] {FunctionParams.of("a", Types.IntegerType.get())};
-    FunctionDefinition[] initialDefinitions =
-        new FunctionDefinition[] {createSimpleDefinition(initialParams)};
-
-    functionOperations.registerFunction(
-        funcIdent,
-        "Initial function",
-        FunctionType.SCALAR,
-        true,
-        Types.StringType.get(),
-        initialDefinitions);
-
-    // Try to add a definition with invalid parameter order
-    FunctionParam[] invalidParams =
-        new FunctionParam[] {
-          FunctionParams.of("x", Types.IntegerType.get(), "param x", Literals.integerLiteral(1)),
-          FunctionParams.of("y", Types.StringType.get()), // Required after optional
-        };
-
-    IllegalArgumentException ex =
-        Assertions.assertThrows(
-            IllegalArgumentException.class,
-            () ->
-                functionOperations.alterFunction(
-                    funcIdent,
-                    FunctionChange.addDefinition(createSimpleDefinition(invalidParams))));
-
-    Assertions.assertTrue(
-        ex.getMessage().contains("Invalid parameter order"),
-        "Expected error about invalid parameter order, got: " + ex.getMessage());
-    Assertions.assertTrue(
-        ex.getMessage().contains("required parameter 'y'"),
-        "Expected error to mention parameter 'y', got: " + ex.getMessage());
   }
 
   private FunctionDefinition createDefinitionWithImpls(
