@@ -25,7 +25,6 @@ import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.exceptions.FunctionAlreadyExistsException;
 import org.apache.gravitino.exceptions.NoSuchFunctionException;
-import org.apache.gravitino.exceptions.NoSuchFunctionVersionException;
 import org.apache.gravitino.exceptions.NoSuchSchemaException;
 import org.apache.gravitino.function.Function;
 import org.apache.gravitino.function.FunctionChange;
@@ -92,10 +91,10 @@ public class FunctionOperationDispatcher extends OperationDispatcher implements 
   }
 
   /**
-   * Get a function by {@link NameIdentifier} from the catalog. Returns the latest version.
+   * Get a function by {@link NameIdentifier} from the catalog. Returns the current version.
    *
    * @param ident A function identifier.
-   * @return The latest version of the function with the given name.
+   * @return The current version of the function with the given name.
    * @throws NoSuchFunctionException If the function does not exist.
    */
   @Override
@@ -108,29 +107,6 @@ public class FunctionOperationDispatcher extends OperationDispatcher implements 
 
     return TreeLockUtils.doWithTreeLock(
         ident, LockType.READ, () -> managedFunctionOps.getFunction(ident));
-  }
-
-  /**
-   * Get a function by {@link NameIdentifier} and version from the catalog.
-   *
-   * @param ident A function identifier.
-   * @param version The function version, counted from 0.
-   * @return The function with the given name and version.
-   * @throws NoSuchFunctionException If the function does not exist.
-   * @throws NoSuchFunctionVersionException If the function version does not exist.
-   */
-  @Override
-  public Function getFunction(NameIdentifier ident, int version)
-      throws NoSuchFunctionException, NoSuchFunctionVersionException {
-    Preconditions.checkArgument(version >= 0, "Function version must be non-negative");
-    NameIdentifier schemaIdent = NameIdentifier.of(ident.namespace().levels());
-    // Validate schema exists in the underlying catalog
-    if (!schemaOps.schemaExists(schemaIdent)) {
-      throw new NoSuchFunctionException("Schema does not exist: %s", schemaIdent);
-    }
-
-    return TreeLockUtils.doWithTreeLock(
-        ident, LockType.READ, () -> managedFunctionOps.getFunction(ident, version));
   }
 
   /**
