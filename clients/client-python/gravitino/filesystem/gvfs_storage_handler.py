@@ -81,7 +81,6 @@ class StorageHandler(ABC):
         self,
         credentials: List[Credential],
         catalog_props: Dict[str, str],
-        options: Dict[str, str],
         actual_path: Optional[str] = None,
         **kwargs,
     ) -> Tuple[int, AbstractFileSystem]:
@@ -214,7 +213,6 @@ class LocalStorageHandler(StorageHandler):
         self,
         credentials: List[Credential],
         catalog_props: Dict[str, str],
-        options: Dict[str, str],
         actual_path: Optional[str] = None,
         **kwargs,
     ) -> Tuple[int, AbstractFileSystem]:
@@ -256,7 +254,6 @@ class HDFSStorageHandler(StorageHandler):
         self,
         credentials: List[Credential],
         catalog_props: Dict[str, str],
-        options: Dict[str, str],
         actual_path: Optional[str] = None,
         **kwargs,
     ) -> Tuple[int, AbstractFileSystem]:
@@ -285,7 +282,6 @@ class S3StorageHandler(StorageHandler):
         self,
         credentials: List[Credential],
         catalog_props: Dict[str, str],
-        options: Dict[str, str],
         actual_path: Optional[str] = None,
         **kwargs,
     ) -> Tuple[int, AbstractFileSystem]:
@@ -296,28 +292,16 @@ class S3StorageHandler(StorageHandler):
         # Note: the endpoint may not be a real S3 endpoint, it can be a simulated S3 endpoint, such as minio,
         # so though the endpoint is not a required field for S3FileSystem, we still need to assign the endpoint
         # to the S3FileSystem
-        s3_endpoint = None
-        if options:
-            s3_endpoint = (
-                options.get(GVFSConfig.GVFS_FILESYSTEM_S3_ENDPOINT, s3_endpoint)
-                if options
-                else None
-            )
-            if s3_endpoint is None:
-                s3_endpoint = (
-                    catalog_props.get("s3-endpoint", None) if catalog_props else None
-                )
-        else:
-            s3_endpoint = (
-                catalog_props.get("s3-endpoint", None) if catalog_props else None
-            )
+        s3_endpoint = catalog_props.get(
+            GVFSConfig.GVFS_FILESYSTEM_S3_ENDPOINT
+        ) or catalog_props.get("s3-endpoint")
 
         if credentials:
             credential = self._get_most_suitable_credential(credentials)
             if credential is not None:
                 expire_time = self._get_expire_time_by_ratio(
                     credential.expire_time_in_ms(),
-                    options,
+                    catalog_props,
                 )
                 if isinstance(credential, S3TokenCredential):
                     fs = self.get_filesystem(
@@ -339,8 +323,8 @@ class S3StorageHandler(StorageHandler):
 
         # this is the old way to get the s3 file system
         # get 'aws_access_key_id' from s3_options, if the key is not found, throw an exception
-        aws_access_key_id = (
-            options.get(GVFSConfig.GVFS_FILESYSTEM_S3_ACCESS_KEY) if options else None
+        aws_access_key_id = catalog_props.get(
+            GVFSConfig.GVFS_FILESYSTEM_S3_ACCESS_KEY, None
         )
         if aws_access_key_id is None:
             raise GravitinoRuntimeException(
@@ -348,8 +332,8 @@ class S3StorageHandler(StorageHandler):
             )
 
         # get 'aws_secret_access_key' from s3_options, if the key is not found, throw an exception
-        aws_secret_access_key = (
-            options.get(GVFSConfig.GVFS_FILESYSTEM_S3_SECRET_KEY) if options else None
+        aws_secret_access_key = catalog_props.get(
+            GVFSConfig.GVFS_FILESYSTEM_S3_SECRET_KEY
         )
         if aws_secret_access_key is None:
             raise GravitinoRuntimeException(
@@ -408,7 +392,6 @@ class GCSStorageHandler(StorageHandler):
         self,
         credentials: List[Credential],
         catalog_props: Dict[str, str],
-        options: Dict[str, str],
         actual_path: Optional[str] = None,
         **kwargs,
     ) -> Tuple[int, AbstractFileSystem]:
@@ -417,7 +400,7 @@ class GCSStorageHandler(StorageHandler):
             if credential is not None:
                 expire_time = self._get_expire_time_by_ratio(
                     credential.expire_time_in_ms(),
-                    options,
+                    catalog_props,
                 )
                 if isinstance(credential, GCSTokenCredential):
                     return (
@@ -429,10 +412,8 @@ class GCSStorageHandler(StorageHandler):
                     )
 
         # get 'service-account-key' from gcs_options, if the key is not found, throw an exception
-        service_account_key_path = (
-            options.get(GVFSConfig.GVFS_FILESYSTEM_GCS_SERVICE_KEY_FILE)
-            if options
-            else None
+        service_account_key_path = catalog_props.get(
+            GVFSConfig.GVFS_FILESYSTEM_GCS_SERVICE_KEY_FILE
         )
         if service_account_key_path is None:
             raise GravitinoRuntimeException(
@@ -485,33 +466,20 @@ class OSSStorageHandler(StorageHandler):
         self,
         credentials: List[Credential],
         catalog_props: Dict[str, str],
-        options: Dict[str, str],
         actual_path: Optional[str] = None,
         **kwargs,
     ) -> Tuple[int, AbstractFileSystem]:
-        oss_endpoint = None
         # OSS endpoint from client options has a higher priority, override the endpoint from catalog properties.
-        if options:
-            oss_endpoint = (
-                options.get(GVFSConfig.GVFS_FILESYSTEM_OSS_ENDPOINT, oss_endpoint)
-                if options
-                else None
-            )
-            if oss_endpoint is None:
-                oss_endpoint = (
-                    catalog_props.get("oss-endpoint", None) if catalog_props else None
-                )
-        else:
-            oss_endpoint = (
-                catalog_props.get("oss-endpoint", None) if catalog_props else None
-            )
+        oss_endpoint = catalog_props.get(
+            GVFSConfig.GVFS_FILESYSTEM_OSS_ENDPOINT
+        ) or catalog_props.get("oss-endpoint")
 
         if credentials:
             credential = self._get_most_suitable_credential(credentials)
             if credential is not None:
                 expire_time = self._get_expire_time_by_ratio(
                     credential.expire_time_in_ms(),
-                    options,
+                    catalog_props,
                 )
                 if isinstance(credential, OSSTokenCredential):
                     fs = self.get_filesystem(
@@ -534,17 +502,15 @@ class OSSStorageHandler(StorageHandler):
                     )
 
         # get 'oss_access_key_id' from oss options, if the key is not found, throw an exception
-        oss_access_key_id = (
-            options.get(GVFSConfig.GVFS_FILESYSTEM_OSS_ACCESS_KEY) if options else None
-        )
+        oss_access_key_id = catalog_props.get(GVFSConfig.GVFS_FILESYSTEM_OSS_ACCESS_KEY)
         if oss_access_key_id is None:
             raise GravitinoRuntimeException(
                 "OSS access key id is not found in the options."
             )
 
         # get 'oss_secret_access_key' from oss options, if the key is not found, throw an exception
-        oss_secret_access_key = (
-            options.get(GVFSConfig.GVFS_FILESYSTEM_OSS_SECRET_KEY) if options else None
+        oss_secret_access_key = catalog_props.get(
+            GVFSConfig.GVFS_FILESYSTEM_OSS_SECRET_KEY
         )
         if oss_secret_access_key is None:
             raise GravitinoRuntimeException(
@@ -604,7 +570,6 @@ class ABSStorageHandler(StorageHandler):
         self,
         credentials: List[Credential],
         catalog_props: Dict[str, str],
-        options: Dict[str, str],
         actual_path: Optional[str] = None,
         **kwargs,
     ) -> Tuple[int, AbstractFileSystem]:
@@ -613,7 +578,7 @@ class ABSStorageHandler(StorageHandler):
             if credential is not None:
                 expire_time = self._get_expire_time_by_ratio(
                     credential.expire_time_in_ms(),
-                    options,
+                    catalog_props,
                 )
                 if isinstance(credential, ADLSTokenCredential):
                     fs = self.get_filesystem(
@@ -632,10 +597,8 @@ class ABSStorageHandler(StorageHandler):
                     return expire_time, fs
 
         # get 'abs_account_name' from abs options, if the key is not found, throw an exception
-        abs_account_name = (
-            options.get(GVFSConfig.GVFS_FILESYSTEM_AZURE_ACCOUNT_NAME)
-            if options
-            else None
+        abs_account_name = catalog_props.get(
+            GVFSConfig.GVFS_FILESYSTEM_AZURE_ACCOUNT_NAME
         )
         if abs_account_name is None:
             raise GravitinoRuntimeException(
@@ -643,10 +606,8 @@ class ABSStorageHandler(StorageHandler):
             )
 
         # get 'abs_account_key' from abs options, if the key is not found, throw an exception
-        abs_account_key = (
-            options.get(GVFSConfig.GVFS_FILESYSTEM_AZURE_ACCOUNT_KEY)
-            if options
-            else None
+        abs_account_key = catalog_props.get(
+            GVFSConfig.GVFS_FILESYSTEM_AZURE_ACCOUNT_KEY
         )
         if abs_account_key is None:
             raise GravitinoRuntimeException(
