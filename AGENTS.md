@@ -67,9 +67,12 @@ The project is organized as a Gradle multi-module project with the following key
 - `catalogs/catalog-lakehouse-paimon/` - Apache Paimon catalog
 - `catalogs/catalog-lakehouse-hudi/` - Apache Hudi catalog
 - `catalogs/catalog-lakehouse-generic/` - Generic lakehouse catalog
+- `catalogs/catalog-jdbc-common/` - Base JDBC catalog functionality
 - `catalogs/catalog-jdbc-mysql/` - MySQL catalog
 - `catalogs/catalog-jdbc-postgresql/` - PostgreSQL catalog
 - `catalogs/catalog-jdbc-doris/` - Apache Doris catalog
+- `catalogs/catalog-jdbc-oceanbase/` - OceanBase catalog
+- `catalogs/catalog-jdbc-starrocks/` - StarRocks catalog
 - `catalogs/catalog-kafka/` - Apache Kafka catalog
 - `catalogs/catalog-fileset/` - Fileset catalog for file-based data
 - `catalogs/catalog-model/` - AI model catalog
@@ -92,9 +95,11 @@ The project is organized as a Gradle multi-module project with the following key
 ### Other Components
 - `web/` - Web UI frontend (Next.js/React)
 - `docs/` - Documentation source files
-- `integration-test-common/` - Common utilities for integration tests
+- `integration-test-common/` - Common utilities for integration tests (includes MiniGravitino)
 - `bundles/` - Cloud storage bundles (AWS, GCP, Azure, Aliyun)
 - `lineage/` - Data lineage tracking
+- `maintenance/` - Maintenance jobs and optimizer modules
+- `mcp-server/` - Model Context Protocol server for AI assistant integration
 
 ## Common Development Commands
 
@@ -138,15 +143,16 @@ Gravitino supports Scala 2.12 and 2.13 (default is 2.12):
 
 #### Python Client Build
 
-```bash
-# Build with Python 3.9 (default)
-./gradlew build
+The default Python version is 3.9, but you should match your local Python version. For example, with Python 3.11:
 
-# Build with specific Python version
-./gradlew build -PpythonVersion=3.10
+```bash
+# Build with specific Python version (matches local environment)
 ./gradlew build -PpythonVersion=3.11
-./gradlew build -PpythonVersion=3.12
+
+# Or modify gradle.properties to set: pythonVersion=3.11
 ```
+
+Available versions: 3.9, 3.10, 3.11, 3.12
 
 #### Connector Builds
 
@@ -213,6 +219,18 @@ Gravitino uses Spotless for code formatting:
 
 Integration tests can run in two modes: `embedded` (default) and `deploy`.
 
+**Embedded mode** uses `MiniGravitino` from `integration-test-common/`:
+- Starts Gravitino in-process for faster testing
+- No need to build distribution
+- Easier debugging (tests run in same JVM)
+- Ideal for rapid development and unit testing
+
+**Deploy mode** uses full distribution:
+- More realistic testing environment
+- Requires `./gradlew compileDistribution` first
+- Tests Gravitino as it would run in production
+- Slower but catches deployment-specific issues
+
 ```bash
 # Run integration tests in embedded mode (uses MiniGravitino)
 ./gradlew test -PskipTests -PtestMode=embedded
@@ -277,12 +295,39 @@ For macOS users running Docker tests:
 ### Code Organization Patterns
 
 - **API-first design**: Public APIs defined in `api/` module
-- **Catalog pattern**: All catalog implementations extend base classes from `catalog-common/`
+- **Catalog pattern**: All catalog implementations extend `BaseCatalog` from `core/` module
 - **Connector pattern**: Query engine connectors provide transparent Gravitino integration
 - **Configuration**: Uses `.conf` files and environment variables
 - **REST API**: JAX-RS based RESTful services
-- **Event listeners**: `core/` module contains event listener interfaces for catalog and metalake changes
+- **Event listeners**: `core/listener/` module contains event listener interfaces for catalog and metalake changes
 - **Transaction management**: Uses `javax.transaction` for distributed transaction support
+
+### Metadata Model Hierarchy
+
+Gravitino organizes metadata in a hierarchical structure:
+
+1. **Metalake** - Top-level isolation boundary for multi-tenancy
+2. **Catalog** - Connection to a metadata source (Hive, Iceberg, MySQL, Kafka, etc.)
+3. **Schema/Namespace** - Logical grouping of objects (database in Hive, schema in relational DBs, topic namespace in Kafka)
+4. **Table/Topic/Fileset/Model** - Actual metadata objects depending on catalog type
+5. **Column/Partition** - Fine-grained metadata for tables
+
+Each level in the hierarchy supports:
+- Properties metadata for configuration validation
+- Event listeners for change notification
+- Authorization checks (if enabled)
+- Audit logging
+
+### Core Architectural Components
+
+- **Entity system**: Core entity management (`Entity`, `EntityStore`) handles all metadata objects
+- **CatalogOperations**: Interface that catalogs implement for metadata operations (schemas, tables, etc.)
+- **Properties metadata**: Each catalog has `PropertiesMetadata` defining valid configuration properties
+- **Hook system**: `core/hook/` supports pre/post operation hooks for extensibility
+- **Cache layer**: `core/cache/` provides caching for catalog metadata
+- **Credential system**: `core/credential/` manages secure credential storage and encryption
+- **Authorization**: `authorizations/` modules provide access control (Ranger, chain-based)
+- **Audit**: `core/audit/` provides audit logging for all operations
 
 ### Database Backend Support
 
@@ -415,9 +460,9 @@ Set breakpoints directly in IntelliJ IDEA or your IDE - tests run in the same pr
 - Use `catalog-common` for shared catalog code
 - Avoid circular dependencies
 
-## Review Guidelines
+## Code Review Guidelines
 
-When reviewing contributions, check for:
+For comprehensive code review guidelines, see `.github/copilot-instructions.md`. Key areas include:
 
 ### Code Quality
 - Follows project coding standards
