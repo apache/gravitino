@@ -17,9 +17,9 @@
   under the License.
 -->
 
-# AGENTS.md
+# CLAUDE.md
 
-This file provides guidance to AI coding agents collaborating on the Apache Gravitino repository.
+This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
 ## Project Overview
 
@@ -82,6 +82,7 @@ The project is organized as a Gradle multi-module project with the following key
 ### Standalone Services
 - `iceberg/iceberg-rest-server/` - Standalone Iceberg REST catalog service
 - `lance/lance-rest-server/` - Lance format REST server
+- `mcp-server/` - Model Context Protocol server for integrating Gravitino with AI assistants
 
 ### Authorization
 - `authorizations/authorization-common/` - Authorization framework
@@ -94,7 +95,6 @@ The project is organized as a Gradle multi-module project with the following key
 - `integration-test-common/` - Common utilities for integration tests
 - `bundles/` - Cloud storage bundles (AWS, GCP, Azure, Aliyun)
 - `lineage/` - Data lineage tracking
-- `mcp-server/` - Model Context Protocol server for Gravitino
 
 ## Common Development Commands
 
@@ -119,17 +119,20 @@ Gravitino uses Gradle as its build system. All commands should be run from the p
 
 # Create distribution tarball
 ./gradlew assembleDistribution
+
+# Build with all deprecation warnings (useful for development)
+./gradlew build --warning-mode all
 ```
 
 #### Scala Version Selection
 
-Gravitino supports Scala 2.12 and 2.13 (default is 2.13):
+Gravitino supports Scala 2.12 and 2.13 (default is 2.12):
 
 ```bash
-# Build with Scala 2.12
+# Build with Scala 2.12 (default)
 ./gradlew build -PscalaVersion=2.12
 
-# Build with Scala 2.13 (default)
+# Build with Scala 2.13
 ./gradlew build -PscalaVersion=2.13
 ```
 
@@ -156,6 +159,21 @@ Gravitino supports Scala 2.12 and 2.13 (default is 2.13):
 
 # Build Iceberg REST server
 ./gradlew assembleIcebergRESTServer
+```
+
+#### Web UI Development
+
+```bash
+# Install dependencies and run web UI in development mode
+cd web
+npm install
+npm run dev
+
+# Build web UI for production
+npm run build
+
+# Run web UI tests
+npm run test
 ```
 
 ### Code Quality and Formatting
@@ -236,10 +254,10 @@ For macOS users running Docker tests:
 
 ### Language and JDK Requirements
 
-- **Build JDK**: Java 17 (required to run Gradle)
+- **Build JDK**: Java 17 is **required** - the build will fail with other versions
 - **Runtime JDK**: Java 17 (for server and connectors)
 - **Target Compatibility**: Client-side modules (clients, connectors) target JDK 8 for compatibility
-- **Scala**: Supports 2.12 and 2.13 (Flink only supports 2.12)
+- **Scala**: Supports 2.12 (default) and 2.13 (Flink only supports 2.12)
 - **Python**: 3.9, 3.10, 3.11, or 3.12
 
 ### Build System Details
@@ -263,6 +281,8 @@ For macOS users running Docker tests:
 - **Connector pattern**: Query engine connectors provide transparent Gravitino integration
 - **Configuration**: Uses `.conf` files and environment variables
 - **REST API**: JAX-RS based RESTful services
+- **Event listeners**: `core/` module contains event listener interfaces for catalog and metalake changes
+- **Transaction management**: Uses `javax.transaction` for distributed transaction support
 
 ### Database Backend Support
 
@@ -271,6 +291,13 @@ Gravitino supports multiple backend databases for metadata storage:
 - MySQL
 - PostgreSQL
 - Configure via `jdbcBackend` property
+
+### REST API Configuration
+
+- **Default port**: 8090
+- **Base path**: `/api/`
+- **Authentication**: Supports OAuth2, Kerberos, and simple auth
+- **API documentation**: YAML specs in `docs/open-api/`
 
 ### Docker Images
 
