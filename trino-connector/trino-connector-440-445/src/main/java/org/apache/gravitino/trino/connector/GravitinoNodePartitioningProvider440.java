@@ -18,28 +18,13 @@
  */
 package org.apache.gravitino.trino.connector;
 
-import com.google.common.collect.ImmutableList;
-import io.trino.spi.connector.ConnectorFactory;
-import org.apache.gravitino.client.GravitinoAdminClient;
-import org.apache.gravitino.trino.connector.catalog.CatalogConnectorManager;
+import io.trino.spi.connector.ConnectorNodePartitioningProvider;
 
-public class TestGravitinoPlugin extends GravitinoPlugin {
-  private TestGravitinoConnectorFactory factory;
+/** Trino NodePartitioningProvider implementation with the new split bucket function signature. */
+public class GravitinoNodePartitioningProvider440 extends GravitinoNodePartitioningProvider {
 
-  private final GravitinoAdminClient gravitinoClient;
-
-  public TestGravitinoPlugin(GravitinoAdminClient gravitinoClient) {
-    this.gravitinoClient = gravitinoClient;
-  }
-
-  @Override
-  public Iterable<ConnectorFactory> getConnectorFactories() {
-    factory = new TestGravitinoConnectorFactory();
-    factory.setGravitinoClient(gravitinoClient);
-    return ImmutableList.of(factory);
-  }
-
-  public CatalogConnectorManager getCatalogConnectorManager() {
-    return factory.getCatalogConnectorManager();
+  public GravitinoNodePartitioningProvider440(
+      ConnectorNodePartitioningProvider nodePartitioningProvider) {
+    super(nodePartitioningProvider);
   }
 }

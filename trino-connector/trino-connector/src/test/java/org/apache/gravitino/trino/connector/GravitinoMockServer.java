@@ -30,7 +30,9 @@ import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableMap;
 import io.trino.plugin.memory.MemoryConnector;
 import io.trino.spi.connector.ColumnHandle;
+import io.trino.spi.connector.ColumnMetadata;
 import io.trino.spi.connector.ConnectorMetadata;
+import io.trino.spi.connector.ConnectorSession;
 import io.trino.spi.connector.ConnectorTableHandle;
 import io.trino.spi.connector.ConnectorTableMetadata;
 import io.trino.spi.connector.SaveMode;
@@ -79,19 +81,32 @@ public class GravitinoMockServer implements AutoCloseable {
   private boolean start = true;
   CatalogConnectorManager catalogConnectorManager;
   private GeneralDataTypeTransformer dataTypeTransformer = new HiveDataTypeTransformer();
+  private int trinoVersion = 0;
 
   public GravitinoMockServer() {
     createMetalake(testMetalake);
     createCatalog(testMetalake, testCatalog, ImmutableMap.of());
   }
 
-  public void setCatalogConnectorManager(CatalogConnectorManager catalogConnectorManager) {
+  public void setCatalogConnectorManager(
+      CatalogConnectorManager catalogConnectorManager, int trinoVersion) {
     this.catalogConnectorManager = catalogConnectorManager;
+    this.trinoVersion = trinoVersion;
   }
 
   public GravitinoAdminClient createGravitinoClient() {
     GravitinoAdminClient client = mock(GravitinoAdminClient.class);
 
+    when(client.listMetalakes())
+        .thenAnswer(
+            new Answer<GravitinoMetalake[]>() {
+              @Override
+              public GravitinoMetalake[] answer(InvocationOnMock invocation) throws Throwable {
+                return metalakes.values().stream()
+                    .map(metalake -> metalake.metalake)
+                    .toArray(GravitinoMetalake[]::new);
+              }
+            });
     when(client.createMetalake(anyString(), anyString(), anyMap()))
         .thenAnswer(
             new Answer<GravitinoMetalake>() {
@@ -558,7 +573,7 @@ public class GravitinoMockServer implements AutoCloseable {
           catalogConnectorManager
               .getCatalogConnector(catalogConnectorManager.getTrinoCatalogName(catalog))
               .getMetadataAdapter();
-      metadata.addColumn(null, tableHandle, metadataAdapter.getColumnMetadata(column));
+      addColumn(metadata, tableHandle, metadataAdapter.getColumnMetadata(column));
 
     } else if (tableChange instanceof TableChange.DeleteColumn) {
       TableChange.DeleteColumn deleteColumn = (TableChange.DeleteColumn) tableChange;
@@ -600,6 +615,42 @@ public class GravitinoMockServer implements AutoCloseable {
           null,
           tableHandle,
           Map.of(setProperty.getProperty(), Optional.of(setProperty.getValue())));
+    }
+  }
+
+  private void addColumn(
+      ConnectorMetadata metadata, ConnectorTableHandle tableHandle, ColumnMetadata columnMetadata) {
+    if (trinoVersion < 468) {
+      try {
+        metadata
+            .getClass()
+            .getMethod(
+                "addColumn",
+                ConnectorSession.class,
+                ConnectorTableHandle.class,
+                ColumnMetadata.class)
+            .invoke(metadata, null, tableHandle, columnMetadata);
+      } catch (ReflectiveOperationException e) {
+        throw new RuntimeException("Failed to invoke legacy addColumn by reflection", e);
+      }
+    } else {
+      try {
+        Class<?> columnPositionClass = Class.forName("io.trino.spi.connector.ColumnPosition");
+        Class<?> lastPositionClass = Class.forName("io.trino.spi.connector.ColumnPosition$Last");
+        Object position = lastPositionClass.getDeclaredConstructor().newInstance();
+
+        metadata
+            .getClass()
+            .getMethod(
+                "addColumn",
+                ConnectorSession.class,
+                ConnectorTableHandle.class,
+                ColumnMetadata.class,
+                columnPositionClass)
+            .invoke(metadata, null, tableHandle, columnMetadata, position);
+      } catch (Exception e) {
+        throw new RuntimeException("Failed to invoke addColumn with ColumnPosition", e);
+      }
     }
   }
 
