@@ -65,7 +65,6 @@ public interface OAuthConfig {
               "The uri of the default OAuth server. Required when using StaticSignKeyValidator, not required for JWKS-based validators")
           .version(ConfigConstants.VERSION_0_3_0)
           .stringConf()
-          .checkValue(StringUtils::isNotBlank, ConfigConstants.NOT_BLANK_ERROR_MSG)
           .create();
 
   ConfigEntry<String> DEFAULT_TOKEN_PATH =
@@ -74,7 +73,6 @@ public interface OAuthConfig {
               "The path for token of the default OAuth server. Required when using StaticSignKeyValidator, not required for JWKS-based validators")
           .version(ConfigConstants.VERSION_0_3_0)
           .stringConf()
-          .checkValue(StringUtils::isNotBlank, ConfigConstants.NOT_BLANK_ERROR_MSG)
           .create();
 
   // OAuth provider configs
