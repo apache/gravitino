@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-description = "catalog-jdbc-postgresql"
+description = "catalog-jdbc-hologres"
 
 plugins {
   `maven-publish`
@@ -30,6 +30,9 @@ dependencies {
     exclude(group = "*")
   }
   implementation(project(":catalogs:catalog-jdbc-common")) {
+    exclude(group = "*")
+  }
+  implementation(project(":catalogs:catalog-jdbc-postgresql")) {
     exclude(group = "*")
   }
   implementation(project(":common")) {
@@ -54,10 +57,8 @@ dependencies {
   testImplementation(libs.awaitility)
   testImplementation(libs.junit.jupiter.api)
   testImplementation(libs.junit.jupiter.params)
-  testImplementation(libs.mysql.driver)
   testImplementation(libs.postgresql.driver)
   testImplementation(libs.testcontainers)
-  testImplementation(libs.testcontainers.mysql)
   testImplementation(libs.testcontainers.postgresql)
 
   testRuntimeOnly(libs.junit.jupiter.engine)
@@ -76,14 +77,14 @@ tasks {
       exclude("log4j-*.jar")
       exclude("slf4j-*.jar")
     }
-    into("$rootDir/distribution/package/catalogs/jdbc-postgresql/libs")
+    into("$rootDir/distribution/package/catalogs/jdbc-hologres/libs")
   }
 
   val copyCatalogConfig by registering(Copy::class) {
     from("src/main/resources")
-    into("$rootDir/distribution/package/catalogs/jdbc-postgresql/conf")
+    into("$rootDir/distribution/package/catalogs/jdbc-hologres/conf")
 
-    include("jdbc-postgresql.conf")
+    include("jdbc-hologres.conf")
 
     exclude { details ->
       details.file.isDirectory()
@@ -103,7 +104,8 @@ tasks.test {
     // Exclude integration tests
     exclude("**/integration/test/**")
   } else {
-    // PG will use project jdbc-mysql/build/libs directory, so we add the task dependency here.
+    // Hologres will use project jdbc-mysql/build/libs directory, so we add the task dependency
+    // here.
     dependsOn(":catalogs:catalog-jdbc-mysql:jar")
     dependsOn(tasks.jar)
   }

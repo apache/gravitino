@@ -376,6 +376,40 @@ export const providers = [
         required: true
       }
     ]
+  },
+  {
+    label: 'Hologres',
+    value: 'jdbc-hologres',
+    defaultProps: [
+      {
+        key: 'jdbc-driver',
+        value: 'org.postgresql.Driver',
+        required: true,
+        description: 'e.g. org.postgresql.Driver'
+      },
+      {
+        key: 'jdbc-url',
+        value: '',
+        required: true,
+        description: 'e.g. jdbc:postgresql://{endpoint}:{port}/{database}'
+      },
+      {
+        key: 'jdbc-user',
+        value: '',
+        required: true
+      },
+      {
+        key: 'jdbc-password',
+        value: '',
+        required: true
+      },
+      {
+        key: 'jdbc-database',
+        value: '',
+        required: true,
+        description: 'Hologres database name'
+      }
+    ]
   }
 ]
 
@@ -649,6 +683,23 @@ const relationalColumnTypeMap = {
     'time',
     'timestamp',
     'varchar'
+  ],
+  'jdbc-hologres': [
+    'binary',
+    'boolean',
+    'char',
+    'date',
+    'decimal',
+    'double',
+    'float',
+    'integer',
+    'long',
+    'short',
+    'string',
+    'time',
+    'timestamp',
+    'timestamp_tz',
+    'varchar'
   ]
 }
 
@@ -703,6 +754,12 @@ const relationalTablePropInfoMap = {
     immutable: [],
     allowDelete: false,
     allowAdd: false
+  },
+  'jdbc-hologres': {
+    reserved: [],
+    immutable: [],
+    allowDelete: true,
+    allowAdd: true
   },
   'lakehouse-hudi': {
     reserved: [],

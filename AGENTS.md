@@ -17,9 +17,9 @@
   under the License.
 -->
 
-# AGENTS.md
+# CLAUDE.md
 
-This file provides guidance to AI coding agents collaborating on the Apache Gravitino repository.
+This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
 ## Project Overview
 
@@ -67,9 +67,13 @@ The project is organized as a Gradle multi-module project with the following key
 - `catalogs/catalog-lakehouse-paimon/` - Apache Paimon catalog
 - `catalogs/catalog-lakehouse-hudi/` - Apache Hudi catalog
 - `catalogs/catalog-lakehouse-generic/` - Generic lakehouse catalog
+- `catalogs/catalog-jdbc-common/` - Base JDBC catalog functionality
 - `catalogs/catalog-jdbc-mysql/` - MySQL catalog
 - `catalogs/catalog-jdbc-postgresql/` - PostgreSQL catalog
+- `catalogs/catalog-jdbc-hologres/` - Hologres catalog (Alibaba Cloud real-time OLAP)
 - `catalogs/catalog-jdbc-doris/` - Apache Doris catalog
+- `catalogs/catalog-jdbc-oceanbase/` - OceanBase catalog
+- `catalogs/catalog-jdbc-starrocks/` - StarRocks catalog
 - `catalogs/catalog-kafka/` - Apache Kafka catalog
 - `catalogs/catalog-fileset/` - Fileset catalog for file-based data
 - `catalogs/catalog-model/` - AI model catalog
@@ -82,6 +86,7 @@ The project is organized as a Gradle multi-module project with the following key
 ### Standalone Services
 - `iceberg/iceberg-rest-server/` - Standalone Iceberg REST catalog service
 - `lance/lance-rest-server/` - Lance format REST server
+- `mcp-server/` - Model Context Protocol server for integrating Gravitino with AI assistants
 
 ### Authorization
 - `authorizations/authorization-common/` - Authorization framework
@@ -91,10 +96,11 @@ The project is organized as a Gradle multi-module project with the following key
 ### Other Components
 - `web/` - Web UI frontend (Next.js/React)
 - `docs/` - Documentation source files
-- `integration-test-common/` - Common utilities for integration tests
+- `integration-test-common/` - Common utilities for integration tests (includes MiniGravitino)
 - `bundles/` - Cloud storage bundles (AWS, GCP, Azure, Aliyun)
 - `lineage/` - Data lineage tracking
-- `mcp-server/` - Model Context Protocol server for Gravitino
+- `maintenance/` - Maintenance jobs and optimizer modules
+- `mcp-server/` - Model Context Protocol server for AI assistant integration
 
 ## Common Development Commands
 
@@ -119,31 +125,35 @@ Gravitino uses Gradle as its build system. All commands should be run from the p
 
 # Create distribution tarball
 ./gradlew assembleDistribution
+
+# Build with all deprecation warnings (useful for development)
+./gradlew build --warning-mode all
 ```
 
 #### Scala Version Selection
 
-Gravitino supports Scala 2.12 and 2.13 (default is 2.13):
+Gravitino supports Scala 2.12 and 2.13 (default is 2.12):
 
 ```bash
-# Build with Scala 2.12
+# Build with Scala 2.12 (default)
 ./gradlew build -PscalaVersion=2.12
 
-# Build with Scala 2.13 (default)
+# Build with Scala 2.13
 ./gradlew build -PscalaVersion=2.13
 ```
 
 #### Python Client Build
 
-```bash
-# Build with Python 3.9 (default)
-./gradlew build
+The default Python version is 3.9, but you should match your local Python version. For example, with Python 3.11:
 
-# Build with specific Python version
-./gradlew build -PpythonVersion=3.10
+```bash
+# Build with specific Python version (matches local environment)
 ./gradlew build -PpythonVersion=3.11
-./gradlew build -PpythonVersion=3.12
+
+# Or modify gradle.properties to set: pythonVersion=3.11
 ```
+
+Available versions: 3.9, 3.10, 3.11, 3.12
 
 #### Connector Builds
 
@@ -156,6 +166,21 @@ Gravitino supports Scala 2.12 and 2.13 (default is 2.13):
 
 # Build Iceberg REST server
 ./gradlew assembleIcebergRESTServer
+```
+
+#### Web UI Development
+
+```bash
+# Install dependencies and run web UI in development mode
+cd web
+npm install
+npm run dev
+
+# Build web UI for production
+npm run build
+
+# Run web UI tests
+npm run test
 ```
 
 ### Code Quality and Formatting
@@ -194,6 +219,18 @@ Gravitino uses Spotless for code formatting:
 #### Integration Tests
 
 Integration tests can run in two modes: `embedded` (default) and `deploy`.
+
+**Embedded mode** uses `MiniGravitino` from `integration-test-common/`:
+- Starts Gravitino in-process for faster testing
+- No need to build distribution
+- Easier debugging (tests run in same JVM)
+- Ideal for rapid development and unit testing
+
+**Deploy mode** uses full distribution:
+- More realistic testing environment
+- Requires `./gradlew compileDistribution` first
+- Tests Gravitino as it would run in production
+- Slower but catches deployment-specific issues
 
 ```bash
 # Run integration tests in embedded mode (uses MiniGravitino)
@@ -236,10 +273,10 @@ For macOS users running Docker tests:
 
 ### Language and JDK Requirements
 
-- **Build JDK**: Java 17 (required to run Gradle)
+- **Build JDK**: Java 17 is **required** - the build will fail with other versions
 - **Runtime JDK**: Java 17 (for server and connectors)
 - **Target Compatibility**: Client-side modules (clients, connectors) target JDK 8 for compatibility
-- **Scala**: Supports 2.12 and 2.13 (Flink only supports 2.12)
+- **Scala**: Supports 2.12 (default) and 2.13 (Flink only supports 2.12)
 - **Python**: 3.9, 3.10, 3.11, or 3.12
 
 ### Build System Details
@@ -259,10 +296,39 @@ For macOS users running Docker tests:
 ### Code Organization Patterns
 
 - **API-first design**: Public APIs defined in `api/` module
-- **Catalog pattern**: All catalog implementations extend base classes from `catalog-common/`
+- **Catalog pattern**: All catalog implementations extend `BaseCatalog` from `core/` module
 - **Connector pattern**: Query engine connectors provide transparent Gravitino integration
 - **Configuration**: Uses `.conf` files and environment variables
 - **REST API**: JAX-RS based RESTful services
+- **Event listeners**: `core/listener/` module contains event listener interfaces for catalog and metalake changes
+- **Transaction management**: Uses `javax.transaction` for distributed transaction support
+
+### Metadata Model Hierarchy
+
+Gravitino organizes metadata in a hierarchical structure:
+
+1. **Metalake** - Top-level isolation boundary for multi-tenancy
+2. **Catalog** - Connection to a metadata source (Hive, Iceberg, MySQL, Kafka, etc.)
+3. **Schema/Namespace** - Logical grouping of objects (database in Hive, schema in relational DBs, topic namespace in Kafka)
+4. **Table/Topic/Fileset/Model** - Actual metadata objects depending on catalog type
+5. **Column/Partition** - Fine-grained metadata for tables
+
+Each level in the hierarchy supports:
+- Properties metadata for configuration validation
+- Event listeners for change notification
+- Authorization checks (if enabled)
+- Audit logging
+
+### Core Architectural Components
+
+- **Entity system**: Core entity management (`Entity`, `EntityStore`) handles all metadata objects
+- **CatalogOperations**: Interface that catalogs implement for metadata operations (schemas, tables, etc.)
+- **Properties metadata**: Each catalog has `PropertiesMetadata` defining valid configuration properties
+- **Hook system**: `core/hook/` supports pre/post operation hooks for extensibility
+- **Cache layer**: `core/cache/` provides caching for catalog metadata
+- **Credential system**: `core/credential/` manages secure credential storage and encryption
+- **Authorization**: `authorizations/` modules provide access control (Ranger, chain-based)
+- **Audit**: `core/audit/` provides audit logging for all operations
 
 ### Database Backend Support
 
@@ -271,6 +337,13 @@ Gravitino supports multiple backend databases for metadata storage:
 - MySQL
 - PostgreSQL
 - Configure via `jdbcBackend` property
+
+### REST API Configuration
+
+- **Default port**: 8090
+- **Base path**: `/api/`
+- **Authentication**: Supports OAuth2, Kerberos, and simple auth
+- **API documentation**: YAML specs in `docs/open-api/`
 
 ### Docker Images
 
@@ -371,15 +444,6 @@ Set breakpoints directly in IntelliJ IDEA or your IDE - tests run in the same pr
 6. Update `settings.gradle.kts` to include module
 7. Add documentation in `docs/`
 
-### Adding a New Connector
-
-1. Create module under `{engine}-connector/`
-2. Implement engine-specific integration
-3. Follow engine's plugin/connector architecture
-4. Add integration tests
-5. Document installation and configuration
-6. Update build to create distribution package
-
 ### Module Dependencies
 
 - API modules should have minimal dependencies
@@ -388,9 +452,66 @@ Set breakpoints directly in IntelliJ IDEA or your IDE - tests run in the same pr
 - Use `catalog-common` for shared catalog code
 - Avoid circular dependencies
 
-## Review Guidelines
+## Catalog Implementation Architecture
 
-When reviewing contributions, check for:
+### JDBC Catalog Pattern
+
+JDBC-based catalogs (MySQL, PostgreSQL, Hologres, Doris, OceanBase, StarRocks) follow a consistent implementation pattern:
+
+```
+catalog-jdbc-{name}/
+├── src/main/java/org/apache/gravitino/catalog/{name}/
+│   ├── {Name}Catalog.java           # Main catalog extending JdbcCatalog
+│   ├── {Name}CatalogOperations.java  # Catalog operations (driver management)
+│   ├── operation/
+│   │   ├── {Name}SchemaOperations.java  # Schema/database operations
+│   │   └── {Name}TableOperations.java   # Table operations
+│   └── converter/
+│       ├── {Name}TypeConverter.java           # Type mapping
+│       ├── {Name}ExceptionConverter.java    # Exception handling
+│       └── {Name}ColumnDefaultValueConverter.java  # Default values
+├── build.gradle.kts                         # Build configuration
+└── src/main/resources/
+    ├── jdbc-{name}.conf                   # Configuration template
+    └── META-INF/services/
+        └── org.apache.gravitino.CatalogProvider  # SPI registration
+```
+
+**Key Implementation Requirements**:
+
+1. **SPI Registration**: Must create `META-INF/services/org.apache.gravitino.CatalogProvider` containing the full class name of your catalog
+2. **JDBC Driver in Runtime Dependencies**: Add `implementation(libs.{driver})` to build.gradle.kts
+3. **Schema Filtering**: Override `createSysDatabaseNameSet()` to hide system schemas
+4. **Table Type Support**: Override `getTables()` to include all supported types (TABLE, VIEW, FOREIGN TABLE)
+5. **Properties Extraction**: Override `getTableProperties()` to return catalog-specific metadata
+
+**Critical Pattern - Schema Operations**:
+- Hologres/PostgreSQL schemas: Filter by `TABLE_SCHEM` field in result set
+- MySQL databases: Filter by `TABLE_CAT` field
+- Always use `connection.getSchema()` to set the schema context before querying
+
+**Common Pitfalls**:
+- Missing SPI file → "No catalog provider found" error
+- JDBC driver only in `testImplementation` → "Cannot load JDBC driver" error at runtime
+- Wrong field name for schema filtering → Empty schema list
+- Not including all table types → Missing tables/views/foreign tables
+
+### Adding a New Catalog
+
+1. Create module under `catalogs/catalog-{name}/`
+2. Extend `JdbcCatalog` and implement required interfaces
+3. Add configuration classes
+4. Implement operations (tables, schemas, etc.)
+5. Add comprehensive tests
+6. Update `settings.gradle.kts` to include module
+7. Add documentation in `docs/`
+8. **CRITICAL**: Create SPI registration file
+9. **CRITICAL**: Add JDBC driver to implementation dependencies
+10. **CRITICAL**: Test both listing and loading schemas/tables
+
+## Code Review Guidelines
+
+For comprehensive code review guidelines, see `.github/copilot-instructions.md`. Key areas include:
 
 ### Code Quality
 - Follows project coding standards
