@@ -70,6 +70,7 @@ The project is organized as a Gradle multi-module project with the following key
 - `catalogs/catalog-jdbc-common/` - Base JDBC catalog functionality
 - `catalogs/catalog-jdbc-mysql/` - MySQL catalog
 - `catalogs/catalog-jdbc-postgresql/` - PostgreSQL catalog
+- `catalogs/catalog-jdbc-hologres/` - Hologres catalog (Alibaba Cloud real-time OLAP)
 - `catalogs/catalog-jdbc-doris/` - Apache Doris catalog
 - `catalogs/catalog-jdbc-oceanbase/` - OceanBase catalog
 - `catalogs/catalog-jdbc-starrocks/` - StarRocks catalog
@@ -443,15 +444,6 @@ Set breakpoints directly in IntelliJ IDEA or your IDE - tests run in the same pr
 6. Update `settings.gradle.kts` to include module
 7. Add documentation in `docs/`
 
-### Adding a New Connector
-
-1. Create module under `{engine}-connector/`
-2. Implement engine-specific integration
-3. Follow engine's plugin/connector architecture
-4. Add integration tests
-5. Document installation and configuration
-6. Update build to create distribution package
-
 ### Module Dependencies
 
 - API modules should have minimal dependencies
@@ -459,6 +451,63 @@ Set breakpoints directly in IntelliJ IDEA or your IDE - tests run in the same pr
 - Keep catalog implementations independent
 - Use `catalog-common` for shared catalog code
 - Avoid circular dependencies
+
+## Catalog Implementation Architecture
+
+### JDBC Catalog Pattern
+
+JDBC-based catalogs (MySQL, PostgreSQL, Hologres, Doris, OceanBase, StarRocks) follow a consistent implementation pattern:
+
+```
+catalog-jdbc-{name}/
+├── src/main/java/org/apache/gravitino/catalog/{name}/
+│   ├── {Name}Catalog.java           # Main catalog extending JdbcCatalog
+│   ├── {Name}CatalogOperations.java  # Catalog operations (driver management)
+│   ├── operation/
+│   │   ├── {Name}SchemaOperations.java  # Schema/database operations
+│   │   └── {Name}TableOperations.java   # Table operations
+│   └── converter/
+│       ├── {Name}TypeConverter.java           # Type mapping
+│       ├── {Name}ExceptionConverter.java    # Exception handling
+│       └── {Name}ColumnDefaultValueConverter.java  # Default values
+├── build.gradle.kts                         # Build configuration
+└── src/main/resources/
+    ├── jdbc-{name}.conf                   # Configuration template
+    └── META-INF/services/
+        └── org.apache.gravitino.CatalogProvider  # SPI registration
+```
+
+**Key Implementation Requirements**:
+
+1. **SPI Registration**: Must create `META-INF/services/org.apache.gravitino.CatalogProvider` containing the full class name of your catalog
+2. **JDBC Driver in Runtime Dependencies**: Add `implementation(libs.{driver})` to build.gradle.kts
+3. **Schema Filtering**: Override `createSysDatabaseNameSet()` to hide system schemas
+4. **Table Type Support**: Override `getTables()` to include all supported types (TABLE, VIEW, FOREIGN TABLE)
+5. **Properties Extraction**: Override `getTableProperties()` to return catalog-specific metadata
+
+**Critical Pattern - Schema Operations**:
+- Hologres/PostgreSQL schemas: Filter by `TABLE_SCHEM` field in result set
+- MySQL databases: Filter by `TABLE_CAT` field
+- Always use `connection.getSchema()` to set the schema context before querying
+
+**Common Pitfalls**:
+- Missing SPI file → "No catalog provider found" error
+- JDBC driver only in `testImplementation` → "Cannot load JDBC driver" error at runtime
+- Wrong field name for schema filtering → Empty schema list
+- Not including all table types → Missing tables/views/foreign tables
+
+### Adding a New Catalog
+
+1. Create module under `catalogs/catalog-{name}/`
+2. Extend `JdbcCatalog` and implement required interfaces
+3. Add configuration classes
+4. Implement operations (tables, schemas, etc.)
+5. Add comprehensive tests
+6. Update `settings.gradle.kts` to include module
+7. Add documentation in `docs/`
+8. **CRITICAL**: Create SPI registration file
+9. **CRITICAL**: Add JDBC driver to implementation dependencies
+10. **CRITICAL**: Test both listing and loading schemas/tables
 
 ## Code Review Guidelines
 
