@@ -32,6 +32,13 @@ import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
 import com.lancedb.lance.namespace.LanceNamespaceException;
 import com.lancedb.lance.namespace.ObjectIdentifier;
+import com.lancedb.lance.namespace.model.AlterTableAddColumnsRequest;
+import com.lancedb.lance.namespace.model.AlterTableAddColumnsResponse;
+import com.lancedb.lance.namespace.model.AlterTableAlterColumnsRequest;
+import com.lancedb.lance.namespace.model.AlterTableAlterColumnsResponse;
+import com.lancedb.lance.namespace.model.AlterTableDropColumnsRequest;
+import com.lancedb.lance.namespace.model.AlterTableDropColumnsResponse;
+import com.lancedb.lance.namespace.model.ColumnAlteration;
 import com.lancedb.lance.namespace.model.CreateEmptyTableResponse;
 import com.lancedb.lance.namespace.model.CreateTableRequest;
 import com.lancedb.lance.namespace.model.CreateTableRequest.ModeEnum;
@@ -52,6 +59,7 @@ import java.util.Optional;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 import org.apache.arrow.vector.types.pojo.Field;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.Catalog;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.exceptions.NoSuchTableException;
@@ -60,8 +68,13 @@ import org.apache.gravitino.lance.common.utils.ArrowUtils;
 import org.apache.gravitino.lance.common.utils.LancePropertiesUtils;
 import org.apache.gravitino.rel.Column;
 import org.apache.gravitino.rel.Table;
+import org.apache.gravitino.rel.TableChange;
+import org.slf4j.Logger;
 
 public class GravitinoLanceTableOperations implements LanceTableOperations {
+
+  public static final Logger LOGGER =
+      org.slf4j.LoggerFactory.getLogger(GravitinoLanceTableOperations.class);
 
   private final GravitinoLanceNamespaceWrapper namespaceWrapper;
 
@@ -294,6 +307,63 @@ public class GravitinoLanceTableOperations implements LanceTableOperations {
     return response;
   }
 
+  @Override
+  public AlterTableDropColumnsResponse alterTableDropColumns(
+      String tableId, String delimiter, AlterTableDropColumnsRequest request) {
+    ObjectIdentifier nsId = ObjectIdentifier.of(tableId, Pattern.quote(delimiter));
+    Preconditions.checkArgument(
+        nsId.levels() == 3, "Expected at 3-level namespace but got: %s", nsId.levels());
+
+    String catalogName = nsId.levelAtListPos(0);
+    Catalog catalog = namespaceWrapper.loadAndValidateLakehouseCatalog(catalogName);
+
+    NameIdentifier tableIdentifier =
+        NameIdentifier.of(nsId.levelAtListPos(1), nsId.levelAtListPos(2));
+
+    TableChange[] changes =
+        request.getColumns().stream()
+            .map(colName -> TableChange.deleteColumn(new String[] {colName}, false))
+            .toArray(TableChange[]::new);
+
+    catalog.asTableCatalog().alterTable(tableIdentifier, changes);
+
+    return new AlterTableDropColumnsResponse();
+  }
+
+  @Override
+  public AlterTableAlterColumnsResponse alterTableAlterColumns(
+      String tableId, String delimiter, AlterTableAlterColumnsRequest request) {
+    ObjectIdentifier nsId = ObjectIdentifier.of(tableId, Pattern.quote(delimiter));
+    Preconditions.checkArgument(
+        nsId.levels() == 3, "Expected at 3-level namespace but got: %s", nsId.levels());
+
+    String catalogName = nsId.levelAtListPos(0);
+    Catalog catalog = namespaceWrapper.loadAndValidateLakehouseCatalog(catalogName);
+
+    NameIdentifier tableIdentifier =
+        NameIdentifier.of(nsId.levelAtListPos(1), nsId.levelAtListPos(2));
+
+    List<TableChange> changes = buildAlterColumnChanges(request);
+    if (changes.isEmpty()) {
+      LOGGER.warn("No valid alterations found in the request for table: {}", tableId);
+      throw new IllegalArgumentException("No valid alterations found in the request.");
+    }
+    catalog.asTableCatalog().alterTable(tableIdentifier, changes.toArray(new TableChange[0]));
+
+    AlterTableAlterColumnsResponse response = new AlterTableAlterColumnsResponse();
+    response.setVersion(0L);
+    return response;
+  }
+
+  @Override
+  public AlterTableAddColumnsResponse alterTableAddColumns(
+      String tableId, String delimiter, AlterTableAddColumnsRequest request) {
+    // We need to parse NewColumnTransform to Column, however, NewColumnTransform only contains
+    // the name and a string expression.
+    // More please see: https://docs.lancedb.com/api-reference/data/add-columns
+    throw new UnsupportedOperationException("Adding columns is not supported yet.");
+  }
+
   private List<Column> extractColumns(org.apache.arrow.vector.types.pojo.Schema arrowSchema) {
     List<Column> columns = new ArrayList<>();
 
@@ -318,5 +388,29 @@ public class GravitinoLanceTableOperations implements LanceTableOperations {
 
     return JsonArrowSchemaConverter.convertToJsonArrowSchema(
         new org.apache.arrow.vector.types.pojo.Schema(fields));
+  }
+
+  private List<TableChange> buildAlterColumnChanges(AlterTableAlterColumnsRequest request) {
+    List<ColumnAlteration> columns = request.getAlterations();
+
+    List<TableChange> changes = new ArrayList<>();
+    for (ColumnAlteration column : columns) {
+      // Column name will not be null according to LanceDB spec.
+      String columnName = column.getColumn();
+      String newName = column.getRename();
+      if (StringUtils.isNotBlank(newName)) {
+        changes.add(TableChange.renameColumn(new String[] {columnName}, newName));
+      }
+
+      // The format of ColumnAlteration#castTo is unclear, so we will skip it now
+      // for more, please see:
+      // https://github.com/lance-format/lance-namespace/blob/9d9cde12520caea2fd80ea5f41a20a4db9b92524/java/lance-namespace-apache-client/api/openapi.yaml#L4508-L4511
+      if (StringUtils.isNotBlank(column.getCastTo())) {
+        LOGGER.error(
+            "Altering column '{}' data type is not supported yet due to unclear spec.", columnName);
+        throw new UnsupportedOperationException("Altering column data type is not supported yet.");
+      }
+    }
+    return changes;
   }
 }
