@@ -167,7 +167,16 @@ public class HologresSchemaOperations extends JdbcDatabaseOperations {
   @Override
   protected Set<String> createSysDatabaseNameSet() {
     // Hologres has its own set of system schemas
-    return ImmutableSet.of("pg_toast", "pg_catalog", "information_schema", "holo");
+    return ImmutableSet.of(
+        "pg_toast",
+        "pg_catalog",
+        "information_schema",
+        "holo",
+        "hologres_streaming_mv",
+        "hologres_sample",
+        "hg_internal",
+        "hologres_object_table",
+        "hg_recyclebin");
   }
 
   /**

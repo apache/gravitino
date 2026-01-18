@@ -19,10 +19,12 @@
 package org.apache.gravitino.catalog.hologres.operation;
 
 import com.google.common.base.Preconditions;
+import com.google.common.collect.Lists;
 import java.sql.Connection;
 import java.sql.SQLException;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import javax.sql.DataSource;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.catalog.jdbc.JdbcColumn;
@@ -102,10 +104,72 @@ public class HologresTableOperations extends JdbcTableOperations
       if (!schemaOperations.schemaExists(connection, schemaName)) {
         throw new NoSuchSchemaException("No such schema: %s", schemaName);
       }
-      return super.listTables(schemaName);
-    } catch (SQLException se) {
+      final List<String> names = Lists.newArrayList();
+      try (java.sql.ResultSet tables = getTables(connection)) {
+        while (tables.next()) {
+          if (Objects.equals(tables.getString("TABLE_SCHEM"), schemaName)) {
+            names.add(tables.getString("TABLE_NAME"));
+          }
+        }
+      }
+      LOG.info("Finished listing tables size {} for schema name {}", names.size(), schemaName);
+      return names;
+    } catch (java.sql.SQLException se) {
       throw this.exceptionMapper.toGravitinoException(se);
     }
+  }
+
+  /**
+   * Override to support TABLE, VIEW, and FOREIGN TABLE types in Hologres. Hologres supports views
+   * and foreign tables which should be listed alongside regular tables.
+   */
+  @Override
+  protected java.sql.ResultSet getTables(Connection connection) throws SQLException {
+    final java.sql.DatabaseMetaData metaData = connection.getMetaData();
+    String catalogName = connection.getCatalog();
+    String schemaName = connection.getSchema();
+    // Include TABLE, VIEW, and FOREIGN TABLE types
+    String[] tableTypes = {"TABLE", "VIEW", "FOREIGN TABLE"};
+    return metaData.getTables(catalogName, schemaName, null, tableTypes);
+  }
+
+  /**
+   * Get Hologres-specific table properties from hologres.hg_table_properties system table.
+   *
+   * <p>This includes properties like distribution key, clustering key, primary key, storage format,
+   * orientation, etc.
+   */
+  @Override
+  protected java.util.Map<String, String> getTableProperties(
+      java.sql.Connection connection, String tableName) throws SQLException {
+    java.util.Map<String, String> properties = new java.util.HashMap<>();
+
+    // Query Hologres table properties
+    String query =
+        "SELECT property_key, property_value FROM hologres.hg_table_properties "
+            + "WHERE table_namespace = ? AND table_name = ?";
+
+    try (java.sql.PreparedStatement stmt = connection.prepareStatement(query)) {
+      stmt.setString(1, connection.getSchema());
+      stmt.setString(2, tableName);
+
+      try (java.sql.ResultSet rs = stmt.executeQuery()) {
+        while (rs.next()) {
+          String key = rs.getString("property_key");
+          String value = rs.getString("property_value");
+          if (key != null && value != null) {
+            // Prefix Hologres-specific properties to avoid conflicts
+            properties.put("hologres." + key, value);
+          }
+        }
+      }
+    } catch (SQLException e) {
+      // If the query fails (e.g., permission issue or table doesn't exist), log and continue
+      LOG.warn(
+          "Failed to query Hologres table properties for table {}: {}", tableName, e.getMessage());
+    }
+
+    return properties;
   }
 
   @Override
