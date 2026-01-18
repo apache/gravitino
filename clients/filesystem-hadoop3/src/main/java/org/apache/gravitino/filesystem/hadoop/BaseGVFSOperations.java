@@ -28,9 +28,6 @@ import static org.apache.gravitino.filesystem.hadoop.GravitinoVirtualFileSystemU
 import static org.apache.gravitino.filesystem.hadoop.GravitinoVirtualFileSystemUtils.extractNonDefaultConfig;
 import static org.apache.gravitino.filesystem.hadoop.GravitinoVirtualFileSystemUtils.getSubPathFromGvfsPath;
 
-import com.github.benmanes.caffeine.cache.Cache;
-import com.github.benmanes.caffeine.cache.Caffeine;
-import com.github.benmanes.caffeine.cache.Scheduler;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableMap;
@@ -38,7 +35,6 @@ import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
 import com.google.common.collect.Sets;
 import com.google.common.collect.Streams;
-import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import java.io.Closeable;
 import java.io.FileNotFoundException;
 import java.io.IOException;
@@ -47,12 +43,9 @@ import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Objects;
 import java.util.Optional;
 import java.util.ServiceLoader;
 import java.util.Set;
-import java.util.concurrent.ScheduledThreadPoolExecutor;
-import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 import javax.annotation.Nullable;
@@ -65,6 +58,8 @@ import org.apache.gravitino.audit.CallerContext;
 import org.apache.gravitino.audit.FilesetAuditConstants;
 import org.apache.gravitino.audit.FilesetDataOperation;
 import org.apache.gravitino.audit.InternalClientType;
+import org.apache.gravitino.catalog.hadoop.fs.FileSystemCache;
+import org.apache.gravitino.catalog.hadoop.fs.FileSystemCacheKey;
 import org.apache.gravitino.catalog.hadoop.fs.FileSystemProvider;
 import org.apache.gravitino.catalog.hadoop.fs.FileSystemUtils;
 import org.apache.gravitino.catalog.hadoop.fs.GravitinoFileSystemCredentialsProvider;
@@ -130,7 +125,7 @@ public abstract class BaseGVFSOperations implements Closeable {
 
   private final Configuration conf;
 
-  private final Cache<FileSystemCacheKey, FileSystem> fileSystemCache;
+  private final FileSystemCache fileSystemCache;
 
   private final Map<String, FileSystemProvider> fileSystemProvidersMap;
 
@@ -143,66 +138,6 @@ public abstract class BaseGVFSOperations implements Closeable {
   private final boolean enableCredentialVending;
 
   private final boolean autoCreateLocation;
-  /** A key class for caching FileSystem instances based on scheme, authority, and configuration. */
-  public static class FileSystemCacheKey {
-    private final String scheme;
-    private final String authority;
-    private final UserGroupInformation ugi;
-
-    /**
-     * Constructor for FileSystemCacheKey.
-     *
-     * @param scheme the scheme of the filesystem
-     * @param authority the authority of the filesystem
-     * @param ugi the user group information
-     */
-    FileSystemCacheKey(String scheme, String authority, UserGroupInformation ugi) {
-      this.scheme = scheme;
-      this.authority = authority;
-      this.ugi = ugi;
-    }
-
-    /**
-     * Get the scheme of the filesystem.
-     *
-     * @return the scheme
-     */
-    public String scheme() {
-      return scheme;
-    }
-
-    /**
-     * Get the authority of the filesystem.
-     *
-     * @return the authority
-     */
-    public String authority() {
-      return authority;
-    }
-
-    /**
-     * Get the UserGroupInformation
-     *
-     * @return the UserGroupInformation
-     */
-    public UserGroupInformation ugi() {
-      return ugi;
-    }
-
-    @Override
-    public boolean equals(Object o) {
-      if (!(o instanceof FileSystemCacheKey)) return false;
-      FileSystemCacheKey that = (FileSystemCacheKey) o;
-      return Objects.equals(scheme, that.scheme)
-          && Objects.equals(authority, that.authority)
-          && Objects.equals(ugi, that.ugi);
-    }
-
-    @Override
-    public int hashCode() {
-      return Objects.hash(scheme, authority, ugi);
-    }
-  }
 
   /**
    * Constructs a new {@link BaseGVFSOperations} with the given {@link Configuration}.
@@ -273,15 +208,10 @@ public abstract class BaseGVFSOperations implements Closeable {
 
   @Override
   public void close() throws IOException {
-    // close all actual FileSystems
-    for (FileSystem fileSystem : fileSystemCache.asMap().values()) {
-      try {
-        fileSystem.close();
-      } catch (IOException e) {
-        // ignore
-      }
+    // close all cached FileSystems via FileSystemCache
+    if (fileSystemCache != null) {
+      fileSystemCache.close();
     }
-    fileSystemCache.invalidateAll();
 
     try {
       if (filesetMetadataCache != null && filesetMetadataCache.isPresent()) {
@@ -755,7 +685,8 @@ public abstract class BaseGVFSOperations implements Closeable {
   }
 
   @VisibleForTesting
-  Cache<FileSystemCacheKey, FileSystem> internalFileSystemCache() {
+  @VisibleForTesting
+  FileSystemCache internalFileSystemCache() {
     return fileSystemCache;
   }
 
@@ -899,7 +830,7 @@ public abstract class BaseGVFSOperations implements Closeable {
     }
   }
 
-  private Cache<FileSystemCacheKey, FileSystem> newFileSystemCache(Configuration configuration) {
+  private FileSystemCache newFileSystemCache(Configuration configuration) {
     int maxCapacity =
         configuration.getInt(
             GravitinoVirtualFileSystemConfiguration.FS_GRAVITINO_FILESET_CACHE_MAX_CAPACITY_KEY,
@@ -922,28 +853,11 @@ public abstract class BaseGVFSOperations implements Closeable {
         GravitinoVirtualFileSystemConfiguration
             .FS_GRAVITINO_FILESET_CACHE_EVICTION_MILLS_AFTER_ACCESS_KEY);
 
-    Caffeine<Object, Object> cacheBuilder =
-        Caffeine.newBuilder()
-            .maximumSize(maxCapacity)
-            // Since Caffeine does not ensure that removalListener will be involved after expiration
-            // We use a scheduler with one thread to clean up expired fs.
-            .scheduler(
-                Scheduler.forScheduledExecutorService(
-                    new ScheduledThreadPoolExecutor(
-                        1, newDaemonThreadFactory("gvfs-filesystem-cache-cleaner"))))
-            .removalListener(
-                (key, value, cause) -> {
-                  FileSystem fs = (FileSystem) value;
-                  if (fs != null) {
-                    try {
-                      fs.close();
-                    } catch (IOException e) {
-                      LOG.error("Cannot close the file system for fileset: {}", key, e);
-                    }
-                  }
-                });
-    cacheBuilder.expireAfterAccess(evictionMillsAfterAccess, TimeUnit.MILLISECONDS);
-    return cacheBuilder.build();
+    return FileSystemCache.newBuilder()
+        .maximumSize(maxCapacity)
+        .expireAfterAccess(evictionMillsAfterAccess, TimeUnit.MILLISECONDS)
+        .withCleanerScheduler("gvfs-filesystem-cache-cleaner-%d")
+        .build();
   }
 
   private Map<String, String> getAllProperties(
@@ -1012,10 +926,6 @@ public abstract class BaseGVFSOperations implements Closeable {
           scheme, GravitinoVirtualFileSystemConfiguration.GVFS_SCHEME);
     }
     return provider;
-  }
-
-  private ThreadFactory newDaemonThreadFactory(String name) {
-    return new ThreadFactoryBuilder().setDaemon(true).setNameFormat(name + "-%d").build();
   }
 
   private Map<String, FileSystemProvider> getFileSystemProviders() {

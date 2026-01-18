@@ -28,9 +28,6 @@ import static org.apache.gravitino.file.Fileset.PROPERTY_SCHEMA_PLACEHOLDER;
 import static org.apache.gravitino.metrics.MetricNames.FILESYSTEM_CACHE;
 
 import com.codahale.metrics.caffeine.MetricsStatsCounter;
-import com.github.benmanes.caffeine.cache.Cache;
-import com.github.benmanes.caffeine.cache.Caffeine;
-import com.github.benmanes.caffeine.cache.Scheduler;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableMap;
@@ -49,14 +46,12 @@ import java.util.Set;
 import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
-import java.util.concurrent.ScheduledThreadPoolExecutor;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
-import javax.annotation.Nullable;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.Catalog;
 import org.apache.gravitino.Entity;
@@ -72,6 +67,8 @@ import org.apache.gravitino.audit.FilesetAuditConstants;
 import org.apache.gravitino.audit.FilesetDataOperation;
 import org.apache.gravitino.catalog.FilesetFileOps;
 import org.apache.gravitino.catalog.ManagedSchemaOperations;
+import org.apache.gravitino.catalog.hadoop.fs.FileSystemCache;
+import org.apache.gravitino.catalog.hadoop.fs.FileSystemCacheKey;
 import org.apache.gravitino.catalog.hadoop.fs.FileSystemProvider;
 import org.apache.gravitino.catalog.hadoop.fs.FileSystemUtils;
 import org.apache.gravitino.connector.CatalogInfo;
@@ -103,7 +100,6 @@ import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
-import org.apache.hadoop.security.UserGroupInformation;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -137,8 +133,7 @@ public class FilesetCatalogOperations extends ManagedSchemaOperations
 
   private FilesetCatalogMetricsSource catalogMetricsSource;
 
-  @VisibleForTesting ScheduledThreadPoolExecutor scheduler;
-  @VisibleForTesting Cache<FileSystemCacheKey, FileSystem> fileSystemCache;
+  @VisibleForTesting FileSystemCache fileSystemCache;
 
   private final ThreadPoolExecutor fileSystemExecutor =
       new ThreadPoolExecutor(
@@ -159,51 +154,6 @@ public class FilesetCatalogOperations extends ManagedSchemaOperations
 
   FilesetCatalogOperations(EntityStore store) {
     this.store = store;
-  }
-
-  static class FileSystemCacheKey {
-    // When the path is a path without scheme such as 'file','hdfs', etc., then the scheme and
-    // authority are both null
-    @Nullable private final String scheme;
-    @Nullable private final String authority;
-    private final Map<String, String> conf;
-    private final String currentUser;
-
-    FileSystemCacheKey(String scheme, String authority, Map<String, String> conf) {
-      this.scheme = scheme;
-      this.authority = authority;
-      this.conf = conf;
-
-      try {
-        this.currentUser = UserGroupInformation.getCurrentUser().getShortUserName();
-      } catch (IOException e) {
-        throw new RuntimeException("Failed to get current user", e);
-      }
-    }
-
-    @Override
-    public boolean equals(Object o) {
-      if (this == o) {
-        return true;
-      }
-      if (!(o instanceof FileSystemCacheKey)) {
-        return false;
-      }
-      FileSystemCacheKey that = (FileSystemCacheKey) o;
-      return conf.equals(that.conf)
-          && (scheme == null ? that.scheme == null : scheme.equals(that.scheme))
-          && (authority == null ? that.authority == null : authority.equals(that.authority))
-          && currentUser.equals(that.currentUser);
-    }
-
-    @Override
-    public int hashCode() {
-      int result = conf.hashCode();
-      result = 31 * result + (scheme == null ? 0 : scheme.hashCode());
-      result = 31 * result + (authority == null ? 0 : authority.hashCode());
-      result = 31 * result + currentUser.hashCode();
-      return result;
-    }
   }
 
   public FilesetCatalogOperations() {
@@ -264,26 +214,10 @@ public class FilesetCatalogOperations extends ManagedSchemaOperations
           FileSystemUtils.getFileSystemProviderByName(
               fileSystemProvidersMap, defaultFileSystemProviderName);
 
-      scheduler =
-          new ScheduledThreadPoolExecutor(
-              1,
-              new ThreadFactoryBuilder()
-                  .setDaemon(true)
-                  .setNameFormat("file-system-cache-for-fileset" + "-%d")
-                  .build());
-
-      Caffeine<Object, Object> cacheBuilder =
-          Caffeine.newBuilder()
+      FileSystemCache.Builder cacheBuilder =
+          FileSystemCache.newBuilder()
               .expireAfterAccess(1, TimeUnit.HOURS)
-              .removalListener(
-                  (ignored, value, cause) -> {
-                    try {
-                      ((FileSystem) value).close();
-                    } catch (IOException e) {
-                      LOG.warn("Failed to close FileSystem instance in cache", e);
-                    }
-                  })
-              .scheduler(Scheduler.forScheduledExecutorService(scheduler));
+              .withCleanerScheduler("file-system-cache-for-fileset-%d");
 
       // Metrics System could be null in UT.
       if (metricsSystem != null) {
@@ -1009,27 +943,12 @@ public class FilesetCatalogOperations extends ManagedSchemaOperations
 
   @Override
   public void close() throws IOException {
-    // do nothing
-    if (scheduler != null) {
-      scheduler.shutdownNow();
-    }
-
     if (!fileSystemExecutor.isShutdown()) {
       fileSystemExecutor.shutdownNow();
     }
 
     if (fileSystemCache != null) {
-      fileSystemCache
-          .asMap()
-          .forEach(
-              (k, v) -> {
-                try {
-                  v.close();
-                } catch (IOException e) {
-                  LOG.warn("Failed to close FileSystem instance in cache", e);
-                }
-              });
-      fileSystemCache.cleanUp();
+      fileSystemCache.close();
     }
 
     // Metrics System could be null in UT.
