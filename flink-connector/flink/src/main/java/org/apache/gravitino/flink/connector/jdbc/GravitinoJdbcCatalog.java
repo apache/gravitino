@@ -27,7 +27,7 @@ import org.apache.flink.table.catalog.AbstractCatalog;
 import org.apache.flink.table.factories.CatalogFactory;
 import org.apache.flink.table.factories.Factory;
 import org.apache.gravitino.flink.connector.PartitionConverter;
-import org.apache.gravitino.flink.connector.PropertiesConverter;
+import org.apache.gravitino.flink.connector.SchemaAndTablePropertiesConverter;
 import org.apache.gravitino.flink.connector.catalog.BaseCatalog;
 
 /**
@@ -41,13 +41,13 @@ public class GravitinoJdbcCatalog extends BaseCatalog {
   protected GravitinoJdbcCatalog(
       CatalogFactory.Context context,
       String defaultDatabase,
-      PropertiesConverter propertiesConverter,
+      SchemaAndTablePropertiesConverter schemaAndTablePropertiesConverter,
       PartitionConverter partitionConverter) {
     super(
         context.getName(),
         context.getOptions(),
         defaultDatabase,
-        propertiesConverter,
+        schemaAndTablePropertiesConverter,
         partitionConverter);
     JdbcCatalogFactory jdbcCatalogFactory = new JdbcCatalogFactory();
     this.jdbcCatalog = (JdbcCatalog) jdbcCatalogFactory.createCatalog(context);

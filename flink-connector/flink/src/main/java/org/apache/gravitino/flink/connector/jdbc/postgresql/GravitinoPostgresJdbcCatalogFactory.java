@@ -19,7 +19,8 @@
 
 package org.apache.gravitino.flink.connector.jdbc.postgresql;
 
-import org.apache.gravitino.flink.connector.PropertiesConverter;
+import org.apache.gravitino.flink.connector.CatalogPropertiesConverter;
+import org.apache.gravitino.flink.connector.SchemaAndTablePropertiesConverter;
 import org.apache.gravitino.flink.connector.jdbc.GravitinoJdbcCatalogFactory;
 import org.apache.gravitino.flink.connector.jdbc.GravitinoJdbcCatalogFactoryOptions;
 
@@ -31,7 +32,11 @@ public class GravitinoPostgresJdbcCatalogFactory extends GravitinoJdbcCatalogFac
   }
 
   @Override
-  public PropertiesConverter propertiesConverter() {
+  public CatalogPropertiesConverter catalogPropertiesConverter() {
+    return PostgresqlPropertiesConverter.INSTANCE;
+  }
+
+  public SchemaAndTablePropertiesConverter schemaAndTablePropertiesConverter() {
     return PostgresqlPropertiesConverter.INSTANCE;
   }
 
