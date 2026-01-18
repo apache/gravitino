@@ -16,97 +16,86 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.gravitino.filesystem.hadoop;
+package org.apache.gravitino.catalog.hadoop.fs;
 
 import static org.apache.gravitino.catalog.hadoop.fs.Constants.AUTH_KERBEROS;
-import static org.apache.gravitino.catalog.hadoop.fs.Constants.AUTH_SIMPLE;
 import static org.apache.gravitino.catalog.hadoop.fs.Constants.FS_DISABLE_CACHE;
-import static org.apache.gravitino.catalog.hadoop.fs.Constants.HADOOP_KRB5_CONF;
-import static org.apache.gravitino.catalog.hadoop.fs.Constants.HADOOP_SECURITY_KEYTAB;
-import static org.apache.gravitino.catalog.hadoop.fs.Constants.HADOOP_SECURITY_PRINCIPAL;
-import static org.apache.gravitino.catalog.hadoop.fs.Constants.SECURITY_KRB5_ENV;
+import static org.apache.gravitino.catalog.hadoop.fs.FileSystemProvider.GRAVITINO_BYPASS;
 import static org.apache.gravitino.catalog.hadoop.fs.HDFSFileSystemProvider.IPC_FALLBACK_TO_SIMPLE_AUTH_ALLOWED;
+import static org.apache.gravitino.catalog.hadoop.fs.HDFSFileSystemProvider.additionalHDFSConfig;
 import static org.apache.hadoop.fs.CommonConfigurationKeysPublic.HADOOP_SECURITY_AUTHENTICATION;
 
+import java.io.File;
 import java.io.IOException;
 import java.lang.reflect.Method;
 import java.security.PrivilegedExceptionAction;
-import java.util.concurrent.Executors;
-import java.util.concurrent.ScheduledExecutorService;
-import java.util.concurrent.TimeUnit;
+import java.util.Locale;
+import java.util.Map;
 import net.sf.cglib.proxy.Enhancer;
 import net.sf.cglib.proxy.MethodInterceptor;
 import net.sf.cglib.proxy.MethodProxy;
-import org.apache.commons.lang3.StringUtils;
+import org.apache.gravitino.catalog.hadoop.fs.kerberos.AuthenticationConfig;
+import org.apache.gravitino.catalog.hadoop.fs.kerberos.KerberosClient;
 import org.apache.gravitino.exceptions.GravitinoRuntimeException;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.security.UserGroupInformation;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
-/**
- * A FileSystem wrapper that runs all operations under a specific UGI (UserGroupInformation).
- * Supports both simple and Kerberos authentication, with automatic ticket renewal.
- */
+/** A FileSystem wrapper that runs all operations under a specific UGI (UserGroupInformation). */
 public class HDFSFileSystemProxy implements MethodInterceptor {
 
-  private static final Logger LOG = LoggerFactory.getLogger(HDFSFileSystemProxy.class);
+  public static final String GRAVITINO_KEYTAB_FORMAT = "keytabs/gravitino-%s";
+  private static final String GRAVITINO_ID_KEY = "gravitino.identifier";
 
-  private static final long DEFAULT_RENEW_INTERVAL_MS = 10 * 60 * 1000L;
-  private static final String SYSTEM_USER_NAME = System.getProperty("user.name");
-  private static final String SYSTEM_ENV_HADOOP_USER_NAME = "HADOOP_USER_NAME";
+  protected UserGroupInformation initUgi;
+  private FileSystem fs;
+  private Configuration configuration;
+  protected boolean impersonationEnabled;
+  protected String kerberosRealm;
 
-  private final UserGroupInformation ugi;
-  private final FileSystem fs;
-  private final Configuration configuration;
-  private ScheduledExecutorService kerberosRenewExecutor;
+  protected HDFSFileSystemProxy() {}
 
   /**
    * Create a HDFSAuthenticationFileSystem with the given path and configuration. Supports both
-   * simple and Kerberos authentication, with automatic ticket renewal for Kerberos.
+   * simple and Kerberos authentication.
    *
    * @param path the HDFS path
-   * @param conf the Hadoop configuration
+   * @param config the configuration map of Gravitino
    */
-  public HDFSFileSystemProxy(Path path, Configuration conf) {
+  public HDFSFileSystemProxy(Path path, Map<String, String> config) {
+    initFileSystem(path, config);
+  }
+
+  protected void initFileSystem(Path path, Map<String, String> config) {
     try {
+      Map<String, String> hadoopConfMap = additionalHDFSConfig(config);
+      Configuration conf = FileSystemUtils.createConfiguration(GRAVITINO_BYPASS, hadoopConfMap);
+
       conf.setBoolean(FS_DISABLE_CACHE, true);
       conf.setBoolean(IPC_FALLBACK_TO_SIMPLE_AUTH_ALLOWED, true);
       this.configuration = conf;
 
-      String authType = conf.get(HADOOP_SECURITY_AUTHENTICATION, AUTH_SIMPLE);
+      AuthenticationConfig authenticationConfig = new AuthenticationConfig(config, configuration);
+      this.impersonationEnabled = authenticationConfig.isImpersonationEnabled();
+      String authType = authenticationConfig.getAuthType();
       if (AUTH_KERBEROS.equalsIgnoreCase(authType)) {
-        String krb5Config = conf.get(HADOOP_KRB5_CONF);
-
-        if (krb5Config != null) {
-          System.setProperty(SECURITY_KRB5_ENV, krb5Config);
-        }
-        UserGroupInformation.setConfiguration(conf);
-        String principal = conf.get(HADOOP_SECURITY_PRINCIPAL, null);
-        String keytab = conf.get(HADOOP_SECURITY_KEYTAB, null);
-
-        if (principal == null || keytab == null) {
-          throw new GravitinoRuntimeException(
-              "Kerberos principal and keytab must be provided for kerberos authentication");
-        }
-
-        this.ugi = UserGroupInformation.loginUserFromKeytabAndReturnUGI(principal, keytab);
-        startKerberosRenewalTask(principal);
+        this.configuration.set(
+            HADOOP_SECURITY_AUTHENTICATION,
+            UserGroupInformation.AuthenticationMethod.KERBEROS.name().toLowerCase(Locale.ROOT));
+        this.initUgi = initKerberosUgi(config, configuration);
       } else {
-        String userName = System.getenv(SYSTEM_ENV_HADOOP_USER_NAME);
-        if (StringUtils.isEmpty(userName)) {
-          userName = SYSTEM_USER_NAME;
-        }
-        this.ugi = UserGroupInformation.createRemoteUser(userName);
+        this.initUgi = UserGroupInformation.getCurrentUser();
       }
 
+      UserGroupInformation requestUgi = getRequestUser();
       this.fs =
-          ugi.doAs(
+          requestUgi.doAs(
               (PrivilegedExceptionAction<FileSystem>)
                   () -> FileSystem.newInstance(path.toUri(), conf));
 
+    } catch (GravitinoRuntimeException e) {
+      throw e;
     } catch (Exception e) {
       throw new GravitinoRuntimeException(e, "Failed to create HDFS FileSystem with UGI: %s", path);
     }
@@ -120,7 +109,8 @@ public class HDFSFileSystemProxy implements MethodInterceptor {
    */
   public FileSystem getProxy() throws IOException {
     Enhancer e = new Enhancer();
-    e.setClassLoader(fs.getClass().getClassLoader());
+    ClassLoader enhancerClassLoader = Enhancer.class.getClassLoader();
+    e.setClassLoader(enhancerClassLoader);
     e.setSuperclass(fs.getClass());
     e.setCallback(this);
     FileSystem proxyFs = (FileSystem) e.create();
@@ -148,46 +138,14 @@ public class HDFSFileSystemProxy implements MethodInterceptor {
     }
   }
 
-  /** Schedule periodic Kerberos re-login to refresh TGT before expiry. */
-  private void startKerberosRenewalTask(String principal) {
-    kerberosRenewExecutor =
-        Executors.newSingleThreadScheduledExecutor(
-            r -> {
-              Thread t = new Thread(r, "HDFSFileSystemProxy Kerberos-Renewal-Thread");
-              t.setDaemon(true);
-              return t;
-            });
-
-    kerberosRenewExecutor.scheduleAtFixedRate(
-        () -> {
-          try {
-            if (ugi.hasKerberosCredentials()) {
-              ugi.checkTGTAndReloginFromKeytab();
-            }
-          } catch (Exception e) {
-            LOG.error(
-                "[Kerberos] Failed to renew TGT for principal {}: {}",
-                principal,
-                e.getMessage(),
-                e);
-          }
-        },
-        DEFAULT_RENEW_INTERVAL_MS,
-        DEFAULT_RENEW_INTERVAL_MS,
-        TimeUnit.MILLISECONDS);
-  }
-
-  /** Close the Kerberos renewal executor service to prevent resource leaks. */
-  private void close() {
-    if (kerberosRenewExecutor != null) {
-      kerberosRenewExecutor.shutdownNow();
-      kerberosRenewExecutor = null;
-    }
+  protected UserGroupInformation getRequestUser() {
+    return initUgi;
   }
 
   /** Invoke the method on the underlying FileSystem using ugi.doAs. */
-  private Object invokeWithUgi(MethodProxy methodProxy, Object[] objects) throws Throwable {
-    return ugi.doAs(
+  protected Object invokeWithUgi(MethodProxy methodProxy, Object[] objects) throws Throwable {
+    UserGroupInformation currentUgi = getRequestUser();
+    return currentUgi.doAs(
         (PrivilegedExceptionAction<Object>)
             () -> {
               try {
@@ -201,5 +159,22 @@ public class HDFSFileSystemProxy implements MethodInterceptor {
                 throw new RuntimeException("Failed to invoke method", e);
               }
             });
+  }
+
+  private void close() {}
+
+  private UserGroupInformation initKerberosUgi(
+      Map<String, String> properties, Configuration configuration) {
+    try {
+      KerberosClient client = new KerberosClient(properties, configuration, true);
+      String keytabPath =
+          String.format(GRAVITINO_KEYTAB_FORMAT, properties.getOrDefault(GRAVITINO_ID_KEY, ""));
+      File keytabFile = client.saveKeyTabFileFromUri(keytabPath);
+      UserGroupInformation ugi = client.login(keytabFile.getAbsolutePath());
+      this.kerberosRealm = client.getKerberosRealm();
+      return ugi;
+    } catch (IOException e) {
+      throw new RuntimeException("Failed to login with Kerberos", e);
+    }
   }
 }
