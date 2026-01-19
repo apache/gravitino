@@ -39,10 +39,13 @@ public abstract class GravitinoJdbcCatalogFactory implements BaseCatalogFactory 
 
   protected abstract SchemaAndTablePropertiesConverter schemaAndTablePropertiesConverter();
 
+  protected abstract GravitinoJdbcCatalog.JdbcCatalogType jdbcCatalogType();
+
   @Override
   public org.apache.flink.table.catalog.Catalog createCatalog(Context context) {
     // FlinkJdbcCatalog does not support 'driver' as an option, but Gravitino JdbcCatalog requires
     // it.
+    String driver = context.getOptions().get(JdbcPropertiesConstants.FLINK_DRIVER);
     context.getOptions().remove(JdbcPropertiesConstants.FLINK_DRIVER);
     final FactoryUtil.CatalogFactoryHelper helper =
         FactoryUtils.createCatalogFactoryHelper(this, context);
@@ -52,7 +55,12 @@ public abstract class GravitinoJdbcCatalogFactory implements BaseCatalogFactory 
         defaultDatabase != null,
         GravitinoJdbcCatalogFactoryOptions.DEFAULT_DATABASE.key() + " should not be null.");
     return new GravitinoJdbcCatalog(
-        context, defaultDatabase, schemaAndTablePropertiesConverter(), partitionConverter());
+        context,
+        defaultDatabase,
+        schemaAndTablePropertiesConverter(),
+        partitionConverter(),
+        jdbcCatalogType(),
+        driver);
   }
 
   @Override

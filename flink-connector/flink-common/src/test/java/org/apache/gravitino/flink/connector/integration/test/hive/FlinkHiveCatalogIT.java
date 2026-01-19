@@ -89,7 +89,7 @@ public class FlinkHiveCatalogIT extends FlinkCommonIT {
   private static final String MYSQL_DATABASE = TestDatabaseName.FLINK_HIVE_CATALOG_IT.name();
 
   private static org.apache.gravitino.Catalog hiveCatalog;
-  private static String hiveConfDir;
+  protected static String hiveConfDir;
 
   private String mysqlUrl;
   private String mysqlUsername;
@@ -207,7 +207,7 @@ public class FlinkHiveCatalogIT extends FlinkCommonIT {
     Configuration configuration = new Configuration();
     configuration.set(
         CommonCatalogOptions.CATALOG_TYPE, GravitinoHiveCatalogFactoryOptions.IDENTIFIER);
-    configuration.set(HiveCatalogFactoryOptions.HIVE_CONF_DIR, "src/test/resources/flink-tests");
+    configuration.set(HiveCatalogFactoryOptions.HIVE_CONF_DIR, hiveConfDir);
     configuration.set(GravitinoHiveCatalogFactoryOptions.HIVE_METASTORE_URIS, hiveMetastoreUri);
     CatalogDescriptor catalogDescriptor = CatalogDescriptor.of(catalogName, configuration);
     tableEnv.createCatalog(catalogName, catalogDescriptor);
@@ -225,7 +225,7 @@ public class FlinkHiveCatalogIT extends FlinkCommonIT {
             .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
     Assertions.assertEquals(2, flinkProperties.size());
     Assertions.assertEquals(
-        "src/test/resources/flink-tests",
+        hiveConfDir,
         flinkProperties.get(flinkByPass(HiveCatalogFactoryOptions.HIVE_CONF_DIR.key())));
     Assertions.assertEquals(
         GravitinoHiveCatalogFactoryOptions.IDENTIFIER,
@@ -274,11 +274,11 @@ public class FlinkHiveCatalogIT extends FlinkCommonIT {
         String.format(
             "create catalog %s with ("
                 + "'type'='gravitino-hive', "
-                + "'hive-conf-dir'='src/test/resources/flink-tests',"
+                + "'hive-conf-dir'='%s',"
                 + "'hive.metastore.uris'='%s',"
                 + "'unknown.key'='unknown.value'"
                 + ")",
-            catalogName, hiveMetastoreUri));
+            catalogName, hiveConfDir, hiveMetastoreUri));
     Assertions.assertTrue(metalake.catalogExists(catalogName));
 
     // Check the properties of the created catalog.
@@ -291,7 +291,7 @@ public class FlinkHiveCatalogIT extends FlinkCommonIT {
             .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
     Assertions.assertEquals(3, flinkProperties.size());
     Assertions.assertEquals(
-        "src/test/resources/flink-tests",
+        hiveConfDir,
         flinkProperties.get(flinkByPass(HiveCatalogFactoryOptions.HIVE_CONF_DIR.key())));
     Assertions.assertEquals(
         GravitinoHiveCatalogFactoryOptions.IDENTIFIER,
@@ -351,9 +351,9 @@ public class FlinkHiveCatalogIT extends FlinkCommonIT {
               String.format(
                   "create catalog %s with ("
                       + "'type'='gravitino-hive', "
-                      + "'hive-conf-dir'='src/test/resources/flink-tests'"
+                      + "'hive-conf-dir'='%s'"
                       + ")",
-                  catalogName));
+                  catalogName, hiveConfDir));
         },
         "The hive.metastore.uris is required.");
 
@@ -375,7 +375,7 @@ public class FlinkHiveCatalogIT extends FlinkCommonIT {
             null,
             ImmutableMap.of(
                 "flink.bypass.hive-conf-dir",
-                "src/test/resources/flink-tests",
+                hiveConfDir,
                 "flink.bypass.hive.test",
                 "hive.config",
                 "metastore.uris",

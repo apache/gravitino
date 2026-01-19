@@ -20,7 +20,7 @@
 package org.apache.gravitino.flink.connector.jdbc;
 
 import java.util.Optional;
-import org.apache.flink.connector.jdbc.catalog.JdbcCatalog;
+import java.util.Properties;
 import org.apache.flink.connector.jdbc.catalog.factory.JdbcCatalogFactory;
 import org.apache.flink.connector.jdbc.table.JdbcDynamicTableFactory;
 import org.apache.flink.table.catalog.AbstractCatalog;
@@ -36,13 +36,30 @@ import org.apache.gravitino.flink.connector.catalog.BaseCatalog;
  */
 public class GravitinoJdbcCatalog extends BaseCatalog {
 
-  private final JdbcCatalog jdbcCatalog;
+  private final AbstractCatalog jdbcCatalog;
+
+  public enum JdbcCatalogType {
+    MYSQL("org.apache.flink.connector.jdbc.mysql.database.catalog.MySqlCatalog"),
+    POSTGRESQL("org.apache.flink.connector.jdbc.postgres.database.catalog.PostgresCatalog");
+
+    private final String className;
+
+    JdbcCatalogType(String className) {
+      this.className = className;
+    }
+
+    String className() {
+      return className;
+    }
+  }
 
   protected GravitinoJdbcCatalog(
       CatalogFactory.Context context,
       String defaultDatabase,
       SchemaAndTablePropertiesConverter schemaAndTablePropertiesConverter,
-      PartitionConverter partitionConverter) {
+      PartitionConverter partitionConverter,
+      JdbcCatalogType catalogType,
+      String driver) {
     super(
         context.getName(),
         context.getOptions(),
@@ -50,7 +67,14 @@ public class GravitinoJdbcCatalog extends BaseCatalog {
         schemaAndTablePropertiesConverter,
         partitionConverter);
     JdbcCatalogFactory jdbcCatalogFactory = new JdbcCatalogFactory();
-    this.jdbcCatalog = (JdbcCatalog) jdbcCatalogFactory.createCatalog(context);
+    AbstractCatalog createdCatalog;
+    try {
+      createdCatalog = (AbstractCatalog) jdbcCatalogFactory.createCatalog(context);
+    } catch (ClassCastException exception) {
+      createdCatalog =
+          createCatalogWithNewJdbcPackages(context, defaultDatabase, catalogType, driver);
+    }
+    this.jdbcCatalog = createdCatalog;
   }
 
   @Override
@@ -60,6 +84,55 @@ public class GravitinoJdbcCatalog extends BaseCatalog {
 
   @Override
   public Optional<Factory> getFactory() {
-    return Optional.of(new JdbcDynamicTableFactory());
+    try {
+      return Optional.of(new JdbcDynamicTableFactory());
+    } catch (NoClassDefFoundError error) {
+      return Optional.of(loadJdbcDynamicTableFactory());
+    }
+  }
+
+  private Factory loadJdbcDynamicTableFactory() {
+    try {
+      return (Factory)
+          Class.forName("org.apache.flink.connector.jdbc.core.table.JdbcDynamicTableFactory")
+              .getConstructor()
+              .newInstance();
+    } catch (ReflectiveOperationException exception) {
+      throw new IllegalStateException("Failed to load JDBC dynamic table factory.", exception);
+    }
+  }
+
+  private AbstractCatalog createCatalogWithNewJdbcPackages(
+      CatalogFactory.Context context,
+      String defaultDatabase,
+      JdbcCatalogType catalogType,
+      String driver) {
+    String baseUrl = context.getOptions().get(JdbcPropertiesConstants.FLINK_JDBC_URL);
+    String username = context.getOptions().get(JdbcPropertiesConstants.FLINK_JDBC_USER);
+    String password = context.getOptions().get(JdbcPropertiesConstants.FLINK_JDBC_PASSWORD);
+    Properties properties = new Properties();
+    if (username != null && password != null) {
+      properties.setProperty("user", username);
+      properties.setProperty("password", password);
+    }
+    if (driver != null) {
+      properties.setProperty("driver", driver);
+    }
+    try {
+      Class<?> catalogClass = Class.forName(catalogType.className());
+      return (AbstractCatalog)
+          catalogClass
+              .getConstructor(
+                  ClassLoader.class, String.class, String.class, String.class, Properties.class)
+              .newInstance(
+                  context.getClassLoader(),
+                  context.getName(),
+                  defaultDatabase,
+                  baseUrl,
+                  properties);
+    } catch (ReflectiveOperationException exception) {
+      throw new IllegalStateException(
+          "Failed to create JDBC catalog for Flink 1.20+ packages.", exception);
+    }
   }
 }
