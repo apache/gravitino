@@ -19,8 +19,11 @@
 
 package org.apache.gravitino.s3.credential;
 
+import com.google.common.collect.Sets;
+import java.util.Set;
 import org.apache.gravitino.credential.CredentialProviderDelegator;
 import org.apache.gravitino.credential.S3TokenCredential;
+import org.apache.gravitino.credential.config.S3CredentialConfig;
 
 /**
  * A lightweight credential provider for S3. It delegates the actual credential generation to {@link
@@ -36,5 +39,12 @@ public class S3TokenProvider extends CredentialProviderDelegator<S3TokenCredenti
   @Override
   public String getGeneratorClassName() {
     return "org.apache.gravitino.s3.credential.S3TokenGenerator";
+  }
+
+  @Override
+  public Set<String> sensitivePropertyKeys() {
+    return Sets.newHashSet(
+        S3CredentialConfig.S3_ACCESS_KEY_ID.getKey(),
+        S3CredentialConfig.S3_SECRET_ACCESS_KEY.getKey());
   }
 }

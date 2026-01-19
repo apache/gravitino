@@ -41,6 +41,8 @@ public final class PropertyEntry<T> {
   private final boolean hidden;
   private final boolean reserved;
   private final boolean prefix;
+  /** Whether this property contains sensitive data, such as passwords, secret keys, etc. */
+  private final boolean sensitive;
 
   /**
    * @param name The name of the property
@@ -55,6 +57,7 @@ public final class PropertyEntry<T> {
    * @param encoder Encode the java type to the string value
    * @param hidden Whether this property is hidden from user, such as password
    * @param reserved This property is reserved and cannot be set by user
+   * @param sensitive Whether this property contains sensitive data
    */
   private PropertyEntry(
       String name,
@@ -66,7 +69,8 @@ public final class PropertyEntry<T> {
       Function<String, T> decoder,
       Function<T, String> encoder,
       boolean hidden,
-      boolean reserved) {
+      boolean reserved,
+      boolean sensitive) {
     this(
         name,
         description,
@@ -78,7 +82,8 @@ public final class PropertyEntry<T> {
         encoder,
         hidden,
         reserved,
-        false);
+        false,
+        sensitive);
   }
 
   /**
@@ -94,6 +99,8 @@ public final class PropertyEntry<T> {
    * @param encoder Encode the java type to the string value
    * @param hidden Whether this property is hidden from user, such as password
    * @param reserved This property is reserved and cannot be set by user
+   * @param prefix Whether this property is a prefix property
+   * @param sensitive Whether this property contains sensitive data
    */
   private PropertyEntry(
       String name,
@@ -106,7 +113,8 @@ public final class PropertyEntry<T> {
       Function<T, String> encoder,
       boolean hidden,
       boolean reserved,
-      boolean prefix) {
+      boolean prefix,
+      boolean sensitive) {
     Preconditions.checkArgument(StringUtils.isNotBlank(name), "name cannot be null or empty");
     Preconditions.checkArgument(
         StringUtils.isNotBlank(description), "description cannot be null or empty");
@@ -130,6 +138,7 @@ public final class PropertyEntry<T> {
     this.hidden = hidden;
     this.reserved = reserved;
     this.prefix = prefix;
+    this.sensitive = sensitive;
   }
 
   public static class Builder<T> {
@@ -145,6 +154,8 @@ public final class PropertyEntry<T> {
     private boolean hidden;
     private boolean reserved;
     private boolean prefix;
+    /** Whether this property contains sensitive data. */
+    private boolean sensitive;
 
     public Builder<T> withName(String name) {
       this.name = name;
@@ -201,6 +212,12 @@ public final class PropertyEntry<T> {
       return this;
     }
 
+    /** Sets whether this property contains sensitive data. */
+    public Builder<T> withSensitive(boolean sensitive) {
+      this.sensitive = sensitive;
+      return this;
+    }
+
     public PropertyEntry<T> build() {
       return new PropertyEntry<>(
           name,
@@ -213,7 +230,8 @@ public final class PropertyEntry<T> {
           encoder,
           hidden,
           reserved,
-          prefix);
+          prefix,
+          sensitive);
     }
   }
 
@@ -263,6 +281,30 @@ public final class PropertyEntry<T> {
         .withEncoder(Function.identity())
         .withHidden(hidden)
         .withReserved(reserved)
+        .build();
+  }
+
+  public static PropertyEntry<String> stringPropertyEntry(
+      String name,
+      String description,
+      boolean required,
+      boolean immutable,
+      String defaultValue,
+      boolean hidden,
+      boolean reserved,
+      boolean sensitive) {
+    return new Builder<String>()
+        .withName(name)
+        .withDescription(description)
+        .withRequired(required)
+        .withImmutable(immutable)
+        .withJavaType(String.class)
+        .withDefaultValue(defaultValue)
+        .withDecoder(Function.identity())
+        .withEncoder(Function.identity())
+        .withHidden(hidden)
+        .withReserved(reserved)
+        .withSensitive(sensitive)
         .build();
   }
 
@@ -396,6 +438,12 @@ public final class PropertyEntry<T> {
     return stringPropertyEntry(name, description, false, immutable, defaultValue, hidden, false);
   }
 
+  public static PropertyEntry<String> stringOptionalSensitivePropertyEntry(
+      String name, String description, boolean immutable, String defaultValue, boolean hidden) {
+    return stringPropertyEntry(
+        name, description, false, immutable, defaultValue, hidden, false, true);
+  }
+
   public static PropertyEntry<String> stringMutablePropertyEntry(
       String name, String description, boolean required, String defaultValue, boolean hidden) {
     return stringPropertyEntry(name, description, required, false, defaultValue, hidden, false);
@@ -518,6 +566,7 @@ public final class PropertyEntry<T> {
     sb.append(", defaultValue=").append(defaultValue);
     sb.append(", hidden=").append(hidden);
     sb.append(", reserved=").append(reserved);
+    sb.append(", sensitive=").append(sensitive);
     sb.append('}');
     return sb.toString();
   }

@@ -87,37 +87,37 @@ public class IcebergCatalogPropertiesMetadata extends BaseCatalogPropertiesMetad
                 true /* immutable */,
                 null /* defaultValue */,
                 false /* hidden */),
-            stringOptionalPropertyEntry(
+            PropertyEntry.stringOptionalSensitivePropertyEntry(
                 S3Properties.GRAVITINO_S3_ACCESS_KEY_ID,
                 "s3 access key ID",
                 false /* immutable */,
                 null /* defaultValue */,
                 false /* hidden */),
-            stringOptionalPropertyEntry(
+            PropertyEntry.stringOptionalSensitivePropertyEntry(
                 S3Properties.GRAVITINO_S3_SECRET_ACCESS_KEY,
                 "s3 secret access key",
                 false /* immutable */,
                 null /* defaultValue */,
                 false /* hidden */),
-            stringOptionalPropertyEntry(
+            PropertyEntry.stringOptionalSensitivePropertyEntry(
                 OSSProperties.GRAVITINO_OSS_ACCESS_KEY_ID,
                 "OSS access key ID",
                 false /* immutable */,
                 null /* defaultValue */,
                 false /* hidden */),
-            stringOptionalPropertyEntry(
+            PropertyEntry.stringOptionalSensitivePropertyEntry(
                 OSSProperties.GRAVITINO_OSS_ACCESS_KEY_SECRET,
                 "OSS access key secret",
                 false /* immutable */,
                 null /* defaultValue */,
                 false /* hidden */),
-            stringOptionalPropertyEntry(
+            PropertyEntry.stringOptionalSensitivePropertyEntry(
                 AzureProperties.GRAVITINO_AZURE_STORAGE_ACCOUNT_NAME,
                 "Azure storage account name",
                 false /* immutable */,
                 null /* defaultValue */,
                 false /* hidden */),
-            stringOptionalPropertyEntry(
+            PropertyEntry.stringOptionalSensitivePropertyEntry(
                 AzureProperties.GRAVITINO_AZURE_STORAGE_ACCOUNT_KEY,
                 "Azure storage account key",
                 false /* immutable */,

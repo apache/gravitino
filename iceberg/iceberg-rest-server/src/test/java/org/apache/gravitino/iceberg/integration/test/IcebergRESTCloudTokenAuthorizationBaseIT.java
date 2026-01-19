@@ -25,6 +25,7 @@ import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.MetadataObjects;
@@ -103,6 +104,14 @@ public abstract class IcebergRESTCloudTokenAuthorizationBaseIT extends IcebergAu
    * @return Cloud provider suffix for table names
    */
   protected abstract String getCloudProviderName();
+
+  /**
+   * Returns the set of sensitive property keys that should be hidden from normal users. Subclasses
+   * implement this to specify cloud-specific sensitive properties (e.g., access keys, secrets).
+   *
+   * @return Set of sensitive property keys
+   */
+  protected abstract Set<String> sensitiveProperties();
 
   /**
    * Sets up cloud-specific bundle JARs by downloading and copying them. This method should be

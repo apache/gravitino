@@ -32,6 +32,7 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import org.apache.gravitino.Catalog;
 import org.apache.gravitino.Configs;
 import org.apache.gravitino.MetadataObject;
@@ -141,6 +142,43 @@ abstract class AbstractFileSystemCredentialAuthorizationIT extends BaseIT {
     gvfsConf.set("fs.gravitino.server.uri", serverUri);
     gvfsConf.set("fs.gravitino.client.metalake", metalakeName);
     gvfsConf.set("fs.gravitino.enableCredentialVending", "true");
+
+    // Test loadCatalog properties - normal user should not see sensitive properties
+    Map<String, String> normalUserCatalogProps =
+        normalUserClient.loadMetalake(metalakeName).loadCatalog(catalogName).properties();
+    Map<String, String> adminCatalogProps = metalake.loadCatalog(catalogName).properties();
+    Assertions.assertTrue(normalUserCatalogProps.size() < adminCatalogProps.size());
+    for (String sensitiveKey : sensitiveProperties()) {
+      Assertions.assertFalse(
+          normalUserCatalogProps.containsKey(sensitiveKey),
+          "Normal user should not see sensitive property: " + sensitiveKey);
+      Assertions.assertTrue(
+          adminCatalogProps.containsKey(sensitiveKey),
+          "Admin user should see sensitive property: " + sensitiveKey);
+    }
+
+    // Test listCatalogsInfo - normal user should not see sensitive properties in catalog info
+    Catalog[] normalUserCatalogs = normalUserClient.loadMetalake(metalakeName).listCatalogsInfo();
+    Catalog[] adminCatalogs = metalake.listCatalogsInfo();
+    Assertions.assertEquals(adminCatalogs.length, normalUserCatalogs.length);
+    for (Catalog normalCatalog : normalUserCatalogs) {
+      if (normalCatalog.name().equals(catalogName)) {
+        for (String sensitiveKey : sensitiveProperties()) {
+          Assertions.assertFalse(
+              normalCatalog.properties().containsKey(sensitiveKey),
+              "Normal user should not see sensitive property in listCatalogsInfo: " + sensitiveKey);
+        }
+      }
+    }
+    for (Catalog adminCatalog : adminCatalogs) {
+      if (adminCatalog.name().equals(catalogName)) {
+        for (String sensitiveKey : sensitiveProperties()) {
+          Assertions.assertTrue(
+              adminCatalog.properties().containsKey(sensitiveKey),
+              "Admin user should see sensitive property in listCatalogsInfo: " + sensitiveKey);
+        }
+      }
+    }
   }
 
   @AfterAll
@@ -311,4 +349,6 @@ abstract class AbstractFileSystemCredentialAuthorizationIT extends BaseIT {
   protected abstract String providerPrefix();
 
   protected abstract String providerRoleName();
+
+  protected abstract Set<String> sensitiveProperties();
 }

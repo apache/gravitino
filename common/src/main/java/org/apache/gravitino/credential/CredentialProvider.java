@@ -20,7 +20,9 @@
 package org.apache.gravitino.credential;
 
 import java.io.Closeable;
+import java.util.Collections;
 import java.util.Map;
+import java.util.Set;
 import javax.annotation.Nullable;
 
 /**
@@ -58,4 +60,14 @@ public interface CredentialProvider extends Closeable {
    */
   @Nullable
   Credential getCredential(CredentialContext context);
+
+  /**
+   * Returns the sensitive property keys used by this credential provider. These properties contain
+   * sensitive data such as passwords, secret keys, etc.
+   *
+   * @return A set of sensitive property keys. Returns an empty set by default.
+   */
+  default Set<String> sensitivePropertyKeys() {
+    return Collections.emptySet();
+  }
 }

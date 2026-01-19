@@ -19,8 +19,10 @@
 
 package org.apache.gravitino.filesystem.hadoop.integration.test;
 
+import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Maps;
 import java.util.Map;
+import java.util.Set;
 import org.apache.gravitino.catalog.hadoop.fs.FileSystemUtils;
 import org.apache.gravitino.credential.GCSTokenCredential;
 import org.apache.gravitino.gcs.fs.GCSFileSystemProvider;
@@ -90,6 +92,11 @@ public class FileSystemGCSCredentialAuthorizationIT
   @Override
   protected String providerRoleName() {
     return "gvfs_gcs_credential_auth_role";
+  }
+
+  @Override
+  protected Set<String> sensitiveProperties() {
+    return ImmutableSet.of(GCSProperties.GRAVITINO_GCS_SERVICE_ACCOUNT_FILE);
   }
 
   protected static boolean isGCPConfigured() {

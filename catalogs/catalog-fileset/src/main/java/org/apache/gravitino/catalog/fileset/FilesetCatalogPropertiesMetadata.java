@@ -30,11 +30,14 @@ import static org.apache.gravitino.file.Fileset.LOCATION_NAME_UNKNOWN;
 import static org.apache.gravitino.file.Fileset.PROPERTY_MULTIPLE_LOCATIONS_PREFIX;
 
 import com.google.common.collect.ImmutableMap;
+import java.util.HashMap;
 import java.util.Map;
+import java.util.Set;
 import org.apache.gravitino.catalog.hadoop.fs.FileSystemProvider;
 import org.apache.gravitino.catalog.hadoop.fs.LocalFileSystemProvider;
 import org.apache.gravitino.connector.BaseCatalogPropertiesMetadata;
 import org.apache.gravitino.connector.PropertyEntry;
+import org.apache.gravitino.credential.CredentialProviderFactory;
 import org.apache.gravitino.credential.config.CredentialConfig;
 
 public class FilesetCatalogPropertiesMetadata extends BaseCatalogPropertiesMetadata {
@@ -228,6 +231,26 @@ public class FilesetCatalogPropertiesMetadata extends BaseCatalogPropertiesMetad
 
   @Override
   protected Map<String, PropertyEntry<?>> specificPropertyEntries() {
-    return FILESET_CATALOG_PROPERTY_ENTRIES;
+    Map<String, PropertyEntry<?>> result = new HashMap<>(FILESET_CATALOG_PROPERTY_ENTRIES);
+
+    // Add credential provider sensitive properties
+    Set<String> sensitiveKeys = CredentialProviderFactory.lookupSensitivePropertyKeys();
+    for (String key : sensitiveKeys) {
+      if (!result.containsKey(key)) {
+        result.put(
+            key,
+            PropertyEntry.stringPropertyEntry(
+                key,
+                "Sensitive property from credential provider",
+                false /* required */,
+                false /* immutable */,
+                null /* defaultValue */,
+                false /* hidden */,
+                false /* reserved */,
+                true /* sensitive */));
+      }
+    }
+
+    return result;
   }
 }
