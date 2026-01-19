@@ -38,7 +38,6 @@ val icebergVersion: String = libs.versions.iceberg4connector.get()
 // https://issues.apache.org/jira/browse/FLINK-20845,
 // https://issues.apache.org/jira/browse/FLINK-13414.
 val scalaVersion: String = "2.12"
-val artifactName = "${rootProject.name}-flink-${flinkMajorVersion}_$scalaVersion"
 
 dependencies {
   implementation(project(":catalogs:catalog-common")) {
@@ -52,7 +51,7 @@ dependencies {
   compileOnly("org.apache.flink:flink-connector-hive_$scalaVersion:$flinkVersion")
   compileOnly("org.apache.flink:flink-table-common:$flinkVersion")
   compileOnly("org.apache.flink:flink-table-api-java:$flinkVersion")
-  compileOnly("org.apache.paimon:paimon-flink-1.18:$paimonVersion")
+  compileOnly("org.apache.paimon:paimon-flink-$flinkMajorVersion:$paimonVersion")
   compileOnly(libs.flinkjdbc)
 
   compileOnly(libs.hive2.exec) {
@@ -186,17 +185,5 @@ tasks.test {
   } else {
     dependsOn(tasks.jar)
     dependsOn(":catalogs:catalog-hive:jar")
-  }
-}
-
-tasks.withType<Jar> {
-  archiveBaseName.set(artifactName)
-}
-
-publishing {
-  publications {
-    withType<MavenPublication>().configureEach {
-      artifactId = artifactName
-    }
   }
 }

@@ -51,7 +51,7 @@ configurations.all {
 
 dependencies {
   implementation(project(":clients:client-java-runtime", configuration = "shadow"))
-  implementation(project(":flink-connector:flink"))
+  implementation(project(":flink-connector:flink-1.18"))
 
   testImplementation(libs.junit.jupiter.api)
   testRuntimeOnly(libs.junit.jupiter.engine)
