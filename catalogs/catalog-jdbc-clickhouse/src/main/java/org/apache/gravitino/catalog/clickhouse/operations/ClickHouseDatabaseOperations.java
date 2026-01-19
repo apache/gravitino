@@ -18,6 +18,7 @@
  */
 package org.apache.gravitino.catalog.clickhouse.operations;
 
+import com.google.common.collect.Sets;
 import java.util.Set;
 import org.apache.gravitino.catalog.jdbc.operation.JdbcDatabaseOperations;
 
@@ -30,6 +31,6 @@ public class ClickHouseDatabaseOperations extends JdbcDatabaseOperations {
 
   @Override
   protected Set<String> createSysDatabaseNameSet() {
-    return null;
+    return Sets.newHashSet();
   }
 }

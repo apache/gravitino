@@ -20,5 +20,6 @@ package org.apache.gravitino.catalog.clickhouse.converter;
 
 import org.apache.gravitino.catalog.jdbc.converter.JdbcExceptionConverter;
 
-// TODO : Implement ClickHouse specific exception conversions if needed
-public class ClickHouseExceptionConverter extends JdbcExceptionConverter {}
+public class ClickHouseExceptionConverter extends JdbcExceptionConverter {
+  // Implement ClickHouse specific exception conversions if needed
+}

@@ -20,5 +20,6 @@ package org.apache.gravitino.catalog.clickhouse.converter;
 
 import org.apache.gravitino.catalog.jdbc.converter.JdbcColumnDefaultValueConverter;
 
-// TODO: Implement ClickHouse specific default value conversions if needed
-public class ClickHouseColumnDefaultValueConverter extends JdbcColumnDefaultValueConverter {}
+public class ClickHouseColumnDefaultValueConverter extends JdbcColumnDefaultValueConverter {
+  // Implement ClickHouse specific default value conversions if needed
+}
