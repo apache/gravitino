@@ -177,8 +177,8 @@ public class FilesetCatalogOperations extends ManagedSchemaOperations
      * When the path is a path without scheme such as 'file','hdfs', etc., then the scheme and
      * authority are both null
      *
-     * <p>NOTE: The filesystem cache key contains the schema, authority and current user. hanged the
-     * configuration of the same fileset. will not be effected by the cached ilesystem.
+     * <p>NOTE: The filesystem cache key includes the schema, authority, and current user. Changes
+     * to the configuration of the same fileset will not be affected by the cached filesystem.
      */
     @Nullable private final String scheme;
 
