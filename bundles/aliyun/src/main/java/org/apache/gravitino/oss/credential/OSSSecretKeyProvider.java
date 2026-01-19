@@ -19,7 +19,9 @@
 
 package org.apache.gravitino.oss.credential;
 
+import com.google.common.collect.Sets;
 import java.util.Map;
+import java.util.Set;
 import org.apache.gravitino.credential.Credential;
 import org.apache.gravitino.credential.CredentialContext;
 import org.apache.gravitino.credential.CredentialProvider;
@@ -50,5 +52,12 @@ public class OSSSecretKeyProvider implements CredentialProvider {
   @Override
   public Credential getCredential(CredentialContext context) {
     return new OSSSecretKeyCredential(accessKey, secretKey);
+  }
+
+  @Override
+  public Set<String> sensitivePropertyKeys() {
+    return Sets.newHashSet(
+        OSSCredentialConfig.OSS_ACCESS_KEY_ID.getKey(),
+        OSSCredentialConfig.OSS_SECRET_ACCESS_KEY.getKey());
   }
 }
