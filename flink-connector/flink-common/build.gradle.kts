@@ -27,7 +27,7 @@ repositories {
 }
 
 var paimonVersion: String = libs.versions.paimon.get()
-val flinkVersion: String = libs.versions.flink.get()
+val flinkVersion: String = libs.versions.flink118.get()
 val flinkMajorVersion: String = flinkVersion.substringBeforeLast(".")
 
 val icebergVersion: String = libs.versions.iceberg4connector.get()
@@ -52,7 +52,7 @@ dependencies {
   compileOnly("org.apache.flink:flink-table-common:$flinkVersion")
   compileOnly("org.apache.flink:flink-table-api-java:$flinkVersion")
   compileOnly("org.apache.paimon:paimon-flink-$flinkMajorVersion:$paimonVersion")
-  compileOnly(libs.flinkjdbc)
+  compileOnly(libs.flinkjdbc118)
 
   compileOnly(libs.hive2.exec) {
     artifact {
@@ -94,7 +94,7 @@ dependencies {
   testImplementation(libs.testcontainers.junit.jupiter)
   testImplementation(libs.testcontainers.mysql)
   testImplementation(libs.metrics.core)
-  testImplementation(libs.flinkjdbc)
+  testImplementation(libs.flinkjdbc118)
   testImplementation(libs.minikdc)
 
   testImplementation("org.apache.iceberg:iceberg-core:$icebergVersion")

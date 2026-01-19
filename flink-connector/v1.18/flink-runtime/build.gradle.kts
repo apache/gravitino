@@ -29,7 +29,7 @@ repositories {
   mavenCentral()
 }
 
-val flinkVersion: String = libs.versions.flink.get()
+val flinkVersion: String = libs.versions.flink118.get()
 val flinkMajorVersion: String = flinkVersion.substringBeforeLast(".")
 
 // The Flink only support scala 2.12, and all scala api will be removed in a future version.
