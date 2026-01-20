@@ -61,7 +61,7 @@ public class PaimonConstants {
   public static final String PAIMON_DLF_TOKEN_PATH = "dlf.token-path";
   public static final String PAIMON_DLF_TOKEN_LOADER = "dlf.token-loader";
 
-  // Table properties constants
+  // Iceberg Table properties constants
   public static final String COMMENT = "comment";
   public static final String OWNER = "owner";
   public static final String BUCKET_KEY = "bucket-key";
