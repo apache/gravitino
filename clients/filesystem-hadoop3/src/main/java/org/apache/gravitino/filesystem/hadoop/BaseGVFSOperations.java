@@ -155,6 +155,7 @@ public abstract class BaseGVFSOperations implements Closeable {
      *
      * @param scheme the scheme of the filesystem
      * @param authority the authority of the filesystem
+     * @param ugi the user group information
      */
     FileSystemCacheKey(String scheme, String authority, UserGroupInformation ugi) {
       this.scheme = scheme;

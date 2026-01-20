@@ -921,7 +921,7 @@ curl -X POST -H "Accept: application/vnd.gravitino.v1+json" \
 Alternatively, you can pass configurations for multiple clusters using the `fs.path.config.{cluster_name}.*` format when creating the fileset catalog.
 All schemas and filesets under the catalog can inherit configuration based on the cluster name,
 and the configuration can be overridden at the schema or fileset level if needed.
-The system can automatically retrieve the appropriate configuration from `fs.path` configuration based on the fileset’s storage location
+The system can automatically retrieve the appropriate configuration from `fs.path.config` configuration based on the fileset’s storage location
 and override the corresponding fileset properties by key.
 
 ```text
