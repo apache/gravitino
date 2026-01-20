@@ -82,6 +82,18 @@ Clone or download the [Gravitino Playground repository](https://github.com/apach
 
 Press `CTRL+C` to stop.
 
+5. (Optional) Use the legacy UI
+
+  - To switch to the legacy UI at runtime: edit `conf/gravitino-env.sh` (or set the environment variable before starting) and set `GRAVITINO_USE_OLD_UI` to `true`:
+
+```bash
+export GRAVITINO_USE_OLD_UI=true
+./bin/gravitino.sh start
+```
+
+  - Alternatively, you can remove the `GRAVITINO_USE_OLD_UI=...` line from `conf/gravitino-env.sh` (the template defaults to `false`); removing that line will revert the service to the legacy UI behavior.
+
+
 ## 🧊 Iceberg REST Catalog
 
 Gravitino provides a native Iceberg REST catalog service.  

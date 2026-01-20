@@ -72,7 +72,6 @@ import { capitalizeFirstLetter, genUpdates } from '@/lib/utils'
 import { cn } from '@/lib/utils/tailwind'
 import { createTable, updateTable, getTableDetails } from '@/lib/store/metalakes'
 import { useAppDispatch } from '@/lib/hooks/useStore'
-import { includes } from 'lodash-es'
 
 const { Paragraph } = Typography
 const { TextArea } = Input

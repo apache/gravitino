@@ -75,8 +75,8 @@ const MetalakeList = () => {
   const [tableData, setTableData] = useState([])
 
   useEffect(() => {
-    dispatch(fetchMetalakes())
     dispatch(resetMetalakeStore())
+    dispatch(fetchMetalakes())
   }, [dispatch])
 
   useEffect(() => {

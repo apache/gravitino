@@ -17,7 +17,7 @@
  * under the License.
  */
 
-import React, { useEffect, useState } from 'react'
+import React, { useEffect, useMemo, useState } from 'react'
 import dynamic from 'next/dynamic'
 import { ArrowRightOutlined, PlusOutlined } from '@ant-design/icons'
 import { Button, Divider, Flex, Form, Input, Modal, Select, Spin, Typography } from 'antd'
@@ -46,6 +46,8 @@ export default function CreateJobDialog({ ...props }) {
   const values = Form.useWatch([], form)
   const currentJobTemplate = Form.useWatch('jobTemplateName', form)
   const jobConfValues = Form?.useWatch('jobConf', form)
+  const [placeholderEntries, setPlaceholderEntries] = useState([])
+  const hasJobConfig = placeholderEntries.length > 0
   const [openTemplate, setOpenTemplate] = useState(false)
   const dispatch = useAppDispatch()
 
@@ -155,8 +157,9 @@ export default function CreateJobDialog({ ...props }) {
         const { payload: jobTemplate } = await dispatch(getJobTemplate({ metalake, jobTemplate: currentJobTemplate }))
         setIsLoading(false)
         setJobTemplateDetail(jobTemplate)
-        const placeholderEntries = getPlaceholderEntries(jobTemplate)
-        form.setFieldsValue({ jobConf: placeholderEntries })
+        const nextPlaceholderEntries = getPlaceholderEntries(jobTemplate)
+        setPlaceholderEntries(nextPlaceholderEntries)
+        form.setFieldsValue({ jobConf: nextPlaceholderEntries })
       } catch (error) {
         console.log(error)
         setIsLoading(false)
@@ -164,6 +167,8 @@ export default function CreateJobDialog({ ...props }) {
     }
     if (currentJobTemplate) {
       fetchJobTemplateDetails()
+    } else {
+      setPlaceholderEntries([])
     }
   }, [currentJobTemplate])
 
@@ -257,11 +262,15 @@ export default function CreateJobDialog({ ...props }) {
               />
             </Form.Item>
             <div className='relative rounded border border-gray-200'>
-              <div className='pointer-events-none absolute inset-y-0 left-1/2 w-px -translate-x-1/2 bg-gray-200' />
-              <div className='pointer-events-none absolute left-1/2 top-1/2 flex size-6 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full border border-gray-200 bg-white text-gray-500'>
-                <Icons.iconify icon='mdi:arrow-left' className='size-4' />
-              </div>
-              <div className='grid grid-cols-2 gap-6 p-4'>
+              {hasJobConfig && (
+                <>
+                  <div className='pointer-events-none absolute inset-y-0 left-1/2 w-px -translate-x-1/2 bg-gray-200' />
+                  <div className='pointer-events-none absolute left-1/2 top-1/2 flex size-6 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full border border-gray-200 bg-white text-gray-500'>
+                    <Icons.iconify icon='mdi:arrow-left' className='size-4' />
+                  </div>
+                </>
+              )}
+              <div className={cn('grid gap-6 p-4', hasJobConfig ? 'grid-cols-2' : 'grid-cols-1')}>
                 <div className='space-y-2 max-h-[320px] overflow-y-auto pr-2'>
                   <Paragraph className='text-sm !mb-0'>Template Parameters</Paragraph>
                   <div>
@@ -297,7 +306,7 @@ export default function CreateJobDialog({ ...props }) {
                           ))}
                         </div>
                       ) : (
-                        <div className='text-sm text-gray-400'>No arguments</div>
+                        <div className='text-[12px] text-gray-400'>No arguments</div>
                       )}
                     </div>
                   </div>
@@ -423,45 +432,47 @@ export default function CreateJobDialog({ ...props }) {
                     </div>
                   )}
                 </div>
-                <div className='pl-2 max-h-[320px] overflow-y-auto pr-2'>
-                  <Form.Item label='Job Configuration'>
-                    <div className='flex flex-col gap-2'>
-                      <Form.List name='jobConf'>
-                        {fields => (
-                          <>
-                            {fields.map(({ key, name, ...restField }) => (
-                              <Form.Item label={null} className='align-items-center mb-0' key={key}>
-                                <Flex gap='small' align='start' key={key}>
-                                  <Form.Item
-                                    {...restField}
-                                    name={[name, 'key']}
-                                    rules={[{ required: true, message: 'Please enter the job config key!' }]}
-                                    className='mb-0 w-full grow'
-                                  >
-                                    <Input disabled placeholder='Job Config Key' />
-                                  </Form.Item>
-                                  <Form.Item
-                                    {...restField}
-                                    name={[name, 'value']}
-                                    rules={[{ required: true, message: 'Please enter the job config value!' }]}
-                                    className='mb-0 w-full grow'
-                                  >
-                                    <Input
-                                      placeholder={
-                                        form.getFieldValue(['jobConf', name, 'template']) || 'Job Config Value'
-                                      }
-                                      onChange={e => updateOnChange(name, e.target.value)}
-                                    />
-                                  </Form.Item>
-                                </Flex>
-                              </Form.Item>
-                            ))}
-                          </>
-                        )}
-                      </Form.List>
-                    </div>
-                  </Form.Item>
-                </div>
+                {hasJobConfig && (
+                  <div className='pl-2 max-h-[320px] overflow-y-auto pr-2'>
+                    <Form.Item label='Job Configuration'>
+                      <div className='flex flex-col gap-2'>
+                        <Form.List name='jobConf'>
+                          {fields => (
+                            <>
+                              {fields.map(({ key, name, ...restField }) => (
+                                <Form.Item label={null} className='align-items-center mb-0' key={key}>
+                                  <Flex gap='small' align='start' key={key}>
+                                    <Form.Item
+                                      {...restField}
+                                      name={[name, 'key']}
+                                      rules={[{ required: true, message: 'Please enter the job config key!' }]}
+                                      className='mb-0 w-full grow'
+                                    >
+                                      <Input disabled placeholder='Job Config Key' />
+                                    </Form.Item>
+                                    <Form.Item
+                                      {...restField}
+                                      name={[name, 'value']}
+                                      rules={[{ required: true, message: 'Please enter the job config value!' }]}
+                                      className='mb-0 w-full grow'
+                                    >
+                                      <Input
+                                        placeholder={
+                                          form.getFieldValue(['jobConf', name, 'template']) || 'Job Config Value'
+                                        }
+                                        onChange={e => updateOnChange(name, e.target.value)}
+                                      />
+                                    </Form.Item>
+                                  </Flex>
+                                </Form.Item>
+                              ))}
+                            </>
+                          )}
+                        </Form.List>
+                      </div>
+                    </Form.Item>
+                  </div>
+                )}
               </div>
             </div>
           </Form>
