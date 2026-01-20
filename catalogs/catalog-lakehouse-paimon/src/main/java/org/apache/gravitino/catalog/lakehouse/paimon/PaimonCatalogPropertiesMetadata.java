@@ -70,10 +70,17 @@ public class PaimonCatalogPropertiesMetadata extends BaseCatalogPropertiesMetada
           .put(GRAVITINO_JDBC_USER, PAIMON_JDBC_USER)
           .put(GRAVITINO_JDBC_PASSWORD, PAIMON_JDBC_PASSWORD)
           .put(GRAVITINO_JDBC_DRIVER, GRAVITINO_JDBC_DRIVER)
-          .put(PaimonConstants.GRAVITINO_DLF_TOKEN_PROVIDER, PaimonConstants.PAIMON_DLF_TOKEN_PROVIDER)
-          .put(PaimonConstants.GRAVITINO_DLF_ACCESS_KEY_ID, PaimonConstants.PAIMON_DLF_ACCESS_KEY_ID)
-          .put(PaimonConstants.GRAVITINO_DLF_ACCESS_KEY_SECRET, PaimonConstants.PAIMON_DLF_ACCESS_KEY_SECRET)
-          .put(PaimonConstants.GRAVITINO_DLF_SECURITY_TOKEN, PaimonConstants.PAIMON_DLF_SECURITY_TOKEN)
+          .put(
+              PaimonConstants.GRAVITINO_DLF_TOKEN_PROVIDER,
+              PaimonConstants.PAIMON_DLF_TOKEN_PROVIDER)
+          .put(
+              PaimonConstants.GRAVITINO_DLF_ACCESS_KEY_ID, PaimonConstants.PAIMON_DLF_ACCESS_KEY_ID)
+          .put(
+              PaimonConstants.GRAVITINO_DLF_ACCESS_KEY_SECRET,
+              PaimonConstants.PAIMON_DLF_ACCESS_KEY_SECRET)
+          .put(
+              PaimonConstants.GRAVITINO_DLF_SECURITY_TOKEN,
+              PaimonConstants.PAIMON_DLF_SECURITY_TOKEN)
           .put(PaimonConstants.GRAVITINO_DLF_TOKEN_PATH, PaimonConstants.PAIMON_DLF_TOKEN_PATH)
           .put(PaimonConstants.GRAVITINO_DLF_TOKEN_LOADER, PaimonConstants.PAIMON_DLF_TOKEN_LOADER)
           .build();
