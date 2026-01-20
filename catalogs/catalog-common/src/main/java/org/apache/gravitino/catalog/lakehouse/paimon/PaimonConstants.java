@@ -45,7 +45,23 @@ public class PaimonConstants {
   public static final String OSS_ACCESS_KEY = "fs.oss.accessKeyId";
   public static final String OSS_SECRET_KEY = "fs.oss.accessKeySecret";
 
-  // Iceberg Table properties constants
+  // DLF (Data Lake Formation) related properties - Gravitino keys
+  public static final String GRAVITINO_DLF_TOKEN_PROVIDER = "dlf-token-provider";
+  public static final String GRAVITINO_DLF_ACCESS_KEY_ID = "dlf-access-key-id";
+  public static final String GRAVITINO_DLF_ACCESS_KEY_SECRET = "dlf-access-key-secret";
+  public static final String GRAVITINO_DLF_SECURITY_TOKEN = "dlf-security-token";
+  public static final String GRAVITINO_DLF_TOKEN_PATH = "dlf-token-path";
+  public static final String GRAVITINO_DLF_TOKEN_LOADER = "dlf-token-loader";
+
+  // DLF related properties - Paimon backend keys
+  public static final String PAIMON_DLF_TOKEN_PROVIDER = "token.provider";
+  public static final String PAIMON_DLF_ACCESS_KEY_ID = "dlf.access-key-id";
+  public static final String PAIMON_DLF_ACCESS_KEY_SECRET = "dlf.access-key-secret";
+  public static final String PAIMON_DLF_SECURITY_TOKEN = "dlf.security-token";
+  public static final String PAIMON_DLF_TOKEN_PATH = "dlf.token-path";
+  public static final String PAIMON_DLF_TOKEN_LOADER = "dlf.token-loader";
+
+  // Table properties constants
   public static final String COMMENT = "comment";
   public static final String OWNER = "owner";
   public static final String BUCKET_KEY = "bucket-key";
