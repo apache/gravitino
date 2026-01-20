@@ -667,14 +667,60 @@ public class CatalogsPage extends BaseWebIT {
       }
     }
 
-    // Use Ant Design Tree structure to find the node by its title
-    String xpath =
-        "//div[contains(@class, 'ant-tree-treenode')]//span[contains(@class, 'ant-tree-title')]//div[@title='"
-            + nodeName
-            + "']";
+    // Use Ant Design Tree structure to find the node by its title.
+    // Try multiple locators to handle UI variations and ensure node is visible/clickable.
+    String[] candidateXpaths =
+        new String[] {
+          "//div[contains(@class, 'ant-tree-treenode')]//span[contains(@class, 'ant-tree-title')]//div[@title='"
+              + nodeName
+              + "']",
+          "//div[contains(@class, 'ant-tree-treenode')]//span[contains(@class, 'ant-tree-title')]//div[text()='"
+              + nodeName
+              + "']",
+          "//div[contains(@class, 'ant-tree-treenode')]//span[contains(@class, 'ant-tree-title')][.//text()[normalize-space()='"
+              + nodeName
+              + "']]",
+          "//div[contains(@class,'ant-tree-treenode')]//span[contains(@class,'ant-tree-title') and normalize-space(.)='"
+              + nodeName
+              + "']",
+        };
+
     WebDriverWait wait = new WebDriverWait(driver, MAX_TIMEOUT);
-    WebElement treeNode = wait.until(ExpectedConditions.elementToBeClickable(By.xpath(xpath)));
-    clickAndWait(treeNode);
+    WebElement treeNode = null;
+    for (String xp : candidateXpaths) {
+      try {
+        treeNode = wait.until(ExpectedConditions.presenceOfElementLocated(By.xpath(xp)));
+        if (treeNode != null) {
+          // Scroll into view and try to click
+          ((JavascriptExecutor) driver)
+              .executeScript("arguments[0].scrollIntoView({block: 'center'});", treeNode);
+          try {
+            wait.until(ExpectedConditions.elementToBeClickable(treeNode));
+            clickAndWait(treeNode);
+            return;
+          } catch (Exception clickEx) {
+            // fallback to JS click
+            try {
+              ((JavascriptExecutor) driver).executeScript("arguments[0].click();", treeNode);
+              Thread.sleep(300);
+              return;
+            } catch (Exception jsEx) {
+              LOG.debug(
+                  "clickTreeNode: failed to click xpath {}: {}, {}",
+                  xp,
+                  clickEx.getMessage(),
+                  jsEx.getMessage());
+            }
+          }
+        }
+      } catch (Exception e) {
+        LOG.debug("clickTreeNode: xpath {} not found: {}", xp, e.getMessage());
+      }
+    }
+
+    // If we reach here, we couldn't find/click the node; throw a descriptive error
+    throw new InterruptedException(
+        "clickTreeNode: could not locate or click tree node '" + nodeName + "'");
   }
 
   public void clickTreeNodeRefresh(String nodeKey) throws InterruptedException {
@@ -1265,7 +1311,24 @@ public class CatalogsPage extends BaseWebIT {
       }
       List<String> texts = new ArrayList<>();
       for (WebElement text : tooltipCols) {
-        texts.add(text.getText());
+        String t = text.getText() == null ? "" : text.getText().trim();
+        if (t.isEmpty()) {
+          // try to extract non-empty text from descendants (some UI versions render text in child
+          // spans)
+          try {
+            List<WebElement> descendants = text.findElements(By.xpath(".//*"));
+            for (WebElement d : descendants) {
+              String dt = d.getText() == null ? "" : d.getText().trim();
+              if (!dt.isEmpty()) {
+                texts.add(dt);
+              }
+            }
+          } catch (Exception e) {
+            LOG.debug("extract descendants text failed: {}", e.getMessage());
+          }
+        } else {
+          texts.add(t);
+        }
       }
       List<String> colsTexts = new ArrayList<>();
       for (String col : cols) {
