@@ -33,7 +33,6 @@ import org.apache.gravitino.StringIdentifier;
 import org.apache.gravitino.catalog.clickhouse.ClickHouseConfig;
 import org.apache.gravitino.catalog.jdbc.converter.JdbcExceptionConverter;
 import org.apache.gravitino.catalog.jdbc.operation.JdbcDatabaseOperations;
-import org.apache.gravitino.exceptions.SchemaAlreadyExistsException;
 
 public class ClickHouseDatabaseOperations extends JdbcDatabaseOperations {
 
@@ -85,12 +84,6 @@ public class ClickHouseDatabaseOperations extends JdbcDatabaseOperations {
     } catch (final SQLException se) {
       throw this.exceptionMapper.toGravitinoException(se);
     }
-  }
-
-  @Override
-  public void create(String databaseName, String comment, Map<String, String> properties)
-      throws SchemaAlreadyExistsException {
-    super.create(databaseName, comment, properties);
   }
 
   @Override
