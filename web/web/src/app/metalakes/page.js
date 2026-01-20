@@ -132,7 +132,7 @@ const MetalakeList = () => {
     }
 
     modal.confirm({
-      title: `Are you sure to delete the ${type} ${name}?`,
+      title: `Are you sure to delete the ${type} ${metalake}?`,
       icon: <ExclamationCircleFilled />,
       content: (
         <NameContext.Consumer>

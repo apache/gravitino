@@ -27,7 +27,6 @@ import useResizeObserver from 'use-resize-observer'
 import AssociatedTable from '@/components/AssociatedTable'
 import Tags from '@/components/CustomTags'
 import Policies from '@/components/PolicyTag'
-import DataPreview from './DataPreview'
 import Icons from '@/components/Icons'
 import { ColumnTypeColorEnum } from '@/config'
 import { cn } from '@/lib/utils/tailwind'
@@ -613,16 +612,6 @@ export default function TableDetailsPage({ ...props }) {
             />
           </Spin>
         </>
-      )}
-      {tabKey === 'Data preview' && (
-        <DataPreview
-          namespaces={{
-            currentMetalake,
-            catalog: decodeURIComponent(catalog),
-            schema: decodeURIComponent(schema),
-            table: decodeURIComponent(table)
-          }}
-        />
       )}
       {tabKey === 'Associated roles' && anthEnable && (
         <AssociatedTable
