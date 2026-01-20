@@ -111,10 +111,12 @@ export default function UserSetting() {
                   params.set('metalake', metalake.name)
 
                   // Reset metalake store to avoid data inconsistency
-                  dispatch(resetMetalakeStore())
+                  dispatch(resetMetalakeStore({ isCacheMetalakes: true }))
 
-                  // Preserve pathname and only update metalake in query string
-                  router.push(`${pathname}?${params.toString()}`)
+                  // Preserve pathname and only update metalake in query string, catalogs page goes to catalogs route
+                  isCatalogsPage
+                    ? router.push(`/catalogs?metalake=${metalake.name}&catalogType=relational`)
+                    : router.push(`${pathname}?${params.toString()}`)
                 }}
               >
                 <span

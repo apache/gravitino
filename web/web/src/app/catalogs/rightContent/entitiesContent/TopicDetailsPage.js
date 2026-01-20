@@ -27,7 +27,7 @@ import AssociatedTable from '@/components/AssociatedTable'
 import Tags from '@/components/CustomTags'
 import Policies from '@/components/PolicyTag'
 import Icons from '@/components/Icons'
-import PropertiesGrid from '@/components/PropertiesContent'
+import PropertiesContent from '@/components/PropertiesContent'
 import { cn } from '@/lib/utils/tailwind'
 import { useAppSelector, useAppDispatch } from '@/lib/hooks/useStore'
 import { useSearchParams } from 'next/navigation'
@@ -90,7 +90,7 @@ export default function TopicDetailsPage({ ...props }) {
   const properties = store.activatedDetails?.properties
 
   const propertyContent = (
-    <PropertiesGrid properties={properties} dataReferPrefix='props' contentDataRefer='properties-popover-content' />
+    <PropertiesContent properties={properties} dataReferPrefix='props' contentDataRefer='properties-popover-content' />
   )
   const tabOptions = [{ label: 'Associated roles', key: 'Associated roles' }]
 

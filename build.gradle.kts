@@ -94,15 +94,6 @@ project.extra["extraJvmArgs"] =
 val pythonVersion: String = project.properties["pythonVersion"] as? String ?: project.extra["pythonVersion"].toString()
 project.extra["pythonVersion"] = pythonVersion
 
-// If caller passed -PfrontendBuild=build:old, forward frontendDist=dist:old
-// into the :web project as early as possible so the :web build script
-// sees the property during its configuration phase.
-if (project.hasProperty("frontendBuild") && project.property("frontendBuild").toString() == "build:old") {
-  val fd = "dist:old"
-  println("root: detected -PfrontendBuild=build:old — forwarding frontendDist='$fd' to :web (early)")
-  project(":web").extensions.extraProperties.set("frontendDist", fd)
-}
-
 licenseReport {
   renderers = arrayOf<ReportRenderer>(InventoryHtmlReportRenderer("report.html", "Backend"))
   filters = arrayOf<DependencyFilter>(LicenseBundleNormalizer())
@@ -724,16 +715,6 @@ tasks {
   val outputDir = projectDir.dir("distribution")
 
   val compileDistribution by registering {
-    // Determine which web build task to depend on. If caller passed
-    // -PfrontendBuild=build:old, depend on the local `buildWebLegacy` task
-    // which sets the :web.frontendDist before invoking `:web:web:build`.
-    val webBuildDependency: String = if (project.hasProperty("frontendBuild") && project.property("frontendBuild").toString() == "build:old") {
-      println("compileDistribution: using legacy web build task 'buildWebLegacy'")
-      "buildWebLegacy"
-    } else {
-      ":web:web:build"
-    }
-
     dependsOn(
       "copyCatalogLibAndConfigs",
       "copySubprojectDependencies",
@@ -792,21 +773,6 @@ tasks {
       val directory = File("distribution/package/data")
       directory.mkdirs()
     }
-  }
-
-  // Task to run the web subproject build using the legacy frontend dist script
-  // (sets :web frontendDist = "dist:old" before invoking :web:web:build).
-  val buildWebLegacy by registering {
-    group = "gravitino distribution"
-    description = "Build :web:web:build using legacy frontend (frontendDist=dist:old)"
-
-    doFirst {
-      val fd = "dist:old"
-      println("buildWebLegacy: setting :web frontendDist='$fd'")
-      project(":web").extensions.extraProperties.set("frontendDist", fd)
-    }
-
-    dependsOn(":web:web:build")
   }
 
   val compileIcebergRESTServer by registering {

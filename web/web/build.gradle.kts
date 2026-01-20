@@ -45,23 +45,9 @@ tasks {
     args = listOf("prettier:check")
   }
 
-  val webpack by registering(PnpmTask::class) {
-    dependsOn(lintCheck, prettierCheck)
-    // Allow overriding the frontend dist task via Gradle project property:
-    // -PfrontendDist=dist:old  -> run `pnpm run dist:old`
-    // -PfrontendDist=dist      -> run `pnpm run dist` (default)
-    val frontendDistArg: String = if (project.hasProperty("frontendDist")) {
-      project.property("frontendDist").toString()
-    } else {
-      "dist"
-    }
-    args = listOf(frontendDistArg)
-    environment.put("NODE_ENV", "production")
-  }
-
   // Separate webpack task for legacy frontend to produce the "old" dist.
   val webpackOld by registering(PnpmTask::class) {
-    dependsOn(installDeps)
+    dependsOn(lintCheck, prettierCheck)
     args = listOf("dist:old")
     environment.put("NODE_ENV", "production")
     doLast {
@@ -77,6 +63,20 @@ tasks {
         }
       }
     }
+  }
+
+  val webpack by registering(PnpmTask::class) {
+    dependsOn(lintCheck, prettierCheck, webpackOld)
+    // Allow overriding the frontend dist task via Gradle project property:
+    // -PfrontendDist=dist:old  -> run `pnpm run dist:old`
+    // -PfrontendDist=dist      -> run `pnpm run dist` (default)
+    val frontendDistArg: String = if (project.hasProperty("frontendDist")) {
+      project.property("frontendDist").toString()
+    } else {
+      "dist"
+    }
+    args = listOf(frontendDistArg)
+    environment.put("NODE_ENV", "production")
   }
 
   // War task for legacy frontend (produces classifier '-old')
@@ -109,7 +109,7 @@ tasks {
     if (project.hasProperty("frontendDist") && project.property("frontendDist").toString() == "dist:old") {
       dependsOn(buildWarOld)
     } else {
-      dependsOn(buildWarOld, buildWarNew)
+      dependsOn(buildWarNew, buildWarOld)
     }
   }
 

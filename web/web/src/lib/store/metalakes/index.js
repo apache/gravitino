@@ -1755,7 +1755,9 @@ export const appMetalakesSlice = createSlice({
       state.tableProps = action.payload
     },
     resetMetalakeStore(state, action) {
-      state.metalakes = []
+      if (!action.payload?.isCacheMetalakes) {
+        state.metalakes = []
+      }
       state.filteredMetalakes = []
       state.tableData = []
       state.tableProps = []

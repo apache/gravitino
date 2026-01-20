@@ -32,5 +32,9 @@ GRAVITINO_VERSION=GRAVITINO_VERSION_PLACEHOLDER
 #                             # Default: -Xms1024m -Xmx1024m -XX:MaxMetaspaceSize=512m
 #                             # Appended to JAVA_OPTS by launch scripts; set GRAVITINO_MEM to change heap/metaspace sizes.
 
-# default use old UI, set GRAVITINO_USE_OLD_UI=false will use new UI
-# GRAVITINO_USE_OLD_UI=false
+# UI selection behaviour:
+# - By default the template sets `GRAVITINO_USE_OLD_UI=false` which forces the NEW UI.
+# - To enable the OLD UI you can EITHER remove this environment variable line from
+#   your env file (i.e. delete the `GRAVITINO_USE_OLD_UI=...` entry) OR set it to
+#   `true` (for example: `export GRAVITINO_USE_OLD_UI=true`).
+GRAVITINO_USE_OLD_UI=false
