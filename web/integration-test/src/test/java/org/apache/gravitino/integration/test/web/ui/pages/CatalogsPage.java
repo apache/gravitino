@@ -1199,16 +1199,42 @@ public class CatalogsPage extends BaseWebIT {
       // Ant Design Table structure: thead > tr > th
       List<WebElement> columnHeadersRows =
           columnHeaders.findElements(By.xpath("./th[contains(@class, 'ant-table-cell')]"));
-      if (columnHeadersRows.size() != columns.size()) {
+      // Filter out header cells that have no visible text (selection/expand columns)
+      List<String> headerTexts = new ArrayList<>();
+      for (WebElement th : columnHeadersRows) {
+        String txt = th.getText() == null ? "" : th.getText().trim();
+        boolean hasInteractiveChild = false;
+        try {
+          // if header contains inputs/icons/buttons and no text, treat as non-data header
+          List<WebElement> interactive =
+              th.findElements(By.xpath(".//input|.//button|.//svg|.//i"));
+          if (interactive != null && !interactive.isEmpty()) {
+            hasInteractiveChild = true;
+          }
+        } catch (Exception e) {
+          LOG.debug("Error checking interactive children of header: {}", e.getMessage());
+        }
+
+        if (!txt.isEmpty()) {
+          headerTexts.add(txt);
+        } else if (!hasInteractiveChild) {
+          // If there is no interactive child but text is empty, still skip it
+          // (some UIs render invisible helper headers)
+          continue;
+        }
+      }
+
+      if (headerTexts.size() != columns.size()) {
         LOG.error(
-            "Column headers count does not match, expected: {}, actual: {}",
+            "Column headers count does not match after filtering, expected: {}, actual: {} -> {}",
             columns.size(),
-            columnHeadersRows.size());
+            headerTexts.size(),
+            headerTexts);
         return false;
       }
 
-      for (int i = 0; i < columnHeadersRows.size(); i++) {
-        String headerText = columnHeadersRows.get(i).getText();
+      for (int i = 0; i < columns.size(); i++) {
+        String headerText = headerTexts.get(i);
         if (!headerText.equals(columns.get(i))) {
           LOG.error("Column header '{}' does not match, expected '{}'", headerText, columns.get(i));
           return false;
