@@ -19,7 +19,7 @@
 
 package org.apache.gravitino.catalog.clickhouse;
 
-public class ClickhouseConstants {
+public class ClickHouseConstants {
 
   // Name of the clickhouse cluster
   public static final String CLUSTER_NAME = "cluster-name";

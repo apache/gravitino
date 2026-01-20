@@ -66,14 +66,4 @@ public class TestClickHouseDatabaseOperations {
     String sql = newOps(conf).buildCreateSql("db_name", "comment", Collections.emptyMap());
     Assertions.assertEquals("CREATE DATABASE `db_name` COMMENT 'comment'", sql);
   }
-
-  @Test
-  void testGenerateCreateDatabaseSqlWithPropertiesThrows() {
-    Map<String, String> conf = new HashMap<>();
-    TestableClickHouseDatabaseOperations ops = newOps(conf);
-
-    Assertions.assertEquals(
-        "CREATE DATABASE `db_name` COMMENT 'comment'",
-        ops.buildCreateSql("db_name", "comment", Collections.emptyMap()));
-  }
 }

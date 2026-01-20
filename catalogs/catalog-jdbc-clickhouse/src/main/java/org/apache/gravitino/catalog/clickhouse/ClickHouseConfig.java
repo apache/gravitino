@@ -19,9 +19,9 @@
 
 package org.apache.gravitino.catalog.clickhouse;
 
-import static org.apache.gravitino.catalog.clickhouse.ClickhouseConstants.CLUSTER_NAME;
-import static org.apache.gravitino.catalog.clickhouse.ClickhouseConstants.CLUSTER_SHARDING_KEY;
-import static org.apache.gravitino.catalog.clickhouse.ClickhouseConstants.ON_CLUSTER;
+import static org.apache.gravitino.catalog.clickhouse.ClickHouseConstants.CLUSTER_NAME;
+import static org.apache.gravitino.catalog.clickhouse.ClickHouseConstants.CLUSTER_SHARDING_KEY;
+import static org.apache.gravitino.catalog.clickhouse.ClickHouseConstants.ON_CLUSTER;
 
 import org.apache.gravitino.config.ConfigBuilder;
 import org.apache.gravitino.config.ConfigConstants;

@@ -46,7 +46,7 @@ public class ClickHouseDatabaseOperations extends JdbcDatabaseOperations {
     super.initialize(dataSource, exceptionMapper, conf);
 
     final String cn = conf.get(ClickHouseConfig.CK_CLUSTER_NAME.getKey());
-    if (StringUtils.isNoneBlank(cn)) {
+    if (StringUtils.isNotBlank(cn)) {
       clusterName = cn;
     }
 
