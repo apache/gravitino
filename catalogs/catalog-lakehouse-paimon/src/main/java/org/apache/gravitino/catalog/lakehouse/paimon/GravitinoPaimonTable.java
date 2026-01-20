@@ -18,6 +18,8 @@
  */
 package org.apache.gravitino.catalog.lakehouse.paimon;
 
+import static org.apache.gravitino.catalog.lakehouse.paimon.PaimonTablePropertiesMetadata.BUCKET;
+import static org.apache.gravitino.catalog.lakehouse.paimon.PaimonTablePropertiesMetadata.BUCKET_KEY;
 import static org.apache.gravitino.catalog.lakehouse.paimon.PaimonTablePropertiesMetadata.COMMENT;
 import static org.apache.gravitino.dto.rel.partitioning.Partitioning.EMPTY_PARTITIONING;
 import static org.apache.gravitino.meta.AuditInfo.EMPTY;
@@ -34,9 +36,14 @@ import java.util.Map;
 import java.util.stream.Collectors;
 import lombok.Getter;
 import lombok.ToString;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.connector.BaseTable;
 import org.apache.gravitino.connector.TableOperations;
+import org.apache.gravitino.rel.expressions.Expression;
 import org.apache.gravitino.rel.expressions.NamedReference;
+import org.apache.gravitino.rel.expressions.distributions.Distribution;
+import org.apache.gravitino.rel.expressions.distributions.Distributions;
+import org.apache.gravitino.rel.expressions.distributions.Strategy;
 import org.apache.gravitino.rel.expressions.transforms.Transform;
 import org.apache.gravitino.rel.expressions.transforms.Transforms;
 import org.apache.gravitino.rel.indexes.Index;
@@ -79,6 +86,9 @@ public class GravitinoPaimonTable extends BaseTable {
 
     Map<String, String> normalizedProperties = new HashMap<>(properties);
     normalizedProperties.remove(COMMENT);
+    normalizedProperties.remove(BUCKET_KEY);
+    normalizedProperties.remove(BUCKET);
+    applyDistribution(normalizedProperties, distribution);
 
     List<String> partitionKeys = getPartitionKeys(partitioning);
     List<String> primaryKeys = getPrimaryKeysFromIndexes(indexes);
@@ -106,6 +116,7 @@ public class GravitinoPaimonTable extends BaseTable {
             GravitinoPaimonColumn.fromPaimonRowType(table.rowType())
                 .toArray(new GravitinoPaimonColumn[0]))
         .withPartitioning(toGravitinoPartitioning(table.partitionKeys()))
+        .withDistribution(getDistribution(table.options()))
         .withComment(table.comment().orElse(null))
         .withProperties(table.options())
         .withIndexes(constructIndexesFromPrimaryKeys(table))
@@ -188,6 +199,61 @@ public class GravitinoPaimonTable extends BaseTable {
     }
   }
 
+  private static void applyDistribution(Map<String, String> properties, Distribution distribution) {
+    if (distribution == null || distribution.strategy() == Distributions.NONE.strategy()) {
+      return;
+    }
+
+    List<String> bucketKeys = getBucketKeys(distribution);
+    if (!bucketKeys.isEmpty()) {
+      properties.put(BUCKET_KEY, String.join(",", bucketKeys));
+    }
+
+    if (distribution.number() != Distributions.AUTO) {
+      properties.put(BUCKET, String.valueOf(distribution.number()));
+    }
+  }
+
+  private static List<String> getBucketKeys(Distribution distribution) {
+    return Arrays.stream(distribution.expressions())
+        .map(
+            expression -> {
+              Preconditions.checkArgument(
+                  expression instanceof NamedReference,
+                  "Paimon bucket keys must be named references.");
+              String[] fieldName = ((NamedReference) expression).fieldName();
+              Preconditions.checkArgument(
+                  fieldName.length == 1, "Paimon bucket keys must be single columns.");
+              return fieldName[0];
+            })
+        .collect(Collectors.toList());
+  }
+
+  private static Distribution getDistribution(Map<String, String> properties) {
+    if (properties == null) {
+      return Distributions.NONE;
+    }
+    String bucketKeys = properties.get(BUCKET_KEY);
+    if (StringUtils.isBlank(bucketKeys)) {
+      return Distributions.NONE;
+    }
+    List<String> bucketKeyList =
+        Arrays.stream(bucketKeys.split(","))
+            .map(String::trim)
+            .filter(StringUtils::isNotEmpty)
+            .collect(Collectors.toList());
+    if (bucketKeyList.isEmpty()) {
+      return Distributions.NONE;
+    }
+    Expression[] expressions =
+        bucketKeyList.stream().map(NamedReference::field).toArray(Expression[]::new);
+    String bucketValue = properties.get(BUCKET);
+    if (StringUtils.isBlank(bucketValue)) {
+      return Distributions.auto(Strategy.HASH, expressions);
+    }
+    return Distributions.hash(Integer.parseInt(bucketValue.trim()), expressions);
+  }
+
   /** A builder class for constructing {@link GravitinoPaimonTable} instance. */
   public static class Builder extends BaseTableBuilder<Builder, GravitinoPaimonTable> {
 
@@ -206,6 +272,7 @@ public class GravitinoPaimonTable extends BaseTable {
       paimonTable.comment = comment;
       paimonTable.columns = columns;
       paimonTable.partitioning = partitioning;
+      paimonTable.distribution = distribution;
       paimonTable.properties = properties == null ? Maps.newHashMap() : Maps.newHashMap(properties);
       paimonTable.indexes = indexes;
       paimonTable.auditInfo = auditInfo;
