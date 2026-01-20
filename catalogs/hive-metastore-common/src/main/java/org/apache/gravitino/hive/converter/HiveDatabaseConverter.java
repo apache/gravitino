@@ -58,6 +58,7 @@ public class HiveDatabaseConverter {
             .build();
     return hiveSchema;
   }
+
   /**
    * Add a comment on lines L57 to L65Add diff commentMarkdown input: edit mode
    * selected.WritePreviewHeadingBoldItalicQuoteCodeLinkUnordered listNumbered listTask
@@ -78,14 +79,17 @@ public class HiveDatabaseConverter {
     Database hiveDb = new Database();
 
     hiveDb.setName(hiveSchema.name());
-    Optional.ofNullable(hiveSchema.properties().get(LOCATION)).ifPresent(hiveDb::setLocationUri);
+    Optional.ofNullable(hiveSchema.properties())
+        .map(props -> props.get(LOCATION))
+        .ifPresent(hiveDb::setLocationUri);
     Optional.ofNullable(hiveSchema.comment()).ifPresent(hiveDb::setDescription);
 
     // TODO: Add more privilege info to Hive's Database object after Gravitino supports privilege.
     hiveDb.setOwnerName(hiveSchema.auditInfo().creator());
     hiveDb.setOwnerType(PrincipalType.USER);
 
-    Map<String, String> parameters = new HashMap<>(hiveSchema.properties());
+    Map<String, String> parameters =
+        Optional.ofNullable(hiveSchema.properties()).map(HashMap::new).orElseGet(HashMap::new);
     parameters.remove(LOCATION);
     hiveDb.setParameters(parameters);
 
