@@ -459,9 +459,9 @@ public class CatalogsPageTest extends BaseWebIT {
     mouseMoveTo(By.xpath("//*[@data-refer='col-icon-" + SORT_ORDERS + "-" + COLUMN_NAME_2 + "']"));
     Assertions.assertTrue(catalogsPage.verifyTableProperties(SORT_ORDERS, COLUMN_NAME_2));
 
-    // Move away first to close the popover, then move to overview
+    // Move away first to close the popover, then hover the overview area and verify
     mouseMoveTo(By.xpath("//*[@data-refer='table-grid']"));
-    mouseMoveTo(By.xpath("//*[@data-refer='overview-tip-" + SORT_ORDERS + "']"));
+    catalogsPage.hoverOverviewTip(SORT_ORDERS);
     Assertions.assertTrue(
         catalogsPage.verifyTablePropertiesOverview(Arrays.asList(COLUMN_NAME, COLUMN_NAME_2)));
   }

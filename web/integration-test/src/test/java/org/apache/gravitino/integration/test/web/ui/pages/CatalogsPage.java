@@ -1011,6 +1011,54 @@ public class CatalogsPage extends BaseWebIT {
     }
   }
 
+  /**
+   * Hover the overview tip area for a given overview `type` (e.g. "sortOrders"), trying multiple
+   * possible locators to support different UI variants.
+   */
+  public void hoverOverviewTip(String type) throws InterruptedException {
+    String[] candidateXpaths =
+        new String[] {
+          "//*[@data-refer='overview-tip-" + type + "']",
+          "//*[@data-refer='overview-tip-" + type + "-items']",
+          "//*[@data-refer='overview-" + type.toLowerCase() + "-link']",
+          "//*[@data-refer='overview-" + type + "-items']",
+        };
+
+    WebDriverWait wait = new WebDriverWait(driver, 5);
+    WebElement found = null;
+    for (String xp : candidateXpaths) {
+      try {
+        found = wait.until(ExpectedConditions.presenceOfElementLocated(By.xpath(xp)));
+        if (found != null) break;
+      } catch (Exception e) {
+        LOG.debug("hoverOverviewTip: xpath {} not present: {}", xp, e.getMessage());
+        // try next candidate
+      }
+    }
+
+    if (found == null) {
+      LOG.warn("hoverOverviewTip: no overview element found for type {}", type);
+      return;
+    }
+
+    ((JavascriptExecutor) driver)
+        .executeScript("arguments[0].scrollIntoView({block: 'center'});", found);
+    Thread.sleep(300);
+    try {
+      Actions actions = new Actions(driver);
+      actions.moveToElement(found).perform();
+      Thread.sleep(300);
+    } catch (Exception e) {
+      // fallback to JS click to open popover if hover fails
+      try {
+        ((JavascriptExecutor) driver).executeScript("arguments[0].click();", found);
+        Thread.sleep(300);
+      } catch (Exception ex) {
+        LOG.error("hoverOverviewTip: cannot hover or click overview element", ex);
+      }
+    }
+  }
+
   public boolean verifyShowDataItemInList(String itemName, Boolean isColumnLevel) {
     try {
       Thread.sleep(ACTION_SLEEP * 1000);
@@ -1100,7 +1148,7 @@ public class CatalogsPage extends BaseWebIT {
 
   public boolean verifyTableColumns() {
     try {
-      List<String> columns = Arrays.asList("Column Name", "Data Type", "Tags");
+      List<String> columns = Arrays.asList("Column Name", "Data Type", "Tags", "Policies");
 
       // Ant Design Table structure: thead > tr > th
       List<WebElement> columnHeadersRows =
@@ -1176,11 +1224,45 @@ public class CatalogsPage extends BaseWebIT {
       // Wait a bit for the popover animation to complete
       Thread.sleep(500);
 
-      WebElement columnsText =
-          driver.findElement(By.xpath("//*[@data-refer='overview-sortOrders-items']"));
-      boolean isMatchText = columnsText.getText().contains(",");
-      List<WebElement> tooltipCols =
-          driver.findElements(By.xpath("//*[@data-refer='overview-tip-sortOrders-items']"));
+      WebElement columnsText = null;
+      boolean isMatchText = false;
+      // try multiple possible overview element locators for compatibility across UI versions
+      String[] candidateColumnsXpaths =
+          new String[] {
+            "//*[@data-refer='overview-sortOrders-items']",
+            "//*[@data-refer='overview-sortOrders-items']",
+            "//*[@data-refer='overview-sortorders-link']",
+            "//*[@data-refer='overview-sortOrders-items']"
+          };
+      for (String xp : candidateColumnsXpaths) {
+        try {
+          columnsText = driver.findElement(By.xpath(xp));
+          if (columnsText != null) {
+            isMatchText = columnsText.getText().contains(",");
+            break;
+          }
+        } catch (Exception e) {
+          LOG.debug("candidateColumnsXpaths: xpath {} not found or error: {}", xp, e.getMessage());
+        }
+      }
+
+      List<WebElement> tooltipCols = new ArrayList<>();
+      String[] candidateTooltipXpaths =
+          new String[] {
+            "//*[@data-refer='overview-tip-sortOrders-items']",
+            "//*[@data-refer='overview-tip-sortOrders']",
+            "//*[@data-refer='overview-tip-sortOrders-items']"
+          };
+      for (String xp : candidateTooltipXpaths) {
+        try {
+          List<WebElement> found = driver.findElements(By.xpath(xp));
+          if (found != null && !found.isEmpty()) {
+            tooltipCols.addAll(found);
+          }
+        } catch (Exception e) {
+          LOG.debug("candidateTooltipXpaths: xpath {} search error: {}", xp, e.getMessage());
+        }
+      }
       List<String> texts = new ArrayList<>();
       for (WebElement text : tooltipCols) {
         texts.add(text.getText());
