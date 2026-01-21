@@ -49,6 +49,8 @@ public abstract class GravitinoClientBase implements Closeable {
 
   /** The REST client to communicate with the REST server */
   protected final RESTClient restClient;
+  /** Environment variable to disable version checks. */
+  private static final String VERSION_CHECK_DISABLED_ENV = "GRAVITINO_VERSION_CHECK_DISABLED";
   /** The REST API path for listing metalakes */
   protected static final String API_METALAKES_LIST_PATH = "api/metalakes";
   /** The REST API path prefix for load a specific metalake */
@@ -220,6 +222,21 @@ public abstract class GravitinoClientBase implements Closeable {
      */
     protected Builder(String uri) {
       this.uri = uri;
+    }
+
+    protected boolean isVersionCheckEnabled() {
+      return checkVersion && !isVersionCheckDisabledByEnv();
+    }
+
+    @VisibleForTesting
+    protected boolean isVersionCheckDisabledByEnv() {
+      String envValue = versionCheckDisabledEnvValue();
+      return envValue != null && "true".equalsIgnoreCase(envValue.trim());
+    }
+
+    @VisibleForTesting
+    protected String versionCheckDisabledEnvValue() {
+      return System.getenv(VERSION_CHECK_DISABLED_ENV);
     }
 
     /**
