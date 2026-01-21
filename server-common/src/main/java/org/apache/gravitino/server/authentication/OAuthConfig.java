@@ -144,4 +144,11 @@ public interface OAuthConfig {
           .version(ConfigConstants.VERSION_1_0_0)
           .stringConf()
           .createWithDefault("org.apache.gravitino.server.authentication.StaticSignKeyValidator");
+
+  ConfigEntry<String> USER_MAPPING_PATTERN =
+      new ConfigBuilder(OAUTH_CONFIG_PREFIX + "userMappingPattern")
+          .doc("Regex pattern to extract the username from the OAuth principal field.")
+          .version(ConfigConstants.VERSION_1_2_0)
+          .stringConf()
+          .createWithDefault("^(.*)$");
 }

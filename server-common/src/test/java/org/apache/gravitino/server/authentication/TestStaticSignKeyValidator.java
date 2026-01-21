@@ -253,4 +253,85 @@ public class TestStaticSignKeyValidator {
     assertNotNull(principal);
     assertEquals("test-user", principal.getName());
   }
+
+  @Test
+  public void testUserMappingPatternWithDefaultPattern() {
+    Map<String, String> config = createBaseConfig();
+    config.put("gravitino.authenticator.oauth.userMappingPattern", "(.*)");
+    validator.initialize(createConfig(config));
+
+    String token =
+        Jwts.builder()
+            .setSubject("user@example.com")
+            .setAudience(serviceAudience)
+            .setIssuedAt(Date.from(Instant.now()))
+            .setExpiration(Date.from(Instant.now().plusSeconds(3600)))
+            .signWith(hmacKey, SignatureAlgorithm.HS256)
+            .compact();
+
+    Principal principal = validator.validateToken(token, serviceAudience);
+    assertNotNull(principal);
+    assertEquals("user@example.com", principal.getName()); // Should match entire subject
+  }
+
+  @Test
+  public void testUserMappingPatternExtractEmailLocalPart() {
+    Map<String, String> config = createBaseConfig();
+    config.put("gravitino.authenticator.oauth.userMappingPattern", "([^@]+)@.*");
+    validator.initialize(createConfig(config));
+
+    String token =
+        Jwts.builder()
+            .setSubject("john.doe@example.com")
+            .setAudience(serviceAudience)
+            .setIssuedAt(Date.from(Instant.now()))
+            .setExpiration(Date.from(Instant.now().plusSeconds(3600)))
+            .signWith(hmacKey, SignatureAlgorithm.HS256)
+            .compact();
+
+    Principal principal = validator.validateToken(token, serviceAudience);
+    assertNotNull(principal);
+    assertEquals("john.doe", principal.getName()); // Should extract local part only
+  }
+
+  @Test
+  public void testUserMappingPatternNoMatch() {
+    Map<String, String> config = createBaseConfig();
+    config.put("gravitino.authenticator.oauth.userMappingPattern", "([^@]+)@.*");
+    validator.initialize(createConfig(config));
+
+    String token =
+        Jwts.builder()
+            .setSubject("plainuser")
+            .setAudience(serviceAudience)
+            .setIssuedAt(Date.from(Instant.now()))
+            .setExpiration(Date.from(Instant.now().plusSeconds(3600)))
+            .signWith(hmacKey, SignatureAlgorithm.HS256)
+            .compact();
+
+    Principal principal = validator.validateToken(token, serviceAudience);
+    assertNotNull(principal);
+    // Should return original principal when pattern doesn't match
+    assertEquals("plainuser", principal.getName());
+  }
+
+  @Test
+  public void testUserMappingPatternKerberosPrincipal() {
+    Map<String, String> config = createBaseConfig();
+    config.put("gravitino.authenticator.oauth.userMappingPattern", "([^/@]+).*");
+    validator.initialize(createConfig(config));
+
+    String token =
+        Jwts.builder()
+            .setSubject("admin/host.example.com@EXAMPLE.COM")
+            .setAudience(serviceAudience)
+            .setIssuedAt(Date.from(Instant.now()))
+            .setExpiration(Date.from(Instant.now().plusSeconds(3600)))
+            .signWith(hmacKey, SignatureAlgorithm.HS256)
+            .compact();
+
+    Principal principal = validator.validateToken(token, serviceAudience);
+    assertNotNull(principal);
+    assertEquals("admin", principal.getName()); // Should extract username only
+  }
 }

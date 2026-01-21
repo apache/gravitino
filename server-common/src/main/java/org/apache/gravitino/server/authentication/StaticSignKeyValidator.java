@@ -41,6 +41,7 @@ import org.apache.gravitino.Config;
 import org.apache.gravitino.UserPrincipal;
 import org.apache.gravitino.auth.SignatureAlgorithmFamilyType;
 import org.apache.gravitino.exceptions.UnauthorizedException;
+import org.apache.gravitino.utils.PrincipalUtils;
 
 /**
  * Static OAuth token validator that uses a pre-configured signing key for JWT validation.
@@ -52,6 +53,7 @@ import org.apache.gravitino.exceptions.UnauthorizedException;
 public class StaticSignKeyValidator implements OAuthTokenValidator {
   private long allowSkewSeconds;
   private Key defaultSigningKey;
+  private String userMappingPattern;
 
   @Override
   public void initialize(Config config) {
@@ -65,6 +67,7 @@ public class StaticSignKeyValidator implements OAuthTokenValidator {
         "The uri of the default OAuth server can't be blank");
     String algType = config.get(OAuthConfig.SIGNATURE_ALGORITHM_TYPE);
     this.defaultSigningKey = decodeSignKey(Base64.getDecoder().decode(configuredSignKey), algType);
+    this.userMappingPattern = config.get(OAuthConfig.USER_MAPPING_PATTERN);
   }
 
   @Override
@@ -97,7 +100,10 @@ public class StaticSignKeyValidator implements OAuthTokenValidator {
         throw new UnauthorizedException(
             "Audiences in token is not in expected format: %s", audienceObject);
       }
-      return new UserPrincipal(jwt.getBody().getSubject());
+
+      String mappedPrincipal =
+          PrincipalUtils.applyUserMappingPattern(jwt.getBody().getSubject(), userMappingPattern);
+      return new UserPrincipal(mappedPrincipal);
     } catch (ExpiredJwtException
         | UnsupportedJwtException
         | MalformedJwtException

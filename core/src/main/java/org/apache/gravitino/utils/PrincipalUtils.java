@@ -23,6 +23,10 @@ import com.google.common.base.Throwables;
 import java.security.Principal;
 import java.security.PrivilegedActionException;
 import java.security.PrivilegedExceptionAction;
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 import javax.security.auth.Subject;
 import org.apache.gravitino.UserPrincipal;
 import org.apache.gravitino.auth.AuthConstants;
@@ -33,6 +37,7 @@ import org.slf4j.LoggerFactory;
 public class PrincipalUtils {
 
   private static final Logger LOG = LoggerFactory.getLogger(PrincipalUtils.class);
+  private static final Map<String, Pattern> PATTERN_CACHE = new ConcurrentHashMap<>();
 
   private PrincipalUtils() {}
 
@@ -65,5 +70,49 @@ public class PrincipalUtils {
 
   public static String getCurrentUserName() {
     return getCurrentPrincipal().getName();
+  }
+
+  /**
+   * Applies a user mapping pattern to extract the username from the principal. Similar to Trino's
+   * http-server.authentication.oauth2.user-mapping.pattern.
+   *
+   * <p>The regex pattern is matched against the principal. If matched and the pattern contains at
+   * least one capturing group, the username is replaced with the first regex group. If the pattern
+   * matches but has no capturing groups, the original principal is returned. If the pattern doesn't
+   * match at all, the original principal is returned.
+   *
+   * @param principal the principal name to apply the pattern to
+   * @param patternStr the regex pattern string. If null or empty, returns the original principal.
+   *     The default pattern "(.*)" allows any username.
+   * @return the extracted username from the first capturing group, or the original principal if no
+   *     match or no capturing group
+   * @throws IllegalArgumentException if the pattern string is invalid regex syntax
+   */
+  public static String applyUserMappingPattern(String principal, String patternStr) {
+    if (principal == null) {
+      return null;
+    }
+
+    if (patternStr == null || patternStr.isEmpty()) {
+      return principal;
+    }
+
+    try {
+      Pattern pattern = PATTERN_CACHE.computeIfAbsent(patternStr, Pattern::compile);
+      Matcher matcher = pattern.matcher(principal);
+
+      // If pattern matches and has at least one capturing group, return the first group
+      if (matcher.find() && matcher.groupCount() >= 1) {
+        String extracted = matcher.group(1);
+        // Return extracted value if it's not null and not empty, otherwise original principal
+        return (extracted != null && !extracted.isEmpty()) ? extracted : principal;
+      }
+
+      // If pattern doesn't match or has no capturing groups, return original principal
+      return principal;
+    } catch (Exception e) {
+      LOG.error("Invalid user mapping pattern: {}", patternStr, e);
+      throw new IllegalArgumentException("Invalid user mapping pattern: " + patternStr, e);
+    }
   }
 }

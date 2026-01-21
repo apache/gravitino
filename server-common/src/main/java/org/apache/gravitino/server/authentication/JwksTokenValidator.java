@@ -38,6 +38,7 @@ import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.Config;
 import org.apache.gravitino.UserPrincipal;
 import org.apache.gravitino.exceptions.UnauthorizedException;
+import org.apache.gravitino.utils.PrincipalUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -55,6 +56,7 @@ public class JwksTokenValidator implements OAuthTokenValidator {
   private String expectedIssuer;
   private List<String> principalFields;
   private long allowSkewSeconds;
+  private String userMappingPattern;
 
   @Override
   public void initialize(Config config) {
@@ -62,7 +64,7 @@ public class JwksTokenValidator implements OAuthTokenValidator {
     this.expectedIssuer = config.get(OAuthConfig.AUTHORITY);
     this.principalFields = config.get(OAuthConfig.PRINCIPAL_FIELDS);
     this.allowSkewSeconds = config.get(OAuthConfig.ALLOW_SKEW_SECONDS);
-
+    this.userMappingPattern = config.get(OAuthConfig.USER_MAPPING_PATTERN);
     LOG.info("Initializing JWKS token validator");
 
     if (StringUtils.isBlank(jwksUri)) {
@@ -132,7 +134,9 @@ public class JwksTokenValidator implements OAuthTokenValidator {
         throw new UnauthorizedException("No valid principal found in token");
       }
 
-      return new UserPrincipal(principal);
+      String mappedPrincipal =
+          PrincipalUtils.applyUserMappingPattern(principal, userMappingPattern);
+      return new UserPrincipal(mappedPrincipal);
 
     } catch (Exception e) {
       LOG.error("JWKS JWT validation error: {}", e.getMessage());
