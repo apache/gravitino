@@ -139,8 +139,8 @@ class DTOConverters:
     def from_dto(dto) -> object:
         raise IllegalArgumentException(f"Unsupported DTO type: {type(dto)}")
 
-    @from_dto.register
     @staticmethod
+    @from_dto.register
     def _(dto: DistributionDTO) -> Distribution:
         """Converts a DistributionDTO to a Distribution.
 
@@ -159,8 +159,8 @@ class DTOConverters:
             *DTOConverters.from_function_args(dto.args()),
         )
 
-    @from_dto.register
     @staticmethod
+    @from_dto.register
     def _(dto: IndexDTO) -> Index:
         """Converts an IndexDTO to an Index.
 
@@ -172,8 +172,8 @@ class DTOConverters:
         """
         return Indexes.of(dto.type(), dto.name(), dto.field_names())
 
-    @from_dto.register
     @staticmethod
+    @from_dto.register
     def _(dto: SortOrderDTO) -> SortOrder:
         """Converts a SortOrderDTO to a SortOrder.
 
@@ -189,8 +189,8 @@ class DTOConverters:
             dto.null_ordering(),
         )
 
-    @from_dto.register
     @staticmethod
+    @from_dto.register
     def _(dto: ColumnDTO) -> Column:
         """Converts a ColumnDTO to a Column.
 
@@ -211,8 +211,8 @@ class DTOConverters:
             DTOConverters.from_function_arg(dto.default_value()),
         )
 
-    @from_dto.register
     @staticmethod
+    @from_dto.register
     def _(dto: Partitioning) -> Transform:  # pylint: disable=too-many-return-statements
         """Converts a partitioning DTO to a Transform.
 
@@ -271,8 +271,8 @@ class DTOConverters:
             )
         raise IllegalArgumentException(f"Unsupported partitioning: {strategy}")
 
-    @from_dto.register
     @staticmethod
+    @from_dto.register
     def _(dto: TableDTO) -> Table:
         """Converts a TableDTO to a Table.
 
@@ -451,8 +451,8 @@ class DTOConverters:
     def to_dto(obj) -> object:
         raise IllegalArgumentException(f"Unsupported type: {type(obj)}")
 
-    @to_dto.register
     @staticmethod
+    @to_dto.register
     def _(obj: Partition) -> PartitionDTO:
         if isinstance(obj, RangePartition):
             range_partition = cast(RangePartition, obj)
@@ -494,8 +494,8 @@ class DTOConverters:
             f"Unsupported partition type: {obj.__class__.__name__}"
         )
 
-    @to_dto.register
     @staticmethod
+    @to_dto.register
     def _(obj: Column) -> ColumnDTO:
         return (
             ColumnDTO.builder()
@@ -513,13 +513,13 @@ class DTOConverters:
             .build()
         )
 
-    @to_dto.register
     @staticmethod
+    @to_dto.register
     def _(obj: SortOrderDTO) -> SortOrderDTO:
         return obj
 
-    @to_dto.register
     @staticmethod
+    @to_dto.register
     def _(obj: SortOrder) -> SortOrderDTO:
         return SortOrderDTO(
             sort_term=DTOConverters.to_function_arg(obj.expression()),
@@ -527,13 +527,13 @@ class DTOConverters:
             null_ordering=obj.null_ordering(),
         )
 
-    @to_dto.register
     @staticmethod
+    @to_dto.register
     def _(obj: IndexDTO) -> IndexDTO:
         return obj
 
-    @to_dto.register
     @staticmethod
+    @to_dto.register
     def _(obj: Index) -> IndexDTO:
         return IndexDTO(
             index_type=obj.type(),
@@ -541,13 +541,13 @@ class DTOConverters:
             field_names=obj.field_names(),
         )
 
-    @to_dto.register
     @staticmethod
+    @to_dto.register
     def _(obj: Partitioning) -> Partitioning:
         return obj
 
-    @to_dto.register
     @staticmethod
+    @to_dto.register
     def _(obj: Transform) -> Partitioning:
         if isinstance(obj, SingleFieldTransform):
             transform_class = DTOConverters._SINGLE_FIELD_TRANSFORM_TYPES.get(
@@ -594,8 +594,8 @@ class DTOConverters:
             )
         raise IllegalArgumentException(f"Unsupported transform: {obj.name()}")
 
-    @to_dto.register
     @staticmethod
+    @to_dto.register
     def _(obj: Distribution) -> DistributionDTO:
         if obj is None or obj is Distributions.NONE:
             return DistributionDTO.NONE

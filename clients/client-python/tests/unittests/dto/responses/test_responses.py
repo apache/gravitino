@@ -29,6 +29,8 @@ from gravitino.dto.responses.model_response import ModelResponse
 from gravitino.dto.responses.model_version_list_response import ModelVersionListResponse
 from gravitino.dto.responses.model_version_response import ModelVersionResponse
 from gravitino.dto.responses.model_version_uri_response import ModelVersionUriResponse
+from gravitino.dto.responses.function_list_response import FunctionListResponse
+from gravitino.dto.responses.function_response import FunctionResponse
 from gravitino.dto.responses.partition_list_response import PartitionListResponse
 from gravitino.dto.responses.partition_name_list_response import (
     PartitionNameListResponse,
@@ -502,3 +504,78 @@ class TestResponses(unittest.TestCase):
         """
         resp: TableResponse = TableResponse.from_json(json_string)
         resp.validate()
+
+    def test_function_response(self):
+        """Test FunctionResponse."""
+        json_str = """
+            {
+                "code": 0,
+                "function": {
+                    "name": "func1",
+                    "functionType": "SCALAR",
+                    "deterministic": true,
+                    "definitions": [
+                        {
+                            "parameters": [],
+                            "returnType": "integer",
+                            "impls": [
+                                {
+                                    "language": "SQL",
+                                    "runtime": "SPARK",
+                                    "sql": "SELECT 1"
+                                }
+                            ]
+                        }
+                    ],
+                    "comment": "comment",
+                    "audit": {
+                        "creator": "anonymous",
+                        "createTime": "2024-04-05T10:10:35.218Z"
+                    }
+                }
+            }
+        """
+        resp = FunctionResponse.from_json(json_str)
+        resp.validate()
+        self.assertEqual("func1", resp.function().name())
+        self.assertEqual("SCALAR", resp.function().function_type().name)
+
+        with self.assertRaises(IllegalArgumentException):
+            FunctionResponse.from_json('{"code": 0, "function": null}').validate()
+
+    def test_function_list_response(self):
+        """Test FunctionListResponse."""
+        json_str = """
+            {
+                "code": 0,
+                "functions": [
+                    {
+                        "name": "func1",
+                        "functionType": "SCALAR",
+                        "deterministic": true,
+                        "definitions": [
+                            {
+                                "parameters": [],
+                                "returnType": "integer",
+                                "impls": [
+                                    {
+                                        "language": "SQL",
+                                        "runtime": "SPARK",
+                                        "sql": "SELECT 1"
+                                    }
+                                ]
+                            }
+                        ],
+                        "comment": "comment",
+                        "audit": {
+                            "creator": "anonymous",
+                            "createTime": "2024-04-05T10:10:35.218Z"
+                        }
+                    }
+                ]
+            }
+        """
+        resp = FunctionListResponse.from_json(json_str)
+        resp.validate()
+        self.assertEqual(1, len(resp.functions()))
+        self.assertEqual("func1", resp.functions()[0].name())
