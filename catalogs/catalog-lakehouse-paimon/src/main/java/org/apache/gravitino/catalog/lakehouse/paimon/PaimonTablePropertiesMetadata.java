@@ -38,7 +38,7 @@ public class PaimonTablePropertiesMetadata extends BasePropertiesMetadata {
   public static final String COMMENT = PaimonConstants.COMMENT;
   public static final String OWNER = PaimonConstants.OWNER;
   public static final String BUCKET_KEY = PaimonConstants.BUCKET_KEY;
-  public static final String BUCKET_NUM = PaimonConstants.BUCKET;
+  public static final String BUCKET_NUM = PaimonConstants.BUCKET_NUM;
   public static final String MERGE_ENGINE = PaimonConstants.MERGE_ENGINE;
   public static final String SEQUENCE_FIELD = PaimonConstants.SEQUENCE_FIELD;
   public static final String ROWKIND_FIELD = PaimonConstants.ROWKIND_FIELD;

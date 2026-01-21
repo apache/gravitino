@@ -217,9 +217,10 @@ public class GravitinoPaimonTable extends BaseTable {
         .map(
             expression -> {
               Preconditions.checkArgument(
-                  expression instanceof NamedReference,
-                  "Paimon bucket keys must be named references.");
-              String[] fieldName = ((NamedReference) expression).fieldName();
+                  expression instanceof NamedReference.FieldReference,
+                  "Paimon bucket keys must be plain column references.");
+              NamedReference.FieldReference reference = (NamedReference.FieldReference) expression;
+              String[] fieldName = reference.fieldName();
               Preconditions.checkArgument(
                   fieldName.length == 1, "Paimon bucket keys must be single columns.");
               return fieldName[0];
@@ -249,7 +250,14 @@ public class GravitinoPaimonTable extends BaseTable {
     if (StringUtils.isBlank(bucketValue)) {
       return Distributions.auto(Strategy.HASH, expressions);
     }
-    return Distributions.hash(Integer.parseInt(bucketValue.trim()), expressions);
+    String trimmedBucketValue = bucketValue.trim();
+    try {
+      return Distributions.hash(Integer.parseInt(trimmedBucketValue), expressions);
+    } catch (NumberFormatException e) {
+      throw new IllegalArgumentException(
+          String.format("Paimon bucket number must be a valid integer, but was '%s'.", bucketValue),
+          e);
+    }
   }
 
   /** A builder class for constructing {@link GravitinoPaimonTable} instance. */

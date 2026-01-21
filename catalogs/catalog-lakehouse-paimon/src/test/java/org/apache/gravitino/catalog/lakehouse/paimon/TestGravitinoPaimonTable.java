@@ -404,6 +404,19 @@ public class TestGravitinoPaimonTable {
   }
 
   @Test
+  void testGetDistributionWithInvalidBucketNumber() {
+    Map<String, String> options = Maps.newHashMap();
+    options.put(PaimonTablePropertiesMetadata.BUCKET_KEY, "col_1");
+    options.put(PaimonTablePropertiesMetadata.BUCKET_NUM, "not_a_number");
+
+    IllegalArgumentException exception =
+        Assertions.assertThrows(
+            IllegalArgumentException.class, () -> GravitinoPaimonTable.getDistribution(options));
+    Assertions.assertTrue(
+        exception.getMessage().contains("Paimon bucket number must be a valid integer"));
+  }
+
+  @Test
   void testCreatePaimonPrimaryKeyTableWithInvalidBucketKey() {
     String paimonTableName = "test_paimon_primary_key_table_invalid_bucket";
     NameIdentifier tableIdentifier = NameIdentifier.of(paimonSchema.name(), paimonTableName);
