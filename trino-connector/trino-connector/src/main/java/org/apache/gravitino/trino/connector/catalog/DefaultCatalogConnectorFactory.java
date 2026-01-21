@@ -43,6 +43,7 @@ public class DefaultCatalogConnectorFactory implements CatalogConnectorFactory {
   private static final String MYSQL_CONNECTOR_PROVIDER_NAME = "jdbc-mysql";
   private static final String POSTGRESQL_CONNECTOR_PROVIDER_NAME = "jdbc-postgresql";
   private static final String TRINO_CLUSTER_CONNECTOR_PROVIDER_NAME = "trino-cluster";
+  private static final String BIGQUERY_CONNECTOR_PROVIDER_NAME = "jdbc-bigquery";
 
   /** Map of catalog provider names to their corresponding connector context builders */
   protected final HashMap<String, CatalogConnectorContext.Builder> catalogBuilders =
@@ -77,6 +78,10 @@ public class DefaultCatalogConnectorFactory implements CatalogConnectorFactory {
     catalogBuilders.put(
         TRINO_CLUSTER_CONNECTOR_PROVIDER_NAME,
         new CatalogConnectorContext.Builder(new TrinoClusterConnectorAdapter()));
+    catalogBuilders.put(
+        BIGQUERY_CONNECTOR_PROVIDER_NAME,
+        new CatalogConnectorContext.Builder(
+            new org.apache.gravitino.trino.connector.catalog.bigquery.BigQueryConnectorAdapter()));
     LOG.info("Start the DefaultCatalogConnectorFactory");
   }
 
