@@ -17,7 +17,7 @@
  * under the License.
  */
 
-package org.apache.gravitino.catalog.fileset.authentication.kerberos;
+package org.apache.gravitino.catalog.hadoop.fs.kerberos;
 
 import static org.apache.gravitino.catalog.hadoop.fs.Constants.HADOOP_KRB5_CONF;
 import static org.apache.gravitino.catalog.hadoop.fs.Constants.SECURITY_KRB5_ENV;
@@ -46,6 +46,7 @@ public class KerberosClient implements Closeable {
   private final Map<String, String> conf;
   private final Configuration hadoopConf;
   private final boolean refreshCredentials;
+  private String kerberosRealm;
 
   public KerberosClient(
       Map<String, String> conf, Configuration hadoopConf, boolean refreshCredentials) {
@@ -54,7 +55,7 @@ public class KerberosClient implements Closeable {
     this.refreshCredentials = refreshCredentials;
   }
 
-  public String login(String keytabFilePath) throws IOException {
+  public UserGroupInformation login(String keytabFilePath) throws IOException {
     KerberosConfig kerberosConfig = new KerberosConfig(conf, hadoopConf);
 
     // Check the principal and keytab file
@@ -65,6 +66,7 @@ public class KerberosClient implements Closeable {
     List<String> principalComponents = Splitter.on('@').splitToList(catalogPrincipal);
     Preconditions.checkArgument(
         principalComponents.size() == 2, "The principal has the wrong format");
+    kerberosRealm = principalComponents.get(1);
 
     String krb5Config = hadoopConf.get(HADOOP_KRB5_CONF);
     if (krb5Config != null) {
@@ -73,8 +75,8 @@ public class KerberosClient implements Closeable {
 
     // Login
     UserGroupInformation.setConfiguration(hadoopConf);
-    UserGroupInformation.loginUserFromKeytab(catalogPrincipal, keytabFilePath);
-    UserGroupInformation kerberosLoginUgi = UserGroupInformation.getLoginUser();
+    UserGroupInformation kerberosLoginUgi =
+        UserGroupInformation.loginUserFromKeytabAndReturnUGI(catalogPrincipal, keytabFilePath);
 
     // Refresh the cache if it's out of date.
     if (refreshCredentials) {
@@ -93,7 +95,7 @@ public class KerberosClient implements Closeable {
           TimeUnit.SECONDS);
     }
 
-    return principalComponents.get(1);
+    return kerberosLoginUgi;
   }
 
   public File saveKeyTabFileFromUri(String keytabPath) throws IOException {
@@ -134,5 +136,9 @@ public class KerberosClient implements Closeable {
     if (checkTgtExecutor != null) {
       checkTgtExecutor.shutdown();
     }
+  }
+
+  public String getKerberosRealm() {
+    return kerberosRealm;
   }
 }
