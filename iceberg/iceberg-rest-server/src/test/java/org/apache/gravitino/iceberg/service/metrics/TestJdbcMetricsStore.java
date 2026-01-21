@@ -18,6 +18,7 @@
  */
 package org.apache.gravitino.iceberg.service.metrics;
 
+import static org.apache.gravitino.config.ConfigConstants.CURRENT_SCRIPT_VERSION;
 import static org.apache.gravitino.iceberg.service.metrics.JDBCMetricsStore.getCounterResult;
 import static org.apache.gravitino.iceberg.service.metrics.JDBCMetricsStore.getTimerResult;
 
@@ -56,7 +57,6 @@ import org.junit.jupiter.api.Test;
 @Tag("gravitino-docker-test")
 public class TestJdbcMetricsStore {
 
-  private static final String CURRENT_SCRIPT_VERSION = "1.1.0";
   private static final Map<String, Map<String, String>> dbProperties = Maps.newHashMap();
 
   @BeforeAll
