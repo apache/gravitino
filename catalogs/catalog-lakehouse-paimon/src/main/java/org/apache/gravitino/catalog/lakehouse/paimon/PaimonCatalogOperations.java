@@ -526,7 +526,7 @@ public class PaimonCatalogOperations implements CatalogOperations, SupportsSchem
     bucketKeys.forEach(
         bucketKey ->
             Preconditions.checkArgument(
-                columnNames.stream().anyMatch(name -> name.equalsIgnoreCase(bucketKey)),
+                columnNames.stream().anyMatch(name -> name.equals(bucketKey)),
                 "Distribution column %s does not exist in table columns.",
                 bucketKey));
 

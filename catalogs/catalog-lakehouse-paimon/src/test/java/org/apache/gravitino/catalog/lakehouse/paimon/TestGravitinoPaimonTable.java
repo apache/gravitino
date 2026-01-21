@@ -52,6 +52,7 @@ import org.apache.gravitino.rel.Column;
 import org.apache.gravitino.rel.Table;
 import org.apache.gravitino.rel.TableCatalog;
 import org.apache.gravitino.rel.expressions.NamedReference;
+import org.apache.gravitino.rel.expressions.distributions.Distribution;
 import org.apache.gravitino.rel.expressions.distributions.Distributions;
 import org.apache.gravitino.rel.expressions.sorts.SortOrder;
 import org.apache.gravitino.rel.expressions.transforms.Transform;
@@ -369,9 +370,37 @@ public class TestGravitinoPaimonTable {
     Assertions.assertEquals(
         "col_1", ((NamedReference) loadedTable.distribution().expressions()[0]).fieldName()[0]);
     Assertions.assertEquals(
-        "4", loadedTable.properties().get(PaimonTablePropertiesMetadata.BUCKET));
+        "4", loadedTable.properties().get(PaimonTablePropertiesMetadata.BUCKET_NUM));
     Assertions.assertEquals(
         "col_1", loadedTable.properties().get(PaimonTablePropertiesMetadata.BUCKET_KEY));
+  }
+
+  @Test
+  void testGetDistributionWithAutoBucketNumber() {
+    Map<String, String> options = Maps.newHashMap();
+    options.put(PaimonTablePropertiesMetadata.BUCKET_KEY, "col_1");
+
+    Distribution distribution = GravitinoPaimonTable.getDistribution(options);
+    Assertions.assertEquals(HASH, distribution.strategy());
+    Assertions.assertEquals(Distributions.AUTO, distribution.number());
+    Assertions.assertEquals(
+        "col_1", ((NamedReference) distribution.expressions()[0]).fieldName()[0]);
+  }
+
+  @Test
+  void testGetDistributionWithMultipleBucketKeys() {
+    Map<String, String> options = Maps.newHashMap();
+    options.put(PaimonTablePropertiesMetadata.BUCKET_KEY, "col_1,col_2");
+    options.put(PaimonTablePropertiesMetadata.BUCKET_NUM, "4");
+
+    Distribution distribution = GravitinoPaimonTable.getDistribution(options);
+    Assertions.assertEquals(HASH, distribution.strategy());
+    Assertions.assertEquals(4, distribution.number());
+    Assertions.assertEquals(2, distribution.expressions().length);
+    Assertions.assertEquals(
+        "col_1", ((NamedReference) distribution.expressions()[0]).fieldName()[0]);
+    Assertions.assertEquals(
+        "col_2", ((NamedReference) distribution.expressions()[1]).fieldName()[0]);
   }
 
   @Test

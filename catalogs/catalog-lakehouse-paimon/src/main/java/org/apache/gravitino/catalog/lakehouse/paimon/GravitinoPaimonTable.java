@@ -18,8 +18,8 @@
  */
 package org.apache.gravitino.catalog.lakehouse.paimon;
 
-import static org.apache.gravitino.catalog.lakehouse.paimon.PaimonTablePropertiesMetadata.BUCKET;
 import static org.apache.gravitino.catalog.lakehouse.paimon.PaimonTablePropertiesMetadata.BUCKET_KEY;
+import static org.apache.gravitino.catalog.lakehouse.paimon.PaimonTablePropertiesMetadata.BUCKET_NUM;
 import static org.apache.gravitino.catalog.lakehouse.paimon.PaimonTablePropertiesMetadata.COMMENT;
 import static org.apache.gravitino.dto.rel.partitioning.Partitioning.EMPTY_PARTITIONING;
 import static org.apache.gravitino.meta.AuditInfo.EMPTY;
@@ -87,7 +87,7 @@ public class GravitinoPaimonTable extends BaseTable {
     Map<String, String> normalizedProperties = new HashMap<>(properties);
     normalizedProperties.remove(COMMENT);
     normalizedProperties.remove(BUCKET_KEY);
-    normalizedProperties.remove(BUCKET);
+    normalizedProperties.remove(BUCKET_NUM);
     applyDistribution(normalizedProperties, distribution);
 
     List<String> partitionKeys = getPartitionKeys(partitioning);
@@ -209,9 +209,7 @@ public class GravitinoPaimonTable extends BaseTable {
       properties.put(BUCKET_KEY, String.join(",", bucketKeys));
     }
 
-    if (distribution.number() != Distributions.AUTO) {
-      properties.put(BUCKET, String.valueOf(distribution.number()));
-    }
+    properties.put(BUCKET_NUM, String.valueOf(distribution.number()));
   }
 
   private static List<String> getBucketKeys(Distribution distribution) {
@@ -229,7 +227,7 @@ public class GravitinoPaimonTable extends BaseTable {
         .collect(Collectors.toList());
   }
 
-  private static Distribution getDistribution(Map<String, String> properties) {
+  static Distribution getDistribution(Map<String, String> properties) {
     if (properties == null) {
       return Distributions.NONE;
     }
@@ -247,7 +245,7 @@ public class GravitinoPaimonTable extends BaseTable {
     }
     Expression[] expressions =
         bucketKeyList.stream().map(NamedReference::field).toArray(Expression[]::new);
-    String bucketValue = properties.get(BUCKET);
+    String bucketValue = properties.get(BUCKET_NUM);
     if (StringUtils.isBlank(bucketValue)) {
       return Distributions.auto(Strategy.HASH, expressions);
     }
