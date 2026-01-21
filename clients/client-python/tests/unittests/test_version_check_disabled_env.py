@@ -15,22 +15,11 @@
 # specific language governing permissions and limitations
 # under the License.
 
+# pylint: disable=wrong-import-position
+
 import os
-import sys
-import types
 import unittest
 from unittest.mock import Mock, patch
-
-package_root = os.path.abspath(
-    os.path.join(os.path.dirname(__file__), "..", "..", "gravitino")
-)
-dummy_package = types.ModuleType("gravitino")
-dummy_package.__path__ = [package_root]
-sys.modules.setdefault("gravitino", dummy_package)
-
-dummy_converters = types.ModuleType("gravitino.client.dto_converters")
-dummy_converters.DTOConverters = object
-sys.modules.setdefault("gravitino.client.dto_converters", dummy_converters)
 
 from gravitino.client.gravitino_admin_client import GravitinoAdminClient
 from gravitino.client.gravitino_client_base import GravitinoClientBase

@@ -224,16 +224,31 @@ public abstract class GravitinoClientBase implements Closeable {
       this.uri = uri;
     }
 
+    /**
+     * Returns whether the client version check is enabled.
+     *
+     * @return {@code true} if version check is enabled, otherwise {@code false}.
+     */
     protected boolean isVersionCheckEnabled() {
       return checkVersion && !isVersionCheckDisabledByEnv();
     }
 
+    /**
+     * Returns whether the version check is disabled by the environment variable.
+     *
+     * @return {@code true} if version check is disabled by env, otherwise {@code false}.
+     */
     @VisibleForTesting
     protected boolean isVersionCheckDisabledByEnv() {
       String envValue = versionCheckDisabledEnvValue();
       return envValue != null && "true".equalsIgnoreCase(envValue.trim());
     }
 
+    /**
+     * Returns the raw value of the version check disabling environment variable.
+     *
+     * @return The environment variable value, or {@code null} if unset.
+     */
     @VisibleForTesting
     protected String versionCheckDisabledEnvValue() {
       return System.getenv(VERSION_CHECK_DISABLED_ENV);
