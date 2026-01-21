@@ -70,9 +70,7 @@ public class PaimonCatalogPropertiesMetadata extends BaseCatalogPropertiesMetada
           .put(GRAVITINO_JDBC_USER, PAIMON_JDBC_USER)
           .put(GRAVITINO_JDBC_PASSWORD, PAIMON_JDBC_PASSWORD)
           .put(GRAVITINO_JDBC_DRIVER, GRAVITINO_JDBC_DRIVER)
-          .put(
-              PaimonConstants.GRAVITINO_DLF_TOKEN_PROVIDER,
-              PaimonConstants.PAIMON_DLF_TOKEN_PROVIDER)
+          .put(PaimonConstants.GRAVITINO_TOKEN_PROVIDER, PaimonConstants.PAIMON_TOKEN_PROVIDER)
           .put(
               PaimonConstants.GRAVITINO_DLF_ACCESS_KEY_ID, PaimonConstants.PAIMON_DLF_ACCESS_KEY_ID)
           .put(
@@ -113,10 +111,10 @@ public class PaimonCatalogPropertiesMetadata extends BaseCatalogPropertiesMetada
   public static final Map<String, PropertyEntry<?>> DLF_PROPERTY_ENTRIES =
       new ImmutableMap.Builder<String, PropertyEntry<?>>()
           .put(
-              PaimonConstants.GRAVITINO_DLF_TOKEN_PROVIDER,
+              PaimonConstants.GRAVITINO_TOKEN_PROVIDER,
               stringOptionalPropertyEntry(
-                  PaimonConstants.GRAVITINO_DLF_TOKEN_PROVIDER,
-                  "The token provider type for Aliyun DLF",
+                  PaimonConstants.GRAVITINO_TOKEN_PROVIDER,
+                  "The token provider type for Paimon",
                   false /* immutable */,
                   null /* defaultValue */,
                   false /* hidden */))
