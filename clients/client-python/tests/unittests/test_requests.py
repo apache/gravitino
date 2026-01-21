@@ -20,6 +20,12 @@ import unittest
 from typing import cast
 
 from gravitino.dto.requests.add_partitions_request import AddPartitionsRequest
+from gravitino.dto.requests.function_register_request import FunctionRegisterRequest
+from gravitino.dto.requests.function_update_request import (
+    FunctionUpdateRequest,
+    UpdateCommentRequest,
+)
+from gravitino.dto.requests.function_updates_request import FunctionUpdatesRequest
 from gravitino.dto.requests.table_create_request import TableCreateRequest
 from gravitino.exceptions.base import IllegalArgumentException
 
@@ -266,3 +272,58 @@ class TestRequests(unittest.TestCase):
             with self.assertRaisesRegex(IllegalArgumentException, exception_str):
                 req = TableCreateRequest.from_json(json_str)
                 req.validate()
+
+    def test_function_register_request(self):
+        """Test FunctionRegisterRequest."""
+        json_str = """
+            {
+                "name": "func1",
+                "functionType": "SCALAR",
+                "deterministic": true,
+                "definitions": [],
+                "comment": "comment"
+            }
+        """
+        req = FunctionRegisterRequest.from_json(json_str)
+        req.validate()
+        self.assertEqual("func1", req.name())
+        self.assertEqual("SCALAR", req.function_type().name)
+        self.assertTrue(req.deterministic())
+
+        # Test request without required fields
+        with self.assertRaises(IllegalArgumentException):
+            FunctionRegisterRequest.from_json('{"name": "func1"}').validate()
+
+    def test_function_update_request(self):
+        """Test FunctionUpdateRequest."""
+        # Test UpdateCommentRequest
+        json_str = """
+            {
+               "@type": "updateComment",
+               "newComment": "new comment"
+            }
+        """
+        req = FunctionUpdateRequest.from_json(json_str)
+        self.assertIsInstance(req, UpdateCommentRequest)
+        req.validate()
+        self.assertEqual("new comment", req.new_comment())
+
+        with self.assertRaises(IllegalArgumentException):
+            FunctionUpdateRequest.from_json(
+                '{"@type": "updateComment", "newComment": null}'
+            ).validate()
+
+    def test_function_updates_request(self):
+        """Test FunctionUpdatesRequest."""
+        json_str = """
+            [
+                {
+                   "@type": "updateComment",
+                   "newComment": "new comment"
+                }
+            ]
+        """
+        req = FunctionUpdatesRequest.from_json(json_str)
+        req.validate()
+        self.assertEqual(1, len(req.updates()))
+        self.assertIsInstance(req.updates()[0], UpdateCommentRequest)
