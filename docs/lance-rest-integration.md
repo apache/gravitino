@@ -75,7 +75,8 @@ import logging
 logging.basicConfig(level=logging.INFO)
 
 # Configure Spark to use the lance-spark bundle
-# Replace /path/to/lance-spark-bundle-3.5_2.12-0.0.15.jar with your actual JAR path
+# Replace /path/to/lance-spark-bundle-3.5_2.12-X.X.XX.jar with your actual JAR path and version;
+# refer to the compatibility matrix for supported lance-spark versions.
 os.environ["PYSPARK_SUBMIT_ARGS"] = (
     "--jars /path/to/lance-spark-bundle-3.5_2.12-0.0.15.jar "
     "--conf \"spark.driver.extraJavaOptions=--add-opens=java.base/sun.nio.ch=ALL-UNNAMED\" "
@@ -85,7 +86,7 @@ os.environ["PYSPARK_SUBMIT_ARGS"] = (
 
 # Initialize Spark session with Lance REST catalog configuration
 # Note: The catalog "lance_catalog" must exist in Gravitino before running this code, you can create
-# it via Lance REST API `CreateNameSpace` or Gravitino REST API `CreateCatalog`.
+# it via Lance REST API `CreateNamespace` or Gravitino REST API `CreateCatalog`.
 spark = SparkSession.builder \
     .appName("lance_rest_integration") \
     .config("spark.sql.catalog.lance", "com.lancedb.lance.spark.LanceNamespaceSparkCatalog") \
@@ -182,7 +183,7 @@ data = ray.data.range(1000).map(
 
 # Write dataset to Lance table
 # Note: Both the catalog "lance_catalog" and schema "sales" must exist in Gravitino, you can create
-# them via Lance REST API `CreateNameSpace` or Gravitino REST API `CreateCatalog` and `CreateSchema`.
+# them via Lance REST API `CreateNamespace` or Gravitino REST API `CreateCatalog` and `CreateSchema`.
 write_lance(
     data, 
     namespace=namespace, 
