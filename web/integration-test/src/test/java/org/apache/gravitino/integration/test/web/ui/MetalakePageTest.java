@@ -27,7 +27,7 @@ import org.junit.jupiter.api.Order;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestMethodOrder;
 
-// @DisabledIfSystemProperty(named = "testMode", matches = "embedded")
+@DisabledIfSystemProperty(named = "testMode", matches = "embedded")
 @TestMethodOrder(MethodOrderer.OrderAnnotation.class)
 public class MetalakePageTest extends BaseWebIT {
   private static final String WEB_TITLE = "Gravitino";

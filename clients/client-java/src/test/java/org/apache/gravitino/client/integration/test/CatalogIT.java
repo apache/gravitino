@@ -381,7 +381,7 @@ public class CatalogIT extends BaseIT {
   }
 
   @Test
-  //   @DisabledIfSystemProperty(named = "testMode", matches = "embedded")
+    @DisabledIfSystemProperty(named = "testMode", matches = "embedded")
   public void testCreateCatalogWithPackage() {
     String catalogName = GravitinoITUtils.genRandomName("catalog");
     Assertions.assertFalse(metalake.catalogExists(catalogName));
