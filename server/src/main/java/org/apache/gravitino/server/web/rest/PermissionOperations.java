@@ -91,6 +91,7 @@ public class PermissionOperations {
       return Utils.doAs(
           httpRequest,
           () -> {
+            AuthorizationUtils.checkMetalakeInUse(metalake);
             request.validate();
             return Utils.ok(
                 new UserResponse(
@@ -119,6 +120,7 @@ public class PermissionOperations {
       return Utils.doAs(
           httpRequest,
           () -> {
+            AuthorizationUtils.checkMetalakeInUse(metalake);
             request.validate();
             return Utils.ok(
                 new GroupResponse(
@@ -148,6 +150,7 @@ public class PermissionOperations {
           httpRequest,
           () -> {
             request.validate();
+            AuthorizationUtils.checkMetalakeInUse(metalake);
             return Utils.ok(
                 new UserResponse(
                     DTOConverters.toDTO(
@@ -176,6 +179,7 @@ public class PermissionOperations {
           httpRequest,
           () -> {
             request.validate();
+            AuthorizationUtils.checkMetalakeInUse(metalake);
             return Utils.ok(
                 new GroupResponse(
                     DTOConverters.toDTO(
@@ -212,6 +216,7 @@ public class PermissionOperations {
           httpRequest,
           () -> {
             privilegeGrantRequest.validate();
+            AuthorizationUtils.checkMetalakeInUse(metalake);
 
             for (PrivilegeDTO privilegeDTO : privilegeGrantRequest.getPrivileges()) {
               AuthorizationUtils.checkPrivilege(privilegeDTO, object, metalake);
@@ -259,6 +264,7 @@ public class PermissionOperations {
           httpRequest,
           () -> {
             privilegeRevokeRequest.validate();
+            AuthorizationUtils.checkMetalakeInUse(metalake);
 
             for (PrivilegeDTO privilegeDTO : privilegeRevokeRequest.getPrivileges()) {
               AuthorizationUtils.checkPrivilege(privilegeDTO, object, metalake);
@@ -299,6 +305,7 @@ public class PermissionOperations {
           httpRequest,
           () -> {
             request.validate();
+            AuthorizationUtils.checkMetalakeInUse(metalake);
             // Check update objects
             List<SecurableObject> updatedObjects = Lists.newArrayList();
 

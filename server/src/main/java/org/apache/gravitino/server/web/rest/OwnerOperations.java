@@ -37,6 +37,7 @@ import org.apache.gravitino.Entity;
 import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.MetadataObjects;
+import org.apache.gravitino.authorization.AuthorizationUtils;
 import org.apache.gravitino.authorization.Owner;
 import org.apache.gravitino.authorization.OwnerDispatcher;
 import org.apache.gravitino.dto.requests.OwnerSetRequest;
@@ -87,6 +88,7 @@ public class OwnerOperations {
       return Utils.doAs(
           httpRequest,
           () -> {
+            AuthorizationUtils.checkMetalakeInUse(metalake);
             MetadataObjectUtil.checkMetadataObject(metalake, object);
             Optional<Owner> owner = ownerDispatcher.getOwner(metalake, object);
             if (owner.isPresent()) {
@@ -124,6 +126,7 @@ public class OwnerOperations {
           httpRequest,
           () -> {
             request.validate();
+            AuthorizationUtils.checkMetalakeInUse(metalake);
             MetadataObjectUtil.checkMetadataObject(metalake, object);
             ownerDispatcher.setOwner(metalake, object, request.getName(), request.getType());
             return Utils.ok(new SetResponse(true));

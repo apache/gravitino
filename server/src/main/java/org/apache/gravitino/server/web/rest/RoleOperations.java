@@ -89,6 +89,7 @@ public class RoleOperations {
       return Utils.doAs(
           httpRequest,
           () -> {
+            AuthorizationUtils.checkMetalakeInUse(metalake);
             String[] names = accessControlManager.listRoleNames(metalake);
             names =
                 MetadataAuthzHelper.filterByExpression(
@@ -118,10 +119,12 @@ public class RoleOperations {
     try {
       return Utils.doAs(
           httpRequest,
-          () ->
-              Utils.ok(
-                  new RoleResponse(
-                      DTOConverters.toDTO(accessControlManager.getRole(metalake, role)))));
+          () -> {
+            AuthorizationUtils.checkMetalakeInUse(metalake);
+            return Utils.ok(
+                new RoleResponse(
+                    DTOConverters.toDTO(accessControlManager.getRole(metalake, role))));
+          });
     } catch (Exception e) {
       return ExceptionHandlers.handleRoleException(OperationType.GET, role, metalake, e);
     }
@@ -142,6 +145,7 @@ public class RoleOperations {
           httpRequest,
           () -> {
             request.validate();
+            AuthorizationUtils.checkMetalakeInUse(metalake);
             Set<MetadataObject> metadataObjects = Sets.newHashSet();
             for (SecurableObjectDTO object : request.getSecurableObjects()) {
               MetadataObject metadataObject =
@@ -211,6 +215,7 @@ public class RoleOperations {
       return Utils.doAs(
           httpRequest,
           () -> {
+            AuthorizationUtils.checkMetalakeInUse(metalake);
             boolean deleted = accessControlManager.deleteRole(metalake, role);
             if (!deleted) {
               LOG.warn("Failed to delete role {} under metalake {}", role, metalake);

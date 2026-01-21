@@ -36,6 +36,7 @@ import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.MetadataObjects;
 import org.apache.gravitino.authorization.AccessControlDispatcher;
+import org.apache.gravitino.authorization.AuthorizationUtils;
 import org.apache.gravitino.authorization.Owner;
 import org.apache.gravitino.authorization.OwnerDispatcher;
 import org.apache.gravitino.authorization.User;
@@ -90,10 +91,12 @@ public class UserOperations {
     try {
       return Utils.doAs(
           httpRequest,
-          () ->
-              Utils.ok(
-                  new UserResponse(
-                      DTOConverters.toDTO(accessControlManager.getUser(metalake, user)))));
+          () -> {
+            AuthorizationUtils.checkMetalakeInUse(metalake);
+            return Utils.ok(
+                new UserResponse(
+                    DTOConverters.toDTO(accessControlManager.getUser(metalake, user))));
+          });
     } catch (Exception e) {
       return ExceptionHandlers.handleUserException(OperationType.GET, user, metalake, e);
     }
@@ -112,6 +115,7 @@ public class UserOperations {
       return Utils.doAs(
           httpRequest,
           () -> {
+            AuthorizationUtils.checkMetalakeInUse(metalake);
             if (verbose) {
               User[] users = accessControlManager.listUsers(metalake);
               users =
@@ -154,6 +158,7 @@ public class UserOperations {
           httpRequest,
           () -> {
             request.validate();
+            AuthorizationUtils.checkMetalakeInUse(metalake);
             return Utils.ok(
                 new UserResponse(
                     DTOConverters.toDTO(
@@ -179,6 +184,8 @@ public class UserOperations {
       return Utils.doAs(
           httpRequest,
           () -> {
+            AuthorizationUtils.checkMetalakeInUse(metalake);
+
             ownerManager
                 .getOwner(
                     metalake, MetadataObjects.of(null, metalake, MetadataObject.Type.METALAKE))
