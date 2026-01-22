@@ -20,8 +20,12 @@ package org.apache.gravitino.dto.function;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
 import java.util.Arrays;
+import lombok.AccessLevel;
+import lombok.AllArgsConstructor;
+import lombok.Builder;
 import lombok.EqualsAndHashCode;
 import lombok.Getter;
+import lombok.NoArgsConstructor;
 import org.apache.gravitino.function.FunctionDefinition;
 import org.apache.gravitino.function.FunctionDefinitions;
 import org.apache.gravitino.function.FunctionImpl;
@@ -30,6 +34,9 @@ import org.apache.gravitino.function.FunctionParam;
 /** DTO for function definition. */
 @Getter
 @EqualsAndHashCode
+@NoArgsConstructor(access = AccessLevel.PRIVATE)
+@AllArgsConstructor(access = AccessLevel.PRIVATE)
+@Builder(setterPrefix = "with")
 public class FunctionDefinitionDTO implements FunctionDefinition {
 
   @JsonProperty("parameters")
@@ -37,13 +44,6 @@ public class FunctionDefinitionDTO implements FunctionDefinition {
 
   @JsonProperty("impls")
   private FunctionImplDTO[] impls;
-
-  private FunctionDefinitionDTO() {}
-
-  private FunctionDefinitionDTO(FunctionParamDTO[] parameters, FunctionImplDTO[] impls) {
-    this.parameters = parameters;
-    this.impls = impls;
-  }
 
   @Override
   public FunctionParam[] parameters() {
@@ -116,51 +116,5 @@ public class FunctionDefinitionDTO implements FunctionDefinition {
         + ", impls="
         + Arrays.toString(impls)
         + '}';
-  }
-
-  /** Builder for {@link FunctionDefinitionDTO}. */
-  public static class Builder {
-    private FunctionParamDTO[] parameters;
-    private FunctionImplDTO[] impls;
-
-    /**
-     * Set the parameters.
-     *
-     * @param parameters The parameters.
-     * @return This builder.
-     */
-    public Builder withParameters(FunctionParamDTO[] parameters) {
-      this.parameters = parameters;
-      return this;
-    }
-
-    /**
-     * Set the implementations.
-     *
-     * @param impls The implementations.
-     * @return This builder.
-     */
-    public Builder withImpls(FunctionImplDTO[] impls) {
-      this.impls = impls;
-      return this;
-    }
-
-    /**
-     * Build the {@link FunctionDefinitionDTO}.
-     *
-     * @return The function definition DTO.
-     */
-    public FunctionDefinitionDTO build() {
-      return new FunctionDefinitionDTO(parameters, impls);
-    }
-  }
-
-  /**
-   * Create a new builder.
-   *
-   * @return A new builder.
-   */
-  public static Builder builder() {
-    return new Builder();
   }
 }
