@@ -17,6 +17,10 @@
  * under the License.
  */
 
+// Disable all tasks in this module by default so that contrib catalogs are
+// not built as part of the standard Gravitino build. If you need to build
+// or test a contrib catalog locally, temporarily remove or adjust this block
+// to re-enable the relevant tasks
 tasks.all {
     enabled = false
 }
