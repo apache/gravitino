@@ -60,6 +60,8 @@ import org.apache.gravitino.rel.Column;
 import org.apache.gravitino.rel.Table;
 import org.apache.gravitino.rel.TableCatalog;
 import org.apache.gravitino.rel.TableChange;
+import org.apache.gravitino.rel.View;
+import org.apache.gravitino.rel.ViewCatalog;
 import org.apache.gravitino.rel.expressions.distributions.Distribution;
 import org.apache.gravitino.rel.expressions.distributions.Distributions;
 import org.apache.gravitino.rel.expressions.sorts.SortOrder;
@@ -82,7 +84,8 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /** Operations for interacting with an Apache Iceberg catalog in Apache Gravitino. */
-public class IcebergCatalogOperations implements CatalogOperations, SupportsSchemas, TableCatalog {
+public class IcebergCatalogOperations
+    implements CatalogOperations, SupportsSchemas, TableCatalog, ViewCatalog {
 
   private static final String ICEBERG_TABLE_DOES_NOT_EXIST_MSG = "Iceberg table does not exist: %s";
 
@@ -617,6 +620,30 @@ public class IcebergCatalogOperations implements CatalogOperations, SupportsSche
     } catch (Exception e) {
       throw new ConnectionFailedException(
           e, "Failed to run listNamespace on Iceberg catalog: %s", e.getMessage());
+    }
+  }
+
+  /**
+   * Load view metadata from the Iceberg catalog.
+   *
+   * <p>Delegates to the underlying Iceberg REST catalog to load view metadata.
+   *
+   * @param ident The identifier of the view to load.
+   * @return The loaded view metadata.
+   * @throws org.apache.gravitino.exceptions.NoSuchViewException If the view does not exist.
+   */
+  @Override
+  public View loadView(org.apache.gravitino.NameIdentifier ident)
+      throws org.apache.gravitino.exceptions.NoSuchViewException {
+    try {
+      org.apache.iceberg.rest.responses.LoadViewResponse response =
+          icebergCatalogWrapper.loadView(
+              IcebergCatalogWrapperHelper.buildIcebergTableIdentifier(ident));
+
+      return IcebergView.fromLoadViewResponse(response, ident.name());
+    } catch (Exception e) {
+      throw new org.apache.gravitino.exceptions.NoSuchViewException(
+          e, "Failed to load view %s from Iceberg catalog: %s", ident, e.getMessage());
     }
   }
 

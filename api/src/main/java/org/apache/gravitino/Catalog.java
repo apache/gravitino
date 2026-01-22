@@ -247,6 +247,16 @@ public interface Catalog extends Auditable {
   }
 
   /**
+   * @return the {@link org.apache.gravitino.rel.ViewCatalog} if the catalog supports view
+   *     operations.
+   * @throws UnsupportedOperationException if the catalog does not support view operations.
+   */
+  default org.apache.gravitino.rel.ViewCatalog asViewCatalog()
+      throws UnsupportedOperationException {
+    throw new UnsupportedOperationException("Catalog does not support view operations");
+  }
+
+  /**
    * @return the {@link SupportsTags} if the catalog supports tag operations.
    * @throws UnsupportedOperationException if the catalog does not support tag operations.
    */
