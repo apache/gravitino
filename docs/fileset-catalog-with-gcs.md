@@ -29,11 +29,14 @@ Apart from configurations mentioned in [Fileset-catalog-catalog-configuration](.
 
 | Configuration item            | Description                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             | Default value   | Required | Since version    |
 |-------------------------------|-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|-----------------|----------|------------------|
-| `filesystem-providers`        | The file system providers to add. Set it to `gcs` if it's a GCS fileset, a comma separated string that contains `gcs` like `gcs,s3` to support multiple kinds of fileset including `gcs`.                                                                                                                                                                                                                                                                                                                               | (none)          | Yes      | 0.7.0-incubating |
-| `default-filesystem-provider` | The name default filesystem providers of this Fileset catalog if users do not specify the scheme in the URI. Default value is `builtin-local`, for GCS, if we set this value, we can omit the prefix 'gs://' in the location.                                                                                                                                                                                                                                                                                           | `builtin-local` | No       | 0.7.0-incubating |
+| `filesystem-providers`        | (deprecated) The file system providers to add. Set it to `gcs` if it's a GCS fileset, a comma separated string that contains `gcs` like `gcs,s3` to support multiple kinds of fileset including `gcs`.                                                                                                                                                                                                                                                                                                                   | (none)          | Yes      | 0.7.0-incubating |
+| `default-filesystem-provider` | (deprecated) The name default filesystem providers of this Fileset catalog if users do not specify the scheme in the URI. Default value is `builtin-local`, for GCS, if we set this value, we can omit the prefix 'gs://' in the location.                                                                                                                                                                                                                                                                               | `builtin-local` | No       | 0.7.0-incubating |
 | `gcs-service-account-file`    | The path of GCS service account JSON file.                                                                                                                                                                                                                                                                                                                                                                                                                                                                              | (none)          | Yes      | 0.7.0-incubating |
 | `credential-providers`        | The credential provider types, separated by comma, possible value can be `gcs-token`. As the default authentication type is using service account as the above, this configuration can enable credential vending provided by Gravitino server and client will no longer need to provide authentication information like service account to access GCS by GVFS. Once it's set, more configuration items are needed to make it works, please see [gcs-credential-vending](security/credential-vending.md#gcs-credentials) | (none)          | No       | 0.8.0-incubating |
 
+:::note
+`default-filesystem-provider` and `filesystem-providers` are deprecated since 1.2.0. The fileset catalog automatically loads filesystem providers on the classpath, including buildin filesystem provider and cloud providers when the corresponding bundle jar is present (for example, `gravitino-gcp-bundle`).
+:::
 
 ### Configurations for a schema
 
@@ -62,8 +65,7 @@ curl -X POST -H "Accept: application/vnd.gravitino.v1+json" \
   "comment": "This is a GCS fileset catalog",
   "properties": {
     "location": "gs://bucket/root",
-    "gcs-service-account-file": "path_of_gcs_service_account_file",
-    "filesystem-providers": "gcs"
+    "gcs-service-account-file": "path_of_gcs_service_account_file"
   }
 }' http://localhost:8090/api/metalakes/metalake/catalogs
 ```
@@ -80,7 +82,6 @@ GravitinoClient gravitinoClient = GravitinoClient
 Map<String, String> gcsProperties = ImmutableMap.<String, String>builder()
     .put("location", "gs://bucket/root")
     .put("gcs-service-account-file", "path_of_gcs_service_account_file")
-    .put("filesystem-providers", "gcs")
     .build();
 
 Catalog gcsCatalog = gravitinoClient.createCatalog("test_catalog", 
@@ -98,8 +99,7 @@ Catalog gcsCatalog = gravitinoClient.createCatalog("test_catalog",
 gravitino_client: GravitinoClient = GravitinoClient(uri="http://localhost:8090", metalake_name="metalake")
 gcs_properties = {
     "location": "gs://bucket/root",
-    "gcs-service-account-file": "path_of_gcs_service_account_file",
-    "filesystem-providers": "gcs"
+    "gcs-service-account-file": "path_of_gcs_service_account_file"
 }
 
 gcs_properties = gravitino_client.create_catalog(name="test_catalog",
@@ -488,7 +488,6 @@ curl -X POST -H "Accept: application/vnd.gravitino.v1+json" \
   "properties": {
     "location": "gs://bucket/root",
     "gcs-service-account-file": "path_of_gcs_service_account_file",
-    "filesystem-providers": "gcs",
     "credential-providers": "gcs-token"
   }
 }' http://localhost:8090/api/metalakes/metalake/catalogs

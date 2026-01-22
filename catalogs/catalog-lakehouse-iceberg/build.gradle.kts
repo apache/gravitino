@@ -78,6 +78,7 @@ dependencies {
     exclude("org.rocksdb")
   }
 
+  testImplementation(libs.awaitility)
   testImplementation(libs.junit.jupiter.api)
   testImplementation(libs.junit.jupiter.params)
   testImplementation(libs.mockito.core)

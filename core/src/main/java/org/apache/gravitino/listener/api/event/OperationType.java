@@ -143,6 +143,7 @@ public enum OperationType {
   LIST_ROLE_NAMES,
   GRANT_PRIVILEGES,
   REVOKE_PRIVILEGES,
+  OVERRIDE_PRIVILEGES,
 
   // Owner operations
   GET_OWNER,

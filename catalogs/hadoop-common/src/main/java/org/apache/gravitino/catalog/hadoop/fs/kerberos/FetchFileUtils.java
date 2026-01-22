@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.gravitino.catalog.fileset.authentication.kerberos;
+package org.apache.gravitino.catalog.hadoop.fs.kerberos;
 
 import java.io.File;
 import java.io.IOException;

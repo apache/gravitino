@@ -46,7 +46,7 @@ public class FilesetCatalogImpl extends BaseCatalog<FilesetCatalogImpl> {
 
   @Override
   protected CatalogOperations newOps(Map<String, String> config) {
-    return new SecureFilesetCatalogOperations();
+    return new FilesetCatalogOperations();
   }
 
   @Override

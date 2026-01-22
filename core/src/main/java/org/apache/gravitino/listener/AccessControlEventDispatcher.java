@@ -83,6 +83,9 @@ import org.apache.gravitino.listener.api.event.ListUserNamesPreEvent;
 import org.apache.gravitino.listener.api.event.ListUsersEvent;
 import org.apache.gravitino.listener.api.event.ListUsersFailureEvent;
 import org.apache.gravitino.listener.api.event.ListUsersPreEvent;
+import org.apache.gravitino.listener.api.event.OverridePrivilegesEvent;
+import org.apache.gravitino.listener.api.event.OverridePrivilegesFailureEvent;
+import org.apache.gravitino.listener.api.event.OverridePrivilegesPreEvent;
 import org.apache.gravitino.listener.api.event.RemoveGroupEvent;
 import org.apache.gravitino.listener.api.event.RemoveGroupFailureEvent;
 import org.apache.gravitino.listener.api.event.RemoveGroupPreEvent;
@@ -518,6 +521,30 @@ public class AccessControlEventDispatcher implements AccessControlDispatcher {
     } catch (Exception e) {
       eventBus.dispatchEvent(
           new RevokePrivilegesFailureEvent(initiator, metalake, e, role, object, privileges));
+      throw e;
+    }
+  }
+
+  @Override
+  public Role overridePrivilegesInRole(
+      String metalake, String role, List<SecurableObject> securableObjectsToOverride)
+      throws NoSuchRoleException, NoSuchMetalakeException {
+    String initiator = PrincipalUtils.getCurrentUserName();
+
+    eventBus.dispatchEvent(
+        new OverridePrivilegesPreEvent(initiator, metalake, role, securableObjectsToOverride));
+    try {
+      Role roleObject =
+          dispatcher.overridePrivilegesInRole(metalake, role, securableObjectsToOverride);
+      eventBus.dispatchEvent(
+          new OverridePrivilegesEvent(
+              initiator, metalake, new RoleInfo(roleObject), securableObjectsToOverride));
+
+      return roleObject;
+    } catch (Exception e) {
+      eventBus.dispatchEvent(
+          new OverridePrivilegesFailureEvent(
+              initiator, metalake, e, role, securableObjectsToOverride));
       throw e;
     }
   }

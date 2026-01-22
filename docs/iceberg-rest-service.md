@@ -31,6 +31,7 @@ There are some key difference between Gravitino Iceberg REST server and Gravitin
 - Supports access control (when running as an auxiliary service).
 - Provides a pluggable metrics store interface to store and delete Iceberg metrics.
 - Supports table metadata cache.
+- Supports scan plan cache.
 
 ## Server management
 
@@ -470,6 +471,20 @@ Gravitino features a pluggable cache system for updating or retrieving table met
 
 Gravitino provides the build-in `org.apache.gravitino.iceberg.common.cache.LocalTableMetadataCache` to store the cached data in the memory. You could also implement your custom table metadata cache by implementing the `org.apache.gravitino.iceberg.common.cache.TableMetadataCache` interface.
 
+### Iceberg scan plan cache configuration
+
+Gravitino caches scan plan results to speed up repeated queries with identical parameters. The cache uses snapshot ID as part of the cache key, so queries against different snapshots will not use stale cached data.
+
+| Configuration item                                         | Description                                              | Default value | Required | Since Version |
+|------------------------------------------------------------|----------------------------------------------------------|---------------|----------|---------------|
+| `gravitino.iceberg-rest.scan-plan-cache-impl`              | The implementation of the scan plan cache.               | (none)        | No       | 1.2.0         |
+| `gravitino.iceberg-rest.scan-plan-cache-capacity`          | The capacity of the scan plan cache.                     | 200           | No       | 1.2.0         |
+| `gravitino.iceberg-rest.scan-plan-cache-expire-minutes`    | The expiration time (in minutes) of the scan plan cache. | 60            | No       | 1.2.0         |
+
+The scan plan cache uses snapshot ID as part of the cache key, ensuring automatic invalidation when table data changes. This can provide significant speedup for repeated queries like dashboard refreshes or BI tool queries.
+
+Gravitino provides the built-in `org.apache.gravitino.iceberg.service.cache.LocalScanPlanCache` to store the cached data in memory. You can also implement your custom scan plan cache by implementing the `org.apache.gravitino.iceberg.service.cache.ScanPlanCache` interface.
+
 ### Misc configurations
 
 | Configuration item                          | Description                                                  | Default value | Required | Since Version    |
@@ -544,6 +559,37 @@ CREATE TABLE dml.test (id bigint COMMENT 'unique id') using iceberg;
 DESCRIBE TABLE EXTENDED dml.test;
 INSERT INTO dml.test VALUES (1), (2);
 SELECT * FROM dml.test;
+```
+
+## Apache Flink Integration
+
+You can use Apache Flink to connect to the Gravitino Iceberg REST catalog service. Below is an example of how to create a catalog and access tables using Flink SQL:
+
+```
+CREATE CATALOG my_catalog WITH (
+  'type' = 'iceberg',
+  'catalog-type' = 'rest',
+  'uri' = 'http://localhost:9001/iceberg/',
+  'header.X-Iceberg-Access-Delegation' = 'vended-credentials',
+  'rest.auth.type' = 'basic',
+  'rest.auth.basic.username' = 'manager',
+  'rest.auth.basic.password' = 'mock'
+);
+```
+
+After creating the catalog, you can use standard Flink SQL commands to explore and manage your Iceberg tables:
+
+```
+USE CATALOG my_catalog;
+SHOW DATABASES;
+USE default;
+SHOW TABLES;
+CREATE TABLE `my_catalog`.`default`.`sample`  (
+     id BIGINT COMMENT 'unique id',
+     data STRING
+);
+INSERT INTO `my_catalog`.`default`.`sample` VALUES (1, 'a');
+SELECT * FROM `my_catalog`.`default`.`sample`;
 ```
 
 ## Exploring the Apache Gravitino Iceberg REST catalog service with Trino
@@ -647,6 +693,58 @@ catalog = load_catalog(
 table_identifier = "db.table"
 table = catalog.load_table(table_identifier)
 print(table.scan().to_arrow())
+```
+
+### Exploring Apache Iceberg with Ray
+
+[Ray](https://www.ray.io/) is a unified framework for scaling AI and Python applications. Ray Data provides native support for reading and writing Iceberg tables through the REST catalog.
+
+:::note
+Ray Data only supports reading from and writing to existing Iceberg tables. It does not support DDL operations such as creating, dropping, or altering tables, schemas, or catalogs. You need to use other tools like Spark or PyIceberg to manage table metadata.
+:::
+
+#### Writing to Iceberg tables with Ray
+
+```python
+import ray
+import pandas as pd
+
+docs = [{"id": i, "data": f"Doc {i}"} for i in range(4)]
+ds = ray.data.from_pandas(pd.DataFrame(docs))
+ds.write_iceberg(
+    table_identifier="default.sample",
+    catalog_kwargs={
+        "name": "default",
+        "type": "rest",
+        "uri": "http://localhost:9001/iceberg/",
+        "header.X-Iceberg-Access-Delegation": "vended-credentials",
+        "auth": {
+            "type": "basic",
+            "basic": {"username": "manager", "password": "mock"}
+        }
+    }
+)
+```
+
+#### Reading Iceberg tables with Ray
+
+```python
+import ray
+
+ds = ray.data.read_iceberg(
+    table_identifier="default.sample",
+    catalog_kwargs={
+        "name": "default",
+        "type": "rest",
+        "uri": "http://localhost:9001/iceberg/",
+        "header.X-Iceberg-Access-Delegation": "vended-credentials",
+        "auth": {
+            "type": "basic",
+            "basic": {"username": "manager", "password": "mock"}
+        }
+    }
+)
+ds.show(limit=1)
 ```
 
 ## Docker instructions

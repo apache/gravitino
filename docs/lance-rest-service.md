@@ -67,19 +67,21 @@ The Lance REST service acts as a bridge between Lance datasets and applications:
 
 The Lance REST service provides comprehensive support for namespace management, table management, and index operations. The table below lists all supported operations:
 
-| Operation         | Description                                                       | HTTP Method | Endpoint Pattern                      | Since Version |
-|-------------------|-------------------------------------------------------------------|-------------|---------------------------------------|---------------|
-| CreateNamespace   | Create a new Lance namespace                                      | POST        | `/lance/v1/namespace/{id}/create`     | 1.1.0         |
-| ListNamespaces    | List all namespaces under a parent namespace                      | GET         | `/lance/v1/namespace/{parent}/list`   | 1.1.0         |
-| DescribeNamespace | Retrieve detailed information about a specific namespace          | POST        | `/lance/v1/namespace/{id}/describe`   | 1.1.0         |
-| DropNamespace     | Delete a namespace                                                | POST        | `/lance/v1/namespace/{id}/drop`       | 1.1.0         |
-| NamespaceExists   | Check whether a namespace exists                                  | POST        | `/lance/v1/namespace/{id}/exists`     | 1.1.0         |
-| ListTables        | List all tables in a namespace                                    | GET         | `/lance/v1/namespace/{id}/table/list` | 1.1.0         |
-| CreateTable       | Create a new table in a namespace                                 | POST        | `/lance/v1/table/{id}/create`         | 1.1.0         |
-| DropTable         | Delete a table including both metadata and data                   | POST        | `/lance/v1/table/{id}/drop`           | 1.1.0         |
-| TableExists       | Check whether a table exists                                      | POST        | `/lance/v1/table/{id}/exists`         | 1.1.0         |
-| RegisterTable     | Register an existing Lance table to a namespace                   | POST        | `/lance/v1/table/{id}/register`       | 1.1.0         |
-| DeregisterTable   | Unregister a table from a namespace (metadata only, data remains) | POST        | `/lance/v1/table/{id}/deregister`     | 1.1.0         |
+| Operation         | Description                                                                                                                                                                        | HTTP Method | Endpoint Pattern                      | Since Version |
+|-------------------|------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|-------------|---------------------------------------|---------------|
+| CreateNamespace   | Create a new Lance namespace                                                                                                                                                       | POST        | `/lance/v1/namespace/{id}/create`     | 1.1.0         |
+| ListNamespaces    | List all namespaces under a parent namespace                                                                                                                                       | GET         | `/lance/v1/namespace/{parent}/list`   | 1.1.0         |
+| DescribeNamespace | Retrieve detailed information about a specific namespace                                                                                                                           | POST        | `/lance/v1/namespace/{id}/describe`   | 1.1.0         |
+| DropNamespace     | Delete a namespace                                                                                                                                                                 | POST        | `/lance/v1/namespace/{id}/drop`       | 1.1.0         |
+| NamespaceExists   | Check whether a namespace exists                                                                                                                                                   | POST        | `/lance/v1/namespace/{id}/exists`     | 1.1.0         |
+| ListTables        | List all tables in a namespace                                                                                                                                                     | GET         | `/lance/v1/namespace/{id}/table/list` | 1.1.0         |
+| CreateTable       | Create a new table in a namespace                                                                                                                                                  | POST        | `/lance/v1/table/{id}/create`         | 1.1.0         |
+| DescribeTable     | Describe an existing Lance table                                                                                                                                                   | POST        | `/lance/v1/table/{id}/describe`       | 1.1.0         |
+| DropTable         | Delete a table including both metadata and data                                                                                                                                    | POST        | `/lance/v1/table/{id}/drop`           | 1.1.0         |
+| TableExists       | Check whether a table exists                                                                                                                                                       | POST        | `/lance/v1/table/{id}/exists`         | 1.1.0         |
+| RegisterTable     | Register an existing Lance table to a namespace                                                                                                                                    | POST        | `/lance/v1/table/{id}/register`       | 1.1.0         |
+| DeregisterTable   | Unregister a table from a namespace (metadata only, data remains)                                                                                                                  | POST        | `/lance/v1/table/{id}/deregister`     | 1.1.0         |
+| CreateEmptyTable  | Declare a table and store the metadata without touching lance table data, for more, please refer to [doc](https://docs.lancedb.com/api-reference/rest/table/create-an-empty-table) | POST        | `/lance/v1/table/{id}/create-empty`   | 1.1.0         |
 
 More details, please refer to the [Lance REST API specification](https://lance.org/format/namespace/rest/catalog-spec/)
 
