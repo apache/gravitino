@@ -80,7 +80,9 @@ public interface FunctionUpdateRequest extends RESTRequest {
     }
 
     @Override
-    public void validate() throws IllegalArgumentException {}
+    public void validate() throws IllegalArgumentException {
+      // newComment can be null or empty to clear the comment
+    }
   }
 
   /** The function update request for adding a definition to a function. */

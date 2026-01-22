@@ -26,8 +26,12 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
 import com.fasterxml.jackson.databind.annotation.JsonSerialize;
 import javax.annotation.Nullable;
+import lombok.AccessLevel;
+import lombok.AllArgsConstructor;
+import lombok.Builder;
 import lombok.EqualsAndHashCode;
 import lombok.Getter;
+import lombok.NoArgsConstructor;
 import org.apache.gravitino.function.FunctionParam;
 import org.apache.gravitino.function.FunctionParams;
 import org.apache.gravitino.json.JsonUtils;
@@ -38,6 +42,9 @@ import org.apache.gravitino.rel.types.Type;
 /** DTO for function parameter. */
 @Getter
 @EqualsAndHashCode
+@NoArgsConstructor(access = AccessLevel.PRIVATE)
+@AllArgsConstructor(access = AccessLevel.PRIVATE)
+@Builder(setterPrefix = "with")
 public class FunctionParamDTO implements FunctionParam {
 
   @JsonProperty("name")
@@ -56,16 +63,8 @@ public class FunctionParamDTO implements FunctionParam {
   @JsonInclude(JsonInclude.Include.NON_EMPTY)
   @JsonSerialize(using = JsonUtils.ColumnDefaultValueSerializer.class)
   @JsonDeserialize(using = JsonUtils.ColumnDefaultValueDeserializer.class)
+  @Builder.Default
   private Expression defaultValue = DEFAULT_VALUE_NOT_SET;
-
-  private FunctionParamDTO() {}
-
-  private FunctionParamDTO(String name, Type dataType, String comment, Expression defaultValue) {
-    this.name = name;
-    this.dataType = dataType;
-    this.comment = comment;
-    this.defaultValue = defaultValue == null ? DEFAULT_VALUE_NOT_SET : defaultValue;
-  }
 
   @Override
   public String name() {
@@ -103,13 +102,16 @@ public class FunctionParamDTO implements FunctionParam {
    * @return The function parameter DTO.
    */
   public static FunctionParamDTO fromFunctionParam(FunctionParam param) {
-    return new FunctionParamDTO(
-        param.name(),
-        param.dataType(),
-        param.comment(),
-        (param.defaultValue() == null || param.defaultValue().equals(Column.DEFAULT_VALUE_NOT_SET))
-            ? Column.DEFAULT_VALUE_NOT_SET
-            : toFunctionArg(param.defaultValue()));
+    return FunctionParamDTO.builder()
+        .withName(param.name())
+        .withDataType(param.dataType())
+        .withComment(param.comment())
+        .withDefaultValue(
+            (param.defaultValue() == null
+                    || param.defaultValue().equals(Column.DEFAULT_VALUE_NOT_SET))
+                ? Column.DEFAULT_VALUE_NOT_SET
+                : toFunctionArg(param.defaultValue()))
+        .build();
   }
 
   @Override
@@ -126,75 +128,5 @@ public class FunctionParamDTO implements FunctionParam {
         + ", defaultValue="
         + defaultValue
         + '}';
-  }
-
-  /** Builder for {@link FunctionParamDTO}. */
-  public static class Builder {
-    private String name;
-    private Type dataType;
-    private String comment;
-    private Expression defaultValue;
-
-    /**
-     * Set the parameter name.
-     *
-     * @param name The parameter name.
-     * @return This builder.
-     */
-    public Builder withName(String name) {
-      this.name = name;
-      return this;
-    }
-
-    /**
-     * Set the parameter data type.
-     *
-     * @param dataType The parameter data type.
-     * @return This builder.
-     */
-    public Builder withDataType(Type dataType) {
-      this.dataType = dataType;
-      return this;
-    }
-
-    /**
-     * Set the parameter comment.
-     *
-     * @param comment The parameter comment.
-     * @return This builder.
-     */
-    public Builder withComment(String comment) {
-      this.comment = comment;
-      return this;
-    }
-
-    /**
-     * Set the parameter default value.
-     *
-     * @param defaultValue The parameter default value.
-     * @return This builder.
-     */
-    public Builder withDefaultValue(Expression defaultValue) {
-      this.defaultValue = defaultValue;
-      return this;
-    }
-
-    /**
-     * Build the {@link FunctionParamDTO}.
-     *
-     * @return The function parameter DTO.
-     */
-    public FunctionParamDTO build() {
-      return new FunctionParamDTO(name, dataType, comment, defaultValue);
-    }
-  }
-
-  /**
-   * Create a new builder.
-   *
-   * @return A new builder.
-   */
-  public static Builder builder() {
-    return new Builder();
   }
 }

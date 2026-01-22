@@ -22,8 +22,12 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
 import com.fasterxml.jackson.databind.annotation.JsonSerialize;
 import javax.annotation.Nullable;
+import lombok.AccessLevel;
+import lombok.AllArgsConstructor;
+import lombok.Builder;
 import lombok.EqualsAndHashCode;
 import lombok.Getter;
+import lombok.NoArgsConstructor;
 import org.apache.gravitino.function.FunctionColumn;
 import org.apache.gravitino.json.JsonUtils;
 import org.apache.gravitino.rel.types.Type;
@@ -31,6 +35,9 @@ import org.apache.gravitino.rel.types.Type;
 /** DTO for function column. */
 @Getter
 @EqualsAndHashCode
+@NoArgsConstructor(access = AccessLevel.PRIVATE)
+@AllArgsConstructor
+@Builder(setterPrefix = "with")
 public class FunctionColumnDTO {
 
   @JsonProperty("name")
@@ -44,14 +51,6 @@ public class FunctionColumnDTO {
   @Nullable
   @JsonProperty("comment")
   private String comment;
-
-  private FunctionColumnDTO() {}
-
-  private FunctionColumnDTO(String name, Type dataType, String comment) {
-    this.name = name;
-    this.dataType = dataType;
-    this.comment = comment;
-  }
 
   /**
    * Convert this DTO to a {@link FunctionColumn} instance.
@@ -84,63 +83,5 @@ public class FunctionColumnDTO {
         + comment
         + '\''
         + '}';
-  }
-
-  /** Builder for {@link FunctionColumnDTO}. */
-  public static class Builder {
-    private String name;
-    private Type dataType;
-    private String comment;
-
-    /**
-     * Set the column name.
-     *
-     * @param name The column name.
-     * @return This builder.
-     */
-    public Builder withName(String name) {
-      this.name = name;
-      return this;
-    }
-
-    /**
-     * Set the column data type.
-     *
-     * @param dataType The column data type.
-     * @return This builder.
-     */
-    public Builder withDataType(Type dataType) {
-      this.dataType = dataType;
-      return this;
-    }
-
-    /**
-     * Set the column comment.
-     *
-     * @param comment The column comment.
-     * @return This builder.
-     */
-    public Builder withComment(String comment) {
-      this.comment = comment;
-      return this;
-    }
-
-    /**
-     * Build the {@link FunctionColumnDTO}.
-     *
-     * @return The function column DTO.
-     */
-    public FunctionColumnDTO build() {
-      return new FunctionColumnDTO(name, dataType, comment);
-    }
-  }
-
-  /**
-   * Create a new builder.
-   *
-   * @return A new builder.
-   */
-  public static Builder builder() {
-    return new Builder();
   }
 }

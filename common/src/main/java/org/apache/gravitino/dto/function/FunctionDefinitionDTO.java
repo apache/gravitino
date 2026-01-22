@@ -47,6 +47,9 @@ public class FunctionDefinitionDTO implements FunctionDefinition {
 
   @Override
   public FunctionParam[] parameters() {
+    if (parameters == null) {
+      return new FunctionParam[0];
+    }
     return parameters;
   }
 

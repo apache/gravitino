@@ -90,9 +90,11 @@ public class FunctionRegisterRequest implements RESTRequest {
       Preconditions.checkArgument(
           returnColumns != null && returnColumns.length > 0,
           "\"returnColumns\" is required for TABLE function type");
-    } else {
+    } else if (functionType == FunctionType.SCALAR || functionType == FunctionType.AGGREGATE) {
       Preconditions.checkArgument(
           returnType != null, "\"returnType\" is required for SCALAR or AGGREGATE function type");
+    } else {
+      throw new IllegalArgumentException("Unsupported function type: " + functionType);
     }
   }
 }
