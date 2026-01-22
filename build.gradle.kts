@@ -766,6 +766,20 @@ tasks {
       // Create the directory 'data' for storage.
       val directory = File("distribution/package/data")
       directory.mkdirs()
+
+      // Copy the all directory distribution/package to distribution/package-extend
+      copy {
+        from(projectDir.dir("distribution/package"))
+        into(projectDir.dir("distribution/package-extend"))
+      }
+
+      // remove catalogs-contrib modules from distribution/package
+      project.file("catalogs-contrib").listFiles()?.forEach { file ->
+        if (file.isDirectory) {
+          val catalogName = file.name.replace("catalog-", "")
+          delete(projectDir.dir("distribution/package/catalogs/$catalogName"))
+        }
+      }
     }
   }
 
@@ -878,7 +892,7 @@ tasks {
   }
 
   val assembleDistribution by registering(Tar::class) {
-    dependsOn("assembleTrinoConnector", "assembleIcebergRESTServer", "assembleLanceRESTServer")
+    dependsOn("assembleTrinoConnector", "assembleIcebergRESTServer", "assembleLanceRESTServer", "assembleDistributionExtend")
     group = "gravitino distribution"
     finalizedBy("checksumDistribution")
     into("${rootProject.name}-$version-bin")
@@ -886,6 +900,33 @@ tasks {
     compression = Compression.GZIP
     archiveFileName.set("${rootProject.name}-$version-bin.tar.gz")
     destinationDirectory.set(projectDir.dir("distribution"))
+  }
+
+  val assembleDistributionExtend by registering(Tar::class) {
+    dependsOn(compileDistribution)
+    group = "gravitino distribution"
+    finalizedBy("checksumDistributionExtend")
+    into("${rootProject.name}-$version-bin-extend")
+    from(projectDir.dir("distribution/package-extend"))
+    compression = Compression.GZIP
+    archiveFileName.set("${rootProject.name}-$version-bin-extend.tar.gz")
+    destinationDirectory.set(projectDir.dir("distribution"))
+  }
+
+  register("checksumDistributionExtend") {
+    group = "gravitino distribution"
+    dependsOn(assembleDistributionExtend)
+    val archiveFile = assembleDistributionExtend.flatMap { it.archiveFile }
+    val checksumFile = archiveFile.map { archive ->
+      archive.asFile.let { it.resolveSibling("${it.name}.sha256") }
+    }
+    inputs.file(archiveFile)
+    outputs.file(checksumFile)
+    doLast {
+      checksumFile.get().writeText(
+        serviceOf<ChecksumService>().sha256(archiveFile.get().asFile).toString()
+      )
+    }
   }
 
   val assembleTrinoConnector by registering(Tar::class) {
@@ -1073,7 +1114,7 @@ tasks {
       ":catalogs:catalog-hive:copyLibAndConfig",
       ":catalogs:catalog-jdbc-doris:copyLibAndConfig",
       ":catalogs:catalog-jdbc-mysql:copyLibAndConfig",
-      ":catalogs:catalog-jdbc-oceanbase:copyLibAndConfig",
+      ":catalogs-contrib:catalog-jdbc-oceanbase:copyLibAndConfig",
       ":catalogs:catalog-jdbc-postgresql:copyLibAndConfig",
       ":catalogs:catalog-jdbc-starrocks:copyLibAndConfig",
       ":catalogs:catalog-kafka:copyLibAndConfig",
