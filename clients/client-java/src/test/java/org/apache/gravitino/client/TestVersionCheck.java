@@ -186,6 +186,9 @@ public class TestVersionCheck extends TestBase {
     String date = "2024-01-03 12:28:33";
     String commitId = "6ef1f9d";
 
+    mockServer.clear(HttpRequest.request("/api/version"));
+    mockServer.clear(HttpRequest.request("/api/metalakes"));
+
     envValue = "false";
     TestAdminBuilder builder =
         new TestAdminBuilder("http://127.0.0.1:" + mockServer.getLocalPort());
