@@ -63,16 +63,17 @@ import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.exceptions.NoSuchTableException;
 import org.apache.gravitino.lance.common.ops.LanceTableOperations;
 import org.apache.gravitino.lance.common.utils.ArrowUtils;
+import org.apache.gravitino.lance.common.utils.LanceConstants;
 import org.apache.gravitino.lance.common.utils.LancePropertiesUtils;
 import org.apache.gravitino.rel.Column;
 import org.apache.gravitino.rel.Table;
 import org.apache.gravitino.rel.TableChange;
 import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 public class GravitinoLanceTableOperations implements LanceTableOperations {
 
-  public static final Logger LOGGER =
-      org.slf4j.LoggerFactory.getLogger(GravitinoLanceTableOperations.class);
+  public static final Logger LOG = LoggerFactory.getLogger(GravitinoLanceTableOperations.class);
 
   private final GravitinoLanceNamespaceWrapper namespaceWrapper;
 
@@ -315,9 +316,15 @@ public class GravitinoLanceTableOperations implements LanceTableOperations {
             .map(colName -> TableChange.deleteColumn(new String[] {colName}, false))
             .toArray(TableChange[]::new);
 
-    catalog.asTableCatalog().alterTable(tableIdentifier, changes);
-
-    return new AlterTableDropColumnsResponse();
+    Table table = catalog.asTableCatalog().alterTable(tableIdentifier, changes);
+    Long version =
+        Optional.ofNullable(table.properties().get(LanceConstants.LANCE_TABLE_VERSION))
+            .map(Long::valueOf)
+            .orElse(null);
+    AlterTableDropColumnsResponse alterTableDropColumnsResponse =
+        new AlterTableDropColumnsResponse();
+    alterTableDropColumnsResponse.setVersion(version);
+    return alterTableDropColumnsResponse;
   }
 
   @Override
@@ -335,13 +342,16 @@ public class GravitinoLanceTableOperations implements LanceTableOperations {
 
     List<TableChange> changes = buildAlterColumnChanges(request);
     if (changes.isEmpty()) {
-      LOGGER.warn("No valid alterations found in the request for table: {}", tableId);
       throw new IllegalArgumentException("No valid alterations found in the request.");
     }
-    catalog.asTableCatalog().alterTable(tableIdentifier, changes.toArray(new TableChange[0]));
-
+    Table table =
+        catalog.asTableCatalog().alterTable(tableIdentifier, changes.toArray(new TableChange[0]));
+    Long version =
+        Optional.ofNullable(table.properties().get(LanceConstants.LANCE_TABLE_VERSION))
+            .map(Long::valueOf)
+            .orElse(null);
     AlterTableAlterColumnsResponse response = new AlterTableAlterColumnsResponse();
-    response.setVersion(0L);
+    response.setVersion(version);
     return response;
   }
 
@@ -396,7 +406,7 @@ public class GravitinoLanceTableOperations implements LanceTableOperations {
       // for more, please see:
       // https://github.com/lance-format/lance-namespace/blob/9d9cde12520caea2fd80ea5f41a20a4db9b92524/java/lance-namespace-apache-client/api/openapi.yaml#L4508-L4511
       if (StringUtils.isNotBlank(column.getCastTo())) {
-        LOGGER.error(
+        LOG.error(
             "Altering column '{}' data type is not supported yet due to unclear spec.", columnName);
         throw new UnsupportedOperationException("Altering column data type is not supported yet.");
       }

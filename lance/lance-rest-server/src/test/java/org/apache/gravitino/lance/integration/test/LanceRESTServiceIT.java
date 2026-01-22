@@ -28,7 +28,9 @@ import com.lancedb.lance.namespace.LanceNamespaces;
 import com.lancedb.lance.namespace.client.apache.ApiException;
 import com.lancedb.lance.namespace.client.apache.api.TableApi;
 import com.lancedb.lance.namespace.model.AlterTableAlterColumnsRequest;
+import com.lancedb.lance.namespace.model.AlterTableAlterColumnsResponse;
 import com.lancedb.lance.namespace.model.AlterTableDropColumnsRequest;
+import com.lancedb.lance.namespace.model.AlterTableDropColumnsResponse;
 import com.lancedb.lance.namespace.model.ColumnAlteration;
 import com.lancedb.lance.namespace.model.CreateEmptyTableRequest;
 import com.lancedb.lance.namespace.model.CreateEmptyTableResponse;
@@ -608,10 +610,13 @@ public class LanceRESTServiceIT extends BaseIT {
     TableApi tableApi = (TableApi) FieldUtils.readField(restNamespace, "tableApi", true);
     String delimiter = RestNamespaceConfig.DELIMITER_DEFAULT;
 
-    Assertions.assertDoesNotThrow(
-        () ->
-            tableApi.alterTableDropColumns(
-                String.join(delimiter, ids), dropColumnsRequest, delimiter));
+    AlterTableDropColumnsResponse alterTableDropColumnsResponse =
+        Assertions.assertDoesNotThrow(
+            () ->
+                tableApi.alterTableDropColumns(
+                    String.join(delimiter, ids), dropColumnsRequest, delimiter));
+    Assertions.assertNotNull(alterTableDropColumnsResponse);
+    Assertions.assertNotNull(alterTableDropColumnsResponse.getVersion());
 
     describeTableRequest.setId(ids);
     loadTable = ns.describeTable(describeTableRequest);
@@ -679,9 +684,13 @@ public class LanceRESTServiceIT extends BaseIT {
     columnAlteration.setRename("value_new");
     alterRequest.setAlterations(List.of(columnAlteration));
 
-    Assertions.assertDoesNotThrow(
-        () ->
-            tableApi.alterTableAlterColumns(String.join(delimiter, ids), alterRequest, delimiter));
+    AlterTableAlterColumnsResponse response =
+        Assertions.assertDoesNotThrow(
+            () ->
+                tableApi.alterTableAlterColumns(
+                    String.join(delimiter, ids), alterRequest, delimiter));
+    Assertions.assertNotNull(response);
+    Assertions.assertNotNull(response.getVersion());
 
     DescribeTableRequest describeTableRequest = new DescribeTableRequest();
     describeTableRequest.setId(ids);

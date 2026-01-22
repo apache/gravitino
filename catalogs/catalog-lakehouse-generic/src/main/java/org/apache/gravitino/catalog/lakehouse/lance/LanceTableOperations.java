@@ -42,11 +42,13 @@ import org.apache.gravitino.EntityStore;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.catalog.ManagedSchemaOperations;
 import org.apache.gravitino.catalog.ManagedTableOperations;
+import org.apache.gravitino.connector.GenericTable;
 import org.apache.gravitino.connector.SupportsSchemas;
 import org.apache.gravitino.exceptions.NoSuchSchemaException;
 import org.apache.gravitino.exceptions.NoSuchTableException;
 import org.apache.gravitino.exceptions.TableAlreadyExistsException;
 import org.apache.gravitino.lance.common.ops.gravitino.LanceDataTypeConverter;
+import org.apache.gravitino.lance.common.utils.LanceConstants;
 import org.apache.gravitino.lance.common.utils.LancePropertiesUtils;
 import org.apache.gravitino.rel.Column;
 import org.apache.gravitino.rel.Table;
@@ -163,11 +165,12 @@ public class LanceTableOperations extends ManagedTableOperations {
       throws NoSuchSchemaException, TableAlreadyExistsException {
 
     Table loadedTable = super.loadTable(ident);
-    handleLanceTableChange(loadedTable, changes);
+    long version = handleLanceTableChange(loadedTable, changes);
     // After making changes to the Lance dataset, we need to update the table metadata in
     // Gravitino. If there's any failure during this process, the code will throw an exception
     // and the update won't be applied in Gravitino.
-    return super.alterTable(ident, changes);
+    GenericTable table = (GenericTable) super.alterTable(ident, changes);
+    return table.setProperties(LanceConstants.LANCE_TABLE_VERSION, String.valueOf(version));
   }
 
   @Override
@@ -289,14 +292,21 @@ public class LanceTableOperations extends ManagedTableOperations {
 
   // Note: this method can't guarantee the atomicity of the operations on Lance dataset. For
   // example, only a subset of changes may be applied if an exception occurs during the process.
-  private void handleLanceTableChange(Table table, TableChange[] changes) {
+  /**
+   * Handle the table changes on the underlying Lance dataset.
+   *
+   * @param table the table to be altered
+   * @param changes the changes to be applied
+   * @return the new version id of the Lance dataset after applying the changes
+   */
+  private long handleLanceTableChange(Table table, TableChange[] changes) {
     List<String> dropColumns = Lists.newArrayList();
     List<Index> indexToAdd = Lists.newArrayList();
     List<ColumnAlteration> renameColumns = Lists.newArrayList();
 
     for (TableChange change : changes) {
       if (change instanceof TableChange.DeleteColumn deleteColumn) {
-        dropColumns.add(deleteColumn.fieldName()[0]);
+        dropColumns.add(String.join(".", deleteColumn.fieldName()));
       } else if (change instanceof TableChange.AddIndex addIndex) {
         indexToAdd.add(
             Indexes.IndexImpl.builder()
@@ -309,7 +319,7 @@ public class LanceTableOperations extends ManagedTableOperations {
         // TODO: Support change column type once we have a clear knowledge about the means of
         // castTo in Lance.
         ColumnAlteration lanceColumnAlter =
-            new ColumnAlteration.Builder(renameColumn.fieldName()[0])
+            new ColumnAlteration.Builder(String.join(".", renameColumn.fieldName()))
                 .rename(renameColumn.getNewName())
                 .build();
         renameColumns.add(lanceColumnAlter);
@@ -342,6 +352,8 @@ public class LanceTableOperations extends ManagedTableOperations {
       if (!renameColumns.isEmpty()) {
         dataset.alterColumns(renameColumns);
       }
+
+      return dataset.getVersion().getId();
     } catch (RuntimeException e) {
       throw e;
     } catch (Exception e) {
