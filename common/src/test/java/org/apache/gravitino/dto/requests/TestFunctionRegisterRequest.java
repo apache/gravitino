@@ -45,12 +45,12 @@ public class TestFunctionRegisterRequest {
 
     FunctionRegisterRequest request =
         FunctionRegisterRequest.builder()
-            .name("test_func")
-            .functionType(FunctionType.SCALAR)
-            .deterministic(true)
-            .comment("test function")
-            .returnType(Types.IntegerType.get())
-            .definitions(new FunctionDefinitionDTO[] {definition})
+            .withName("test_func")
+            .withFunctionType(FunctionType.SCALAR)
+            .withDeterministic(true)
+            .withComment("test function")
+            .withReturnType(Types.IntegerType.get())
+            .withDefinitions(new FunctionDefinitionDTO[] {definition})
             .build();
 
     String json = JsonUtils.objectMapper().writeValueAsString(request);
@@ -67,11 +67,11 @@ public class TestFunctionRegisterRequest {
 
     FunctionRegisterRequest validRequest =
         FunctionRegisterRequest.builder()
-            .name("scalar_func")
-            .functionType(FunctionType.SCALAR)
-            .deterministic(true)
-            .returnType(Types.IntegerType.get())
-            .definitions(new FunctionDefinitionDTO[] {definition})
+            .withName("scalar_func")
+            .withFunctionType(FunctionType.SCALAR)
+            .withDeterministic(true)
+            .withReturnType(Types.IntegerType.get())
+            .withDefinitions(new FunctionDefinitionDTO[] {definition})
             .build();
 
     Assertions.assertDoesNotThrow(validRequest::validate);
@@ -79,10 +79,10 @@ public class TestFunctionRegisterRequest {
     // Missing returnType for SCALAR function
     FunctionRegisterRequest invalidRequest =
         FunctionRegisterRequest.builder()
-            .name("scalar_func")
-            .functionType(FunctionType.SCALAR)
-            .deterministic(true)
-            .definitions(new FunctionDefinitionDTO[] {definition})
+            .withName("scalar_func")
+            .withFunctionType(FunctionType.SCALAR)
+            .withDeterministic(true)
+            .withDefinitions(new FunctionDefinitionDTO[] {definition})
             .build();
 
     Assertions.assertThrows(IllegalArgumentException.class, invalidRequest::validate);
@@ -95,11 +95,11 @@ public class TestFunctionRegisterRequest {
 
     FunctionRegisterRequest validRequest =
         FunctionRegisterRequest.builder()
-            .name("agg_func")
-            .functionType(FunctionType.AGGREGATE)
-            .deterministic(true)
-            .returnType(Types.IntegerType.get())
-            .definitions(new FunctionDefinitionDTO[] {definition})
+            .withName("agg_func")
+            .withFunctionType(FunctionType.AGGREGATE)
+            .withDeterministic(true)
+            .withReturnType(Types.IntegerType.get())
+            .withDefinitions(new FunctionDefinitionDTO[] {definition})
             .build();
 
     Assertions.assertDoesNotThrow(validRequest::validate);
@@ -107,10 +107,10 @@ public class TestFunctionRegisterRequest {
     // Missing returnType for AGGREGATE function
     FunctionRegisterRequest invalidRequest =
         FunctionRegisterRequest.builder()
-            .name("agg_func")
-            .functionType(FunctionType.AGGREGATE)
-            .deterministic(true)
-            .definitions(new FunctionDefinitionDTO[] {definition})
+            .withName("agg_func")
+            .withFunctionType(FunctionType.AGGREGATE)
+            .withDeterministic(true)
+            .withDefinitions(new FunctionDefinitionDTO[] {definition})
             .build();
 
     Assertions.assertThrows(IllegalArgumentException.class, invalidRequest::validate);
@@ -129,11 +129,11 @@ public class TestFunctionRegisterRequest {
 
     FunctionRegisterRequest validRequest =
         FunctionRegisterRequest.builder()
-            .name("table_func")
-            .functionType(FunctionType.TABLE)
-            .deterministic(false)
-            .returnColumns(new org.apache.gravitino.dto.function.FunctionColumnDTO[] {col})
-            .definitions(new FunctionDefinitionDTO[] {definition})
+            .withName("table_func")
+            .withFunctionType(FunctionType.TABLE)
+            .withDeterministic(false)
+            .withReturnColumns(new org.apache.gravitino.dto.function.FunctionColumnDTO[] {col})
+            .withDefinitions(new FunctionDefinitionDTO[] {definition})
             .build();
 
     Assertions.assertDoesNotThrow(validRequest::validate);
@@ -141,10 +141,10 @@ public class TestFunctionRegisterRequest {
     // Missing returnColumns for TABLE function
     FunctionRegisterRequest invalidRequest =
         FunctionRegisterRequest.builder()
-            .name("table_func")
-            .functionType(FunctionType.TABLE)
-            .deterministic(false)
-            .definitions(new FunctionDefinitionDTO[] {definition})
+            .withName("table_func")
+            .withFunctionType(FunctionType.TABLE)
+            .withDeterministic(false)
+            .withDefinitions(new FunctionDefinitionDTO[] {definition})
             .build();
 
     Assertions.assertThrows(IllegalArgumentException.class, invalidRequest::validate);
@@ -157,10 +157,10 @@ public class TestFunctionRegisterRequest {
 
     FunctionRegisterRequest invalidRequest =
         FunctionRegisterRequest.builder()
-            .functionType(FunctionType.SCALAR)
-            .deterministic(true)
-            .returnType(Types.IntegerType.get())
-            .definitions(new FunctionDefinitionDTO[] {definition})
+            .withFunctionType(FunctionType.SCALAR)
+            .withDeterministic(true)
+            .withReturnType(Types.IntegerType.get())
+            .withDefinitions(new FunctionDefinitionDTO[] {definition})
             .build();
 
     Assertions.assertThrows(IllegalArgumentException.class, invalidRequest::validate);
@@ -170,10 +170,10 @@ public class TestFunctionRegisterRequest {
   public void testValidateMissingDefinitions() {
     FunctionRegisterRequest invalidRequest =
         FunctionRegisterRequest.builder()
-            .name("test_func")
-            .functionType(FunctionType.SCALAR)
-            .deterministic(true)
-            .returnType(Types.IntegerType.get())
+            .withName("test_func")
+            .withFunctionType(FunctionType.SCALAR)
+            .withDeterministic(true)
+            .withReturnType(Types.IntegerType.get())
             .build();
 
     Assertions.assertThrows(IllegalArgumentException.class, invalidRequest::validate);
