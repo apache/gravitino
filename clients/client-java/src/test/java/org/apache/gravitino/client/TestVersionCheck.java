@@ -22,7 +22,9 @@ package org.apache.gravitino.client;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import java.util.Collections;
 import org.apache.gravitino.Version;
+import org.apache.gravitino.dto.MetalakeDTO;
 import org.apache.gravitino.dto.VersionDTO;
+import org.apache.gravitino.dto.responses.MetalakeListResponse;
 import org.apache.gravitino.dto.responses.VersionResponse;
 import org.apache.gravitino.exceptions.GravitinoRuntimeException;
 import org.apache.hc.core5.http.HttpStatus;
@@ -33,8 +35,11 @@ import org.junit.jupiter.api.Test;
 import org.mockserver.matchers.Times;
 import org.mockserver.model.HttpRequest;
 import org.mockserver.model.HttpResponse;
+import org.mockserver.verify.VerificationTimes;
 
 public class TestVersionCheck extends TestBase {
+
+  private static String envValue;
 
   private static class TestClient extends GravitinoClientBase {
     protected TestClient(String uri, AuthDataProvider authDataProvider, boolean checkVersion) {
@@ -42,16 +47,35 @@ public class TestVersionCheck extends TestBase {
     }
   }
 
-  private static class TestBuilder extends GravitinoClientBase.Builder<TestClient> {
-    private static String envValue;
+  private static class TestAdminClient extends GravitinoClientBase {
+    protected TestAdminClient(String uri, AuthDataProvider authDataProvider, boolean checkVersion) {
+      super(uri, authDataProvider, checkVersion, Collections.emptyMap(), Collections.emptyMap());
+    }
 
+    private int listMetalakesCount() {
+      MetalakeListResponse resp =
+          restClient.get(
+              "api/metalakes",
+              MetalakeListResponse.class,
+              Collections.emptyMap(),
+              ErrorHandlers.metalakeErrorHandler());
+      resp.validate();
+      return resp.getMetalakes().length;
+    }
+  }
+
+  private static class TestBuilder extends GravitinoClientBase.Builder<TestClient> {
     protected TestBuilder() {
       super("http://localhost:12345");
     }
 
+    protected TestBuilder(String uri) {
+      super(uri);
+    }
+
     @Override
     protected String versionCheckDisabledEnvValue() {
-      return envValue;
+      return TestVersionCheck.envValue;
     }
 
     @Override
@@ -64,14 +88,30 @@ public class TestVersionCheck extends TestBase {
     }
   }
 
+  private static class TestAdminBuilder extends GravitinoClientBase.Builder<TestAdminClient> {
+    protected TestAdminBuilder(String uri) {
+      super(uri);
+    }
+
+    @Override
+    protected String versionCheckDisabledEnvValue() {
+      return TestVersionCheck.envValue;
+    }
+
+    @Override
+    public TestAdminClient build() {
+      return new TestAdminClient(uri, authDataProvider, isVersionCheckEnabled());
+    }
+  }
+
   @AfterEach
   public void resetEnvValue() {
-    TestBuilder.envValue = null;
+    envValue = null;
   }
 
   @Test
   public void testEnvDisablesVersionCheck() {
-    TestBuilder.envValue = "true";
+    envValue = "true";
     TestBuilder builder = new TestBuilder();
 
     Assertions.assertFalse(builder.isEnabled());
@@ -79,7 +119,7 @@ public class TestVersionCheck extends TestBase {
 
   @Test
   public void testEnvIsCaseInsensitive() {
-    TestBuilder.envValue = "TrUe";
+    envValue = "TrUe";
     TestBuilder builder = new TestBuilder();
 
     Assertions.assertFalse(builder.isEnabled());
@@ -87,7 +127,7 @@ public class TestVersionCheck extends TestBase {
 
   @Test
   public void testEnvFalseKeepsVersionCheckEnabled() {
-    TestBuilder.envValue = "false";
+    envValue = "false";
     TestBuilder builder = new TestBuilder();
 
     Assertions.assertTrue(builder.isEnabled());
@@ -95,7 +135,7 @@ public class TestVersionCheck extends TestBase {
 
   @Test
   public void testExplicitDisableOverridesEnvFalse() {
-    TestBuilder.envValue = "false";
+    envValue = "false";
     TestBuilder builder = new TestBuilder();
     builder.withVersionCheckDisabled();
 
@@ -138,6 +178,48 @@ public class TestVersionCheck extends TestBase {
 
     // check the client version is greater than server version
     Assertions.assertThrows(GravitinoRuntimeException.class, () -> client.checkVersion());
+  }
+
+  @Test
+  public void testVersionCheckSkippedByEnv() throws JsonProcessingException {
+    String version = "0.1.1";
+    String date = "2024-01-03 12:28:33";
+    String commitId = "6ef1f9d";
+
+    envValue = "false";
+    TestAdminBuilder builder =
+        new TestAdminBuilder("http://127.0.0.1:" + mockServer.getLocalPort());
+
+    VersionResponse resp = new VersionResponse(new VersionDTO(version, date, commitId));
+    buildMockResource(Method.GET, "/api/version", null, resp, HttpStatus.SC_OK);
+
+    try (TestAdminClient testClient = builder.build()) {
+      Assertions.assertThrows(GravitinoRuntimeException.class, testClient::listMetalakesCount);
+    }
+
+    mockServer.verify(
+        HttpRequest.request("/api/version").withMethod(Method.GET.name()),
+        VerificationTimes.once());
+    mockServer.verify(
+        HttpRequest.request("/api/metalakes").withMethod(Method.GET.name()),
+        VerificationTimes.exactly(0));
+
+    mockServer.clear(HttpRequest.request("/api/version"));
+    mockServer.clear(HttpRequest.request("/api/metalakes"));
+
+    envValue = "true";
+    TestAdminBuilder skipBuilder =
+        new TestAdminBuilder("http://127.0.0.1:" + mockServer.getLocalPort());
+    MetalakeListResponse listResponse = new MetalakeListResponse(new MetalakeDTO[] {});
+    buildMockResource(Method.GET, "/api/metalakes", null, listResponse, HttpStatus.SC_OK);
+
+    try (TestAdminClient testClient = skipBuilder.build()) {
+      Assertions.assertEquals(0, testClient.listMetalakesCount());
+    }
+
+    mockServer.verify(
+        HttpRequest.request("/api/version").withMethod(Method.GET.name()),
+        VerificationTimes.exactly(0));
   }
 
   @Test
