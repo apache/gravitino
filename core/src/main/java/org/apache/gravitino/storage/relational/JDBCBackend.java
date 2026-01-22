@@ -396,6 +396,12 @@ public class JDBCBackend implements RelationalBackend {
       case JOB:
         return JobMetaService.getInstance()
             .deleteJobsByLegacyTimeline(legacyTimeline, GARBAGE_COLLECTOR_SINGLE_DELETION_LIMIT);
+      case VIEW:
+        // TODO: Implement hard delete logic for VIEW once ViewMetaService is implemented in #9746
+        //  return ViewMetaService.getInstance()
+        //      .deleteViewMetasByLegacyTimeline(
+        //          legacyTimeline, GARBAGE_COLLECTOR_SINGLE_DELETION_LIMIT);
+        return 0;
       case AUDIT:
       case FUNCTION:
         return 0;
@@ -427,6 +433,7 @@ public class JDBCBackend implements RelationalBackend {
       case TABLE_STATISTIC:
       case JOB_TEMPLATE:
       case JOB:
+      case VIEW:
       case FUNCTION: // todo: remove once function versioning is supported
         // These entity types have not implemented multi-versions, so we can skip.
         return 0;
