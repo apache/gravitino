@@ -52,6 +52,7 @@ import org.apache.gravitino.dto.responses.RoleResponse;
 import org.apache.gravitino.dto.util.DTOConverters;
 import org.apache.gravitino.exceptions.IllegalMetadataObjectException;
 import org.apache.gravitino.exceptions.NoSuchMetadataObjectException;
+import org.apache.gravitino.metalake.MetalakeManager;
 import org.apache.gravitino.metrics.MetricNames;
 import org.apache.gravitino.server.authorization.MetadataAuthzHelper;
 import org.apache.gravitino.server.authorization.NameBindings;
@@ -89,7 +90,7 @@ public class RoleOperations {
       return Utils.doAs(
           httpRequest,
           () -> {
-            AuthorizationUtils.checkMetalakeInUse(metalake);
+            MetalakeManager.checkMetalakeInUse(metalake);
             String[] names = accessControlManager.listRoleNames(metalake);
             names =
                 MetadataAuthzHelper.filterByExpression(
@@ -120,7 +121,7 @@ public class RoleOperations {
       return Utils.doAs(
           httpRequest,
           () -> {
-            AuthorizationUtils.checkMetalakeInUse(metalake);
+            MetalakeManager.checkMetalakeInUse(metalake);
             return Utils.ok(
                 new RoleResponse(
                     DTOConverters.toDTO(accessControlManager.getRole(metalake, role))));
@@ -145,7 +146,7 @@ public class RoleOperations {
           httpRequest,
           () -> {
             request.validate();
-            AuthorizationUtils.checkMetalakeInUse(metalake);
+            MetalakeManager.checkMetalakeInUse(metalake);
             Set<MetadataObject> metadataObjects = Sets.newHashSet();
             for (SecurableObjectDTO object : request.getSecurableObjects()) {
               MetadataObject metadataObject =
@@ -215,7 +216,7 @@ public class RoleOperations {
       return Utils.doAs(
           httpRequest,
           () -> {
-            AuthorizationUtils.checkMetalakeInUse(metalake);
+            MetalakeManager.checkMetalakeInUse(metalake);
             boolean deleted = accessControlManager.deleteRole(metalake, role);
             if (!deleted) {
               LOG.warn("Failed to delete role {} under metalake {}", role, metalake);

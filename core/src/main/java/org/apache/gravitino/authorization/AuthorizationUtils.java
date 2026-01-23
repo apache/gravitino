@@ -51,7 +51,6 @@ import org.apache.gravitino.exceptions.NoSuchCatalogException;
 import org.apache.gravitino.exceptions.NoSuchMetadataObjectException;
 import org.apache.gravitino.file.Fileset;
 import org.apache.gravitino.meta.RoleEntity;
-import org.apache.gravitino.metalake.MetalakeManager;
 import org.apache.gravitino.rel.Table;
 import org.apache.gravitino.utils.MetadataObjectUtil;
 import org.apache.gravitino.utils.NameIdentifierUtil;
@@ -123,11 +122,6 @@ public class AuthorizationUtils {
           "Current user %s doesn't exist in the metalake %s, you should add the user to the metalake first",
           user, metalake);
     }
-  }
-
-  public static void checkMetalakeInUse(String metalake) {
-    MetalakeManager.checkMetalake(
-        NameIdentifierUtil.ofMetalake(metalake), GravitinoEnv.getInstance().entityStore());
   }
 
   public static NameIdentifier ofRole(String metalake, String role) {

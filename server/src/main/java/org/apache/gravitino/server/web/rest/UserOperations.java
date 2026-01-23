@@ -36,7 +36,6 @@ import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.MetadataObjects;
 import org.apache.gravitino.authorization.AccessControlDispatcher;
-import org.apache.gravitino.authorization.AuthorizationUtils;
 import org.apache.gravitino.authorization.Owner;
 import org.apache.gravitino.authorization.OwnerDispatcher;
 import org.apache.gravitino.authorization.User;
@@ -46,6 +45,7 @@ import org.apache.gravitino.dto.responses.RemoveResponse;
 import org.apache.gravitino.dto.responses.UserListResponse;
 import org.apache.gravitino.dto.responses.UserResponse;
 import org.apache.gravitino.dto.util.DTOConverters;
+import org.apache.gravitino.metalake.MetalakeManager;
 import org.apache.gravitino.metrics.MetricNames;
 import org.apache.gravitino.server.authorization.MetadataAuthzHelper;
 import org.apache.gravitino.server.authorization.NameBindings;
@@ -92,7 +92,7 @@ public class UserOperations {
       return Utils.doAs(
           httpRequest,
           () -> {
-            AuthorizationUtils.checkMetalakeInUse(metalake);
+            MetalakeManager.checkMetalakeInUse(metalake);
             return Utils.ok(
                 new UserResponse(
                     DTOConverters.toDTO(accessControlManager.getUser(metalake, user))));
@@ -115,7 +115,7 @@ public class UserOperations {
       return Utils.doAs(
           httpRequest,
           () -> {
-            AuthorizationUtils.checkMetalakeInUse(metalake);
+            MetalakeManager.checkMetalakeInUse(metalake);
             if (verbose) {
               User[] users = accessControlManager.listUsers(metalake);
               users =
@@ -158,7 +158,7 @@ public class UserOperations {
           httpRequest,
           () -> {
             request.validate();
-            AuthorizationUtils.checkMetalakeInUse(metalake);
+            MetalakeManager.checkMetalakeInUse(metalake);
             return Utils.ok(
                 new UserResponse(
                     DTOConverters.toDTO(
@@ -184,7 +184,7 @@ public class UserOperations {
       return Utils.doAs(
           httpRequest,
           () -> {
-            AuthorizationUtils.checkMetalakeInUse(metalake);
+            MetalakeManager.checkMetalakeInUse(metalake);
 
             ownerManager
                 .getOwner(

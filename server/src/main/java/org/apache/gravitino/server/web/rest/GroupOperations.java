@@ -37,7 +37,6 @@ import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.MetadataObjects;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.authorization.AccessControlDispatcher;
-import org.apache.gravitino.authorization.AuthorizationUtils;
 import org.apache.gravitino.authorization.Owner;
 import org.apache.gravitino.authorization.OwnerDispatcher;
 import org.apache.gravitino.dto.requests.GroupAddRequest;
@@ -46,6 +45,7 @@ import org.apache.gravitino.dto.responses.GroupResponse;
 import org.apache.gravitino.dto.responses.NameListResponse;
 import org.apache.gravitino.dto.responses.RemoveResponse;
 import org.apache.gravitino.dto.util.DTOConverters;
+import org.apache.gravitino.metalake.MetalakeManager;
 import org.apache.gravitino.metrics.MetricNames;
 import org.apache.gravitino.server.authorization.NameBindings;
 import org.apache.gravitino.server.authorization.annotations.AuthorizationExpression;
@@ -84,7 +84,7 @@ public class GroupOperations {
       return Utils.doAs(
           httpRequest,
           () -> {
-            AuthorizationUtils.checkMetalakeInUse(metalake);
+            MetalakeManager.checkMetalakeInUse(metalake);
             return Utils.ok(
                 new GroupResponse(
                     DTOConverters.toDTO(accessControlManager.getGroup(metalake, group))));
@@ -108,7 +108,7 @@ public class GroupOperations {
           httpRequest,
           () -> {
             request.validate();
-            AuthorizationUtils.checkMetalakeInUse(metalake);
+            MetalakeManager.checkMetalakeInUse(metalake);
             return Utils.ok(
                 new GroupResponse(
                     DTOConverters.toDTO(
@@ -134,7 +134,7 @@ public class GroupOperations {
       return Utils.doAs(
           httpRequest,
           () -> {
-            AuthorizationUtils.checkMetalakeInUse(metalake);
+            MetalakeManager.checkMetalakeInUse(metalake);
             ownerDispatcher
                 .getOwner(
                     metalake, MetadataObjects.of(null, metalake, MetadataObject.Type.METALAKE))
@@ -173,7 +173,7 @@ public class GroupOperations {
       return Utils.doAs(
           httpRequest,
           () -> {
-            AuthorizationUtils.checkMetalakeInUse(metalake);
+            MetalakeManager.checkMetalakeInUse(metalake);
             if (verbose) {
               return Utils.ok(
                   new GroupListResponse(
