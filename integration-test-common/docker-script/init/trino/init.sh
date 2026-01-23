@@ -28,7 +28,7 @@ cp "$trino_conf_dir/config/node.properties" /etc/trino/node.properties
 cp "$trino_conf_dir/config/catalog/gravitino.properties" /etc/trino/catalog/gravitino.properties
 
 # Copy the MYSQL driver to iceberg connector
-cp /usr/lib/trino/plugin/mysql/mysql-connector-j-8.2.0.jar /usr/lib/trino/plugin/iceberg/
+cp /usr/lib/trino/plugin/mysql/*mysql-connector-j-*.jar /usr/lib/trino/plugin/iceberg/
 
 # Update `gravitino.uri = http://GRAVITINO_HOST_IP:GRAVITINO_HOST_PORT` in the `conf/catalog/gravitino.properties`
 sed -i "s/GRAVITINO_HOST_IP:GRAVITINO_HOST_PORT/${GRAVITINO_HOST_IP}:${GRAVITINO_HOST_PORT}/g" /etc/trino/catalog/gravitino.properties
