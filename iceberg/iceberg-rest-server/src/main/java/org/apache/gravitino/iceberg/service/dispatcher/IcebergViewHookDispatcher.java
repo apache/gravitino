@@ -62,27 +62,23 @@ public class IcebergViewHookDispatcher implements IcebergViewOperationDispatcher
     // Then import it into Gravitino so Gravitino is aware of the view
     importView(context.catalogName(), namespace, createViewRequest.name());
 
-    // Set view ownership
-    IcebergOwnershipUtils.setViewOwner(
-        metalake,
-        context.catalogName(),
-        namespace,
-        createViewRequest.name(),
-        context.userName(),
-        GravitinoEnv.getInstance().ownerDispatcher());
+    // TODO(#9746): Enable view ownership once ViewMetaService is implemented
+    // Currently disabled because VIEW entity type is not supported in
+    // RelationalEntityStoreIdResolver
+    // IcebergOwnershipUtils.setViewOwner(
+    //     metalake,
+    //     context.catalogName(),
+    //     namespace,
+    //     createViewRequest.name(),
+    //     context.userName(),
+    //     GravitinoEnv.getInstance().ownerDispatcher());
 
     return response;
   }
 
   @Override
   public LoadViewResponse loadView(IcebergRequestContext context, TableIdentifier viewIdentifier) {
-    LoadViewResponse response = dispatcher.loadView(context, viewIdentifier);
-
-    // Import on load as well to ensure Gravitino knows about views that may have been
-    // created outside of this REST server instance
-    importView(context.catalogName(), viewIdentifier.namespace(), viewIdentifier.name());
-
-    return response;
+    return dispatcher.loadView(context, viewIdentifier);
   }
 
   @Override
