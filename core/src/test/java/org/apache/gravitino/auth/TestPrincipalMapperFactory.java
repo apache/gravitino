@@ -64,20 +64,20 @@ public class TestPrincipalMapperFactory {
     assertTrue(exception.getMessage().contains("Unknown principal mapper type"));
   }
 
+  public static class TestCustomMapper implements PrincipalMapper {
+    @Override
+    public Principal map(String principal) {
+      return new UserPrincipal("custom:" + principal);
+    }
+  }
+
   @Test
   public void testCreateCustomMapperWithInlineClass() {
-    class InlineCustomMapper implements PrincipalMapper {
-      @Override
-      public Principal map(String principal) {
-        return new UserPrincipal("inline:" + principal);
-      }
-    }
-    // Register the class by name in the current classloader
-    String className = InlineCustomMapper.class.getName();
+    String className = TestCustomMapper.class.getName();
     PrincipalMapper mapper = PrincipalMapperFactory.create(className, null);
     assertNotNull(mapper);
-    assertTrue(mapper instanceof InlineCustomMapper);
+    assertTrue(mapper instanceof TestCustomMapper);
     Principal principal = mapper.map("foo");
-    assertEquals("inline:foo", principal.getName());
+    assertEquals("custom:foo", principal.getName());
   }
 }

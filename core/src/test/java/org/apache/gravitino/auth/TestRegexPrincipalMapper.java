@@ -58,20 +58,20 @@ public class TestRegexPrincipalMapper {
 
   @Test
   public void testNullPattern() {
-    RegexPrincipalMapper mapper = new RegexPrincipalMapper(null);
-    Principal principal = mapper.map("user@company.com");
-
-    assertNotNull(principal);
-    assertEquals("user@company.com", principal.getName());
+    assertThrows(
+        IllegalArgumentException.class,
+        () -> {
+          new RegexPrincipalMapper(null);
+        });
   }
 
   @Test
   public void testEmptyPattern() {
-    RegexPrincipalMapper mapper = new RegexPrincipalMapper("");
-    Principal principal = mapper.map("user@company.com");
-
-    assertNotNull(principal);
-    assertEquals("user@company.com", principal.getName());
+    assertThrows(
+        IllegalArgumentException.class,
+        () -> {
+          new RegexPrincipalMapper("");
+        });
   }
 
   @Test
