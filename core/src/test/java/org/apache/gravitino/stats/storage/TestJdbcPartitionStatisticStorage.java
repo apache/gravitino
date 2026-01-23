@@ -56,10 +56,10 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 
-/** Unit tests for {@link MysqlPartitionStatisticStorage} using mocked JDBC components. */
-public class TestMysqlPartitionStatisticStorage {
+/** Unit tests for {@link JdbcPartitionStatisticStorage} using mocked JDBC components. */
+public class TestJdbcPartitionStatisticStorage {
 
-  private MysqlPartitionStatisticStorage storage;
+  private JdbcPartitionStatisticStorage storage;
   private DataSource mockDataSource;
   private Connection mockConnection;
   private PreparedStatement mockPreparedStatement;
@@ -92,7 +92,7 @@ public class TestMysqlPartitionStatisticStorage {
     FieldUtils.writeField(GravitinoEnv.getInstance(), "entityStore", mockEntityStore, true);
 
     // Create storage with mocked DataSource
-    storage = new MysqlPartitionStatisticStorage(mockDataSource);
+    storage = new JdbcPartitionStatisticStorage(mockDataSource);
   }
 
   @AfterEach

@@ -18,8 +18,10 @@
  */
 package org.apache.gravitino.stats.storage;
 
+import com.google.common.base.Preconditions;
 import java.sql.SQLException;
 import java.time.Duration;
+import java.util.HashMap;
 import java.util.Map;
 import org.apache.commons.dbcp2.BasicDataSource;
 import org.apache.gravitino.exceptions.GravitinoRuntimeException;
@@ -27,16 +29,17 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- * Factory for creating {@link MysqlPartitionStatisticStorage} instances.
+ * Factory for creating {@link JdbcPartitionStatisticStorage} instances.
  *
- * <p>This factory creates a MySQL-based partition statistics storage using Apache Commons DBCP2 for
- * connection pooling. It configures the connection pool with appropriate settings for partition
- * statistics workloads.
+ * <p>This factory creates a JDBC-based partition statistics storage using Apache Commons DBCP2 for
+ * connection pooling. It supports multiple database backends (MySQL, PostgreSQL, H2) and configures
+ * the connection pool with appropriate settings for partition statistics workloads.
  *
  * <p>Configuration properties:
  *
  * <ul>
- *   <li>jdbc-url (required): JDBC connection URL for MySQL
+ *   <li>jdbc-url (required): JDBC connection URL (e.g., jdbc:mysql://host:port/db,
+ *       jdbc:postgresql://host:port/db)
  *   <li>jdbc-user (required): Database username
  *   <li>jdbc-password (required): Database password
  *   <li>jdbc-driver (optional): JDBC driver class name (defaults to com.mysql.cj.jdbc.Driver)
@@ -46,10 +49,10 @@ import org.slf4j.LoggerFactory;
  *   <li>test-on-borrow (optional): Test connections before use (default: true)
  * </ul>
  */
-public class MysqlPartitionStatisticStorageFactory implements PartitionStatisticStorageFactory {
+public class JdbcPartitionStatisticStorageFactory implements PartitionStatisticStorageFactory {
 
   private static final Logger LOG =
-      LoggerFactory.getLogger(MysqlPartitionStatisticStorageFactory.class);
+      LoggerFactory.getLogger(JdbcPartitionStatisticStorageFactory.class);
 
   // Configuration keys
   private static final String JDBC_URL = "jdbc-url";
@@ -75,14 +78,14 @@ public class MysqlPartitionStatisticStorageFactory implements PartitionStatistic
   @Override
   public PartitionStatisticStorage create(Map<String, String> properties) {
     LOG.info(
-        "Creating MysqlPartitionStatisticStorage with properties: {}",
+        "Creating JdbcPartitionStatisticStorage with properties: {}",
         maskSensitiveProperties(properties));
 
     validateRequiredProperties(properties);
 
     try {
       dataSource = createDataSource(properties);
-      return new MysqlPartitionStatisticStorage(dataSource);
+      return new JdbcPartitionStatisticStorage(dataSource);
     } catch (Exception e) {
       if (dataSource != null) {
         try {
@@ -91,7 +94,7 @@ public class MysqlPartitionStatisticStorageFactory implements PartitionStatistic
           LOG.error("Failed to close data source after creation error", closeException);
         }
       }
-      throw new GravitinoRuntimeException(e, "Failed to create MysqlPartitionStatisticStorage");
+      throw new GravitinoRuntimeException(e, "Failed to create JdbcPartitionStatisticStorage");
     }
   }
 
@@ -143,7 +146,7 @@ public class MysqlPartitionStatisticStorageFactory implements PartitionStatistic
     }
 
     LOG.info(
-        "Created MySQL DataSource: url={}, driver={}, maxPoolSize={}, minIdle={}, timeout={}ms",
+        "Created JDBC DataSource: url={}, driver={}, maxPoolSize={}, minIdle={}, timeout={}ms",
         jdbcUrl,
         driverClassName,
         maxSize,
@@ -154,21 +157,25 @@ public class MysqlPartitionStatisticStorageFactory implements PartitionStatistic
   }
 
   /**
-   * Validates that all required properties are present.
+   * Validates that all required properties are present and non-empty.
    *
    * @param properties configuration properties
-   * @throws IllegalArgumentException if required properties are missing
+   * @throws IllegalArgumentException if required properties are missing or empty
    */
   private void validateRequiredProperties(Map<String, String> properties) {
-    if (!properties.containsKey(JDBC_URL)) {
-      throw new IllegalArgumentException("Missing required property: " + JDBC_URL);
-    }
-    if (!properties.containsKey(JDBC_USER)) {
-      throw new IllegalArgumentException("Missing required property: " + JDBC_USER);
-    }
-    if (!properties.containsKey(JDBC_PASSWORD)) {
-      throw new IllegalArgumentException("Missing required property: " + JDBC_PASSWORD);
-    }
+    String jdbcUrl = properties.get(JDBC_URL);
+    Preconditions.checkArgument(
+        jdbcUrl != null && !jdbcUrl.trim().isEmpty(), "Property %s must be non-empty", JDBC_URL);
+
+    String jdbcUser = properties.get(JDBC_USER);
+    Preconditions.checkArgument(
+        jdbcUser != null && !jdbcUser.trim().isEmpty(), "Property %s must be non-empty", JDBC_USER);
+
+    String jdbcPassword = properties.get(JDBC_PASSWORD);
+    Preconditions.checkArgument(
+        jdbcPassword != null && !jdbcPassword.trim().isEmpty(),
+        "Property %s must be non-empty",
+        JDBC_PASSWORD);
   }
 
   /**
@@ -178,7 +185,7 @@ public class MysqlPartitionStatisticStorageFactory implements PartitionStatistic
    * @return masked properties map
    */
   private Map<String, String> maskSensitiveProperties(Map<String, String> properties) {
-    Map<String, String> masked = new java.util.HashMap<>(properties);
+    Map<String, String> masked = new HashMap<>(properties);
     if (masked.containsKey(JDBC_PASSWORD)) {
       masked.put(JDBC_PASSWORD, "***");
     }
@@ -192,7 +199,7 @@ public class MysqlPartitionStatisticStorageFactory implements PartitionStatistic
    */
   public void close() throws SQLException {
     if (dataSource != null) {
-      LOG.info("Closing MySQL DataSource");
+      LOG.info("Closing JDBC DataSource");
       dataSource.close();
       dataSource = null;
     }
