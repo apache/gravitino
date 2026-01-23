@@ -767,10 +767,10 @@ tasks {
       val directory = File("distribution/package/data")
       directory.mkdirs()
 
-      // Copy the all directory distribution/package to distribution/package-extend
+      // Copy the all directory distribution/package to distribution/package-all
       copy {
         from(projectDir.dir("distribution/package"))
-        into(projectDir.dir("distribution/package-extend"))
+        into(projectDir.dir("distribution/package-all"))
       }
 
       // remove catalogs-contrib modules from distribution/package
@@ -892,7 +892,7 @@ tasks {
   }
 
   val assembleDistribution by registering(Tar::class) {
-    dependsOn("assembleTrinoConnector", "assembleIcebergRESTServer", "assembleLanceRESTServer", "assembleDistributionExtend")
+    dependsOn("assembleTrinoConnector", "assembleIcebergRESTServer", "assembleLanceRESTServer", "assembleDistributionAll")
     group = "gravitino distribution"
     finalizedBy("checksumDistribution")
     into("${rootProject.name}-$version-bin")
@@ -902,21 +902,21 @@ tasks {
     destinationDirectory.set(projectDir.dir("distribution"))
   }
 
-  val assembleDistributionExtend by registering(Tar::class) {
+  val assembleDistributionAll by registering(Tar::class) {
     dependsOn(compileDistribution)
     group = "gravitino distribution"
-    finalizedBy("checksumDistributionExtend")
-    into("${rootProject.name}-$version-bin-extend")
-    from(projectDir.dir("distribution/package-extend"))
+    finalizedBy("checksumDistributionAll")
+    into("${rootProject.name}-$version-bin-all")
+    from(projectDir.dir("distribution/package-all"))
     compression = Compression.GZIP
-    archiveFileName.set("${rootProject.name}-$version-bin-extend.tar.gz")
+    archiveFileName.set("${rootProject.name}-$version-bin-all.tar.gz")
     destinationDirectory.set(projectDir.dir("distribution"))
   }
 
-  register("checksumDistributionExtend") {
+  register("checksumDistributionAll") {
     group = "gravitino distribution"
-    dependsOn(assembleDistributionExtend)
-    val archiveFile = assembleDistributionExtend.flatMap { it.archiveFile }
+    dependsOn(assembleDistributionAll)
+    val archiveFile = assembleDistributionAll.flatMap { it.archiveFile }
     val checksumFile = archiveFile.map { archive ->
       archive.asFile.let { it.resolveSibling("${it.name}.sha256") }
     }
