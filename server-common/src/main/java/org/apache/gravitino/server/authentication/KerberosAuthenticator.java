@@ -11,22 +11,21 @@
  */
 package org.apache.gravitino.server.authentication;
 
-import com.google.common.base.Splitter;
 import java.io.File;
 import java.nio.charset.StandardCharsets;
 import java.security.Principal;
 import java.security.PrivilegedActionException;
 import java.security.PrivilegedExceptionAction;
 import java.util.Base64;
-import java.util.List;
 import javax.security.auth.Subject;
 import javax.security.auth.kerberos.KerberosPrincipal;
 import javax.security.auth.kerberos.KeyTab;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.Config;
-import org.apache.gravitino.UserPrincipal;
 import org.apache.gravitino.auth.AuthConstants;
 import org.apache.gravitino.auth.KerberosUtils;
+import org.apache.gravitino.auth.PrincipalMapper;
+import org.apache.gravitino.auth.PrincipalMapperFactory;
 import org.apache.gravitino.exceptions.UnauthorizedException;
 import org.ietf.jgss.GSSContext;
 import org.ietf.jgss.GSSCredential;
@@ -50,6 +49,7 @@ public class KerberosAuthenticator implements Authenticator {
   public static final Logger LOG = LoggerFactory.getLogger(KerberosAuthenticator.class);
   private final Subject serverSubject = new Subject();
   private GSSManager gssManager;
+  private PrincipalMapper principalMapper;
 
   @Override
   public void initialize(Config config) throws RuntimeException {
@@ -74,6 +74,13 @@ public class KerberosAuthenticator implements Authenticator {
       serverSubject.getPrincipals().add(krbPrincipal);
       KeyTab keytabInstance = KeyTab.getInstance(keytabFile);
       serverSubject.getPrivateCredentials().add(keytabInstance);
+
+      // Initialize principal mapper. The default regex pattern '([^@]+).*'
+      // extracts everything before '@' (e.g., "user" from "user@REALM",
+      // "HTTP/host" from "HTTP/host@REALM")
+      String mapperType = config.get(KerberosConfig.PRINCIPAL_MAPPER_TYPE);
+      String regexPattern = config.get(KerberosConfig.PRINCIPAL_MAPPER_REGEX_PATTERN);
+      this.principalMapper = PrincipalMapperFactory.create(mapperType, regexPattern);
 
       gssManager =
           Subject.doAs(
@@ -170,23 +177,14 @@ public class KerberosAuthenticator implements Authenticator {
         throw new UnauthorizedException("GssContext isn't established", challenge);
       }
 
-      // Usually principal names are in the form 'user/instance@REALM' or 'user@REALM'.
-      List<String> principalComponents =
-          Splitter.on('@').splitToList(gssContext.getSrcName().toString());
-      if (principalComponents.size() != 2) {
-        throw new UnauthorizedException("Principal has wrong format", AuthConstants.NEGOTIATE);
-      }
+      // Extract principal from GSS context and map it using configured mapper
+      String principalString = gssContext.getSrcName().toString();
 
-      String user = principalComponents.get(0);
-      // TODO: We will have KerberosUserPrincipal in the future.
-      //  We can put more information of Kerberos to the KerberosUserPrincipal
-      // For example, we can put the token into the KerberosUserPrincipal,
-      // We can return the token to the client in the AuthenticationFilter. It will be convenient
-      // for client to establish the security context. Hadoop uses the cookie to store the token.
-      // For now, we don't store it in the cookie. I can have a simple implementation. first.
-      // It's also not required for the protocol.
-      // https://datatracker.ietf.org/doc/html/rfc4559
-      return new UserPrincipal(user);
+      // Use principal mapper to extract the principal
+      // This allows for flexible mapping strategies (regex, kerberos-specific parsing, etc.)
+      // The mapper will handle validation and extraction based on its configured type
+      Principal mappedPrincipal = principalMapper.map(principalString);
+      return mappedPrincipal;
     } finally {
       if (gssContext != null) {
         gssContext.dispose();

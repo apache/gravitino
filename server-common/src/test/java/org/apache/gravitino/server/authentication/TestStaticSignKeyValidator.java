@@ -255,9 +255,10 @@ public class TestStaticSignKeyValidator {
   }
 
   @Test
-  public void testUserMappingPatternWithDefaultPattern() {
+  public void testPrincipalMapperWithDefaultPattern() {
     Map<String, String> config = createBaseConfig();
-    config.put("gravitino.authenticator.oauth.userMappingPattern", "(.*)");
+    config.put("gravitino.authenticator.oauth.principalMapperType", "regex");
+    config.put("gravitino.authenticator.oauth.principalMapper.regex.pattern", "(.*)");
     validator.initialize(createConfig(config));
 
     String token =
@@ -271,13 +272,14 @@ public class TestStaticSignKeyValidator {
 
     Principal principal = validator.validateToken(token, serviceAudience);
     assertNotNull(principal);
-    assertEquals("user@example.com", principal.getName()); // Should match entire subject
+    assertEquals("user@example.com", principal.getName());
   }
 
   @Test
-  public void testUserMappingPatternExtractEmailLocalPart() {
+  public void testPrincipalMapperExtractEmailLocalPart() {
     Map<String, String> config = createBaseConfig();
-    config.put("gravitino.authenticator.oauth.userMappingPattern", "([^@]+)@.*");
+    config.put("gravitino.authenticator.oauth.principalMapperType", "regex");
+    config.put("gravitino.authenticator.oauth.principalMapper.regex.pattern", "([^@]+)@.*");
     validator.initialize(createConfig(config));
 
     String token =
@@ -291,13 +293,14 @@ public class TestStaticSignKeyValidator {
 
     Principal principal = validator.validateToken(token, serviceAudience);
     assertNotNull(principal);
-    assertEquals("john.doe", principal.getName()); // Should extract local part only
+    assertEquals("john.doe", principal.getName());
   }
 
   @Test
-  public void testUserMappingPatternNoMatch() {
+  public void testPrincipalMapperNoMatch() {
     Map<String, String> config = createBaseConfig();
-    config.put("gravitino.authenticator.oauth.userMappingPattern", "([^@]+)@.*");
+    config.put("gravitino.authenticator.oauth.principalMapperType", "regex");
+    config.put("gravitino.authenticator.oauth.principalMapper.regex.pattern", "([^@]+)@.*");
     validator.initialize(createConfig(config));
 
     String token =
@@ -311,14 +314,14 @@ public class TestStaticSignKeyValidator {
 
     Principal principal = validator.validateToken(token, serviceAudience);
     assertNotNull(principal);
-    // Should return original principal when pattern doesn't match
     assertEquals("plainuser", principal.getName());
   }
 
   @Test
-  public void testUserMappingPatternKerberosPrincipal() {
+  public void testPrincipalMapperKerberosPrincipal() {
     Map<String, String> config = createBaseConfig();
-    config.put("gravitino.authenticator.oauth.userMappingPattern", "([^/@]+).*");
+    config.put("gravitino.authenticator.oauth.principalMapperType", "regex");
+    config.put("gravitino.authenticator.oauth.principalMapper.regex.pattern", "([^/@]+).*");
     validator.initialize(createConfig(config));
 
     String token =
@@ -332,6 +335,6 @@ public class TestStaticSignKeyValidator {
 
     Principal principal = validator.validateToken(token, serviceAudience);
     assertNotNull(principal);
-    assertEquals("admin", principal.getName()); // Should extract username only
+    assertEquals("admin", principal.getName());
   }
 }

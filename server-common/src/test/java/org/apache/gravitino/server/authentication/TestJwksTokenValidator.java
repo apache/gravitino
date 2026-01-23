@@ -391,7 +391,7 @@ public class TestJwksTokenValidator {
   }
 
   @Test
-  public void testUserMappingPatternWithDefaultPattern() throws Exception {
+  public void testPrincipalMapperWithDefaultPattern() throws Exception {
     // Generate a test RSA key pair
     RSAKey rsaKey =
         new RSAKeyGenerator(2048).keyID("test-key-id").algorithm(JWSAlgorithm.RS256).generate();
@@ -431,19 +431,20 @@ public class TestJwksTokenValidator {
       config.put(
           "gravitino.authenticator.oauth.jwksUri", "https://test-jwks.com/.well-known/jwks.json");
       config.put("gravitino.authenticator.oauth.authority", "https://test-issuer.com");
-      config.put("gravitino.authenticator.oauth.userMappingPattern", "(.*)");
+      config.put("gravitino.authenticator.oauth.principalMapperType", "regex");
+      config.put("gravitino.authenticator.oauth.principalMapper.regex.pattern", "(.*)");
       config.put("gravitino.authenticator.oauth.allowSkewSecs", "120");
 
       validator.initialize(createConfig(config));
       Principal result = validator.validateToken(tokenString, "test-service");
 
       assertNotNull(result);
-      assertEquals("user@example.com", result.getName()); // Should match entire subject
+      assertEquals("user@example.com", result.getName());
     }
   }
 
   @Test
-  public void testUserMappingPatternExtractEmailLocalPart() throws Exception {
+  public void testPrincipalMapperExtractEmailLocalPart() throws Exception {
     // Generate a test RSA key pair
     RSAKey rsaKey =
         new RSAKeyGenerator(2048).keyID("test-key-id").algorithm(JWSAlgorithm.RS256).generate();
@@ -483,19 +484,20 @@ public class TestJwksTokenValidator {
       config.put(
           "gravitino.authenticator.oauth.jwksUri", "https://test-jwks.com/.well-known/jwks.json");
       config.put("gravitino.authenticator.oauth.authority", "https://test-issuer.com");
-      config.put("gravitino.authenticator.oauth.userMappingPattern", "([^@]+)@.*");
+      config.put("gravitino.authenticator.oauth.principalMapperType", "regex");
+      config.put("gravitino.authenticator.oauth.principalMapper.regex.pattern", "([^@]+)@.*");
       config.put("gravitino.authenticator.oauth.allowSkewSecs", "120");
 
       validator.initialize(createConfig(config));
       Principal result = validator.validateToken(tokenString, "test-service");
 
       assertNotNull(result);
-      assertEquals("john.doe", result.getName()); // Should extract local part only
+      assertEquals("john.doe", result.getName());
     }
   }
 
   @Test
-  public void testUserMappingPatternNoMatch() throws Exception {
+  public void testPrincipalMapperNoMatch() throws Exception {
     // Generate a test RSA key pair
     RSAKey rsaKey =
         new RSAKeyGenerator(2048).keyID("test-key-id").algorithm(JWSAlgorithm.RS256).generate();
@@ -535,14 +537,14 @@ public class TestJwksTokenValidator {
       config.put(
           "gravitino.authenticator.oauth.jwksUri", "https://test-jwks.com/.well-known/jwks.json");
       config.put("gravitino.authenticator.oauth.authority", "https://test-issuer.com");
-      config.put("gravitino.authenticator.oauth.userMappingPattern", "([^@]+)@.*");
+      config.put("gravitino.authenticator.oauth.principalMapperType", "regex");
+      config.put("gravitino.authenticator.oauth.principalMapper.regex.pattern", "([^@]+)@.*");
       config.put("gravitino.authenticator.oauth.allowSkewSecs", "120");
 
       validator.initialize(createConfig(config));
       Principal result = validator.validateToken(tokenString, "test-service");
 
       assertNotNull(result);
-      // Should return original principal when pattern doesn't match
       assertEquals("plainuser", result.getName());
     }
   }

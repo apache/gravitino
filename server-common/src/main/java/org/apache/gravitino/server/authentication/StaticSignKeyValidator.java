@@ -38,10 +38,10 @@ import java.util.Base64;
 import java.util.List;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.Config;
-import org.apache.gravitino.UserPrincipal;
+import org.apache.gravitino.auth.PrincipalMapper;
+import org.apache.gravitino.auth.PrincipalMapperFactory;
 import org.apache.gravitino.auth.SignatureAlgorithmFamilyType;
 import org.apache.gravitino.exceptions.UnauthorizedException;
-import org.apache.gravitino.utils.PrincipalUtils;
 
 /**
  * Static OAuth token validator that uses a pre-configured signing key for JWT validation.
@@ -53,7 +53,7 @@ import org.apache.gravitino.utils.PrincipalUtils;
 public class StaticSignKeyValidator implements OAuthTokenValidator {
   private long allowSkewSeconds;
   private Key defaultSigningKey;
-  private String userMappingPattern;
+  private PrincipalMapper principalMapper;
 
   @Override
   public void initialize(Config config) {
@@ -67,7 +67,11 @@ public class StaticSignKeyValidator implements OAuthTokenValidator {
         "The uri of the default OAuth server can't be blank");
     String algType = config.get(OAuthConfig.SIGNATURE_ALGORITHM_TYPE);
     this.defaultSigningKey = decodeSignKey(Base64.getDecoder().decode(configuredSignKey), algType);
-    this.userMappingPattern = config.get(OAuthConfig.USER_MAPPING_PATTERN);
+
+    // Create principal mapper based on configuration
+    String mapperType = config.get(OAuthConfig.PRINCIPAL_MAPPER_TYPE);
+    String regexPattern = config.get(OAuthConfig.PRINCIPAL_MAPPER_REGEX_PATTERN);
+    this.principalMapper = PrincipalMapperFactory.create(mapperType, regexPattern);
   }
 
   @Override
@@ -101,9 +105,9 @@ public class StaticSignKeyValidator implements OAuthTokenValidator {
             "Audiences in token is not in expected format: %s", audienceObject);
       }
 
-      String mappedPrincipal =
-          PrincipalUtils.applyUserMappingPattern(jwt.getBody().getSubject(), userMappingPattern);
-      return new UserPrincipal(mappedPrincipal);
+      // Use principal mapper to extract username
+      Principal mappedPrincipal = principalMapper.map(jwt.getBody().getSubject());
+      return mappedPrincipal;
     } catch (ExpiredJwtException
         | UnsupportedJwtException
         | MalformedJwtException
