@@ -19,7 +19,7 @@
 package org.apache.gravitino.rel;
 
 import org.apache.gravitino.NameIdentifier;
-import org.apache.gravitino.annotation.Evolving;
+import org.apache.gravitino.annotation.Unstable;
 import org.apache.gravitino.exceptions.NoSuchViewException;
 
 /**
@@ -29,7 +29,7 @@ import org.apache.gravitino.exceptions.NoSuchViewException;
  * <p>Note: This is a minimal interface. Full operations (create, list, alter, drop) will be added
  * when Gravitino APIs support views.
  */
-@Evolving
+@Unstable
 public interface ViewCatalog {
 
   /**

@@ -467,6 +467,17 @@ public class NameIdentifierUtil {
   }
 
   /**
+   * Check the given {@link NameIdentifier} is a view identifier. Throw an {@link
+   * IllegalNameIdentifierException} if it's not.
+   *
+   * @param ident The view {@link NameIdentifier} to check.
+   */
+  public static void checkView(NameIdentifier ident) {
+    NameIdentifier.check(ident != null, "View identifier must not be null");
+    NamespaceUtil.checkTable(ident.namespace()); // Views have same namespace structure as tables
+  }
+
+  /**
    * Check the given {@link NameIdentifier} is a column identifier. Throw an {@link
    * IllegalNameIdentifierException} if it's not.
    *
@@ -576,6 +587,11 @@ public class NameIdentifierUtil {
         checkTable(ident);
         String tableParent = dot.join(ident.namespace().level(1), ident.namespace().level(2));
         return MetadataObjects.of(tableParent, ident.name(), MetadataObject.Type.TABLE);
+
+      case VIEW:
+        checkView(ident);
+        String viewParent = dot.join(ident.namespace().level(1), ident.namespace().level(2));
+        return MetadataObjects.of(viewParent, ident.name(), MetadataObject.Type.VIEW);
 
       case COLUMN:
         checkColumn(ident);
