@@ -19,6 +19,7 @@
 package org.apache.gravitino.dto.requests;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
+import org.apache.gravitino.dto.function.FunctionColumnDTO;
 import org.apache.gravitino.dto.function.FunctionDefinitionDTO;
 import org.apache.gravitino.dto.function.FunctionParamDTO;
 import org.apache.gravitino.dto.function.SQLImplDTO;
@@ -121,18 +122,15 @@ public class TestFunctionRegisterRequest {
     FunctionDefinitionDTO definition =
         FunctionDefinitionDTO.builder().withParameters(new FunctionParamDTO[0]).build();
 
-    org.apache.gravitino.dto.function.FunctionColumnDTO col =
-        org.apache.gravitino.dto.function.FunctionColumnDTO.builder()
-            .withName("id")
-            .withDataType(Types.IntegerType.get())
-            .build();
+    FunctionColumnDTO col =
+        FunctionColumnDTO.builder().withName("id").withDataType(Types.IntegerType.get()).build();
 
     FunctionRegisterRequest validRequest =
         FunctionRegisterRequest.builder()
             .withName("table_func")
             .withFunctionType(FunctionType.TABLE)
             .withDeterministic(false)
-            .withReturnColumns(new org.apache.gravitino.dto.function.FunctionColumnDTO[] {col})
+            .withReturnColumns(new FunctionColumnDTO[] {col})
             .withDefinitions(new FunctionDefinitionDTO[] {definition})
             .build();
 
