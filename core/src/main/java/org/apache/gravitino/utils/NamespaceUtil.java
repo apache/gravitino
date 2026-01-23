@@ -73,6 +73,18 @@ public class NamespaceUtil {
   }
 
   /**
+   * Create a namespace for view.
+   *
+   * @param metalake The metalake name
+   * @param catalog The catalog name
+   * @param schema The schema name
+   * @return A namespace for view
+   */
+  public static Namespace ofView(String metalake, String catalog, String schema) {
+    return Namespace.of(metalake, catalog, schema);
+  }
+
+  /**
    * Create a namespace for tag.
    *
    * @param metalake The metalake name
@@ -269,6 +281,19 @@ public class NamespaceUtil {
     check(
         namespace != null && namespace.length() == 3,
         "Table namespace must be non-null and have 3 levels, the input namespace is %s",
+        namespace);
+  }
+
+  /**
+   * Check if the given view namespace is legal, throw an {@link IllegalNamespaceException} if it's
+   * illegal.
+   *
+   * @param namespace The view namespace
+   */
+  public static void checkView(Namespace namespace) {
+    check(
+        namespace != null && namespace.length() == 3,
+        "View namespace must be non-null and have 3 levels, the input namespace is %s",
         namespace);
   }
 

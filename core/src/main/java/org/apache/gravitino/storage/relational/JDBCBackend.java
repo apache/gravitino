@@ -404,6 +404,7 @@ public class JDBCBackend implements RelationalBackend {
         return 0;
       case AUDIT:
       case FUNCTION:
+      case VIEW:
         return 0;
         // TODO: Implement hard delete logic for these entity types.
 
@@ -435,6 +436,7 @@ public class JDBCBackend implements RelationalBackend {
       case JOB:
       case VIEW:
       case FUNCTION: // todo: remove once function versioning is supported
+      case VIEW:
         // These entity types have not implemented multi-versions, so we can skip.
         return 0;
 

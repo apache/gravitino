@@ -108,6 +108,19 @@ public class NameIdentifierUtil {
   }
 
   /**
+   * Create the view {@link NameIdentifier} with the given metalake, catalog, schema and view name.
+   *
+   * @param metalake The metalake name
+   * @param catalog The catalog name
+   * @param schema The schema name
+   * @param view The view name
+   * @return The created view {@link NameIdentifier}
+   */
+  public static NameIdentifier ofView(String metalake, String catalog, String schema, String view) {
+    return NameIdentifier.of(metalake, catalog, schema, view);
+  }
+
+  /**
    * Create the tag {@link NameIdentifier} with the given metalake and tag name.
    *
    * @param metalake The metalake name
@@ -474,7 +487,7 @@ public class NameIdentifierUtil {
    */
   public static void checkView(NameIdentifier ident) {
     NameIdentifier.check(ident != null, "View identifier must not be null");
-    NamespaceUtil.checkTable(ident.namespace()); // Views have same namespace structure as tables
+    NamespaceUtil.checkView(ident.namespace());
   }
 
   /**
@@ -852,6 +865,7 @@ public class NameIdentifierUtil {
         return Entity.EntityType.MODEL;
 
       case TABLE:
+      case VIEW:
       case FILESET:
       case MODEL:
       case TOPIC:
