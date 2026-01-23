@@ -502,7 +502,10 @@ public class Configs {
 
   public static final ConfigEntry<String> PARTITION_STATS_STORAGE_FACTORY_CLASS =
       new ConfigBuilder("gravitino.stats.partition.storageFactoryClass")
-          .doc("The partition stats storage factory class.")
+          .doc(
+              "The partition stats storage factory class. "
+                  + "Default is Lance-based storage. "
+                  + "For production use, configure JdbcPartitionStatisticStorageFactory with database settings.")
           .version(ConfigConstants.VERSION_1_0_0)
           .stringConf()
           .createWithDefault(LancePartitionStatisticStorageFactory.class.getCanonicalName());

@@ -50,15 +50,15 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- * MySQL-based implementation of {@link PartitionStatisticStorage}.
+ * JDBC-based implementation of {@link PartitionStatisticStorage}.
  *
- * <p>This implementation stores partition statistics in a MySQL database table, using Apache
- * Commons DBCP2 for connection pooling. Statistics are stored as JSON-serialized values along with
- * audit information.
+ * <p>This implementation stores partition statistics in a JDBC-compatible database table, using
+ * Apache Commons DBCP2 for connection pooling. It supports multiple database backends (MySQL,
+ * PostgreSQL, H2). Statistics are stored as JSON-serialized values along with audit information.
  */
-public class MysqlPartitionStatisticStorage implements PartitionStatisticStorage {
+public class JdbcPartitionStatisticStorage implements PartitionStatisticStorage {
 
-  private static final Logger LOG = LoggerFactory.getLogger(MysqlPartitionStatisticStorage.class);
+  private static final Logger LOG = LoggerFactory.getLogger(JdbcPartitionStatisticStorage.class);
 
   private final DataSource dataSource;
   private final EntityStore entityStore;
@@ -83,11 +83,11 @@ public class MysqlPartitionStatisticStorage implements PartitionStatisticStorage
           + "WHERE table_id = ? AND partition_name = ? AND statistic_name = ?";
 
   /**
-   * Constructs a new MysqlPartitionStatisticStorage.
+   * Constructs a new JdbcPartitionStatisticStorage.
    *
-   * @param dataSource the JDBC DataSource for MySQL connections
+   * @param dataSource the JDBC DataSource for database connections
    */
-  public MysqlPartitionStatisticStorage(DataSource dataSource) {
+  public JdbcPartitionStatisticStorage(DataSource dataSource) {
     this.dataSource = dataSource;
     this.entityStore = GravitinoEnv.getInstance().entityStore();
   }
@@ -110,11 +110,10 @@ public class MysqlPartitionStatisticStorage implements PartitionStatisticStorage
     try (Connection conn = dataSource.getConnection();
         PreparedStatement stmt = conn.prepareStatement(sql)) {
 
-      int paramIndex = 1;
-      stmt.setLong(paramIndex++, tableId);
+      stmt.setLong(1, tableId);
 
       // Set partition range parameters
-      setPartitionRangeParameters(stmt, partitionRange, paramIndex);
+      setPartitionRangeParameters(stmt, partitionRange, 2);
 
       try (ResultSet rs = stmt.executeQuery()) {
         return parseResultSet(rs);
@@ -153,9 +152,9 @@ public class MysqlPartitionStatisticStorage implements PartitionStatisticStorage
     try (Connection conn = dataSource.getConnection();
         PreparedStatement stmt = conn.prepareStatement(sql)) {
 
-      int paramIndex = 1;
-      stmt.setLong(paramIndex++, tableId);
+      stmt.setLong(1, tableId);
 
+      int paramIndex = 2;
       for (String partitionName : partitionNames) {
         stmt.setString(paramIndex++, partitionName);
       }
@@ -202,6 +201,10 @@ public class MysqlPartitionStatisticStorage implements PartitionStatisticStorage
 
         int[] results = stmt.executeBatch();
         for (int result : results) {
+          // Count successful deletions. Per JDBC spec, executeBatch() returns:
+          // - Positive number: actual update count
+          // - SUCCESS_NO_INFO (-2): operation succeeded but driver doesn't know row count
+          // - EXECUTE_FAILED (-3): operation failed (we don't count this)
           if (result > 0 || result == PreparedStatement.SUCCESS_NO_INFO) {
             totalDropped++;
           }
@@ -294,7 +297,7 @@ public class MysqlPartitionStatisticStorage implements PartitionStatisticStorage
   @Override
   public void close() throws IOException {
     // DataSource lifecycle is managed externally by the factory
-    LOG.debug("Closing MysqlPartitionStatisticStorage");
+    LOG.debug("Closing JdbcPartitionStatisticStorage");
   }
 
   /**
@@ -355,10 +358,9 @@ public class MysqlPartitionStatisticStorage implements PartitionStatisticStorage
    * @param stmt the prepared statement
    * @param range the partition range
    * @param startIndex the starting parameter index
-   * @return the next parameter index
    * @throws SQLException if setting parameters fails
    */
-  private int setPartitionRangeParameters(
+  private void setPartitionRangeParameters(
       PreparedStatement stmt, PartitionRange range, int startIndex) throws SQLException {
     int paramIndex = startIndex;
 
@@ -369,8 +371,6 @@ public class MysqlPartitionStatisticStorage implements PartitionStatisticStorage
     if (range.upperPartitionName().isPresent()) {
       stmt.setString(paramIndex++, range.upperPartitionName().get());
     }
-
-    return paramIndex;
   }
 
   /**

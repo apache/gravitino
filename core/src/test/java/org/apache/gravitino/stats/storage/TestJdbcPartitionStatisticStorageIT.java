@@ -64,7 +64,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- * End-to-end integration tests for {@link MysqlPartitionStatisticStorage} using real MySQL database
+ * End-to-end integration tests for {@link JdbcPartitionStatisticStorage} using real MySQL database
  * via Testcontainers.
  *
  * <p>These tests verify the complete flow from API calls through JDBC to a real MySQL instance.
@@ -81,15 +81,15 @@ import org.slf4j.LoggerFactory;
  * </ul>
  */
 @Tag("gravitino-docker-test")
-public class TestMysqlPartitionStatisticStorageIT {
+public class TestJdbcPartitionStatisticStorageIT {
 
   private static final Logger LOG =
-      LoggerFactory.getLogger(TestMysqlPartitionStatisticStorageIT.class);
+      LoggerFactory.getLogger(TestJdbcPartitionStatisticStorageIT.class);
 
   private static final ContainerSuite containerSuite = ContainerSuite.getInstance();
   private static final TestDatabaseName TEST_DB_NAME = TestDatabaseName.MYSQL_MYSQL_ABSTRACT_IT;
 
-  private static MysqlPartitionStatisticStorage storage;
+  private static JdbcPartitionStatisticStorage storage;
   private static MySQLContainer mySQLContainer;
   private static EntityStore entityStore;
 
@@ -116,8 +116,8 @@ public class TestMysqlPartitionStatisticStorageIT {
     properties.put("jdbc-password", mySQLContainer.getPassword());
     properties.put("jdbc-driver", mySQLContainer.getDriverClassName(TEST_DB_NAME));
 
-    MysqlPartitionStatisticStorageFactory factory = new MysqlPartitionStatisticStorageFactory();
-    storage = (MysqlPartitionStatisticStorage) factory.create(properties);
+    JdbcPartitionStatisticStorageFactory factory = new JdbcPartitionStatisticStorageFactory();
+    storage = (JdbcPartitionStatisticStorage) factory.create(properties);
 
     // Mock EntityStore to return a test table entity
     entityStore = mock(EntityStore.class);
