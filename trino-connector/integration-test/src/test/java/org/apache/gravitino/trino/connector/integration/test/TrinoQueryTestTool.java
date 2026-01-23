@@ -32,7 +32,7 @@ public class TrinoQueryTestTool {
 
   public static void main(String[] args) throws Exception {
     Options options = new Options();
-
+    boolean isFailed = false;
     try {
       options.addOption(
           "auto",
@@ -92,6 +92,16 @@ public class TrinoQueryTestTool {
               + "Use a distributed cluster for integration testing when necessary (value > 0), "
               + "otherwise fall back to a single-node setup with combined coordinator-worker roles.");
 
+      options.addOption(
+          "trino_version", true, "Specify the Trino version to test, the default value is 435.");
+
+      options.addOption(
+          "trino_connector_dir",
+          true,
+          "Specify the Gravitino connector JAR path. "
+              + "The JAR file under ${trino_connector_dir} will be copied into the test image, "
+              + "the default value is ${project_root}/trino-connector/trino-connector/build/libs.");
+
       options.addOption("help", false, "Print this help message");
 
       CommandLineParser parser = new PosixParser();
@@ -106,6 +116,10 @@ public class TrinoQueryTestTool {
                 + "TrinoTestTool --auto=all\n\n"
                 + "Run all the testers in the 'testsets' directory with a distributed cluster:\n"
                 + "TrinoTestTool --auto=all --trino_worker_num=3\n\n"
+                + "Run all the testers in the 'testsets' directory with specific trino version:\n"
+                + "TrinoTestTool --auto=all --trino_version=435\n\n"
+                + "Run all the testers in the 'testsets' directory with specific trino connector JAR files:\n"
+                + "TrinoTestTool --auto=all --trino_connector_dir=./trino-connector/libs\n\n"
                 + "Run all the tpch testset's testers in the 'testsets/tpch' directory:\n"
                 + "TrinoTestTool --testset=tpch --auto=all\n\n"
                 + "Run the tester 'testsets/tpch/00005.sql' in the tpch testset under hive catalog :\n"
@@ -221,22 +235,9 @@ public class TrinoQueryTestTool {
         }
       }
 
-      String trinoWorkerNumConfig = commandLine.getOptionValue("trino_worker_num", "0");
-      try {
-        int trinoWorkerNum = Integer.parseInt(trinoWorkerNumConfig);
-        if (trinoWorkerNum < 0) {
-          System.out.println(
-              "The value of trino_worker_num must be greater than zero, current value is: "
-                  + trinoWorkerNumConfig);
-          System.exit(1);
-        }
-        TrinoQueryIT.trinoWorkerNum = trinoWorkerNum;
-      } catch (Exception e) {
-        System.out.println(
-            "The value of trino_worker_num must be an integer value, current value is: "
-                + trinoWorkerNumConfig);
-        System.exit(1);
-      }
+      TrinoQueryIT.trinoWorkerNum = extractIntValue(commandLine, "trino_worker_num");
+      TrinoQueryIT.trinoVersion = extractIntValue(commandLine, "trino_version");
+      TrinoQueryIT.trinoConnectorDir = commandLine.getOptionValue("trino_connector_dir");
 
       checkEnv();
 
@@ -263,10 +264,40 @@ public class TrinoQueryTestTool {
           testerRunner.totalCount, testerRunner.passCount, testerRunner.generateTestStatus());
     } catch (Exception e) {
       System.out.println(e.getMessage());
-      System.exit(-1);
+      isFailed = true;
     } finally {
-      TrinoQueryIT.cleanup();
+      try {
+        TrinoQueryIT.cleanup();
+      } catch (Exception ex) {
+        System.out.println("Cleanup failed during error handling: " + ex.getMessage());
+      }
+      if (isFailed) {
+        System.exit(-1);
+      }
     }
+  }
+
+  private static Integer extractIntValue(CommandLine commandLine, String key) {
+    String valueConfig = commandLine.getOptionValue(key);
+    if (valueConfig != null) {
+      try {
+        int value = Integer.parseInt(valueConfig);
+        if (value < 0) {
+          System.out.println(
+              "The value of "
+                  + key
+                  + " must be greater than zero, current value is: "
+                  + valueConfig);
+          System.exit(1);
+        }
+        return value;
+      } catch (Exception e) {
+        System.out.println(
+            "The value of " + key + " must be an integer value, current value is: " + valueConfig);
+        System.exit(1);
+      }
+    }
+    return null;
   }
 
   private static void checkEnv() {
