@@ -52,6 +52,8 @@ public interface MetadataObject {
     FILESET,
     /** A table is mapped the table of relational data sources like Apache Hive, MySQL, etc. */
     TABLE,
+    /** A view is mapped to the view of relational data sources like Apache Hive, MySQL, etc. */
+    VIEW,
     /**
      * A topic is mapped the topic of messaging data sources like Apache Kafka, Apache Pulsar, etc.
      */
