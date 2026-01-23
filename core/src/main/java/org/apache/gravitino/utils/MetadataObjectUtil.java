@@ -39,6 +39,7 @@ import org.apache.gravitino.exceptions.NoSuchMetadataObjectException;
 import org.apache.gravitino.exceptions.NoSuchPolicyException;
 import org.apache.gravitino.exceptions.NoSuchRoleException;
 import org.apache.gravitino.exceptions.NoSuchTagException;
+import org.apache.gravitino.exceptions.NoSuchViewException;
 
 public class MetadataObjectUtil {
 
@@ -199,6 +200,15 @@ public class MetadataObjectUtil {
       case MODEL:
         NameIdentifierUtil.checkModel(identifier);
         check(env.modelDispatcher().modelExists(identifier), exceptionToThrowSupplier);
+        break;
+
+      case VIEW:
+        NameIdentifierUtil.checkView(identifier);
+        try {
+          env.viewDispatcher().loadView(identifier);
+        } catch (NoSuchViewException nse) {
+          throw exceptionToThrowSupplier.get();
+        }
         break;
 
       case ROLE:
