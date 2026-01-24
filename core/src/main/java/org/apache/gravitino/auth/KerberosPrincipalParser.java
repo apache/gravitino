@@ -19,17 +19,16 @@
 
 package org.apache.gravitino.auth;
 
-import java.security.Principal;
 import java.util.Objects;
 import java.util.Optional;
 
 /**
- * Represents a Kerberos principal with structured information.
+ * Utility for parsing Kerberos principal strings into structured components.
  *
- * <p>A Kerberos principal has the format: {@code user[/instance][@REALM]} where:
+ * <p>A Kerberos principal has the format: {@code primary[/instance][@REALM]} where:
  *
  * <ul>
- *   <li><b>username</b> (required): The primary component, typically the user or service name
+ *   <li><b>primary</b> (required): The primary component, typically the user or service name
  *   <li><b>instance</b> (optional): The secondary component, often a hostname for service
  *       principals
  *   <li><b>realm</b> (optional): The Kerberos realm (domain), typically uppercase
@@ -38,12 +37,12 @@ import java.util.Optional;
  * <p>Examples:
  *
  * <ul>
- *   <li>{@code john} - username only
- *   <li>{@code john@EXAMPLE.COM} - username with realm
+ *   <li>{@code john} - primary only
+ *   <li>{@code john@EXAMPLE.COM} - primary with realm
  *   <li>{@code HTTP/server.example.com@EXAMPLE.COM} - service principal with instance and realm
  * </ul>
  */
-public class KerberosPrincipalParser implements Principal {
+public class KerberosPrincipalParser {
 
   private final String username;
   private final String instance;
@@ -51,7 +50,7 @@ public class KerberosPrincipalParser implements Principal {
   private final String fullPrincipal;
 
   /**
-   * Creates a new Kerberos principal.
+   * Creates a new Kerberos principal parser result.
    *
    * @param username the primary username component (required, cannot be null or empty)
    * @param instance the instance component (optional, can be null)
@@ -108,11 +107,10 @@ public class KerberosPrincipalParser implements Principal {
   }
 
   /**
-   * Gets the name of this principal. Returns the primary component (username) only.
+   * Gets the primary component (username).
    *
    * @return the username
    */
-  @Override
   public String getName() {
     return username;
   }
