@@ -51,6 +51,9 @@ import org.apache.gravitino.dto.authorization.UserDTO;
 import org.apache.gravitino.dto.credential.CredentialDTO;
 import org.apache.gravitino.dto.file.FileInfoDTO;
 import org.apache.gravitino.dto.file.FilesetDTO;
+import org.apache.gravitino.dto.function.FunctionColumnDTO;
+import org.apache.gravitino.dto.function.FunctionDTO;
+import org.apache.gravitino.dto.function.FunctionDefinitionDTO;
 import org.apache.gravitino.dto.job.JobTemplateDTO;
 import org.apache.gravitino.dto.job.ShellJobTemplateDTO;
 import org.apache.gravitino.dto.job.SparkJobTemplateDTO;
@@ -88,6 +91,7 @@ import org.apache.gravitino.dto.tag.MetadataObjectDTO;
 import org.apache.gravitino.dto.tag.TagDTO;
 import org.apache.gravitino.file.FileInfo;
 import org.apache.gravitino.file.Fileset;
+import org.apache.gravitino.function.Function;
 import org.apache.gravitino.job.JobTemplate;
 import org.apache.gravitino.job.ShellJobTemplate;
 import org.apache.gravitino.job.SparkJobTemplate;
@@ -723,6 +727,41 @@ public class DTOConverters {
         .withUris(modelVersion.uris())
         .withProperties(modelVersion.properties())
         .withAudit(toDTO(modelVersion.auditInfo()))
+        .build();
+  }
+
+  /**
+   * Converts a Function to a FunctionDTO.
+   *
+   * @param function The function to be converted.
+   * @return The function DTO.
+   */
+  public static FunctionDTO toDTO(Function function) {
+    FunctionColumnDTO[] returnColumnDTOs = null;
+    if (function.returnColumns() != null && function.returnColumns().length > 0) {
+      returnColumnDTOs =
+          Arrays.stream(function.returnColumns())
+              .map(FunctionColumnDTO::fromFunctionColumn)
+              .toArray(FunctionColumnDTO[]::new);
+    }
+
+    FunctionDefinitionDTO[] definitionDTOs = null;
+    if (function.definitions() != null) {
+      definitionDTOs =
+          Arrays.stream(function.definitions())
+              .map(FunctionDefinitionDTO::fromFunctionDefinition)
+              .toArray(FunctionDefinitionDTO[]::new);
+    }
+
+    return FunctionDTO.builder()
+        .withName(function.name())
+        .withFunctionType(function.functionType())
+        .withDeterministic(function.deterministic())
+        .withComment(function.comment())
+        .withReturnType(function.returnType())
+        .withReturnColumns(returnColumnDTOs)
+        .withDefinitions(definitionDTOs)
+        .withAudit(toDTO(function.auditInfo()))
         .build();
   }
 
