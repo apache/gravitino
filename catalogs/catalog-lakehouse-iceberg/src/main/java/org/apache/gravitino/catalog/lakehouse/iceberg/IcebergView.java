@@ -19,6 +19,7 @@
 package org.apache.gravitino.catalog.lakehouse.iceberg;
 
 import com.google.common.collect.Maps;
+import java.time.Instant;
 import java.util.Collections;
 import java.util.Map;
 import lombok.Getter;
@@ -55,10 +56,7 @@ public class IcebergView implements View {
         .withName(viewName)
         .withProperties(properties)
         .withAuditInfo(
-            AuditInfo.builder()
-                .withCreator("iceberg")
-                .withCreateTime(java.time.Instant.now())
-                .build())
+            AuditInfo.builder().withCreator("iceberg").withCreateTime(Instant.now()).build())
         .build();
   }
 

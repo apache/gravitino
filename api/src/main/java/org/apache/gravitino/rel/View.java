@@ -18,6 +18,7 @@
  */
 package org.apache.gravitino.rel;
 
+import java.util.Collections;
 import java.util.Map;
 import javax.annotation.Nullable;
 import org.apache.gravitino.Auditable;
@@ -48,6 +49,6 @@ public interface View extends Auditable {
    * @return The properties of the view, empty map if no properties are set.
    */
   default Map<String, String> properties() {
-    return java.util.Collections.emptyMap();
+    return Collections.emptyMap();
   }
 }
