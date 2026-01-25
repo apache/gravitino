@@ -33,6 +33,7 @@ import org.apache.gravitino.connector.PropertiesMetadata;
 import org.apache.gravitino.iceberg.common.ops.IcebergCatalogWrapper;
 import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.meta.CatalogEntity;
+import org.apache.gravitino.rel.ViewCatalog;
 import org.apache.iceberg.rest.responses.ListNamespacesResponse;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
@@ -198,5 +199,29 @@ public class TestIcebergCatalog {
       Assertions.assertTrue(
           throwable.getMessage().contains(IcebergCatalogPropertiesMetadata.CATALOG_BACKEND));
     }
+  }
+
+  @Test
+  public void testAsViewCatalog() {
+    AuditInfo auditInfo =
+        AuditInfo.builder().withCreator("creator").withCreateTime(Instant.now()).build();
+
+    CatalogEntity entity =
+        CatalogEntity.builder()
+            .withId(1L)
+            .withName("catalog")
+            .withNamespace(Namespace.of("metalake"))
+            .withType(IcebergCatalog.Type.RELATIONAL)
+            .withProvider("iceberg")
+            .withAuditInfo(auditInfo)
+            .build();
+
+    Map<String, String> conf = Maps.newHashMap();
+    IcebergCatalog icebergCatalog =
+        new IcebergCatalog().withCatalogConf(conf).withCatalogEntity(entity);
+
+    ViewCatalog viewCatalog = icebergCatalog.asViewCatalog();
+    Assertions.assertNotNull(viewCatalog);
+    Assertions.assertTrue(viewCatalog instanceof IcebergCatalogOperations);
   }
 }
