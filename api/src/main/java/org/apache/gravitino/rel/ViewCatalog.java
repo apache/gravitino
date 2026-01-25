@@ -40,4 +40,18 @@ public interface ViewCatalog {
    * @throws NoSuchViewException If the view does not exist.
    */
   View loadView(NameIdentifier ident) throws NoSuchViewException;
+
+  /**
+   * Check if a view exists using its identifier.
+   *
+   * @param ident A view identifier.
+   * @return true If the view exists, false otherwise.
+   */
+  default boolean viewExists(NameIdentifier ident) {
+    try {
+      return loadView(ident) != null;
+    } catch (NoSuchViewException e) {
+      return false;
+    }
+  }
 }
