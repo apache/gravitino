@@ -186,7 +186,7 @@ public class GravitinoVirtualFileSystemConfiguration {
 
   /**
    * The prefix for user-defined location configs: {@code
-   * fs.path.config.<locationName><property_name>=<property_value>}.
+   * fs.path.config.<locationName>.<property_name>=<property_value>}.
    */
   public static final String FS_GRAVITINO_PATH_CONFIG_PREFIX = "fs.path.config.";
 

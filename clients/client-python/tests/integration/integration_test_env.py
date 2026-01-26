@@ -182,8 +182,8 @@ class IntegrationTestEnv(unittest.TestCase):
         if result.stderr:
             logger.info("stderr: %s", result.stderr)
 
-        succes = check_gravitino_server_status()
-        if succes:
+        success = check_gravitino_server_status()
+        if success:
             cls.gravitino_admin_client = GravitinoAdminClient("http://localhost:8090")
         else:
             raise GravitinoRuntimeException("ERROR: Can't start Gravitino server!")

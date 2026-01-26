@@ -512,9 +512,9 @@ class BaseGVFSOperations(ABC):
         fileset_props.update(fileset.properties())
         # Get user-defined configurations for the actual location
         user_defined_configs = self._get_user_defined_configs(actual_location)
+        fileset_props.update(user_defined_configs)
         if self._options:
             fileset_props.update(self._options)
-        fileset_props.update(user_defined_configs)
         return fileset_props
 
     def _get_actual_filesystem_by_location_name(

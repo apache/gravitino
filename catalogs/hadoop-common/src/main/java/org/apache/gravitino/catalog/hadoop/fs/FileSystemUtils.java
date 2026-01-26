@@ -49,7 +49,7 @@ public class FileSystemUtils {
     ServiceLoader<FileSystemProvider> allFileSystemProviders =
         ServiceLoader.load(FileSystemProvider.class);
 
-    // Only get the file system providers that are in the user list and check if the scheme is
+    // Load all available file system providers from the ServiceLoader and ensure each scheme is
     // unique.
     Streams.stream(allFileSystemProviders.iterator())
         .forEach(
