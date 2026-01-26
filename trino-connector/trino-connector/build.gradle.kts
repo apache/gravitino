@@ -17,8 +17,6 @@
  * under the License.
  */
 
-import net.ltgt.gradle.errorprone.errorprone
-
 plugins {
   id("java")
   id("idea")
@@ -32,10 +30,6 @@ var trinoVersion = 435
 val trinoVersionProvider =
   providers.gradleProperty("trinoVersion").map { it.toInt() }.orElse(435)
 trinoVersion = trinoVersionProvider.get()
-
-java {
-  toolchain.languageVersion.set(JavaLanguageVersion.of(24))
-}
 
 dependencies {
   implementation(project(":catalogs:catalog-common"))
@@ -60,23 +54,4 @@ dependencies {
     exclude("org.apache.logging.log4j")
   }
   testRuntimeOnly(libs.junit.jupiter.engine)
-}
-
-tasks.named("generateMetadataFileForMavenJavaPublication") {
-  // No extra dependencies required now that runtime artifacts are copied directly during distribution tasks.
-}
-
-tasks {
-  register("copyLibs", Copy::class) {
-    dependsOn("build")
-    from("build/libs")
-    from({ configurations.runtimeClasspath.get().filter(File::isFile) })
-    into("$rootDir/distribution/${rootProject.name}-trino-connector")
-  }
-}
-
-tasks.withType<JavaCompile>().configureEach {
-  // Error Prone is incompatible with the JDK 24 toolchain required by this Trino range.
-  options.errorprone.isEnabled.set(false)
-  options.release.set(17)
 }
