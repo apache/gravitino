@@ -20,6 +20,8 @@ package org.apache.gravitino;
 
 import java.io.Closeable;
 import java.io.IOException;
+import java.lang.reflect.Array;
+import java.util.Arrays;
 import java.util.List;
 import java.util.function.Function;
 import org.apache.commons.lang3.tuple.Pair;
@@ -164,6 +166,35 @@ public interface EntityStore extends Closeable {
    */
   <E extends Entity & HasIdentifier> E get(NameIdentifier ident, EntityType entityType, Class<E> e)
       throws NoSuchEntityException, IOException;
+
+  /**
+   * Batch get the entity from the underlying storage.
+   *
+   * @param idents the unique identifier of the entity
+   * @param entityType the general type of the entity
+   * @param e the entity class instance
+   * @param <E> the class of entity
+   * @return the entity retrieved from the underlying storage
+   * @throws NoSuchEntityException if the entity does not exist
+   */
+  <E extends Entity & HasIdentifier> List<E> batchGet(
+      List<NameIdentifier> idents, EntityType entityType, Class<E> e);
+
+  /**
+   * Batch get the entity from the underlying storage.
+   *
+   * @param idents the unique identifier of the entity
+   * @param entityType the general type of the entity
+   * @param e the entity class instance
+   * @param <E> the class of entity
+   * @return the entity retrieved from the underlying storage
+   * @throws NoSuchEntityException if the entity does not exist
+   */
+  default <E extends Entity & HasIdentifier> E[] batchGet(
+      NameIdentifier[] idents, EntityType entityType, Class<E> e) {
+    return batchGet(Arrays.asList(idents), entityType, e)
+        .toArray(size -> (E[]) Array.newInstance(e, size));
+  }
 
   /**
    * Delete the entity from the underlying storage by the specified {@link

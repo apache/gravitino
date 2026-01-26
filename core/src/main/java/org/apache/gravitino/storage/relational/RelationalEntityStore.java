@@ -154,6 +154,16 @@ public class RelationalEntityStore implements EntityStore, SupportsRelationOpera
   }
 
   @Override
+  public <E extends Entity & HasIdentifier> List<E> batchGet(
+      List<NameIdentifier> ident, Entity.EntityType entityType, Class<E> e) {
+    List<E> entities = backend.batchGet(ident, entityType);
+    for (E entity : entities) {
+      cache.put(entity);
+    }
+    return entities;
+  }
+
+  @Override
   public boolean delete(NameIdentifier ident, Entity.EntityType entityType, boolean cascade)
       throws IOException {
     try {
