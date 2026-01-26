@@ -72,7 +72,7 @@ public class ReverseIndexCache {
    * or the data will be in the memory forever.
    */
   private final Map<EntityCacheKey, List<EntityCacheKey>> entityToReverseIndexMap =
-      Maps.newHashMap();
+      Maps.newConcurrentMap();
 
   public ReverseIndexCache() {
     this.reverseIndex = new ConcurrentRadixTree<>(new DefaultCharArrayNodeFactory());
