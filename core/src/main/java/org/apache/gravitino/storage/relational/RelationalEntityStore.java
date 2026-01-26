@@ -155,7 +155,7 @@ public class RelationalEntityStore implements EntityStore, SupportsRelationOpera
 
   @Override
   public <E extends Entity & HasIdentifier> List<E> batchGet(
-      List<NameIdentifier> ident, Entity.EntityType entityType, Class<E> e) {
+      List<NameIdentifier> ident, Entity.EntityType entityType, Class<E> clazz) {
     List<E> entities = backend.batchGet(ident, entityType);
     for (E entity : entities) {
       cache.put(entity);

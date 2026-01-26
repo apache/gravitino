@@ -172,26 +172,26 @@ public interface EntityStore extends Closeable {
    *
    * @param idents the unique identifier of the entity
    * @param entityType the general type of the entity
-   * @param e the entity class instance
+   * @param clazz the entity class instance
    * @param <E> the class of entity
    * @return the entity retrieved from the underlying storage
    * @throws NoSuchEntityException if the entity does not exist
    */
   <E extends Entity & HasIdentifier> List<E> batchGet(
-      List<NameIdentifier> idents, EntityType entityType, Class<E> e);
+      List<NameIdentifier> idents, EntityType entityType, Class<E> clazz);
 
   /**
    * Batch get the entity from the underlying storage.
    *
    * @param idents the unique identifier of the entity
    * @param entityType the general type of the entity
-   * @param e the entity class instance
+   * @param clazz the entity class instance
    * @param <E> the class of entity
    * @return the entity retrieved from the underlying storage
    * @throws NoSuchEntityException if the entity does not exist
    */
   default <E extends Entity & HasIdentifier> E[] batchGet(
-      NameIdentifier[] idents, EntityType entityType, Class<E> e) {
+      NameIdentifier[] idents, EntityType entityType, Class<E> clazz) {
     return batchGet(Arrays.asList(idents), entityType, e)
         .toArray(size -> (E[]) Array.newInstance(e, size));
   }
