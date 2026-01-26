@@ -72,10 +72,3 @@ gravitino_client = GravitinoClient(
 | `gravitino_client_request_timeout` | An optional client timeout in seconds. | `10`          | No       | 1.0.0         |
 
 **Note:** Invalid configuration properties will result in exceptions. 
-
-## Disabling client/server version checks
-
-By default, Gravitino clients verify that the client and server versions are compatible. If you
-need to bypass this check (for example, during a staged upgrade), set the environment variable
-`GRAVITINO_VERSION_CHECK_DISABLED` to `true` before starting your Java or Python client process.
-Any other value keeps the version check enabled.
