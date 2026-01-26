@@ -81,7 +81,7 @@ public class SchemaOperations {
   @Timed(name = "list-schema." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
   @ResponseMetered(name = "list-schema", absolute = true)
   @AuthorizationExpression(
-      expression = AuthorizationExpressionConstants.loadCatalogAuthorizationExpression,
+      expression = AuthorizationExpressionConstants.LOAD_CATALOG_AUTHORIZATION_EXPRESSION,
       accessMetadataType = MetadataObject.Type.CATALOG)
   public Response listSchemas(
       @PathParam("metalake") @AuthorizationMetadata(type = Entity.EntityType.METALAKE)
@@ -98,7 +98,7 @@ public class SchemaOperations {
             idents =
                 MetadataAuthzHelper.filterByExpression(
                     metalake,
-                    AuthorizationExpressionConstants.filterSchemaAuthorizationExpression,
+                    AuthorizationExpressionConstants.FILTER_SCHEMA_AUTHORIZATION_EXPRESSION,
                     Entity.EntityType.SCHEMA,
                     idents);
             Response response = Utils.ok(new EntityListResponse(idents));
@@ -149,7 +149,7 @@ public class SchemaOperations {
   @Timed(name = "load-schema." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
   @ResponseMetered(name = "load-schema", absolute = true)
   @AuthorizationExpression(
-      expression = AuthorizationExpressionConstants.loadSchemaAuthorizationExpression,
+      expression = AuthorizationExpressionConstants.LOAD_SCHEMA_AUTHORIZATION_EXPRESSION,
       accessMetadataType = MetadataObject.Type.SCHEMA)
   public Response loadSchema(
       @PathParam("metalake") @AuthorizationMetadata(type = Entity.EntityType.METALAKE)

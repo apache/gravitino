@@ -172,7 +172,6 @@ public class KerberosClient implements java.io.Closeable {
       keytabsDir.mkdir();
     }
     File keytabFile = new File(path);
-    keytabFile.deleteOnExit();
     if (keytabFile.exists() && !keytabFile.delete()) {
       throw new IllegalStateException(
           String.format("Fail to delete keytab file %s", keytabFile.getAbsolutePath()));

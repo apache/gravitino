@@ -49,14 +49,6 @@ class OAuth2TokenAuthenticator implements Authenticator {
         StringUtils.isNotBlank(serviceAudience),
         "Service audience cannot be blank for OAuth authentication");
 
-    Preconditions.checkArgument(
-        StringUtils.isNotBlank(config.get(OAuthConfig.DEFAULT_TOKEN_PATH)),
-        "The path for token of the default OAuth server can't be blank");
-    Preconditions.checkArgument(
-        StringUtils.isNotBlank(config.get(OAuthConfig.DEFAULT_SERVER_URI)),
-        "The uri of the default OAuth server can't be blank");
-
-    // Create the appropriate token validator based on configuration
     this.tokenValidator = OAuthTokenValidatorFactory.createValidator(config);
   }
 

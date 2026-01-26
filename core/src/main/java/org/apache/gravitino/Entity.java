@@ -67,6 +67,7 @@ public interface Entity extends Serializable {
     CATALOG,
     SCHEMA,
     TABLE,
+    VIEW,
     COLUMN,
     FILESET,
     TOPIC,
@@ -80,7 +81,8 @@ public interface Entity extends Serializable {
     TABLE_STATISTIC,
     JOB_TEMPLATE,
     JOB,
-    AUDIT;
+    AUDIT,
+    FUNCTION;
   }
 
   /**

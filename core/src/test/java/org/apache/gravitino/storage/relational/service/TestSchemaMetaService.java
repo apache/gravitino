@@ -171,7 +171,7 @@ public class TestSchemaMetaService extends TestJDBCBackend {
   }
 
   @TestTemplate
-  public void testDeleteSchemlaaNonCascadingFailsWhenTopicExists() throws IOException {
+  public void testDeleteSchemaNonCascadingFailsWhenTopicExists() throws IOException {
 
     createAndInsertMakeLake(metalakeName);
     createAndInsertCatalog(metalakeName, catalogName);

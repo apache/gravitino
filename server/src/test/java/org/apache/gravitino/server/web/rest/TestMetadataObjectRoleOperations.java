@@ -33,13 +33,17 @@ import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 import org.apache.commons.lang3.reflect.FieldUtils;
 import org.apache.gravitino.Config;
+import org.apache.gravitino.EntityStore;
 import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.authorization.AccessControlManager;
+import org.apache.gravitino.connector.PropertiesMetadata;
 import org.apache.gravitino.dto.responses.ErrorConstants;
 import org.apache.gravitino.dto.responses.ErrorResponse;
 import org.apache.gravitino.dto.responses.NameListResponse;
+import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.exceptions.NoSuchMetalakeException;
 import org.apache.gravitino.lock.LockManager;
+import org.apache.gravitino.meta.BaseMetalake;
 import org.apache.gravitino.rest.RESTUtils;
 import org.glassfish.hk2.utilities.binding.AbstractBinder;
 import org.glassfish.jersey.server.ResourceConfig;
@@ -53,6 +57,7 @@ import org.mockito.Mockito;
 public class TestMetadataObjectRoleOperations extends JerseyTest {
 
   private static final AccessControlManager manager = mock(AccessControlManager.class);
+  private static final EntityStore entityStore = mock(EntityStore.class);
 
   private static class MockServletRequestFactory extends ServletRequestFactoryBase {
     @Override
@@ -71,6 +76,7 @@ public class TestMetadataObjectRoleOperations extends JerseyTest {
     Mockito.doReturn(36000L).when(config).get(TREE_LOCK_CLEAN_INTERVAL);
     FieldUtils.writeField(GravitinoEnv.getInstance(), "lockManager", new LockManager(config), true);
     FieldUtils.writeField(GravitinoEnv.getInstance(), "accessControlDispatcher", manager, true);
+    FieldUtils.writeField(GravitinoEnv.getInstance(), "entityStore", entityStore, true);
   }
 
   @Override
@@ -96,8 +102,15 @@ public class TestMetadataObjectRoleOperations extends JerseyTest {
   }
 
   @Test
-  public void testListRoleNames() {
+  public void testListRoleNames() throws IOException {
     when(manager.listRoleNamesByObject(any(), any())).thenReturn(new String[] {"role"});
+
+    // Mock metalake with in-use property
+    BaseMetalake metalake = mock(BaseMetalake.class);
+    PropertiesMetadata propertiesMetadata = mock(PropertiesMetadata.class);
+    when(propertiesMetadata.getOrDefault(any(), any())).thenReturn(true);
+    when(metalake.propertiesMetadata()).thenReturn(propertiesMetadata);
+    when(entityStore.get(any(), any(), any())).thenReturn(metalake);
 
     Response resp =
         target("/metalakes/metalake1/objects/metalake/metalake1/roles/")
@@ -113,9 +126,7 @@ public class TestMetadataObjectRoleOperations extends JerseyTest {
     Assertions.assertEquals("role", listResponse.getNames()[0]);
 
     // Test to throw NoSuchMetalakeException
-    doThrow(new NoSuchMetalakeException("mock error"))
-        .when(manager)
-        .listRoleNamesByObject(any(), any());
+    doThrow(new NoSuchEntityException("mock error")).when(entityStore).get(any(), any(), any());
     Response resp1 =
         target("/metalakes/metalake1/objects/metalake/metalake1/roles/")
             .request(MediaType.APPLICATION_JSON_TYPE)
@@ -129,6 +140,12 @@ public class TestMetadataObjectRoleOperations extends JerseyTest {
     Assertions.assertEquals(NoSuchMetalakeException.class.getSimpleName(), errorResponse.getType());
 
     // Test to throw internal RuntimeException
+    Mockito.reset(entityStore);
+    BaseMetalake metalake1 = mock(BaseMetalake.class);
+    PropertiesMetadata propertiesMetadata1 = mock(PropertiesMetadata.class);
+    when(propertiesMetadata1.getOrDefault(any(), any())).thenReturn(true);
+    when(metalake1.propertiesMetadata()).thenReturn(propertiesMetadata1);
+    when(entityStore.get(any(), any(), any())).thenReturn(metalake1);
     doThrow(new RuntimeException("mock error")).when(manager).listRoleNamesByObject(any(), any());
     Response resp3 =
         target("/metalakes/metalake1/objects/metalake/metalake1/roles")

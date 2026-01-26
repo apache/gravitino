@@ -83,6 +83,14 @@ public class TestNamespaceUtil {
             IllegalNamespaceException.class, () -> NamespaceUtil.checkModelVersion(ab));
     Assertions.assertTrue(
         excep5.getMessage().contains("Model version namespace must be non-null and have 4 levels"));
+
+    // Test view
+    Assertions.assertThrows(IllegalNamespaceException.class, () -> NamespaceUtil.checkView(null));
+    Throwable excep6 =
+        Assertions.assertThrows(
+            IllegalNamespaceException.class, () -> NamespaceUtil.checkView(abcd));
+    Assertions.assertTrue(
+        excep6.getMessage().contains("View namespace must be non-null and have 3 levels"));
   }
 
   @Test

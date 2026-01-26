@@ -24,10 +24,15 @@ plugins {
 // try to avoid adding extra dependencies because it is used by catalogs and connectors.
 dependencies {
   implementation(project(":api"))
+  implementation(project(":common"))
+
+  implementation(libs.cglib)
   implementation(libs.commons.lang3)
+  implementation(libs.commons.io)
   implementation(libs.hadoop3.client.api)
   implementation(libs.hadoop3.client.runtime)
   implementation(libs.guava)
+  implementation(libs.slf4j.api)
 
   testImplementation(libs.junit.jupiter.api)
   testImplementation(libs.junit.jupiter.params)

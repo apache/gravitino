@@ -36,6 +36,12 @@ import org.apache.gravitino.annotation.Evolving;
 @Evolving
 public abstract class BaseCatalogPropertiesMetadata extends BasePropertiesMetadata {
 
+  /**
+   * This property indicates whether the metalake that contains this catalog is in use. When a
+   * metalake is disabled, this property is set to {@code false} on all its catalogs.
+   */
+  public static String PROPERTY_METALAKE_IN_USE = "metalake-in-use";
+
   public static final PropertiesMetadata BASIC_CATALOG_PROPERTIES_METADATA =
       new BaseCatalogPropertiesMetadata() {
         @Override
@@ -88,7 +94,12 @@ public abstract class BaseCatalogPropertiesMetadata extends BasePropertiesMetada
                   PROPERTY_IN_USE,
                   "The property indicating the catalog is in use",
                   true /* default value */,
-                  false /* hidden */)),
+                  false /* hidden */),
+              PropertyEntry.booleanReservedPropertyEntry(
+                  PROPERTY_METALAKE_IN_USE,
+                  "The property indicating the metalake that holds the catalog is in use",
+                  true /* default value */,
+                  true /* hidden */)),
           PropertyEntry::getName);
 
   @Override

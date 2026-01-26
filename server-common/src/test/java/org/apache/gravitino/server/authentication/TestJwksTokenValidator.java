@@ -292,6 +292,60 @@ public class TestJwksTokenValidator {
   }
 
   @Test
+  public void testValidateTokenWithMultipleAudiences() throws Exception {
+    // Generate a test RSA key pair
+    RSAKey rsaKey =
+        new RSAKeyGenerator(2048).keyID("test-key-id").algorithm(JWSAlgorithm.RS256).generate();
+
+    // Mock the JWKSourceBuilder to return our test key
+    try (MockedStatic<JWKSourceBuilder> mockedBuilder = mockStatic(JWKSourceBuilder.class)) {
+      @SuppressWarnings("unchecked")
+      JWKSource<SecurityContext> mockJwkSource = mock(JWKSource.class);
+      @SuppressWarnings("unchecked")
+      JWKSourceBuilder<SecurityContext> mockBuilder = mock(JWKSourceBuilder.class);
+
+      mockedBuilder.when(() -> JWKSourceBuilder.create(any(URL.class))).thenReturn(mockBuilder);
+      when(mockBuilder.build()).thenReturn(mockJwkSource);
+      when(mockJwkSource.get(any(), any())).thenReturn(Arrays.asList(rsaKey));
+
+      // Initialize validator
+      Map<String, String> config = new HashMap<>();
+      config.put(
+          "gravitino.authenticator.oauth.jwksUri", "https://test-jwks.com/.well-known/jwks.json");
+      config.put("gravitino.authenticator.oauth.authority", "https://test-issuer.com");
+      config.put("gravitino.authenticator.oauth.principalFields", "sub");
+      config.put("gravitino.authenticator.oauth.allowSkewSecs", "60");
+
+      validator.initialize(createConfig(config));
+
+      // Test 1: Token with multiple audiences including our service - should succeed
+      JWTClaimsSet validClaimsSet =
+          new JWTClaimsSet.Builder()
+              .subject("test-user")
+              .audience(Arrays.asList("other-service", "test-service", "another-service"))
+              .issuer("https://test-issuer.com")
+              .expirationTime(Date.from(Instant.now().plusSeconds(3600)))
+              .issueTime(Date.from(Instant.now()))
+              .build();
+
+      SignedJWT validToken =
+          new SignedJWT(
+              new JWSHeader.Builder(JWSAlgorithm.RS256).keyID("test-key-id").build(),
+              validClaimsSet);
+      validToken.sign(new RSASSASigner(rsaKey));
+
+      Principal result = validator.validateToken(validToken.serialize(), "test-service");
+      assertNotNull(result);
+      assertEquals("test-user", result.getName());
+
+      // Test 2: Same token, different service name - should fail
+      assertThrows(
+          UnauthorizedException.class,
+          () -> validator.validateToken(validToken.serialize(), "incorrect-service"));
+    }
+  }
+
+  @Test
   public void testValidateTokenWithInvalidToken() {
     Map<String, String> config = new HashMap<>();
     config.put("gravitino.authenticator.oauth.jwksUri", validJwksUri);

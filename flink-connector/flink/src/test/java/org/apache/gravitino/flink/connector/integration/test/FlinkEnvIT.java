@@ -68,7 +68,7 @@ public abstract class FlinkEnvIT extends BaseIT {
 
   protected static FileSystem hdfs;
 
-  private static String gravitinoUri = "http://127.0.0.1:8090";
+  protected static String gravitinoUri = "http://localhost:8090";
 
   private final String lakeHouseIcebergProvider = "lakehouse-iceberg";
 
@@ -143,7 +143,7 @@ public abstract class FlinkEnvIT extends BaseIT {
   private void initGravitinoEnv() {
     // Gravitino server is already started by AbstractIT, just construct gravitinoUrl
     int gravitinoPort = getGravitinoServerPort();
-    gravitinoUri = String.format("http://127.0.0.1:%d", gravitinoPort);
+    gravitinoUri = String.format("http://localhost:%d", gravitinoPort);
     if (lakeHouseIcebergProvider.equalsIgnoreCase(getProvider())) {
       this.icebergRestServiceUri = getIcebergRestServiceUri();
     }
@@ -183,7 +183,7 @@ public abstract class FlinkEnvIT extends BaseIT {
     }
   }
 
-  private static void initFlinkEnv() {
+  protected void initFlinkEnv() {
     final Configuration configuration = new Configuration();
     configuration.setString(
         "table.catalog-store.kind", GravitinoCatalogStoreFactoryOptions.GRAVITINO);

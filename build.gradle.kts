@@ -154,6 +154,11 @@ allprojects {
           "import\\s+.*\\.(Logger|LoggerFactory);",
           "import org.slf4j.${'$'}1;"
         )
+        replaceRegex(
+          "Remove Testcontainers shading",
+          "import\\s+org\\.testcontainers\\.shaded\\.([^;]+);",
+          "import $1;"
+        )
 
         targetExclude("**/build/**", "**/.pnpm/***")
       }
@@ -314,24 +319,26 @@ subprojects {
   }
 
   fun compatibleWithJDK8(project: Project): Boolean {
+    val name = project.name.lowercase()
+    val path = project.path.lowercase()
+    if (path.startsWith(":maintenance:jobs") ||
+      name == "api" ||
+      name == "common" ||
+      name == "catalog-common" ||
+      name == "hadoop-common"
+    ) {
+      return true
+    }
+
     val isReleaseRun = gradle.startParameter.taskNames.any { it == "release" || it == "publish" || it == "publishToMavenLocal" }
     if (!isReleaseRun) {
       return false
     }
 
-    val name = project.name.lowercase()
-    val path = project.path.lowercase()
-
     if (path.startsWith(":client") ||
       path.startsWith(":spark-connector") ||
       path.startsWith(":flink-connector") ||
       path.startsWith(":bundles")
-    ) {
-      return true
-    }
-
-    if (name == "api" || name == "common" ||
-      name == "catalog-common" || name == "hadoop-common"
     ) {
       return true
     }
@@ -713,9 +720,11 @@ tasks {
       "copySubprojectDependencies",
       "copySubprojectLib",
       "copyCliLib",
+      "copyJobsLib",
       ":authorizations:copyLibAndConfig",
       ":iceberg:iceberg-rest-server:copyLibAndConfigs",
       ":lance:lance-rest-server:copyLibAndConfigs",
+      ":maintenance:optimizer:copyLibAndConfigs",
       ":web:web:build"
     )
 
@@ -991,12 +1000,14 @@ tasks {
         !it.name.startsWith("flink") &&
         !it.name.startsWith("iceberg") &&
         !it.name.startsWith("lance") &&
+        !it.name.startsWith("optimizer") &&
         !it.name.startsWith("spark") &&
         !it.name.startsWith("hive-metastore") &&
         it.name != "hadoop-common" &&
         it.name != "integration-test" &&
         it.name != "trino-connector" &&
         it.parent?.name != "bundles" &&
+        it.parent?.name != "maintenance" &&
         it.name != "mcp-server"
       ) {
         from(it.configurations.runtimeClasspath)
@@ -1010,6 +1021,15 @@ tasks {
     from("clients/cli/build/libs")
     into("distribution/package/auxlib")
     include("gravitino-cli-*.jar")
+    setDuplicatesStrategy(DuplicatesStrategy.EXCLUDE)
+  }
+
+  register("copyJobsLib", Copy::class) {
+    dependsOn(":maintenance:jobs:build")
+    from("maintenance/jobs/build/libs")
+    into("distribution/package/auxlib")
+    include("gravitino-jobs-*.jar")
+    exclude("*-empty.jar")
     setDuplicatesStrategy(DuplicatesStrategy.EXCLUDE)
   }
 
@@ -1028,10 +1048,12 @@ tasks {
         !it.name.startsWith("trino-connector") &&
         it.name != "hive-metastore2-libs" &&
         it.name != "hive-metastore3-libs" &&
+        !it.name.startsWith("optimizer") &&
         it.name != "hive-metastore-common" &&
         it.name != "docs" &&
         it.name != "hadoop-common" &&
         it.parent?.name != "bundles" &&
+        it.parent?.name != "maintenance" &&
         it.name != "mcp-server"
       ) {
         dependsOn("${it.name}:build")

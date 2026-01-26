@@ -50,6 +50,7 @@ import org.apache.gravitino.authorization.AuthorizationUtils;
 import org.apache.gravitino.authorization.GravitinoAuthorizer;
 import org.apache.gravitino.authorization.Privilege;
 import org.apache.gravitino.authorization.SecurableObject;
+import org.apache.gravitino.exceptions.NoSuchUserException;
 import org.apache.gravitino.meta.RoleEntity;
 import org.apache.gravitino.meta.UserEntity;
 import org.apache.gravitino.server.authorization.MetadataIdConverter;
@@ -226,14 +227,9 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
     }
 
     try {
-      return GravitinoEnv.getInstance()
-              .entityStore()
-              .get(
-                  NameIdentifierUtil.ofUser(metalake, currentUserName),
-                  Entity.EntityType.USER,
-                  UserEntity.class)
+      return GravitinoEnv.getInstance().accessControlDispatcher().getUser(metalake, currentUserName)
           != null;
-    } catch (Exception e) {
+    } catch (NoSuchUserException e) {
       LOG.warn("Can not get user {} in metalake {}", currentUserName, metalake, e);
       return false;
     }

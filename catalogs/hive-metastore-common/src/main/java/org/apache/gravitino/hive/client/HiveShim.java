@@ -108,6 +108,8 @@ public abstract class HiveShim {
 
   public abstract List<String> getCatalogs();
 
+  public abstract void createCatalog(String catalogName, String location, String description);
+
   public void close() throws Exception {
     if (client != null) {
       client.close();

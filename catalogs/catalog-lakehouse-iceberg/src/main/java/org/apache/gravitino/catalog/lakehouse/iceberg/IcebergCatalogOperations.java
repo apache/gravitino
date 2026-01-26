@@ -449,15 +449,28 @@ public class IcebergCatalogOperations implements CatalogOperations, SupportsSche
   private Table renameTable(NameIdentifier tableIdent, TableChange.RenameTable renameTable)
       throws NoSuchTableException, IllegalArgumentException {
     try {
+      Namespace destNamespace = tableIdent.namespace();
+      if (renameTable.getNewSchemaName().isPresent()) {
+        String[] namespaceLevels = tableIdent.namespace().levels();
+        String[] destLevels = Arrays.copyOf(namespaceLevels, namespaceLevels.length);
+        destLevels[destLevels.length - 1] = renameTable.getNewSchemaName().get();
+        NameIdentifier destSchemaIdent = NameIdentifier.of(destLevels);
+        if (!schemaExists(destSchemaIdent)) {
+          throw new NoSuchSchemaException("Iceberg schema does not exist %s", destSchemaIdent);
+        }
+        destNamespace = Namespace.of(destLevels);
+      }
+
       RenameTableRequest renameTableRequest =
           RenameTableRequest.builder()
               .withSource(IcebergCatalogWrapperHelper.buildIcebergTableIdentifier(tableIdent))
               .withDestination(
                   IcebergCatalogWrapperHelper.buildIcebergTableIdentifier(
-                      tableIdent.namespace(), renameTable.getNewName()))
+                      destNamespace, renameTable.getNewName()))
               .build();
       icebergCatalogWrapper.renameTable(renameTableRequest);
-      return loadTable(NameIdentifier.of(tableIdent.namespace(), renameTable.getNewName()));
+      return loadTable(
+          NameIdentifier.of(ArrayUtils.add(destNamespace.levels(), renameTable.getNewName())));
     } catch (org.apache.iceberg.exceptions.NoSuchTableException e) {
       throw new NoSuchTableException(e, ICEBERG_TABLE_DOES_NOT_EXIST_MSG, tableIdent.name());
     }
