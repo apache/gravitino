@@ -773,4 +773,180 @@ public class TestEntityStorageRelationCache extends AbstractEntityStorageTest {
       destroy(type);
     }
   }
+
+  @ParameterizedTest
+  @MethodSource("storageProvider")
+  void testCacheInvalidationOnNewRelation(String type, boolean enableCache) throws Exception {
+    Config config = Mockito.mock(Config.class);
+    Mockito.when(config.get(Configs.CACHE_ENABLED)).thenReturn(enableCache);
+    init(type, config);
+
+    AuditInfo auditInfo =
+        AuditInfo.builder().withCreator("creator").withCreateTime(Instant.now()).build();
+
+    try (EntityStore store = EntityStoreFactory.createEntityStore(config)) {
+      store.initialize(config);
+
+      BaseMetalake metalake =
+          createBaseMakeLake(RandomIdGenerator.INSTANCE.nextId(), "metalake", auditInfo);
+      store.put(metalake, false);
+
+      CatalogEntity catalog =
+          createCatalog(
+              RandomIdGenerator.INSTANCE.nextId(),
+              NamespaceUtil.ofCatalog("metalake"),
+              "catalog",
+              auditInfo);
+      store.put(catalog, false);
+
+      SupportsRelationOperations relationOperations = (SupportsRelationOperations) store;
+
+      // 1. Fetch relation, it should be empty
+      List<TagEntity> tags =
+          relationOperations.listEntitiesByRelation(
+              SupportsRelationOperations.Type.TAG_METADATA_OBJECT_REL,
+              catalog.nameIdentifier(),
+              Entity.EntityType.CATALOG,
+              true);
+      Assertions.assertTrue(tags.isEmpty());
+
+      // 2. Verify cache has empty list if cache is enabled
+      if (enableCache && store instanceof RelationalEntityStore) {
+        RelationalEntityStore relationalEntityStore = (RelationalEntityStore) store;
+        if (relationalEntityStore.getCache() instanceof CaffeineEntityCache) {
+          CaffeineEntityCache cache = (CaffeineEntityCache) relationalEntityStore.getCache();
+          List<Entity> cachedEntities =
+              cache
+                  .getCacheData()
+                  .getIfPresent(
+                      EntityCacheRelationKey.of(
+                          catalog.nameIdentifier(),
+                          Entity.EntityType.CATALOG,
+                          SupportsRelationOperations.Type.TAG_METADATA_OBJECT_REL));
+          Assertions.assertNotNull(cachedEntities);
+          Assertions.assertTrue(cachedEntities.isEmpty());
+        }
+      }
+
+      // 3. Create a tag and add relation
+      Namespace tagNamespace = NameIdentifierUtil.ofTag("metalake", "tag1").namespace();
+      TagEntity tag1 =
+          TagEntity.builder()
+              .withId(RandomIdGenerator.INSTANCE.nextId())
+              .withNamespace(tagNamespace)
+              .withName("tag1")
+              .withAuditInfo(auditInfo)
+              .withProperties(Collections.emptyMap())
+              .build();
+      store.put(tag1, false);
+
+      relationOperations.updateEntityRelations(
+          SupportsRelationOperations.Type.TAG_METADATA_OBJECT_REL,
+          catalog.nameIdentifier(),
+          Entity.EntityType.CATALOG,
+          new NameIdentifier[] {tag1.nameIdentifier()},
+          new NameIdentifier[] {});
+
+      // 4. Fetch relation again, it should not be empty
+      tags =
+          relationOperations.listEntitiesByRelation(
+              SupportsRelationOperations.Type.TAG_METADATA_OBJECT_REL,
+              catalog.nameIdentifier(),
+              Entity.EntityType.CATALOG,
+              true);
+      Assertions.assertEquals(1, tags.size());
+      Assertions.assertEquals(tag1.name(), tags.get(0).name());
+
+      destroy(type);
+    }
+  }
+
+  @ParameterizedTest
+  @MethodSource("storageProvider")
+  void testCacheInvalidationOnNewRelationReverse(String type, boolean enableCache)
+      throws Exception {
+    Config config = Mockito.mock(Config.class);
+    Mockito.when(config.get(Configs.CACHE_ENABLED)).thenReturn(enableCache);
+    init(type, config);
+
+    AuditInfo auditInfo =
+        AuditInfo.builder().withCreator("creator").withCreateTime(Instant.now()).build();
+
+    try (EntityStore store = EntityStoreFactory.createEntityStore(config)) {
+      store.initialize(config);
+
+      BaseMetalake metalake =
+          createBaseMakeLake(RandomIdGenerator.INSTANCE.nextId(), "metalake", auditInfo);
+      store.put(metalake, false);
+
+      CatalogEntity catalog =
+          createCatalog(
+              RandomIdGenerator.INSTANCE.nextId(),
+              NamespaceUtil.ofCatalog("metalake"),
+              "catalog",
+              auditInfo);
+      store.put(catalog, false);
+
+      Namespace tagNamespace = NameIdentifierUtil.ofTag("metalake", "tag1").namespace();
+      TagEntity tag1 =
+          TagEntity.builder()
+              .withId(RandomIdGenerator.INSTANCE.nextId())
+              .withNamespace(tagNamespace)
+              .withName("tag1")
+              .withAuditInfo(auditInfo)
+              .withProperties(Collections.emptyMap())
+              .build();
+      store.put(tag1, false);
+
+      SupportsRelationOperations relationOperations = (SupportsRelationOperations) store;
+
+      // 1. Fetch relation for Tag (Target side), it should be empty
+      // This populates the cache for (Tag, TAG, REL) with empty list
+      List<GenericEntity> entities =
+          relationOperations.listEntitiesByRelation(
+              SupportsRelationOperations.Type.TAG_METADATA_OBJECT_REL,
+              tag1.nameIdentifier(),
+              Entity.EntityType.TAG,
+              true);
+      Assertions.assertTrue(entities.isEmpty());
+
+      // 2. Verify cache has empty list if cache is enabled
+      if (enableCache && store instanceof RelationalEntityStore) {
+        RelationalEntityStore relationalEntityStore = (RelationalEntityStore) store;
+        if (relationalEntityStore.getCache() instanceof CaffeineEntityCache) {
+          CaffeineEntityCache cache = (CaffeineEntityCache) relationalEntityStore.getCache();
+          List<Entity> cachedEntities =
+              cache
+                  .getCacheData()
+                  .getIfPresent(
+                      EntityCacheRelationKey.of(
+                          tag1.nameIdentifier(),
+                          Entity.EntityType.TAG,
+                          SupportsRelationOperations.Type.TAG_METADATA_OBJECT_REL));
+          Assertions.assertNotNull(cachedEntities);
+          Assertions.assertTrue(cachedEntities.isEmpty());
+        }
+      }
+
+      // 3. Add relation from Catalog (Source side)
+      relationOperations.updateEntityRelations(
+          SupportsRelationOperations.Type.TAG_METADATA_OBJECT_REL,
+          catalog.nameIdentifier(),
+          Entity.EntityType.CATALOG,
+          new NameIdentifier[] {tag1.nameIdentifier()},
+          new NameIdentifier[] {});
+
+      // 4. Fetch relation for Tag again, it should NOT be empty
+      entities =
+          relationOperations.listEntitiesByRelation(
+              SupportsRelationOperations.Type.TAG_METADATA_OBJECT_REL,
+              tag1.nameIdentifier(),
+              Entity.EntityType.TAG,
+              true);
+      Assertions.assertEquals(1, entities.size());
+      Assertions.assertEquals(catalog.name(), entities.get(0).name());
+
+      destroy(type);
+    }
+  }
 }
