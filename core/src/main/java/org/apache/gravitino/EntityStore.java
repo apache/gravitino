@@ -192,8 +192,8 @@ public interface EntityStore extends Closeable {
    */
   default <E extends Entity & HasIdentifier> E[] batchGet(
       NameIdentifier[] idents, EntityType entityType, Class<E> clazz) {
-    return batchGet(Arrays.asList(idents), entityType, e)
-        .toArray(size -> (E[]) Array.newInstance(e, size));
+    return batchGet(Arrays.asList(idents), entityType, clazz)
+        .toArray(size -> (E[]) Array.newInstance(clazz, size));
   }
 
   /**
