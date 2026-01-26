@@ -225,6 +225,10 @@ public abstract class TestJDBCBackend {
         tableName = "policy_meta";
         idColumnName = "policy_id";
         break;
+      case FUNCTION:
+        tableName = "function_meta";
+        idColumnName = "function_id";
+        break;
       default:
         throw new IllegalArgumentException("Unsupported entity type: " + entityType);
     }
