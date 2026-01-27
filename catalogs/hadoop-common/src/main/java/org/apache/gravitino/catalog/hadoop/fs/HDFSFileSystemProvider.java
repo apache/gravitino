@@ -46,7 +46,7 @@ public class HDFSFileSystemProvider implements FileSystemProvider {
       throws IOException {
     Map<String, String> hadoopConfMap = additionalHDFSConfig(config);
     Configuration configuration =
-        FileSystemUtils.createConfiguration(GRAVITINO_BYPASS, hadoopConfMap);
+        FileSystemUtils.createCompatibleConfiguration(GRAVITINO_BYPASS, hadoopConfMap);
     return FileSystem.newInstance(path.toUri(), configuration);
   }
 
