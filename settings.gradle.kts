@@ -39,9 +39,10 @@ include(
   "catalogs:catalog-jdbc-doris",
   "catalogs:catalog-jdbc-mysql",
   "catalogs:catalog-jdbc-postgresql",
-  "catalogs:catalog-jdbc-oceanbase",
   "catalogs:catalog-jdbc-starrocks"
 )
+include("catalogs-contrib:catalog-jdbc-oceanbase")
+
 include("catalogs:catalog-fileset")
 include("catalogs:catalog-kafka")
 include("catalogs:catalog-model")
