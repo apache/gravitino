@@ -59,6 +59,10 @@ public class FunctionPO {
 
   public FunctionPO() {}
 
+  public static class FunctionPOBuilder {
+    // Lombok will generate builder methods
+  }
+
   @lombok.Builder(setterPrefix = "with")
   private FunctionPO(
       Long functionId,
