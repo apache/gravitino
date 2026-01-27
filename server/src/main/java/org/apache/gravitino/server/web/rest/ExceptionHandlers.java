@@ -27,6 +27,7 @@ import org.apache.gravitino.exceptions.CatalogAlreadyExistsException;
 import org.apache.gravitino.exceptions.ConnectionFailedException;
 import org.apache.gravitino.exceptions.FilesetAlreadyExistsException;
 import org.apache.gravitino.exceptions.ForbiddenException;
+import org.apache.gravitino.exceptions.FunctionAlreadyExistsException;
 import org.apache.gravitino.exceptions.GroupAlreadyExistsException;
 import org.apache.gravitino.exceptions.IllegalJobTemplateOperationException;
 import org.apache.gravitino.exceptions.InUseException;
@@ -140,6 +141,11 @@ public class ExceptionHandlers {
   public static Response handleModelException(
       OperationType op, String model, String schema, Exception e) {
     return ModelExceptionHandler.INSTANCE.handle(op, model, schema, e);
+  }
+
+  public static Response handleFunctionException(
+      OperationType op, String function, String schema, Exception e) {
+    return FunctionExceptionHandler.INSTANCE.handle(op, function, schema, e);
   }
 
   public static Response handleJobTemplateException(
@@ -839,6 +845,43 @@ public class ExceptionHandlers {
 
       } else {
         return super.handle(op, model, schema, e);
+      }
+    }
+  }
+
+  private static class FunctionExceptionHandler extends BaseExceptionHandler {
+    private static final ExceptionHandler INSTANCE = new FunctionExceptionHandler();
+
+    private static String getFunctionErrorMsg(
+        String function, String operation, String schema, String reason) {
+      return String.format(
+          "Failed to operate function(s)%s operation [%s] under schema [%s], reason [%s]",
+          function, operation, schema, reason);
+    }
+
+    @Override
+    public Response handle(OperationType op, String function, String schema, Exception e) {
+      String formatted = StringUtil.isBlank(function) ? "" : " [" + function + "]";
+      String errorMsg = getFunctionErrorMsg(formatted, op.name(), schema, getErrorMsg(e));
+      LOG.warn(errorMsg, e);
+
+      if (e instanceof IllegalArgumentException) {
+        return Utils.illegalArguments(errorMsg, e);
+
+      } else if (e instanceof NotFoundException) {
+        return Utils.notFound(errorMsg, e);
+
+      } else if (e instanceof FunctionAlreadyExistsException) {
+        return Utils.alreadyExists(errorMsg, e);
+
+      } else if (e instanceof ForbiddenException) {
+        return Utils.forbidden(errorMsg, e);
+
+      } else if (e instanceof NotInUseException) {
+        return Utils.notInUse(errorMsg, e);
+
+      } else {
+        return super.handle(op, function, schema, e);
       }
     }
   }
