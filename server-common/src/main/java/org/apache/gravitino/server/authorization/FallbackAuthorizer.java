@@ -22,7 +22,6 @@ package org.apache.gravitino.server.authorization;
 import java.io.IOException;
 import java.security.Principal;
 import org.apache.gravitino.Entity;
-import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.authorization.AuthorizationRequestContext;
@@ -108,8 +107,7 @@ public class FallbackAuthorizer implements GravitinoAuthorizer {
 
     if (existsInGravitino(metalake, metadataObject)) {
       LOG.debug(
-          "Object {} exists in Gravitino, using primary authorizer",
-          metadataObject.fullName());
+          "Object {} exists in Gravitino, using primary authorizer", metadataObject.fullName());
       return primaryAuthorizer.authorize(
           principal, metalake, metadataObject, privilege, requestContext);
     } else {
@@ -191,11 +189,6 @@ public class FallbackAuthorizer implements GravitinoAuthorizer {
   @Override
   public void handleRolePrivilegeChange(Long roleId) {
     primaryAuthorizer.handleRolePrivilegeChange(roleId);
-  }
-
-  @Override
-  public void handleRoleUserRelChange(Long roleId) {
-    primaryAuthorizer.handleRoleUserRelChange(roleId);
   }
 
   @Override
