@@ -160,30 +160,32 @@ export function MainNav() {
           </span>
         </div>
       </Link>
-      {pathname !== '/login' && pathname !== '/ui/login' && <ConfigProvider
-        theme={{
-          components: {
-            Menu: {
-              horizontalLineHeight: '4rem',
-              iconMarginInlineEnd: 8,
-              fontSize: 16,
-              darkItemSelectedBg: '#334155',
-              darkPopupBg: '#2b3748',
-              darkItemColor: '#f1f5f9',
-              activeBarHeight: 2
+      {pathname !== '/login' && pathname !== '/ui/login' && (
+        <ConfigProvider
+          theme={{
+            components: {
+              Menu: {
+                horizontalLineHeight: '4rem',
+                iconMarginInlineEnd: 8,
+                fontSize: 16,
+                darkItemSelectedBg: '#334155',
+                darkPopupBg: '#2b3748',
+                darkItemColor: '#f1f5f9',
+                activeBarHeight: 2
+              }
             }
-          }
-        }}
-      >
-        <Menu
-          theme={'dark'}
-          className='h-full min-w-0 flex-auto items-stretch border-0 bg-slate-800'
-          onClick={onClick}
-          selectedKeys={[current]}
-          mode='horizontal'
-          items={NavItems}
-        />
-      </ConfigProvider>}
+          }}
+        >
+          <Menu
+            theme={'dark'}
+            className='h-full min-w-0 flex-auto items-stretch border-0 bg-slate-800'
+            onClick={onClick}
+            selectedKeys={[current]}
+            mode='horizontal'
+            items={NavItems}
+          />
+        </ConfigProvider>
+      )}
     </div>
   )
 }

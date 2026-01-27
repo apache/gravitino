@@ -100,9 +100,7 @@ export function SiteHeader() {
   }
 
   return (
-    <header
-      className='sticky top-0 z-40 w-full border-b border-b-[color:theme(colors.borderWhite)] bg-slate-800 text-white'
-    >
+    <header className='sticky top-0 z-40 w-full border-b border-b-[color:theme(colors.borderWhite)] bg-slate-800 text-white'>
       <div className='container flex h-16 items-stretch space-x-4 md:justify-between md:space-x-0'>
         <MainNav />
         <div className='flex flex-1 items-center justify-end space-x-4'>
