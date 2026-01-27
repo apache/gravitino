@@ -25,13 +25,21 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
-public class TestKerberosPrincipalParser {
+public class TestKerberosPrincipalMapper {
+
+  private KerberosPrincipalMapper mapper;
+
+  @BeforeEach
+  public void setUp() {
+    mapper = new KerberosPrincipalMapper();
+  }
 
   @Test
   public void testUsernameOnly() {
-    KerberosPrincipalParser principal = KerberosPrincipalParser.parse("john");
+    KerberosPrincipal principal = (KerberosPrincipal) mapper.map("john");
 
     assertEquals("john", principal.getName());
     assertEquals("john", principal.getPrimaryWithInstance());
@@ -42,7 +50,7 @@ public class TestKerberosPrincipalParser {
 
   @Test
   public void testUsernameWithRealm() {
-    KerberosPrincipalParser principal = KerberosPrincipalParser.parse("john@EXAMPLE.COM");
+    KerberosPrincipal principal = (KerberosPrincipal) mapper.map("john@EXAMPLE.COM");
 
     assertEquals("john", principal.getName());
     assertEquals("john", principal.getPrimaryWithInstance());
@@ -54,8 +62,8 @@ public class TestKerberosPrincipalParser {
 
   @Test
   public void testServicePrincipalWithInstanceAndRealm() {
-    KerberosPrincipalParser principal =
-        KerberosPrincipalParser.parse("HTTP/server.example.com@EXAMPLE.COM");
+    KerberosPrincipal principal =
+        (KerberosPrincipal) mapper.map("HTTP/server.example.com@EXAMPLE.COM");
 
     assertEquals("HTTP", principal.getName());
     assertEquals("HTTP/server.example.com", principal.getPrimaryWithInstance());
@@ -68,7 +76,7 @@ public class TestKerberosPrincipalParser {
 
   @Test
   public void testUsernameWithInstance() {
-    KerberosPrincipalParser principal = KerberosPrincipalParser.parse("user/admin");
+    KerberosPrincipal principal = (KerberosPrincipal) mapper.map("user/admin");
 
     assertEquals("user", principal.getName());
     assertEquals("user/admin", principal.getPrimaryWithInstance());
@@ -83,7 +91,7 @@ public class TestKerberosPrincipalParser {
     assertThrows(
         IllegalArgumentException.class,
         () -> {
-          KerberosPrincipalParser.parse(null);
+          mapper.map(null);
         });
   }
 
@@ -92,7 +100,7 @@ public class TestKerberosPrincipalParser {
     assertThrows(
         IllegalArgumentException.class,
         () -> {
-          KerberosPrincipalParser.parse("");
+          mapper.map("");
         });
   }
 
@@ -101,7 +109,7 @@ public class TestKerberosPrincipalParser {
     assertThrows(
         IllegalArgumentException.class,
         () -> {
-          KerberosPrincipalParser.parse("@EXAMPLE.COM");
+          mapper.map("@EXAMPLE.COM");
         });
   }
 
@@ -110,7 +118,7 @@ public class TestKerberosPrincipalParser {
     assertThrows(
         IllegalArgumentException.class,
         () -> {
-          KerberosPrincipalParser.parse("user@EXAMPLE.COM/instance");
+          mapper.map("user@EXAMPLE.COM/instance");
         });
   }
 
@@ -119,7 +127,7 @@ public class TestKerberosPrincipalParser {
     assertThrows(
         IllegalArgumentException.class,
         () -> {
-          new KerberosPrincipalParser(null, null, null);
+          new KerberosPrincipal(null, null, null);
         });
   }
 
@@ -128,17 +136,15 @@ public class TestKerberosPrincipalParser {
     assertThrows(
         IllegalArgumentException.class,
         () -> {
-          new KerberosPrincipalParser("", null, null);
+          new KerberosPrincipal("", null, null);
         });
   }
 
   @Test
   public void testEqualsAndHashCode() {
-    KerberosPrincipalParser principal1 =
-        new KerberosPrincipalParser("john", "admin", "EXAMPLE.COM");
-    KerberosPrincipalParser principal2 =
-        new KerberosPrincipalParser("john", "admin", "EXAMPLE.COM");
-    KerberosPrincipalParser principal3 = new KerberosPrincipalParser("john", null, "EXAMPLE.COM");
+    KerberosPrincipal principal1 = new KerberosPrincipal("john", "admin", "EXAMPLE.COM");
+    KerberosPrincipal principal2 = new KerberosPrincipal("john", "admin", "EXAMPLE.COM");
+    KerberosPrincipal principal3 = new KerberosPrincipal("john", null, "EXAMPLE.COM");
 
     assertEquals(principal1, principal2);
     assertEquals(principal1.hashCode(), principal2.hashCode());
@@ -147,8 +153,8 @@ public class TestKerberosPrincipalParser {
 
   @Test
   public void testToString() {
-    KerberosPrincipalParser principal =
-        KerberosPrincipalParser.parse("HTTP/server.example.com@EXAMPLE.COM");
+    KerberosPrincipal principal =
+        (KerberosPrincipal) mapper.map("HTTP/server.example.com@EXAMPLE.COM");
     String toString = principal.toString();
 
     assertNotNull(toString);
@@ -157,7 +163,7 @@ public class TestKerberosPrincipalParser {
 
   @Test
   public void testConstructorDirectly() {
-    KerberosPrincipalParser principal = new KerberosPrincipalParser("john", "admin", "EXAMPLE.COM");
+    KerberosPrincipal principal = new KerberosPrincipal("john", "admin", "EXAMPLE.COM");
 
     assertEquals("john", principal.getName());
     assertEquals("john/admin", principal.getPrimaryWithInstance());

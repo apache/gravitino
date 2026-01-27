@@ -19,11 +19,12 @@
 
 package org.apache.gravitino.auth;
 
+import java.security.Principal;
 import java.util.Objects;
 import java.util.Optional;
 
 /**
- * Utility for parsing Kerberos principal strings into structured components.
+ * Represents a Kerberos principal with its structured components.
  *
  * <p>A Kerberos principal has the format: {@code primary[/instance][@REALM]} where:
  *
@@ -42,7 +43,7 @@ import java.util.Optional;
  *   <li>{@code HTTP/server.example.com@EXAMPLE.COM} - service principal with instance and realm
  * </ul>
  */
-public class KerberosPrincipalParser {
+public class KerberosPrincipal implements Principal {
 
   private final String username;
   private final String instance;
@@ -50,14 +51,14 @@ public class KerberosPrincipalParser {
   private final String fullPrincipal;
 
   /**
-   * Creates a new Kerberos principal parser result.
+   * Creates a new Kerberos principal.
    *
    * @param username the primary username component (required, cannot be null or empty)
    * @param instance the instance component (optional, can be null)
    * @param realm the realm component (optional, can be null)
    * @throws IllegalArgumentException if username is null or empty
    */
-  public KerberosPrincipalParser(String username, String instance, String realm) {
+  public KerberosPrincipal(String username, String instance, String realm) {
     if (username == null || username.isEmpty()) {
       throw new IllegalArgumentException("Username cannot be null or empty");
     }
@@ -65,6 +66,16 @@ public class KerberosPrincipalParser {
     this.instance = instance;
     this.realm = realm;
     this.fullPrincipal = buildFullPrincipal(username, instance, realm);
+  }
+
+  /**
+   * Gets the primary component (username). This is the name used for authentication.
+   *
+   * @return the username (never null or empty)
+   */
+  @Override
+  public String getName() {
+    return username;
   }
 
   /**
@@ -106,24 +117,15 @@ public class KerberosPrincipalParser {
     return username;
   }
 
-  /**
-   * Gets the primary component (username).
-   *
-   * @return the username
-   */
-  public String getName() {
-    return username;
-  }
-
   @Override
   public boolean equals(Object o) {
     if (this == o) {
       return true;
     }
-    if (!(o instanceof KerberosPrincipalParser)) {
+    if (!(o instanceof KerberosPrincipal)) {
       return false;
     }
-    KerberosPrincipalParser that = (KerberosPrincipalParser) o;
+    KerberosPrincipal that = (KerberosPrincipal) o;
     return Objects.equals(username, that.username)
         && Objects.equals(instance, that.instance)
         && Objects.equals(realm, that.realm);
@@ -136,7 +138,7 @@ public class KerberosPrincipalParser {
 
   @Override
   public String toString() {
-    return "KerberosPrincipalParser{" + "fullPrincipal='" + fullPrincipal + '\'' + '}';
+    return "KerberosPrincipal{" + "fullPrincipal='" + fullPrincipal + '\'' + '}';
   }
 
   /**
@@ -156,59 +158,5 @@ public class KerberosPrincipalParser {
       sb.append('@').append(realm);
     }
     return sb.toString();
-  }
-
-  /**
-   * Parses a Kerberos principal string into its components.
-   *
-   * @param principal the principal string to parse (e.g., "user/instance@REALM")
-   * @return a KerberosPrincipalParser instance
-   * @throws IllegalArgumentException if the principal string is null, empty, or has invalid format
-   */
-  public static KerberosPrincipalParser parse(String principal) {
-    if (principal == null || principal.isEmpty()) {
-      throw new IllegalArgumentException("Principal string cannot be null or empty");
-    }
-
-    // Kerberos principal format: user[/instance][@REALM]
-    // Find positions of '/' and '@'
-    int slashIndex = principal.indexOf('/');
-    int atIndex = principal.indexOf('@');
-
-    String username;
-    String instance = null;
-    String realm = null;
-
-    // Extract username (up to '/' or '@', whichever comes first)
-    if (slashIndex >= 0 && atIndex >= 0) {
-      // Both '/' and '@' present
-      if (slashIndex < atIndex) {
-        // Format: user/instance@REALM
-        username = principal.substring(0, slashIndex);
-        instance = principal.substring(slashIndex + 1, atIndex);
-        realm = principal.substring(atIndex + 1);
-      } else {
-        // Invalid format: '@' before '/'
-        throw new IllegalArgumentException("Invalid Kerberos principal format: " + principal);
-      }
-    } else if (slashIndex >= 0) {
-      // Only '/' present: user/instance
-      username = principal.substring(0, slashIndex);
-      instance = principal.substring(slashIndex + 1);
-    } else if (atIndex >= 0) {
-      // Only '@' present: user@REALM
-      username = principal.substring(0, atIndex);
-      realm = principal.substring(atIndex + 1);
-    } else {
-      // No delimiters: just username
-      username = principal;
-    }
-
-    // Validate username is not empty
-    if (username.isEmpty()) {
-      throw new IllegalArgumentException("Username cannot be empty in principal: " + principal);
-    }
-
-    return new KerberosPrincipalParser(username, instance, realm);
   }
 }
