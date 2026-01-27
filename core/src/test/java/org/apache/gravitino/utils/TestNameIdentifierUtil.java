@@ -136,6 +136,12 @@ public class TestNameIdentifierUtil {
         MetadataObjects.parse("catalog1.schema1.model1", MetadataObject.Type.MODEL);
     assertEquals(modelObject, NameIdentifierUtil.toMetadataObject(model, Entity.EntityType.MODEL));
 
+    // test view
+    NameIdentifier view = NameIdentifier.of("metalake1", "catalog1", "schema1", "view1");
+    MetadataObject viewObject =
+        MetadataObjects.parse("catalog1.schema1.view1", MetadataObject.Type.VIEW);
+    assertEquals(viewObject, NameIdentifierUtil.toMetadataObject(view, Entity.EntityType.VIEW));
+
     // test null
     Throwable e1 =
         assertThrows(
@@ -346,5 +352,16 @@ public class TestNameIdentifierUtil {
         NameIdentifierUtil.buildNameIdentifier(Entity.EntityType.TOPIC, topicName, topicEntities);
     assertEquals(NameIdentifier.of(metalake, catalog, schema, topicName), topicIdent);
     assertEquals(topicName, topicIdent.name());
+
+    // Test 13: Build a VIEW identifier
+    String viewName = "my_view";
+    Map<Entity.EntityType, String> viewEntities = Maps.newHashMap();
+    viewEntities.put(Entity.EntityType.METALAKE, metalake);
+    viewEntities.put(Entity.EntityType.CATALOG, catalog);
+    viewEntities.put(Entity.EntityType.SCHEMA, schema);
+    NameIdentifier viewIdent =
+        NameIdentifierUtil.buildNameIdentifier(Entity.EntityType.VIEW, viewName, viewEntities);
+    assertEquals(NameIdentifier.of(metalake, catalog, schema, viewName), viewIdent);
+    assertEquals(viewName, viewIdent.name());
   }
 }

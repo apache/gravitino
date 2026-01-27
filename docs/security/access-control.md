@@ -147,6 +147,7 @@ The following metadata objects support ownership:
 | Catalog              |
 | Schema               |
 | Table                |
+| View                 |
 | Topic                |
 | Fileset              |
 | Role                 |
@@ -202,6 +203,7 @@ Metalake (top level)
 └── Catalog (represents a data source)
     └── Schema
         ├── Table
+        ├── View
         ├── Topic
         └── Fileset
 ```
@@ -313,7 +315,14 @@ and `USE_SCHEMA` privileges on its parent schema.
 | SELECT_TABLE | Metalake, Catalog, Schema, Table  | Select data from a table                                                  |
 
 DENY `MODIFY_TABLE` won't deny the `SELECT_TABLE` operation if the user has the privilege to `ALLOW SELECT_TABLE` on the table.
-DENY `SELECT_TABLE` won‘t deny the `MODIFY_TABLE` operation if the user has the privilege `ALLOW MODIFY_TABLE` on the table. 
+DENY `SELECT_TABLE` won't deny the `MODIFY_TABLE` operation if the user has the privilege `ALLOW MODIFY_TABLE` on the table. 
+
+### View privileges
+
+| Name        | Supports Securable Object       | Operation                |
+|-------------|---------------------------------|--------------------------|
+| CREATE_VIEW | Metalake, Catalog, Schema       | Create a view            |
+| SELECT_VIEW | Metalake, Catalog, Schema, View | Select data from a view  |
 
 ### Topic privileges
 
@@ -1240,6 +1249,7 @@ The following table lists the required privileges for each API.
 | load schema                       | First, you should have the privilege to load the catalog. Then, you are the owner of the metalake, catalog, schema or have `USE_SCHEMA` on the metalake, catalog, schema.                                                                     |
 | create table                      | First, you should have the privilege to load the catalog and the schema. `CREATE_TABLE` on the metalake, catalog, schema or the owner of the metalake, catalog, schema                                                                        |
 | alter table                       | First, you should have the privilege to load the catalog and the schema. Then, you are one of the owners of the table, schema,catalog, metalake or have `MODIFY_TABLE` on the table, schema, catalog, metalake                                |
+| rename table across schema        | First, you should have the privilege to load the catalog and both schemas. Then, you must be the owner of the table and have `CREATE_TABLE` privilege on the target schema, catalog, or metalake                                              |
 | update table statistics           | First, you should have the privilege to load the catalog and the schema. Then, you are one of the owners of the table, schema,catalog, metalake or have `MODIFY_TABLE` on the table, schema, catalog, metalake                                |
 | drop table statistics             | First, you should have the privilege to load the catalog and the schema. Then, you are one of the owners of the table, schema,catalog, metalake or have `MODIFY_TABLE` on the table, schema, catalog, metalake                                |
 | update table partition statistics | First, you should have the privilege to load the catalog and the schema. Then, you are one of the owners of the table, schema,catalog, metalake or have `MODIFY_TABLE` on the table, schema, catalog, metalake                                |
@@ -1249,6 +1259,12 @@ The following table lists the required privileges for each API.
 | load table                        | First, you should have the privilege to load the catalog and the schema. Then, you are one of the owners of the table, schema, metalake, catalog or have either `SELECT_TABLE` or `MODIFY_TABLE` on the table, schema, catalog, metalake      |
 | list table statistics             | First, you should have the privilege to load the catalog and the schema. Then, you are one of the owners of the table, schema, metalake, catalog or have either `SELECT_TABLE` or `MODIFY_TABLE` on the table, schema, catalog, metalake      |
 | list table partition statistics   | First, you should have the privilege to load the catalog and the schema. Then, you are one of the owners of the table, schema, metalake, catalog or have either `SELECT_TABLE` or `MODIFY_TABLE` on the table, schema, catalog, metalake      |
+| create view                       | First, you should have the privilege to load the catalog and the schema. `CREATE_VIEW` on the metalake, catalog, schema or the owner of the metalake, catalog, schema                                                                         |
+| alter view                        | First, you should have the privilege to load the catalog and the schema. Then, you are one of the owners of the view, schema, catalog, metalake                                                                                               |
+| rename view across schema         | First, you should have the privilege to load the catalog and both schemas. Then, you must be the owner of the view and have `CREATE_VIEW` privilege on the target schema, catalog, or metalake                                                |
+| drop view                         | First, you should have the privilege to load the catalog and the schema. Then, you are one of the owners of the view, schema, catalog, metalake                                                                                               |
+| list view                         | First, you should have the privilege to load the catalog and the schema. Then, the owner of the schema, catalog, metalake can see all the views, others can see the views which they can load                                                 |
+| load view                         | First, you should have the privilege to load the catalog and the schema. Then, you are one of the owners of the view, schema, metalake, catalog or have `SELECT_VIEW` on the view, schema, catalog, metalake                                  |
 | create topic                      | First, you should have the privilege to load the catalog and the schema. Then, you have `CREATE_TOPIC` on the metalake, catalog, schema or are the owner of the metalake, catalog, schema                                                     |
 | alter topic                       | First, you should have the privilege to load the catalog and the schema. Then, you are one of the owners of the topic, schema,catalog, metalake or have `PRODUCE_TOPIC` on the topic, schema, catalog, metalake                               |
 | drop topic                        | First, you should have the privilege to load the catalog and the schema. Then, you are one of the owners of the topic, schema, catalog, metalake                                                                                              |
@@ -1319,4 +1335,3 @@ The following table lists the required privileges for each API.
 | get a job                         | The owner of the metalake or the job.                                                                                                                                                                                                         |
 | cancel a job                      | The owner of the metalake or the job.                                                                                                                                                                                                         |
 | get credential                    | If you can load the metadata object, you can get its credential.                                                                                                                                                                              | 
-

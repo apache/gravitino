@@ -141,7 +141,11 @@ public interface Privilege {
     /** The privilege to use a job template */
     USE_JOB_TEMPLATE(0L, 1L << 26),
     /** The privilege to run a job */
-    RUN_JOB(0L, 1L << 27);
+    RUN_JOB(0L, 1L << 27),
+    /** The privilege to create a view. */
+    CREATE_VIEW(0L, 1L << 28),
+    /** The privilege to select data from a view. */
+    SELECT_VIEW(0L, 1L << 29);
 
     private final long highBits;
     private final long lowBits;
