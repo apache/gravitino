@@ -26,10 +26,9 @@ repositories {
   mavenCentral()
 }
 
-var trinoVersion = 435
 val trinoVersionProvider =
   providers.gradleProperty("trinoVersion").map { it.toInt() }.orElse(435)
-trinoVersion = trinoVersionProvider.get()
+val trinoVersion = trinoVersionProvider.get()
 
 dependencies {
   implementation(project(":catalogs:catalog-common"))
