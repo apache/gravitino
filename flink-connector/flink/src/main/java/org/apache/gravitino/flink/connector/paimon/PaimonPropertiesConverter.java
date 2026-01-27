@@ -21,9 +21,11 @@ package org.apache.gravitino.flink.connector.paimon;
 
 import org.apache.gravitino.catalog.lakehouse.paimon.PaimonConstants;
 import org.apache.gravitino.catalog.lakehouse.paimon.PaimonPropertiesUtils;
-import org.apache.gravitino.flink.connector.PropertiesConverter;
+import org.apache.gravitino.flink.connector.CatalogPropertiesConverter;
+import org.apache.gravitino.flink.connector.SchemaAndTablePropertiesConverter;
 
-public class PaimonPropertiesConverter implements PropertiesConverter {
+public class PaimonPropertiesConverter
+    implements CatalogPropertiesConverter, SchemaAndTablePropertiesConverter {
 
   public static final PaimonPropertiesConverter INSTANCE = new PaimonPropertiesConverter();
 
