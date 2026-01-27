@@ -19,9 +19,11 @@ The Gravitino package comprises both the Gravitino server and the Gravitino Iceb
 Before installing Gravitino, make sure you have the Gravitino binary distribution package. You can download the latest Gravitino binary distribution package from [GitHub](https://github.com/apache/gravitino/releases).
 You can also build it yourself by following the instructions in [How to Build Gravitino](./how-to-build.md).
 
-  - If you build Gravitino yourself using the `./gradlew compileDistribution` command, you can find the Gravitino binary distribution package in the `distribution/package` directory.
+- If you build Gravitino yourself using the `./gradlew compileDistribution` command, you can find the Gravitino binary distribution package in the `distribution/package` and `distribution/package-all` directory. The main difference between these two packages is that the `package-all` package contains all catalogs including catalog under folder `catalogs-contrib`, while the `package` package only contains the main catalogs under folder `catalogs`.
 
-  - If you build Gravitino yourself using the `./gradlew assembleDistribution` command, you can get the compressed Gravitino binary distribution package with the name `gravitino-<version>-bin.tar.gz` in the `distribution` directory with sha256 checksum file `gravitino-<version>-bin.tar.gz.sha256`.
+- If you build Gravitino yourself using the `./gradlew assembleDistribution` command, you can get the compressed Gravitino binary distribution package with the name `gravitino-<version>-bin.tar.gz` in the `distribution` directory with sha256 checksum file `gravitino-<version>-bin.tar.gz.sha256`. Also, you can get the complete compressed Gravitino binary distribution package with the name `gravitino-<version>-bin-all.tar.gz` in the `distribution` directory with sha256 checksum file `gravitino-<version>-bin-all.tar.gz.sha256`. The main difference between these two packages is that the `-all` package contains all catalogs including catalog under folder `catalogs-contrib` while the normal package only contains the main catalogs under folder `catalogs`.
+
+Note: **Apache Gravitino only releases `gravitino-<version>-bin.tar.gz` packages on GitHub releases and the `gravitino-<version>-bin-all.tar.gz` packages are only for users who build Gravitino from source code by themselves if interested.**
 
 The Gravitino binary distribution package contains the following files:
 

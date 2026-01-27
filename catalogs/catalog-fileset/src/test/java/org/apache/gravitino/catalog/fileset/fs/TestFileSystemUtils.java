@@ -49,7 +49,7 @@ public class TestFileSystemUtils {
             "fs.s3a.impl", "v2",
             "fs.s3a.endpoint", "v3",
             "gravitino.bypass.fs.s3a.endpoint", "v4");
-    Configuration configuration = FileSystemUtils.createConfiguration(confMap);
+    Configuration configuration = FileSystemUtils.createCompatibleConfiguration(confMap);
     Assertions.assertEquals("v1", configuration.get("s3a-endpoint"));
     Assertions.assertEquals("v2", configuration.get("fs.s3a.impl"));
     Assertions.assertEquals("v3", configuration.get("fs.s3a.endpoint"));
