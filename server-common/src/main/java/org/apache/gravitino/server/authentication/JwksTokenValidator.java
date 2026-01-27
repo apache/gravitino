@@ -140,8 +140,7 @@ public class JwksTokenValidator implements OAuthTokenValidator {
       }
 
       // Use principal mapper to extract username
-      Principal mappedPrincipal = principalMapper.map(principal);
-      return mappedPrincipal;
+      return principalMapper.map(principal);
 
     } catch (Exception e) {
       LOG.error("JWKS JWT validation error: {}", e.getMessage());
