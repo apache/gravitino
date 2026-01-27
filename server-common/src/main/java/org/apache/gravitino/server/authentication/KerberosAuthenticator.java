@@ -183,8 +183,7 @@ public class KerberosAuthenticator implements Authenticator {
       // Use principal mapper to extract the principal
       // This allows for flexible mapping strategies (regex, kerberos-specific parsing, etc.)
       // The mapper will handle validation and extraction based on its configured type
-      Principal mappedPrincipal = principalMapper.map(principalString);
-      return mappedPrincipal;
+      return principalMapper.map(principalString);
     } finally {
       if (gssContext != null) {
         gssContext.dispose();
