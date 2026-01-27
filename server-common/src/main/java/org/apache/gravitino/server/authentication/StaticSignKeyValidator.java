@@ -106,9 +106,9 @@ public class StaticSignKeyValidator implements OAuthTokenValidator {
       }
 
       // Use principal mapper to extract username
-      Principal mappedPrincipal = principalMapper.map(jwt.getBody().getSubject());
-      return mappedPrincipal;
+      return principalMapper.map(jwt.getBody().getSubject());
     } catch (ExpiredJwtException
+        | UnsupportedJwtException
         | UnsupportedJwtException
         | MalformedJwtException
         | SignatureException
