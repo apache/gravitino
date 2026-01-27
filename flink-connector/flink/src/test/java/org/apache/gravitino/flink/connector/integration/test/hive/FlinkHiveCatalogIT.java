@@ -387,7 +387,9 @@ public class FlinkHiveCatalogIT extends FlinkCommonIT {
 
       StreamExecutionEnvironment env =
           StreamExecutionEnvironment.getExecutionEnvironment(configuration);
-      StreamTableEnvironment streamTableEnv = StreamTableEnvironment.create(env);
+      EnvironmentSettings settings =
+          EnvironmentSettings.newInstance().withConfiguration(configuration).build();
+      StreamTableEnvironment streamTableEnv = StreamTableEnvironment.create(env, settings);
 
       Assertions.assertTrue(
           Arrays.asList(streamTableEnv.listCatalogs()).contains(catalogName),

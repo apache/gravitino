@@ -117,7 +117,7 @@ public class HiveSchemaAndTablePropertiesConverter implements SchemaAndTableProp
       Preconditions.checkArgument(
           "hive".equalsIgnoreCase(connector),
           "The connector type must be hive, but get %s",
-          FlinkGenericTableUtil.CONNECTOR);
+          connector);
       properties.remove(FlinkGenericTableUtil.CONNECTOR);
     }
     properties.put(CatalogPropertiesUtil.IS_GENERIC, "false");
