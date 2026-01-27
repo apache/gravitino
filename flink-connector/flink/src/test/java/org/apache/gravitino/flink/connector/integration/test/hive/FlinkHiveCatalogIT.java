@@ -869,7 +869,7 @@ public class FlinkHiveCatalogIT extends FlinkCommonIT {
   }
 
   @Test
-  public void testGravitinoCreateRawHiveTableReadableByNativeHive() {
+  public void testGravitinoCreateRawHiveTableReadableByNativeHiveCatalog() {
     String databaseName = "test_native_read_raw_hive_db";
     String tableName = "raw_hive_table";
     doWithSchema(
@@ -892,7 +892,7 @@ public class FlinkHiveCatalogIT extends FlinkCommonIT {
   }
 
   @Test
-  public void testGravitinoCreateGenericJdbcTableReadableByNativeHive() {
+  public void testGravitinoCreateGenericJdbcTableReadableByNativeHiveCatalog() {
     String databaseName = "test_native_read_jdbc_db";
     String tableName = "generic_jdbc_table";
     doWithSchema(
@@ -929,7 +929,7 @@ public class FlinkHiveCatalogIT extends FlinkCommonIT {
   }
 
   @Test
-  public void testGravitinoCreatePaimonTableReadableByNativeHive() {
+  public void testGravitinoCreatePaimonTableReadableByNativePaimonCatalog() {
     String databaseName = "test_native_read_paimon_db";
     String tableName = "paimon_table";
     String tablePath = paimonTablePath(databaseName, tableName);
