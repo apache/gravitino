@@ -44,6 +44,7 @@ import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.meta.BaseMetalake;
 import org.apache.gravitino.meta.CatalogEntity;
 import org.apache.gravitino.meta.FilesetEntity;
+import org.apache.gravitino.meta.GenericEntity;
 import org.apache.gravitino.meta.GroupEntity;
 import org.apache.gravitino.meta.JobEntity;
 import org.apache.gravitino.meta.JobTemplateEntity;
@@ -77,6 +78,7 @@ import org.apache.gravitino.storage.relational.service.TableMetaService;
 import org.apache.gravitino.storage.relational.service.TagMetaService;
 import org.apache.gravitino.storage.relational.service.TopicMetaService;
 import org.apache.gravitino.storage.relational.service.UserMetaService;
+import org.apache.gravitino.storage.relational.service.ViewMetaService;
 import org.apache.gravitino.storage.relational.session.SqlSessionFactoryHelper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -117,6 +119,8 @@ public class JDBCBackend implements RelationalBackend {
         return (List<E>) SchemaMetaService.getInstance().listSchemasByNamespace(namespace);
       case TABLE:
         return (List<E>) TableMetaService.getInstance().listTablesByNamespace(namespace);
+      case VIEW:
+        return (List<E>) ViewMetaService.getInstance().listViewsByNamespace(namespace);
       case FILESET:
         return (List<E>) FilesetMetaService.getInstance().listFilesetsByNamespace(namespace);
       case TOPIC:
@@ -200,6 +204,14 @@ public class JDBCBackend implements RelationalBackend {
       JobTemplateMetaService.getInstance().insertJobTemplate((JobTemplateEntity) e, overwritten);
     } else if (e instanceof JobEntity) {
       JobMetaService.getInstance().insertJob((JobEntity) e, overwritten);
+    } else if (e instanceof GenericEntity) {
+      GenericEntity genericEntity = (GenericEntity) e;
+      if (genericEntity.type() == Entity.EntityType.VIEW) {
+        ViewMetaService.getInstance().insertView(genericEntity, overwritten);
+      } else {
+        throw new UnsupportedEntityTypeException(
+            "Unsupported entity type: %s for insert operation", genericEntity.type());
+      }
     } else {
       throw new UnsupportedEntityTypeException(
           "Unsupported entity type: %s for insert operation", e.getClass());
@@ -239,6 +251,8 @@ public class JDBCBackend implements RelationalBackend {
         return (E) PolicyMetaService.getInstance().updatePolicy(ident, updater);
       case JOB_TEMPLATE:
         return (E) JobTemplateMetaService.getInstance().updateJobTemplate(ident, updater);
+      case VIEW:
+        return (E) ViewMetaService.getInstance().updateView(ident, updater);
       default:
         throw new UnsupportedEntityTypeException(
             "Unsupported entity type: %s for update operation", entityType);
@@ -280,6 +294,8 @@ public class JDBCBackend implements RelationalBackend {
         return (E) JobTemplateMetaService.getInstance().getJobTemplateByIdentifier(ident);
       case JOB:
         return (E) JobMetaService.getInstance().getJobByIdentifier(ident);
+      case VIEW:
+        return (E) ViewMetaService.getInstance().getViewByIdentifier(ident);
       default:
         throw new UnsupportedEntityTypeException(
             "Unsupported entity type: %s for get operation", entityType);
@@ -320,6 +336,8 @@ public class JDBCBackend implements RelationalBackend {
         return JobTemplateMetaService.getInstance().deleteJobTemplate(ident);
       case JOB:
         return JobMetaService.getInstance().deleteJob(ident);
+      case VIEW:
+        return ViewMetaService.getInstance().deleteView(ident);
       default:
         throw new UnsupportedEntityTypeException(
             "Unsupported entity type: %s for delete operation", entityType);
@@ -396,9 +414,12 @@ public class JDBCBackend implements RelationalBackend {
       case JOB:
         return JobMetaService.getInstance()
             .deleteJobsByLegacyTimeline(legacyTimeline, GARBAGE_COLLECTOR_SINGLE_DELETION_LIMIT);
+      case VIEW:
+        return ViewMetaService.getInstance()
+            .deleteViewMetasByLegacyTimeline(
+                legacyTimeline, GARBAGE_COLLECTOR_SINGLE_DELETION_LIMIT);
       case AUDIT:
       case FUNCTION:
-      case VIEW:
         return 0;
         // TODO: Implement hard delete logic for these entity types.
 
