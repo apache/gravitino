@@ -182,7 +182,7 @@ public class FunctionOperations {
           });
     } catch (Exception e) {
       return ExceptionHandlers.handleFunctionException(
-          OperationType.CREATE, request.getName(), schema, e);
+          OperationType.REGISTER, request.getName(), schema, e);
     }
   }
 
