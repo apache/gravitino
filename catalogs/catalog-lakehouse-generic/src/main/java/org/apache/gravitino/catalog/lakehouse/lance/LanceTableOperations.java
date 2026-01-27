@@ -23,6 +23,7 @@ import static org.apache.gravitino.lance.common.utils.LanceConstants.LANCE_TABLE
 
 import com.google.common.base.Preconditions;
 import com.lancedb.lance.Dataset;
+import com.lancedb.lance.ReadOptions;
 import com.lancedb.lance.WriteParams;
 import com.lancedb.lance.index.DistanceType;
 import com.lancedb.lance.index.IndexParams;
@@ -35,6 +36,7 @@ import java.util.Optional;
 import java.util.stream.Collectors;
 import org.apache.arrow.memory.RootAllocator;
 import org.apache.arrow.vector.types.pojo.Field;
+import org.apache.arrow.vector.types.pojo.Schema;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.EntityStore;
 import org.apache.gravitino.NameIdentifier;
@@ -45,6 +47,7 @@ import org.apache.gravitino.exceptions.NoSuchSchemaException;
 import org.apache.gravitino.exceptions.NoSuchTableException;
 import org.apache.gravitino.exceptions.TableAlreadyExistsException;
 import org.apache.gravitino.lance.common.ops.gravitino.LanceDataTypeConverter;
+import org.apache.gravitino.lance.common.utils.ArrowUtils;
 import org.apache.gravitino.lance.common.utils.LanceConstants;
 import org.apache.gravitino.lance.common.utils.LancePropertiesUtils;
 import org.apache.gravitino.rel.Column;
@@ -259,7 +262,29 @@ public class LanceTableOperations extends ManagedTableOperations {
       String location)
       throws NoSuchSchemaException, TableAlreadyExistsException {
 
+    Map<String, String> storageProps = LancePropertiesUtils.getLanceStorageOptions(properties);
     if (register) {
+      // Try to check if the Lance dataset exists at the location and then extract the schema.
+      // Note: We will ignore the column parameter in this case.
+      LOG.warn(
+          "Registering existing Lance table at location {}. The provided schema will be ignored. columns: {}",
+          location,
+          Arrays.toString(columns));
+
+      try (Dataset readDataset =
+          Dataset.open(
+              location, new ReadOptions.Builder().setStorageOptions(storageProps).build())) {
+        Schema schema = readDataset.getSchema();
+        List<Column> existingColumns = ArrowUtils.extractColumns(schema);
+        columns = existingColumns.toArray(new Column[0]);
+      } catch (Exception e) {
+        throw new IllegalArgumentException(
+            String.format(
+                "Failed to register Lance table. No existing Lance dataset found at location %s",
+                location),
+            e);
+      }
+
       return super.createTable(
           ident, columns, comment, properties, partitions, distribution, sortOrders, indexes);
     }
@@ -276,7 +301,6 @@ public class LanceTableOperations extends ManagedTableOperations {
           ident, columns, comment, properties, partitions, distribution, sortOrders, indexes);
     }
 
-    Map<String, String> storageProps = LancePropertiesUtils.getLanceStorageOptions(properties);
     try (Dataset ignored =
         Dataset.create(
             new RootAllocator(),
