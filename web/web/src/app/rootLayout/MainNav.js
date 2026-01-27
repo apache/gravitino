@@ -160,7 +160,7 @@ export function MainNav() {
           </span>
         </div>
       </Link>
-      <ConfigProvider
+      {pathname !== '/login' && pathname !== '/ui/login' && <ConfigProvider
         theme={{
           components: {
             Menu: {
@@ -183,7 +183,7 @@ export function MainNav() {
           mode='horizontal'
           items={NavItems}
         />
-      </ConfigProvider>
+      </ConfigProvider>}
     </div>
   )
 }

@@ -27,6 +27,7 @@ import { cn } from '@/lib/utils/tailwind'
 import { useAppSelector, useAppDispatch } from '@/lib/hooks/useStore'
 import Loading from '@/components/Loading'
 import { fetchMetalakes, resetMetalakeStore } from '@/lib/store/metalakes'
+import { resetRolesStore } from '@/lib/store/roles'
 import { logoutAction } from '@/lib/store/auth'
 import { oauthProviderFactory } from '@/lib/auth/providers/factory'
 
@@ -112,6 +113,7 @@ export default function UserSetting() {
 
                   // Reset metalake store to avoid data inconsistency
                   dispatch(resetMetalakeStore({ isCacheMetalakes: true }))
+                  dispatch(resetRolesStore())
 
                   // Preserve pathname and only update metalake in query string, catalogs page goes to catalogs route
                   isCatalogsPage

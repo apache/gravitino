@@ -56,7 +56,7 @@ const LoginPage = () => {
   const useOidcLogin = providerType === 'oidc'
 
   return (
-    <Flex justify='center' align='center' style={{ minHeight: '100vh' }}>
+    <Flex justify='center' align='center' style={{ minHeight: 'calc(100vh - 7rem)' }}>
       <Card style={{ width: 480 }} styles={{ body: { padding: 48 } }}>
         <Flex justify='center' align='center' className='mb-8'>
           <Image

@@ -150,7 +150,10 @@ export const genUpdates = (originalData, newData, disableUpdate = false) => {
         fieldName: [newColumn.name],
         type: newColumn.type,
         nullable: newColumn.nullable,
-        comment: newColumn.comment
+        comment: newColumn.comment,
+        ...(newColumn.defaultValue !== undefined && newColumn.defaultValue !== null
+          ? { defaultValue: newColumn.defaultValue }
+          : {})
       })
     }
   }

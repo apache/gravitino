@@ -48,7 +48,7 @@ export default function AssociatedTable({ ...props }) {
         const privileges = roleData?.securableObjects?.filter(o => o.fullName === metadataObjectFullName)[0]?.privileges
         const allowPrivileges = privileges?.filter(p => p.condition === 'allow').map(p => p.name)
         const denyPrivileges = privileges?.filter(p => p.condition === 'deny').map(p => p.name)
-        if (allowPrivileges.length) {
+        if (allowPrivileges?.length) {
           data.push({
             key: roleData.name + '-allow',
             role: roleData.name,
@@ -56,7 +56,7 @@ export default function AssociatedTable({ ...props }) {
             privileges: allowPrivileges
           })
         }
-        if (denyPrivileges.length) {
+        if (denyPrivileges?.length) {
           data.push({
             key: roleData.name + '-deny',
             role: roleData.name,
@@ -103,7 +103,6 @@ export default function AssociatedTable({ ...props }) {
         title: 'Privileges',
         dataIndex: 'privileges',
         key: 'privileges',
-        width: '60%',
         render: privileges => (
           <>
             {privileges.map(privilege => {

@@ -101,29 +101,28 @@ export function SiteHeader() {
 
   return (
     <header
-      className={cn(
-        'sticky top-0 z-40 w-full border-b border-b-[color:theme(colors.borderWhite)] bg-slate-800 text-white',
-        {
-          hidden: pathname === '/login' || pathname === '/ui/login'
-        }
-      )}
+      className='sticky top-0 z-40 w-full border-b border-b-[color:theme(colors.borderWhite)] bg-slate-800 text-white'
     >
       <div className='container flex h-16 items-stretch space-x-4 md:justify-between md:space-x-0'>
         <MainNav />
         <div className='flex flex-1 items-center justify-end space-x-4'>
           <nav className='flex items-center space-x-1'>
             <GitHubInfo />
-            <div
-              className={cn('cursor-pointer rounded p-1.5 hover:bg-slate-700', {
-                'bg-gray-100 shadow-inner': pathname === '/metalakes' || pathname === '/ui/metalakes',
-                'bg-slate-700': pathname === '/metalakes' || pathname === '/ui/metalakes'
-              })}
-            >
-              <Tooltip title='System Mode'>
-                <Icons.Settings onClick={handleSystemMode} className='size-6' />
-              </Tooltip>
-            </div>
-            <UserSetting />
+            {pathname !== '/login' && pathname !== '/ui/login' && (
+              <>
+                <div
+                  className={cn('cursor-pointer rounded p-1.5 hover:bg-slate-700', {
+                    'bg-gray-100 shadow-inner': pathname === '/metalakes' || pathname === '/ui/metalakes',
+                    'bg-slate-700': pathname === '/metalakes' || pathname === '/ui/metalakes'
+                  })}
+                >
+                  <Tooltip title='System Mode'>
+                    <Icons.Settings onClick={handleSystemMode} className='size-6' />
+                  </Tooltip>
+                </div>
+                <UserSetting />
+              </>
+            )}
           </nav>
         </div>
       </div>

@@ -381,7 +381,7 @@ export const providerBase = {
         description: 'e.g. com.mysql.jdbc.Driver or com.mysql.cj.jdbc.Driver'
       },
       {
-        label: 'JDBC Url',
+        label: 'JDBC URL',
         key: 'jdbc-url',
         value: '',
         required: true,
@@ -412,7 +412,7 @@ export const providerBase = {
         description: 'e.g. org.postgresql.Driver'
       },
       {
-        label: 'JDBC Url',
+        label: 'JDBC URL',
         key: 'jdbc-url',
         value: '',
         required: true,
@@ -449,7 +449,7 @@ export const providerBase = {
         description: 'e.g. com.mysql.jdbc.Driver or com.mysql.cj.jdbc.Driver'
       },
       {
-        label: 'JDBC Url',
+        label: 'JDBC URL',
         key: 'jdbc-url',
         value: '',
         required: true,
@@ -480,7 +480,7 @@ export const providerBase = {
         description: 'e.g. com.mysql.jdbc.Driver or com.mysql.cj.jdbc.Driver'
       },
       {
-        label: 'JDBC Url',
+        label: 'JDBC URL',
         key: 'jdbc-url',
         value: '',
         required: true,
@@ -617,7 +617,7 @@ export const providerBase = {
         description: 'e.g. com.mysql.jdbc.Driver or com.mysql.cj.jdbc.Driver or com.oceanbase.jdbc.Driver'
       },
       {
-        label: 'JDBC Url',
+        label: 'JDBC URL',
         key: 'jdbc-url',
         value: '',
         required: true,

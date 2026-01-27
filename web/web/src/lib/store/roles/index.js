@@ -121,6 +121,12 @@ const rolesSlice = createSlice({
     },
     setRolesForObjectLoading(state, action) {
       state.rolesForObjectLoading = action.payload
+    },
+    resetRolesStore(state) {
+      state.rolesData = []
+      state.rolesLoading = false
+      state.rolesForObject = []
+      state.rolesForObjectLoading = false
     }
   },
   extraReducers: builder => {
@@ -163,6 +169,6 @@ const rolesSlice = createSlice({
   }
 })
 
-export const { setRolesLoading, setRolesForObjectLoading } = rolesSlice.actions
+export const { setRolesLoading, setRolesForObjectLoading, resetRolesStore } = rolesSlice.actions
 
 export default rolesSlice.reducer
