@@ -54,6 +54,7 @@ public class StaticSignKeyValidator implements OAuthTokenValidator {
   private long allowSkewSeconds;
   private Key defaultSigningKey;
   private PrincipalMapper principalMapper;
+  private List<String> principalFields;
 
   @Override
   public void initialize(Config config) {
@@ -67,7 +68,7 @@ public class StaticSignKeyValidator implements OAuthTokenValidator {
         "The uri of the default OAuth server can't be blank");
     String algType = config.get(OAuthConfig.SIGNATURE_ALGORITHM_TYPE);
     this.defaultSigningKey = decodeSignKey(Base64.getDecoder().decode(configuredSignKey), algType);
-
+    this.principalFields = config.get(OAuthConfig.PRINCIPAL_FIELDS);
     // Create principal mapper based on configuration
     String mapperType = config.get(OAuthConfig.PRINCIPAL_MAPPER_TYPE);
     String regexPattern = config.get(OAuthConfig.PRINCIPAL_MAPPER_REGEX_PATTERN);
@@ -105,8 +106,14 @@ public class StaticSignKeyValidator implements OAuthTokenValidator {
             "Audiences in token is not in expected format: %s", audienceObject);
       }
 
+      // Extract principal from JWT claims using configured field(s)
+      String principal = extractPrincipal(jwt.getBody());
+      if (principal == null) {
+        throw new UnauthorizedException("No valid principal found in token");
+      }
+
       // Use principal mapper to extract username
-      return principalMapper.map(jwt.getBody().getSubject());
+      return principalMapper.map(principal);
     } catch (ExpiredJwtException
         | UnsupportedJwtException
         | MalformedJwtException
@@ -114,6 +121,23 @@ public class StaticSignKeyValidator implements OAuthTokenValidator {
         | IllegalArgumentException e) {
       throw new UnauthorizedException(e, "JWT parse error");
     }
+  }
+
+  /** Extracts the principal from the JWT claims using configured field(s). */
+  private String extractPrincipal(Claims claims) {
+    // Try the principal field(s) one by one in order
+    if (principalFields != null && !principalFields.isEmpty()) {
+      for (String field : principalFields) {
+        if (StringUtils.isNotBlank(field)) {
+          Object claimValue = claims.get(field);
+          if (claimValue != null) {
+            return claimValue.toString();
+          }
+        }
+      }
+    }
+
+    return null;
   }
 
   private static Key decodeSignKey(byte[] key, String algType) {
