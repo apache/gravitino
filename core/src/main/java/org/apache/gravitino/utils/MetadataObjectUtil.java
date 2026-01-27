@@ -59,6 +59,7 @@ public class MetadataObjectUtil {
           .put(MetadataObject.Type.POLICY, Entity.EntityType.POLICY)
           .put(MetadataObject.Type.JOB_TEMPLATE, Entity.EntityType.JOB_TEMPLATE)
           .put(MetadataObject.Type.JOB, Entity.EntityType.JOB)
+          .put(MetadataObject.Type.VIEW, Entity.EntityType.VIEW)
           .build();
 
   private MetadataObjectUtil() {}
@@ -120,6 +121,7 @@ public class MetadataObjectUtil {
         return NameIdentifierUtil.ofJob(metalakeName, metadataObject.name());
       case JOB_TEMPLATE:
         return NameIdentifierUtil.ofJobTemplate(metalakeName, metadataObject.name());
+      case VIEW:
       case CATALOG:
       case SCHEMA:
       case TABLE:
