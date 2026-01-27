@@ -26,16 +26,18 @@ import java.util.regex.Pattern;
 import org.apache.flink.configuration.Configuration;
 import org.apache.flink.table.catalog.ObjectPath;
 import org.apache.flink.util.Preconditions;
-import org.apache.gravitino.flink.connector.PropertiesConverter;
+import org.apache.gravitino.flink.connector.CatalogPropertiesConverter;
+import org.apache.gravitino.flink.connector.SchemaAndTablePropertiesConverter;
 
-public abstract class JdbcPropertiesConverter implements PropertiesConverter {
+public abstract class JdbcPropertiesConverter
+    implements CatalogPropertiesConverter, SchemaAndTablePropertiesConverter {
 
   private static final Pattern jdbcUrlPattern = Pattern.compile("(jdbc:\\w+://[^:/]+(?::\\d+)?)");
 
   @Override
   public Map<String, String> toGravitinoCatalogProperties(Configuration flinkConf) {
     Map<String, String> gravitinoCatalogProperties =
-        PropertiesConverter.super.toGravitinoCatalogProperties(flinkConf);
+        CatalogPropertiesConverter.super.toGravitinoCatalogProperties(flinkConf);
     if (!gravitinoCatalogProperties.containsKey(JdbcPropertiesConstants.GRAVITINO_JDBC_DRIVER)) {
       gravitinoCatalogProperties.put(
           JdbcPropertiesConstants.GRAVITINO_JDBC_DRIVER, defaultDriverName());
@@ -46,7 +48,7 @@ public abstract class JdbcPropertiesConverter implements PropertiesConverter {
   @Override
   public Map<String, String> toFlinkCatalogProperties(Map<String, String> gravitinoProperties) {
     Map<String, String> flinkCatalogProperties =
-        PropertiesConverter.super.toFlinkCatalogProperties(gravitinoProperties);
+        CatalogPropertiesConverter.super.toFlinkCatalogProperties(gravitinoProperties);
     String gravitinoJdbcUrl = gravitinoProperties.get(JdbcPropertiesConstants.GRAVITINO_JDBC_URL);
     Preconditions.checkArgument(
         gravitinoJdbcUrl != null,
