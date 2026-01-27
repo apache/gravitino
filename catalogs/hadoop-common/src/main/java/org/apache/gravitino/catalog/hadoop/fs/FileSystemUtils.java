@@ -206,11 +206,8 @@ public class FileSystemUtils {
    * @param config properties map
    * @return Configuration map
    */
-  public static Configuration createCompatibleConfiguration(Map<String, String> config) {
-    Map<String, String> updatedConfig = Maps.newHashMap(config);
-    updatedConfig.put(IPC_FALLBACK_TO_SIMPLE_AUTH_ALLOWED, "true");
-    updatedConfig.put(FS_DISABLE_CACHE, "true");
-    return createCompatibleConfiguration(null, updatedConfig);
+  public static Configuration createConfiguration(Map<String, String> config) {
+    return createConfiguration(null, config);
   }
 
   /**
@@ -220,19 +217,9 @@ public class FileSystemUtils {
    * @param config properties map
    * @return Configuration map
    */
-  public static Configuration createCompatibleConfiguration(
-      String bypass, Map<String, String> config) {
-    Map<String, String> updatedConfig = Maps.newHashMap(config);
-    updatedConfig.put(IPC_FALLBACK_TO_SIMPLE_AUTH_ALLOWED, "true");
-    updatedConfig.put(FS_DISABLE_CACHE, "true");
-    return createConfiguration(bypass, updatedConfig);
-  }
-
   public static Configuration createConfiguration(String bypass, Map<String, String> config) {
     try (ByteArrayOutputStream out = new ByteArrayOutputStream()) {
       Configuration configuration = new Configuration();
-      // Please don't call the method configuration.set(key, value) here, because it will
-      // cause performance issue.
 
       String hdfsConfigResources = config.get(CONFIG_RESOURCES);
       if (StringUtils.isNotBlank(hdfsConfigResources)) {
@@ -255,6 +242,9 @@ public class FileSystemUtils {
       writer.writeEndDocument();
       writer.close();
       configuration.addResource(new ByteArrayInputStream(out.toByteArray()));
+
+      configuration.setBoolean(FS_DISABLE_CACHE, true);
+      configuration.setBoolean(IPC_FALLBACK_TO_SIMPLE_AUTH_ALLOWED, true);
 
       return configuration;
     } catch (Exception e) {
