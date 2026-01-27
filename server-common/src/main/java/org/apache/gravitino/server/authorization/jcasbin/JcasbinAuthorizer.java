@@ -17,6 +17,8 @@
 
 package org.apache.gravitino.server.authorization.jcasbin;
 
+import com.github.benmanes.caffeine.cache.Cache;
+import com.github.benmanes.caffeine.cache.Caffeine;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableList;
 import java.io.IOException;
@@ -26,14 +28,13 @@ import java.security.Principal;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
-import java.util.Map;
 import java.util.Objects;
-import java.util.Set;
+import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Executor;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ThreadPoolExecutor;
+import java.util.concurrent.TimeUnit;
 import org.apache.commons.io.IOUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.Configs;
@@ -84,14 +85,40 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
    * loadedRoles is used to cache roles that have loaded permissions. When the permissions of a role
    * are updated, they should be removed from it.
    */
-  private Set<Long> loadedRoles = ConcurrentHashMap.newKeySet();
+  private Cache<Long, Boolean> loadedRoles;
 
-  private Map<Long, Long> ownerRel = new ConcurrentHashMap<>();
+  private Cache<Long, Optional<Long>> ownerRel;
 
   private Executor executor = null;
 
   @Override
   public void initialize() {
+    long cacheExpirationSecs =
+        GravitinoEnv.getInstance()
+            .config()
+            .get(Configs.GRAVITINO_AUTHORIZATION_CACHE_EXPIRATION_SECS);
+    long roleCacheSize =
+        GravitinoEnv.getInstance().config().get(Configs.GRAVITINO_AUTHORIZATION_ROLE_CACHE_SIZE);
+    long ownerCacheSize =
+        GravitinoEnv.getInstance().config().get(Configs.GRAVITINO_AUTHORIZATION_OWNER_CACHE_SIZE);
+    loadedRoles =
+        Caffeine.newBuilder()
+            .expireAfterWrite(cacheExpirationSecs, TimeUnit.SECONDS)
+            .maximumSize(roleCacheSize)
+            .executor(Runnable::run)
+            .removalListener(
+                (roleId, value, cause) -> {
+                  if (roleId != null) {
+                    allowEnforcer.deleteRole(String.valueOf(roleId));
+                    denyEnforcer.deleteRole(String.valueOf(roleId));
+                  }
+                })
+            .build();
+    ownerRel =
+        Caffeine.newBuilder()
+            .expireAfterWrite(cacheExpirationSecs, TimeUnit.SECONDS)
+            .maximumSize(ownerCacheSize)
+            .build();
     executor =
         Executors.newFixedThreadPool(
             GravitinoEnv.getInstance()
@@ -196,7 +223,7 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
       UserEntity userEntity = getUserEntity(principal.getName(), metalake);
       userId = userEntity.id();
       metadataId = MetadataIdConverter.getID(metadataObject, metalake);
-      result = Objects.equals(userId, ownerRel.get(metadataId));
+      result = Objects.equals(Optional.of(userId), ownerRel.getIfPresent(metadataId));
     } catch (Exception e) {
       LOG.debug("Can not get entity id", e);
       result = false;
@@ -353,9 +380,7 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
 
   @Override
   public void handleRolePrivilegeChange(Long roleId) {
-    loadedRoles.remove(roleId);
-    allowEnforcer.deleteRole(String.valueOf(roleId));
-    denyEnforcer.deleteRole(String.valueOf(roleId));
+    loadedRoles.invalidate(roleId);
   }
 
   @Override
@@ -363,7 +388,7 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
       String metalake, Long oldOwnerId, NameIdentifier nameIdentifier, Entity.EntityType type) {
     MetadataObject metadataObject = NameIdentifierUtil.toMetadataObject(nameIdentifier, type);
     Long metadataId = MetadataIdConverter.getID(metadataObject, metalake);
-    ownerRel.remove(metadataId);
+    ownerRel.invalidate(metadataId);
   }
 
   @Override
@@ -417,7 +442,8 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
     private boolean authorizeByJcasbin(
         Long userId, MetadataObject metadataObject, Long metadataId, String privilege) {
       if (AuthConstants.OWNER.equals(privilege)) {
-        return Objects.equals(userId, ownerRel.get(metadataId));
+        Optional<Long> owner = ownerRel.getIfPresent(metadataId);
+        return Objects.equals(Optional.of(userId), owner);
       }
       return enforcer.enforce(
           String.valueOf(userId),
@@ -457,7 +483,7 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
               Long roleId = role.id();
               allowEnforcer.addRoleForUser(String.valueOf(userId), String.valueOf(roleId));
               denyEnforcer.addRoleForUser(String.valueOf(userId), String.valueOf(roleId));
-              if (loadedRoles.contains(roleId)) {
+              if (loadedRoles.getIfPresent(roleId) != null) {
                 continue;
               }
               CompletableFuture<Void> loadRoleFuture =
@@ -476,7 +502,7 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
                       .thenAcceptAsync(
                           roleEntity -> {
                             loadPolicyByRoleEntity(roleEntity);
-                            loadedRoles.add(roleId);
+                            loadedRoles.put(roleId, true);
                           },
                           executor);
               loadRoleFutures.add(loadRoleFuture);
@@ -489,7 +515,7 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
   }
 
   private void loadOwnerPolicy(String metalake, MetadataObject metadataObject, Long metadataId) {
-    if (ownerRel.containsKey(metadataId)) {
+    if (ownerRel.getIfPresent(metadataId) != null) {
       LOG.debug("Metadata {} OWNER has bean loaded.", metadataId);
       return;
     }
@@ -503,10 +529,14 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
                   SupportsRelationOperations.Type.OWNER_REL,
                   entityIdent,
                   Entity.EntityType.valueOf(metadataObject.type().name()));
-      for (Entity ownerEntity : owners) {
-        if (ownerEntity instanceof UserEntity) {
-          UserEntity user = (UserEntity) ownerEntity;
-          ownerRel.put(metadataId, user.id());
+      if (owners.isEmpty()) {
+        ownerRel.put(metadataId, Optional.empty());
+      } else {
+        for (Entity ownerEntity : owners) {
+          if (ownerEntity instanceof UserEntity) {
+            UserEntity user = (UserEntity) ownerEntity;
+            ownerRel.put(metadataId, Optional.of(user.id()));
+          }
         }
       }
     } catch (IOException e) {
