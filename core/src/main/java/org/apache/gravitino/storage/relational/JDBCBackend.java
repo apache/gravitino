@@ -44,6 +44,7 @@ import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.meta.BaseMetalake;
 import org.apache.gravitino.meta.CatalogEntity;
 import org.apache.gravitino.meta.FilesetEntity;
+import org.apache.gravitino.meta.FunctionEntity;
 import org.apache.gravitino.meta.GroupEntity;
 import org.apache.gravitino.meta.JobEntity;
 import org.apache.gravitino.meta.JobTemplateEntity;
@@ -61,6 +62,7 @@ import org.apache.gravitino.storage.relational.converters.SQLExceptionConverterF
 import org.apache.gravitino.storage.relational.database.H2Database;
 import org.apache.gravitino.storage.relational.service.CatalogMetaService;
 import org.apache.gravitino.storage.relational.service.FilesetMetaService;
+import org.apache.gravitino.storage.relational.service.FunctionMetaService;
 import org.apache.gravitino.storage.relational.service.GroupMetaService;
 import org.apache.gravitino.storage.relational.service.JobMetaService;
 import org.apache.gravitino.storage.relational.service.JobTemplateMetaService;
@@ -134,6 +136,8 @@ public class JDBCBackend implements RelationalBackend {
       case MODEL_VERSION:
         return (List<E>)
             ModelVersionMetaService.getInstance().listModelVersionsByNamespace(namespace);
+      case FUNCTION:
+        return (List<E>) FunctionMetaService.getInstance().listFunctionsByNamespace(namespace);
       case POLICY:
         return (List<E>) PolicyMetaService.getInstance().listPoliciesByNamespace(namespace);
       case JOB_TEMPLATE:
@@ -194,6 +198,8 @@ public class JDBCBackend implements RelationalBackend {
                 + "inserting the new model version.");
       }
       ModelVersionMetaService.getInstance().insertModelVersion((ModelVersionEntity) e);
+    } else if (e instanceof FunctionEntity) {
+      FunctionMetaService.getInstance().insertFunction((FunctionEntity) e, overwritten);
     } else if (e instanceof PolicyEntity) {
       PolicyMetaService.getInstance().insertPolicy((PolicyEntity) e, overwritten);
     } else if (e instanceof JobTemplateEntity) {
@@ -235,6 +241,8 @@ public class JDBCBackend implements RelationalBackend {
         return (E) ModelMetaService.getInstance().updateModel(ident, updater);
       case MODEL_VERSION:
         return (E) ModelVersionMetaService.getInstance().updateModelVersion(ident, updater);
+      case FUNCTION:
+        return (E) FunctionMetaService.getInstance().updateFunction(ident, updater);
       case POLICY:
         return (E) PolicyMetaService.getInstance().updatePolicy(ident, updater);
       case JOB_TEMPLATE:
@@ -274,6 +282,8 @@ public class JDBCBackend implements RelationalBackend {
         return (E) ModelMetaService.getInstance().getModelByIdentifier(ident);
       case MODEL_VERSION:
         return (E) ModelVersionMetaService.getInstance().getModelVersionByIdentifier(ident);
+      case FUNCTION:
+        return (E) FunctionMetaService.getInstance().getFunctionByIdentifier(ident);
       case POLICY:
         return (E) PolicyMetaService.getInstance().getPolicyByIdentifier(ident);
       case JOB_TEMPLATE:
@@ -314,6 +324,8 @@ public class JDBCBackend implements RelationalBackend {
         return ModelMetaService.getInstance().deleteModel(ident);
       case MODEL_VERSION:
         return ModelVersionMetaService.getInstance().deleteModelVersion(ident);
+      case FUNCTION:
+        return FunctionMetaService.getInstance().deleteFunction(ident);
       case POLICY:
         return PolicyMetaService.getInstance().deletePolicy(ident);
       case JOB_TEMPLATE:
@@ -385,6 +397,10 @@ public class JDBCBackend implements RelationalBackend {
         return ModelVersionMetaService.getInstance()
             .deleteModelVersionMetasByLegacyTimeline(
                 legacyTimeline, GARBAGE_COLLECTOR_SINGLE_DELETION_LIMIT);
+      case FUNCTION:
+        return FunctionMetaService.getInstance()
+            .deleteFunctionMetasByLegacyTimeline(
+                legacyTimeline, GARBAGE_COLLECTOR_SINGLE_DELETION_LIMIT);
       case TABLE_STATISTIC:
         return StatisticMetaService.getInstance()
             .deleteStatisticsByLegacyTimeline(
@@ -397,7 +413,6 @@ public class JDBCBackend implements RelationalBackend {
         return JobMetaService.getInstance()
             .deleteJobsByLegacyTimeline(legacyTimeline, GARBAGE_COLLECTOR_SINGLE_DELETION_LIMIT);
       case AUDIT:
-      case FUNCTION:
       case VIEW:
         return 0;
         // TODO: Implement hard delete logic for these entity types.
@@ -428,7 +443,6 @@ public class JDBCBackend implements RelationalBackend {
       case TABLE_STATISTIC:
       case JOB_TEMPLATE:
       case JOB:
-      case FUNCTION: // todo: remove once function versioning is supported
       case VIEW:
         // These entity types have not implemented multi-versions, so we can skip.
         return 0;
@@ -441,6 +455,11 @@ public class JDBCBackend implements RelationalBackend {
       case POLICY:
         return PolicyMetaService.getInstance()
             .deletePolicyVersionsByRetentionCount(
+                versionRetentionCount, GARBAGE_COLLECTOR_SINGLE_DELETION_LIMIT);
+
+      case FUNCTION:
+        return FunctionMetaService.getInstance()
+            .deleteFunctionVersionsByRetentionCount(
                 versionRetentionCount, GARBAGE_COLLECTOR_SINGLE_DELETION_LIMIT);
 
       default:
