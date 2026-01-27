@@ -49,7 +49,7 @@ public interface KerberosConfig {
               "Type of principal mapper to use for Kerberos authentication. "
                   + "Built-in value: 'regex' (uses regex pattern to extract username). "
                   + "Can also be a fully qualified class name implementing PrincipalMapper for custom logic. "
-                  + "Custom mappers can use KerberosPrincipal.parse() for structured Kerberos principal parsing.")
+                  + "Custom mappers can use KerberosPrincipalMapper for structured Kerberos principal parsing.")
           .version(ConfigConstants.VERSION_1_2_0)
           .stringConf()
           .createWithDefault("regex");

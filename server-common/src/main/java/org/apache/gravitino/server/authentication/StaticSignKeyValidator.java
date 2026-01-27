@@ -109,7 +109,6 @@ public class StaticSignKeyValidator implements OAuthTokenValidator {
       return principalMapper.map(jwt.getBody().getSubject());
     } catch (ExpiredJwtException
         | UnsupportedJwtException
-        | UnsupportedJwtException
         | MalformedJwtException
         | SignatureException
         | IllegalArgumentException e) {
