@@ -410,8 +410,9 @@ public class JDBCBackend implements RelationalBackend {
             .deleteModelVersionMetasByLegacyTimeline(
                 legacyTimeline, GARBAGE_COLLECTOR_SINGLE_DELETION_LIMIT);
       case FUNCTION:
-        // TODO: implement deleteFunctionMetasByLegacyTimeline
-        return 0;
+        return FunctionMetaService.getInstance()
+            .deleteFunctionMetasByLegacyTimeline(
+                legacyTimeline, GARBAGE_COLLECTOR_SINGLE_DELETION_LIMIT);
       case TABLE_STATISTIC:
         return StatisticMetaService.getInstance()
             .deleteStatisticsByLegacyTimeline(
@@ -469,8 +470,9 @@ public class JDBCBackend implements RelationalBackend {
                 versionRetentionCount, GARBAGE_COLLECTOR_SINGLE_DELETION_LIMIT);
 
       case FUNCTION:
-        // TODO: implement deleteFunctionVersionsByRetentionCount
-        return 0;
+        return FunctionMetaService.getInstance()
+            .deleteFunctionVersionsByRetentionCount(
+                versionRetentionCount, GARBAGE_COLLECTOR_SINGLE_DELETION_LIMIT);
 
       default:
         throw new IllegalArgumentException(
