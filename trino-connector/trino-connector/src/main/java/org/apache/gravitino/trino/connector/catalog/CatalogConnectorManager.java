@@ -19,7 +19,6 @@
 package org.apache.gravitino.trino.connector.catalog;
 
 import com.google.common.base.Preconditions;
-import com.google.common.base.Strings;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import io.trino.spi.TrinoException;
 import io.trino.spi.connector.ConnectorContext;
@@ -35,7 +34,7 @@ import java.util.concurrent.ScheduledThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
-import org.apache.commons.lang3.NotImplementedException;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.Catalog;
 import org.apache.gravitino.client.GravitinoAdminClient;
 import org.apache.gravitino.client.GravitinoMetalake;
@@ -131,10 +130,9 @@ public class CatalogConnectorManager {
   /**
    * Starts the catalog connector manager with the specified Trino connector context.
    *
-   * @param context the Trino connector context
    * @throws Exception if the catalog connector manager fails to start
    */
-  public void start(ConnectorContext context) throws Exception {
+  public void start() throws Exception {
     catalogRegister.init(config);
     executorService.scheduleWithFixedDelay(
         this::loadMetalake,
@@ -336,7 +334,6 @@ public class CatalogConnectorManager {
       catalogRegister.close();
     }
     executorService.shutdown();
-    throw new NotImplementedException();
   }
 
   /**
@@ -386,7 +383,7 @@ public class CatalogConnectorManager {
 
       GravitinoCatalog catalog = GravitinoCatalog.fromJson(catalogConfig);
       if (this.config.singleMetalakeMode()
-          && !Strings.isNullOrEmpty(targetMetalake)
+          && !StringUtils.isNotBlank(targetMetalake)
           && !targetMetalake.equals(catalog.getMetalake())) {
         throw new TrinoException(
             GravitinoErrorCode.GRAVITINO_UNSUPPORTED_OPERATION,

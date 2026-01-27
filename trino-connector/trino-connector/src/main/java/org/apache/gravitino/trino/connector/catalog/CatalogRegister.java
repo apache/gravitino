@@ -173,7 +173,11 @@ public class CatalogRegister {
           ResultSet rs = statement.getResultSet();
           while (rs.next()) {
             String catalogName = rs.getString(1);
-            if (name.equals(catalogName) || name.equals("\"" + catalogName + "\"")) {
+            // In some Trino version catalog name may be quoted, so we need to check both quoted and
+            // unquoted names
+            if (name.equals(catalogName)
+                || name.equals("\"" + catalogName + "\"")
+                || ("\"" + name + "\"").equals(catalogName)) {
               return true;
             }
           }

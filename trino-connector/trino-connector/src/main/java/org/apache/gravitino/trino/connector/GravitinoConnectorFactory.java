@@ -46,7 +46,7 @@ public class GravitinoConnectorFactory implements ConnectorFactory {
 
   private static final Logger LOG = LoggerFactory.getLogger(GravitinoConnectorFactory.class);
   private static final int MIN_SUPPORT_TRINO_SPI_VERSION = 435;
-  private static final int MAX_SUPPORT_TRINO_SPI_VERSION = 440;
+  private static final int MAX_SUPPORT_TRINO_SPI_VERSION = Integer.MAX_VALUE;
   /** The default connector name. */
   public static final String DEFAULT_CONNECTOR_NAME = "gravitino";
 
@@ -106,7 +106,7 @@ public class GravitinoConnectorFactory implements ConnectorFactory {
           catalogConnectorManager.config(config, client);
 
           if (isCoordinator(trinoConnectorContext)) {
-            catalogConnectorManager.start(trinoConnectorContext);
+            catalogConnectorManager.start();
           }
 
           gravitinoSystemTableFactory = new GravitinoSystemTableFactory(catalogConnectorManager);
@@ -170,19 +170,17 @@ public class GravitinoConnectorFactory implements ConnectorFactory {
         throw new TrinoException(GravitinoErrorCode.GRAVITINO_UNSUPPORTED_TRINO_VERSION, errmsg);
       } else {
         LOG.warn(
-            "The version {} has not undergone thorough testing with Gravitino, there may be compatiablity problem.",
+            "The version {} has not undergone thorough testing with Gravitino, there may be compatibility problem.",
             trinoVersion);
       }
     }
 
-    if (!config.singleMetalakeMode()) {
-      if (!supportCatalogNameWithMetalake()) {
-        String errmsg =
-            String.format(
-                "The trino-connector-%s-%s does not support catalog name with metalake.",
-                getMinSupportTrinoSpiVersion(), getMaxSupportTrinoSpiVersion());
-        throw new TrinoException(GravitinoErrorCode.GRAVITINO_UNSUPPORTED_TRINO_VERSION, errmsg);
-      }
+    if (!config.singleMetalakeMode() && !supportCatalogNameWithMetalake()) {
+      String errmsg =
+          String.format(
+              "The trino-connector-%s-%s does not support catalog name with metalake.",
+              getMinSupportTrinoSpiVersion(), getMaxSupportTrinoSpiVersion());
+      throw new TrinoException(GravitinoErrorCode.GRAVITINO_UNSUPPORTED_TRINO_VERSION, errmsg);
     }
   }
 
