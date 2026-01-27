@@ -72,6 +72,10 @@ public class HDFSFileSystemProxy implements MethodInterceptor {
    */
   public HDFSFileSystemProxy(Path path, Configuration conf) {
     try {
+      Map<String, String> hadoopConfMap = additionalHDFSConfig(config);
+      Configuration conf =
+          FileSystemUtils.createCompatibleConfiguration(GRAVITINO_BYPASS, hadoopConfMap);
+
       conf.setBoolean(FS_DISABLE_CACHE, true);
       conf.setBoolean(IPC_FALLBACK_TO_SIMPLE_AUTH_ALLOWED, true);
       this.configuration = conf;
