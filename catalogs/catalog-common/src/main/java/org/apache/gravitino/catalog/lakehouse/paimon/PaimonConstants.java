@@ -49,6 +49,7 @@ public class PaimonConstants {
   public static final String COMMENT = "comment";
   public static final String OWNER = "owner";
   public static final String BUCKET_KEY = "bucket-key";
+  public static final String BUCKET_NUM = "bucket";
   public static final String MERGE_ENGINE = "merge-engine";
   public static final String SEQUENCE_FIELD = "sequence.field";
   public static final String ROWKIND_FIELD = "rowkind.field";
