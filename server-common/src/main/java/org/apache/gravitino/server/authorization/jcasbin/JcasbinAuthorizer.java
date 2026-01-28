@@ -101,6 +101,13 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
         GravitinoEnv.getInstance().config().get(Configs.GRAVITINO_AUTHORIZATION_ROLE_CACHE_SIZE);
     long ownerCacheSize =
         GravitinoEnv.getInstance().config().get(Configs.GRAVITINO_AUTHORIZATION_OWNER_CACHE_SIZE);
+
+    // Initialize enforcers before the caches that reference them in removal listeners
+    allowEnforcer = new SyncedEnforcer(getModel("/jcasbin_model.conf"), new GravitinoAdapter());
+    allowInternalAuthorizer = new InternalAuthorizer(allowEnforcer);
+    denyEnforcer = new SyncedEnforcer(getModel("/jcasbin_model.conf"), new GravitinoAdapter());
+    denyInternalAuthorizer = new InternalAuthorizer(denyEnforcer);
+
     loadedRoles =
         Caffeine.newBuilder()
             .expireAfterWrite(cacheExpirationSecs, TimeUnit.SECONDS)
@@ -129,10 +136,6 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
               thread.setName("GravitinoAuthorizer-ThreadPool-" + thread.getId());
               return thread;
             });
-    allowEnforcer = new SyncedEnforcer(getModel("/jcasbin_model.conf"), new GravitinoAdapter());
-    allowInternalAuthorizer = new InternalAuthorizer(allowEnforcer);
-    denyEnforcer = new SyncedEnforcer(getModel("/jcasbin_model.conf"), new GravitinoAdapter());
-    denyInternalAuthorizer = new InternalAuthorizer(denyEnforcer);
   }
 
   private Model getModel(String modelFilePath) {
@@ -516,7 +519,7 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
 
   private void loadOwnerPolicy(String metalake, MetadataObject metadataObject, Long metadataId) {
     if (ownerRel.getIfPresent(metadataId) != null) {
-      LOG.debug("Metadata {} OWNER has bean loaded.", metadataId);
+      LOG.debug("Metadata {} OWNER has been loaded.", metadataId);
       return;
     }
     try {
