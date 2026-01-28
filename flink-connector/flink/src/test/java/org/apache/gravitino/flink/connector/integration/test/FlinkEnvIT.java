@@ -37,7 +37,7 @@ import org.apache.flink.table.api.internal.TableEnvironmentImpl;
 import org.apache.flink.types.Row;
 import org.apache.gravitino.Catalog;
 import org.apache.gravitino.client.GravitinoMetalake;
-import org.apache.gravitino.flink.connector.PropertiesConverter;
+import org.apache.gravitino.flink.connector.CatalogPropertiesConverter;
 import org.apache.gravitino.flink.connector.iceberg.IcebergPropertiesConstants;
 import org.apache.gravitino.flink.connector.integration.test.utils.TestUtils;
 import org.apache.gravitino.flink.connector.store.GravitinoCatalogStoreFactoryOptions;
@@ -111,7 +111,7 @@ public abstract class FlinkEnvIT extends BaseIT {
   protected void stopCatalogEnv() throws Exception {}
 
   protected String flinkByPass(String key) {
-    return PropertiesConverter.FLINK_PROPERTY_PREFIX + key;
+    return CatalogPropertiesConverter.FLINK_PROPERTY_PREFIX + key;
   }
 
   protected abstract String getProvider();

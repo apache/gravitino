@@ -358,7 +358,8 @@ public class TestFilesetCatalogOperations {
 
     CatalogInfo catalogInfo = randomCatalogInfo();
     ops.initialize(emptyProps, catalogInfo, FILESET_PROPERTIES_METADATA);
-    Configuration conf = FileSystemUtils.createConfiguration(GRAVITINO_BYPASS, ops.getConf());
+    Configuration conf =
+        FileSystemUtils.createCompatibleConfiguration(GRAVITINO_BYPASS, ops.getConf());
     String value = conf.get("fs.defaultFS");
     Assertions.assertEquals("file:///", value);
 
