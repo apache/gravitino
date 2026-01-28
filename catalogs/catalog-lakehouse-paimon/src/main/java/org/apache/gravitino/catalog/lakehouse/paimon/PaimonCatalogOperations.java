@@ -558,6 +558,7 @@ public class PaimonCatalogOperations implements CatalogOperations, SupportsSchem
     if (indexes == null || indexes.length == 0) {
       return Collections.emptyList();
     }
+    // Paimon supports at most one index; this is enforced in {@code checkPaimonIndexes()}.
     Index primaryKeyIndex = indexes[0];
     return Arrays.stream(primaryKeyIndex.fieldNames())
         .map(

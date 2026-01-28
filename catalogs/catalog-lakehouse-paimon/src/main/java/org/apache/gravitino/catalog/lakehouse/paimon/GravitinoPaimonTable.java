@@ -239,7 +239,7 @@ public class GravitinoPaimonTable extends BaseTable {
     List<String> bucketKeyList =
         Arrays.stream(bucketKeys.split(","))
             .map(String::trim)
-            .filter(StringUtils::isNotEmpty)
+            .filter(StringUtils::isNotBlank)
             .collect(Collectors.toList());
     if (bucketKeyList.isEmpty()) {
       return Distributions.NONE;
