@@ -56,7 +56,9 @@ Builds with Apache Paimon `1.2`.
 
 :::note
 - If you want to use the `oss` or `s3` warehouse, you need to place related jars in the `catalogs/lakehouse-paimon/lib` directory, more information can be found in the [Paimon S3](https://paimon.apache.org/docs/1.2/project/download/#filesystem-jars).
-- If you want to use REST backend, Gravitino Paimon catalog supports Aliyun DLF (Data Lake Formation) as the REST catalog service. You need to configure the DLF-related properties eg: ```{
+- If you want to use REST backend, Gravitino Paimon catalog supports Aliyun DLF (Data Lake Formation) as the REST catalog service. You need to configure the DLF-related properties eg:
+```
+{
   "name": "dlf_paimon",
   "type": "RELATIONAL",
   "provider": "lakehouse-paimon",
@@ -68,7 +70,9 @@ Builds with Apache Paimon `1.2`.
     "dlf-access-key-id": "<access-key-id>",
     "dlf-access-key-secret": "<access-key-secret>"
   }
-}``` connect to Aliyun DLF, more information can be found in the [Paimon REST Catalog](https://paimon.apache.org/docs/master/concepts/rest/overview/).
+}
+```
+connect to Aliyun DLF, more information can be found in the [Paimon REST Catalog](https://paimon.apache.org/docs/master/concepts/rest/overview/).
 - The hive backend does not support the kerberos authentication now.
 :::
 

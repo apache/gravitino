@@ -108,7 +108,7 @@ public class PaimonCatalogPropertiesMetadata extends BaseCatalogPropertiesMetada
           OSSProperties.GRAVITINO_OSS_ACCESS_KEY_SECRET, PaimonOSSFileSystemConfig.OSS_SECRET_KEY,
           OSSProperties.GRAVITINO_OSS_ENDPOINT, PaimonOSSFileSystemConfig.OSS_ENDPOINT);
 
-  public static final Map<String, PropertyEntry<?>> DLF_PROPERTY_ENTRIES =
+  public static final Map<String, PropertyEntry<?>> REST_PROPERTY_ENTRIES =
       new ImmutableMap.Builder<String, PropertyEntry<?>>()
           .put(
               PaimonConstants.GRAVITINO_TOKEN_PROVIDER,
@@ -207,7 +207,7 @@ public class PaimonCatalogPropertiesMetadata extends BaseCatalogPropertiesMetada
     result.putAll(AuthenticationConfig.AUTHENTICATION_PROPERTY_ENTRIES);
     result.putAll(PaimonS3FileSystemConfig.S3_FILESYSTEM_PROPERTY_ENTRIES);
     result.putAll(PaimonOSSFileSystemConfig.OSS_FILESYSTEM_PROPERTY_ENTRIES);
-    result.putAll(DLF_PROPERTY_ENTRIES);
+    result.putAll(REST_PROPERTY_ENTRIES);
     PROPERTIES_METADATA = ImmutableMap.copyOf(result);
   }
 
