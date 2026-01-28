@@ -21,10 +21,14 @@ package org.apache.gravitino.storage.relational.po;
 import com.google.common.base.Preconditions;
 import lombok.EqualsAndHashCode;
 import lombok.Getter;
+import lombok.ToString;
+import lombok.experimental.Accessors;
 import org.apache.commons.lang3.StringUtils;
 
 @EqualsAndHashCode
 @Getter
+@ToString
+@Accessors(fluent = true)
 public class FunctionPO {
 
   private Long functionId;
@@ -53,123 +57,50 @@ public class FunctionPO {
 
   private FunctionVersionPO functionVersionPO;
 
-  private FunctionPO() {}
+  public FunctionPO() {}
 
-  public static Builder builder() {
-    return new Builder();
-  }
+  @lombok.Builder(setterPrefix = "with")
+  private FunctionPO(
+      Long functionId,
+      String functionName,
+      Long metalakeId,
+      Long catalogId,
+      Long schemaId,
+      String functionType,
+      Integer deterministic,
+      String returnType,
+      Integer functionLatestVersion,
+      Integer functionCurrentVersion,
+      String auditInfo,
+      Long deletedAt,
+      FunctionVersionPO functionVersionPO) {
+    Preconditions.checkArgument(functionId != null, "Function id is required");
+    Preconditions.checkArgument(
+        StringUtils.isNotBlank(functionName), "Function name cannot be empty");
+    Preconditions.checkArgument(metalakeId != null, "Metalake id is required");
+    Preconditions.checkArgument(catalogId != null, "Catalog id is required");
+    Preconditions.checkArgument(schemaId != null, "Schema id is required");
+    Preconditions.checkArgument(
+        StringUtils.isNotBlank(functionType), "Function type cannot be empty");
+    Preconditions.checkArgument(
+        functionLatestVersion != null, "Function latest version is required");
+    Preconditions.checkArgument(
+        functionCurrentVersion != null, "Function current version is required");
+    Preconditions.checkArgument(StringUtils.isNotBlank(auditInfo), "Audit info cannot be empty");
+    Preconditions.checkArgument(deletedAt != null, "Deleted at is required");
 
-  public static class Builder {
-
-    private final FunctionPO functionPO;
-
-    private Builder() {
-      functionPO = new FunctionPO();
-    }
-
-    public Builder withFunctionId(Long functionId) {
-      functionPO.functionId = functionId;
-      return this;
-    }
-
-    public Builder withFunctionName(String functionName) {
-      functionPO.functionName = functionName;
-      return this;
-    }
-
-    public Builder withMetalakeId(Long metalakeId) {
-      functionPO.metalakeId = metalakeId;
-      return this;
-    }
-
-    public Builder withCatalogId(Long catalogId) {
-      functionPO.catalogId = catalogId;
-      return this;
-    }
-
-    public Builder withSchemaId(Long schemaId) {
-      functionPO.schemaId = schemaId;
-      return this;
-    }
-
-    public Builder withFunctionType(String functionType) {
-      functionPO.functionType = functionType;
-      return this;
-    }
-
-    public Builder withDeterministic(Integer deterministic) {
-      functionPO.deterministic = deterministic;
-      return this;
-    }
-
-    public Builder withReturnType(String returnType) {
-      functionPO.returnType = returnType;
-      return this;
-    }
-
-    public Builder withFunctionLatestVersion(Integer functionLatestVersion) {
-      functionPO.functionLatestVersion = functionLatestVersion;
-      return this;
-    }
-
-    public Builder withFunctionCurrentVersion(Integer functionCurrentVersion) {
-      functionPO.functionCurrentVersion = functionCurrentVersion;
-      return this;
-    }
-
-    public Builder withAuditInfo(String auditInfo) {
-      functionPO.auditInfo = auditInfo;
-      return this;
-    }
-
-    public Builder withDeletedAt(Long deletedAt) {
-      functionPO.deletedAt = deletedAt;
-      return this;
-    }
-
-    public Builder withFunctionVersionPO(FunctionVersionPO functionVersionPO) {
-      functionPO.functionVersionPO = functionVersionPO;
-      return this;
-    }
-
-    public Long getMetalakeId() {
-      Preconditions.checkState(functionPO.metalakeId != null, "Metalake id is null");
-      return functionPO.metalakeId;
-    }
-
-    public Long getCatalogId() {
-      Preconditions.checkState(functionPO.catalogId != null, "Catalog id is null");
-      return functionPO.catalogId;
-    }
-
-    public Long getSchemaId() {
-      Preconditions.checkState(functionPO.schemaId != null, "Schema id is null");
-      return functionPO.schemaId;
-    }
-
-    public Integer getFunctionCurrentVersion() {
-      Preconditions.checkState(
-          functionPO.functionCurrentVersion != null, "Function current version is null");
-      return functionPO.functionCurrentVersion;
-    }
-
-    public FunctionPO build() {
-      Preconditions.checkArgument(functionPO.functionId != null, "Function id is required");
-      Preconditions.checkArgument(
-          StringUtils.isNotBlank(functionPO.functionName), "Function name cannot be empty");
-      Preconditions.checkArgument(functionPO.metalakeId != null, "Metalake id is required");
-      Preconditions.checkArgument(functionPO.catalogId != null, "Catalog id is required");
-      Preconditions.checkArgument(functionPO.schemaId != null, "Schema id is required");
-      Preconditions.checkArgument(
-          StringUtils.isNotBlank(functionPO.functionType), "Function type cannot be empty");
-      Preconditions.checkArgument(
-          functionPO.functionLatestVersion != null, "Function latest version is required");
-      Preconditions.checkArgument(
-          functionPO.functionCurrentVersion != null, "Function current version is required");
-      Preconditions.checkArgument(
-          StringUtils.isNotBlank(functionPO.auditInfo), "Audit info cannot be empty");
-      Preconditions.checkArgument(functionPO.deletedAt != null, "Deleted at is required");
-      return functionPO;
-    }
+    this.functionId = functionId;
+    this.functionName = functionName;
+    this.metalakeId = metalakeId;
+    this.catalogId = catalogId;
+    this.schemaId = schemaId;
+    this.functionType = functionType;
+    this.deterministic = deterministic;
+    this.returnType = returnType;
+    this.functionLatestVersion = functionLatestVersion;
+    this.functionCurrentVersion = functionCurrentVersion;
+    this.auditInfo = auditInfo;
+    this.deletedAt = deletedAt;
+    this.functionVersionPO = functionVersionPO;
   }
 }

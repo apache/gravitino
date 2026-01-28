@@ -21,10 +21,14 @@ package org.apache.gravitino.storage.relational.po;
 import com.google.common.base.Preconditions;
 import lombok.EqualsAndHashCode;
 import lombok.Getter;
+import lombok.ToString;
+import lombok.experimental.Accessors;
 import org.apache.commons.lang3.StringUtils;
 
 @EqualsAndHashCode
 @Getter
+@ToString
+@Accessors(fluent = true)
 public class FunctionVersionPO {
 
   private Long id;
@@ -47,76 +51,35 @@ public class FunctionVersionPO {
 
   private Long deletedAt;
 
-  private FunctionVersionPO() {}
+  public FunctionVersionPO() {}
 
-  public static Builder builder() {
-    return new Builder();
-  }
+  @lombok.Builder(setterPrefix = "with")
+  private FunctionVersionPO(
+      Long id,
+      Long functionId,
+      Long metalakeId,
+      Long catalogId,
+      Long schemaId,
+      Integer functionVersion,
+      String functionComment,
+      String definitions,
+      String auditInfo,
+      Long deletedAt) {
+    Preconditions.checkArgument(functionId != null, "Function id is required");
+    Preconditions.checkArgument(functionVersion != null, "Function version is required");
+    Preconditions.checkArgument(StringUtils.isNotBlank(definitions), "Definitions cannot be empty");
+    Preconditions.checkArgument(StringUtils.isNotBlank(auditInfo), "Audit info cannot be empty");
+    Preconditions.checkArgument(deletedAt != null, "Deleted at is required");
 
-  public static class Builder {
-
-    private final FunctionVersionPO functionVersionPO;
-
-    private Builder() {
-      functionVersionPO = new FunctionVersionPO();
-    }
-
-    public Builder withFunctionId(Long functionId) {
-      functionVersionPO.functionId = functionId;
-      return this;
-    }
-
-    public Builder withMetalakeId(Long metalakeId) {
-      functionVersionPO.metalakeId = metalakeId;
-      return this;
-    }
-
-    public Builder withCatalogId(Long catalogId) {
-      functionVersionPO.catalogId = catalogId;
-      return this;
-    }
-
-    public Builder withSchemaId(Long schemaId) {
-      functionVersionPO.schemaId = schemaId;
-      return this;
-    }
-
-    public Builder withFunctionVersion(Integer functionVersion) {
-      functionVersionPO.functionVersion = functionVersion;
-      return this;
-    }
-
-    public Builder withFunctionComment(String functionComment) {
-      functionVersionPO.functionComment = functionComment;
-      return this;
-    }
-
-    public Builder withDefinitions(String definitions) {
-      functionVersionPO.definitions = definitions;
-      return this;
-    }
-
-    public Builder withAuditInfo(String auditInfo) {
-      functionVersionPO.auditInfo = auditInfo;
-      return this;
-    }
-
-    public Builder withDeletedAt(Long deletedAt) {
-      functionVersionPO.deletedAt = deletedAt;
-      return this;
-    }
-
-    public FunctionVersionPO build() {
-      Preconditions.checkArgument(functionVersionPO.functionId != null, "Function id is required");
-      Preconditions.checkArgument(
-          functionVersionPO.functionVersion != null, "Function version is required");
-      Preconditions.checkArgument(
-          StringUtils.isNotBlank(functionVersionPO.definitions), "Definitions cannot be empty");
-      Preconditions.checkArgument(
-          StringUtils.isNotBlank(functionVersionPO.auditInfo), "Audit info cannot be empty");
-      Preconditions.checkArgument(functionVersionPO.deletedAt != null, "Deleted at is required");
-
-      return functionVersionPO;
-    }
+    this.id = id;
+    this.functionId = functionId;
+    this.metalakeId = metalakeId;
+    this.catalogId = catalogId;
+    this.schemaId = schemaId;
+    this.functionVersion = functionVersion;
+    this.functionComment = functionComment;
+    this.definitions = definitions;
+    this.auditInfo = auditInfo;
+    this.deletedAt = deletedAt;
   }
 }

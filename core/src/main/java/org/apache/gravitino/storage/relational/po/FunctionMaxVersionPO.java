@@ -18,31 +18,23 @@
  */
 package org.apache.gravitino.storage.relational.po;
 
-import com.google.common.base.Objects;
+import lombok.AccessLevel;
+import lombok.AllArgsConstructor;
+import lombok.Builder;
+import lombok.EqualsAndHashCode;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
+import lombok.ToString;
+import lombok.experimental.Accessors;
 
+@Getter
+@Accessors(fluent = true)
+@EqualsAndHashCode
+@ToString
+@NoArgsConstructor(access = AccessLevel.PRIVATE)
+@AllArgsConstructor(access = AccessLevel.PRIVATE)
+@Builder(setterPrefix = "with")
 public class FunctionMaxVersionPO {
   private Long functionId;
   private Long version;
-
-  public Long getFunctionId() {
-    return functionId;
-  }
-
-  public Long getVersion() {
-    return version;
-  }
-
-  @Override
-  public boolean equals(Object o) {
-    if (this == o) return true;
-    if (!(o instanceof FunctionMaxVersionPO)) return false;
-    FunctionMaxVersionPO that = (FunctionMaxVersionPO) o;
-    return Objects.equal(getFunctionId(), that.getFunctionId())
-        && Objects.equal(getVersion(), that.getVersion());
-  }
-
-  @Override
-  public int hashCode() {
-    return Objects.hashCode(getFunctionId(), getVersion());
-  }
 }
