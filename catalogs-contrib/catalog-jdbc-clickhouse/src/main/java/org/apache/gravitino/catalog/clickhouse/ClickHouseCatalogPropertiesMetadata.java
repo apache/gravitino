@@ -30,7 +30,7 @@ import java.util.Map;
 import org.apache.gravitino.catalog.jdbc.JdbcCatalogPropertiesMetadata;
 import org.apache.gravitino.connector.PropertyEntry;
 
-public class ClickHouseCatalogPropertiesMeta extends JdbcCatalogPropertiesMetadata {
+public class ClickHouseCatalogPropertiesMetadata extends JdbcCatalogPropertiesMetadata {
 
   private static final Map<String, PropertyEntry<?>> PROPERTIES_METADATA;
 

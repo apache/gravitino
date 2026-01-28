@@ -28,7 +28,7 @@ public class TestClickHouseCatalogPropertiesMeta {
 
   @Test
   void testSpecificPropertyEntriesIncludeClickHouseSettings() {
-    ClickHouseCatalogPropertiesMeta meta = new ClickHouseCatalogPropertiesMeta();
+    ClickHouseCatalogPropertiesMetadata meta = new ClickHouseCatalogPropertiesMetadata();
     Map<String, PropertyEntry<?>> entries = meta.specificPropertyEntries();
 
     Assertions.assertTrue(

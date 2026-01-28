@@ -71,7 +71,7 @@ public class ClickHouseCatalog extends JdbcCatalog {
 
   @Override
   public PropertiesMetadata catalogPropertiesMetadata() throws UnsupportedOperationException {
-    return new ClickHouseCatalogPropertiesMeta();
+    return new ClickHouseCatalogPropertiesMetadata();
   }
 
   @Override

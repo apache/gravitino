@@ -74,7 +74,7 @@ public class ClickHouseDatabaseOperations extends JdbcDatabaseOperations {
 
   @Override
   protected Set<String> createSysDatabaseNameSet() {
-    return ImmutableSet.of("information_schema", "INFORMATION_SCHEMA", "default", "system");
+    return ImmutableSet.of("information_schema", "default", "system");
   }
 
   @Override
@@ -113,7 +113,7 @@ public class ClickHouseDatabaseOperations extends JdbcDatabaseOperations {
     StringBuilder createDatabaseSql =
         new StringBuilder(String.format("CREATE DATABASE `%s`", databaseName));
 
-    if (StringUtils.isNotEmpty(comment)) {
+    if (StringUtils.isNotEmpty(originComment)) {
       createDatabaseSql.append(String.format(" COMMENT '%s'", originComment));
     }
 
