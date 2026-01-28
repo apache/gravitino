@@ -299,7 +299,7 @@ export const providerBase = {
         value: 'hive',
         required: true,
         description: 'Apache Iceberg catalog type choose properties',
-        select: ['hive', 'jdbc']
+        select: ['hive', 'jdbc', 'rest']
       },
       {
         label: 'URI',
@@ -312,7 +312,6 @@ export const providerBase = {
         label: 'Warehouse',
         key: 'warehouse',
         value: '',
-        required: true,
         description: 'Apache Iceberg catalog warehouse config'
       },
       {

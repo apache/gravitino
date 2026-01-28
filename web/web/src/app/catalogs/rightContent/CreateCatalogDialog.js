@@ -502,7 +502,15 @@ export default function CreateCatalogDialog({ ...props }) {
                             name={prop.key}
                             label={prop.label}
                             key={idx}
-                            rules={[{ required: prop.required }]}
+                            rules={[
+                              {
+                                required:
+                                  prop.required ||
+                                  (prop.key === 'warehouse' &&
+                                    currentProvider === 'lakehouse-iceberg' &&
+                                    ['hive', 'jdbc'].includes(catalogBackend))
+                              }
+                            ]}
                             messageVariables={{ label: prop.label.toLowerCase() }}
                             initialValue={prop.value}
                           >
