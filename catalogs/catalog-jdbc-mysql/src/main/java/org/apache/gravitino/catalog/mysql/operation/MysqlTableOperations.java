@@ -619,10 +619,22 @@ public class MysqlTableOperations extends JdbcTableOperations {
 
     // Add DEFAULT value if specified
     if (!DEFAULT_VALUE_NOT_SET.equals(column.defaultValue())) {
-      sqlBuilder
-          .append("DEFAULT ")
-          .append(columnDefaultValueConverter.fromGravitino(column.defaultValue()))
-          .append(SPACE);
+      String defaultValue = columnDefaultValueConverter.fromGravitino(column.defaultValue());
+      if ((column.dataType() instanceof Types.VarCharType
+          || column.dataType() instanceof Types.StringType
+          || column.dataType() instanceof Types.FixedCharType)) {
+        if (StringUtils.isEmpty(defaultValue)) {
+          defaultValue = "''";
+        } else if (!defaultValue.startsWith("'") || !defaultValue.endsWith("'")) {
+          // If the default value is not wrapped in single quotes, wrap it.
+          // This is to support cases where the default value is like " " (space) or "abc" (unquoted
+          // string).
+          // And standard converters might return unquoted strings in some versions or
+          // configurations.
+          defaultValue = "'" + defaultValue + "'";
+        }
+      }
+      sqlBuilder.append("DEFAULT ").append(defaultValue).append(SPACE);
     }
 
     // Add column auto_increment if specified
