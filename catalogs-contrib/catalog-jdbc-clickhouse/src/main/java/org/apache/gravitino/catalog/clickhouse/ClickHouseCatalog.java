@@ -29,6 +29,7 @@ import org.apache.gravitino.catalog.jdbc.converter.JdbcExceptionConverter;
 import org.apache.gravitino.catalog.jdbc.converter.JdbcTypeConverter;
 import org.apache.gravitino.catalog.jdbc.operation.JdbcDatabaseOperations;
 import org.apache.gravitino.catalog.jdbc.operation.JdbcTableOperations;
+import org.apache.gravitino.connector.PropertiesMetadata;
 import org.apache.gravitino.connector.capability.Capability;
 
 public class ClickHouseCatalog extends JdbcCatalog {
@@ -66,5 +67,15 @@ public class ClickHouseCatalog extends JdbcCatalog {
   @Override
   public Capability newCapability() {
     return new ClickHouseCatalogCapability();
+  }
+
+  @Override
+  public PropertiesMetadata catalogPropertiesMetadata() throws UnsupportedOperationException {
+    return new ClickHouseCatalogPropertiesMeta();
+  }
+
+  @Override
+  public PropertiesMetadata schemaPropertiesMetadata() throws UnsupportedOperationException {
+    return new ClickHouseSchemaPropertiesMetadata();
   }
 }
