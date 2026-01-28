@@ -38,9 +38,7 @@ public class OwnerMetaPostgreSQLProvider extends OwnerMetaBaseSQLProvider {
 
   @Override
   protected String softDeleteSQL(Optional<String> tableAlias) {
-    String prefix = tableAlias.map(alias -> alias + ".").orElse("");
-    return " SET "
-        + prefix
-        + "deleted_at = CAST(EXTRACT(EPOCH FROM CURRENT_TIMESTAMP) * 1000 AS BIGINT) ";
+    // PostgreSQL doesn't support alias prefix in SET clause
+    return " SET deleted_at = CAST(EXTRACT(EPOCH FROM CURRENT_TIMESTAMP) * 1000 AS BIGINT) ";
   }
 }
