@@ -110,7 +110,7 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
 
     loadedRoles =
         Caffeine.newBuilder()
-            .expireAfterWrite(cacheExpirationSecs, TimeUnit.SECONDS)
+            .expireAfterAccess(cacheExpirationSecs, TimeUnit.SECONDS)
             .maximumSize(roleCacheSize)
             .executor(Runnable::run)
             .removalListener(
@@ -123,7 +123,7 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
             .build();
     ownerRel =
         Caffeine.newBuilder()
-            .expireAfterWrite(cacheExpirationSecs, TimeUnit.SECONDS)
+            .expireAfterAccess(cacheExpirationSecs, TimeUnit.SECONDS)
             .maximumSize(ownerCacheSize)
             .build();
     executor =
