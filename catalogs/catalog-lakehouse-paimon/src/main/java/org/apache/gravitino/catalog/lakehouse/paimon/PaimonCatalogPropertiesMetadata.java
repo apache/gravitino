@@ -71,6 +71,7 @@ public class PaimonCatalogPropertiesMetadata extends BaseCatalogPropertiesMetada
           .put(GRAVITINO_JDBC_PASSWORD, PAIMON_JDBC_PASSWORD)
           .put(GRAVITINO_JDBC_DRIVER, GRAVITINO_JDBC_DRIVER)
           .put(PaimonConstants.GRAVITINO_TOKEN_PROVIDER, PaimonConstants.PAIMON_TOKEN_PROVIDER)
+          .put(PaimonConstants.TOKEN, PaimonConstants.TOKEN)
           .put(
               PaimonConstants.GRAVITINO_DLF_ACCESS_KEY_ID, PaimonConstants.PAIMON_DLF_ACCESS_KEY_ID)
           .put(
@@ -115,6 +116,14 @@ public class PaimonCatalogPropertiesMetadata extends BaseCatalogPropertiesMetada
               stringOptionalPropertyEntry(
                   PaimonConstants.GRAVITINO_TOKEN_PROVIDER,
                   "The token provider type for Paimon",
+                  false /* immutable */,
+                  null /* defaultValue */,
+                  false /* hidden */))
+          .put(
+              PaimonConstants.TOKEN,
+              stringOptionalPropertyEntry(
+                  PaimonConstants.TOKEN,
+                  "The bear token for REST catalog authentication",
                   false /* immutable */,
                   null /* defaultValue */,
                   false /* hidden */))

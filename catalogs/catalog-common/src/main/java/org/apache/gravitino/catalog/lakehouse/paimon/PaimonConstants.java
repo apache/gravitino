@@ -37,6 +37,7 @@ public class PaimonConstants {
 
   public static final String GRAVITINO_TOKEN_PROVIDER = "token-provider";
   public static final String PAIMON_TOKEN_PROVIDER = "token.provider";
+  public static final String TOKEN = "token";
 
   // S3 properties needed by Paimon
   public static final String S3_ENDPOINT = "s3.endpoint";
