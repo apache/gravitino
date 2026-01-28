@@ -29,7 +29,7 @@ import org.apache.gravitino.cli.CommandContext;
  */
 public class Column {
   /** The character used to indicate that a cell has been truncated. */
-  public static final char ELLIPSIS = '…';
+  public static final char ELLIPSIS = '\u2026';
 
   private final String header;
   private final HorizontalAlign headerAlign;
