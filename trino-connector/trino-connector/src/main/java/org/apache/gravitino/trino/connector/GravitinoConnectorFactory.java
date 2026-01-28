@@ -142,7 +142,7 @@ public class GravitinoConnectorFactory implements ConnectorFactory {
   }
 
   protected GravitinoConnector createConnector(CatalogConnectorContext connectorContext) {
-    return new GravitinoConnector(connectorContext);
+    throw new RuntimeException("Should be overridden in subclass");
   }
 
   protected GravitinoSystemConnector createSystemConnector(
@@ -156,30 +156,37 @@ public class GravitinoConnectorFactory implements ConnectorFactory {
 
   private void checkTrinoSpiVersion(ConnectorContext context, GravitinoConfig config) {
     String spiVersion = context.getSpiVersion();
-
     trinoVersion = Integer.parseInt(spiVersion);
-    if (trinoVersion < getMinSupportTrinoSpiVersion()
-        || trinoVersion > getMaxSupportTrinoSpiVersion()) {
-      Boolean skipTrinoVersionValidation = config.isSkipTrinoVersionValidation();
-      if (!skipTrinoVersionValidation) {
-        String errmsg =
-            String.format(
-                "Unsupported Trino-%s version. The Supported version for the Gravitino-Trino-connector from Trino-%d to Trino-%d."
-                    + "Maybe you can set gravitino.trino.skip-version-validation to skip version validation.",
-                trinoVersion, getMinSupportTrinoSpiVersion(), getMaxSupportTrinoSpiVersion());
-        throw new TrinoException(GravitinoErrorCode.GRAVITINO_UNSUPPORTED_TRINO_VERSION, errmsg);
-      } else {
-        LOG.warn(
-            "The version {} has not undergone thorough testing with Gravitino, there may be compatibility problem.",
-            trinoVersion);
-      }
-    }
 
+    // check catalog name with metalake are supported in this trino version
     if (!config.singleMetalakeMode() && !supportCatalogNameWithMetalake()) {
       String errmsg =
           String.format(
               "The trino-connector-%s-%s does not support catalog name with metalake.",
               getMinSupportTrinoSpiVersion(), getMaxSupportTrinoSpiVersion());
+      throw new TrinoException(GravitinoErrorCode.GRAVITINO_UNSUPPORTED_TRINO_VERSION, errmsg);
+    }
+
+    // skip version validation
+    boolean spiVersionCheck = config.isSkipTrinoVersionValidation();
+    if (spiVersionCheck) {
+      if (trinoVersion < getMinSupportTrinoSpiVersion()
+          || trinoVersion > getMaxSupportTrinoSpiVersion()) {
+        LOG.warn(
+            "The version {} has not undergone thorough testing with Gravitino, there may be compatibility problem.",
+            trinoVersion);
+      }
+      return;
+    }
+
+    // version validation
+    if (trinoVersion < getMinSupportTrinoSpiVersion()
+        || trinoVersion > getMaxSupportTrinoSpiVersion()) {
+      String errmsg =
+          String.format(
+              "Unsupported Trino-%s version. The Supported version for the Gravitino-Trino-connector from Trino-%d to Trino-%d."
+                  + "Maybe you can set gravitino.trino.skip-version-validation to skip version validation.",
+              trinoVersion, getMinSupportTrinoSpiVersion(), getMaxSupportTrinoSpiVersion());
       throw new TrinoException(GravitinoErrorCode.GRAVITINO_UNSUPPORTED_TRINO_VERSION, errmsg);
     }
   }

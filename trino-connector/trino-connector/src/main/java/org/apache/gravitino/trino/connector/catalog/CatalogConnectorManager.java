@@ -383,7 +383,7 @@ public class CatalogConnectorManager {
 
       GravitinoCatalog catalog = GravitinoCatalog.fromJson(catalogConfig);
       if (this.config.singleMetalakeMode()
-          && !StringUtils.isNotBlank(targetMetalake)
+          && StringUtils.isNotBlank(targetMetalake)
           && !targetMetalake.equals(catalog.getMetalake())) {
         throw new TrinoException(
             GravitinoErrorCode.GRAVITINO_UNSUPPORTED_OPERATION,
