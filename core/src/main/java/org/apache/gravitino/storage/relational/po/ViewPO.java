@@ -33,38 +33,6 @@ public class ViewPO {
   private Long lastVersion;
   private Long deletedAt;
 
-  public Long getViewId() {
-    return viewId;
-  }
-
-  public String getViewName() {
-    return viewName;
-  }
-
-  public Long getMetalakeId() {
-    return metalakeId;
-  }
-
-  public Long getCatalogId() {
-    return catalogId;
-  }
-
-  public Long getSchemaId() {
-    return schemaId;
-  }
-
-  public Long getCurrentVersion() {
-    return currentVersion;
-  }
-
-  public Long getLastVersion() {
-    return lastVersion;
-  }
-
-  public Long getDeletedAt() {
-    return deletedAt;
-  }
-
   @Override
   public boolean equals(Object o) {
     if (this == o) {
