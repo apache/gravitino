@@ -41,12 +41,14 @@ include(
   "catalogs:catalog-jdbc-postgresql",
   "catalogs:catalog-jdbc-starrocks"
 )
-include("catalogs-contrib:catalog-jdbc-oceanbase")
-include("catalogs-contrib:catalog-jdbc-clickhouse")
 
 include("catalogs:catalog-fileset")
 include("catalogs:catalog-kafka")
 include("catalogs:catalog-model")
+
+include("catalogs-contrib:catalog-jdbc-clickhouse")
+include("catalogs-contrib:catalog-jdbc-oceanbase")
+
 include(
   "clients:client-java",
   "clients:client-java-runtime",
