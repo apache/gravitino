@@ -18,11 +18,14 @@
  */
 package org.apache.gravitino.storage.relational.po;
 
-import com.google.common.base.Objects;
 import com.google.common.base.Preconditions;
+import lombok.EqualsAndHashCode;
 import lombok.Getter;
+import lombok.ToString;
 
 @Getter
+@EqualsAndHashCode
+@ToString
 public class ViewPO {
   private Long viewId;
   private String viewName;
@@ -33,37 +36,6 @@ public class ViewPO {
   private Long lastVersion;
   private Long deletedAt;
 
-  @Override
-  public boolean equals(Object o) {
-    if (this == o) {
-      return true;
-    }
-    if (!(o instanceof ViewPO)) {
-      return false;
-    }
-    ViewPO viewPO = (ViewPO) o;
-    return Objects.equal(getViewId(), viewPO.getViewId())
-        && Objects.equal(getViewName(), viewPO.getViewName())
-        && Objects.equal(getMetalakeId(), viewPO.getMetalakeId())
-        && Objects.equal(getCatalogId(), viewPO.getCatalogId())
-        && Objects.equal(getSchemaId(), viewPO.getSchemaId())
-        && Objects.equal(getCurrentVersion(), viewPO.getCurrentVersion())
-        && Objects.equal(getLastVersion(), viewPO.getLastVersion())
-        && Objects.equal(getDeletedAt(), viewPO.getDeletedAt());
-  }
-
-  @Override
-  public int hashCode() {
-    return Objects.hashCode(
-        getViewId(),
-        getViewName(),
-        getMetalakeId(),
-        getCatalogId(),
-        getSchemaId(),
-        getCurrentVersion(),
-        getLastVersion(),
-        getDeletedAt());
-  }
 
   public static class Builder {
     private final ViewPO viewPO;
