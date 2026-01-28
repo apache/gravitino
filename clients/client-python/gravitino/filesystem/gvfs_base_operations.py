@@ -677,7 +677,7 @@ class BaseGVFSOperations(ABC):
         # This allows multiple filesets pointing to the same storage to share
         # the same filesystem instance
         cache_key = FileSystemCacheKey(
-            scheme, authority, credentials, fileset_props, self._options or {}, kwargs
+            scheme, authority, credentials, fileset_props, self._options, kwargs
         )
 
         # Try to get from cache with read lock
