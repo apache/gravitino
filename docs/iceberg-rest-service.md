@@ -695,6 +695,58 @@ table = catalog.load_table(table_identifier)
 print(table.scan().to_arrow())
 ```
 
+### Exploring Apache Iceberg with Ray
+
+[Ray](https://www.ray.io/) is a unified framework for scaling AI and Python applications. Ray Data provides native support for reading and writing Iceberg tables through the REST catalog.
+
+:::note
+Ray Data only supports reading from and writing to existing Iceberg tables. It does not support DDL operations such as creating, dropping, or altering tables, schemas, or catalogs. You need to use other tools like Spark or PyIceberg to manage table metadata.
+:::
+
+#### Writing to Iceberg tables with Ray
+
+```python
+import ray
+import pandas as pd
+
+docs = [{"id": i, "data": f"Doc {i}"} for i in range(4)]
+ds = ray.data.from_pandas(pd.DataFrame(docs))
+ds.write_iceberg(
+    table_identifier="default.sample",
+    catalog_kwargs={
+        "name": "default",
+        "type": "rest",
+        "uri": "http://localhost:9001/iceberg/",
+        "header.X-Iceberg-Access-Delegation": "vended-credentials",
+        "auth": {
+            "type": "basic",
+            "basic": {"username": "manager", "password": "mock"}
+        }
+    }
+)
+```
+
+#### Reading Iceberg tables with Ray
+
+```python
+import ray
+
+ds = ray.data.read_iceberg(
+    table_identifier="default.sample",
+    catalog_kwargs={
+        "name": "default",
+        "type": "rest",
+        "uri": "http://localhost:9001/iceberg/",
+        "header.X-Iceberg-Access-Delegation": "vended-credentials",
+        "auth": {
+            "type": "basic",
+            "basic": {"username": "manager", "password": "mock"}
+        }
+    }
+)
+ds.show(limit=1)
+```
+
 ## Docker instructions
 
 You could run Gravitino Iceberg REST server through docker container:
