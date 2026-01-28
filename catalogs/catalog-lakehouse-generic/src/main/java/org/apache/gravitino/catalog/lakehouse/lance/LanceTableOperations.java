@@ -171,7 +171,20 @@ public class LanceTableOperations extends ManagedTableOperations {
     // Gravitino. If there's any failure during this process, the code will throw an exception
     // and the update won't be applied in Gravitino.
     GenericTable table = (GenericTable) super.alterTable(ident, changes);
-    return table.setProperties(LanceConstants.LANCE_TABLE_VERSION, String.valueOf(version));
+    Map<String, String> updatedProperties = new java.util.HashMap<>(table.properties());
+    updatedProperties.put(LanceConstants.LANCE_TABLE_VERSION, String.valueOf(version));
+
+    return GenericTable.builder()
+        .withName(table.name())
+        .withColumns(table.columns())
+        .withComment(table.comment())
+        .withProperties(updatedProperties)
+        .withAuditInfo(table.auditInfo())
+        .withPartitioning(table.partitioning())
+        .withSortOrders(table.sortOrder())
+        .withDistribution(table.distribution())
+        .withIndexes(table.index())
+        .build();
   }
 
   @Override

@@ -68,20 +68,4 @@ public class GenericTable extends BaseTable {
       return table;
     }
   }
-
-  // Copy the current table and set new properties
-  public GenericTable setProperties(String key, String value) {
-    GenericTable table = new GenericTable();
-    table.columns = this.columns;
-    table.comment = this.comment;
-    table.properties = this.properties;
-    table.auditInfo = this.auditInfo;
-    table.distribution = this.distribution;
-    table.indexes = this.indexes;
-    table.name = this.name;
-    table.partitioning = this.partitioning;
-    table.sortOrders = this.sortOrders;
-    table.properties.put(key, value);
-    return table;
-  }
 }
