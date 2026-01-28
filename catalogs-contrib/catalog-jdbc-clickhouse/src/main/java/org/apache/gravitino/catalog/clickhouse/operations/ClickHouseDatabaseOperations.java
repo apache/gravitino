@@ -18,6 +18,8 @@
  */
 package org.apache.gravitino.catalog.clickhouse.operations;
 
+import static org.apache.gravitino.catalog.clickhouse.ClickHouseConfig.DEFAULT_CK_ON_CLUSTER;
+
 import com.google.common.collect.ImmutableSet;
 import java.sql.Connection;
 import java.sql.ResultSet;
@@ -49,8 +51,15 @@ public class ClickHouseDatabaseOperations extends JdbcDatabaseOperations {
       clusterName = cn;
     }
 
-    final String oc = conf.getOrDefault(ClickHouseConfig.CK_ON_CLUSTER.getKey(), "false");
+    final String oc =
+        conf.getOrDefault(
+            ClickHouseConfig.CK_ON_CLUSTER.getKey(), String.valueOf(DEFAULT_CK_ON_CLUSTER));
     onCluster = Boolean.parseBoolean(oc);
+
+    if (onCluster && StringUtils.isBlank(clusterName)) {
+      throw new IllegalArgumentException(
+          "ClickHouse 'ON CLUSTER' is enabled, but cluster name is not provided.");
+    }
   }
 
   @Override

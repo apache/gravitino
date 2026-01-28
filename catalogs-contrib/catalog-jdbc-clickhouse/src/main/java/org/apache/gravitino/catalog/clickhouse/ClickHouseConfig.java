@@ -29,6 +29,8 @@ import org.apache.gravitino.config.ConfigEntry;
 
 public class ClickHouseConfig {
 
+  public static final boolean DEFAULT_CK_ON_CLUSTER = false;
+
   // Constants part
   public static final ConfigEntry<String> CK_CLUSTER_NAME =
       new ConfigBuilder(CLUSTER_NAME)
@@ -42,7 +44,7 @@ public class ClickHouseConfig {
           .doc("Whether to use 'ON CLUSTER' clause when creating tables in ClickHouse")
           .version(ConfigConstants.VERSION_1_2_0)
           .booleanConf()
-          .createWithDefault(false);
+          .createWithDefault(DEFAULT_CK_ON_CLUSTER);
 
   public static final ConfigEntry<String> CK_CLUSTER_SHARDING_KEY =
       new ConfigBuilder(CLUSTER_SHARDING_KEY)
