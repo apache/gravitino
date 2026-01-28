@@ -23,6 +23,7 @@ import static org.apache.gravitino.Configs.ENTITY_RELATIONAL_STORE;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.ImmutableMap;
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 import java.util.function.Function;
@@ -155,12 +156,23 @@ public class RelationalEntityStore implements EntityStore, SupportsRelationOpera
 
   @Override
   public <E extends Entity & HasIdentifier> List<E> batchGet(
-      List<NameIdentifier> ident, Entity.EntityType entityType, Class<E> clazz) {
-    List<E> entities = backend.batchGet(ident, entityType);
-    for (E entity : entities) {
+      List<NameIdentifier> idents, Entity.EntityType entityType, Class<E> clazz) {
+    List<E> allEntities = new ArrayList<>();
+    List<NameIdentifier> noCacheIdents =
+        idents.stream()
+            .filter(
+                ident -> {
+                  Optional<E> entity = cache.getIfPresent(ident, entityType);
+                  entity.ifPresent(allEntities::add);
+                  return entity.isEmpty();
+                })
+            .toList();
+    List<E> fetchEntities = backend.batchGet(noCacheIdents, entityType);
+    for (E entity : fetchEntities) {
       cache.put(entity);
+      allEntities.add(entity);
     }
-    return entities;
+    return allEntities;
   }
 
   @Override
