@@ -141,7 +141,7 @@ public class ModelAuthorizationIT extends BaseRestApiAuthorizationIT {
         () -> {
           normalUserCatalog.registerModel(NameIdentifier.of(SCHEMA, "model3"), "", new HashMap<>());
         });
-    
+
     // Test Case 3: Grant using LEGACY privilege name (CREATE_MODEL)
     // This should work, proving backward compatibility is maintained
     gravitinoMetalake.grantPrivilegesToRole(
@@ -262,7 +262,7 @@ public class ModelAuthorizationIT extends BaseRestApiAuthorizationIT {
               null);
         });
     GravitinoMetalake gravitinoMetalake = client.loadMetalake(METALAKE);
-    
+
     // Test Case 1: Grant using NEW privilege name (LINK_MODEL_VERSION)
     // This should allow the user to link model versions
     gravitinoMetalake.grantPrivilegesToRole(
@@ -299,7 +299,7 @@ public class ModelAuthorizationIT extends BaseRestApiAuthorizationIT {
         ImmutableSet.of(Privileges.CreateModelVersion.allow()));
     modelCatalog.linkModelVersion(
         NameIdentifier.of(SCHEMA, "model1"), "uri1", new String[] {"alias1"}, "comment2", null);
-    
+
     // Test Case 4: Revoke using NEW privilege name (LINK_MODEL_VERSION)
     // This should successfully revoke the permission that was granted using the legacy name,
     // further proving bidirectional equivalence between old and new privilege names
