@@ -69,7 +69,25 @@ If you are using multiple JDBC catalog backends, setting `jdbc-initialize` to tr
 
 #### REST catalog backend
 
-For the REST catalog backend, `warehouse` identifies the catalog in the Iceberg REST spec. In the Gravitino Iceberg REST server, `warehouse` maps to the catalog name. The default value is empty, which corresponds to the default catalog.
+For the REST catalog backend, `warehouse` identifies the catalog in the Iceberg REST spec. In the Gravitino Iceberg REST server, `warehouse` maps to the catalog name. An empty value means the default catalog.
+
+Example: create an Iceberg catalog with the REST backend. This targets the default catalog and uses a REST path like `http://127.0.0.1:9001/iceberg/v1/namespaces/db/tables/table`.
+
+```shell
+curl -X POST -H "Content-Type: application/json" \
+-d '{
+  "name": "iceberg_rest",
+  "type": "RELATIONAL",
+  "comment": "Iceberg REST catalog",
+  "provider": "lakehouse-iceberg",
+  "properties": {
+    "catalog-backend": "rest",
+    "uri": "http://localhost:9001/iceberg"
+  }
+}' http://localhost:8090/api/metalakes/metalake/catalogs
+```
+
+To access a non-default catalog, set `warehouse` to the catalog name. This uses a REST path like `http://127.0.0.1:9001/iceberg/v1/catalog/namespaces/db/tables/table`. See [Multi catalog](./iceberg-rest-service.md#multiple-catalog-backend-support) for details.
 
 #### S3
 
