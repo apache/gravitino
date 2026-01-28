@@ -41,7 +41,7 @@ public class ClickHouseCatalogCapability implements Capability {
 
   @Override
   public CapabilityResult specificationOnName(Scope scope, String name) {
-    // TODO: Validate the name against reserved words
+    // TODO(yuqi): Validate the name against reserved words
     if (!name.matches(CLICKHOUSE_NAME_PATTERN)) {
       return CapabilityResult.unsupported(
           String.format("The %s name '%s' is illegal.", scope, name));

@@ -32,6 +32,10 @@ public class TestClickHouseDatabaseOperations {
     String buildCreateSql(String databaseName, String comment, Map<String, String> properties) {
       return generateCreateDatabaseSql(databaseName, comment, properties);
     }
+
+    String buildDropSql(String databaseName, boolean cascade) {
+      return generateDropDatabaseSql(databaseName, cascade);
+    }
   }
 
   private TestableClickHouseDatabaseOperations newOps(Map<String, String> conf) {
@@ -48,17 +52,6 @@ public class TestClickHouseDatabaseOperations {
   }
 
   @Test
-  void testGenerateCreateDatabaseSqlWithCluster() {
-    Map<String, String> conf = new HashMap<>();
-    conf.put(ClickHouseConfig.CK_CLUSTER_NAME.getKey(), "ck_cluster");
-    conf.put(ClickHouseConfig.CK_ON_CLUSTER.getKey(), "true");
-
-    String sql = newOps(conf).buildCreateSql("db_name", "comment", Collections.emptyMap());
-    Assertions.assertEquals(
-        "CREATE DATABASE `db_name` ON CLUSTER ck_cluster COMMENT 'comment'", sql);
-  }
-
-  @Test
   void testGenerateCreateDatabaseSqlWithClusterNameButDisabled() {
     Map<String, String> conf = new HashMap<>();
     conf.put(ClickHouseConfig.CK_CLUSTER_NAME.getKey(), "ck_cluster");
@@ -68,14 +61,9 @@ public class TestClickHouseDatabaseOperations {
   }
 
   @Test
-  void testInitializeWithoutClusterName() {
+  void testGenerateDropDatabaseSqlWithoutCluster() {
     Map<String, String> conf = new HashMap<>();
-    conf.put(ClickHouseConfig.CK_ON_CLUSTER.getKey(), "true");
-
-    IllegalArgumentException exception =
-        Assertions.assertThrows(IllegalArgumentException.class, () -> newOps(conf));
-    Assertions.assertEquals(
-        "ClickHouse 'ON CLUSTER' is enabled, but cluster name is not provided.",
-        exception.getMessage());
+    String sql = newOps(conf).buildDropSql("db_name", true);
+    Assertions.assertEquals("DROP DATABASE `db_name`", sql);
   }
 }

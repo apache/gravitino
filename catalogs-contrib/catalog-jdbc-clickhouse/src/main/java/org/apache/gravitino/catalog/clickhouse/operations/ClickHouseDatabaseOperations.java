@@ -38,7 +38,12 @@ import org.apache.gravitino.catalog.jdbc.operation.JdbcDatabaseOperations;
 
 public class ClickHouseDatabaseOperations extends JdbcDatabaseOperations {
 
+  // TODO: handle ClickHouse cluster properly when creating/dropping databases/tables
+  //  use https://github.com/apache/gravitino/issues/9820 to track it.
+  @SuppressWarnings("unused")
   private boolean onCluster = false;
+
+  @SuppressWarnings("unused")
   private String clusterName = null;
 
   @Override
@@ -107,9 +112,6 @@ public class ClickHouseDatabaseOperations extends JdbcDatabaseOperations {
 
     StringBuilder createDatabaseSql =
         new StringBuilder(String.format("CREATE DATABASE `%s`", databaseName));
-    if (onCluster && StringUtils.isNotBlank(clusterName)) {
-      createDatabaseSql.append(String.format(" ON CLUSTER %s", clusterName));
-    }
 
     if (StringUtils.isNotEmpty(comment)) {
       createDatabaseSql.append(String.format(" COMMENT '%s'", originComment));
