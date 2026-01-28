@@ -25,16 +25,21 @@ import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Lists;
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 import java.security.PrivilegedAction;
 import java.util.Arrays;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.stream.Collectors;
 import org.apache.flink.configuration.Configuration;
 import org.apache.flink.table.api.DataTypes;
+import org.apache.flink.table.api.EnvironmentSettings;
 import org.apache.flink.table.api.ResultKind;
+import org.apache.flink.table.api.TableEnvironment;
 import org.apache.flink.table.api.TableResult;
 import org.apache.flink.table.api.ValidationException;
+import org.apache.flink.table.api.internal.TableEnvironmentImpl;
 import org.apache.flink.table.catalog.Catalog;
 import org.apache.flink.table.catalog.CatalogBaseTable;
 import org.apache.flink.table.catalog.CatalogDescriptor;
@@ -44,10 +49,12 @@ import org.apache.flink.table.catalog.DefaultCatalogTable;
 import org.apache.flink.table.catalog.ObjectPath;
 import org.apache.flink.table.catalog.exceptions.TableNotExistException;
 import org.apache.flink.table.catalog.hive.factories.HiveCatalogFactoryOptions;
+import org.apache.flink.table.catalog.hive.util.Constants;
 import org.apache.flink.types.Row;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.catalog.hive.HiveConstants;
-import org.apache.gravitino.flink.connector.PropertiesConverter;
+import org.apache.gravitino.catalog.hive.HiveStorageConstants;
+import org.apache.gravitino.flink.connector.CatalogPropertiesConverter;
 import org.apache.gravitino.flink.connector.hive.GravitinoHiveCatalog;
 import org.apache.gravitino.flink.connector.hive.GravitinoHiveCatalogFactoryOptions;
 import org.apache.gravitino.flink.connector.integration.test.FlinkCommonIT;
@@ -59,6 +66,9 @@ import org.apache.gravitino.rel.expressions.transforms.Transforms;
 import org.apache.gravitino.rel.types.Types;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hive.conf.HiveConf;
+import org.apache.hadoop.hive.ql.io.RCFileStorageFormatDescriptor;
+import org.apache.hadoop.hive.ql.io.StorageFormatDescriptor;
+import org.apache.hadoop.hive.ql.io.StorageFormatFactory;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.Assertions;
@@ -72,6 +82,7 @@ public class FlinkHiveCatalogIT extends FlinkCommonIT {
   private static final String FLINK_USER_NAME = "gravitino";
 
   private static org.apache.gravitino.Catalog hiveCatalog;
+  private static String hiveConfDir;
 
   @Override
   protected boolean supportsPrimaryKey() {
@@ -80,6 +91,7 @@ public class FlinkHiveCatalogIT extends FlinkCommonIT {
 
   @BeforeAll
   void hiveStartUp() {
+    initHiveConfDir();
     initDefaultHiveCatalog();
   }
 
@@ -98,6 +110,45 @@ public class FlinkHiveCatalogIT extends FlinkCommonIT {
             getProvider(),
             null,
             ImmutableMap.of("metastore.uris", hiveMetastoreUri));
+  }
+
+  private void initHiveConfDir() {
+    if (hiveConfDir != null) {
+      return;
+    }
+    try {
+      java.nio.file.Path dir = java.nio.file.Files.createTempDirectory("flink-hive-conf");
+      java.nio.file.Path hiveSite = dir.resolve("hive-site.xml");
+      String hiveSiteXml =
+          "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n"
+              + "<?xml-stylesheet type=\"text/xsl\" href=\"configuration.xsl\"?>\n"
+              + "<configuration>\n"
+              + "  <property>\n"
+              + "    <name>hive.metastore.sasl.enabled</name>\n"
+              + "    <value>false</value>\n"
+              + "  </property>\n"
+              + "  <property>\n"
+              + "    <name>hive.metastore.uris</name>\n"
+              + "    <value>"
+              + hiveMetastoreUri
+              + "</value>\n"
+              + "  </property>\n"
+              + "  <property>\n"
+              + "    <name>hadoop.security.authentication</name>\n"
+              + "    <value>simple</value>\n"
+              + "  </property>\n"
+              + "  <property>\n"
+              + "    <name>hive.metastore.warehouse.dir</name>\n"
+              + "    <value>"
+              + warehouse
+              + "</value>\n"
+              + "  </property>\n"
+              + "</configuration>\n";
+      java.nio.file.Files.write(hiveSite, hiveSiteXml.getBytes(StandardCharsets.UTF_8));
+      hiveConfDir = dir.toAbsolutePath().toString();
+    } catch (IOException e) {
+      throw new RuntimeException("Failed to prepare hive conf dir for ITs", e);
+    }
   }
 
   @Test
@@ -126,7 +177,7 @@ public class FlinkHiveCatalogIT extends FlinkCommonIT {
     Assertions.assertEquals(hiveMetastoreUri, properties.get(HiveConstants.METASTORE_URIS));
     Map<String, String> flinkProperties =
         gravitinoCatalog.properties().entrySet().stream()
-            .filter(e -> e.getKey().startsWith(PropertiesConverter.FLINK_PROPERTY_PREFIX))
+            .filter(e -> e.getKey().startsWith(CatalogPropertiesConverter.FLINK_PROPERTY_PREFIX))
             .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
     Assertions.assertEquals(2, flinkProperties.size());
     Assertions.assertEquals(
@@ -192,7 +243,7 @@ public class FlinkHiveCatalogIT extends FlinkCommonIT {
     Assertions.assertEquals(hiveMetastoreUri, properties.get(HiveConstants.METASTORE_URIS));
     Map<String, String> flinkProperties =
         properties.entrySet().stream()
-            .filter(e -> e.getKey().startsWith(PropertiesConverter.FLINK_PROPERTY_PREFIX))
+            .filter(e -> e.getKey().startsWith(CatalogPropertiesConverter.FLINK_PROPERTY_PREFIX))
             .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
     Assertions.assertEquals(3, flinkProperties.size());
     Assertions.assertEquals(
@@ -471,6 +522,144 @@ public class FlinkHiveCatalogIT extends FlinkCommonIT {
           Assertions.assertArrayEquals(EMPTY_TRANSFORM, table.partitioning());
         },
         true);
+  }
+
+  @Test
+  public void testRowFormatSerdeOverridesDefaultFormat() {
+    String databaseName = "test_hive_row_format_precedence_db";
+    String tableName = "test_row_format_overrides_default";
+    String customSerde = HiveStorageConstants.OPENCSV_SERDE_CLASS;
+
+    doWithSchema(
+        currentCatalog(),
+        databaseName,
+        catalog -> {
+          TestUtils.assertTableResult(
+              sql(
+                  "CREATE TABLE %s (id STRING) WITH ('%s'='%s')",
+                  tableName, Constants.SERDE_LIB_CLASS_NAME, customSerde),
+              ResultKind.SUCCESS);
+          TestUtils.assertTableResult(
+              sql("INSERT INTO %s VALUES ('1')", tableName),
+              ResultKind.SUCCESS_WITH_CONTENT,
+              Row.of(-1L));
+          Table tableWithRowFormat =
+              catalog.asTableCatalog().loadTable(NameIdentifier.of(databaseName, tableName));
+          Assertions.assertEquals(
+              HiveStorageConstants.TEXT_INPUT_FORMAT_CLASS,
+              tableWithRowFormat.properties().get(HiveConstants.INPUT_FORMAT));
+          Assertions.assertEquals(
+              "org.apache.hadoop.hive.ql.io.IgnoreKeyTextOutputFormat",
+              tableWithRowFormat.properties().get(HiveConstants.OUTPUT_FORMAT));
+          Assertions.assertEquals(
+              customSerde, tableWithRowFormat.properties().get(HiveConstants.SERDE_LIB));
+          assertHiveCatalogRead(databaseName, tableName, Row.of("1"));
+        },
+        true);
+  }
+
+  @Test
+  public void testStoredAsOverridesRowFormatSerde() {
+    String databaseName = "test_hive_stored_as_precedence_db";
+    String tableName = "test_stored_as_overrides_row_format";
+    String customSerde = HiveStorageConstants.OPENCSV_SERDE_CLASS;
+
+    doWithSchema(
+        currentCatalog(),
+        databaseName,
+        catalog -> {
+          TestUtils.assertTableResult(
+              sql(
+                  "CREATE TABLE %s (id INT) WITH ('%s'='%s', '%s'='%s')",
+                  tableName,
+                  Constants.SERDE_LIB_CLASS_NAME,
+                  customSerde,
+                  Constants.STORED_AS_FILE_FORMAT,
+                  "ORC"),
+              ResultKind.SUCCESS);
+          TestUtils.assertTableResult(
+              sql("INSERT INTO %s VALUES (1)", tableName),
+              ResultKind.SUCCESS_WITH_CONTENT,
+              Row.of(-1L));
+          Table tableWithStoredAs =
+              catalog.asTableCatalog().loadTable(NameIdentifier.of(databaseName, tableName));
+          Assertions.assertEquals(
+              HiveStorageConstants.ORC_SERDE_CLASS,
+              tableWithStoredAs.properties().get(HiveConstants.SERDE_LIB));
+          Assertions.assertEquals(
+              HiveStorageConstants.ORC_INPUT_FORMAT_CLASS,
+              tableWithStoredAs.properties().get(HiveConstants.INPUT_FORMAT));
+          Assertions.assertEquals(
+              HiveStorageConstants.ORC_OUTPUT_FORMAT_CLASS,
+              tableWithStoredAs.properties().get(HiveConstants.OUTPUT_FORMAT));
+          assertHiveCatalogRead(databaseName, tableName, Row.of(1));
+        },
+        true);
+  }
+
+  @Test
+  public void testDefaultFormatAndSerdeApplied() {
+    String databaseName = "test_hive_default_format_db";
+    String tableName = "test_default_format_and_serde";
+
+    doWithSchema(
+        currentCatalog(),
+        databaseName,
+        catalog -> {
+          Optional<Catalog> flinkCatalog = tableEnv.getCatalog(catalog.name());
+          Assertions.assertTrue(flinkCatalog.isPresent());
+          HiveConf hiveConf = ((GravitinoHiveCatalog) flinkCatalog.get()).getHiveConf();
+          TestUtils.assertTableResult(
+              sql("CREATE TABLE %s (id INT)", tableName), ResultKind.SUCCESS);
+          TestUtils.assertTableResult(
+              sql("INSERT INTO %s VALUES (1)", tableName),
+              ResultKind.SUCCESS_WITH_CONTENT,
+              Row.of(-1L));
+          Table tableWithDefaults =
+              catalog.asTableCatalog().loadTable(NameIdentifier.of(databaseName, tableName));
+          StorageFormatFactory storageFormatFactory = new StorageFormatFactory();
+          String defaultFormat = hiveConf.getVar(HiveConf.ConfVars.HIVEDEFAULTFILEFORMAT);
+          StorageFormatDescriptor descriptor = storageFormatFactory.get(defaultFormat);
+          Assertions.assertNotNull(descriptor);
+          Assertions.assertEquals(
+              descriptor.getInputFormat(),
+              tableWithDefaults.properties().get(HiveConstants.INPUT_FORMAT));
+          Assertions.assertEquals(
+              descriptor.getOutputFormat(),
+              tableWithDefaults.properties().get(HiveConstants.OUTPUT_FORMAT));
+          String expectedSerde = descriptor.getSerde();
+          if (expectedSerde == null && descriptor instanceof RCFileStorageFormatDescriptor) {
+            expectedSerde = hiveConf.getVar(HiveConf.ConfVars.HIVEDEFAULTRCFILESERDE);
+          }
+          if (expectedSerde == null) {
+            expectedSerde = hiveConf.getVar(HiveConf.ConfVars.HIVEDEFAULTSERDE);
+          }
+          Assertions.assertEquals(
+              expectedSerde, tableWithDefaults.properties().get(HiveConstants.SERDE_LIB));
+          assertHiveCatalogRead(databaseName, tableName, Row.of(1));
+        },
+        true);
+  }
+
+  private void assertHiveCatalogRead(String databaseName, String tableName, Row expectedRow) {
+    EnvironmentSettings settings = EnvironmentSettings.newInstance().inBatchMode().build();
+    TableEnvironment hiveEnv = TableEnvironment.create(settings);
+    try {
+      TestUtils.assertTableResult(
+          hiveEnv.executeSql(
+              String.format(
+                  "CREATE CATALOG hive_it WITH ('type'='hive', 'hive-conf-dir'='%s')",
+                  hiveConfDir)),
+          ResultKind.SUCCESS);
+      TestUtils.assertTableResult(hiveEnv.executeSql("USE CATALOG hive_it"), ResultKind.SUCCESS);
+      TestUtils.assertTableResult(hiveEnv.executeSql("USE " + databaseName), ResultKind.SUCCESS);
+      TableResult result = hiveEnv.executeSql("SELECT * FROM " + tableName);
+      List<Row> rows = Lists.newArrayList(result.collect());
+      Assertions.assertEquals(1, rows.size());
+      Assertions.assertEquals(expectedRow, rows.get(0));
+    } finally {
+      ((TableEnvironmentImpl) hiveEnv).getCatalogManager().close();
+    }
   }
 
   @Test

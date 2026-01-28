@@ -22,6 +22,7 @@ import static org.apache.gravitino.lance.common.utils.LanceConstants.LANCE_CREAT
 import static org.apache.gravitino.lance.common.utils.LanceConstants.LANCE_TABLE_REGISTER;
 
 import com.google.common.base.Preconditions;
+import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Lists;
 import com.lancedb.lance.Dataset;
 import com.lancedb.lance.WriteParams;
@@ -246,6 +247,8 @@ public class LanceTableOperations extends ManagedTableOperations {
       throws NoSuchSchemaException, TableAlreadyExistsException {
 
     if (register) {
+      // Currently, register operation does not read the schema from the underlying Lance dataset.
+      // So we can't get the version of the dataset here.
       return super.createTable(
           ident, columns, comment, properties, partitions, distribution, sortOrders, indexes);
     }
@@ -271,8 +274,21 @@ public class LanceTableOperations extends ManagedTableOperations {
             new WriteParams.Builder().withStorageOptions(storageProps).build())) {
       // Only create the table metadata in Gravitino after the Lance dataset is successfully
       // created.
+      long datasetVersion = ignored.version();
+      Map<String, String> updatedProperties =
+          ImmutableMap.<String, String>builder()
+              .putAll(properties)
+              .put(LanceConstants.LANCE_TABLE_VERSION, String.valueOf(datasetVersion))
+              .build();
       return super.createTable(
-          ident, columns, comment, properties, partitions, distribution, sortOrders, indexes);
+          ident,
+          columns,
+          comment,
+          updatedProperties,
+          partitions,
+          distribution,
+          sortOrders,
+          indexes);
     } catch (NoSuchSchemaException e) {
       throw e;
     } catch (TableAlreadyExistsException e) {

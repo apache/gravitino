@@ -508,12 +508,14 @@ public class LanceRESTServiceIT extends BaseIT {
     Assertions.assertEquals("v1", response.getProperties().get("key1"));
     Assertions.assertEquals("value_a", response.getStorageOptions().get("a"));
     Assertions.assertEquals("value_b", response.getStorageOptions().get("b"));
+    Assertions.assertNotNull(response.getVersion());
 
     DescribeTableRequest describeTableRequest = new DescribeTableRequest();
     describeTableRequest.setId(ids);
     DescribeTableResponse loadTable = ns.describeTable(describeTableRequest);
     Assertions.assertNotNull(loadTable);
     Assertions.assertEquals(location, loadTable.getLocation());
+    Assertions.assertNotNull(loadTable.getVersion());
 
     List<JsonArrowField> jsonArrowFields = loadTable.getSchema().getFields();
     for (int i = 0; i < jsonArrowFields.size(); i++) {

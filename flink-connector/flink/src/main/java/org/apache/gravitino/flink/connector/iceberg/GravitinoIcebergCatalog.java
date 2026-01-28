@@ -23,7 +23,7 @@ import java.util.Optional;
 import org.apache.flink.table.catalog.AbstractCatalog;
 import org.apache.flink.table.factories.Factory;
 import org.apache.gravitino.flink.connector.PartitionConverter;
-import org.apache.gravitino.flink.connector.PropertiesConverter;
+import org.apache.gravitino.flink.connector.SchemaAndTablePropertiesConverter;
 import org.apache.gravitino.flink.connector.catalog.BaseCatalog;
 import org.apache.iceberg.flink.FlinkCatalog;
 import org.apache.iceberg.flink.FlinkCatalogFactory;
@@ -36,14 +36,14 @@ public class GravitinoIcebergCatalog extends BaseCatalog {
   protected GravitinoIcebergCatalog(
       String catalogName,
       String defaultDatabase,
-      PropertiesConverter propertiesConverter,
+      SchemaAndTablePropertiesConverter schemaAndTablePropertiesConverter,
       PartitionConverter partitionConverter,
       Map<String, String> flinkCatalogProperties) {
     super(
         catalogName,
         flinkCatalogProperties,
         defaultDatabase,
-        propertiesConverter,
+        schemaAndTablePropertiesConverter,
         partitionConverter);
     FlinkCatalogFactory flinkCatalogFactory = new FlinkCatalogFactory();
     this.icebergCatalog =
