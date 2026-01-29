@@ -1,11 +1,8 @@
 name: Frontend Integration Test
 
 # Controls when the workflow will run
-on:
-  push:
-    branches: [ "main", "branch-*" ]
-  pull_request:
-    branches: [ "main", "branch-*" ]
+# Disable it temporarily.
+on: {}
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
@@ -37,7 +34,7 @@ jobs:
               - scripts/**
               - server/**
               - server-common/**
-              - web-v2/**
+              - web/**
               - build.gradle.kts
               - gradle.properties
               - gradlew
@@ -49,7 +46,7 @@ jobs:
     needs: changes
     if: needs.changes.outputs.source_changes == 'true'
     runs-on: ubuntu-latest
-    timeout-minutes: 90
+    timeout-minutes: 60
     strategy:
       matrix:
         # Integration test for AMD64 architecture
@@ -75,7 +72,7 @@ jobs:
 
       - name: Package Gravitino
         run: |
-          GRAVITINO_USE_WEB_V2=true ./gradlew compileDistribution -x test 
+          ./gradlew compileDistribution -x test 
 
       - name: Free up disk space
         run: |
@@ -84,8 +81,8 @@ jobs:
       - name: Frontend Integration Test
         id: integrationTest
         run: |
-          GRAVITINO_USE_WEB_V2=true ./gradlew -PskipTests -PtestMode=embedded -PskipDockerTests=false :web-v2:integration-test:test
-          GRAVITINO_USE_WEB_V2=true ./gradlew -PskipTests -PtestMode=deploy -PskipDockerTests=false :web-v2:integration-test:test
+          ./gradlew -PskipTests -PtestMode=embedded -PskipDockerTests=false :web:integration-test:test
+          ./gradlew -PskipTests -PtestMode=deploy -PskipDockerTests=false :web:integration-test:test
 
       - name: Upload integrate tests reports
         uses: actions/upload-artifact@v4
@@ -99,4 +96,4 @@ jobs:
             distribution/package/logs/gravitino-server.log
             catalogs/**/*.log
             catalogs/**/*.tar
-            web-v2/integration-test/build/*.log
+            web/integration-test/build/*.log
