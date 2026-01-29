@@ -99,18 +99,70 @@ public abstract class JdbcTableOperations implements TableOperation {
 
   protected String calculateDefaultValue(JdbcColumn column, Expression defaultValueExpression) {
     String defaultValue = columnDefaultValueConverter.fromGravitino(defaultValueExpression);
-    if ((column.dataType() instanceof org.apache.gravitino.rel.types.Types.VarCharType
-        || column.dataType() instanceof org.apache.gravitino.rel.types.Types.StringType
-        || column.dataType() instanceof org.apache.gravitino.rel.types.Types.FixedCharType)) {
-      if (StringUtils.isEmpty(defaultValue)) {
-        defaultValue = "''";
-      } else if (!defaultValue.startsWith("'") || !defaultValue.endsWith("'")) {
-        defaultValue = "'" + defaultValue + "'";
-      }
+
+    // Special handling for SQL NULL: do not quote it, even for string-like columns.
+    String trimmedDefault =
+        defaultValue == null ? null : defaultValue.trim();
+    if (defaultValueExpression == Literals.NULL
+        || (trimmedDefault != null && "NULL".equalsIgnoreCase(trimmedDefault))) {
+      return "NULL";
     }
+
+    if (column.dataType() instanceof org.apache.gravitino.rel.types.Types.VarCharType
+        || column.dataType() instanceof org.apache.gravitino.rel.types.Types.StringType
+        || column.dataType() instanceof org.apache.gravitino.rel.types.Types.FixedCharType) {
+      if (StringUtils.isEmpty(defaultValue)) {
+        // Represent empty string default as two single quotes.
+        return "''";
+      }
+
+      // If the converter already produced a quoted literal, preserve it.
+      if (trimmedDefault != null
+          && trimmedDefault.length() >= 2
+          && trimmedDefault.startsWith("'")
+          && trimmedDefault.endsWith("'")) {
+        return trimmedDefault;
+      }
+
+      // Avoid quoting function/keyword defaults that are intentionally unquoted.
+      if (trimmedDefault != null && !shouldQuoteStringDefault(trimmedDefault)) {
+        return trimmedDefault;
+      }
+
+      // Fall back to quoting as a string literal.
+      return "'" + defaultValue + "'";
+    }
+
     return defaultValue;
   }
 
+  /**
+   * Returns whether a string default value for a string-like column should be wrapped in single
+   * quotes.
+   *
+   * <p>This method is used to avoid changing semantics for SQL NULLs and function/keyword
+   * defaults (for example, CURRENT_TIMESTAMP, NOW(), or UUID()) that the converter already
+   * returns unquoted.
+   */
+  private boolean shouldQuoteStringDefault(String trimmedDefault) {
+    if (StringUtils.isEmpty(trimmedDefault)) {
+      return true;
+    }
+
+    // Preserve explicit NULL, which is handled earlier but double-check here.
+    if ("NULL".equalsIgnoreCase(trimmedDefault)) {
+      return false;
+    }
+
+    // Detect common SQL keywords or function-style expressions that should not be quoted.
+    // Examples: CURRENT_TIMESTAMP, NOW(), UUID(), RANDOM_UUID().
+    if (trimmedDefault.equals(trimmedDefault.toUpperCase())
+        && trimmedDefault.matches("[A-Z_][A-Z0-9_]*(\\s*\\(.*\\))?")) {
+      return false;
+    }
+
+    return true;
+  }
   protected void appendDefaultValue(JdbcColumn column, StringBuilder sqlBuilder) {
     if (DEFAULT_VALUE_NOT_SET.equals(column.defaultValue())) {
       return;
