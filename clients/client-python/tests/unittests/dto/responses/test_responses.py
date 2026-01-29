@@ -14,7 +14,10 @@
 # KIND, either express or implied.  See the License for the
 # specific language governing permissions and limitations
 # under the License.
-import json
+
+from __future__ import annotations
+
+import json as _json
 import unittest
 
 from gravitino.dto.rel.partitions.json_serdes.partition_dto_serdes import (
@@ -198,7 +201,7 @@ class TestResponses(unittest.TestCase):
 
     def test_file_location_response(self):
         json_data = {"code": 0, "fileLocation": "file:/test/1"}
-        json_str = json.dumps(json_data)
+        json_str = _json.dumps(json_data)
         file_location_resp: FileLocationResponse = FileLocationResponse.from_json(
             json_str
         )
@@ -207,7 +210,7 @@ class TestResponses(unittest.TestCase):
 
     def test_file_location_response_exception(self):
         json_data = {"code": 0, "fileLocation": ""}
-        json_str = json.dumps(json_data)
+        json_str = _json.dumps(json_data)
         file_location_resp: FileLocationResponse = FileLocationResponse.from_json(
             json_str
         )
@@ -216,7 +219,7 @@ class TestResponses(unittest.TestCase):
 
     def test_credential_response(self):
         json_data = {"code": 0, "credentials": []}
-        json_str = json.dumps(json_data)
+        json_str = _json.dumps(json_data)
         credential_resp: CredentialResponse = CredentialResponse.from_json(json_str)
         self.assertEqual(0, len(credential_resp.credentials()))
         credential_resp.validate()
@@ -235,7 +238,7 @@ class TestResponses(unittest.TestCase):
                 }
             ],
         }
-        json_str = json.dumps(json_data)
+        json_str = _json.dumps(json_data)
         credential_resp: CredentialResponse = CredentialResponse.from_json(json_str)
         credential_resp.validate()
         self.assertEqual(1, len(credential_resp.credentials()))
@@ -262,7 +265,7 @@ class TestResponses(unittest.TestCase):
                 },
             },
         }
-        json_str = json.dumps(json_data)
+        json_str = _json.dumps(json_data)
         model_resp: ModelResponse = ModelResponse.from_json(
             json_str, infer_missing=True
         )
@@ -287,7 +290,7 @@ class TestResponses(unittest.TestCase):
                 },
             },
         }
-        json_str_missing = json.dumps(json_data_missing)
+        json_str_missing = _json.dumps(json_data_missing)
         model_resp_missing: ModelResponse = ModelResponse.from_json(
             json_str_missing, infer_missing=True
         )
@@ -299,7 +302,7 @@ class TestResponses(unittest.TestCase):
 
     def test_model_version_list_response(self):
         json_data = {"code": 0, "versions": [0, 1, 2]}
-        json_str = json.dumps(json_data)
+        json_str = _json.dumps(json_data)
         resp: ModelVersionListResponse = ModelVersionListResponse.from_json(
             json_str, infer_missing=True
         )
@@ -308,7 +311,7 @@ class TestResponses(unittest.TestCase):
         self.assertEqual([0, 1, 2], resp.versions())
 
         json_data_missing = {"code": 0, "versions": []}
-        json_str_missing = json.dumps(json_data_missing)
+        json_str_missing = _json.dumps(json_data_missing)
         resp_missing: ModelVersionListResponse = ModelVersionListResponse.from_json(
             json_str_missing, infer_missing=True
         )
@@ -319,7 +322,7 @@ class TestResponses(unittest.TestCase):
         json_data_missing_1 = {
             "code": 0,
         }
-        json_str_missing_1 = json.dumps(json_data_missing_1)
+        json_str_missing_1 = _json.dumps(json_data_missing_1)
         resp_missing_1: ModelVersionListResponse = ModelVersionListResponse.from_json(
             json_str_missing_1, infer_missing=True
         )
@@ -340,7 +343,7 @@ class TestResponses(unittest.TestCase):
                 },
             },
         }
-        json_str = json.dumps(json_data)
+        json_str = _json.dumps(json_data)
         resp: ModelVersionResponse = ModelVersionResponse.from_json(
             json_str, infer_missing=True
         )
@@ -365,7 +368,7 @@ class TestResponses(unittest.TestCase):
                 },
             },
         }
-        json_str = json.dumps(json_data)
+        json_str = _json.dumps(json_data)
         resp: ModelVersionResponse = ModelVersionResponse.from_json(
             json_str, infer_missing=True
         )
@@ -385,7 +388,7 @@ class TestResponses(unittest.TestCase):
                 },
             },
         }
-        json_str = json.dumps(json_data)
+        json_str = _json.dumps(json_data)
         resp: ModelVersionResponse = ModelVersionResponse.from_json(
             json_str, infer_missing=True
         )
@@ -401,7 +404,7 @@ class TestResponses(unittest.TestCase):
                 },
             },
         }
-        json_str = json.dumps(json_data)
+        json_str = _json.dumps(json_data)
         resp: ModelVersionResponse = ModelVersionResponse.from_json(
             json_str, infer_missing=True
         )
@@ -414,7 +417,7 @@ class TestResponses(unittest.TestCase):
                 "uris": {"unknown": "http://localhost:8080"},
             },
         }
-        json_str = json.dumps(json_data)
+        json_str = _json.dumps(json_data)
         resp: ModelVersionResponse = ModelVersionResponse.from_json(
             json_str, infer_missing=True
         )
@@ -422,7 +425,7 @@ class TestResponses(unittest.TestCase):
 
     def test_model_version_uri_response(self):
         json_data = {"code": 0, "uri": "s3://path/to/model"}
-        json_str = json.dumps(json_data)
+        json_str = _json.dumps(json_data)
         resp: ModelVersionUriResponse = ModelVersionUriResponse.from_json(
             json_str, infer_missing=True
         )
@@ -430,7 +433,7 @@ class TestResponses(unittest.TestCase):
         self.assertEqual("s3://path/to/model", resp.uri())
 
         json_data_missing = {"code": 0, "uri": ""}
-        json_str_missing = json.dumps(json_data_missing)
+        json_str_missing = _json.dumps(json_data_missing)
         resp_missing: ModelVersionUriResponse = ModelVersionUriResponse.from_json(
             json_str_missing, infer_missing=True
         )
@@ -439,7 +442,7 @@ class TestResponses(unittest.TestCase):
         json_data_missing_1 = {
             "code": 0,
         }
-        json_str_missing_1 = json.dumps(json_data_missing_1)
+        json_str_missing_1 = _json.dumps(json_data_missing_1)
         resp_missing_1: ModelVersionUriResponse = ModelVersionUriResponse.from_json(
             json_str_missing_1, infer_missing=True
         )
@@ -448,14 +451,14 @@ class TestResponses(unittest.TestCase):
     def test_partition_name_list_response(self):
         partition_names = [f"partition_{i}" for i in range(3)]
         json_data = {"code": 0, "names": partition_names}
-        json_str = json.dumps(json_data)
+        json_str = _json.dumps(json_data)
         resp: PartitionNameListResponse = PartitionNameListResponse.from_json(json_str)
         self.assertListEqual(resp.partition_names(), partition_names)
         resp.validate()
 
     def test_partition_name_list_response_exception(self):
         json_data = {"code": 0, "names": None}
-        json_str = json.dumps(json_data)
+        json_str = _json.dumps(json_data)
         resp: PartitionNameListResponse = PartitionNameListResponse.from_json(json_str)
         with self.assertRaises(IllegalArgumentException):
             resp.validate()
@@ -468,7 +471,7 @@ class TestResponses(unittest.TestCase):
         }}
         """
         partition = PartitionDTOSerdes.deserialize(
-            json.loads(TestResponses.PARTITION_JSON_STRING)
+            _json.loads(TestResponses.PARTITION_JSON_STRING)
         )
         resp: PartitionResponse = PartitionResponse.from_json(json_string)
         resp.validate()
@@ -483,7 +486,7 @@ class TestResponses(unittest.TestCase):
         """
         partitions = [
             PartitionDTOSerdes.deserialize(
-                json.loads(TestResponses.PARTITION_JSON_STRING)
+                _json.loads(TestResponses.PARTITION_JSON_STRING)
             )
         ]
         resp: PartitionListResponse = PartitionListResponse.from_json(json_string)
