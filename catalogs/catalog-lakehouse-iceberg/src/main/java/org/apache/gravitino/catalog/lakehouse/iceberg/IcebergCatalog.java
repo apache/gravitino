@@ -23,6 +23,7 @@ import org.apache.gravitino.connector.BaseCatalog;
 import org.apache.gravitino.connector.CatalogOperations;
 import org.apache.gravitino.connector.PropertiesMetadata;
 import org.apache.gravitino.connector.capability.Capability;
+import org.apache.gravitino.rel.ViewCatalog;
 
 /** Implementation of an Apache Iceberg catalog in Apache Gravitino. */
 public class IcebergCatalog extends BaseCatalog<IcebergCatalog> {
@@ -54,6 +55,11 @@ public class IcebergCatalog extends BaseCatalog<IcebergCatalog> {
   protected CatalogOperations newOps(Map<String, String> config) {
     IcebergCatalogOperations ops = new IcebergCatalogOperations();
     return ops;
+  }
+
+  @Override
+  public ViewCatalog asViewCatalog() {
+    return (ViewCatalog) ops();
   }
 
   @Override
