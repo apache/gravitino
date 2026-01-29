@@ -21,9 +21,11 @@ package org.apache.gravitino.credential;
 
 import com.google.common.collect.Iterables;
 import com.google.common.collect.Streams;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.ServiceLoader;
+import java.util.Set;
 import java.util.stream.Collectors;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -42,6 +44,24 @@ public class CredentialProviderFactory {
       LOG.warn("Create credential provider failed, {}", credentialType, e);
       throw new RuntimeException(e);
     }
+  }
+
+  /**
+   * Looks up all sensitive property keys from all registered credential providers.
+   *
+   * @return A set of all sensitive property keys used by credential providers.
+   */
+  public static Set<String> lookupSensitivePropertyKeys() {
+    ClassLoader classLoader = Thread.currentThread().getContextClassLoader();
+    ServiceLoader<CredentialProvider> serviceLoader =
+        ServiceLoader.load(CredentialProvider.class, classLoader);
+
+    Set<String> allPropertyKeys = new HashSet<>();
+    for (CredentialProvider provider : serviceLoader) {
+      Set<String> providerPropertyKeys = provider.sensitivePropertyKeys();
+      allPropertyKeys.addAll(providerPropertyKeys);
+    }
+    return allPropertyKeys;
   }
 
   private static Class<? extends CredentialProvider> lookupCredentialProvider(

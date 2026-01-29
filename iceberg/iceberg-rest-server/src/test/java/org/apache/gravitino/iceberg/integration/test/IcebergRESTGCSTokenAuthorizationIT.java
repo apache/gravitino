@@ -20,8 +20,10 @@
 package org.apache.gravitino.iceberg.integration.test;
 
 import java.io.IOException;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Set;
 import org.apache.gravitino.catalog.lakehouse.iceberg.IcebergConstants;
 import org.apache.gravitino.credential.CredentialConstants;
 import org.apache.gravitino.credential.GCSTokenCredential;
@@ -99,6 +101,11 @@ public class IcebergRESTGCSTokenAuthorizationIT extends IcebergRESTCloudTokenAut
     String gravitinoHome = System.getenv("GRAVITINO_HOME");
     String targetDir = String.format("%s/iceberg-rest-server/libs/", gravitinoHome);
     BaseIT.copyBundleJarsToDirectory("gcp", targetDir);
+  }
+
+  @Override
+  protected Set<String> sensitiveProperties() {
+    return Collections.emptySet();
   }
 
   private Map<String, String> getGCSConfig() {

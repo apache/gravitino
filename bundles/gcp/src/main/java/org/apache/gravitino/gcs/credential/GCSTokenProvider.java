@@ -19,8 +19,11 @@
 
 package org.apache.gravitino.gcs.credential;
 
+import com.google.common.collect.Sets;
+import java.util.Set;
 import org.apache.gravitino.credential.CredentialProviderDelegator;
 import org.apache.gravitino.credential.GCSTokenCredential;
+import org.apache.gravitino.credential.config.GCSCredentialConfig;
 
 /**
  * A lightweight credential provider for GCS. It delegates the actual credential generation to
@@ -36,5 +39,10 @@ public class GCSTokenProvider extends CredentialProviderDelegator<GCSTokenCreden
   @Override
   public String getGeneratorClassName() {
     return "org.apache.gravitino.gcs.credential.GCSTokenGenerator";
+  }
+
+  @Override
+  public Set<String> sensitivePropertyKeys() {
+    return Sets.newHashSet(GCSCredentialConfig.GCS_CREDENTIAL_FILE_PATH.getKey());
   }
 }
