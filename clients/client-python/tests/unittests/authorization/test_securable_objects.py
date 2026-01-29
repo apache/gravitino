@@ -23,7 +23,28 @@ import unittest
 from gravitino.api.authorization.privileges import Privilege
 from gravitino.api.authorization.securable_objects import SecurableObjects
 from gravitino.api.metadata_object import MetadataObject
-from tests.unittests.authorization.test_role_change import MockPrivilege
+
+
+class MockPrivilege(Privilege):
+    def __init__(self, name: Privilege.Name, condition: Privilege.Condition) -> None:
+        self._name = name
+        self._condition = condition
+
+    def name(self) -> Privilege.Name:
+        return self._name
+
+    def simple_string(self) -> str:
+        return f"{self._condition.value.lower()}_{self._name.name.lower()}"
+
+    def condition(self) -> Privilege.Condition:
+        return self._condition
+
+    def can_bind_to(self, obj_type: MetadataObject.Type) -> bool:
+        # mock: allow everything
+        return True
+
+    def __repr__(self) -> str:
+        return f"MockPrivilege(name={self._name}, condition={self._condition})"
 
 
 class TestSecurableObject(unittest.TestCase):
