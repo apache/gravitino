@@ -302,6 +302,26 @@ public class Configs {
           .intConf()
           .createWithDefault(DEFAULT_GRAVITINO_AUTHORIZATION_THREAD_POOL_SIZE);
 
+  public static final ConfigEntry<String> FALLBACK_AUTHORIZER_PRIMARY =
+      new ConfigBuilder("gravitino.authorization.fallback.primary")
+          .doc(
+              "Primary authorizer class for FallbackAuthorizer. "
+                  + "Used for Gravitino-managed objects.")
+          .version(ConfigConstants.VERSION_1_2_0)
+          .stringConf()
+          .createWithDefault("org.apache.gravitino.server.authorization.jcasbin.JcasbinAuthorizer");
+
+  public static final ConfigEntry<String> FALLBACK_AUTHORIZER_SECONDARY =
+      new ConfigBuilder("gravitino.authorization.fallback.secondary")
+          .doc(
+              "Secondary authorizer class for FallbackAuthorizer. "
+                  + "Used for external objects not managed by Gravitino. "
+                  + "If not set, FallbackAuthorizer will allow access to external objects "
+                  + "so natural 404 occurs during entity loading.")
+          .version(ConfigConstants.VERSION_1_2_0)
+          .stringConf()
+          .createWithDefault(null);
+
   public static final ConfigEntry<List<String>> SERVICE_ADMINS =
       new ConfigBuilder("gravitino.authorization.serviceAdmins")
           .doc("The admins of Gravitino service")
