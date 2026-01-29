@@ -54,6 +54,9 @@ dependencies {
   testImplementation(project(":server-common"))
 
   testImplementation(libs.awaitility)
+  testImplementation(libs.delta.kernel)
+  testImplementation(libs.delta.kernel.defaults)
+  testImplementation(libs.hadoop3.common)
   testImplementation(libs.junit.jupiter.api)
   testImplementation(libs.junit.jupiter.params)
   testImplementation(libs.lance) // Included in the test runtime classpath for test only
