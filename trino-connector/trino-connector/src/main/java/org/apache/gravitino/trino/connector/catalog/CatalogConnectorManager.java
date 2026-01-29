@@ -21,7 +21,6 @@ package org.apache.gravitino.trino.connector.catalog;
 import com.google.common.base.Preconditions;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import io.trino.spi.TrinoException;
-import io.trino.spi.connector.Connector;
 import io.trino.spi.connector.ConnectorContext;
 import java.util.Arrays;
 import java.util.HashSet;
@@ -35,7 +34,7 @@ import java.util.concurrent.ScheduledThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
-import org.apache.commons.lang3.NotImplementedException;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.Catalog;
 import org.apache.gravitino.client.GravitinoAdminClient;
 import org.apache.gravitino.client.GravitinoMetalake;
@@ -76,6 +75,7 @@ public class CatalogConnectorManager {
 
   private GravitinoAdminClient gravitinoClient;
   private GravitinoConfig config;
+  private TrinoCatalogNameHandler trinoCatalogNameHandler;
 
   /**
    * Constructs a new CatalogConnectorManager with the specified catalog register and catalog
@@ -85,10 +85,13 @@ public class CatalogConnectorManager {
    * @param catalogFactory the catalog connector factory
    */
   public CatalogConnectorManager(
-      CatalogRegister catalogRegister, CatalogConnectorFactory catalogFactory) {
+      CatalogRegister catalogRegister,
+      CatalogConnectorFactory catalogFactory,
+      TrinoCatalogNameHandler trinoCatalogNameHandler) {
     this.catalogRegister = catalogRegister;
     this.catalogConnectorFactory = catalogFactory;
     this.executorService = createScheduledThreadPoolExecutor();
+    this.trinoCatalogNameHandler = trinoCatalogNameHandler;
   }
 
   private static ScheduledThreadPoolExecutor createScheduledThreadPoolExecutor() {
@@ -127,19 +130,15 @@ public class CatalogConnectorManager {
   /**
    * Starts the catalog connector manager with the specified Trino connector context.
    *
-   * @param context the Trino connector context
    * @throws Exception if the catalog connector manager fails to start
    */
-  public void start(ConnectorContext context) throws Exception {
-    catalogRegister.init(context, config);
-    if (catalogRegister.isCoordinator()) {
-      executorService.scheduleWithFixedDelay(
-          this::loadMetalake,
-          metadataUpdateIntervalSecond,
-          metadataUpdateIntervalSecond,
-          TimeUnit.SECONDS);
-    }
-
+  public void start() throws Exception {
+    catalogRegister.init(config);
+    executorService.scheduleWithFixedDelay(
+        this::loadMetalake,
+        metadataUpdateIntervalSecond,
+        metadataUpdateIntervalSecond,
+        TimeUnit.SECONDS);
     LOG.info("Gravitino CatalogConnectorManager started.");
   }
 
@@ -330,7 +329,15 @@ public class CatalogConnectorManager {
   /** Shuts down the catalog connector manager. */
   public void shutdown() {
     LOG.info("Gravitino CatalogConnectorManager shutdown.");
-    throw new NotImplementedException();
+    if (catalogRegister != null) {
+      catalogRegister.close();
+    }
+
+    executorService.shutdown();
+
+    if (gravitinoClient != null) {
+      gravitinoClient.close();
+    }
   }
 
   /**
@@ -341,7 +348,9 @@ public class CatalogConnectorManager {
    * @return the Trino catalog name
    */
   public String getTrinoCatalogName(String metalake, String catalog) {
-    return config.singleMetalakeMode() ? catalog : String.format("\"%s.%s\"", metalake, catalog);
+    return config.singleMetalakeMode()
+        ? catalog
+        : trinoCatalogNameHandler.getCatalogName(metalake, catalog);
   }
 
   /**
@@ -369,14 +378,21 @@ public class CatalogConnectorManager {
    * @param connectorName the name of the connector
    * @param config the Gravitino configuration
    * @param context the Trino connector context
-   * @return the created connector
+   * @return the created catalog connector context
    */
-  public Connector createConnector(
+  public CatalogConnectorContext createCatalogConnectorContext(
       String connectorName, GravitinoConfig config, ConnectorContext context) {
     try {
       String catalogConfig = config.getCatalogConfig();
 
       GravitinoCatalog catalog = GravitinoCatalog.fromJson(catalogConfig);
+      if (this.config.singleMetalakeMode()
+          && StringUtils.isNotBlank(targetMetalake)
+          && !targetMetalake.equals(catalog.getMetalake())) {
+        throw new TrinoException(
+            GravitinoErrorCode.GRAVITINO_UNSUPPORTED_OPERATION,
+            "Multiple metalakes are not supported");
+      }
       CatalogConnectorContext.Builder builder =
           catalogConnectorFactory.createCatalogConnectorContextBuilder(catalog);
       builder
@@ -384,9 +400,10 @@ public class CatalogConnectorManager {
           .withContext(context);
 
       CatalogConnectorContext connectorContext = builder.build();
-      catalogConnectors.put(connectorName, connectorContext);
+      String fullCatalogName = getTrinoCatalogName(catalog);
+      catalogConnectors.put(fullCatalogName, connectorContext);
       LOG.info("Create connector {} successful", connectorName);
-      return connectorContext.getConnector();
+      return connectorContext;
     } catch (Exception e) {
       LOG.error("Failed to create connector: {}", connectorName, e);
       throw new TrinoException(
@@ -432,5 +449,9 @@ public class CatalogConnectorManager {
       }
     }
     return false;
+  }
+
+  public interface TrinoCatalogNameHandler {
+    String getCatalogName(String metalake, String catalog);
   }
 }
