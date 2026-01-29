@@ -38,6 +38,9 @@ import org.apache.gravitino.catalog.jdbc.operation.JdbcDatabaseOperations;
 
 public class ClickHouseDatabaseOperations extends JdbcDatabaseOperations {
 
+  private static final Set<String> CLICK_HOUSE_SYSTEM_DATABASES =
+      ImmutableSet.of("information_schema", "default", "system", "INFORMATION_SCHEMA");
+
   // TODO: handle ClickHouse cluster properly when creating/dropping databases/tables
   //  use https://github.com/apache/gravitino/issues/9820 to track it.
   @SuppressWarnings("unused")
@@ -74,7 +77,7 @@ public class ClickHouseDatabaseOperations extends JdbcDatabaseOperations {
 
   @Override
   protected Set<String> createSysDatabaseNameSet() {
-    return ImmutableSet.of("information_schema", "default", "system");
+    return CLICK_HOUSE_SYSTEM_DATABASES;
   }
 
   @Override
