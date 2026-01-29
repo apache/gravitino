@@ -26,7 +26,7 @@ from gravitino.dto.responses.metadata_object_list_response import (
 )
 from gravitino.dto.tag_dto import TagDTO
 from gravitino.exceptions.handlers.error_handler import ErrorHandler
-from gravitino.exceptions.handlers.error_handlers import ErrorHandlers
+from gravitino.exceptions.handlers.tag_error_handler import TAG_ERROR_HANDLER
 from gravitino.rest.rest_utils import encode_string
 from gravitino.utils import HTTPClient
 from gravitino.utils.http_client import Response
@@ -125,7 +125,7 @@ class GenericTag(Tag, Tag.AssociatedObjects):
             encode_string(self.name()),
         )
 
-        response = self.get_response(url, ErrorHandlers.tag_error_handler())
+        response = self.get_response(url, TAG_ERROR_HANDLER)
         objects_resp = MetadataObjectListResponse.from_json(
             response.body, infer_missing=True
         )

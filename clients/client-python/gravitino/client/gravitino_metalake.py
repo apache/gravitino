@@ -50,8 +50,9 @@ from gravitino.dto.responses.job_response import JobResponse
 from gravitino.dto.responses.job_template_list_response import JobTemplateListResponse
 from gravitino.dto.responses.job_template_response import JobTemplateResponse
 from gravitino.dto.responses.tag_response import TagNamesListResponse, TagResponse
-from gravitino.exceptions.handlers import ErrorHandlers
 from gravitino.exceptions.handlers.catalog_error_handler import CATALOG_ERROR_HANDLER
+from gravitino.exceptions.handlers.job_error_handler import JOB_ERROR_HANDLER
+from gravitino.exceptions.handlers.tag_error_handler import TAG_ERROR_HANDLER
 from gravitino.rest.rest_utils import encode_string
 from gravitino.utils.http_client import HTTPClient
 from gravitino.utils.precondition import Precondition
@@ -299,7 +300,7 @@ class GravitinoMetalake(
         params = {"details": "true"}
         url = self.API_METALAKES_JOB_TEMPLATES_PATH.format(encode_string(self.name()))
         response = self.rest_client.get(
-            url, params=params, error_handler=ErrorHandlers.job_error_handler()
+            url, params=params, error_handler=JOB_ERROR_HANDLER
         )
         resp = JobTemplateListResponse.from_json(response.body, infer_missing=True)
         resp.validate()
@@ -323,9 +324,7 @@ class GravitinoMetalake(
             DTOConverters.to_job_template_dto(job_template)
         )
 
-        self.rest_client.post(
-            url, json=req, error_handler=ErrorHandlers.job_error_handler()
-        )
+        self.rest_client.post(url, json=req, error_handler=JOB_ERROR_HANDLER)
 
     def get_job_template(self, job_template_name: str) -> JobTemplate:
         """Retrieves a job template by its name.
@@ -346,9 +345,7 @@ class GravitinoMetalake(
             f"{self.API_METALAKES_JOB_TEMPLATES_PATH.format(encode_string(self.name()))}/"
             f"{encode_string(job_template_name)}"
         )
-        response = self.rest_client.get(
-            url, error_handler=ErrorHandlers.job_error_handler()
-        )
+        response = self.rest_client.get(url, error_handler=JOB_ERROR_HANDLER)
         resp = JobTemplateResponse.from_json(response.body, infer_missing=True)
         resp.validate()
 
@@ -381,9 +378,7 @@ class GravitinoMetalake(
             f"{self.API_METALAKES_JOB_TEMPLATES_PATH.format(encode_string(self.name()))}/"
             f"{encode_string(job_template_name)}"
         )
-        response = self.rest_client.delete(
-            url, error_handler=ErrorHandlers.job_error_handler()
-        )
+        response = self.rest_client.delete(url, error_handler=JOB_ERROR_HANDLER)
 
         drop_response = DropResponse.from_json(response.body, infer_missing=True)
         drop_response.validate()
@@ -417,7 +412,7 @@ class GravitinoMetalake(
             f"{encode_string(job_template_name)}"
         )
         response = self.rest_client.put(
-            url, json=updates_request, error_handler=ErrorHandlers.job_error_handler()
+            url, json=updates_request, error_handler=JOB_ERROR_HANDLER
         )
         job_template_response = JobTemplateResponse.from_json(
             response.body, infer_missing=True
@@ -438,7 +433,7 @@ class GravitinoMetalake(
         params = {"jobTemplateName": job_template_name} if job_template_name else {}
         url = self.API_METALAKES_JOB_RUNS_PATH.format(encode_string(self.name()))
         response = self.rest_client.get(
-            url, params=params, error_handler=ErrorHandlers.job_error_handler()
+            url, params=params, error_handler=JOB_ERROR_HANDLER
         )
         resp = JobListResponse.from_json(response.body, infer_missing=True)
         resp.validate()
@@ -464,9 +459,7 @@ class GravitinoMetalake(
             f"{self.API_METALAKES_JOB_RUNS_PATH.format(encode_string(self.name()))}"
             f"/{encode_string(job_id)}"
         )
-        response = self.rest_client.get(
-            url, error_handler=ErrorHandlers.job_error_handler()
-        )
+        response = self.rest_client.get(url, error_handler=JOB_ERROR_HANDLER)
         resp = JobResponse.from_json(response.body, infer_missing=True)
         resp.validate()
 
@@ -489,7 +482,7 @@ class GravitinoMetalake(
         request = JobRunRequest(job_template_name, job_conf)
 
         response = self.rest_client.post(
-            url, json=request, error_handler=ErrorHandlers.job_error_handler()
+            url, json=request, error_handler=JOB_ERROR_HANDLER
         )
         resp = JobResponse.from_json(response.body, infer_missing=True)
         resp.validate()
@@ -515,9 +508,7 @@ class GravitinoMetalake(
             f"{self.API_METALAKES_JOB_RUNS_PATH.format(encode_string(self.name()))}"
             f"/{encode_string(job_id)}"
         )
-        response = self.rest_client.post(
-            url, error_handler=ErrorHandlers.job_error_handler()
-        )
+        response = self.rest_client.post(url, error_handler=JOB_ERROR_HANDLER)
         resp = JobResponse.from_json(response.body, infer_missing=True)
         resp.validate()
 
@@ -537,9 +528,7 @@ class GravitinoMetalake(
         """
         url = self.API_METALAKES_TAGS_PATH.format(encode_string(self.name()))
 
-        response = self.rest_client.get(
-            url, error_handler=ErrorHandlers.tag_error_handler()
-        )
+        response = self.rest_client.get(url, error_handler=TAG_ERROR_HANDLER)
         resp = TagNamesListResponse.from_json(response.body, infer_missing=True)
         resp.validate()
 
@@ -577,9 +566,7 @@ class GravitinoMetalake(
         url = self.API_METALAKES_TAG_PATH.format(
             encode_string(self.name()), encode_string(tag_name)
         )
-        response = self.rest_client.get(
-            url, error_handler=ErrorHandlers.tag_error_handler()
-        )
+        response = self.rest_client.get(url, error_handler=TAG_ERROR_HANDLER)
 
         tag_resp = TagResponse.from_json(response.body, infer_missing=True)
         tag_resp.validate()
@@ -614,7 +601,7 @@ class GravitinoMetalake(
         response = self.rest_client.post(
             url,
             json=tag_create_request,
-            error_handler=ErrorHandlers.tag_error_handler(),
+            error_handler=TAG_ERROR_HANDLER,
         )
         tag_resp = TagResponse.from_json(response.body, infer_missing=True)
         tag_resp.validate()
