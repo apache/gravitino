@@ -22,7 +22,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { Box } from '@mui/material'
 import dynamic from 'next/dynamic'
-import Loading from '@/appOld/rootLayout/Loading'
+import Loading from '@/appV1/rootLayout/Loading'
 
 const DynamicMetalakeTree = dynamic(() => import('./MetalakeTree'), {
   loading: () => <Loading />,

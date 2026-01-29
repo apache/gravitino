@@ -25,7 +25,7 @@ import TableHeader from './TableHeader'
 import DetailsDrawer from '@/components/DetailsDrawer'
 import CreateMetalakeDialog from './CreateMetalakeDialog'
 import dynamic from 'next/dynamic'
-import Loading from '@/appOld/rootLayout/Loading'
+import Loading from '@/appV1/rootLayout/Loading'
 
 const DynamicTableBody = dynamic(() => import('./TableBody'), {
   loading: () => <Loading height={'200px'} />,

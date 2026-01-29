@@ -36,7 +36,7 @@
 /.next/
 /out/
 /dist/
-/dist-old/
+/dist-v1/
 
 # production
 /build

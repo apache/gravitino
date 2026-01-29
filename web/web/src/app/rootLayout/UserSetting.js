@@ -85,7 +85,7 @@ export default function UserSetting() {
         label: (
           <div className='flex w-[208px] justify-between'>
             <span>Metalakes</span>
-            {[...(serviceAdmins || '').split(','), ...['service_admin']].includes(authUser?.name) && (
+            {[...(serviceAdmins || '').split(',')].includes(authUser?.name) && (
               <Tooltip title='Create Metalake'>
                 <PlusOutlined className='cursor-pointer text-black' onClick={handleCreateMetalake} />
               </Tooltip>

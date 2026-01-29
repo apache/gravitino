@@ -57,7 +57,7 @@ jobs:
         java-version: [ 17 ]
     env:
       PLATFORM: ${{ matrix.architecture }}
-      GRAVITINO_USE_OLD_UI: 'false'
+      GRAVITINO_USE_WEB_V1: 'false'
     steps:
       - uses: actions/checkout@v4
 

@@ -80,20 +80,20 @@ function removeSymlinkIfPointsTo(linkPath, target) {
   }
 }
 
-const buildTarget = process.env.BUILD_TARGET || 'new'
+const buildTarget = process.env.BUILD_TARGET || 'v2'
 console.log(`select-build-target: BUILD_TARGET=${buildTarget}`)
 
 // map of names under src
 const items = [
-  { name: 'app', alt: 'appOld' },
-  { name: 'components', alt: 'componentsOld' }
+  { name: 'app', alt: 'appV1' },
+  { name: 'components', alt: 'componentsV1' }
 ]
 
 for (const it of items) {
   const normal = path.join(SRC, it.name)
   const alt = path.join(SRC, it.alt)
 
-  if (buildTarget === 'old') {
+  if (buildTarget === 'v1') {
     ensureExists(alt, it.alt)
     // backup existing normal if it's a real dir
     backupIfNeeded(normal)
@@ -107,10 +107,10 @@ for (const it of items) {
       console.log(`linked ${normal} -> ${alt} (fallback)`)
     }
   } else {
-    // for new/default target: if normal is symlink pointing to alt, remove it and restore backup if present
+    // for v2/default target: if normal is symlink pointing to alt, remove it and restore backup if present
     // if normal is symlink to alt, remove it
     removeSymlinkIfPointsTo(normal, alt)
-    // if normal is a copied directory (from previous 'old'), remove it so backup can be restored
+    // if normal is a copied directory (from previous 'v1'), remove it so backup can be restored
     try {
       if (fs.existsSync(normal) && !fs.lstatSync(normal).isSymbolicLink()) {
         // Only remove the directory if we previously backed up the original (i.e. .bak exists).

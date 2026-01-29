@@ -84,4 +84,4 @@ const tailwindConfig = {
   plugins: []
 }
 
-module.exports = process.env.BUILD_TARGET === 'old' ? tailwindConfig : config
+module.exports = process.env.BUILD_TARGET === 'v1' ? tailwindConfig : config

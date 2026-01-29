@@ -735,10 +735,10 @@ tasks {
         from(projectDir.dir("conf")) { into("package/conf") }
         from(projectDir.dir("bin")) { into("package/bin") }
         // Copy both new and legacy web WARs if present. The legacy WAR uses a
-        // "-old" classifier (e.g. gravitino-web-1.1.0-old.war), old ui will not be update after v1.1.0 anymore.
+        // "-v1" classifier (e.g. gravitino-web-v1.war), v1 ui will not be update after v1.1.0 anymore.
         from(projectDir.dir("web/web/build/libs")) {
-          include("${rootProject.name}-web-$version.war")
-          include("${rootProject.name}-web-1.1.0-old.war")
+          include("${rootProject.name}-web-v1.war")
+          include("${rootProject.name}-web-v2-$version.war")
           into("package/web")
         }
         from(projectDir.dir("scripts")) { into("package/scripts") }
