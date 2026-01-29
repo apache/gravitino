@@ -43,8 +43,8 @@ public interface KerberosConfig {
           .checkValue(StringUtils::isNotBlank, ConfigConstants.NOT_BLANK_ERROR_MSG)
           .create();
 
-  ConfigEntry<String> PRINCIPAL_MAPPER_TYPE =
-      new ConfigBuilder(KERBEROS_CONFIG_PREFIX + "principalMapperType")
+  ConfigEntry<String> PRINCIPAL_MAPPER =
+      new ConfigBuilder(KERBEROS_CONFIG_PREFIX + "principalMapper")
           .doc(
               "Type of principal mapper to use for Kerberos authentication. "
                   + "Built-in value: 'regex' (uses regex pattern to extract username). "
@@ -58,7 +58,7 @@ public interface KerberosConfig {
       new ConfigBuilder(KERBEROS_CONFIG_PREFIX + "principalMapper.regex.pattern")
           .doc(
               "Regex pattern to extract the username from the Kerberos principal. "
-                  + "Only used when principalMapperType is 'regex'. "
+                  + "Only used when principalMapper is 'regex'. "
                   + "The pattern should contain at least one capturing group. "
                   + "Default pattern '([^@]+).*' extracts everything before '@' (including instance if present).")
           .version(ConfigConstants.VERSION_1_2_0)

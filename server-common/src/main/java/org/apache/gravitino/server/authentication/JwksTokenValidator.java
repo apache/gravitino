@@ -66,7 +66,7 @@ public class JwksTokenValidator implements OAuthTokenValidator {
     this.allowSkewSeconds = config.get(OAuthConfig.ALLOW_SKEW_SECONDS);
 
     // Create principal mapper based on configuration
-    String mapperType = config.get(OAuthConfig.PRINCIPAL_MAPPER_TYPE);
+    String mapperType = config.get(OAuthConfig.PRINCIPAL_MAPPER);
     String regexPattern = config.get(OAuthConfig.PRINCIPAL_MAPPER_REGEX_PATTERN);
     this.principalMapper = PrincipalMapperFactory.create(mapperType, regexPattern);
 

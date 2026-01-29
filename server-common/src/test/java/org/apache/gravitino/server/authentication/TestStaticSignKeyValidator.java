@@ -257,7 +257,7 @@ public class TestStaticSignKeyValidator {
   @Test
   public void testPrincipalMapperWithDefaultPattern() {
     Map<String, String> config = createBaseConfig();
-    config.put("gravitino.authenticator.oauth.principalMapperType", "regex");
+    config.put("gravitino.authenticator.oauth.principalMapper", "regex");
     config.put("gravitino.authenticator.oauth.principalMapper.regex.pattern", "(.*)");
     validator.initialize(createConfig(config));
 
@@ -278,7 +278,7 @@ public class TestStaticSignKeyValidator {
   @Test
   public void testPrincipalMapperExtractEmailLocalPart() {
     Map<String, String> config = createBaseConfig();
-    config.put("gravitino.authenticator.oauth.principalMapperType", "regex");
+    config.put("gravitino.authenticator.oauth.principalMapper", "regex");
     config.put("gravitino.authenticator.oauth.principalMapper.regex.pattern", "([^@]+)@.*");
     validator.initialize(createConfig(config));
 
@@ -299,7 +299,7 @@ public class TestStaticSignKeyValidator {
   @Test
   public void testPrincipalMapperNoMatch() {
     Map<String, String> config = createBaseConfig();
-    config.put("gravitino.authenticator.oauth.principalMapperType", "regex");
+    config.put("gravitino.authenticator.oauth.principalMapper", "regex");
     config.put("gravitino.authenticator.oauth.principalMapper.regex.pattern", "([^@]+)@.*");
     validator.initialize(createConfig(config));
 
@@ -320,7 +320,7 @@ public class TestStaticSignKeyValidator {
   @Test
   public void testPrincipalMapperKerberosPrincipal() {
     Map<String, String> config = createBaseConfig();
-    config.put("gravitino.authenticator.oauth.principalMapperType", "regex");
+    config.put("gravitino.authenticator.oauth.principalMapper", "regex");
     config.put("gravitino.authenticator.oauth.principalMapper.regex.pattern", "([^/@]+).*");
     validator.initialize(createConfig(config));
 
@@ -464,7 +464,7 @@ public class TestStaticSignKeyValidator {
     // Test that principal fields and mapper work together
     Map<String, String> config = createBaseConfig();
     config.put("gravitino.authenticator.oauth.principalFields", "email");
-    config.put("gravitino.authenticator.oauth.principalMapperType", "regex");
+    config.put("gravitino.authenticator.oauth.principalMapper", "regex");
     config.put(
         "gravitino.authenticator.oauth.principalMapper.regex.pattern",
         "([^@]+)@.*"); // Extract user ID part

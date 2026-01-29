@@ -431,7 +431,7 @@ public class TestJwksTokenValidator {
       config.put(
           "gravitino.authenticator.oauth.jwksUri", "https://test-jwks.com/.well-known/jwks.json");
       config.put("gravitino.authenticator.oauth.authority", "https://test-issuer.com");
-      config.put("gravitino.authenticator.oauth.principalMapperType", "regex");
+      config.put("gravitino.authenticator.oauth.principalMapper", "regex");
       config.put("gravitino.authenticator.oauth.principalMapper.regex.pattern", "(.*)");
       config.put("gravitino.authenticator.oauth.allowSkewSecs", "120");
 
@@ -484,7 +484,7 @@ public class TestJwksTokenValidator {
       config.put(
           "gravitino.authenticator.oauth.jwksUri", "https://test-jwks.com/.well-known/jwks.json");
       config.put("gravitino.authenticator.oauth.authority", "https://test-issuer.com");
-      config.put("gravitino.authenticator.oauth.principalMapperType", "regex");
+      config.put("gravitino.authenticator.oauth.principalMapper", "regex");
       config.put("gravitino.authenticator.oauth.principalMapper.regex.pattern", "([^@]+)@.*");
       config.put("gravitino.authenticator.oauth.allowSkewSecs", "120");
 
@@ -537,7 +537,7 @@ public class TestJwksTokenValidator {
       config.put(
           "gravitino.authenticator.oauth.jwksUri", "https://test-jwks.com/.well-known/jwks.json");
       config.put("gravitino.authenticator.oauth.authority", "https://test-issuer.com");
-      config.put("gravitino.authenticator.oauth.principalMapperType", "regex");
+      config.put("gravitino.authenticator.oauth.principalMapper", "regex");
       config.put("gravitino.authenticator.oauth.principalMapper.regex.pattern", "([^@]+)@.*");
       config.put("gravitino.authenticator.oauth.allowSkewSecs", "120");
 

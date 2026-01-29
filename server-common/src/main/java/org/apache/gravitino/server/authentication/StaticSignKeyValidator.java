@@ -70,7 +70,7 @@ public class StaticSignKeyValidator implements OAuthTokenValidator {
     this.defaultSigningKey = decodeSignKey(Base64.getDecoder().decode(configuredSignKey), algType);
     this.principalFields = config.get(OAuthConfig.PRINCIPAL_FIELDS);
     // Create principal mapper based on configuration
-    String mapperType = config.get(OAuthConfig.PRINCIPAL_MAPPER_TYPE);
+    String mapperType = config.get(OAuthConfig.PRINCIPAL_MAPPER);
     String regexPattern = config.get(OAuthConfig.PRINCIPAL_MAPPER_REGEX_PATTERN);
     this.principalMapper = PrincipalMapperFactory.create(mapperType, regexPattern);
   }
@@ -108,9 +108,6 @@ public class StaticSignKeyValidator implements OAuthTokenValidator {
 
       // Extract principal from JWT claims using configured field(s)
       String principal = extractPrincipal(jwt.getBody());
-      if (principal == null) {
-        throw new UnauthorizedException("No valid principal found in token");
-      }
 
       // Use principal mapper to extract username
       return principalMapper.map(principal);
@@ -137,7 +134,8 @@ public class StaticSignKeyValidator implements OAuthTokenValidator {
       }
     }
 
-    return null;
+    throw new UnauthorizedException(
+        "No valid principal found in token. Checked fields: %s", principalFields);
   }
 
   private static Key decodeSignKey(byte[] key, String algType) {

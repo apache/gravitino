@@ -78,7 +78,7 @@ public class KerberosAuthenticator implements Authenticator {
       // Initialize principal mapper. The default regex pattern '([^@]+).*'
       // extracts everything before '@' (e.g., "user" from "user@REALM",
       // "HTTP/host" from "HTTP/host@REALM")
-      String mapperType = config.get(KerberosConfig.PRINCIPAL_MAPPER_TYPE);
+      String mapperType = config.get(KerberosConfig.PRINCIPAL_MAPPER);
       String regexPattern = config.get(KerberosConfig.PRINCIPAL_MAPPER_REGEX_PATTERN);
       this.principalMapper = PrincipalMapperFactory.create(mapperType, regexPattern);
 

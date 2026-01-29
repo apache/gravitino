@@ -145,8 +145,8 @@ public interface OAuthConfig {
           .stringConf()
           .createWithDefault("org.apache.gravitino.server.authentication.StaticSignKeyValidator");
 
-  ConfigEntry<String> PRINCIPAL_MAPPER_TYPE =
-      new ConfigBuilder(OAUTH_CONFIG_PREFIX + "principalMapperType")
+  ConfigEntry<String> PRINCIPAL_MAPPER =
+      new ConfigBuilder(OAUTH_CONFIG_PREFIX + "principalMapper")
           .doc(
               "Type of principal mapper to use for OAuth/JWT principals. "
                   + "Built-in value: 'regex' (uses regex pattern to extract username). "
@@ -160,7 +160,7 @@ public interface OAuthConfig {
       new ConfigBuilder(OAUTH_CONFIG_PREFIX + "principalMapper.regex.pattern")
           .doc(
               "Regex pattern to extract the username from the OAuth principal field. "
-                  + "Only used when principalMapperType is 'regex'. "
+                  + "Only used when principalMapper is 'regex'. "
                   + "The pattern should contain at least one capturing group. "
                   + "Default pattern '^(.*)$' matches the entire principal.")
           .version(ConfigConstants.VERSION_1_2_0)
