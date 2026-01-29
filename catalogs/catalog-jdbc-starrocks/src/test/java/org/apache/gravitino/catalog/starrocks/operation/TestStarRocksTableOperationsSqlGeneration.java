@@ -24,6 +24,7 @@ import org.apache.gravitino.catalog.jdbc.converter.JdbcColumnDefaultValueConvert
 import org.apache.gravitino.catalog.jdbc.converter.JdbcExceptionConverter;
 import org.apache.gravitino.catalog.starrocks.converter.StarRocksTypeConverter;
 import org.apache.gravitino.catalog.starrocks.operations.StarRocksTableOperations;
+import org.apache.gravitino.rel.expressions.NamedReference;
 import org.apache.gravitino.rel.expressions.distributions.Distribution;
 import org.apache.gravitino.rel.expressions.distributions.Distributions;
 import org.apache.gravitino.rel.expressions.literals.Literals;
@@ -36,6 +37,7 @@ import org.junit.jupiter.api.Test;
 public class TestStarRocksTableOperationsSqlGeneration {
 
   private static class TestableStarRocksTableOperations extends StarRocksTableOperations {
+
     public TestableStarRocksTableOperations() {
       super.exceptionMapper = new JdbcExceptionConverter();
       super.typeConverter = new StarRocksTypeConverter();
@@ -68,7 +70,7 @@ public class TestStarRocksTableOperationsSqlGeneration {
             .build();
 
     // StarRocks requires distribution
-    Distribution distribution = Distributions.hash(1, Distributions.fields("col1"));
+    Distribution distribution = Distributions.hash(1, NamedReference.field("col1"));
 
     String sql = ops.createTableSql(tableName, new JdbcColumn[] {col1}, distribution);
     Assertions.assertTrue(sql.contains("DEFAULT ''"), "Should contain DEFAULT '' but was: " + sql);
@@ -87,10 +89,33 @@ public class TestStarRocksTableOperationsSqlGeneration {
             .build();
 
     // StarRocks requires distribution
-    Distribution distribution = Distributions.hash(1, Distributions.fields("col1"));
+    Distribution distribution = Distributions.hash(1, NamedReference.field("col1"));
 
     String sql = ops.createTableSql(tableName, new JdbcColumn[] {col1}, distribution);
     Assertions.assertTrue(
         sql.contains("DEFAULT 'abc'"), "Should contain DEFAULT 'abc' but was: " + sql);
+  }
+
+  @Test
+  public void testCreateTableWithWhitespaceDefaultValue() {
+    TestableStarRocksTableOperations ops = new TestableStarRocksTableOperations();
+    String tableName = "test_table";
+    JdbcColumn col1 =
+        JdbcColumn.builder()
+            .withName("col1")
+            .withType(Types.VarCharType.of(255))
+            .withNullable(false)
+            .withDefaultValue(Literals.of("   ", Types.VarCharType.of(255)))
+            .build();
+
+    Distribution distribution = Distributions.hash(1, NamedReference.field("col1"));
+    String sql = ops.createTableSql(tableName, new JdbcColumn[] {col1}, distribution);
+    // Logic check: if converter returns "'   '", this should pass.
+    // If it returns "   " (unquoted), this assert might fail or pass depending on what we expect.
+    // The user suspects it generates "DEFAULT ;" or similar invalid SQL.
+    // Let's see what it actually generates.
+    System.out.println("Generated SQL: " + sql);
+    Assertions.assertTrue(
+        sql.contains("DEFAULT '   '"), "Should contain DEFAULT '   ' but was: " + sql);
   }
 }
