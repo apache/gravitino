@@ -52,7 +52,7 @@ public interface RoleChange {
    * @param roleName The role name.
    * @param securableObject The securable object.
    * @param newSecurableObject The new securable object.
-   * @return return a RoleChange for the update-securable object.
+   * @return return a RoleChange for the update securable object.
    */
   static RoleChange updateSecurableObject(
       String roleName, SecurableObject securableObject, SecurableObject newSecurableObject) {

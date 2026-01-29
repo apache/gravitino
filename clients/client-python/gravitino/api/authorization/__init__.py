@@ -19,12 +19,10 @@ from __future__ import annotations
 
 from gravitino.api.authorization.privileges import Privileges
 from gravitino.api.authorization.role import Role
-from gravitino.api.authorization.role_change import RoleChange
 from gravitino.api.authorization.securable_objects import SecurableObjects
 
 __all__ = [
     "Role",
     "SecurableObjects",
-    "RoleChange",
     "Privileges",
 ]

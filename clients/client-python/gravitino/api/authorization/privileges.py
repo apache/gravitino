@@ -139,10 +139,10 @@ class Privilege(ABC):
         MANAGE_GRANTS = (0, 1 << 17)
         """The privilege to grant or revoke a role for the user or the group."""
 
-        CREATE_MODEL = (0, 1 << 18)
+        REGISTER_MODEL = (0, 1 << 18)
         """The privilege to create a model."""
 
-        CREATE_MODEL_VERSION = (0, 1 << 19)
+        LINK_MODEL_VERSION = (0, 1 << 19)
         """The privilege to create a model version."""
 
         USE_MODEL = (0, 1 << 20)
