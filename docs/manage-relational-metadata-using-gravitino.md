@@ -716,12 +716,7 @@ curl -X POST -H "Accept: application/vnd.gravitino.v1+json" \
       "type": "integer",
       "comment": "id column comment",
       "nullable": false,
-      "autoIncrement": true,
-      "defaultValue": {
-        "type": "literal",
-        "dataType": "integer",
-        "value": "-1"
-      }
+      "autoIncrement": true
     },
     {
       "name": "name",
