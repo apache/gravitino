@@ -192,6 +192,9 @@ You can pass [Paimon table properties](https://paimon.apache.org/docs/0.8/mainte
 **Immutable**: Fields that cannot be modified once set.
 :::
 
+Bucket settings are defined via Gravitino table distribution (HASH strategy). The `bucket` and
+`bucket-key` options are reserved and derived from the distribution instead of being set directly.
+
 | Configuration item | Description               | Default Value | Required  | Reserved | Immutable | Since version     |
 |--------------------|---------------------------|---------------|-----------|----------|-----------|-------------------|
 | `merge-engine`     | The table merge-engine.   | (none)        | No        | No       | Yes       | 0.6.0-incubating  |
@@ -200,6 +203,7 @@ You can pass [Paimon table properties](https://paimon.apache.org/docs/0.8/mainte
 | `comment`          | The table comment.        | (none)        | No        | Yes      | No        | 0.6.0-incubating  |
 | `owner`            | The table owner.          | (none)        | No        | Yes      | No        | 0.6.0-incubating  |
 | `bucket-key`       | The table bucket-key.     | (none)        | No        | Yes      | No        | 0.6.0-incubating  |
+| `bucket`           | The table bucket number.  | (none)        | No        | Yes      | No        | 1.2.0  |
 | `primary-key`      | The table primary-key.    | (none)        | No        | Yes      | No        | 0.6.0-incubating  |
 | `partition`        | The table partition.      | (none)        | No        | Yes      | No        | 0.6.0-incubating  |
 

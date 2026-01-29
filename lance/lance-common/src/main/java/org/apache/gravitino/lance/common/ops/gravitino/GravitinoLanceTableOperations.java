@@ -24,6 +24,7 @@ import static org.apache.gravitino.lance.common.utils.LanceConstants.LANCE_CREAT
 import static org.apache.gravitino.lance.common.utils.LanceConstants.LANCE_LOCATION;
 import static org.apache.gravitino.lance.common.utils.LanceConstants.LANCE_TABLE_CREATE_EMPTY;
 import static org.apache.gravitino.lance.common.utils.LanceConstants.LANCE_TABLE_FORMAT;
+import static org.apache.gravitino.lance.common.utils.LanceConstants.LANCE_TABLE_VERSION;
 import static org.apache.gravitino.rel.Column.DEFAULT_VALUE_NOT_SET;
 
 import com.google.common.base.Preconditions;
@@ -92,7 +93,10 @@ public class GravitinoLanceTableOperations implements LanceTableOperations {
     response.setProperties(table.properties());
     response.setLocation(table.properties().get(LANCE_LOCATION));
     response.setSchema(toJsonArrowSchema(table.columns()));
-    response.setVersion(null);
+    response.setVersion(
+        Optional.ofNullable(table.properties().get(LANCE_TABLE_VERSION))
+            .map(Long::valueOf)
+            .orElse(null));
     response.setStorageOptions(LancePropertiesUtils.getLanceStorageOptions(table.properties()));
     return response;
   }
@@ -147,7 +151,10 @@ public class GravitinoLanceTableOperations implements LanceTableOperations {
     // Extract storage options from table properties. All storage options stores in table
     // properties.
     response.setStorageOptions(LancePropertiesUtils.getLanceStorageOptions(t.properties()));
-    response.setVersion(null);
+    response.setVersion(
+        Optional.ofNullable(t.properties().get(LANCE_TABLE_VERSION))
+            .map(Long::valueOf)
+            .orElse(null));
     response.setLocation(t.properties().get(LANCE_LOCATION));
     response.setProperties(t.properties());
     return response;

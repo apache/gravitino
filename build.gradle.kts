@@ -1114,7 +1114,6 @@ tasks {
       ":catalogs:catalog-hive:copyLibAndConfig",
       ":catalogs:catalog-jdbc-doris:copyLibAndConfig",
       ":catalogs:catalog-jdbc-mysql:copyLibAndConfig",
-      ":catalogs-contrib:catalog-jdbc-oceanbase:copyLibAndConfig",
       ":catalogs:catalog-jdbc-postgresql:copyLibAndConfig",
       ":catalogs:catalog-jdbc-starrocks:copyLibAndConfig",
       ":catalogs:catalog-kafka:copyLibAndConfig",
@@ -1124,7 +1123,9 @@ tasks {
       ":catalogs:catalog-model:copyLibAndConfig",
       ":catalogs:hive-metastore2-libs:copyLibs",
       ":catalogs:hive-metastore3-libs:copyLibs",
-      ":catalogs:catalog-lakehouse-generic:copyLibAndConfig"
+      ":catalogs:catalog-lakehouse-generic:copyLibAndConfig",
+      ":catalogs-contrib:catalog-jdbc-oceanbase:copyLibAndConfig",
+      ":catalogs-contrib:catalog-jdbc-clickhouse:copyLibAndConfig"
     )
   }
 
