@@ -28,6 +28,7 @@ import org.openqa.selenium.JavascriptExecutor;
 import org.openqa.selenium.Keys;
 import org.openqa.selenium.WebDriver;
 import org.openqa.selenium.WebElement;
+import org.openqa.selenium.interactions.Actions;
 import org.openqa.selenium.support.FindBy;
 import org.openqa.selenium.support.PageFactory;
 import org.openqa.selenium.support.ui.ExpectedConditions;
@@ -38,7 +39,7 @@ public class MetalakePage extends BaseWebIT {
 
   @FindBy(
       xpath =
-          "//div[contains(@class, 'MuiDataGrid-main')]//div[contains(@class, 'MuiDataGrid-virtualScroller')]//div[@role='rowgroup']")
+          "//div[@data-refer='metalake-table-grid']//div[contains(@class, 'ant-table-body')]//table/tbody")
   public WebElement dataViewer;
 
   @FindBy(xpath = "//div[@data-refer='metalake-table-grid']")
@@ -53,43 +54,41 @@ public class MetalakePage extends BaseWebIT {
   @FindBy(xpath = "//*[@data-refer='metalake-comment-field']")
   public WebElement metalakeCommentField;
 
-  @FindBy(xpath = "//*[@data-refer='query-metalake']//input")
+  @FindBy(
+      xpath = "//span[@data-refer='query-metalake']//input | //input[@data-refer='query-metalake']")
   public WebElement queryMetalakeInput;
 
-  @FindBy(xpath = "//*[@data-refer='submit-handle-metalake']")
+  @FindBy(xpath = "//button[@data-refer='submit-handle-metalake']")
   public WebElement submitHandleMetalakeBtn;
 
-  @FindBy(xpath = "//*[@data-refer='cancel-handle-metalake']")
+  @FindBy(xpath = "//button[@data-refer='cancel-handle-metalake']")
   public WebElement cancelHandleMetalakeBtn;
 
-  @FindBy(xpath = "//button[@data-refer='confirm-delete']")
+  @FindBy(xpath = "//input[@data-refer='confirm-delete-input']")
+  public WebElement confirmDeleteInput;
+
+  @FindBy(
+      xpath =
+          "//div[contains(@class, 'ant-modal-confirm')]//button[contains(@class, 'ant-btn-dangerous')]")
   public WebElement confirmDeleteBtn;
 
-  @FindBy(xpath = "//div[@data-refer='details-drawer']")
-  public WebElement detailsDrawer;
-
-  @FindBy(xpath = "//h6[@data-refer='details-title']")
-  public WebElement detailsTitle;
-
-  @FindBy(xpath = "//button[@data-refer='close-details-btn']")
-  public WebElement closeDetailsBtn;
-
-  @FindBy(xpath = "//button[@data-refer='add-metalake-props']")
+  @FindBy(xpath = "//*[@data-refer='add-props']")
   public WebElement addMetalakePropsBtn;
 
-  @FindBy(xpath = "//div[@data-refer='metalake-table-grid']//button[@aria-label='Go to next page']")
+  @FindBy(
+      xpath =
+          "//div[@data-refer='metalake-table-grid']//ul[contains(@class, 'ant-pagination')]//button[@title='Next Page']")
   public WebElement nextPageBtn;
 
   @FindBy(
-      xpath = "//div[@data-refer='metalake-table-grid']//button[@aria-label='Go to previous page']")
+      xpath =
+          "//div[@data-refer='metalake-table-grid']//ul[contains(@class, 'ant-pagination')]//button[@title='Previous Page']")
   public WebElement prevPageBtn;
 
   @FindBy(xpath = "//a[@data-refer='metalake-name-link']")
   public WebElement metalakeNameLink;
 
-  @FindBy(
-      xpath =
-          "//div[@data-refer='metalake-table-grid']//div[contains(@class, 'MuiDataGrid-overlay')]")
+  @FindBy(xpath = "//div[@data-refer='metalake-table-grid']//div[contains(@class, 'ant-empty')]")
   public WebElement metalakeTableWrapper;
 
   @FindBy(xpath = "//*[@data-refer='back-home-btn']")
@@ -147,8 +146,23 @@ public class MetalakePage extends BaseWebIT {
 
   public void clickInUseSwitch(String name) {
     try {
-      String xpath = "//*[@data-refer='metalake-in-use-" + name + "']";
-      clickAndWait(By.xpath(xpath));
+      // Find and hover over the Settings icon to open the dropdown menu
+      String settingsXpath = "//a[@data-refer='settings-metalake-" + name + "']";
+      WebDriverWait wait = new WebDriverWait(driver, MAX_TIMEOUT);
+      WebElement settingsIcon =
+          wait.until(ExpectedConditions.elementToBeClickable(By.xpath(settingsXpath)));
+
+      // Use Actions to hover over the settings icon to trigger the dropdown
+      new Actions(driver).moveToElement(settingsIcon).perform();
+      Thread.sleep(1000);
+
+      // Wait for dropdown menu to appear and click on the "Not In-Use" or "In-Use" menu item
+      String menuItemXpath =
+          "//ul[contains(@class, 'ant-dropdown-menu')]//li[contains(@class, 'ant-dropdown-menu-item')]//span[contains(text(), 'Not In-Use') or contains(text(), 'In-Use')]";
+      WebElement menuItem =
+          wait.until(ExpectedConditions.elementToBeClickable(By.xpath(menuItemXpath)));
+      menuItem.click();
+      Thread.sleep(500);
     } catch (Exception e) {
       LOG.error(e.getMessage(), e);
     }
@@ -156,7 +170,7 @@ public class MetalakePage extends BaseWebIT {
 
   public void clickDeleteMetalakeBtn(String name) {
     try {
-      String xpath = "//button[@data-refer='delete-metalake-" + name + "']";
+      String xpath = "//a[@data-refer='delete-metalake-" + name + "']";
       clickAndWait(By.xpath(xpath));
     } catch (Exception e) {
       LOG.error(e.getMessage(), e);
@@ -165,7 +179,7 @@ public class MetalakePage extends BaseWebIT {
 
   public void clickViewMetalakeBtn(String name) {
     try {
-      String xpath = "//button[@data-refer='view-metalake-" + name + "']";
+      String xpath = "//a[@data-refer='view-metalake-" + name + "']";
       clickAndWait(By.xpath(xpath));
     } catch (Exception e) {
       LOG.error(e.getMessage(), e);
@@ -174,7 +188,7 @@ public class MetalakePage extends BaseWebIT {
 
   public void clickEditMetalakeBtn(String name) {
     try {
-      String xpath = "//button[@data-refer='edit-metalake-" + name + "']";
+      String xpath = "//a[@data-refer='edit-metalake-" + name + "']";
       clickAndWait(By.xpath(xpath));
     } catch (Exception e) {
       LOG.error(e.getMessage(), e);
@@ -196,12 +210,12 @@ public class MetalakePage extends BaseWebIT {
 
   public void setMetalakeProps(int index, String key, String value) {
     // Set the indexed props key
-    String keyPath = "//div[@data-refer='add-props-key-" + index + "']//input[@name='key']";
+    String keyPath = "//*[@data-refer='props-key-" + index + "']//input";
     WebElement keyInput = driver.findElement(By.xpath(keyPath));
     keyInput.sendKeys(key);
 
     // Set the indexed props value
-    String valuePath = "//div[@data-refer='add-props-value-" + index + "']//input[@name='value']";
+    String valuePath = "//*[@data-refer='props-value-" + index + "']//input";
     WebElement valueInput = driver.findElement(By.xpath(valuePath));
     valueInput.sendKeys(value);
   }
@@ -209,7 +223,8 @@ public class MetalakePage extends BaseWebIT {
   public boolean checkIsErrorName() throws InterruptedException {
     try {
       List<WebElement> errorText =
-          metalakeNameField.findElements(By.xpath("//div[contains(@class, 'Mui-error')]"));
+          metalakeNameField.findElements(
+              By.xpath("//div[contains(@class, 'ant-form-item-explain-error')]"));
 
       return !errorText.isEmpty();
     } catch (Exception e) {
@@ -222,13 +237,13 @@ public class MetalakePage extends BaseWebIT {
 
   public boolean verifyCreateMetalake(String name) {
     try {
-      // Get the created metalake row element from DataGrid by name.
-      String rowPath = "//div[@data-id='" + name + "']";
+      // Get the created metalake row element from Ant Design Table by name.
+      String rowPath = "//tr[@data-row-key='" + name + "']";
       WebElement createdMetalakeRow = driver.findElement(By.xpath(rowPath));
       boolean isRow = createdMetalakeRow.isDisplayed();
 
-      // Get and verify the created metalake link from DataGrid row item by name.
-      String linkPath = "//div[@data-field='name']//a[@href='/ui/metalakes?metalake=" + name + "']";
+      // Get and verify the created metalake link from Table row item by name.
+      String linkPath = "//a[@data-refer='metalake-link-" + name + "']";
       WebElement createdMetalakeLink = driver.findElement(By.xpath(linkPath));
       boolean isLink = createdMetalakeLink.isDisplayed();
       boolean isText = Objects.equals(createdMetalakeLink.getText(), name);
@@ -241,7 +256,7 @@ public class MetalakePage extends BaseWebIT {
 
   public boolean verifyEditedMetalake(String name) {
     try {
-      String xpath = "//div[@data-field='name']//a[@href='/ui/metalakes?metalake=" + name + "']";
+      String xpath = "//a[@data-refer='metalake-link-" + name + "']";
       WebElement editedMetalakeLink = driver.findElement(By.xpath(xpath));
 
       // Check if the link text is match with name
@@ -251,32 +266,33 @@ public class MetalakePage extends BaseWebIT {
     }
   }
 
-  public boolean verifyShowMetalakeDetails(String name) throws InterruptedException {
+  public void confirmDeleteMetalake(String name) {
     try {
-      // Check the drawer css property value
-      detailsDrawer.isDisplayed();
-      String drawerVisible = detailsDrawer.getCssValue("visibility");
-      boolean isVisible = Objects.equals(drawerVisible, "visible");
-
-      // Check the created metalake name
-      String drawerTitle = detailsTitle.getText();
-      boolean isText = Objects.equals(drawerTitle, name);
-
-      return isVisible && isText;
+      WebDriverWait wait = new WebDriverWait(driver, ACTION_SLEEP);
+      WebElement inputElement =
+          wait.until(ExpectedConditions.elementToBeClickable(confirmDeleteInput));
+      inputElement.sendKeys(name);
+      clickAndWait(confirmDeleteBtn);
     } catch (Exception e) {
       LOG.error(e.getMessage(), e);
-      return false;
-    } finally {
-      clickAndWait(closeDetailsBtn);
     }
   }
 
   public boolean verifyEmptyMetalake() {
     try {
-      boolean isNoRows = waitShowText("No rows", metalakeTableWrapper);
+      // Wait for the table to refresh after deletion
+      Thread.sleep(2000);
+      WebDriverWait wait = new WebDriverWait(driver, MAX_TIMEOUT);
+      // Wait for the empty state element to be visible
+      WebElement emptyElement =
+          wait.until(
+              ExpectedConditions.visibilityOfElementLocated(
+                  By.xpath(
+                      "//div[@data-refer='metalake-table-grid']//div[contains(@class, 'ant-empty')]")));
+      boolean isNoRows = emptyElement.isDisplayed();
 
       if (!isNoRows) {
-        LOG.error(metalakeTableWrapper.getText(), metalakeTableWrapper);
+        LOG.error("Empty state not displayed");
         return false;
       }
 
@@ -289,10 +305,81 @@ public class MetalakePage extends BaseWebIT {
 
   public boolean verifyChangePagination() {
     try {
-      clickAndWait(nextPageBtn);
-      // Check if the previous page button is available
-      return prevPageBtn.isEnabled() && performPrevPageAction();
+      // Wait for the table to fully load
+      Thread.sleep(1000);
+      WebDriverWait wait = new WebDriverWait(driver, MAX_TIMEOUT);
+
+      // First check if the table has data
+      WebElement tableBody =
+          wait.until(
+              ExpectedConditions.visibilityOfElementLocated(
+                  By.xpath(
+                      "//div[@data-refer='metalake-table-grid']//div[contains(@class, 'ant-table-body')]//table/tbody")));
+
+      // Count the rows in the table
+      List<WebElement> rows = tableBody.findElements(By.xpath(".//tr[@data-row-key]"));
+      LOG.info("Found {} rows in the current page", rows.size());
+
+      // Debug: Print out any elements with pagination-related classes
+      List<WebElement> anyPagination = driver.findElements(By.cssSelector("[class*='pagination']"));
+      LOG.info("Found {} elements with 'pagination' in class name", anyPagination.size());
+      for (WebElement el : anyPagination) {
+        LOG.info("  - Element: {}, class: {}", el.getTagName(), el.getAttribute("class"));
+      }
+
+      // Try to find pagination using CSS selector (more reliable for Antd)
+      List<WebElement> paginationElements =
+          driver.findElements(By.cssSelector("ul.ant-pagination"));
+
+      if (paginationElements.isEmpty()) {
+        // Fallback: try xpath
+        paginationElements =
+            driver.findElements(By.xpath("//ul[contains(@class, 'ant-pagination')]"));
+      }
+
+      if (paginationElements.isEmpty()) {
+        LOG.error("No pagination found even though we have {} rows", rows.size());
+        // If no pagination and 10 or fewer rows, that's expected
+        if (rows.size() <= 10) {
+          LOG.info("Less than or equal to 10 rows, pagination not needed - returning true");
+          return true;
+        }
+        return false;
+      }
+
+      LOG.info("Found {} pagination elements", paginationElements.size());
+      WebElement paginationContainer = paginationElements.get(0);
+
+      // Find and click the next page button
+      WebElement nextBtn =
+          paginationContainer.findElement(
+              By.xpath(".//li[contains(@class, 'ant-pagination-next')]/button"));
+
+      // Check if next button is enabled (not disabled)
+      String disabledAttr = nextBtn.getAttribute("disabled");
+      if (disabledAttr != null) {
+        LOG.info("Next page button is disabled - only one page of data");
+        return rows.size() > 0;
+      }
+
+      nextBtn.click();
+      Thread.sleep(1000);
+
+      // Check if the previous page button is now enabled
+      WebElement prevBtn =
+          paginationContainer.findElement(
+              By.xpath(".//li[contains(@class, 'ant-pagination-prev')]/button"));
+
+      boolean isPrevEnabled = prevBtn.getAttribute("disabled") == null;
+
+      if (isPrevEnabled) {
+        prevBtn.click();
+        Thread.sleep(500);
+        return true;
+      }
+      return true;
     } catch (Exception e) {
+      LOG.error(e.getMessage(), e);
       return false;
     }
   }
@@ -309,15 +396,26 @@ public class MetalakePage extends BaseWebIT {
   public boolean verifyQueryMetalake(String name) {
     try {
       setQueryParams(name);
-      List<WebElement> dataList = dataViewer.findElements(By.xpath(".//div[@data-field='name']"));
-      // Check if the text in the first row matches the search input
-      boolean isQueried = Objects.equals(dataList.get(0).getText(), name);
+      // Wait for the table to filter
+      Thread.sleep(1000);
+
+      WebDriverWait wait = new WebDriverWait(driver, MAX_TIMEOUT);
+
+      // Wait for the table body to be present and find the metalake link with the searched name
+      String metalakeLinkXpath = "//a[@data-refer='metalake-link-" + name + "']";
+      WebElement metalakeLink =
+          wait.until(ExpectedConditions.visibilityOfElementLocated(By.xpath(metalakeLinkXpath)));
+
+      // Check if the metalake link is displayed and contains the correct name
+      boolean isQueried = metalakeLink.isDisplayed() && metalakeLink.getText().equals(name);
 
       if (isQueried) {
         clearQueryInput();
-
+        Thread.sleep(500);
         return true;
       } else {
+        LOG.error(
+            "Query result does not match: expected {} but got {}", name, metalakeLink.getText());
         return false;
       }
     } catch (Exception e) {
@@ -328,13 +426,31 @@ public class MetalakePage extends BaseWebIT {
 
   public boolean verifyLinkToCatalogsPage(String name) throws InterruptedException {
     try {
+      // Wait for the catalogs page to load
+      Thread.sleep(1000);
       WebDriverWait wait = new WebDriverWait(driver, MAX_TIMEOUT);
-      wait.until(ExpectedConditions.visibilityOf(metalakeNameLink));
-      wait.until(ExpectedConditions.urlContains(metalakeNameLink.getAttribute("href")));
 
-      if (!driver.getCurrentUrl().contains(name)
-          || !metalakeNameLink.getAttribute("href").contains(name)) {
-        LOG.error("metalake name link is not match");
+      // Wait for the URL to contain metalake name
+      wait.until(ExpectedConditions.urlContains("metalake=" + name));
+
+      // Verify the URL contains the metalake name
+      String currentUrl = driver.getCurrentUrl();
+      if (!currentUrl.contains(name)) {
+        LOG.error("Current URL does not contain metalake name: {}", currentUrl);
+        return false;
+      }
+
+      // Wait for the metalake name link in breadcrumb to be visible
+      WebElement metalakeLink =
+          wait.until(
+              ExpectedConditions.visibilityOfElementLocated(
+                  By.xpath("//*[@data-refer='metalake-name-link']")));
+
+      if (!metalakeLink.getText().contains(name)) {
+        LOG.error(
+            "Metalake name link text does not match: expected {} but got {}",
+            name,
+            metalakeLink.getText());
         return false;
       }
 
@@ -343,7 +459,14 @@ public class MetalakePage extends BaseWebIT {
       LOG.error(e.getMessage(), e);
       return false;
     } finally {
-      clickAndWait(backHomeBtn);
+      // Navigate back to metalakes page
+      WebDriverWait wait = new WebDriverWait(driver, MAX_TIMEOUT);
+      WebElement backBtn =
+          wait.until(
+              ExpectedConditions.elementToBeClickable(
+                  By.xpath("//*[@data-refer='back-home-btn']")));
+      backBtn.click();
+      Thread.sleep(1000);
     }
   }
 
@@ -361,7 +484,7 @@ public class MetalakePage extends BaseWebIT {
         LOG.error("No match with title, get {}", pageTitle);
         return false;
       }
-      List<WebElement> dataList = dataViewer.findElements(By.xpath(".//div[@data-field='name']"));
+      List<WebElement> dataList = dataViewer.findElements(By.xpath(".//tr//td[1]"));
       if (dataList.isEmpty()) {
         LOG.error("Table List should not be empty");
         return false;

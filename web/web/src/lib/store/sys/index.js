@@ -41,30 +41,58 @@ export const initialVersion = createAsyncThunk('sys/fetchVersion', async (params
   return version
 })
 
-export const fetchGitHubInfo = createAsyncThunk('sys/fetchGitHubInfo', async (params, { getState }) => {
-  let stars = 0
-  let forks = 0
-  const [err, res] = await to(getGitHubApi())
-  if (err || !res) {
-    console.error('Error fetching repository status : ', err)
-  }
+export const fetchGitHubInfo = createAsyncThunk(
+  'sys/fetchGitHubInfo',
+  async (params, { getState, rejectWithValue }) => {
+    // Check sessionStorage cache first
+    if (typeof window !== 'undefined') {
+      const cached = window.sessionStorage.getItem('githubInfo')
+      if (cached) {
+        try {
+          const parsed = JSON.parse(cached)
+          if (parsed.stars && parsed.forks) {
+            return parsed
+          }
+        } catch (e) {
+          // ignore parse error
+        }
+      }
+    }
 
-  stars = formatNumber(res.stargazers_count)
-  forks = formatNumber(res.forks_count)
-  loggerGitHubInfo(stars, forks)
+    let stars = 0
+    let forks = 0
+    const [err, res] = await to(getGitHubApi())
+    if (err || !res) {
+      console.error('Error fetching repository status : ', err)
 
-  return {
-    stars: stars,
-    forks: forks
+      return rejectWithValue({ error: true })
+    }
+
+    stars = formatNumber(res.stargazers_count)
+    forks = formatNumber(res.forks_count)
+    loggerGitHubInfo(stars, forks)
+
+    const result = {
+      stars: stars,
+      forks: forks
+    }
+
+    // Cache to sessionStorage
+    if (typeof window !== 'undefined') {
+      window.sessionStorage.setItem('githubInfo', JSON.stringify(result))
+    }
+
+    return result
   }
-})
+)
 
 export const sysSlice = createSlice({
   name: 'sys',
   initialState: {
     version: '',
     stars: 0,
-    forks: 0
+    forks: 0,
+    githubError: false
   },
   reducers: {
     setVersion(state, action) {
@@ -85,6 +113,10 @@ export const sysSlice = createSlice({
       .addCase(fetchGitHubInfo.fulfilled, (state, action) => {
         state.stars = action.payload.stars
         state.forks = action.payload.forks
+        state.githubError = false
+      })
+      .addCase(fetchGitHubInfo.rejected, (state, action) => {
+        state.githubError = true
       })
   }
 })
