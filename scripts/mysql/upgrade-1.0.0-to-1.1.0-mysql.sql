@@ -30,15 +30,3 @@ CREATE TABLE IF NOT EXISTS `table_version_info` (
     `deleted_at`      BIGINT(20) UNSIGNED DEFAULT 0 COMMENT 'table deletion timestamp, 0 means not deleted',
     UNIQUE KEY `uk_table_id_version_deleted_at` (`table_id`, `version`, `deleted_at`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin COMMENT 'table detail information including format, location, properties, partition, distribution, sort order, index and so on';
-
-CREATE TABLE IF NOT EXISTS `partition_statistic_meta` (
-    `table_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'table id from table_meta',
-    `partition_name` VARCHAR(1024) NOT NULL COMMENT 'partition name',
-    `statistic_name` VARCHAR(128) NOT NULL COMMENT 'statistic name',
-    `statistic_value` MEDIUMTEXT NOT NULL COMMENT 'statistic value as JSON',
-    `audit_info` TEXT NOT NULL COMMENT 'audit information as JSON',
-    `created_at` BIGINT(20) UNSIGNED NOT NULL COMMENT 'creation timestamp in milliseconds',
-    `updated_at` BIGINT(20) UNSIGNED NOT NULL COMMENT 'last update timestamp in milliseconds',
-    PRIMARY KEY (`table_id`, `partition_name`(255), `statistic_name`),
-    KEY `idx_table_partition` (`table_id`, `partition_name`(255))
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin COMMENT 'partition statistics metadata';

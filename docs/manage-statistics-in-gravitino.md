@@ -250,53 +250,53 @@ This provides a reliable, production-ready solution that supports multiple datab
 
 To use JDBC storage, configure the following options by adding the prefix `gravitino.stats.partition.storageOption.`:
 
-| Configuration item                                  | Description                                                          | Default value                  | Required | Since version |
-|-----------------------------------------------------|----------------------------------------------------------------------|--------------------------------|----------|---------------|
-| `gravitino.stats.partition.storageOption.jdbc-url`  | JDBC connection URL (e.g., jdbc:mysql://localhost:3306/gravitino)   | None                           | Yes      | 1.2.0         |
-| `gravitino.stats.partition.storageOption.jdbc-user` | Database username                                                    | None                           | Yes      | 1.2.0         |
-| `gravitino.stats.partition.storageOption.jdbc-password` | Database password                                                | None                           | Yes      | 1.2.0         |
-| `gravitino.stats.partition.storageOption.jdbc-driver` | JDBC driver class name                                             | `com.mysql.cj.jdbc.Driver`     | No       | 1.2.0         |
-| `gravitino.stats.partition.storageOption.pool-max-size` | Maximum connection pool size                                     | `10`                           | No       | 1.2.0         |
-| `gravitino.stats.partition.storageOption.pool-min-idle` | Minimum idle connections in pool                                 | `2`                            | No       | 1.2.0         |
-| `gravitino.stats.partition.storageOption.connection-timeout-ms` | Connection timeout in milliseconds                       | `30000`                        | No       | 1.2.0         |
-| `gravitino.stats.partition.storageOption.test-on-borrow` | Test connections before use                                     | `true`                         | No       | 1.2.0         |
+| Configuration item                                          | Description                                                        | Default value              | Required | Since version |
+|-------------------------------------------------------------|--------------------------------------------------------------------|----------------------------|----------|---------------|
+| `gravitino.stats.partition.storageOption.jdbc-url`          | JDBC connection URL (e.g., jdbc:mysql://localhost:3306/gravitino) | None                       | Yes      | 1.2.0         |
+| `gravitino.stats.partition.storageOption.jdbc-user`         | Database username                                                  | None                       | Yes      | 1.2.0         |
+| `gravitino.stats.partition.storageOption.jdbc-password`     | Database password                                                  | None                       | Yes      | 1.2.0         |
+| `gravitino.stats.partition.storageOption.jdbc-driver`       | JDBC driver class name                                             | `com.mysql.cj.jdbc.Driver` | No       | 1.2.0         |
+| `gravitino.stats.partition.storageOption.pool-max-size`     | Maximum connection pool size                                       | `10`                       | No       | 1.2.0         |
+| `gravitino.stats.partition.storageOption.pool-min-idle`     | Minimum idle connections in pool                                   | `2`                        | No       | 1.2.0         |
+| `gravitino.stats.partition.storageOption.connection-timeout-ms` | Connection timeout in milliseconds                             | `30000`                    | No       | 1.2.0         |
+| `gravitino.stats.partition.storageOption.test-on-borrow`    | Test connections before use                                        | `true`                     | No       | 1.2.0         |
 
 **Example MySQL Configuration:**
 
 ```properties
-gravitino.stats.partition.storageFactoryClass=org.apache.gravitino.stats.storage.JdbcPartitionStatisticStorageFactory
-gravitino.stats.partition.storageOption.jdbc-url=jdbc:mysql://localhost:3306/gravitino
-gravitino.stats.partition.storageOption.jdbc-user=gravitino
-gravitino.stats.partition.storageOption.jdbc-password=gravitino123
-gravitino.stats.partition.storageOption.pool-max-size=20
+gravitino.stats.partition.storageFactoryClass = org.apache.gravitino.stats.storage.JdbcPartitionStatisticStorageFactory
+gravitino.stats.partition.storageOption.jdbc-url = jdbc:mysql://localhost:3306/gravitino
+gravitino.stats.partition.storageOption.jdbc-user = gravitino
+gravitino.stats.partition.storageOption.jdbc-password = gravitino123
+gravitino.stats.partition.storageOption.pool-max-size = 20
 ```
 
 **Example PostgreSQL Configuration:**
 
 ```properties
-gravitino.stats.partition.storageFactoryClass=org.apache.gravitino.stats.storage.JdbcPartitionStatisticStorageFactory
-gravitino.stats.partition.storageOption.jdbc-url=jdbc:postgresql://localhost:5432/gravitino
-gravitino.stats.partition.storageOption.jdbc-user=gravitino
-gravitino.stats.partition.storageOption.jdbc-password=gravitino123
-gravitino.stats.partition.storageOption.jdbc-driver=org.postgresql.Driver
+gravitino.stats.partition.storageFactoryClass = org.apache.gravitino.stats.storage.JdbcPartitionStatisticStorageFactory
+gravitino.stats.partition.storageOption.jdbc-url = jdbc:postgresql://localhost:5432/gravitino
+gravitino.stats.partition.storageOption.jdbc-user = gravitino
+gravitino.stats.partition.storageOption.jdbc-password = gravitino123
+gravitino.stats.partition.storageOption.jdbc-driver = org.postgresql.Driver
 ```
 
 **Database Schema Setup:**
 
 Before using JDBC storage, you need to create the database schema. Schema files are provided for all supported databases:
 
-- MySQL: `scripts/mysql/schema-1.2.0-mysql.sql`
-- PostgreSQL: `scripts/postgresql/schema-1.2.0-postgresql.sql`
-- H2: `scripts/h2/schema-1.2.0-h2.sql`
+- MySQL: `scripts/mysql/schema-${GRAVITINO_VERSION}-mysql.sql`
+- PostgreSQL: `scripts/postgresql/schema-${GRAVITINO_VERSION}-postgresql.sql`
+- H2: `scripts/h2/schema-${GRAVITINO_VERSION}-h2.sql`
 
 For MySQL:
 ```bash
-mysql -u root -p < scripts/mysql/schema-1.2.0-mysql.sql
+mysql -u root -p < scripts/mysql/schema-${GRAVITINO_VERSION}-mysql.sql
 ```
 
 For PostgreSQL:
 ```bash
-psql -U postgres -d gravitino -f scripts/postgresql/schema-1.2.0-postgresql.sql
+psql -U postgres -d gravitino -f scripts/postgresql/schema-${GRAVITINO_VERSION}-postgresql.sql
 ```
 
 #### Lance Storage (Alternative)
