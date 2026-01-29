@@ -24,6 +24,7 @@ import static org.apache.gravitino.catalog.doris.DorisTablePropertiesMetadata.RE
 import static org.apache.gravitino.catalog.doris.utils.DorisUtils.generatePartitionSqlFragment;
 import static org.apache.gravitino.rel.Column.DEFAULT_VALUE_NOT_SET;
 
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableList;
 import java.sql.Connection;
@@ -149,7 +150,8 @@ public class DorisTableOperations extends JdbcTableOperations {
     return result;
   }
 
-  private Map<String, String> appendNecessaryProperties(Map<String, String> properties) {
+  @VisibleForTesting
+  Map<String, String> appendNecessaryProperties(Map<String, String> properties) {
     Map<String, String> resultMap;
     if (properties == null) {
       resultMap = new HashMap<>();

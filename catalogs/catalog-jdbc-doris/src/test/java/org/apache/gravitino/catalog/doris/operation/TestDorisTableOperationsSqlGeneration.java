@@ -23,6 +23,7 @@ import org.apache.gravitino.catalog.doris.converter.DorisTypeConverter;
 import org.apache.gravitino.catalog.jdbc.JdbcColumn;
 import org.apache.gravitino.catalog.jdbc.converter.JdbcColumnDefaultValueConverter;
 import org.apache.gravitino.catalog.jdbc.converter.JdbcExceptionConverter;
+import org.apache.gravitino.rel.expressions.NamedReference;
 import org.apache.gravitino.rel.expressions.distributions.Distribution;
 import org.apache.gravitino.rel.expressions.distributions.Distributions;
 import org.apache.gravitino.rel.expressions.literals.Literals;
@@ -31,6 +32,7 @@ import org.apache.gravitino.rel.indexes.Indexes;
 import org.apache.gravitino.rel.types.Types;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
+import org.mockito.Mockito;
 
 public class TestDorisTableOperationsSqlGeneration {
 
@@ -66,9 +68,14 @@ public class TestDorisTableOperationsSqlGeneration {
             .withDefaultValue(Literals.of("", Types.VarCharType.of(255)))
             .build();
     // Doris requires distribution
-    Distribution distribution = Distributions.hash(1, Distributions.fields("col1"));
+    Distribution distribution = Distributions.hash(1, NamedReference.field("col1"));
 
-    String sql = ops.createTableSql(tableName, new JdbcColumn[] {col1}, distribution);
+    TestableDorisTableOperations mockOps = Mockito.spy(ops);
+    Mockito.doAnswer(a -> a.getArgument(0))
+        .when(mockOps)
+        .appendNecessaryProperties(Mockito.anyMap());
+
+    String sql = mockOps.createTableSql(tableName, new JdbcColumn[] {col1}, distribution);
     Assertions.assertTrue(sql.contains("DEFAULT ''"), "Should contain DEFAULT '' but was: " + sql);
   }
 
@@ -84,9 +91,14 @@ public class TestDorisTableOperationsSqlGeneration {
             .withDefaultValue(Literals.of("abc", Types.VarCharType.of(255)))
             .build();
     // Doris requires distribution
-    Distribution distribution = Distributions.hash(1, Distributions.fields("col1"));
+    Distribution distribution = Distributions.hash(1, NamedReference.field("col1"));
 
-    String sql = ops.createTableSql(tableName, new JdbcColumn[] {col1}, distribution);
+    TestableDorisTableOperations mockOps = Mockito.spy(ops);
+    Mockito.doAnswer(a -> a.getArgument(0))
+        .when(mockOps)
+        .appendNecessaryProperties(Mockito.anyMap());
+
+    String sql = mockOps.createTableSql(tableName, new JdbcColumn[] {col1}, distribution);
     Assertions.assertTrue(
         sql.contains("DEFAULT 'abc'"), "Should contain DEFAULT 'abc' but was: " + sql);
   }
