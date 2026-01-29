@@ -63,4 +63,16 @@ public interface IcebergConfigProvider extends Closeable {
   default String getDefaultCatalogName() {
     return IcebergConstants.ICEBERG_REST_DEFAULT_CATALOG;
   }
+
+  /**
+   * Indicates whether the catalog config can be checked for changes efficiently. When true, the
+   * caller can compare cached config with current config to detect stale entries. This is typically
+   * true only for providers that can fetch config without expensive operations (e.g., internal
+   * calls that bypass HTTP).
+   *
+   * @return true if config changes can be detected efficiently, false otherwise.
+   */
+  default boolean canCheckConfigChange() {
+    return false;
+  }
 }
