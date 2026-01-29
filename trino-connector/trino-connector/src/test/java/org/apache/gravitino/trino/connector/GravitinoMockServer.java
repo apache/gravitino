@@ -19,6 +19,7 @@
 package org.apache.gravitino.trino.connector;
 
 import static java.util.Collections.emptyMap;
+import static org.apache.gravitino.trino.connector.TestGravitinoConnector.SPI_VERSION_SUPPORT_ADD_COLUMN_WITH_POSITION;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.ArgumentMatchers.anyMap;
@@ -620,7 +621,7 @@ public class GravitinoMockServer implements AutoCloseable {
 
   private void addColumn(
       ConnectorMetadata metadata, ConnectorTableHandle tableHandle, ColumnMetadata columnMetadata) {
-    if (trinoVersion < 468) {
+    if (trinoVersion < SPI_VERSION_SUPPORT_ADD_COLUMN_WITH_POSITION) {
       try {
         metadata
             .getClass()

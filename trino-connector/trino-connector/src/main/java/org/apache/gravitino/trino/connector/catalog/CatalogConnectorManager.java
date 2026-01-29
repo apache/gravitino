@@ -139,7 +139,6 @@ public class CatalogConnectorManager {
         metadataUpdateIntervalSecond,
         metadataUpdateIntervalSecond,
         TimeUnit.SECONDS);
-    gravitinoClient.close();
     LOG.info("Gravitino CatalogConnectorManager started.");
   }
 
@@ -333,7 +332,12 @@ public class CatalogConnectorManager {
     if (catalogRegister != null) {
       catalogRegister.close();
     }
+
     executorService.shutdown();
+
+    if (gravitinoClient != null) {
+      gravitinoClient.close();
+    }
   }
 
   /**

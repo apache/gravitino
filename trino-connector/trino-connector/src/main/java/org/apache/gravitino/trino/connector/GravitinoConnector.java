@@ -18,7 +18,10 @@
  */
 package org.apache.gravitino.trino.connector;
 
+import static io.trino.spi.StandardErrorCode.NOT_SUPPORTED;
+
 import com.google.common.base.Preconditions;
+import io.trino.spi.TrinoException;
 import io.trino.spi.connector.Connector;
 import io.trino.spi.connector.ConnectorAccessControl;
 import io.trino.spi.connector.ConnectorCapabilities;
@@ -95,7 +98,7 @@ public class GravitinoConnector implements Connector {
       CatalogConnectorMetadata catalogConnectorMetadata,
       CatalogConnectorMetadataAdapter metadataAdapter,
       ConnectorMetadata internalMetadata) {
-    throw new RuntimeException("Should be overridden in subclass");
+    throw new TrinoException(NOT_SUPPORTED, "Should be overridden in subclass");
   }
 
   @Override

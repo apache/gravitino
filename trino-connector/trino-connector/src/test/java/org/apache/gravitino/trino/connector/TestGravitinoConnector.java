@@ -18,7 +18,6 @@
  */
 package org.apache.gravitino.trino.connector;
 
-import static io.trino.testing.QueryAssertions.assertUpdate;
 import static java.lang.String.format;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -35,6 +34,10 @@ import org.apache.gravitino.client.GravitinoAdminClient;
 import org.junit.jupiter.api.Test;
 
 public abstract class TestGravitinoConnector extends AbstractGravitinoConnectorTest {
+
+  public static final int SPI_VERSION_TEST_SUPPORT_RENAME_COLUMN = 452;
+  public static final int SPI_VERSION_SUPPORT_ADD_COLUMN_WITH_POSITION = 468;
+  public static final int SPI_VERSION_TEST_SUPPORT_ADD_COLUMN = 469;
 
   @Override
   protected void configureCatalogs(
@@ -162,7 +165,7 @@ public abstract class TestGravitinoConnector extends AbstractGravitinoConnectorT
         .contains("COMMENT 'test column comments'");
 
     // test add column and drop column, but the memory connector is not supported these operations.
-    if (trinoVersion < 469) {
+    if (trinoVersion < SPI_VERSION_TEST_SUPPORT_ADD_COLUMN) {
       assertQueryFails(
           String.format("alter table %s add column if not exists c varchar", fullTableName1),
           "This connector does not support adding columns");
@@ -178,7 +181,7 @@ public abstract class TestGravitinoConnector extends AbstractGravitinoConnectorT
         "This connector does not support dropping columns");
 
     // test rename column, but the memory connector is not supported these operations.
-    if (trinoVersion < 452) {
+    if (trinoVersion < SPI_VERSION_TEST_SUPPORT_RENAME_COLUMN) {
       assertQueryFails(
           String.format("alter table %s rename column b to d ", fullTableName1),
           "This connector does not support renaming columns");

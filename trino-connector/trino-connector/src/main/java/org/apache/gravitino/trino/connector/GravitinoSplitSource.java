@@ -18,6 +18,9 @@
  */
 package org.apache.gravitino.trino.connector;
 
+import static io.trino.spi.StandardErrorCode.NOT_SUPPORTED;
+
+import io.trino.spi.TrinoException;
 import io.trino.spi.connector.ConnectorSplit;
 import io.trino.spi.connector.ConnectorSplitSource;
 import java.util.List;
@@ -55,7 +58,7 @@ public class GravitinoSplitSource implements ConnectorSplitSource {
   }
 
   protected ConnectorSplit createSplit(ConnectorSplit split) {
-    throw new RuntimeException("Should be overridden in subclass");
+    throw new TrinoException(NOT_SUPPORTED, "Should be overridden in subclass");
   }
 
   @Override

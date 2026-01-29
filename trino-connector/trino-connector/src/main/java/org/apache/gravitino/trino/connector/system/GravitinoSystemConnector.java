@@ -18,10 +18,13 @@
  */
 package org.apache.gravitino.trino.connector.system;
 
+import static io.trino.spi.StandardErrorCode.NOT_SUPPORTED;
+
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import io.trino.spi.HostAddress;
 import io.trino.spi.Page;
+import io.trino.spi.TrinoException;
 import io.trino.spi.connector.ColumnHandle;
 import io.trino.spi.connector.Connector;
 import io.trino.spi.connector.ConnectorMetadata;
@@ -130,7 +133,7 @@ public class GravitinoSystemConnector implements Connector {
     }
 
     protected ConnectorPageSource createPageSource(Page page) {
-      throw new RuntimeException("Should be overridden in subclass");
+      throw new TrinoException(NOT_SUPPORTED, "Should be overridden in subclass");
     }
   }
 
@@ -151,7 +154,7 @@ public class GravitinoSystemConnector implements Connector {
     }
 
     protected ConnectorSplit createSplit(SchemaTableName tableName) {
-      throw new RuntimeException("Should be overridden in subclass");
+      throw new TrinoException(NOT_SUPPORTED, "Should be overridden in subclass");
     }
   }
 

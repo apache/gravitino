@@ -18,6 +18,7 @@
  */
 package org.apache.gravitino.trino.connector;
 
+import static io.trino.spi.StandardErrorCode.NOT_SUPPORTED;
 import static org.apache.gravitino.trino.connector.GravitinoErrorCode.GRAVITINO_RUNTIME_ERROR;
 
 import com.google.common.annotations.VisibleForTesting;
@@ -142,7 +143,7 @@ public class GravitinoConnectorFactory implements ConnectorFactory {
   }
 
   protected GravitinoConnector createConnector(CatalogConnectorContext connectorContext) {
-    throw new RuntimeException("Should be overridden in subclass");
+    throw new TrinoException(NOT_SUPPORTED, "Should be overridden in subclass");
   }
 
   protected GravitinoSystemConnector createSystemConnector(

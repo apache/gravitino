@@ -37,7 +37,7 @@ import java.lang.reflect.Method;
  */
 public final class BlockJsonSerde {
   private static final String BLOCK_SERDE_UTIL_CLASS_NAME = "io.trino.block.BlockSerdeUtil";
-  private static final int DEFAULT_BLOCK_ENCODING_NAME_LENGTH = 1024;
+  private static final int DEFAULT_BLOCK_ENCODING_NAME_LENGTH = 64;
 
   /**
    * Jackson serializer for Trino {@link Block} objects. Serializes block instances using Trino's
