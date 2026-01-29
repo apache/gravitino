@@ -114,7 +114,6 @@ public class TestStarRocksTableOperationsSqlGeneration {
     // If it returns "   " (unquoted), this assert might fail or pass depending on what we expect.
     // The user suspects it generates "DEFAULT ;" or similar invalid SQL.
     // Let's see what it actually generates.
-    System.out.println("Generated SQL: " + sql);
     Assertions.assertTrue(
         sql.contains("DEFAULT '   '"), "Should contain DEFAULT '   ' but was: " + sql);
   }
