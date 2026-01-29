@@ -73,7 +73,36 @@ public class ClickHouseContainer extends BaseContainer {
 
   @Override
   protected boolean checkContainerStatus(int retryLimit) {
-    return true;
+    for (int attempt = 1; attempt <= retryLimit; attempt++) {
+      try (Connection connection =
+              DriverManager.getConnection(getJdbcUrl(), USER_NAME, getPassword());
+          Statement statement = connection.createStatement()) {
+        // Simple health check query; ClickHouse should respond if it is ready.
+        statement.execute("SELECT 1");
+        LOG.info("clickHouse container is healthy after {} attempt(s)", attempt);
+        return true;
+      } catch (SQLException e) {
+        LOG.warn(
+            "Failed to connect to clickHouse container on attempt {}/{}: {}",
+            attempt,
+            retryLimit,
+            e.getMessage(),
+            e);
+        if (attempt < retryLimit) {
+          try {
+            Thread.sleep(1000L);
+          } catch (InterruptedException interruptedException) {
+            Thread.currentThread().interrupt();
+            LOG.error(
+                "Interrupted while waiting to retry clickHouse container health check",
+                interruptedException);
+            break;
+          }
+        }
+      }
+    }
+    LOG.error("clickHouse container failed health checks after {} attempt(s)", retryLimit);
+    return false;
   }
 
   public void createDatabase(TestDatabaseName testDatabaseName) {
@@ -81,7 +110,8 @@ public class ClickHouseContainer extends BaseContainer {
         StringUtils.substring(
             getJdbcUrl(testDatabaseName), 0, getJdbcUrl(testDatabaseName).lastIndexOf("/"));
 
-    // change password for root user, Gravitino API must set password in catalog properties
+    // Use the default username and password to connect and create the database;
+    // any non-default password must be configured via Gravitino catalog properties.
     try (Connection connection =
             DriverManager.getConnection(clickHouseJdbcUrl, USER_NAME, getPassword());
         Statement statement = connection.createStatement()) {

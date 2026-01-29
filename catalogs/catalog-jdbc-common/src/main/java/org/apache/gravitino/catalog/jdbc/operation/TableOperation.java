@@ -76,14 +76,18 @@ public interface TableOperation {
       throws TableAlreadyExistsException;
 
   /**
-   * @param databaseName The name of the database.
-   * @param tableName The name of the table.
-   * @param columns The columns of the table.
-   * @param comment The comment of the table.
-   * @param properties The properties of the table.
-   * @param partitioning The partitioning of the table.
-   * @param indexes The indexes of the table.
-   * @param sortOrders The sort orders of the table
+   * Create a table with sort orders.
+   *
+   * @param databaseName database name of the table
+   * @param tableName name of the table
+   * @param columns columns of the table
+   * @param comment comment of the table
+   * @param properties properties of the table
+   * @param partitioning partitioning of the table
+   * @param distribution distribution information of the table
+   * @param indexes indexes of the table
+   * @param sortOrders sort orders of the table
+   * @throws TableAlreadyExistsException if the table already exists
    */
   void create(
       String databaseName,

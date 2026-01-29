@@ -123,7 +123,7 @@ public class ClickHouseTableOperations extends JdbcTableOperations {
       Index[] indexes,
       SortOrder[] sortOrders) {
 
-    // This two is not yet supported in Gravitino now and will be supported in future.
+    // These two are not yet supported in Gravitino now and will be supported in the future.
     if (ArrayUtils.isNotEmpty(partitioning)) {
       throw new UnsupportedOperationException(
           "Currently we do not support Partitioning in clickhouse");
@@ -176,18 +176,18 @@ public class ClickHouseTableOperations extends JdbcTableOperations {
     sqlBuilder.append("\n ENGINE = ").append(engine);
 
     // Omit partition by clause as it will be supported in the next PR
-    // TODO (yuqi)
+    // TODO: Add partition by clause support
 
     // Add order by clause
     if (ArrayUtils.isNotEmpty(sortOrders)) {
       if (sortOrders.length > 1) {
         throw new UnsupportedOperationException(
-            "Currently we do not support sortOrders's length > 1");
+            "Currently ClickHouse does not support sortOrders with more than 1 element");
       } else if (sortOrders[0].nullOrdering() != null || sortOrders[0].direction() != null) {
         // If no value is set earlier, some default values will be set.
         // It is difficult to determine whether the user has set a value.
         LOG.warn(
-            "clickhouse currently do not support nullOrdering: {} and direction: {} of sortOrders,and will ignore these",
+            "ClickHouse currently does not support nullOrdering: {} and direction: {} of sortOrders,and will ignore them",
             sortOrders[0].nullOrdering(),
             sortOrders[0].direction());
       }
@@ -285,7 +285,7 @@ public class ClickHouseTableOperations extends JdbcTableOperations {
     String schemaName = connection.getSchema();
     // CK tables include : DICTIONARY", "LOG TABLE", "MEMORY TABLE",
     // "REMOTE TABLE", "TABLE", "VIEW", "SYSTEM TABLE", "TEMPORARY TABLE
-    return metaData.getTables(catalogName, schemaName, null, null);
+    return metaData.getTables(catalogName, schemaName, null, new String[] {"TABLE"});
   }
 
   @Override

@@ -37,7 +37,6 @@ public class ClickHouseTablePropertiesMetadata extends JdbcTablePropertiesMetada
       ClickHouseConstants.GRAVITINO_CLICKHOUSE_ENGINE_NAME;
   public static final String CLICKHOUSE_ENGINE_KEY = ClickHouseConstants.CLICKHOUSE_ENGINE_NAME;
 
-  // Reorganize the code here.
   public static final PropertyEntry<String> COMMENT_PROPERTY_ENTRY =
       stringReservedPropertyEntry(COMMENT_KEY, "The table comment", true);
   public static final PropertyEntry<ENGINE> ENGINE_PROPERTY_ENTRY =
@@ -73,7 +72,6 @@ public class ClickHouseTablePropertiesMetadata extends JdbcTablePropertiesMetada
           false,
           "",
           false);
-  // End of reorganization.
 
   private static final Map<String, PropertyEntry<?>> PROPERTIES_METADATA =
       createPropertiesMetadata();
