@@ -18,8 +18,6 @@
  */
 package org.apache.gravitino.catalog.postgresql.operation;
 
-import static org.apache.gravitino.rel.Column.DEFAULT_VALUE_NOT_SET;
-
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
@@ -293,24 +291,7 @@ public class PostgreSqlTableOperations extends JdbcTableOperations
       sqlBuilder.append("NOT NULL ");
     }
     // Add DEFAULT value if specified
-    if (!DEFAULT_VALUE_NOT_SET.equals(column.defaultValue())) {
-      String defaultValue = columnDefaultValueConverter.fromGravitino(column.defaultValue());
-      if ((column.dataType() instanceof Types.VarCharType
-          || column.dataType() instanceof Types.StringType
-          || column.dataType() instanceof Types.FixedCharType)) {
-        if (StringUtils.isEmpty(defaultValue)) {
-          defaultValue = "''";
-        } else if (!defaultValue.startsWith("'") || !defaultValue.endsWith("'")) {
-          // If the default value is not wrapped in single quotes, wrap it.
-          // This is to support cases where the default value is like " " (space) or "abc" (unquoted
-          // string).
-          // And standard converters might return unquoted strings in some versions or
-          // configurations.
-          defaultValue = "'" + defaultValue + "'";
-        }
-      }
-      sqlBuilder.append("DEFAULT ").append(defaultValue).append(SPACE);
-    }
+    appendDefaultValue(column, sqlBuilder);
   }
 
   @Override
@@ -576,16 +557,7 @@ public class PostgreSqlTableOperations extends JdbcTableOperations
 
     StringBuilder sqlBuilder = new StringBuilder(ALTER_TABLE + jdbcTable.name());
     String newDefaultValue =
-        columnDefaultValueConverter.fromGravitino(updateColumnDefaultValue.getNewDefaultValue());
-    if ((column.dataType() instanceof Types.VarCharType
-        || column.dataType() instanceof Types.StringType
-        || column.dataType() instanceof Types.FixedCharType)) {
-      if (StringUtils.isEmpty(newDefaultValue)) {
-        newDefaultValue = "''";
-      } else if (!newDefaultValue.startsWith("'") || !newDefaultValue.endsWith("'")) {
-        newDefaultValue = "'" + newDefaultValue + "'";
-      }
-    }
+        calculateDefaultValue(column, updateColumnDefaultValue.getNewDefaultValue());
     sqlBuilder
         .append("\n")
         .append(ALTER_COLUMN)
