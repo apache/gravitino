@@ -18,8 +18,6 @@
  */
 package org.apache.gravitino.catalog.clickhouse.operations;
 
-import static org.apache.gravitino.catalog.clickhouse.ClickHouseConfig.DEFAULT_CK_ON_CLUSTER;
-
 import com.google.common.collect.ImmutableSet;
 import java.sql.Connection;
 import java.sql.ResultSet;
@@ -44,9 +42,6 @@ public class ClickHouseDatabaseOperations extends JdbcDatabaseOperations {
   // TODO: handle ClickHouse cluster properly when creating/dropping databases/tables
   //  use https://github.com/apache/gravitino/issues/9820 to track it.
   @SuppressWarnings("unused")
-  private boolean onCluster = false;
-
-  @SuppressWarnings("unused")
   private String clusterName = null;
 
   @Override
@@ -57,16 +52,6 @@ public class ClickHouseDatabaseOperations extends JdbcDatabaseOperations {
     final String cn = conf.get(ClickHouseConfig.CK_CLUSTER_NAME.getKey());
     if (StringUtils.isNotBlank(cn)) {
       clusterName = cn;
-    }
-
-    final String oc =
-        conf.getOrDefault(
-            ClickHouseConfig.CK_ON_CLUSTER.getKey(), String.valueOf(DEFAULT_CK_ON_CLUSTER));
-    onCluster = Boolean.parseBoolean(oc);
-
-    if (onCluster && StringUtils.isBlank(clusterName)) {
-      throw new IllegalArgumentException(
-          "ClickHouse 'ON CLUSTER' is enabled, but cluster name is not provided.");
     }
   }
 

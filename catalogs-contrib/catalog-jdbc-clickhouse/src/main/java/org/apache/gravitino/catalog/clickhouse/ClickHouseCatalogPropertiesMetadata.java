@@ -19,7 +19,6 @@
 
 package org.apache.gravitino.catalog.clickhouse;
 
-import static org.apache.gravitino.connector.PropertyEntry.booleanPropertyEntry;
 import static org.apache.gravitino.connector.PropertyEntry.stringPropertyEntry;
 
 import com.google.common.collect.ImmutableList;
@@ -40,22 +39,6 @@ public class ClickHouseCatalogPropertiesMetadata extends JdbcCatalogPropertiesMe
             stringPropertyEntry(
                 ClickHouseConfig.CK_CLUSTER_NAME.getKey(),
                 ClickHouseConfig.CK_CLUSTER_NAME.getDoc(),
-                false /* required */,
-                false /* immutable */,
-                null /* defaultValue */,
-                false /* hidden */,
-                false /* reserved */),
-            booleanPropertyEntry(
-                ClickHouseConfig.CK_ON_CLUSTER.getKey(),
-                ClickHouseConfig.CK_ON_CLUSTER.getDoc(),
-                false /* required */,
-                false /* immutable */,
-                false /* defaultValue */,
-                false /* hidden */,
-                false /* reserved */),
-            stringPropertyEntry(
-                ClickHouseConfig.CK_CLUSTER_SHARDING_KEY.getKey(),
-                ClickHouseConfig.CK_CLUSTER_SHARDING_KEY.getDoc(),
                 false /* required */,
                 false /* immutable */,
                 null /* defaultValue */,
