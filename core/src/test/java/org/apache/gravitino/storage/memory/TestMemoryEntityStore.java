@@ -147,6 +147,12 @@ public class TestMemoryEntityStore {
     }
 
     @Override
+    public <E extends Entity & HasIdentifier> List<E> batchGet(
+        List<NameIdentifier> idents, EntityType entityType, Class<E> e) {
+      return idents.stream().map(ident -> (E) entityMap.get(ident)).toList();
+    }
+
+    @Override
     public boolean delete(NameIdentifier ident, EntityType entityType, boolean cascade)
         throws IOException {
       Entity prev = entityMap.remove(ident);

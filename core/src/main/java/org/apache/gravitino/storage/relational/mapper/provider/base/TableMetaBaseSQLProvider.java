@@ -337,4 +337,28 @@ public class TableMetaBaseSQLProvider {
             TABLE_NAME,
             TableVersionMapper.TABLE_NAME);
   }
+
+  public String batchSelectTableByIdentifier(
+      @Param("schemaId") Long schemaId, @Param("tableNames") List<String> tableNames) {
+    return """
+            <script>
+            SELECT
+            tm.table_id AS tableId,
+            tm.table_name AS tableName,
+            tm.metalake_id AS metalakeId,
+            tm.audit_info AS auditInfo,
+            tm.current_version AS currentVersion,
+            tm.last_version AS lastVersion,
+            tm.deleted_at AS deletedAt
+            FROM %s tm
+            WHERE schema_id = #{schemaId}
+            AND table_name IN
+            <foreach collection="tableNames" item="tableName" open="(" separator="," close=")">
+            #{tableName}
+            </foreach>
+             AND deleted_at = 0
+             </script>
+            """
+        .formatted(TABLE_NAME);
+  }
 }
