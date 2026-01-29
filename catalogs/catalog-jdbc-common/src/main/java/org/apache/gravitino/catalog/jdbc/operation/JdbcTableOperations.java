@@ -62,6 +62,9 @@ import org.apache.gravitino.rel.expressions.transforms.Transform;
 import org.apache.gravitino.rel.expressions.transforms.Transforms;
 import org.apache.gravitino.rel.indexes.Index;
 import org.apache.gravitino.rel.indexes.Indexes;
+import org.apache.gravitino.rel.types.Types.FixedCharType;
+import org.apache.gravitino.rel.types.Types.StringType;
+import org.apache.gravitino.rel.types.Types.VarCharType;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -101,16 +104,15 @@ public abstract class JdbcTableOperations implements TableOperation {
     String defaultValue = columnDefaultValueConverter.fromGravitino(defaultValueExpression);
 
     // Special handling for SQL NULL: do not quote it, even for string-like columns.
-    String trimmedDefault =
-        defaultValue == null ? null : defaultValue.trim();
+    String trimmedDefault = defaultValue == null ? null : defaultValue.trim();
     if (defaultValueExpression == Literals.NULL
         || (trimmedDefault != null && "NULL".equalsIgnoreCase(trimmedDefault))) {
       return "NULL";
     }
 
-    if (column.dataType() instanceof org.apache.gravitino.rel.types.Types.VarCharType
-        || column.dataType() instanceof org.apache.gravitino.rel.types.Types.StringType
-        || column.dataType() instanceof org.apache.gravitino.rel.types.Types.FixedCharType) {
+    if (column.dataType() instanceof VarCharType
+        || column.dataType() instanceof StringType
+        || column.dataType() instanceof FixedCharType) {
       if (StringUtils.isEmpty(defaultValue)) {
         // Represent empty string default as two single quotes.
         return "''";
@@ -140,11 +142,10 @@ public abstract class JdbcTableOperations implements TableOperation {
    * Returns whether a string default value for a string-like column should be wrapped in single
    * quotes.
    *
-   * <p>This method is used to avoid changing semantics for SQL NULLs and function/keyword
-   * defaults (for example, CURRENT_TIMESTAMP, NOW(), or UUID()) that the converter already
-   * returns unquoted.
+   * <p>This method is used to avoid changing semantics for SQL NULLs and function/keyword defaults
+   * (for example, CURRENT_TIMESTAMP, NOW(), or UUID()) that the converter already returns unquoted.
    */
-  private boolean shouldQuoteStringDefault(String trimmedDefault) {
+  protected boolean shouldQuoteStringDefault(String trimmedDefault) {
     if (StringUtils.isEmpty(trimmedDefault)) {
       return true;
     }
@@ -163,6 +164,7 @@ public abstract class JdbcTableOperations implements TableOperation {
 
     return true;
   }
+
   protected void appendDefaultValue(JdbcColumn column, StringBuilder sqlBuilder) {
     if (DEFAULT_VALUE_NOT_SET.equals(column.defaultValue())) {
       return;
