@@ -31,6 +31,11 @@ public class Indexes {
   public static final String DEFAULT_MYSQL_PRIMARY_KEY_NAME = "PRIMARY";
 
   /**
+   * ClickHouse does not support setting the name of the primary key, so the default name is used.
+   */
+  public static final String DEFAULT_CLICKHOUSE_PRIMARY_KEY_NAME = "PRIMARY";
+
+  /**
    * Create a unique index on columns. Like unique (a) or unique (a, b), for complex like unique
    *
    * @param name The name of the index
@@ -165,7 +170,7 @@ public class Indexes {
        * @param indexType The type of the index
        * @return The builder for creating a new instance of IndexImpl.
        */
-      public Indexes.IndexImpl.Builder withIndexType(IndexType indexType) {
+      public Builder withIndexType(IndexType indexType) {
         this.indexType = indexType;
         return this;
       }
@@ -176,7 +181,7 @@ public class Indexes {
        * @param name The name of the index
        * @return The builder for creating a new instance of IndexImpl.
        */
-      public Indexes.IndexImpl.Builder withName(String name) {
+      public Builder withName(String name) {
         this.name = name;
         return this;
       }
@@ -187,7 +192,7 @@ public class Indexes {
        * @param fieldNames The field names of the index
        * @return The builder for creating a new instance of IndexImpl.
        */
-      public Indexes.IndexImpl.Builder withFieldNames(String[][] fieldNames) {
+      public Builder withFieldNames(String[][] fieldNames) {
         this.fieldNames = fieldNames;
         return this;
       }

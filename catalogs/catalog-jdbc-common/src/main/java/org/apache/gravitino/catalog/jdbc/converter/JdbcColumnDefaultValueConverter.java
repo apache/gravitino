@@ -22,6 +22,8 @@ import static org.apache.gravitino.rel.Column.DEFAULT_VALUE_NOT_SET;
 
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
+import java.time.format.DateTimeFormatterBuilder;
+import java.time.temporal.ChronoField;
 import org.apache.gravitino.rel.expressions.Expression;
 import org.apache.gravitino.rel.expressions.FunctionExpression;
 import org.apache.gravitino.rel.expressions.literals.Literal;
@@ -34,11 +36,18 @@ public class JdbcColumnDefaultValueConverter {
   protected static final String CURRENT_TIMESTAMP = "CURRENT_TIMESTAMP";
   protected static final String NULL = "NULL";
   protected static final DateTimeFormatter DATE_TIME_FORMATTER =
-      DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss[.SSSSSS][.SSSSS][.SSSS][.SSS][.SS][.S]");
+      new DateTimeFormatterBuilder()
+          .appendPattern("yyyy-MM-dd HH:mm:ss")
+          .appendFraction(ChronoField.NANO_OF_SECOND, 0, 6, true)
+          .toFormatter();
   protected static final DateTimeFormatter DATE_FORMATTER =
       DateTimeFormatter.ofPattern("yyyy-MM-dd");
+
   protected static final DateTimeFormatter TIME_FORMATTER =
-      DateTimeFormatter.ofPattern("HH:mm:ss[.SSSSSS][.SSSSS][.SSSS][.SSS][.SS][.S]");
+      new DateTimeFormatterBuilder()
+          .appendPattern("HH:mm:ss")
+          .appendFraction(ChronoField.NANO_OF_SECOND, 0, 6, true)
+          .toFormatter();
 
   public String fromGravitino(Expression defaultValue) {
     if (DEFAULT_VALUE_NOT_SET.equals(defaultValue)) {

@@ -27,4 +27,11 @@ public class ClickHouseConstants {
   public static final String ON_CLUSTER = "on-cluster";
   // Sharding key for the clickhouse cluster
   public static final String CLUSTER_SHARDING_KEY = "cluster-sharding-key";
+  public static final String CLUSTER_REMOTE_DATABASE = "cluster-remote-database";
+  public static final String CLUSTER_REMOTE_TABLE = "cluster-remote-table";
+
+  public static final String GRAVITINO_CLICKHOUSE_ENGINE_NAME = "engine";
+  public static final String CLICKHOUSE_ENGINE_NAME = "ENGINE";
+
+  public static final String SETTINGS_PREFIX = "settings.";
 }
