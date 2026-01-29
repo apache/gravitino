@@ -302,6 +302,33 @@ public class Configs {
           .intConf()
           .createWithDefault(DEFAULT_GRAVITINO_AUTHORIZATION_THREAD_POOL_SIZE);
 
+  public static final long DEFAULT_GRAVITINO_AUTHORIZATION_CACHE_EXPIRATION_SECS = 3600L;
+
+  public static final ConfigEntry<Long> GRAVITINO_AUTHORIZATION_CACHE_EXPIRATION_SECS =
+      new ConfigBuilder("gravitino.authorization.jcasbin.cacheExpirationSecs")
+          .doc("The expiration time in seconds for authorization cache entries")
+          .version(ConfigConstants.VERSION_1_2_0)
+          .longConf()
+          .createWithDefault(DEFAULT_GRAVITINO_AUTHORIZATION_CACHE_EXPIRATION_SECS);
+
+  public static final long DEFAULT_GRAVITINO_AUTHORIZATION_ROLE_CACHE_SIZE = 10000L;
+
+  public static final ConfigEntry<Long> GRAVITINO_AUTHORIZATION_ROLE_CACHE_SIZE =
+      new ConfigBuilder("gravitino.authorization.jcasbin.roleCacheSize")
+          .doc("The maximum size of the role cache for authorization")
+          .version(ConfigConstants.VERSION_1_2_0)
+          .longConf()
+          .createWithDefault(DEFAULT_GRAVITINO_AUTHORIZATION_ROLE_CACHE_SIZE);
+
+  public static final long DEFAULT_GRAVITINO_AUTHORIZATION_OWNER_CACHE_SIZE = 100000L;
+
+  public static final ConfigEntry<Long> GRAVITINO_AUTHORIZATION_OWNER_CACHE_SIZE =
+      new ConfigBuilder("gravitino.authorization.jcasbin.ownerCacheSize")
+          .doc("The maximum size of the owner cache for authorization")
+          .version(ConfigConstants.VERSION_1_2_0)
+          .longConf()
+          .createWithDefault(DEFAULT_GRAVITINO_AUTHORIZATION_OWNER_CACHE_SIZE);
+
   public static final ConfigEntry<List<String>> SERVICE_ADMINS =
       new ConfigBuilder("gravitino.authorization.serviceAdmins")
           .doc("The admins of Gravitino service")
