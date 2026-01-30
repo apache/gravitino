@@ -161,13 +161,6 @@ public class DynamicIcebergConfigProvider implements IcebergConfigProvider {
     return defaultDynamicCatalogName.orElse(IcebergConstants.ICEBERG_REST_DEFAULT_CATALOG);
   }
 
-  @Override
-  public boolean canCheckConfigChange() {
-    // Only support checking config changes when using internal fetcher (authorization enabled),
-    // as it can efficiently fetch current config without HTTP overhead.
-    return IcebergRESTServerContext.getInstance().isAuthorizationEnabled();
-  }
-
   /** Interface for fetching catalog information. */
   private interface CatalogFetcher extends Closeable {
     Catalog loadCatalog(String catalogName) throws NoSuchCatalogException;
