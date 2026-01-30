@@ -18,8 +18,36 @@
  */
 package org.apache.gravitino.catalog.clickhouse.converter;
 
+import java.sql.SQLException;
 import org.apache.gravitino.catalog.jdbc.converter.JdbcExceptionConverter;
+import org.apache.gravitino.exceptions.GravitinoRuntimeException;
+import org.apache.gravitino.exceptions.NoSuchSchemaException;
+import org.apache.gravitino.exceptions.NoSuchTableException;
+import org.apache.gravitino.exceptions.SchemaAlreadyExistsException;
+import org.apache.gravitino.exceptions.TableAlreadyExistsException;
 
 public class ClickHouseExceptionConverter extends JdbcExceptionConverter {
-  // Implement ClickHouse specific exception conversions if needed
+  static final int ERROR_CODE_UNKNOWN_DATABASE = 81;
+  static final int ERROR_CODE_DATABASE_ALREADY_EXISTS = 82;
+
+  static final int ERROR_CODE_TABLE_ALREADY_EXISTS = 57;
+  static final int ERROR_CODE_TABLE_IS_DROPPED = 218;
+
+  @SuppressWarnings("FormatStringAnnotation")
+  @Override
+  public GravitinoRuntimeException toGravitinoException(SQLException sqlException) {
+    int errorCode = sqlException.getErrorCode();
+    switch (errorCode) {
+      case ERROR_CODE_DATABASE_ALREADY_EXISTS:
+        return new SchemaAlreadyExistsException(sqlException, sqlException.getMessage());
+      case ERROR_CODE_TABLE_ALREADY_EXISTS:
+        return new TableAlreadyExistsException(sqlException, sqlException.getMessage());
+      case ERROR_CODE_UNKNOWN_DATABASE:
+        return new NoSuchSchemaException(sqlException, sqlException.getMessage());
+      case ERROR_CODE_TABLE_IS_DROPPED:
+        return new NoSuchTableException(sqlException, sqlException.getMessage());
+      default:
+        return new GravitinoRuntimeException(sqlException, sqlException.getMessage());
+    }
+  }
 }
