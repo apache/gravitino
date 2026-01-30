@@ -29,7 +29,6 @@ import java.util.Objects;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Function;
-import java.util.stream.Collectors;
 import org.apache.commons.collections4.CollectionUtils;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.HasIdentifier;
