@@ -114,6 +114,18 @@ public interface RelationalBackend extends Closeable, SupportsRelationOperations
       throws IOException;
 
   /**
+   * Batch retrieves the entities associated with the identifiers and the entity type.
+   *
+   * @param <E> The type of the entity returned.
+   * @param identifiers The identifiers of the entities.
+   * @param entityType The type of the entity.
+   * @return The entities associated with the identifiers and the entity type, or null if the key
+   *     does not exist.
+   */
+  <E extends Entity & HasIdentifier> List<E> batchGet(
+      List<NameIdentifier> identifiers, Entity.EntityType entityType);
+
+  /**
    * Soft deletes the entity associated with the identifier and the entity type.
    *
    * @param ident The identifier of the entity.
