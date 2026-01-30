@@ -38,7 +38,9 @@ public class SecurableObjectPostgreSQLProvider extends SecurableObjectBaseSQLPro
 
   @Override
   protected String softDeleteSQL(Optional<String> tableAlias) {
-    // PostgreSQL doesn't support alias prefix in SET clause
-    return " SET deleted_at = CAST(EXTRACT(EPOCH FROM CURRENT_TIMESTAMP) * 1000 AS BIGINT) ";
+    String prefix = tableAlias.map(alias -> alias + ".").orElse("");
+    return " SET "
+        + prefix
+        + "deleted_at = CAST(EXTRACT(EPOCH FROM CURRENT_TIMESTAMP) * 1000 AS BIGINT) ";
   }
 }
