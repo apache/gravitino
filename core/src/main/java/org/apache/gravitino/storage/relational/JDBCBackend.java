@@ -287,6 +287,18 @@ public class JDBCBackend implements RelationalBackend {
   }
 
   @Override
+  public <E extends Entity & HasIdentifier> List<E> batchGet(
+      List<NameIdentifier> identifiers, Entity.EntityType entityType) {
+    switch (entityType) {
+      case TABLE:
+        return (List<E>) TableMetaService.getInstance().batchGetTableByIdentifier(identifiers);
+      default:
+        throw new UnsupportedEntityTypeException(
+            "Unsupported entity type: %s for get operation", entityType);
+    }
+  }
+
+  @Override
   public boolean delete(NameIdentifier ident, Entity.EntityType entityType, boolean cascade)
       throws IOException {
     switch (entityType) {

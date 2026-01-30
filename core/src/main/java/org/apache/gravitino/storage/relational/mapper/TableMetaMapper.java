@@ -95,4 +95,8 @@ public interface TableMetaMapper {
       method = "deleteTableMetasByLegacyTimeline")
   Integer deleteTableMetasByLegacyTimeline(
       @Param("legacyTimeline") Long legacyTimeline, @Param("limit") int limit);
+
+  @SelectProvider(type = TableMetaSQLProviderFactory.class, method = "batchSelectTableByIdentifier")
+  List<TablePO> batchSelectTableByIdentifier(
+      @Param("schemaId") Long schemaId, @Param("tableNames") List<String> tableNames);
 }
