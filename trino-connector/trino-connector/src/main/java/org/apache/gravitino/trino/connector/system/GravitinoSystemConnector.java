@@ -79,16 +79,30 @@ public class GravitinoSystemConnector implements Connector {
   @Override
   public ConnectorMetadata getMetadata(
       ConnectorSession session, ConnectorTransactionHandle transactionHandle) {
+    return createMetadata();
+  }
+
+  protected ConnectorMetadata createMetadata() {
     return new GravitinoSystemConnectorMetadata();
   }
 
   @Override
   public ConnectorSplitManager getSplitManager() {
-    return new SplitManager();
+    return createSplitManager();
   }
 
   @Override
   public ConnectorPageSourceProvider getPageSourceProvider() {
+    return createPageSourceProvider();
+  }
+
+  public void shutdown() {}
+
+  protected ConnectorSplitManager createSplitManager() {
+    return new SplitManager();
+  }
+
+  protected ConnectorPageSourceProvider createPageSourceProvider() {
     return new DatasourceProvider();
   }
 
@@ -112,7 +126,11 @@ public class GravitinoSystemConnector implements Connector {
 
       SchemaTableName tableName =
           ((GravitinoSystemConnectorMetadata.SystemTableHandle) table).getName();
-      return new SystemTablePageSource(GravitinoSystemTableFactory.loadPageData(tableName));
+      return createPageSource(GravitinoSystemTableFactory.loadPageData(tableName));
+    }
+
+    protected ConnectorPageSource createPageSource(Page page) {
+      throw new RuntimeException("Should be overridden in subclass");
     }
   }
 
@@ -129,13 +147,18 @@ public class GravitinoSystemConnector implements Connector {
 
       SchemaTableName tableName =
           ((GravitinoSystemConnectorMetadata.SystemTableHandle) connectorTableHandle).getName();
-      return new FixedSplitSource(new Split(tableName));
+      return new FixedSplitSource(createSplit(tableName));
+    }
+
+    protected ConnectorSplit createSplit(SchemaTableName tableName) {
+      throw new RuntimeException("Should be overridden in subclass");
     }
   }
 
   /** The split. */
-  public static class Split implements ConnectorSplit {
-    private final SchemaTableName tableName;
+  public abstract static class Split implements ConnectorSplit {
+
+    protected final SchemaTableName tableName;
 
     /**
      * Constructs a new Split with the specified table name.
@@ -166,18 +189,13 @@ public class GravitinoSystemConnector implements Connector {
     public List<HostAddress> getAddresses() {
       return Collections.emptyList();
     }
-
-    @Override
-    public Object getInfo() {
-      return this;
-    }
   }
 
   /** The system table page source. */
-  public static class SystemTablePageSource implements ConnectorPageSource {
+  public abstract static class SystemTablePageSource implements ConnectorPageSource {
 
-    private boolean isFinished = false;
-    private final Page page;
+    protected boolean isFinished = false;
+    protected final Page page;
 
     /**
      * Constructs a new SystemTablePageSource.
@@ -203,8 +221,7 @@ public class GravitinoSystemConnector implements Connector {
       return isFinished;
     }
 
-    @Override
-    public Page getNextPage() {
+    public Page nextPage() {
       if (isFinished) {
         return null;
       }
