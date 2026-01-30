@@ -43,14 +43,14 @@ public class IcebergCatalogWrapperManager implements AutoCloseable {
 
   public static final Logger LOG = LoggerFactory.getLogger(IcebergCatalogWrapperManager.class);
 
-  private final ValidatingCache validatingCache;
+  private final Cache<String, CatalogWrapperForREST> catalogWrapperCache;
 
   private final IcebergConfigProvider configProvider;
 
   public IcebergCatalogWrapperManager(
       Map<String, String> properties, IcebergConfigProvider configProvider) {
     this.configProvider = configProvider;
-    Cache<String, CatalogWrapperForREST> cache =
+    this.catalogWrapperCache =
         Caffeine.newBuilder()
             .expireAfterWrite(
                 (new IcebergConfig(properties))
@@ -71,7 +71,6 @@ public class IcebergCatalogWrapperManager implements AutoCloseable {
                             .setNameFormat("iceberg-catalog-wrapper-cleaner-%d")
                             .build())))
             .build();
-    this.validatingCache = new ValidatingCache(cache, configProvider);
   }
 
   /**
@@ -86,7 +85,7 @@ public class IcebergCatalogWrapperManager implements AutoCloseable {
 
   public CatalogWrapperForREST getCatalogWrapper(String catalogName) {
     CatalogWrapperForREST catalogWrapperForREST =
-        validatingCache.get(catalogName, k -> createCatalogWrapper(catalogName));
+        catalogWrapperCache.get(catalogName, k -> createCatalogWrapper(catalogName));
     // Reload conf to reset UserGroupInformation or icebergTableOps will always use
     // Simple auth.
     catalogWrapperForREST.reloadHadoopConf();
@@ -135,6 +134,6 @@ public class IcebergCatalogWrapperManager implements AutoCloseable {
 
   @Override
   public void close() throws Exception {
-    validatingCache.invalidateAll();
+    catalogWrapperCache.invalidateAll();
   }
 }
