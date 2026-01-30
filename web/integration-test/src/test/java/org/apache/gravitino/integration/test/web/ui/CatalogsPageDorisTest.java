@@ -146,12 +146,11 @@ public class CatalogsPageDorisTest extends BaseWebIT {
     // load metalake
     metalake = gravitinoClient.loadMetalake(METALAKE_NAME);
     metalakePage.clickMetalakeLink(METALAKE_NAME);
-    // create doris catalog actions
+    // create doris catalog - new UI flow: select provider first, then click Next
     clickAndWait(catalogsPage.createCatalogBtn);
-    catalogsPage.setCatalogNameField(DORIS_CATALOG_NAME);
-    // select provider as doris
-    clickAndWait(catalogsPage.catalogProviderSelector);
     catalogsPage.clickSelectProvider("jdbc-doris");
+    clickAndWait(catalogsPage.handleNextCatalogBtn);
+    catalogsPage.setCatalogNameField(DORIS_CATALOG_NAME);
     catalogsPage.setCatalogCommentField("doris catalog comment");
     // set doris catalog props
     catalogsPage.setCatalogFixedProp("jdbc-driver", DORIS_JDBC_DRIVER);
@@ -246,11 +245,18 @@ public class CatalogsPageDorisTest extends BaseWebIT {
             SCHEMA_NAME_DORIS,
             TABLE_NAME);
     catalogsPage.clickTreeNode(tableNode);
-    // 2. verify show table column after click table tree node
+    // 2. verify table is selected in tree
+    Assertions.assertTrue(catalogsPage.verifySelectedNode(TABLE_NAME));
+    // 3. verify show table columns in the Columns tab (default tab in new UI)
+    Assertions.assertTrue(catalogsPage.verifyShowTableTitle(TABLE_TABLE_TITLE));
     Assertions.assertTrue(catalogsPage.verifyShowDataItemInList(COLUMN_NAME, true));
-    clickAndWait(catalogsPage.tabDetailsBtn);
-    // 3. verify show tab details
-    Assertions.assertTrue(catalogsPage.verifyShowDetailsContent());
+    // 4. verify table overview links in header section
+    // Doris table has distribution (hash distribution with 2 buckets on col1)
+    Assertions.assertTrue(catalogsPage.verifyTableOverviewLink("distribution", "1"));
+    // Verify partitions, sort orders, and indexes show 0 for this simple table
+    Assertions.assertTrue(catalogsPage.verifyTableOverviewLink("partitions", "0"));
+    Assertions.assertTrue(catalogsPage.verifyTableOverviewLink("sortorders", "0"));
+    Assertions.assertTrue(catalogsPage.verifyTableOverviewLink("indexes", "0"));
   }
 
   @Test

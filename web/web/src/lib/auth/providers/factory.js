@@ -19,6 +19,7 @@
 
 import { OidcOAuthProvider } from './oidc'
 import { GenericOAuthProvider } from './generic'
+import { get } from 'http'
 
 // Registry of available OAuth providers
 const PROVIDER_REGISTRY = {
@@ -96,6 +97,16 @@ class OAuthProviderFactory {
     const provider = await this.getProvider()
 
     return await provider.getAccessToken()
+  }
+
+  /**
+   * Get user profile from current provider
+   * @returns {Promise<object|null>}
+   */
+  async getUserProfile() {
+    const provider = await this.getProvider()
+
+    return await provider.getUserProfile()
   }
 
   /**

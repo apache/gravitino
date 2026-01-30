@@ -209,7 +209,9 @@
 
    @humanwhocodes/config-array
    @humanwhocodes/module-importer
+   @juggle/resize-observer
    @pkgjs/parseargs
+   @swc/counter
    @swc/helpers
    aira-query
    axobject-query
@@ -233,17 +235,24 @@
    @alloc/quick-lru
    @ant-design/colors
    @ant-design/cssinjs
+   @ant-design/cssinjs-utils
+   @ant-design/fast-color
    @ant-design/icons
    @ant-design/icons-svg
    @ant-design/react-slick
    @antfu/install-pkg
    @antfu/utils
    @babel/code-frame
+   @babel/generator
+   @babel/helper-globals
    @babel/helper-module-imports
    @babel/helper-string-parser
    @babel/helper-validator-identifier
    @babel/highlight
+   @babel/parser
    @babel/runtime
+   @babel/template
+   @babel/traverse
    @babel/types
    @ctrl/tinycolor
    @discoveryjs/json-ext
@@ -278,18 +287,6 @@
    @jridgewell/set-array
    @jridgewell/sourcemap-codec
    @jridgewell/trace-mapping
-   @mui/base
-   @mui/core-downloads-tracker
-   @mui/icons-material
-   @mui/lab
-   @mui/material
-   @mui/private-theming
-   @mui/styled-engine
-   @mui/system
-   @mui/types
-   @mui/utils
-   @mui/x-data-grid
-   @mui/x-tree-view
    @next/bundle-analyzer
    @next/env
    @next/eslint-plugin-next
@@ -305,25 +302,28 @@
    @nodelib/fs.stat
    @nodelib/fs.walk
    @popperjs/core
+   @rc-component/async-validator
    @rc-component/color-picker
    @rc-component/context
    @rc-component/mini-decimal
    @rc-component/mutate-observer
    @rc-component/portal
+   @rc-component/qrcode
    @rc-component/tour
    @rc-component/trigger
+   @rc-component/util
    @reduxjs/toolkit
    @rushstack/eslint-patch
+   @types/hoist-non-react-statics
+   @types/js-cookie
    @types/lodash
    @types/lodash-es
    @types/node
-   @types/hoist-non-react-statics
-   @types/js-cookie
    @types/parse-json
    @types/prop-types
    @types/qs
-   @types/react-transition-group
    @types/react
+   @types/react-transition-group
    @types/scheduler
    @types/use-sync-external-store
    @types/yauzl
@@ -354,8 +354,8 @@
    array.prototype.tosorted
    arraybuffer.prototype.slice
    ast-types-flow
-   asynckit
    async-validator
+   asynckit
    autoprefixer
    available-typed-arrays
    axios
@@ -372,16 +372,16 @@
    call-bound
    callsites
    camelcase-css
-   cheerio
    chalk
+   cheerio
    chokidar
    classnames
    client-only
    clsx
    color-convert
    color-name
-   commander
    combined-stream
+   commander
    compute-scroll-into-view
    concat-map
    confbox
@@ -407,8 +407,8 @@
    dlv
    dom-helpers
    dom-serializer
-   duplexer
    dunder-proto
+   duplexer
    eastasianwidth
    end-of-stream
    enhanced-resolve
@@ -416,7 +416,6 @@
    env-cmd
    error-ex
    error-stack-parser
-   escape-string-regexp
    es-abstract
    es-define-property
    es-errors
@@ -427,6 +426,7 @@
    es-to-primitive
    esbuild
    escalade
+   escape-string-regexp
    eslint
    eslint-config-next
    eslint-config-prettier
@@ -452,7 +452,7 @@
    follow-redirects
    for-each
    form-data
-   raction.js
+   fraction.js
    fsevents
    function-bind
    function.prototype.name
@@ -470,19 +470,20 @@
    graphemer
    gzip-size
    has-bigints
-   html-escaper
    has-flag
    has-property-descriptors
    has-proto
    has-symbols
    has-tostringtag
    hasown
+   html-escaper
    htmlparser2
    ignore
    immer
    import-fresh
    imurmurhash
    inline-style-prefixer
+   internal-slot
    is-array-buffer
    is-arrayish
    is-async-function
@@ -499,6 +500,7 @@
    is-generator-function
    is-glob
    is-map
+   is-mobile
    is-negative-zero
    is-number
    is-number-object
@@ -515,37 +517,38 @@
    is-weakref
    is-weakset
    isarray
-   internal-slot
    iterator.prototype
    jiti
    js-cookie
    js-tokens
    js-yaml
    jsdom
+   jsesc
    json-buffer
+   json-parse-even-better-errors
    json-schema-traverse
    json-stable-stringify-without-jsonify
    json2mq
-   json-parse-even-better-errors
    jsx-ast-utils
+   jwt-decode
    keyv
    kolorist
    language-tags
+   levn
    lilconfig
    lines-and-columns
-   levn
    local-minizlib
    locate-path
-   lodash.merge
    lodash-es
+   lodash.merge
    loose-envify
    math-intrinsics
    merge-stream
    micromatch
-   minimist
    mime-db
    mime-types
    mimic-fn
+   minimist
    minizlib
    mkdirp
    mlly
@@ -554,19 +557,20 @@
    mz
    nanoid
    next
+   next-themes
    node-releases
    normalize-path
    normalize-range
    npm-run-path
    nprogress
    object-assign
+   object-hash
+   object-inspect
+   object-keys
    object.entries
    object.fromentries
    object.groupby
    object.hasown
-   object-hash
-   object-inspect
-   object-keys
    object.values
    onetime
    opener
@@ -588,8 +592,8 @@
    pify
    pirates
    pkg-types
-   postcss
    possible-typed-array-names
+   postcss
    postcss-import
    postcss-js
    postcss-load-config
@@ -638,15 +642,18 @@
    rc-util
    rc-virtual-list
    react
+   react-antd-column-resize
    react-dom
+   react-draggable
    react-hook-form
    react-hot-toast
    react-is
    react-redux
+   react-resizable
    read-cache
    readdirp
-   redux-thunk
    redux
+   redux-thunk
    reflect.getprototypeof
    regenerator-runtime
    regexp.prototype.flags
@@ -655,19 +662,23 @@
    resolve
    resolve-from
    resolve-pkg-maps
-   rtl-css-js
    reusify
+   rtl-css-js
    run-parallel
    safe-array-concat
    safe-regex-test
+   scheduler
+   screenfull
    scroll-into-view-if-needed
+   set-function-length
    set-function-name
    shebang-command
    shebang-regex
-   sirv
-   screenfull
-   set-function-length
    side-channel
+   side-channel-list
+   side-channel-map
+   side-channel-weakmap
+   sirv
    slash
    stack-generator
    stackframe
@@ -692,13 +703,14 @@
    supports-color
    supports-preserve-symlinks-flag
    svgo
+   tailwind-merge
    tailwindcss
    tapable
-   tiny-case
-   throttle-debounce
-   thejoshwolfe-yauzl
    thenify
    thenify-all
+   thejoshwolfe-yauzl
+   throttle-debounce
+   tiny-case
    to-fast-properties
    to-regex-range
    toggle-selection
@@ -716,6 +728,7 @@
    unbox-primitive
    undici-types
    update-browserslist-db
+   use-resize-observer
    use-sync-external-store
    util-deprecate
    vitest
@@ -730,7 +743,6 @@
    ws
    yallist
    yocto-queue
-   yup
 
    This product bundles various third-party components also under the
    CC BY 4.0 license.
@@ -773,11 +785,10 @@
    espree
    hoist-non-react-statics
    hyphenate-style-name
-   react-transition-group
    qs
-   source-map-js
+   react-transition-group
    source-map
-   tslib
+   source-map-js
 
    This product bundles various third-party components also under the
    BSD-3-Clause and Apache-2.0 license.
@@ -798,8 +809,8 @@
    fastq
    flatted
    foreground-child
-   fs.realpath
    fs-minipass
+   fs.realpath
    glob
    glob-parent
    graceful-fs
@@ -807,10 +818,11 @@
    inherits
    isexe
    lru-cache
+   lucide-react
    minimatch
    minipass
-   picocolors
    once
+   picocolors
    qrcode.react
    rimraf
    semver
@@ -850,3 +862,8 @@
    chownr
    jackspeak
    path-scurry
+
+   This product bundles various third-party components also under the
+   0BSD license.
+
+   tslib

@@ -54,6 +54,14 @@ export class GenericOAuthProvider extends BaseOAuthProvider {
   }
 
   /**
+   * Get current user profile
+   */
+  async getUserProfile() {
+    // Generic OAuth provider doesn't have user profile, default to a test user
+    return this.getAccessToken() ? { name: 'test' } : null
+  }
+
+  /**
    * Clear authentication data
    */
   async clearAuthData() {
