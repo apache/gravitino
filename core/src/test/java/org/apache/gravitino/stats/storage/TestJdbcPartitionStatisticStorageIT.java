@@ -111,10 +111,10 @@ public class TestJdbcPartitionStatisticStorageIT {
 
     // Create storage factory with MySQL container connection
     Map<String, String> properties = Maps.newHashMap();
-    properties.put("jdbc-url", mySQLContainer.getJdbcUrl(TEST_DB_NAME));
-    properties.put("jdbc-user", mySQLContainer.getUsername());
-    properties.put("jdbc-password", mySQLContainer.getPassword());
-    properties.put("jdbc-driver", mySQLContainer.getDriverClassName(TEST_DB_NAME));
+    properties.put("jdbcUrl", mySQLContainer.getJdbcUrl(TEST_DB_NAME));
+    properties.put("jdbcUser", mySQLContainer.getUsername());
+    properties.put("jdbcPassword", mySQLContainer.getPassword());
+    properties.put("jdbcDriver", mySQLContainer.getDriverClassName(TEST_DB_NAME));
 
     JdbcPartitionStatisticStorageFactory factory = new JdbcPartitionStatisticStorageFactory();
     storage = (JdbcPartitionStatisticStorage) factory.create(properties);
