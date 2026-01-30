@@ -23,6 +23,10 @@ import org.apache.gravitino.client.GravitinoAdminClient;
 /** Trino plugin endpoint, using java spi mechanism */
 public class GravitinoPlugin435 extends GravitinoPlugin {
 
+  public GravitinoPlugin435() {
+    super();
+  }
+
   public GravitinoPlugin435(GravitinoAdminClient client) {
     super(client);
   }
