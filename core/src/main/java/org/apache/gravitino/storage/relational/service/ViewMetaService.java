@@ -72,7 +72,6 @@ public class ViewMetaService {
     return viewId;
   }
 
-
   @Monitored(
       metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME,
       baseMetricName = "listViewPOsByNamespace")
@@ -104,7 +103,6 @@ public class ViewMetaService {
     }
   }
 
-
   @Monitored(
       metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME,
       baseMetricName = "deleteViewMetasByLegacyTimeline")
@@ -113,7 +111,6 @@ public class ViewMetaService {
         ViewMetaMapper.class,
         mapper -> mapper.deleteViewMetasByLegacyTimeline(legacyTimeline, limit));
   }
-
 
   /**
    * List views as GenericEntity by namespace.
@@ -225,6 +222,8 @@ public class ViewMetaService {
             .withCatalogId(oldViewPO.getCatalogId())
             .withSchemaId(oldViewPO.getSchemaId())
             .withDeletedAt(oldViewPO.getDeletedAt())
+            .withLastVersion(oldViewPO.getLastVersion())
+            .withCurrentVersion(oldViewPO.getCurrentVersion())
             .build();
 
     updateView(oldViewPO, newViewPO);
