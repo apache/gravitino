@@ -27,18 +27,24 @@ import com.google.common.collect.Lists;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.security.PrivilegedAction;
+import java.sql.Connection;
+import java.sql.DriverManager;
+import java.sql.SQLException;
+import java.sql.Statement;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.stream.Collectors;
 import org.apache.flink.configuration.Configuration;
+import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
 import org.apache.flink.table.api.DataTypes;
 import org.apache.flink.table.api.EnvironmentSettings;
 import org.apache.flink.table.api.ResultKind;
 import org.apache.flink.table.api.TableEnvironment;
 import org.apache.flink.table.api.TableResult;
 import org.apache.flink.table.api.ValidationException;
+import org.apache.flink.table.api.bridge.java.StreamTableEnvironment;
 import org.apache.flink.table.api.internal.TableEnvironmentImpl;
 import org.apache.flink.table.catalog.Catalog;
 import org.apache.flink.table.catalog.CatalogBaseTable;
@@ -59,6 +65,9 @@ import org.apache.gravitino.flink.connector.hive.GravitinoHiveCatalog;
 import org.apache.gravitino.flink.connector.hive.GravitinoHiveCatalogFactoryOptions;
 import org.apache.gravitino.flink.connector.integration.test.FlinkCommonIT;
 import org.apache.gravitino.flink.connector.integration.test.utils.TestUtils;
+import org.apache.gravitino.flink.connector.store.GravitinoCatalogStoreFactoryOptions;
+import org.apache.gravitino.integration.test.container.ContainerSuite;
+import org.apache.gravitino.integration.test.util.TestDatabaseName;
 import org.apache.gravitino.rel.Column;
 import org.apache.gravitino.rel.Table;
 import org.apache.gravitino.rel.expressions.transforms.Transform;
@@ -80,12 +89,29 @@ import org.junit.jupiter.api.Test;
 public class FlinkHiveCatalogIT extends FlinkCommonIT {
   private static final String DEFAULT_HIVE_CATALOG = "test_flink_hive_schema_catalog";
   private static final String FLINK_USER_NAME = "gravitino";
+  private static final String MYSQL_DATABASE = TestDatabaseName.FLINK_HIVE_CATALOG_IT.name();
 
   private static org.apache.gravitino.Catalog hiveCatalog;
   private static String hiveConfDir;
 
+  private String mysqlUrl;
+  private String mysqlUsername;
+  private String mysqlPassword;
+  private String mysqlDriver;
+  private ContainerSuite containerSuite;
+
   @Override
   protected boolean supportsPrimaryKey() {
+    return false;
+  }
+
+  @Override
+  protected boolean supportColumnOperation() {
+    return false;
+  }
+
+  @Override
+  protected boolean supportTablePropertiesOperation() {
     return false;
   }
 
@@ -99,6 +125,27 @@ public class FlinkHiveCatalogIT extends FlinkCommonIT {
   static void hiveStop() {
     Preconditions.checkArgument(metalake != null, "metalake should not be null");
     metalake.dropCatalog(DEFAULT_HIVE_CATALOG, true);
+  }
+
+  @Override
+  protected void initCatalogEnv() throws Exception {
+    containerSuite = ContainerSuite.getInstance();
+    containerSuite.startMySQLContainer(TestDatabaseName.FLINK_HIVE_CATALOG_IT);
+    mysqlUrl =
+        containerSuite.getMySQLContainer().getJdbcUrl(TestDatabaseName.FLINK_HIVE_CATALOG_IT);
+    mysqlUsername = containerSuite.getMySQLContainer().getUsername();
+    mysqlPassword = containerSuite.getMySQLContainer().getPassword();
+    mysqlDriver =
+        containerSuite
+            .getMySQLContainer()
+            .getDriverClassName(TestDatabaseName.FLINK_HIVE_CATALOG_IT);
+  }
+
+  @Override
+  protected void stopCatalogEnv() throws Exception {
+    if (containerSuite != null) {
+      containerSuite.close();
+    }
   }
 
   protected void initDefaultHiveCatalog() {
@@ -317,6 +364,42 @@ public class FlinkHiveCatalogIT extends FlinkCommonIT {
   }
 
   @Test
+  public void testStreamExecutionEnvironmentLoadsGravitinoCatalogStoreConfiguration() {
+    String catalogName = "gravitino_hive_stream_env";
+    if (metalake.catalogExists(catalogName)) {
+      metalake.dropCatalog(catalogName, true);
+    }
+
+    metalake.createCatalog(
+        catalogName,
+        org.apache.gravitino.Catalog.Type.RELATIONAL,
+        getProvider(),
+        null,
+        ImmutableMap.of(HiveConstants.METASTORE_URIS, hiveMetastoreUri));
+
+    try {
+      Configuration configuration = new Configuration();
+      configuration.setString(
+          "table.catalog-store.kind", GravitinoCatalogStoreFactoryOptions.GRAVITINO);
+      configuration.setString(
+          "table.catalog-store.gravitino.gravitino.metalake", GRAVITINO_METALAKE);
+      configuration.setString("table.catalog-store.gravitino.gravitino.uri", gravitinoUri);
+
+      StreamExecutionEnvironment env =
+          StreamExecutionEnvironment.getExecutionEnvironment(configuration);
+      EnvironmentSettings settings =
+          EnvironmentSettings.newInstance().withConfiguration(configuration).build();
+      StreamTableEnvironment streamTableEnv = StreamTableEnvironment.create(env, settings);
+
+      Assertions.assertTrue(
+          Arrays.asList(streamTableEnv.listCatalogs()).contains(catalogName),
+          "StreamTableEnvironment should load Gravitino catalog store configs");
+    } finally {
+      metalake.dropCatalog(catalogName, true);
+    }
+  }
+
+  @Test
   public void testGetCatalogFromGravitino() {
     // list catalogs.
     int numCatalogs = tableEnv.listCatalogs().length;
@@ -362,7 +445,7 @@ public class FlinkHiveCatalogIT extends FlinkCommonIT {
   }
 
   @Test
-  public void testHivePartitionTable() {
+  public void testRawHivePartitionTable() {
     String databaseName = "test_create_hive_partition_table_db";
     String tableName = "test_create_hive_partition_table";
     String comment = "test comment";
@@ -381,7 +464,8 @@ public class FlinkHiveCatalogIT extends FlinkCommonIT {
                       + " COMMENT '%s' "
                       + " PARTITIONED BY (string_type, double_type)"
                       + " WITH ("
-                      + "'%s' = '%s')",
+                      + "'%s' = '%s',"
+                      + "'connector'='hive')",
                   tableName, comment, key, value);
           TestUtils.assertTableResult(result, ResultKind.SUCCESS);
 
@@ -443,7 +527,7 @@ public class FlinkHiveCatalogIT extends FlinkCommonIT {
   }
 
   @Test
-  public void testCreateHiveTable() {
+  public void testCreateRawHiveTable() {
     String databaseName = "test_create_hive_table_db";
     String tableName = "test_create_hive_table";
     String comment = "test comment";
@@ -479,7 +563,8 @@ public class FlinkHiveCatalogIT extends FlinkCommonIT {
                       + " map_type MAP<INT, STRING> COMMENT 'map_type',"
                       + " struct_type ROW<k1 INT, k2 String>)"
                       + " COMMENT '%s' WITH ("
-                      + "'%s' = '%s')",
+                      + "'%s' = '%s',"
+                      + "'connector'='hive')",
                   tableName, comment, key, value);
           TestUtils.assertTableResult(result, ResultKind.SUCCESS);
 
@@ -536,7 +621,7 @@ public class FlinkHiveCatalogIT extends FlinkCommonIT {
         catalog -> {
           TestUtils.assertTableResult(
               sql(
-                  "CREATE TABLE %s (id STRING) WITH ('%s'='%s')",
+                  "CREATE TABLE %s (id STRING) WITH ('%s'='%s', 'connector'='hive')",
                   tableName, Constants.SERDE_LIB_CLASS_NAME, customSerde),
               ResultKind.SUCCESS);
           TestUtils.assertTableResult(
@@ -570,7 +655,7 @@ public class FlinkHiveCatalogIT extends FlinkCommonIT {
         catalog -> {
           TestUtils.assertTableResult(
               sql(
-                  "CREATE TABLE %s (id INT) WITH ('%s'='%s', '%s'='%s')",
+                  "CREATE TABLE %s (id INT) WITH ('%s'='%s', '%s'='%s', 'connector'='hive')",
                   tableName,
                   Constants.SERDE_LIB_CLASS_NAME,
                   customSerde,
@@ -610,7 +695,8 @@ public class FlinkHiveCatalogIT extends FlinkCommonIT {
           Assertions.assertTrue(flinkCatalog.isPresent());
           HiveConf hiveConf = ((GravitinoHiveCatalog) flinkCatalog.get()).getHiveConf();
           TestUtils.assertTableResult(
-              sql("CREATE TABLE %s (id INT)", tableName), ResultKind.SUCCESS);
+              sql("CREATE TABLE %s (id INT) WITH ('connector'='hive')", tableName),
+              ResultKind.SUCCESS);
           TestUtils.assertTableResult(
               sql("INSERT INTO %s VALUES (1)", tableName),
               ResultKind.SUCCESS_WITH_CONTENT,
@@ -780,6 +866,519 @@ public class FlinkHiveCatalogIT extends FlinkCommonIT {
           }
         },
         true);
+  }
+
+  @Test
+  public void testGravitinoCreateRawHiveTableReadableByNativeHiveCatalog() {
+    String databaseName = "test_native_read_raw_hive_db";
+    String tableName = "raw_hive_table";
+    doWithSchema(
+        currentCatalog(),
+        databaseName,
+        catalog -> {
+          TestUtils.assertTableResult(
+              sql("CREATE TABLE %s (id INT, name STRING) WITH ('connector'='hive')", tableName),
+              ResultKind.SUCCESS);
+          TestUtils.assertTableResult(
+              sql("ALTER TABLE %s ADD age INT", tableName), ResultKind.SUCCESS);
+          TestUtils.assertTableResult(
+              sql("INSERT INTO %s VALUES (1, 'a', 10)", tableName),
+              ResultKind.SUCCESS_WITH_CONTENT,
+              Row.of(-1L));
+          withNativeHiveEnv(
+              databaseName, env -> assertSingleRow(env, tableName, Row.of(1, "a", 10)));
+        },
+        true);
+  }
+
+  @Test
+  public void testGravitinoCreateGenericJdbcTableReadableByNativeHiveCatalog() {
+    String databaseName = "test_native_read_jdbc_db";
+    String tableName = "generic_jdbc_table";
+    doWithSchema(
+        currentCatalog(),
+        databaseName,
+        catalog -> {
+          createJdbcTable(tableName);
+          try {
+            TestUtils.assertTableResult(
+                sql(
+                    "CREATE TABLE %s (id INT, name STRING) WITH ("
+                        + "'connector'='jdbc',"
+                        + "'url'='%s',"
+                        + "'table-name'='%s',"
+                        + "'username'='%s',"
+                        + "'password'='%s',"
+                        + "'driver'='%s')",
+                    tableName, mysqlUrl, tableName, mysqlUsername, mysqlPassword, mysqlDriver),
+                ResultKind.SUCCESS);
+            TestUtils.assertTableResult(
+                sql("ALTER TABLE %s ADD age INT", tableName), ResultKind.SUCCESS);
+            alterJdbcTableAddColumn(tableName);
+            TestUtils.assertTableResult(
+                sql("INSERT INTO %s VALUES (1, 'a', 10)", tableName),
+                ResultKind.SUCCESS_WITH_CONTENT,
+                Row.of(-1L));
+            withNativeHiveEnv(
+                databaseName, env -> assertSingleRow(env, tableName, Row.of(1, "a", 10)));
+          } finally {
+            dropJdbcTable(tableName);
+          }
+        },
+        true);
+  }
+
+  @Test
+  public void testGravitinoCreatePaimonTableReadableByNativePaimonCatalog() {
+    String databaseName = "test_native_read_paimon_db";
+    String tableName = "paimon_table";
+    String tablePath = paimonTablePath(databaseName, tableName);
+    doWithSchema(
+        currentCatalog(),
+        databaseName,
+        catalog -> {
+          TestUtils.assertTableResult(
+              sql(
+                  "CREATE TABLE %s (id INT, name STRING) WITH ("
+                      + "'connector'='paimon',"
+                      + "'path'='%s')",
+                  tableName, tablePath),
+              ResultKind.SUCCESS);
+          withNativePaimonEnv(
+              databaseName,
+              env -> {
+                TestUtils.assertTableResult(
+                    env.executeSql(
+                        String.format("CREATE TABLE %s (id INT, name STRING)", tableName)),
+                    ResultKind.SUCCESS);
+                TestUtils.assertTableResult(
+                    env.executeSql(String.format("ALTER TABLE %s ADD age INT", tableName)),
+                    ResultKind.SUCCESS);
+              });
+          TestUtils.assertTableResult(
+              sql("ALTER TABLE %s ADD age INT", tableName), ResultKind.SUCCESS);
+          TestUtils.assertTableResult(
+              sql("INSERT INTO %s VALUES (1, 'a', 10)", tableName),
+              ResultKind.SUCCESS_WITH_CONTENT,
+              Row.of(-1L));
+          withNativePaimonEnv(
+              databaseName, env -> assertSingleRow(env, tableName, Row.of(1, "a", 10)));
+        },
+        true);
+  }
+
+  @Test
+  public void testNativeCreateRawHiveTableReadableByGravitino() {
+    String databaseName = "test_gravitino_read_raw_hive_db";
+    String tableName = "raw_hive_table";
+    doWithSchema(
+        currentCatalog(),
+        databaseName,
+        catalog -> {
+          withNativeHiveEnv(
+              databaseName,
+              env -> {
+                TestUtils.assertTableResult(
+                    env.executeSql(
+                        String.format(
+                            "CREATE TABLE %s (id INT, name STRING) WITH ('connector'='hive')",
+                            tableName)),
+                    ResultKind.SUCCESS);
+                TestUtils.assertTableResult(
+                    env.executeSql(String.format("ALTER TABLE %s ADD age INT", tableName)),
+                    ResultKind.SUCCESS);
+                TestUtils.assertTableResult(
+                    env.executeSql(String.format("INSERT INTO %s VALUES (1, 'a', 10)", tableName)),
+                    ResultKind.SUCCESS_WITH_CONTENT,
+                    Row.of(-1L));
+              });
+          assertSingleRow(tableEnv, tableName, Row.of(1, "a", 10));
+        },
+        true);
+  }
+
+  @Test
+  public void testNativeCreateGenericJdbcTableReadableByGravitino() {
+    String databaseName = "test_gravitino_read_jdbc_db";
+    String tableName = "generic_jdbc_table";
+    doWithSchema(
+        currentCatalog(),
+        databaseName,
+        catalog -> {
+          createJdbcTable(tableName);
+          try {
+            withNativeHiveEnv(
+                databaseName,
+                env -> {
+                  TestUtils.assertTableResult(
+                      env.executeSql(
+                          String.format(
+                              "CREATE TABLE %s (id INT, name STRING) WITH ("
+                                  + "'connector'='jdbc',"
+                                  + "'url'='%s',"
+                                  + "'table-name'='%s',"
+                                  + "'username'='%s',"
+                                  + "'password'='%s',"
+                                  + "'driver'='%s')",
+                              tableName,
+                              mysqlUrl,
+                              tableName,
+                              mysqlUsername,
+                              mysqlPassword,
+                              mysqlDriver)),
+                      ResultKind.SUCCESS);
+                  TestUtils.assertTableResult(
+                      env.executeSql(String.format("ALTER TABLE %s ADD age INT", tableName)),
+                      ResultKind.SUCCESS);
+                  alterJdbcTableAddColumn(tableName);
+                  TestUtils.assertTableResult(
+                      env.executeSql(
+                          String.format("INSERT INTO %s VALUES (1, 'a', 10)", tableName)),
+                      ResultKind.SUCCESS_WITH_CONTENT,
+                      Row.of(-1L));
+                });
+            assertSingleRow(tableEnv, tableName, Row.of(1, "a", 10));
+          } finally {
+            dropJdbcTable(tableName);
+          }
+        },
+        true);
+  }
+
+  @Test
+  public void testNativeCreatePaimonTableReadableByGravitino() {
+    String databaseName = "test_gravitino_read_paimon_db";
+    String tableName = "paimon_table";
+    String tablePath = paimonTablePath(databaseName, tableName);
+    doWithSchema(
+        currentCatalog(),
+        databaseName,
+        catalog -> {
+          withNativePaimonEnv(
+              databaseName,
+              env -> {
+                TestUtils.assertTableResult(
+                    env.executeSql(
+                        String.format("CREATE TABLE %s (id INT, name STRING)", tableName)),
+                    ResultKind.SUCCESS);
+                TestUtils.assertTableResult(
+                    env.executeSql(String.format("ALTER TABLE %s ADD age INT", tableName)),
+                    ResultKind.SUCCESS);
+                TestUtils.assertTableResult(
+                    env.executeSql(String.format("INSERT INTO %s VALUES (1, 'a', 10)", tableName)),
+                    ResultKind.SUCCESS_WITH_CONTENT,
+                    Row.of(-1L));
+              });
+          TestUtils.assertTableResult(
+              sql(
+                  "CREATE TABLE %s (id INT, name STRING, age INT) WITH ("
+                      + "'connector'='paimon',"
+                      + "'path'='%s')",
+                  tableName, tablePath),
+              ResultKind.SUCCESS);
+          assertSingleRow(tableEnv, tableName, Row.of(1, "a", 10));
+        },
+        true);
+  }
+
+  @Test
+  @Override
+  public void testCreateSimpleTable() {
+    String databaseName = "test_create_no_partition_table_db";
+    String tableName = "test_create_no_partition_table";
+    String comment = "test comment";
+
+    doWithSchema(
+        currentCatalog(),
+        databaseName,
+        catalog -> {
+          TableResult result =
+              sql(
+                  "CREATE TABLE %s "
+                      + "(string_type STRING COMMENT 'string_type', "
+                      + " double_type DOUBLE COMMENT 'double_type')"
+                      + " COMMENT '%s' WITH ('connector'='hive')",
+                  tableName, comment);
+          TestUtils.assertTableResult(result, ResultKind.SUCCESS);
+
+          Optional<Catalog> flinkCatalog = tableEnv.getCatalog(currentCatalog().name());
+          Assertions.assertTrue(flinkCatalog.isPresent());
+          try {
+            CatalogBaseTable table =
+                flinkCatalog.get().getTable(new ObjectPath(databaseName, tableName));
+            Assertions.assertNotNull(table);
+            Assertions.assertEquals(comment, table.getComment());
+
+            CatalogTable catalogTable = (CatalogTable) table;
+            Assertions.assertFalse(catalogTable.isPartitioned());
+          } catch (TableNotExistException e) {
+            Assertions.fail(e);
+          }
+
+          assertFlinkTableColumns(databaseName, tableName, "string_type", "double_type");
+
+          TestUtils.assertTableResult(
+              sql("INSERT INTO %s VALUES ('A', 1.0), ('B', 2.0)", tableName),
+              ResultKind.SUCCESS_WITH_CONTENT,
+              Row.of(-1L));
+          TableResult selectResult = sql("SELECT * FROM %s ORDER BY string_type", tableName);
+          Assertions.assertEquals(ResultKind.SUCCESS_WITH_CONTENT, selectResult.getResultKind());
+          List<Row> actualRows = Lists.newArrayList(selectResult.collect());
+          Assertions.assertEquals(2, actualRows.size());
+          Assertions.assertTrue(hasRow(actualRows, "A", 1.0));
+          Assertions.assertTrue(hasRow(actualRows, "B", 2.0));
+        },
+        true,
+        supportDropCascade());
+  }
+
+  @Test
+  public void testAlterRawHiveTableAddColumn() {
+    String databaseName = "test_alter_raw_hive_table_db";
+    String tableName = "test_alter_raw_hive_table";
+    doWithSchema(
+        currentCatalog(),
+        databaseName,
+        catalog -> {
+          TestUtils.assertTableResult(
+              sql("CREATE TABLE %s (id INT, name STRING) WITH ('connector'='hive')", tableName),
+              ResultKind.SUCCESS);
+          TestUtils.assertTableResult(
+              sql("ALTER TABLE %s ADD age INT", tableName), ResultKind.SUCCESS);
+          Column[] columns =
+              catalog
+                  .asTableCatalog()
+                  .loadTable(NameIdentifier.of(databaseName, tableName))
+                  .columns();
+          Assertions.assertEquals(3, columns.length);
+        },
+        true);
+  }
+
+  @Test
+  public void testAlterRawHiveTableRenameColumn() {
+    String databaseName = "test_alter_raw_hive_table_rename_db";
+    String tableName = "test_alter_raw_hive_table_rename";
+    doWithSchema(
+        currentCatalog(),
+        databaseName,
+        catalog -> {
+          TestUtils.assertTableResult(
+              sql("CREATE TABLE %s (id INT, name STRING) WITH ('connector'='hive')", tableName),
+              ResultKind.SUCCESS);
+          TestUtils.assertTableResult(
+              sql("ALTER TABLE %s RENAME id TO id_new", tableName), ResultKind.SUCCESS);
+          Column[] columns =
+              catalog
+                  .asTableCatalog()
+                  .loadTable(NameIdentifier.of(databaseName, tableName))
+                  .columns();
+          Column[] expected =
+              new Column[] {
+                Column.of("id_new", Types.IntegerType.get(), null),
+                Column.of("name", Types.StringType.get(), null)
+              };
+          assertColumns(expected, columns);
+        },
+        true);
+  }
+
+  @Test
+  public void testAlterRawHiveTableDropColumn() {
+    String databaseName = "test_alter_raw_hive_table_drop_db";
+    String tableName = "test_alter_raw_hive_table_drop";
+    doWithSchema(
+        currentCatalog(),
+        databaseName,
+        catalog -> {
+          TestUtils.assertTableResult(
+              sql("CREATE TABLE %s (id INT, name STRING) WITH ('connector'='hive')", tableName),
+              ResultKind.SUCCESS);
+          TestUtils.assertTableResult(
+              sql("ALTER TABLE %s DROP name", tableName), ResultKind.SUCCESS);
+          Column[] columns =
+              catalog
+                  .asTableCatalog()
+                  .loadTable(NameIdentifier.of(databaseName, tableName))
+                  .columns();
+          Column[] expected = new Column[] {Column.of("id", Types.IntegerType.get(), null)};
+          assertColumns(expected, columns);
+        },
+        true);
+  }
+
+  @Test
+  public void testAlterGenericTableAddColumn() {
+    String databaseName = "test_alter_generic_table_db";
+    String tableName = "test_alter_generic_table";
+    doWithSchema(
+        currentCatalog(),
+        databaseName,
+        catalog -> {
+          TestUtils.assertTableResult(
+              sql("CREATE TABLE %s (id INT, name STRING)", tableName), ResultKind.SUCCESS);
+          TestUtils.assertTableResult(
+              sql("ALTER TABLE %s ADD age INT", tableName), ResultKind.SUCCESS);
+          assertFlinkTableColumns(databaseName, tableName, "id", "name", "age");
+        },
+        true);
+  }
+
+  @Test
+  public void testAlterGenericTableRenameColumn() {
+    String databaseName = "test_alter_generic_table_rename_db";
+    String tableName = "test_alter_generic_table_rename";
+    doWithSchema(
+        currentCatalog(),
+        databaseName,
+        catalog -> {
+          TestUtils.assertTableResult(
+              sql("CREATE TABLE %s (id INT, name STRING)", tableName), ResultKind.SUCCESS);
+          TestUtils.assertTableResult(
+              sql("ALTER TABLE %s RENAME id TO id_new", tableName), ResultKind.SUCCESS);
+          assertFlinkTableColumns(databaseName, tableName, "id_new", "name");
+        },
+        true);
+  }
+
+  @Test
+  public void testAlterGenericTableDropColumn() {
+    String databaseName = "test_alter_generic_table_drop_db";
+    String tableName = "test_alter_generic_table_drop";
+    doWithSchema(
+        currentCatalog(),
+        databaseName,
+        catalog -> {
+          TestUtils.assertTableResult(
+              sql("CREATE TABLE %s (id INT, name STRING)", tableName), ResultKind.SUCCESS);
+          TestUtils.assertTableResult(
+              sql("ALTER TABLE %s DROP name", tableName), ResultKind.SUCCESS);
+          assertFlinkTableColumns(databaseName, tableName, "id");
+        },
+        true);
+  }
+
+  private void assertFlinkTableColumns(
+      String databaseName, String tableName, String... expectedColumnNames) {
+    Optional<Catalog> flinkCatalog = tableEnv.getCatalog(currentCatalog().name());
+    Assertions.assertTrue(flinkCatalog.isPresent());
+    ObjectPath tablePath = new ObjectPath(databaseName, tableName);
+    try {
+      CatalogTable table = (CatalogTable) flinkCatalog.get().getTable(tablePath);
+      List<String> actual =
+          table.getUnresolvedSchema().getColumns().stream()
+              .map(column -> column.getName())
+              .collect(Collectors.toList());
+      Assertions.assertEquals(Arrays.asList(expectedColumnNames), actual);
+    } catch (TableNotExistException e) {
+      Assertions.fail(e);
+    }
+  }
+
+  private boolean hasRow(List<Row> rows, String name, double value) {
+    return rows.stream()
+        .anyMatch(
+            row ->
+                row.toString().contains("[" + name + ",")
+                    && row.toString().contains(String.valueOf(value)));
+  }
+
+  private void withNativeHiveEnv(
+      String databaseName, java.util.function.Consumer<TableEnvironment> action) {
+    EnvironmentSettings settings = EnvironmentSettings.newInstance().inBatchMode().build();
+    TableEnvironment nativeEnv = TableEnvironment.create(settings);
+    try {
+      TestUtils.assertTableResult(
+          nativeEnv.executeSql(
+              String.format(
+                  "CREATE CATALOG native_hive WITH ('type'='hive', 'hive-conf-dir'='%s')",
+                  hiveConfDir)),
+          ResultKind.SUCCESS);
+      TestUtils.assertTableResult(
+          nativeEnv.executeSql("USE CATALOG native_hive"), ResultKind.SUCCESS);
+      if (databaseName != null) {
+        TestUtils.assertTableResult(
+            nativeEnv.executeSql(String.format("CREATE DATABASE IF NOT EXISTS %s", databaseName)),
+            ResultKind.SUCCESS);
+        TestUtils.assertTableResult(
+            nativeEnv.executeSql("USE " + databaseName), ResultKind.SUCCESS);
+      }
+      action.accept(nativeEnv);
+    } finally {
+      ((TableEnvironmentImpl) nativeEnv).getCatalogManager().close();
+    }
+  }
+
+  private void withNativePaimonEnv(
+      String databaseName, java.util.function.Consumer<TableEnvironment> action) {
+    EnvironmentSettings settings = EnvironmentSettings.newInstance().inBatchMode().build();
+    TableEnvironment nativeEnv = TableEnvironment.create(settings);
+    try {
+      TestUtils.assertTableResult(
+          nativeEnv.executeSql(
+              String.format(
+                  "CREATE CATALOG native_paimon WITH ('type'='paimon', 'warehouse'='%s')",
+                  warehouse)),
+          ResultKind.SUCCESS);
+      TestUtils.assertTableResult(
+          nativeEnv.executeSql("USE CATALOG native_paimon"), ResultKind.SUCCESS);
+      if (databaseName != null) {
+        TestUtils.assertTableResult(
+            nativeEnv.executeSql(String.format("CREATE DATABASE IF NOT EXISTS %s", databaseName)),
+            ResultKind.SUCCESS);
+        TestUtils.assertTableResult(
+            nativeEnv.executeSql("USE " + databaseName), ResultKind.SUCCESS);
+      }
+      action.accept(nativeEnv);
+    } finally {
+      ((TableEnvironmentImpl) nativeEnv).getCatalogManager().close();
+    }
+  }
+
+  private void assertSingleRow(TableEnvironment env, String tableName, Row expectedRow) {
+    TableResult result = env.executeSql("SELECT * FROM " + tableName);
+    List<Row> rows = Lists.newArrayList(result.collect());
+    Assertions.assertEquals(1, rows.size());
+    Assertions.assertEquals(expectedRow, rows.get(0));
+  }
+
+  private void createJdbcTable(String tableName) {
+    try (Connection connection =
+            DriverManager.getConnection(mysqlUrl, mysqlUsername, mysqlPassword);
+        Statement statement = connection.createStatement()) {
+      statement.execute(String.format("CREATE DATABASE IF NOT EXISTS %s", MYSQL_DATABASE));
+      statement.execute(String.format("DROP TABLE IF EXISTS %s.%s", MYSQL_DATABASE, tableName));
+      statement.execute(
+          String.format(
+              "CREATE TABLE %s.%s (id INT, name VARCHAR(32))", MYSQL_DATABASE, tableName));
+    } catch (SQLException e) {
+      throw new RuntimeException("Failed to create JDBC table " + tableName, e);
+    }
+  }
+
+  private void alterJdbcTableAddColumn(String tableName) {
+    try (Connection connection =
+            DriverManager.getConnection(mysqlUrl, mysqlUsername, mysqlPassword);
+        Statement statement = connection.createStatement()) {
+      statement.execute(
+          String.format("ALTER TABLE %s.%s ADD COLUMN age INT", MYSQL_DATABASE, tableName));
+    } catch (SQLException e) {
+      throw new RuntimeException("Failed to alter JDBC table " + tableName, e);
+    }
+  }
+
+  private String paimonTablePath(String databaseName, String tableName) {
+    return String.format("%s/%s.db/%s", warehouse, databaseName, tableName);
+  }
+
+  private void dropJdbcTable(String tableName) {
+    try (Connection connection =
+            DriverManager.getConnection(mysqlUrl, mysqlUsername, mysqlPassword);
+        Statement statement = connection.createStatement()) {
+      statement.execute(String.format("DROP TABLE IF EXISTS %s.%s", MYSQL_DATABASE, tableName));
+    } catch (SQLException e) {
+      throw new RuntimeException("Failed to drop JDBC table " + tableName, e);
+    }
   }
 
   @Override
