@@ -444,9 +444,9 @@ To enable access control in Gravitino, configure the following settings in your 
 |---------------------------------------------------------|---------------------------------------------------------------------------|---------------|---------------------------------------------|---------------|
 | `gravitino.authorization.enable`                        | Enable or disable authorization in Gravitino                              | `false`       | No                                          | 0.5.0         |
 | `gravitino.authorization.serviceAdmins`                 | Comma-separated list of service administrator usernames                   | (none)        | Yes (when authorization is enabled)         | 0.5.0         |
-| `gravitino.authorization.jcasbin.cacheExpirationSecs`   | The expiration time in seconds for authorization cache entries            | `3600`        | No                                          | 1.2.0         |
-| `gravitino.authorization.jcasbin.roleCacheSize`         | The maximum size of the role cache for authorization                      | `10000`       | No                                          | 1.2.0         |
-| `gravitino.authorization.jcasbin.ownerCacheSize`        | The maximum size of the owner cache for authorization                     | `100000`      | No                                          | 1.2.0         |
+| `gravitino.authorization.jcasbin.cacheExpirationSecs`   | The expiration time in seconds for authorization cache entries            | `3600`        | No                                          | 1.1.1         |
+| `gravitino.authorization.jcasbin.roleCacheSize`         | The maximum size of the role cache for authorization                      | `10000`       | No                                          | 1.1.1         |
+| `gravitino.authorization.jcasbin.ownerCacheSize`        | The maximum size of the owner cache for authorization                     | `100000`      | No                                          | 1.1.1         |
 
 ### Authorization Cache
 
