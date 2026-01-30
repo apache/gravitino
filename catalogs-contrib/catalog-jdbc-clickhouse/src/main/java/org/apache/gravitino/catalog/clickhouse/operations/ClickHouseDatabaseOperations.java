@@ -41,19 +41,6 @@ public class ClickHouseDatabaseOperations extends JdbcDatabaseOperations {
 
   // TODO: handle ClickHouse cluster properly when creating/dropping databases/tables
   //  use https://github.com/apache/gravitino/issues/9820 to track it.
-  @SuppressWarnings("unused")
-  private String clusterName = null;
-
-  @Override
-  public void initialize(
-      DataSource dataSource, JdbcExceptionConverter exceptionMapper, Map<String, String> conf) {
-    super.initialize(dataSource, exceptionMapper, conf);
-
-    final String cn = conf.get(ClickHouseConfig.CK_CLUSTER_NAME.getKey());
-    if (StringUtils.isNotBlank(cn)) {
-      clusterName = cn;
-    }
-  }
 
   @Override
   protected boolean supportSchemaComment() {
