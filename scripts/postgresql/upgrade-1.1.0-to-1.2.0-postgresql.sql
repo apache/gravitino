@@ -78,3 +78,30 @@ COMMENT ON COLUMN function_version_info.function_comment IS 'function version co
 COMMENT ON COLUMN function_version_info.definitions IS 'function definitions details';
 COMMENT ON COLUMN function_version_info.audit_info IS 'function version audit info';
 COMMENT ON COLUMN function_version_info.deleted_at IS 'function version deleted at';
+
+CREATE TABLE IF NOT EXISTS view_meta (
+    view_id BIGINT NOT NULL,
+    view_name VARCHAR(128) NOT NULL,
+    metalake_id BIGINT NOT NULL,
+    catalog_id BIGINT NOT NULL,
+    schema_id BIGINT NOT NULL,
+    current_version INT NOT NULL DEFAULT 1,
+    last_version INT NOT NULL DEFAULT 1,
+    deleted_at BIGINT NOT NULL DEFAULT 0,
+    PRIMARY KEY (view_id),
+    UNIQUE (schema_id, view_name, deleted_at)
+);
+
+CREATE INDEX IF NOT EXISTS view_meta_idx_metalake_id ON view_meta (metalake_id);
+CREATE INDEX IF NOT EXISTS view_meta_idx_catalog_id ON view_meta (catalog_id);
+COMMENT ON TABLE view_meta IS 'view metadata';
+
+COMMENT ON COLUMN view_meta.view_id IS 'view id';
+COMMENT ON COLUMN view_meta.view_name IS 'view name';
+COMMENT ON COLUMN view_meta.metalake_id IS 'metalake id';
+COMMENT ON COLUMN view_meta.catalog_id IS 'catalog id';
+COMMENT ON COLUMN view_meta.schema_id IS 'schema id';
+COMMENT ON COLUMN view_meta.current_version IS 'view current version';
+COMMENT ON COLUMN view_meta.last_version IS 'view last version';
+COMMENT ON COLUMN view_meta.deleted_at IS 'view deleted at';
+
