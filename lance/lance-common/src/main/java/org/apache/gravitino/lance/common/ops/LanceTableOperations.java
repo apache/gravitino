@@ -18,6 +18,12 @@
  */
 package org.apache.gravitino.lance.common.ops;
 
+import com.lancedb.lance.namespace.model.AlterTableAddColumnsRequest;
+import com.lancedb.lance.namespace.model.AlterTableAddColumnsResponse;
+import com.lancedb.lance.namespace.model.AlterTableAlterColumnsRequest;
+import com.lancedb.lance.namespace.model.AlterTableAlterColumnsResponse;
+import com.lancedb.lance.namespace.model.AlterTableDropColumnsRequest;
+import com.lancedb.lance.namespace.model.AlterTableDropColumnsResponse;
 import com.lancedb.lance.namespace.model.CreateEmptyTableResponse;
 import com.lancedb.lance.namespace.model.CreateTableRequest;
 import com.lancedb.lance.namespace.model.CreateTableResponse;
@@ -113,4 +119,37 @@ public interface LanceTableOperations {
    * @return the response of the drop table operation
    */
   DropTableResponse dropTable(String tableId, String delimiter);
+
+  /**
+   * Alter a table to drop columns.
+   *
+   * @param tableId table ids are in the format of "{namespace}{delimiter}{table_name}"
+   * @param delimiter the delimiter used in the namespace
+   * @param request the request containing columns to be dropped
+   * @return the response of the alter table drop columns operation.
+   */
+  AlterTableDropColumnsResponse alterTableDropColumns(
+      String tableId, String delimiter, AlterTableDropColumnsRequest request);
+
+  /**
+   * Alter a table to update columns.
+   *
+   * @param tableId table ids are in the format of "{namespace}{delimiter}{table_name}"
+   * @param delimiter the delimiter used in the namespace
+   * @param request the request containing columns to be altered
+   * @return the response of the alter table alter columns operation.
+   */
+  AlterTableAlterColumnsResponse alterTableAlterColumns(
+      String tableId, String delimiter, AlterTableAlterColumnsRequest request);
+
+  /**
+   * Alter a table to add columns.
+   *
+   * @param tableId table ids are in the format of "{namespace}{delimiter}{table_name}"
+   * @param delimiter the delimiter used in the namespace
+   * @param request the request containing columns to be added
+   * @return the response of the alter table add columns operation.
+   */
+  AlterTableAddColumnsResponse alterTableAddColumns(
+      String tableId, String delimiter, AlterTableAddColumnsRequest request);
 }
