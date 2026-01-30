@@ -307,7 +307,7 @@ public class Configs {
   public static final ConfigEntry<Long> GRAVITINO_AUTHORIZATION_CACHE_EXPIRATION_SECS =
       new ConfigBuilder("gravitino.authorization.jcasbin.cacheExpirationSecs")
           .doc("The expiration time in seconds for authorization cache entries")
-          .version(ConfigConstants.VERSION_1_2_0)
+          .version(ConfigConstants.VERSION_1_1_1)
           .longConf()
           .createWithDefault(DEFAULT_GRAVITINO_AUTHORIZATION_CACHE_EXPIRATION_SECS);
 
@@ -316,7 +316,7 @@ public class Configs {
   public static final ConfigEntry<Long> GRAVITINO_AUTHORIZATION_ROLE_CACHE_SIZE =
       new ConfigBuilder("gravitino.authorization.jcasbin.roleCacheSize")
           .doc("The maximum size of the role cache for authorization")
-          .version(ConfigConstants.VERSION_1_2_0)
+          .version(ConfigConstants.VERSION_1_1_1)
           .longConf()
           .createWithDefault(DEFAULT_GRAVITINO_AUTHORIZATION_ROLE_CACHE_SIZE);
 
@@ -325,7 +325,7 @@ public class Configs {
   public static final ConfigEntry<Long> GRAVITINO_AUTHORIZATION_OWNER_CACHE_SIZE =
       new ConfigBuilder("gravitino.authorization.jcasbin.ownerCacheSize")
           .doc("The maximum size of the owner cache for authorization")
-          .version(ConfigConstants.VERSION_1_2_0)
+          .version(ConfigConstants.VERSION_1_1_1)
           .longConf()
           .createWithDefault(DEFAULT_GRAVITINO_AUTHORIZATION_OWNER_CACHE_SIZE);
 
