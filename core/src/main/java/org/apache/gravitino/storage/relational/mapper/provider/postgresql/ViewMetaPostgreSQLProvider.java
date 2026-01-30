@@ -54,6 +54,38 @@ public class ViewMetaPostgreSQLProvider extends ViewMetaBaseSQLProvider {
   }
 
   @Override
+  public String softDeleteViewMetasByViewId(@Param("viewId") Long viewId) {
+    return "UPDATE "
+        + TABLE_NAME
+        + " SET deleted_at = CAST(EXTRACT(EPOCH FROM CURRENT_TIMESTAMP) * 1000 AS BIGINT)"
+        + " WHERE view_id = #{viewId} AND deleted_at = 0";
+  }
+
+  @Override
+  public String softDeleteViewMetasByMetalakeId(@Param("metalakeId") Long metalakeId) {
+    return "UPDATE "
+        + TABLE_NAME
+        + " SET deleted_at = CAST(EXTRACT(EPOCH FROM CURRENT_TIMESTAMP) * 1000 AS BIGINT)"
+        + " WHERE metalake_id = #{metalakeId} AND deleted_at = 0";
+  }
+
+  @Override
+  public String softDeleteViewMetasByCatalogId(@Param("catalogId") Long catalogId) {
+    return "UPDATE "
+        + TABLE_NAME
+        + " SET deleted_at = CAST(EXTRACT(EPOCH FROM CURRENT_TIMESTAMP) * 1000 AS BIGINT)"
+        + " WHERE catalog_id = #{catalogId} AND deleted_at = 0";
+  }
+
+  @Override
+  public String softDeleteViewMetasBySchemaId(@Param("schemaId") Long schemaId) {
+    return "UPDATE "
+        + TABLE_NAME
+        + " SET deleted_at = CAST(EXTRACT(EPOCH FROM CURRENT_TIMESTAMP) * 1000 AS BIGINT)"
+        + " WHERE schema_id = #{schemaId} AND deleted_at = 0";
+  }
+
+  @Override
   public String deleteViewMetasByLegacyTimeline(
       @Param("legacyTimeline") Long legacyTimeline, @Param("limit") int limit) {
     return "DELETE FROM "
@@ -61,10 +93,5 @@ public class ViewMetaPostgreSQLProvider extends ViewMetaBaseSQLProvider {
         + " WHERE view_id IN (SELECT view_id FROM "
         + TABLE_NAME
         + " WHERE deleted_at > 0 AND deleted_at < #{legacyTimeline} LIMIT #{limit})";
-  }
-
-  @Override
-  protected String softDeleteSQL() {
-    return " SET deleted_at = CAST(EXTRACT(EPOCH FROM CURRENT_TIMESTAMP) * 1000 AS BIGINT) ";
   }
 }

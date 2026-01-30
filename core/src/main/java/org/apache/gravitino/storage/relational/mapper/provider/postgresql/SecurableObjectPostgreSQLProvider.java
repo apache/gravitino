@@ -18,13 +18,146 @@
  */
 package org.apache.gravitino.storage.relational.mapper.provider.postgresql;
 
+import static org.apache.gravitino.storage.relational.mapper.SecurableObjectMapper.ROLE_TABLE_NAME;
 import static org.apache.gravitino.storage.relational.mapper.SecurableObjectMapper.SECURABLE_OBJECT_TABLE_NAME;
 
-import java.util.Optional;
+import java.util.List;
+import org.apache.gravitino.storage.relational.mapper.CatalogMetaMapper;
+import org.apache.gravitino.storage.relational.mapper.FilesetMetaMapper;
+import org.apache.gravitino.storage.relational.mapper.ModelMetaMapper;
+import org.apache.gravitino.storage.relational.mapper.SchemaMetaMapper;
+import org.apache.gravitino.storage.relational.mapper.TableMetaMapper;
+import org.apache.gravitino.storage.relational.mapper.TopicMetaMapper;
+import org.apache.gravitino.storage.relational.mapper.ViewMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.provider.base.SecurableObjectBaseSQLProvider;
+import org.apache.gravitino.storage.relational.po.SecurableObjectPO;
 import org.apache.ibatis.annotations.Param;
 
 public class SecurableObjectPostgreSQLProvider extends SecurableObjectBaseSQLProvider {
+  @Override
+  public String batchSoftDeleteSecurableObjects(
+      @Param("securableObjects") List<SecurableObjectPO> securableObjectPOs) {
+    return "<script>"
+        + "UPDATE "
+        + SECURABLE_OBJECT_TABLE_NAME
+        + " SET deleted_at = CAST(EXTRACT(EPOCH FROM CURRENT_TIMESTAMP) * 1000 AS BIGINT)"
+        + " WHERE FALSE "
+        + "<foreach collection='securableObjects' item='item' separator=' '>"
+        + " OR (metadata_object_id = #{item.metadataObjectId} AND"
+        + " role_id = #{item.roleId} AND deleted_at = 0)"
+        + "</foreach>"
+        + "</script>";
+  }
+
+  @Override
+  public String softDeleteSecurableObjectsByRoleId(Long roleId) {
+    return "UPDATE "
+        + SECURABLE_OBJECT_TABLE_NAME
+        + " SET deleted_at = CAST(EXTRACT(EPOCH FROM CURRENT_TIMESTAMP) * 1000 AS BIGINT)"
+        + " WHERE role_id = #{roleId} AND deleted_at = 0";
+  }
+
+  @Override
+  public String softDeleteSecurableObjectsByMetalakeId(Long metalakeId) {
+    return "UPDATE "
+        + SECURABLE_OBJECT_TABLE_NAME
+        + " ob SET deleted_at = CAST(EXTRACT(EPOCH FROM CURRENT_TIMESTAMP) * 1000 AS BIGINT)"
+        + " WHERE exists (SELECT * FROM "
+        + ROLE_TABLE_NAME
+        + " ro WHERE ro.metalake_id = #{metalakeId} AND ro.role_id = ob.role_id"
+        + " AND ro.deleted_at = 0) AND ob.deleted_at = 0";
+  }
+
+  @Override
+  public String softDeleteObjectRelsByMetadataObject(
+      @Param("metadataObjectId") Long metadataObjectId,
+      @Param("metadataObjectType") String metadataObjectType) {
+    return "UPDATE "
+        + SECURABLE_OBJECT_TABLE_NAME
+        + " SET deleted_at = CAST(EXTRACT(EPOCH FROM CURRENT_TIMESTAMP) * 1000 AS BIGINT)"
+        + " WHERE metadata_object_id = #{metadataObjectId} AND deleted_at = 0 AND type = #{metadataObjectType}";
+  }
+
+  @Override
+  public String softDeleteObjectRelsByCatalogId(@Param("catalogId") Long catalogId) {
+    return "UPDATE "
+        + SECURABLE_OBJECT_TABLE_NAME
+        + " sect SET deleted_at = CAST(EXTRACT(EPOCH FROM CURRENT_TIMESTAMP) * 1000 AS BIGINT)"
+        + " WHERE sect.deleted_at = 0 AND EXISTS ("
+        + " SELECT ct.catalog_id FROM "
+        + CatalogMetaMapper.TABLE_NAME
+        + " ct WHERE ct.catalog_id = #{catalogId} AND "
+        + "ct.catalog_id = sect.metadata_object_id AND sect.type = 'CATALOG'"
+        + " UNION"
+        + " SELECT st.catalog_id FROM "
+        + SchemaMetaMapper.TABLE_NAME
+        + " st WHERE st.catalog_id = #{catalogId} AND"
+        + " st.schema_id = sect.metadata_object_id AND sect.type = 'SCHEMA'"
+        + " UNION"
+        + " SELECT tt.catalog_id FROM "
+        + TopicMetaMapper.TABLE_NAME
+        + " tt WHERE tt.catalog_id = #{catalogId} AND "
+        + " tt.topic_id = sect.metadata_object_id AND sect.type = 'TOPIC'"
+        + " UNION"
+        + " SELECT tat.catalog_id FROM "
+        + TableMetaMapper.TABLE_NAME
+        + " tat WHERE tat.catalog_id = #{catalogId} AND"
+        + " tat.table_id = sect.metadata_object_id AND sect.type = 'TABLE'"
+        + " UNION"
+        + " SELECT ft.catalog_id FROM "
+        + FilesetMetaMapper.META_TABLE_NAME
+        + " ft WHERE ft.catalog_id = #{catalogId} AND"
+        + " ft.fileset_id = sect.metadata_object_id AND sect.type = 'FILESET'"
+        + " UNION"
+        + " SELECT mt.catalog_id FROM "
+        + ModelMetaMapper.TABLE_NAME
+        + " mt WHERE mt.catalog_id = #{catalogId} AND"
+        + " mt.model_id = sect.metadata_object_id AND sect.type = 'MODEL'"
+        + " UNION"
+        + " SELECT vt.catalog_id FROM "
+        + ViewMetaMapper.TABLE_NAME
+        + " vt WHERE vt.catalog_id = #{catalogId} AND"
+        + " vt.view_id = sect.metadata_object_id AND sect.type = 'VIEW'"
+        + ")";
+  }
+
+  @Override
+  public String softDeleteObjectRelsBySchemaId(@Param("schemaId") Long schemaId) {
+    return "UPDATE "
+        + SECURABLE_OBJECT_TABLE_NAME
+        + " sect SET deleted_at = CAST(EXTRACT(EPOCH FROM CURRENT_TIMESTAMP) * 1000 AS BIGINT)"
+        + " WHERE sect.deleted_at = 0 AND EXISTS ("
+        + " SELECT st.schema_id FROM "
+        + SchemaMetaMapper.TABLE_NAME
+        + " st WHERE st.schema_id = #{schemaId}"
+        + " AND st.schema_id = sect.metadata_object_id AND sect.type = 'SCHEMA'"
+        + " UNION"
+        + " SELECT tt.schema_id FROM "
+        + TopicMetaMapper.TABLE_NAME
+        + " tt WHERE tt.schema_id = #{schemaId} AND"
+        + " tt.topic_id = sect.metadata_object_id AND sect.type = 'TOPIC'"
+        + " UNION"
+        + " SELECT tat.schema_id FROM "
+        + TableMetaMapper.TABLE_NAME
+        + " tat WHERE tat.schema_id = #{schemaId} AND"
+        + " tat.table_id = sect.metadata_object_id AND sect.type = 'TABLE'"
+        + " UNION"
+        + " SELECT ft.schema_id FROM "
+        + FilesetMetaMapper.META_TABLE_NAME
+        + " ft WHERE ft.schema_id = #{schemaId} AND"
+        + " ft.fileset_id = sect.metadata_object_id AND sect.type = 'FILESET'"
+        + " UNION"
+        + " SELECT mt.schema_id FROM "
+        + ModelMetaMapper.TABLE_NAME
+        + " mt WHERE mt.schema_id = #{schemaId} AND"
+        + " mt.model_id = sect.metadata_object_id AND sect.type = 'MODEL'"
+        + " UNION"
+        + " SELECT vt.schema_id FROM "
+        + ViewMetaMapper.TABLE_NAME
+        + " vt WHERE vt.schema_id = #{schemaId} AND"
+        + " vt.view_id = sect.metadata_object_id AND sect.type = 'VIEW'"
+        + ")";
+  }
 
   @Override
   public String deleteSecurableObjectsByLegacyTimeline(
@@ -34,13 +167,5 @@ public class SecurableObjectPostgreSQLProvider extends SecurableObjectBaseSQLPro
         + " WHERE id IN (SELECT id FROM "
         + SECURABLE_OBJECT_TABLE_NAME
         + " WHERE deleted_at > 0 AND deleted_at < #{legacyTimeline} LIMIT #{limit})";
-  }
-
-  @Override
-  protected String softDeleteSQL(Optional<String> tableAlias) {
-    String prefix = tableAlias.map(alias -> alias + ".").orElse("");
-    return " SET "
-        + prefix
-        + "deleted_at = CAST(EXTRACT(EPOCH FROM CURRENT_TIMESTAMP) * 1000 AS BIGINT) ";
   }
 }

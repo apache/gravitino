@@ -36,6 +36,7 @@ public class ViewPO {
   private Long lastVersion;
   private Long deletedAt;
 
+
   public static class Builder {
     private final ViewPO viewPO;
 

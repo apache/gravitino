@@ -22,7 +22,6 @@ import static org.apache.gravitino.storage.relational.mapper.SecurableObjectMapp
 import static org.apache.gravitino.storage.relational.mapper.SecurableObjectMapper.SECURABLE_OBJECT_TABLE_NAME;
 
 import java.util.List;
-import java.util.Optional;
 import org.apache.gravitino.storage.relational.mapper.CatalogMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.FilesetMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.ModelMetaMapper;
@@ -61,7 +60,8 @@ public class SecurableObjectBaseSQLProvider {
     return "<script>"
         + "UPDATE "
         + SECURABLE_OBJECT_TABLE_NAME
-        + softDeleteSQL()
+        + " SET deleted_at = (UNIX_TIMESTAMP() * 1000.0)"
+        + " + EXTRACT(MICROSECOND FROM CURRENT_TIMESTAMP(3)) / 1000"
         + " WHERE FALSE "
         + "<foreach collection='securableObjects' item='item' separator=' '>"
         + " OR (metadata_object_id = #{item.metadataObjectId} AND"
@@ -73,15 +73,16 @@ public class SecurableObjectBaseSQLProvider {
   public String softDeleteSecurableObjectsByRoleId(@Param("roleId") Long roleId) {
     return "UPDATE "
         + SECURABLE_OBJECT_TABLE_NAME
-        + softDeleteSQL()
+        + " SET deleted_at = (UNIX_TIMESTAMP() * 1000.0)"
+        + " + EXTRACT(MICROSECOND FROM CURRENT_TIMESTAMP(3)) / 1000"
         + " WHERE role_id = #{roleId} AND deleted_at = 0";
   }
 
   public String softDeleteSecurableObjectsByMetalakeId(@Param("metalakeId") Long metalakeId) {
     return "UPDATE "
         + SECURABLE_OBJECT_TABLE_NAME
-        + " ob"
-        + softDeleteSQL(Optional.of("ob"))
+        + " ob SET ob.deleted_at = (UNIX_TIMESTAMP() * 1000.0)"
+        + " + EXTRACT(MICROSECOND FROM CURRENT_TIMESTAMP(3)) / 1000"
         + " WHERE exists (SELECT * FROM "
         + ROLE_TABLE_NAME
         + " ro WHERE ro.metalake_id = #{metalakeId} AND ro.role_id = ob.role_id"
@@ -93,7 +94,8 @@ public class SecurableObjectBaseSQLProvider {
       @Param("metadataObjectType") String metadataObjectType) {
     return "UPDATE "
         + SECURABLE_OBJECT_TABLE_NAME
-        + softDeleteSQL()
+        + " SET deleted_at = (UNIX_TIMESTAMP() * 1000.0)"
+        + " + EXTRACT(MICROSECOND FROM CURRENT_TIMESTAMP(3)) / 1000"
         + " WHERE metadata_object_id = #{metadataObjectId} AND deleted_at = 0"
         + " AND type = #{metadataObjectType}";
   }
@@ -101,8 +103,8 @@ public class SecurableObjectBaseSQLProvider {
   public String softDeleteObjectRelsByCatalogId(@Param("catalogId") Long catalogId) {
     return "UPDATE "
         + SECURABLE_OBJECT_TABLE_NAME
-        + " sect"
-        + softDeleteSQL(Optional.of("sect"))
+        + " sect SET deleted_at = (UNIX_TIMESTAMP() * 1000.0)"
+        + " + EXTRACT(MICROSECOND FROM CURRENT_TIMESTAMP(3)) / 1000"
         + " WHERE sect.deleted_at = 0 AND EXISTS ("
         + " SELECT ct.catalog_id FROM "
         + CatalogMetaMapper.TABLE_NAME
@@ -144,8 +146,8 @@ public class SecurableObjectBaseSQLProvider {
   public String softDeleteObjectRelsBySchemaId(@Param("schemaId") Long schemaId) {
     return "UPDATE "
         + SECURABLE_OBJECT_TABLE_NAME
-        + " sect"
-        + softDeleteSQL(Optional.of("sect"))
+        + " sect SET deleted_at = (UNIX_TIMESTAMP() * 1000.0)"
+        + " + EXTRACT(MICROSECOND FROM CURRENT_TIMESTAMP(3)) / 1000"
         + " WHERE sect.deleted_at = 0 AND EXISTS ("
         + " SELECT st.schema_id FROM "
         + SchemaMetaMapper.TABLE_NAME
@@ -177,18 +179,6 @@ public class SecurableObjectBaseSQLProvider {
         + " vt WHERE vt.schema_id = #{schemaId} AND"
         + " vt.view_id = sect.metadata_object_id AND sect.type = 'VIEW'"
         + ")";
-  }
-
-  protected String softDeleteSQL() {
-    return softDeleteSQL(Optional.empty());
-  }
-
-  protected String softDeleteSQL(Optional<String> tableAlias) {
-    String prefix = tableAlias.map(alias -> alias + ".").orElse("");
-    return " SET "
-        + prefix
-        + "deleted_at = (UNIX_TIMESTAMP() * 1000.0)"
-        + " + EXTRACT(MICROSECOND FROM CURRENT_TIMESTAMP(3)) / 1000 ";
   }
 
   public String listSecurableObjectsByRoleId(@Param("roleId") Long roleId) {
