@@ -38,15 +38,15 @@ import org.slf4j.LoggerFactory;
  * <p>Configuration properties:
  *
  * <ul>
- *   <li>jdbc-url (required): JDBC connection URL (e.g., jdbc:mysql://host:port/db,
+ *   <li>jdbcUrl (required): JDBC connection URL (e.g., jdbc:mysql://host:port/db,
  *       jdbc:postgresql://host:port/db)
- *   <li>jdbc-user (required): Database username
- *   <li>jdbc-password (required): Database password
- *   <li>jdbc-driver (optional): JDBC driver class name (defaults to com.mysql.cj.jdbc.Driver)
- *   <li>pool-max-size (optional): Maximum connection pool size (default: 10)
- *   <li>pool-min-idle (optional): Minimum idle connections (default: 2)
- *   <li>connection-timeout-ms (optional): Connection timeout in milliseconds (default: 30000)
- *   <li>test-on-borrow (optional): Test connections before use (default: true)
+ *   <li>jdbcUser (required): Database username
+ *   <li>jdbcPassword (required): Database password
+ *   <li>jdbcDriver (optional): JDBC driver class name (defaults to com.mysql.cj.jdbc.Driver)
+ *   <li>poolMaxSize (optional): Maximum connection pool size (default: 10)
+ *   <li>poolMinIdle (optional): Minimum idle connections (default: 2)
+ *   <li>connectionTimeoutMs (optional): Connection timeout in milliseconds (default: 30000)
+ *   <li>testOnBorrow (optional): Test connections before use (default: true)
  * </ul>
  */
 public class JdbcPartitionStatisticStorageFactory implements PartitionStatisticStorageFactory {
@@ -55,14 +55,14 @@ public class JdbcPartitionStatisticStorageFactory implements PartitionStatisticS
       LoggerFactory.getLogger(JdbcPartitionStatisticStorageFactory.class);
 
   // Configuration keys
-  private static final String JDBC_URL = "jdbc-url";
-  private static final String JDBC_USER = "jdbc-user";
-  private static final String JDBC_PASSWORD = "jdbc-password";
-  private static final String JDBC_DRIVER = "jdbc-driver";
-  private static final String POOL_MAX_SIZE = "pool-max-size";
-  private static final String POOL_MIN_IDLE = "pool-min-idle";
-  private static final String CONNECTION_TIMEOUT_MS = "connection-timeout-ms";
-  private static final String TEST_ON_BORROW = "test-on-borrow";
+  private static final String JDBC_URL = "jdbcUrl";
+  private static final String JDBC_USER = "jdbcUser";
+  private static final String JDBC_PASSWORD = "jdbcPassword";
+  private static final String JDBC_DRIVER = "jdbcDriver";
+  private static final String POOL_MAX_SIZE = "poolMaxSize";
+  private static final String POOL_MIN_IDLE = "poolMinIdle";
+  private static final String CONNECTION_TIMEOUT_MS = "connectionTimeoutMs";
+  private static final String TEST_ON_BORROW = "testOnBorrow";
 
   // Default values
   private static final String DEFAULT_JDBC_DRIVER = "com.mysql.cj.jdbc.Driver";

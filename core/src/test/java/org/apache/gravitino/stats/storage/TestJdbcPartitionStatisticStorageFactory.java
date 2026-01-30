@@ -34,10 +34,10 @@ public class TestJdbcPartitionStatisticStorageFactory {
     JdbcPartitionStatisticStorageFactory factory = new JdbcPartitionStatisticStorageFactory();
 
     Map<String, String> properties = new HashMap<>();
-    properties.put("jdbc-url", "jdbc:mysql://localhost:3306/test_db");
-    properties.put("jdbc-user", "test_user");
-    properties.put("jdbc-password", "test_password");
-    properties.put("jdbc-driver", "com.mysql.cj.jdbc.Driver");
+    properties.put("jdbcUrl", "jdbc:mysql://localhost:3306/test_db");
+    properties.put("jdbcUser", "test_user");
+    properties.put("jdbcPassword", "test_password");
+    properties.put("jdbcDriver", "com.mysql.cj.jdbc.Driver");
 
     // This test only validates that the properties pass validation
     // Actual storage creation requires GravitinoEnv and is tested in integration tests
@@ -61,10 +61,10 @@ public class TestJdbcPartitionStatisticStorageFactory {
     JdbcPartitionStatisticStorageFactory factory = new JdbcPartitionStatisticStorageFactory();
 
     Map<String, String> properties = new HashMap<>();
-    properties.put("jdbc-url", "jdbc:mysql://localhost:3306/test_db");
-    properties.put("jdbc-user", "test_user");
-    properties.put("jdbc-password", "test_password");
-    // jdbc-driver not provided, should use default
+    properties.put("jdbcUrl", "jdbc:mysql://localhost:3306/test_db");
+    properties.put("jdbcUser", "test_user");
+    properties.put("jdbcPassword", "test_password");
+    // jdbcDriver not provided, should use default
 
     // This test only validates that the properties pass validation
     try {
@@ -86,14 +86,14 @@ public class TestJdbcPartitionStatisticStorageFactory {
     JdbcPartitionStatisticStorageFactory factory = new JdbcPartitionStatisticStorageFactory();
 
     Map<String, String> properties = new HashMap<>();
-    properties.put("jdbc-user", "test_user");
-    properties.put("jdbc-password", "test_password");
-    // jdbc-url is missing
+    properties.put("jdbcUser", "test_user");
+    properties.put("jdbcPassword", "test_password");
+    // jdbcUrl is missing
 
     Exception exception =
         assertThrows(IllegalArgumentException.class, () -> factory.create(properties));
 
-    assertTrue(exception.getMessage().contains("jdbc-url"));
+    assertTrue(exception.getMessage().contains("jdbcUrl"));
   }
 
   @Test
@@ -101,14 +101,14 @@ public class TestJdbcPartitionStatisticStorageFactory {
     JdbcPartitionStatisticStorageFactory factory = new JdbcPartitionStatisticStorageFactory();
 
     Map<String, String> properties = new HashMap<>();
-    properties.put("jdbc-url", "jdbc:mysql://localhost:3306/test_db");
-    properties.put("jdbc-password", "test_password");
-    // jdbc-user is missing
+    properties.put("jdbcUrl", "jdbc:mysql://localhost:3306/test_db");
+    properties.put("jdbcPassword", "test_password");
+    // jdbcUser is missing
 
     Exception exception =
         assertThrows(IllegalArgumentException.class, () -> factory.create(properties));
 
-    assertTrue(exception.getMessage().contains("jdbc-user"));
+    assertTrue(exception.getMessage().contains("jdbcUser"));
   }
 
   @Test
@@ -116,14 +116,14 @@ public class TestJdbcPartitionStatisticStorageFactory {
     JdbcPartitionStatisticStorageFactory factory = new JdbcPartitionStatisticStorageFactory();
 
     Map<String, String> properties = new HashMap<>();
-    properties.put("jdbc-url", "jdbc:mysql://localhost:3306/test_db");
-    properties.put("jdbc-user", "test_user");
-    // jdbc-password is missing
+    properties.put("jdbcUrl", "jdbc:mysql://localhost:3306/test_db");
+    properties.put("jdbcUser", "test_user");
+    // jdbcPassword is missing
 
     Exception exception =
         assertThrows(IllegalArgumentException.class, () -> factory.create(properties));
 
-    assertTrue(exception.getMessage().contains("jdbc-password"));
+    assertTrue(exception.getMessage().contains("jdbcPassword"));
   }
 
   @Test
@@ -150,10 +150,10 @@ public class TestJdbcPartitionStatisticStorageFactory {
     JdbcPartitionStatisticStorageFactory factory = new JdbcPartitionStatisticStorageFactory();
 
     Map<String, String> properties = new HashMap<>();
-    properties.put("jdbc-url", "jdbc:mysql://localhost:3306/test_db?useSSL=false");
-    properties.put("jdbc-user", "test_user");
-    properties.put("jdbc-password", "test_password");
-    properties.put("jdbc-driver", "com.mysql.cj.jdbc.Driver");
+    properties.put("jdbcUrl", "jdbc:mysql://localhost:3306/test_db?useSSL=false");
+    properties.put("jdbcUser", "test_user");
+    properties.put("jdbcPassword", "test_password");
+    properties.put("jdbcDriver", "com.mysql.cj.jdbc.Driver");
     properties.put("extra-property", "extra-value"); // Extra properties should be ignored
 
     try {
@@ -177,14 +177,14 @@ public class TestJdbcPartitionStatisticStorageFactory {
     JdbcPartitionStatisticStorageFactory factory2 = new JdbcPartitionStatisticStorageFactory();
 
     Map<String, String> properties1 = new HashMap<>();
-    properties1.put("jdbc-url", "jdbc:mysql://localhost:3306/db1");
-    properties1.put("jdbc-user", "user1");
-    properties1.put("jdbc-password", "pass1");
+    properties1.put("jdbcUrl", "jdbc:mysql://localhost:3306/db1");
+    properties1.put("jdbcUser", "user1");
+    properties1.put("jdbcPassword", "pass1");
 
     Map<String, String> properties2 = new HashMap<>();
-    properties2.put("jdbc-url", "jdbc:mysql://localhost:3306/db2");
-    properties2.put("jdbc-user", "user2");
-    properties2.put("jdbc-password", "pass2");
+    properties2.put("jdbcUrl", "jdbc:mysql://localhost:3306/db2");
+    properties2.put("jdbcUser", "user2");
+    properties2.put("jdbcPassword", "pass2");
 
     try {
       PartitionStatisticStorage storage1 = factory1.create(properties1);
@@ -209,10 +209,10 @@ public class TestJdbcPartitionStatisticStorageFactory {
 
     Map<String, String> properties = new HashMap<>();
     properties.put(
-        "jdbc-url",
+        "jdbcUrl",
         "jdbc:mysql://localhost:3306/test_db?useSSL=false&serverTimezone=UTC&allowPublicKeyRetrieval=true");
-    properties.put("jdbc-user", "test_user");
-    properties.put("jdbc-password", "test_password");
+    properties.put("jdbcUser", "test_user");
+    properties.put("jdbcPassword", "test_password");
 
     try {
       PartitionStatisticStorage storage = factory.create(properties);
@@ -233,9 +233,9 @@ public class TestJdbcPartitionStatisticStorageFactory {
     JdbcPartitionStatisticStorageFactory factory = new JdbcPartitionStatisticStorageFactory();
 
     Map<String, String> properties = new HashMap<>();
-    properties.put("jdbc-url", "jdbc:mysql://[::1]:3306/test_db");
-    properties.put("jdbc-user", "test_user");
-    properties.put("jdbc-password", "test_password");
+    properties.put("jdbcUrl", "jdbc:mysql://[::1]:3306/test_db");
+    properties.put("jdbcUser", "test_user");
+    properties.put("jdbcPassword", "test_password");
 
     try {
       PartitionStatisticStorage storage = factory.create(properties);
@@ -256,14 +256,14 @@ public class TestJdbcPartitionStatisticStorageFactory {
     JdbcPartitionStatisticStorageFactory factory = new JdbcPartitionStatisticStorageFactory();
 
     Map<String, String> properties = new HashMap<>();
-    properties.put("jdbc-url", "jdbc:mysql://localhost:3306/test_db");
-    properties.put("jdbc-user", "test_user");
-    properties.put("jdbc-password", ""); // Empty password
+    properties.put("jdbcUrl", "jdbc:mysql://localhost:3306/test_db");
+    properties.put("jdbcUser", "test_user");
+    properties.put("jdbcPassword", ""); // Empty password
 
     Exception exception =
         assertThrows(IllegalArgumentException.class, () -> factory.create(properties));
 
-    assertTrue(exception.getMessage().contains("jdbc-password"));
+    assertTrue(exception.getMessage().contains("jdbcPassword"));
   }
 
   @Test
@@ -271,9 +271,9 @@ public class TestJdbcPartitionStatisticStorageFactory {
     JdbcPartitionStatisticStorageFactory factory = new JdbcPartitionStatisticStorageFactory();
 
     Map<String, String> properties = new HashMap<>();
-    properties.put("jdbc-url", "jdbc:mysql://localhost:3306/test_db");
-    properties.put("jdbc-user", "user@domain.com");
-    properties.put("jdbc-password", "p@ssw0rd!#$%"); // Special characters
+    properties.put("jdbcUrl", "jdbc:mysql://localhost:3306/test_db");
+    properties.put("jdbcUser", "user@domain.com");
+    properties.put("jdbcPassword", "p@ssw0rd!#$%"); // Special characters
 
     try {
       PartitionStatisticStorage storage = factory.create(properties);
