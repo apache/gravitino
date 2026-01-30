@@ -84,7 +84,7 @@ public final class ConfigConstants {
   public static final String VERSION_1_1_0 = "1.1.0";
 
   /** The version number for the 1.1.1 release. */
-  public static final  String VERSION_1_1_1 = "1.1.1";
+  public static final String VERSION_1_1_1 = "1.1.1";
 
   /** The current version of backend storage initialization script. */
   public static final String CURRENT_SCRIPT_VERSION = VERSION_1_1_0;
