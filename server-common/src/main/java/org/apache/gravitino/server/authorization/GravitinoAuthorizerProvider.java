@@ -55,6 +55,27 @@ public class GravitinoAuthorizerProvider implements Closeable {
               gravitinoAuthorizer =
                   (GravitinoAuthorizer)
                       Class.forName(authorizationImpl).getDeclaredConstructor().newInstance();
+
+              // Special handling for FallbackAuthorizer
+              if (gravitinoAuthorizer instanceof FallbackAuthorizer) {
+                FallbackAuthorizer fallbackAuthorizer = (FallbackAuthorizer) gravitinoAuthorizer;
+
+                // Create and set primary authorizer
+                String primaryImpl = serverConfig.get(Configs.FALLBACK_AUTHORIZER_PRIMARY);
+                GravitinoAuthorizer primaryAuthorizer =
+                    (GravitinoAuthorizer)
+                        Class.forName(primaryImpl).getDeclaredConstructor().newInstance();
+                fallbackAuthorizer.setPrimaryAuthorizer(primaryAuthorizer);
+
+                // Create and set secondary authorizer if configured
+                String secondaryImpl = serverConfig.get(Configs.FALLBACK_AUTHORIZER_SECONDARY);
+                if (secondaryImpl != null && !secondaryImpl.isEmpty()) {
+                  GravitinoAuthorizer secondaryAuthorizer =
+                      (GravitinoAuthorizer)
+                          Class.forName(secondaryImpl).getDeclaredConstructor().newInstance();
+                  fallbackAuthorizer.setSecondaryAuthorizer(secondaryAuthorizer);
+                }
+              }
             } catch (Exception e) {
               throw new IllegalArgumentException("Can not initialize GravitinoAuthorizer", e);
             }
