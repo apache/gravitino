@@ -72,23 +72,6 @@ public class ViewMetaService {
     return viewId;
   }
 
-  @Monitored(
-      metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME,
-      baseMetricName = "getViewPOBySchemaIdAndName")
-  public ViewPO getViewPOBySchemaIdAndName(Long schemaId, String viewName) {
-    ViewPO viewPO =
-        SessionUtils.getWithoutCommit(
-            ViewMetaMapper.class,
-            mapper -> mapper.selectViewMetaBySchemaIdAndName(schemaId, viewName));
-
-    if (viewPO == null) {
-      throw new NoSuchEntityException(
-          NoSuchEntityException.NO_SUCH_ENTITY_MESSAGE,
-          Entity.EntityType.VIEW.name().toLowerCase(),
-          viewName);
-    }
-    return viewPO;
-  }
 
   @Monitored(
       metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME,
@@ -121,50 +104,6 @@ public class ViewMetaService {
     }
   }
 
-  @Monitored(metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME, baseMetricName = "updateView")
-  public void updateView(ViewPO oldViewPO, ViewPO newViewPO) throws IOException {
-    try {
-      Integer updateResult =
-          SessionUtils.doWithCommitAndFetchResult(
-              ViewMetaMapper.class, mapper -> mapper.updateViewMeta(newViewPO, oldViewPO));
-      if (updateResult == 0) {
-        throw new IOException("Failed to update the view: " + oldViewPO.getViewName());
-      }
-    } catch (RuntimeException re) {
-      ExceptionUtils.checkSQLException(re, Entity.EntityType.VIEW, newViewPO.getViewName());
-      throw re;
-    }
-  }
-
-  @Monitored(metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME, baseMetricName = "deleteView")
-  public boolean deleteView(Long viewId) {
-    AtomicInteger deleteResult = new AtomicInteger(0);
-    SessionUtils.doMultipleWithCommit(
-        () ->
-            deleteResult.set(
-                SessionUtils.getWithoutCommit(
-                    ViewMetaMapper.class, mapper -> mapper.softDeleteViewMetasByViewId(viewId))),
-        () -> {
-          if (deleteResult.get() > 0) {
-            SessionUtils.doWithoutCommit(
-                OwnerMetaMapper.class,
-                mapper ->
-                    mapper.softDeleteOwnerRelByMetadataObjectIdAndType(
-                        viewId, MetadataObject.Type.VIEW.name()));
-            SessionUtils.doWithoutCommit(
-                SecurableObjectMapper.class,
-                mapper ->
-                    mapper.softDeleteObjectRelsByMetadataObject(
-                        viewId, MetadataObject.Type.VIEW.name()));
-            SessionUtils.doWithoutCommit(
-                TagMetadataObjectRelMapper.class,
-                mapper ->
-                    mapper.softDeleteTagMetadataObjectRelsByMetadataObject(
-                        viewId, MetadataObject.Type.VIEW.name()));
-          }
-        });
-    return deleteResult.get() > 0;
-  }
 
   @Monitored(
       metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME,
@@ -175,21 +114,6 @@ public class ViewMetaService {
         mapper -> mapper.deleteViewMetasByLegacyTimeline(legacyTimeline, limit));
   }
 
-  private void fillViewPOBuilderParentEntityId(ViewPO.Builder builder, Namespace namespace) {
-    NamespaceUtil.checkView(namespace);
-    NamespacedEntityId namespacedEntityId =
-        EntityIdService.getEntityIds(
-            NameIdentifier.of(namespace.levels()), Entity.EntityType.SCHEMA);
-    builder.withMetalakeId(namespacedEntityId.namespaceIds()[0]);
-    builder.withCatalogId(namespacedEntityId.namespaceIds()[1]);
-    builder.withSchemaId(namespacedEntityId.entityId());
-  }
-
-  public ViewPO.Builder createViewPOBuilder(Namespace namespace) {
-    ViewPO.Builder builder = ViewPO.builder();
-    fillViewPOBuilderParentEntityId(builder, namespace);
-    return builder;
-  }
 
   /**
    * List views as GenericEntity by namespace.
@@ -300,8 +224,6 @@ public class ViewMetaService {
             .withMetalakeId(oldViewPO.getMetalakeId())
             .withCatalogId(oldViewPO.getCatalogId())
             .withSchemaId(oldViewPO.getSchemaId())
-            .withCurrentVersion(oldViewPO.getCurrentVersion())
-            .withLastVersion(oldViewPO.getLastVersion())
             .withDeletedAt(oldViewPO.getDeletedAt())
             .build();
 
@@ -328,5 +250,79 @@ public class ViewMetaService {
     Long viewId = getViewIdBySchemaIdAndName(schemaId, ident.name());
 
     return deleteView(viewId);
+  }
+
+  private ViewPO getViewPOBySchemaIdAndName(Long schemaId, String viewName) {
+    ViewPO viewPO =
+        SessionUtils.getWithoutCommit(
+            ViewMetaMapper.class,
+            mapper -> mapper.selectViewMetaBySchemaIdAndName(schemaId, viewName));
+
+    if (viewPO == null) {
+      throw new NoSuchEntityException(
+          NoSuchEntityException.NO_SUCH_ENTITY_MESSAGE,
+          Entity.EntityType.VIEW.name().toLowerCase(),
+          viewName);
+    }
+    return viewPO;
+  }
+
+  private boolean deleteView(Long viewId) {
+    AtomicInteger deleteResult = new AtomicInteger(0);
+    SessionUtils.doMultipleWithCommit(
+        () ->
+            deleteResult.set(
+                SessionUtils.getWithoutCommit(
+                    ViewMetaMapper.class, mapper -> mapper.softDeleteViewMetasByViewId(viewId))),
+        () -> {
+          if (deleteResult.get() > 0) {
+            SessionUtils.doWithoutCommit(
+                OwnerMetaMapper.class,
+                mapper ->
+                    mapper.softDeleteOwnerRelByMetadataObjectIdAndType(
+                        viewId, MetadataObject.Type.VIEW.name()));
+            SessionUtils.doWithoutCommit(
+                SecurableObjectMapper.class,
+                mapper ->
+                    mapper.softDeleteObjectRelsByMetadataObject(
+                        viewId, MetadataObject.Type.VIEW.name()));
+            SessionUtils.doWithoutCommit(
+                TagMetadataObjectRelMapper.class,
+                mapper ->
+                    mapper.softDeleteTagMetadataObjectRelsByMetadataObject(
+                        viewId, MetadataObject.Type.VIEW.name()));
+          }
+        });
+    return deleteResult.get() > 0;
+  }
+
+  private void updateView(ViewPO oldViewPO, ViewPO newViewPO) throws IOException {
+    try {
+      Integer updateResult =
+          SessionUtils.doWithCommitAndFetchResult(
+              ViewMetaMapper.class, mapper -> mapper.updateViewMeta(newViewPO, oldViewPO));
+      if (updateResult == 0) {
+        throw new IOException("Failed to update the view: " + oldViewPO.getViewName());
+      }
+    } catch (RuntimeException re) {
+      ExceptionUtils.checkSQLException(re, Entity.EntityType.VIEW, newViewPO.getViewName());
+      throw re;
+    }
+  }
+
+  private void fillViewPOBuilderParentEntityId(ViewPO.Builder builder, Namespace namespace) {
+    NamespaceUtil.checkView(namespace);
+    NamespacedEntityId namespacedEntityId =
+        EntityIdService.getEntityIds(
+            NameIdentifier.of(namespace.levels()), Entity.EntityType.SCHEMA);
+    builder.withMetalakeId(namespacedEntityId.namespaceIds()[0]);
+    builder.withCatalogId(namespacedEntityId.namespaceIds()[1]);
+    builder.withSchemaId(namespacedEntityId.entityId());
+  }
+
+  private ViewPO.Builder createViewPOBuilder(Namespace namespace) {
+    ViewPO.Builder builder = ViewPO.builder();
+    fillViewPOBuilderParentEntityId(builder, namespace);
+    return builder;
   }
 }
