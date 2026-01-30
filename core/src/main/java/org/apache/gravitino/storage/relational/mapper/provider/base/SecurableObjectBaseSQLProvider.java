@@ -23,6 +23,13 @@ import static org.apache.gravitino.storage.relational.mapper.SecurableObjectMapp
 
 import java.util.List;
 import java.util.Optional;
+import org.apache.gravitino.storage.relational.mapper.CatalogMetaMapper;
+import org.apache.gravitino.storage.relational.mapper.FilesetMetaMapper;
+import org.apache.gravitino.storage.relational.mapper.ModelMetaMapper;
+import org.apache.gravitino.storage.relational.mapper.SchemaMetaMapper;
+import org.apache.gravitino.storage.relational.mapper.TableMetaMapper;
+import org.apache.gravitino.storage.relational.mapper.TopicMetaMapper;
+import org.apache.gravitino.storage.relational.mapper.ViewMetaMapper;
 import org.apache.gravitino.storage.relational.po.SecurableObjectPO;
 import org.apache.ibatis.annotations.Param;
 
@@ -97,8 +104,40 @@ public class SecurableObjectBaseSQLProvider {
         + " sect"
         + softDeleteSQL(Optional.of("sect"))
         + " WHERE sect.deleted_at = 0 AND EXISTS ("
-        + CatalogSchemaExistsSQLHelper.generateExistsSQL(
-            "sect", "metadata_object_id", "type", "catalog_id", "catalogId", true)
+        + " SELECT ct.catalog_id FROM "
+        + CatalogMetaMapper.TABLE_NAME
+        + " ct WHERE ct.catalog_id = #{catalogId} AND"
+        + " ct.catalog_id = sect.metadata_object_id AND sect.type = 'CATALOG'"
+        + " UNION"
+        + " SELECT st.catalog_id FROM "
+        + SchemaMetaMapper.TABLE_NAME
+        + " st WHERE st.catalog_id = #{catalogId} AND"
+        + " st.schema_id = sect.metadata_object_id AND sect.type = 'SCHEMA'"
+        + " UNION"
+        + " SELECT tt.catalog_id FROM "
+        + TopicMetaMapper.TABLE_NAME
+        + " tt WHERE tt.catalog_id = #{catalogId} AND"
+        + " tt.topic_id = sect.metadata_object_id AND sect.type = 'TOPIC'"
+        + " UNION"
+        + " SELECT tat.catalog_id FROM "
+        + TableMetaMapper.TABLE_NAME
+        + " tat WHERE tat.catalog_id = #{catalogId} AND"
+        + " tat.table_id = sect.metadata_object_id AND sect.type = 'TABLE'"
+        + " UNION"
+        + " SELECT ft.catalog_id FROM "
+        + FilesetMetaMapper.META_TABLE_NAME
+        + " ft WHERE ft.catalog_id = #{catalogId} AND"
+        + " ft.fileset_id = sect.metadata_object_id AND sect.type = 'FILESET'"
+        + " UNION"
+        + " SELECT mt.catalog_id FROM "
+        + ModelMetaMapper.TABLE_NAME
+        + " mt WHERE mt.catalog_id = #{catalogId} AND"
+        + " mt.model_id = sect.metadata_object_id AND sect.type = 'MODEL'"
+        + " UNION"
+        + " SELECT vt.catalog_id FROM "
+        + ViewMetaMapper.TABLE_NAME
+        + " vt WHERE vt.catalog_id = #{catalogId} AND"
+        + " vt.view_id = sect.metadata_object_id AND sect.type = 'VIEW'"
         + ")";
   }
 
@@ -108,8 +147,35 @@ public class SecurableObjectBaseSQLProvider {
         + " sect"
         + softDeleteSQL(Optional.of("sect"))
         + " WHERE sect.deleted_at = 0 AND EXISTS ("
-        + CatalogSchemaExistsSQLHelper.generateExistsSQL(
-            "sect", "metadata_object_id", "type", "schema_id", "schemaId", false)
+        + " SELECT st.schema_id FROM "
+        + SchemaMetaMapper.TABLE_NAME
+        + " st WHERE st.schema_id = #{schemaId}"
+        + " AND st.schema_id = sect.metadata_object_id AND sect.type = 'SCHEMA'"
+        + " UNION"
+        + " SELECT tt.schema_id FROM "
+        + TopicMetaMapper.TABLE_NAME
+        + " tt WHERE tt.schema_id = #{schemaId} AND"
+        + " tt.topic_id = sect.metadata_object_id AND sect.type = 'TOPIC'"
+        + " UNION"
+        + " SELECT tat.schema_id FROM "
+        + TableMetaMapper.TABLE_NAME
+        + " tat WHERE tat.schema_id = #{schemaId} AND"
+        + " tat.table_id = sect.metadata_object_id AND sect.type = 'TABLE'"
+        + " UNION"
+        + " SELECT ft.schema_id FROM "
+        + FilesetMetaMapper.META_TABLE_NAME
+        + " ft WHERE ft.schema_id = #{schemaId} AND"
+        + " ft.fileset_id = sect.metadata_object_id AND sect.type = 'FILESET'"
+        + " UNION"
+        + " SELECT mt.schema_id FROM "
+        + ModelMetaMapper.TABLE_NAME
+        + " mt WHERE mt.schema_id = #{schemaId} AND"
+        + " mt.model_id = sect.metadata_object_id AND sect.type = 'MODEL'"
+        + " UNION"
+        + " SELECT vt.schema_id FROM "
+        + ViewMetaMapper.TABLE_NAME
+        + " vt WHERE vt.schema_id = #{schemaId} AND"
+        + " vt.view_id = sect.metadata_object_id AND sect.type = 'VIEW'"
         + ")";
   }
 
