@@ -19,12 +19,7 @@
 
 package org.apache.gravitino.catalog.clickhouse;
 
-import static org.apache.gravitino.connector.PropertyEntry.stringPropertyEntry;
-
-import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
-import com.google.common.collect.Maps;
-import java.util.List;
 import java.util.Map;
 import org.apache.gravitino.catalog.jdbc.JdbcCatalogPropertiesMetadata;
 import org.apache.gravitino.connector.PropertyEntry;

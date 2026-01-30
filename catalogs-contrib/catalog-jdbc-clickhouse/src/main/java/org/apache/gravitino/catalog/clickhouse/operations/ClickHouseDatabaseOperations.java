@@ -27,11 +27,8 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import javax.sql.DataSource;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.StringIdentifier;
-import org.apache.gravitino.catalog.clickhouse.ClickHouseConfig;
-import org.apache.gravitino.catalog.jdbc.converter.JdbcExceptionConverter;
 import org.apache.gravitino.catalog.jdbc.operation.JdbcDatabaseOperations;
 
 public class ClickHouseDatabaseOperations extends JdbcDatabaseOperations {
