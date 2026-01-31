@@ -362,15 +362,29 @@ public class JdbcPartitionStatisticStorage implements PartitionStatisticStorage 
    */
   private void setPartitionRangeParameters(
       PreparedStatement stmt, PartitionRange range, int startIndex) throws SQLException {
-    int paramIndex = startIndex;
+    final int[] paramIndex = {startIndex};
 
-    if (range.lowerPartitionName().isPresent()) {
-      stmt.setString(paramIndex++, range.lowerPartitionName().get());
-    }
+    range
+        .lowerPartitionName()
+        .ifPresent(
+            name -> {
+              try {
+                stmt.setString(paramIndex[0]++, name);
+              } catch (SQLException e) {
+                throw new RuntimeException("Failed to set lower partition name parameter", e);
+              }
+            });
 
-    if (range.upperPartitionName().isPresent()) {
-      stmt.setString(paramIndex++, range.upperPartitionName().get());
-    }
+    range
+        .upperPartitionName()
+        .ifPresent(
+            name -> {
+              try {
+                stmt.setString(paramIndex[0]++, name);
+              } catch (SQLException e) {
+                throw new RuntimeException("Failed to set upper partition name parameter", e);
+              }
+            });
   }
 
   /**
