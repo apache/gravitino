@@ -22,6 +22,7 @@ import org.apache.gravitino.storage.relational.po.FunctionVersionPO;
 import org.apache.ibatis.annotations.InsertProvider;
 import org.apache.ibatis.annotations.Param;
 
+/** A MyBatis Mapper for function version metadata operation SQLs. */
 public interface FunctionVersionMetaMapper {
 
   String TABLE_NAME = "function_version_info";

@@ -30,6 +30,7 @@ import org.apache.ibatis.annotations.Results;
 import org.apache.ibatis.annotations.Select;
 import org.apache.ibatis.annotations.SelectProvider;
 
+/** A MyBatis Mapper for function metadata operation SQLs. */
 public interface FunctionMetaMapper {
   String TABLE_NAME = "function_meta";
   String VERSION_TABLE_NAME = "function_version_info";
