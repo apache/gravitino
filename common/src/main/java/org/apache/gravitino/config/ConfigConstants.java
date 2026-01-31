@@ -83,6 +83,9 @@ public final class ConfigConstants {
   /** The version number for the 1.1.0 release. */
   public static final String VERSION_1_1_0 = "1.1.0";
 
+  /** The version number for the 1.1.1 release. */
+  public static final String VERSION_1_1_1 = "1.1.1";
+
   /** The version number for the 1.2.0 release. */
   public static final String VERSION_1_2_0 = "1.2.0";
 
