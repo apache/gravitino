@@ -78,3 +78,26 @@ COMMENT ON COLUMN function_version_info.function_comment IS 'function version co
 COMMENT ON COLUMN function_version_info.definitions IS 'function definitions details';
 COMMENT ON COLUMN function_version_info.audit_info IS 'function version audit info';
 COMMENT ON COLUMN function_version_info.deleted_at IS 'function version deleted at';
+
+-- Add partition statistics storage support
+CREATE TABLE IF NOT EXISTS partition_statistic_meta (
+    table_id BIGINT NOT NULL,
+    partition_name VARCHAR(1024) NOT NULL,
+    statistic_name VARCHAR(128) NOT NULL,
+    statistic_value TEXT NOT NULL,
+    audit_info TEXT NOT NULL,
+    created_at BIGINT NOT NULL,
+    updated_at BIGINT NOT NULL,
+    PRIMARY KEY (table_id, partition_name, statistic_name)
+);
+
+CREATE INDEX IF NOT EXISTS idx_table_partition ON partition_statistic_meta(table_id, partition_name);
+
+COMMENT ON TABLE partition_statistic_meta IS 'partition statistics metadata';
+COMMENT ON COLUMN partition_statistic_meta.table_id IS 'table id from table_meta';
+COMMENT ON COLUMN partition_statistic_meta.partition_name IS 'partition name';
+COMMENT ON COLUMN partition_statistic_meta.statistic_name IS 'statistic name';
+COMMENT ON COLUMN partition_statistic_meta.statistic_value IS 'statistic value as JSON';
+COMMENT ON COLUMN partition_statistic_meta.audit_info IS 'audit information as JSON';
+COMMENT ON COLUMN partition_statistic_meta.created_at IS 'creation timestamp in milliseconds';
+COMMENT ON COLUMN partition_statistic_meta.updated_at IS 'last update timestamp in milliseconds';
