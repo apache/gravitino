@@ -116,7 +116,18 @@ allprojects {
     configure<com.diffplug.gradle.spotless.SpotlessExtension> {
       // Only check files that have changed since origin/main
       // This allows gradual adoption of the line length check
-      ratchetFrom("origin/main")
+      // Note: ratchetFrom requires the reference to exist, which may not be the case in CI
+      // environments using shallow clone. We check if the reference exists first.
+      val gitDir = project.rootProject.file(".git")
+      if (gitDir.exists()) {
+        val result = providers.exec {
+          commandLine("git", "rev-parse", "--verify", "origin/main")
+          isIgnoreExitValue = true
+        }
+        if (result.result.get().exitValue == 0) {
+          ratchetFrom("origin/main")
+        }
+      }
 
       java {
         // 1.15.0 supports both JDK8 and JDK17.
