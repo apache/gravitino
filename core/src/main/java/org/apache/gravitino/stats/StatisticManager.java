@@ -69,7 +69,7 @@ public class StatisticManager implements Closeable, StatisticDispatcher {
     this.store = store;
     this.idGenerator = idGenerator;
     String className = config.get(Configs.PARTITION_STATS_STORAGE_FACTORY_CLASS);
-    Map<String, String> options = config.getConfigsWithPrefix(OPTIONS_PREFIX);
+    Map<String, String> options = buildStorageOptions(config);
     try {
       PartitionStatisticStorageFactory factory =
           (PartitionStatisticStorageFactory)
@@ -83,6 +83,56 @@ public class StatisticManager implements Closeable, StatisticDispatcher {
       throw new RuntimeException(
           "Failed to create and initialize partition statistics storage factory: " + className, e);
     }
+  }
+
+  /**
+   * Builds storage options map by merging entity store JDBC configs (as defaults) with
+   * partition-specific configs (which override defaults).
+   *
+   * @param config the configuration
+   * @return merged options map
+   */
+  private Map<String, String> buildStorageOptions(Config config) {
+    Map<String, String> options = new java.util.HashMap<>();
+
+    // First, add entity store JDBC configs as defaults
+    // These will be used if partition-specific configs are not provided
+    String entityJdbcUrl = config.get(Configs.ENTITY_RELATIONAL_JDBC_BACKEND_URL);
+    if (entityJdbcUrl != null && !entityJdbcUrl.isEmpty()) {
+      options.put("jdbcUrl", entityJdbcUrl);
+    }
+
+    String entityJdbcDriver = config.get(Configs.ENTITY_RELATIONAL_JDBC_BACKEND_DRIVER);
+    if (entityJdbcDriver != null && !entityJdbcDriver.isEmpty()) {
+      options.put("jdbcDriver", entityJdbcDriver);
+    }
+
+    String entityJdbcUser = config.get(Configs.ENTITY_RELATIONAL_JDBC_BACKEND_USER);
+    if (entityJdbcUser != null && !entityJdbcUser.isEmpty()) {
+      options.put("jdbcUser", entityJdbcUser);
+    }
+
+    String entityJdbcPassword = config.get(Configs.ENTITY_RELATIONAL_JDBC_BACKEND_PASSWORD);
+    if (entityJdbcPassword != null && !entityJdbcPassword.isEmpty()) {
+      options.put("jdbcPassword", entityJdbcPassword);
+    }
+
+    Integer entityMaxConnections =
+        config.get(Configs.ENTITY_RELATIONAL_JDBC_BACKEND_MAX_CONNECTIONS);
+    if (entityMaxConnections != null) {
+      options.put("poolMaxSize", String.valueOf(entityMaxConnections));
+    }
+
+    Long entityWaitMs = config.get(Configs.ENTITY_RELATIONAL_JDBC_BACKEND_WAIT_MILLISECONDS);
+    if (entityWaitMs != null) {
+      options.put("connectionTimeoutMs", String.valueOf(entityWaitMs));
+    }
+
+    // Then, overlay partition-specific configs (these override entity store configs)
+    Map<String, String> partitionOptions = config.getConfigsWithPrefix(OPTIONS_PREFIX);
+    options.putAll(partitionOptions);
+
+    return options;
   }
 
   @Override

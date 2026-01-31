@@ -28,7 +28,7 @@ import org.apache.gravitino.audit.v2.SimpleFormatterV2;
 import org.apache.gravitino.config.ConfigBuilder;
 import org.apache.gravitino.config.ConfigConstants;
 import org.apache.gravitino.config.ConfigEntry;
-import org.apache.gravitino.stats.storage.LancePartitionStatisticStorageFactory;
+import org.apache.gravitino.stats.storage.JdbcPartitionStatisticStorageFactory;
 
 public class Configs {
 
@@ -504,9 +504,9 @@ public class Configs {
       new ConfigBuilder("gravitino.stats.partition.storageFactoryClass")
           .doc(
               "The partition stats storage factory class. "
-                  + "Default is Lance-based storage. "
-                  + "For production use, configure JdbcPartitionStatisticStorageFactory with database settings.")
+                  + "Default is JDBC-based storage using the same database as entity storage. "
+                  + "Set to LancePartitionStatisticStorageFactory for Lance-based storage.")
           .version(ConfigConstants.VERSION_1_0_0)
           .stringConf()
-          .createWithDefault(LancePartitionStatisticStorageFactory.class.getCanonicalName());
+          .createWithDefault(JdbcPartitionStatisticStorageFactory.class.getCanonicalName());
 }
