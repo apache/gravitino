@@ -114,6 +114,10 @@ allprojects {
 
   plugins.withType<com.diffplug.gradle.spotless.SpotlessPlugin>().configureEach {
     configure<com.diffplug.gradle.spotless.SpotlessExtension> {
+      // Only check files that have changed since origin/main
+      // This allows gradual adoption of the line length check
+      ratchetFrom("origin/main")
+
       java {
         // 1.15.0 supports both JDK8 and JDK17.
         googleJavaFormat("1.15.0")
@@ -159,6 +163,23 @@ allprojects {
           "import\\s+org\\.testcontainers\\.shaded\\.([^;]+);",
           "import $1;"
         )
+        custom("Enforce line length limit (100 chars)") { fileContent ->
+          val maxLineLength = 100
+          val lines = fileContent.split("\n")
+          val violations = mutableListOf<String>()
+          lines.forEachIndexed { index, line ->
+            val trimmedLine = line.trimEnd('\r')
+            if (trimmedLine.length > maxLineLength) {
+              violations.add("Line ${index + 1}: ${trimmedLine.length} chars (max $maxLineLength)")
+            }
+          }
+          if (violations.isNotEmpty()) {
+            throw AssertionError(
+              "Lines exceed $maxLineLength characters:\n  ${violations.joinToString("\n  ")}"
+            )
+          }
+          fileContent
+        }
 
         targetExclude("**/build/**", "**/.pnpm/***")
       }

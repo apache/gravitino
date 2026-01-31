@@ -39,6 +39,10 @@
   4. Constructors.
   5. Methods (Group by visibility, putting `private` methods at the end).
 
+## Issue and PR Guidelines
+- **Issue Templates**: Use the appropriate template from `.github/ISSUE_TEMPLATE/`
+- **PR Description**: Follow the template in `.github/PULL_REQUEST_TEMPLATE`
+
 ## Project Structure
 - `api/`: Public interfaces.
 - `common/`: Shared utilities/DTOs.
