@@ -38,7 +38,7 @@
     "next": "14.2.32",
     "nprogress": "^0.2.0",
     "oidc-client-ts": "^3.3.0",
-    "qs": "^6.14.0",
+    "qs": "^6.14.1",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
     "react-hook-form": "^7.52.1",
