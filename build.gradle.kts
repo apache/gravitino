@@ -682,7 +682,18 @@ tasks.rat {
     "web/web/src/lib/icons/svg/**/*.svg",
     "web/web/src/lib/utils/axios/**/*",
     "web/web/src/types/axios.d.ts",
-    "web/web/yarn.lock"
+    "web/web/yarn.lock",
+    "web/web-v2/.**",
+    "web/web-v2/dist/**/*",
+    "web/web-v2/next-env.d.ts",
+    "web/web-v2/node_modules/**/*",
+    "web/web-v2/package-lock.json",
+    "web/web-v2/pnpm-lock.yaml",
+    "web/web-v2/src/lib/enums/httpEnum.js",
+    "web/web-v2/src/lib/icons/svg/**/*.svg",
+    "web/web-v2/src/lib/utils/axios/**/*",
+    "web/web-v2/src/types/axios.d.ts",
+    "web/web-v2/yarn.lock"
   )
 
   // Add .gitignore excludes to the Apache Rat exclusion list.
