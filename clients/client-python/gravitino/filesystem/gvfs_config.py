@@ -87,6 +87,12 @@ class GVFSConfig:
     GVFS_FILESYSTEM_AUTO_CREATE_LOCATION = "auto_create_location"
 
     # The configuration prefix for user-defined path-specific configurations.
-    # Format: fs.path.config.<base_location>.<property_name>=<property_value>
-    # Example: fs.path.config.s3.aws-access-key=XXX
+    # Configuration is defined in two steps:
+    #   1) Map a logical location name to a base location:
+    #        fs.path.config.<location_name>=<base_location>
+    #   2) Define properties for that logical location:
+    #        fs.path.config.<location_name>.<property_name>=<property_value>
+    # Example:
+    #   fs.path.config.my_s3_location=s3://bucket/path
+    #   fs.path.config.my_s3_location.aws-access-key=XXX
     FS_GRAVITINO_PATH_CONFIG_PREFIX = "fs.path.config."
