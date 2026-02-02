@@ -8,8 +8,8 @@ public class ListTopicFailureEventTest {
 
   @Test
   public void testNamespaceMustNotBeNull() {
-    Assertions.assertThrows(
-        NullPointerException.class,
-        () -> new ListTopicFailureEvent("user", null, new Exception("boom")));
-  }
+  Assertions.assertThrows(
+      IllegalArgumentException.class,
+      () -> new ListTopicFailureEvent("user", null, new Exception("boom")));
+}
 }
