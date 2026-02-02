@@ -45,7 +45,8 @@ public class TableMetaBaseSQLProvider {
         + TABLE_NAME
         + " tm LEFT JOIN "
         + TableVersionMapper.TABLE_NAME
-        + " tv ON tm.table_id = tv.table_id AND tm.current_version = tv.version AND tv.deleted_at = 0"
+        + " tv ON tm.table_id = tv.table_id AND tm.current_version = tv.version"
+        + " AND tv.deleted_at = 0"
         + " WHERE tm.schema_id = #{schemaId} AND tm.deleted_at = 0";
   }
 
@@ -65,7 +66,8 @@ public class TableMetaBaseSQLProvider {
         + TABLE_NAME
         + " tm LEFT JOIN "
         + TableVersionMapper.TABLE_NAME
-        + " tv ON tm.table_id = tv.table_id AND tm.current_version = tv.version AND tv.deleted_at = 0"
+        + " tv ON tm.table_id = tv.table_id AND tm.current_version = tv.version"
+        + " AND tv.deleted_at = 0"
         + " WHERE tm.deleted_at = 0"
         + " AND tm.table_id IN ("
         + "<foreach collection='tableIds' item='tableId' separator=','>"
@@ -150,8 +152,10 @@ public class TableMetaBaseSQLProvider {
         + TABLE_NAME
         + " tm LEFT JOIN "
         + TableVersionMapper.TABLE_NAME
-        + " tv ON tm.table_id = tv.table_id AND tm.current_version = tv.version AND tv.deleted_at = 0"
-        + " WHERE tm.schema_id = #{schemaId} AND tm.table_name = #{tableName} AND tm.deleted_at = 0";
+        + " tv ON tm.table_id = tv.table_id AND tm.current_version = tv.version"
+        + " AND tv.deleted_at = 0"
+        + " WHERE tm.schema_id = #{schemaId} AND tm.table_name = #{tableName}"
+        + " AND tm.deleted_at = 0";
   }
 
   public String selectTableMetaById(@Param("tableId") Long tableId) {

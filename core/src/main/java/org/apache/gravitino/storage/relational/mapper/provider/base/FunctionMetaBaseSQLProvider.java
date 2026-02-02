@@ -105,11 +105,13 @@ public class FunctionMetaBaseSQLProvider {
     return "INSERT INTO "
         + TABLE_NAME
         + " (function_id, function_name, metalake_id, catalog_id, schema_id,"
-        + " function_type, `deterministic`, return_type, function_current_version, function_latest_version, audit_info, deleted_at)"
-        + " VALUES (#{functionMeta.functionId}, #{functionMeta.functionName}, #{functionMeta.metalakeId},"
-        + " #{functionMeta.catalogId}, #{functionMeta.schemaId}, #{functionMeta.functionType},"
-        + " #{functionMeta.deterministic}, #{functionMeta.returnType},"
-        + " #{functionMeta.functionCurrentVersion}, #{functionMeta.functionLatestVersion}, #{functionMeta.auditInfo},"
+        + " function_type, `deterministic`, return_type,"
+        + " function_current_version, function_latest_version, audit_info, deleted_at)"
+        + " VALUES (#{functionMeta.functionId}, #{functionMeta.functionName},"
+        + " #{functionMeta.metalakeId}, #{functionMeta.catalogId}, #{functionMeta.schemaId},"
+        + " #{functionMeta.functionType}, #{functionMeta.deterministic},"
+        + " #{functionMeta.returnType}, #{functionMeta.functionCurrentVersion},"
+        + " #{functionMeta.functionLatestVersion}, #{functionMeta.auditInfo},"
         + " #{functionMeta.deletedAt})"
         + " ON DUPLICATE KEY UPDATE"
         + " function_name = #{functionMeta.functionName},"
@@ -186,7 +188,8 @@ public class FunctionMetaBaseSQLProvider {
 
   public String listFunctionPOsBySchemaId(@Param("schemaId") Long schemaId) {
     return "SELECT fm.function_id, fm.function_name, fm.metalake_id, fm.catalog_id, fm.schema_id,"
-        + " fm.function_type, fm.`deterministic`, fm.return_type, fm.function_current_version, fm.function_latest_version,"
+        + " fm.function_type, fm.`deterministic`, fm.return_type,"
+        + " fm.function_current_version, fm.function_latest_version,"
         + " fm.audit_info, fm.deleted_at,"
         + " vi.id, vi.metalake_id as version_metalake_id, vi.catalog_id as version_catalog_id,"
         + " vi.schema_id as version_schema_id, vi.function_id as version_function_id,"
@@ -203,7 +206,8 @@ public class FunctionMetaBaseSQLProvider {
   public String selectFunctionMetaBySchemaIdAndName(
       @Param("schemaId") Long schemaId, @Param("functionName") String functionName) {
     return "SELECT fm.function_id, fm.function_name, fm.metalake_id, fm.catalog_id, fm.schema_id,"
-        + " fm.function_type, fm.`deterministic`, fm.return_type, fm.function_current_version, fm.function_latest_version,"
+        + " fm.function_type, fm.`deterministic`, fm.return_type,"
+        + " fm.function_current_version, fm.function_latest_version,"
         + " fm.audit_info, fm.deleted_at,"
         + " vi.id, vi.metalake_id as version_metalake_id, vi.catalog_id as version_catalog_id,"
         + " vi.schema_id as version_schema_id, vi.function_id as version_function_id,"
