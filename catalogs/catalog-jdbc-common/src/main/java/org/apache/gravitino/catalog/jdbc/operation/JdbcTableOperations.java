@@ -808,4 +808,8 @@ public abstract class JdbcTableOperations implements TableOperation {
 
     return false;
   }
+
+  protected String quoteIdentifier(String identifier) {
+    return "`" + identifier + "`";
+  }
 }

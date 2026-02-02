@@ -23,6 +23,7 @@ import static org.apache.gravitino.rel.Column.DEFAULT_VALUE_OF_CURRENT_TIMESTAMP
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.catalog.jdbc.converter.JdbcColumnDefaultValueConverter;
 import org.apache.gravitino.catalog.jdbc.converter.JdbcTypeConverter;
 import org.apache.gravitino.rel.expressions.Expression;
@@ -37,7 +38,7 @@ import org.apache.gravitino.rel.types.Types;
 public class ClickHouseColumnDefaultValueConverter extends JdbcColumnDefaultValueConverter {
 
   protected static final String NOW = "now";
-  protected static final Expression DEFAULT_VALUE_OF_NOW = FunctionExpression.of("now");
+  protected static final Expression DEFAULT_VALUE_OF_NOW = FunctionExpression.of(NOW);
 
   public String fromGravitino(Expression defaultValue) {
     if (DEFAULT_VALUE_NOT_SET.equals(defaultValue)) {
@@ -78,17 +79,18 @@ public class ClickHouseColumnDefaultValueConverter extends JdbcColumnDefaultValu
       return nullable ? Literals.NULL : DEFAULT_VALUE_NOT_SET;
     }
 
-    String reallyType = type.getTypeName();
-    if (reallyType.startsWith("Nullable(")) {
-      reallyType = type.getTypeName().substring(9, type.getTypeName().length() - 1);
+    String realType = type.getTypeName();
+    if (realType.startsWith("Nullable(")) {
+      realType =
+          type.getTypeName().substring("Nullable(".length(), type.getTypeName().length() - 1);
     }
 
-    if (reallyType.startsWith("Decimal(")) {
-      reallyType = "Decimal";
+    if (realType.startsWith("Decimal(")) {
+      realType = "Decimal";
     }
 
-    if (reallyType.startsWith("FixedString(")) {
-      reallyType = "FixedString";
+    if (realType.startsWith("FixedString(")) {
+      realType = "FixedString";
     }
 
     if (nullable) {
@@ -114,7 +116,7 @@ public class ClickHouseColumnDefaultValueConverter extends JdbcColumnDefaultValu
             : columnDefaultValue;
 
     try {
-      switch (reallyType) {
+      switch (realType) {
         case ClickHouseTypeConverter.INT8:
           return Literals.byteLiteral(Byte.valueOf(reallyValue));
         case ClickHouseTypeConverter.UINT8:
@@ -142,8 +144,8 @@ public class ClickHouseColumnDefaultValueConverter extends JdbcColumnDefaultValu
           return Literals.decimalLiteral(
               Decimal.of(reallyValue, type.getColumnSize(), type.getScale()));
         case ClickHouseTypeConverter.DATE:
-          if (reallyValue.equals("")) {
-            return Literals.NULL;
+          if (StringUtils.isBlank(realType)) {
+            throw new IllegalArgumentException("Can't convert blank default value for DATE type.");
           }
           return Literals.dateLiteral(LocalDate.parse(reallyValue, DATE_FORMATTER));
         case ClickHouseTypeConverter.DATETIME:

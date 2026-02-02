@@ -27,13 +27,11 @@ public class Indexes {
   /** An empty array of indexes. */
   public static final Index[] EMPTY_INDEXES = new Index[0];
 
-  /** MySQL does not support setting the name of the primary key, so the default name is used. */
-  public static final String DEFAULT_MYSQL_PRIMARY_KEY_NAME = "PRIMARY";
-
   /**
-   * ClickHouse does not support setting the name of the primary key, so the default name is used.
+   * Name of the default primary key. MySQL, ClickHouse, OceanBase and many other databases supports
+   * setting the name of the primary key and use it as primary key name.
    */
-  public static final String DEFAULT_CLICKHOUSE_PRIMARY_KEY_NAME = "PRIMARY";
+  public static final String DEFAULT_PRIMARY_KEY_NAME = "PRIMARY";
 
   /**
    * Create a unique index on columns. Like unique (a) or unique (a, b), for complex like unique
@@ -53,7 +51,7 @@ public class Indexes {
    * @return The primary key index
    */
   public static Index createMysqlPrimaryKey(String[][] fieldNames) {
-    return primary(DEFAULT_MYSQL_PRIMARY_KEY_NAME, fieldNames);
+    return primary(DEFAULT_PRIMARY_KEY_NAME, fieldNames);
   }
 
   /**

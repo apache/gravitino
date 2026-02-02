@@ -39,12 +39,15 @@ import java.util.stream.Collectors;
 import org.apache.commons.collections4.MapUtils;
 import org.apache.commons.lang3.ArrayUtils;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.gravitino.catalog.clickhouse.ClickHouseTablePropertiesMetadata;
 import org.apache.gravitino.catalog.jdbc.JdbcColumn;
 import org.apache.gravitino.catalog.jdbc.operation.JdbcTableOperations;
 import org.apache.gravitino.exceptions.NoSuchTableException;
 import org.apache.gravitino.rel.TableChange;
 import org.apache.gravitino.rel.expressions.distributions.Distribution;
 import org.apache.gravitino.rel.expressions.distributions.Distributions;
+import org.apache.gravitino.rel.expressions.sorts.NullOrdering;
+import org.apache.gravitino.rel.expressions.sorts.SortDirection;
 import org.apache.gravitino.rel.expressions.sorts.SortOrder;
 import org.apache.gravitino.rel.expressions.transforms.Transform;
 import org.apache.gravitino.rel.indexes.Index;
@@ -52,37 +55,32 @@ import org.apache.gravitino.rel.indexes.Indexes;
 
 public class ClickHouseTableOperations extends JdbcTableOperations {
 
-  private static final String BACK_QUOTE = "`";
-
-  @SuppressWarnings("unused")
-  private static final String CLICKHOUSE_AUTO_INCREMENT = "AUTO_INCREMENT";
-
   @SuppressWarnings("unused")
   private static final String CLICKHOUSE_NOT_SUPPORT_NESTED_COLUMN_MSG =
       "Clickhouse does not support nested column names.";
+
+  private static final String QUERY_INDEXES_SQL =
+      """
+      SELECT NULL AS TABLE_CAT,
+             system.tables.database AS TABLE_SCHEM,
+             system.tables.name AS TABLE_NAME,
+             trim(c.1) AS COLUMN_NAME,
+             c.2 AS KEY_SEQ,
+             'PRIMARY' AS PK_NAME
+      FROM system.tables
+      ARRAY JOIN arrayZip(splitByChar(',', primary_key), arrayEnumerate(splitByChar(',', primary_key))) as c
+      WHERE system.tables.primary_key <> ''
+        AND system.tables.database = '%s'
+        AND system.tables.name = '%s'
+      ORDER BY COLUMN_NAME
+      """;
 
   @Override
   protected List<Index> getIndexes(Connection connection, String databaseName, String tableName) {
     // cause clickhouse not impl getPrimaryKeys yet, ref:
     // https://github.com/ClickHouse/clickhouse-java/issues/1625
     String sql =
-        "SELECT NULL AS TABLE_CAT, "
-            + "system.tables.database AS TABLE_SCHEM, "
-            + "system.tables.name AS TABLE_NAME, "
-            + "trim(c.1) AS COLUMN_NAME, "
-            + "c.2 AS KEY_SEQ, "
-            + "'PRIMARY' AS PK_NAME "
-            + "FROM system.tables "
-            + "ARRAY JOIN arrayZip(splitByChar(',', primary_key), arrayEnumerate(splitByChar(',', primary_key))) as c "
-            + "WHERE system.tables.primary_key <> '' "
-            + "AND system.tables.database = '"
-            + databaseName
-            + "' "
-            + "AND system.tables.name = '"
-            + tableName
-            + "' "
-            + "ORDER BY COLUMN_NAME";
-
+        QUERY_INDEXES_SQL.formatted(quoteIdentifier(databaseName), quoteIdentifier(tableName));
     try (PreparedStatement preparedStatement = connection.prepareStatement(sql);
         ResultSet resultSet = preparedStatement.executeQuery()) {
 
@@ -131,33 +129,12 @@ public class ClickHouseTableOperations extends JdbcTableOperations {
     Preconditions.checkArgument(
         Distributions.NONE.equals(distribution), "ClickHouse does not support distribution");
 
-    validateIncrementCol(columns, indexes);
-
     // First build the CREATE TABLE statement
     StringBuilder sqlBuilder = new StringBuilder();
-    sqlBuilder
-        .append("CREATE TABLE ")
-        .append(BACK_QUOTE)
-        .append(tableName)
-        .append(BACK_QUOTE)
-        .append(" (\n");
+    sqlBuilder.append("CREATE TABLE %s (\n".formatted(quoteIdentifier(tableName)));
 
     // Add columns
-    for (int i = 0; i < columns.length; i++) {
-      JdbcColumn column = columns[i];
-      sqlBuilder
-          .append(SPACE)
-          .append(SPACE)
-          .append(BACK_QUOTE)
-          .append(column.name())
-          .append(BACK_QUOTE);
-
-      appendColumnDefinition(column, sqlBuilder);
-      // Add a comma for the next column, unless it's the last one
-      if (i < columns.length - 1) {
-        sqlBuilder.append(",\n");
-      }
-    }
+    buildColumnsDefinition(columns, sqlBuilder);
 
     // Index definition, we only support primary index now, secondary index will be supported in
     // future
@@ -166,52 +143,20 @@ public class ClickHouseTableOperations extends JdbcTableOperations {
     sqlBuilder.append("\n)");
 
     // Extract engine from properties
-    String engine = ENGINE_PROPERTY_ENTRY.getDefaultValue().getValue();
-    if (MapUtils.isNotEmpty(properties)) {
-      String userSetEngine = properties.remove(CLICKHOUSE_ENGINE_KEY);
-      if (StringUtils.isNotEmpty(userSetEngine)) {
-        engine = userSetEngine;
-      }
-    }
-    sqlBuilder.append("\n ENGINE = ").append(engine);
-
+    ClickHouseTablePropertiesMetadata.ENGINE engine = appendTableEngine(properties, sqlBuilder);
     // Omit partition by clause as it will be supported in the next PR
     // TODO: Add partition by clause support
 
-    // Add order by clause
-    if (ArrayUtils.isNotEmpty(sortOrders)) {
-      if (sortOrders.length > 1) {
-        throw new UnsupportedOperationException(
-            "Currently ClickHouse does not support sortOrders with more than 1 element");
-      } else if (sortOrders[0].nullOrdering() != null || sortOrders[0].direction() != null) {
-        // If no value is set earlier, some default values will be set.
-        // It is difficult to determine whether the user has set a value.
-        LOG.warn(
-            "ClickHouse currently does not support nullOrdering: {} and direction: {} of sortOrders,and will ignore them",
-            sortOrders[0].nullOrdering(),
-            sortOrders[0].direction());
-      }
-      sqlBuilder.append(
-          " \n ORDER BY " + BACK_QUOTE + sortOrders[0].expression() + BACK_QUOTE + " \n");
-    }
+    appendOrderBy(sortOrders, sqlBuilder, engine);
 
     // Add table comment if specified
     if (StringUtils.isNotEmpty(comment)) {
       String escapedComment = comment.replace("'", "''");
-      sqlBuilder.append(" COMMENT '").append(escapedComment).append("'");
+      sqlBuilder.append(" COMMENT '%s'".formatted(escapedComment));
     }
 
     // Add setting clause if specified, clickhouse only supports predefine settings
-    if (MapUtils.isNotEmpty(properties)) {
-      String settings =
-          properties.entrySet().stream()
-              .filter(entry -> entry.getKey().startsWith(SETTINGS_PREFIX))
-              .map(
-                  entry ->
-                      entry.getKey().substring(SETTINGS_PREFIX.length()) + " = " + entry.getValue())
-              .collect(Collectors.joining(",\n ", " \n SETTINGS ", ""));
-      sqlBuilder.append(settings);
-    }
+    appendTableProperties(properties, sqlBuilder);
 
     // Return the generated SQL statement
     String result = sqlBuilder.toString();
@@ -220,8 +165,91 @@ public class ClickHouseTableOperations extends JdbcTableOperations {
     return result;
   }
 
-  public static void appendIndexesSql(Index[] indexes, StringBuilder sqlBuilder) {
-    if (indexes == null) {
+  private static void appendTableProperties(
+      Map<String, String> properties, StringBuilder sqlBuilder) {
+    if (MapUtils.isEmpty(properties)) {
+      return;
+    }
+
+    String settings =
+        properties.entrySet().stream()
+            .filter(entry -> entry.getKey().startsWith(SETTINGS_PREFIX))
+            .map(
+                entry ->
+                    entry.getKey().substring(SETTINGS_PREFIX.length()) + " = " + entry.getValue())
+            .collect(Collectors.joining(",\n ", " \n SETTINGS ", ""));
+    sqlBuilder.append(settings);
+  }
+
+  private static void appendOrderBy(
+      SortOrder[] sortOrders,
+      StringBuilder sqlBuilder,
+      ClickHouseTablePropertiesMetadata.ENGINE engine) {
+    // ClickHouse requires ORDER BY clause for some engines and currently only mergeTree family
+    // requires
+    // ORDER BY clause.
+    boolean requireOrderBy = engine.isRequireOrderBy();
+    if (!requireOrderBy) {
+      if (ArrayUtils.isNotEmpty(sortOrders)) {
+        throw new UnsupportedOperationException(
+            "ORDER BY clause is not supported for engine: " + engine.getValue());
+      }
+
+      // No need to add order by clause
+      return;
+    }
+
+    if (ArrayUtils.isEmpty(sortOrders)) {
+      throw new IllegalArgumentException(
+          "ORDER BY clause is required for engine: " + engine.getValue());
+    }
+
+    if (sortOrders.length > 1) {
+      throw new UnsupportedOperationException(
+          "Currently ClickHouse does not support sortOrders with more than 1 element");
+    }
+
+    NullOrdering nullOrdering = sortOrders[0].nullOrdering();
+    SortDirection sortDirection = sortOrders[0].direction();
+    if (nullOrdering != null && sortDirection != null) {
+      // ClickHouse does not support NULLS FIRST/LAST now.
+      LOG.warn(
+          "ClickHouse currently does not support nullOrdering: {}, and will ignore it",
+          nullOrdering);
+    }
+
+    sqlBuilder.append("\n ORDER BY `%s`\n".formatted(sortOrders[0].expression()));
+  }
+
+  private ClickHouseTablePropertiesMetadata.ENGINE appendTableEngine(
+      Map<String, String> properties, StringBuilder sqlBuilder) {
+    ClickHouseTablePropertiesMetadata.ENGINE engine = ENGINE_PROPERTY_ENTRY.getDefaultValue();
+    if (MapUtils.isNotEmpty(properties)) {
+      String userSetEngine = properties.remove(CLICKHOUSE_ENGINE_KEY);
+      if (StringUtils.isNotEmpty(userSetEngine)) {
+        engine = ClickHouseTablePropertiesMetadata.ENGINE.fromString(userSetEngine);
+      }
+    }
+    sqlBuilder.append("\n ENGINE = %s".formatted(engine.getValue()));
+    return engine;
+  }
+
+  private void buildColumnsDefinition(JdbcColumn[] columns, StringBuilder sqlBuilder) {
+    for (int i = 0; i < columns.length; i++) {
+      JdbcColumn column = columns[i];
+      sqlBuilder.append("  %s".formatted(quoteIdentifier(column.name())));
+
+      appendColumnDefinition(column, sqlBuilder);
+      // Add a comma for the next column, unless it's the last one
+      if (i < columns.length - 1) {
+        sqlBuilder.append(",\n");
+      }
+    }
+  }
+
+  // ClickHouse only supports primary key now and some secondary index will be supported in future
+  private void appendIndexesSql(Index[] indexes, StringBuilder sqlBuilder) {
+    if (ArrayUtils.isEmpty(indexes)) {
       return;
     }
 
@@ -231,17 +259,13 @@ public class ClickHouseTableOperations extends JdbcTableOperations {
       switch (index.type()) {
         case PRIMARY_KEY:
           if (null != index.name()
-              && !StringUtils.equalsIgnoreCase(
-                  index.name(), Indexes.DEFAULT_CLICKHOUSE_PRIMARY_KEY_NAME)) {
+              && !StringUtils.equalsIgnoreCase(index.name(), Indexes.DEFAULT_PRIMARY_KEY_NAME)) {
             LOG.warn(
                 "Primary key name must be PRIMARY in ClickHouse, the name {} will be ignored.",
                 index.name());
           }
           sqlBuilder.append(" PRIMARY KEY (").append(fieldStr).append(")");
           break;
-        case UNIQUE_KEY:
-          throw new IllegalArgumentException(
-              "Gravitino clickHouse doesn't support index : " + index.type());
         default:
           throw new IllegalArgumentException(
               "Gravitino Clickhouse doesn't support index : " + index.type());
@@ -306,23 +330,22 @@ public class ClickHouseTableOperations extends JdbcTableOperations {
     // Add Nullable data type
     String dataType = typeConverter.fromGravitino(column.dataType());
     if (column.nullable()) {
-      sqlBuilder.append(SPACE).append("Nullable(").append(dataType).append(")").append(SPACE);
+      sqlBuilder.append(" Nullable(%s) ".formatted(dataType));
     } else {
-      sqlBuilder.append(SPACE).append(dataType).append(SPACE);
+      sqlBuilder.append(" %s ".formatted(dataType));
     }
 
     // Add DEFAULT value if specified
     if (!DEFAULT_VALUE_NOT_SET.equals(column.defaultValue())) {
-      sqlBuilder
-          .append("DEFAULT ")
-          .append(columnDefaultValueConverter.fromGravitino(column.defaultValue()))
-          .append(SPACE);
+      sqlBuilder.append(
+          " DEFAULT %s "
+              .formatted(columnDefaultValueConverter.fromGravitino(column.defaultValue())));
     }
 
     // Add column comment if specified
     if (StringUtils.isNotEmpty(column.comment())) {
       String escapedComment = StringUtils.replace(column.comment(), "'", "''");
-      sqlBuilder.append("COMMENT '").append(escapedComment).append("' ");
+      sqlBuilder.append("COMMENT '%s' ".formatted(escapedComment));
     }
 
     return sqlBuilder;

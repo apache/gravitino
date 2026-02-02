@@ -37,6 +37,7 @@ import static org.apache.gravitino.catalog.clickhouse.converter.ClickHouseTypeCo
 import static org.apache.gravitino.catalog.clickhouse.converter.ClickHouseTypeConverter.UINT64;
 import static org.apache.gravitino.catalog.clickhouse.converter.ClickHouseTypeConverter.UINT8;
 import static org.apache.gravitino.catalog.clickhouse.converter.ClickHouseTypeConverter.UUID;
+import static org.apache.gravitino.catalog.jdbc.converter.JdbcTypeConverter.TIME;
 
 import org.apache.gravitino.catalog.jdbc.converter.JdbcTypeConverter;
 import org.apache.gravitino.rel.types.Type;
@@ -66,7 +67,6 @@ public class TestClickHouseTypeConverter {
     checkJdbcTypeToGravitinoType(Types.DateType.get(), DATE, null, null);
     checkJdbcTypeToGravitinoType(Types.DateType.get(), DATE32, null, null);
     checkJdbcTypeToGravitinoType(Types.TimestampType.withoutTimeZone(), DATETIME, null, null);
-    checkJdbcTypeToGravitinoType(Types.TimestampType.withoutTimeZone(), DATETIME64, null, null);
     checkJdbcTypeToGravitinoType(Types.DecimalType.of(10, 2), DECIMAL, 10, 2);
     checkJdbcTypeToGravitinoType(Types.StringType.get(), STRING, 20, null);
     checkJdbcTypeToGravitinoType(Types.FixedCharType.of(20), FIXEDSTRING, 20, null);
@@ -74,6 +74,18 @@ public class TestClickHouseTypeConverter {
     checkJdbcTypeToGravitinoType(Types.UUIDType.get(), UUID, 20, null);
     checkJdbcTypeToGravitinoType(
         Types.ExternalType.of(USER_DEFINED_TYPE), USER_DEFINED_TYPE, null, null);
+
+    JdbcTypeConverter.JdbcTypeBean dateTime64 = createTypeBean(DATETIME64, null, null);
+    dateTime64.setDatetimePrecision(3);
+    Assertions.assertEquals(
+        Types.TimestampType.withoutTimeZone(3), CLICKHOUSE_TYPE_CONVERTER.toGravitino(dateTime64));
+
+    JdbcTypeConverter.JdbcTypeBean nullableDecimal =
+        createTypeBean("Nullable(" + DECIMAL + ")", 12, 2);
+    nullableDecimal.setColumnSize(12);
+    nullableDecimal.setScale(2);
+    Assertions.assertEquals(
+        Types.DecimalType.of(12, 2), CLICKHOUSE_TYPE_CONVERTER.toGravitino(nullableDecimal));
   }
 
   @Test
@@ -97,6 +109,8 @@ public class TestClickHouseTypeConverter {
     checkGravitinoTypeToJdbcType(BOOL, Types.BooleanType.get());
     checkGravitinoTypeToJdbcType(UUID, Types.UUIDType.get());
     checkGravitinoTypeToJdbcType(USER_DEFINED_TYPE, Types.ExternalType.of(USER_DEFINED_TYPE));
+    checkGravitinoTypeToJdbcType("DateTime64(4)", Types.TimestampType.withoutTimeZone(4));
+    checkGravitinoTypeToJdbcType(TIME, Types.TimeType.get());
     Assertions.assertThrows(
         IllegalArgumentException.class,
         () -> CLICKHOUSE_TYPE_CONVERTER.fromGravitino(Types.UnparsedType.of(USER_DEFINED_TYPE)));

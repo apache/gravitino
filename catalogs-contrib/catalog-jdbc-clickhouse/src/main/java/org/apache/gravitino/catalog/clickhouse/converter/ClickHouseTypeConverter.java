@@ -45,6 +45,7 @@ public class ClickHouseTypeConverter extends JdbcTypeConverter {
   static final String FIXEDSTRING = "FixedString";
   static final String DATE = "Date";
   static final String DATE32 = "Date32";
+  // DataTime with detail time zone is not directly supported in Gravitino.
   static final String DATETIME = "DateTime";
   static final String DATETIME64 = "DateTime64";
   static final String ENUM = "Enum";
@@ -74,7 +75,7 @@ public class ClickHouseTypeConverter extends JdbcTypeConverter {
   public Type toGravitino(JdbcTypeBean typeBean) {
     String typeName = typeBean.getTypeName();
     if (typeName.startsWith("Nullable(")) {
-      typeName = typeName.substring(9, typeName.length() - 1);
+      typeName = typeName.substring("Nullable(".length(), typeName.length() - 1);
     }
 
     if (typeName.startsWith("Decimal(")) {
@@ -117,9 +118,11 @@ public class ClickHouseTypeConverter extends JdbcTypeConverter {
       case DATE32:
         return Types.DateType.get();
       case DATETIME:
+        // Gravitino timestamp type does not support time zones with detail zone name like 'UTC'
+        // or 'America/Los_Angeles'. so we ignore it here and use ExternalType for such cases.
         return Types.TimestampType.withoutTimeZone();
       case DATETIME64:
-        return Types.TimestampType.withoutTimeZone();
+        return Types.TimestampType.withoutTimeZone(typeBean.getDatetimePrecision());
       case BOOL:
         return Types.BooleanType.get();
       case UUID:
@@ -147,10 +150,13 @@ public class ClickHouseTypeConverter extends JdbcTypeConverter {
       return STRING;
     } else if (type instanceof Types.DateType) {
       return DATE;
-    } else if (type instanceof Types.TimestampType) {
+    } else if (type instanceof Types.TimestampType timestampType) {
+      if (timestampType.hasPrecisionSet()) {
+        return String.format("%s(%s)", DATETIME64, timestampType.precision());
+      }
       return DATETIME;
     } else if (type instanceof Types.TimeType) {
-      return INT64;
+      return TIME;
     } else if (type instanceof Types.DecimalType decimalType) {
       return String.format("%s(%s,%s)", DECIMAL, decimalType.precision(), decimalType.scale());
     } else if (type instanceof Types.VarCharType) {
