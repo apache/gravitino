@@ -19,6 +19,7 @@
 package org.apache.gravitino.iceberg.service.provider;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -45,8 +46,11 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.parallel.Execution;
+import org.junit.jupiter.api.parallel.ExecutionMode;
 import org.mockito.Mockito;
 
+@Execution(ExecutionMode.SAME_THREAD)
 public class TestDynamicIcebergConfigProvider {
 
   @BeforeEach
@@ -71,8 +75,13 @@ public class TestDynamicIcebergConfigProvider {
   }
 
   private void resetServerContext() throws IllegalAccessException {
-    // Reset the IcebergRESTServerContext singleton
-    Class<?> holderClass = IcebergRESTServerContext.class.getDeclaredClasses()[0];
+    // Reset the IcebergRESTServerContext singleton by finding InstanceHolder class by name
+    // This approach is more robust than using array index which can break if class order changes
+    Class<?> holderClass =
+        Arrays.stream(IcebergRESTServerContext.class.getDeclaredClasses())
+            .filter(c -> c.getSimpleName().equals("InstanceHolder"))
+            .findFirst()
+            .orElseThrow(() -> new RuntimeException("InstanceHolder class not found"));
     FieldUtils.writeStaticField(holderClass, "INSTANCE", null, true);
   }
 

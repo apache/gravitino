@@ -165,6 +165,61 @@ public class DynamicIcebergConfigProvider implements IcebergConfigProvider {
   }
 
   /**
+   * Creates a GravitinoClient based on the provided configuration properties. This static factory
+   * method centralizes client creation logic for consistency and maintainability.
+   *
+   * @param uri the Gravitino server URI
+   * @param metalake the metalake name
+   * @param properties configuration properties including authentication settings
+   * @return a configured GravitinoClient instance
+   */
+  @VisibleForTesting
+  static GravitinoClient createGravitinoClient(
+      String uri, String metalake, Map<String, String> properties) {
+    ClientBuilder builder = GravitinoClient.builder(uri).withMetalake(metalake);
+    String authType =
+        properties.getOrDefault(
+            IcebergConstants.GRAVITINO_AUTH_TYPE, AuthProperties.SIMPLE_AUTH_TYPE);
+    if (AuthProperties.isSimple(authType)) {
+      String userName =
+          properties.getOrDefault(
+              IcebergConstants.GRAVITINO_SIMPLE_USERNAME, "iceberg-rest-server");
+      builder.withSimpleAuth(userName);
+    } else if (AuthProperties.isOAuth2(authType)) {
+      String oAuthUri = getRequiredConfig(properties, IcebergConstants.GRAVITINO_OAUTH2_SERVER_URI);
+      String credential =
+          getRequiredConfig(properties, IcebergConstants.GRAVITINO_OAUTH2_CREDENTIAL);
+      String path = getRequiredConfig(properties, IcebergConstants.GRAVITINO_OAUTH2_TOKEN_PATH);
+      String scope = getRequiredConfig(properties, IcebergConstants.GRAVITINO_OAUTH2_SCOPE);
+      DefaultOAuth2TokenProvider oAuth2TokenProvider =
+          DefaultOAuth2TokenProvider.builder()
+              .withUri(oAuthUri)
+              .withCredential(credential)
+              .withPath(path)
+              .withScope(scope)
+              .build();
+      builder.withOAuth(oAuth2TokenProvider);
+    } else {
+      throw new UnsupportedOperationException("Unsupported auth type: " + authType);
+    }
+    return builder.build();
+  }
+
+  /**
+   * Gets a required configuration value from the properties map.
+   *
+   * @param properties the configuration properties
+   * @param key the configuration key
+   * @return the configuration value
+   * @throws IllegalArgumentException if the value is blank or missing
+   */
+  private static String getRequiredConfig(Map<String, String> properties, String key) {
+    String configValue = properties.get(key);
+    Preconditions.checkArgument(StringUtils.isNotBlank(configValue), key + " should not be empty");
+    return configValue;
+  }
+
+  /**
    * Sets the catalog fetcher for testing purposes.
    *
    * @param catalogFetcher the catalog fetcher to use
@@ -191,18 +246,20 @@ public class DynamicIcebergConfigProvider implements IcebergConfigProvider {
    */
   private static class InternalCatalogFetcher implements CatalogFetcher {
     private final String metalake;
+    private final CatalogDispatcher catalogDispatcher;
 
     InternalCatalogFetcher(String metalake) {
       this.metalake = metalake;
+      CatalogDispatcher dispatcher = GravitinoEnv.getInstance().catalogDispatcher();
+      Preconditions.checkState(
+          dispatcher != null,
+          "CatalogDispatcher is not available. "
+              + "Internal catalog fetcher requires running within Gravitino server.");
+      this.catalogDispatcher = dispatcher;
     }
 
     @Override
     public Catalog loadCatalog(String catalogName) throws NoSuchCatalogException {
-      CatalogDispatcher catalogDispatcher = GravitinoEnv.getInstance().catalogDispatcher();
-      Preconditions.checkState(
-          catalogDispatcher != null,
-          "CatalogDispatcher is not available. "
-              + "Internal catalog fetcher requires running within Gravitino server.");
       NameIdentifier catalogIdent = NameIdentifierUtil.ofCatalog(metalake, catalogName);
       return catalogDispatcher.loadCatalog(catalogIdent);
     }
@@ -248,45 +305,6 @@ public class DynamicIcebergConfigProvider implements IcebergConfigProvider {
         }
       }
       return client;
-    }
-
-    private GravitinoClient createGravitinoClient(
-        String uri, String metalake, Map<String, String> properties) {
-      ClientBuilder builder = GravitinoClient.builder(uri).withMetalake(metalake);
-      String authType =
-          properties.getOrDefault(
-              IcebergConstants.GRAVITINO_AUTH_TYPE, AuthProperties.SIMPLE_AUTH_TYPE);
-      if (AuthProperties.isSimple(authType)) {
-        String userName =
-            properties.getOrDefault(
-                IcebergConstants.GRAVITINO_SIMPLE_USERNAME, "iceberg-rest-server");
-        builder.withSimpleAuth(userName);
-      } else if (AuthProperties.isOAuth2(authType)) {
-        String oAuthUri =
-            getRequiredConfig(properties, IcebergConstants.GRAVITINO_OAUTH2_SERVER_URI);
-        String credential =
-            getRequiredConfig(properties, IcebergConstants.GRAVITINO_OAUTH2_CREDENTIAL);
-        String path = getRequiredConfig(properties, IcebergConstants.GRAVITINO_OAUTH2_TOKEN_PATH);
-        String scope = getRequiredConfig(properties, IcebergConstants.GRAVITINO_OAUTH2_SCOPE);
-        DefaultOAuth2TokenProvider oAuth2TokenProvider =
-            DefaultOAuth2TokenProvider.builder()
-                .withUri(oAuthUri)
-                .withCredential(credential)
-                .withPath(path)
-                .withScope(scope)
-                .build();
-        builder.withOAuth(oAuth2TokenProvider);
-      } else {
-        throw new UnsupportedOperationException("Unsupported auth type: " + authType);
-      }
-      return builder.build();
-    }
-
-    private String getRequiredConfig(Map<String, String> properties, String key) {
-      String configValue = properties.get(key);
-      Preconditions.checkArgument(
-          StringUtils.isNotBlank(configValue), key + " should not be empty");
-      return configValue;
     }
   }
 }
