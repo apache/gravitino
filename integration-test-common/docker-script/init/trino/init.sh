@@ -60,7 +60,7 @@ fi
 
 # Container start up
 if [[ "${TRINO_ROLE}" == "coordinator" ]]; then
-  nohup /usr/lib/trino/bin/run-trino &
+  nohup /usr/lib/trino/bin/run-trino > /tmp/trino.out 2>&1 &
 
   counter=0
   while [ $counter -le 300 ]; do

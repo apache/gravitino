@@ -26,4 +26,5 @@ if [ -d $LOG_DIR ]; then
   docker cp trino-ci-hive:/tmp/root $LOG_DIR/hive
 fi
 
+export GRAVITINO_TRINO_CONNECTOR_DIR=/dev/null
 docker compose down
