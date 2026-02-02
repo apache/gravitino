@@ -18,9 +18,16 @@
  */
 package org.apache.gravitino.iceberg.service.provider;
 
+import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
 import org.apache.commons.lang3.reflect.FieldUtils;
 import org.apache.gravitino.Catalog;
 import org.apache.gravitino.GravitinoEnv;
@@ -70,44 +77,24 @@ public class TestDynamicIcebergConfigProvider {
   }
 
   /**
-   * Creates a mock CatalogFetcher using reflection to set it on the provider. This avoids directly
-   * accessing the private CatalogFetcher interface.
+   * Creates a mock CatalogFetcher and sets it on the provider using the test-visible setter. This
+   * approach avoids reflection and is more maintainable.
    */
   private void setMockCatalogFetcher(
-      DynamicIcebergConfigProvider provider, Map<String, Catalog> catalogMap)
-      throws IllegalAccessException {
-    // Create a mock object that implements the private CatalogFetcher interface via reflection
-    Object mockFetcher =
-        java.lang.reflect.Proxy.newProxyInstance(
-            getClass().getClassLoader(),
-            new Class<?>[] {getCatalogFetcherInterface()},
-            (proxy, method, args) -> {
-              if ("loadCatalog".equals(method.getName())) {
-                String catalogName = (String) args[0];
-                Catalog catalog = catalogMap.get(catalogName);
-                if (catalog == null) {
-                  throw new NoSuchCatalogException("Catalog not found: %s", catalogName);
-                }
-                return catalog;
-              } else if ("close".equals(method.getName())) {
-                return null;
-              }
-              return null;
-            });
-    FieldUtils.writeField(provider, "catalogFetcher", mockFetcher, true);
-  }
-
-  private Class<?> getCatalogFetcherInterface() {
-    for (Class<?> innerClass : DynamicIcebergConfigProvider.class.getDeclaredClasses()) {
-      if (innerClass.getSimpleName().equals("CatalogFetcher")) {
-        return innerClass;
-      }
-    }
-    throw new RuntimeException("CatalogFetcher interface not found");
+      DynamicIcebergConfigProvider provider, Map<String, Catalog> catalogMap) {
+    DynamicIcebergConfigProvider.CatalogFetcher mockFetcher =
+        catalogName -> {
+          Catalog catalog = catalogMap.get(catalogName);
+          if (catalog == null) {
+            throw new NoSuchCatalogException("Catalog not found: %s", catalogName);
+          }
+          return catalog;
+        };
+    provider.setCatalogFetcher(mockFetcher);
   }
 
   @Test
-  public void testValidIcebergTableOps() throws IllegalAccessException {
+  public void testValidIcebergTableOps() {
     String metalakeName = "test_metalake";
     String hiveCatalogName = "hive_backend";
     String jdbcCatalogName = "jdbc_backend";
@@ -170,7 +157,7 @@ public class TestDynamicIcebergConfigProvider {
   }
 
   @Test
-  public void testInvalidIcebergTableOps() throws IllegalAccessException {
+  public void testInvalidIcebergTableOps() {
     String metalakeName = "test_metalake";
     String invalidCatalogName = "invalid_catalog";
 
@@ -197,7 +184,7 @@ public class TestDynamicIcebergConfigProvider {
   }
 
   @Test
-  public void testCustomProperties() throws IllegalAccessException {
+  public void testCustomProperties() {
     String metalakeName = "test_metalake";
     String customCatalogName = "custom_backend";
     String customKey1 = "custom-k1";
@@ -337,5 +324,210 @@ public class TestDynamicIcebergConfigProvider {
     Optional<IcebergConfig> icebergConfig = provider.getIcebergCatalogConfig(catalogName);
 
     Assertions.assertTrue(icebergConfig.isPresent());
+  }
+
+  @Test
+  public void testInternalCatalogFetcherWithNullCatalogDispatcher() throws IllegalAccessException {
+    String metalakeName = "test_metalake";
+    String catalogName = "internal_catalog";
+
+    // Enable authorization to use internal fetcher
+    createMockServerContext(true);
+
+    // Ensure CatalogDispatcher is null (simulating GravitinoEnv not initialized)
+    FieldUtils.writeField(GravitinoEnv.getInstance(), "catalogDispatcher", null, true);
+
+    // Initialize provider with required properties
+    Map<String, String> properties = new HashMap<>();
+    properties.put(IcebergConstants.GRAVITINO_METALAKE, metalakeName);
+
+    DynamicIcebergConfigProvider provider = new DynamicIcebergConfigProvider();
+    provider.initialize(properties);
+
+    // Test that IllegalStateException is thrown when CatalogDispatcher is null
+    Assertions.assertThrows(
+        IllegalStateException.class, () -> provider.getIcebergCatalogConfig(catalogName));
+  }
+
+  @Test
+  public void testInternalCatalogFetcherNoSuchCatalogException() throws IllegalAccessException {
+    String metalakeName = "test_metalake";
+    String nonExistentCatalogName = "non_existent_catalog";
+
+    // Enable authorization to use internal fetcher
+    createMockServerContext(true);
+
+    // Mock CatalogDispatcher to throw NoSuchCatalogException
+    CatalogDispatcher mockCatalogDispatcher = Mockito.mock(CatalogDispatcher.class);
+    NameIdentifier catalogIdent =
+        NameIdentifierUtil.ofCatalog(metalakeName, nonExistentCatalogName);
+    Mockito.when(mockCatalogDispatcher.loadCatalog(catalogIdent))
+        .thenThrow(new NoSuchCatalogException("Catalog not found: %s", nonExistentCatalogName));
+
+    // Set the mock CatalogDispatcher to GravitinoEnv
+    FieldUtils.writeField(
+        GravitinoEnv.getInstance(), "catalogDispatcher", mockCatalogDispatcher, true);
+
+    // Initialize provider with required properties
+    Map<String, String> properties = new HashMap<>();
+    properties.put(IcebergConstants.GRAVITINO_METALAKE, metalakeName);
+
+    DynamicIcebergConfigProvider provider = new DynamicIcebergConfigProvider();
+    provider.initialize(properties);
+
+    // Test that NoSuchCatalogException is properly handled and returns empty Optional
+    Optional<IcebergConfig> result = provider.getIcebergCatalogConfig(nonExistentCatalogName);
+
+    Assertions.assertFalse(result.isPresent());
+    Mockito.verify(mockCatalogDispatcher).loadCatalog(catalogIdent);
+  }
+
+  @Test
+  public void testConcurrentAccessToProvider() throws Exception {
+    String metalakeName = "test_metalake";
+    String catalogName = "concurrent_catalog";
+    int numThreads = 10;
+
+    // Mock catalog
+    Catalog mockCatalog = Mockito.mock(Catalog.class);
+    Mockito.when(mockCatalog.provider()).thenReturn("lakehouse-iceberg");
+    Mockito.when(mockCatalog.properties())
+        .thenReturn(
+            new HashMap<String, String>() {
+              {
+                put(IcebergConstants.CATALOG_BACKEND, "custom");
+                put(IcebergConstants.CATALOG_BACKEND_NAME, catalogName);
+              }
+            });
+
+    // Initialize provider with properties
+    Map<String, String> properties = new HashMap<>();
+    properties.put(IcebergConstants.GRAVITINO_URI, "http://localhost:8090");
+    properties.put(IcebergConstants.GRAVITINO_METALAKE, metalakeName);
+
+    DynamicIcebergConfigProvider provider = new DynamicIcebergConfigProvider();
+    provider.initialize(properties);
+
+    // Set mock catalog fetcher
+    Map<String, Catalog> catalogMap = new HashMap<>();
+    catalogMap.put(catalogName, mockCatalog);
+    setMockCatalogFetcher(provider, catalogMap);
+
+    // Create a latch to ensure all threads start at the same time
+    CountDownLatch startLatch = new CountDownLatch(1);
+    CountDownLatch doneLatch = new CountDownLatch(numThreads);
+
+    ExecutorService executor = Executors.newFixedThreadPool(numThreads);
+    List<Future<Optional<IcebergConfig>>> futures = new ArrayList<>();
+
+    // Submit concurrent tasks
+    for (int i = 0; i < numThreads; i++) {
+      futures.add(
+          executor.submit(
+              () -> {
+                try {
+                  startLatch.await(); // Wait for all threads to be ready
+                  return provider.getIcebergCatalogConfig(catalogName);
+                } finally {
+                  doneLatch.countDown();
+                }
+              }));
+    }
+
+    // Start all threads simultaneously
+    startLatch.countDown();
+
+    // Wait for all threads to complete
+    boolean completed = doneLatch.await(30, TimeUnit.SECONDS);
+    Assertions.assertTrue(completed, "All threads should complete within timeout");
+
+    // Verify all results are present and consistent
+    for (Future<Optional<IcebergConfig>> future : futures) {
+      Optional<IcebergConfig> result = future.get();
+      Assertions.assertTrue(result.isPresent(), "Each thread should get a valid config");
+      Assertions.assertEquals(
+          catalogName,
+          result.get().getIcebergCatalogProperties().get(IcebergConstants.CATALOG_BACKEND_NAME));
+    }
+
+    executor.shutdown();
+    executor.awaitTermination(5, TimeUnit.SECONDS);
+  }
+
+  @Test
+  public void testConcurrentAccessWithInternalFetcher() throws Exception {
+    String metalakeName = "test_metalake";
+    String catalogName = "concurrent_internal_catalog";
+    int numThreads = 10;
+
+    // Enable authorization to use internal fetcher
+    createMockServerContext(true);
+
+    // Mock CatalogDispatcher
+    CatalogDispatcher mockCatalogDispatcher = Mockito.mock(CatalogDispatcher.class);
+    Catalog mockCatalog = Mockito.mock(Catalog.class);
+
+    NameIdentifier catalogIdent = NameIdentifierUtil.ofCatalog(metalakeName, catalogName);
+    Mockito.when(mockCatalogDispatcher.loadCatalog(catalogIdent)).thenReturn(mockCatalog);
+    Mockito.when(mockCatalog.provider()).thenReturn("lakehouse-iceberg");
+    Mockito.when(mockCatalog.properties())
+        .thenReturn(
+            new HashMap<String, String>() {
+              {
+                put(IcebergConstants.CATALOG_BACKEND, "custom");
+                put(IcebergConstants.CATALOG_BACKEND_NAME, catalogName);
+              }
+            });
+
+    // Set the mock CatalogDispatcher to GravitinoEnv
+    FieldUtils.writeField(
+        GravitinoEnv.getInstance(), "catalogDispatcher", mockCatalogDispatcher, true);
+
+    // Initialize provider with required properties
+    Map<String, String> properties = new HashMap<>();
+    properties.put(IcebergConstants.GRAVITINO_METALAKE, metalakeName);
+
+    DynamicIcebergConfigProvider provider = new DynamicIcebergConfigProvider();
+    provider.initialize(properties);
+
+    // Create a latch to ensure all threads start at the same time
+    CountDownLatch startLatch = new CountDownLatch(1);
+    CountDownLatch doneLatch = new CountDownLatch(numThreads);
+
+    ExecutorService executor = Executors.newFixedThreadPool(numThreads);
+    List<Future<Optional<IcebergConfig>>> futures = new ArrayList<>();
+
+    // Submit concurrent tasks
+    for (int i = 0; i < numThreads; i++) {
+      futures.add(
+          executor.submit(
+              () -> {
+                try {
+                  startLatch.await(); // Wait for all threads to be ready
+                  return provider.getIcebergCatalogConfig(catalogName);
+                } finally {
+                  doneLatch.countDown();
+                }
+              }));
+    }
+
+    // Start all threads simultaneously
+    startLatch.countDown();
+
+    // Wait for all threads to complete
+    boolean completed = doneLatch.await(30, TimeUnit.SECONDS);
+    Assertions.assertTrue(completed, "All threads should complete within timeout");
+
+    // Verify all results are present and consistent
+    for (Future<Optional<IcebergConfig>> future : futures) {
+      Optional<IcebergConfig> result = future.get();
+      Assertions.assertTrue(result.isPresent(), "Each thread should get a valid config");
+    }
+
+    // Verify CatalogDispatcher was called (at least once, possibly more due to concurrency)
+    Mockito.verify(mockCatalogDispatcher, Mockito.atLeastOnce()).loadCatalog(catalogIdent);
+
+    executor.shutdown();
+    executor.awaitTermination(5, TimeUnit.SECONDS);
   }
 }

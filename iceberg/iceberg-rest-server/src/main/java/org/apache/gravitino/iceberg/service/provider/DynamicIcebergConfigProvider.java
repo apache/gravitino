@@ -136,8 +136,11 @@ public class DynamicIcebergConfigProvider implements IcebergConfigProvider {
 
   @Override
   public void close() {
-    if (catalogFetcher != null) {
-      catalogFetcher.close();
+    synchronized (this) {
+      if (catalogFetcher != null) {
+        catalogFetcher.close();
+        catalogFetcher = null;
+      }
     }
   }
 
@@ -161,8 +164,18 @@ public class DynamicIcebergConfigProvider implements IcebergConfigProvider {
     return defaultDynamicCatalogName.orElse(IcebergConstants.ICEBERG_REST_DEFAULT_CATALOG);
   }
 
+  /**
+   * Sets the catalog fetcher for testing purposes.
+   *
+   * @param catalogFetcher the catalog fetcher to use
+   */
+  @VisibleForTesting
+  void setCatalogFetcher(CatalogFetcher catalogFetcher) {
+    this.catalogFetcher = catalogFetcher;
+  }
+
   /** Interface for fetching catalog information. */
-  private interface CatalogFetcher extends Closeable {
+  interface CatalogFetcher extends Closeable {
     Catalog loadCatalog(String catalogName) throws NoSuchCatalogException;
 
     @Override
