@@ -75,17 +75,12 @@ public class TrinoITContainers implements AutoCloseable {
     if (trinoConnectorDir != null) {
       // If the provided path is relative, resolve it against the current working directory.
       Path path = Paths.get(trinoConnectorDir);
-      if (!path.isAbsolute()) {
-        path = Paths.get(System.getProperty("user.dir")).resolve(path);
-      }
-      path = path.toAbsolutePath().normalize();
-      String absPath = path.toString();
       if (!Files.exists(path)) {
         LOG.warn(
             "Configured GRAVITINO_TRINO_CONNECTOR_DIR '{}' does not exist; docker-compose may fail",
-            absPath);
+            path);
       }
-      env.put("GRAVITINO_TRINO_CONNECTOR_DIR", absPath);
+      env.put("GRAVITINO_TRINO_CONNECTOR_DIR", trinoConnectorDir);
     }
     env.put("GRAVITINO_SERVER_PORT", String.valueOf(gravitinoServerPort));
     env.put("HIVE_RUNTIME_VERSION", hiveRuntimeVersion);
@@ -94,6 +89,7 @@ public class TrinoITContainers implements AutoCloseable {
       env.put("GRAVITINO_LOG_PATH", System.getProperty("gravitino.log.path"));
     }
 
+    LOG.info("Launching containers with env: {}", env);
     String command = ITUtils.joinPath(dockerComposeDir, "launch.sh");
     Object output =
         CommandExecutor.executeCommandLocalHost(
