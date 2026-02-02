@@ -114,9 +114,8 @@ public abstract class JdbcTableOperations implements TableOperation {
     String defaultValue = columnDefaultValueConverter.fromGravitino(defaultValueExpression);
 
     // Special handling for SQL NULL: do not quote it, even for string-like columns.
-    String trimmedDefault = defaultValue == null ? null : defaultValue.trim();
     if (defaultValueExpression == Literals.NULL
-        || (trimmedDefault != null && "NULL".equalsIgnoreCase(trimmedDefault))) {
+        || (defaultValue != null && "NULL".equalsIgnoreCase(defaultValue))) {
       return "NULL";
     }
 
@@ -130,16 +129,16 @@ public abstract class JdbcTableOperations implements TableOperation {
       }
 
       // If the converter already produced a quoted literal, preserve it.
-      if (trimmedDefault != null
-          && trimmedDefault.length() >= 2
-          && trimmedDefault.startsWith("'")
-          && trimmedDefault.endsWith("'")) {
-        return trimmedDefault;
+      if (defaultValue != null
+          && defaultValue.length() >= 2
+          && defaultValue.startsWith("'")
+          && defaultValue.endsWith("'")) {
+        return defaultValue;
       }
 
       // Avoid quoting function/keyword defaults that are intentionally unquoted.
-      if (trimmedDefault != null && !shouldQuoteStringDefault(trimmedDefault)) {
-        return trimmedDefault;
+      if (defaultValue != null && !shouldQuoteStringDefault(defaultValue)) {
+        return defaultValue;
       }
 
       // Fall back to quoting as a string literal.
