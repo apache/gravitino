@@ -23,6 +23,7 @@ import static org.apache.gravitino.catalog.clickhouse.ClickHouseConstants.CLUSTE
 import static org.apache.gravitino.catalog.clickhouse.ClickHouseConstants.CLUSTER_SHARDING_KEY;
 import static org.apache.gravitino.catalog.clickhouse.ClickHouseConstants.ON_CLUSTER;
 
+import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.config.ConfigBuilder;
 import org.apache.gravitino.config.ConfigConstants;
 import org.apache.gravitino.config.ConfigEntry;
@@ -37,6 +38,7 @@ public class ClickHouseConfig {
           .doc("Cluster name for ClickHouse distributed tables")
           .version(ConfigConstants.VERSION_1_2_0)
           .stringConf()
+          .checkValue(StringUtils::isNotEmpty, "Cluster name cannot be empty")
           .create();
 
   public static final ConfigEntry<Boolean> CK_ON_CLUSTER =

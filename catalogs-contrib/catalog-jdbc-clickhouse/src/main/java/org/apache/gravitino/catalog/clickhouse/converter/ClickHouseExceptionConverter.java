@@ -27,24 +27,24 @@ import org.apache.gravitino.exceptions.SchemaAlreadyExistsException;
 import org.apache.gravitino.exceptions.TableAlreadyExistsException;
 
 public class ClickHouseExceptionConverter extends JdbcExceptionConverter {
-  static final int UNKNOWN_DATABASE = 81;
-  static final int DATABASE_ALREADY_EXISTS = 82;
+  static final int ERROR_CODE_UNKNOWN_DATABASE = 81;
+  static final int ERROR_CODE_DATABASE_ALREADY_EXISTS = 82;
 
-  static final int TABLE_ALREADY_EXISTS = 57;
-  static final int TABLE_IS_DROPPED = 218;
+  static final int ERROR_CODE_TABLE_ALREADY_EXISTS = 57;
+  static final int ERROR_CODE_TABLE_IS_DROPPED = 218;
 
   @SuppressWarnings("FormatStringAnnotation")
   @Override
   public GravitinoRuntimeException toGravitinoException(SQLException sqlException) {
     int errorCode = sqlException.getErrorCode();
     switch (errorCode) {
-      case DATABASE_ALREADY_EXISTS:
+      case ERROR_CODE_DATABASE_ALREADY_EXISTS:
         return new SchemaAlreadyExistsException(sqlException, sqlException.getMessage());
-      case TABLE_ALREADY_EXISTS:
+      case ERROR_CODE_TABLE_ALREADY_EXISTS:
         return new TableAlreadyExistsException(sqlException, sqlException.getMessage());
-      case UNKNOWN_DATABASE:
+      case ERROR_CODE_UNKNOWN_DATABASE:
         return new NoSuchSchemaException(sqlException, sqlException.getMessage());
-      case TABLE_IS_DROPPED:
+      case ERROR_CODE_TABLE_IS_DROPPED:
         return new NoSuchTableException(sqlException, sqlException.getMessage());
       default:
         return new GravitinoRuntimeException(sqlException, sqlException.getMessage());

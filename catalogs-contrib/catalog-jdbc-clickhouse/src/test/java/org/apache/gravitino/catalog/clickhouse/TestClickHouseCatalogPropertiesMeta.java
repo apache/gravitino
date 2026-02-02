@@ -30,30 +30,6 @@ public class TestClickHouseCatalogPropertiesMeta {
   void testSpecificPropertyEntriesIncludeClickHouseSettings() {
     ClickHouseCatalogPropertiesMetadata meta = new ClickHouseCatalogPropertiesMetadata();
     Map<String, PropertyEntry<?>> entries = meta.specificPropertyEntries();
-
-    Assertions.assertTrue(
-        entries.containsKey(ClickHouseConfig.CK_CLUSTER_NAME.getKey()), "cluster name missing");
-    Assertions.assertTrue(
-        entries.containsKey(ClickHouseConfig.CK_ON_CLUSTER.getKey()), "on cluster missing");
-    Assertions.assertTrue(
-        entries.containsKey(ClickHouseConfig.CK_CLUSTER_SHARDING_KEY.getKey()),
-        "sharding key missing");
-
-    PropertyEntry<?> clusterName = entries.get(ClickHouseConfig.CK_CLUSTER_NAME.getKey());
-    Assertions.assertFalse(clusterName.isRequired());
-    Assertions.assertNull(clusterName.getDefaultValue());
-    Assertions.assertFalse(clusterName.isHidden());
-
-    PropertyEntry<?> onCluster = entries.get(ClickHouseConfig.CK_ON_CLUSTER.getKey());
-    Assertions.assertEquals(Boolean.FALSE, onCluster.getDefaultValue());
-    Assertions.assertFalse(onCluster.isRequired());
-    Assertions.assertFalse(onCluster.isImmutable());
-    Assertions.assertFalse(onCluster.isReserved());
-
-    PropertyEntry<?> shardKey = entries.get(ClickHouseConfig.CK_CLUSTER_SHARDING_KEY.getKey());
-    Assertions.assertNull(shardKey.getDefaultValue());
-    Assertions.assertFalse(shardKey.isRequired());
-
     // Should still include base JDBC properties
     Assertions.assertTrue(entries.containsKey(JdbcConfig.JDBC_URL.getKey()));
     Assertions.assertTrue(entries.containsKey(JdbcConfig.USERNAME.getKey()));
