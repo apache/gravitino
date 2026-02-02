@@ -27,10 +27,6 @@ tasks.withType(PnpmTask::class) {
   workingDir.set(file("${project.projectDir}"))
 }
 
-tasks.named<War>("war") {
-  enabled = false
-}
-
 tasks {
   // Install dependencies
   val installDeps by registering(PnpmTask::class) {
@@ -49,59 +45,15 @@ tasks {
     args = listOf("prettier:check")
   }
 
-  // Separate webpack task for legacy frontend to produce the "v1" dist.
-  val webpackV1 by registering(PnpmTask::class) {
-    dependsOn(lintCheck, prettierCheck)
-    args = listOf("dist:v1")
-    environment.put("NODE_ENV", "production")
-    doLast {
-      val srcDir = file("dist")
-      val dstDir = file("dist-v1")
-      if (dstDir.exists()) {
-        dstDir.deleteRecursively()
-      }
-      if (srcDir.exists()) {
-        copy {
-          from(srcDir)
-          into(dstDir)
-        }
-      }
-    }
-  }
-
   val webpack by registering(PnpmTask::class) {
-    dependsOn(lintCheck, prettierCheck, webpackV1)
-    // Allow overriding the frontend dist task via Gradle project property:
-    // -PfrontendDist=dist:v1  -> run `pnpm run dist:v1`
-    // -PfrontendDist=dist      -> run `pnpm run dist` (default)
-    val frontendDistArg: String = if (project.hasProperty("frontendDist")) {
-      project.property("frontendDist").toString()
-    } else {
-      "dist"
-    }
-    args = listOf(frontendDistArg)
+    dependsOn(lintCheck, prettierCheck)
+    args = listOf("dist")
     environment.put("NODE_ENV", "production")
   }
 
-  // War task for legacy frontend (produces classifier '-v1')
-  val buildWarV1 by registering(War::class) {
-    dependsOn(webpackV1)
-    archiveBaseName.set("${rootProject.name}-web")
-    archiveClassifier.set("v1")
-    archiveVersion.set("")
-    from("./WEB-INF") {
-      into("WEB-INF")
-    }
-    from("dist-v1") {
-      into("")
-    }
-  }
-
-  // War task for default (new) frontend
-  val buildWarV2 by registering(War::class) {
+  val buildWar by registering(War::class) {
     dependsOn(webpack)
-    archiveBaseName.set("${rootProject.name}-web-v2")
-    // no classifier for the new WAR
+    archiveFileName.set("${rootProject.name}-web-v1.war")
     from("./WEB-INF") {
       into("WEB-INF")
     }
@@ -110,22 +62,14 @@ tasks {
     }
   }
 
-  // Configure the `build` lifecycle to produce either only the legacy WAR
-  // (when caller set -PfrontendDist=dist:v1) or both legacy+new by default.
   build {
-    if (project.hasProperty("frontendDist") && project.property("frontendDist").toString() == "dist:v1") {
-      dependsOn(buildWarV1)
-    } else {
-      dependsOn(buildWarV2, buildWarV1)
-    }
+    dependsOn(buildWar)
   }
 
   clean {
-    delete(".node")
     delete("build")
     delete(".next")
     delete("dist")
-    delete("dist-v1")
     delete("node_modules")
     delete("yarn-error.log")
   }

@@ -18,50 +18,8 @@
  */
 
 import tailwindTheme from './src/lib/theme/tailwind'
-const { fontFamily } = require('tailwindcss/defaultTheme')
 
 /** @type {import('tailwindcss').Config} */
-const config = {
-  darkMode: 'selector',
-  corePlugins: {
-    preflight: false
-  },
-  content: ['./src/**/*.{js,css}'],
-  theme: {
-    container: {
-      center: true,
-      padding: '1.5rem',
-      screens: {
-        '2xl': '1440px'
-      }
-    },
-    extend: {
-      fontFamily: {
-        sans: ['var(--font-sans)', ...fontFamily.sans]
-      },
-      backgroundColor: {
-        colorDarkBgContainer: '#141414',
-        colorDarkBg: '#1f1f1f',
-        colorColumnBg: 'rgba(60,60,60,1)',
-        primary: '#1677ff',
-        defaultPrimary: '#0369a1',
-        borderBlack: '#303030',
-        borderWhite: '#ffffff'
-      },
-      colors: {
-        primary: '#1677ff',
-        defaultPrimary: '#0369a1',
-        borderBlack: '#303030',
-        borderWhite: 'rgba(5,5,5,0.06)'
-      },
-      backgroundImage: {
-        loginBg: 'url("/image/login-bg.jpg")'
-      }
-    }
-  },
-  plugins: []
-}
-
 const tailwindConfig = {
   darkMode: 'class',
   corePlugins: {
@@ -84,4 +42,4 @@ const tailwindConfig = {
   plugins: []
 }
 
-module.exports = process.env.BUILD_TARGET === 'v1' ? tailwindConfig : config
+module.exports = tailwindConfig

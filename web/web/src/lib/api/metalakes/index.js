@@ -24,17 +24,7 @@ const Apis = {
   CREATE: '/api/metalakes',
   DELETE: '/api/metalakes',
   UPDATE: '/api/metalakes',
-  UPDATEINUSE: '/api/metalakes',
-  OWNER_PATH: ({ metalake, metadataObjectType, metadataObjectFullName }) =>
-    `/api/metalakes/${encodeURIComponent(metalake)}/owners/${encodeURIComponent(metadataObjectType)}/${encodeURIComponent(metadataObjectFullName)}`,
-  TAGS_PATH: ({ metalake, metadataObjectType, metadataObjectFullName }) =>
-    `/api/metalakes/${encodeURIComponent(metalake)}/objects/${encodeURIComponent(metadataObjectType)}/${encodeURIComponent(metadataObjectFullName)}/tags`,
-  POLICIES_PATH: ({ metalake, metadataObjectType, metadataObjectFullName }) =>
-    `/api/metalakes/${encodeURIComponent(metalake)}/objects/${encodeURIComponent(metadataObjectType)}/${encodeURIComponent(metadataObjectFullName)}/policies`,
-  METADATA_PATH_TAG: ({ metalake, tag }) =>
-    `/api/metalakes/${encodeURIComponent(metalake)}/tags/${encodeURIComponent(tag)}/objects`,
-  METADATA_PATH_POLICY: ({ metalake, policy }) =>
-    `/api/metalakes/${encodeURIComponent(metalake)}/policies/${encodeURIComponent(policy)}/objects`
+  UPDATEINUSE: '/api/metalakes'
 }
 
 export const getMetalakesApi = () => {
@@ -79,44 +69,5 @@ export const switchInUseApi = ({ name, isInUse }) => {
   return defHttp.patch({
     url: `${Apis.UPDATEINUSE}/${name}`,
     data: { inUse: isInUse }
-  })
-}
-
-export const getEntityOwnerApi = (metalake, metadataObjectType, metadataObjectFullName) => {
-  return defHttp.get({
-    url: Apis.OWNER_PATH({ metalake, metadataObjectType, metadataObjectFullName })
-  })
-}
-
-export const setEntityOwnerApi = (metalake, metadataObjectType, metadataObjectFullName, data) => {
-  return defHttp.put({
-    url: Apis.OWNER_PATH({ metalake, metadataObjectType, metadataObjectFullName }),
-    data
-  })
-}
-
-export const getCurrentEntityTagsApi = (metalake, metadataObjectType, metadataObjectFullName, details) => {
-  return defHttp.get({
-    url: Apis.TAGS_PATH({ metalake, metadataObjectType, metadataObjectFullName }),
-    params: { details }
-  })
-}
-
-export const getCurrentEntityPoliciesApi = ({ metalake, metadataObjectType, metadataObjectFullName, details }) => {
-  return defHttp.get({
-    url: Apis.POLICIES_PATH({ metalake, metadataObjectType, metadataObjectFullName }),
-    params: { details }
-  })
-}
-
-export const getMetadataObjectsForTagApi = (metalake, tag) => {
-  return defHttp.get({
-    url: Apis.METADATA_PATH_TAG({ metalake, tag })
-  })
-}
-
-export const getMetadataObjectsForPolicyApi = (metalake, policy) => {
-  return defHttp.get({
-    url: Apis.METADATA_PATH_POLICY({ metalake, policy })
   })
 }

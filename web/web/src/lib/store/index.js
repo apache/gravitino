@@ -26,24 +26,12 @@ import { isDevEnv } from '@/lib/utils'
 import sys from './sys'
 import auth from './auth'
 import metalakes from './metalakes'
-import tags from './tags'
-import policies from './policies'
-import users from './users'
-import userGroups from './userGroups'
-import roles from './roles'
-import jobs from './jobs'
 
 export const store = configureStore({
   reducer: {
     sys,
     auth,
-    metalakes,
-    tags,
-    policies,
-    users,
-    userGroups,
-    roles,
-    jobs
+    metalakes
   },
   devTools: true,
   middleware: getDefaultMiddleware =>

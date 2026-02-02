@@ -22,18 +22,21 @@
 import ClientOnly from './client'
 import AuthProvider from './session'
 import StoreProvider from './store'
-import ThemeProvider from './ThemeProvider'
+import EmotionProvider from './emotion'
+import ThemeProvider from './theme'
 
-const ProviderNew = ({ children }) => {
+const Provider = ({ children }) => {
   return (
     <ClientOnly>
       <StoreProvider>
-        <AuthProvider>
-          <ThemeProvider>{children}</ThemeProvider>
-        </AuthProvider>
+        <EmotionProvider>
+          <AuthProvider>
+            <ThemeProvider>{children}</ThemeProvider>
+          </AuthProvider>
+        </EmotionProvider>
       </StoreProvider>
     </ClientOnly>
   )
 }
 
-export default ProviderNew
+export default Provider

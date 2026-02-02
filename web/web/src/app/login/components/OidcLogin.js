@@ -19,11 +19,9 @@
 
 'use client'
 
-import { Alert, Button, Flex, Typography } from 'antd'
+import { Box, Button, Typography, Alert } from '@mui/material'
 import { useState, useEffect } from 'react'
 import { oauthProviderFactory } from '@/lib/auth/providers/factory'
-
-const { Text } = Typography
 
 function OidcLogin() {
   const [isLoading, setIsLoading] = useState(true)
@@ -61,24 +59,32 @@ function OidcLogin() {
 
   if (isLoading) {
     return (
-      <Flex justify='center' className='my-4'>
-        <Text>Initializing authentication...</Text>
-      </Flex>
+      <Box sx={{ textAlign: 'center', my: 4 }}>
+        <Typography>Initializing authentication...</Typography>
+      </Box>
     )
   }
 
   if (error) {
     return (
-      <Flex justify='center' className='my-4'>
-        <Alert message={error} type='error' showIcon />
-      </Flex>
+      <Box sx={{ textAlign: 'center', my: 4 }}>
+        <Alert severity='error'>{error}</Alert>
+      </Box>
     )
   }
 
   return (
-    <Flex vertical align='center' gap={24} className='mt-4'>
+    <Box
+      sx={{
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'center',
+        gap: 3,
+        mt: 4
+      }}
+    >
       <OidcLoginButton userManager={userManager} />
-    </Flex>
+    </Box>
   )
 }
 
@@ -100,11 +106,11 @@ function OidcLoginButton({ userManager }) {
 
   return (
     <Button
-      type='primary'
+      variant='contained'
       size='large'
       onClick={handleLogin}
       disabled={!userManager || isLoggingIn}
-      style={{ minWidth: 200, height: 48 }}
+      sx={{ minWidth: 200, py: 1.5 }}
     >
       {isLoggingIn ? 'Redirecting...' : 'Sign In'}
     </Button>

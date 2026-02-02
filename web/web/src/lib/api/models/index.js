@@ -52,7 +52,9 @@ const Apis = {
     )}/schemas/${encodeURIComponent(schema)}/models/${encodeURIComponent(model)}/versions/${version}`
   },
   DELETE_VERSION: ({ metalake, catalog, schema, model, version }) => {
-    return `/api/metalakes/${encodeURIComponent(metalake)}/catalogs/${encodeURIComponent(catalog)}/schemas/${encodeURIComponent(schema)}/models/${encodeURIComponent(model)}/versions/${encodeURIComponent(version)}`
+    return `/api/metalakes/${encodeURIComponent(metalake)}/catalogs/${encodeURIComponent(
+      catalog
+    )}/schemas/${encodeURIComponent(schema)}/models/${encodeURIComponent(model)}/versions/${version}`
   }
 }
 

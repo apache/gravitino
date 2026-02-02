@@ -19,19 +19,6 @@
 
 import _, { intersectionWith, isEqual, mergeWith, unionWith } from 'lodash-es'
 import { isArray, isObject } from './is'
-import { ColumnSpesicalType } from '@/config'
-import dayjs from 'dayjs'
-import { original } from '@reduxjs/toolkit'
-
-const DATE_TIME_FORMAT = 'YYYY-MM-DD HH:mm:ss'
-
-const getColumnType = type => {
-  if (typeof type === 'string') {
-    return type
-  } else {
-    return type.type
-  }
-}
 
 export const isDevEnv = process.env.NODE_ENV === 'development'
 
@@ -65,7 +52,7 @@ export const loggerGitHubInfo = (stars, forks) => {
   )
 }
 
-export const genUpdates = (originalData, newData, disableUpdate = false) => {
+export const genUpdates = (originalData, newData) => {
   const updates = []
 
   if (originalData.name !== newData.name) {
@@ -113,13 +100,6 @@ export const genUpdates = (originalData, newData, disableUpdate = false) => {
     updates.push({ '@type': 'updateComment', newComment: newData.comment })
   }
 
-  const originalContent = originalData.content || {}
-  const newContent = newData.content || {}
-
-  if (JSON.stringify(originalContent) !== JSON.stringify(newContent)) {
-    updates.push({ '@type': 'updateContent', policyType: 'custom', newContent: newContent })
-  }
-
   const originalProperties = originalData.properties || {}
   const newProperties = newData.properties || {}
 
@@ -150,10 +130,7 @@ export const genUpdates = (originalData, newData, disableUpdate = false) => {
         fieldName: [newColumn.name],
         type: newColumn.type,
         nullable: newColumn.nullable,
-        comment: newColumn.comment,
-        ...(newColumn.defaultValue !== undefined && newColumn.defaultValue !== null
-          ? { defaultValue: newColumn.defaultValue }
-          : {})
+        comment: newColumn.comment
       })
     }
   }
@@ -169,10 +146,7 @@ export const genUpdates = (originalData, newData, disableUpdate = false) => {
           newFieldName: newColumnsMap[key].name
         })
       }
-      if (
-        getColumnType(originalColumnsMap[key].type) !== getColumnType(newColumnsMap[key].type).toLowerCase() ||
-        (ColumnSpesicalType.includes(getColumnType(newColumnsMap[key].type).toLowerCase()) && !disableUpdate)
-      ) {
+      if ((originalColumnsMap[key].type + originalColumnsMap[key].typeSuffix || '') !== newColumnsMap[key].type) {
         updates.push({
           '@type': 'updateColumnType',
           fieldName: [newColumnsMap[key].name],
@@ -186,20 +160,7 @@ export const genUpdates = (originalData, newData, disableUpdate = false) => {
           nullable: newColumnsMap[key].nullable
         })
       }
-      if (JSON.stringify(originalColumnsMap[key].defaultValue) !== JSON.stringify(newColumnsMap[key].defaultValue)) {
-        updates.push({
-          '@type': 'updateColumnDefaultValue',
-          fieldName: [newColumnsMap[key].name],
-          newDefaultValue: newColumnsMap[key].defaultValue
-        })
-      }
-      if (
-        (!originalColumnsMap[key].comment && newColumnsMap[key].comment) ||
-        (originalColumnsMap[key].comment && !newColumnsMap[key].comment) ||
-        (originalColumnsMap[key].comment &&
-          newColumnsMap[key].comment &&
-          originalColumnsMap[key].comment !== newColumnsMap[key].comment)
-      ) {
+      if (originalColumnsMap[key].comment !== newColumnsMap[key].comment) {
         updates.push({
           '@type': 'updateColumnComment',
           fieldName: [newColumnsMap[key].name],
@@ -207,38 +168,6 @@ export const genUpdates = (originalData, newData, disableUpdate = false) => {
         })
       }
     }
-  }
-
-  // job template updateTemplate
-  if (
-    JSON.stringify(originalData) !== JSON.stringify(newData) &&
-    originalData.jobType &&
-    originalData.name === newData.name &&
-    originalData.comment === newData.comment
-  ) {
-    const newTemplate = {
-      '@type': newData.jobType
-    }
-    originalData.executable !== newData.executable && (newTemplate['newExecutable'] = newData.executable)
-    JSON.stringify(originalData.arguments) !== JSON.stringify(newData.arguments) &&
-      (newTemplate['newArguments'] = newData.arguments)
-    JSON.stringify(originalData.environments) !== JSON.stringify(newData.environments) &&
-      (newTemplate['newEnvironments'] = newData.environments)
-    JSON.stringify(originalData.customFields) !== JSON.stringify(newData.customFields) &&
-      (newTemplate['newCustomFields'] = newData.customFields)
-    if (newData.jobType === 'shell') {
-      JSON.stringify(originalData.scripts) !== JSON.stringify(newData.scripts) &&
-        (newTemplate['newScripts'] = newData.scripts)
-    } else {
-      originalData.className !== newData.className && (newTemplate['newClassName'] = newData.className)
-      JSON.stringify(originalData.jars) !== JSON.stringify(newData.jars) && (newTemplate['newJars'] = newData.jars)
-      JSON.stringify(originalData.files) !== JSON.stringify(newData.files) && (newTemplate['newFiles'] = newData.files)
-      JSON.stringify(originalData.archives) !== JSON.stringify(newData.archives) &&
-        (newTemplate['newArchives'] = newData.archives)
-      JSON.stringify(originalData.configs) !== JSON.stringify(newData.configs) &&
-        (newTemplate['newConfigs'] = newData.configs)
-    }
-    updates.push({ '@type': 'updateTemplate', newTemplate })
   }
 
   return updates
@@ -314,11 +243,10 @@ export const updateTreeData = (list = [], key, children = []) => {
         children
       }
     }
-
-    // Always recurse if node has children property (even if empty array)
-    if (node.children) {
+    if (node.children && node.children.length > 0) {
       return {
         ...node,
+        isLeaf: node.children.length === 0,
         children: updateTreeData(node.children, key, children)
       }
     }
@@ -352,135 +280,4 @@ export const formatNumber = num => {
   }
 
   return num.toString()
-}
-
-export const copyToClipboard = async text => {
-  if (navigator.clipboard && window.isSecureContext) {
-    return navigator.clipboard.writeText(text)
-  } else {
-    const textArea = document.createElement('textarea')
-    textArea.value = text
-    textArea.style.position = 'fixed'
-    textArea.style.left = '-999999px'
-    document.body.appendChild(textArea)
-    textArea.focus()
-    textArea.select()
-    try {
-      document.execCommand('copy')
-    } catch (err) {
-      throw new Error('Failed to copy path')
-    }
-    document.body.removeChild(textArea)
-
-    return Promise.resolve()
-  }
-}
-
-export const formatFileSize = sizeInBytes => {
-  if (sizeInBytes === undefined || sizeInBytes === null) return '-'
-  if (sizeInBytes < 1024) return `${sizeInBytes} B`
-  if (sizeInBytes < 1024 * 1024) return `${(sizeInBytes / 1024).toFixed(2)} KB`
-  if (sizeInBytes < 1024 * 1024 * 1024) return `${(sizeInBytes / (1024 * 1024)).toFixed(2)} MB`
-
-  return `${(sizeInBytes / (1024 * 1024 * 1024)).toFixed(2)} GB`
-}
-
-export const formatLastModified = timestamp => {
-  if (timestamp === undefined || timestamp === null) return '-'
-  try {
-    const date = new Date(Number(timestamp))
-    const year = date.getFullYear()
-    const month = (date.getMonth() + 1).toString().padStart(2, '0')
-    const day = date.getDate().toString().padStart(2, '0')
-    const hours = date.getHours().toString().padStart(2, '0')
-    const minutes = date.getMinutes().toString().padStart(2, '0')
-    const seconds = date.getSeconds().toString().padStart(2, '0')
-
-    return `${year}-${month}-${day} ${hours}:${minutes}:${seconds}`
-  } catch (e) {
-    console.error('Error formatting lastModified:', e)
-
-    return String(timestamp) // Fallback to string representation of bigint
-  }
-}
-
-export function capitalizeFirstLetter(input) {
-  if (!input) return input
-
-  return input.charAt(0).toUpperCase() + input.slice(1)
-}
-
-export function extractNumbersInParentheses(str) {
-  let regex = /\((\d+(?:,\d+)*)\)/g
-  let matches = []
-  let match
-
-  while ((match = regex.exec(str)) !== null) {
-    matches.push(match[1])
-  }
-
-  return matches[0] || ''
-}
-
-export function sanitizeText(str, options = {}) {
-  const defaults = {
-    removeTabs: true,
-    removeNewlines: false,
-    removeMultipleSpaces: false,
-    trim: true,
-    maxLength: null
-  }
-
-  const config = { ...defaults, ...options }
-  let result = str
-
-  if (config.removeTabs) {
-    result = result.replace(/\t/g, ' ')
-  }
-
-  if (config.removeNewlines) {
-    result = result.replace(/[\n\r]/g, ' ')
-  }
-
-  if (config.removeMultipleSpaces) {
-    result = result.replace(/\s+/g, ' ')
-  }
-
-  if (config.trim) {
-    result = result.trim()
-  }
-
-  if (config.maxLength && result.length > config.maxLength) {
-    result = result.substring(0, config.maxLength)
-  }
-
-  return result
-}
-
-export function generateRandomColor() {
-  return (
-    '#' +
-    Math.floor(Math.random() * 16777215)
-      .toString(16)
-      .padStart(6, '0')
-  )
-}
-
-export const formatToDateTime = (date, format = DATE_TIME_FORMAT) => {
-  return dayjs(date).format(format)
-}
-
-export const getJobParamValues = params => {
-  if (!params) return []
-
-  // Match the content within the double curly braces {{...}}
-  const regex = /\{\{([^}]+)\}\}/g
-  const matches = []
-  let match
-
-  while ((match = regex.exec(params)) !== null) {
-    matches.push(match[1])
-  }
-
-  return matches
 }

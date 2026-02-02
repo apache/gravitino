@@ -624,15 +624,11 @@ const relationalColumnTypeMap = {
     'integer',
     'interval_day',
     'interval_year',
-    'list',
     'long',
-    'map',
     'short',
-    'struct',
     'string',
     'time',
-    'timestamp',
-    'union'
+    'timestamp'
   ],
   'jdbc-oceanbase': [
     'binary',
@@ -747,17 +743,22 @@ const relationalTablePropInfoMap = {
     reserved: [],
     immutable: ['format', 'location'],
     allowDelete: true,
-    allowAdd: true
-  },
-  kafka: {
-    reserved: [],
-    immutable: ['replication-factor'],
-    allowAdd: true
-  },
-  fileset: {
-    reserved: [],
-    immutable: ['default-location-name'],
-    allowAdd: true
+    allowAdd: true,
+    defaultProps: [
+      {
+        key: 'location',
+        value: '',
+        required: false,
+        description: 'The storage location of the table. Required if not set in catalog or schema.'
+      },
+      {
+        key: 'format',
+        value: 'lance',
+        required: true,
+        description: "The table format. Currently only 'lance' is supported.",
+        disabled: true
+      }
+    ]
   }
 }
 

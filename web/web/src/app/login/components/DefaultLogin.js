@@ -21,16 +21,43 @@
 
 import { useRouter } from 'next/navigation'
 import { useEffect } from 'react'
-import { Button, Form, Input } from 'antd'
+import { Grid, Button, Typography, TextField, FormControl, FormHelperText } from '@mui/material'
+import * as yup from 'yup'
+import { useForm, Controller } from 'react-hook-form'
+import { yupResolver } from '@hookform/resolvers/yup'
 
 import { useAppDispatch, useAppSelector } from '@/lib/hooks/useStore'
-import { loginAction, setIntervalIdAction, clearIntervalId, setAuthUser } from '@/lib/store/auth'
+import { loginAction, setIntervalIdAction, clearIntervalId } from '@/lib/store/auth'
+
+const defaultValues = {
+  grant_type: 'client_credentials',
+  client_id: '',
+  client_secret: '',
+  scope: ''
+}
+
+const schema = yup.object().shape({
+  grant_type: yup.string().required(),
+  client_id: yup.string().required(),
+  client_secret: yup.string().required(),
+  scope: yup.string().required()
+})
 
 function DefaultLogin() {
   const router = useRouter()
   const dispatch = useAppDispatch()
   const store = useAppSelector(state => state.auth)
-  const [form] = Form.useForm()
+
+  const {
+    control,
+    handleSubmit,
+    reset,
+    formState: { errors }
+  } = useForm({
+    defaultValues: Object.assign({}, defaultValues),
+    mode: 'onChange',
+    resolver: yupResolver(schema)
+  })
 
   useEffect(() => {
     if (store.intervalId) {
@@ -38,81 +65,104 @@ function DefaultLogin() {
     }
   }, [store.intervalId])
 
-  const onFinish = async values => {
-    if (store.authType === 'simple' && store.anthEnable) {
-      await dispatch(setAuthUser({ name: values.username, type: 'user' }))
-      router.push('/metalakes')
-    } else {
-      await dispatch(loginAction({ params: values, router }))
-      await dispatch(setIntervalIdAction())
-    }
+  const onSubmit = async data => {
+    await dispatch(loginAction({ params: data, router }))
+    await dispatch(setIntervalIdAction())
+
+    reset({ ...data })
+  }
+
+  const onError = errors => {
+    // Form validation errors are handled by the UI
   }
 
   return (
-    <Form
-      form={form}
-      layout='vertical'
-      autoComplete='off'
-      onFinish={onFinish}
-      initialValues={{
-        grant_type: 'client_credentials',
-        client_id: '',
-        client_secret: '',
-        scope: ''
-      }}
-    >
-      {store.authType === 'simple' && store.anthEnable ? (
-        <>
-          <Form.Item label='Username' name='username' rules={[{ required: true, message: 'Username is required' }]}>
-            <Input placeholder='Please enter your username' />
-          </Form.Item>
-        </>
-      ) : (
-        <>
-          <Form.Item
-            label='Grant Type'
+    <form autoComplete='off' onSubmit={handleSubmit(onSubmit, onError)}>
+      <Grid item xs={12} sx={{ mt: 4 }}>
+        <FormControl fullWidth>
+          <Controller
             name='grant_type'
-            rules={[{ required: true, message: 'Grant Type is required' }]}
-            className='mt-4'
-          >
-            <Input disabled placeholder='Please enter the grant type' />
-          </Form.Item>
+            control={control}
+            rules={{ required: true }}
+            render={({ field: { value, onChange } }) => (
+              <TextField
+                value={value}
+                label='Grant Type'
+                disabled
+                onChange={onChange}
+                placeholder=''
+                error={Boolean(errors.grant_type)}
+              />
+            )}
+          />
+          {errors.grant_type && (
+            <FormHelperText className={'twc-text-error-main'}>{errors.grant_type.message}</FormHelperText>
+          )}
+        </FormControl>
+      </Grid>
 
-          <Form.Item
-            label='Client ID'
+      <Grid item xs={12} sx={{ mt: 4 }}>
+        <FormControl fullWidth>
+          <Controller
             name='client_id'
-            rules={[{ required: true, message: 'Client ID is required' }]}
-            className='mt-4'
-          >
-            <Input placeholder='' />
-          </Form.Item>
+            control={control}
+            rules={{ required: true }}
+            render={({ field: { value, onChange } }) => (
+              <TextField
+                value={value}
+                label='Client ID'
+                onChange={onChange}
+                placeholder=''
+                error={Boolean(errors.client_id)}
+              />
+            )}
+          />
+          {errors.client_id && (
+            <FormHelperText className={'twc-text-error-main'}>{errors.client_id.message}</FormHelperText>
+          )}
+        </FormControl>
+      </Grid>
 
-          <Form.Item
-            label='Client Secret'
+      <Grid item xs={12} sx={{ mt: 4 }}>
+        <FormControl fullWidth>
+          <Controller
             name='client_secret'
-            rules={[{ required: true, message: 'Client Secret is required' }]}
-            className='mt-4'
-          >
-            <Input placeholder='' />
-          </Form.Item>
+            control={control}
+            rules={{ required: true }}
+            render={({ field: { value, onChange } }) => (
+              <TextField
+                value={value}
+                label='Client Secret'
+                onChange={onChange}
+                placeholder=''
+                error={Boolean(errors.client_secret)}
+              />
+            )}
+          />
+          {errors.client_secret && (
+            <FormHelperText className={'twc-text-error-main'}>{errors.client_secret.message}</FormHelperText>
+          )}
+        </FormControl>
+      </Grid>
 
-          <Form.Item
-            label='Scope'
+      <Grid item xs={12} sx={{ mt: 4 }}>
+        <FormControl fullWidth>
+          <Controller
             name='scope'
-            rules={[{ required: true, message: 'Scope is required' }]}
-            className='mt-4'
-          >
-            <Input placeholder='' />
-          </Form.Item>
-        </>
-      )}
+            control={control}
+            rules={{ required: true }}
+            render={({ field: { value, onChange } }) => (
+              <TextField value={value} label='Scope' onChange={onChange} placeholder='' error={Boolean(errors.scope)} />
+            )}
+          />
+          {errors.scope && <FormHelperText className={'twc-text-error-main'}>{errors.scope.message}</FormHelperText>}
+        </FormControl>
+      </Grid>
 
-      <Form.Item className='mb-7 mt-12'>
-        <Button type='primary' htmlType='submit' block size='large'>
-          Login
-        </Button>
-      </Form.Item>
-    </Form>
+      <Button fullWidth size='large' type='submit' variant='contained' sx={{ mb: 7, mt: 12 }}>
+        Login
+      </Button>
+    </form>
   )
 }
 

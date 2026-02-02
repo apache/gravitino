@@ -512,7 +512,7 @@ subprojects {
     }
   }
 
-  if (project.name in listOf("web", "docs")) {
+  if (project.name in listOf("web", "web-v2", "docs")) {
     plugins.apply(NodePlugin::class)
     configure<NodeExtension> {
       version.set("20.19.0")
@@ -725,7 +725,8 @@ tasks {
       ":iceberg:iceberg-rest-server:copyLibAndConfigs",
       ":lance:lance-rest-server:copyLibAndConfigs",
       ":maintenance:optimizer:copyLibAndConfigs",
-      ":web:web:build"
+      ":web:web:build",
+      ":web:web-v2:build"
     )
 
     group = "gravitino distribution"
@@ -734,13 +735,8 @@ tasks {
       copy {
         from(projectDir.dir("conf")) { into("package/conf") }
         from(projectDir.dir("bin")) { into("package/bin") }
-        // Copy both new and legacy web WARs if present. The legacy WAR uses a
-        // "-v1" classifier (e.g. gravitino-web-v1.war), v1 ui will not be update after v1.1.0 anymore.
-        from(projectDir.dir("web/web/build/libs")) {
-          include("${rootProject.name}-web-v1.war")
-          include("${rootProject.name}-web-v2-$version.war")
-          into("package/web")
-        }
+        from(projectDir.dir("web/web/build/libs/${rootProject.name}-web-v1.war")) { into("package/web") }
+        from(projectDir.dir("web/web-v2/build/libs/${rootProject.name}-web-v2-$version.war")) { into("package/web-v2") }
         from(projectDir.dir("scripts")) { into("package/scripts") }
         into(outputDir)
         rename { fileName ->
@@ -763,6 +759,9 @@ tasks {
         from(projectDir.dir("web/web/licenses")) { into("package/web/licenses") }
         from(projectDir.dir("web/web/LICENSE.bin")) { into("package/web") }
         from(projectDir.dir("web/web/NOTICE.bin")) { into("package/web") }
+        from(projectDir.dir("web/web-v2/licenses")) { into("package/web-v2/licenses") }
+        from(projectDir.dir("web/web-v2/LICENSE.bin")) { into("package/web-v2") }
+        from(projectDir.dir("web/web-v2/NOTICE.bin")) { into("package/web-v2") }
         into(outputDir)
         rename { fileName ->
           fileName.replace(".bin", "")
@@ -1058,6 +1057,8 @@ tasks {
         it.name != "hive-metastore-common" &&
         it.name != "docs" &&
         it.name != "hadoop-common" &&
+        it.name != "web" &&
+        it.name != "web-v2" &&
         it.parent?.name != "bundles" &&
         it.parent?.name != "maintenance" &&
         it.name != "mcp-server"

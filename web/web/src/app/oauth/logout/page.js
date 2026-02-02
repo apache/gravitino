@@ -21,12 +21,10 @@
 
 import { useEffect } from 'react'
 import { useRouter } from 'next/navigation'
-import { Flex, Spin, Typography } from 'antd'
+import { Box, Typography, CircularProgress } from '@mui/material'
 import { oauthProviderFactory } from '@/lib/auth/providers/factory'
 import { useAppDispatch } from '@/lib/hooks/useStore'
 import { logoutAction } from '@/lib/store/auth'
-
-const { Title, Text } = Typography
 
 export default function OAuthLogout() {
   const router = useRouter()
@@ -58,12 +56,21 @@ export default function OAuthLogout() {
   }, [dispatch, router])
 
   return (
-    <Flex vertical align='center' justify='center' gap={16} style={{ minHeight: '100vh' }}>
-      <Spin size='large' />
-      <Title level={4} style={{ margin: 0 }}>
-        Logging out...
-      </Title>
-      <Text type='secondary'>Please wait while we complete your logout.</Text>
-    </Flex>
+    <Box
+      sx={{
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'center',
+        justifyContent: 'center',
+        minHeight: '100vh',
+        gap: 2
+      }}
+    >
+      <CircularProgress />
+      <Typography variant='h6'>Logging out...</Typography>
+      <Typography variant='body2' color='text.secondary'>
+        Please wait while we complete your logout.
+      </Typography>
+    </Box>
   )
 }
