@@ -317,7 +317,8 @@ public class MysqlTableOperations extends JdbcTableOperations {
   }
 
   @Override
-  protected String calculateDefaultValue(JdbcColumn column, Expression defaultValueExpression) {
+  protected String handleQuotingForDefaultValue(
+      JdbcColumn column, Expression defaultValueExpression) {
     String defaultValue = columnDefaultValueConverter.fromGravitino(defaultValueExpression);
 
     // Special handling for SQL NULL: do not quote it, even for string-like columns.

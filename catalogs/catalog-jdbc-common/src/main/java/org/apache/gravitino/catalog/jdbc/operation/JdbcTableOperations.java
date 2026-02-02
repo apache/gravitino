@@ -100,7 +100,17 @@ public abstract class JdbcTableOperations implements TableOperation {
     this.columnDefaultValueConverter = jdbcColumnDefaultValueConverter;
   }
 
-  protected String calculateDefaultValue(JdbcColumn column, Expression defaultValueExpression) {
+  /**
+   * Handles quoting for default values based on the column data type. For example, if the default
+   * valur is ""(empty string), it will be represented as two single quotes '' for string-like
+   * columns, or NULL for others.
+   *
+   * @param column the column
+   * @param defaultValueExpression the default value expression
+   * @return the properly quoted default value as a string
+   */
+  protected String handleQuotingForDefaultValue(
+      JdbcColumn column, Expression defaultValueExpression) {
     String defaultValue = columnDefaultValueConverter.fromGravitino(defaultValueExpression);
 
     // Special handling for SQL NULL: do not quote it, even for string-like columns.
@@ -110,6 +120,7 @@ public abstract class JdbcTableOperations implements TableOperation {
       return "NULL";
     }
 
+    // Special handling for string-like columns.
     if (column.dataType() instanceof VarCharType
         || column.dataType() instanceof StringType
         || column.dataType() instanceof FixedCharType) {
@@ -169,7 +180,7 @@ public abstract class JdbcTableOperations implements TableOperation {
     if (DEFAULT_VALUE_NOT_SET.equals(column.defaultValue())) {
       return;
     }
-    String defaultValue = calculateDefaultValue(column, column.defaultValue());
+    String defaultValue = handleQuotingForDefaultValue(column, column.defaultValue());
     sqlBuilder.append("DEFAULT ").append(defaultValue).append(SPACE);
   }
 

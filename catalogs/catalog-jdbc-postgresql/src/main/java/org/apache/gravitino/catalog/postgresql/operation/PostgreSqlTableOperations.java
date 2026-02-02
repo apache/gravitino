@@ -557,7 +557,7 @@ public class PostgreSqlTableOperations extends JdbcTableOperations
 
     StringBuilder sqlBuilder = new StringBuilder(ALTER_TABLE + jdbcTable.name());
     String newDefaultValue =
-        calculateDefaultValue(column, updateColumnDefaultValue.getNewDefaultValue());
+        handleQuotingForDefaultValue(column, updateColumnDefaultValue.getNewDefaultValue());
     sqlBuilder
         .append("\n")
         .append(ALTER_COLUMN)
