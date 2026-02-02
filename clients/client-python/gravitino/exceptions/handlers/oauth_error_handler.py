@@ -15,8 +15,8 @@
 # specific language governing permissions and limitations
 # under the License.
 
-from gravitino.exceptions.base import UnauthorizedException, BadRequestException
 from gravitino.dto.responses.oauth2_error_response import OAuth2ErrorResponse
+from gravitino.exceptions.base import BadRequestException, UnauthorizedException
 from gravitino.exceptions.handlers.rest_error_handler import RestErrorHandler
 
 INVALID_CLIENT_ERROR = "invalid_client"

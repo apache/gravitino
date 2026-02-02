@@ -18,8 +18,6 @@
  */
 package org.apache.gravitino.catalog.clickhouse.operations;
 
-import static org.apache.gravitino.catalog.clickhouse.ClickHouseConfig.DEFAULT_CK_ON_CLUSTER;
-
 import com.google.common.collect.ImmutableSet;
 import java.sql.Connection;
 import java.sql.ResultSet;
@@ -29,43 +27,17 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import javax.sql.DataSource;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.StringIdentifier;
-import org.apache.gravitino.catalog.clickhouse.ClickHouseConfig;
-import org.apache.gravitino.catalog.jdbc.converter.JdbcExceptionConverter;
 import org.apache.gravitino.catalog.jdbc.operation.JdbcDatabaseOperations;
 
 public class ClickHouseDatabaseOperations extends JdbcDatabaseOperations {
 
+  private static final Set<String> CLICK_HOUSE_SYSTEM_DATABASES =
+      ImmutableSet.of("information_schema", "default", "system", "INFORMATION_SCHEMA");
+
   // TODO: handle ClickHouse cluster properly when creating/dropping databases/tables
   //  use https://github.com/apache/gravitino/issues/9820 to track it.
-  @SuppressWarnings("unused")
-  private boolean onCluster = false;
-
-  @SuppressWarnings("unused")
-  private String clusterName = null;
-
-  @Override
-  public void initialize(
-      DataSource dataSource, JdbcExceptionConverter exceptionMapper, Map<String, String> conf) {
-    super.initialize(dataSource, exceptionMapper, conf);
-
-    final String cn = conf.get(ClickHouseConfig.CK_CLUSTER_NAME.getKey());
-    if (StringUtils.isNotBlank(cn)) {
-      clusterName = cn;
-    }
-
-    final String oc =
-        conf.getOrDefault(
-            ClickHouseConfig.CK_ON_CLUSTER.getKey(), String.valueOf(DEFAULT_CK_ON_CLUSTER));
-    onCluster = Boolean.parseBoolean(oc);
-
-    if (onCluster && StringUtils.isBlank(clusterName)) {
-      throw new IllegalArgumentException(
-          "ClickHouse 'ON CLUSTER' is enabled, but cluster name is not provided.");
-    }
-  }
 
   @Override
   protected boolean supportSchemaComment() {
@@ -74,7 +46,7 @@ public class ClickHouseDatabaseOperations extends JdbcDatabaseOperations {
 
   @Override
   protected Set<String> createSysDatabaseNameSet() {
-    return ImmutableSet.of("information_schema", "default", "system");
+    return CLICK_HOUSE_SYSTEM_DATABASES;
   }
 
   @Override

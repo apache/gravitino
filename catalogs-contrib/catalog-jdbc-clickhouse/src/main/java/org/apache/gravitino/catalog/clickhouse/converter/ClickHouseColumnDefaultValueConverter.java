@@ -37,7 +37,7 @@ import org.apache.gravitino.rel.types.Types;
 public class ClickHouseColumnDefaultValueConverter extends JdbcColumnDefaultValueConverter {
 
   protected static final String NOW = "now";
-  Expression DEFAULT_VALUE_OF_NOW = FunctionExpression.of("now");
+  protected static final Expression DEFAULT_VALUE_OF_NOW = FunctionExpression.of("now");
 
   public String fromGravitino(Expression defaultValue) {
     if (DEFAULT_VALUE_NOT_SET.equals(defaultValue)) {

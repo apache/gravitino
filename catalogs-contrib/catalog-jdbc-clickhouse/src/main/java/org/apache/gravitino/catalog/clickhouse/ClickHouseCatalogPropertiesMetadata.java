@@ -19,51 +19,14 @@
 
 package org.apache.gravitino.catalog.clickhouse;
 
-import static org.apache.gravitino.connector.PropertyEntry.booleanPropertyEntry;
-import static org.apache.gravitino.connector.PropertyEntry.stringPropertyEntry;
-
-import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
-import com.google.common.collect.Maps;
-import java.util.List;
 import java.util.Map;
 import org.apache.gravitino.catalog.jdbc.JdbcCatalogPropertiesMetadata;
 import org.apache.gravitino.connector.PropertyEntry;
 
 public class ClickHouseCatalogPropertiesMetadata extends JdbcCatalogPropertiesMetadata {
 
-  private static final Map<String, PropertyEntry<?>> PROPERTIES_METADATA;
-
-  static {
-    List<PropertyEntry<?>> propertyEntries =
-        ImmutableList.of(
-            stringPropertyEntry(
-                ClickHouseConfig.CK_CLUSTER_NAME.getKey(),
-                ClickHouseConfig.CK_CLUSTER_NAME.getDoc(),
-                false /* required */,
-                false /* immutable */,
-                null /* defaultValue */,
-                false /* hidden */,
-                false /* reserved */),
-            booleanPropertyEntry(
-                ClickHouseConfig.CK_ON_CLUSTER.getKey(),
-                ClickHouseConfig.CK_ON_CLUSTER.getDoc(),
-                false /* required */,
-                false /* immutable */,
-                false /* defaultValue */,
-                false /* hidden */,
-                false /* reserved */),
-            stringPropertyEntry(
-                ClickHouseConfig.CK_CLUSTER_SHARDING_KEY.getKey(),
-                ClickHouseConfig.CK_CLUSTER_SHARDING_KEY.getDoc(),
-                false /* required */,
-                false /* immutable */,
-                null /* defaultValue */,
-                false /* hidden */,
-                false /* reserved */));
-
-    PROPERTIES_METADATA = Maps.uniqueIndex(propertyEntries, PropertyEntry::getName);
-  }
+  private static final Map<String, PropertyEntry<?>> PROPERTIES_METADATA = ImmutableMap.of();
 
   @Override
   protected Map<String, PropertyEntry<?>> specificPropertyEntries() {

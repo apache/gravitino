@@ -205,7 +205,8 @@ public class ClickHouseTableOperations extends JdbcTableOperations {
 
     // Add table comment if specified
     if (StringUtils.isNotEmpty(comment)) {
-      sqlBuilder.append(" COMMENT '").append(comment).append("'");
+      String escapedComment = comment.replace("'", "''");
+      sqlBuilder.append(" COMMENT '").append(escapedComment).append("'");
     }
 
     // Add setting clause if specified, clickhouse only supports predefine settings
@@ -712,8 +713,10 @@ public class ClickHouseTableOperations extends JdbcTableOperations {
 
     // Add column comment if specified
     if (StringUtils.isNotEmpty(column.comment())) {
-      sqlBuilder.append("COMMENT '").append(column.comment()).append("' ");
+      String escapedComment = StringUtils.replace(column.comment(), "'", "''");
+      sqlBuilder.append("COMMENT '").append(escapedComment).append("' ");
     }
+
     return sqlBuilder;
   }
 

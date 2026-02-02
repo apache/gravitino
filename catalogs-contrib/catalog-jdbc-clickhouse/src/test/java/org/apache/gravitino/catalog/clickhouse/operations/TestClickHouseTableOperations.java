@@ -640,10 +640,10 @@ public class TestClickHouseTableOperations extends TestClickHouse {
 
   @Test
   public void testCreateMultipleTables() {
-    String test_table_1 = "test_table_1";
+    String testTable1 = "test_table_1";
     TABLE_OPERATIONS.create(
         TEST_DB_NAME.toString(),
-        test_table_1,
+        testTable1,
         new JdbcColumn[] {
           JdbcColumn.builder()
               .withName("col_1")
@@ -664,12 +664,12 @@ public class TestClickHouseTableOperations extends TestClickHouse {
 
     DATABASE_OPERATIONS.create(testDb, null, null);
     List<String> tables = TABLE_OPERATIONS.listTables(testDb);
-    Assertions.assertFalse(tables.contains(test_table_1));
+    Assertions.assertFalse(tables.contains(testTable1));
 
-    String test_table_2 = "test_table_2";
+    String testTable2 = "test_table_2";
     TABLE_OPERATIONS.create(
         testDb,
-        test_table_2,
+        testTable2,
         new JdbcColumn[] {
           JdbcColumn.builder()
               .withName("col_1")
@@ -687,15 +687,15 @@ public class TestClickHouseTableOperations extends TestClickHouse {
         getSortOrders("col_1"));
 
     tables = TABLE_OPERATIONS.listTables(TEST_DB_NAME.toString());
-    Assertions.assertFalse(tables.contains(test_table_2));
+    Assertions.assertFalse(tables.contains(testTable2));
   }
 
   @Test
   public void testLoadTableDefaultProperties() {
-    String test_table_1 = RandomNameUtils.genRandomName("properties_table_");
+    String testTable1 = RandomNameUtils.genRandomName("properties_table_");
     TABLE_OPERATIONS.create(
         TEST_DB_NAME.toString(),
-        test_table_1,
+        testTable1,
         new JdbcColumn[] {
           JdbcColumn.builder()
               .withName("col_1")
@@ -711,7 +711,7 @@ public class TestClickHouseTableOperations extends TestClickHouse {
         Distributions.NONE,
         Indexes.EMPTY_INDEXES,
         getSortOrders("col_1"));
-    JdbcTable load = TABLE_OPERATIONS.load(TEST_DB_NAME.toString(), test_table_1);
+    JdbcTable load = TABLE_OPERATIONS.load(TEST_DB_NAME.toString(), testTable1);
     Assertions.assertEquals("MergeTree", load.properties().get(CLICKHOUSE_ENGINE_KEY));
   }
 }
