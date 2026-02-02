@@ -16,12 +16,25 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.gravitino.catalog.lakehouse.paimon;
 
-/** The type of Apache Paimon catalog backend. */
-public enum PaimonCatalogBackend {
-  FILESYSTEM,
-  JDBC,
-  HIVE,
-  REST
+package org.apache.gravitino.auth;
+
+import java.security.Principal;
+
+/**
+ * Interface for mapping authenticated principals to user identities.
+ *
+ * <p>Implementations should be thread-safe as they may be shared across multiple authentication
+ * requests.
+ */
+public interface PrincipalMapper {
+
+  /**
+   * Maps a principal string to a Principal object.
+   *
+   * @param principal the principal string to map (e.g., "user@company.com", "user/instance@REALM")
+   * @return a Principal object containing the mapped username
+   * @throws IllegalArgumentException if the principal cannot be mapped
+   */
+  Principal map(String principal);
 }
