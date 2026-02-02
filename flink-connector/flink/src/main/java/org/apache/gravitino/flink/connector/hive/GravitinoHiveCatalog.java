@@ -170,6 +170,9 @@ public class GravitinoHiveCatalog extends BaseCatalog {
     if (!(newTable instanceof ResolvedCatalogTable)) {
       throw new CatalogException("Generic table must be a resolved catalog table");
     }
+    // For generic tables, we re-serialize the entire table schema and partition keys into
+    // flink.* properties, so the individual tableChanges are not needed. The newTable
+    // parameter contains the final state after applying all changes.
     applyGenericTableAlter(tablePath, table, (ResolvedCatalogTable) newTable);
   }
 
@@ -212,7 +215,7 @@ public class GravitinoHiveCatalog extends BaseCatalog {
 
   private void applyGenericTableAlter(
       ObjectPath tablePath, Table existingTable, ResolvedCatalogTable newTable)
-      throws CatalogException {
+      throws TableNotExistException, CatalogException {
     NameIdentifier identifier =
         NameIdentifier.of(tablePath.getDatabaseName(), tablePath.getObjectName());
     Map<String, String> updatedProperties =
@@ -241,6 +244,12 @@ public class GravitinoHiveCatalog extends BaseCatalog {
           }
         });
 
-    catalog().asTableCatalog().alterTable(identifier, changes.toArray(new TableChange[0]));
+    try {
+      catalog().asTableCatalog().alterTable(identifier, changes.toArray(new TableChange[0]));
+    } catch (NoSuchTableException e) {
+      throw new TableNotExistException(catalogName(), tablePath, e);
+    } catch (Exception e) {
+      throw new CatalogException(e);
+    }
   }
 }

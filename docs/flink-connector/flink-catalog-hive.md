@@ -39,7 +39,12 @@ reconstructed from the serialized `flink.*` properties. Hive tables continue to 
 Hive schema.
 
 :::note
-You must set `connector=hive` explicitly when creating a raw Hive table. Otherwise, the table is created as a managed generic table. The managed table is not recommended to use and is deprecated in Flink.
+You must set `connector=hive` explicitly when creating a raw Hive table. Otherwise, the table is
+created as a generic table by default in HiveCatalog. Starting from Apache Flink 1.18,
+ManagedTable-related APIs are deprecated, so avoid relying on managed table behavior. Prefer
+Hive-compatible tables (use Hive dialect or set `connector=hive`) or external generic tables (set
+an explicit `connector`). For details, see the Flink documentation on Hive generic tables:
+https://nightlies.apache.org/flink/flink-docs-stable/docs/connectors/table/hive/hive_catalog/#generic-tables
 :::
 
 ## Requirement
