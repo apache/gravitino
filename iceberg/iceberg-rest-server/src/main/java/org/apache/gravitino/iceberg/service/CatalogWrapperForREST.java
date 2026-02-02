@@ -244,6 +244,7 @@ public class CatalogWrapperForREST extends IcebergCatalogWrapper {
     if (!requestCredential) {
       return false;
     }
+    validateCredentialLocation(loadTableResponse.tableMetadata().location());
     return !isLocalOrHdfsTable(loadTableResponse.tableMetadata());
   }
 
@@ -252,7 +253,16 @@ public class CatalogWrapperForREST extends IcebergCatalogWrapper {
   }
 
   @VisibleForTesting
+  static void validateCredentialLocation(String location) {
+    if (StringUtils.isBlank(location)) {
+      throw new IllegalArgumentException(
+          "Table location cannot be null or blank when requesting credentials");
+    }
+  }
+
+  @VisibleForTesting
   static boolean isLocalOrHdfsLocation(String location) {
+    // Precondition: location is non-blank (enforced by caller).
     if (StringUtils.isBlank(location)) {
       return false;
     }
@@ -264,6 +274,7 @@ public class CatalogWrapperForREST extends IcebergCatalogWrapper {
     }
     String scheme = uri.getScheme();
     if (scheme == null) {
+      // No scheme means a local path.
       return true;
     }
     return "file".equalsIgnoreCase(scheme) || "hdfs".equalsIgnoreCase(scheme);

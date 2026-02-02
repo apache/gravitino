@@ -60,4 +60,18 @@ public class TestCatalogWrapperForREST {
     Assertions.assertFalse(CatalogWrapperForREST.isLocalOrHdfsLocation(""));
     Assertions.assertFalse(CatalogWrapperForREST.isLocalOrHdfsLocation("   "));
   }
+
+  @Test
+  void testValidateCredentialLocation() {
+    Assertions.assertDoesNotThrow(
+        () -> CatalogWrapperForREST.validateCredentialLocation("/tmp/warehouse"));
+    Assertions.assertDoesNotThrow(
+        () -> CatalogWrapperForREST.validateCredentialLocation("file:///tmp/warehouse"));
+
+    Assertions.assertThrowsExactly(
+        IllegalArgumentException.class, () -> CatalogWrapperForREST.validateCredentialLocation(""));
+    Assertions.assertThrowsExactly(
+        IllegalArgumentException.class,
+        () -> CatalogWrapperForREST.validateCredentialLocation("   "));
+  }
 }
