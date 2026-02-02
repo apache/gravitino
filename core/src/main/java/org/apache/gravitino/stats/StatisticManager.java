@@ -23,6 +23,7 @@ import com.google.common.collect.Lists;
 import java.io.Closeable;
 import java.io.IOException;
 import java.time.Instant;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -93,7 +94,7 @@ public class StatisticManager implements Closeable, StatisticDispatcher {
    * @return merged options map
    */
   private Map<String, String> buildStorageOptions(Config config) {
-    Map<String, String> options = new java.util.HashMap<>();
+    Map<String, String> options = new HashMap<>();
 
     // First, add entity store JDBC configs as defaults
     // These will be used if partition-specific configs are not provided

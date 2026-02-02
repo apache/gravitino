@@ -323,8 +323,8 @@ If you have many tables with a small number of partitions, you should set a smal
 **To use Lance storage, configure:**
 
 ```properties
-gravitino.stats.partition.storageFactoryClass=org.apache.gravitino.stats.storage.LancePartitionStatisticStorageFactory
-gravitino.stats.partition.storageOption.location=/data/lance
+gravitino.stats.partition.storageFactoryClass = org.apache.gravitino.stats.storage.LancePartitionStatisticStorageFactory
+gravitino.stats.partition.storageOption.location = /data/lance
 ```
 
 ### Implement a custom partition storage

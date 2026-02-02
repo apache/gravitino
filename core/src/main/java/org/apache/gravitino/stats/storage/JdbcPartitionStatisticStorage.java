@@ -62,9 +62,17 @@ public class JdbcPartitionStatisticStorage implements PartitionStatisticStorage 
 
   private final DataSource dataSource;
   private final EntityStore entityStore;
+  private final DatabaseType databaseType;
 
-  // SQL statements
-  private static final String INSERT_OR_UPDATE_SQL =
+  /** Supported database types. */
+  private enum DatabaseType {
+    MYSQL,
+    POSTGRESQL,
+    H2
+  }
+
+  // SQL statements for MySQL and H2 (compatible syntax)
+  private static final String INSERT_OR_UPDATE_SQL_MYSQL =
       "INSERT INTO partition_statistic_meta "
           + "(table_id, partition_name, statistic_name, statistic_value, audit_info, created_at, updated_at) "
           + "VALUES (?, ?, ?, ?, ?, ?, ?) "
@@ -72,6 +80,16 @@ public class JdbcPartitionStatisticStorage implements PartitionStatisticStorage 
           + "statistic_value = VALUES(statistic_value), "
           + "audit_info = VALUES(audit_info), "
           + "updated_at = VALUES(updated_at)";
+
+  // SQL statement for PostgreSQL
+  private static final String INSERT_OR_UPDATE_SQL_POSTGRESQL =
+      "INSERT INTO partition_statistic_meta "
+          + "(table_id, partition_name, statistic_name, statistic_value, audit_info, created_at, updated_at) "
+          + "VALUES (?, ?, ?, ?, ?, ?, ?) "
+          + "ON CONFLICT (table_id, partition_name, statistic_name) DO UPDATE SET "
+          + "statistic_value = EXCLUDED.statistic_value, "
+          + "audit_info = EXCLUDED.audit_info, "
+          + "updated_at = EXCLUDED.updated_at";
 
   private static final String SELECT_STATISTICS_SQL =
       "SELECT partition_name, statistic_name, statistic_value, audit_info "
@@ -90,6 +108,47 @@ public class JdbcPartitionStatisticStorage implements PartitionStatisticStorage 
   public JdbcPartitionStatisticStorage(DataSource dataSource) {
     this.dataSource = dataSource;
     this.entityStore = GravitinoEnv.getInstance().entityStore();
+    this.databaseType = detectDatabaseType();
+  }
+
+  /**
+   * Detects the database type from the JDBC connection.
+   *
+   * @return the detected database type
+   */
+  private DatabaseType detectDatabaseType() {
+    try (Connection conn = dataSource.getConnection()) {
+      String productName = conn.getMetaData().getDatabaseProductName().toLowerCase();
+      LOG.info("Detected database product: {}", productName);
+
+      if (productName.contains("mysql")) {
+        return DatabaseType.MYSQL;
+      } else if (productName.contains("postgresql")) {
+        return DatabaseType.POSTGRESQL;
+      } else if (productName.contains("h2")) {
+        return DatabaseType.H2;
+      } else {
+        LOG.warn("Unknown database type: {}, defaulting to MySQL syntax", productName);
+        return DatabaseType.MYSQL;
+      }
+    } catch (SQLException e) {
+      LOG.error("Failed to detect database type, defaulting to MySQL", e);
+      return DatabaseType.MYSQL;
+    }
+  }
+
+  /**
+   * Gets the appropriate INSERT/UPDATE SQL for the current database type.
+   *
+   * @return the SQL statement
+   */
+  private String getInsertOrUpdateSql() {
+    if (databaseType == DatabaseType.POSTGRESQL) {
+      return INSERT_OR_UPDATE_SQL_POSTGRESQL;
+    } else {
+      // MySQL and H2 use the same syntax
+      return INSERT_OR_UPDATE_SQL_MYSQL;
+    }
   }
 
   @Override
@@ -236,7 +295,8 @@ public class JdbcPartitionStatisticStorage implements PartitionStatisticStorage 
     try (Connection conn = dataSource.getConnection()) {
       conn.setAutoCommit(false);
 
-      try (PreparedStatement stmt = conn.prepareStatement(INSERT_OR_UPDATE_SQL)) {
+      String sql = getInsertOrUpdateSql();
+      try (PreparedStatement stmt = conn.prepareStatement(sql)) {
         for (MetadataObjectStatisticsUpdate objectUpdate : statisticsToUpdate) {
           Long tableId = resolveTableId(metalake, objectUpdate.metadataObject());
 
