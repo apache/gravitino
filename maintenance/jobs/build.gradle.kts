@@ -35,7 +35,7 @@ val icebergVersion: String = libs.versions.iceberg4connector.get()
 val sparkMajorVersion = "3.5"
 
 dependencies {
-  compileOnly(project(":api"))
+  implementation(project(":api"))
 
   compileOnly(libs.slf4j.api)
   compileOnly(libs.jackson.databind)
@@ -78,10 +78,15 @@ tasks.test {
 
 tasks.withType(ShadowJar::class.java) {
   isZip64 = true
+  configurations = listOf(project.configurations.runtimeClasspath.get())
   archiveClassifier.set("")
   mergeServiceFiles()
 
   dependencies {
+    relocate("com.google", "org.apache.gravitino.shaded.com.google")
+    relocate("org.apache.commons", "org.apache.gravitino.shaded.org.apache.commons")
+    relocate("com.fasterxml", "org.apache.gravitino.shaded.com.fasterxml")
+
     exclude(dependency("org.apache.spark:.*"))
     exclude(dependency("org.apache.iceberg:.*"))
     exclude(dependency("org.slf4j:slf4j-api"))
