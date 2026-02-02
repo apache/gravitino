@@ -23,7 +23,6 @@ import static org.apache.gravitino.lance.common.utils.LanceConstants.LANCE_TABLE
 
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableMap;
-import com.google.common.collect.Lists;
 import com.lancedb.lance.Dataset;
 import com.lancedb.lance.WriteParams;
 import com.lancedb.lance.index.DistanceType;
@@ -32,6 +31,7 @@ import com.lancedb.lance.index.IndexType;
 import com.lancedb.lance.index.vector.VectorIndexParams;
 import com.lancedb.lance.schema.ColumnAlteration;
 import java.util.Arrays;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -58,7 +58,6 @@ import org.apache.gravitino.rel.expressions.distributions.Distribution;
 import org.apache.gravitino.rel.expressions.sorts.SortOrder;
 import org.apache.gravitino.rel.expressions.transforms.Transform;
 import org.apache.gravitino.rel.indexes.Index;
-import org.apache.gravitino.rel.indexes.Indexes;
 import org.apache.gravitino.storage.IdGenerator;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -171,9 +170,12 @@ public class LanceTableOperations extends ManagedTableOperations {
     // Gravitino. If there's any failure during this process, the code will throw an exception
     // and the update won't be applied in Gravitino.
     GenericTable table = (GenericTable) super.alterTable(ident, changes);
-    Map<String, String> updatedProperties = new java.util.HashMap<>(table.properties());
-    updatedProperties.put(LanceConstants.LANCE_TABLE_VERSION, String.valueOf(version));
-
+    Map<String, String> updatedProperties =
+        new HashMap<>(table.properties()) {
+          {
+            put(LanceConstants.LANCE_TABLE_VERSION, String.valueOf(version));
+          }
+        };
     return GenericTable.builder()
         .withName(table.name())
         .withColumns(table.columns())
@@ -331,69 +333,47 @@ public class LanceTableOperations extends ManagedTableOperations {
     return new org.apache.arrow.vector.types.pojo.Schema(fields);
   }
 
-  // Note: this method can't guarantee the atomicity of the operations on Lance dataset. For
-  // example, only a subset of changes may be applied if an exception occurs during the process.
   /**
    * Handle the table changes on the underlying Lance dataset.
+   *
+   * <p>Note: this method can't guarantee the atomicity of the operations on Lance dataset. For
+   * example, only a subset of changes may be applied if an exception occurs during the process.
    *
    * @param table the table to be altered
    * @param changes the changes to be applied
    * @return the new version id of the Lance dataset after applying the changes
    */
-  private long handleLanceTableChange(Table table, TableChange[] changes) {
-    List<String> dropColumns = Lists.newArrayList();
-    List<Index> indexToAdd = Lists.newArrayList();
-    List<ColumnAlteration> renameColumns = Lists.newArrayList();
-
-    for (TableChange change : changes) {
-      if (change instanceof TableChange.DeleteColumn deleteColumn) {
-        dropColumns.add(String.join(".", deleteColumn.fieldName()));
-      } else if (change instanceof TableChange.AddIndex addIndex) {
-        indexToAdd.add(
-            Indexes.IndexImpl.builder()
-                .withIndexType(addIndex.getType())
-                .withName(addIndex.getName())
-                .withFieldNames(addIndex.getFieldNames())
-                .build());
-      } else if (change instanceof TableChange.RenameColumn renameColumn) {
-        // Currently, only renaming columns is supported.
-        // TODO: Support change column type once we have a clear knowledge about the means of
-        // castTo in Lance.
-        ColumnAlteration lanceColumnAlter =
-            new ColumnAlteration.Builder(String.join(".", renameColumn.fieldName()))
-                .rename(renameColumn.getNewName())
-                .build();
-        renameColumns.add(lanceColumnAlter);
-      } else {
-        throw new UnsupportedOperationException(
-            "Unsupported changes to lance table: " + change.getClass().getSimpleName());
-      }
-    }
-
+  long handleLanceTableChange(Table table, TableChange[] changes) {
     String location = table.properties().get(Table.PROPERTY_LOCATION);
-    try (Dataset dataset = Dataset.open(location, new RootAllocator())) {
-      for (Index index : indexToAdd) {
-        IndexType indexType = IndexType.valueOf(index.type().name());
-        IndexParams indexParams = getIndexParamsByIndexType(indexType);
-
-        dataset.createIndex(
-            Arrays.stream(index.fieldNames())
-                .map(field -> String.join(".", field))
-                .collect(Collectors.toList()),
-            indexType,
-            Optional.of(index.name()),
-            indexParams,
-            true);
+    try (Dataset dataset = openDataset(location)) {
+      for (TableChange change : changes) {
+        if (change instanceof TableChange.DeleteColumn deleteColumn) {
+          dataset.dropColumns(List.of(String.join(".", deleteColumn.fieldName())));
+        } else if (change instanceof TableChange.AddIndex addIndex) {
+          IndexType indexType = IndexType.valueOf(addIndex.getType().name());
+          IndexParams indexParams = getIndexParamsByIndexType(indexType);
+          dataset.createIndex(
+              Arrays.stream(addIndex.getFieldNames())
+                  .map(field -> String.join(".", field))
+                  .collect(Collectors.toList()),
+              indexType,
+              Optional.of(addIndex.getName()),
+              indexParams,
+              true);
+        } else if (change instanceof TableChange.RenameColumn renameColumn) {
+          ColumnAlteration lanceColumnAlter =
+              new ColumnAlteration.Builder(String.join(".", renameColumn.fieldName()))
+                  .rename(renameColumn.getNewName())
+                  .build();
+          dataset.alterColumns(List.of(lanceColumnAlter));
+        } else {
+          // Currently, only column drop/rename and index addition are supported.
+          // TODO: Support change column type once we have a clear knowledge about the means of
+          // castTo in Lance.
+          throw new UnsupportedOperationException(
+              "Unsupported changes to lance table: " + change.getClass().getSimpleName());
+        }
       }
-
-      if (!dropColumns.isEmpty()) {
-        dataset.dropColumns(dropColumns);
-      }
-
-      if (!renameColumns.isEmpty()) {
-        dataset.alterColumns(renameColumns);
-      }
-
       return dataset.getVersion().getId();
     } catch (RuntimeException e) {
       throw e;
@@ -401,6 +381,10 @@ public class LanceTableOperations extends ManagedTableOperations {
       throw new RuntimeException(
           "Failed to handle alterations to Lance dataset at location " + location, e);
     }
+  }
+
+  Dataset openDataset(String location) {
+    return Dataset.open(location, new RootAllocator());
   }
 
   private IndexParams getIndexParamsByIndexType(IndexType indexType) {

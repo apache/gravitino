@@ -31,6 +31,7 @@ import com.lancedb.lance.namespace.model.AlterTableAlterColumnsRequest;
 import com.lancedb.lance.namespace.model.AlterTableAlterColumnsResponse;
 import com.lancedb.lance.namespace.model.AlterTableDropColumnsRequest;
 import com.lancedb.lance.namespace.model.AlterTableDropColumnsResponse;
+import com.lancedb.lance.namespace.model.ColumnAlteration;
 import com.lancedb.lance.namespace.model.CreateEmptyTableRequest;
 import com.lancedb.lance.namespace.model.CreateEmptyTableResponse;
 import com.lancedb.lance.namespace.model.CreateTableRequest;
@@ -60,6 +61,7 @@ import javax.ws.rs.core.HttpHeaders;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.MultivaluedMap;
 import javax.ws.rs.core.Response;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.lance.common.ops.NamespaceWrapper;
 import org.apache.gravitino.lance.common.utils.LanceConstants;
 import org.apache.gravitino.lance.common.utils.SerializationUtils;
@@ -329,5 +331,11 @@ public class LanceTableOperations {
   private void validateAlterColumnsRequest(AlterTableAlterColumnsRequest request) {
     Preconditions.checkArgument(
         !request.getAlterations().isEmpty(), "Columns to alter cannot be empty.");
+
+    for (ColumnAlteration alteration : request.getAlterations()) {
+      Preconditions.checkArgument(
+          StringUtils.isBlank(alteration.getCastTo()),
+          "Only RENAME alteration is supported currently.");
+    }
   }
 }
