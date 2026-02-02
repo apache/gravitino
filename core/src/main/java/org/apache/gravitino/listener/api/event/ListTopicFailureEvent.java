@@ -40,8 +40,8 @@ public final class ListTopicFailureEvent extends TopicFailureEvent {
    * @param exception The exception encountered during the attempt to list topics.
    */
   public ListTopicFailureEvent(String user, Namespace namespace, Exception exception) {
+  Preconditions.checkArgument(namespace != null, "namespace must not be null");
     super(user, NameIdentifier.of(namespace.levels()), exception);
-    Preconditions.checkNotNull(namespace, "namespace must not be null");
     this.namespace = namespace;
   }
 
