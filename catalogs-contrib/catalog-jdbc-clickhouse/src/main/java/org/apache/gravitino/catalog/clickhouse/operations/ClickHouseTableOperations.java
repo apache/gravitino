@@ -144,8 +144,6 @@ public class ClickHouseTableOperations extends JdbcTableOperations {
 
     // Extract engine from properties
     ClickHouseTablePropertiesMetadata.ENGINE engine = appendTableEngine(properties, sqlBuilder);
-    // Omit partition by clause as it will be supported in the next PR
-    // TODO: Add partition by clause support
 
     appendOrderBy(sortOrders, sqlBuilder, engine);
 
@@ -185,9 +183,8 @@ public class ClickHouseTableOperations extends JdbcTableOperations {
       SortOrder[] sortOrders,
       StringBuilder sqlBuilder,
       ClickHouseTablePropertiesMetadata.ENGINE engine) {
-    // ClickHouse requires ORDER BY clause for some engines and currently only mergeTree family
-    // requires
-    // ORDER BY clause.
+    // ClickHouse requires ORDER BY clause for some engines, and currently only mergeTree family
+    // requires ORDER BY clause.
     boolean requireOrderBy = engine.isRequireOrderBy();
     if (!requireOrderBy) {
       if (ArrayUtils.isNotEmpty(sortOrders)) {
