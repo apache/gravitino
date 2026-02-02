@@ -36,11 +36,12 @@ import org.apache.gravitino.rel.TableChange;
 import org.apache.gravitino.rel.expressions.distributions.Distribution;
 import org.apache.gravitino.rel.expressions.distributions.Distributions;
 import org.apache.gravitino.rel.expressions.sorts.SortOrder;
+import org.apache.gravitino.rel.expressions.sorts.SortOrders;
 import org.apache.gravitino.rel.expressions.transforms.Transform;
+import org.apache.gravitino.rel.expressions.transforms.Transforms;
 import org.apache.gravitino.rel.indexes.Index;
+import org.apache.gravitino.rel.indexes.Indexes;
 import org.apache.gravitino.storage.IdGenerator;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 /**
  * Table operations for Delta Lake tables in Gravitino lakehouse catalog.
@@ -72,11 +73,11 @@ import org.slf4j.LoggerFactory;
  *   <li>Only supports external tables ({@code external=true} must be explicitly set)
  *   <li>Schema comes from CREATE TABLE request (not validated against Delta log)
  *   <li>User is responsible for ensuring schema accuracy matches the actual Delta table
- *   <li>Partitions, distribution, sort orders, and indexes are ignored with warnings (not errors)
+ *   <li>Partitions, distribution, sort orders, and indexes must not be specified (throws
+ *       IllegalArgumentException)
  * </ul>
  */
 public class DeltaTableOperations extends ManagedTableOperations {
-  private static final Logger LOG = LoggerFactory.getLogger(DeltaTableOperations.class);
 
   private final EntityStore store;
   private final ManagedSchemaOperations schemaOps;
@@ -118,10 +119,10 @@ public class DeltaTableOperations extends ManagedTableOperations {
    *   <li>{@code location} - Storage path of the existing Delta table
    * </ul>
    *
-   * <p><b>Ignored Parameters (with warnings):</b>
+   * <p><b>Disallowed Parameters:</b>
    *
    * <ul>
-   *   <li>Partitions - Delta table partitioning is managed in the Delta log
+   *   <li>Partitions - Delta table partitioning is managed in the Delta log, not Gravitino
    *   <li>Distribution - Not applicable for external Delta tables
    *   <li>Sort orders - Not applicable for external Delta tables
    *   <li>Indexes - Not applicable for external Delta tables
@@ -132,14 +133,15 @@ public class DeltaTableOperations extends ManagedTableOperations {
    * @param comment the table comment
    * @param properties the table properties (must include {@code external=true} and {@code
    *     location})
-   * @param partitions the partitioning (ignored with warning)
-   * @param distribution the distribution (ignored with warning)
-   * @param sortOrders the sort orders (ignored with warning)
-   * @param indexes the indexes (ignored with warning)
+   * @param partitions the partitioning (must be empty or null)
+   * @param distribution the distribution (must be NONE or null)
+   * @param sortOrders the sort orders (must be empty or null)
+   * @param indexes the indexes (must be empty or null)
    * @return the created table metadata
    * @throws NoSuchSchemaException if the schema does not exist
    * @throws TableAlreadyExistsException if the table already exists
-   * @throws IllegalArgumentException if {@code external=true} is not set or location is missing
+   * @throws IllegalArgumentException if {@code external=true} is not set, location is missing, or
+   *     any partitions, distribution, sort orders, or indexes are specified
    */
   @Override
   public Table createTable(
@@ -169,34 +171,37 @@ public class DeltaTableOperations extends ManagedTableOperations {
             + " Delta table location.",
         Table.PROPERTY_LOCATION);
 
-    // Warn about ignored parameters (don't fail - be permissive)
-    if (partitions != null && partitions.length != 0) {
-      LOG.warn(
-          "Delta table doesn't support specifying partitioning in CREATE TABLE, will ignore"
-              + " this field.");
-    }
+    // Validate that partitioning, distribution, sort orders, and indexes are not specified
+    Preconditions.checkArgument(
+        partitions == null || partitions.length == 0,
+        "Delta table doesn't support specifying partitioning in CREATE TABLE. "
+            + "Partitioning is managed in the Delta transaction log.");
 
-    if (distribution != null && !distribution.equals(Distributions.NONE)) {
-      LOG.warn(
-          "Delta table doesn't support specifying distribution in CREATE TABLE, will ignore"
-              + " this field.");
-    }
+    Preconditions.checkArgument(
+        distribution == null || distribution.equals(Distributions.NONE),
+        "Delta table doesn't support specifying distribution in CREATE TABLE. "
+            + "Distribution is not applicable for external Delta tables.");
 
-    if (sortOrders != null && sortOrders.length != 0) {
-      LOG.warn(
-          "Delta table doesn't support specifying sort orders in CREATE TABLE, will ignore"
-              + " this field.");
-    }
+    Preconditions.checkArgument(
+        sortOrders == null || sortOrders.length == 0,
+        "Delta table doesn't support specifying sort orders in CREATE TABLE. "
+            + "Sort orders are not applicable for external Delta tables.");
 
-    if (indexes != null && indexes.length != 0) {
-      LOG.warn(
-          "Delta table doesn't support specifying indexes in CREATE TABLE, will ignore"
-              + " this field.");
-    }
+    Preconditions.checkArgument(
+        indexes == null || indexes.length == 0,
+        "Delta table doesn't support specifying indexes in CREATE TABLE. "
+            + "Indexes are not applicable for external Delta tables.");
 
     // Store metadata in entity store (schema from user request)
     return super.createTable(
-        ident, columns, comment, copiedProperties, partitions, distribution, sortOrders, indexes);
+        ident,
+        columns,
+        comment,
+        copiedProperties,
+        Transforms.EMPTY_TRANSFORM,
+        Distributions.NONE,
+        SortOrders.NONE,
+        Indexes.EMPTY_INDEXES);
   }
 
   /**
@@ -225,7 +230,7 @@ public class DeltaTableOperations extends ManagedTableOperations {
    * Purges a Delta table (removes both metadata and data).
    *
    * <p>This operation is not supported for external Delta tables. External table data is managed
-   * outside of Gravitino, so purging is not applicable. Use {@link #dropTable(NameIdentifier)} to
+   * outside Gravitino, so purging is not applicable. Use {@link #dropTable(NameIdentifier)} to
    * remove only the metadata, leaving the Delta table data intact.
    *
    * @param ident the table identifier

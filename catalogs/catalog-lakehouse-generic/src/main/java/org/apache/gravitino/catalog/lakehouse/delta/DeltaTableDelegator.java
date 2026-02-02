@@ -27,6 +27,7 @@ import org.apache.gravitino.catalog.ManagedSchemaOperations;
 import org.apache.gravitino.catalog.ManagedTableOperations;
 import org.apache.gravitino.catalog.lakehouse.generic.LakehouseTableDelegator;
 import org.apache.gravitino.connector.PropertyEntry;
+import org.apache.gravitino.rel.Table;
 import org.apache.gravitino.storage.IdGenerator;
 
 /**

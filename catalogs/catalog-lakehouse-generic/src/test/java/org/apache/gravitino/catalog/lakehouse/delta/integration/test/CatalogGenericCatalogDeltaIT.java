@@ -383,7 +383,7 @@ public class CatalogGenericCatalogDeltaIT extends BaseIT {
   }
 
   @Test
-  public void testCreateDeltaTableWithIgnoredParameters() {
+  public void testCreateDeltaTableWithPartitionsThrowsException() {
     Column[] columns = createColumns();
     NameIdentifier nameIdentifier = NameIdentifier.of(schemaName, tableName);
 
@@ -394,23 +394,120 @@ public class CatalogGenericCatalogDeltaIT extends BaseIT {
     properties.put(Table.PROPERTY_EXTERNAL, "true");
 
     Transform[] partitions = new Transform[] {Transforms.identity("created_at")};
+
+    IllegalArgumentException exception =
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () ->
+                catalog
+                    .asTableCatalog()
+                    .createTable(
+                        nameIdentifier,
+                        columns,
+                        TABLE_COMMENT,
+                        properties,
+                        partitions,
+                        null,
+                        null,
+                        null));
+
+    Assertions.assertTrue(exception.getMessage().contains("partitioning"));
+    Assertions.assertTrue(exception.getMessage().contains("doesn't support"));
+  }
+
+  @Test
+  public void testCreateDeltaTableWithDistributionThrowsException() {
+    Column[] columns = createColumns();
+    NameIdentifier nameIdentifier = NameIdentifier.of(schemaName, tableName);
+
+    Map<String, String> properties = createTableProperties();
+    String tableLocation = tempDirectory + "/" + tableName;
+    properties.put(Table.PROPERTY_TABLE_FORMAT, DeltaConstants.DELTA_TABLE_FORMAT);
+    properties.put(Table.PROPERTY_LOCATION, tableLocation);
+    properties.put(Table.PROPERTY_EXTERNAL, "true");
+
+    IllegalArgumentException exception =
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () ->
+                catalog
+                    .asTableCatalog()
+                    .createTable(
+                        nameIdentifier,
+                        columns,
+                        TABLE_COMMENT,
+                        properties,
+                        null,
+                        Distributions.hash(5, NamedReference.field(COL_NAME1)),
+                        null,
+                        null));
+
+    Assertions.assertTrue(exception.getMessage().contains("distribution"));
+    Assertions.assertTrue(exception.getMessage().contains("doesn't support"));
+  }
+
+  @Test
+  public void testCreateDeltaTableWithSortOrdersThrowsException() {
+    Column[] columns = createColumns();
+    NameIdentifier nameIdentifier = NameIdentifier.of(schemaName, tableName);
+
+    Map<String, String> properties = createTableProperties();
+    String tableLocation = tempDirectory + "/" + tableName;
+    properties.put(Table.PROPERTY_TABLE_FORMAT, DeltaConstants.DELTA_TABLE_FORMAT);
+    properties.put(Table.PROPERTY_LOCATION, tableLocation);
+    properties.put(Table.PROPERTY_EXTERNAL, "true");
+
+    IllegalArgumentException exception =
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () ->
+                catalog
+                    .asTableCatalog()
+                    .createTable(
+                        nameIdentifier,
+                        columns,
+                        TABLE_COMMENT,
+                        properties,
+                        null,
+                        null,
+                        new SortOrder[] {SortOrders.ascending(NamedReference.field(COL_NAME1))},
+                        null));
+
+    Assertions.assertTrue(exception.getMessage().contains("sort orders"));
+    Assertions.assertTrue(exception.getMessage().contains("doesn't support"));
+  }
+
+  @Test
+  public void testCreateDeltaTableWithIndexesThrowsException() {
+    Column[] columns = createColumns();
+    NameIdentifier nameIdentifier = NameIdentifier.of(schemaName, tableName);
+
+    Map<String, String> properties = createTableProperties();
+    String tableLocation = tempDirectory + "/" + tableName;
+    properties.put(Table.PROPERTY_TABLE_FORMAT, DeltaConstants.DELTA_TABLE_FORMAT);
+    properties.put(Table.PROPERTY_LOCATION, tableLocation);
+    properties.put(Table.PROPERTY_EXTERNAL, "true");
+
     Index[] indexes = new Index[] {Indexes.primary("pk_id", new String[][] {{COL_NAME1}})};
 
-    Table createdTable =
-        catalog
-            .asTableCatalog()
-            .createTable(
-                nameIdentifier,
-                columns,
-                TABLE_COMMENT,
-                properties,
-                partitions,
-                Distributions.hash(5, NamedReference.field(COL_NAME1)),
-                new SortOrder[] {SortOrders.ascending(NamedReference.field(COL_NAME1))},
-                indexes);
+    IllegalArgumentException exception =
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () ->
+                catalog
+                    .asTableCatalog()
+                    .createTable(
+                        nameIdentifier,
+                        columns,
+                        TABLE_COMMENT,
+                        properties,
+                        null,
+                        null,
+                        null,
+                        indexes));
 
-    Assertions.assertNotNull(createdTable);
-    Assertions.assertEquals(tableName, createdTable.name());
+    Assertions.assertTrue(exception.getMessage().contains("indexes"));
+    Assertions.assertTrue(exception.getMessage().contains("doesn't support"));
   }
 
   protected Map<String, String> createSchemaProperties() {

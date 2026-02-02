@@ -29,7 +29,15 @@ import org.apache.gravitino.catalog.ManagedSchemaOperations;
 import org.apache.gravitino.rel.Column;
 import org.apache.gravitino.rel.Table;
 import org.apache.gravitino.rel.TableChange;
+import org.apache.gravitino.rel.expressions.NamedReference;
+import org.apache.gravitino.rel.expressions.distributions.Distribution;
+import org.apache.gravitino.rel.expressions.distributions.Distributions;
+import org.apache.gravitino.rel.expressions.sorts.SortOrder;
+import org.apache.gravitino.rel.expressions.sorts.SortOrders;
 import org.apache.gravitino.rel.expressions.transforms.Transform;
+import org.apache.gravitino.rel.expressions.transforms.Transforms;
+import org.apache.gravitino.rel.indexes.Index;
+import org.apache.gravitino.rel.indexes.Indexes;
 import org.apache.gravitino.rel.types.Types;
 import org.apache.gravitino.storage.IdGenerator;
 import org.junit.jupiter.api.Assertions;
@@ -114,6 +122,102 @@ public class TestDeltaTableOperations {
         () ->
             deltaTableOps.createTable(
                 ident, columns, null, null, new Transform[0], null, null, null));
+  }
+
+  @Test
+  public void testCreateTableWithPartitionsThrowsException() {
+    NameIdentifier ident = NameIdentifier.of("catalog", "schema", "table");
+    Column[] columns = new Column[] {Column.of("id", Types.IntegerType.get(), "id column")};
+    String location = tempDir.resolve("delta_table").toString();
+
+    Map<String, String> properties = Maps.newHashMap();
+    properties.put(Table.PROPERTY_EXTERNAL, "true");
+    properties.put(Table.PROPERTY_LOCATION, location);
+
+    Transform[] partitions = new Transform[] {Transforms.identity("id")};
+
+    IllegalArgumentException exception =
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () ->
+                deltaTableOps.createTable(
+                    ident, columns, null, properties, partitions, null, null, null));
+
+    Assertions.assertTrue(exception.getMessage().contains("partitioning"));
+    Assertions.assertTrue(exception.getMessage().contains("doesn't support"));
+    Assertions.assertTrue(exception.getMessage().contains("Delta transaction log"));
+  }
+
+  @Test
+  public void testCreateTableWithDistributionThrowsException() {
+    NameIdentifier ident = NameIdentifier.of("catalog", "schema", "table");
+    Column[] columns = new Column[] {Column.of("id", Types.IntegerType.get(), "id column")};
+    String location = tempDir.resolve("delta_table").toString();
+
+    Map<String, String> properties = Maps.newHashMap();
+    properties.put(Table.PROPERTY_EXTERNAL, "true");
+    properties.put(Table.PROPERTY_LOCATION, location);
+
+    Distribution distribution = Distributions.hash(1, Transforms.identity("id"));
+
+    IllegalArgumentException exception =
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () ->
+                deltaTableOps.createTable(
+                    ident, columns, null, properties, null, distribution, null, null));
+
+    Assertions.assertTrue(exception.getMessage().contains("distribution"));
+    Assertions.assertTrue(exception.getMessage().contains("doesn't support"));
+    Assertions.assertTrue(exception.getMessage().contains("not applicable"));
+  }
+
+  @Test
+  public void testCreateTableWithSortOrdersThrowsException() {
+    NameIdentifier ident = NameIdentifier.of("catalog", "schema", "table");
+    Column[] columns = new Column[] {Column.of("id", Types.IntegerType.get(), "id column")};
+    String location = tempDir.resolve("delta_table").toString();
+
+    Map<String, String> properties = Maps.newHashMap();
+    properties.put(Table.PROPERTY_EXTERNAL, "true");
+    properties.put(Table.PROPERTY_LOCATION, location);
+
+    SortOrder[] sortOrders = new SortOrder[] {SortOrders.ascending(NamedReference.field("id"))};
+
+    IllegalArgumentException exception =
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () ->
+                deltaTableOps.createTable(
+                    ident, columns, null, properties, null, null, sortOrders, null));
+
+    Assertions.assertTrue(exception.getMessage().contains("sort orders"));
+    Assertions.assertTrue(exception.getMessage().contains("doesn't support"));
+    Assertions.assertTrue(exception.getMessage().contains("not applicable"));
+  }
+
+  @Test
+  public void testCreateTableWithIndexesThrowsException() {
+    NameIdentifier ident = NameIdentifier.of("catalog", "schema", "table");
+    Column[] columns = new Column[] {Column.of("id", Types.IntegerType.get(), "id column")};
+    String location = tempDir.resolve("delta_table").toString();
+
+    Map<String, String> properties = Maps.newHashMap();
+    properties.put(Table.PROPERTY_EXTERNAL, "true");
+    properties.put(Table.PROPERTY_LOCATION, location);
+
+    Index[] indexes = new Index[] {Indexes.primary("pk", new String[][] {{"id"}})};
+
+    IllegalArgumentException exception =
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () ->
+                deltaTableOps.createTable(
+                    ident, columns, null, properties, null, null, null, indexes));
+
+    Assertions.assertTrue(exception.getMessage().contains("indexes"));
+    Assertions.assertTrue(exception.getMessage().contains("doesn't support"));
+    Assertions.assertTrue(exception.getMessage().contains("not applicable"));
   }
 
   @Test
