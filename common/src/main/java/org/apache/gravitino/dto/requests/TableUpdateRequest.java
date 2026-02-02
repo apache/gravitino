@@ -623,9 +623,6 @@ public interface TableUpdateRequest extends RESTRequest {
               && fieldName.length > 0
               && Arrays.stream(fieldName).allMatch(StringUtils::isNotBlank),
           "\"fieldName\" field is required and cannot be empty");
-      Preconditions.checkArgument(
-          StringUtils.isNotBlank(newComment),
-          "\"newComment\" field is required and cannot be empty");
     }
 
     /**
