@@ -65,8 +65,8 @@ public class TestClickHouseTypeConverter {
     checkJdbcTypeToGravitinoType(Types.FloatType.get(), FLOAT32, null, null);
     checkJdbcTypeToGravitinoType(Types.DoubleType.get(), FLOAT64, null, null);
     checkJdbcTypeToGravitinoType(Types.DateType.get(), DATE, null, null);
-    checkJdbcTypeToGravitinoType(Types.DateType.get(), DATE32, null, null);
-    checkJdbcTypeToGravitinoType(Types.TimestampType.withoutTimeZone(), DATETIME, null, null);
+    checkJdbcTypeToGravitinoType(Types.ExternalType.of("Date32"), DATE32, null, null);
+    checkJdbcTypeToGravitinoType(Types.TimestampType.withoutTimeZone(0), DATETIME, null, null);
     checkJdbcTypeToGravitinoType(Types.DecimalType.of(10, 2), DECIMAL, 10, 2);
     checkJdbcTypeToGravitinoType(Types.StringType.get(), STRING, 20, null);
     checkJdbcTypeToGravitinoType(Types.FixedCharType.of(20), FIXEDSTRING, 20, null);
@@ -78,7 +78,7 @@ public class TestClickHouseTypeConverter {
     JdbcTypeConverter.JdbcTypeBean dateTime64 = createTypeBean(DATETIME64, null, null);
     dateTime64.setDatetimePrecision(3);
     Assertions.assertEquals(
-        Types.TimestampType.withoutTimeZone(3), CLICKHOUSE_TYPE_CONVERTER.toGravitino(dateTime64));
+        Types.ExternalType.of("DateTime64"), CLICKHOUSE_TYPE_CONVERTER.toGravitino(dateTime64));
 
     JdbcTypeConverter.JdbcTypeBean nullableDecimal =
         createTypeBean("Nullable(" + DECIMAL + ")", 12, 2);
@@ -86,6 +86,24 @@ public class TestClickHouseTypeConverter {
     nullableDecimal.setScale(2);
     Assertions.assertEquals(
         Types.DecimalType.of(12, 2), CLICKHOUSE_TYPE_CONVERTER.toGravitino(nullableDecimal));
+
+    JdbcTypeConverter.JdbcTypeBean date32 = createTypeBean(DATE32, null, null);
+    Assertions.assertEquals(
+        Types.ExternalType.of(DATE32), CLICKHOUSE_TYPE_CONVERTER.toGravitino(date32));
+
+    JdbcTypeConverter.JdbcTypeBean ipv4 = createTypeBean("IPv4", null, null);
+    Assertions.assertEquals(
+        Types.ExternalType.of("IPv4"), CLICKHOUSE_TYPE_CONVERTER.toGravitino(ipv4));
+
+    JdbcTypeConverter.JdbcTypeBean decimalTooLarge = createTypeBean("Decimal", 77, 2);
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () -> CLICKHOUSE_TYPE_CONVERTER.toGravitino(decimalTooLarge));
+
+    JdbcTypeConverter.JdbcTypeBean decimalScaleTooHigh = createTypeBean("Decimal", 10, 20);
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () -> CLICKHOUSE_TYPE_CONVERTER.toGravitino(decimalScaleTooHigh));
   }
 
   @Test
@@ -101,7 +119,7 @@ public class TestClickHouseTypeConverter {
     checkGravitinoTypeToJdbcType(FLOAT32, Types.FloatType.get());
     checkGravitinoTypeToJdbcType(FLOAT64, Types.DoubleType.get());
     checkGravitinoTypeToJdbcType(DATE, Types.DateType.get());
-    checkGravitinoTypeToJdbcType(DATETIME, Types.TimestampType.withoutTimeZone());
+    checkGravitinoTypeToJdbcType(DATETIME, Types.TimestampType.withoutTimeZone(0));
     checkGravitinoTypeToJdbcType(DECIMAL + "(10,2)", Types.DecimalType.of(10, 2));
     checkGravitinoTypeToJdbcType(STRING, Types.VarCharType.of(20));
     checkGravitinoTypeToJdbcType(FIXEDSTRING + "(20)", Types.FixedCharType.of(20));
@@ -109,7 +127,7 @@ public class TestClickHouseTypeConverter {
     checkGravitinoTypeToJdbcType(BOOL, Types.BooleanType.get());
     checkGravitinoTypeToJdbcType(UUID, Types.UUIDType.get());
     checkGravitinoTypeToJdbcType(USER_DEFINED_TYPE, Types.ExternalType.of(USER_DEFINED_TYPE));
-    checkGravitinoTypeToJdbcType("DateTime64(4)", Types.TimestampType.withoutTimeZone(4));
+    checkGravitinoTypeToJdbcType("DateTime", Types.TimestampType.withoutTimeZone(0));
     checkGravitinoTypeToJdbcType(TIME, Types.TimeType.get());
     Assertions.assertThrows(
         IllegalArgumentException.class,

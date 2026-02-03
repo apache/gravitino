@@ -244,7 +244,12 @@ public class ClickHouseTableOperations extends JdbcTableOperations {
     }
   }
 
-  // ClickHouse only supports primary key now and some secondary index will be supported in future
+  /**
+   * ClickHouse only supports primary key now, and some secondary index will be supported in future
+   *
+   * <p>This method will not check the validity of the indexes. For clickhouse, the primary key must
+   * be a subset of the order by columns. We will leave the underlying clickhouse to validate it.
+   */
   private void appendIndexesSql(Index[] indexes, StringBuilder sqlBuilder) {
     if (ArrayUtils.isEmpty(indexes)) {
       return;
@@ -261,7 +266,8 @@ public class ClickHouseTableOperations extends JdbcTableOperations {
                 "Primary key name must be PRIMARY in ClickHouse, the name {} will be ignored.",
                 index.name());
           }
-          sqlBuilder.append(" PRIMARY KEY (").append(quoteIdentifier(fieldStr)).append(")");
+          // fieldStr already quoted in getIndexFieldStr
+          sqlBuilder.append(" PRIMARY KEY (").append(fieldStr).append(")");
           break;
         default:
           throw new IllegalArgumentException(

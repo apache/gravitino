@@ -25,11 +25,13 @@ import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.SQLException;
 import java.sql.Statement;
+import java.time.Duration;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.integration.test.util.TestDatabaseName;
+import org.awaitility.Awaitility;
 import org.rnorth.ducttape.Preconditions;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -73,36 +75,28 @@ public class ClickHouseContainer extends BaseContainer {
 
   @Override
   protected boolean checkContainerStatus(int retryLimit) {
-    for (int attempt = 1; attempt <= retryLimit; attempt++) {
-      try (Connection connection =
-              DriverManager.getConnection(getJdbcUrl(), USER_NAME, getPassword());
-          Statement statement = connection.createStatement()) {
-        // Simple health check query; ClickHouse should respond if it is ready.
-        statement.execute("SELECT 1");
-        LOG.info("clickHouse container is healthy after {} attempt(s)", attempt);
-        return true;
-      } catch (SQLException e) {
-        LOG.warn(
-            "Failed to connect to clickHouse container on attempt {}/{}: {}",
-            attempt,
-            retryLimit,
-            e.getMessage(),
-            e);
-        if (attempt < retryLimit) {
-          try {
-            Thread.sleep(1000L);
-          } catch (InterruptedException interruptedException) {
-            Thread.currentThread().interrupt();
-            LOG.error(
-                "Interrupted while waiting to retry clickHouse container health check",
-                interruptedException);
-            break;
-          }
-        }
-      }
-    }
-    LOG.error("clickHouse container failed health checks after {} attempt(s)", retryLimit);
-    return false;
+    Awaitility.await()
+        .atMost(java.time.Duration.ofMinutes(2))
+        .pollInterval(Duration.ofSeconds(5))
+        .until(
+            () -> {
+              try (Connection connection =
+                      DriverManager.getConnection(getJdbcUrl(), USER_NAME, getPassword());
+                  Statement statement = connection.createStatement()) {
+                // Simple health check query; ClickHouse should respond if it is ready.
+                statement.execute("SELECT 1");
+                LOG.info("clickHouse container is healthy");
+                return true;
+              } catch (SQLException e) {
+                LOG.warn(
+                    "Failed to connect to clickHouse container during Awaitility health check: {}",
+                    e.getMessage(),
+                    e);
+                return false;
+              }
+            });
+
+    return true;
   }
 
   public void createDatabase(TestDatabaseName testDatabaseName) {
