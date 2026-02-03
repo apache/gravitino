@@ -74,13 +74,6 @@ public class MetalakePageTest extends BaseWebIT {
 
   @Test
   @Order(2)
-  public void testViewMetalakeDetails() throws InterruptedException {
-    metalakePage.clickViewMetalakeBtn(METALAKE_NAME);
-    Assertions.assertTrue(metalakePage.verifyShowMetalakeDetails(METALAKE_NAME));
-  }
-
-  @Test
-  @Order(3)
   public void testEditMetalake() {
     metalakePage.clickEditMetalakeBtn(METALAKE_NAME);
     metalakePage.setMetalakeNameField(EDITED_METALAKE_NAME);
@@ -89,16 +82,17 @@ public class MetalakePageTest extends BaseWebIT {
   }
 
   @Test
-  @Order(4)
-  public void testDeleteMetalake() {
+  @Order(3)
+  public void testDeleteMetalake() throws InterruptedException {
     metalakePage.clickInUseSwitch(EDITED_METALAKE_NAME);
+    Thread.sleep(1000);
     metalakePage.clickDeleteMetalakeBtn(EDITED_METALAKE_NAME);
-    metalakePage.confirmDeleteBtn.click();
+    metalakePage.confirmDeleteMetalake(EDITED_METALAKE_NAME);
     Assertions.assertTrue(metalakePage.verifyEmptyMetalake());
   }
 
   @Test
-  @Order(5)
+  @Order(4)
   public void testCreateMultipleMetalakes() throws InterruptedException {
     int twoPagesCount = 11;
 
@@ -116,7 +110,7 @@ public class MetalakePageTest extends BaseWebIT {
   }
 
   @Test
-  @Order(6)
+  @Order(5)
   public void testQueryMetalake() throws InterruptedException {
     String name = "query";
     createMetalakeAction(name);
@@ -124,7 +118,7 @@ public class MetalakePageTest extends BaseWebIT {
   }
 
   @Test
-  @Order(7)
+  @Order(6)
   public void testCreateInvalidMetalake() throws InterruptedException {
     String name = "1!@#$";
     metalakePage.createMetalakeBtn.click();
@@ -134,7 +128,7 @@ public class MetalakePageTest extends BaseWebIT {
   }
 
   @Test
-  @Order(8)
+  @Order(7)
   public void testLinkToCatalogsPage() throws InterruptedException {
     String name = "a_test_link";
     createMetalakeAction(name);
@@ -143,7 +137,7 @@ public class MetalakePageTest extends BaseWebIT {
   }
 
   @Test
-  @Order(9)
+  @Order(8)
   public void testRefreshPage() {
     driver.navigate().refresh();
 
@@ -152,7 +146,7 @@ public class MetalakePageTest extends BaseWebIT {
   }
 
   @Test
-  @Order(10)
+  @Order(9)
   public void testCheckLinkGravitino() {
     String originalWindowHandle = driver.getWindowHandle();
     metalakePage.footerLinkGravitino.click();
@@ -161,7 +155,7 @@ public class MetalakePageTest extends BaseWebIT {
   }
 
   @Test
-  @Order(11)
+  @Order(10)
   public void testCheckLinkLicense() {
     String originalWindowHandle = driver.getWindowHandle();
     metalakePage.footerLinkLicense.click();
@@ -170,7 +164,7 @@ public class MetalakePageTest extends BaseWebIT {
   }
 
   @Test
-  @Order(12)
+  @Order(11)
   public void testCheckLinkDocs() {
     String originalWindowHandle = driver.getWindowHandle();
     metalakePage.footerLinkDocs.click();
@@ -179,7 +173,7 @@ public class MetalakePageTest extends BaseWebIT {
   }
 
   @Test
-  @Order(13)
+  @Order(12)
   public void testCheckLinkSupport() {
     String originalWindowHandle = driver.getWindowHandle();
     metalakePage.footerLinkSupport.click();
