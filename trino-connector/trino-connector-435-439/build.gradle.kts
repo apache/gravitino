@@ -106,6 +106,12 @@ tasks {
     into(layout.buildDirectory.dir("libs"))
   }
 
+  register("copyLibs", Copy::class) {
+    dependsOn(copyRuntimeLibs, "build")
+    from(layout.buildDirectory.dir("libs"))
+    into("$rootDir/distribution/gravitino-trino-connector/libs")
+  }
+
   named("build") {
     finalizedBy(copyRuntimeLibs)
   }

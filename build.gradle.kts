@@ -860,7 +860,7 @@ tasks {
   }
 
   val compileTrinoConnector by registering {
-    dependsOn("trino-connector:trino-connector:copyLibs")
+    dependsOn("trino-connector:trino-connector-435-439:copyLibs")
     group = "gravitino distribution"
     outputs.dir(projectDir.dir("distribution/${rootProject.name}-trino-connector"))
     doLast {
