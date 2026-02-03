@@ -69,15 +69,16 @@ public class TrinoITContainers implements AutoCloseable {
     if (trinoWorkerNum != null) {
       env.put("TRINO_WORKER_NUM", String.valueOf(trinoWorkerNum));
     }
-    String resolvedTrinoVersion = resolveTrinoVersion(trinoVersion);
-    if (resolvedTrinoVersion != null) {
-      env.put("TRINO_VERSION", resolvedTrinoVersion);
+    if (trinoVersion != null) {
+      env.put("TRINO_VERSION", String.valueOf(trinoVersion));
     }
-
-    String resolvedTrinoConnectorDir = resolveTrinoConnectorDir(trinoConnectorDir);
-    if (resolvedTrinoConnectorDir != null) {
-
-      env.put("GRAVITINO_TRINO_CONNECTOR_DIR", resolvedTrinoConnectorDir);
+    if (trinoConnectorDir != null) {
+      // If the provided path is relative, resolve it against the current working directory.
+      Path path = Paths.get(trinoConnectorDir);
+      if (!Files.exists(path)) {
+        throw new Exception("Provided GRAVITINO_TRINO_CONNECTOR_DIR '" + path + "' does not exist");
+      }
+      env.put("GRAVITINO_TRINO_CONNECTOR_DIR", trinoConnectorDir);
     }
     env.put("GRAVITINO_SERVER_PORT", String.valueOf(gravitinoServerPort));
     env.put("HIVE_RUNTIME_VERSION", hiveRuntimeVersion);
@@ -178,30 +179,6 @@ public class TrinoITContainers implements AutoCloseable {
 
   public String getPostgresqlUri() {
     return servicesUri.get("postgresql");
-  }
-
-  private String resolveTrinoVersion(Integer trinoVersion) {
-    if (trinoVersion != null) {
-      return String.valueOf(trinoVersion);
-    }
-    String envValue = System.getenv("TRINO_VERSION");
-    return Strings.isEmpty(envValue) ? null : envValue;
-  }
-
-  private String resolveTrinoConnectorDir(String trinoConnectorDir) throws Exception {
-    if (!Strings.isEmpty(trinoConnectorDir)) {
-      return trinoConnectorDir;
-    }
-    String dir = System.getenv("GRAVITINO_TRINO_CONNECTOR_DIR");
-    // If the provided path is relative, resolve it against the current working directory.
-    Path path = Paths.get(dir);
-    if (!path.isAbsolute()) {
-      throw new Exception("Trino connector directory should be an absolute path: " + dir);
-    }
-    if (!Files.exists(path)) {
-      throw new Exception("Trino connector directory does not exist: " + path.toAbsolutePath());
-    }
-    return path.toAbsolutePath().toString();
   }
 
   @Override
