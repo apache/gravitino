@@ -22,6 +22,7 @@ import static org.apache.gravitino.rel.Column.DEFAULT_VALUE_NOT_SET;
 
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.rel.expressions.Expression;
 import org.apache.gravitino.rel.expressions.FunctionExpression;
 import org.apache.gravitino.rel.expressions.literals.Literal;
@@ -61,7 +62,12 @@ public class JdbcColumnDefaultValueConverter {
       if (defaultValue.equals(Literals.NULL)) {
         return NULL;
       } else if (type instanceof Type.NumericType) {
-        return literal.value().toString();
+        // It seem that literals.value().toString() can be an empty string for numeric types
+        String value = literal.value().toString();
+        if (StringUtils.isBlank(value)) {
+          value = "'%s'".formatted(value);
+        }
+        return value;
       } else if (type instanceof Types.TimestampType) {
         /**
          * @see LocalDateTime#toString() would return like 'yyyy-MM-ddTHH:mm:ss'

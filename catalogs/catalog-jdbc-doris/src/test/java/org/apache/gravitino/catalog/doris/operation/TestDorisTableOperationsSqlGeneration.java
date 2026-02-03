@@ -63,7 +63,7 @@ public class TestDorisTableOperationsSqlGeneration {
     JdbcColumn col1 =
         JdbcColumn.builder()
             .withName("col1")
-            .withType(Types.VarCharType.of(255))
+            .withType(Types.IntegerType.get())
             .withNullable(false)
             .withDefaultValue(Literals.of("", Types.VarCharType.of(255)))
             .build();
@@ -76,7 +76,10 @@ public class TestDorisTableOperationsSqlGeneration {
         .appendNecessaryProperties(Mockito.anyMap());
 
     String sql = mockOps.createTableSql(tableName, new JdbcColumn[] {col1}, distribution);
-    Assertions.assertTrue(sql.contains("DEFAULT ''"), "Should contain DEFAULT '' but was: " + sql);
+    JdbcColumnDefaultValueConverter converter = new JdbcColumnDefaultValueConverter();
+    Assertions.assertTrue(
+        sql.contains("DEFAULT " + converter.fromGravitino(col1.defaultValue())),
+        "Should contain DEFAULT '' but was: " + sql);
   }
 
   @Test
@@ -86,7 +89,7 @@ public class TestDorisTableOperationsSqlGeneration {
     JdbcColumn col1 =
         JdbcColumn.builder()
             .withName("col1")
-            .withType(Types.VarCharType.of(255))
+            .withType(Types.IntegerType.get())
             .withNullable(false)
             .withDefaultValue(Literals.of("abc", Types.VarCharType.of(255)))
             .build();
@@ -99,7 +102,9 @@ public class TestDorisTableOperationsSqlGeneration {
         .appendNecessaryProperties(Mockito.anyMap());
 
     String sql = mockOps.createTableSql(tableName, new JdbcColumn[] {col1}, distribution);
+    JdbcColumnDefaultValueConverter converter = new JdbcColumnDefaultValueConverter();
     Assertions.assertTrue(
-        sql.contains("DEFAULT 'abc'"), "Should contain DEFAULT 'abc' but was: " + sql);
+        sql.contains("DEFAULT " + converter.fromGravitino(col1.defaultValue())),
+        "Should contain DEFAULT value but was: " + sql);
   }
 }

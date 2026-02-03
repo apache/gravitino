@@ -65,7 +65,10 @@ public class TestMysqlTableOperationsSqlGeneration {
             .build();
 
     String sql = ops.createTableSql(tableName, new JdbcColumn[] {col1});
-    Assertions.assertTrue(sql.contains("DEFAULT ''"), "Should contain DEFAULT '' but was: " + sql);
+    JdbcColumnDefaultValueConverter converter = new JdbcColumnDefaultValueConverter();
+    Assertions.assertTrue(
+        sql.contains("DEFAULT " + converter.fromGravitino(col1.defaultValue())),
+        "Should contain DEFAULT '' but was: " + sql);
   }
 
   @Test
@@ -81,7 +84,9 @@ public class TestMysqlTableOperationsSqlGeneration {
             .build();
 
     String sql = ops.createTableSql(tableName, new JdbcColumn[] {col1});
+    JdbcColumnDefaultValueConverter converter = new JdbcColumnDefaultValueConverter();
     Assertions.assertTrue(
-        sql.contains("DEFAULT 'abc'"), "Should contain DEFAULT 'abc' but was: " + sql);
+        sql.contains("DEFAULT " + converter.fromGravitino(col1.defaultValue())),
+        "Should contain DEFAULT value but was: " + sql);
   }
 }

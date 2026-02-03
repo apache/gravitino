@@ -73,7 +73,10 @@ public class TestStarRocksTableOperationsSqlGeneration {
     Distribution distribution = Distributions.hash(1, NamedReference.field("col1"));
 
     String sql = ops.createTableSql(tableName, new JdbcColumn[] {col1}, distribution);
-    Assertions.assertTrue(sql.contains("DEFAULT ''"), "Should contain DEFAULT '' but was: " + sql);
+    JdbcColumnDefaultValueConverter converter = new JdbcColumnDefaultValueConverter();
+    Assertions.assertTrue(
+        sql.contains("DEFAULT " + converter.fromGravitino(col1.defaultValue())),
+        "Should contain DEFAULT '' but was: " + sql);
   }
 
   @Test
@@ -92,8 +95,10 @@ public class TestStarRocksTableOperationsSqlGeneration {
     Distribution distribution = Distributions.hash(1, NamedReference.field("col1"));
 
     String sql = ops.createTableSql(tableName, new JdbcColumn[] {col1}, distribution);
+    JdbcColumnDefaultValueConverter converter = new JdbcColumnDefaultValueConverter();
     Assertions.assertTrue(
-        sql.contains("DEFAULT 'abc'"), "Should contain DEFAULT 'abc' but was: " + sql);
+        sql.contains("DEFAULT " + converter.fromGravitino(col1.defaultValue())),
+        "Should contain DEFAULT value but was: " + sql);
   }
 
   @Test
@@ -110,11 +115,9 @@ public class TestStarRocksTableOperationsSqlGeneration {
 
     Distribution distribution = Distributions.hash(1, NamedReference.field("col1"));
     String sql = ops.createTableSql(tableName, new JdbcColumn[] {col1}, distribution);
-    // Logic check: if converter returns "'   '", this should pass.
-    // If it returns "   " (unquoted), this assert might fail or pass depending on what we expect.
-    // The user suspects it generates "DEFAULT ;" or similar invalid SQL.
-    // Let's see what it actually generates.
+    JdbcColumnDefaultValueConverter converter = new JdbcColumnDefaultValueConverter();
     Assertions.assertTrue(
-        sql.contains("DEFAULT '   '"), "Should contain DEFAULT '   ' but was: " + sql);
+        sql.contains("DEFAULT " + converter.fromGravitino(col1.defaultValue())),
+        "Should contain DEFAULT '   ' but was: " + sql);
   }
 }

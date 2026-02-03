@@ -49,16 +49,12 @@ import org.apache.gravitino.exceptions.NoSuchColumnException;
 import org.apache.gravitino.exceptions.NoSuchTableException;
 import org.apache.gravitino.rel.Column;
 import org.apache.gravitino.rel.TableChange;
-import org.apache.gravitino.rel.expressions.Expression;
 import org.apache.gravitino.rel.expressions.distributions.Distribution;
 import org.apache.gravitino.rel.expressions.distributions.Distributions;
-import org.apache.gravitino.rel.expressions.literals.Literals;
 import org.apache.gravitino.rel.expressions.transforms.Transform;
 import org.apache.gravitino.rel.indexes.Index;
 import org.apache.gravitino.rel.indexes.Indexes;
 import org.apache.gravitino.rel.types.Types;
-import org.apache.gravitino.rel.types.Types.FixedCharType;
-import org.apache.gravitino.rel.types.Types.VarCharType;
 
 /** Table operations for MySQL. */
 public class MysqlTableOperations extends JdbcTableOperations {
@@ -314,42 +310,6 @@ public class MysqlTableOperations extends JdbcTableOperations {
     String result = "ALTER TABLE `" + tableName + "`\n" + String.join(",\n", alterSql) + ";";
     LOG.info("Generated alter table:{}.{} sql: {}", databaseName, tableName, result);
     return result;
-  }
-
-  @Override
-  protected String handleQuotingForDefaultValue(
-      JdbcColumn column, Expression defaultValueExpression) {
-    String defaultValue = columnDefaultValueConverter.fromGravitino(defaultValueExpression);
-
-    // Special handling for SQL NULL: do not quote it, even for string-like columns.
-    String trimmedDefault = defaultValue == null ? null : defaultValue.trim();
-    if (Literals.NULL.equals(defaultValueExpression)) {
-      return "NULL";
-    }
-
-    if (column.dataType() instanceof VarCharType || column.dataType() instanceof FixedCharType) {
-      if (StringUtils.isEmpty(defaultValue)) {
-        // Represent empty string default as two single quotes.
-        return "''";
-      }
-
-      // If the converter already produced a quoted literal, preserve it.
-      if (trimmedDefault.length() >= 2
-          && trimmedDefault.startsWith("'")
-          && trimmedDefault.endsWith("'")) {
-        return trimmedDefault;
-      }
-
-      // Avoid quoting function/keyword defaults that are intentionally unquoted.
-      if (!shouldQuoteStringDefault(trimmedDefault)) {
-        return trimmedDefault;
-      }
-
-      // Fall back to quoting as a string literal.
-      return "'" + defaultValue + "'";
-    }
-
-    return defaultValue;
   }
 
   private String updateColumnAutoIncrementDefinition(
