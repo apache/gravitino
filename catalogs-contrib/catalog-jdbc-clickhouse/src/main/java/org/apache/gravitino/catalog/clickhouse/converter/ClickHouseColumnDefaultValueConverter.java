@@ -45,13 +45,11 @@ public class ClickHouseColumnDefaultValueConverter extends JdbcColumnDefaultValu
       return null;
     }
 
-    if (defaultValue instanceof FunctionExpression) {
-      FunctionExpression functionExpression = (FunctionExpression) defaultValue;
+    if (defaultValue instanceof FunctionExpression functionExpression) {
       return String.format("(%s)", functionExpression);
     }
 
-    if (defaultValue instanceof Literal) {
-      Literal<?> literal = (Literal<?>) defaultValue;
+    if (defaultValue instanceof Literal<?> literal) {
       Type type = literal.dataType();
       if (defaultValue.equals(Literals.NULL)) {
         return NULL;

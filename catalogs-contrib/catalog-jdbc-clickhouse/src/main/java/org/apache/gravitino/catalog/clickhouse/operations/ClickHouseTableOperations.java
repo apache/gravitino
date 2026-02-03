@@ -137,7 +137,7 @@ public class ClickHouseTableOperations extends JdbcTableOperations {
     buildColumnsDefinition(columns, sqlBuilder);
 
     // Index definition, we only support primary index now, secondary index will be supported in
-    // future
+    // the future
     appendIndexesSql(indexes, sqlBuilder);
 
     sqlBuilder.append("\n)");
@@ -261,7 +261,7 @@ public class ClickHouseTableOperations extends JdbcTableOperations {
                 "Primary key name must be PRIMARY in ClickHouse, the name {} will be ignored.",
                 index.name());
           }
-          sqlBuilder.append(" PRIMARY KEY (").append(fieldStr).append(")");
+          sqlBuilder.append(" PRIMARY KEY (").append(quoteIdentifier(fieldStr)).append(")");
           break;
         default:
           throw new IllegalArgumentException(
@@ -323,7 +323,7 @@ public class ClickHouseTableOperations extends JdbcTableOperations {
         "ClickHouseTableOperations.generateAlterTableSql is not implemented yet.");
   }
 
-  private StringBuilder appendColumnDefinition(JdbcColumn column, StringBuilder sqlBuilder) {
+  private void appendColumnDefinition(JdbcColumn column, StringBuilder sqlBuilder) {
     // Add Nullable data type
     String dataType = typeConverter.fromGravitino(column.dataType());
     if (column.nullable()) {
@@ -344,7 +344,5 @@ public class ClickHouseTableOperations extends JdbcTableOperations {
       String escapedComment = StringUtils.replace(column.comment(), "'", "''");
       sqlBuilder.append("COMMENT '%s' ".formatted(escapedComment));
     }
-
-    return sqlBuilder;
   }
 }
