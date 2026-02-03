@@ -1003,9 +1003,9 @@ tasks {
         !it.name.startsWith("optimizer") &&
         !it.name.startsWith("spark") &&
         !it.name.startsWith("hive-metastore") &&
+        !it.name.startsWith("trino-connector") &&
         it.name != "hadoop-common" &&
         it.name != "integration-test" &&
-        it.name != "trino-connector" &&
         it.parent?.name != "bundles" &&
         it.parent?.name != "maintenance" &&
         it.name != "mcp-server"
