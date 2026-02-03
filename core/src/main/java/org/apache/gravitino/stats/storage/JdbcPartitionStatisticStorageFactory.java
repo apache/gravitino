@@ -172,10 +172,7 @@ public class JdbcPartitionStatisticStorageFactory implements PartitionStatisticS
         jdbcUser != null && !jdbcUser.trim().isEmpty(), "Property %s must be non-empty", JDBC_USER);
 
     String jdbcPassword = properties.get(JDBC_PASSWORD);
-    Preconditions.checkArgument(
-        jdbcPassword != null && !jdbcPassword.trim().isEmpty(),
-        "Property %s must be non-empty",
-        JDBC_PASSWORD);
+    Preconditions.checkArgument(jdbcPassword != null, "Property %s must be present", JDBC_PASSWORD);
   }
 
   /**

@@ -256,14 +256,14 @@ public class TestJdbcPartitionStatisticStorageFactory {
     JdbcPartitionStatisticStorageFactory factory = new JdbcPartitionStatisticStorageFactory();
 
     Map<String, String> properties = new HashMap<>();
-    properties.put("jdbcUrl", "jdbc:mysql://localhost:3306/test_db");
-    properties.put("jdbcUser", "test_user");
-    properties.put("jdbcPassword", ""); // Empty password
+    properties.put("jdbcUrl", "jdbc:h2:mem:test;DB_CLOSE_DELAY=-1");
+    properties.put("jdbcUser", "sa");
+    properties.put("jdbcPassword", ""); // Empty password (allowed for H2 and similar databases)
+    properties.put("jdbcDriver", "org.h2.Driver");
 
-    Exception exception =
-        assertThrows(IllegalArgumentException.class, () -> factory.create(properties));
-
-    assertTrue(exception.getMessage().contains("jdbcPassword"));
+    // Empty passwords should be allowed (e.g., for H2 in-memory databases)
+    PartitionStatisticStorage storage = factory.create(properties);
+    assertNotNull(storage);
   }
 
   @Test

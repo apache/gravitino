@@ -63,6 +63,7 @@ import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.TestInstance;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -94,6 +95,7 @@ public class TestJdbcPartitionStatisticStorageIT {
    * Abstract base class containing all test logic. Each database-specific test class extends this
    * and implements the database setup.
    */
+  @TestInstance(TestInstance.Lifecycle.PER_CLASS)
   abstract static class BaseJdbcPartitionStatisticStorageTest {
 
     protected JdbcPartitionStatisticStorage storage;
@@ -584,7 +586,7 @@ public class TestJdbcPartitionStatisticStorageIT {
   /** MySQL-specific tests using Docker container. */
   @Nested
   @Tag("gravitino-docker-test")
-  class MySQLTest extends BaseJdbcPartitionStatisticStorageTest {
+  static class MySQLTest extends BaseJdbcPartitionStatisticStorageTest {
 
     private static final ContainerSuite containerSuite = ContainerSuite.getInstance();
     private static final TestDatabaseName TEST_DB_NAME = TestDatabaseName.MYSQL_MYSQL_ABSTRACT_IT;
@@ -654,7 +656,7 @@ public class TestJdbcPartitionStatisticStorageIT {
   /** PostgreSQL-specific tests using Docker container. */
   @Nested
   @Tag("gravitino-docker-test")
-  class PostgreSQLTest extends BaseJdbcPartitionStatisticStorageTest {
+  static class PostgreSQLTest extends BaseJdbcPartitionStatisticStorageTest {
 
     private static final ContainerSuite containerSuite = ContainerSuite.getInstance();
     private static final TestDatabaseName TEST_DB_NAME = TestDatabaseName.PG_TEST_PARTITION_STATS;
@@ -726,9 +728,10 @@ public class TestJdbcPartitionStatisticStorageIT {
 
   /** H2-specific tests using embedded in-memory database. */
   @Nested
-  class H2Test extends BaseJdbcPartitionStatisticStorageTest {
+  static class H2Test extends BaseJdbcPartitionStatisticStorageTest {
 
-    private static final String H2_JDBC_URL = "jdbc:h2:mem:test_partition_stats;MODE=MySQL";
+    private static final String H2_JDBC_URL =
+        "jdbc:h2:mem:test_partition_stats;MODE=MySQL;DB_CLOSE_DELAY=-1";
     private static final String H2_USERNAME = "sa";
     private static final String H2_PASSWORD = "";
 

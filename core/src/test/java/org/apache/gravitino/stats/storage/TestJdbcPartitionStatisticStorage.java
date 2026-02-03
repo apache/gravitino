@@ -32,6 +32,7 @@ import static org.mockito.Mockito.when;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.google.common.collect.Lists;
 import java.sql.Connection;
+import java.sql.DatabaseMetaData;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
@@ -84,6 +85,11 @@ public class TestJdbcPartitionStatisticStorage {
     when(mockConnection.prepareStatement(anyString())).thenReturn(mockPreparedStatement);
     when(mockPreparedStatement.executeQuery()).thenReturn(mockResultSet);
 
+    // Mock DatabaseMetaData for database type detection
+    DatabaseMetaData mockMetaData = mock(DatabaseMetaData.class);
+    when(mockConnection.getMetaData()).thenReturn(mockMetaData);
+    when(mockMetaData.getDatabaseProductName()).thenReturn("MySQL");
+
     // Mock EntityStore
     mockEntityStore = mock(EntityStore.class);
     TableEntity mockTableEntity = mock(TableEntity.class);
@@ -129,7 +135,9 @@ public class TestJdbcPartitionStatisticStorage {
 
     // Verify connection and commit were called
     verify(mockConnection, times(1)).commit();
-    verify(mockConnection, times(1)).close();
+    // Connection.close() is called twice: once during database type detection in constructor,
+    // and once during updateStatistics
+    verify(mockConnection, times(2)).close();
   }
 
   @Test
