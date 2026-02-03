@@ -115,4 +115,13 @@ public enum TestDatabaseName {
     }
   },
   PG_ICEBERG_AUTHZ_IT,
+
+  /** Represents the PostgreSQL database for partition statistics integration tests. */
+  PG_TEST_PARTITION_STATS {
+    /** PostgreSQL only accept lowercase database name */
+    @Override
+    public String toString() {
+      return this.name().toLowerCase();
+    }
+  },
 }
