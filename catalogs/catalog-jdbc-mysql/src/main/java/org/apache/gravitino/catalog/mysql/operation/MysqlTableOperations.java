@@ -323,8 +323,7 @@ public class MysqlTableOperations extends JdbcTableOperations {
 
     // Special handling for SQL NULL: do not quote it, even for string-like columns.
     String trimmedDefault = defaultValue == null ? null : defaultValue.trim();
-    if (defaultValueExpression == Literals.NULL
-        || (trimmedDefault != null && "NULL".equalsIgnoreCase(trimmedDefault))) {
+    if (Literals.NULL.equals(defaultValueExpression)) {
       return "NULL";
     }
 
@@ -335,15 +334,14 @@ public class MysqlTableOperations extends JdbcTableOperations {
       }
 
       // If the converter already produced a quoted literal, preserve it.
-      if (trimmedDefault != null
-          && trimmedDefault.length() >= 2
+      if (trimmedDefault.length() >= 2
           && trimmedDefault.startsWith("'")
           && trimmedDefault.endsWith("'")) {
         return trimmedDefault;
       }
 
       // Avoid quoting function/keyword defaults that are intentionally unquoted.
-      if (trimmedDefault != null && !shouldQuoteStringDefault(trimmedDefault)) {
+      if (!shouldQuoteStringDefault(trimmedDefault)) {
         return trimmedDefault;
       }
 

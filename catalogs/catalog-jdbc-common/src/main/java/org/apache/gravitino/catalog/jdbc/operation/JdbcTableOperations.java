@@ -114,8 +114,7 @@ public abstract class JdbcTableOperations implements TableOperation {
     String defaultValue = columnDefaultValueConverter.fromGravitino(defaultValueExpression);
 
     // Special handling for SQL NULL: do not quote it, even for string-like columns.
-    if (defaultValueExpression == Literals.NULL
-        || (defaultValue != null && "NULL".equalsIgnoreCase(defaultValue))) {
+    if (Literals.NULL.equals(defaultValueExpression)) {
       return "NULL";
     }
 
@@ -129,15 +128,14 @@ public abstract class JdbcTableOperations implements TableOperation {
       }
 
       // If the converter already produced a quoted literal, preserve it.
-      if (defaultValue != null
-          && defaultValue.length() >= 2
+      if (defaultValue.length() >= 2
           && defaultValue.startsWith("'")
           && defaultValue.endsWith("'")) {
         return defaultValue;
       }
 
       // Avoid quoting function/keyword defaults that are intentionally unquoted.
-      if (defaultValue != null && !shouldQuoteStringDefault(defaultValue)) {
+      if (!shouldQuoteStringDefault(defaultValue)) {
         return defaultValue;
       }
 
