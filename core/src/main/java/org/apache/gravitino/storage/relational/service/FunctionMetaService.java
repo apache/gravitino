@@ -20,11 +20,10 @@
 package org.apache.gravitino.storage.relational.service;
 
 import static org.apache.gravitino.metrics.source.MetricsSource.GRAVITINO_RELATIONAL_STORE_METRIC_NAME;
-import static org.apache.gravitino.storage.relational.utils.POConverters.DEFAULT_DELETED_AT;
+import static org.apache.gravitino.storage.relational.po.FunctionPO.fromFunctionPO;
+import static org.apache.gravitino.storage.relational.po.FunctionPO.initializeFunctionPO;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
 import java.io.IOException;
-import java.util.Arrays;
 import java.util.List;
 import java.util.Locale;
 import java.util.function.Function;
@@ -33,20 +32,13 @@ import org.apache.gravitino.Entity;
 import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
-import org.apache.gravitino.dto.function.FunctionDefinitionDTO;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
-import org.apache.gravitino.function.FunctionDefinition;
-import org.apache.gravitino.function.FunctionType;
-import org.apache.gravitino.json.JsonUtils;
-import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.meta.FunctionEntity;
 import org.apache.gravitino.meta.NamespacedEntityId;
 import org.apache.gravitino.metrics.Monitored;
-import org.apache.gravitino.rel.types.Type;
 import org.apache.gravitino.storage.relational.mapper.FunctionMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.FunctionVersionMetaMapper;
 import org.apache.gravitino.storage.relational.po.FunctionPO;
-import org.apache.gravitino.storage.relational.po.FunctionVersionPO;
 import org.apache.gravitino.storage.relational.utils.ExceptionUtils;
 import org.apache.gravitino.storage.relational.utils.SessionUtils;
 import org.apache.gravitino.utils.NameIdentifierUtil;
@@ -58,7 +50,6 @@ public class FunctionMetaService {
   }
 
   private static final FunctionMetaService INSTANCE = new FunctionMetaService();
-  private static final Integer INITIAL_VERSION = 1;
 
   private FunctionMetaService() {}
 
@@ -221,91 +212,5 @@ public class FunctionMetaService {
     builder.withMetalakeId(namespacedEntityId.namespaceIds()[0]);
     builder.withCatalogId(namespacedEntityId.namespaceIds()[1]);
     builder.withSchemaId(namespacedEntityId.entityId());
-  }
-
-  // ============================ PO Converters ============================
-
-  private FunctionEntity fromFunctionPO(FunctionPO functionPO, Namespace namespace) {
-    try {
-      FunctionVersionPO versionPO = functionPO.functionVersionPO();
-      List<FunctionDefinitionDTO> definitionDTOs =
-          JsonUtils.anyFieldMapper()
-              .readValue(
-                  versionPO.definitions(),
-                  JsonUtils.anyFieldMapper()
-                      .getTypeFactory()
-                      .constructCollectionType(List.class, FunctionDefinitionDTO.class));
-      FunctionDefinition[] definitions =
-          definitionDTOs.stream()
-              .map(FunctionDefinitionDTO::toFunctionDefinition)
-              .toArray(FunctionDefinition[]::new);
-      return FunctionEntity.builder()
-          .withId(functionPO.functionId())
-          .withName(functionPO.functionName())
-          .withNamespace(namespace)
-          .withComment(versionPO.functionComment())
-          .withFunctionType(FunctionType.valueOf(functionPO.functionType()))
-          .withDeterministic(functionPO.deterministic() != null && functionPO.deterministic() == 1)
-          .withReturnType(JsonUtils.anyFieldMapper().readValue(functionPO.returnType(), Type.class))
-          .withDefinitions(definitions)
-          .withAuditInfo(
-              JsonUtils.anyFieldMapper().readValue(functionPO.auditInfo(), AuditInfo.class))
-          .build();
-    } catch (JsonProcessingException e) {
-      throw new RuntimeException("Failed to deserialize json object:", e);
-    }
-  }
-
-  private FunctionPO initializeFunctionPO(
-      FunctionEntity functionEntity, FunctionPO.FunctionPOBuilder builder) {
-    builder.withFunctionLatestVersion(INITIAL_VERSION).withFunctionCurrentVersion(INITIAL_VERSION);
-    return buildFunctionPO(functionEntity, builder);
-  }
-
-  private FunctionVersionPO initializeFunctionVersionPO(
-      FunctionEntity functionEntity, NamespacedEntityId namespacedEntityId, Integer version) {
-    try {
-      List<FunctionDefinitionDTO> definitionDTOs =
-          Arrays.stream(functionEntity.definitions())
-              .map(FunctionDefinitionDTO::fromFunctionDefinition)
-              .collect(Collectors.toList());
-      return FunctionVersionPO.builder()
-          .withFunctionId(functionEntity.id())
-          .withMetalakeId(namespacedEntityId.namespaceIds()[0])
-          .withCatalogId(namespacedEntityId.namespaceIds()[1])
-          .withSchemaId(namespacedEntityId.entityId())
-          .withFunctionVersion(version)
-          .withFunctionComment(functionEntity.comment())
-          .withDefinitions(JsonUtils.anyFieldMapper().writeValueAsString(definitionDTOs))
-          .withAuditInfo(JsonUtils.anyFieldMapper().writeValueAsString(functionEntity.auditInfo()))
-          .withDeletedAt(DEFAULT_DELETED_AT)
-          .build();
-    } catch (JsonProcessingException e) {
-      throw new RuntimeException("Failed to serialize json object:", e);
-    }
-  }
-
-  private FunctionPO buildFunctionPO(
-      FunctionEntity functionEntity, FunctionPO.FunctionPOBuilder builder) {
-    try {
-      NamespacedEntityId namespacedEntityId =
-          EntityIdService.getEntityIds(
-              NameIdentifier.of(functionEntity.namespace().levels()), Entity.EntityType.SCHEMA);
-      FunctionVersionPO versionPO =
-          initializeFunctionVersionPO(functionEntity, namespacedEntityId, INITIAL_VERSION);
-      return builder
-          .withFunctionId(functionEntity.id())
-          .withFunctionName(functionEntity.name())
-          .withFunctionType(functionEntity.functionType().name())
-          .withDeterministic(functionEntity.deterministic() ? 1 : 0)
-          .withReturnType(
-              JsonUtils.anyFieldMapper().writeValueAsString(functionEntity.returnType()))
-          .withFunctionVersionPO(versionPO)
-          .withAuditInfo(JsonUtils.anyFieldMapper().writeValueAsString(functionEntity.auditInfo()))
-          .withDeletedAt(DEFAULT_DELETED_AT)
-          .build();
-    } catch (JsonProcessingException e) {
-      throw new RuntimeException("Failed to serialize json object:", e);
-    }
   }
 }
