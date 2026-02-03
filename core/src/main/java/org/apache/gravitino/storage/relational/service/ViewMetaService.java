@@ -26,6 +26,8 @@ import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 import org.apache.gravitino.Entity;
+import org.apache.gravitino.Entity.EntityType;
+import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.HasIdentifier;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.NameIdentifier;
@@ -134,10 +136,7 @@ public class ViewMetaService {
   public GenericEntity getViewByIdentifier(NameIdentifier identifier) {
     NameIdentifierUtil.checkView(identifier);
 
-    Long schemaId =
-        EntityIdService.getEntityId(
-            NameIdentifierUtil.getSchemaIdentifier(identifier), Entity.EntityType.SCHEMA);
-    ViewPO viewPO = getViewPOBySchemaIdAndName(schemaId, identifier.name());
+    ViewPO viewPO = viewPOFetcher().apply(identifier);
 
     return GenericEntity.builder()
         .withId(viewPO.getViewId())
@@ -188,10 +187,7 @@ public class ViewMetaService {
       NameIdentifier ident, Function<E, E> updater) throws IOException {
     NameIdentifierUtil.checkView(ident);
 
-    Long schemaId =
-        EntityIdService.getEntityId(
-            NameIdentifierUtil.getSchemaIdentifier(ident), Entity.EntityType.SCHEMA);
-    ViewPO oldViewPO = getViewPOBySchemaIdAndName(schemaId, ident.name());
+    ViewPO oldViewPO = viewPOFetcher().apply(ident);
 
     GenericEntity oldEntity =
         GenericEntity.builder()
@@ -231,12 +227,8 @@ public class ViewMetaService {
   public boolean deleteView(NameIdentifier ident) {
     NameIdentifierUtil.checkView(ident);
 
-    Long schemaId =
-        EntityIdService.getEntityId(
-            NameIdentifierUtil.getSchemaIdentifier(ident), Entity.EntityType.SCHEMA);
-    Long viewId = getViewIdBySchemaIdAndName(schemaId, ident.name());
-
-    return deleteView(viewId);
+    ViewPO viewPO = viewPOFetcher().apply(ident);
+    return deleteView(viewPO.getViewId());
   }
 
   private ViewPO getViewPOBySchemaIdAndName(Long schemaId, String viewName) {
@@ -314,10 +306,76 @@ public class ViewMetaService {
   }
 
   private List<ViewPO> listViewPOsByNamespace(Namespace namespace) {
+    return viewListFetcher().apply(namespace);
+  }
+
+  private Function<Namespace, List<ViewPO>> viewListFetcher() {
+    return GravitinoEnv.getInstance().cacheEnabled()
+        ? this::listViewPOsBySchemaId
+        : this::listViewPOsByFullQualifiedName;
+  }
+
+  private Function<NameIdentifier, ViewPO> viewPOFetcher() {
+    return GravitinoEnv.getInstance().cacheEnabled()
+        ? this::getViewPOBySchemaId
+        : this::getViewPOByFullQualifiedName;
+  }
+
+  private List<ViewPO> listViewPOsBySchemaId(Namespace namespace) {
     Long schemaId =
         EntityIdService.getEntityId(
             NameIdentifier.of(namespace.levels()), Entity.EntityType.SCHEMA);
     return SessionUtils.getWithoutCommit(
         ViewMetaMapper.class, mapper -> mapper.listViewPOsBySchemaId(schemaId));
+  }
+
+  private List<ViewPO> listViewPOsByFullQualifiedName(Namespace namespace) {
+    String[] namespaceLevels = namespace.levels();
+    List<ViewPO> viewPOs =
+        SessionUtils.getWithoutCommit(
+            ViewMetaMapper.class,
+            mapper ->
+                mapper.listViewPOsByFullQualifiedName(
+                    namespaceLevels[0], namespaceLevels[1], namespaceLevels[2]));
+    if (viewPOs.isEmpty() || viewPOs.get(0).getSchemaId() == null) {
+      throw new NoSuchEntityException(
+          NoSuchEntityException.NO_SUCH_ENTITY_MESSAGE,
+          EntityType.SCHEMA.name().toLowerCase(),
+          namespaceLevels[2]);
+    }
+    return viewPOs.stream().filter(po -> po.getViewId() != null).collect(Collectors.toList());
+  }
+
+  private ViewPO getViewPOBySchemaId(NameIdentifier identifier) {
+    Long schemaId =
+        EntityIdService.getEntityId(
+            NameIdentifier.of(identifier.namespace().levels()), Entity.EntityType.SCHEMA);
+    return getViewPOBySchemaIdAndName(schemaId, identifier.name());
+  }
+
+  private ViewPO getViewPOByFullQualifiedName(NameIdentifier identifier) {
+    String[] namespaceLevels = identifier.namespace().levels();
+    ViewPO viewPO =
+        SessionUtils.getWithoutCommit(
+            ViewMetaMapper.class,
+            mapper ->
+                mapper.selectViewByFullQualifiedName(
+                    namespaceLevels[0], namespaceLevels[1], namespaceLevels[2], identifier.name()));
+
+    if (viewPO == null || viewPO.getSchemaId() == null) {
+      throw new NoSuchEntityException(
+          NoSuchEntityException.NO_SUCH_ENTITY_MESSAGE,
+          EntityType.SCHEMA.name().toLowerCase(),
+          namespaceLevels[2]);
+    }
+
+    if (viewPO.getViewId() == null) {
+      throw new NoSuchEntityException(
+          NoSuchEntityException.NO_SUCH_ENTITY_MESSAGE,
+          EntityType.VIEW.name().toLowerCase(),
+          identifier.name());
+    }
+
+    return viewPO;
   }
 }

@@ -41,6 +41,14 @@ public interface ViewMetaMapper {
   @SelectProvider(type = ViewMetaSQLProviderFactory.class, method = "listViewPOsBySchemaId")
   List<ViewPO> listViewPOsBySchemaId(@Param("schemaId") Long schemaId);
 
+  @SelectProvider(
+      type = ViewMetaSQLProviderFactory.class,
+      method = "listViewPOsByFullQualifiedName")
+  List<ViewPO> listViewPOsByFullQualifiedName(
+      @Param("metalakeName") String metalakeName,
+      @Param("catalogName") String catalogName,
+      @Param("schemaName") String schemaName);
+
   @SelectProvider(type = ViewMetaSQLProviderFactory.class, method = "selectViewIdBySchemaIdAndName")
   Long selectViewIdBySchemaIdAndName(
       @Param("schemaId") Long schemaId, @Param("viewName") String name);
@@ -53,6 +61,13 @@ public interface ViewMetaMapper {
       method = "selectViewMetaBySchemaIdAndName")
   ViewPO selectViewMetaBySchemaIdAndName(
       @Param("schemaId") Long schemaId, @Param("viewName") String name);
+
+  @SelectProvider(type = ViewMetaSQLProviderFactory.class, method = "selectViewByFullQualifiedName")
+  ViewPO selectViewByFullQualifiedName(
+      @Param("metalakeName") String metalakeName,
+      @Param("catalogName") String catalogName,
+      @Param("schemaName") String schemaName,
+      @Param("viewName") String viewName);
 
   @InsertProvider(type = ViewMetaSQLProviderFactory.class, method = "insertViewMeta")
   void insertViewMeta(@Param("viewMeta") ViewPO viewPO);

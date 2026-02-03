@@ -21,6 +21,9 @@ package org.apache.gravitino.storage.relational.mapper.provider.base;
 import static org.apache.gravitino.storage.relational.mapper.ViewMetaMapper.TABLE_NAME;
 
 import java.util.List;
+import org.apache.gravitino.storage.relational.mapper.CatalogMetaMapper;
+import org.apache.gravitino.storage.relational.mapper.MetalakeMetaMapper;
+import org.apache.gravitino.storage.relational.mapper.SchemaMetaMapper;
 import org.apache.gravitino.storage.relational.po.ViewPO;
 import org.apache.ibatis.annotations.Param;
 
@@ -35,6 +38,44 @@ public class ViewMetaBaseSQLProvider {
         + " FROM "
         + TABLE_NAME
         + " WHERE schema_id = #{schemaId} AND deleted_at = 0";
+  }
+
+  public String listViewPOsByFullQualifiedName(
+      @Param("metalakeName") String metalakeName,
+      @Param("catalogName") String catalogName,
+      @Param("schemaName") String schemaName) {
+    return """
+        SELECT
+            sm.schema_id AS schemaId,
+            cm.catalog_id AS catalogId,
+            vm.view_id AS viewId,
+            vm.view_name AS viewName,
+            vm.metalake_id AS metalakeId,
+            vm.current_version AS currentVersion,
+            vm.last_version AS lastVersion,
+            vm.deleted_at AS deletedAt
+        FROM
+            %s mm
+        INNER JOIN
+            %s cm ON mm.metalake_id = cm.metalake_id
+            AND cm.catalog_name = #{catalogName}
+            AND cm.deleted_at = 0
+        LEFT JOIN
+            %s sm ON cm.catalog_id = sm.catalog_id
+            AND sm.schema_name = #{schemaName}
+            AND sm.deleted_at = 0
+        LEFT JOIN
+            %s vm ON sm.schema_id = vm.schema_id
+            AND vm.deleted_at = 0
+        WHERE
+            mm.metalake_name = #{metalakeName}
+            AND mm.deleted_at = 0;
+            """
+        .formatted(
+            MetalakeMetaMapper.TABLE_NAME,
+            CatalogMetaMapper.TABLE_NAME,
+            SchemaMetaMapper.TABLE_NAME,
+            TABLE_NAME);
   }
 
   public String selectViewIdBySchemaIdAndName(
@@ -166,5 +207,45 @@ public class ViewMetaBaseSQLProvider {
     return "DELETE FROM "
         + TABLE_NAME
         + " WHERE deleted_at > 0 AND deleted_at < #{legacyTimeline} LIMIT #{limit}";
+  }
+
+  public String selectViewByFullQualifiedName(
+      @Param("metalakeName") String metalakeName,
+      @Param("catalogName") String catalogName,
+      @Param("schemaName") String schemaName,
+      @Param("viewName") String viewName) {
+    return """
+        SELECT
+            sm.schema_id AS schemaId,
+            cm.catalog_id AS catalogId,
+            vm.view_id AS viewId,
+            vm.view_name AS viewName,
+            vm.metalake_id AS metalakeId,
+            vm.current_version AS currentVersion,
+            vm.last_version AS lastVersion,
+            vm.deleted_at AS deletedAt
+        FROM
+            %s mm
+        INNER JOIN
+            %s cm ON mm.metalake_id = cm.metalake_id
+            AND cm.catalog_name = #{catalogName}
+            AND cm.deleted_at = 0
+        LEFT JOIN
+            %s sm ON cm.catalog_id = sm.catalog_id
+            AND sm.schema_name = #{schemaName}
+            AND sm.deleted_at = 0
+        LEFT JOIN
+            %s vm ON sm.schema_id = vm.schema_id
+            AND vm.view_name = #{viewName}
+            AND vm.deleted_at = 0
+        WHERE
+            mm.metalake_name = #{metalakeName}
+            AND mm.deleted_at = 0;
+            """
+        .formatted(
+            MetalakeMetaMapper.TABLE_NAME,
+            CatalogMetaMapper.TABLE_NAME,
+            SchemaMetaMapper.TABLE_NAME,
+            TABLE_NAME);
   }
 }

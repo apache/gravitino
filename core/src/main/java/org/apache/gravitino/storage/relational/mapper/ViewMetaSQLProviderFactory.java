@@ -55,6 +55,13 @@ public class ViewMetaSQLProviderFactory {
     return getProvider().listViewPOsBySchemaId(schemaId);
   }
 
+  public static String listViewPOsByFullQualifiedName(
+      @Param("metalakeName") String metalakeName,
+      @Param("catalogName") String catalogName,
+      @Param("schemaName") String schemaName) {
+    return getProvider().listViewPOsByFullQualifiedName(metalakeName, catalogName, schemaName);
+  }
+
   public static String selectViewIdBySchemaIdAndName(
       @Param("schemaId") Long schemaId, @Param("viewName") String name) {
     return getProvider().selectViewIdBySchemaIdAndName(schemaId, name);
@@ -67,6 +74,15 @@ public class ViewMetaSQLProviderFactory {
   public static String selectViewMetaBySchemaIdAndName(
       @Param("schemaId") Long schemaId, @Param("viewName") String name) {
     return getProvider().selectViewMetaBySchemaIdAndName(schemaId, name);
+  }
+
+  public static String selectViewByFullQualifiedName(
+      @Param("metalakeName") String metalakeName,
+      @Param("catalogName") String catalogName,
+      @Param("schemaName") String schemaName,
+      @Param("viewName") String viewName) {
+    return getProvider()
+        .selectViewByFullQualifiedName(metalakeName, catalogName, schemaName, viewName);
   }
 
   public static String insertViewMeta(@Param("viewMeta") ViewPO viewPO) {
