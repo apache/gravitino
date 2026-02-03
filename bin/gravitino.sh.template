@@ -186,8 +186,8 @@ addJarInDir "${GRAVITINO_HOME}/libs"
 # set GRAVITINO_USE_WEB_V2=true to prefer the new war when both exist.
 if [[ -z "${GRAVITINO_WAR+x}" || -z "${GRAVITINO_WAR}" ]]; then
   # Compose expected war paths based on packaged layout and version
-  WAR_V1_PATH="${GRAVITINO_HOME}/web/gravitino-web-v1.war"
-  WAR_V2_PATH="${GRAVITINO_HOME}/web-v2/gravitino-web-v2-${GRAVITINO_VERSION}.war"
+  WAR_V1_PATH="${GRAVITINO_HOME}/web/gravitino-web-${GRAVITINO_VERSION}.war"
+  WAR_V2_PATH="${GRAVITINO_HOME}/web-v2/gravitino-web-${GRAVITINO_VERSION}.war"
 
   if [[ -n "${GRAVITINO_USE_WEB_V2}" && "${GRAVITINO_USE_WEB_V2}" == "true" ]]; then
     # User explicitly requests new UI if available

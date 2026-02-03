@@ -53,7 +53,6 @@ tasks {
 
   val buildWar by registering(War::class) {
     dependsOn(webpack)
-    archiveFileName.set("${rootProject.name}-web-v1.war")
     from("./WEB-INF") {
       into("WEB-INF")
     }

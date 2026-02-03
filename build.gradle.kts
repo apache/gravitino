@@ -683,17 +683,17 @@ tasks.rat {
     "web/web/src/lib/utils/axios/**/*",
     "web/web/src/types/axios.d.ts",
     "web/web/yarn.lock",
-    "web/web-v2/.**",
-    "web/web-v2/dist/**/*",
-    "web/web-v2/next-env.d.ts",
-    "web/web-v2/node_modules/**/*",
-    "web/web-v2/package-lock.json",
-    "web/web-v2/pnpm-lock.yaml",
-    "web/web-v2/src/lib/enums/httpEnum.js",
-    "web/web-v2/src/lib/icons/svg/**/*.svg",
-    "web/web-v2/src/lib/utils/axios/**/*",
-    "web/web-v2/src/types/axios.d.ts",
-    "web/web-v2/yarn.lock"
+    "web-v2/web/.**",
+    "web-v2/web/dist/**/*",
+    "web-v2/web/next-env.d.ts",
+    "web-v2/web/node_modules/**/*",
+    "web-v2/web/package-lock.json",
+    "web-v2/web/pnpm-lock.yaml",
+    "web-v2/web/src/lib/enums/httpEnum.js",
+    "web-v2/web/src/lib/icons/svg/**/*.svg",
+    "web-v2/web/src/lib/utils/axios/**/*",
+    "web-v2/web/src/types/axios.d.ts",
+    "web-v2/web/yarn.lock"
   )
 
   // Add .gitignore excludes to the Apache Rat exclusion list.
@@ -737,7 +737,7 @@ tasks {
       ":lance:lance-rest-server:copyLibAndConfigs",
       ":maintenance:optimizer:copyLibAndConfigs",
       ":web:web:build",
-      ":web:web-v2:build"
+      ":web-v2:web:build"
     )
 
     group = "gravitino distribution"
@@ -746,8 +746,8 @@ tasks {
       copy {
         from(projectDir.dir("conf")) { into("package/conf") }
         from(projectDir.dir("bin")) { into("package/bin") }
-        from(projectDir.dir("web/web/build/libs/${rootProject.name}-web-v1.war")) { into("package/web") }
-        from(projectDir.dir("web/web-v2/build/libs/${rootProject.name}-web-v2-$version.war")) { into("package/web-v2") }
+        from(projectDir.dir("web/web/build/libs/${rootProject.name}-web-$version.war")) { into("package/web") }
+        from(projectDir.dir("web-v2/web/build/libs/${rootProject.name}-web-$version.war")) { into("package/web-v2") }
         from(projectDir.dir("scripts")) { into("package/scripts") }
         into(outputDir)
         rename { fileName ->
@@ -770,9 +770,9 @@ tasks {
         from(projectDir.dir("web/web/licenses")) { into("package/web/licenses") }
         from(projectDir.dir("web/web/LICENSE.bin")) { into("package/web") }
         from(projectDir.dir("web/web/NOTICE.bin")) { into("package/web") }
-        from(projectDir.dir("web/web-v2/licenses")) { into("package/web-v2/licenses") }
-        from(projectDir.dir("web/web-v2/LICENSE.bin")) { into("package/web-v2") }
-        from(projectDir.dir("web/web-v2/NOTICE.bin")) { into("package/web-v2") }
+        from(projectDir.dir("web-v2/web/licenses")) { into("package/web-v2/licenses") }
+        from(projectDir.dir("web-v2/web/LICENSE.bin")) { into("package/web-v2") }
+        from(projectDir.dir("web-v2/web/NOTICE.bin")) { into("package/web-v2") }
         into(outputDir)
         rename { fileName ->
           fileName.replace(".bin", "")
