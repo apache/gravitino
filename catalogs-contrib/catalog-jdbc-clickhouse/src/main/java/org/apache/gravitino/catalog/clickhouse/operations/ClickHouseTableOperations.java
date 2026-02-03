@@ -323,7 +323,7 @@ public class ClickHouseTableOperations extends JdbcTableOperations {
         "ClickHouseTableOperations.generateAlterTableSql is not implemented yet.");
   }
 
-  private void appendColumnDefinition(JdbcColumn column, StringBuilder sqlBuilder) {
+  private StringBuilder appendColumnDefinition(JdbcColumn column, StringBuilder sqlBuilder) {
     // Add Nullable data type
     String dataType = typeConverter.fromGravitino(column.dataType());
     if (column.nullable()) {
@@ -344,5 +344,7 @@ public class ClickHouseTableOperations extends JdbcTableOperations {
       String escapedComment = StringUtils.replace(column.comment(), "'", "''");
       sqlBuilder.append("COMMENT '%s' ".formatted(escapedComment));
     }
+
+    return sqlBuilder;
   }
 }
