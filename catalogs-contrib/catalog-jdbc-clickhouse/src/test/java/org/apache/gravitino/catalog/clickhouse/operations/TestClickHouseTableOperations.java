@@ -40,6 +40,7 @@ import org.apache.gravitino.catalog.clickhouse.converter.ClickHouseTypeConverter
 import org.apache.gravitino.catalog.jdbc.JdbcColumn;
 import org.apache.gravitino.catalog.jdbc.JdbcTable;
 import org.apache.gravitino.exceptions.GravitinoRuntimeException;
+import org.apache.gravitino.rel.Column;
 import org.apache.gravitino.rel.TableChange;
 import org.apache.gravitino.rel.expressions.NamedReference;
 import org.apache.gravitino.rel.expressions.distributions.Distributions;
@@ -173,7 +174,7 @@ public class TestClickHouseTableOperations extends TestClickHouse {
     Assertions.assertTrue(
         StringUtils.contains(
             gravitinoRuntimeException.getMessage(),
-            "alter table properties in ck is not supported"));
+            "Alter table properties in ClickHouse is not supported"));
 
     // delete column
     TABLE_OPERATIONS.alterTable(
@@ -190,7 +191,8 @@ public class TestClickHouseTableOperations extends TestClickHouse {
             IllegalArgumentException.class,
             () -> TABLE_OPERATIONS.alterTable(TEST_DB_NAME.toString(), newName, deleteColumn));
     Assertions.assertEquals(
-        "Delete column does not exist: " + newColumn.name(), illegalArgumentException.getMessage());
+        "Delete column '%s' does not exist.".formatted(newColumn.name()),
+        illegalArgumentException.getMessage());
     Assertions.assertDoesNotThrow(
         () ->
             TABLE_OPERATIONS.alterTable(
@@ -857,6 +859,228 @@ public class TestClickHouseTableOperations extends TestClickHouse {
         SortOrder[] sortOrders) {
       return generateCreateTableSql(
           tableName, columns, comment, properties, partitioning, distribution, indexes, sortOrders);
+    }
+  }
+
+  @Test
+  public void testGenerateAlterTableSqlCoverage() {
+    StubClickHouseTableOperations ops = new StubClickHouseTableOperations();
+    ops.initialize(
+        null,
+        new ClickHouseExceptionConverter(),
+        new ClickHouseTypeConverter(),
+        new ClickHouseColumnDefaultValueConverter(),
+        new HashMap<>());
+
+    JdbcTable table = buildStubTable();
+    ops.setTable(table);
+
+    TableChange[] changes =
+        new TableChange[] {
+          TableChange.addColumn(
+              new String[] {"c_new"},
+              Types.StringType.get(),
+              "new column",
+              TableChange.ColumnPosition.after("c1"),
+              true,
+              false,
+              Column.DEFAULT_VALUE_NOT_SET),
+          TableChange.updateColumnDefaultValue(
+              new String[] {"c2"}, Literals.of("val", Types.StringType.get())),
+          TableChange.updateColumnType(new String[] {"c1"}, Types.LongType.get()),
+          TableChange.updateColumnComment(new String[] {"c1"}, "c1_comment"),
+          TableChange.updateColumnPosition(new String[] {"c1"}, TableChange.ColumnPosition.first()),
+          TableChange.deleteColumn(new String[] {"c3"}, false),
+          TableChange.updateColumnNullability(new String[] {"c2"}, false),
+          TableChange.deleteIndex("idx1", false),
+          TableChange.updateColumnAutoIncrement(new String[] {"c1"}, true),
+          TableChange.renameColumn(new String[] {"c2"}, "c2_new"),
+          TableChange.updateComment("new_table_comment")
+        };
+
+    String sql = ops.buildAlterSql("db", "tbl", changes);
+
+    Assertions.assertTrue(sql.contains("ADD COLUMN `c_new` Nullable(String)"));
+    Assertions.assertTrue(sql.contains("RENAME COLUMN `c2` TO `c2_new`"));
+    Assertions.assertTrue(sql.contains("DEFAULT 'val'"));
+    Assertions.assertTrue(sql.contains("Int64"));
+    Assertions.assertTrue(sql.contains("COMMENT 'c1_comment'"));
+    Assertions.assertTrue(sql.contains("FIRST"));
+    Assertions.assertTrue(sql.contains("DROP COLUMN `c3`"));
+    Assertions.assertTrue(sql.contains("DROP INDEX `idx1`"));
+    Assertions.assertTrue(sql.contains("MODIFY COMMENT 'new_table_comment'"));
+    Assertions.assertTrue(sql.startsWith("ALTER TABLE `tbl`"));
+  }
+
+  @Test
+  public void testAlterTableDeleteColumnIfExistsNoOpReturnsEmpty() {
+    StubClickHouseTableOperations ops = new StubClickHouseTableOperations();
+    ops.initialize(
+        null,
+        new ClickHouseExceptionConverter(),
+        new ClickHouseTypeConverter(),
+        new ClickHouseColumnDefaultValueConverter(),
+        new HashMap<>());
+    ops.setTable(buildStubTable());
+
+    String sql =
+        ops.buildAlterSql(
+            "db",
+            "tbl",
+            new TableChange[] {TableChange.deleteColumn(new String[] {"missing"}, true)});
+    Assertions.assertEquals("", sql);
+  }
+
+  @Test
+  public void testAlterTableDeleteIndexBranches() {
+    StubClickHouseTableOperations ops = new StubClickHouseTableOperations();
+    ops.initialize(
+        null,
+        new ClickHouseExceptionConverter(),
+        new ClickHouseTypeConverter(),
+        new ClickHouseColumnDefaultValueConverter(),
+        new HashMap<>());
+    ops.setTable(buildStubTable());
+
+    String sqlSkip =
+        ops.buildAlterSql(
+            "db", "tbl", new TableChange[] {TableChange.deleteIndex("missing", true)});
+    Assertions.assertEquals("", sqlSkip);
+
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () ->
+            ops.buildAlterSql(
+                "db", "tbl", new TableChange[] {TableChange.deleteIndex("missing", false)}));
+  }
+
+  @Test
+  public void testAlterTableNullabilityValidationFails() {
+    StubClickHouseTableOperations ops = new StubClickHouseTableOperations();
+    ops.initialize(
+        null,
+        new ClickHouseExceptionConverter(),
+        new ClickHouseTypeConverter(),
+        new ClickHouseColumnDefaultValueConverter(),
+        new HashMap<>());
+    ops.setTable(buildStubTableWithNullDefault());
+
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () ->
+            ops.buildAlterSql(
+                "db",
+                "tbl",
+                new TableChange[] {
+                  TableChange.updateColumnNullability(new String[] {"c3"}, false)
+                }));
+  }
+
+  @Test
+  public void testAlterTableSetPropertyUnsupported() {
+    StubClickHouseTableOperations ops = new StubClickHouseTableOperations();
+    ops.initialize(
+        null,
+        new ClickHouseExceptionConverter(),
+        new ClickHouseTypeConverter(),
+        new ClickHouseColumnDefaultValueConverter(),
+        new HashMap<>());
+    ops.setTable(buildStubTable());
+
+    Assertions.assertThrows(
+        UnsupportedOperationException.class,
+        () ->
+            ops.buildAlterSql("db", "tbl", new TableChange[] {TableChange.setProperty("k", "v")}));
+  }
+
+  @Test
+  public void testAlterTableRemovePropertyUnsupported() {
+    StubClickHouseTableOperations ops = new StubClickHouseTableOperations();
+    ops.initialize(
+        null,
+        new ClickHouseExceptionConverter(),
+        new ClickHouseTypeConverter(),
+        new ClickHouseColumnDefaultValueConverter(),
+        new HashMap<>());
+    ops.setTable(buildStubTable());
+
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () -> ops.buildAlterSql("db", "tbl", new TableChange[] {TableChange.removeProperty("k")}));
+  }
+
+  private static JdbcTable buildStubTable() {
+    JdbcColumn c1 =
+        JdbcColumn.builder()
+            .withName("c1")
+            .withType(Types.IntegerType.get())
+            .withNullable(false)
+            .withDefaultValue(Literals.integerLiteral(1))
+            .build();
+    JdbcColumn c2 =
+        JdbcColumn.builder()
+            .withName("c2")
+            .withType(Types.StringType.get())
+            .withNullable(true)
+            .withDefaultValue(Literals.of("x", Types.StringType.get()))
+            .build();
+    JdbcColumn c3 =
+        JdbcColumn.builder()
+            .withName("c3")
+            .withType(Types.StringType.get())
+            .withNullable(true)
+            .withDefaultValue(DEFAULT_VALUE_NOT_SET)
+            .build();
+    return JdbcTable.builder()
+        .withName("tbl")
+        .withColumns(new JdbcColumn[] {c1, c2, c3})
+        .withIndexes(
+            new Index[] {
+              Indexes.primary(Indexes.DEFAULT_PRIMARY_KEY_NAME, new String[][] {{"c1"}}),
+              Indexes.unique("idx1", new String[][] {{"c2"}})
+            })
+        .withComment("table_comment")
+        .withTableOperation(null)
+        .build();
+  }
+
+  private static JdbcTable buildStubTableWithNullDefault() {
+    JdbcColumn c1 = JdbcColumn.builder().withName("c1").withType(Types.IntegerType.get()).build();
+    JdbcColumn c2 = JdbcColumn.builder().withName("c2").withType(Types.StringType.get()).build();
+    JdbcColumn c3 =
+        JdbcColumn.builder()
+            .withName("c3")
+            .withType(Types.StringType.get())
+            .withNullable(true)
+            .withDefaultValue(Literals.NULL)
+            .build();
+    return JdbcTable.builder()
+        .withName("tbl")
+        .withColumns(new JdbcColumn[] {c1, c2, c3})
+        .withIndexes(
+            new Index[] {
+              Indexes.primary(Indexes.DEFAULT_PRIMARY_KEY_NAME, new String[][] {{"c1"}})
+            })
+        .withComment("table_comment")
+        .withTableOperation(null)
+        .build();
+  }
+
+  private static final class StubClickHouseTableOperations extends ClickHouseTableOperations {
+    private JdbcTable table;
+
+    void setTable(JdbcTable table) {
+      this.table = table;
+    }
+
+    @Override
+    protected JdbcTable getOrCreateTable(
+        String databaseName, String tableName, JdbcTable lazyLoadCreateTable) {
+      return table;
+    }
+
+    String buildAlterSql(String db, String tableName, TableChange[] changes) {
+      return generateAlterTableSql(db, tableName, changes);
     }
   }
 }
