@@ -72,19 +72,6 @@ public class ViewMetaService {
     return viewId;
   }
 
-  @Monitored(
-      metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME,
-      baseMetricName = "listViewPOsByNamespace")
-  public List<ViewPO> listViewPOsByNamespace(Namespace namespace) {
-    NamespaceUtil.checkView(namespace);
-
-    Long schemaId =
-        EntityIdService.getEntityId(
-            NameIdentifier.of(namespace.levels()), Entity.EntityType.SCHEMA);
-    return SessionUtils.getWithoutCommit(
-        ViewMetaMapper.class, mapper -> mapper.listViewPOsBySchemaId(schemaId));
-  }
-
   @Monitored(metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME, baseMetricName = "insertView")
   public void insertView(ViewPO viewPO, boolean overwrite) throws IOException {
     try {
@@ -122,6 +109,7 @@ public class ViewMetaService {
       metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME,
       baseMetricName = "listViewsByNamespace")
   public List<GenericEntity> listViewsByNamespace(Namespace namespace) {
+    NamespaceUtil.checkView(namespace);
     List<ViewPO> viewPOs = listViewPOsByNamespace(namespace);
     return viewPOs.stream()
         .map(
@@ -323,5 +311,13 @@ public class ViewMetaService {
     ViewPO.Builder builder = ViewPO.builder();
     fillViewPOBuilderParentEntityId(builder, namespace);
     return builder;
+  }
+
+  private List<ViewPO> listViewPOsByNamespace(Namespace namespace) {
+    Long schemaId =
+        EntityIdService.getEntityId(
+            NameIdentifier.of(namespace.levels()), Entity.EntityType.SCHEMA);
+    return SessionUtils.getWithoutCommit(
+        ViewMetaMapper.class, mapper -> mapper.listViewPOsBySchemaId(schemaId));
   }
 }
