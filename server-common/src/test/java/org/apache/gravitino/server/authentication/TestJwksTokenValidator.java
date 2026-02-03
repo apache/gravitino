@@ -389,4 +389,163 @@ public class TestJwksTokenValidator {
     // The message should not contain "not initialized" or similar
     assertTrue(exception.getMessage().toLowerCase().contains("jwt"));
   }
+
+  @Test
+  public void testPrincipalMapperWithDefaultPattern() throws Exception {
+    // Generate a test RSA key pair
+    RSAKey rsaKey =
+        new RSAKeyGenerator(2048).keyID("test-key-id").algorithm(JWSAlgorithm.RS256).generate();
+
+    // Create a signed JWT token with email as subject
+    JWTClaimsSet claimsSet =
+        new JWTClaimsSet.Builder()
+            .subject("user@example.com")
+            .audience("test-service")
+            .issuer("https://test-issuer.com")
+            .expirationTime(Date.from(Instant.now().plusSeconds(3600)))
+            .issueTime(Date.from(Instant.now()))
+            .build();
+
+    SignedJWT signedJWT =
+        new SignedJWT(
+            new JWSHeader.Builder(JWSAlgorithm.RS256).keyID("test-key-id").build(), claimsSet);
+
+    JWSSigner signer = new RSASSASigner(rsaKey);
+    signedJWT.sign(signer);
+
+    String tokenString = signedJWT.serialize();
+
+    // Mock the JWKSourceBuilder to return our test key
+    try (MockedStatic<JWKSourceBuilder> mockedBuilder = mockStatic(JWKSourceBuilder.class)) {
+      @SuppressWarnings("unchecked")
+      JWKSource<SecurityContext> mockJwkSource = mock(JWKSource.class);
+      @SuppressWarnings("unchecked")
+      JWKSourceBuilder<SecurityContext> mockBuilder = mock(JWKSourceBuilder.class);
+
+      mockedBuilder.when(() -> JWKSourceBuilder.create(any(URL.class))).thenReturn(mockBuilder);
+      when(mockBuilder.build()).thenReturn(mockJwkSource);
+      when(mockJwkSource.get(any(), any())).thenReturn(Arrays.asList(rsaKey));
+
+      // Initialize validator with default user mapping pattern
+      Map<String, String> config = new HashMap<>();
+      config.put(
+          "gravitino.authenticator.oauth.jwksUri", "https://test-jwks.com/.well-known/jwks.json");
+      config.put("gravitino.authenticator.oauth.authority", "https://test-issuer.com");
+      config.put("gravitino.authenticator.oauth.principalMapper", "regex");
+      config.put("gravitino.authenticator.oauth.principalMapper.regex.pattern", "(.*)");
+      config.put("gravitino.authenticator.oauth.allowSkewSecs", "120");
+
+      validator.initialize(createConfig(config));
+      Principal result = validator.validateToken(tokenString, "test-service");
+
+      assertNotNull(result);
+      assertEquals("user@example.com", result.getName());
+    }
+  }
+
+  @Test
+  public void testPrincipalMapperExtractEmailLocalPart() throws Exception {
+    // Generate a test RSA key pair
+    RSAKey rsaKey =
+        new RSAKeyGenerator(2048).keyID("test-key-id").algorithm(JWSAlgorithm.RS256).generate();
+
+    // Create a signed JWT token with email as subject
+    JWTClaimsSet claimsSet =
+        new JWTClaimsSet.Builder()
+            .subject("john.doe@example.com")
+            .audience("test-service")
+            .issuer("https://test-issuer.com")
+            .expirationTime(Date.from(Instant.now().plusSeconds(3600)))
+            .issueTime(Date.from(Instant.now()))
+            .build();
+
+    SignedJWT signedJWT =
+        new SignedJWT(
+            new JWSHeader.Builder(JWSAlgorithm.RS256).keyID("test-key-id").build(), claimsSet);
+
+    JWSSigner signer = new RSASSASigner(rsaKey);
+    signedJWT.sign(signer);
+
+    String tokenString = signedJWT.serialize();
+
+    // Mock the JWKSourceBuilder to return our test key
+    try (MockedStatic<JWKSourceBuilder> mockedBuilder = mockStatic(JWKSourceBuilder.class)) {
+      @SuppressWarnings("unchecked")
+      JWKSource<SecurityContext> mockJwkSource = mock(JWKSource.class);
+      @SuppressWarnings("unchecked")
+      JWKSourceBuilder<SecurityContext> mockBuilder = mock(JWKSourceBuilder.class);
+
+      mockedBuilder.when(() -> JWKSourceBuilder.create(any(URL.class))).thenReturn(mockBuilder);
+      when(mockBuilder.build()).thenReturn(mockJwkSource);
+      when(mockJwkSource.get(any(), any())).thenReturn(Arrays.asList(rsaKey));
+
+      // Initialize validator with pattern to extract email local part
+      Map<String, String> config = new HashMap<>();
+      config.put(
+          "gravitino.authenticator.oauth.jwksUri", "https://test-jwks.com/.well-known/jwks.json");
+      config.put("gravitino.authenticator.oauth.authority", "https://test-issuer.com");
+      config.put("gravitino.authenticator.oauth.principalMapper", "regex");
+      config.put("gravitino.authenticator.oauth.principalMapper.regex.pattern", "([^@]+)@.*");
+      config.put("gravitino.authenticator.oauth.allowSkewSecs", "120");
+
+      validator.initialize(createConfig(config));
+      Principal result = validator.validateToken(tokenString, "test-service");
+
+      assertNotNull(result);
+      assertEquals("john.doe", result.getName());
+    }
+  }
+
+  @Test
+  public void testPrincipalMapperNoMatch() throws Exception {
+    // Generate a test RSA key pair
+    RSAKey rsaKey =
+        new RSAKeyGenerator(2048).keyID("test-key-id").algorithm(JWSAlgorithm.RS256).generate();
+
+    // Create a signed JWT token with simple username (no @)
+    JWTClaimsSet claimsSet =
+        new JWTClaimsSet.Builder()
+            .subject("plainuser")
+            .audience("test-service")
+            .issuer("https://test-issuer.com")
+            .expirationTime(Date.from(Instant.now().plusSeconds(3600)))
+            .issueTime(Date.from(Instant.now()))
+            .build();
+
+    SignedJWT signedJWT =
+        new SignedJWT(
+            new JWSHeader.Builder(JWSAlgorithm.RS256).keyID("test-key-id").build(), claimsSet);
+
+    JWSSigner signer = new RSASSASigner(rsaKey);
+    signedJWT.sign(signer);
+
+    String tokenString = signedJWT.serialize();
+
+    // Mock the JWKSourceBuilder to return our test key
+    try (MockedStatic<JWKSourceBuilder> mockedBuilder = mockStatic(JWKSourceBuilder.class)) {
+      @SuppressWarnings("unchecked")
+      JWKSource<SecurityContext> mockJwkSource = mock(JWKSource.class);
+      @SuppressWarnings("unchecked")
+      JWKSourceBuilder<SecurityContext> mockBuilder = mock(JWKSourceBuilder.class);
+
+      mockedBuilder.when(() -> JWKSourceBuilder.create(any(URL.class))).thenReturn(mockBuilder);
+      when(mockBuilder.build()).thenReturn(mockJwkSource);
+      when(mockJwkSource.get(any(), any())).thenReturn(Arrays.asList(rsaKey));
+
+      // Initialize validator with pattern that requires @ (won't match)
+      Map<String, String> config = new HashMap<>();
+      config.put(
+          "gravitino.authenticator.oauth.jwksUri", "https://test-jwks.com/.well-known/jwks.json");
+      config.put("gravitino.authenticator.oauth.authority", "https://test-issuer.com");
+      config.put("gravitino.authenticator.oauth.principalMapper", "regex");
+      config.put("gravitino.authenticator.oauth.principalMapper.regex.pattern", "([^@]+)@.*");
+      config.put("gravitino.authenticator.oauth.allowSkewSecs", "120");
+
+      validator.initialize(createConfig(config));
+      Principal result = validator.validateToken(tokenString, "test-service");
+
+      assertNotNull(result);
+      assertEquals("plainuser", result.getName());
+    }
+  }
 }

@@ -40,6 +40,7 @@ dependencies {
   implementation(libs.bundles.kerby)
   implementation(libs.bundles.log4j)
   implementation(libs.bundles.metrics)
+  implementation(libs.caffeine)
   implementation(libs.commons.lang3)
   implementation(libs.guava)
   implementation(libs.jackson.datatype.jdk8)

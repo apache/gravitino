@@ -23,6 +23,8 @@ import java.util.List;
 import org.apache.gravitino.storage.relational.mapper.CatalogMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.FilesetMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.FilesetVersionMapper;
+import org.apache.gravitino.storage.relational.mapper.FunctionMetaMapper;
+import org.apache.gravitino.storage.relational.mapper.FunctionVersionMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.GroupMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.GroupRoleRelMapper;
 import org.apache.gravitino.storage.relational.mapper.JobMetaMapper;
@@ -58,6 +60,8 @@ public class DefaultMapperPackageProvider implements MapperPackageProvider {
         CatalogMetaMapper.class,
         FilesetMetaMapper.class,
         FilesetVersionMapper.class,
+        FunctionMetaMapper.class,
+        FunctionVersionMetaMapper.class,
         GroupMetaMapper.class,
         GroupRoleRelMapper.class,
         JobMetaMapper.class,
