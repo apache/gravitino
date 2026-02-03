@@ -71,7 +71,6 @@ public class ClickHouseTypeConverter extends JdbcTypeConverter {
   static final String Dynamic = "Dynamic";
   static final String JSON = "JSON";
 
-
   private static final int MAX_PRECISION = 76;
 
   @Override
@@ -121,8 +120,7 @@ public class ClickHouseTypeConverter extends JdbcTypeConverter {
 
         if (scale > precision || scale < 0) {
           throw new IllegalArgumentException(
-              String.format(
-                  "Decimal scale %s is out of range [0, %s]", scale, precision));
+              String.format("Decimal scale %s is out of range [0, %s]", scale, precision));
         }
 
         return Types.DecimalType.of(precision, scale);
