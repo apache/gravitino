@@ -23,6 +23,9 @@ export GRAVITINO_HOME=$GRAVITINO_ROOT_DIR
 export GRAVITINO_TEST=true
 export HADOOP_USER_NAME=anonymous
 
+DEFAULT_TRINO_VERSION=435
+DEFAULT_TRINO_CONNECTOR_DIR=$GRAVITINO_ROOT_DIR/trino-connector/trino-connector-435-439/build/libs
+
 echo $GRAVITINO_ROOT_DIR
 cd $GRAVITINO_ROOT_DIR
 
@@ -49,11 +52,11 @@ done
 set -- "${new_args[@]}"
 
 if [ "$has_trino_version" = false ]; then
-  set -- "$@" --trino_version=435
+  set -- "$@" --trino_version=$DEFAULT_TRINO_VERSION
 fi
 
 if [ "$has_trino_connector_dir" = false ]; then
-  set -- "$@" "--trino_connector_dir=$GRAVITINO_ROOT_DIR/trino-connector/trino-connector-435-439/build/libs"
+  set -- "$@" "--trino_connector_dir=$DEFAULT_TRINO_CONNECTOR_DIR"
 fi
 
 args="\"$@\""
