@@ -77,11 +77,8 @@ public class ClickHouseColumnDefaultValueConverter extends JdbcColumnDefaultValu
       return nullable ? Literals.NULL : DEFAULT_VALUE_NOT_SET;
     }
 
-    String realType = type.getTypeName();
-    if (realType.startsWith("Nullable(")) {
-      realType =
-          type.getTypeName().substring("Nullable(".length(), type.getTypeName().length() - 1);
-    }
+    // Handle Nullable type Nullable(type) -> type
+    String realType = TypeUtils.stripNullable(type.getTypeName());
 
     if (realType.startsWith("Decimal(")) {
       realType = "Decimal";

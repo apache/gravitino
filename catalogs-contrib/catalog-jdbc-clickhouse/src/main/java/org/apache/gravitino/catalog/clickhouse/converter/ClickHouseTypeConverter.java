@@ -24,6 +24,7 @@ import org.apache.gravitino.rel.types.Types;
 
 /** Type converter for ClickHouse. */
 public class ClickHouseTypeConverter extends JdbcTypeConverter {
+
   static final String INT8 = "Int8";
   static final String INT16 = "Int16";
   static final String INT32 = "Int32";
@@ -75,9 +76,11 @@ public class ClickHouseTypeConverter extends JdbcTypeConverter {
 
   @Override
   public Type toGravitino(JdbcTypeBean typeBean) {
-    String typeName = typeBean.getTypeName();
-    if (typeName.startsWith("Nullable(")) {
-      typeName = typeName.substring("Nullable(".length(), typeName.length() - 1);
+    String typeName = TypeUtils.stripNullable(typeBean.getTypeName());
+
+    Integer dateTimePrecision = TypeUtils.extractDateTimePrecision(typeName);
+    if (dateTimePrecision != null) {
+      return Types.TimestampType.withoutTimeZone(dateTimePrecision);
     }
 
     if (typeName.startsWith("Decimal(")) {
@@ -130,14 +133,10 @@ public class ClickHouseTypeConverter extends JdbcTypeConverter {
         return Types.FixedCharType.of(typeBean.getColumnSize());
       case DATE:
         return Types.DateType.get();
-      case DATE32:
-        return Types.DateType.get();
+        // No type mapping for date32, we will use external type to handle it.
       case DATETIME:
-        // Gravitino timestamp type does not support time zones with detail zone name like 'UTC'
-        // or 'America/Los_Angeles'. So we ignore it here and use ExternalType for such cases.
-        return Types.TimestampType.withoutTimeZone();
-      case DATETIME64:
-        return Types.TimestampType.withoutTimeZone(typeBean.getDatetimePrecision());
+        // Default is 0 precision
+        return Types.TimestampType.withoutTimeZone(0);
       case BOOL:
         return Types.BooleanType.get();
       case UUID:
@@ -165,10 +164,9 @@ public class ClickHouseTypeConverter extends JdbcTypeConverter {
       return STRING;
     } else if (type instanceof Types.DateType) {
       return DATE;
-    } else if (type instanceof Types.TimestampType timestampType) {
-      if (timestampType.hasPrecisionSet()) {
-        return String.format("%s(%s)", DATETIME64, timestampType.precision());
-      }
+    } else if (type instanceof Types.TimestampType) {
+      // Gravitino timestamp type maps to ClickHouse DateTime with precision 0, and
+      // Use the external type to handle DateTime64
       return DATETIME;
     } else if (type instanceof Types.TimeType) {
       return TIME;

@@ -65,7 +65,7 @@ public class TestClickHouseTableOperations extends TestClickHouse {
   private static final Type LONG = Types.LongType.get();
 
   @Test
-  public void testCreateTable() {
+  public void testCreateAndAlterTable() {
     String tableName = RandomStringUtils.randomAlphabetic(16) + "_op_table";
     String tableComment = "test_comment";
     List<JdbcColumn> columns = new ArrayList<>();
@@ -381,7 +381,7 @@ public class TestClickHouseTableOperations extends TestClickHouse {
     columns.add(
         JdbcColumn.builder()
             .withName("col_3")
-            .withType(Types.TimestampType.withoutTimeZone())
+            .withType(Types.TimestampType.withoutTimeZone(0))
             .withNullable(false)
             .withComment("timestamp")
             .withDefaultValue(Literals.timestampLiteral(LocalDateTime.parse("2013-01-01T00:00:00")))
@@ -462,7 +462,7 @@ public class TestClickHouseTableOperations extends TestClickHouse {
     columns.add(
         JdbcColumn.builder()
             .withName("col_3")
-            .withType(Types.TimestampType.withoutTimeZone())
+            .withType(Types.TimestampType.withoutTimeZone(0))
             .withNullable(false)
             .withComment("timestamp")
             .withDefaultValue(Literals.timestampLiteral(LocalDateTime.parse("2013-01-01T00:00:00")))
@@ -493,6 +493,170 @@ public class TestClickHouseTableOperations extends TestClickHouse {
     JdbcTable loaded = TABLE_OPERATIONS.load(TEST_DB_NAME.toString(), tableName);
     assertionsTableInfo(
         tableName, tableComment, columns, properties, indexes, Transforms.EMPTY_TRANSFORM, loaded);
+  }
+
+  @Test
+  public void testTypeConversionAgainstCluster() {
+    String tableName = RandomStringUtils.randomAlphabetic(16) + "_type_conv";
+
+    List<JdbcColumn> columns = new ArrayList<>();
+    columns.add(
+        JdbcColumn.builder()
+            .withName("c_int8")
+            .withType(Types.ByteType.get())
+            .withNullable(false)
+            .build());
+    columns.add(
+        JdbcColumn.builder()
+            .withName("c_uint8")
+            .withType(Types.ByteType.unsigned())
+            .withNullable(false)
+            .build());
+    columns.add(
+        JdbcColumn.builder()
+            .withName("c_int16")
+            .withType(Types.ShortType.get())
+            .withNullable(false)
+            .build());
+    columns.add(
+        JdbcColumn.builder()
+            .withName("c_uint16")
+            .withType(Types.ShortType.unsigned())
+            .withNullable(false)
+            .build());
+    columns.add(
+        JdbcColumn.builder()
+            .withName("c_int32")
+            .withType(Types.IntegerType.get())
+            .withNullable(false)
+            .build());
+    columns.add(
+        JdbcColumn.builder()
+            .withName("c_uint32")
+            .withType(Types.IntegerType.unsigned())
+            .withNullable(false)
+            .build());
+    columns.add(
+        JdbcColumn.builder()
+            .withName("c_decimal")
+            .withType(Types.DecimalType.of(10, 2))
+            .withNullable(false)
+            .build());
+    columns.add(
+        JdbcColumn.builder()
+            .withName("c_uint64")
+            .withType(Types.LongType.unsigned())
+            .withNullable(false)
+            .build());
+    columns.add(
+        JdbcColumn.builder()
+            .withName("c_float32")
+            .withType(Types.FloatType.get())
+            .withNullable(false)
+            .build());
+    columns.add(
+        JdbcColumn.builder()
+            .withName("c_float64")
+            .withType(Types.DoubleType.get())
+            .withNullable(false)
+            .build());
+    columns.add(
+        JdbcColumn.builder()
+            .withName("c_fixed")
+            .withType(Types.FixedCharType.of(3))
+            .withNullable(false)
+            .build());
+    columns.add(
+        JdbcColumn.builder()
+            .withName("c_string")
+            .withType(Types.StringType.get())
+            .withNullable(false)
+            .build());
+    columns.add(
+        JdbcColumn.builder()
+            .withName("c_varchar")
+            .withType(Types.VarCharType.of(5))
+            .withNullable(false)
+            .build());
+    columns.add(
+        JdbcColumn.builder()
+            .withName("c_date")
+            .withType(Types.DateType.get())
+            .withNullable(false)
+            .build());
+    columns.add(
+        JdbcColumn.builder()
+            .withName("c_ts")
+            .withType(Types.TimestampType.withoutTimeZone(0))
+            .withNullable(false)
+            .build());
+    columns.add(
+        JdbcColumn.builder()
+            .withName("c_dt64")
+            .withType(Types.ExternalType.of("DateTime64(3)"))
+            .withNullable(false)
+            .build());
+    columns.add(
+        JdbcColumn.builder()
+            .withName("c_bool")
+            .withType(Types.BooleanType.get())
+            .withNullable(false)
+            .build());
+    columns.add(
+        JdbcColumn.builder()
+            .withName("c_uuid")
+            .withType(Types.UUIDType.get())
+            .withNullable(false)
+            .build());
+    columns.add(
+        JdbcColumn.builder()
+            .withName("c_ipv4")
+            .withType(Types.ExternalType.of("IPv4"))
+            .withNullable(false)
+            .build());
+
+    Map<String, String> properties = new HashMap<>();
+    Index[] indexes =
+        new Index[] {
+          Indexes.primary(Indexes.DEFAULT_PRIMARY_KEY_NAME, new String[][] {{"c_int8"}})
+        };
+
+    TABLE_OPERATIONS.create(
+        TEST_DB_NAME.toString(),
+        tableName,
+        columns.toArray(new JdbcColumn[0]),
+        "type conversion",
+        properties,
+        null,
+        Distributions.NONE,
+        indexes,
+        getSortOrders("c_int8"));
+
+    JdbcTable loaded = TABLE_OPERATIONS.load(TEST_DB_NAME.toString(), tableName);
+
+    Assertions.assertEquals(Types.ByteType.get(), loaded.columns()[0].dataType());
+    Assertions.assertEquals(Types.ByteType.unsigned(), loaded.columns()[1].dataType());
+    Assertions.assertEquals(Types.ShortType.get(), loaded.columns()[2].dataType());
+    Assertions.assertEquals(Types.ShortType.unsigned(), loaded.columns()[3].dataType());
+    Assertions.assertEquals(Types.IntegerType.get(), loaded.columns()[4].dataType());
+    Assertions.assertEquals(Types.IntegerType.unsigned(), loaded.columns()[5].dataType());
+    Assertions.assertEquals(Types.DecimalType.of(10, 2), loaded.columns()[6].dataType());
+    Assertions.assertEquals(Types.LongType.unsigned(), loaded.columns()[7].dataType());
+    Assertions.assertEquals(Types.FloatType.get(), loaded.columns()[8].dataType());
+    Assertions.assertEquals(Types.DoubleType.get(), loaded.columns()[9].dataType());
+    Assertions.assertEquals(Types.FixedCharType.of(3), loaded.columns()[10].dataType());
+    Assertions.assertEquals(Types.StringType.get(), loaded.columns()[11].dataType());
+    Assertions.assertEquals(Types.StringType.get(), loaded.columns()[12].dataType());
+    Assertions.assertEquals(Types.DateType.get(), loaded.columns()[13].dataType());
+    Assertions.assertEquals(
+        Types.TimestampType.withoutTimeZone(0), loaded.columns()[14].dataType());
+    Assertions.assertEquals(
+        Types.ExternalType.of("DateTime64(3)"), loaded.columns()[15].dataType());
+    Assertions.assertEquals(Types.BooleanType.get(), loaded.columns()[16].dataType());
+    Assertions.assertEquals(Types.UUIDType.get(), loaded.columns()[17].dataType());
+    Assertions.assertEquals(Types.ExternalType.of("IPv4"), loaded.columns()[18].dataType());
+
+    Assertions.assertTrue(TABLE_OPERATIONS.drop(TEST_DB_NAME.toString(), tableName));
   }
 
   @Test
@@ -546,7 +710,7 @@ public class TestClickHouseTableOperations extends TestClickHouse {
     columns.add(
         JdbcColumn.builder()
             .withName("col_9")
-            .withType(Types.TimestampType.withoutTimeZone())
+            .withType(Types.TimestampType.withoutTimeZone(0))
             .withNullable(false)
             .build());
     columns.add(
