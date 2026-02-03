@@ -45,6 +45,7 @@ public class ClickHouseTypeConverter extends JdbcTypeConverter {
   static final String FIXEDSTRING = "FixedString";
   static final String DATE = "Date";
   static final String DATE32 = "Date32";
+  // DataTime with detail time zone is not directly supported in Gravitino.
   static final String DATETIME = "DateTime";
   static final String DATETIME64 = "DateTime64";
   static final String ENUM = "Enum";
@@ -70,11 +71,13 @@ public class ClickHouseTypeConverter extends JdbcTypeConverter {
   static final String Dynamic = "Dynamic";
   static final String JSON = "JSON";
 
+  private static final int MAX_PRECISION = 76;
+
   @Override
   public Type toGravitino(JdbcTypeBean typeBean) {
     String typeName = typeBean.getTypeName();
     if (typeName.startsWith("Nullable(")) {
-      typeName = typeName.substring(9, typeName.length() - 1);
+      typeName = typeName.substring("Nullable(".length(), typeName.length() - 1);
     }
 
     if (typeName.startsWith("Decimal(")) {
@@ -107,7 +110,20 @@ public class ClickHouseTypeConverter extends JdbcTypeConverter {
       case FLOAT64:
         return Types.DoubleType.get();
       case DECIMAL:
-        return Types.DecimalType.of(typeBean.getColumnSize(), typeBean.getScale());
+        int precision = typeBean.getColumnSize();
+        int scale = typeBean.getScale();
+        if (precision < 1 || precision > MAX_PRECISION) {
+          throw new IllegalArgumentException(
+              String.format(
+                  "Decimal precision %s is out of range [1, %s]", precision, MAX_PRECISION));
+        }
+
+        if (scale > precision || scale < 0) {
+          throw new IllegalArgumentException(
+              String.format("Decimal scale %s is out of range [0, %s]", scale, precision));
+        }
+
+        return Types.DecimalType.of(precision, scale);
       case STRING:
         return Types.StringType.get();
       case FIXEDSTRING:
@@ -117,9 +133,11 @@ public class ClickHouseTypeConverter extends JdbcTypeConverter {
       case DATE32:
         return Types.DateType.get();
       case DATETIME:
+        // Gravitino timestamp type does not support time zones with detail zone name like 'UTC'
+        // or 'America/Los_Angeles'. So we ignore it here and use ExternalType for such cases.
         return Types.TimestampType.withoutTimeZone();
       case DATETIME64:
-        return Types.TimestampType.withoutTimeZone();
+        return Types.TimestampType.withoutTimeZone(typeBean.getDatetimePrecision());
       case BOOL:
         return Types.BooleanType.get();
       case UUID:
@@ -147,10 +165,13 @@ public class ClickHouseTypeConverter extends JdbcTypeConverter {
       return STRING;
     } else if (type instanceof Types.DateType) {
       return DATE;
-    } else if (type instanceof Types.TimestampType) {
+    } else if (type instanceof Types.TimestampType timestampType) {
+      if (timestampType.hasPrecisionSet()) {
+        return String.format("%s(%s)", DATETIME64, timestampType.precision());
+      }
       return DATETIME;
     } else if (type instanceof Types.TimeType) {
-      return INT64;
+      return TIME;
     } else if (type instanceof Types.DecimalType decimalType) {
       return String.format("%s(%s,%s)", DECIMAL, decimalType.precision(), decimalType.scale());
     } else if (type instanceof Types.VarCharType) {

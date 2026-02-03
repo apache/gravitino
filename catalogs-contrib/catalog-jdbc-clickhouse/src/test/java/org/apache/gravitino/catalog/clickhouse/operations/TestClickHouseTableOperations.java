@@ -31,12 +31,21 @@ import java.util.List;
 import java.util.Map;
 import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.gravitino.catalog.clickhouse.ClickHouseConstants;
+import org.apache.gravitino.catalog.clickhouse.ClickHouseTablePropertiesMetadata;
+import org.apache.gravitino.catalog.clickhouse.ClickHouseUtils;
+import org.apache.gravitino.catalog.clickhouse.converter.ClickHouseColumnDefaultValueConverter;
+import org.apache.gravitino.catalog.clickhouse.converter.ClickHouseExceptionConverter;
+import org.apache.gravitino.catalog.clickhouse.converter.ClickHouseTypeConverter;
 import org.apache.gravitino.catalog.jdbc.JdbcColumn;
 import org.apache.gravitino.catalog.jdbc.JdbcTable;
 import org.apache.gravitino.exceptions.GravitinoRuntimeException;
 import org.apache.gravitino.rel.TableChange;
+import org.apache.gravitino.rel.expressions.NamedReference;
 import org.apache.gravitino.rel.expressions.distributions.Distributions;
 import org.apache.gravitino.rel.expressions.literals.Literals;
+import org.apache.gravitino.rel.expressions.sorts.SortOrder;
+import org.apache.gravitino.rel.expressions.transforms.Transform;
 import org.apache.gravitino.rel.expressions.transforms.Transforms;
 import org.apache.gravitino.rel.indexes.Index;
 import org.apache.gravitino.rel.indexes.Indexes;
@@ -55,7 +64,7 @@ public class TestClickHouseTableOperations extends TestClickHouse {
   private static final Type LONG = Types.LongType.get();
 
   @Test
-  public void testOperationTable() {
+  public void testCreateTable() {
     String tableName = RandomStringUtils.randomAlphabetic(16) + "_op_table";
     String tableComment = "test_comment";
     List<JdbcColumn> columns = new ArrayList<>();
@@ -713,5 +722,141 @@ public class TestClickHouseTableOperations extends TestClickHouse {
         getSortOrders("col_1"));
     JdbcTable load = TABLE_OPERATIONS.load(TEST_DB_NAME.toString(), testTable1);
     Assertions.assertEquals("MergeTree", load.properties().get(CLICKHOUSE_ENGINE_KEY));
+  }
+
+  @Test
+  public void testGenerateCreateTableSqlBranchCoverage() {
+    TestableClickHouseTableOperations ops = new TestableClickHouseTableOperations();
+    ops.initialize(
+        null,
+        new ClickHouseExceptionConverter(),
+        new ClickHouseTypeConverter(),
+        new ClickHouseColumnDefaultValueConverter(),
+        new HashMap<>());
+
+    JdbcColumn col =
+        JdbcColumn.builder()
+            .withName("c1")
+            .withType(Types.IntegerType.get())
+            .withNullable(false)
+            .build();
+    Index[] indexes =
+        new Index[] {
+          Indexes.of(
+              Index.IndexType.PRIMARY_KEY,
+              Indexes.DEFAULT_PRIMARY_KEY_NAME,
+              new String[][] {{"c1"}})
+        };
+
+    // partitioning not supported
+    Assertions.assertThrows(
+        UnsupportedOperationException.class,
+        () ->
+            ops.buildCreateSql(
+                "t1",
+                new JdbcColumn[] {col},
+                null,
+                new HashMap<>(),
+                new Transform[] {Transforms.identity("p")},
+                Distributions.NONE,
+                indexes,
+                ClickHouseUtils.getSortOrders("c1")));
+
+    // distribution not NONE
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () ->
+            ops.buildCreateSql(
+                "t1",
+                new JdbcColumn[] {col},
+                null,
+                new HashMap<>(),
+                new Transform[0],
+                Distributions.hash(4, NamedReference.field("c1")),
+                indexes,
+                ClickHouseUtils.getSortOrders("c1")));
+
+    // MergeTree requires ORDER BY
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () ->
+            ops.buildCreateSql(
+                "t1",
+                new JdbcColumn[] {col},
+                null,
+                new HashMap<>(),
+                new Transform[0],
+                Distributions.NONE,
+                indexes,
+                new SortOrder[0]));
+
+    // MergeTree only supports single sortOrders
+    Assertions.assertThrows(
+        UnsupportedOperationException.class,
+        () ->
+            ops.buildCreateSql(
+                "t1",
+                new JdbcColumn[] {col},
+                null,
+                new HashMap<>(),
+                new Transform[0],
+                Distributions.NONE,
+                indexes,
+                new SortOrder[] {
+                  ClickHouseUtils.getSortOrders("c1")[0], ClickHouseUtils.getSortOrders("c1")[0]
+                }));
+
+    // Engine without ORDER BY support should fail when sortOrders provided
+    Map<String, String> logEngineProps = new HashMap<>();
+    logEngineProps.put(
+        ClickHouseConstants.CLICKHOUSE_ENGINE_NAME,
+        ClickHouseTablePropertiesMetadata.ENGINE.LOG.getValue());
+    Assertions.assertThrows(
+        UnsupportedOperationException.class,
+        () ->
+            ops.buildCreateSql(
+                "t1",
+                new JdbcColumn[] {col},
+                null,
+                logEngineProps,
+                new Transform[0],
+                Distributions.NONE,
+                indexes,
+                ClickHouseUtils.getSortOrders("c1")));
+
+    // Settings and comment retained
+    Map<String, String> props = new HashMap<>();
+    props.put(
+        ClickHouseConstants.CLICKHOUSE_ENGINE_NAME,
+        ClickHouseTablePropertiesMetadata.ENGINE.MERGETREE.getValue());
+    props.put(ClickHouseConstants.SETTINGS_PREFIX + "max_threads", "8");
+    String sql =
+        ops.buildCreateSql(
+            "t1",
+            new JdbcColumn[] {col},
+            "co'mment",
+            props,
+            new Transform[0],
+            Distributions.NONE,
+            indexes,
+            ClickHouseUtils.getSortOrders("c1"));
+    Assertions.assertTrue(sql.contains("ENGINE = MergeTree"));
+    Assertions.assertTrue(sql.contains("SETTINGS max_threads = 8"));
+    Assertions.assertTrue(sql.contains("COMMENT 'co''mment'"));
+  }
+
+  private static final class TestableClickHouseTableOperations extends ClickHouseTableOperations {
+    String buildCreateSql(
+        String tableName,
+        JdbcColumn[] columns,
+        String comment,
+        Map<String, String> properties,
+        Transform[] partitioning,
+        org.apache.gravitino.rel.expressions.distributions.Distribution distribution,
+        Index[] indexes,
+        SortOrder[] sortOrders) {
+      return generateCreateTableSql(
+          tableName, columns, comment, properties, partitioning, distribution, indexes, sortOrders);
+    }
   }
 }

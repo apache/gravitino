@@ -101,12 +101,12 @@ public class ClickHouseTablePropertiesMetadata extends JdbcTablePropertiesMetada
   /** refer https://clickhouse.com/docs/en/engines/table-engines */
   public enum ENGINE {
     // MergeTree
-    MERGETREE("MergeTree"),
-    REPLACINGMERGETREE("ReplacingMergeTree"),
-    SUMMINGMERGETREE("SummingMergeTree"),
-    AGGREGATINGMERGETREE("AggregatingMergeTree"),
-    COLLAPSINGMERGETREE("CollapsingMergeTree"),
-    VERSIONEDCOLLAPSINGMERGETREE("VersionedCollapsingMergeTree"),
+    MERGETREE("MergeTree", true),
+    REPLACINGMERGETREE("ReplacingMergeTree", true),
+    SUMMINGMERGETREE("SummingMergeTree", true),
+    AGGREGATINGMERGETREE("AggregatingMergeTree", true),
+    COLLAPSINGMERGETREE("CollapsingMergeTree", true),
+    VERSIONEDCOLLAPSINGMERGETREE("VersionedCollapsingMergeTree", true),
     GRAPHITEMERGETREE("GraphiteMergeTree"),
 
     // Log
@@ -144,13 +144,33 @@ public class ClickHouseTablePropertiesMetadata extends JdbcTablePropertiesMetada
     KEEPER_MAP("KeeperMap");
 
     private final String value;
+    private final boolean requireOrderBy;
 
     ENGINE(String value) {
       this.value = value;
+      this.requireOrderBy = false;
+    }
+
+    ENGINE(String value, boolean requireOrderBy) {
+      this.value = value;
+      this.requireOrderBy = requireOrderBy;
     }
 
     public String getValue() {
-      return this.value;
+      return value;
+    }
+
+    public boolean isRequireOrderBy() {
+      return requireOrderBy;
+    }
+
+    public static ENGINE fromString(String engineText) {
+      for (ENGINE engine : ENGINE.values()) {
+        if (engine.value.equalsIgnoreCase(engineText)) {
+          return engine;
+        }
+      }
+      throw new IllegalArgumentException("Unknown ClickHouse engine: " + engineText);
     }
   }
 
