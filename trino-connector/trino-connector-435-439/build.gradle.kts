@@ -19,6 +19,8 @@
 
 import com.diffplug.gradle.spotless.SpotlessExtension
 import net.ltgt.gradle.errorprone.errorprone
+import org.gradle.internal.hash.ChecksumService
+import org.gradle.kotlin.dsl.support.serviceOf
 
 plugins {
   `java-library`
@@ -123,7 +125,7 @@ tasks {
     outputs.dir(distributionDir)
   }
 
-  register("assembleTrinoConnector", Tar::class) {
+  val assembleTrinoConnector by registering(Tar::class) {
     dependsOn(copyLibs)
     group = "gravitino distribution"
     finalizedBy("checksumTrinoConnector")
@@ -135,11 +137,10 @@ tasks {
     destinationDirectory.set(rootProject.layout.projectDirectory.dir("distribution"))
   }
 
-  register("checksumTrinoConnector") {
+  val checksumTrinoConnector by registering {
     group = "gravitino distribution"
-    val assembleTask = tasks.named<Tar>("assembleTrinoConnector")
-    dependsOn(assembleTask)
-    val archiveFile = assembleTask.flatMap { it.archiveFile }
+    dependsOn(assembleTrinoConnector)
+    val archiveFile = assembleTrinoConnector.flatMap { it.archiveFile }
     val checksumFile = archiveFile.map { archive ->
       archive.asFile.let { it.resolveSibling("${it.name}.sha256") }
     }
