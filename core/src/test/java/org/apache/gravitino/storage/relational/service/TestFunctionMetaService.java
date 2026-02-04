@@ -58,6 +58,7 @@ import org.apache.ibatis.session.SqlSession;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.TestTemplate;
 
+@SuppressWarnings("deprecation")
 public class TestFunctionMetaService extends TestJDBCBackend {
   private final String metalakeName = GravitinoITUtils.genRandomName("tst_metalake");
   private final String catalogName = GravitinoITUtils.genRandomName("tst_fn_catalog");
@@ -136,7 +137,6 @@ public class TestFunctionMetaService extends TestJDBCBackend {
             .withComment("updated comment")
             .withFunctionType(function.functionType())
             .withDeterministic(function.deterministic())
-            .withReturnType(function.returnType())
             .withDefinitions(function.definitions())
             .withAuditInfo(AUDIT_INFO)
             .build();
@@ -197,7 +197,6 @@ public class TestFunctionMetaService extends TestJDBCBackend {
             .withComment("updated comment")
             .withFunctionType(function.functionType())
             .withDeterministic(true)
-            .withReturnType(function.returnType())
             .withDefinitions(function.definitions())
             .withAuditInfo(AUDIT_INFO)
             .build();
@@ -263,7 +262,6 @@ public class TestFunctionMetaService extends TestJDBCBackend {
             .withComment("version 2 comment")
             .withFunctionType(function.functionType())
             .withDeterministic(function.deterministic())
-            .withReturnType(function.returnType())
             .withDefinitions(function.definitions())
             .withAuditInfo(AUDIT_INFO)
             .build();
@@ -300,7 +298,6 @@ public class TestFunctionMetaService extends TestJDBCBackend {
             .withComment("another function v2")
             .withFunctionType(anotherFunction.functionType())
             .withDeterministic(anotherFunction.deterministic())
-            .withReturnType(anotherFunction.returnType())
             .withDefinitions(anotherFunction.definitions())
             .withAuditInfo(AUDIT_INFO)
             .build();
@@ -314,7 +311,6 @@ public class TestFunctionMetaService extends TestJDBCBackend {
             .withComment("another function v3")
             .withFunctionType(anotherFunction.functionType())
             .withDeterministic(anotherFunction.deterministic())
-            .withReturnType(anotherFunction.returnType())
             .withDefinitions(anotherFunction.definitions())
             .withAuditInfo(AUDIT_INFO)
             .build();
@@ -391,7 +387,6 @@ public class TestFunctionMetaService extends TestJDBCBackend {
               .withComment("version " + version)
               .withFunctionType(function.functionType())
               .withDeterministic(function.deterministic())
-              .withReturnType(function.returnType())
               .withDefinitions(function.definitions())
               .withAuditInfo(AUDIT_INFO)
               .build();
@@ -441,7 +436,6 @@ public class TestFunctionMetaService extends TestJDBCBackend {
             .withComment("overwritten comment")
             .withFunctionType(function.functionType())
             .withDeterministic(true)
-            .withReturnType(function.returnType())
             .withDefinitions(function.definitions())
             .withAuditInfo(AUDIT_INFO)
             .build();
@@ -461,7 +455,10 @@ public class TestFunctionMetaService extends TestJDBCBackend {
     FunctionParam param2 = FunctionParams.of("param2", Types.StringType.get());
     FunctionImpl impl = FunctionImpls.ofSql(FunctionImpl.RuntimeType.SPARK, "SELECT param1 + 1");
     FunctionDefinition definition =
-        FunctionDefinitions.of(new FunctionParam[] {param1, param2}, new FunctionImpl[] {impl});
+        FunctionDefinitions.of(
+            new FunctionParam[] {param1, param2},
+            Types.IntegerType.get(),
+            new FunctionImpl[] {impl});
 
     return FunctionEntity.builder()
         .withId(id)
@@ -470,7 +467,6 @@ public class TestFunctionMetaService extends TestJDBCBackend {
         .withComment("test function comment")
         .withFunctionType(FunctionType.SCALAR)
         .withDeterministic(false)
-        .withReturnType(Types.IntegerType.get())
         .withDefinitions(new FunctionDefinition[] {definition})
         .withAuditInfo(auditInfo)
         .build();
