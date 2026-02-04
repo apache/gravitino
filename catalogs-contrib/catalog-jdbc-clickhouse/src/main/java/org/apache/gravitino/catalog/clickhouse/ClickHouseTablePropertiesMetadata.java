@@ -55,14 +55,14 @@ public class ClickHouseTablePropertiesMetadata extends JdbcTablePropertiesMetada
   public static final PropertyEntry<String> CLUSTER_NAME_PROPERTY_ENTRY =
       stringOptionalPropertyEntry(
           ClusterConstants.NAME,
-          "The cluster name for ClickHouse distributed tables",
+          "The cluster name for DDL operations, for example, creating on cluster tables",
           false,
           "",
           false);
   public static final PropertyEntry<String> ON_CLUSTER_PROPERTY_ENTRY =
       stringOptionalPropertyEntry(
           ClusterConstants.ON_CLUSTER,
-          "The cluster name for ClickHouse distributed tables",
+          "Whether to use 'ON CLUSTER' clause when creating tables in ClickHouse",
           false,
           "",
           false);
