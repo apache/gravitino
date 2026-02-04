@@ -49,6 +49,7 @@ import org.apache.gravitino.rel.expressions.sorts.SortOrder;
 import org.apache.gravitino.rel.expressions.transforms.Transform;
 import org.apache.gravitino.rel.expressions.transforms.Transforms;
 import org.apache.gravitino.rel.indexes.Index;
+import org.apache.gravitino.rel.indexes.Index.IndexType;
 import org.apache.gravitino.rel.indexes.Indexes;
 import org.apache.gravitino.rel.types.Decimal;
 import org.apache.gravitino.rel.types.Type;
@@ -914,19 +915,18 @@ public class TestClickHouseTableOperations extends TestClickHouse {
               new String[][] {{"c1"}})
         };
 
-    // partitioning not supported
-    Assertions.assertThrows(
-        UnsupportedOperationException.class,
-        () ->
-            ops.buildCreateSql(
-                "t1",
-                new JdbcColumn[] {col},
-                null,
-                new HashMap<>(),
-                new Transform[] {Transforms.identity("p")},
-                Distributions.NONE,
-                indexes,
-                ClickHouseUtils.getSortOrders("c1")));
+    Map<String, String> propsWithPartition = new HashMap<>();
+    String partitionSql =
+        ops.buildCreateSql(
+            "t1",
+            new JdbcColumn[] {col},
+            null,
+            propsWithPartition,
+            new Transform[] {Transforms.identity("c1")},
+            Distributions.NONE,
+            indexes,
+            ClickHouseUtils.getSortOrders("c1"));
+    Assertions.assertTrue(partitionSql.contains("PARTITION BY `c1`"));
 
     // distribution not NONE
     Assertions.assertThrows(
@@ -985,6 +985,18 @@ public class TestClickHouseTableOperations extends TestClickHouse {
                 new JdbcColumn[] {col},
                 null,
                 logEngineProps,
+                new Transform[] {Transforms.identity("c1")},
+                Distributions.NONE,
+                indexes,
+                null));
+    Assertions.assertThrows(
+        UnsupportedOperationException.class,
+        () ->
+            ops.buildCreateSql(
+                "t1",
+                new JdbcColumn[] {col},
+                null,
+                logEngineProps,
                 new Transform[0],
                 Distributions.NONE,
                 indexes,
@@ -1009,6 +1021,76 @@ public class TestClickHouseTableOperations extends TestClickHouse {
     Assertions.assertTrue(sql.contains("ENGINE = MergeTree"));
     Assertions.assertTrue(sql.contains("SETTINGS max_threads = 8"));
     Assertions.assertTrue(sql.contains("COMMENT 'co''mment'"));
+  }
+
+  @Test
+  void testGenerateCreateTableSqlWithSecondaryIndexAndPartition() {
+    TestableClickHouseTableOperations ops = new TestableClickHouseTableOperations();
+    ops.initialize(
+        null,
+        new ClickHouseExceptionConverter(),
+        new ClickHouseTypeConverter(),
+        new ClickHouseColumnDefaultValueConverter(),
+        new HashMap<>());
+
+    JdbcColumn[] cols =
+        new JdbcColumn[] {
+          JdbcColumn.builder()
+              .withName("c1")
+              .withType(Types.IntegerType.get())
+              .withNullable(false)
+              .build(),
+          JdbcColumn.builder()
+              .withName("c2")
+              .withType(Types.StringType.get())
+              .withNullable(true)
+              .build(),
+          JdbcColumn.builder()
+              .withName("c3")
+              .withType(Types.LongType.get())
+              .withNullable(true)
+              .build(),
+        };
+
+    Index[] indexes =
+        new Index[] {
+          Indexes.primary(Indexes.DEFAULT_PRIMARY_KEY_NAME, new String[][] {{"c1"}}),
+          Indexes.of(IndexType.DATA_SKIPPING_MINMAX, "idx_c2", new String[][] {{"c2"}}),
+          Indexes.of(IndexType.DATA_SKIPPING_BLOOM_FILTER, "idx_c3", new String[][] {{"c3"}}),
+        };
+
+    String sql =
+        ops.buildCreateSql(
+            "t_idx",
+            cols,
+            "comment",
+            new HashMap<>(),
+            new Transform[] {Transforms.identity("c1")},
+            Distributions.NONE,
+            indexes,
+            ClickHouseUtils.getSortOrders("c1"));
+
+    Assertions.assertTrue(sql.contains("PARTITION BY `c1`"));
+    Assertions.assertTrue(sql.contains("INDEX `idx_c2` `c2` TYPE minmax GRANULARITY 1"));
+    Assertions.assertTrue(sql.contains("INDEX `idx_c3` `c3` TYPE bloom_filter GRANULARITY 3"));
+  }
+
+  @Test
+  void testParsePartitioningAndIndexExpressions() {
+    TestableClickHouseTableOperations ops = new TestableClickHouseTableOperations();
+
+    Transform[] transforms = ops.parsePartitioning("tuple(`p1`, `p2`)");
+    Assertions.assertEquals(2, transforms.length);
+    Assertions.assertArrayEquals(
+        new String[] {"p1"}, ((NamedReference) transforms[0].arguments()[0]).fieldName());
+    Assertions.assertArrayEquals(
+        new String[] {"p2"}, ((NamedReference) transforms[1].arguments()[0]).fieldName());
+
+    String[][] fields = ops.parseIndexFields("tuple(`c2`, `c3`)");
+    Assertions.assertArrayEquals(new String[][] {{"c2"}, {"c3"}}, fields);
+
+    String[][] bloomFields = ops.parseIndexFields("bloom_filter(`c4`)");
+    Assertions.assertArrayEquals(new String[][] {{"c4"}}, bloomFields);
   }
 
   private static final class TestableClickHouseTableOperations extends ClickHouseTableOperations {
