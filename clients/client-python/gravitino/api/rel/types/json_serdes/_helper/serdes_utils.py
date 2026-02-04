@@ -16,17 +16,30 @@
 # under the License.
 
 import json
-from typing import Any, Dict, Union, overload
+from typing import Any, Dict, Optional, Union, overload
 
 from dataclasses_json.core import Json
 
+from gravitino.api.rel.expressions.expression import Expression
+from gravitino.api.rel.indexes.index import Index
+from gravitino.api.rel.table_change import After, Default, First, TableChange
 from gravitino.api.rel.types.type import Name, Type
 from gravitino.api.rel.types.types import Types
+from gravitino.dto.rel.expressions.field_reference_dto import FieldReferenceDTO
+from gravitino.dto.rel.expressions.func_expression_dto import FuncExpressionDTO
+from gravitino.dto.rel.expressions.function_arg import FunctionArg
+from gravitino.dto.rel.expressions.literal_dto import LiteralDTO
+from gravitino.dto.rel.expressions.unparsed_expression_dto import UnparsedExpressionDTO
+from gravitino.dto.rel.indexes.index_dto import IndexDTO
 from gravitino.utils.precondition import Precondition
 from gravitino.utils.serdes import SerdesUtilsBase
 
 
 class SerdesUtils(SerdesUtilsBase):
+    POSITION_FIRST = "first"
+    POSITION_AFTER = "after"
+    POSITION_DEFAULT = "default"
+
     @classmethod
     def write_data_type(cls, data_type: Type) -> Union[str, Dict[str, Any]]:
         """Write Gravitino Type to JSON data. Used for Gravitino Type JSON Serialization.
@@ -309,3 +322,202 @@ class SerdesUtils(SerdesUtilsBase):
             f"Cannot parse external type from missing catalogString: {external_data}",
         )
         return Types.ExternalType.of(external_data[cls.CATALOG_STRING])
+
+    @classmethod
+    def column_default_value_encoder(cls, value: Expression) -> Union[str, None]:
+        if value is None or value == Expression.EMPTY_EXPRESSION:
+            return None
+
+        return cls.write_function_arg(value)
+
+    @classmethod
+    def write_function_arg(cls, arg: FunctionArg) -> Any:
+        if arg.arg_type() == FunctionArg.ArgType.LITERAL:
+            return {
+                cls.TYPE: arg.arg_type().value.lower(),
+                cls.DATA_TYPE: cls.write_data_type(arg.data_type()),
+                cls.LITERAL_VALUE: arg.value(),
+            }
+
+        if arg.arg_type() == FunctionArg.ArgType.FIELD:
+            return {
+                cls.TYPE: arg.arg_type().value.lower(),
+                cls.FIELD_NAME: arg.field_name(),
+            }
+
+        if arg.arg_type() == FunctionArg.ArgType.FUNCTION:
+            return {
+                cls.TYPE: arg.arg_type().value.lower(),
+                cls.FUNCTION_NAME: arg.function_name(),
+                cls.FUNCTION_ARGS: [
+                    cls.write_function_arg(child) for child in arg.args()
+                ],
+            }
+
+        if arg.arg_type() == FunctionArg.ArgType.UNPARSED:
+            return {
+                cls.TYPE: arg.arg_type().value.lower(),
+                cls.UNPARSED_EXPRESSION: arg.unparsed_expression(),
+            }
+
+        raise ValueError(f"Unknown function argument type: {arg.arg_type()}")
+
+    @classmethod
+    def column_default_value_decoder(cls, value: dict) -> Expression:
+        if value is None:
+            return Expression.EMPTY_EXPRESSION
+
+        return cls.read_function_arg(value)
+
+    @classmethod
+    def read_function_arg(cls, value: dict[str, Any]) -> Expression:
+        obj_type = value.get(cls.EXPRESSION_TYPE)
+        if obj_type is None:
+            raise ValueError(f"Cannot parse function arg from missing type: {value}")
+
+        arg_type = FunctionArg.ArgType[obj_type.upper()]
+
+        if arg_type == FunctionArg.ArgType.LITERAL:
+            if cls.DATA_TYPE not in value:
+                raise ValueError(
+                    f"Cannot parse literal arg from missing data type: {value}"
+                )
+
+            if cls.LITERAL_VALUE not in value:
+                raise ValueError(
+                    f"Cannot parse literal arg from missing literal value: {value}"
+                )
+
+            data_type = cls.read_data_type(value[cls.DATA_TYPE])
+            data_value = value[cls.LITERAL_VALUE]
+
+            return (
+                LiteralDTO.builder()
+                .with_data_type(data_type)
+                .with_value(data_value)
+                .build()
+            )
+
+        if arg_type == FunctionArg.ArgType.FIELD:
+            if cls.FIELD_NAME not in value:
+                raise ValueError(
+                    f"Cannot parse field arg from missing field name: {value}"
+                )
+
+            field_name = value[cls.FIELD_NAME]
+            return FieldReferenceDTO.builder().with_field_name(field_name).build()
+
+        if arg_type == FunctionArg.ArgType.FUNCTION:
+            if cls.FUNCTION_NAME not in value:
+                raise ValueError(
+                    f"Cannot parse function arg from missing function name: {value}"
+                )
+
+            if cls.FUNCTION_ARGS not in value:
+                raise ValueError(
+                    f"Cannot parse function arg from missing function args: {value}"
+                )
+
+            function_name = value[cls.FUNCTION_NAME]
+            function_args = value[cls.FUNCTION_ARGS]
+
+            return (
+                FuncExpressionDTO.builder()
+                .with_function_name(function_name)
+                .with_function_args(function_args)
+                .build()
+            )
+
+        if arg_type == FunctionArg.ArgType.UNPARSED:
+            if cls.UNPARSED_EXPRESSION not in value or not isinstance(
+                value[cls.UNPARSED_EXPRESSION], str
+            ):
+                raise ValueError(
+                    f"Cannot parse unparsed expression from missing string field unparsedExpression: {value}"
+                )
+
+            return (
+                UnparsedExpressionDTO.builder()
+                .with_unparsed_expression(value.get(cls.UNPARSED_EXPRESSION))
+                .build()
+            )
+
+        raise ValueError(f"Unknown function argument type:  {arg_type}")
+
+    @classmethod
+    def table_index_encoder(cls, index: Index) -> Optional[dict]:
+        if index is None:
+            return None
+
+        if index.name() is not None:
+            data = {
+                cls.INDEX_TYPE: str(index.type().name).upper(),
+                cls.INDEX_NAME: index.name(),
+                cls.INDEX_FIELD_NAMES: index.field_names(),
+            }
+
+        else:
+            data = {
+                cls.INDEX_TYPE: str(index.type().name).upper(),
+                cls.INDEX_FIELD_NAMES: index.field_names(),
+            }
+
+        return data
+
+    @classmethod
+    def table_index_decoder(cls, data: dict) -> Optional[Index]:
+        if data is None:
+            return None
+
+        builder = IndexDTO.builder()
+        index_type_str = data.get("indexType")
+        name = data.get("name")
+        field_names = data.get("fieldNames")
+
+        if index_type_str is None or field_names is None:
+            raise ValueError(
+                "Invalid index data: 'indexType' and 'fieldNames' are required"
+            )
+        builder.with_index_type(Index.IndexType[index_type_str.upper()])
+        builder.with_field_names(field_names)
+
+        if name is not None:
+            builder.with_name(name)
+
+        return builder.build()
+
+    @classmethod
+    def column_position_encoder(
+        cls,
+        value: TableChange.ColumnPosition,
+    ) -> Union[str, dict[str, str]]:
+        if isinstance(value, First):
+            return cls.POSITION_FIRST
+        if isinstance(value, After):
+            return {
+                cls.POSITION_AFTER: value.get_column(),
+            }
+
+        if isinstance(value, Default):
+            return cls.POSITION_DEFAULT
+
+        raise ValueError(f"Unknown column position: {value}")
+
+    @classmethod
+    def column_position_decoder(
+        cls,
+        value: Union[str, dict[str, str]],
+    ) -> Union[First, After, Default]:
+        if isinstance(value, str):
+            if value == cls.POSITION_FIRST or value == cls.POSITION_FIRST.upper():
+                return TableChange.ColumnPosition.first()
+
+            if value == cls.POSITION_DEFAULT or value == cls.POSITION_DEFAULT.upper():
+                return TableChange.ColumnPosition.default_pos()
+
+        if isinstance(value, dict):
+            after_column = value.get(cls.POSITION_AFTER)
+            if after_column:
+                return TableChange.ColumnPosition.after(after_column)
+
+        raise ValueError(f"Unknown json column position: {value}")
