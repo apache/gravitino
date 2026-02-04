@@ -32,6 +32,7 @@ import java.util.Map;
 import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.catalog.clickhouse.ClickHouseConstants;
+import org.apache.gravitino.catalog.clickhouse.ClickHouseConstants.TableConstants;
 import org.apache.gravitino.catalog.clickhouse.ClickHouseTablePropertiesMetadata;
 import org.apache.gravitino.catalog.clickhouse.ClickHouseUtils;
 import org.apache.gravitino.catalog.clickhouse.converter.ClickHouseColumnDefaultValueConverter;
@@ -975,8 +976,7 @@ public class TestClickHouseTableOperations extends TestClickHouse {
     // Engine without ORDER BY support should fail when sortOrders provided
     Map<String, String> logEngineProps = new HashMap<>();
     logEngineProps.put(
-        ClickHouseConstants.CLICKHOUSE_ENGINE_NAME,
-        ClickHouseTablePropertiesMetadata.ENGINE.LOG.getValue());
+        TableConstants.ENGINE_UPPER, ClickHouseTablePropertiesMetadata.ENGINE.LOG.getValue());
     Assertions.assertThrows(
         UnsupportedOperationException.class,
         () ->
@@ -993,9 +993,8 @@ public class TestClickHouseTableOperations extends TestClickHouse {
     // Settings and comment retained
     Map<String, String> props = new HashMap<>();
     props.put(
-        ClickHouseConstants.CLICKHOUSE_ENGINE_NAME,
-        ClickHouseTablePropertiesMetadata.ENGINE.MERGETREE.getValue());
-    props.put(ClickHouseConstants.SETTINGS_PREFIX + "max_threads", "8");
+        TableConstants.ENGINE_UPPER, ClickHouseTablePropertiesMetadata.ENGINE.MERGETREE.getValue());
+    props.put(ClickHouseConstants.TableConstants.SETTINGS_PREFIX + "max_threads", "8");
     String sql =
         ops.buildCreateSql(
             "t1",
