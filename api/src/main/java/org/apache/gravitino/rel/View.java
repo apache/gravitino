@@ -23,13 +23,13 @@ import java.util.Map;
 import javax.annotation.Nullable;
 import org.apache.gravitino.Auditable;
 import org.apache.gravitino.Namespace;
-import org.apache.gravitino.annotation.Evolving;
+import org.apache.gravitino.annotation.Unstable;
 
 /**
  * An interface representing a view in a {@link Namespace}. It defines the basic properties of a
  * view. A catalog implementation with {@link ViewCatalog} should implement this interface.
  */
-@Evolving
+@Unstable
 public interface View extends Auditable {
 
   /**

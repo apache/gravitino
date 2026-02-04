@@ -1,0 +1,42 @@
+MCP requirements gateway
+
+
+What MCP Azure AD app should do:
+
+1. Expose an API:
+   - Application ID URI: api://1c39933a-8e46-4fe7-b6b3-d2fa5033b493
+   
+2. Add a Scope (for human users):
+   - Scope name: access_as_user
+   - Who can consent: Admins and users
+   - Display name: "Access HMS MCP"
+   
+3. Add an App Role (for service accounts):
+   - Display name: "Service Account Access"
+   - Value: ServiceAccount.Access
+   - Allowed member types: Applications
+   
+4. Grant admin consent for your organization
+
+
+
+Service Account's Azure AD App (data-platform-app)
+This is: The app created per team/service account
+
+Purpose: Represents the non-human identity (Spark, Airflow, etc.)
+
+Azure Portal Configuration:
+
+1. Certificates & Secrets:
+   ✅ Client secret: Generate and copy (store in AgentBox .secrets.json)
+   
+2. API Permissions:
+   ✅ Add permission → My APIs → HMS-MCP (1c39933a-...)
+   ✅ Select: ServiceAccount.Access (Application permission)
+   ✅ Grant admin consent
+   
+3. DO NOT need to expose any API
+4. DO NOT need to add scopes
+5. DO NOT need app roles
+
+This app MUST have a client secret - that's how it authenticates!
