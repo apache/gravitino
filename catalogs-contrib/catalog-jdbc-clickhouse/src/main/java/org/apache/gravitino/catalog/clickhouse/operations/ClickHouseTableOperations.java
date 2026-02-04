@@ -18,6 +18,11 @@
  */
 package org.apache.gravitino.catalog.clickhouse.operations;
 
+import static org.apache.gravitino.catalog.clickhouse.ClickHouseConstants.CLUSTER_NAME;
+import static org.apache.gravitino.catalog.clickhouse.ClickHouseConstants.CLUSTER_REMOTE_DATABASE;
+import static org.apache.gravitino.catalog.clickhouse.ClickHouseConstants.CLUSTER_REMOTE_TABLE;
+import static org.apache.gravitino.catalog.clickhouse.ClickHouseConstants.CLUSTER_SHARDING_KEY;
+import static org.apache.gravitino.catalog.clickhouse.ClickHouseConstants.ON_CLUSTER;
 import static org.apache.gravitino.catalog.clickhouse.ClickHouseConstants.SETTINGS_PREFIX;
 import static org.apache.gravitino.catalog.clickhouse.ClickHouseTablePropertiesMetadata.CLICKHOUSE_ENGINE_KEY;
 import static org.apache.gravitino.catalog.clickhouse.ClickHouseTablePropertiesMetadata.ENGINE_PROPERTY_ENTRY;
@@ -45,6 +50,7 @@ import org.apache.commons.lang3.BooleanUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.StringIdentifier;
 import org.apache.gravitino.catalog.clickhouse.ClickHouseTablePropertiesMetadata;
+import org.apache.gravitino.catalog.clickhouse.ClickHouseTablePropertiesMetadata.ENGINE;
 import org.apache.gravitino.catalog.jdbc.JdbcColumn;
 import org.apache.gravitino.catalog.jdbc.JdbcTable;
 import org.apache.gravitino.catalog.jdbc.operation.JdbcTableOperations;
@@ -138,9 +144,13 @@ public class ClickHouseTableOperations extends JdbcTableOperations {
     Preconditions.checkArgument(
         Distributions.NONE.equals(distribution), "ClickHouse does not support distribution");
 
-    // First build the CREATE TABLE statement
     StringBuilder sqlBuilder = new StringBuilder();
-    sqlBuilder.append("CREATE TABLE %s (\n".formatted(quoteIdentifier(tableName)));
+
+    Map<String, String> notNullProperties =
+        MapUtils.isNotEmpty(properties) ? properties : Collections.emptyMap();
+
+    // Add Create table clause
+    boolean onCluster = appendCreateTableClause(notNullProperties, sqlBuilder, tableName);
 
     // Add columns
     buildColumnsDefinition(columns, sqlBuilder);
@@ -152,7 +162,8 @@ public class ClickHouseTableOperations extends JdbcTableOperations {
     sqlBuilder.append("\n)");
 
     // Extract engine from properties
-    ClickHouseTablePropertiesMetadata.ENGINE engine = appendTableEngine(properties, sqlBuilder);
+    ClickHouseTablePropertiesMetadata.ENGINE engine =
+        appendTableEngine(notNullProperties, sqlBuilder, onCluster);
 
     appendOrderBy(sortOrders, sqlBuilder, engine);
 
@@ -163,13 +174,41 @@ public class ClickHouseTableOperations extends JdbcTableOperations {
     }
 
     // Add setting clause if specified, clickhouse only supports predefine settings
-    appendTableProperties(properties, sqlBuilder);
+    appendTableProperties(notNullProperties, sqlBuilder);
 
     // Return the generated SQL statement
     String result = sqlBuilder.toString();
 
     LOG.info("Generated create table:{} sql: {}", tableName, result);
     return result;
+  }
+
+  /**
+   * Append CREATE TABLE clause. If cluster name && on-cluster is specified in properties, append ON
+   * CLUSTER clause.
+   *
+   * @param properties Table properties
+   * @param sqlBuilder SQL builder
+   * @return true if ON CLUSTER clause is appended, false otherwise
+   */
+  private boolean appendCreateTableClause(
+      Map<String, String> properties, StringBuilder sqlBuilder, String tableName) {
+    String clusterName = properties.get(CLUSTER_NAME);
+    String onClusterValue = properties.get(ON_CLUSTER);
+
+    boolean onCluster =
+        StringUtils.isNotBlank(clusterName)
+            && StringUtils.isNotBlank(onClusterValue)
+            && Boolean.TRUE.equals(BooleanUtils.toBooleanObject(onClusterValue));
+
+    if (onCluster) {
+      sqlBuilder.append(
+          "CREATE TABLE %s ON CLUSTER `%s` (\n".formatted(quoteIdentifier(tableName), clusterName));
+    } else {
+      sqlBuilder.append("CREATE TABLE %s (\n".formatted(quoteIdentifier(tableName)));
+    }
+
+    return onCluster;
   }
 
   private static void appendTableProperties(
@@ -228,14 +267,51 @@ public class ClickHouseTableOperations extends JdbcTableOperations {
   }
 
   private ClickHouseTablePropertiesMetadata.ENGINE appendTableEngine(
-      Map<String, String> properties, StringBuilder sqlBuilder) {
+      Map<String, String> properties, StringBuilder sqlBuilder, boolean onCluster) {
     ClickHouseTablePropertiesMetadata.ENGINE engine = ENGINE_PROPERTY_ENTRY.getDefaultValue();
     if (MapUtils.isNotEmpty(properties)) {
-      String userSetEngine = properties.remove(CLICKHOUSE_ENGINE_KEY);
+      String userSetEngine = properties.get(CLICKHOUSE_ENGINE_KEY);
       if (StringUtils.isNotEmpty(userSetEngine)) {
         engine = ClickHouseTablePropertiesMetadata.ENGINE.fromString(userSetEngine);
       }
     }
+
+    if (engine == ENGINE.DISTRIBUTED) {
+      if (!onCluster) {
+        throw new IllegalArgumentException(
+            "ENGINE = DISTRIBUTED requires ON CLUSTER clause to be specified.");
+      }
+
+      // Check properties
+      String clusterName = properties.get(CLUSTER_NAME);
+      String remoteDatabase = properties.get(CLUSTER_REMOTE_DATABASE);
+      String remoteTable = properties.get(CLUSTER_REMOTE_TABLE);
+      String shardingKey = properties.get(CLUSTER_SHARDING_KEY);
+
+      Preconditions.checkArgument(
+          StringUtils.isNotBlank(clusterName),
+          "Cluster name must be specified when engine is Distributed");
+      Preconditions.checkArgument(
+          StringUtils.isNotBlank(remoteDatabase),
+          "Remote database must be specified for Distributed");
+      Preconditions.checkArgument(
+          StringUtils.isNotBlank(remoteTable), "Remote table must be specified for Distributed");
+      Preconditions.checkArgument(
+          StringUtils.isNotBlank(shardingKey), "Sharding key must be specified for Distributed");
+
+      sqlBuilder.append(
+          "\n ENGINE = %s(`%s`,`%s`,`%s`,%s)"
+              .formatted(
+                  ENGINE.DISTRIBUTED.getValue(),
+                  clusterName,
+                  remoteDatabase,
+                  remoteTable,
+                  shardingKey));
+      return engine;
+    }
+
+    // Now check if engine is distributed, we need to check the remote database and table properties
+
     sqlBuilder.append("\n ENGINE = %s".formatted(engine.getValue()));
     return engine;
   }
