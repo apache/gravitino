@@ -861,29 +861,22 @@ tasks {
 
   val compileTrinoConnector by registering {
     dependsOn("trino-connector:trino-connector-435-439:copyLibs")
-    group = "gravitino trino connector distribution"
+    group = "gravitino distribution"
     outputs.dir(projectDir.dir("distribution/${rootProject.name}-trino-connector-435-439"))
   }
 
   val assembleDistribution by registering(Tar::class) {
-    dependsOn("assembleTrinoConnector", "assembleIcebergRESTServer", "assembleLanceRESTServer")
+    dependsOn(
+      ":trino-connector:trino-connector-435-439:assembleTrinoConnector",
+      "assembleIcebergRESTServer",
+      "assembleLanceRESTServer"
+    )
     group = "gravitino distribution"
     finalizedBy("checksumDistribution")
     into("${rootProject.name}-$version-bin")
     from(compileDistribution.map { it.outputs.files.single() })
     compression = Compression.GZIP
     archiveFileName.set("${rootProject.name}-$version-bin.tar.gz")
-    destinationDirectory.set(projectDir.dir("distribution"))
-  }
-
-  val assembleTrinoConnector by registering(Tar::class) {
-    dependsOn("compileTrinoConnector")
-    group = "gravitino distribution"
-    finalizedBy("checksumTrinoConnector")
-    into("${rootProject.name}-trino-connector-$version")
-    from(compileTrinoConnector.map { it.outputs.files.single() })
-    compression = Compression.GZIP
-    archiveFileName.set("${rootProject.name}-trino-connector-$version.tar.gz")
     destinationDirectory.set(projectDir.dir("distribution"))
   }
 
@@ -943,24 +936,12 @@ tasks {
 
   register("checksumDistribution") {
     group = "gravitino distribution"
-    dependsOn(assembleDistribution, "checksumTrinoConnector", "checksumIcebergRESTServerDistribution", "checksumLanceRESTServerDistribution")
+    dependsOn(
+      assembleDistribution,
+      "checksumIcebergRESTServerDistribution",
+      "checksumLanceRESTServerDistribution"
+    )
     val archiveFile = assembleDistribution.flatMap { it.archiveFile }
-    val checksumFile = archiveFile.map { archive ->
-      archive.asFile.let { it.resolveSibling("${it.name}.sha256") }
-    }
-    inputs.file(archiveFile)
-    outputs.file(checksumFile)
-    doLast {
-      checksumFile.get().writeText(
-        serviceOf<ChecksumService>().sha256(archiveFile.get().asFile).toString()
-      )
-    }
-  }
-
-  register("checksumTrinoConnector") {
-    group = "gravitino distribution"
-    dependsOn(assembleTrinoConnector)
-    val archiveFile = assembleTrinoConnector.flatMap { it.archiveFile }
     val checksumFile = archiveFile.map { archive ->
       archive.asFile.let { it.resolveSibling("${it.name}.sha256") }
     }

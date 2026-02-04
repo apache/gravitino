@@ -19,6 +19,8 @@
 
 import com.diffplug.gradle.spotless.SpotlessExtension
 import net.ltgt.gradle.errorprone.errorprone
+import org.gradle.internal.hash.ChecksumService
+import org.gradle.kotlin.dsl.support.serviceOf
 
 plugins {
   `java-library`
@@ -107,7 +109,7 @@ tasks {
 
   val distributionDir = rootProject.layout.projectDirectory.dir("distribution/${rootProject.name}-${project.name}")
 
-  register("copyLibs", Copy::class) {
+  val copyLibs by registering(Copy::class) {
     dependsOn(copyRuntimeLibs, "build")
     from(layout.buildDirectory.dir("libs"))
     from(rootProject.layout.projectDirectory.dir("licenses")) {
@@ -121,6 +123,17 @@ tasks {
       fileName.replace(".trino", "")
     }
     outputs.dir(distributionDir)
+  }
+
+  register("assembleTrinoConnector", Tar::class) {
+    dependsOn(copyLibs)
+    group = "gravitino distribution"
+    val archiveBase = "${rootProject.name}-${project.name}-$version"
+    into(archiveBase)
+    from(distributionDir)
+    compression = Compression.GZIP
+    archiveFileName.set("$archiveBase.tar.gz")
+    destinationDirectory.set(rootProject.layout.projectDirectory.dir("distribution"))
   }
 
   named("build") {
