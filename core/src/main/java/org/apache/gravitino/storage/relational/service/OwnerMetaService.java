@@ -20,8 +20,13 @@ package org.apache.gravitino.storage.relational.service;
 
 import static org.apache.gravitino.metrics.source.MetricsSource.GRAVITINO_RELATIONAL_STORE_METRIC_NAME;
 
+import com.google.common.base.Preconditions;
+import java.util.ArrayList;
 import java.util.Collections;
+import java.util.List;
+import java.util.Objects;
 import java.util.Optional;
+import org.apache.commons.collections4.CollectionUtils;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.authorization.AuthorizationUtils;
@@ -77,6 +82,44 @@ public class OwnerMetaService {
     }
 
     return Optional.empty();
+  }
+
+  @Monitored(
+      metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME,
+      baseMetricName = "batchGetOwner")
+  public List<Entity> batchGetOwner(List<NameIdentifier> identifiers, Entity.EntityType type) {
+    List<Long> entityIds =
+        identifiers.stream()
+            .map(identifier -> EntityIdService.getEntityId(identifier, type))
+            .toList();
+    if (CollectionUtils.isEmpty(identifiers)) {
+      return new ArrayList<>();
+    }
+    NameIdentifier nameIdentifier = identifiers.get(0);
+    String metalake = NameIdentifierUtil.getMetalake(nameIdentifier);
+    for (NameIdentifier identifier : identifiers) {
+      Preconditions.checkArgument(
+          Objects.equals(NameIdentifierUtil.getMetalake(identifier), metalake),
+          "identifiers should in one metalake");
+    }
+    List<UserPO> userPOList =
+        SessionUtils.getWithoutCommit(
+            OwnerMetaMapper.class,
+            mapper ->
+                mapper.batchSelectUserOwnerMetaByMetadataObjectIdAndType(entityIds, type.name()));
+    if (CollectionUtils.isNotEmpty(userPOList)) {
+      return userPOList.stream()
+          .map(
+              userPO ->
+                  (Entity)
+                      POConverters.fromUserPO(
+                          userPO,
+                          Collections.emptyList(),
+                          AuthorizationUtils.ofUserNamespace(metalake)))
+          .toList();
+    }
+
+    return new ArrayList<>();
   }
 
   @Monitored(metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME, baseMetricName = "setOwner")

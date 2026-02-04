@@ -20,6 +20,7 @@ package org.apache.gravitino.storage.relational.mapper.provider.base;
 
 import static org.apache.gravitino.storage.relational.mapper.OwnerMetaMapper.OWNER_TABLE_NAME;
 
+import java.util.List;
 import org.apache.gravitino.storage.relational.mapper.CatalogMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.FilesetMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.GroupMetaMapper;
@@ -51,6 +52,33 @@ public class OwnerMetaBaseSQLProvider {
         + " ot.metadata_object_type = #{metadataObjectType} AND"
         + " ot.owner_type = 'USER' AND"
         + " ot.deleted_at = 0 AND ut.deleted_at = 0";
+  }
+
+  public String batchSelectUserOwnerMetaByMetadataObjectIdAndType(
+      @Param("metadataObjectIds") List<Long> metadataObjectIds,
+      @Param("metadataObjectType") String metadataObjectType) {
+    return """
+            <script>
+            SELECT ut.user_id as userId,
+            ut.user_name as userName,
+            ut.metalake_id as metalakeId,
+            ut.audit_info as auditInfo,
+            ut.current_version as currentVersion,
+            ut.last_version as lastVersion,
+            ut.deleted_at as deletedAt
+            FROM
+            %s
+            ot JOIN %s ut ON ut.user_id = ot.owner_id
+            WHERE
+            ot.metadata_object_type = #{metadataObjectType}
+            AND ot.owner_type = 'USER'
+            AND ot.metadata_object_id IN
+            <foreach collection="metadataObjectIds" item="id" open="(" separator="," close=")">
+                #{id}
+            </foreach>
+            AND ot.deleted_at = 0 AND ut.deleted_at = 0
+            </script>
+           """;
   }
 
   public String selectGroupOwnerMetaByMetadataObjectIdAndType(
