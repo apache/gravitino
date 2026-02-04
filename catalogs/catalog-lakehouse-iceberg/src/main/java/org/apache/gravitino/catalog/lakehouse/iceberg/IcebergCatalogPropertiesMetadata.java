@@ -123,6 +123,18 @@ public class IcebergCatalogPropertiesMetadata extends BaseCatalogPropertiesMetad
                 false /* immutable */,
                 null /* defaultValue */,
                 false /* hidden */),
+            PropertyEntry.stringOptionalSensitivePropertyEntry(
+                GRAVITINO_JDBC_USER,
+                "JDBC username",
+                false /* immutable */,
+                null /* defaultValue */,
+                false /* hidden */),
+            PropertyEntry.stringOptionalSensitivePropertyEntry(
+                GRAVITINO_JDBC_PASSWORD,
+                "JDBC password",
+                false /* immutable */,
+                null /* defaultValue */,
+                false /* hidden */),
             stringOptionalPropertyEntry(
                 IcebergConstants.TABLE_METADATA_CACHE_IMPL,
                 "Table metadata cache implementation",

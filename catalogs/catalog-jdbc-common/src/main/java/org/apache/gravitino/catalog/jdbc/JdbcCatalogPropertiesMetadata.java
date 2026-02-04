@@ -78,7 +78,8 @@ public class JdbcCatalogPropertiesMetadata extends BaseCatalogPropertiesMetadata
                 false /* immutable */,
                 null /* defaultValue */,
                 false /* hidden */,
-                false /* reserved */),
+                false /* reserved */,
+                true /* sensitive */),
             stringPropertyEntry(
                 JdbcConfig.PASSWORD.getKey(),
                 JdbcConfig.PASSWORD.getDoc(),
@@ -86,7 +87,8 @@ public class JdbcCatalogPropertiesMetadata extends BaseCatalogPropertiesMetadata
                 false /* immutable */,
                 null /* defaultValue */,
                 false /* hidden */,
-                false /* reserved */),
+                false /* reserved */,
+                true /* sensitive */),
             integerPropertyEntry(
                 JdbcConfig.POOL_MIN_SIZE.getKey(),
                 JdbcConfig.POOL_MIN_SIZE.getDoc(),
