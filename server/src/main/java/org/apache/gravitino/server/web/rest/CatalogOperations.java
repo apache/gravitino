@@ -43,7 +43,6 @@ import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 import org.apache.gravitino.Catalog;
 import org.apache.gravitino.CatalogChange;
-import org.apache.gravitino.Configs;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.MetadataObject;
@@ -90,8 +89,7 @@ public class CatalogOperations {
   @Inject
   public CatalogOperations(CatalogDispatcher catalogDispatcher) {
     this.catalogDispatcher = catalogDispatcher;
-    this.filterSensitiveProperties =
-        GravitinoEnv.getInstance().config().get(Configs.FILTER_SENSITIVE_PROPERTIES);
+    this.filterSensitiveProperties = GravitinoEnv.getInstance().filterSensitiveProperties();
   }
 
   @GET
