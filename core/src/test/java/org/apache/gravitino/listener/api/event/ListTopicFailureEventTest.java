@@ -27,7 +27,7 @@ public class ListTopicFailureEventTest {
   @Test
   public void testNamespaceMustNotBeNull() {
     Assertions.assertThrows(
-        NullPointerException.class,
+        IllegalArgumentException.class,
         () -> {
           new ListTopicFailureEvent("user", null, new Exception());
         });
