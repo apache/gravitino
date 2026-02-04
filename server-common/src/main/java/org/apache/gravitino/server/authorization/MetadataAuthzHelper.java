@@ -328,7 +328,8 @@ public class MetadataAuthzHelper {
 
   private static void preloadToCache(
       Entity.EntityType entityType, NameIdentifier[] nameIdentifiers) {
-    if (GravitinoEnv.getInstance().cacheEnabled()) {
+    Config config = GravitinoEnv.getInstance().config();
+    if (config != null && !config.get(Configs.CACHE_ENABLED)) {
       if (entityType == Entity.EntityType.TABLE) {
         GravitinoEnv.getInstance()
             .entityStore()
