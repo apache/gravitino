@@ -18,6 +18,8 @@
  */
 package org.apache.gravitino.catalog.jdbc.operation;
 
+import static org.apache.gravitino.rel.Column.DEFAULT_VALUE_NOT_SET;
+
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
 import java.sql.Connection;
@@ -93,6 +95,14 @@ public abstract class JdbcTableOperations implements TableOperation {
     this.exceptionMapper = exceptionMapper;
     this.typeConverter = jdbcTypeConverter;
     this.columnDefaultValueConverter = jdbcColumnDefaultValueConverter;
+  }
+
+  protected void appendDefaultValue(JdbcColumn column, StringBuilder sqlBuilder) {
+    if (DEFAULT_VALUE_NOT_SET.equals(column.defaultValue())) {
+      return;
+    }
+    String defaultValue = columnDefaultValueConverter.fromGravitino(column.defaultValue());
+    sqlBuilder.append("DEFAULT ").append(defaultValue).append(SPACE);
   }
 
   @Override

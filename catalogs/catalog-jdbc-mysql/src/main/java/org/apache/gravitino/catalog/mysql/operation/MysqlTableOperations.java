@@ -618,12 +618,7 @@ public class MysqlTableOperations extends JdbcTableOperations {
     }
 
     // Add DEFAULT value if specified
-    if (!DEFAULT_VALUE_NOT_SET.equals(column.defaultValue())) {
-      sqlBuilder
-          .append("DEFAULT ")
-          .append(columnDefaultValueConverter.fromGravitino(column.defaultValue()))
-          .append(SPACE);
-    }
+    appendDefaultValue(column, sqlBuilder);
 
     // Add column auto_increment if specified
     if (column.autoIncrement()) {
