@@ -74,7 +74,7 @@ jobs:
         run: |
           dev/ci/check_commands.sh
 
-      - name: Package Gravitino
+      - name: Build Gravitino
         run: |
           ./gradlew build -x test
 

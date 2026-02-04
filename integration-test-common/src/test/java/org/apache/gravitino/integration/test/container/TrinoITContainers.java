@@ -73,7 +73,6 @@ public class TrinoITContainers implements AutoCloseable {
       env.put("TRINO_VERSION", String.valueOf(trinoVersion));
     }
     if (trinoConnectorDir != null) {
-      // If the provided path is relative, resolve it against the current working directory.
       Path path = Paths.get(trinoConnectorDir);
       if (!Files.exists(path)) {
         throw new Exception("Provided GRAVITINO_TRINO_CONNECTOR_DIR '" + path + "' does not exist");

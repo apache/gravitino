@@ -32,10 +32,9 @@ val trinoVersionProvider =
 
 val resolvedTrinoVersion = trinoVersionProvider.get()
 check(resolvedTrinoVersion >= supportedTrinoVersion) {
-  "Invalid trinoVersion=$resolvedTrinoVersion for project ${project.path}. " +
+  "Failed to build the module ${project.path} of trinoVersion=$resolvedTrinoVersion. " +
     "This module requires trinoVersion >= $supportedTrinoVersion. " +
-    "Either omit -PtrinoVersion to use minSupportedTrinoVersion=${minSupportedTrinoVersionProperty.get()}, " +
-    "or set -PtrinoVersion to a supported value."
+    "Please set '-PtrinoVersion' in the command or set config the 'minSupportedTrinoVersion' of gradle.properties."
 }
 val trinoVersion = resolvedTrinoVersion
 
