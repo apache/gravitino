@@ -464,17 +464,12 @@ public class MetadataAuthzHelper {
 
   private static void preloadToCache(
       Entity.EntityType entityType, NameIdentifier[] nameIdentifiers) {
-      if (GravitinoEnv.getInstance().cacheEnabled()) {
-          if (entityType == Entity.EntityType.TABLE) {
-              GravitinoEnv.getInstance()
-                      .entityStore()
-                      .batchGet(nameIdentifiers, entityType, TableEntity.class);
-          }
+    if (GravitinoEnv.getInstance().cacheEnabled()) {
+      if (entityType == Entity.EntityType.TABLE) {
+        GravitinoEnv.getInstance()
+            .entityStore()
+            .batchGet(nameIdentifiers, entityType, TableEntity.class);
       }
-  }
-
-  @SuppressWarnings("unchecked")
-  private static <E> E[] createArray(Class<?> componentType, int size) {
-    return (E[]) Array.newInstance(componentType, size);
+    }
   }
 }
