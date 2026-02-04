@@ -556,8 +556,6 @@ public class PostgreSqlTableOperations extends JdbcTableOperations
     }
 
     StringBuilder sqlBuilder = new StringBuilder(ALTER_TABLE + jdbcTable.name());
-    String newDefaultValue =
-        handleQuotingForDefaultValue(column, updateColumnDefaultValue.getNewDefaultValue());
     sqlBuilder
         .append("\n")
         .append(ALTER_COLUMN)
@@ -565,7 +563,9 @@ public class PostgreSqlTableOperations extends JdbcTableOperations
         .append(col)
         .append(PG_QUOTE)
         .append(" SET DEFAULT ")
-        .append(newDefaultValue);
+        .append(
+            columnDefaultValueConverter.fromGravitino(
+                updateColumnDefaultValue.getNewDefaultValue()));
     return sqlBuilder.append(";").toString();
   }
 
