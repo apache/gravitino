@@ -37,6 +37,8 @@ public class ClickHouseTablePropertiesMetadata extends JdbcTablePropertiesMetada
       ClickHouseConstants.GRAVITINO_CLICKHOUSE_ENGINE_NAME;
   public static final String CLICKHOUSE_ENGINE_KEY = ClickHouseConstants.CLICKHOUSE_ENGINE_NAME;
 
+  // The following two properties are mapped to ClickHouse table properties and can be used by
+  // tables with different engines.
   public static final PropertyEntry<String> COMMENT_PROPERTY_ENTRY =
       stringReservedPropertyEntry(COMMENT_KEY, "The table comment", true);
   public static final PropertyEntry<ENGINE> ENGINE_PROPERTY_ENTRY =
@@ -48,6 +50,9 @@ public class ClickHouseTablePropertiesMetadata extends JdbcTablePropertiesMetada
           ENGINE.MERGETREE,
           false,
           false);
+
+  // The following properties are specific to ClickHouse Distributed engine, so it's recommended to
+  // only use them when ENGINE is set to DISTRIBUTED.
   public static final PropertyEntry<String> ON_CLUSTER_PROPERTY_ENTRY =
       stringOptionalPropertyEntry(
           ON_CLUSTER, "The cluster name for ClickHouse distributed tables", false, "", false);
@@ -87,8 +92,10 @@ public class ClickHouseTablePropertiesMetadata extends JdbcTablePropertiesMetada
 
   private static Map<String, PropertyEntry<?>> createPropertiesMetadata() {
     Map<String, PropertyEntry<?>> map = new HashMap<>();
+    // For all tables with different engines
     map.put(COMMENT_PROPERTY_ENTRY.getName(), COMMENT_PROPERTY_ENTRY);
     map.put(ENGINE_PROPERTY_ENTRY.getName(), ENGINE_PROPERTY_ENTRY);
+    // For ClickHouse Distributed engine
     map.put(ON_CLUSTER_PROPERTY_ENTRY.getName(), ON_CLUSTER_PROPERTY_ENTRY);
     map.put(
         CLUSTER_REMOTE_DATABASE_PROPERTY_ENTRY.getName(), CLUSTER_REMOTE_DATABASE_PROPERTY_ENTRY);
