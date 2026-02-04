@@ -19,8 +19,6 @@
 
 import com.diffplug.gradle.spotless.SpotlessExtension
 import net.ltgt.gradle.errorprone.errorprone
-import org.gradle.internal.hash.ChecksumService
-import org.gradle.kotlin.dsl.support.serviceOf
 
 plugins {
   `java-library`
