@@ -104,8 +104,8 @@ public class DynamicIcebergConfigProvider implements IcebergConfigProvider {
   }
 
   /**
-   * Lazily creates the CatalogFetcher based on whether authorization is enabled. Uses internal
-   * interface when authorization is enabled, otherwise uses HTTP interface.
+   * Lazily creates the CatalogFetcher based on whether running in auxiliary mode. Uses internal
+   * interface when in auxiliary mode (embedded in Gravitino server), otherwise uses HTTP interface.
    */
   private CatalogFetcher getCatalogFetcher() {
     if (catalogFetcher != null) {
@@ -114,7 +114,7 @@ public class DynamicIcebergConfigProvider implements IcebergConfigProvider {
     synchronized (this) {
       if (catalogFetcher == null) {
         IcebergRESTServerContext serverContext = IcebergRESTServerContext.getInstance();
-        if (serverContext.isAuthorizationEnabled()) {
+        if (serverContext.isAuxMode()) {
           catalogFetcher = new InternalCatalogFetcher(gravitinoMetalake);
         } else {
           String uri = properties.get(IcebergConstants.GRAVITINO_URI);
@@ -239,10 +239,11 @@ public class DynamicIcebergConfigProvider implements IcebergConfigProvider {
 
   /**
    * Internal catalog fetcher that uses CatalogDispatcher directly. This bypasses the HTTP layer and
-   * is used when authorization is enabled.
+   * is used when running in auxiliary mode (embedded in Gravitino server).
    *
-   * <p>Note: When authorization is enabled, IcebergCatalogWrapperManager bypasses its cache to
-   * avoid consistency issues between the IcebergCatalogWrapper cache and CatalogManager cache.
+   * <p>Note: When authorization is enabled (which requires auxiliary mode),
+   * IcebergCatalogWrapperManager bypasses its cache to avoid consistency issues between the
+   * IcebergCatalogWrapper cache and CatalogManager cache.
    */
   private static class InternalCatalogFetcher implements CatalogFetcher {
     private final String metalake;
@@ -267,7 +268,7 @@ public class DynamicIcebergConfigProvider implements IcebergConfigProvider {
 
   /**
    * HTTP catalog fetcher that uses GravitinoClient to access catalogs via REST API. This is used
-   * when authorization is not enabled.
+   * when running in standalone mode (not embedded in Gravitino server).
    */
   private static class HttpCatalogFetcher implements CatalogFetcher {
     private final String uri;
