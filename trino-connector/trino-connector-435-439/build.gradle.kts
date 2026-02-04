@@ -105,10 +105,22 @@ tasks {
     into(layout.buildDirectory.dir("libs"))
   }
 
+  val distributionDir = rootProject.layout.projectDirectory.dir("distribution/${rootProject.name}-${project.name}")
+
   register("copyLibs", Copy::class) {
     dependsOn(copyRuntimeLibs, "build")
     from(layout.buildDirectory.dir("libs"))
-    into("$rootDir/distribution/gravitino-trino-connector/libs")
+    from(rootProject.layout.projectDirectory.dir("licenses")) {
+      into("licenses")
+    }
+    from(rootProject.file("LICENSE.trino"))
+    from(rootProject.file("NOTICE.trino"))
+    from(rootProject.file("README.md"))
+    into(distributionDir)
+    rename { fileName ->
+      fileName.replace(".trino", "")
+    }
+    outputs.dir(distributionDir)
   }
 
   named("build") {

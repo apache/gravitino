@@ -861,20 +861,8 @@ tasks {
 
   val compileTrinoConnector by registering {
     dependsOn("trino-connector:trino-connector-435-439:copyLibs")
-    group = "gravitino distribution"
-    outputs.dir(projectDir.dir("distribution/${rootProject.name}-trino-connector"))
-    doLast {
-      copy {
-        from(projectDir.dir("licenses")) { into("${rootProject.name}-trino-connector/licenses") }
-        from(projectDir.file("LICENSE.trino")) { into("${rootProject.name}-trino-connector") }
-        from(projectDir.file("NOTICE.trino")) { into("${rootProject.name}-trino-connector") }
-        from(projectDir.file("README.md")) { into("${rootProject.name}-trino-connector") }
-        into(outputDir)
-        rename { fileName ->
-          fileName.replace(".trino", "")
-        }
-      }
-    }
+    group = "gravitino trino connector distribution"
+    outputs.dir(projectDir.dir("distribution/${rootProject.name}-trino-connector-435-439"))
   }
 
   val assembleDistribution by registering(Tar::class) {
