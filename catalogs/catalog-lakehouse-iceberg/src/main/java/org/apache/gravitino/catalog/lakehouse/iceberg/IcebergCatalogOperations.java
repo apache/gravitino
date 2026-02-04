@@ -632,7 +632,7 @@ public class IcebergCatalogOperations
    *
    * @param ident The identifier of the view to load.
    * @return The loaded view metadata.
-   * @throws org.apache.gravitino.exceptions.NoSuchViewException If the view does not exist.
+   * @throws NoSuchViewException If the view does not exist.
    */
   @Override
   public View loadView(NameIdentifier ident) throws NoSuchViewException {
