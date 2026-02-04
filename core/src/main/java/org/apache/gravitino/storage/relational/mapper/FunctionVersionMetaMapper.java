@@ -18,9 +18,14 @@
  */
 package org.apache.gravitino.storage.relational.mapper;
 
+import java.util.List;
+import org.apache.gravitino.storage.relational.po.FunctionMaxVersionPO;
 import org.apache.gravitino.storage.relational.po.FunctionVersionPO;
+import org.apache.ibatis.annotations.DeleteProvider;
 import org.apache.ibatis.annotations.InsertProvider;
 import org.apache.ibatis.annotations.Param;
+import org.apache.ibatis.annotations.SelectProvider;
+import org.apache.ibatis.annotations.UpdateProvider;
 
 /** A MyBatis Mapper for function version metadata operation SQLs. */
 public interface FunctionVersionMetaMapper {
@@ -37,4 +42,44 @@ public interface FunctionVersionMetaMapper {
       method = "insertFunctionVersionMetaOnDuplicateKeyUpdate")
   void insertFunctionVersionMetaOnDuplicateKeyUpdate(
       @Param("functionVersionMeta") FunctionVersionPO functionVersionPO);
+
+  @UpdateProvider(
+      type = FunctionVersionMetaSQLProviderFactory.class,
+      method = "softDeleteFunctionVersionMetasBySchemaId")
+  Integer softDeleteFunctionVersionMetasBySchemaId(@Param("schemaId") Long schemaId);
+
+  @UpdateProvider(
+      type = FunctionVersionMetaSQLProviderFactory.class,
+      method = "softDeleteFunctionVersionMetasByCatalogId")
+  Integer softDeleteFunctionVersionMetasByCatalogId(@Param("catalogId") Long catalogId);
+
+  @UpdateProvider(
+      type = FunctionVersionMetaSQLProviderFactory.class,
+      method = "softDeleteFunctionVersionMetasByMetalakeId")
+  Integer softDeleteFunctionVersionMetasByMetalakeId(@Param("metalakeId") Long metalakeId);
+
+  @DeleteProvider(
+      type = FunctionVersionMetaSQLProviderFactory.class,
+      method = "deleteFunctionVersionMetasByLegacyTimeline")
+  Integer deleteFunctionVersionMetasByLegacyTimeline(
+      @Param("legacyTimeline") Long legacyTimeline, @Param("limit") int limit);
+
+  @SelectProvider(
+      type = FunctionVersionMetaSQLProviderFactory.class,
+      method = "selectFunctionVersionsByRetentionCount")
+  List<FunctionMaxVersionPO> selectFunctionVersionsByRetentionCount(
+      @Param("versionRetentionCount") Long versionRetentionCount);
+
+  @UpdateProvider(
+      type = FunctionVersionMetaSQLProviderFactory.class,
+      method = "softDeleteFunctionVersionsByRetentionLine")
+  Integer softDeleteFunctionVersionsByRetentionLine(
+      @Param("functionId") Long functionId,
+      @Param("versionRetentionLine") long versionRetentionLine,
+      @Param("limit") int limit);
+
+  @UpdateProvider(
+      type = FunctionVersionMetaSQLProviderFactory.class,
+      method = "softDeleteFunctionVersionsByFunctionId")
+  Integer softDeleteFunctionVersionsByFunctionId(@Param("functionId") Long functionId);
 }
