@@ -62,8 +62,10 @@ public class JdbcColumnDefaultValueConverter {
       if (defaultValue.equals(Literals.NULL)) {
         return NULL;
       } else if (type instanceof Type.NumericType) {
-        // It seem that literals.value().toString() can be an empty string for numeric types
         String value = literal.value().toString();
+        // It seems that literals.value().toString() can be an empty string for numeric types
+        // in some cases like `alter table t modify column `id` int null default '';`, in such
+        // case value is an empty string, we should wrap it with single quotes to avoid SQL error.
         if (StringUtils.isBlank(value)) {
           value = "'%s'".formatted(value);
         }
