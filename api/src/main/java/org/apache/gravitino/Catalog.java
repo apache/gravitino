@@ -29,6 +29,7 @@ import org.apache.gravitino.messaging.TopicCatalog;
 import org.apache.gravitino.model.ModelCatalog;
 import org.apache.gravitino.policy.SupportsPolicies;
 import org.apache.gravitino.rel.TableCatalog;
+import org.apache.gravitino.rel.ViewCatalog;
 import org.apache.gravitino.tag.SupportsTags;
 
 /**
@@ -247,12 +248,10 @@ public interface Catalog extends Auditable {
   }
 
   /**
-   * @return the {@link org.apache.gravitino.rel.ViewCatalog} if the catalog supports view
-   *     operations.
+   * @return the {@link ViewCatalog} if the catalog supports view operations.
    * @throws UnsupportedOperationException if the catalog does not support view operations.
    */
-  default org.apache.gravitino.rel.ViewCatalog asViewCatalog()
-      throws UnsupportedOperationException {
+  default ViewCatalog asViewCatalog() throws UnsupportedOperationException {
     throw new UnsupportedOperationException("Catalog does not support view operations");
   }
 
