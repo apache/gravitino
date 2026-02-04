@@ -358,59 +358,74 @@ public class ClickHouseTableOperations extends JdbcTableOperations {
     TableChange.UpdateComment updateComment = null;
     List<TableChange.SetProperty> setProperties = new ArrayList<>();
     List<String> alterSql = new ArrayList<>();
+
     for (TableChange change : changes) {
       if (change instanceof TableChange.UpdateComment) {
         updateComment = (TableChange.UpdateComment) change;
-      } else if (change instanceof TableChange.SetProperty) {
+
+      } else if (change instanceof TableChange.SetProperty setProperty) {
         // The set attribute needs to be added at the end.
-        setProperties.add(((TableChange.SetProperty) change));
+        setProperties.add(setProperty);
+
       } else if (change instanceof TableChange.RemoveProperty) {
-        // clickhouse does not support deleting table attributes, it can be replaced by Set Property
+        // Clickhouse does not support deleting table attributes, it can be replaced by Set Property
         throw new IllegalArgumentException("Remove property is not supported yet");
-      } else if (change instanceof TableChange.AddColumn) {
-        TableChange.AddColumn addColumn = (TableChange.AddColumn) change;
+
+      } else if (change instanceof TableChange.AddColumn addColumn) {
         lazyLoadTable = getOrCreateTable(databaseName, tableName, lazyLoadTable);
         alterSql.add(addColumnFieldDefinition(addColumn));
+
       } else if (change instanceof TableChange.RenameColumn renameColumn) {
         lazyLoadTable = getOrCreateTable(databaseName, tableName, lazyLoadTable);
         alterSql.add(renameColumnFieldDefinition(renameColumn));
+
       } else if (change instanceof TableChange.UpdateColumnDefaultValue updateColumnDefaultValue) {
         lazyLoadTable = getOrCreateTable(databaseName, tableName, lazyLoadTable);
         alterSql.add(
             updateColumnDefaultValueFieldDefinition(updateColumnDefaultValue, lazyLoadTable));
+
       } else if (change instanceof TableChange.UpdateColumnType updateColumnType) {
         lazyLoadTable = getOrCreateTable(databaseName, tableName, lazyLoadTable);
         alterSql.add(updateColumnTypeFieldDefinition(updateColumnType, lazyLoadTable));
+
       } else if (change instanceof TableChange.UpdateColumnComment updateColumnComment) {
         lazyLoadTable = getOrCreateTable(databaseName, tableName, lazyLoadTable);
         alterSql.add(updateColumnCommentFieldDefinition(updateColumnComment, lazyLoadTable));
+
       } else if (change instanceof TableChange.UpdateColumnPosition updateColumnPosition) {
         lazyLoadTable = getOrCreateTable(databaseName, tableName, lazyLoadTable);
         alterSql.add(updateColumnPositionFieldDefinition(updateColumnPosition, lazyLoadTable));
+
       } else if (change instanceof TableChange.DeleteColumn deleteColumn) {
         lazyLoadTable = getOrCreateTable(databaseName, tableName, lazyLoadTable);
         String deleteColSql = deleteColumnFieldDefinition(deleteColumn, lazyLoadTable);
+
         if (StringUtils.isNotEmpty(deleteColSql)) {
           alterSql.add(deleteColSql);
         }
+
       } else if (change instanceof TableChange.UpdateColumnNullability) {
         lazyLoadTable = getOrCreateTable(databaseName, tableName, lazyLoadTable);
         alterSql.add(
             updateColumnNullabilityDefinition(
                 (TableChange.UpdateColumnNullability) change, lazyLoadTable));
+
       } else if (change instanceof TableChange.DeleteIndex) {
         lazyLoadTable = getOrCreateTable(databaseName, tableName, lazyLoadTable);
         alterSql.add(deleteIndexDefinition(lazyLoadTable, (TableChange.DeleteIndex) change));
+
       } else if (change instanceof TableChange.UpdateColumnAutoIncrement) {
         lazyLoadTable = getOrCreateTable(databaseName, tableName, lazyLoadTable);
         alterSql.add(
             updateColumnAutoIncrementDefinition(
                 lazyLoadTable, (TableChange.UpdateColumnAutoIncrement) change));
+
       } else {
         throw new IllegalArgumentException(
             "Unsupported table change type: " + change.getClass().getName());
       }
     }
+
     if (!setProperties.isEmpty()) {
       alterSql.add(generateAlterTableProperties(setProperties));
     }
@@ -426,7 +441,7 @@ public class ClickHouseTableOperations extends JdbcTableOperations {
           newComment = StringIdentifier.addToComment(identifier, newComment);
         }
       }
-      alterSql.add(" MODIFY COMMENT '" + newComment + "'");
+      alterSql.add(" MODIFY COMMENT '%s'".formatted(newComment));
     }
 
     if (!setProperties.isEmpty()) {
@@ -434,15 +449,16 @@ public class ClickHouseTableOperations extends JdbcTableOperations {
     }
 
     // Remove all empty SQL statements
-    List<String> nonEmptySqls =
+    List<String> nonEmptySQLs =
         alterSql.stream().filter(StringUtils::isNotEmpty).collect(Collectors.toList());
-    if (CollectionUtils.isEmpty(nonEmptySqls)) {
+    if (CollectionUtils.isEmpty(nonEmptySQLs)) {
       return "";
     }
+
     // Return the generated SQL statement
     String result =
         "ALTER TABLE %s \n%s;"
-            .formatted(quoteIdentifier(tableName), String.join(",\n", nonEmptySqls));
+            .formatted(quoteIdentifier(tableName), String.join(",\n", nonEmptySQLs));
     LOG.info("Generated alter table:{} sql: {}", databaseName + "." + tableName, result);
     return result;
   }
@@ -489,11 +505,12 @@ public class ClickHouseTableOperations extends JdbcTableOperations {
       if (deleteIndex.isIfExists()) {
         return "";
       } else {
-        throw new IllegalArgumentException("Index does not exist");
+        throw new IllegalArgumentException(
+            "Index '%s' does not exist".formatted(deleteIndex.getName()));
       }
     }
 
-    return String.format("DROP INDEX %s".formatted(quoteIdentifier(deleteIndex.getName())));
+    return String.format("DROP INDEX %s ".formatted(quoteIdentifier(deleteIndex.getName())));
   }
 
   private String updateColumnNullabilityDefinition(
@@ -555,15 +572,15 @@ public class ClickHouseTableOperations extends JdbcTableOperations {
     if (addColumn.fieldName().length > 1) {
       throw new UnsupportedOperationException(CLICKHOUSE_NOT_SUPPORT_NESTED_COLUMN_MSG);
     }
-    String col = addColumn.fieldName()[0];
 
+    String col = addColumn.fieldName()[0];
     StringBuilder columnDefinition = new StringBuilder();
     //  [IF NOT EXISTS] name [type] [default_expr] [codec] [AFTER name_after | FIRST]
-    if (!addColumn.isNullable()) {
-      columnDefinition.append("ADD COLUMN %s %s ".formatted(quoteIdentifier(col), dataType));
-    } else {
+    if (addColumn.isNullable()) {
       columnDefinition.append(
           "ADD COLUMN %s Nullable(%s) ".formatted(quoteIdentifier(col), dataType));
+    } else {
+      columnDefinition.append("ADD COLUMN %s %s ".formatted(quoteIdentifier(col), dataType));
     }
 
     if (addColumn.isAutoIncrement()) {
@@ -580,7 +597,8 @@ public class ClickHouseTableOperations extends JdbcTableOperations {
 
     // Append comment if available after default value
     if (StringUtils.isNotEmpty(addColumn.getComment())) {
-      columnDefinition.append("COMMENT '%s'".formatted(addColumn.getComment()));
+      String escapedComment = StringUtils.replace(addColumn.getComment(), "'", "''");
+      columnDefinition.append("COMMENT '%s'".formatted(escapedComment));
     }
 
     // Append position if available
@@ -665,6 +683,7 @@ public class ClickHouseTableOperations extends JdbcTableOperations {
     if (updateColumnDefaultValue.fieldName().length > 1) {
       throw new UnsupportedOperationException(CLICKHOUSE_NOT_SUPPORT_NESTED_COLUMN_MSG);
     }
+
     String col = updateColumnDefaultValue.fieldName()[0];
     JdbcColumn column = getJdbcColumnFromTable(jdbcTable, col);
     StringBuilder sqlBuilder = new StringBuilder(MODIFY_COLUMN + quoteIdentifier(col));
@@ -685,6 +704,7 @@ public class ClickHouseTableOperations extends JdbcTableOperations {
     if (updateColumnType.fieldName().length > 1) {
       throw new UnsupportedOperationException(CLICKHOUSE_NOT_SUPPORT_NESTED_COLUMN_MSG);
     }
+
     String col = updateColumnType.fieldName()[0];
     JdbcColumn column = getJdbcColumnFromTable(jdbcTable, col);
     StringBuilder sqlBuilder = new StringBuilder(MODIFY_COLUMN + quoteIdentifier(col));
