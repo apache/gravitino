@@ -45,6 +45,8 @@ import org.apache.gravitino.metrics.Monitored;
 import org.apache.gravitino.storage.relational.helper.SchemaIds;
 import org.apache.gravitino.storage.relational.mapper.FilesetMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.FilesetVersionMapper;
+import org.apache.gravitino.storage.relational.mapper.FunctionMetaMapper;
+import org.apache.gravitino.storage.relational.mapper.FunctionVersionMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.ModelMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.ModelVersionAliasRelMapper;
 import org.apache.gravitino.storage.relational.mapper.ModelVersionMetaMapper;
@@ -247,6 +249,14 @@ public class SchemaMetaService {
           () ->
               SessionUtils.doWithoutCommit(
                   TopicMetaMapper.class, mapper -> mapper.softDeleteTopicMetasBySchemaId(schemaId)),
+          () ->
+              SessionUtils.doWithoutCommit(
+                  FunctionMetaMapper.class,
+                  mapper -> mapper.softDeleteFunctionMetasBySchemaId(schemaId)),
+          () ->
+              SessionUtils.doWithoutCommit(
+                  FunctionVersionMetaMapper.class,
+                  mapper -> mapper.softDeleteFunctionVersionMetasBySchemaId(schemaId)),
           () ->
               SessionUtils.doWithoutCommit(
                   OwnerMetaMapper.class, mapper -> mapper.softDeleteOwnerRelBySchemaId(schemaId)),
