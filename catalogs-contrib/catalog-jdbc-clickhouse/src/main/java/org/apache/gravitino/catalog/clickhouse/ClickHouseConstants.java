@@ -21,19 +21,37 @@ package org.apache.gravitino.catalog.clickhouse;
 
 public class ClickHouseConstants {
 
-  /*---------------------The following are ClickHouse cluster related properties---------------------*/
-  // Name of the clickhouse cluster
-  public static final String CLUSTER_NAME = "cluster-name";
-  // Whether to use 'ON CLUSTER' clause when creating tables
-  public static final String ON_CLUSTER = "on-cluster";
-  // Sharding key for the clickhouse cluster
-  public static final String CLUSTER_SHARDING_KEY = "cluster-sharding-key";
-  public static final String CLUSTER_REMOTE_DATABASE = "cluster-remote-database";
-  public static final String CLUSTER_REMOTE_TABLE = "cluster-remote-table";
+  /** Cluster-scoped properties. */
+  public static final class DistributedOrClusterConstants {
+    private DistributedOrClusterConstants() {}
 
-  /*---------------------The following are ClickHouse table related properties---------------------*/
-  public static final String GRAVITINO_CLICKHOUSE_ENGINE_NAME = "engine";
-  public static final String CLICKHOUSE_ENGINE_NAME = "ENGINE";
+    // Name of the clickhouse cluster
+    public static final String NAME = "cluster-name";
+    // Whether to use 'ON CLUSTER' clause when creating tables
+    public static final String ON_CLUSTER = "on-cluster";
+    // Sharding key for the clickhouse cluster
+    public static final String SHARDING_KEY = "cluster-sharding-key";
+    public static final String REMOTE_DATABASE = "cluster-remote-database";
+    public static final String REMOTE_TABLE = "cluster-remote-table";
+  }
 
-  public static final String SETTINGS_PREFIX = "settings.";
+  /** Table-scoped properties. */
+  public static final class TableConstants {
+    private TableConstants() {}
+
+    public static final String ENGINE = "engine";
+    public static final String ENGINE_UPPER = "ENGINE";
+    public static final String SETTINGS_PREFIX = "settings.";
+  }
+
+  public static final String CLUSTER_NAME = DistributedOrClusterConstants.NAME;
+  public static final String ON_CLUSTER = DistributedOrClusterConstants.ON_CLUSTER;
+  public static final String CLUSTER_SHARDING_KEY = DistributedOrClusterConstants.SHARDING_KEY;
+  public static final String CLUSTER_REMOTE_DATABASE =
+      DistributedOrClusterConstants.REMOTE_DATABASE;
+  public static final String CLUSTER_REMOTE_TABLE = DistributedOrClusterConstants.REMOTE_TABLE;
+
+  public static final String GRAVITINO_CLICKHOUSE_ENGINE_NAME = TableConstants.ENGINE;
+  public static final String CLICKHOUSE_ENGINE_NAME = TableConstants.ENGINE_UPPER;
+  public static final String SETTINGS_PREFIX = TableConstants.SETTINGS_PREFIX;
 }
