@@ -18,7 +18,6 @@
  */
 package org.apache.gravitino.catalog.clickhouse.operations;
 
-import static org.apache.gravitino.catalog.clickhouse.ClickHouseConstants.SETTINGS_PREFIX;
 import static org.apache.gravitino.catalog.clickhouse.ClickHouseTablePropertiesMetadata.CLICKHOUSE_ENGINE_KEY;
 import static org.apache.gravitino.catalog.clickhouse.ClickHouseTablePropertiesMetadata.ENGINE_PROPERTY_ENTRY;
 import static org.apache.gravitino.rel.Column.DEFAULT_VALUE_NOT_SET;
@@ -39,6 +38,7 @@ import java.util.stream.Collectors;
 import org.apache.commons.collections4.MapUtils;
 import org.apache.commons.lang3.ArrayUtils;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.gravitino.catalog.clickhouse.ClickHouseConstants.TableConstants;
 import org.apache.gravitino.catalog.clickhouse.ClickHouseTablePropertiesMetadata;
 import org.apache.gravitino.catalog.jdbc.JdbcColumn;
 import org.apache.gravitino.catalog.jdbc.operation.JdbcTableOperations;
@@ -171,10 +171,12 @@ public class ClickHouseTableOperations extends JdbcTableOperations {
 
     String settings =
         properties.entrySet().stream()
-            .filter(entry -> entry.getKey().startsWith(SETTINGS_PREFIX))
+            .filter(entry -> entry.getKey().startsWith(TableConstants.SETTINGS_PREFIX))
             .map(
                 entry ->
-                    entry.getKey().substring(SETTINGS_PREFIX.length()) + " = " + entry.getValue())
+                    entry.getKey().substring(TableConstants.SETTINGS_PREFIX.length())
+                        + " = "
+                        + entry.getValue())
             .collect(Collectors.joining(",\n ", " \n SETTINGS ", ""));
     sqlBuilder.append(settings);
   }
