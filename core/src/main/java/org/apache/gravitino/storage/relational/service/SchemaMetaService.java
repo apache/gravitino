@@ -57,6 +57,7 @@ import org.apache.gravitino.storage.relational.mapper.TableColumnMapper;
 import org.apache.gravitino.storage.relational.mapper.TableMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.TagMetadataObjectRelMapper;
 import org.apache.gravitino.storage.relational.mapper.TopicMetaMapper;
+import org.apache.gravitino.storage.relational.mapper.ViewMetaMapper;
 import org.apache.gravitino.storage.relational.po.SchemaPO;
 import org.apache.gravitino.storage.relational.utils.ExceptionUtils;
 import org.apache.gravitino.storage.relational.utils.POConverters;
@@ -275,7 +276,10 @@ public class SchemaMetaService {
           () ->
               SessionUtils.doWithoutCommit(
                   StatisticMetaMapper.class,
-                  mapper -> mapper.softDeleteStatisticsBySchemaId(schemaId)));
+                  mapper -> mapper.softDeleteStatisticsBySchemaId(schemaId)),
+          () ->
+              SessionUtils.doWithoutCommit(
+                  ViewMetaMapper.class, mapper -> mapper.softDeleteViewMetasBySchemaId(schemaId)));
     } else {
       List<TableEntity> tableEntities =
           TableMetaService.getInstance()
