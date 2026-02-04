@@ -21,6 +21,7 @@ package org.apache.gravitino.storage.relational.mapper;
 import java.util.List;
 import org.apache.gravitino.storage.relational.po.FunctionPO;
 import org.apache.gravitino.storage.relational.po.FunctionVersionPO;
+import org.apache.ibatis.annotations.DeleteProvider;
 import org.apache.ibatis.annotations.InsertProvider;
 import org.apache.ibatis.annotations.One;
 import org.apache.ibatis.annotations.Param;
@@ -29,6 +30,7 @@ import org.apache.ibatis.annotations.ResultMap;
 import org.apache.ibatis.annotations.Results;
 import org.apache.ibatis.annotations.Select;
 import org.apache.ibatis.annotations.SelectProvider;
+import org.apache.ibatis.annotations.UpdateProvider;
 
 /** A MyBatis Mapper for function metadata operation SQLs. */
 public interface FunctionMetaMapper {
@@ -131,4 +133,35 @@ public interface FunctionMetaMapper {
       method = "selectFunctionMetaBySchemaIdAndName")
   FunctionPO selectFunctionMetaBySchemaIdAndName(
       @Param("schemaId") Long schemaId, @Param("functionName") String functionName);
+
+  @UpdateProvider(
+      type = FunctionMetaSQLProviderFactory.class,
+      method = "softDeleteFunctionMetaByFunctionId")
+  Integer softDeleteFunctionMetaByFunctionId(@Param("functionId") Long functionId);
+
+  @UpdateProvider(
+      type = FunctionMetaSQLProviderFactory.class,
+      method = "softDeleteFunctionMetasByCatalogId")
+  Integer softDeleteFunctionMetasByCatalogId(@Param("catalogId") Long catalogId);
+
+  @UpdateProvider(
+      type = FunctionMetaSQLProviderFactory.class,
+      method = "softDeleteFunctionMetasByMetalakeId")
+  Integer softDeleteFunctionMetasByMetalakeId(@Param("metalakeId") Long metalakeId);
+
+  @UpdateProvider(
+      type = FunctionMetaSQLProviderFactory.class,
+      method = "softDeleteFunctionMetasBySchemaId")
+  Integer softDeleteFunctionMetasBySchemaId(@Param("schemaId") Long schemaId);
+
+  @DeleteProvider(
+      type = FunctionMetaSQLProviderFactory.class,
+      method = "deleteFunctionMetasByLegacyTimeline")
+  Integer deleteFunctionMetasByLegacyTimeline(
+      @Param("legacyTimeline") Long legacyTimeline, @Param("limit") int limit);
+
+  @UpdateProvider(type = FunctionMetaSQLProviderFactory.class, method = "updateFunctionMeta")
+  Integer updateFunctionMeta(
+      @Param("newFunctionMeta") FunctionPO newFunctionPO,
+      @Param("oldFunctionMeta") FunctionPO oldFunctionPO);
 }

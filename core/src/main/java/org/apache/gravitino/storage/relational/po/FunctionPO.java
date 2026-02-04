@@ -192,12 +192,17 @@ public class FunctionPO {
 
   public static FunctionPO buildFunctionPO(
       FunctionEntity functionEntity, FunctionPO.FunctionPOBuilder builder) {
+    return buildFunctionPO(functionEntity, builder, INITIAL_VERSION);
+  }
+
+  public static FunctionPO buildFunctionPO(
+      FunctionEntity functionEntity, FunctionPO.FunctionPOBuilder builder, Integer version) {
     try {
       NamespacedEntityId namespacedEntityId =
           EntityIdService.getEntityIds(
               NameIdentifier.of(functionEntity.namespace().levels()), Entity.EntityType.SCHEMA);
       FunctionVersionPO versionPO =
-          initializeFunctionVersionPO(functionEntity, namespacedEntityId, INITIAL_VERSION);
+          initializeFunctionVersionPO(functionEntity, namespacedEntityId, version);
       return builder
           .withFunctionId(functionEntity.id())
           .withFunctionName(functionEntity.name())
