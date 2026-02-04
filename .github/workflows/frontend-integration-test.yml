@@ -57,7 +57,6 @@ jobs:
         java-version: [ 17 ]
     env:
       PLATFORM: ${{ matrix.architecture }}
-      GRAVITINO_USE_WEB_V2: true
     steps:
       - uses: actions/checkout@v4
 
@@ -85,8 +84,8 @@ jobs:
       - name: Frontend Integration Test
         id: integrationTest
         run: |
-          ./gradlew -PskipTests -PtestMode=embedded -PskipDockerTests=false :web-v2:integration-test:test
-          ./gradlew -PskipTests -PtestMode=deploy -PskipDockerTests=false :web-v2:integration-test:test
+          GRAVITINO_USE_WEB_V2=true ./gradlew -PskipTests -PtestMode=embedded -PskipDockerTests=false :web-v2:integration-test:test
+          GRAVITINO_USE_WEB_V2=true ./gradlew -PskipTests -PtestMode=deploy -PskipDockerTests=false :web-v2:integration-test:test
 
       - name: Upload integrate tests reports
         uses: actions/upload-artifact@v4
