@@ -21,6 +21,7 @@ package org.apache.gravitino.catalog.clickhouse;
 
 public class ClickHouseConstants {
 
+  /*---------------------The following are ClickHouse cluster related properties---------------------*/
   // Name of the clickhouse cluster
   public static final String CLUSTER_NAME = "cluster-name";
   // Whether to use 'ON CLUSTER' clause when creating tables
@@ -30,6 +31,7 @@ public class ClickHouseConstants {
   public static final String CLUSTER_REMOTE_DATABASE = "cluster-remote-database";
   public static final String CLUSTER_REMOTE_TABLE = "cluster-remote-table";
 
+  /*---------------------The following are ClickHouse table related properties---------------------*/
   public static final String GRAVITINO_CLICKHOUSE_ENGINE_NAME = "engine";
   public static final String CLICKHOUSE_ENGINE_NAME = "ENGINE";
 
