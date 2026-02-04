@@ -260,8 +260,7 @@ class SecurableObjects:
         Returns:
             SecurableObjectImpl: The created topic SecurableObject
         """
-        names = schema.full_name().split(".")
-        names.append(topic)
+        names = [*schema.full_name().split("."), topic]
         return SecurableObjects.of(
             MetadataObject.Type.TOPIC,
             names,
@@ -285,8 +284,7 @@ class SecurableObjects:
         Returns:
             SecurableObjectImpl: The created fileset SecurableObject.
         """
-        names = schema.full_name().split(".")
-        names.append(fileset)
+        names = [*schema.full_name().split("."), fileset]
         return SecurableObjects.of(
             MetadataObject.Type.FILESET,
             names,
@@ -310,8 +308,7 @@ class SecurableObjects:
         Returns:
             SecurableObjectImpl: The created model SecurableObject.
         """
-        names = schema.full_name().split(".")
-        names.append(model)
+        names = [*schema.full_name().split("."), model]
         return SecurableObjects.of(
             MetadataObject.Type.MODEL,
             names,
