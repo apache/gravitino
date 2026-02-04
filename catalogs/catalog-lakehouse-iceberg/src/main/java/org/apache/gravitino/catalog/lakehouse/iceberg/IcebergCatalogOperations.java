@@ -46,6 +46,7 @@ import org.apache.gravitino.exceptions.ConnectionFailedException;
 import org.apache.gravitino.exceptions.NoSuchCatalogException;
 import org.apache.gravitino.exceptions.NoSuchSchemaException;
 import org.apache.gravitino.exceptions.NoSuchTableException;
+import org.apache.gravitino.exceptions.NoSuchViewException;
 import org.apache.gravitino.exceptions.NonEmptySchemaException;
 import org.apache.gravitino.exceptions.SchemaAlreadyExistsException;
 import org.apache.gravitino.exceptions.TableAlreadyExistsException;
@@ -79,6 +80,7 @@ import org.apache.iceberg.rest.requests.UpdateNamespacePropertiesRequest;
 import org.apache.iceberg.rest.responses.GetNamespaceResponse;
 import org.apache.iceberg.rest.responses.ListTablesResponse;
 import org.apache.iceberg.rest.responses.LoadTableResponse;
+import org.apache.iceberg.rest.responses.LoadViewResponse;
 import org.apache.iceberg.rest.responses.UpdateNamespacePropertiesResponse;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -633,16 +635,15 @@ public class IcebergCatalogOperations
    * @throws org.apache.gravitino.exceptions.NoSuchViewException If the view does not exist.
    */
   @Override
-  public View loadView(org.apache.gravitino.NameIdentifier ident)
-      throws org.apache.gravitino.exceptions.NoSuchViewException {
+  public View loadView(NameIdentifier ident) throws NoSuchViewException {
     try {
-      org.apache.iceberg.rest.responses.LoadViewResponse response =
+      LoadViewResponse response =
           icebergCatalogWrapper.loadView(
               IcebergCatalogWrapperHelper.buildIcebergTableIdentifier(ident));
 
       return IcebergView.fromLoadViewResponse(response, ident.name());
     } catch (Exception e) {
-      throw new org.apache.gravitino.exceptions.NoSuchViewException(
+      throw new NoSuchViewException(
           e, "Failed to load view %s from Iceberg catalog: %s", ident, e.getMessage());
     }
   }
