@@ -27,7 +27,6 @@ import java.util.Map;
 import java.util.stream.Collectors;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
-import org.apache.gravitino.dto.function.FunctionColumnDTO;
 import org.apache.gravitino.dto.function.FunctionDefinitionDTO;
 import org.apache.gravitino.dto.requests.FunctionRegisterRequest;
 import org.apache.gravitino.dto.requests.FunctionUpdateRequest;
@@ -42,10 +41,8 @@ import org.apache.gravitino.exceptions.NoSuchSchemaException;
 import org.apache.gravitino.function.Function;
 import org.apache.gravitino.function.FunctionCatalog;
 import org.apache.gravitino.function.FunctionChange;
-import org.apache.gravitino.function.FunctionColumn;
 import org.apache.gravitino.function.FunctionDefinition;
 import org.apache.gravitino.function.FunctionType;
-import org.apache.gravitino.rel.types.Type;
 import org.apache.gravitino.rest.RESTUtils;
 
 /**
@@ -141,14 +138,14 @@ class FunctionCatalogOperations implements FunctionCatalog {
   }
 
   /**
-   * Register a scalar or aggregate function with one or more definitions (overloads).
+   * Register a function with one or more definitions (overloads). Each definition carries its own
+   * return type or return columns.
    *
    * @param ident The function identifier.
    * @param comment The optional function comment.
    * @param functionType The function type.
    * @param deterministic Whether the function is deterministic.
-   * @param returnType The return type.
-   * @param definitions The function definitions.
+   * @param definitions The function definitions, each containing its own return type/columns.
    * @return The registered function.
    * @throws NoSuchSchemaException If the schema does not exist.
    * @throws FunctionAlreadyExistsException If the function already exists.
@@ -159,7 +156,6 @@ class FunctionCatalogOperations implements FunctionCatalog {
       String comment,
       FunctionType functionType,
       boolean deterministic,
-      Type returnType,
       FunctionDefinition[] definitions)
       throws NoSuchSchemaException, FunctionAlreadyExistsException {
     checkFunctionNameIdentifier(ident);
@@ -171,53 +167,6 @@ class FunctionCatalogOperations implements FunctionCatalog {
             .withComment(comment)
             .withFunctionType(functionType)
             .withDeterministic(deterministic)
-            .withReturnType(returnType)
-            .withDefinitions(toFunctionDefinitionDTOs(definitions))
-            .build();
-    req.validate();
-
-    FunctionResponse resp =
-        restClient.post(
-            formatFunctionRequestPath(fullNamespace),
-            req,
-            FunctionResponse.class,
-            Collections.emptyMap(),
-            ErrorHandlers.functionErrorHandler());
-    resp.validate();
-
-    return resp.getFunction();
-  }
-
-  /**
-   * Register a table-valued function with one or more definitions (overloads).
-   *
-   * @param ident The function identifier.
-   * @param comment The optional function comment.
-   * @param deterministic Whether the function is deterministic.
-   * @param returnColumns The return columns.
-   * @param definitions The function definitions.
-   * @return The registered function.
-   * @throws NoSuchSchemaException If the schema does not exist.
-   * @throws FunctionAlreadyExistsException If the function already exists.
-   */
-  @Override
-  public Function registerFunction(
-      NameIdentifier ident,
-      String comment,
-      boolean deterministic,
-      FunctionColumn[] returnColumns,
-      FunctionDefinition[] definitions)
-      throws NoSuchSchemaException, FunctionAlreadyExistsException {
-    checkFunctionNameIdentifier(ident);
-
-    Namespace fullNamespace = getFunctionFullNamespace(ident.namespace());
-    FunctionRegisterRequest req =
-        FunctionRegisterRequest.builder()
-            .withName(ident.name())
-            .withComment(comment)
-            .withFunctionType(FunctionType.TABLE)
-            .withDeterministic(deterministic)
-            .withReturnColumns(toFunctionColumnDTOs(returnColumns))
             .withDefinitions(toFunctionDefinitionDTOs(definitions))
             .build();
     req.validate();
@@ -342,14 +291,5 @@ class FunctionCatalogOperations implements FunctionCatalog {
     return Arrays.stream(definitions)
         .map(DTOConverters::toFunctionDefinitionDTO)
         .toArray(FunctionDefinitionDTO[]::new);
-  }
-
-  private FunctionColumnDTO[] toFunctionColumnDTOs(FunctionColumn[] columns) {
-    if (columns == null) {
-      return null;
-    }
-    return Arrays.stream(columns)
-        .map(DTOConverters::toFunctionColumnDTO)
-        .toArray(FunctionColumnDTO[]::new);
   }
 }

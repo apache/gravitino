@@ -64,7 +64,6 @@ import org.apache.gravitino.function.FunctionParam;
 import org.apache.gravitino.function.FunctionParams;
 import org.apache.gravitino.function.FunctionType;
 import org.apache.gravitino.meta.AuditInfo;
-import org.apache.gravitino.rel.types.Type;
 import org.apache.gravitino.rel.types.Types;
 import org.apache.gravitino.rest.RESTUtils;
 import org.apache.gravitino.utils.NameIdentifierUtil;
@@ -277,18 +276,16 @@ public class TestFunctionOperations extends BaseOperationsTest {
             anyString(),
             eq(FunctionType.SCALAR),
             anyBoolean(),
-            any(Type.class),
             any(FunctionDefinition[].class)))
         .thenReturn(mockFunction);
 
-    FunctionDefinitionDTO[] definitionDTOs = createMockDefinitionDTOs();
+    FunctionDefinitionDTO[] definitionDTOs = createMockScalarDefinitionDTOs();
     FunctionRegisterRequest req =
         FunctionRegisterRequest.builder()
             .withName("func1")
             .withComment("test comment")
             .withFunctionType(FunctionType.SCALAR)
             .withDeterministic(true)
-            .withReturnType(Types.IntegerType.get())
             .withDefinitions(definitionDTOs)
             .build();
 
@@ -313,7 +310,6 @@ public class TestFunctionOperations extends BaseOperationsTest {
             anyString(),
             eq(FunctionType.SCALAR),
             anyBoolean(),
-            any(Type.class),
             any(FunctionDefinition[].class));
 
     Response resp1 =
@@ -336,7 +332,6 @@ public class TestFunctionOperations extends BaseOperationsTest {
             anyString(),
             eq(FunctionType.SCALAR),
             anyBoolean(),
-            any(Type.class),
             any(FunctionDefinition[].class));
 
     Response resp2 =
@@ -360,7 +355,6 @@ public class TestFunctionOperations extends BaseOperationsTest {
             anyString(),
             eq(FunctionType.SCALAR),
             anyBoolean(),
-            any(Type.class),
             any(FunctionDefinition[].class));
 
     Response resp3 =
@@ -385,8 +379,8 @@ public class TestFunctionOperations extends BaseOperationsTest {
     when(functionDispatcher.registerFunction(
             eq(funcId),
             anyString(),
+            eq(FunctionType.TABLE),
             anyBoolean(),
-            any(FunctionColumn[].class),
             any(FunctionDefinition[].class)))
         .thenReturn(mockFunction);
 
@@ -396,8 +390,7 @@ public class TestFunctionOperations extends BaseOperationsTest {
             .withComment("test comment")
             .withFunctionType(FunctionType.TABLE)
             .withDeterministic(true)
-            .withReturnColumns(createMockReturnColumnDTOs())
-            .withDefinitions(createMockDefinitionDTOs())
+            .withDefinitions(createMockTableDefinitionDTOs())
             .build();
 
     Response resp =
@@ -501,7 +494,7 @@ public class TestFunctionOperations extends BaseOperationsTest {
     NameIdentifier funcId = NameIdentifierUtil.ofFunction(metalake, catalog, schema, "func1");
     Function mockFunction = mockFunction("func1", "comment", FunctionType.SCALAR);
 
-    FunctionDefinitionDTO newDef = createMockDefinitionDTOs()[0];
+    FunctionDefinitionDTO newDef = createMockScalarDefinitionDTOs()[0];
     FunctionChange addDef = FunctionChange.addDefinition(newDef.toFunctionDefinition());
     when(functionDispatcher.alterFunction(funcId, addDef)).thenReturn(mockFunction);
 
@@ -666,9 +659,7 @@ public class TestFunctionOperations extends BaseOperationsTest {
     when(mockFunction.comment()).thenReturn(comment);
     when(mockFunction.functionType()).thenReturn(functionType);
     when(mockFunction.deterministic()).thenReturn(true);
-    when(mockFunction.returnType()).thenReturn(Types.IntegerType.get());
-    when(mockFunction.returnColumns()).thenReturn(new FunctionColumn[0]);
-    when(mockFunction.definitions()).thenReturn(createMockDefinitions());
+    when(mockFunction.definitions()).thenReturn(createMockScalarDefinitions());
     when(mockFunction.auditInfo()).thenReturn(testAuditInfo);
     return mockFunction;
   }
@@ -679,27 +670,50 @@ public class TestFunctionOperations extends BaseOperationsTest {
     when(mockFunction.comment()).thenReturn(comment);
     when(mockFunction.functionType()).thenReturn(FunctionType.TABLE);
     when(mockFunction.deterministic()).thenReturn(true);
-    when(mockFunction.returnType()).thenReturn(null);
-    when(mockFunction.returnColumns()).thenReturn(createMockReturnColumns());
-    when(mockFunction.definitions()).thenReturn(createMockDefinitions());
+    when(mockFunction.definitions()).thenReturn(createMockTableDefinitions());
     when(mockFunction.auditInfo()).thenReturn(testAuditInfo);
     return mockFunction;
   }
 
-  private FunctionDefinition[] createMockDefinitions() {
+  private FunctionDefinition[] createMockScalarDefinitions() {
     FunctionParam[] params =
         new FunctionParam[] {FunctionParams.of("param1", Types.IntegerType.get())};
     FunctionImpl[] impls =
         new FunctionImpl[] {
           FunctionImpls.ofSql(FunctionImpl.RuntimeType.SPARK, "SELECT param1 + 1")
         };
-    return new FunctionDefinition[] {FunctionDefinitions.of(params, impls)};
+    return new FunctionDefinition[] {
+      FunctionDefinitions.of(params, Types.IntegerType.get(), impls)
+    };
   }
 
-  private FunctionDefinitionDTO[] createMockDefinitionDTOs() {
+  private FunctionDefinition[] createMockTableDefinitions() {
+    FunctionParam[] params =
+        new FunctionParam[] {FunctionParams.of("param1", Types.IntegerType.get())};
+    FunctionImpl[] impls =
+        new FunctionImpl[] {
+          FunctionImpls.ofSql(FunctionImpl.RuntimeType.SPARK, "SELECT param1 + 1")
+        };
+    return new FunctionDefinition[] {
+      FunctionDefinitions.of(params, createMockReturnColumns(), impls)
+    };
+  }
+
+  private FunctionDefinitionDTO[] createMockScalarDefinitionDTOs() {
     return new FunctionDefinitionDTO[] {
       FunctionDefinitionDTO.builder()
           .withParameters(createMockParamDTOs())
+          .withReturnType(Types.IntegerType.get())
+          .withImpls(new FunctionImplDTO[] {createMockSqlImplDTO()})
+          .build()
+    };
+  }
+
+  private FunctionDefinitionDTO[] createMockTableDefinitionDTOs() {
+    return new FunctionDefinitionDTO[] {
+      FunctionDefinitionDTO.builder()
+          .withParameters(createMockParamDTOs())
+          .withReturnColumns(createMockReturnColumnDTOs())
           .withImpls(new FunctionImplDTO[] {createMockSqlImplDTO()})
           .build()
     };

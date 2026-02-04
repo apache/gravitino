@@ -452,7 +452,6 @@ CREATE TABLE IF NOT EXISTS `function_meta` (
     `schema_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'schema id',
     `function_type` VARCHAR(64) NOT NULL COMMENT 'function type',
     `deterministic` TINYINT(1) DEFAULT 1 COMMENT 'whether the function result is deterministic',
-    `return_type` CLOB NOT NULL COMMENT 'function return type',
     `function_current_version` INT UNSIGNED DEFAULT 1 COMMENT 'function current version',
     `function_latest_version` INT UNSIGNED DEFAULT 1 COMMENT 'function latest version',
     `audit_info` CLOB NOT NULL COMMENT 'function audit info',

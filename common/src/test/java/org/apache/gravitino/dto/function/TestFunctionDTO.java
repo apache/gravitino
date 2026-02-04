@@ -61,10 +61,11 @@ public class TestFunctionDTO {
             ImmutableMap.of("key", "value"),
             "SELECT x + y");
 
-    // Create function definition
+    // Create function definition with returnType
     FunctionDefinitionDTO definition =
         FunctionDefinitionDTO.builder()
             .withParameters(new FunctionParamDTO[] {param1, param2})
+            .withReturnType(Types.FloatType.get())
             .withImpls(new FunctionImplDTO[] {sqlImpl})
             .build();
 
@@ -75,7 +76,6 @@ public class TestFunctionDTO {
             .withFunctionType(FunctionType.SCALAR)
             .withDeterministic(true)
             .withComment("A simple add function")
-            .withReturnType(Types.FloatType.get())
             .withDefinitions(new FunctionDefinitionDTO[] {definition})
             .withAudit(audit)
             .build();
@@ -88,8 +88,9 @@ public class TestFunctionDTO {
     Assertions.assertEquals(scalarFunction.functionType(), deserialized.functionType());
     Assertions.assertEquals(scalarFunction.deterministic(), deserialized.deterministic());
     Assertions.assertEquals(scalarFunction.comment(), deserialized.comment());
-    Assertions.assertEquals(scalarFunction.returnType(), deserialized.returnType());
     Assertions.assertEquals(scalarFunction.definitions().length, deserialized.definitions().length);
+    // Verify returnType is in definition
+    Assertions.assertEquals(Types.FloatType.get(), deserialized.definitions()[0].returnType());
   }
 
   @Test
@@ -117,10 +118,11 @@ public class TestFunctionDTO {
             ImmutableMap.of(),
             "com.example.TableFunction");
 
-    // Create function definition
+    // Create function definition with returnColumns
     FunctionDefinitionDTO definition =
         FunctionDefinitionDTO.builder()
             .withParameters(new FunctionParamDTO[] {})
+            .withReturnColumns(new FunctionColumnDTO[] {col1, col2})
             .withImpls(new FunctionImplDTO[] {javaImpl})
             .build();
 
@@ -131,7 +133,6 @@ public class TestFunctionDTO {
             .withFunctionType(FunctionType.TABLE)
             .withDeterministic(false)
             .withComment("A table function")
-            .withReturnColumns(new FunctionColumnDTO[] {col1, col2})
             .withDefinitions(new FunctionDefinitionDTO[] {definition})
             .withAudit(audit)
             .build();
@@ -142,7 +143,8 @@ public class TestFunctionDTO {
 
     Assertions.assertEquals(tableFunction.name(), deserialized.name());
     Assertions.assertEquals(FunctionType.TABLE, deserialized.functionType());
-    Assertions.assertEquals(2, deserialized.returnColumns().length);
+    // Verify returnColumns is in definition
+    Assertions.assertEquals(2, deserialized.definitions()[0].returnColumns().length);
   }
 
   @Test
@@ -246,6 +248,7 @@ public class TestFunctionDTO {
     FunctionDefinitionDTO definition =
         FunctionDefinitionDTO.builder()
             .withParameters(new FunctionParamDTO[] {param})
+            .withReturnType(Types.StringType.get())
             .withImpls(new FunctionImplDTO[] {impl})
             .build();
 
@@ -256,5 +259,35 @@ public class TestFunctionDTO {
     Assertions.assertEquals(1, deserialized.parameters().length);
     Assertions.assertEquals("input", deserialized.parameters()[0].name());
     Assertions.assertEquals(1, deserialized.impls().length);
+    Assertions.assertEquals(Types.StringType.get(), deserialized.returnType());
+  }
+
+  @Test
+  public void testFunctionDefinitionDTOWithReturnColumns() throws JsonProcessingException {
+    FunctionParamDTO param =
+        FunctionParamDTO.builder().withName("n").withDataType(Types.IntegerType.get()).build();
+
+    FunctionColumnDTO col1 =
+        FunctionColumnDTO.builder().withName("id").withDataType(Types.IntegerType.get()).build();
+    FunctionColumnDTO col2 =
+        FunctionColumnDTO.builder().withName("value").withDataType(Types.StringType.get()).build();
+
+    SQLImplDTO impl = new SQLImplDTO("SPARK", null, null, "SELECT id, value FROM t LIMIT n");
+
+    FunctionDefinitionDTO definition =
+        FunctionDefinitionDTO.builder()
+            .withParameters(new FunctionParamDTO[] {param})
+            .withReturnColumns(new FunctionColumnDTO[] {col1, col2})
+            .withImpls(new FunctionImplDTO[] {impl})
+            .build();
+
+    String json = JsonUtils.objectMapper().writeValueAsString(definition);
+    FunctionDefinitionDTO deserialized =
+        JsonUtils.objectMapper().readValue(json, FunctionDefinitionDTO.class);
+
+    Assertions.assertEquals(1, deserialized.parameters().length);
+    Assertions.assertNull(deserialized.returnType());
+    Assertions.assertEquals(2, deserialized.returnColumns().length);
+    Assertions.assertEquals("id", deserialized.returnColumns()[0].name());
   }
 }

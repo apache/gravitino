@@ -809,10 +809,10 @@ public class CatalogHive2IT extends BaseIT {
                 "test comment",
                 FunctionType.SCALAR,
                 true,
-                Types.StringType.get(),
                 FunctionDefinitions.of(
                     FunctionDefinitions.of(
                         FunctionParams.of(FunctionParams.of("input", Types.StringType.get())),
+                        Types.StringType.get(),
                         FunctionImpls.of(
                             FunctionImpls.ofJava(
                                 FunctionImpl.RuntimeType.SPARK, "mock.udf.class.name")))));
