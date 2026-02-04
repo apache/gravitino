@@ -85,8 +85,8 @@ jobs:
       - name: Frontend Integration Test
         id: integrationTest
         run: |
-          ./gradlew -PskipTests -PtestMode=embedded -PskipDockerTests=false :web:integration-test:test
-          ./gradlew -PskipTests -PtestMode=deploy -PskipDockerTests=false :web:integration-test:test
+          ./gradlew -PskipTests -PtestMode=embedded -PskipDockerTests=false :web-v2:integration-test:test
+          ./gradlew -PskipTests -PtestMode=deploy -PskipDockerTests=false :web-v2:integration-test:test
 
       - name: Upload integrate tests reports
         uses: actions/upload-artifact@v4
@@ -100,4 +100,4 @@ jobs:
             distribution/package/logs/gravitino-server.log
             catalogs/**/*.log
             catalogs/**/*.tar
-            web/integration-test/build/*.log
+            web-v2/integration-test/build/*.log
