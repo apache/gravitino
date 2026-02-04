@@ -28,7 +28,7 @@ public class ListTopicFailureEventTest {
   public void testNamespaceMustNotBeNull() {
     Assertions.assertThrows(
         IllegalArgumentException.class,
-        () -> {
+         () -> {
           new ListTopicFailureEvent("user", null, new Exception());
         });
   }
