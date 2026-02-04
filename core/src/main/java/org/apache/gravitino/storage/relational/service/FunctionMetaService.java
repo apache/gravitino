@@ -135,7 +135,7 @@ public class FunctionMetaService {
                     FunctionMetaMapper.class,
                     mapper -> mapper.softDeleteFunctionMetaByFunctionId(functionId))),
 
-        // delete function versions first
+        // delete function versions after meta deletion
         () -> {
           if (functionDeletedCount.get() > 0) {
             SessionUtils.doWithoutCommit(
@@ -151,17 +151,17 @@ public class FunctionMetaService {
       metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME,
       baseMetricName = "deleteFunctionMetasByLegacyTimeline")
   public int deleteFunctionMetasByLegacyTimeline(Long legacyTimeline, int limit) {
-    int functionDeletedCount =
+    int functionVersionDeletedCount =
         SessionUtils.doWithCommitAndFetchResult(
             FunctionVersionMetaMapper.class,
             mapper -> mapper.deleteFunctionVersionMetasByLegacyTimeline(legacyTimeline, limit));
 
-    int functionVersionDeletedCount =
+    int functionMetaDeletedCount =
         SessionUtils.doWithCommitAndFetchResult(
             FunctionMetaMapper.class,
             mapper -> mapper.deleteFunctionMetasByLegacyTimeline(legacyTimeline, limit));
 
-    return functionDeletedCount + functionVersionDeletedCount;
+    return functionVersionDeletedCount + functionMetaDeletedCount;
   }
 
   @Monitored(
