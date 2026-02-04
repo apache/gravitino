@@ -32,6 +32,7 @@ import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.StringIdentifier;
 import org.apache.gravitino.catalog.clickhouse.ClickHouseConstants;
 import org.apache.gravitino.catalog.jdbc.operation.JdbcDatabaseOperations;
+import org.apache.gravitino.catalog.jdbc.utils.JdbcConnectorUtils;
 
 public class ClickHouseDatabaseOperations extends JdbcDatabaseOperations {
 
@@ -98,6 +99,35 @@ public class ClickHouseDatabaseOperations extends JdbcDatabaseOperations {
 
     LOG.info("Generated create database:{} sql: {}", databaseName, createDatabaseSql);
     return createDatabaseSql.toString();
+  }
+
+  @Override
+  public void create(String databaseName, String comment, Map<String, String> properties) {
+    LOG.info("Beginning to create database {}", databaseName);
+    String originComment = StringIdentifier.removeIdFromComment(comment);
+    if (!supportSchemaComment() && StringUtils.isNotEmpty(originComment)) {
+      throw new UnsupportedOperationException(
+          "Doesn't support setting schema comment: " + originComment);
+    }
+
+    try (final Connection connection = getConnection()) {
+      connection.setCatalog(createSysDatabaseNameSet().iterator().next());
+      JdbcConnectorUtils.executeUpdate(
+          connection, generateCreateDatabaseSql(databaseName, comment, properties));
+      LOG.info("Finished creating database {}", databaseName);
+    } catch (final SQLException se) {
+      throw this.exceptionMapper.toGravitinoException(se);
+    }
+  }
+
+  @Override
+  protected void dropDatabase(String databaseName, boolean cascade) {
+    try (final Connection connection = getConnection()) {
+      connection.setCatalog(createSysDatabaseNameSet().iterator().next());
+      JdbcConnectorUtils.executeUpdate(connection, generateDropDatabaseSql(databaseName, cascade));
+    } catch (final SQLException se) {
+      throw this.exceptionMapper.toGravitinoException(se);
+    }
   }
 
   private boolean onCluster(Map<String, String> dbProperties) {

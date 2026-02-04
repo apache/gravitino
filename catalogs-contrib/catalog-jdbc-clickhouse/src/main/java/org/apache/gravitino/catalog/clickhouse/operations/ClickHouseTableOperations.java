@@ -26,6 +26,7 @@ import static org.apache.gravitino.catalog.clickhouse.ClickHouseConstants.ON_CLU
 import static org.apache.gravitino.catalog.clickhouse.ClickHouseConstants.SETTINGS_PREFIX;
 import static org.apache.gravitino.catalog.clickhouse.ClickHouseTablePropertiesMetadata.CLICKHOUSE_ENGINE_KEY;
 import static org.apache.gravitino.catalog.clickhouse.ClickHouseTablePropertiesMetadata.ENGINE_PROPERTY_ENTRY;
+import static org.apache.gravitino.catalog.clickhouse.ClickHouseTablePropertiesMetadata.GRAVITINO_ENGINE_KEY;
 import static org.apache.gravitino.rel.Column.DEFAULT_VALUE_NOT_SET;
 
 import com.google.common.annotations.VisibleForTesting;
@@ -96,8 +97,7 @@ public class ClickHouseTableOperations extends JdbcTableOperations {
   protected List<Index> getIndexes(Connection connection, String databaseName, String tableName) {
     // cause clickhouse not impl getPrimaryKeys yet, ref:
     // https://github.com/ClickHouse/clickhouse-java/issues/1625
-    String sql =
-        QUERY_INDEXES_SQL.formatted(quoteIdentifier(databaseName), quoteIdentifier(tableName));
+    String sql = QUERY_INDEXES_SQL.formatted(databaseName, tableName);
     try (PreparedStatement preparedStatement = connection.prepareStatement(sql);
         ResultSet resultSet = preparedStatement.executeQuery()) {
 
@@ -108,6 +108,7 @@ public class ClickHouseTableOperations extends JdbcTableOperations {
         indexes.add(
             Indexes.of(Index.IndexType.PRIMARY_KEY, indexName, new String[][] {{columnName}}));
       }
+
       indexes.addAll(getSecondaryIndexes(connection, databaseName, tableName));
       return indexes;
     } catch (SQLException e) {
@@ -216,9 +217,16 @@ public class ClickHouseTableOperations extends JdbcTableOperations {
       return;
     }
 
-    String settings =
+    Map<String, String> settingMap =
         properties.entrySet().stream()
             .filter(entry -> entry.getKey().startsWith(SETTINGS_PREFIX))
+            .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
+    if (MapUtils.isEmpty(settingMap)) {
+      return;
+    }
+
+    String settings =
+        settingMap.entrySet().stream()
             .map(
                 entry ->
                     entry.getKey().substring(SETTINGS_PREFIX.length()) + " = " + entry.getValue())
@@ -452,7 +460,7 @@ public class ClickHouseTableOperations extends JdbcTableOperations {
                 new HashMap<String, String>() {
                   {
                     put(COMMENT, resultSet.getString(COMMENT));
-                    put(CLICKHOUSE_ENGINE_KEY, resultSet.getString(CLICKHOUSE_ENGINE_KEY));
+                    put(GRAVITINO_ENGINE_KEY, resultSet.getString(CLICKHOUSE_ENGINE_KEY));
                   }
                 });
           }
