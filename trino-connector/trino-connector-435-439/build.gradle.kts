@@ -126,12 +126,30 @@ tasks {
   register("assembleTrinoConnector", Tar::class) {
     dependsOn(copyLibs)
     group = "gravitino distribution"
+    finalizedBy("checksumTrinoConnector")
     val archiveBase = "${rootProject.name}-${project.name}-$version"
     into(archiveBase)
     from(distributionDir)
     compression = Compression.GZIP
     archiveFileName.set("$archiveBase.tar.gz")
     destinationDirectory.set(rootProject.layout.projectDirectory.dir("distribution"))
+  }
+
+  register("checksumTrinoConnector") {
+    group = "gravitino distribution"
+    val assembleTask = tasks.named<Tar>("assembleTrinoConnector")
+    dependsOn(assembleTask)
+    val archiveFile = assembleTask.flatMap { it.archiveFile }
+    val checksumFile = archiveFile.map { archive ->
+      archive.asFile.let { it.resolveSibling("${it.name}.sha256") }
+    }
+    inputs.file(archiveFile)
+    outputs.file(checksumFile)
+    doLast {
+      checksumFile.get().writeText(
+        serviceOf<ChecksumService>().sha256(archiveFile.get().asFile).toString()
+      )
+    }
   }
 
   named("build") {
