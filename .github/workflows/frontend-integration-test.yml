@@ -73,7 +73,7 @@ jobs:
         run: |
           dev/ci/check_commands.sh
 
-      - name: Package Gravitino
+      - name: Build Gravitino
         run: |
           ./gradlew assembleDistribution -x test 
 
