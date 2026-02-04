@@ -260,6 +260,16 @@ Writer configuration begins with `gravitino.audit.writer.${name}`, where `${name
 
 Refer to [security](security/security.md) for HTTPS and authentication configurations.
 
+#### Catalog security configuration
+
+| Configuration item                                  | Description                                                                                                                                                                                                          | Default value | Required | Since version |
+|-----------------------------------------------------|----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|---------------|----------|---------------|
+| `gravitino.authorization.filterSensitiveProperties` | Whether to filter sensitive properties (passwords, secret keys, tokens) in catalog responses. When enabled, sensitive properties are hidden from users without appropriate permissions (owner or alter permission).  | `true`        | No       | 1.1.0         |
+
+:::info
+When `gravitino.authorization.filterSensitiveProperties` is set to `true`, sensitive catalog properties such as passwords, JDBC credentials, AWS secret keys, Azure storage account keys, and authentication tokens will be hidden in API responses unless the user has owner or alter permissions on the catalog.
+:::
+
 ### Metrics configuration
 
 | Property name                             | Description                                          | Default value | Required | Since Version |
