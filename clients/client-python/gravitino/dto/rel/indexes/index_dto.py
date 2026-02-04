@@ -15,6 +15,8 @@
 # specific language governing permissions and limitations
 # under the License.
 
+from __future__ import annotations
+
 from functools import reduce
 from typing import ClassVar, List, Optional, Dict
 
@@ -49,6 +51,10 @@ class IndexDTO(Index):
         self._field_names = field_names
         self._properties = properties or {}
 
+    @staticmethod
+    def builder() -> IndexDTO.Builder:
+        return IndexDTO.Builder()
+
     def type(self) -> Index.IndexType:
         return self._index_type
 
@@ -77,3 +83,36 @@ class IndexDTO(Index):
             self._field_names,
             initial_hash,
         )
+
+    class Builder:
+        def __init__(self) -> None:
+            self._index_type: Optional[str] = None
+            self._name: Optional[str] = None
+            self._field_names: Optional[list[list[str]]] = None
+
+        def with_index_type(self, index_type) -> IndexDTO.Builder:
+            self._index_type = index_type
+            return self
+
+        def with_name(self, name: str) -> IndexDTO.Builder:
+            self._name = name
+            return self
+
+        def with_field_names(self, field_names: List[List[str]]) -> IndexDTO.Builder:
+            self._field_names = field_names
+            return self
+
+        def build(self) -> IndexDTO:
+            if self._index_type is None:
+                raise ValueError("Index type cannot be null")
+
+            if not self._field_names or len(self._field_names) == 0:
+                raise ValueError(
+                    "The index must be set with corresponding column names"
+                )
+
+            return IndexDTO(
+                index_type=self._index_type,
+                name=self._name,
+                field_names=self._field_names,
+            )
