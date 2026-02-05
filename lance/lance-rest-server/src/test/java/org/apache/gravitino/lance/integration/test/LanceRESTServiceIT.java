@@ -633,17 +633,9 @@ public class LanceRESTServiceIT extends BaseIT {
 
     jsonArrowFields = loadTable.getSchema().getFields();
     Assertions.assertEquals(1, jsonArrowFields.size());
-    for (int i = 0; i < jsonArrowFields.size(); i++) {
-      JsonArrowField jsonArrowField = jsonArrowFields.get(i);
-      Field originalField = schema.getFields().get(i);
-      Assertions.assertEquals(originalField.getName(), jsonArrowField.getName());
-
-      if (i == 0) {
-        Assertions.assertEquals("int32", jsonArrowField.getType().getType());
-      } else if (i == 1) {
-        Assertions.assertEquals("utf8", jsonArrowField.getType().getType());
-      }
-    }
+    JsonArrowField jsonArrowField = jsonArrowFields.get(0);
+    Assertions.assertEquals("id", jsonArrowField.getName());
+    Assertions.assertEquals("int32", jsonArrowField.getType().getType());
 
     // Drop a non-existing column should fail
     AlterTableDropColumnsRequest dropNonExistingColumnsRequest = new AlterTableDropColumnsRequest();

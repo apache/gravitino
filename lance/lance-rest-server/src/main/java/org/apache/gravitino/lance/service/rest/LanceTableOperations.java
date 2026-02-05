@@ -260,9 +260,10 @@ public class LanceTableOperations {
     try {
       validateDropColumnsRequest(alterTableDropColumnsRequest);
       AlterTableDropColumnsResponse response =
-          lanceNamespace
-              .asTableOps()
-              .alterTableDropColumns(tableId, delimiter, alterTableDropColumnsRequest);
+          (AlterTableDropColumnsResponse)
+              lanceNamespace
+                  .asTableOps()
+                  .alterTable(tableId, delimiter, alterTableDropColumnsRequest);
       return Response.ok(response).build();
     } catch (Exception e) {
       return LanceExceptionMapper.toRESTResponse(tableId, e);
@@ -282,9 +283,10 @@ public class LanceTableOperations {
     try {
       validateAlterColumnsRequest(alterTableAlterColumnsRequest);
       AlterTableAlterColumnsResponse response =
-          lanceNamespace
-              .asTableOps()
-              .alterTableAlterColumns(tableId, delimiter, alterTableAlterColumnsRequest);
+          (AlterTableAlterColumnsResponse)
+              lanceNamespace
+                  .asTableOps()
+                  .alterTable(tableId, delimiter, alterTableAlterColumnsRequest);
       return Response.ok(response).build();
     } catch (Exception e) {
       return LanceExceptionMapper.toRESTResponse(tableId, e);
@@ -326,6 +328,9 @@ public class LanceTableOperations {
   private void validateDropColumnsRequest(AlterTableDropColumnsRequest request) {
     Preconditions.checkArgument(
         !request.getColumns().isEmpty(), "Columns to drop cannot be empty.");
+    Preconditions.checkArgument(
+        request.getColumns().stream().allMatch(StringUtils::isNotBlank),
+        "Columns to drop cannot be blank.");
   }
 
   private void validateAlterColumnsRequest(AlterTableAlterColumnsRequest request) {
@@ -336,6 +341,9 @@ public class LanceTableOperations {
       Preconditions.checkArgument(
           StringUtils.isBlank(alteration.getCastTo()),
           "Only RENAME alteration is supported currently.");
+      Preconditions.checkArgument(
+          StringUtils.isNotBlank(alteration.getRename()),
+          "Rename field must be specified when castTo is not provided.");
     }
   }
 }

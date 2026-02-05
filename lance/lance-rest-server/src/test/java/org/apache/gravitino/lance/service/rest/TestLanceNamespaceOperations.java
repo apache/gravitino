@@ -792,7 +792,8 @@ public class TestLanceNamespaceOperations extends JerseyTest {
 
     AlterTableDropColumnsRequest dropColumnsRequest = new AlterTableDropColumnsRequest();
     dropColumnsRequest.setColumns(List.of("id"));
-    when(tableOps.alterTableDropColumns(any(), any(), any())).thenReturn(dropColumnsResponse);
+    when(tableOps.alterTable(any(), any(), any(AlterTableDropColumnsRequest.class)))
+        .thenReturn(dropColumnsResponse);
     Response resp =
         target(String.format("/v1/table/%s/drop_columns", tableIds))
             .queryParam("delimiter", delimiter)
@@ -804,9 +805,37 @@ public class TestLanceNamespaceOperations extends JerseyTest {
     AlterTableDropColumnsResponse response = resp.readEntity(AlterTableDropColumnsResponse.class);
     Assertions.assertEquals(dropColumnsResponse.getVersion(), response.getVersion());
 
+    // Test empty columns validation
+    AlterTableDropColumnsRequest emptyColumnsRequest = new AlterTableDropColumnsRequest();
+    emptyColumnsRequest.setColumns(List.of());
+    resp =
+        target(String.format("/v1/table/%s/drop_columns", tableIds))
+            .queryParam("delimiter", delimiter)
+            .request(MediaType.APPLICATION_JSON_TYPE)
+            .post(Entity.entity(emptyColumnsRequest, MediaType.APPLICATION_JSON_TYPE));
+    Assertions.assertEquals(Response.Status.BAD_REQUEST.getStatusCode(), resp.getStatus());
+    Assertions.assertEquals(MediaType.APPLICATION_JSON_TYPE, resp.getMediaType());
+    ErrorResponse errorResp = resp.readEntity(ErrorResponse.class);
+    Assertions.assertEquals("Columns to drop cannot be empty.", errorResp.getError());
+    Assertions.assertEquals(IllegalArgumentException.class.getSimpleName(), errorResp.getType());
+
+    // Test blank column names validation
+    AlterTableDropColumnsRequest blankColumnRequest = new AlterTableDropColumnsRequest();
+    blankColumnRequest.setColumns(List.of(" "));
+    resp =
+        target(String.format("/v1/table/%s/drop_columns", tableIds))
+            .queryParam("delimiter", delimiter)
+            .request(MediaType.APPLICATION_JSON_TYPE)
+            .post(Entity.entity(blankColumnRequest, MediaType.APPLICATION_JSON_TYPE));
+    Assertions.assertEquals(Response.Status.BAD_REQUEST.getStatusCode(), resp.getStatus());
+    Assertions.assertEquals(MediaType.APPLICATION_JSON_TYPE, resp.getMediaType());
+    errorResp = resp.readEntity(ErrorResponse.class);
+    Assertions.assertEquals("Columns to drop cannot be blank.", errorResp.getError());
+    Assertions.assertEquals(IllegalArgumentException.class.getSimpleName(), errorResp.getType());
+
     // Test runtime exception
     Mockito.reset(tableOps);
-    when(tableOps.alterTableDropColumns(any(), any(), any()))
+    when(tableOps.alterTable(any(), any(), any(AlterTableDropColumnsRequest.class)))
         .thenThrow(new RuntimeException("Runtime exception"));
     resp =
         target(String.format("/v1/table/%s/drop_columns", tableIds))
@@ -819,7 +848,7 @@ public class TestLanceNamespaceOperations extends JerseyTest {
 
     // Test No such table exception
     Mockito.reset(tableOps);
-    when(tableOps.alterTableDropColumns(any(), any(), any()))
+    when(tableOps.alterTable(any(), any(), any(AlterTableDropColumnsRequest.class)))
         .thenThrow(
             LanceNamespaceException.notFound(
                 "Table not found", "NoSuchTableException", tableIds, ""));
@@ -846,7 +875,8 @@ public class TestLanceNamespaceOperations extends JerseyTest {
     columnAlteration.setRename("col1_new");
     alterColumnsRequest.setAlterations(List.of(columnAlteration));
 
-    when(tableOps.alterTableAlterColumns(any(), any(), any())).thenReturn(alterColumnsResponse);
+    when(tableOps.alterTable(any(), any(), any(AlterTableAlterColumnsRequest.class)))
+        .thenReturn(alterColumnsResponse);
     Response resp =
         target(String.format("/v1/table/%s/alter_columns", tableIds))
             .queryParam("delimiter", delimiter)
@@ -859,7 +889,7 @@ public class TestLanceNamespaceOperations extends JerseyTest {
     Assertions.assertEquals(alterColumnsResponse.getVersion(), response.getVersion());
 
     Mockito.reset(tableOps);
-    when(tableOps.alterTableAlterColumns(any(), any(), any()))
+    when(tableOps.alterTable(any(), any(), any(AlterTableAlterColumnsRequest.class)))
         .thenThrow(new RuntimeException("Runtime exception"));
     resp =
         target(String.format("/v1/table/%s/alter_columns", tableIds))
@@ -871,7 +901,7 @@ public class TestLanceNamespaceOperations extends JerseyTest {
     Assertions.assertEquals(MediaType.APPLICATION_JSON_TYPE, resp.getMediaType());
 
     Mockito.reset(tableOps);
-    when(tableOps.alterTableAlterColumns(any(), any(), any()))
+    when(tableOps.alterTable(any(), any(), any(AlterTableAlterColumnsRequest.class)))
         .thenThrow(
             LanceNamespaceException.notFound(
                 "Table not found", "NoSuchTableException", tableIds, ""));

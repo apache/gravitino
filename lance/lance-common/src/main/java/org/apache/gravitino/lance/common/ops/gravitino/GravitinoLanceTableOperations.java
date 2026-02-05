@@ -316,7 +316,20 @@ public class GravitinoLanceTableOperations implements LanceTableOperations {
   }
 
   @Override
-  public AlterTableDropColumnsResponse alterTableDropColumns(
+  public Object alterTable(String tableId, String delimiter, Object request) {
+    if (request instanceof AlterTableAddColumnsRequest) {
+      return alterTableAddColumns(tableId, delimiter, (AlterTableAddColumnsRequest) request);
+    } else if (request instanceof AlterTableAlterColumnsRequest) {
+      return alterTableAlterColumns(tableId, delimiter, (AlterTableAlterColumnsRequest) request);
+    } else if (request instanceof AlterTableDropColumnsRequest) {
+      return alterTableDropColumns(tableId, delimiter, (AlterTableDropColumnsRequest) request);
+    } else {
+      throw new IllegalArgumentException(
+          "Unsupported alter table request type: " + request.getClass().getName());
+    }
+  }
+
+  private AlterTableDropColumnsResponse alterTableDropColumns(
       String tableId, String delimiter, AlterTableDropColumnsRequest request) {
     ObjectIdentifier nsId = ObjectIdentifier.of(tableId, Pattern.quote(delimiter));
     Preconditions.checkArgument(
@@ -344,8 +357,7 @@ public class GravitinoLanceTableOperations implements LanceTableOperations {
     return alterTableDropColumnsResponse;
   }
 
-  @Override
-  public AlterTableAlterColumnsResponse alterTableAlterColumns(
+  private AlterTableAlterColumnsResponse alterTableAlterColumns(
       String tableId, String delimiter, AlterTableAlterColumnsRequest request) {
     ObjectIdentifier nsId = ObjectIdentifier.of(tableId, Pattern.quote(delimiter));
     Preconditions.checkArgument(
@@ -372,8 +384,8 @@ public class GravitinoLanceTableOperations implements LanceTableOperations {
     return response;
   }
 
-  @Override
-  public AlterTableAddColumnsResponse alterTableAddColumns(
+  @SuppressWarnings("unused")
+  private AlterTableAddColumnsResponse alterTableAddColumns(
       String tableId, String delimiter, AlterTableAddColumnsRequest request) {
     // We need to parse NewColumnTransform to Column, however, NewColumnTransform only contains
     // the name and a string expression.
