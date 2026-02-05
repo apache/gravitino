@@ -430,7 +430,7 @@ public class TestClickHouseTableOperations extends TestClickHouse {
 
     loaded = TABLE_OPERATIONS.load(TEST_DB_NAME.toString(), tableName);
     Assertions.assertEquals(
-        Literals.decimalLiteral(Decimal.of("1.234", 10, 2)), loaded.columns()[0].defaultValue());
+        Literals.decimalLiteral(Decimal.of("1.23", 10, 2)), loaded.columns()[0].defaultValue());
     Assertions.assertEquals(Literals.longLiteral(1L), loaded.columns()[1].defaultValue());
     Assertions.assertEquals(
         Literals.timestampLiteral(LocalDateTime.parse("2024-04-01T00:00:00")),

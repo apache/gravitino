@@ -297,14 +297,12 @@ public class ClickHouseTableOperations extends JdbcTableOperations {
       throws NoSuchTableException {
     LOG.info("Attempting to alter table {} from database {}", tableName, databaseName);
     try (Connection connection = getConnection(databaseName)) {
-      for (TableChange change : changes) {
-        String sql = generateAlterTableSql(databaseName, tableName, change);
-        if (StringUtils.isEmpty(sql)) {
-          LOG.info("No changes to alter table {} from database {}", tableName, databaseName);
-          return;
-        }
-        JdbcConnectorUtils.executeUpdate(connection, sql);
+      String sql = generateAlterTableSql(databaseName, tableName, changes);
+      if (StringUtils.isEmpty(sql)) {
+        LOG.info("No changes to alter table {} from database {}", tableName, databaseName);
+        return;
       }
+      JdbcConnectorUtils.executeUpdate(connection, sql);
       LOG.info("Alter table {} from database {}", tableName, databaseName);
     } catch (final SQLException se) {
       throw this.exceptionMapper.toGravitinoException(se);
@@ -428,10 +426,6 @@ public class ClickHouseTableOperations extends JdbcTableOperations {
       }
     }
 
-    if (!setProperties.isEmpty()) {
-      alterSql.add(generateAlterTableProperties(setProperties));
-    }
-
     // Last modified comment
     if (null != updateComment) {
       String newComment = updateComment.getNewComment();
@@ -512,7 +506,7 @@ public class ClickHouseTableOperations extends JdbcTableOperations {
       }
     }
 
-    return String.format("DROP INDEX %s ".formatted(quoteIdentifier(deleteIndex.getName())));
+    return "DROP INDEX %s ".formatted(quoteIdentifier(deleteIndex.getName()));
   }
 
   private String updateColumnNullabilityDefinition(
@@ -600,14 +594,14 @@ public class ClickHouseTableOperations extends JdbcTableOperations {
     // Append comment if available after default value
     if (StringUtils.isNotEmpty(addColumn.getComment())) {
       String escapedComment = StringUtils.replace(addColumn.getComment(), "'", "''");
-      columnDefinition.append("COMMENT '%s'".formatted(escapedComment));
+      columnDefinition.append(" COMMENT '%s' ".formatted(escapedComment));
     }
 
     // Append position if available
     if (addColumn.getPosition() instanceof TableChange.First) {
-      columnDefinition.append("FIRST");
+      columnDefinition.append(" FIRST ");
     } else if (addColumn.getPosition() instanceof TableChange.After afterPosition) {
-      columnDefinition.append("AFTER %s ".formatted(quoteIdentifier(afterPosition.getColumn())));
+      columnDefinition.append(" AFTER %s ".formatted(quoteIdentifier(afterPosition.getColumn())));
     } else if (addColumn.getPosition() instanceof TableChange.Default) {
       // Do nothing, follow the default behavior of clickhouse
     } else {
@@ -639,18 +633,19 @@ public class ClickHouseTableOperations extends JdbcTableOperations {
     JdbcColumn column = getJdbcColumnFromTable(jdbcTable, col);
 
     StringBuilder columnDefinition = new StringBuilder();
-    columnDefinition.append("%s %s ".formatted(MODIFY_COLUMN, quoteIdentifier(col)));
+    columnDefinition.append(" %s %s ".formatted(MODIFY_COLUMN, quoteIdentifier(col)));
     appendColumnDefinition(column, columnDefinition);
 
     if (updateColumnPosition.getPosition() instanceof TableChange.First) {
-      columnDefinition.append("FIRST");
+      columnDefinition.append(" FIRST ");
     } else if (updateColumnPosition.getPosition() instanceof TableChange.After afterPosition) {
-      columnDefinition.append("%s %s".formatted(AFTER, quoteIdentifier(afterPosition.getColumn())));
+      columnDefinition.append(
+          " %s %s ".formatted(AFTER, quoteIdentifier(afterPosition.getColumn())));
     } else {
       Arrays.stream(jdbcTable.columns())
           .reduce((column1, column2) -> column2)
           .map(Column::name)
-          .ifPresent(s -> columnDefinition.append(AFTER).append(s));
+          .ifPresent(s -> columnDefinition.append(" %s %s ".formatted(AFTER, quoteIdentifier(s))));
     }
     return columnDefinition.toString();
   }
