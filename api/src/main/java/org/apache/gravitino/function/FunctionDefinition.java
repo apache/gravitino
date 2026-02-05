@@ -25,7 +25,8 @@ import org.apache.gravitino.rel.types.Type;
 /**
  * A function definition that pairs a specific parameter list with its implementations and return
  * type. A single function can include multiple definitions (overloads), each with distinct
- * parameters, return types, and implementations.
+ * parameters and implementations. Overload resolution is based on parameters only; return type or
+ * return columns are metadata and do not participate in definition matching.
  *
  * <p>For scalar or aggregate functions, use {@link #returnType()} to specify the return type. For
  * table-valued functions, use {@link #returnColumns()} to specify the output columns.

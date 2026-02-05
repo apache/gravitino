@@ -58,7 +58,6 @@ import org.apache.ibatis.session.SqlSession;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.TestTemplate;
 
-@SuppressWarnings("deprecation")
 public class TestFunctionMetaService extends TestJDBCBackend {
   private final String metalakeName = GravitinoITUtils.genRandomName("tst_metalake");
   private final String catalogName = GravitinoITUtils.genRandomName("tst_fn_catalog");
