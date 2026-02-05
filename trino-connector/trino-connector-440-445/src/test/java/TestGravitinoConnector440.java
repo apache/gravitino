@@ -32,7 +32,7 @@ public class TestGravitinoConnector440 {
   @Nested
   class SingleMetalake extends TestGravitinoConnector {
     @Override
-    protected GravitinoPlugin createGravitinoPulgin(GravitinoAdminClient client) {
+    protected GravitinoPlugin createGravitinoPlugin(GravitinoAdminClient client) {
       return new GravitinoPlugin440(client);
     }
 
@@ -46,7 +46,7 @@ public class TestGravitinoConnector440 {
   @Nested
   class MultiMetalake extends TestGravitinoConnectorWithMetalakeCatalogName {
     @Override
-    protected GravitinoPlugin createGravitinoPulgin(GravitinoAdminClient client) {
+    protected GravitinoPlugin createGravitinoPlugin(GravitinoAdminClient client) {
       return new GravitinoPlugin440(client);
     }
 
