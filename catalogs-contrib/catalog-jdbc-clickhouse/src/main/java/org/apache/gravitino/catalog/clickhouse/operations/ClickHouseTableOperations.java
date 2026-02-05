@@ -53,7 +53,6 @@ import org.apache.gravitino.catalog.jdbc.JdbcColumn;
 import org.apache.gravitino.catalog.jdbc.JdbcTable;
 import org.apache.gravitino.catalog.jdbc.operation.JdbcTableOperations;
 import org.apache.gravitino.catalog.jdbc.utils.JdbcConnectorUtils;
-import org.apache.gravitino.exceptions.NoSuchColumnException;
 import org.apache.gravitino.exceptions.NoSuchTableException;
 import org.apache.gravitino.rel.Column;
 import org.apache.gravitino.rel.TableChange;
@@ -67,7 +66,6 @@ import org.apache.gravitino.rel.expressions.transforms.Transform;
 import org.apache.gravitino.rel.expressions.transforms.Transforms;
 import org.apache.gravitino.rel.indexes.Index;
 import org.apache.gravitino.rel.indexes.Indexes;
-import org.apache.gravitino.rel.types.Types;
 
 public class ClickHouseTableOperations extends JdbcTableOperations {
 
@@ -431,14 +429,12 @@ public class ClickHouseTableOperations extends JdbcTableOperations {
       throws NoSuchTableException {
     LOG.info("Attempting to alter table {} from database {}", tableName, databaseName);
     try (Connection connection = getConnection(databaseName)) {
-      for (TableChange change : changes) {
-        String sql = generateAlterTableSql(databaseName, tableName, change);
-        if (StringUtils.isEmpty(sql)) {
-          LOG.info("No changes to alter table {} from database {}", tableName, databaseName);
-          return;
-        }
-        JdbcConnectorUtils.executeUpdate(connection, sql);
+      String sql = generateAlterTableSql(databaseName, tableName, changes);
+      if (StringUtils.isEmpty(sql)) {
+        LOG.info("No changes to alter table {} from database {}", tableName, databaseName);
+        return;
       }
+      JdbcConnectorUtils.executeUpdate(connection, sql);
       LOG.info("Alter table {} from database {}", tableName, databaseName);
     } catch (final SQLException se) {
       throw this.exceptionMapper.toGravitinoException(se);
@@ -533,7 +529,8 @@ public class ClickHouseTableOperations extends JdbcTableOperations {
 
       } else if (change instanceof TableChange.RemoveProperty) {
         // Clickhouse does not support deleting table attributes, it can be replaced by Set Property
-        throw new IllegalArgumentException("Remove property is not supported yet");
+        throw new UnsupportedOperationException(
+            "Remove property for ClickHouse is not supported yet");
 
       } else if (change instanceof TableChange.AddColumn addColumn) {
         lazyLoadTable = getOrCreateTable(databaseName, tableName, lazyLoadTable);
@@ -579,19 +576,14 @@ public class ClickHouseTableOperations extends JdbcTableOperations {
         alterSql.add(deleteIndexDefinition(lazyLoadTable, (TableChange.DeleteIndex) change));
 
       } else if (change instanceof TableChange.UpdateColumnAutoIncrement) {
-        lazyLoadTable = getOrCreateTable(databaseName, tableName, lazyLoadTable);
-        alterSql.add(
-            updateColumnAutoIncrementDefinition(
-                lazyLoadTable, (TableChange.UpdateColumnAutoIncrement) change));
-
+        // Auto increment functionality was added in ClickHouse 25.1. Since this PR is based on
+        // 23.x, we throw unsupported operation here.
+        throw new UnsupportedOperationException(
+            "ClickHouse auto increment is not supported in this version.");
       } else {
         throw new IllegalArgumentException(
             "Unsupported table change type: " + change.getClass().getName());
       }
-    }
-
-    if (!setProperties.isEmpty()) {
-      alterSql.add(generateAlterTableProperties(setProperties));
     }
 
     // Last modified comment
@@ -605,7 +597,8 @@ public class ClickHouseTableOperations extends JdbcTableOperations {
           newComment = StringIdentifier.addToComment(identifier, newComment);
         }
       }
-      alterSql.add(" MODIFY COMMENT '%s'".formatted(newComment));
+      String escapedComment = newComment.replace("'", "''");
+      alterSql.add(" MODIFY COMMENT '%s'".formatted(escapedComment));
     }
 
     if (!setProperties.isEmpty()) {
@@ -627,35 +620,6 @@ public class ClickHouseTableOperations extends JdbcTableOperations {
     return result;
   }
 
-  private String updateColumnAutoIncrementDefinition(
-      JdbcTable table, TableChange.UpdateColumnAutoIncrement change) {
-    if (change.fieldName().length > 1) {
-      throw new UnsupportedOperationException("Nested column names are not supported");
-    }
-
-    String col = change.fieldName()[0];
-    JdbcColumn column = getJdbcColumnFromTable(table, col);
-    if (change.isAutoIncrement()) {
-      Preconditions.checkArgument(
-          Types.allowAutoIncrement(column.dataType()),
-          "Auto increment is not allowed, type: " + column.dataType());
-    }
-
-    JdbcColumn updateColumn =
-        JdbcColumn.builder()
-            .withName(col)
-            .withDefaultValue(column.defaultValue())
-            .withNullable(column.nullable())
-            .withType(column.dataType())
-            .withComment(column.comment())
-            .withAutoIncrement(change.isAutoIncrement())
-            .build();
-
-    return MODIFY_COLUMN
-        + quoteIdentifier(col)
-        + appendColumnDefinition(updateColumn, new StringBuilder());
-  }
-
   @VisibleForTesting
   private String deleteIndexDefinition(
       JdbcTable lazyLoadTable, TableChange.DeleteIndex deleteIndex) {
@@ -674,7 +638,7 @@ public class ClickHouseTableOperations extends JdbcTableOperations {
       }
     }
 
-    return String.format("DROP INDEX %s ".formatted(quoteIdentifier(deleteIndex.getName())));
+    return "DROP INDEX %s ".formatted(quoteIdentifier(deleteIndex.getName()));
   }
 
   private String updateColumnNullabilityDefinition(
@@ -693,9 +657,11 @@ public class ClickHouseTableOperations extends JdbcTableOperations {
             .withAutoIncrement(column.autoIncrement())
             .build();
 
-    return MODIFY_COLUMN
-        + quoteIdentifier(col)
-        + appendColumnDefinition(updateColumn, new StringBuilder());
+    return "%s %s %s"
+        .formatted(
+            MODIFY_COLUMN,
+            quoteIdentifier(col),
+            appendColumnDefinition(updateColumn, new StringBuilder()));
   }
 
   private String generateAlterTableProperties(List<TableChange.SetProperty> setProperties) {
@@ -726,9 +692,11 @@ public class ClickHouseTableOperations extends JdbcTableOperations {
             .withAutoIncrement(column.autoIncrement())
             .build();
 
-    return MODIFY_COLUMN
-        + quoteIdentifier(col)
-        + appendColumnDefinition(updateColumn, new StringBuilder());
+    return "%s %s %s"
+        .formatted(
+            MODIFY_COLUMN,
+            quoteIdentifier(col),
+            appendColumnDefinition(updateColumn, new StringBuilder()));
   }
 
   private String addColumnFieldDefinition(TableChange.AddColumn addColumn) {
@@ -762,18 +730,14 @@ public class ClickHouseTableOperations extends JdbcTableOperations {
     // Append comment if available after default value
     if (StringUtils.isNotEmpty(addColumn.getComment())) {
       String escapedComment = StringUtils.replace(addColumn.getComment(), "'", "''");
-      columnDefinition.append("COMMENT '%s'".formatted(escapedComment));
+      columnDefinition.append(" COMMENT '%s' ".formatted(escapedComment));
     }
 
     // Append position if available
     if (addColumn.getPosition() instanceof TableChange.First) {
-      columnDefinition.append("FIRST");
+      columnDefinition.append(" FIRST ");
     } else if (addColumn.getPosition() instanceof TableChange.After afterPosition) {
-      columnDefinition.append("AFTER %s ".formatted(quoteIdentifier(afterPosition.getColumn())));
-    } else if (addColumn.getPosition() instanceof TableChange.Default) {
-      // Do nothing, follow the default behavior of clickhouse
-    } else {
-      throw new IllegalArgumentException("Invalid column position.");
+      columnDefinition.append(" AFTER %s ".formatted(quoteIdentifier(afterPosition.getColumn())));
     }
 
     return columnDefinition.toString();
@@ -801,18 +765,19 @@ public class ClickHouseTableOperations extends JdbcTableOperations {
     JdbcColumn column = getJdbcColumnFromTable(jdbcTable, col);
 
     StringBuilder columnDefinition = new StringBuilder();
-    columnDefinition.append("%s %s ".formatted(MODIFY_COLUMN, quoteIdentifier(col)));
+    columnDefinition.append(" %s %s ".formatted(MODIFY_COLUMN, quoteIdentifier(col)));
     appendColumnDefinition(column, columnDefinition);
 
     if (updateColumnPosition.getPosition() instanceof TableChange.First) {
-      columnDefinition.append("FIRST");
+      columnDefinition.append(" FIRST ");
     } else if (updateColumnPosition.getPosition() instanceof TableChange.After afterPosition) {
-      columnDefinition.append("%s %s".formatted(AFTER, quoteIdentifier(afterPosition.getColumn())));
+      columnDefinition.append(
+          " %s %s ".formatted(AFTER, quoteIdentifier(afterPosition.getColumn())));
     } else {
       Arrays.stream(jdbcTable.columns())
           .reduce((column1, column2) -> column2)
           .map(Column::name)
-          .ifPresent(s -> columnDefinition.append(AFTER).append(s));
+          .ifPresent(s -> columnDefinition.append(" %s %s ".formatted(AFTER, quoteIdentifier(s))));
     }
     return columnDefinition.toString();
   }
@@ -824,13 +789,7 @@ public class ClickHouseTableOperations extends JdbcTableOperations {
     }
 
     String col = deleteColumn.fieldName()[0];
-    boolean colExists = true;
-    try {
-      getJdbcColumnFromTable(jdbcTable, col);
-    } catch (NoSuchColumnException noSuchColumnException) {
-      colExists = false;
-    }
-
+    boolean colExists = columnExists(jdbcTable, col);
     if (!colExists) {
       if (BooleanUtils.isTrue(deleteColumn.getIfExists())) {
         return "";
@@ -871,13 +830,15 @@ public class ClickHouseTableOperations extends JdbcTableOperations {
 
     String col = updateColumnType.fieldName()[0];
     JdbcColumn column = getJdbcColumnFromTable(jdbcTable, col);
-    StringBuilder sqlBuilder = new StringBuilder(MODIFY_COLUMN + quoteIdentifier(col));
+    StringBuilder sqlBuilder =
+        new StringBuilder("%s %s ".formatted(MODIFY_COLUMN, quoteIdentifier(col)));
+
     JdbcColumn newColumn =
         JdbcColumn.builder()
             .withName(col)
             .withType(updateColumnType.getNewDataType())
             .withComment(column.comment())
-            .withDefaultValue(DEFAULT_VALUE_NOT_SET)
+            .withDefaultValue(column.defaultValue())
             .withNullable(column.nullable())
             .withAutoIncrement(column.autoIncrement())
             .build();

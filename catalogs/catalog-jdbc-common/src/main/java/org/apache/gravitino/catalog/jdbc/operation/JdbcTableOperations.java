@@ -663,6 +663,10 @@ public abstract class JdbcTableOperations implements TableOperation {
                         "Column %s does not exist in table %s", colName, jdbcTable.name()));
   }
 
+  protected boolean columnExists(JdbcTable table, String columnName) {
+    return Arrays.stream(table.columns()).anyMatch(col -> col.name().equals(columnName));
+  }
+
   protected Connection getConnection(String catalog) throws SQLException {
     Connection connection = dataSource.getConnection();
     connection.setCatalog(catalog);

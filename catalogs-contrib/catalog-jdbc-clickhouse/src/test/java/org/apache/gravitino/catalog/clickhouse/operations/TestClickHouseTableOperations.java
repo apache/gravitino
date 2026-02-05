@@ -130,14 +130,13 @@ public class TestClickHouseTableOperations extends TestClickHouse {
         () -> TABLE_OPERATIONS.rename(TEST_DB_NAME.toString(), tableName, newName));
     Assertions.assertDoesNotThrow(() -> TABLE_OPERATIONS.load(TEST_DB_NAME.toString(), newName));
 
-    // alter table
+    // alter table add column
     JdbcColumn newColumn =
         JdbcColumn.builder()
             .withName("col_5")
             .withType(STRING)
             .withComment("new_add")
             .withNullable(false) //
-            //            .withDefaultValue(Literals.of("hello test", STRING))
             .build();
     TABLE_OPERATIONS.alterTable(
         TEST_DB_NAME.toString(),
@@ -264,6 +263,7 @@ public class TestClickHouseTableOperations extends TestClickHouse {
     assertionsTableInfo(
         tableName, tableComment, columns, properties, null, Transforms.EMPTY_TRANSFORM, load);
 
+    // Update column type
     TABLE_OPERATIONS.alterTable(
         TEST_DB_NAME.toString(),
         tableName,
@@ -428,7 +428,7 @@ public class TestClickHouseTableOperations extends TestClickHouse {
 
     loaded = TABLE_OPERATIONS.load(TEST_DB_NAME.toString(), tableName);
     Assertions.assertEquals(
-        Literals.decimalLiteral(Decimal.of("1.234", 10, 2)), loaded.columns()[0].defaultValue());
+        Literals.decimalLiteral(Decimal.of("1.23", 10, 2)), loaded.columns()[0].defaultValue());
     Assertions.assertEquals(Literals.longLiteral(1L), loaded.columns()[1].defaultValue());
     Assertions.assertEquals(
         Literals.timestampLiteral(LocalDateTime.parse("2024-04-01T00:00:00")),
@@ -1123,7 +1123,6 @@ public class TestClickHouseTableOperations extends TestClickHouse {
           TableChange.deleteColumn(new String[] {"c3"}, false),
           TableChange.updateColumnNullability(new String[] {"c2"}, false),
           TableChange.deleteIndex("idx1", false),
-          TableChange.updateColumnAutoIncrement(new String[] {"c1"}, true),
           TableChange.renameColumn(new String[] {"c2"}, "c2_new"),
           TableChange.updateComment("new_table_comment")
         };
@@ -1235,7 +1234,7 @@ public class TestClickHouseTableOperations extends TestClickHouse {
     ops.setTable(buildStubTable());
 
     Assertions.assertThrows(
-        IllegalArgumentException.class,
+        UnsupportedOperationException.class,
         () -> ops.buildAlterSql("db", "tbl", new TableChange[] {TableChange.removeProperty("k")}));
   }
 
