@@ -621,7 +621,8 @@ public class GravitinoMockServer implements AutoCloseable {
   }
 
   private void addColumn(
-      ConnectorMetadata metadata, ConnectorTableHandle tableHandle, ColumnMetadata columnMetadata) throws TrinoException{
+      ConnectorMetadata metadata, ConnectorTableHandle tableHandle, ColumnMetadata columnMetadata)
+      throws TrinoException {
     if (trinoVersion < SPI_VERSION_SUPPORT_ADD_COLUMN_WITH_POSITION) {
       try {
         metadata
