@@ -30,7 +30,7 @@ import java.util.Set;
 import org.apache.commons.collections4.MapUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.StringIdentifier;
-import org.apache.gravitino.catalog.clickhouse.ClickHouseConstants;
+import org.apache.gravitino.catalog.clickhouse.ClickHouseConstants.ClusterConstants;
 import org.apache.gravitino.catalog.jdbc.operation.JdbcDatabaseOperations;
 
 public class ClickHouseDatabaseOperations extends JdbcDatabaseOperations {
@@ -88,7 +88,7 @@ public class ClickHouseDatabaseOperations extends JdbcDatabaseOperations {
         new StringBuilder(String.format("CREATE DATABASE `%s`", databaseName));
 
     if (onCluster(properties)) {
-      String clusterName = properties.get(ClickHouseConstants.CLUSTER_NAME);
+      String clusterName = properties.get(ClusterConstants.NAME);
       createDatabaseSql.append(String.format(" ON CLUSTER `%s`", clusterName));
     }
 
@@ -105,11 +105,11 @@ public class ClickHouseDatabaseOperations extends JdbcDatabaseOperations {
       return false;
     }
 
-    String clusterName = dbProperties.get(ClickHouseConstants.CLUSTER_NAME);
+    String clusterName = dbProperties.get(ClusterConstants.NAME);
     if (StringUtils.isBlank(clusterName)) {
       return false;
     }
 
-    return Boolean.parseBoolean(dbProperties.getOrDefault(ClickHouseConstants.ON_CLUSTER, "false"));
+    return Boolean.parseBoolean(dbProperties.getOrDefault(ClusterConstants.ON_CLUSTER, "false"));
   }
 }

@@ -18,15 +18,12 @@
  */
 package org.apache.gravitino.catalog.clickhouse.operations;
 
-import static org.apache.gravitino.catalog.clickhouse.ClickHouseConstants.CLUSTER_NAME;
-import static org.apache.gravitino.catalog.clickhouse.ClickHouseConstants.CLUSTER_REMOTE_DATABASE;
-import static org.apache.gravitino.catalog.clickhouse.ClickHouseConstants.CLUSTER_REMOTE_TABLE;
-import static org.apache.gravitino.catalog.clickhouse.ClickHouseConstants.CLUSTER_SHARDING_KEY;
-import static org.apache.gravitino.catalog.clickhouse.ClickHouseConstants.ON_CLUSTER;
 import static org.apache.gravitino.catalog.clickhouse.ClickHouseTablePropertiesMetadata.CLICKHOUSE_ENGINE_KEY;
 
 import java.util.HashMap;
 import java.util.Map;
+import org.apache.gravitino.catalog.clickhouse.ClickHouseConstants.ClusterConstants;
+import org.apache.gravitino.catalog.clickhouse.ClickHouseConstants.DistributedTableConstants;
 import org.apache.gravitino.catalog.clickhouse.converter.ClickHouseColumnDefaultValueConverter;
 import org.apache.gravitino.catalog.clickhouse.converter.ClickHouseExceptionConverter;
 import org.apache.gravitino.catalog.clickhouse.converter.ClickHouseTypeConverter;
@@ -67,12 +64,12 @@ class TestClickHouseTableOperationsCluster {
         };
 
     Map<String, String> props = new HashMap<>();
-    props.put(CLUSTER_NAME, "ck_cluster");
-    props.put(ON_CLUSTER, "true");
+    props.put(ClusterConstants.NAME, "ck_cluster");
+    props.put(ClusterConstants.ON_CLUSTER, "true");
     props.put(CLICKHOUSE_ENGINE_KEY, "Distributed");
-    props.put(CLUSTER_REMOTE_DATABASE, "remote_db");
-    props.put(CLUSTER_REMOTE_TABLE, "remote_table");
-    props.put(CLUSTER_SHARDING_KEY, "user_id");
+    props.put(DistributedTableConstants.REMOTE_DATABASE, "remote_db");
+    props.put(DistributedTableConstants.REMOTE_TABLE, "remote_table");
+    props.put(DistributedTableConstants.SHARDING_KEY, "user_id");
 
     String sql =
         ops.buildCreateSql(

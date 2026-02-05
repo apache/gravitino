@@ -22,7 +22,7 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
 import org.apache.gravitino.catalog.clickhouse.ClickHouseConfig;
-import org.apache.gravitino.catalog.clickhouse.ClickHouseConstants;
+import org.apache.gravitino.catalog.clickhouse.ClickHouseConstants.ClusterConstants;
 import org.apache.gravitino.catalog.jdbc.converter.JdbcExceptionConverter;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
@@ -64,8 +64,8 @@ public class TestClickHouseDatabaseOperations {
   @Test
   void testGenerateCreateDatabaseSqlWithClusterEnabled() {
     Map<String, String> properties = new HashMap<>();
-    properties.put(ClickHouseConstants.CLUSTER_NAME, "ck_cluster");
-    properties.put(ClickHouseConstants.ON_CLUSTER, "true");
+    properties.put(ClusterConstants.NAME, "ck_cluster");
+    properties.put(ClusterConstants.ON_CLUSTER, "true");
 
     String sql = newOps(new HashMap<>()).buildCreateSql("db_name", null, properties);
     Assertions.assertEquals("CREATE DATABASE `db_name` ON CLUSTER `ck_cluster`", sql);

@@ -32,6 +32,7 @@ import java.util.Map;
 import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.catalog.clickhouse.ClickHouseConstants;
+import org.apache.gravitino.catalog.clickhouse.ClickHouseConstants.TableConstants;
 import org.apache.gravitino.catalog.clickhouse.ClickHouseTablePropertiesMetadata;
 import org.apache.gravitino.catalog.clickhouse.ClickHouseUtils;
 import org.apache.gravitino.catalog.clickhouse.converter.ClickHouseColumnDefaultValueConverter;
@@ -147,11 +148,7 @@ public class TestClickHouseTableOperations extends TestClickHouse {
             TableChange.ColumnPosition.after("col_1"),
             newColumn.nullable(),
             newColumn.autoIncrement(),
-            newColumn.defaultValue())
-        //        ,
-        //        TableChange.setProperty(CLICKHOUSE_ENGINE_KEY, "InnoDB"));
-        //    properties.put(CLICKHOUSE_ENGINE_KEY, "InnoDB"
-        );
+            newColumn.defaultValue()));
     load = TABLE_OPERATIONS.load(TEST_DB_NAME.toString(), newName);
     List<JdbcColumn> alterColumns =
         new ArrayList<JdbcColumn>() {
@@ -702,12 +699,6 @@ public class TestClickHouseTableOperations extends TestClickHouse {
             .withType(Types.DateType.get())
             .withNullable(false)
             .build());
-    //    columns.add(
-    //        JdbcColumn.builder()
-    //            .withName("col_8")
-    //            .withType(Types.TimeType.get())
-    //            .withNullable(false)
-    //            .build());
     columns.add(
         JdbcColumn.builder()
             .withName("col_9")
@@ -730,12 +721,6 @@ public class TestClickHouseTableOperations extends TestClickHouse {
             .withType(Types.StringType.get())
             .withNullable(false)
             .build());
-    //    columns.add(
-    //        JdbcColumn.builder()
-    //            .withName("col_14")
-    //            .withType(Types.BinaryType.get())
-    //            .withNullable(false)
-    //            .build());
     columns.add(
         JdbcColumn.builder()
             .withName("col_15")
@@ -975,8 +960,7 @@ public class TestClickHouseTableOperations extends TestClickHouse {
     // Engine without ORDER BY support should fail when sortOrders provided
     Map<String, String> logEngineProps = new HashMap<>();
     logEngineProps.put(
-        ClickHouseConstants.CLICKHOUSE_ENGINE_NAME,
-        ClickHouseTablePropertiesMetadata.ENGINE.LOG.getValue());
+        TableConstants.ENGINE_UPPER, ClickHouseTablePropertiesMetadata.ENGINE.LOG.getValue());
     Assertions.assertThrows(
         UnsupportedOperationException.class,
         () ->
@@ -1005,9 +989,8 @@ public class TestClickHouseTableOperations extends TestClickHouse {
     // Settings and comment retained
     Map<String, String> props = new HashMap<>();
     props.put(
-        ClickHouseConstants.CLICKHOUSE_ENGINE_NAME,
-        ClickHouseTablePropertiesMetadata.ENGINE.MERGETREE.getValue());
-    props.put(ClickHouseConstants.SETTINGS_PREFIX + "max_threads", "8");
+        TableConstants.ENGINE_UPPER, ClickHouseTablePropertiesMetadata.ENGINE.MERGETREE.getValue());
+    props.put(ClickHouseConstants.TableConstants.SETTINGS_PREFIX + "max_threads", "8");
     String sql =
         ops.buildCreateSql(
             "t1",

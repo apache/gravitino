@@ -19,11 +19,9 @@
 
 package org.apache.gravitino.catalog.clickhouse;
 
-import static org.apache.gravitino.catalog.clickhouse.ClickHouseConstants.CLUSTER_NAME;
-import static org.apache.gravitino.catalog.clickhouse.ClickHouseConstants.CLUSTER_SHARDING_KEY;
-import static org.apache.gravitino.catalog.clickhouse.ClickHouseConstants.ON_CLUSTER;
-
 import org.apache.commons.lang3.StringUtils;
+import org.apache.gravitino.catalog.clickhouse.ClickHouseConstants.ClusterConstants;
+import org.apache.gravitino.catalog.clickhouse.ClickHouseConstants.DistributedTableConstants;
 import org.apache.gravitino.config.ConfigBuilder;
 import org.apache.gravitino.config.ConfigConstants;
 import org.apache.gravitino.config.ConfigEntry;
@@ -34,7 +32,7 @@ public class ClickHouseConfig {
 
   // Constants part
   public static final ConfigEntry<String> CK_CLUSTER_NAME =
-      new ConfigBuilder(CLUSTER_NAME)
+      new ConfigBuilder(ClusterConstants.NAME)
           .doc("Cluster name for ClickHouse distributed tables")
           .version(ConfigConstants.VERSION_1_2_0)
           .stringConf()
@@ -42,14 +40,14 @@ public class ClickHouseConfig {
           .create();
 
   public static final ConfigEntry<Boolean> CK_ON_CLUSTER =
-      new ConfigBuilder(ON_CLUSTER)
+      new ConfigBuilder(ClusterConstants.ON_CLUSTER)
           .doc("Whether to use 'ON CLUSTER' clause when creating tables in ClickHouse")
           .version(ConfigConstants.VERSION_1_2_0)
           .booleanConf()
           .createWithDefault(DEFAULT_CK_ON_CLUSTER);
 
   public static final ConfigEntry<String> CK_CLUSTER_SHARDING_KEY =
-      new ConfigBuilder(CLUSTER_SHARDING_KEY)
+      new ConfigBuilder(DistributedTableConstants.SHARDING_KEY)
           .doc("Sharding key for ClickHouse distributed tables")
           .version(ConfigConstants.VERSION_1_2_0)
           .stringConf()

@@ -18,12 +18,6 @@
  */
 package org.apache.gravitino.catalog.clickhouse.operations;
 
-import static org.apache.gravitino.catalog.clickhouse.ClickHouseConstants.CLUSTER_NAME;
-import static org.apache.gravitino.catalog.clickhouse.ClickHouseConstants.CLUSTER_REMOTE_DATABASE;
-import static org.apache.gravitino.catalog.clickhouse.ClickHouseConstants.CLUSTER_REMOTE_TABLE;
-import static org.apache.gravitino.catalog.clickhouse.ClickHouseConstants.CLUSTER_SHARDING_KEY;
-import static org.apache.gravitino.catalog.clickhouse.ClickHouseConstants.ON_CLUSTER;
-import static org.apache.gravitino.catalog.clickhouse.ClickHouseConstants.SETTINGS_PREFIX;
 import static org.apache.gravitino.catalog.clickhouse.ClickHouseTablePropertiesMetadata.CLICKHOUSE_ENGINE_KEY;
 import static org.apache.gravitino.catalog.clickhouse.ClickHouseTablePropertiesMetadata.ENGINE_PROPERTY_ENTRY;
 import static org.apache.gravitino.rel.Column.DEFAULT_VALUE_NOT_SET;
@@ -49,6 +43,9 @@ import org.apache.commons.lang3.ArrayUtils;
 import org.apache.commons.lang3.BooleanUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.StringIdentifier;
+import org.apache.gravitino.catalog.clickhouse.ClickHouseConstants.ClusterConstants;
+import org.apache.gravitino.catalog.clickhouse.ClickHouseConstants.DistributedTableConstants;
+import org.apache.gravitino.catalog.clickhouse.ClickHouseConstants.TableConstants;
 import org.apache.gravitino.catalog.clickhouse.ClickHouseTablePropertiesMetadata;
 import org.apache.gravitino.catalog.clickhouse.ClickHouseTablePropertiesMetadata.ENGINE;
 import org.apache.gravitino.catalog.jdbc.JdbcColumn;
@@ -192,8 +189,8 @@ public class ClickHouseTableOperations extends JdbcTableOperations {
    */
   private boolean appendCreateTableClause(
       Map<String, String> properties, StringBuilder sqlBuilder, String tableName) {
-    String clusterName = properties.get(CLUSTER_NAME);
-    String onClusterValue = properties.get(ON_CLUSTER);
+    String clusterName = properties.get(ClusterConstants.NAME);
+    String onClusterValue = properties.get(ClusterConstants.ON_CLUSTER);
 
     boolean onCluster =
         StringUtils.isNotBlank(clusterName)
@@ -218,10 +215,12 @@ public class ClickHouseTableOperations extends JdbcTableOperations {
 
     String settings =
         properties.entrySet().stream()
-            .filter(entry -> entry.getKey().startsWith(SETTINGS_PREFIX))
+            .filter(entry -> entry.getKey().startsWith(TableConstants.SETTINGS_PREFIX))
             .map(
                 entry ->
-                    entry.getKey().substring(SETTINGS_PREFIX.length()) + " = " + entry.getValue())
+                    entry.getKey().substring(TableConstants.SETTINGS_PREFIX.length())
+                        + " = "
+                        + entry.getValue())
             .collect(Collectors.joining(",\n ", " \n SETTINGS ", ""));
     sqlBuilder.append(settings);
   }
@@ -282,10 +281,10 @@ public class ClickHouseTableOperations extends JdbcTableOperations {
       }
 
       // Check properties
-      String clusterName = properties.get(CLUSTER_NAME);
-      String remoteDatabase = properties.get(CLUSTER_REMOTE_DATABASE);
-      String remoteTable = properties.get(CLUSTER_REMOTE_TABLE);
-      String shardingKey = properties.get(CLUSTER_SHARDING_KEY);
+      String clusterName = properties.get(ClusterConstants.NAME);
+      String remoteDatabase = properties.get(DistributedTableConstants.REMOTE_DATABASE);
+      String remoteTable = properties.get(DistributedTableConstants.REMOTE_TABLE);
+      String shardingKey = properties.get(DistributedTableConstants.SHARDING_KEY);
 
       Preconditions.checkArgument(
           StringUtils.isNotBlank(clusterName),
