@@ -9,6 +9,7 @@ concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: ${{ contains(github.ref, 'main') }}
 
+
 jobs:
   changes:
     if: github.repository == 'apache/gravitino'
