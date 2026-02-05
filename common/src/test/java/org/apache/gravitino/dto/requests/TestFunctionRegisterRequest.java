@@ -41,6 +41,7 @@ public class TestFunctionRegisterRequest {
     FunctionDefinitionDTO definition =
         FunctionDefinitionDTO.builder()
             .withParameters(new FunctionParamDTO[] {param})
+            .withReturnType(Types.IntegerType.get())
             .withImpls(new SQLImplDTO[] {impl})
             .build();
 
@@ -50,7 +51,6 @@ public class TestFunctionRegisterRequest {
             .withFunctionType(FunctionType.SCALAR)
             .withDeterministic(true)
             .withComment("test function")
-            .withReturnType(Types.IntegerType.get())
             .withDefinitions(new FunctionDefinitionDTO[] {definition})
             .build();
 
@@ -63,27 +63,33 @@ public class TestFunctionRegisterRequest {
 
   @Test
   public void testValidateScalarFunction() {
-    FunctionDefinitionDTO definition =
-        FunctionDefinitionDTO.builder().withParameters(new FunctionParamDTO[0]).build();
+    // Definition with returnType for SCALAR function
+    FunctionDefinitionDTO validDefinition =
+        FunctionDefinitionDTO.builder()
+            .withParameters(new FunctionParamDTO[0])
+            .withReturnType(Types.IntegerType.get())
+            .build();
 
     FunctionRegisterRequest validRequest =
         FunctionRegisterRequest.builder()
             .withName("scalar_func")
             .withFunctionType(FunctionType.SCALAR)
             .withDeterministic(true)
-            .withReturnType(Types.IntegerType.get())
-            .withDefinitions(new FunctionDefinitionDTO[] {definition})
+            .withDefinitions(new FunctionDefinitionDTO[] {validDefinition})
             .build();
 
     Assertions.assertDoesNotThrow(validRequest::validate);
 
-    // Missing returnType for SCALAR function
+    // Definition without returnType for SCALAR function should fail
+    FunctionDefinitionDTO invalidDefinition =
+        FunctionDefinitionDTO.builder().withParameters(new FunctionParamDTO[0]).build();
+
     FunctionRegisterRequest invalidRequest =
         FunctionRegisterRequest.builder()
             .withName("scalar_func")
             .withFunctionType(FunctionType.SCALAR)
             .withDeterministic(true)
-            .withDefinitions(new FunctionDefinitionDTO[] {definition})
+            .withDefinitions(new FunctionDefinitionDTO[] {invalidDefinition})
             .build();
 
     Assertions.assertThrows(IllegalArgumentException.class, invalidRequest::validate);
@@ -91,27 +97,33 @@ public class TestFunctionRegisterRequest {
 
   @Test
   public void testValidateAggregateFunction() {
-    FunctionDefinitionDTO definition =
-        FunctionDefinitionDTO.builder().withParameters(new FunctionParamDTO[0]).build();
+    // Definition with returnType for AGGREGATE function
+    FunctionDefinitionDTO validDefinition =
+        FunctionDefinitionDTO.builder()
+            .withParameters(new FunctionParamDTO[0])
+            .withReturnType(Types.IntegerType.get())
+            .build();
 
     FunctionRegisterRequest validRequest =
         FunctionRegisterRequest.builder()
             .withName("agg_func")
             .withFunctionType(FunctionType.AGGREGATE)
             .withDeterministic(true)
-            .withReturnType(Types.IntegerType.get())
-            .withDefinitions(new FunctionDefinitionDTO[] {definition})
+            .withDefinitions(new FunctionDefinitionDTO[] {validDefinition})
             .build();
 
     Assertions.assertDoesNotThrow(validRequest::validate);
 
-    // Missing returnType for AGGREGATE function
+    // Definition without returnType for AGGREGATE function should fail
+    FunctionDefinitionDTO invalidDefinition =
+        FunctionDefinitionDTO.builder().withParameters(new FunctionParamDTO[0]).build();
+
     FunctionRegisterRequest invalidRequest =
         FunctionRegisterRequest.builder()
             .withName("agg_func")
             .withFunctionType(FunctionType.AGGREGATE)
             .withDeterministic(true)
-            .withDefinitions(new FunctionDefinitionDTO[] {definition})
+            .withDefinitions(new FunctionDefinitionDTO[] {invalidDefinition})
             .build();
 
     Assertions.assertThrows(IllegalArgumentException.class, invalidRequest::validate);
@@ -119,30 +131,36 @@ public class TestFunctionRegisterRequest {
 
   @Test
   public void testValidateTableFunction() {
-    FunctionDefinitionDTO definition =
-        FunctionDefinitionDTO.builder().withParameters(new FunctionParamDTO[0]).build();
-
     FunctionColumnDTO col =
         FunctionColumnDTO.builder().withName("id").withDataType(Types.IntegerType.get()).build();
+
+    // Definition with returnColumns for TABLE function
+    FunctionDefinitionDTO validDefinition =
+        FunctionDefinitionDTO.builder()
+            .withParameters(new FunctionParamDTO[0])
+            .withReturnColumns(new FunctionColumnDTO[] {col})
+            .build();
 
     FunctionRegisterRequest validRequest =
         FunctionRegisterRequest.builder()
             .withName("table_func")
             .withFunctionType(FunctionType.TABLE)
             .withDeterministic(false)
-            .withReturnColumns(new FunctionColumnDTO[] {col})
-            .withDefinitions(new FunctionDefinitionDTO[] {definition})
+            .withDefinitions(new FunctionDefinitionDTO[] {validDefinition})
             .build();
 
     Assertions.assertDoesNotThrow(validRequest::validate);
 
-    // Missing returnColumns for TABLE function
+    // Definition without returnColumns for TABLE function should fail
+    FunctionDefinitionDTO invalidDefinition =
+        FunctionDefinitionDTO.builder().withParameters(new FunctionParamDTO[0]).build();
+
     FunctionRegisterRequest invalidRequest =
         FunctionRegisterRequest.builder()
             .withName("table_func")
             .withFunctionType(FunctionType.TABLE)
             .withDeterministic(false)
-            .withDefinitions(new FunctionDefinitionDTO[] {definition})
+            .withDefinitions(new FunctionDefinitionDTO[] {invalidDefinition})
             .build();
 
     Assertions.assertThrows(IllegalArgumentException.class, invalidRequest::validate);
@@ -151,13 +169,15 @@ public class TestFunctionRegisterRequest {
   @Test
   public void testValidateMissingName() {
     FunctionDefinitionDTO definition =
-        FunctionDefinitionDTO.builder().withParameters(new FunctionParamDTO[0]).build();
+        FunctionDefinitionDTO.builder()
+            .withParameters(new FunctionParamDTO[0])
+            .withReturnType(Types.IntegerType.get())
+            .build();
 
     FunctionRegisterRequest invalidRequest =
         FunctionRegisterRequest.builder()
             .withFunctionType(FunctionType.SCALAR)
             .withDeterministic(true)
-            .withReturnType(Types.IntegerType.get())
             .withDefinitions(new FunctionDefinitionDTO[] {definition})
             .build();
 
@@ -171,9 +191,40 @@ public class TestFunctionRegisterRequest {
             .withName("test_func")
             .withFunctionType(FunctionType.SCALAR)
             .withDeterministic(true)
-            .withReturnType(Types.IntegerType.get())
             .build();
 
     Assertions.assertThrows(IllegalArgumentException.class, invalidRequest::validate);
+  }
+
+  @Test
+  public void testValidateMultipleDefinitionsWithDifferentReturnTypes() {
+    // Test that multiple definitions can have different return types
+    FunctionParamDTO intParam =
+        FunctionParamDTO.builder().withName("x").withDataType(Types.IntegerType.get()).build();
+    FunctionParamDTO floatParam =
+        FunctionParamDTO.builder().withName("x").withDataType(Types.FloatType.get()).build();
+
+    FunctionDefinitionDTO intDef =
+        FunctionDefinitionDTO.builder()
+            .withParameters(new FunctionParamDTO[] {intParam})
+            .withReturnType(Types.IntegerType.get())
+            .build();
+
+    FunctionDefinitionDTO floatDef =
+        FunctionDefinitionDTO.builder()
+            .withParameters(new FunctionParamDTO[] {floatParam})
+            .withReturnType(Types.FloatType.get())
+            .build();
+
+    FunctionRegisterRequest request =
+        FunctionRegisterRequest.builder()
+            .withName("overloaded_func")
+            .withFunctionType(FunctionType.SCALAR)
+            .withDeterministic(true)
+            .withDefinitions(new FunctionDefinitionDTO[] {intDef, floatDef})
+            .build();
+
+    // This should succeed - different definitions can have different return types
+    Assertions.assertDoesNotThrow(request::validate);
   }
 }

@@ -27,7 +27,6 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
-import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Collectors;
 import org.apache.gravitino.Entity;
@@ -42,7 +41,6 @@ import org.apache.gravitino.exceptions.NoSuchSchemaException;
 import org.apache.gravitino.function.Function;
 import org.apache.gravitino.function.FunctionCatalog;
 import org.apache.gravitino.function.FunctionChange;
-import org.apache.gravitino.function.FunctionColumn;
 import org.apache.gravitino.function.FunctionDefinition;
 import org.apache.gravitino.function.FunctionDefinitions;
 import org.apache.gravitino.function.FunctionImpl;
@@ -52,7 +50,6 @@ import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.meta.FunctionEntity;
 import org.apache.gravitino.rel.Column;
 import org.apache.gravitino.rel.expressions.Expression;
-import org.apache.gravitino.rel.types.Type;
 import org.apache.gravitino.storage.IdGenerator;
 import org.apache.gravitino.utils.PrincipalUtils;
 
@@ -122,35 +119,9 @@ public class ManagedFunctionOperations implements FunctionCatalog {
       String comment,
       FunctionType functionType,
       boolean deterministic,
-      Type returnType,
       FunctionDefinition[] definitions)
       throws NoSuchSchemaException, FunctionAlreadyExistsException {
-    return doRegisterFunction(
-        ident,
-        comment,
-        functionType,
-        deterministic,
-        Optional.of(returnType),
-        Optional.empty(),
-        definitions);
-  }
-
-  @Override
-  public Function registerFunction(
-      NameIdentifier ident,
-      String comment,
-      boolean deterministic,
-      FunctionColumn[] returnColumns,
-      FunctionDefinition[] definitions)
-      throws NoSuchSchemaException, FunctionAlreadyExistsException {
-    return doRegisterFunction(
-        ident,
-        comment,
-        FunctionType.TABLE,
-        deterministic,
-        Optional.empty(),
-        Optional.of(returnColumns),
-        definitions);
+    return doRegisterFunction(ident, comment, functionType, deterministic, definitions);
   }
 
   @Override
@@ -188,8 +159,6 @@ public class ManagedFunctionOperations implements FunctionCatalog {
       String comment,
       FunctionType functionType,
       boolean deterministic,
-      Optional<Type> returnType,
-      Optional<FunctionColumn[]> returnColumns,
       FunctionDefinition[] definitions)
       throws NoSuchSchemaException, FunctionAlreadyExistsException {
     Preconditions.checkArgument(
@@ -209,8 +178,6 @@ public class ManagedFunctionOperations implements FunctionCatalog {
             .withComment(comment)
             .withFunctionType(functionType)
             .withDeterministic(deterministic)
-            .withReturnType(returnType.orElse(null))
-            .withReturnColumns(returnColumns.orElse(null))
             .withDefinitions(definitions)
             .withAuditInfo(auditInfo)
             .build();
@@ -321,8 +288,6 @@ public class ManagedFunctionOperations implements FunctionCatalog {
         .withComment(newComment)
         .withFunctionType(oldEntity.functionType())
         .withDeterministic(oldEntity.deterministic())
-        .withReturnType(oldEntity.returnType())
-        .withReturnColumns(oldEntity.returnColumns())
         .withDefinitions(newDefinitions.toArray(new FunctionDefinition[0]))
         .withAuditInfo(newAuditInfo)
         .build();
@@ -492,7 +457,7 @@ public class ManagedFunctionOperations implements FunctionCatalog {
         }
         List<FunctionImpl> impls = new ArrayList<>(Arrays.asList(def.impls()));
         impls.add(implToAdd);
-        result.add(FunctionDefinitions.of(def.parameters(), impls.toArray(new FunctionImpl[0])));
+        result.add(rebuildDefinitionWithNewImpls(def, impls.toArray(new FunctionImpl[0])));
       } else {
         result.add(def);
       }
@@ -527,7 +492,7 @@ public class ManagedFunctionOperations implements FunctionCatalog {
             impls.add(impl);
           }
         }
-        result.add(FunctionDefinitions.of(def.parameters(), impls.toArray(new FunctionImpl[0])));
+        result.add(rebuildDefinitionWithNewImpls(def, impls.toArray(new FunctionImpl[0])));
       } else {
         result.add(def);
       }
@@ -575,7 +540,7 @@ public class ManagedFunctionOperations implements FunctionCatalog {
             impls.add(impl);
           }
         }
-        result.add(FunctionDefinitions.of(def.parameters(), impls.toArray(new FunctionImpl[0])));
+        result.add(rebuildDefinitionWithNewImpls(def, impls.toArray(new FunctionImpl[0])));
       } else {
         result.add(def);
       }
@@ -593,5 +558,21 @@ public class ManagedFunctionOperations implements FunctionCatalog {
     }
 
     return result;
+  }
+
+  /**
+   * Rebuilds a FunctionDefinition with new implementations while preserving
+   * returnType/returnColumns.
+   */
+  @SuppressWarnings("deprecation")
+  private FunctionDefinition rebuildDefinitionWithNewImpls(
+      FunctionDefinition original, FunctionImpl[] newImpls) {
+    if (original.returnType() != null) {
+      return FunctionDefinitions.of(original.parameters(), original.returnType(), newImpls);
+    } else if (original.returnColumns() != null && original.returnColumns().length > 0) {
+      return FunctionDefinitions.of(original.parameters(), original.returnColumns(), newImpls);
+    } else {
+      return FunctionDefinitions.of(original.parameters(), newImpls);
+    }
   }
 }

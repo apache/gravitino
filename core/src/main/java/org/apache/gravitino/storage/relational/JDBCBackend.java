@@ -254,7 +254,7 @@ public class JDBCBackend implements RelationalBackend {
       case MODEL_VERSION:
         return (E) ModelVersionMetaService.getInstance().updateModelVersion(ident, updater);
       case FUNCTION:
-        throw new UnsupportedOperationException("updateFunction not implemented yet");
+        return (E) FunctionMetaService.getInstance().updateFunction(ident, updater);
       case POLICY:
         return (E) PolicyMetaService.getInstance().updatePolicy(ident, updater);
       case JOB_TEMPLATE:
@@ -353,7 +353,7 @@ public class JDBCBackend implements RelationalBackend {
       case MODEL_VERSION:
         return ModelVersionMetaService.getInstance().deleteModelVersion(ident);
       case FUNCTION:
-        throw new UnsupportedOperationException("deleteFunction not implemented yet");
+        return FunctionMetaService.getInstance().deleteFunction(ident);
       case POLICY:
         return PolicyMetaService.getInstance().deletePolicy(ident);
       case JOB_TEMPLATE:
