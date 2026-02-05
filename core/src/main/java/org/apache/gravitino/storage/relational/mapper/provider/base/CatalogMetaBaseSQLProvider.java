@@ -241,4 +241,28 @@ public class CatalogMetaBaseSQLProvider {
         + TABLE_NAME
         + " WHERE deleted_at > 0 AND deleted_at < #{legacyTimeline} LIMIT #{limit}";
   }
+
+  public String batchSelectCatalogByIdentifier(
+      @Param("metalakeName") String metalakeName,
+      @Param("catalogNames") List<String> catalogNames) {
+    return "<script>"
+        + "SELECT cm.catalog_id as catalogId, cm.catalog_name as catalogName,"
+        + " cm.metalake_id as metalakeId, cm.type, cm.provider,"
+        + " cm.catalog_comment as catalogComment, cm.properties, cm.audit_info as auditInfo,"
+        + " cm.current_version as currentVersion, cm.last_version as lastVersion,"
+        + " cm.deleted_at as deletedAt"
+        + " FROM "
+        + TABLE_NAME
+        + " cm JOIN "
+        + MetalakeMetaMapper.TABLE_NAME
+        + " mm ON cm.metalake_id = mm.metalake_id"
+        + " WHERE mm.metalake_name = #{metalakeName}"
+        + " AND cm.catalog_name IN ("
+        + "<foreach collection='catalogNames' item='catalogName' separator=','>"
+        + "#{catalogName}"
+        + "</foreach>"
+        + " )"
+        + " AND cm.deleted_at = 0 AND mm.deleted_at = 0"
+        + "</script>";
+  }
 }

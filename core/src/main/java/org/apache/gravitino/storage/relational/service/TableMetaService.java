@@ -23,14 +23,12 @@ import static org.apache.gravitino.metrics.source.MetricsSource.GRAVITINO_RELATI
 import com.google.common.base.Preconditions;
 import java.io.IOException;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.List;
 import java.util.Objects;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Function;
 import java.util.stream.Collectors;
-import org.apache.commons.collections4.CollectionUtils;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.Entity.EntityType;
 import org.apache.gravitino.GravitinoEnv;
@@ -297,9 +295,6 @@ public class TableMetaService {
       metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME,
       baseMetricName = "batchGetTableByIdentifier")
   public List<TableEntity> batchGetTableByIdentifier(List<NameIdentifier> identifiers) {
-    if (CollectionUtils.isEmpty(identifiers)) {
-      return Collections.emptyList();
-    }
     NameIdentifier firstIdent = identifiers.get(0);
     NameIdentifier schemaIdent = NameIdentifierUtil.getSchemaIdentifier(firstIdent);
     List<String> tableNames = new ArrayList<>(identifiers.size());

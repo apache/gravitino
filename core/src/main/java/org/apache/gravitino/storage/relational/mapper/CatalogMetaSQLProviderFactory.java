@@ -121,4 +121,10 @@ public class CatalogMetaSQLProviderFactory {
       @Param("legacyTimeline") Long legacyTimeline, @Param("limit") int limit) {
     return getProvider().deleteCatalogMetasByLegacyTimeline(legacyTimeline, limit);
   }
+
+  public static String batchSelectCatalogByIdentifier(
+      @Param("metalakeName") String metalakeName,
+      @Param("catalogNames") List<String> catalogNames) {
+    return getProvider().batchSelectCatalogByIdentifier(metalakeName, catalogNames);
+  }
 }

@@ -125,4 +125,13 @@ public class FilesetMetaSQLProviderFactory {
       @Param("legacyTimeline") Long legacyTimeline, @Param("limit") int limit) {
     return getProvider().deleteFilesetMetasByLegacyTimeline(legacyTimeline, limit);
   }
+
+  public static String batchSelectFilesetByIdentifier(
+      @Param("metalakeName") String metalakeName,
+      @Param("catalogName") String catalogName,
+      @Param("schemaName") String schemaName,
+      @Param("filesetNames") List<String> filesetNames) {
+    return getProvider()
+        .batchSelectFilesetByIdentifier(metalakeName, catalogName, schemaName, filesetNames);
+  }
 }

@@ -114,4 +114,12 @@ public interface SchemaMetaMapper {
       @Param("metalakeName") String metalakeName,
       @Param("catalogName") String catalogName,
       @Param("schemaName") String schemaName);
+
+  @SelectProvider(
+      type = SchemaMetaSQLProviderFactory.class,
+      method = "batchSelectSchemaByIdentifier")
+  List<SchemaPO> batchSelectSchemaByIdentifier(
+      @Param("metalakeName") String metalakeName,
+      @Param("catalogName") String catalogName,
+      @Param("schemaNames") List<String> schemaNames);
 }
