@@ -238,9 +238,10 @@ The signature algorithms that Gravitino supports follows:
 This example shows how to configure Gravitino with Azure AD using JWKS-based token validation.
 
 **Prerequisites:**
-- Azure AD tenant with an application registration
+- Azure AD tenant with an application registration (Single-page application)
 - Application configured with:
   - Client ID (Application ID)
+  - Platform configuration: Single-page application (SPA)
   - Redirect URI: `https://your-gravitino-server/ui/oauth/callback`
   - Required API permissions/scopes (typically `openid`, `profile`, `email`)
 
