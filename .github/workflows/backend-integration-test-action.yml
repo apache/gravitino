@@ -47,7 +47,7 @@ jobs:
       - name: Package Gravitino
         if: ${{ inputs.test-mode == 'deploy' }}
         run: |
-          ./gradlew compileDistribution -x test 
+          GRAVITINO_USE_WEB_V2=true ./gradlew compileDistribution -x test 
 
       - name: Free up disk space
         run: |
