@@ -33,14 +33,13 @@ from gravitino.api.rel.table_change import (
     UpdateColumnAutoIncrement,
     UpdateColumnComment,
     UpdateColumnDefaultValue,
+    UpdateColumnNullability,
     UpdateColumnPosition,
     UpdateColumnType,
 )
 from gravitino.api.rel.types.json_serdes._helper.serdes_utils import SerdesUtils
 from gravitino.api.rel.types.type import Type
 from gravitino.rest.rest_message import RESTRequest
-
-from ...api.rel.table_change import UpdateColumnNullability
 
 
 @dataclass_json
