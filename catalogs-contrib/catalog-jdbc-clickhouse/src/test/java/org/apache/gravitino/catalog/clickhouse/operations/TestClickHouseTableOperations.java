@@ -146,8 +146,7 @@ public class TestClickHouseTableOperations extends TestClickHouse {
             TableChange.ColumnPosition.after("col_1"),
             newColumn.nullable(),
             newColumn.autoIncrement(),
-            newColumn.defaultValue())
-        );
+            newColumn.defaultValue()));
     load = TABLE_OPERATIONS.load(TEST_DB_NAME.toString(), newName);
     List<JdbcColumn> alterColumns =
         new ArrayList<JdbcColumn>() {

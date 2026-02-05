@@ -49,7 +49,6 @@ import org.apache.gravitino.catalog.jdbc.JdbcColumn;
 import org.apache.gravitino.catalog.jdbc.JdbcTable;
 import org.apache.gravitino.catalog.jdbc.operation.JdbcTableOperations;
 import org.apache.gravitino.catalog.jdbc.utils.JdbcConnectorUtils;
-import org.apache.gravitino.exceptions.NoSuchColumnException;
 import org.apache.gravitino.exceptions.NoSuchTableException;
 import org.apache.gravitino.rel.Column;
 import org.apache.gravitino.rel.TableChange;
@@ -369,7 +368,8 @@ public class ClickHouseTableOperations extends JdbcTableOperations {
 
       } else if (change instanceof TableChange.RemoveProperty) {
         // Clickhouse does not support deleting table attributes, it can be replaced by Set Property
-        throw new UnsupportedOperationException("Remove property for ClickHouse is not supported yet");
+        throw new UnsupportedOperationException(
+            "Remove property for ClickHouse is not supported yet");
 
       } else if (change instanceof TableChange.AddColumn addColumn) {
         lazyLoadTable = getOrCreateTable(databaseName, tableName, lazyLoadTable);
@@ -703,7 +703,8 @@ public class ClickHouseTableOperations extends JdbcTableOperations {
 
     String col = updateColumnType.fieldName()[0];
     JdbcColumn column = getJdbcColumnFromTable(jdbcTable, col);
-    StringBuilder sqlBuilder = new StringBuilder("%s %s ".formatted(MODIFY_COLUMN, quoteIdentifier(col)));
+    StringBuilder sqlBuilder =
+        new StringBuilder("%s %s ".formatted(MODIFY_COLUMN, quoteIdentifier(col)));
 
     JdbcColumn newColumn =
         JdbcColumn.builder()
