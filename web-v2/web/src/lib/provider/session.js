@@ -127,7 +127,11 @@ const AuthProvider = ({ children }) => {
         } else {
           // Don't redirect to login if we're on the OAuth callback page
           // Let the callback page handle the OAuth flow completion
-          if (typeof window !== 'undefined' && window.location.pathname.startsWith('/ui/oauth/callback')) {
+          if (
+            typeof window !== 'undefined' &&
+            (window.location.pathname.startsWith(`${process.env.NEXT_PUBLIC_BASE_PATH}/oauth/callback`) ||
+              window.location.pathname.startsWith('/ui/oauth/callback'))
+          ) {
             return
           }
           router.push('/login')

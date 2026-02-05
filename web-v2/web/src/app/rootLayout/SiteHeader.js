@@ -40,7 +40,7 @@ export function SiteHeader() {
   const store = useAppSelector(state => state.metalakes)
 
   useEffect(() => {
-    if (pathname && !['/', '/ui', '/login', '/ui/login'].includes(pathname)) {
+    if (pathname && !['/', '/ui', '/login', '/ui/login', '/oauth/callback', '/ui/oauth/callback'].includes(pathname)) {
       dispatch(fetchMetalakes())
     }
   }, [dispatch, pathname])

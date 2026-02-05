@@ -42,7 +42,7 @@ export default function OAuthCallback() {
 
       // Complete the signin process
       const user = await userManager.signinRedirectCallback()
-      window.location.href = '/ui/metalakes'
+      window.location.href = process.env.NEXT_PUBLIC_BASE_PATH + '/metalakes'
     } catch (error) {
       console.error('OAuth callback failed:', error)
 
@@ -58,7 +58,7 @@ export default function OAuthCallback() {
 
       // Redirect to login with error
       const errorMessage = encodeURIComponent(error.message || 'Authentication failed')
-      window.location.href = `/ui/login?error=${errorMessage}`
+      window.location.href = `${process.env.NEXT_PUBLIC_BASE_PATH}/login?error=${errorMessage}`
     }
   }
 

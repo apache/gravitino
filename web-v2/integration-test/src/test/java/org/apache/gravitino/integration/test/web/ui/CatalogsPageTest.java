@@ -340,7 +340,8 @@ public class CatalogsPageTest extends BaseWebIT {
     // Switch back to relational tab to verify relational catalogs
     catalogsPage.clickSelectType("relational");
     Thread.sleep(1000); // Wait for tab switch
-    driver.navigate().refresh();
+    String currentUrl = driver.getCurrentUrl();
+    driver.get(currentUrl);
     Assertions.assertEquals(WEB_TITLE, driver.getTitle());
     Assertions.assertTrue(catalogsPage.verifyRefreshPage());
     List<String> relationalCatalogsNames =
@@ -382,7 +383,8 @@ public class CatalogsPageTest extends BaseWebIT {
   @Test
   @Order(9)
   public void testRefreshCatalogPage() {
-    driver.navigate().refresh();
+    String currentUrl = driver.getCurrentUrl();
+    driver.get(currentUrl);
     Assertions.assertEquals(WEB_TITLE, driver.getTitle());
     Assertions.assertTrue(catalogsPage.verifyShowTableTitle(CATALOG_TABLE_TITLE));
     Assertions.assertTrue(catalogsPage.verifyShowDataItemInList(SCHEMA_NAME, false));
@@ -414,7 +416,8 @@ public class CatalogsPageTest extends BaseWebIT {
   @Test
   @Order(11)
   public void testRefreshSchemaPage() {
-    driver.navigate().refresh();
+    String currentUrl = driver.getCurrentUrl();
+    driver.get(currentUrl);
     Assertions.assertEquals(WEB_TITLE, driver.getTitle());
     Assertions.assertTrue(catalogsPage.verifyShowTableTitle(SCHEMA_TABLE_TITLE));
     Assertions.assertTrue(catalogsPage.verifyShowDataItemInList(TABLE_NAME, false));
@@ -469,7 +472,8 @@ public class CatalogsPageTest extends BaseWebIT {
   @Test
   @Order(14)
   public void testRefreshTablePage() {
-    driver.navigate().refresh();
+    String currentUrl = driver.getCurrentUrl();
+    driver.get(currentUrl);
     Assertions.assertEquals(WEB_TITLE, driver.getTitle());
     Assertions.assertTrue(catalogsPage.verifyRefreshPage());
     Assertions.assertTrue(catalogsPage.verifyShowTableTitle(TABLE_TABLE_TITLE));
@@ -601,7 +605,8 @@ public class CatalogsPageTest extends BaseWebIT {
     Assertions.assertTrue(catalogsPage.verifyEmptyTableData());
 
     catalogsPage.metalakeSelectChange(METALAKE_NAME);
-    driver.navigate().refresh();
+    String currentUrl = driver.getCurrentUrl();
+    driver.get(currentUrl);
   }
 
   @Test

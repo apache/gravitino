@@ -139,7 +139,8 @@ public class MetalakePageTest extends BaseWebIT {
   @Test
   @Order(8)
   public void testRefreshPage() {
-    driver.navigate().refresh();
+    String currentUrl = driver.getCurrentUrl();
+    driver.get(currentUrl);
 
     Assertions.assertEquals(WEB_TITLE, driver.getTitle());
     Assertions.assertTrue(metalakePage.verifyRefreshPage());
