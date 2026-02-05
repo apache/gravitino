@@ -60,7 +60,6 @@ import org.apache.gravitino.rel.expressions.sorts.SortOrder;
 import org.apache.gravitino.rel.expressions.transforms.Transform;
 import org.apache.gravitino.rel.indexes.Index;
 import org.apache.gravitino.rel.indexes.Indexes;
-import org.apache.gravitino.rel.types.Types;
 
 public class ClickHouseTableOperations extends JdbcTableOperations {
 
@@ -415,13 +414,10 @@ public class ClickHouseTableOperations extends JdbcTableOperations {
         alterSql.add(deleteIndexDefinition(lazyLoadTable, (TableChange.DeleteIndex) change));
 
       } else if (change instanceof TableChange.UpdateColumnAutoIncrement) {
-        // Auto increment functionality was added in ClickHouse 25.1. Should we just
-        // throw unsupported exception here as this PR is based on 23.x.
-        lazyLoadTable = getOrCreateTable(databaseName, tableName, lazyLoadTable);
-        alterSql.add(
-            updateColumnAutoIncrementDefinition(
-                lazyLoadTable, (TableChange.UpdateColumnAutoIncrement) change));
-
+        // Auto increment functionality was added in ClickHouse 25.1. Since this PR is based on
+        // 23.x, we throw unsupported operation here.
+        throw new UnsupportedOperationException(
+            "ClickHouse auto increment is not supported in this version.");
       } else {
         throw new IllegalArgumentException(
             "Unsupported table change type: " + change.getClass().getName());
@@ -462,37 +458,6 @@ public class ClickHouseTableOperations extends JdbcTableOperations {
     return result;
   }
 
-  private String updateColumnAutoIncrementDefinition(
-      JdbcTable table, TableChange.UpdateColumnAutoIncrement change) {
-    if (change.fieldName().length > 1) {
-      throw new UnsupportedOperationException("Nested column names are not supported");
-    }
-
-    // TODO add validation check for the column. The column must be a single column and
-    //  a part of primary key or sort key.
-    String col = change.fieldName()[0];
-    JdbcColumn column = getJdbcColumnFromTable(table, col);
-    if (change.isAutoIncrement()) {
-      Preconditions.checkArgument(
-          Types.allowAutoIncrement(column.dataType()),
-          "Auto increment is not allowed, type: " + column.dataType());
-    }
-
-    JdbcColumn updateColumn =
-        JdbcColumn.builder()
-            .withName(col)
-            .withDefaultValue(column.defaultValue())
-            .withNullable(column.nullable())
-            .withType(column.dataType())
-            .withComment(column.comment())
-            .withAutoIncrement(change.isAutoIncrement())
-            .build();
-
-    return MODIFY_COLUMN
-        + quoteIdentifier(col)
-        + appendColumnDefinition(updateColumn, new StringBuilder());
-  }
-
   @VisibleForTesting
   private String deleteIndexDefinition(
       JdbcTable lazyLoadTable, TableChange.DeleteIndex deleteIndex) {
@@ -530,9 +495,11 @@ public class ClickHouseTableOperations extends JdbcTableOperations {
             .withAutoIncrement(column.autoIncrement())
             .build();
 
-    return MODIFY_COLUMN
-        + quoteIdentifier(col)
-        + appendColumnDefinition(updateColumn, new StringBuilder());
+    return "%s %s %s"
+        .formatted(
+            MODIFY_COLUMN,
+            quoteIdentifier(col),
+            appendColumnDefinition(updateColumn, new StringBuilder()));
   }
 
   private String generateAlterTableProperties(List<TableChange.SetProperty> setProperties) {
@@ -563,9 +530,11 @@ public class ClickHouseTableOperations extends JdbcTableOperations {
             .withAutoIncrement(column.autoIncrement())
             .build();
 
-    return MODIFY_COLUMN
-        + quoteIdentifier(col)
-        + appendColumnDefinition(updateColumn, new StringBuilder());
+    return "%s %s %s"
+        .formatted(
+            MODIFY_COLUMN,
+            quoteIdentifier(col),
+            appendColumnDefinition(updateColumn, new StringBuilder()));
   }
 
   private String addColumnFieldDefinition(TableChange.AddColumn addColumn) {
@@ -607,10 +576,6 @@ public class ClickHouseTableOperations extends JdbcTableOperations {
       columnDefinition.append(" FIRST ");
     } else if (addColumn.getPosition() instanceof TableChange.After afterPosition) {
       columnDefinition.append(" AFTER %s ".formatted(quoteIdentifier(afterPosition.getColumn())));
-    } else if (addColumn.getPosition() instanceof TableChange.Default) {
-      // Do nothing, follow the default behavior of clickhouse
-    } else {
-      throw new IllegalArgumentException("Invalid column position.");
     }
 
     return columnDefinition.toString();

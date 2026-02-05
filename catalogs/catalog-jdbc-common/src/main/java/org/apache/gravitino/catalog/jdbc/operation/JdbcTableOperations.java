@@ -662,8 +662,7 @@ public abstract class JdbcTableOperations implements TableOperation {
   }
 
   protected boolean columnExists(JdbcTable table, String columnName) {
-    return Arrays.stream(table.columns())
-        .anyMatch(col -> col.name().equals(columnName));
+    return Arrays.stream(table.columns()).anyMatch(col -> col.name().equals(columnName));
   }
 
   protected Connection getConnection(String catalog) throws SQLException {
