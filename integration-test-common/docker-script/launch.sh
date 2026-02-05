@@ -43,7 +43,8 @@ LOG_PATH=$LOG_DIR/trino-ci-docker-compose.log
 
 echo "The docker compose log is: $LOG_PATH"
 
-nohup docker compose logs -f  -t > $LOG_PATH &
+# Stream logs to the console in real time while still saving to the log file.
+docker compose logs -f -t | tee -a "$LOG_PATH" &
 
 max_attempts=300
 attempts=0
