@@ -150,7 +150,7 @@ public class TrinoQueryITBase {
     try {
       if (autoStart) {
         if (trinoITContainers != null) trinoITContainers.shutdown();
-        baseIT.stopIntegrationTest();
+        if (baseIT != null) baseIT.stopIntegrationTest();
       }
     } catch (Exception e) {
       LOG.error("Error in cleanup", e);
