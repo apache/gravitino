@@ -67,6 +67,6 @@ tasks.test {
     dependsOn(":catalogs:catalog-kafka:jar", ":catalogs:catalog-kafka:runtimeJars")
 
     // Frontend tests depend on the web page, so we need to build the web module first.
-    dependsOn(":web:web:build")
+    dependsOn(":web-v2:web:build")
   }
 }
