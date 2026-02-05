@@ -128,11 +128,11 @@ If you are using multiple JDBC catalog backends, setting `jdbc-initialize` to tr
 
 Use the REST backend to proxy another Iceberg REST catalog server (IRC2). The Gravitino Iceberg REST service acts as IRC1 and forwards catalog operations to IRC2.
 
-| Configuration item                            | Description                                                                                                                                                 | Default value | Required | Since Version |
-|-----------------------------------------------|-------------------------------------------------------------------------------------------------------------------------------------------------------------|---------------|----------|---------------|
-| `gravitino.iceberg-rest.catalog-backend`      | The Catalog backend of the Gravitino Iceberg REST catalog service. Use the value **`rest`** for the REST catalog backend.                                  | `memory`      | Yes      | 0.2.0         |
-| `gravitino.iceberg-rest.uri`                  | The Iceberg REST catalog URI (IRC2), such as `http://127.0.0.1:9001/iceberg`.                                                                                | (none)        | Yes      | 0.2.0         |
-| `gravitino.iceberg-rest.warehouse`            | The catalog name in the Iceberg REST spec. Set to a specific catalog name, or leave empty to use the default catalog on IRC2.                               | (none)        | No       | 0.2.0         |
+| Configuration item                       | Description                                                                                                                   | Default value | Required | Since Version |
+|------------------------------------------|-------------------------------------------------------------------------------------------------------------------------------|---------------|----------|---------------|
+| `gravitino.iceberg-rest.catalog-backend` | The Catalog backend of the Gravitino Iceberg REST catalog service. Use the value **`rest`** for the REST catalog backend.     | `memory`      | Yes      | 0.2.0         |
+| `gravitino.iceberg-rest.uri`             | The Iceberg REST catalog URI (IRC2), such as `http://127.0.0.1:9001/iceberg`.                                                 | (none)        | Yes      | 0.2.0         |
+| `gravitino.iceberg-rest.warehouse`       | The catalog name in the Iceberg REST spec. Set to a specific catalog name, or leave empty to use the default catalog on IRC2. | (none)        | No       | 0.2.0         |
 
 IRC1 configuration example if IRC2 using HDFS storage:
 
