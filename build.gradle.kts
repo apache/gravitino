@@ -220,6 +220,13 @@ allprojects {
       project.delete("build/${project.name}-integration-test.log")
       if (testMode == "deploy") {
         param.environment("GRAVITINO_HOME", project.rootDir.path + "/distribution/package")
+        val useWebV2 = System.getenv("GRAVITINO_USE_WEB_V2")?.toBoolean() == true
+        val webWarPath = if (useWebV2) {
+          project.rootDir.path + "/distribution/package/web-v2/gravitino-web-${project.version}.war"
+        } else {
+          project.rootDir.path + "/distribution/package/web/gravitino-web-${project.version}.war"
+        }
+        param.environment("GRAVITINO_WAR", webWarPath)
         param.systemProperty("testMode", "deploy")
       } else if (testMode == "embedded") {
         param.environment("GRAVITINO_HOME", project.rootDir.path)
