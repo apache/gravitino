@@ -397,4 +397,22 @@ public class MetalakeMetaService {
                     mapper -> mapper.deleteOwnerMetasByLegacyTimeline(legacyTimeline, limit)));
     return metalakeDeleteCount[0] + ownerRelDeleteCount[0];
   }
+
+  @Monitored(
+      metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME,
+      baseMetricName = "batchGetMetalakeByIdentifier")
+  public List<BaseMetalake> batchGetMetalakeByIdentifier(List<NameIdentifier> identifiers) {
+
+    List<String> metalakeNames =
+        identifiers.stream()
+            .map(NameIdentifier::name)
+            .collect(java.util.stream.Collectors.toList());
+
+    return SessionUtils.doWithCommitAndFetchResult(
+        MetalakeMetaMapper.class,
+        mapper -> {
+          List<MetalakePO> metalakePOs = mapper.batchSelectMetalakeByName(metalakeNames);
+          return POConverters.fromMetalakePOs(metalakePOs);
+        });
+  }
 }

@@ -161,4 +161,26 @@ public class JobMetaService {
       throw new NoSuchEntityException("Invalid job run ID format %s", jobRunId);
     }
   }
+
+  @Monitored(
+      metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME,
+      baseMetricName = "batchGetJobByIdentifier")
+  public List<JobEntity> batchGetJobByIdentifier(List<NameIdentifier> identifiers) {
+    NameIdentifier firstIdent = identifiers.get(0);
+    NamespaceUtil.checkJob(firstIdent.namespace());
+    String metalakeName = firstIdent.namespace().level(0);
+    String jobTemplateName = firstIdent.namespace().level(1);
+    List<String> jobNames =
+        identifiers.stream().map(NameIdentifier::name).collect(Collectors.toList());
+
+    return SessionUtils.doWithCommitAndFetchResult(
+        JobMetaMapper.class,
+        mapper -> {
+          List<JobPO> jobPOs =
+              mapper.batchSelectJobByIdentifier(metalakeName, jobTemplateName, jobNames);
+          return jobPOs.stream()
+              .map(po -> JobPO.fromJobPO(po, firstIdent.namespace()))
+              .collect(Collectors.toList());
+        });
+  }
 }

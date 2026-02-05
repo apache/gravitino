@@ -19,6 +19,7 @@
 package org.apache.gravitino.storage.relational.mapper;
 
 import com.google.common.collect.ImmutableMap;
+import java.util.List;
 import java.util.Map;
 import org.apache.gravitino.storage.relational.JDBCBackend;
 import org.apache.gravitino.storage.relational.mapper.provider.base.JobMetaBaseSQLProvider;
@@ -97,5 +98,12 @@ public class JobMetaSQLProviderFactory {
 
   public static String softDeleteJobMetaByRunId(@Param("jobRunId") Long jobRunId) {
     return getProvider().softDeleteJobMetaByRunId(jobRunId);
+  }
+
+  public static String batchSelectJobByIdentifier(
+      @Param("metalakeName") String metalakeName,
+      @Param("jobTemplateName") String jobTemplateName,
+      @Param("jobNames") List<String> jobNames) {
+    return getProvider().batchSelectJobByIdentifier(metalakeName, jobTemplateName, jobNames);
   }
 }
