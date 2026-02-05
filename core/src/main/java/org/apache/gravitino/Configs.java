@@ -435,6 +435,21 @@ public class Configs {
           .booleanConf()
           .createWithDefault(true);
 
+  public static final ConfigEntry<Boolean> CACHE_INVALIDATION_ENABLED =
+      new ConfigBuilder("gravitino.cache.invalidation.enabled")
+          .doc("Whether to enable DB-based cache invalidation polling.")
+          .version(ConfigConstants.VERSION_1_3_0)
+          .booleanConf()
+          .createWithDefault(true);
+
+  public static final ConfigEntry<Long> CACHE_INVALIDATION_POLL_INTERVAL_MS =
+      new ConfigBuilder("gravitino.cache.invalidation.pollIntervalMs")
+          .doc("Polling interval in milliseconds for cache version checks.")
+          .version(ConfigConstants.VERSION_1_3_0)
+          .longConf()
+          .checkValue(value -> value > 0, ConfigConstants.POSITIVE_NUMBER_ERROR_MSG)
+          .createWithDefault(1000L);
+
   // Provider name for cache
   public static final ConfigEntry<String> CACHE_IMPLEMENTATION =
       new ConfigBuilder("gravitino.cache.implementation")

@@ -501,3 +501,10 @@ CREATE TABLE IF NOT EXISTS `partition_statistic_meta` (
     PRIMARY KEY (`table_id`, `partition_name`(255), `statistic_name`),
     KEY `idx_table_partition` (`table_id`, `partition_name`(255))
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin COMMENT 'partition statistics metadata';
+
+CREATE TABLE IF NOT EXISTS `cache_invalidation_version` (
+    `id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'singleton row id',
+    `version` BIGINT(20) UNSIGNED NOT NULL DEFAULT 0 COMMENT 'cache invalidation version',
+    `updated_at` BIGINT(20) UNSIGNED NOT NULL DEFAULT 0 COMMENT 'last update timestamp',
+    PRIMARY KEY (`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin COMMENT 'cache invalidation version';

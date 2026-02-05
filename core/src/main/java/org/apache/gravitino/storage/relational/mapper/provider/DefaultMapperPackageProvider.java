@@ -20,6 +20,7 @@ package org.apache.gravitino.storage.relational.mapper.provider;
 
 import com.google.common.collect.ImmutableList;
 import java.util.List;
+import org.apache.gravitino.storage.relational.mapper.CacheInvalidationVersionMapper;
 import org.apache.gravitino.storage.relational.mapper.CatalogMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.FilesetMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.FilesetVersionMapper;
@@ -58,6 +59,7 @@ public class DefaultMapperPackageProvider implements MapperPackageProvider {
   public List<Class<?>> getMapperClasses() {
     return ImmutableList.of(
         CatalogMetaMapper.class,
+        CacheInvalidationVersionMapper.class,
         FilesetMetaMapper.class,
         FilesetVersionMapper.class,
         FunctionMetaMapper.class,

@@ -878,6 +878,17 @@ CREATE TABLE IF NOT EXISTS partition_statistic_meta (
 
 CREATE INDEX IF NOT EXISTS idx_table_partition ON partition_statistic_meta(table_id, partition_name);
 
+CREATE TABLE IF NOT EXISTS cache_invalidation_version (
+    id BIGINT NOT NULL,
+    version BIGINT NOT NULL DEFAULT 0,
+    updated_at BIGINT NOT NULL DEFAULT 0,
+    PRIMARY KEY (id)
+);
+COMMENT ON TABLE cache_invalidation_version IS 'cache invalidation version';
+COMMENT ON COLUMN cache_invalidation_version.id IS 'singleton row id';
+COMMENT ON COLUMN cache_invalidation_version.version IS 'cache invalidation version';
+COMMENT ON COLUMN cache_invalidation_version.updated_at IS 'last update timestamp';
+
 COMMENT ON TABLE partition_statistic_meta IS 'partition statistics metadata';
 COMMENT ON COLUMN partition_statistic_meta.table_id IS 'table id from table_meta';
 COMMENT ON COLUMN partition_statistic_meta.partition_name IS 'partition name';
