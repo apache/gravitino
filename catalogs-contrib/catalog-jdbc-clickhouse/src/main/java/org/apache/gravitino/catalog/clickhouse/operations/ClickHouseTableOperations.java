@@ -193,7 +193,7 @@ public class ClickHouseTableOperations extends JdbcTableOperations {
     boolean onCluster =
         StringUtils.isNotBlank(clusterName)
             && StringUtils.isNotBlank(onClusterValue)
-            && Boolean.TRUE.equals(BooleanUtils.toBooleanObject(onClusterValue));
+            && Boolean.TRUE.equals(Boolean.parseBoolean(onClusterValue));
 
     if (onCluster) {
       sqlBuilder.append(
@@ -292,6 +292,8 @@ public class ClickHouseTableOperations extends JdbcTableOperations {
           "Remote database must be specified for Distributed");
       Preconditions.checkArgument(
           StringUtils.isNotBlank(remoteTable), "Remote table must be specified for Distributed");
+
+      // User must ensure the sharding key is a trusted value
       Preconditions.checkArgument(
           StringUtils.isNotBlank(shardingKey), "Sharding key must be specified for Distributed");
 
@@ -305,8 +307,6 @@ public class ClickHouseTableOperations extends JdbcTableOperations {
                   shardingKey));
       return engine;
     }
-
-    // Now check if engine is distributed, we need to check the remote database and table properties
 
     sqlBuilder.append("\n ENGINE = %s".formatted(engine.getValue()));
     return engine;
@@ -391,13 +391,16 @@ public class ClickHouseTableOperations extends JdbcTableOperations {
         case DATA_SKIPPING_MINMAX:
           Preconditions.checkArgument(
               StringUtils.isNotBlank(index.name()), "Data skipping index name must not be blank");
-          // The GRANULARITY value is always 1 here currently.
+          // The GRANULARITY value is always 1 here currently as we can't set it by Index: there is
+          // no field for it.
+          // TODO add a properties field to Index to support user defined GRANULARITY value.
           sqlBuilder.append(
               " INDEX %s %s TYPE minmax GRANULARITY 1"
                   .formatted(quoteIdentifier(index.name()), fieldStr));
           break;
         case DATA_SKIPPING_BLOOM_FILTER:
           // The GRANULARITY value is always 3 here currently.
+          // TODO add a properties field to Index to support user defined GRANULARITY value.
           Preconditions.checkArgument(
               StringUtils.isNotBlank(index.name()), "Data skipping index name must not be blank");
           sqlBuilder.append(
