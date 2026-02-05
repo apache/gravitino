@@ -27,9 +27,9 @@ plugins {
   `maven-publish`
 }
 
-// This module supports Trino versions 435-439
-val minTrinoVersion = 435
-val maxTrinoVersion = 439
+// This module supports Trino versions 440-445
+val minTrinoVersion = 440
+val maxTrinoVersion = 445
 
 val trinoVersion = providers.gradleProperty("trinoVersion")
   .map { it.trim().toInt() }
