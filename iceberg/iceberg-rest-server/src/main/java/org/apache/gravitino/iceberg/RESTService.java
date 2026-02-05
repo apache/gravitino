@@ -40,6 +40,7 @@ import org.apache.gravitino.iceberg.service.dispatcher.IcebergTableHookDispatche
 import org.apache.gravitino.iceberg.service.dispatcher.IcebergTableOperationDispatcher;
 import org.apache.gravitino.iceberg.service.dispatcher.IcebergTableOperationExecutor;
 import org.apache.gravitino.iceberg.service.dispatcher.IcebergViewEventDispatcher;
+import org.apache.gravitino.iceberg.service.dispatcher.IcebergViewHookDispatcher;
 import org.apache.gravitino.iceberg.service.dispatcher.IcebergViewOperationDispatcher;
 import org.apache.gravitino.iceberg.service.dispatcher.IcebergViewOperationExecutor;
 import org.apache.gravitino.iceberg.service.metrics.IcebergMetricsManager;
@@ -114,8 +115,10 @@ public class RESTService implements GravitinoAuxiliaryService {
         new IcebergTableEventDispatcher(icebergTableOperationDispatcher, eventBus, metalakeName);
     IcebergViewOperationExecutor icebergViewOperationExecutor =
         new IcebergViewOperationExecutor(icebergCatalogWrapperManager);
+    IcebergViewHookDispatcher icebergViewHookDispatcher =
+        new IcebergViewHookDispatcher(icebergViewOperationExecutor, metalakeName);
     IcebergViewEventDispatcher icebergViewEventDispatcher =
-        new IcebergViewEventDispatcher(icebergViewOperationExecutor, eventBus, metalakeName);
+        new IcebergViewEventDispatcher(icebergViewHookDispatcher, eventBus, metalakeName);
 
     IcebergNamespaceOperationDispatcher namespaceOperationDispatcher =
         new IcebergNamespaceOperationExecutor(icebergCatalogWrapperManager);

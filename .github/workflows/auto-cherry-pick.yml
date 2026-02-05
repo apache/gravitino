@@ -1,65 +1,110 @@
 name: Automatically cherry-pick merged PR to different branches
 
 on:
-  pull_request_target:
+  push:
     branches:
       - main
-    types: ["closed"]
 
 jobs:
-  cherry_pick_branch_1_0:
+  detect-cherry-pick-labels:
     runs-on: ubuntu-latest
-    name: Cherry pick into branch_1.0
-    if: ${{ contains(github.event.pull_request.labels.*.name, 'branch-1.0') && github.event.pull_request.merged == true }}
+    name: Detect cherry-pick labels from merged PR
+    outputs:
+      branch-1-0: ${{ steps.check-labels.outputs.branch-1-0 }}
+      branch-1-1: ${{ steps.check-labels.outputs.branch-1-1 }}
+      branch-1-2: ${{ steps.check-labels.outputs.branch-1-2 }}
+      commit-sha: ${{ steps.get-commit.outputs.commit-sha }}
+      commit-message: ${{ steps.get-commit.outputs.commit-message }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
-      - name: Cherry pick into branch-1.0
-        uses: carloscastrojumo/github-cherry-pick-action@503773289f4a459069c832dc628826685b75b4b3
-        with:
-          branch: branch-1.0
-          labels: |
-            cherry-pick
-          reviewers: |
-            jerryshao
 
-  cherry_pick_branch_1_1:
-    runs-on: ubuntu-latest
-    name: Cherry pick into branch_1.1
-    if: ${{ contains(github.event.pull_request.labels.*.name, 'branch-1.1') && github.event.pull_request.merged == true }}
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-      - name: Cherry pick into branch-1.1
-        uses: carloscastrojumo/github-cherry-pick-action@503773289f4a459069c832dc628826685b75b4b3
-        with:
-          branch: branch-1.1
-          labels: |
-            cherry-pick
-          reviewers: |
-            jerryshao
+      - name: Get commit info
+        id: get-commit
+        run: |
+          # Get the commit message and extract PR number if available
+          COMMIT_MESSAGE=$(git log -1 --pretty=%B ${{ github.sha }})
+          COMMIT_SUBJECT=$(git log -1 --pretty=%s ${{ github.sha }})
+          echo "Commit: $COMMIT_SUBJECT"
+          
+          # Try to extract PR number for later use
+          PR_NUMBER=$(echo "$COMMIT_MESSAGE" | grep -oE '#[0-9]+' | head -1 | sed 's/#//')
+          
+          if [ -z "$PR_NUMBER" ]; then
+            echo "No PR number found, will skip label check"
+            echo "pr-number=" >> $GITHUB_OUTPUT
+          else
+            echo "Found PR number: $PR_NUMBER"
+            echo "pr-number=$PR_NUMBER" >> $GITHUB_OUTPUT
+          fi
+          
+          # Save commit info
+          echo "commit-sha=${{ github.sha }}" >> $GITHUB_OUTPUT
+          {
+            echo "commit-message<<EOF"
+            echo "$COMMIT_SUBJECT"
+            echo "EOF"
+          } >> $GITHUB_OUTPUT
 
-  cherry_pick_branch_1_2:
-    runs-on: ubuntu-latest
-    name: Cherry pick into branch_1.2
-    if: ${{ contains(github.event.pull_request.labels.*.name, 'branch-1.2') && github.event.pull_request.merged == true }}
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-      - name: Cherry pick into branch-1.2
-        uses: carloscastrojumo/github-cherry-pick-action@503773289f4a459069c832dc628826685b75b4b3
-        with:
-          branch: branch-1.2
-          labels: |
-            cherry-pick
-          reviewers: |
-            jerryshao
+      - name: Check PR labels
+        id: check-labels
+        if: steps.get-commit.outputs.pr-number != ''
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          PR_NUMBER=${{ steps.get-commit.outputs.pr-number }}
+          
+          # Get PR labels using GitHub CLI
+          LABELS=$(gh pr view $PR_NUMBER --json labels --jq '.labels[].name' || echo "")
+          echo "PR #$PR_NUMBER labels: $LABELS"
+          
+          # Check for each branch label
+          if echo "$LABELS" | grep -q "branch-1.0"; then
+            echo "branch-1-0=true" >> $GITHUB_OUTPUT
+          else
+            echo "branch-1-0=false" >> $GITHUB_OUTPUT
+          fi
+          
+          if echo "$LABELS" | grep -q "branch-1.1"; then
+            echo "branch-1-1=true" >> $GITHUB_OUTPUT
+          else
+            echo "branch-1-1=false" >> $GITHUB_OUTPUT
+          fi
+          
+          if echo "$LABELS" | grep -q "branch-1.2"; then
+            echo "branch-1-2=true" >> $GITHUB_OUTPUT
+          else
+            echo "branch-1-2=false" >> $GITHUB_OUTPUT
+          fi
 
-env:
-  GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+  cherry-pick-branch-1-0:
+    needs: detect-cherry-pick-labels
+    if: needs.detect-cherry-pick-labels.outputs.branch-1-0 == 'true'
+    uses: ./.github/workflows/cherry-pick-branch.yml
+    with:
+      target-branch: branch-1.0
+      commit-sha: ${{ needs.detect-cherry-pick-labels.outputs.commit-sha }}
+      commit-message: ${{ needs.detect-cherry-pick-labels.outputs.commit-message }}
+    secrets: inherit
+
+  cherry-pick-branch-1-1:
+    needs: detect-cherry-pick-labels
+    if: needs.detect-cherry-pick-labels.outputs.branch-1-1 == 'true'
+    uses: ./.github/workflows/cherry-pick-branch.yml
+    with:
+      target-branch: branch-1.1
+      commit-sha: ${{ needs.detect-cherry-pick-labels.outputs.commit-sha }}
+      commit-message: ${{ needs.detect-cherry-pick-labels.outputs.commit-message }}
+    secrets: inherit
+
+  cherry-pick-branch-1-2:
+    needs: detect-cherry-pick-labels
+    if: needs.detect-cherry-pick-labels.outputs.branch-1-2 == 'true'
+    uses: ./.github/workflows/cherry-pick-branch.yml
+    with:
+      target-branch: branch-1.2
+      commit-sha: ${{ needs.detect-cherry-pick-labels.outputs.commit-sha }}
+      commit-message: ${{ needs.detect-cherry-pick-labels.outputs.commit-message }}
+    secrets: inherit

@@ -201,6 +201,11 @@ public class MetadataObjectUtil {
         check(env.modelDispatcher().modelExists(identifier), exceptionToThrowSupplier);
         break;
 
+      case VIEW:
+        NameIdentifierUtil.checkView(identifier);
+        check(env.viewDispatcher().viewExists(identifier), exceptionToThrowSupplier);
+        break;
+
       case ROLE:
         AuthorizationUtils.checkRole(identifier);
         try {
