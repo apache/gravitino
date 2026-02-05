@@ -293,10 +293,9 @@ public abstract class BaseCatalog extends AbstractCatalog {
         schemaAndTablePropertiesConverter.toGravitinoTableProperties(table.getOptions());
     Transform[] partitions =
         partitionConverter.toGravitinoPartitions(((CatalogTable) table).getPartitionKeys());
+    Index[] indices = getGrivatinoIndices(resolvedTable);
 
     try {
-
-      Index[] indices = getGrivatinoIndices(resolvedTable);
       catalog()
           .asTableCatalog()
           .createTable(
