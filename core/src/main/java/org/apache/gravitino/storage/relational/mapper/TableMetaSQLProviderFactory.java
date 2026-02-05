@@ -108,4 +108,9 @@ public class TableMetaSQLProviderFactory {
       @Param("legacyTimeline") Long legacyTimeline, @Param("limit") int limit) {
     return getProvider().deleteTableMetasByLegacyTimeline(legacyTimeline, limit);
   }
+
+  public static String batchSelectTableByIdentifier(
+      @Param("schemaId") Long schemaId, @Param("tableNames") List<String> tableNames) {
+    return getProvider().batchSelectTableByIdentifier(schemaId, tableNames);
+  }
 }

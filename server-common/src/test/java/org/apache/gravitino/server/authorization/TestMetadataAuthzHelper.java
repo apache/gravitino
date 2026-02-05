@@ -54,6 +54,7 @@ public class TestMetadataAuthzHelper {
     Config configMock = mock(Config.class);
     when(gravitinoEnv.config()).thenReturn(configMock);
     when(configMock.get(eq(Configs.ENABLE_AUTHORIZATION))).thenReturn(true);
+    when(configMock.get(eq(Configs.CACHE_ENABLED))).thenReturn(false);
   }
 
   @AfterAll
