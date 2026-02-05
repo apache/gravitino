@@ -169,16 +169,27 @@ gravitino.iceberg-rest.catalog.jdbc_backend.warehouse = hdfs://127.0.0.1:9000/us
 
 The dynamic catalog configuration provider retrieves the catalog configuration from the Gravitino server, and the catalog configuration could be updated dynamically.
 
-| Configuration item                                          | Description                                                                                                                                                                                         | Default value | Required | Since Version    |
-|-------------------------------------------------------------|-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|---------------|----------|------------------|
-| `gravitino.iceberg-rest.gravitino-uri`                      | The uri of Gravitino server address, only worked if `catalog-config-provider` is `dynamic-config-provider`.                                                                                         | (none)        | No       | 0.7.0-incubating |
-| `gravitino.iceberg-rest.gravitino-metalake`                 | The metalake name that `dynamic-config-provider` used to request to Gravitino, only worked if `catalog-config-provider` is `dynamic-config-provider`.                                               | (none)        | No       | 0.7.0-incubating |
-| `gravitino.iceberg-rest.default-catalog-name`               | The default catalog name used by Iceberg REST server if the Iceberg REST client doesn't specify the catalog name explicitly. Only worked if `catalog-config-provider` is `dynamic-config-provider`. | (none)        | No       | 1.0.0            |
-| `gravitino.iceberg-rest.catalog-cache-eviction-interval-ms` | Catalog cache eviction interval.                                                                                                                                                                    | 3600000       | No       | 0.7.0-incubating |
+| Configuration item                                          | Description                                                                                                                                                                                         | Default value | Required                                                             | Since Version    |
+|-------------------------------------------------------------|-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|---------------|----------------------------------------------------------------------|------------------|
+| `gravitino.iceberg-rest.gravitino-uri`                      | The uri of Gravitino server address, only worked if `catalog-config-provider` is `dynamic-config-provider`. Not required when running as an auxiliary service embedded in Gravitino server.         | (none)        | Yes, when using `dynamic-config-provider` in standalone mode         | 0.7.0-incubating |
+| `gravitino.iceberg-rest.gravitino-metalake`                 | The metalake name that `dynamic-config-provider` used to request to Gravitino, only worked if `catalog-config-provider` is `dynamic-config-provider`.                                               | (none)        | Yes, when using `dynamic-config-provider`                            | 0.7.0-incubating |
+| `gravitino.iceberg-rest.default-catalog-name`               | The default catalog name used by Iceberg REST server if the Iceberg REST client doesn't specify the catalog name explicitly. Only worked if `catalog-config-provider` is `dynamic-config-provider`. | (none)        | No                                                                   | 1.0.0            |
+| `gravitino.iceberg-rest.catalog-cache-eviction-interval-ms` | Catalog cache eviction interval.                                                                                                                                                                    | 3600000       | No                                                                   | 0.7.0-incubating |
 
+:::tip
+When using `dynamic-config-provider`, the behavior differs based on deployment mode:
+
+- **Auxiliary mode** (embedded in Gravitino server): The service uses internal interfaces to access Gravitino directly. The `gravitino-uri` configuration is **not required** and will be ignored if provided.
+- **Standalone mode**: The service uses HTTP/REST APIs to communicate with Gravitino server. The `gravitino-uri` configuration is **required** and must point to your Gravitino server.
+
+Authorization features are only available when running in auxiliary mode.
+:::
+ 
 ```text
 gravitino.iceberg-rest.catalog-cache-eviction-interval-ms = 300000
 gravitino.iceberg-rest.catalog-config-provider = dynamic-config-provider
+# gravitino-uri is only required when running as a standalone server
+# When running as an auxiliary service (embedded in Gravitino server), this is not needed
 gravitino.iceberg-rest.gravitino-uri = http://127.0.0.1:8090
 gravitino.iceberg-rest.gravitino-metalake = test
 ```
@@ -234,11 +245,12 @@ gravitino.authenticator.oauth.tokenPath = oauth2/token
 gravitino.authenticator.oauth.serverUri = http://localhost:8177
 ```
 
-You should add extra configurations if using `dynamic-config-provider`:
+You should add extra configurations if using `dynamic-config-provider` in standalone mode:
 
 ```text
 gravitino.iceberg-rest.catalog-config-provider = dynamic-config-provider
 gravitino.iceberg-rest.gravitino-metalake = test
+# gravitino-uri is required when running in standalone mode
 gravitino.iceberg-rest.gravitino-uri = http://127.0.0.1:8090
 gravitino.iceberg-rest.gravitino-auth-type = oauth2
 gravitino.iceberg-rest.gravitino-oauth2.server-uri = http://localhost:8177
@@ -298,6 +310,8 @@ To use access control with the Iceberg REST service:
 
 :::note
 Access control for the Iceberg REST Catalog (IRC) is only supported when running as an auxiliary service embedded in the Gravitino server. Standalone Iceberg REST server deployments do not support access control features.
+
+When running as an auxiliary service, the `gravitino.iceberg-rest.gravitino-uri` configuration is **not required**. The service will use internal interfaces to access Gravitino directly, providing better performance and avoiding the need for HTTP-based communication.
 :::
 
 Please refer to [Access Control](./security/access-control.md) for details on how to configure authorization, create roles, and grant privileges in Gravitino.
@@ -818,8 +832,9 @@ gravitino.authorization.enable = true
 gravitino.authorization.serviceAdmins = adminUser
 
 gravitino.iceberg-rest.catalog-config-provider = dynamic-config-provider
-gravitino.iceberg-rest.gravitino-uri = http://127.0.0.1:8090
 gravitino.iceberg-rest.gravitino-metalake = test
+# Note: gravitino-uri is not required when running as an auxiliary service
+# The service will use internal interfaces to access Gravitino
 ```
 
 Restart the Iceberg REST server after updating the configuration.

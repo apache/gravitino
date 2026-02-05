@@ -702,12 +702,6 @@ public class TestClickHouseTableOperations extends TestClickHouse {
             .withType(Types.DateType.get())
             .withNullable(false)
             .build());
-    //    columns.add(
-    //        JdbcColumn.builder()
-    //            .withName("col_8")
-    //            .withType(Types.TimeType.get())
-    //            .withNullable(false)
-    //            .build());
     columns.add(
         JdbcColumn.builder()
             .withName("col_9")
@@ -730,12 +724,6 @@ public class TestClickHouseTableOperations extends TestClickHouse {
             .withType(Types.StringType.get())
             .withNullable(false)
             .build());
-    //    columns.add(
-    //        JdbcColumn.builder()
-    //            .withName("col_14")
-    //            .withType(Types.BinaryType.get())
-    //            .withNullable(false)
-    //            .build());
     columns.add(
         JdbcColumn.builder()
             .withName("col_15")
