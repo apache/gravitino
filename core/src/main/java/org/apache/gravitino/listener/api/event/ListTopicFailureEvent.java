@@ -45,8 +45,8 @@ public final class ListTopicFailureEvent extends TopicFailureEvent {
   }
 
   private static NameIdentifier toNameIdentifier(Namespace namespace) {
-     Preconditions.checkArgument(namespace != null, "namespace must not be null");
-     return NameIdentifier.of(namespace.levels());
+    Preconditions.checkArgument(namespace != null, "namespace must not be null");
+    return NameIdentifier.of(namespace.levels());
   }
 
   /**
