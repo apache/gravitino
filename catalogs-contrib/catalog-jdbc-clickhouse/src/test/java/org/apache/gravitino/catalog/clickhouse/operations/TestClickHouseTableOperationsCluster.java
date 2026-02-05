@@ -64,7 +64,7 @@ class TestClickHouseTableOperationsCluster {
         };
 
     Map<String, String> props = new HashMap<>();
-    props.put(ClusterConstants.NAME, "ck_cluster");
+    props.put(ClusterConstants.CLUSTER_NAME, "ck_cluster");
     props.put(ClusterConstants.ON_CLUSTER, "true");
     props.put(CLICKHOUSE_ENGINE_KEY, "Distributed");
     props.put(DistributedTableConstants.REMOTE_DATABASE, "remote_db");

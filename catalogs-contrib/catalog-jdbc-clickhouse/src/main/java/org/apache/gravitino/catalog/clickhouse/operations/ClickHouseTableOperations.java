@@ -189,7 +189,7 @@ public class ClickHouseTableOperations extends JdbcTableOperations {
    */
   private boolean appendCreateTableClause(
       Map<String, String> properties, StringBuilder sqlBuilder, String tableName) {
-    String clusterName = properties.get(ClusterConstants.NAME);
+    String clusterName = properties.get(ClusterConstants.CLUSTER_NAME);
     String onClusterValue = properties.get(ClusterConstants.ON_CLUSTER);
 
     boolean onCluster =
@@ -281,7 +281,7 @@ public class ClickHouseTableOperations extends JdbcTableOperations {
       }
 
       // Check properties
-      String clusterName = properties.get(ClusterConstants.NAME);
+      String clusterName = properties.get(ClusterConstants.CLUSTER_NAME);
       String remoteDatabase = properties.get(DistributedTableConstants.REMOTE_DATABASE);
       String remoteTable = properties.get(DistributedTableConstants.REMOTE_TABLE);
       String shardingKey = properties.get(DistributedTableConstants.SHARDING_KEY);

@@ -64,7 +64,7 @@ public class TestClickHouseDatabaseOperations {
   @Test
   void testGenerateCreateDatabaseSqlWithClusterEnabled() {
     Map<String, String> properties = new HashMap<>();
-    properties.put(ClusterConstants.NAME, "ck_cluster");
+    properties.put(ClusterConstants.CLUSTER_NAME, "ck_cluster");
     properties.put(ClusterConstants.ON_CLUSTER, "true");
 
     String sql = newOps(new HashMap<>()).buildCreateSql("db_name", null, properties);

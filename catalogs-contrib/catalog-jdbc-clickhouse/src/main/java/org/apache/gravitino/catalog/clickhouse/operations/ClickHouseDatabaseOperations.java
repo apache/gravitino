@@ -88,7 +88,7 @@ public class ClickHouseDatabaseOperations extends JdbcDatabaseOperations {
         new StringBuilder(String.format("CREATE DATABASE `%s`", databaseName));
 
     if (onCluster(properties)) {
-      String clusterName = properties.get(ClusterConstants.NAME);
+      String clusterName = properties.get(ClusterConstants.CLUSTER_NAME);
       createDatabaseSql.append(String.format(" ON CLUSTER `%s`", clusterName));
     }
 
@@ -105,7 +105,7 @@ public class ClickHouseDatabaseOperations extends JdbcDatabaseOperations {
       return false;
     }
 
-    String clusterName = dbProperties.get(ClusterConstants.NAME);
+    String clusterName = dbProperties.get(ClusterConstants.CLUSTER_NAME);
     if (StringUtils.isBlank(clusterName)) {
       return false;
     }
