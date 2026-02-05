@@ -23,18 +23,29 @@ import com.google.common.annotations.VisibleForTesting;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Optional;
-import org.apache.gravitino.maintenance.optimizer.api.common.Strategy;
+import org.apache.gravitino.maintenance.optimizer.api.common.PartitionStrategy;
+import org.apache.gravitino.maintenance.optimizer.api.common.PartitionStrategy.ScoreMode;
 import org.apache.gravitino.policy.Policy;
 import org.apache.gravitino.policy.PolicyContent;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /** Strategy implementation backed by a Gravitino policy. */
-public class GravitinoStrategy implements Strategy {
+public class GravitinoStrategy implements PartitionStrategy {
+
+  private static final Logger LOG = LoggerFactory.getLogger(GravitinoStrategy.class);
 
   @VisibleForTesting public static final String STRATEGY_TYPE_KEY = "strategy.type";
 
   @VisibleForTesting public static final String JOB_TEMPLATE_NAME_KEY = "job.template-name";
 
   private static final String JOB_OPTIONS_PREFIX = "job.options.";
+  /** Rule key for the partition table score aggregation mode. */
+  public static final String PARTITION_TABLE_SCORE_MODE = "partition_table_score_mode";
+  /** Rule key for the maximum number of partitions selected for execution. */
+  public static final String MAX_PARTITION_NUM = "max_partition_num";
+
+  private static final int DEFAULT_MAX_PARTITION_NUM = 100;
 
   private final Policy policy;
 
@@ -117,5 +128,52 @@ public class GravitinoStrategy implements Strategy {
   public String jobTemplateName() {
     return Optional.ofNullable(policy.content().properties().get(JOB_TEMPLATE_NAME_KEY))
         .orElseThrow(() -> new IllegalArgumentException("job.template-name is not set"));
+  }
+
+  @Override
+  public ScoreMode partitionTableScoreMode() {
+    Object value = rules().get(PARTITION_TABLE_SCORE_MODE);
+    if (value == null) {
+      return ScoreMode.AVG;
+    }
+    if (value instanceof ScoreMode) {
+      return (ScoreMode) value;
+    }
+    String mode = value.toString().trim().toLowerCase();
+    if (mode.isEmpty()) {
+      return ScoreMode.AVG;
+    }
+    switch (mode) {
+      case "sum":
+        return ScoreMode.SUM;
+      case "max":
+        return ScoreMode.MAX;
+      case "avg":
+        return ScoreMode.AVG;
+      default:
+        LOG.warn(
+            "Unsupported partition table score mode '{}' for strategy {}, defaulting to avg",
+            mode,
+            name());
+        return ScoreMode.AVG;
+    }
+  }
+
+  @Override
+  public int maxPartitionNum() {
+    Object value = rules().get(MAX_PARTITION_NUM);
+    if (value == null) {
+      return DEFAULT_MAX_PARTITION_NUM;
+    }
+    String limit = value.toString().trim();
+    if (limit.isEmpty()) {
+      return DEFAULT_MAX_PARTITION_NUM;
+    }
+    try {
+      int parsed = Integer.parseInt(limit);
+      return parsed > 0 ? parsed : DEFAULT_MAX_PARTITION_NUM;
+    } catch (NumberFormatException e) {
+      return DEFAULT_MAX_PARTITION_NUM;
+    }
   }
 }
