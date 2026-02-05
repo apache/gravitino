@@ -22,12 +22,13 @@ package org.apache.iceberg.jdbc;
 import com.google.common.base.Preconditions;
 import java.util.Map;
 import org.apache.commons.lang3.reflect.FieldUtils;
+import org.apache.gravitino.iceberg.common.ClosableJdbcCatalog;
 import org.apache.gravitino.iceberg.common.cache.SupportsMetadataLocation;
 import org.apache.iceberg.catalog.TableIdentifier;
 import org.apache.iceberg.jdbc.JdbcUtil.SchemaVersion;
 
 // Use Iceberg package to reuse JdbcUtil related classes.
-public class JdbcCatalogWithMetadataLocationSupport extends JdbcCatalog
+public class JdbcCatalogWithMetadataLocationSupport extends ClosableJdbcCatalog
     implements SupportsMetadataLocation {
   private String jdbcCatalogName;
   private JdbcClientPool jdbcConnections;
