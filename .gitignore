@@ -61,3 +61,7 @@ web/node_modules
 web/dist
 web/.next
 .worktrees/
+
+# Agent
+AGENT.md
+CLAUDE.md
