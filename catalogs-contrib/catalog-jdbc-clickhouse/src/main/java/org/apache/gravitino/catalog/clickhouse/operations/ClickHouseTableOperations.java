@@ -369,7 +369,7 @@ public class ClickHouseTableOperations extends JdbcTableOperations {
 
       } else if (change instanceof TableChange.RemoveProperty) {
         // Clickhouse does not support deleting table attributes, it can be replaced by Set Property
-        throw new IllegalArgumentException("Remove property is not supported yet");
+        throw new UnsupportedOperationException("Remove property for ClickHouse is not supported yet");
 
       } else if (change instanceof TableChange.AddColumn addColumn) {
         lazyLoadTable = getOrCreateTable(databaseName, tableName, lazyLoadTable);
@@ -415,6 +415,8 @@ public class ClickHouseTableOperations extends JdbcTableOperations {
         alterSql.add(deleteIndexDefinition(lazyLoadTable, (TableChange.DeleteIndex) change));
 
       } else if (change instanceof TableChange.UpdateColumnAutoIncrement) {
+        // Auto increment functionality was added in ClickHouse 25.1. Should we just
+        // throw unsupported exception here as this PR is based on 23.x.
         lazyLoadTable = getOrCreateTable(databaseName, tableName, lazyLoadTable);
         alterSql.add(
             updateColumnAutoIncrementDefinition(
@@ -437,7 +439,8 @@ public class ClickHouseTableOperations extends JdbcTableOperations {
           newComment = StringIdentifier.addToComment(identifier, newComment);
         }
       }
-      alterSql.add(" MODIFY COMMENT '%s'".formatted(newComment));
+      String escapedComment = newComment.replace("'", "''");
+      alterSql.add(" MODIFY COMMENT '%s'".formatted(escapedComment));
     }
 
     if (!setProperties.isEmpty()) {
@@ -465,6 +468,8 @@ public class ClickHouseTableOperations extends JdbcTableOperations {
       throw new UnsupportedOperationException("Nested column names are not supported");
     }
 
+    // TODO add validation check for the column. The column must be a single column and
+    //  a part of primary key or sort key.
     String col = change.fieldName()[0];
     JdbcColumn column = getJdbcColumnFromTable(table, col);
     if (change.isAutoIncrement()) {
@@ -657,13 +662,7 @@ public class ClickHouseTableOperations extends JdbcTableOperations {
     }
 
     String col = deleteColumn.fieldName()[0];
-    boolean colExists = true;
-    try {
-      getJdbcColumnFromTable(jdbcTable, col);
-    } catch (NoSuchColumnException noSuchColumnException) {
-      colExists = false;
-    }
-
+    boolean colExists = columnExists(jdbcTable, col);
     if (!colExists) {
       if (BooleanUtils.isTrue(deleteColumn.getIfExists())) {
         return "";
@@ -704,13 +703,14 @@ public class ClickHouseTableOperations extends JdbcTableOperations {
 
     String col = updateColumnType.fieldName()[0];
     JdbcColumn column = getJdbcColumnFromTable(jdbcTable, col);
-    StringBuilder sqlBuilder = new StringBuilder(MODIFY_COLUMN + quoteIdentifier(col));
+    StringBuilder sqlBuilder = new StringBuilder("%s %s ".formatted(MODIFY_COLUMN, quoteIdentifier(col)));
+
     JdbcColumn newColumn =
         JdbcColumn.builder()
             .withName(col)
             .withType(updateColumnType.getNewDataType())
             .withComment(column.comment())
-            .withDefaultValue(DEFAULT_VALUE_NOT_SET)
+            .withDefaultValue(column.defaultValue())
             .withNullable(column.nullable())
             .withAutoIncrement(column.autoIncrement())
             .build();

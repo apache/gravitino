@@ -135,7 +135,6 @@ public class TestClickHouseTableOperations extends TestClickHouse {
             .withType(STRING)
             .withComment("new_add")
             .withNullable(false) //
-            //            .withDefaultValue(Literals.of("hello test", STRING))
             .build();
     TABLE_OPERATIONS.alterTable(
         TEST_DB_NAME.toString(),
@@ -148,9 +147,6 @@ public class TestClickHouseTableOperations extends TestClickHouse {
             newColumn.nullable(),
             newColumn.autoIncrement(),
             newColumn.defaultValue())
-        //        ,
-        //        TableChange.setProperty(CLICKHOUSE_ENGINE_KEY, "InnoDB"));
-        //    properties.put(CLICKHOUSE_ENGINE_KEY, "InnoDB"
         );
     load = TABLE_OPERATIONS.load(TEST_DB_NAME.toString(), newName);
     List<JdbcColumn> alterColumns =
