@@ -139,9 +139,9 @@ public class CatalogClickHouseIT extends BaseIT {
   public void stop() {
     clearTableAndSchema();
     metalake.disableCatalog(catalogName);
-    metalake.dropCatalog(catalogName);
+    metalake.dropCatalog(catalogName, true);
     client.disableMetalake(metalakeName);
-    client.dropMetalake(metalakeName);
+    client.dropMetalake(metalakeName, true);
     clickhouseService.close();
   }
 
@@ -670,10 +670,10 @@ public class CatalogClickHouseIT extends BaseIT {
           Assertions.assertEquals(Types.LongType.get(), column.dataType());
           break;
         case "timestamp_col":
-          Assertions.assertEquals(Types.TimestampType.withoutTimeZone(), column.dataType());
+          Assertions.assertEquals(Types.TimestampType.withoutTimeZone(0), column.dataType());
           break;
         case "datetime_col":
-          Assertions.assertEquals(Types.TimestampType.withoutTimeZone(), column.dataType());
+          Assertions.assertEquals(Types.TimestampType.withoutTimeZone(0), column.dataType());
           break;
         case "decimal_6_2_col":
           Assertions.assertEquals(Types.DecimalType.of(6, 2), column.dataType());
@@ -987,16 +987,14 @@ public class CatalogClickHouseIT extends BaseIT {
 
   @Test
   public void testSchemaComment() {
-    final String testSchemaName = "test";
-    RuntimeException exception =
-        Assertions.assertThrowsExactly(
-            UnsupportedOperationException.class,
-            () -> catalog.asSchemas().createSchema(testSchemaName, "comment", null));
-    Assertions.assertTrue(
-        exception.getMessage().contains("Doesn't support setting schema comment: comment"));
+    final String testSchemaName = GravitinoITUtils.genRandomName("test");
+    Assertions.assertDoesNotThrow(
+        () -> {
+          catalog.asSchemas().createSchema(testSchemaName, "comment", null);
+        });
 
     // test null comment
-    String testSchemaName2 = "test2";
+    String testSchemaName2 = GravitinoITUtils.genRandomName("test");
     Schema schema = catalog.asSchemas().createSchema(testSchemaName2, "", null);
     Assertions.assertTrue(StringUtils.isEmpty(schema.comment()));
     schema = catalog.asSchemas().loadSchema(testSchemaName2);
@@ -1635,10 +1633,12 @@ public class CatalogClickHouseIT extends BaseIT {
 
     Assertions.assertThrows(
         Exception.class, () -> loadCatalog.asSchemas().createSchema("test", "", null));
-    metalake.alterCatalog(
-        testCatalogName, CatalogChange.setProperty(JdbcConfig.PASSWORD.getKey(), password));
+    Catalog newLoadedCatalog =
+        metalake.alterCatalog(
+            testCatalogName, CatalogChange.setProperty(JdbcConfig.PASSWORD.getKey(), password));
 
-    Assertions.assertDoesNotThrow(() -> loadCatalog.asSchemas().createSchema("test", "", null));
+    Assertions.assertDoesNotThrow(
+        () -> newLoadedCatalog.asSchemas().createSchema("test", "", null));
 
     loadCatalog.asSchemas().dropSchema("test", true);
     metalake.dropCatalog(testCatalogName, true);

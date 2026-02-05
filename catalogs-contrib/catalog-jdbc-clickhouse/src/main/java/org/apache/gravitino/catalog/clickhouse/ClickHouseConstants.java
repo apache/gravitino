@@ -21,19 +21,31 @@ package org.apache.gravitino.catalog.clickhouse;
 
 public class ClickHouseConstants {
 
-  /*---------------------The following are ClickHouse cluster related properties---------------------*/
-  // Name of the clickhouse cluster
-  public static final String CLUSTER_NAME = "cluster-name";
-  // Whether to use 'ON CLUSTER' clause when creating tables
-  public static final String ON_CLUSTER = "on-cluster";
-  // Sharding key for the clickhouse cluster
-  public static final String CLUSTER_SHARDING_KEY = "cluster-sharding-key";
-  public static final String CLUSTER_REMOTE_DATABASE = "cluster-remote-database";
-  public static final String CLUSTER_REMOTE_TABLE = "cluster-remote-table";
+  /** Constants for tables with the distributed engine. */
+  public static final class DistributedTableConstants {
+    private DistributedTableConstants() {}
+    // Sharding key for the clickhouse cluster
+    public static final String SHARDING_KEY = "cluster-sharding-key";
+    public static final String REMOTE_DATABASE = "cluster-remote-database";
+    public static final String REMOTE_TABLE = "cluster-remote-table";
+  }
 
-  /*---------------------The following are ClickHouse table related properties---------------------*/
-  public static final String GRAVITINO_CLICKHOUSE_ENGINE_NAME = "engine";
-  public static final String CLICKHOUSE_ENGINE_NAME = "ENGINE";
+  /** Constants for cluster tables. */
+  public static final class ClusterConstants {
+    private ClusterConstants() {}
 
-  public static final String SETTINGS_PREFIX = "settings.";
+    // Name of the clickhouse cluster
+    public static final String CLUSTER_NAME = "cluster-name";
+    // Whether to use 'ON CLUSTER' clause when creating tables
+    public static final String ON_CLUSTER = "on-cluster";
+  }
+
+  /** Table-scoped properties. */
+  public static final class TableConstants {
+    private TableConstants() {}
+
+    public static final String ENGINE = "engine";
+    public static final String ENGINE_UPPER = "ENGINE";
+    public static final String SETTINGS_PREFIX = "settings.";
+  }
 }

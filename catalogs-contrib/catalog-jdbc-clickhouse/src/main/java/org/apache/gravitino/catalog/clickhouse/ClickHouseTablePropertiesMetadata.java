@@ -18,8 +18,6 @@
  */
 package org.apache.gravitino.catalog.clickhouse;
 
-import static org.apache.gravitino.catalog.clickhouse.ClickHouseConstants.CLUSTER_REMOTE_DATABASE;
-import static org.apache.gravitino.catalog.clickhouse.ClickHouseConstants.ON_CLUSTER;
 import static org.apache.gravitino.connector.PropertyEntry.enumImmutablePropertyEntry;
 import static org.apache.gravitino.connector.PropertyEntry.stringOptionalPropertyEntry;
 import static org.apache.gravitino.connector.PropertyEntry.stringReservedPropertyEntry;
@@ -29,13 +27,15 @@ import java.util.HashMap;
 import java.util.Map;
 import org.apache.commons.collections4.BidiMap;
 import org.apache.commons.collections4.bidimap.TreeBidiMap;
+import org.apache.gravitino.catalog.clickhouse.ClickHouseConstants.ClusterConstants;
+import org.apache.gravitino.catalog.clickhouse.ClickHouseConstants.DistributedTableConstants;
+import org.apache.gravitino.catalog.clickhouse.ClickHouseConstants.TableConstants;
 import org.apache.gravitino.catalog.jdbc.JdbcTablePropertiesMetadata;
 import org.apache.gravitino.connector.PropertyEntry;
 
 public class ClickHouseTablePropertiesMetadata extends JdbcTablePropertiesMetadata {
-  public static final String GRAVITINO_ENGINE_KEY =
-      ClickHouseConstants.GRAVITINO_CLICKHOUSE_ENGINE_NAME;
-  public static final String CLICKHOUSE_ENGINE_KEY = ClickHouseConstants.CLICKHOUSE_ENGINE_NAME;
+  public static final String GRAVITINO_ENGINE_KEY = TableConstants.ENGINE;
+  public static final String CLICKHOUSE_ENGINE_KEY = TableConstants.ENGINE_UPPER;
 
   // The following two properties are mapped to ClickHouse table properties and can be used by
   // tables with different engines.
@@ -51,28 +51,40 @@ public class ClickHouseTablePropertiesMetadata extends JdbcTablePropertiesMetada
           false,
           false);
 
-  // The following properties are specific to ClickHouse Distributed engine, so it's recommended to
-  // only use them when ENGINE is set to DISTRIBUTED.
+  // The following two are for cluster tables
+  public static final PropertyEntry<String> CLUSTER_NAME_PROPERTY_ENTRY =
+      stringOptionalPropertyEntry(
+          ClusterConstants.CLUSTER_NAME,
+          "The cluster name for DDL operations, for example, creating on cluster tables",
+          false,
+          "",
+          false);
   public static final PropertyEntry<String> ON_CLUSTER_PROPERTY_ENTRY =
       stringOptionalPropertyEntry(
-          ON_CLUSTER, "The cluster name for ClickHouse distributed tables", false, "", false);
+          ClusterConstants.ON_CLUSTER,
+          "Whether to use 'ON CLUSTER' clause when creating tables in ClickHouse",
+          false,
+          "",
+          false);
+
+  // The following three are for ClickHouse Distributed engine
   public static final PropertyEntry<String> CLUSTER_REMOTE_DATABASE_PROPERTY_ENTRY =
       stringOptionalPropertyEntry(
-          CLUSTER_REMOTE_DATABASE,
+          DistributedTableConstants.REMOTE_DATABASE,
           "The remote database name for ClickHouse distributed tables",
           false,
           "",
           false);
   public static final PropertyEntry<String> CLUSTER_REMOTE_TABLE_PROPERTY_ENTRY =
       stringOptionalPropertyEntry(
-          ClickHouseConstants.CLUSTER_REMOTE_TABLE,
+          DistributedTableConstants.REMOTE_TABLE,
           "The remote table name for ClickHouse distributed tables",
           false,
           "",
           false);
   public static final PropertyEntry<String> CLUSTER_SHARDING_KEY_PROPERTY_ENTRY =
       stringOptionalPropertyEntry(
-          ClickHouseConstants.CLUSTER_SHARDING_KEY,
+          DistributedTableConstants.SHARDING_KEY,
           "The sharding key for ClickHouse distributed tables",
           false,
           "",
@@ -97,6 +109,7 @@ public class ClickHouseTablePropertiesMetadata extends JdbcTablePropertiesMetada
     map.put(ENGINE_PROPERTY_ENTRY.getName(), ENGINE_PROPERTY_ENTRY);
     // For ClickHouse Distributed engine
     map.put(ON_CLUSTER_PROPERTY_ENTRY.getName(), ON_CLUSTER_PROPERTY_ENTRY);
+    map.put(CLUSTER_NAME_PROPERTY_ENTRY.getName(), CLUSTER_NAME_PROPERTY_ENTRY);
     map.put(
         CLUSTER_REMOTE_DATABASE_PROPERTY_ENTRY.getName(), CLUSTER_REMOTE_DATABASE_PROPERTY_ENTRY);
     map.put(CLUSTER_REMOTE_TABLE_PROPERTY_ENTRY.getName(), CLUSTER_REMOTE_TABLE_PROPERTY_ENTRY);
