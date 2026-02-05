@@ -154,17 +154,17 @@ public class DeltaTableOperations extends ManagedTableOperations {
       SortOrder[] sortOrders,
       Index[] indexes)
       throws NoSuchSchemaException, TableAlreadyExistsException {
-    Map<String, String> copiedProperties = properties == null ? Collections.emptyMap() : properties;
+    Map<String, String> nonNullProps = properties == null ? Collections.emptyMap() : properties;
 
     // Validate that the table is explicitly marked as external
     Preconditions.checkArgument(
-        copiedProperties.containsKey(Table.PROPERTY_EXTERNAL)
-            && "true".equalsIgnoreCase(copiedProperties.get(Table.PROPERTY_EXTERNAL)),
+        nonNullProps.containsKey(Table.PROPERTY_EXTERNAL)
+            && "true".equalsIgnoreCase(nonNullProps.get(Table.PROPERTY_EXTERNAL)),
         "Gravitino only supports creating external Delta tables"
             + " for now. Please set property 'external=true' when creating Delta tables.");
 
     // Validate required location property
-    String location = copiedProperties.get(Table.PROPERTY_LOCATION);
+    String location = nonNullProps.get(Table.PROPERTY_LOCATION);
     Preconditions.checkArgument(
         StringUtils.isNotBlank(location),
         "Property '%s' is required for external Delta tables. Please specify the"
@@ -197,7 +197,7 @@ public class DeltaTableOperations extends ManagedTableOperations {
         ident,
         columns,
         comment,
-        copiedProperties,
+        nonNullProps,
         Transforms.EMPTY_TRANSFORM,
         Distributions.NONE,
         SortOrders.NONE,
