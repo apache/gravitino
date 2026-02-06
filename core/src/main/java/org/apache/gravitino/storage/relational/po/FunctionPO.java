@@ -40,7 +40,6 @@ import org.apache.gravitino.json.JsonUtils;
 import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.meta.FunctionEntity;
 import org.apache.gravitino.meta.NamespacedEntityId;
-import org.apache.gravitino.rel.types.Type;
 import org.apache.gravitino.storage.relational.service.EntityIdService;
 
 @EqualsAndHashCode
@@ -64,8 +63,6 @@ public class FunctionPO {
   private String functionType;
 
   private Integer deterministic;
-
-  private String returnType;
 
   private Integer functionLatestVersion;
 
@@ -92,7 +89,6 @@ public class FunctionPO {
       Long schemaId,
       String functionType,
       Integer deterministic,
-      String returnType,
       Integer functionLatestVersion,
       Integer functionCurrentVersion,
       String auditInfo,
@@ -120,7 +116,6 @@ public class FunctionPO {
     this.schemaId = schemaId;
     this.functionType = functionType;
     this.deterministic = deterministic;
-    this.returnType = returnType;
     this.functionLatestVersion = functionLatestVersion;
     this.functionCurrentVersion = functionCurrentVersion;
     this.auditInfo = auditInfo;
@@ -151,7 +146,6 @@ public class FunctionPO {
           .withComment(versionPO.functionComment())
           .withFunctionType(FunctionType.valueOf(functionPO.functionType()))
           .withDeterministic(functionPO.deterministic() != null && functionPO.deterministic() == 1)
-          .withReturnType(JsonUtils.anyFieldMapper().readValue(functionPO.returnType(), Type.class))
           .withDefinitions(definitions)
           .withAuditInfo(
               JsonUtils.anyFieldMapper().readValue(functionPO.auditInfo(), AuditInfo.class))
@@ -208,8 +202,6 @@ public class FunctionPO {
           .withFunctionName(functionEntity.name())
           .withFunctionType(functionEntity.functionType().name())
           .withDeterministic(functionEntity.deterministic() ? 1 : 0)
-          .withReturnType(
-              JsonUtils.anyFieldMapper().writeValueAsString(functionEntity.returnType()))
           .withFunctionVersionPO(versionPO)
           .withAuditInfo(JsonUtils.anyFieldMapper().writeValueAsString(functionEntity.auditInfo()))
           .withDeletedAt(DEFAULT_DELETED_AT)
