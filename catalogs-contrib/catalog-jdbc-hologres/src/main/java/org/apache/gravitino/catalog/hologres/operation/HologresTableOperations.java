@@ -756,12 +756,18 @@ public class HologresTableOperations extends JdbcTableOperations
   }
 
   /**
-   * Get tables from the database including both regular tables and partitioned parent tables.
+   * Get tables from the database including regular tables, partitioned parent tables, and views.
    *
-   * <p>In Hologres (PostgreSQL-compatible), partitioned parent tables have TABLE_TYPE =
-   * "PARTITIONED TABLE", while regular tables and partition child tables have TABLE_TYPE = "TABLE".
-   * This method overrides the parent to include both types so that partition parent tables are
-   * visible in the table list.
+   * <p>In Hologres (PostgreSQL-compatible):
+   *
+   * <ul>
+   *   <li>Regular tables and partition child tables have TABLE_TYPE = "TABLE"
+   *   <li>Partitioned parent tables have TABLE_TYPE = "PARTITIONED TABLE"
+   *   <li>Views have TABLE_TYPE = "VIEW"
+   * </ul>
+   *
+   * <p>This method overrides the parent to include all these types so that partition parent tables
+   * and views are visible in the table list.
    *
    * @param connection the database connection
    * @return ResultSet containing table metadata
@@ -772,19 +778,19 @@ public class HologresTableOperations extends JdbcTableOperations
     DatabaseMetaData metaData = connection.getMetaData();
     String catalogName = connection.getCatalog();
     String schemaName = connection.getSchema();
-    // Include both "TABLE" (regular tables and partition children) and
-    // "PARTITIONED TABLE" (partition parent tables) to show all tables
+    // Include "TABLE" (regular tables and partition children),
+    // "PARTITIONED TABLE" (partition parent tables), and "VIEW" (views)
     return metaData.getTables(
-        catalogName, schemaName, null, new String[] {"TABLE", "PARTITIONED TABLE"});
+        catalogName, schemaName, null, new String[] {"TABLE", "PARTITIONED TABLE", "VIEW"});
   }
 
   @Override
   protected ResultSet getTable(Connection connection, String schema, String tableName)
       throws SQLException {
     DatabaseMetaData metaData = connection.getMetaData();
-    // Include both types when looking up a specific table
+    // Include all types when looking up a specific table or view
     return metaData.getTables(
-        database, schema, tableName, new String[] {"TABLE", "PARTITIONED TABLE"});
+        database, schema, tableName, new String[] {"TABLE", "PARTITIONED TABLE", "VIEW"});
   }
 
   @Override
