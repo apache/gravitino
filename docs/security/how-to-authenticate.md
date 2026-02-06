@@ -159,9 +159,10 @@ The signature algorithms that Gravitino supports follows:
 This example shows how to configure Gravitino with Azure AD using JWKS-based token validation.
 
 **Prerequisites:**
-- Azure AD tenant with an application registration
+- Azure AD tenant with an application registration (Single-page application)
 - Application configured with:
   - Client ID (Application ID)
+  - Platform configuration: Single-page application (SPA)
   - Redirect URI: `https://your-gravitino-server/ui/oauth/callback`
   - Required API permissions/scopes (typically `openid`, `profile`, `email`)
 
@@ -174,7 +175,7 @@ gravitino.authenticators = oauth
 # OIDC Provider Configuration for Web UI
 gravitino.authenticator.oauth.provider = oidc
 gravitino.authenticator.oauth.clientId = <your-azure-app-client-id>
-gravitino.authenticator.oauth.authority = https://sts.windows.net/<your-tenant-id>/
+gravitino.authenticator.oauth.authority = https://login.microsoftonline.com/<your-tenant-id>/v2.0
 gravitino.authenticator.oauth.scope = openid profile email
 
 # JWKS-based Token Validation
@@ -188,9 +189,23 @@ gravitino.authenticator.oauth.principalFields = preferred_username,email,sub
 - **Web UI**: Navigate to Gravitino Web UI, which will redirect to Azure AD for authentication
 - **API Access**: Use Azure AD tokens in the `Authorization: Bearer <token>` header
 
-:::note
+**Azure AD v2.0 Endpoint (Recommended):**
+The `authority` must use the v2.0 endpoint (`/v2.0` suffix) to match the v2.0 JWKS URI. This ensures that tokens issued during OIDC discovery use the correct token format and issuer claim that matches your JWKS configuration.
+
+**Alternative: Azure AD v1.0 Endpoint:**
+For legacy applications or organizational policies requiring v1.0 tokens, use:
+```text
+gravitino.authenticator.oauth.authority = https://sts.windows.net/<your-tenant-id>/
+gravitino.authenticator.oauth.jwksUri = https://login.microsoftonline.com/<your-tenant-id>/discovery/v2.0/keys
+```
+Azure AD uses the same signing keys for both v1.0 and v2.0, so v2.0 JWKS can validate v1.0 tokens.
+
+**Important:** Do NOT use `https://login.microsoftonline.com/<tenant-id>/` (without `/v2.0`) as the authority when using v2.0 JWKS. This causes an issuer mismatch: the token will have `iss: "https://sts.windows.net/..."` but the server expects `iss: "https://login.microsoftonline.com/..."`.
+
+**Service Audience:**
 The `serviceAudience` should match the `aud` claim in your Azure AD tokens. This is typically your Azure AD application's client ID, but could be a custom API identifier if you've configured custom API scopes (e.g., `api://<client-id>`).
 
+**Principal Fields:**
 The `principalFields` supports multiple fallback options. Gravitino will try each field in order (e.g., first `preferred_username`, then `email`, then `sub`) until it finds a non-null value to use as the user identity.
 
 With JWKS validation, you don't need to configure `defaultSignKey`, `serverUri`, or `tokenPath` as the validator dynamically fetches public keys from Azure AD's JWKS endpoint.
