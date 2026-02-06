@@ -22,7 +22,8 @@ import io.trino.spi.connector.ColumnHandle;
 import io.trino.spi.connector.DynamicFilter;
 import io.trino.spi.predicate.TupleDomain;
 import java.util.Set;
-import java.util.concurrent.CompletableFuture;import java.util.stream.Collectors;
+import java.util.concurrent.CompletableFuture;
+import java.util.stream.Collectors;
 
 /** The GravitinoDynamicFilter is used to warp DynamicFilter */
 class GravitinoDynamicFilter implements DynamicFilter {
