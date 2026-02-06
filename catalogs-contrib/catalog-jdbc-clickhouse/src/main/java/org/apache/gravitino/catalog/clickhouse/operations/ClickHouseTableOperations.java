@@ -37,6 +37,8 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 import org.apache.commons.collections4.CollectionUtils;
 import org.apache.commons.collections4.MapUtils;
@@ -71,6 +73,14 @@ public class ClickHouseTableOperations extends JdbcTableOperations {
 
   private static final String CLICKHOUSE_NOT_SUPPORT_NESTED_COLUMN_MSG =
       "Clickhouse does not support nested column names.";
+  private static final Pattern TO_DATE_PATTERN =
+      Pattern.compile("toDate\\((.+)\\)", Pattern.CASE_INSENSITIVE);
+  private static final Pattern TO_YEAR_PATTERN =
+      Pattern.compile("toYear\\((.+)\\)", Pattern.CASE_INSENSITIVE);
+  private static final Pattern TO_MONTH_PATTERN =
+      Pattern.compile("toYYYYMM\\((.+)\\)", Pattern.CASE_INSENSITIVE);
+  private static final Pattern FUNCTION_WRAPPER_PATTERN =
+      Pattern.compile("^\\s*([A-Za-z0-9_]+)\\((.*)\\)\\s*$");
 
   private static final String QUERY_INDEXES_SQL =
       """
@@ -194,7 +204,7 @@ public class ClickHouseTableOperations extends JdbcTableOperations {
     boolean onCluster =
         StringUtils.isNotBlank(clusterName)
             && StringUtils.isNotBlank(onClusterValue)
-            && Boolean.TRUE.equals(BooleanUtils.toBooleanObject(onClusterValue));
+            && Boolean.TRUE.equals(Boolean.parseBoolean(onClusterValue));
 
     if (onCluster) {
       sqlBuilder.append(
@@ -300,6 +310,8 @@ public class ClickHouseTableOperations extends JdbcTableOperations {
           "Remote database must be specified for Distributed");
       Preconditions.checkArgument(
           StringUtils.isNotBlank(remoteTable), "Remote table must be specified for Distributed");
+
+      // User must ensure the sharding key is a trusted value
       Preconditions.checkArgument(
           StringUtils.isNotBlank(shardingKey), "Sharding key must be specified for Distributed");
 
@@ -313,8 +325,6 @@ public class ClickHouseTableOperations extends JdbcTableOperations {
                   shardingKey));
       return engine;
     }
-
-    // Now check if engine is distributed, we need to check the remote database and table properties
 
     sqlBuilder.append("\n ENGINE = %s".formatted(engine.getValue()));
     return engine;
@@ -399,13 +409,16 @@ public class ClickHouseTableOperations extends JdbcTableOperations {
         case DATA_SKIPPING_MINMAX:
           Preconditions.checkArgument(
               StringUtils.isNotBlank(index.name()), "Data skipping index name must not be blank");
-          // The GRANULARITY value is always 1 here currently.
+          // The GRANULARITY value is always 1 here currently as we can't set it by Index: there is
+          // no field for it.
+          // TODO(yuqi) add a properties field to Index to support user defined GRANULARITY value.
           sqlBuilder.append(
               " INDEX %s %s TYPE minmax GRANULARITY 1"
                   .formatted(quoteIdentifier(index.name()), fieldStr));
           break;
         case DATA_SKIPPING_BLOOM_FILTER:
           // The GRANULARITY value is always 3 here currently.
+          // TODO(yuqi) add a properties field to Index to support user defined GRANULARITY value.
           Preconditions.checkArgument(
               StringUtils.isNotBlank(index.name()), "Data skipping index name must not be blank");
           sqlBuilder.append(
@@ -851,15 +864,7 @@ public class ClickHouseTableOperations extends JdbcTableOperations {
       return Transforms.EMPTY_TRANSFORM;
     }
 
-    String trimmedKey = partitionKey.trim();
-    if (StringUtils.equalsIgnoreCase(trimmedKey, "tuple()")) {
-      return Transforms.EMPTY_TRANSFORM;
-    }
-
-    if (StringUtils.startsWith(trimmedKey, "tuple(") && StringUtils.endsWith(trimmedKey, ")")) {
-      trimmedKey = trimmedKey.substring("tuple(".length(), trimmedKey.length() - 1);
-    }
-
+    String trimmedKey = normalizePartitionKey(partitionKey);
     if (StringUtils.isBlank(trimmedKey)) {
       return Transforms.EMPTY_TRANSFORM;
     }
@@ -867,17 +872,81 @@ public class ClickHouseTableOperations extends JdbcTableOperations {
     String[] parts = trimmedKey.split(",");
     List<Transform> transforms = new ArrayList<>();
     for (String part : parts) {
-      String col = StringUtils.trim(part);
-      if (StringUtils.startsWith(col, "`") && StringUtils.endsWith(col, "`")) {
-        col = col.substring(1, col.length() - 1);
+      String expression = StringUtils.trim(part);
+      if (StringUtils.isBlank(expression)) {
+        continue;
       }
-      Preconditions.checkArgument(
-          StringUtils.isNotBlank(col) && !StringUtils.containsAny(col, "()", " "),
-          "Unsupported partition expression: " + partitionKey);
-      transforms.add(Transforms.identity(col));
+      transforms.add(parsePartitionExpression(expression, partitionKey));
     }
 
     return transforms.toArray(new Transform[0]);
+  }
+
+  private Transform parsePartitionExpression(String expression, String originalPartitionKey) {
+    String trimmedExpression = StringUtils.trim(expression);
+
+    Matcher toYearMatcher = TO_YEAR_PATTERN.matcher(trimmedExpression);
+    if (toYearMatcher.matches()) {
+      String identifier = normalizeIdentifier(toYearMatcher.group(1));
+      Preconditions.checkArgument(
+          StringUtils.isNotBlank(identifier),
+          "Unsupported partition expression: " + originalPartitionKey);
+      return Transforms.year(identifier);
+    }
+
+    Matcher toYYYYMMMatcher = TO_MONTH_PATTERN.matcher(trimmedExpression);
+    if (toYYYYMMMatcher.matches()) {
+      String identifier = normalizeIdentifier(toYYYYMMMatcher.group(1));
+      Preconditions.checkArgument(
+          StringUtils.isNotBlank(identifier),
+          "Unsupported partition expression: " + originalPartitionKey);
+      return Transforms.month(identifier);
+    }
+
+    Matcher toDateMatcher = TO_DATE_PATTERN.matcher(trimmedExpression);
+    if (toDateMatcher.matches()) {
+      String identifier = normalizeIdentifier(toDateMatcher.group(1));
+      Preconditions.checkArgument(
+          StringUtils.isNotBlank(identifier),
+          "Unsupported partition expression: " + originalPartitionKey);
+      return Transforms.day(identifier);
+    }
+
+    // for other functions, we do not support it now
+    if (trimmedExpression.contains("(") && trimmedExpression.contains(")")) {
+      throw new UnsupportedOperationException(
+          "Currently Gravitino only supports toYYYY, toYYYYMM, toDate partition expressions, but got: "
+              + trimmedExpression);
+    }
+
+    String identifier = normalizeIdentifier(trimmedExpression);
+    Preconditions.checkArgument(
+        StringUtils.isNotBlank(identifier) && !StringUtils.containsAny(identifier, "(", ")", " "),
+        "Unsupported partition expression: " + originalPartitionKey);
+    return Transforms.identity(identifier);
+  }
+
+  private String normalizePartitionKey(String partitionKey) {
+    String trimmedKey = partitionKey.trim();
+    if (StringUtils.equalsIgnoreCase(trimmedKey, "tuple()")) {
+      return "";
+    }
+    if (StringUtils.startsWithIgnoreCase(trimmedKey, "tuple(")
+        && StringUtils.endsWith(trimmedKey, ")")) {
+      return trimmedKey.substring("tuple(".length(), trimmedKey.length() - 1).trim();
+    }
+    if (StringUtils.startsWith(trimmedKey, "(") && StringUtils.endsWith(trimmedKey, ")")) {
+      return trimmedKey.substring(1, trimmedKey.length() - 1).trim();
+    }
+    return trimmedKey;
+  }
+
+  private String normalizeIdentifier(String identifier) {
+    String col = StringUtils.trim(identifier);
+    if (StringUtils.startsWith(col, "`") && StringUtils.endsWith(col, "`") && col.length() >= 2) {
+      return col.substring(1, col.length() - 1);
+    }
+    return col;
   }
 
   @VisibleForTesting
@@ -886,46 +955,48 @@ public class ClickHouseTableOperations extends JdbcTableOperations {
       return new String[0][];
     }
 
-    String trimmed = expression.trim();
-
-    // Strip function wrappers like bloom_filter(...), minmax(...), etc.
-    boolean stripped = true;
-    while (stripped) {
-      stripped = false;
-      int open = trimmed.indexOf('(');
-      int close = trimmed.lastIndexOf(')');
-      if (open > 0 && close > open) {
-        String func = trimmed.substring(0, open).trim();
-        if (func.chars().allMatch(ch -> Character.isLetterOrDigit(ch) || ch == '_')) {
-          trimmed = trimmed.substring(open + 1, close).trim();
-          stripped = true;
-        }
-      }
-    }
-
-    if (StringUtils.startsWith(trimmed, "tuple(") && StringUtils.endsWith(trimmed, ")")) {
-      trimmed = trimmed.substring("tuple(".length(), trimmed.length() - 1);
-    }
-
-    if (StringUtils.isBlank(trimmed)) {
+    String normalized = normalizeIndexExpression(expression);
+    if (StringUtils.isBlank(normalized)) {
       return new String[0][];
     }
 
-    String[] parts = trimmed.split(",");
+    String[] parts = normalized.split(",");
     List<String[]> fields = new ArrayList<>();
     for (String part : parts) {
-      String col = StringUtils.trim(part);
-      if (StringUtils.startsWith(col, "`") && StringUtils.endsWith(col, "`")) {
-        col = col.substring(1, col.length() - 1);
-      }
-
+      String col = normalizeIdentifier(part);
       Preconditions.checkArgument(
-          StringUtils.isNotBlank(col) && !StringUtils.containsAny(col, "()", " "),
-          "Unsupported index expression: " + expression);
+          isSimpleIdentifier(col), "Unsupported index expression: " + expression);
       fields.add(new String[] {col});
     }
 
     return fields.toArray(new String[0][]);
+  }
+
+  private String normalizeIndexExpression(String expression) {
+    String trimmed = expression.trim();
+
+    boolean stripped = true;
+    while (stripped) {
+      stripped = false;
+      Matcher matcher = FUNCTION_WRAPPER_PATTERN.matcher(trimmed);
+      if (matcher.matches()) {
+        trimmed = matcher.group(2).trim();
+        stripped = true;
+      }
+    }
+
+    if (StringUtils.startsWithIgnoreCase(trimmed, "tuple(") && StringUtils.endsWith(trimmed, ")")) {
+      trimmed = trimmed.substring("tuple(".length(), trimmed.length() - 1).trim();
+    } else if (StringUtils.equalsIgnoreCase(trimmed, "tuple()")) {
+      trimmed = "";
+    }
+
+    return trimmed;
+  }
+
+  private boolean isSimpleIdentifier(String identifier) {
+    return StringUtils.isNotBlank(identifier)
+        && !StringUtils.containsAny(identifier, "(", ")", " ", "%", "+", "-", "*", "/");
   }
 
   private List<Index> getSecondaryIndexes(
