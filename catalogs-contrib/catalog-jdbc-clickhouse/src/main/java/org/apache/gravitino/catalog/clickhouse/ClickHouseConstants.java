@@ -35,7 +35,7 @@ public class ClickHouseConstants {
     private ClusterConstants() {}
 
     // Name of the clickhouse cluster
-    public static final String NAME = "cluster-name";
+    public static final String CLUSTER_NAME = "cluster-name";
     // Whether to use 'ON CLUSTER' clause when creating tables
     public static final String ON_CLUSTER = "on-cluster";
   }
