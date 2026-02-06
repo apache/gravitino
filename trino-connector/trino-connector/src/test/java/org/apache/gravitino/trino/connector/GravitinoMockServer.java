@@ -621,7 +621,8 @@ public class GravitinoMockServer implements AutoCloseable {
   }
 
   private void addColumn(
-      ConnectorMetadata metadata, ConnectorTableHandle tableHandle, ColumnMetadata columnMetadata) {
+      ConnectorMetadata metadata, ConnectorTableHandle tableHandle, ColumnMetadata columnMetadata)
+      throws TrinoException {
     if (trinoVersion < SPI_VERSION_SUPPORT_ADD_COLUMN_WITH_POSITION) {
       try {
         metadata
@@ -634,7 +635,7 @@ public class GravitinoMockServer implements AutoCloseable {
             .invoke(metadata, null, tableHandle, columnMetadata);
       } catch (ReflectiveOperationException e) {
         if (e.getCause() instanceof TrinoException) {
-          throw new RuntimeException(e.getCause().getMessage(), e);
+          throw (TrinoException) e.getCause();
         }
         throw new RuntimeException("Failed to invoke legacy addColumn by reflection", e);
       }
