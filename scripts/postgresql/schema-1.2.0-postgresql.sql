@@ -782,7 +782,6 @@ CREATE TABLE IF NOT EXISTS function_meta (
     schema_id BIGINT NOT NULL,
     function_type VARCHAR(64) NOT NULL,
     deterministic SMALLINT DEFAULT 1,
-    return_type TEXT NOT NULL,
     function_current_version INT DEFAULT 1,
     function_latest_version INT DEFAULT 1,
     audit_info TEXT NOT NULL,
@@ -801,7 +800,6 @@ COMMENT ON COLUMN function_meta.catalog_id IS 'catalog id';
 COMMENT ON COLUMN function_meta.schema_id IS 'schema id';
 COMMENT ON COLUMN function_meta.function_type IS 'function type';
 COMMENT ON COLUMN function_meta.deterministic IS 'whether the function result is deterministic';
-COMMENT ON COLUMN function_meta.return_type IS 'function return type';
 COMMENT ON COLUMN function_meta.function_latest_version IS 'function latest version';
 COMMENT ON COLUMN function_meta.audit_info IS 'function audit info';
 COMMENT ON COLUMN function_meta.deleted_at IS 'function deleted at';

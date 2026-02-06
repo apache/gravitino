@@ -49,7 +49,6 @@ import org.apache.gravitino.exceptions.SchemaAlreadyExistsException;
 import org.apache.gravitino.function.Function;
 import org.apache.gravitino.function.FunctionCatalog;
 import org.apache.gravitino.function.FunctionChange;
-import org.apache.gravitino.function.FunctionColumn;
 import org.apache.gravitino.function.FunctionDefinition;
 import org.apache.gravitino.function.FunctionType;
 import org.apache.gravitino.policy.Policy;
@@ -358,21 +357,9 @@ abstract class BaseSchemaCatalog extends CatalogDTO
       String comment,
       FunctionType functionType,
       boolean deterministic,
-      org.apache.gravitino.rel.types.Type returnType,
       FunctionDefinition[] definitions) {
     return functionOperations.registerFunction(
-        ident, comment, functionType, deterministic, returnType, definitions);
-  }
-
-  @Override
-  public Function registerFunction(
-      NameIdentifier ident,
-      String comment,
-      boolean deterministic,
-      FunctionColumn[] returnColumns,
-      FunctionDefinition[] definitions) {
-    return functionOperations.registerFunction(
-        ident, comment, deterministic, returnColumns, definitions);
+        ident, comment, functionType, deterministic, definitions);
   }
 
   @Override
