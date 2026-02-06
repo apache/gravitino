@@ -106,6 +106,7 @@ public class ChromeWebDriverProvider implements WebDriverProvider {
     if (Strings.isEmpty(System.getenv("DISPLAY_WEBPAGE_IN_TESTING"))) {
       chromeOptions.addArguments("--headless");
       chromeOptions.addArguments("--no-sandbox");
+      chromeOptions.addArguments("--disable-dev-shm-usage");
     }
 
     if (SystemUtils.IS_OS_MAC_OSX) {
