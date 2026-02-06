@@ -19,7 +19,6 @@
 
 package org.apache.gravitino.stats;
 
-import static org.apache.gravitino.Configs.CATALOG_CACHE_EVICTION_INTERVAL_MS;
 import static org.apache.gravitino.Configs.DEFAULT_ENTITY_RELATIONAL_STORE;
 import static org.apache.gravitino.Configs.ENTITY_RELATIONAL_JDBC_BACKEND_DRIVER;
 import static org.apache.gravitino.Configs.ENTITY_RELATIONAL_JDBC_BACKEND_MAX_CONNECTIONS;
@@ -120,7 +119,8 @@ public class TestStatisticManager {
     Mockito.when(config.get(Configs.CACHE_LOCK_SEGMENTS)).thenReturn(16);
     Mockito.when(config.get(Configs.PARTITION_STATS_STORAGE_FACTORY_CLASS))
         .thenReturn(MemoryPartitionStatsStorageFactory.class.getCanonicalName());
-    Mockito.when(config.get(CATALOG_CACHE_EVICTION_INTERVAL_MS)).thenReturn(500L);
+    Mockito.when(config.get(Configs.CACHE_INVALIDATION_POLL_INTERVAL_MS)).thenReturn(500L);
+    Mockito.when(config.get(Configs.CACHE_INVALIDATION_ENABLED)).thenReturn(true);
 
     Mockito.doReturn(100000L).when(config).get(TREE_LOCK_MAX_NODE_IN_MEMORY);
     Mockito.doReturn(1000L).when(config).get(TREE_LOCK_MIN_NODE_IN_MEMORY);
