@@ -83,7 +83,7 @@ public class CacheInvalidationVersionService {
           if (updated == 0) {
             try {
               mapper.insertVersion(DEFAULT_ROW_ID, 0L, now);
-            } catch (RuntimeException e) {
+            } catch (Exception e) {
               LOG.debug("Failed to insert version row, it may already exist: {}", e.getMessage());
             }
             mapper.incrementVersion(DEFAULT_ROW_ID, now);
