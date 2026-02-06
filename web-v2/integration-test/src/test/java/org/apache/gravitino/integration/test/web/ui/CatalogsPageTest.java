@@ -55,7 +55,6 @@ import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestMethodOrder;
 import org.openqa.selenium.By;
-import org.openqa.selenium.JavascriptExecutor;
 
 @Tag("gravitino-docker-test")
 @TestMethodOrder(MethodOrderer.OrderAnnotation.class)
@@ -341,8 +340,7 @@ public class CatalogsPageTest extends BaseWebIT {
     // Switch back to relational tab to verify relational catalogs
     catalogsPage.clickSelectType("relational");
     Thread.sleep(1000); // Wait for tab switch
-    JavascriptExecutor js = (JavascriptExecutor) driver;
-    js.executeScript("location.reload()");
+    reloadPageAndWait();
     Assertions.assertEquals(WEB_TITLE, driver.getTitle());
     Assertions.assertTrue(catalogsPage.verifyRefreshPage());
     List<String> relationalCatalogsNames =
@@ -384,8 +382,7 @@ public class CatalogsPageTest extends BaseWebIT {
   @Test
   @Order(9)
   public void testRefreshCatalogPage() {
-    JavascriptExecutor js = (JavascriptExecutor) driver;
-    js.executeScript("location.reload()");
+    reloadPageAndWait();
     Assertions.assertEquals(WEB_TITLE, driver.getTitle());
     Assertions.assertTrue(catalogsPage.verifyShowTableTitle(CATALOG_TABLE_TITLE));
     Assertions.assertTrue(catalogsPage.verifyShowDataItemInList(SCHEMA_NAME, false));
@@ -417,8 +414,7 @@ public class CatalogsPageTest extends BaseWebIT {
   @Test
   @Order(11)
   public void testRefreshSchemaPage() {
-    JavascriptExecutor js = (JavascriptExecutor) driver;
-    js.executeScript("location.reload()");
+    reloadPageAndWait();
     Assertions.assertEquals(WEB_TITLE, driver.getTitle());
     Assertions.assertTrue(catalogsPage.verifyShowTableTitle(SCHEMA_TABLE_TITLE));
     Assertions.assertTrue(catalogsPage.verifyShowDataItemInList(TABLE_NAME, false));
@@ -473,8 +469,7 @@ public class CatalogsPageTest extends BaseWebIT {
   @Test
   @Order(14)
   public void testRefreshTablePage() {
-    JavascriptExecutor js = (JavascriptExecutor) driver;
-    js.executeScript("location.reload()");
+    reloadPageAndWait();
     Assertions.assertEquals(WEB_TITLE, driver.getTitle());
     Assertions.assertTrue(catalogsPage.verifyRefreshPage());
     Assertions.assertTrue(catalogsPage.verifyShowTableTitle(TABLE_TABLE_TITLE));
@@ -606,8 +601,7 @@ public class CatalogsPageTest extends BaseWebIT {
     Assertions.assertTrue(catalogsPage.verifyEmptyTableData());
 
     catalogsPage.metalakeSelectChange(METALAKE_NAME);
-    JavascriptExecutor js = (JavascriptExecutor) driver;
-    js.executeScript("location.reload()");
+    reloadPageAndWait();
   }
 
   @Test

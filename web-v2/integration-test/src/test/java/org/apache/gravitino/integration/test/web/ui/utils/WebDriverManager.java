@@ -37,6 +37,7 @@ public class WebDriverManager {
     WebDriverProvider provide = new ChromeWebDriverProvider();
     WebDriver driver = generateWebDriver(provide);
     driver.manage().timeouts().implicitlyWait(BaseWebIT.MAX_IMPLICIT_WAIT, TimeUnit.SECONDS);
+    driver.manage().timeouts().pageLoadTimeout(BaseWebIT.MAX_TIMEOUT, TimeUnit.SECONDS);
     driver.get(url);
 
     // wait for webpage load compiled.

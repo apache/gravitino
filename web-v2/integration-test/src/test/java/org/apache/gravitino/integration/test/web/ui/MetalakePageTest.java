@@ -27,7 +27,6 @@ import org.junit.jupiter.api.Order;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestMethodOrder;
 import org.junit.jupiter.api.condition.DisabledIfSystemProperty;
-import org.openqa.selenium.JavascriptExecutor;
 
 @DisabledIfSystemProperty(named = "testMode", matches = "embedded")
 @TestMethodOrder(MethodOrderer.OrderAnnotation.class)
@@ -140,8 +139,7 @@ public class MetalakePageTest extends BaseWebIT {
   @Test
   @Order(8)
   public void testRefreshPage() {
-    JavascriptExecutor js = (JavascriptExecutor) driver;
-    js.executeScript("location.reload()");
+    reloadPageAndWait();
 
     Assertions.assertEquals(WEB_TITLE, driver.getTitle());
     Assertions.assertTrue(metalakePage.verifyRefreshPage());

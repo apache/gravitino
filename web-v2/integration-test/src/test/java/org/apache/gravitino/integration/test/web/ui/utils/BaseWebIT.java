@@ -28,6 +28,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.openqa.selenium.By;
 import org.openqa.selenium.ElementClickInterceptedException;
 import org.openqa.selenium.InvalidArgumentException;
+import org.openqa.selenium.JavascriptExecutor;
 import org.openqa.selenium.NoSuchElementException;
 import org.openqa.selenium.TimeoutException;
 import org.openqa.selenium.WebDriver;
@@ -89,6 +90,16 @@ public class BaseWebIT extends BaseIT {
       action.moveToElement(locatorElement(locator)).click().build().perform();
       Thread.sleep(ACTION_SLEEP * 1000);
     }
+  }
+
+  protected void reloadPageAndWait() {
+    JavascriptExecutor js = (JavascriptExecutor) driver;
+    js.executeScript("location.reload()");
+    WebDriverWait wait = new WebDriverWait(driver, MAX_TIMEOUT);
+    wait.until(
+        d ->
+            "complete"
+                .equals(((JavascriptExecutor) d).executeScript("return document.readyState")));
   }
 
   WebElement locatorElement(final Object locatorOrElement) {
