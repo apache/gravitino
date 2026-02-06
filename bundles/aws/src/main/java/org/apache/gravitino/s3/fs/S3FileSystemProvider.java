@@ -82,7 +82,7 @@ public class S3FileSystemProvider implements FileSystemProvider, SupportsCredent
 
     hadoopConfMap = additionalS3Config(hadoopConfMap);
 
-    Configuration configuration = FileSystemUtils.createConfiguration(hadoopConfMap);
+    Configuration configuration = FileSystemUtils.createCompatibleConfiguration(hadoopConfMap);
     return S3AFileSystem.newInstance(path.toUri(), configuration);
   }
 

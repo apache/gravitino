@@ -31,10 +31,13 @@ import com.nimbusds.jwt.proc.DefaultJWTClaimsVerifier;
 import com.nimbusds.jwt.proc.DefaultJWTProcessor;
 import java.net.URL;
 import java.security.Principal;
+import java.util.Collections;
 import java.util.List;
+import java.util.Set;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.Config;
-import org.apache.gravitino.UserPrincipal;
+import org.apache.gravitino.auth.PrincipalMapper;
+import org.apache.gravitino.auth.PrincipalMapperFactory;
 import org.apache.gravitino.exceptions.UnauthorizedException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -53,6 +56,7 @@ public class JwksTokenValidator implements OAuthTokenValidator {
   private String expectedIssuer;
   private List<String> principalFields;
   private long allowSkewSeconds;
+  private PrincipalMapper principalMapper;
 
   @Override
   public void initialize(Config config) {
@@ -60,6 +64,11 @@ public class JwksTokenValidator implements OAuthTokenValidator {
     this.expectedIssuer = config.get(OAuthConfig.AUTHORITY);
     this.principalFields = config.get(OAuthConfig.PRINCIPAL_FIELDS);
     this.allowSkewSeconds = config.get(OAuthConfig.ALLOW_SKEW_SECONDS);
+
+    // Create principal mapper based on configuration
+    String mapperType = config.get(OAuthConfig.PRINCIPAL_MAPPER);
+    String regexPattern = config.get(OAuthConfig.PRINCIPAL_MAPPER_REGEX_PATTERN);
+    this.principalMapper = PrincipalMapperFactory.create(mapperType, regexPattern);
 
     LOG.info("Initializing JWKS token validator");
 
@@ -101,27 +110,27 @@ public class JwksTokenValidator implements OAuthTokenValidator {
       DefaultJWTProcessor<SecurityContext> jwtProcessor = new DefaultJWTProcessor<>();
       jwtProcessor.setJWSKeySelector(keySelector);
 
-      // Configure claims verification
-      JWTClaimsSet.Builder expectedClaimsBuilder = new JWTClaimsSet.Builder();
-
-      // Set expected issuer if configured
-      if (StringUtils.isNotBlank(expectedIssuer)) {
-        expectedClaimsBuilder.issuer(expectedIssuer);
-      }
-
-      // Set expected audience if provided
+      // Audience validation per RFC 7519 (at-least-one match)
+      Set<String> acceptedAudiences = null;
       if (StringUtils.isNotBlank(serviceAudience)) {
-        expectedClaimsBuilder.audience(serviceAudience);
+        acceptedAudiences = Collections.singleton(serviceAudience);
       }
+
+      // Build exact match claims for issuer validation
+      JWTClaimsSet.Builder exactMatchBuilder = new JWTClaimsSet.Builder();
+      if (StringUtils.isNotBlank(expectedIssuer)) {
+        exactMatchBuilder.issuer(expectedIssuer);
+      }
+      JWTClaimsSet exactMatchClaims = exactMatchBuilder.build();
 
       DefaultJWTClaimsVerifier<SecurityContext> claimsVerifier =
-          new DefaultJWTClaimsVerifier<SecurityContext>(expectedClaimsBuilder.build(), null);
+          new DefaultJWTClaimsVerifier<>(acceptedAudiences, exactMatchClaims, null, null);
 
       // Set clock skew tolerance
       claimsVerifier.setMaxClockSkew((int) allowSkewSeconds);
       jwtProcessor.setJWTClaimsSetVerifier(claimsVerifier);
 
-      // Process and validate the token
+      // Validate token signature and claims
       JWTClaimsSet validatedClaims = jwtProcessor.process(signedJWT, null);
 
       String principal = extractPrincipal(validatedClaims);
@@ -130,7 +139,8 @@ public class JwksTokenValidator implements OAuthTokenValidator {
         throw new UnauthorizedException("No valid principal found in token");
       }
 
-      return new UserPrincipal(principal);
+      // Use principal mapper to extract username
+      return principalMapper.map(principal);
 
     } catch (Exception e) {
       LOG.error("JWKS JWT validation error: {}", e.getMessage());

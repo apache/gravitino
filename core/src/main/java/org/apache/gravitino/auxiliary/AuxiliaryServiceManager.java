@@ -191,7 +191,7 @@ public class AuxiliaryServiceManager {
               auxServiceName,
               cl ->
                   auxService.serviceInit(
-                      MapUtils.getPrefixMap(serviceConfigs, DOT.join(auxServiceName, ""))));
+                      MapUtils.getPrefixMap(serviceConfigs, DOT.join(auxServiceName, "")), true));
         });
   }
 

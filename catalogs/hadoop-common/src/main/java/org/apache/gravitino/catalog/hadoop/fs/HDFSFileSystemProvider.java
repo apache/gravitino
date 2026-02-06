@@ -23,12 +23,15 @@ import static org.apache.gravitino.catalog.hadoop.fs.Constants.DEFAULT_CONNECTIO
 import static org.apache.gravitino.catalog.hadoop.fs.Constants.DEFAULT_HDFS_IPC_PING;
 import static org.apache.gravitino.catalog.hadoop.fs.Constants.HDFS_IPC_CLIENT_CONNECT_TIMEOUT_KEY;
 import static org.apache.gravitino.catalog.hadoop.fs.Constants.HDFS_IPC_PING_KEY;
+import static org.apache.gravitino.catalog.hadoop.fs.kerberos.AuthenticationConfig.IMPERSONATION_ENABLE_KEY;
+import static org.apache.gravitino.catalog.hadoop.fs.kerberos.KerberosConfig.PRINCIPAL_KEY;
 
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Maps;
 import java.io.IOException;
 import java.util.Map;
 import javax.annotation.Nonnull;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
@@ -43,7 +46,7 @@ public class HDFSFileSystemProvider implements FileSystemProvider {
       throws IOException {
     Map<String, String> hadoopConfMap = additionalHDFSConfig(config);
     Configuration configuration =
-        FileSystemUtils.createConfiguration(GRAVITINO_BYPASS, hadoopConfMap);
+        FileSystemUtils.createCompatibleConfiguration(GRAVITINO_BYPASS, hadoopConfMap);
     return FileSystem.newInstance(path.toUri(), configuration);
   }
 
@@ -57,13 +60,28 @@ public class HDFSFileSystemProvider implements FileSystemProvider {
     return BUILTIN_HDFS_FS_PROVIDER;
   }
 
+  @Override
+  public String getFullAuthority(Path path, Map<String, String> conf) {
+    String authority = path.toUri().getAuthority();
+    String principal = conf.get(PRINCIPAL_KEY);
+    if (StringUtils.isNotBlank(principal)) {
+      principal = principal.replaceAll("@.*$", ""); // Remove realm if exists
+      authority = String.format("%s@%s", principal, authority);
+    }
+    String impersonationEnabled = conf.get(IMPERSONATION_ENABLE_KEY);
+    if (conf.containsKey(IMPERSONATION_ENABLE_KEY)) {
+      authority = String.format("%s?impersonation_enabled=%s", authority, impersonationEnabled);
+    }
+    return authority;
+  }
+
   /**
    * Add additional HDFS specific configurations.
    *
    * @param configs Original configurations.
    * @return Configurations with additional HDFS specific configurations.
    */
-  private Map<String, String> additionalHDFSConfig(Map<String, String> configs) {
+  public static Map<String, String> additionalHDFSConfig(Map<String, String> configs) {
     Map<String, String> additionalConfigs = Maps.newHashMap(configs);
 
     // Avoid multiple retries to speed up failure in test cases.

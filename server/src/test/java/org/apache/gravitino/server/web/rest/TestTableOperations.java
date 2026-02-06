@@ -718,7 +718,7 @@ public class TestTableOperations extends BaseOperationsTest {
     TableUpdateRequest.AddTableIndexRequest req =
         new TableUpdateRequest.AddTableIndexRequest(
             Index.IndexType.PRIMARY_KEY,
-            Indexes.DEFAULT_MYSQL_PRIMARY_KEY_NAME,
+            Indexes.DEFAULT_PRIMARY_KEY_NAME,
             new String[][] {{"col1"}});
     Column[] columns =
         new Column[] {

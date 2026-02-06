@@ -27,8 +27,11 @@ public class Indexes {
   /** An empty array of indexes. */
   public static final Index[] EMPTY_INDEXES = new Index[0];
 
-  /** MySQL does not support setting the name of the primary key, so the default name is used. */
-  public static final String DEFAULT_MYSQL_PRIMARY_KEY_NAME = "PRIMARY";
+  /**
+   * Name of the default primary key. MySQL, ClickHouse, OceanBase and many other databases supports
+   * setting the name of the primary key and use it as primary key name.
+   */
+  public static final String DEFAULT_PRIMARY_KEY_NAME = "PRIMARY";
 
   /**
    * Create a unique index on columns. Like unique (a) or unique (a, b), for complex like unique
@@ -48,7 +51,7 @@ public class Indexes {
    * @return The primary key index
    */
   public static Index createMysqlPrimaryKey(String[][] fieldNames) {
-    return primary(DEFAULT_MYSQL_PRIMARY_KEY_NAME, fieldNames);
+    return primary(DEFAULT_PRIMARY_KEY_NAME, fieldNames);
   }
 
   /**
@@ -165,7 +168,7 @@ public class Indexes {
        * @param indexType The type of the index
        * @return The builder for creating a new instance of IndexImpl.
        */
-      public Indexes.IndexImpl.Builder withIndexType(IndexType indexType) {
+      public Builder withIndexType(IndexType indexType) {
         this.indexType = indexType;
         return this;
       }
@@ -176,7 +179,7 @@ public class Indexes {
        * @param name The name of the index
        * @return The builder for creating a new instance of IndexImpl.
        */
-      public Indexes.IndexImpl.Builder withName(String name) {
+      public Builder withName(String name) {
         this.name = name;
         return this;
       }
@@ -187,7 +190,7 @@ public class Indexes {
        * @param fieldNames The field names of the index
        * @return The builder for creating a new instance of IndexImpl.
        */
-      public Indexes.IndexImpl.Builder withFieldNames(String[][] fieldNames) {
+      public Builder withFieldNames(String[][] fieldNames) {
         this.fieldNames = fieldNames;
         return this;
       }

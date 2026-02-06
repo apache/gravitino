@@ -53,6 +53,7 @@ import org.apache.gravitino.meta.CatalogEntity;
 import org.apache.gravitino.meta.SchemaVersion;
 import org.apache.gravitino.storage.IdGenerator;
 import org.apache.gravitino.utils.Executable;
+import org.apache.gravitino.utils.NameIdentifierUtil;
 import org.apache.gravitino.utils.PrincipalUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -130,6 +131,11 @@ public class MetalakeManager implements MetalakeDispatcher, Closeable {
       LOG.error("Failed to do store operation", e);
       throw new RuntimeException(e);
     }
+  }
+
+  public static void checkMetalakeInUse(String metalake) {
+    checkMetalake(
+        NameIdentifierUtil.ofMetalake(metalake), GravitinoEnv.getInstance().entityStore());
   }
 
   /**

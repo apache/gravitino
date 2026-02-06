@@ -48,7 +48,7 @@ public class GravitinoLanceRESTServer {
   private void initialize() {
     gravitinoEnv.initializeBaseComponents(serverConfig);
     lanceRESTService.serviceInit(
-        serverConfig.getConfigsWithPrefix(LanceConfig.LANCE_CONFIG_PREFIX));
+        serverConfig.getConfigsWithPrefix(LanceConfig.LANCE_CONFIG_PREFIX), false);
     ServerAuthenticator.getInstance().initialize(serverConfig);
   }
 

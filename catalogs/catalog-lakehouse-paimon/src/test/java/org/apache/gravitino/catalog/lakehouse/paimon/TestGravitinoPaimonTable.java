@@ -23,6 +23,7 @@ import static org.apache.gravitino.catalog.lakehouse.paimon.GravitinoPaimonTable
 import static org.apache.gravitino.catalog.lakehouse.paimon.TestPaimonCatalog.PAIMON_PROPERTIES_METADATA;
 import static org.apache.gravitino.catalog.lakehouse.paimon.utils.TableOpsUtils.checkColumnCapability;
 import static org.apache.gravitino.rel.Column.DEFAULT_VALUE_NOT_SET;
+import static org.apache.gravitino.rel.expressions.distributions.Strategy.HASH;
 import static org.apache.gravitino.rel.expressions.transforms.Transforms.identity;
 import static org.apache.gravitino.rel.indexes.Indexes.primary;
 
@@ -51,6 +52,7 @@ import org.apache.gravitino.rel.Column;
 import org.apache.gravitino.rel.Table;
 import org.apache.gravitino.rel.TableCatalog;
 import org.apache.gravitino.rel.expressions.NamedReference;
+import org.apache.gravitino.rel.expressions.distributions.Distribution;
 import org.apache.gravitino.rel.expressions.distributions.Distributions;
 import org.apache.gravitino.rel.expressions.sorts.SortOrder;
 import org.apache.gravitino.rel.expressions.transforms.Transform;
@@ -333,6 +335,118 @@ public class TestGravitinoPaimonTable {
       Assertions.assertEquals(indexes[i].type(), loadedTable.index()[i].type());
       Assertions.assertArrayEquals(indexes[i].fieldNames(), loadedTable.index()[i].fieldNames());
     }
+  }
+
+  @Test
+  void testCreatePaimonTableWithDistribution() {
+    String paimonTableName = "test_paimon_table_with_distribution";
+    NameIdentifier tableIdentifier = NameIdentifier.of(paimonSchema.name(), paimonTableName);
+    Map<String, String> properties = Maps.newHashMap();
+
+    Column[] columns =
+        new Column[] {
+          fromPaimonColumn(new DataField(0, "col_1", DataTypes.INT().notNull(), PAIMON_COMMENT)),
+          fromPaimonColumn(new DataField(1, "col_2", DataTypes.STRING().nullable(), PAIMON_COMMENT))
+        };
+
+    Table table =
+        paimonCatalogOperations.createTable(
+            tableIdentifier,
+            columns,
+            PAIMON_COMMENT,
+            properties,
+            new Transform[0],
+            Distributions.hash(4, NamedReference.field("col_1")),
+            new SortOrder[0]);
+
+    Assertions.assertEquals(HASH, table.distribution().strategy());
+    Assertions.assertEquals(4, table.distribution().number());
+    Assertions.assertEquals(
+        "col_1", ((NamedReference) table.distribution().expressions()[0]).fieldName()[0]);
+
+    Table loadedTable = paimonCatalogOperations.loadTable(tableIdentifier);
+    Assertions.assertEquals(HASH, loadedTable.distribution().strategy());
+    Assertions.assertEquals(4, loadedTable.distribution().number());
+    Assertions.assertEquals(
+        "col_1", ((NamedReference) loadedTable.distribution().expressions()[0]).fieldName()[0]);
+    Assertions.assertEquals(
+        "4", loadedTable.properties().get(PaimonTablePropertiesMetadata.BUCKET_NUM));
+    Assertions.assertEquals(
+        "col_1", loadedTable.properties().get(PaimonTablePropertiesMetadata.BUCKET_KEY));
+  }
+
+  @Test
+  void testGetDistributionWithAutoBucketNumber() {
+    Map<String, String> options = Maps.newHashMap();
+    options.put(PaimonTablePropertiesMetadata.BUCKET_KEY, "col_1");
+
+    Distribution distribution = GravitinoPaimonTable.getDistribution(options);
+    Assertions.assertEquals(HASH, distribution.strategy());
+    Assertions.assertEquals(Distributions.AUTO, distribution.number());
+    Assertions.assertEquals(
+        "col_1", ((NamedReference) distribution.expressions()[0]).fieldName()[0]);
+  }
+
+  @Test
+  void testGetDistributionWithMultipleBucketKeys() {
+    Map<String, String> options = Maps.newHashMap();
+    options.put(PaimonTablePropertiesMetadata.BUCKET_KEY, "col_1,col_2");
+    options.put(PaimonTablePropertiesMetadata.BUCKET_NUM, "4");
+
+    Distribution distribution = GravitinoPaimonTable.getDistribution(options);
+    Assertions.assertEquals(HASH, distribution.strategy());
+    Assertions.assertEquals(4, distribution.number());
+    Assertions.assertEquals(2, distribution.expressions().length);
+    Assertions.assertEquals(
+        "col_1", ((NamedReference) distribution.expressions()[0]).fieldName()[0]);
+    Assertions.assertEquals(
+        "col_2", ((NamedReference) distribution.expressions()[1]).fieldName()[0]);
+  }
+
+  @Test
+  void testGetDistributionWithInvalidBucketNumber() {
+    Map<String, String> options = Maps.newHashMap();
+    options.put(PaimonTablePropertiesMetadata.BUCKET_KEY, "col_1");
+    options.put(PaimonTablePropertiesMetadata.BUCKET_NUM, "not_a_number");
+
+    IllegalArgumentException exception =
+        Assertions.assertThrows(
+            IllegalArgumentException.class, () -> GravitinoPaimonTable.getDistribution(options));
+    Assertions.assertTrue(
+        exception.getMessage().contains("Paimon bucket number must be a valid integer"));
+  }
+
+  @Test
+  void testCreatePaimonPrimaryKeyTableWithInvalidBucketKey() {
+    String paimonTableName = "test_paimon_primary_key_table_invalid_bucket";
+    NameIdentifier tableIdentifier = NameIdentifier.of(paimonSchema.name(), paimonTableName);
+
+    Column[] columns =
+        new Column[] {
+          fromPaimonColumn(new DataField(0, "col_1", DataTypes.INT().notNull(), PAIMON_COMMENT)),
+          fromPaimonColumn(new DataField(1, "col_2", DataTypes.STRING().notNull(), PAIMON_COMMENT))
+        };
+
+    Index[] indexes =
+        Collections.singletonList(
+                primary(PAIMON_PRIMARY_KEY_INDEX_NAME, new String[][] {new String[] {"col_2"}}))
+            .toArray(new Index[0]);
+
+    IllegalArgumentException exception =
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () ->
+                paimonCatalogOperations.createTable(
+                    tableIdentifier,
+                    columns,
+                    PAIMON_COMMENT,
+                    Maps.newHashMap(),
+                    new Transform[0],
+                    Distributions.hash(2, NamedReference.field("col_1")),
+                    new SortOrder[0],
+                    indexes));
+    Assertions.assertTrue(
+        exception.getMessage().contains("bucket keys must be a subset of primary key columns"));
   }
 
   @Test

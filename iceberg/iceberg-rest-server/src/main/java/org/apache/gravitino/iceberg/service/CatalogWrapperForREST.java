@@ -23,6 +23,7 @@ import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
 import java.io.IOException;
+import java.net.URI;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
@@ -111,7 +112,7 @@ public class CatalogWrapperForREST extends IcebergCatalogWrapper {
   public LoadTableResponse createTable(
       Namespace namespace, CreateTableRequest request, boolean requestCredential) {
     LoadTableResponse loadTableResponse = super.createTable(namespace, request);
-    if (requestCredential) {
+    if (shouldGenerateCredential(loadTableResponse, requestCredential)) {
       return injectCredentialConfig(
           TableIdentifier.of(namespace, request.name()),
           loadTableResponse,
@@ -123,7 +124,7 @@ public class CatalogWrapperForREST extends IcebergCatalogWrapper {
   public LoadTableResponse loadTable(
       TableIdentifier identifier, boolean requestCredential, CredentialPrivilege privilege) {
     LoadTableResponse loadTableResponse = super.loadTable(identifier);
-    if (requestCredential) {
+    if (shouldGenerateCredential(loadTableResponse, requestCredential)) {
       return injectCredentialConfig(identifier, loadTableResponse, privilege);
     }
     return loadTableResponse;
@@ -236,6 +237,47 @@ public class CatalogWrapperForREST extends IcebergCatalogWrapper {
       throw new ServiceUnavailableException("Couldn't generate credential, %s", context);
     }
     return credential;
+  }
+
+  private boolean shouldGenerateCredential(
+      LoadTableResponse loadTableResponse, boolean requestCredential) {
+    if (!requestCredential) {
+      return false;
+    }
+    validateCredentialLocation(loadTableResponse.tableMetadata().location());
+    return !isLocalOrHdfsTable(loadTableResponse.tableMetadata());
+  }
+
+  private boolean isLocalOrHdfsTable(TableMetadata tableMetadata) {
+    return isLocalOrHdfsLocation(tableMetadata.location());
+  }
+
+  @VisibleForTesting
+  static void validateCredentialLocation(String location) {
+    if (StringUtils.isBlank(location)) {
+      throw new IllegalArgumentException(
+          "Table location cannot be null or blank when requesting credentials");
+    }
+  }
+
+  @VisibleForTesting
+  static boolean isLocalOrHdfsLocation(String location) {
+    // Precondition: location is non-blank (enforced by caller).
+    if (StringUtils.isBlank(location)) {
+      return false;
+    }
+    URI uri;
+    try {
+      uri = URI.create(location);
+    } catch (IllegalArgumentException e) {
+      return false;
+    }
+    String scheme = uri.getScheme();
+    if (scheme == null) {
+      // No scheme means a local path.
+      return true;
+    }
+    return "file".equalsIgnoreCase(scheme) || "hdfs".equalsIgnoreCase(scheme);
   }
 
   /**

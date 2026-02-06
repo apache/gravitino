@@ -31,7 +31,7 @@ Builds with Apache Paimon `1.2`.
 
 | Property name                                      | Description                                                                                                                                                                                                 | Default value                                                                  | Required                                                                                                                                                             | Since Version    |
 |----------------------------------------------------|-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|--------------------------------------------------------------------------------|----------------------------------------------------------------------------------------------------------------------------------------------------------------------|------------------|
-| `catalog-backend`                                  | Catalog backend of Gravitino Paimon catalog. Supports `filesystem`, `jdbc` and `hive`.                                                                                                                      | (none)                                                                         | Yes                                                                                                                                                                  | 0.6.0-incubating |
+| `catalog-backend`                                  | Catalog backend of Gravitino Paimon catalog. Supports `filesystem`, `jdbc`, `hive` and `rest`.                                                                                                              | (none)                                                                         | Yes                                                                                                                                                                  | 0.6.0-incubating |
 | `uri`                                              | The URI configuration of the Paimon catalog. `thrift://127.0.0.1:9083` or `jdbc:postgresql://127.0.0.1:5432/db_name` or `jdbc:mysql://127.0.0.1:3306/metastore_db`. It is optional for `FilesystemCatalog`. | (none)                                                                         | required if the value of `catalog-backend` is not `filesystem`.                                                                                                      | 0.6.0-incubating |
 | `warehouse`                                        | Warehouse directory of catalog. `file:///user/hive/warehouse-paimon/` for local fs, `hdfs://namespace/hdfs/path` for HDFS , `s3://{bucket-name}/path/` for S3 or `oss://{bucket-name}/path` for Aliyun OSS  | (none)                                                                         | Yes                                                                                                                                                                  | 0.6.0-incubating |
 | `catalog-backend-name`                             | The catalog name passed to underlying Paimon catalog backend.                                                                                                                                               | The property value of `catalog-backend`, like `jdbc` for JDBC catalog backend. | No                                                                                                                                                                   | 0.8.0-incubating |
@@ -47,13 +47,34 @@ Builds with Apache Paimon `1.2`.
 | `s3-endpoint`                                      | The endpoint of the AWS S3.                                                                                                                                                                                 | (none)                                                                         | required if the value of `warehouse` is a S3 path                                                                                                                    | 0.7.0-incubating |
 | `s3-access-key-id`                                 | The access key of the AWS S3.                                                                                                                                                                               | (none)                                                                         | required if the value of `warehouse` is a S3 path                                                                                                                    | 0.7.0-incubating |
 | `s3-secret-access-key`                             | The secret key of the AWS S3.                                                                                                                                                                               | (none)                                                                         | required if the value of `warehouse` is a S3 path                                                                                                                    | 0.7.0-incubating |
+| `token-provider`                                   | The token provider type for Paimon catalog backend.                                                                                                                                                         | Token provider could be `bear` or `dlf`.                                       | required if the value of `catalog-backend` is `rest`.                                                                                                                | 1.2.0            |
+| `token`                                            | The bear token for Paimon REST catalog authentication.                                                                                                                                                      | (none)                                                                         | required if the value of `token-provider` is `bear`.                                                                                                                 | 1.2.0            |
+| `dlf-access-key-id`                                | The access key ID for Aliyun DLF (Data Lake Formation).                                                                                                                                                     | (none)                                                                         | required if the value of `catalog-backend` is `rest` and accessing Aliyun DLF Paimon REST server.                                                                    | 1.2.0            |
+| `dlf-access-key-secret`                            | The access key secret for Aliyun DLF.                                                                                                                                                                       | (none)                                                                         | required if the value of `catalog-backend` is `rest` and accessing Aliyun DLF Paimon REST server.                                                                    | 1.2.0            |
+| `dlf-security-token`                               | The security token for Aliyun DLF.                                                                                                                                                                          | (none)                                                                         | No                                                                                                                                                                   | 1.2.0            |
+| `dlf-token-path`                                   | The token path for Aliyun DLF.                                                                                                                                                                              | (none)                                                                         | No                                                                                                                                                                   | 1.2.0            |
+| `dlf-token-loader`                                 | The token loader for Aliyun DLF.                                                                                                                                                                            | (none)                                                                         | No                                                                                                                                                                   | 1.2.0            |
 
 :::note
-If you want to use the `oss` or `s3` warehouse, you need to place related jars in the `catalogs/lakehouse-paimon/lib` directory, more information can be found in the [Paimon S3](https://paimon.apache.org/docs/master/filesystems/s3/).
-:::
-
-:::note
-The hive backend does not support the kerberos authentication now.
+- If you want to use the `oss` or `s3` warehouse, you need to place related jars in the `catalogs/lakehouse-paimon/lib` directory, more information can be found in the [Paimon S3](https://paimon.apache.org/docs/1.2/project/download/#filesystem-jars).
+- If you want to use REST backend, Gravitino Paimon catalog supports Aliyun DLF (Data Lake Formation) as the REST catalog service. You need to configure the DLF-related properties eg:
+```
+{
+  "name": "dlf_paimon",
+  "type": "RELATIONAL",
+  "provider": "lakehouse-paimon",
+  "properties": {
+    "catalog-backend": "rest",
+    "uri": "<catalog server url>",
+    "warehouse": "gravitino",
+    "token-provider": "dlf",
+    "dlf-access-key-id": "<access-key-id>",
+    "dlf-access-key-secret": "<access-key-secret>"
+  }
+}
+```
+connect to Aliyun DLF, more information can be found in the [Paimon REST Catalog](https://paimon.apache.org/docs/master/concepts/rest/overview/).
+- The hive backend does not support the kerberos authentication now.
 :::
 
 Any properties not defined by Gravitino with `gravitino.bypass.` prefix will pass to Paimon catalog properties and HDFS configuration. For example, if specify `gravitino.bypass.table.type`, `table.type` will pass to Paimon catalog properties.
@@ -192,6 +213,9 @@ You can pass [Paimon table properties](https://paimon.apache.org/docs/0.8/mainte
 **Immutable**: Fields that cannot be modified once set.
 :::
 
+Bucket settings are defined via Gravitino table distribution (HASH strategy). The `bucket` and
+`bucket-key` options are reserved and derived from the distribution instead of being set directly.
+
 | Configuration item | Description               | Default Value | Required  | Reserved | Immutable | Since version     |
 |--------------------|---------------------------|---------------|-----------|----------|-----------|-------------------|
 | `merge-engine`     | The table merge-engine.   | (none)        | No        | No       | Yes       | 0.6.0-incubating  |
@@ -200,6 +224,7 @@ You can pass [Paimon table properties](https://paimon.apache.org/docs/0.8/mainte
 | `comment`          | The table comment.        | (none)        | No        | Yes      | No        | 0.6.0-incubating  |
 | `owner`            | The table owner.          | (none)        | No        | Yes      | No        | 0.6.0-incubating  |
 | `bucket-key`       | The table bucket-key.     | (none)        | No        | Yes      | No        | 0.6.0-incubating  |
+| `bucket`           | The table bucket number.  | (none)        | No        | Yes      | No        | 1.2.0  |
 | `primary-key`      | The table primary-key.    | (none)        | No        | Yes      | No        | 0.6.0-incubating  |
 | `partition`        | The table partition.      | (none)        | No        | Yes      | No        | 0.6.0-incubating  |
 

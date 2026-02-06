@@ -21,12 +21,12 @@ package org.apache.gravitino.catalog;
 import com.google.common.base.Preconditions;
 import java.io.IOException;
 import java.time.Instant;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
-import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Collectors;
 import org.apache.gravitino.Entity;
@@ -41,15 +41,15 @@ import org.apache.gravitino.exceptions.NoSuchSchemaException;
 import org.apache.gravitino.function.Function;
 import org.apache.gravitino.function.FunctionCatalog;
 import org.apache.gravitino.function.FunctionChange;
-import org.apache.gravitino.function.FunctionColumn;
 import org.apache.gravitino.function.FunctionDefinition;
+import org.apache.gravitino.function.FunctionDefinitions;
+import org.apache.gravitino.function.FunctionImpl;
 import org.apache.gravitino.function.FunctionParam;
 import org.apache.gravitino.function.FunctionType;
 import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.meta.FunctionEntity;
 import org.apache.gravitino.rel.Column;
 import org.apache.gravitino.rel.expressions.Expression;
-import org.apache.gravitino.rel.types.Type;
 import org.apache.gravitino.storage.IdGenerator;
 import org.apache.gravitino.utils.PrincipalUtils;
 
@@ -119,42 +119,28 @@ public class ManagedFunctionOperations implements FunctionCatalog {
       String comment,
       FunctionType functionType,
       boolean deterministic,
-      Type returnType,
       FunctionDefinition[] definitions)
       throws NoSuchSchemaException, FunctionAlreadyExistsException {
-    return doRegisterFunction(
-        ident,
-        comment,
-        functionType,
-        deterministic,
-        Optional.of(returnType),
-        Optional.empty(),
-        definitions);
-  }
-
-  @Override
-  public Function registerFunction(
-      NameIdentifier ident,
-      String comment,
-      boolean deterministic,
-      FunctionColumn[] returnColumns,
-      FunctionDefinition[] definitions)
-      throws NoSuchSchemaException, FunctionAlreadyExistsException {
-    return doRegisterFunction(
-        ident,
-        comment,
-        FunctionType.TABLE,
-        deterministic,
-        Optional.empty(),
-        Optional.of(returnColumns),
-        definitions);
+    return doRegisterFunction(ident, comment, functionType, deterministic, definitions);
   }
 
   @Override
   public Function alterFunction(NameIdentifier ident, FunctionChange... changes)
       throws NoSuchFunctionException, IllegalArgumentException {
-    // TODO: Implement when FunctionEntity is available
-    throw new UnsupportedOperationException("alterFunction: FunctionEntity not yet implemented");
+    try {
+      return store.update(
+          ident,
+          FunctionEntity.class,
+          Entity.EntityType.FUNCTION,
+          oldEntity -> applyChanges(oldEntity, changes));
+
+    } catch (NoSuchEntityException e) {
+      throw new NoSuchFunctionException(e, "Function %s does not exist", ident);
+    } catch (EntityAlreadyExistsException e) {
+      throw new IllegalArgumentException("Failed to alter function " + ident, e);
+    } catch (IOException e) {
+      throw new RuntimeException("Failed to alter function " + ident, e);
+    }
   }
 
   @Override
@@ -173,8 +159,6 @@ public class ManagedFunctionOperations implements FunctionCatalog {
       String comment,
       FunctionType functionType,
       boolean deterministic,
-      Optional<Type> returnType,
-      Optional<FunctionColumn[]> returnColumns,
       FunctionDefinition[] definitions)
       throws NoSuchSchemaException, FunctionAlreadyExistsException {
     Preconditions.checkArgument(
@@ -194,8 +178,6 @@ public class ManagedFunctionOperations implements FunctionCatalog {
             .withComment(comment)
             .withFunctionType(functionType)
             .withDeterministic(deterministic)
-            .withReturnType(returnType.orElse(null))
-            .withReturnColumns(returnColumns.orElse(null))
             .withDefinitions(definitions)
             .withAuditInfo(auditInfo)
             .build();
@@ -245,9 +227,109 @@ public class ManagedFunctionOperations implements FunctionCatalog {
     }
   }
 
+  private FunctionEntity applyChanges(FunctionEntity oldEntity, FunctionChange... changes) {
+    String newComment = oldEntity.comment();
+    List<FunctionDefinition> newDefinitions =
+        new ArrayList<>(Arrays.asList(oldEntity.definitions()));
+
+    for (FunctionChange change : changes) {
+      if (change instanceof FunctionChange.UpdateComment) {
+        newComment = ((FunctionChange.UpdateComment) change).newComment();
+
+      } else if (change instanceof FunctionChange.AddDefinition) {
+        FunctionDefinition defToAdd = ((FunctionChange.AddDefinition) change).definition();
+        validateNoArityOverlap(newDefinitions, defToAdd);
+        newDefinitions.add(defToAdd);
+
+      } else if (change instanceof FunctionChange.RemoveDefinition) {
+        FunctionParam[] paramsToRemove = ((FunctionChange.RemoveDefinition) change).parameters();
+        validateRemoveDefinition(newDefinitions, paramsToRemove);
+        newDefinitions.removeIf(def -> parametersMatch(def.parameters(), paramsToRemove));
+
+      } else if (change instanceof FunctionChange.AddImpl) {
+        FunctionChange.AddImpl addImpl = (FunctionChange.AddImpl) change;
+        FunctionParam[] targetParams = addImpl.parameters();
+        FunctionImpl implToAdd = addImpl.implementation();
+        newDefinitions = addImplToDefinition(newDefinitions, targetParams, implToAdd);
+
+      } else if (change instanceof FunctionChange.UpdateImpl) {
+        FunctionChange.UpdateImpl updateImpl = (FunctionChange.UpdateImpl) change;
+        FunctionParam[] targetParams = updateImpl.parameters();
+        FunctionImpl.RuntimeType runtime = updateImpl.runtime();
+        FunctionImpl newImpl = updateImpl.implementation();
+        newDefinitions = updateImplInDefinition(newDefinitions, targetParams, runtime, newImpl);
+
+      } else if (change instanceof FunctionChange.RemoveImpl) {
+        FunctionChange.RemoveImpl removeImpl = (FunctionChange.RemoveImpl) change;
+        FunctionParam[] targetParams = removeImpl.parameters();
+        FunctionImpl.RuntimeType runtime = removeImpl.runtime();
+        newDefinitions = removeImplFromDefinition(newDefinitions, targetParams, runtime);
+
+      } else {
+        throw new IllegalArgumentException(
+            "Unknown function change: " + change.getClass().getSimpleName());
+      }
+    }
+
+    String currentUser = PrincipalUtils.getCurrentUserName();
+    Instant now = Instant.now();
+    AuditInfo newAuditInfo =
+        AuditInfo.builder()
+            .withCreator(oldEntity.auditInfo().creator())
+            .withCreateTime(oldEntity.auditInfo().createTime())
+            .withLastModifier(currentUser)
+            .withLastModifiedTime(now)
+            .build();
+
+    return FunctionEntity.builder()
+        .withId(oldEntity.id())
+        .withName(oldEntity.name())
+        .withNamespace(oldEntity.namespace())
+        .withComment(newComment)
+        .withFunctionType(oldEntity.functionType())
+        .withDeterministic(oldEntity.deterministic())
+        .withDefinitions(newDefinitions.toArray(new FunctionDefinition[0]))
+        .withAuditInfo(newAuditInfo)
+        .build();
+  }
+
+  /**
+   * Validates that a new definition does not create ambiguous function arities with existing
+   * definitions. Each definition can support multiple arities based on parameters with default
+   * values.
+   *
+   * <p>Gravitino enforces strict validation to prevent ambiguity. Operations MUST fail if a new
+   * definition's invocation arities overlap with existing ones. For example, if an existing
+   * definition {@code foo(int, float default 1.0)} supports arities {@code (int)} and {@code (int,
+   * float)}, adding a new definition {@code foo(int, string default 'x')} (which supports {@code
+   * (int)} and {@code (int, string)}) will be REJECTED because both support the call {@code
+   * foo(1)}. This ensures every function invocation deterministically maps to a single definition.
+   *
+   * @param existingDefinitions The current definitions.
+   * @param newDefinition The definition to add.
+   * @throws IllegalArgumentException If the new definition creates overlapping arities.
+   */
+  private void validateNoArityOverlap(
+      List<FunctionDefinition> existingDefinitions, FunctionDefinition newDefinition) {
+    Set<String> newArities = computeArities(newDefinition);
+
+    for (FunctionDefinition existing : existingDefinitions) {
+      Set<String> existingArities = computeArities(existing);
+      for (String arity : newArities) {
+        if (existingArities.contains(arity)) {
+          throw new IllegalArgumentException(
+              String.format(
+                  "Cannot add definition: arity '%s' overlaps with an existing definition. "
+                      + "This would create ambiguous function invocations.",
+                  arity));
+        }
+      }
+    }
+  }
+
   /**
    * Computes all possible invocation arities for a function definition. A definition with N
-   * parameters where the last M have default values supports arities from (N-M) to N parameters.
+   * parameters where the last M has default values supports arities from (N-M) to N parameters.
    *
    * <p>For example:
    *
@@ -312,5 +394,185 @@ public class ManagedFunctionOperations implements FunctionCatalog {
   private boolean hasDefaultValue(FunctionParam param) {
     Expression defaultValue = param.defaultValue();
     return defaultValue != null && defaultValue != Column.DEFAULT_VALUE_NOT_SET;
+  }
+
+  /**
+   * Validates that a definition can be removed.
+   *
+   * @param definitions The current definitions.
+   * @param paramsToRemove The parameters identifying the definition to remove.
+   * @throws IllegalArgumentException If the definition doesn't exist or is the only one.
+   */
+  private void validateRemoveDefinition(
+      List<FunctionDefinition> definitions, FunctionParam[] paramsToRemove) {
+    if (definitions.size() == 1) {
+      throw new IllegalArgumentException(
+          "Cannot remove the only definition. Use dropFunction to remove the entire function.");
+    }
+
+    boolean found = false;
+    for (FunctionDefinition def : definitions) {
+      if (parametersMatch(def.parameters(), paramsToRemove)) {
+        found = true;
+        break;
+      }
+    }
+
+    if (!found) {
+      throw new IllegalArgumentException(
+          "Cannot remove definition: no definition found with the specified parameters");
+    }
+  }
+
+  private boolean parametersMatch(FunctionParam[] params1, FunctionParam[] params2) {
+    if (params1.length != params2.length) {
+      return false;
+    }
+    for (int i = 0; i < params1.length; i++) {
+      if (!params1[i].name().equals(params2[i].name())
+          || !params1[i].dataType().equals(params2[i].dataType())) {
+        return false;
+      }
+    }
+    return true;
+  }
+
+  private List<FunctionDefinition> addImplToDefinition(
+      List<FunctionDefinition> definitions, FunctionParam[] targetParams, FunctionImpl implToAdd) {
+    List<FunctionDefinition> result = new ArrayList<>();
+    boolean found = false;
+
+    for (FunctionDefinition def : definitions) {
+      if (parametersMatch(def.parameters(), targetParams)) {
+        found = true;
+        // Check if runtime already exists
+        for (FunctionImpl existingImpl : def.impls()) {
+          if (existingImpl.runtime() == implToAdd.runtime()) {
+            throw new IllegalArgumentException(
+                String.format(
+                    "Cannot add implementation: runtime '%s' already exists in this definition. "
+                        + "Use updateImpl to replace it.",
+                    implToAdd.runtime()));
+          }
+        }
+        List<FunctionImpl> impls = new ArrayList<>(Arrays.asList(def.impls()));
+        impls.add(implToAdd);
+        result.add(rebuildDefinitionWithNewImpls(def, impls.toArray(new FunctionImpl[0])));
+      } else {
+        result.add(def);
+      }
+    }
+
+    if (!found) {
+      throw new IllegalArgumentException(
+          "Cannot add implementation: no definition found with the specified parameters");
+    }
+
+    return result;
+  }
+
+  private List<FunctionDefinition> updateImplInDefinition(
+      List<FunctionDefinition> definitions,
+      FunctionParam[] targetParams,
+      FunctionImpl.RuntimeType runtime,
+      FunctionImpl newImpl) {
+    List<FunctionDefinition> result = new ArrayList<>();
+    boolean definitionFound = false;
+    boolean runtimeFound = false;
+
+    for (FunctionDefinition def : definitions) {
+      if (parametersMatch(def.parameters(), targetParams)) {
+        definitionFound = true;
+        List<FunctionImpl> impls = new ArrayList<>();
+        for (FunctionImpl impl : def.impls()) {
+          if (impl.runtime() == runtime) {
+            runtimeFound = true;
+            impls.add(newImpl);
+          } else {
+            impls.add(impl);
+          }
+        }
+        result.add(rebuildDefinitionWithNewImpls(def, impls.toArray(new FunctionImpl[0])));
+      } else {
+        result.add(def);
+      }
+    }
+
+    if (!definitionFound) {
+      throw new IllegalArgumentException(
+          "Cannot update implementation: no definition found with the specified parameters");
+    }
+
+    if (!runtimeFound) {
+      throw new IllegalArgumentException(
+          String.format(
+              "Cannot update implementation: runtime '%s' not found in the definition", runtime));
+    }
+
+    return result;
+  }
+
+  private List<FunctionDefinition> removeImplFromDefinition(
+      List<FunctionDefinition> definitions,
+      FunctionParam[] targetParams,
+      FunctionImpl.RuntimeType runtime) {
+    List<FunctionDefinition> result = new ArrayList<>();
+    boolean definitionFound = false;
+    boolean runtimeFound = false;
+
+    for (FunctionDefinition def : definitions) {
+      if (parametersMatch(def.parameters(), targetParams)) {
+        definitionFound = true;
+
+        // Check if this is the only implementation
+        if (def.impls().length == 1) {
+          if (def.impls()[0].runtime() == runtime) {
+            throw new IllegalArgumentException(
+                "Cannot remove the only implementation. Use removeDefinition to remove the entire definition.");
+          }
+        }
+
+        List<FunctionImpl> impls = new ArrayList<>();
+        for (FunctionImpl impl : def.impls()) {
+          if (impl.runtime() == runtime) {
+            runtimeFound = true;
+          } else {
+            impls.add(impl);
+          }
+        }
+        result.add(rebuildDefinitionWithNewImpls(def, impls.toArray(new FunctionImpl[0])));
+      } else {
+        result.add(def);
+      }
+    }
+
+    if (!definitionFound) {
+      throw new IllegalArgumentException(
+          "Cannot remove implementation: no definition found with the specified parameters");
+    }
+
+    if (!runtimeFound) {
+      throw new IllegalArgumentException(
+          String.format(
+              "Cannot remove implementation: runtime '%s' not found in the definition", runtime));
+    }
+
+    return result;
+  }
+
+  /**
+   * Rebuilds a FunctionDefinition with new implementations while preserving
+   * returnType/returnColumns.
+   */
+  @SuppressWarnings("deprecation")
+  private FunctionDefinition rebuildDefinitionWithNewImpls(
+      FunctionDefinition original, FunctionImpl[] newImpls) {
+    if (original.returnType() != null) {
+      return FunctionDefinitions.of(original.parameters(), original.returnType(), newImpls);
+    } else if (original.returnColumns() != null && original.returnColumns().length > 0) {
+      return FunctionDefinitions.of(original.parameters(), original.returnColumns(), newImpls);
+    } else {
+      return FunctionDefinitions.of(original.parameters(), newImpls);
+    }
   }
 }
