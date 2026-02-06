@@ -19,9 +19,7 @@
 package org.apache.gravitino.integration.test.container;
 
 import com.google.common.collect.ImmutableSet;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.nio.file.Paths;
+import java.io.File;
 import java.util.HashMap;
 import java.util.Map;
 import org.apache.gravitino.integration.test.util.CommandExecutor;
@@ -73,9 +71,11 @@ public class TrinoITContainers implements AutoCloseable {
       env.put("TRINO_VERSION", String.valueOf(trinoVersion));
     }
     if (trinoConnectorDir != null) {
-      Path path = Paths.get(trinoConnectorDir);
-      if (!Files.exists(path)) {
-        throw new Exception("Provided GRAVITINO_TRINO_CONNECTOR_DIR '" + path + "' does not exist");
+      File dir = new File(trinoConnectorDir);
+      if (!dir.exists() || dir.list().length == 0) {
+        throw new Exception(
+            "Gravitino trino connector directory %s is not exist or empty"
+                .formatted(trinoConnectorDir));
       }
       env.put("GRAVITINO_TRINO_CONNECTOR_DIR", trinoConnectorDir);
     }
