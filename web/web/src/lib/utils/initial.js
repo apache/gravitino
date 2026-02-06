@@ -289,6 +289,41 @@ export const providers = [
     ]
   },
   {
+    label: 'Hologres',
+    value: 'jdbc-hologres',
+    defaultProps: [
+      {
+        key: 'jdbc-driver',
+        value: 'org.postgresql.Driver',
+        required: true,
+        description: 'e.g. org.postgresql.Driver'
+      },
+      {
+        key: 'jdbc-url',
+        value: '',
+        required: true,
+        description: 'e.g. jdbc:postgresql://{ENDPOINT}:{PORT}/{DATABASE}'
+      },
+      {
+        key: 'jdbc-user',
+        value: '',
+        required: true,
+        description: 'Alibaba Cloud AccessKey ID'
+      },
+      {
+        key: 'jdbc-password',
+        value: '',
+        required: true,
+        description: 'Alibaba Cloud AccessKey Secret'
+      },
+      {
+        key: 'jdbc-database',
+        value: '',
+        required: true
+      }
+    ]
+  },
+  {
     label: 'OceanBase',
     value: 'jdbc-oceanbase',
     defaultProps: [
@@ -649,6 +684,23 @@ const relationalColumnTypeMap = {
     'time',
     'timestamp',
     'varchar'
+  ],
+  'jdbc-hologres': [
+    'binary',
+    'boolean',
+    'char',
+    'date',
+    'decimal',
+    'double',
+    'float',
+    'integer',
+    'long',
+    'short',
+    'string',
+    'time',
+    'timestamp',
+    'timestamp_tz',
+    'varchar'
   ]
 }
 
@@ -699,6 +751,12 @@ const relationalTablePropInfoMap = {
     allowAdd: false
   },
   'jdbc-postgresql': {
+    reserved: [],
+    immutable: [],
+    allowDelete: false,
+    allowAdd: false
+  },
+  'jdbc-hologres': {
     reserved: [],
     immutable: [],
     allowDelete: false,
