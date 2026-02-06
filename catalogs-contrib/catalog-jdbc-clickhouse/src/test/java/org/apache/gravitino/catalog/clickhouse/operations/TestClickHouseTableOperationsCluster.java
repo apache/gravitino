@@ -30,6 +30,7 @@ import org.apache.gravitino.catalog.clickhouse.converter.ClickHouseTypeConverter
 import org.apache.gravitino.catalog.jdbc.JdbcColumn;
 import org.apache.gravitino.rel.expressions.distributions.Distribution;
 import org.apache.gravitino.rel.expressions.distributions.Distributions;
+import org.apache.gravitino.rel.expressions.sorts.SortOrder;
 import org.apache.gravitino.rel.expressions.transforms.Transform;
 import org.apache.gravitino.rel.indexes.Index;
 import org.apache.gravitino.rel.types.Types;
@@ -78,6 +79,37 @@ class TestClickHouseTableOperationsCluster {
     Assertions.assertTrue(sql.contains("CREATE TABLE `tbl` ON CLUSTER `ck_cluster`"));
     Assertions.assertTrue(
         sql.contains("ENGINE = Distributed(`ck_cluster`,`remote_db`,`remote_table`,user_id)"));
+
+    props.put(ClusterConstants.ON_CLUSTER, "false");
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () ->
+            ops.buildCreateSql(
+                "tbl", columns, "comment", props, null, Distributions.NONE, new Index[0], null));
+
+    props.put(ClusterConstants.ON_CLUSTER, "true");
+    props.remove(DistributedTableConstants.REMOTE_DATABASE);
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () ->
+            ops.buildCreateSql(
+                "tbl", columns, "comment", props, null, Distributions.NONE, new Index[0], null));
+
+    props.put(DistributedTableConstants.REMOTE_DATABASE, "remote_db");
+    props.remove(DistributedTableConstants.REMOTE_TABLE);
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () ->
+            ops.buildCreateSql(
+                "tbl", columns, "comment", props, null, Distributions.NONE, new Index[0], null));
+
+    props.put(DistributedTableConstants.REMOTE_TABLE, "remote_table");
+    props.remove(DistributedTableConstants.SHARDING_KEY);
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () ->
+            ops.buildCreateSql(
+                "tbl", columns, "comment", props, null, Distributions.NONE, new Index[0], null));
   }
 
   private static class TestableClickHouseTableOperations extends ClickHouseTableOperations {
@@ -89,7 +121,7 @@ class TestClickHouseTableOperationsCluster {
         Transform[] partitioning,
         Distribution distribution,
         Index[] indexes,
-        org.apache.gravitino.rel.expressions.sorts.SortOrder[] sortOrders) {
+        SortOrder[] sortOrders) {
       return generateCreateTableSql(
           tableName, columns, comment, properties, partitioning, distribution, indexes, sortOrders);
     }
