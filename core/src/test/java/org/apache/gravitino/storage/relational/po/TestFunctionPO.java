@@ -34,7 +34,6 @@ public class TestFunctionPO {
             .withSchemaId(1L)
             .withFunctionType("SCALAR")
             .withDeterministic(1)
-            .withReturnType("STRING")
             .withFunctionLatestVersion(1)
             .withFunctionCurrentVersion(1)
             .withAuditInfo("audit-info")
@@ -48,7 +47,6 @@ public class TestFunctionPO {
     Assertions.assertEquals(1L, functionPO.schemaId());
     Assertions.assertEquals("SCALAR", functionPO.functionType());
     Assertions.assertEquals(1, functionPO.deterministic());
-    Assertions.assertEquals("STRING", functionPO.returnType());
     Assertions.assertEquals(1, functionPO.functionLatestVersion());
     Assertions.assertEquals(1, functionPO.functionCurrentVersion());
     Assertions.assertEquals("audit-info", functionPO.auditInfo());
@@ -103,7 +101,6 @@ public class TestFunctionPO {
             .withSchemaId(1L)
             .withFunctionType("SCALAR")
             .withDeterministic(1)
-            .withReturnType("STRING")
             .withFunctionLatestVersion(1)
             .withFunctionCurrentVersion(1)
             .withAuditInfo("audit-info")
@@ -119,7 +116,6 @@ public class TestFunctionPO {
             .withSchemaId(1L)
             .withFunctionType("SCALAR")
             .withDeterministic(1)
-            .withReturnType("STRING")
             .withFunctionLatestVersion(1)
             .withFunctionCurrentVersion(1)
             .withAuditInfo("audit-info")

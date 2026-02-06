@@ -130,7 +130,8 @@ public class FunctionIT extends BaseIT {
         FunctionParams.of("x", Types.IntegerType.get(), null, Literals.integerLiteral(0));
     FunctionImpl impl = FunctionImpls.ofSql(FunctionImpl.RuntimeType.SPARK, "SELECT x + 1");
     FunctionDefinition definition =
-        FunctionDefinitions.of(new FunctionParam[] {param}, new FunctionImpl[] {impl});
+        FunctionDefinitions.of(
+            new FunctionParam[] {param}, Types.IntegerType.get(), new FunctionImpl[] {impl});
 
     Function registered =
         functionCatalog.registerFunction(
@@ -138,14 +139,13 @@ public class FunctionIT extends BaseIT {
             "Add one to input",
             FunctionType.SCALAR,
             true,
-            Types.IntegerType.get(),
             new FunctionDefinition[] {definition});
 
     Assertions.assertEquals(functionName, registered.name());
     Assertions.assertEquals(FunctionType.SCALAR, registered.functionType());
     Assertions.assertTrue(registered.deterministic());
     Assertions.assertEquals("Add one to input", registered.comment());
-    Assertions.assertEquals(Types.IntegerType.get(), registered.returnType());
+    Assertions.assertEquals(Types.IntegerType.get(), registered.definitions()[0].returnType());
     Assertions.assertEquals(1, registered.definitions().length);
 
     Function loaded = functionCatalog.getFunction(ident);
@@ -153,7 +153,7 @@ public class FunctionIT extends BaseIT {
     Assertions.assertEquals(FunctionType.SCALAR, loaded.functionType());
     Assertions.assertTrue(loaded.deterministic());
     Assertions.assertEquals("Add one to input", loaded.comment());
-    Assertions.assertEquals(Types.IntegerType.get(), loaded.returnType());
+    Assertions.assertEquals(Types.IntegerType.get(), loaded.definitions()[0].returnType());
 
     Assertions.assertTrue(functionCatalog.functionExists(ident));
     Assertions.assertFalse(
@@ -165,7 +165,8 @@ public class FunctionIT extends BaseIT {
 
     FunctionImpl nonDetImpl = FunctionImpls.ofSql(FunctionImpl.RuntimeType.SPARK, "SELECT RAND()");
     FunctionDefinition nonDetDefinition =
-        FunctionDefinitions.of(new FunctionParam[0], new FunctionImpl[] {nonDetImpl});
+        FunctionDefinitions.of(
+            new FunctionParam[0], Types.DoubleType.get(), new FunctionImpl[] {nonDetImpl});
 
     Function nonDetRegistered =
         functionCatalog.registerFunction(
@@ -173,7 +174,6 @@ public class FunctionIT extends BaseIT {
             "Non-deterministic function",
             FunctionType.SCALAR,
             false,
-            Types.DoubleType.get(),
             new FunctionDefinition[] {nonDetDefinition});
 
     Assertions.assertFalse(nonDetRegistered.deterministic());
@@ -185,18 +185,22 @@ public class FunctionIT extends BaseIT {
     FunctionParam tableParam = FunctionParams.of("n", Types.IntegerType.get());
     FunctionImpl tableImpl =
         FunctionImpls.ofJava(FunctionImpl.RuntimeType.SPARK, "com.example.GenerateRowsUDTF");
+    FunctionColumn[] returnColumns =
+        new FunctionColumn[] {FunctionColumn.of("x", Types.StringType.get(), "comment")};
     FunctionDefinition tableDefinition =
-        FunctionDefinitions.of(new FunctionParam[] {tableParam}, new FunctionImpl[] {tableImpl});
+        FunctionDefinitions.of(
+            new FunctionParam[] {tableParam}, returnColumns, new FunctionImpl[] {tableImpl});
 
     Function tableRegistered =
         functionCatalog.registerFunction(
             tableFuncIdent,
             "Table function",
+            FunctionType.TABLE,
             true,
-            new FunctionColumn[] {FunctionColumn.of("x", Types.StringType.get(), "comment")},
             new FunctionDefinition[] {tableDefinition});
 
     Assertions.assertEquals(FunctionType.TABLE, tableRegistered.functionType());
+    Assertions.assertArrayEquals(returnColumns, tableRegistered.definitions()[0].returnColumns());
   }
 
   @Test
@@ -208,15 +212,11 @@ public class FunctionIT extends BaseIT {
     FunctionParam param = FunctionParams.of("x", Types.IntegerType.get());
     FunctionImpl impl = FunctionImpls.ofSql(FunctionImpl.RuntimeType.SPARK, "SELECT x + 1");
     FunctionDefinition definition =
-        FunctionDefinitions.of(new FunctionParam[] {param}, new FunctionImpl[] {impl});
+        FunctionDefinitions.of(
+            new FunctionParam[] {param}, Types.IntegerType.get(), new FunctionImpl[] {impl});
 
     functionCatalog.registerFunction(
-        ident,
-        "comment",
-        FunctionType.SCALAR,
-        true,
-        Types.IntegerType.get(),
-        new FunctionDefinition[] {definition});
+        ident, "comment", FunctionType.SCALAR, true, new FunctionDefinition[] {definition});
 
     Assertions.assertThrows(
         FunctionAlreadyExistsException.class,
@@ -226,7 +226,6 @@ public class FunctionIT extends BaseIT {
                 "comment",
                 FunctionType.SCALAR,
                 true,
-                Types.IntegerType.get(),
                 new FunctionDefinition[] {definition}));
 
     // Test 2: Register function with ambiguous definitions should fail
@@ -247,12 +246,14 @@ public class FunctionIT extends BaseIT {
     FunctionDefinition def1 =
         FunctionDefinitions.of(
             new FunctionParam[] {intParam, floatParamWithDefault},
+            Types.IntegerType.get(),
             new FunctionImpl[] {ambiguousImpl});
 
     // Definition 2: foo(int, string default 'x') supports arities: (int), (int, string)
     FunctionDefinition def2 =
         FunctionDefinitions.of(
             new FunctionParam[] {intParam, stringParamWithDefault},
+            Types.IntegerType.get(),
             new FunctionImpl[] {ambiguousImpl});
 
     // Both definitions support call foo(1), so this should fail
@@ -264,7 +265,6 @@ public class FunctionIT extends BaseIT {
                 "Ambiguous function",
                 FunctionType.SCALAR,
                 true,
-                Types.IntegerType.get(),
                 new FunctionDefinition[] {def1, def2}));
   }
 
@@ -294,7 +294,8 @@ public class FunctionIT extends BaseIT {
     FunctionParam param = FunctionParams.of("x", Types.IntegerType.get());
     FunctionImpl impl = FunctionImpls.ofSql(FunctionImpl.RuntimeType.SPARK, "SELECT x + 1");
     FunctionDefinition definition =
-        FunctionDefinitions.of(new FunctionParam[] {param}, new FunctionImpl[] {impl});
+        FunctionDefinitions.of(
+            new FunctionParam[] {param}, Types.IntegerType.get(), new FunctionImpl[] {impl});
 
     Function func1 =
         functionCatalog.registerFunction(
@@ -302,7 +303,6 @@ public class FunctionIT extends BaseIT {
             "comment1",
             FunctionType.SCALAR,
             true,
-            Types.IntegerType.get(),
             new FunctionDefinition[] {definition});
 
     Function func2 =
@@ -311,7 +311,6 @@ public class FunctionIT extends BaseIT {
             "comment2",
             FunctionType.SCALAR,
             true,
-            Types.IntegerType.get(),
             new FunctionDefinition[] {definition});
 
     // List functions
@@ -340,15 +339,11 @@ public class FunctionIT extends BaseIT {
     FunctionParam param = FunctionParams.of("x", Types.IntegerType.get());
     FunctionImpl impl = FunctionImpls.ofSql(FunctionImpl.RuntimeType.SPARK, "SELECT x + 1");
     FunctionDefinition definition =
-        FunctionDefinitions.of(new FunctionParam[] {param}, new FunctionImpl[] {impl});
+        FunctionDefinitions.of(
+            new FunctionParam[] {param}, Types.IntegerType.get(), new FunctionImpl[] {impl});
 
     functionCatalog.registerFunction(
-        ident,
-        "comment",
-        FunctionType.SCALAR,
-        true,
-        Types.IntegerType.get(),
-        new FunctionDefinition[] {definition});
+        ident, "comment", FunctionType.SCALAR, true, new FunctionDefinition[] {definition});
 
     // Function exists
     Assertions.assertTrue(functionCatalog.functionExists(ident));
@@ -371,14 +366,14 @@ public class FunctionIT extends BaseIT {
     FunctionParam param = FunctionParams.of("x", Types.IntegerType.get());
     FunctionImpl impl = FunctionImpls.ofSql(FunctionImpl.RuntimeType.SPARK, "SELECT x + 1");
     FunctionDefinition definition =
-        FunctionDefinitions.of(new FunctionParam[] {param}, new FunctionImpl[] {impl});
+        FunctionDefinitions.of(
+            new FunctionParam[] {param}, Types.IntegerType.get(), new FunctionImpl[] {impl});
 
     functionCatalog.registerFunction(
         ident,
         "original comment",
         FunctionType.SCALAR,
         true,
-        Types.IntegerType.get(),
         new FunctionDefinition[] {definition});
 
     // Alter comment
@@ -401,22 +396,19 @@ public class FunctionIT extends BaseIT {
     FunctionParam param1 = FunctionParams.of("x", Types.IntegerType.get());
     FunctionImpl impl1 = FunctionImpls.ofSql(FunctionImpl.RuntimeType.SPARK, "SELECT x + 1");
     FunctionDefinition definition1 =
-        FunctionDefinitions.of(new FunctionParam[] {param1}, new FunctionImpl[] {impl1});
+        FunctionDefinitions.of(
+            new FunctionParam[] {param1}, Types.IntegerType.get(), new FunctionImpl[] {impl1});
 
     functionCatalog.registerFunction(
-        ident,
-        "comment",
-        FunctionType.SCALAR,
-        true,
-        Types.IntegerType.get(),
-        new FunctionDefinition[] {definition1});
+        ident, "comment", FunctionType.SCALAR, true, new FunctionDefinition[] {definition1});
 
     // Add a new definition with different parameter type
     FunctionParam param2 = FunctionParams.of("x", Types.StringType.get());
     FunctionImpl impl2 =
         FunctionImpls.ofSql(FunctionImpl.RuntimeType.SPARK, "SELECT CONCAT(x, '_suffix')");
     FunctionDefinition definition2 =
-        FunctionDefinitions.of(new FunctionParam[] {param2}, new FunctionImpl[] {impl2});
+        FunctionDefinitions.of(
+            new FunctionParam[] {param2}, Types.StringType.get(), new FunctionImpl[] {impl2});
 
     Function altered =
         functionCatalog.alterFunction(ident, FunctionChange.addDefinition(definition2));
@@ -433,15 +425,11 @@ public class FunctionIT extends BaseIT {
     FunctionParam param = FunctionParams.of("x", Types.IntegerType.get());
     FunctionImpl sparkImpl = FunctionImpls.ofSql(FunctionImpl.RuntimeType.SPARK, "SELECT x + 1");
     FunctionDefinition definition =
-        FunctionDefinitions.of(new FunctionParam[] {param}, new FunctionImpl[] {sparkImpl});
+        FunctionDefinitions.of(
+            new FunctionParam[] {param}, Types.IntegerType.get(), new FunctionImpl[] {sparkImpl});
 
     functionCatalog.registerFunction(
-        ident,
-        "comment",
-        FunctionType.SCALAR,
-        true,
-        Types.IntegerType.get(),
-        new FunctionDefinition[] {definition});
+        ident, "comment", FunctionType.SCALAR, true, new FunctionDefinition[] {definition});
 
     // Test 1: Add Trino implementation
     FunctionImpl trinoImpl = FunctionImpls.ofSql(FunctionImpl.RuntimeType.TRINO, "SELECT x + 1");
@@ -495,7 +483,10 @@ public class FunctionIT extends BaseIT {
     FunctionImpl javaImpl =
         FunctionImpls.ofJava(FunctionImpl.RuntimeType.SPARK, "com.example.AddOneUDF");
     FunctionDefinition javaDefinition =
-        FunctionDefinitions.of(new FunctionParam[] {javaParam}, new FunctionImpl[] {javaImpl});
+        FunctionDefinitions.of(
+            new FunctionParam[] {javaParam},
+            Types.IntegerType.get(),
+            new FunctionImpl[] {javaImpl});
 
     Function javaRegistered =
         functionCatalog.registerFunction(
@@ -503,7 +494,6 @@ public class FunctionIT extends BaseIT {
             "Java UDF",
             FunctionType.SCALAR,
             true,
-            Types.IntegerType.get(),
             new FunctionDefinition[] {javaDefinition});
 
     Assertions.assertEquals(javaFuncName, javaRegistered.name());
@@ -523,7 +513,10 @@ public class FunctionIT extends BaseIT {
             null,
             null);
     FunctionDefinition pythonDefinition =
-        FunctionDefinitions.of(new FunctionParam[] {pythonParam}, new FunctionImpl[] {pythonImpl});
+        FunctionDefinitions.of(
+            new FunctionParam[] {pythonParam},
+            Types.IntegerType.get(),
+            new FunctionImpl[] {pythonImpl});
 
     Function pythonRegistered =
         functionCatalog.registerFunction(
@@ -531,7 +524,6 @@ public class FunctionIT extends BaseIT {
             "Python UDF",
             FunctionType.SCALAR,
             true,
-            Types.IntegerType.get(),
             new FunctionDefinition[] {pythonDefinition});
 
     Assertions.assertEquals(pythonFuncName, pythonRegistered.name());
@@ -545,13 +537,15 @@ public class FunctionIT extends BaseIT {
     FunctionParam param1 = FunctionParams.of("x", Types.IntegerType.get());
     FunctionImpl impl1 = FunctionImpls.ofSql(FunctionImpl.RuntimeType.SPARK, "SELECT x + 1");
     FunctionDefinition definition1 =
-        FunctionDefinitions.of(new FunctionParam[] {param1}, new FunctionImpl[] {impl1});
+        FunctionDefinitions.of(
+            new FunctionParam[] {param1}, Types.IntegerType.get(), new FunctionImpl[] {impl1});
 
     FunctionParam param2 = FunctionParams.of("x", Types.StringType.get());
     FunctionImpl impl2 =
         FunctionImpls.ofSql(FunctionImpl.RuntimeType.SPARK, "SELECT CONCAT(x, '_suffix')");
     FunctionDefinition definition2 =
-        FunctionDefinitions.of(new FunctionParam[] {param2}, new FunctionImpl[] {impl2});
+        FunctionDefinitions.of(
+            new FunctionParam[] {param2}, Types.StringType.get(), new FunctionImpl[] {impl2});
 
     Function multiRegistered =
         functionCatalog.registerFunction(
@@ -559,7 +553,6 @@ public class FunctionIT extends BaseIT {
             "Overloaded function",
             FunctionType.SCALAR,
             true,
-            Types.StringType.get(),
             new FunctionDefinition[] {definition1, definition2});
 
     Assertions.assertEquals(2, multiRegistered.definitions().length);
@@ -574,20 +567,21 @@ public class FunctionIT extends BaseIT {
     FunctionParam param1 = FunctionParams.of("x", Types.IntegerType.get());
     FunctionImpl impl1 = FunctionImpls.ofSql(FunctionImpl.RuntimeType.SPARK, "SELECT x + 1");
     FunctionDefinition definition1 =
-        FunctionDefinitions.of(new FunctionParam[] {param1}, new FunctionImpl[] {impl1});
+        FunctionDefinitions.of(
+            new FunctionParam[] {param1}, Types.IntegerType.get(), new FunctionImpl[] {impl1});
 
     FunctionParam param2 = FunctionParams.of("x", Types.StringType.get());
     FunctionImpl impl2 =
         FunctionImpls.ofSql(FunctionImpl.RuntimeType.SPARK, "SELECT CONCAT(x, '_suffix')");
     FunctionDefinition definition2 =
-        FunctionDefinitions.of(new FunctionParam[] {param2}, new FunctionImpl[] {impl2});
+        FunctionDefinitions.of(
+            new FunctionParam[] {param2}, Types.StringType.get(), new FunctionImpl[] {impl2});
 
     functionCatalog.registerFunction(
         ident,
         "comment",
         FunctionType.SCALAR,
         true,
-        Types.StringType.get(),
         new FunctionDefinition[] {definition1, definition2});
 
     // Remove one definition

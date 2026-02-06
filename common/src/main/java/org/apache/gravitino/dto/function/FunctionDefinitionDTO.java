@@ -19,17 +19,23 @@
 package org.apache.gravitino.dto.function;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
+import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
+import com.fasterxml.jackson.databind.annotation.JsonSerialize;
 import java.util.Arrays;
+import javax.annotation.Nullable;
 import lombok.AccessLevel;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.EqualsAndHashCode;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
+import org.apache.gravitino.function.FunctionColumn;
 import org.apache.gravitino.function.FunctionDefinition;
 import org.apache.gravitino.function.FunctionDefinitions;
 import org.apache.gravitino.function.FunctionImpl;
 import org.apache.gravitino.function.FunctionParam;
+import org.apache.gravitino.json.JsonUtils;
+import org.apache.gravitino.rel.types.Type;
 
 /** DTO for function definition. */
 @Getter
@@ -42,6 +48,15 @@ public class FunctionDefinitionDTO implements FunctionDefinition {
   @JsonProperty("parameters")
   private FunctionParamDTO[] parameters;
 
+  @Nullable
+  @JsonProperty("returnType")
+  @JsonSerialize(using = JsonUtils.TypeSerializer.class)
+  @JsonDeserialize(using = JsonUtils.TypeDeserializer.class)
+  private Type returnType;
+
+  @JsonProperty("returnColumns")
+  private FunctionColumnDTO[] returnColumns;
+
   @JsonProperty("impls")
   private FunctionImplDTO[] impls;
 
@@ -51,6 +66,21 @@ public class FunctionDefinitionDTO implements FunctionDefinition {
       return new FunctionParam[0];
     }
     return parameters;
+  }
+
+  @Override
+  public Type returnType() {
+    return returnType;
+  }
+
+  @Override
+  public FunctionColumn[] returnColumns() {
+    if (returnColumns == null) {
+      return FunctionDefinition.EMPTY_COLUMNS;
+    }
+    return Arrays.stream(returnColumns)
+        .map(FunctionColumnDTO::toFunctionColumn)
+        .toArray(FunctionColumn[]::new);
   }
 
   @Override
@@ -66,6 +96,7 @@ public class FunctionDefinitionDTO implements FunctionDefinition {
    *
    * @return The function definition.
    */
+  @SuppressWarnings("deprecation")
   public FunctionDefinition toFunctionDefinition() {
     FunctionParam[] params =
         parameters == null
@@ -79,7 +110,19 @@ public class FunctionDefinitionDTO implements FunctionDefinition {
             : Arrays.stream(impls)
                 .map(FunctionImplDTO::toFunctionImpl)
                 .toArray(FunctionImpl[]::new);
-    return FunctionDefinitions.of(params, implArr);
+
+    if (returnType != null) {
+      return FunctionDefinitions.of(params, returnType, implArr);
+    } else if (returnColumns != null && returnColumns.length > 0) {
+      FunctionColumn[] cols =
+          Arrays.stream(returnColumns)
+              .map(FunctionColumnDTO::toFunctionColumn)
+              .toArray(FunctionColumn[]::new);
+      return FunctionDefinitions.of(params, cols, implArr);
+    } else {
+      // Fallback for backward compatibility
+      return FunctionDefinitions.of(params, implArr);
+    }
   }
 
   /**
@@ -99,13 +142,28 @@ public class FunctionDefinitionDTO implements FunctionDefinition {
                             ? (FunctionParamDTO) param
                             : FunctionParamDTO.fromFunctionParam(param))
                 .toArray(FunctionParamDTO[]::new);
+
+    FunctionColumnDTO[] columnDTOs = null;
+    if (definition.returnColumns() != null && definition.returnColumns().length > 0) {
+      columnDTOs =
+          Arrays.stream(definition.returnColumns())
+              .map(FunctionColumnDTO::fromFunctionColumn)
+              .toArray(FunctionColumnDTO[]::new);
+    }
+
     FunctionImplDTO[] implDTOs =
         definition.impls() == null
             ? new FunctionImplDTO[0]
             : Arrays.stream(definition.impls())
                 .map(FunctionImplDTO::fromFunctionImpl)
                 .toArray(FunctionImplDTO[]::new);
-    return new FunctionDefinitionDTO(paramDTOs, implDTOs);
+
+    return FunctionDefinitionDTO.builder()
+        .withParameters(paramDTOs)
+        .withReturnType(definition.returnType())
+        .withReturnColumns(columnDTOs)
+        .withImpls(implDTOs)
+        .build();
   }
 
   @Override
@@ -113,6 +171,10 @@ public class FunctionDefinitionDTO implements FunctionDefinition {
     return "FunctionDefinitionDTO{"
         + "parameters="
         + Arrays.toString(parameters)
+        + ", returnType="
+        + returnType
+        + ", returnColumns="
+        + Arrays.toString(returnColumns)
         + ", impls="
         + Arrays.toString(impls)
         + '}';
