@@ -100,6 +100,11 @@ public class LanceTableOperations extends ManagedTableOperations {
   }
 
   @Override
+  protected boolean supportsIndex() {
+    return true;
+  }
+
+  @Override
   public Table createTable(
       NameIdentifier ident,
       Column[] columns,

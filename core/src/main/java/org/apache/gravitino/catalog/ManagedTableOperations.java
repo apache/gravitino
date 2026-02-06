@@ -73,6 +73,12 @@ public abstract class ManagedTableOperations implements TableCatalog {
 
   protected abstract IdGenerator idGenerator();
 
+  protected abstract boolean supportsIndex();
+
+  public boolean isLocationRequired() {
+    return true;
+  }
+
   @Override
   public NameIdentifier[] listTables(Namespace namespace) throws NoSuchSchemaException {
     try {
@@ -117,6 +123,8 @@ public abstract class ManagedTableOperations implements TableCatalog {
       SortOrder[] sortOrders,
       Index[] indexes)
       throws NoSuchSchemaException, TableAlreadyExistsException {
+    validateIndexSupport(indexes);
+
     // createTable in ManagedTableOperations only stores the table metadata in the entity store.
     // It doesn't handle any additional operations like creating physical location, preprocessing
     // the properties, etc. Those operations should be handled in the specific catalog
@@ -165,6 +173,8 @@ public abstract class ManagedTableOperations implements TableCatalog {
   @Override
   public Table alterTable(NameIdentifier ident, TableChange... changes)
       throws NoSuchTableException, IllegalArgumentException {
+    validateIndexSupport(changes);
+
     // The alterTable in ManagedTableOperations only updates the table metadata in the entity store.
     // It doesn't handle any additional operations like modifying physical data, etc. Those
     // operations should be handled in the specific catalog implementation.
@@ -535,6 +545,27 @@ public abstract class ManagedTableOperations implements TableCatalog {
       return existingColumns.size();
     } else {
       throw new IllegalArgumentException("Unsupported column position: " + position);
+    }
+  }
+
+  private void validateIndexSupport(Index[] indexes) {
+    if (!supportsIndex() && indexes != null && indexes.length > 0) {
+      throw new IllegalArgumentException("Indexes are not supported by this catalog");
+    }
+  }
+
+  private void validateIndexSupport(TableChange[] changes) {
+    if (supportsIndex()) {
+      return;
+    }
+    boolean hasIndexChange =
+        Arrays.stream(changes)
+            .anyMatch(
+                change ->
+                    change instanceof TableChange.AddIndex
+                        || change instanceof TableChange.DeleteIndex);
+    if (hasIndexChange) {
+      throw new IllegalArgumentException("Indexes are not supported by this catalog");
     }
   }
 }

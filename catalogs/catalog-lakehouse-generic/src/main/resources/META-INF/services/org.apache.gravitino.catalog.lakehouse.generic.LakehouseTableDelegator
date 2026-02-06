@@ -18,3 +18,4 @@
 #
 org.apache.gravitino.catalog.lakehouse.delta.DeltaTableDelegator
 org.apache.gravitino.catalog.lakehouse.lance.LanceTableDelegator
+org.apache.gravitino.catalog.lakehouse.iceberg.IcebergTableDelegator

@@ -84,6 +84,47 @@ public class TestManagedTableOperations {
     protected IdGenerator idGenerator() {
       return idGenerator;
     }
+
+    @Override
+    protected boolean supportsIndex() {
+      return true;
+    }
+  }
+
+  public static class InMemoryNoIndexTableOperations extends ManagedTableOperations {
+
+    private final EntityStore entityStore;
+
+    private final SupportsSchemas supportsSchemas;
+
+    private final IdGenerator idGenerator;
+
+    public InMemoryNoIndexTableOperations(
+        EntityStore entityStore, SupportsSchemas supportsSchemas, IdGenerator idGenerator) {
+      this.entityStore = entityStore;
+      this.supportsSchemas = supportsSchemas;
+      this.idGenerator = idGenerator;
+    }
+
+    @Override
+    protected EntityStore store() {
+      return entityStore;
+    }
+
+    @Override
+    protected SupportsSchemas schemas() {
+      return supportsSchemas;
+    }
+
+    @Override
+    protected IdGenerator idGenerator() {
+      return idGenerator;
+    }
+
+    @Override
+    protected boolean supportsIndex() {
+      return false;
+    }
   }
 
   private static final String METALAKE_NAME = "test_metalake";
@@ -416,6 +457,69 @@ public class TestManagedTableOperations {
         NoSuchTableException.class,
         () ->
             tableOperations.alterTable(nonExistingTableIdent, TableChange.rename("another_name")));
+  }
+
+  @Test
+  public void testCreateTableWithIndexesUnsupported() {
+    ManagedTableOperations noIndexTableOps =
+        new InMemoryNoIndexTableOperations(store, schemas, idGenerator);
+    NameIdentifier tableIdent =
+        NameIdentifierUtil.ofTable(METALAKE_NAME, CATALOG_NAME, SCHEMA_NAME, "table_no_index");
+    Column column1 = createColumn("col1", Types.StringType.get(), null);
+    Column[] columns = new Column[] {column1};
+    Transform[] partitioning = new Transform[0];
+    Distribution distribution = Distributions.NONE;
+    SortOrder[] sortOrders = new SortOrder[0];
+    Index[] indexes =
+        new Index[] {
+          Indexes.of(Index.IndexType.PRIMARY_KEY, "pk_index", new String[][] {{"col1"}})
+        };
+
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () ->
+            noIndexTableOps.createTable(
+                tableIdent,
+                columns,
+                "Test Table",
+                StringIdentifier.newPropertiesWithId(
+                    StringIdentifier.fromId(idGenerator.nextId()), Collections.emptyMap()),
+                partitioning,
+                distribution,
+                sortOrders,
+                indexes));
+  }
+
+  @Test
+  public void testAlterTableWithIndexesUnsupported() throws TableAlreadyExistsException {
+    ManagedTableOperations noIndexTableOps =
+        new InMemoryNoIndexTableOperations(store, schemas, idGenerator);
+    NameIdentifier tableIdent =
+        NameIdentifierUtil.ofTable(METALAKE_NAME, CATALOG_NAME, SCHEMA_NAME, "table_no_index");
+    Column column1 = createColumn("col1", Types.StringType.get(), null);
+    Column[] columns = new Column[] {column1};
+    Transform[] partitioning = new Transform[0];
+    Distribution distribution = Distributions.NONE;
+    SortOrder[] sortOrders = new SortOrder[0];
+
+    noIndexTableOps.createTable(
+        tableIdent,
+        columns,
+        "Test Table",
+        StringIdentifier.newPropertiesWithId(
+            StringIdentifier.fromId(idGenerator.nextId()), Collections.emptyMap()),
+        partitioning,
+        distribution,
+        sortOrders,
+        Indexes.EMPTY_INDEXES);
+
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () ->
+            noIndexTableOps.alterTable(
+                tableIdent,
+                TableChange.addIndex(
+                    Index.IndexType.PRIMARY_KEY, "pk_index", new String[][] {{"col1"}})));
   }
 
   @Test
