@@ -58,7 +58,7 @@ public class CacheInvalidationVersionService {
           long now = System.currentTimeMillis();
           try {
             mapper.insertVersion(DEFAULT_ROW_ID, 0L, now);
-          } catch (RuntimeException e) {
+          } catch (Exception e) {
             LOG.debug("Version row already exists, continue to read it", e);
           }
 

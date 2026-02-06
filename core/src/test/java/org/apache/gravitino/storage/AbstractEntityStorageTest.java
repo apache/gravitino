@@ -152,6 +152,8 @@ abstract class AbstractEntityStorageTest {
     Mockito.when(config.get(Configs.CACHE_STATS_ENABLED)).thenReturn(false);
     Mockito.when(config.get(Configs.CACHE_IMPLEMENTATION)).thenReturn("caffeine");
     Mockito.when(config.get(Configs.CACHE_LOCK_SEGMENTS)).thenReturn(16);
+    Mockito.when(config.get(Configs.CACHE_INVALIDATION_ENABLED)).thenReturn(true);
+    Mockito.when(config.get(Configs.CACHE_INVALIDATION_POLL_INTERVAL_MS)).thenReturn(500L);
 
     FieldUtils.writeField(GravitinoEnv.getInstance(), "config", config, true);
 
