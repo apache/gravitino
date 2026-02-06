@@ -756,7 +756,8 @@ public class HologresTableOperations extends JdbcTableOperations
   }
 
   /**
-   * Get tables from the database including regular tables, partitioned parent tables, and views.
+   * Get tables from the database including regular tables, partitioned parent tables, views, and
+   * foreign tables.
    *
    * <p>In Hologres (PostgreSQL-compatible):
    *
@@ -764,10 +765,11 @@ public class HologresTableOperations extends JdbcTableOperations
    *   <li>Regular tables and partition child tables have TABLE_TYPE = "TABLE"
    *   <li>Partitioned parent tables have TABLE_TYPE = "PARTITIONED TABLE"
    *   <li>Views have TABLE_TYPE = "VIEW"
+   *   <li>Foreign tables have TABLE_TYPE = "FOREIGN TABLE"
    * </ul>
    *
-   * <p>This method overrides the parent to include all these types so that partition parent tables
-   * and views are visible in the table list.
+   * <p>This method overrides the parent to include all these types so that partition parent tables,
+   * views, and foreign tables are visible in the table list.
    *
    * @param connection the database connection
    * @return ResultSet containing table metadata
@@ -779,18 +781,25 @@ public class HologresTableOperations extends JdbcTableOperations
     String catalogName = connection.getCatalog();
     String schemaName = connection.getSchema();
     // Include "TABLE" (regular tables and partition children),
-    // "PARTITIONED TABLE" (partition parent tables), and "VIEW" (views)
+    // "PARTITIONED TABLE" (partition parent tables), "VIEW" (views),
+    // and "FOREIGN TABLE" (foreign tables)
     return metaData.getTables(
-        catalogName, schemaName, null, new String[] {"TABLE", "PARTITIONED TABLE", "VIEW"});
+        catalogName,
+        schemaName,
+        null,
+        new String[] {"TABLE", "PARTITIONED TABLE", "VIEW", "FOREIGN TABLE"});
   }
 
   @Override
   protected ResultSet getTable(Connection connection, String schema, String tableName)
       throws SQLException {
     DatabaseMetaData metaData = connection.getMetaData();
-    // Include all types when looking up a specific table or view
+    // Include all types when looking up a specific table, view, or foreign table
     return metaData.getTables(
-        database, schema, tableName, new String[] {"TABLE", "PARTITIONED TABLE", "VIEW"});
+        database,
+        schema,
+        tableName,
+        new String[] {"TABLE", "PARTITIONED TABLE", "VIEW", "FOREIGN TABLE"});
   }
 
   @Override
