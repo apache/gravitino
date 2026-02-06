@@ -762,6 +762,7 @@ public class TestEntityStorage extends AbstractEntityStorageTest {
       throws IOException, IllegalAccessException {
     Config config = Mockito.mock(Config.class);
     Mockito.when(config.get(Configs.CACHE_ENABLED)).thenReturn(enableCache);
+    Mockito.when(config.get(Configs.CATALOG_CACHE_EVICTION_INTERVAL_MS)).thenReturn(500L);
     init(type, config);
     try (EntityStore store = EntityStoreFactory.createEntityStore(config)) {
       store.initialize(config);

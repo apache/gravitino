@@ -18,6 +18,8 @@
  */
 package org.apache.gravitino.tag;
 
+import static org.apache.gravitino.Configs.CACHE_INVALIDATION_ENABLED;
+import static org.apache.gravitino.Configs.CACHE_INVALIDATION_POLL_INTERVAL_MS;
 import static org.apache.gravitino.Configs.DEFAULT_ENTITY_RELATIONAL_STORE;
 import static org.apache.gravitino.Configs.ENTITY_RELATIONAL_JDBC_BACKEND_DRIVER;
 import static org.apache.gravitino.Configs.ENTITY_RELATIONAL_JDBC_BACKEND_MAX_CONNECTIONS;
@@ -140,6 +142,8 @@ public class TestTagManager {
     Mockito.when(config.get(Configs.CACHE_STATS_ENABLED)).thenReturn(false);
     Mockito.when(config.get(Configs.CACHE_IMPLEMENTATION)).thenReturn("caffeine");
     Mockito.when(config.get(Configs.CACHE_LOCK_SEGMENTS)).thenReturn(16);
+    Mockito.when(config.get(CACHE_INVALIDATION_ENABLED)).thenReturn(true);
+    Mockito.when(config.get(CACHE_INVALIDATION_POLL_INTERVAL_MS)).thenReturn(500L);
 
     Mockito.doReturn(100000L).when(config).get(TREE_LOCK_MAX_NODE_IN_MEMORY);
     Mockito.doReturn(1000L).when(config).get(TREE_LOCK_MIN_NODE_IN_MEMORY);

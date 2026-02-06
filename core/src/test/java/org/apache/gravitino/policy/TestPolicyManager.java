@@ -203,6 +203,8 @@ public class TestPolicyManager {
     Mockito.when(config.get(Configs.CACHE_STATS_ENABLED)).thenReturn(false);
     Mockito.when(config.get(Configs.CACHE_IMPLEMENTATION)).thenReturn("caffeine");
     Mockito.when(config.get(Configs.CACHE_LOCK_SEGMENTS)).thenReturn(16);
+    Mockito.when(config.get(Configs.CACHE_INVALIDATION_POLL_INTERVAL_MS)).thenReturn(500L);
+    Mockito.when(config.get(Configs.CACHE_INVALIDATION_ENABLED)).thenReturn(true);
 
     Mockito.doReturn(100000L).when(config).get(TREE_LOCK_MAX_NODE_IN_MEMORY);
     Mockito.doReturn(1000L).when(config).get(TREE_LOCK_MIN_NODE_IN_MEMORY);
