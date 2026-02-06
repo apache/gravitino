@@ -19,6 +19,7 @@
 
 package org.apache.gravitino.rel.indexes;
 
+import java.util.Map;
 import org.apache.gravitino.annotation.Evolving;
 
 /**
@@ -43,6 +44,11 @@ public interface Index {
    *     "a.b.c" for nested column, but normally it could only be "a".
    */
   String[][] fieldNames();
+
+  /**
+   * @return Extra properties for index configuration
+   */
+  Map<String, String> properties();
 
   /**
    * The enum IndexType defines the type of the index. Currently, PRIMARY_KEY and UNIQUE_KEY are
