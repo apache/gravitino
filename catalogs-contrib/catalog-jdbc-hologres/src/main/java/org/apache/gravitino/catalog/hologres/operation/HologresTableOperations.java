@@ -755,11 +755,36 @@ public class HologresTableOperations extends JdbcTableOperations
     return connection;
   }
 
+  /**
+   * Get tables from the database including both regular tables and partitioned parent tables.
+   *
+   * <p>In Hologres (PostgreSQL-compatible), partitioned parent tables have TABLE_TYPE =
+   * "PARTITIONED TABLE", while regular tables and partition child tables have TABLE_TYPE = "TABLE".
+   * This method overrides the parent to include both types so that partition parent tables are
+   * visible in the table list.
+   *
+   * @param connection the database connection
+   * @return ResultSet containing table metadata
+   * @throws SQLException if a database access error occurs
+   */
+  @Override
+  protected ResultSet getTables(Connection connection) throws SQLException {
+    DatabaseMetaData metaData = connection.getMetaData();
+    String catalogName = connection.getCatalog();
+    String schemaName = connection.getSchema();
+    // Include both "TABLE" (regular tables and partition children) and
+    // "PARTITIONED TABLE" (partition parent tables) to show all tables
+    return metaData.getTables(
+        catalogName, schemaName, null, new String[] {"TABLE", "PARTITIONED TABLE"});
+  }
+
   @Override
   protected ResultSet getTable(Connection connection, String schema, String tableName)
       throws SQLException {
     DatabaseMetaData metaData = connection.getMetaData();
-    return metaData.getTables(database, schema, tableName, null);
+    // Include both types when looking up a specific table
+    return metaData.getTables(
+        database, schema, tableName, new String[] {"TABLE", "PARTITIONED TABLE"});
   }
 
   @Override
