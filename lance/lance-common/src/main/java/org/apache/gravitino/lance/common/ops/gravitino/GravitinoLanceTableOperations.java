@@ -27,6 +27,7 @@ import static org.apache.gravitino.lance.common.utils.LanceConstants.LANCE_TABLE
 import static org.apache.gravitino.lance.common.utils.LanceConstants.LANCE_TABLE_VERSION;
 import static org.apache.gravitino.rel.Column.DEFAULT_VALUE_NOT_SET;
 
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Lists;
@@ -353,7 +354,8 @@ public class GravitinoLanceTableOperations implements LanceTableOperations {
     RESPONSE handle(Table gravitinoTable, REQUEST request);
   }
 
-  static class DropColumns
+  @VisibleForTesting
+  public static class DropColumns
       implements TableAlterHandler<AlterTableDropColumnsRequest, AlterTableDropColumnsResponse> {
 
     @Override
@@ -375,7 +377,8 @@ public class GravitinoLanceTableOperations implements LanceTableOperations {
     }
   }
 
-  static class AlterColumns
+  @VisibleForTesting
+  public static class AlterColumns
       implements TableAlterHandler<AlterTableAlterColumnsRequest, AlterTableAlterColumnsResponse> {
 
     @Override
