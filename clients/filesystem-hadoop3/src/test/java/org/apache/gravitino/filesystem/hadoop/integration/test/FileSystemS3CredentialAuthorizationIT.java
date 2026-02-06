@@ -19,8 +19,10 @@
 
 package org.apache.gravitino.filesystem.hadoop.integration.test;
 
+import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Maps;
 import java.util.Map;
+import java.util.Set;
 import org.apache.gravitino.catalog.hadoop.fs.FileSystemUtils;
 import org.apache.gravitino.credential.S3TokenCredential;
 import org.apache.gravitino.s3.fs.S3FileSystemProvider;
@@ -108,6 +110,12 @@ public class FileSystemS3CredentialAuthorizationIT
   @Override
   protected String providerRoleName() {
     return "gvfs_s3_credential_auth_role";
+  }
+
+  @Override
+  protected Set<String> sensitiveProperties() {
+    return ImmutableSet.of(
+        S3Properties.GRAVITINO_S3_ACCESS_KEY_ID, S3Properties.GRAVITINO_S3_SECRET_ACCESS_KEY);
   }
 
   protected static boolean s3IsConfigured() {

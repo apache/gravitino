@@ -105,7 +105,9 @@ public abstract class SparkAuthorizationIT extends BaseIT {
             Configs.CACHE_ENABLED.getKey(),
             "false",
             Configs.AUTHENTICATORS.getKey(),
-            "simple"));
+            "simple",
+            Configs.FILTER_SENSITIVE_PROPERTIES.getKey(),
+            "false"));
     putServiceAdmin();
     initMysqlContainer();
     super.startIntegrationTest();
