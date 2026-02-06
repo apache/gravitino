@@ -38,6 +38,8 @@ import java.io.File;
 import java.io.IOException;
 import java.time.Instant;
 import java.util.Arrays;
+import java.util.Collections;
+import java.util.HashMap;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
@@ -54,6 +56,7 @@ import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.Schema;
 import org.apache.gravitino.StringIdentifier;
+import org.apache.gravitino.connector.CatalogInfo;
 import org.apache.gravitino.exceptions.NoSuchCatalogException;
 import org.apache.gravitino.exceptions.NoSuchSchemaException;
 import org.apache.gravitino.exceptions.SchemaAlreadyExistsException;
@@ -61,6 +64,10 @@ import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.meta.BaseMetalake;
 import org.apache.gravitino.meta.CatalogEntity;
 import org.apache.gravitino.meta.SchemaVersion;
+import org.apache.gravitino.rel.Column;
+import org.apache.gravitino.rel.Table;
+import org.apache.gravitino.rel.TableChange;
+import org.apache.gravitino.rel.types.Types;
 import org.apache.gravitino.storage.IdGenerator;
 import org.apache.gravitino.storage.RandomIdGenerator;
 import org.apache.gravitino.utils.NameIdentifierUtil;
@@ -79,6 +86,7 @@ public class TestGenericCatalogOperations {
   private static EntityStore store;
   private static IdGenerator idGenerator;
   private static GenericCatalogOperations ops;
+  private static GenericCatalog genericCatalog;
 
   @BeforeAll
   public static void setUp() throws IOException, IllegalAccessException {
@@ -137,6 +145,7 @@ public class TestGenericCatalogOperations {
     FieldUtils.writeField(GravitinoEnv.getInstance(), "config", config, true);
 
     ops = new GenericCatalogOperations(store, idGenerator);
+    genericCatalog = new GenericCatalog();
   }
 
   @AfterAll
@@ -228,6 +237,105 @@ public class TestGenericCatalogOperations {
         ops.dropSchema(
             NameIdentifierUtil.ofSchema(METALAKE_NAME, "non-existent-catalog", schemaName2),
             false));
+  }
+
+  @Test
+  public void testCreateExternalIcebergTable() throws Exception {
+    initializeCatalogOps();
+
+    String schemaName = randomSchemaName();
+    NameIdentifier schemaIdent =
+        NameIdentifierUtil.ofSchema(METALAKE_NAME, CATALOG_NAME, schemaName);
+    Map<String, String> schemaProperties =
+        StringIdentifier.newPropertiesWithId(
+            StringIdentifier.fromId(idGenerator.nextId()),
+            Collections.singletonMap(Schema.PROPERTY_LOCATION, "/tmp/iceberg_schema"));
+    ops.createSchema(schemaIdent, "schema comment", schemaProperties);
+
+    NameIdentifier tableIdent =
+        NameIdentifierUtil.ofTable(METALAKE_NAME, CATALOG_NAME, schemaName, "iceberg_table");
+    Column[] columns = new Column[] {Column.of("id", Types.IntegerType.get(), "id column")};
+    Map<String, String> tableProperties = new HashMap<>();
+    tableProperties.put(Table.PROPERTY_TABLE_FORMAT, "iceberg");
+    tableProperties.put(Table.PROPERTY_EXTERNAL, "true");
+    tableProperties.put(Table.PROPERTY_LOCATION, "/tmp/iceberg_table");
+    tableProperties =
+        StringIdentifier.newPropertiesWithId(
+            StringIdentifier.fromId(idGenerator.nextId()), tableProperties);
+
+    Table createdTable =
+        ops.createTable(
+            tableIdent, columns, "table comment", tableProperties, null, null, null, null);
+
+    Assertions.assertEquals("iceberg", createdTable.properties().get(Table.PROPERTY_TABLE_FORMAT));
+    Assertions.assertEquals("true", createdTable.properties().get(Table.PROPERTY_EXTERNAL));
+    Assertions.assertEquals(
+        "/tmp/iceberg_table/", createdTable.properties().get(Table.PROPERTY_LOCATION));
+
+    Assertions.assertThrows(UnsupportedOperationException.class, () -> ops.purgeTable(tableIdent));
+
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () ->
+            ops.alterTable(tableIdent, TableChange.setProperty(Table.PROPERTY_EXTERNAL, "false")));
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () ->
+            ops.alterTable(
+                tableIdent, TableChange.setProperty(Table.PROPERTY_TABLE_FORMAT, "lance")));
+
+    Assertions.assertTrue(ops.dropTable(tableIdent));
+  }
+
+  @Test
+  public void testCreateIcebergTableWithoutExternal() throws Exception {
+    initializeCatalogOps();
+
+    String schemaName = randomSchemaName();
+    NameIdentifier schemaIdent =
+        NameIdentifierUtil.ofSchema(METALAKE_NAME, CATALOG_NAME, schemaName);
+    Map<String, String> schemaProperties =
+        StringIdentifier.newPropertiesWithId(
+            StringIdentifier.fromId(idGenerator.nextId()),
+            Collections.singletonMap(Schema.PROPERTY_LOCATION, "/tmp/iceberg_schema_2"));
+    ops.createSchema(schemaIdent, "schema comment", schemaProperties);
+
+    NameIdentifier tableIdent =
+        NameIdentifierUtil.ofTable(METALAKE_NAME, CATALOG_NAME, schemaName, "iceberg_table_no_ext");
+    Column[] columns = new Column[] {Column.of("id", Types.IntegerType.get(), "id column")};
+    Map<String, String> tableProperties = new HashMap<>();
+    tableProperties.put(Table.PROPERTY_TABLE_FORMAT, "iceberg");
+    tableProperties.put(Table.PROPERTY_LOCATION, "/tmp/iceberg_table_2");
+    Map<String, String> tablePropertiesFinal =
+        StringIdentifier.newPropertiesWithId(
+            StringIdentifier.fromId(idGenerator.nextId()), tableProperties);
+
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () ->
+            ops.createTable(
+                tableIdent,
+                columns,
+                "table comment",
+                tablePropertiesFinal,
+                null,
+                null,
+                null,
+                null));
+  }
+
+  private void initializeCatalogOps() {
+    CatalogInfo catalogInfo =
+        new CatalogInfo(
+            idGenerator.nextId(),
+            CATALOG_NAME,
+            Catalog.Type.RELATIONAL,
+            "generic-lakehouse",
+            null,
+            Collections.emptyMap(),
+            AuditInfo.builder().withCreator("test").withCreateTime(Instant.now()).build(),
+            Namespace.of(METALAKE_NAME));
+    ops.initialize(Collections.emptyMap(), catalogInfo, genericCatalog);
   }
 
   private String randomSchemaName() {
