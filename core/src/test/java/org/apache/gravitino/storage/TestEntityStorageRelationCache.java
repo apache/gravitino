@@ -857,6 +857,56 @@ public class TestEntityStorageRelationCache extends AbstractEntityStorageTest {
       Assertions.assertEquals(1, tags.size());
       Assertions.assertEquals(tag1.name(), tags.get(0).name());
 
+      List<UserEntity> owners =
+          relationOperations.listEntitiesByRelation(
+              SupportsRelationOperations.Type.OWNER_REL,
+              catalog.nameIdentifier(),
+              Entity.EntityType.CATALOG,
+              true);
+      Assertions.assertTrue(owners.isEmpty());
+
+      if (enableCache && store instanceof RelationalEntityStore) {
+        RelationalEntityStore relationalEntityStore = (RelationalEntityStore) store;
+        if (relationalEntityStore.getCache() instanceof CaffeineEntityCache) {
+          CaffeineEntityCache cache = (CaffeineEntityCache) relationalEntityStore.getCache();
+          List<Entity> cachedOwners =
+              cache
+                  .getCacheData()
+                  .getIfPresent(
+                      EntityCacheRelationKey.of(
+                          catalog.nameIdentifier(),
+                          Entity.EntityType.CATALOG,
+                          SupportsRelationOperations.Type.OWNER_REL));
+          Assertions.assertNotNull(cachedOwners);
+          Assertions.assertTrue(cachedOwners.isEmpty());
+        }
+      }
+
+      UserEntity ownerUser =
+          createUserEntity(
+              RandomIdGenerator.INSTANCE.nextId(),
+              AuthorizationUtils.ofUserNamespace("metalake"),
+              "ownerUser",
+              auditInfo);
+      store.put(ownerUser, false);
+
+      relationOperations.insertRelation(
+          SupportsRelationOperations.Type.OWNER_REL,
+          catalog.nameIdentifier(),
+          Entity.EntityType.CATALOG,
+          ownerUser.nameIdentifier(),
+          Entity.EntityType.USER,
+          true);
+
+      owners =
+          relationOperations.listEntitiesByRelation(
+              SupportsRelationOperations.Type.OWNER_REL,
+              catalog.nameIdentifier(),
+              Entity.EntityType.CATALOG,
+              true);
+      Assertions.assertEquals(1, owners.size());
+      Assertions.assertEquals(ownerUser.name(), owners.get(0).name());
+
       destroy(type);
     }
   }
@@ -945,6 +995,56 @@ public class TestEntityStorageRelationCache extends AbstractEntityStorageTest {
               true);
       Assertions.assertEquals(1, entities.size());
       Assertions.assertEquals(catalog.name(), entities.get(0).name());
+
+      UserEntity ownerUser =
+          createUserEntity(
+              RandomIdGenerator.INSTANCE.nextId(),
+              AuthorizationUtils.ofUserNamespace("metalake"),
+              "ownerUser",
+              auditInfo);
+      store.put(ownerUser, false);
+
+      List<GenericEntity> ownedEntities =
+          relationOperations.listEntitiesByRelation(
+              SupportsRelationOperations.Type.OWNER_REL,
+              ownerUser.nameIdentifier(),
+              Entity.EntityType.USER,
+              true);
+      Assertions.assertTrue(ownedEntities.isEmpty());
+
+      if (enableCache && store instanceof RelationalEntityStore) {
+        RelationalEntityStore relationalEntityStore = (RelationalEntityStore) store;
+        if (relationalEntityStore.getCache() instanceof CaffeineEntityCache) {
+          CaffeineEntityCache cache = (CaffeineEntityCache) relationalEntityStore.getCache();
+          List<Entity> cachedOwners =
+              cache
+                  .getCacheData()
+                  .getIfPresent(
+                      EntityCacheRelationKey.of(
+                          ownerUser.nameIdentifier(),
+                          Entity.EntityType.USER,
+                          SupportsRelationOperations.Type.OWNER_REL));
+          Assertions.assertNotNull(cachedOwners);
+          Assertions.assertTrue(cachedOwners.isEmpty());
+        }
+      }
+
+      relationOperations.insertRelation(
+          SupportsRelationOperations.Type.OWNER_REL,
+          catalog.nameIdentifier(),
+          Entity.EntityType.CATALOG,
+          ownerUser.nameIdentifier(),
+          Entity.EntityType.USER,
+          true);
+
+      ownedEntities =
+          relationOperations.listEntitiesByRelation(
+              SupportsRelationOperations.Type.OWNER_REL,
+              ownerUser.nameIdentifier(),
+              Entity.EntityType.USER,
+              true);
+      Assertions.assertEquals(1, ownedEntities.size());
+      Assertions.assertEquals(catalog.id(), ownedEntities.get(0).id());
 
       destroy(type);
     }
