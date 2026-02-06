@@ -17,3 +17,4 @@
 # under the License.
 #
 org.apache.gravitino.catalog.lakehouse.lance.LanceTableDelegator
+org.apache.gravitino.catalog.lakehouse.iceberg.IcebergTableDelegator
