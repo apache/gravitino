@@ -356,11 +356,23 @@ public class MetadataAuthzHelper {
       return;
     }
 
-    GravitinoEnv.getInstance()
-        .entityStore()
-        .batchGet(
-            Arrays.asList(nameIdentifiers),
-            entityType,
-            EntityClassMapper.getEntityClass(entityType));
+    try {
+      GravitinoEnv.getInstance()
+          .entityStore()
+          .batchGet(
+              Arrays.asList(nameIdentifiers),
+              entityType,
+              EntityClassMapper.getEntityClass(entityType));
+    } catch (Exception e) {
+      // Ignore exceptions when preloading to cache.
+      // This can happen when the metadata is not registered in Gravitino
+      // (e.g., browsing external catalog data in read-only mode).
+      // The metadata can still be accessed directly from the external source.
+      LOG.debug(
+          "Failed to preload {} entities to cache, this may happen when browsing "
+              + "unregistered metadata: {}",
+          nameIdentifiers.length,
+          e.getMessage());
+    }
   }
 }
