@@ -29,6 +29,7 @@ import com.google.common.base.Preconditions;
 import com.google.common.collect.Maps;
 import java.time.Instant;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -60,6 +61,7 @@ import org.apache.gravitino.rel.TableChange.RenameTable;
 import org.apache.gravitino.rel.expressions.NamedReference;
 import org.apache.gravitino.rel.expressions.distributions.Distribution;
 import org.apache.gravitino.rel.expressions.distributions.Distributions;
+import org.apache.gravitino.rel.expressions.distributions.Strategy;
 import org.apache.gravitino.rel.expressions.sorts.SortOrder;
 import org.apache.gravitino.rel.expressions.transforms.Transform;
 import org.apache.gravitino.rel.indexes.Index;
@@ -349,12 +351,10 @@ public class PaimonCatalogOperations implements CatalogOperations, SupportsSchem
                 }),
         "Paimon partition columns should not be nested.");
     Preconditions.checkArgument(
-        distribution == null || distribution.strategy() == Distributions.NONE.strategy(),
-        "Distribution is not supported for Paimon in Gravitino now.");
-    Preconditions.checkArgument(
         sortOrders == null || sortOrders.length == 0,
         "Sort orders are not supported for Paimon in Gravitino.");
     checkPaimonIndexes(indexes);
+    validateDistribution(distribution, columns, indexes);
     String currentUser = currentUser();
     GravitinoPaimonTable createdTable =
         GravitinoPaimonTable.builder()
@@ -378,6 +378,7 @@ public class PaimonCatalogOperations implements CatalogOperations, SupportsSchem
             .withPartitioning(partitioning)
             .withComment(comment)
             .withProperties(properties)
+            .withDistribution(distribution)
             .withIndexes(indexes)
             .withAuditInfo(
                 AuditInfo.builder().withCreator(currentUser).withCreateTime(Instant.now()).build())
@@ -499,6 +500,75 @@ public class PaimonCatalogOperations implements CatalogOperations, SupportsSchem
                 Preconditions.checkArgument(
                     index.type() == Index.IndexType.PRIMARY_KEY,
                     "Paimon only supports primary key Index."));
+  }
+
+  private void validateDistribution(Distribution distribution, Column[] columns, Index[] indexes) {
+    if (distribution == null || distribution.strategy() == Distributions.NONE.strategy()) {
+      return;
+    }
+
+    Preconditions.checkArgument(
+        distribution.strategy() == Strategy.HASH,
+        "Paimon only supports HASH distribution strategy.");
+
+    Preconditions.checkArgument(
+        distribution.expressions() != null && distribution.expressions().length > 0,
+        "Paimon bucket keys must be specified for HASH distribution.");
+
+    int bucketNumber = distribution.number();
+    Preconditions.checkArgument(
+        bucketNumber == Distributions.AUTO || bucketNumber > 0,
+        "Paimon bucket number must be positive or AUTO.");
+
+    List<String> bucketKeys = extractBucketKeys(distribution);
+    List<String> columnNames =
+        Arrays.stream(columns).map(Column::name).collect(Collectors.toList());
+    bucketKeys.forEach(
+        bucketKey ->
+            Preconditions.checkArgument(
+                columnNames.stream().anyMatch(name -> name.equals(bucketKey)),
+                "Distribution column %s does not exist in table columns.",
+                bucketKey));
+
+    List<String> primaryKeys = extractPrimaryKeys(indexes);
+    if (!primaryKeys.isEmpty()) {
+      Preconditions.checkArgument(
+          primaryKeys.containsAll(bucketKeys),
+          "Paimon bucket keys must be a subset of primary key columns for primary key tables.");
+    }
+  }
+
+  private static List<String> extractBucketKeys(Distribution distribution) {
+    return Arrays.stream(distribution.expressions())
+        .map(
+            expression -> {
+              Preconditions.checkArgument(
+                  expression instanceof NamedReference.FieldReference,
+                  "Paimon bucket keys must be plain column references.");
+              NamedReference.FieldReference reference = (NamedReference.FieldReference) expression;
+              String[] fieldNames = reference.fieldName();
+              Preconditions.checkArgument(
+                  fieldNames.length == 1, "Paimon bucket keys must be single columns.");
+              return fieldNames[0];
+            })
+        .collect(Collectors.toList());
+  }
+
+  private static List<String> extractPrimaryKeys(Index[] indexes) {
+    if (indexes == null || indexes.length == 0) {
+      return Collections.emptyList();
+    }
+    // Paimon supports at most one index; this is enforced in {@code checkPaimonIndexes()}.
+    Index primaryKeyIndex = indexes[0];
+    return Arrays.stream(primaryKeyIndex.fieldNames())
+        .map(
+            fieldName -> {
+              Preconditions.checkArgument(
+                  fieldName != null && fieldName.length == 1,
+                  "Paimon primary keys must be single columns.");
+              return fieldName[0];
+            })
+        .collect(Collectors.toList());
   }
 
   /**

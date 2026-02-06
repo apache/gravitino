@@ -46,6 +46,7 @@ import org.apache.gravitino.storage.relational.mapper.TableColumnMapper;
 import org.apache.gravitino.storage.relational.mapper.TableMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.TagMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.TopicMetaMapper;
+import org.apache.gravitino.storage.relational.mapper.ViewMetaMapper;
 import org.apache.gravitino.storage.relational.po.CatalogPO;
 import org.apache.gravitino.storage.relational.po.ColumnPO;
 import org.apache.gravitino.storage.relational.po.FilesetPO;
@@ -54,6 +55,7 @@ import org.apache.gravitino.storage.relational.po.ModelPO;
 import org.apache.gravitino.storage.relational.po.SchemaPO;
 import org.apache.gravitino.storage.relational.po.TablePO;
 import org.apache.gravitino.storage.relational.po.TopicPO;
+import org.apache.gravitino.storage.relational.po.ViewPO;
 import org.apache.gravitino.storage.relational.utils.SessionUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -78,6 +80,7 @@ public class MetadataObjectService {
               .put(MetadataObject.Type.FILESET, MetadataObjectService::getFilesetObjectsFullName)
               .put(MetadataObject.Type.MODEL, MetadataObjectService::getModelObjectsFullName)
               .put(MetadataObject.Type.TOPIC, MetadataObjectService::getTopicObjectsFullName)
+              .put(MetadataObject.Type.VIEW, MetadataObjectService::getViewObjectsFullName)
               .put(MetadataObject.Type.COLUMN, MetadataObjectService::getColumnObjectsFullName)
               .put(MetadataObject.Type.TAG, MetadataObjectService::getTagObjectsFullName)
               .put(MetadataObject.Type.POLICY, MetadataObjectService::getPolicyObjectsFullName)
@@ -438,6 +441,44 @@ public class MetadataObjectService {
         });
 
     return topicIdAndNameMap;
+  }
+
+  /**
+   * Retrieves a map of View object IDs to their full names.
+   *
+   * @param viewIds A list of View object IDs to fetch names for.
+   * @return A Map where the key is the View ID and the value is the View full name. The map may
+   *     contain null values for the names if its parent object is deleted. Returns an empty map if
+   *     no View objects are found for the given IDs. {@code @example} value of view full name:
+   *     "catalog1.schema1.view1"
+   */
+  @Monitored(
+      metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME,
+      baseMetricName = "getViewObjectsFullName")
+  public static Map<Long, String> getViewObjectsFullName(List<Long> viewIds) {
+    List<ViewPO> viewPOs =
+        SessionUtils.getWithoutCommit(
+            ViewMetaMapper.class, mapper -> mapper.listViewPOsByViewIds(viewIds));
+    if (viewPOs == null || viewPOs.isEmpty()) {
+      return new HashMap<>();
+    }
+    List<Long> schemaIds = viewPOs.stream().map(ViewPO::getSchemaId).collect(Collectors.toList());
+    Map<Long, String> schemaIdAndNameMap = getSchemaObjectsFullName(schemaIds);
+    HashMap<Long, String> viewIdAndNameMap = new HashMap<>();
+    viewPOs.forEach(
+        viewPO -> {
+          // since the schema can be deleted, we need to check the null value,
+          // and when schema is deleted, we will set fullName of viewPO to null.
+          String schemaName = schemaIdAndNameMap.getOrDefault(viewPO.getSchemaId(), null);
+          if (schemaName == null) {
+            LOG.warn("The schema of view {} may be deleted", viewPO.getViewId());
+            viewIdAndNameMap.put(viewPO.getViewId(), null);
+            return;
+          }
+          String fullName = DOT_JOINER.join(schemaName, viewPO.getViewName());
+          viewIdAndNameMap.put(viewPO.getViewId(), fullName);
+        });
+    return viewIdAndNameMap;
   }
 
   /**

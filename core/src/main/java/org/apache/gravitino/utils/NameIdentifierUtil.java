@@ -226,6 +226,21 @@ public class NameIdentifierUtil {
   }
 
   /**
+   * Create the function {@link NameIdentifier} with the given metalake, catalog, schema and
+   * function name.
+   *
+   * @param metalake The metalake name
+   * @param catalog The catalog name
+   * @param schema The schema name
+   * @param function The function name
+   * @return The created function {@link NameIdentifier}
+   */
+  public static NameIdentifier ofFunction(
+      String metalake, String catalog, String schema, String function) {
+    return NameIdentifier.of(metalake, catalog, schema, function);
+  }
+
+  /**
    * Create the model {@link NameIdentifier} from the give model version's namespace.
    *
    * @param modelVersionNs The model version's namespace
@@ -543,6 +558,17 @@ public class NameIdentifierUtil {
   public static void checkModelVersion(NameIdentifier ident) {
     NameIdentifier.check(ident != null, "Model version identifier must not be null");
     NamespaceUtil.checkModelVersion(ident.namespace());
+  }
+
+  /**
+   * Check the given {@link NameIdentifier} is a function identifier. Throw an {@link
+   * IllegalNameIdentifierException} if it's not.
+   *
+   * @param ident The function {@link NameIdentifier} to check.
+   */
+  public static void checkFunction(NameIdentifier ident) {
+    NameIdentifier.check(ident != null, "Function identifier must not be null");
+    NamespaceUtil.checkFunction(ident.namespace());
   }
 
   /**
