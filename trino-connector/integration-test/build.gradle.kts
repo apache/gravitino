@@ -71,6 +71,7 @@ dependencies {
 }
 
 tasks.register("setupDependencies") {
+  dependsOn(":trino-connector:trino-connector-435-439:jar")
   dependsOn(":trino-connector:trino-connector-440-445:jar")
   dependsOn(":catalogs:catalog-lakehouse-iceberg:jar", ":catalogs:catalog-lakehouse-iceberg:runtimeJars")
   dependsOn(":catalogs:catalog-jdbc-mysql:jar", ":catalogs:catalog-jdbc-mysql:runtimeJars")
