@@ -33,21 +33,7 @@ import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.catalog.CapabilityHelpers;
 import org.apache.gravitino.catalog.CatalogManager;
 import org.apache.gravitino.connector.capability.Capability;
-import org.apache.gravitino.meta.BaseMetalake;
-import org.apache.gravitino.meta.CatalogEntity;
-import org.apache.gravitino.meta.ColumnEntity;
-import org.apache.gravitino.meta.FilesetEntity;
-import org.apache.gravitino.meta.GroupEntity;
-import org.apache.gravitino.meta.JobEntity;
-import org.apache.gravitino.meta.JobTemplateEntity;
-import org.apache.gravitino.meta.ModelEntity;
-import org.apache.gravitino.meta.ModelVersionEntity;
-import org.apache.gravitino.meta.RoleEntity;
-import org.apache.gravitino.meta.SchemaEntity;
-import org.apache.gravitino.meta.TableEntity;
-import org.apache.gravitino.meta.TagEntity;
-import org.apache.gravitino.meta.TopicEntity;
-import org.apache.gravitino.meta.UserEntity;
+import org.apache.gravitino.utils.EntityClassMapper;
 import org.apache.gravitino.utils.MetadataObjectUtil;
 
 /** It is used to convert MetadataObject to MetadataId */
@@ -62,25 +48,6 @@ public class MetadataIdConverter {
           MetadataObject.Type.FILESET, Capability.Scope.FILESET,
           MetadataObject.Type.TOPIC, Capability.Scope.TOPIC,
           MetadataObject.Type.COLUMN, Capability.Scope.COLUMN);
-  // Maps entity type to entity class.
-  private static final Map<Entity.EntityType, Class<?>> ENTITY_CLASS_MAPPING =
-      ImmutableMap.<Entity.EntityType, Class<?>>builder()
-          .put(Entity.EntityType.METALAKE, BaseMetalake.class)
-          .put(Entity.EntityType.CATALOG, CatalogEntity.class)
-          .put(Entity.EntityType.SCHEMA, SchemaEntity.class)
-          .put(Entity.EntityType.TABLE, TableEntity.class)
-          .put(Entity.EntityType.FILESET, FilesetEntity.class)
-          .put(Entity.EntityType.MODEL, ModelEntity.class)
-          .put(Entity.EntityType.TOPIC, TopicEntity.class)
-          .put(Entity.EntityType.TAG, TagEntity.class)
-          .put(Entity.EntityType.MODEL_VERSION, ModelVersionEntity.class)
-          .put(Entity.EntityType.COLUMN, ColumnEntity.class)
-          .put(Entity.EntityType.USER, UserEntity.class)
-          .put(Entity.EntityType.GROUP, GroupEntity.class)
-          .put(Entity.EntityType.ROLE, RoleEntity.class)
-          .put(Entity.EntityType.JOB_TEMPLATE, JobTemplateEntity.class)
-          .put(Entity.EntityType.JOB, JobEntity.class)
-          .build();
 
   private MetadataIdConverter() {}
 
@@ -106,7 +73,9 @@ public class MetadataIdConverter {
 
     Entity entity;
     try {
-      entity = entityStore.get(normalizedIdent, entityType, getEntityClass(entityType));
+      entity =
+          entityStore.get(
+              normalizedIdent, entityType, EntityClassMapper.getEntityClass(entityType));
     } catch (IOException e) {
       throw new RuntimeException(
           "failed to load entity from entity store: " + metadataObject.fullName(), e);
@@ -131,12 +100,5 @@ public class MetadataIdConverter {
         entity instanceof HasIdentifier, "Entity must implement HasIdentifier interface");
 
     return ((HasIdentifier) entity).id();
-  }
-
-  @SuppressWarnings("unchecked")
-  private static <E extends Entity & HasIdentifier> Class<E> getEntityClass(
-      Entity.EntityType entityType) {
-    Class<?> clazz = ENTITY_CLASS_MAPPING.get(entityType);
-    return (Class<E>) clazz;
   }
 }
