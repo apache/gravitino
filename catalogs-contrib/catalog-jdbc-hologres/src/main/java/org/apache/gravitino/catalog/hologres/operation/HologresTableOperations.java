@@ -23,10 +23,12 @@ import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
 import java.sql.Connection;
 import java.sql.DatabaseMetaData;
+import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -778,6 +780,92 @@ public class HologresTableOperations extends JdbcTableOperations
         return Math.max(scale, 0);
       default:
         return null;
+    }
+  }
+
+  /**
+   * Get table properties from Hologres system table hologres.hg_table_properties.
+   *
+   * <p>This method queries the Hologres system table to retrieve table properties such as:
+   *
+   * <ul>
+   *   <li>orientation: storage format (row/column/row,column)
+   *   <li>distribution_key: distribution key columns
+   *   <li>clustering_key: clustering key columns
+   *   <li>segment_key: event time column (segment key)
+   *   <li>bitmap_columns: bitmap index columns
+   *   <li>dictionary_encoding_columns: dictionary encoding columns
+   *   <li>primary_key: primary key columns
+   *   <li>time_to_live_in_seconds: TTL setting
+   *   <li>table_group: table group name
+   * </ul>
+   *
+   * @param connection the database connection
+   * @param tableName the name of the table
+   * @return a map of table properties
+   * @throws SQLException if a database access error occurs
+   */
+  @Override
+  protected Map<String, String> getTableProperties(Connection connection, String tableName)
+      throws SQLException {
+    Map<String, String> properties = new HashMap<>();
+    String schemaName = connection.getSchema();
+
+    // Query table properties from hologres.hg_table_properties system table
+    // The system table stores each property as a separate row with property_key and property_value
+    String propertiesSql =
+        "SELECT property_key, property_value "
+            + "FROM hologres.hg_table_properties "
+            + "WHERE table_namespace = ? AND table_name = ?";
+
+    try (PreparedStatement statement = connection.prepareStatement(propertiesSql)) {
+      statement.setString(1, schemaName);
+      statement.setString(2, tableName);
+
+      try (ResultSet resultSet = statement.executeQuery()) {
+        while (resultSet.next()) {
+          String propertyKey = resultSet.getString("property_key");
+          String propertyValue = resultSet.getString("property_value");
+
+          // Only include meaningful properties that users care about
+          if (StringUtils.isNotEmpty(propertyValue) && isUserRelevantProperty(propertyKey)) {
+            properties.put(propertyKey, propertyValue);
+          }
+        }
+      }
+    }
+
+    LOG.debug("Loaded table properties for {}.{}: {}", schemaName, tableName, properties);
+    return properties;
+  }
+
+  /**
+   * Check if a property key is relevant for users to see.
+   *
+   * <p>This filters out internal system properties and only returns properties that are meaningful
+   * for users.
+   *
+   * @param propertyKey the property key to check
+   * @return true if the property is relevant for users
+   */
+  private boolean isUserRelevantProperty(String propertyKey) {
+    // List of properties that are meaningful for users
+    switch (propertyKey) {
+      case "orientation":
+      case "distribution_key":
+      case "clustering_key":
+      case "segment_key": // event_time_column
+      case "bitmap_columns":
+      case "dictionary_encoding_columns":
+      case "primary_key":
+      case "time_to_live_in_seconds":
+      case "table_group":
+      case "storage_format":
+      case "binlog_level":
+        return true;
+      default:
+        // Exclude internal properties like table_id, schema_version, etc.
+        return false;
     }
   }
 }
