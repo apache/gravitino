@@ -51,7 +51,6 @@ import org.apache.gravitino.dto.authorization.UserDTO;
 import org.apache.gravitino.dto.credential.CredentialDTO;
 import org.apache.gravitino.dto.file.FileInfoDTO;
 import org.apache.gravitino.dto.file.FilesetDTO;
-import org.apache.gravitino.dto.function.FunctionColumnDTO;
 import org.apache.gravitino.dto.function.FunctionDTO;
 import org.apache.gravitino.dto.function.FunctionDefinitionDTO;
 import org.apache.gravitino.dto.job.JobTemplateDTO;
@@ -739,14 +738,6 @@ public class DTOConverters {
    * @return The function DTO.
    */
   public static FunctionDTO toDTO(Function function) {
-    FunctionColumnDTO[] returnColumnDTOs = null;
-    if (function.returnColumns() != null && function.returnColumns().length > 0) {
-      returnColumnDTOs =
-          Arrays.stream(function.returnColumns())
-              .map(FunctionColumnDTO::fromFunctionColumn)
-              .toArray(FunctionColumnDTO[]::new);
-    }
-
     FunctionDefinitionDTO[] definitionDTOs = null;
     if (function.definitions() != null) {
       definitionDTOs =
@@ -760,8 +751,6 @@ public class DTOConverters {
         .withFunctionType(function.functionType())
         .withDeterministic(function.deterministic())
         .withComment(function.comment())
-        .withReturnType(function.returnType())
-        .withReturnColumns(returnColumnDTOs)
         .withDefinitions(definitionDTOs)
         .withAudit(toDTO(function.auditInfo()))
         .build();
