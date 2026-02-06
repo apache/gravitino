@@ -42,7 +42,7 @@ echo "The docker compose log is: $LOG_PATH"
 docker compose up -d
 
 # Stream logs directly to the log file (no console output).
-docker compose logs -f -t | tee -a "$LOG_PATH" >/dev/null &
+nohup docker compose logs -f -t | tee -a "$LOG_PATH" &
 LOG_FOLLOW_PID=$!
 cleanup_log_follow() {
   if [ -n "$LOG_FOLLOW_PID" ] && kill -0 "$LOG_FOLLOW_PID" 2>/dev/null; then

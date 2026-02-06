@@ -24,6 +24,7 @@ LOG_DIR=../build/trino-ci-container-log
 if [ -d $LOG_DIR ]; then
   docker cp trino-ci-hive:/usr/local/hadoop/logs $LOG_DIR/hdfs
   docker cp trino-ci-hive:/tmp/root $LOG_DIR/hive
+  docker cp trino-ci-trino:/tmp/trino.log $LOG_DIR/trino.log
 fi
 
 export GRAVITINO_TRINO_CONNECTOR_DIR=/dev/null
