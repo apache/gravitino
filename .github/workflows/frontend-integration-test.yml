@@ -1,8 +1,11 @@
 name: Frontend Integration Test
 
 # Controls when the workflow will run
-# Disable it temporarily.
-on: {}
+on:
+  push:
+    branches: [ "main", "branch-*" ]
+  pull_request:
+    branches: [ "main", "branch-*" ]
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
@@ -72,7 +75,7 @@ jobs:
 
       - name: Package Gravitino
         run: |
-          ./gradlew compileDistribution -x test 
+          ./gradlew compileDistribution compileTrinoConnector -x test
 
       - name: Free up disk space
         run: |

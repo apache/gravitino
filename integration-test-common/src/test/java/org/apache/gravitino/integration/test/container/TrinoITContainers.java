@@ -19,6 +19,9 @@
 package org.apache.gravitino.integration.test.container;
 
 import com.google.common.collect.ImmutableSet;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.util.HashMap;
 import java.util.Map;
 import org.apache.gravitino.integration.test.util.CommandExecutor;
@@ -70,6 +73,10 @@ public class TrinoITContainers implements AutoCloseable {
       env.put("TRINO_VERSION", String.valueOf(trinoVersion));
     }
     if (trinoConnectorDir != null) {
+      Path path = Paths.get(trinoConnectorDir);
+      if (!Files.exists(path)) {
+        throw new Exception("Provided GRAVITINO_TRINO_CONNECTOR_DIR '" + path + "' does not exist");
+      }
       env.put("GRAVITINO_TRINO_CONNECTOR_DIR", trinoConnectorDir);
     }
     env.put("GRAVITINO_SERVER_PORT", String.valueOf(gravitinoServerPort));
@@ -79,6 +86,7 @@ public class TrinoITContainers implements AutoCloseable {
       env.put("GRAVITINO_LOG_PATH", System.getProperty("gravitino.log.path"));
     }
 
+    LOG.info("Launching containers with env: {}", env);
     String command = ITUtils.joinPath(dockerComposeDir, "launch.sh");
     Object output =
         CommandExecutor.executeCommandLocalHost(
