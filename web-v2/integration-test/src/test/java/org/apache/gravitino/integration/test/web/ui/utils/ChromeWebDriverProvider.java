@@ -114,10 +114,11 @@ public class ChromeWebDriverProvider implements WebDriverProvider {
       chromeOptions.addArguments("--disable-background-timer-throttling");
     }
 
-    // Use EAGER strategy so navigation commands return at DOMContentLoaded
-    // instead of waiting for the full load event, which can cause renderer
-    // timeout in headless Chrome 103.
-    chromeOptions.setPageLoadStrategy(PageLoadStrategy.EAGER);
+    // Use NONE strategy so navigation commands (get, refresh) return immediately
+    // without waiting for the renderer. This avoids the "Timed out receiving message
+    // from renderer" error in headless Chrome 103 where the renderer process can hang
+    // during page load/reload. Page readiness is handled explicitly via waitForPageReady().
+    chromeOptions.setPageLoadStrategy(PageLoadStrategy.NONE);
 
     if (SystemUtils.IS_OS_MAC_OSX) {
       chromeOptions.setBinary(

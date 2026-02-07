@@ -93,41 +93,18 @@ public class BaseWebIT extends BaseIT {
   }
 
   protected void reloadPageAndWait() {
-    int maxRetries = 3;
-    String currentUrl = driver.getCurrentUrl();
-
-    for (int attempt = 1; attempt <= maxRetries; attempt++) {
-      try {
-        // With EAGER page load strategy, navigate().refresh() returns at DOMContentLoaded
-        // instead of blocking until the full load event, avoiding renderer timeout.
-        driver.navigate().refresh();
-        waitForPageReady();
-        return;
-      } catch (TimeoutException e) {
-        LOG.warn("Page reload timed out (attempt {}/{}): {}", attempt, maxRetries, e.getMessage());
-
-        if (attempt < maxRetries) {
-          // Fallback: use driver.get(url) which takes a different code path
-          try {
-            driver.get(currentUrl);
-            waitForPageReady();
-            return;
-          } catch (TimeoutException e2) {
-            LOG.warn("Fallback driver.get() also timed out, will retry: {}", e2.getMessage());
-          }
-        } else {
-          throw new TimeoutException(
-              "Failed to reload page after " + maxRetries + " attempts: " + e.getMessage(), e);
-        }
-      }
-    }
+    // With PageLoadStrategy.NONE, navigate().refresh() returns immediately
+    // without waiting for the renderer, avoiding the "Timed out receiving
+    // message from renderer" error in headless Chrome 103.
+    driver.navigate().refresh();
+    waitForPageReady();
   }
 
   private void waitForPageReady() {
     Wait<WebDriver> wait =
         new FluentWait<>(driver)
             .withTimeout(Duration.of(MAX_TIMEOUT, ChronoUnit.SECONDS))
-            .pollingEvery(Duration.of(500, ChronoUnit.MILLIS))
+            .pollingEvery(Duration.of(1, ChronoUnit.SECONDS))
             .ignoring(NoSuchElementException.class);
 
     wait.until(
@@ -137,6 +114,7 @@ public class BaseWebIT extends BaseIT {
                 ((JavascriptExecutor) d).executeScript("return document.readyState");
             return "complete".equals(readyState);
           } catch (Exception e) {
+            // Renderer may be temporarily busy during page load; keep polling
             return false;
           }
         });
