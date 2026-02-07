@@ -93,16 +93,13 @@ public class BaseWebIT extends BaseIT {
   }
 
   protected void reloadPageAndWait() {
-    int maxRetries = 3;
+    int maxRetries = 5;
     int retryCount = 0;
     boolean success = false;
 
     while (retryCount < maxRetries && !success) {
       try {
-        JavascriptExecutor js = (JavascriptExecutor) driver;
-
-        // Use JavaScript reload for better control in headless Chrome
-        js.executeScript("location.reload()");
+        driver.navigate().refresh();
 
         // Add a small delay to let the page start reloading
         try {
