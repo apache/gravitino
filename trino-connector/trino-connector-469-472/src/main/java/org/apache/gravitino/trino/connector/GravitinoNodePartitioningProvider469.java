@@ -18,18 +18,15 @@
  */
 package org.apache.gravitino.trino.connector;
 
-import java.util.function.Supplier;
-import org.apache.gravitino.client.GravitinoAdminClient;
+import io.trino.spi.connector.ConnectorNodePartitioningProvider;
 
-public class TestGravitinoConnectorFactory extends GravitinoConnectorFactory {
-  private GravitinoAdminClient gravitinoClient;
+/**
+ * Trino 469+ NodePartitioningProvider implementation with the new split bucket function signature.
+ */
+public class GravitinoNodePartitioningProvider469 extends GravitinoNodePartitioningProvider {
 
-  public void setGravitinoClient(GravitinoAdminClient client) {
-    this.gravitinoClient = client;
-  }
-
-  @Override
-  Supplier<GravitinoAdminClient> clientProvider() {
-    return () -> gravitinoClient;
+  public GravitinoNodePartitioningProvider469(
+      ConnectorNodePartitioningProvider nodePartitioningProvider) {
+    super(nodePartitioningProvider);
   }
 }
