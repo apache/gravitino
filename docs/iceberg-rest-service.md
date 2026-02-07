@@ -150,7 +150,7 @@ gravitino.iceberg-rest.s3-access-key-id = xx
 gravitino.iceberg-rest.s3-secret-access-key = xx
 gravitino.iceberg-rest.s3-region = xx
 gravitino.iceberg-rest.credential-providers = s3-secret-key
-gravitino.iceberg-rest.header.X-Iceberg-Access-Delegation=vended-credentials
+gravitino.iceberg-rest.header.X-Iceberg-Access-Delegation = vended-credentials
 ```
 
 IRC1 must also configure S3 configurations if the client side requests credential vending.
