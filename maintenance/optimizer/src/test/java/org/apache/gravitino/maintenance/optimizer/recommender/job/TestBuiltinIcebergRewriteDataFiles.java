@@ -42,10 +42,10 @@ import org.apache.gravitino.rel.expressions.transforms.Transforms;
 import org.apache.gravitino.rel.types.Types;
 import org.apache.spark.sql.Row;
 import org.apache.spark.sql.SparkSession;
+import org.awaitility.Awaitility;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.condition.EnabledIfEnvironmentVariable;
-import org.testcontainers.shaded.org.awaitility.Awaitility;
 
 // Requires a running Gravitino server and Spark environment; enable with GRAVITINO_ENV_IT=true.
 @EnabledIfEnvironmentVariable(named = "GRAVITINO_ENV_IT", matches = "true")
