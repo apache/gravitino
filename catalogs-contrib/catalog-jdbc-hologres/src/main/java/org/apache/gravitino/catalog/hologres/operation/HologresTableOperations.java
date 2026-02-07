@@ -56,6 +56,7 @@ import org.apache.gravitino.rel.TableChange;
 import org.apache.gravitino.rel.expressions.distributions.Distribution;
 import org.apache.gravitino.rel.expressions.distributions.Distributions;
 import org.apache.gravitino.rel.expressions.transforms.Transform;
+import org.apache.gravitino.rel.expressions.transforms.Transforms;
 import org.apache.gravitino.rel.indexes.Index;
 import org.apache.gravitino.rel.types.Types;
 
@@ -821,6 +822,96 @@ public class HologresTableOperations extends JdbcTableOperations
       default:
         return null;
     }
+  }
+
+  /**
+   * Get table partitioning information from PostgreSQL system tables.
+   *
+   * <p>Hologres (PostgreSQL-compatible) only supports LIST partitioning. This method queries
+   * pg_partitioned_table and pg_attribute system tables to determine if a table is partitioned, and
+   * if so, returns the partition column names as a LIST transform.
+   *
+   * <p>The SQL queries follow the same approach used by Holo Client's ConnectionUtil:
+   *
+   * <ol>
+   *   <li>Query pg_partitioned_table to check if the table is partitioned and get partition column
+   *       attribute numbers (partattrs)
+   *   <li>Query pg_attribute to resolve attribute numbers to column names
+   * </ol>
+   *
+   * @param connection the database connection
+   * @param databaseName the schema name
+   * @param tableName the table name
+   * @return the partition transforms, or empty if the table is not partitioned
+   * @throws SQLException if a database access error occurs
+   */
+  @Override
+  protected Transform[] getTablePartitioning(
+      Connection connection, String databaseName, String tableName) throws SQLException {
+
+    // Query pg_partitioned_table to get partition strategy and column attribute numbers
+    String partitionSql =
+        "SELECT part.partstrat, part.partnatts, part.partattrs "
+            + "FROM pg_catalog.pg_class c "
+            + "JOIN pg_catalog.pg_namespace n ON n.oid = c.relnamespace "
+            + "JOIN pg_catalog.pg_partitioned_table part ON c.oid = part.partrelid "
+            + "WHERE n.nspname = ? AND c.relname = ? "
+            + "LIMIT 1";
+
+    String partStrategy = null;
+    String partAttrs = null;
+
+    try (PreparedStatement statement = connection.prepareStatement(partitionSql)) {
+      statement.setString(1, databaseName);
+      statement.setString(2, tableName);
+
+      try (ResultSet resultSet = statement.executeQuery()) {
+        if (resultSet.next()) {
+          partStrategy = resultSet.getString("partstrat");
+          partAttrs = resultSet.getString("partattrs");
+        }
+      }
+    }
+
+    // Not a partitioned table
+    if (partStrategy == null || partAttrs == null) {
+      return Transforms.EMPTY_TRANSFORM;
+    }
+
+    // Parse partition attribute numbers (e.g., "1" or "1 2")
+    String[] attrNums = partAttrs.trim().split("\\s+");
+    List<String[]> partitionColumnNames = new ArrayList<>();
+
+    // Resolve attribute numbers to column names
+    String attrSql =
+        "SELECT attname FROM pg_catalog.pg_attribute "
+            + "WHERE attrelid = (SELECT c.oid FROM pg_catalog.pg_class c "
+            + "  JOIN pg_catalog.pg_namespace n ON n.oid = c.relnamespace "
+            + "  WHERE n.nspname = ? AND c.relname = ?) "
+            + "AND attnum = ?";
+
+    for (String attrNum : attrNums) {
+      try (PreparedStatement statement = connection.prepareStatement(attrSql)) {
+        statement.setString(1, databaseName);
+        statement.setString(2, tableName);
+        statement.setInt(3, Integer.parseInt(attrNum));
+
+        try (ResultSet resultSet = statement.executeQuery()) {
+          if (resultSet.next()) {
+            partitionColumnNames.add(new String[] {resultSet.getString("attname")});
+          }
+        }
+      }
+    }
+
+    if (partitionColumnNames.isEmpty()) {
+      return Transforms.EMPTY_TRANSFORM;
+    }
+
+    // Hologres only supports LIST partitioning (partstrat = 'l')
+    // Return a LIST transform with the partition column names
+    String[][] fieldNames = partitionColumnNames.toArray(new String[0][]);
+    return new Transform[] {Transforms.list(fieldNames)};
   }
 
   /**
