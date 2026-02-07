@@ -97,6 +97,15 @@ public class BaseWebIT extends BaseIT {
     // without waiting for the renderer, avoiding the "Timed out receiving
     // message from renderer" error in headless Chrome 103.
     driver.navigate().refresh();
+
+    // Brief delay to ensure the page starts reloading before we poll.
+    // Without this, the first poll might still see the old page's "complete" state.
+    try {
+      Thread.sleep(1000);
+    } catch (InterruptedException e) {
+      Thread.currentThread().interrupt();
+    }
+
     waitForPageReady();
   }
 
@@ -112,7 +121,10 @@ public class BaseWebIT extends BaseIT {
           try {
             Object readyState =
                 ((JavascriptExecutor) d).executeScript("return document.readyState");
-            return "complete".equals(readyState);
+            // Accept "interactive" (DOM ready) or "complete" (all resources loaded).
+            // On CI VMs, "complete" may never be reached if some resource is slow,
+            // but "interactive" is sufficient for React to render the page.
+            return "complete".equals(readyState) || "interactive".equals(readyState);
           } catch (Exception e) {
             // Renderer may be temporarily busy during page load; keep polling
             return false;
