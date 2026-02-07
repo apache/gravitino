@@ -93,13 +93,92 @@ public class BaseWebIT extends BaseIT {
   }
 
   protected void reloadPageAndWait() {
-    JavascriptExecutor js = (JavascriptExecutor) driver;
-    js.executeScript("location.reload()");
-    WebDriverWait wait = new WebDriverWait(driver, MAX_TIMEOUT);
-    wait.until(
-        d ->
-            "complete"
-                .equals(((JavascriptExecutor) d).executeScript("return document.readyState")));
+    int maxRetries = 3;
+    int retryCount = 0;
+    boolean success = false;
+
+    while (retryCount < maxRetries && !success) {
+      try {
+        JavascriptExecutor js = (JavascriptExecutor) driver;
+
+        // Use JavaScript reload for better control in headless Chrome
+        js.executeScript("location.reload()");
+
+        // Add a small delay to let the page start reloading
+        try {
+          Thread.sleep(500);
+        } catch (InterruptedException e) {
+          Thread.currentThread().interrupt();
+        }
+
+        // Use FluentWait with multiple conditions for more robust waiting
+        Wait<WebDriver> wait =
+            new FluentWait<>(driver)
+                .withTimeout(Duration.of(MAX_TIMEOUT, ChronoUnit.SECONDS))
+                .pollingEvery(Duration.of(500, ChronoUnit.MILLIS))
+                .ignoring(NoSuchElementException.class)
+                .ignoring(org.openqa.selenium.JavascriptException.class);
+
+        // Wait for document ready state
+        wait.until(
+            d -> {
+              try {
+                Object readyState = js.executeScript("return document.readyState");
+                return "complete".equals(readyState);
+              } catch (Exception e) {
+                LOG.warn("Error checking document.readyState: {}", e.getMessage());
+                return false;
+              }
+            });
+
+        // Additional wait to ensure page is fully interactive
+        wait.until(
+            d -> {
+              try {
+                // Check if body element is present and has content
+                Object bodyExists =
+                    js.executeScript(
+                        "return document.body != null && document.body.innerHTML.length > 0");
+                return Boolean.TRUE.equals(bodyExists);
+              } catch (Exception e) {
+                LOG.warn("Error checking body element: {}", e.getMessage());
+                return false;
+              }
+            });
+
+        // Extra stability wait for JavaScript to finish executing
+        try {
+          Thread.sleep(1000);
+        } catch (InterruptedException e) {
+          Thread.currentThread().interrupt();
+        }
+
+        success = true;
+        if (retryCount > 0) {
+          LOG.info("Page reload succeeded after {} retries", retryCount);
+        }
+
+      } catch (TimeoutException e) {
+        retryCount++;
+        LOG.warn(
+            "Page reload timed out (attempt {}/{}). {}",
+            retryCount,
+            maxRetries,
+            retryCount < maxRetries ? "Retrying..." : "Max retries reached");
+
+        if (retryCount >= maxRetries) {
+          throw new TimeoutException(
+              "Failed to reload page after " + maxRetries + " attempts: " + e.getMessage(), e);
+        }
+
+        // Wait before retrying
+        try {
+          Thread.sleep(2000);
+        } catch (InterruptedException ie) {
+          Thread.currentThread().interrupt();
+        }
+      }
+    }
   }
 
   WebElement locatorElement(final Object locatorOrElement) {
