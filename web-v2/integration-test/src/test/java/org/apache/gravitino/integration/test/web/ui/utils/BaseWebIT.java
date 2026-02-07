@@ -78,7 +78,7 @@ public class BaseWebIT extends BaseIT {
   protected void clickAndWait(final Object locator) throws InterruptedException {
     try {
       // wait the element is available
-      WebDriverWait wait = new WebDriverWait(driver, MAX_TIMEOUT);
+      WebDriverWait wait = new WebDriverWait(driver, Duration.ofSeconds(MAX_TIMEOUT));
       wait.until(ExpectedConditions.visibilityOf(locatorElement(locator)));
       wait.until(ExpectedConditions.elementToBeClickable(locatorElement(locator)));
 
@@ -93,43 +93,12 @@ public class BaseWebIT extends BaseIT {
   }
 
   protected void reloadPageAndWait() {
-    // With PageLoadStrategy.NONE, navigate().refresh() returns immediately
-    // without waiting for the renderer, avoiding the "Timed out receiving
-    // message from renderer" error in headless Chrome 103.
     driver.navigate().refresh();
-
-    // Brief delay to ensure the page starts reloading before we poll.
-    // Without this, the first poll might still see the old page's "complete" state.
-    try {
-      Thread.sleep(1000);
-    } catch (InterruptedException e) {
-      Thread.currentThread().interrupt();
-    }
-
-    waitForPageReady();
-  }
-
-  private void waitForPageReady() {
-    Wait<WebDriver> wait =
-        new FluentWait<>(driver)
-            .withTimeout(Duration.of(MAX_TIMEOUT, ChronoUnit.SECONDS))
-            .pollingEvery(Duration.of(1, ChronoUnit.SECONDS))
-            .ignoring(NoSuchElementException.class);
-
-    wait.until(
-        d -> {
-          try {
-            Object readyState =
-                ((JavascriptExecutor) d).executeScript("return document.readyState");
-            // Accept "interactive" (DOM ready) or "complete" (all resources loaded).
-            // On CI VMs, "complete" may never be reached if some resource is slow,
-            // but "interactive" is sufficient for React to render the page.
-            return "complete".equals(readyState) || "interactive".equals(readyState);
-          } catch (Exception e) {
-            // Renderer may be temporarily busy during page load; keep polling
-            return false;
-          }
-        });
+    new WebDriverWait(driver, Duration.ofSeconds(MAX_TIMEOUT))
+        .until(
+            d ->
+                "complete"
+                    .equals(((JavascriptExecutor) d).executeScript("return document.readyState")));
   }
 
   WebElement locatorElement(final Object locatorOrElement) {

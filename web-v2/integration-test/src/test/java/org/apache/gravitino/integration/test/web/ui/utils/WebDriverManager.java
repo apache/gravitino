@@ -18,7 +18,7 @@
  */
 package org.apache.gravitino.integration.test.web.ui.utils;
 
-import java.util.concurrent.TimeUnit;
+import java.time.Duration;
 import org.openqa.selenium.By;
 import org.openqa.selenium.Dimension;
 import org.openqa.selenium.TimeoutException;
@@ -36,13 +36,13 @@ public class WebDriverManager {
 
     WebDriverProvider provide = new ChromeWebDriverProvider();
     WebDriver driver = generateWebDriver(provide);
-    driver.manage().timeouts().implicitlyWait(BaseWebIT.MAX_IMPLICIT_WAIT, TimeUnit.SECONDS);
-    driver.manage().timeouts().pageLoadTimeout(BaseWebIT.MAX_TIMEOUT, TimeUnit.SECONDS);
+    driver.manage().timeouts().implicitlyWait(Duration.ofSeconds(BaseWebIT.MAX_IMPLICIT_WAIT));
+    driver.manage().timeouts().pageLoadTimeout(Duration.ofSeconds(BaseWebIT.MAX_TIMEOUT));
     driver.get(url);
 
     // wait for webpage load compiled.
     try {
-      (new WebDriverWait(driver, BaseWebIT.MAX_TIMEOUT))
+      (new WebDriverWait(driver, Duration.ofSeconds(BaseWebIT.MAX_TIMEOUT)))
           .until(
               d -> {
                 String gravitinoVersion = d.findElement(By.id("gravitino_version")).getText();

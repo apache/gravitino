@@ -19,6 +19,7 @@
 
 package org.apache.gravitino.integration.test.web.ui.pages;
 
+import java.time.Duration;
 import java.util.List;
 import java.util.Objects;
 import java.util.Set;
@@ -131,7 +132,7 @@ public class MetalakePage extends BaseWebIT {
   }
 
   public void setQueryParams(String queryParams) {
-    WebDriverWait wait = new WebDriverWait(driver, ACTION_SLEEP);
+    WebDriverWait wait = new WebDriverWait(driver, Duration.ofSeconds(ACTION_SLEEP));
     WebElement queryInputElement =
         wait.until(ExpectedConditions.elementToBeClickable(queryMetalakeInput));
     clearQueryInput();
@@ -148,7 +149,7 @@ public class MetalakePage extends BaseWebIT {
     try {
       // Find and hover over the Settings icon to open the dropdown menu
       String settingsXpath = "//a[@data-refer='settings-metalake-" + name + "']";
-      WebDriverWait wait = new WebDriverWait(driver, MAX_TIMEOUT);
+      WebDriverWait wait = new WebDriverWait(driver, Duration.ofSeconds(MAX_TIMEOUT));
       WebElement settingsIcon =
           wait.until(ExpectedConditions.elementToBeClickable(By.xpath(settingsXpath)));
 
@@ -198,7 +199,7 @@ public class MetalakePage extends BaseWebIT {
   public void clickMetalakeLink(String name) {
     try {
       setQueryParams(name);
-      WebDriverWait wait = new WebDriverWait(driver, ACTION_SLEEP);
+      WebDriverWait wait = new WebDriverWait(driver, Duration.ofSeconds(ACTION_SLEEP));
       String xpath = "//a[@data-refer='metalake-link-" + name + "']";
       WebElement metalakeLink =
           wait.until(ExpectedConditions.elementToBeClickable(By.xpath(xpath)));
@@ -268,7 +269,7 @@ public class MetalakePage extends BaseWebIT {
 
   public void confirmDeleteMetalake(String name) {
     try {
-      WebDriverWait wait = new WebDriverWait(driver, ACTION_SLEEP);
+      WebDriverWait wait = new WebDriverWait(driver, Duration.ofSeconds(ACTION_SLEEP));
       WebElement inputElement =
           wait.until(ExpectedConditions.elementToBeClickable(confirmDeleteInput));
       inputElement.sendKeys(name);
@@ -282,7 +283,7 @@ public class MetalakePage extends BaseWebIT {
     try {
       // Wait for the table to refresh after deletion
       Thread.sleep(2000);
-      WebDriverWait wait = new WebDriverWait(driver, MAX_TIMEOUT);
+      WebDriverWait wait = new WebDriverWait(driver, Duration.ofSeconds(MAX_TIMEOUT));
       // Wait for the empty state element to be visible
       WebElement emptyElement =
           wait.until(
@@ -307,7 +308,7 @@ public class MetalakePage extends BaseWebIT {
     try {
       // Wait for the table to fully load
       Thread.sleep(1000);
-      WebDriverWait wait = new WebDriverWait(driver, MAX_TIMEOUT);
+      WebDriverWait wait = new WebDriverWait(driver, Duration.ofSeconds(MAX_TIMEOUT));
 
       // First check if the table has data
       WebElement tableBody =
@@ -399,7 +400,7 @@ public class MetalakePage extends BaseWebIT {
       // Wait for the table to filter
       Thread.sleep(1000);
 
-      WebDriverWait wait = new WebDriverWait(driver, MAX_TIMEOUT);
+      WebDriverWait wait = new WebDriverWait(driver, Duration.ofSeconds(MAX_TIMEOUT));
 
       // Wait for the table body to be present and find the metalake link with the searched name
       String metalakeLinkXpath = "//a[@data-refer='metalake-link-" + name + "']";
@@ -428,7 +429,7 @@ public class MetalakePage extends BaseWebIT {
     try {
       // Wait for the catalogs page to load
       Thread.sleep(1000);
-      WebDriverWait wait = new WebDriverWait(driver, MAX_TIMEOUT);
+      WebDriverWait wait = new WebDriverWait(driver, Duration.ofSeconds(MAX_TIMEOUT));
 
       // Wait for the URL to contain metalake name
       wait.until(ExpectedConditions.urlContains("metalake=" + name));
@@ -460,7 +461,7 @@ public class MetalakePage extends BaseWebIT {
       return false;
     } finally {
       // Navigate back to metalakes page
-      WebDriverWait wait = new WebDriverWait(driver, MAX_TIMEOUT);
+      WebDriverWait wait = new WebDriverWait(driver, Duration.ofSeconds(MAX_TIMEOUT));
       WebElement backBtn =
           wait.until(
               ExpectedConditions.elementToBeClickable(
@@ -472,7 +473,7 @@ public class MetalakePage extends BaseWebIT {
 
   public boolean verifyRefreshPage() {
     try {
-      WebDriverWait wait = new WebDriverWait(driver, MAX_TIMEOUT);
+      WebDriverWait wait = new WebDriverWait(driver, Duration.ofSeconds(MAX_TIMEOUT));
       wait.until(
           webDriver ->
               ((JavascriptExecutor) webDriver)

@@ -26,7 +26,6 @@ import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.SystemUtils;
 import org.apache.gravitino.integration.test.util.ITUtils;
 import org.apache.logging.log4j.util.Strings;
-import org.openqa.selenium.PageLoadStrategy;
 import org.openqa.selenium.WebDriver;
 import org.openqa.selenium.chrome.ChromeDriver;
 import org.openqa.selenium.chrome.ChromeOptions;
@@ -46,14 +45,14 @@ public class ChromeWebDriverProvider implements WebDriverProvider {
 
   public ChromeWebDriverProvider() {
     if (SystemUtils.IS_OS_MAC_OSX) {
-      this.chromeDriverBinName = ITUtils.joinPath("chromedriver_mac64", "chromedriver");
-      this.chromeBinName = ITUtils.joinPath("chrome-mac", "Chromium.app");
+      this.chromeDriverBinName = ITUtils.joinPath("chromedriver-mac-x64", "chromedriver");
+      this.chromeBinName = ITUtils.joinPath("chrome-mac-x64", "Google Chrome for Testing.app");
     } else if (SystemUtils.IS_OS_LINUX) {
-      this.chromeDriverBinName = ITUtils.joinPath("chromedriver_linux64", "chromedriver");
-      this.chromeBinName = ITUtils.joinPath("chrome-linux", "chrome");
+      this.chromeDriverBinName = ITUtils.joinPath("chromedriver-linux64", "chromedriver");
+      this.chromeBinName = ITUtils.joinPath("chrome-linux64", "chrome");
     } else if (SystemUtils.IS_OS_WINDOWS) {
-      this.chromeDriverBinName = ITUtils.joinPath("chromedriver_win32", "chromedriver.exe");
-      this.chromeBinName = ITUtils.joinPath("chrome-win", "chrome.exe");
+      this.chromeDriverBinName = ITUtils.joinPath("chromedriver-win64", "chromedriver.exe");
+      this.chromeBinName = ITUtils.joinPath("chrome-win64", "chrome.exe");
     } else {
       throw new RuntimeException("Unsupported OS : " + SystemUtils.OS_NAME);
     }
@@ -61,34 +60,34 @@ public class ChromeWebDriverProvider implements WebDriverProvider {
 
   @Override
   public void downloadWebDriver() {
-    // Chrome release list in here:
-    // https://commondatastorage.googleapis.com/chromium-browser-snapshots/index.html
+    // Chrome for Testing release list:
+    // https://googlechromelabs.github.io/chrome-for-testing/
     String chromeDownloadURL = "", chromeDriverDownloadURL = "";
     String chromeZipFile = "", chromeDriverZipFile = "";
     if (SystemUtils.IS_OS_LINUX) {
-      chromeZipFile = "chrome-linux.zip";
+      chromeZipFile = "chrome-linux64.zip";
       chromeDownloadURL =
-          "https://www.googleapis.com/download/storage/v1/b/chromium-browser-snapshots/o/Linux_x64%2F1000022%2Fchrome-linux.zip?generation=1651778257041732&alt=media";
+          "https://storage.googleapis.com/chrome-for-testing-public/145.0.7632.46/linux64/chrome-linux64.zip";
 
-      chromeDriverZipFile = "chromedriver_linux64.zip";
+      chromeDriverZipFile = "chromedriver-linux64.zip";
       chromeDriverDownloadURL =
-          "https://www.googleapis.com/download/storage/v1/b/chromium-browser-snapshots/o/Linux_x64%2F1000022%2Fchromedriver_linux64.zip?generation=1651778262235204&alt=media";
+          "https://storage.googleapis.com/chrome-for-testing-public/145.0.7632.46/linux64/chromedriver-linux64.zip";
     } else if (SystemUtils.IS_OS_MAC_OSX) {
-      chromeZipFile = "chrome-mac.zip";
+      chromeZipFile = "chrome-mac-x64.zip";
       chromeDownloadURL =
-          "https://www.googleapis.com/download/storage/v1/b/chromium-browser-snapshots/o/Mac%2F1000022%2Fchrome-mac.zip?generation=1651779420087881&alt=media";
+          "https://storage.googleapis.com/chrome-for-testing-public/145.0.7632.46/mac-x64/chrome-mac-x64.zip";
 
-      chromeDriverZipFile = "chromedriver_mac64.zip";
+      chromeDriverZipFile = "chromedriver-mac-x64.zip";
       chromeDriverDownloadURL =
-          "https://www.googleapis.com/download/storage/v1/b/chromium-browser-snapshots/o/Mac%2F1000022%2Fchromedriver_mac64.zip?generation=1651779426705083&alt=media";
+          "https://storage.googleapis.com/chrome-for-testing-public/145.0.7632.46/mac-x64/chromedriver-mac-x64.zip";
     } else if (SystemUtils.IS_OS_WINDOWS) {
-      chromeZipFile = "chrome-win.zip";
+      chromeZipFile = "chrome-win64.zip";
       chromeDownloadURL =
-          "https://www.googleapis.com/download/storage/v1/b/chromium-browser-snapshots/o/Win_x64%2F1000027%2Fchrome-win.zip?generation=1651780728332948&alt=media";
+          "https://storage.googleapis.com/chrome-for-testing-public/145.0.7632.46/win64/chrome-win64.zip";
 
-      chromeDriverZipFile = "chromedriver_win32.zip";
+      chromeDriverZipFile = "chromedriver-win64.zip";
       chromeDriverDownloadURL =
-          "https://www.googleapis.com/download/storage/v1/b/chromium-browser-snapshots/o/Win_x64%2F1000027%2Fchromedriver_win32.zip?generation=1651780916599219&alt=media";
+          "https://storage.googleapis.com/chrome-for-testing-public/145.0.7632.46/win64/chromedriver-win64.zip";
     }
 
     downloadZipFile(chromeDriverDownloadURL, chromeDriverZipFile, chromeDriverBinName);
@@ -105,24 +104,18 @@ public class ChromeWebDriverProvider implements WebDriverProvider {
 
     // Display the web interface during testing
     if (Strings.isEmpty(System.getenv("DISPLAY_WEBPAGE_IN_TESTING"))) {
-      chromeOptions.addArguments("--headless");
+      // Use --headless=new for the modern headless mode (Chrome 112+)
+      // which has a much more stable renderer than the legacy --headless mode.
+      chromeOptions.addArguments("--headless=new");
       chromeOptions.addArguments("--no-sandbox");
       chromeOptions.addArguments("--disable-dev-shm-usage");
       chromeOptions.addArguments("--disable-gpu");
-      chromeOptions.addArguments("--disable-renderer-backgrounding");
-      chromeOptions.addArguments("--disable-backgrounding-occluded-windows");
-      chromeOptions.addArguments("--disable-background-timer-throttling");
     }
-
-    // Use NONE strategy so navigation commands (get, refresh) return immediately
-    // without waiting for the renderer. This avoids the "Timed out receiving message
-    // from renderer" error in headless Chrome 103 where the renderer process can hang
-    // during page load/reload. Page readiness is handled explicitly via waitForPageReady().
-    chromeOptions.setPageLoadStrategy(PageLoadStrategy.NONE);
 
     if (SystemUtils.IS_OS_MAC_OSX) {
       chromeOptions.setBinary(
-          ITUtils.joinPath(downLoadDir, chromeBinName, "Contents", "MacOS", "Chromium"));
+          ITUtils.joinPath(
+              downLoadDir, chromeBinName, "Contents", "MacOS", "Google Chrome for Testing"));
     } else {
       chromeOptions.setBinary(ITUtils.joinPath(downLoadDir, chromeBinName));
     }
@@ -160,8 +153,8 @@ public class ChromeWebDriverProvider implements WebDriverProvider {
         Archiver archiver = ArchiverFactory.createArchiver(ArchiveFormat.ZIP);
         archiver.extract(chromeDriverZip, new File(downLoadTmpDir));
 
-        // fileName contains directory path like "chrome-linux/chrome", there's an assumption
-        // that the zip file is extracted to the firstPath "chrome-linux"
+        // fileName contains directory path like "chrome-linux64/chrome", there's an assumption
+        // that the zip file is extracted to the firstPath "chrome-linux64"
         String firstPath = ITUtils.splitPath(fileName)[0];
         LOG.info("filename:{}, firstPath:{}, {}", fileName, firstPath, ITUtils.splitPath(fileName));
         File unzipFile = new File(downLoadTmpDir, firstPath);

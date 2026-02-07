@@ -22,6 +22,7 @@ package org.apache.gravitino.integration.test.web.ui.pages;
 import static org.apache.gravitino.integration.test.web.ui.CatalogsPageTest.DISTRIBUTION;
 import static org.apache.gravitino.integration.test.web.ui.CatalogsPageTest.SORT_ORDERS;
 
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
@@ -195,7 +196,7 @@ public class CatalogsPage extends BaseWebIT {
       Thread.sleep(500); // Wait for dropdown to appear
       // Ant Design Dropdown menu item with data-refer attribute
       String keyPath = "//div[@data-refer='select-option-" + metalakeName + "']";
-      WebDriverWait wait = new WebDriverWait(driver, MAX_TIMEOUT);
+      WebDriverWait wait = new WebDriverWait(driver, Duration.ofSeconds(MAX_TIMEOUT));
       WebElement selectOption =
           wait.until(ExpectedConditions.elementToBeClickable(By.xpath(keyPath)));
       clickAndWait(selectOption);
@@ -231,7 +232,7 @@ public class CatalogsPage extends BaseWebIT {
   // set the required fixed catalog properties
   public void setCatalogFixedProp(String key, String value) {
     try {
-      WebDriverWait wait = new WebDriverWait(driver, MAX_TIMEOUT);
+      WebDriverWait wait = new WebDriverWait(driver, Duration.ofSeconds(MAX_TIMEOUT));
       // Try to find by data-refer attribute on input element first
       String xpath = "//input[@data-refer='catalog-props-" + key + "']";
       WebElement propItem =
@@ -245,7 +246,7 @@ public class CatalogsPage extends BaseWebIT {
   // set the indexed catalog properties
   public void setPropsAt(int index, String key, String value) {
     try {
-      WebDriverWait wait = new WebDriverWait(driver, MAX_TIMEOUT);
+      WebDriverWait wait = new WebDriverWait(driver, Duration.ofSeconds(MAX_TIMEOUT));
       // Set the indexed props key - Ant Design Form.Item with data-refer/data-testid on wrapper
       String keyPath = "//*[@data-testid='props-key-" + index + "']//input";
       WebElement keyInput =
@@ -265,7 +266,7 @@ public class CatalogsPage extends BaseWebIT {
     try {
       // UI uses <a> tag with data-refer attribute for edit button
       String xpath = "//a[@data-refer='edit-entity-" + name + "']";
-      WebDriverWait wait = new WebDriverWait(driver, MAX_TIMEOUT);
+      WebDriverWait wait = new WebDriverWait(driver, Duration.ofSeconds(MAX_TIMEOUT));
       WebElement btn = wait.until(ExpectedConditions.elementToBeClickable(By.xpath(xpath)));
       clickAndWait(btn);
     } catch (Exception e) {
@@ -282,7 +283,7 @@ public class CatalogsPage extends BaseWebIT {
 
         // Find and hover over the Settings icon to open the dropdown menu
         String settingsXpath = "//a[@data-refer='settings-catalog-" + name + "']";
-        WebDriverWait wait = new WebDriverWait(driver, MAX_TIMEOUT);
+        WebDriverWait wait = new WebDriverWait(driver, Duration.ofSeconds(MAX_TIMEOUT));
 
         // First ensure the element is present in DOM
         WebElement settingsIcon =
@@ -312,7 +313,7 @@ public class CatalogsPage extends BaseWebIT {
             "//li[contains(@class, 'ant-dropdown-menu-item')]//span[contains(@class, 'ant-dropdown-menu-title-content') and (contains(text(), 'Not In-Use') or contains(text(), 'In-Use'))]";
 
         // Use shorter timeout for menu item since we'll retry (10 seconds)
-        WebDriverWait menuWait = new WebDriverWait(driver, 10);
+        WebDriverWait menuWait = new WebDriverWait(driver, Duration.ofSeconds(10));
         WebElement menuItem =
             menuWait.until(ExpectedConditions.elementToBeClickable(By.xpath(menuItemXpath)));
         menuItem.click();
@@ -339,7 +340,7 @@ public class CatalogsPage extends BaseWebIT {
       // New UI uses <a> tag instead of <button> for delete action
       String xpath = "//a[@data-refer='delete-entity-" + name + "']";
       WebElement btn = driver.findElement(By.xpath(xpath));
-      WebDriverWait wait = new WebDriverWait(driver, MAX_TIMEOUT);
+      WebDriverWait wait = new WebDriverWait(driver, Duration.ofSeconds(MAX_TIMEOUT));
       wait.until(ExpectedConditions.elementToBeClickable(By.xpath(xpath)));
       clickAndWait(btn);
     } catch (Exception e) {
@@ -350,7 +351,7 @@ public class CatalogsPage extends BaseWebIT {
   // Input the name to confirm deletion in the modal dialog
   public void setConfirmDeleteInput(String name) {
     try {
-      WebDriverWait wait = new WebDriverWait(driver, MAX_TIMEOUT);
+      WebDriverWait wait = new WebDriverWait(driver, Duration.ofSeconds(MAX_TIMEOUT));
       wait.until(ExpectedConditions.visibilityOf(confirmDeleteInput));
       confirmDeleteInput.sendKeys(name);
     } catch (Exception e) {
@@ -425,7 +426,7 @@ public class CatalogsPage extends BaseWebIT {
               By.xpath(
                   "./ancestor::span[contains(@class, 'ant-input-wrapper') or contains(@class, 'ant-input-group')]//span[contains(@class, 'ant-select')]"));
 
-      WebDriverWait wait = new WebDriverWait(driver, MAX_TIMEOUT);
+      WebDriverWait wait = new WebDriverWait(driver, Duration.ofSeconds(MAX_TIMEOUT));
       wait.until(ExpectedConditions.elementToBeClickable(addonWrapper));
       addonWrapper.click();
       Thread.sleep(500);
@@ -520,7 +521,7 @@ public class CatalogsPage extends BaseWebIT {
       // Wait for dropdown to appear and click the option
       // Ant Design Select dropdown - try multiple selectors for compatibility
       Thread.sleep(500);
-      WebDriverWait wait = new WebDriverWait(driver, MAX_TIMEOUT);
+      WebDriverWait wait = new WebDriverWait(driver, Duration.ofSeconds(MAX_TIMEOUT));
       String optionXpath =
           "//div[contains(@class, 'ant-select-dropdown')]"
               + "//div[contains(@class, 'ant-select-item-option') and (@title='"
@@ -547,7 +548,7 @@ public class CatalogsPage extends BaseWebIT {
     try {
       String xpath = "//a[@href='?metalake=" + metalakeName + "']";
       WebElement link = tableGrid.findElement(By.xpath(xpath));
-      WebDriverWait wait = new WebDriverWait(driver, MAX_TIMEOUT);
+      WebDriverWait wait = new WebDriverWait(driver, Duration.ofSeconds(MAX_TIMEOUT));
       wait.until(ExpectedConditions.elementToBeClickable(By.xpath(xpath)));
       clickAndWait(link);
     } catch (Exception e) {
@@ -559,7 +560,7 @@ public class CatalogsPage extends BaseWebIT {
     try {
       // Use data-refer attribute for more stable element location
       String xpath = "//a[@data-refer='catalog-link-" + catalogName + "']";
-      WebDriverWait wait = new WebDriverWait(driver, MAX_TIMEOUT);
+      WebDriverWait wait = new WebDriverWait(driver, Duration.ofSeconds(MAX_TIMEOUT));
       WebElement link = wait.until(ExpectedConditions.elementToBeClickable(By.xpath(xpath)));
       clickAndWait(link);
       // Wait for navigation to complete and catalog details page to load
@@ -574,7 +575,7 @@ public class CatalogsPage extends BaseWebIT {
     try {
       // Use data-refer attribute for more stable element location
       String xpath = "//a[@data-refer='schema-link-" + schemaName + "']";
-      WebDriverWait wait = new WebDriverWait(driver, MAX_TIMEOUT);
+      WebDriverWait wait = new WebDriverWait(driver, Duration.ofSeconds(MAX_TIMEOUT));
       WebElement link = wait.until(ExpectedConditions.elementToBeClickable(By.xpath(xpath)));
       clickAndWait(link);
       // Wait for navigation to complete and schema details page to load
@@ -594,7 +595,7 @@ public class CatalogsPage extends BaseWebIT {
       // Use data-refer attribute for more stable element location
       // In SchemaDetailsPage.js, entityType is "table" for relational catalogs
       String xpath = "//a[@data-refer='table-link-" + tableName + "']";
-      WebDriverWait wait = new WebDriverWait(driver, MAX_TIMEOUT);
+      WebDriverWait wait = new WebDriverWait(driver, Duration.ofSeconds(MAX_TIMEOUT));
       WebElement link = wait.until(ExpectedConditions.elementToBeClickable(By.xpath(xpath)));
       clickAndWait(link);
       // Wait for navigation to complete and table details page to load
@@ -606,7 +607,7 @@ public class CatalogsPage extends BaseWebIT {
 
   public void clickBreadCrumbsToCatalogs() {
     try {
-      WebDriverWait wait = new WebDriverWait(driver, MAX_TIMEOUT);
+      WebDriverWait wait = new WebDriverWait(driver, Duration.ofSeconds(MAX_TIMEOUT));
       wait.until(ExpectedConditions.elementToBeClickable(metalakeNameLink));
       clickAndWait(metalakeNameLink);
     } catch (Exception e) {
@@ -617,7 +618,7 @@ public class CatalogsPage extends BaseWebIT {
   public void clickSelectProvider(String provider) throws InterruptedException {
     // New UI uses provider cards instead of dropdown
     // Wait for the provider card to be visible before clicking
-    WebDriverWait wait = new WebDriverWait(driver, MAX_TIMEOUT);
+    WebDriverWait wait = new WebDriverWait(driver, Duration.ofSeconds(MAX_TIMEOUT));
     String providerCardPath = "//div[@data-refer='catalog-provider-" + provider + "']";
     WebElement providerCard =
         wait.until(ExpectedConditions.presenceOfElementLocated(By.xpath(providerCardPath)));
@@ -685,7 +686,7 @@ public class CatalogsPage extends BaseWebIT {
               + "']",
         };
 
-    WebDriverWait wait = new WebDriverWait(driver, MAX_TIMEOUT);
+    WebDriverWait wait = new WebDriverWait(driver, Duration.ofSeconds(MAX_TIMEOUT));
     WebElement treeNode = null;
     for (String xp : candidateXpaths) {
       try {
@@ -743,7 +744,7 @@ public class CatalogsPage extends BaseWebIT {
             + "']/ancestor::span[contains(@class, 'ant-tree-title')]/preceding-sibling::span[contains(@class, 'ant-tree-iconEle')]";
 
     try {
-      WebDriverWait wait = new WebDriverWait(driver, MAX_TIMEOUT);
+      WebDriverWait wait = new WebDriverWait(driver, Duration.ofSeconds(MAX_TIMEOUT));
       WebElement iconElement =
           wait.until(ExpectedConditions.presenceOfElementLocated(By.xpath(nodeXpath)));
 
@@ -767,7 +768,7 @@ public class CatalogsPage extends BaseWebIT {
           "//div[contains(@class, 'ant-tree-treenode')]//span[contains(@class, 'ant-tree-title')]//div[@title='"
               + name
               + "']";
-      WebDriverWait wait = new WebDriverWait(driver, MAX_TIMEOUT);
+      WebDriverWait wait = new WebDriverWait(driver, Duration.ofSeconds(MAX_TIMEOUT));
       WebElement treeNode =
           wait.until(ExpectedConditions.visibilityOfElementLocated(By.xpath(xpath)));
       boolean match = Objects.equals(treeNode.getText(), name);
@@ -784,7 +785,7 @@ public class CatalogsPage extends BaseWebIT {
 
   public boolean verifyCatalogDetailsPage(String catalogName, String provider, String type) {
     try {
-      WebDriverWait wait = new WebDriverWait(driver, MAX_TIMEOUT);
+      WebDriverWait wait = new WebDriverWait(driver, Duration.ofSeconds(MAX_TIMEOUT));
 
       // Verify catalog name is displayed in the page title (h3.ant-typography > span[@title])
       String titleXpath =
@@ -839,7 +840,7 @@ public class CatalogsPage extends BaseWebIT {
           "//div[contains(@class, 'ant-tree-treenode')]//span[contains(@class, 'ant-tree-title')]//div[@title='"
               + name
               + "']";
-      WebDriverWait wait = new WebDriverWait(driver, MAX_TIMEOUT);
+      WebDriverWait wait = new WebDriverWait(driver, Duration.ofSeconds(MAX_TIMEOUT));
       WebElement treeNode =
           wait.until(ExpectedConditions.visibilityOfElementLocated(By.xpath(xpath)));
 
@@ -859,7 +860,7 @@ public class CatalogsPage extends BaseWebIT {
   public boolean verifyEmptyTableData() {
     try {
       // Check is empty table - Ant Design shows ant-empty component for empty tables
-      WebDriverWait wait = new WebDriverWait(driver, MAX_TIMEOUT);
+      WebDriverWait wait = new WebDriverWait(driver, Duration.ofSeconds(MAX_TIMEOUT));
       String emptyXpath = "//div[@data-refer='table-grid']//div[contains(@class, 'ant-empty')]";
       WebElement emptyElement =
           wait.until(ExpectedConditions.visibilityOfElementLocated(By.xpath(emptyXpath)));
@@ -880,7 +881,7 @@ public class CatalogsPage extends BaseWebIT {
       // Wait for page to load first
       Thread.sleep(2000);
 
-      WebDriverWait wait = new WebDriverWait(driver, MAX_TIMEOUT);
+      WebDriverWait wait = new WebDriverWait(driver, Duration.ofSeconds(MAX_TIMEOUT));
 
       // Use data-refer attribute for more stable location, then find active tab
       // Ant Design 5.x Tabs structure:
@@ -927,7 +928,7 @@ public class CatalogsPage extends BaseWebIT {
    */
   public boolean verifyShowPropertiesItemInList(
       String item, String key, String value, Boolean isHighlight) {
-    WebDriverWait wait = new WebDriverWait(driver, ACTION_SLEEP);
+    WebDriverWait wait = new WebDriverWait(driver, Duration.ofSeconds(ACTION_SLEEP));
     String xpath;
     if (isHighlight) {
       xpath = "//div[@data-refer='props-" + item + "-" + key + "-highlight']";
@@ -953,7 +954,7 @@ public class CatalogsPage extends BaseWebIT {
    */
   public void clickPropertiesLink() throws InterruptedException {
     try {
-      WebDriverWait wait = new WebDriverWait(driver, MAX_TIMEOUT);
+      WebDriverWait wait = new WebDriverWait(driver, Duration.ofSeconds(MAX_TIMEOUT));
       String xpath = "//a[@data-refer='properties-link']";
       WebElement propertiesLink =
           wait.until(ExpectedConditions.elementToBeClickable(By.xpath(xpath)));
@@ -973,7 +974,7 @@ public class CatalogsPage extends BaseWebIT {
    */
   public boolean verifyPropertyInPopover(String key, String expectedValue) {
     try {
-      WebDriverWait wait = new WebDriverWait(driver, ACTION_SLEEP);
+      WebDriverWait wait = new WebDriverWait(driver, Duration.ofSeconds(ACTION_SLEEP));
       // Verify the popover content is visible
       String popoverXpath = "//*[@data-refer='properties-popover-content']";
       wait.until(ExpectedConditions.visibilityOfElementLocated(By.xpath(popoverXpath)));
@@ -1018,7 +1019,7 @@ public class CatalogsPage extends BaseWebIT {
    */
   public boolean verifyTableOverviewLink(String linkType, String expectedValue) {
     try {
-      WebDriverWait wait = new WebDriverWait(driver, MAX_TIMEOUT);
+      WebDriverWait wait = new WebDriverWait(driver, Duration.ofSeconds(MAX_TIMEOUT));
       String xpath = "//a[@data-refer='overview-" + linkType + "-link']";
       WebElement linkElement =
           wait.until(ExpectedConditions.visibilityOfElementLocated(By.xpath(xpath)));
@@ -1047,7 +1048,7 @@ public class CatalogsPage extends BaseWebIT {
    */
   public void clickTableOverviewLink(String linkType) throws InterruptedException {
     try {
-      WebDriverWait wait = new WebDriverWait(driver, MAX_TIMEOUT);
+      WebDriverWait wait = new WebDriverWait(driver, Duration.ofSeconds(MAX_TIMEOUT));
       String xpath = "//a[@data-refer='overview-" + linkType + "-link']";
       WebElement linkElement = wait.until(ExpectedConditions.elementToBeClickable(By.xpath(xpath)));
       linkElement.click();
@@ -1070,7 +1071,7 @@ public class CatalogsPage extends BaseWebIT {
           "//*[@data-refer='overview-" + type + "-items']",
         };
 
-    WebDriverWait wait = new WebDriverWait(driver, 5);
+    WebDriverWait wait = new WebDriverWait(driver, Duration.ofSeconds(5));
     WebElement found = null;
     for (String xp : candidateXpaths) {
       try {
@@ -1111,7 +1112,7 @@ public class CatalogsPage extends BaseWebIT {
     } catch (Exception e) {
       LOG.error(e.getMessage(), e);
     }
-    WebDriverWait wait = new WebDriverWait(driver, ACTION_SLEEP);
+    WebDriverWait wait = new WebDriverWait(driver, Duration.ofSeconds(ACTION_SLEEP));
 
     // Ant Design Table structure: table > tbody > tr > td
     // For catalog/schema pages, the first column contains a Link (<a> tag)
@@ -1176,7 +1177,7 @@ public class CatalogsPage extends BaseWebIT {
     if (isColumnLevel) {
       xpath = xpath + "//p";
     }
-    WebDriverWait wait = new WebDriverWait(driver, ACTION_SLEEP);
+    WebDriverWait wait = new WebDriverWait(driver, Duration.ofSeconds(ACTION_SLEEP));
     List<WebElement> list =
         wait.until(ExpectedConditions.visibilityOfAllElementsLocatedBy(By.xpath(xpath)));
     List<String> texts = new ArrayList<>();
@@ -1264,7 +1265,7 @@ public class CatalogsPage extends BaseWebIT {
       Thread.sleep(500);
 
       // Wait for the popover content to be visible
-      WebDriverWait wait = new WebDriverWait(driver, 10);
+      WebDriverWait wait = new WebDriverWait(driver, Duration.ofSeconds(10));
       wait.until(ExpectedConditions.presenceOfElementLocated(By.xpath(xpath)));
 
       // Then find all matching elements
@@ -1373,7 +1374,7 @@ public class CatalogsPage extends BaseWebIT {
   }
 
   public boolean verifyBackHomePage() {
-    WebDriverWait wait = new WebDriverWait(driver, MAX_TIMEOUT);
+    WebDriverWait wait = new WebDriverWait(driver, Duration.ofSeconds(MAX_TIMEOUT));
     wait.until(ExpectedConditions.visibilityOf(metalakePageTitle));
     boolean matchTitle = Objects.equals(metalakePageTitle.getText(), "Metalakes");
     if (!matchTitle) {
@@ -1384,7 +1385,7 @@ public class CatalogsPage extends BaseWebIT {
   }
 
   public boolean verifyRefreshPage() {
-    WebDriverWait wait = new WebDriverWait(driver, MAX_TIMEOUT);
+    WebDriverWait wait = new WebDriverWait(driver, Duration.ofSeconds(MAX_TIMEOUT));
     wait.until(
         webDriver ->
             ((JavascriptExecutor) webDriver)
@@ -1419,7 +1420,7 @@ public class CatalogsPage extends BaseWebIT {
   }
 
   public boolean verifyTreeNodes(List<String> treeNodes) {
-    WebDriverWait wait = new WebDriverWait(driver, ACTION_SLEEP);
+    WebDriverWait wait = new WebDriverWait(driver, Duration.ofSeconds(ACTION_SLEEP));
     List<WebElement> list =
         wait.until(
             ExpectedConditions.visibilityOfAllElementsLocatedBy(
@@ -1443,7 +1444,7 @@ public class CatalogsPage extends BaseWebIT {
 
   public boolean verifySelectedNode(String nodeName) {
 
-    WebDriverWait wait = new WebDriverWait(driver, ACTION_SLEEP);
+    WebDriverWait wait = new WebDriverWait(driver, Duration.ofSeconds(ACTION_SLEEP));
 
     WebElement selectedNode =
         wait.until(
