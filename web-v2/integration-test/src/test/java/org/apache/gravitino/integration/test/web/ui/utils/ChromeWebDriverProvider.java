@@ -26,6 +26,7 @@ import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.SystemUtils;
 import org.apache.gravitino.integration.test.util.ITUtils;
 import org.apache.logging.log4j.util.Strings;
+import org.openqa.selenium.PageLoadStrategy;
 import org.openqa.selenium.WebDriver;
 import org.openqa.selenium.chrome.ChromeDriver;
 import org.openqa.selenium.chrome.ChromeOptions;
@@ -107,7 +108,16 @@ public class ChromeWebDriverProvider implements WebDriverProvider {
       chromeOptions.addArguments("--headless");
       chromeOptions.addArguments("--no-sandbox");
       chromeOptions.addArguments("--disable-dev-shm-usage");
+      chromeOptions.addArguments("--disable-gpu");
+      chromeOptions.addArguments("--disable-renderer-backgrounding");
+      chromeOptions.addArguments("--disable-backgrounding-occluded-windows");
+      chromeOptions.addArguments("--disable-background-timer-throttling");
     }
+
+    // Use EAGER strategy so navigation commands return at DOMContentLoaded
+    // instead of waiting for the full load event, which can cause renderer
+    // timeout in headless Chrome 103.
+    chromeOptions.setPageLoadStrategy(PageLoadStrategy.EAGER);
 
     if (SystemUtils.IS_OS_MAC_OSX) {
       chromeOptions.setBinary(

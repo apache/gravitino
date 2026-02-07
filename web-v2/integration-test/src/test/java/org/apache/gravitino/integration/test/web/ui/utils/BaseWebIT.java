@@ -28,6 +28,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.openqa.selenium.By;
 import org.openqa.selenium.ElementClickInterceptedException;
 import org.openqa.selenium.InvalidArgumentException;
+import org.openqa.selenium.JavascriptExecutor;
 import org.openqa.selenium.NoSuchElementException;
 import org.openqa.selenium.TimeoutException;
 import org.openqa.selenium.WebDriver;
@@ -92,89 +93,53 @@ public class BaseWebIT extends BaseIT {
   }
 
   protected void reloadPageAndWait() {
-    int maxRetries = 5;
-    int retryCount = 0;
-    boolean success = false;
+    int maxRetries = 3;
+    String currentUrl = driver.getCurrentUrl();
 
-    while (retryCount < maxRetries && !success) {
+    for (int attempt = 1; attempt <= maxRetries; attempt++) {
       try {
+        // With EAGER page load strategy, navigate().refresh() returns at DOMContentLoaded
+        // instead of blocking until the full load event, avoiding renderer timeout.
         driver.navigate().refresh();
-
-        // Add a small delay to let the page start reloading
-        try {
-          Thread.sleep(500);
-        } catch (InterruptedException e) {
-          Thread.currentThread().interrupt();
-        }
-
-        // Use FluentWait with multiple conditions for more robust waiting
-        Wait<WebDriver> wait =
-            new FluentWait<>(driver)
-                .withTimeout(Duration.of(MAX_TIMEOUT, ChronoUnit.SECONDS))
-                .pollingEvery(Duration.of(500, ChronoUnit.MILLIS))
-                .ignoring(NoSuchElementException.class)
-                .ignoring(org.openqa.selenium.JavascriptException.class);
-
-        // Wait for document ready state
-        wait.until(
-            d -> {
-              try {
-                Object readyState = js.executeScript("return document.readyState");
-                return "complete".equals(readyState);
-              } catch (Exception e) {
-                LOG.warn("Error checking document.readyState: {}", e.getMessage());
-                return false;
-              }
-            });
-
-        // Additional wait to ensure page is fully interactive
-        wait.until(
-            d -> {
-              try {
-                // Check if body element is present and has content
-                Object bodyExists =
-                    js.executeScript(
-                        "return document.body != null && document.body.innerHTML.length > 0");
-                return Boolean.TRUE.equals(bodyExists);
-              } catch (Exception e) {
-                LOG.warn("Error checking body element: {}", e.getMessage());
-                return false;
-              }
-            });
-
-        // Extra stability wait for JavaScript to finish executing
-        try {
-          Thread.sleep(1000);
-        } catch (InterruptedException e) {
-          Thread.currentThread().interrupt();
-        }
-
-        success = true;
-        if (retryCount > 0) {
-          LOG.info("Page reload succeeded after {} retries", retryCount);
-        }
-
+        waitForPageReady();
+        return;
       } catch (TimeoutException e) {
-        retryCount++;
-        LOG.warn(
-            "Page reload timed out (attempt {}/{}). {}",
-            retryCount,
-            maxRetries,
-            retryCount < maxRetries ? "Retrying..." : "Max retries reached");
+        LOG.warn("Page reload timed out (attempt {}/{}): {}", attempt, maxRetries, e.getMessage());
 
-        if (retryCount >= maxRetries) {
+        if (attempt < maxRetries) {
+          // Fallback: use driver.get(url) which takes a different code path
+          try {
+            driver.get(currentUrl);
+            waitForPageReady();
+            return;
+          } catch (TimeoutException e2) {
+            LOG.warn("Fallback driver.get() also timed out, will retry: {}", e2.getMessage());
+          }
+        } else {
           throw new TimeoutException(
               "Failed to reload page after " + maxRetries + " attempts: " + e.getMessage(), e);
         }
-
-        // Wait before retrying
-        try {
-          Thread.sleep(2000);
-        } catch (InterruptedException ie) {
-          Thread.currentThread().interrupt();
-        }
       }
     }
+  }
+
+  private void waitForPageReady() {
+    Wait<WebDriver> wait =
+        new FluentWait<>(driver)
+            .withTimeout(Duration.of(MAX_TIMEOUT, ChronoUnit.SECONDS))
+            .pollingEvery(Duration.of(500, ChronoUnit.MILLIS))
+            .ignoring(NoSuchElementException.class);
+
+    wait.until(
+        d -> {
+          try {
+            Object readyState =
+                ((JavascriptExecutor) d).executeScript("return document.readyState");
+            return "complete".equals(readyState);
+          } catch (Exception e) {
+            return false;
+          }
+        });
   }
 
   WebElement locatorElement(final Object locatorOrElement) {
