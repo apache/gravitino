@@ -122,7 +122,7 @@ public class TestQLExpressionEvaluator {
 
     // Test numeric operations
     long numericResult = evaluator.evaluateLong("intVal + doubleVal", context);
-    assertEquals(16L, numericResult); // 10 + 5.5 = 15.5 → rounded to 16
+    assertEquals(16L, numericResult); // 10 + 5.5 = 15.5 -> rounded to 16
 
     // Test boolean operations
     boolean boolResult = evaluator.evaluateBool("boolVal && (intVal > 5)", context);
