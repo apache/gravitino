@@ -65,3 +65,4 @@ web/.next
 # Agent
 AGENT.md
 CLAUDE.md
+.qoder/*
