@@ -638,6 +638,26 @@ public class JDBCBackend implements RelationalBackend {
   }
 
   @Override
+  public <E extends Entity & HasIdentifier> List<E> listEntitiesByRelation(
+      Type relType,
+      List<NameIdentifier> nameIdentifiers,
+      Entity.EntityType identType,
+      boolean allFields)
+      throws IOException {
+    switch (relType) {
+      case OWNER_REL:
+        List<E> list = Lists.newArrayList();
+        OwnerMetaService.getInstance()
+            .batchGetOwner(nameIdentifiers, identType)
+            .forEach(e -> list.add((E) e));
+        return list;
+      default:
+        throw new IllegalArgumentException(
+            String.format("Doesn't support the relation type %s", relType));
+    }
+  }
+
+  @Override
   public void insertRelation(
       SupportsRelationOperations.Type relType,
       NameIdentifier srcIdentifier,

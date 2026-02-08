@@ -92,6 +92,13 @@ public interface SupportsRelationOperations {
       Type relType, NameIdentifier nameIdentifier, Entity.EntityType identType, boolean allFields)
       throws IOException;
 
+  <E extends Entity & HasIdentifier> List<E> listEntitiesByRelation(
+      Type relType,
+      List<NameIdentifier> nameIdentifiers,
+      Entity.EntityType identType,
+      boolean allFields)
+      throws IOException;
+
   /**
    * Get a specific entity that is related to a given source entity.
    *
