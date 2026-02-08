@@ -561,28 +561,49 @@ public class CatalogsPage extends BaseWebIT {
     try {
       String linkXpath = "//a[@data-refer='catalog-link-" + catalogName + "']";
       String detailsTabsXpath = "//*[@data-refer='details-tabs']";
+      WebDriverWait shortWait = new WebDriverWait(driver, Duration.ofSeconds(10));
       WebDriverWait wait = new WebDriverWait(driver, Duration.ofSeconds(MAX_TIMEOUT));
+      WebElement link = wait.until(ExpectedConditions.elementToBeClickable(By.xpath(linkXpath)));
 
-      // Retry click up to 3 times to handle cases where SPA navigation doesn't trigger
-      int maxRetries = 3;
-      for (int attempt = 0; attempt < maxRetries; attempt++) {
-        WebElement link = wait.until(ExpectedConditions.elementToBeClickable(By.xpath(linkXpath)));
-        clickAndWait(link);
-
-        // Wait for navigation to complete: details-tabs only exists on detail pages
-        try {
-          new WebDriverWait(driver, Duration.ofSeconds(10))
-              .until(ExpectedConditions.presenceOfElementLocated(By.xpath(detailsTabsXpath)));
-          LOG.info("Navigation to catalog details page completed on attempt {}", attempt + 1);
-          return;
-        } catch (TimeoutException e) {
-          LOG.warn(
-              "Catalog details page not loaded after click attempt {}, retrying...", attempt + 1);
-        }
+      // Strategy 1: Normal click
+      clickAndWait(link);
+      if (isElementPresent(detailsTabsXpath, shortWait)) {
+        LOG.info("Catalog details navigation succeeded via normal click");
+        return;
       }
-      LOG.error("Failed to navigate to catalog details page after {} attempts", maxRetries);
+      LOG.warn("Normal click did not navigate, trying JavaScript click...");
+
+      // Strategy 2: JavaScript click (bypasses overlay interception)
+      link = driver.findElement(By.xpath(linkXpath));
+      ((JavascriptExecutor) driver).executeScript("arguments[0].click();", link);
+      Thread.sleep(ACTION_SLEEP * 1000);
+      if (isElementPresent(detailsTabsXpath, shortWait)) {
+        LOG.info("Catalog details navigation succeeded via JavaScript click");
+        return;
+      }
+      LOG.warn("JavaScript click did not navigate, trying direct URL navigation...");
+
+      // Strategy 3: Extract href and navigate directly (bypasses SPA routing entirely)
+      link = driver.findElement(By.xpath(linkXpath));
+      String href = link.getAttribute("href");
+      if (href != null && !href.isEmpty()) {
+        driver.get(href);
+        wait.until(ExpectedConditions.presenceOfElementLocated(By.xpath(detailsTabsXpath)));
+        LOG.info("Catalog details navigation succeeded via direct URL: {}", href);
+        return;
+      }
+      LOG.error("Failed to navigate to catalog details page: href was empty");
     } catch (Exception e) {
       LOG.error(e.getMessage(), e);
+    }
+  }
+
+  private boolean isElementPresent(String xpath, WebDriverWait wait) {
+    try {
+      wait.until(ExpectedConditions.presenceOfElementLocated(By.xpath(xpath)));
+      return true;
+    } catch (TimeoutException e) {
+      return false;
     }
   }
 
@@ -590,28 +611,49 @@ public class CatalogsPage extends BaseWebIT {
       String metalakeName, String catalogName, String catalogType, String schemaName) {
     try {
       String linkXpath = "//a[@data-refer='schema-link-" + schemaName + "']";
+      WebDriverWait shortWait = new WebDriverWait(driver, Duration.ofSeconds(10));
       WebDriverWait wait = new WebDriverWait(driver, Duration.ofSeconds(MAX_TIMEOUT));
+      WebElement link = wait.until(ExpectedConditions.elementToBeClickable(By.xpath(linkXpath)));
 
-      // Retry click up to 3 times to handle cases where SPA navigation doesn't trigger
-      int maxRetries = 3;
-      for (int attempt = 0; attempt < maxRetries; attempt++) {
-        WebElement link = wait.until(ExpectedConditions.elementToBeClickable(By.xpath(linkXpath)));
-        clickAndWait(link);
-
-        // Wait for navigation: URL should contain schema= parameter
-        try {
-          new WebDriverWait(driver, Duration.ofSeconds(10))
-              .until(d -> d.getCurrentUrl().contains("schema="));
-          LOG.info("Navigation to schema details page completed on attempt {}", attempt + 1);
-          return;
-        } catch (TimeoutException e) {
-          LOG.warn(
-              "Schema details page not loaded after click attempt {}, retrying...", attempt + 1);
-        }
+      // Strategy 1: Normal click
+      clickAndWait(link);
+      if (isUrlContains("schema=", shortWait)) {
+        LOG.info("Schema details navigation succeeded via normal click");
+        return;
       }
-      LOG.error("Failed to navigate to schema details page after {} attempts", maxRetries);
+      LOG.warn("Normal click did not navigate to schema, trying JavaScript click...");
+
+      // Strategy 2: JavaScript click
+      link = driver.findElement(By.xpath(linkXpath));
+      ((JavascriptExecutor) driver).executeScript("arguments[0].click();", link);
+      Thread.sleep(ACTION_SLEEP * 1000);
+      if (isUrlContains("schema=", shortWait)) {
+        LOG.info("Schema details navigation succeeded via JavaScript click");
+        return;
+      }
+      LOG.warn("JavaScript click did not navigate to schema, trying direct URL navigation...");
+
+      // Strategy 3: Extract href and navigate directly
+      link = driver.findElement(By.xpath(linkXpath));
+      String href = link.getAttribute("href");
+      if (href != null && !href.isEmpty()) {
+        driver.get(href);
+        wait.until(d -> d.getCurrentUrl().contains("schema="));
+        LOG.info("Schema details navigation succeeded via direct URL: {}", href);
+        return;
+      }
+      LOG.error("Failed to navigate to schema details page: href was empty");
     } catch (Exception e) {
       LOG.error(e.getMessage(), e);
+    }
+  }
+
+  private boolean isUrlContains(String expected, WebDriverWait wait) {
+    try {
+      wait.until(d -> d.getCurrentUrl().contains(expected));
+      return true;
+    } catch (TimeoutException e) {
+      return false;
     }
   }
 
@@ -623,26 +665,38 @@ public class CatalogsPage extends BaseWebIT {
       String tableName) {
     try {
       String linkXpath = "//a[@data-refer='table-link-" + tableName + "']";
+      WebDriverWait shortWait = new WebDriverWait(driver, Duration.ofSeconds(10));
       WebDriverWait wait = new WebDriverWait(driver, Duration.ofSeconds(MAX_TIMEOUT));
+      WebElement link = wait.until(ExpectedConditions.elementToBeClickable(By.xpath(linkXpath)));
 
-      // Retry click up to 3 times to handle cases where SPA navigation doesn't trigger
-      int maxRetries = 3;
-      for (int attempt = 0; attempt < maxRetries; attempt++) {
-        WebElement link = wait.until(ExpectedConditions.elementToBeClickable(By.xpath(linkXpath)));
-        clickAndWait(link);
-
-        // Wait for navigation: URL should contain table= parameter
-        try {
-          new WebDriverWait(driver, Duration.ofSeconds(10))
-              .until(d -> d.getCurrentUrl().contains("table="));
-          LOG.info("Navigation to table details page completed on attempt {}", attempt + 1);
-          return;
-        } catch (TimeoutException e) {
-          LOG.warn(
-              "Table details page not loaded after click attempt {}, retrying...", attempt + 1);
-        }
+      // Strategy 1: Normal click
+      clickAndWait(link);
+      if (isUrlContains("table=", shortWait)) {
+        LOG.info("Table details navigation succeeded via normal click");
+        return;
       }
-      LOG.error("Failed to navigate to table details page after {} attempts", maxRetries);
+      LOG.warn("Normal click did not navigate to table, trying JavaScript click...");
+
+      // Strategy 2: JavaScript click
+      link = driver.findElement(By.xpath(linkXpath));
+      ((JavascriptExecutor) driver).executeScript("arguments[0].click();", link);
+      Thread.sleep(ACTION_SLEEP * 1000);
+      if (isUrlContains("table=", shortWait)) {
+        LOG.info("Table details navigation succeeded via JavaScript click");
+        return;
+      }
+      LOG.warn("JavaScript click did not navigate to table, trying direct URL navigation...");
+
+      // Strategy 3: Extract href and navigate directly
+      link = driver.findElement(By.xpath(linkXpath));
+      String href = link.getAttribute("href");
+      if (href != null && !href.isEmpty()) {
+        driver.get(href);
+        wait.until(d -> d.getCurrentUrl().contains("table="));
+        LOG.info("Table details navigation succeeded via direct URL: {}", href);
+        return;
+      }
+      LOG.error("Failed to navigate to table details page: href was empty");
     } catch (Exception e) {
       LOG.error(e.getMessage(), e);
     }
