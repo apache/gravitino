@@ -32,6 +32,7 @@ import org.openqa.selenium.By;
 import org.openqa.selenium.JavascriptExecutor;
 import org.openqa.selenium.Keys;
 import org.openqa.selenium.StaleElementReferenceException;
+import org.openqa.selenium.TimeoutException;
 import org.openqa.selenium.WebDriver;
 import org.openqa.selenium.WebElement;
 import org.openqa.selenium.interactions.Actions;
@@ -558,13 +559,28 @@ public class CatalogsPage extends BaseWebIT {
 
   public void clickCatalogLink(String metalakeName, String catalogName, String catalogType) {
     try {
-      // Use data-refer attribute for more stable element location
-      String xpath = "//a[@data-refer='catalog-link-" + catalogName + "']";
+      String linkXpath = "//a[@data-refer='catalog-link-" + catalogName + "']";
+      String detailsTabsXpath = "//*[@data-refer='details-tabs']";
       WebDriverWait wait = new WebDriverWait(driver, Duration.ofSeconds(MAX_TIMEOUT));
-      WebElement link = wait.until(ExpectedConditions.elementToBeClickable(By.xpath(xpath)));
-      clickAndWait(link);
-      // Wait for navigation to complete and catalog details page to load
-      Thread.sleep(2000);
+
+      // Retry click up to 3 times to handle cases where SPA navigation doesn't trigger
+      int maxRetries = 3;
+      for (int attempt = 0; attempt < maxRetries; attempt++) {
+        WebElement link = wait.until(ExpectedConditions.elementToBeClickable(By.xpath(linkXpath)));
+        clickAndWait(link);
+
+        // Wait for navigation to complete: details-tabs only exists on detail pages
+        try {
+          new WebDriverWait(driver, Duration.ofSeconds(10))
+              .until(ExpectedConditions.presenceOfElementLocated(By.xpath(detailsTabsXpath)));
+          LOG.info("Navigation to catalog details page completed on attempt {}", attempt + 1);
+          return;
+        } catch (TimeoutException e) {
+          LOG.warn(
+              "Catalog details page not loaded after click attempt {}, retrying...", attempt + 1);
+        }
+      }
+      LOG.error("Failed to navigate to catalog details page after {} attempts", maxRetries);
     } catch (Exception e) {
       LOG.error(e.getMessage(), e);
     }
@@ -573,13 +589,27 @@ public class CatalogsPage extends BaseWebIT {
   public void clickSchemaLink(
       String metalakeName, String catalogName, String catalogType, String schemaName) {
     try {
-      // Use data-refer attribute for more stable element location
-      String xpath = "//a[@data-refer='schema-link-" + schemaName + "']";
+      String linkXpath = "//a[@data-refer='schema-link-" + schemaName + "']";
       WebDriverWait wait = new WebDriverWait(driver, Duration.ofSeconds(MAX_TIMEOUT));
-      WebElement link = wait.until(ExpectedConditions.elementToBeClickable(By.xpath(xpath)));
-      clickAndWait(link);
-      // Wait for navigation to complete and schema details page to load
-      Thread.sleep(2000);
+
+      // Retry click up to 3 times to handle cases where SPA navigation doesn't trigger
+      int maxRetries = 3;
+      for (int attempt = 0; attempt < maxRetries; attempt++) {
+        WebElement link = wait.until(ExpectedConditions.elementToBeClickable(By.xpath(linkXpath)));
+        clickAndWait(link);
+
+        // Wait for navigation: URL should contain schema= parameter
+        try {
+          new WebDriverWait(driver, Duration.ofSeconds(10))
+              .until(d -> d.getCurrentUrl().contains("schema="));
+          LOG.info("Navigation to schema details page completed on attempt {}", attempt + 1);
+          return;
+        } catch (TimeoutException e) {
+          LOG.warn(
+              "Schema details page not loaded after click attempt {}, retrying...", attempt + 1);
+        }
+      }
+      LOG.error("Failed to navigate to schema details page after {} attempts", maxRetries);
     } catch (Exception e) {
       LOG.error(e.getMessage(), e);
     }
@@ -592,14 +622,27 @@ public class CatalogsPage extends BaseWebIT {
       String schemaName,
       String tableName) {
     try {
-      // Use data-refer attribute for more stable element location
-      // In SchemaDetailsPage.js, entityType is "table" for relational catalogs
-      String xpath = "//a[@data-refer='table-link-" + tableName + "']";
+      String linkXpath = "//a[@data-refer='table-link-" + tableName + "']";
       WebDriverWait wait = new WebDriverWait(driver, Duration.ofSeconds(MAX_TIMEOUT));
-      WebElement link = wait.until(ExpectedConditions.elementToBeClickable(By.xpath(xpath)));
-      clickAndWait(link);
-      // Wait for navigation to complete and table details page to load
-      Thread.sleep(2000);
+
+      // Retry click up to 3 times to handle cases where SPA navigation doesn't trigger
+      int maxRetries = 3;
+      for (int attempt = 0; attempt < maxRetries; attempt++) {
+        WebElement link = wait.until(ExpectedConditions.elementToBeClickable(By.xpath(linkXpath)));
+        clickAndWait(link);
+
+        // Wait for navigation: URL should contain table= parameter
+        try {
+          new WebDriverWait(driver, Duration.ofSeconds(10))
+              .until(d -> d.getCurrentUrl().contains("table="));
+          LOG.info("Navigation to table details page completed on attempt {}", attempt + 1);
+          return;
+        } catch (TimeoutException e) {
+          LOG.warn(
+              "Table details page not loaded after click attempt {}, retrying...", attempt + 1);
+        }
+      }
+      LOG.error("Failed to navigate to table details page after {} attempts", maxRetries);
     } catch (Exception e) {
       LOG.error(e.getMessage(), e);
     }
@@ -878,38 +921,22 @@ public class CatalogsPage extends BaseWebIT {
 
   public boolean verifyShowTableTitle(String title) {
     try {
-      // Wait for page to load first
-      Thread.sleep(2000);
-
       WebDriverWait wait = new WebDriverWait(driver, Duration.ofSeconds(MAX_TIMEOUT));
 
-      // Use data-refer attribute for more stable location, then find active tab
-      // Ant Design 5.x Tabs structure:
-      // div[@data-refer='details-tabs'] > div.ant-tabs-nav > ... > div.ant-tabs-tab-active
-      String[] xpaths = {
-        "//*[@data-refer='details-tabs']//div[contains(@class, 'ant-tabs-tab-active')]",
-        "//div[contains(@class, 'ant-tabs-tab-active')]//div[contains(@class, 'ant-tabs-tab-btn')]",
-        "//div[contains(@class, 'ant-tabs-tab-active')]"
-      };
-
-      for (String xpath : xpaths) {
-        try {
-          WebElement activeTab =
-              wait.until(ExpectedConditions.visibilityOfElementLocated(By.xpath(xpath)));
-          String tabText = activeTab.getText().trim();
-          // Check if tab text contains the title (in case of extra text)
-          if (tabText.equals(title) || tabText.contains(title)) {
-            LOG.info("Found active tab with title: {}", tabText);
-            return true;
-          }
-          LOG.info(
-              "Tab text '{}' from xpath '{}' does not match title '{}'", tabText, xpath, title);
-        } catch (Exception e) {
-          LOG.info("Xpath '{}' not found, trying next...", xpath);
-        }
+      // Only use the data-refer scoped xpath to avoid matching tabs from other pages
+      // (e.g. the metalake-level "Relational" tab which does NOT have data-refer='details-tabs').
+      // All detail pages (CatalogDetailsPage, SchemaDetailsPage, TableDetailsPage) render:
+      //   <Tabs data-refer='details-tabs' ...>
+      String xpath =
+          "//*[@data-refer='details-tabs']//div[contains(@class, 'ant-tabs-tab-active')]";
+      WebElement activeTab =
+          wait.until(ExpectedConditions.visibilityOfElementLocated(By.xpath(xpath)));
+      String tabText = activeTab.getText().trim();
+      if (tabText.equals(title) || tabText.contains(title)) {
+        LOG.info("Found active tab with title: {}", tabText);
+        return true;
       }
-
-      LOG.error("Could not find active tab with title: {}", title);
+      LOG.error("Active tab text '{}' does not match expected title '{}'", tabText, title);
       return false;
     } catch (Exception e) {
       LOG.error(e.getMessage(), e);
