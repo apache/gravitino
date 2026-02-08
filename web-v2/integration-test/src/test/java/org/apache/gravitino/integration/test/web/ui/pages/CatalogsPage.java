@@ -710,6 +710,7 @@ public class CatalogsPage extends BaseWebIT {
 
   public void clickBreadCrumbsToCatalogs() {
     try {
+      waitForLoading();
       WebDriverWait wait = new WebDriverWait(driver, Duration.ofSeconds(MAX_TIMEOUT));
       wait.until(ExpectedConditions.elementToBeClickable(metalakeNameLink));
       clickAndWait(metalakeNameLink);
@@ -747,6 +748,7 @@ public class CatalogsPage extends BaseWebIT {
   }
 
   public void clickTreeNode(String nodeKey) throws InterruptedException {
+    waitForLoading();
     // Parse nodeKey format: {{metalake}}{{catalog}}{{type}} or
     // {{metalake}}{{catalog}}{{type}}{{schema}} etc.
     // Extract the last meaningful part (the node name to click)
