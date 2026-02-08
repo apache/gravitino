@@ -99,10 +99,9 @@ public class OwnerMetaSQLProviderFactory {
   }
 
   public static String batchSelectUserOwnerMetaByMetadataObjectIdAndType(
-      @Param("metadataObjectIdList") List<Long> metadataObjectIdList,
+      @Param("metadataObjectIds") List<Long> metadataObjectIds,
       @Param("metadataObjectType") String metadataObjectType) {
     return getProvider()
-        .batchSelectUserOwnerMetaByMetadataObjectIdAndType(
-            metadataObjectIdList, metadataObjectType);
+        .batchSelectUserOwnerMetaByMetadataObjectIdAndType(metadataObjectIds, metadataObjectType);
   }
 }

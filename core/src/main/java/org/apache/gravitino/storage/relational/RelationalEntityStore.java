@@ -21,10 +21,12 @@ package org.apache.gravitino.storage.relational;
 import static org.apache.gravitino.Configs.ENTITY_RELATIONAL_STORE;
 
 import com.google.common.annotations.VisibleForTesting;
+import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableMap;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.function.Function;
 import org.apache.commons.lang3.tuple.Pair;
@@ -223,6 +225,27 @@ public class RelationalEntityStore implements EntityStore, SupportsRelationOpera
 
           return backendEntities;
         });
+  }
+
+  @Override
+  public <E extends Entity & HasIdentifier> List<E> listEntitiesByRelation(
+      Type relType,
+      List<NameIdentifier> nameIdentifiers,
+      Entity.EntityType identType,
+      boolean allFields)
+      throws IOException {
+    // TODO add lock
+    if (Objects.requireNonNull(relType) == Type.OWNER_REL) {
+      List<E> list = backend.listEntitiesByRelation(relType, nameIdentifiers, identType, allFields);
+      Preconditions.checkArgument(
+          list.size() == nameIdentifiers.size(),
+          "Owner list size not equal to nameIdentifiers size");
+      for (int i = 0; i < list.size(); i++) {
+        cache.put(nameIdentifiers.get(i), identType, relType, List.of(list.get(i)));
+      }
+      return list;
+    }
+    return List.of();
   }
 
   @Override
