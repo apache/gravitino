@@ -76,6 +76,12 @@ public class BaseWebIT extends BaseIT {
   }
 
   protected void clickAndWait(final Object locator) throws InterruptedException {
+    // Wait for any Ant Design loading spinners to disappear before clicking.
+    // When <Spin spinning={true}>, an overlay with class 'ant-spin-spinning' intercepts clicks.
+    // This is critical for slow backends like Doris (Docker + JDBC) where data loading takes
+    // longer and the spinner overlay stays visible, causing clicks to not reach the target.
+    waitForLoading();
+
     try {
       // wait the element is available
       WebDriverWait wait = new WebDriverWait(driver, Duration.ofSeconds(MAX_TIMEOUT));
@@ -89,6 +95,22 @@ public class BaseWebIT extends BaseIT {
       Actions action = new Actions(driver);
       action.moveToElement(locatorElement(locator)).click().build().perform();
       Thread.sleep(ACTION_SLEEP * 1000);
+    }
+  }
+
+  /**
+   * Waits for all Ant Design loading spinners to disappear. The Ant Design {@code <Spin>} component
+   * renders an overlay with class {@code ant-spin-spinning} when active, which intercepts click
+   * events on underlying elements.
+   */
+  protected void waitForLoading() {
+    try {
+      new WebDriverWait(driver, Duration.ofSeconds(MAX_TIMEOUT))
+          .until(
+              ExpectedConditions.invisibilityOfElementLocated(
+                  By.cssSelector(".ant-spin-spinning")));
+    } catch (TimeoutException e) {
+      LOG.warn("Loading spinner still visible after {}s, proceeding anyway", MAX_TIMEOUT);
     }
   }
 

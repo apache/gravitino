@@ -574,6 +574,7 @@ public class CatalogsPage extends BaseWebIT {
       LOG.warn("Normal click did not navigate, trying JavaScript click...");
 
       // Strategy 2: JavaScript click (bypasses overlay interception)
+      waitForLoading();
       link = driver.findElement(By.xpath(linkXpath));
       ((JavascriptExecutor) driver).executeScript("arguments[0].click();", link);
       Thread.sleep(ACTION_SLEEP * 1000);
@@ -584,6 +585,7 @@ public class CatalogsPage extends BaseWebIT {
       LOG.warn("JavaScript click did not navigate, trying direct URL navigation...");
 
       // Strategy 3: Extract href and navigate directly (bypasses SPA routing entirely)
+      waitForLoading();
       link = driver.findElement(By.xpath(linkXpath));
       String href = link.getAttribute("href");
       if (href != null && !href.isEmpty()) {
@@ -624,6 +626,7 @@ public class CatalogsPage extends BaseWebIT {
       LOG.warn("Normal click did not navigate to schema, trying JavaScript click...");
 
       // Strategy 2: JavaScript click
+      waitForLoading();
       link = driver.findElement(By.xpath(linkXpath));
       ((JavascriptExecutor) driver).executeScript("arguments[0].click();", link);
       Thread.sleep(ACTION_SLEEP * 1000);
@@ -634,6 +637,7 @@ public class CatalogsPage extends BaseWebIT {
       LOG.warn("JavaScript click did not navigate to schema, trying direct URL navigation...");
 
       // Strategy 3: Extract href and navigate directly
+      waitForLoading();
       link = driver.findElement(By.xpath(linkXpath));
       String href = link.getAttribute("href");
       if (href != null && !href.isEmpty()) {
@@ -678,6 +682,7 @@ public class CatalogsPage extends BaseWebIT {
       LOG.warn("Normal click did not navigate to table, trying JavaScript click...");
 
       // Strategy 2: JavaScript click
+      waitForLoading();
       link = driver.findElement(By.xpath(linkXpath));
       ((JavascriptExecutor) driver).executeScript("arguments[0].click();", link);
       Thread.sleep(ACTION_SLEEP * 1000);
@@ -688,6 +693,7 @@ public class CatalogsPage extends BaseWebIT {
       LOG.warn("JavaScript click did not navigate to table, trying direct URL navigation...");
 
       // Strategy 3: Extract href and navigate directly
+      waitForLoading();
       link = driver.findElement(By.xpath(linkXpath));
       String href = link.getAttribute("href");
       if (href != null && !href.isEmpty()) {
@@ -799,6 +805,7 @@ public class CatalogsPage extends BaseWebIT {
           } catch (Exception clickEx) {
             // fallback to JS click
             try {
+              waitForLoading();
               ((JavascriptExecutor) driver).executeScript("arguments[0].click();", treeNode);
               Thread.sleep(300);
               return;
