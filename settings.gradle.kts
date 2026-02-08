@@ -83,6 +83,7 @@ project(":spark-connector:spark-runtime-3.4").projectDir = file("spark-connector
 project(":spark-connector:spark-3.5").projectDir = file("spark-connector/v3.5/spark")
 project(":spark-connector:spark-runtime-3.5").projectDir = file("spark-connector/v3.5/spark-runtime")
 include("web:web", "web:integration-test")
+include("web-v2:web", "web-v2:integration-test")
 include("docs")
 include("integration-test-common")
 include(":bundles:aws", ":bundles:aws-bundle", ":bundles:iceberg-aws-bundle")

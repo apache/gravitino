@@ -220,11 +220,24 @@ allprojects {
       project.delete("build/${project.name}-integration-test.log")
       if (testMode == "deploy") {
         param.environment("GRAVITINO_HOME", project.rootDir.path + "/distribution/package")
+        val useWebV2 = System.getenv("GRAVITINO_USE_WEB_V2")?.toBoolean() == true
+        val webWarPath = if (useWebV2) {
+          project.rootDir.path + "/distribution/package/web-v2/gravitino-web-${project.version}.war"
+        } else {
+          project.rootDir.path + "/distribution/package/web/gravitino-web-${project.version}.war"
+        }
+        param.environment("GRAVITINO_WAR", webWarPath)
         param.systemProperty("testMode", "deploy")
       } else if (testMode == "embedded") {
         param.environment("GRAVITINO_HOME", project.rootDir.path)
         param.environment("GRAVITINO_TEST", "true")
-        param.environment("GRAVITINO_WAR", project.rootDir.path + "/web/web/dist/")
+        val useWebV2 = System.getenv("GRAVITINO_USE_WEB_V2")?.toBoolean() == true
+        val webWarPath = if (useWebV2) {
+          project.rootDir.path + "/web-v2/web/dist/"
+        } else {
+          project.rootDir.path + "/web/web/dist/"
+        }
+        param.environment("GRAVITINO_WAR", webWarPath)
         param.systemProperty("testMode", "embedded")
       } else {
         throw GradleException(
@@ -512,7 +525,7 @@ subprojects {
     }
   }
 
-  if (project.name in listOf("web", "docs")) {
+  if (project.name in listOf("web", "web-v2", "docs")) {
     plugins.apply(NodePlugin::class)
     configure<NodeExtension> {
       version.set("20.19.0")
@@ -682,7 +695,18 @@ tasks.rat {
     "web/web/src/lib/icons/svg/**/*.svg",
     "web/web/src/lib/utils/axios/**/*",
     "web/web/src/types/axios.d.ts",
-    "web/web/yarn.lock"
+    "web/web/yarn.lock",
+    "web-v2/web/.**",
+    "web-v2/web/dist/**/*",
+    "web-v2/web/next-env.d.ts",
+    "web-v2/web/node_modules/**/*",
+    "web-v2/web/package-lock.json",
+    "web-v2/web/pnpm-lock.yaml",
+    "web-v2/web/src/lib/enums/httpEnum.js",
+    "web-v2/web/src/lib/icons/svg/**/*.svg",
+    "web-v2/web/src/lib/utils/axios/**/*",
+    "web-v2/web/src/types/axios.d.ts",
+    "web-v2/web/yarn.lock"
   )
 
   // Add .gitignore excludes to the Apache Rat exclusion list.
@@ -725,7 +749,8 @@ tasks {
       ":iceberg:iceberg-rest-server:copyLibAndConfigs",
       ":lance:lance-rest-server:copyLibAndConfigs",
       ":maintenance:optimizer:copyLibAndConfigs",
-      ":web:web:build"
+      ":web:web:build",
+      ":web-v2:web:build"
     )
 
     group = "gravitino distribution"
@@ -735,6 +760,7 @@ tasks {
         from(projectDir.dir("conf")) { into("package/conf") }
         from(projectDir.dir("bin")) { into("package/bin") }
         from(projectDir.dir("web/web/build/libs/${rootProject.name}-web-$version.war")) { into("package/web") }
+        from(projectDir.dir("web-v2/web/build/libs/${rootProject.name}-web-$version.war")) { into("package/web-v2") }
         from(projectDir.dir("scripts")) { into("package/scripts") }
         into(outputDir)
         rename { fileName ->
@@ -757,6 +783,9 @@ tasks {
         from(projectDir.dir("web/web/licenses")) { into("package/web/licenses") }
         from(projectDir.dir("web/web/LICENSE.bin")) { into("package/web") }
         from(projectDir.dir("web/web/NOTICE.bin")) { into("package/web") }
+        from(projectDir.dir("web-v2/web/licenses")) { into("package/web-v2/licenses") }
+        from(projectDir.dir("web-v2/web/LICENSE.bin")) { into("package/web-v2") }
+        from(projectDir.dir("web-v2/web/NOTICE.bin")) { into("package/web-v2") }
         into(outputDir)
         rename { fileName ->
           fileName.replace(".bin", "")
@@ -1093,6 +1122,8 @@ tasks {
         it.name != "hive-metastore-common" &&
         it.name != "docs" &&
         it.name != "hadoop-common" &&
+        it.name != "web" &&
+        it.name != "web-v2" &&
         it.parent?.name != "bundles" &&
         it.parent?.name != "maintenance" &&
         it.name != "mcp-server"
