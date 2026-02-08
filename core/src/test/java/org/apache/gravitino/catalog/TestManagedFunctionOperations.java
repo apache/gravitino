@@ -49,6 +49,7 @@ import org.apache.gravitino.function.FunctionType;
 import org.apache.gravitino.function.JavaImpl;
 import org.apache.gravitino.meta.FunctionEntity;
 import org.apache.gravitino.rel.expressions.literals.Literals;
+import org.apache.gravitino.rel.types.Type;
 import org.apache.gravitino.rel.types.Types;
 import org.apache.gravitino.storage.IdGenerator;
 import org.apache.gravitino.storage.RandomIdGenerator;
@@ -79,15 +80,11 @@ public class TestManagedFunctionOperations {
   public void testRegisterAndListFunctions() {
     NameIdentifier func1Ident = getFunctionIdent("func1");
     FunctionParam[] params1 = new FunctionParam[] {FunctionParams.of("a", Types.IntegerType.get())};
-    FunctionDefinition[] definitions1 = new FunctionDefinition[] {createSimpleDefinition(params1)};
+    FunctionDefinition[] definitions1 =
+        new FunctionDefinition[] {createSimpleDefinition(params1, Types.StringType.get())};
 
     functionOperations.registerFunction(
-        func1Ident,
-        "Test function 1",
-        FunctionType.SCALAR,
-        true,
-        Types.StringType.get(),
-        definitions1);
+        func1Ident, "Test function 1", FunctionType.SCALAR, true, definitions1);
 
     NameIdentifier func2Ident = getFunctionIdent("func2");
     FunctionParam[] params2 =
@@ -95,15 +92,11 @@ public class TestManagedFunctionOperations {
           FunctionParams.of("x", Types.StringType.get()),
           FunctionParams.of("y", Types.StringType.get())
         };
-    FunctionDefinition[] definitions2 = new FunctionDefinition[] {createSimpleDefinition(params2)};
+    FunctionDefinition[] definitions2 =
+        new FunctionDefinition[] {createSimpleDefinition(params2, Types.IntegerType.get())};
 
     functionOperations.registerFunction(
-        func2Ident,
-        "Test function 2",
-        FunctionType.SCALAR,
-        false,
-        Types.IntegerType.get(),
-        definitions2);
+        func2Ident, "Test function 2", FunctionType.SCALAR, false, definitions2);
 
     // List functions
     NameIdentifier[] functionIdents = functionOperations.listFunctions(getFunctionNamespace());
@@ -120,22 +113,18 @@ public class TestManagedFunctionOperations {
     NameIdentifier funcIdent = getFunctionIdent("my_func");
     FunctionParam[] params =
         new FunctionParam[] {FunctionParams.of("input", Types.StringType.get())};
-    FunctionDefinition[] definitions = new FunctionDefinition[] {createSimpleDefinition(params)};
+    FunctionDefinition[] definitions =
+        new FunctionDefinition[] {createSimpleDefinition(params, Types.IntegerType.get())};
 
     Function newFunc =
         functionOperations.registerFunction(
-            funcIdent,
-            "My test function",
-            FunctionType.SCALAR,
-            true,
-            Types.IntegerType.get(),
-            definitions);
+            funcIdent, "My test function", FunctionType.SCALAR, true, definitions);
 
     Assertions.assertEquals("my_func", newFunc.name());
     Assertions.assertEquals("My test function", newFunc.comment());
     Assertions.assertEquals(FunctionType.SCALAR, newFunc.functionType());
     Assertions.assertTrue(newFunc.deterministic());
-    Assertions.assertEquals(Types.IntegerType.get(), newFunc.returnType());
+    Assertions.assertEquals(Types.IntegerType.get(), newFunc.definitions()[0].returnType());
 
     // Get function
     Function loadedFunc = functionOperations.getFunction(funcIdent);
@@ -147,12 +136,7 @@ public class TestManagedFunctionOperations {
         FunctionAlreadyExistsException.class,
         () ->
             functionOperations.registerFunction(
-                funcIdent,
-                "Another function",
-                FunctionType.SCALAR,
-                true,
-                Types.StringType.get(),
-                definitions));
+                funcIdent, "Another function", FunctionType.SCALAR, true, definitions));
 
     // Test get non-existing function
     NameIdentifier nonExistingIdent = getFunctionIdent("non_existing_func");
@@ -164,15 +148,11 @@ public class TestManagedFunctionOperations {
   public void testRegisterAndDropFunction() {
     NameIdentifier funcIdent = getFunctionIdent("func_to_drop");
     FunctionParam[] params = new FunctionParam[] {FunctionParams.of("a", Types.IntegerType.get())};
-    FunctionDefinition[] definitions = new FunctionDefinition[] {createSimpleDefinition(params)};
+    FunctionDefinition[] definitions =
+        new FunctionDefinition[] {createSimpleDefinition(params, Types.StringType.get())};
 
     functionOperations.registerFunction(
-        funcIdent,
-        "Function to drop",
-        FunctionType.SCALAR,
-        true,
-        Types.StringType.get(),
-        definitions);
+        funcIdent, "Function to drop", FunctionType.SCALAR, true, definitions);
 
     // Drop the function
     boolean dropped = functionOperations.dropFunction(funcIdent);
@@ -190,15 +170,11 @@ public class TestManagedFunctionOperations {
   public void testAlterFunctionUpdateComment() {
     NameIdentifier funcIdent = getFunctionIdent("func_to_alter");
     FunctionParam[] params = new FunctionParam[] {FunctionParams.of("a", Types.IntegerType.get())};
-    FunctionDefinition[] definitions = new FunctionDefinition[] {createSimpleDefinition(params)};
+    FunctionDefinition[] definitions =
+        new FunctionDefinition[] {createSimpleDefinition(params, Types.StringType.get())};
 
     functionOperations.registerFunction(
-        funcIdent,
-        "Original comment",
-        FunctionType.SCALAR,
-        true,
-        Types.StringType.get(),
-        definitions);
+        funcIdent, "Original comment", FunctionType.SCALAR, true, definitions);
 
     // Update comment
     String newComment = "Updated comment";
@@ -216,15 +192,11 @@ public class TestManagedFunctionOperations {
   public void testAlterFunctionAddDefinition() {
     NameIdentifier funcIdent = getFunctionIdent("func_add_def");
     FunctionParam[] params1 = new FunctionParam[] {FunctionParams.of("a", Types.IntegerType.get())};
-    FunctionDefinition[] definitions1 = new FunctionDefinition[] {createSimpleDefinition(params1)};
+    FunctionDefinition[] definitions1 =
+        new FunctionDefinition[] {createSimpleDefinition(params1, Types.StringType.get())};
 
     functionOperations.registerFunction(
-        funcIdent,
-        "Test function",
-        FunctionType.SCALAR,
-        true,
-        Types.StringType.get(),
-        definitions1);
+        funcIdent, "Test function", FunctionType.SCALAR, true, definitions1);
 
     // Add a new definition with different parameters
     FunctionParam[] params2 =
@@ -232,7 +204,7 @@ public class TestManagedFunctionOperations {
           FunctionParams.of("a", Types.IntegerType.get()),
           FunctionParams.of("b", Types.StringType.get())
         };
-    FunctionDefinition newDef = createSimpleDefinition(params2);
+    FunctionDefinition newDef = createSimpleDefinition(params2, Types.StringType.get());
 
     org.apache.gravitino.function.Function updatedFunc =
         functionOperations.alterFunction(funcIdent, FunctionChange.addDefinition(newDef));
@@ -250,15 +222,11 @@ public class TestManagedFunctionOperations {
           FunctionParams.of("a", Types.IntegerType.get()),
           FunctionParams.of("b", Types.FloatType.get(), null, Literals.floatLiteral(1.0f))
         };
-    FunctionDefinition[] definitions1 = new FunctionDefinition[] {createSimpleDefinition(params1)};
+    FunctionDefinition[] definitions1 =
+        new FunctionDefinition[] {createSimpleDefinition(params1, Types.StringType.get())};
 
     functionOperations.registerFunction(
-        funcIdent,
-        "Test function",
-        FunctionType.SCALAR,
-        true,
-        Types.StringType.get(),
-        definitions1);
+        funcIdent, "Test function", FunctionType.SCALAR, true, definitions1);
 
     // Try to add definition: foo(int, string default 'x') which supports (int) and (int, string)
     // This should fail because both support the call foo(int)
@@ -267,7 +235,7 @@ public class TestManagedFunctionOperations {
           FunctionParams.of("a", Types.IntegerType.get()),
           FunctionParams.of("c", Types.StringType.get(), null, Literals.stringLiteral("x"))
         };
-    FunctionDefinition newDef = createSimpleDefinition(params2);
+    FunctionDefinition newDef = createSimpleDefinition(params2, Types.StringType.get());
 
     Assertions.assertThrows(
         IllegalArgumentException.class,
@@ -291,18 +259,16 @@ public class TestManagedFunctionOperations {
         };
 
     FunctionDefinition[] definitions =
-        new FunctionDefinition[] {createSimpleDefinition(params1), createSimpleDefinition(params2)};
+        new FunctionDefinition[] {
+          createSimpleDefinition(params1, Types.StringType.get()),
+          createSimpleDefinition(params2, Types.StringType.get())
+        };
 
     Assertions.assertThrows(
         IllegalArgumentException.class,
         () ->
             functionOperations.registerFunction(
-                funcIdent,
-                "Test function",
-                FunctionType.SCALAR,
-                true,
-                Types.StringType.get(),
-                definitions));
+                funcIdent, "Test function", FunctionType.SCALAR, true, definitions));
   }
 
   @Test
@@ -318,7 +284,7 @@ public class TestManagedFunctionOperations {
           FunctionParams.of("c", Types.IntegerType.get(), "param c", Literals.integerLiteral(2))
         };
     FunctionDefinition[] definitions =
-        new FunctionDefinition[] {createSimpleDefinition(invalidParams)};
+        new FunctionDefinition[] {createSimpleDefinition(invalidParams, Types.StringType.get())};
 
     // Should throw IllegalArgumentException when trying to register
     IllegalArgumentException ex =
@@ -326,12 +292,7 @@ public class TestManagedFunctionOperations {
             IllegalArgumentException.class,
             () ->
                 functionOperations.registerFunction(
-                    funcIdent,
-                    "Invalid function",
-                    FunctionType.SCALAR,
-                    true,
-                    Types.StringType.get(),
-                    definitions));
+                    funcIdent, "Invalid function", FunctionType.SCALAR, true, definitions));
 
     Assertions.assertTrue(
         ex.getMessage().contains("Invalid parameter order"),
@@ -352,16 +313,11 @@ public class TestManagedFunctionOperations {
           FunctionParams.of("d", Types.IntegerType.get(), "param d", Literals.integerLiteral(2))
         };
     FunctionDefinition[] validDefinitions =
-        new FunctionDefinition[] {createSimpleDefinition(validParams)};
+        new FunctionDefinition[] {createSimpleDefinition(validParams, Types.StringType.get())};
 
     // This should succeed
     functionOperations.registerFunction(
-        funcIdent,
-        "Valid function",
-        FunctionType.SCALAR,
-        true,
-        Types.StringType.get(),
-        validDefinitions);
+        funcIdent, "Valid function", FunctionType.SCALAR, true, validDefinitions);
 
     // Verify the function was registered
     Function func = functionOperations.getFunction(funcIdent);
@@ -379,17 +335,15 @@ public class TestManagedFunctionOperations {
     FunctionParam[] params2 = new FunctionParam[] {FunctionParams.of("a", Types.StringType.get())};
 
     FunctionDefinition[] definitions =
-        new FunctionDefinition[] {createSimpleDefinition(params1), createSimpleDefinition(params2)};
+        new FunctionDefinition[] {
+          createSimpleDefinition(params1, Types.StringType.get()),
+          createSimpleDefinition(params2, Types.StringType.get())
+        };
 
     // Should succeed - no arity overlap
     Function func =
         functionOperations.registerFunction(
-            funcIdent,
-            "Non-overlapping function",
-            FunctionType.SCALAR,
-            true,
-            Types.StringType.get(),
-            definitions);
+            funcIdent, "Non-overlapping function", FunctionType.SCALAR, true, definitions);
 
     Assertions.assertNotNull(func);
     Assertions.assertEquals(2, func.definitions().length);
@@ -401,16 +355,12 @@ public class TestManagedFunctionOperations {
     NameIdentifier funcIdent = getFunctionIdent("func_no_args");
 
     FunctionParam[] params = new FunctionParam[] {};
-    FunctionDefinition[] definitions = new FunctionDefinition[] {createSimpleDefinition(params)};
+    FunctionDefinition[] definitions =
+        new FunctionDefinition[] {createSimpleDefinition(params, Types.StringType.get())};
 
     Function func =
         functionOperations.registerFunction(
-            funcIdent,
-            "No args function",
-            FunctionType.SCALAR,
-            true,
-            Types.StringType.get(),
-            definitions);
+            funcIdent, "No args function", FunctionType.SCALAR, true, definitions);
 
     Assertions.assertNotNull(func);
     Assertions.assertEquals(0, func.definitions()[0].parameters().length);
@@ -429,16 +379,12 @@ public class TestManagedFunctionOperations {
           FunctionParams.of("b", Types.FloatType.get(), "param b", Literals.floatLiteral(1.0f)),
           FunctionParams.of("c", Types.StringType.get(), "param c", Literals.stringLiteral("x"))
         };
-    FunctionDefinition[] definitions = new FunctionDefinition[] {createSimpleDefinition(params)};
+    FunctionDefinition[] definitions =
+        new FunctionDefinition[] {createSimpleDefinition(params, Types.StringType.get())};
 
     Function func =
         functionOperations.registerFunction(
-            funcIdent,
-            "Multi default function",
-            FunctionType.SCALAR,
-            true,
-            Types.StringType.get(),
-            definitions);
+            funcIdent, "Multi default function", FunctionType.SCALAR, true, definitions);
 
     Assertions.assertNotNull(func);
     Assertions.assertEquals(3, func.definitions()[0].parameters().length);
@@ -462,17 +408,15 @@ public class TestManagedFunctionOperations {
         };
 
     FunctionDefinition[] definitions =
-        new FunctionDefinition[] {createSimpleDefinition(params1), createSimpleDefinition(params2)};
+        new FunctionDefinition[] {
+          createSimpleDefinition(params1, Types.StringType.get()),
+          createSimpleDefinition(params2, Types.StringType.get())
+        };
 
     // Should succeed - arities are "integer,integer" vs "string,string"
     Function func =
         functionOperations.registerFunction(
-            funcIdent,
-            "Same arity different types",
-            FunctionType.SCALAR,
-            true,
-            Types.StringType.get(),
-            definitions);
+            funcIdent, "Same arity different types", FunctionType.SCALAR, true, definitions);
 
     Assertions.assertNotNull(func);
     Assertions.assertEquals(2, func.definitions().length);
@@ -486,10 +430,13 @@ public class TestManagedFunctionOperations {
     FunctionParam[] params1 = new FunctionParam[] {FunctionParams.of("a", Types.IntegerType.get())};
     FunctionParam[] params2 = new FunctionParam[] {FunctionParams.of("b", Types.StringType.get())};
     FunctionDefinition[] definitions =
-        new FunctionDefinition[] {createSimpleDefinition(params1), createSimpleDefinition(params2)};
+        new FunctionDefinition[] {
+          createSimpleDefinition(params1, Types.StringType.get()),
+          createSimpleDefinition(params2, Types.StringType.get())
+        };
 
     functionOperations.registerFunction(
-        funcIdent, "Test function", FunctionType.SCALAR, true, Types.StringType.get(), definitions);
+        funcIdent, "Test function", FunctionType.SCALAR, true, definitions);
 
     // Remove one definition
     Function updatedFunc =
@@ -502,10 +449,11 @@ public class TestManagedFunctionOperations {
   public void testAlterFunctionRemoveOnlyDefinition() {
     NameIdentifier funcIdent = getFunctionIdent("func_remove_only");
     FunctionParam[] params = new FunctionParam[] {FunctionParams.of("a", Types.IntegerType.get())};
-    FunctionDefinition[] definitions = new FunctionDefinition[] {createSimpleDefinition(params)};
+    FunctionDefinition[] definitions =
+        new FunctionDefinition[] {createSimpleDefinition(params, Types.StringType.get())};
 
     functionOperations.registerFunction(
-        funcIdent, "Test function", FunctionType.SCALAR, true, Types.StringType.get(), definitions);
+        funcIdent, "Test function", FunctionType.SCALAR, true, definitions);
 
     // Try to remove the only definition - should fail
     Assertions.assertThrows(
@@ -517,10 +465,11 @@ public class TestManagedFunctionOperations {
   public void testAlterFunctionRemoveNonExistingDefinition() {
     NameIdentifier funcIdent = getFunctionIdent("func_remove_nonexist");
     FunctionParam[] params = new FunctionParam[] {FunctionParams.of("a", Types.IntegerType.get())};
-    FunctionDefinition[] definitions = new FunctionDefinition[] {createSimpleDefinition(params)};
+    FunctionDefinition[] definitions =
+        new FunctionDefinition[] {createSimpleDefinition(params, Types.StringType.get())};
 
     functionOperations.registerFunction(
-        funcIdent, "Test function", FunctionType.SCALAR, true, Types.StringType.get(), definitions);
+        funcIdent, "Test function", FunctionType.SCALAR, true, definitions);
 
     // Try to remove a definition that doesn't exist
     FunctionParam[] nonExistingParams =
@@ -541,11 +490,11 @@ public class TestManagedFunctionOperations {
         FunctionImpls.ofJava(FunctionImpl.RuntimeType.SPARK, "com.example.SparkUDF");
     FunctionDefinition[] definitions =
         new FunctionDefinition[] {
-          createDefinitionWithImpls(params, new FunctionImpl[] {sparkImpl})
+          createDefinitionWithImpls(params, Types.StringType.get(), new FunctionImpl[] {sparkImpl})
         };
 
     functionOperations.registerFunction(
-        funcIdent, "Test function", FunctionType.SCALAR, true, Types.StringType.get(), definitions);
+        funcIdent, "Test function", FunctionType.SCALAR, true, definitions);
 
     // Add Trino implementation
     FunctionImpl trinoImpl =
@@ -564,11 +513,11 @@ public class TestManagedFunctionOperations {
         FunctionImpls.ofJava(FunctionImpl.RuntimeType.SPARK, "com.example.SparkUDF");
     FunctionDefinition[] definitions =
         new FunctionDefinition[] {
-          createDefinitionWithImpls(params, new FunctionImpl[] {sparkImpl})
+          createDefinitionWithImpls(params, Types.StringType.get(), new FunctionImpl[] {sparkImpl})
         };
 
     functionOperations.registerFunction(
-        funcIdent, "Test function", FunctionType.SCALAR, true, Types.StringType.get(), definitions);
+        funcIdent, "Test function", FunctionType.SCALAR, true, definitions);
 
     // Try to add another Spark implementation - should fail
     FunctionImpl anotherSparkImpl =
@@ -585,10 +534,11 @@ public class TestManagedFunctionOperations {
   public void testAlterFunctionAddImplToNonExistingDefinition() {
     NameIdentifier funcIdent = getFunctionIdent("func_add_impl_nodef");
     FunctionParam[] params = new FunctionParam[] {FunctionParams.of("a", Types.IntegerType.get())};
-    FunctionDefinition[] definitions = new FunctionDefinition[] {createSimpleDefinition(params)};
+    FunctionDefinition[] definitions =
+        new FunctionDefinition[] {createSimpleDefinition(params, Types.StringType.get())};
 
     functionOperations.registerFunction(
-        funcIdent, "Test function", FunctionType.SCALAR, true, Types.StringType.get(), definitions);
+        funcIdent, "Test function", FunctionType.SCALAR, true, definitions);
 
     // Try to add impl to non-existing definition
     FunctionParam[] nonExistingParams =
@@ -611,11 +561,11 @@ public class TestManagedFunctionOperations {
         FunctionImpls.ofJava(FunctionImpl.RuntimeType.SPARK, "com.example.OldSparkUDF");
     FunctionDefinition[] definitions =
         new FunctionDefinition[] {
-          createDefinitionWithImpls(params, new FunctionImpl[] {sparkImpl})
+          createDefinitionWithImpls(params, Types.StringType.get(), new FunctionImpl[] {sparkImpl})
         };
 
     functionOperations.registerFunction(
-        funcIdent, "Test function", FunctionType.SCALAR, true, Types.StringType.get(), definitions);
+        funcIdent, "Test function", FunctionType.SCALAR, true, definitions);
 
     // Update Spark implementation
     FunctionImpl newSparkImpl =
@@ -641,11 +591,11 @@ public class TestManagedFunctionOperations {
         FunctionImpls.ofJava(FunctionImpl.RuntimeType.SPARK, "com.example.SparkUDF");
     FunctionDefinition[] definitions =
         new FunctionDefinition[] {
-          createDefinitionWithImpls(params, new FunctionImpl[] {sparkImpl})
+          createDefinitionWithImpls(params, Types.StringType.get(), new FunctionImpl[] {sparkImpl})
         };
 
     functionOperations.registerFunction(
-        funcIdent, "Test function", FunctionType.SCALAR, true, Types.StringType.get(), definitions);
+        funcIdent, "Test function", FunctionType.SCALAR, true, definitions);
 
     // Try to update Trino implementation which doesn't exist
     FunctionImpl trinoImpl =
@@ -669,11 +619,12 @@ public class TestManagedFunctionOperations {
         FunctionImpls.ofJava(FunctionImpl.RuntimeType.TRINO, "com.example.TrinoUDF");
     FunctionDefinition[] definitions =
         new FunctionDefinition[] {
-          createDefinitionWithImpls(params, new FunctionImpl[] {sparkImpl, trinoImpl})
+          createDefinitionWithImpls(
+              params, Types.StringType.get(), new FunctionImpl[] {sparkImpl, trinoImpl})
         };
 
     functionOperations.registerFunction(
-        funcIdent, "Test function", FunctionType.SCALAR, true, Types.StringType.get(), definitions);
+        funcIdent, "Test function", FunctionType.SCALAR, true, definitions);
 
     // Remove Spark implementation
     org.apache.gravitino.function.Function updatedFunc =
@@ -693,11 +644,11 @@ public class TestManagedFunctionOperations {
         FunctionImpls.ofJava(FunctionImpl.RuntimeType.SPARK, "com.example.SparkUDF");
     FunctionDefinition[] definitions =
         new FunctionDefinition[] {
-          createDefinitionWithImpls(params, new FunctionImpl[] {sparkImpl})
+          createDefinitionWithImpls(params, Types.StringType.get(), new FunctionImpl[] {sparkImpl})
         };
 
     functionOperations.registerFunction(
-        funcIdent, "Test function", FunctionType.SCALAR, true, Types.StringType.get(), definitions);
+        funcIdent, "Test function", FunctionType.SCALAR, true, definitions);
 
     // Try to remove the only implementation - should fail
     Assertions.assertThrows(
@@ -715,11 +666,11 @@ public class TestManagedFunctionOperations {
         FunctionImpls.ofJava(FunctionImpl.RuntimeType.SPARK, "com.example.SparkUDF");
     FunctionDefinition[] definitions =
         new FunctionDefinition[] {
-          createDefinitionWithImpls(params, new FunctionImpl[] {sparkImpl})
+          createDefinitionWithImpls(params, Types.StringType.get(), new FunctionImpl[] {sparkImpl})
         };
 
     functionOperations.registerFunction(
-        funcIdent, "Test function", FunctionType.SCALAR, true, Types.StringType.get(), definitions);
+        funcIdent, "Test function", FunctionType.SCALAR, true, definitions);
 
     // Try to remove Trino implementation which doesn't exist
     Assertions.assertThrows(
@@ -749,15 +700,10 @@ public class TestManagedFunctionOperations {
     FunctionParam[] initialParams =
         new FunctionParam[] {FunctionParams.of("a", Types.IntegerType.get())};
     FunctionDefinition[] initialDefinitions =
-        new FunctionDefinition[] {createSimpleDefinition(initialParams)};
+        new FunctionDefinition[] {createSimpleDefinition(initialParams, Types.StringType.get())};
 
     functionOperations.registerFunction(
-        funcIdent,
-        "Initial function",
-        FunctionType.SCALAR,
-        true,
-        Types.StringType.get(),
-        initialDefinitions);
+        funcIdent, "Initial function", FunctionType.SCALAR, true, initialDefinitions);
 
     // Try to add a definition with invalid parameter order
     FunctionParam[] invalidParams =
@@ -772,7 +718,8 @@ public class TestManagedFunctionOperations {
             () ->
                 functionOperations.alterFunction(
                     funcIdent,
-                    FunctionChange.addDefinition(createSimpleDefinition(invalidParams))));
+                    FunctionChange.addDefinition(
+                        createSimpleDefinition(invalidParams, Types.StringType.get()))));
 
     Assertions.assertTrue(
         ex.getMessage().contains("Invalid parameter order"),
@@ -904,12 +851,21 @@ public class TestManagedFunctionOperations {
   }
 
   private FunctionDefinition createSimpleDefinition(FunctionParam[] params) {
+    return createSimpleDefinition(params, Types.StringType.get());
+  }
+
+  private FunctionDefinition createSimpleDefinition(FunctionParam[] params, Type returnType) {
     FunctionImpl impl = FunctionImpls.ofJava(FunctionImpl.RuntimeType.SPARK, "com.example.TestUDF");
-    return FunctionDefinitions.of(params, new FunctionImpl[] {impl});
+    return FunctionDefinitions.of(params, returnType, new FunctionImpl[] {impl});
   }
 
   private FunctionDefinition createDefinitionWithImpls(
       FunctionParam[] params, FunctionImpl[] impls) {
-    return FunctionDefinitions.of(params, impls);
+    return createDefinitionWithImpls(params, Types.StringType.get(), impls);
+  }
+
+  private FunctionDefinition createDefinitionWithImpls(
+      FunctionParam[] params, Type returnType, FunctionImpl[] impls) {
+    return FunctionDefinitions.of(params, returnType, impls);
   }
 }

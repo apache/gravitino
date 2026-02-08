@@ -37,7 +37,6 @@ import javax.ws.rs.core.Response;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.catalog.FunctionDispatcher;
-import org.apache.gravitino.dto.function.FunctionColumnDTO;
 import org.apache.gravitino.dto.function.FunctionDTO;
 import org.apache.gravitino.dto.function.FunctionDefinitionDTO;
 import org.apache.gravitino.dto.requests.FunctionRegisterRequest;
@@ -50,11 +49,8 @@ import org.apache.gravitino.dto.responses.FunctionResponse;
 import org.apache.gravitino.dto.util.DTOConverters;
 import org.apache.gravitino.function.Function;
 import org.apache.gravitino.function.FunctionChange;
-import org.apache.gravitino.function.FunctionColumn;
 import org.apache.gravitino.function.FunctionDefinition;
-import org.apache.gravitino.function.FunctionType;
 import org.apache.gravitino.metrics.MetricNames;
-import org.apache.gravitino.rel.types.Type;
 import org.apache.gravitino.server.web.Utils;
 import org.apache.gravitino.utils.NameIdentifierUtil;
 import org.apache.gravitino.utils.NamespaceUtil;
@@ -150,30 +146,13 @@ public class FunctionOperations {
                     .map(FunctionDefinitionDTO::toFunctionDefinition)
                     .toArray(FunctionDefinition[]::new);
 
-            Function function;
-            if (request.getFunctionType() == FunctionType.TABLE) {
-              FunctionColumn[] returnColumns =
-                  Arrays.stream(request.getReturnColumns())
-                      .map(FunctionColumnDTO::toFunctionColumn)
-                      .toArray(FunctionColumn[]::new);
-              function =
-                  dispatcher.registerFunction(
-                      ident,
-                      request.getComment(),
-                      request.isDeterministic(),
-                      returnColumns,
-                      definitions);
-            } else {
-              Type returnType = request.getReturnType();
-              function =
-                  dispatcher.registerFunction(
-                      ident,
-                      request.getComment(),
-                      request.getFunctionType(),
-                      request.isDeterministic(),
-                      returnType,
-                      definitions);
-            }
+            Function function =
+                dispatcher.registerFunction(
+                    ident,
+                    request.getComment(),
+                    request.getFunctionType(),
+                    request.isDeterministic(),
+                    definitions);
 
             Response response = Utils.ok(new FunctionResponse(DTOConverters.toDTO(function)));
             LOG.info(

@@ -31,10 +31,8 @@ import org.apache.gravitino.exceptions.NoSuchFunctionException;
 import org.apache.gravitino.exceptions.NoSuchSchemaException;
 import org.apache.gravitino.function.Function;
 import org.apache.gravitino.function.FunctionChange;
-import org.apache.gravitino.function.FunctionColumn;
 import org.apache.gravitino.function.FunctionDefinition;
 import org.apache.gravitino.function.FunctionType;
-import org.apache.gravitino.rel.types.Type;
 
 /**
  * {@code FunctionNormalizeDispatcher} normalizes function identifiers and namespaces by applying
@@ -77,28 +75,10 @@ public class FunctionNormalizeDispatcher implements FunctionDispatcher {
       String comment,
       FunctionType functionType,
       boolean deterministic,
-      Type returnType,
       FunctionDefinition[] definitions)
       throws NoSuchSchemaException, FunctionAlreadyExistsException {
     return dispatcher.registerFunction(
-        normalizeNameIdentifier(ident),
-        comment,
-        functionType,
-        deterministic,
-        returnType,
-        definitions);
-  }
-
-  @Override
-  public Function registerFunction(
-      NameIdentifier ident,
-      String comment,
-      boolean deterministic,
-      FunctionColumn[] returnColumns,
-      FunctionDefinition[] definitions)
-      throws NoSuchSchemaException, FunctionAlreadyExistsException {
-    return dispatcher.registerFunction(
-        normalizeNameIdentifier(ident), comment, deterministic, returnColumns, definitions);
+        normalizeNameIdentifier(ident), comment, functionType, deterministic, definitions);
   }
 
   @Override
