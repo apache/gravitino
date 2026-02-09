@@ -78,6 +78,33 @@ public class TestViewOperationDispatcher extends TestOperationDispatcher {
     return catalogManager;
   }
 
+  /**
+   * Helper method to create a mock View object.
+   *
+   * @param name The name of the view
+   * @param props The properties of the view
+   * @param auditInfo The audit info of the view
+   * @return A mock View implementation
+   */
+  private static View createMockView(String name, Map<String, String> props, AuditInfo auditInfo) {
+    return new View() {
+      @Override
+      public String name() {
+        return name;
+      }
+
+      @Override
+      public Map<String, String> properties() {
+        return props;
+      }
+
+      @Override
+      public AuditInfo auditInfo() {
+        return auditInfo;
+      }
+    };
+  }
+
   @Test
   public void testLoadView() throws IOException {
     Namespace viewNs = Namespace.of(metalake, catalog, "schema61");
@@ -89,23 +116,7 @@ public class TestViewOperationDispatcher extends TestOperationDispatcher {
     // Create a mock view through the catalog operations
     AuditInfo auditInfo =
         AuditInfo.builder().withCreator("test").withCreateTime(Instant.now()).build();
-    View mockView =
-        new View() {
-          @Override
-          public String name() {
-            return "view1";
-          }
-
-          @Override
-          public Map<String, String> properties() {
-            return props;
-          }
-
-          @Override
-          public AuditInfo auditInfo() {
-            return auditInfo;
-          }
-        };
+    View mockView = createMockView("view1", props, auditInfo);
 
     // Mock the catalog operations to return the view
     TestCatalog testCatalog =
@@ -148,24 +159,7 @@ public class TestViewOperationDispatcher extends TestOperationDispatcher {
       NameIdentifier viewIdent = NameIdentifier.of(viewNs, "view" + i);
       AuditInfo auditInfo =
           AuditInfo.builder().withCreator("test").withCreateTime(Instant.now()).build();
-      int index = i;
-      View mockView =
-          new View() {
-            @Override
-            public String name() {
-              return "view" + index;
-            }
-
-            @Override
-            public Map<String, String> properties() {
-              return props;
-            }
-
-            @Override
-            public AuditInfo auditInfo() {
-              return auditInfo;
-            }
-          };
+      View mockView = createMockView("view" + i, props, auditInfo);
       testCatalogOperations.views.put(viewIdent, mockView);
     }
 
@@ -188,23 +182,7 @@ public class TestViewOperationDispatcher extends TestOperationDispatcher {
     // Create a mock view through the catalog operations
     AuditInfo auditInfo =
         AuditInfo.builder().withCreator("test").withCreateTime(Instant.now()).build();
-    View mockView =
-        new View() {
-          @Override
-          public String name() {
-            return "auto_import_view";
-          }
-
-          @Override
-          public Map<String, String> properties() {
-            return props;
-          }
-
-          @Override
-          public AuditInfo auditInfo() {
-            return auditInfo;
-          }
-        };
+    View mockView = createMockView("auto_import_view", props, auditInfo);
 
     TestCatalog testCatalog =
         (TestCatalog) catalogManager.loadCatalog(NameIdentifier.of(metalake, catalog));
@@ -248,23 +226,7 @@ public class TestViewOperationDispatcher extends TestOperationDispatcher {
     // Create a mock view through the catalog operations
     AuditInfo auditInfo =
         AuditInfo.builder().withCreator("test").withCreateTime(Instant.now()).build();
-    View mockView =
-        new View() {
-          @Override
-          public String name() {
-            return "cached_view";
-          }
-
-          @Override
-          public Map<String, String> properties() {
-            return props;
-          }
-
-          @Override
-          public AuditInfo auditInfo() {
-            return auditInfo;
-          }
-        };
+    View mockView = createMockView("cached_view", props, auditInfo);
 
     TestCatalog testCatalog =
         (TestCatalog) catalogManager.loadCatalog(NameIdentifier.of(metalake, catalog));
@@ -292,23 +254,7 @@ public class TestViewOperationDispatcher extends TestOperationDispatcher {
     // Create a mock view through the catalog operations
     AuditInfo auditInfo =
         AuditInfo.builder().withCreator("test").withCreateTime(Instant.now()).build();
-    View mockView =
-        new View() {
-          @Override
-          public String name() {
-            return "generic_entity_view";
-          }
-
-          @Override
-          public Map<String, String> properties() {
-            return props;
-          }
-
-          @Override
-          public AuditInfo auditInfo() {
-            return auditInfo;
-          }
-        };
+    View mockView = createMockView("generic_entity_view", props, auditInfo);
 
     TestCatalog testCatalog =
         (TestCatalog) catalogManager.loadCatalog(NameIdentifier.of(metalake, catalog));
@@ -339,23 +285,7 @@ public class TestViewOperationDispatcher extends TestOperationDispatcher {
     // Create a mock view through the catalog operations
     AuditInfo auditInfo =
         AuditInfo.builder().withCreator("test").withCreateTime(Instant.now()).build();
-    View mockView =
-        new View() {
-          @Override
-          public String name() {
-            return "concurrent_view";
-          }
-
-          @Override
-          public Map<String, String> properties() {
-            return props;
-          }
-
-          @Override
-          public AuditInfo auditInfo() {
-            return auditInfo;
-          }
-        };
+    View mockView = createMockView("concurrent_view", props, auditInfo);
 
     TestCatalog testCatalog =
         (TestCatalog) catalogManager.loadCatalog(NameIdentifier.of(metalake, catalog));
@@ -387,23 +317,7 @@ public class TestViewOperationDispatcher extends TestOperationDispatcher {
     // Create a mock view through the catalog operations
     AuditInfo auditInfo =
         AuditInfo.builder().withCreator("test").withCreateTime(Instant.now()).build();
-    View mockView =
-        new View() {
-          @Override
-          public String name() {
-            return "deleted_view";
-          }
-
-          @Override
-          public Map<String, String> properties() {
-            return props;
-          }
-
-          @Override
-          public AuditInfo auditInfo() {
-            return auditInfo;
-          }
-        };
+    View mockView = createMockView("deleted_view", props, auditInfo);
 
     TestCatalog testCatalog =
         (TestCatalog) catalogManager.loadCatalog(NameIdentifier.of(metalake, catalog));

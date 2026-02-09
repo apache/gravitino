@@ -60,8 +60,9 @@ public class ViewOperationDispatcher extends OperationDispatcher implements View
   /**
    * Load view metadata by identifier from the catalog.
    *
-   * <p>This method first checks if the view exists in Gravitino's EntityStore. If not found, it loads from the catalog
-   * and auto-imports into EntityStore.
+   * <p>This method first checks if the view exists in Gravitino's EntityStore. If not found, it
+   * loads from the catalog and auto-imports into EntityStore.
+   *
    * @param ident The view identifier.
    * @return The loaded view metadata.
    * @throws NoSuchViewException If the view does not exist.
@@ -95,8 +96,7 @@ public class ViewOperationDispatcher extends OperationDispatcher implements View
    * @return EntityCombinedView containing the view and import status.
    * @throws NoSuchViewException If the view does not exist.
    */
-  private EntityCombinedView internalLoadView(NameIdentifier ident)
-      throws NoSuchViewException {
+  private EntityCombinedView internalLoadView(NameIdentifier ident) throws NoSuchViewException {
     // Load view from the underlying catalog
     View catalogView =
         doWithCatalog(
@@ -106,8 +106,7 @@ public class ViewOperationDispatcher extends OperationDispatcher implements View
 
     // Check if view exists in entity store
     try {
-      GenericEntity viewEntity =
-          store.get(ident, Entity.EntityType.VIEW, GenericEntity.class);
+      GenericEntity viewEntity = store.get(ident, Entity.EntityType.VIEW, GenericEntity.class);
       return EntityCombinedView.of(catalogView, viewEntity).withImported(true);
     } catch (NoSuchEntityException e) {
       // View not in store yet
