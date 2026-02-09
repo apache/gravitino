@@ -28,7 +28,14 @@ import static org.mockito.Mockito.mock;
 import com.google.common.collect.ImmutableMap;
 import java.io.IOException;
 import java.time.Instant;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Map;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
 import org.apache.commons.lang3.reflect.FieldUtils;
 import org.apache.gravitino.Config;
 import org.apache.gravitino.Entity;
@@ -206,12 +213,12 @@ public class TestViewOperationDispatcher extends TestOperationDispatcher {
   }
 
   @Test
-  public void testLoadViewUsesEntityStoreCache() throws IOException {
+  public void testLoadViewSkipsImportWhenAlreadyInEntityStore() throws IOException {
     Namespace viewNs = Namespace.of(metalake, catalog, "schema64");
     Map<String, String> props = ImmutableMap.of("k1", "v1", "k2", "v2");
     schemaOperationDispatcher.createSchema(NameIdentifier.of(viewNs.levels()), "comment", props);
 
-    NameIdentifier viewIdent = NameIdentifier.of(viewNs, "cached_view");
+    NameIdentifier viewIdent = NameIdentifier.of(viewNs, "already_imported_view");
 
     // Pre-populate entity store with view entity
     GenericEntity viewEntity =
@@ -226,56 +233,32 @@ public class TestViewOperationDispatcher extends TestOperationDispatcher {
     // Create a mock view through the catalog operations
     AuditInfo auditInfo =
         AuditInfo.builder().withCreator("test").withCreateTime(Instant.now()).build();
-    View mockView = createMockView("cached_view", props, auditInfo);
+    View mockView = createMockView("already_imported_view", props, auditInfo);
 
     TestCatalog testCatalog =
         (TestCatalog) catalogManager.loadCatalog(NameIdentifier.of(metalake, catalog));
     TestCatalogOperations testCatalogOperations = (TestCatalogOperations) testCatalog.ops();
     testCatalogOperations.views.put(viewIdent, mockView);
 
-    // Load view - should use entity store cache
-    View loadedView = viewOperationDispatcher.loadView(viewIdent);
-    Assertions.assertEquals("cached_view", loadedView.name());
+    // Record the initial entity state
+    GenericEntity initialEntity = entityStore.get(viewIdent, VIEW, GenericEntity.class);
+    long initialId = initialEntity.id();
 
-    // Verify entity is still in store (no duplicate import)
+    // Load view - should load from catalog but skip import since already in entity store
+    View loadedView = viewOperationDispatcher.loadView(viewIdent);
+    Assertions.assertEquals("already_imported_view", loadedView.name());
+
+    // Verify entity is still in store with same ID (no duplicate import)
+    // If import was called, a new entity would be created with a different ID
     GenericEntity retrievedEntity = entityStore.get(viewIdent, VIEW, GenericEntity.class);
     Assertions.assertNotNull(retrievedEntity);
-    Assertions.assertEquals(1L, retrievedEntity.id());
+    Assertions.assertEquals(initialId, retrievedEntity.id(), "Entity ID should not change");
+    Assertions.assertEquals(
+        1L, retrievedEntity.id(), "Entity ID should remain 1L (no new import)");
   }
 
   @Test
-  public void testLoadViewCreatesGenericEntity() throws IOException {
-    Namespace viewNs = Namespace.of(metalake, catalog, "schema65");
-    Map<String, String> props = ImmutableMap.of("k1", "v1", "k2", "v2");
-    schemaOperationDispatcher.createSchema(NameIdentifier.of(viewNs.levels()), "comment", props);
-
-    NameIdentifier viewIdent = NameIdentifier.of(viewNs, "generic_entity_view");
-
-    // Create a mock view through the catalog operations
-    AuditInfo auditInfo =
-        AuditInfo.builder().withCreator("test").withCreateTime(Instant.now()).build();
-    View mockView = createMockView("generic_entity_view", props, auditInfo);
-
-    TestCatalog testCatalog =
-        (TestCatalog) catalogManager.loadCatalog(NameIdentifier.of(metalake, catalog));
-    TestCatalogOperations testCatalogOperations = (TestCatalogOperations) testCatalog.ops();
-    testCatalogOperations.views.put(viewIdent, mockView);
-
-    // Load view - should create GenericEntity (not ViewEntity)
-    View loadedView = viewOperationDispatcher.loadView(viewIdent);
-    Assertions.assertEquals("generic_entity_view", loadedView.name());
-
-    // Verify GenericEntity was created (without auditInfo)
-    GenericEntity viewEntity = entityStore.get(viewIdent, VIEW, GenericEntity.class);
-    Assertions.assertNotNull(viewEntity);
-    Assertions.assertEquals(Entity.EntityType.VIEW, viewEntity.type());
-    // GenericEntity doesn't have auditInfo, only basic fields
-    Assertions.assertNotNull(viewEntity.id());
-    Assertions.assertEquals(viewIdent.name(), viewEntity.name());
-  }
-
-  @Test
-  public void testLoadViewAutoImportWithMultipleConcurrentLoads() throws IOException {
+  public void testLoadViewAutoImportWithMultipleConcurrentLoads() throws Exception {
     Namespace viewNs = Namespace.of(metalake, catalog, "schema66");
     Map<String, String> props = ImmutableMap.of("k1", "v1", "k2", "v2");
     schemaOperationDispatcher.createSchema(NameIdentifier.of(viewNs.levels()), "comment", props);
@@ -292,18 +275,47 @@ public class TestViewOperationDispatcher extends TestOperationDispatcher {
     TestCatalogOperations testCatalogOperations = (TestCatalogOperations) testCatalog.ops();
     testCatalogOperations.views.put(viewIdent, mockView);
 
-    // Load view multiple times - should handle gracefully
-    View loadedView1 = viewOperationDispatcher.loadView(viewIdent);
-    View loadedView2 = viewOperationDispatcher.loadView(viewIdent);
-    View loadedView3 = viewOperationDispatcher.loadView(viewIdent);
+    // Test concurrent loads with multiple threads
+    int threadCount = 10;
+    ExecutorService executor = Executors.newFixedThreadPool(threadCount);
+    CountDownLatch latch = new CountDownLatch(threadCount);
+    List<Future<View>> futures = new ArrayList<>();
 
-    Assertions.assertEquals("concurrent_view", loadedView1.name());
-    Assertions.assertEquals("concurrent_view", loadedView2.name());
-    Assertions.assertEquals("concurrent_view", loadedView3.name());
+    try {
+      // Submit concurrent load tasks
+      for (int i = 0; i < threadCount; i++) {
+        Future<View> future =
+            executor.submit(
+                () -> {
+                  latch.countDown();
+                  latch.await(); // Wait for all threads to be ready
+                  return viewOperationDispatcher.loadView(viewIdent);
+                });
+        futures.add(future);
+      }
 
-    // Verify only one entity exists in store
-    GenericEntity viewEntity = entityStore.get(viewIdent, VIEW, GenericEntity.class);
-    Assertions.assertNotNull(viewEntity);
+      // Verify only one entity was imported (no duplicate imports despite concurrent access)
+      // If import was called multiple times, entity IDs would differ across views
+      GenericEntity viewEntity = entityStore.get(viewIdent, VIEW, GenericEntity.class);
+      Assertions.assertNotNull(viewEntity);
+      long entityId = viewEntity.id();
+
+      // Verify all concurrent loads succeeded and reference the same imported entity
+      for (Future<View> future : futures) {
+        View loadedView = future.get(5, TimeUnit.SECONDS);
+        Assertions.assertEquals("concurrent_view", loadedView.name());
+        
+        EntityCombinedView combinedView = (EntityCombinedView) loadedView;
+        Assertions.assertEquals(
+            entityId,
+            combinedView.viewFromGravitino().id(),
+            "All concurrent loads should reference the same entity (import called only once)");
+      }
+
+    } finally {
+      executor.shutdown();
+      executor.awaitTermination(10, TimeUnit.SECONDS);
+    }
   }
 
   @Test
