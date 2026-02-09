@@ -66,3 +66,6 @@ web/.next
 AGENT.md
 CLAUDE.md
 .qoder/*
+
+# Hologres Test
+scripts/hologres-test/*
