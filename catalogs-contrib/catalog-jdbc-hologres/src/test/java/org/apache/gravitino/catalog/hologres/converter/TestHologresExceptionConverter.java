@@ -19,7 +19,6 @@
 package org.apache.gravitino.catalog.hologres.converter;
 
 import java.sql.SQLException;
-
 import org.apache.gravitino.exceptions.ConnectionFailedException;
 import org.apache.gravitino.exceptions.GravitinoRuntimeException;
 import org.apache.gravitino.exceptions.NoSuchSchemaException;

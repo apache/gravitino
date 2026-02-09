@@ -18,10 +18,14 @@
  */
 package org.apache.gravitino.catalog.hologres.operation;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
-
 import org.apache.gravitino.catalog.hologres.converter.HologresColumnDefaultValueConverter;
 import org.apache.gravitino.catalog.hologres.converter.HologresExceptionConverter;
 import org.apache.gravitino.catalog.hologres.converter.HologresTypeConverter;
@@ -36,10 +40,6 @@ import org.apache.gravitino.rel.expressions.transforms.Transforms;
 import org.apache.gravitino.rel.indexes.Index;
 import org.apache.gravitino.rel.indexes.Indexes;
 import org.apache.gravitino.rel.types.Types;
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertFalse;
-import static org.junit.jupiter.api.Assertions.assertThrows;
-import static org.junit.jupiter.api.Assertions.assertTrue;
 import org.junit.jupiter.api.Test;
 
 /** Unit tests for {@link HologresTableOperations}. */
