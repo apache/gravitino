@@ -26,7 +26,6 @@ import static org.apache.gravitino.rel.Column.DEFAULT_VALUE_NOT_SET;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
-import com.google.common.collect.ImmutableList;
 import java.sql.Connection;
 import java.sql.DatabaseMetaData;
 import java.sql.PreparedStatement;
@@ -39,8 +38,6 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 import org.apache.commons.collections4.CollectionUtils;
 import org.apache.commons.collections4.MapUtils;
@@ -75,14 +72,6 @@ public class ClickHouseTableOperations extends JdbcTableOperations {
 
   private static final String CLICKHOUSE_NOT_SUPPORT_NESTED_COLUMN_MSG =
       "Clickhouse does not support nested column names.";
-  private static final Pattern TO_DATE_PATTERN =
-      Pattern.compile("toDate\\((.+)\\)", Pattern.CASE_INSENSITIVE);
-  private static final Pattern TO_YEAR_PATTERN =
-      Pattern.compile("toYear\\((.+)\\)", Pattern.CASE_INSENSITIVE);
-  private static final Pattern TO_MONTH_PATTERN =
-      Pattern.compile("toYYYYMM\\((.+)\\)", Pattern.CASE_INSENSITIVE);
-  private static final Pattern FUNCTION_WRAPPER_PATTERN =
-      Pattern.compile("^\\s*([A-Za-z0-9_]+)\\((.*)\\)\\s*$");
 
   private static final String QUERY_INDEXES_SQL =
       """
@@ -326,7 +315,7 @@ public class ClickHouseTableOperations extends JdbcTableOperations {
     Preconditions.checkArgument(
         StringUtils.isNotBlank(shardingKey), "Sharding key must be specified for Distributed");
 
-    List<String> shardingColumns = extractShardingKeyColumns(shardingKey);
+    List<String> shardingColumns = ClickHouseTableSqlUtils.extractShardingKeyColumns(shardingKey);
     if (CollectionUtils.isNotEmpty(shardingColumns)) {
       for (String columnName : shardingColumns) {
         JdbcColumn shardingColumn = findColumn(columns, columnName);
@@ -337,7 +326,7 @@ public class ClickHouseTableOperations extends JdbcTableOperations {
       }
     }
 
-    String sanitizedShardingKey = formatShardingKey(shardingKey);
+    String sanitizedShardingKey = ClickHouseTableSqlUtils.formatShardingKey(shardingKey);
 
     sqlBuilder.append(
         "\n ENGINE = %s(`%s`,`%s`,`%s`,%s)"
@@ -363,7 +352,9 @@ public class ClickHouseTableOperations extends JdbcTableOperations {
     }
 
     List<String> partitionExprs =
-        Arrays.stream(partitioning).map(this::toPartitionExpression).collect(Collectors.toList());
+        Arrays.stream(partitioning)
+            .map(ClickHouseTableSqlUtils::toPartitionExpression)
+            .collect(Collectors.toList());
     String partitionExpr =
         partitionExprs.size() == 1
             ? partitionExprs.get(0)
@@ -380,37 +371,6 @@ public class ClickHouseTableOperations extends JdbcTableOperations {
         .filter(column -> StringUtils.equals(column.name(), columnName))
         .findFirst()
         .orElse(null);
-  }
-
-  private List<String> extractShardingKeyColumns(String shardingKey) {
-    String normalized = normalizeIndexExpression(shardingKey);
-    if (StringUtils.isBlank(normalized)) {
-      return Collections.emptyList();
-    }
-
-    String[] parts = normalized.split(",");
-    List<String> columns = new ArrayList<>();
-    for (String part : parts) {
-      String column = normalizeIdentifier(part);
-      Preconditions.checkArgument(
-          isSimpleIdentifier(column), "Sharding key contains unsupported expression: %s", part);
-      columns.add(column);
-    }
-
-    return ImmutableList.copyOf(columns);
-  }
-
-  private String formatShardingKey(String shardingKey) {
-    String trimmed = StringUtils.trim(shardingKey);
-    if (StringUtils.isBlank(trimmed)) {
-      return trimmed;
-    }
-
-    String normalized = normalizeIdentifier(trimmed);
-    if (isSimpleIdentifier(normalized)) {
-      return quoteIdentifier(normalized);
-    }
-    return trimmed;
   }
 
   private String toPartitionExpression(Transform transform) {
@@ -921,146 +881,12 @@ public class ClickHouseTableOperations extends JdbcTableOperations {
 
   @VisibleForTesting
   Transform[] parsePartitioning(String partitionKey) {
-    if (StringUtils.isBlank(partitionKey)) {
-      return Transforms.EMPTY_TRANSFORM;
-    }
-
-    String trimmedKey = normalizePartitionKey(partitionKey);
-    if (StringUtils.isBlank(trimmedKey)) {
-      return Transforms.EMPTY_TRANSFORM;
-    }
-
-    String[] parts = trimmedKey.split(",");
-    List<Transform> transforms = new ArrayList<>();
-    for (String part : parts) {
-      String expression = StringUtils.trim(part);
-      if (StringUtils.isBlank(expression)) {
-        continue;
-      }
-      transforms.add(parsePartitionExpression(expression, partitionKey));
-    }
-
-    return transforms.toArray(new Transform[0]);
-  }
-
-  private Transform parsePartitionExpression(String expression, String originalPartitionKey) {
-    String trimmedExpression = StringUtils.trim(expression);
-
-    Matcher toYearMatcher = TO_YEAR_PATTERN.matcher(trimmedExpression);
-    if (toYearMatcher.matches()) {
-      String identifier = normalizeIdentifier(toYearMatcher.group(1));
-      Preconditions.checkArgument(
-          StringUtils.isNotBlank(identifier),
-          "Unsupported partition expression: " + originalPartitionKey);
-      return Transforms.year(identifier);
-    }
-
-    Matcher toYYYYMMMatcher = TO_MONTH_PATTERN.matcher(trimmedExpression);
-    if (toYYYYMMMatcher.matches()) {
-      String identifier = normalizeIdentifier(toYYYYMMMatcher.group(1));
-      Preconditions.checkArgument(
-          StringUtils.isNotBlank(identifier),
-          "Unsupported partition expression: " + originalPartitionKey);
-      return Transforms.month(identifier);
-    }
-
-    Matcher toDateMatcher = TO_DATE_PATTERN.matcher(trimmedExpression);
-    if (toDateMatcher.matches()) {
-      String identifier = normalizeIdentifier(toDateMatcher.group(1));
-      Preconditions.checkArgument(
-          StringUtils.isNotBlank(identifier),
-          "Unsupported partition expression: " + originalPartitionKey);
-      return Transforms.day(identifier);
-    }
-
-    // for other functions, we do not support it now
-    if (trimmedExpression.contains("(") && trimmedExpression.contains(")")) {
-      throw new UnsupportedOperationException(
-          "Currently Gravitino only supports toYear, toYYYYMM, toDate partition expressions, but got: "
-              + trimmedExpression);
-    }
-
-    String identifier = normalizeIdentifier(trimmedExpression);
-
-    // Should check whether it's a simple identifier `ts` not `ts + 1`
-    Preconditions.checkArgument(
-        isSimpleIdentifier(identifier),
-        "Only simple identifier is supported for partition expression, but got: "
-            + originalPartitionKey);
-    return Transforms.identity(identifier);
-  }
-
-  private boolean isSimpleIdentifier(String identifier) {
-    if (StringUtils.isBlank(identifier)) return false;
-    return identifier.matches("^[a-zA-Z_][a-zA-Z0-9_]*$");
-  }
-
-  private String normalizePartitionKey(String partitionKey) {
-    String trimmedKey = partitionKey.trim();
-    if (StringUtils.equalsIgnoreCase(trimmedKey, "tuple()")) {
-      return "";
-    }
-    if (StringUtils.startsWithIgnoreCase(trimmedKey, "tuple(")
-        && StringUtils.endsWith(trimmedKey, ")")) {
-      return trimmedKey.substring("tuple(".length(), trimmedKey.length() - 1).trim();
-    }
-    if (StringUtils.startsWith(trimmedKey, "(") && StringUtils.endsWith(trimmedKey, ")")) {
-      return trimmedKey.substring(1, trimmedKey.length() - 1).trim();
-    }
-    return trimmedKey;
-  }
-
-  private String normalizeIdentifier(String identifier) {
-    String col = StringUtils.trim(identifier);
-    if (StringUtils.startsWith(col, "`") && StringUtils.endsWith(col, "`") && col.length() >= 2) {
-      return col.substring(1, col.length() - 1);
-    }
-    return col;
+    return ClickHouseTableSqlUtils.parsePartitioning(partitionKey);
   }
 
   @VisibleForTesting
   String[][] parseIndexFields(String expression) {
-    if (StringUtils.isBlank(expression)) {
-      return new String[0][];
-    }
-
-    String normalized = normalizeIndexExpression(expression);
-    if (StringUtils.isBlank(normalized)) {
-      return new String[0][];
-    }
-
-    String[] parts = normalized.split(",");
-    List<String[]> fields = new ArrayList<>();
-    for (String part : parts) {
-      String col = normalizeIdentifier(part);
-      Preconditions.checkArgument(
-          isSimpleIdentifier(col), "Unsupported index expression: " + expression);
-      fields.add(new String[] {col});
-    }
-
-    return fields.toArray(new String[0][]);
-  }
-
-  private String normalizeIndexExpression(String expression) {
-    String trimmed = expression.trim();
-
-    boolean stripped = true;
-    while (stripped) {
-      stripped = false;
-      Matcher matcher = FUNCTION_WRAPPER_PATTERN.matcher(trimmed);
-      if (matcher.matches()) {
-        trimmed = matcher.group(2).trim();
-        stripped = true;
-      }
-    }
-
-    if (StringUtils.startsWithIgnoreCase(trimmed, "tuple(") && StringUtils.endsWith(trimmed, ")")) {
-      trimmed = trimmed.substring("tuple(".length(), trimmed.length() - 1).trim();
-    } else if (StringUtils.equalsIgnoreCase(trimmed, "tuple()")) {
-      trimmed = "";
-    }
-
-    return trimmed;
+    return ClickHouseTableSqlUtils.parseIndexFields(expression);
   }
 
   private List<Index> getSecondaryIndexes(
