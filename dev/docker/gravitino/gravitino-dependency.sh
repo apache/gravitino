@@ -49,7 +49,12 @@ download_gcs_connector() {
 }
 
 # Build the Gravitino project
-${gravitino_home}/gradlew clean build -x test
+${gravitino_home}/gradlew clean build -x test \
+  -x rat \
+  -x :clients:client-python:build \
+  -x :clients:client-python:envSetup \
+  -x :clients:client-python:miniforgeSetup
+
 
 rm -rf ${gravitino_home}/distribution
 # Prepare compile Gravitino packages

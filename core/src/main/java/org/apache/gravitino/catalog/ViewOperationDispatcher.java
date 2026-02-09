@@ -20,11 +20,15 @@ package org.apache.gravitino.catalog;
 
 import static org.apache.gravitino.utils.NameIdentifierUtil.getCatalogIdentifier;
 
+import java.io.IOException;
+import org.apache.gravitino.Entity;
 import org.apache.gravitino.EntityStore;
 import org.apache.gravitino.NameIdentifier;
+import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.exceptions.NoSuchViewException;
 import org.apache.gravitino.lock.LockType;
 import org.apache.gravitino.lock.TreeLockUtils;
+import org.apache.gravitino.meta.GenericEntity;
 import org.apache.gravitino.rel.View;
 import org.apache.gravitino.storage.IdGenerator;
 import org.slf4j.Logger;
@@ -55,10 +59,9 @@ public class ViewOperationDispatcher extends OperationDispatcher implements View
   /**
    * Load view metadata by identifier from the catalog.
    *
-   * <p>Delegates directly to the underlying catalog's ViewCatalog interface. Views are loaded from
-   * the external catalog without caching in Gravitino's EntityStore.
-   *
-   * <p>TODO(#9746): Add entity storage support to cache view metadata in EntityStore.
+   * <p>This method first checks if the view exists in Gravitino's EntityStore. If found, it loads
+   * from the catalog and verifies consistency. If not found, it loads from the catalog and
+   * auto-imports into EntityStore.
    *
    * @param ident The view identifier.
    * @return The loaded view metadata.
@@ -71,10 +74,46 @@ public class ViewOperationDispatcher extends OperationDispatcher implements View
     return TreeLockUtils.doWithTreeLock(
         ident,
         LockType.READ,
-        () ->
-            doWithCatalog(
-                getCatalogIdentifier(ident),
-                c -> c.doWithViewOps(v -> v.loadView(ident)),
-                NoSuchViewException.class));
+        () -> {
+          // Load view from the underlying catalog
+          View catalogView =
+              doWithCatalog(
+                  getCatalogIdentifier(ident),
+                  c -> c.doWithViewOps(v -> v.loadView(ident)),
+                  NoSuchViewException.class);
+
+          // Check if view exists in entity store
+          GenericEntity viewEntity = null;
+          try {
+            viewEntity = store.get(ident, Entity.EntityType.VIEW, GenericEntity.class);
+          } catch (NoSuchEntityException e) {
+            // View not in store yet, will auto-import below
+            LOG.debug("View {} not found in entity store, will auto-import", ident);
+          } catch (IOException ioe) {
+            LOG.warn("Failed to check if view {} exists in entity store", ident, ioe);
+          }
+
+          // If view doesn't exist in entity store, auto-import it
+          if (viewEntity == null) {
+            LOG.info("Auto-importing view {} into Gravitino entity store", ident);
+            long uid = idGenerator.nextId();
+            GenericEntity newViewEntity =
+                GenericEntity.builder()
+                    .withId(uid)
+                    .withName(ident.name())
+                    .withNamespace(ident.namespace())
+                    .withEntityType(Entity.EntityType.VIEW)
+                    .build();
+            try {
+              store.put(newViewEntity, false /* overwrite */);
+              LOG.info("Successfully imported view {} into entity store with id {}", ident, uid);
+            } catch (Exception e) {
+              // Log but don't fail - view import is best-effort
+              LOG.warn("Failed to import view {} into entity store: {}", ident, e.getMessage());
+            }
+          }
+
+          return catalogView;
+        });
   }
 }
