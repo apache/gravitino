@@ -13,7 +13,7 @@ import TabItem from '@theme/TabItem';
 
 ## Introduction
 
-Apache Gravitino can manage ClickHouse metadata through a JDBC catalog.
+Apache Gravitino can manage ClickHouse metadata through a JDBC catalog. This document describes the capabilities and limitations of the ClickHouse catalog, as well as the supported operations and properties for catalogs, schemas, and tables.
 
 :::caution
 Gravitino writes system markers into table comments (for example `(From Gravitino, DO NOT EDIT: ...)`). Do not change or remove them.
@@ -51,6 +51,8 @@ Download the ClickHouse JDBC driver yourself and place it under `catalogs-contri
 
 See [Manage Relational Metadata Using Gravitino](./manage-relational-metadata-using-gravitino.md#catalog-operations).
 
+The only difference is that the provider for ClickHouse is `jdbc-clickhouse`.
+
 ## Schema
 
 ### Schema capabilities
@@ -77,9 +79,16 @@ See [Manage Relational Metadata Using Gravitino](./manage-relational-metadata-us
 ### Table capabilities
 
 - Gravitino table maps to a ClickHouse table.
-- Supports comments, column default values, and primary/data-skipping indexes.
-- Requires `ORDER BY` for MergeTree-family engines; distribution strategies are not supported.
-- Supports single-column identity partitioning on MergeTree-family engines only.
+- Supports comments and column default values.
+- Engines:
+  - Local engines: `MergeTree` (default), `ReplacingMergeTree`, `SummingMergeTree`, `AggregatingMergeTree`, `CollapsingMergeTree`, `VersionedCollapsingMergeTree`, `GraphiteMergeTree`, `TinyLog`, `StripeLog`, `Log`, `Memory`, `File`, `Null`, `Set`, `Join`, `View`, `Buffer`, `KeeperMap`, and other listed ClickHouse engines exposed in the properties metadata.
+  - Cluster/Distributed: `Distributed` engine with `cluster-name`, `remote-database`, `remote-table`, and `sharding-key`. Sharding key can be an expression; when it references columns they must be non-nullable integral types.
+- Order/partition:
+  - MergeTree-family engines require exactly one `ORDER BY` column; other engines reject `ORDER BY`.
+  - Partitioning supported only for MergeTree-family engines with single-column identity transform.
+- Indexes: primary key, data-skipping `MINMAX` and `BLOOM_FILTER` (granularity fixed internally).
+- Distribution strategy (`Distributions.NONE`) is enforced; no custom distribution.
+- Unsupported: auto increment, dropping table properties, altering engine, multi-column sort keys.
 
 ### Table column types
 
@@ -112,30 +121,46 @@ Other ClickHouse types are exposed as [External Type](./manage-relational-metada
 - The `engine` value is immutable after creation.
 :::
 
-| Property Name                | Description                                                                                    | Default Value | Required | Reserved | Immutable | Since version |
-|------------------------------|------------------------------------------------------------------------------------------------|---------------|----------|----------|-----------|---------------|
-| `engine`                     | Table engine (for example `MergeTree`, `ReplacingMergeTree`, `Distributed`, `Memory`, etc.)    | `MergeTree`   | No       | No       | Yes       | 1.2.0         |
-| `cluster-name`               | Cluster name used with `ON CLUSTER` and Distributed engine                                     | (none)        | No\*     | No       | No        | 1.2.0         |
-| `on-cluster`                 | Use `ON CLUSTER` when creating the table                                                       | (none)        | No       | No       | No        | 1.2.0         |
-| `cluster-remote-database`    | Remote database for `Distributed` engine                                                       | (none)        | No\*\*   | No       | No        | 1.2.0         |
-| `cluster-remote-table`       | Remote table for `Distributed` engine                                                          | (none)        | No\*\*   | No       | No        | 1.2.0         |
-| `cluster-sharding-key`       | Sharding key for `Distributed` engine                                                          | (none)        | No\*\*   | No       | No        | 1.2.0         |
-| `settings.<name>`            | ClickHouse engine setting forwarded as `SETTINGS <name>=<value>`                               | (none)        | No       | No       | No        | 1.2.0         |
+| Property Name                | Description                                                                                              | Default Value  | Required  | Reserved  | Immutable  | Since version  |
+|------------------------------|----------------------------------------------------------------------------------------------------------|----------------|-----------|-----------|------------|----------------|
+| `engine`                     | Table engine (for example `MergeTree`, `ReplacingMergeTree`, `Distributed`, `Memory`, etc.)              | `MergeTree`    | No        | No        | Yes        | 1.2.0          |
+| `cluster-name`               | Cluster name used with `ON CLUSTER` and Distributed engine                                               | (none)         | No\*      | No        | No         | 1.2.0          |
+| `on-cluster`                 | Use `ON CLUSTER` when creating the table                                                                 | (none)         | No        | No        | No         | 1.2.0          |
+| `cluster-remote-database`    | Remote database for `Distributed` engine                                                                 | (none)         | No\*\*    | No        | No         | 1.2.0          |
+| `cluster-remote-table`       | Remote table for `Distributed` engine                                                                    | (none)         | No\*\*    | No        | No         | 1.2.0          |
+| `cluster-sharding-key`       | Sharding key for `Distributed` engine (expression allowed; referenced columns must be non-null integral) | (none)         | No\*\*    | No        | No         | 1.2.0          |
+| `settings.<name>`            | ClickHouse engine setting forwarded as `SETTINGS <name>=<value>`                                         | (none)         | No        | No        | No         | 1.2.0          |
 
 \* Required when `on-cluster=true` or `engine=Distributed`.  
 \*\* Required when `engine=Distributed`.
 
 ### Table indexes
 
-- Supports `PRIMARY_KEY`.
-- Supports data-skipping indexes: `DATA_SKIPPING_MINMAX` and `DATA_SKIPPING_BLOOM_FILTER` (granularity fixed internally).
+- `PRIMARY_KEY`
+- Data-skipping indexes:
+  - `DATA_SKIPPING_MINMAX` (`GRANULARITY` fixed to 1)
+  - `DATA_SKIPPING_BLOOM_FILTER` (`GRANULARITY` fixed to 3)
 
-### Partitioning and distribution
+### Partitioning, sorting, and distribution
 
-- Partitioning: only identity transform on a single column, and only for MergeTree-family engines.
-- Distribution: not supported (`Distributions.NONE` is enforced).
-- Sort order: MergeTree-family engines require exactly one `ORDER BY` column; other engines do not accept `ORDER BY`.
+- `ORDER BY`: required for MergeTree-family engines (single column); rejected for engines that do not support it.
+- `PARTITION BY`: single-column identity only, and only for MergeTree-family engines.
+- Distribution: fixed to `Distributions.NONE` (no custom distribution).
 
 ### Table operations
 
-See [Manage Relational Metadata Using Gravitino](./manage-relational-metadata-using-gravitino.md#table-operations).
+Supported:
+- Create table with engine, `ORDER BY`, optional partition, indexes, comments, default values, and `SETTINGS`.
+- Add column (with nullable flag, default, comment, position).
+- Rename column.
+- Update column type/comment/default/position/nullability.
+- Delete column (with `IF EXISTS` support).
+- Add primary or data-skipping indexes; drop data-skipping indexes.
+- Update table comment.
+
+Unsupported:
+- Changing engine after creation.
+- Removing table properties or arbitrary `ALTER TABLE ... SETTINGS`.
+- Auto-increment columns.
+
+See [Manage Relational Metadata Using Gravitino](./manage-relational-metadata-using-gravitino.md#table-operations) for common JDBC semantics.
