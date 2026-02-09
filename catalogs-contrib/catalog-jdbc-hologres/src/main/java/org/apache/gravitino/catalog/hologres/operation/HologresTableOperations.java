@@ -53,8 +53,10 @@ import org.apache.gravitino.exceptions.NoSuchSchemaException;
 import org.apache.gravitino.exceptions.NoSuchTableException;
 import org.apache.gravitino.rel.Column;
 import org.apache.gravitino.rel.TableChange;
+import org.apache.gravitino.rel.expressions.NamedReference;
 import org.apache.gravitino.rel.expressions.distributions.Distribution;
 import org.apache.gravitino.rel.expressions.distributions.Distributions;
+import org.apache.gravitino.rel.expressions.distributions.Strategy;
 import org.apache.gravitino.rel.expressions.transforms.Transform;
 import org.apache.gravitino.rel.expressions.transforms.Transforms;
 import org.apache.gravitino.rel.indexes.Index;
@@ -171,9 +173,6 @@ public class HologresTableOperations extends JdbcTableOperations
       throw new UnsupportedOperationException(
           "Currently we do not support Partitioning in Hologres through Gravitino");
     }
-    Preconditions.checkArgument(
-        Distributions.NONE.equals(distribution), "Hologres does not support distribution");
-
     StringBuilder sqlBuilder = new StringBuilder();
     sqlBuilder
         .append("CREATE TABLE ")
@@ -197,12 +196,39 @@ public class HologresTableOperations extends JdbcTableOperations
     appendIndexesSql(indexes, sqlBuilder);
     sqlBuilder.append(NEW_LINE).append(")");
 
-    // Add table properties if any (Hologres specific properties like orientation, distribution_key)
+    // Build WITH clause combining distribution and Hologres-specific table properties
+    // Supported properties: orientation, distribution_key, clustering_key, event_time_column,
+    // bitmap_columns, dictionary_encoding_columns, time_to_live_in_seconds, table_group, etc.
+    List<String> withEntries = new ArrayList<>();
+
+    // Add distribution_key from Distribution parameter
+    if (!Distributions.NONE.equals(distribution)) {
+      validateDistribution(distribution);
+      String distributionColumns =
+          Arrays.stream(distribution.expressions())
+              .map(Object::toString)
+              .collect(Collectors.joining(","));
+      withEntries.add("distribution_key = '" + distributionColumns + "'");
+    }
+
+    // Add user-specified properties (filter out distribution_key to avoid conflict)
     if (MapUtils.isNotEmpty(properties)) {
-      // TODO: Support Hologres-specific table properties like orientation, distribution_key,
-      // clustering_key, etc.
-      throw new IllegalArgumentException(
-          "Hologres table properties are not supported yet through Gravitino");
+      properties.forEach(
+          (key, value) -> {
+            if (!"distribution_key".equals(key)) {
+              withEntries.add(key + " = '" + value + "'");
+            }
+          });
+    }
+
+    // Generate WITH clause
+    if (!withEntries.isEmpty()) {
+      sqlBuilder.append(NEW_LINE).append("WITH (").append(NEW_LINE);
+      sqlBuilder.append(
+          withEntries.stream()
+              .map(entry -> "    " + entry)
+              .collect(Collectors.joining("," + NEW_LINE)));
+      sqlBuilder.append(NEW_LINE).append(")");
     }
 
     sqlBuilder.append(";");
@@ -810,6 +836,71 @@ public class HologresTableOperations extends JdbcTableOperations
     return metaData.getColumns(database, schema, tableName, null);
   }
 
+  /**
+   * Get distribution information from Hologres system table hologres.hg_table_properties.
+   *
+   * <p>In Hologres, distribution_key is stored as a table property with the property_key
+   * "distribution_key" and property_value as comma-separated column names (e.g., "col1,col2").
+   *
+   * <p>This method queries the system table and returns a HASH distribution with the specified
+   * columns. Hologres only supports HASH distribution strategy.
+   *
+   * @param connection the database connection
+   * @param databaseName the schema name
+   * @param tableName the table name
+   * @return the distribution info, or {@link Distributions#NONE} if no distribution_key is set
+   * @throws SQLException if a database access error occurs
+   */
+  @Override
+  protected Distribution getDistributionInfo(
+      Connection connection, String databaseName, String tableName) throws SQLException {
+    String schemaName = connection.getSchema();
+    String distributionSql =
+        "SELECT property_value "
+            + "FROM hologres.hg_table_properties "
+            + "WHERE table_namespace = ? AND table_name = ? AND property_key = 'distribution_key'";
+
+    try (PreparedStatement statement = connection.prepareStatement(distributionSql)) {
+      statement.setString(1, schemaName);
+      statement.setString(2, tableName);
+
+      try (ResultSet resultSet = statement.executeQuery()) {
+        if (resultSet.next()) {
+          String distributionKey = resultSet.getString("property_value");
+          if (StringUtils.isNotEmpty(distributionKey)) {
+            NamedReference[] columns =
+                Arrays.stream(distributionKey.split(","))
+                    .map(String::trim)
+                    .filter(StringUtils::isNotEmpty)
+                    .map(NamedReference::field)
+                    .toArray(NamedReference[]::new);
+            if (columns.length > 0) {
+              return Distributions.hash(0, columns);
+            }
+          }
+        }
+      }
+    }
+    return Distributions.NONE;
+  }
+
+  /**
+   * Validate the distribution for Hologres.
+   *
+   * <p>Hologres only supports HASH distribution strategy.
+   *
+   * @param distribution the distribution to validate
+   */
+  private void validateDistribution(Distribution distribution) {
+    Preconditions.checkArgument(
+        distribution.strategy() == Strategy.HASH,
+        "Hologres only supports HASH distribution strategy, but got: %s",
+        distribution.strategy());
+    Preconditions.checkArgument(
+        distribution.expressions().length > 0,
+        "Hologres HASH distribution requires at least one distribution column");
+  }
+
   @Override
   public Integer calculateDatetimePrecision(String typeName, int columnSize, int scale) {
     String upperTypeName = typeName.toUpperCase();
@@ -921,7 +1012,6 @@ public class HologresTableOperations extends JdbcTableOperations
    *
    * <ul>
    *   <li>orientation: storage format (row/column/row,column)
-   *   <li>distribution_key: distribution key columns
    *   <li>clustering_key: clustering key columns
    *   <li>segment_key: event time column (segment key)
    *   <li>bitmap_columns: bitmap index columns
@@ -983,7 +1073,6 @@ public class HologresTableOperations extends JdbcTableOperations
     // List of properties that are meaningful for users
     switch (propertyKey) {
       case "orientation":
-      case "distribution_key":
       case "clustering_key":
       case "segment_key": // event_time_column
       case "bitmap_columns":
