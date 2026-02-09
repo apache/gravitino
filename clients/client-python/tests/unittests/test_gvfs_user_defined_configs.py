@@ -28,8 +28,8 @@ class TestGVFSUserDefinedConfigs(unittest.TestCase):
         """Test _get_user_defined_configs with single location."""
         options = {
             f"{GVFSConfig.FS_GRAVITINO_PATH_CONFIG_PREFIX}cluster1": "s3://bucket1",
-            f"{GVFSConfig.FS_GRAVITINO_PATH_CONFIG_PREFIX}cluster1.key1": "value1",
-            f"{GVFSConfig.FS_GRAVITINO_PATH_CONFIG_PREFIX}cluster1.key2": "value2",
+            f"{GVFSConfig.FS_GRAVITINO_PATH_CONFIG_PREFIX}cluster1_key1": "value1",
+            f"{GVFSConfig.FS_GRAVITINO_PATH_CONFIG_PREFIX}cluster1_key2": "value2",
         }
         operations = DefaultGVFSOperations(options=options)
 
@@ -44,11 +44,11 @@ class TestGVFSUserDefinedConfigs(unittest.TestCase):
         """Test _get_user_defined_configs with multiple location configurations."""
         options = {
             f"{GVFSConfig.FS_GRAVITINO_PATH_CONFIG_PREFIX}cluster1": "s3://bucket1",
-            f"{GVFSConfig.FS_GRAVITINO_PATH_CONFIG_PREFIX}cluster1.key1": "value1",
-            f"{GVFSConfig.FS_GRAVITINO_PATH_CONFIG_PREFIX}cluster1.key2": "value2",
+            f"{GVFSConfig.FS_GRAVITINO_PATH_CONFIG_PREFIX}cluster1_key1": "value1",
+            f"{GVFSConfig.FS_GRAVITINO_PATH_CONFIG_PREFIX}cluster1_key2": "value2",
             f"{GVFSConfig.FS_GRAVITINO_PATH_CONFIG_PREFIX}cluster2": "s3://bucket2",
-            f"{GVFSConfig.FS_GRAVITINO_PATH_CONFIG_PREFIX}cluster2.key1": "value3",
-            f"{GVFSConfig.FS_GRAVITINO_PATH_CONFIG_PREFIX}cluster2.key2": "value4",
+            f"{GVFSConfig.FS_GRAVITINO_PATH_CONFIG_PREFIX}cluster2_key1": "value3",
+            f"{GVFSConfig.FS_GRAVITINO_PATH_CONFIG_PREFIX}cluster2_key2": "value4",
         }
         operations = DefaultGVFSOperations(options=options)
 
@@ -71,7 +71,7 @@ class TestGVFSUserDefinedConfigs(unittest.TestCase):
         # Test with empty path
         options1 = {
             f"{GVFSConfig.FS_GRAVITINO_PATH_CONFIG_PREFIX}cluster1": "s3://bucket1",
-            f"{GVFSConfig.FS_GRAVITINO_PATH_CONFIG_PREFIX}cluster1.key1": "value1",
+            f"{GVFSConfig.FS_GRAVITINO_PATH_CONFIG_PREFIX}cluster1_key1": "value1",
         }
         operations1 = DefaultGVFSOperations(options=options1)
         self.assertEqual(operations1._get_user_defined_configs(""), {})
@@ -88,14 +88,14 @@ class TestGVFSUserDefinedConfigs(unittest.TestCase):
         # Test with no matching location
         options4 = {
             f"{GVFSConfig.FS_GRAVITINO_PATH_CONFIG_PREFIX}cluster1": "s3://bucket1",
-            f"{GVFSConfig.FS_GRAVITINO_PATH_CONFIG_PREFIX}cluster1.key1": "value1",
+            f"{GVFSConfig.FS_GRAVITINO_PATH_CONFIG_PREFIX}cluster1_key1": "value1",
         }
         operations4 = DefaultGVFSOperations(options=options4)
         self.assertEqual(operations4._get_user_defined_configs("s3://bucket2/path"), {})
 
         # Test with property without location definition
         options5 = {
-            f"{GVFSConfig.FS_GRAVITINO_PATH_CONFIG_PREFIX}cluster1.key1": "value1",
+            f"{GVFSConfig.FS_GRAVITINO_PATH_CONFIG_PREFIX}cluster1_key1": "value1",
         }
         operations5 = DefaultGVFSOperations(options=options5)
         self.assertEqual(operations5._get_user_defined_configs("s3://bucket1/path"), {})

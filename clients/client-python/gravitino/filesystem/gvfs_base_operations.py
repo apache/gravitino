@@ -866,18 +866,18 @@ class BaseGVFSOperations(ABC):
         config_prefix = GVFSConfig.FS_GRAVITINO_PATH_CONFIG_PREFIX
 
         # First pass: find the location name by matching baseLocation
-        # Look for entries like "fs.path.config.<name> = <base_location>"
-        # The key format should be exactly "fs.path.config.<name>" (no dot after name)
+        # Look for entries like "fs_path_config_<name> = <base_location>"
+        # The key format should be exactly "fs_path_config_<name>" (no underscore after name)
         if self._options:
             for key, value in self._options.items():
                 if not key.startswith(config_prefix):
                     continue
 
                 suffix = key[len(config_prefix) :]
-                # Check if this is a location definition (no dot after the name)
-                # Format: "fs.path.config.<name>" (not "fs.path.config.<name>.<property>")
-                if "." not in suffix and suffix and value:
-                    # This is a location definition: "fs.path.config.<name>"
+                # Check if this is a location definition (no underscore after the name)
+                # Format: "fs_path_config_<name>" (not "fs_path_config_<name>_<property>")
+                if "_" not in suffix and suffix and value:
+                    # This is a location definition: "fs_path_config_<name>"
                     # Extract baseLocation from the value and compare with the path's baseLocation
                     if base_location == value:
                         location_name = suffix
@@ -885,14 +885,14 @@ class BaseGVFSOperations(ABC):
 
         # Second pass: extract all properties for the matched location name
         if location_name:
-            property_prefix = config_prefix + location_name + "."
+            property_prefix = config_prefix + location_name + "_"
             if self._options:
                 for key, value in self._options.items():
                     # Check if this key is a property for the matched location
-                    # e.g., "fs.path.config.cluster1.aws-ak" matches prefix "fs.path.config.cluster1."
+                    # e.g., "fs_path_config_cluster1_aws-ak" matches prefix "fs_path_config_cluster1_"
                     if key.startswith(property_prefix):
                         # Extract the property name after the location prefix
-                        # e.g., "fs.path.config.cluster1.aws-ak" -> "aws-ak"
+                        # e.g., "fs_path_config_cluster1_aws-ak" -> "aws-ak"
                         property_name = key[len(property_prefix) :]
                         if property_name:
                             properties[property_name] = value
