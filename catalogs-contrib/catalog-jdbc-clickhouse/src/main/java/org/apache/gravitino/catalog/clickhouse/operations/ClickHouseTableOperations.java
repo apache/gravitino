@@ -18,6 +18,8 @@
  */
 package org.apache.gravitino.catalog.clickhouse.operations;
 
+import static org.apache.gravitino.catalog.clickhouse.ClickHouseConstants.IndexConstants.DATA_SKIPPING_BLOOM_FILTER;
+import static org.apache.gravitino.catalog.clickhouse.ClickHouseConstants.IndexConstants.DATA_SKIPPING_MINMAX_VALUE;
 import static org.apache.gravitino.catalog.clickhouse.ClickHouseTablePropertiesMetadata.CLICKHOUSE_ENGINE_KEY;
 import static org.apache.gravitino.catalog.clickhouse.ClickHouseTablePropertiesMetadata.ENGINE_PROPERTY_ENTRY;
 import static org.apache.gravitino.rel.Column.DEFAULT_VALUE_NOT_SET;
@@ -288,55 +290,63 @@ public class ClickHouseTableOperations extends JdbcTableOperations {
     }
 
     if (engine == ENGINE.DISTRIBUTED) {
-      if (!onCluster) {
-        throw new IllegalArgumentException(
-            "ENGINE = DISTRIBUTED requires ON CLUSTER clause to be specified.");
-      }
-
-      // Check properties
-      String clusterName = properties.get(ClusterConstants.CLUSTER_NAME);
-      String remoteDatabase = properties.get(DistributedTableConstants.REMOTE_DATABASE);
-      String remoteTable = properties.get(DistributedTableConstants.REMOTE_TABLE);
-      String shardingKey = properties.get(DistributedTableConstants.SHARDING_KEY);
-
-      Preconditions.checkArgument(
-          StringUtils.isNotBlank(clusterName),
-          "Cluster name must be specified when engine is Distributed");
-      Preconditions.checkArgument(
-          StringUtils.isNotBlank(remoteDatabase),
-          "Remote database must be specified for Distributed");
-      Preconditions.checkArgument(
-          StringUtils.isNotBlank(remoteTable), "Remote table must be specified for Distributed");
-
-      Preconditions.checkArgument(
-          StringUtils.isNotBlank(shardingKey), "Sharding key must be specified for Distributed");
-
-      List<String> shardingColumns = extractShardingKeyColumns(shardingKey);
-      if (CollectionUtils.isNotEmpty(shardingColumns)) {
-        for (String columnName : shardingColumns) {
-          JdbcColumn shardingColumn = findColumn(columns, columnName);
-          Preconditions.checkArgument(
-              shardingColumn != null,
-              "Sharding key column %s must be defined in the table",
-              columnName);
-        }
-      }
-
-      String sanitizedShardingKey = formatShardingKey(shardingKey);
-
-      sqlBuilder.append(
-          "\n ENGINE = %s(`%s`,`%s`,`%s`,%s)"
-              .formatted(
-                  ENGINE.DISTRIBUTED.getValue(),
-                  clusterName,
-                  remoteDatabase,
-                  remoteTable,
-                  sanitizedShardingKey));
+      handleDistributeTable(properties, sqlBuilder, onCluster, columns);
       return engine;
     }
 
     sqlBuilder.append("\n ENGINE = %s".formatted(engine.getValue()));
     return engine;
+  }
+
+  private void handleDistributeTable(
+      Map<String, String> properties,
+      StringBuilder sqlBuilder,
+      boolean onCluster,
+      JdbcColumn[] columns) {
+    if (!onCluster) {
+      throw new IllegalArgumentException(
+          "ENGINE = DISTRIBUTED requires ON CLUSTER clause to be specified.");
+    }
+
+    // Check properties
+    String clusterName = properties.get(ClusterConstants.CLUSTER_NAME);
+    String remoteDatabase = properties.get(DistributedTableConstants.REMOTE_DATABASE);
+    String remoteTable = properties.get(DistributedTableConstants.REMOTE_TABLE);
+    String shardingKey = properties.get(DistributedTableConstants.SHARDING_KEY);
+
+    Preconditions.checkArgument(
+        StringUtils.isNotBlank(clusterName),
+        "Cluster name must be specified when engine is Distributed");
+    Preconditions.checkArgument(
+        StringUtils.isNotBlank(remoteDatabase),
+        "Remote database must be specified for Distributed");
+    Preconditions.checkArgument(
+        StringUtils.isNotBlank(remoteTable), "Remote table must be specified for Distributed");
+
+    Preconditions.checkArgument(
+        StringUtils.isNotBlank(shardingKey), "Sharding key must be specified for Distributed");
+
+    List<String> shardingColumns = extractShardingKeyColumns(shardingKey);
+    if (CollectionUtils.isNotEmpty(shardingColumns)) {
+      for (String columnName : shardingColumns) {
+        JdbcColumn shardingColumn = findColumn(columns, columnName);
+        Preconditions.checkArgument(
+            shardingColumn != null,
+            "Sharding key column %s must be defined in the table",
+            columnName);
+      }
+    }
+
+    String sanitizedShardingKey = formatShardingKey(shardingKey);
+
+    sqlBuilder.append(
+        "\n ENGINE = %s(`%s`,`%s`,`%s`,%s)"
+            .formatted(
+                ENGINE.DISTRIBUTED.getValue(),
+                clusterName,
+                remoteDatabase,
+                remoteTable,
+                sanitizedShardingKey));
   }
 
   private void appendPartitionClause(
@@ -1094,9 +1104,9 @@ public class ClickHouseTableOperations extends JdbcTableOperations {
     }
 
     switch (rawType) {
-      case "minmax":
+      case DATA_SKIPPING_MINMAX_VALUE:
         return Index.IndexType.DATA_SKIPPING_MINMAX;
-      case "bloom_filter":
+      case DATA_SKIPPING_BLOOM_FILTER:
         return Index.IndexType.DATA_SKIPPING_BLOOM_FILTER;
       default:
         throw new IllegalArgumentException("Unsupported data skipping index type: " + rawType);

@@ -48,4 +48,14 @@ public class ClickHouseConstants {
     public static final String ENGINE_UPPER = "ENGINE";
     public static final String SETTINGS_PREFIX = "settings.";
   }
+
+  public static final class IndexConstants {
+    private IndexConstants() {}
+
+    // The name of the data skipping index type for minmax index in clickhouse.
+    public static final String DATA_SKIPPING_MINMAX_VALUE = "minmax";
+
+    // The name of the data skipping index type for bloom filter index in clickhouse.
+    public static final String DATA_SKIPPING_BLOOM_FILTER = "bloom_filter";
+  }
 }
