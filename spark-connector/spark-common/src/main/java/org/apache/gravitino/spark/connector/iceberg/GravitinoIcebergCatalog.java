@@ -21,7 +21,11 @@ package org.apache.gravitino.spark.connector.iceberg;
 
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
+import java.util.ArrayList;
+import java.util.HashSet;
+import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import org.apache.commons.lang3.ArrayUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.catalog.lakehouse.iceberg.IcebergConstants;
@@ -118,12 +122,24 @@ public class GravitinoIcebergCatalog extends BaseCatalog
     Identifier[] gravitinoFunctions =
         namespace.length == 0 ? new Identifier[0] : super.listFunctions(namespace);
 
-    // Combine and return both sets of functions
-    Identifier[] allFunctions = new Identifier[icebergFunctions.length + gravitinoFunctions.length];
-    System.arraycopy(icebergFunctions, 0, allFunctions, 0, icebergFunctions.length);
-    System.arraycopy(
-        gravitinoFunctions, 0, allFunctions, icebergFunctions.length, gravitinoFunctions.length);
-    return allFunctions;
+    // Combine and deduplicate functions, Gravitino functions take precedence
+    Set<String> seenNames = new HashSet<>();
+    List<Identifier> result = new ArrayList<>();
+
+    // Add Gravitino functions first (higher precedence)
+    for (Identifier id : gravitinoFunctions) {
+      seenNames.add(id.name());
+      result.add(id);
+    }
+
+    // Add Iceberg functions if not already present
+    for (Identifier id : icebergFunctions) {
+      if (!seenNames.contains(id.name())) {
+        result.add(id);
+      }
+    }
+
+    return result.toArray(new Identifier[0]);
   }
 
   @Override

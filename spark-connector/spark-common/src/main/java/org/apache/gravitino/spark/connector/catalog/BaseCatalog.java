@@ -464,7 +464,7 @@ public abstract class BaseCatalog implements TableCatalog, SupportsNamespaces, F
           .map(f -> Identifier.of(new String[] {gravitinoNamespace}, f.name()))
           .toArray(Identifier[]::new);
     } catch (NoSuchSchemaException e) {
-      return new Identifier[0];
+      throw new NoSuchNamespaceException(namespace);
     }
   }
 
@@ -558,7 +558,9 @@ public abstract class BaseCatalog implements TableCatalog, SupportsNamespaces, F
   private UnboundFunction instantiateFunction(String className, Identifier ident)
       throws NoSuchFunctionException {
     try {
-      Class<?> functionClass = Class.forName(className);
+      // Use context classloader to work with Spark's isolated plugin classloaders
+      ClassLoader classLoader = Thread.currentThread().getContextClassLoader();
+      Class<?> functionClass = Class.forName(className, true, classLoader);
       Object instance = functionClass.getDeclaredConstructor().newInstance();
       if (instance instanceof UnboundFunction) {
         return (UnboundFunction) instance;
