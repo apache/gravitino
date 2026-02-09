@@ -18,6 +18,9 @@
  */
 package org.apache.gravitino.catalog.hologres.operation;
 
+import com.google.common.annotations.VisibleForTesting;
+import com.google.common.base.Preconditions;
+import com.google.common.collect.Lists;
 import java.sql.Connection;
 import java.sql.DatabaseMetaData;
 import java.sql.PreparedStatement;
@@ -30,9 +33,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.stream.Collectors;
-
 import javax.sql.DataSource;
-
 import org.apache.commons.collections4.MapUtils;
 import org.apache.commons.lang3.ArrayUtils;
 import org.apache.commons.lang3.BooleanUtils;
@@ -60,10 +61,6 @@ import org.apache.gravitino.rel.expressions.transforms.Transform;
 import org.apache.gravitino.rel.expressions.transforms.Transforms;
 import org.apache.gravitino.rel.indexes.Index;
 import org.apache.gravitino.rel.types.Types;
-
-import com.google.common.annotations.VisibleForTesting;
-import com.google.common.base.Preconditions;
-import com.google.common.collect.Lists;
 
 /**
  * Table operations for Hologres.
@@ -797,8 +794,8 @@ public class HologresTableOperations extends JdbcTableOperations
    *   <li>Foreign tables have TABLE_TYPE = "FOREIGN TABLE" (excluded from listing)
    * </ul>
    *
-   * <p>This method overrides the parent to include regular tables and partition parent tables,
-   * but excludes views and foreign tables from the table list.
+   * <p>This method overrides the parent to include regular tables and partition parent tables, but
+   * excludes views and foreign tables from the table list.
    *
    * @param connection the database connection
    * @return ResultSet containing table metadata
@@ -813,10 +810,7 @@ public class HologresTableOperations extends JdbcTableOperations
     // and "PARTITIONED TABLE" (partition parent tables)
     // Exclude "VIEW" and "FOREIGN TABLE" to hide views and foreign tables from Gravitino
     return metaData.getTables(
-        catalogName,
-        schemaName,
-        null,
-        new String[] {"TABLE", "PARTITIONED TABLE"});
+        catalogName, schemaName, null, new String[] {"TABLE", "PARTITIONED TABLE"});
   }
 
   @Override
@@ -826,10 +820,7 @@ public class HologresTableOperations extends JdbcTableOperations
     // Include TABLE and PARTITIONED TABLE types
     // Exclude VIEW and FOREIGN TABLE to hide views and foreign tables from Gravitino
     return metaData.getTables(
-        database,
-        schema,
-        tableName,
-        new String[] {"TABLE", "PARTITIONED TABLE"});
+        database, schema, tableName, new String[] {"TABLE", "PARTITIONED TABLE"});
   }
 
   @Override
@@ -1053,7 +1044,11 @@ public class HologresTableOperations extends JdbcTableOperations
 
           // Only include meaningful properties that users care about
           if (StringUtils.isNotEmpty(propertyValue) && isUserRelevantProperty(propertyKey)) {
-            properties.put(propertyKey, propertyValue);
+            // Convert JDBC property keys to DDL-compatible keys
+            // Hologres system table stores "binlog.level" and "binlog.ttl",
+            // but CREATE TABLE WITH clause uses "binlog_level" and "binlog_ttl"
+            String normalizedKey = convertFromJdbcPropertyKey(propertyKey);
+            properties.put(normalizedKey, propertyValue);
           }
         }
       }
@@ -1061,6 +1056,28 @@ public class HologresTableOperations extends JdbcTableOperations
 
     LOG.debug("Loaded table properties for {}.{}: {}", schemaName, tableName, properties);
     return properties;
+  }
+
+  /**
+   * Convert JDBC property key to DDL-compatible property key.
+   *
+   * <p>Hologres system table {@code hologres.hg_table_properties} stores some property keys with
+   * dots (e.g., "binlog.level", "binlog.ttl"), but the CREATE TABLE WITH clause uses underscores
+   * (e.g., "binlog_level", "binlog_ttl"). This method converts from the JDBC format to the DDL
+   * format so that properties can be round-tripped correctly.
+   *
+   * @param jdbcKey the property key from the JDBC query
+   * @return the DDL-compatible property key
+   */
+  private String convertFromJdbcPropertyKey(String jdbcKey) {
+    switch (jdbcKey) {
+      case "binlog.level":
+        return "binlog_level";
+      case "binlog.ttl":
+        return "binlog_ttl";
+      default:
+        return jdbcKey;
+    }
   }
 
   /**
@@ -1084,7 +1101,9 @@ public class HologresTableOperations extends JdbcTableOperations
       case "time_to_live_in_seconds":
       case "table_group":
       case "storage_format":
-      case "binlog_level":
+      case "binlog.level":
+      case "binlog.ttl":
+      case "is_logical_partitioned_table":
         return true;
       default:
         // Exclude internal properties like table_id, schema_version, etc.
