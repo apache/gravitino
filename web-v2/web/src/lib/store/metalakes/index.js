@@ -256,8 +256,10 @@ export const setIntoTreeNodeWithFetch = createAsyncThunk(
       }
 
       const { identifiers: functionIdentifiers = [] } = funcRes || {}
+
       const functions = functionIdentifiers.map(functionItem => {
         const functionName = functionItem?.name || functionItem?.identifier?.name || functionItem
+
         return {
           ...functionItem,
           node: 'function',
@@ -279,6 +281,7 @@ export const setIntoTreeNodeWithFetch = createAsyncThunk(
           }
 
           const { identifiers: tableIdentifiers = [] } = tableRes || {}
+
           const tables = tableIdentifiers.map(tableItem => {
             return {
               ...tableItem,
@@ -304,6 +307,7 @@ export const setIntoTreeNodeWithFetch = createAsyncThunk(
           }
 
           const { identifiers: filesetIdentifiers = [] } = filesetRes || {}
+
           const filesets = filesetIdentifiers.map(filesetItem => {
             return {
               ...filesetItem,
@@ -327,6 +331,7 @@ export const setIntoTreeNodeWithFetch = createAsyncThunk(
           }
 
           const { identifiers: topicIdentifiers = [] } = topicRes || {}
+
           const topics = topicIdentifiers.map(topicItem => {
             return {
               ...topicItem,
@@ -350,6 +355,7 @@ export const setIntoTreeNodeWithFetch = createAsyncThunk(
           }
 
           const { identifiers: modelIdentifiers = [] } = modelRes || {}
+
           const models = modelIdentifiers.map(modelItem => {
             return {
               ...modelItem,
@@ -1653,18 +1659,14 @@ export const deleteVersion = createAsyncThunk(
 export const fetchFunctions = createAsyncThunk(
   'appMetalakes/fetchFunctions',
   async ({ init, metalake, catalog, schema }, { dispatch }) => {
-    if (init) {
-      await dispatch(setTableLoading(true))
-    }
-
     const [err, res] = await to(getFunctionsApi({ metalake, catalog, schema, details: true }))
-    await dispatch(setTableLoading(false))
 
     if (init && (err || !res)) {
       throw new Error(err)
     }
 
     const { functions = [], identifiers = [] } = res || {}
+
     const normalized = (functions.length ? functions : identifiers).map(item => {
       return {
         ...item,

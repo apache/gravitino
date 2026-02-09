@@ -33,6 +33,7 @@ const formatType = type => {
   if (!type) return '-'
   if (typeof type === 'string') return type
   if (type?.type === 'unparsed') return type.unparsedType
+
   return JSON.stringify(type)
 }
 
@@ -41,25 +42,27 @@ const renderParameters = parameters => {
 
   return parameters.map((param, index) => {
     const comment = typeof param?.comment === 'string' ? param.comment.trim() : ''
+
     return (
-    <span key={`${param.name || 'param'}-${index}`}>
-      <span>{param.name || '-'}</span>
-      {comment && (
-        <Tooltip title={comment}>
-          <span className='mx-1 inline-flex cursor-help text-slate-400 align-middle'>
-            <Icons.iconify icon='material-symbols:info-outline' />
-          </span>
-        </Tooltip>
-      )}
-      <span>{`: ${formatType(param.dataType)}`}</span>
-      {index < parameters.length - 1 && <span>, </span>}
-    </span>
+      <span key={`${param.name || 'param'}-${index}`}>
+        <span>{param.name || '-'}</span>
+        {comment && (
+          <Tooltip title={comment}>
+            <span className='mx-1 inline-flex cursor-help text-slate-400 align-middle'>
+              <Icons.iconify icon='material-symbols:info-outline' />
+            </span>
+          </Tooltip>
+        )}
+        <span>{`: ${formatType(param.dataType)}`}</span>
+        {index < parameters.length - 1 && <span>, </span>}
+      </span>
     )
   })
 }
 
 const formatReturnColumns = returnColumns => {
   if (!returnColumns?.length) return ''
+
   return returnColumns.map(col => `${col.name}: ${formatType(col.dataType)}`).join(', ')
 }
 
@@ -103,7 +106,10 @@ const buildImplDetails = impl => {
     details.push({ label: 'Resources (Archives)', value: archives.length ? archives.join(', ') : '-' })
   }
   if (impl?.properties) {
-    details.push({ label: 'Properties', value: Object.keys(impl.properties).length ? JSON.stringify(impl.properties) : '-' })
+    details.push({
+      label: 'Properties',
+      value: Object.keys(impl.properties).length ? JSON.stringify(impl.properties) : '-'
+    })
   }
 
   return details
@@ -111,6 +117,7 @@ const buildImplDetails = impl => {
 
 const FunctionImplTabs = ({ impls }) => {
   const [activeKey, setActiveKey] = useState(impls[0]?.runtime || 'runtime-0')
+
   const tabItems = impls.map((impl, implIndex) => {
     const runtimeKey = impl?.runtime || `runtime-${implIndex}`
     const tabLabel = impl?.runtime || `Runtime ${implIndex + 1}`
@@ -123,19 +130,14 @@ const FunctionImplTabs = ({ impls }) => {
 
   const activeImpl = impls.find((impl, index) => {
     const key = impl?.runtime || `runtime-${index}`
+
     return key === activeKey
   })
   const activeDetails = activeImpl ? buildImplDetails(activeImpl) : []
 
   return (
     <div className='flex flex-col gap-2 w-full'>
-      <Tabs
-        size='small'
-        className='w-full'
-        items={tabItems}
-        activeKey={activeKey}
-        onChange={setActiveKey}
-      />
+      <Tabs size='small' className='w-full' items={tabItems} activeKey={activeKey} onChange={setActiveKey} />
       <Descriptions layout='horizontal' column={1} size='small' bordered style={{ width: '100%' }}>
         {activeDetails.map(detail => (
           <Descriptions.Item key={`${activeKey}-${detail.label}`} label={detail.label}>
@@ -160,6 +162,7 @@ export default function FunctionDetailsPage() {
     const loadDetails = async () => {
       if (!metalake || !catalog || !schema || !functionName) return
       setLoading(true)
+
       const [err, res] = await to(
         getFunctionDetailsApi({
           metalake,
@@ -171,6 +174,7 @@ export default function FunctionDetailsPage() {
       setLoading(false)
       if (err || !res) {
         setFunctionData(null)
+
         return
       }
       setFunctionData(res.function)
@@ -186,6 +190,7 @@ export default function FunctionDetailsPage() {
   const definitionItems = definitions.map((definition, index) => {
     const signature = buildSignature(functionData?.name, definition)
     const impls = definition?.impls || []
+
     return {
       key: `definition-${index}`,
       label: (
@@ -209,62 +214,59 @@ export default function FunctionDetailsPage() {
     <Spin spinning={loading}>
       <div className='bg-white min-h-[calc(100vh-24rem)]'>
         <Space direction='vertical' size='small' style={{ width: '100%' }}>
-        <Flex className='mb-2' gap='small' align='flex-start'>
-          <div className='size-8'>
-            <Icons.iconify icon='material-symbols:function' className='my-icon-large' />
-          </div>
-          <div className='grow-1 relative bottom-1'>
-            <Title level={3} style={{ marginBottom: '0.125rem' }}>
-              {functionData?.name || '-'}
-            </Title>
-            <Paragraph type='secondary' style={{ marginBottom: 0 }}>
-              {functionData?.comment || '-'}
-            </Paragraph>
-          </div>
-        </Flex>
-        <Space split={<Divider type='vertical' />} wrap={true} className='mb-2'>
-          <Space size={4}>
-            <Tooltip title='Type'>
-              <Icons.Type className='size-4' color='grey' />
-            </Tooltip>
-            <span>{functionData?.functionType || '-'}</span>
+          <Flex className='mb-2' gap='small' align='flex-start'>
+            <div className='size-8'>
+              <Icons.iconify icon='material-symbols:function' className='my-icon-large' />
+            </div>
+            <div className='grow-1 relative bottom-1'>
+              <Title level={3} style={{ marginBottom: '0.125rem' }}>
+                {functionData?.name || '-'}
+              </Title>
+              <Paragraph type='secondary' style={{ marginBottom: 0 }}>
+                {functionData?.comment || '-'}
+              </Paragraph>
+            </div>
+          </Flex>
+          <Space split={<Divider type='vertical' />} wrap={true} className='mb-2'>
+            <Space size={4}>
+              <Tooltip title='Type'>
+                <Icons.Type className='size-4' color='grey' />
+              </Tooltip>
+              <span>{functionData?.functionType || '-'}</span>
+            </Space>
+            <Space size={4}>
+              <Tooltip title='Deterministic'>
+                <Icons.CircleCheckBig className='size-4' color='grey' />
+              </Tooltip>
+              {typeof functionData?.deterministic === 'boolean' ? (
+                <Tag color={functionData?.deterministic ? 'green' : 'orange'}>
+                  {functionData?.deterministic ? 'true' : 'false'}
+                </Tag>
+              ) : (
+                <span>-</span>
+              )}
+            </Space>
+            <Space size={4}>
+              <Tooltip title='Creator'>
+                <Icons.User className='size-4' color='grey' />
+              </Tooltip>
+              <span>{functionData?.audit?.creator || '-'}</span>
+            </Space>
+            <Space size={4}>
+              <Tooltip title='Created At'>
+                <Icons.Clock className='size-4' color='grey' />
+              </Tooltip>
+              <span>{createdAtText}</span>
+            </Space>
           </Space>
-          <Space size={4}>
-            <Tooltip title='Deterministic'>
-              <Icons.CircleCheckBig className='size-4' color='grey' />
-            </Tooltip>
-            {typeof functionData?.deterministic === 'boolean' ? (
-              <Tag color={functionData?.deterministic ? 'green' : 'orange'}>
-                {functionData?.deterministic ? 'true' : 'false'}
-              </Tag>
+          <div className='max-h-[60vh] overflow-auto'>
+            <div className='mb-2 font-medium'>Definitions</div>
+            {definitions.length === 0 ? (
+              <span className='text-slate-400'>No definitions</span>
             ) : (
-              <span>-</span>
+              <Collapse items={definitionItems} defaultActiveKey={[]} />
             )}
-          </Space>
-          <Space size={4}>
-            <Tooltip title='Creator'>
-              <Icons.User className='size-4' color='grey' />
-            </Tooltip>
-            <span>{functionData?.audit?.creator || '-'}</span>
-          </Space>
-          <Space size={4}>
-            <Tooltip title='Created At'>
-              <Icons.Clock className='size-4' color='grey' />
-            </Tooltip>
-            <span>{createdAtText}</span>
-          </Space>
-        </Space>
-        <div className='max-h-[60vh] overflow-auto'>
-          <div className='mb-2 font-medium'>Definitions</div>
-          {definitions.length === 0 ? (
-            <span className='text-slate-400'>No definitions</span>
-          ) : (
-            <Collapse
-              items={definitionItems}
-              defaultActiveKey={[]}
-            />
-          )}
-        </div>
+          </div>
         </Space>
       </div>
     </Spin>

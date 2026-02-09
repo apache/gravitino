@@ -72,15 +72,12 @@ const RightContent = () => {
   const functionName = searchParams.get('function')
 
   const entity =
-    catalogType === 'relational'
-      ? functionName || searchParams.get('table')
-      : catalogType === 'fileset'
-        ? searchParams.get('fileset')
-        : catalogType === 'messaging'
-          ? searchParams.get('topic')
-          : catalogType === 'model'
-            ? searchParams.get('model')
-            : ''
+    functionName ||
+    searchParams.get('table') ||
+    searchParams.get('fileset') ||
+    searchParams.get('topic') ||
+    searchParams.get('model') ||
+    ''
   const paramsSize = [...searchParams.keys()].length
   const { ref, width } = useResizeObserver()
 
@@ -92,11 +89,11 @@ const RightContent = () => {
     } else if (paramsSize === 4 && catalog && schema && !entity) {
       return <SchemaDetailsPage />
     } else {
+      if (functionName) {
+        return <FunctionDetailsPage />
+      }
       switch (catalogType) {
         case 'relational':
-          if (functionName) {
-            return <FunctionDetailsPage />
-          }
           return (
             <TableDetailsPage
               namespaces={{

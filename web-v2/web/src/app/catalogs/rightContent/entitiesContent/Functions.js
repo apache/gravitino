@@ -44,7 +44,11 @@ export default function Functions({ metalake, catalog, schema }) {
         key: 'name',
         width: 240,
         ellipsis: true,
-        sorter: (a, b) => a?.name.toLowerCase().localeCompare(b?.name.toLowerCase()),
+        sorter: (a, b) =>
+          (a?.name ?? '')
+            .toString()
+            .toLowerCase()
+            .localeCompare((b?.name ?? '').toString().toLowerCase()),
         render: name => (
           <Link
             data-refer={`function-link-${name}`}
@@ -69,6 +73,7 @@ export default function Functions({ metalake, catalog, schema }) {
         render: (_, record) => {
           const createTime = record?.audit?.createTime
           if (!createTime || !isValidDate(createTime)) return '-'
+
           return formatToDateTime(createTime)
         }
       }
@@ -76,12 +81,9 @@ export default function Functions({ metalake, catalog, schema }) {
     []
   )
 
-  const { resizableColumns, components, tableWidth } = useAntdColumnResize(
-    () => {
-      return { columns, minWidth: 100 }
-    },
-    [columns]
-  )
+  const { resizableColumns, components, tableWidth } = useAntdColumnResize(() => {
+    return { columns, minWidth: 100 }
+  }, [columns])
 
   return (
     <Spin spinning={store.tableLoading}>
