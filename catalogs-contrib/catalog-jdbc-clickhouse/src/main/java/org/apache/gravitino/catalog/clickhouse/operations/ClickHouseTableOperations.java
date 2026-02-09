@@ -18,6 +18,8 @@
  */
 package org.apache.gravitino.catalog.clickhouse.operations;
 
+import static org.apache.gravitino.catalog.clickhouse.ClickHouseConstants.IndexConstants.DATA_SKIPPING_BLOOM_FILTER;
+import static org.apache.gravitino.catalog.clickhouse.ClickHouseConstants.IndexConstants.DATA_SKIPPING_MINMAX_VALUE;
 import static org.apache.gravitino.catalog.clickhouse.ClickHouseTablePropertiesMetadata.CLICKHOUSE_ENGINE_KEY;
 import static org.apache.gravitino.catalog.clickhouse.ClickHouseTablePropertiesMetadata.ENGINE_PROPERTY_ENTRY;
 import static org.apache.gravitino.catalog.clickhouse.ClickHouseTablePropertiesMetadata.GRAVITINO_ENGINE_KEY;
@@ -37,8 +39,6 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 import org.apache.commons.collections4.CollectionUtils;
 import org.apache.commons.collections4.MapUtils;
@@ -73,14 +73,6 @@ public class ClickHouseTableOperations extends JdbcTableOperations {
 
   private static final String CLICKHOUSE_NOT_SUPPORT_NESTED_COLUMN_MSG =
       "Clickhouse does not support nested column names.";
-  private static final Pattern TO_DATE_PATTERN =
-      Pattern.compile("toDate\\((.+)\\)", Pattern.CASE_INSENSITIVE);
-  private static final Pattern TO_YEAR_PATTERN =
-      Pattern.compile("toYear\\((.+)\\)", Pattern.CASE_INSENSITIVE);
-  private static final Pattern TO_MONTH_PATTERN =
-      Pattern.compile("toYYYYMM\\((.+)\\)", Pattern.CASE_INSENSITIVE);
-  private static final Pattern FUNCTION_WRAPPER_PATTERN =
-      Pattern.compile("^\\s*([A-Za-z0-9_]+)\\((.*)\\)\\s*$");
 
   private static final String QUERY_INDEXES_SQL =
       """
@@ -166,7 +158,7 @@ public class ClickHouseTableOperations extends JdbcTableOperations {
 
     // Extract engine from properties
     ClickHouseTablePropertiesMetadata.ENGINE engine =
-        appendTableEngine(notNullProperties, sqlBuilder, onCluster);
+        appendTableEngine(notNullProperties, sqlBuilder, onCluster, columns);
 
     appendOrderBy(sortOrders, sqlBuilder, engine);
 
@@ -208,7 +200,8 @@ public class ClickHouseTableOperations extends JdbcTableOperations {
 
     if (onCluster) {
       sqlBuilder.append(
-          "CREATE TABLE %s ON CLUSTER `%s` (\n".formatted(quoteIdentifier(tableName), clusterName));
+          "CREATE TABLE %s ON CLUSTER %s (\n"
+              .formatted(quoteIdentifier(tableName), quoteIdentifier(clusterName)));
     } else {
       sqlBuilder.append("CREATE TABLE %s (\n".formatted(quoteIdentifier(tableName)));
     }
@@ -281,7 +274,10 @@ public class ClickHouseTableOperations extends JdbcTableOperations {
   }
 
   private ClickHouseTablePropertiesMetadata.ENGINE appendTableEngine(
-      Map<String, String> properties, StringBuilder sqlBuilder, boolean onCluster) {
+      Map<String, String> properties,
+      StringBuilder sqlBuilder,
+      boolean onCluster,
+      JdbcColumn[] columns) {
     ClickHouseTablePropertiesMetadata.ENGINE engine = ENGINE_PROPERTY_ENTRY.getDefaultValue();
     if (MapUtils.isNotEmpty(properties)) {
       String userSetEngine = properties.get(GRAVITINO_ENGINE_KEY);
@@ -291,47 +287,68 @@ public class ClickHouseTableOperations extends JdbcTableOperations {
     }
 
     if (engine == ENGINE.DISTRIBUTED) {
-      if (!onCluster) {
-        throw new IllegalArgumentException(
-            "ENGINE = DISTRIBUTED requires ON CLUSTER clause to be specified.");
-      }
-
-      // Check properties
-      String clusterName = properties.get(ClusterConstants.CLUSTER_NAME);
-      String remoteDatabase = properties.get(DistributedTableConstants.REMOTE_DATABASE);
-      String remoteTable = properties.get(DistributedTableConstants.REMOTE_TABLE);
-      String shardingKey = properties.get(DistributedTableConstants.SHARDING_KEY);
-
-      Preconditions.checkArgument(
-          StringUtils.isNotBlank(clusterName),
-          "Cluster name must be specified when engine is Distributed");
-      Preconditions.checkArgument(
-          StringUtils.isNotBlank(remoteDatabase),
-          "Remote database must be specified for Distributed");
-      Preconditions.checkArgument(
-          StringUtils.isNotBlank(remoteTable), "Remote table must be specified for Distributed");
-
-      // User must ensure the sharding key is a trusted value.
-      // TODO(yuqi) WE need to check the columns in shard keys should be integer and not nullable,
-      //  as clickhouse distributed table requires the sharding key to be integer and not nullable.
-      //  We can add this validation after we support user defined sharding key in index, as we can
-      //  reuse the index field definition for validation.
-      Preconditions.checkArgument(
-          StringUtils.isNotBlank(shardingKey), "Sharding key must be specified for Distributed");
-
-      sqlBuilder.append(
-          "\n ENGINE = %s(`%s`,`%s`,`%s`,%s)"
-              .formatted(
-                  ENGINE.DISTRIBUTED.getValue(),
-                  clusterName,
-                  remoteDatabase,
-                  remoteTable,
-                  shardingKey));
+      handleDistributeTable(properties, sqlBuilder, onCluster, columns);
       return engine;
     }
 
     sqlBuilder.append("\n ENGINE = %s".formatted(engine.getValue()));
     return engine;
+  }
+
+  private void handleDistributeTable(
+      Map<String, String> properties,
+      StringBuilder sqlBuilder,
+      boolean onCluster,
+      JdbcColumn[] columns) {
+    if (!onCluster) {
+      throw new IllegalArgumentException(
+          "ENGINE = DISTRIBUTED requires ON CLUSTER clause to be specified.");
+    }
+
+    // Check properties
+    String clusterName = properties.get(ClusterConstants.CLUSTER_NAME);
+    String remoteDatabase = properties.get(DistributedTableConstants.REMOTE_DATABASE);
+    String remoteTable = properties.get(DistributedTableConstants.REMOTE_TABLE);
+    String shardingKey = properties.get(DistributedTableConstants.SHARDING_KEY);
+
+    Preconditions.checkArgument(
+        StringUtils.isNotBlank(clusterName),
+        "Cluster name must be specified when engine is Distributed");
+    Preconditions.checkArgument(
+        StringUtils.isNotBlank(remoteDatabase),
+        "Remote database must be specified for Distributed");
+    Preconditions.checkArgument(
+        StringUtils.isNotBlank(remoteTable), "Remote table must be specified for Distributed");
+
+    // User must ensure the sharding key is a trusted value.
+    // TODO(yuqi) WE need to check the columns in shard keys should be integer and not nullable,
+    //  as clickhouse distributed table requires the sharding key to be integer and not nullable.
+    //  We can add this validation after we support user defined sharding key in index, as we can
+    //  reuse the index field definition for validation.
+    Preconditions.checkArgument(
+        StringUtils.isNotBlank(shardingKey), "Sharding key must be specified for Distributed");
+
+    List<String> shardingColumns = ClickHouseTableSqlUtils.extractShardingKeyColumns(shardingKey);
+    if (CollectionUtils.isNotEmpty(shardingColumns)) {
+      for (String columnName : shardingColumns) {
+        JdbcColumn shardingColumn = findColumn(columns, columnName);
+        Preconditions.checkArgument(
+            shardingColumn != null,
+            "Sharding key column %s must be defined in the table",
+            columnName);
+      }
+    }
+
+    String sanitizedShardingKey = ClickHouseTableSqlUtils.formatShardingKey(shardingKey);
+
+    sqlBuilder.append(
+        "\n ENGINE = %s(`%s`,`%s`,`%s`,%s)"
+            .formatted(
+                ENGINE.DISTRIBUTED.getValue(),
+                clusterName,
+                remoteDatabase,
+                remoteTable,
+                sanitizedShardingKey));
   }
 
   private void appendPartitionClause(
@@ -348,12 +365,25 @@ public class ClickHouseTableOperations extends JdbcTableOperations {
     }
 
     List<String> partitionExprs =
-        Arrays.stream(partitioning).map(this::toPartitionExpression).collect(Collectors.toList());
+        Arrays.stream(partitioning)
+            .map(ClickHouseTableSqlUtils::toPartitionExpression)
+            .collect(Collectors.toList());
     String partitionExpr =
         partitionExprs.size() == 1
             ? partitionExprs.get(0)
             : "tuple(" + String.join(", ", partitionExprs) + ")";
     sqlBuilder.append("\n PARTITION BY ").append(partitionExpr);
+  }
+
+  private JdbcColumn findColumn(JdbcColumn[] columns, String columnName) {
+    if (ArrayUtils.isEmpty(columns)) {
+      return null;
+    }
+
+    return Arrays.stream(columns)
+        .filter(column -> StringUtils.equals(column.name(), columnName))
+        .findFirst()
+        .orElse(null);
   }
 
   private String toPartitionExpression(Transform transform) {
@@ -497,7 +527,7 @@ public class ClickHouseTableOperations extends JdbcTableOperations {
           String partitionKey = resultSet.getString("partition_key");
           try {
             return parsePartitioning(partitionKey);
-          } catch (IllegalArgumentException e) {
+          } catch (IllegalArgumentException | UnsupportedOperationException e) {
             LOG.warn(
                 "Skip unsupported partition expression {} for {}.{}",
                 partitionKey,
@@ -864,143 +894,12 @@ public class ClickHouseTableOperations extends JdbcTableOperations {
 
   @VisibleForTesting
   Transform[] parsePartitioning(String partitionKey) {
-    if (StringUtils.isBlank(partitionKey)) {
-      return Transforms.EMPTY_TRANSFORM;
-    }
-
-    String trimmedKey = normalizePartitionKey(partitionKey);
-    if (StringUtils.isBlank(trimmedKey)) {
-      return Transforms.EMPTY_TRANSFORM;
-    }
-
-    String[] parts = trimmedKey.split(",");
-    List<Transform> transforms = new ArrayList<>();
-    for (String part : parts) {
-      String expression = StringUtils.trim(part);
-      if (StringUtils.isBlank(expression)) {
-        continue;
-      }
-      transforms.add(parsePartitionExpression(expression, partitionKey));
-    }
-
-    return transforms.toArray(new Transform[0]);
-  }
-
-  private Transform parsePartitionExpression(String expression, String originalPartitionKey) {
-    String trimmedExpression = StringUtils.trim(expression);
-
-    Matcher toYearMatcher = TO_YEAR_PATTERN.matcher(trimmedExpression);
-    if (toYearMatcher.matches()) {
-      String identifier = normalizeIdentifier(toYearMatcher.group(1));
-      Preconditions.checkArgument(
-          StringUtils.isNotBlank(identifier),
-          "Unsupported partition expression: " + originalPartitionKey);
-      return Transforms.year(identifier);
-    }
-
-    Matcher toYYYYMMMatcher = TO_MONTH_PATTERN.matcher(trimmedExpression);
-    if (toYYYYMMMatcher.matches()) {
-      String identifier = normalizeIdentifier(toYYYYMMMatcher.group(1));
-      Preconditions.checkArgument(
-          StringUtils.isNotBlank(identifier),
-          "Unsupported partition expression: " + originalPartitionKey);
-      return Transforms.month(identifier);
-    }
-
-    Matcher toDateMatcher = TO_DATE_PATTERN.matcher(trimmedExpression);
-    if (toDateMatcher.matches()) {
-      String identifier = normalizeIdentifier(toDateMatcher.group(1));
-      Preconditions.checkArgument(
-          StringUtils.isNotBlank(identifier),
-          "Unsupported partition expression: " + originalPartitionKey);
-      return Transforms.day(identifier);
-    }
-
-    // for other functions, we do not support it now
-    if (trimmedExpression.contains("(") && trimmedExpression.contains(")")) {
-      throw new UnsupportedOperationException(
-          "Currently Gravitino only supports toYYYY, toYYYYMM, toDate partition expressions, but got: "
-              + trimmedExpression);
-    }
-
-    String identifier = normalizeIdentifier(trimmedExpression);
-    Preconditions.checkArgument(
-        StringUtils.isNotBlank(identifier) && !StringUtils.containsAny(identifier, "(", ")", " "),
-        "Unsupported partition expression: " + originalPartitionKey);
-    return Transforms.identity(identifier);
-  }
-
-  private String normalizePartitionKey(String partitionKey) {
-    String trimmedKey = partitionKey.trim();
-    if (StringUtils.equalsIgnoreCase(trimmedKey, "tuple()")) {
-      return "";
-    }
-    if (StringUtils.startsWithIgnoreCase(trimmedKey, "tuple(")
-        && StringUtils.endsWith(trimmedKey, ")")) {
-      return trimmedKey.substring("tuple(".length(), trimmedKey.length() - 1).trim();
-    }
-    if (StringUtils.startsWith(trimmedKey, "(") && StringUtils.endsWith(trimmedKey, ")")) {
-      return trimmedKey.substring(1, trimmedKey.length() - 1).trim();
-    }
-    return trimmedKey;
-  }
-
-  private String normalizeIdentifier(String identifier) {
-    String col = StringUtils.trim(identifier);
-    if (StringUtils.startsWith(col, "`") && StringUtils.endsWith(col, "`") && col.length() >= 2) {
-      return col.substring(1, col.length() - 1);
-    }
-    return col;
+    return ClickHouseTableSqlUtils.parsePartitioning(partitionKey);
   }
 
   @VisibleForTesting
   String[][] parseIndexFields(String expression) {
-    if (StringUtils.isBlank(expression)) {
-      return new String[0][];
-    }
-
-    String normalized = normalizeIndexExpression(expression);
-    if (StringUtils.isBlank(normalized)) {
-      return new String[0][];
-    }
-
-    String[] parts = normalized.split(",");
-    List<String[]> fields = new ArrayList<>();
-    for (String part : parts) {
-      String col = normalizeIdentifier(part);
-      Preconditions.checkArgument(
-          isSimpleIdentifier(col), "Unsupported index expression: " + expression);
-      fields.add(new String[] {col});
-    }
-
-    return fields.toArray(new String[0][]);
-  }
-
-  private String normalizeIndexExpression(String expression) {
-    String trimmed = expression.trim();
-
-    boolean stripped = true;
-    while (stripped) {
-      stripped = false;
-      Matcher matcher = FUNCTION_WRAPPER_PATTERN.matcher(trimmed);
-      if (matcher.matches()) {
-        trimmed = matcher.group(2).trim();
-        stripped = true;
-      }
-    }
-
-    if (StringUtils.startsWithIgnoreCase(trimmed, "tuple(") && StringUtils.endsWith(trimmed, ")")) {
-      trimmed = trimmed.substring("tuple(".length(), trimmed.length() - 1).trim();
-    } else if (StringUtils.equalsIgnoreCase(trimmed, "tuple()")) {
-      trimmed = "";
-    }
-
-    return trimmed;
-  }
-
-  private boolean isSimpleIdentifier(String identifier) {
-    return StringUtils.isNotBlank(identifier)
-        && !StringUtils.containsAny(identifier, "(", ")", " ", "%", "+", "-", "*", "/");
+    return ClickHouseTableSqlUtils.parseIndexFields(expression);
   }
 
   private List<Index> getSecondaryIndexes(
@@ -1044,9 +943,9 @@ public class ClickHouseTableOperations extends JdbcTableOperations {
     }
 
     switch (rawType) {
-      case "minmax":
+      case DATA_SKIPPING_MINMAX_VALUE:
         return Index.IndexType.DATA_SKIPPING_MINMAX;
-      case "bloom_filter":
+      case DATA_SKIPPING_BLOOM_FILTER:
         return Index.IndexType.DATA_SKIPPING_BLOOM_FILTER;
       default:
         throw new IllegalArgumentException("Unsupported data skipping index type: " + rawType);
