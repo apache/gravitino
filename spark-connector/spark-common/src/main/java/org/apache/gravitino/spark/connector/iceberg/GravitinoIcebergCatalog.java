@@ -21,11 +21,8 @@ package org.apache.gravitino.spark.connector.iceberg;
 
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
-import java.util.ArrayList;
-import java.util.HashSet;
-import java.util.List;
+import java.util.LinkedHashMap;
 import java.util.Map;
-import java.util.Set;
 import org.apache.commons.lang3.ArrayUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.catalog.lakehouse.iceberg.IcebergConstants;
@@ -117,29 +114,29 @@ public class GravitinoIcebergCatalog extends BaseCatalog
     // Get functions from Iceberg catalog
     Identifier[] icebergFunctions = ((SparkCatalog) sparkCatalog).listFunctions(namespace);
 
-    // When the namespace is empty, to maintain compatibility with Iceberg behavior, only Iceberg
-    // functions are returned.
-    Identifier[] gravitinoFunctions =
-        namespace.length == 0 ? new Identifier[0] : super.listFunctions(namespace);
-
-    // Combine and deduplicate functions, Gravitino functions take precedence
-    Set<String> seenNames = new HashSet<>();
-    List<Identifier> result = new ArrayList<>();
-
-    // Add Gravitino functions first (higher precedence)
-    for (Identifier id : gravitinoFunctions) {
-      seenNames.add(id.name());
-      result.add(id);
-    }
-
-    // Add Iceberg functions if not already present
-    for (Identifier id : icebergFunctions) {
-      if (!seenNames.contains(id.name())) {
-        result.add(id);
+    // Try to get Gravitino functions. If the namespace doesn't exist in Gravitino
+    // (e.g., Iceberg's "system" namespace), gracefully return empty array.
+    Identifier[] gravitinoFunctions;
+    if (namespace.length == 0) {
+      gravitinoFunctions = new Identifier[0];
+    } else {
+      try {
+        gravitinoFunctions = super.listFunctions(namespace);
+      } catch (NoSuchNamespaceException e) {
+        // Namespace exists in Iceberg but not in Gravitino, skip Gravitino functions
+        gravitinoFunctions = new Identifier[0];
       }
     }
 
-    return result.toArray(new Identifier[0]);
+    // Combine and deduplicate functions, Gravitino functions take precedence
+    Map<String, Identifier> mergedFunctions = new LinkedHashMap<>();
+    for (Identifier id : gravitinoFunctions) {
+      mergedFunctions.put(id.name(), id);
+    }
+    for (Identifier id : icebergFunctions) {
+      mergedFunctions.putIfAbsent(id.name(), id);
+    }
+    return mergedFunctions.values().toArray(new Identifier[0]);
   }
 
   @Override
