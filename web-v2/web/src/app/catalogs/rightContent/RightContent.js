@@ -57,6 +57,11 @@ const TableDetailsPage = dynamic(() => import('./entitiesContent/TableDetailsPag
   ssr: false
 })
 
+const FunctionDetailsPage = dynamic(() => import('./entitiesContent/FunctionDetailsPage'), {
+  loading: () => <Loading height={'200px'} />,
+  ssr: false
+})
+
 const RightContent = () => {
   const searchParams = useSearchParams()
 
@@ -64,18 +69,18 @@ const RightContent = () => {
   const catalogType = searchParams.get('catalogType')
   const catalog = searchParams.get('catalog')
   const schema = searchParams.get('schema')
+  const functionName = searchParams.get('function')
 
-  const entity = searchParams.get(
+  const entity =
     catalogType === 'relational'
-      ? 'table'
+      ? functionName || searchParams.get('table')
       : catalogType === 'fileset'
-        ? 'fileset'
+        ? searchParams.get('fileset')
         : catalogType === 'messaging'
-          ? 'topic'
+          ? searchParams.get('topic')
           : catalogType === 'model'
-            ? 'model'
+            ? searchParams.get('model')
             : ''
-  )
   const paramsSize = [...searchParams.keys()].length
   const { ref, width } = useResizeObserver()
 
@@ -89,6 +94,9 @@ const RightContent = () => {
     } else {
       switch (catalogType) {
         case 'relational':
+          if (functionName) {
+            return <FunctionDetailsPage />
+          }
           return (
             <TableDetailsPage
               namespaces={{
@@ -220,7 +228,16 @@ const RightContent = () => {
           ...(entity
             ? [
                 {
-                  title: (
+                  title: functionName ? (
+                    <Link
+                      href={`/catalogs?metalake=${currentMetalake}&catalogType=${catalogType}&catalog=${decodeURIComponent(catalog)}&schema=${decodeURIComponent(schema)}`}
+                      title={entity}
+                      className='inline-block min-w-10 truncate'
+                      style={{ maxWidth: `calc((${width}px - 160px)/4)` }}
+                    >
+                      {decodeURIComponent(entity)}
+                    </Link>
+                  ) : (
                     <span
                       title={entity}
                       className='inline-block min-w-10 truncate'

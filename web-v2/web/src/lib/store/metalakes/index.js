@@ -77,6 +77,7 @@ import {
   updateVersionApi,
   deleteVersionApi
 } from '@/lib/api/models'
+import { getFunctionsApi } from '@/lib/api/functions'
 
 export const fetchMetalakes = createAsyncThunk('appMetalakes/fetchMetalakes', async (params, { getState }) => {
   const [err, res] = await to(getMetalakesApi())
@@ -247,92 +248,128 @@ export const setIntoTreeNodeWithFetch = createAsyncThunk(
         const loaded = loadedNodes.filter(key => !reloadedKeys.includes(key))
         dispatch(setLoadedNodes(loaded))
       }
-    } else if (pathArr.length === 4 && type === 'relational') {
-      const [err, res] = await to(getTablesApi({ metalake, catalog, schema }))
+    } else if (pathArr.length === 4) {
+      const [funcErr, funcRes] = await to(getFunctionsApi({ metalake, catalog, schema, details: false }))
 
-      if (err || !res) {
-        throw new Error(err)
+      if (funcErr || !funcRes) {
+        throw new Error(funcErr)
       }
 
-      const { identifiers = [] } = res || {}
-
-      result.data = identifiers.map(tableItem => {
+      const { identifiers: functionIdentifiers = [] } = funcRes || {}
+      const functions = functionIdentifiers.map(functionItem => {
+        const functionName = functionItem?.name || functionItem?.identifier?.name || functionItem
         return {
-          ...tableItem,
-          node: 'table',
-          id: `{{${metalake}}}{{${catalog}}}{{${type}}}{{${schema}}}{{${tableItem.name}}}`,
-          key: `{{${metalake}}}{{${catalog}}}{{${type}}}{{${schema}}}{{${tableItem.name}}}`,
-          path: `?${new URLSearchParams({ metalake, catalog, catalogType: type, schema, table: tableItem.name }).toString()}`,
-          name: tableItem.name,
-          title: tableItem.name,
+          ...functionItem,
+          node: 'function',
+          id: `{{${metalake}}}{{${catalog}}}{{${type}}}{{${schema}}}{{${functionName}}}`,
+          key: `{{${metalake}}}{{${catalog}}}{{${type}}}{{${schema}}}{{${functionName}}}`,
+          path: `?${new URLSearchParams({ metalake, catalog, catalogType: type, schema, function: functionName }).toString()}`,
+          name: functionName,
+          title: functionName,
           isLeaf: true,
-          columns: [],
           children: []
         }
       })
-    } else if (pathArr.length === 4 && type === 'fileset') {
-      const [err, res] = await to(getFilesetsApi({ metalake, catalog, schema }))
 
-      if (err || !res) {
-        throw new Error(err)
-      }
+      switch (type) {
+        case 'relational': {
+          const [tableErr, tableRes] = await to(getTablesApi({ metalake, catalog, schema }))
+          if (tableErr || !tableRes) {
+            throw new Error(tableErr)
+          }
 
-      const { identifiers = [] } = res || {}
+          const { identifiers: tableIdentifiers = [] } = tableRes || {}
+          const tables = tableIdentifiers.map(tableItem => {
+            return {
+              ...tableItem,
+              node: 'table',
+              id: `{{${metalake}}}{{${catalog}}}{{${type}}}{{${schema}}}{{${tableItem.name}}}`,
+              key: `{{${metalake}}}{{${catalog}}}{{${type}}}{{${schema}}}{{${tableItem.name}}}`,
+              path: `?${new URLSearchParams({ metalake, catalog, catalogType: type, schema, table: tableItem.name }).toString()}`,
+              name: tableItem.name,
+              title: tableItem.name,
+              isLeaf: true,
+              columns: [],
+              children: []
+            }
+          })
 
-      result.data = identifiers.map(filesetItem => {
-        return {
-          ...filesetItem,
-          node: 'fileset',
-          id: `{{${metalake}}}{{${catalog}}}{{${type}}}{{${schema}}}{{${filesetItem.name}}}`,
-          key: `{{${metalake}}}{{${catalog}}}{{${type}}}{{${schema}}}{{${filesetItem.name}}}`,
-          path: `?${new URLSearchParams({ metalake, catalog, catalogType: type, schema, fileset: filesetItem.name }).toString()}`,
-          name: filesetItem.name,
-          title: filesetItem.name,
-          isLeaf: true
+          result.data = [...tables, ...functions]
+          break
         }
-      })
-    } else if (pathArr.length === 4 && type === 'messaging') {
-      const [err, res] = await to(getTopicsApi({ metalake, catalog, schema }))
+        case 'fileset': {
+          const [filesetErr, filesetRes] = await to(getFilesetsApi({ metalake, catalog, schema }))
+          if (filesetErr || !filesetRes) {
+            throw new Error(filesetErr)
+          }
 
-      if (err || !res) {
-        throw new Error(err)
-      }
+          const { identifiers: filesetIdentifiers = [] } = filesetRes || {}
+          const filesets = filesetIdentifiers.map(filesetItem => {
+            return {
+              ...filesetItem,
+              node: 'fileset',
+              id: `{{${metalake}}}{{${catalog}}}{{${type}}}{{${schema}}}{{${filesetItem.name}}}`,
+              key: `{{${metalake}}}{{${catalog}}}{{${type}}}{{${schema}}}{{${filesetItem.name}}}`,
+              path: `?${new URLSearchParams({ metalake, catalog, catalogType: type, schema, fileset: filesetItem.name }).toString()}`,
+              name: filesetItem.name,
+              title: filesetItem.name,
+              isLeaf: true
+            }
+          })
 
-      const { identifiers = [] } = res || {}
-
-      result.data = identifiers.map(topicItem => {
-        return {
-          ...topicItem,
-          node: 'topic',
-          id: `{{${metalake}}}{{${catalog}}}{{${type}}}{{${schema}}}{{${topicItem.name}}}`,
-          key: `{{${metalake}}}{{${catalog}}}{{${type}}}{{${schema}}}{{${topicItem.name}}}`,
-          path: `?${new URLSearchParams({ metalake, catalog, catalogType: type, schema, topic: topicItem.name }).toString()}`,
-          name: topicItem.name,
-          title: topicItem.name,
-          isLeaf: true
+          result.data = [...filesets, ...functions]
+          break
         }
-      })
-    } else if (pathArr.length === 4 && type === 'model') {
-      const [err, res] = await to(getModelsApi({ metalake, catalog, schema }))
+        case 'messaging': {
+          const [topicErr, topicRes] = await to(getTopicsApi({ metalake, catalog, schema }))
+          if (topicErr || !topicRes) {
+            throw new Error(topicErr)
+          }
 
-      if (err || !res) {
-        throw new Error(err)
-      }
+          const { identifiers: topicIdentifiers = [] } = topicRes || {}
+          const topics = topicIdentifiers.map(topicItem => {
+            return {
+              ...topicItem,
+              node: 'topic',
+              id: `{{${metalake}}}{{${catalog}}}{{${type}}}{{${schema}}}{{${topicItem.name}}}`,
+              key: `{{${metalake}}}{{${catalog}}}{{${type}}}{{${schema}}}{{${topicItem.name}}}`,
+              path: `?${new URLSearchParams({ metalake, catalog, catalogType: type, schema, topic: topicItem.name }).toString()}`,
+              name: topicItem.name,
+              title: topicItem.name,
+              isLeaf: true
+            }
+          })
 
-      const { identifiers = [] } = res || {}
-
-      result.data = identifiers.map(modelItem => {
-        return {
-          ...modelItem,
-          node: 'model',
-          id: `{{${metalake}}}{{${catalog}}}{{${type}}}{{${schema}}}{{${modelItem.name}}}`,
-          key: `{{${metalake}}}{{${catalog}}}{{${type}}}{{${schema}}}{{${modelItem.name}}}`,
-          path: `?${new URLSearchParams({ metalake, catalog, catalogType: type, schema, model: modelItem.name }).toString()}`,
-          name: modelItem.name,
-          title: modelItem.name,
-          isLeaf: true
+          result.data = [...topics, ...functions]
+          break
         }
-      })
+        case 'model': {
+          const [modelErr, modelRes] = await to(getModelsApi({ metalake, catalog, schema }))
+          if (modelErr || !modelRes) {
+            throw new Error(modelErr)
+          }
+
+          const { identifiers: modelIdentifiers = [] } = modelRes || {}
+          const models = modelIdentifiers.map(modelItem => {
+            return {
+              ...modelItem,
+              node: 'model',
+              id: `{{${metalake}}}{{${catalog}}}{{${type}}}{{${schema}}}{{${modelItem.name}}}`,
+              key: `{{${metalake}}}{{${catalog}}}{{${type}}}{{${schema}}}{{${modelItem.name}}}`,
+              path: `?${new URLSearchParams({ metalake, catalog, catalogType: type, schema, model: modelItem.name }).toString()}`,
+              name: modelItem.name,
+              title: modelItem.name,
+              isLeaf: true
+            }
+          })
+
+          result.data = [...models, ...functions]
+          break
+        }
+        default:
+          result.data = functions
+          break
+      }
     }
 
     return result
@@ -1613,6 +1650,32 @@ export const deleteVersion = createAsyncThunk(
   }
 )
 
+export const fetchFunctions = createAsyncThunk(
+  'appMetalakes/fetchFunctions',
+  async ({ init, metalake, catalog, schema }, { dispatch }) => {
+    if (init) {
+      await dispatch(setTableLoading(true))
+    }
+
+    const [err, res] = await to(getFunctionsApi({ metalake, catalog, schema, details: true }))
+    await dispatch(setTableLoading(false))
+
+    if (init && (err || !res)) {
+      throw new Error(err)
+    }
+
+    const { functions = [], identifiers = [] } = res || {}
+    const normalized = (functions.length ? functions : identifiers).map(item => {
+      return {
+        ...item,
+        name: item?.name || item?.identifier?.name || item?.identifier || ''
+      }
+    })
+
+    return { functions: normalized, init }
+  }
+)
+
 export const appMetalakesSlice = createSlice({
   name: 'appMetalakes',
   initialState: {
@@ -1623,6 +1686,7 @@ export const appMetalakesSlice = createSlice({
     catalogs: [],
     schemas: [],
     tables: [],
+    functions: [],
     columns: [],
     filesets: [],
     topics: [],
@@ -1686,6 +1750,7 @@ export const appMetalakesSlice = createSlice({
       state.catalogs = []
       state.schemas = []
       state.tables = []
+      state.functions = []
       state.columns = []
       state.filesets = []
       state.topics = []
@@ -2099,6 +2164,14 @@ export const appMetalakesSlice = createSlice({
       }
     })
     builder.addCase(fetchModelVersions.rejected, (state, action) => {
+      if (!action.error.message.includes('CanceledError')) {
+        toast.error(action.error.message)
+      }
+    })
+    builder.addCase(fetchFunctions.fulfilled, (state, action) => {
+      state.functions = action.payload.functions
+    })
+    builder.addCase(fetchFunctions.rejected, (state, action) => {
       if (!action.error.message.includes('CanceledError')) {
         toast.error(action.error.message)
       }

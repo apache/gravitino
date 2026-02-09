@@ -292,6 +292,12 @@ export const TreeComponent = forwardRef(function TreeComponent(props, ref) {
             <Icons.iconify icon='mdi:globe-model' className='my-icon-small' />
           </span>
         )
+      case 'function':
+        return (
+          <span role='img' aria-label='frown' className='anticon anticon-frown'>
+            <Icons.iconify icon='material-symbols:function' className='my-icon-small' />
+          </span>
+        )
       default:
         return <></>
     }
