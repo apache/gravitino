@@ -24,6 +24,7 @@ import static org.apache.gravitino.rel.Column.DEFAULT_VALUE_NOT_SET;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
+import com.google.common.collect.ImmutableList;
 import java.sql.Connection;
 import java.sql.DatabaseMetaData;
 import java.sql.PreparedStatement;
@@ -165,7 +166,7 @@ public class ClickHouseTableOperations extends JdbcTableOperations {
 
     // Extract engine from properties
     ClickHouseTablePropertiesMetadata.ENGINE engine =
-        appendTableEngine(notNullProperties, sqlBuilder, onCluster);
+        appendTableEngine(notNullProperties, sqlBuilder, onCluster, columns);
 
     appendOrderBy(sortOrders, sqlBuilder, engine);
 
@@ -207,7 +208,8 @@ public class ClickHouseTableOperations extends JdbcTableOperations {
 
     if (onCluster) {
       sqlBuilder.append(
-          "CREATE TABLE %s ON CLUSTER `%s` (\n".formatted(quoteIdentifier(tableName), clusterName));
+          "CREATE TABLE %s ON CLUSTER %s (\n"
+              .formatted(quoteIdentifier(tableName), quoteIdentifier(clusterName)));
     } else {
       sqlBuilder.append("CREATE TABLE %s (\n".formatted(quoteIdentifier(tableName)));
     }
@@ -273,7 +275,10 @@ public class ClickHouseTableOperations extends JdbcTableOperations {
   }
 
   private ClickHouseTablePropertiesMetadata.ENGINE appendTableEngine(
-      Map<String, String> properties, StringBuilder sqlBuilder, boolean onCluster) {
+      Map<String, String> properties,
+      StringBuilder sqlBuilder,
+      boolean onCluster,
+      JdbcColumn[] columns) {
     ClickHouseTablePropertiesMetadata.ENGINE engine = ENGINE_PROPERTY_ENTRY.getDefaultValue();
     if (MapUtils.isNotEmpty(properties)) {
       String userSetEngine = properties.get(CLICKHOUSE_ENGINE_KEY);
@@ -303,9 +308,21 @@ public class ClickHouseTableOperations extends JdbcTableOperations {
       Preconditions.checkArgument(
           StringUtils.isNotBlank(remoteTable), "Remote table must be specified for Distributed");
 
-      // User must ensure the sharding key is a trusted value
       Preconditions.checkArgument(
           StringUtils.isNotBlank(shardingKey), "Sharding key must be specified for Distributed");
+
+      List<String> shardingColumns = extractShardingKeyColumns(shardingKey);
+      if (CollectionUtils.isNotEmpty(shardingColumns)) {
+        for (String columnName : shardingColumns) {
+          JdbcColumn shardingColumn = findColumn(columns, columnName);
+          Preconditions.checkArgument(
+              shardingColumn != null,
+              "Sharding key column %s must be defined in the table",
+              columnName);
+        }
+      }
+
+      String sanitizedShardingKey = formatShardingKey(shardingKey);
 
       sqlBuilder.append(
           "\n ENGINE = %s(`%s`,`%s`,`%s`,%s)"
@@ -314,7 +331,7 @@ public class ClickHouseTableOperations extends JdbcTableOperations {
                   clusterName,
                   remoteDatabase,
                   remoteTable,
-                  shardingKey));
+                  sanitizedShardingKey));
       return engine;
     }
 
@@ -342,6 +359,48 @@ public class ClickHouseTableOperations extends JdbcTableOperations {
             ? partitionExprs.get(0)
             : "tuple(" + String.join(", ", partitionExprs) + ")";
     sqlBuilder.append("\n PARTITION BY ").append(partitionExpr);
+  }
+
+  private JdbcColumn findColumn(JdbcColumn[] columns, String columnName) {
+    if (ArrayUtils.isEmpty(columns)) {
+      return null;
+    }
+
+    return Arrays.stream(columns)
+        .filter(column -> StringUtils.equals(column.name(), columnName))
+        .findFirst()
+        .orElse(null);
+  }
+
+  private List<String> extractShardingKeyColumns(String shardingKey) {
+    String normalized = normalizeIndexExpression(shardingKey);
+    if (StringUtils.isBlank(normalized)) {
+      return Collections.emptyList();
+    }
+
+    String[] parts = normalized.split(",");
+    List<String> columns = new ArrayList<>();
+    for (String part : parts) {
+      String column = normalizeIdentifier(part);
+      Preconditions.checkArgument(
+          isSimpleIdentifier(column), "Sharding key contains unsupported expression: %s", part);
+      columns.add(column);
+    }
+
+    return ImmutableList.copyOf(columns);
+  }
+
+  private String formatShardingKey(String shardingKey) {
+    String trimmed = StringUtils.trim(shardingKey);
+    if (StringUtils.isBlank(trimmed)) {
+      return trimmed;
+    }
+
+    String normalized = normalizeIdentifier(trimmed);
+    if (isSimpleIdentifier(normalized)) {
+      return quoteIdentifier(normalized);
+    }
+    return trimmed;
   }
 
   private String toPartitionExpression(Transform transform) {
@@ -485,7 +544,7 @@ public class ClickHouseTableOperations extends JdbcTableOperations {
           String partitionKey = resultSet.getString("partition_key");
           try {
             return parsePartitioning(partitionKey);
-          } catch (IllegalArgumentException e) {
+          } catch (IllegalArgumentException | UnsupportedOperationException e) {
             LOG.warn(
                 "Skip unsupported partition expression {} for {}.{}",
                 partitionKey,
@@ -907,15 +966,23 @@ public class ClickHouseTableOperations extends JdbcTableOperations {
     // for other functions, we do not support it now
     if (trimmedExpression.contains("(") && trimmedExpression.contains(")")) {
       throw new UnsupportedOperationException(
-          "Currently Gravitino only supports toYYYY, toYYYYMM, toDate partition expressions, but got: "
+          "Currently Gravitino only supports toYear, toYYYYMM, toDate partition expressions, but got: "
               + trimmedExpression);
     }
 
     String identifier = normalizeIdentifier(trimmedExpression);
+
+    // Should check whether it's a simple identifier `ts` not `ts + 1`
     Preconditions.checkArgument(
-        StringUtils.isNotBlank(identifier) && !StringUtils.containsAny(identifier, "(", ")", " "),
-        "Unsupported partition expression: " + originalPartitionKey);
+        isSimpleIdentifier(identifier),
+        "Only simple identifier is supported for partition expression, but got: "
+            + originalPartitionKey);
     return Transforms.identity(identifier);
+  }
+
+  private boolean isSimpleIdentifier(String identifier) {
+    if (StringUtils.isBlank(identifier)) return false;
+    return identifier.matches("^[a-zA-Z_][a-zA-Z0-9_]*$");
   }
 
   private String normalizePartitionKey(String partitionKey) {
@@ -984,11 +1051,6 @@ public class ClickHouseTableOperations extends JdbcTableOperations {
     }
 
     return trimmed;
-  }
-
-  private boolean isSimpleIdentifier(String identifier) {
-    return StringUtils.isNotBlank(identifier)
-        && !StringUtils.containsAny(identifier, "(", ")", " ", "%", "+", "-", "*", "/");
   }
 
   private List<Index> getSecondaryIndexes(
