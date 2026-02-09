@@ -26,6 +26,12 @@ import com.lancedb.lance.namespace.LanceNamespace;
 import com.lancedb.lance.namespace.LanceNamespaceException;
 import com.lancedb.lance.namespace.LanceNamespaces;
 import com.lancedb.lance.namespace.client.apache.ApiException;
+import com.lancedb.lance.namespace.client.apache.api.TableApi;
+import com.lancedb.lance.namespace.model.AlterTableAlterColumnsRequest;
+import com.lancedb.lance.namespace.model.AlterTableAlterColumnsResponse;
+import com.lancedb.lance.namespace.model.AlterTableDropColumnsRequest;
+import com.lancedb.lance.namespace.model.AlterTableDropColumnsResponse;
+import com.lancedb.lance.namespace.model.ColumnAlteration;
 import com.lancedb.lance.namespace.model.CreateEmptyTableRequest;
 import com.lancedb.lance.namespace.model.CreateEmptyTableResponse;
 import com.lancedb.lance.namespace.model.CreateNamespaceRequest;
@@ -51,6 +57,7 @@ import com.lancedb.lance.namespace.model.RegisterTableRequest;
 import com.lancedb.lance.namespace.model.RegisterTableRequest.ModeEnum;
 import com.lancedb.lance.namespace.model.RegisterTableResponse;
 import com.lancedb.lance.namespace.model.TableExistsRequest;
+import com.lancedb.lance.namespace.rest.RestNamespace;
 import com.lancedb.lance.namespace.rest.RestNamespaceConfig;
 import java.io.File;
 import java.io.IOException;
@@ -69,6 +76,7 @@ import org.apache.arrow.memory.RootAllocator;
 import org.apache.arrow.vector.types.pojo.ArrowType;
 import org.apache.arrow.vector.types.pojo.Field;
 import org.apache.commons.io.FileUtils;
+import org.apache.commons.lang3.reflect.FieldUtils;
 import org.apache.gravitino.Catalog;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Schema;
@@ -472,7 +480,7 @@ public class LanceRESTServiceIT extends BaseIT {
   }
 
   @Test
-  void testCreateTable() throws IOException, ApiException {
+  void testCreateTable() throws IOException, ApiException, IllegalAccessException {
     catalog = createCatalog(CATALOG_NAME);
     createSchema();
 
@@ -599,6 +607,100 @@ public class LanceRESTServiceIT extends BaseIT {
     Set<String> stringSet = listResponse.getTables();
     Assertions.assertEquals(1, stringSet.size());
     Assertions.assertTrue(stringSet.contains(Joiner.on(".").join(ids)));
+
+    // Now try to drop columns in the table
+    AlterTableDropColumnsRequest dropColumnsRequest = new AlterTableDropColumnsRequest();
+    dropColumnsRequest.setId(List.of(CATALOG_NAME, SCHEMA_NAME, "table"));
+    dropColumnsRequest.setColumns(List.of("value"));
+
+    // No alterTableDropColumns in Namespace interface, so we need to get TableApi via reflection
+    RestNamespace restNamespace = (RestNamespace) ns;
+    TableApi tableApi = (TableApi) FieldUtils.readField(restNamespace, "tableApi", true);
+    String delimiter = RestNamespaceConfig.DELIMITER_DEFAULT;
+
+    AlterTableDropColumnsResponse alterTableDropColumnsResponse =
+        Assertions.assertDoesNotThrow(
+            () ->
+                tableApi.alterTableDropColumns(
+                    String.join(delimiter, ids), dropColumnsRequest, delimiter));
+    Assertions.assertNotNull(alterTableDropColumnsResponse);
+    Assertions.assertNotNull(alterTableDropColumnsResponse.getVersion());
+
+    describeTableRequest.setId(ids);
+    loadTable = ns.describeTable(describeTableRequest);
+    Assertions.assertNotNull(loadTable);
+    Assertions.assertEquals(newLocation, loadTable.getLocation());
+
+    jsonArrowFields = loadTable.getSchema().getFields();
+    Assertions.assertEquals(1, jsonArrowFields.size());
+    JsonArrowField jsonArrowField = jsonArrowFields.get(0);
+    Assertions.assertEquals("id", jsonArrowField.getName());
+    Assertions.assertEquals("int32", jsonArrowField.getType().getType());
+
+    // Drop a non-existing column should fail
+    AlterTableDropColumnsRequest dropNonExistingColumnsRequest = new AlterTableDropColumnsRequest();
+    dropNonExistingColumnsRequest.setId(ids);
+    dropNonExistingColumnsRequest.setColumns(List.of("non_existing_column"));
+    Exception dropColumnException =
+        Assertions.assertThrows(
+            Exception.class,
+            () ->
+                tableApi.alterTableDropColumns(
+                    String.join(delimiter, ids), dropNonExistingColumnsRequest, delimiter));
+    Assertions.assertTrue(
+        dropColumnException
+            .getMessage()
+            .contains("Column non_existing_column does not exist in the dataset"));
+  }
+
+  @Test
+  void testAlterColumns() throws Exception {
+    catalog = createCatalog(CATALOG_NAME);
+    createSchema();
+
+    String location = tempDir + "/" + "alter_columns/";
+    List<String> ids = List.of(CATALOG_NAME, SCHEMA_NAME, "alter_columns_table");
+    org.apache.arrow.vector.types.pojo.Schema schema =
+        new org.apache.arrow.vector.types.pojo.Schema(
+            Arrays.asList(
+                Field.nullable("id", new ArrowType.Int(32, true)),
+                Field.nullable("value", new ArrowType.Utf8())));
+    byte[] body = ArrowUtils.generateIpcStream(schema);
+
+    CreateTableRequest request = new CreateTableRequest();
+    request.setId(ids);
+    request.setLocation(location);
+    request.setProperties(ImmutableMap.of("key1", "v1"));
+    ns.createTable(request, body);
+
+    RestNamespace restNamespace = (RestNamespace) ns;
+    TableApi tableApi = (TableApi) FieldUtils.readField(restNamespace, "tableApi", true);
+    String delimiter = RestNamespaceConfig.DELIMITER_DEFAULT;
+
+    AlterTableAlterColumnsRequest alterRequest = new AlterTableAlterColumnsRequest();
+    alterRequest.setId(ids);
+    ColumnAlteration columnAlteration = new ColumnAlteration();
+    columnAlteration.setColumn("value");
+    columnAlteration.setRename("value_new");
+    alterRequest.setAlterations(List.of(columnAlteration));
+
+    AlterTableAlterColumnsResponse response =
+        Assertions.assertDoesNotThrow(
+            () ->
+                tableApi.alterTableAlterColumns(
+                    String.join(delimiter, ids), alterRequest, delimiter));
+    Assertions.assertNotNull(response);
+    Assertions.assertNotNull(response.getVersion());
+
+    DescribeTableRequest describeTableRequest = new DescribeTableRequest();
+    describeTableRequest.setId(ids);
+    DescribeTableResponse loadTable = ns.describeTable(describeTableRequest);
+    Assertions.assertNotNull(loadTable);
+
+    List<JsonArrowField> jsonArrowFields = loadTable.getSchema().getFields();
+    Assertions.assertEquals(2, jsonArrowFields.size());
+    Assertions.assertEquals("id", jsonArrowFields.get(0).getName());
+    Assertions.assertEquals("value_new", jsonArrowFields.get(1).getName());
   }
 
   @Test
