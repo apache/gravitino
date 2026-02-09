@@ -55,6 +55,8 @@ dependencies {
   testImplementation(libs.junit.jupiter.params)
   testImplementation(libs.lz4.java)
   testImplementation(libs.mockito.core)
+  testImplementation(libs.mysql.driver)
+  testImplementation(libs.postgresql.driver)
   testImplementation(libs.testcontainers)
   testImplementation(libs.testcontainers.clickhouse)
 

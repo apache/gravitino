@@ -30,11 +30,15 @@ import java.io.Closeable;
 import java.io.IOException;
 import java.net.InetAddress;
 import java.nio.ByteBuffer;
+import java.nio.file.Files;
+import java.nio.file.Paths;
+import java.nio.file.attribute.PosixFilePermission;
 import java.util.EnumMap;
 import java.util.List;
 import java.util.Map;
 import java.util.NoSuchElementException;
 import java.util.Objects;
+import java.util.Set;
 import org.apache.gravitino.integration.test.util.CloseableGroup;
 import org.apache.gravitino.integration.test.util.TestDatabaseName;
 import org.slf4j.Logger;
@@ -73,6 +77,8 @@ public class ContainerSuite implements Closeable {
       new EnumMap<>(PGImageName.class);
   private static volatile OceanBaseContainer oceanBaseContainer;
   private static volatile ClickHouseContainer clickHouseContainer;
+  private static volatile ClickHouseContainer clickHouseClusterContainer;
+  private static volatile ZooKeeperContainer zooKeeperContainer;
 
   private static volatile GravitinoLocalStackContainer gravitinoLocalStackContainer;
 
@@ -534,8 +540,94 @@ public class ContainerSuite implements Closeable {
     }
   }
 
+  public void startClickHouseClusterContainer(
+      TestDatabaseName testDatabaseName, String remoteServersTemplatePath) {
+    if (clickHouseClusterContainer == null) {
+      synchronized (ContainerSuite.class) {
+        if (clickHouseClusterContainer == null) {
+          initIfNecessary();
+          startZooKeeperContainer();
+          String zkHost = zooKeeperContainer.getContainerIpAddress();
+          String resolvedConfigPath = prepareRemoteServersConfig(remoteServersTemplatePath, zkHost);
+          ClickHouseContainer.Builder clickHouseBuilder =
+              ClickHouseContainer.builder()
+                  .withHostName("gravitino-ci-clickhouse-cluster")
+                  .withEnvVars(
+                      ImmutableMap.<String, String>builder()
+                          .put("CLICKHOUSE_PASSWORD", ClickHouseContainer.PASSWORD)
+                          .build())
+                  .withRemoteServersConfig(resolvedConfigPath)
+                  .withExposePorts(
+                      ImmutableSet.of(
+                          ClickHouseContainer.CLICKHOUSE_PORT,
+                          ClickHouseContainer.CLICKHOUSE_NATIVE_PORT))
+                  .withNetwork(network);
+
+          ClickHouseContainer container = closer.register(clickHouseBuilder.build());
+          container.start();
+          clickHouseClusterContainer = container;
+        }
+      }
+    }
+    synchronized (ClickHouseContainer.class) {
+      clickHouseClusterContainer.createDatabaseOnCluster(
+          testDatabaseName, ClickHouseContainer.DEFAULT_CLUSTER_NAME);
+    }
+  }
+
+  private String prepareRemoteServersConfig(String templatePath, String zkHost) {
+    try {
+      String content =
+          new String(
+              Files.readAllBytes(Paths.get(templatePath)), java.nio.charset.StandardCharsets.UTF_8);
+      String replaced =
+          content
+              .replace("${ZOOKEEPER_HOST}", zkHost)
+              .replace("${ZOOKEEPER_PORT}", String.valueOf(ZooKeeperContainer.ZK_PORT));
+      java.nio.file.Path tempFile = Files.createTempFile("remote_servers", ".xml").toAbsolutePath();
+      Files.writeString(tempFile, replaced);
+      // Change the access mode of temFile to 644
+      Files.setPosixFilePermissions(
+          tempFile,
+          Set.of(
+              PosixFilePermission.OWNER_READ,
+              PosixFilePermission.OWNER_WRITE,
+              PosixFilePermission.GROUP_READ,
+              PosixFilePermission.OTHERS_READ));
+      return tempFile.toString();
+    } catch (IOException e) {
+      throw new RuntimeException("Failed to prepare remote_servers.xml", e);
+    }
+  }
+
+  public void startZooKeeperContainer() {
+    if (zooKeeperContainer == null) {
+      synchronized (ContainerSuite.class) {
+        if (zooKeeperContainer == null) {
+          initIfNecessary();
+          ZooKeeperContainer.Builder zkBuilder =
+              ZooKeeperContainer.builder()
+                  .withHostName(ZooKeeperContainer.HOST_NAME)
+                  .withExposePorts(ImmutableSet.of(ZooKeeperContainer.ZK_PORT))
+                  .withNetwork(network);
+          ZooKeeperContainer container = closer.register(zkBuilder.build());
+          container.start();
+          zooKeeperContainer = container;
+        }
+      }
+    }
+  }
+
   public ClickHouseContainer getClickHouseContainer() {
     return clickHouseContainer;
+  }
+
+  public ClickHouseContainer getClickHouseClusterContainer() {
+    return clickHouseClusterContainer;
+  }
+
+  public ZooKeeperContainer getZooKeeperContainer() {
+    return zooKeeperContainer;
   }
 
   public GravitinoLocalStackContainer getLocalStackContainer() {

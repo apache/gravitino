@@ -963,7 +963,7 @@ public class TestClickHouseTableOperations extends TestClickHouse {
     logEngineProps.put(
         TableConstants.ENGINE_UPPER, ClickHouseTablePropertiesMetadata.ENGINE.LOG.getValue());
     Assertions.assertThrows(
-        UnsupportedOperationException.class,
+        IllegalArgumentException.class,
         () ->
             ops.buildCreateSql(
                 "t1",
@@ -974,8 +974,7 @@ public class TestClickHouseTableOperations extends TestClickHouse {
                 Distributions.NONE,
                 indexes,
                 null));
-    Assertions.assertThrows(
-        UnsupportedOperationException.class,
+    Assertions.assertDoesNotThrow(
         () ->
             ops.buildCreateSql(
                 "t1",

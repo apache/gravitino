@@ -284,7 +284,7 @@ public class ClickHouseTableOperations extends JdbcTableOperations {
       Map<String, String> properties, StringBuilder sqlBuilder, boolean onCluster) {
     ClickHouseTablePropertiesMetadata.ENGINE engine = ENGINE_PROPERTY_ENTRY.getDefaultValue();
     if (MapUtils.isNotEmpty(properties)) {
-      String userSetEngine = properties.get(CLICKHOUSE_ENGINE_KEY);
+      String userSetEngine = properties.get(GRAVITINO_ENGINE_KEY);
       if (StringUtils.isNotEmpty(userSetEngine)) {
         engine = ClickHouseTablePropertiesMetadata.ENGINE.fromString(userSetEngine);
       }
@@ -311,7 +311,11 @@ public class ClickHouseTableOperations extends JdbcTableOperations {
       Preconditions.checkArgument(
           StringUtils.isNotBlank(remoteTable), "Remote table must be specified for Distributed");
 
-      // User must ensure the sharding key is a trusted value
+      // User must ensure the sharding key is a trusted value.
+      // TODO(yuqi) WE need to check the columns in shard keys should be integer and not nullable,
+      //  as clickhouse distributed table requires the sharding key to be integer and not nullable.
+      //  We can add this validation after we support user defined sharding key in index, as we can
+      //  reuse the index field definition for validation.
       Preconditions.checkArgument(
           StringUtils.isNotBlank(shardingKey), "Sharding key must be specified for Distributed");
 
