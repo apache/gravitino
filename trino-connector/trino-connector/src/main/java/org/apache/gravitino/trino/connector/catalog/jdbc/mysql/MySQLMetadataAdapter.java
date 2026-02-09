@@ -172,7 +172,7 @@ public class MySQLMetadataAdapter extends CatalogConnectorMetadataAdapter {
                 primaryKeyColumn, TABLE_PRIMARY_KEY));
       }
     }
-    return Indexes.createMysqlPrimaryKey(convertIndexFieldNames(primaryKeys));
+    return Indexes.createMysqlPrimaryKey(convertIndexFieldNames(primaryKeys), Map.of());
   }
 
   private static List<Index> convertUniqueKey(
@@ -189,7 +189,7 @@ public class MySQLMetadataAdapter extends CatalogConnectorMetadataAdapter {
                   uniqueKeyColumn, TABLE_UNIQUE_KEY));
         }
       }
-      builder.add(Indexes.unique(uniqueKey, convertIndexFieldNames(uniqueKeyColumns)));
+      builder.add(Indexes.unique(uniqueKey, convertIndexFieldNames(uniqueKeyColumns), Map.of()));
     }
     return builder.build();
   }

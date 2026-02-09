@@ -1204,7 +1204,7 @@ public class TrinoConnectorIT extends BaseIT {
             Distributions.NONE,
             new SortOrder[0],
             new Index[] {
-              Indexes.createMysqlPrimaryKey(new String[][] {new String[] {"IntegerType"}})
+              Indexes.createMysqlPrimaryKey(new String[][] {new String[] {"IntegerType"}}, Map.of())
             });
     sql = String.format("show create table %s.%s.%s", catalogName, schemaName, tableName);
 

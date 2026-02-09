@@ -959,7 +959,8 @@ public class DTOConverters {
    * @return The index.
    */
   public static Index fromDTO(IndexDTO indexDTO) {
-    return Indexes.of(indexDTO.type(), indexDTO.name(), indexDTO.fieldNames());
+    return Indexes.of(
+        indexDTO.type(), indexDTO.name(), indexDTO.fieldNames(), indexDTO.properties());
   }
 
   /**

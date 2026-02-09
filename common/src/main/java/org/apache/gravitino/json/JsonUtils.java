@@ -1473,6 +1473,8 @@ public class JsonUtils {
       }
       gen.writeFieldName(INDEX_FIELD_NAMES);
       gen.writeObject(value.fieldNames());
+      gen.writeFieldName("properties");
+      gen.writeObject(value.properties());
       gen.writeEndObject();
     }
   }

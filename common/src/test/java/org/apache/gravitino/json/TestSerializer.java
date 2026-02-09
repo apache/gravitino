@@ -20,6 +20,7 @@
 package org.apache.gravitino.json;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
+import java.util.Map;
 import org.apache.gravitino.dto.rel.DistributionDTO;
 import org.apache.gravitino.dto.rel.SortOrderDTO;
 import org.apache.gravitino.dto.rel.expressions.LiteralDTO;
@@ -116,11 +117,13 @@ public class TestSerializer {
   void testIndexImplSerializer() throws JsonProcessingException {
     IndexImpl index =
         (IndexImpl)
-            Indexes.of(IndexType.PRIMARY_KEY, "index_1", new String[][] {new String[] {"col1"}});
+            Indexes.of(
+                IndexType.PRIMARY_KEY, "index_1", new String[][] {new String[] {"col1"}}, Map.of());
 
     String actualJson = JsonUtils.anyFieldMapper().writeValueAsString((DTOConverters.toDTO(index)));
     String expectedJson =
-        "{\"indexType\":\"PRIMARY_KEY\",\"name\":\"index_1\"," + "\"fieldNames\":[[\"col1\"]]}";
+        "{\"indexType\":\"PRIMARY_KEY\",\"name\":\"index_1\","
+            + "\"fieldNames\":[[\"col1\"]],\"properties\":{}}";
     Assertions.assertEquals(expectedJson, actualJson);
     IndexDTO deserialized = JsonUtils.anyFieldMapper().readValue(actualJson, IndexDTO.class);
     Assertions.assertEquals(index, DTOConverters.fromDTO(deserialized));
@@ -130,11 +133,12 @@ public class TestSerializer {
             Indexes.of(
                 IndexType.UNIQUE_KEY,
                 "index_2",
-                new String[][] {new String[] {"col1"}, new String[] {"col2"}});
+                new String[][] {new String[] {"col1"}, new String[] {"col2"}},
+                Map.of());
     actualJson = JsonUtils.anyFieldMapper().writeValueAsString(index);
     expectedJson =
         "{\"indexType\":\"unique_key\",\"name\":\"index_2\","
-            + "\"fieldNames\":[[\"col1\"],[\"col2\"]]}";
+            + "\"fieldNames\":[[\"col1\"],[\"col2\"]],\"properties\":{}}";
     Assertions.assertEquals(expectedJson, actualJson);
   }
 

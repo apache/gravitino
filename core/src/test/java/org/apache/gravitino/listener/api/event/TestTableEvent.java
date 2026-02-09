@@ -325,7 +325,7 @@ public class TestTableEvent {
     when(table.distribution())
         .thenReturn(Distributions.of(Strategy.HASH, 10, NamedReference.field("a")));
     when(table.index())
-        .thenReturn(new Index[] {Indexes.primary("p", new String[][] {{"a"}, {"b"}})});
+        .thenReturn(new Index[] {Indexes.primary("p", new String[][] {{"a"}, {"b"}}, Map.of())});
     when(table.sortOrder())
         .thenReturn(new SortOrder[] {SortOrders.ascending(NamedReference.field("a"))});
     when(table.partitioning()).thenReturn(new Transform[] {Transforms.identity("a")});

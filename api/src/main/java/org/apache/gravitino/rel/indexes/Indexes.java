@@ -21,6 +21,7 @@ package org.apache.gravitino.rel.indexes;
 import com.google.common.base.Objects;
 import java.util.Arrays;
 import java.util.Map;
+import org.apache.gravitino.rel.indexes.Index.IndexType;
 
 /** Helper methods to create index to pass into Apache Gravitino. */
 public class Indexes {
@@ -39,6 +40,7 @@ public class Indexes {
    *
    * @param name The name of the index
    * @param fieldNames The field names under the table contained in the index.
+   * @param properties Extra properties for index configuration
    * @return The unique index
    */
   public static Index unique(String name, String[][] fieldNames, Map<String, String> properties) {
@@ -48,6 +50,7 @@ public class Indexes {
   /**
    * To create a MySQL primary key, you need to use the default primary key name.
    *
+   * @param properties Extra properties for index configuration
    * @param fieldNames The field names under the table contained in the index.
    * @return The primary key index
    */
@@ -60,10 +63,20 @@ public class Indexes {
    *
    * @param name The name of the index
    * @param fieldNames The field names under the table contained in the index.
+   * @param properties Extra properties for index configuration
    * @return The primary index
    */
   public static Index primary(String name, String[][] fieldNames, Map<String, String> properties) {
     return of(Index.IndexType.PRIMARY_KEY, name, fieldNames, properties);
+  }
+  /**
+   * @param indexType The type of the index
+   * @param name The name of the index
+   * @param fieldNames The field names under the table contained in the index.
+   * @return An {@link Index} instance with empty properties
+   */
+  public static Index of(IndexType indexType, String name, String[][] fieldNames) {
+    return of(indexType, name, fieldNames, Map.of());
   }
 
   /**

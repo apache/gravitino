@@ -859,7 +859,7 @@ tableCatalog.createTable(
   new Transform[] {Transforms.identity("id")},
   Distributions.of(Strategy.HASH, 32, NamedReference.field("id")),
   new SortOrder[] {SortOrders.ascending(NamedReference.field("name"))},
-  new Index[] {Indexes.of(IndexType.PRIMARY_KEY, "PRIMARY", new String[][]{{"id"}})}
+  new Index[] {Indexes.of(IndexType.PRIMARY_KEY, "PRIMARY", new String[][]{{"id"}}, Map.of())}
 );
 ```
 

@@ -332,7 +332,8 @@ public class CatalogDorisIT extends BaseIT {
 
     Index[] indexes =
         new Index[] {
-          Indexes.of(Index.IndexType.PRIMARY_KEY, "k1_index", new String[][] {{DORIS_COL_NAME1}})
+          Indexes.of(
+              Index.IndexType.PRIMARY_KEY, "k1_index", new String[][] {{DORIS_COL_NAME1}}, Map.of())
         };
 
     Map<String, String> properties = createTableProperties();
@@ -382,7 +383,7 @@ public class CatalogDorisIT extends BaseIT {
     String t1_name = table_name + "`; DROP TABLE important_table; -- ";
     Column t1_col = Column.of(t1_name, Types.LongType.get(), "id", false, false, null);
     Column[] columns = {t1_col};
-    Index[] t1_indexes = {Indexes.unique("u1_key", new String[][] {{t1_name}})};
+    Index[] t1_indexes = {Indexes.unique("u1_key", new String[][] {{t1_name}}, Map.of())};
     NameIdentifier tableIdentifier =
         NameIdentifier.of(metalakeName, catalogName, schemaName, t1_name);
 
@@ -403,7 +404,7 @@ public class CatalogDorisIT extends BaseIT {
 
     String t2_name = table_name + "`; SLEEP(10); -- ";
     Column t2_col = Column.of(t2_name, Types.LongType.get(), "id", false, false, null);
-    Index[] t2_indexes = {Indexes.unique("u2_key", new String[][] {{t2_name}})};
+    Index[] t2_indexes = {Indexes.unique("u2_key", new String[][] {{t2_name}}, Map.of())};
     Column[] columns2 = new Column[] {t2_col};
     NameIdentifier tableIdentifier2 =
         NameIdentifier.of(metalakeName, catalogName, schemaName, t2_name);
@@ -426,7 +427,7 @@ public class CatalogDorisIT extends BaseIT {
     String t3_name =
         table_name + "`; UPDATE Users SET password = 'newpassword' WHERE username = 'admin'; -- ";
     Column t3_col = Column.of(t3_name, Types.LongType.get(), "id", false, false, null);
-    Index[] t3_indexes = {Indexes.unique("u3_key", new String[][] {{t3_name}})};
+    Index[] t3_indexes = {Indexes.unique("u3_key", new String[][] {{t3_name}}, Map.of())};
     Column[] columns3 = new Column[] {t3_col};
     NameIdentifier tableIdentifier3 =
         NameIdentifier.of(metalakeName, catalogName, schemaName, t3_name);
@@ -448,7 +449,7 @@ public class CatalogDorisIT extends BaseIT {
 
     String invalidInput = StringUtils.repeat("a", 65);
     Column t4_col = Column.of(invalidInput, Types.LongType.get(), "id", false, false, null);
-    Index[] t4_indexes = {Indexes.unique("u4_key", new String[][] {{invalidInput}})};
+    Index[] t4_indexes = {Indexes.unique("u4_key", new String[][] {{invalidInput}}, Map.of())};
     Column[] columns4 = new Column[] {t4_col};
     NameIdentifier tableIdentifier4 =
         NameIdentifier.of(metalakeName, catalogName, schemaName, invalidInput);
@@ -500,7 +501,8 @@ public class CatalogDorisIT extends BaseIT {
 
     Index[] indexes =
         new Index[] {
-          Indexes.of(Index.IndexType.PRIMARY_KEY, "k1_index", new String[][] {{DORIS_COL_NAME1}})
+          Indexes.of(
+              Index.IndexType.PRIMARY_KEY, "k1_index", new String[][] {{DORIS_COL_NAME1}}, Map.of())
         };
 
     Map<String, String> properties = createTableProperties();
@@ -662,7 +664,8 @@ public class CatalogDorisIT extends BaseIT {
     Distribution distribution = createDistribution();
     Index[] indexes =
         new Index[] {
-          Indexes.of(Index.IndexType.PRIMARY_KEY, "k1_index", new String[][] {{DORIS_COL_NAME1}})
+          Indexes.of(
+              Index.IndexType.PRIMARY_KEY, "k1_index", new String[][] {{DORIS_COL_NAME1}}, Map.of())
         };
     Map<String, String> properties = createTableProperties();
     Transform[] partitioning = {Transforms.list(new String[][] {{DORIS_COL_NAME1}})};
@@ -769,7 +772,8 @@ public class CatalogDorisIT extends BaseIT {
     Distribution distribution = createDistribution();
     Index[] indexes =
         new Index[] {
-          Indexes.of(Index.IndexType.PRIMARY_KEY, "k1_index", new String[][] {{DORIS_COL_NAME1}})
+          Indexes.of(
+              Index.IndexType.PRIMARY_KEY, "k1_index", new String[][] {{DORIS_COL_NAME1}}, Map.of())
         };
     Map<String, String> properties = createTableProperties();
     Literal todayLiteral = Literals.of("2024-07-24", Types.DateType.get());
@@ -894,7 +898,8 @@ public class CatalogDorisIT extends BaseIT {
     Distribution distribution = createDistribution();
     Index[] indexes =
         new Index[] {
-          Indexes.of(Index.IndexType.PRIMARY_KEY, "k1_index", new String[][] {{DORIS_COL_NAME1}})
+          Indexes.of(
+              Index.IndexType.PRIMARY_KEY, "k1_index", new String[][] {{DORIS_COL_NAME1}}, Map.of())
         };
     Map<String, String> properties = createTableProperties();
     TableCatalog tableCatalog = catalog.asTableCatalog();
@@ -1110,7 +1115,8 @@ public class CatalogDorisIT extends BaseIT {
 
     Index[] indexes =
         new Index[] {
-          Indexes.of(Index.IndexType.PRIMARY_KEY, "k1_index", new String[][] {{DORIS_COL_NAME1}})
+          Indexes.of(
+              Index.IndexType.PRIMARY_KEY, "k1_index", new String[][] {{DORIS_COL_NAME1}}, Map.of())
         };
 
     Map<String, String> properties = createTableProperties();

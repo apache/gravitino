@@ -213,7 +213,10 @@ public class CapabilityHelpers {
 
   private static Index applyCapabilities(Index index, Capability capabilities) {
     return Indexes.of(
-        index.type(), index.name(), applyCapabilities(index.fieldNames(), capabilities));
+        index.type(),
+        index.name(),
+        applyCapabilities(index.fieldNames(), capabilities),
+        index.properties());
   }
 
   private static String[][] applyCapabilities(String[][] fieldNames, Capability capabilities) {

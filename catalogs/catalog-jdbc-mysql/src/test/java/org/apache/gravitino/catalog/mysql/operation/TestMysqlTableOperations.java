@@ -90,7 +90,8 @@ public class TestMysqlTableOperations extends TestMysql {
     Map<String, String> properties = new HashMap<>();
     properties.put(MYSQL_AUTO_INCREMENT_OFFSET_KEY, "10");
 
-    Index[] indexes = new Index[] {Indexes.unique("test", new String[][] {{"col_1"}, {"col_2"}})};
+    Index[] indexes =
+        new Index[] {Indexes.unique("test", new String[][] {{"col_1"}, {"col_2"}}, Map.of())};
     // create table
     TABLE_OPERATIONS.create(
         TEST_DB_NAME.toString(),
@@ -231,8 +232,8 @@ public class TestMysqlTableOperations extends TestMysql {
 
     Index[] indexes =
         new Index[] {
-          Indexes.createMysqlPrimaryKey(new String[][] {{"col_1"}, {"col_2"}}),
-          Indexes.unique("uk_2", new String[][] {{"col_1"}, {"col_2"}})
+          Indexes.createMysqlPrimaryKey(new String[][] {{"col_1"}, {"col_2"}}, Map.of()),
+          Indexes.unique("uk_2", new String[][] {{"col_1"}, {"col_2"}}, Map.of())
         };
     // create table
     TABLE_OPERATIONS.create(
@@ -496,8 +497,8 @@ public class TestMysqlTableOperations extends TestMysql {
 
     Index[] indexes =
         new Index[] {
-          Indexes.createMysqlPrimaryKey(new String[][] {{"col_2"}}),
-          Indexes.unique("uk_col_4", new String[][] {{"col_4"}})
+          Indexes.createMysqlPrimaryKey(new String[][] {{"col_2"}}, Map.of()),
+          Indexes.unique("uk_col_4", new String[][] {{"col_4"}}, Map.of())
         };
     // create table
     TABLE_OPERATIONS.create(
@@ -581,8 +582,8 @@ public class TestMysqlTableOperations extends TestMysql {
 
     Index[] indexes =
         new Index[] {
-          Indexes.createMysqlPrimaryKey(new String[][] {{"col_2"}}),
-          Indexes.unique("uk_col_4", new String[][] {{"col_4"}})
+          Indexes.createMysqlPrimaryKey(new String[][] {{"col_2"}}, Map.of()),
+          Indexes.unique("uk_col_4", new String[][] {{"col_4"}}, Map.of())
         };
     // create table
     TABLE_OPERATIONS.create(
@@ -859,8 +860,8 @@ public class TestMysqlTableOperations extends TestMysql {
     // Test create increment key for unique index.
     Index[] indexes =
         new Index[] {
-          Indexes.createMysqlPrimaryKey(new String[][] {{"col_2"}}),
-          Indexes.unique("uk_1", new String[][] {{"col_1"}})
+          Indexes.createMysqlPrimaryKey(new String[][] {{"col_2"}}, Map.of()),
+          Indexes.unique("uk_1", new String[][] {{"col_1"}}, Map.of())
         };
     TABLE_OPERATIONS.create(
         TEST_DB_NAME.toString(),
@@ -886,8 +887,8 @@ public class TestMysqlTableOperations extends TestMysql {
     // Test create increment key for primary index.
     indexes =
         new Index[] {
-          Indexes.createMysqlPrimaryKey(new String[][] {{"col_1"}}),
-          Indexes.unique("uk_2", new String[][] {{"col_2"}})
+          Indexes.createMysqlPrimaryKey(new String[][] {{"col_1"}}, Map.of()),
+          Indexes.unique("uk_2", new String[][] {{"col_2"}}, Map.of())
         };
     TABLE_OPERATIONS.create(
         TEST_DB_NAME.toString(),
@@ -911,7 +912,8 @@ public class TestMysqlTableOperations extends TestMysql {
     TABLE_OPERATIONS.drop(TEST_DB_NAME.toString(), tableName);
 
     // Test create increment key for col_1 + col_3 uk.
-    indexes = new Index[] {Indexes.unique("uk_2_3", new String[][] {{"col_1"}, {"col_3"}})};
+    indexes =
+        new Index[] {Indexes.unique("uk_2_3", new String[][] {{"col_1"}, {"col_3"}}, Map.of())};
     TABLE_OPERATIONS.create(
         TEST_DB_NAME.toString(),
         tableName,
@@ -967,7 +969,9 @@ public class TestMysqlTableOperations extends TestMysql {
     };
 
     final Index[] primaryIndex =
-        new Index[] {Indexes.createMysqlPrimaryKey(new String[][] {{"col_1"}, {"col_4"}})};
+        new Index[] {
+          Indexes.createMysqlPrimaryKey(new String[][] {{"col_1"}, {"col_4"}}, Map.of())
+        };
     exception =
         Assertions.assertThrows(
             IllegalArgumentException.class,
@@ -991,10 +995,10 @@ public class TestMysqlTableOperations extends TestMysql {
   public void testAppendIndexesBuilder() {
     Index[] indexes =
         new Index[] {
-          Indexes.createMysqlPrimaryKey(new String[][] {{"col_2"}, {"col_1"}}),
-          Indexes.unique("uk_col_4", new String[][] {{"col_4"}}),
-          Indexes.unique("uk_col_5", new String[][] {{"col_4"}, {"col_5"}}),
-          Indexes.unique("uk_col_6", new String[][] {{"col_4"}, {"col_5"}, {"col_6"}})
+          Indexes.createMysqlPrimaryKey(new String[][] {{"col_2"}, {"col_1"}}, Map.of()),
+          Indexes.unique("uk_col_4", new String[][] {{"col_4"}}, Map.of()),
+          Indexes.unique("uk_col_5", new String[][] {{"col_4"}, {"col_5"}}, Map.of()),
+          Indexes.unique("uk_col_6", new String[][] {{"col_4"}, {"col_5"}, {"col_6"}}, Map.of())
         };
     StringBuilder sql = new StringBuilder();
     MysqlTableOperations.appendIndexesSql(indexes, sql);
@@ -1008,10 +1012,11 @@ public class TestMysqlTableOperations extends TestMysql {
 
     indexes =
         new Index[] {
-          Indexes.unique("uk_1", new String[][] {{"col_4"}}),
-          Indexes.unique("uk_2", new String[][] {{"col_4"}, {"col_3"}}),
-          Indexes.createMysqlPrimaryKey(new String[][] {{"col_2"}, {"col_1"}, {"col_3"}}),
-          Indexes.unique("uk_3", new String[][] {{"col_4"}, {"col_5"}, {"col_6"}, {"col_7"}})
+          Indexes.unique("uk_1", new String[][] {{"col_4"}}, Map.of()),
+          Indexes.unique("uk_2", new String[][] {{"col_4"}, {"col_3"}}, Map.of()),
+          Indexes.createMysqlPrimaryKey(new String[][] {{"col_2"}, {"col_1"}, {"col_3"}}, Map.of()),
+          Indexes.unique(
+              "uk_3", new String[][] {{"col_4"}, {"col_5"}, {"col_6"}, {"col_7"}}, Map.of())
         };
     sql = new StringBuilder();
     MysqlTableOperations.appendIndexesSql(indexes, sql);
@@ -1071,7 +1076,7 @@ public class TestMysqlTableOperations extends TestMysql {
     Map<String, String> properties = new HashMap<>();
     properties.put(MYSQL_AUTO_INCREMENT_OFFSET_KEY, "10");
 
-    Index[] indexes = new Index[] {Indexes.unique("uk_2", new String[][] {{"col_1"}})};
+    Index[] indexes = new Index[] {Indexes.unique("uk_2", new String[][] {{"col_1"}}, Map.of())};
     // create table
     TABLE_OPERATIONS.create(
         TEST_DB_NAME.toString(),

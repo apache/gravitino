@@ -142,7 +142,8 @@ public class TestTableHookDispatcher extends TestOperationDispatcher {
         Distributions.fields(Strategy.HASH, 5, new String[] {columns[0].name()});
     SortOrder[] sortOrders =
         new SortOrder[] {SortOrders.ascending(NamedReference.field(columns[0].name()))};
-    Index[] indexes = new Index[] {Indexes.primary("index1", new String[][] {{columns[0].name()}})};
+    Index[] indexes =
+        new Index[] {Indexes.primary("index1", new String[][] {{columns[0].name()}}, Map.of())};
     tableHookDispatcher.createTable(
         tableIdent, columns, "comment", props, transforms, distribution, sortOrders, indexes);
 
@@ -215,7 +216,8 @@ public class TestTableHookDispatcher extends TestOperationDispatcher {
         Distributions.fields(Strategy.HASH, 5, new String[] {columns[0].name()});
     SortOrder[] sortOrders =
         new SortOrder[] {SortOrders.ascending(NamedReference.field(columns[0].name()))};
-    Index[] indexes = new Index[] {Indexes.primary("index1", new String[][] {{columns[0].name()}})};
+    Index[] indexes =
+        new Index[] {Indexes.primary("index1", new String[][] {{columns[0].name()}}, Map.of())};
     tableHookDispatcher.createTable(
         tableIdent, columns, "comment", props, transforms, distribution, sortOrders, indexes);
 

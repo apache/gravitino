@@ -359,7 +359,7 @@ class TestDTOConverters(unittest.TestCase):
             field_names=field_names,
         )
         converted = DTOConverters.from_dto(index_dto)
-        expected = Indexes.of(Index.IndexType.PRIMARY_KEY, "PRIMARY", field_names)
+        expected = Indexes.of(Index.IndexType.PRIMARY_KEY, "PRIMARY", field_names, {})
         self.assertTrue(converted.type() == expected.type())
         self.assertTrue(converted.name() == expected.name())
         self.assertListEqual(converted.field_names(), expected.field_names())
@@ -493,7 +493,7 @@ class TestDTOConverters(unittest.TestCase):
         ]
         converted_dtos = DTOConverters.from_dtos(dtos)
         expected_items = [
-            Indexes.of(index_type, index_type.value, field_names)
+            Indexes.of(index_type, index_type.value, field_names, {})
             for index_type in Index.IndexType
         ]
         self.assertEqual(len(converted_dtos), len(expected_items))
@@ -839,7 +839,7 @@ class TestDTOConverters(unittest.TestCase):
         field_names = [[f"field_{i}"] for i in range(2)]
 
         indexes: list[Index] = [
-            Indexes.of(index_type, index_type.value, field_names)
+            Indexes.of(index_type, index_type.value, field_names, {})
             for index_type in Index.IndexType
         ]
         expected_dtos: list[IndexDTO] = [

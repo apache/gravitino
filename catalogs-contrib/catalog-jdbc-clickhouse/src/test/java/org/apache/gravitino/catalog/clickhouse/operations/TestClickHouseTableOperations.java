@@ -615,7 +615,7 @@ public class TestClickHouseTableOperations extends TestClickHouse {
     Map<String, String> properties = new HashMap<>();
     Index[] indexes =
         new Index[] {
-          Indexes.primary(Indexes.DEFAULT_PRIMARY_KEY_NAME, new String[][] {{"c_int8"}})
+          Indexes.primary(Indexes.DEFAULT_PRIMARY_KEY_NAME, new String[][] {{"c_int8"}}, Map.of())
         };
 
     TABLE_OPERATIONS.create(
@@ -896,7 +896,8 @@ public class TestClickHouseTableOperations extends TestClickHouse {
           Indexes.of(
               Index.IndexType.PRIMARY_KEY,
               Indexes.DEFAULT_PRIMARY_KEY_NAME,
-              new String[][] {{"c1"}})
+              new String[][] {{"c1"}},
+              Map.of())
         };
 
     // partitioning not supported
@@ -1182,8 +1183,8 @@ public class TestClickHouseTableOperations extends TestClickHouse {
         .withColumns(new JdbcColumn[] {c1, c2, c3})
         .withIndexes(
             new Index[] {
-              Indexes.primary(Indexes.DEFAULT_PRIMARY_KEY_NAME, new String[][] {{"c1"}}),
-              Indexes.unique("idx1", new String[][] {{"c2"}})
+              Indexes.primary(Indexes.DEFAULT_PRIMARY_KEY_NAME, new String[][] {{"c1"}}, Map.of()),
+              Indexes.unique("idx1", new String[][] {{"c2"}}, Map.of())
             })
         .withComment("table_comment")
         .withTableOperation(null)
@@ -1205,7 +1206,7 @@ public class TestClickHouseTableOperations extends TestClickHouse {
         .withColumns(new JdbcColumn[] {c1, c2, c3})
         .withIndexes(
             new Index[] {
-              Indexes.primary(Indexes.DEFAULT_PRIMARY_KEY_NAME, new String[][] {{"c1"}})
+              Indexes.primary(Indexes.DEFAULT_PRIMARY_KEY_NAME, new String[][] {{"c1"}}, Map.of())
             })
         .withComment("table_comment")
         .withTableOperation(null)
