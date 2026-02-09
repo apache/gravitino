@@ -32,4 +32,6 @@ pyjwt[crypto]==2.10.1
 jwcrypto==1.5.6
 sphinx==7.1.2
 furo==2024.8.6
+# banks 2.4.0 does not support python 3.9.* or lower, so we limit the version here. We can also
+# consider upgrading the python version to 3.10.x or higher in the future to avoid this issue.
 banks<2.4.0
