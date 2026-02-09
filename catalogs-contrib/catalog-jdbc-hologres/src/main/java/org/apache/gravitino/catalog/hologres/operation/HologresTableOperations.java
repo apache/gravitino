@@ -1252,7 +1252,6 @@ public class HologresTableOperations extends JdbcTableOperations
       case "segment_key": // event_time_column
       case "bitmap_columns":
       case "dictionary_encoding_columns":
-      case "primary_key":
       case "time_to_live_in_seconds":
       case "table_group":
       case "storage_format":
