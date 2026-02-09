@@ -30,6 +30,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import java.io.IOException;
+import org.apache.commons.lang3.reflect.FieldUtils;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.EntityStore;
 import org.apache.gravitino.GravitinoEnv;
@@ -89,19 +90,9 @@ public class TestIcebergViewHookDispatcher {
     // Setup GravitinoEnv mock
     gravitinoEnv = GravitinoEnv.getInstance();
     try {
-      java.lang.reflect.Field entityStoreField = GravitinoEnv.class.getDeclaredField("entityStore");
-      entityStoreField.setAccessible(true);
-      entityStoreField.set(gravitinoEnv, mockEntityStore);
-
-      java.lang.reflect.Field viewDispatcherField =
-          GravitinoEnv.class.getDeclaredField("viewDispatcher");
-      viewDispatcherField.setAccessible(true);
-      viewDispatcherField.set(gravitinoEnv, mockViewDispatcher);
-
-      java.lang.reflect.Field ownerDispatcherField =
-          GravitinoEnv.class.getDeclaredField("ownerDispatcher");
-      ownerDispatcherField.setAccessible(true);
-      ownerDispatcherField.set(gravitinoEnv, mockOwnerDispatcher);
+      FieldUtils.writeField(gravitinoEnv, "entityStore", mockEntityStore, true);
+      FieldUtils.writeField(gravitinoEnv, "viewDispatcher", mockViewDispatcher, true);
+      FieldUtils.writeField(gravitinoEnv, "ownerDispatcher", mockOwnerDispatcher, true);
     } catch (Exception e) {
       throw new RuntimeException("Failed to setup test", e);
     }
@@ -113,19 +104,9 @@ public class TestIcebergViewHookDispatcher {
   public void tearDown() {
     try {
       // Clean up GravitinoEnv
-      java.lang.reflect.Field entityStoreField = GravitinoEnv.class.getDeclaredField("entityStore");
-      entityStoreField.setAccessible(true);
-      entityStoreField.set(gravitinoEnv, null);
-
-      java.lang.reflect.Field viewDispatcherField =
-          GravitinoEnv.class.getDeclaredField("viewDispatcher");
-      viewDispatcherField.setAccessible(true);
-      viewDispatcherField.set(gravitinoEnv, null);
-
-      java.lang.reflect.Field ownerDispatcherField =
-          GravitinoEnv.class.getDeclaredField("ownerDispatcher");
-      ownerDispatcherField.setAccessible(true);
-      ownerDispatcherField.set(gravitinoEnv, null);
+      FieldUtils.writeField(gravitinoEnv, "entityStore", null, true);
+      FieldUtils.writeField(gravitinoEnv, "viewDispatcher", null, true);
+      FieldUtils.writeField(gravitinoEnv, "ownerDispatcher", null, true);
     } catch (Exception e) {
       // Ignore cleanup errors
     }
