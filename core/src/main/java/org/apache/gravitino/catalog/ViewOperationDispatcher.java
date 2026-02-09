@@ -23,6 +23,7 @@ import static org.apache.gravitino.utils.NameIdentifierUtil.getCatalogIdentifier
 import java.io.IOException;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.EntityStore;
+import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.exceptions.NoSuchViewException;
@@ -59,10 +60,8 @@ public class ViewOperationDispatcher extends OperationDispatcher implements View
   /**
    * Load view metadata by identifier from the catalog.
    *
-   * <p>This method first checks if the view exists in Gravitino's EntityStore. If found, it loads
-   * from the catalog and verifies consistency. If not found, it loads from the catalog and
-   * auto-imports into EntityStore.
-   *
+   * <p>This method first checks if the view exists in Gravitino's EntityStore. If not found, it loads from the catalog
+   * and auto-imports into EntityStore.
    * @param ident The view identifier.
    * @return The loaded view metadata.
    * @throws NoSuchViewException If the view does not exist.
@@ -76,8 +75,12 @@ public class ViewOperationDispatcher extends OperationDispatcher implements View
         TreeLockUtils.doWithTreeLock(ident, LockType.READ, () -> internalLoadView(ident));
 
     if (!entityCombinedView.imported()) {
-      // If not imported, take WRITE lock on schema (parent) and import
+      // Load the schema to make sure the schema is imported.
+      SchemaDispatcher schemaDispatcher = GravitinoEnv.getInstance().schemaDispatcher();
       NameIdentifier schemaIdent = NameIdentifier.of(ident.namespace().levels());
+      schemaDispatcher.loadSchema(schemaIdent);
+
+      // Import the view.
       entityCombinedView =
           TreeLockUtils.doWithTreeLock(schemaIdent, LockType.WRITE, () -> importView(ident));
     }
