@@ -244,7 +244,7 @@ public class CatalogGenericCatalogDeltaIT extends BaseIT {
 
     Exception exception =
         Assertions.assertThrows(
-            Exception.class,
+            IllegalArgumentException.class,
             () ->
                 catalog
                     .asTableCatalog()
@@ -271,7 +271,7 @@ public class CatalogGenericCatalogDeltaIT extends BaseIT {
 
     Exception exception =
         Assertions.assertThrows(
-            Exception.class,
+            IllegalArgumentException.class,
             () ->
                 catalog
                     .asTableCatalog()

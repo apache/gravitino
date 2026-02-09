@@ -19,7 +19,6 @@
 package org.apache.gravitino.catalog.lakehouse.delta;
 
 import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.spy;
 
 import com.google.common.collect.Maps;
 import java.util.Map;
@@ -60,7 +59,7 @@ public class TestDeltaTableOperations {
     store = mock(EntityStore.class);
     schemaOps = mock(ManagedSchemaOperations.class);
     idGenerator = mock(IdGenerator.class);
-    deltaTableOps = spy(new DeltaTableOperations(store, schemaOps, idGenerator));
+    deltaTableOps = new DeltaTableOperations(store, schemaOps, idGenerator);
   }
 
   @Test
