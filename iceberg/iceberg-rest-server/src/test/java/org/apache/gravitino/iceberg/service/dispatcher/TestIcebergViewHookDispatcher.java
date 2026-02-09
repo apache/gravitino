@@ -145,39 +145,10 @@ public class TestIcebergViewHookDispatcher {
     NameIdentifier expectedIdent = NameIdentifier.of(METALAKE, CATALOG, SCHEMA_NAME, VIEW_NAME);
     verify(mockViewDispatcher, times(1)).loadView(eq(expectedIdent));
 
-    assertEquals(mockResponse, response);
-  }
-
-  @Test
-  public void testCreateViewSetsOwnership() throws Exception {
-    Namespace namespace = Namespace.of(SCHEMA_NAME);
-    CreateViewRequest createRequest =
-        ImmutableCreateViewRequest.builder()
-            .name(VIEW_NAME)
-            .schema(VIEW_SCHEMA)
-            .viewVersion(
-                ImmutableViewVersion.builder()
-                    .versionId(1)
-                    .timestampMillis(System.currentTimeMillis())
-                    .schemaId(1)
-                    .defaultNamespace(namespace)
-                    .addRepresentations(
-                        ImmutableSQLViewRepresentation.builder()
-                            .sql("SELECT * FROM test")
-                            .dialect("spark")
-                            .build())
-                    .build())
-            .build();
-
-    LoadViewResponse mockResponse = mock(LoadViewResponse.class);
-    when(mockExecutor.createView(mockContext, namespace, createRequest)).thenReturn(mockResponse);
-
-    hookDispatcher.createView(mockContext, namespace, createRequest);
-
-    // Verify ownership was set - this is tested via IcebergOwnershipUtils
-    // The actual verification is that ownerDispatcher.setOwner() is called
-    // This is covered by the integration between hookDispatcher and ownerDispatcher
+    // Verify ownership was set
     verify(mockOwnerDispatcher, times(1)).setOwner(any(), any(), eq(USER), any());
+
+    assertEquals(mockResponse, response);
   }
 
   @Test
@@ -288,7 +259,7 @@ public class TestIcebergViewHookDispatcher {
             eq(sourceGravitinoIdent),
             eq(GenericEntity.class),
             eq(Entity.EntityType.VIEW),
-            any(java.util.function.Function.class));
+            any());
   }
 
   @Test
@@ -305,7 +276,7 @@ public class TestIcebergViewHookDispatcher {
             eq(sourceGravitinoIdent),
             eq(GenericEntity.class),
             eq(Entity.EntityType.VIEW),
-            any(java.util.function.Function.class)))
+            any()))
         .thenThrow(new NoSuchEntityException("Entity not found"));
 
     // Should not throw - missing entity is ignored
@@ -328,7 +299,7 @@ public class TestIcebergViewHookDispatcher {
             eq(sourceGravitinoIdent),
             eq(GenericEntity.class),
             eq(Entity.EntityType.VIEW),
-            any(java.util.function.Function.class)))
+            any()))
         .thenThrow(new IOException("IO error"));
 
     // Should throw RuntimeException wrapping the IOException
@@ -398,30 +369,5 @@ public class TestIcebergViewHookDispatcher {
 
     verify(mockExecutor, times(1)).viewExists(mockContext, viewIdent);
     assertEquals(true, exists);
-  }
-
-  @Test
-  public void testDropViewWithNullEntityStore() throws Exception {
-    // Don't test null entity store - GravitinoEnv validates initialization
-    // Instead, test that drop proceeds when entity store operations are available
-    TableIdentifier viewIdent = TableIdentifier.of(Namespace.of(SCHEMA_NAME), VIEW_NAME);
-
-    hookDispatcher.dropView(mockContext, viewIdent);
-
-    verify(mockExecutor, times(1)).dropView(mockContext, viewIdent);
-  }
-
-  @Test
-  public void testRenameViewWithNullEntityStore() throws Exception {
-    // Don't test null entity store - GravitinoEnv validates initialization
-    // Instead, test that rename proceeds when entity store operations are available
-    TableIdentifier sourceIdent = TableIdentifier.of(Namespace.of(SCHEMA_NAME), "old_view");
-    TableIdentifier destIdent = TableIdentifier.of(Namespace.of(SCHEMA_NAME), "new_view");
-    RenameTableRequest renameRequest =
-        RenameTableRequest.builder().withSource(sourceIdent).withDestination(destIdent).build();
-
-    hookDispatcher.renameView(mockContext, renameRequest);
-
-    verify(mockExecutor, times(1)).renameView(mockContext, renameRequest);
   }
 }
