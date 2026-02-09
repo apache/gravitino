@@ -18,9 +18,6 @@
  */
 package org.apache.gravitino.catalog.hologres.operation;
 
-import com.google.common.annotations.VisibleForTesting;
-import com.google.common.base.Preconditions;
-import com.google.common.collect.Lists;
 import java.sql.Connection;
 import java.sql.DatabaseMetaData;
 import java.sql.PreparedStatement;
@@ -33,7 +30,9 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.stream.Collectors;
+
 import javax.sql.DataSource;
+
 import org.apache.commons.collections4.MapUtils;
 import org.apache.commons.lang3.ArrayUtils;
 import org.apache.commons.lang3.BooleanUtils;
@@ -61,6 +60,10 @@ import org.apache.gravitino.rel.expressions.transforms.Transform;
 import org.apache.gravitino.rel.expressions.transforms.Transforms;
 import org.apache.gravitino.rel.indexes.Index;
 import org.apache.gravitino.rel.types.Types;
+
+import com.google.common.annotations.VisibleForTesting;
+import com.google.common.base.Preconditions;
+import com.google.common.collect.Lists;
 
 /**
  * Table operations for Hologres.
@@ -783,20 +786,19 @@ public class HologresTableOperations extends JdbcTableOperations
   }
 
   /**
-   * Get tables from the database including regular tables, partitioned parent tables, views, and
-   * foreign tables.
+   * Get tables from the database including regular tables and partitioned parent tables.
    *
    * <p>In Hologres (PostgreSQL-compatible):
    *
    * <ul>
    *   <li>Regular tables and partition child tables have TABLE_TYPE = "TABLE"
    *   <li>Partitioned parent tables have TABLE_TYPE = "PARTITIONED TABLE"
-   *   <li>Views have TABLE_TYPE = "VIEW"
-   *   <li>Foreign tables have TABLE_TYPE = "FOREIGN TABLE"
+   *   <li>Views have TABLE_TYPE = "VIEW" (excluded from listing)
+   *   <li>Foreign tables have TABLE_TYPE = "FOREIGN TABLE" (excluded from listing)
    * </ul>
    *
-   * <p>This method overrides the parent to include all these types so that partition parent tables,
-   * views, and foreign tables are visible in the table list.
+   * <p>This method overrides the parent to include regular tables and partition parent tables,
+   * but excludes views and foreign tables from the table list.
    *
    * @param connection the database connection
    * @return ResultSet containing table metadata
@@ -808,25 +810,26 @@ public class HologresTableOperations extends JdbcTableOperations
     String catalogName = connection.getCatalog();
     String schemaName = connection.getSchema();
     // Include "TABLE" (regular tables and partition children),
-    // "PARTITIONED TABLE" (partition parent tables), "VIEW" (views),
-    // and "FOREIGN TABLE" (foreign tables)
+    // and "PARTITIONED TABLE" (partition parent tables)
+    // Exclude "VIEW" and "FOREIGN TABLE" to hide views and foreign tables from Gravitino
     return metaData.getTables(
         catalogName,
         schemaName,
         null,
-        new String[] {"TABLE", "PARTITIONED TABLE", "VIEW", "FOREIGN TABLE"});
+        new String[] {"TABLE", "PARTITIONED TABLE"});
   }
 
   @Override
   protected ResultSet getTable(Connection connection, String schema, String tableName)
       throws SQLException {
     DatabaseMetaData metaData = connection.getMetaData();
-    // Include all types when looking up a specific table, view, or foreign table
+    // Include TABLE and PARTITIONED TABLE types
+    // Exclude VIEW and FOREIGN TABLE to hide views and foreign tables from Gravitino
     return metaData.getTables(
         database,
         schema,
         tableName,
-        new String[] {"TABLE", "PARTITIONED TABLE", "VIEW", "FOREIGN TABLE"});
+        new String[] {"TABLE", "PARTITIONED TABLE"});
   }
 
   @Override
