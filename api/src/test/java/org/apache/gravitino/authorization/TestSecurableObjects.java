@@ -100,6 +100,18 @@ public class TestSecurableObjects {
             Lists.newArrayList(Privileges.ConsumeTopic.allow()));
     Assertions.assertEquals(topic, anotherTopic);
 
+    SecurableObject view =
+        SecurableObjects.ofView(schema, "view", Lists.newArrayList(Privileges.SelectView.allow()));
+    Assertions.assertEquals("catalog.schema.view", view.fullName());
+    Assertions.assertEquals(MetadataObject.Type.VIEW, view.type());
+
+    SecurableObject anotherView =
+        SecurableObjects.of(
+            MetadataObject.Type.VIEW,
+            Lists.newArrayList("catalog", "schema", "view"),
+            Lists.newArrayList(Privileges.SelectView.allow()));
+    Assertions.assertEquals(view, anotherView);
+
     Exception e =
         Assertions.assertThrows(
             IllegalArgumentException.class,
@@ -156,6 +168,16 @@ public class TestSecurableObjects {
                     Lists.newArrayList("catalog", "schema", "table"),
                     Lists.newArrayList(Privileges.UseSchema.allow())));
     Assertions.assertTrue(e.getMessage().contains("the length of names must be 2"));
+
+    e =
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () ->
+                SecurableObjects.of(
+                    MetadataObject.Type.VIEW,
+                    Lists.newArrayList("metalake"),
+                    Lists.newArrayList(Privileges.SelectView.allow())));
+    Assertions.assertTrue(e.getMessage().contains("the length of names must be 3"));
   }
 
   @Test
@@ -187,6 +209,8 @@ public class TestSecurableObjects {
     Privilege registerJobTemplate = Privileges.RegisterJobTemplate.allow();
     Privilege runJob = Privileges.RunJob.allow();
     Privilege useJobTemplate = Privileges.UseJobTemplate.allow();
+    Privilege createView = Privileges.CreateView.allow();
+    Privilege selectView = Privileges.SelectView.allow();
 
     // Test create catalog
     Assertions.assertTrue(createCatalog.canBindTo(MetadataObject.Type.METALAKE));
@@ -456,5 +480,27 @@ public class TestSecurableObjects {
     Assertions.assertFalse(useJobTemplate.canBindTo(MetadataObject.Type.COLUMN));
     Assertions.assertTrue(useJobTemplate.canBindTo(MetadataObject.Type.JOB_TEMPLATE));
     Assertions.assertFalse(useJobTemplate.canBindTo(MetadataObject.Type.JOB));
+
+    // Test create view
+    Assertions.assertTrue(createView.canBindTo(MetadataObject.Type.METALAKE));
+    Assertions.assertTrue(createView.canBindTo(MetadataObject.Type.CATALOG));
+    Assertions.assertTrue(createView.canBindTo(MetadataObject.Type.SCHEMA));
+    Assertions.assertFalse(createView.canBindTo(MetadataObject.Type.TABLE));
+    Assertions.assertFalse(createView.canBindTo(MetadataObject.Type.TOPIC));
+    Assertions.assertFalse(createView.canBindTo(MetadataObject.Type.FILESET));
+    Assertions.assertFalse(createView.canBindTo(MetadataObject.Type.ROLE));
+    Assertions.assertFalse(createView.canBindTo(MetadataObject.Type.COLUMN));
+    Assertions.assertFalse(createView.canBindTo(MetadataObject.Type.VIEW));
+
+    // Test select view
+    Assertions.assertTrue(selectView.canBindTo(MetadataObject.Type.METALAKE));
+    Assertions.assertTrue(selectView.canBindTo(MetadataObject.Type.CATALOG));
+    Assertions.assertTrue(selectView.canBindTo(MetadataObject.Type.SCHEMA));
+    Assertions.assertFalse(selectView.canBindTo(MetadataObject.Type.TABLE));
+    Assertions.assertFalse(selectView.canBindTo(MetadataObject.Type.TOPIC));
+    Assertions.assertFalse(selectView.canBindTo(MetadataObject.Type.FILESET));
+    Assertions.assertFalse(selectView.canBindTo(MetadataObject.Type.ROLE));
+    Assertions.assertFalse(selectView.canBindTo(MetadataObject.Type.COLUMN));
+    Assertions.assertTrue(selectView.canBindTo(MetadataObject.Type.VIEW));
   }
 }

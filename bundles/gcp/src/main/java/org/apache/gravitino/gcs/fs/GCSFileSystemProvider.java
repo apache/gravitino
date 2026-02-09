@@ -54,7 +54,7 @@ public class GCSFileSystemProvider implements FileSystemProvider, SupportsCreden
         FileSystemUtils.toHadoopConfigMap(config, GRAVITINO_KEY_TO_GCS_HADOOP_KEY);
     hadoopConfMap = additionalGCSConfig(hadoopConfMap);
 
-    Configuration configuration = FileSystemUtils.createConfiguration(hadoopConfMap);
+    Configuration configuration = FileSystemUtils.createCompatibleConfiguration(hadoopConfMap);
     return FileSystem.newInstance(path.toUri(), configuration);
   }
 
