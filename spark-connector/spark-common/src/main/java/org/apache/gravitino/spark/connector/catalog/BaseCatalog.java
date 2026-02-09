@@ -494,7 +494,7 @@ public abstract class BaseCatalog implements TableCatalog, SupportsNamespaces, F
         }
       }
     } catch (org.apache.gravitino.exceptions.NoSuchFunctionException e) {
-      // fall through
+      throw new NoSuchFunctionException(ident);
     }
     throw new NoSuchFunctionException(ident);
   }
