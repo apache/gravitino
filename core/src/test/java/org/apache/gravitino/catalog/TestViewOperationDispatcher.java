@@ -253,8 +253,7 @@ public class TestViewOperationDispatcher extends TestOperationDispatcher {
     GenericEntity retrievedEntity = entityStore.get(viewIdent, VIEW, GenericEntity.class);
     Assertions.assertNotNull(retrievedEntity);
     Assertions.assertEquals(initialId, retrievedEntity.id(), "Entity ID should not change");
-    Assertions.assertEquals(
-        1L, retrievedEntity.id(), "Entity ID should remain 1L (no new import)");
+    Assertions.assertEquals(1L, retrievedEntity.id(), "Entity ID should remain 1L (no new import)");
   }
 
   @Test
@@ -304,7 +303,7 @@ public class TestViewOperationDispatcher extends TestOperationDispatcher {
       for (Future<View> future : futures) {
         View loadedView = future.get(5, TimeUnit.SECONDS);
         Assertions.assertEquals("concurrent_view", loadedView.name());
-        
+
         EntityCombinedView combinedView = (EntityCombinedView) loadedView;
         Assertions.assertEquals(
             entityId,

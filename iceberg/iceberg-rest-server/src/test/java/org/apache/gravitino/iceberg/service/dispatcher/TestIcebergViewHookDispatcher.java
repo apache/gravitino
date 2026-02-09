@@ -256,10 +256,7 @@ public class TestIcebergViewHookDispatcher {
         IcebergIdentifierUtils.toGravitinoTableIdentifier(METALAKE, CATALOG, sourceIdent);
     verify(mockEntityStore, times(1))
         .update(
-            eq(sourceGravitinoIdent),
-            eq(GenericEntity.class),
-            eq(Entity.EntityType.VIEW),
-            any());
+            eq(sourceGravitinoIdent), eq(GenericEntity.class), eq(Entity.EntityType.VIEW), any());
   }
 
   @Test
@@ -273,10 +270,7 @@ public class TestIcebergViewHookDispatcher {
     NameIdentifier sourceGravitinoIdent =
         IcebergIdentifierUtils.toGravitinoTableIdentifier(METALAKE, CATALOG, sourceIdent);
     when(mockEntityStore.update(
-            eq(sourceGravitinoIdent),
-            eq(GenericEntity.class),
-            eq(Entity.EntityType.VIEW),
-            any()))
+            eq(sourceGravitinoIdent), eq(GenericEntity.class), eq(Entity.EntityType.VIEW), any()))
         .thenThrow(new NoSuchEntityException("Entity not found"));
 
     // Should not throw - missing entity is ignored
@@ -296,10 +290,7 @@ public class TestIcebergViewHookDispatcher {
     NameIdentifier sourceGravitinoIdent =
         IcebergIdentifierUtils.toGravitinoTableIdentifier(METALAKE, CATALOG, sourceIdent);
     when(mockEntityStore.update(
-            eq(sourceGravitinoIdent),
-            eq(GenericEntity.class),
-            eq(Entity.EntityType.VIEW),
-            any()))
+            eq(sourceGravitinoIdent), eq(GenericEntity.class), eq(Entity.EntityType.VIEW), any()))
         .thenThrow(new IOException("IO error"));
 
     // Should throw RuntimeException wrapping the IOException
