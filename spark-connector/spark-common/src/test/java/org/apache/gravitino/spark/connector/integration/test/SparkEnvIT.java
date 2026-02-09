@@ -67,6 +67,7 @@ public abstract class SparkEnvIT extends SparkUtilIT {
   protected String icebergRestServiceUri;
   protected final String functionSchemaName = "test_function_schema";
   protected final String functionName = "my_string_length";
+  protected final String nonSparkFunctionName = "trino_upper";
 
   private final String metalakeName = "test";
   private SparkSession sparkSession;
@@ -78,6 +79,10 @@ public abstract class SparkEnvIT extends SparkUtilIT {
   protected abstract String getProvider();
 
   protected abstract Map<String, String> getCatalogConfigs();
+
+  protected boolean supportsListFunctions() {
+    return true;
+  }
 
   @Override
   protected SparkSession getSparkSession() {
@@ -99,7 +104,9 @@ public abstract class SparkEnvIT extends SparkUtilIT {
     initHdfsFileSystem();
     initGravitinoEnv();
     initMetalakeAndCatalogs();
-    initSchemaAndFunction();
+    if (supportsListFunctions()) {
+      initSchemaAndFunction();
+    }
     initSparkEnv();
     LOG.info(
         "Startup Spark env successfully, Gravitino uri: {}, Hive metastore uri: {}",
@@ -149,6 +156,8 @@ public abstract class SparkEnvIT extends SparkUtilIT {
     if (!catalog.asSchemas().schemaExists(functionSchemaName)) {
       catalog.asSchemas().createSchema(functionSchemaName, "", Collections.emptyMap());
     }
+
+    // Register a Spark runtime function
     if (!catalog
         .asFunctionCatalog()
         .functionExists(NameIdentifier.of(functionSchemaName, functionName))) {
@@ -166,6 +175,27 @@ public abstract class SparkEnvIT extends SparkUtilIT {
                     new FunctionImpl[] {
                       FunctionImpls.ofJava(
                           FunctionImpl.RuntimeType.SPARK, StringLengthFunction.class.getName())
+                    })
+              });
+    }
+
+    // Register a non-Spark (TRINO) runtime function for testing filtering
+    if (!catalog
+        .asFunctionCatalog()
+        .functionExists(NameIdentifier.of(functionSchemaName, nonSparkFunctionName))) {
+      catalog
+          .asFunctionCatalog()
+          .registerFunction(
+              NameIdentifier.of(functionSchemaName, nonSparkFunctionName),
+              "Converts a string to uppercase (Trino implementation)",
+              FunctionType.SCALAR,
+              true /* deterministic */,
+              new FunctionDefinition[] {
+                FunctionDefinitions.of(
+                    new FunctionParam[] {FunctionParams.of("input", Types.StringType.get())},
+                    Types.StringType.get(),
+                    new FunctionImpl[] {
+                      FunctionImpls.ofJava(FunctionImpl.RuntimeType.TRINO, "com.example.TrinoUpper")
                     })
               });
     }

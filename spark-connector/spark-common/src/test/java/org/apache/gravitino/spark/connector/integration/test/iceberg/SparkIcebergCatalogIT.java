@@ -62,6 +62,7 @@ import org.apache.spark.sql.types.DataTypes;
 import org.apache.spark.sql.types.StructField;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.condition.EnabledIf;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.MethodSource;
 
@@ -1271,5 +1272,49 @@ public abstract class SparkIcebergCatalogIT extends SparkCommonIT {
         boolean isPartitionedTable, int formatVersion, String writeMode) {
       return new IcebergTableWriteProperties(isPartitionedTable, formatVersion, writeMode);
     }
+  }
+
+  @Test
+  @EnabledIf("supportsListFunctions")
+  void testListFunctionsWithIcebergBuiltins() {
+    // Test Gravitino function listing
+    Set<String> gravitinoFunctions = listUserFunctions(functionSchemaName);
+    Assertions.assertTrue(
+        gravitinoFunctions.contains(
+            String.join(".", getCatalogName(), functionSchemaName, functionName)));
+
+    // Non-Spark function should NOT be listed
+    Assertions.assertFalse(
+        gravitinoFunctions.contains(
+            String.join(".", getCatalogName(), functionSchemaName, nonSparkFunctionName)));
+
+    // Test Iceberg built-in functions are also listed
+    Set<String> systemFunctions = listUserFunctions("system");
+    Assertions.assertTrue(
+        systemFunctions.stream().anyMatch(f -> f.contains("iceberg_version")),
+        "Iceberg built-in function 'iceberg_version' should be listed");
+    Assertions.assertTrue(
+        systemFunctions.stream().anyMatch(f -> f.contains("bucket")),
+        "Iceberg built-in function 'bucket' should be listed");
+  }
+
+  @Test
+  void testCallUDFAndIcebergBuiltins() {
+    // Test Gravitino UDF
+    List<String> gravitinoUdfResult =
+        getQueryData(String.format("SELECT %s.%s('abc')", functionSchemaName, functionName));
+    Assertions.assertEquals(1, gravitinoUdfResult.size());
+    Assertions.assertEquals("3", gravitinoUdfResult.get(0));
+
+    // Test Iceberg built-in functions can be called
+    List<String> icebergVersionResult =
+        getQueryData(String.format("SELECT %s.system.iceberg_version()", getCatalogName()));
+    Assertions.assertEquals(1, icebergVersionResult.size());
+    Assertions.assertFalse(icebergVersionResult.get(0).isEmpty());
+
+    List<String> bucketResult =
+        getQueryData(String.format("SELECT %s.system.bucket(2, 100)", getCatalogName()));
+    Assertions.assertEquals(1, bucketResult.size());
+    Assertions.assertEquals("0", bucketResult.get(0));
   }
 }

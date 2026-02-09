@@ -125,10 +125,6 @@ public abstract class SparkCommonIT extends SparkEnvIT {
 
   protected abstract boolean supportsUpdateColumnPosition();
 
-  protected boolean supportsListFunctions() {
-    return true;
-  }
-
   protected boolean supportsCreateTableWithComment() {
     return true;
   }
@@ -212,11 +208,16 @@ public abstract class SparkCommonIT extends SparkEnvIT {
   @Test
   @EnabledIf("supportsListFunctions")
   void testListFunctions() {
-    // test list functions
+    // Test list functions - should only include Spark runtime functions
     Set<String> functionNames = listUserFunctions(functionSchemaName);
     Assertions.assertTrue(
         functionNames.contains(
             String.join(".", getCatalogName(), functionSchemaName, functionName)));
+
+    // Non-Spark function should NOT be listed
+    Assertions.assertFalse(
+        functionNames.contains(
+            String.join(".", getCatalogName(), functionSchemaName, nonSparkFunctionName)));
   }
 
   @Test
