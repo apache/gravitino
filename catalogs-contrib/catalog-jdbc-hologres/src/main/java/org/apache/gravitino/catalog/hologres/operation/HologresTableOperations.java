@@ -169,10 +169,9 @@ public class HologresTableOperations extends JdbcTableOperations
       Transform[] partitioning,
       Distribution distribution,
       Index[] indexes) {
-    if (ArrayUtils.isNotEmpty(partitioning)) {
-      throw new UnsupportedOperationException(
-          "Currently we do not support Partitioning in Hologres through Gravitino");
-    }
+    boolean isLogicalPartition =
+        MapUtils.isNotEmpty(properties)
+            && "true".equalsIgnoreCase(properties.get("is_logical_partitioned_table"));
     StringBuilder sqlBuilder = new StringBuilder();
     sqlBuilder
         .append("CREATE TABLE ")
@@ -196,6 +195,11 @@ public class HologresTableOperations extends JdbcTableOperations
     appendIndexesSql(indexes, sqlBuilder);
     sqlBuilder.append(NEW_LINE).append(")");
 
+    // Append partitioning clause if specified
+    if (ArrayUtils.isNotEmpty(partitioning)) {
+      appendPartitioningSql(partitioning, isLogicalPartition, sqlBuilder);
+    }
+
     // Build WITH clause combining distribution and Hologres-specific table properties
     // Supported properties: orientation, distribution_key, clustering_key, event_time_column,
     // bitmap_columns, dictionary_encoding_columns, time_to_live_in_seconds, table_group, etc.
@@ -211,11 +215,11 @@ public class HologresTableOperations extends JdbcTableOperations
       withEntries.add("distribution_key = '" + distributionColumns + "'");
     }
 
-    // Add user-specified properties (filter out distribution_key to avoid conflict)
+    // Add user-specified properties (filter out internal properties to avoid conflict)
     if (MapUtils.isNotEmpty(properties)) {
       properties.forEach(
           (key, value) -> {
-            if (!"distribution_key".equals(key)) {
+            if (!"distribution_key".equals(key) && !"is_logical_partitioned_table".equals(key)) {
               withEntries.add(key + " = '" + value + "'");
             }
           });
@@ -313,6 +317,64 @@ public class HologresTableOperations extends JdbcTableOperations
               return HOLO_QUOTE + colNames[0] + HOLO_QUOTE;
             })
         .collect(Collectors.joining(", "));
+  }
+
+  /**
+   * Append the partitioning clause to the CREATE TABLE SQL.
+   *
+   * <p>Hologres supports two types of partition tables:
+   *
+   * <ul>
+   *   <li>Physical partition table: uses {@code PARTITION BY LIST(column)} syntax
+   *   <li>Logical partition table (V3.1+): uses {@code LOGICAL PARTITION BY LIST(column1[,
+   *       column2])} syntax
+   * </ul>
+   *
+   * @param partitioning the partition transforms (only LIST partitioning is supported)
+   * @param isLogicalPartition whether to create a logical partition table
+   * @param sqlBuilder the SQL builder to append to
+   */
+  @VisibleForTesting
+  static void appendPartitioningSql(
+      Transform[] partitioning, boolean isLogicalPartition, StringBuilder sqlBuilder) {
+    Preconditions.checkArgument(
+        partitioning.length == 1 && partitioning[0] instanceof Transforms.ListTransform,
+        "Hologres only supports LIST partitioning");
+
+    Transforms.ListTransform listTransform = (Transforms.ListTransform) partitioning[0];
+    String[][] fieldNames = listTransform.fieldNames();
+
+    Preconditions.checkArgument(fieldNames.length > 0, "Partition columns must not be empty");
+
+    if (isLogicalPartition) {
+      Preconditions.checkArgument(
+          fieldNames.length <= 2,
+          "Logical partition table supports at most 2 partition columns, but got: %s",
+          fieldNames.length);
+    } else {
+      Preconditions.checkArgument(
+          fieldNames.length == 1,
+          "Physical partition table supports exactly 1 partition column, but got: %s",
+          fieldNames.length);
+    }
+
+    String partitionColumns =
+        Arrays.stream(fieldNames)
+            .map(
+                colNames -> {
+                  Preconditions.checkArgument(
+                      colNames.length == 1,
+                      "Hologres partition does not support nested field names");
+                  return HOLO_QUOTE + colNames[0] + HOLO_QUOTE;
+                })
+            .collect(Collectors.joining(", "));
+
+    sqlBuilder.append(NEW_LINE);
+    if (isLogicalPartition) {
+      sqlBuilder.append("LOGICAL PARTITION BY LIST(").append(partitionColumns).append(")");
+    } else {
+      sqlBuilder.append("PARTITION BY LIST(").append(partitionColumns).append(")");
+    }
   }
 
   private void appendColumnDefinition(JdbcColumn column, StringBuilder sqlBuilder) {
@@ -932,6 +994,97 @@ public class HologresTableOperations extends JdbcTableOperations
    */
   @Override
   protected Transform[] getTablePartitioning(
+      Connection connection, String databaseName, String tableName) throws SQLException {
+
+    // First, check if this is a logical partitioned table by querying table properties.
+    // Logical partition tables in Hologres (V3.1+) have the property
+    // "is_logical_partitioned_table" set to "true", and partition columns are stored in
+    // the "logical_partition_columns" property.
+    Transform[] logicalPartitioning = getLogicalPartitioning(connection, tableName);
+    if (logicalPartitioning.length > 0) {
+      return logicalPartitioning;
+    }
+
+    // Fall back to physical partition table check via pg_partitioned_table system table
+    return getPhysicalPartitioning(connection, databaseName, tableName);
+  }
+
+  /**
+   * Get logical partition information from Hologres table properties.
+   *
+   * <p>Hologres V3.1+ supports logical partition tables where the parent table is a physical table
+   * and child partitions are logical concepts. A logical partition table is identified by the
+   * property "is_logical_partitioned_table" = "true" in hologres.hg_table_properties, and its
+   * partition columns are stored in the "logical_partition_columns" property.
+   *
+   * @param connection the database connection
+   * @param tableName the table name
+   * @return the partition transforms, or empty if the table is not a logical partition table
+   * @throws SQLException if a database access error occurs
+   */
+  private Transform[] getLogicalPartitioning(Connection connection, String tableName)
+      throws SQLException {
+    String schemaName = connection.getSchema();
+    String logicalPartitionSql =
+        "SELECT property_key, property_value "
+            + "FROM hologres.hg_table_properties "
+            + "WHERE table_namespace = ? AND table_name = ? "
+            + "AND property_key IN ('is_logical_partitioned_table', 'logical_partition_columns')";
+
+    String isLogicalPartitioned = null;
+    String logicalPartitionColumns = null;
+
+    try (PreparedStatement statement = connection.prepareStatement(logicalPartitionSql)) {
+      statement.setString(1, schemaName);
+      statement.setString(2, tableName);
+
+      try (ResultSet resultSet = statement.executeQuery()) {
+        while (resultSet.next()) {
+          String key = resultSet.getString("property_key");
+          String value = resultSet.getString("property_value");
+          if ("is_logical_partitioned_table".equals(key)) {
+            isLogicalPartitioned = value;
+          } else if ("logical_partition_columns".equals(key)) {
+            logicalPartitionColumns = value;
+          }
+        }
+      }
+    }
+
+    if (!"true".equalsIgnoreCase(isLogicalPartitioned)
+        || StringUtils.isEmpty(logicalPartitionColumns)) {
+      return Transforms.EMPTY_TRANSFORM;
+    }
+
+    // Parse partition column names (comma-separated, e.g., "col1" or "col1,col2")
+    String[][] fieldNames =
+        Arrays.stream(logicalPartitionColumns.split(","))
+            .map(String::trim)
+            .filter(StringUtils::isNotEmpty)
+            .map(col -> new String[] {col})
+            .toArray(String[][]::new);
+
+    if (fieldNames.length == 0) {
+      return Transforms.EMPTY_TRANSFORM;
+    }
+
+    return new Transform[] {Transforms.list(fieldNames)};
+  }
+
+  /**
+   * Get physical partition information from PostgreSQL system tables.
+   *
+   * <p>Hologres (PostgreSQL-compatible) only supports LIST partitioning for physical partitions.
+   * This method queries pg_partitioned_table and pg_attribute system tables to determine if a table
+   * is partitioned, and if so, returns the partition column names as a LIST transform.
+   *
+   * @param connection the database connection
+   * @param databaseName the schema name
+   * @param tableName the table name
+   * @return the partition transforms, or empty if the table is not a physical partition table
+   * @throws SQLException if a database access error occurs
+   */
+  private Transform[] getPhysicalPartitioning(
       Connection connection, String databaseName, String tableName) throws SQLException {
 
     // Query pg_partitioned_table to get partition strategy and column attribute numbers
