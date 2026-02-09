@@ -27,7 +27,6 @@ import static org.apache.gravitino.lance.common.utils.LanceConstants.LANCE_TABLE
 import static org.apache.gravitino.lance.common.utils.LanceConstants.LANCE_TABLE_VERSION;
 import static org.apache.gravitino.rel.Column.DEFAULT_VALUE_NOT_SET;
 
-import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Lists;
@@ -35,10 +34,7 @@ import com.google.common.collect.Maps;
 import com.lancedb.lance.namespace.LanceNamespaceException;
 import com.lancedb.lance.namespace.ObjectIdentifier;
 import com.lancedb.lance.namespace.model.AlterTableAlterColumnsRequest;
-import com.lancedb.lance.namespace.model.AlterTableAlterColumnsResponse;
 import com.lancedb.lance.namespace.model.AlterTableDropColumnsRequest;
-import com.lancedb.lance.namespace.model.AlterTableDropColumnsResponse;
-import com.lancedb.lance.namespace.model.ColumnAlteration;
 import com.lancedb.lance.namespace.model.CreateEmptyTableResponse;
 import com.lancedb.lance.namespace.model.CreateTableRequest;
 import com.lancedb.lance.namespace.model.CreateTableRequest.ModeEnum;
@@ -59,13 +55,13 @@ import java.util.Optional;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 import org.apache.arrow.vector.types.pojo.Field;
-import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.Catalog;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.exceptions.NoSuchTableException;
 import org.apache.gravitino.lance.common.ops.LanceTableOperations;
+import org.apache.gravitino.lance.common.ops.gravitino.GravitinoLanceTableAlterHandler.AlterColumnsGravitinoLance;
+import org.apache.gravitino.lance.common.ops.gravitino.GravitinoLanceTableAlterHandler.DropColumns;
 import org.apache.gravitino.lance.common.utils.ArrowUtils;
-import org.apache.gravitino.lance.common.utils.LanceConstants;
 import org.apache.gravitino.lance.common.utils.LancePropertiesUtils;
 import org.apache.gravitino.rel.Column;
 import org.apache.gravitino.rel.Table;
@@ -79,10 +75,10 @@ public class GravitinoLanceTableOperations implements LanceTableOperations {
 
   private final GravitinoLanceNamespaceWrapper namespaceWrapper;
 
-  private static final Map<Class<?>, TableAlterHandler<?, ?>> ALTER_HANDLERS =
+  private static final Map<Class<?>, GravitinoLanceTableAlterHandler<?, ?>> ALTER_HANDLERS =
       Map.of(
           AlterTableDropColumnsRequest.class, new DropColumns(),
-          AlterTableAlterColumnsRequest.class, new AlterColumns());
+          AlterTableAlterColumnsRequest.class, new AlterColumnsGravitinoLance());
 
   public GravitinoLanceTableOperations(GravitinoLanceNamespaceWrapper namespaceWrapper) {
     this.namespaceWrapper = namespaceWrapper;
@@ -330,7 +326,7 @@ public class GravitinoLanceTableOperations implements LanceTableOperations {
     NameIdentifier tableIdentifier =
         NameIdentifier.of(nsId.levelAtListPos(1), nsId.levelAtListPos(2));
 
-    TableAlterHandler<Object, Object> handler = getHandler(request.getClass());
+    GravitinoLanceTableAlterHandler<Object, Object> handler = getHandler(request.getClass());
     if (handler == null) {
       throw new IllegalArgumentException(
           "Unsupported alter table request type: " + request.getClass().getName());
@@ -343,92 +339,9 @@ public class GravitinoLanceTableOperations implements LanceTableOperations {
   }
 
   @SuppressWarnings("unchecked")
-  private static <REQUEST, RESPONSE> TableAlterHandler<REQUEST, RESPONSE> getHandler(
+  private static <REQUEST, RESPONSE> GravitinoLanceTableAlterHandler<REQUEST, RESPONSE> getHandler(
       Class<?> requestClass) {
-    return (TableAlterHandler<REQUEST, RESPONSE>) ALTER_HANDLERS.get(requestClass);
-  }
-
-  interface TableAlterHandler<REQUEST, RESPONSE> {
-    TableChange[] buildGravitinoTableChange(REQUEST request);
-
-    RESPONSE handle(Table gravitinoTable, REQUEST request);
-  }
-
-  @VisibleForTesting
-  public static class DropColumns
-      implements TableAlterHandler<AlterTableDropColumnsRequest, AlterTableDropColumnsResponse> {
-
-    @Override
-    public TableChange[] buildGravitinoTableChange(AlterTableDropColumnsRequest request) {
-      return request.getColumns().stream()
-          .map(colName -> TableChange.deleteColumn(new String[] {colName}, false))
-          .toArray(TableChange[]::new);
-    }
-
-    @Override
-    public AlterTableDropColumnsResponse handle(
-        Table gravitinoTable, AlterTableDropColumnsRequest request) {
-      AlterTableDropColumnsResponse response = new AlterTableDropColumnsResponse();
-      Long version = extractTableVersion(gravitinoTable);
-      if (version != null) {
-        response.setVersion(version);
-      }
-      return response;
-    }
-  }
-
-  @VisibleForTesting
-  public static class AlterColumns
-      implements TableAlterHandler<AlterTableAlterColumnsRequest, AlterTableAlterColumnsResponse> {
-
-    @Override
-    public TableChange[] buildGravitinoTableChange(AlterTableAlterColumnsRequest request) {
-      return buildAlterColumnChanges(request);
-    }
-
-    @Override
-    public AlterTableAlterColumnsResponse handle(
-        Table gravitinoTable, AlterTableAlterColumnsRequest request) {
-      AlterTableAlterColumnsResponse response = new AlterTableAlterColumnsResponse();
-      Long version = extractTableVersion(gravitinoTable);
-      if (version != null) {
-        response.setVersion(version);
-      }
-
-      return response;
-    }
-
-    private TableChange[] buildAlterColumnChanges(AlterTableAlterColumnsRequest request) {
-      List<ColumnAlteration> columns = request.getAlterations();
-
-      List<TableChange> changes = new ArrayList<>();
-      for (ColumnAlteration column : columns) {
-        // Column name will not be null according to LanceDB spec.
-        String columnName = column.getColumn();
-        String newName = column.getRename();
-        if (StringUtils.isNotBlank(newName)) {
-          changes.add(TableChange.renameColumn(new String[] {columnName}, newName));
-        }
-
-        // The format of ColumnAlteration#castTo is unclear, so we will skip it now
-        // for more, please see:
-        // https://github.com/lance-format/lance-namespace/blob/9d9cde12520caea2fd80ea5f41a20a4db9b92524/java/lance-namespace-apache-client/api/openapi.yaml#L4508-L4511
-        if (StringUtils.isNotBlank(column.getCastTo())) {
-          LOG.error(
-              "Altering column '{}' data type is not supported yet due to unclear spec.",
-              columnName);
-          throw new UnsupportedOperationException(
-              "Altering column data type is not supported yet.");
-        }
-      }
-      return changes.stream().toArray(TableChange[]::new);
-    }
-  }
-
-  private static Long extractTableVersion(Table gravitinoTable) {
-    return Optional.ofNullable(gravitinoTable.properties().get(LanceConstants.LANCE_TABLE_VERSION))
-        .map(Long::valueOf)
-        .orElse(null);
+    return (GravitinoLanceTableAlterHandler<REQUEST, RESPONSE>) ALTER_HANDLERS.get(requestClass);
   }
 
   private List<Column> extractColumns(org.apache.arrow.vector.types.pojo.Schema arrowSchema) {

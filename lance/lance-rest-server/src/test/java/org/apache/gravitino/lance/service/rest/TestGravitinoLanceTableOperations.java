@@ -28,7 +28,8 @@ import com.lancedb.lance.namespace.model.AlterTableDropColumnsResponse;
 import com.lancedb.lance.namespace.model.ColumnAlteration;
 import java.util.List;
 import java.util.Map;
-import org.apache.gravitino.lance.common.ops.gravitino.GravitinoLanceTableOperations;
+import org.apache.gravitino.lance.common.ops.gravitino.GravitinoLanceTableAlterHandler.AlterColumnsGravitinoLance;
+import org.apache.gravitino.lance.common.ops.gravitino.GravitinoLanceTableAlterHandler.DropColumns;
 import org.apache.gravitino.rel.Table;
 import org.apache.gravitino.rel.TableChange;
 import org.junit.jupiter.api.Assertions;
@@ -42,8 +43,7 @@ class TestGravitinoLanceTableOperations {
     AlterTableDropColumnsRequest request = new AlterTableDropColumnsRequest();
     request.setColumns(List.of("col1", "col2"));
 
-    GravitinoLanceTableOperations.DropColumns handler =
-        new GravitinoLanceTableOperations.DropColumns();
+    DropColumns handler = new DropColumns();
 
     TableChange[] changes = handler.buildGravitinoTableChange(request);
     Assertions.assertEquals(2, changes.length);
@@ -63,8 +63,7 @@ class TestGravitinoLanceTableOperations {
     alteration.setRename("c1_new");
     request.setAlterations(List.of(alteration));
 
-    GravitinoLanceTableOperations.AlterColumns handler =
-        new GravitinoLanceTableOperations.AlterColumns();
+    AlterColumnsGravitinoLance handler = new AlterColumnsGravitinoLance();
 
     TableChange[] changes = handler.buildGravitinoTableChange(request);
     Assertions.assertEquals(1, changes.length);
