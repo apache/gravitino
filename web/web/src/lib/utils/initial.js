@@ -759,8 +759,8 @@ const relationalTablePropInfoMap = {
   'jdbc-hologres': {
     reserved: [],
     immutable: [],
-    allowDelete: false,
-    allowAdd: false
+    allowDelete: true,
+    allowAdd: true
   },
   'lakehouse-hudi': {
     reserved: [],
