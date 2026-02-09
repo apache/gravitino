@@ -389,6 +389,33 @@ public class TestHologresTableOperations {
   }
 
   @Test
+  void testCreateTablePrimaryKeyFilteredFromProperties() {
+    JdbcColumn col =
+        JdbcColumn.builder()
+            .withName("id")
+            .withType(Types.IntegerType.get())
+            .withNullable(false)
+            .build();
+    Map<String, String> properties = new HashMap<>();
+    properties.put("primary_key", "id");
+    properties.put("orientation", "column");
+    Index pk = Indexes.primary("pk_id", new String[][] {{"id"}});
+    String sql =
+        ops.createTableSql(
+            "test_table",
+            new JdbcColumn[] {col},
+            null,
+            properties,
+            Transforms.EMPTY_TRANSFORM,
+            Distributions.NONE,
+            new Index[] {pk});
+    // primary_key should NOT appear in WITH clause (it is defined via PRIMARY KEY constraint)
+    assertFalse(sql.contains("primary_key"));
+    assertTrue(sql.contains("orientation = 'column'"));
+    assertTrue(sql.contains("PRIMARY KEY"));
+  }
+
+  @Test
   void testCreateTableWithPhysicalPartition() {
     JdbcColumn col =
         JdbcColumn.builder()
@@ -582,6 +609,32 @@ public class TestHologresTableOperations {
     assertTrue(sql.contains("\"name\" text"));
     assertTrue(sql.contains("\"amount\" numeric(10,2)"));
     assertTrue(sql.contains("COMMENT ON TABLE \"orders\" IS 'Order table'"));
+  }
+
+  @Test
+  void testCreateTableCommentWithSingleQuotes() {
+    JdbcColumn col =
+        JdbcColumn.builder()
+            .withName("flag")
+            .withType(Types.StringType.get())
+            .withNullable(false)
+            .withComment("退货标志（'R'=已退货, 'A'=未退货）")
+            .build();
+    String sql =
+        ops.createTableSql(
+            "test_table",
+            new JdbcColumn[] {col},
+            "It's a test table",
+            Collections.emptyMap(),
+            Transforms.EMPTY_TRANSFORM,
+            Distributions.NONE,
+            Indexes.EMPTY_INDEXES);
+    // Single quotes in table comment should be escaped
+    assertTrue(sql.contains("IS 'It''s a test table'"));
+    // Single quotes in column comment should be escaped
+    assertTrue(sql.contains("IS '退货标志（''R''=已退货, ''A''=未退货）'"));
+    // Unescaped single quotes should NOT appear
+    assertFalse(sql.contains("IS 'It's"));
   }
 
   @Test

@@ -215,11 +215,13 @@ public class HologresTableOperations extends JdbcTableOperations
       withEntries.add("distribution_key = '" + distributionColumns + "'");
     }
 
-    // Add user-specified properties (filter out internal properties to avoid conflict)
+    // Add user-specified properties (filter out read-only / internally-handled properties)
     if (MapUtils.isNotEmpty(properties)) {
       properties.forEach(
           (key, value) -> {
-            if (!"distribution_key".equals(key) && !"is_logical_partitioned_table".equals(key)) {
+            if (!"distribution_key".equals(key)
+                && !"is_logical_partitioned_table".equals(key)
+                && !"primary_key".equals(key)) {
               withEntries.add(key + " = '" + value + "'");
             }
           });
@@ -246,7 +248,7 @@ public class HologresTableOperations extends JdbcTableOperations
           .append(tableName)
           .append(HOLO_QUOTE)
           .append(IS)
-          .append(comment)
+          .append(comment.replace("'", "''"))
           .append("';");
     }
     Arrays.stream(columns)
@@ -264,7 +266,7 @@ public class HologresTableOperations extends JdbcTableOperations
                     .append(jdbcColumn.name())
                     .append(HOLO_QUOTE)
                     .append(IS)
-                    .append(jdbcColumn.comment())
+                    .append(jdbcColumn.comment().replace("'", "''"))
                     .append("';"));
 
     // Return the generated SQL statement
