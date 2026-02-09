@@ -71,49 +71,84 @@ public class ViewOperationDispatcher extends OperationDispatcher implements View
   public View loadView(NameIdentifier ident) throws NoSuchViewException {
     LOG.info("Loading view: {}", ident);
 
-    return TreeLockUtils.doWithTreeLock(
-        ident,
-        LockType.READ,
-        () -> {
-          // Load view from the underlying catalog
-          View catalogView =
-              doWithCatalog(
-                  getCatalogIdentifier(ident),
-                  c -> c.doWithViewOps(v -> v.loadView(ident)),
-                  NoSuchViewException.class);
+    // First load with READ lock to check if view is already imported
+    EntityCombinedView entityCombinedView =
+        TreeLockUtils.doWithTreeLock(ident, LockType.READ, () -> internalLoadView(ident));
 
-          // Check if view exists in entity store
-          GenericEntity viewEntity = null;
-          try {
-            viewEntity = store.get(ident, Entity.EntityType.VIEW, GenericEntity.class);
-          } catch (NoSuchEntityException e) {
-            // View not in store yet, will auto-import below
-            LOG.debug("View {} not found in entity store, will auto-import", ident);
-          } catch (IOException ioe) {
-            LOG.warn("Failed to check if view {} exists in entity store", ident, ioe);
-          }
+    if (!entityCombinedView.imported()) {
+      // If not imported, take WRITE lock on schema (parent) and import
+      NameIdentifier schemaIdent = NameIdentifier.of(ident.namespace().levels());
+      entityCombinedView =
+          TreeLockUtils.doWithTreeLock(schemaIdent, LockType.WRITE, () -> importView(ident));
+    }
 
-          // If view doesn't exist in entity store, auto-import it
-          if (viewEntity == null) {
-            LOG.info("Auto-importing view {} into Gravitino entity store", ident);
-            long uid = idGenerator.nextId();
-            GenericEntity newViewEntity =
-                GenericEntity.builder()
-                    .withId(uid)
-                    .withName(ident.name())
-                    .withNamespace(ident.namespace())
-                    .withEntityType(Entity.EntityType.VIEW)
-                    .build();
-            try {
-              store.put(newViewEntity, false /* overwrite */);
-              LOG.info("Successfully imported view {} into entity store with id {}", ident, uid);
-            } catch (Exception e) {
-              // Log but don't fail - view import is best-effort
-              LOG.warn("Failed to import view {} into entity store: {}", ident, e.getMessage());
-            }
-          }
+    return entityCombinedView;
+  }
 
-          return catalogView;
-        });
+  /**
+   * Internal method to load view and check if it exists in entity store.
+   *
+   * @param ident The view identifier.
+   * @return EntityCombinedView containing the view and import status.
+   * @throws NoSuchViewException If the view does not exist.
+   */
+  private EntityCombinedView internalLoadView(NameIdentifier ident)
+      throws NoSuchViewException {
+    // Load view from the underlying catalog
+    View catalogView =
+        doWithCatalog(
+            getCatalogIdentifier(ident),
+            c -> c.doWithViewOps(v -> v.loadView(ident)),
+            NoSuchViewException.class);
+
+    // Check if view exists in entity store
+    try {
+      GenericEntity viewEntity =
+          store.get(ident, Entity.EntityType.VIEW, GenericEntity.class);
+      return EntityCombinedView.of(catalogView, viewEntity).withImported(true);
+    } catch (NoSuchEntityException e) {
+      // View not in store yet
+      LOG.debug("View {} not found in entity store", ident);
+      return EntityCombinedView.of(catalogView).withImported(false);
+    } catch (IOException ioe) {
+      LOG.warn("Failed to check if view {} exists in entity store", ident, ioe);
+      return EntityCombinedView.of(catalogView).withImported(false);
+    }
+  }
+
+  /**
+   * Import view into Gravitino entity store.
+   *
+   * @param ident The view identifier.
+   * @return EntityCombinedView containing the view and import status.
+   * @throws NoSuchViewException If the view does not exist.
+   */
+  private EntityCombinedView importView(NameIdentifier ident) throws NoSuchViewException {
+    // Double-check if already imported (another thread might have imported between locks)
+    EntityCombinedView entityCombinedView = internalLoadView(ident);
+
+    if (entityCombinedView.imported()) {
+      return entityCombinedView;
+    }
+
+    LOG.info("Auto-importing view {} into Gravitino entity store", ident);
+    long uid = idGenerator.nextId();
+    GenericEntity newViewEntity =
+        GenericEntity.builder()
+            .withId(uid)
+            .withName(ident.name())
+            .withNamespace(ident.namespace())
+            .withEntityType(Entity.EntityType.VIEW)
+            .build();
+    try {
+      store.put(newViewEntity, false /* overwrite */);
+      LOG.info("Successfully imported view {} into entity store with id {}", ident, uid);
+      return EntityCombinedView.of(entityCombinedView.viewFromCatalog(), newViewEntity)
+          .withImported(true);
+    } catch (Exception e) {
+      // Log but don't fail - view import is best-effort
+      LOG.warn("Failed to import view {} into entity store: {}", ident, e.getMessage());
+      return EntityCombinedView.of(entityCombinedView.viewFromCatalog()).withImported(false);
+    }
   }
 }
