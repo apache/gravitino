@@ -1104,6 +1104,10 @@ public class HologresTableOperations extends JdbcTableOperations
       case "binlog.level":
       case "binlog.ttl":
       case "is_logical_partitioned_table":
+      case "partition_expiration_time":
+      case "partition_keep_hot_window":
+      case "partition_require_filter":
+      case "partition_generate_binlog_window":
         return true;
       default:
         // Exclude internal properties like table_id, schema_version, etc.
