@@ -574,7 +574,6 @@ public class CatalogsPage extends BaseWebIT {
       LOG.warn("Normal click did not navigate, trying JavaScript click...");
 
       // Strategy 2: JavaScript click (bypasses overlay interception)
-      waitForLoading();
       link = driver.findElement(By.xpath(linkXpath));
       ((JavascriptExecutor) driver).executeScript("arguments[0].click();", link);
       Thread.sleep(ACTION_SLEEP * 1000);
@@ -585,7 +584,6 @@ public class CatalogsPage extends BaseWebIT {
       LOG.warn("JavaScript click did not navigate, trying direct URL navigation...");
 
       // Strategy 3: Extract href and navigate directly (bypasses SPA routing entirely)
-      waitForLoading();
       link = driver.findElement(By.xpath(linkXpath));
       String href = link.getAttribute("href");
       if (href != null && !href.isEmpty()) {
@@ -626,7 +624,6 @@ public class CatalogsPage extends BaseWebIT {
       LOG.warn("Normal click did not navigate to schema, trying JavaScript click...");
 
       // Strategy 2: JavaScript click
-      waitForLoading();
       link = driver.findElement(By.xpath(linkXpath));
       ((JavascriptExecutor) driver).executeScript("arguments[0].click();", link);
       Thread.sleep(ACTION_SLEEP * 1000);
@@ -637,7 +634,6 @@ public class CatalogsPage extends BaseWebIT {
       LOG.warn("JavaScript click did not navigate to schema, trying direct URL navigation...");
 
       // Strategy 3: Extract href and navigate directly
-      waitForLoading();
       link = driver.findElement(By.xpath(linkXpath));
       String href = link.getAttribute("href");
       if (href != null && !href.isEmpty()) {
@@ -682,7 +678,6 @@ public class CatalogsPage extends BaseWebIT {
       LOG.warn("Normal click did not navigate to table, trying JavaScript click...");
 
       // Strategy 2: JavaScript click
-      waitForLoading();
       link = driver.findElement(By.xpath(linkXpath));
       ((JavascriptExecutor) driver).executeScript("arguments[0].click();", link);
       Thread.sleep(ACTION_SLEEP * 1000);
@@ -693,7 +688,6 @@ public class CatalogsPage extends BaseWebIT {
       LOG.warn("JavaScript click did not navigate to table, trying direct URL navigation...");
 
       // Strategy 3: Extract href and navigate directly
-      waitForLoading();
       link = driver.findElement(By.xpath(linkXpath));
       String href = link.getAttribute("href");
       if (href != null && !href.isEmpty()) {
@@ -710,12 +704,47 @@ public class CatalogsPage extends BaseWebIT {
 
   public void clickBreadCrumbsToCatalogs() {
     try {
-      waitForLoading();
+      String urlBefore = driver.getCurrentUrl();
+      WebDriverWait shortWait = new WebDriverWait(driver, Duration.ofSeconds(10));
       WebDriverWait wait = new WebDriverWait(driver, Duration.ofSeconds(MAX_TIMEOUT));
+
+      // Strategy 1: Normal click
       wait.until(ExpectedConditions.elementToBeClickable(metalakeNameLink));
       clickAndWait(metalakeNameLink);
+      if (isUrlChanged(urlBefore, shortWait)) {
+        LOG.info("Breadcrumb navigation succeeded via normal click");
+        return;
+      }
+      LOG.warn("Normal breadcrumb click did not navigate, trying JavaScript click...");
+
+      // Strategy 2: JavaScript click
+      ((JavascriptExecutor) driver).executeScript("arguments[0].click();", metalakeNameLink);
+      Thread.sleep(ACTION_SLEEP * 1000);
+      if (isUrlChanged(urlBefore, shortWait)) {
+        LOG.info("Breadcrumb navigation succeeded via JavaScript click");
+        return;
+      }
+      LOG.warn("JavaScript breadcrumb click did not navigate, trying direct URL navigation...");
+
+      // Strategy 3: Extract href and navigate directly
+      String href = metalakeNameLink.getAttribute("href");
+      if (href != null && !href.isEmpty()) {
+        driver.get(href);
+        LOG.info("Breadcrumb navigation succeeded via direct URL: {}", href);
+        return;
+      }
+      LOG.error("Failed to navigate via breadcrumb: href was empty");
     } catch (Exception e) {
       LOG.error(e.getMessage(), e);
+    }
+  }
+
+  private boolean isUrlChanged(String urlBefore, WebDriverWait wait) {
+    try {
+      wait.until(d -> !d.getCurrentUrl().equals(urlBefore));
+      return true;
+    } catch (TimeoutException e) {
+      return false;
     }
   }
 
@@ -748,33 +777,21 @@ public class CatalogsPage extends BaseWebIT {
   }
 
   public void clickTreeNode(String nodeKey) throws InterruptedException {
-    waitForLoading();
     // Parse nodeKey format: {{metalake}}{{catalog}}{{type}} or
     // {{metalake}}{{catalog}}{{type}}{{schema}} etc.
-    // Extract the last meaningful part (the node name to click)
     String[] parts = nodeKey.replace("{{", "").split("}}");
     String nodeName = "";
 
-    // The parts array will contain: [metalake, catalog, type, schema?, entity?]
-    // We need to get the actual node name (catalog, schema, or entity name)
     if (parts.length >= 2) {
-      // For catalog node: parts[1] is catalog name
-      // For schema node: parts[3] is schema name
-      // For table node: parts[4] is table name
       if (parts.length == 3) {
-        // Catalog node: {{metalake}}{{catalog}}{{type}}
         nodeName = parts[1];
       } else if (parts.length == 4) {
-        // Schema node: {{metalake}}{{catalog}}{{type}}{{schema}}
         nodeName = parts[3];
       } else if (parts.length >= 5) {
-        // Table/Entity node: {{metalake}}{{catalog}}{{type}}{{schema}}{{entity}}
         nodeName = parts[4];
       }
     }
 
-    // Use Ant Design Tree structure to find the node by its title.
-    // Try multiple locators to handle UI variations and ensure node is visible/clickable.
     String[] candidateXpaths =
         new String[] {
           "//div[contains(@class, 'ant-tree-treenode')]//span[contains(@class, 'ant-tree-title')]//div[@title='"
@@ -791,43 +808,96 @@ public class CatalogsPage extends BaseWebIT {
               + "']",
         };
 
+    String urlBefore = driver.getCurrentUrl();
     WebDriverWait wait = new WebDriverWait(driver, Duration.ofSeconds(MAX_TIMEOUT));
+    WebDriverWait shortWait = new WebDriverWait(driver, Duration.ofSeconds(10));
+
+    // Strategy 1 & 2: Find tree node and try normal click then JS click
     WebElement treeNode = null;
     for (String xp : candidateXpaths) {
       try {
         treeNode = wait.until(ExpectedConditions.presenceOfElementLocated(By.xpath(xp)));
         if (treeNode != null) {
-          // Scroll into view and try to click
           ((JavascriptExecutor) driver)
               .executeScript("arguments[0].scrollIntoView({block: 'center'});", treeNode);
+
+          // Strategy 1: Normal click
           try {
             wait.until(ExpectedConditions.elementToBeClickable(treeNode));
             clickAndWait(treeNode);
-            return;
-          } catch (Exception clickEx) {
-            // fallback to JS click
-            try {
-              waitForLoading();
-              ((JavascriptExecutor) driver).executeScript("arguments[0].click();", treeNode);
-              Thread.sleep(300);
+            if (isUrlChanged(urlBefore, shortWait)) {
+              LOG.info("Tree node '{}' navigation succeeded via normal click", nodeName);
               return;
-            } catch (Exception jsEx) {
-              LOG.debug(
-                  "clickTreeNode: failed to click xpath {}: {}, {}",
-                  xp,
-                  clickEx.getMessage(),
-                  jsEx.getMessage());
             }
+            LOG.warn("Normal click on tree node '{}' did not navigate", nodeName);
+          } catch (Exception clickEx) {
+            LOG.debug("clickTreeNode: normal click failed for {}: {}", xp, clickEx.getMessage());
           }
+
+          // Strategy 2: JavaScript click
+          try {
+            ((JavascriptExecutor) driver).executeScript("arguments[0].click();", treeNode);
+            Thread.sleep(ACTION_SLEEP * 1000);
+            if (isUrlChanged(urlBefore, shortWait)) {
+              LOG.info("Tree node '{}' navigation succeeded via JavaScript click", nodeName);
+              return;
+            }
+            LOG.warn("JavaScript click on tree node '{}' did not navigate", nodeName);
+          } catch (Exception jsEx) {
+            LOG.debug("clickTreeNode: JS click failed for {}: {}", xp, jsEx.getMessage());
+          }
+
+          // Found and tried to click the node; break out of xpath loop to try Strategy 3
+          break;
         }
       } catch (Exception e) {
         LOG.debug("clickTreeNode: xpath {} not found: {}", xp, e.getMessage());
       }
     }
 
-    // If we reach here, we couldn't find/click the node; throw a descriptive error
+    // Strategy 3: Construct URL from nodeKey parts and navigate directly
+    LOG.warn("Click strategies failed for tree node '{}', trying direct URL navigation", nodeName);
+    String directUrl = buildTreeNodeUrl(parts);
+    if (directUrl != null) {
+      driver.get(directUrl);
+      LOG.info("Tree node '{}' navigation succeeded via direct URL: {}", nodeName, directUrl);
+      return;
+    }
+
     throw new InterruptedException(
-        "clickTreeNode: could not locate or click tree node '" + nodeName + "'");
+        "clickTreeNode: could not navigate to tree node '" + nodeName + "'");
+  }
+
+  /**
+   * Constructs the direct URL for a tree node based on the parsed nodeKey parts. The URL pattern
+   * matches the Next.js routing used by the front-end: catalog node →
+   * /catalogs?metalake=X&catalog=Y&catalogType=Z schema node → adds &schema=W table node → adds
+   * &table=V
+   */
+  private String buildTreeNodeUrl(String[] parts) {
+    if (parts.length < 3) {
+      return null;
+    }
+    String metalake = parts[0];
+    String catalog = parts[1];
+    String catalogType = parts[2];
+
+    // Get base URL from current page
+    String currentUrl = driver.getCurrentUrl();
+    String baseUrl = currentUrl.split("/catalogs")[0] + "/catalogs";
+
+    StringBuilder url = new StringBuilder(baseUrl);
+    url.append("?metalake=").append(metalake);
+    url.append("&catalog=").append(catalog);
+    url.append("&catalogType=").append(catalogType);
+
+    if (parts.length >= 4) {
+      url.append("&schema=").append(parts[3]);
+    }
+    if (parts.length >= 5) {
+      url.append("&table=").append(parts[4]);
+    }
+    return url.toString();
   }
 
   public void clickTreeNodeRefresh(String nodeKey) throws InterruptedException {
