@@ -25,6 +25,7 @@ import com.google.common.collect.Maps;
 import java.util.Map;
 import org.apache.gravitino.EntityStore;
 import org.apache.gravitino.NameIdentifier;
+import org.apache.gravitino.StringIdentifier;
 import org.apache.gravitino.catalog.ManagedSchemaOperations;
 import org.apache.gravitino.rel.Column;
 import org.apache.gravitino.rel.Table;
@@ -125,27 +126,78 @@ public class TestDeltaTableOperations {
   }
 
   @Test
-  public void testCreateTableWithPartitionsThrowsException() {
+  public void testCreateTableWithIdentityPartitionsSucceeds() {
     NameIdentifier ident = NameIdentifier.of("catalog", "schema", "table");
-    Column[] columns = new Column[] {Column.of("id", Types.IntegerType.get(), "id column")};
+    Column[] columns =
+        new Column[] {
+          Column.of("id", Types.IntegerType.get(), "id column"),
+          Column.of("region", Types.StringType.get(), "region column")
+        };
+    String location = tempDir.resolve("delta_table").toString();
+
+    Map<String, String> properties = Maps.newHashMap();
+    properties.put(Table.PROPERTY_EXTERNAL, "true");
+    properties.put(Table.PROPERTY_LOCATION, location);
+    StringIdentifier stringId = StringIdentifier.fromId(1L);
+    Map<String, String> newProperties = StringIdentifier.newPropertiesWithId(stringId, properties);
+
+    Transform[] partitions = new Transform[] {Transforms.identity("region")};
+
+    // Should NOT throw exception with identity partitions
+    // Note: We can't fully create the table with mocks, but validation should pass
+    Assertions.assertDoesNotThrow(
+        () -> {
+          deltaTableOps.createTable(
+              ident, columns, null, newProperties, partitions, null, null, null);
+        });
+  }
+
+  @Test
+  public void testCreateTableWithNonIdentityPartitionsThrowsException() {
+    NameIdentifier ident = NameIdentifier.of("catalog", "schema", "table");
+    Column[] columns =
+        new Column[] {
+          Column.of("id", Types.IntegerType.get(), "id column"),
+          Column.of("created_at", Types.DateType.get(), "created_at column")
+        };
     String location = tempDir.resolve("delta_table").toString();
 
     Map<String, String> properties = Maps.newHashMap();
     properties.put(Table.PROPERTY_EXTERNAL, "true");
     properties.put(Table.PROPERTY_LOCATION, location);
 
-    Transform[] partitions = new Transform[] {Transforms.identity("id")};
-
-    IllegalArgumentException exception =
+    // Test bucket transform
+    Transform[] bucketPartitions = new Transform[] {Transforms.bucket(10, new String[] {"id"})};
+    IllegalArgumentException bucketException =
         Assertions.assertThrows(
             IllegalArgumentException.class,
             () ->
                 deltaTableOps.createTable(
-                    ident, columns, null, properties, partitions, null, null, null));
+                    ident, columns, null, properties, bucketPartitions, null, null, null));
+    Assertions.assertTrue(bucketException.getMessage().contains("identity partitioning"));
+    Assertions.assertTrue(bucketException.getMessage().contains("bucket"));
 
-    Assertions.assertTrue(exception.getMessage().contains("partitioning"));
-    Assertions.assertTrue(exception.getMessage().contains("doesn't support"));
-    Assertions.assertTrue(exception.getMessage().contains("Delta transaction log"));
+    // Test year transform
+    Transform[] yearPartitions = new Transform[] {Transforms.year("created_at")};
+    IllegalArgumentException yearException =
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () ->
+                deltaTableOps.createTable(
+                    ident, columns, null, properties, yearPartitions, null, null, null));
+    Assertions.assertTrue(yearException.getMessage().contains("identity partitioning"));
+    Assertions.assertTrue(yearException.getMessage().contains("year"));
+
+    // Test truncate transform
+    Transform[] truncatePartitions = new Transform[] {Transforms.truncate(10, "id")};
+    IllegalArgumentException truncateException =
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () ->
+                deltaTableOps.createTable(
+                    ident, columns, null, properties, truncatePartitions, null, null, null));
+    Assertions.assertTrue(truncateException.getMessage().contains("identity partitioning"));
+    Assertions.assertTrue(truncateException.getMessage().contains("truncate"));
   }
 
   @Test

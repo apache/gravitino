@@ -38,6 +38,7 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.NoSuchElementException;
 import org.apache.commons.io.FileUtils;
 import org.apache.gravitino.Catalog;
 import org.apache.gravitino.NameIdentifier;
@@ -383,7 +384,7 @@ public class CatalogGenericCatalogDeltaIT extends BaseIT {
   }
 
   @Test
-  public void testCreateDeltaTableWithPartitionsThrowsException() {
+  public void testCreateDeltaTableWithIdentityPartitionsSucceeds() throws Exception {
     Column[] columns = createColumns();
     NameIdentifier nameIdentifier = NameIdentifier.of(schemaName, tableName);
 
@@ -395,7 +396,41 @@ public class CatalogGenericCatalogDeltaIT extends BaseIT {
 
     Transform[] partitions = new Transform[] {Transforms.identity("created_at")};
 
-    IllegalArgumentException exception =
+    // Create Delta table with identity partitions should succeed
+    Table table =
+        catalog
+            .asTableCatalog()
+            .createTable(
+                nameIdentifier, columns, TABLE_COMMENT, properties, partitions, null, null, null);
+
+    Assertions.assertNotNull(table);
+    Assertions.assertEquals(1, table.partitioning().length);
+    Assertions.assertEquals("identity", table.partitioning()[0].name());
+
+    // Verify partition metadata is persisted
+    Table loadedTable = catalog.asTableCatalog().loadTable(nameIdentifier);
+    Assertions.assertEquals(1, loadedTable.partitioning().length);
+    Assertions.assertEquals("identity", loadedTable.partitioning()[0].name());
+
+    // Cleanup
+    catalog.asTableCatalog().dropTable(nameIdentifier);
+  }
+
+  @Test
+  public void testCreateDeltaTableWithNonIdentityPartitionsThrowsException() {
+    Column[] columns = createColumns();
+    NameIdentifier nameIdentifier = NameIdentifier.of(schemaName, tableName);
+
+    Map<String, String> properties = createTableProperties();
+    String tableLocation = tempDirectory + "/" + tableName;
+    properties.put(Table.PROPERTY_TABLE_FORMAT, DeltaConstants.DELTA_TABLE_FORMAT);
+    properties.put(Table.PROPERTY_LOCATION, tableLocation);
+    properties.put(Table.PROPERTY_EXTERNAL, "true");
+
+    // Test bucket transform
+    Transform[] bucketPartitions =
+        new Transform[] {Transforms.bucket(10, new String[] {COL_NAME1})};
+    IllegalArgumentException bucketException =
         Assertions.assertThrows(
             IllegalArgumentException.class,
             () ->
@@ -406,13 +441,13 @@ public class CatalogGenericCatalogDeltaIT extends BaseIT {
                         columns,
                         TABLE_COMMENT,
                         properties,
-                        partitions,
+                        bucketPartitions,
                         null,
                         null,
                         null));
 
-    Assertions.assertTrue(exception.getMessage().contains("partitioning"));
-    Assertions.assertTrue(exception.getMessage().contains("doesn't support"));
+    Assertions.assertTrue(bucketException.getMessage().contains("identity partitioning"));
+    Assertions.assertTrue(bucketException.getMessage().contains("bucket"));
   }
 
   @Test
@@ -582,7 +617,7 @@ public class CatalogGenericCatalogDeltaIT extends BaseIT {
 
           @Override
           public Row next() {
-            throw new java.util.NoSuchElementException("Empty iterator");
+            throw new NoSuchElementException("Empty iterator");
           }
         };
       }

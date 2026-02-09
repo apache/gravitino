@@ -73,8 +73,10 @@ import org.apache.gravitino.storage.IdGenerator;
  *   <li>Only supports external tables ({@code external=true} must be explicitly set)
  *   <li>Schema comes from CREATE TABLE request (not validated against Delta log)
  *   <li>User is responsible for ensuring schema accuracy matches the actual Delta table
- *   <li>Partitions, distribution, sort orders, and indexes must not be specified (throws
- *       IllegalArgumentException)
+ *   <li>Supports identity partitioning as metadata only (user must ensure it matches actual Delta
+ *       table)
+ *   <li>Non-identity transforms (bucket, truncate, etc.), distribution, sort orders, and indexes
+ *       are not supported
  * </ul>
  */
 public class DeltaTableOperations extends ManagedTableOperations {
@@ -119,10 +121,18 @@ public class DeltaTableOperations extends ManagedTableOperations {
    *   <li>{@code location} - Storage path of the existing Delta table
    * </ul>
    *
+   * <p><b>Supported Partitioning:</b>
+   *
+   * <ul>
+   *   <li>Identity transforms only (e.g., {@code Transforms.identity("column_name")})
+   *   <li>Partition information is stored as metadata only
+   *   <li>User is responsible for ensuring partition metadata matches the actual Delta table
+   *   <li>Non-identity transforms (bucket, truncate, year, month, etc.) are not supported
+   * </ul>
+   *
    * <p><b>Disallowed Parameters:</b>
    *
    * <ul>
-   *   <li>Partitions - Delta table partitioning is managed in the Delta log, not Gravitino
    *   <li>Distribution - Not applicable for external Delta tables
    *   <li>Sort orders - Not applicable for external Delta tables
    *   <li>Indexes - Not applicable for external Delta tables
@@ -133,15 +143,16 @@ public class DeltaTableOperations extends ManagedTableOperations {
    * @param comment the table comment
    * @param properties the table properties (must include {@code external=true} and {@code
    *     location})
-   * @param partitions the partitioning (must be empty or null)
+   * @param partitions the partitioning (optional, identity transforms only)
    * @param distribution the distribution (must be NONE or null)
    * @param sortOrders the sort orders (must be empty or null)
    * @param indexes the indexes (must be empty or null)
    * @return the created table metadata
    * @throws NoSuchSchemaException if the schema does not exist
    * @throws TableAlreadyExistsException if the table already exists
-   * @throws IllegalArgumentException if {@code external=true} is not set, location is missing, or
-   *     any partitions, distribution, sort orders, or indexes are specified
+   * @throws IllegalArgumentException if {@code external=true} is not set, location is missing,
+   *     non-identity partitions are specified, or distribution, sort orders, or indexes are
+   *     specified
    */
   @Override
   public Table createTable(
@@ -171,11 +182,20 @@ public class DeltaTableOperations extends ManagedTableOperations {
             + " Delta table location.",
         Table.PROPERTY_LOCATION);
 
-    // Validate that partitioning, distribution, sort orders, and indexes are not specified
-    Preconditions.checkArgument(
-        partitions == null || partitions.length == 0,
-        "Delta table doesn't support specifying partitioning in CREATE TABLE. "
-            + "Partitioning is managed in the Delta transaction log.");
+    // Validate partition transforms - only identity transforms are allowed
+    Transform[] validatedPartitions = Transforms.EMPTY_TRANSFORM;
+    if (partitions != null && partitions.length > 0) {
+      for (Transform partition : partitions) {
+        Preconditions.checkArgument(
+            partition instanceof Transform.SingleFieldTransform
+                && "identity".equalsIgnoreCase(partition.name()),
+            "Delta table only supports identity partitioning. "
+                + "Non-identity transforms (bucket, truncate, year, month, etc.) are not supported. "
+                + "Invalid transform: %s",
+            partition.name());
+      }
+      validatedPartitions = partitions;
+    }
 
     Preconditions.checkArgument(
         distribution == null || distribution.equals(Distributions.NONE),
@@ -198,7 +218,7 @@ public class DeltaTableOperations extends ManagedTableOperations {
         columns,
         comment,
         nonNullProps,
-        Transforms.EMPTY_TRANSFORM,
+        validatedPartitions,
         Distributions.NONE,
         SortOrders.NONE,
         Indexes.EMPTY_INDEXES);

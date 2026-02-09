@@ -45,10 +45,10 @@ For Delta tables in a Generic Lakehouse Catalog, the following table summarizes 
 - **External Tables Only:** Must set `external=true` when creating Delta tables
 - **Alter Operations:** Not supported; modify tables using Delta Lake APIs or Spark, then update Gravitino metadata if needed
 - **Purge:** Not applicable for external tables; use DROP to remove metadata only
-- **Partitioning:** Partition information can be specified but is informational only (managed by Delta log)
-- **Sort Orders:** Not enforced by Delta Lake
-- **Distributions:** Not applicable for Delta Lake
-- **Indexes:** Not supported by Delta Lake
+- **Partitioning:** Identity partitions supported as metadata only; user must ensure consistency with actual Delta table
+- **Sort Orders:** Not supported in CREATE TABLE
+- **Distributions:** Not supported in CREATE TABLE
+- **Indexes:** Not supported in CREATE TABLE
 :::
 
 ### Data Type Mappings
@@ -68,8 +68,8 @@ Delta Lake uses Apache Spark data types. The following table shows type mappings
 | `String`            | `StringType`           |                                 |
 | `Binary`            | `BinaryType`           |                                 |
 | `Date`              | `DateType`             |                                 |
-| `Timestamp`         | `TimestampType`        |                                 |
-| `Timestamp_tz`      | `TimestampNTZType`     | Spark 3.4+                      |
+| `Timestamp`         | `TimestampNTZType`     | No timezone, Spark 3.4+         |
+| `Timestamp_tz`      | `TimestampType`        | With timezone                   |
 | `List`              | `ArrayType`            |                                 |
 | `Map`               | `MapType`              |                                 |
 | `Struct`            | `StructType`           |                                 |
@@ -167,9 +167,9 @@ tableCatalog.createTable(
     },
     "Customer orders Delta table",
     tableProperties,
-    null,  // partitions (informational only)
-    null,  // distributions (not applicable)
-    null,  // sortOrders (not enforced)
+    null,  // partitions (optional, identity only)
+    null,  // distributions (not supported)
+    null,  // sortOrders (not supported)
     null   // indexes (not supported)
 );
 ```
@@ -300,7 +300,7 @@ df.show();
 
 ### Partitioned Delta Tables
 
-While Delta Lake supports partitioning, Gravitino treats partition information as metadata only:
+Delta Lake supports partitioning, and Gravitino can store identity partition metadata for external Delta tables. The partition information is metadata-only and must match the actual Delta table's partitioning scheme defined in the Delta transaction log.
 
 ```java
 // Register a partitioned Delta table
@@ -310,7 +310,7 @@ Map<String, String> properties = ImmutableMap.<String, String>builder()
     .put("location", "s3://my-bucket/delta-tables/sales_partitioned")
     .build();
 
-// You can specify partitions for documentation purposes
+// Specify identity partitions (metadata only)
 Transform[] partitions = new Transform[] {
     Transforms.identity("year"),
     Transforms.identity("month")
@@ -321,13 +321,19 @@ tableCatalog.createTable(
     columns,
     "Partitioned sales data",
     properties,
-    partitions,  // Stored as metadata, not enforced
-    null, null, null
-);
+    partitions,  // Identity partitions supported
+    null,
+    null,
+    null);
 ```
 
 :::note
-Partition information in Gravitino is **informational only**. The actual partitioning is managed by Delta Lake in the _delta_log. Gravitino will log a warning if partitions are specified during table creation.
+Partition information in Gravitino is **metadata only**:
+- Only **identity transforms** are supported (e.g., `Transforms.identity("column")`)
+- Non-identity transforms (bucket, truncate, year, month, etc.) will be rejected
+- The actual partitioning is managed by Delta Lake in the _delta_log
+- **User responsibility**: Ensure the partition metadata you provide matches the actual Delta table's partitioning
+- Gravitino does not validate partition metadata against the Delta transaction log
 :::
 
 ## Advanced Topics
@@ -364,8 +370,8 @@ manually remove files from the storage location
 
 - **Managed Tables**: Not supported; only external tables are available
 - **ALTER Operations**: Cannot modify table schema through Gravitino; use Delta Lake APIs
-- **Partitioning**: Partition metadata is informational only
-- **Indexes**: Not supported by Delta Lake format
+- **Partitioning**: Only identity partitions supported; stored as metadata only (not validated against Delta log)
+- **Indexes**: Not supported in CREATE TABLE
 - **Time Travel**: Access via Delta Lake APIs directly; not exposed through Gravitino
 
 ### Planned Enhancements
