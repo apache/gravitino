@@ -91,7 +91,7 @@ You can also specify filter parameters by setting configuration entries in the s
 ### Catalog backend configuration
 
 :::info
-The Gravitino Iceberg REST catalog service uses the memory catalog backend by default. You can specify a Hive or JDBC catalog backend for production environment.
+The Gravitino Iceberg REST catalog service uses the memory catalog backend by default. You can specify a Hive, JDBC or REST catalog backend for production environment.
 :::
 
 #### Hive backend configuration
@@ -122,6 +122,37 @@ If you have a JDBC Iceberg catalog prior, you must set `catalog-backend-name` to
 You must download the corresponding JDBC driver to the `iceberg-rest-server/libs` directory.
 If you are using multiple JDBC catalog backends, setting `jdbc-initialize` to true may not take effect for RDBMS like `Mysql`, you should create Iceberg meta tables explicitly.
 :::
+
+#### REST backend configuration
+
+Use the REST backend to proxy another Iceberg REST catalog server (IRC2). The Gravitino Iceberg REST service acts as IRC1 and forwards catalog operations to IRC2.
+
+| Configuration item                       | Description                                                                                                                   | Default value | Required | Since Version |
+|------------------------------------------|-------------------------------------------------------------------------------------------------------------------------------|---------------|----------|---------------|
+| `gravitino.iceberg-rest.catalog-backend` | The Catalog backend of the Gravitino Iceberg REST catalog service. Use the value **`rest`** for the REST catalog backend.     | `memory`      | Yes      | 0.2.0         |
+| `gravitino.iceberg-rest.uri`             | The Iceberg REST catalog URI (IRC2), such as `http://127.0.0.1:9001/iceberg`.                                                 | (none)        | Yes      | 0.2.0         |
+| `gravitino.iceberg-rest.warehouse`       | The catalog name in the Iceberg REST spec. Set to a specific catalog name, or leave empty to use the default catalog on IRC2. | (none)        | No       | 0.2.0         |
+
+IRC1 configuration example if IRC2 using HDFS storage:
+
+```text
+gravitino.iceberg-rest.catalog-backend = rest
+gravitino.iceberg-rest.uri = http://127.0.0.1:9001/iceberg
+```
+
+IRC1 configuration example if IRC2 using S3 storage:
+
+```text
+gravitino.iceberg-rest.catalog-backend = rest
+gravitino.iceberg-rest.uri = http://127.0.0.1:9001/iceberg
+gravitino.iceberg-rest.s3-access-key-id = xx
+gravitino.iceberg-rest.s3-secret-access-key = xx
+gravitino.iceberg-rest.s3-region = xx
+gravitino.iceberg-rest.credential-providers = s3-secret-key
+gravitino.iceberg-rest.header.X-Iceberg-Access-Delegation = vended-credentials
+```
+
+IRC1 must also configure S3 configurations if the client side requests credential vending.
 
 #### Custom backend configuration
 
