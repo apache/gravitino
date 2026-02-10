@@ -17,7 +17,15 @@
  * under the License.
  */
 
-import org.gradle.api.tasks.Exec
+import io.github.liurenjie1024.gradle.rust.CargoBuildTask
+import io.github.liurenjie1024.gradle.rust.CargoCleanTask
+import io.github.liurenjie1024.gradle.rust.CargoDocTask
+import io.github.liurenjie1024.gradle.rust.CargoTestTask
+import io.github.liurenjie1024.gradle.rust.FeatureSpec as CargoFeatureSpec
+
+plugins {
+  id("io.github.liurenjie1024.gradle.rust") version "0.1.0"
+}
 
 val checkRustEnvironment by tasks.registering(Exec::class) {
   commandLine("bash", "-c", "cargo --version")
@@ -26,10 +34,16 @@ val checkRustEnvironment by tasks.registering(Exec::class) {
   isIgnoreExitValue = false
 }
 
-val buildRustProject by tasks.registering(Exec::class) {
+val buildRustProject = tasks.withType(CargoBuildTask::class.java)
+val testRustProject = tasks.withType(CargoTestTask::class.java)
+
+buildRustProject.configureEach {
   dependsOn(checkRustEnvironment)
-  workingDir = file("$projectDir")
-  commandLine("bash", "-c", "make build")
+  dependsOn(testRustProject)
+  verbose = false
+  release = true
+  extraCargoBuildArguments = listOf("--workspace")
+  featureSpec = CargoFeatureSpec.all()
 }
 
 val checkRustProject by tasks.registering(Exec::class) {
@@ -39,45 +53,25 @@ val checkRustProject by tasks.registering(Exec::class) {
   commandLine("bash", "-c", "make check")
 }
 
-val testRustProject by tasks.registering(Exec::class) {
+testRustProject.configureEach {
   dependsOn(checkRustEnvironment)
-  workingDir = file("$projectDir")
-  commandLine("bash", "-c", "make test")
-
-  standardOutput = System.out
-  errorOutput = System.err
-}
-
-val cleanRustProject by tasks.registering(Exec::class) {
-  dependsOn(checkRustEnvironment)
-  workingDir = file("$projectDir")
-  commandLine("bash", "-c", "make clean")
-
-  standardOutput = System.out
-  errorOutput = System.err
-}
-
-tasks.named("testRustProject") {
   mustRunAfter("checkRustProject")
-}
-tasks.named("buildRustProject") {
-  mustRunAfter("testRustProject")
+  extraCargoBuildArguments = listOf("--no-fail-fast", "--all-targets", "--all-features", "--workspace")
 }
 
-tasks.named("build") {
-  dependsOn(testRustProject)
-  dependsOn(buildRustProject)
+tasks.withType(CargoCleanTask::class.java).configureEach {
+  dependsOn(checkRustEnvironment)
 }
 
-tasks.named("check") {
-  dependsOn.clear()
-  dependsOn(checkRustProject)
+tasks.withType(CargoDocTask::class.java).configureEach {
+  dependsOn(checkRustEnvironment)
 }
 
 tasks.named("test") {
   dependsOn(testRustProject)
 }
 
-tasks.named("clean") {
-  dependsOn(cleanRustProject)
+tasks.named("check") {
+  dependsOn.clear()
+  dependsOn(checkRustProject)
 }
