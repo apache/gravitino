@@ -23,7 +23,7 @@ import { createContext, useContext, useEffect, useMemo, useState } from 'react'
 import dynamic from 'next/dynamic'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { ExclamationCircleFilled, PlusOutlined } from '@ant-design/icons'
-import { Button, Drawer, Flex, Input, Modal, Space, Spin, Table, Tooltip, Typography } from 'antd'
+import { Button, Descriptions, Drawer, Empty, Flex, Input, Modal, Spin, Table, Tooltip, Typography } from 'antd'
 import { useAntdColumnResize } from 'react-antd-column-resize'
 import ConfirmInput from '@/components/ConfirmInput'
 import Icons from '@/components/Icons'
@@ -255,183 +255,217 @@ export default function JobTemplatesPage() {
             loading={isLoadingDetails}
             onClose={onClose}
             open={openDetailJobTemplate}
+            width={640}
           >
-            <>
-              <div className='my-4'>
-                <div className='text-sm text-slate-400'>Template Name</div>
-                <span className='break-words text-base'>{currentJobTemplate?.name}</span>
-              </div>
-              <div className='my-4'>
-                <div className='text-sm text-slate-400'>Job Type</div>
-                <span className='break-words text-base'>{currentJobTemplate?.jobType}</span>
-              </div>
-              <div className='my-4'>
-                <div className='text-sm text-slate-400'>Executable</div>
-                <span className='break-words text-base'>{currentJobTemplate?.executable}</span>
-              </div>
-              <div className='my-4'>
-                <div className='text-sm text-slate-400'>Comment</div>
-                <span className='break-words text-base'>{currentJobTemplate?.comment || '-'}</span>
-              </div>
-              <div className='my-4'>
-                <div className='text-sm text-slate-400'>Arguments</div>
-                <span className='break-words text-base'>
-                  {currentJobTemplate?.arguments.length === 1
-                    ? currentJobTemplate?.arguments[0]
-                    : currentJobTemplate?.arguments.length
-                      ? currentJobTemplate?.arguments.join(', ')
-                      : '-'}
-                </span>
-              </div>
-              <div className='my-4'>
-                <div className='mb-1 text-sm text-slate-400'>Environment Variable(s)</div>
-                <Space.Compact className='max-h-80 w-full overflow-auto'>
-                  <Space.Compact direction='vertical' className='w-1/2 divide-y border-gray-100'>
-                    <span className='bg-gray-100 p-1'>Env Var Name</span>
-                    {currentJobTemplate?.environments
-                      ? Object.keys(currentJobTemplate?.environments).map(envName => (
-                          <span key={envName} className='truncate p-1' title={envName}>
-                            {envName}
-                          </span>
-                        ))
-                      : null}
-                  </Space.Compact>
-                  <Space.Compact direction='vertical' className='w-1/2 divide-y border-gray-100'>
-                    <span className='bg-gray-100 p-1'>Env Var Value</span>
-                    {currentJobTemplate?.environments
-                      ? Object.values(currentJobTemplate?.environments).map(envValue => (
-                          <span key={envValue} className='truncate p-1' title={envValue}>
-                            {envValue || '-'}
-                          </span>
-                        ))
-                      : null}
-                  </Space.Compact>
-                </Space.Compact>
-              </div>
-              <div className='my-4'>
-                <div className='mb-1 text-sm text-slate-400'>Custom Fields</div>
-                <Space.Compact className='max-h-80 w-full overflow-auto'>
-                  <Space.Compact direction='vertical' className='w-1/2 divide-y border-gray-100'>
-                    <span className='bg-gray-100 p-1'>Key</span>
-                    {currentJobTemplate?.customFields
-                      ? Object.keys(currentJobTemplate?.customFields).map(field => (
-                          <span key={field} className='truncate p-1' title={field}>
-                            {field}
-                          </span>
-                        ))
-                      : null}
-                  </Space.Compact>
-                  <Space.Compact direction='vertical' className='w-1/2 divide-y border-gray-100'>
-                    <span className='bg-gray-100 p-1'>Value</span>
-                    {currentJobTemplate?.customFields
-                      ? Object.values(currentJobTemplate?.customFields).map(value => (
-                          <span key={value} className='truncate p-1' title={value}>
-                            {value || '-'}
-                          </span>
-                        ))
-                      : null}
-                  </Space.Compact>
-                </Space.Compact>
-              </div>
+            <Title level={5} className='mb-2'>
+              Basic Information
+            </Title>
+            <Descriptions column={1} bordered size='small'>
+              <Descriptions.Item label='Template Name'>{currentJobTemplate?.name}</Descriptions.Item>
+              <Descriptions.Item label='Job Type'>{currentJobTemplate?.jobType}</Descriptions.Item>
+              <Descriptions.Item label='Executable'>{currentJobTemplate?.executable}</Descriptions.Item>
+              <Descriptions.Item label='Comment'>{currentJobTemplate?.comment || '-'}</Descriptions.Item>
+              {currentJobTemplate?.jobType === 'spark' && (
+                <Descriptions.Item label='Class Name'>{currentJobTemplate?.className || '-'}</Descriptions.Item>
+              )}
+              <Descriptions.Item label='Arguments'>
+                {currentJobTemplate?.arguments?.length === 1
+                  ? currentJobTemplate?.arguments[0]
+                  : currentJobTemplate?.arguments?.length
+                    ? currentJobTemplate?.arguments.join(', ')
+                    : '-'}
+              </Descriptions.Item>
               {currentJobTemplate?.jobType === 'shell' && (
-                <div className='my-4'>
-                  <div className='text-sm text-slate-400'>Script(s)</div>
-                  {currentJobTemplate?.scripts && currentJobTemplate.scripts.length > 0 ? (
-                    currentJobTemplate.scripts.map((script, index) => (
-                      <span key={index} className='mb-2 block break-words last:mb-0'>
-                        {script}
-                      </span>
-                    ))
-                  ) : (
-                    <span>-</span>
-                  )}
-                </div>
+                <Descriptions.Item label='Script(s)'>
+                  {currentJobTemplate?.scripts && currentJobTemplate.scripts.length > 0
+                    ? currentJobTemplate.scripts.map((script, index) => (
+                        <span key={index} className='mb-2 block break-words last:mb-0'>
+                          {script}
+                        </span>
+                      ))
+                    : '-'}
+                </Descriptions.Item>
               )}
               {currentJobTemplate?.jobType === 'spark' && (
                 <>
-                  <div className='my-4'>
-                    <div className='text-sm text-slate-400'>Class Name</div>
-                    <span className='break-words text-base'>{currentJobTemplate?.className}</span>
-                  </div>
-                  <div className='my-4'>
-                    <div className='text-sm text-slate-400'>Jars</div>
-                    {currentJobTemplate?.jars && currentJobTemplate.jars.length > 0 ? (
-                      currentJobTemplate.jars.map((jar, index) => (
-                        <span key={index} className='mb-2 block break-words last:mb-0'>
-                          {jar}
-                        </span>
-                      ))
-                    ) : (
-                      <span>-</span>
-                    )}
-                  </div>
-                  <div className='my-4'>
-                    <div className='text-sm text-slate-400'>Files</div>
-                    {currentJobTemplate?.files && currentJobTemplate.files.length > 0 ? (
-                      currentJobTemplate.files.map((file, index) => (
-                        <span key={index} className='mb-2 block break-words last:mb-0'>
-                          {file}
-                        </span>
-                      ))
-                    ) : (
-                      <span>-</span>
-                    )}
-                  </div>
-                  <div className='my-4'>
-                    <div className='text-sm text-slate-400'>Archives</div>
-                    {currentJobTemplate?.archives && currentJobTemplate.archives.length > 0 ? (
-                      currentJobTemplate.archives.map((archive, index) => (
-                        <span key={index} className='mb-2 block break-words last:mb-0'>
-                          {archive}
-                        </span>
-                      ))
-                    ) : (
-                      <span>-</span>
-                    )}
-                  </div>
-                  <div className='my-4'>
-                    <div className='mb-1 text-sm text-slate-400'>Config(s)</div>
-                    <Space.Compact className='max-h-80 w-full overflow-auto'>
-                      <Space.Compact direction='vertical' className='w-1/2 divide-y border-gray-100'>
-                        <span className='bg-gray-100 p-1'>Config Name</span>
-                        {currentJobTemplate?.configs
-                          ? Object.keys(currentJobTemplate?.configs).map(configName => (
-                              <span key={configName} className='truncate p-1' title={configName}>
-                                {configName}
-                              </span>
-                            ))
-                          : null}
-                      </Space.Compact>
-                      <Space.Compact direction='vertical' className='w-1/2 divide-y border-gray-100'>
-                        <span className='bg-gray-100 p-1'>Config Value</span>
-                        {currentJobTemplate?.configs
-                          ? Object.values(currentJobTemplate?.configs).map(configValue => (
-                              <span key={configValue} className='truncate p-1' title={configValue}>
-                                {configValue || '-'}
-                              </span>
-                            ))
-                          : null}
-                      </Space.Compact>
-                    </Space.Compact>
-                  </div>
+                  <Descriptions.Item label='Class Name'>{currentJobTemplate?.className || '-'}</Descriptions.Item>
                 </>
               )}
-              <div className='my-4'>
-                <div className='text-sm text-slate-400'>Details</div>
-                <div className='flex justify-between'>
-                  <span className='text-sm'>Creator: </span>
-                  <span className='text-sm'>{currentJobTemplate?.audit?.creator}</span>
-                </div>
-                <div className='flex justify-between'>
-                  <span className='text-sm'>Created At: </span>
-                  <span className='text-sm'>{formatToDateTime(currentJobTemplate?.audit?.createTime)}</span>
-                </div>
-                <div className='flex justify-between'>
-                  <span className='text-sm'>Updated At: </span>
-                  <span className='text-sm'>{formatToDateTime(currentJobTemplate?.audit?.lastModifiedTime)}</span>
-                </div>
-              </div>
-            </>
+            </Descriptions>
+            <Title level={5} className='mt-4 mb-2'>
+              Environment Variable(s)
+            </Title>
+            <Table
+              size='small'
+              pagination={false}
+              rowKey='key'
+              dataSource={
+                currentJobTemplate?.environments && Object.keys(currentJobTemplate.environments).length > 0
+                  ? Object.entries(currentJobTemplate.environments).map(([key, value]) => ({
+                      key,
+                      value
+                    }))
+                  : []
+              }
+              columns={[
+                {
+                  title: 'Env Var Name',
+                  dataIndex: 'key',
+                  key: 'key',
+                  ellipsis: true
+                },
+                {
+                  title: 'Env Var Value',
+                  dataIndex: 'value',
+                  key: 'value',
+                  ellipsis: true,
+                  render: value => value || '-'
+                }
+              ]}
+            />
+            <Title level={5} className='mt-4 mb-2'>
+              Custom Fields
+            </Title>
+            <Table
+              size='small'
+              pagination={false}
+              rowKey='key'
+              dataSource={
+                currentJobTemplate?.customFields && Object.keys(currentJobTemplate.customFields).length > 0
+                  ? Object.entries(currentJobTemplate.customFields).map(([key, value]) => ({
+                      key,
+                      value
+                    }))
+                  : []
+              }
+              columns={[
+                {
+                  title: 'Key',
+                  dataIndex: 'key',
+                  key: 'key',
+                  ellipsis: true
+                },
+                {
+                  title: 'Value',
+                  dataIndex: 'value',
+                  key: 'value',
+                  ellipsis: true,
+                  render: value => value || '-'
+                }
+              ]}
+            />
+            {currentJobTemplate?.jobType === 'spark' && (
+              <>
+                <Title level={5} className='mt-4 mb-2'>
+                  Jars
+                </Title>
+                <Table
+                  size='small'
+                  pagination={false}
+                  rowKey='value'
+                  dataSource={
+                    currentJobTemplate?.jars && currentJobTemplate.jars.length > 0
+                      ? currentJobTemplate.jars.map(value => ({ value }))
+                      : []
+                  }
+                  columns={[
+                    {
+                      title: 'Jar',
+                      dataIndex: 'value',
+                      key: 'value',
+                      ellipsis: true
+                    }
+                  ]}
+                />
+                <Title level={5} className='mt-4 mb-2'>
+                  Files
+                </Title>
+                <Table
+                  size='small'
+                  pagination={false}
+                  rowKey='value'
+                  dataSource={
+                    currentJobTemplate?.files && currentJobTemplate.files.length > 0
+                      ? currentJobTemplate.files.map(value => ({ value }))
+                      : []
+                  }
+                  columns={[
+                    {
+                      title: 'File',
+                      dataIndex: 'value',
+                      key: 'value',
+                      ellipsis: true
+                    }
+                  ]}
+                />
+                <Title level={5} className='mt-4 mb-2'>
+                  Archives
+                </Title>
+                <Table
+                  size='small'
+                  pagination={false}
+                  rowKey='value'
+                  dataSource={
+                    currentJobTemplate?.archives && currentJobTemplate.archives.length > 0
+                      ? currentJobTemplate.archives.map(value => ({ value }))
+                      : []
+                  }
+                  columns={[
+                    {
+                      title: 'Archive',
+                      dataIndex: 'value',
+                      key: 'value',
+                      ellipsis: true
+                    }
+                  ]}
+                />
+                <Title level={5} className='mt-4 mb-2'>
+                  Config(s)
+                </Title>
+                <Table
+                  size='small'
+                  pagination={false}
+                  rowKey='key'
+                  dataSource={
+                    currentJobTemplate?.configs && Object.keys(currentJobTemplate.configs).length > 0
+                      ? Object.entries(currentJobTemplate.configs).map(([key, value]) => ({
+                          key,
+                          value
+                        }))
+                      : []
+                  }
+                  columns={[
+                    {
+                      title: 'Config Name',
+                      dataIndex: 'key',
+                      key: 'key',
+                      ellipsis: true
+                    },
+                    {
+                      title: 'Config Value',
+                      dataIndex: 'value',
+                      key: 'value',
+                      ellipsis: true,
+                      render: value => value || '-'
+                    }
+                  ]}
+                />
+              </>
+            )}
+            <div className='my-4'>
+              <Typography.Title level={5} className='mb-2'>
+                Details
+              </Typography.Title>
+              <Descriptions size='small' bordered column={1} labelStyle={{ width: 180 }}>
+                <Descriptions.Item label='Creator'>{currentJobTemplate?.audit?.creator || '-'}</Descriptions.Item>
+                <Descriptions.Item label='Created At'>
+                  {formatToDateTime(currentJobTemplate?.audit?.createTime)}
+                </Descriptions.Item>
+                <Descriptions.Item label='Updated At'>
+                  {formatToDateTime(currentJobTemplate?.audit?.lastModifiedTime) || '-'}
+                </Descriptions.Item>
+              </Descriptions>
+            </div>
           </Drawer>
         )}
         {open && (

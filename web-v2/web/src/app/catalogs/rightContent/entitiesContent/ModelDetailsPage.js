@@ -24,6 +24,7 @@ import dynamic from 'next/dynamic'
 import { ExclamationCircleFilled, PlusOutlined } from '@ant-design/icons'
 import {
   Button,
+  Descriptions,
   Divider,
   Drawer,
   Empty,
@@ -368,85 +369,72 @@ export default function ModelDetailsPage({ ...props }) {
             />
           )}
           {openVersion && (
-            <Drawer title={`Version ${currentVersion?.version} Details`} onClose={onClose} open={openVersion}>
-              <>
-                {currentVersion?.uri && (
-                  <div className='my-4'>
-                    <div className='text-sm text-slate-400'>URI</div>
-                    <span className='break-words text-base'>{currentVersion?.uri}</span>
-                  </div>
-                )}
+            <Drawer
+              title={`Version ${currentVersion?.version} Details`}
+              onClose={onClose}
+              open={openVersion}
+              width={560}
+            >
+              <Title level={5} className='mb-2'>
+                Basic Information
+              </Title>
+              <Descriptions column={1} bordered size='small'>
+                {currentVersion?.uri && <Descriptions.Item label='URI'>{currentVersion?.uri}</Descriptions.Item>}
                 {currentVersion?.uris && (
-                  <div className='my-4'>
-                    <div className='mb-1 text-sm text-slate-400'>URI(s)</div>
+                  <Descriptions.Item label='URI(s)'>
                     <Space.Compact className='max-h-80 w-full overflow-auto'>
                       <Space.Compact direction='vertical' className='w-1/2 divide-y border-gray-100'>
                         <span className='bg-gray-100 p-1'>URI Name</span>
-                        {currentVersion?.uris
-                          ? Object.keys(currentVersion?.uris).map(name => (
-                              <span key={name} className='truncate p-1' title={name}>
-                                {name}
-                              </span>
-                            ))
-                          : null}
+                        {Object.keys(currentVersion.uris).map(name => (
+                          <span key={name} className='truncate p-1' title={name}>
+                            {name}
+                          </span>
+                        ))}
                       </Space.Compact>
                       <Space.Compact direction='vertical' className='w-1/2 divide-y border-gray-100'>
                         <span className='bg-gray-100 p-1'>URI</span>
-                        {currentVersion?.uris
-                          ? Object.values(currentVersion?.uris).map(uri => (
-                              <span key={uri} className='truncate p-1' title={uri}>
-                                {uri || '-'}
-                              </span>
-                            ))
-                          : null}
+                        {Object.values(currentVersion.uris).map((uri, idx) => (
+                          <span key={idx} className='truncate p-1' title={uri}>
+                            {uri || '-'}
+                          </span>
+                        ))}
                       </Space.Compact>
                     </Space.Compact>
-                  </div>
+                  </Descriptions.Item>
                 )}
-                <div className='my-4'>
-                  <div className='text-sm text-slate-400'>Aliases</div>
-                  <span className='break-words text-base'>
-                    {currentVersion?.aliases.length === 1
-                      ? currentVersion?.aliases[0]
-                      : currentVersion?.aliases.length
-                        ? currentVersion?.aliases.join(', ')
-                        : '-'}
-                  </span>
-                </div>
-                <div className='my-4'>
-                  <div className='text-sm text-slate-400'>Comment</div>
-                  <span className='break-words text-base'>{currentVersion?.comment || '-'}</span>
-                </div>
-                <div className='my-4'>
-                  <div className='mb-1 text-sm text-slate-400'>Properties</div>
-                  {currentVersion?.properties && Object.keys(currentVersion?.properties).length > 0 ? (
+                <Descriptions.Item label='Aliases'>
+                  {currentVersion?.aliases?.length === 1
+                    ? currentVersion?.aliases[0]
+                    : currentVersion?.aliases?.length
+                      ? currentVersion?.aliases.join(', ')
+                      : '-'}
+                </Descriptions.Item>
+                <Descriptions.Item label='Comment'>{currentVersion?.comment || '-'}</Descriptions.Item>
+                <Descriptions.Item label='Properties'>
+                  {currentVersion?.properties && Object.keys(currentVersion.properties).length > 0 ? (
                     <Space.Compact className='max-h-80 w-full overflow-auto'>
                       <Space.Compact direction='vertical' className='w-1/2 divide-y border-gray-100'>
                         <span className='bg-gray-100 p-1'>Key</span>
-                        {currentVersion?.properties
-                          ? Object.keys(currentVersion?.properties).map(key => (
-                              <span key={key} className='truncate p-1' title={key}>
-                                {key}
-                              </span>
-                            ))
-                          : null}
+                        {Object.keys(currentVersion.properties).map(key => (
+                          <span key={key} className='truncate p-1' title={key}>
+                            {key}
+                          </span>
+                        ))}
                       </Space.Compact>
                       <Space.Compact direction='vertical' className='w-1/2 divide-y border-gray-100'>
                         <span className='bg-gray-100 p-1'>Value</span>
-                        {currentVersion?.properties
-                          ? Object.values(currentVersion?.properties).map(value => (
-                              <span key={value} className='truncate p-1' title={value}>
-                                {value || '-'}
-                              </span>
-                            ))
-                          : null}
+                        {Object.values(currentVersion.properties).map((value, idx) => (
+                          <span key={idx} className='truncate p-1' title={value}>
+                            {value || '-'}
+                          </span>
+                        ))}
                       </Space.Compact>
                     </Space.Compact>
                   ) : (
                     <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} />
                   )}
-                </div>
-              </>
+                </Descriptions.Item>
+              </Descriptions>
             </Drawer>
           )}
         </>
