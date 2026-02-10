@@ -26,10 +26,13 @@ import { useAppDispatch, useAppSelector } from '@/lib/hooks/useStore'
 import { fetchFunctions } from '@/lib/store/metalakes'
 import { formatToDateTime, isValidDate } from '@/lib/utils/date'
 import Link from 'next/link'
+import { useSearchParams } from 'next/navigation'
 
 export default function Functions({ metalake, catalog, schema }) {
   const dispatch = useAppDispatch()
   const store = useAppSelector(state => state.metalakes)
+  const searchParams = useSearchParams()
+  const catalogType = searchParams.get('catalogType')
 
   useEffect(() => {
     if (!metalake || !catalog || !schema) return
@@ -52,7 +55,7 @@ export default function Functions({ metalake, catalog, schema }) {
         render: name => (
           <Link
             data-refer={`function-link-${name}`}
-            href={`/catalogs?metalake=${encodeURIComponent(metalake)}&catalogType=relational&catalog=${encodeURIComponent(catalog)}&schema=${encodeURIComponent(schema)}&function=${encodeURIComponent(name)}`}
+            href={`/catalogs?metalake=${encodeURIComponent(metalake)}&catalogType=${catalogType}&catalog=${encodeURIComponent(catalog)}&schema=${encodeURIComponent(schema)}&function=${encodeURIComponent(name)}`}
           >
             {name}
           </Link>

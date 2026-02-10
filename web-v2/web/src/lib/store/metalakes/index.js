@@ -249,133 +249,146 @@ export const setIntoTreeNodeWithFetch = createAsyncThunk(
         dispatch(setLoadedNodes(loaded))
       }
     } else if (pathArr.length === 4) {
-      const [funcErr, funcRes] = await to(getFunctionsApi({ metalake, catalog, schema, details: false }))
-
-      if (funcErr || !funcRes) {
-        throw new Error(funcErr)
-      }
-
-      const { identifiers: functionIdentifiers = [] } = funcRes || {}
-
-      const functions = functionIdentifiers.map(functionItem => {
-        const functionName = functionItem?.name || functionItem?.identifier?.name || functionItem
-
-        return {
-          ...functionItem,
-          node: 'function',
-          id: `{{${metalake}}}{{${catalog}}}{{${type}}}{{${schema}}}{{${functionName}}}`,
-          key: `{{${metalake}}}{{${catalog}}}{{${type}}}{{${schema}}}{{${functionName}}}`,
-          path: `?${new URLSearchParams({ metalake, catalog, catalogType: type, schema, function: functionName }).toString()}`,
-          name: functionName,
-          title: functionName,
-          isLeaf: true,
-          children: []
-        }
-      })
-
+      let entityPromise = Promise.resolve(null)
       switch (type) {
-        case 'relational': {
-          const [tableErr, tableRes] = await to(getTablesApi({ metalake, catalog, schema }))
-          if (tableErr || !tableRes) {
-            throw new Error(tableErr)
-          }
-
-          const { identifiers: tableIdentifiers = [] } = tableRes || {}
-
-          const tables = tableIdentifiers.map(tableItem => {
-            return {
-              ...tableItem,
-              node: 'table',
-              id: `{{${metalake}}}{{${catalog}}}{{${type}}}{{${schema}}}{{${tableItem.name}}}`,
-              key: `{{${metalake}}}{{${catalog}}}{{${type}}}{{${schema}}}{{${tableItem.name}}}`,
-              path: `?${new URLSearchParams({ metalake, catalog, catalogType: type, schema, table: tableItem.name }).toString()}`,
-              name: tableItem.name,
-              title: tableItem.name,
-              isLeaf: true,
-              columns: [],
-              children: []
-            }
-          })
-
-          result.data = [...tables, ...functions]
+        case 'relational':
+          entityPromise = getTablesApi({ metalake, catalog, schema })
           break
-        }
-        case 'fileset': {
-          const [filesetErr, filesetRes] = await to(getFilesetsApi({ metalake, catalog, schema }))
-          if (filesetErr || !filesetRes) {
-            throw new Error(filesetErr)
-          }
-
-          const { identifiers: filesetIdentifiers = [] } = filesetRes || {}
-
-          const filesets = filesetIdentifiers.map(filesetItem => {
-            return {
-              ...filesetItem,
-              node: 'fileset',
-              id: `{{${metalake}}}{{${catalog}}}{{${type}}}{{${schema}}}{{${filesetItem.name}}}`,
-              key: `{{${metalake}}}{{${catalog}}}{{${type}}}{{${schema}}}{{${filesetItem.name}}}`,
-              path: `?${new URLSearchParams({ metalake, catalog, catalogType: type, schema, fileset: filesetItem.name }).toString()}`,
-              name: filesetItem.name,
-              title: filesetItem.name,
-              isLeaf: true
-            }
-          })
-
-          result.data = [...filesets, ...functions]
+        case 'fileset':
+          entityPromise = getFilesetsApi({ metalake, catalog, schema })
           break
-        }
-        case 'messaging': {
-          const [topicErr, topicRes] = await to(getTopicsApi({ metalake, catalog, schema }))
-          if (topicErr || !topicRes) {
-            throw new Error(topicErr)
-          }
-
-          const { identifiers: topicIdentifiers = [] } = topicRes || {}
-
-          const topics = topicIdentifiers.map(topicItem => {
-            return {
-              ...topicItem,
-              node: 'topic',
-              id: `{{${metalake}}}{{${catalog}}}{{${type}}}{{${schema}}}{{${topicItem.name}}}`,
-              key: `{{${metalake}}}{{${catalog}}}{{${type}}}{{${schema}}}{{${topicItem.name}}}`,
-              path: `?${new URLSearchParams({ metalake, catalog, catalogType: type, schema, topic: topicItem.name }).toString()}`,
-              name: topicItem.name,
-              title: topicItem.name,
-              isLeaf: true
-            }
-          })
-
-          result.data = [...topics, ...functions]
+        case 'messaging':
+          entityPromise = getTopicsApi({ metalake, catalog, schema })
           break
-        }
-        case 'model': {
-          const [modelErr, modelRes] = await to(getModelsApi({ metalake, catalog, schema }))
-          if (modelErr || !modelRes) {
-            throw new Error(modelErr)
-          }
-
-          const { identifiers: modelIdentifiers = [] } = modelRes || {}
-
-          const models = modelIdentifiers.map(modelItem => {
-            return {
-              ...modelItem,
-              node: 'model',
-              id: `{{${metalake}}}{{${catalog}}}{{${type}}}{{${schema}}}{{${modelItem.name}}}`,
-              key: `{{${metalake}}}{{${catalog}}}{{${type}}}{{${schema}}}{{${modelItem.name}}}`,
-              path: `?${new URLSearchParams({ metalake, catalog, catalogType: type, schema, model: modelItem.name }).toString()}`,
-              name: modelItem.name,
-              title: modelItem.name,
-              isLeaf: true
-            }
-          })
-
-          result.data = [...models, ...functions]
+        case 'model':
+          entityPromise = getModelsApi({ metalake, catalog, schema })
           break
-        }
         default:
-          result.data = functions
           break
       }
+
+      const [funcResult, entityResult] = await Promise.allSettled([
+        getFunctionsApi({ metalake, catalog, schema, details: false }),
+        entityPromise
+      ])
+
+      const functions =
+        funcResult.status === 'fulfilled'
+          ? (funcResult.value?.identifiers || []).map(functionItem => {
+              const functionName = functionItem?.name || functionItem?.identifier?.name || functionItem
+
+              return {
+                ...functionItem,
+                node: 'function',
+                id: `{{${metalake}}}{{${catalog}}}{{${type}}}{{${schema}}}{{${functionName}}}`,
+                key: `{{${metalake}}}{{${catalog}}}{{${type}}}{{${schema}}}{{${functionName}}}`,
+                path: `?${new URLSearchParams({ metalake, catalog, catalogType: type, schema, function: functionName }).toString()}`,
+                name: functionName,
+                title: functionName,
+                isLeaf: true,
+                children: []
+              }
+            })
+          : []
+
+      if (funcResult.status === 'rejected') {
+        console.warn('Failed to load functions for schema tree node', {
+          metalake,
+          catalog,
+          schema,
+          error: funcResult.reason
+        })
+      }
+
+      let entities = []
+      if (entityResult.status === 'fulfilled' && entityResult.value) {
+        switch (type) {
+          case 'relational': {
+            const { identifiers: tableIdentifiers = [] } = entityResult.value || {}
+            entities = tableIdentifiers.map(tableItem => {
+              return {
+                ...tableItem,
+                node: 'table',
+                id: `{{${metalake}}}{{${catalog}}}{{${type}}}{{${schema}}}{{${tableItem.name}}}`,
+                key: `{{${metalake}}}{{${catalog}}}{{${type}}}{{${schema}}}{{${tableItem.name}}}`,
+                path: `?${new URLSearchParams({ metalake, catalog, catalogType: type, schema, table: tableItem.name }).toString()}`,
+                name: tableItem.name,
+                title: tableItem.name,
+                isLeaf: true,
+                columns: [],
+                children: []
+              }
+            })
+            break
+          }
+          case 'fileset': {
+            const { identifiers: filesetIdentifiers = [] } = entityResult.value || {}
+            entities = filesetIdentifiers.map(filesetItem => {
+              return {
+                ...filesetItem,
+                node: 'fileset',
+                id: `{{${metalake}}}{{${catalog}}}{{${type}}}{{${schema}}}{{${filesetItem.name}}}`,
+                key: `{{${metalake}}}{{${catalog}}}{{${type}}}{{${schema}}}{{${filesetItem.name}}}`,
+                path: `?${new URLSearchParams({ metalake, catalog, catalogType: type, schema, fileset: filesetItem.name }).toString()}`,
+                name: filesetItem.name,
+                title: filesetItem.name,
+                isLeaf: true
+              }
+            })
+            break
+          }
+          case 'messaging': {
+            const { identifiers: topicIdentifiers = [] } = entityResult.value || {}
+            entities = topicIdentifiers.map(topicItem => {
+              return {
+                ...topicItem,
+                node: 'topic',
+                id: `{{${metalake}}}{{${catalog}}}{{${type}}}{{${schema}}}{{${topicItem.name}}}`,
+                key: `{{${metalake}}}{{${catalog}}}{{${type}}}{{${schema}}}{{${topicItem.name}}}`,
+                path: `?${new URLSearchParams({ metalake, catalog, catalogType: type, schema, topic: topicItem.name }).toString()}`,
+                name: topicItem.name,
+                title: topicItem.name,
+                isLeaf: true
+              }
+            })
+            break
+          }
+          case 'model': {
+            const { identifiers: modelIdentifiers = [] } = entityResult.value || {}
+            entities = modelIdentifiers.map(modelItem => {
+              return {
+                ...modelItem,
+                node: 'model',
+                id: `{{${metalake}}}{{${catalog}}}{{${type}}}{{${schema}}}{{${modelItem.name}}}`,
+                key: `{{${metalake}}}{{${catalog}}}{{${type}}}{{${schema}}}{{${modelItem.name}}}`,
+                path: `?${new URLSearchParams({ metalake, catalog, catalogType: type, schema, model: modelItem.name }).toString()}`,
+                name: modelItem.name,
+                title: modelItem.name,
+                isLeaf: true
+              }
+            })
+            break
+          }
+          default:
+            break
+        }
+      } else if (entityResult.status === 'rejected') {
+        console.warn('Failed to load entities for schema tree node', {
+          metalake,
+          catalog,
+          schema,
+          type,
+          error: entityResult.reason
+        })
+      }
+
+      if (funcResult.status === 'rejected' && entityResult.status === 'rejected') {
+        const funcMessage = funcResult.reason?.message || funcResult.reason
+        const entityMessage = entityResult.reason?.message || entityResult.reason
+        throw new Error(funcMessage || entityMessage)
+      }
+
+      result.data = [...entities, ...functions]
     }
 
     return result
