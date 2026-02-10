@@ -40,7 +40,7 @@ public class CatalogConnectorContext {
   private final GravitinoMetalake metalake;
 
   // Connector communicates with Trino
-  private final GravitinoConnector connector;
+  private GravitinoConnector connector;
 
   // Internal connector communicates with data storage
   private final Connector internalConnector;
@@ -64,8 +64,15 @@ public class CatalogConnectorContext {
     this.metalake = metalake;
     this.internalConnector = internalConnector;
     this.adapter = adapter;
+  }
 
-    this.connector = new GravitinoConnector(catalog.geNameIdentifier(), this);
+  /**
+   * Binds the Gravitino connector to this context.
+   *
+   * @param connector the Gravitino connector
+   */
+  public void bindConnector(GravitinoConnector connector) {
+    this.connector = connector;
   }
 
   /**

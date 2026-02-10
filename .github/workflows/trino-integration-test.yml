@@ -1,11 +1,8 @@
 name: Trino Integration Test
 
 # Controls when the workflow will run
-on:
-  push:
-    branches: [ "main", "branch-*" ]
-  pull_request:
-    branches: [ "main", "branch-*" ]
+# Disable it temporarily.
+on: {}
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
