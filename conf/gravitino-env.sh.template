@@ -33,6 +33,6 @@ GRAVITINO_VERSION=GRAVITINO_VERSION_PLACEHOLDER
 #                             # Appended to JAVA_OPTS by launch scripts; set GRAVITINO_MEM to change heap/metaspace sizes.
 
 # UI selection behaviour:
-# - By default the template sets `GRAVITINO_USE_WEB_V2=false` which forces the V1 UI.
-# - To enable the v2 UI you can set it to `true` (for example: `export GRAVITINO_USE_WEB_V2=true`).
+# - By default this template does not set `GRAVITINO_USE_WEB_V2`, so the container or environment can control which UI is used.
+# - To force the v1 UI, explicitly set it to `false`; to enable the v2 UI, set it to `true` (for example: `export GRAVITINO_USE_WEB_V2=true`).
 # GRAVITINO_USE_WEB_V2=false
