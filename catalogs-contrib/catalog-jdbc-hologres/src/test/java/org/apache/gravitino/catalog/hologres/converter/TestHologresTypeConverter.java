@@ -144,6 +144,14 @@ public class TestHologresTypeConverter {
     // Test fromGravitino with timezone
     hologresType = converter.fromGravitino(Types.TimestampType.withTimeZone());
     Assertions.assertEquals("timestamptz", hologresType);
+
+    // Test fromGravitino with timezone and precision - Hologres does not support precision
+    hologresType = converter.fromGravitino(Types.TimestampType.withTimeZone(6));
+    Assertions.assertEquals("timestamptz", hologresType);
+
+    // Test fromGravitino without timezone and precision - Hologres does not support precision
+    hologresType = converter.fromGravitino(Types.TimestampType.withoutTimeZone(6));
+    Assertions.assertEquals("timestamp", hologresType);
   }
 
   @Test

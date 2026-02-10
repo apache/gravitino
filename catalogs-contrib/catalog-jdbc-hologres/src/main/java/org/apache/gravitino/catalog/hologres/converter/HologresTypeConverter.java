@@ -18,13 +18,15 @@
  */
 package org.apache.gravitino.catalog.hologres.converter;
 
-import com.google.common.annotations.VisibleForTesting;
-import com.google.common.base.Preconditions;
 import java.util.Optional;
+
 import org.apache.gravitino.catalog.jdbc.converter.JdbcTypeConverter;
 import org.apache.gravitino.rel.types.Type;
 import org.apache.gravitino.rel.types.Types;
 import org.apache.gravitino.rel.types.Types.ListType;
+
+import com.google.common.annotations.VisibleForTesting;
+import com.google.common.base.Preconditions;
 
 /**
  * Type converter for Hologres.
@@ -134,11 +136,10 @@ public class HologresTypeConverter extends JdbcTypeConverter {
     } else if (type instanceof Types.TimeType) {
       return type.simpleString();
     } else if (type instanceof Types.TimestampType) {
+      // Hologres does not support precision for TIMESTAMP/TIMESTAMPTZ (e.g. timestamptz(6)),
+      // so we always emit the base type without precision.
       Types.TimestampType timestampType = (Types.TimestampType) type;
-      String baseType = timestampType.hasTimeZone() ? TIMESTAMP_TZ : TIMESTAMP;
-      return timestampType.hasPrecisionSet()
-          ? String.format("%s(%d)", baseType, timestampType.precision())
-          : baseType;
+      return timestampType.hasTimeZone() ? TIMESTAMP_TZ : TIMESTAMP;
     } else if (type instanceof Types.DecimalType) {
       return NUMERIC
           + "("
