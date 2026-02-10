@@ -40,7 +40,9 @@ from gravitino.rest.rest_utils import encode_string
 from gravitino.utils import HTTPClient
 
 
-class RelationalCatalog(BaseSchemaCatalog, TableCatalog):
+class RelationalCatalog(
+    BaseSchemaCatalog, TableCatalog
+):  # pylint: disable=too-many-ancestors
     """Relational catalog is a catalog implementation
 
     The `RelationalCatalog` supports relational database like metadata operations,
