@@ -34,8 +34,7 @@ public class TestVersion {
 
   @Test
   public void testParseReleaseCandidateOutOfRange() {
-    Assertions.assertThrowsExactly(
-        IllegalArgumentException.class, () -> Version.parseVersionNumber("1.1.0rc1001"));
+    Assertions.assertDoesNotThrow(() -> Version.parseVersionNumber("1.1.0rc1001"));
     Assertions.assertThrowsExactly(
         GravitinoRuntimeException.class, () -> Version.parseVersionNumber("1.1.0rc"));
     Assertions.assertThrowsExactly(

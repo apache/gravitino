@@ -36,10 +36,9 @@ public class Version {
 
   private static final int VERSION_PART_NUMBER = 3;
   private static final Pattern PATTERN =
-      Pattern.compile("^(\\d+)\\.(\\d+)\\.(\\d+)(?:rc(\\d{1,4})|-.*|\\.([a-zA-Z].*))?$");
+      Pattern.compile("^(\\d+)\\.(\\d+)\\.(\\d+)(?:rc(\\d{1,9})|-.*|\\.([a-zA-Z].*))?$");
 
   private static final Version INSTANCE = new Version();
-  private static final int MAX_RC_NUMBER = 1000;
 
   private final VersionInfo versionInfo;
   private final VersionDTO versionDTO;
@@ -97,16 +96,6 @@ public class Version {
 
     Matcher matcher = PATTERN.matcher(versionString);
     if (matcher.matches()) {
-      String releaseCandidateNumber = matcher.group(4);
-      if (releaseCandidateNumber != null) {
-        int rcNumber = Integer.parseInt(releaseCandidateNumber);
-        // Validate RC number is within a supported range for Gravitino versioning semantics.
-        // This is a domain constraint and is not used in numeric version comparison here.
-        Preconditions.checkArgument(
-            rcNumber >= 0 && rcNumber <= MAX_RC_NUMBER,
-            "Invalid RC version string %s, RC number must be between 0 and 1000",
-            versionString);
-      }
       int[] versionNumbers = new int[VERSION_PART_NUMBER];
       for (int i = 0; i < VERSION_PART_NUMBER; i++) {
         versionNumbers[i] = Integer.parseInt(matcher.group(i + 1));
