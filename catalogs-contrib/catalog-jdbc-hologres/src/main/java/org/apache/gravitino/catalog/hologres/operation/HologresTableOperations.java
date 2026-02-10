@@ -18,9 +18,6 @@
  */
 package org.apache.gravitino.catalog.hologres.operation;
 
-import com.google.common.annotations.VisibleForTesting;
-import com.google.common.base.Preconditions;
-import com.google.common.collect.Lists;
 import java.sql.Connection;
 import java.sql.DatabaseMetaData;
 import java.sql.PreparedStatement;
@@ -33,7 +30,9 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.stream.Collectors;
+
 import javax.sql.DataSource;
+
 import org.apache.commons.collections4.MapUtils;
 import org.apache.commons.lang3.ArrayUtils;
 import org.apache.commons.lang3.BooleanUtils;
@@ -48,7 +47,6 @@ import org.apache.gravitino.catalog.jdbc.converter.JdbcTypeConverter;
 import org.apache.gravitino.catalog.jdbc.operation.DatabaseOperation;
 import org.apache.gravitino.catalog.jdbc.operation.JdbcTableOperations;
 import org.apache.gravitino.catalog.jdbc.operation.RequireDatabaseOperation;
-import org.apache.gravitino.exceptions.NoSuchColumnException;
 import org.apache.gravitino.exceptions.NoSuchSchemaException;
 import org.apache.gravitino.exceptions.NoSuchTableException;
 import org.apache.gravitino.rel.Column;
@@ -62,6 +60,10 @@ import org.apache.gravitino.rel.expressions.transforms.Transform;
 import org.apache.gravitino.rel.expressions.transforms.Transforms;
 import org.apache.gravitino.rel.indexes.Index;
 import org.apache.gravitino.rel.types.Types;
+
+import com.google.common.annotations.VisibleForTesting;
+import com.google.common.base.Preconditions;
+import com.google.common.collect.Lists;
 
 /**
  * Table operations for Hologres.
@@ -463,15 +465,11 @@ public class HologresTableOperations extends JdbcTableOperations
         TableChange.RenameColumn renameColumn = (TableChange.RenameColumn) change;
         alterSql.add(renameColumnFieldDefinition(renameColumn, tableName));
       } else if (change instanceof TableChange.UpdateColumnDefaultValue) {
-        lazyLoadTable = getOrCreateTable(schemaName, tableName, lazyLoadTable);
-        TableChange.UpdateColumnDefaultValue updateColumnDefaultValue =
-            (TableChange.UpdateColumnDefaultValue) change;
-        alterSql.add(
-            updateColumnDefaultValueFieldDefinition(updateColumnDefaultValue, lazyLoadTable));
+        throw new IllegalArgumentException(
+            "Hologres does not support altering column default value via ALTER TABLE.");
       } else if (change instanceof TableChange.UpdateColumnType) {
-        lazyLoadTable = getOrCreateTable(schemaName, tableName, lazyLoadTable);
-        TableChange.UpdateColumnType updateColumnType = (TableChange.UpdateColumnType) change;
-        alterSql.add(updateColumnTypeFieldDefinition(updateColumnType, lazyLoadTable));
+        throw new IllegalArgumentException(
+            "Hologres does not support altering column type via ALTER TABLE.");
       } else if (change instanceof TableChange.UpdateColumnComment) {
         alterSql.add(
             updateColumnCommentFieldDefinition(
@@ -486,21 +484,17 @@ public class HologresTableOperations extends JdbcTableOperations
           alterSql.add(deleteColSql);
         }
       } else if (change instanceof TableChange.UpdateColumnNullability) {
-        TableChange.UpdateColumnNullability updateColumnNullability =
-            (TableChange.UpdateColumnNullability) change;
-
-        lazyLoadTable = getOrCreateTable(schemaName, tableName, lazyLoadTable);
-        validateUpdateColumnNullable(updateColumnNullability, lazyLoadTable);
-
-        alterSql.add(updateColumnNullabilityDefinition(updateColumnNullability, tableName));
+        throw new IllegalArgumentException(
+            "Hologres does not support altering column nullability via ALTER TABLE.");
       } else if (change instanceof TableChange.AddIndex) {
-        alterSql.add(addIndexDefinition(tableName, (TableChange.AddIndex) change));
+        throw new IllegalArgumentException(
+            "Hologres does not support adding index via ALTER TABLE.");
       } else if (change instanceof TableChange.DeleteIndex) {
-        alterSql.add(deleteIndexDefinition(tableName, (TableChange.DeleteIndex) change));
+        throw new IllegalArgumentException(
+            "Hologres does not support deleting index via ALTER TABLE.");
       } else if (change instanceof TableChange.UpdateColumnAutoIncrement) {
-        alterSql.add(
-            updateColumnAutoIncrementDefinition(
-                (TableChange.UpdateColumnAutoIncrement) change, tableName));
+        throw new IllegalArgumentException(
+            "Hologres does not support altering column auto-increment via ALTER TABLE.");
       } else {
         throw new IllegalArgumentException(
             "Unsupported table change type: " + change.getClass().getName());
@@ -516,112 +510,6 @@ public class HologresTableOperations extends JdbcTableOperations
     String result = String.join("\n", alterSql);
     LOG.info("Generated alter table:{}.{} sql: {}", schemaName, tableName, result);
     return result;
-  }
-
-  @VisibleForTesting
-  static String updateColumnAutoIncrementDefinition(
-      TableChange.UpdateColumnAutoIncrement change, String tableName) {
-    if (change.fieldName().length > 1) {
-      throw new UnsupportedOperationException(HOLOGRES_NOT_SUPPORT_NESTED_COLUMN_MSG);
-    }
-    String fieldName = change.fieldName()[0];
-    String action =
-        change.isAutoIncrement() ? "ADD GENERATED BY DEFAULT AS IDENTITY" : "DROP IDENTITY";
-
-    return String.format(
-        "ALTER TABLE %s %s %s %s;",
-        HOLO_QUOTE + tableName + HOLO_QUOTE,
-        ALTER_COLUMN,
-        HOLO_QUOTE + fieldName + HOLO_QUOTE,
-        action);
-  }
-
-  @VisibleForTesting
-  static String deleteIndexDefinition(String tableName, TableChange.DeleteIndex deleteIndex) {
-    StringBuilder sqlBuilder = new StringBuilder();
-    sqlBuilder
-        .append("ALTER TABLE ")
-        .append(HOLO_QUOTE)
-        .append(tableName)
-        .append(HOLO_QUOTE)
-        .append(" DROP CONSTRAINT ")
-        .append(HOLO_QUOTE)
-        .append(deleteIndex.getName())
-        .append(HOLO_QUOTE)
-        .append(";\n");
-    if (deleteIndex.isIfExists()) {
-      sqlBuilder
-          .append("DROP INDEX IF EXISTS ")
-          .append(HOLO_QUOTE)
-          .append(deleteIndex.getName())
-          .append(HOLO_QUOTE)
-          .append(";");
-    } else {
-      sqlBuilder
-          .append("DROP INDEX ")
-          .append(HOLO_QUOTE)
-          .append(deleteIndex.getName())
-          .append(HOLO_QUOTE)
-          .append(";");
-    }
-    return sqlBuilder.toString();
-  }
-
-  @VisibleForTesting
-  static String addIndexDefinition(String tableName, TableChange.AddIndex addIndex) {
-    StringBuilder sqlBuilder = new StringBuilder();
-    sqlBuilder
-        .append("ALTER TABLE ")
-        .append(HOLO_QUOTE)
-        .append(tableName)
-        .append(HOLO_QUOTE)
-        .append(" ADD CONSTRAINT ")
-        .append(HOLO_QUOTE)
-        .append(addIndex.getName())
-        .append(HOLO_QUOTE);
-    switch (addIndex.getType()) {
-      case PRIMARY_KEY:
-        sqlBuilder.append(" PRIMARY KEY ");
-        break;
-      case UNIQUE_KEY:
-        sqlBuilder.append(" UNIQUE ");
-        break;
-      default:
-        throw new IllegalArgumentException("Unsupported index type: " + addIndex.getType());
-    }
-    sqlBuilder.append("(").append(getIndexFieldStr(addIndex.getFieldNames())).append(");");
-    return sqlBuilder.toString();
-  }
-
-  private String updateColumnNullabilityDefinition(
-      TableChange.UpdateColumnNullability updateColumnNullability, String tableName) {
-    if (updateColumnNullability.fieldName().length > 1) {
-      throw new UnsupportedOperationException(HOLOGRES_NOT_SUPPORT_NESTED_COLUMN_MSG);
-    }
-    String col = updateColumnNullability.fieldName()[0];
-    if (updateColumnNullability.nullable()) {
-      return ALTER_TABLE
-          + HOLO_QUOTE
-          + tableName
-          + HOLO_QUOTE
-          + " "
-          + ALTER_COLUMN
-          + HOLO_QUOTE
-          + col
-          + HOLO_QUOTE
-          + " DROP NOT NULL;";
-    } else {
-      return ALTER_TABLE
-          + HOLO_QUOTE
-          + tableName
-          + HOLO_QUOTE
-          + " "
-          + ALTER_COLUMN
-          + HOLO_QUOTE
-          + col
-          + HOLO_QUOTE
-          + " SET NOT NULL;";
-    }
   }
 
   private String updateCommentDefinition(
@@ -665,72 +553,6 @@ public class HologresTableOperations extends JdbcTableOperations
         + ";";
   }
 
-  private String updateColumnDefaultValueFieldDefinition(
-      TableChange.UpdateColumnDefaultValue updateColumnDefaultValue, JdbcTable jdbcTable) {
-    if (updateColumnDefaultValue.fieldName().length > 1) {
-      throw new UnsupportedOperationException(HOLOGRES_NOT_SUPPORT_NESTED_COLUMN_MSG);
-    }
-    String col = updateColumnDefaultValue.fieldName()[0];
-    JdbcColumn column =
-        (JdbcColumn)
-            Arrays.stream(jdbcTable.columns())
-                .filter(c -> c.name().equals(col))
-                .findFirst()
-                .orElse(null);
-    if (null == column) {
-      throw new NoSuchColumnException("Column %s does not exist.", col);
-    }
-
-    StringBuilder sqlBuilder = new StringBuilder(ALTER_TABLE + jdbcTable.name());
-    sqlBuilder
-        .append("\n")
-        .append(ALTER_COLUMN)
-        .append(HOLO_QUOTE)
-        .append(col)
-        .append(HOLO_QUOTE)
-        .append(" SET DEFAULT ")
-        .append(
-            columnDefaultValueConverter.fromGravitino(
-                updateColumnDefaultValue.getNewDefaultValue()));
-    return sqlBuilder.append(";").toString();
-  }
-
-  private String updateColumnTypeFieldDefinition(
-      TableChange.UpdateColumnType updateColumnType, JdbcTable jdbcTable) {
-    if (updateColumnType.fieldName().length > 1) {
-      throw new UnsupportedOperationException(HOLOGRES_NOT_SUPPORT_NESTED_COLUMN_MSG);
-    }
-    String col = updateColumnType.fieldName()[0];
-    JdbcColumn column =
-        (JdbcColumn)
-            Arrays.stream(jdbcTable.columns())
-                .filter(c -> c.name().equals(col))
-                .findFirst()
-                .orElse(null);
-    if (null == column) {
-      throw new NoSuchColumnException("Column %s does not exist.", col);
-    }
-    StringBuilder sqlBuilder = new StringBuilder(ALTER_TABLE + jdbcTable.name());
-    sqlBuilder
-        .append("\n")
-        .append(ALTER_COLUMN)
-        .append(HOLO_QUOTE)
-        .append(col)
-        .append(HOLO_QUOTE)
-        .append(" SET DATA TYPE ")
-        .append(typeConverter.fromGravitino(updateColumnType.getNewDataType()));
-    if (!column.nullable()) {
-      sqlBuilder
-          .append(",\n")
-          .append(ALTER_COLUMN)
-          .append(HOLO_QUOTE)
-          .append(col)
-          .append(HOLO_QUOTE)
-          .append(" SET NOT NULL");
-    }
-    return sqlBuilder.append(";").toString();
-  }
-
   private String renameColumnFieldDefinition(
       TableChange.RenameColumn renameColumn, String tableName) {
     if (renameColumn.fieldName().length > 1) {
@@ -756,6 +578,21 @@ public class HologresTableOperations extends JdbcTableOperations
     if (addColumn.fieldName().length > 1) {
       throw new UnsupportedOperationException(HOLOGRES_NOT_SUPPORT_NESTED_COLUMN_MSG);
     }
+
+    // Hologres does not support setting nullable, default value, or auto-increment via ADD COLUMN
+    if (!addColumn.isNullable()) {
+      throw new IllegalArgumentException(
+          "Hologres does not support setting NOT NULL constraint when adding a column via ALTER TABLE.");
+    }
+    if (!Column.DEFAULT_VALUE_NOT_SET.equals(addColumn.getDefaultValue())) {
+      throw new IllegalArgumentException(
+          "Hologres does not support setting default value when adding a column via ALTER TABLE.");
+    }
+    if (addColumn.isAutoIncrement()) {
+      throw new IllegalArgumentException(
+          "Hologres does not support setting auto-increment when adding a column via ALTER TABLE.");
+    }
+
     List<String> result = new ArrayList<>();
     String col = addColumn.fieldName()[0];
 
@@ -769,32 +606,7 @@ public class HologresTableOperations extends JdbcTableOperations
         .append(col)
         .append(HOLO_QUOTE)
         .append(SPACE)
-        .append(typeConverter.fromGravitino(addColumn.getDataType()))
-        .append(SPACE);
-
-    if (addColumn.isAutoIncrement()) {
-      if (!Types.allowAutoIncrement(addColumn.getDataType())) {
-        throw new IllegalArgumentException(
-            "Unsupported auto-increment , column: "
-                + Arrays.toString(addColumn.getFieldName())
-                + ", type: "
-                + addColumn.getDataType());
-      }
-      columnDefinition.append("GENERATED BY DEFAULT AS IDENTITY ");
-    }
-
-    // Add NOT NULL if the column is marked as such
-    if (!addColumn.isNullable()) {
-      columnDefinition.append("NOT NULL ");
-    }
-
-    // Append default value if available
-    if (!Column.DEFAULT_VALUE_NOT_SET.equals(addColumn.getDefaultValue())) {
-      columnDefinition
-          .append("DEFAULT ")
-          .append(columnDefaultValueConverter.fromGravitino(addColumn.getDefaultValue()))
-          .append(SPACE);
-    }
+        .append(typeConverter.fromGravitino(addColumn.getDataType()));
 
     // Append position if available
     if (!(addColumn.getPosition() instanceof TableChange.Default)) {
