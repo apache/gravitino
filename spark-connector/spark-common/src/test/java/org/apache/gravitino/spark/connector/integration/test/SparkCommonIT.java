@@ -197,6 +197,7 @@ public abstract class SparkCommonIT extends SparkEnvIT {
   }
 
   @Test
+  @EnabledIf("supportsListFunctions")
   void testCallUDF() {
     // test call function
     List<String> data =

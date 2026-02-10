@@ -1299,6 +1299,7 @@ public abstract class SparkIcebergCatalogIT extends SparkCommonIT {
   }
 
   @Test
+  @EnabledIf("supportsListFunctions")
   void testCallUDFAndIcebergBuiltins() {
     // Test Gravitino UDF
     List<String> gravitinoUdfResult =
