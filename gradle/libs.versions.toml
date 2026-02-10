@@ -30,6 +30,7 @@ slf4j = "2.0.16"
 log4j = "2.24.3"
 lance = "0.39.0"
 lance-namespace = "0.0.20"
+delta-kernel = "3.3.0"
 jetty = "9.4.51.v20230217"
 jersey = "2.41"
 mockito = "4.11.0"
@@ -171,6 +172,8 @@ log4j-12-api = { group = "org.apache.logging.log4j", name = "log4j-1.2-api", ver
 log4j-layout-template-json = { group = "org.apache.logging.log4j", name = "log4j-layout-template-json", version.ref = "log4j" }
 lance = { group = "com.lancedb", name = "lance-core", version.ref = "lance" }
 lance-namespace-core = { group = "com.lancedb", name = "lance-namespace-core", version.ref = "lance-namespace" }
+delta-kernel = { group = "io.delta", name = "delta-kernel-api", version.ref = "delta-kernel" }
+delta-kernel-defaults = { group = "io.delta", name = "delta-kernel-defaults", version.ref = "delta-kernel" }
 jakarta-validation-api = { group = "jakarta.validation", name = "jakarta.validation-api", version.ref = "jakarta-validation" }
 jetty-server = { group = "org.eclipse.jetty", name = "jetty-server", version.ref = "jetty" }
 jetty-servlet = { group = "org.eclipse.jetty", name = "jetty-servlet", version.ref = "jetty" }
