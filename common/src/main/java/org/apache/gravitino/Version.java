@@ -36,7 +36,7 @@ public class Version {
 
   private static final int VERSION_PART_NUMBER = 3;
   private static final Pattern PATTERN =
-      Pattern.compile("^(\\d+)\\.(\\d+)\\.(\\d+)(?:-.*|\\.([a-zA-Z].*))?$");
+      Pattern.compile("^(\\d+)\\.(\\d+)\\.(\\d+)(?:rc(\\d{1,4})|-.*|\\.([a-zA-Z].*))?$");
 
   private static final Version INSTANCE = new Version();
 
@@ -96,6 +96,16 @@ public class Version {
 
     Matcher matcher = PATTERN.matcher(versionString);
     if (matcher.matches()) {
+      String releaseCandidateNumber = matcher.group(4);
+      if (releaseCandidateNumber != null) {
+        int rcNumber = Integer.parseInt(releaseCandidateNumber);
+        // We set an upper bound for RC number to prevent potential overflow issues, as we use RC
+        // number as part of the version number for comparison.
+        Preconditions.checkArgument(
+            rcNumber >= 0 && rcNumber <= 1000,
+            "Invalid RC version string %s, RC number must be between 0 and 1000",
+            versionString);
+      }
       int[] versionNumbers = new int[VERSION_PART_NUMBER];
       for (int i = 0; i < VERSION_PART_NUMBER; i++) {
         versionNumbers[i] = Integer.parseInt(matcher.group(i + 1));
