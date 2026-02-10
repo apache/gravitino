@@ -909,7 +909,11 @@ tasks {
   }
 
   val assembleDistribution by registering(Tar::class) {
-    dependsOn("assembleTrinoConnector", "assembleIcebergRESTServer", "assembleLanceRESTServer", "assembleDistributionAll")
+    dependsOn(
+      ":trino-connector:trino-connector-435-439:assembleTrinoConnector",
+      "assembleIcebergRESTServer",
+      "assembleLanceRESTServer"
+    )
     group = "gravitino distribution"
     finalizedBy("checksumDistribution")
     into("${rootProject.name}-$version-bin")
