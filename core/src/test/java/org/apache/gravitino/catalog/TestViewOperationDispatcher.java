@@ -293,22 +293,24 @@ public class TestViewOperationDispatcher extends TestOperationDispatcher {
         futures.add(future);
       }
 
-      // Verify only one entity was imported (no duplicate imports despite concurrent access)
-      // If import was called multiple times, entity IDs would differ across views
-      GenericEntity viewEntity = entityStore.get(viewIdent, VIEW, GenericEntity.class);
-      Assertions.assertNotNull(viewEntity);
-      long entityId = viewEntity.id();
-
       // Verify all concurrent loads succeeded and reference the same imported entity
+      // If import was called multiple times, entity IDs would differ across views
+      Long entityId = null;
       for (Future<View> future : futures) {
         View loadedView = future.get(5, TimeUnit.SECONDS);
         Assertions.assertEquals("concurrent_view", loadedView.name());
 
         EntityCombinedView combinedView = (EntityCombinedView) loadedView;
-        Assertions.assertEquals(
-            entityId,
-            combinedView.viewFromGravitino().id(),
-            "All concurrent loads should reference the same entity (import called only once)");
+        long currentEntityId = combinedView.viewFromGravitino().id();
+
+        if (entityId == null) {
+          entityId = currentEntityId;
+        } else {
+          Assertions.assertEquals(
+              entityId,
+              currentEntityId,
+              "All concurrent loads should reference the same entity (import called only once)");
+        }
       }
 
     } finally {
