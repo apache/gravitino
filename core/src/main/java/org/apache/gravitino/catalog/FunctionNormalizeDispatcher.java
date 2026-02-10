@@ -28,14 +28,11 @@ import org.apache.gravitino.Namespace;
 import org.apache.gravitino.connector.capability.Capability;
 import org.apache.gravitino.exceptions.FunctionAlreadyExistsException;
 import org.apache.gravitino.exceptions.NoSuchFunctionException;
-import org.apache.gravitino.exceptions.NoSuchFunctionVersionException;
 import org.apache.gravitino.exceptions.NoSuchSchemaException;
 import org.apache.gravitino.function.Function;
 import org.apache.gravitino.function.FunctionChange;
-import org.apache.gravitino.function.FunctionColumn;
 import org.apache.gravitino.function.FunctionDefinition;
 import org.apache.gravitino.function.FunctionType;
-import org.apache.gravitino.rel.types.Type;
 
 /**
  * {@code FunctionNormalizeDispatcher} normalizes function identifiers and namespaces by applying
@@ -68,12 +65,6 @@ public class FunctionNormalizeDispatcher implements FunctionDispatcher {
   }
 
   @Override
-  public Function getFunction(NameIdentifier ident, int version)
-      throws NoSuchFunctionException, NoSuchFunctionVersionException {
-    return dispatcher.getFunction(normalizeCaseSensitive(ident), version);
-  }
-
-  @Override
   public boolean functionExists(NameIdentifier ident) {
     return dispatcher.functionExists(normalizeCaseSensitive(ident));
   }
@@ -84,28 +75,10 @@ public class FunctionNormalizeDispatcher implements FunctionDispatcher {
       String comment,
       FunctionType functionType,
       boolean deterministic,
-      Type returnType,
       FunctionDefinition[] definitions)
       throws NoSuchSchemaException, FunctionAlreadyExistsException {
     return dispatcher.registerFunction(
-        normalizeNameIdentifier(ident),
-        comment,
-        functionType,
-        deterministic,
-        returnType,
-        definitions);
-  }
-
-  @Override
-  public Function registerFunction(
-      NameIdentifier ident,
-      String comment,
-      boolean deterministic,
-      FunctionColumn[] returnColumns,
-      FunctionDefinition[] definitions)
-      throws NoSuchSchemaException, FunctionAlreadyExistsException {
-    return dispatcher.registerFunction(
-        normalizeNameIdentifier(ident), comment, deterministic, returnColumns, definitions);
+        normalizeNameIdentifier(ident), comment, functionType, deterministic, definitions);
   }
 
   @Override

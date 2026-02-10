@@ -57,6 +57,7 @@ public class MetadataObjects {
       Sets.newHashSet(
           MetadataObject.Type.FILESET,
           MetadataObject.Type.TABLE,
+          MetadataObject.Type.VIEW,
           MetadataObject.Type.TOPIC,
           MetadataObject.Type.MODEL);
 
@@ -146,6 +147,7 @@ public class MetadataObjects {
         parentType = MetadataObject.Type.TABLE;
         break;
       case TABLE:
+      case VIEW:
       case FILESET:
       case TOPIC:
       case MODEL:

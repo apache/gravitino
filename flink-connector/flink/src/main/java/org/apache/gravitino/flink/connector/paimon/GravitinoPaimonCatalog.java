@@ -28,7 +28,7 @@ import org.apache.flink.table.factories.CatalogFactory;
 import org.apache.flink.table.factories.Factory;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.flink.connector.PartitionConverter;
-import org.apache.gravitino.flink.connector.PropertiesConverter;
+import org.apache.gravitino.flink.connector.SchemaAndTablePropertiesConverter;
 import org.apache.gravitino.flink.connector.catalog.BaseCatalog;
 import org.apache.paimon.flink.FlinkCatalogFactory;
 import org.apache.paimon.flink.FlinkTableFactory;
@@ -44,13 +44,13 @@ public class GravitinoPaimonCatalog extends BaseCatalog {
   protected GravitinoPaimonCatalog(
       CatalogFactory.Context context,
       String defaultDatabase,
-      PropertiesConverter propertiesConverter,
+      SchemaAndTablePropertiesConverter schemaAndTablePropertiesConverter,
       PartitionConverter partitionConverter) {
     super(
         context.getName(),
         context.getOptions(),
         defaultDatabase,
-        propertiesConverter,
+        schemaAndTablePropertiesConverter,
         partitionConverter);
     FlinkCatalogFactory flinkCatalogFactory = new FlinkCatalogFactory();
     this.paimonCatalog = flinkCatalogFactory.createCatalog(context);

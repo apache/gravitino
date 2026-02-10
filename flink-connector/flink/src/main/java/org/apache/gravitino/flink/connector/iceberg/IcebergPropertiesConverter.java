@@ -24,9 +24,11 @@ import java.util.HashMap;
 import java.util.Map;
 import org.apache.gravitino.catalog.lakehouse.iceberg.IcebergConstants;
 import org.apache.gravitino.catalog.lakehouse.iceberg.IcebergPropertiesUtils;
-import org.apache.gravitino.flink.connector.PropertiesConverter;
+import org.apache.gravitino.flink.connector.CatalogPropertiesConverter;
+import org.apache.gravitino.flink.connector.SchemaAndTablePropertiesConverter;
 
-public class IcebergPropertiesConverter implements PropertiesConverter {
+public class IcebergPropertiesConverter
+    implements CatalogPropertiesConverter, SchemaAndTablePropertiesConverter {
   public static IcebergPropertiesConverter INSTANCE = new IcebergPropertiesConverter();
 
   private IcebergPropertiesConverter() {}

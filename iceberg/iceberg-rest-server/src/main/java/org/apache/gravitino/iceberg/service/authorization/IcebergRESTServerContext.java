@@ -24,12 +24,17 @@ import org.apache.gravitino.iceberg.service.provider.IcebergConfigProvider;
 
 public class IcebergRESTServerContext {
   private boolean isAuthorizationEnabled;
+  private boolean auxMode;
   private String metalakeName;
   private String defaultCatalogName;
 
   private IcebergRESTServerContext(
-      Boolean isAuthorizationEnabled, String metalakeName, String defaultCatalogName) {
+      Boolean isAuthorizationEnabled,
+      Boolean auxMode,
+      String metalakeName,
+      String defaultCatalogName) {
     this.isAuthorizationEnabled = isAuthorizationEnabled;
+    this.auxMode = auxMode;
     this.metalakeName = metalakeName;
     this.defaultCatalogName = defaultCatalogName;
   }
@@ -39,10 +44,13 @@ public class IcebergRESTServerContext {
   }
 
   public static IcebergRESTServerContext create(
-      IcebergConfigProvider configProvider, Boolean enableAuth) {
+      IcebergConfigProvider configProvider, Boolean enableAuth, Boolean auxMode) {
     InstanceHolder.INSTANCE =
         new IcebergRESTServerContext(
-            enableAuth, configProvider.getMetalakeName(), configProvider.getDefaultCatalogName());
+            enableAuth,
+            auxMode,
+            configProvider.getMetalakeName(),
+            configProvider.getDefaultCatalogName());
     return InstanceHolder.INSTANCE;
   }
 
@@ -53,6 +61,10 @@ public class IcebergRESTServerContext {
 
   public boolean isAuthorizationEnabled() {
     return isAuthorizationEnabled;
+  }
+
+  public boolean isAuxMode() {
+    return auxMode;
   }
 
   public String metalakeName() {

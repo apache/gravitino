@@ -23,12 +23,15 @@ import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
 import java.io.IOException;
+import java.net.URI;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
+import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.catalog.lakehouse.iceberg.IcebergConstants;
@@ -40,7 +43,10 @@ import org.apache.gravitino.credential.CredentialPropertyUtils;
 import org.apache.gravitino.credential.PathBasedCredentialContext;
 import org.apache.gravitino.iceberg.common.IcebergConfig;
 import org.apache.gravitino.iceberg.common.ops.IcebergCatalogWrapper;
+import org.apache.gravitino.iceberg.service.cache.ScanPlanCache;
+import org.apache.gravitino.iceberg.service.cache.ScanPlanCacheKey;
 import org.apache.gravitino.storage.GCSProperties;
+import org.apache.gravitino.utils.ClassUtils;
 import org.apache.gravitino.utils.MapUtils;
 import org.apache.gravitino.utils.PrincipalUtils;
 import org.apache.iceberg.DeleteFile;
@@ -72,6 +78,8 @@ public class CatalogWrapperForREST extends IcebergCatalogWrapper {
 
   private final Map<String, String> catalogConfigToClients;
 
+  private final ScanPlanCache scanPlanCache;
+
   private static final Set<String> catalogPropertiesToClientKeys =
       ImmutableSet.of(
           IcebergConstants.IO_IMPL,
@@ -98,12 +106,13 @@ public class CatalogWrapperForREST extends IcebergCatalogWrapper {
     Map<String, String> catalogProperties =
         checkForCompatibility(config.getAllConfig(), deprecatedProperties);
     this.catalogCredentialManager = new CatalogCredentialManager(catalogName, catalogProperties);
+    this.scanPlanCache = loadScanPlanCache(config);
   }
 
   public LoadTableResponse createTable(
       Namespace namespace, CreateTableRequest request, boolean requestCredential) {
     LoadTableResponse loadTableResponse = super.createTable(namespace, request);
-    if (requestCredential) {
+    if (shouldGenerateCredential(loadTableResponse, requestCredential)) {
       return injectCredentialConfig(
           TableIdentifier.of(namespace, request.name()),
           loadTableResponse,
@@ -115,7 +124,7 @@ public class CatalogWrapperForREST extends IcebergCatalogWrapper {
   public LoadTableResponse loadTable(
       TableIdentifier identifier, boolean requestCredential, CredentialPrivilege privilege) {
     LoadTableResponse loadTableResponse = super.loadTable(identifier);
-    if (requestCredential) {
+    if (shouldGenerateCredential(loadTableResponse, requestCredential)) {
       return injectCredentialConfig(identifier, loadTableResponse, privilege);
     }
     return loadTableResponse;
@@ -160,6 +169,9 @@ public class CatalogWrapperForREST extends IcebergCatalogWrapper {
     try {
       if (catalogCredentialManager != null) {
         catalogCredentialManager.close();
+      }
+      if (scanPlanCache != null) {
+        scanPlanCache.close();
       }
     } finally {
       // Call super.close() to release parent class resources including:
@@ -227,6 +239,47 @@ public class CatalogWrapperForREST extends IcebergCatalogWrapper {
     return credential;
   }
 
+  private boolean shouldGenerateCredential(
+      LoadTableResponse loadTableResponse, boolean requestCredential) {
+    if (!requestCredential) {
+      return false;
+    }
+    validateCredentialLocation(loadTableResponse.tableMetadata().location());
+    return !isLocalOrHdfsTable(loadTableResponse.tableMetadata());
+  }
+
+  private boolean isLocalOrHdfsTable(TableMetadata tableMetadata) {
+    return isLocalOrHdfsLocation(tableMetadata.location());
+  }
+
+  @VisibleForTesting
+  static void validateCredentialLocation(String location) {
+    if (StringUtils.isBlank(location)) {
+      throw new IllegalArgumentException(
+          "Table location cannot be null or blank when requesting credentials");
+    }
+  }
+
+  @VisibleForTesting
+  static boolean isLocalOrHdfsLocation(String location) {
+    // Precondition: location is non-blank (enforced by caller).
+    if (StringUtils.isBlank(location)) {
+      return false;
+    }
+    URI uri;
+    try {
+      uri = URI.create(location);
+    } catch (IllegalArgumentException e) {
+      return false;
+    }
+    String scheme = uri.getScheme();
+    if (scheme == null) {
+      // No scheme means a local path.
+      return true;
+    }
+    return "file".equalsIgnoreCase(scheme) || "hdfs".equalsIgnoreCase(scheme);
+  }
+
   /**
    * Plan table scan and return scan tasks.
    *
@@ -261,14 +314,19 @@ public class CatalogWrapperForREST extends IcebergCatalogWrapper {
 
     try {
       Table table = catalog.loadTable(tableIdentifier);
-      CloseableIterable<FileScanTask> fileScanTasks =
-          createFilePlanScanTasks(table, tableIdentifier, scanRequest);
+      Optional<PlanTableScanResponse> cachedResponse =
+          scanPlanCache.get(ScanPlanCacheKey.create(tableIdentifier, table, scanRequest));
+      if (cachedResponse.isPresent()) {
+        LOG.info("Using cached scan plan for table: {}", tableIdentifier);
+        return cachedResponse.get();
+      }
 
       List<String> planTasks = new ArrayList<>();
       Map<Integer, PartitionSpec> specsById = new HashMap<>();
-      List<org.apache.iceberg.DeleteFile> deleteFiles = new ArrayList<>();
+      List<DeleteFile> deleteFiles = new ArrayList<>();
 
-      try (fileScanTasks) {
+      try (CloseableIterable<FileScanTask> fileScanTasks =
+          createFilePlanScanTasks(table, tableIdentifier, scanRequest)) {
         for (FileScanTask fileScanTask : fileScanTasks) {
           try {
             String taskString = ScanTaskParser.toJson(fileScanTask);
@@ -296,7 +354,7 @@ public class CatalogWrapperForREST extends IcebergCatalogWrapper {
       }
 
       List<DeleteFile> uniqueDeleteFiles =
-          deleteFiles.stream().distinct().collect(java.util.stream.Collectors.toList());
+          deleteFiles.stream().distinct().collect(Collectors.toList());
 
       if (planTasks.isEmpty()) {
         LOG.info(
@@ -318,7 +376,11 @@ public class CatalogWrapperForREST extends IcebergCatalogWrapper {
             tableIdentifier);
       }
 
-      return responseBuilder.build();
+      PlanTableScanResponse response = responseBuilder.build();
+
+      // Cache the scan plan response
+      scanPlanCache.put(ScanPlanCacheKey.create(tableIdentifier, table, scanRequest), response);
+      return response;
 
     } catch (IllegalArgumentException e) {
       LOG.error("Invalid scan request for table {}: {}", tableIdentifier, e.getMessage());
@@ -425,6 +487,26 @@ public class CatalogWrapperForREST extends IcebergCatalogWrapper {
       }
     }
     return scan;
+  }
+
+  private ScanPlanCache loadScanPlanCache(IcebergConfig config) {
+    String impl = config.get(IcebergConfig.SCAN_PLAN_CACHE_IMPL);
+    if (StringUtils.isBlank(impl)) {
+      return ScanPlanCache.DUMMY;
+    }
+
+    ScanPlanCache cache =
+        ClassUtils.loadAndGetInstance(impl, Thread.currentThread().getContextClassLoader());
+    int capacity = config.get(IcebergConfig.SCAN_PLAN_CACHE_CAPACITY);
+    int expireMinutes = config.get(IcebergConfig.SCAN_PLAN_CACHE_EXPIRE_MINUTES);
+    cache.initialize(capacity, expireMinutes);
+    LOG.info(
+        "Load scan plan cache for catalog: {}, impl: {}, capacity: {}, expire minutes: {}",
+        catalog.name(),
+        impl,
+        capacity,
+        expireMinutes);
+    return cache;
   }
 
   @VisibleForTesting

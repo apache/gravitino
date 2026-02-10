@@ -23,6 +23,7 @@ import static org.apache.gravitino.Configs.ENTITY_RELATIONAL_STORE;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.ImmutableMap;
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 import java.util.function.Function;
@@ -154,6 +155,27 @@ public class RelationalEntityStore implements EntityStore, SupportsRelationOpera
   }
 
   @Override
+  public <E extends Entity & HasIdentifier> List<E> batchGet(
+      List<NameIdentifier> idents, Entity.EntityType entityType, Class<E> clazz) {
+    List<E> allEntities = new ArrayList<>();
+    List<NameIdentifier> noCacheIdents =
+        idents.stream()
+            .filter(
+                ident -> {
+                  Optional<E> entity = cache.getIfPresent(ident, entityType);
+                  entity.ifPresent(allEntities::add);
+                  return entity.isEmpty();
+                })
+            .toList();
+    List<E> fetchEntities = backend.batchGet(noCacheIdents, entityType);
+    for (E entity : fetchEntities) {
+      cache.put(entity);
+      allEntities.add(entity);
+    }
+    return allEntities;
+  }
+
+  @Override
   public boolean delete(NameIdentifier ident, Entity.EntityType entityType, boolean cascade)
       throws IOException {
     try {
@@ -253,6 +275,7 @@ public class RelationalEntityStore implements EntityStore, SupportsRelationOpera
       boolean override)
       throws IOException {
     cache.invalidate(srcIdentifier, srcType, relType);
+    cache.invalidate(dstIdentifier, dstType, relType);
     backend.insertRelation(relType, srcIdentifier, srcType, dstIdentifier, dstType, override);
   }
 
@@ -264,7 +287,21 @@ public class RelationalEntityStore implements EntityStore, SupportsRelationOpera
       NameIdentifier[] destEntitiesToAdd,
       NameIdentifier[] destEntitiesToRemove)
       throws IOException, NoSuchEntityException, EntityAlreadyExistsException {
+
+    // We need to clear the cache of the source entity and all destination entities being added or
+    // removed. This ensures that any subsequent reads will fetch the updated relations from the
+    // backend. For example, if we are adding a tag to table, we need to invalidate the cache for
+    // that table and the tag being added or removed. Otherwise, we might return stale data if we
+    // list all tags for that table or all tables for that tag.
     cache.invalidate(srcEntityIdent, srcEntityType, relType);
+    for (NameIdentifier destToAdd : destEntitiesToAdd) {
+      cache.invalidate(destToAdd, srcEntityType, relType);
+    }
+
+    for (NameIdentifier destToRemove : destEntitiesToRemove) {
+      cache.invalidate(destToRemove, srcEntityType, relType);
+    }
+
     return backend.updateEntityRelations(
         relType, srcEntityIdent, srcEntityType, destEntitiesToAdd, destEntitiesToRemove);
   }

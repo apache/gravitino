@@ -49,7 +49,6 @@ import org.apache.gravitino.exceptions.ForbiddenException;
 import org.apache.gravitino.exceptions.IllegalPrivilegeException;
 import org.apache.gravitino.exceptions.NoSuchCatalogException;
 import org.apache.gravitino.exceptions.NoSuchMetadataObjectException;
-import org.apache.gravitino.exceptions.NoSuchUserException;
 import org.apache.gravitino.file.Fileset;
 import org.apache.gravitino.meta.RoleEntity;
 import org.apache.gravitino.rel.Table;
@@ -96,7 +95,8 @@ public class AuthorizationUtils {
           MetadataObject.Type.JOB,
           MetadataObject.Type.JOB_TEMPLATE,
           MetadataObject.Type.TAG,
-          MetadataObject.Type.POLICY);
+          MetadataObject.Type.POLICY,
+          MetadataObject.Type.VIEW);
 
   private static final Set<Privilege.Name> FILESET_PRIVILEGES =
       Sets.immutableEnumSet(
@@ -117,13 +117,8 @@ public class AuthorizationUtils {
   private AuthorizationUtils() {}
 
   public static void checkCurrentUser(String metalake, String user) {
-    try {
-      AccessControlDispatcher dispatcher = GravitinoEnv.getInstance().accessControlDispatcher();
-      // Only when we enable authorization, we need to check the current user
-      if (dispatcher != null) {
-        dispatcher.getUser(metalake, user);
-      }
-    } catch (NoSuchUserException nsu) {
+    GravitinoAuthorizer authorizer = GravitinoEnv.getInstance().gravitinoAuthorizer();
+    if (authorizer != null && !authorizer.isMetalakeUser(metalake)) {
       throw new ForbiddenException(
           "Current user %s doesn't exist in the metalake %s, you should add the user to the metalake first",
           user, metalake);

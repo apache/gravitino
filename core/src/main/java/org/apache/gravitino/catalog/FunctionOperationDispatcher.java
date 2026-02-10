@@ -25,16 +25,13 @@ import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.exceptions.FunctionAlreadyExistsException;
 import org.apache.gravitino.exceptions.NoSuchFunctionException;
-import org.apache.gravitino.exceptions.NoSuchFunctionVersionException;
 import org.apache.gravitino.exceptions.NoSuchSchemaException;
 import org.apache.gravitino.function.Function;
 import org.apache.gravitino.function.FunctionChange;
-import org.apache.gravitino.function.FunctionColumn;
 import org.apache.gravitino.function.FunctionDefinition;
 import org.apache.gravitino.function.FunctionType;
 import org.apache.gravitino.lock.LockType;
 import org.apache.gravitino.lock.TreeLockUtils;
-import org.apache.gravitino.rel.types.Type;
 import org.apache.gravitino.storage.IdGenerator;
 
 /**
@@ -92,10 +89,10 @@ public class FunctionOperationDispatcher extends OperationDispatcher implements 
   }
 
   /**
-   * Get a function by {@link NameIdentifier} from the catalog. Returns the latest version.
+   * Get a function by {@link NameIdentifier} from the catalog. Returns the current version.
    *
    * @param ident A function identifier.
-   * @return The latest version of the function with the given name.
+   * @return The current version of the function with the given name.
    * @throws NoSuchFunctionException If the function does not exist.
    */
   @Override
@@ -111,37 +108,15 @@ public class FunctionOperationDispatcher extends OperationDispatcher implements 
   }
 
   /**
-   * Get a function by {@link NameIdentifier} and version from the catalog.
-   *
-   * @param ident A function identifier.
-   * @param version The function version, counted from 0.
-   * @return The function with the given name and version.
-   * @throws NoSuchFunctionException If the function does not exist.
-   * @throws NoSuchFunctionVersionException If the function version does not exist.
-   */
-  @Override
-  public Function getFunction(NameIdentifier ident, int version)
-      throws NoSuchFunctionException, NoSuchFunctionVersionException {
-    Preconditions.checkArgument(version >= 0, "Function version must be non-negative");
-    NameIdentifier schemaIdent = NameIdentifier.of(ident.namespace().levels());
-    // Validate schema exists in the underlying catalog
-    if (!schemaOps.schemaExists(schemaIdent)) {
-      throw new NoSuchFunctionException("Schema does not exist: %s", schemaIdent);
-    }
-
-    return TreeLockUtils.doWithTreeLock(
-        ident, LockType.READ, () -> managedFunctionOps.getFunction(ident, version));
-  }
-
-  /**
-   * Register a scalar or aggregate function with one or more definitions (overloads).
+   * Register a function with one or more definitions (overloads). Each definition contains its own
+   * return type (for scalar/aggregate functions) or return columns (for table-valued functions).
    *
    * @param ident The function identifier.
    * @param comment The optional function comment.
-   * @param functionType The function type.
+   * @param functionType The function type (SCALAR, AGGREGATE, or TABLE).
    * @param deterministic Whether the function is deterministic.
-   * @param returnType The return type.
-   * @param definitions The function definitions.
+   * @param definitions The function definitions, each containing parameters, return type/columns,
+   *     and implementations.
    * @return The registered function.
    * @throws NoSuchSchemaException If the schema does not exist.
    * @throws FunctionAlreadyExistsException If the function already exists.
@@ -152,13 +127,9 @@ public class FunctionOperationDispatcher extends OperationDispatcher implements 
       String comment,
       FunctionType functionType,
       boolean deterministic,
-      Type returnType,
       FunctionDefinition[] definitions)
       throws NoSuchSchemaException, FunctionAlreadyExistsException {
-    Preconditions.checkArgument(
-        functionType == FunctionType.SCALAR || functionType == FunctionType.AGGREGATE,
-        "This method is for scalar or aggregate functions only");
-    Preconditions.checkArgument(returnType != null, "Return type is required");
+    Preconditions.checkArgument(functionType != null, "Function type is required");
     Preconditions.checkArgument(
         definitions != null && definitions.length > 0, "At least one definition is required");
 
@@ -171,45 +142,7 @@ public class FunctionOperationDispatcher extends OperationDispatcher implements 
         LockType.WRITE,
         () ->
             managedFunctionOps.registerFunction(
-                ident, comment, functionType, deterministic, returnType, definitions));
-  }
-
-  /**
-   * Register a table-valued function with one or more definitions (overloads).
-   *
-   * @param ident The function identifier.
-   * @param comment The optional function comment.
-   * @param deterministic Whether the function is deterministic.
-   * @param returnColumns The return columns.
-   * @param definitions The function definitions.
-   * @return The registered function.
-   * @throws NoSuchSchemaException If the schema does not exist.
-   * @throws FunctionAlreadyExistsException If the function already exists.
-   */
-  @Override
-  public Function registerFunction(
-      NameIdentifier ident,
-      String comment,
-      boolean deterministic,
-      FunctionColumn[] returnColumns,
-      FunctionDefinition[] definitions)
-      throws NoSuchSchemaException, FunctionAlreadyExistsException {
-    Preconditions.checkArgument(
-        returnColumns != null && returnColumns.length > 0,
-        "At least one return column is required for table-valued function");
-    Preconditions.checkArgument(
-        definitions != null && definitions.length > 0, "At least one definition is required");
-
-    NameIdentifier schemaIdent = NameIdentifier.of(ident.namespace().levels());
-    // Validate schema exists in the underlying catalog
-    schemaOps.loadSchema(schemaIdent);
-
-    return TreeLockUtils.doWithTreeLock(
-        ident,
-        LockType.WRITE,
-        () ->
-            managedFunctionOps.registerFunction(
-                ident, comment, deterministic, returnColumns, definitions));
+                ident, comment, functionType, deterministic, definitions));
   }
 
   /**

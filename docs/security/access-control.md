@@ -147,6 +147,7 @@ The following metadata objects support ownership:
 | Catalog              |
 | Schema               |
 | Table                |
+| View                 |
 | Topic                |
 | Fileset              |
 | Role                 |
@@ -202,6 +203,7 @@ Metalake (top level)
 └── Catalog (represents a data source)
     └── Schema
         ├── Table
+        ├── View
         ├── Topic
         └── Fileset
 ```
@@ -313,7 +315,14 @@ and `USE_SCHEMA` privileges on its parent schema.
 | SELECT_TABLE | Metalake, Catalog, Schema, Table  | Select data from a table                                                  |
 
 DENY `MODIFY_TABLE` won't deny the `SELECT_TABLE` operation if the user has the privilege to `ALLOW SELECT_TABLE` on the table.
-DENY `SELECT_TABLE` won‘t deny the `MODIFY_TABLE` operation if the user has the privilege `ALLOW MODIFY_TABLE` on the table. 
+DENY `SELECT_TABLE` won't deny the `MODIFY_TABLE` operation if the user has the privilege `ALLOW MODIFY_TABLE` on the table. 
+
+### View privileges
+
+| Name        | Supports Securable Object       | Operation                |
+|-------------|---------------------------------|--------------------------|
+| CREATE_VIEW | Metalake, Catalog, Schema       | Create a view            |
+| SELECT_VIEW | Metalake, Catalog, Schema, View | Select data from a view  |
 
 ### Topic privileges
 
@@ -431,10 +440,27 @@ This model ensures that denials cannot be circumvented by grants at lower levels
 
 To enable access control in Gravitino, configure the following settings in your server configuration file:
 
-| Configuration Item                      | Description                                                               | Default Value | Required                                    | Since Version |
-|-----------------------------------------|---------------------------------------------------------------------------|---------------|---------------------------------------------|---------------|
-| `gravitino.authorization.enable`        | Enable or disable authorization in Gravitino                              | `false`       | No                                          | 0.5.0         |
-| `gravitino.authorization.serviceAdmins` | Comma-separated list of service administrator usernames                   | (none)        | Yes (when authorization is enabled)         | 0.5.0         |
+| Configuration Item                                      | Description                                                               | Default Value | Required                                    | Since Version |
+|---------------------------------------------------------|---------------------------------------------------------------------------|---------------|---------------------------------------------|---------------|
+| `gravitino.authorization.enable`                        | Enable or disable authorization in Gravitino                              | `false`       | No                                          | 0.5.0         |
+| `gravitino.authorization.serviceAdmins`                 | Comma-separated list of service administrator usernames                   | (none)        | Yes (when authorization is enabled)         | 0.5.0         |
+| `gravitino.authorization.jcasbin.cacheExpirationSecs`   | The expiration time in seconds for authorization cache entries            | `3600`        | No                                          | 1.1.1         |
+| `gravitino.authorization.jcasbin.roleCacheSize`         | The maximum size of the role cache for authorization                      | `10000`       | No                                          | 1.1.1         |
+| `gravitino.authorization.jcasbin.ownerCacheSize`        | The maximum size of the owner cache for authorization                     | `100000`      | No                                          | 1.1.1         |
+
+### Authorization Cache
+
+Gravitino uses Caffeine caches to improve authorization performance by caching role and owner information. The cache configuration options allow you to tune the cache behavior:
+
+- **`cacheExpirationSecs`**: Controls how long cache entries remain valid. After this time, entries are automatically evicted and reloaded from the backend on the next access. Lower values provide more up-to-date authorization decisions but may increase load on the backend.
+
+- **`roleCacheSize`**: Controls the maximum number of role entries that can be cached. When the cache reaches this size, the least recently used entries are evicted.
+
+- **`ownerCacheSize`**: Controls the maximum number of owner relationship entries that can be cached. This cache maps metadata object IDs to their owner IDs.
+
+:::info
+When role privileges or ownership are changed through the Gravitino API, the corresponding cache entries are automatically invalidated to ensure authorization decisions reflect the latest state.
+:::
 
 ### Important Notes
 
@@ -453,7 +479,79 @@ gravitino.authorization.enable = true
 
 # Define service administrators
 gravitino.authorization.serviceAdmins = admin1,admin2
+
+# Optional: Configure authorization cache (default values shown)
+gravitino.authorization.jcasbin.cacheExpirationSecs = 3600
+gravitino.authorization.jcasbin.roleCacheSize = 10000
+gravitino.authorization.jcasbin.ownerCacheSize = 100000
 ```
+
+## Migration Guide
+
+If you have metalakes that were created before authorization was enabled, you need to perform a migration to ensure proper access control.
+
+### Migrating Existing Metalakes
+
+When you created metalakes with `gravitino.authorization.enable = false`, those metalakes don't have owners assigned. To enable authorization for these existing metalakes:
+
+**Step 1: Configure PassThrough Authorization**
+
+Temporarily set the authorization implementation to pass-through mode:
+
+```properties
+gravitino.authorization.enable = true
+gravitino.authorization.serviceAdmins = admin1,admin2
+gravitino.authorization.impl = org.apache.gravitino.server.authorization.PassThroughAuthorizer
+```
+
+**Step 2: Set Metalake Owners**
+
+Set the owner for each existing metalake using the Gravitino API:
+
+<Tabs groupId='language' queryString>
+<TabItem value="shell" label="Shell">
+
+```shell
+curl -X PUT -H "Accept: application/vnd.gravitino.v1+json" \
+-H "Content-Type: application/json" -d '{
+  "owner": "admin1",
+  "ownerType": "USER"
+}' http://localhost:8090/api/metalakes/{metalake}/owners
+```
+
+</TabItem>
+<TabItem value="java" label="Java">
+
+```java
+GravitinoClient client = GravitinoClient.builder("http://localhost:8090")
+    .build();
+
+MetadataObject metalake = MetadataObjects.of(null, "metalake_name", MetadataObject.Type.METALAKE);
+client.setOwner(metalake, "admin1", Owner.Type.USER);
+```
+
+</TabItem>
+</Tabs>
+
+**Step 3: Enable Full Authorization**
+
+After setting owners for all metalakes, remove the `gravitino.authorization.impl` configuration to enable full authorization:
+
+```properties
+gravitino.authorization.enable = true
+gravitino.authorization.serviceAdmins = admin1,admin2
+# Remove: gravitino.authorization.impl = org.apache.gravitino.server.authorization.PassThroughAuthorizer
+```
+
+**Step 4: Restart Gravitino**
+
+Restart the Gravitino server for the configuration changes to take effect.
+
+:::caution
+**Important Migration Notes:**
+- Set owners for **all** existing metalakes before removing the `gravitino.authorization.impl` configuration
+- Without assigned owners, operations on these metalakes will fail after full authorization is enabled
+:::
 
 ## Operations
 
@@ -914,6 +1012,51 @@ Role role = client.revokePrivilegesFromRole("role1", table, Lists.newArrayList(P
 </TabItem>
 </Tabs>
 
+### Override privileges in a role
+
+You can override all privileges in a role with a new set of securable objects and their privileges. This operation completely replaces the role's entire privilege configuration - any securable objects not included in the request will be removed from the role.
+
+The request path for REST API is `/api/metalakes/{metalake}/permissions/roles/{role}/`.
+
+```shell
+curl -X PUT -H "Accept: application/vnd.gravitino.v1+json" \
+-H "Content-Type: application/json" -d '{
+    "overrides": [
+      {
+        "fullName": "catalog1.schema1.table1",
+        "type": "TABLE",
+        "privileges": [
+          {
+            "name": "SELECT_TABLE",
+            "condition": "ALLOW"
+          }
+        ]
+      },
+      {
+        "fullName": "catalog1.schema1.table2",
+        "type": "TABLE",
+        "privileges": [
+          {
+            "name": "MODIFY_TABLE",
+            "condition": "ALLOW"
+          }
+        ]
+      }
+    ]
+}' http://localhost:8090/api/metalakes/test/permissions/roles/role1/
+```
+
+:::warning
+This operation completely replaces **all privileges** in the role. The role will contain only the securable objects and privileges specified in the request. Any securable objects that existed in the role but are not included in the request will be removed from the role.
+
+**Example scenario:**
+- Before: `role1` has privileges on `table1`, `table2`, and `table3`
+- Request: Override with privileges for `table1` and `table4` only
+- After: `role1` has privileges only on `table1` and `table4` (table2 and table3 are removed, table4 is added)
+
+Use this operation when you want to set the exact privilege configuration for a role, replacing its entire state.
+:::
+
 ### Grant roles to a user
 
 You can grant specific roles to a user.
@@ -1128,6 +1271,7 @@ The following table lists the required privileges for each API.
 | load schema                       | First, you should have the privilege to load the catalog. Then, you are the owner of the metalake, catalog, schema or have `USE_SCHEMA` on the metalake, catalog, schema.                                                                     |
 | create table                      | First, you should have the privilege to load the catalog and the schema. `CREATE_TABLE` on the metalake, catalog, schema or the owner of the metalake, catalog, schema                                                                        |
 | alter table                       | First, you should have the privilege to load the catalog and the schema. Then, you are one of the owners of the table, schema,catalog, metalake or have `MODIFY_TABLE` on the table, schema, catalog, metalake                                |
+| rename table across schema        | First, you should have the privilege to load the catalog and both schemas. Then, you must be the owner of the table and have `CREATE_TABLE` privilege on the target schema, catalog, or metalake                                              |
 | update table statistics           | First, you should have the privilege to load the catalog and the schema. Then, you are one of the owners of the table, schema,catalog, metalake or have `MODIFY_TABLE` on the table, schema, catalog, metalake                                |
 | drop table statistics             | First, you should have the privilege to load the catalog and the schema. Then, you are one of the owners of the table, schema,catalog, metalake or have `MODIFY_TABLE` on the table, schema, catalog, metalake                                |
 | update table partition statistics | First, you should have the privilege to load the catalog and the schema. Then, you are one of the owners of the table, schema,catalog, metalake or have `MODIFY_TABLE` on the table, schema, catalog, metalake                                |
@@ -1137,6 +1281,12 @@ The following table lists the required privileges for each API.
 | load table                        | First, you should have the privilege to load the catalog and the schema. Then, you are one of the owners of the table, schema, metalake, catalog or have either `SELECT_TABLE` or `MODIFY_TABLE` on the table, schema, catalog, metalake      |
 | list table statistics             | First, you should have the privilege to load the catalog and the schema. Then, you are one of the owners of the table, schema, metalake, catalog or have either `SELECT_TABLE` or `MODIFY_TABLE` on the table, schema, catalog, metalake      |
 | list table partition statistics   | First, you should have the privilege to load the catalog and the schema. Then, you are one of the owners of the table, schema, metalake, catalog or have either `SELECT_TABLE` or `MODIFY_TABLE` on the table, schema, catalog, metalake      |
+| create view                       | First, you should have the privilege to load the catalog and the schema. `CREATE_VIEW` on the metalake, catalog, schema or the owner of the metalake, catalog, schema                                                                         |
+| alter view                        | First, you should have the privilege to load the catalog and the schema. Then, you are one of the owners of the view, schema, catalog, metalake                                                                                               |
+| rename view across schema         | First, you should have the privilege to load the catalog and both schemas. Then, you must be the owner of the view and have `CREATE_VIEW` privilege on the target schema, catalog, or metalake                                                |
+| drop view                         | First, you should have the privilege to load the catalog and the schema. Then, you are one of the owners of the view, schema, catalog, metalake                                                                                               |
+| list view                         | First, you should have the privilege to load the catalog and the schema. Then, the owner of the schema, catalog, metalake can see all the views, others can see the views which they can load                                                 |
+| load view                         | First, you should have the privilege to load the catalog and the schema. Then, you are one of the owners of the view, schema, metalake, catalog or have `SELECT_VIEW` on the view, schema, catalog, metalake                                  |
 | create topic                      | First, you should have the privilege to load the catalog and the schema. Then, you have `CREATE_TOPIC` on the metalake, catalog, schema or are the owner of the metalake, catalog, schema                                                     |
 | alter topic                       | First, you should have the privilege to load the catalog and the schema. Then, you are one of the owners of the topic, schema,catalog, metalake or have `PRODUCE_TOPIC` on the topic, schema, catalog, metalake                               |
 | drop topic                        | First, you should have the privilege to load the catalog and the schema. Then, you are one of the owners of the topic, schema, catalog, metalake                                                                                              |
@@ -1174,8 +1324,9 @@ The following table lists the required privileges for each API.
 | list roles                        | `MANAGE_GRANTS` on the metalake or the owner of the metalake can see all the roles. Others can see his granted roles or owned roles.                                                                                                          |
 | grant role                        | `MANAGE_GRANTS` on the metalake                                                                                                                                                                                                               |
 | revoke role                       | `MANAGE_GRANTS` on the metalake                                                                                                                                                                                                               |
-| grant privilege                   | `MANAGE_GRANTS` on the metalake or the owner of the securable object                                                                                                                                                                          |
-| revoke privilege                  | `MANAGE_GRANTS` on the metalake or the owner of the securable object                                                                                                                                                                          |
+| grant privilege                   | `MANAGE_GRANTS` on the metalake or the owner of the securable object or the metalake                                                                                                                                                          |
+| revoke privilege                  | `MANAGE_GRANTS` on the metalake or the owner of the securable object or the metalake                                                                                                                                                          |
+| override privilege                | `MANAGE_GRANTS` on the metalake or the owner of the metalake                                                                                                                                                                                  |
 | set owner                         | The owner of the securable object                                                                                                                                                                                                             |
 | list tags                         | The owner of the metalake can see all the tags, others can see the tags which they can load.                                                                                                                                                  |
 | create tag                        | `CREATE_TAG` on the metalake or the owner of the metalake.                                                                                                                                                                                    |

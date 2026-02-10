@@ -23,9 +23,7 @@ import org.apache.gravitino.Namespace;
 import org.apache.gravitino.annotation.Evolving;
 import org.apache.gravitino.exceptions.FunctionAlreadyExistsException;
 import org.apache.gravitino.exceptions.NoSuchFunctionException;
-import org.apache.gravitino.exceptions.NoSuchFunctionVersionException;
 import org.apache.gravitino.exceptions.NoSuchSchemaException;
-import org.apache.gravitino.rel.types.Type;
 
 /** The FunctionCatalog interface defines the public API for managing functions in a schema. */
 @Evolving
@@ -52,28 +50,13 @@ public interface FunctionCatalog {
   /**
    * Get a function by {@link NameIdentifier} from the catalog. The identifier only contains the
    * schema and function name. A function may include multiple definitions (overloads) in the
-   * result. This method returns the latest version of the function.
+   * result.
    *
    * @param ident A function identifier.
-   * @return The latest version of the function with the given name.
+   * @return The function with the given name.
    * @throws NoSuchFunctionException If the function does not exist.
    */
   Function getFunction(NameIdentifier ident) throws NoSuchFunctionException;
-
-  /**
-   * Get a function by {@link NameIdentifier} and version from the catalog. The identifier only
-   * contains the schema and function name. A function may include multiple definitions (overloads)
-   * in the result.
-   *
-   * @param ident A function identifier.
-   * @param version The zero-based function version index (0 for the first created version), as
-   *     returned by {@link Function#version()}.
-   * @return The function with the given name and version.
-   * @throws NoSuchFunctionException If the function does not exist.
-   * @throws NoSuchFunctionVersionException If the function version does not exist.
-   */
-  Function getFunction(NameIdentifier ident, int version)
-      throws NoSuchFunctionException, NoSuchFunctionVersionException;
 
   /**
    * Check if a function with the given name exists in the catalog.
@@ -91,14 +74,15 @@ public interface FunctionCatalog {
   }
 
   /**
-   * Register a scalar or aggregate function with one or more definitions (overloads).
+   * Register a function with one or more definitions (overloads). Each definition contains its own
+   * return type (for scalar/aggregate functions) or return columns (for table-valued functions).
    *
    * @param ident The function identifier.
    * @param comment The optional function comment.
-   * @param functionType The function type.
+   * @param functionType The function type (SCALAR, AGGREGATE, or TABLE).
    * @param deterministic Whether the function is deterministic.
-   * @param returnType The return type.
-   * @param definitions The function definitions.
+   * @param definitions The function definitions, each containing parameters, return type/columns,
+   *     and implementations.
    * @return The registered function.
    * @throws NoSuchSchemaException If the schema does not exist.
    * @throws FunctionAlreadyExistsException If the function already exists.
@@ -108,27 +92,6 @@ public interface FunctionCatalog {
       String comment,
       FunctionType functionType,
       boolean deterministic,
-      Type returnType,
-      FunctionDefinition[] definitions)
-      throws NoSuchSchemaException, FunctionAlreadyExistsException;
-
-  /**
-   * Register a table-valued function with one or more definitions (overloads).
-   *
-   * @param ident The function identifier.
-   * @param comment The optional function comment.
-   * @param deterministic Whether the function is deterministic.
-   * @param returnColumns The return columns.
-   * @param definitions The function definitions.
-   * @return The registered function.
-   * @throws NoSuchSchemaException If the schema does not exist.
-   * @throws FunctionAlreadyExistsException If the function already exists.
-   */
-  Function registerFunction(
-      NameIdentifier ident,
-      String comment,
-      boolean deterministic,
-      FunctionColumn[] returnColumns,
       FunctionDefinition[] definitions)
       throws NoSuchSchemaException, FunctionAlreadyExistsException;
 

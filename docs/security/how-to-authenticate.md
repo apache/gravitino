@@ -113,6 +113,81 @@ GravitinoClient client = GravitinoClient.builder(uri)
     .build();
 ```
 
+### Principal mapping
+
+Gravitino supports principal mapping to transform authenticated principals (from OAuth or Kerberos) into user identities for authorization. By default, Gravitino uses regex-based mapping.
+
+#### OAuth principal mapping
+
+For OAuth authentication, principals are extracted from JWT claims (configured via `gravitino.authenticator.oauth.principalFields`). You can customize how these principals are mapped:
+
+```text
+# Use default regex mapper that extracts everything (passes through unchanged)
+gravitino.authenticator.oauth.principalMapper = regex
+gravitino.authenticator.oauth.principalMapper.regex.pattern = ^(.*)$
+
+# Extract username from email (e.g., user@example.com -> user)
+gravitino.authenticator.oauth.principalMapper = regex
+gravitino.authenticator.oauth.principalMapper.regex.pattern = ([^@]+)@.*
+
+# Use custom mapper implementation
+gravitino.authenticator.oauth.principalMapper = com.example.MyCustomMapper
+```
+
+#### Kerberos principal mapping
+
+For Kerberos authentication, principals follow the format `primary[/instance][@REALM]`. The default mapper extracts the primary component (username before `@`):
+
+```text
+# Default: Extract primary component (user@REALM -> user, HTTP/server@REALM -> HTTP)
+gravitino.authenticator.kerberos.principalMapper = regex
+gravitino.authenticator.kerberos.principalMapper.regex.pattern = ([^@]+).*
+
+# Extract only the first part before '/' (HTTP/server@REALM -> HTTP)
+gravitino.authenticator.kerberos.principalMapper = regex
+gravitino.authenticator.kerberos.principalMapper.regex.pattern = ([^/@]+).*
+```
+
+#### Custom principal mapper
+
+For advanced use cases, implement the `PrincipalMapper` interface:
+
+```java
+package com.example;
+
+import org.apache.gravitino.auth.KerberosPrincipal;
+import org.apache.gravitino.auth.KerberosPrincipalMapper;
+import org.apache.gravitino.auth.PrincipalMapper;
+
+import java.security.Principal;
+
+public class RealmBasedMapper implements PrincipalMapper {
+  private final KerberosPrincipalMapper parser = new KerberosPrincipalMapper();
+
+  @Override
+  public Principal map(String principal) {
+    // Parse Kerberos principal components
+    KerberosPrincipal krbPrincipal = (KerberosPrincipal) parser.map(principal);
+    
+    // Route based on realm
+    if ("DEV.EXAMPLE.COM".equals(krbPrincipal.getRealm().orElse(null))) {
+      return () -> "dev_" + krbPrincipal.getName();
+    } else if ("PROD.EXAMPLE.COM".equals(krbPrincipal.getRealm().orElse(null))) {
+      return () -> "prod_" + krbPrincipal.getName();
+    }
+    
+    // Default: use primary with instance (e.g., "HTTP/server")
+    return () -> krbPrincipal.getPrimaryWithInstance();
+  }
+}
+```
+
+Configure Gravitino to use your custom mapper:
+
+```text
+gravitino.authenticator.kerberos.principalMapper = com.example.RealmBasedMapper
+```
+
 ### Server configuration
 
 Gravitino server and Gravitino Iceberg REST server share the same configuration items, you doesn't need to add `gravitino.iceberg-rest` prefix for Gravitino Iceberg REST server.
@@ -125,8 +200,8 @@ Gravitino server and Gravitino Iceberg REST server share the same configuration 
 | `gravitino.authenticator.oauth.allowSkewSecs`       | The JWT allows skew seconds when Gravitino uses OAuth as the authenticator.                                                                                                                                                                                             | `0`                                                                 | No                                                                                              | 0.3.0            |
 | `gravitino.authenticator.oauth.defaultSignKey`      | The signing key of JWT when Gravitino uses OAuth as the authenticator.                                                                                                                                                                                                  | (none)                                                              | Yes if use `oauth` as the authenticator                                                         | 0.3.0            |
 | `gravitino.authenticator.oauth.signAlgorithmType`   | The signature algorithm when Gravitino uses OAuth as the authenticator.                                                                                                                                                                                                 | `RS256`                                                             | No                                                                                              | 0.3.0            |
-| `gravitino.authenticator.oauth.serverUri`           | The URI of the default OAuth server.                                                                                                                                                                                                                                    | (none)                                                              | Yes if use `oauth` as the authenticator                                                         | 0.3.0            |
-| `gravitino.authenticator.oauth.tokenPath`           | The path for token of the default OAuth server.                                                                                                                                                                                                                         | (none)                                                              | Yes if use `oauth` as the authenticator                                                         | 0.3.0            |
+| `gravitino.authenticator.oauth.serverUri`           | The URI of the default OAuth server. Required when using StaticSignKeyValidator, not required for JWKS-based validators.                                                                                                                                                | (none)                                                              | Yes if using `StaticSignKeyValidator`                                                           | 0.3.0            |
+| `gravitino.authenticator.oauth.tokenPath`           | The path for token of the default OAuth server. Required when using StaticSignKeyValidator, not required for JWKS-based validators.                                                                                                                                     | (none)                                                              | Yes if using `StaticSignKeyValidator`                                                           | 0.3.0            |
 | `gravitino.authenticator.oauth.provider`            | OAuth provider type (default, oidc). Determines the Web UI authentication flow. Use 'oidc' for Web UI OIDC login, 'default' for legacy login or API-only authentication.                                                                                                | `default`                                                           | No                                                                                              | 1.0.0            |
 | `gravitino.authenticator.oauth.clientId`            | OAuth client ID for Web UI authentication.                                                                                                                                                                                                                              | (none)                                                              | Yes if provider is `oidc`                                                                       | 1.0.0            |
 | `gravitino.authenticator.oauth.authority`           | OAuth authority/issuer URL for OIDC providers for web UI authentication. (e.g., Azure AD tenant URL).                                                                                                                                                                   | (none)                                                              | Yes if provider is `oidc`                                                                       | 1.0.0            |
@@ -134,8 +209,12 @@ Gravitino server and Gravitino Iceberg REST server share the same configuration 
 | `gravitino.authenticator.oauth.jwksUri`             | JWKS URI for server-side OAuth token validation. Required when using JWKS-based validation.                                                                                                                                                                             | (none)                                                              | Yes if `tokenValidatorClass` is `org.apache.gravitino.server.authentication.JwksTokenValidator` | 1.0.0            |
 | `gravitino.authenticator.oauth.principalFields`     | JWT claim field(s) to use as principal identity. Comma-separated list for fallback in order (e.g., 'preferred_username,email,sub').                                                                                                                                     | `sub`                                                               | No                                                                                              | 1.0.0            |
 | `gravitino.authenticator.oauth.tokenValidatorClass` | Fully qualified class name of the OAuth token validator implementation. Use `org.apache.gravitino.server.authentication.JwksTokenValidator` for JWKS-based validation or `org.apache.gravitino.server.authentication.StaticSignKeyValidator` for static key validation. | `org.apache.gravitino.server.authentication.StaticSignKeyValidator` | No                                                                                              | 1.0.0            |
+| `gravitino.authenticator.oauth.principalMapper` | Principal mapper type for OAuth. Use 'regex' for regex-based mapping, or provide a fully qualified class name implementing `org.apache.gravitino.auth.PrincipalMapper`.                                                                                                 | `regex`                                                             | No                                                                                              | 1.2.0            |
+| `gravitino.authenticator.oauth.principalMapper.regex.pattern` | Regex pattern for OAuth principal mapping. First capture group becomes the mapped principal. Only used when principalMapper is 'regex'.                                                                                                                           | `^(.*)$`                                                            | No                                                                                              | 1.2.0            |
 | `gravitino.authenticator.kerberos.principal`        | Indicates the Kerberos principal to be used for HTTP endpoint. Principal should start with `HTTP/`.                                                                                                                                                                     | (none)                                                              | Yes if use `kerberos` as the authenticator                                                      | 0.4.0            |
 | `gravitino.authenticator.kerberos.keytab`           | Location of the keytab file with the credentials for the principal.                                                                                                                                                                                                     | (none)                                                              | Yes if use `kerberos` as the authenticator                                                      | 0.4.0            |
+| `gravitino.authenticator.kerberos.principalMapper` | Principal mapper type for Kerberos. Use 'regex' for regex-based mapping, or provide a fully qualified class name implementing `org.apache.gravitino.auth.PrincipalMapper`.                                                                                            | `regex`                                                             | No                                                                                              | 1.2.0            |
+| `gravitino.authenticator.kerberos.principalMapper.regex.pattern` | Regex pattern for Kerberos principal mapping. First capture group becomes the mapped principal. Only used when principalMapper is 'regex'.                                                                                                                       | `([^@]+).*`                                                         | No                                                                                              | 1.2.0            |
 
 The signature algorithms that Gravitino supports follows:
 
@@ -159,9 +238,10 @@ The signature algorithms that Gravitino supports follows:
 This example shows how to configure Gravitino with Azure AD using JWKS-based token validation.
 
 **Prerequisites:**
-- Azure AD tenant with an application registration
+- Azure AD tenant with an application registration (Single-page application)
 - Application configured with:
   - Client ID (Application ID)
+  - Platform configuration: Single-page application (SPA)
   - Redirect URI: `https://your-gravitino-server/ui/oauth/callback`
   - Required API permissions/scopes (typically `openid`, `profile`, `email`)
 
@@ -174,7 +254,7 @@ gravitino.authenticators = oauth
 # OIDC Provider Configuration for Web UI
 gravitino.authenticator.oauth.provider = oidc
 gravitino.authenticator.oauth.clientId = <your-azure-app-client-id>
-gravitino.authenticator.oauth.authority = https://sts.windows.net/<your-tenant-id>/
+gravitino.authenticator.oauth.authority = https://login.microsoftonline.com/<your-tenant-id>/v2.0
 gravitino.authenticator.oauth.scope = openid profile email
 
 # JWKS-based Token Validation
@@ -188,9 +268,23 @@ gravitino.authenticator.oauth.principalFields = preferred_username,email,sub
 - **Web UI**: Navigate to Gravitino Web UI, which will redirect to Azure AD for authentication
 - **API Access**: Use Azure AD tokens in the `Authorization: Bearer <token>` header
 
-:::note
+**Azure AD v2.0 Endpoint (Recommended):**
+The `authority` must use the v2.0 endpoint (`/v2.0` suffix) to match the v2.0 JWKS URI. This ensures that tokens issued during OIDC discovery use the correct token format and issuer claim that matches your JWKS configuration.
+
+**Alternative: Azure AD v1.0 Endpoint:**
+For legacy applications or organizational policies requiring v1.0 tokens, use:
+```text
+gravitino.authenticator.oauth.authority = https://sts.windows.net/<your-tenant-id>/
+gravitino.authenticator.oauth.jwksUri = https://login.microsoftonline.com/<your-tenant-id>/discovery/v2.0/keys
+```
+Azure AD uses the same signing keys for both v1.0 and v2.0, so v2.0 JWKS can validate v1.0 tokens.
+
+**Important:** Do NOT use `https://login.microsoftonline.com/<tenant-id>/` (without `/v2.0`) as the authority when using v2.0 JWKS. This causes an issuer mismatch: the token will have `iss: "https://sts.windows.net/..."` but the server expects `iss: "https://login.microsoftonline.com/..."`.
+
+**Service Audience:**
 The `serviceAudience` should match the `aud` claim in your Azure AD tokens. This is typically your Azure AD application's client ID, but could be a custom API identifier if you've configured custom API scopes (e.g., `api://<client-id>`).
 
+**Principal Fields:**
 The `principalFields` supports multiple fallback options. Gravitino will try each field in order (e.g., first `preferred_username`, then `email`, then `sub`) until it finds a non-null value to use as the user identity.
 
 With JWKS validation, you don't need to configure `defaultSignKey`, `serverUri`, or `tokenPath` as the validator dynamically fetches public keys from Azure AD's JWKS endpoint.
