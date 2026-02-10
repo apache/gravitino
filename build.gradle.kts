@@ -219,7 +219,7 @@ allprojects {
       param.systemProperty("gravitino.log.path", "build/${project.name}-integration-test.log")
       project.delete("build/${project.name}-integration-test.log")
       if (testMode == "deploy") {
-        param.environment("GRAVITINO_HOME", project.rootDir.path + "/distribution/package")
+        param.environment("GRAVITINO_HOME", project.rootDir.path + "/distribution/package-all")
         param.systemProperty("testMode", "deploy")
       } else if (testMode == "embedded") {
         param.environment("GRAVITINO_HOME", project.rootDir.path)
