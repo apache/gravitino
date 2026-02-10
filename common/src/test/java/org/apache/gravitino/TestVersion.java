@@ -19,6 +19,7 @@
 
 package org.apache.gravitino;
 
+import org.apache.gravitino.exceptions.GravitinoRuntimeException;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
@@ -35,5 +36,22 @@ public class TestVersion {
   public void testParseReleaseCandidateOutOfRange() {
     Assertions.assertThrowsExactly(
         IllegalArgumentException.class, () -> Version.parseVersionNumber("1.1.0rc1001"));
+    Assertions.assertThrowsExactly(
+        GravitinoRuntimeException.class, () -> Version.parseVersionNumber("1.1.0rc"));
+    Assertions.assertThrowsExactly(
+        GravitinoRuntimeException.class, () -> Version.parseVersionNumber("1.1.0rc-1"));
+  }
+
+  @Test
+  public void testParseSnapshotVersion() {
+    Assertions.assertArrayEquals(new int[] {1, 1, 0}, Version.parseVersionNumber("1.1.0-SNAPSHOT"));
+    Assertions.assertArrayEquals(new int[] {2, 0, 1}, Version.parseVersionNumber("2.0.1-beta"));
+    Assertions.assertArrayEquals(new int[] {3, 2, 4}, Version.parseVersionNumber("3.2.4-foo.bar"));
+  }
+
+  @Test
+  public void testParseAlphaVersion() {
+    Assertions.assertArrayEquals(new int[] {1, 1, 0}, Version.parseVersionNumber("1.1.0.alpha"));
+    Assertions.assertArrayEquals(new int[] {0, 9, 9}, Version.parseVersionNumber("0.9.9.alpha1"));
   }
 }
