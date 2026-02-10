@@ -197,7 +197,10 @@ public class GravitinoIcebergCatalog extends BaseCatalog
   private boolean isIcebergFunctionNamespace(String[] namespace) {
     try {
       return namespace.length == 0 || isSystemNamespace(namespace);
-    } catch (IllegalAccessException | InvocationTargetException | NoSuchMethodException | ClassNotFoundException e) {
+    } catch (IllegalAccessException
+        | InvocationTargetException
+        | NoSuchMethodException
+        | ClassNotFoundException e) {
       throw new RuntimeException("Failed to check Iceberg function namespace", e);
     }
   }
