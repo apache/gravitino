@@ -242,7 +242,9 @@ export default function TagsPage() {
                 <Tag color={selectedTag.properties?.color}>{selectedTag.name}</Tag>
               </Descriptions.Item>
               <Descriptions.Item label='Comment'>{selectedTag.comment || '-'}</Descriptions.Item>
-              <Descriptions.Item label='Created At'>{selectedTag.createTime ? formatToDateTime(selectedTag.createTime) : '-'}</Descriptions.Item>
+              <Descriptions.Item label='Created At'>
+                {selectedTag.createTime ? formatToDateTime(selectedTag.createTime) : '-'}
+              </Descriptions.Item>
               <Descriptions.Item label='Creator'>{selectedTag.audit?.creator || '-'}</Descriptions.Item>
             </Descriptions>
             {anthEnable && (
