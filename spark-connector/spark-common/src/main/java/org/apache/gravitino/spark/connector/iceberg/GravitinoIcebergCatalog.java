@@ -21,9 +21,7 @@ package org.apache.gravitino.spark.connector.iceberg;
 
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
-import java.util.LinkedHashMap;
 import java.util.Map;
-import org.apache.commons.lang3.ArrayUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.catalog.lakehouse.iceberg.IcebergConstants;
 import org.apache.gravitino.catalog.lakehouse.iceberg.IcebergPropertiesUtils;
@@ -111,45 +109,16 @@ public class GravitinoIcebergCatalog extends BaseCatalog
 
   @Override
   public Identifier[] listFunctions(String[] namespace) throws NoSuchNamespaceException {
-    // Get functions from Iceberg catalog
-    Identifier[] icebergFunctions = ((SparkCatalog) sparkCatalog).listFunctions(namespace);
-
-    // Try to get Gravitino functions. If the namespace doesn't exist in Gravitino
-    // (e.g., Iceberg's "system" namespace), gracefully return empty array.
-    Identifier[] gravitinoFunctions;
-    if (namespace.length == 0) {
-      gravitinoFunctions = new Identifier[0];
-    } else {
-      try {
-        gravitinoFunctions = super.listFunctions(namespace);
-      } catch (NoSuchNamespaceException e) {
-        // Namespace exists in Iceberg but not in Gravitino, skip Gravitino functions
-        gravitinoFunctions = new Identifier[0];
-      }
-    }
-
-    // Combine and deduplicate functions, Gravitino functions take precedence
-    Map<String, Identifier> mergedFunctions = new LinkedHashMap<>();
-    for (Identifier id : gravitinoFunctions) {
-      mergedFunctions.put(id.name(), id);
-    }
-    for (Identifier id : icebergFunctions) {
-      mergedFunctions.putIfAbsent(id.name(), id);
-    }
-    return mergedFunctions.values().toArray(new Identifier[0]);
+    return isIcebergFunctionNamespace(namespace)
+        ? ((SparkCatalog) sparkCatalog).listFunctions(namespace)
+        : super.listFunctions(namespace);
   }
 
   @Override
   public UnboundFunction loadFunction(Identifier ident) throws NoSuchFunctionException {
-    try {
-      // When the namespace is empty, to maintain compatibility with Iceberg behavior, only Iceberg
-      // functions are returned.
-      return ident.namespace().length == 0 && ArrayUtils.isEmpty(sparkCatalog.defaultNamespace())
-          ? ((SparkCatalog) sparkCatalog).loadFunction(ident)
-          : super.loadFunction(ident);
-    } catch (NoSuchFunctionException e) {
-      return ((SparkCatalog) sparkCatalog).loadFunction(ident);
-    }
+    return isIcebergFunctionNamespace(ident.namespace())
+        ? ((SparkCatalog) sparkCatalog).loadFunction(ident)
+        : super.loadFunction(ident);
   }
 
   /**
@@ -222,6 +191,14 @@ public class GravitinoIcebergCatalog extends BaseCatalog
           getSparkTypeConverter());
     } catch (org.apache.gravitino.exceptions.NoSuchTableException e) {
       throw new NoSuchTableException(ident);
+    }
+  }
+
+  private boolean isIcebergFunctionNamespace(String[] namespace) {
+    try {
+      return namespace.length == 0 || isSystemNamespace(namespace);
+    } catch (IllegalAccessException | InvocationTargetException | NoSuchMethodException | ClassNotFoundException e) {
+      throw new RuntimeException("Failed to check Iceberg function namespace", e);
     }
   }
 
