@@ -101,7 +101,7 @@ public class JobMetaSQLProviderFactory {
   }
 
   public static String batchSelectJobByRunIds(
-      @Param("metalakeName") String metalakeName, @Param("jobRunIds") List<String> jobRunIds) {
+      @Param("metalakeName") String metalakeName, @Param("jobRunIds") List<Long> jobRunIds) {
     return getProvider().batchSelectJobByRunIds(metalakeName, jobRunIds);
   }
 

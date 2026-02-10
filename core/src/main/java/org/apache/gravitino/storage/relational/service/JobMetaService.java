@@ -171,10 +171,8 @@ public class JobMetaService {
     String metalakeName = firstIdent.namespace().level(0);
 
     // Parse job names (e.g., "job-123") to extract job run IDs
-    List<String> jobRunIds =
-        identifiers.stream()
-            .map(ident -> String.valueOf(parseJobRunId(ident.name())))
-            .collect(Collectors.toList());
+    List<Long> jobRunIds =
+        identifiers.stream().map(ident -> parseJobRunId(ident.name())).collect(Collectors.toList());
 
     // Get job template name from the first job identifier's namespace
     // Job namespace is: [metalake, system_catalog, job_schema_name]

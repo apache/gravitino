@@ -212,7 +212,7 @@ public class JobMetaBaseSQLProvider {
   }
 
   public String batchSelectJobByRunIds(
-      @Param("metalakeName") String metalakeName, @Param("jobRunIds") List<String> jobRunIds) {
+      @Param("metalakeName") String metalakeName, @Param("jobRunIds") List<Long> jobRunIds) {
     return "<script>"
         + "SELECT jrm.job_run_id AS jobRunId, jtm.job_template_name AS jobTemplateName,"
         + " jrm.metalake_id AS metalakeId, jrm.job_execution_id AS jobExecutionId,"
