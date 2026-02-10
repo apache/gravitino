@@ -73,9 +73,27 @@ public class TestJDBCBackendBatchGet extends TestJDBCBackend {
     Assertions.assertEquals(3, result.size());
     Map<String, BaseMetalake> resultMap =
         result.stream().collect(Collectors.toMap(BaseMetalake::name, m -> m));
-    Assertions.assertTrue(resultMap.containsKey("metalake1"));
-    Assertions.assertTrue(resultMap.containsKey("metalake2"));
-    Assertions.assertTrue(resultMap.containsKey("metalake3"));
+
+    // Verify metalake1
+    BaseMetalake retrieved1 = resultMap.get("metalake1");
+    Assertions.assertNotNull(retrieved1);
+    Assertions.assertEquals(metalake1.id(), retrieved1.id());
+    Assertions.assertEquals(metalake1.name(), retrieved1.name());
+    Assertions.assertEquals(metalake1.auditInfo().creator(), retrieved1.auditInfo().creator());
+
+    // Verify metalake2
+    BaseMetalake retrieved2 = resultMap.get("metalake2");
+    Assertions.assertNotNull(retrieved2);
+    Assertions.assertEquals(metalake2.id(), retrieved2.id());
+    Assertions.assertEquals(metalake2.name(), retrieved2.name());
+    Assertions.assertEquals(metalake2.auditInfo().creator(), retrieved2.auditInfo().creator());
+
+    // Verify metalake3
+    BaseMetalake retrieved3 = resultMap.get("metalake3");
+    Assertions.assertNotNull(retrieved3);
+    Assertions.assertEquals(metalake3.id(), retrieved3.id());
+    Assertions.assertEquals(metalake3.name(), retrieved3.name());
+    Assertions.assertEquals(metalake3.auditInfo().creator(), retrieved3.auditInfo().creator());
   }
 
   @TestTemplate
@@ -118,9 +136,29 @@ public class TestJDBCBackendBatchGet extends TestJDBCBackend {
     Assertions.assertEquals(3, result.size());
     Map<String, CatalogEntity> resultMap =
         result.stream().collect(Collectors.toMap(CatalogEntity::name, c -> c));
-    Assertions.assertTrue(resultMap.containsKey("catalog1"));
-    Assertions.assertTrue(resultMap.containsKey("catalog2"));
-    Assertions.assertTrue(resultMap.containsKey("catalog3"));
+
+    // Verify catalog1
+    CatalogEntity retrieved1 = resultMap.get("catalog1");
+    Assertions.assertNotNull(retrieved1);
+    Assertions.assertEquals(catalog1.id(), retrieved1.id());
+    Assertions.assertEquals(catalog1.name(), retrieved1.name());
+    Assertions.assertEquals(catalog1.namespace(), retrieved1.namespace());
+    Assertions.assertEquals(catalog1.getType(), retrieved1.getType());
+    Assertions.assertEquals(catalog1.getProvider(), retrieved1.getProvider());
+
+    // Verify catalog2
+    CatalogEntity retrieved2 = resultMap.get("catalog2");
+    Assertions.assertNotNull(retrieved2);
+    Assertions.assertEquals(catalog2.id(), retrieved2.id());
+    Assertions.assertEquals(catalog2.name(), retrieved2.name());
+    Assertions.assertEquals(catalog2.namespace(), retrieved2.namespace());
+
+    // Verify catalog3
+    CatalogEntity retrieved3 = resultMap.get("catalog3");
+    Assertions.assertNotNull(retrieved3);
+    Assertions.assertEquals(catalog3.id(), retrieved3.id());
+    Assertions.assertEquals(catalog3.name(), retrieved3.name());
+    Assertions.assertEquals(catalog3.namespace(), retrieved3.namespace());
   }
 
   @TestTemplate
@@ -157,8 +195,21 @@ public class TestJDBCBackendBatchGet extends TestJDBCBackend {
     Assertions.assertEquals(2, result.size());
     Map<String, SchemaEntity> resultMap =
         result.stream().collect(Collectors.toMap(SchemaEntity::name, s -> s));
-    Assertions.assertTrue(resultMap.containsKey("schema1"));
-    Assertions.assertTrue(resultMap.containsKey("schema2"));
+
+    // Verify schema1
+    SchemaEntity retrieved1 = resultMap.get("schema1");
+    Assertions.assertNotNull(retrieved1);
+    Assertions.assertEquals(schema1.id(), retrieved1.id());
+    Assertions.assertEquals(schema1.name(), retrieved1.name());
+    Assertions.assertEquals(schema1.namespace(), retrieved1.namespace());
+    Assertions.assertEquals(schema1.auditInfo().creator(), retrieved1.auditInfo().creator());
+
+    // Verify schema2
+    SchemaEntity retrieved2 = resultMap.get("schema2");
+    Assertions.assertNotNull(retrieved2);
+    Assertions.assertEquals(schema2.id(), retrieved2.id());
+    Assertions.assertEquals(schema2.name(), retrieved2.name());
+    Assertions.assertEquals(schema2.namespace(), retrieved2.namespace());
   }
 
   @TestTemplate
@@ -203,9 +254,28 @@ public class TestJDBCBackendBatchGet extends TestJDBCBackend {
     Assertions.assertEquals(3, result.size());
     Map<String, TableEntity> resultMap =
         result.stream().collect(Collectors.toMap(TableEntity::name, t -> t));
-    Assertions.assertTrue(resultMap.containsKey("table1"));
-    Assertions.assertTrue(resultMap.containsKey("table2"));
-    Assertions.assertTrue(resultMap.containsKey("table3"));
+
+    // Verify table1
+    TableEntity retrieved1 = resultMap.get("table1");
+    Assertions.assertNotNull(retrieved1);
+    Assertions.assertEquals(table1.id(), retrieved1.id());
+    Assertions.assertEquals(table1.name(), retrieved1.name());
+    Assertions.assertEquals(table1.namespace(), retrieved1.namespace());
+    Assertions.assertEquals(table1.auditInfo().creator(), retrieved1.auditInfo().creator());
+
+    // Verify table2
+    TableEntity retrieved2 = resultMap.get("table2");
+    Assertions.assertNotNull(retrieved2);
+    Assertions.assertEquals(table2.id(), retrieved2.id());
+    Assertions.assertEquals(table2.name(), retrieved2.name());
+    Assertions.assertEquals(table2.namespace(), retrieved2.namespace());
+
+    // Verify table3
+    TableEntity retrieved3 = resultMap.get("table3");
+    Assertions.assertNotNull(retrieved3);
+    Assertions.assertEquals(table3.id(), retrieved3.id());
+    Assertions.assertEquals(table3.name(), retrieved3.name());
+    Assertions.assertEquals(table3.namespace(), retrieved3.namespace());
   }
 
   @TestTemplate
@@ -242,8 +312,23 @@ public class TestJDBCBackendBatchGet extends TestJDBCBackend {
     Assertions.assertEquals(2, result.size());
     Map<String, FilesetEntity> resultMap =
         result.stream().collect(Collectors.toMap(FilesetEntity::name, f -> f));
-    Assertions.assertTrue(resultMap.containsKey("fileset1"));
-    Assertions.assertTrue(resultMap.containsKey("fileset2"));
+
+    // Verify fileset1
+    FilesetEntity retrieved1 = resultMap.get("fileset1");
+    Assertions.assertNotNull(retrieved1);
+    Assertions.assertEquals(fileset1.id(), retrieved1.id());
+    Assertions.assertEquals(fileset1.name(), retrieved1.name());
+    Assertions.assertEquals(fileset1.namespace(), retrieved1.namespace());
+    Assertions.assertEquals(fileset1.filesetType(), retrieved1.filesetType());
+    Assertions.assertEquals(fileset1.storageLocation(), retrieved1.storageLocation());
+
+    // Verify fileset2
+    FilesetEntity retrieved2 = resultMap.get("fileset2");
+    Assertions.assertNotNull(retrieved2);
+    Assertions.assertEquals(fileset2.id(), retrieved2.id());
+    Assertions.assertEquals(fileset2.name(), retrieved2.name());
+    Assertions.assertEquals(fileset2.namespace(), retrieved2.namespace());
+    Assertions.assertEquals(fileset2.filesetType(), retrieved2.filesetType());
   }
 
   @TestTemplate
@@ -280,8 +365,23 @@ public class TestJDBCBackendBatchGet extends TestJDBCBackend {
     Assertions.assertEquals(2, result.size());
     Map<String, TopicEntity> resultMap =
         result.stream().collect(Collectors.toMap(TopicEntity::name, t -> t));
-    Assertions.assertTrue(resultMap.containsKey("topic1"));
-    Assertions.assertTrue(resultMap.containsKey("topic2"));
+
+    // Verify topic1
+    TopicEntity retrieved1 = resultMap.get("topic1");
+    Assertions.assertNotNull(retrieved1);
+    Assertions.assertEquals(topic1.id(), retrieved1.id());
+    Assertions.assertEquals(topic1.name(), retrieved1.name());
+    Assertions.assertEquals(topic1.namespace(), retrieved1.namespace());
+    Assertions.assertEquals(topic1.comment(), retrieved1.comment());
+    Assertions.assertEquals(topic1.properties(), retrieved1.properties());
+
+    // Verify topic2
+    TopicEntity retrieved2 = resultMap.get("topic2");
+    Assertions.assertNotNull(retrieved2);
+    Assertions.assertEquals(topic2.id(), retrieved2.id());
+    Assertions.assertEquals(topic2.name(), retrieved2.name());
+    Assertions.assertEquals(topic2.namespace(), retrieved2.namespace());
+    Assertions.assertEquals(topic2.comment(), retrieved2.comment());
   }
 
   @TestTemplate
@@ -324,8 +424,25 @@ public class TestJDBCBackendBatchGet extends TestJDBCBackend {
     Assertions.assertEquals(2, result.size());
     Map<String, ModelEntity> resultMap =
         result.stream().collect(Collectors.toMap(ModelEntity::name, m -> m));
-    Assertions.assertTrue(resultMap.containsKey("model1"));
-    Assertions.assertTrue(resultMap.containsKey("model2"));
+
+    // Verify model1
+    ModelEntity retrieved1 = resultMap.get("model1");
+    Assertions.assertNotNull(retrieved1);
+    Assertions.assertEquals(model1.id(), retrieved1.id());
+    Assertions.assertEquals(model1.name(), retrieved1.name());
+    Assertions.assertEquals(model1.namespace(), retrieved1.namespace());
+    Assertions.assertEquals(model1.comment(), retrieved1.comment());
+    Assertions.assertEquals(model1.latestVersion(), retrieved1.latestVersion());
+    Assertions.assertEquals(model1.properties(), retrieved1.properties());
+
+    // Verify model2
+    ModelEntity retrieved2 = resultMap.get("model2");
+    Assertions.assertNotNull(retrieved2);
+    Assertions.assertEquals(model2.id(), retrieved2.id());
+    Assertions.assertEquals(model2.name(), retrieved2.name());
+    Assertions.assertEquals(model2.namespace(), retrieved2.namespace());
+    Assertions.assertEquals(model2.comment(), retrieved2.comment());
+    Assertions.assertEquals(model2.latestVersion(), retrieved2.latestVersion());
   }
 
   @TestTemplate
@@ -366,8 +483,23 @@ public class TestJDBCBackendBatchGet extends TestJDBCBackend {
     Assertions.assertEquals(2, result.size());
     Map<String, TagEntity> resultMap =
         result.stream().collect(Collectors.toMap(TagEntity::name, t -> t));
-    Assertions.assertTrue(resultMap.containsKey("tag1"));
-    Assertions.assertTrue(resultMap.containsKey("tag2"));
+
+    // Verify tag1
+    TagEntity retrieved1 = resultMap.get("tag1");
+    Assertions.assertNotNull(retrieved1);
+    Assertions.assertEquals(tag1.id(), retrieved1.id());
+    Assertions.assertEquals(tag1.name(), retrieved1.name());
+    Assertions.assertEquals(tag1.namespace(), retrieved1.namespace());
+    Assertions.assertEquals(tag1.comment(), retrieved1.comment());
+    Assertions.assertEquals(tag1.properties(), retrieved1.properties());
+
+    // Verify tag2
+    TagEntity retrieved2 = resultMap.get("tag2");
+    Assertions.assertNotNull(retrieved2);
+    Assertions.assertEquals(tag2.id(), retrieved2.id());
+    Assertions.assertEquals(tag2.name(), retrieved2.name());
+    Assertions.assertEquals(tag2.namespace(), retrieved2.namespace());
+    Assertions.assertEquals(tag2.comment(), retrieved2.comment());
   }
 
   @TestTemplate
@@ -396,8 +528,23 @@ public class TestJDBCBackendBatchGet extends TestJDBCBackend {
     Assertions.assertEquals(2, result.size());
     Map<String, PolicyEntity> resultMap =
         result.stream().collect(Collectors.toMap(PolicyEntity::name, p -> p));
-    Assertions.assertTrue(resultMap.containsKey("policy1"));
-    Assertions.assertTrue(resultMap.containsKey("policy2"));
+
+    // Verify policy1
+    PolicyEntity retrieved1 = resultMap.get("policy1");
+    Assertions.assertNotNull(retrieved1);
+    Assertions.assertEquals(policy1.id(), retrieved1.id());
+    Assertions.assertEquals(policy1.name(), retrieved1.name());
+    Assertions.assertEquals(policy1.namespace(), retrieved1.namespace());
+    Assertions.assertEquals(policy1.policyType(), retrieved1.policyType());
+    Assertions.assertEquals(policy1.enabled(), retrieved1.enabled());
+
+    // Verify policy2
+    PolicyEntity retrieved2 = resultMap.get("policy2");
+    Assertions.assertNotNull(retrieved2);
+    Assertions.assertEquals(policy2.id(), retrieved2.id());
+    Assertions.assertEquals(policy2.name(), retrieved2.name());
+    Assertions.assertEquals(policy2.namespace(), retrieved2.namespace());
+    Assertions.assertEquals(policy2.policyType(), retrieved2.policyType());
   }
 
   @TestTemplate
@@ -482,8 +629,25 @@ public class TestJDBCBackendBatchGet extends TestJDBCBackend {
     Assertions.assertEquals(2, result.size());
     Map<String, JobEntity> resultMap =
         result.stream().collect(Collectors.toMap(JobEntity::name, j -> j));
-    Assertions.assertTrue(resultMap.containsKey(job1.name()));
-    Assertions.assertTrue(resultMap.containsKey(job2.name()));
+
+    // Verify job1
+    JobEntity retrieved1 = resultMap.get(job1.name());
+    Assertions.assertNotNull(retrieved1);
+    Assertions.assertEquals(job1.id(), retrieved1.id());
+    Assertions.assertEquals(job1.name(), retrieved1.name());
+    Assertions.assertEquals(job1.namespace(), retrieved1.namespace());
+    Assertions.assertEquals(job1.jobExecutionId(), retrieved1.jobExecutionId());
+    Assertions.assertEquals(job1.status(), retrieved1.status());
+    Assertions.assertEquals(job1.jobTemplateName(), retrieved1.jobTemplateName());
+
+    // Verify job2
+    JobEntity retrieved2 = resultMap.get(job2.name());
+    Assertions.assertNotNull(retrieved2);
+    Assertions.assertEquals(job2.id(), retrieved2.id());
+    Assertions.assertEquals(job2.name(), retrieved2.name());
+    Assertions.assertEquals(job2.namespace(), retrieved2.namespace());
+    Assertions.assertEquals(job2.jobExecutionId(), retrieved2.jobExecutionId());
+    Assertions.assertEquals(job2.status(), retrieved2.status());
   }
 
   @TestTemplate
@@ -545,8 +709,25 @@ public class TestJDBCBackendBatchGet extends TestJDBCBackend {
     Assertions.assertEquals(2, result.size());
     Map<String, JobTemplateEntity> resultMap =
         result.stream().collect(Collectors.toMap(JobTemplateEntity::name, t -> t));
-    Assertions.assertTrue(resultMap.containsKey("template1"));
-    Assertions.assertTrue(resultMap.containsKey("template2"));
+
+    // Verify template1
+    JobTemplateEntity retrieved1 = resultMap.get("template1");
+    Assertions.assertNotNull(retrieved1);
+    Assertions.assertEquals(template1.id(), retrieved1.id());
+    Assertions.assertEquals(template1.name(), retrieved1.name());
+    Assertions.assertEquals(template1.namespace(), retrieved1.namespace());
+    Assertions.assertEquals(template1.comment(), retrieved1.comment());
+    Assertions.assertNotNull(retrieved1.templateContent());
+    Assertions.assertEquals(JobTemplate.JobType.SHELL, retrieved1.templateContent().jobType());
+
+    // Verify template2
+    JobTemplateEntity retrieved2 = resultMap.get("template2");
+    Assertions.assertNotNull(retrieved2);
+    Assertions.assertEquals(template2.id(), retrieved2.id());
+    Assertions.assertEquals(template2.name(), retrieved2.name());
+    Assertions.assertEquals(template2.namespace(), retrieved2.namespace());
+    Assertions.assertEquals(template2.comment(), retrieved2.comment());
+    Assertions.assertNotNull(retrieved2.templateContent());
   }
 
   @TestTemplate
