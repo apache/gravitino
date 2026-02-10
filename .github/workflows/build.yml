@@ -44,6 +44,7 @@ jobs:
               - '!**/*.md'
               - '!**/*.png'
               - '!**/*.svg'
+              - 'mcp-server/**'
             spark_connector_changes:
               - spark-connector/**
             mcp_server_changes:
