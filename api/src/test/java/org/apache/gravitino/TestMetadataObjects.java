@@ -127,4 +127,56 @@ public class TestMetadataObjects {
         IllegalArgumentException.class,
         () -> MetadataObjects.of("parent", "template_abc", MetadataObject.Type.JOB_TEMPLATE));
   }
+
+  @Test
+  public void testViewObject() {
+    MetadataObject viewObject =
+        MetadataObjects.of("catalog.schema", "view1", MetadataObject.Type.VIEW);
+    Assertions.assertEquals("catalog.schema", viewObject.parent());
+    Assertions.assertEquals("view1", viewObject.name());
+    Assertions.assertEquals(MetadataObject.Type.VIEW, viewObject.type());
+    Assertions.assertEquals("catalog.schema.view1", viewObject.fullName());
+
+    MetadataObject viewObject2 =
+        MetadataObjects.of(
+            Lists.newArrayList("catalog", "schema", "view2"), MetadataObject.Type.VIEW);
+    Assertions.assertEquals("catalog.schema", viewObject2.parent());
+    Assertions.assertEquals("view2", viewObject2.name());
+    Assertions.assertEquals(MetadataObject.Type.VIEW, viewObject2.type());
+    Assertions.assertEquals("catalog.schema.view2", viewObject2.fullName());
+
+    MetadataObject viewObject3 =
+        MetadataObjects.parse("catalog.schema.view3", MetadataObject.Type.VIEW);
+    Assertions.assertEquals("catalog.schema", viewObject3.parent());
+    Assertions.assertEquals("view3", viewObject3.name());
+    Assertions.assertEquals(MetadataObject.Type.VIEW, viewObject3.type());
+    Assertions.assertEquals("catalog.schema.view3", viewObject3.fullName());
+
+    // Test parent
+    MetadataObject parent = MetadataObjects.parent(viewObject);
+    Assertions.assertEquals("catalog.schema", parent.fullName());
+    Assertions.assertEquals("catalog", parent.parent());
+    Assertions.assertEquals("schema", parent.name());
+    Assertions.assertEquals(MetadataObject.Type.SCHEMA, parent.type());
+
+    // Test incomplete name
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () -> MetadataObjects.parse("view1", MetadataObject.Type.VIEW));
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () -> MetadataObjects.parse("catalog", MetadataObject.Type.VIEW));
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () -> MetadataObjects.parse("catalog.schema", MetadataObject.Type.VIEW));
+
+    // Test incomplete name list
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () -> MetadataObjects.of(Lists.newArrayList("catalog"), MetadataObject.Type.VIEW));
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () ->
+            MetadataObjects.of(Lists.newArrayList("catalog", "schema"), MetadataObject.Type.VIEW));
+  }
 }

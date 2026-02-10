@@ -63,19 +63,26 @@ public class PaimonCatalogPropertiesMetadata extends BaseCatalogPropertiesMetada
   public static final String S3_SECRET_KEY = PaimonConstants.S3_SECRET_KEY;
 
   public static final Map<String, String> GRAVITINO_CONFIG_TO_PAIMON =
-      ImmutableMap.of(
-          GRAVITINO_CATALOG_BACKEND,
-          PAIMON_METASTORE,
-          WAREHOUSE,
-          WAREHOUSE,
-          URI,
-          URI,
-          GRAVITINO_JDBC_USER,
-          PAIMON_JDBC_USER,
-          GRAVITINO_JDBC_PASSWORD,
-          PAIMON_JDBC_PASSWORD,
-          GRAVITINO_JDBC_DRIVER,
-          GRAVITINO_JDBC_DRIVER);
+      ImmutableMap.<String, String>builder()
+          .put(GRAVITINO_CATALOG_BACKEND, PAIMON_METASTORE)
+          .put(WAREHOUSE, WAREHOUSE)
+          .put(URI, URI)
+          .put(GRAVITINO_JDBC_USER, PAIMON_JDBC_USER)
+          .put(GRAVITINO_JDBC_PASSWORD, PAIMON_JDBC_PASSWORD)
+          .put(GRAVITINO_JDBC_DRIVER, GRAVITINO_JDBC_DRIVER)
+          .put(PaimonConstants.GRAVITINO_TOKEN_PROVIDER, PaimonConstants.PAIMON_TOKEN_PROVIDER)
+          .put(PaimonConstants.TOKEN, PaimonConstants.TOKEN)
+          .put(
+              PaimonConstants.GRAVITINO_DLF_ACCESS_KEY_ID, PaimonConstants.PAIMON_DLF_ACCESS_KEY_ID)
+          .put(
+              PaimonConstants.GRAVITINO_DLF_ACCESS_KEY_SECRET,
+              PaimonConstants.PAIMON_DLF_ACCESS_KEY_SECRET)
+          .put(
+              PaimonConstants.GRAVITINO_DLF_SECURITY_TOKEN,
+              PaimonConstants.PAIMON_DLF_SECURITY_TOKEN)
+          .put(PaimonConstants.GRAVITINO_DLF_TOKEN_PATH, PaimonConstants.PAIMON_DLF_TOKEN_PATH)
+          .put(PaimonConstants.GRAVITINO_DLF_TOKEN_LOADER, PaimonConstants.PAIMON_DLF_TOKEN_LOADER)
+          .build();
   private static final Map<String, PropertyEntry<?>> PROPERTIES_METADATA;
   public static final Map<String, String> KERBEROS_CONFIGURATION =
       ImmutableMap.of(
@@ -101,6 +108,66 @@ public class PaimonCatalogPropertiesMetadata extends BaseCatalogPropertiesMetada
           OSSProperties.GRAVITINO_OSS_ACCESS_KEY_ID, PaimonOSSFileSystemConfig.OSS_ACCESS_KEY,
           OSSProperties.GRAVITINO_OSS_ACCESS_KEY_SECRET, PaimonOSSFileSystemConfig.OSS_SECRET_KEY,
           OSSProperties.GRAVITINO_OSS_ENDPOINT, PaimonOSSFileSystemConfig.OSS_ENDPOINT);
+
+  public static final Map<String, PropertyEntry<?>> REST_PROPERTY_ENTRIES =
+      new ImmutableMap.Builder<String, PropertyEntry<?>>()
+          .put(
+              PaimonConstants.GRAVITINO_TOKEN_PROVIDER,
+              stringOptionalPropertyEntry(
+                  PaimonConstants.GRAVITINO_TOKEN_PROVIDER,
+                  "The token provider type for Paimon",
+                  false /* immutable */,
+                  null /* defaultValue */,
+                  false /* hidden */))
+          .put(
+              PaimonConstants.TOKEN,
+              stringOptionalPropertyEntry(
+                  PaimonConstants.TOKEN,
+                  "The bear token for REST catalog authentication",
+                  false /* immutable */,
+                  null /* defaultValue */,
+                  false /* hidden */))
+          .put(
+              PaimonConstants.GRAVITINO_DLF_ACCESS_KEY_ID,
+              stringOptionalPropertyEntry(
+                  PaimonConstants.GRAVITINO_DLF_ACCESS_KEY_ID,
+                  "The access key ID for Aliyun DLF",
+                  false /* immutable */,
+                  null /* defaultValue */,
+                  false /* hidden */))
+          .put(
+              PaimonConstants.GRAVITINO_DLF_ACCESS_KEY_SECRET,
+              stringOptionalPropertyEntry(
+                  PaimonConstants.GRAVITINO_DLF_ACCESS_KEY_SECRET,
+                  "The access key secret for Aliyun DLF",
+                  false /* immutable */,
+                  null /* defaultValue */,
+                  false /* hidden */))
+          .put(
+              PaimonConstants.GRAVITINO_DLF_SECURITY_TOKEN,
+              stringOptionalPropertyEntry(
+                  PaimonConstants.GRAVITINO_DLF_SECURITY_TOKEN,
+                  "The security token for Aliyun DLF",
+                  false /* immutable */,
+                  null /* defaultValue */,
+                  false /* hidden */))
+          .put(
+              PaimonConstants.GRAVITINO_DLF_TOKEN_PATH,
+              stringOptionalPropertyEntry(
+                  PaimonConstants.GRAVITINO_DLF_TOKEN_PATH,
+                  "The token path for Aliyun DLF",
+                  false /* immutable */,
+                  null /* defaultValue */,
+                  false /* hidden */))
+          .put(
+              PaimonConstants.GRAVITINO_DLF_TOKEN_LOADER,
+              stringOptionalPropertyEntry(
+                  PaimonConstants.GRAVITINO_DLF_TOKEN_LOADER,
+                  "The token loader for Aliyun DLF",
+                  false /* immutable */,
+                  null /* defaultValue */,
+                  false /* hidden */))
+          .build();
 
   static {
     List<PropertyEntry<?>> propertyEntries =
@@ -149,6 +216,7 @@ public class PaimonCatalogPropertiesMetadata extends BaseCatalogPropertiesMetada
     result.putAll(AuthenticationConfig.AUTHENTICATION_PROPERTY_ENTRIES);
     result.putAll(PaimonS3FileSystemConfig.S3_FILESYSTEM_PROPERTY_ENTRIES);
     result.putAll(PaimonOSSFileSystemConfig.OSS_FILESYSTEM_PROPERTY_ENTRIES);
+    result.putAll(REST_PROPERTY_ENTRIES);
     PROPERTIES_METADATA = ImmutableMap.copyOf(result);
   }
 

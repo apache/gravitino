@@ -26,6 +26,7 @@ import lombok.ToString;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.Field;
 import org.apache.gravitino.HasIdentifier;
+import org.apache.gravitino.Namespace;
 import org.apache.gravitino.policy.PolicyManager;
 
 /**
@@ -46,6 +47,7 @@ public class GenericEntity implements Entity, HasIdentifier {
   private Long id;
   private EntityType entityType;
   private String name;
+  private Namespace namespace;
 
   private GenericEntity() {}
 
@@ -93,6 +95,16 @@ public class GenericEntity implements Entity, HasIdentifier {
     return entityType;
   }
 
+  /**
+   * Retrieves the namespace of the entity.
+   *
+   * @return the namespace of the entity.
+   */
+  @Override
+  public Namespace namespace() {
+    return namespace != null ? namespace : Namespace.empty();
+  }
+
   /** Builder class for creating instances of {@link GenericEntity}. */
   public static class Builder {
     private final GenericEntity entity;
@@ -136,7 +148,18 @@ public class GenericEntity implements Entity, HasIdentifier {
     }
 
     /**
-     * Builds the {@link GenericEntity} instance after validation.
+     * Sets the namespace of the entity.
+     *
+     * @param namespace the namespace of the entity.
+     * @return the builder instance.
+     */
+    public Builder withNamespace(Namespace namespace) {
+      entity.namespace = namespace;
+      return this;
+    }
+
+    /**
+     * Builds the instance of the {@link GenericEntity} after validation.
      *
      * @return the constructed and validated {@link GenericEntity} instance.
      */
@@ -145,6 +168,7 @@ public class GenericEntity implements Entity, HasIdentifier {
       genericEntity.id = entity.id;
       genericEntity.name = entity.name;
       genericEntity.entityType = entity.entityType;
+      genericEntity.namespace = entity.namespace;
       genericEntity.validate();
       return genericEntity;
     }

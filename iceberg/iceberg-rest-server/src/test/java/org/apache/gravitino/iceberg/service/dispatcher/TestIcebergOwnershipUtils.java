@@ -25,7 +25,7 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 
-import org.apache.gravitino.Entity;
+import org.apache.gravitino.Entity.EntityType;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.authorization.Owner;
@@ -46,6 +46,7 @@ public class TestIcebergOwnershipUtils {
   private static final String USER = "test_user";
   private static final String SCHEMA_NAME = "test_schema";
   private static final String TABLE_NAME = "test_table";
+  private static final String VIEW_NAME = "test_view";
 
   private OwnerDispatcher mockOwnerDispatcher;
 
@@ -60,7 +61,7 @@ public class TestIcebergOwnershipUtils {
     NameIdentifier expectedSchemaIdentifier =
         IcebergIdentifierUtils.toGravitinoSchemaIdentifier(METALAKE, CATALOG, namespace);
     MetadataObject expectedMetadataObject =
-        NameIdentifierUtil.toMetadataObject(expectedSchemaIdentifier, Entity.EntityType.SCHEMA);
+        NameIdentifierUtil.toMetadataObject(expectedSchemaIdentifier, EntityType.SCHEMA);
 
     IcebergOwnershipUtils.setSchemaOwner(METALAKE, CATALOG, namespace, USER, mockOwnerDispatcher);
 
@@ -75,7 +76,7 @@ public class TestIcebergOwnershipUtils {
     NameIdentifier expectedTableIdentifier =
         IcebergIdentifierUtils.toGravitinoTableIdentifier(METALAKE, CATALOG, tableIdentifier);
     MetadataObject expectedMetadataObject =
-        NameIdentifierUtil.toMetadataObject(expectedTableIdentifier, Entity.EntityType.TABLE);
+        NameIdentifierUtil.toMetadataObject(expectedTableIdentifier, EntityType.TABLE);
 
     IcebergOwnershipUtils.setTableOwner(
         METALAKE, CATALOG, namespace, TABLE_NAME, USER, mockOwnerDispatcher);
@@ -103,6 +104,33 @@ public class TestIcebergOwnershipUtils {
       IcebergOwnershipUtils.setTableOwner(METALAKE, CATALOG, namespace, TABLE_NAME, USER, null);
     } catch (Exception e) {
       fail("setTableOwner should handle null dispatcher gracefully, but threw: " + e.getMessage());
+    }
+  }
+
+  @Test
+  public void testSetViewOwner() {
+    Namespace namespace = Namespace.of(SCHEMA_NAME);
+    TableIdentifier viewIdentifier = TableIdentifier.of(namespace, VIEW_NAME);
+    NameIdentifier expectedViewIdentifier =
+        IcebergIdentifierUtils.toGravitinoTableIdentifier(METALAKE, CATALOG, viewIdentifier);
+    MetadataObject expectedMetadataObject =
+        NameIdentifierUtil.toMetadataObject(expectedViewIdentifier, EntityType.VIEW);
+
+    IcebergOwnershipUtils.setViewOwner(
+        METALAKE, CATALOG, namespace, VIEW_NAME, USER, mockOwnerDispatcher);
+
+    verify(mockOwnerDispatcher, times(1))
+        .setOwner(eq(METALAKE), eq(expectedMetadataObject), eq(USER), eq(Owner.Type.USER));
+  }
+
+  @Test
+  public void testSetViewOwnerWithNullOwnerDispatcher() {
+    Namespace namespace = Namespace.of(SCHEMA_NAME);
+
+    try {
+      IcebergOwnershipUtils.setViewOwner(METALAKE, CATALOG, namespace, VIEW_NAME, USER, null);
+    } catch (Exception e) {
+      fail("setViewOwner should handle null dispatcher gracefully, but threw: " + e.getMessage());
     }
   }
 }

@@ -62,11 +62,12 @@ jobs:
         id: integrationTest
         run: >
           ./gradlew test -PskipTests -PtestMode=${{ inputs.test-mode }} -PjdbcBackend=${{ inputs.backend }} -PskipDockerTests=false
-          -x :web:web:test -x :web:integration-test:test -x :clients:client-python:test -x :flink-connector:flink:test -x :spark-connector:spark-common:test 
+          -x :web:web:test -x :web:integration-test:test -x :web-v2:web:test -x :web-v2:integration-test:test -x :clients:client-python:test -x :flink-connector:flink:test -x :spark-connector:spark-common:test 
           -x :spark-connector:spark-3.3:test -x :spark-connector:spark-3.4:test -x :spark-connector:spark-3.5:test 
           -x :spark-connector:spark-runtime-3.3:test -x :spark-connector:spark-runtime-3.4:test -x :spark-connector:spark-runtime-3.5:test
           -x :trino-connector:integration-test:test -x :trino-connector:trino-connector:test
           -x :authorizations:authorization-chain:test -x :authorizations:authorization-ranger:test 
+          -x :catalogs-contrib:catalog-jdbc-oceanbase:test
 
       - name: Upload integrate tests reports
         uses: actions/upload-artifact@v4

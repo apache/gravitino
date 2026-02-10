@@ -21,8 +21,8 @@ package org.apache.gravitino.flink.connector.catalog;
 
 import org.apache.flink.table.factories.CatalogFactory;
 import org.apache.gravitino.Catalog;
+import org.apache.gravitino.flink.connector.CatalogPropertiesConverter;
 import org.apache.gravitino.flink.connector.PartitionConverter;
-import org.apache.gravitino.flink.connector.PropertiesConverter;
 
 public interface BaseCatalogFactory extends CatalogFactory {
 
@@ -41,11 +41,11 @@ public interface BaseCatalogFactory extends CatalogFactory {
   Catalog.Type gravitinoCatalogType();
 
   /**
-   * Define properties converter {@link PropertiesConverter}.
+   * Define catalog properties converter {@link CatalogPropertiesConverter}.
    *
-   * @return The requested property converter.
+   * @return The requested catalog properties converter.
    */
-  PropertiesConverter propertiesConverter();
+  CatalogPropertiesConverter catalogPropertiesConverter();
 
   /**
    * Define partition converter.
