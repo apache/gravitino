@@ -35,6 +35,7 @@ val paimonVersion: String = libs.versions.paimon.get()
 val kyuubiVersion: String = libs.versions.kyuubi4spark.get()
 val scalaJava8CompatVersion: String = libs.versions.scala.java.compat.get()
 val scalaCollectionCompatVersion: String = libs.versions.scala.collection.compat.get()
+val slf4j17Version = "1.7.36"
 val artifactName = "${rootProject.name}-spark-${sparkMajorVersion}_$scalaVersion"
 
 if (hasProperty("excludePackagesForSparkConnector")) {
@@ -42,14 +43,14 @@ if (hasProperty("excludePackagesForSparkConnector")) {
   configureFunc?.invoke(project)
 }
 
-configurations.all {
-  resolutionStrategy {
-    // 1.7.36 is the latest version of slf4j 1.7.x, and log4j-slf4j-impl 2.17.2 depends on it,
-    // we need to align the version to avoid conflicts.
-    force("org.slf4j:slf4j-api:1.7.36")
+configurations.matching { it.name in setOf("testRuntimeClasspath", "testCompileClasspath") }
+  .configureEach {
+    resolutionStrategy {
+      // Spark 3.3 pulls an SLF4J 1.7 binding; align slf4j-api to 1.7.x to avoid Log4j bridge conflicts.
+      force("org.slf4j:slf4j-api:$slf4j17Version")
+    }
+    exclude(group = "org.apache.logging.log4j", module = "log4j-slf4j2-impl")
   }
-  exclude(group = "org.apache.logging.log4j", module = "log4j-slf4j2-impl")
-}
 
 dependencies {
   implementation(project(":spark-connector:spark-common"))
