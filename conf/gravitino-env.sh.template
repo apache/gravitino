@@ -35,4 +35,4 @@ GRAVITINO_VERSION=GRAVITINO_VERSION_PLACEHOLDER
 # UI selection behaviour:
 # - By default the template sets `GRAVITINO_USE_WEB_V2=false` which forces the V1 UI.
 # - To enable the v2 UI you can set it to `true` (for example: `export GRAVITINO_USE_WEB_V2=true`).
-GRAVITINO_USE_WEB_V2=false
+# GRAVITINO_USE_WEB_V2=false
