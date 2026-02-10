@@ -30,6 +30,7 @@ import static org.mockito.Mockito.when;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableMap;
 import io.trino.plugin.memory.MemoryConnector;
+import io.trino.spi.TrinoException;
 import io.trino.spi.connector.ColumnHandle;
 import io.trino.spi.connector.ColumnMetadata;
 import io.trino.spi.connector.ConnectorMetadata;
@@ -632,6 +633,9 @@ public class GravitinoMockServer implements AutoCloseable {
                 ColumnMetadata.class)
             .invoke(metadata, null, tableHandle, columnMetadata);
       } catch (ReflectiveOperationException e) {
+        if (e.getCause() instanceof TrinoException) {
+          throw new RuntimeException(e.getCause().getMessage(), e);
+        }
         throw new RuntimeException("Failed to invoke legacy addColumn by reflection", e);
       }
     } else {
@@ -650,6 +654,9 @@ public class GravitinoMockServer implements AutoCloseable {
                 columnPositionClass)
             .invoke(metadata, null, tableHandle, columnMetadata, position);
       } catch (Exception e) {
+        if (e.getCause() instanceof TrinoException) {
+          throw new RuntimeException(e.getCause().getMessage(), e);
+        }
         throw new RuntimeException("Failed to invoke addColumn with ColumnPosition", e);
       }
     }
