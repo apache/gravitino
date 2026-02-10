@@ -306,10 +306,10 @@ export default function PoliciesPage() {
             <Descriptions.Item label='Comment'>{currentPolicy?.comment || '-'}</Descriptions.Item>
             <Descriptions.Item label='Creator'>{currentPolicy?.audit?.creator || '-'}</Descriptions.Item>
             <Descriptions.Item label='Created At'>
-              {formatToDateTime(currentPolicy?.audit?.createTime)}
+              {currentPolicy?.audit?.createTime ? formatToDateTime(currentPolicy.audit.createTime) : '-'}
             </Descriptions.Item>
             <Descriptions.Item label='Last Modified At'>
-              {formatToDateTime(currentPolicy?.audit?.lastModifiedTime) || '-'}
+              {currentPolicy?.audit?.lastModifiedTime ? formatToDateTime(currentPolicy.audit.lastModifiedTime) : '-'}
             </Descriptions.Item>
             <Descriptions.Item label='Last Modifier'>{currentPolicy?.audit?.lastModifier || '-'}</Descriptions.Item>
           </Descriptions>

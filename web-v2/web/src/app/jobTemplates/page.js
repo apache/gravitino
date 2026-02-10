@@ -23,11 +23,12 @@ import { createContext, useContext, useEffect, useMemo, useState } from 'react'
 import dynamic from 'next/dynamic'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { ExclamationCircleFilled, PlusOutlined } from '@ant-design/icons'
-import { Button, Descriptions, Drawer, Empty, Flex, Input, Modal, Spin, Table, Tooltip, Typography } from 'antd'
+import { Button, Descriptions, Drawer, Flex, Input, Modal, Spin, Table, Tooltip, Typography } from 'antd'
 import { useAntdColumnResize } from 'react-antd-column-resize'
 import ConfirmInput from '@/components/ConfirmInput'
 import Icons from '@/components/Icons'
 import SectionContainer from '@/components/SectionContainer'
+import AssociatedTable from '@/components/AssociatedTable'
 import { formatToDateTime } from '@/lib/utils'
 import Loading from '@/components/Loading'
 import { useAppSelector, useAppDispatch } from '@/lib/hooks/useStore'
@@ -55,6 +56,8 @@ export default function JobTemplatesPage() {
   const dispatch = useAppDispatch()
   const store = useAppSelector(state => state.jobs)
   const [isLoadingDetails, setIsLoadingDetails] = useState(false)
+  const auth = useAppSelector(state => state.auth)
+  const { anthEnable } = auth
 
   useEffect(() => {
     currentMetalake && dispatch(fetchJobTemplates({ metalake: currentMetalake, details: true }))
@@ -286,11 +289,6 @@ export default function JobTemplatesPage() {
                     : '-'}
                 </Descriptions.Item>
               )}
-              {currentJobTemplate?.jobType === 'spark' && (
-                <>
-                  <Descriptions.Item label='Class Name'>{currentJobTemplate?.className || '-'}</Descriptions.Item>
-                </>
-              )}
             </Descriptions>
             <Title level={5} className='mt-4 mb-2'>
               Environment Variable(s)
@@ -459,13 +457,27 @@ export default function JobTemplatesPage() {
               <Descriptions size='small' bordered column={1} labelStyle={{ width: 180 }}>
                 <Descriptions.Item label='Creator'>{currentJobTemplate?.audit?.creator || '-'}</Descriptions.Item>
                 <Descriptions.Item label='Created At'>
-                  {formatToDateTime(currentJobTemplate?.audit?.createTime)}
+                  {currentJobTemplate?.audit?.createTime ? formatToDateTime(currentJobTemplate.audit.createTime) : '-'}
                 </Descriptions.Item>
                 <Descriptions.Item label='Updated At'>
-                  {formatToDateTime(currentJobTemplate?.audit?.lastModifiedTime) || '-'}
+                  {currentJobTemplate?.audit?.lastModifiedTime
+                    ? formatToDateTime(currentJobTemplate.audit.lastModifiedTime)
+                    : '-'}
                 </Descriptions.Item>
               </Descriptions>
             </div>
+            {anthEnable && (
+              <>
+                <Title level={5} className='mt-4 mb-2'>
+                  Associated Roles
+                </Title>
+                <AssociatedTable
+                  metalake={currentMetalake}
+                  metadataObjectType={'job_template'}
+                  metadataObjectFullName={currentJobTemplate?.name}
+                />
+              </>
+            )}
           </Drawer>
         )}
         {open && (

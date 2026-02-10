@@ -339,10 +339,10 @@ export default function JobsPage() {
               </Descriptions.Item>
               <Descriptions.Item label='Creator'>{currentJob?.audit?.creator || '-'}</Descriptions.Item>
               <Descriptions.Item label='Created At'>
-                {formatToDateTime(currentJob?.audit?.createTime)}
+                {currentJob?.audit?.createTime ? formatToDateTime(currentJob?.audit?.createTime) : '-'}
               </Descriptions.Item>
               <Descriptions.Item label='Updated At'>
-                {formatToDateTime(currentJob?.audit?.lastModifiedTime) || '-'}
+                {currentJob?.audit?.lastModifiedTime ? formatToDateTime(currentJob?.audit?.lastModifiedTime) : '-'}
               </Descriptions.Item>
             </Descriptions>
           </Drawer>
