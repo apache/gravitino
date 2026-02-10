@@ -80,8 +80,7 @@ class FileSystemCacheKey:
         scheme: str,
         authority: Optional[str],
         credentials,
-        catalog_props: Dict[str, str],
-        options: Dict[str, str],
+        fileset_props: Dict[str, str],
         extra_kwargs: Dict,
     ):
         """
@@ -91,8 +90,7 @@ class FileSystemCacheKey:
             scheme: The filesystem scheme (e.g., 's3', 'gs', 'hdfs', 'file')
             authority: The authority part of the URI (e.g., bucket name, host:port)
             credentials: The credentials for the filesystem
-            catalog_props: The catalog properties
-            options: The GVFS options
+            fileset_props: The fileset properties
             extra_kwargs: Extra keyword arguments
         """
         self._pid = os.getpid()
@@ -106,8 +104,7 @@ class FileSystemCacheKey:
             scheme,
             authority,
             credentials,
-            catalog_props,
-            options,
+            fileset_props,
             extra_kwargs,
         )
 
@@ -507,14 +504,15 @@ class BaseGVFSOperations(ABC):
         :param actual_location: The actual storage location
         :return: Merged properties dictionary
         """
-        fileset_props = dict(catalog.properties())
-        fileset_props.update(schema.properties())
-        fileset_props.update(fileset.properties())
-        # Get user-defined configurations for the actual location
-        user_defined_configs = self._get_user_defined_configs(actual_location)
-        fileset_props.update(user_defined_configs)
+        fileset_props = dict(catalog.properties() or {})
+        fileset_props.update(schema.properties() or {})
+        fileset_props.update(fileset.properties() or {})
         if self._options:
             fileset_props.update(self._options)
+        # Get user-defined configurations for the actual location
+        # Apply after global options so path-specific configs take precedence
+        user_defined_configs = self._get_user_defined_configs(actual_location)
+        fileset_props.update(user_defined_configs)
         return fileset_props
 
     def _get_actual_filesystem_by_location_name(
@@ -662,7 +660,7 @@ class BaseGVFSOperations(ABC):
         the same configuration will share the same filesystem instance.
 
         :param credentials: The credentials for accessing the filesystem
-        :param fileset_props: The catalog properties
+        :param fileset_props: The fileset properties
         :param actual_path: The actual file path (e.g., 's3://bucket/path', 'gs://bucket/path')
         :param kwargs: Additional keyword arguments
         :return: The filesystem instance
@@ -677,7 +675,7 @@ class BaseGVFSOperations(ABC):
         # This allows multiple filesets pointing to the same storage to share
         # the same filesystem instance
         cache_key = FileSystemCacheKey(
-            scheme, authority, credentials, fileset_props, self._options, kwargs
+            scheme, authority, credentials, fileset_props, kwargs
         )
 
         # Try to get from cache with read lock
@@ -840,15 +838,15 @@ class BaseGVFSOperations(ABC):
 
         The logic:
         1. Extract baseLocation (scheme://authority) from the given path
-        2. Find config entries like "fs.path.config.<name> = <base_location>" where the
+        2. Find config entries like "fs_path_config_<name> = <base_location>" where the
            base_location matches the extracted baseLocation
         3. Extract the name from the matching entry
-        4. Then find all config entries with prefix "fs.path.config.<name>." and extract properties
+        4. Then find all config entries with prefix "fs_path_config_<name>_" and extract properties
 
         Example:
-          fs.path.config.cluster1 = s3://bucket1
-          fs.path.config.cluster1.aws-access-key = XXX1
-          fs.path.config.cluster1.aws-secret-key = XXX2
+          fs_path_config_cluster1 = s3://bucket1
+          fs_path_config_cluster1_aws-access-key = XXX1
+          fs_path_config_cluster1_aws-secret-key = XXX2
           If path is "s3://bucket1/path/fileset1", then baseLocation is "s3://bucket1",
           cluster1 matches and we extract:
           - aws-access-key = XXX1
@@ -879,7 +877,8 @@ class BaseGVFSOperations(ABC):
                 if "_" not in suffix and suffix and value:
                     # This is a location definition: "fs_path_config_<name>"
                     # Extract baseLocation from the value and compare with the path's baseLocation
-                    if base_location == value:
+                    config_base_location = self._get_base_location(value)
+                    if base_location == config_base_location:
                         location_name = suffix
                         break
 

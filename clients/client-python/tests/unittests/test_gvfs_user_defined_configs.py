@@ -99,3 +99,29 @@ class TestGVFSUserDefinedConfigs(unittest.TestCase):
         }
         operations5 = DefaultGVFSOperations(options=options5)
         self.assertEqual(operations5._get_user_defined_configs("s3://bucket1/path"), {})
+
+    def test_get_user_defined_configs_trailing_slash(self):
+        """Test _get_user_defined_configs with trailing slash in base location value."""
+        # Config value has trailing slash, path does not
+        options = {
+            f"{GVFSConfig.FS_GRAVITINO_PATH_CONFIG_PREFIX}cluster1": "hdfs://cluster1/",
+            f"{GVFSConfig.FS_GRAVITINO_PATH_CONFIG_PREFIX}cluster1_key1": "value1",
+        }
+        operations = DefaultGVFSOperations(options=options)
+
+        path = "hdfs://cluster1/path/to/file"
+        configs = operations._get_user_defined_configs(path)
+        self.assertEqual(len(configs), 1)
+        self.assertEqual(configs["key1"], "value1")
+
+        # Config value has sub path, should still match by scheme://authority
+        options2 = {
+            f"{GVFSConfig.FS_GRAVITINO_PATH_CONFIG_PREFIX}cluster1": "hdfs://cluster1/sub/path",
+            f"{GVFSConfig.FS_GRAVITINO_PATH_CONFIG_PREFIX}cluster1_key1": "value2",
+        }
+        operations2 = DefaultGVFSOperations(options=options2)
+
+        path2 = "hdfs://cluster1/other/path"
+        configs2 = operations2._get_user_defined_configs(path2)
+        self.assertEqual(len(configs2), 1)
+        self.assertEqual(configs2["key1"], "value2")
