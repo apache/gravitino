@@ -147,7 +147,6 @@ The following metadata objects support ownership:
 | Catalog              |
 | Schema               |
 | Table                |
-| View                 |
 | Topic                |
 | Fileset              |
 | Role                 |
@@ -203,7 +202,6 @@ Metalake (top level)
 └── Catalog (represents a data source)
     └── Schema
         ├── Table
-        ├── View
         ├── Topic
         └── Fileset
 ```
@@ -315,14 +313,7 @@ and `USE_SCHEMA` privileges on its parent schema.
 | SELECT_TABLE | Metalake, Catalog, Schema, Table  | Select data from a table                                                  |
 
 DENY `MODIFY_TABLE` won't deny the `SELECT_TABLE` operation if the user has the privilege to `ALLOW SELECT_TABLE` on the table.
-DENY `SELECT_TABLE` won't deny the `MODIFY_TABLE` operation if the user has the privilege `ALLOW MODIFY_TABLE` on the table. 
-
-### View privileges
-
-| Name        | Supports Securable Object       | Operation                |
-|-------------|---------------------------------|--------------------------|
-| CREATE_VIEW | Metalake, Catalog, Schema       | Create a view            |
-| SELECT_VIEW | Metalake, Catalog, Schema, View | Select data from a view  |
+DENY `SELECT_TABLE` won‘t deny the `MODIFY_TABLE` operation if the user has the privilege `ALLOW MODIFY_TABLE` on the table. 
 
 ### Topic privileges
 
@@ -440,27 +431,10 @@ This model ensures that denials cannot be circumvented by grants at lower levels
 
 To enable access control in Gravitino, configure the following settings in your server configuration file:
 
-| Configuration Item                                      | Description                                                               | Default Value | Required                                    | Since Version |
-|---------------------------------------------------------|---------------------------------------------------------------------------|---------------|---------------------------------------------|---------------|
-| `gravitino.authorization.enable`                        | Enable or disable authorization in Gravitino                              | `false`       | No                                          | 0.5.0         |
-| `gravitino.authorization.serviceAdmins`                 | Comma-separated list of service administrator usernames                   | (none)        | Yes (when authorization is enabled)         | 0.5.0         |
-| `gravitino.authorization.jcasbin.cacheExpirationSecs`   | The expiration time in seconds for authorization cache entries            | `3600`        | No                                          | 1.1.1         |
-| `gravitino.authorization.jcasbin.roleCacheSize`         | The maximum size of the role cache for authorization                      | `10000`       | No                                          | 1.1.1         |
-| `gravitino.authorization.jcasbin.ownerCacheSize`        | The maximum size of the owner cache for authorization                     | `100000`      | No                                          | 1.1.1         |
-
-### Authorization Cache
-
-Gravitino uses Caffeine caches to improve authorization performance by caching role and owner information. The cache configuration options allow you to tune the cache behavior:
-
-- **`cacheExpirationSecs`**: Controls how long cache entries remain valid. After this time, entries are automatically evicted and reloaded from the backend on the next access. Lower values provide more up-to-date authorization decisions but may increase load on the backend.
-
-- **`roleCacheSize`**: Controls the maximum number of role entries that can be cached. When the cache reaches this size, the least recently used entries are evicted.
-
-- **`ownerCacheSize`**: Controls the maximum number of owner relationship entries that can be cached. This cache maps metadata object IDs to their owner IDs.
-
-:::info
-When role privileges or ownership are changed through the Gravitino API, the corresponding cache entries are automatically invalidated to ensure authorization decisions reflect the latest state.
-:::
+| Configuration Item                      | Description                                                               | Default Value | Required                                    | Since Version |
+|-----------------------------------------|---------------------------------------------------------------------------|---------------|---------------------------------------------|---------------|
+| `gravitino.authorization.enable`        | Enable or disable authorization in Gravitino                              | `false`       | No                                          | 0.5.0         |
+| `gravitino.authorization.serviceAdmins` | Comma-separated list of service administrator usernames                   | (none)        | Yes (when authorization is enabled)         | 0.5.0         |
 
 ### Important Notes
 
@@ -479,11 +453,6 @@ gravitino.authorization.enable = true
 
 # Define service administrators
 gravitino.authorization.serviceAdmins = admin1,admin2
-
-# Optional: Configure authorization cache (default values shown)
-gravitino.authorization.jcasbin.cacheExpirationSecs = 3600
-gravitino.authorization.jcasbin.roleCacheSize = 10000
-gravitino.authorization.jcasbin.ownerCacheSize = 100000
 ```
 
 ## Migration Guide
@@ -1271,7 +1240,6 @@ The following table lists the required privileges for each API.
 | load schema                       | First, you should have the privilege to load the catalog. Then, you are the owner of the metalake, catalog, schema or have `USE_SCHEMA` on the metalake, catalog, schema.                                                                     |
 | create table                      | First, you should have the privilege to load the catalog and the schema. `CREATE_TABLE` on the metalake, catalog, schema or the owner of the metalake, catalog, schema                                                                        |
 | alter table                       | First, you should have the privilege to load the catalog and the schema. Then, you are one of the owners of the table, schema,catalog, metalake or have `MODIFY_TABLE` on the table, schema, catalog, metalake                                |
-| rename table across schema        | First, you should have the privilege to load the catalog and both schemas. Then, you must be the owner of the table and have `CREATE_TABLE` privilege on the target schema, catalog, or metalake                                              |
 | update table statistics           | First, you should have the privilege to load the catalog and the schema. Then, you are one of the owners of the table, schema,catalog, metalake or have `MODIFY_TABLE` on the table, schema, catalog, metalake                                |
 | drop table statistics             | First, you should have the privilege to load the catalog and the schema. Then, you are one of the owners of the table, schema,catalog, metalake or have `MODIFY_TABLE` on the table, schema, catalog, metalake                                |
 | update table partition statistics | First, you should have the privilege to load the catalog and the schema. Then, you are one of the owners of the table, schema,catalog, metalake or have `MODIFY_TABLE` on the table, schema, catalog, metalake                                |
@@ -1281,12 +1249,6 @@ The following table lists the required privileges for each API.
 | load table                        | First, you should have the privilege to load the catalog and the schema. Then, you are one of the owners of the table, schema, metalake, catalog or have either `SELECT_TABLE` or `MODIFY_TABLE` on the table, schema, catalog, metalake      |
 | list table statistics             | First, you should have the privilege to load the catalog and the schema. Then, you are one of the owners of the table, schema, metalake, catalog or have either `SELECT_TABLE` or `MODIFY_TABLE` on the table, schema, catalog, metalake      |
 | list table partition statistics   | First, you should have the privilege to load the catalog and the schema. Then, you are one of the owners of the table, schema, metalake, catalog or have either `SELECT_TABLE` or `MODIFY_TABLE` on the table, schema, catalog, metalake      |
-| create view                       | First, you should have the privilege to load the catalog and the schema. `CREATE_VIEW` on the metalake, catalog, schema or the owner of the metalake, catalog, schema                                                                         |
-| alter view                        | First, you should have the privilege to load the catalog and the schema. Then, you are one of the owners of the view, schema, catalog, metalake                                                                                               |
-| rename view across schema         | First, you should have the privilege to load the catalog and both schemas. Then, you must be the owner of the view and have `CREATE_VIEW` privilege on the target schema, catalog, or metalake                                                |
-| drop view                         | First, you should have the privilege to load the catalog and the schema. Then, you are one of the owners of the view, schema, catalog, metalake                                                                                               |
-| list view                         | First, you should have the privilege to load the catalog and the schema. Then, the owner of the schema, catalog, metalake can see all the views, others can see the views which they can load                                                 |
-| load view                         | First, you should have the privilege to load the catalog and the schema. Then, you are one of the owners of the view, schema, metalake, catalog or have `SELECT_VIEW` on the view, schema, catalog, metalake                                  |
 | create topic                      | First, you should have the privilege to load the catalog and the schema. Then, you have `CREATE_TOPIC` on the metalake, catalog, schema or are the owner of the metalake, catalog, schema                                                     |
 | alter topic                       | First, you should have the privilege to load the catalog and the schema. Then, you are one of the owners of the topic, schema,catalog, metalake or have `PRODUCE_TOPIC` on the topic, schema, catalog, metalake                               |
 | drop topic                        | First, you should have the privilege to load the catalog and the schema. Then, you are one of the owners of the topic, schema, catalog, metalake                                                                                              |
@@ -1357,3 +1319,4 @@ The following table lists the required privileges for each API.
 | get a job                         | The owner of the metalake or the job.                                                                                                                                                                                                         |
 | cancel a job                      | The owner of the metalake or the job.                                                                                                                                                                                                         |
 | get credential                    | If you can load the metadata object, you can get its credential.                                                                                                                                                                              | 
+

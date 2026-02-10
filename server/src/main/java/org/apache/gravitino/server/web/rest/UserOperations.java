@@ -45,7 +45,6 @@ import org.apache.gravitino.dto.responses.RemoveResponse;
 import org.apache.gravitino.dto.responses.UserListResponse;
 import org.apache.gravitino.dto.responses.UserResponse;
 import org.apache.gravitino.dto.util.DTOConverters;
-import org.apache.gravitino.metalake.MetalakeManager;
 import org.apache.gravitino.metrics.MetricNames;
 import org.apache.gravitino.server.authorization.MetadataAuthzHelper;
 import org.apache.gravitino.server.authorization.NameBindings;
@@ -91,12 +90,10 @@ public class UserOperations {
     try {
       return Utils.doAs(
           httpRequest,
-          () -> {
-            MetalakeManager.checkMetalakeInUse(metalake);
-            return Utils.ok(
-                new UserResponse(
-                    DTOConverters.toDTO(accessControlManager.getUser(metalake, user))));
-          });
+          () ->
+              Utils.ok(
+                  new UserResponse(
+                      DTOConverters.toDTO(accessControlManager.getUser(metalake, user)))));
     } catch (Exception e) {
       return ExceptionHandlers.handleUserException(OperationType.GET, user, metalake, e);
     }
@@ -115,7 +112,6 @@ public class UserOperations {
       return Utils.doAs(
           httpRequest,
           () -> {
-            MetalakeManager.checkMetalakeInUse(metalake);
             if (verbose) {
               User[] users = accessControlManager.listUsers(metalake);
               users =
@@ -158,7 +154,6 @@ public class UserOperations {
           httpRequest,
           () -> {
             request.validate();
-            MetalakeManager.checkMetalakeInUse(metalake);
             return Utils.ok(
                 new UserResponse(
                     DTOConverters.toDTO(
@@ -184,8 +179,6 @@ public class UserOperations {
       return Utils.doAs(
           httpRequest,
           () -> {
-            MetalakeManager.checkMetalakeInUse(metalake);
-
             ownerManager
                 .getOwner(
                     metalake, MetadataObjects.of(null, metalake, MetadataObject.Type.METALAKE))

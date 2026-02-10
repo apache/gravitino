@@ -72,18 +72,6 @@ class MetadataObject(ABC):
         MODEL = "model"
         """A model is mapped to the model artifact in ML."""
 
-        TAG = "tag"
-        """A tag is used to help manage other metadata object."""
-
-        POLICY = "policy"
-        """A policy can be associated with a metadata object for data governance and similar purposes."""
-
-        JOB = "job"
-        """A job represents a data processing task in Gravitino."""
-
-        JOB_TEMPLATE = "job_template"
-        """A job template represents a reusable template for creating jobs in Gravitino."""
-
     @abstractmethod
     def parent(self) -> Optional[str]:
         """The parent full name of the object.

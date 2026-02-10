@@ -70,7 +70,7 @@ public class OSSFileSystemProvider implements FileSystemProvider, SupportsCreden
 
     hadoopConfMap = additionalOSSConfig(hadoopConfMap);
 
-    Configuration configuration = FileSystemUtils.createCompatibleConfiguration(hadoopConfMap);
+    Configuration configuration = FileSystemUtils.createConfiguration(hadoopConfMap);
 
     return AliyunOSSFileSystem.newInstance(path.toUri(), configuration);
   }

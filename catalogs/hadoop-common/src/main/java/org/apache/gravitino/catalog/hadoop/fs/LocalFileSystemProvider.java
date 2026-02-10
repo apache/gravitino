@@ -30,8 +30,7 @@ public class LocalFileSystemProvider implements FileSystemProvider {
 
   @Override
   public FileSystem getFileSystem(Path path, Map<String, String> config) throws IOException {
-    Configuration configuration =
-        FileSystemUtils.createCompatibleConfiguration(GRAVITINO_BYPASS, config);
+    Configuration configuration = FileSystemUtils.createConfiguration(GRAVITINO_BYPASS, config);
     return FileSystem.newInstance(path.toUri(), configuration);
   }
 

@@ -20,7 +20,6 @@
 package org.apache.gravitino.auxiliary;
 
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.mock;
@@ -100,8 +99,8 @@ public class TestAuxiliaryServiceManager {
                 "/tmp",
                 "gravitino.mock2." + AuxiliaryServiceManager.AUX_SERVICE_CLASSPATH,
                 "/tmp")));
-    verify(auxService, times(1)).serviceInit(any(), anyBoolean());
-    verify(auxService2, times(1)).serviceInit(any(), anyBoolean());
+    verify(auxService, times(1)).serviceInit(any());
+    verify(auxService2, times(1)).serviceInit(any());
 
     spyAuxManager.serviceStart();
     verify(auxService, times(1)).serviceStart();

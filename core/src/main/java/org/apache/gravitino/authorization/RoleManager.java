@@ -19,6 +19,8 @@
 
 package org.apache.gravitino.authorization;
 
+import static org.apache.gravitino.metalake.MetalakeManager.checkMetalake;
+
 import java.io.IOException;
 import java.time.Instant;
 import java.util.List;
@@ -64,6 +66,7 @@ class RoleManager {
       Map<String, String> properties,
       List<SecurableObject> securableObjects)
       throws RoleAlreadyExistsException {
+    checkMetalake(NameIdentifier.of(metalake), store);
     RoleEntity roleEntity =
         RoleEntity.builder()
             .withId(idGenerator.nextId())
@@ -101,6 +104,7 @@ class RoleManager {
 
   RoleEntity getRole(String metalake, String role) throws NoSuchRoleException {
     try {
+      checkMetalake(NameIdentifier.of(metalake), store);
       return getRoleEntity(AuthorizationUtils.ofRole(metalake, role));
     } catch (NoSuchEntityException e) {
       LOG.warn("Role {} does not exist in the metalake {}", role, metalake, e);
@@ -110,6 +114,7 @@ class RoleManager {
 
   boolean deleteRole(String metalake, String role) {
     try {
+      checkMetalake(NameIdentifier.of(metalake), store);
       NameIdentifier ident = AuthorizationUtils.ofRole(metalake, role);
 
       try {
@@ -134,6 +139,7 @@ class RoleManager {
 
   String[] listRoleNames(String metalake) {
     try {
+      checkMetalake(NameIdentifier.of(metalake), store);
       Namespace namespace = AuthorizationUtils.ofRoleNamespace(metalake);
       return store.list(namespace, RoleEntity.class, Entity.EntityType.ROLE).stream()
           .map(Role::name)
@@ -146,6 +152,7 @@ class RoleManager {
 
   String[] listRoleNamesByObject(String metalake, MetadataObject object) {
     try {
+      checkMetalake(NameIdentifier.of(metalake), store);
 
       return store
           .relationOperations()

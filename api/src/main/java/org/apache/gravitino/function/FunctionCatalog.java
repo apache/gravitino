@@ -24,6 +24,7 @@ import org.apache.gravitino.annotation.Evolving;
 import org.apache.gravitino.exceptions.FunctionAlreadyExistsException;
 import org.apache.gravitino.exceptions.NoSuchFunctionException;
 import org.apache.gravitino.exceptions.NoSuchSchemaException;
+import org.apache.gravitino.rel.types.Type;
 
 /** The FunctionCatalog interface defines the public API for managing functions in a schema. */
 @Evolving
@@ -74,15 +75,14 @@ public interface FunctionCatalog {
   }
 
   /**
-   * Register a function with one or more definitions (overloads). Each definition contains its own
-   * return type (for scalar/aggregate functions) or return columns (for table-valued functions).
+   * Register a scalar or aggregate function with one or more definitions (overloads).
    *
    * @param ident The function identifier.
    * @param comment The optional function comment.
-   * @param functionType The function type (SCALAR, AGGREGATE, or TABLE).
+   * @param functionType The function type.
    * @param deterministic Whether the function is deterministic.
-   * @param definitions The function definitions, each containing parameters, return type/columns,
-   *     and implementations.
+   * @param returnType The return type.
+   * @param definitions The function definitions.
    * @return The registered function.
    * @throws NoSuchSchemaException If the schema does not exist.
    * @throws FunctionAlreadyExistsException If the function already exists.
@@ -92,6 +92,27 @@ public interface FunctionCatalog {
       String comment,
       FunctionType functionType,
       boolean deterministic,
+      Type returnType,
+      FunctionDefinition[] definitions)
+      throws NoSuchSchemaException, FunctionAlreadyExistsException;
+
+  /**
+   * Register a table-valued function with one or more definitions (overloads).
+   *
+   * @param ident The function identifier.
+   * @param comment The optional function comment.
+   * @param deterministic Whether the function is deterministic.
+   * @param returnColumns The return columns.
+   * @param definitions The function definitions.
+   * @return The registered function.
+   * @throws NoSuchSchemaException If the schema does not exist.
+   * @throws FunctionAlreadyExistsException If the function already exists.
+   */
+  Function registerFunction(
+      NameIdentifier ident,
+      String comment,
+      boolean deterministic,
+      FunctionColumn[] returnColumns,
       FunctionDefinition[] definitions)
       throws NoSuchSchemaException, FunctionAlreadyExistsException;
 

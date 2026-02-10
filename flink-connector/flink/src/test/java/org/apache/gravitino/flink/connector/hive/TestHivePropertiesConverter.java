@@ -28,8 +28,7 @@ import org.junit.jupiter.api.Test;
 
 public class TestHivePropertiesConverter {
 
-  private static final HiveCatalogPropertiesConverter CONVERTER =
-      HiveCatalogPropertiesConverter.INSTANCE;
+  private static final HivePropertiesConverter CONVERTER = HivePropertiesConverter.INSTANCE;
 
   @Test
   public void testToGravitinoCatalogProperties() {

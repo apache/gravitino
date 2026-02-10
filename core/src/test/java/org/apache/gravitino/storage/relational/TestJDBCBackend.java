@@ -47,7 +47,6 @@ import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.meta.BaseMetalake;
 import org.apache.gravitino.meta.CatalogEntity;
 import org.apache.gravitino.meta.FilesetEntity;
-import org.apache.gravitino.meta.GenericEntity;
 import org.apache.gravitino.meta.GroupEntity;
 import org.apache.gravitino.meta.ModelEntity;
 import org.apache.gravitino.meta.PolicyEntity;
@@ -225,14 +224,6 @@ public abstract class TestJDBCBackend {
       case POLICY:
         tableName = "policy_meta";
         idColumnName = "policy_id";
-        break;
-      case VIEW:
-        tableName = "view_meta";
-        idColumnName = "view_id";
-        break;
-      case FUNCTION:
-        tableName = "function_meta";
-        idColumnName = "function_id";
         break;
       default:
         throw new IllegalArgumentException("Unsupported entity type: " + entityType);
@@ -522,15 +513,6 @@ public abstract class TestJDBCBackend {
         .withLatestVersion(latestVersion)
         .withProperties(properties)
         .withAuditInfo(auditInfo)
-        .build();
-  }
-
-  protected GenericEntity createViewEntity(Long id, Namespace namespace, String viewName) {
-    return GenericEntity.builder()
-        .withId(id)
-        .withName(viewName)
-        .withNamespace(namespace)
-        .withEntityType(Entity.EntityType.VIEW)
         .build();
   }
 

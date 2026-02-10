@@ -17,43 +17,155 @@
   under the License.
 -->
 
-# Copilot Instructions for Gravitino
+# GitHub Copilot Code Review Instructions for Apache Gravitino
 
-## Critical Rules
-- **Java Imports**: ALWAYS use standard imports. NEVER use Fully Qualified Class Names (FQN) inside methods unless absolutely necessary for collision resolution.
-  - BAD: `org.apache.gravitino.NameIdentifier id = ...`
-  - GOOD: `NameIdentifier id = ...` (add `import org.apache.gravitino.NameIdentifier;`)
-- **Coding Style**: Strict adherence to Google Java Style.
-- **Testing**:
-  - EVERY change must have a corresponding test.
-  - Do NOT modify existing tests unless the logic has fundamentally changed.
-  - Use `TestXxx` prefix for test classes (e.g., `TestMetalake`).
-- **Dependencies**: Do NOT add new dependencies without explicit user request.
-- **Documentation**: JavaDoc is required for all public APIs.
+This document provides comprehensive guidelines for GitHub Copilot and other AI assistants when reviewing code contributions to the Apache Gravitino project.
 
-## Language Specifics
-- **Java**:
-  - Use `@Nullable` for optional fields/params.
-  - Avoid `System.out.println`. Use SLF4J logging.
-  - Use `Preconditions.checkArgument` for validation.
-  - **Class Member Ordering**: Follow the order:
-    1. `static` constants (e.g., `LOG`).
-    2. `static` fields.
-    3. Instance fields.
-    4. Constructors.
-    5. Methods (Group by visibility, putting `private` methods at the end).
-- **Python**:
-  - Follow PEP 8.
-  - Type hints are mandatory.
+## Core Review Principles
 
-## General
-- **Brevity**: Write concise, efficient code. Avoid boilerplate where possible.
-- **Safety**: Always check for nulls and handle exceptions specifically (no generic `catch (Exception e)`).
+1. **Apache Foundation Standards**: Ensure all contributions follow Apache Software Foundation guidelines
+2. **Backward Compatibility**: Breaking changes must be explicitly justified and documented
+3. **Test Coverage**: All code changes must include appropriate tests - no exceptions
+4. **Code Quality**: Prioritize maintainability, readability, and performance
+5. **Documentation**: Public APIs and complex logic must be well-documented
 
-## Review Checklist (Keep It Short)
-- **License/Legal**: New files must include Apache License 2.0 header; dependency/license changes must update LICENSE/NOTICE as required.
-- **Compatibility**: Avoid breaking changes unless explicitly justified and documented (including migrations when needed).
-- **Java hygiene**: No wildcard imports; close resources (try-with-resources); do not leave TODO/FIXME without an issue reference.
-- **Security**: No hardcoded secrets; validate external inputs; prevent injection/path traversal/SSRF where applicable; do not log sensitive data.
-- **APIs**: Public APIs require JavaDoc; REST APIs must enforce authentication/authorization and return correct HTTP status codes with consistent error payloads.
-- **Testing**: Cover error paths and edge cases; keep tests isolated/non-flaky; Docker-dependent tests must be tagged with `@Tag("gravitino-docker-test")`.
+## Code Review Checklist
+
+### 1. License and Legal Compliance
+
+- [ ] All new files have the Apache License 2.0 header
+- [ ] No GPL or other incompatible licenses in dependencies
+- [ ] Third-party code is properly attributed
+- [ ] LICENSE and NOTICE files updated if dependencies added
+- [ ] No copyrighted code without proper permissions
+
+### 2. Code Quality
+
+#### Java Code
+- [ ] Follows Google Java Style Guide (enforced by Spotless)
+- [ ] No wildcard imports
+- [ ] Proper use of `@Nullable` annotations
+- [ ] Exception handling is appropriate (don't catch generic `Exception`)
+- [ ] Resources are properly closed (use try-with-resources)
+- [ ] No `System.out.println()` - use proper logging
+- [ ] Logging levels are appropriate (DEBUG, INFO, WARN, ERROR)
+- [ ] No TODO or FIXME comments without issue references
+- [ ] Thread safety is considered and documented where relevant
+- [ ] No deprecated APIs unless necessary (document why)
+
+#### Scala Code
+- [ ] Follows Scala style conventions
+- [ ] Proper use of immutable collections
+- [ ] Pattern matching over if-else where appropriate
+- [ ] Avoid `null` - use `Option` instead
+
+#### Python Code
+- [ ] Follows PEP 8 style guidelines
+- [ ] Type hints for function parameters and return values
+- [ ] Proper docstrings for public methods
+- [ ] Use context managers for resource management
+
+### 3. Testing Requirements
+
+#### Unit Tests
+- [ ] All new methods/functions have unit tests
+- [ ] Edge cases and error conditions are tested
+- [ ] Tests are independent and can run in any order
+- [ ] Test names clearly describe what is being tested
+- [ ] Assertions have meaningful failure messages
+- [ ] No hard-coded timeouts (or well-justified)
+- [ ] Mock external dependencies appropriately
+
+#### Integration Tests
+- [ ] End-to-end scenarios are covered
+- [ ] Docker-dependent tests tagged with `@Tag("gravitino-docker-test")`
+- [ ] Tests clean up resources (temp files, containers, etc.)
+- [ ] Tests work in both embedded and deploy modes
+- [ ] Connection pooling and resource limits considered
+
+#### Test Anti-Patterns to Flag
+- [ ] Tests that depend on execution order
+- [ ] Tests with `Thread.sleep()` without justification
+- [ ] Tests that ignore exceptions
+- [ ] Tests without assertions
+- [ ] Flaky tests (consider marking as such)
+
+### 4. API Design
+
+#### Public APIs
+- [ ] Complete Javadoc with `@param`, `@return`, `@throws`
+- [ ] API is intuitive and follows existing patterns
+- [ ] Backward compatible or breaking change is documented
+- [ ] Proper use of interfaces vs. abstract classes
+- [ ] Builder pattern for complex object construction
+
+#### REST APIs
+- [ ] Follows RESTful conventions
+- [ ] Proper HTTP status codes
+- [ ] Request/response DTOs are properly validated
+- [ ] API versioning considered
+- [ ] Error responses are consistent and informative
+- [ ] Authentication/authorization properly enforced
+
+### 5. Performance Considerations
+
+- [ ] No unnecessary object allocations in hot paths
+- [ ] Database queries are efficient (proper indexing considered)
+- [ ] Proper use of connection pooling
+- [ ] Batch operations where appropriate
+- [ ] Caching strategy is sound
+- [ ] Memory leaks prevented (especially with caches)
+- [ ] Large datasets handled with streaming/pagination
+- [ ] Potential performance regressions identified
+
+### 6. Security Review
+
+- [ ] No hardcoded credentials or secrets
+- [ ] Input validation for all external data
+- [ ] SQL injection prevention (use prepared statements)
+- [ ] Path traversal vulnerabilities prevented
+- [ ] Proper access control checks
+- [ ] Sensitive data is not logged
+- [ ] Cryptographic operations use strong algorithms
+- [ ] SSRF (Server-Side Request Forgery) protection
+
+### 7. Configuration and Dependencies
+
+- [ ] Configuration keys follow naming conventions
+- [ ] Default values are sensible
+- [ ] Configuration is validated on startup
+- [ ] New dependencies are justified and minimal
+- [ ] Dependency versions are appropriate (not too old/bleeding edge)
+- [ ] Transitive dependencies reviewed for conflicts
+- [ ] Dependencies compatible with Apache License
+
+### 8. Error Handling
+
+- [ ] Exceptions are meaningful and actionable
+- [ ] Error messages help users understand what went wrong
+- [ ] Stack traces include relevant context
+- [ ] Graceful degradation where possible
+- [ ] Retry logic is implemented with exponential backoff
+- [ ] Circuit breakers for external service calls
+- [ ] Proper cleanup in error paths
+
+### 9. Code Organization
+
+- [ ] Classes have single responsibility
+- [ ] Methods are appropriately sized (< 100 lines typically)
+- [ ] Proper separation of concerns (API/implementation/tests)
+- [ ] Package structure is logical
+- [ ] No circular dependencies between modules
+- [ ] Utility classes are truly reusable
+- [ ] Constants are properly defined and named
+
+### 10. Documentation
+
+- [ ] User-facing documentation updated in `docs/`
+- [ ] Configuration examples provided
+- [ ] Migration guides for breaking changes
+- [ ] Code comments explain "why" not "what"
+- [ ] Complex algorithms have explanatory comments
+- [ ] Links to relevant issues/discussions
+
+Remember: The goal is to maintain code quality while being welcoming and constructive to contributors. Balance rigor with pragmatism, and always assume good intent.

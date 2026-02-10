@@ -46,11 +46,6 @@ import org.apache.gravitino.exceptions.NoSuchSchemaException;
 import org.apache.gravitino.exceptions.NonEmptySchemaException;
 import org.apache.gravitino.exceptions.PolicyAlreadyAssociatedException;
 import org.apache.gravitino.exceptions.SchemaAlreadyExistsException;
-import org.apache.gravitino.function.Function;
-import org.apache.gravitino.function.FunctionCatalog;
-import org.apache.gravitino.function.FunctionChange;
-import org.apache.gravitino.function.FunctionDefinition;
-import org.apache.gravitino.function.FunctionType;
 import org.apache.gravitino.policy.Policy;
 import org.apache.gravitino.policy.SupportsPolicies;
 import org.apache.gravitino.rest.RESTUtils;
@@ -63,12 +58,7 @@ import org.apache.gravitino.tag.Tag;
  * create, load, alter and drop a schema with specified identifier.
  */
 abstract class BaseSchemaCatalog extends CatalogDTO
-    implements Catalog,
-        SupportsSchemas,
-        SupportsTags,
-        SupportsRoles,
-        SupportsPolicies,
-        FunctionCatalog {
+    implements Catalog, SupportsSchemas, SupportsTags, SupportsRoles, SupportsPolicies {
 
   /** The REST client to send the requests. */
   protected final RESTClient restClient;
@@ -80,7 +70,6 @@ abstract class BaseSchemaCatalog extends CatalogDTO
   private final MetadataObjectPolicyOperations objectPolicyOperations;
   private final MetadataObjectRoleOperations objectRoleOperations;
   protected final MetadataObjectCredentialOperations objectCredentialOperations;
-  private final FunctionCatalogOperations functionOperations;
 
   BaseSchemaCatalog(
       Namespace catalogNamespace,
@@ -111,8 +100,6 @@ abstract class BaseSchemaCatalog extends CatalogDTO
     this.objectCredentialOperations =
         new MetadataObjectCredentialOperations(
             catalogNamespace.level(0), metadataObject, restClient);
-    this.functionOperations =
-        new FunctionCatalogOperations(restClient, catalogNamespace, this.name());
   }
 
   @Override
@@ -329,46 +316,5 @@ abstract class BaseSchemaCatalog extends CatalogDTO
         .append(RESTUtils.encodeString(ns.level(1)))
         .append("/schemas")
         .toString();
-  }
-
-  @Override
-  public FunctionCatalog asFunctionCatalog() {
-    return this;
-  }
-
-  @Override
-  public NameIdentifier[] listFunctions(Namespace namespace) {
-    return functionOperations.listFunctions(namespace);
-  }
-
-  @Override
-  public Function[] listFunctionInfos(Namespace namespace) throws NoSuchSchemaException {
-    return functionOperations.listFunctionInfos(namespace);
-  }
-
-  @Override
-  public Function getFunction(NameIdentifier ident) {
-    return functionOperations.getFunction(ident);
-  }
-
-  @Override
-  public Function registerFunction(
-      NameIdentifier ident,
-      String comment,
-      FunctionType functionType,
-      boolean deterministic,
-      FunctionDefinition[] definitions) {
-    return functionOperations.registerFunction(
-        ident, comment, functionType, deterministic, definitions);
-  }
-
-  @Override
-  public Function alterFunction(NameIdentifier ident, FunctionChange... changes) {
-    return functionOperations.alterFunction(ident, changes);
-  }
-
-  @Override
-  public boolean dropFunction(NameIdentifier ident) {
-    return functionOperations.dropFunction(ident);
   }
 }

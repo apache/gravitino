@@ -27,9 +27,6 @@ plugins {
 dependencies {
   implementation(project(":api"))
   implementation(project(":catalogs:catalog-common"))
-  implementation(project(":catalogs:hadoop-common")) {
-    exclude("*")
-  }
   implementation(project(":core")) {
     exclude("*")
   }

@@ -19,25 +19,16 @@
 package org.apache.gravitino.catalog.lakehouse.lance;
 
 import static org.apache.gravitino.lance.common.utils.LanceConstants.LANCE_CREATION_MODE;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyList;
-import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.spy;
-import static org.mockito.Mockito.when;
 
 import com.google.common.collect.Maps;
-import com.lancedb.lance.Dataset;
-import com.lancedb.lance.Version;
-import com.lancedb.lance.index.IndexParams;
-import com.lancedb.lance.index.IndexType;
 import java.util.Map;
 import org.apache.gravitino.EntityStore;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.catalog.ManagedSchemaOperations;
 import org.apache.gravitino.rel.Column;
 import org.apache.gravitino.rel.Table;
-import org.apache.gravitino.rel.TableChange;
 import org.apache.gravitino.rel.expressions.sorts.SortOrder;
 import org.apache.gravitino.rel.expressions.transforms.Transform;
 import org.apache.gravitino.rel.indexes.Index;
@@ -47,8 +38,6 @@ import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
-import org.mockito.InOrder;
-import org.mockito.Mockito;
 
 public class TestLanceTableOperations {
 
@@ -99,35 +88,5 @@ public class TestLanceTableOperations {
                 null,
                 new SortOrder[0],
                 new Index[0]));
-  }
-
-  @Test
-  public void testHandleLanceTableChangeRespectsOrder() {
-    Table table = mock(Table.class);
-    when(table.properties()).thenReturn(Map.of(Table.PROPERTY_LOCATION, "location"));
-
-    Dataset dataset = mock(Dataset.class);
-    Version version = mock(Version.class);
-    when(dataset.getVersion()).thenReturn(version);
-    when(version.getId()).thenReturn(7L);
-    Mockito.doReturn(dataset).when(lanceTableOps).openDataset("location");
-
-    TableChange[] changes =
-        new TableChange[] {
-          TableChange.renameColumn(new String[] {"old"}, "renamed"),
-          TableChange.addIndex(Index.IndexType.SCALAR, "idx_renamed", new String[][] {{"renamed"}}),
-          TableChange.deleteColumn(new String[] {"renamed"}, false)
-        };
-
-    long returnedVersion = lanceTableOps.handleLanceTableChange(table, changes);
-    Assertions.assertEquals(7L, returnedVersion);
-
-    InOrder inOrder = Mockito.inOrder(dataset);
-    inOrder.verify(dataset).alterColumns(anyList());
-    inOrder
-        .verify(dataset)
-        .createIndex(anyList(), any(IndexType.class), any(), any(IndexParams.class), eq(true));
-    inOrder.verify(dataset).dropColumns(anyList());
-    inOrder.verify(dataset).getVersion();
   }
 }

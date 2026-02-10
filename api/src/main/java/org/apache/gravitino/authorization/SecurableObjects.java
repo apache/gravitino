@@ -91,22 +91,6 @@ public class SecurableObjects {
   }
 
   /**
-   * Create the view {@link SecurableObject} with the given securable schema object, view name and
-   * privileges.
-   *
-   * @param schema The schema securable object
-   * @param view The view name
-   * @param privileges The privileges of the view
-   * @return The created view {@link SecurableObject}
-   */
-  public static SecurableObject ofView(
-      SecurableObject schema, String view, List<Privilege> privileges) {
-    List<String> names = Lists.newArrayList(DOT_SPLITTER.splitToList(schema.fullName()));
-    names.add(view);
-    return of(MetadataObject.Type.VIEW, names, privileges);
-  }
-
-  /**
    * Create the topic {@link SecurableObject} with the given securable schema object ,topic name and
    * privileges.
    *

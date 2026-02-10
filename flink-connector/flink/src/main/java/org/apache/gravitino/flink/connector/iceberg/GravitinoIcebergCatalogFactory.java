@@ -23,10 +23,9 @@ import java.util.Set;
 import org.apache.flink.configuration.ConfigOption;
 import org.apache.flink.table.catalog.Catalog;
 import org.apache.flink.table.factories.FactoryUtil;
-import org.apache.gravitino.flink.connector.CatalogPropertiesConverter;
 import org.apache.gravitino.flink.connector.DefaultPartitionConverter;
 import org.apache.gravitino.flink.connector.PartitionConverter;
-import org.apache.gravitino.flink.connector.SchemaAndTablePropertiesConverter;
+import org.apache.gravitino.flink.connector.PropertiesConverter;
 import org.apache.gravitino.flink.connector.catalog.BaseCatalogFactory;
 import org.apache.gravitino.flink.connector.utils.FactoryUtils;
 
@@ -39,7 +38,7 @@ public class GravitinoIcebergCatalogFactory implements BaseCatalogFactory {
     return new GravitinoIcebergCatalog(
         context.getName(),
         helper.getOptions().get(GravitinoIcebergCatalogFactoryOptions.DEFAULT_DATABASE),
-        schemaAndTablePropertiesConverter(),
+        propertiesConverter(),
         partitionConverter(),
         context.getOptions());
   }
@@ -80,12 +79,13 @@ public class GravitinoIcebergCatalogFactory implements BaseCatalogFactory {
     return org.apache.gravitino.Catalog.Type.RELATIONAL;
   }
 
+  /**
+   * Define properties converter.
+   *
+   * @return The properties converter instance for Iceberg catalog.
+   */
   @Override
-  public CatalogPropertiesConverter catalogPropertiesConverter() {
-    return IcebergPropertiesConverter.INSTANCE;
-  }
-
-  public SchemaAndTablePropertiesConverter schemaAndTablePropertiesConverter() {
+  public PropertiesConverter propertiesConverter() {
     return IcebergPropertiesConverter.INSTANCE;
   }
 

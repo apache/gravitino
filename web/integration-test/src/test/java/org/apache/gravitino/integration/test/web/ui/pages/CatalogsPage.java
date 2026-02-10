@@ -22,7 +22,6 @@ package org.apache.gravitino.integration.test.web.ui.pages;
 import static org.apache.gravitino.integration.test.web.ui.CatalogsPageTest.DISTRIBUTION;
 import static org.apache.gravitino.integration.test.web.ui.CatalogsPageTest.SORT_ORDERS;
 
-import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
@@ -249,7 +248,7 @@ public class CatalogsPage extends BaseWebIT {
     try {
       String xpath = "//button[@data-refer='view-entity-" + name + "']";
       WebElement btn = driver.findElement(By.xpath(xpath));
-      WebDriverWait wait = new WebDriverWait(driver, Duration.ofSeconds(MAX_TIMEOUT));
+      WebDriverWait wait = new WebDriverWait(driver, MAX_TIMEOUT);
       wait.until(ExpectedConditions.elementToBeClickable(By.xpath(xpath)));
       clickAndWait(btn);
     } catch (Exception e) {
@@ -261,7 +260,7 @@ public class CatalogsPage extends BaseWebIT {
     try {
       String xpath = "//button[@data-refer='edit-entity-" + name + "']";
       WebElement btn = driver.findElement(By.xpath(xpath));
-      WebDriverWait wait = new WebDriverWait(driver, Duration.ofSeconds(MAX_TIMEOUT));
+      WebDriverWait wait = new WebDriverWait(driver, MAX_TIMEOUT);
       wait.until(ExpectedConditions.elementToBeClickable(By.xpath(xpath)));
       clickAndWait(btn);
     } catch (Exception e) {
@@ -282,7 +281,7 @@ public class CatalogsPage extends BaseWebIT {
     try {
       String xpath = "//button[@data-refer='delete-entity-" + name + "']";
       WebElement btn = driver.findElement(By.xpath(xpath));
-      WebDriverWait wait = new WebDriverWait(driver, Duration.ofSeconds(MAX_TIMEOUT));
+      WebDriverWait wait = new WebDriverWait(driver, MAX_TIMEOUT);
       wait.until(ExpectedConditions.elementToBeClickable(By.xpath(xpath)));
       clickAndWait(btn);
     } catch (Exception e) {
@@ -426,7 +425,7 @@ public class CatalogsPage extends BaseWebIT {
     try {
       String xpath = "//a[@href='?metalake=" + metalakeName + "']";
       WebElement link = tableGrid.findElement(By.xpath(xpath));
-      WebDriverWait wait = new WebDriverWait(driver, Duration.ofSeconds(MAX_TIMEOUT));
+      WebDriverWait wait = new WebDriverWait(driver, MAX_TIMEOUT);
       wait.until(ExpectedConditions.elementToBeClickable(By.xpath(xpath)));
       clickAndWait(link);
     } catch (Exception e) {
@@ -445,7 +444,7 @@ public class CatalogsPage extends BaseWebIT {
               + catalogType
               + "']";
       WebElement link = tableGrid.findElement(By.xpath(xpath));
-      WebDriverWait wait = new WebDriverWait(driver, Duration.ofSeconds(MAX_TIMEOUT));
+      WebDriverWait wait = new WebDriverWait(driver, MAX_TIMEOUT);
       wait.until(ExpectedConditions.elementToBeClickable(By.xpath(xpath)));
       clickAndWait(link);
     } catch (Exception e) {
@@ -467,7 +466,7 @@ public class CatalogsPage extends BaseWebIT {
               + schemaName
               + "']";
       WebElement link = tableGrid.findElement(By.xpath(xpath));
-      WebDriverWait wait = new WebDriverWait(driver, Duration.ofSeconds(MAX_TIMEOUT));
+      WebDriverWait wait = new WebDriverWait(driver, MAX_TIMEOUT);
       wait.until(ExpectedConditions.elementToBeClickable(By.xpath(xpath)));
       clickAndWait(link);
     } catch (Exception e) {
@@ -495,7 +494,7 @@ public class CatalogsPage extends BaseWebIT {
               + tableName
               + "']";
       WebElement link = tableGrid.findElement(By.xpath(xpath));
-      WebDriverWait wait = new WebDriverWait(driver, Duration.ofSeconds(MAX_TIMEOUT));
+      WebDriverWait wait = new WebDriverWait(driver, MAX_TIMEOUT);
       wait.until(ExpectedConditions.elementToBeClickable(By.xpath(xpath)));
       clickAndWait(link);
     } catch (Exception e) {
@@ -505,7 +504,7 @@ public class CatalogsPage extends BaseWebIT {
 
   public void clickBreadCrumbsToCatalogs() {
     try {
-      WebDriverWait wait = new WebDriverWait(driver, Duration.ofSeconds(MAX_TIMEOUT));
+      WebDriverWait wait = new WebDriverWait(driver, MAX_TIMEOUT);
       wait.until(ExpectedConditions.elementToBeClickable(metalakeNameLink));
       clickAndWait(metalakeNameLink);
     } catch (Exception e) {
@@ -596,7 +595,7 @@ public class CatalogsPage extends BaseWebIT {
       throws InterruptedException {
     try {
       // Check the drawer css property value
-      WebDriverWait wait = new WebDriverWait(driver, Duration.ofSeconds(MAX_TIMEOUT));
+      WebDriverWait wait = new WebDriverWait(driver, MAX_TIMEOUT);
       wait.until(ExpectedConditions.visibilityOf(detailsDrawer));
       String drawerVisible = detailsDrawer.getCssValue("visibility");
       boolean isVisible = Objects.equals(drawerVisible, "visible");
@@ -643,7 +642,7 @@ public class CatalogsPage extends BaseWebIT {
               + name
               + "']//p[@data-refer='tree-node']";
       WebElement treeNode = treeView.findElement(By.xpath(xpath));
-      WebDriverWait wait = new WebDriverWait(driver, Duration.ofSeconds(MAX_TIMEOUT));
+      WebDriverWait wait = new WebDriverWait(driver, MAX_TIMEOUT);
       wait.until(ExpectedConditions.visibilityOf(treeNode));
 
       // Check if the link text is match with name
@@ -680,7 +679,7 @@ public class CatalogsPage extends BaseWebIT {
   public boolean verifyShowTableTitle(String title) {
     try {
       WebElement text = tabTableBtn.findElement(By.tagName("p"));
-      WebDriverWait wait = new WebDriverWait(driver, Duration.ofSeconds(MAX_TIMEOUT));
+      WebDriverWait wait = new WebDriverWait(driver, MAX_TIMEOUT);
       wait.until(ExpectedConditions.visibilityOf(text));
       boolean matchTitle = Objects.equals(text.getText(), title);
       if (!matchTitle) {
@@ -705,7 +704,7 @@ public class CatalogsPage extends BaseWebIT {
    */
   public boolean verifyShowPropertiesItemInList(
       String item, String key, String value, Boolean isHighlight) {
-    WebDriverWait wait = new WebDriverWait(driver, Duration.ofSeconds(ACTION_SLEEP));
+    WebDriverWait wait = new WebDriverWait(driver, ACTION_SLEEP);
     String xpath;
     if (isHighlight) {
       xpath = "//div[@data-refer='props-" + item + "-" + key + "-highlight']";
@@ -730,7 +729,7 @@ public class CatalogsPage extends BaseWebIT {
     } catch (Exception e) {
       LOG.error(e.getMessage(), e);
     }
-    WebDriverWait wait = new WebDriverWait(driver, Duration.ofSeconds(ACTION_SLEEP));
+    WebDriverWait wait = new WebDriverWait(driver, ACTION_SLEEP);
     String xpath =
         "//div[@data-refer='table-grid']"
             + "//div[contains(@class, 'MuiDataGrid-main')]"
@@ -783,7 +782,7 @@ public class CatalogsPage extends BaseWebIT {
     if (isColumnLevel) {
       xpath = xpath + "//p";
     }
-    WebDriverWait wait = new WebDriverWait(driver, Duration.ofSeconds(ACTION_SLEEP));
+    WebDriverWait wait = new WebDriverWait(driver, ACTION_SLEEP);
     List<WebElement> list =
         wait.until(ExpectedConditions.visibilityOfAllElementsLocatedBy(By.xpath(xpath)));
     List<String> texts = new ArrayList<>();
@@ -838,7 +837,7 @@ public class CatalogsPage extends BaseWebIT {
         formattedColName = colName + " desc nulls_last";
       }
       List<WebElement> tooltipItems = driver.findElements(By.xpath(xpath));
-      new WebDriverWait(driver, Duration.ofSeconds(MAX_TIMEOUT))
+      new WebDriverWait(driver, MAX_TIMEOUT)
           .until(ExpectedConditions.visibilityOfElementLocated(By.xpath(xpath)));
       List<String> texts = new ArrayList<>();
       for (WebElement text : tooltipItems) {
@@ -882,7 +881,7 @@ public class CatalogsPage extends BaseWebIT {
   }
 
   public boolean verifyBackHomePage() {
-    WebDriverWait wait = new WebDriverWait(driver, Duration.ofSeconds(MAX_TIMEOUT));
+    WebDriverWait wait = new WebDriverWait(driver, MAX_TIMEOUT);
     wait.until(ExpectedConditions.visibilityOf(metalakePageTitle));
     boolean matchTitle = Objects.equals(metalakePageTitle.getText(), "Metalakes");
     if (!matchTitle) {
@@ -893,7 +892,7 @@ public class CatalogsPage extends BaseWebIT {
   }
 
   public boolean verifyRefreshPage() {
-    WebDriverWait wait = new WebDriverWait(driver, Duration.ofSeconds(MAX_TIMEOUT));
+    WebDriverWait wait = new WebDriverWait(driver, MAX_TIMEOUT);
     wait.until(
         webDriver ->
             ((JavascriptExecutor) webDriver)
@@ -928,7 +927,7 @@ public class CatalogsPage extends BaseWebIT {
   }
 
   public boolean verifyTreeNodes(List<String> treeNodes) {
-    WebDriverWait wait = new WebDriverWait(driver, Duration.ofSeconds(ACTION_SLEEP));
+    WebDriverWait wait = new WebDriverWait(driver, ACTION_SLEEP);
     List<WebElement> list =
         wait.until(
             ExpectedConditions.visibilityOfAllElementsLocatedBy(
@@ -952,7 +951,7 @@ public class CatalogsPage extends BaseWebIT {
 
   public boolean verifySelectedNode(String nodeName) {
 
-    WebDriverWait wait = new WebDriverWait(driver, Duration.ofSeconds(ACTION_SLEEP));
+    WebDriverWait wait = new WebDriverWait(driver, ACTION_SLEEP);
 
     WebElement selectedNode =
         wait.until(

@@ -22,26 +22,15 @@ package org.apache.gravitino;
 import com.google.common.base.Preconditions;
 import java.security.Principal;
 
-/** A simple implementation of Principal that holds a username. */
 public class UserPrincipal implements Principal {
 
   private final String username;
 
-  /**
-   * Constructs a UserPrincipal with the given username.
-   *
-   * @param username the username of the principal
-   */
   public UserPrincipal(final String username) {
     Preconditions.checkArgument(username != null, "UserPrincipal must have the username");
     this.username = username;
   }
 
-  /**
-   * Returns the username of this principal.
-   *
-   * @return the username
-   */
   @Override
   public String getName() {
     return username;

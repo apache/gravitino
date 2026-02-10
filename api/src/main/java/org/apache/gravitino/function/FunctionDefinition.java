@@ -18,53 +18,20 @@
  */
 package org.apache.gravitino.function;
 
-import javax.annotation.Nullable;
 import org.apache.gravitino.annotation.Evolving;
-import org.apache.gravitino.rel.types.Type;
 
 /**
- * A function definition that pairs a specific parameter list with its implementations and return
- * type. A single function can include multiple definitions (overloads), each with distinct
- * parameters and implementations. Overload resolution is based on parameters only; return type or
- * return columns are metadata and do not participate in definition matching.
- *
- * <p>For scalar or aggregate functions, use {@link #returnType()} to specify the return type. For
- * table-valued functions, use {@link #returnColumns()} to specify the output columns.
+ * A function definition that pairs a specific parameter list with its implementations. A single
+ * function can include multiple definitions (overloads), each with distinct parameters and
+ * implementations.
  */
 @Evolving
 public interface FunctionDefinition {
-
-  /** An empty array of {@link FunctionColumn}. */
-  FunctionColumn[] EMPTY_COLUMNS = new FunctionColumn[0];
 
   /**
    * @return The parameters for this definition. Maybe an empty array for a no-arg definition.
    */
   FunctionParam[] parameters();
-
-  /**
-   * The return type for scalar or aggregate function definitions.
-   *
-   * @return The return type, or null if this is a table-valued function definition.
-   */
-  @Nullable
-  default Type returnType() {
-    return null;
-  }
-
-  /**
-   * The output columns for a table-valued function definition.
-   *
-   * <p>A table-valued function is a function that returns a table instead of a scalar value or an
-   * aggregate result. The returned table has a fixed schema defined by the columns returned from
-   * this method.
-   *
-   * @return The output columns that define the schema of the table returned by this definition, or
-   *     an empty array if this is a scalar or aggregate function definition.
-   */
-  default FunctionColumn[] returnColumns() {
-    return EMPTY_COLUMNS;
-  }
 
   /**
    * @return The implementations associated with this definition.

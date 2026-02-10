@@ -36,7 +36,7 @@ import org.apache.flink.table.factories.Factory;
 import org.apache.flink.util.Preconditions;
 import org.apache.gravitino.Catalog;
 import org.apache.gravitino.exceptions.NoSuchCatalogException;
-import org.apache.gravitino.flink.connector.CatalogPropertiesConverter;
+import org.apache.gravitino.flink.connector.PropertiesConverter;
 import org.apache.gravitino.flink.connector.catalog.BaseCatalogFactory;
 import org.apache.gravitino.flink.connector.catalog.GravitinoCatalogManager;
 import org.slf4j.Logger;
@@ -58,7 +58,7 @@ public class GravitinoCatalogStore extends AbstractCatalogStore {
     Map<String, String> gravitino = configuration.toMap();
     BaseCatalogFactory catalogFactory = getCatalogFactory(gravitino);
     Map<String, String> gravitinoProperties =
-        catalogFactory.catalogPropertiesConverter().toGravitinoCatalogProperties(configuration);
+        catalogFactory.propertiesConverter().toGravitinoCatalogProperties(configuration);
     gravitinoCatalogManager.createCatalog(
         catalogName,
         catalogFactory.gravitinoCatalogType(),
@@ -97,10 +97,9 @@ public class GravitinoCatalogStore extends AbstractCatalogStore {
     try {
       Catalog catalog = gravitinoCatalogManager.getGravitinoCatalogInfo(catalogName);
       BaseCatalogFactory catalogFactory = getCatalogFactory(catalog.provider());
-      CatalogPropertiesConverter catalogPropertiesConverter =
-          catalogFactory.catalogPropertiesConverter();
+      PropertiesConverter propertiesConverter = catalogFactory.propertiesConverter();
       Map<String, String> flinkCatalogProperties =
-          catalogPropertiesConverter.toFlinkCatalogProperties(catalog.properties());
+          propertiesConverter.toFlinkCatalogProperties(catalog.properties());
       CatalogDescriptor descriptor =
           CatalogDescriptor.of(catalogName, Configuration.fromMap(flinkCatalogProperties));
       return Optional.of(descriptor);
