@@ -37,6 +37,8 @@ import org.apache.gravitino.metrics.Monitored;
 import org.apache.gravitino.storage.relational.mapper.CatalogMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.FilesetMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.FilesetVersionMapper;
+import org.apache.gravitino.storage.relational.mapper.FunctionMetaMapper;
+import org.apache.gravitino.storage.relational.mapper.FunctionVersionMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.GroupMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.GroupRoleRelMapper;
 import org.apache.gravitino.storage.relational.mapper.JobMetaMapper;
@@ -59,6 +61,7 @@ import org.apache.gravitino.storage.relational.mapper.TagMetadataObjectRelMapper
 import org.apache.gravitino.storage.relational.mapper.TopicMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.UserMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.UserRoleRelMapper;
+import org.apache.gravitino.storage.relational.mapper.ViewMetaMapper;
 import org.apache.gravitino.storage.relational.po.MetalakePO;
 import org.apache.gravitino.storage.relational.utils.ExceptionUtils;
 import org.apache.gravitino.storage.relational.utils.POConverters;
@@ -231,6 +234,14 @@ public class MetalakeMetaService {
                     mapper -> mapper.softDeleteTopicMetasByMetalakeId(metalakeId)),
             () ->
                 SessionUtils.doWithoutCommit(
+                    FunctionMetaMapper.class,
+                    mapper -> mapper.softDeleteFunctionMetasByMetalakeId(metalakeId)),
+            () ->
+                SessionUtils.doWithoutCommit(
+                    FunctionVersionMetaMapper.class,
+                    mapper -> mapper.softDeleteFunctionVersionMetasByMetalakeId(metalakeId)),
+            () ->
+                SessionUtils.doWithoutCommit(
                     UserRoleRelMapper.class,
                     mapper -> mapper.softDeleteUserRoleRelByMetalakeId(metalakeId)),
             () ->
@@ -296,7 +307,11 @@ public class MetalakeMetaService {
             () ->
                 SessionUtils.doWithoutCommit(
                     JobMetaMapper.class,
-                    mapper -> mapper.softDeleteJobMetasByMetalakeId(metalakeId)));
+                    mapper -> mapper.softDeleteJobMetasByMetalakeId(metalakeId)),
+            () ->
+                SessionUtils.doWithoutCommit(
+                    ViewMetaMapper.class,
+                    mapper -> mapper.softDeleteViewMetasByMetalakeId(metalakeId)));
       } else {
         List<CatalogEntity> catalogEntities =
             CatalogMetaService.getInstance()

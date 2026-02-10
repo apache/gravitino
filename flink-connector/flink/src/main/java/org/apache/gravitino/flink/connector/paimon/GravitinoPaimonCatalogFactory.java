@@ -24,9 +24,10 @@ import java.util.Set;
 import org.apache.flink.configuration.ConfigOption;
 import org.apache.flink.table.catalog.Catalog;
 import org.apache.flink.table.factories.FactoryUtil;
+import org.apache.gravitino.flink.connector.CatalogPropertiesConverter;
 import org.apache.gravitino.flink.connector.DefaultPartitionConverter;
 import org.apache.gravitino.flink.connector.PartitionConverter;
-import org.apache.gravitino.flink.connector.PropertiesConverter;
+import org.apache.gravitino.flink.connector.SchemaAndTablePropertiesConverter;
 import org.apache.gravitino.flink.connector.catalog.BaseCatalogFactory;
 import org.apache.gravitino.flink.connector.utils.FactoryUtils;
 
@@ -43,7 +44,7 @@ public class GravitinoPaimonCatalogFactory implements BaseCatalogFactory {
     String defaultDatabase =
         helper.getOptions().get(GravitinoPaimonCatalogFactoryOptions.DEFAULT_DATABASE);
     return new GravitinoPaimonCatalog(
-        context, defaultDatabase, propertiesConverter(), partitionConverter());
+        context, defaultDatabase, schemaAndTablePropertiesConverter(), partitionConverter());
   }
 
   @Override
@@ -72,7 +73,11 @@ public class GravitinoPaimonCatalogFactory implements BaseCatalogFactory {
   }
 
   @Override
-  public PropertiesConverter propertiesConverter() {
+  public CatalogPropertiesConverter catalogPropertiesConverter() {
+    return PaimonPropertiesConverter.INSTANCE;
+  }
+
+  public SchemaAndTablePropertiesConverter schemaAndTablePropertiesConverter() {
     return PaimonPropertiesConverter.INSTANCE;
   }
 
