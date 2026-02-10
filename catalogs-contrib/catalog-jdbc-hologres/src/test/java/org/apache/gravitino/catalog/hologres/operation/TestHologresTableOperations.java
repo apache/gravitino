@@ -32,6 +32,7 @@ import org.apache.gravitino.catalog.hologres.converter.HologresTypeConverter;
 import org.apache.gravitino.catalog.jdbc.JdbcColumn;
 import org.apache.gravitino.rel.TableChange;
 import org.apache.gravitino.rel.expressions.NamedReference;
+import org.apache.gravitino.rel.expressions.UnparsedExpression;
 import org.apache.gravitino.rel.expressions.distributions.Distribution;
 import org.apache.gravitino.rel.expressions.distributions.Distributions;
 import org.apache.gravitino.rel.expressions.literals.Literals;
@@ -833,5 +834,64 @@ public class TestHologresTableOperations {
   void testCalculateDatetimePrecisionNegativeScaleReturnsZero() {
     Integer result = ops.calculateDatetimePrecision("TIMESTAMP", 0, -1);
     assertEquals(0, result);
+  }
+
+  @Test
+  void testCreateTableWithGeneratedColumn() {
+    JdbcColumn col1 =
+        JdbcColumn.builder()
+            .withName("order_time")
+            .withType(Types.TimestampType.withoutTimeZone())
+            .withNullable(false)
+            .build();
+    JdbcColumn col2 =
+        JdbcColumn.builder()
+            .withName("ds")
+            .withType(Types.TimestampType.withoutTimeZone())
+            .withNullable(false)
+            .withDefaultValue(UnparsedExpression.of("date_trunc('day'::text, order_time)"))
+            .build();
+    String sql =
+        ops.createTableSql(
+            "test_generated",
+            new JdbcColumn[] {col1, col2},
+            null,
+            Collections.emptyMap(),
+            Transforms.EMPTY_TRANSFORM,
+            Distributions.NONE,
+            Indexes.EMPTY_INDEXES);
+    assertTrue(sql.contains("GENERATED ALWAYS AS (date_trunc('day'::text, order_time)) STORED"));
+    assertTrue(sql.contains("NOT NULL"));
+    // Should NOT contain DEFAULT for the generated column
+    assertFalse(sql.contains("DEFAULT date_trunc"));
+  }
+
+  @Test
+  void testCreateTableWithGeneratedColumnNullable() {
+    JdbcColumn col1 =
+        JdbcColumn.builder()
+            .withName("val")
+            .withType(Types.IntegerType.get())
+            .withNullable(false)
+            .build();
+    JdbcColumn col2 =
+        JdbcColumn.builder()
+            .withName("computed")
+            .withType(Types.IntegerType.get())
+            .withNullable(true)
+            .withDefaultValue(UnparsedExpression.of("val * 2"))
+            .build();
+    String sql =
+        ops.createTableSql(
+            "test_gen_nullable",
+            new JdbcColumn[] {col1, col2},
+            null,
+            Collections.emptyMap(),
+            Transforms.EMPTY_TRANSFORM,
+            Distributions.NONE,
+            Indexes.EMPTY_INDEXES);
+    assertTrue(sql.contains("GENERATED ALWAYS AS (val * 2) STORED"));
+    // The generated column should have NULL (nullable)
+    assertTrue(sql.contains("STORED NULL"));
   }
 }

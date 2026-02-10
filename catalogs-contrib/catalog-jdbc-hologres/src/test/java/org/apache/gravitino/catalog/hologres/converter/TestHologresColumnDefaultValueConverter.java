@@ -187,4 +187,23 @@ public class TestHologresColumnDefaultValueConverter {
     Expression result = converter.toGravitino(type, "some_value", false, true);
     Assertions.assertInstanceOf(UnparsedExpression.class, result);
   }
+
+  @Test
+  public void testFromGravitinoUnparsedExpression() {
+    UnparsedExpression unparsed = UnparsedExpression.of("date_trunc('day'::text, order_time)");
+    String result = converter.fromGravitino(unparsed);
+    Assertions.assertEquals("date_trunc('day'::text, order_time)", result);
+  }
+
+  @Test
+  public void testFromGravitinoLiteralDelegatesToSuper() {
+    String result = converter.fromGravitino(Literals.integerLiteral(42));
+    Assertions.assertEquals("42", result);
+  }
+
+  @Test
+  public void testFromGravitinoDefaultValueNotSet() {
+    String result = converter.fromGravitino(DEFAULT_VALUE_NOT_SET);
+    Assertions.assertNull(result);
+  }
 }

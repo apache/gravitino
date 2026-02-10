@@ -54,6 +54,7 @@ import org.apache.gravitino.exceptions.NoSuchTableException;
 import org.apache.gravitino.rel.Column;
 import org.apache.gravitino.rel.TableChange;
 import org.apache.gravitino.rel.expressions.NamedReference;
+import org.apache.gravitino.rel.expressions.UnparsedExpression;
 import org.apache.gravitino.rel.expressions.distributions.Distribution;
 import org.apache.gravitino.rel.expressions.distributions.Distributions;
 import org.apache.gravitino.rel.expressions.distributions.Strategy;
@@ -382,6 +383,19 @@ public class HologresTableOperations extends JdbcTableOperations
   private void appendColumnDefinition(JdbcColumn column, StringBuilder sqlBuilder) {
     // Add data type
     sqlBuilder.append(SPACE).append(typeConverter.fromGravitino(column.dataType())).append(SPACE);
+
+    // Handle generated (stored computed) columns:
+    // GENERATED ALWAYS AS (expr) STORED must come before nullable constraints.
+    if (!column.autoIncrement() && column.defaultValue() instanceof UnparsedExpression) {
+      String expr = ((UnparsedExpression) column.defaultValue()).unparsedExpression();
+      sqlBuilder.append("GENERATED ALWAYS AS (").append(expr).append(") STORED ");
+      if (column.nullable()) {
+        sqlBuilder.append("NULL ");
+      } else {
+        sqlBuilder.append("NOT NULL ");
+      }
+      return;
+    }
 
     if (column.autoIncrement()) {
       if (!Types.allowAutoIncrement(column.dataType())) {

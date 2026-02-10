@@ -53,6 +53,14 @@ public class HologresColumnDefaultValueConverter extends JdbcColumnDefaultValueC
   private static final String NULL_PREFIX = "NULL::";
 
   @Override
+  public String fromGravitino(Expression defaultValue) {
+    if (defaultValue instanceof UnparsedExpression) {
+      return ((UnparsedExpression) defaultValue).unparsedExpression();
+    }
+    return super.fromGravitino(defaultValue);
+  }
+
+  @Override
   public Expression toGravitino(
       JdbcTypeConverter.JdbcTypeBean type,
       String columnDefaultValue,
