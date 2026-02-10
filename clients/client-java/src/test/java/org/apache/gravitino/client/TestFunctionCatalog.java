@@ -47,8 +47,13 @@ import org.apache.gravitino.exceptions.NoSuchFunctionException;
 import org.apache.gravitino.exceptions.NoSuchSchemaException;
 import org.apache.gravitino.function.Function;
 import org.apache.gravitino.function.FunctionCatalog;
+import org.apache.gravitino.function.FunctionDefinition;
+import org.apache.gravitino.function.FunctionDefinitions;
 import org.apache.gravitino.function.FunctionImpl;
+import org.apache.gravitino.function.FunctionImpls;
+import org.apache.gravitino.function.FunctionParam;
 import org.apache.gravitino.function.FunctionType;
+import org.apache.gravitino.rel.types.Type;
 import org.apache.gravitino.rel.types.Types;
 import org.apache.hc.core5.http.Method;
 import org.junit.jupiter.api.Assertions;
@@ -202,8 +207,7 @@ public class TestFunctionCatalog extends TestBase {
                 "mock comment",
                 FunctionType.SCALAR,
                 true,
-                Types.StringType.get(),
-                mockFunction.definitions());
+                FunctionDefinitions.of(mockDefinition(Types.StringType.get())));
 
     Assertions.assertNotNull(registeredFunction);
     assertFunction(mockFunction, registeredFunction);
@@ -223,8 +227,7 @@ public class TestFunctionCatalog extends TestBase {
                     "mock comment",
                     FunctionType.SCALAR,
                     true,
-                    Types.StringType.get(),
-                    mockFunction.definitions()),
+                    FunctionDefinitions.of(mockDefinition(Types.StringType.get()))),
         "function already exists");
   }
 
@@ -284,6 +287,19 @@ public class TestFunctionCatalog extends TestBase {
 
   private static FunctionDTO mockFunctionDTO(
       String name, FunctionType functionType, String comment, boolean deterministic) {
+    FunctionDefinitionDTO definition = mockDefinitionDTO(Types.StringType.get());
+
+    return FunctionDTO.builder()
+        .withName(name)
+        .withFunctionType(functionType)
+        .withComment(comment)
+        .withDeterministic(deterministic)
+        .withDefinitions(new FunctionDefinitionDTO[] {definition})
+        .withAudit(AuditDTO.builder().withCreator("creator").withCreateTime(Instant.now()).build())
+        .build();
+  }
+
+  private static FunctionDefinitionDTO mockDefinitionDTO(Type returnType) {
     FunctionParamDTO[] params =
         new FunctionParamDTO[] {
           FunctionParamDTO.builder()
@@ -295,21 +311,28 @@ public class TestFunctionCatalog extends TestBase {
     SQLImplDTO impl =
         new SQLImplDTO(FunctionImpl.RuntimeType.SPARK.name(), null, null, "SELECT param1 + 1");
 
-    FunctionDefinitionDTO definition =
-        FunctionDefinitionDTO.builder()
-            .withParameters(params)
-            .withImpls(new FunctionImplDTO[] {impl})
-            .build();
-
-    return FunctionDTO.builder()
-        .withName(name)
-        .withFunctionType(functionType)
-        .withComment(comment)
-        .withDeterministic(deterministic)
-        .withReturnType(Types.StringType.get())
-        .withDefinitions(new FunctionDefinitionDTO[] {definition})
-        .withAudit(AuditDTO.builder().withCreator("creator").withCreateTime(Instant.now()).build())
+    return FunctionDefinitionDTO.builder()
+        .withParameters(params)
+        .withReturnType(returnType)
+        .withImpls(new FunctionImplDTO[] {impl})
         .build();
+  }
+
+  private static FunctionDefinition mockDefinition(Type returnType) {
+    FunctionParam[] params =
+        new FunctionParam[] {
+          FunctionParamDTO.builder()
+              .withName("param1")
+              .withDataType(Types.IntegerType.get())
+              .build()
+        };
+
+    FunctionImpl[] impls =
+        new FunctionImpl[] {
+          FunctionImpls.ofSql(FunctionImpl.RuntimeType.SPARK, "SELECT param1 + 1")
+        };
+
+    return FunctionDefinitions.of(params, returnType, impls);
   }
 
   private static void assertFunction(FunctionDTO expected, Function actual) {
@@ -317,8 +340,9 @@ public class TestFunctionCatalog extends TestBase {
     Assertions.assertEquals(expected.functionType(), actual.functionType());
     Assertions.assertEquals(expected.comment(), actual.comment());
     Assertions.assertEquals(expected.deterministic(), actual.deterministic());
-    Assertions.assertEquals(expected.returnType(), actual.returnType());
     Assertions.assertEquals(expected.definitions().length, actual.definitions().length);
+    Assertions.assertEquals(
+        expected.definitions()[0].returnType(), actual.definitions()[0].returnType());
   }
 
   private static String formatFunctionRequestPath(Namespace ns) {
