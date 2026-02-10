@@ -42,6 +42,15 @@ if (hasProperty("excludePackagesForSparkConnector")) {
   configureFunc?.invoke(project)
 }
 
+configurations.all {
+  resolutionStrategy {
+    // 1.7.36 is the latest version of slf4j 1.7.x, and log4j-slf4j-impl 2.17.2 depends on it,
+    // we need to align the version to avoid conflicts.
+    force("org.slf4j:slf4j-api:1.7.36")
+  }
+  exclude(group = "org.apache.logging.log4j", module = "log4j-slf4j2-impl")
+}
+
 dependencies {
   implementation(project(":spark-connector:spark-common"))
   compileOnly("org.apache.kyuubi:kyuubi-spark-connector-hive_$scalaVersion:$kyuubiVersion")
