@@ -903,21 +903,9 @@ tasks {
   }
 
   val compileTrinoConnector by registering {
-    dependsOn("trino-connector:trino-connector:copyLibs")
+    dependsOn("trino-connector:trino-connector-435-439:copyLibs")
     group = "gravitino distribution"
-    outputs.dir(projectDir.dir("distribution/${rootProject.name}-trino-connector"))
-    doLast {
-      copy {
-        from(projectDir.dir("licenses")) { into("${rootProject.name}-trino-connector/licenses") }
-        from(projectDir.file("LICENSE.trino")) { into("${rootProject.name}-trino-connector") }
-        from(projectDir.file("NOTICE.trino")) { into("${rootProject.name}-trino-connector") }
-        from(projectDir.file("README.md")) { into("${rootProject.name}-trino-connector") }
-        into(outputDir)
-        rename { fileName ->
-          fileName.replace(".trino", "")
-        }
-      }
-    }
+    outputs.dir(projectDir.dir("distribution/${rootProject.name}-trino-connector-435-439"))
   }
 
   val assembleDistribution by registering(Tar::class) {
@@ -1025,24 +1013,12 @@ tasks {
 
   register("checksumDistribution") {
     group = "gravitino distribution"
-    dependsOn(assembleDistribution, "checksumTrinoConnector", "checksumIcebergRESTServerDistribution", "checksumLanceRESTServerDistribution")
+    dependsOn(
+      assembleDistribution,
+      "checksumIcebergRESTServerDistribution",
+      "checksumLanceRESTServerDistribution"
+    )
     val archiveFile = assembleDistribution.flatMap { it.archiveFile }
-    val checksumFile = archiveFile.map { archive ->
-      archive.asFile.let { it.resolveSibling("${it.name}.sha256") }
-    }
-    inputs.file(archiveFile)
-    outputs.file(checksumFile)
-    doLast {
-      checksumFile.get().writeText(
-        serviceOf<ChecksumService>().sha256(archiveFile.get().asFile).toString()
-      )
-    }
-  }
-
-  register("checksumTrinoConnector") {
-    group = "gravitino distribution"
-    dependsOn(assembleTrinoConnector)
-    val archiveFile = assembleTrinoConnector.flatMap { it.archiveFile }
     val checksumFile = archiveFile.map { archive ->
       archive.asFile.let { it.resolveSibling("${it.name}.sha256") }
     }
@@ -1073,9 +1049,9 @@ tasks {
         !it.name.startsWith("optimizer") &&
         !it.name.startsWith("spark") &&
         !it.name.startsWith("hive-metastore") &&
+        !it.name.startsWith("trino-connector") &&
         it.name != "hadoop-common" &&
         it.name != "integration-test" &&
-        it.name != "trino-connector" &&
         it.parent?.name != "bundles" &&
         it.parent?.name != "maintenance" &&
         it.name != "mcp-server"
