@@ -22,6 +22,5 @@ package org.apache.gravitino.catalog.lakehouse.paimon;
 public enum PaimonCatalogBackend {
   FILESYSTEM,
   JDBC,
-  HIVE,
-  REST
+  HIVE
 }

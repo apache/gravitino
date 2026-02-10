@@ -19,7 +19,6 @@
 
 package org.apache.gravitino.integration.test.web.ui.pages;
 
-import java.time.Duration;
 import java.util.List;
 import java.util.Objects;
 import java.util.Set;
@@ -133,7 +132,7 @@ public class MetalakePage extends BaseWebIT {
   }
 
   public void setQueryParams(String queryParams) {
-    WebDriverWait wait = new WebDriverWait(driver, Duration.ofSeconds(ACTION_SLEEP));
+    WebDriverWait wait = new WebDriverWait(driver, ACTION_SLEEP);
     WebElement queryInputElement =
         wait.until(ExpectedConditions.elementToBeClickable(queryMetalakeInput));
     clearQueryInput();
@@ -185,7 +184,7 @@ public class MetalakePage extends BaseWebIT {
   public void clickMetalakeLink(String name) {
     try {
       setQueryParams(name);
-      WebDriverWait wait = new WebDriverWait(driver, Duration.ofSeconds(ACTION_SLEEP));
+      WebDriverWait wait = new WebDriverWait(driver, ACTION_SLEEP);
       String xpath = "//a[@data-refer='metalake-link-" + name + "']";
       WebElement metalakeLink =
           wait.until(ExpectedConditions.elementToBeClickable(By.xpath(xpath)));
@@ -329,7 +328,7 @@ public class MetalakePage extends BaseWebIT {
 
   public boolean verifyLinkToCatalogsPage(String name) throws InterruptedException {
     try {
-      WebDriverWait wait = new WebDriverWait(driver, Duration.ofSeconds(MAX_TIMEOUT));
+      WebDriverWait wait = new WebDriverWait(driver, MAX_TIMEOUT);
       wait.until(ExpectedConditions.visibilityOf(metalakeNameLink));
       wait.until(ExpectedConditions.urlContains(metalakeNameLink.getAttribute("href")));
 
@@ -350,7 +349,7 @@ public class MetalakePage extends BaseWebIT {
 
   public boolean verifyRefreshPage() {
     try {
-      WebDriverWait wait = new WebDriverWait(driver, Duration.ofSeconds(MAX_TIMEOUT));
+      WebDriverWait wait = new WebDriverWait(driver, MAX_TIMEOUT);
       wait.until(
           webDriver ->
               ((JavascriptExecutor) webDriver)

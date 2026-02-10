@@ -18,19 +18,14 @@
  */
 package org.apache.gravitino.catalog.fileset;
 
+import static org.apache.gravitino.catalog.fileset.authentication.kerberos.KerberosConfig.KERBEROS_PROPERTY_ENTRIES;
 import static org.apache.gravitino.catalog.hadoop.fs.Constants.BUILTIN_LOCAL_FS_PROVIDER;
-import static org.apache.gravitino.catalog.hadoop.fs.kerberos.AuthenticationConfig.AUTH_TYPE_KEY;
-import static org.apache.gravitino.catalog.hadoop.fs.kerberos.AuthenticationConfig.IMPERSONATION_ENABLE_KEY;
-import static org.apache.gravitino.catalog.hadoop.fs.kerberos.AuthenticationConfig.KERBEROS_DEFAULT_IMPERSONATION_ENABLE;
-import static org.apache.gravitino.catalog.hadoop.fs.kerberos.KerberosConfig.CHECK_INTERVAL_SEC_KEY;
-import static org.apache.gravitino.catalog.hadoop.fs.kerberos.KerberosConfig.FETCH_TIMEOUT_SEC_KEY;
-import static org.apache.gravitino.catalog.hadoop.fs.kerberos.KerberosConfig.KEY_TAB_URI_KEY;
-import static org.apache.gravitino.catalog.hadoop.fs.kerberos.KerberosConfig.PRINCIPAL_KEY;
 import static org.apache.gravitino.file.Fileset.LOCATION_NAME_UNKNOWN;
 import static org.apache.gravitino.file.Fileset.PROPERTY_MULTIPLE_LOCATIONS_PREFIX;
 
 import com.google.common.collect.ImmutableMap;
 import java.util.Map;
+import org.apache.gravitino.catalog.fileset.authentication.AuthenticationConfig;
 import org.apache.gravitino.catalog.hadoop.fs.FileSystemProvider;
 import org.apache.gravitino.catalog.hadoop.fs.LocalFileSystemProvider;
 import org.apache.gravitino.connector.BaseCatalogPropertiesMetadata;
@@ -71,11 +66,8 @@ public class FilesetCatalogPropertiesMetadata extends BaseCatalogPropertiesMetad
   /** The value to indicate the cache value is not set. */
   public static final long CACHE_VALUE_NOT_SET = -1;
 
-  public static final String FILESYSTEM_CONNECTION_TIMEOUT_SECONDS = "filesystem-conn-timeout-secs";
+  static final String FILESYSTEM_CONNECTION_TIMEOUT_SECONDS = "filesystem-conn-timeout-secs";
   static final int DEFAULT_GET_FILESYSTEM_TIMEOUT_SECONDS = 6;
-
-  /** The prefix for user-defined location configs: {@code fs.path.config.<name>=<path>}. */
-  public static final String FS_GRAVITINO_PATH_CONFIG_PREFIX = "fs.path.config.";
 
   /**
    * The property to disable file system operations like list, exists, mkdir operations in the
@@ -85,65 +77,6 @@ public class FilesetCatalogPropertiesMetadata extends BaseCatalogPropertiesMetad
   static final String DISABLE_FILESYSTEM_OPS = "disable-filesystem-ops";
 
   static final boolean DEFAULT_DISABLE_FILESYSTEM_OPS = false;
-
-  public static final Map<String, PropertyEntry<?>> KERBEROS_PROPERTY_ENTRIES =
-      new ImmutableMap.Builder<String, PropertyEntry<?>>()
-          .put(
-              KEY_TAB_URI_KEY,
-              PropertyEntry.stringOptionalPropertyEntry(
-                  KEY_TAB_URI_KEY,
-                  "The uri of key tab for the catalog",
-                  false /* immutable */,
-                  null /* default value */,
-                  false /* hidden */))
-          .put(
-              PRINCIPAL_KEY,
-              PropertyEntry.stringOptionalPropertyEntry(
-                  PRINCIPAL_KEY,
-                  "The principal for the catalog",
-                  false /* immutable */,
-                  null /* defaultValue */,
-                  false /* hidden */))
-          .put(
-              CHECK_INTERVAL_SEC_KEY,
-              PropertyEntry.integerOptionalPropertyEntry(
-                  CHECK_INTERVAL_SEC_KEY,
-                  "The interval to check validness of the principal",
-                  true /* immutable */,
-                  60 /* defaultValue */,
-                  false /* hidden */))
-          .put(
-              FETCH_TIMEOUT_SEC_KEY,
-              PropertyEntry.integerOptionalPropertyEntry(
-                  FETCH_TIMEOUT_SEC_KEY,
-                  "The timeout to fetch key tab",
-                  false /* immutable */,
-                  60 /* defaultValue */,
-                  false /* hidden */))
-          .build();
-
-  public static final Map<String, PropertyEntry<?>> AUTHENTICATION_PROPERTY_ENTRIES =
-      new ImmutableMap.Builder<String, PropertyEntry<?>>()
-          .put(
-              IMPERSONATION_ENABLE_KEY,
-              PropertyEntry.booleanPropertyEntry(
-                  IMPERSONATION_ENABLE_KEY,
-                  "Whether to enable impersonation for the Fileset catalog",
-                  false /* required */,
-                  true /* immutable */,
-                  KERBEROS_DEFAULT_IMPERSONATION_ENABLE /* default value */,
-                  false /* hidden */,
-                  false /* reserved */))
-          .put(
-              AUTH_TYPE_KEY,
-              PropertyEntry.stringOptionalPropertyEntry(
-                  AUTH_TYPE_KEY,
-                  "The type of authentication for Fileset catalog, currently we only "
-                      + "support simple and Kerberos",
-                  false /* immutable */,
-                  null /* default value */,
-                  false /* hidden */))
-          .build();
 
   private static final Map<String, PropertyEntry<?>> FILESET_CATALOG_PROPERTY_ENTRIES =
       ImmutableMap.<String, PropertyEntry<?>>builder()
@@ -222,7 +155,7 @@ public class FilesetCatalogPropertiesMetadata extends BaseCatalogPropertiesMetad
                   false /* reserved */))
           // The following two are about authentication.
           .putAll(KERBEROS_PROPERTY_ENTRIES)
-          .putAll(AUTHENTICATION_PROPERTY_ENTRIES)
+          .putAll(AuthenticationConfig.AUTHENTICATION_PROPERTY_ENTRIES)
           .putAll(CredentialConfig.CREDENTIAL_PROPERTY_ENTRIES)
           .build();
 

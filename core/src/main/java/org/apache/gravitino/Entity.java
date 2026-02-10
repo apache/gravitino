@@ -67,7 +67,6 @@ public interface Entity extends Serializable {
     CATALOG,
     SCHEMA,
     TABLE,
-    VIEW,
     COLUMN,
     FILESET,
     TOPIC,

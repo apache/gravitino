@@ -18,8 +18,6 @@
  */
 package org.apache.gravitino.catalog.jdbc.operation;
 
-import static org.apache.gravitino.rel.Column.DEFAULT_VALUE_NOT_SET;
-
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
 import java.sql.Connection;
@@ -58,7 +56,6 @@ import org.apache.gravitino.rel.expressions.Expression;
 import org.apache.gravitino.rel.expressions.distributions.Distribution;
 import org.apache.gravitino.rel.expressions.distributions.Distributions;
 import org.apache.gravitino.rel.expressions.literals.Literals;
-import org.apache.gravitino.rel.expressions.sorts.SortOrder;
 import org.apache.gravitino.rel.expressions.transforms.Transform;
 import org.apache.gravitino.rel.expressions.transforms.Transforms;
 import org.apache.gravitino.rel.indexes.Index;
@@ -98,14 +95,6 @@ public abstract class JdbcTableOperations implements TableOperation {
     this.columnDefaultValueConverter = jdbcColumnDefaultValueConverter;
   }
 
-  protected void appendDefaultValue(JdbcColumn column, StringBuilder sqlBuilder) {
-    if (DEFAULT_VALUE_NOT_SET.equals(column.defaultValue())) {
-      return;
-    }
-    String defaultValue = columnDefaultValueConverter.fromGravitino(column.defaultValue());
-    sqlBuilder.append("DEFAULT ").append(defaultValue).append(SPACE);
-  }
-
   @Override
   public void create(
       String databaseName,
@@ -117,43 +106,12 @@ public abstract class JdbcTableOperations implements TableOperation {
       Distribution distribution,
       Index[] indexes)
       throws TableAlreadyExistsException {
-    create(
-        databaseName,
-        tableName,
-        columns,
-        comment,
-        properties,
-        partitioning,
-        distribution,
-        indexes,
-        null);
-  }
-
-  @Override
-  public void create(
-      String databaseName,
-      String tableName,
-      JdbcColumn[] columns,
-      String comment,
-      Map<String, String> properties,
-      Transform[] partitioning,
-      Distribution distribution,
-      Index[] indexes,
-      SortOrder[] sortOrders)
-      throws TableAlreadyExistsException {
     LOG.info("Attempting to create table {} in database {}", tableName, databaseName);
     try (Connection connection = getConnection(databaseName)) {
       JdbcConnectorUtils.executeUpdate(
           connection,
           generateCreateTableSql(
-              tableName,
-              columns,
-              comment,
-              properties,
-              partitioning,
-              distribution,
-              indexes,
-              sortOrders));
+              tableName, columns, comment, properties, partitioning, distribution, indexes));
       LOG.info("Created table {} in database {}", tableName, databaseName);
     } catch (final SQLException se) {
       throw this.exceptionMapper.toGravitinoException(se);
@@ -515,24 +473,6 @@ public abstract class JdbcTableOperations implements TableOperation {
       Distribution distribution,
       Index[] indexes);
 
-  protected String generateCreateTableSql(
-      String tableName,
-      JdbcColumn[] columns,
-      String comment,
-      Map<String, String> properties,
-      Transform[] partitioning,
-      Distribution distribution,
-      Index[] indexes,
-      SortOrder[] sortOrders) {
-    if (sortOrders == null || sortOrders.length == 0) {
-      return generateCreateTableSql(
-          tableName, columns, comment, properties, partitioning, distribution, indexes);
-    }
-
-    throw new UnsupportedOperationException(
-        "generateCreateTableSql with sortOrders defined is not supported");
-  }
-
   /**
    * The default implementation of this method is based on MySQL syntax, and if the catalog does not
    * support MySQL syntax, this method needs to be rewritten.
@@ -659,10 +599,6 @@ public abstract class JdbcTableOperations implements TableOperation {
                 () ->
                     new NoSuchColumnException(
                         "Column %s does not exist in table %s", colName, jdbcTable.name()));
-  }
-
-  protected boolean columnExists(JdbcTable table, String columnName) {
-    return Arrays.stream(table.columns()).anyMatch(col -> col.name().equals(columnName));
   }
 
   protected Connection getConnection(String catalog) throws SQLException {
@@ -821,9 +757,5 @@ public abstract class JdbcTableOperations implements TableOperation {
     }
 
     return false;
-  }
-
-  protected String quoteIdentifier(String identifier) {
-    return "`" + identifier + "`";
   }
 }

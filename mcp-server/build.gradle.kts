@@ -117,12 +117,7 @@ tasks {
 
     doFirst {
       println("UV executable path: ${getUvExecutable()}")
-      if (venvDir.exists()) {
-        logger.lifecycle("Virtual environment already exists at: ${venvDir.absolutePath}, clearing...")
-        commandLine(getUvExecutable(), "venv", "--clear", venvDir.absolutePath)
-      } else {
-        commandLine(getUvExecutable(), "venv", venvDir.absolutePath)
-      }
+      commandLine(getUvExecutable(), "venv", venvDir.absolutePath)
     }
 
     doLast {

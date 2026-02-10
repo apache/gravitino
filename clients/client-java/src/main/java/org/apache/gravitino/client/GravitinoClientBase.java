@@ -49,8 +49,6 @@ public abstract class GravitinoClientBase implements Closeable {
 
   /** The REST client to communicate with the REST server */
   protected final RESTClient restClient;
-  /** Environment variable to disable version checks. */
-  private static final String VERSION_CHECK_DISABLED_ENV = "GRAVITINO_VERSION_CHECK_DISABLED";
   /** The REST API path for listing metalakes */
   protected static final String API_METALAKES_LIST_PATH = "api/metalakes";
   /** The REST API path prefix for load a specific metalake */
@@ -222,36 +220,6 @@ public abstract class GravitinoClientBase implements Closeable {
      */
     protected Builder(String uri) {
       this.uri = uri;
-    }
-
-    /**
-     * Returns whether the client version check is enabled.
-     *
-     * @return {@code true} if version check is enabled, otherwise {@code false}.
-     */
-    protected boolean isVersionCheckEnabled() {
-      return checkVersion && !isVersionCheckDisabledByEnv();
-    }
-
-    /**
-     * Returns whether the version check is disabled by the environment variable.
-     *
-     * @return {@code true} if version check is disabled by env, otherwise {@code false}.
-     */
-    @VisibleForTesting
-    protected boolean isVersionCheckDisabledByEnv() {
-      String envValue = versionCheckDisabledEnvValue();
-      return envValue != null && "true".equalsIgnoreCase(envValue.trim());
-    }
-
-    /**
-     * Returns the raw value of the version check disabling environment variable.
-     *
-     * @return The environment variable value, or {@code null} if unset.
-     */
-    @VisibleForTesting
-    protected String versionCheckDisabledEnvValue() {
-      return System.getenv(VERSION_CHECK_DISABLED_ENV);
     }
 
     /**

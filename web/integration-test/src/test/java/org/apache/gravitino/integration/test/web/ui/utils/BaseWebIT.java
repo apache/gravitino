@@ -77,7 +77,7 @@ public class BaseWebIT extends BaseIT {
   protected void clickAndWait(final Object locator) throws InterruptedException {
     try {
       // wait the element is available
-      WebDriverWait wait = new WebDriverWait(driver, Duration.ofSeconds(MAX_TIMEOUT));
+      WebDriverWait wait = new WebDriverWait(driver, MAX_TIMEOUT);
       wait.until(ExpectedConditions.visibilityOf(locatorElement(locator)));
       wait.until(ExpectedConditions.elementToBeClickable(locatorElement(locator)));
 

@@ -19,10 +19,10 @@
 
 package org.apache.gravitino.catalog.fileset.integration.test;
 
-import static org.apache.gravitino.catalog.hadoop.fs.kerberos.AuthenticationConfig.AUTH_TYPE_KEY;
-import static org.apache.gravitino.catalog.hadoop.fs.kerberos.KerberosConfig.IMPERSONATION_ENABLE_KEY;
-import static org.apache.gravitino.catalog.hadoop.fs.kerberos.KerberosConfig.KEY_TAB_URI_KEY;
-import static org.apache.gravitino.catalog.hadoop.fs.kerberos.KerberosConfig.PRINCIPAL_KEY;
+import static org.apache.gravitino.catalog.fileset.authentication.AuthenticationConfig.AUTH_TYPE_KEY;
+import static org.apache.gravitino.catalog.fileset.authentication.kerberos.KerberosConfig.IMPERSONATION_ENABLE_KEY;
+import static org.apache.gravitino.catalog.fileset.authentication.kerberos.KerberosConfig.KEY_TAB_URI_KEY;
+import static org.apache.gravitino.catalog.fileset.authentication.kerberos.KerberosConfig.PRINCIPAL_KEY;
 import static org.apache.hadoop.hdfs.client.HdfsClientConfigKeys.DFS_DATA_TRANSFER_PROTECTION_KEY;
 
 import com.google.common.collect.ImmutableMap;

@@ -31,44 +31,19 @@ repositories {
 
 val scalaVersion: String = project.properties["scalaVersion"] as? String ?: extra["defaultScalaVersion"].toString()
 val sparkVersion: String = libs.versions.spark35.get()
-val icebergVersion: String = libs.versions.iceberg4connector.get()
-val sparkMajorVersion = "3.5"
 
 dependencies {
-  implementation(project(":api"))
+  compileOnly(project(":api"))
 
   compileOnly(libs.slf4j.api)
-  compileOnly(libs.jackson.databind)
   compileOnly("org.apache.spark:spark-sql_$scalaVersion:$sparkVersion") {
-    exclude("org.slf4j")
-    exclude("org.apache.logging.log4j")
-  }
-
-  // Iceberg dependencies for rewrite data files job
-  compileOnly("org.apache.iceberg:iceberg-spark-runtime-${sparkMajorVersion}_$scalaVersion:$icebergVersion") {
     exclude("org.slf4j")
     exclude("org.apache.logging.log4j")
   }
 
   testImplementation(project(":api"))
   testImplementation(libs.bundles.log4j)
-  testImplementation(libs.hadoop3.common) {
-    exclude("org.slf4j")
-    exclude("org.apache.logging.log4j")
-    exclude("com.sun.jersey")
-    exclude("javax.servlet")
-  }
   testImplementation(libs.junit.jupiter.api)
-  testImplementation("org.apache.iceberg:iceberg-spark-runtime-${sparkMajorVersion}_$scalaVersion:$icebergVersion") {
-    exclude("org.slf4j")
-    exclude("org.apache.logging.log4j")
-  }
-  testImplementation("org.apache.spark:spark-sql_$scalaVersion:$sparkVersion") {
-    exclude("org.slf4j")
-    exclude("org.apache.logging.log4j")
-  }
-  testImplementation("org.scala-lang.modules:scala-collection-compat_$scalaVersion:2.7.0")
-
   testRuntimeOnly(libs.junit.jupiter.engine)
 }
 
@@ -78,17 +53,11 @@ tasks.test {
 
 tasks.withType(ShadowJar::class.java) {
   isZip64 = true
-  configurations = listOf(project.configurations.runtimeClasspath.get())
   archiveClassifier.set("")
   mergeServiceFiles()
 
   dependencies {
-    relocate("com.google", "org.apache.gravitino.shaded.com.google")
-    relocate("org.apache.commons", "org.apache.gravitino.shaded.org.apache.commons")
-    relocate("com.fasterxml", "org.apache.gravitino.shaded.com.fasterxml")
-
     exclude(dependency("org.apache.spark:.*"))
-    exclude(dependency("org.apache.iceberg:.*"))
     exclude(dependency("org.slf4j:slf4j-api"))
     exclude(dependency("org.apache.logging.log4j:.*"))
   }

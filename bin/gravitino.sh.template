@@ -181,31 +181,6 @@ fi
 
 addJarInDir "${GRAVITINO_HOME}/libs"
 
-# By default, prefer starting the legacy (old) UI war if present.
-# Users may override by setting GRAVITINO_WAR to an explicit path, or
-# set GRAVITINO_USE_WEB_V2=true to prefer the new war when both exist.
-if [[ -z "${GRAVITINO_WAR+x}" || -z "${GRAVITINO_WAR}" ]]; then
-  # Compose expected war paths based on packaged layout and version
-  WAR_V1_PATH="${GRAVITINO_HOME}/web/gravitino-web-${GRAVITINO_VERSION}.war"
-  WAR_V2_PATH="${GRAVITINO_HOME}/web-v2/gravitino-web-${GRAVITINO_VERSION}.war"
-
-  if [[ -n "${GRAVITINO_USE_WEB_V2}" && "${GRAVITINO_USE_WEB_V2}" == "true" ]]; then
-    # User explicitly requests new UI if available
-    if [[ -f "${WAR_V2_PATH}" ]]; then
-      export GRAVITINO_WAR="${WAR_V2_PATH}"
-    elif [[ -f "${WAR_V1_PATH}" ]]; then
-      export GRAVITINO_WAR="${WAR_V1_PATH}"
-    fi
-  else
-    # Default behavior: prefer old UI war
-    if [[ -f "${WAR_V1_PATH}" ]]; then
-      export GRAVITINO_WAR="${WAR_V1_PATH}"
-    elif [[ -f "${WAR_V2_PATH}" ]]; then
-      export GRAVITINO_WAR="${WAR_V2_PATH}"
-    fi
-  fi
-fi
-
 case "${1}" in
   start)
     start

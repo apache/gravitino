@@ -28,10 +28,12 @@ import org.apache.gravitino.exceptions.NoSuchFunctionException;
 import org.apache.gravitino.exceptions.NoSuchSchemaException;
 import org.apache.gravitino.function.Function;
 import org.apache.gravitino.function.FunctionChange;
+import org.apache.gravitino.function.FunctionColumn;
 import org.apache.gravitino.function.FunctionDefinition;
 import org.apache.gravitino.function.FunctionType;
 import org.apache.gravitino.lock.LockType;
 import org.apache.gravitino.lock.TreeLockUtils;
+import org.apache.gravitino.rel.types.Type;
 import org.apache.gravitino.storage.IdGenerator;
 
 /**
@@ -108,15 +110,14 @@ public class FunctionOperationDispatcher extends OperationDispatcher implements 
   }
 
   /**
-   * Register a function with one or more definitions (overloads). Each definition contains its own
-   * return type (for scalar/aggregate functions) or return columns (for table-valued functions).
+   * Register a scalar or aggregate function with one or more definitions (overloads).
    *
    * @param ident The function identifier.
    * @param comment The optional function comment.
-   * @param functionType The function type (SCALAR, AGGREGATE, or TABLE).
+   * @param functionType The function type.
    * @param deterministic Whether the function is deterministic.
-   * @param definitions The function definitions, each containing parameters, return type/columns,
-   *     and implementations.
+   * @param returnType The return type.
+   * @param definitions The function definitions.
    * @return The registered function.
    * @throws NoSuchSchemaException If the schema does not exist.
    * @throws FunctionAlreadyExistsException If the function already exists.
@@ -127,9 +128,13 @@ public class FunctionOperationDispatcher extends OperationDispatcher implements 
       String comment,
       FunctionType functionType,
       boolean deterministic,
+      Type returnType,
       FunctionDefinition[] definitions)
       throws NoSuchSchemaException, FunctionAlreadyExistsException {
-    Preconditions.checkArgument(functionType != null, "Function type is required");
+    Preconditions.checkArgument(
+        functionType == FunctionType.SCALAR || functionType == FunctionType.AGGREGATE,
+        "This method is for scalar or aggregate functions only");
+    Preconditions.checkArgument(returnType != null, "Return type is required");
     Preconditions.checkArgument(
         definitions != null && definitions.length > 0, "At least one definition is required");
 
@@ -142,7 +147,45 @@ public class FunctionOperationDispatcher extends OperationDispatcher implements 
         LockType.WRITE,
         () ->
             managedFunctionOps.registerFunction(
-                ident, comment, functionType, deterministic, definitions));
+                ident, comment, functionType, deterministic, returnType, definitions));
+  }
+
+  /**
+   * Register a table-valued function with one or more definitions (overloads).
+   *
+   * @param ident The function identifier.
+   * @param comment The optional function comment.
+   * @param deterministic Whether the function is deterministic.
+   * @param returnColumns The return columns.
+   * @param definitions The function definitions.
+   * @return The registered function.
+   * @throws NoSuchSchemaException If the schema does not exist.
+   * @throws FunctionAlreadyExistsException If the function already exists.
+   */
+  @Override
+  public Function registerFunction(
+      NameIdentifier ident,
+      String comment,
+      boolean deterministic,
+      FunctionColumn[] returnColumns,
+      FunctionDefinition[] definitions)
+      throws NoSuchSchemaException, FunctionAlreadyExistsException {
+    Preconditions.checkArgument(
+        returnColumns != null && returnColumns.length > 0,
+        "At least one return column is required for table-valued function");
+    Preconditions.checkArgument(
+        definitions != null && definitions.length > 0, "At least one definition is required");
+
+    NameIdentifier schemaIdent = NameIdentifier.of(ident.namespace().levels());
+    // Validate schema exists in the underlying catalog
+    schemaOps.loadSchema(schemaIdent);
+
+    return TreeLockUtils.doWithTreeLock(
+        ident,
+        LockType.WRITE,
+        () ->
+            managedFunctionOps.registerFunction(
+                ident, comment, deterministic, returnColumns, definitions));
   }
 
   /**

@@ -45,7 +45,7 @@ public class TestIcebergCatalogWrapperManagerForREST {
     config.put(String.format("catalog.%s.catalog-backend-name", prefix), prefix);
     IcebergConfigProvider configProvider = IcebergConfigProviderFactory.create(config);
     configProvider.initialize(config);
-    IcebergRESTServerContext.create(configProvider, false, false);
+    IcebergRESTServerContext.create(configProvider, false);
     IcebergCatalogWrapperManager manager = new IcebergCatalogWrapperManager(config, configProvider);
 
     IcebergCatalogWrapper ops = manager.getOps(rawPrefix);
@@ -63,7 +63,7 @@ public class TestIcebergCatalogWrapperManagerForREST {
     Map<String, String> config = Maps.newHashMap();
     IcebergConfigProvider configProvider = IcebergConfigProviderFactory.create(config);
     configProvider.initialize(config);
-    IcebergRESTServerContext.create(configProvider, false, false);
+    IcebergRESTServerContext.create(configProvider, false);
     IcebergCatalogWrapperManager manager = new IcebergCatalogWrapperManager(config, configProvider);
 
     Assertions.assertThrowsExactly(IllegalArgumentException.class, () -> manager.getOps(rawPrefix));
@@ -74,7 +74,7 @@ public class TestIcebergCatalogWrapperManagerForREST {
     Map<String, String> config = Maps.newHashMap();
     IcebergConfigProvider configProvider = IcebergConfigProviderFactory.create(config);
     configProvider.initialize(config);
-    IcebergRESTServerContext.create(configProvider, true, true);
+    IcebergRESTServerContext.create(configProvider, true);
     IcebergCatalogWrapperManager manager = new IcebergCatalogWrapperManager(config, configProvider);
 
     IllegalArgumentException exception =

@@ -30,8 +30,10 @@ import org.apache.gravitino.Field;
 import org.apache.gravitino.HasIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.function.Function;
+import org.apache.gravitino.function.FunctionColumn;
 import org.apache.gravitino.function.FunctionDefinition;
 import org.apache.gravitino.function.FunctionType;
+import org.apache.gravitino.rel.types.Type;
 
 /** A class representing a function entity in the metadata store. */
 @ToString
@@ -47,6 +49,14 @@ public class FunctionEntity implements Entity, Auditable, HasIdentifier, Functio
       Field.required("function_type", FunctionType.class, "The type of the function.");
   public static final Field DETERMINISTIC =
       Field.required("deterministic", Boolean.class, "Whether the function is deterministic.");
+  public static final Field RETURN_TYPE =
+      Field.optional(
+          "return_type", Type.class, "The return type for scalar or aggregate functions.");
+  public static final Field RETURN_COLUMNS =
+      Field.optional(
+          "return_columns",
+          FunctionColumn[].class,
+          "The output columns for table-valued functions.");
   public static final Field DEFINITIONS =
       Field.required("definitions", FunctionDefinition[].class, "The definitions of the function.");
   public static final Field AUDIT_INFO =
@@ -58,6 +68,8 @@ public class FunctionEntity implements Entity, Auditable, HasIdentifier, Functio
   private String comment;
   private FunctionType functionType;
   private boolean deterministic;
+  private Type returnType;
+  private FunctionColumn[] returnColumns;
   private FunctionDefinition[] definitions;
   private AuditInfo auditInfo;
 
@@ -71,6 +83,8 @@ public class FunctionEntity implements Entity, Auditable, HasIdentifier, Functio
     fields.put(COMMENT, comment);
     fields.put(FUNCTION_TYPE, functionType);
     fields.put(DETERMINISTIC, deterministic);
+    fields.put(RETURN_TYPE, returnType);
+    fields.put(RETURN_COLUMNS, returnColumns);
     fields.put(DEFINITIONS, definitions);
     fields.put(AUDIT_INFO, auditInfo);
 
@@ -108,6 +122,16 @@ public class FunctionEntity implements Entity, Auditable, HasIdentifier, Functio
   }
 
   @Override
+  public Type returnType() {
+    return returnType;
+  }
+
+  @Override
+  public FunctionColumn[] returnColumns() {
+    return returnColumns != null ? returnColumns : new FunctionColumn[0];
+  }
+
+  @Override
   public FunctionDefinition[] definitions() {
     return definitions;
   }
@@ -139,13 +163,18 @@ public class FunctionEntity implements Entity, Auditable, HasIdentifier, Functio
         && Objects.equals(comment, that.comment)
         && functionType == that.functionType
         && deterministic == that.deterministic
+        && Objects.equals(returnType, that.returnType)
+        && Arrays.equals(returnColumns, that.returnColumns)
         && Arrays.equals(definitions, that.definitions)
         && Objects.equals(auditInfo, that.auditInfo);
   }
 
   @Override
   public int hashCode() {
-    int result = Objects.hash(id, name, namespace, comment, functionType, deterministic, auditInfo);
+    int result =
+        Objects.hash(
+            id, name, namespace, comment, functionType, deterministic, returnType, auditInfo);
+    result = 31 * result + Arrays.hashCode(returnColumns);
     result = 31 * result + Arrays.hashCode(definitions);
     return result;
   }
@@ -230,6 +259,28 @@ public class FunctionEntity implements Entity, Auditable, HasIdentifier, Functio
      */
     public Builder withDeterministic(boolean deterministic) {
       functionEntity.deterministic = deterministic;
+      return this;
+    }
+
+    /**
+     * Sets the return type for scalar or aggregate functions.
+     *
+     * @param returnType The return type.
+     * @return This builder instance.
+     */
+    public Builder withReturnType(Type returnType) {
+      functionEntity.returnType = returnType;
+      return this;
+    }
+
+    /**
+     * Sets the return columns for table-valued functions.
+     *
+     * @param returnColumns The output columns.
+     * @return This builder instance.
+     */
+    public Builder withReturnColumns(FunctionColumn[] returnColumns) {
+      functionEntity.returnColumns = returnColumns;
       return this;
     }
 

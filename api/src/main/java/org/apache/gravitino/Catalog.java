@@ -29,7 +29,6 @@ import org.apache.gravitino.messaging.TopicCatalog;
 import org.apache.gravitino.model.ModelCatalog;
 import org.apache.gravitino.policy.SupportsPolicies;
 import org.apache.gravitino.rel.TableCatalog;
-import org.apache.gravitino.rel.ViewCatalog;
 import org.apache.gravitino.tag.SupportsTags;
 
 /**
@@ -245,14 +244,6 @@ public interface Catalog extends Auditable {
    */
   default FunctionCatalog asFunctionCatalog() throws UnsupportedOperationException {
     throw new UnsupportedOperationException("Catalog does not support function operations");
-  }
-
-  /**
-   * @return the {@link ViewCatalog} if the catalog supports view operations.
-   * @throws UnsupportedOperationException if the catalog does not support view operations.
-   */
-  default ViewCatalog asViewCatalog() throws UnsupportedOperationException {
-    throw new UnsupportedOperationException("Catalog does not support view operations");
   }
 
   /**

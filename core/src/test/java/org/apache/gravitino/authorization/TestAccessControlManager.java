@@ -63,6 +63,7 @@ import org.apache.gravitino.connector.BaseCatalog;
 import org.apache.gravitino.connector.authorization.AuthorizationPlugin;
 import org.apache.gravitino.exceptions.GroupAlreadyExistsException;
 import org.apache.gravitino.exceptions.NoSuchGroupException;
+import org.apache.gravitino.exceptions.NoSuchMetalakeException;
 import org.apache.gravitino.exceptions.NoSuchRoleException;
 import org.apache.gravitino.exceptions.NoSuchUserException;
 import org.apache.gravitino.exceptions.RoleAlreadyExistsException;
@@ -204,6 +205,10 @@ public class TestAccessControlManager {
     Assertions.assertEquals("testAddWithOptionalField", user.name());
     Assertions.assertTrue(user.roles().isEmpty());
 
+    // Test with NoSuchMetalakeException
+    Assertions.assertThrows(
+        NoSuchMetalakeException.class, () -> accessControlManager.addUser("no-exist", "testAdd"));
+
     // Test with UserAlreadyExistsException
     Assertions.assertThrows(
         UserAlreadyExistsException.class, () -> accessControlManager.addUser(METALAKE, "testAdd"));
@@ -216,6 +221,10 @@ public class TestAccessControlManager {
     User user = accessControlManager.getUser(METALAKE, "testGet");
     Assertions.assertEquals("testGet", user.name());
 
+    // Test with NoSuchMetalakeException
+    Assertions.assertThrows(
+        NoSuchMetalakeException.class, () -> accessControlManager.getUser("no-exist", "testAdd"));
+
     // Test to get non-existed user
     Throwable exception =
         Assertions.assertThrows(
@@ -226,6 +235,11 @@ public class TestAccessControlManager {
   @Test
   public void testRemoveUser() {
     accessControlManager.addUser(METALAKE, "testRemove");
+
+    // Test with NoSuchMetalakeException
+    Assertions.assertThrows(
+        NoSuchMetalakeException.class,
+        () -> accessControlManager.removeUser("no-exist", "testAdd"));
 
     // Test to remove user
     boolean removed = accessControlManager.removeUser(METALAKE, "testRemove");
@@ -250,6 +264,12 @@ public class TestAccessControlManager {
     Arrays.sort(users, Comparator.comparing(User::name));
     Assertions.assertArrayEquals(
         expectUsernames, Arrays.stream(users).map(User::name).toArray(String[]::new));
+
+    // Test with NoSuchMetalakeException
+    Assertions.assertThrows(
+        NoSuchMetalakeException.class, () -> accessControlManager.listUserNames("no-exist"));
+    Assertions.assertThrows(
+        NoSuchMetalakeException.class, () -> accessControlManager.listUsers("no-exist"));
   }
 
   @Test
@@ -263,6 +283,10 @@ public class TestAccessControlManager {
     Assertions.assertEquals("testAddWithOptionalField", group.name());
     Assertions.assertTrue(group.roles().isEmpty());
 
+    // Test with NoSuchMetalakeException
+    Assertions.assertThrows(
+        NoSuchMetalakeException.class, () -> accessControlManager.addGroup("no-exist", "testAdd"));
+
     // Test with GroupAlreadyExistsException
     Assertions.assertThrows(
         GroupAlreadyExistsException.class,
@@ -275,6 +299,10 @@ public class TestAccessControlManager {
 
     Group group = accessControlManager.getGroup(METALAKE, "testGet");
     Assertions.assertEquals("testGet", group.name());
+
+    // Test with NoSuchMetalakeException
+    Assertions.assertThrows(
+        NoSuchMetalakeException.class, () -> accessControlManager.getGroup("no-exist", "testAdd"));
 
     // Test to get non-existed group
     Throwable exception =
@@ -297,11 +325,22 @@ public class TestAccessControlManager {
     Arrays.sort(groups, Comparator.comparing(Group::name));
     Assertions.assertArrayEquals(
         expectGroupNames, Arrays.stream(groups).map(Group::name).toArray(String[]::new));
+
+    // Test with NoSuchMetalakeException
+    Assertions.assertThrows(
+        NoSuchMetalakeException.class, () -> accessControlManager.listGroupNames("no-exist"));
+    Assertions.assertThrows(
+        NoSuchMetalakeException.class, () -> accessControlManager.listGroups("no-exist"));
   }
 
   @Test
   public void testRemoveGroup() {
     accessControlManager.addGroup(METALAKE, "testRemove");
+
+    // Test with NoSuchMetalakeException
+    Assertions.assertThrows(
+        NoSuchMetalakeException.class,
+        () -> accessControlManager.removeGroup("no-exist", "testAdd"));
 
     // Test to remove group
     boolean removed = accessControlManager.removeGroup(METALAKE, "testRemove");

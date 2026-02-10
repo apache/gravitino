@@ -36,10 +36,6 @@ import org.apache.gravitino.dto.CatalogDTO;
 import org.apache.gravitino.dto.MetalakeDTO;
 import org.apache.gravitino.dto.authorization.PrivilegeDTO;
 import org.apache.gravitino.dto.authorization.SecurableObjectDTO;
-import org.apache.gravitino.dto.function.FunctionColumnDTO;
-import org.apache.gravitino.dto.function.FunctionDefinitionDTO;
-import org.apache.gravitino.dto.function.FunctionImplDTO;
-import org.apache.gravitino.dto.function.FunctionParamDTO;
 import org.apache.gravitino.dto.job.JobTemplateDTO;
 import org.apache.gravitino.dto.job.ShellJobTemplateDTO;
 import org.apache.gravitino.dto.job.ShellTemplateUpdateDTO;
@@ -48,7 +44,6 @@ import org.apache.gravitino.dto.job.SparkTemplateUpdateDTO;
 import org.apache.gravitino.dto.job.TemplateUpdateDTO;
 import org.apache.gravitino.dto.requests.CatalogUpdateRequest;
 import org.apache.gravitino.dto.requests.FilesetUpdateRequest;
-import org.apache.gravitino.dto.requests.FunctionUpdateRequest;
 import org.apache.gravitino.dto.requests.JobTemplateUpdateRequest;
 import org.apache.gravitino.dto.requests.MetalakeUpdateRequest;
 import org.apache.gravitino.dto.requests.ModelUpdateRequest;
@@ -59,10 +54,6 @@ import org.apache.gravitino.dto.requests.TableUpdateRequest;
 import org.apache.gravitino.dto.requests.TagUpdateRequest;
 import org.apache.gravitino.dto.requests.TopicUpdateRequest;
 import org.apache.gravitino.file.FilesetChange;
-import org.apache.gravitino.function.FunctionChange;
-import org.apache.gravitino.function.FunctionColumn;
-import org.apache.gravitino.function.FunctionDefinition;
-import org.apache.gravitino.function.FunctionParam;
 import org.apache.gravitino.job.JobTemplate;
 import org.apache.gravitino.job.JobTemplateChange;
 import org.apache.gravitino.job.ShellJobTemplate;
@@ -560,62 +551,5 @@ class DTOConverters {
       throw new IllegalArgumentException(
           "Unknown template update type: " + change.getClass().getSimpleName());
     }
-  }
-
-  static FunctionUpdateRequest toFunctionUpdateRequest(FunctionChange change) {
-    if (change instanceof FunctionChange.UpdateComment) {
-      return new FunctionUpdateRequest.UpdateCommentRequest(
-          ((FunctionChange.UpdateComment) change).newComment());
-
-    } else if (change instanceof FunctionChange.AddDefinition) {
-      FunctionDefinition def = ((FunctionChange.AddDefinition) change).definition();
-      return new FunctionUpdateRequest.AddDefinitionRequest(
-          FunctionDefinitionDTO.fromFunctionDefinition(def));
-
-    } else if (change instanceof FunctionChange.RemoveDefinition) {
-      FunctionParam[] params = ((FunctionChange.RemoveDefinition) change).parameters();
-      return new FunctionUpdateRequest.RemoveDefinitionRequest(toFunctionParamDTOs(params));
-
-    } else if (change instanceof FunctionChange.AddImpl) {
-      FunctionChange.AddImpl addImpl = (FunctionChange.AddImpl) change;
-      return new FunctionUpdateRequest.AddImplRequest(
-          toFunctionParamDTOs(addImpl.parameters()),
-          FunctionImplDTO.fromFunctionImpl(addImpl.implementation()));
-
-    } else if (change instanceof FunctionChange.UpdateImpl) {
-      FunctionChange.UpdateImpl updateImpl = (FunctionChange.UpdateImpl) change;
-      return new FunctionUpdateRequest.UpdateImplRequest(
-          toFunctionParamDTOs(updateImpl.parameters()),
-          updateImpl.runtime().name(),
-          FunctionImplDTO.fromFunctionImpl(updateImpl.implementation()));
-
-    } else if (change instanceof FunctionChange.RemoveImpl) {
-      FunctionChange.RemoveImpl removeImpl = (FunctionChange.RemoveImpl) change;
-      return new FunctionUpdateRequest.RemoveImplRequest(
-          toFunctionParamDTOs(removeImpl.parameters()), removeImpl.runtime().name());
-
-    } else {
-      throw new IllegalArgumentException(
-          "Unknown function change type: " + change.getClass().getSimpleName());
-    }
-  }
-
-  static FunctionDefinitionDTO toFunctionDefinitionDTO(FunctionDefinition definition) {
-    return FunctionDefinitionDTO.fromFunctionDefinition(definition);
-  }
-
-  static FunctionColumnDTO toFunctionColumnDTO(FunctionColumn column) {
-    return FunctionColumnDTO.fromFunctionColumn(column);
-  }
-
-  private static FunctionParamDTO[] toFunctionParamDTOs(FunctionParam[] params) {
-    if (params == null) {
-      return new FunctionParamDTO[0];
-    }
-    FunctionParamDTO[] dtos = new FunctionParamDTO[params.length];
-    for (int i = 0; i < params.length; i++) {
-      dtos[i] = FunctionParamDTO.fromFunctionParam(params[i]);
-    }
-    return dtos;
   }
 }

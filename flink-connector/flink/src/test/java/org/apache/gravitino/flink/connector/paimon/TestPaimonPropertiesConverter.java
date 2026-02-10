@@ -22,7 +22,7 @@ import com.google.common.collect.ImmutableMap;
 import java.util.Map;
 import org.apache.flink.configuration.Configuration;
 import org.apache.gravitino.catalog.lakehouse.paimon.PaimonConstants;
-import org.apache.gravitino.flink.connector.CatalogPropertiesConverter;
+import org.apache.gravitino.flink.connector.PropertiesConverter;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
@@ -58,7 +58,7 @@ public class TestPaimonPropertiesConverter {
             testUser,
             PaimonConstants.GRAVITINO_JDBC_PASSWORD,
             testPassword,
-            CatalogPropertiesConverter.FLINK_PROPERTY_PREFIX + PaimonConstants.URI,
+            PropertiesConverter.FLINK_PROPERTY_PREFIX + PaimonConstants.URI,
             testUri);
     Map<String, String> flinkCatalogProperties =
         CONVERTER.toFlinkCatalogProperties(catalogProperties);

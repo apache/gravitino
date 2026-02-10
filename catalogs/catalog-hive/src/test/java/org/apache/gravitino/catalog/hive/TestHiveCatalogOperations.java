@@ -36,8 +36,6 @@ import static org.apache.gravitino.catalog.hive.HiveCatalogPropertiesMetadata.PR
 import static org.apache.gravitino.catalog.hive.TestHiveCatalog.HIVE_PROPERTIES_METADATA;
 import static org.apache.gravitino.connector.BaseCatalog.CATALOG_BYPASS_PREFIX;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyString;
-import static org.mockito.Mockito.doNothing;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
@@ -51,20 +49,10 @@ import org.apache.gravitino.connector.BaseCatalog;
 import org.apache.gravitino.connector.PropertyEntry;
 import org.apache.gravitino.exceptions.ConnectionFailedException;
 import org.apache.gravitino.hive.CachedClientPool;
-import org.apache.gravitino.hive.HiveSchema;
-import org.apache.gravitino.hive.HiveTable;
-import org.apache.gravitino.hive.client.HiveClient;
-import org.apache.gravitino.rel.Column;
-import org.apache.gravitino.rel.expressions.distributions.Distributions;
-import org.apache.gravitino.rel.expressions.sorts.SortOrder;
-import org.apache.gravitino.rel.expressions.transforms.Transform;
-import org.apache.gravitino.rel.indexes.Index;
-import org.apache.gravitino.utils.ClientPool;
 import org.apache.hadoop.hive.conf.HiveConf.ConfVars;
 import org.apache.thrift.TException;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
-import org.mockito.ArgumentCaptor;
 
 class TestHiveCatalogOperations {
   @Test
@@ -159,42 +147,5 @@ class TestHiveCatalogOperations {
     Assertions.assertEquals(
         "Failed to run getAllDatabases in Hive Metastore: mock connection exception",
         exception.getMessage());
-  }
-
-  @Test
-  void testCreateGenericTableWithEmptyColumns() throws Exception {
-    HiveCatalogOperations op = new HiveCatalogOperations();
-    op.initialize(Maps.newHashMap(), null, HIVE_PROPERTIES_METADATA);
-
-    CachedClientPool clientPool = mock(CachedClientPool.class);
-    HiveClient hiveClient = mock(HiveClient.class);
-    HiveSchema schema = HiveSchema.builder().withCatalogName("hive").withName("db").build();
-    when(hiveClient.getDatabase(anyString(), anyString())).thenReturn(schema);
-
-    ArgumentCaptor<HiveTable> hiveTableCaptor = ArgumentCaptor.forClass(HiveTable.class);
-    doNothing().when(hiveClient).createTable(hiveTableCaptor.capture());
-    when(clientPool.run(any()))
-        .thenAnswer(
-            invocation -> {
-              ClientPool.Action<?, HiveClient, ?> action = invocation.getArgument(0);
-              return action.run(hiveClient);
-            });
-    op.clientPool = clientPool;
-
-    Map<String, String> properties = Maps.newHashMap();
-    properties.put("is_generic", "true");
-
-    op.createTable(
-        NameIdentifier.of("db", "tbl"),
-        new Column[0],
-        "comment",
-        properties,
-        new Transform[0],
-        Distributions.NONE,
-        new SortOrder[0],
-        new Index[0]);
-
-    HiveTable createdTable = hiveTableCaptor.getValue();
-    Assertions.assertEquals(0, createdTable.columns().length);
   }
 }

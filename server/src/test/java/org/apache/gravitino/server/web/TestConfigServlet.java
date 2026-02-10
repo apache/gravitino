@@ -18,7 +18,6 @@
  */
 package org.apache.gravitino.server.web;
 
-import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -27,12 +26,10 @@ import com.google.common.collect.Lists;
 import java.io.PrintWriter;
 import javax.servlet.http.HttpServletResponse;
 import org.apache.gravitino.Configs;
-import org.apache.gravitino.auth.AuthenticatorType;
 import org.apache.gravitino.config.ConfigBuilder;
 import org.apache.gravitino.config.ConfigConstants;
 import org.apache.gravitino.config.ConfigEntry;
 import org.apache.gravitino.server.ServerConfig;
-import org.apache.gravitino.server.authentication.OAuthConfig;
 import org.junit.jupiter.api.Test;
 
 public class TestConfigServlet {
@@ -75,20 +72,5 @@ public class TestConfigServlet {
         .write(
             "{\"gravitino.extended.custom.config\":\"test\",\"gravitino.authorization.enable\":false,\"gravitino.authenticators\":[\"simple\"]}");
     configServlet.destroy();
-  }
-
-  @Test
-  public void testConfigServletWithOAuthJwksValidator() throws Exception {
-    ServerConfig serverConfig = new ServerConfig();
-
-    serverConfig.set(
-        Configs.AUTHENTICATORS, Lists.newArrayList(AuthenticatorType.OAUTH.name().toLowerCase()));
-    serverConfig.set(OAuthConfig.SERVICE_AUDIENCE, "test-service");
-    serverConfig.set(OAuthConfig.JWKS_URI, "https://example.com/.well-known/jwks.json");
-    serverConfig.set(
-        OAuthConfig.TOKEN_VALIDATOR_CLASS,
-        "org.apache.gravitino.server.authentication.JwksTokenValidator");
-
-    assertDoesNotThrow(() -> new ConfigServlet(serverConfig));
   }
 }

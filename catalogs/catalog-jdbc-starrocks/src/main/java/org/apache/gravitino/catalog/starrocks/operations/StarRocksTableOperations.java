@@ -324,7 +324,12 @@ public class StarRocksTableOperations extends JdbcTableOperations {
     }
 
     // Add DEFAULT value if specified
-    appendDefaultValue(column, sqlBuilder);
+    if (!DEFAULT_VALUE_NOT_SET.equals(column.defaultValue())) {
+      sqlBuilder
+          .append("DEFAULT ")
+          .append(columnDefaultValueConverter.fromGravitino(column.defaultValue()))
+          .append(SPACE);
+    }
 
     // Add column auto_increment if specified
     if (column.autoIncrement()) {

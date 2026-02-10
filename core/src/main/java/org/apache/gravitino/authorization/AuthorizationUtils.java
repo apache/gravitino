@@ -95,8 +95,7 @@ public class AuthorizationUtils {
           MetadataObject.Type.JOB,
           MetadataObject.Type.JOB_TEMPLATE,
           MetadataObject.Type.TAG,
-          MetadataObject.Type.POLICY,
-          MetadataObject.Type.VIEW);
+          MetadataObject.Type.POLICY);
 
   private static final Set<Privilege.Name> FILESET_PRIVILEGES =
       Sets.immutableEnumSet(

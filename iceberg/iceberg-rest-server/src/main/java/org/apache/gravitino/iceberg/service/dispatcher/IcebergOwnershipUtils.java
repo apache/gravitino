@@ -27,9 +27,8 @@ import org.apache.iceberg.catalog.Namespace;
 import org.apache.iceberg.catalog.TableIdentifier;
 
 /**
- * Utility class for managing ownership of Iceberg resources (schemas, tables, and views) in
- * Gravitino. Provides centralized methods for setting ownership during resource creation
- * operations.
+ * Utility class for managing ownership of Iceberg resources (schemas and tables) in Gravitino.
+ * Provides centralized methods for setting ownership during resource creation operations.
  */
 public class IcebergOwnershipUtils {
 
@@ -84,35 +83,6 @@ public class IcebergOwnershipUtils {
               IcebergIdentifierUtils.toGravitinoTableIdentifier(
                   metalake, catalogName, TableIdentifier.of(namespace, tableName)),
               Entity.EntityType.TABLE),
-          user,
-          Owner.Type.USER);
-    }
-  }
-
-  /**
-   * Sets the owner of a view to the specified user using the provided owner dispatcher.
-   *
-   * @param metalake the metalake name
-   * @param catalogName the catalog name
-   * @param namespace the Iceberg namespace containing the view
-   * @param viewName the view name
-   * @param user the user to set as owner
-   * @param ownerDispatcher the owner dispatcher to use
-   */
-  public static void setViewOwner(
-      String metalake,
-      String catalogName,
-      Namespace namespace,
-      String viewName,
-      String user,
-      OwnerDispatcher ownerDispatcher) {
-    if (ownerDispatcher != null) {
-      ownerDispatcher.setOwner(
-          metalake,
-          NameIdentifierUtil.toMetadataObject(
-              IcebergIdentifierUtils.toGravitinoTableIdentifier(
-                  metalake, catalogName, TableIdentifier.of(namespace, viewName)),
-              Entity.EntityType.VIEW),
           user,
           Owner.Type.USER);
     }
