@@ -145,7 +145,7 @@ public class ClickHouseTableOperations extends JdbcTableOperations {
         MapUtils.isNotEmpty(properties) ? properties : Collections.emptyMap();
 
     // Add Create table clause
-    boolean onCluster = appendCreateTableClause(notNullProperties, sqlBuilder, tableName);
+    appendCreateTableClause(notNullProperties, sqlBuilder, tableName);
 
     // Add columns
     buildColumnsDefinition(columns, sqlBuilder);
@@ -157,7 +157,7 @@ public class ClickHouseTableOperations extends JdbcTableOperations {
 
     // Extract engine from properties
     ClickHouseTablePropertiesMetadata.ENGINE engine =
-        appendTableEngine(notNullProperties, sqlBuilder, onCluster, columns);
+        appendTableEngine(notNullProperties, sqlBuilder, columns);
 
     appendOrderBy(sortOrders, sqlBuilder, engine);
 
@@ -266,10 +266,7 @@ public class ClickHouseTableOperations extends JdbcTableOperations {
   }
 
   private ClickHouseTablePropertiesMetadata.ENGINE appendTableEngine(
-      Map<String, String> properties,
-      StringBuilder sqlBuilder,
-      boolean onCluster,
-      JdbcColumn[] columns) {
+      Map<String, String> properties, StringBuilder sqlBuilder, JdbcColumn[] columns) {
     ClickHouseTablePropertiesMetadata.ENGINE engine = ENGINE_PROPERTY_ENTRY.getDefaultValue();
     if (MapUtils.isNotEmpty(properties)) {
       String userSetEngine = properties.get(CLICKHOUSE_ENGINE_KEY);
@@ -279,7 +276,7 @@ public class ClickHouseTableOperations extends JdbcTableOperations {
     }
 
     if (engine == ENGINE.DISTRIBUTED) {
-      handleDistributeTable(properties, sqlBuilder, onCluster, columns);
+      handleDistributeTable(properties, sqlBuilder, columns);
       return engine;
     }
 
@@ -288,14 +285,7 @@ public class ClickHouseTableOperations extends JdbcTableOperations {
   }
 
   private void handleDistributeTable(
-      Map<String, String> properties,
-      StringBuilder sqlBuilder,
-      boolean onCluster,
-      JdbcColumn[] columns) {
-    if (!onCluster) {
-      throw new IllegalArgumentException(
-          "ENGINE = DISTRIBUTED requires ON CLUSTER clause to be specified.");
-    }
+      Map<String, String> properties, StringBuilder sqlBuilder, JdbcColumn[] columns) {
 
     // Check properties
     String clusterName = properties.get(ClusterConstants.CLUSTER_NAME);
