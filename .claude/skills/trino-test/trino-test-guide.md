@@ -66,10 +66,10 @@ trino-connector/integration-test/
 #### Specify Trino Version
 
 ```bash
-# Test with Trino 446
+# Test with Trino 452
 ./trino-connector/integration-test/trino-test-tools/trino_integration_test.sh \
-  --auto=all --trino_version=446 \
-  --trino_connector_dir=/path/to/trino-connector-446-451/build/libs
+  --auto=all --trino_version=452 \
+  --trino_connector_dir=/path/to/trino-connector-452-468/build/libs
 
 # Test with Trino 435
 ./trino-connector/integration-test/trino-test-tools/trino_integration_test.sh \
@@ -154,7 +154,7 @@ trino-connector/integration-test/
 | `--catalog` | Specify catalog name | - | `--catalog=mysql` |
 | `--params` | Parameter substitution | - | `--params=key1,v1;key2,v2` |
 | `--trino_worker_num` | Number of Trino workers | 0 | `--trino_worker_num=3` |
-| `--trino_version` | Trino version | 435 | `--trino_version=446` |
+| `--trino_version` | Trino version | 452 | `--trino_version=452` |
 | `--trino_connector_dir` | Connector JAR directory | trino-connector/build/libs | `--trino_connector_dir=/path/to/libs` |
 | `--help` | Show help message | - | `--help` |
 
@@ -180,11 +180,11 @@ trino-connector/integration-test/
   --auto=all --test_set=jdbc-mysql --tester_id=00004
 ```
 
-#### Scenario 4: Verify Trino 446 compatibility
+#### Scenario 4: Verify Trino 452 compatibility
 
 ```bash
 ./trino-connector/integration-test/trino-test-tools/run_test_with_versions.sh \
-  --trino_versions_map="446:trino-connector-446-451"
+  --trino_versions_map="452:trino-connector-452-468"
 ```
 
 #### Scenario 5: Connect to remote test environment
@@ -324,7 +324,7 @@ Use `%` to match variable content:
 ```
 "Trino version: %
 ```
-Matches: `Trino version: 446`, `Trino version: 435`, etc.
+Matches: `Trino version: 452`, `Trino version: 435`, etc.
 
 **Example 2: Match query plan**
 ```
@@ -425,7 +425,7 @@ Expect:
     %ScanFilter[...]
 "
 Actual:
-"Trino version: 446
+"Trino version: 452
 Fragment 0 [SINGLE]
     ...
 "

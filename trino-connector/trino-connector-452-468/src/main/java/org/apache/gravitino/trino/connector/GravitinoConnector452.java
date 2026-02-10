@@ -18,8 +18,10 @@
  */
 package org.apache.gravitino.trino.connector;
 
+import io.trino.spi.connector.Connector;
 import io.trino.spi.connector.ConnectorMetadata;
 import io.trino.spi.connector.ConnectorNodePartitioningProvider;
+import io.trino.spi.connector.ConnectorPageSourceProviderFactory;
 import io.trino.spi.connector.ConnectorSplitManager;
 import org.apache.gravitino.trino.connector.catalog.CatalogConnectorContext;
 import org.apache.gravitino.trino.connector.catalog.CatalogConnectorMetadata;
@@ -51,5 +53,15 @@ public class GravitinoConnector452 extends GravitinoConnector {
     ConnectorNodePartitioningProvider nodePartitioningProvider =
         catalogConnectorContext.getInternalConnector().getNodePartitioningProvider();
     return new GravitinoNodePartitioningProvider452(nodePartitioningProvider);
+  }
+
+  @Override
+  public ConnectorPageSourceProviderFactory getPageSourceProviderFactory() {
+    Connector internalConnector = catalogConnectorContext.getInternalConnector();
+    ConnectorPageSourceProviderFactory internalConnectorPageSourceProviderFactory =
+        internalConnector.getPageSourceProviderFactory();
+    return () ->
+        new GravitinoDataSourceProvider(
+            internalConnectorPageSourceProviderFactory.createPageSourceProvider());
   }
 }
