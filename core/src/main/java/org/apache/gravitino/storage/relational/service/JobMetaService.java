@@ -169,15 +169,25 @@ public class JobMetaService {
     NameIdentifier firstIdent = identifiers.get(0);
     NamespaceUtil.checkJob(firstIdent.namespace());
     String metalakeName = firstIdent.namespace().level(0);
-    String jobTemplateName = firstIdent.namespace().level(1);
-    List<String> jobNames =
-        identifiers.stream().map(NameIdentifier::name).collect(Collectors.toList());
+
+    // Parse job names (e.g., "job-123") to extract job run IDs
+    List<String> jobRunIds =
+        identifiers.stream()
+            .map(ident -> String.valueOf(parseJobRunId(ident.name())))
+            .collect(Collectors.toList());
+
+    // Get job template name from the first job identifier's namespace
+    // Job namespace is: [metalake, system_catalog, job_schema_name]
+    // We need to query without filtering by template since job names contain the ID
 
     return SessionUtils.doWithCommitAndFetchResult(
         JobMetaMapper.class,
         mapper -> {
-          List<JobPO> jobPOs =
-              mapper.batchSelectJobByIdentifier(metalakeName, jobTemplateName, jobNames);
+          // For jobs, we query by metalake and job run IDs
+          // Note: Jobs don't have a jobTemplateName in the identifier namespace like we thought
+          // The namespace is: [metalake, Entity.SYSTEM_CATALOG_RESERVED_NAME,
+          // Entity.JOB_SCHEMA_NAME]
+          List<JobPO> jobPOs = mapper.batchSelectJobByRunIds(metalakeName, jobRunIds);
           return jobPOs.stream()
               .map(po -> JobPO.fromJobPO(po, firstIdent.namespace()))
               .collect(Collectors.toList());

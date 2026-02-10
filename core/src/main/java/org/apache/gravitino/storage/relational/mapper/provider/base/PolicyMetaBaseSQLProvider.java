@@ -202,7 +202,6 @@ public class PolicyMetaBaseSQLProvider {
       @Param("metalakeName") String metalakeName, @Param("policyNames") List<String> policyNames) {
     return "<script>"
         + "SELECT pm.policy_id, pm.policy_name, pm.policy_type, pm.metalake_id,"
-        + " pm.inheritable, pm.exclusive, pm.supported_object_types,"
         + " pm.audit_info, pm.current_version, pm.last_version, pm.deleted_at,"
         + " pv.id, pv.metalake_id as version_metalake_id, pv.policy_id as version_policy_id,"
         + " pv.version, pv.policy_comment, pv.enabled, pv.content, pv.deleted_at as version_deleted_at"

@@ -23,6 +23,7 @@ import static org.apache.gravitino.Configs.CACHE_ENABLED;
 import static org.apache.gravitino.Configs.ENABLE_AUTHORIZATION;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.doNothing;
+import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
@@ -130,8 +131,8 @@ public class TestJobOperations extends JerseyTest {
   @BeforeAll
   public static void setup() throws IllegalAccessException {
     Config config = mock(Config.class);
-    org.mockito.Mockito.doReturn(false).when(config).get(CACHE_ENABLED);
-    org.mockito.Mockito.doReturn(false).when(config).get(ENABLE_AUTHORIZATION);
+    doReturn(false).when(config).get(CACHE_ENABLED);
+    doReturn(false).when(config).get(ENABLE_AUTHORIZATION);
     FieldUtils.writeField(GravitinoEnv.getInstance(), "config", config, true);
 
     IdGenerator idGenerator = new RandomIdGenerator();

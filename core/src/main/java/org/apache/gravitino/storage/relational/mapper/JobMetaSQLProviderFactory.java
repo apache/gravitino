@@ -100,6 +100,11 @@ public class JobMetaSQLProviderFactory {
     return getProvider().softDeleteJobMetaByRunId(jobRunId);
   }
 
+  public static String batchSelectJobByRunIds(
+      @Param("metalakeName") String metalakeName, @Param("jobRunIds") List<String> jobRunIds) {
+    return getProvider().batchSelectJobByRunIds(metalakeName, jobRunIds);
+  }
+
   public static String batchSelectJobByIdentifier(
       @Param("metalakeName") String metalakeName,
       @Param("jobTemplateName") String jobTemplateName,

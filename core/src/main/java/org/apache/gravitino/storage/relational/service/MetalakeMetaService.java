@@ -26,6 +26,7 @@ import java.io.IOException;
 import java.util.List;
 import java.util.Objects;
 import java.util.function.Function;
+import java.util.stream.Collectors;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.HasIdentifier;
 import org.apache.gravitino.NameIdentifier;
@@ -404,9 +405,7 @@ public class MetalakeMetaService {
   public List<BaseMetalake> batchGetMetalakeByIdentifier(List<NameIdentifier> identifiers) {
 
     List<String> metalakeNames =
-        identifiers.stream()
-            .map(NameIdentifier::name)
-            .collect(java.util.stream.Collectors.toList());
+        identifiers.stream().map(NameIdentifier::name).collect(Collectors.toList());
 
     return SessionUtils.doWithCommitAndFetchResult(
         MetalakeMetaMapper.class,
