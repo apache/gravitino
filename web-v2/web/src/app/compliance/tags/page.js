@@ -231,7 +231,7 @@ export default function TagsPage() {
         />
       </Spin>
       <CreateTagDialog open={open} setOpen={setOpen} metalake={currentMetalake} editTag={editTag} />
-      <Drawer title='Tag Details' placement='right' width={'35%'} onClose={handleCloseDrawer} open={drawerOpen}>
+      <Drawer title='Tag Details' placement='right' width={'40%'} onClose={handleCloseDrawer} open={drawerOpen}>
         {selectedTag && (
           <>
             <Title level={5} className='mb-2'>
@@ -242,7 +242,7 @@ export default function TagsPage() {
                 <Tag color={selectedTag.properties?.color}>{selectedTag.name}</Tag>
               </Descriptions.Item>
               <Descriptions.Item label='Comment'>{selectedTag.comment || '-'}</Descriptions.Item>
-              <Descriptions.Item label='Created At'>{formatToDateTime(selectedTag.createTime)}</Descriptions.Item>
+              <Descriptions.Item label='Created At'>{selectedTag.createTime ? formatToDateTime(selectedTag.createTime) : '-'}</Descriptions.Item>
               <Descriptions.Item label='Creator'>{selectedTag.audit?.creator || '-'}</Descriptions.Item>
             </Descriptions>
             {anthEnable && (

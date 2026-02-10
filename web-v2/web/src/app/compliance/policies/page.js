@@ -285,7 +285,7 @@ export default function PoliciesPage() {
           loading={detailsLoading}
           onClose={onClose}
           open={openPolicy}
-          width={640}
+          width={'40%'}
         >
           <Title level={5} className='mb-2'>
             Basic Information

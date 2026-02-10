@@ -258,7 +258,7 @@ export default function JobTemplatesPage() {
             loading={isLoadingDetails}
             onClose={onClose}
             open={openDetailJobTemplate}
-            width={640}
+            width={'40%'}
           >
             <Title level={5} className='mb-2'>
               Basic Information

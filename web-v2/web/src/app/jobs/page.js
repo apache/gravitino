@@ -326,7 +326,7 @@ export default function JobsPage() {
             loading={jobDetailLoading}
             onClose={onClose}
             open={openDetailJob}
-            width={560}
+            width={'40%'}
           >
             <Title level={5} className='mb-2'>
               Basic Information
