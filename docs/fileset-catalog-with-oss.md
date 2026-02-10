@@ -28,18 +28,15 @@ Once the server is up and running, you can proceed to configure the Fileset cata
 
 In addition to the basic configurations mentioned in [Fileset-catalog-catalog-configuration](./fileset-catalog.md#catalog-properties), the following properties are required to configure a Fileset catalog with OSS:
 
-| Configuration item            | Description                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         | Default value   | Required | Since version    |
-|-------------------------------|---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|-----------------|----------|------------------|
-| `filesystem-providers`        | (deprecated) The file system providers to add. Set it to `oss` if it's a OSS fileset, or a comma separated string that contains `oss` like `oss,gs,s3` to support multiple kinds of fileset including `oss`.                                                                                                                                                                                                                                                                                                         | (none)          | Yes      | 0.7.0-incubating |
-| `default-filesystem-provider` | (deprecated) The name default filesystem providers of this Fileset catalog if users do not specify the scheme in the URI. Default value is `builtin-local`, for OSS, if we set this value, we can omit the prefix 'oss://' in the location.                                                                                                                                                                                                                                                                          | `builtin-local` | No       | 0.7.0-incubating |
-| `oss-endpoint`                | The endpoint of the Aliyun OSS.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     | (none)          | Yes      | 0.7.0-incubating |
-| `oss-access-key-id`           | The access key of the Aliyun OSS.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   | (none)          | Yes      | 0.7.0-incubating |
-| `oss-secret-access-key`       | The secret key of the Aliyun OSS.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   | (none)          | Yes      | 0.7.0-incubating |
-| `credential-providers`        | The credential provider types, separated by comma, possible value can be `oss-token`, `oss-secret-key`. As the default authentication type is using AKSK as the above, this configuration can enable credential vending provided by Gravitino server and client will no longer need to provide authentication information like AKSK to access OSS by GVFS. Once it's set, more configuration items are needed to make it works, please see [oss-credential-vending](security/credential-vending.md#oss-credentials) | (none)          | No       | 0.8.0-incubating |
+| Configuration item             | Description                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         | Default value   | Required | Since version    |
+|--------------------------------|---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|-----------------|----------|------------------|
+| `filesystem-providers`         | The file system providers to add. Set it to `oss` if it's a OSS fileset, or a comma separated string that contains `oss` like `oss,gs,s3` to support multiple kinds of fileset including `oss`.                                                                                                                                                                                                                                                                                                                     | (none)          | Yes      | 0.7.0-incubating |
+| `default-filesystem-provider`  | The name default filesystem providers of this Fileset catalog if users do not specify the scheme in the URI. Default value is `builtin-local`, for OSS, if we set this value, we can omit the prefix 'oss://' in the location.                                                                                                                                                                                                                                                                                      | `builtin-local` | No       | 0.7.0-incubating |
+| `oss-endpoint`                 | The endpoint of the Aliyun OSS.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     | (none)          | Yes      | 0.7.0-incubating |
+| `oss-access-key-id`            | The access key of the Aliyun OSS.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   | (none)          | Yes      | 0.7.0-incubating |
+| `oss-secret-access-key`        | The secret key of the Aliyun OSS.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   | (none)          | Yes      | 0.7.0-incubating |
+| `credential-providers`         | The credential provider types, separated by comma, possible value can be `oss-token`, `oss-secret-key`. As the default authentication type is using AKSK as the above, this configuration can enable credential vending provided by Gravitino server and client will no longer need to provide authentication information like AKSK to access OSS by GVFS. Once it's set, more configuration items are needed to make it works, please see [oss-credential-vending](security/credential-vending.md#oss-credentials) | (none)          | No       | 0.8.0-incubating |
 
-:::note
-`default-filesystem-provider` and `filesystem-providers` are deprecated since 1.2.0. The fileset catalog automatically loads filesystem providers on the classpath, including buildin filesystem provider and cloud providers when the corresponding bundle jar is present (for example, `gravitino-aliyun-bundle`).
-:::
 
 ### Configurations for a schema
 
@@ -70,7 +67,8 @@ curl -X POST -H "Accept: application/vnd.gravitino.v1+json" \
     "location": "oss://bucket/root",
     "oss-access-key-id": "access_key",
     "oss-secret-access-key": "secret_key",
-    "oss-endpoint": "http://oss-cn-hangzhou.aliyuncs.com"
+    "oss-endpoint": "http://oss-cn-hangzhou.aliyuncs.com",
+    "filesystem-providers": "oss"
   }
 }' http://localhost:8090/api/metalakes/metalake/catalogs
 ```
@@ -89,6 +87,7 @@ Map<String, String> ossProperties = ImmutableMap.<String, String>builder()
     .put("oss-access-key-id", "access_key")
     .put("oss-secret-access-key", "secret_key")
     .put("oss-endpoint", "http://oss-cn-hangzhou.aliyuncs.com")
+    .put("filesystem-providers", "oss")
     .build();
 
 Catalog ossCatalog = gravitinoClient.createCatalog("test_catalog",
@@ -108,7 +107,8 @@ oss_properties = {
     "location": "oss://bucket/root",
     "oss-access-key-id": "access_key"
     "oss-secret-access-key": "secret_key",
-    "oss-endpoint": "ossProperties"
+    "oss-endpoint": "ossProperties",
+    "filesystem-providers": "oss"
 }
 
 oss_catalog = gravitino_client.create_catalog(name="test_catalog",
@@ -516,6 +516,7 @@ curl -X POST -H "Accept: application/vnd.gravitino.v1+json" \
     "oss-access-key-id": "access_key",
     "oss-secret-access-key": "secret_key",
     "oss-endpoint": "http://oss-cn-hangzhou.aliyuncs.com",
+    "filesystem-providers": "oss",
     "credential-providers": "oss-token",
     "oss-region":"oss-cn-hangzhou",
     "oss-role-arn":"The ARN of the role to access the OSS data"
@@ -561,4 +562,5 @@ spark = SparkSession.builder
 ```
 
 Python client and Hadoop command are similar to the above examples.
+
 

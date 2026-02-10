@@ -73,18 +73,6 @@ public class NamespaceUtil {
   }
 
   /**
-   * Create a namespace for view.
-   *
-   * @param metalake The metalake name
-   * @param catalog The catalog name
-   * @param schema The schema name
-   * @return A namespace for view
-   */
-  public static Namespace ofView(String metalake, String catalog, String schema) {
-    return Namespace.of(metalake, catalog, schema);
-  }
-
-  /**
    * Create a namespace for tag.
    *
    * @param metalake The metalake name
@@ -180,18 +168,6 @@ public class NamespaceUtil {
    * @return A namespace for model
    */
   public static Namespace ofModel(String metalake, String catalog, String schema) {
-    return Namespace.of(metalake, catalog, schema);
-  }
-
-  /**
-   * Create a namespace for function.
-   *
-   * @param metalake The metalake name
-   * @param catalog The catalog name
-   * @param schema The schema name
-   * @return A namespace for function
-   */
-  public static Namespace ofFunction(String metalake, String catalog, String schema) {
     return Namespace.of(metalake, catalog, schema);
   }
 
@@ -297,19 +273,6 @@ public class NamespaceUtil {
   }
 
   /**
-   * Check if the given view namespace is legal, throw an {@link IllegalNamespaceException} if it's
-   * illegal.
-   *
-   * @param namespace The view namespace
-   */
-  public static void checkView(Namespace namespace) {
-    check(
-        namespace != null && namespace.length() == 3,
-        "View namespace must be non-null and have 3 levels, the input namespace is %s",
-        namespace);
-  }
-
-  /**
    * Check if the given column namespace is legal, throw an {@link IllegalNamespaceException} if
    * it's illegal.
    *
@@ -371,19 +334,6 @@ public class NamespaceUtil {
     check(
         namespace != null && namespace.length() == 4,
         "Model version namespace must be non-null and have 4 levels, the input namespace is %s",
-        namespace);
-  }
-
-  /**
-   * Check if the given function namespace is legal, throw an {@link IllegalNamespaceException} if
-   * it's illegal.
-   *
-   * @param namespace The function namespace
-   */
-  public static void checkFunction(Namespace namespace) {
-    check(
-        namespace != null && namespace.length() == 3,
-        "Function namespace must be non-null and have 3 levels, the input namespace is %s",
         namespace);
   }
 

@@ -22,16 +22,13 @@ import static org.apache.gravitino.lance.common.utils.LanceConstants.LANCE_CREAT
 import static org.apache.gravitino.lance.common.utils.LanceConstants.LANCE_TABLE_REGISTER;
 
 import com.google.common.base.Preconditions;
-import com.google.common.collect.ImmutableMap;
 import com.lancedb.lance.Dataset;
 import com.lancedb.lance.WriteParams;
 import com.lancedb.lance.index.DistanceType;
 import com.lancedb.lance.index.IndexParams;
 import com.lancedb.lance.index.IndexType;
 import com.lancedb.lance.index.vector.VectorIndexParams;
-import com.lancedb.lance.schema.ColumnAlteration;
 import java.util.Arrays;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -43,7 +40,6 @@ import org.apache.gravitino.EntityStore;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.catalog.ManagedSchemaOperations;
 import org.apache.gravitino.catalog.ManagedTableOperations;
-import org.apache.gravitino.connector.GenericTable;
 import org.apache.gravitino.connector.SupportsSchemas;
 import org.apache.gravitino.exceptions.NoSuchSchemaException;
 import org.apache.gravitino.exceptions.NoSuchTableException;
@@ -58,6 +54,7 @@ import org.apache.gravitino.rel.expressions.distributions.Distribution;
 import org.apache.gravitino.rel.expressions.sorts.SortOrder;
 import org.apache.gravitino.rel.expressions.transforms.Transform;
 import org.apache.gravitino.rel.indexes.Index;
+import org.apache.gravitino.rel.indexes.Indexes;
 import org.apache.gravitino.storage.IdGenerator;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -163,26 +160,31 @@ public class LanceTableOperations extends ManagedTableOperations {
   @Override
   public Table alterTable(NameIdentifier ident, TableChange... changes)
       throws NoSuchSchemaException, TableAlreadyExistsException {
+    // Lance only supports adding indexes for now.
+    boolean onlyAddIndex =
+        Arrays.stream(changes).allMatch(change -> change instanceof TableChange.AddIndex);
+    Preconditions.checkArgument(onlyAddIndex, "Only adding indexes is supported for Lance tables");
+
+    List<Index> addedIndexes =
+        Arrays.stream(changes)
+            .filter(change -> change instanceof TableChange.AddIndex)
+            .map(
+                change -> {
+                  TableChange.AddIndex addIndexChange = (TableChange.AddIndex) change;
+                  return Indexes.IndexImpl.builder()
+                      .withIndexType(addIndexChange.getType())
+                      .withName(addIndexChange.getName())
+                      .withFieldNames(addIndexChange.getFieldNames())
+                      .build();
+                })
+            .collect(Collectors.toList());
 
     Table loadedTable = super.loadTable(ident);
-    long version = handleLanceTableChange(loadedTable, changes);
-    // After making changes to the Lance dataset, we need to update the table metadata in
+    addLanceIndex(loadedTable, addedIndexes);
+    // After adding the index to the Lance dataset, we need to update the table metadata in
     // Gravitino. If there's any failure during this process, the code will throw an exception
     // and the update won't be applied in Gravitino.
-    GenericTable table = (GenericTable) super.alterTable(ident, changes);
-    Map<String, String> updatedProperties = new HashMap<>(table.properties());
-    updatedProperties.put(LanceConstants.LANCE_TABLE_VERSION, String.valueOf(version));
-    return GenericTable.builder()
-        .withName(table.name())
-        .withColumns(table.columns())
-        .withComment(table.comment())
-        .withProperties(updatedProperties)
-        .withAuditInfo(table.auditInfo())
-        .withPartitioning(table.partitioning())
-        .withSortOrders(table.sortOrder())
-        .withDistribution(table.distribution())
-        .withIndexes(table.index())
-        .build();
+    return super.alterTable(ident, changes);
   }
 
   @Override
@@ -258,8 +260,6 @@ public class LanceTableOperations extends ManagedTableOperations {
       throws NoSuchSchemaException, TableAlreadyExistsException {
 
     if (register) {
-      // Currently, register operation does not read the schema from the underlying Lance dataset.
-      // So we can't get the version of the dataset here.
       return super.createTable(
           ident, columns, comment, properties, partitions, distribution, sortOrders, indexes);
     }
@@ -285,21 +285,8 @@ public class LanceTableOperations extends ManagedTableOperations {
             new WriteParams.Builder().withStorageOptions(storageProps).build())) {
       // Only create the table metadata in Gravitino after the Lance dataset is successfully
       // created.
-      long datasetVersion = ignored.version();
-      Map<String, String> updatedProperties =
-          ImmutableMap.<String, String>builder()
-              .putAll(properties)
-              .put(LanceConstants.LANCE_TABLE_VERSION, String.valueOf(datasetVersion))
-              .build();
       return super.createTable(
-          ident,
-          columns,
-          comment,
-          updatedProperties,
-          partitions,
-          distribution,
-          sortOrders,
-          indexes);
+          ident, columns, comment, properties, partitions, distribution, sortOrders, indexes);
     } catch (NoSuchSchemaException e) {
       throw e;
     } catch (TableAlreadyExistsException e) {
@@ -329,58 +316,27 @@ public class LanceTableOperations extends ManagedTableOperations {
     return new org.apache.arrow.vector.types.pojo.Schema(fields);
   }
 
-  /**
-   * Handle the table changes on the underlying Lance dataset.
-   *
-   * <p>Note: this method can't guarantee the atomicity of the operations on Lance dataset. For
-   * example, only a subset of changes may be applied if an exception occurs during the process.
-   *
-   * @param table the table to be altered
-   * @param changes the changes to be applied
-   * @return the new version id of the Lance dataset after applying the changes
-   */
-  long handleLanceTableChange(Table table, TableChange[] changes) {
+  private void addLanceIndex(Table table, List<Index> addedIndexes) {
     String location = table.properties().get(Table.PROPERTY_LOCATION);
-    try (Dataset dataset = openDataset(location)) {
-      for (TableChange change : changes) {
-        if (change instanceof TableChange.DeleteColumn deleteColumn) {
-          dataset.dropColumns(List.of(String.join(".", deleteColumn.fieldName())));
-        } else if (change instanceof TableChange.AddIndex addIndex) {
-          IndexType indexType = IndexType.valueOf(addIndex.getType().name());
-          IndexParams indexParams = getIndexParamsByIndexType(indexType);
-          dataset.createIndex(
-              Arrays.stream(addIndex.getFieldNames())
-                  .map(field -> String.join(".", field))
-                  .collect(Collectors.toList()),
-              indexType,
-              Optional.of(addIndex.getName()),
-              indexParams,
-              true);
-        } else if (change instanceof TableChange.RenameColumn renameColumn) {
-          ColumnAlteration lanceColumnAlter =
-              new ColumnAlteration.Builder(String.join(".", renameColumn.fieldName()))
-                  .rename(renameColumn.getNewName())
-                  .build();
-          dataset.alterColumns(List.of(lanceColumnAlter));
-        } else {
-          // Currently, only column drop/rename and index addition are supported.
-          // TODO: Support change column type once we have a clear knowledge about the means of
-          // castTo in Lance.
-          throw new UnsupportedOperationException(
-              "Unsupported changes to lance table: " + change.getClass().getSimpleName());
-        }
+    try (Dataset dataset = Dataset.open(location, new RootAllocator())) {
+      // For Lance, we only support adding indexes, so in fact, we can't handle drop index here.
+      for (Index index : addedIndexes) {
+        IndexType indexType = IndexType.valueOf(index.type().name());
+        IndexParams indexParams = getIndexParamsByIndexType(indexType);
+
+        dataset.createIndex(
+            Arrays.stream(index.fieldNames())
+                .map(field -> String.join(".", field))
+                .collect(Collectors.toList()),
+            indexType,
+            Optional.of(index.name()),
+            indexParams,
+            true);
       }
-      return dataset.getVersion().getId();
-    } catch (RuntimeException e) {
-      throw e;
     } catch (Exception e) {
       throw new RuntimeException(
-          "Failed to handle alterations to Lance dataset at location " + location, e);
+          "Failed to add indexes to Lance dataset at location " + location, e);
     }
-  }
-
-  Dataset openDataset(String location) {
-    return Dataset.open(location, new RootAllocator());
   }
 
   private IndexParams getIndexParamsByIndexType(IndexType indexType) {

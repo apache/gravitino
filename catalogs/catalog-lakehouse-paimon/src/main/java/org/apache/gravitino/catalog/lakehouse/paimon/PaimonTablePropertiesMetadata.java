@@ -38,7 +38,6 @@ public class PaimonTablePropertiesMetadata extends BasePropertiesMetadata {
   public static final String COMMENT = PaimonConstants.COMMENT;
   public static final String OWNER = PaimonConstants.OWNER;
   public static final String BUCKET_KEY = PaimonConstants.BUCKET_KEY;
-  public static final String BUCKET_NUM = PaimonConstants.BUCKET_NUM;
   public static final String MERGE_ENGINE = PaimonConstants.MERGE_ENGINE;
   public static final String SEQUENCE_FIELD = PaimonConstants.SEQUENCE_FIELD;
   public static final String ROWKIND_FIELD = PaimonConstants.ROWKIND_FIELD;
@@ -53,7 +52,6 @@ public class PaimonTablePropertiesMetadata extends BasePropertiesMetadata {
             stringReservedPropertyEntry(COMMENT, "The table comment", true),
             stringReservedPropertyEntry(OWNER, "The table owner", false),
             stringReservedPropertyEntry(BUCKET_KEY, "The table bucket key", false),
-            stringReservedPropertyEntry(BUCKET_NUM, "The table bucket number", false),
             stringImmutablePropertyEntry(
                 MERGE_ENGINE, "The table merge engine", false, null, false, false),
             stringImmutablePropertyEntry(

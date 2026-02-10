@@ -22,6 +22,7 @@ import javax.annotation.Nullable;
 import org.apache.gravitino.Auditable;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.annotation.Evolving;
+import org.apache.gravitino.rel.types.Type;
 
 /**
  * An interface representing a user-defined function under a schema {@link Namespace}. A function is
@@ -31,12 +32,14 @@ import org.apache.gravitino.annotation.Evolving;
  * reuse it across multiple compute engines like Spark, Trino, and AI engines.
  *
  * <p>A function is characterized by its name, type (scalar for row-by-row operations, aggregate for
- * group operations, or table-valued for set-returning operations), whether it is deterministic, and
- * its definitions that contain parameters, return type or columns (for table function), and
+ * group operations, or table-valued for set-returning operations), whether it is deterministic, its
+ * return type or columns (for table function), and its definitions that contain parameters and
  * implementations for different runtime engines.
  */
 @Evolving
 public interface Function extends Auditable {
+  /** An empty array of {@link FunctionColumn}. */
+  FunctionColumn[] EMPTY = new FunctionColumn[0];
 
   /**
    * @return The function name.
@@ -59,6 +62,30 @@ public interface Function extends Auditable {
   @Nullable
   default String comment() {
     return null;
+  }
+
+  /**
+   * The return type for scalar or aggregate functions.
+   *
+   * @return The return type, null if this is a table-valued function.
+   */
+  @Nullable
+  default Type returnType() {
+    return null;
+  }
+
+  /**
+   * The output columns for a table-valued function.
+   *
+   * <p>A table-valued function is a function that returns a table instead of a scalar value or an
+   * aggregate result. The returned table has a fixed schema defined by the columns returned from
+   * this method.
+   *
+   * @return The output columns that define the schema of the table returned by this function, or an
+   *     empty array if this is a scalar or aggregate function.
+   */
+  default FunctionColumn[] returnColumns() {
+    return EMPTY;
   }
 
   /**

@@ -22,26 +22,21 @@ import static org.apache.gravitino.connector.BaseCatalog.CATALOG_BYPASS_PREFIX;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
-import java.io.Closeable;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Optional;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.Catalog;
 import org.apache.gravitino.GravitinoEnv;
-import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.auth.AuthProperties;
-import org.apache.gravitino.catalog.CatalogDispatcher;
 import org.apache.gravitino.catalog.lakehouse.iceberg.IcebergConstants;
 import org.apache.gravitino.client.DefaultOAuth2TokenProvider;
 import org.apache.gravitino.client.GravitinoClient;
 import org.apache.gravitino.client.GravitinoClient.ClientBuilder;
 import org.apache.gravitino.exceptions.NoSuchCatalogException;
 import org.apache.gravitino.iceberg.common.IcebergConfig;
-import org.apache.gravitino.iceberg.service.authorization.IcebergRESTServerContext;
 import org.apache.gravitino.server.web.JettyServerConfig;
 import org.apache.gravitino.utils.MapUtils;
-import org.apache.gravitino.utils.NameIdentifierUtil;
 
 /**
  * This provider proxy Gravitino lakehouse-iceberg catalogs.
@@ -53,19 +48,31 @@ import org.apache.gravitino.utils.NameIdentifierUtil;
 public class DynamicIcebergConfigProvider implements IcebergConfigProvider {
 
   private String gravitinoMetalake;
+  private String gravitinoUri;
   private Optional<String> defaultDynamicCatalogName;
   private Map<String, String> properties;
 
-  private volatile CatalogFetcher catalogFetcher;
+  private volatile GravitinoClient client;
 
   @Override
   public void initialize(Map<String, String> properties) {
+    String uri = properties.get(IcebergConstants.GRAVITINO_URI);
     String metalake = properties.get(IcebergConstants.GRAVITINO_METALAKE);
+    if (StringUtils.isBlank(uri)) {
+      JettyServerConfig config =
+          JettyServerConfig.fromConfig(
+              GravitinoEnv.getInstance().config(),
+              JettyServerConfig.GRAVITINO_SERVER_CONFIG_PREFIX);
+      uri = String.format("http://%s:%d", config.getHost(), config.getHttpPort());
+    }
 
+    Preconditions.checkArgument(
+        StringUtils.isNotBlank(uri), IcebergConstants.GRAVITINO_URI + " is blank");
     Preconditions.checkArgument(
         StringUtils.isNotBlank(metalake), IcebergConstants.GRAVITINO_METALAKE + " is blank");
 
     this.gravitinoMetalake = metalake;
+    this.gravitinoUri = uri;
     this.defaultDynamicCatalogName =
         Optional.ofNullable(
             properties.get(IcebergConstants.ICEBERG_REST_DEFAULT_DYNAMIC_CATALOG_NAME));
@@ -91,7 +98,7 @@ public class DynamicIcebergConfigProvider implements IcebergConfigProvider {
     }
     Catalog catalog;
     try {
-      catalog = getCatalogFetcher().loadCatalog(catalogName);
+      catalog = getGravitinoClient().loadMetalake(gravitinoMetalake).loadCatalog(catalogName);
     } catch (NoSuchCatalogException e) {
       return Optional.empty();
     }
@@ -103,44 +110,15 @@ public class DynamicIcebergConfigProvider implements IcebergConfigProvider {
     return Optional.of(getIcebergConfigFromCatalogProperties(catalog.properties()));
   }
 
-  /**
-   * Lazily creates the CatalogFetcher based on whether running in auxiliary mode. Uses internal
-   * interface when in auxiliary mode (embedded in Gravitino server), otherwise uses HTTP interface.
-   */
-  private CatalogFetcher getCatalogFetcher() {
-    if (catalogFetcher != null) {
-      return catalogFetcher;
-    }
-    synchronized (this) {
-      if (catalogFetcher == null) {
-        IcebergRESTServerContext serverContext = IcebergRESTServerContext.getInstance();
-        if (serverContext.isAuxMode()) {
-          catalogFetcher = new InternalCatalogFetcher(gravitinoMetalake);
-        } else {
-          String uri = properties.get(IcebergConstants.GRAVITINO_URI);
-          if (StringUtils.isBlank(uri)) {
-            JettyServerConfig config =
-                JettyServerConfig.fromConfig(
-                    GravitinoEnv.getInstance().config(),
-                    JettyServerConfig.GRAVITINO_SERVER_CONFIG_PREFIX);
-            uri = String.format("http://%s:%d", config.getHost(), config.getHttpPort());
-          }
-          Preconditions.checkArgument(
-              StringUtils.isNotBlank(uri), IcebergConstants.GRAVITINO_URI + " is blank");
-          catalogFetcher = new HttpCatalogFetcher(uri, gravitinoMetalake, properties);
-        }
-      }
-    }
-    return catalogFetcher;
+  @VisibleForTesting
+  void setClient(GravitinoClient client) {
+    this.client = client;
   }
 
   @Override
   public void close() {
-    synchronized (this) {
-      if (catalogFetcher != null) {
-        catalogFetcher.close();
-        catalogFetcher = null;
-      }
+    if (client != null) {
+      client.close();
     }
   }
 
@@ -164,17 +142,21 @@ public class DynamicIcebergConfigProvider implements IcebergConfigProvider {
     return defaultDynamicCatalogName.orElse(IcebergConstants.ICEBERG_REST_DEFAULT_CATALOG);
   }
 
-  /**
-   * Creates a GravitinoClient based on the provided configuration properties. This static factory
-   * method centralizes client creation logic for consistency and maintainability.
-   *
-   * @param uri the Gravitino server URI
-   * @param metalake the metalake name
-   * @param properties configuration properties including authentication settings
-   * @return a configured GravitinoClient instance
-   */
-  @VisibleForTesting
-  static GravitinoClient createGravitinoClient(
+  // client is lazy loaded because the Gravitino server may not be started yet when the provider is
+  // initialized.
+  private GravitinoClient getGravitinoClient() {
+    if (client != null) {
+      return client;
+    }
+    synchronized (this) {
+      if (client == null) {
+        client = createGravitinoClient(gravitinoUri, gravitinoMetalake, properties);
+      }
+    }
+    return client;
+  }
+
+  private GravitinoClient createGravitinoClient(
       String uri, String metalake, Map<String, String> properties) {
     ClientBuilder builder = GravitinoClient.builder(uri).withMetalake(metalake);
     String authType =
@@ -205,107 +187,9 @@ public class DynamicIcebergConfigProvider implements IcebergConfigProvider {
     return builder.build();
   }
 
-  /**
-   * Gets a required configuration value from the properties map.
-   *
-   * @param properties the configuration properties
-   * @param key the configuration key
-   * @return the configuration value
-   * @throws IllegalArgumentException if the value is blank or missing
-   */
-  private static String getRequiredConfig(Map<String, String> properties, String key) {
+  private String getRequiredConfig(Map<String, String> properties, String key) {
     String configValue = properties.get(key);
     Preconditions.checkArgument(StringUtils.isNotBlank(configValue), key + " should not be empty");
     return configValue;
-  }
-
-  /**
-   * Sets the catalog fetcher for testing purposes.
-   *
-   * @param catalogFetcher the catalog fetcher to use
-   */
-  @VisibleForTesting
-  void setCatalogFetcher(CatalogFetcher catalogFetcher) {
-    this.catalogFetcher = catalogFetcher;
-  }
-
-  /** Interface for fetching catalog information. */
-  interface CatalogFetcher extends Closeable {
-    Catalog loadCatalog(String catalogName) throws NoSuchCatalogException;
-
-    @Override
-    default void close() {}
-  }
-
-  /**
-   * Internal catalog fetcher that uses CatalogDispatcher directly. This bypasses the HTTP layer and
-   * is used when running in auxiliary mode (embedded in Gravitino server).
-   *
-   * <p>Note: When authorization is enabled (which requires auxiliary mode),
-   * IcebergCatalogWrapperManager bypasses its cache to avoid consistency issues between the
-   * IcebergCatalogWrapper cache and CatalogManager cache.
-   */
-  private static class InternalCatalogFetcher implements CatalogFetcher {
-    private final String metalake;
-    private final CatalogDispatcher catalogDispatcher;
-
-    InternalCatalogFetcher(String metalake) {
-      this.metalake = metalake;
-      CatalogDispatcher dispatcher = GravitinoEnv.getInstance().catalogDispatcher();
-      Preconditions.checkState(
-          dispatcher != null,
-          "CatalogDispatcher is not available. "
-              + "Internal catalog fetcher requires running within Gravitino server.");
-      this.catalogDispatcher = dispatcher;
-    }
-
-    @Override
-    public Catalog loadCatalog(String catalogName) throws NoSuchCatalogException {
-      NameIdentifier catalogIdent = NameIdentifierUtil.ofCatalog(metalake, catalogName);
-      return catalogDispatcher.loadCatalog(catalogIdent);
-    }
-  }
-
-  /**
-   * HTTP catalog fetcher that uses GravitinoClient to access catalogs via REST API. This is used
-   * when running in standalone mode (not embedded in Gravitino server).
-   */
-  private static class HttpCatalogFetcher implements CatalogFetcher {
-    private final String uri;
-    private final String metalake;
-    private final Map<String, String> properties;
-    private volatile GravitinoClient client;
-
-    HttpCatalogFetcher(String uri, String metalake, Map<String, String> properties) {
-      this.uri = uri;
-      this.metalake = metalake;
-      this.properties = properties;
-    }
-
-    @Override
-    public Catalog loadCatalog(String catalogName) throws NoSuchCatalogException {
-      return getGravitinoClient().loadMetalake(metalake).loadCatalog(catalogName);
-    }
-
-    @Override
-    public void close() {
-      if (client != null) {
-        client.close();
-      }
-    }
-
-    // Client is lazy loaded because the Gravitino server may not be started yet when the provider
-    // is initialized.
-    private GravitinoClient getGravitinoClient() {
-      if (client != null) {
-        return client;
-      }
-      synchronized (this) {
-        if (client == null) {
-          client = createGravitinoClient(uri, metalake, properties);
-        }
-      }
-      return client;
-    }
   }
 }

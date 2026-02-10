@@ -59,7 +59,7 @@ public class LanceRESTService implements GravitinoAuxiliaryService {
   }
 
   @Override
-  public void serviceInit(Map<String, String> properties, boolean auxMode) {
+  public void serviceInit(Map<String, String> properties) {
     LanceConfig lanceConfig = new LanceConfig(properties);
     JettyServerConfig serverConfig = JettyServerConfig.fromConfig(lanceConfig);
 
@@ -92,10 +92,7 @@ public class LanceRESTService implements GravitinoAuxiliaryService {
     server.addCustomFilters(LANCE_SPEC);
     server.addSystemFilters(LANCE_SPEC);
 
-    LOG.info(
-        "Initialized Lance REST service for backend {} in {} mode",
-        lanceConfig.getNamespaceBackend(),
-        auxMode ? "auxiliary" : "standalone");
+    LOG.info("Initialized Lance REST service for backend {}", lanceConfig.getNamespaceBackend());
   }
 
   @Override

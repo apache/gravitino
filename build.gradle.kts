@@ -220,24 +220,11 @@ allprojects {
       project.delete("build/${project.name}-integration-test.log")
       if (testMode == "deploy") {
         param.environment("GRAVITINO_HOME", project.rootDir.path + "/distribution/package")
-        val useWebV2 = System.getenv("GRAVITINO_USE_WEB_V2")?.toBoolean() == true
-        val webWarPath = if (useWebV2) {
-          project.rootDir.path + "/distribution/package/web-v2/gravitino-web-${project.version}.war"
-        } else {
-          project.rootDir.path + "/distribution/package/web/gravitino-web-${project.version}.war"
-        }
-        param.environment("GRAVITINO_WAR", webWarPath)
         param.systemProperty("testMode", "deploy")
       } else if (testMode == "embedded") {
         param.environment("GRAVITINO_HOME", project.rootDir.path)
         param.environment("GRAVITINO_TEST", "true")
-        val useWebV2 = System.getenv("GRAVITINO_USE_WEB_V2")?.toBoolean() == true
-        val webWarPath = if (useWebV2) {
-          project.rootDir.path + "/web-v2/web/dist/"
-        } else {
-          project.rootDir.path + "/web/web/dist/"
-        }
-        param.environment("GRAVITINO_WAR", webWarPath)
+        param.environment("GRAVITINO_WAR", project.rootDir.path + "/web/web/dist/")
         param.systemProperty("testMode", "embedded")
       } else {
         throw GradleException(
@@ -525,7 +512,7 @@ subprojects {
     }
   }
 
-  if (project.name in listOf("web", "web-v2", "docs")) {
+  if (project.name in listOf("web", "docs")) {
     plugins.apply(NodePlugin::class)
     configure<NodeExtension> {
       version.set("20.19.0")
@@ -695,18 +682,7 @@ tasks.rat {
     "web/web/src/lib/icons/svg/**/*.svg",
     "web/web/src/lib/utils/axios/**/*",
     "web/web/src/types/axios.d.ts",
-    "web/web/yarn.lock",
-    "web-v2/web/.**",
-    "web-v2/web/dist/**/*",
-    "web-v2/web/next-env.d.ts",
-    "web-v2/web/node_modules/**/*",
-    "web-v2/web/package-lock.json",
-    "web-v2/web/pnpm-lock.yaml",
-    "web-v2/web/src/lib/enums/httpEnum.js",
-    "web-v2/web/src/lib/icons/svg/**/*.svg",
-    "web-v2/web/src/lib/utils/axios/**/*",
-    "web-v2/web/src/types/axios.d.ts",
-    "web-v2/web/yarn.lock"
+    "web/web/yarn.lock"
   )
 
   // Add .gitignore excludes to the Apache Rat exclusion list.
@@ -749,8 +725,7 @@ tasks {
       ":iceberg:iceberg-rest-server:copyLibAndConfigs",
       ":lance:lance-rest-server:copyLibAndConfigs",
       ":maintenance:optimizer:copyLibAndConfigs",
-      ":web:web:build",
-      ":web-v2:web:build"
+      ":web:web:build"
     )
 
     group = "gravitino distribution"
@@ -760,7 +735,6 @@ tasks {
         from(projectDir.dir("conf")) { into("package/conf") }
         from(projectDir.dir("bin")) { into("package/bin") }
         from(projectDir.dir("web/web/build/libs/${rootProject.name}-web-$version.war")) { into("package/web") }
-        from(projectDir.dir("web-v2/web/build/libs/${rootProject.name}-web-$version.war")) { into("package/web-v2") }
         from(projectDir.dir("scripts")) { into("package/scripts") }
         into(outputDir)
         rename { fileName ->
@@ -783,9 +757,6 @@ tasks {
         from(projectDir.dir("web/web/licenses")) { into("package/web/licenses") }
         from(projectDir.dir("web/web/LICENSE.bin")) { into("package/web") }
         from(projectDir.dir("web/web/NOTICE.bin")) { into("package/web") }
-        from(projectDir.dir("web-v2/web/licenses")) { into("package/web-v2/licenses") }
-        from(projectDir.dir("web-v2/web/LICENSE.bin")) { into("package/web-v2") }
-        from(projectDir.dir("web-v2/web/NOTICE.bin")) { into("package/web-v2") }
         into(outputDir)
         rename { fileName ->
           fileName.replace(".bin", "")
@@ -795,20 +766,6 @@ tasks {
       // Create the directory 'data' for storage.
       val directory = File("distribution/package/data")
       directory.mkdirs()
-
-      // Copy the all directory distribution/package to distribution/package-all
-      copy {
-        from(projectDir.dir("distribution/package"))
-        into(projectDir.dir("distribution/package-all"))
-      }
-
-      // remove catalogs-contrib modules from distribution/package
-      project.file("catalogs-contrib").listFiles()?.forEach { file ->
-        if (file.isDirectory) {
-          val catalogName = file.name.replace("catalog-", "")
-          delete(projectDir.dir("distribution/package/catalogs/$catalogName"))
-        }
-      }
     }
   }
 
@@ -920,44 +877,6 @@ tasks {
     from(compileDistribution.map { it.outputs.files.single() })
     compression = Compression.GZIP
     archiveFileName.set("${rootProject.name}-$version-bin.tar.gz")
-    destinationDirectory.set(projectDir.dir("distribution"))
-  }
-
-  val assembleDistributionAll by registering(Tar::class) {
-    dependsOn(compileDistribution)
-    group = "gravitino distribution"
-    finalizedBy("checksumDistributionAll")
-    into("${rootProject.name}-$version-bin-all")
-    from(projectDir.dir("distribution/package-all"))
-    compression = Compression.GZIP
-    archiveFileName.set("${rootProject.name}-$version-bin-all.tar.gz")
-    destinationDirectory.set(projectDir.dir("distribution"))
-  }
-
-  register("checksumDistributionAll") {
-    group = "gravitino distribution"
-    dependsOn(assembleDistributionAll)
-    val archiveFile = assembleDistributionAll.flatMap { it.archiveFile }
-    val checksumFile = archiveFile.map { archive ->
-      archive.asFile.let { it.resolveSibling("${it.name}.sha256") }
-    }
-    inputs.file(archiveFile)
-    outputs.file(checksumFile)
-    doLast {
-      checksumFile.get().writeText(
-        serviceOf<ChecksumService>().sha256(archiveFile.get().asFile).toString()
-      )
-    }
-  }
-
-  val assembleTrinoConnector by registering(Tar::class) {
-    dependsOn("compileTrinoConnector")
-    group = "gravitino distribution"
-    finalizedBy("checksumTrinoConnector")
-    into("${rootProject.name}-trino-connector-$version")
-    from(compileTrinoConnector.map { it.outputs.files.single() })
-    compression = Compression.GZIP
-    archiveFileName.set("${rootProject.name}-trino-connector-$version.tar.gz")
     destinationDirectory.set(projectDir.dir("distribution"))
   }
 
@@ -1102,8 +1021,6 @@ tasks {
         it.name != "hive-metastore-common" &&
         it.name != "docs" &&
         it.name != "hadoop-common" &&
-        it.name != "web" &&
-        it.name != "web-v2" &&
         it.parent?.name != "bundles" &&
         it.parent?.name != "maintenance" &&
         it.name != "mcp-server"
@@ -1125,6 +1042,7 @@ tasks {
       ":catalogs:catalog-hive:copyLibAndConfig",
       ":catalogs:catalog-jdbc-doris:copyLibAndConfig",
       ":catalogs:catalog-jdbc-mysql:copyLibAndConfig",
+      ":catalogs:catalog-jdbc-oceanbase:copyLibAndConfig",
       ":catalogs:catalog-jdbc-postgresql:copyLibAndConfig",
       ":catalogs:catalog-jdbc-starrocks:copyLibAndConfig",
       ":catalogs:catalog-kafka:copyLibAndConfig",
@@ -1134,9 +1052,7 @@ tasks {
       ":catalogs:catalog-model:copyLibAndConfig",
       ":catalogs:hive-metastore2-libs:copyLibs",
       ":catalogs:hive-metastore3-libs:copyLibs",
-      ":catalogs:catalog-lakehouse-generic:copyLibAndConfig",
-      ":catalogs-contrib:catalog-jdbc-oceanbase:copyLibAndConfig",
-      ":catalogs-contrib:catalog-jdbc-clickhouse:copyLibAndConfig"
+      ":catalogs:catalog-lakehouse-generic:copyLibAndConfig"
     )
   }
 

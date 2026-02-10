@@ -716,7 +716,12 @@ curl -X POST -H "Accept: application/vnd.gravitino.v1+json" \
       "type": "integer",
       "comment": "id column comment",
       "nullable": false,
-      "autoIncrement": true
+      "autoIncrement": true,
+      "defaultValue": {
+        "type": "literal",
+        "dataType": "integer",
+        "value": "-1"
+      }
     },
     {
       "name": "name",
@@ -844,7 +849,7 @@ Map<String, String> tablePropertiesMap = ImmutableMap.<String, String>builder()
 tableCatalog.createTable(
   NameIdentifier.of("schema", "example_table"),
   new Column[] {
-    Column.of("id", Types.IntegerType.get(), "id column comment", false, true, Column.DEFAULT_VALUE_NOT_SET),
+    Column.of("id", Types.IntegerType.get(), "id column comment", false, true, Literals.integerLiteral(-1)),
     Column.of("name", Types.VarCharType.of(500), "name column comment", true, false, Literals.NULL),
     Column.of("StartingDate", Types.TimestampType.withoutTimeZone(), "StartingDate column comment", false, false, Column.DEFAULT_VALUE_OF_CURRENT_TIMESTAMP),
     Column.of("info", Types.StructType.of(

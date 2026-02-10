@@ -18,13 +18,13 @@
  */
 package org.apache.gravitino.catalog.fileset;
 
-import static org.apache.gravitino.catalog.fileset.FilesetCatalogPropertiesMetadata.AUTHENTICATION_PROPERTY_ENTRIES;
-import static org.apache.gravitino.catalog.fileset.FilesetCatalogPropertiesMetadata.KERBEROS_PROPERTY_ENTRIES;
 import static org.apache.gravitino.file.Fileset.LOCATION_NAME_UNKNOWN;
 import static org.apache.gravitino.file.Fileset.PROPERTY_MULTIPLE_LOCATIONS_PREFIX;
 
 import com.google.common.collect.ImmutableMap;
 import java.util.Map;
+import org.apache.gravitino.catalog.fileset.authentication.AuthenticationConfig;
+import org.apache.gravitino.catalog.fileset.authentication.kerberos.KerberosConfig;
 import org.apache.gravitino.connector.BasePropertiesMetadata;
 import org.apache.gravitino.connector.PropertyEntry;
 import org.apache.gravitino.credential.config.CredentialConfig;
@@ -66,8 +66,8 @@ public class FilesetSchemaPropertiesMetadata extends BasePropertiesMetadata {
                   null /* default value */,
                   false /* hidden */,
                   false /* reserved */))
-          .putAll(KERBEROS_PROPERTY_ENTRIES)
-          .putAll(AUTHENTICATION_PROPERTY_ENTRIES)
+          .putAll(KerberosConfig.KERBEROS_PROPERTY_ENTRIES)
+          .putAll(AuthenticationConfig.AUTHENTICATION_PROPERTY_ENTRIES)
           .putAll(CredentialConfig.CREDENTIAL_PROPERTY_ENTRIES)
           .build();
 

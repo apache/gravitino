@@ -70,7 +70,6 @@ import org.apache.gravitino.exceptions.NoSuchModelVersionURINameException;
 import org.apache.gravitino.exceptions.NoSuchSchemaException;
 import org.apache.gravitino.exceptions.NoSuchTableException;
 import org.apache.gravitino.exceptions.NoSuchTopicException;
-import org.apache.gravitino.exceptions.NoSuchViewException;
 import org.apache.gravitino.exceptions.NonEmptySchemaException;
 import org.apache.gravitino.exceptions.SchemaAlreadyExistsException;
 import org.apache.gravitino.exceptions.TableAlreadyExistsException;
@@ -92,8 +91,6 @@ import org.apache.gravitino.rel.Column;
 import org.apache.gravitino.rel.Table;
 import org.apache.gravitino.rel.TableCatalog;
 import org.apache.gravitino.rel.TableChange;
-import org.apache.gravitino.rel.View;
-import org.apache.gravitino.rel.ViewCatalog;
 import org.apache.gravitino.rel.expressions.distributions.Distribution;
 import org.apache.gravitino.rel.expressions.sorts.SortOrder;
 import org.apache.gravitino.rel.expressions.transforms.Transform;
@@ -104,7 +101,6 @@ import org.slf4j.LoggerFactory;
 public class TestCatalogOperations
     implements CatalogOperations,
         TableCatalog,
-        ViewCatalog,
         FilesetCatalog,
         TopicCatalog,
         ModelCatalog,
@@ -125,8 +121,6 @@ public class TestCatalogOperations
 
   private final Map<Pair<NameIdentifier, String>, Integer> modelAliasToVersion;
 
-  public final Map<NameIdentifier, View> views;
-
   public static final String FAIL_CREATE = "fail-create";
 
   public static final String FAIL_TEST = "need-fail";
@@ -141,7 +135,6 @@ public class TestCatalogOperations
     models = Maps.newHashMap();
     modelVersions = Maps.newHashMap();
     modelAliasToVersion = Maps.newHashMap();
-    views = Maps.newHashMap();
   }
 
   @Override
@@ -299,16 +292,6 @@ public class TestCatalogOperations
       return true;
     } else {
       return false;
-    }
-  }
-
-  // ViewCatalog methods
-  @Override
-  public View loadView(NameIdentifier ident) throws NoSuchViewException {
-    if (views.containsKey(ident)) {
-      return views.get(ident);
-    } else {
-      throw new NoSuchViewException("View %s does not exist", ident);
     }
   }
 

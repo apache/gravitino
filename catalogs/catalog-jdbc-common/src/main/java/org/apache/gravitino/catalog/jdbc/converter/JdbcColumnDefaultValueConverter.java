@@ -22,9 +22,6 @@ import static org.apache.gravitino.rel.Column.DEFAULT_VALUE_NOT_SET;
 
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
-import java.time.format.DateTimeFormatterBuilder;
-import java.time.temporal.ChronoField;
-import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.rel.expressions.Expression;
 import org.apache.gravitino.rel.expressions.FunctionExpression;
 import org.apache.gravitino.rel.expressions.literals.Literal;
@@ -37,18 +34,11 @@ public class JdbcColumnDefaultValueConverter {
   protected static final String CURRENT_TIMESTAMP = "CURRENT_TIMESTAMP";
   protected static final String NULL = "NULL";
   protected static final DateTimeFormatter DATE_TIME_FORMATTER =
-      new DateTimeFormatterBuilder()
-          .appendPattern("yyyy-MM-dd HH:mm:ss")
-          .appendFraction(ChronoField.NANO_OF_SECOND, 0, 6, true)
-          .toFormatter();
+      DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss[.SSSSSS][.SSSSS][.SSSS][.SSS][.SS][.S]");
   protected static final DateTimeFormatter DATE_FORMATTER =
       DateTimeFormatter.ofPattern("yyyy-MM-dd");
-
   protected static final DateTimeFormatter TIME_FORMATTER =
-      new DateTimeFormatterBuilder()
-          .appendPattern("HH:mm:ss")
-          .appendFraction(ChronoField.NANO_OF_SECOND, 0, 6, true)
-          .toFormatter();
+      DateTimeFormatter.ofPattern("HH:mm:ss[.SSSSSS][.SSSSS][.SSSS][.SSS][.SS][.S]");
 
   public String fromGravitino(Expression defaultValue) {
     if (DEFAULT_VALUE_NOT_SET.equals(defaultValue)) {
@@ -71,14 +61,7 @@ public class JdbcColumnDefaultValueConverter {
       if (defaultValue.equals(Literals.NULL)) {
         return NULL;
       } else if (type instanceof Type.NumericType) {
-        String value = literal.value().toString();
-        // It seems that literals.value().toString() can be an empty string for numeric types
-        // in some cases like `alter table t modify column `id` int null default '';`, in such
-        // case value is an empty string, we should wrap it with single quotes to avoid SQL error.
-        if (StringUtils.isBlank(value)) {
-          value = "'%s'".formatted(value);
-        }
-        return value;
+        return literal.value().toString();
       } else if (type instanceof Types.TimestampType) {
         /**
          * @see LocalDateTime#toString() would return like 'yyyy-MM-ddTHH:mm:ss'

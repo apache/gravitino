@@ -113,14 +113,4 @@ public interface LanceTableOperations {
    * @return the response of the drop table operation
    */
   DropTableResponse dropTable(String tableId, String delimiter);
-
-  /**
-   * Alter a table.
-   *
-   * @param tableId table ids are in the format of "{namespace}{delimiter}{table_name}"
-   * @param delimiter the delimiter used in the namespace
-   * @param request the request containing alter table details, it can be add/drop/alter columns
-   * @return the response of the alter table operation.
-   */
-  Object alterTable(String tableId, String delimiter, Object request);
 }

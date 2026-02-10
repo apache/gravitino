@@ -18,6 +18,8 @@
  */
 package org.apache.gravitino.catalog.postgresql.operation;
 
+import static org.apache.gravitino.rel.Column.DEFAULT_VALUE_NOT_SET;
+
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
@@ -291,7 +293,12 @@ public class PostgreSqlTableOperations extends JdbcTableOperations
       sqlBuilder.append("NOT NULL ");
     }
     // Add DEFAULT value if specified
-    appendDefaultValue(column, sqlBuilder);
+    if (!DEFAULT_VALUE_NOT_SET.equals(column.defaultValue())) {
+      sqlBuilder
+          .append("DEFAULT ")
+          .append(columnDefaultValueConverter.fromGravitino(column.defaultValue()))
+          .append(SPACE);
+    }
   }
 
   @Override

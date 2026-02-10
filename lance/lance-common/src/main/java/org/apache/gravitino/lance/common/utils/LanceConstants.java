@@ -37,7 +37,6 @@ public class LanceConstants {
 
   public static final String LANCE_TABLE_REGISTER = "lance.register";
 
-  public static final String LANCE_TABLE_VERSION = "lance.version";
   // Mark whether it is to create an empty Lance table(no data files)
   public static final String LANCE_TABLE_CREATE_EMPTY = "lance.create-empty";
 

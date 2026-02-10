@@ -98,7 +98,6 @@ import org.apache.gravitino.model.ModelCatalog;
 import org.apache.gravitino.rel.SupportsPartitions;
 import org.apache.gravitino.rel.Table;
 import org.apache.gravitino.rel.TableCatalog;
-import org.apache.gravitino.rel.ViewCatalog;
 import org.apache.gravitino.storage.IdGenerator;
 import org.apache.gravitino.utils.IsolatedClassLoader;
 import org.apache.gravitino.utils.NamespaceUtil;
@@ -146,16 +145,6 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
               throw new UnsupportedOperationException("Catalog does not support table operations");
             }
             return fn.apply(asTables());
-          });
-    }
-
-    public <R> R doWithViewOps(ThrowableFunction<ViewCatalog, R> fn) throws Exception {
-      return classLoader.withClassLoader(
-          cl -> {
-            if (asViews() == null) {
-              throw new UnsupportedOperationException("Catalog does not support view operations");
-            }
-            return fn.apply(asViews());
           });
     }
 
@@ -255,10 +244,6 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
 
     private TableCatalog asTables() {
       return catalog.ops() instanceof TableCatalog ? (TableCatalog) catalog.ops() : null;
-    }
-
-    private ViewCatalog asViews() {
-      return catalog.ops() instanceof ViewCatalog ? (ViewCatalog) catalog.ops() : null;
     }
 
     private FilesetCatalog asFilesets() {

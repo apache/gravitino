@@ -65,6 +65,7 @@ public interface OAuthConfig {
               "The uri of the default OAuth server. Required when using StaticSignKeyValidator, not required for JWKS-based validators")
           .version(ConfigConstants.VERSION_0_3_0)
           .stringConf()
+          .checkValue(StringUtils::isNotBlank, ConfigConstants.NOT_BLANK_ERROR_MSG)
           .create();
 
   ConfigEntry<String> DEFAULT_TOKEN_PATH =
@@ -73,6 +74,7 @@ public interface OAuthConfig {
               "The path for token of the default OAuth server. Required when using StaticSignKeyValidator, not required for JWKS-based validators")
           .version(ConfigConstants.VERSION_0_3_0)
           .stringConf()
+          .checkValue(StringUtils::isNotBlank, ConfigConstants.NOT_BLANK_ERROR_MSG)
           .create();
 
   // OAuth provider configs
@@ -144,26 +146,4 @@ public interface OAuthConfig {
           .version(ConfigConstants.VERSION_1_0_0)
           .stringConf()
           .createWithDefault("org.apache.gravitino.server.authentication.StaticSignKeyValidator");
-
-  ConfigEntry<String> PRINCIPAL_MAPPER =
-      new ConfigBuilder(OAUTH_CONFIG_PREFIX + "principalMapper")
-          .doc(
-              "Type of principal mapper to use for OAuth/JWT principals. "
-                  + "Built-in value: 'regex' (uses regex pattern to extract username). "
-                  + "Default pattern '^(.*)$' keeps the principal unchanged. "
-                  + "Can also be a fully qualified class name implementing PrincipalMapper for custom logic.")
-          .version(ConfigConstants.VERSION_1_2_0)
-          .stringConf()
-          .createWithDefault("regex");
-
-  ConfigEntry<String> PRINCIPAL_MAPPER_REGEX_PATTERN =
-      new ConfigBuilder(OAUTH_CONFIG_PREFIX + "principalMapper.regex.pattern")
-          .doc(
-              "Regex pattern to extract the username from the OAuth principal field. "
-                  + "Only used when principalMapper is 'regex'. "
-                  + "The pattern should contain at least one capturing group. "
-                  + "Default pattern '^(.*)$' matches the entire principal.")
-          .version(ConfigConstants.VERSION_1_2_0)
-          .stringConf()
-          .createWithDefault("^(.*)$");
 }

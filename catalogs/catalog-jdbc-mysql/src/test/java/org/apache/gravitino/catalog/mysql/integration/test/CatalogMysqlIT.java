@@ -1934,7 +1934,7 @@ public class CatalogMysqlIT extends BaseIT {
             Index.IndexType.UNIQUE_KEY, "u1_key", new String[][] {{"col_2"}, {"col_3"}}),
         TableChange.addIndex(
             Index.IndexType.PRIMARY_KEY,
-            Indexes.DEFAULT_PRIMARY_KEY_NAME,
+            Indexes.DEFAULT_MYSQL_PRIMARY_KEY_NAME,
             new String[][] {{"col_1"}}));
 
     Table table = tableCatalog.loadTable(NameIdentifier.of(schemaName, tableName));
@@ -2059,7 +2059,7 @@ public class CatalogMysqlIT extends BaseIT {
             true),
         TableChange.addIndex(
             Index.IndexType.PRIMARY_KEY,
-            Indexes.DEFAULT_PRIMARY_KEY_NAME,
+            Indexes.DEFAULT_MYSQL_PRIMARY_KEY_NAME,
             new String[][] {{"col_6"}}));
 
     Table table = tableCatalog.loadTable(tableIdentifier);

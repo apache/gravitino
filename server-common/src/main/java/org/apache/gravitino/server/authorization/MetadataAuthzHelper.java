@@ -38,7 +38,6 @@ import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.authorization.AuthorizationRequestContext;
 import org.apache.gravitino.authorization.GravitinoAuthorizer;
 import org.apache.gravitino.dto.tag.MetadataObjectDTO;
-import org.apache.gravitino.meta.TableEntity;
 import org.apache.gravitino.server.authorization.expression.AuthorizationExpressionConstants;
 import org.apache.gravitino.server.authorization.expression.AuthorizationExpressionEvaluator;
 import org.apache.gravitino.utils.MetadataObjectUtil;
@@ -137,7 +136,6 @@ public class MetadataAuthzHelper {
       String expression,
       Entity.EntityType entityType,
       NameIdentifier[] nameIdentifiers) {
-    preloadToCache(entityType, nameIdentifiers);
     return filterByExpression(metalake, expression, entityType, nameIdentifiers, e -> e);
   }
 
@@ -293,12 +291,7 @@ public class MetadataAuthzHelper {
     return futures.stream()
         .map(CompletableFuture::join)
         .filter(Objects::nonNull)
-        .toArray(size -> createArray(entities.getClass().getComponentType(), size));
-  }
-
-  @SuppressWarnings("unchecked")
-  private static <E> E[] createArray(Class<?> componentType, int size) {
-    return (E[]) Array.newInstance(componentType, size);
+        .toArray(size -> (E[]) Array.newInstance(entities.getClass().getComponentType(), size));
   }
 
   private static boolean enableAuthorization() {
@@ -322,17 +315,6 @@ public class MetadataAuthzHelper {
                     return thread;
                   });
         }
-      }
-    }
-  }
-
-  private static void preloadToCache(
-      Entity.EntityType entityType, NameIdentifier[] nameIdentifiers) {
-    if (GravitinoEnv.getInstance().cacheEnabled()) {
-      if (entityType == Entity.EntityType.TABLE) {
-        GravitinoEnv.getInstance()
-            .entityStore()
-            .batchGet(nameIdentifiers, entityType, TableEntity.class);
       }
     }
   }

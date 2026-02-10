@@ -45,26 +45,6 @@ class AuditDTO(Audit, DataClassJsonMixin):
     )  # TODO: Can't deserialized datetime from JSON
     """The last modified time of the audit."""
 
-    def __hash__(self):
-        return hash(
-            (
-                self.creator(),
-                self.create_time(),
-                self.last_modifier(),
-                self.last_modified_time(),
-            )
-        )
-
-    def __eq__(self, other) -> bool:
-        if not isinstance(other, AuditDTO):
-            return False
-        return (
-            self.creator() == other.creator()
-            and self.create_time() == other.create_time()
-            and self.last_modifier() == other.last_modifier()
-            and self.last_modified_time() == other.last_modified_time()
-        )
-
     def creator(self) -> str:
         """The creator of the entity.
 

@@ -23,8 +23,6 @@ import java.util.List;
 import org.apache.gravitino.storage.relational.mapper.CatalogMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.FilesetMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.FilesetVersionMapper;
-import org.apache.gravitino.storage.relational.mapper.FunctionMetaMapper;
-import org.apache.gravitino.storage.relational.mapper.FunctionVersionMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.GroupMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.GroupRoleRelMapper;
 import org.apache.gravitino.storage.relational.mapper.JobMetaMapper;
@@ -49,7 +47,6 @@ import org.apache.gravitino.storage.relational.mapper.TagMetadataObjectRelMapper
 import org.apache.gravitino.storage.relational.mapper.TopicMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.UserMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.UserRoleRelMapper;
-import org.apache.gravitino.storage.relational.mapper.ViewMetaMapper;
 
 /** The default provider that supplies the primary mapper package for Gravitino. */
 public class DefaultMapperPackageProvider implements MapperPackageProvider {
@@ -60,8 +57,6 @@ public class DefaultMapperPackageProvider implements MapperPackageProvider {
         CatalogMetaMapper.class,
         FilesetMetaMapper.class,
         FilesetVersionMapper.class,
-        FunctionMetaMapper.class,
-        FunctionVersionMetaMapper.class,
         GroupMetaMapper.class,
         GroupRoleRelMapper.class,
         JobMetaMapper.class,
@@ -85,7 +80,6 @@ public class DefaultMapperPackageProvider implements MapperPackageProvider {
         TopicMetaMapper.class,
         UserMetaMapper.class,
         UserRoleRelMapper.class,
-        TableVersionMapper.class,
-        ViewMetaMapper.class);
+        TableVersionMapper.class);
   }
 }

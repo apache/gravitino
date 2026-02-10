@@ -108,19 +108,6 @@ public class NameIdentifierUtil {
   }
 
   /**
-   * Create the view {@link NameIdentifier} with the given metalake, catalog, schema and view name.
-   *
-   * @param metalake The metalake name
-   * @param catalog The catalog name
-   * @param schema The schema name
-   * @param view The view name
-   * @return The created view {@link NameIdentifier}
-   */
-  public static NameIdentifier ofView(String metalake, String catalog, String schema, String view) {
-    return NameIdentifier.of(metalake, catalog, schema, view);
-  }
-
-  /**
    * Create the tag {@link NameIdentifier} with the given metalake and tag name.
    *
    * @param metalake The metalake name
@@ -223,21 +210,6 @@ public class NameIdentifierUtil {
   public static NameIdentifier ofModel(
       String metalake, String catalog, String schema, String model) {
     return NameIdentifier.of(metalake, catalog, schema, model);
-  }
-
-  /**
-   * Create the function {@link NameIdentifier} with the given metalake, catalog, schema and
-   * function name.
-   *
-   * @param metalake The metalake name
-   * @param catalog The catalog name
-   * @param schema The schema name
-   * @param function The function name
-   * @return The created function {@link NameIdentifier}
-   */
-  public static NameIdentifier ofFunction(
-      String metalake, String catalog, String schema, String function) {
-    return NameIdentifier.of(metalake, catalog, schema, function);
   }
 
   /**
@@ -495,17 +467,6 @@ public class NameIdentifierUtil {
   }
 
   /**
-   * Check the given {@link NameIdentifier} is a view identifier. Throw an {@link
-   * IllegalNameIdentifierException} if it's not.
-   *
-   * @param ident The view {@link NameIdentifier} to check.
-   */
-  public static void checkView(NameIdentifier ident) {
-    NameIdentifier.check(ident != null, "View identifier must not be null");
-    NamespaceUtil.checkView(ident.namespace());
-  }
-
-  /**
    * Check the given {@link NameIdentifier} is a column identifier. Throw an {@link
    * IllegalNameIdentifierException} if it's not.
    *
@@ -558,17 +519,6 @@ public class NameIdentifierUtil {
   public static void checkModelVersion(NameIdentifier ident) {
     NameIdentifier.check(ident != null, "Model version identifier must not be null");
     NamespaceUtil.checkModelVersion(ident.namespace());
-  }
-
-  /**
-   * Check the given {@link NameIdentifier} is a function identifier. Throw an {@link
-   * IllegalNameIdentifierException} if it's not.
-   *
-   * @param ident The function {@link NameIdentifier} to check.
-   */
-  public static void checkFunction(NameIdentifier ident) {
-    NameIdentifier.check(ident != null, "Function identifier must not be null");
-    NamespaceUtil.checkFunction(ident.namespace());
   }
 
   /**
@@ -626,11 +576,6 @@ public class NameIdentifierUtil {
         checkTable(ident);
         String tableParent = dot.join(ident.namespace().level(1), ident.namespace().level(2));
         return MetadataObjects.of(tableParent, ident.name(), MetadataObject.Type.TABLE);
-
-      case VIEW:
-        checkView(ident);
-        String viewParent = dot.join(ident.namespace().level(1), ident.namespace().level(2));
-        return MetadataObjects.of(viewParent, ident.name(), MetadataObject.Type.VIEW);
 
       case COLUMN:
         checkColumn(ident);
@@ -891,7 +836,6 @@ public class NameIdentifierUtil {
         return Entity.EntityType.MODEL;
 
       case TABLE:
-      case VIEW:
       case FILESET:
       case MODEL:
       case TOPIC:

@@ -54,7 +54,6 @@ import org.apache.gravitino.dto.responses.GroupResponse;
 import org.apache.gravitino.dto.responses.RoleResponse;
 import org.apache.gravitino.dto.responses.UserResponse;
 import org.apache.gravitino.dto.util.DTOConverters;
-import org.apache.gravitino.metalake.MetalakeManager;
 import org.apache.gravitino.metrics.MetricNames;
 import org.apache.gravitino.server.authorization.NameBindings;
 import org.apache.gravitino.server.authorization.annotations.AuthorizationExpression;
@@ -92,7 +91,6 @@ public class PermissionOperations {
       return Utils.doAs(
           httpRequest,
           () -> {
-            MetalakeManager.checkMetalakeInUse(metalake);
             request.validate();
             return Utils.ok(
                 new UserResponse(
@@ -121,7 +119,6 @@ public class PermissionOperations {
       return Utils.doAs(
           httpRequest,
           () -> {
-            MetalakeManager.checkMetalakeInUse(metalake);
             request.validate();
             return Utils.ok(
                 new GroupResponse(
@@ -151,7 +148,6 @@ public class PermissionOperations {
           httpRequest,
           () -> {
             request.validate();
-            MetalakeManager.checkMetalakeInUse(metalake);
             return Utils.ok(
                 new UserResponse(
                     DTOConverters.toDTO(
@@ -180,7 +176,6 @@ public class PermissionOperations {
           httpRequest,
           () -> {
             request.validate();
-            MetalakeManager.checkMetalakeInUse(metalake);
             return Utils.ok(
                 new GroupResponse(
                     DTOConverters.toDTO(
@@ -217,7 +212,6 @@ public class PermissionOperations {
           httpRequest,
           () -> {
             privilegeGrantRequest.validate();
-            MetalakeManager.checkMetalakeInUse(metalake);
 
             for (PrivilegeDTO privilegeDTO : privilegeGrantRequest.getPrivileges()) {
               AuthorizationUtils.checkPrivilege(privilegeDTO, object, metalake);
@@ -265,7 +259,6 @@ public class PermissionOperations {
           httpRequest,
           () -> {
             privilegeRevokeRequest.validate();
-            MetalakeManager.checkMetalakeInUse(metalake);
 
             for (PrivilegeDTO privilegeDTO : privilegeRevokeRequest.getPrivileges()) {
               AuthorizationUtils.checkPrivilege(privilegeDTO, object, metalake);
@@ -306,7 +299,6 @@ public class PermissionOperations {
           httpRequest,
           () -> {
             request.validate();
-            MetalakeManager.checkMetalakeInUse(metalake);
             // Check update objects
             List<SecurableObject> updatedObjects = Lists.newArrayList();
 

@@ -28,7 +28,6 @@ import org.apache.gravitino.storage.relational.mapper.ModelMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.SchemaMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.TableMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.TopicMetaMapper;
-import org.apache.gravitino.storage.relational.mapper.ViewMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.provider.base.SecurableObjectBaseSQLProvider;
 import org.apache.gravitino.storage.relational.po.SecurableObjectPO;
 import org.apache.ibatis.annotations.Param;
@@ -113,11 +112,6 @@ public class SecurableObjectPostgreSQLProvider extends SecurableObjectBaseSQLPro
         + ModelMetaMapper.TABLE_NAME
         + " mt WHERE mt.catalog_id = #{catalogId} AND"
         + " mt.model_id = sect.metadata_object_id AND sect.type = 'MODEL'"
-        + " UNION"
-        + " SELECT vt.catalog_id FROM "
-        + ViewMetaMapper.TABLE_NAME
-        + " vt WHERE vt.catalog_id = #{catalogId} AND"
-        + " vt.view_id = sect.metadata_object_id AND sect.type = 'VIEW'"
         + ")";
   }
 
@@ -151,11 +145,6 @@ public class SecurableObjectPostgreSQLProvider extends SecurableObjectBaseSQLPro
         + ModelMetaMapper.TABLE_NAME
         + " mt WHERE mt.schema_id = #{schemaId} AND"
         + " mt.model_id = sect.metadata_object_id AND sect.type = 'MODEL'"
-        + " UNION"
-        + " SELECT vt.schema_id FROM "
-        + ViewMetaMapper.TABLE_NAME
-        + " vt WHERE vt.schema_id = #{schemaId} AND"
-        + " vt.view_id = sect.metadata_object_id AND sect.type = 'VIEW'"
         + ")";
   }
 

@@ -72,7 +72,6 @@ public class ContainerSuite implements Closeable {
   private static volatile Map<PGImageName, PostgreSQLContainer> pgContainerMap =
       new EnumMap<>(PGImageName.class);
   private static volatile OceanBaseContainer oceanBaseContainer;
-  private static volatile ClickHouseContainer clickHouseContainer;
 
   private static volatile GravitinoLocalStackContainer gravitinoLocalStackContainer;
 
@@ -507,37 +506,6 @@ public class ContainerSuite implements Closeable {
     }
   }
 
-  public void startClickHouseContainer(TestDatabaseName testDatabaseName) {
-    if (clickHouseContainer == null) {
-      synchronized (ContainerSuite.class) {
-        if (clickHouseContainer == null) {
-          initIfNecessary();
-          // Start ClickHouse container
-          ClickHouseContainer.Builder clickHouseBuilder =
-              ClickHouseContainer.builder()
-                  .withHostName("gravitino-ci-clickhouse")
-                  .withEnvVars(
-                      ImmutableMap.<String, String>builder()
-                          .put("CLICKHOUSE_PASSWORD", ClickHouseContainer.PASSWORD)
-                          .build())
-                  .withExposePorts(ImmutableSet.of(ClickHouseContainer.CLICKHOUSE_PORT))
-                  .withNetwork(network);
-
-          ClickHouseContainer container = closer.register(clickHouseBuilder.build());
-          container.start();
-          clickHouseContainer = container;
-        }
-      }
-    }
-    synchronized (ClickHouseContainer.class) {
-      clickHouseContainer.createDatabase(testDatabaseName);
-    }
-  }
-
-  public ClickHouseContainer getClickHouseContainer() {
-    return clickHouseContainer;
-  }
-
   public GravitinoLocalStackContainer getLocalStackContainer() {
     return gravitinoLocalStackContainer;
   }
@@ -684,7 +652,8 @@ public class ContainerSuite implements Closeable {
       }
     }
 
-    Config ipamConfig = new Config();
+    com.github.dockerjava.api.model.Network.Ipam.Config ipamConfig =
+        new com.github.dockerjava.api.model.Network.Ipam.Config();
     ipamConfig
         .withSubnet(CONTAINER_NETWORK_SUBNET)
         .withGateway(CONTAINER_NETWORK_GATEWAY)

@@ -80,15 +80,4 @@ public interface FileSystemProvider {
    * @return The name of this FileSystem provider.
    */
   String name();
-
-  /**
-   * Get full authority (user:pw@host:port?xxx=1) from the given path and configuration.
-   *
-   * @param path The path to get the authority from.
-   * @param conf The configuration map.
-   * @return The full authority string.
-   */
-  default String getFullAuthority(Path path, Map<String, String> conf) {
-    return path.toUri().getAuthority();
-  }
 }

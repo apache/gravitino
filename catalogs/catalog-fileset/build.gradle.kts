@@ -42,7 +42,6 @@ dependencies {
   }
   implementation(libs.awaitility)
   implementation(libs.caffeine)
-  implementation(libs.cglib)
   implementation(libs.commons.lang3)
   implementation(libs.commons.io)
   implementation(libs.hadoop3.client.api)

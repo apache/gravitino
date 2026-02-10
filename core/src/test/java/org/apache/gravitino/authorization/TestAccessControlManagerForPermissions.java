@@ -46,6 +46,7 @@ import org.apache.gravitino.connector.BaseCatalog;
 import org.apache.gravitino.connector.authorization.AuthorizationPlugin;
 import org.apache.gravitino.exceptions.IllegalRoleException;
 import org.apache.gravitino.exceptions.NoSuchGroupException;
+import org.apache.gravitino.exceptions.NoSuchMetalakeException;
 import org.apache.gravitino.exceptions.NoSuchRoleException;
 import org.apache.gravitino.exceptions.NoSuchUserException;
 import org.apache.gravitino.lock.LockManager;
@@ -220,6 +221,11 @@ public class TestAccessControlManagerForPermissions {
     user = accessControlManager.grantRolesToUser(METALAKE, ROLE, USER);
     Assertions.assertEquals(1, user.roles().size());
 
+    // Throw NoSuchMetalakeException
+    Assertions.assertThrows(
+        NoSuchMetalakeException.class,
+        () -> accessControlManager.grantRolesToUser(notExist, ROLE, USER));
+
     // Throw IllegalRoleException
     Assertions.assertThrows(
         IllegalRoleException.class,
@@ -248,6 +254,11 @@ public class TestAccessControlManagerForPermissions {
 
     // Test authorization plugin
     Mockito.verify(authorizationPlugin).onRevokedRolesFromUser(any(), any());
+
+    // Throw NoSuchMetalakeException
+    Assertions.assertThrows(
+        NoSuchMetalakeException.class,
+        () -> accessControlManager.revokeRolesFromUser(notExist, ROLE, USER));
 
     // Throw IllegalRoleException
     Assertions.assertThrows(
@@ -288,6 +299,11 @@ public class TestAccessControlManagerForPermissions {
     group = accessControlManager.grantRolesToGroup(METALAKE, ROLE, GROUP);
     Assertions.assertEquals(1, group.roles().size());
 
+    // Throw NoSuchMetalakeException
+    Assertions.assertThrows(
+        NoSuchMetalakeException.class,
+        () -> accessControlManager.grantRolesToGroup(notExist, ROLE, GROUP));
+
     // Throw IllegalRoleException
     Assertions.assertThrows(
         IllegalRoleException.class,
@@ -317,6 +333,11 @@ public class TestAccessControlManagerForPermissions {
 
     // Test authorization plugin
     verify(authorizationPlugin).onRevokedRolesFromGroup(any(), any());
+
+    // Throw NoSuchMetalakeException
+    Assertions.assertThrows(
+        NoSuchMetalakeException.class,
+        () -> accessControlManager.revokeRolesFromGroup(notExist, ROLE, GROUP));
 
     // Throw IllegalRoleException
     Assertions.assertThrows(

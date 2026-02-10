@@ -78,7 +78,6 @@ gravitino.cache.implementation = caffeine
 # Whether Gravitino enable authorization or not
 gravitino.authorization.enable = false
 # The admins of Gravitino service, multiple admins are spitted by comma.
-gravitino.server.visibleConfigs=gravitino.authorization.serviceAdmins
 gravitino.authorization.serviceAdmins = anonymous
 
 # THE CONFIGURATION FOR AUXILIARY SERVICE

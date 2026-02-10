@@ -19,7 +19,6 @@
 
 package org.apache.gravitino.listener.api.event;
 
-import com.google.common.base.Preconditions;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.annotation.DeveloperApi;
@@ -40,13 +39,8 @@ public final class ListTopicFailureEvent extends TopicFailureEvent {
    * @param exception The exception encountered during the attempt to list topics.
    */
   public ListTopicFailureEvent(String user, Namespace namespace, Exception exception) {
-    super(user, toNameIdentifier(namespace), exception);
+    super(user, NameIdentifier.of(namespace.levels()), exception);
     this.namespace = namespace;
-  }
-
-  private static NameIdentifier toNameIdentifier(Namespace namespace) {
-    Preconditions.checkArgument(namespace != null, "namespace must not be null");
-    return NameIdentifier.of(namespace.levels());
   }
 
   /**

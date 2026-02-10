@@ -31,8 +31,3 @@ GRAVITINO_VERSION=GRAVITINO_VERSION_PLACEHOLDER
 # export GRAVITINO_MEM         # JVM memory options for the Gravitino server, Iceberg REST server, and Lance REST server.
 #                             # Default: -Xms1024m -Xmx1024m -XX:MaxMetaspaceSize=512m
 #                             # Appended to JAVA_OPTS by launch scripts; set GRAVITINO_MEM to change heap/metaspace sizes.
-
-# UI selection behaviour:
-# - By default the template sets `GRAVITINO_USE_WEB_V2=false` which forces the V1 UI.
-# - To enable the v2 UI you can set it to `true` (for example: `export GRAVITINO_USE_WEB_V2=true`).
-GRAVITINO_USE_WEB_V2=false
