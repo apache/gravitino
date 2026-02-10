@@ -17,7 +17,6 @@
 
 package org.apache.gravitino.server.authorization;
 
-import java.io.IOException;
 import java.lang.reflect.Array;
 import java.security.Principal;
 import java.util.ArrayList;
@@ -334,28 +333,34 @@ public class MetadataAuthzHelper {
   private static void preloadToCache(
       Entity.EntityType entityType, NameIdentifier[] nameIdentifiers) {
     if (GravitinoEnv.getInstance().cacheEnabled()) {
+      return;
+    }
+    try {
       if (entityType == Entity.EntityType.TABLE) {
         GravitinoEnv.getInstance()
             .entityStore()
             .batchGet(nameIdentifiers, entityType, TableEntity.class);
       }
+    } catch (Exception e) {
+      LOG.warn("Ignore preload cache error:{}", e.getMessage(), e);
     }
   }
 
   private static void preloadOwner(Entity.EntityType entityType, NameIdentifier[] nameIdentifiers) {
     if (GravitinoEnv.getInstance().cacheEnabled()) {
-      EntityStore entityStore = GravitinoEnv.getInstance().entityStore();
-      try {
-        entityStore
-            .relationOperations()
-            .listEntitiesByRelation(
-                SupportsRelationOperations.Type.OWNER_REL,
-                Arrays.stream(nameIdentifiers).toList(),
-                entityType,
-                true);
-      } catch (IOException e) {
-        LOG.error("Ignore preloadOwner error:{}", e.getMessage(), e);
-      }
+      return;
+    }
+    EntityStore entityStore = GravitinoEnv.getInstance().entityStore();
+    try {
+      entityStore
+          .relationOperations()
+          .listEntitiesByRelation(
+              SupportsRelationOperations.Type.OWNER_REL,
+              Arrays.stream(nameIdentifiers).toList(),
+              entityType,
+              true);
+    } catch (Exception e) {
+      LOG.warn("Ignore preloadOwner error:{}", e.getMessage(), e);
     }
   }
 }

@@ -237,7 +237,7 @@ public class RelationalEntityStore implements EntityStore, SupportsRelationOpera
     // TODO add lock
     if (Objects.requireNonNull(relType) == Type.OWNER_REL) {
       List<E> list = backend.listEntitiesByRelation(relType, nameIdentifiers, identType, allFields);
-      Preconditions.checkArgument(
+      Preconditions.checkState(
           list.size() == nameIdentifiers.size(),
           "Owner list size not equal to nameIdentifiers size");
       for (int i = 0; i < list.size(); i++) {
