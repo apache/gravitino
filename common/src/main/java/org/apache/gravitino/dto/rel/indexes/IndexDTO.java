@@ -194,8 +194,6 @@ public class IndexDTO implements Index {
       return (S) this;
     }
 
-    /** */
-
     /**
      * Builds a new instance of IndexDTO.
      *
