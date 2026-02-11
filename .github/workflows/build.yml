@@ -152,6 +152,7 @@ jobs:
           files: |
             **/build/test-results/test/TEST-*.xml
           check_run_annotations: true
+          huge_xml: true
 
       - name: Release with Gradle
         run: ./gradlew clean && ./gradlew release -x test --rerun-tasks
