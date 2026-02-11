@@ -70,6 +70,7 @@ include("authorizations:authorization-ranger", "authorizations:authorization-com
 include(
   "trino-connector:trino-connector",
   "trino-connector:trino-connector-435-439",
+  "trino-connector:trino-connector-440-445",
   "trino-connector:integration-test"
 )
 include("spark-connector:spark-common")
