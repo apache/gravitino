@@ -468,7 +468,6 @@ public class CatalogClickHouseIT extends BaseIT {
   }
 
   @Test
-  // ClickHouse support column default value expression after 8.0.13
   // see https://dev.clickhouse.com/doc/refman/8.0/en/data-type-defaults.html
   @EnabledIf("supportColumnDefaultValueExpression")
   void testColumnDefaultValueConverter() {
@@ -599,12 +598,6 @@ public class CatalogClickHouseIT extends BaseIT {
                   + ", default value: "
                   + column.defaultValue());
       }
-      //      } catch (Throwable ex) {
-      //        System.err.println(ex);
-      //        for (Object obj : ex.getStackTrace()) {
-      //          System.err.println(obj);
-      //        }
-      //      }
     }
   }
 
@@ -630,7 +623,6 @@ public class CatalogClickHouseIT extends BaseIT {
             + "  decimal_6_2_col decimal(6, 2),\n"
             + "  varchar20_col varchar(20),\n"
             + "  text_col text,\n"
-            //            + "  binary_col binary,\n"
             + "  blob_col blob\n"
             + ") order by tinyint_col;\n";
 
@@ -962,9 +954,6 @@ public class CatalogClickHouseIT extends BaseIT {
         Assertions.assertThrows(
             RuntimeException.class, () -> catalog.asSchemas().dropSchema(schemaName, false));
     Assertions.assertTrue(excep.getMessage().contains("the value of cascade should be true."));
-    //    Assertions.assertTrue(
-    //        excep.getMessage().contains("has sub-entities, you should remove sub-entities
-    // first"));
 
     // Check the database still exists
     catalog.asSchemas().loadSchema(schemaName);
@@ -1446,9 +1435,6 @@ public class CatalogClickHouseIT extends BaseIT {
     Column col3 = Column.of("col_3", Types.VarCharType.of(255), "config", false, false, null);
     Column[] newColumns = new Column[] {col1, col2, col3};
 
-    //    Index[] indexes = new Index[] {Indexes.unique("u1_key", new String[][] {{"col_2"},
-    // {"col_3"}})};
-
     String[] schemas = {"db_", "db_1", "db_2", "db12"};
     SupportsSchemas schemaSupport = catalog.asSchemas();
 
@@ -1546,8 +1532,6 @@ public class CatalogClickHouseIT extends BaseIT {
 
     Table table = tableCatalog.loadTable(tableIdentifier);
     newColumns = new Column[] {col1, col2, col3, col4};
-
-    //    Assertions.assertEquals(col4.defaultValue(), table.columns()[3].defaultValue());
 
     ITUtils.assertionsTableInfo(
         tableName,
