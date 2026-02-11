@@ -21,7 +21,7 @@ package org.apache.gravitino.server.web.rest;
 import static javax.ws.rs.core.Response.Status.INTERNAL_SERVER_ERROR;
 import static org.apache.gravitino.Catalog.PROPERTY_IN_USE;
 import static org.apache.gravitino.Configs.CACHE_ENABLED;
-import static org.apache.gravitino.Configs.ENABLE_AUTHORIZATION;
+import static org.apache.gravitino.Configs.FILTER_SENSITIVE_PROPERTIES;
 import static org.apache.gravitino.Configs.TREE_LOCK_CLEAN_INTERVAL;
 import static org.apache.gravitino.Configs.TREE_LOCK_MAX_NODE_IN_MEMORY;
 import static org.apache.gravitino.Configs.TREE_LOCK_MIN_NODE_IN_MEMORY;
@@ -98,8 +98,8 @@ public class TestCatalogOperations extends BaseOperationsTest {
     Mockito.doReturn(100000L).when(config).get(TREE_LOCK_MAX_NODE_IN_MEMORY);
     Mockito.doReturn(1000L).when(config).get(TREE_LOCK_MIN_NODE_IN_MEMORY);
     Mockito.doReturn(36000L).when(config).get(TREE_LOCK_CLEAN_INTERVAL);
-    Mockito.doReturn(false).when(config).get(Configs.FILTER_SENSITIVE_PROPERTIES);
-    Mockito.doReturn(false).when(config).get(Configs.CACHE_ENABLED);
+    Mockito.doReturn(false).when(config).get(FILTER_SENSITIVE_PROPERTIES);
+    Mockito.doReturn(false).when(config).get(CACHE_ENABLED);
     FieldUtils.writeField(GravitinoEnv.getInstance(), "lockManager", new LockManager(config), true);
     FieldUtils.writeField(GravitinoEnv.getInstance(), "config", config, true);
   }

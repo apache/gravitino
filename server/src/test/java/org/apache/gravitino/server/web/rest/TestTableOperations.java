@@ -18,11 +18,7 @@
  */
 package org.apache.gravitino.server.web.rest;
 
-import static org.apache.gravitino.Configs.CACHE_ENABLED;
-import static org.apache.gravitino.Configs.ENABLE_AUTHORIZATION;
-import static org.apache.gravitino.Configs.TREE_LOCK_CLEAN_INTERVAL;
-import static org.apache.gravitino.Configs.TREE_LOCK_MAX_NODE_IN_MEMORY;
-import static org.apache.gravitino.Configs.TREE_LOCK_MIN_NODE_IN_MEMORY;
+import static org.apache.gravitino.Configs.*;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doThrow;
@@ -123,7 +119,7 @@ public class TestTableOperations extends BaseOperationsTest {
     Mockito.doReturn(36000L).when(config).get(TREE_LOCK_CLEAN_INTERVAL);
     Mockito.doReturn(false)
         .when(config)
-        .get(org.apache.gravitino.Configs.FILTER_SENSITIVE_PROPERTIES);
+        .get(FILTER_SENSITIVE_PROPERTIES);
     Mockito.doReturn(false).when(config).get(org.apache.gravitino.Configs.CACHE_ENABLED);
     Mockito.doReturn(false).when(config).get(org.apache.gravitino.Configs.ENABLE_AUTHORIZATION);
 
