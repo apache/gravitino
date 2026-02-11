@@ -114,16 +114,18 @@ public class CatalogOperations {
             if (verbose) {
               Catalog[] catalogs = catalogDispatcher.listCatalogsInfo(catalogNS);
               CatalogDTO[] catalogDTOs;
+              // Always apply authorization filtering, regardless of filterSensitiveProperties setting
+              MetadataAuthzHelper.FilterResult<Catalog, Catalog> filterResult =
+                  MetadataAuthzHelper.partitionByTwoExpressions(
+                      metalake,
+                      AuthorizationExpressionConstants.CATALOG_OWNER_EXPRESSION,
+                      AuthorizationExpressionConstants.USE_CATALOG_EXPRESSION,
+                      Entity.EntityType.CATALOG,
+                      catalogs,
+                      (catalogEntity) ->
+                          NameIdentifierUtil.ofCatalog(metalake, catalogEntity.name()));
+
               if (filterSensitiveProperties) {
-                MetadataAuthzHelper.FilterResult<Catalog, Catalog> filterResult =
-                    MetadataAuthzHelper.partitionByTwoExpressions(
-                        metalake,
-                        AuthorizationExpressionConstants.CATALOG_OWNER_EXPRESSION,
-                        AuthorizationExpressionConstants.USE_CATALOG_EXPRESSION,
-                        Entity.EntityType.CATALOG,
-                        catalogs,
-                        (catalogEntity) ->
-                            NameIdentifierUtil.ofCatalog(metalake, catalogEntity.name()));
                 // First array: catalogs with full access (can see sensitive properties)
                 CatalogDTO[] fullAccessCatalogs = DTOConverters.toDTOs(filterResult.getFirst());
                 // Second array: catalogs with use access only (hide sensitive properties)
@@ -134,8 +136,14 @@ public class CatalogOperations {
                             Arrays.stream(fullAccessCatalogs), Arrays.stream(limitedAccessCatalogs))
                         .toArray(CatalogDTO[]::new);
               } else {
-                // If filtering is disabled, return all catalogs with full properties
-                catalogDTOs = DTOConverters.toDTOs(catalogs);
+                // If filtering is disabled, return all authorized catalogs with full properties
+                // Combine both arrays (owner-or-use) without hiding sensitive properties
+                Catalog[] allAuthorizedCatalogs =
+                    Stream.concat(
+                            Arrays.stream(filterResult.getFirst()),
+                            Arrays.stream(filterResult.getSecond()))
+                        .toArray(Catalog[]::new);
+                catalogDTOs = DTOConverters.toDTOs(allAuthorizedCatalogs);
               }
               Response response = Utils.ok(new CatalogListResponse(catalogDTOs));
               LOG.info("List {} catalogs info under metalake: {}", catalogDTOs.length, metalake);
