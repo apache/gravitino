@@ -974,7 +974,8 @@ public class TestClickHouseTableOperations extends TestClickHouse {
                 Distributions.NONE,
                 indexes,
                 null));
-    Assertions.assertDoesNotThrow(
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
         () ->
             ops.buildCreateSql(
                 "t1",
@@ -984,7 +985,7 @@ public class TestClickHouseTableOperations extends TestClickHouse {
                 new Transform[0],
                 Distributions.NONE,
                 indexes,
-                ClickHouseUtils.getSortOrders("c1")));
+                null));
 
     // Settings and comment retained
     Map<String, String> props = new HashMap<>();
