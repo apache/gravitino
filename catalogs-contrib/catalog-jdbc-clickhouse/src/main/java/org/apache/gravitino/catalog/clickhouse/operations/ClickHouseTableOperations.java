@@ -113,6 +113,11 @@ public class ClickHouseTableOperations extends JdbcTableOperations {
   }
 
   @Override
+  public boolean supportsTableSortOrder() {
+    return true;
+  }
+
+  @Override
   protected String generateCreateTableSql(
       String tableName,
       JdbcColumn[] columns,

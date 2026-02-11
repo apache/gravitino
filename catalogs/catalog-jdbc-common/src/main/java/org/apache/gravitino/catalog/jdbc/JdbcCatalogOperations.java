@@ -450,11 +450,12 @@ public class JdbcCatalogOperations implements CatalogOperations, SupportsSchemas
       SortOrder[] sortOrders,
       Index[] indexes)
       throws NoSuchSchemaException, TableAlreadyExistsException {
-    // clickhouse support sortOrders
-    if (!tableOperation.getClass().getSimpleName().equals("ClickHouseTableOperations")) {
+    JdbcTableOperations jdbcTableOperations = (JdbcTableOperations) tableOperation;
+    if (!jdbcTableOperations.supportsTableSortOrder()) {
       Preconditions.checkArgument(
           null == sortOrders || sortOrders.length == 0,
-          "jdbc-catalog does not support sort orders");
+          "The current JDBC connector: %s does not support sort orders",
+          jdbcTableOperations.getClass().getName());
     }
 
     StringIdentifier identifier = StringIdentifier.fromProperties(properties);

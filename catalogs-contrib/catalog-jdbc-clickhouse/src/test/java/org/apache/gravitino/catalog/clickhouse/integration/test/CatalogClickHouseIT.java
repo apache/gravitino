@@ -96,8 +96,7 @@ public class CatalogClickHouseIT extends BaseIT {
   public String alertTableName = "alert_table_name";
   public String table_comment = "table_comment";
 
-  // ClickHouse doesn't support schema comment
-  public String schema_comment = null;
+  public String schema_comment = "test schema";
   public String CLICKHOUSE_COL_NAME1 = "clickhouse_col_name1";
   public String CLICKHOUSE_COL_NAME2 = "clickhouse_col_name2";
   public String CLICKHOUSE_COL_NAME3 = "clickhouse_col_name3";
@@ -114,11 +113,7 @@ public class CatalogClickHouseIT extends BaseIT {
 
   private TestDatabaseName TEST_DB_NAME;
 
-  public static final String defaultClickhouseImageName = "clickhouse:8.0";
-
-  protected String clickhouseImageName = defaultClickhouseImageName;
-
-  boolean SupportColumnDefaultValueExpression() {
+  boolean supportColumnDefaultValueExpression() {
     return true;
   }
 
@@ -409,7 +404,7 @@ public class CatalogClickHouseIT extends BaseIT {
   @Test
   // ClickHouse support column default value expression after 8.0.13
   // see https://dev.clickhouse.com/doc/refman/8.0/en/data-type-defaults.html
-  @EnabledIf("SupportColumnDefaultValueExpression")
+  @EnabledIf("supportColumnDefaultValueExpression")
   void testColumnDefaultValue() {
     Column col1 =
         Column.of(
@@ -475,7 +470,7 @@ public class CatalogClickHouseIT extends BaseIT {
   @Test
   // ClickHouse support column default value expression after 8.0.13
   // see https://dev.clickhouse.com/doc/refman/8.0/en/data-type-defaults.html
-  @EnabledIf("SupportColumnDefaultValueExpression")
+  @EnabledIf("supportColumnDefaultValueExpression")
   void testColumnDefaultValueConverter() {
     // test convert from ClickHouse to Gravitino
     String tableName = GravitinoITUtils.genRandomName("test_default_value");

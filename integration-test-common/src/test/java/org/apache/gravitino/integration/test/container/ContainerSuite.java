@@ -30,6 +30,7 @@ import java.io.Closeable;
 import java.io.IOException;
 import java.net.InetAddress;
 import java.nio.ByteBuffer;
+import java.nio.file.FileSystems;
 import java.nio.file.Files;
 import java.nio.file.Paths;
 import java.nio.file.attribute.PosixFilePermission;
@@ -586,14 +587,17 @@ public class ContainerSuite implements Closeable {
               .replace("${ZOOKEEPER_PORT}", String.valueOf(ZooKeeperContainer.ZK_PORT));
       java.nio.file.Path tempFile = Files.createTempFile("remote_servers", ".xml").toAbsolutePath();
       Files.writeString(tempFile, replaced);
-      // Change the access mode of temFile to 644
-      Files.setPosixFilePermissions(
-          tempFile,
-          Set.of(
-              PosixFilePermission.OWNER_READ,
-              PosixFilePermission.OWNER_WRITE,
-              PosixFilePermission.GROUP_READ,
-              PosixFilePermission.OTHERS_READ));
+      // Change the access mode of temFile to 644 to avoid permission issues when ClickHouse
+      // container read the file.
+      if (FileSystems.getDefault().supportedFileAttributeViews().contains("posix")) {
+        Files.setPosixFilePermissions(
+            tempFile,
+            Set.of(
+                PosixFilePermission.OWNER_READ,
+                PosixFilePermission.OWNER_WRITE,
+                PosixFilePermission.GROUP_READ,
+                PosixFilePermission.OTHERS_READ));
+      }
       return tempFile.toString();
     } catch (IOException e) {
       throw new RuntimeException("Failed to prepare remote_servers.xml", e);

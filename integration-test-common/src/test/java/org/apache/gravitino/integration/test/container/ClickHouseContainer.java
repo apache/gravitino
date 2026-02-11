@@ -121,7 +121,8 @@ public class ClickHouseContainer extends BaseContainer {
       LOG.info(
           String.format("clickHouse container database %s has been created", testDatabaseName));
     } catch (Exception e) {
-      LOG.error(e.getMessage(), e);
+      throw new RuntimeException(
+          "Failed to create database on clickHouse container: " + e.getMessage(), e);
     }
   }
 
@@ -164,7 +165,8 @@ public class ClickHouseContainer extends BaseContainer {
               "clickHouse cluster database %s has been created with cluster %s",
               testDatabaseName, clusterName));
     } catch (Exception e) {
-      LOG.error(e.getMessage(), e);
+      throw new RuntimeException(
+          "Failed to create database on clickHouse cluster: " + e.getMessage(), e);
     }
   }
 

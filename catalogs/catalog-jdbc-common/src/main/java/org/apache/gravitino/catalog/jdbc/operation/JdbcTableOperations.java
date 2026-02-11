@@ -236,6 +236,10 @@ public abstract class JdbcTableOperations implements TableOperation {
     return builder;
   }
 
+  public boolean supportsTableSortOrder() {
+    return false;
+  }
+
   @Override
   public JdbcTable load(String databaseName, String tableName) throws NoSuchTableException {
     // We should handle case sensitivity and wild card issue in some catalog tables, take MySQL

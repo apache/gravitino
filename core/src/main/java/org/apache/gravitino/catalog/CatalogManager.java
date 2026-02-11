@@ -30,6 +30,7 @@ import com.github.benmanes.caffeine.cache.Cache;
 import com.github.benmanes.caffeine.cache.Caffeine;
 import com.github.benmanes.caffeine.cache.Scheduler;
 import com.google.common.base.Preconditions;
+import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Iterables;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
@@ -44,7 +45,6 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -116,12 +116,7 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
   private static final Logger LOG = LoggerFactory.getLogger(CatalogManager.class);
 
   private static final Set<String> CONTRIB_CATALOGS_TYPES =
-      new HashSet<>() {
-        {
-          add("jdbc-oceanbase");
-          add("jdbc-clickhouse");
-        }
-      };
+      ImmutableSet.of("jdbc-oceanbase", "jdbc-clickhouse");
 
   /** Wrapper class for a catalog instance and its class loader. */
   public static class CatalogWrapper {
