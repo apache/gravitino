@@ -76,7 +76,7 @@ public abstract class JobTemplate {
   /**
    * The list of arguments for the job template.
    *
-   * Arguments can be marked as optional by prefixing them with '?'. Optional arguments will be
+   * <p>Arguments can be marked as optional by prefixing them with '?'. Optional arguments will be
    * automatically removed if their placeholder value is empty or null during job execution.
    */
   protected final List<String> arguments;
