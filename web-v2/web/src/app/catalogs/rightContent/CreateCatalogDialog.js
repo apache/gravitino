@@ -349,6 +349,8 @@ export default function CreateCatalogDialog({ ...props }) {
           return <Icons.starrocks className={small ? 'size-6' : 'size-12'}></Icons.starrocks>
         case 'custom-icons-lakehouse':
           return <Icons.lakehouse className={small ? 'size-6' : 'size-12'}></Icons.lakehouse>
+        case 'custom-icons-clickhouse':
+          return <Icons.clickhouse className={small ? 'size-6' : 'size-12'}></Icons.clickhouse>
       }
     } else {
       return <Icons.iconify icon={calalogIcon} className={small ? 'size-6' : 'size-12'} />

@@ -52,7 +52,7 @@ import { validateMessages, mismatchName } from '@/config'
 import {
   ColumnSpesicalType,
   ColumnType,
-  ColumnTypeForMysql,
+  ColumnTypeForUnsigned,
   ColumnTypeSupportAutoIncrement,
   ColumnWithParamType,
   UnsupportColumnType,
@@ -462,8 +462,8 @@ export default function CreateTableDialog({ ...props }) {
           item => !UnsupportColumnType[provider]?.includes(item)
         )
 
-        if (provider === 'jdbc-mysql') {
-          columnTypes = [...columnTypes, ...ColumnTypeForMysql]
+        if (['jdbc-mysql', 'jdbc-clickhouse'].includes(provider)) {
+          columnTypes = [...columnTypes, ...ColumnTypeForUnsigned]
         }
         setColumnTypes(columnTypes.sort((a, b) => a.localeCompare(b)))
       }

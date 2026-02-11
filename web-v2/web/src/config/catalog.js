@@ -41,6 +41,8 @@ export const checkCatalogIcon = ({ type, provider }) => {
           return 'custom-icons-starrocks'
         case 'lakehouse-generic':
           return 'custom-icons-lakehouse'
+        case 'jdbc-clickhouse':
+          return 'custom-icons-clickhouse'
         default:
           return 'bx:book'
       }
@@ -287,6 +289,46 @@ export const providerBase = {
         value: '',
         required: true,
         description: 'The Apache Hive metastore URIs'
+      }
+    ]
+  },
+  'jdbc-clickhouse': {
+    label: 'ClickHouse',
+    defaultProps: [
+      {
+        label: 'JDBC URL',
+        key: 'jdbc-url',
+        value: '',
+        required: true,
+        description: 'e.g. jdbc:clickhouse://localhost:8123'
+      },
+      {
+        label: 'JDBC Driver',
+        key: 'jdbc-driver',
+        value: '',
+        required: true,
+        description: 'e.g. com.clickhouse.ClickHouseDriver'
+      },
+      {
+        label: 'JDBC User',
+        key: 'jdbc-user',
+        value: '',
+        required: true,
+        description: 'The username to connect to ClickHouse'
+      },
+      {
+        label: 'JDBC Password',
+        key: 'jdbc-password',
+        value: '',
+        required: true,
+        description: 'The password to connect to ClickHouse'
+      },
+      {
+        label: 'Pool Min Size',
+        key: 'jdbc.pool.min-size',
+        value: '',
+        required: false,
+        description: 'The minimum number of connections in the connection pool'
       }
     ]
   },
@@ -699,6 +741,11 @@ export const relationalProviders = [
     label: 'Apache Paimon',
     value: 'lakehouse-paimon',
     description: 'A realtime lakehouse architecture with Flink and Spark for both streaming and batch operations'
+  },
+  {
+    label: 'ClickHouse',
+    value: 'jdbc-clickhouse',
+    description: 'A fast open-source column-oriented database management system'
   },
   {
     label: 'Lakehouse Generic',
