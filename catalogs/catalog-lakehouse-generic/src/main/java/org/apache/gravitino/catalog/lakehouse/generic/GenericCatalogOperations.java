@@ -254,7 +254,7 @@ public class GenericCatalogOperations implements CatalogOperations, SupportsSche
     if (StringUtils.isNotBlank(tableLocation)) {
       newProperties.put(Table.PROPERTY_LOCATION, ensureTrailingSlash(tableLocation));
     } else {
-      String generatedLocation = calculateTableLocation(schema, ident, properties);
+      String generatedLocation = calculateTableLocation(schema, ident);
       if (StringUtils.isNotBlank(generatedLocation)) {
         newProperties.put(Table.PROPERTY_LOCATION, generatedLocation);
       } else if (tableOps.capabilities().contains(TableCapability.REQUIRES_LOCATION)) {
@@ -302,17 +302,7 @@ public class GenericCatalogOperations implements CatalogOperations, SupportsSche
     return dropped;
   }
 
-  private String calculateTableLocation(
-      Schema schema, NameIdentifier tableIdent, Map<String, String> tableProperties) {
-    String tableLocation =
-        (String)
-            propertiesMetadata
-                .tablePropertiesMetadata()
-                .getOrDefault(tableProperties, Table.PROPERTY_LOCATION);
-    if (StringUtils.isNotBlank(tableLocation)) {
-      return ensureTrailingSlash(tableLocation);
-    }
-
+  private String calculateTableLocation(Schema schema, NameIdentifier tableIdent) {
     String schemaLocation =
         schema.properties() == null ? null : schema.properties().get(Schema.PROPERTY_LOCATION);
 
