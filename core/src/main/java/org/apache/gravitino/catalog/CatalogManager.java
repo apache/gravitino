@@ -53,6 +53,7 @@ import java.util.ServiceLoader;
 import java.util.Set;
 import java.util.concurrent.ScheduledThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
+import java.util.function.Consumer;
 import java.util.stream.Collectors;
 import javax.annotation.Nullable;
 import lombok.Getter;
@@ -285,6 +286,7 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
   private final EntityStore store;
 
   private final IdGenerator idGenerator;
+  private final List<Consumer<NameIdentifier>> removalListeners = Lists.newArrayList();
 
   /**
    * Constructs a CatalogManager instance.
@@ -304,6 +306,11 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
             .expireAfterAccess(cacheEvictionIntervalInMs, TimeUnit.MILLISECONDS)
             .removalListener(
                 (k, v, c) -> {
+                  for (Consumer<NameIdentifier> listener : removalListeners) {
+                    if (k != null) {
+                      listener.accept((NameIdentifier) k);
+                    }
+                  }
                   LOG.info("Closing catalog {}.", k);
                   ((CatalogWrapper) v).close();
                 })
@@ -325,6 +332,16 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
   @Override
   public void close() {
     catalogCache.invalidateAll();
+  }
+
+  /**
+   * Adds a listener that will be notified when a catalog is removed from the cache.
+   *
+   * @param listener The consumer to be called with the NameIdentifier of the removed catalog.
+   */
+  @Override
+  public void addCatalogCacheRemoveListener(Consumer<NameIdentifier> listener) {
+    removalListeners.add(listener);
   }
 
   /**

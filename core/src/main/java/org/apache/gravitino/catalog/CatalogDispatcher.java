@@ -19,10 +19,26 @@
 
 package org.apache.gravitino.catalog;
 
+import java.util.function.Consumer;
+import org.apache.gravitino.NameIdentifier;
+
 /**
  * {@code CatalogDispatcher} interface acts as a specialization of the {@link SupportsCatalogs}
  * interface. This interface is designed to potentially add custom behaviors or operations related
  * to dispatching or handling catalog-related events or actions that are not covered by the standard
  * {@code SupportsCatalogs} operations.
  */
-public interface CatalogDispatcher extends SupportsCatalogs {}
+public interface CatalogDispatcher extends SupportsCatalogs {
+  /**
+   * Adds a listener that will be notified when a catalog is removed from the cache.
+   *
+   * <p>Note: Cache eviction is invoked asynchronously but uses a single thread to process removal
+   * events. To avoid blocking the eviction thread and delaying subsequent cache operations,
+   * listeners should avoid performing heavy operations (such as I/O, network calls, or complex
+   * computations) directly. Instead, consider offloading heavy work to a separate thread or
+   * executor.
+   *
+   * @param listener The consumer to be called with the NameIdentifier of the removed catalog.
+   */
+  void addCatalogCacheRemoveListener(Consumer<NameIdentifier> listener);
+}
