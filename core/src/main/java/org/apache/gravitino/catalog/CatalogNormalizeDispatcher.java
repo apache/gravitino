@@ -134,11 +134,6 @@ public class CatalogNormalizeDispatcher implements CatalogDispatcher {
     dispatcher.disableCatalog(ident);
   }
 
-  @Override
-  public void addCatalogCacheRemoveListener(java.util.function.Consumer<NameIdentifier> listener) {
-    dispatcher.addCatalogCacheRemoveListener(listener);
-  }
-
   private void validateCatalogName(String name) throws IllegalArgumentException {
     if (RESERVED_WORDS.contains(name.toLowerCase())) {
       throw new IllegalArgumentException("The catalog name '" + name + "' is reserved.");

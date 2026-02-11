@@ -337,9 +337,14 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
   /**
    * Adds a listener that will be notified when a catalog is removed from the cache.
    *
+   * <p>Note: Cache eviction is invoked asynchronously but uses a single thread to process removal
+   * events. To avoid blocking the eviction thread and delaying subsequent cache operations,
+   * listeners should avoid performing heavy operations (such as I/O, network calls, or complex
+   * computations) directly. Instead, consider offloading heavy work to a separate thread or
+   * executor.
+   *
    * @param listener The consumer to be called with the NameIdentifier of the removed catalog.
    */
-  @Override
   public void addCatalogCacheRemoveListener(Consumer<NameIdentifier> listener) {
     removalListeners.add(listener);
   }

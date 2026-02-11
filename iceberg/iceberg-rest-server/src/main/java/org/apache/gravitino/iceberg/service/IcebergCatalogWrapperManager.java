@@ -75,13 +75,11 @@ public class IcebergCatalogWrapperManager implements AutoCloseable {
     IcebergRESTServerContext context = IcebergRESTServerContext.getInstance();
     if (context.isAuxMode()) {
       GravitinoEnv.getInstance()
-          .catalogDispatcher()
+          .catalogManager()
           .addCatalogCacheRemoveListener(
               ident -> {
-                if (ident != null) {
-                  if (ident.namespace().level(0).equals(context.metalakeName())) {
-                    catalogWrapperCache.invalidate(ident.name());
-                  }
+                if (ident.namespace().level(0).equals(context.metalakeName())) {
+                  catalogWrapperCache.invalidate(ident.name());
                 }
               });
     }

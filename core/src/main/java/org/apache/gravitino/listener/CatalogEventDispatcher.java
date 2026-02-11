@@ -201,9 +201,4 @@ public class CatalogEventDispatcher implements CatalogDispatcher {
     // todo: support disable catalog event
     dispatcher.disableCatalog(ident);
   }
-
-  @Override
-  public void addCatalogCacheRemoveListener(java.util.function.Consumer<NameIdentifier> listener) {
-    dispatcher.addCatalogCacheRemoveListener(listener);
-  }
 }

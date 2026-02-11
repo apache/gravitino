@@ -175,9 +175,4 @@ public class CatalogHookDispatcher implements CatalogDispatcher {
   public boolean catalogExists(NameIdentifier ident) {
     return dispatcher.catalogExists(ident);
   }
-
-  @Override
-  public void addCatalogCacheRemoveListener(java.util.function.Consumer<NameIdentifier> listener) {
-    dispatcher.addCatalogCacheRemoveListener(listener);
-  }
 }
