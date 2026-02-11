@@ -139,45 +139,22 @@ jobs:
 
       - name: Build with Gradle
         if: needs.changes.outputs.mcp_server_changes == 'true'
-        run: |
-          TASKS="build"
-          if [ "${{ github.event_name }}" = "pull_request" ]; then
-            TASKS="$TASKS jacocoTestReport"
-          fi
-          ./gradlew $TASKS -PskipITs -PskipDockerTests=false -x :clients:client-python:build
+        run: ./gradlew build -PskipITs -PskipDockerTests=false -x :clients:client-python:build
 
       - name: Build with Gradle (skip mcp-server tests)
         if: needs.changes.outputs.mcp_server_changes != 'true'
-        run: |
-          TASKS="build"
-          if [ "${{ github.event_name }}" = "pull_request" ]; then
-            TASKS="$TASKS jacocoTestReport"
-          fi
-          ./gradlew $TASKS -PskipITs -PskipDockerTests=false -x :clients:client-python:build -x :mcp-server:build -x :mcp-server:test -x :mcp-server:pylint
+        run: ./gradlew build -PskipITs -PskipDockerTests=false -x :clients:client-python:build -x :mcp-server:build -x :mcp-server:test -x :mcp-server:pylint
+
+      - name: Publish unit test results
+        if: ${{ always() && github.event_name == 'pull_request' }}
+        uses: EnricoMi/publish-unit-test-result-action@v2
+        with:
+          files: |
+            **/build/test-results/test/TEST-*.xml
+          check_run_annotations: true
 
       - name: Release with Gradle
         run: ./gradlew clean && ./gradlew release -x test --rerun-tasks
-
-      - name: Jacoco Report to PR
-        if: github.event_name == 'pull_request'
-        id: jacoco
-        uses: madrapps/jacoco-report@v1.6.1
-        with:
-          paths: ${{ github.workspace }}/**/build/reports/jacoco/test/jacocoTestReport.xml
-          token: ${{ secrets.GITHUB_TOKEN }}
-          min-coverage-overall: 40
-          min-coverage-changed-files: 60
-          title: 'Code Coverage Report'
-          debug-mode: false
-          update-comment: true
-          pass-emoji: ':green_circle:'
-          fail-emoji: ':red_circle:'
-
-      - name: Get the Coverage info
-        if: github.event_name == 'pull_request'
-        run: |
-          echo "Total coverage ${{ steps.jacoco.outputs.coverage-overall }}"
-          echo "Changed Files coverage ${{ steps.jacoco.outputs.coverage-changed-files }}"
 
       - name: Upload unit tests report
         uses: actions/upload-artifact@v4
