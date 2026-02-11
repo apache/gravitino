@@ -180,7 +180,7 @@ class TestClickHouseTableOperationsCluster {
 
     Map<String, String> props = new HashMap<>();
     props.put(ClusterConstants.CLUSTER_NAME, "ck_cluster");
-    props.put(CLICKHOUSE_ENGINE_KEY, "Distributed");
+    props.put(GRAVITINO_ENGINE_KEY, "Distributed");
     props.put(DistributedTableConstants.REMOTE_DATABASE, "remote_db");
     props.put(DistributedTableConstants.REMOTE_TABLE, "remote_table");
     props.put(DistributedTableConstants.SHARDING_KEY, "user_id");
