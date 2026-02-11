@@ -36,6 +36,10 @@ class MetadataObjects:
             MetadataObject.Type.METALAKE,
             MetadataObject.Type.CATALOG,
             MetadataObject.Type.ROLE,
+            MetadataObject.Type.TAG,
+            MetadataObject.Type.POLICY,
+            MetadataObject.Type.JOB,
+            MetadataObject.Type.JOB_TEMPLATE,
         },
         2: {MetadataObject.Type.SCHEMA},
         3: {

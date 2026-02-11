@@ -25,7 +25,6 @@ CREATE TABLE IF NOT EXISTS function_meta (
     schema_id BIGINT NOT NULL,
     function_type VARCHAR(64) NOT NULL,
     deterministic SMALLINT DEFAULT 1,
-    return_type TEXT NOT NULL,
     function_current_version INT DEFAULT 1,
     function_latest_version INT DEFAULT 1,
     audit_info TEXT NOT NULL,
@@ -44,7 +43,6 @@ COMMENT ON COLUMN function_meta.catalog_id IS 'catalog id';
 COMMENT ON COLUMN function_meta.schema_id IS 'schema id';
 COMMENT ON COLUMN function_meta.function_type IS 'function type';
 COMMENT ON COLUMN function_meta.deterministic IS 'whether the function result is deterministic';
-COMMENT ON COLUMN function_meta.return_type IS 'function return type';
 COMMENT ON COLUMN function_meta.function_latest_version IS 'function latest version';
 COMMENT ON COLUMN function_meta.audit_info IS 'function audit info';
 COMMENT ON COLUMN function_meta.deleted_at IS 'function deleted at';
@@ -78,3 +76,52 @@ COMMENT ON COLUMN function_version_info.function_comment IS 'function version co
 COMMENT ON COLUMN function_version_info.definitions IS 'function definitions details';
 COMMENT ON COLUMN function_version_info.audit_info IS 'function version audit info';
 COMMENT ON COLUMN function_version_info.deleted_at IS 'function version deleted at';
+
+CREATE TABLE IF NOT EXISTS view_meta (
+    view_id BIGINT NOT NULL,
+    view_name VARCHAR(128) NOT NULL,
+    metalake_id BIGINT NOT NULL,
+    catalog_id BIGINT NOT NULL,
+    schema_id BIGINT NOT NULL,
+    current_version INT NOT NULL DEFAULT 1,
+    last_version INT NOT NULL DEFAULT 1,
+    deleted_at BIGINT NOT NULL DEFAULT 0,
+    PRIMARY KEY (view_id),
+    UNIQUE (schema_id, view_name, deleted_at)
+);
+
+CREATE INDEX IF NOT EXISTS view_meta_idx_metalake_id ON view_meta (metalake_id);
+CREATE INDEX IF NOT EXISTS view_meta_idx_catalog_id ON view_meta (catalog_id);
+COMMENT ON TABLE view_meta IS 'view metadata';
+
+COMMENT ON COLUMN view_meta.view_id IS 'view id';
+COMMENT ON COLUMN view_meta.view_name IS 'view name';
+COMMENT ON COLUMN view_meta.metalake_id IS 'metalake id';
+COMMENT ON COLUMN view_meta.catalog_id IS 'catalog id';
+COMMENT ON COLUMN view_meta.schema_id IS 'schema id';
+COMMENT ON COLUMN view_meta.current_version IS 'view current version';
+COMMENT ON COLUMN view_meta.last_version IS 'view last version';
+COMMENT ON COLUMN view_meta.deleted_at IS 'view deleted at';
+
+-- Add partition statistics storage support
+CREATE TABLE IF NOT EXISTS partition_statistic_meta (
+    table_id BIGINT NOT NULL,
+    partition_name VARCHAR(1024) NOT NULL,
+    statistic_name VARCHAR(128) NOT NULL,
+    statistic_value TEXT NOT NULL,
+    audit_info TEXT NOT NULL,
+    created_at BIGINT NOT NULL,
+    updated_at BIGINT NOT NULL,
+    PRIMARY KEY (table_id, partition_name, statistic_name)
+);
+
+CREATE INDEX IF NOT EXISTS idx_table_partition ON partition_statistic_meta(table_id, partition_name);
+
+COMMENT ON TABLE partition_statistic_meta IS 'partition statistics metadata';
+COMMENT ON COLUMN partition_statistic_meta.table_id IS 'table id from table_meta';
+COMMENT ON COLUMN partition_statistic_meta.partition_name IS 'partition name';
+COMMENT ON COLUMN partition_statistic_meta.statistic_name IS 'statistic name';
+COMMENT ON COLUMN partition_statistic_meta.statistic_value IS 'statistic value as JSON';
+COMMENT ON COLUMN partition_statistic_meta.audit_info IS 'audit information as JSON';
+COMMENT ON COLUMN partition_statistic_meta.created_at IS 'creation timestamp in milliseconds';
+COMMENT ON COLUMN partition_statistic_meta.updated_at IS 'last update timestamp in milliseconds';

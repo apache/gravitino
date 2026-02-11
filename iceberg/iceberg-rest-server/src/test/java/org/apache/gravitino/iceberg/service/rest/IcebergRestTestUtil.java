@@ -131,7 +131,7 @@ public class IcebergRestTestUtil {
           "true");
       IcebergConfigProvider configProvider = IcebergConfigProviderFactory.create(catalogConf);
       configProvider.initialize(catalogConf);
-      IcebergRESTServerContext.create(configProvider, false);
+      IcebergRESTServerContext.create(configProvider, false, false);
       // used to override register table interface
       IcebergCatalogWrapperManager icebergCatalogWrapperManager =
           new IcebergCatalogWrapperManagerForTest(catalogConf, configProvider);

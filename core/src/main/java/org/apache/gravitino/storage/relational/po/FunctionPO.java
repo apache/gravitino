@@ -18,18 +18,37 @@
  */
 package org.apache.gravitino.storage.relational.po;
 
+import static org.apache.gravitino.storage.relational.utils.POConverters.DEFAULT_DELETED_AT;
+
+import com.fasterxml.jackson.core.JsonProcessingException;
 import com.google.common.base.Preconditions;
+import java.util.Arrays;
+import java.util.List;
+import java.util.stream.Collectors;
 import lombok.EqualsAndHashCode;
 import lombok.Getter;
 import lombok.ToString;
 import lombok.experimental.Accessors;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.gravitino.Entity;
+import org.apache.gravitino.NameIdentifier;
+import org.apache.gravitino.Namespace;
+import org.apache.gravitino.dto.function.FunctionDefinitionDTO;
+import org.apache.gravitino.function.FunctionDefinition;
+import org.apache.gravitino.function.FunctionType;
+import org.apache.gravitino.json.JsonUtils;
+import org.apache.gravitino.meta.AuditInfo;
+import org.apache.gravitino.meta.FunctionEntity;
+import org.apache.gravitino.meta.NamespacedEntityId;
+import org.apache.gravitino.storage.relational.service.EntityIdService;
 
 @EqualsAndHashCode
 @Getter
 @ToString
 @Accessors(fluent = true)
 public class FunctionPO {
+
+  private static final Integer INITIAL_VERSION = 1;
 
   private Long functionId;
 
@@ -45,8 +64,6 @@ public class FunctionPO {
 
   private Integer deterministic;
 
-  private String returnType;
-
   private Integer functionLatestVersion;
 
   private Integer functionCurrentVersion;
@@ -59,6 +76,10 @@ public class FunctionPO {
 
   public FunctionPO() {}
 
+  public static class FunctionPOBuilder {
+    // Lombok will generate builder methods
+  }
+
   @lombok.Builder(setterPrefix = "with")
   private FunctionPO(
       Long functionId,
@@ -68,7 +89,6 @@ public class FunctionPO {
       Long schemaId,
       String functionType,
       Integer deterministic,
-      String returnType,
       Integer functionLatestVersion,
       Integer functionCurrentVersion,
       String auditInfo,
@@ -96,11 +116,98 @@ public class FunctionPO {
     this.schemaId = schemaId;
     this.functionType = functionType;
     this.deterministic = deterministic;
-    this.returnType = returnType;
     this.functionLatestVersion = functionLatestVersion;
     this.functionCurrentVersion = functionCurrentVersion;
     this.auditInfo = auditInfo;
     this.deletedAt = deletedAt;
     this.functionVersionPO = functionVersionPO;
+  }
+
+  // ============================ PO Converters ============================
+
+  public static FunctionEntity fromFunctionPO(FunctionPO functionPO, Namespace namespace) {
+    try {
+      FunctionVersionPO versionPO = functionPO.functionVersionPO();
+      List<FunctionDefinitionDTO> definitionDTOs =
+          JsonUtils.anyFieldMapper()
+              .readValue(
+                  versionPO.definitions(),
+                  JsonUtils.anyFieldMapper()
+                      .getTypeFactory()
+                      .constructCollectionType(List.class, FunctionDefinitionDTO.class));
+      FunctionDefinition[] definitions =
+          definitionDTOs.stream()
+              .map(FunctionDefinitionDTO::toFunctionDefinition)
+              .toArray(FunctionDefinition[]::new);
+      return FunctionEntity.builder()
+          .withId(functionPO.functionId())
+          .withName(functionPO.functionName())
+          .withNamespace(namespace)
+          .withComment(versionPO.functionComment())
+          .withFunctionType(FunctionType.valueOf(functionPO.functionType()))
+          .withDeterministic(functionPO.deterministic() != null && functionPO.deterministic() == 1)
+          .withDefinitions(definitions)
+          .withAuditInfo(
+              JsonUtils.anyFieldMapper().readValue(functionPO.auditInfo(), AuditInfo.class))
+          .build();
+    } catch (JsonProcessingException e) {
+      throw new RuntimeException("Failed to deserialize json object:", e);
+    }
+  }
+
+  public static FunctionPO initializeFunctionPO(
+      FunctionEntity functionEntity, FunctionPO.FunctionPOBuilder builder) {
+    builder.withFunctionLatestVersion(INITIAL_VERSION).withFunctionCurrentVersion(INITIAL_VERSION);
+    return buildFunctionPO(functionEntity, builder);
+  }
+
+  public static FunctionVersionPO initializeFunctionVersionPO(
+      FunctionEntity functionEntity, NamespacedEntityId namespacedEntityId, Integer version) {
+    try {
+      List<FunctionDefinitionDTO> definitionDTOs =
+          Arrays.stream(functionEntity.definitions())
+              .map(FunctionDefinitionDTO::fromFunctionDefinition)
+              .collect(Collectors.toList());
+      return FunctionVersionPO.builder()
+          .withFunctionId(functionEntity.id())
+          .withMetalakeId(namespacedEntityId.namespaceIds()[0])
+          .withCatalogId(namespacedEntityId.namespaceIds()[1])
+          .withSchemaId(namespacedEntityId.entityId())
+          .withFunctionVersion(version)
+          .withFunctionComment(functionEntity.comment())
+          .withDefinitions(JsonUtils.anyFieldMapper().writeValueAsString(definitionDTOs))
+          .withAuditInfo(JsonUtils.anyFieldMapper().writeValueAsString(functionEntity.auditInfo()))
+          .withDeletedAt(DEFAULT_DELETED_AT)
+          .build();
+    } catch (JsonProcessingException e) {
+      throw new RuntimeException("Failed to serialize json object:", e);
+    }
+  }
+
+  public static FunctionPO buildFunctionPO(
+      FunctionEntity functionEntity, FunctionPO.FunctionPOBuilder builder) {
+    return buildFunctionPO(functionEntity, builder, INITIAL_VERSION);
+  }
+
+  public static FunctionPO buildFunctionPO(
+      FunctionEntity functionEntity, FunctionPO.FunctionPOBuilder builder, Integer version) {
+    try {
+      NamespacedEntityId namespacedEntityId =
+          EntityIdService.getEntityIds(
+              NameIdentifier.of(functionEntity.namespace().levels()), Entity.EntityType.SCHEMA);
+      FunctionVersionPO versionPO =
+          initializeFunctionVersionPO(functionEntity, namespacedEntityId, version);
+      return builder
+          .withFunctionId(functionEntity.id())
+          .withFunctionName(functionEntity.name())
+          .withFunctionType(functionEntity.functionType().name())
+          .withDeterministic(functionEntity.deterministic() ? 1 : 0)
+          .withFunctionVersionPO(versionPO)
+          .withAuditInfo(JsonUtils.anyFieldMapper().writeValueAsString(functionEntity.auditInfo()))
+          .withDeletedAt(DEFAULT_DELETED_AT)
+          .build();
+    } catch (JsonProcessingException e) {
+      throw new RuntimeException("Failed to serialize json object:", e);
+    }
   }
 }
