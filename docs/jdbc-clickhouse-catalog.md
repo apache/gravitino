@@ -23,9 +23,12 @@ Gravitino writes system markers into table comments (for example `(From Gravitin
 
 ### Catalog capabilities
 
-- A catalog maps to one ClickHouse instance.
-- Supports JDBC-based metadata management and DDL.
-- Supports column default values.
+| Item            | Description                                                             |
+|-----------------|-------------------------------------------------------------------------|
+| Scope           | One catalog maps to one ClickHouse instance                             |
+| Metadata/DDL    | Supports JDBC-based metadata management and DDL                         |
+| Column defaults | Supports column default values                                          |
+| Drivers         | Requires user-provided ClickHouse JDBC driver in `catalogs-contrib/catalog-jdbc-clickhouse/libs` |
 
 ### Catalog properties
 
@@ -43,52 +46,114 @@ When using the JDBC catalog you must provide `jdbc-url`, `jdbc-driver`, `jdbc-us
 | `jdbc.pool.max-size`    | Maximum pool size                                                           | `10`          | No       | 1.2.0         |
 | `jdbc.pool.max-wait-ms` | Max wait time for a connection                                              | `30000`       | No       | 1.2.0         |
 
-:::caution
-Download the ClickHouse JDBC driver yourself and place it under `catalogs-contrib/catalog-jdbc-clickhouse/libs`.
-:::
+### Create a ClickHouse catalog
 
-### Catalog operations
+<Tabs groupId="language" queryString>
+<TabItem value="shell" label="Shell">
 
-See [Manage Relational Metadata Using Gravitino](./manage-relational-metadata-using-gravitino.md#catalog-operations).
+```shell
+curl -X POST -H "Accept: application/vnd.gravitino.v1+json" \
+-H "Content-Type: application/json" -d '{
+  "name": "ck",
+  "type": "RELATIONAL",
+  "comment": "ClickHouse catalog",
+  "provider": "jdbc-clickhouse",
+  "properties": {
+    "jdbc-url": "jdbc:clickhouse://localhost:8123",
+    "jdbc-driver": "com.clickhouse.jdbc.ClickHouseDriver",
+    "jdbc-user": "default",
+    "jdbc-password": "passw0rd"
+  }
+}' http://localhost:8090/api/metalakes/metalake/catalogs
+```
 
-The only difference is that the provider for ClickHouse is `jdbc-clickhouse`.
+</TabItem>
+<TabItem value="java" label="Java">
+
+```java
+GravitinoClient client = GravitinoClient.builder("http://localhost:8090")
+    .withMetalake("metalake")
+    .build();
+
+Map<String, String> ckProps = ImmutableMap.<String, String>builder()
+    .put("jdbc-url", "jdbc:clickhouse://localhost:8123")
+    .put("jdbc-driver", "com.clickhouse.jdbc.ClickHouseDriver")
+    .put("jdbc-user", "default")
+    .put("jdbc-password", "passw0rd")
+    .build();
+
+Catalog catalog =
+    client.createCatalog("ck", Catalog.Type.RELATIONAL, "jdbc-clickhouse", "ClickHouse catalog", ckProps);
+```
+
+</TabItem>
+</Tabs>
+
+See [Manage Relational Metadata Using Gravitino](./manage-relational-metadata-using-gravitino.md#catalog-operations) for other catalog operations.
 
 ## Schema
 
 ### Schema capabilities
 
-- Gravitino schema maps to a ClickHouse database.
-- Supports create and drop (cascade supported by ClickHouse).
-- Supports schema comments.
+| Item         | Description                                                                                  |
+|--------------|----------------------------------------------------------------------------------------------|
+| Mapping      | Gravitino schema maps to a ClickHouse database                                               |
+| Operations   | Create / drop (ClickHouse supports cascade drop)                                             |
+| Comments     | Schema comments supported                                                                    |
+| Cluster mode | Optional `ON CLUSTER` for creation when `cluster-name` is provided                           |
 
 ### Schema properties
 
-| Property Name | Description                                                                                      | Default Value | Required | Immutable | Since version |
-|---------------|--------------------------------------------------------------------------------------------------|---------------|----------|-----------|---------------|
-| `on-cluster`  | Use `ON CLUSTER` when creating the database (cluster name must also be provided at table level)  | `false`       | No       | No        | 1.2.0         |
-| `cluster-name`| Cluster name used with `ON CLUSTER` when creating the database                                   | (none)        | No       | No        | 1.2.0         |
+| Property Name  | Description                                                                                     | Default Value | Required | Immutable | Since version |
+|----------------|-------------------------------------------------------------------------------------------------|---------------|----------|-----------|---------------|
+| `on-cluster`   | Use `ON CLUSTER` when creating the database                                                     | `false`       | No       | No        | 1.2.0         |
+| `cluster-name` | Cluster name used with `ON CLUSTER` (must align with table-level cluster settings)             | (none)        | No       | No        | 1.2.0         |
 
-Please note that both `on-cluster` and `cluster-name` are optional. If we want to create a schema on a cluster, we need to set `on-cluster` to `true` and provide `cluster-name`.
+### Create a schema
 
-### Schema operations
+<Tabs groupId="language" queryString>
+<TabItem value="shell" label="Shell">
 
-See [Manage Relational Metadata Using Gravitino](./manage-relational-metadata-using-gravitino.md#schema-operations).
+```shell
+curl -X POST -H "Accept: application/vnd.gravitino.v1+json" \
+-H "Content-Type: application/json" -d '{
+  "name": "sales",
+  "comment": "Sales database",
+  "properties": {
+    "on-cluster": "true",
+    "cluster-name": "ck_cluster"
+  }
+}' http://localhost:8090/api/metalakes/metalake/catalogs/ck/schemas
+```
+
+</TabItem>
+<TabItem value="java" label="Java">
+
+```java
+Catalog catalog = client.loadCatalog("ck");
+Schema schema = catalog.asTableCatalog()
+    .createSchema("sales", "Sales database",
+        ImmutableMap.of("on-cluster", "true", "cluster-name", "ck_cluster"));
+```
+
+</TabItem>
+</Tabs>
+
+See [Manage Relational Metadata Using Gravitino](./manage-relational-metadata-using-gravitino.md#schema-operations) for more schema operations.
 
 ## Table
 
 ### Table capabilities
 
-- Gravitino table maps to a ClickHouse table.
-- Supports comments and column default values.
-- Engines:
-  - Local engines: `MergeTree` (default), `ReplacingMergeTree`, `SummingMergeTree`, `AggregatingMergeTree`, `CollapsingMergeTree`, `VersionedCollapsingMergeTree`, `GraphiteMergeTree`, `TinyLog`, `StripeLog`, `Log`, `Memory`, `File`, `Null`, `Set`, `Join`, `View`, `Buffer`, `KeeperMap`, and other listed ClickHouse engines exposed in the properties metadata.
-  - Cluster/Distributed: `Distributed` engine with `cluster-name`, `remote-database`, `remote-table`, and `sharding-key`. Sharding key can be an expression; when it references columns they must be non-nullable integral types.
-- Order/partition:
-  - MergeTree-family engines require exactly one `ORDER BY` column; other engines reject `ORDER BY`.
-  - Partitioning is supported only for MergeTree-family engines with single-column identity transform. Note: Some complicated partitioning expressions (for example `toYYYYMM(date + 1)`) are not supported.(`date + 1` is not supported because it is not an identity transform, Current version supports only identity transform for partitioning like toYYYYMM(date)).
-- Indexes: primary key, data-skipping `MINMAX` and `BLOOM_FILTER` (granularity fixed internally). Other data skip index types are not supported.
-- Distribution strategy (`Distributions.NONE`) is enforced; no custom distribution.
-- Unsupported: auto increment, dropping table properties, altering engine, multi-column sort keys.
+| Area                | Details                                                                                                                                                                                                                 |
+|---------------------|-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| Mapping             | Gravitino table maps to a ClickHouse table                                                                                                                                                                             |
+| Engines             | Local engines: MergeTree family (`MergeTree` default, `ReplacingMergeTree`, `SummingMergeTree`, `AggregatingMergeTree`, `CollapsingMergeTree`, `VersionedCollapsingMergeTree`, `GraphiteMergeTree`), Tiny/Stripe/Log, Memory, File, Null, Set, Join, View, Buffer, KeeperMap, etc. Distributed engine supports cluster mode with remote database/table and sharding key. |
+| Ordering/Partition  | MergeTree-family requires exactly one `ORDER BY` column; only single-column identity `PARTITION BY` is supported on MergeTree engines. Other engines reject `ORDER BY`/`PARTITION BY`.                                   |
+| Indexes             | Primary key; data-skipping indexes `DATA_SKIPPING_MINMAX` and `DATA_SKIPPING_BLOOM_FILTER` (fixed granularities).                                                                                                      |
+| Distribution        | Gravitino enforces `Distributions.NONE`; no custom distribution strategies.                                                                                                                                           |
+| Column defaults     | Supported.                                                                                                                                                                                                             |
+| Unsupported         | Engine change after creation; removing table properties; auto-increment columns.                                                                                                                                       |
 
 ### Table column types
 
@@ -121,15 +186,15 @@ Other ClickHouse types are exposed as [External Type](./manage-relational-metada
 - The `engine` value is immutable after creation.
 :::
 
-| Property Name                | Description                                                                                              | Default Value  | Required  | Reserved  | Immutable  | Since version  |
-|------------------------------|----------------------------------------------------------------------------------------------------------|----------------|-----------|-----------|------------|----------------|
-| `engine`                     | Table engine (for example `MergeTree`, `ReplacingMergeTree`, `Distributed`, `Memory`, etc.)              | `MergeTree`    | No        | No        | Yes        | 1.2.0          |
-| `cluster-name`               | Cluster name used with `ON CLUSTER` and Distributed engine                                               | (none)         | No\*      | No        | No         | 1.2.0          |
-| `on-cluster`                 | Use `ON CLUSTER` when creating the table                                                                 | (none)         | No        | No        | No         | 1.2.0          |
-| `cluster-remote-database`    | Remote database for `Distributed` engine                                                                 | (none)         | No\*\*    | No        | No         | 1.2.0          |
-| `cluster-remote-table`       | Remote table for `Distributed` engine                                                                    | (none)         | No\*\*    | No        | No         | 1.2.0          |
-| `cluster-sharding-key`       | Sharding key for `Distributed` engine (expression allowed; referenced columns must be non-null integral) | (none)         | No\*\*    | No        | No         | 1.2.0          |
-| `settings.<name>`            | ClickHouse engine setting forwarded as `SETTINGS <name>=<value>`                                         | (none)         | No        | No        | No         | 1.2.0          |
+| Property Name              | Description                                                                                              | Default Value | Required | Reserved | Immutable | Since version |
+|----------------------------|----------------------------------------------------------------------------------------------------------|---------------|----------|----------|-----------|---------------|
+| `engine`                   | Table engine (for example `MergeTree`, `ReplacingMergeTree`, `Distributed`, `Memory`, etc.)              | `MergeTree`   | No       | No       | Yes       | 1.2.0         |
+| `cluster-name`             | Cluster name used with `ON CLUSTER` and Distributed engine                                               | (none)        | No\*     | No       | No        | 1.2.0         |
+| `on-cluster`               | Use `ON CLUSTER` when creating the table                                                                 | (none)        | No       | No       | No        | 1.2.0         |
+| `cluster-remote-database`  | Remote database for `Distributed` engine                                                                 | (none)        | No\*\*   | No       | No        | 1.2.0         |
+| `cluster-remote-table`     | Remote table for `Distributed` engine                                                                    | (none)        | No\*\*   | No       | No        | 1.2.0         |
+| `cluster-sharding-key`     | Sharding key for `Distributed` engine (expression allowed; referenced columns must be non-null integral) | (none)        | No\*\*   | No       | No        | 1.2.0         |
+| `settings.<name>`          | ClickHouse engine setting forwarded as `SETTINGS <name>=<value>`                                         | (none)        | No       | No       | No        | 1.2.0         |
 
 \* Required when `on-cluster=true` or `engine=Distributed`.  
 \*\* Required when `engine=Distributed`.
@@ -146,6 +211,74 @@ Other ClickHouse types are exposed as [External Type](./manage-relational-metada
 - `ORDER BY`: required for MergeTree-family engines (single column); rejected for engines that do not support it.
 - `PARTITION BY`: single-column identity only, and only for MergeTree-family engines.
 - Distribution: fixed to `Distributions.NONE` (no custom distribution).
+
+### Create a table
+
+The following example creates a `MergeTree` table with `ORDER BY`, partitioning, indexes, comments, and properties including `ON CLUSTER`. Note that the `engine` property is required for MergeTree-family tables, and that the cluster properties must align with the schema-level cluster settings if `on-cluster=true`.
+
+<Tabs groupId="language" queryString>
+<TabItem value="shell" label="Shell">
+
+```shell
+curl -X POST -H "Accept: application/vnd.gravitino.v1+json" \
+-H "Content-Type: application/json" -d '{
+  "name": "orders",
+  "comment": "Orders table",
+  "columns": [
+    {"name": "order_id", "type": "int", "nullable": false},
+    {"name": "user_id", "type": "int", "nullable": false},
+    {"name": "amount", "type": "decimal(18,2)", "nullable": false},
+    {"name": "created_at", "type": "timestamp", "nullable": false}
+  ],
+  "properties": {
+    "engine": "MergeTree",
+    "on-cluster": "true",
+    "cluster-name": "ck_cluster"
+  },
+  "sortOrders": [
+    {"expression": "order_id", "direction": "ASCENDING"}
+  ],
+  "partitioning": ["created_at"],
+  "indexes": [
+    {"indexType": "primary_key", "name": "pk_order", "fieldNames": [["order_id"]]}
+  ]
+}' http://localhost:8090/api/metalakes/metalake/catalogs/ck/schemas/sales/tables
+```
+
+</TabItem>
+<TabItem value="java" label="Java">
+
+```java
+TableCatalog tableCatalog = client.loadCatalog("ck").asTableCatalog();
+
+Column[] columns = new Column[] {
+    Column.of("order_id", Types.IntegerType.get(), "Order ID", false),
+    Column.of("user_id", Types.IntegerType.get(), "User ID", false),
+    Column.of("amount", Types.DecimalType.of(18, 2), "Amount", false),
+    Column.of("created_at", Types.TimestampType.withoutTimeZone(), "Created time", false)
+};
+
+Index[] indexes =
+    new Index[] {Indexes.of(Index.IndexType.PRIMARY_KEY, "pk_order", new String[][] {{"order_id"}})};
+
+SortOrder[] sortOrders =
+    new SortOrder[] {SortOrder.builder("order_id").withDirection(SortDirection.ASCENDING).build()};
+
+Transform[] partitions = new Transform[] {Transforms.identity("created_at")};
+
+tableCatalog.createTable(
+    NameIdentifier.of("sales", "orders"),
+    columns,
+    "Orders table",
+    ImmutableMap.of("engine", "MergeTree", "on-cluster", "true", "cluster-name", "ck_cluster"),
+    partitions,
+    Distributions.NONE,
+    indexes,
+    sortOrders);
+```
+
+</TabItem>
+</Tabs>
 
 ### Table operations
 
