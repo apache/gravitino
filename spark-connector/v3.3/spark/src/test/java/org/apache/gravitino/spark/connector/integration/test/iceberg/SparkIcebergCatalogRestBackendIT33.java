@@ -25,7 +25,7 @@ import org.junit.jupiter.api.condition.DisabledIf;
 public class SparkIcebergCatalogRestBackendIT33 extends SparkIcebergCatalogRestBackendIT {
   @Override
   protected boolean supportsFunction() {
-    // Spark 3.3 does not support listFunctions
+    // Spark 3.3 does not support function operations
     return false;
   }
 }

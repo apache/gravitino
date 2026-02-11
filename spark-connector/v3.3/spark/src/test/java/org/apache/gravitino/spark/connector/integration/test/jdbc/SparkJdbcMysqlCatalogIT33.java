@@ -36,7 +36,7 @@ public class SparkJdbcMysqlCatalogIT33 extends SparkJdbcMysqlCatalogIT {
 
   @Override
   protected boolean supportsFunction() {
-    // Spark 3.3 does not support listFunctions
+    // Spark 3.3 does not support function operations
     return false;
   }
 }
