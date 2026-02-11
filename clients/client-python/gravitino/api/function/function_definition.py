@@ -158,7 +158,12 @@ class FunctionDefinitions:
 
         Returns:
             A FunctionDefinition instance.
+
+        Raises:
+            ValueError: If return_type is None.
         """
+        if return_type is None:
+            raise ValueError("Return type cannot be None")
         return cls.SimpleFunctionDefinition(parameters, return_type, None, impls)
 
     @classmethod
@@ -177,5 +182,10 @@ class FunctionDefinitions:
 
         Returns:
             A FunctionDefinition instance.
+
+        Raises:
+            ValueError: If return_columns is None or empty.
         """
+        if not return_columns:
+            raise ValueError("Return columns cannot be None or empty")
         return cls.SimpleFunctionDefinition(parameters, None, return_columns, impls)
