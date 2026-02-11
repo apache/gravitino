@@ -462,7 +462,6 @@ public class TestJobTemplate {
   @Test
   public void testCreateRuntimeJobTemplateWithOptionalArguments() {
     // Verify that optional arguments are correctly processed in job templates
-    // Detailed logic testing is in TestJobManager.testBuildArgumentsWithOptional()
     List<String> templateArgs =
         Lists.newArrayList(
             "Required:",

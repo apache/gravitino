@@ -789,17 +789,6 @@ public class JobManager implements JobOperationDispatcher {
   /**
    * Build arguments list with optional argument support.
    *
-   * <p>Arguments prefixed with '?' are treated as optional and will be removed if their placeholder
-   * value is empty/null after replacement.
-   *
-   * <p>Example:
-   *
-   * <pre>
-   * Template: ["--foo", "{{bar}}", "?--opt", "?{{opt_val}}"]
-   * JobConf: {"bar": "value1"}
-   * Result: ["--foo", "value1"]
-   * </pre>
-   *
    * @param templateArgs Template argument list (may contain optional markers)
    * @param jobConf Job configuration for placeholder replacement
    * @return Final argument list with optional arguments filtered

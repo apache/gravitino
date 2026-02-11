@@ -76,29 +76,8 @@ public abstract class JobTemplate {
   /**
    * The list of arguments for the job template.
    *
-   * <p>Arguments can be marked as optional by prefixing them with '?'. Optional arguments will be
+   * Arguments can be marked as optional by prefixing them with '?'. Optional arguments will be
    * automatically removed if their placeholder value is empty or null during job execution.
-   *
-   * <p>Example with optional arguments:
-   *
-   * <pre>
-   * .withArguments(Lists.newArrayList(
-   *     "--catalog", "{{catalog_name}}",       // Required argument
-   *     "--table", "{{table_identifier}}",     // Required argument
-   *     "?--strategy", "?{{strategy}}",        // Optional: only included if strategy is provided
-   *     "?--sort-order", "?{{sort_order}}"     // Optional: only included if sort_order is provided
-   * ))
-   * </pre>
-   *
-   * <p>When running the job:
-   *
-   * <ul>
-   *   <li>If {@code jobConf = {catalog_name: "hive", table_identifier: "db.table"}}, the resulting
-   *       arguments will be: {@code ["--catalog", "hive", "--table", "db.table"]}
-   *   <li>If {@code jobConf = {catalog_name: "hive", table_identifier: "db.table", strategy:
-   *       "binpack"}}, the resulting arguments will be: {@code ["--catalog", "hive", "--table",
-   *       "db.table", "--strategy", "binpack"]}
-   * </ul>
    */
   protected final List<String> arguments;
 
