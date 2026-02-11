@@ -61,6 +61,8 @@ You can use either to manage metadata. See
   messaging metadata.
 * [Manage model metadata using Gravitino](./manage-model-metadata-using-gravitino.md) to learn how to manage
   model metadata.
+* [Manage user-defined function using Gravitino](./manage-user-defined-function-using-gravitino.md) to learn how to manage
+  user-defined functions.
 
 Also, you can find the complete REST API definition in
 [Gravitino Open API](./api/rest/gravitino-rest-api),
