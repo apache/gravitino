@@ -52,6 +52,7 @@ import CreateFilesetDialog from '../CreateFilesetDialog'
 import RegisterModelDialog from '../RegisterModelDialog'
 import CreateTopicDialog from '../CreateTopicDialog'
 import CreateTableDialog from '../CreateTableDialog'
+import Functions from './Functions'
 
 const SetOwnerDialog = dynamic(() => import('@/components/SetOwnerDialog'), {
   loading: () => <Loading />,
@@ -125,9 +126,13 @@ export default function SchemaDetailsPage() {
           anthEnable
             ? [
                 { label: 'Tables', key: 'Tables' },
+                { label: 'Functions', key: 'Functions' },
                 { label: 'Associated roles', key: 'Associated roles' }
               ]
-            : [{ label: 'Tables', key: 'Tables' }]
+            : [
+                { label: 'Tables', key: 'Tables' },
+                { label: 'Functions', key: 'Functions' }
+              ]
         )
         setTabKey('Tables')
         setCreateBtn('Create Table')
@@ -519,7 +524,15 @@ export default function SchemaDetailsPage() {
         </Space>
       </Spin>
       <Tabs data-refer='details-tabs' defaultActiveKey={tabKey} onChange={onChangeTab} items={tabOptions} />
-      {tabKey !== 'Associated roles' ? (
+      {tabKey === 'Associated roles' ? (
+        <AssociatedTable
+          metalake={currentMetalake}
+          metadataObjectType={'schema'}
+          metadataObjectFullName={`${catalog}.${store.activatedDetails.name}`}
+        />
+      ) : tabKey === 'Functions' ? (
+        <Functions metalake={currentMetalake} catalog={catalog} schema={schema} />
+      ) : (
         <>
           <Flex justify='flex-end' className='mb-4'>
             <div
@@ -609,12 +622,6 @@ export default function SchemaDetailsPage() {
             />
           )}
         </>
-      ) : (
-        <AssociatedTable
-          metalake={currentMetalake}
-          metadataObjectType={'schema'}
-          metadataObjectFullName={`${catalog}.${store.activatedDetails.name}`}
-        />
       )}
       {openSchema && (
         <CreateSchemaDialog
