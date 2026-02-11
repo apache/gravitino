@@ -65,7 +65,11 @@ class FunctionImpl(ABC):
             """
             if not value or not value.strip():
                 raise ValueError("Function runtime must be set")
-            return cls[value.strip().upper()]
+            normalized = value.strip().upper()
+            for runtime in cls:
+                if runtime.name == normalized:
+                    return runtime
+            raise ValueError(f"Unsupported function runtime: {value}")
 
     def __init__(
         self,

@@ -91,7 +91,9 @@ class FunctionParams:
             )
 
         def __hash__(self) -> int:
-            return hash((self._name, self._data_type, self._comment))
+            return hash(
+                (self._name, self._data_type, self._comment, self._default_value)
+            )
 
         def __repr__(self) -> str:
             return (
