@@ -20,6 +20,7 @@ package org.apache.gravitino.server.authorization;
 import java.lang.reflect.Array;
 import java.security.Principal;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -38,9 +39,9 @@ import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.authorization.AuthorizationRequestContext;
 import org.apache.gravitino.authorization.GravitinoAuthorizer;
 import org.apache.gravitino.dto.tag.MetadataObjectDTO;
-import org.apache.gravitino.meta.TableEntity;
 import org.apache.gravitino.server.authorization.expression.AuthorizationExpressionConstants;
 import org.apache.gravitino.server.authorization.expression.AuthorizationExpressionEvaluator;
+import org.apache.gravitino.utils.EntityClassMapper;
 import org.apache.gravitino.utils.MetadataObjectUtil;
 import org.apache.gravitino.utils.NameIdentifierUtil;
 import org.apache.gravitino.utils.PrincipalUtils;
@@ -56,6 +57,24 @@ public class MetadataAuthzHelper {
 
   private static final Logger LOG = LoggerFactory.getLogger(MetadataAuthzHelper.class);
   private static volatile Executor executor = null;
+
+  /**
+   * Entity types that support batch get operations for cache preloading. These types have
+   * implemented the batchGetByIdentifier method in their respective MetaService classes.
+   */
+  private static final List<Entity.EntityType> SUPPORTED_PRELOAD_ENTITY_TYPES =
+      Arrays.asList(
+          Entity.EntityType.METALAKE,
+          Entity.EntityType.CATALOG,
+          Entity.EntityType.SCHEMA,
+          Entity.EntityType.TABLE,
+          Entity.EntityType.FILESET,
+          Entity.EntityType.TOPIC,
+          Entity.EntityType.MODEL,
+          Entity.EntityType.TAG,
+          Entity.EntityType.POLICY,
+          Entity.EntityType.JOB,
+          Entity.EntityType.JOB_TEMPLATE);
 
   private MetadataAuthzHelper() {}
 
@@ -329,12 +348,20 @@ public class MetadataAuthzHelper {
   private static void preloadToCache(
       Entity.EntityType entityType, NameIdentifier[] nameIdentifiers) {
     Config config = GravitinoEnv.getInstance().config();
-    if (config != null && !config.get(Configs.CACHE_ENABLED)) {
-      if (entityType == Entity.EntityType.TABLE) {
-        GravitinoEnv.getInstance()
-            .entityStore()
-            .batchGet(nameIdentifiers, entityType, TableEntity.class);
-      }
+    if (config == null || !config.get(Configs.CACHE_ENABLED)) {
+      return;
     }
+
+    // Only preload entity types that support batch get operations
+    if (!SUPPORTED_PRELOAD_ENTITY_TYPES.contains(entityType)) {
+      return;
+    }
+
+    GravitinoEnv.getInstance()
+        .entityStore()
+        .batchGet(
+            Arrays.asList(nameIdentifiers),
+            entityType,
+            EntityClassMapper.getEntityClass(entityType));
   }
 }

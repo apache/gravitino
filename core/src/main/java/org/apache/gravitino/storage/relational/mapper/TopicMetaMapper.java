@@ -87,4 +87,11 @@ public interface TopicMetaMapper {
       method = "deleteTopicMetasByLegacyTimeline")
   Integer deleteTopicMetasByLegacyTimeline(
       @Param("legacyTimeline") Long legacyTimeline, @Param("limit") int limit);
+
+  @SelectProvider(type = TopicMetaSQLProviderFactory.class, method = "batchSelectTopicByIdentifier")
+  List<TopicPO> batchSelectTopicByIdentifier(
+      @Param("metalakeName") String metalakeName,
+      @Param("catalogName") String catalogName,
+      @Param("schemaName") String schemaName,
+      @Param("topicNames") List<String> topicNames);
 }

@@ -25,6 +25,7 @@ import java.io.IOException;
 import java.util.List;
 import java.util.Objects;
 import java.util.function.Function;
+import java.util.stream.Collectors;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.HasIdentifier;
 import org.apache.gravitino.MetadataObject;
@@ -363,6 +364,24 @@ public class CatalogMetaService {
         CatalogMetaMapper.class,
         mapper -> {
           return mapper.deleteCatalogMetasByLegacyTimeline(legacyTimeline, limit);
+        });
+  }
+
+  @Monitored(
+      metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME,
+      baseMetricName = "batchGetCatalogByIdentifier")
+  public List<CatalogEntity> batchGetCatalogByIdentifier(List<NameIdentifier> identifiers) {
+    NameIdentifier firstIdent = identifiers.get(0);
+    String metalakeName = firstIdent.namespace().level(0);
+    List<String> catalogNames =
+        identifiers.stream().map(NameIdentifier::name).collect(Collectors.toList());
+
+    return SessionUtils.doWithCommitAndFetchResult(
+        CatalogMetaMapper.class,
+        mapper -> {
+          List<CatalogPO> catalogPOs =
+              mapper.batchSelectCatalogByIdentifier(metalakeName, catalogNames);
+          return POConverters.fromCatalogPOs(catalogPOs, firstIdent.namespace());
         });
   }
 }

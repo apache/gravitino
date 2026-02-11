@@ -91,4 +91,11 @@ public interface ModelMetaMapper {
   @UpdateProvider(type = ModelMetaSQLProviderFactory.class, method = "updateModelMeta")
   Integer updateModelMeta(
       @Param("newModelMeta") ModelPO newModelPO, @Param("oldModelMeta") ModelPO oldModelPO);
+
+  @SelectProvider(type = ModelMetaSQLProviderFactory.class, method = "batchSelectModelByIdentifier")
+  List<ModelPO> batchSelectModelByIdentifier(
+      @Param("metalakeName") String metalakeName,
+      @Param("catalogName") String catalogName,
+      @Param("schemaName") String schemaName,
+      @Param("modelNames") List<String> modelNames);
 }

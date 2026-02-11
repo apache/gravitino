@@ -25,6 +25,7 @@ import java.io.IOException;
 import java.util.List;
 import java.util.Objects;
 import java.util.function.Function;
+import java.util.stream.Collectors;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.HasIdentifier;
 import org.apache.gravitino.MetadataObject;
@@ -355,5 +356,45 @@ public class FilesetMetaService {
     builder.withMetalakeId(namespacedEntityId.namespaceIds()[0]);
     builder.withCatalogId(namespacedEntityId.namespaceIds()[1]);
     builder.withSchemaId(namespacedEntityId.entityId());
+  }
+
+  private FilesetPO getFilesetByFullQualifiedName(
+      String metalakeName, String catalogName, String schemaName, String filesetName) {
+    FilesetPO filesetPO =
+        SessionUtils.getWithoutCommit(
+            FilesetMetaMapper.class,
+            mapper ->
+                mapper.selectFilesetByFullQualifiedName(
+                    metalakeName, catalogName, schemaName, filesetName));
+    if (filesetPO == null) {
+      throw new NoSuchEntityException(
+          NoSuchEntityException.NO_SUCH_ENTITY_MESSAGE,
+          Entity.EntityType.FILESET.name().toLowerCase(),
+          filesetName);
+    }
+
+    return filesetPO;
+  }
+
+  @Monitored(
+      metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME,
+      baseMetricName = "batchGetFilesetByIdentifier")
+  public List<FilesetEntity> batchGetFilesetByIdentifier(List<NameIdentifier> identifiers) {
+    NameIdentifier firstIdent = identifiers.get(0);
+    NameIdentifier schemaIdent = NameIdentifierUtil.getSchemaIdentifier(firstIdent);
+    List<String> filesetNames =
+        identifiers.stream().map(NameIdentifier::name).collect(Collectors.toList());
+
+    return SessionUtils.doWithCommitAndFetchResult(
+        FilesetMetaMapper.class,
+        mapper -> {
+          List<FilesetPO> filesetPOs =
+              mapper.batchSelectFilesetByIdentifier(
+                  schemaIdent.namespace().level(0),
+                  schemaIdent.namespace().level(1),
+                  schemaIdent.name(),
+                  filesetNames);
+          return POConverters.fromFilesetPOs(filesetPOs, firstIdent.namespace());
+        });
   }
 }
