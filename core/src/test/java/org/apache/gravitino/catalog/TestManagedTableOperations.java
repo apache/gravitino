@@ -30,6 +30,7 @@ import org.apache.gravitino.Schema;
 import org.apache.gravitino.StringIdentifier;
 import org.apache.gravitino.connector.GenericColumn;
 import org.apache.gravitino.connector.SupportsSchemas;
+import org.apache.gravitino.connector.TableCapability;
 import org.apache.gravitino.exceptions.NoSuchTableException;
 import org.apache.gravitino.exceptions.TableAlreadyExistsException;
 import org.apache.gravitino.rel.Column;
@@ -91,8 +92,8 @@ public class TestManagedTableOperations {
     }
 
     @Override
-    public Set<TableFormatCapability> capabilities() {
-      return EnumSet.allOf(TableFormatCapability.class);
+    public Set<TableCapability> capabilities() {
+      return EnumSet.allOf(TableCapability.class);
     }
   }
 
@@ -127,12 +128,12 @@ public class TestManagedTableOperations {
     }
 
     @Override
-    public Set<TableFormatCapability> capabilities() {
+    public Set<TableCapability> capabilities() {
       return EnumSet.of(
-          TableFormatCapability.SUPPORTS_PARTITIONING,
-          TableFormatCapability.SUPPORTS_DISTRIBUTION,
-          TableFormatCapability.SUPPORTS_SORT_ORDERS,
-          TableFormatCapability.REQUIRES_LOCATION);
+          TableCapability.SUPPORTS_PARTITIONING,
+          TableCapability.SUPPORTS_DISTRIBUTION,
+          TableCapability.SUPPORTS_SORT_ORDERS,
+          TableCapability.REQUIRES_LOCATION);
     }
   }
 
@@ -144,13 +145,13 @@ public class TestManagedTableOperations {
 
     private final IdGenerator idGenerator;
 
-    private final Set<TableFormatCapability> capabilities;
+    private final Set<TableCapability> capabilities;
 
     public InMemoryCustomCapabilitiesTableOperations(
         EntityStore entityStore,
         SupportsSchemas supportsSchemas,
         IdGenerator idGenerator,
-        Set<TableFormatCapability> capabilities) {
+        Set<TableCapability> capabilities) {
       this.entityStore = entityStore;
       this.supportsSchemas = supportsSchemas;
       this.idGenerator = idGenerator;
@@ -173,7 +174,7 @@ public class TestManagedTableOperations {
     }
 
     @Override
-    public Set<TableFormatCapability> capabilities() {
+    public Set<TableCapability> capabilities() {
       return capabilities;
     }
   }
@@ -577,20 +578,17 @@ public class TestManagedTableOperations {
   public void testCapabilitiesDefaultAndOverrides() {
     ManagedTableOperations allCapsOps =
         new InMemoryManagedTableOperations(store, schemas, idGenerator);
-    Assertions.assertEquals(EnumSet.allOf(TableFormatCapability.class), allCapsOps.capabilities());
+    Assertions.assertEquals(EnumSet.allOf(TableCapability.class), allCapsOps.capabilities());
 
     ManagedTableOperations noIndexOps =
         new InMemoryNoIndexTableOperations(store, schemas, idGenerator);
-    Assertions.assertFalse(
-        noIndexOps.capabilities().contains(TableFormatCapability.SUPPORTS_INDEX));
+    Assertions.assertFalse(noIndexOps.capabilities().contains(TableCapability.SUPPORTS_INDEX));
     Assertions.assertTrue(
-        noIndexOps.capabilities().contains(TableFormatCapability.SUPPORTS_PARTITIONING));
+        noIndexOps.capabilities().contains(TableCapability.SUPPORTS_PARTITIONING));
     Assertions.assertTrue(
-        noIndexOps.capabilities().contains(TableFormatCapability.SUPPORTS_DISTRIBUTION));
-    Assertions.assertTrue(
-        noIndexOps.capabilities().contains(TableFormatCapability.SUPPORTS_SORT_ORDERS));
-    Assertions.assertTrue(
-        noIndexOps.capabilities().contains(TableFormatCapability.REQUIRES_LOCATION));
+        noIndexOps.capabilities().contains(TableCapability.SUPPORTS_DISTRIBUTION));
+    Assertions.assertTrue(noIndexOps.capabilities().contains(TableCapability.SUPPORTS_SORT_ORDERS));
+    Assertions.assertTrue(noIndexOps.capabilities().contains(TableCapability.REQUIRES_LOCATION));
   }
 
   @Test
@@ -601,10 +599,10 @@ public class TestManagedTableOperations {
             schemas,
             idGenerator,
             EnumSet.of(
-                TableFormatCapability.SUPPORTS_INDEX,
-                TableFormatCapability.SUPPORTS_DISTRIBUTION,
-                TableFormatCapability.SUPPORTS_SORT_ORDERS,
-                TableFormatCapability.REQUIRES_LOCATION));
+                TableCapability.SUPPORTS_INDEX,
+                TableCapability.SUPPORTS_DISTRIBUTION,
+                TableCapability.SUPPORTS_SORT_ORDERS,
+                TableCapability.REQUIRES_LOCATION));
     NameIdentifier tableIdent =
         NameIdentifierUtil.ofTable(METALAKE_NAME, CATALOG_NAME, SCHEMA_NAME, "table_no_partition");
     Column column1 = createColumn("col1", Types.StringType.get(), null);
@@ -637,10 +635,10 @@ public class TestManagedTableOperations {
             schemas,
             idGenerator,
             EnumSet.of(
-                TableFormatCapability.SUPPORTS_INDEX,
-                TableFormatCapability.SUPPORTS_PARTITIONING,
-                TableFormatCapability.SUPPORTS_SORT_ORDERS,
-                TableFormatCapability.REQUIRES_LOCATION));
+                TableCapability.SUPPORTS_INDEX,
+                TableCapability.SUPPORTS_PARTITIONING,
+                TableCapability.SUPPORTS_SORT_ORDERS,
+                TableCapability.REQUIRES_LOCATION));
     NameIdentifier tableIdent =
         NameIdentifierUtil.ofTable(
             METALAKE_NAME, CATALOG_NAME, SCHEMA_NAME, "table_no_distribution");
@@ -674,10 +672,10 @@ public class TestManagedTableOperations {
             schemas,
             idGenerator,
             EnumSet.of(
-                TableFormatCapability.SUPPORTS_INDEX,
-                TableFormatCapability.SUPPORTS_PARTITIONING,
-                TableFormatCapability.SUPPORTS_DISTRIBUTION,
-                TableFormatCapability.REQUIRES_LOCATION));
+                TableCapability.SUPPORTS_INDEX,
+                TableCapability.SUPPORTS_PARTITIONING,
+                TableCapability.SUPPORTS_DISTRIBUTION,
+                TableCapability.REQUIRES_LOCATION));
     NameIdentifier tableIdent =
         NameIdentifierUtil.ofTable(
             METALAKE_NAME, CATALOG_NAME, SCHEMA_NAME, "table_no_sort_orders");

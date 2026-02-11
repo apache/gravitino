@@ -42,6 +42,7 @@ import org.apache.gravitino.StringIdentifier;
 import org.apache.gravitino.connector.GenericColumn;
 import org.apache.gravitino.connector.GenericTable;
 import org.apache.gravitino.connector.SupportsSchemas;
+import org.apache.gravitino.connector.TableCapability;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.exceptions.NoSuchSchemaException;
 import org.apache.gravitino.exceptions.NoSuchTableException;
@@ -55,7 +56,6 @@ import org.apache.gravitino.rel.TableCatalog;
 import org.apache.gravitino.rel.TableChange;
 import org.apache.gravitino.rel.expressions.Expression;
 import org.apache.gravitino.rel.expressions.distributions.Distribution;
-import org.apache.gravitino.rel.expressions.distributions.Distributions;
 import org.apache.gravitino.rel.expressions.sorts.SortOrder;
 import org.apache.gravitino.rel.expressions.transforms.Transform;
 import org.apache.gravitino.rel.indexes.Index;
@@ -64,6 +64,7 @@ import org.apache.gravitino.rel.types.Type;
 import org.apache.gravitino.storage.IdGenerator;
 import org.apache.gravitino.utils.NamespaceUtil;
 import org.apache.gravitino.utils.PrincipalUtils;
+import org.apache.gravitino.utils.TableCapabilityValidator;
 
 public abstract class ManagedTableOperations implements TableCatalog {
 
@@ -75,7 +76,7 @@ public abstract class ManagedTableOperations implements TableCatalog {
 
   protected abstract IdGenerator idGenerator();
 
-  public abstract Set<TableFormatCapability> capabilities();
+  public abstract Set<TableCapability> capabilities();
 
   @Override
   public NameIdentifier[] listTables(Namespace namespace) throws NoSuchSchemaException {
@@ -121,8 +122,9 @@ public abstract class ManagedTableOperations implements TableCatalog {
       SortOrder[] sortOrders,
       Index[] indexes)
       throws NoSuchSchemaException, TableAlreadyExistsException {
-    validateIndexSupport(indexes);
-    validateTableLayoutSupport(partitions, distribution, sortOrders);
+    TableCapabilityValidator.validateIndexSupport(capabilities(), indexes);
+    TableCapabilityValidator.validateTableLayoutSupport(
+        capabilities(), partitions, distribution, sortOrders);
 
     // createTable in ManagedTableOperations only stores the table metadata in the entity store.
     // It doesn't handle any additional operations like creating physical location, preprocessing
@@ -172,7 +174,7 @@ public abstract class ManagedTableOperations implements TableCatalog {
   @Override
   public Table alterTable(NameIdentifier ident, TableChange... changes)
       throws NoSuchTableException, IllegalArgumentException {
-    validateIndexSupport(changes);
+    TableCapabilityValidator.validateIndexSupport(capabilities(), changes);
 
     // The alterTable in ManagedTableOperations only updates the table metadata in the entity store.
     // It doesn't handle any additional operations like modifying physical data, etc. Those
@@ -544,50 +546,6 @@ public abstract class ManagedTableOperations implements TableCatalog {
       return existingColumns.size();
     } else {
       throw new IllegalArgumentException("Unsupported column position: " + position);
-    }
-  }
-
-  private void validateIndexSupport(Index[] indexes) {
-    if (!capabilities().contains(TableFormatCapability.SUPPORTS_INDEX)
-        && indexes != null
-        && indexes.length > 0) {
-      throw new IllegalArgumentException("Indexes are not supported by this catalog");
-    }
-  }
-
-  private void validateIndexSupport(TableChange[] changes) {
-    if (capabilities().contains(TableFormatCapability.SUPPORTS_INDEX)) {
-      return;
-    }
-    boolean hasIndexChange =
-        Arrays.stream(changes)
-            .anyMatch(
-                change ->
-                    change instanceof TableChange.AddIndex
-                        || change instanceof TableChange.DeleteIndex);
-    if (hasIndexChange) {
-      throw new IllegalArgumentException("Indexes are not supported by this catalog");
-    }
-  }
-
-  private void validateTableLayoutSupport(
-      Transform[] partitions, Distribution distribution, SortOrder[] sortOrders) {
-    if (!capabilities().contains(TableFormatCapability.SUPPORTS_PARTITIONING)
-        && partitions != null
-        && partitions.length > 0) {
-      throw new IllegalArgumentException("Partitioning is not supported by this catalog");
-    }
-
-    if (!capabilities().contains(TableFormatCapability.SUPPORTS_DISTRIBUTION)
-        && distribution != null
-        && !Distributions.NONE.equals(distribution)) {
-      throw new IllegalArgumentException("Distribution is not supported by this catalog");
-    }
-
-    if (!capabilities().contains(TableFormatCapability.SUPPORTS_SORT_ORDERS)
-        && sortOrders != null
-        && sortOrders.length > 0) {
-      throw new IllegalArgumentException("Sort orders are not supported by this catalog");
     }
   }
 }

@@ -26,8 +26,8 @@ import org.apache.gravitino.EntityStore;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.catalog.ManagedSchemaOperations;
 import org.apache.gravitino.catalog.ManagedTableOperations;
-import org.apache.gravitino.catalog.TableFormatCapability;
 import org.apache.gravitino.connector.SupportsSchemas;
+import org.apache.gravitino.connector.TableCapability;
 import org.apache.gravitino.exceptions.NoSuchSchemaException;
 import org.apache.gravitino.exceptions.TableAlreadyExistsException;
 import org.apache.gravitino.rel.Column;
@@ -70,11 +70,11 @@ public class IcebergTableOperations extends ManagedTableOperations {
   }
 
   @Override
-  public Set<TableFormatCapability> capabilities() {
+  public Set<TableCapability> capabilities() {
     return EnumSet.of(
-        TableFormatCapability.SUPPORTS_PARTITIONING,
-        TableFormatCapability.SUPPORTS_DISTRIBUTION,
-        TableFormatCapability.SUPPORTS_SORT_ORDERS);
+        TableCapability.SUPPORTS_PARTITIONING,
+        TableCapability.SUPPORTS_DISTRIBUTION,
+        TableCapability.SUPPORTS_SORT_ORDERS);
   }
 
   @Override

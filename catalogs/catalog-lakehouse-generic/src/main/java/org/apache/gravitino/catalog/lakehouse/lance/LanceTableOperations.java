@@ -45,9 +45,9 @@ import org.apache.gravitino.EntityStore;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.catalog.ManagedSchemaOperations;
 import org.apache.gravitino.catalog.ManagedTableOperations;
-import org.apache.gravitino.catalog.TableFormatCapability;
 import org.apache.gravitino.connector.GenericTable;
 import org.apache.gravitino.connector.SupportsSchemas;
+import org.apache.gravitino.connector.TableCapability;
 import org.apache.gravitino.exceptions.NoSuchSchemaException;
 import org.apache.gravitino.exceptions.NoSuchTableException;
 import org.apache.gravitino.exceptions.TableAlreadyExistsException;
@@ -103,8 +103,8 @@ public class LanceTableOperations extends ManagedTableOperations {
   }
 
   @Override
-  public Set<TableFormatCapability> capabilities() {
-    return EnumSet.allOf(TableFormatCapability.class);
+  public Set<TableCapability> capabilities() {
+    return EnumSet.allOf(TableCapability.class);
   }
 
   @Override
