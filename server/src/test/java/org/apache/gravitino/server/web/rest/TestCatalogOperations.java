@@ -21,6 +21,7 @@ package org.apache.gravitino.server.web.rest;
 import static javax.ws.rs.core.Response.Status.INTERNAL_SERVER_ERROR;
 import static org.apache.gravitino.Catalog.PROPERTY_IN_USE;
 import static org.apache.gravitino.Configs.CACHE_ENABLED;
+import static org.apache.gravitino.Configs.ENABLE_AUTHORIZATION;
 import static org.apache.gravitino.Configs.FILTER_SENSITIVE_PROPERTIES;
 import static org.apache.gravitino.Configs.TREE_LOCK_CLEAN_INTERVAL;
 import static org.apache.gravitino.Configs.TREE_LOCK_MAX_NODE_IN_MEMORY;
@@ -99,6 +100,7 @@ public class TestCatalogOperations extends BaseOperationsTest {
     Mockito.doReturn(36000L).when(config).get(TREE_LOCK_CLEAN_INTERVAL);
     Mockito.doReturn(false).when(config).get(FILTER_SENSITIVE_PROPERTIES);
     Mockito.doReturn(false).when(config).get(CACHE_ENABLED);
+    Mockito.doReturn(false).when(config).get(ENABLE_AUTHORIZATION);
     FieldUtils.writeField(GravitinoEnv.getInstance(), "lockManager", new LockManager(config), true);
     FieldUtils.writeField(GravitinoEnv.getInstance(), "config", config, true);
   }
@@ -216,6 +218,46 @@ public class TestCatalogOperations extends BaseOperationsTest {
     ErrorResponse errorResponse = resp1.readEntity(ErrorResponse.class);
     Assertions.assertEquals(ErrorConstants.NOT_FOUND_CODE, errorResponse.getCode());
     Assertions.assertEquals(NoSuchMetalakeException.class.getSimpleName(), errorResponse.getType());
+  }
+
+  @Test
+  public void testListCatalogsInfoWithSensitivePropertiesWhenFilteringDisabled() {
+    // This test verifies that when filterSensitiveProperties=false (set in @BeforeAll),
+    // authorization filtering still works and all properties (including sensitive ones) are visible
+    TestCatalog catalog1 = buildCatalogWithSensitiveProperties("metalake1", "catalog1");
+    TestCatalog catalog2 = buildCatalogWithSensitiveProperties("metalake1", "catalog2");
+
+    when(manager.listCatalogsInfo(any())).thenReturn(new Catalog[] {catalog1, catalog2});
+
+    Response resp =
+        target("/metalakes/metalake1/catalogs")
+            .queryParam("details", "true")
+            .request(MediaType.APPLICATION_JSON_TYPE)
+            .accept("application/vnd.gravitino.v1+json")
+            .get();
+
+    Assertions.assertEquals(Response.Status.OK.getStatusCode(), resp.getStatus());
+    CatalogListResponse catalogResponse = resp.readEntity(CatalogListResponse.class);
+    Assertions.assertEquals(0, catalogResponse.getCode());
+
+    CatalogDTO[] catalogDTOs = catalogResponse.getCatalogs();
+    Assertions.assertEquals(2, catalogDTOs.length);
+
+    // Verify that sensitive properties are present when filtering is disabled
+    CatalogDTO catalogDTO1 = catalogDTOs[0];
+    Assertions.assertEquals("catalog1", catalogDTO1.name());
+    Assertions.assertNotNull(catalogDTO1.properties());
+    Assertions.assertTrue(
+        catalogDTO1.properties().containsKey("jdbc-password"),
+        "Sensitive property should be visible when filterSensitiveProperties=false");
+    Assertions.assertEquals("secret123", catalogDTO1.properties().get("jdbc-password"));
+
+    CatalogDTO catalogDTO2 = catalogDTOs[1];
+    Assertions.assertEquals("catalog2", catalogDTO2.name());
+    Assertions.assertNotNull(catalogDTO2.properties());
+    Assertions.assertTrue(
+        catalogDTO2.properties().containsKey("jdbc-password"),
+        "Sensitive property should be visible when filterSensitiveProperties=false");
   }
 
   @Test
@@ -596,6 +638,36 @@ public class TestCatalogOperations extends BaseOperationsTest {
             .withComment("comment")
             .withNamespace(Namespace.of(metalake))
             .withProperties(ImmutableMap.of("key", "value"))
+            .withType(Catalog.Type.RELATIONAL)
+            .withProvider("test")
+            .withAuditInfo(
+                AuditInfo.builder().withCreator("creator").withCreateTime(Instant.now()).build())
+            .build();
+
+    return new TestCatalog().withCatalogConf(Collections.emptyMap()).withCatalogEntity(entity);
+  }
+
+  private static TestCatalog buildCatalogWithSensitiveProperties(
+      String metalake, String catalogName) {
+    // Include both regular and sensitive properties to test filterSensitiveProperties behavior
+    ImmutableMap<String, String> properties =
+        ImmutableMap.<String, String>builder()
+            .put("key", "value")
+            .put(PROPERTY_IN_USE, "true")
+            .put("jdbc-url", "jdbc:mysql://localhost:3306/db")
+            .put("jdbc-user", "admin")
+            .put("jdbc-password", "secret123") // sensitive property
+            .put("s3-access-key-id", "AKIAIOSFODNN7EXAMPLE")
+            .put("s3-secret-access-key", "aws-secret") // sensitive property
+            .build();
+
+    CatalogEntity entity =
+        CatalogEntity.builder()
+            .withId(1L)
+            .withName(catalogName)
+            .withComment("comment")
+            .withNamespace(Namespace.of(metalake))
+            .withProperties(properties)
             .withType(Catalog.Type.RELATIONAL)
             .withProvider("test")
             .withAuditInfo(
