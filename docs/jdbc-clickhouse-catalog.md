@@ -85,8 +85,8 @@ See [Manage Relational Metadata Using Gravitino](./manage-relational-metadata-us
   - Cluster/Distributed: `Distributed` engine with `cluster-name`, `remote-database`, `remote-table`, and `sharding-key`. Sharding key can be an expression; when it references columns they must be non-nullable integral types.
 - Order/partition:
   - MergeTree-family engines require exactly one `ORDER BY` column; other engines reject `ORDER BY`.
-  - Partitioning supported only for MergeTree-family engines with single-column identity transform.
-- Indexes: primary key, data-skipping `MINMAX` and `BLOOM_FILTER` (granularity fixed internally).
+  - Partitioning is supported only for MergeTree-family engines with single-column identity transform. Note: Some complicated partitioning expressions (for example `toYYYYMM(date + 1)`) are not supported.(`date + 1` is not supported because it is not an identity transform, Current version supports only identity transform for partitioning like toYYYYMM(date)).
+- Indexes: primary key, data-skipping `MINMAX` and `BLOOM_FILTER` (granularity fixed internally). Other data skip index types are not supported.
 - Distribution strategy (`Distributions.NONE`) is enforced; no custom distribution.
 - Unsupported: auto increment, dropping table properties, altering engine, multi-column sort keys.
 
@@ -154,7 +154,7 @@ Supported:
 - Add column (with nullable flag, default, comment, position).
 - Rename column.
 - Update column type/comment/default/position/nullability.
-- Delete column (with `IF EXISTS` support).
+- Delete columns (with `IF EXISTS` support).
 - Add primary or data-skipping indexes; drop data-skipping indexes.
 - Update table comment.
 
