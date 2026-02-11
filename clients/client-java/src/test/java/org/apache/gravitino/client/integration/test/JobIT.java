@@ -452,4 +452,85 @@ public class JobIT extends BaseIT {
       throw new RuntimeException("Failed to create test lib script", e);
     }
   }
+
+  @Test
+  public void testJobTemplateWithOptionalArguments() throws Exception {
+    // Register template with optional arguments
+    ShellJobTemplate template =
+        ShellJobTemplate.builder()
+            .withName("test_optional_args_template")
+            .withComment("Test template with optional arguments")
+            .withExecutable(testEntryScriptPath)
+            .withArguments(
+                Lists.newArrayList(
+                    "{{required_arg}}", "success", "?{{optional_arg1}}", "?{{optional_arg2}}"))
+            .withEnvironments(ImmutableMap.of("ENV_VAR", "test_value"))
+            .withScripts(Lists.newArrayList(testLibScriptPath))
+            .withCustomFields(Collections.emptyMap())
+            .build();
+
+    metalake.registerJobTemplate(template);
+
+    // Verify template was registered
+    JobTemplate retrievedTemplate = metalake.getJobTemplate(template.name());
+    Assertions.assertNotNull(retrievedTemplate);
+
+    // Case 1: Run with only required arguments
+    Map<String, String> jobConf1 = ImmutableMap.of("required_arg", "value1");
+    JobHandle job1 = metalake.runJob(template.name(), jobConf1);
+    Assertions.assertNotNull(job1);
+
+    // Wait for job to complete
+    Awaitility.await()
+        .atMost(30, TimeUnit.SECONDS)
+        .pollInterval(1, TimeUnit.SECONDS)
+        .until(
+            () -> {
+              JobHandle handle = metalake.getJob(job1.jobId());
+              return handle.jobStatus() == JobHandle.Status.SUCCEEDED
+                  || handle.jobStatus() == JobHandle.Status.FAILED;
+            });
+
+    JobHandle completedJob1 = metalake.getJob(job1.jobId());
+    Assertions.assertEquals(JobHandle.Status.SUCCEEDED, completedJob1.jobStatus());
+
+    // Case 2: Run with one optional argument
+    Map<String, String> jobConf2 =
+        ImmutableMap.of("required_arg", "value1", "optional_arg1", "opt_value1");
+    JobHandle job2 = metalake.runJob(template.name(), jobConf2);
+    Assertions.assertNotNull(job2);
+
+    Awaitility.await()
+        .atMost(30, TimeUnit.SECONDS)
+        .pollInterval(1, TimeUnit.SECONDS)
+        .until(
+            () -> {
+              JobHandle handle = metalake.getJob(job2.jobId());
+              return handle.jobStatus() == JobHandle.Status.SUCCEEDED
+                  || handle.jobStatus() == JobHandle.Status.FAILED;
+            });
+
+    JobHandle completedJob2 = metalake.getJob(job2.jobId());
+    Assertions.assertEquals(JobHandle.Status.SUCCEEDED, completedJob2.jobStatus());
+
+    // Case 3: Run with all arguments
+    Map<String, String> jobConf3 =
+        ImmutableMap.of(
+            "required_arg", "value1", "optional_arg1", "opt_value1", "optional_arg2", "opt_value2");
+    JobHandle job3 = metalake.runJob(template.name(), jobConf3);
+    Assertions.assertNotNull(job3);
+
+    Awaitility.await()
+        .atMost(30, TimeUnit.SECONDS)
+        .pollInterval(1, TimeUnit.SECONDS)
+        .until(
+            () -> {
+              JobHandle handle = metalake.getJob(job3.jobId());
+              return handle.jobStatus() == JobHandle.Status.SUCCEEDED
+                  || handle.jobStatus() == JobHandle.Status.FAILED;
+            });
+
+    JobHandle completedJob3 = metalake.getJob(job3.jobId());
+    Assertions.assertEquals(JobHandle.Status.SUCCEEDED, completedJob3.jobStatus());
+  }
 }

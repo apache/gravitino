@@ -458,4 +458,45 @@ public class TestJobTemplate {
                 .collect(Collectors.toList());
     Assertions.assertTrue(archiveNames.contains(archive1.getName()));
   }
+
+  @Test
+  public void testCreateRuntimeJobTemplateWithOptionalArguments() {
+    // Verify that optional arguments are correctly processed in job templates
+    // Detailed logic testing is in TestJobManager.testBuildArgumentsWithOptional()
+    List<String> templateArgs =
+        Lists.newArrayList(
+            "Required:",
+            "{{required_arg}}",
+            "?Optional1:",
+            "?{{optional_arg1}}",
+            "?Optional2:",
+            "?{{optional_arg2}}");
+
+    // Test Case 1: Only required argument provided
+    Map<String, String> jobConf1 = ImmutableMap.of("required_arg", "value1");
+    List<String> result1 = JobManager.buildArgumentsWithOptional(templateArgs, jobConf1);
+    Assertions.assertEquals(Lists.newArrayList("Required:", "value1"), result1);
+
+    // Test Case 2: One optional argument provided
+    Map<String, String> jobConf2 =
+        ImmutableMap.of("required_arg", "value1", "optional_arg1", "opt_value1");
+    List<String> result2 = JobManager.buildArgumentsWithOptional(templateArgs, jobConf2);
+    Assertions.assertEquals(
+        Lists.newArrayList("Required:", "value1", "Optional1:", "opt_value1"), result2);
+
+    // Test Case 3: All arguments provided
+    Map<String, String> jobConf3 =
+        ImmutableMap.of(
+            "required_arg", "value1", "optional_arg1", "opt_value1", "optional_arg2", "opt_value2");
+    List<String> result3 = JobManager.buildArgumentsWithOptional(templateArgs, jobConf3);
+    Assertions.assertEquals(
+        Lists.newArrayList(
+            "Required:", "value1", "Optional1:", "opt_value1", "Optional2:", "opt_value2"),
+        result3);
+
+    // Test Case 4: Empty string for optional argument should be filtered
+    Map<String, String> jobConf4 = ImmutableMap.of("required_arg", "value1", "optional_arg1", "");
+    List<String> result4 = JobManager.buildArgumentsWithOptional(templateArgs, jobConf4);
+    Assertions.assertEquals(Lists.newArrayList("Required:", "value1"), result4);
+  }
 }
