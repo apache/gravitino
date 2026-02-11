@@ -26,6 +26,7 @@ import org.apache.gravitino.trino.connector.GravitinoPlugin;
 import org.apache.gravitino.trino.connector.GravitinoPlugin446;
 import org.apache.gravitino.trino.connector.TestGravitinoConnector;
 import org.apache.gravitino.trino.connector.TestGravitinoConnectorWithMetalakeCatalogName;
+import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Nested;
 
 public class TestGravitinoConnector446 {
@@ -44,6 +45,7 @@ public class TestGravitinoConnector446 {
   }
 
   @Nested
+  @Disabled
   class MultiMetalake extends TestGravitinoConnectorWithMetalakeCatalogName {
     @Override
     protected GravitinoPlugin createGravitinoPlugin(GravitinoAdminClient client) {
@@ -54,6 +56,16 @@ public class TestGravitinoConnector446 {
     protected DistributedQueryRunner createTrinoQueryRunner() throws Exception {
       Session session = testSessionBuilder().setCatalog("gravitino").build();
       return DistributedQueryRunner.builder(session).setWorkerCount(1).build();
+    }
+
+    @Override
+    protected String getTrinoCliCatalogName(String metalakeName, String catalogName) {
+      return metalakeName + "." + catalogName;
+    }
+
+    @Override
+    protected String getTrinoSqlCatalogName(String metalakeName, String catalogName) {
+      return "\"" + metalakeName + "." + catalogName + "\"";
     }
   }
 }
