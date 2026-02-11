@@ -69,10 +69,10 @@ wget "https://repo1.maven.org/maven2/mysql/mysql-connector-java/8.0.27/$mysql_dr
 cp "${gravitino_staging_dir}/${mysql_driver}" "${gravitino_package_dir}/catalogs/jdbc-mysql/libs/"
 cp "${gravitino_staging_dir}/${mysql_driver}" "${gravitino_package_dir}/catalogs/jdbc-doris/libs/"
 cp "${gravitino_staging_dir}/${mysql_driver}" "${gravitino_package_dir}/catalogs/jdbc-starrocks/libs/"
-cp "${gravitino_staging_dir}/${mysql_driver}" "${gravitino_package_dir}/catalogs/jdbc-oceanbase/libs/"
 cp "${gravitino_staging_dir}/${mysql_driver}" "${gravitino_package_dir}/catalogs/lakehouse-iceberg/libs/"
 cp "${gravitino_staging_dir}/${mysql_driver}" "${gravitino_iceberg_rest_dir}"
 cp "${gravitino_staging_dir}/${mysql_driver}" "${gravitino_package_dir}/libs/"
+
 
 pg_driver="postgresql-42.7.0.jar"
 wget "https://jdbc.postgresql.org/download/${pg_driver}" -O "${gravitino_staging_dir}/${pg_driver}"

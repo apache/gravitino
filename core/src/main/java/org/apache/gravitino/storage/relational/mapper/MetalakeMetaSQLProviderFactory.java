@@ -96,4 +96,9 @@ public class MetalakeMetaSQLProviderFactory {
       @Param("legacyTimeline") Long legacyTimeline, @Param("limit") int limit) {
     return getProvider().deleteMetalakeMetasByLegacyTimeline(legacyTimeline, limit);
   }
+
+  public static String batchSelectMetalakeByName(
+      @Param("metalakeNames") List<String> metalakeNames) {
+    return getProvider().batchSelectMetalakeByName(metalakeNames);
+  }
 }

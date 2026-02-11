@@ -273,4 +273,34 @@ public class SchemaMetaBaseSQLProvider {
         + " AND catalog_meta.deleted_at = 0"
         + " AND metalake_meta.deleted_at = 0";
   }
+
+  public String batchSelectSchemaByIdentifier(
+      @Param("metalakeName") String metalakeName,
+      @Param("catalogName") String catalogName,
+      @Param("schemaNames") List<String> schemaNames) {
+    return "<script>"
+        + "SELECT sm.schema_id as schemaId, sm.schema_name as schemaName,"
+        + " sm.metalake_id as metalakeId, sm.catalog_id as catalogId,"
+        + " sm.schema_comment as schemaComment, sm.properties, sm.audit_info as auditInfo,"
+        + " sm.current_version as currentVersion, sm.last_version as lastVersion,"
+        + " sm.deleted_at as deletedAt"
+        + " FROM "
+        + TABLE_NAME
+        + " sm"
+        + " JOIN "
+        + CatalogMetaMapper.TABLE_NAME
+        + " cm ON sm.catalog_id = cm.catalog_id"
+        + " JOIN "
+        + MetalakeMetaMapper.TABLE_NAME
+        + " mm ON cm.metalake_id = mm.metalake_id"
+        + " WHERE mm.metalake_name = #{metalakeName}"
+        + " AND cm.catalog_name = #{catalogName}"
+        + " AND sm.schema_name IN ("
+        + "<foreach collection='schemaNames' item='schemaName' separator=','>"
+        + "#{schemaName}"
+        + "</foreach>"
+        + " )"
+        + " AND sm.deleted_at = 0 AND cm.deleted_at = 0 AND mm.deleted_at = 0"
+        + "</script>";
+  }
 }

@@ -1404,6 +1404,10 @@ public class POConverters {
     }
   }
 
+  public static List<TagEntity> fromTagPOs(List<TagPO> tagPOs, Namespace namespace) {
+    return tagPOs.stream().map(po -> fromTagPO(po, namespace)).collect(Collectors.toList());
+  }
+
   public static TagPO initializeTagPOWithVersion(TagEntity tagEntity, TagPO.Builder builder) {
     try {
       return builder
@@ -1485,6 +1489,10 @@ public class POConverters {
     } catch (JsonProcessingException e) {
       throw new RuntimeException("Failed to deserialize json object:", e);
     }
+  }
+
+  public static List<PolicyEntity> fromPolicyPOs(List<PolicyPO> policyPOs, Namespace namespace) {
+    return policyPOs.stream().map(po -> fromPolicyPO(po, namespace)).collect(Collectors.toList());
   }
 
   public static PolicyPO initializePolicyPOWithVersion(
@@ -1583,6 +1591,10 @@ public class POConverters {
     } catch (JsonProcessingException e) {
       throw new RuntimeException("Failed to deserialize json object:", e);
     }
+  }
+
+  public static List<ModelEntity> fromModelPOs(List<ModelPO> modelPOs, Namespace namespace) {
+    return modelPOs.stream().map(po -> fromModelPO(po, namespace)).collect(Collectors.toList());
   }
 
   public static ModelPO initializeModelPO(ModelEntity modelEntity, ModelPO.Builder builder) {
