@@ -175,13 +175,7 @@ public abstract class BaseCatalog implements TableCatalog, SupportsNamespaces, F
 
   @Override
   public Identifier[] listTables(String[] namespace) throws NoSuchNamespaceException {
-    String gravitinoNamespace;
-    if (namespace.length == 0) {
-      gravitinoNamespace = getCatalogDefaultNamespace();
-    } else {
-      validateNamespace(namespace);
-      gravitinoNamespace = namespace[0];
-    }
+    String gravitinoNamespace = getDatabase(namespace);
     try {
       NameIdentifier[] identifiers =
           gravitinoCatalogClient.asTableCatalog().listTables(Namespace.of(gravitinoNamespace));
@@ -438,21 +432,26 @@ public abstract class BaseCatalog implements TableCatalog, SupportsNamespaces, F
   }
 
   protected String getDatabase(Identifier sparkIdentifier) {
-    if (sparkIdentifier.namespace().length > 0) {
-      return sparkIdentifier.namespace()[0];
+    return getDatabase(sparkIdentifier.namespace());
+  }
+
+  /**
+   * Get the database name from the namespace array.
+   *
+   * @param namespace the namespace array
+   * @return the database name, or the catalog default namespace if the namespace is empty
+   */
+  protected String getDatabase(String[] namespace) {
+    if (namespace.length == 0) {
+      return getCatalogDefaultNamespace();
     }
-    return getCatalogDefaultNamespace();
+    validateNamespace(namespace);
+    return namespace[0];
   }
 
   @Override
   public Identifier[] listFunctions(String[] namespace) throws NoSuchNamespaceException {
-    String gravitinoNamespace;
-    if (namespace.length == 0) {
-      gravitinoNamespace = getCatalogDefaultNamespace();
-    } else {
-      validateNamespace(namespace);
-      gravitinoNamespace = namespace[0];
-    }
+    String gravitinoNamespace = getDatabase(namespace);
     try {
       Function[] functions =
           gravitinoCatalogClient
