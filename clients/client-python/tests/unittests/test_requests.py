@@ -19,7 +19,13 @@ import json
 import unittest
 from typing import cast
 
+from gravitino.api.function.function_type import FunctionType
 from gravitino.dto.requests.add_partitions_request import AddPartitionsRequest
+from gravitino.dto.requests.function_register_request import FunctionRegisterRequest
+from gravitino.dto.requests.function_update_request import (
+    UpdateCommentRequest,
+)
+from gravitino.dto.requests.function_updates_request import FunctionUpdatesRequest
 from gravitino.dto.requests.table_create_request import TableCreateRequest
 from gravitino.exceptions.base import IllegalArgumentException
 
@@ -266,3 +272,44 @@ class TestRequests(unittest.TestCase):
             with self.assertRaisesRegex(IllegalArgumentException, exception_str):
                 req = TableCreateRequest.from_json(json_str)
                 req.validate()
+
+    def test_function_register_request(self):
+        """Test FunctionRegisterRequest."""
+        req = FunctionRegisterRequest(
+            name="func1",
+            function_type=FunctionType.SCALAR,
+            deterministic=True,
+            definitions=[],
+            comment="comment",
+        )
+        json_data = json.loads(req.to_json())
+        self.assertEqual("func1", json_data["name"])
+        self.assertEqual("scalar", json_data["functionType"])
+        self.assertTrue(json_data["deterministic"])
+        self.assertEqual("comment", json_data["comment"])
+
+        # Test request without required fields
+        with self.assertRaises(IllegalArgumentException):
+            FunctionRegisterRequest(
+                name="func1",
+                function_type=None,
+                deterministic=True,
+                definitions=[],
+            ).validate()
+
+    def test_function_update_request(self):
+        """Test FunctionUpdateRequest."""
+        # Test UpdateCommentRequest serialization
+        req = UpdateCommentRequest("new comment")
+        json_data = json.loads(req.to_json())
+        self.assertEqual("updateComment", json_data["@type"])
+        self.assertEqual("new comment", json_data["newComment"])
+        req.validate()
+
+    def test_function_updates_request(self):
+        """Test FunctionUpdatesRequest."""
+        updates = [UpdateCommentRequest("new comment")]
+        req = FunctionUpdatesRequest(updates)
+        req.validate()
+        self.assertEqual(1, len(req.updates()))
+        self.assertIsInstance(req.updates()[0], UpdateCommentRequest)
