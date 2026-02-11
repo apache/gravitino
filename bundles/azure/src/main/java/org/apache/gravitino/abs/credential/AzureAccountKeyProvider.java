@@ -56,7 +56,9 @@ public class AzureAccountKeyProvider implements CredentialProvider {
   @Override
   public Set<String> sensitivePropertyKeys() {
     return Sets.newHashSet(
+        AzureCredentialConfig.AZURE_STORAGE_ACCOUNT_NAME.getKey(),
         AzureCredentialConfig.AZURE_STORAGE_ACCOUNT_KEY.getKey(),
+        AzureCredentialConfig.AZURE_CLIENT_ID.getKey(),
         AzureCredentialConfig.AZURE_CLIENT_SECRET.getKey());
   }
 }
