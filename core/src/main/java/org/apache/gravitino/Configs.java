@@ -294,7 +294,7 @@ public class Configs {
               "Whether to filter sensitive properties in catalog responses. "
                   + "When enabled, sensitive properties like passwords and secret keys will be "
                   + "hidden from users without appropriate permissions")
-          .version(ConfigConstants.VERSION_1_1_0)
+          .version(ConfigConstants.VERSION_1_2_0)
           .booleanConf()
           .createWithDefault(true);
 

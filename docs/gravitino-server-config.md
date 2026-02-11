@@ -268,7 +268,7 @@ Refer to [security](security/security.md) for HTTPS and authentication configura
 
 | Configuration item                                  | Description                                                                                                                                                                                                          | Default value | Required | Since version |
 |-----------------------------------------------------|----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|---------------|----------|---------------|
-| `gravitino.authorization.filterSensitiveProperties` | Whether to filter sensitive properties (passwords, secret keys, tokens) in catalog responses. When enabled, sensitive properties are hidden from users without appropriate permissions (owner or alter permission).  | `true`        | No       | 1.1.0         |
+| `gravitino.authorization.filterSensitiveProperties` | Whether to filter sensitive properties (passwords, secret keys, tokens) in catalog responses. When enabled, sensitive properties are hidden from users without appropriate permissions (owner or alter permission).  | `true`        | No       | 1.2.0         |
 
 :::info
 When `gravitino.authorization.filterSensitiveProperties` is set to `true`, sensitive catalog properties such as passwords, JDBC credentials, AWS secret keys, Azure storage account keys, and authentication tokens will be hidden in API responses unless the user has owner or alter permissions on the catalog.

@@ -69,8 +69,7 @@ public interface CredentialProvider extends Closeable {
    *
    * <ul>
    *   <li><b>Metadata registration:</b> Properties are automatically registered as sensitive in the
-   *       catalog's {@link org.apache.gravitino.connector.PropertiesMetadata}, enabling proper
-   *       validation and handling.
+   *       catalog's PropertiesMetadata, enabling proper validation and handling.
    *   <li><b>API response filtering:</b> When the server configuration {@code
    *       gravitino.authorization.filterSensitiveProperties} is enabled (default: true), these
    *       properties are excluded from catalog API responses unless the requesting user has owner
