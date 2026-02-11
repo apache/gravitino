@@ -68,6 +68,4 @@ public class TestProviderUtils {
     Assertions.assertNotNull(tableMetadataProvider);
     Assertions.assertTrue(tableMetadataProvider instanceof GravitinoTableMetadataProvider);
   }
-
-  // Updater/monitor providers removed for recommender-only scope.
 }

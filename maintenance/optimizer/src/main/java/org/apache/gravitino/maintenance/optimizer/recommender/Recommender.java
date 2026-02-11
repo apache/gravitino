@@ -88,23 +88,22 @@ public class Recommender implements AutoCloseable {
    */
   public Recommender(OptimizerEnv optimizerEnv) {
     OptimizerConfig config = optimizerEnv.config();
-    StrategyProvider strategyProvider = loadStrategyProvider(config);
-    StatisticsProvider statisticsProvider = loadStatisticsProvider(config);
-    TableMetadataProvider tableMetadataProvider = loadTableMetadataProvider(config);
-    JobSubmitter jobSubmitter = loadJobSubmitter(config);
-
     this.optimizerEnv = optimizerEnv;
-    this.strategyProvider = strategyProvider;
-    this.statisticsProvider = statisticsProvider;
-    this.tableMetadataProvider = tableMetadataProvider;
-    this.jobSubmitter = jobSubmitter;
-
+    this.strategyProvider = loadStrategyProvider(config);
     this.strategyProvider.initialize(optimizerEnv);
-    this.statisticsProvider.initialize(optimizerEnv);
-    this.tableMetadataProvider.initialize(optimizerEnv);
-    this.jobSubmitter.initialize(optimizerEnv);
+    closeableGroup.register(strategyProvider, StrategyProvider.class.getSimpleName());
 
-    addToCloseableGroup();
+    this.statisticsProvider = loadStatisticsProvider(config);
+    this.statisticsProvider.initialize(optimizerEnv);
+    closeableGroup.register(statisticsProvider, StatisticsProvider.class.getSimpleName());
+
+    this.tableMetadataProvider = loadTableMetadataProvider(config);
+    this.tableMetadataProvider.initialize(optimizerEnv);
+    closeableGroup.register(tableMetadataProvider, TableMetadataProvider.class.getSimpleName());
+
+    this.jobSubmitter = loadJobSubmitter(config);
+    this.jobSubmitter.initialize(optimizerEnv);
+    closeableGroup.register(jobSubmitter, JobSubmitter.class.getSimpleName());
   }
 
   @VisibleForTesting
