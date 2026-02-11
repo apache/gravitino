@@ -43,11 +43,15 @@ jobs:
               - '!**/*.md'
               - '!**/*.png'
               - '!**/*.svg'
+              - 'mcp-server/**'
             spark_connector_changes:
               - spark-connector/**
+            mcp_server_changes:
+              - mcp-server/**
     outputs:
       source_changes: ${{ steps.filter.outputs.source_changes }}
       spark_connector_changes: ${{ steps.filter.outputs.spark_connector_changes }}
+      mcp_server_changes: ${{ steps.filter.outputs.mcp_server_changes }}
 
   compile-check:
     runs-on: ubuntu-latest
@@ -133,7 +137,12 @@ jobs:
           sudo dpkg -i libssl1.1_1.1.1f-1ubuntu2_amd64.deb  
 
       - name: Build with Gradle
+        if: needs.changes.outputs.mcp_server_changes == 'true'
         run: ./gradlew build -PskipITs -PskipDockerTests=false -x :clients:client-python:build
+
+      - name: Build with Gradle (skip mcp-server tests)
+        if: needs.changes.outputs.mcp_server_changes != 'true'
+        run: ./gradlew build -PskipITs -PskipDockerTests=false -x :clients:client-python:build -x :mcp-server:build -x :mcp-server:test -x :mcp-server:pylint
 
       - name: Release with Gradle
         run: ./gradlew clean && ./gradlew release -x test --rerun-tasks
