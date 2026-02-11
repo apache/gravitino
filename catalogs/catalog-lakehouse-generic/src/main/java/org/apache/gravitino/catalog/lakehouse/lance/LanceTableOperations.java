@@ -204,15 +204,40 @@ public class LanceTableOperations extends ManagedTableOperations {
     try {
       Table table = loadTable(ident);
       String location = table.properties().get(Table.PROPERTY_LOCATION);
+      boolean external =
+          Optional.ofNullable(table.properties().get(Table.PROPERTY_EXTERNAL))
+              .map(Boolean::parseBoolean)
+              .orElse(false);
 
       boolean purged = super.purgeTable(ident);
+      // If the table is a managed table, super.purgeTable will call dropTable to remove the
+      // underlying Lance dataset, so we don't need to do anything here.
+      if (!external) {
+        return purged;
+      }
+
       // If the table metadata is purged successfully, we can delete the Lance dataset.
       // Otherwise, we should not delete the dataset.
       if (purged) {
-        // Delete the Lance dataset at the location
-        Dataset.drop(
-            location,
-            LancePropertiesUtils.resolveLanceStorageOptions(catalogProperties, table.properties()));
+        // Check if the dataset still exists before attempting deletion. If it does not exist,
+        // there is no need to call Dataset#drop. If it still exists, proceed with deletion.
+        Map<String, String> resolvedStorageOptions =
+            LancePropertiesUtils.resolveLanceStorageOptions(catalogProperties, table.properties());
+        ReadOptions readOptions =
+            new ReadOptions.Builder().setStorageOptions(resolvedStorageOptions).build();
+        try (RootAllocator allocator = new RootAllocator();
+            Dataset ignored = Dataset.open(allocator, location, readOptions)) {
+        } catch (Exception e) {
+          LOG.warn(
+              "Failed to open Lance dataset at location {} with options {}, it may have already"
+                  + " been deleted. Skipping dataset deletion.",
+              location,
+              readOptions,
+              e);
+          return purged;
+        }
+
+        Dataset.drop(location, resolvedStorageOptions);
         LOG.info("Deleted Lance dataset at location {}", location);
       }
 
