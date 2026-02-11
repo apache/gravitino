@@ -21,6 +21,7 @@ package org.apache.gravitino.storage.relational.mapper;
 import java.util.List;
 import org.apache.gravitino.storage.relational.po.GroupPO;
 import org.apache.gravitino.storage.relational.po.OwnerRelPO;
+import org.apache.gravitino.storage.relational.po.UserOwnerRelPO;
 import org.apache.gravitino.storage.relational.po.UserPO;
 import org.apache.ibatis.annotations.InsertProvider;
 import org.apache.ibatis.annotations.Param;
@@ -49,7 +50,7 @@ public interface OwnerMetaMapper {
   @SelectProvider(
       type = OwnerMetaSQLProviderFactory.class,
       method = "batchSelectUserOwnerMetaByMetadataObjectIdAndType")
-  List<UserPO> batchSelectUserOwnerMetaByMetadataObjectIdAndType(
+  List<UserOwnerRelPO> batchSelectUserOwnerMetaByMetadataObjectIdAndType(
       @Param("metadataObjectIds") List<Long> metadataObjectIds,
       @Param("metadataObjectType") String metadataObjectType);
 

@@ -20,6 +20,7 @@ package org.apache.gravitino;
 
 import java.io.IOException;
 import java.util.List;
+import java.util.Map;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
 
 /**
@@ -92,7 +93,7 @@ public interface SupportsRelationOperations {
       Type relType, NameIdentifier nameIdentifier, Entity.EntityType identType, boolean allFields)
       throws IOException;
 
-  <E extends Entity & HasIdentifier> List<E> listEntitiesByRelation(
+  <E extends Entity & HasIdentifier> Map<NameIdentifier, List<E>> batchListEntitiesByRelation(
       Type relType,
       List<NameIdentifier> nameIdentifiers,
       Entity.EntityType identType,

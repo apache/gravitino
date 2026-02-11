@@ -26,6 +26,7 @@ import com.google.common.collect.ImmutableMap;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.function.Function;
@@ -228,24 +229,27 @@ public class RelationalEntityStore implements EntityStore, SupportsRelationOpera
   }
 
   @Override
-  public <E extends Entity & HasIdentifier> List<E> listEntitiesByRelation(
-      Type relType,
-      List<NameIdentifier> nameIdentifiers,
-      Entity.EntityType identType,
-      boolean allFields)
-      throws IOException {
+  public <E extends Entity & HasIdentifier>
+      Map<NameIdentifier, List<E>> batchListEntitiesByRelation(
+          Type relType,
+          List<NameIdentifier> nameIdentifiers,
+          Entity.EntityType identType,
+          boolean allFields)
+          throws IOException {
     // TODO add lock
     if (Objects.requireNonNull(relType) == Type.OWNER_REL) {
-      List<E> list = backend.listEntitiesByRelation(relType, nameIdentifiers, identType, allFields);
+      Map<NameIdentifier, List<E>> nameIdentifierMap =
+          backend.batchListEntitiesByRelation(relType, nameIdentifiers, identType, allFields);
       Preconditions.checkState(
-          list.size() == nameIdentifiers.size(),
+          nameIdentifierMap.size() == nameIdentifiers.size(),
           "Owner list size not equal to nameIdentifiers size");
-      for (int i = 0; i < list.size(); i++) {
-        cache.put(nameIdentifiers.get(i), identType, relType, List.of(list.get(i)));
+      for (int i = 0; i < nameIdentifierMap.size(); i++) {
+        NameIdentifier ident = nameIdentifiers.get(i);
+        cache.put(ident, identType, relType, nameIdentifierMap.get(ident));
       }
-      return list;
+      return nameIdentifierMap;
     }
-    return List.of();
+    return Map.of();
   }
 
   @Override

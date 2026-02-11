@@ -21,11 +21,13 @@ package org.apache.gravitino.storage.relational.service;
 import static org.apache.gravitino.metrics.source.MetricsSource.GRAVITINO_RELATIONAL_STORE_METRIC_NAME;
 
 import com.google.common.base.Preconditions;
-import java.util.ArrayList;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.stream.Collectors;
 import org.apache.commons.collections4.CollectionUtils;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.NameIdentifier;
@@ -34,6 +36,7 @@ import org.apache.gravitino.metrics.Monitored;
 import org.apache.gravitino.storage.relational.mapper.OwnerMetaMapper;
 import org.apache.gravitino.storage.relational.po.GroupPO;
 import org.apache.gravitino.storage.relational.po.OwnerRelPO;
+import org.apache.gravitino.storage.relational.po.UserOwnerRelPO;
 import org.apache.gravitino.storage.relational.po.UserPO;
 import org.apache.gravitino.storage.relational.utils.POConverters;
 import org.apache.gravitino.storage.relational.utils.SessionUtils;
@@ -87,14 +90,22 @@ public class OwnerMetaService {
   @Monitored(
       metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME,
       baseMetricName = "batchGetOwner")
-  public List<Entity> batchGetOwner(List<NameIdentifier> identifiers, Entity.EntityType type) {
+  public Map<NameIdentifier, List<Entity>> batchGetOwner(
+      List<NameIdentifier> identifiers, Entity.EntityType type) {
+    if (CollectionUtils.isEmpty(identifiers)) {
+      return new HashMap<>();
+    }
+    Map<NameIdentifier, List<Entity>> result = new HashMap<>();
+    Map<Long, NameIdentifier> nameIdentifierMap = new HashMap<>();
     List<Long> entityIds =
         identifiers.stream()
-            .map(identifier -> EntityIdService.getEntityId(identifier, type))
+            .map(
+                identifier -> {
+                  long entityId = EntityIdService.getEntityId(identifier, type);
+                  nameIdentifierMap.put(entityId, identifier);
+                  return entityId;
+                })
             .toList();
-    if (CollectionUtils.isEmpty(identifiers)) {
-      return new ArrayList<>();
-    }
     NameIdentifier nameIdentifier = identifiers.get(0);
     String metalake = NameIdentifierUtil.getMetalake(nameIdentifier);
     for (NameIdentifier identifier : identifiers) {
@@ -102,24 +113,34 @@ public class OwnerMetaService {
           Objects.equals(NameIdentifierUtil.getMetalake(identifier), metalake),
           "identifiers should in one metalake");
     }
-    List<UserPO> userPOList =
+    List<UserOwnerRelPO> userPOList =
         SessionUtils.getWithoutCommit(
             OwnerMetaMapper.class,
             mapper ->
                 mapper.batchSelectUserOwnerMetaByMetadataObjectIdAndType(entityIds, type.name()));
     if (CollectionUtils.isNotEmpty(userPOList)) {
-      return userPOList.stream()
-          .map(
-              userPO ->
-                  (Entity)
-                      POConverters.fromUserPO(
-                          userPO,
-                          Collections.emptyList(),
-                          AuthorizationUtils.ofUserNamespace(metalake)))
-          .toList();
+      Map<NameIdentifier, List<UserOwnerRelPO>> poMap =
+          userPOList.stream()
+              .collect(
+                  Collectors.groupingBy(
+                      userPO -> nameIdentifierMap.get(userPO.getMetadataObjectId())));
+      poMap.forEach(
+          (name, poList) -> {
+            result.put(
+                name,
+                poList.stream()
+                    .map(
+                        userPO ->
+                            (Entity)
+                                POConverters.fromUserPO(
+                                    userPO,
+                                    Collections.emptyList(),
+                                    AuthorizationUtils.ofUserNamespace(metalake)))
+                    .toList());
+          });
     }
 
-    return new ArrayList<>();
+    return result;
   }
 
   @Monitored(metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME, baseMetricName = "setOwner")

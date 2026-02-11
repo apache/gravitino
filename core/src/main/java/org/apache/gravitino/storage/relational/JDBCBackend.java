@@ -26,6 +26,7 @@ import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Lists;
 import java.io.IOException;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.function.Function;
@@ -638,19 +639,23 @@ public class JDBCBackend implements RelationalBackend {
   }
 
   @Override
-  public <E extends Entity & HasIdentifier> List<E> listEntitiesByRelation(
-      Type relType,
-      List<NameIdentifier> nameIdentifiers,
-      Entity.EntityType identType,
-      boolean allFields)
-      throws IOException {
+  public <E extends Entity & HasIdentifier>
+      Map<NameIdentifier, List<E>> batchListEntitiesByRelation(
+          Type relType,
+          List<NameIdentifier> nameIdentifiers,
+          Entity.EntityType identType,
+          boolean allFields)
+          throws IOException {
     switch (relType) {
       case OWNER_REL:
-        List<E> list = Lists.newArrayList();
+        Map<NameIdentifier, List<E>> resultMap = new HashMap<>();
         OwnerMetaService.getInstance()
             .batchGetOwner(nameIdentifiers, identType)
-            .forEach(e -> list.add((E) e));
-        return list;
+            .forEach(
+                (nameIdentifier, entities) -> {
+                  resultMap.put(nameIdentifier, entities.stream().map(e -> (E) e).toList());
+                });
+        return resultMap;
       default:
         throw new IllegalArgumentException(
             String.format("Doesn't support the relation type %s", relType));

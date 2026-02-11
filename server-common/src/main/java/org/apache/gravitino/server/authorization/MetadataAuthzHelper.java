@@ -332,7 +332,7 @@ public class MetadataAuthzHelper {
 
   private static void preloadToCache(
       Entity.EntityType entityType, NameIdentifier[] nameIdentifiers) {
-    if (GravitinoEnv.getInstance().cacheEnabled()) {
+    if (!GravitinoEnv.getInstance().cacheEnabled()) {
       return;
     }
     try {
@@ -347,14 +347,14 @@ public class MetadataAuthzHelper {
   }
 
   private static void preloadOwner(Entity.EntityType entityType, NameIdentifier[] nameIdentifiers) {
-    if (GravitinoEnv.getInstance().cacheEnabled()) {
+    if (!GravitinoEnv.getInstance().cacheEnabled()) {
       return;
     }
     EntityStore entityStore = GravitinoEnv.getInstance().entityStore();
     try {
       entityStore
           .relationOperations()
-          .listEntitiesByRelation(
+          .batchListEntitiesByRelation(
               SupportsRelationOperations.Type.OWNER_REL,
               Arrays.stream(nameIdentifiers).toList(),
               entityType,

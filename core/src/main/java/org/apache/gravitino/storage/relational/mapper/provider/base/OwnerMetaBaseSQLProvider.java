@@ -58,7 +58,8 @@ public class OwnerMetaBaseSQLProvider {
       @Param("metadataObjectIds") List<Long> metadataObjectIds,
       @Param("metadataObjectType") String metadataObjectType) {
     return "<script>"
-        + "SELECT ut.user_id as userId, "
+        + "SELECT ot.metadata_object_id as metadataObjectId,"
+        + "ut.user_id as userId, "
         + "ut.user_name as userName, "
         + "ut.metalake_id as metalakeId, "
         + "ut.audit_info as auditInfo, "
