@@ -49,11 +49,33 @@ Builds with Apache Paimon `1.2`.
 | `s3-secret-access-key`                             | The secret key of the AWS S3.                                                                                                                                                                               | (none)                                                                         | required if the value of `warehouse` is a S3 path                                                                                                                    | 0.7.0-incubating |
 
 :::note
+<<<<<<< HEAD
 If you want to use the `oss` or `s3` warehouse, you need to place related jars in the `catalogs/lakehouse-paimon/lib` directory, more information can be found in the [Paimon S3](https://paimon.apache.org/docs/master/filesystems/s3/).
 :::
 
 :::note
 The hive backend does not support the kerberos authentication now.
+=======
+- If you want to use the `oss` or `s3` warehouse, you need to place related jars in the `catalogs/lakehouse-paimon/lib` directory, more information can be found in the [Paimon S3](https://paimon.apache.org/docs/1.2/maintenance/filesystems/#s3).
+- If you want to use REST backend, Gravitino Paimon catalog supports Aliyun DLF (Data Lake Formation) as the REST catalog service. You need to configure the DLF-related properties eg:
+```
+{
+  "name": "dlf_paimon",
+  "type": "RELATIONAL",
+  "provider": "lakehouse-paimon",
+  "properties": {
+    "catalog-backend": "rest",
+    "uri": "<catalog server url>",
+    "warehouse": "gravitino",
+    "token-provider": "dlf",
+    "dlf-access-key-id": "<access-key-id>",
+    "dlf-access-key-secret": "<access-key-secret>"
+  }
+}
+```
+connect to Aliyun DLF, more information can be found in the [Paimon REST Catalog](https://paimon.apache.org/docs/master/concepts/rest/overview/).
+- The hive backend does not support the kerberos authentication now.
+>>>>>>> 91faad83e ([#9957] fix(docs): improve lakehouse-paimon-catalog.md (#9958))
 :::
 
 Any properties not defined by Gravitino with `gravitino.bypass.` prefix will pass to Paimon catalog properties and HDFS configuration. For example, if specify `gravitino.bypass.table.type`, `table.type` will pass to Paimon catalog properties.
