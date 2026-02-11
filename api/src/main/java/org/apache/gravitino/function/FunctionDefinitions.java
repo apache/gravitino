@@ -52,6 +52,7 @@ public final class FunctionDefinitions {
    */
   public static FunctionDefinition of(
       FunctionParam[] parameters, Type returnType, FunctionImpl[] impls) {
+    Preconditions.checkArgument(returnType != null, "Return type cannot be null");
     return new FunctionDefinitionImpl(parameters, returnType, null, impls);
   }
 
@@ -65,6 +66,8 @@ public final class FunctionDefinitions {
    */
   public static FunctionDefinition of(
       FunctionParam[] parameters, FunctionColumn[] returnColumns, FunctionImpl[] impls) {
+    Preconditions.checkArgument(
+        ArrayUtils.isNotEmpty(returnColumns), "Return columns cannot be null or empty");
     return new FunctionDefinitionImpl(parameters, null, returnColumns, impls);
   }
 
