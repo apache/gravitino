@@ -383,9 +383,9 @@ export default function CreateCatalogDialog({ ...props }) {
           </div>
         </div>
         {provider.value === currentProvider ? (
-          <Icons.CircleCheckBig className='provider-radio size-4 text-white default-theme-radio' />
+          <Icons.CircleCheckBig className='provider-radio size-4 shrink-0 text-white default-theme-radio' />
         ) : (
-          <Icons.Circle className='provider-radio size-4 text-gray-400 default-theme-radio' />
+          <Icons.Circle className='provider-radio size-4 shrink-0 text-gray-400 default-theme-radio' />
         )}
       </div>
     )

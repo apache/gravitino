@@ -498,6 +498,7 @@ export default function CatalogDetailsPage() {
               catalogType={catalogType}
               provider={store.activatedDetails?.provider}
               locationProviders={store.activatedDetails?.properties?.['filesystem-providers']?.split(',') || []}
+              catalogBackend={store.activatedDetails?.properties?.['catalog-backend']}
               editSchema={editSchema}
             />
           )}
