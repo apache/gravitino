@@ -35,7 +35,7 @@ public class ClickHouseConstants {
     private ClusterConstants() {}
 
     // Name of the clickhouse cluster
-    public static final String NAME = "cluster-name";
+    public static final String CLUSTER_NAME = "cluster-name";
     // Whether to use 'ON CLUSTER' clause when creating tables
     public static final String ON_CLUSTER = "on-cluster";
   }
@@ -47,5 +47,15 @@ public class ClickHouseConstants {
     public static final String ENGINE = "engine";
     public static final String ENGINE_UPPER = "ENGINE";
     public static final String SETTINGS_PREFIX = "settings.";
+  }
+
+  public static final class IndexConstants {
+    private IndexConstants() {}
+
+    // The name of the data skipping index type for minmax index in clickhouse.
+    public static final String DATA_SKIPPING_MINMAX_VALUE = "minmax";
+
+    // The name of the data skipping index type for bloom filter index in clickhouse.
+    public static final String DATA_SKIPPING_BLOOM_FILTER = "bloom_filter";
   }
 }
