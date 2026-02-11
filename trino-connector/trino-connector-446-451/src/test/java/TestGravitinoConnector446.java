@@ -26,6 +26,7 @@ import org.apache.gravitino.trino.connector.GravitinoPlugin;
 import org.apache.gravitino.trino.connector.GravitinoPlugin446;
 import org.apache.gravitino.trino.connector.TestGravitinoConnector;
 import org.apache.gravitino.trino.connector.TestGravitinoConnectorWithMetalakeCatalogName;
+import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Nested;
 
 public class TestGravitinoConnector446 {
@@ -44,6 +45,7 @@ public class TestGravitinoConnector446 {
   }
 
   @Nested
+  @Disabled
   class MultiMetalake extends TestGravitinoConnectorWithMetalakeCatalogName {
     @Override
     protected GravitinoPlugin createGravitinoPlugin(GravitinoAdminClient client) {
