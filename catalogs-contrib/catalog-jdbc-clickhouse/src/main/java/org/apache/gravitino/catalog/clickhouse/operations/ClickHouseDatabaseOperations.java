@@ -27,8 +27,10 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import org.apache.commons.collections4.MapUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.StringIdentifier;
+import org.apache.gravitino.catalog.clickhouse.ClickHouseConstants.ClusterConstants;
 import org.apache.gravitino.catalog.jdbc.operation.JdbcDatabaseOperations;
 
 public class ClickHouseDatabaseOperations extends JdbcDatabaseOperations {
@@ -85,11 +87,29 @@ public class ClickHouseDatabaseOperations extends JdbcDatabaseOperations {
     StringBuilder createDatabaseSql =
         new StringBuilder(String.format("CREATE DATABASE `%s`", databaseName));
 
+    if (onCluster(properties)) {
+      String clusterName = properties.get(ClusterConstants.CLUSTER_NAME);
+      createDatabaseSql.append(String.format(" ON CLUSTER `%s`", clusterName));
+    }
+
     if (StringUtils.isNotEmpty(originComment)) {
       createDatabaseSql.append(String.format(" COMMENT '%s'", originComment));
     }
 
     LOG.info("Generated create database:{} sql: {}", databaseName, createDatabaseSql);
     return createDatabaseSql.toString();
+  }
+
+  private boolean onCluster(Map<String, String> dbProperties) {
+    if (MapUtils.isEmpty(dbProperties)) {
+      return false;
+    }
+
+    String clusterName = dbProperties.get(ClusterConstants.CLUSTER_NAME);
+    if (StringUtils.isBlank(clusterName)) {
+      return false;
+    }
+
+    return Boolean.parseBoolean(dbProperties.getOrDefault(ClusterConstants.ON_CLUSTER, "false"));
   }
 }

@@ -531,6 +531,32 @@ public class TestManagedFunctionOperations {
   }
 
   @Test
+  public void testRegisterFunctionWithDuplicateRuntimeInDefinition() {
+    NameIdentifier funcIdent = getFunctionIdent("func_register_dup_runtime");
+    FunctionParam[] params = new FunctionParam[] {FunctionParams.of("a", Types.IntegerType.get())};
+    FunctionImpl sparkImpl1 =
+        FunctionImpls.ofJava(FunctionImpl.RuntimeType.SPARK, "com.example.SparkUDF1");
+    FunctionImpl sparkImpl2 =
+        FunctionImpls.ofJava(FunctionImpl.RuntimeType.SPARK, "com.example.SparkUDF2");
+
+    FunctionDefinition[] definitions =
+        new FunctionDefinition[] {
+          createDefinitionWithImpls(
+              params, Types.StringType.get(), new FunctionImpl[] {sparkImpl1, sparkImpl2})
+        };
+
+    IllegalArgumentException ex =
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () ->
+                functionOperations.registerFunction(
+                    funcIdent, "Test function", FunctionType.SCALAR, true, definitions));
+    Assertions.assertTrue(
+        ex.getMessage().contains("duplicate runtime"),
+        "Expected error about duplicate runtime, got: " + ex.getMessage());
+  }
+
+  @Test
   public void testAlterFunctionAddImplToNonExistingDefinition() {
     NameIdentifier funcIdent = getFunctionIdent("func_add_impl_nodef");
     FunctionParam[] params = new FunctionParam[] {FunctionParams.of("a", Types.IntegerType.get())};
