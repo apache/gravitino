@@ -19,11 +19,14 @@
 package org.apache.gravitino.catalog.lakehouse.iceberg;
 
 import com.google.common.base.Preconditions;
+import java.util.EnumSet;
 import java.util.Map;
+import java.util.Set;
 import org.apache.gravitino.EntityStore;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.catalog.ManagedSchemaOperations;
 import org.apache.gravitino.catalog.ManagedTableOperations;
+import org.apache.gravitino.catalog.TableFormatCapability;
 import org.apache.gravitino.connector.SupportsSchemas;
 import org.apache.gravitino.exceptions.NoSuchSchemaException;
 import org.apache.gravitino.exceptions.TableAlreadyExistsException;
@@ -67,13 +70,11 @@ public class IcebergTableOperations extends ManagedTableOperations {
   }
 
   @Override
-  protected boolean supportsIndex() {
-    return false;
-  }
-
-  @Override
-  public boolean isLocationRequired() {
-    return false;
+  public Set<TableFormatCapability> capabilities() {
+    return EnumSet.of(
+        TableFormatCapability.SUPPORTS_PARTITIONING,
+        TableFormatCapability.SUPPORTS_DISTRIBUTION,
+        TableFormatCapability.SUPPORTS_SORT_ORDERS);
   }
 
   @Override

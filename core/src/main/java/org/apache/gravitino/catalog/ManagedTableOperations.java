@@ -30,6 +30,7 @@ import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 import org.apache.gravitino.Entity;
@@ -54,6 +55,7 @@ import org.apache.gravitino.rel.TableCatalog;
 import org.apache.gravitino.rel.TableChange;
 import org.apache.gravitino.rel.expressions.Expression;
 import org.apache.gravitino.rel.expressions.distributions.Distribution;
+import org.apache.gravitino.rel.expressions.distributions.Distributions;
 import org.apache.gravitino.rel.expressions.sorts.SortOrder;
 import org.apache.gravitino.rel.expressions.transforms.Transform;
 import org.apache.gravitino.rel.indexes.Index;
@@ -73,11 +75,7 @@ public abstract class ManagedTableOperations implements TableCatalog {
 
   protected abstract IdGenerator idGenerator();
 
-  protected abstract boolean supportsIndex();
-
-  public boolean isLocationRequired() {
-    return true;
-  }
+  public abstract Set<TableFormatCapability> capabilities();
 
   @Override
   public NameIdentifier[] listTables(Namespace namespace) throws NoSuchSchemaException {
@@ -124,6 +122,7 @@ public abstract class ManagedTableOperations implements TableCatalog {
       Index[] indexes)
       throws NoSuchSchemaException, TableAlreadyExistsException {
     validateIndexSupport(indexes);
+    validateTableLayoutSupport(partitions, distribution, sortOrders);
 
     // createTable in ManagedTableOperations only stores the table metadata in the entity store.
     // It doesn't handle any additional operations like creating physical location, preprocessing
@@ -549,13 +548,15 @@ public abstract class ManagedTableOperations implements TableCatalog {
   }
 
   private void validateIndexSupport(Index[] indexes) {
-    if (!supportsIndex() && indexes != null && indexes.length > 0) {
+    if (!capabilities().contains(TableFormatCapability.SUPPORTS_INDEX)
+        && indexes != null
+        && indexes.length > 0) {
       throw new IllegalArgumentException("Indexes are not supported by this catalog");
     }
   }
 
   private void validateIndexSupport(TableChange[] changes) {
-    if (supportsIndex()) {
+    if (capabilities().contains(TableFormatCapability.SUPPORTS_INDEX)) {
       return;
     }
     boolean hasIndexChange =
@@ -566,6 +567,27 @@ public abstract class ManagedTableOperations implements TableCatalog {
                         || change instanceof TableChange.DeleteIndex);
     if (hasIndexChange) {
       throw new IllegalArgumentException("Indexes are not supported by this catalog");
+    }
+  }
+
+  private void validateTableLayoutSupport(
+      Transform[] partitions, Distribution distribution, SortOrder[] sortOrders) {
+    if (!capabilities().contains(TableFormatCapability.SUPPORTS_PARTITIONING)
+        && partitions != null
+        && partitions.length > 0) {
+      throw new IllegalArgumentException("Partitioning is not supported by this catalog");
+    }
+
+    if (!capabilities().contains(TableFormatCapability.SUPPORTS_DISTRIBUTION)
+        && distribution != null
+        && !Distributions.NONE.equals(distribution)) {
+      throw new IllegalArgumentException("Distribution is not supported by this catalog");
+    }
+
+    if (!capabilities().contains(TableFormatCapability.SUPPORTS_SORT_ORDERS)
+        && sortOrders != null
+        && sortOrders.length > 0) {
+      throw new IllegalArgumentException("Sort orders are not supported by this catalog");
     }
   }
 }

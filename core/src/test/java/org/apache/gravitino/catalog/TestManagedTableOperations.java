@@ -20,6 +20,7 @@ package org.apache.gravitino.catalog;
 
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.EnumSet;
 import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
@@ -35,11 +36,15 @@ import org.apache.gravitino.rel.Column;
 import org.apache.gravitino.rel.Table;
 import org.apache.gravitino.rel.TableChange;
 import org.apache.gravitino.rel.expressions.Expression;
+import org.apache.gravitino.rel.expressions.NamedReference;
 import org.apache.gravitino.rel.expressions.distributions.Distribution;
 import org.apache.gravitino.rel.expressions.distributions.Distributions;
+import org.apache.gravitino.rel.expressions.distributions.Strategy;
 import org.apache.gravitino.rel.expressions.literals.Literals;
 import org.apache.gravitino.rel.expressions.sorts.SortOrder;
+import org.apache.gravitino.rel.expressions.sorts.SortOrders;
 import org.apache.gravitino.rel.expressions.transforms.Transform;
+import org.apache.gravitino.rel.expressions.transforms.Transforms;
 import org.apache.gravitino.rel.indexes.Index;
 import org.apache.gravitino.rel.indexes.Indexes;
 import org.apache.gravitino.rel.types.Type;
@@ -86,8 +91,8 @@ public class TestManagedTableOperations {
     }
 
     @Override
-    protected boolean supportsIndex() {
-      return true;
+    public Set<TableFormatCapability> capabilities() {
+      return EnumSet.allOf(TableFormatCapability.class);
     }
   }
 
@@ -122,8 +127,54 @@ public class TestManagedTableOperations {
     }
 
     @Override
-    protected boolean supportsIndex() {
-      return false;
+    public Set<TableFormatCapability> capabilities() {
+      return EnumSet.of(
+          TableFormatCapability.SUPPORTS_PARTITIONING,
+          TableFormatCapability.SUPPORTS_DISTRIBUTION,
+          TableFormatCapability.SUPPORTS_SORT_ORDERS,
+          TableFormatCapability.REQUIRES_LOCATION);
+    }
+  }
+
+  public static class InMemoryCustomCapabilitiesTableOperations extends ManagedTableOperations {
+
+    private final EntityStore entityStore;
+
+    private final SupportsSchemas supportsSchemas;
+
+    private final IdGenerator idGenerator;
+
+    private final Set<TableFormatCapability> capabilities;
+
+    public InMemoryCustomCapabilitiesTableOperations(
+        EntityStore entityStore,
+        SupportsSchemas supportsSchemas,
+        IdGenerator idGenerator,
+        Set<TableFormatCapability> capabilities) {
+      this.entityStore = entityStore;
+      this.supportsSchemas = supportsSchemas;
+      this.idGenerator = idGenerator;
+      this.capabilities = capabilities;
+    }
+
+    @Override
+    protected EntityStore store() {
+      return entityStore;
+    }
+
+    @Override
+    protected SupportsSchemas schemas() {
+      return supportsSchemas;
+    }
+
+    @Override
+    protected IdGenerator idGenerator() {
+      return idGenerator;
+    }
+
+    @Override
+    public Set<TableFormatCapability> capabilities() {
+      return capabilities;
     }
   }
 
@@ -520,6 +571,136 @@ public class TestManagedTableOperations {
                 tableIdent,
                 TableChange.addIndex(
                     Index.IndexType.PRIMARY_KEY, "pk_index", new String[][] {{"col1"}})));
+  }
+
+  @Test
+  public void testCapabilitiesDefaultAndOverrides() {
+    ManagedTableOperations allCapsOps =
+        new InMemoryManagedTableOperations(store, schemas, idGenerator);
+    Assertions.assertEquals(EnumSet.allOf(TableFormatCapability.class), allCapsOps.capabilities());
+
+    ManagedTableOperations noIndexOps =
+        new InMemoryNoIndexTableOperations(store, schemas, idGenerator);
+    Assertions.assertFalse(
+        noIndexOps.capabilities().contains(TableFormatCapability.SUPPORTS_INDEX));
+    Assertions.assertTrue(
+        noIndexOps.capabilities().contains(TableFormatCapability.SUPPORTS_PARTITIONING));
+    Assertions.assertTrue(
+        noIndexOps.capabilities().contains(TableFormatCapability.SUPPORTS_DISTRIBUTION));
+    Assertions.assertTrue(
+        noIndexOps.capabilities().contains(TableFormatCapability.SUPPORTS_SORT_ORDERS));
+    Assertions.assertTrue(
+        noIndexOps.capabilities().contains(TableFormatCapability.REQUIRES_LOCATION));
+  }
+
+  @Test
+  public void testCreateTableWithPartitioningUnsupported() {
+    ManagedTableOperations noPartitioningOps =
+        new InMemoryCustomCapabilitiesTableOperations(
+            store,
+            schemas,
+            idGenerator,
+            EnumSet.of(
+                TableFormatCapability.SUPPORTS_INDEX,
+                TableFormatCapability.SUPPORTS_DISTRIBUTION,
+                TableFormatCapability.SUPPORTS_SORT_ORDERS,
+                TableFormatCapability.REQUIRES_LOCATION));
+    NameIdentifier tableIdent =
+        NameIdentifierUtil.ofTable(METALAKE_NAME, CATALOG_NAME, SCHEMA_NAME, "table_no_partition");
+    Column column1 = createColumn("col1", Types.StringType.get(), null);
+    Column[] columns = new Column[] {column1};
+    Transform[] partitioning = new Transform[] {Transforms.identity("col1")};
+
+    IllegalArgumentException exception =
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () ->
+                noPartitioningOps.createTable(
+                    tableIdent,
+                    columns,
+                    "Test Table",
+                    StringIdentifier.newPropertiesWithId(
+                        StringIdentifier.fromId(idGenerator.nextId()), Collections.emptyMap()),
+                    partitioning,
+                    Distributions.NONE,
+                    new SortOrder[0],
+                    Indexes.EMPTY_INDEXES));
+
+    Assertions.assertTrue(exception.getMessage().contains("Partitioning"));
+  }
+
+  @Test
+  public void testCreateTableWithDistributionUnsupported() {
+    ManagedTableOperations noDistributionOps =
+        new InMemoryCustomCapabilitiesTableOperations(
+            store,
+            schemas,
+            idGenerator,
+            EnumSet.of(
+                TableFormatCapability.SUPPORTS_INDEX,
+                TableFormatCapability.SUPPORTS_PARTITIONING,
+                TableFormatCapability.SUPPORTS_SORT_ORDERS,
+                TableFormatCapability.REQUIRES_LOCATION));
+    NameIdentifier tableIdent =
+        NameIdentifierUtil.ofTable(
+            METALAKE_NAME, CATALOG_NAME, SCHEMA_NAME, "table_no_distribution");
+    Column column1 = createColumn("col1", Types.StringType.get(), null);
+    Column[] columns = new Column[] {column1};
+    Distribution distribution = Distributions.of(Strategy.HASH, 8, NamedReference.field("col1"));
+
+    IllegalArgumentException exception =
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () ->
+                noDistributionOps.createTable(
+                    tableIdent,
+                    columns,
+                    "Test Table",
+                    StringIdentifier.newPropertiesWithId(
+                        StringIdentifier.fromId(idGenerator.nextId()), Collections.emptyMap()),
+                    new Transform[0],
+                    distribution,
+                    new SortOrder[0],
+                    Indexes.EMPTY_INDEXES));
+
+    Assertions.assertTrue(exception.getMessage().contains("Distribution"));
+  }
+
+  @Test
+  public void testCreateTableWithSortOrdersUnsupported() {
+    ManagedTableOperations noSortOrdersOps =
+        new InMemoryCustomCapabilitiesTableOperations(
+            store,
+            schemas,
+            idGenerator,
+            EnumSet.of(
+                TableFormatCapability.SUPPORTS_INDEX,
+                TableFormatCapability.SUPPORTS_PARTITIONING,
+                TableFormatCapability.SUPPORTS_DISTRIBUTION,
+                TableFormatCapability.REQUIRES_LOCATION));
+    NameIdentifier tableIdent =
+        NameIdentifierUtil.ofTable(
+            METALAKE_NAME, CATALOG_NAME, SCHEMA_NAME, "table_no_sort_orders");
+    Column column1 = createColumn("col1", Types.StringType.get(), null);
+    Column[] columns = new Column[] {column1};
+    SortOrder[] sortOrders = new SortOrder[] {SortOrders.ascending(NamedReference.field("col1"))};
+
+    IllegalArgumentException exception =
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () ->
+                noSortOrdersOps.createTable(
+                    tableIdent,
+                    columns,
+                    "Test Table",
+                    StringIdentifier.newPropertiesWithId(
+                        StringIdentifier.fromId(idGenerator.nextId()), Collections.emptyMap()),
+                    new Transform[0],
+                    Distributions.NONE,
+                    sortOrders,
+                    Indexes.EMPTY_INDEXES));
+
+    Assertions.assertTrue(exception.getMessage().contains("Sort orders"));
   }
 
   @Test

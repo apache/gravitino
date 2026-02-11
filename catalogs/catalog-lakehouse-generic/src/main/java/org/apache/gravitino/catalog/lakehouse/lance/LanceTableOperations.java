@@ -31,10 +31,12 @@ import com.lancedb.lance.index.IndexType;
 import com.lancedb.lance.index.vector.VectorIndexParams;
 import com.lancedb.lance.schema.ColumnAlteration;
 import java.util.Arrays;
+import java.util.EnumSet;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import java.util.stream.Collectors;
 import org.apache.arrow.memory.RootAllocator;
 import org.apache.arrow.vector.types.pojo.Field;
@@ -43,6 +45,7 @@ import org.apache.gravitino.EntityStore;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.catalog.ManagedSchemaOperations;
 import org.apache.gravitino.catalog.ManagedTableOperations;
+import org.apache.gravitino.catalog.TableFormatCapability;
 import org.apache.gravitino.connector.GenericTable;
 import org.apache.gravitino.connector.SupportsSchemas;
 import org.apache.gravitino.exceptions.NoSuchSchemaException;
@@ -100,8 +103,8 @@ public class LanceTableOperations extends ManagedTableOperations {
   }
 
   @Override
-  protected boolean supportsIndex() {
-    return true;
+  public Set<TableFormatCapability> capabilities() {
+    return EnumSet.allOf(TableFormatCapability.class);
   }
 
   @Override

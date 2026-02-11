@@ -44,6 +44,7 @@ import org.apache.gravitino.Schema;
 import org.apache.gravitino.SchemaChange;
 import org.apache.gravitino.catalog.ManagedSchemaOperations;
 import org.apache.gravitino.catalog.ManagedTableOperations;
+import org.apache.gravitino.catalog.TableFormatCapability;
 import org.apache.gravitino.connector.CatalogInfo;
 import org.apache.gravitino.connector.CatalogOperations;
 import org.apache.gravitino.connector.HasPropertyMetadata;
@@ -256,7 +257,7 @@ public class GenericCatalogOperations implements CatalogOperations, SupportsSche
       String generatedLocation = calculateTableLocation(schema, ident, properties);
       if (StringUtils.isNotBlank(generatedLocation)) {
         newProperties.put(Table.PROPERTY_LOCATION, generatedLocation);
-      } else if (tableOps.isLocationRequired()) {
+      } else if (tableOps.capabilities().contains(TableFormatCapability.REQUIRES_LOCATION)) {
         throw new IllegalArgumentException(
             "'location' property is neither set in table properties "
                 + "nor in schema properties, and no location is set in catalog properties either. "
