@@ -114,7 +114,8 @@ public class CatalogOperations {
             if (verbose) {
               Catalog[] catalogs = catalogDispatcher.listCatalogsInfo(catalogNS);
               CatalogDTO[] catalogDTOs;
-              // Always apply authorization filtering, regardless of filterSensitiveProperties setting
+              // Always apply authorization filtering, regardless of filterSensitiveProperties
+              // setting
               MetadataAuthzHelper.FilterResult<Catalog, Catalog> filterResult =
                   MetadataAuthzHelper.partitionByTwoExpressions(
                       metalake,
