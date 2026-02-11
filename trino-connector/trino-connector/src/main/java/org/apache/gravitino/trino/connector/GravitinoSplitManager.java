@@ -55,7 +55,7 @@ public class GravitinoSplitManager implements ConnectorSplitManager {
             session,
             GravitinoHandle.unWrap(connectorTableHandle),
             new GravitinoDynamicFilter(dynamicFilter),
-            constraint);
+            new GravitinoConstraint(constraint));
     return createSplitSource(splits);
   }
 
