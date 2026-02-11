@@ -82,7 +82,7 @@ public interface CredentialProvider extends Closeable {
    *
    * <ul>
    *   <li>S3: {@code s3-access-key-id}, {@code s3-secret-access-key}
-   *   <li>Azure: {@code azure-storage-account-name}, {@code azure-storage-account-key}
+   *   <li>Azure: {@code azure-storage-client-secret}, {@code azure-storage-account-key}
    *   <li>OSS: {@code oss-access-key-id}, {@code oss-access-key-secret}
    * </ul>
    *
