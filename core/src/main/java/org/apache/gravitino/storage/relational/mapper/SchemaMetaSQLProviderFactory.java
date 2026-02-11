@@ -112,4 +112,11 @@ public class SchemaMetaSQLProviderFactory {
         .selectSchemaIdByMetalakeNameAndCatalogNameAndSchemaName(
             metalakeName, catalogName, schemaName);
   }
+
+  public static String batchSelectSchemaByIdentifier(
+      @Param("metalakeName") String metalakeName,
+      @Param("catalogName") String catalogName,
+      @Param("schemaNames") List<String> schemaNames) {
+    return getProvider().batchSelectSchemaByIdentifier(metalakeName, catalogName, schemaNames);
+  }
 }

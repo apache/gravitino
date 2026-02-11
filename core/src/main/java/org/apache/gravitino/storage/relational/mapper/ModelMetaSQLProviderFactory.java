@@ -111,4 +111,13 @@ public class ModelMetaSQLProviderFactory {
       @Param("newModelMeta") ModelPO newModelPO, @Param("oldModelMeta") ModelPO oldModelPO) {
     return getProvider().updateModelMeta(newModelPO, oldModelPO);
   }
+
+  public static String batchSelectModelByIdentifier(
+      @Param("metalakeName") String metalakeName,
+      @Param("catalogName") String catalogName,
+      @Param("schemaName") String schemaName,
+      @Param("modelNames") List<String> modelNames) {
+    return getProvider()
+        .batchSelectModelByIdentifier(metalakeName, catalogName, schemaName, modelNames);
+  }
 }

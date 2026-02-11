@@ -22,6 +22,9 @@ package org.apache.gravitino.storage.relational.mapper.provider.base;
 import static org.apache.gravitino.storage.relational.mapper.TopicMetaMapper.TABLE_NAME;
 
 import java.util.List;
+import org.apache.gravitino.storage.relational.mapper.CatalogMetaMapper;
+import org.apache.gravitino.storage.relational.mapper.MetalakeMetaMapper;
+import org.apache.gravitino.storage.relational.mapper.SchemaMetaMapper;
 import org.apache.gravitino.storage.relational.po.TopicPO;
 import org.apache.ibatis.annotations.Param;
 
@@ -205,5 +208,40 @@ public class TopicMetaBaseSQLProvider {
     return "DELETE FROM "
         + TABLE_NAME
         + " WHERE deleted_at != 0 AND deleted_at < #{legacyTimeline} LIMIT #{limit}";
+  }
+
+  public String batchSelectTopicByIdentifier(
+      @Param("metalakeName") String metalakeName,
+      @Param("catalogName") String catalogName,
+      @Param("schemaName") String schemaName,
+      @Param("topicNames") List<String> topicNames) {
+    return "<script>"
+        + "SELECT tm.topic_id as topicId, tm.topic_name as topicName,"
+        + " tm.metalake_id as metalakeId, tm.catalog_id as catalogId, tm.schema_id as schemaId,"
+        + " tm.comment as comment, tm.properties as properties, tm.audit_info as auditInfo,"
+        + " tm.current_version as currentVersion, tm.last_version as lastVersion,"
+        + " tm.deleted_at as deletedAt"
+        + " FROM "
+        + TABLE_NAME
+        + " tm"
+        + " JOIN "
+        + SchemaMetaMapper.TABLE_NAME
+        + " sm ON tm.schema_id = sm.schema_id"
+        + " JOIN "
+        + CatalogMetaMapper.TABLE_NAME
+        + " cm ON sm.catalog_id = cm.catalog_id"
+        + " JOIN "
+        + MetalakeMetaMapper.TABLE_NAME
+        + " mm ON cm.metalake_id = mm.metalake_id"
+        + " WHERE mm.metalake_name = #{metalakeName}"
+        + " AND cm.catalog_name = #{catalogName}"
+        + " AND sm.schema_name = #{schemaName}"
+        + " AND tm.topic_name IN ("
+        + "<foreach collection='topicNames' item='topicName' separator=','>"
+        + "#{topicName}"
+        + "</foreach>"
+        + " )"
+        + " AND tm.deleted_at = 0 AND sm.deleted_at = 0 AND cm.deleted_at = 0 AND mm.deleted_at = 0"
+        + "</script>";
   }
 }

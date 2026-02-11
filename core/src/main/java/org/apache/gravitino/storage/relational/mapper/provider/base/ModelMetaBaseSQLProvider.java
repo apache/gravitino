@@ -19,7 +19,10 @@
 package org.apache.gravitino.storage.relational.mapper.provider.base;
 
 import java.util.List;
+import org.apache.gravitino.storage.relational.mapper.CatalogMetaMapper;
+import org.apache.gravitino.storage.relational.mapper.MetalakeMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.ModelMetaMapper;
+import org.apache.gravitino.storage.relational.mapper.SchemaMetaMapper;
 import org.apache.gravitino.storage.relational.po.ModelPO;
 import org.apache.ibatis.annotations.Param;
 
@@ -184,5 +187,40 @@ public class ModelMetaBaseSQLProvider {
         + " AND model_latest_version = #{oldModelMeta.modelLatestVersion}"
         + " AND audit_info = #{oldModelMeta.auditInfo}"
         + " AND deleted_at = 0";
+  }
+
+  public String batchSelectModelByIdentifier(
+      @Param("metalakeName") String metalakeName,
+      @Param("catalogName") String catalogName,
+      @Param("schemaName") String schemaName,
+      @Param("modelNames") List<String> modelNames) {
+    return "<script>"
+        + "SELECT mm.model_id as modelId, mm.model_name as modelName,"
+        + " mm.metalake_id as metalakeId, mm.catalog_id as catalogId, mm.schema_id as schemaId,"
+        + " mm.model_comment as modelComment, mm.model_properties as modelProperties,"
+        + " mm.model_latest_version as modelLatestVersion, mm.audit_info as auditInfo,"
+        + " mm.deleted_at as deletedAt"
+        + " FROM "
+        + ModelMetaMapper.TABLE_NAME
+        + " mm"
+        + " JOIN "
+        + SchemaMetaMapper.TABLE_NAME
+        + " sm ON mm.schema_id = sm.schema_id"
+        + " JOIN "
+        + CatalogMetaMapper.TABLE_NAME
+        + " cm ON sm.catalog_id = cm.catalog_id"
+        + " JOIN "
+        + MetalakeMetaMapper.TABLE_NAME
+        + " mlm ON cm.metalake_id = mlm.metalake_id"
+        + " WHERE mlm.metalake_name = #{metalakeName}"
+        + " AND cm.catalog_name = #{catalogName}"
+        + " AND sm.schema_name = #{schemaName}"
+        + " AND mm.model_name IN ("
+        + "<foreach collection='modelNames' item='modelName' separator=','>"
+        + "#{modelName}"
+        + "</foreach>"
+        + " )"
+        + " AND mm.deleted_at = 0 AND sm.deleted_at = 0 AND cm.deleted_at = 0 AND mlm.deleted_at = 0"
+        + "</script>";
   }
 }
