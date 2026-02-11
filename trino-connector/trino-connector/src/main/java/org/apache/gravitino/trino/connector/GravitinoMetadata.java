@@ -145,6 +145,9 @@ public abstract class GravitinoMetadata implements ConnectorMetadata {
         catalogConnectorMetadata.getTable(
             gravitinoTableHandle.getSchemaName(), gravitinoTableHandle.getTableName());
     return metadataAdapter.getTableMetadata(table);
+
+    // TODO Add support for retrieving hidden columns from the table; they are used for query
+    // optimization.
   }
 
   @Override
