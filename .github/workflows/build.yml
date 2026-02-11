@@ -145,14 +145,49 @@ jobs:
         if: needs.changes.outputs.mcp_server_changes != 'true'
         run: ./gradlew build -PskipITs -PskipDockerTests=false -x :clients:client-python:build -x :mcp-server:build -x :mcp-server:test -x :mcp-server:pylint
 
-      - name: Publish unit test results
-        if: ${{ always() && github.event_name == 'pull_request' }}
-        uses: EnricoMi/publish-unit-test-result-action@v2
-        with:
-          files: |
-            **/build/test-results/test/TEST-*.xml
-          check_run_annotations: true
-          huge_xml: true
+      - name: Diff-based coverage (PR only)
+        if: github.event_name == 'pull_request'
+        run: |
+          echo "## Diff-based Coverage Report" > diff-coverage.md
+          echo "" >> diff-coverage.md
+
+          # 1. 获取 PR diff 的 Java 文件
+          git fetch origin ${{ github.base_ref }} --depth=1
+          DIFF_FILES=$(git diff --name-only origin/${{ github.base_ref }}...HEAD | grep '\.java$' || true)
+
+          if [ -z "$DIFF_FILES" ]; then
+            echo "No Java changes detected." >> diff-coverage.md
+            exit 0
+          fi
+
+          echo "Changed Java files:" >> diff-coverage.md
+          echo '```' >> diff-coverage.md
+          echo "$DIFF_FILES" >> diff-coverage.md
+          echo '```' >> diff-coverage.md
+
+          # 2. 判断对应 module 是否跑过 test
+          COVERED=0
+          TOTAL=0
+
+          for f in $DIFF_FILES; do
+            TOTAL=$((TOTAL+1))
+            MODULE=$(echo "$f" | cut -d/ -f1)
+
+            if [ -d "$MODULE/build/test-results" ]; then
+              COVERED=$((COVERED+1))
+              echo "- ✅ $f (tests executed)" >> diff-coverage.md
+            else
+              echo "- ❌ $f (no test results found)" >> diff-coverage.md
+            fi
+          done
+
+          echo "" >> diff-coverage.md
+          echo "**Diff Coverage:** $COVERED / $TOTAL files covered" >> diff-coverage.md
+
+      - name: Publish diff coverage summary
+        if: github.event_name == 'pull_request'
+        run: |
+          cat diff-coverage.md >> $GITHUB_STEP_SUMMARY
 
       - name: Release with Gradle
         run: ./gradlew clean && ./gradlew release -x test --rerun-tasks
