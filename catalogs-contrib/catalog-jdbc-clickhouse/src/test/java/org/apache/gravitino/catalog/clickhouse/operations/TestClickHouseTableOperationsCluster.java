@@ -80,14 +80,6 @@ class TestClickHouseTableOperationsCluster {
     Assertions.assertTrue(
         sql.contains("ENGINE = Distributed(`ck_cluster`,`remote_db`,`remote_table`,`user_id`)"));
 
-    props.put(ClusterConstants.ON_CLUSTER, "false");
-    Assertions.assertThrows(
-        IllegalArgumentException.class,
-        () ->
-            ops.buildCreateSql(
-                "tbl", columns, "comment", props, null, Distributions.NONE, new Index[0], null));
-
-    props.put(ClusterConstants.ON_CLUSTER, "true");
     props.remove(DistributedTableConstants.REMOTE_DATABASE);
     Assertions.assertThrows(
         IllegalArgumentException.class,
@@ -177,6 +169,29 @@ class TestClickHouseTableOperationsCluster {
             "tbl", columns, "comment", props, null, Distributions.NONE, new Index[0], null);
     Assertions.assertTrue(
         sql.contains("ENGINE = Distributed(`ck_cluster`,`remote_db`,`remote_table`,rand())"));
+  }
+
+  @Test
+  void testGenerateCreateTableSqlWithDistributedEngineWithoutOnCluster() {
+    JdbcColumn[] columns =
+        new JdbcColumn[] {
+          JdbcColumn.builder().withName("user_id").withType(Types.IntegerType.get()).build()
+        };
+
+    Map<String, String> props = new HashMap<>();
+    props.put(ClusterConstants.CLUSTER_NAME, "ck_cluster");
+    props.put(CLICKHOUSE_ENGINE_KEY, "Distributed");
+    props.put(DistributedTableConstants.REMOTE_DATABASE, "remote_db");
+    props.put(DistributedTableConstants.REMOTE_TABLE, "remote_table");
+    props.put(DistributedTableConstants.SHARDING_KEY, "user_id");
+
+    String sql =
+        ops.buildCreateSql(
+            "tbl", columns, "comment", props, null, Distributions.NONE, new Index[0], null);
+
+    Assertions.assertTrue(sql.startsWith("CREATE TABLE `tbl` ("));
+    Assertions.assertTrue(
+        sql.contains("ENGINE = Distributed(`ck_cluster`,`remote_db`,`remote_table`,`user_id`)"));
   }
 
   private static class TestableClickHouseTableOperations extends ClickHouseTableOperations {
