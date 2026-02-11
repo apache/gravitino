@@ -20,6 +20,7 @@ package org.apache.gravitino.server.authorization;
 import java.lang.reflect.Array;
 import java.security.Principal;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -31,10 +32,12 @@ import java.util.function.Function;
 import org.apache.gravitino.Config;
 import org.apache.gravitino.Configs;
 import org.apache.gravitino.Entity;
+import org.apache.gravitino.EntityStore;
 import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.Metalake;
 import org.apache.gravitino.NameIdentifier;
+import org.apache.gravitino.SupportsRelationOperations;
 import org.apache.gravitino.authorization.AuthorizationRequestContext;
 import org.apache.gravitino.authorization.GravitinoAuthorizer;
 import org.apache.gravitino.dto.tag.MetadataObjectDTO;
@@ -138,6 +141,7 @@ public class MetadataAuthzHelper {
       Entity.EntityType entityType,
       NameIdentifier[] nameIdentifiers) {
     preloadToCache(entityType, nameIdentifiers);
+    preloadOwner(entityType, nameIdentifiers);
     return filterByExpression(metalake, expression, entityType, nameIdentifiers, e -> e);
   }
 
@@ -329,11 +333,34 @@ public class MetadataAuthzHelper {
   private static void preloadToCache(
       Entity.EntityType entityType, NameIdentifier[] nameIdentifiers) {
     if (GravitinoEnv.getInstance().cacheEnabled()) {
+      return;
+    }
+    try {
       if (entityType == Entity.EntityType.TABLE) {
         GravitinoEnv.getInstance()
             .entityStore()
             .batchGet(nameIdentifiers, entityType, TableEntity.class);
       }
+    } catch (Exception e) {
+      LOG.warn("Ignore preload cache error:{}", e.getMessage(), e);
+    }
+  }
+
+  private static void preloadOwner(Entity.EntityType entityType, NameIdentifier[] nameIdentifiers) {
+    if (GravitinoEnv.getInstance().cacheEnabled()) {
+      return;
+    }
+    EntityStore entityStore = GravitinoEnv.getInstance().entityStore();
+    try {
+      entityStore
+          .relationOperations()
+          .listEntitiesByRelation(
+              SupportsRelationOperations.Type.OWNER_REL,
+              Arrays.stream(nameIdentifiers).toList(),
+              entityType,
+              true);
+    } catch (Exception e) {
+      LOG.warn("Ignore preloadOwner error:{}", e.getMessage(), e);
     }
   }
 }

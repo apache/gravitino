@@ -456,7 +456,7 @@ public class GravitinoEnv {
   }
 
   public boolean cacheEnabled() {
-    return config.get(Configs.CACHE_ENABLED);
+    return config != null && config.get(Configs.CACHE_ENABLED);
   }
 
   public void start() {
