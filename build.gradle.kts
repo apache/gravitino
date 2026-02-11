@@ -862,13 +862,15 @@ tasks {
   val compileTrinoConnector by registering {
     dependsOn("trino-connector:trino-connector-435-439:copyLibs")
     dependsOn("trino-connector:trino-connector-440-445:copyLibs")
+    dependsOn("trino-connector:trino-connector-446-451:copyLibs")
+    dependsOn("trino-connector:trino-connector-452-468:copyLibs")
     group = "gravitino distribution"
-    outputs.dir(projectDir.dir("distribution/${rootProject.name}-trino-connector-435-439"))
+    outputs.dir(projectDir.dir("distribution/${rootProject.name}-trino-connector-452-468"))
   }
 
   val assembleDistribution by registering(Tar::class) {
     dependsOn(
-      ":trino-connector:trino-connector-435-439:assembleTrinoConnector",
+      ":trino-connector:trino-connector-452-468:assembleTrinoConnector",
       "assembleIcebergRESTServer",
       "assembleLanceRESTServer"
     )

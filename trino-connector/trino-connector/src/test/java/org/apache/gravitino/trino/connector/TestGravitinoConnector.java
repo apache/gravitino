@@ -37,7 +37,7 @@ public abstract class TestGravitinoConnector extends AbstractGravitinoConnectorT
 
   public static final int SPI_VERSION_TEST_SUPPORT_RENAME_COLUMN = 452;
   public static final int SPI_VERSION_SUPPORT_ADD_COLUMN_WITH_POSITION = 468;
-  public static final int SPI_VERSION_TEST_SUPPORT_ADD_COLUMN = 469;
+  public static final int SPI_VERSION_TEST_SUPPORT_ADD_COLUMN = 452;
 
   @Override
   protected void configureCatalogs(

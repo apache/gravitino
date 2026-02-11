@@ -79,9 +79,9 @@ for entry in $trino_versions_map; do
     # execute test
     echo "Running test for Trino version: $trino_version with connector: $trino_module_name"
     echo "The args: $args"
-    
+
     sleep 5
-    $GRAVITINO_HOME_DIR/trino-connector/integration-test/trino-test-tools/trino_test.sh $args
+    $GRAVITINO_HOME_DIR/trino-connector/integration-test/trino-test-tools/trino_integration_test.sh $args
     
     if [ $? -ne 0 ]; then
         echo "Test failed for Trino version $trino_version"
