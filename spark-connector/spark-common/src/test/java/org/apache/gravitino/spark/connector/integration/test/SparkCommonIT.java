@@ -197,7 +197,7 @@ public abstract class SparkCommonIT extends SparkEnvIT {
   }
 
   @Test
-  @EnabledIf("supportsListFunctions")
+  @EnabledIf("supportsFunction")
   void testCallUDF() {
     // test call function
     List<String> data =
@@ -207,7 +207,7 @@ public abstract class SparkCommonIT extends SparkEnvIT {
   }
 
   @Test
-  @EnabledIf("supportsListFunctions")
+  @EnabledIf("supportsFunction")
   void testListFunctions() {
     // Test list functions - should only include Spark runtime functions
     Set<String> functionNames = listUserFunctions(functionSchemaName);

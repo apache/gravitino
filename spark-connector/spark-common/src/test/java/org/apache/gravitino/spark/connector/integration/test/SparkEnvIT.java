@@ -80,7 +80,7 @@ public abstract class SparkEnvIT extends SparkUtilIT {
 
   protected abstract Map<String, String> getCatalogConfigs();
 
-  protected boolean supportsListFunctions() {
+  protected boolean supportsFunction() {
     return true;
   }
 
@@ -104,7 +104,7 @@ public abstract class SparkEnvIT extends SparkUtilIT {
     initHdfsFileSystem();
     initGravitinoEnv();
     initMetalakeAndCatalogs();
-    if (supportsListFunctions()) {
+    if (supportsFunction()) {
       initSchemaAndFunction();
     }
     initSparkEnv();

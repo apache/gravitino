@@ -34,7 +34,7 @@ public class SparkIcebergCatalogHiveBackendIT33 extends SparkIcebergCatalogHiveB
   }
 
   @Override
-  protected boolean supportsListFunctions() {
+  protected boolean supportsFunction() {
     // Spark 3.3 does not support listFunctions
     return false;
   }

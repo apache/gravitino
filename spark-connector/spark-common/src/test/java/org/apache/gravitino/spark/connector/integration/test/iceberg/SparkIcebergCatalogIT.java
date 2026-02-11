@@ -1275,7 +1275,7 @@ public abstract class SparkIcebergCatalogIT extends SparkCommonIT {
   }
 
   @Test
-  @EnabledIf("supportsListFunctions")
+  @EnabledIf("supportsFunction")
   void testListFunctionsWithIcebergBuiltins() {
     // Test Gravitino function listing
     Set<String> gravitinoFunctions = listUserFunctions(functionSchemaName);
@@ -1299,7 +1299,7 @@ public abstract class SparkIcebergCatalogIT extends SparkCommonIT {
   }
 
   @Test
-  @EnabledIf("supportsListFunctions")
+  @EnabledIf("supportsFunction")
   void testCallUDFAndIcebergBuiltins() {
     // Test Gravitino UDF
     List<String> gravitinoUdfResult =

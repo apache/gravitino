@@ -34,7 +34,7 @@ public class SparkHiveCatalogIT33 extends SparkHiveCatalogIT {
   }
 
   @Override
-  protected boolean supportsListFunctions() {
+  protected boolean supportsFunction() {
     // Spark 3.3 does not support listFunctions
     return false;
   }

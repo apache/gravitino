@@ -35,7 +35,7 @@ public class SparkJdbcPostgreSqlCatalogIT33 extends SparkJdbcPostgreSqlCatalogIT
   }
 
   @Override
-  protected boolean supportsListFunctions() {
+  protected boolean supportsFunction() {
     // Spark 3.3 does not support listFunctions
     return false;
   }
