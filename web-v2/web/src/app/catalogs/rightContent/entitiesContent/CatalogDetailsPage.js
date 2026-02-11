@@ -81,6 +81,8 @@ const renderIcon = catalog => {
         return <Icons.paimon className='size-8'></Icons.paimon>
       case 'custom-icons-hudi':
         return <Icons.hudi className='size-8'></Icons.hudi>
+      case 'custom-icons-hologres':
+        return <Icons.hologres className='size-8'></Icons.hologres>
       case 'custom-icons-oceanbase':
         return <Icons.oceanbase className='size-8'></Icons.oceanbase>
       case 'custom-icons-starrocks':

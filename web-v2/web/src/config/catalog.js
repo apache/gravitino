@@ -35,6 +35,8 @@ export const checkCatalogIcon = ({ type, provider }) => {
           return 'custom-icons-paimon'
         case 'lakehouse-hudi':
           return 'custom-icons-hudi'
+        case 'jdbc-hologres':
+          return 'custom-icons-hologres'
         case 'jdbc-oceanbase':
           return 'custom-icons-oceanbase'
         case 'jdbc-starrocks':
@@ -647,6 +649,45 @@ export const providerBase = {
       }
     ]
   },
+  'jdbc-hologres': {
+    label: 'Hologres',
+    defaultProps: [
+      {
+        label: 'JDBC Driver',
+        key: 'jdbc-driver',
+        value: 'org.postgresql.Driver',
+        required: true,
+        description: 'e.g. org.postgresql.Driver'
+      },
+      {
+        label: 'JDBC URL',
+        key: 'jdbc-url',
+        value: '',
+        required: true,
+        description: 'e.g. jdbc:postgresql://{ENDPOINT}:{PORT}/{DATABASE}'
+      },
+      {
+        label: 'JDBC User',
+        key: 'jdbc-user',
+        value: '',
+        required: true,
+        description: 'Alibaba Cloud AccessKey ID'
+      },
+      {
+        label: 'JDBC Password',
+        key: 'jdbc-password',
+        value: '',
+        required: true,
+        description: 'Alibaba Cloud AccessKey Secret'
+      },
+      {
+        label: 'JDBC Database',
+        key: 'jdbc-database',
+        value: '',
+        required: true
+      }
+    ]
+  },
   'jdbc-oceanbase': {
     label: 'OceanBase',
     defaultProps: [
@@ -756,6 +797,11 @@ export const relationalProviders = [
     label: 'MySQL',
     value: 'jdbc-mysql',
     description: 'A fully managed database service'
+  },
+  {
+    label: 'Hologres',
+    value: 'jdbc-hologres',
+    description: 'Real-time Data Warehouse'
   },
   {
     label: 'OceanBase',
