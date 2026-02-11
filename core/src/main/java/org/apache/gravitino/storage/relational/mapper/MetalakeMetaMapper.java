@@ -80,4 +80,7 @@ public interface MetalakeMetaMapper {
       method = "deleteMetalakeMetasByLegacyTimeline")
   Integer deleteMetalakeMetasByLegacyTimeline(
       @Param("legacyTimeline") Long legacyTimeline, @Param("limit") int limit);
+
+  @SelectProvider(type = MetalakeMetaSQLProviderFactory.class, method = "batchSelectMetalakeByName")
+  List<MetalakePO> batchSelectMetalakeByName(@Param("metalakeNames") List<String> metalakeNames);
 }

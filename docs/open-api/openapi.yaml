@@ -140,6 +140,12 @@ paths:
   /metalakes/{metalake}/catalogs/{catalog}/schemas/{schema}/topics/{topic}:
     $ref: "./topics.yaml#/paths/~1metalakes~1%7Bmetalake%7D~1catalogs~1%7Bcatalog%7D~1schemas~1%7Bschema%7D~1topics~1%7Btopic%7D"
 
+  /metalakes/{metalake}/catalogs/{catalog}/schemas/{schema}/functions:
+    $ref: "./functions.yaml#/paths/~1metalakes~1%7Bmetalake%7D~1catalogs~1%7Bcatalog%7D~1schemas~1%7Bschema%7D~1functions"
+
+  /metalakes/{metalake}/catalogs/{catalog}/schemas/{schema}/functions/{function}:
+    $ref: "./functions.yaml#/paths/~1metalakes~1%7Bmetalake%7D~1catalogs~1%7Bcatalog%7D~1schemas~1%7Bschema%7D~1functions~1%7Bfunction%7D"
+
   /metalakes/{metalake}/catalogs/{catalog}/schemas/{schema}/models:
     $ref: "./models.yaml#/paths/~1metalakes~1%7Bmetalake%7D~1catalogs~1%7Bcatalog%7D~1schemas~1%7Bschema%7D~1models"
 
@@ -499,6 +505,14 @@ components:
       name: model
       in: path
       description: The name of the model
+      required: true
+      schema:
+        type: string
+
+    function:
+      name: function
+      in: path
+      description: The name of the function
       required: true
       schema:
         type: string

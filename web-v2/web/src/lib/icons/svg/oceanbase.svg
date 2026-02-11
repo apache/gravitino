@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg class="img-fluid" id="outputsvg" xmlns="http://www.w3.org/2000/svg" style="transform: matrix(1, 0, 0, 1, 0, 0); transform-origin: 50% 50%; cursor: move; max-height: none; transition: transform 200ms ease-in-out 0s;" width="280" height="280" viewBox="0 0 2800 2800">
+  <g id="l1FLkn6jgqwOe1OQbCdWskk" fill="rgb(1,129,253)" style="transform: none;">
+    <g style="transform: none;">
+      <path id="pqCWjVUON" d="M338 1933 c-17 -4 -18 -31 -18 -383 l0 -378 148 5 c251 9 542 -36 827 -127 222 -71 357 -103 560 -135 136 -22 427 -38 548 -30 l107 7 0 382 0 382 -159 -4 c-163 -4 -323 7 -478 33 -83 14 -374 94 -418 115 -21 10 -164 47 -280 74 -104 23 -245 44 -380 56 -118 10 -423 12 -457 3z"></path>
+    </g>
+  </g>
+  <g id="l3Tw7sWw6PeBNAiRP2RWbkL" fill="rgb(7,200,70)" style="transform: none;">
+    <g style="transform: none;">
+      <path id="p18iitp5Ia" d="M1509 2094 c-27 -70 -66 -200 -63 -206 7 -11 251 -88 348 -109 215 -48 552 -73 679 -53 l37 7 0 123 0 124 -132 -6 c-279 -14 -552 33 -845 143 -7 3 -18 -8 -24 -23z"></path>
+    </g>
+  </g>
+  <g id="l25zI63SdRTqq2xRblRuhKG" fill="rgb(255,160,5)" style="transform: none;">
+    <g style="transform: none;">
+      <path id="pecUtCUzo" d="M320 970 l0 -132 33 6 c84 17 219 18 362 1 142 -16 378 -59 400 -73 5 -4 52 -21 103 -38 108 -35 97 -43 137 91 15 50 30 95 32 101 7 18 -229 94 -407 132 -156 32 -179 34 -412 39 l-248 5 0 -132z"></path>
+    </g>
+  </g>
+</svg>

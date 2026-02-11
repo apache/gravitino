@@ -52,6 +52,8 @@ import org.apache.gravitino.catalog.TableOperationDispatcher;
 import org.apache.gravitino.catalog.TopicDispatcher;
 import org.apache.gravitino.catalog.TopicNormalizeDispatcher;
 import org.apache.gravitino.catalog.TopicOperationDispatcher;
+import org.apache.gravitino.catalog.ViewDispatcher;
+import org.apache.gravitino.catalog.ViewOperationDispatcher;
 import org.apache.gravitino.credential.CredentialOperationDispatcher;
 import org.apache.gravitino.hook.AccessControlHookDispatcher;
 import org.apache.gravitino.hook.CatalogHookDispatcher;
@@ -132,6 +134,8 @@ public class GravitinoEnv {
   private ModelDispatcher modelDispatcher;
 
   private FunctionDispatcher functionDispatcher;
+
+  private ViewDispatcher viewDispatcher;
 
   private MetalakeDispatcher metalakeDispatcher;
 
@@ -270,7 +274,16 @@ public class GravitinoEnv {
   }
 
   /**
-   * Get the PartitionDispatcher associated with the Gravitino environment.
+   * Get the ViewDispatcher associated with the Gravitino environment.
+   *
+   * @return The ViewDispatcher instance.
+   */
+  public ViewDispatcher viewDispatcher() {
+    return viewDispatcher;
+  }
+
+  /**
+   * * Get the PartitionDispatcher associated with the Gravitino environment.
    *
    * @return The PartitionDispatcher instance.
    */
@@ -608,6 +621,12 @@ public class GravitinoEnv {
             catalogManager, schemaOperationDispatcher, entityStore, idGenerator);
     this.functionDispatcher =
         new FunctionNormalizeDispatcher(functionOperationDispatcher, catalogManager);
+
+    // TODO: Add ViewHookDispatcher and ViewEventDispatcher when needed for view-specific hooks
+    //  and event handling.
+    ViewOperationDispatcher viewOperationDispatcher =
+        new ViewOperationDispatcher(catalogManager, entityStore, idGenerator);
+    this.viewDispatcher = viewOperationDispatcher;
 
     this.statisticDispatcher =
         new StatisticEventDispatcher(

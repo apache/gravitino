@@ -388,12 +388,20 @@ public class TestIcebergTableOperations extends IcebergNamespaceTestBase {
 
     // create the table with credential vending
     String tableName = "create_with_credential_vending";
-    response = doCreateTableWithCredentialVending(namespace, tableName);
+    String localLocation = "file:///tmp/" + tableName;
+    response = doCreateTableWithCredentialVending(namespace, tableName, localLocation);
     Assertions.assertEquals(Status.OK.getStatusCode(), response.getStatus());
     loadTableResponse = response.readEntity(LoadTableResponse.class);
+    Assertions.assertTrue(!loadTableResponse.config().containsKey(Credential.CREDENTIAL_TYPE));
+
+    String s3TableName = "create_with_credential_vending_s3";
+    String s3Location = "s3://dummy-bucket/" + s3TableName;
+    response = doCreateTableWithCredentialVending(namespace, s3TableName, s3Location);
+    Assertions.assertEquals(Status.OK.getStatusCode(), response.getStatus());
+    LoadTableResponse s3LoadTableResponse = response.readEntity(LoadTableResponse.class);
     Assertions.assertEquals(
         DummyCredentialProvider.DUMMY_CREDENTIAL_TYPE,
-        loadTableResponse.config().get(Credential.CREDENTIAL_TYPE));
+        s3LoadTableResponse.config().get(Credential.CREDENTIAL_TYPE));
 
     // load the table without credential vending
     response = doLoadTable(namespace, tableName);
@@ -405,14 +413,23 @@ public class TestIcebergTableOperations extends IcebergNamespaceTestBase {
     response = doLoadTableWithCredentialVending(namespace, tableName);
     Assertions.assertEquals(Status.OK.getStatusCode(), response.getStatus());
     loadTableResponse = response.readEntity(LoadTableResponse.class);
+    Assertions.assertTrue(!loadTableResponse.config().containsKey(Credential.CREDENTIAL_TYPE));
+
+    response = doLoadTableWithCredentialVending(namespace, s3TableName);
+    Assertions.assertEquals(Status.OK.getStatusCode(), response.getStatus());
+    loadTableResponse = response.readEntity(LoadTableResponse.class);
     Assertions.assertEquals(
         DummyCredentialProvider.DUMMY_CREDENTIAL_TYPE,
         loadTableResponse.config().get(Credential.CREDENTIAL_TYPE));
   }
 
-  private Response doCreateTableWithCredentialVending(Namespace ns, String name) {
+  private Response doCreateTableWithCredentialVending(Namespace ns, String name, String location) {
     CreateTableRequest createTableRequest =
-        CreateTableRequest.builder().withName(name).withSchema(tableSchema).build();
+        CreateTableRequest.builder()
+            .withName(name)
+            .withSchema(tableSchema)
+            .withLocation(location)
+            .build();
     return getTableClientBuilder(ns, Optional.empty())
         .header(IcebergTableOperations.X_ICEBERG_ACCESS_DELEGATION, "vended-credentials")
         .post(Entity.entity(createTableRequest, MediaType.APPLICATION_JSON_TYPE));

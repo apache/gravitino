@@ -25,7 +25,6 @@ CREATE TABLE IF NOT EXISTS `function_meta` (
     `schema_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'schema id',
     `function_type` VARCHAR(64) NOT NULL COMMENT 'function type',
     `deterministic` TINYINT(1) DEFAULT 1 COMMENT 'whether the function result is deterministic',
-    `return_type` CLOB NOT NULL COMMENT 'function return type',
     `function_current_version` INT UNSIGNED DEFAULT 1 COMMENT 'function current version',
     `function_latest_version` INT UNSIGNED DEFAULT 1 COMMENT 'function latest version',
     `audit_info` CLOB NOT NULL COMMENT 'function audit info',
@@ -53,3 +52,32 @@ CREATE TABLE IF NOT EXISTS `function_version_info` (
     KEY `idx_funvcid` (`catalog_id`),
     KEY `idx_funvsid` (`schema_id`)
 ) ENGINE=InnoDB;
+
+CREATE TABLE IF NOT EXISTS `view_meta` (
+    `view_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'view id',
+    `view_name` VARCHAR(128) NOT NULL COMMENT 'view name',
+    `metalake_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'metalake id',
+    `catalog_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'catalog id',
+    `schema_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'schema id',
+    `current_version` INT UNSIGNED NOT NULL DEFAULT 1 COMMENT 'view current version',
+    `last_version` INT UNSIGNED NOT NULL DEFAULT 1 COMMENT 'view last version',
+    `deleted_at` BIGINT(20) UNSIGNED NOT NULL DEFAULT 0 COMMENT 'view deleted at',
+    PRIMARY KEY (`view_id`),
+    UNIQUE KEY `uk_sid_vn_del` (`schema_id`, `view_name`, `deleted_at`),
+    KEY `idx_vemid` (`metalake_id`),
+    KEY `idx_vecid` (`catalog_id`)
+) ENGINE=InnoDB;
+
+-- Add partition statistics storage support
+CREATE TABLE IF NOT EXISTS partition_statistic_meta (
+    table_id BIGINT NOT NULL COMMENT 'table id from table_meta',
+    partition_name VARCHAR(1024) NOT NULL COMMENT 'partition name',
+    statistic_name VARCHAR(128) NOT NULL COMMENT 'statistic name',
+    statistic_value CLOB NOT NULL COMMENT 'statistic value as JSON',
+    audit_info CLOB NOT NULL COMMENT 'audit information as JSON',
+    created_at BIGINT NOT NULL COMMENT 'creation timestamp in milliseconds',
+    updated_at BIGINT NOT NULL COMMENT 'last update timestamp in milliseconds',
+    PRIMARY KEY (table_id, partition_name, statistic_name)
+);
+
+CREATE INDEX IF NOT EXISTS idx_table_partition ON partition_statistic_meta(table_id, partition_name);
