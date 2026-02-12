@@ -27,6 +27,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
+import org.apache.gravitino.Catalog;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.MetadataObjects;
 import org.apache.gravitino.NameIdentifier;
@@ -35,6 +36,7 @@ import org.apache.gravitino.authorization.Owner;
 import org.apache.gravitino.authorization.Privileges;
 import org.apache.gravitino.authorization.SecurableObject;
 import org.apache.gravitino.authorization.SecurableObjects;
+import org.apache.gravitino.client.GravitinoAdminClient;
 import org.apache.gravitino.integration.test.util.ITUtils;
 import org.apache.iceberg.exceptions.ForbiddenException;
 import org.apache.spark.SparkException;
@@ -297,5 +299,83 @@ public abstract class IcebergRESTCloudTokenAuthorizationBaseIT extends IcebergAu
     NameIdentifier[] nameIdentifiers =
         catalogClientWithAllPrivilege.asTableCatalog().listTables(Namespace.of(SCHEMA_NAME));
     Assertions.assertEquals(0, nameIdentifiers.length);
+  }
+
+  /**
+   * Verifies that normal user cannot see sensitive properties while admin user can.
+   *
+   * @param normalUserProps Properties accessible by normal user
+   * @param adminProps Properties accessible by admin user
+   * @param context Context description for error messages (e.g., "loadCatalog", "listCatalogsInfo")
+   */
+  protected void verifySensitivePropertiesFiltering(
+      Map<String, String> normalUserProps, Map<String, String> adminProps, String context) {
+    Assertions.assertTrue(
+        normalUserProps.size() < adminProps.size(),
+        String.format(
+            "Normal user properties should be less than admin properties in %s", context));
+
+    for (String sensitiveKey : sensitiveProperties()) {
+      Assertions.assertFalse(
+          normalUserProps.containsKey(sensitiveKey),
+          String.format(
+              "Normal user should not see sensitive property in %s: %s", context, sensitiveKey));
+      Assertions.assertTrue(
+          adminProps.containsKey(sensitiveKey),
+          String.format(
+              "Admin user should see sensitive property in %s: %s", context, sensitiveKey));
+    }
+  }
+
+  /**
+   * Extracts catalog properties for the target catalog from catalog array.
+   *
+   * @param catalogs Array of catalogs to search
+   * @return Properties map of the target catalog, or empty map if not found
+   */
+  protected Map<String, String> getCatalogProperties(org.apache.gravitino.Catalog[] catalogs) {
+    for (org.apache.gravitino.Catalog catalog : catalogs) {
+      if (catalog.name().equals(GRAVITINO_CATALOG_NAME)) {
+        return catalog.properties();
+      }
+    }
+    return new HashMap<>();
+  }
+
+  protected void testSensitiveProperties() {
+    // Grant normal user use_catalog privilege to access catalog
+    String roleName = "useCatalog_" + UUID.randomUUID();
+    metalakeClientWithAllPrivilege.createRole(
+        roleName,
+        new HashMap<>(),
+        ImmutableList.of(
+            SecurableObjects.ofCatalog(
+                GRAVITINO_CATALOG_NAME, ImmutableList.of(Privileges.UseCatalog.allow()))));
+    metalakeClientWithAllPrivilege.grantRolesToUser(ImmutableList.of(roleName), NORMAL_USER);
+
+    try (GravitinoAdminClient normalUserClient =
+        GravitinoAdminClient.builder(serverUri).withSimpleAuth(NORMAL_USER).build()) {
+      // Test loadCatalog properties - normal user should not see sensitive properties
+      Map<String, String> normalUserCatalogProps =
+          normalUserClient
+              .loadMetalake(METALAKE_NAME)
+              .loadCatalog(GRAVITINO_CATALOG_NAME)
+              .properties();
+      Map<String, String> adminCatalogProps = catalogClientWithAllPrivilege.properties();
+      verifySensitivePropertiesFiltering(normalUserCatalogProps, adminCatalogProps, "loadCatalog");
+
+      // Test listCatalogsInfo - normal user should not see sensitive properties in catalog info
+      Catalog[] normalUserCatalogs =
+          normalUserClient.loadMetalake(METALAKE_NAME).listCatalogsInfo();
+      Catalog[] adminCatalogs = metalakeClientWithAllPrivilege.listCatalogsInfo();
+      Assertions.assertEquals(adminCatalogs.length, normalUserCatalogs.length);
+
+      Map<String, String> normalUserCatalogInfo = getCatalogProperties(normalUserCatalogs);
+      Map<String, String> adminCatalogInfo = getCatalogProperties(adminCatalogs);
+      verifySensitivePropertiesFiltering(
+          normalUserCatalogInfo, adminCatalogInfo, "listCatalogsInfo");
+    }
+
+    metalakeClientWithAllPrivilege.deleteRole(roleName);
   }
 }

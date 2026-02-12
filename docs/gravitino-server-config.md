@@ -264,7 +264,6 @@ Writer configuration begins with `gravitino.audit.writer.${name}`, where `${name
 
 Refer to [security](security/security.md) for HTTPS and authentication configurations.
 
-
 ### Metrics configuration
 
 | Property name                             | Description                                          | Default value | Required | Since Version |

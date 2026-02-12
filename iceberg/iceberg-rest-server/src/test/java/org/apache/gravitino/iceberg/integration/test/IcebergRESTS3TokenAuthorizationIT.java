@@ -19,25 +19,18 @@
 
 package org.apache.gravitino.iceberg.integration.test;
 
-import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
 import java.io.IOException;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Set;
-import java.util.UUID;
-import org.apache.gravitino.Catalog;
-import org.apache.gravitino.authorization.Privileges;
-import org.apache.gravitino.authorization.SecurableObjects;
 import org.apache.gravitino.catalog.lakehouse.iceberg.IcebergConstants;
-import org.apache.gravitino.client.GravitinoAdminClient;
 import org.apache.gravitino.credential.CredentialConstants;
 import org.apache.gravitino.credential.S3TokenCredential;
 import org.apache.gravitino.integration.test.util.BaseIT;
 import org.apache.gravitino.integration.test.util.DownloaderUtils;
 import org.apache.gravitino.integration.test.util.ITUtils;
 import org.apache.gravitino.storage.S3Properties;
-import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.condition.EnabledIfEnvironmentVariable;
 import org.junit.platform.commons.util.StringUtils;
@@ -70,60 +63,7 @@ public class IcebergRESTS3TokenAuthorizationIT extends IcebergRESTCloudTokenAuth
 
     setupCloudBundles();
 
-    // Grant normal user use_catalog privilege to access catalog
-    String roleName = "useCatalog_" + UUID.randomUUID();
-    metalakeClientWithAllPrivilege.createRole(
-        roleName,
-        new HashMap<>(),
-        ImmutableList.of(
-            SecurableObjects.ofCatalog(
-                GRAVITINO_CATALOG_NAME, ImmutableList.of(Privileges.UseCatalog.allow()))));
-    metalakeClientWithAllPrivilege.grantRolesToUser(ImmutableList.of(roleName), NORMAL_USER);
-
-    try (GravitinoAdminClient normalUserClient =
-        GravitinoAdminClient.builder(serverUri).withSimpleAuth(NORMAL_USER).build()) {
-      // Test loadCatalog properties - normal user should not see sensitive properties
-      Map<String, String> normalUserCatalogProps =
-          normalUserClient
-              .loadMetalake(METALAKE_NAME)
-              .loadCatalog(GRAVITINO_CATALOG_NAME)
-              .properties();
-      Map<String, String> adminCatalogProps = catalogClientWithAllPrivilege.properties();
-      Assertions.assertTrue(normalUserCatalogProps.size() < adminCatalogProps.size());
-      for (String sensitiveKey : sensitiveProperties()) {
-        Assertions.assertFalse(
-            normalUserCatalogProps.containsKey(sensitiveKey),
-            "Normal user should not see sensitive property: " + sensitiveKey);
-        Assertions.assertTrue(
-            adminCatalogProps.containsKey(sensitiveKey),
-            "Admin user should see sensitive property: " + sensitiveKey);
-      }
-
-      // Test listCatalogsInfo - normal user should not see sensitive properties in catalog info
-      Catalog[] normalUserCatalogs =
-          normalUserClient.loadMetalake(METALAKE_NAME).listCatalogsInfo();
-      Catalog[] adminCatalogs = metalakeClientWithAllPrivilege.listCatalogsInfo();
-      Assertions.assertEquals(adminCatalogs.length, normalUserCatalogs.length);
-      for (Catalog normalCatalog : normalUserCatalogs) {
-        if (normalCatalog.name().equals(GRAVITINO_CATALOG_NAME)) {
-          for (String sensitiveKey : sensitiveProperties()) {
-            Assertions.assertFalse(
-                normalCatalog.properties().containsKey(sensitiveKey),
-                "Normal user should not see sensitive property in listCatalogsInfo: "
-                    + sensitiveKey);
-          }
-        }
-      }
-      for (Catalog adminCatalog : adminCatalogs) {
-        if (adminCatalog.name().equals(GRAVITINO_CATALOG_NAME)) {
-          for (String sensitiveKey : sensitiveProperties()) {
-            Assertions.assertTrue(
-                adminCatalog.properties().containsKey(sensitiveKey),
-                "Admin user should see sensitive property in listCatalogsInfo: " + sensitiveKey);
-          }
-        }
-      }
-    }
+    testSensitiveProperties();
   }
 
   @Override
