@@ -73,7 +73,12 @@ public class FuncExpressionDTO implements FunctionExpression, FunctionArg {
     if (functionArgs.length == 0) {
       return functionName + "()";
     }
-    return functionName + "(" + String.join(", ", Arrays.toString(functionArgs)) + ")";
+
+    return functionName
+        + "("
+        + String.join(
+            ", ", Arrays.stream(functionArgs).map(Object::toString).toArray(String[]::new))
+        + ")";
   }
 
   /** Builder for {@link FuncExpressionDTO}. */
