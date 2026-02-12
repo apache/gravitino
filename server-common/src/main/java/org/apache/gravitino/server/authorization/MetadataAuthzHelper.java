@@ -289,6 +289,9 @@ public class MetadataAuthzHelper {
     GravitinoAuthorizer authorizer =
         GravitinoAuthorizerProvider.getInstance().getGravitinoAuthorizer();
     AuthorizationRequestContext authorizationRequestContext = new AuthorizationRequestContext();
+    // Set the original authorization expression for better observability in debug logs
+    authorizationRequestContext.setOriginalAuthorizationExpression(
+        String.format("(%s) || (%s)", firstExpression, secondExpression));
     List<CompletableFuture<int[]>> futures = new ArrayList<>();
 
     for (int i = 0; i < entities.length; i++) {

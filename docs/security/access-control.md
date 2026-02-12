@@ -440,13 +440,14 @@ This model ensures that denials cannot be circumvented by grants at lower levels
 
 To enable access control in Gravitino, configure the following settings in your server configuration file:
 
-| Configuration Item                                      | Description                                                               | Default Value | Required                                    | Since Version |
-|---------------------------------------------------------|---------------------------------------------------------------------------|---------------|---------------------------------------------|---------------|
-| `gravitino.authorization.enable`                        | Enable or disable authorization in Gravitino                              | `false`       | No                                          | 0.5.0         |
-| `gravitino.authorization.serviceAdmins`                 | Comma-separated list of service administrator usernames                   | (none)        | Yes (when authorization is enabled)         | 0.5.0         |
-| `gravitino.authorization.jcasbin.cacheExpirationSecs`   | The expiration time in seconds for authorization cache entries            | `3600`        | No                                          | 1.1.1         |
-| `gravitino.authorization.jcasbin.roleCacheSize`         | The maximum size of the role cache for authorization                      | `10000`       | No                                          | 1.1.1         |
-| `gravitino.authorization.jcasbin.ownerCacheSize`        | The maximum size of the owner cache for authorization                     | `100000`      | No                                          | 1.1.1         |
+| Configuration Item                                      | Description                                                                                                                                                                                                         | Default Value | Required                                    | Since Version |
+|---------------------------------------------------------|---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|---------------|---------------------------------------------|---------------|
+| `gravitino.authorization.enable`                        | Enable or disable authorization in Gravitino                                                                                                                                                                        | `false`       | No                                          | 0.5.0         |
+| `gravitino.authorization.serviceAdmins`                 | Comma-separated list of service administrator usernames                                                                                                                                                             | (none)        | Yes (when authorization is enabled)         | 0.5.0         |
+| `gravitino.authorization.filterSensitiveProperties`     | Whether to filter sensitive properties (passwords, secret keys, tokens) in catalog responses. When enabled, sensitive properties are hidden from users without appropriate permissions (owner or alter permission). | `true`        | No                                          | 1.2.0         |
+| `gravitino.authorization.jcasbin.cacheExpirationSecs`   | The expiration time in seconds for authorization cache entries                                                                                                                                                      | `3600`        | No                                          | 1.1.1         |
+| `gravitino.authorization.jcasbin.roleCacheSize`         | The maximum size of the role cache for authorization                                                                                                                                                                | `10000`       | No                                          | 1.1.1         |
+| `gravitino.authorization.jcasbin.ownerCacheSize`        | The maximum size of the owner cache for authorization                                                                                                                                                               | `100000`      | No                                          | 1.1.1         |
 
 ### Authorization Cache
 
@@ -461,6 +462,14 @@ Gravitino uses Caffeine caches to improve authorization performance by caching r
 :::info
 When role privileges or ownership are changed through the Gravitino API, the corresponding cache entries are automatically invalidated to ensure authorization decisions reflect the latest state.
 :::
+
+### Sensitive Properties Filtering
+
+Gravitino can automatically filter sensitive properties (such as passwords, secret keys, and tokens) from catalog responses to prevent unauthorized disclosure of credentials.
+
+When `gravitino.authorization.filterSensitiveProperties` is set to `true`, sensitive catalog properties such as passwords, JDBC credentials, AWS secret keys, Azure storage account keys, and authentication tokens will be hidden in API responses unless the user has owner or alter permissions on the catalog.
+
+This provides an additional layer of security by ensuring that only users with appropriate permissions can view sensitive configuration details.
 
 ### Important Notes
 
