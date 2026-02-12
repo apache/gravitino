@@ -1027,7 +1027,6 @@ public class CatalogClickHouseIT extends BaseIT {
                     Types.StringType.get(),
                     TableChange.ColumnPosition.after("status"))));
 
-    Table table = tableCatalog.loadTable(tableIdentifier);
     Assertions.assertDoesNotThrow(
         () ->
             tableCatalog.alterTable(

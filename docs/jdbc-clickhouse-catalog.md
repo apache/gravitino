@@ -19,12 +19,13 @@ Apache Gravitino can manage ClickHouse metadata through a JDBC catalog. This doc
 
 ### Catalog capabilities
 
-| Item            | Description                                                             |
-|-----------------|-------------------------------------------------------------------------|
-| Scope           | One catalog maps to one ClickHouse instance                             |
-| Metadata/DDL    | Supports JDBC-based metadata management and DDL                         |
-| Column defaults | Supports column default values                                          |
-| Drivers         | Requires user-provided ClickHouse JDBC driver in `catalogs-contrib/catalog-jdbc-clickhouse/libs` |
+| Item              | Description                                                                                             |
+|-------------------|---------------------------------------------------------------------------------------------------------|
+| Scope             | One catalog maps to one ClickHouse instance                                                             |
+| Metadata/DDL      | Supports JDBC-based metadata management and DDL                                                         |
+| Column defaults   | Supports column default values                                                                          |
+| Drivers           | Requires user-provided ClickHouse JDBC driver in `catalogs-contrib/catalog-jdbc-clickhouse/libs`        |
+| Supported version | All the codes are tested by ClickHouse `24.8.14`, but should be compatible with other versions as well. |                                                
 
 ### Catalog properties
 
