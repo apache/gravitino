@@ -281,7 +281,7 @@ export default function PoliciesPage() {
       </Spin>
       {openPolicy && (
         <Drawer
-          title={`View ${currentPolicy?.name} details`}
+          title={`View Policy "${currentPolicy?.name}" Details`}
           loading={detailsLoading}
           onClose={onClose}
           open={openPolicy}

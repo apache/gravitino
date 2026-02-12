@@ -231,7 +231,13 @@ export default function TagsPage() {
         />
       </Spin>
       <CreateTagDialog open={open} setOpen={setOpen} metalake={currentMetalake} editTag={editTag} />
-      <Drawer title='Tag Details' placement='right' width={'40%'} onClose={handleCloseDrawer} open={drawerOpen}>
+      <Drawer
+        title={`View Tag "${selectedTag?.name || ''}" Details`}
+        placement='right'
+        width={'40%'}
+        onClose={handleCloseDrawer}
+        open={drawerOpen}
+      >
         {selectedTag && (
           <>
             <Title level={5} className='mb-2'>

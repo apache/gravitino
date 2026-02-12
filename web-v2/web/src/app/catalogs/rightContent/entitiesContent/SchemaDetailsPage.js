@@ -125,7 +125,7 @@ export default function SchemaDetailsPage() {
           anthEnable
             ? [
                 { label: 'Tables', key: 'Tables' },
-                { label: 'Associated roles', key: 'Associated roles' }
+                { label: 'Associated Roles', key: 'Associated Roles' }
               ]
             : [{ label: 'Tables', key: 'Tables' }]
         )
@@ -139,7 +139,7 @@ export default function SchemaDetailsPage() {
           anthEnable
             ? [
                 { label: 'Topics', key: 'Topics' },
-                { label: 'Associated roles', key: 'Associated roles' }
+                { label: 'Associated Roles', key: 'Associated Roles' }
               ]
             : [{ label: 'Topics', key: 'Topics' }]
         )
@@ -153,7 +153,7 @@ export default function SchemaDetailsPage() {
           anthEnable
             ? [
                 { label: 'Filesets', key: 'Filesets' },
-                { label: 'Associated roles', key: 'Associated roles' }
+                { label: 'Associated Roles', key: 'Associated Roles' }
               ]
             : [{ label: 'Filesets', key: 'Filesets' }]
         )
@@ -167,7 +167,7 @@ export default function SchemaDetailsPage() {
           anthEnable
             ? [
                 { label: 'Models', key: 'Models' },
-                { label: 'Associated roles', key: 'Associated roles' }
+                { label: 'Associated Roles', key: 'Associated Roles' }
               ]
             : [{ label: 'Models', key: 'Models' }]
         )
@@ -519,7 +519,7 @@ export default function SchemaDetailsPage() {
         </Space>
       </Spin>
       <Tabs data-refer='details-tabs' defaultActiveKey={tabKey} onChange={onChangeTab} items={tabOptions} />
-      {tabKey !== 'Associated roles' ? (
+      {tabKey !== 'Associated Roles' ? (
         <>
           <Flex justify='flex-end' className='mb-4'>
             <div

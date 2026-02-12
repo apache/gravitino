@@ -322,7 +322,7 @@ export default function JobsPage() {
         </Spin>
         {openDetailJob && (
           <Drawer
-            title={`View Job ${currentJob?.jobId} Details`}
+            title={`View Job "${currentJob?.jobId}" Details`}
             loading={jobDetailLoading}
             onClose={onClose}
             open={openDetailJob}

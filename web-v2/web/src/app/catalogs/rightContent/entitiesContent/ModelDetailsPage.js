@@ -135,7 +135,7 @@ export default function ModelDetailsPage({ ...props }) {
 
   const tabOptions = [
     { label: 'Versions', key: 'Versions' },
-    ...(anthEnable ? [{ label: 'Associated roles', key: 'Associated roles' }] : [])
+    ...(anthEnable ? [{ label: 'Associated Roles', key: 'Associated Roles' }] : [])
   ]
 
   const onChangeTab = key => {
@@ -439,7 +439,7 @@ export default function ModelDetailsPage({ ...props }) {
           )}
         </>
       )}
-      {anthEnable && activeTab === 'Associated roles' && model && (
+      {anthEnable && activeTab === 'Associated Roles' && model && (
         <AssociatedTable
           metalake={currentMetalake}
           metadataObjectType={'model'}

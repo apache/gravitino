@@ -172,7 +172,7 @@ export default function CatalogDetailsPage() {
   const tabOptions = anthEnable
     ? [
         { label: 'Schemas', key: 'Schemas' },
-        { label: 'Associated roles', key: 'Associated roles' }
+        { label: 'Associated Roles', key: 'Associated Roles' }
       ]
     : [{ label: 'Schemas', key: 'Schemas' }]
 

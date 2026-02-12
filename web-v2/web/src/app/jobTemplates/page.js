@@ -23,7 +23,7 @@ import { createContext, useContext, useEffect, useMemo, useState } from 'react'
 import dynamic from 'next/dynamic'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { ExclamationCircleFilled, PlusOutlined } from '@ant-design/icons'
-import { Button, Descriptions, Drawer, Flex, Input, Modal, Spin, Table, Tooltip, Typography } from 'antd'
+import { Button, Descriptions, Drawer, Flex, Input, Modal, Spin, Table, Tag, Tooltip, Typography } from 'antd'
 import { useAntdColumnResize } from 'react-antd-column-resize'
 import ConfirmInput from '@/components/ConfirmInput'
 import Icons from '@/components/Icons'
@@ -254,7 +254,7 @@ export default function JobTemplatesPage() {
         </Spin>
         {openDetailJobTemplate && (
           <Drawer
-            title={`View Details - ${currentJobTemplate?.name || ''}`}
+            title={`View Job Template "${currentJobTemplate?.name || ''}" Details`}
             loading={isLoadingDetails}
             onClose={onClose}
             open={openDetailJobTemplate}
@@ -272,11 +272,13 @@ export default function JobTemplatesPage() {
                 <Descriptions.Item label='Class Name'>{currentJobTemplate?.className || '-'}</Descriptions.Item>
               )}
               <Descriptions.Item label='Arguments'>
-                {currentJobTemplate?.arguments?.length === 1
-                  ? currentJobTemplate?.arguments[0]
-                  : currentJobTemplate?.arguments?.length
-                    ? currentJobTemplate?.arguments.join(', ')
-                    : '-'}
+                {currentJobTemplate?.arguments?.length
+                  ? currentJobTemplate.arguments.map((argument, index) => (
+                      <Tag key={`${argument}-${index}`} className='mb-1 mr-1'>
+                        {argument}
+                      </Tag>
+                    ))
+                  : '-'}
               </Descriptions.Item>
               {currentJobTemplate?.jobType === 'shell' && (
                 <Descriptions.Item label='Script(s)'>
