@@ -148,15 +148,15 @@ See [Manage Relational Metadata Using Gravitino](./manage-relational-metadata-us
 
 ### Table capabilities
 
-| Area                | Details                                                                                                                                                                                                                 |
-|---------------------|-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| Mapping             | Gravitino table maps to a ClickHouse table                                                                                                                                                                             |
+| Area                | Details                                                                                                                                                                                                                                                                                                                                                                  |
+|---------------------|--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| Mapping             | Gravitino table maps to a ClickHouse table                                                                                                                                                                                                                                                                                                                               |
 | Engines             | Local engines: MergeTree family (`MergeTree` default, `ReplacingMergeTree`, `SummingMergeTree`, `AggregatingMergeTree`, `CollapsingMergeTree`, `VersionedCollapsingMergeTree`, `GraphiteMergeTree`), Tiny/Stripe/Log, Memory, File, Null, Set, Join, View, Buffer, KeeperMap, etc. Distributed engine supports cluster mode with remote database/table and sharding key. |
-| Ordering/Partition  | MergeTree-family requires exactly one `ORDER BY` column; only single-column identity `PARTITION BY` is supported on MergeTree engines. Other engines reject `ORDER BY`/`PARTITION BY`.                                   |
-| Indexes             | Primary key; data-skipping indexes `DATA_SKIPPING_MINMAX` and `DATA_SKIPPING_BLOOM_FILTER` (fixed granularities).                                                                                                      |
-| Distribution        | Gravitino enforces `Distributions.NONE`; no custom distribution strategies.                                                                                                                                           |
-| Column defaults     | Supported.                                                                                                                                                                                                             |
-| Unsupported         | Engine change after creation; removing table properties; auto-increment columns.                                                                                                                                       |
+| Ordering/Partition  | MergeTree-family requires exactly one `ORDER BY` column; only single-column identity `PARTITION BY` is supported on MergeTree engines. Other engines reject `ORDER BY`/`PARTITION BY`.                                                                                                                                                                                   |
+| Indexes             | Primary key; data-skipping indexes `DATA_SKIPPING_MINMAX` and `DATA_SKIPPING_BLOOM_FILTER` (fixed granularities).                                                                                                                                                                                                                                                        |
+| Distribution        | Gravitino enforces `Distributions.NONE`; no custom distribution strategies.                                                                                                                                                                                                                                                                                              |
+| Column defaults     | Supported.                                                                                                                                                                                                                                                                                                                                                               |
+| Unsupported         | Engine change after creation; removing table properties; auto-increment columns.                                                                                                                                                                                                                                                                                         |
 
 ### Table column types
 
@@ -211,12 +211,16 @@ Other ClickHouse types are exposed as [External Type](./manage-relational-metada
 
 ### Partitioning, sorting, and distribution
 
-- `ORDER BY`: required for MergeTree-family engines and only columns identity are supported; for example `ORDER BY order_id` is supported, but `ORDER BY (order_id + 1)` is not supported. Other engines reject `ORDER BY` clause.
+- `ORDER BY`: required for MergeTree-family engines and only columns identity are supported;
+   - Accept format: `id`, `(id, name)`, `(func(id), name)`, `func(id)`;
+   - Reject format: `(id + 1)`, `(func(id) + 1)`, etc.
+
 - `PARTITION BY`: single-column identity and some functions are supported only, and only for MergeTree-family engines. For example `PARTITION BY created_at` or `PARTITION BY toYYYYMM(created_at)` are supported, but `PARTITION BY (created_at + 1)` are not supported.
    In all, the following partitioning expressions are supported:
    - Identity: `PARTITION BY column_name`
    - Functions: `PARTITION BY toDate(column_name)`, `PARTITION BY toYear(column_name)`, `PARTITION BY toYYYYMM(column_name)`. Other functions are not supported.
    - Not support: `PARTITION BY (column_name + 1)`, `PARTITION BY (toYear(column_name) + 1)`, etc.
+
 - Distribution: fixed to `Distributions.NONE` (no custom distribution). ClickHouse does not support custom distribution strategies since distribution is handled by the engine (for example `Distributed` engine with sharding key).
 
 ### Create a table

@@ -32,6 +32,7 @@ import java.sql.DatabaseMetaData;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
+import java.sql.Statement;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -39,6 +40,8 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 import org.apache.commons.collections4.CollectionUtils;
 import org.apache.commons.collections4.MapUtils;
@@ -58,12 +61,16 @@ import org.apache.gravitino.catalog.jdbc.utils.JdbcConnectorUtils;
 import org.apache.gravitino.exceptions.NoSuchTableException;
 import org.apache.gravitino.rel.Column;
 import org.apache.gravitino.rel.TableChange;
+import org.apache.gravitino.rel.expressions.Expression;
+import org.apache.gravitino.rel.expressions.FunctionExpression;
 import org.apache.gravitino.rel.expressions.NamedReference;
+import org.apache.gravitino.rel.expressions.UnparsedExpression;
 import org.apache.gravitino.rel.expressions.distributions.Distribution;
 import org.apache.gravitino.rel.expressions.distributions.Distributions;
 import org.apache.gravitino.rel.expressions.sorts.NullOrdering;
 import org.apache.gravitino.rel.expressions.sorts.SortDirection;
 import org.apache.gravitino.rel.expressions.sorts.SortOrder;
+import org.apache.gravitino.rel.expressions.sorts.SortOrders;
 import org.apache.gravitino.rel.expressions.transforms.Transform;
 import org.apache.gravitino.rel.expressions.transforms.Transforms;
 import org.apache.gravitino.rel.indexes.Index;
@@ -73,6 +80,10 @@ public class ClickHouseTableOperations extends JdbcTableOperations {
 
   private static final String CLICKHOUSE_NOT_SUPPORT_NESTED_COLUMN_MSG =
       "Clickhouse does not support nested column names.";
+  private static final Pattern ORDER_BY_PATTERN =
+      Pattern.compile("ORDER\\s+BY\\s+([^\\n]+)", Pattern.CASE_INSENSITIVE);
+  private static final Pattern PARTITION_BY_PATTERN =
+      Pattern.compile("PARTITION\\s+BY\\s+([^\\n]+)", Pattern.CASE_INSENSITIVE);
 
   private static final String QUERY_INDEXES_SQL =
       """
@@ -238,7 +249,7 @@ public class ClickHouseTableOperations extends JdbcTableOperations {
     sqlBuilder.append(settings);
   }
 
-  private static void appendOrderBy(
+  private void appendOrderBy(
       SortOrder[] sortOrders,
       StringBuilder sqlBuilder,
       ClickHouseTablePropertiesMetadata.ENGINE engine) {
@@ -260,22 +271,26 @@ public class ClickHouseTableOperations extends JdbcTableOperations {
           "ORDER BY clause is required for engine: " + engine.getValue());
     }
 
-    // TODO support the size larger than 1.
-    if (sortOrders.length > 1) {
-      throw new UnsupportedOperationException(
-          "Currently ClickHouse does not support sortOrders with more than 1 element");
+    List<String> orderBySql = new ArrayList<>();
+    for (SortOrder sortOrder : sortOrders) {
+      NullOrdering nullOrdering = sortOrder.nullOrdering();
+      SortDirection sortDirection = sortOrder.direction();
+      if (nullOrdering != null) {
+        LOG.warn(
+            "ClickHouse currently does not support nullOrdering: {}, and will ignore it",
+            nullOrdering);
+      }
+
+      String exprSql = toOrderBySql(sortOrder.expression());
+      if (sortDirection == SortDirection.DESCENDING) {
+        exprSql = exprSql + " DESC";
+      }
+      orderBySql.add(exprSql);
     }
 
-    NullOrdering nullOrdering = sortOrders[0].nullOrdering();
-    SortDirection sortDirection = sortOrders[0].direction();
-    if (nullOrdering != null && sortDirection != null) {
-      // ClickHouse does not support NULLS FIRST/LAST now.
-      LOG.warn(
-          "ClickHouse currently does not support nullOrdering: {}, and will ignore it",
-          nullOrdering);
-    }
-
-    sqlBuilder.append("\n ORDER BY `%s`\n".formatted(sortOrders[0].expression()));
+    String renderedOrderBy =
+        orderBySql.size() == 1 ? orderBySql.get(0) : "(" + String.join(", ", orderBySql) + ")";
+    sqlBuilder.append("\n ORDER BY ").append(renderedOrderBy).append("\n");
   }
 
   private ClickHouseTablePropertiesMetadata.ENGINE appendTableEngine(
@@ -506,6 +521,49 @@ public class ClickHouseTableOperations extends JdbcTableOperations {
         throw new NoSuchTableException(
             "Table %s does not exist in %s.", tableName, connection.getCatalog());
       }
+    }
+  }
+
+  @Override
+  public JdbcTable load(String databaseName, String tableName) throws NoSuchTableException {
+    try (Connection connection = getConnection(databaseName)) {
+      ResultSet tables = getTable(connection, databaseName, tableName);
+      JdbcTable.Builder jdbcTableBuilder = getTableBuilder(tables, databaseName, tableName);
+
+      List<JdbcColumn> jdbcColumns = new ArrayList<>();
+      ResultSet columns = getColumns(connection, databaseName, tableName);
+      while (columns.next()) {
+        JdbcColumn.Builder columnBuilder = getColumnBuilder(columns, databaseName, tableName);
+        if (columnBuilder != null) {
+          boolean autoIncrement = getAutoIncrementInfo(columns);
+          columnBuilder.withAutoIncrement(autoIncrement);
+          jdbcColumns.add(columnBuilder.build());
+        }
+      }
+      jdbcTableBuilder.withColumns(jdbcColumns.toArray(new JdbcColumn[0]));
+
+      List<Index> indexes = getIndexes(connection, databaseName, tableName);
+      jdbcTableBuilder.withIndexes(indexes.toArray(new Index[0]));
+
+      ShowCreateTableMetadata metadata = parseShowCreateTable(connection, tableName);
+      Transform[] partitioning = metadata.partitioning;
+      if (ArrayUtils.isEmpty(partitioning)) {
+        partitioning = getTablePartitioning(connection, databaseName, tableName);
+      }
+      jdbcTableBuilder.withPartitioning(partitioning);
+      jdbcTableBuilder.withSortOrders(metadata.sortOrders);
+
+      Distribution distribution = getDistributionInfo(connection, databaseName, tableName);
+      jdbcTableBuilder.withDistribution(distribution);
+
+      Map<String, String> tableProperties = getTableProperties(connection, tableName);
+      jdbcTableBuilder.withProperties(tableProperties);
+
+      correctJdbcTableFields(connection, databaseName, tableName, jdbcTableBuilder);
+
+      return jdbcTableBuilder.withTableOperation(this).build();
+    } catch (SQLException e) {
+      throw exceptionMapper.toGravitinoException(e);
     }
   }
 
@@ -890,6 +948,129 @@ public class ClickHouseTableOperations extends JdbcTableOperations {
   @VisibleForTesting
   Transform[] parsePartitioning(String partitionKey) {
     return ClickHouseTableSqlUtils.parsePartitioning(partitionKey);
+  }
+
+  private ShowCreateTableMetadata parseCreateStatement(String createSql) {
+    ShowCreateTableMetadata metadata = new ShowCreateTableMetadata();
+    if (StringUtils.isBlank(createSql)) {
+      return metadata;
+    }
+
+    Matcher orderMatcher = ORDER_BY_PATTERN.matcher(createSql);
+    if (orderMatcher.find()) {
+      metadata.sortOrders = parseOrderByClause(orderMatcher.group(1));
+    }
+
+    Matcher partitionMatcher = PARTITION_BY_PATTERN.matcher(createSql);
+    if (partitionMatcher.find()) {
+      metadata.partitioning = parsePartitioning(partitionMatcher.group(1));
+    }
+
+    return metadata;
+  }
+
+  private ShowCreateTableMetadata parseShowCreateTable(Connection connection, String tableName)
+      throws SQLException {
+    String sql = "SHOW CREATE TABLE " + quoteIdentifier(tableName);
+    try (Statement statement = connection.createStatement();
+        ResultSet resultSet = statement.executeQuery(sql)) {
+      if (resultSet.next()) {
+        String createSql = resultSet.getString(1);
+        return parseCreateStatement(createSql);
+      }
+      throw new SQLException("SHOW CREATE TABLE returned no rows for " + tableName);
+    }
+  }
+
+  private SortOrder[] parseOrderByClause(String orderClause) {
+    if (StringUtils.isBlank(orderClause)) {
+      return SortOrders.NONE;
+    }
+    String trimmed = orderClause.trim();
+    if (trimmed.startsWith("(") && trimmed.endsWith(")")) {
+      trimmed = trimmed.substring(1, trimmed.length() - 1);
+    }
+
+    List<String> expressions = splitExpressions(trimmed);
+    List<SortOrder> sortOrders = new ArrayList<>();
+    for (String expression : expressions) {
+      Expression sortExpr = toSortExpression(expression);
+      sortOrders.add(SortOrders.of(sortExpr, SortDirection.ASCENDING));
+    }
+    return sortOrders.toArray(new SortOrder[0]);
+  }
+
+  private List<String> splitExpressions(String expressionList) {
+    List<String> expressions = new ArrayList<>();
+    StringBuilder current = new StringBuilder();
+    int depth = 0;
+    for (int i = 0; i < expressionList.length(); i++) {
+      char ch = expressionList.charAt(i);
+      if (ch == '(') {
+        depth++;
+      } else if (ch == ')') {
+        depth--;
+      } else if (ch == ',' && depth == 0) {
+        expressions.add(current.toString());
+        current.setLength(0);
+        continue;
+      }
+      current.append(ch);
+    }
+    if (current.length() > 0) {
+      expressions.add(current.toString());
+    }
+    return expressions;
+  }
+
+  private Expression toSortExpression(String expression) {
+    String trimmed = StringUtils.trim(expression);
+    if (StringUtils.isBlank(trimmed)) {
+      return UnparsedExpression.of(expression);
+    }
+    String unquoted = trimmed;
+    if (StringUtils.startsWith(unquoted, "`") && StringUtils.endsWith(unquoted, "`")) {
+      unquoted = unquoted.substring(1, unquoted.length() - 1);
+    }
+    if (unquoted.matches("[A-Za-z_][A-Za-z0-9_]*")) {
+      return NamedReference.field(unquoted);
+    }
+
+    int firstParen = unquoted.indexOf('(');
+    int lastParen = unquoted.lastIndexOf(')');
+    if (firstParen > 0 && lastParen > firstParen) {
+      String funcName = unquoted.substring(0, firstParen).trim();
+      if (funcName.matches("[A-Za-z_][A-Za-z0-9_]*")) {
+        String argsString = unquoted.substring(firstParen + 1, lastParen);
+        List<String> args = splitExpressions(argsString);
+        Expression[] parsedArgs =
+            args.stream().map(this::toSortExpression).toArray(Expression[]::new);
+        return FunctionExpression.of(funcName, parsedArgs);
+      }
+    }
+
+    return UnparsedExpression.of(trimmed);
+  }
+
+  private String toOrderBySql(Expression expression) {
+    if (expression instanceof NamedReference) {
+      String[] parts = ((NamedReference) expression).fieldName();
+      return "`" + String.join("`.`", parts) + "`";
+    } else if (expression instanceof FunctionExpression) {
+      FunctionExpression func = (FunctionExpression) expression;
+      return func.functionName()
+          + Arrays.stream(func.arguments())
+              .map(this::toOrderBySql)
+              .collect(Collectors.joining(", ", "(", ")"));
+    } else if (expression instanceof UnparsedExpression) {
+      return ((UnparsedExpression) expression).unparsedExpression();
+    }
+    return expression.toString();
+  }
+
+  private static final class ShowCreateTableMetadata {
+    private Transform[] partitioning = Transforms.EMPTY_TRANSFORM;
+    private SortOrder[] sortOrders = SortOrders.NONE;
   }
 
   @VisibleForTesting

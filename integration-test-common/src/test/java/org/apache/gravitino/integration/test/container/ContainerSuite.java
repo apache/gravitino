@@ -30,6 +30,7 @@ import java.io.Closeable;
 import java.io.IOException;
 import java.net.InetAddress;
 import java.nio.ByteBuffer;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.FileSystems;
 import java.nio.file.Files;
 import java.nio.file.Paths;
@@ -579,8 +580,7 @@ public class ContainerSuite implements Closeable {
   private String prepareRemoteServersConfig(String templatePath, String zkHost) {
     try {
       String content =
-          new String(
-              Files.readAllBytes(Paths.get(templatePath)), java.nio.charset.StandardCharsets.UTF_8);
+          new String(Files.readAllBytes(Paths.get(templatePath)), StandardCharsets.UTF_8);
       String replaced =
           content
               .replace("${ZOOKEEPER_HOST}", zkHost)

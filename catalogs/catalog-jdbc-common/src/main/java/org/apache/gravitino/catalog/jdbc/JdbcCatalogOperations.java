@@ -371,6 +371,7 @@ public class JdbcCatalogOperations implements CatalogOperations, SupportsSchemas
         .withName(tableName)
         .withColumns(load.columns())
         .withAuditInfo(load.auditInfo())
+        .withSortOrders(load.sortOrder())
         .withComment(comment)
         .withProperties(properties)
         .withDistribution(load.distribution())

@@ -61,11 +61,15 @@ import org.apache.gravitino.rel.Table;
 import org.apache.gravitino.rel.TableCatalog;
 import org.apache.gravitino.rel.TableChange;
 import org.apache.gravitino.rel.expressions.FunctionExpression;
+import org.apache.gravitino.rel.expressions.FunctionExpression.FuncExpressionImpl;
+import org.apache.gravitino.rel.expressions.NamedReference;
 import org.apache.gravitino.rel.expressions.UnparsedExpression;
 import org.apache.gravitino.rel.expressions.distributions.Distribution;
 import org.apache.gravitino.rel.expressions.distributions.Distributions;
 import org.apache.gravitino.rel.expressions.literals.Literals;
+import org.apache.gravitino.rel.expressions.sorts.SortDirection;
 import org.apache.gravitino.rel.expressions.sorts.SortOrder;
+import org.apache.gravitino.rel.expressions.sorts.SortOrders;
 import org.apache.gravitino.rel.expressions.transforms.Transform;
 import org.apache.gravitino.rel.expressions.transforms.Transforms;
 import org.apache.gravitino.rel.indexes.Index;
@@ -366,6 +370,189 @@ public class CatalogClickHouseIT extends BaseIT {
     for (int i = 0; i < columns.length; i++) {
       ITUtils.assertColumn(columns[i], loadTable.columns()[i]);
     }
+  }
+
+  @Test
+  void testCreateTableWithComplexOrderBy() {
+    Column[] columns =
+        new Column[] {
+          Column.of(
+              CLICKHOUSE_COL_NAME1,
+              Types.IntegerType.get(),
+              "col_1_comment",
+              false,
+              false,
+              DEFAULT_VALUE_NOT_SET),
+          Column.of(
+              CLICKHOUSE_COL_NAME2,
+              Types.DateType.get(),
+              "col_2_comment",
+              false,
+              false,
+              DEFAULT_VALUE_NOT_SET),
+          Column.of(
+              CLICKHOUSE_COL_NAME3,
+              Types.StringType.get(),
+              "col_3_comment",
+              false,
+              false,
+              DEFAULT_VALUE_NOT_SET)
+        };
+    String name = GravitinoITUtils.genRandomName("order_by_table");
+    NameIdentifier tableIdentifier = NameIdentifier.of(schemaName, name);
+    Map<String, String> properties = createProperties();
+    TableCatalog tableCatalog = catalog.asTableCatalog();
+    SortOrder[] sortOrders =
+        new SortOrder[] {
+          SortOrders.of(NamedReference.field("clickhouse_col_name1"), SortDirection.ASCENDING),
+          SortOrders.of(
+              FunctionExpression.of("toDate", NamedReference.field("clickhouse_col_name2")),
+              SortDirection.ASCENDING)
+        };
+
+    tableCatalog.createTable(
+        tableIdentifier,
+        columns,
+        table_comment,
+        properties,
+        Transforms.EMPTY_TRANSFORM,
+        Distributions.NONE,
+        sortOrders);
+    Table loaded = tableCatalog.loadTable(tableIdentifier);
+    Assertions.assertEquals(2, loaded.sortOrder().length);
+    Assertions.assertTrue(loaded.sortOrder()[0].expression() instanceof NamedReference);
+    Assertions.assertTrue(loaded.sortOrder()[1].expression() instanceof FuncExpressionImpl);
+  }
+
+  @Test
+  void testLoadTableFromShowCreateParsing() {
+    String name = GravitinoITUtils.genRandomName("show_create_table");
+    clickhouseService.executeQuery(
+        String.format(
+            "CREATE TABLE `%s`.`%s` (\n"
+                + "  `id` UInt64,\n"
+                + "  `event_time` DateTime,\n"
+                + "  `user_id` UInt64,\n"
+                + "  `region` String,\n"
+                + "  `amount` Float64,\n"
+                + "  PRIMARY KEY user_id,\n"
+                + "  INDEX idx_amount amount TYPE minmax GRANULARITY 1\n"
+                + ")\n"
+                + "ENGINE = MergeTree\n"
+                + "PARTITION BY toYYYYMM(event_time)\n"
+                + "ORDER BY (user_id, toYYYYMM(event_time), region)",
+            schemaName, name));
+
+    Table loaded = catalog.asTableCatalog().loadTable(NameIdentifier.of(schemaName, name));
+    SortOrder[] sortOrders = loaded.sortOrder();
+    Assertions.assertEquals(3, sortOrders.length);
+    Assertions.assertTrue(sortOrders[0].expression() instanceof NamedReference);
+    Assertions.assertArrayEquals(
+        new String[] {"user_id"}, ((NamedReference) sortOrders[0].expression()).fieldName());
+    Assertions.assertTrue(sortOrders[1].expression() instanceof FuncExpressionImpl);
+
+    Assertions.assertEquals(
+        FunctionExpression.of("toYYYYMM", NamedReference.field("event_time")),
+        sortOrders[1].expression());
+    Assertions.assertTrue(sortOrders[2].expression() instanceof NamedReference);
+    Assertions.assertArrayEquals(
+        new String[] {"region"}, ((NamedReference) sortOrders[2].expression()).fieldName());
+
+    Transform[] partitioning = loaded.partitioning();
+    Assertions.assertEquals(1, partitioning.length);
+    Assertions.assertEquals(Transforms.NAME_OF_MONTH, partitioning[0].name());
+    Assertions.assertArrayEquals(
+        new String[] {"event_time"}, ((NamedReference) partitioning[0].arguments()[0]).fieldName());
+
+    Index[] indexes = loaded.index();
+    Assertions.assertTrue(
+        Arrays.stream(indexes)
+            .anyMatch(
+                idx ->
+                    idx.type() == Index.IndexType.PRIMARY_KEY
+                        && Arrays.deepEquals(idx.fieldNames(), new String[][] {{"user_id"}})));
+    Assertions.assertTrue(
+        Arrays.stream(indexes)
+            .anyMatch(
+                idx ->
+                    idx.type() == Index.IndexType.DATA_SKIPPING_MINMAX
+                        && Arrays.deepEquals(idx.fieldNames(), new String[][] {{"amount"}})));
+  }
+
+  @Test
+  void testCreateAndLoadWithPartitionSortAndIndexes() {
+    String table = GravitinoITUtils.genRandomName("meta_roundtrip");
+    NameIdentifier ident = NameIdentifier.of(schemaName, table);
+    Column[] cols =
+        new Column[] {
+          Column.of("id", Types.LongType.get(), "id"),
+          Column.of(
+              "event_time",
+              Types.TimestampType.withoutTimeZone(),
+              "ts",
+              false,
+              false,
+              DEFAULT_VALUE_NOT_SET),
+          Column.of("user_id", Types.LongType.get(), "user", false, false, DEFAULT_VALUE_NOT_SET),
+          Column.of("amount", Types.FloatType.get(), "amt")
+        };
+
+    Transform[] partitioning = new Transform[] {Transforms.identity("event_time")};
+    SortOrder[] sortOrders =
+        new SortOrder[] {
+          SortOrders.of(NamedReference.field("user_id"), SortDirection.ASCENDING),
+          SortOrders.of(
+              FunctionExpression.of("toDate", NamedReference.field("event_time")),
+              SortDirection.ASCENDING)
+        };
+    Index[] indexes =
+        new Index[] {
+          Indexes.primary(Indexes.DEFAULT_PRIMARY_KEY_NAME, new String[][] {{"user_id"}}),
+          Indexes.of(
+              Index.IndexType.DATA_SKIPPING_MINMAX, "idx_amount", new String[][] {{"amount"}})
+        };
+
+    catalog
+        .asTableCatalog()
+        .createTable(
+            ident,
+            cols,
+            "roundtrip meta",
+            createProperties(),
+            partitioning,
+            Distributions.NONE,
+            sortOrders,
+            indexes);
+
+    Table loaded = catalog.asTableCatalog().loadTable(ident);
+    Assertions.assertEquals(1, loaded.partitioning().length);
+    Assertions.assertEquals(
+        "event_time", ((NamedReference) loaded.partitioning()[0].arguments()[0]).fieldName()[0]);
+
+    Assertions.assertEquals(2, loaded.sortOrder().length);
+    Assertions.assertTrue(loaded.sortOrder()[0].expression() instanceof NamedReference);
+    Assertions.assertEquals(
+        "user_id", ((NamedReference) loaded.sortOrder()[0].expression()).fieldName()[0]);
+
+    Assertions.assertTrue(loaded.sortOrder()[1].expression() instanceof FuncExpressionImpl);
+    Assertions.assertEquals(
+        "toDate", ((FuncExpressionImpl) loaded.sortOrder()[1].expression()).functionName());
+    Assertions.assertEquals(
+        1, ((FuncExpressionImpl) loaded.sortOrder()[1].expression()).arguments().length);
+
+    Index[] loadedIndexes = loaded.index();
+    Assertions.assertTrue(
+        Arrays.stream(loadedIndexes)
+            .anyMatch(
+                idx ->
+                    idx.type() == Index.IndexType.PRIMARY_KEY
+                        && Arrays.deepEquals(idx.fieldNames(), new String[][] {{"user_id"}})));
+    Assertions.assertTrue(
+        Arrays.stream(loadedIndexes)
+            .anyMatch(
+                idx ->
+                    idx.type() == Index.IndexType.DATA_SKIPPING_MINMAX
+                        && Arrays.deepEquals(idx.fieldNames(), new String[][] {{"amount"}})));
   }
 
   @Test

@@ -943,8 +943,7 @@ public class TestClickHouseTableOperations extends TestClickHouse {
                 new SortOrder[0]));
 
     // MergeTree only supports single sortOrders
-    Assertions.assertThrows(
-        UnsupportedOperationException.class,
+    Assertions.assertDoesNotThrow(
         () ->
             ops.buildCreateSql(
                 "t1",
