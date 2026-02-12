@@ -29,7 +29,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.PriorityQueue;
 import java.util.Set;
-import java.util.stream.Collectors;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.maintenance.optimizer.api.common.PartitionPath;
@@ -79,6 +78,7 @@ public class Recommender implements AutoCloseable {
   private final TableMetadataProvider tableMetadataProvider;
   private final JobSubmitter jobSubmitter;
   private final CloseableGroup closeableGroup = new CloseableGroup();
+  private final OptimizerEnv optimizerEnv;
 
   /**
    * Create a recommender whose providers and submitter are resolved from the optimizer
@@ -93,6 +93,7 @@ public class Recommender implements AutoCloseable {
     TableMetadataProvider tableMetadataProvider = loadTableMetadataProvider(config);
     JobSubmitter jobSubmitter = loadJobSubmitter(config);
 
+    this.optimizerEnv = optimizerEnv;
     this.strategyProvider = strategyProvider;
     this.statisticsProvider = statisticsProvider;
     this.tableMetadataProvider = tableMetadataProvider;
@@ -111,7 +112,10 @@ public class Recommender implements AutoCloseable {
       StrategyProvider strategyProvider,
       StatisticsProvider statisticsProvider,
       TableMetadataProvider tableMetadataProvider,
-      JobSubmitter jobSubmitter) {
+      JobSubmitter jobSubmitter,
+      OptimizerEnv optimizerEnv) {
+
+    this.optimizerEnv = optimizerEnv;
     this.strategyProvider = strategyProvider;
     this.statisticsProvider = statisticsProvider;
     this.tableMetadataProvider = tableMetadataProvider;
@@ -139,12 +143,25 @@ public class Recommender implements AutoCloseable {
 
     for (Map.Entry<String, List<NameIdentifier>> entry : identifiersByStrategyName.entrySet()) {
       String strategyName = entry.getKey();
-      List<JobExecutionContext> jobConfigs =
+      List<StrategyEvaluation> evaluations =
           recommendForOneStrategy(entry.getValue(), strategyName);
-      for (JobExecutionContext jobConfig : jobConfigs) {
-        String templateName = jobConfig.jobTemplateName();
-        String jobId = jobSubmitter.submitJob(templateName, jobConfig);
-        LOG.info("Submit job {} for strategy {} with context {}", jobId, strategyName, jobConfig);
+      for (StrategyEvaluation evaluation : evaluations) {
+        JobExecutionContext jobExecutionContext =
+            evaluation
+                .jobExecutionContext()
+                .orElseThrow(
+                    () ->
+                        new IllegalStateException(
+                            "Job execution context is missing for evaluation of strategy "
+                                + strategyName));
+        String templateName = jobExecutionContext.jobTemplateName();
+        String jobId = jobSubmitter.submitJob(templateName, jobExecutionContext);
+        LOG.info(
+            "Submit job {} for strategy {} with context {}",
+            jobId,
+            strategyName,
+            jobExecutionContext);
+        logRecommendation(strategyName, evaluation);
       }
     }
   }
@@ -162,7 +179,7 @@ public class Recommender implements AutoCloseable {
     closeableGroup.register(jobSubmitter, "job submitter");
   }
 
-  private List<JobExecutionContext> recommendForOneStrategy(
+  private List<StrategyEvaluation> recommendForOneStrategy(
       List<NameIdentifier> identifiers, String strategyName) {
     LOG.info("Recommend strategy {} for identifiers {}", strategyName, identifiers);
     Strategy strategy = strategyProvider.strategy(strategyName);
@@ -175,6 +192,13 @@ public class Recommender implements AutoCloseable {
         continue;
       }
       StrategyEvaluation evaluation = strategyHandler.evaluate();
+      if (evaluation.score() < 0 || evaluation.jobExecutionContext().isEmpty()) {
+        LOG.info(
+            "Skip strategy {} for identifier {} because evaluation score is negative or job execution context is missing",
+            strategyName,
+            identifier);
+        continue;
+      }
       LOG.info(
           "Recommend strategy {} for identifier {} score: {}",
           strategyName,
@@ -183,9 +207,11 @@ public class Recommender implements AutoCloseable {
       scoreQueue.add(evaluation);
     }
 
-    return scoreQueue.stream()
-        .map(StrategyEvaluation::jobExecutionContext)
-        .collect(Collectors.toList());
+    List<StrategyEvaluation> results = new ArrayList<>();
+    while (!scoreQueue.isEmpty()) {
+      results.add(scoreQueue.poll());
+    }
+    return results;
   }
 
   private StrategyHandler loadStrategyHandler(Strategy strategy, NameIdentifier nameIdentifier) {
@@ -251,9 +277,8 @@ public class Recommender implements AutoCloseable {
    * by configuration or an explicit registry that maps stable strategy type strings (for example,
    * {@code COMPACTION}) to {@link StrategyHandler} implementations.
    */
-  @SuppressWarnings("UnusedVariable")
   private String getStrategyHandlerClassName(String strategyType) {
-    return "";
+    return optimizerEnv.config().getStrategyHandlerClassName(strategyType);
   }
 
   private Map<String, List<NameIdentifier>> getIdentifiersByStrategyName(
@@ -301,5 +326,24 @@ public class Recommender implements AutoCloseable {
                 + "To use TABLE_STATISTICS or PARTITION_STATISTICS data requirements, "
                 + "configure a statistics provider that implements SupportTableStatistics.",
             statisticsProvider.name()));
+  }
+
+  private void logRecommendation(String strategyName, StrategyEvaluation evaluation) {
+    JobExecutionContext jobExecutionContext =
+        evaluation
+            .jobExecutionContext()
+            .orElseThrow(
+                () ->
+                    new IllegalStateException(
+                        "Job execution context is missing for evaluation of strategy "
+                            + strategyName));
+    System.out.println(
+        String.format(
+            "RECOMMEND: strategy=%s identifier=%s score=%d jobTemplate=%s jobOptions=%s",
+            strategyName,
+            jobExecutionContext.nameIdentifier(),
+            evaluation.score(),
+            jobExecutionContext.jobTemplateName(),
+            jobExecutionContext.jobOptions()));
   }
 }

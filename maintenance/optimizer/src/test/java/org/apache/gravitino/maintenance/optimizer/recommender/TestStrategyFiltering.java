@@ -19,6 +19,7 @@
 
 package org.apache.gravitino.maintenance.optimizer.recommender;
 
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -68,7 +69,7 @@ class TestStrategyFiltering {
           .forEach(
               strategy ->
                   identifiersByStrategyName
-                      .computeIfAbsent(strategy.name(), key -> new java.util.ArrayList<>())
+                      .computeIfAbsent(strategy.name(), key -> new ArrayList<>())
                       .add(identifier));
     }
     return identifiersByStrategyName;

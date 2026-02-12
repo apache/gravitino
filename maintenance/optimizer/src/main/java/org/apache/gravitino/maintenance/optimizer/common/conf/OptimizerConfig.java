@@ -44,6 +44,8 @@ public class OptimizerConfig extends Config {
   public static final String GRAVITINO_METALAKE = OPTIMIZER_PREFIX + "gravitinoMetalake";
   public static final String GRAVITINO_DEFAULT_CATALOG =
       OPTIMIZER_PREFIX + "gravitinoDefaultCatalog";
+  public static final String JOB_ADAPTER_PREFIX = OPTIMIZER_PREFIX + "jobAdapter.";
+  public static final String JOB_SUBMITTER_CONFIG_PREFIX = OPTIMIZER_PREFIX + "jobSubmitterConfig.";
 
   private static final String RECOMMENDER_PREFIX = OPTIMIZER_PREFIX + "recommender.";
   private static final String STATISTICS_PROVIDER = RECOMMENDER_PREFIX + "statisticsProvider";
@@ -131,5 +133,26 @@ public class OptimizerConfig extends Config {
   public OptimizerConfig(Map<String, String> properties) {
     super(false);
     loadFromMap(properties, k -> true);
+  }
+
+  /**
+   * Returns job submitter custom config entries with the {@code
+   * gravitino.optimizer.jobSubmitterConfig.} prefix stripped.
+   *
+   * @return custom job submitter config map
+   */
+  public Map<String, String> jobSubmitterConfigs() {
+    return getConfigsWithPrefix(JOB_SUBMITTER_CONFIG_PREFIX);
+  }
+
+  public String getStrategyHandlerClassName(String strategyHandlerName) {
+    String configKey =
+        String.format(OPTIMIZER_PREFIX + "strategyHandler.%s.className", strategyHandlerName);
+    return configMap.get(configKey);
+  }
+
+  public String getJobAdapterClassName(String jobTemplateName) {
+    String configKey = String.format(JOB_ADAPTER_PREFIX + "%s.className", jobTemplateName);
+    return configMap.get(configKey);
   }
 }
