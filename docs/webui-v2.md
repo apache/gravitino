@@ -10,7 +10,7 @@ license: 'This software is licensed under the Apache License version 2.'
 
 This document outlines how users can manage metadata within Apache Gravitino using the Web V2 UI, the latest graphical interface accessible through a web browser as an alternative to writing code or using the REST interface.
 
-[Build](./how-to-build.md#quick-start) and [deploy](./getting-started/index.md#local-workstation) the Gravitino Web UI and open it in a browser at `http://<gravitino-host>:<gravitino-port>`, by default is [http://localhost:8090](http://localhost:8090).
+[Build](./how-to-build.md#quick-start) and [deploy](./getting-started/index.md#local-workstation) the Gravitino Web UI and open it in a browser at `http://<gravitino-host>:<gravitino-port>`. By default, it is [http://localhost:8090](http://localhost:8090).
 
 ## UI Version 1.2.0 — Web V2 introduced
 
@@ -159,7 +159,7 @@ Overview for Associated Roles in the Web V2. (visible only when `gravitino.autho
 
 The Apache Gravitino Spark connector supports loading user-defined functions (UDFs) registered
 in the Gravitino function registry. Once a function is
-[registered in Gravitino](../manage-user-defined-function-using-gravitino.md), Spark can discover and
+[registered in Gravitino](./manage-user-defined-function-using-gravitino.md), Spark can discover and
 invoke it through standard Spark SQL syntax — no additional `CREATE FUNCTION` statement is needed.
 If a UDF is registered, you can see a **Functions** list tab on the schema details page.
 
@@ -186,7 +186,7 @@ Depending on the provider, you can configure **Partitions**, **Sort Orders**, an
 
 ![tables-create-columns](./assets/webui-v2/create-table.png)
 ![tables-create-columns2](./assets/webui-v2/create-table2.png)
-![tables-create-sorderOrders](./assets/webui-v2/create-table-sortOrders.png)
+![create-table-sortOrders](./assets/webui-v2/create-table-sortOrders.png)
 
 
 In **Properties**, default values are prefilled and can be changed. You can reselect and update the values before submitting.
