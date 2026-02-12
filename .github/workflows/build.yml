@@ -148,41 +148,33 @@ jobs:
       - name: Diff-based coverage (PR only)
         if: github.event_name == 'pull_request'
         run: |
+          set -e
+          
           echo "## Diff-based Coverage Report" > diff-coverage.md
           echo "" >> diff-coverage.md
-
-          # 1. 获取 PR diff 的 Java 文件
-          git fetch origin ${{ github.base_ref }} --depth=1
-          DIFF_FILES=$(git diff --name-only origin/${{ github.base_ref }}...HEAD | grep '\.java$' || true)
-
+          
+          echo "Base branch: ${{ github.base_ref }}" >> diff-coverage.md
+          echo "" >> diff-coverage.md
+          
+          # 确保 base branch 可用
+          git fetch origin ${{ github.base_ref }}
+          
+          BASE_COMMIT=$(git merge-base HEAD origin/${{ github.base_ref }})
+          
+          echo "Merge base: $BASE_COMMIT" >> diff-coverage.md
+          echo "" >> diff-coverage.md
+          
+          DIFF_FILES=$(git diff --name-only $BASE_COMMIT...HEAD | grep '\.java$' || true)
+          
           if [ -z "$DIFF_FILES" ]; then
             echo "No Java changes detected." >> diff-coverage.md
             exit 0
           fi
-
+          
           echo "Changed Java files:" >> diff-coverage.md
           echo '```' >> diff-coverage.md
           echo "$DIFF_FILES" >> diff-coverage.md
           echo '```' >> diff-coverage.md
-
-          # 2. 判断对应 module 是否跑过 test
-          COVERED=0
-          TOTAL=0
-
-          for f in $DIFF_FILES; do
-            TOTAL=$((TOTAL+1))
-            MODULE=$(echo "$f" | cut -d/ -f1)
-
-            if [ -d "$MODULE/build/test-results" ]; then
-              COVERED=$((COVERED+1))
-              echo "- ✅ $f (tests executed)" >> diff-coverage.md
-            else
-              echo "- ❌ $f (no test results found)" >> diff-coverage.md
-            fi
-          done
-
-          echo "" >> diff-coverage.md
-          echo "**Diff Coverage:** $COVERED / $TOTAL files covered" >> diff-coverage.md
 
       - name: Publish diff coverage summary
         if: github.event_name == 'pull_request'
