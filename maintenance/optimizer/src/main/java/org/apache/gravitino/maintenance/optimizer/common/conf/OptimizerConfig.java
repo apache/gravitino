@@ -53,6 +53,10 @@ public class OptimizerConfig extends Config {
   private static final String TABLE_META_PROVIDER = RECOMMENDER_PREFIX + "tableMetaProvider";
   private static final String JOB_SUBMITTER = RECOMMENDER_PREFIX + "jobSubmitter";
 
+  private static final String UPDATER_PREFIX = OPTIMIZER_PREFIX + "updater.";
+  private static final String STATISTICS_UPDATER = UPDATER_PREFIX + "statisticsUpdater";
+  private static final String METRICS_UPDATER = UPDATER_PREFIX + "metricsUpdater";
+
   public static final ConfigEntry<String> STATISTICS_PROVIDER_CONFIG =
       new ConfigBuilder(STATISTICS_PROVIDER)
           .doc(
@@ -96,6 +100,20 @@ public class OptimizerConfig extends Config {
           .version(ConfigConstants.VERSION_1_2_0)
           .stringConf()
           .createWithDefault(NoopJobSubmitter.NAME);
+
+  public static final ConfigEntry<String> STATISTICS_UPDATER_CONFIG =
+      new ConfigBuilder(STATISTICS_UPDATER)
+          .doc("The statistics updater implementation name (matches Provider.name()).")
+          .version(ConfigConstants.VERSION_1_2_0)
+          .stringConf()
+          .create();
+
+  public static final ConfigEntry<String> METRICS_UPDATER_CONFIG =
+      new ConfigBuilder(METRICS_UPDATER)
+          .doc("The metrics updater implementation name (matches Provider.name()).")
+          .version(ConfigConstants.VERSION_1_2_0)
+          .stringConf()
+          .create();
 
   public static final ConfigEntry<String> GRAVITINO_URI_CONFIG =
       new ConfigBuilder(GRAVITINO_URI)

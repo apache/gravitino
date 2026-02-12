@@ -29,6 +29,8 @@ import org.apache.gravitino.maintenance.optimizer.api.recommender.JobSubmitter;
 import org.apache.gravitino.maintenance.optimizer.api.recommender.StatisticsProvider;
 import org.apache.gravitino.maintenance.optimizer.api.recommender.StrategyProvider;
 import org.apache.gravitino.maintenance.optimizer.api.recommender.TableMetadataProvider;
+import org.apache.gravitino.maintenance.optimizer.api.updater.MetricsUpdater;
+import org.apache.gravitino.maintenance.optimizer.api.updater.StatisticsUpdater;
 
 /** Helper for loading optimizer providers via {@link ServiceLoader}. */
 public class ProviderUtils {
@@ -88,5 +90,13 @@ public class ProviderUtils {
 
   public static JobSubmitter createJobSubmitterInstance(String provider) {
     return createProviderInstance(JobSubmitter.class, provider);
+  }
+
+  public static StatisticsUpdater createStatisticsUpdaterInstance(String provider) {
+    return createProviderInstance(StatisticsUpdater.class, provider);
+  }
+
+  public static MetricsUpdater createMetricsUpdaterInstance(String provider) {
+    return createProviderInstance(MetricsUpdater.class, provider);
   }
 }
