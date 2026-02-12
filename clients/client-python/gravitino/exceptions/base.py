@@ -219,3 +219,11 @@ class PartitionAlreadyExistsException(AlreadyExistsException):
 
 class TableAlreadyExistsException(AlreadyExistsException):
     """An exception thrown when a table already exists."""
+
+
+class NoSuchFunctionException(NotFoundException):
+    """An exception thrown when a function with specified name is not found."""
+
+
+class FunctionAlreadyExistsException(AlreadyExistsException):
+    """An exception thrown when a function already exists."""

@@ -54,7 +54,7 @@ public class ClickHouseTablePropertiesMetadata extends JdbcTablePropertiesMetada
   // The following two are for cluster tables
   public static final PropertyEntry<String> CLUSTER_NAME_PROPERTY_ENTRY =
       stringOptionalPropertyEntry(
-          ClusterConstants.NAME,
+          ClusterConstants.CLUSTER_NAME,
           "The cluster name for DDL operations, for example, creating on cluster tables",
           false,
           "",
@@ -121,12 +121,12 @@ public class ClickHouseTablePropertiesMetadata extends JdbcTablePropertiesMetada
   /** refer https://clickhouse.com/docs/en/engines/table-engines */
   public enum ENGINE {
     // MergeTree
-    MERGETREE("MergeTree", true),
-    REPLACINGMERGETREE("ReplacingMergeTree", true),
-    SUMMINGMERGETREE("SummingMergeTree", true),
-    AGGREGATINGMERGETREE("AggregatingMergeTree", true),
-    COLLAPSINGMERGETREE("CollapsingMergeTree", true),
-    VERSIONEDCOLLAPSINGMERGETREE("VersionedCollapsingMergeTree", true),
+    MERGETREE("MergeTree", true, true),
+    REPLACINGMERGETREE("ReplacingMergeTree", true, true),
+    SUMMINGMERGETREE("SummingMergeTree", true, true),
+    AGGREGATINGMERGETREE("AggregatingMergeTree", true, true),
+    COLLAPSINGMERGETREE("CollapsingMergeTree", true, true),
+    VERSIONEDCOLLAPSINGMERGETREE("VersionedCollapsingMergeTree", true, true),
     GRAPHITEMERGETREE("GraphiteMergeTree"),
 
     // Log
@@ -165,15 +165,24 @@ public class ClickHouseTablePropertiesMetadata extends JdbcTablePropertiesMetada
 
     private final String value;
     private final boolean requireOrderBy;
+    private final boolean acceptPartition;
 
     ENGINE(String value) {
       this.value = value;
       this.requireOrderBy = false;
+      this.acceptPartition = false;
     }
 
     ENGINE(String value, boolean requireOrderBy) {
       this.value = value;
       this.requireOrderBy = requireOrderBy;
+      this.acceptPartition = false;
+    }
+
+    ENGINE(String value, boolean requireOrderBy, boolean acceptPartition) {
+      this.value = value;
+      this.requireOrderBy = requireOrderBy;
+      this.acceptPartition = acceptPartition;
     }
 
     public String getValue() {
@@ -182,6 +191,10 @@ public class ClickHouseTablePropertiesMetadata extends JdbcTablePropertiesMetada
 
     public boolean isRequireOrderBy() {
       return requireOrderBy;
+    }
+
+    public boolean acceptPartition() {
+      return acceptPartition;
     }
 
     public static ENGINE fromString(String engineText) {

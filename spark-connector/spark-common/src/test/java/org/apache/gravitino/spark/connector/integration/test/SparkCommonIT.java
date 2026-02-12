@@ -197,6 +197,31 @@ public abstract class SparkCommonIT extends SparkEnvIT {
   }
 
   @Test
+  @EnabledIf("supportsFunction")
+  void testCallUDF() {
+    // test call function
+    List<String> data =
+        getQueryData(String.format("SELECT %s.%s('abc')", functionSchemaName, functionName));
+    Assertions.assertEquals(1, data.size());
+    Assertions.assertEquals("3", data.get(0));
+  }
+
+  @Test
+  @EnabledIf("supportsFunction")
+  void testListFunctions() {
+    // Test list functions - should only include Spark runtime functions
+    Set<String> functionNames = listUserFunctions(functionSchemaName);
+    Assertions.assertTrue(
+        functionNames.contains(
+            String.join(".", getCatalogName(), functionSchemaName, functionName)));
+
+    // Non-Spark function should NOT be listed
+    Assertions.assertFalse(
+        functionNames.contains(
+            String.join(".", getCatalogName(), functionSchemaName, nonSparkFunctionName)));
+  }
+
+  @Test
   void testLoadCatalogs() {
     Set<String> catalogs = getCatalogs();
     Assertions.assertTrue(catalogs.contains(getCatalogName()));

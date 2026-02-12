@@ -164,6 +164,7 @@ public class ManagedFunctionOperations implements FunctionCatalog {
     Preconditions.checkArgument(
         definitions != null && definitions.length > 0,
         "At least one function definition must be provided");
+    validateDefinitionsNoRuntimeDuplicate(definitions);
     validateDefinitionsNoArityOverlap(definitions);
 
     String currentUser = PrincipalUtils.getCurrentUserName();
@@ -222,6 +223,32 @@ public class ManagedFunctionOperations implements FunctionCatalog {
                   "Cannot register function: definitions at index %d and %d have overlapping "
                       + "arity '%s'. This would create ambiguous function invocations.",
                   existingIndex, i, arity));
+        }
+      }
+    }
+  }
+
+  /**
+   * Validates that no definition contains duplicate runtime types in its implementations. Each
+   * definition must have at most one implementation per runtime type.
+   *
+   * @param definitions The array of definitions to validate.
+   * @throws IllegalArgumentException If any definition has duplicate runtime types.
+   */
+  private void validateDefinitionsNoRuntimeDuplicate(FunctionDefinition[] definitions) {
+    for (int i = 0; i < definitions.length; i++) {
+      FunctionImpl[] impls = definitions[i].impls();
+      if (impls == null || impls.length <= 1) {
+        continue;
+      }
+      Set<FunctionImpl.RuntimeType> seenRuntimes = new HashSet<>();
+      for (FunctionImpl impl : impls) {
+        if (!seenRuntimes.add(impl.runtime())) {
+          throw new IllegalArgumentException(
+              String.format(
+                  "Cannot register function: definition at index %d has duplicate runtime '%s'. "
+                      + "Each definition must have at most one implementation per runtime.",
+                  i, impl.runtime()));
         }
       }
     }

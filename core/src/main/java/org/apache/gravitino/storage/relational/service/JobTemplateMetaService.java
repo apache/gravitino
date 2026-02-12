@@ -219,4 +219,24 @@ public class JobTemplateMetaService {
     }
     return jobTemplateId;
   }
+
+  @Monitored(
+      metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME,
+      baseMetricName = "batchGetJobTemplateByIdentifier")
+  public List<JobTemplateEntity> batchGetJobTemplateByIdentifier(List<NameIdentifier> identifiers) {
+    NameIdentifier firstIdent = identifiers.get(0);
+    String metalakeName = firstIdent.namespace().level(0);
+    List<String> jobTemplateNames =
+        identifiers.stream().map(NameIdentifier::name).collect(Collectors.toList());
+
+    return SessionUtils.doWithCommitAndFetchResult(
+        JobTemplateMetaMapper.class,
+        mapper -> {
+          List<JobTemplatePO> jobTemplatePOs =
+              mapper.batchSelectJobTemplateByIdentifier(metalakeName, jobTemplateNames);
+          return jobTemplatePOs.stream()
+              .map(po -> JobTemplatePO.fromJobTemplatePO(po, firstIdent.namespace()))
+              .collect(Collectors.toList());
+        });
+  }
 }
