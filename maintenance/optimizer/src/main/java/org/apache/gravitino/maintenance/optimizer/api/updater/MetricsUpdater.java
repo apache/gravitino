@@ -17,40 +17,30 @@
  * under the License.
  */
 
-package org.apache.gravitino.maintenance.optimizer.api.recommender;
+package org.apache.gravitino.maintenance.optimizer.api.updater;
 
-import java.util.Map;
+import java.util.List;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.annotation.DeveloperApi;
+import org.apache.gravitino.maintenance.optimizer.api.common.MetricSample;
+import org.apache.gravitino.maintenance.optimizer.api.common.Provider;
 
-/**
- * Immutable description of a recommended optimization job. Produced by {@link StrategyHandler} and
- * consumed by {@link JobSubmitter}.
- */
+/** Represents an updater that can update metrics for a table or job. */
 @DeveloperApi
-public interface JobExecutionContext {
+public interface MetricsUpdater extends Provider {
+  /**
+   * Persist table metrics.
+   *
+   * @param nameIdentifier catalog/schema/table identifier
+   * @param metrics time-series samples to write
+   */
+  void updateTableMetrics(NameIdentifier nameIdentifier, List<MetricSample> metrics);
 
   /**
-   * Target table identifier for the job.
+   * Persist job metrics.
    *
-   * @return fully qualified table identifier (catalog/schema/table)
+   * @param nameIdentifier job identifier
+   * @param metrics time-series samples to write
    */
-  NameIdentifier nameIdentifier();
-
-  /**
-   * Free-form job options, such as engine parameters (e.g., target file size bytes).
-   *
-   * <p>The {@code StrategyHandler} is free to add additional job options besides the job options
-   * specified in the strategy.
-   *
-   * @return immutable map of option entries
-   */
-  Map<String, String> jobOptions();
-
-  /**
-   * Job template name to resolve the job in the job submitter.
-   *
-   * @return job template name
-   */
-  String jobTemplateName();
+  void updateJobMetrics(NameIdentifier nameIdentifier, List<MetricSample> metrics);
 }

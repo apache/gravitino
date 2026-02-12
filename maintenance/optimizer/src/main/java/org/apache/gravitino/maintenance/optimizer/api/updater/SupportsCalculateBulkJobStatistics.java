@@ -17,40 +17,21 @@
  * under the License.
  */
 
-package org.apache.gravitino.maintenance.optimizer.api.recommender;
+package org.apache.gravitino.maintenance.optimizer.api.updater;
 
+import java.util.List;
 import java.util.Map;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.annotation.DeveloperApi;
+import org.apache.gravitino.maintenance.optimizer.api.common.StatisticEntry;
 
-/**
- * Immutable description of a recommended optimization job. Produced by {@link StrategyHandler} and
- * consumed by {@link JobSubmitter}.
- */
+/** Represents a provider that supports bulk job statistics calculation. */
 @DeveloperApi
-public interface JobExecutionContext {
-
+public interface SupportsCalculateBulkJobStatistics extends SupportsCalculateJobStatistics {
   /**
-   * Target table identifier for the job.
+   * Calculate job-level statistics for all identifiers discoverable by this calculator.
    *
-   * @return fully qualified table identifier (catalog/schema/table)
+   * @return map of job identifier to its statistics; empty when none are produced
    */
-  NameIdentifier nameIdentifier();
-
-  /**
-   * Free-form job options, such as engine parameters (e.g., target file size bytes).
-   *
-   * <p>The {@code StrategyHandler} is free to add additional job options besides the job options
-   * specified in the strategy.
-   *
-   * @return immutable map of option entries
-   */
-  Map<String, String> jobOptions();
-
-  /**
-   * Job template name to resolve the job in the job submitter.
-   *
-   * @return job template name
-   */
-  String jobTemplateName();
+  Map<NameIdentifier, List<StatisticEntry<?>>> calculateAllJobStatistics();
 }

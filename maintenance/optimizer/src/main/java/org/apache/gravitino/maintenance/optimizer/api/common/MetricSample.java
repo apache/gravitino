@@ -17,40 +17,25 @@
  * under the License.
  */
 
-package org.apache.gravitino.maintenance.optimizer.api.recommender;
+package org.apache.gravitino.maintenance.optimizer.api.common;
 
-import java.util.Map;
-import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.annotation.DeveloperApi;
 
-/**
- * Immutable description of a recommended optimization job. Produced by {@link StrategyHandler} and
- * consumed by {@link JobSubmitter}.
- */
+/** Represents a single metric sample with a timestamp and associated statistic. */
 @DeveloperApi
-public interface JobExecutionContext {
+public interface MetricSample {
 
   /**
-   * Target table identifier for the job.
+   * Metric event time in epoch seconds.
    *
-   * @return fully qualified table identifier (catalog/schema/table)
+   * @return the metric timestamp in epoch seconds
    */
-  NameIdentifier nameIdentifier();
+  long timestamp();
 
   /**
-   * Free-form job options, such as engine parameters (e.g., target file size bytes).
+   * The statistic value sampled at this timestamp.
    *
-   * <p>The {@code StrategyHandler} is free to add additional job options besides the job options
-   * specified in the strategy.
-   *
-   * @return immutable map of option entries
+   * @return the statistic entry for this sample
    */
-  Map<String, String> jobOptions();
-
-  /**
-   * Job template name to resolve the job in the job submitter.
-   *
-   * @return job template name
-   */
-  String jobTemplateName();
+  StatisticEntry<?> statistic();
 }

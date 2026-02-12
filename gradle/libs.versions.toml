@@ -137,6 +137,7 @@ ognl = "3.4.7"
 concurrent-trees = "2.6.0"
 jakarta-validation = "2.0.2"
 aspectj = "1.9.24"
+ql-expression = "4.0.3"
 
 [libraries]
 aspectj-aspectjrt = { group = "org.aspectj", name = "aspectjrt", version.ref = "aspectj" }
@@ -322,6 +323,7 @@ concurrent-trees = { group = "com.googlecode.concurrent-trees", name = "concurre
 jcasbin = { group='org.casbin', name='jcasbin', version.ref="jcasbin" }
 openlineage-java= { group = "io.openlineage", name = "openlineage-java", version.ref = "openlineage" }
 ognl = { group='ognl', name='ognl', version.ref="ognl" }
+ql-expression = { group='com.alibaba', name='qlexpress4', version.ref="ql-expression" }
 
 [bundles]
 log4j = ["slf4j-api", "log4j-slf4j2-impl", "log4j-api", "log4j-core", "log4j-12-api", "log4j-layout-template-json"]
