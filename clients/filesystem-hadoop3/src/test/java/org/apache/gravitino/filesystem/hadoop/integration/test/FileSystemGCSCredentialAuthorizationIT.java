@@ -96,7 +96,7 @@ public class FileSystemGCSCredentialAuthorizationIT
 
   @Override
   protected Set<String> sensitiveProperties() {
-    return ImmutableSet.of(GCSProperties.GRAVITINO_GCS_SERVICE_ACCOUNT_FILE);
+    return ImmutableSet.of();
   }
 
   protected static boolean isGCPConfigured() {
