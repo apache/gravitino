@@ -363,7 +363,7 @@ export default function CreateCatalogDialog({ ...props }) {
         key={idx}
         data-refer={`catalog-provider-${provider.value}`}
         className={cn('provider-card flex items-center justify-between', {
-          'actived-default': provider.value === currentProvider,
+          'actived-default bg-defaultPrimary': provider.value === currentProvider,
           disabled: editCatalog
         })}
         onClick={() => handleSelectProvider(provider.value)}

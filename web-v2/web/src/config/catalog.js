@@ -326,7 +326,7 @@ export const providerBase = {
       {
         label: 'Pool Min Size',
         key: 'jdbc.pool.min-size',
-        value: '',
+        value: '2',
         required: false,
         description: 'The minimum number of connections in the connection pool'
       }

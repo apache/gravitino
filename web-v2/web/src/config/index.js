@@ -300,7 +300,8 @@ export const transformsLimitMap = {
 
 export const sortOrdersInfoMap = {
   hive: ['field'],
-  'lakehouse-iceberg': ['field', 'bucket', 'truncate', 'year', 'month', 'day', 'hour']
+  'lakehouse-iceberg': ['field', 'bucket', 'truncate', 'year', 'month', 'day', 'hour'],
+  'jdbc-clickhouse': ['field', 'bucket', 'truncate', 'year', 'month', 'day', 'hour']
 }
 
 export const indexesInfoMap = {
