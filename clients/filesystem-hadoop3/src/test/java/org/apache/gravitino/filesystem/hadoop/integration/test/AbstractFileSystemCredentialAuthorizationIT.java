@@ -147,7 +147,8 @@ abstract class AbstractFileSystemCredentialAuthorizationIT extends BaseIT {
     Map<String, String> normalUserCatalogProps =
         normalUserClient.loadMetalake(metalakeName).loadCatalog(catalogName).properties();
     Map<String, String> adminCatalogProps = metalake.loadCatalog(catalogName).properties();
-    Assertions.assertTrue(normalUserCatalogProps.size() < adminCatalogProps.size());
+    Assertions.assertEquals(
+        normalUserCatalogProps.size() + sensitiveProperties().size(), adminCatalogProps.size());
     for (String sensitiveKey : sensitiveProperties()) {
       Assertions.assertFalse(
           normalUserCatalogProps.containsKey(sensitiveKey),
