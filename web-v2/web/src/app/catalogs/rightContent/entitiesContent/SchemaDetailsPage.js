@@ -144,9 +144,13 @@ export default function SchemaDetailsPage() {
           anthEnable
             ? [
                 { label: 'Topics', key: 'Topics' },
+                { label: 'Functions', key: 'Functions' },
                 { label: 'Associated roles', key: 'Associated roles' }
               ]
-            : [{ label: 'Topics', key: 'Topics' }]
+            : [
+                { label: 'Topics', key: 'Topics' },
+                { label: 'Functions', key: 'Functions' }
+              ]
         )
         setTabKey('Topics')
         setCreateBtn('Create Topic')
@@ -158,9 +162,13 @@ export default function SchemaDetailsPage() {
           anthEnable
             ? [
                 { label: 'Filesets', key: 'Filesets' },
+                { label: 'Functions', key: 'Functions' },
                 { label: 'Associated roles', key: 'Associated roles' }
               ]
-            : [{ label: 'Filesets', key: 'Filesets' }]
+            : [
+                { label: 'Filesets', key: 'Filesets' },
+                { label: 'Functions', key: 'Functions' }
+              ]
         )
         setTabKey('Filesets')
         setCreateBtn('Create Fileset')
@@ -172,9 +180,13 @@ export default function SchemaDetailsPage() {
           anthEnable
             ? [
                 { label: 'Models', key: 'Models' },
+                { label: 'Functions', key: 'Functions' },
                 { label: 'Associated roles', key: 'Associated roles' }
               ]
-            : [{ label: 'Models', key: 'Models' }]
+            : [
+                { label: 'Models', key: 'Models' },
+                { label: 'Functions', key: 'Functions' }
+              ]
         )
         setTabKey('Models')
         setCreateBtn('Register Model')

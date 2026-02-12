@@ -291,15 +291,6 @@ export const setIntoTreeNodeWithFetch = createAsyncThunk(
             })
           : []
 
-      if (funcResult.status === 'rejected') {
-        console.warn('Failed to load functions for schema tree node', {
-          metalake,
-          catalog,
-          schema,
-          error: funcResult.reason
-        })
-      }
-
       let entities = []
       if (entityResult.status === 'fulfilled' && entityResult.value) {
         switch (type) {
@@ -372,20 +363,6 @@ export const setIntoTreeNodeWithFetch = createAsyncThunk(
           default:
             break
         }
-      } else if (entityResult.status === 'rejected') {
-        console.warn('Failed to load entities for schema tree node', {
-          metalake,
-          catalog,
-          schema,
-          type,
-          error: entityResult.reason
-        })
-      }
-
-      if (funcResult.status === 'rejected' && entityResult.status === 'rejected') {
-        const funcMessage = funcResult.reason?.message || funcResult.reason
-        const entityMessage = entityResult.reason?.message || entityResult.reason
-        throw new Error(funcMessage || entityMessage)
       }
 
       result.data = [...entities, ...functions]
