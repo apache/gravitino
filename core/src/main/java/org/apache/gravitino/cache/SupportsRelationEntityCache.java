@@ -75,7 +75,6 @@ public interface SupportsRelationEntityCache {
    * @param type The type of the entity to cache the related entities for
    * @param relType The relation type to cache the related entities for
    * @param entities The list of related entities to cache
-   * @param <E> The class of the related entities
    */
   <E extends Entity & HasIdentifier> void put(
       NameIdentifier ident,

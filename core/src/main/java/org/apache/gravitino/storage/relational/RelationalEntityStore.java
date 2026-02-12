@@ -26,7 +26,6 @@ import com.google.common.collect.ImmutableMap;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.function.Function;
@@ -46,6 +45,7 @@ import org.apache.gravitino.cache.EntityCache;
 import org.apache.gravitino.cache.EntityCacheRelationKey;
 import org.apache.gravitino.cache.NoOpsCache;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
+import org.apache.gravitino.storage.relational.helper.EntityRelation;
 import org.apache.gravitino.storage.relational.service.EntityIdService;
 import org.apache.gravitino.utils.Executable;
 import org.slf4j.Logger;
@@ -229,27 +229,30 @@ public class RelationalEntityStore implements EntityStore, SupportsRelationOpera
   }
 
   @Override
-  public <E extends Entity & HasIdentifier>
-      Map<NameIdentifier, List<E>> batchListEntitiesByRelation(
-          Type relType,
-          List<NameIdentifier> nameIdentifiers,
-          Entity.EntityType identType,
-          boolean allFields)
-          throws IOException {
+  public <E extends Entity & HasIdentifier> List<EntityRelation<E>> batchListEntitiesByRelation(
+      Type relType,
+      List<NameIdentifier> nameIdentifiers,
+      Entity.EntityType identType,
+      boolean allFields)
+      throws IOException {
     // TODO add lock
     if (Objects.requireNonNull(relType) == Type.OWNER_REL) {
-      Map<NameIdentifier, List<E>> nameIdentifierMap =
+      List<EntityRelation<E>> entityRelations =
           backend.batchListEntitiesByRelation(relType, nameIdentifiers, identType, allFields);
       Preconditions.checkState(
-          nameIdentifierMap.size() == nameIdentifiers.size(),
+          entityRelations.size() == nameIdentifiers.size(),
           "Owner list size not equal to nameIdentifiers size");
-      for (int i = 0; i < nameIdentifierMap.size(); i++) {
-        NameIdentifier ident = nameIdentifiers.get(i);
-        cache.put(ident, identType, relType, nameIdentifierMap.get(ident));
+      for (int i = 0; i < entityRelations.size(); i++) {
+        EntityRelation<E> entityRelation = entityRelations.get(i);
+        cache.put(
+            entityRelation.getSourceNameIdentity(),
+            identType,
+            relType,
+            entityRelation.getRelationEntity());
       }
-      return nameIdentifierMap;
+      return entityRelations;
     }
-    return Map.of();
+    return List.of();
   }
 
   @Override
