@@ -150,21 +150,16 @@ jobs:
         run: |
           set -e
           
+          BASE_SHA="${{ github.event.pull_request.base.sha }}"
+          HEAD_SHA="${{ github.event.pull_request.head.sha }}"
+          
           echo "## Diff-based Coverage Report" > diff-coverage.md
           echo "" >> diff-coverage.md
-          
-          echo "Base branch: ${{ github.base_ref }}" >> diff-coverage.md
+          echo "Base commit: $BASE_SHA" >> diff-coverage.md
+          echo "Head commit: $HEAD_SHA" >> diff-coverage.md
           echo "" >> diff-coverage.md
           
-          # 确保 base branch 可用
-          git fetch origin ${{ github.base_ref }}
-          
-          BASE_COMMIT=$(git merge-base HEAD origin/${{ github.base_ref }})
-          
-          echo "Merge base: $BASE_COMMIT" >> diff-coverage.md
-          echo "" >> diff-coverage.md
-          
-          DIFF_FILES=$(git diff --name-only $BASE_COMMIT...HEAD | grep '\.java$' || true)
+          DIFF_FILES=$(git diff --name-only $BASE_SHA $HEAD_SHA | grep '\.java$' || true)
           
           if [ -z "$DIFF_FILES" ]; then
             echo "No Java changes detected." >> diff-coverage.md
