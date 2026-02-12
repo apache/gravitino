@@ -36,7 +36,7 @@ To develop the Gravitino Trino connector locally, you need to do the following s
 
 ### IDEA
 
-1. Clone the Trino repository from the [GitHub](https://github.com/trinodb/trino) repository. The released version Trino-435 is the least version that Gravitino supports.
+1. Clone the Trino repository from the [GitHub](https://github.com/trinodb/trino) repository. Gravitino Trino connector supports multiple Trino versions (see [Requirements](requirements.md)); this document uses Trino `469` by default.
 2. Open the Trino project in your IDEA.
 3. Create a new module for the Gravitino Trino connector in the Trino project as the following picture (we will use the name `trino-gravitino` as the module name in the following steps). ![trino-gravitino](../assets/trino/create-gravitino-trino-connector.jpg)
 4. Add a soft link to the Gravitino Trino connector module in the Trino project. Assuming the src java main directory of the Gravitino Trino connector in project Gravitino is `gravitino/path/to/gravitino-trino-connector/src/main/java`, and the src java main directory of trino-gravitino in the Trino project is `trino/path/to/trino-gravitino/src/main/java`, you can use the following command to create a soft link:
@@ -57,7 +57,7 @@ then you can see the `gravitino-trino-connecor` source files and directories in 
     <parent>
         <groupId>io.trino</groupId>
         <artifactId>trino-root</artifactId>
-        <version>435</version>
+        <version>469</version>
         <relativePath>../../pom.xml</relativePath>
     </parent>
 
@@ -278,10 +278,10 @@ Remove the file `/etc/catalogs/xxx.properties` if the corresponding `plugin/trin
 ![](../assets/trino/start-trino.jpg)
 9. If `DevelopmentServer` has started successfully, you can connect to the Trino server using the `trino-cli` and run the following command to see if the Gravitino Trino connector is available:
 ```shell
-java -jar trino-cli-429-executable.jar --server localhost:8180
+java -jar trino-cli-*-executable.jar --server localhost:8180
 ```
 :::note
-The `trino-cli-429-executable.jar` is the Trino CLI jar file, you can download it from the [Trino release page](https://trino.io/docs/current/client/cli.html). **Users can use the version of the Trino CLI jar file according to the version of the Trino server.**
+The `trino-cli-*-executable.jar` is the Trino CLI jar file, you can download it from the [Trino release page](https://trino.io/docs/current/client/cli.html). **Users can use the version of the Trino CLI jar file according to the version of the Trino server.**
 :::
 
 10. If nothing goes wrong, you can start developing the Gravitino Trino connector in the Gravitino project and debug it in the Trino project.
