@@ -36,8 +36,6 @@ def _encode_function_type(func_type: FunctionType) -> str:
 
 def _decode_function_type(func_type_str: str) -> FunctionType:
     """Decode string to FunctionType."""
-    if func_type_str is None:
-        return None
     return FunctionType.from_string(func_type_str)
 
 
@@ -61,6 +59,10 @@ class FunctionDTO(Function, DataClassJsonMixin):
     _audit: Optional[AuditDTO] = field(
         default=None, metadata=config(field_name="audit")
     )
+
+    def __post_init__(self):
+        if self._function_type is None:
+            raise ValueError("Function type cannot be null or empty")
 
     def name(self) -> str:
         """Returns the function name."""

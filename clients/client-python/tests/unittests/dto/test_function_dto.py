@@ -31,6 +31,7 @@ from gravitino.dto.function.function_impl_dto import (
 )
 from gravitino.dto.function.function_param_dto import FunctionParamDTO
 from gravitino.dto.function.function_resources_dto import FunctionResourcesDTO
+from gravitino.dto.rel.expressions.literal_dto import LiteralDTO
 
 
 class TestFunctionDTO(unittest.TestCase):
@@ -98,6 +99,45 @@ class TestFunctionDTO(unittest.TestCase):
         self.assertEqual(definition.impls()[0].sql(), deserialized.impls()[0].sql())
         self.assertEqual(definition.return_type(), deserialized.return_type())
 
+    def test_function_param_dto_default_value(self):
+        """Test FunctionParamDTO supports defaultValue serdes."""
+        default_value = (
+            LiteralDTO.builder()
+            .with_data_type(Types.IntegerType.get())
+            .with_value("0")
+            .build()
+        )
+        param = FunctionParamDTO(
+            _name="x",
+            _data_type=Types.IntegerType.get(),
+            _comment="comment",
+            _default_value=default_value,
+        )
+
+        json_str = param.to_json()
+        deserialized = FunctionParamDTO.from_json(json_str)
+        self.assertEqual(param, deserialized)
+        self.assertIsNotNone(deserialized.default_value())
+
+    def test_function_definition_hash_with_impls(self):
+        """Test FunctionDefinitionDTO hash works when impl list is not empty."""
+        definition = FunctionDefinitionDTO(
+            _parameters=[
+                FunctionParamDTO(_name="param1", _data_type=Types.IntegerType.get())
+            ],
+            _return_type=Types.IntegerType.get(),
+            _impls=[
+                SQLImplDTO(
+                    _runtime="SPARK",
+                    _sql="SELECT param1 + 1",
+                    _resources=None,
+                    _properties={},
+                )
+            ],
+        )
+
+        self.assertIsInstance(hash(definition), int)
+
     def test_function_impl_dto(self):
         """Test FunctionImplDTO serialization and deserialization."""
         sql_impl = SQLImplDTO(
@@ -147,3 +187,11 @@ class TestFunctionDTO(unittest.TestCase):
         deserialized = FunctionColumnDTO.from_json(json_str)
         self.assertEqual(column.name(), deserialized.name())
         self.assertEqual(column.data_type(), deserialized.data_type())
+
+    def test_function_type_cannot_be_null(self):
+        """Test FunctionDTO rejects null functionType during deserialization."""
+        json_str = (
+            '{"name":"func1","functionType":null,"deterministic":true,"definitions":[]}'
+        )
+        with self.assertRaises(ValueError):
+            FunctionDTO.from_json(json_str)

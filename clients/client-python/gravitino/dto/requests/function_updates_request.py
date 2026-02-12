@@ -39,9 +39,10 @@ class FunctionUpdatesRequest(RESTRequest):
         Raises:
             IllegalArgumentException: If the request is invalid.
         """
-        if self._updates:
-            for update in self._updates:
-                update.validate()
+        if self._updates is None:
+            raise ValueError("Updates cannot be null")
+        for update in self._updates:
+            update.validate()
 
     def updates(self) -> List[FunctionUpdateRequest]:
         """Returns the list of updates."""

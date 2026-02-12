@@ -197,6 +197,6 @@ class FunctionDefinitionDTO(FunctionDefinition, DataClassJsonMixin):
                 tuple(self._parameters) if self._parameters else None,
                 self._return_type,
                 tuple(self._return_columns) if self._return_columns else None,
-                tuple(self._impls) if self._impls else None,
+                len(self._impls) if self._impls is not None else None,
             )
         )

@@ -59,7 +59,8 @@ class UpdateCommentRequest(FunctionUpdateRequest, DataClassJsonMixin):
         return FunctionChange.update_comment(self._new_comment)
 
     def validate(self):
-        pass
+        # newComment can be null or empty to clear the comment
+        return
 
 
 @dataclass

@@ -16,13 +16,31 @@
 # under the License.
 
 from dataclasses import dataclass, field
-from typing import Optional
+from typing import Any, Dict, Optional
 
 from dataclasses_json import DataClassJsonMixin, config
 
 from gravitino.api.function.function_param import FunctionParam, FunctionParams
+from gravitino.api.rel.expressions.expression import Expression
 from gravitino.api.rel.types.json_serdes.type_serdes import TypeSerdes
 from gravitino.api.rel.types.type import Type
+from gravitino.dto.rel.expressions.function_arg import FunctionArg
+from gravitino.dto.rel.expressions.json_serdes._helper.serdes_utils import (
+    SerdesUtils as ExpressionSerdesUtils,
+)
+from gravitino.dto.util.dto_converters import DTOConverters
+
+
+def _encode_default_value(default_value: Optional[Expression]) -> Optional[Dict[str, Any]]:
+    if default_value is None:
+        return None
+    return ExpressionSerdesUtils.write_function_arg(DTOConverters.to_function_arg(default_value))
+
+
+def _decode_default_value(default_value_dict: Optional[Dict[str, Any]]) -> Optional[FunctionArg]:
+    if default_value_dict is None:
+        return None
+    return ExpressionSerdesUtils.read_function_arg(default_value_dict)
 
 
 @dataclass
@@ -38,8 +56,14 @@ class FunctionParamDTO(FunctionParam, DataClassJsonMixin):
         )
     )
     _comment: Optional[str] = field(default=None, metadata=config(field_name="comment"))
-    # Note: defaultValue handling is complex and may need custom serialization
-    # For now, we'll keep it simple without expression support
+    _default_value: Optional[FunctionArg] = field(
+        default=None,
+        metadata=config(
+            field_name="defaultValue",
+            encoder=_encode_default_value,
+            decoder=_decode_default_value,
+        ),
+    )
 
     def name(self) -> str:
         """Returns the parameter name."""
@@ -53,17 +77,29 @@ class FunctionParamDTO(FunctionParam, DataClassJsonMixin):
         """Returns the optional parameter comment."""
         return self._comment
 
+    def default_value(self) -> Optional[Expression]:
+        """Returns the default value of the parameter if provided, otherwise None."""
+        if self._default_value is None:
+            return None
+        return DTOConverters.from_function_arg(self._default_value)
+
     def to_function_param(self) -> FunctionParam:
         """Convert this DTO to a FunctionParam instance."""
-        return FunctionParams.of(self._name, self._data_type, self._comment, None)
+        return FunctionParams.of(
+            self._name, self._data_type, self._comment, self.default_value()
+        )
 
     @classmethod
     def from_function_param(cls, param: FunctionParam) -> "FunctionParamDTO":
         """Create a FunctionParamDTO from a FunctionParam instance."""
+        default_value = param.default_value()
         return cls(
             _name=param.name(),
             _data_type=param.data_type(),
             _comment=param.comment(),
+            _default_value=(
+                None if default_value is None else DTOConverters.to_function_arg(default_value)
+            ),
         )
 
     def __eq__(self, other) -> bool:
@@ -73,7 +109,8 @@ class FunctionParamDTO(FunctionParam, DataClassJsonMixin):
             self._name == other._name
             and self._data_type == other._data_type
             and self._comment == other._comment
+            and self._default_value == other._default_value
         )
 
     def __hash__(self) -> int:
-        return hash((self._name, self._data_type, self._comment))
+        return hash((self._name, self._data_type, self._comment, self._default_value))

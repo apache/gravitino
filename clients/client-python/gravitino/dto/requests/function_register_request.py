@@ -22,22 +22,12 @@ from dataclasses_json import config
 
 from gravitino.api.function.function_type import FunctionType
 from gravitino.dto.function.function_definition_dto import FunctionDefinitionDTO
+from gravitino.dto.function.function_dto import (
+    _decode_function_type,
+    _encode_function_type,
+)
 from gravitino.exceptions.base import IllegalArgumentException
 from gravitino.rest.rest_message import RESTRequest
-
-
-def _encode_function_type(func_type: FunctionType) -> str:
-    """Encode FunctionType to string."""
-    if func_type is None:
-        return None
-    return func_type.value
-
-
-def _decode_function_type(func_type_str: str) -> FunctionType:
-    """Decode string to FunctionType."""
-    if func_type_str is None:
-        return None
-    return FunctionType.from_string(func_type_str)
 
 
 @dataclass
