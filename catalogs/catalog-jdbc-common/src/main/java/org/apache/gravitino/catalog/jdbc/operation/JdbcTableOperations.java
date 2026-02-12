@@ -142,9 +142,8 @@ public abstract class JdbcTableOperations implements TableOperation {
       SortOrder[] sortOrders)
       throws TableAlreadyExistsException {
     LOG.info("Attempting to create table {} in database {}", tableName, databaseName);
-    String s;
     try (Connection connection = getConnection(databaseName)) {
-      s =
+      String sql =
           generateCreateTableSql(
               tableName,
               columns,
@@ -155,8 +154,8 @@ public abstract class JdbcTableOperations implements TableOperation {
               indexes,
               sortOrders);
 
-      JdbcConnectorUtils.executeUpdate(connection, s);
-      LOG.info("Created table {} in database {}", tableName, databaseName);
+      JdbcConnectorUtils.executeUpdate(connection, sql);
+      LOG.info("Created table {} in database {} with SQL:\n{}", tableName, databaseName, sql);
     } catch (final SQLException se) {
       throw this.exceptionMapper.toGravitinoException(se);
     }

@@ -260,6 +260,7 @@ public class ClickHouseTableOperations extends JdbcTableOperations {
           "ORDER BY clause is required for engine: " + engine.getValue());
     }
 
+    // TODO support the size larger than 1.
     if (sortOrders.length > 1) {
       throw new UnsupportedOperationException(
           "Currently ClickHouse does not support sortOrders with more than 1 element");

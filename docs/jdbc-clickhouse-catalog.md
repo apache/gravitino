@@ -15,10 +15,6 @@ import TabItem from '@theme/TabItem';
 
 Apache Gravitino can manage ClickHouse metadata through a JDBC catalog. This document describes the capabilities and limitations of the ClickHouse catalog, as well as the supported operations and properties for catalogs, schemas, and tables.
 
-:::caution
-Gravitino writes system markers into table comments (for example `(From Gravitino, DO NOT EDIT: ...)`). Do not change or remove them.
-:::
-
 ## Catalog
 
 ### Catalog capabilities
@@ -48,6 +44,12 @@ When using the JDBC catalog you must provide `jdbc-url`, `jdbc-driver`, `jdbc-us
 
 ### Create a ClickHouse catalog
 
+The following example creates a ClickHouse catalog with the required JDBC properties and optional connection pool settings. Note that the `jdbc-driver` class must be available in the Gravitino classpath (for example by placing the ClickHouse JDBC driver JAR in `catalogs/catalog-jdbc-clickhouse/libs`).
+Description about some of the properties:
+- provider: must be `jdbc-clickhouse` for Gravitino to recognize the catalog as ClickHouse;
+- type: must be `RELATIONAL` since ClickHouse is a relational database; 
+
+
 <Tabs groupId="language" queryString>
 <TabItem value="shell" label="Shell">
 
@@ -62,7 +64,7 @@ curl -X POST -H "Accept: application/vnd.gravitino.v1+json" \
     "jdbc-url": "jdbc:clickhouse://localhost:8123",
     "jdbc-driver": "com.clickhouse.jdbc.ClickHouseDriver",
     "jdbc-user": "default",
-    "jdbc-password": "passw0rd"
+    "jdbc-password": "password"
   }
 }' http://localhost:8090/api/metalakes/metalake/catalogs
 ```
@@ -208,13 +210,31 @@ Other ClickHouse types are exposed as [External Type](./manage-relational-metada
 
 ### Partitioning, sorting, and distribution
 
-- `ORDER BY`: required for MergeTree-family engines (single column); rejected for engines that do not support it.
-- `PARTITION BY`: single-column identity only, and only for MergeTree-family engines.
-- Distribution: fixed to `Distributions.NONE` (no custom distribution).
+- `ORDER BY`: required for MergeTree-family engines and only columns identity are supported; for example `ORDER BY order_id` is supported, but `ORDER BY (order_id + 1)` is not supported. Other engines reject `ORDER BY` clause.
+- `PARTITION BY`: single-column identity and some functions are supported only, and only for MergeTree-family engines. For example `PARTITION BY created_at` or `PARTITION BY toYYYYMM(created_at)` are supported, but `PARTITION BY (created_at + 1)` are not supported.
+   In all, the following partitioning expressions are supported:
+   - Identity: `PARTITION BY column_name`
+   - Functions: `PARTITION BY toDate(column_name)`, `PARTITION BY toYear(column_name)`, `PARTITION BY toYYYYMM(column_name)`. Other functions are not supported.
+   - Not support: `PARTITION BY (column_name + 1)`, `PARTITION BY (toYear(column_name) + 1)`, etc.
+- Distribution: fixed to `Distributions.NONE` (no custom distribution). ClickHouse does not support custom distribution strategies since distribution is handled by the engine (for example `Distributed` engine with sharding key).
 
 ### Create a table
 
 The following example creates a `MergeTree` table with `ORDER BY`, partitioning, indexes, comments, and properties including `ON CLUSTER`. Note that the `engine` property is required for MergeTree-family tables, and that the cluster properties must align with the schema-level cluster settings if `on-cluster=true`.
+
+This is a create table statement that would be executed in ClickHouse to create the corresponding table:
+```sql
+CREATE TABLE sales.orders ON CLUSTER ck_cluster (
+  order_id Int32,
+  user_id Int32,
+  amount Decimal(18,2),
+  created_at DateTime,
+  primary key (order_id),
+) ENGINE = MergeTree order BY order_id PARTITION BY created_at;
+
+```
+
+The same table can be created through the API as follows:
 
 <Tabs groupId="language" queryString>
 <TabItem value="shell" label="Shell">

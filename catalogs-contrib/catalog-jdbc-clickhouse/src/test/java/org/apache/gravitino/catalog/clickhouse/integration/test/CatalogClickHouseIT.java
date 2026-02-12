@@ -837,6 +837,8 @@ public class CatalogClickHouseIT extends BaseIT {
 
     Assertions.assertEquals(AuthConstants.ANONYMOUS_USER, table.auditInfo().creator());
     Assertions.assertNull(table.auditInfo().lastModifier());
+
+    // Change default value of float
     catalog
         .asTableCatalog()
         .alterTable(
@@ -844,13 +846,14 @@ public class CatalogClickHouseIT extends BaseIT {
             TableChange.updateColumnDefaultValue(
                 new String[] {columns[0].name()}, Literals.of("1.2345", Types.FloatType.get())));
 
+    // Change default value of timestamp to function expression
     catalog
         .asTableCatalog()
         .alterTable(
             NameIdentifier.of(schemaName, tableName),
             TableChange.updateColumnDefaultValue(
                 new String[] {columns[1].name()}, FunctionExpression.of("now")));
-
+    // Change default value of varchar
     catalog
         .asTableCatalog()
         .alterTable(
@@ -858,13 +861,14 @@ public class CatalogClickHouseIT extends BaseIT {
             TableChange.updateColumnDefaultValue(
                 new String[] {columns[2].name()}, Literals.of("hello", Types.VarCharType.of(255))));
 
+    // Change default value of int
     catalog
         .asTableCatalog()
         .alterTable(
             NameIdentifier.of(schemaName, tableName),
             TableChange.updateColumnDefaultValue(
                 new String[] {columns[3].name()}, Literals.of("2000", Types.IntegerType.get())));
-
+    // Change default value of decimal
     catalog
         .asTableCatalog()
         .alterTable(
@@ -872,21 +876,7 @@ public class CatalogClickHouseIT extends BaseIT {
             TableChange.updateColumnDefaultValue(
                 new String[] {columns[4].name()}, Literals.of("2.34", Types.DecimalType.of(3, 2))));
 
-    catalog
-        .asTableCatalog()
-        .alterTable(
-            NameIdentifier.of(schemaName, tableName),
-            TableChange.updateColumnDefaultValue(
-                new String[] {columns[0].name()}, Literals.of("1.2345", Types.FloatType.get())),
-            TableChange.updateColumnDefaultValue(
-                new String[] {columns[1].name()}, FunctionExpression.of("now")),
-            TableChange.updateColumnDefaultValue(
-                new String[] {columns[2].name()}, Literals.of("hello", Types.VarCharType.of(255))),
-            TableChange.updateColumnDefaultValue(
-                new String[] {columns[3].name()}, Literals.of("2000", Types.IntegerType.get())),
-            TableChange.updateColumnDefaultValue(
-                new String[] {columns[4].name()}, Literals.of("2.34", Types.DecimalType.of(3, 2))));
-
+    // Change default value of all columns at once
     catalog
         .asTableCatalog()
         .alterTable(
@@ -902,6 +892,25 @@ public class CatalogClickHouseIT extends BaseIT {
             TableChange.updateColumnDefaultValue(
                 new String[] {columns[4].name()}, Literals.of("2.34", Types.DecimalType.of(3, 2))));
 
+    // Change default value of all columns at once again to make sure multiple alter table with
+    // updateColumnDefaultValue works well together
+    catalog
+        .asTableCatalog()
+        .alterTable(
+            NameIdentifier.of(schemaName, tableName),
+            TableChange.updateColumnDefaultValue(
+                new String[] {columns[0].name()}, Literals.of("1.2345", Types.FloatType.get())),
+            TableChange.updateColumnDefaultValue(
+                new String[] {columns[1].name()}, FunctionExpression.of("now")),
+            TableChange.updateColumnDefaultValue(
+                new String[] {columns[2].name()}, Literals.of("hello", Types.VarCharType.of(255))),
+            TableChange.updateColumnDefaultValue(
+                new String[] {columns[3].name()}, Literals.of("2000", Types.IntegerType.get())),
+            TableChange.updateColumnDefaultValue(
+                new String[] {columns[4].name()}, Literals.of("2.34", Types.DecimalType.of(3, 2))));
+
+    // Change default value of all columns at once again with different values to make sure multiple
+    // alter table with updateColumnDefaultValue works well together
     catalog
         .asTableCatalog()
         .alterTable(
@@ -1019,10 +1028,6 @@ public class CatalogClickHouseIT extends BaseIT {
                     TableChange.ColumnPosition.after("status"))));
 
     Table table = tableCatalog.loadTable(tableIdentifier);
-    for (Column column : table.columns()) {
-      System.out.println(column.name());
-    }
-
     Assertions.assertDoesNotThrow(
         () ->
             tableCatalog.alterTable(
