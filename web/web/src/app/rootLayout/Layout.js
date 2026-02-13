@@ -57,7 +57,7 @@ const Layout = ({ children, scrollToTop }) => {
                 <Box sx={{ flex: 1 }}>
                   <Typography variant='body2' component='div'>
                     <Box component='span' sx={{ fontWeight: 600 }}>
-                      Welcome to Web V2 UI.
+                      Try the new Web V2 UI.
                     </Box>
                     <Box component='div' sx={{ fontFamily: 'monospace', mt: 1 }}>
                       # In &lt;path-to-gravitino&gt;/conf/gravitino-env.sh
