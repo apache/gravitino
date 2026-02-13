@@ -206,5 +206,23 @@ public class ITUtils {
         System.getenv("GRAVITINO_ROOT_DIR"), "bundles", bundleName, "build", "libs");
   }
 
+  public static void cleanDisk() {
+    // Execute docker system prune -af to free up space before starting the OceanBase container
+    ProcessBuilder processBuilder =
+        new ProcessBuilder("/bin/bash", "-c", "docker system prune -af");
+    try {
+      Process process = processBuilder.start();
+      int exitCode = process.waitFor();
+      if (exitCode != 0) {
+        throw new RuntimeException("Failed to execute free memory exit code: " + exitCode);
+      }
+    } catch (IOException e) {
+      throw new RuntimeException("Failed to execute free memory command", e);
+    } catch (InterruptedException e) {
+      Thread.currentThread().interrupt();
+      throw new RuntimeException("Interrupted while waiting for util_free_space.sh to finish", e);
+    }
+  }
+
   private ITUtils() {}
 }

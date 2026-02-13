@@ -36,6 +36,7 @@ import java.util.Map;
 import java.util.NoSuchElementException;
 import java.util.Objects;
 import org.apache.gravitino.integration.test.util.CloseableGroup;
+import org.apache.gravitino.integration.test.util.ITUtils;
 import org.apache.gravitino.integration.test.util.TestDatabaseName;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -132,6 +133,7 @@ public class ContainerSuite implements Closeable {
     builder.putAll(env);
     builder.put("HADOOP_USER_NAME", "anonymous");
 
+    ITUtils.cleanDisk();
     if (hiveContainer == null) {
       synchronized (ContainerSuite.class) {
         if (hiveContainer == null) {
@@ -154,7 +156,7 @@ public class ContainerSuite implements Closeable {
     ImmutableMap.Builder<String, String> builder = ImmutableMap.builder();
     builder.putAll(env);
     builder.put("HADOOP_USER_NAME", "anonymous");
-
+    ITUtils.cleanDisk();
     if (hiveContainerWithS3 == null) {
       synchronized (ContainerSuite.class) {
         if (hiveContainerWithS3 == null) {
@@ -199,6 +201,7 @@ public class ContainerSuite implements Closeable {
       throw new IllegalArgumentException("Error environment variables for Hive Ranger container");
     }
 
+    ITUtils.cleanDisk();
     if (hiveRangerContainer == null) {
       synchronized (ContainerSuite.class) {
         if (hiveRangerContainer == null) {
@@ -217,6 +220,7 @@ public class ContainerSuite implements Closeable {
   }
 
   public void startKerberosHiveContainer(Map<String, String> envVars) {
+    ITUtils.cleanDisk();
     if (kerberosHiveContainer == null) {
       synchronized (ContainerSuite.class) {
         if (kerberosHiveContainer == null) {
@@ -273,6 +277,7 @@ public class ContainerSuite implements Closeable {
       String trinoConnectorLibDir,
       int gravitinoServerPort,
       String metalakeName) {
+    ITUtils.cleanDisk();
     if (trinoContainer == null) {
       synchronized (ContainerSuite.class) {
         if (trinoContainer == null) {
@@ -314,6 +319,7 @@ public class ContainerSuite implements Closeable {
   }
 
   public void startDorisContainer() {
+    ITUtils.cleanDisk();
     if (dorisContainer == null) {
       synchronized (ContainerSuite.class) {
         if (dorisContainer == null) {
@@ -330,6 +336,7 @@ public class ContainerSuite implements Closeable {
   }
 
   public void startMySQLContainer(TestDatabaseName testDatabaseName) {
+    ITUtils.cleanDisk();
     if (mySQLContainer == null) {
       synchronized (ContainerSuite.class) {
         if (mySQLContainer == null) {
@@ -357,6 +364,7 @@ public class ContainerSuite implements Closeable {
   }
 
   public void startMySQLVersion5Container(TestDatabaseName testDatabaseName) {
+    ITUtils.cleanDisk();
     if (mySQLVersion5Container == null) {
       synchronized (ContainerSuite.class) {
         if (mySQLVersion5Container == null) {
@@ -385,6 +393,7 @@ public class ContainerSuite implements Closeable {
   }
 
   public void startPostgreSQLContainer(TestDatabaseName testDatabaseName, PGImageName pgImageName) {
+    ITUtils.cleanDisk();
     if (!pgContainerMap.containsKey(pgImageName)) {
       synchronized (ContainerSuite.class) {
         if (!pgContainerMap.containsKey(pgImageName)) {
@@ -419,6 +428,7 @@ public class ContainerSuite implements Closeable {
   }
 
   public void startOceanBaseContainer() {
+    ITUtils.cleanDisk();
     if (oceanBaseContainer == null) {
       synchronized (ContainerSuite.class) {
         if (oceanBaseContainer == null) {
@@ -451,6 +461,7 @@ public class ContainerSuite implements Closeable {
   }
 
   public void startKafkaContainer() {
+    ITUtils.cleanDisk();
     if (kafkaContainer == null) {
       synchronized (ContainerSuite.class) {
         if (kafkaContainer == null) {
@@ -470,6 +481,7 @@ public class ContainerSuite implements Closeable {
   }
 
   public void startLocalStackContainer() {
+    ITUtils.cleanDisk();
     if (gravitinoLocalStackContainer == null) {
       synchronized (ContainerSuite.class) {
         if (gravitinoLocalStackContainer == null) {
@@ -489,6 +501,7 @@ public class ContainerSuite implements Closeable {
   }
 
   public void startStarRocksContainer() {
+    ITUtils.cleanDisk();
     if (starRocksContainer == null) {
       synchronized (ContainerSuite.class) {
         if (starRocksContainer == null) {
@@ -510,6 +523,7 @@ public class ContainerSuite implements Closeable {
   }
 
   public void startClickHouseContainer(TestDatabaseName testDatabaseName) {
+    ITUtils.cleanDisk();
     if (clickHouseContainer == null) {
       synchronized (ContainerSuite.class) {
         if (clickHouseContainer == null) {
