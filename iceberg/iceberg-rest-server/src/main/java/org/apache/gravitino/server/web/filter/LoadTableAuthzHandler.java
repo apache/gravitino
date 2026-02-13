@@ -36,6 +36,10 @@ import org.apache.iceberg.rest.RESTUtil;
 /**
  * Handler for LOAD_TABLE operations. Validates that the requested table is not a metadata table
  * (e.g., table$snapshots) and extracts the table identifier for authorization checks.
+ *
+ * <p>Note: This handler does NOT check if the entity is a view. That check is performed in the
+ * executor layer (IcebergTableOperationExecutor) after authorization, to ensure proper Spark
+ * fallback behavior (404 NoSuchTableException triggers /views/ retry).
  */
 public class LoadTableAuthzHandler implements AuthorizationHandler {
   private final Parameter[] parameters;
@@ -89,6 +93,8 @@ public class LoadTableAuthzHandler implements AuthorizationHandler {
     String schema = schemaId.name();
 
     // Add table identifier to the map for authorization expression evaluation
+    // Note: This assumes it's a table. If it's actually a view, the executor will detect
+    // that and throw NoSuchTableException to trigger Spark's fallback to /views/ endpoint.
     nameIdentifierMap.put(
         EntityType.TABLE, NameIdentifierUtil.ofTable(metalakeName, catalog, schema, tableName));
   }

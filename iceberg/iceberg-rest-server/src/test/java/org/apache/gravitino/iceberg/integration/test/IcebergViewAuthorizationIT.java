@@ -119,6 +119,34 @@ public class IcebergViewAuthorizationIT extends IcebergAuthorizationIT {
   }
 
   @Test
+  void testCreateViewRequiresSelectOnUnderlyingTable() {
+    String viewName = "test_invoker_create_view";
+
+    // Grant ONLY CREATE_VIEW privilege (not SELECT_TABLE on underlying table)
+    String createViewRole = grantCreateViewRole(SCHEMA_NAME);
+
+    // This should FAIL because user lacks SELECT privilege on the underlying base_table
+    // Spark will attempt to load the base_table during view creation, triggering authorization
+    Assertions.assertThrowsExactly(
+        ForbiddenException.class,
+        () -> sql("CREATE VIEW %s AS SELECT * FROM %s", viewName, fullTableName(BASE_TABLE_NAME)),
+        "View creation should fail when user lacks SELECT privilege on underlying table");
+
+    revokeRole(createViewRole);
+
+    // Now grant both CREATE_VIEW and SELECT_TABLE - should succeed
+    createViewRole = grantCreateViewRole(SCHEMA_NAME);
+    String selectTableRole = grantSelectTableRole(BASE_TABLE_NAME);
+
+    Assertions.assertDoesNotThrow(
+        () -> sql("CREATE VIEW %s AS SELECT * FROM %s", viewName, fullTableName(BASE_TABLE_NAME)),
+        "View creation should succeed when user has both CREATE_VIEW and SELECT on underlying table");
+
+    revokeRole(createViewRole);
+    revokeRole(selectTableRole);
+  }
+
+  @Test
   void testLoadView() {
     String viewName = "test_load_view";
     createViewAsAdmin(viewName);
@@ -127,12 +155,17 @@ public class IcebergViewAuthorizationIT extends IcebergAuthorizationIT {
     Assertions.assertThrowsExactly(
         ForbiddenException.class, () -> sql("SELECT * FROM %s", viewName));
 
-    // Grant SELECT_VIEW and verify access succeeds
-    String roleName = grantSelectViewRole(viewName);
+    // Grant SELECT on underlying table first (INVOKER model requires access to base tables)
+    String tableRoleName = grantSelectTableRole(BASE_TABLE_NAME);
+    // Then grant SELECT_VIEW permission
+    String viewRoleName = grantSelectViewRole(viewName);
     Assertions.assertDoesNotThrow(() -> sql("SELECT * FROM %s", viewName));
 
     // Revoke and verify access denied again
-    revokeRole(roleName);
+    revokeRole(tableRoleName);
+    Assertions.assertThrowsExactly(
+        ForbiddenException.class, () -> sql("SELECT * FROM %s", viewName));
+    revokeRole(viewRoleName);
     Assertions.assertThrowsExactly(
         ForbiddenException.class, () -> sql("SELECT * FROM %s", viewName));
 
@@ -144,9 +177,11 @@ public class IcebergViewAuthorizationIT extends IcebergAuthorizationIT {
     Assertions.assertThrowsExactly(
         ForbiddenException.class, () -> sql("SELECT * FROM %s", viewName));
 
-    // View owner can access view
+    // View owner can access view (INVOKER model requires base table permissions)
     setViewOwner(viewName);
+    String ownerTableRole = grantSelectTableRole(BASE_TABLE_NAME);
     Assertions.assertDoesNotThrow(() -> sql("SELECT * FROM %s", viewName));
+    revokeRole(ownerTableRole);
   }
 
   @Test
@@ -186,13 +221,15 @@ public class IcebergViewAuthorizationIT extends IcebergAuthorizationIT {
                 viewName, fullTableName(BASE_TABLE_NAME)));
     revokeRole(selectRole);
 
-    // View owner can replace
+    // View owner can replace (INVOKER model requires base table permissions)
     setViewOwner(viewName);
+    String ownerTableRole = grantSelectTableRole(BASE_TABLE_NAME);
     Assertions.assertDoesNotThrow(
         () ->
             sql(
                 "CREATE OR REPLACE VIEW %s AS SELECT col_1 FROM %s",
                 viewName, fullTableName(BASE_TABLE_NAME)));
+    revokeRole(ownerTableRole);
   }
 
   @Test

@@ -113,14 +113,12 @@ public class RESTService implements GravitinoAuxiliaryService {
     }
     IcebergTableEventDispatcher icebergTableEventDispatcher =
         new IcebergTableEventDispatcher(icebergTableOperationDispatcher, eventBus, metalakeName);
-    IcebergViewOperationDispatcher icebergViewOperationDispatcher =
+    IcebergViewOperationExecutor icebergViewOperationExecutor =
         new IcebergViewOperationExecutor(icebergCatalogWrapperManager);
-    if (authorizationContext.isAuthorizationEnabled()) {
-      icebergViewOperationDispatcher =
-          new IcebergViewHookDispatcher(icebergViewOperationDispatcher, metalakeName);
-    }
+    IcebergViewHookDispatcher icebergViewHookDispatcher =
+        new IcebergViewHookDispatcher(icebergViewOperationExecutor, metalakeName);
     IcebergViewEventDispatcher icebergViewEventDispatcher =
-        new IcebergViewEventDispatcher(icebergViewOperationDispatcher, eventBus, metalakeName);
+        new IcebergViewEventDispatcher(icebergViewHookDispatcher, eventBus, metalakeName);
 
     IcebergNamespaceOperationDispatcher namespaceOperationDispatcher =
         new IcebergNamespaceOperationExecutor(icebergCatalogWrapperManager);
