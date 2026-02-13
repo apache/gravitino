@@ -18,6 +18,8 @@
  */
 package org.apache.gravitino.catalog;
 
+import static org.apache.gravitino.utils.NameIdentifierUtil.getCatalogIdentifier;
+
 import com.google.common.base.Preconditions;
 import java.util.Arrays;
 import org.apache.gravitino.EntityStore;
@@ -43,6 +45,9 @@ import org.apache.gravitino.storage.IdGenerator;
  * delegates actual storage operations to {@link ManagedFunctionOperations}.
  */
 public class FunctionOperationDispatcher extends OperationDispatcher implements FunctionDispatcher {
+
+  private static final String ICEBERG_PROVIDER = "lakehouse-iceberg";
+  private static final String ICEBERG_SYSTEM_SCHEMA = "system";
 
   private final SchemaOperationDispatcher schemaOps;
   private final ManagedFunctionOperations managedFunctionOps;
@@ -133,6 +138,8 @@ public class FunctionOperationDispatcher extends OperationDispatcher implements 
     Preconditions.checkArgument(
         definitions != null && definitions.length > 0, "At least one definition is required");
 
+    validateNotIcebergReservedSchema(ident);
+
     NameIdentifier schemaIdent = NameIdentifier.of(ident.namespace().levels());
     // Validate schema exists in the underlying catalog
     schemaOps.loadSchema(schemaIdent);
@@ -159,6 +166,8 @@ public class FunctionOperationDispatcher extends OperationDispatcher implements 
       throws NoSuchFunctionException, IllegalArgumentException {
     Preconditions.checkArgument(
         changes != null && changes.length > 0, "At least one change is required");
+    validateNotIcebergReservedSchema(ident);
+
     NameIdentifier schemaIdent = NameIdentifier.of(ident.namespace().levels());
     if (!schemaOps.schemaExists(schemaIdent)) {
       throw new NoSuchFunctionException("Schema does not exist: %s", schemaIdent);
@@ -176,6 +185,8 @@ public class FunctionOperationDispatcher extends OperationDispatcher implements 
    */
   @Override
   public boolean dropFunction(NameIdentifier ident) {
+    validateNotIcebergReservedSchema(ident);
+
     NameIdentifier schemaIdent = NameIdentifier.of(ident.namespace().levels());
     if (!schemaOps.schemaExists(schemaIdent)) {
       return false;
@@ -183,5 +194,30 @@ public class FunctionOperationDispatcher extends OperationDispatcher implements 
 
     return TreeLockUtils.doWithTreeLock(
         ident, LockType.WRITE, () -> managedFunctionOps.dropFunction(ident));
+  }
+
+  /**
+   * Validates that the function operation is not targeting the Iceberg reserved "system" schema.
+   * Iceberg's "system" schema is reserved for built-in functions (e.g., iceberg_version, bucket,
+   * truncate) and should not allow user-managed function operations.
+   *
+   * @param ident The function identifier.
+   * @throws IllegalArgumentException If the function targets the Iceberg "system" schema.
+   */
+  private void validateNotIcebergReservedSchema(NameIdentifier ident) {
+    String schemaName = ident.namespace().level(ident.namespace().length() - 1);
+    if (!ICEBERG_SYSTEM_SCHEMA.equals(schemaName)) {
+      return;
+    }
+
+    NameIdentifier catalogIdent = getCatalogIdentifier(ident);
+    String provider =
+        doWithCatalog(catalogIdent, c -> c.catalog().provider(), IllegalArgumentException.class);
+    if (ICEBERG_PROVIDER.equals(provider)) {
+      throw new IllegalArgumentException(
+          String.format(
+              "Cannot operate on functions in the Iceberg reserved schema \"%s\"",
+              ICEBERG_SYSTEM_SCHEMA));
+    }
   }
 }

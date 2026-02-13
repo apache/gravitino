@@ -19,6 +19,7 @@
 
 package org.apache.gravitino.maintenance.optimizer.recommender.statistics;
 
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -113,7 +114,7 @@ public class GravitinoStatisticsProvider implements SupportTableStatistics {
         .forEach(
             statistic ->
                 statisticsByPartition
-                    .computeIfAbsent(partitions, key -> new java.util.ArrayList<>())
+                    .computeIfAbsent(partitions, key -> new ArrayList<>())
                     .add(new StatisticEntryImpl<>(statistic.name(), statistic.value().get())));
   }
 

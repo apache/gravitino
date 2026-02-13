@@ -32,4 +32,10 @@ public class SparkIcebergCatalogHiveBackendIT33 extends SparkIcebergCatalogHiveB
             .getConfString("spark.sql.catalog." + getCatalogName());
     Assertions.assertEquals(GravitinoIcebergCatalogSpark33.class.getName(), catalogClass);
   }
+
+  @Override
+  protected boolean supportsFunction() {
+    // Spark 3.3 does not support function operations
+    return false;
+  }
 }
