@@ -19,7 +19,7 @@
 
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Box, Fab, IconButton, Paper, Stack, Typography } from '@mui/material'
 import CloseIcon from '@mui/icons-material/Close'
 
@@ -36,8 +36,30 @@ const DynamicMainContent = dynamic(() => import('./MainContent'), {
   ssr: false
 })
 
+const WEB_V2_NOTICE_DISMISSED_KEY = 'gravitino:webV2NoticeDismissed'
+
 const Layout = ({ children, scrollToTop }) => {
   const [showNotice, setShowNotice] = useState(true)
+
+  useEffect(() => {
+    try {
+      const dismissed = localStorage.getItem(WEB_V2_NOTICE_DISMISSED_KEY)
+      if (dismissed === 'true') {
+        setShowNotice(false)
+      }
+    } catch (error) {
+      // Ignore storage errors and keep default behavior.
+    }
+  }, [])
+
+  const handleDismissNotice = () => {
+    setShowNotice(false)
+    try {
+      localStorage.setItem(WEB_V2_NOTICE_DISMISSED_KEY, 'true')
+    } catch (error) {
+      // Ignore storage errors.
+    }
+  }
 
   return (
     <div className={'layout-wrapper twc-h-full twc-flex twc-overflow-clip'}>
@@ -69,7 +91,7 @@ const Layout = ({ children, scrollToTop }) => {
                     </Box>
                   </Typography>
                 </Box>
-                <IconButton aria-label='close notice' size='small' onClick={() => setShowNotice(false)}>
+                <IconButton aria-label='close notice' size='small' onClick={handleDismissNotice}>
                   <CloseIcon fontSize='small' />
                 </IconButton>
               </Stack>
