@@ -21,18 +21,37 @@ package org.apache.gravitino.iceberg.service;
 import com.google.common.collect.Maps;
 import java.util.Map;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.commons.lang3.reflect.FieldUtils;
+import org.apache.gravitino.GravitinoEnv;
+import org.apache.gravitino.catalog.CatalogManager;
 import org.apache.gravitino.iceberg.common.ops.IcebergCatalogWrapper;
 import org.apache.gravitino.iceberg.service.authorization.IcebergRESTServerContext;
 import org.apache.gravitino.iceberg.service.provider.IcebergConfigProvider;
 import org.apache.gravitino.iceberg.service.provider.IcebergConfigProviderFactory;
+import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
+import org.mockito.Mockito;
 
 public class TestIcebergCatalogWrapperManagerForREST {
 
   private static final String DEFAULT_CATALOG = "memory";
+
+  @BeforeAll
+  public static void setup() throws IllegalAccessException {
+    // Mock CatalogManager for GravitinoEnv to avoid initialization errors
+    CatalogManager mockCatalogManager = Mockito.mock(CatalogManager.class);
+    FieldUtils.writeField(GravitinoEnv.getInstance(), "catalogManager", mockCatalogManager, true);
+  }
+
+  @AfterAll
+  public static void tearDown() throws IllegalAccessException {
+    // Clean up GravitinoEnv
+    FieldUtils.writeField(GravitinoEnv.getInstance(), "catalogManager", null, true);
+  }
 
   @ParameterizedTest
   @ValueSource(strings = {"", "hello/", "\\\n\t\\\'/", "\u0024/", "\100/", "[_~/"})

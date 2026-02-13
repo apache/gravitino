@@ -168,19 +168,22 @@ public class IcebergViewOperations {
               + "ANY_USE_CATALOG && ANY_USE_SCHEMA && (VIEW::OWNER || ANY_SELECT_VIEW)",
       accessMetadataType = MetadataObject.Type.VIEW)
   public Response loadView(
-      @AuthorizationMetadata(type = Entity.EntityType.CATALOG) @PathParam("prefix") String prefix,
-      @AuthorizationMetadata(type = EntityType.SCHEMA) @Encoded() @PathParam("namespace")
-          String namespace,
-      @AuthorizationMetadata(type = Entity.EntityType.VIEW) @PathParam("view") String view) {
+      @PathParam("prefix") String prefix,
+      @Encoded() @PathParam("namespace") String namespace,
+      @Encoded() @PathParam("view") String view) {
     String catalogName = IcebergRESTUtils.getCatalogName(prefix);
     Namespace icebergNS = RESTUtil.decodeNamespace(namespace);
+    String viewName = RESTUtil.decodeString(view);
     LOG.info(
-        "Load Iceberg view, catalog: {}, namespace: {}, view: {}", catalogName, icebergNS, view);
+        "Load Iceberg view, catalog: {}, namespace: {}, view: {}",
+        catalogName,
+        icebergNS,
+        viewName);
     try {
       return Utils.doAs(
           httpRequest,
           () -> {
-            TableIdentifier viewIdentifier = TableIdentifier.of(icebergNS, view);
+            TableIdentifier viewIdentifier = TableIdentifier.of(icebergNS, viewName);
             IcebergRequestContext context =
                 new IcebergRequestContext(httpServletRequest(), catalogName);
             LoadViewResponse loadViewResponse =
@@ -204,18 +207,18 @@ public class IcebergViewOperations {
               + "ANY_USE_CATALOG && ANY_USE_SCHEMA && VIEW::OWNER",
       accessMetadataType = MetadataObject.Type.VIEW)
   public Response replaceView(
-      @AuthorizationMetadata(type = Entity.EntityType.CATALOG) @PathParam("prefix") String prefix,
-      @AuthorizationMetadata(type = EntityType.SCHEMA) @Encoded() @PathParam("namespace")
-          String namespace,
-      @AuthorizationMetadata(type = Entity.EntityType.VIEW) @PathParam("view") String view,
+      @PathParam("prefix") String prefix,
+      @Encoded() @PathParam("namespace") String namespace,
+      @Encoded() @PathParam("view") String view,
       UpdateTableRequest replaceViewRequest) {
     String catalogName = IcebergRESTUtils.getCatalogName(prefix);
     Namespace icebergNS = RESTUtil.decodeNamespace(namespace);
+    String viewName = RESTUtil.decodeString(view);
     LOG.info(
         "Replace Iceberg view, catalog: {}, namespace: {}, view: {}, replaceViewRequest: {}",
         catalogName,
         icebergNS,
-        view,
+        viewName,
         SerializeReplaceViewRequest(replaceViewRequest));
     try {
       return Utils.doAs(
@@ -223,7 +226,7 @@ public class IcebergViewOperations {
           () -> {
             IcebergRequestContext context =
                 new IcebergRequestContext(httpServletRequest(), catalogName);
-            TableIdentifier viewIdentifier = TableIdentifier.of(icebergNS, view);
+            TableIdentifier viewIdentifier = TableIdentifier.of(icebergNS, viewName);
             LoadViewResponse loadViewResponse =
                 viewOperationDispatcher.replaceView(context, viewIdentifier, replaceViewRequest);
             return IcebergRESTUtils.ok(loadViewResponse);
@@ -245,19 +248,22 @@ public class IcebergViewOperations {
               + "ANY_USE_CATALOG && ANY_USE_SCHEMA && VIEW::OWNER",
       accessMetadataType = MetadataObject.Type.VIEW)
   public Response dropView(
-      @AuthorizationMetadata(type = Entity.EntityType.CATALOG) @PathParam("prefix") String prefix,
-      @AuthorizationMetadata(type = EntityType.SCHEMA) @Encoded() @PathParam("namespace")
-          String namespace,
-      @AuthorizationMetadata(type = Entity.EntityType.VIEW) @PathParam("view") String view) {
+      @PathParam("prefix") String prefix,
+      @Encoded() @PathParam("namespace") String namespace,
+      @Encoded() @PathParam("view") String view) {
     String catalogName = IcebergRESTUtils.getCatalogName(prefix);
     Namespace icebergNS = RESTUtil.decodeNamespace(namespace);
+    String viewName = RESTUtil.decodeString(view);
     LOG.info(
-        "Drop Iceberg view, catalog: {}, namespace: {}, view: {}", catalogName, icebergNS, view);
+        "Drop Iceberg view, catalog: {}, namespace: {}, view: {}",
+        catalogName,
+        icebergNS,
+        viewName);
     try {
       return Utils.doAs(
           httpRequest,
           () -> {
-            TableIdentifier viewIdentifier = TableIdentifier.of(icebergNS, view);
+            TableIdentifier viewIdentifier = TableIdentifier.of(icebergNS, viewName);
             IcebergRequestContext context =
                 new IcebergRequestContext(httpServletRequest(), catalogName);
             viewOperationDispatcher.dropView(context, viewIdentifier);
@@ -280,24 +286,24 @@ public class IcebergViewOperations {
               + "ANY_USE_CATALOG && ANY_USE_SCHEMA && (VIEW::OWNER || ANY_SELECT_VIEW || ANY_CREATE_VIEW)",
       accessMetadataType = MetadataObject.Type.VIEW)
   public Response viewExists(
-      @AuthorizationMetadata(type = Entity.EntityType.CATALOG) @PathParam("prefix") String prefix,
-      @AuthorizationMetadata(type = EntityType.SCHEMA) @Encoded() @PathParam("namespace")
-          String namespace,
-      @AuthorizationMetadata(type = Entity.EntityType.VIEW) @PathParam("view") String view) {
+      @PathParam("prefix") String prefix,
+      @Encoded() @PathParam("namespace") String namespace,
+      @Encoded() @PathParam("view") String view) {
     String catalogName = IcebergRESTUtils.getCatalogName(prefix);
     Namespace icebergNS = RESTUtil.decodeNamespace(namespace);
+    String viewName = RESTUtil.decodeString(view);
     LOG.info(
         "Check Iceberg view exists, catalog: {}, namespace: {}, view: {}",
         catalogName,
         icebergNS,
-        view);
+        viewName);
     try {
       return Utils.doAs(
           httpRequest,
           () -> {
             IcebergRequestContext context =
                 new IcebergRequestContext(httpServletRequest(), catalogName);
-            TableIdentifier viewIdentifier = TableIdentifier.of(icebergNS, view);
+            TableIdentifier viewIdentifier = TableIdentifier.of(icebergNS, viewName);
             boolean exists = viewOperationDispatcher.viewExists(context, viewIdentifier);
             if (exists) {
               return IcebergRESTUtils.noContent();

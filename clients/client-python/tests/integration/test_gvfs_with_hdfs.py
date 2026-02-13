@@ -36,7 +36,6 @@ from pyarrow.fs import HadoopFileSystem
 from gravitino import (
     gvfs,
     NameIdentifier,
-    GravitinoAdminClient,
     GravitinoClient,
     Catalog,
     Fileset,
@@ -92,9 +91,6 @@ class TestGvfsWithHDFS(IntegrationTestEnv):
         schema_name, multiple_locations_fileset_name
     )
 
-    gravitino_admin_client: GravitinoAdminClient = GravitinoAdminClient(
-        uri="http://localhost:8090"
-    )
     gravitino_client: GravitinoClient = None
     options = {}
 

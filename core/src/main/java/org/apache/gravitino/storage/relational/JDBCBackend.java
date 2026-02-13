@@ -315,12 +315,44 @@ public class JDBCBackend implements RelationalBackend {
   @Override
   public <E extends Entity & HasIdentifier> List<E> batchGet(
       List<NameIdentifier> identifiers, Entity.EntityType entityType) {
+    if (identifiers == null || identifiers.isEmpty()) {
+      return Lists.newArrayList();
+    }
+
+    // Verify all identifiers have the same namespace
+    Namespace firstNamespace = identifiers.get(0).namespace();
+    Preconditions.checkArgument(
+        identifiers.stream().allMatch(id -> id.namespace().equals(firstNamespace)),
+        "All identifiers must have the same namespace for batch get operation");
+
     switch (entityType) {
+      case METALAKE:
+        return (List<E>)
+            MetalakeMetaService.getInstance().batchGetMetalakeByIdentifier(identifiers);
+      case CATALOG:
+        return (List<E>) CatalogMetaService.getInstance().batchGetCatalogByIdentifier(identifiers);
+      case SCHEMA:
+        return (List<E>) SchemaMetaService.getInstance().batchGetSchemaByIdentifier(identifiers);
       case TABLE:
         return (List<E>) TableMetaService.getInstance().batchGetTableByIdentifier(identifiers);
+      case FILESET:
+        return (List<E>) FilesetMetaService.getInstance().batchGetFilesetByIdentifier(identifiers);
+      case TOPIC:
+        return (List<E>) TopicMetaService.getInstance().batchGetTopicByIdentifier(identifiers);
+      case MODEL:
+        return (List<E>) ModelMetaService.getInstance().batchGetModelByIdentifier(identifiers);
+      case TAG:
+        return (List<E>) TagMetaService.getInstance().batchGetTagByIdentifier(identifiers);
+      case POLICY:
+        return (List<E>) PolicyMetaService.getInstance().batchGetPolicyByIdentifier(identifiers);
+      case JOB:
+        return (List<E>) JobMetaService.getInstance().batchGetJobByIdentifier(identifiers);
+      case JOB_TEMPLATE:
+        return (List<E>)
+            JobTemplateMetaService.getInstance().batchGetJobTemplateByIdentifier(identifiers);
       default:
         throw new UnsupportedEntityTypeException(
-            "Unsupported entity type: %s for get operation", entityType);
+            "Unsupported entity type: %s for batch get operation", entityType);
     }
   }
 

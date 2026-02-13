@@ -24,6 +24,12 @@ plugins {
   id("idea")
 }
 
+val scalaVersion: String =
+  project.properties["scalaVersion"] as? String ?: extra["defaultScalaVersion"].toString()
+val sparkVersion: String = libs.versions.spark33.get()
+val sparkMajorVersion: String = sparkVersion.substringBeforeLast(".")
+val icebergVersion: String = libs.versions.iceberg4connector.get()
+
 dependencies {
   implementation(project(":api"))
   implementation(project(":catalogs:catalog-common"))
@@ -39,12 +45,43 @@ dependencies {
   implementation(libs.jackson.databind)
   implementation(libs.jackson.annotations)
   implementation(libs.guava)
+  implementation(libs.ql.expression)
 
   annotationProcessor(libs.lombok)
   compileOnly(libs.lombok)
 
+  testImplementation(libs.awaitility)
   testImplementation(libs.junit.jupiter.api)
   testImplementation(libs.junit.jupiter.params)
+  testImplementation(libs.mockito.core)
+  testImplementation("org.slf4j:slf4j-api:1.7.36")
+  testRuntimeOnly("org.slf4j:slf4j-simple:1.7.36")
+  testRuntimeOnly(
+    "org.scala-lang.modules:scala-collection-compat_$scalaVersion:${libs.versions.scala.collection.compat.get()}"
+  )
+  testImplementation(
+    "org.apache.iceberg:iceberg-spark-runtime-${sparkMajorVersion}_$scalaVersion:$icebergVersion"
+  ) {
+    exclude(group = "org.slf4j", module = "slf4j-api")
+    exclude(group = "org.apache.logging.log4j", module = "log4j-slf4j-impl")
+    exclude(group = "org.slf4j", module = "slf4j-log4j12")
+  }
+  testImplementation("org.apache.spark:spark-catalyst_$scalaVersion:$sparkVersion") {
+    exclude(group = "org.slf4j", module = "slf4j-api")
+    exclude(group = "org.apache.logging.log4j", module = "log4j-slf4j-impl")
+    exclude(group = "org.slf4j", module = "slf4j-log4j12")
+  }
+  testImplementation("org.apache.spark:spark-core_$scalaVersion:$sparkVersion") {
+    exclude(group = "org.slf4j", module = "slf4j-api")
+    exclude(group = "org.apache.logging.log4j", module = "log4j-slf4j-impl")
+    exclude(group = "org.slf4j", module = "slf4j-log4j12")
+  }
+  testImplementation("org.apache.spark:spark-sql_$scalaVersion:$sparkVersion") {
+    exclude(group = "org.slf4j", module = "slf4j-api")
+    exclude(group = "org.apache.logging.log4j", module = "log4j-slf4j-impl")
+    exclude(group = "org.slf4j", module = "slf4j-log4j12")
+  }
+  testImplementation(libs.testcontainers)
   testAnnotationProcessor(libs.lombok)
   testCompileOnly(libs.lombok)
 
@@ -84,6 +121,10 @@ tasks {
   register("copyLibAndConfigs", Copy::class) {
     dependsOn("copyLibs", "copyConfigs")
   }
+}
+
+configurations.testRuntimeClasspath {
+  exclude(group = "org.apache.logging.log4j", module = "log4j-slf4j2-impl")
 }
 
 tasks.test {

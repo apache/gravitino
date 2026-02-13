@@ -337,4 +337,44 @@ public class FilesetMetaBaseSQLProvider {
         + META_TABLE_NAME
         + " WHERE deleted_at > 0 AND deleted_at < #{legacyTimeline} LIMIT #{limit}";
   }
+
+  public String batchSelectFilesetByIdentifier(
+      @Param("metalakeName") String metalakeName,
+      @Param("catalogName") String catalogName,
+      @Param("schemaName") String schemaName,
+      @Param("filesetNames") List<String> filesetNames) {
+    return "<script>"
+        + "SELECT fm.fileset_id, fm.fileset_name, fm.metalake_id, fm.catalog_id, fm.schema_id,"
+        + " fm.type, fm.audit_info, fm.current_version, fm.last_version, fm.deleted_at,"
+        + " vi.id, vi.metalake_id as version_metalake_id, vi.catalog_id as version_catalog_id,"
+        + " vi.schema_id as version_schema_id, vi.fileset_id as version_fileset_id,"
+        + " vi.version, vi.fileset_comment, vi.properties, vi.storage_location_name, vi.storage_location,"
+        + " vi.deleted_at as version_deleted_at"
+        + " FROM "
+        + META_TABLE_NAME
+        + " fm"
+        + " INNER JOIN "
+        + VERSION_TABLE_NAME
+        + " vi ON fm.fileset_id = vi.fileset_id AND fm.current_version = vi.version"
+        + " JOIN "
+        + SchemaMetaMapper.TABLE_NAME
+        + " sm ON fm.schema_id = sm.schema_id"
+        + " JOIN "
+        + CatalogMetaMapper.TABLE_NAME
+        + " cm ON sm.catalog_id = cm.catalog_id"
+        + " JOIN "
+        + MetalakeMetaMapper.TABLE_NAME
+        + " mm ON cm.metalake_id = mm.metalake_id"
+        + " WHERE mm.metalake_name = #{metalakeName}"
+        + " AND cm.catalog_name = #{catalogName}"
+        + " AND sm.schema_name = #{schemaName}"
+        + " AND fm.fileset_name IN ("
+        + "<foreach collection='filesetNames' item='filesetName' separator=','>"
+        + "#{filesetName}"
+        + "</foreach>"
+        + " )"
+        + " AND fm.deleted_at = 0 AND vi.deleted_at = 0 AND sm.deleted_at = 0"
+        + " AND cm.deleted_at = 0 AND mm.deleted_at = 0"
+        + "</script>";
+  }
 }
