@@ -429,7 +429,7 @@ public class ContainerSuite implements Closeable {
                   .withEnvVars(
                       ImmutableMap.of(
                           "MODE",
-                          "mini",
+                          "SLIM",
                           "OB_SYS_PASSWORD",
                           OceanBaseContainer.PASSWORD,
                           "OB_TENANT_PASSWORD",
@@ -439,7 +439,7 @@ public class ContainerSuite implements Closeable {
                           "OB_LOG_DISK_SIZE",
                           "4G",
                           "OB_MEMORY_LIMIT",
-                          "8G"))
+                          "6G"))
                   .withNetwork(network)
                   .withExposePorts(ImmutableSet.of(OceanBaseContainer.OCEANBASE_PORT));
           OceanBaseContainer container = closer.register(oceanBaseBuilder.build());
