@@ -275,8 +275,7 @@ public class IcebergTableOperations {
       @AuthorizationMetadata(type = Entity.EntityType.CATALOG) @PathParam("prefix") String prefix,
       @AuthorizationMetadata(type = EntityType.SCHEMA) @Encoded() @PathParam("namespace")
           String namespace,
-      @IcebergAuthorizationMetadata(type = RequestType.LOAD_TABLE) @PathParam("table")
-          String table,
+      @IcebergAuthorizationMetadata(type = RequestType.LOAD_TABLE) @PathParam("table") String table,
       @DefaultValue("all") @QueryParam("snapshots") String snapshots,
       @HeaderParam(X_ICEBERG_ACCESS_DELEGATION) String accessDelegation) {
     String catalogName = IcebergRESTUtils.getCatalogName(prefix);
