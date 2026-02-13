@@ -209,7 +209,7 @@ public class ITUtils {
   public static void cleanDisk() {
     // Execute docker system prune -af to free up space before starting the OceanBase container
     ProcessBuilder processBuilder =
-        new ProcessBuilder("/bin/bash", "-c", "docker system prune -af");
+        new ProcessBuilder("/bin/bash", "-c", "docker system prune -f");
     try {
       Process process = processBuilder.start();
       int exitCode = process.waitFor();
