@@ -62,7 +62,8 @@ FROM my_catalog.my_schema.my_table;
 You can simplify the syntax by setting the default catalog and schema first:
 
 ```sql
-USE my_catalog.my_schema;
+USE my_catalog;
+USE my_schema;
 SELECT add_one(42);
 ```
 :::

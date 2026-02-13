@@ -1,5 +1,5 @@
 ---
-title: Manage user-defined function using Gravitino
+title: Manage user-defined functions using Gravitino
 slug: /manage-user-defined-function-using-gravitino
 keyword: Gravitino user-defined function UDF manage
 license: This software is licensed under the Apache License version 2.
@@ -67,7 +67,7 @@ curl -X POST -H "Accept: application/vnd.gravitino.v1+json" \
       "impls": [
         {
           "language": "SQL",
-          "runtime": "SPARK",
+          "runtime": "TRINO",
           "sql": "x + 1"
         }
       ]
@@ -91,9 +91,9 @@ FunctionCatalog functionCatalog = catalog.asFunctionCatalog();
 // Define the function parameter
 FunctionParam param = FunctionParams.of("x", Types.IntegerType.get());
 
-// Create a SQL implementation for Spark
+// Create a SQL implementation for Trino
 FunctionImpl sqlImpl = FunctionImpls.ofSql(
-    FunctionImpl.RuntimeType.SPARK, "x + 1");
+    FunctionImpl.RuntimeType.TRINO, "x + 1");
 
 // Create the function definition with return type
 FunctionDefinition definition = FunctionDefinitions.of(
@@ -122,10 +122,10 @@ function_catalog = catalog.as_function_catalog()
 # Define the function parameter
 param = FunctionParams.of("x", Types.IntegerType.get())
 
-# Create a SQL implementation for Spark
+# Create a SQL implementation for Trino
 sql_impl = (
     SQLImpl.builder()
-    .with_runtime_type(SQLImpl.RuntimeType.SPARK)
+    .with_runtime_type(SQLImpl.RuntimeType.TRINO)
     .with_sql("x + 1")
     .build()
 )
@@ -586,7 +586,7 @@ curl -X POST -H "Accept: application/vnd.gravitino.v1+json" \
       "impls": [
         {
           "language": "SQL",
-          "runtime": "SPARK",
+          "runtime": "TRINO",
           "sql": "x + y"
         }
       ]
@@ -600,7 +600,7 @@ curl -X POST -H "Accept: application/vnd.gravitino.v1+json" \
       "impls": [
         {
           "language": "SQL",
-          "runtime": "SPARK",
+          "runtime": "TRINO",
           "sql": "x + y"
         }
       ]
@@ -624,7 +624,7 @@ FunctionDefinition intDef = FunctionDefinitions.of(
     },
     Types.IntegerType.get(),
     new FunctionImpl[] {
-        FunctionImpls.ofSql(FunctionImpl.RuntimeType.SPARK, "x + y")
+        FunctionImpls.ofSql(FunctionImpl.RuntimeType.TRINO, "x + y")
     });
 
 // Definition 2: double overload
@@ -635,7 +635,7 @@ FunctionDefinition doubleDef = FunctionDefinitions.of(
     },
     Types.DoubleType.get(),
     new FunctionImpl[] {
-        FunctionImpls.ofSql(FunctionImpl.RuntimeType.SPARK, "x + y")
+        FunctionImpls.ofSql(FunctionImpl.RuntimeType.TRINO, "x + y")
     });
 
 Function function = functionCatalog.registerFunction(
@@ -659,7 +659,7 @@ int_param_x = FunctionParams.of("x", Types.IntegerType.get())
 int_param_y = FunctionParams.of("y", Types.IntegerType.get())
 sql_int = (
     SQLImpl.builder()
-    .with_runtime_type(SQLImpl.RuntimeType.SPARK)
+    .with_runtime_type(SQLImpl.RuntimeType.TRINO)
     .with_sql("x + y")
     .build()
 )
@@ -670,7 +670,7 @@ double_param_x = FunctionParams.of("x", Types.DoubleType.get())
 double_param_y = FunctionParams.of("y", Types.DoubleType.get())
 sql_double = (
     SQLImpl.builder()
-    .with_runtime_type(SQLImpl.RuntimeType.SPARK)
+    .with_runtime_type(SQLImpl.RuntimeType.TRINO)
     .with_sql("x + y")
     .build()
 )
