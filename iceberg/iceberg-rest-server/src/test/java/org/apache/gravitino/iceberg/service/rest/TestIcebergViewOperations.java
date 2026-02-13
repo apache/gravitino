@@ -54,6 +54,7 @@ import org.apache.iceberg.Schema;
 import org.apache.iceberg.UpdateRequirements;
 import org.apache.iceberg.catalog.Namespace;
 import org.apache.iceberg.catalog.TableIdentifier;
+import org.apache.iceberg.rest.RESTUtil;
 import org.apache.iceberg.rest.requests.CreateViewRequest;
 import org.apache.iceberg.rest.requests.ImmutableCreateViewRequest;
 import org.apache.iceberg.rest.requests.RenameTableRequest;
@@ -258,6 +259,40 @@ public class TestIcebergViewOperations extends IcebergNamespaceTestBase {
     // dest view exists
     verifyCreateViewSucc(namespace, "rename_foo3");
     verifyRenameViewFail(namespace, "rename_foo2", "rename_foo3", 409);
+  }
+
+  @ParameterizedTest
+  @MethodSource("org.apache.gravitino.iceberg.service.rest.IcebergRestTestUtil#testNamespaces")
+  void testViewOperationsWithEncodedName(Namespace namespace) {
+    // View names with special characters that require percent-encoding in URL paths.
+    // RESTUtil.encodeString encodes them for the URL, and the server should decode
+    // them back via RESTUtil.decodeString thanks to @Encoded on the path parameter.
+    String[] specialNames = {"view.with.dots", "view@special"};
+
+    verifyCreateNamespaceSucc(namespace);
+
+    for (String originalName : specialNames) {
+      String encodedName = RESTUtil.encodeString(originalName);
+
+      // Create uses the original name in the request body, not in the URL path
+      verifyCreateViewSucc(namespace, originalName);
+
+      // Load, exists use the encoded name in the URL path
+      verifyLoadViewSucc(namespace, encodedName);
+      verifyViewExistsStatusCode(namespace, encodedName, 204);
+
+      // Replace: load metadata with encoded path, then replace with encoded path
+      ViewMetadata metadata = getViewMeta(namespace, encodedName);
+      verifyReplaceSucc(namespace, encodedName, metadata);
+    }
+
+    // Verify list returns the original (decoded) view names
+    verifyLisViewSucc(namespace, ImmutableSet.copyOf(specialNames));
+
+    for (String originalName : specialNames) {
+      verifyDropViewSucc(namespace, RESTUtil.encodeString(originalName));
+    }
+    verifyDropNamespaceSucc(namespace);
   }
 
   private Response doCreateView(Namespace ns, String name) {
