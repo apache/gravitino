@@ -125,9 +125,6 @@ jobs:
           distribution: 'temurin'
           cache: 'gradle'
 
-      - name: Test publish to local
-        run: ./gradlew publishToMavenLocal -x test
-
       - name: Free up disk space
         run: |
           dev/ci/util_free_space.sh
@@ -151,36 +148,36 @@ jobs:
           -x :mcp-server:build
           -x :mcp-server:test
           -x :mcp-server:pylint
-          -x :catalogs:catalog-jdbc-clickhouse:build
-          -x :catalogs:catalog-jdbc-clickhouse:test
+          -x :catalogs-contrib:catalog-jdbc-clickhouse:build
+          -x :catalogs-contrib:catalog-jdbc-clickhouse:test
           -x :catalogs:catalog-jdbc-mysql:build
           -x :catalogs:catalog-jdbc-mysql:test
           -x :catalogs:catalog-jdbc-postgresql:build
           -x :catalogs:catalog-jdbc-postgresql:test
-          -x :catalogs-contrib:catalog-fileset:build
-          -x :catalogs-contrib:catalog-fileset:test
-          -x :catalogs-contrib:catalog-hive:build
-          -x :catalogs-contrib:catalog-hive:test
-          -x :catalogs-contrib:catalog-jdbc-mysql:build
-          -x :catalogs-contrib:catalog-jdbc-mysql:test
-          -x :catalogs-contrib:catalog-jdbc-postgresql:build
-          -x :catalogs-contrib:catalog-jdbc-postgresql:test
-          -x :catalogs-contrib:catalog-kafka:build
-          -x :catalogs-contrib:catalog-kafka:test
-          -x :catalogs-contrib:catalog-lakehouse-generic:build
-          -x :catalogs-contrib:catalog-lakehouse-generic:test
-          -x :catalogs-contrib:catalog-lakehouse-hudi:build
-          -x :catalogs-contrib:catalog-lakehouse-hudi:test
-          -x :catalogs-contrib:catalog-lakehouse-iceberg:build
-          -x :catalogs-contrib:catalog-lakehouse-iceberg:test
-          -x :catalogs-contrib:catalog-lakehouse-paimon:build
-          -x :catalogs-contrib:catalog-lakehouse-paimon:test
-          -x :catalogs-contrib:catalog-model:build
-          -x :catalogs-contrib:catalog-model:test
-          -x :catalogs-contrib:hive-metastore2-libs:build
-          -x :catalogs-contrib:hive-metastore2-libs:test
-          -x :catalogs-contrib:hive-metastore3-libs:build
-          -x :catalogs-contrib:hive-metastore3-libs:test
+          -x :catalogs:catalog-fileset:build
+          -x :catalogs:catalog-fileset:test
+          -x :catalogs:catalog-hive:build
+          -x :catalogs:catalog-hive:test
+          -x :catalogs:catalog-jdbc-mysql:build
+          -x :catalogs:catalog-jdbc-mysql:test
+          -x :catalogs:catalog-jdbc-postgresql:build
+          -x :catalogs:catalog-jdbc-postgresql:test
+          -x :catalogs:catalog-kafka:build
+          -x :catalogs:catalog-kafka:test
+          -x :catalogs:catalog-lakehouse-generic:build
+          -x :catalogs:catalog-lakehouse-generic:test
+          -x :catalogs:catalog-lakehouse-hudi:build
+          -x :catalogs:catalog-lakehouse-hudi:test
+          -x :catalogs:catalog-lakehouse-iceberg:build
+          -x :catalogs:catalog-lakehouse-iceberg:test
+          -x :catalogs:catalog-lakehouse-paimon:build
+          -x :catalogs:catalog-lakehouse-paimon:test
+          -x :catalogs:catalog-model:build
+          -x :catalogs:catalog-model:test
+          -x :catalogs:hive-metastore2-libs:build
+          -x :catalogs:hive-metastore2-libs:test
+          -x :catalogs:hive-metastore3-libs:build
+          -x :catalogs:hive-metastore3-libs:test
 
       - name: Release with Gradle
         run: ./gradlew clean && ./gradlew release -x test --rerun-tasks
