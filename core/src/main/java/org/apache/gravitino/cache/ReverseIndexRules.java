@@ -115,25 +115,21 @@ public class ReverseIndexRules {
 
   // Keep policies/tags to objects reverse index for metadata objects, so the key are objects and
   // the values are policies/tags.
+  // Only processes GenericEntity objects without namespace (metadata objects from tag/policy
+  // queries).
+  // Entities with namespace (views, tables) are skipped.
   public static final ReverseIndexCache.ReverseIndexRule GENERIC_METADATA_OBJECT_REVERSE_RULE =
       (entity, key, reverseIndexCache) -> {
         GenericEntity genericEntity = (GenericEntity) entity;
         EntityType type = entity.type();
-        if (genericEntity.name() != null) {
-          // For entities with a non-empty namespace (e.g., views), use the full identifier directly
-          if (genericEntity.namespace() != null && genericEntity.namespace().length() > 0) {
-            NameIdentifier objectNameIdentifier =
-                NameIdentifier.of(genericEntity.namespace(), genericEntity.name());
-            reverseIndexCache.put(objectNameIdentifier, type, key);
-          } else {
-            // For entities without namespace (e.g., policy metadata objects),
-            // the name contains catalog.schema.object format without metalake prefix
-            String[] levels = genericEntity.name().split("\\.");
-            String metalakeName = key.identifier().namespace().levels()[0];
-            NameIdentifier objectNameIdentifier =
-                NameIdentifier.of(ArrayUtils.addFirst(levels, metalakeName));
-            reverseIndexCache.put(objectNameIdentifier, type, key);
-          }
+        if (genericEntity.name() != null
+            && (genericEntity.namespace() == null || genericEntity.namespace().isEmpty())) {
+          // Name contains catalog.schema.object format without metalake, so prepend it.
+          String[] levels = genericEntity.name().split("\\.");
+          String metalakeName = key.identifier().namespace().levels()[0];
+          NameIdentifier objectNameIdentifier =
+              NameIdentifier.of(ArrayUtils.addFirst(levels, metalakeName));
+          reverseIndexCache.put(objectNameIdentifier, type, key);
         }
       };
 
