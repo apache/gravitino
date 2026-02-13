@@ -24,7 +24,10 @@ plugins {
 }
 
 dependencies {
-  compileOnly(project(":clients:client-java-runtime", configuration = "shadow"))
+  compileOnly(project(":api"))
+  compileOnly(project(":clients:client-java"))
+  compileOnly(project(":common"))
+
   compileOnly(libs.hadoop3.client.api)
   compileOnly(libs.hadoop3.client.runtime)
 
@@ -54,6 +57,11 @@ dependencies {
   testImplementation(project(":bundles:gcp-bundle", configuration = "shadow"))
   testImplementation(project(":bundles:aliyun-bundle", configuration = "shadow"))
   testImplementation(project(":bundles:azure-bundle", configuration = "shadow"))
+
+  testCompileOnly(project(":bundles:aws"))
+  testCompileOnly(project(":bundles:gcp"))
+  testCompileOnly(project(":bundles:aliyun"))
+  testCompileOnly(project(":bundles:azure"))
 
   testImplementation(libs.awaitility)
   testImplementation(libs.bundles.jetty)

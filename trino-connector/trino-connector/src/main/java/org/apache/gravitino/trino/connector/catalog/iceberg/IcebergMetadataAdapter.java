@@ -119,7 +119,11 @@ public class IcebergMetadataAdapter extends CatalogConnectorMetadataAdapter {
             removeKeys(tableMetadata.getProperties(), ICEBERG_PROPERTIES_TO_REMOVE));
 
     properties.put(PROVIDER, propertyMap.get(ICEBERG_FORMAT_PROPERTY).toString());
-    properties.put(FORMAT_VERSION, propertyMap.getOrDefault(ICEBERG_FORMAT_VERSION_PROPERTY, DEFAULT_ICEBERG_FORMAT_VERSION).toString());
+    properties.put(
+        FORMAT_VERSION,
+        propertyMap
+            .getOrDefault(ICEBERG_FORMAT_VERSION_PROPERTY, DEFAULT_ICEBERG_FORMAT_VERSION)
+            .toString());
 
     List<GravitinoColumn> columns = new ArrayList<>();
     for (int i = 0; i < tableMetadata.getColumns().size(); i++) {
