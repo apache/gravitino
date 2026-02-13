@@ -437,7 +437,9 @@ public class ContainerSuite implements Closeable {
                           "OB_DATAFILE_SIZE",
                           "2G",
                           "OB_LOG_DISK_SIZE",
-                          "4G"))
+                          "4G",
+                          "OB_MEMORY_LIMIT",
+                          "8G"))
                   .withNetwork(network)
                   .withExposePorts(ImmutableSet.of(OceanBaseContainer.OCEANBASE_PORT));
           OceanBaseContainer container = closer.register(oceanBaseBuilder.build());
