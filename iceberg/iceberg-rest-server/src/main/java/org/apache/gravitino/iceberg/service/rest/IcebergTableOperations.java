@@ -279,11 +279,7 @@ public class IcebergTableOperations {
       @AuthorizationMetadata(type = Entity.EntityType.CATALOG) @PathParam("prefix") String prefix,
       @AuthorizationMetadata(type = EntityType.SCHEMA) @Encoded() @PathParam("namespace")
           String namespace,
-<<<<<<< HEAD
       @IcebergAuthorizationMetadata(type = RequestType.LOAD_TABLE) @Encoded() @PathParam("table")
-=======
-      @IcebergAuthorizationMetadata(type = RequestType.LOAD_TABLE) @PathParam("table")
->>>>>>> 6bcf083fc (Implement view authorization for Iceberg REST with INVOKER model)
           String table,
       @DefaultValue("all") @QueryParam("snapshots") String snapshots,
       @HeaderParam(X_ICEBERG_ACCESS_DELEGATION) String accessDelegation) {
