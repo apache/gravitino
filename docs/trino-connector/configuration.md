@@ -20,3 +20,7 @@ license: "This software is licensed under the Apache License version 2."
 To configure the Gravitino client, use properties prefixed with `gravitino.client.`. These properties will directly passed to the Gravitino client.
 
 **Note:** Invalid configuration properties will result in exceptions. Please see [Gravitino Java client configurations](../how-to-use-gravitino-client.md#gravitino-java-client-configuration) for more support client configuration.
+
+## Authentication
+
+The Gravitino Trino connector supports authenticating to the Gravitino server using Simple, OAuth, and Kerberos authentication. For detailed authentication configuration, please refer to [Trino Connector Authentication](./authentication.md).

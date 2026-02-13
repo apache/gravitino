@@ -56,3 +56,7 @@
 - **Format**: `./gradlew spotlessApply`
 - **Unit Tests**: `./gradlew test -PskipITs -PskipDockerTests=false`
 - **Integration Tests**: `./gradlew test -PskipTests -PskipDockerTests=false`
+
+
+## Documents Guidelines
+- Ensure proper column alignment for every table in the Markdown (.md) file.
