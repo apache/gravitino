@@ -341,7 +341,12 @@ export default function CatalogsPage() {
   }, [columns])
 
   const handleChangeInUse = async (catalogObj, checked) => {
-    await dispatch(switchInUseCatalog({ metalake: currentMetalake, catalog: catalogObj.name, isInUse: checked }))
+    const action = await dispatch(
+      switchInUseCatalog({ metalake: currentMetalake, catalog: catalogObj.name, isInUse: checked })
+    )
+    if (!action?.meta || action.meta.requestStatus !== 'fulfilled') {
+      return
+    }
     dispatch(updateCatalogInUse({ catalog: catalogObj.name, isInUse: checked }))
     treeRef.current?.setCatalogInUse(catalogObj.name, checked)
   }
