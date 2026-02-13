@@ -117,15 +117,23 @@ public class ReverseIndexRules {
   // the values are policies/tags.
   public static final ReverseIndexCache.ReverseIndexRule GENERIC_METADATA_OBJECT_REVERSE_RULE =
       (entity, key, reverseIndexCache) -> {
-        // Name in GenericEntity contains no metalake.
         GenericEntity genericEntity = (GenericEntity) entity;
         EntityType type = entity.type();
         if (genericEntity.name() != null) {
-          String[] levels = genericEntity.name().split("\\.");
-          String metalakeName = key.identifier().namespace().levels()[0];
-          NameIdentifier objectNameIdentifier =
-              NameIdentifier.of(ArrayUtils.addFirst(levels, metalakeName));
-          reverseIndexCache.put(objectNameIdentifier, type, key);
+          // For entities with a non-empty namespace (e.g., views), use the full identifier directly
+          if (genericEntity.namespace() != null && genericEntity.namespace().length() > 0) {
+            NameIdentifier objectNameIdentifier =
+                NameIdentifier.of(genericEntity.namespace(), genericEntity.name());
+            reverseIndexCache.put(objectNameIdentifier, type, key);
+          } else {
+            // For entities without namespace (e.g., policy metadata objects),
+            // the name contains catalog.schema.object format without metalake prefix
+            String[] levels = genericEntity.name().split("\\.");
+            String metalakeName = key.identifier().namespace().levels()[0];
+            NameIdentifier objectNameIdentifier =
+                NameIdentifier.of(ArrayUtils.addFirst(levels, metalakeName));
+            reverseIndexCache.put(objectNameIdentifier, type, key);
+          }
         }
       };
 
