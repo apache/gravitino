@@ -439,7 +439,7 @@ public class ContainerSuite implements Closeable {
                   .withEnvVars(
                       ImmutableMap.of(
                           "MODE",
-                          "SLIM",
+                          "MINI",
                           "OB_SYS_PASSWORD",
                           OceanBaseContainer.PASSWORD,
                           "OB_TENANT_PASSWORD",
