@@ -50,7 +50,11 @@ dependencies {
   compileOnly("org.apache.spark:spark-catalyst_$scalaVersion:$sparkVersion") {
     exclude("com.fasterxml.jackson")
   }
-  compileOnly(project(":clients:client-java-runtime", configuration = "shadow"))
+
+  compileOnly(project(":api"))
+  compileOnly(project(":clients:client-java"))
+  compileOnly(project(":common"))
+
   compileOnly("org.apache.iceberg:iceberg-spark-runtime-${sparkMajorVersion}_$scalaVersion:$icebergVersion")
   if (scalaVersion == "2.12") {
     compileOnly("org.apache.paimon:paimon-spark-$sparkMajorVersion:$paimonVersion") {

@@ -50,6 +50,11 @@ java {
 dependencies {
   implementation(project(":catalogs:catalog-common"))
   implementation(project(":clients:client-java-runtime", configuration = "shadow"))
+
+  compileOnly(project(":api"))
+  compileOnly(project(":clients:client-java"))
+  compileOnly(project(":common"))
+
   implementation(libs.airlift.json)
   implementation(libs.bundles.log4j)
   implementation(libs.commons.collections4)
