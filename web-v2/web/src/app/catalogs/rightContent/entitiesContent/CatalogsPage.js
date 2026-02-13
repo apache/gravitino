@@ -19,15 +19,15 @@
 
 'use client'
 
-import { createContext, useContext, useMemo, useState } from 'react'
+import { useContext, useMemo, useState } from 'react'
 
 import dynamic from 'next/dynamic'
 import { useSearchParams } from 'next/navigation'
 import { ExclamationCircleFilled, PlusOutlined } from '@ant-design/icons'
-import { Button, Dropdown, Flex, Input, Modal, Spin, Table, Tooltip, Typography } from 'antd'
+import { Button, Dropdown, Flex, Input, Modal, Spin, Switch, Table, Tooltip, Typography } from 'antd'
 import { useAntdColumnResize } from 'react-antd-column-resize'
 import { useAppSelector, useAppDispatch } from '@/lib/hooks/useStore'
-import { switchInUseCatalog, deleteCatalog } from '@/lib/store/metalakes'
+import { switchInUseCatalog, deleteCatalog, updateCatalogInUse } from '@/lib/store/metalakes'
 import { TreeRefContext } from '../../page'
 import Tags from '@/components/CustomTags'
 import Icons from '@/components/Icons'
@@ -118,17 +118,9 @@ export default function CatalogsPage() {
     setOpenOwner(true)
   }
 
-  const showDeleteConfirm = (NameContext, catalog, type) => {
-    const inUse = catalog.properties['in-use'] === 'true'
-    if (inUse) {
-      modal.error({
-        title: `Make sure the ${type} ${catalog.name} is not in-use`,
-        icon: <ExclamationCircleFilled />,
-        okText: 'OK'
-      })
-
-      return
-    }
+  const showDeleteConfirm = (catalog, type) => {
+    const initialInUse = catalog.properties?.['in-use'] === 'true'
+    let currentInUse = initialInUse
     let confirmInput = ''
     let validateFn = null
 
@@ -140,25 +132,56 @@ export default function CatalogsPage() {
       validateFn = fn
     }
 
-    modal.confirm({
-      title: `Are you sure to delete the ${type} ${catalog.name}?`,
-      icon: <ExclamationCircleFilled />,
-      content: (
-        <NameContext.Consumer>
-          {name => (
+    const updateInUse = value => {
+      currentInUse = value
+    }
+
+    let confirmModal
+
+    const DeleteCatalogConfirmContent = () => {
+      const [inUse, setInUse] = useState(currentInUse)
+
+      const handleSwitchChange = async checked => {
+        setInUse(checked)
+        updateInUse(checked)
+        confirmModal?.update({ okButtonProps: { disabled: checked } })
+        await handleChangeInUse(catalog, checked)
+      }
+
+      return (
+        <Flex vertical gap={8}>
+          {initialInUse ? (
+            <>
+              <Paragraph style={{ marginBottom: 0 }}>
+                Please set the {type} to &quot;Not In-Use&quot; before deleting.
+              </Paragraph>
+              <Flex align='center' gap={8}>
+                <Switch size='small' checked={inUse} onChange={handleSwitchChange} />
+                <span>{inUse ? 'In-Use' : 'Not In-Use'}</span>
+              </Flex>
+            </>
+          ) : (
             <ConfirmInput
-              name={name}
+              name={catalog.name}
               type={type}
               setConfirmInput={setConfirmInput}
               registerValidate={registerValidate}
             />
           )}
-        </NameContext.Consumer>
-      ),
+        </Flex>
+      )
+    }
+
+    confirmModal = modal.confirm({
+      title: `Are you sure to delete the ${type} ${catalog.name}?`,
+      icon: <ExclamationCircleFilled />,
+      content: <DeleteCatalogConfirmContent />,
+      okButtonProps: { disabled: currentInUse },
       okText: 'Delete',
       okType: 'danger',
       cancelText: 'Cancel',
       onOk(close) {
+        if (currentInUse) return Promise.reject()
         if (validateFn && !validateFn()) return
 
         const confirmFn = async () => {
@@ -252,11 +275,8 @@ export default function CatalogsPage() {
         key: 'action',
         width: 100,
         render: (_, record) => {
-          const NameContext = createContext(record.name)
-
           return (
             <div className='flex gap-2'>
-              <NameContext.Provider value={record.name}>{contextHolder}</NameContext.Provider>
               <a data-refer={`edit-entity-${record.name}`}>
                 <Tooltip title='Edit'>
                   <Icons.Pencil className='size-4' onClick={() => handleEditCatalog(record.name)} />
@@ -264,10 +284,7 @@ export default function CatalogsPage() {
               </a>
               <a data-refer={`delete-entity-${record.name}`}>
                 <Tooltip title='Delete'>
-                  <Icons.Trash2Icon
-                    className='size-4'
-                    onClick={() => showDeleteConfirm(NameContext, record, 'catalog')}
-                  />
+                  <Icons.Trash2Icon className='size-4' onClick={() => showDeleteConfirm(record, 'catalog')} />
                 </Tooltip>
               </a>
               <Dropdown
@@ -325,11 +342,13 @@ export default function CatalogsPage() {
 
   const handleChangeInUse = async (catalogObj, checked) => {
     await dispatch(switchInUseCatalog({ metalake: currentMetalake, catalog: catalogObj.name, isInUse: checked }))
+    dispatch(updateCatalogInUse({ catalog: catalogObj.name, isInUse: checked }))
     treeRef.current?.setCatalogInUse(catalogObj.name, checked)
   }
 
   return (
     <div>
+      {contextHolder}
       <Title level={2}>Catalogs</Title>
       <Paragraph type='secondary'>This table lists the data catalogs you have access to.</Paragraph>
       <Flex justify='flex-end' className='mb-4'>
