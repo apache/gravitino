@@ -19,6 +19,8 @@
 
 package org.apache.gravitino.maintenance.optimizer.api.recommender;
 
+import java.util.Optional;
+
 /**
  * Encapsulates the scored result and job execution context for a single strategy evaluation. The
  * recommender ranks evaluations by {@link #score()} before asking the {@link
@@ -28,11 +30,31 @@ package org.apache.gravitino.maintenance.optimizer.api.recommender;
 public interface StrategyEvaluation {
 
   /**
+   * Evaluation placeholder indicating that no execution should happen. It uses score {@code -1} and
+   * an empty job execution context.
+   */
+  StrategyEvaluation NO_EXECUTION =
+      new StrategyEvaluation() {
+        @Override
+        public long score() {
+          return -1L;
+        }
+
+        @Override
+        public Optional<JobExecutionContext> jobExecutionContext() {
+          return Optional.empty();
+        }
+      };
+
+  /**
    * Score used to rank multiple recommendations of the same strategy. Higher wins; equal scores
    * preserve the evaluation order returned by the {@code StrategyHandler}.
    */
   long score();
 
-  /** Job execution context for this evaluation. */
-  JobExecutionContext jobExecutionContext();
+  /**
+   * Job execution context for this evaluation. Implementations return {@link Optional#empty()} when
+   * {@link #NO_EXECUTION} is used to signal that no job should be submitted.
+   */
+  Optional<JobExecutionContext> jobExecutionContext();
 }

@@ -27,6 +27,7 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.ScheduledThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
+import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.exceptions.NoSuchCatalogException;
 import org.apache.gravitino.iceberg.common.IcebergConfig;
 import org.apache.gravitino.iceberg.common.authentication.AuthenticationConfig;
@@ -71,6 +72,17 @@ public class IcebergCatalogWrapperManager implements AutoCloseable {
                             .setNameFormat("iceberg-catalog-wrapper-cleaner-%d")
                             .build())))
             .build();
+    IcebergRESTServerContext context = IcebergRESTServerContext.getInstance();
+    if (context.isAuxMode()) {
+      GravitinoEnv.getInstance()
+          .catalogManager()
+          .addCatalogCacheRemoveListener(
+              ident -> {
+                if (ident.namespace().level(0).equals(context.metalakeName())) {
+                  catalogWrapperCache.invalidate(ident.name());
+                }
+              });
+    }
   }
 
   /**

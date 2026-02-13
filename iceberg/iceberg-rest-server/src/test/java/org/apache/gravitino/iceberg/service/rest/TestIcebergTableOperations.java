@@ -176,8 +176,7 @@ public class TestIcebergTableOperations extends IcebergNamespaceTestBase {
         metadata.currentSnapshot() == null ? null : metadata.currentSnapshot().snapshotId();
     JsonNode planResponse = verifyPlanTableScanSucc(namespace, "plan_scan_table", snapshotId);
 
-    Assertions.assertEquals(
-        PlanStatus.COMPLETED.status(), planResponse.get("plan-status").asText());
+    Assertions.assertEquals(PlanStatus.COMPLETED.status(), planResponse.get("status").asText());
     Assertions.assertTrue(planResponse.has("plan-tasks"));
     Assertions.assertTrue(planResponse.get("plan-tasks").isArray());
     Assertions.assertTrue(planResponse.get("plan-tasks").size() > 0);
@@ -223,8 +222,7 @@ public class TestIcebergTableOperations extends IcebergNamespaceTestBase {
     JsonNode planResponse =
         verifyPlanTableScanSuccWithRange(
             namespace, "incremental_scan_valid_table", startSnapshotId, endSnapshotId);
-    Assertions.assertEquals(
-        PlanStatus.COMPLETED.status(), planResponse.get("plan-status").asText());
+    Assertions.assertEquals(PlanStatus.COMPLETED.status(), planResponse.get("status").asText());
     Assertions.assertTrue(planResponse.has("plan-tasks"));
     Assertions.assertTrue(planResponse.get("plan-tasks").isArray());
 
@@ -573,7 +571,7 @@ public class TestIcebergTableOperations extends IcebergNamespaceTestBase {
   }
 
   private PlanTableScanRequest buildPlanTableScanRequest(Long snapshotId) {
-    PlanTableScanRequest.Builder builder = new PlanTableScanRequest.Builder();
+    PlanTableScanRequest.Builder builder = PlanTableScanRequest.builder();
     if (snapshotId != null) {
       builder = builder.withSnapshotId(snapshotId);
     } else {
@@ -584,7 +582,7 @@ public class TestIcebergTableOperations extends IcebergNamespaceTestBase {
 
   private PlanTableScanRequest buildPlanTableScanRequestWithRange(
       Long startSnapshotId, Long endSnapshotId) {
-    PlanTableScanRequest.Builder builder = new PlanTableScanRequest.Builder();
+    PlanTableScanRequest.Builder builder = PlanTableScanRequest.builder();
     if (startSnapshotId != null) {
       builder = builder.withStartSnapshotId(startSnapshotId);
     }

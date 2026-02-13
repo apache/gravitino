@@ -39,6 +39,7 @@ import {
   fetchTopics,
   fetchModels,
   fetchModelVersions,
+  fetchFunctions,
   getMetalakeDetails,
   getCatalogDetails,
   getSchemaDetails,
@@ -129,6 +130,7 @@ const CatalogsListPage = () => {
             await dispatch(fetchCatalogs({ metalake }))
             await dispatch(fetchSchemas({ metalake, catalog, catalogType }))
           }
+          dispatch(fetchFunctions({ init: true, metalake, catalog, schema }))
           switch (catalogType) {
             case 'relational':
               dispatch(fetchTables({ init: true, page: 'schemas', metalake, catalog, schema }))

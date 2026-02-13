@@ -255,7 +255,7 @@ export const TreeComponent = forwardRef(function TreeComponent(props, ref) {
         return (
           <span
             role='img'
-            aria-label='frown'
+            aria-label='schema'
             className='anticon anticon-frown'
             onMouseEnter={e => onMouseEnter(e, nodeProps.data)}
             onMouseLeave={e => onMouseLeave(e, nodeProps.data)}
@@ -270,26 +270,32 @@ export const TreeComponent = forwardRef(function TreeComponent(props, ref) {
         )
       case 'table':
         return (
-          <span role='img' aria-label='frown' className='anticon anticon-frown'>
+          <span role='img' aria-label='table' className='anticon anticon-frown'>
             <Icons.iconify icon='bx:table' className='my-icon-small' />
           </span>
         )
       case 'fileset':
         return (
-          <span role='img' aria-label='frown' className='anticon anticon-frown'>
+          <span role='img' aria-label='fileset' className='anticon anticon-frown'>
             <Icons.iconify icon='bx:file' className='my-icon-small' />
           </span>
         )
       case 'topic':
         return (
-          <span role='img' aria-label='frown' className='anticon anticon-frown'>
+          <span role='img' aria-label='topic' className='anticon anticon-frown'>
             <Icons.iconify icon='material-symbols:topic-outline' className='my-icon-small' />
           </span>
         )
       case 'model':
         return (
-          <span role='img' aria-label='frown' className='anticon anticon-frown'>
+          <span role='img' aria-label='model' className='anticon anticon-frown'>
             <Icons.iconify icon='mdi:globe-model' className='my-icon-small' />
+          </span>
+        )
+      case 'function':
+        return (
+          <span role='img' aria-label='function' className='anticon anticon-frown'>
+            <Icons.iconify icon='material-symbols:function' className='my-icon-small' />
           </span>
         )
       default:
