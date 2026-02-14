@@ -369,4 +369,26 @@ public class ModelMetaService {
       throw new IOException("Failed to update the entity: " + identifier);
     }
   }
+
+  @Monitored(
+      metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME,
+      baseMetricName = "batchGetModelByIdentifier")
+  public List<ModelEntity> batchGetModelByIdentifier(List<NameIdentifier> identifiers) {
+    NameIdentifier firstIdent = identifiers.get(0);
+    NameIdentifier schemaIdent = NameIdentifierUtil.getSchemaIdentifier(firstIdent);
+    List<String> modelNames =
+        identifiers.stream().map(NameIdentifier::name).collect(Collectors.toList());
+
+    return SessionUtils.doWithCommitAndFetchResult(
+        ModelMetaMapper.class,
+        mapper -> {
+          List<ModelPO> modelPOs =
+              mapper.batchSelectModelByIdentifier(
+                  schemaIdent.namespace().level(0),
+                  schemaIdent.namespace().level(1),
+                  schemaIdent.name(),
+                  modelNames);
+          return POConverters.fromModelPOs(modelPOs, firstIdent.namespace());
+        });
+  }
 }
