@@ -19,11 +19,14 @@
 
 package org.apache.gravitino.maintenance.optimizer.common.util;
 
+import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.maintenance.optimizer.api.recommender.JobSubmitter;
 import org.apache.gravitino.maintenance.optimizer.api.recommender.StatisticsProvider;
 import org.apache.gravitino.maintenance.optimizer.api.recommender.StrategyProvider;
 import org.apache.gravitino.maintenance.optimizer.api.recommender.TableMetadataProvider;
+import org.apache.gravitino.maintenance.optimizer.monitor.callback.ConsoleMonitorCallback;
 import org.apache.gravitino.maintenance.optimizer.monitor.callback.MonitorCallbackForTest;
+import org.apache.gravitino.maintenance.optimizer.monitor.job.DummyJobProvider;
 import org.apache.gravitino.maintenance.optimizer.monitor.job.JobProviderForTest;
 import org.apache.gravitino.maintenance.optimizer.monitor.metrics.MetricsProviderForTest;
 import org.apache.gravitino.maintenance.optimizer.recommender.job.GravitinoJobSubmitter;
@@ -80,6 +83,14 @@ public class TestProviderUtils {
     Assertions.assertTrue(
         ProviderUtils.createJobProviderInstance(JobProviderForTest.NAME)
             instanceof JobProviderForTest);
+    DummyJobProvider dummyJobProvider =
+        (DummyJobProvider) ProviderUtils.createJobProviderInstance(DummyJobProvider.NAME);
+    Assertions.assertNotNull(dummyJobProvider);
+    Assertions.assertTrue(
+        dummyJobProvider.jobIdentifiers(NameIdentifier.parse("catalog.db.table")).isEmpty());
+    Assertions.assertTrue(
+        ProviderUtils.createMonitorCallbackInstance(ConsoleMonitorCallback.NAME)
+            instanceof ConsoleMonitorCallback);
     Assertions.assertTrue(
         ProviderUtils.createMonitorCallbackInstance(MonitorCallbackForTest.NAME)
             instanceof MonitorCallbackForTest);

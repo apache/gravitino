@@ -112,6 +112,7 @@ public class Monitor implements AutoCloseable {
     closeableGroup.register(jobProvider, JobProvider.class.getSimpleName());
 
     this.metricsEvaluator = loadMetricsEvaluator(optimizerEnv.config());
+    metricsEvaluator.initialize(optimizerEnv);
     this.callbacks = loadCallbacks(optimizerEnv.config());
     for (MonitorCallback callback : callbacks) {
       callback.initialize(optimizerEnv);

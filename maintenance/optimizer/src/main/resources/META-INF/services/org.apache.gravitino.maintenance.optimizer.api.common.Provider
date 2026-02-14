@@ -23,3 +23,7 @@ org.apache.gravitino.maintenance.optimizer.recommender.job.GravitinoJobSubmitter
 org.apache.gravitino.maintenance.optimizer.recommender.job.NoopJobSubmitter
 org.apache.gravitino.maintenance.optimizer.updater.statistics.GravitinoStatisticsUpdater
 org.apache.gravitino.maintenance.optimizer.updater.metrics.GravitinoMetricsUpdater
+org.apache.gravitino.maintenance.optimizer.monitor.metrics.GravitinoMetricsProvider
+org.apache.gravitino.maintenance.optimizer.monitor.job.DummyJobProvider
+org.apache.gravitino.maintenance.optimizer.monitor.job.LocalJobProvider
+org.apache.gravitino.maintenance.optimizer.monitor.callback.ConsoleMonitorCallback
