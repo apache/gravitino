@@ -23,7 +23,6 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-import java.util.Comparator;
 import java.util.List;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.maintenance.optimizer.api.common.DataScope;
@@ -47,17 +46,25 @@ public class TestUpdater {
         mockOptimizerEnv(StatisticsUpdaterForTest.NAME, MetricsUpdaterForTest.NAME);
     NameIdentifier identifier = NameIdentifier.of("catalog", "schema", "table");
 
-    createUpdater(optimizerEnv)
-        .update(StatisticsCalculatorForTest.NAME, List.of(identifier), UpdateType.STATISTICS);
+    Updater updater = createUpdater(optimizerEnv);
+    Updater.UpdateSummary summary =
+        updater.update(
+            StatisticsCalculatorForTest.NAME, List.of(identifier), UpdateType.STATISTICS);
 
-    StatisticsUpdaterForTest statisticsUpdater = selectStatisticsUpdater();
-    MetricsUpdaterForTest metricsUpdater = selectMetricsUpdater();
+    StatisticsUpdaterForTest statisticsUpdater =
+        (StatisticsUpdaterForTest) updater.getStatisticsUpdater();
+    MetricsUpdaterForTest metricsUpdater = (MetricsUpdaterForTest) updater.getMetricsUpdater();
     assertNotNull(statisticsUpdater);
     assertNotNull(metricsUpdater);
     assertEquals(1, statisticsUpdater.tableUpdates());
     assertEquals(1, statisticsUpdater.partitionUpdates());
     assertEquals(0, metricsUpdater.tableAndPartitionUpdates());
     assertEquals(0, metricsUpdater.jobUpdates());
+    assertEquals(UpdateType.STATISTICS, summary.updateType());
+    assertEquals(3, summary.totalRecords());
+    assertEquals(1, summary.tableRecords());
+    assertEquals(2, summary.partitionRecords());
+    assertEquals(0, summary.jobRecords());
   }
 
   @Test
@@ -66,11 +73,13 @@ public class TestUpdater {
         mockOptimizerEnv(StatisticsUpdaterForTest.NAME, MetricsUpdaterForTest.NAME);
     NameIdentifier identifier = NameIdentifier.of("catalog", "schema", "table");
 
-    createUpdater(optimizerEnv)
-        .update(StatisticsCalculatorForTest.NAME, List.of(identifier), UpdateType.METRICS);
+    Updater updater = createUpdater(optimizerEnv);
+    Updater.UpdateSummary summary =
+        updater.update(StatisticsCalculatorForTest.NAME, List.of(identifier), UpdateType.METRICS);
 
-    StatisticsUpdaterForTest statisticsUpdater = selectStatisticsUpdater();
-    MetricsUpdaterForTest metricsUpdater = selectMetricsUpdater();
+    StatisticsUpdaterForTest statisticsUpdater =
+        (StatisticsUpdaterForTest) updater.getStatisticsUpdater();
+    MetricsUpdaterForTest metricsUpdater = (MetricsUpdaterForTest) updater.getMetricsUpdater();
     assertNotNull(statisticsUpdater);
     assertNotNull(metricsUpdater);
     assertEquals(0, statisticsUpdater.tableUpdates());
@@ -83,6 +92,11 @@ public class TestUpdater {
     assertTrue(
         metricsUpdater.lastJobMetrics().stream()
             .anyMatch(metric -> metric.scope() == DataScope.Type.JOB));
+    assertEquals(UpdateType.METRICS, summary.updateType());
+    assertEquals(4, summary.totalRecords());
+    assertEquals(1, summary.tableRecords());
+    assertEquals(2, summary.partitionRecords());
+    assertEquals(1, summary.jobRecords());
   }
 
   @Test
@@ -94,15 +108,21 @@ public class TestUpdater {
             NameIdentifier.of("catalog", "schema", "table1"),
             NameIdentifier.of("catalog", "schema", "table2"));
 
-    createUpdater(optimizerEnv)
-        .update(StatisticsCalculatorForTest.NAME, identifiers, UpdateType.METRICS);
+    Updater updater = createUpdater(optimizerEnv);
+    Updater.UpdateSummary summary =
+        updater.update(StatisticsCalculatorForTest.NAME, identifiers, UpdateType.METRICS);
 
-    MetricsUpdaterForTest metricsUpdater = selectMetricsUpdater();
+    MetricsUpdaterForTest metricsUpdater = (MetricsUpdaterForTest) updater.getMetricsUpdater();
     assertNotNull(metricsUpdater);
     assertEquals(1, metricsUpdater.tableAndPartitionUpdates());
     assertEquals(1, metricsUpdater.jobUpdates());
     assertEquals(6, metricsUpdater.lastTableAndPartitionMetrics().size());
     assertEquals(2, metricsUpdater.lastJobMetrics().size());
+    assertEquals(UpdateType.METRICS, summary.updateType());
+    assertEquals(8, summary.totalRecords());
+    assertEquals(2, summary.tableRecords());
+    assertEquals(4, summary.partitionRecords());
+    assertEquals(2, summary.jobRecords());
   }
 
   @Test
@@ -110,16 +130,24 @@ public class TestUpdater {
     OptimizerEnv optimizerEnv =
         mockOptimizerEnv(StatisticsUpdaterForTest.NAME, MetricsUpdaterForTest.NAME);
 
-    createUpdater(optimizerEnv).updateAll(StatisticsCalculatorForTest.NAME, UpdateType.STATISTICS);
+    Updater updater = createUpdater(optimizerEnv);
+    Updater.UpdateSummary summary =
+        updater.updateAll(StatisticsCalculatorForTest.NAME, UpdateType.STATISTICS);
 
-    StatisticsUpdaterForTest statisticsUpdater = selectStatisticsUpdater();
-    MetricsUpdaterForTest metricsUpdater = selectMetricsUpdater();
+    StatisticsUpdaterForTest statisticsUpdater =
+        (StatisticsUpdaterForTest) updater.getStatisticsUpdater();
+    MetricsUpdaterForTest metricsUpdater = (MetricsUpdaterForTest) updater.getMetricsUpdater();
     assertNotNull(statisticsUpdater);
     assertNotNull(metricsUpdater);
     assertEquals(1, statisticsUpdater.tableUpdates());
     assertEquals(1, statisticsUpdater.partitionUpdates());
     assertEquals(0, metricsUpdater.tableAndPartitionUpdates());
     assertEquals(0, metricsUpdater.jobUpdates());
+    assertEquals(UpdateType.STATISTICS, summary.updateType());
+    assertEquals(3, summary.totalRecords());
+    assertEquals(1, summary.tableRecords());
+    assertEquals(2, summary.partitionRecords());
+    assertEquals(0, summary.jobRecords());
   }
 
   @Test
@@ -127,10 +155,13 @@ public class TestUpdater {
     OptimizerEnv optimizerEnv =
         mockOptimizerEnv(StatisticsUpdaterForTest.NAME, MetricsUpdaterForTest.NAME);
 
-    createUpdater(optimizerEnv).updateAll(StatisticsCalculatorForTest.NAME, UpdateType.METRICS);
+    Updater updater = createUpdater(optimizerEnv);
+    Updater.UpdateSummary summary =
+        updater.updateAll(StatisticsCalculatorForTest.NAME, UpdateType.METRICS);
 
-    StatisticsUpdaterForTest statisticsUpdater = selectStatisticsUpdater();
-    MetricsUpdaterForTest metricsUpdater = selectMetricsUpdater();
+    StatisticsUpdaterForTest statisticsUpdater =
+        (StatisticsUpdaterForTest) updater.getStatisticsUpdater();
+    MetricsUpdaterForTest metricsUpdater = (MetricsUpdaterForTest) updater.getMetricsUpdater();
     assertNotNull(statisticsUpdater);
     assertNotNull(metricsUpdater);
     assertEquals(0, statisticsUpdater.tableUpdates());
@@ -143,6 +174,11 @@ public class TestUpdater {
     assertTrue(
         metricsUpdater.lastJobMetrics().stream()
             .anyMatch(metric -> metric.scope() == DataScope.Type.JOB));
+    assertEquals(UpdateType.METRICS, summary.updateType());
+    assertEquals(4, summary.totalRecords());
+    assertEquals(1, summary.tableRecords());
+    assertEquals(2, summary.partitionRecords());
+    assertEquals(1, summary.jobRecords());
   }
 
   @Test
@@ -151,10 +187,11 @@ public class TestUpdater {
         mockOptimizerEnv(StatisticsUpdaterForTest.NAME, MetricsUpdaterForTest.NAME);
 
     Updater updater = createUpdater(optimizerEnv);
+    StatisticsUpdaterForTest statisticsUpdater =
+        (StatisticsUpdaterForTest) updater.getStatisticsUpdater();
+    MetricsUpdaterForTest metricsUpdater = (MetricsUpdaterForTest) updater.getMetricsUpdater();
     updater.close();
 
-    StatisticsUpdaterForTest statisticsUpdater = selectStatisticsUpdater();
-    MetricsUpdaterForTest metricsUpdater = selectMetricsUpdater();
     assertNotNull(statisticsUpdater);
     assertNotNull(metricsUpdater);
     assertEquals(1, statisticsUpdater.closeCalls());
@@ -163,26 +200,6 @@ public class TestUpdater {
 
   private Updater createUpdater(OptimizerEnv optimizerEnv) {
     return new Updater(optimizerEnv);
-  }
-
-  private StatisticsUpdaterForTest selectStatisticsUpdater() {
-    return StatisticsUpdaterForTest.instances().stream()
-        .max(
-            Comparator.comparingInt(
-                updater ->
-                    updater.tableUpdates() + updater.partitionUpdates() + updater.closeCalls()))
-        .orElse(null);
-  }
-
-  private MetricsUpdaterForTest selectMetricsUpdater() {
-    return MetricsUpdaterForTest.instances().stream()
-        .max(
-            Comparator.comparingInt(
-                updater ->
-                    updater.tableAndPartitionUpdates()
-                        + updater.jobUpdates()
-                        + updater.closeCalls()))
-        .orElse(null);
   }
 
   private OptimizerEnv mockOptimizerEnv(String statisticsUpdater, String metricsUpdater) {
