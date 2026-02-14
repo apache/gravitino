@@ -18,7 +18,7 @@
  */
 package org.apache.gravitino.catalog.clickhouse.operations;
 
-import static org.apache.gravitino.catalog.clickhouse.ClickHouseTablePropertiesMetadata.CLICKHOUSE_ENGINE_KEY;
+import static org.apache.gravitino.catalog.clickhouse.ClickHouseTablePropertiesMetadata.GRAVITINO_ENGINE_KEY;
 
 import java.util.HashMap;
 import java.util.Map;
@@ -67,7 +67,7 @@ class TestClickHouseTableOperationsCluster {
     Map<String, String> props = new HashMap<>();
     props.put(ClusterConstants.CLUSTER_NAME, "ck_cluster");
     props.put(ClusterConstants.ON_CLUSTER, "true");
-    props.put(CLICKHOUSE_ENGINE_KEY, "Distributed");
+    props.put(GRAVITINO_ENGINE_KEY, "Distributed");
     props.put(DistributedTableConstants.REMOTE_DATABASE, "remote_db");
     props.put(DistributedTableConstants.REMOTE_TABLE, "remote_table");
     props.put(DistributedTableConstants.SHARDING_KEY, "`user_id`");
@@ -117,7 +117,7 @@ class TestClickHouseTableOperationsCluster {
     Map<String, String> props = new HashMap<>();
     props.put(ClusterConstants.CLUSTER_NAME, "ck_cluster");
     props.put(ClusterConstants.ON_CLUSTER, "true");
-    props.put(CLICKHOUSE_ENGINE_KEY, "Distributed");
+    props.put(GRAVITINO_ENGINE_KEY, "Distributed");
     props.put(DistributedTableConstants.REMOTE_DATABASE, "remote_db");
     props.put(DistributedTableConstants.REMOTE_TABLE, "remote_table");
     props.put(DistributedTableConstants.SHARDING_KEY, "user");
@@ -150,7 +150,7 @@ class TestClickHouseTableOperationsCluster {
     Map<String, String> props = new HashMap<>();
     props.put(ClusterConstants.CLUSTER_NAME, "ck_cluster");
     props.put(ClusterConstants.ON_CLUSTER, "true");
-    props.put(CLICKHOUSE_ENGINE_KEY, "Distributed");
+    props.put(GRAVITINO_ENGINE_KEY, "Distributed");
     props.put(DistributedTableConstants.REMOTE_DATABASE, "remote_db");
     props.put(DistributedTableConstants.REMOTE_TABLE, "remote_table");
     props.put(DistributedTableConstants.SHARDING_KEY, "rand()");
@@ -180,7 +180,7 @@ class TestClickHouseTableOperationsCluster {
 
     Map<String, String> props = new HashMap<>();
     props.put(ClusterConstants.CLUSTER_NAME, "ck_cluster");
-    props.put(CLICKHOUSE_ENGINE_KEY, "Distributed");
+    props.put(GRAVITINO_ENGINE_KEY, "Distributed");
     props.put(DistributedTableConstants.REMOTE_DATABASE, "remote_db");
     props.put(DistributedTableConstants.REMOTE_TABLE, "remote_table");
     props.put(DistributedTableConstants.SHARDING_KEY, "user_id");

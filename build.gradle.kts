@@ -219,7 +219,7 @@ allprojects {
       param.systemProperty("gravitino.log.path", "build/${project.name}-integration-test.log")
       project.delete("build/${project.name}-integration-test.log")
       if (testMode == "deploy") {
-        param.environment("GRAVITINO_HOME", project.rootDir.path + "/distribution/package")
+        param.environment("GRAVITINO_HOME", project.rootDir.path + "/distribution/package-all")
         val useWebV2 = System.getenv("GRAVITINO_USE_WEB_V2")?.toBoolean() == true
         val webWarPath = if (useWebV2) {
           project.rootDir.path + "/distribution/package/web-v2/gravitino-web-${project.version}.war"
