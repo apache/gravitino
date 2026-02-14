@@ -46,8 +46,11 @@ import org.apache.gravitino.rel.expressions.transforms.Transform;
 import org.apache.gravitino.rel.indexes.Index;
 import org.apache.gravitino.rel.partitions.Partition;
 import org.junit.jupiter.api.Assertions;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 public class ITUtils {
+  private static final Logger LOG = LoggerFactory.getLogger(ITUtils.class);
 
   public static final String TEST_MODE = "testMode";
   public static final String EMBEDDED_TEST_MODE = "embedded";
@@ -207,6 +210,16 @@ public class ITUtils {
   }
 
   public static void cleanDisk() {
+
+    Object output =
+        CommandExecutor.executeCommandLocalHost(
+            "df -h", false, ProcessData.TypesOfData.STREAMS_MERGED, Map.of());
+    LOG.info("Before clean: Command df -h output:\n{}", output);
+    output =
+        CommandExecutor.executeCommandLocalHost(
+            "free -m", false, ProcessData.TypesOfData.STREAMS_MERGED, Map.of());
+    LOG.info("Before clean: Command free -m output:\n{}", output);
+
     // Execute docker system prune -af to free up space before starting the OceanBase container
     ProcessBuilder processBuilder = new ProcessBuilder("/bin/bash", "-c", "docker system prune -f");
     try {
@@ -221,6 +234,15 @@ public class ITUtils {
       Thread.currentThread().interrupt();
       throw new RuntimeException("Interrupted while waiting for util_free_space.sh to finish", e);
     }
+
+    output =
+        CommandExecutor.executeCommandLocalHost(
+            "df -h", false, ProcessData.TypesOfData.STREAMS_MERGED, Map.of());
+    LOG.info("After clean: Command df -h output:\n{}", output);
+    output =
+        CommandExecutor.executeCommandLocalHost(
+            "free -m", false, ProcessData.TypesOfData.STREAMS_MERGED, Map.of());
+    LOG.info("After clean: Command free -m output:\n{}", output);
   }
 
   private ITUtils() {}
