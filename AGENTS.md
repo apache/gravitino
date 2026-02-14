@@ -56,3 +56,4 @@
 - **Format**: `./gradlew spotlessApply`
 - **Unit Tests**: `./gradlew test -PskipITs -PskipDockerTests=false`
 - **Integration Tests**: `./gradlew test -PskipTests -PskipDockerTests=false`
+- **OpenAPI Docs Validation**: `./gradlew :docs:build` — Run this after any changes to `docs/open-api/*.yaml` to validate OpenAPI specification correctness.

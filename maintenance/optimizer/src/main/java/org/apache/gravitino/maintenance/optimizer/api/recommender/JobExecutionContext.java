@@ -38,14 +38,14 @@ public interface JobExecutionContext {
   NameIdentifier nameIdentifier();
 
   /**
-   * Free-form job configuration, such as engine parameters (e.g., target file size bytes).
+   * Free-form job options, such as engine parameters (e.g., target file size bytes).
    *
-   * <p>The {@code StrategyHandler} is free to add additional job configuration besides the job
-   * options specified in the strategy.
+   * <p>The {@code StrategyHandler} is free to add additional job options besides the job options
+   * specified in the strategy.
    *
-   * @return immutable map of configuration entries
+   * @return immutable map of option entries
    */
-  Map<String, String> jobConfig();
+  Map<String, String> jobOptions();
 
   /**
    * Job template name to resolve the job in the job submitter.

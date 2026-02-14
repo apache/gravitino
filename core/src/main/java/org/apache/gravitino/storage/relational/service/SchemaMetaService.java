@@ -487,4 +487,24 @@ public class SchemaMetaService {
     builder.withMetalakeId(namespacedEntityId.namespaceIds()[0]);
     builder.withCatalogId(namespacedEntityId.entityId());
   }
+
+  @Monitored(
+      metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME,
+      baseMetricName = "batchGetSchemaByIdentifier")
+  public List<SchemaEntity> batchGetSchemaByIdentifier(List<NameIdentifier> identifiers) {
+
+    NameIdentifier firstIdent = identifiers.get(0);
+    NameIdentifier catalogIdent = NameIdentifierUtil.getCatalogIdentifier(firstIdent);
+    List<String> schemaNames =
+        identifiers.stream().map(NameIdentifier::name).collect(Collectors.toList());
+
+    return SessionUtils.doWithCommitAndFetchResult(
+        SchemaMetaMapper.class,
+        mapper -> {
+          List<SchemaPO> schemaPOs =
+              mapper.batchSelectSchemaByIdentifier(
+                  catalogIdent.namespace().level(0), catalogIdent.name(), schemaNames);
+          return POConverters.fromSchemaPOs(schemaPOs, firstIdent.namespace());
+        });
+  }
 }
