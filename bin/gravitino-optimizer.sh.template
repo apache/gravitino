@@ -1,0 +1,85 @@
+#!/bin/bash
+#
+# Licensed to the Apache Software Foundation (ASF) under one
+# or more contributor license agreements.  See the NOTICE file
+# distributed with this work for additional information
+# regarding copyright ownership.  The ASF licenses this file
+# to you under the Apache License, Version 2.0 (the
+# "License"); you may not use this file except in compliance
+# with the License.  You may obtain a copy of the License at
+#
+#  http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing,
+# software distributed under the License is distributed on an
+# "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+# KIND, either express or implied.  See the License for the
+# specific language governing permissions and limitations
+# under the License.
+#
+#set -ex
+USAGE="-e Usage: bin/gravitino-optimizer.sh [--config <conf-dir>]\n\t
+        {cmd}"
+
+if [[ "$1" == "--config" ]]; then
+  shift
+  conf_dir="$1"
+  if [[ ! -d "${conf_dir}" ]]; then
+    echo "ERROR : ${conf_dir} is not a directory"
+    echo ${USAGE}
+    exit 1
+  else
+    export GRAVITINO_CONF_DIR="${conf_dir}"
+  fi
+  shift
+fi
+
+bin="$(dirname "${BASH_SOURCE-$0}")"
+bin="$(cd "${bin}">/dev/null; pwd)"
+
+. "${bin}/common.sh"
+
+check_java_version
+
+HOSTNAME=$(hostname)
+GRAVITINO_OPTIMIZER_NAME=org.apache.gravitino.maintenance.optimizer.OptimizerCmd
+GRAVITINO_SIMPLE_SERVER_NAME=gravitino-optimizer
+
+JAVA_OPTS+=" -Dfile.encoding=UTF-8"
+JAVA_OPTS+=" -Dlog4j2.configurationFile=file://${GRAVITINO_CONF_DIR}/log4j2.properties"
+JAVA_OPTS+=" -Dgravitino.log.path=${GRAVITINO_LOG_DIR} ${GRAVITINO_MEM}"
+JAVA_OPTS+=" -Dgravitino.server.name=${GRAVITINO_SIMPLE_SERVER_NAME}"
+if [ "$JVM_VERSION" -eq 17 ]; then
+  JAVA_OPTS+=" -XX:+IgnoreUnrecognizedVMOptions"
+  JAVA_OPTS+=" --add-opens java.base/java.io=ALL-UNNAMED"
+  JAVA_OPTS+=" --add-opens java.base/java.lang.invoke=ALL-UNNAMED"
+  JAVA_OPTS+=" --add-opens java.base/java.lang.reflect=ALL-UNNAMED"
+  JAVA_OPTS+=" --add-opens java.base/java.lang=ALL-UNNAMED"
+  JAVA_OPTS+=" --add-opens java.base/java.math=ALL-UNNAMED"
+  JAVA_OPTS+=" --add-opens java.base/java.net=ALL-UNNAMED"
+  JAVA_OPTS+=" --add-opens java.base/java.nio=ALL-UNNAMED"
+  JAVA_OPTS+=" --add-opens java.base/java.text=ALL-UNNAMED"
+  JAVA_OPTS+=" --add-opens java.base/java.time=ALL-UNNAMED"
+  JAVA_OPTS+=" --add-opens java.base/java.util.concurrent.atomic=ALL-UNNAMED"
+  JAVA_OPTS+=" --add-opens java.base/java.util.concurrent=ALL-UNNAMED"
+  JAVA_OPTS+=" --add-opens java.base/java.util.regex=ALL-UNNAMED"
+  JAVA_OPTS+=" --add-opens java.base/java.util=ALL-UNNAMED"
+  JAVA_OPTS+=" --add-opens java.base/jdk.internal.ref=ALL-UNNAMED"
+  JAVA_OPTS+=" --add-opens java.base/jdk.internal.reflect=ALL-UNNAMED"
+  JAVA_OPTS+=" --add-opens java.sql/java.sql=ALL-UNNAMED"
+  JAVA_OPTS+=" --add-opens java.base/sun.util.calendar=ALL-UNNAMED"
+  JAVA_OPTS+=" --add-opens java.base/sun.nio.ch=ALL-UNNAMED"
+  JAVA_OPTS+=" --add-opens java.base/sun.nio.cs=ALL-UNNAMED"
+  JAVA_OPTS+=" --add-opens java.base/sun.security.action=ALL-UNNAMED"
+  JAVA_OPTS+=" --add-opens java.base/sun.util.calendar=ALL-UNNAMED"
+  JAVA_OPTS+=" --add-opens java.security.jgss/sun.security.krb5=ALL-UNNAMED"
+fi
+
+#JAVA_OPTS+=" -Djava.security.krb5.conf=/etc/krb5.conf"
+
+if [ -d "${GRAVITINO_HOME}/optimizer/libs" ]; then
+  addJarInDir "${GRAVITINO_HOME}/optimizer/libs"
+  addDirToClasspath "${GRAVITINO_HOME}/optimizer/conf"
+fi
+
+${JAVA_RUNNER} ${JAVA_OPTS} ${GRAVITINO_DEBUG_OPTS} -cp ${GRAVITINO_CLASSPATH} ${GRAVITINO_OPTIMIZER_NAME} "$@"
