@@ -36,7 +36,9 @@ import java.util.Map;
 import java.util.NoSuchElementException;
 import java.util.Objects;
 import org.apache.gravitino.integration.test.util.CloseableGroup;
+import org.apache.gravitino.integration.test.util.CommandExecutor;
 import org.apache.gravitino.integration.test.util.ITUtils;
+import org.apache.gravitino.integration.test.util.ProcessData;
 import org.apache.gravitino.integration.test.util.TestDatabaseName;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -429,6 +431,12 @@ public class ContainerSuite implements Closeable {
 
   public void startOceanBaseContainer() {
     ITUtils.cleanDisk();
+    // create dir /tmp/obdata by CommandExecutor
+    Object o =
+        CommandExecutor.executeCommandLocalHost(
+            "mkdir -p /tmp/obdata", false, ProcessData.TypesOfData.STREAMS_MERGED);
+    LOG.info("Command mkdir -p /tmp/obdata output:\n{}", o);
+
     if (oceanBaseContainer == null) {
       synchronized (ContainerSuite.class) {
         if (oceanBaseContainer == null) {
@@ -451,6 +459,8 @@ public class ContainerSuite implements Closeable {
                           "OB_MEMORY_LIMIT",
                           "4G"))
                   .withNetwork(network)
+                  .withFilesToMount(
+                      ImmutableMap.<String, String>builder().put("/tmp/obdata", "/root/ob").build())
                   .withExposePorts(ImmutableSet.of(OceanBaseContainer.OCEANBASE_PORT));
           OceanBaseContainer container = closer.register(oceanBaseBuilder.build());
           container.start();
