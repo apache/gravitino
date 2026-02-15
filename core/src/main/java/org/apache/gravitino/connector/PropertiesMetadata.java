@@ -97,6 +97,22 @@ public interface PropertiesMetadata {
   }
 
   /**
+   * Check if the property is sensitive.
+   *
+   * @param propertyName The name of the property.
+   * @return true if the property is existed and sensitive, false otherwise.
+   */
+  default boolean isSensitiveProperty(String propertyName) {
+    // First check non-prefix exact match
+    if (getNonPrefixEntry(propertyName).map(PropertyEntry::isSensitive).orElse(false)) {
+      return true;
+    }
+
+    // Then check property prefixes
+    return getPropertyPrefixEntry(propertyName).map(PropertyEntry::isSensitive).orElse(false);
+  }
+
+  /**
    * Checks whether the specified property exists.
    *
    * @param propertyName the name of the property to check for existence

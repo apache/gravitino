@@ -87,7 +87,7 @@ public class PaimonS3FileSystemConfig extends Config {
                   false /* hidden */))
           .put(
               S3_ACCESS_KEY,
-              PropertyEntry.stringOptionalPropertyEntry(
+              PropertyEntry.stringOptionalSensitivePropertyEntry(
                   S3_ACCESS_KEY,
                   "The access key of the AWS s3",
                   false /* immutable */,
@@ -95,7 +95,7 @@ public class PaimonS3FileSystemConfig extends Config {
                   false /* hidden */))
           .put(
               S3_SECRET_KEY,
-              PropertyEntry.stringOptionalPropertyEntry(
+              PropertyEntry.stringOptionalSensitivePropertyEntry(
                   S3_SECRET_KEY,
                   "The secret key of the AWS s3",
                   false /* immutable */,

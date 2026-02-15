@@ -20,6 +20,7 @@ package org.apache.gravitino.catalog.lakehouse.paimon;
 
 import static org.apache.gravitino.connector.PropertyEntry.enumPropertyEntry;
 import static org.apache.gravitino.connector.PropertyEntry.stringOptionalPropertyEntry;
+import static org.apache.gravitino.connector.PropertyEntry.stringOptionalSensitivePropertyEntry;
 import static org.apache.gravitino.connector.PropertyEntry.stringRequiredPropertyEntry;
 
 import com.google.common.annotations.VisibleForTesting;
@@ -121,7 +122,7 @@ public class PaimonCatalogPropertiesMetadata extends BaseCatalogPropertiesMetada
                   false /* hidden */))
           .put(
               PaimonConstants.TOKEN,
-              stringOptionalPropertyEntry(
+              stringOptionalSensitivePropertyEntry(
                   PaimonConstants.TOKEN,
                   "The bear token for REST catalog authentication",
                   false /* immutable */,
@@ -137,7 +138,7 @@ public class PaimonCatalogPropertiesMetadata extends BaseCatalogPropertiesMetada
                   false /* hidden */))
           .put(
               PaimonConstants.GRAVITINO_DLF_ACCESS_KEY_SECRET,
-              stringOptionalPropertyEntry(
+              stringOptionalSensitivePropertyEntry(
                   PaimonConstants.GRAVITINO_DLF_ACCESS_KEY_SECRET,
                   "The access key secret for Aliyun DLF",
                   false /* immutable */,
@@ -145,7 +146,7 @@ public class PaimonCatalogPropertiesMetadata extends BaseCatalogPropertiesMetada
                   false /* hidden */))
           .put(
               PaimonConstants.GRAVITINO_DLF_SECURITY_TOKEN,
-              stringOptionalPropertyEntry(
+              stringOptionalSensitivePropertyEntry(
                   PaimonConstants.GRAVITINO_DLF_SECURITY_TOKEN,
                   "The security token for Aliyun DLF",
                   false /* immutable */,
@@ -192,13 +193,13 @@ public class PaimonCatalogPropertiesMetadata extends BaseCatalogPropertiesMetada
                 false /* immutable */,
                 null /* defaultValue */,
                 false /* hidden */),
-            stringOptionalPropertyEntry(
+            stringOptionalSensitivePropertyEntry(
                 GRAVITINO_JDBC_USER,
                 "Gravitino Paimon catalog jdbc user",
                 false /* immutable */,
                 null /* defaultValue */,
                 false /* hidden */),
-            stringOptionalPropertyEntry(
+            stringOptionalSensitivePropertyEntry(
                 GRAVITINO_JDBC_PASSWORD,
                 "Gravitino Paimon catalog jdbc password",
                 false /* immutable */,

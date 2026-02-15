@@ -19,8 +19,11 @@
 
 package org.apache.gravitino.s3.credential;
 
+import com.google.common.collect.Sets;
+import java.util.Set;
 import org.apache.gravitino.credential.AwsIrsaCredential;
 import org.apache.gravitino.credential.CredentialProviderDelegator;
+import org.apache.gravitino.credential.config.S3CredentialConfig;
 
 /**
  * AWS IRSA credential provider that supports both basic IRSA credentials and fine-grained
@@ -66,5 +69,12 @@ public class AwsIrsaCredentialProvider extends CredentialProviderDelegator<AwsIr
   @Override
   public String getGeneratorClassName() {
     return "org.apache.gravitino.s3.credential.AwsIrsaCredentialGenerator";
+  }
+
+  @Override
+  public Set<String> sensitivePropertyKeys() {
+    return Sets.newHashSet(
+        S3CredentialConfig.S3_ACCESS_KEY_ID.getKey(),
+        S3CredentialConfig.S3_SECRET_ACCESS_KEY.getKey());
   }
 }

@@ -19,7 +19,9 @@
 
 package org.apache.gravitino.abs.credential;
 
+import com.google.common.collect.Sets;
 import java.util.Map;
+import java.util.Set;
 import org.apache.gravitino.credential.AzureAccountKeyCredential;
 import org.apache.gravitino.credential.Credential;
 import org.apache.gravitino.credential.CredentialContext;
@@ -49,5 +51,14 @@ public class AzureAccountKeyProvider implements CredentialProvider {
   @Override
   public Credential getCredential(CredentialContext context) {
     return new AzureAccountKeyCredential(accountName, accountKey);
+  }
+
+  @Override
+  public Set<String> sensitivePropertyKeys() {
+    return Sets.newHashSet(
+        AzureCredentialConfig.AZURE_STORAGE_ACCOUNT_NAME.getKey(),
+        AzureCredentialConfig.AZURE_STORAGE_ACCOUNT_KEY.getKey(),
+        AzureCredentialConfig.AZURE_CLIENT_ID.getKey(),
+        AzureCredentialConfig.AZURE_CLIENT_SECRET.getKey());
   }
 }
