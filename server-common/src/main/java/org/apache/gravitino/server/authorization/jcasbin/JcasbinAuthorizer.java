@@ -331,6 +331,7 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
           return hasCatalogUseCatalog || hasMetalakeUseCatalog;
         }
         if (tempType == MetadataObject.Type.TABLE
+            || tempType == MetadataObject.Type.VIEW
             || tempType == MetadataObject.Type.TOPIC
             || tempType == MetadataObject.Type.FILESET
             || tempType == MetadataObject.Type.MODEL) {
