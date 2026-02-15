@@ -552,22 +552,34 @@ const TableView = () => {
       renderCell: ({ row }) => {
         const { defaultValue } = row
 
-        return typeof defaultValue !== 'undefined' ? (
+        if (typeof defaultValue === 'undefined') {
+          return <EmptyText />
+        }
+
+        let displayValue
+        if (defaultValue?.type === 'unparsed') {
+          displayValue = defaultValue?.unparsedExpression
+        } else if (defaultValue?.type === 'function') {
+          displayValue = defaultValue?.funcName
+        } else {
+          displayValue = defaultValue?.value
+        }
+
+        return (
           <Box sx={{ display: 'flex', alignItems: 'center' }}>
             <Typography
               noWrap
               variant='body2'
+              title={displayValue}
               sx={{
                 fontWeight: 400,
                 color: 'text.secondary',
                 textDecoration: 'none'
               }}
             >
-              {`${defaultValue?.value}`}
+              {`${displayValue}`}
             </Typography>
           </Box>
-        ) : (
-          <EmptyText />
         )
       }
     },
