@@ -87,7 +87,6 @@ const CatalogsListPage = () => {
     async function fetchDependsData() {
       if ([...searchParams.keys()].length) {
         const { metalake, catalog, catalogType, schema, table, fileset, topic, model, version } = routeParams
-        await dispatch(setActivatedDetailsLoading(true))
 
         if (metalake) {
           dispatch(fetchTags({ metalake, details: true }))
@@ -103,7 +102,9 @@ const CatalogsListPage = () => {
           if (!store.catalogs.length) {
             await dispatch(fetchCatalogs({ metalake }))
           }
-          dispatch(getCatalogDetails({ init: true, metalake, catalog }))
+          await dispatch(setActivatedDetailsLoading(true))
+          await dispatch(getCatalogDetails({ init: true, metalake, catalog }))
+          await dispatch(setActivatedDetailsLoading(false))
           await dispatch(fetchSchemas({ init: true, page: 'catalogs', metalake, catalog, catalogType }))
           dispatch(
             getCurrentEntityTags({
@@ -147,7 +148,9 @@ const CatalogsListPage = () => {
             default:
               break
           }
-          dispatch(getSchemaDetails({ init: true, metalake, catalog, schema }))
+          await dispatch(setActivatedDetailsLoading(true))
+          await dispatch(getSchemaDetails({ init: true, metalake, catalog, schema }))
+          await dispatch(setActivatedDetailsLoading(false))
           dispatch(
             getCurrentEntityTags({
               init: true,
@@ -175,10 +178,13 @@ const CatalogsListPage = () => {
           }
           switch (catalogType) {
             case 'relational':
-              await dispatch(fetchTables({ init: true, page: 'schemas', metalake, catalog, schema }))
+              store.tables.length === 0 &&
+                (await dispatch(fetchTables({ init: true, page: 'schemas', metalake, catalog, schema })))
               await dispatch(resetActivatedDetails())
+              await dispatch(setActivatedDetailsLoading(true))
               await dispatch(getTableDetails({ init: true, metalake, catalog, schema, table }))
-              await dispatch(
+              await dispatch(setActivatedDetailsLoading(false))
+              dispatch(
                 getCurrentEntityTags({
                   init: true,
                   metalake,
@@ -186,7 +192,7 @@ const CatalogsListPage = () => {
                   metadataObjectFullName: `${catalog}.${schema}.${table}`
                 })
               )
-              await dispatch(
+              dispatch(
                 getCurrentEntityPolicies({
                   init: true,
                   metalake,
@@ -197,9 +203,12 @@ const CatalogsListPage = () => {
               )
               break
             case 'fileset':
-              await dispatch(fetchFilesets({ init: true, page: 'schemas', metalake, catalog, schema }))
+              store.filesets.length === 0 &&
+                (await dispatch(fetchFilesets({ init: true, page: 'schemas', metalake, catalog, schema })))
+              await dispatch(setActivatedDetailsLoading(true))
               await dispatch(getFilesetDetails({ init: true, metalake, catalog, schema, fileset }))
-              await dispatch(
+              await dispatch(setActivatedDetailsLoading(false))
+              dispatch(
                 getCurrentEntityTags({
                   init: true,
                   metalake,
@@ -208,7 +217,7 @@ const CatalogsListPage = () => {
                   details: true
                 })
               )
-              await dispatch(
+              dispatch(
                 getCurrentEntityPolicies({
                   init: true,
                   metalake,
@@ -219,9 +228,12 @@ const CatalogsListPage = () => {
               )
               break
             case 'messaging':
-              await dispatch(fetchTopics({ init: true, page: 'schemas', metalake, catalog, schema }))
+              store.topics.length === 0 &&
+                (await dispatch(fetchTopics({ init: true, page: 'schemas', metalake, catalog, schema })))
+              await dispatch(setActivatedDetailsLoading(true))
               await dispatch(getTopicDetails({ init: true, metalake, catalog, schema, topic }))
-              await dispatch(
+              await dispatch(setActivatedDetailsLoading(false))
+              dispatch(
                 getCurrentEntityTags({
                   init: true,
                   metalake,
@@ -230,7 +242,7 @@ const CatalogsListPage = () => {
                   details: true
                 })
               )
-              await dispatch(
+              dispatch(
                 getCurrentEntityPolicies({
                   init: true,
                   metalake,
@@ -241,10 +253,13 @@ const CatalogsListPage = () => {
               )
               break
             case 'model':
-              await dispatch(fetchModels({ init: true, page: 'schemas', metalake, catalog, schema }))
+              store.models.length === 0 &&
+                (await dispatch(fetchModels({ init: true, page: 'schemas', metalake, catalog, schema })))
               await dispatch(fetchModelVersions({ init: true, metalake, catalog, schema, model }))
+              await dispatch(setActivatedDetailsLoading(true))
               await dispatch(getModelDetails({ init: true, metalake, catalog, schema, model }))
-              await dispatch(
+              await dispatch(setActivatedDetailsLoading(false))
+              dispatch(
                 getCurrentEntityTags({
                   init: true,
                   metalake,
@@ -253,7 +268,7 @@ const CatalogsListPage = () => {
                   details: true
                 })
               )
-              await dispatch(
+              dispatch(
                 getCurrentEntityPolicies({
                   init: true,
                   metalake,
@@ -273,9 +288,10 @@ const CatalogsListPage = () => {
             await dispatch(fetchSchemas({ metalake, catalog, catalogType }))
             await dispatch(fetchModels({ init: true, page: 'schemas', metalake, catalog, schema }))
           }
-          dispatch(getVersionDetails({ init: true, metalake, catalog, schema, model, version }))
+          await dispatch(setActivatedDetailsLoading(true))
+          await dispatch(getVersionDetails({ init: true, metalake, catalog, schema, model, version }))
+          await dispatch(setActivatedDetailsLoading(false))
         }
-        await dispatch(setActivatedDetailsLoading(false))
       }
     }
     fetchDependsData()
