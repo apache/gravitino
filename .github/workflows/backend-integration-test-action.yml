@@ -81,4 +81,6 @@ jobs:
             distribution/package/logs/*.log
             catalogs/**/*.log
             catalogs/**/*.tar
+            catalogs-contrib/**/*.log
+            catalogs-contrib/**/*.tar
             distribution/**/*.log

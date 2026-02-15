@@ -1,7 +1,7 @@
 ---
 title: "Install Iceberg Rest catalog server on Kubernetes"
 slug: /iceberg-rest-catalog-chart
-keyword: 
+keyword:
   - Iceberg REST Helm Chart
 license: "This software is licensed under the Apache License version 2."
 ---
@@ -17,7 +17,7 @@ This Helm chart deploys Apache Gravitino Iceberg REST Catalog Server on Kubernet
 
 ## Update Chart Dependency
 
-The Gravitino Iceberg REST Catalog Server Helm chart has not yet been officially released.   
+The Gravitino Iceberg REST Catalog Server Helm chart has not yet been released to the helm registry.
 To proceed, please clone the repository, navigate to the chart directory [charts](../dev/charts), and execute the Helm dependency update command.
 
 ```console
@@ -59,7 +59,7 @@ helm upgrade --install gravitino ./gravitino-iceberg-rest-server \
 To customize the deployment, use the --set flag to override specific values:
 
 ```console
-helm upgrade --install gravitino ./gravitino-iceberg-rest-server 
+helm upgrade --install gravitino ./gravitino-iceberg-rest-server
   -n gravitino \
   --create-namespace \
   --set key1=val1,key2=val2,...
@@ -67,7 +67,7 @@ helm upgrade --install gravitino ./gravitino-iceberg-rest-server
 Alternatively, you can provide a custom values.yaml file:
 
 ```console
-helm upgrade --install gravitino ./gravitino-iceberg-rest-server 
+helm upgrade --install gravitino ./gravitino-iceberg-rest-server
   -n gravitino \
   --create-namespace \
   -f /path/to/values.yaml
