@@ -28,6 +28,7 @@ import java.io.IOException;
 import java.net.URI;
 import java.nio.file.Files;
 import java.time.Instant;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
@@ -38,6 +39,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
+import javax.annotation.Nullable;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.ArrayUtils;
 import org.apache.commons.lang3.StringUtils;
@@ -674,10 +676,7 @@ public class JobManager implements JobOperationDispatcher {
         fetchFileFromUri(
             replacePlaceholder(content.executable(), jobConf), stagingDir, TIMEOUT_IN_MS);
 
-    List<String> args =
-        content.arguments().stream()
-            .map(arg -> replacePlaceholder(arg, jobConf))
-            .collect(Collectors.toList());
+    List<String> args = buildArgumentsWithOptional(content.arguments(), jobConf);
     Map<String, String> environments =
         content.environments().entrySet().stream()
             .collect(
@@ -785,6 +784,68 @@ public class JobManager implements JobOperationDispatcher {
     matcher.appendTail(result);
 
     return result.toString();
+  }
+
+  /**
+   * Build arguments list with optional argument support.
+   *
+   * @param templateArgs Template argument list (may contain optional markers)
+   * @param jobConf Job configuration for placeholder replacement
+   * @return Final argument list with optional arguments filtered
+   */
+  @VisibleForTesting
+  static List<String> buildArgumentsWithOptional(
+      List<String> templateArgs, Map<String, String> jobConf) {
+    List<String> result = new ArrayList<>();
+
+    for (int i = 0; i < templateArgs.size(); i++) {
+      String arg = templateArgs.get(i);
+      boolean isOptional = arg.startsWith("?");
+      String cleanArg = isOptional ? arg.substring(1) : arg;
+
+      // Replace placeholder
+      String replacedArg = replacePlaceholder(cleanArg, jobConf);
+
+      // If optional and value is empty, skip this argument
+      if (isOptional && isEmptyValue(replacedArg)) {
+        continue;
+      }
+
+      // If this is an optional argument and the next argument is also optional but empty,
+      // skip both (they form a pair like ?--flag ?{{value}})
+      if (isOptional && i + 1 < templateArgs.size()) {
+        String nextArg = templateArgs.get(i + 1);
+        if (nextArg.startsWith("?")) {
+          String cleanNextArg = nextArg.substring(1);
+          String replacedNextArg = replacePlaceholder(cleanNextArg, jobConf);
+          if (isEmptyValue(replacedNextArg)) {
+            // Skip both this arg and next arg
+            i++; // Skip the next argument
+            continue;
+          }
+        }
+      }
+
+      result.add(replacedArg);
+    }
+
+    return result;
+  }
+
+  /**
+   * Check if a value should be considered empty for optional argument filtering.
+   *
+   * @param value The value to check
+   * @return true if the value is null, empty, contains only whitespace, or is an unreplaced
+   *     placeholder
+   */
+  @VisibleForTesting
+  static boolean isEmptyValue(@Nullable String value) {
+    if (value == null || value.trim().isEmpty()) {
+      return true;
+    }
+    // Also consider unreplaced placeholders as empty (e.g., "{{key}}")
+    return PLACEHOLDER_PATTERN.matcher(value).matches();
   }
 
   @VisibleForTesting

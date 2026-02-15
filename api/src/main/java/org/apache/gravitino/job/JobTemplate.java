@@ -73,7 +73,12 @@ public abstract class JobTemplate {
   /** The executable path for the job template. */
   protected final String executable;
 
-  /** The list of arguments for the job template. */
+  /**
+   * The list of arguments for the job template.
+   *
+   * <p>Arguments can be marked as optional by prefixing them with '?'. Optional arguments will be
+   * automatically removed if their placeholder value is empty or null during job execution.
+   */
   protected final List<String> arguments;
 
   /** The map of environment variables for the job template. */
