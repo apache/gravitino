@@ -28,9 +28,13 @@ class TestIndexes(unittest.TestCase):
 
     def test_indexes_create_index(self):
         field_names = [["col_1"], ["col_2"]]
-        unique = Indexes.unique(name="unique", field_names=field_names)
-        primary = Indexes.primary(name="primary", field_names=field_names)
-        mysql_primary = Indexes.create_mysql_primary_key(field_names=field_names)
+        unique = Indexes.unique(name="unique", field_names=field_names, properties={})
+        primary = Indexes.primary(
+            name="primary", field_names=field_names, properties={}
+        )
+        mysql_primary = Indexes.create_mysql_primary_key(
+            field_names=field_names, properties={}
+        )
 
         self.assertIs(unique.type(), Index.IndexType.UNIQUE_KEY)
         self.assertIs(primary.type(), Index.IndexType.PRIMARY_KEY)

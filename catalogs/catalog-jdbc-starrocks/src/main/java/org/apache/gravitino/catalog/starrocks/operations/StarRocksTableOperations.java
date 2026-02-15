@@ -242,7 +242,8 @@ public class StarRocksTableOperations extends JdbcTableOperations {
         String indexName = resultSet.getString("Key_name");
         String columnName = resultSet.getString("Column_name");
         indexes.add(
-            Indexes.of(Index.IndexType.PRIMARY_KEY, indexName, new String[][] {{columnName}}));
+            Indexes.of(
+                Index.IndexType.PRIMARY_KEY, indexName, new String[][] {{columnName}}, Map.of()));
       }
       return indexes;
     } catch (SQLException e) {

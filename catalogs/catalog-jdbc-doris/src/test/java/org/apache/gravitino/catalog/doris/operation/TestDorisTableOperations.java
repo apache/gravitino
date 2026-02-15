@@ -380,7 +380,7 @@ public class TestDorisTableOperations extends TestDoris {
             Index.IndexType.PRIMARY_KEY, "k2_index", new String[][] {{"col_2"}, {"col_3"}}));
 
     Index[] newIndexes =
-        new Index[] {Indexes.primary("k2_index", new String[][] {{"col_2"}, {"col_3"}})};
+        new Index[] {Indexes.primary("k2_index", new String[][] {{"col_2"}, {"col_3"}}, Map.of())};
     Awaitility.await()
         .atMost(MAX_WAIT_IN_SECONDS, TimeUnit.SECONDS)
         .pollInterval(WAIT_INTERVAL_IN_SECONDS, TimeUnit.SECONDS)
@@ -655,7 +655,7 @@ public class TestDorisTableOperations extends TestDoris {
 
     Distribution distribution =
         Distributions.hash(DEFAULT_BUCKET_SIZE, NamedReference.field("col_1"));
-    Index[] indexes = new Index[] {Indexes.unique("uk_2", new String[][] {{"col_1"}})};
+    Index[] indexes = new Index[] {Indexes.unique("uk_2", new String[][] {{"col_1"}}, Map.of())};
 
     // create table
     TABLE_OPERATIONS.create(
