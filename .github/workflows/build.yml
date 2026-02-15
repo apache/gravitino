@@ -15,7 +15,7 @@ concurrency:
 # A workflow run is made up of one or more jobs that can run sequentially or in parallel
 jobs:
   changes:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-22.04
     steps:
       - uses: actions/checkout@v4
       - uses: dorny/paths-filter@de90cc6fb38fc0963ad72b210f1f284cd68cea36
@@ -145,5 +145,7 @@ jobs:
           name: unit test report
           path: |
             build/reports
+            catalogs-contrib/**/*.log
+            catalogs-contrib/**/*.tar
             catalogs/**/*.log
             catalogs/**/*.tar
