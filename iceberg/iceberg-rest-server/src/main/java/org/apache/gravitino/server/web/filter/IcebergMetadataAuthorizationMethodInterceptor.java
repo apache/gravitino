@@ -76,7 +76,9 @@ public class IcebergMetadataAuthorizationMethodInterceptor
           break;
         case TABLE:
           nameIdentifierMap.put(
-              EntityType.TABLE, NameIdentifierUtil.ofTable(metalakeName, catalog, schema, value));
+              EntityType.TABLE,
+              NameIdentifierUtil.ofTable(
+                  metalakeName, catalog, schema, RESTUtil.decodeString(value)));
           break;
         case VIEW:
           nameIdentifierMap.put(
