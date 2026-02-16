@@ -119,6 +119,7 @@ public class ViewMetaService {
                 GenericEntity.builder()
                     .withId(viewPO.getViewId())
                     .withName(viewPO.getViewName())
+                    .withNamespace(namespace)
                     .withEntityType(Entity.EntityType.VIEW)
                     .build())
         .collect(Collectors.toList());
@@ -141,6 +142,7 @@ public class ViewMetaService {
     return GenericEntity.builder()
         .withId(viewPO.getViewId())
         .withName(viewPO.getViewName())
+        .withNamespace(identifier.namespace())
         .withEntityType(Entity.EntityType.VIEW)
         .build();
   }
