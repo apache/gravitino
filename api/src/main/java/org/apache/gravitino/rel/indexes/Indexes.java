@@ -19,6 +19,7 @@
 package org.apache.gravitino.rel.indexes;
 
 import com.google.common.base.Objects;
+import com.google.common.collect.ImmutableMap;
 import java.util.Arrays;
 import java.util.Map;
 import org.apache.gravitino.rel.indexes.Index.IndexType;
@@ -40,11 +41,32 @@ public class Indexes {
    *
    * @param name The name of the index
    * @param fieldNames The field names under the table contained in the index.
+   * @return The unique index
+   */
+  public static Index unique(String name, String[][] fieldNames) {
+    return of(Index.IndexType.UNIQUE_KEY, name, fieldNames, ImmutableMap.of());
+  }
+
+  /**
+   * Create a unique index on columns. Like unique (a) or unique (a, b), for complex like unique
+   *
+   * @param name The name of the index
+   * @param fieldNames The field names under the table contained in the index.
    * @param properties Extra properties for index configuration
    * @return The unique index
    */
   public static Index unique(String name, String[][] fieldNames, Map<String, String> properties) {
     return of(Index.IndexType.UNIQUE_KEY, name, fieldNames, properties);
+  }
+
+  /**
+   * To create a MySQL primary key, you need to use the default primary key name.
+   *
+   * @param fieldNames The field names under the table contained in the index.
+   * @return The primary key index
+   */
+  public static Index createMysqlPrimaryKey(String[][] fieldNames) {
+    return primary(DEFAULT_PRIMARY_KEY_NAME, fieldNames, ImmutableMap.of());
   }
 
   /**
@@ -63,12 +85,24 @@ public class Indexes {
    *
    * @param name The name of the index
    * @param fieldNames The field names under the table contained in the index.
+   * @return The primary index
+   */
+  public static Index primary(String name, String[][] fieldNames) {
+    return of(Index.IndexType.PRIMARY_KEY, name, fieldNames, ImmutableMap.of());
+  }
+
+  /**
+   * Create a primary index on columns. Like primary (a), for complex like primary
+   *
+   * @param name The name of the index
+   * @param fieldNames The field names under the table contained in the index.
    * @param properties Extra properties for index configuration
    * @return The primary index
    */
   public static Index primary(String name, String[][] fieldNames, Map<String, String> properties) {
     return of(Index.IndexType.PRIMARY_KEY, name, fieldNames, properties);
   }
+
   /**
    * @param indexType The type of the index
    * @param name The name of the index
@@ -174,7 +208,7 @@ public class Indexes {
 
     @Override
     public int hashCode() {
-      return Objects.hashCode(indexType, name, Arrays.hashCode(fieldNames), properties);
+      return Objects.hashCode(indexType, name, Arrays.deepHashCode(fieldNames), properties);
     }
 
     /**

@@ -407,6 +407,7 @@ public class DTOConverters {
         .withIndexType(index.type())
         .withName(index.name())
         .withFieldNames(index.fieldNames())
+        .withProperties(index.properties())
         .build();
   }
 

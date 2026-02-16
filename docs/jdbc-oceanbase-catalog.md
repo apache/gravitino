@@ -191,7 +191,7 @@ Column[] cols = new Column[] {
 };
 Index[] indexes = new Index[] {
     Indexes.of(IndexType.PRIMARY_KEY, "PRIMARY", new String[][]{{"id"}}, Map.of())
-}
+};
 ```
 
 </TabItem>
@@ -229,7 +229,7 @@ Index[] indexes = new Index[] {
 Index[] indexes = new Index[] {
     Indexes.of(IndexType.PRIMARY_KEY, "PRIMARY", new String[][]{{"id"}}, Map.of()),
     Indexes.of(IndexType.UNIQUE_KEY, "id_name_uk", new String[][]{{"id"} , {"name"}}, Map.of()),
-}
+};
 ```
 
 </TabItem>

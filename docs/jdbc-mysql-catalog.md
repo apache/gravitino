@@ -189,7 +189,7 @@ Column[] cols = new Column[] {
     Column.of("name", Types.VarCharType.of(500), "Name of the user", true, false, null)
 };
 Index[] indexes = new Index[] {
-    Indexes.of(IndexType.PRIMARY_KEY, "PRIMARY", new String[][]{{"id"}, Map.of()})
+    Indexes.of(IndexType.PRIMARY_KEY, "PRIMARY", new String[][]{{"id"}}, Map.of())
 };
 ```
 

@@ -140,6 +140,32 @@ public class TestSerializer {
         "{\"indexType\":\"unique_key\",\"name\":\"index_2\","
             + "\"fieldNames\":[[\"col1\"],[\"col2\"]],\"properties\":{}}";
     Assertions.assertEquals(expectedJson, actualJson);
+
+    Map<String, String> props =
+        Map.of(
+            "compression", "lz4",
+            "level", "high");
+    index =
+        (IndexImpl)
+            Indexes.of(
+                IndexType.PRIMARY_KEY, "index_3", new String[][] {new String[] {"colA"}}, props);
+    actualJson = JsonUtils.anyFieldMapper().writeValueAsString(DTOConverters.toDTO(index));
+
+    expectedJson =
+        "{"
+            + "\"indexType\":\"PRIMARY_KEY\","
+            + "\"name\":\"index_3\","
+            + "\"fieldNames\":[[\"colA\"]],"
+            + "\"properties\":{"
+            + "\"compression\":\"lz4\","
+            + "\"level\":\"high\""
+            + "}"
+            + "}";
+    Assertions.assertEquals(expectedJson, actualJson);
+
+    deserialized = JsonUtils.anyFieldMapper().readValue(actualJson, IndexDTO.class);
+
+    Assertions.assertEquals(index, DTOConverters.fromDTO(deserialized));
   }
 
   @Test

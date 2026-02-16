@@ -171,7 +171,7 @@ Unsupported for now.
 
     ```java
     Index[] indexes = new Index[] {
-        Indexes.of(IndexType.PRIMARY_KEY, "PRIMARY", new String[][]{{"id"}, Map.of()})
+        Indexes.of(IndexType.PRIMARY_KEY, "PRIMARY", new String[][]{{"id"}}, Map.of())
     }
     ```
 

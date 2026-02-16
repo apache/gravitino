@@ -50,6 +50,8 @@ import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
 import java.io.IOException;
 import java.io.UnsupportedEncodingException;
+import java.util.Collections;
+import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Locale;
@@ -1473,16 +1475,21 @@ public class JsonUtils {
       }
       gen.writeFieldName(INDEX_FIELD_NAMES);
       gen.writeObject(value.fieldNames());
+      Map<String, String> props = value.properties();
+      if (props == null) {
+        props = Collections.emptyMap();
+      }
+
       gen.writeFieldName("properties");
-      gen.writeObject(value.properties());
+      gen.writeObject(props);
       gen.writeEndObject();
     }
   }
 
   /** Custom JSON deserializer for Index objects. */
-  public static class IndexDeserializer extends JsonDeserializer<Index> {
+  public static class IndexDeserializer extends JsonDeserializer<IndexDTO> {
     @Override
-    public Index deserialize(JsonParser p, DeserializationContext ctxt) throws IOException {
+    public IndexDTO deserialize(JsonParser p, DeserializationContext ctxt) throws IOException {
       JsonNode node = p.getCodec().readTree(p);
       Preconditions.checkArgument(
           node != null && !node.isNull() && node.isObject(),
@@ -1503,6 +1510,20 @@ public class JsonUtils {
       node.get(INDEX_FIELD_NAMES)
           .forEach(field -> fieldNames.add(getStringArray((ArrayNode) field)));
       builder.withFieldNames(fieldNames.toArray(new String[0][0]));
+      Map<String, String> properties = Map.of();
+
+      if (node.has("properties") && node.get("properties").isObject()) {
+
+        Map<String, String> props = new HashMap<>();
+
+        node.get("properties")
+            .fields()
+            .forEachRemaining(entry -> props.put(entry.getKey(), entry.getValue().asText()));
+
+        properties = props;
+      }
+
+      builder.withProperties(properties);
       return builder.build();
     }
   }
