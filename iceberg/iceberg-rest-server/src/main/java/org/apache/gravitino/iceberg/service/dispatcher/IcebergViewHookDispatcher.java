@@ -52,11 +52,11 @@ public class IcebergViewHookDispatcher implements IcebergViewOperationDispatcher
   private static final Logger LOG = LoggerFactory.getLogger(IcebergViewHookDispatcher.class);
 
   private final IcebergViewOperationDispatcher dispatcher;
-  private String metalake;
+  private final String metalake;
 
-  public IcebergViewHookDispatcher(IcebergViewOperationDispatcher dispatcher) {
+  public IcebergViewHookDispatcher(IcebergViewOperationDispatcher dispatcher, String metalake) {
     this.dispatcher = dispatcher;
-    this.metalake = IcebergRESTServerContext.getInstance().metalakeName();
+    this.metalake = metalake;
   }
 
   @Override

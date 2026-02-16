@@ -171,7 +171,7 @@ public class IcebergViewOperations {
       @AuthorizationMetadata(type = Entity.EntityType.CATALOG) @PathParam("prefix") String prefix,
       @AuthorizationMetadata(type = EntityType.SCHEMA) @Encoded() @PathParam("namespace")
           String namespace,
-      @AuthorizationMetadata(type = Entity.EntityType.VIEW) @Encoded() @PathParam("view") String view) {
+      @AuthorizationMetadata(type = EntityType.VIEW) @Encoded() @PathParam("view") String view) {
     String catalogName = IcebergRESTUtils.getCatalogName(prefix);
     Namespace icebergNS = RESTUtil.decodeNamespace(namespace);
     String viewName = RESTUtil.decodeString(view);
@@ -211,7 +211,7 @@ public class IcebergViewOperations {
       @AuthorizationMetadata(type = Entity.EntityType.CATALOG) @PathParam("prefix") String prefix,
       @AuthorizationMetadata(type = EntityType.SCHEMA) @Encoded() @PathParam("namespace")
           String namespace,
-      @AuthorizationMetadata(type = Entity.EntityType.VIEW) @Encoded() @PathParam("view") String view,
+      @AuthorizationMetadata(type = EntityType.VIEW) @Encoded() @PathParam("view") String view,
       UpdateTableRequest replaceViewRequest) {
     String catalogName = IcebergRESTUtils.getCatalogName(prefix);
     Namespace icebergNS = RESTUtil.decodeNamespace(namespace);
@@ -253,7 +253,7 @@ public class IcebergViewOperations {
       @AuthorizationMetadata(type = Entity.EntityType.CATALOG) @PathParam("prefix") String prefix,
       @AuthorizationMetadata(type = EntityType.SCHEMA) @Encoded() @PathParam("namespace")
           String namespace,
-      @AuthorizationMetadata(type = Entity.EntityType.VIEW) @Encoded() @PathParam("view") String view) {
+      @AuthorizationMetadata(type = EntityType.VIEW) @Encoded() @PathParam("view") String view) {
     String catalogName = IcebergRESTUtils.getCatalogName(prefix);
     Namespace icebergNS = RESTUtil.decodeNamespace(namespace);
     String viewName = RESTUtil.decodeString(view);
@@ -292,7 +292,7 @@ public class IcebergViewOperations {
       @AuthorizationMetadata(type = Entity.EntityType.CATALOG) @PathParam("prefix") String prefix,
       @AuthorizationMetadata(type = EntityType.SCHEMA) @Encoded() @PathParam("namespace")
           String namespace,
-      @AuthorizationMetadata(type = Entity.EntityType.VIEW) @Encoded() @PathParam("view") String view) {
+      @AuthorizationMetadata(type = EntityType.VIEW) @Encoded() @PathParam("view") String view) {
     String catalogName = IcebergRESTUtils.getCatalogName(prefix);
     Namespace icebergNS = RESTUtil.decodeNamespace(namespace);
     String viewName = RESTUtil.decodeString(view);

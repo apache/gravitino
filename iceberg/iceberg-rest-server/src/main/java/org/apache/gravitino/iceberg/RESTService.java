@@ -118,7 +118,7 @@ public class RESTService implements GravitinoAuxiliaryService {
         new IcebergViewOperationExecutor(icebergCatalogWrapperManager);
     if (authorizationContext.isAuthorizationEnabled()) {
       icebergViewOperationDispatcher =
-          new IcebergViewHookDispatcher(icebergViewOperationDispatcher);
+          new IcebergViewHookDispatcher(icebergViewOperationDispatcher, metalakeName);
     }
     IcebergViewEventDispatcher icebergViewEventDispatcher =
         new IcebergViewEventDispatcher(icebergViewOperationDispatcher, eventBus, metalakeName);
