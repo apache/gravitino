@@ -25,6 +25,7 @@ from gravitino.client.generic_model_catalog import GenericModelCatalog
 from gravitino.dto.fileset_dto import FilesetDTO
 from gravitino.dto.audit_dto import AuditDTO
 from gravitino.dto.metalake_dto import MetalakeDTO
+from gravitino.dto.schema_dto import SchemaDTO
 from gravitino.namespace import Namespace
 from gravitino.utils.http_client import HTTPClient
 
@@ -109,6 +110,21 @@ def mock_load_fileset(name: str, location: str):
     )
 
 
+def mock_load_schema(name: str):
+    audit_dto = AuditDTO(
+        _creator="test",
+        _create_time="2022-01-01T00:00:00Z",
+        _last_modifier="test",
+        _last_modified_time="2024-04-05T10:10:35.218Z",
+    )
+    return SchemaDTO(
+        _name=name,
+        _comment="this is schema test",
+        _properties={"schema-prop": "schema-val"},
+        _audit=audit_dto,
+    )
+
+
 def mock_data(cls):
     @patch(
         "gravitino.client.gravitino_client_base.GravitinoClientBase.load_metalake",
@@ -121,6 +137,10 @@ def mock_data(cls):
     @patch(
         "gravitino.client.fileset_catalog.FilesetCatalog.load_fileset",
         return_value=mock_load_fileset("fileset", ""),
+    )
+    @patch(
+        "gravitino.client.fileset_catalog.FilesetCatalog.load_schema",
+        side_effect=mock_load_schema,
     )
     @patch(
         "gravitino.client.gravitino_client_base.GravitinoClientBase.check_version",

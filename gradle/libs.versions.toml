@@ -30,6 +30,7 @@ slf4j = "2.0.16"
 log4j = "2.24.3"
 lance = "0.39.0"
 lance-namespace = "0.0.20"
+delta-kernel = "3.3.0"
 jetty = "9.4.51.v20230217"
 jersey = "2.41"
 mockito = "4.11.0"
@@ -59,7 +60,7 @@ commons-collections3 = "3.2.2"
 commons-configuration1 = "1.6"
 commons-dbcp2 = "2.11.0"
 caffeine = "2.9.3"
-iceberg = '1.10.0' # used for Gravitino Iceberg catalog and Iceberg REST service
+iceberg = '1.10.1' # used for Gravitino Iceberg catalog and Iceberg REST service
 iceberg4connector = "1.6.1" # used for compile connectors like Spark, Flink, etc
 paimon = '1.2.0'
 spark33 = "3.3.4"
@@ -71,7 +72,7 @@ trino = '435'
 scala-collection-compat = "2.7.0"
 scala-java-compat = "1.0.2"
 sqlite-jdbc = "3.42.0.0"
-testcontainers = "1.20.6"
+testcontainers = "1.21.4"
 jwt = "0.11.1"
 nimbus-jose-jwt = "9.37.3"
 jline = "3.21.0"
@@ -136,6 +137,7 @@ ognl = "3.4.7"
 concurrent-trees = "2.6.0"
 jakarta-validation = "2.0.2"
 aspectj = "1.9.24"
+ql-expression = "4.0.3"
 
 [libraries]
 aspectj-aspectjrt = { group = "org.aspectj", name = "aspectjrt", version.ref = "aspectj" }
@@ -171,6 +173,8 @@ log4j-12-api = { group = "org.apache.logging.log4j", name = "log4j-1.2-api", ver
 log4j-layout-template-json = { group = "org.apache.logging.log4j", name = "log4j-layout-template-json", version.ref = "log4j" }
 lance = { group = "com.lancedb", name = "lance-core", version.ref = "lance" }
 lance-namespace-core = { group = "com.lancedb", name = "lance-namespace-core", version.ref = "lance-namespace" }
+delta-kernel = { group = "io.delta", name = "delta-kernel-api", version.ref = "delta-kernel" }
+delta-kernel-defaults = { group = "io.delta", name = "delta-kernel-defaults", version.ref = "delta-kernel" }
 jakarta-validation-api = { group = "jakarta.validation", name = "jakarta.validation-api", version.ref = "jakarta-validation" }
 jetty-server = { group = "org.eclipse.jetty", name = "jetty-server", version.ref = "jetty" }
 jetty-servlet = { group = "org.eclipse.jetty", name = "jetty-servlet", version.ref = "jetty" }
@@ -319,6 +323,7 @@ concurrent-trees = { group = "com.googlecode.concurrent-trees", name = "concurre
 jcasbin = { group='org.casbin', name='jcasbin', version.ref="jcasbin" }
 openlineage-java= { group = "io.openlineage", name = "openlineage-java", version.ref = "openlineage" }
 ognl = { group='ognl', name='ognl', version.ref="ognl" }
+ql-expression = { group='com.alibaba', name='qlexpress4', version.ref="ql-expression" }
 
 [bundles]
 log4j = ["slf4j-api", "log4j-slf4j2-impl", "log4j-api", "log4j-core", "log4j-12-api", "log4j-layout-template-json"]

@@ -18,6 +18,7 @@
  */
 package org.apache.gravitino.catalog.lakehouse.generic;
 
+import static org.apache.gravitino.connector.PropertyEntry.booleanPropertyEntry;
 import static org.apache.gravitino.connector.PropertyEntry.stringOptionalPropertyEntry;
 import static org.apache.gravitino.connector.PropertyEntry.stringRequiredPropertyEntry;
 
@@ -40,7 +41,9 @@ public class GenericTablePropertiesMetadata extends BasePropertiesMetadata {
         ImmutableList.of(
             stringOptionalPropertyEntry(
                 Table.PROPERTY_LOCATION,
-                "The root directory of the generic table.",
+                "The directory of the table. If this is not specified in the table"
+                    + " property, it will use the one in catalog / schema level and concatenate"
+                    + " with the table name. For external table, this property is required.",
                 false /* immutable */,
                 null, /* defaultValue */
                 false /* hidden */),
@@ -48,7 +51,15 @@ public class GenericTablePropertiesMetadata extends BasePropertiesMetadata {
                 Table.PROPERTY_TABLE_FORMAT,
                 "The format of the table",
                 true /* immutable */,
-                false /* hidden */));
+                false /* hidden */),
+            booleanPropertyEntry(
+                Table.PROPERTY_EXTERNAL,
+                "Whether the table is external or managed by the catalog.",
+                false /* required */,
+                true /* immutable */,
+                false /* defaultValue */,
+                false /* hidden */,
+                false /* reserved */));
 
     PROPERTIES_METADATA = Maps.uniqueIndex(propertyEntries, PropertyEntry::getName);
   }

@@ -19,6 +19,7 @@
 package org.apache.gravitino.storage.relational.mapper;
 
 import com.google.common.collect.ImmutableMap;
+import java.util.List;
 import java.util.Map;
 import org.apache.gravitino.storage.relational.JDBCBackend;
 import org.apache.gravitino.storage.relational.mapper.provider.base.JobTemplateMetaBaseSQLProvider;
@@ -101,5 +102,11 @@ public class JobTemplateMetaSQLProviderFactory {
 
   public static String selectJobTemplateById(@Param("jobTemplateId") Long jobTemplateId) {
     return getProvider().selectJobTemplateById(jobTemplateId);
+  }
+
+  public static String batchSelectJobTemplateByIdentifier(
+      @Param("metalakeName") String metalakeName,
+      @Param("jobTemplateNames") List<String> jobTemplateNames) {
+    return getProvider().batchSelectJobTemplateByIdentifier(metalakeName, jobTemplateNames);
   }
 }

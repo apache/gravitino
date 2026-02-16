@@ -44,12 +44,18 @@ public class OptimizerConfig extends Config {
   public static final String GRAVITINO_METALAKE = OPTIMIZER_PREFIX + "gravitinoMetalake";
   public static final String GRAVITINO_DEFAULT_CATALOG =
       OPTIMIZER_PREFIX + "gravitinoDefaultCatalog";
+  public static final String JOB_ADAPTER_PREFIX = OPTIMIZER_PREFIX + "jobAdapter.";
+  public static final String JOB_SUBMITTER_CONFIG_PREFIX = OPTIMIZER_PREFIX + "jobSubmitterConfig.";
 
   private static final String RECOMMENDER_PREFIX = OPTIMIZER_PREFIX + "recommender.";
   private static final String STATISTICS_PROVIDER = RECOMMENDER_PREFIX + "statisticsProvider";
   private static final String STRATEGY_PROVIDER = RECOMMENDER_PREFIX + "strategyProvider";
   private static final String TABLE_META_PROVIDER = RECOMMENDER_PREFIX + "tableMetaProvider";
   private static final String JOB_SUBMITTER = RECOMMENDER_PREFIX + "jobSubmitter";
+
+  private static final String UPDATER_PREFIX = OPTIMIZER_PREFIX + "updater.";
+  private static final String STATISTICS_UPDATER = UPDATER_PREFIX + "statisticsUpdater";
+  private static final String METRICS_UPDATER = UPDATER_PREFIX + "metricsUpdater";
 
   public static final ConfigEntry<String> STATISTICS_PROVIDER_CONFIG =
       new ConfigBuilder(STATISTICS_PROVIDER)
@@ -95,6 +101,20 @@ public class OptimizerConfig extends Config {
           .stringConf()
           .createWithDefault(NoopJobSubmitter.NAME);
 
+  public static final ConfigEntry<String> STATISTICS_UPDATER_CONFIG =
+      new ConfigBuilder(STATISTICS_UPDATER)
+          .doc("The statistics updater implementation name (matches Provider.name()).")
+          .version(ConfigConstants.VERSION_1_2_0)
+          .stringConf()
+          .create();
+
+  public static final ConfigEntry<String> METRICS_UPDATER_CONFIG =
+      new ConfigBuilder(METRICS_UPDATER)
+          .doc("The metrics updater implementation name (matches Provider.name()).")
+          .version(ConfigConstants.VERSION_1_2_0)
+          .stringConf()
+          .create();
+
   public static final ConfigEntry<String> GRAVITINO_URI_CONFIG =
       new ConfigBuilder(GRAVITINO_URI)
           .doc("The URI of the Gravitino server.")
@@ -131,5 +151,26 @@ public class OptimizerConfig extends Config {
   public OptimizerConfig(Map<String, String> properties) {
     super(false);
     loadFromMap(properties, k -> true);
+  }
+
+  /**
+   * Returns job submitter custom config entries with the {@code
+   * gravitino.optimizer.jobSubmitterConfig.} prefix stripped.
+   *
+   * @return custom job submitter config map
+   */
+  public Map<String, String> jobSubmitterConfigs() {
+    return getConfigsWithPrefix(JOB_SUBMITTER_CONFIG_PREFIX);
+  }
+
+  public String getStrategyHandlerClassName(String strategyHandlerName) {
+    String configKey =
+        String.format(OPTIMIZER_PREFIX + "strategyHandler.%s.className", strategyHandlerName);
+    return configMap.get(configKey);
+  }
+
+  public String getJobAdapterClassName(String jobTemplateName) {
+    String configKey = String.format(JOB_ADAPTER_PREFIX + "%s.className", jobTemplateName);
+    return configMap.get(configKey);
   }
 }

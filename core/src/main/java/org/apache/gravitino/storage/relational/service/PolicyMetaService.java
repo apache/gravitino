@@ -482,4 +482,22 @@ public class PolicyMetaService {
     }
     return policyPO.getPolicyId();
   }
+
+  @Monitored(
+      metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME,
+      baseMetricName = "batchGetPolicyByIdentifier")
+  public List<PolicyEntity> batchGetPolicyByIdentifier(List<NameIdentifier> identifiers) {
+    NameIdentifier firstIdent = identifiers.get(0);
+    String metalakeName = firstIdent.namespace().level(0);
+    List<String> policyNames =
+        identifiers.stream().map(NameIdentifier::name).collect(Collectors.toList());
+
+    return SessionUtils.doWithCommitAndFetchResult(
+        PolicyMetaMapper.class,
+        mapper -> {
+          List<PolicyPO> policyPOs =
+              mapper.batchSelectPolicyByIdentifier(metalakeName, policyNames);
+          return POConverters.fromPolicyPOs(policyPOs, firstIdent.namespace());
+        });
+  }
 }

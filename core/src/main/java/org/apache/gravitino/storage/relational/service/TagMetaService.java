@@ -421,4 +421,21 @@ public class TagMetaService {
         TagMetaMapper.class,
         mapper -> mapper.listTagPOsByMetalakeAndTagNames(metalakeName, tagNames));
   }
+
+  @Monitored(
+      metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME,
+      baseMetricName = "batchGetTagByIdentifier")
+  public List<TagEntity> batchGetTagByIdentifier(List<NameIdentifier> identifiers) {
+    NameIdentifier firstIdent = identifiers.get(0);
+    String metalakeName = firstIdent.namespace().level(0);
+    List<String> tagNames =
+        identifiers.stream().map(NameIdentifier::name).collect(Collectors.toList());
+
+    return SessionUtils.doWithCommitAndFetchResult(
+        TagMetaMapper.class,
+        mapper -> {
+          List<TagPO> tagPOs = mapper.batchSelectTagByIdentifier(metalakeName, tagNames);
+          return POConverters.fromTagPOs(tagPOs, firstIdent.namespace());
+        });
+  }
 }

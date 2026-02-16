@@ -566,10 +566,14 @@ public class CatalogDorisIT extends BaseIT {
         .pollInterval(WAIT_INTERVAL_IN_SECONDS, TimeUnit.SECONDS)
         .untilAsserted(
             () -> assertEquals(5, tableCatalog.loadTable(tableIdentifier).columns().length));
-
-    ITUtils.assertColumn(
-        Column.of("col_5", Types.VarCharType.of(255), "col_5_comment"),
-        tableCatalog.loadTable(tableIdentifier).columns()[4]);
+    Awaitility.await()
+        .atMost(MAX_WAIT_IN_SECONDS, TimeUnit.SECONDS)
+        .pollInterval(WAIT_INTERVAL_IN_SECONDS, TimeUnit.SECONDS)
+        .untilAsserted(
+            () ->
+                ITUtils.assertColumn(
+                    Column.of("col_5", Types.VarCharType.of(255), "col_5_comment"),
+                    tableCatalog.loadTable(tableIdentifier).columns()[4]));
 
     // change column position
     // TODO: change column position is unstable, add it later

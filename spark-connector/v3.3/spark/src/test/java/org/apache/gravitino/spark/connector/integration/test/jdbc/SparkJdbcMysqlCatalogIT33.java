@@ -33,4 +33,10 @@ public class SparkJdbcMysqlCatalogIT33 extends SparkJdbcMysqlCatalogIT {
             .getConfString("spark.sql.catalog." + getCatalogName());
     Assertions.assertEquals(GravitinoJdbcCatalogSpark33.class.getName(), catalogClass);
   }
+
+  @Override
+  protected boolean supportsFunction() {
+    // Spark 3.3 does not support function operations
+    return false;
+  }
 }
