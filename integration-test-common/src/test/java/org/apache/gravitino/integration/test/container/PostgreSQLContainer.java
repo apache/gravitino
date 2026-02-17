@@ -69,7 +69,7 @@ public class PostgreSQLContainer extends BaseContainer {
   @Override
   public void start() {
     super.start();
-    Preconditions.check("PostgreSQL container startup failed!", checkContainerStatus(30));
+    Preconditions.check("PostgreSQL container startup failed!", checkContainerStatus(5));
   }
 
   @Override
@@ -112,57 +112,19 @@ public class PostgreSQLContainer extends BaseContainer {
   }
 
   public void createDatabase(TestDatabaseName testDatabaseName) {
-    // Retry connection with short backoff as fallback (container should already be ready)
-    int maxRetries = 3;
-    long retryDelayMs = 1000;
+    try (Connection connection =
+            DriverManager.getConnection(getJdbcUrl(), getUsername(), getPassword());
+        Statement statement = connection.createStatement()) {
 
-    for (int attempt = 0; attempt < maxRetries; attempt++) {
-      try (Connection connection =
-              DriverManager.getConnection(getJdbcUrl(), getUsername(), getPassword());
-          Statement statement = connection.createStatement()) {
-
-        String query = format("CREATE DATABASE \"%s\"", testDatabaseName);
-        statement.execute(query);
-        LOG.info(format("PostgreSQL container database %s has been created", testDatabaseName));
-        return;
-      } catch (SQLException e) {
-        if (e.getMessage()
-            .equals(String.format("ERROR: database \"%s\" already exists", testDatabaseName))) {
-          LOG.info("PostgreSQL Database {} already exists, skipping", testDatabaseName);
-          return;
-        }
-
-        // Retry only on connection errors with short delay
-        if (attempt < maxRetries - 1 && isRetriableException(e)) {
-          LOG.warn(
-              "Failed to connect to PostgreSQL (attempt {}/{}), retrying in {}ms: {}",
-              attempt + 1,
-              maxRetries,
-              retryDelayMs,
-              e.getMessage());
-          try {
-            Thread.sleep(retryDelayMs);
-          } catch (InterruptedException ie) {
-            Thread.currentThread().interrupt();
-            throw new RuntimeException("Interrupted while waiting to retry database creation", ie);
-          }
-        } else {
-          throw new RuntimeException(e);
-        }
-      }
+      String query = format("CREATE DATABASE \"%s\"", testDatabaseName);
+      statement.execute(query);
+      LOG.info(format("PostgreSQL container database %s has been created", testDatabaseName));
+    } catch (SQLException e) {
+      if (e.getMessage()
+          .equals(String.format("ERROR: database \"%s\" already exists", testDatabaseName))) {
+        LOG.info("PostgreSQL Database {} already exists, skipping", testDatabaseName);
+      } else throw new RuntimeException(e);
     }
-    throw new RuntimeException("Failed to create database after " + maxRetries + " attempts");
-  }
-
-  private boolean isRetriableException(SQLException e) {
-    // Check for connection-related errors that might be transient
-    String message = e.getMessage();
-    return message != null
-        && (message.contains("connection")
-            || message.contains("Connection")
-            || message.contains("timeout")
-            || e.getCause() instanceof java.net.SocketTimeoutException
-            || e.getCause() instanceof java.net.ConnectException);
   }
 
   public String getUsername() {
@@ -175,16 +137,12 @@ public class PostgreSQLContainer extends BaseContainer {
 
   /** getJdbcUrl without database name. */
   public String getJdbcUrl() {
-    return format(
-        "jdbc:postgresql://%s:%d/?connectTimeout=60&socketTimeout=60",
-        container.getHost(), getMappedPort(PG_PORT));
+    return format("jdbc:postgresql://%s:%d/", getContainerIpAddress(), PG_PORT);
   }
 
   /** getJdbcUrl with database name. */
   public String getJdbcUrl(TestDatabaseName testDatabaseName) {
-    return format(
-        "jdbc:postgresql://%s:%d/%s?connectTimeout=60&socketTimeout=60",
-        container.getHost(), getMappedPort(PG_PORT), testDatabaseName);
+    return format("jdbc:postgresql://%s:%d/%s", getContainerIpAddress(), PG_PORT, testDatabaseName);
   }
 
   public String getDriverClassName(TestDatabaseName testDatabaseName) throws SQLException {
