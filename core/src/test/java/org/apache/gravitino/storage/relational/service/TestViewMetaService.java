@@ -71,6 +71,7 @@ public class TestViewMetaService extends TestJDBCBackend {
     assertNotNull(retrievedView);
     assertEquals(view.id(), retrievedView.id());
     assertEquals(view.name(), retrievedView.name());
+    assertEquals(viewNamespace, retrievedView.namespace());
     assertEquals(Entity.EntityType.VIEW, retrievedView.type());
   }
 
@@ -103,6 +104,7 @@ public class TestViewMetaService extends TestJDBCBackend {
     GenericEntity retrievedView = backend.get(viewIdent, Entity.EntityType.VIEW);
     assertNotNull(retrievedView);
     assertEquals(view.id(), retrievedView.id());
+    assertEquals(viewNamespace, retrievedView.namespace());
   }
 
   @TestTemplate
@@ -125,6 +127,8 @@ public class TestViewMetaService extends TestJDBCBackend {
     assertTrue(views.stream().anyMatch(v -> v.name().equals("view1")));
     assertTrue(views.stream().anyMatch(v -> v.name().equals("view2")));
     assertTrue(views.stream().anyMatch(v -> v.name().equals("view3")));
+    // Verify all views have namespace set
+    assertTrue(views.stream().allMatch(v -> viewNamespace.equals(v.namespace())));
   }
 
   @TestTemplate
@@ -160,6 +164,7 @@ public class TestViewMetaService extends TestJDBCBackend {
     GenericEntity retrievedView = backend.get(newViewIdent, Entity.EntityType.VIEW);
     assertNotNull(retrievedView);
     assertEquals("view_updated", retrievedView.name());
+    assertEquals(viewNamespace, retrievedView.namespace());
   }
 
   @TestTemplate
@@ -288,6 +293,7 @@ public class TestViewMetaService extends TestJDBCBackend {
         backend.get(NameIdentifier.of(viewNamespace, "lifecycle_view"), Entity.EntityType.VIEW);
     assertEquals(view.id(), viewEntity.id());
     assertEquals(view.name(), viewEntity.name());
+    assertEquals(viewNamespace, viewEntity.namespace());
 
     // meta data soft delete
     backend.delete(
