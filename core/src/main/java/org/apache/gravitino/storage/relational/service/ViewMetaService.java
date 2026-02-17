@@ -193,10 +193,20 @@ public class ViewMetaService {
         GenericEntity.builder()
             .withId(oldViewPO.getViewId())
             .withName(oldViewPO.getViewName())
+            .withNamespace(ident.namespace())
             .withEntityType(Entity.EntityType.VIEW)
             .build();
 
     GenericEntity newEntity = (GenericEntity) updater.apply((E) oldEntity);
+
+    // Check if the namespace (schema) has changed and resolve new schema ID if needed
+    boolean isSchemaChanged =
+        newEntity.namespace() != null && !newEntity.namespace().equals(ident.namespace());
+    Long schemaId =
+        isSchemaChanged
+            ? EntityIdService.getEntityId(
+                NameIdentifier.of(newEntity.namespace().levels()), Entity.EntityType.SCHEMA)
+            : oldViewPO.getSchemaId();
 
     ViewPO newViewPO =
         ViewPO.builder()
@@ -204,7 +214,7 @@ public class ViewMetaService {
             .withViewName(newEntity.name())
             .withMetalakeId(oldViewPO.getMetalakeId())
             .withCatalogId(oldViewPO.getCatalogId())
-            .withSchemaId(oldViewPO.getSchemaId())
+            .withSchemaId(schemaId)
             .withDeletedAt(oldViewPO.getDeletedAt())
             .withLastVersion(oldViewPO.getLastVersion())
             .withCurrentVersion(oldViewPO.getCurrentVersion())
