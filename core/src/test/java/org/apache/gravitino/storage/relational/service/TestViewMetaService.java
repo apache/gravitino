@@ -168,6 +168,49 @@ public class TestViewMetaService extends TestJDBCBackend {
   }
 
   @TestTemplate
+  public void testUpdateViewCrossNamespace() throws IOException {
+    // Create a second schema for cross-namespace rename
+    String schemaName2 = "schema_for_view_test_2";
+    createAndInsertSchema(metalakeName, catalogName, schemaName2);
+
+    Namespace viewNamespace1 = NamespaceUtil.ofView(metalakeName, catalogName, schemaName);
+    Namespace viewNamespace2 = NamespaceUtil.ofView(metalakeName, catalogName, schemaName2);
+
+    GenericEntity view =
+        createViewEntity(
+            RandomIdGenerator.INSTANCE.nextId(), viewNamespace1, "view_cross_namespace");
+
+    backend.insert(view, false);
+
+    // Update view to move to different namespace
+    Function<GenericEntity, GenericEntity> updater =
+        oldView ->
+            GenericEntity.builder()
+                .withId(oldView.id())
+                .withName("view_cross_namespace_renamed")
+                .withNamespace(viewNamespace2)
+                .withEntityType(Entity.EntityType.VIEW)
+                .build();
+
+    NameIdentifier viewIdent = NameIdentifier.of(viewNamespace1, "view_cross_namespace");
+    GenericEntity updatedView = backend.update(viewIdent, Entity.EntityType.VIEW, updater);
+
+    assertNotNull(updatedView);
+    assertEquals("view_cross_namespace_renamed", updatedView.name());
+    assertEquals(view.id(), updatedView.id());
+
+    // Verify old namespace+name no longer exists
+    assertThrows(NoSuchEntityException.class, () -> backend.get(viewIdent, Entity.EntityType.VIEW));
+
+    // Verify new namespace+name exists
+    NameIdentifier newViewIdent = NameIdentifier.of(viewNamespace2, "view_cross_namespace_renamed");
+    GenericEntity retrievedView = backend.get(newViewIdent, Entity.EntityType.VIEW);
+    assertNotNull(retrievedView);
+    assertEquals("view_cross_namespace_renamed", retrievedView.name());
+    assertEquals(viewNamespace2, retrievedView.namespace());
+  }
+
+  @TestTemplate
   public void testUpdateAlreadyExistsException() throws IOException {
     Namespace viewNamespace = NamespaceUtil.ofView(metalakeName, catalogName, schemaName);
     GenericEntity view1 =
