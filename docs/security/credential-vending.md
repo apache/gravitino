@@ -14,7 +14,7 @@ Gravitino credential vending is used to generate temporary or static credentials
 - Supports Gravitino Iceberg REST server.
 - Supports Gravitino server, only support Hadoop catalog.
 - Supports pluggable credentials with build-in credentials:
-  - S3: `S3TokenCredential`, `S3SecretKeyCredential`, `AwsIrsaCredential`
+  - S3: `S3TokenCredential`, `S3SecretKeyCredential`, `AwsIrsaCredential`, `AwsPodIdentityCredential`
   - GCS: `GCSTokenCredential`
   - ADLS: `ADLSTokenCredential`, `AzureAccountKeyCredential`
   - OSS: `OSSTokenCredential`, `OSSSecretKeyCredential`
@@ -58,6 +58,32 @@ A credential using AWS IAM Roles for Service Accounts (IRSA) to access S3 with t
 - EKS cluster with IRSA properly configured
 - `AWS_WEB_IDENTITY_TOKEN_FILE` environment variable pointing to the service account token
 - IAM role with permissions to assume the target role specified in `s3-role-arn`
+- Target IAM role with necessary S3 permissions for the data locations
+
+#### S3 Pod Identity credential
+
+A credential using AWS EKS Pod Identity to access S3 with temporary credentials. This provider supports both basic Pod Identity credentials and fine-grained path-based access control with dynamically generated IAM policies.
+
+**Features:**
+- **Basic Pod Identity mode**: Returns credentials with full permissions of the IAM role associated with the Kubernetes service account (for non-path-based contexts)
+- **Fine-grained mode**: Generates path-specific credentials with minimal required permissions (for table access with `X-Iceberg-Access-Delegation: vended-credentials`)
+- **Automatic policy generation**: Creates custom IAM policies scoped to specific table paths including data, metadata, and write locations
+- **EKS integration**: Leverages EKS Pod Identity agent for retrieving credentials
+
+| Gravitino server catalog properties | Gravitino Iceberg REST server configurations       | Description                                                                                               | Default value | Required | Since Version |
+|-------------------------------------|----------------------------------------------------|-----------------------------------------------------------------------------------------------------------|---------------|----------|---------------|
+| `credential-providers`              | `gravitino.iceberg-rest.credential-providers`      | `aws-pod-identity` for AWS Pod Identity credential provider.                                              | (none)        | Yes      | 0.9.0         |
+| `s3-role-arn`                       | `gravitino.iceberg-rest.s3-role-arn`               | The ARN of the IAM role to assume. Required for fine-grained path-based access control.                   | (none)        | Yes*     | 0.9.0         |
+| `s3-region`                         | `gravitino.iceberg-rest.s3-region`                 | The AWS region for STS operations. Used for fine-grained access control.                                  | (none)        | No       | 0.9.0         |
+| `s3-token-expire-in-secs`           | `gravitino.iceberg-rest.s3-token-expire-in-secs`   | Token expiration time in seconds for fine-grained credentials. Cannot exceed role's max session duration. | 3600          | No       | 0.9.0         |
+| `s3-token-service-endpoint`         | `gravitino.iceberg-rest.s3-token-service-endpoint` | Alternative STS endpoint for fine-grained credential generation. Useful for S3-compatible services.       | (none)        | No       | 0.9.0         |
+
+**Note**: `s3-role-arn` is required only when using fine-grained path-based access control with vended credentials. For basic Pod Identity usage without path restrictions, only `credential-providers=aws-pod-identity` is needed.
+
+**Prerequisites for fine-grained mode:**
+- EKS cluster with Pod Identity agent installed and configured
+- IAM role associated with the Kubernetes service account
+- Target IAM role configured to allow assumption from the Pod Identity role (trust relationship)
 - Target IAM role with necessary S3 permissions for the data locations
 
 #### S3 secret key credential
