@@ -272,8 +272,7 @@ public class IcebergTableOperations {
   @Produces(MediaType.APPLICATION_JSON)
   @Timed(name = "load-table." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
   @ResponseMetered(name = "load-table", absolute = true)
-  // Note: SCHEMA-level authorization at REST allows both tables and views. Entity-specific
-  // authorization (TABLE) is enforced in the executor after determining the entity type.
+  // SCHEMA-level authorization; TABLE-specific authorization is handled in LoadTableAuthzHandler
   @AuthorizationExpression(
       expression = AuthorizationExpressionConstants.LOAD_SCHEMA_AUTHORIZATION_EXPRESSION,
       accessMetadataType = MetadataObject.Type.SCHEMA)
@@ -305,11 +304,6 @@ public class IcebergTableOperations {
             TableIdentifier tableIdentifier = TableIdentifier.of(icebergNS, tableName);
             IcebergRequestContext context =
                 new IcebergRequestContext(httpServletRequest(), catalogName, isCredentialVending);
-
-            // Authorization is handled in the dispatcher which will:
-            // 1. Check if it's a view -> throw NoSuchTableException (triggers Spark /views/
-            // fallback)
-            // 2. If table -> proceed with normal TABLE authorization
             LoadTableResponse loadTableResponse =
                 tableOperationDispatcher.loadTable(context, tableIdentifier);
             return IcebergRESTUtils.ok(loadTableResponse);

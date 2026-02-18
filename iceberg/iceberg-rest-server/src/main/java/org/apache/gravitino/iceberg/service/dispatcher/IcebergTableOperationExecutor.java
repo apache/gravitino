@@ -34,7 +34,6 @@ import org.apache.gravitino.server.authorization.MetadataAuthzHelper;
 import org.apache.gravitino.server.authorization.expression.AuthorizationExpressionConstants;
 import org.apache.iceberg.catalog.Namespace;
 import org.apache.iceberg.catalog.TableIdentifier;
-import org.apache.iceberg.exceptions.NoSuchTableException;
 import org.apache.iceberg.rest.requests.CreateTableRequest;
 import org.apache.iceberg.rest.requests.PlanTableScanRequest;
 import org.apache.iceberg.rest.requests.RenameTableRequest;
@@ -124,30 +123,6 @@ public class IcebergTableOperationExecutor implements IcebergTableOperationDispa
   public LoadTableResponse loadTable(
       IcebergRequestContext context, TableIdentifier tableIdentifier) {
     String catalogName = context.catalogName();
-
-    // Per Iceberg REST spec, /tables/ endpoint should only serve tables, not views.
-    // Check if the identifier is a view and throw NoSuchTableException to trigger
-    // Spark's fallback logic to use /views/ endpoint instead.
-    if (icebergCatalogWrapperManager.getCatalogWrapper(catalogName).viewExists(tableIdentifier)) {
-      throw new NoSuchTableException(
-          "No such table: %s (it is a view)", tableIdentifier.toString());
-    }
-
-    // Now we know it's a table - enforce TABLE-specific authorization
-    // Note: This check runs after viewExists() to ensure views get 404 (not 403) for Spark
-    // fallback
-    String metalake = IcebergRESTServerContext.getInstance().metalakeName();
-    NameIdentifier identifier =
-        IcebergIdentifierUtils.toGravitinoTableIdentifier(metalake, catalogName, tableIdentifier);
-    boolean hasAccess =
-        MetadataAuthzHelper.checkAccess(
-            identifier,
-            Entity.EntityType.TABLE,
-            AuthorizationExpressionConstants.ICEBERG_LOAD_TABLE_AUTHORIZATION_EXPRESSION);
-    if (!hasAccess) {
-      throw new org.apache.iceberg.exceptions.ForbiddenException(
-          "User does not have permission to access table: %s", tableIdentifier.toString());
-    }
 
     CredentialPrivilege privilege = CredentialPrivilege.READ;
     if (context.requestCredentialVending()) {

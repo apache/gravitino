@@ -23,6 +23,8 @@ import java.lang.reflect.Parameter;
 import java.util.Map;
 import org.apache.gravitino.Entity.EntityType;
 import org.apache.gravitino.NameIdentifier;
+import org.apache.gravitino.iceberg.service.IcebergCatalogWrapperManager;
+import org.apache.gravitino.iceberg.service.authorization.IcebergRESTServerContext;
 import org.apache.gravitino.server.authorization.annotations.AuthorizationMetadata;
 import org.apache.gravitino.server.authorization.annotations.IcebergAuthorizationMetadata;
 import org.apache.gravitino.server.authorization.annotations.IcebergAuthorizationMetadata.RequestType;
@@ -30,16 +32,17 @@ import org.apache.gravitino.server.web.filter.BaseMetadataAuthorizationMethodInt
 import org.apache.gravitino.utils.NameIdentifierUtil;
 import org.apache.iceberg.MetadataTableType;
 import org.apache.iceberg.catalog.Namespace;
+import org.apache.iceberg.catalog.TableIdentifier;
 import org.apache.iceberg.exceptions.NoSuchTableException;
 import org.apache.iceberg.rest.RESTUtil;
 
 /**
- * Handler for LOAD_TABLE operations. Validates that the requested table is not a metadata table
- * (e.g., table$snapshots) and extracts the table identifier for authorization checks.
+ * Handler for LOAD_TABLE operations. Validates that the requested entity is not a metadata table or
+ * a view, and extracts the table identifier for authorization checks.
  *
- * <p>Note: This handler does NOT check if the entity is a view. That check is performed in the
- * executor layer (IcebergTableOperationExecutor) after authorization, to ensure proper Spark
- * fallback behavior (404 NoSuchTableException triggers /views/ retry).
+ * <p>Per Iceberg REST spec, the /tables/ endpoint should only serve tables. If the identifier
+ * refers to a view, this handler throws NoSuchTableException (404), triggering Spark to retry with
+ * the /views/ endpoint.
  */
 public class LoadTableAuthzHandler implements AuthorizationHandler {
   private final Parameter[] parameters;
@@ -92,9 +95,16 @@ public class LoadTableAuthzHandler implements AuthorizationHandler {
     String catalog = catalogId.name();
     String schema = schemaId.name();
 
-    // Add table identifier to the map for authorization expression evaluation
-    // Note: This assumes it's a table. If it's actually a view, the executor will detect
-    // that and throw NoSuchTableException to trigger Spark's fallback to /views/ endpoint.
+    // Per Iceberg REST spec, /tables/ endpoint should only serve tables.
+    // If the identifier doesn't exist as a table, throw NoSuchTableException.
+    // This triggers Spark's fallback to /views/ endpoint if it's actually a view.
+    IcebergCatalogWrapperManager wrapperManager =
+        IcebergRESTServerContext.getInstance().catalogWrapperManager();
+    TableIdentifier tableIdentifier = TableIdentifier.of(namespace, tableName);
+    if (!wrapperManager.getCatalogWrapper(catalog).tableExists(tableIdentifier)) {
+      throw new NoSuchTableException("Table %s not found", tableName);
+    }
+
     nameIdentifierMap.put(
         EntityType.TABLE, NameIdentifierUtil.ofTable(metalakeName, catalog, schema, tableName));
   }
