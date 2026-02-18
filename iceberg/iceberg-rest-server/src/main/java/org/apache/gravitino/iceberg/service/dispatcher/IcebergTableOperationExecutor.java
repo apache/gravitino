@@ -122,15 +122,13 @@ public class IcebergTableOperationExecutor implements IcebergTableOperationDispa
   @Override
   public LoadTableResponse loadTable(
       IcebergRequestContext context, TableIdentifier tableIdentifier) {
-    String catalogName = context.catalogName();
-
     CredentialPrivilege privilege = CredentialPrivilege.READ;
     if (context.requestCredentialVending()) {
       privilege = getCredentialPrivilege(context, tableIdentifier);
     }
 
     return icebergCatalogWrapperManager
-        .getCatalogWrapper(catalogName)
+        .getCatalogWrapper(context.catalogName())
         .loadTable(tableIdentifier, context.requestCredentialVending(), privilege);
   }
 

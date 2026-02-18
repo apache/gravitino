@@ -181,8 +181,9 @@ public class TestIcebergViewAuthorizationExpression {
                 "METALAKE::USE_SCHEMA",
                 "METALAKE::USE_CATALOG")));
 
-    // CREATE_VIEW does NOT grant load permission
-    assertFalse(
+    // CREATE_VIEW grants load permission to allow catalog implementations that call viewExists()
+    // during creation to work
+    assertTrue(
         mockEvaluator.getResult(
             ImmutableSet.of("SCHEMA::CREATE_VIEW", "SCHEMA::USE_SCHEMA", "CATALOG::USE_CATALOG")));
   }
