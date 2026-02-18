@@ -65,7 +65,7 @@ public class LoadTableAuthzHandler implements AuthorizationHandler {
       IcebergAuthorizationMetadata icebergMetadata =
           parameter.getAnnotation(IcebergAuthorizationMetadata.class);
       if (icebergMetadata != null && icebergMetadata.type() == RequestType.LOAD_TABLE) {
-        tableName = String.valueOf(args[i]);
+        tableName = RESTUtil.decodeString(String.valueOf(args[i]));
       }
 
       AuthorizationMetadata authMetadata = parameter.getAnnotation(AuthorizationMetadata.class);

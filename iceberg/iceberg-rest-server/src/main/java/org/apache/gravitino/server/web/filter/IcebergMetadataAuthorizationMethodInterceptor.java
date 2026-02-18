@@ -82,7 +82,9 @@ public class IcebergMetadataAuthorizationMethodInterceptor
           break;
         case VIEW:
           nameIdentifierMap.put(
-              EntityType.VIEW, NameIdentifierUtil.ofView(metalakeName, catalog, schema, value));
+              EntityType.VIEW,
+              NameIdentifierUtil.ofView(
+                  metalakeName, catalog, schema, RESTUtil.decodeString(value)));
           break;
         default:
           break;
