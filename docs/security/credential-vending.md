@@ -72,11 +72,11 @@ A credential using AWS EKS Pod Identity to access S3 with temporary credentials.
 
 | Gravitino server catalog properties | Gravitino Iceberg REST server configurations       | Description                                                                                               | Default value | Required | Since Version |
 |-------------------------------------|----------------------------------------------------|-----------------------------------------------------------------------------------------------------------|---------------|----------|---------------|
-| `credential-providers`              | `gravitino.iceberg-rest.credential-providers`      | `aws-pod-identity` for AWS Pod Identity credential provider.                                              | (none)        | Yes      | 0.9.0         |
-| `s3-role-arn`                       | `gravitino.iceberg-rest.s3-role-arn`               | The ARN of the IAM role to assume. Required for fine-grained path-based access control.                   | (none)        | Yes*     | 0.9.0         |
-| `s3-region`                         | `gravitino.iceberg-rest.s3-region`                 | The AWS region for STS operations. Used for fine-grained access control.                                  | (none)        | No       | 0.9.0         |
-| `s3-token-expire-in-secs`           | `gravitino.iceberg-rest.s3-token-expire-in-secs`   | Token expiration time in seconds for fine-grained credentials. Cannot exceed role's max session duration. | 3600          | No       | 0.9.0         |
-| `s3-token-service-endpoint`         | `gravitino.iceberg-rest.s3-token-service-endpoint` | Alternative STS endpoint for fine-grained credential generation. Useful for S3-compatible services.       | (none)        | No       | 0.9.0         |
+| `credential-providers`              | `gravitino.iceberg-rest.credential-providers`      | `aws-pod-identity` for AWS Pod Identity credential provider.                                              | (none)        | Yes      | 1.2.0         |
+| `s3-role-arn`                       | `gravitino.iceberg-rest.s3-role-arn`               | The ARN of the IAM role to assume. Required for fine-grained path-based access control.                   | (none)        | Yes*     | 1.2.0         |
+| `s3-region`                         | `gravitino.iceberg-rest.s3-region`                 | The AWS region for STS operations. Used for fine-grained access control.                                  | (none)        | No       | 1.2.0         |
+| `s3-token-expire-in-secs`           | `gravitino.iceberg-rest.s3-token-expire-in-secs`   | Token expiration time in seconds for fine-grained credentials. Cannot exceed role's max session duration. | 3600          | No       | 1.2.0         |
+| `s3-token-service-endpoint`         | `gravitino.iceberg-rest.s3-token-service-endpoint` | Alternative STS endpoint for fine-grained credential generation. Useful for S3-compatible services.       | (none)        | No       | 1.2.0         |
 
 **Note**: `s3-role-arn` is required only when using fine-grained path-based access control with vended credentials. For basic Pod Identity usage without path restrictions, only `credential-providers=aws-pod-identity` is needed.
 
