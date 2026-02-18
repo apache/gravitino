@@ -37,6 +37,15 @@ public class AuthorizationExpressionConstants {
       """
                   ANY(OWNER, METALAKE, CATALOG) ||
                   SCHEMA_OWNER_WITH_USE_CATALOG ||
+                  ANY_USE_CATALOG && ANY_USE_SCHEMA  && (TABLE::OWNER || ANY_SELECT_TABLE || ANY_MODIFY_TABLE)
+                  """;
+
+  // Used by IcebergTableOperationExecutor to allow CREATE_TABLE holders to load
+  // tables they just created. Spark calls loadTable immediately after createTable.
+  public static final String ICEBERG_LOAD_TABLE_AUTHORIZATION_EXPRESSION =
+      """
+                  ANY(OWNER, METALAKE, CATALOG) ||
+                  SCHEMA_OWNER_WITH_USE_CATALOG ||
                   ANY_USE_CATALOG && ANY_USE_SCHEMA  && (TABLE::OWNER || ANY_SELECT_TABLE || ANY_MODIFY_TABLE || ANY_CREATE_TABLE)
                   """;
 

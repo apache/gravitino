@@ -143,7 +143,7 @@ public class IcebergTableOperationExecutor implements IcebergTableOperationDispa
         MetadataAuthzHelper.checkAccess(
             identifier,
             Entity.EntityType.TABLE,
-            AuthorizationExpressionConstants.LOAD_TABLE_AUTHORIZATION_EXPRESSION);
+            AuthorizationExpressionConstants.ICEBERG_LOAD_TABLE_AUTHORIZATION_EXPRESSION);
     if (!hasAccess) {
       throw new org.apache.iceberg.exceptions.ForbiddenException(
           "User does not have permission to access table: %s", tableIdentifier.toString());
