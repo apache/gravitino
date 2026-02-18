@@ -20,19 +20,26 @@
 package org.apache.gravitino.server.web.filter;
 
 import java.lang.reflect.Parameter;
+import java.util.HashMap;
 import java.util.Map;
+import java.util.Optional;
 import org.apache.gravitino.Entity.EntityType;
 import org.apache.gravitino.NameIdentifier;
+import org.apache.gravitino.authorization.AuthorizationRequestContext;
 import org.apache.gravitino.iceberg.service.IcebergCatalogWrapperManager;
 import org.apache.gravitino.iceberg.service.authorization.IcebergRESTServerContext;
 import org.apache.gravitino.server.authorization.annotations.AuthorizationMetadata;
 import org.apache.gravitino.server.authorization.annotations.IcebergAuthorizationMetadata;
 import org.apache.gravitino.server.authorization.annotations.IcebergAuthorizationMetadata.RequestType;
+import org.apache.gravitino.server.authorization.expression.AuthorizationExpressionConstants;
+import org.apache.gravitino.server.authorization.expression.AuthorizationExpressionEvaluator;
 import org.apache.gravitino.server.web.filter.BaseMetadataAuthorizationMethodInterceptor.AuthorizationHandler;
 import org.apache.gravitino.utils.NameIdentifierUtil;
+import org.apache.gravitino.utils.PrincipalUtils;
 import org.apache.iceberg.MetadataTableType;
 import org.apache.iceberg.catalog.Namespace;
 import org.apache.iceberg.catalog.TableIdentifier;
+import org.apache.iceberg.exceptions.ForbiddenException;
 import org.apache.iceberg.exceptions.NoSuchTableException;
 import org.apache.iceberg.rest.RESTUtil;
 
@@ -95,24 +102,51 @@ public class LoadTableAuthzHandler implements AuthorizationHandler {
     String catalog = catalogId.name();
     String schema = schemaId.name();
 
-    // Per Iceberg REST spec, /tables/ endpoint should only serve tables.
-    // If the identifier doesn't exist as a table, throw NoSuchTableException.
-    // This triggers Spark's fallback to /views/ endpoint if it's actually a view.
+    // Per Iceberg REST spec, /tables/ endpoint should only serve tables, not views.
+    // 1. Check if it's a view first -> 404 (enables Spark fallback to /views/)
+    // 2. Authorize the table access -> 403 if unauthorized
+    // 3. Let request proceed - the actual loadTable() call will handle non-existence
     IcebergCatalogWrapperManager wrapperManager =
         IcebergRESTServerContext.getInstance().catalogWrapperManager();
     TableIdentifier tableIdentifier = TableIdentifier.of(namespace, tableName);
-    if (!wrapperManager.getCatalogWrapper(catalog).tableExists(tableIdentifier)) {
+
+    if (wrapperManager.getCatalogWrapper(catalog).viewExists(tableIdentifier)) {
       throw new NoSuchTableException("Table %s not found", tableName);
     }
 
     nameIdentifierMap.put(
         EntityType.TABLE, NameIdentifierUtil.ofTable(metalakeName, catalog, schema, tableName));
+    performTableAuthorization(nameIdentifierMap);
   }
 
   @Override
   public boolean authorizationCompleted() {
-    // This handler only enriches identifiers, doesn't perform full authorization
-    return false;
+    // This handler performs complete authorization
+    return true;
+  }
+
+  /**
+   * Perform TABLE-level authorization check using ICEBERG_LOAD_TABLE_AUTHORIZATION_EXPRESSION. This
+   * enforces table-specific privileges including ANY_CREATE_TABLE for Iceberg REST.
+   */
+  private void performTableAuthorization(Map<EntityType, NameIdentifier> nameIdentifierMap) {
+    AuthorizationExpressionEvaluator evaluator =
+        new AuthorizationExpressionEvaluator(
+            AuthorizationExpressionConstants.ICEBERG_LOAD_TABLE_AUTHORIZATION_EXPRESSION);
+
+    boolean authorized =
+        evaluator.evaluate(
+            nameIdentifierMap,
+            new HashMap<>(),
+            new AuthorizationRequestContext(),
+            Optional.empty());
+
+    if (!authorized) {
+      String currentUser = PrincipalUtils.getCurrentUserName();
+      NameIdentifier tableId = nameIdentifierMap.get(EntityType.TABLE);
+      throw new ForbiddenException(
+          "User '%s' is not authorized to load table '%s'", currentUser, tableId);
+    }
   }
 
   /**
