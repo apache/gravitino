@@ -1481,7 +1481,8 @@ public class JsonUtils {
       }
 
       gen.writeFieldName("properties");
-      gen.writeObject(props);
+      Map<String, String> sortedProps = new java.util.TreeMap<>(props);
+      gen.writeObject(sortedProps);
       gen.writeEndObject();
     }
   }
