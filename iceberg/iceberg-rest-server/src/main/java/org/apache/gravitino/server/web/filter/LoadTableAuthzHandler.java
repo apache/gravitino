@@ -72,6 +72,9 @@ public class LoadTableAuthzHandler implements AuthorizationHandler {
       IcebergAuthorizationMetadata icebergMetadata =
           parameter.getAnnotation(IcebergAuthorizationMetadata.class);
       if (icebergMetadata != null && icebergMetadata.type() == RequestType.LOAD_TABLE) {
+        // TODO: Refactor to move decode logic to interceptor in a generic way
+        // See: https://docs.google.com/document/d/18yx88tBbU3S9LB8hhL7xUVzSWHIWkXJ7sRNmLh2v_kQ/
+        // Consider consolidating custom authorization handlers and standardizing parameter decoding
         tableName = RESTUtil.decodeString(String.valueOf(args[i]));
       }
 
