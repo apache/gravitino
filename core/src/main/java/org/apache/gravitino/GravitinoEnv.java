@@ -459,6 +459,10 @@ public class GravitinoEnv {
     return config.get(Configs.CACHE_ENABLED);
   }
 
+  public boolean filterSensitiveProperties() {
+    return config.get(Configs.FILTER_SENSITIVE_PROPERTIES);
+  }
+
   public void start() {
     metricsSystem.start();
     eventListenerManager.start();

@@ -20,6 +20,11 @@ package org.apache.gravitino.server.web.rest;
 
 import com.codahale.metrics.annotation.ResponseMetered;
 import com.codahale.metrics.annotation.Timed;
+import com.google.common.base.Preconditions;
+import com.google.common.collect.Maps;
+import java.util.Arrays;
+import java.util.Map;
+import java.util.stream.Stream;
 import javax.inject.Inject;
 import javax.servlet.http.HttpServletRequest;
 import javax.ws.rs.Consumes;
@@ -39,10 +44,14 @@ import javax.ws.rs.core.Response;
 import org.apache.gravitino.Catalog;
 import org.apache.gravitino.CatalogChange;
 import org.apache.gravitino.Entity;
+import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.catalog.CatalogDispatcher;
+import org.apache.gravitino.connector.HasPropertyMetadata;
+import org.apache.gravitino.connector.PropertiesMetadata;
+import org.apache.gravitino.dto.CatalogDTO;
 import org.apache.gravitino.dto.requests.CatalogCreateRequest;
 import org.apache.gravitino.dto.requests.CatalogSetRequest;
 import org.apache.gravitino.dto.requests.CatalogUpdateRequest;
@@ -73,11 +82,14 @@ public class CatalogOperations {
 
   private final CatalogDispatcher catalogDispatcher;
 
+  private final boolean filterSensitiveProperties;
+
   @Context private HttpServletRequest httpRequest;
 
   @Inject
   public CatalogOperations(CatalogDispatcher catalogDispatcher) {
     this.catalogDispatcher = catalogDispatcher;
+    this.filterSensitiveProperties = GravitinoEnv.getInstance().filterSensitiveProperties();
   }
 
   @GET
@@ -101,16 +113,41 @@ public class CatalogOperations {
             // Lock the root and the metalake with WRITE lock to ensure the consistency of the list.
             if (verbose) {
               Catalog[] catalogs = catalogDispatcher.listCatalogsInfo(catalogNS);
-              catalogs =
-                  MetadataAuthzHelper.filterByExpression(
+              CatalogDTO[] catalogDTOs;
+              // Always apply authorization filtering, regardless of filterSensitiveProperties
+              // setting
+              MetadataAuthzHelper.FilterResult<Catalog, Catalog> filterResult =
+                  MetadataAuthzHelper.partitionByTwoExpressions(
                       metalake,
-                      AuthorizationExpressionConstants.LOAD_CATALOG_AUTHORIZATION_EXPRESSION,
+                      AuthorizationExpressionConstants.CATALOG_OWNER_EXPRESSION,
+                      AuthorizationExpressionConstants.USE_CATALOG_EXPRESSION,
                       Entity.EntityType.CATALOG,
                       catalogs,
                       (catalogEntity) ->
                           NameIdentifierUtil.ofCatalog(metalake, catalogEntity.name()));
-              Response response = Utils.ok(new CatalogListResponse(DTOConverters.toDTOs(catalogs)));
-              LOG.info("List {} catalogs info under metalake: {}", catalogs.length, metalake);
+
+              if (filterSensitiveProperties) {
+                // First array: catalogs with full access (can see sensitive properties)
+                CatalogDTO[] fullAccessCatalogs = DTOConverters.toDTOs(filterResult.getFirst());
+                // Second array: catalogs with use access only (hide sensitive properties)
+                CatalogDTO[] limitedAccessCatalogs =
+                    buildCatalogDTOsWithoutSensitiveProps(filterResult.getSecond());
+                catalogDTOs =
+                    Stream.concat(
+                            Arrays.stream(fullAccessCatalogs), Arrays.stream(limitedAccessCatalogs))
+                        .toArray(CatalogDTO[]::new);
+              } else {
+                // If filtering is disabled, return all authorized catalogs with full properties
+                // Combine both arrays (owner-or-use) without hiding sensitive properties
+                Catalog[] allAuthorizedCatalogs =
+                    Stream.concat(
+                            Arrays.stream(filterResult.getFirst()),
+                            Arrays.stream(filterResult.getSecond()))
+                        .toArray(Catalog[]::new);
+                catalogDTOs = DTOConverters.toDTOs(allAuthorizedCatalogs);
+              }
+              Response response = Utils.ok(new CatalogListResponse(catalogDTOs));
+              LOG.info("List {} catalogs info under metalake: {}", catalogDTOs.length, metalake);
               return response;
             } else {
               NameIdentifier[] idents = catalogDispatcher.listCatalogs(catalogNS);
@@ -268,7 +305,29 @@ public class CatalogOperations {
     try {
       NameIdentifier ident = NameIdentifierUtil.ofCatalog(metalakeName, catalogName);
       Catalog catalog = catalogDispatcher.loadCatalog(ident);
-      Response response = Utils.ok(new CatalogResponse(DTOConverters.toDTO(catalog)));
+      CatalogDTO catalogDTO;
+      if (filterSensitiveProperties) {
+        // Only allow users with alter permission to access sensitive data in catalog properties.
+        boolean enableAccessSensitiveData =
+            MetadataAuthzHelper.checkAccess(
+                ident,
+                Entity.EntityType.CATALOG,
+                AuthorizationExpressionConstants.CATALOG_OWNER_EXPRESSION);
+        if (enableAccessSensitiveData) {
+          catalogDTO = DTOConverters.toDTO(catalog);
+        } else {
+          Preconditions.checkState(
+              catalog instanceof HasPropertyMetadata,
+              "Catalog does not support hiding sensitive properties.");
+          PropertiesMetadata propertiesMetadata =
+              ((HasPropertyMetadata) catalog).catalogPropertiesMetadata();
+          catalogDTO = buildCatalogDTO(catalog, propertiesMetadata);
+        }
+      } else {
+        // If filtering is disabled, return catalog with full properties
+        catalogDTO = DTOConverters.toDTO(catalog);
+      }
+      Response response = Utils.ok(new CatalogResponse(catalogDTO));
       LOG.info("Catalog loaded: {}.{}", metalakeName, catalogName);
       return response;
 
@@ -348,5 +407,36 @@ public class CatalogOperations {
       return ExceptionHandlers.handleCatalogException(
           OperationType.DROP, catalogName, metalakeName, e);
     }
+  }
+
+  private static CatalogDTO buildCatalogDTO(
+      Catalog catalog, PropertiesMetadata propertiesMetadata) {
+    CatalogDTO catalogDTO;
+    Map<String, String> newProps = Maps.newHashMap(catalog.properties());
+    newProps.keySet().removeIf(propertiesMetadata::isSensitiveProperty);
+    catalogDTO =
+        CatalogDTO.builder()
+            .withName(catalog.name())
+            .withType(catalog.type())
+            .withProvider(catalog.provider())
+            .withComment(catalog.comment())
+            .withProperties(newProps)
+            .withAudit(DTOConverters.toDTO(catalog.auditInfo()))
+            .build();
+    return catalogDTO;
+  }
+
+  private static CatalogDTO[] buildCatalogDTOsWithoutSensitiveProps(Catalog[] catalogs) {
+    return Arrays.stream(catalogs)
+        .map(
+            catalog -> {
+              Preconditions.checkState(
+                  catalog instanceof HasPropertyMetadata,
+                  "Catalog does not support hiding sensitive properties.");
+              PropertiesMetadata propertiesMetadata =
+                  ((HasPropertyMetadata) catalog).catalogPropertiesMetadata();
+              return buildCatalogDTO(catalog, propertiesMetadata);
+            })
+        .toArray(CatalogDTO[]::new);
   }
 }
