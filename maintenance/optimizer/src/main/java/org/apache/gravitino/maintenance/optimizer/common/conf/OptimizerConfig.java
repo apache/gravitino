@@ -19,6 +19,7 @@
 
 package org.apache.gravitino.maintenance.optimizer.common.conf;
 
+import java.util.List;
 import java.util.Map;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.Config;
@@ -31,10 +32,9 @@ import org.apache.gravitino.maintenance.optimizer.recommender.strategy.Gravitino
 import org.apache.gravitino.maintenance.optimizer.recommender.table.GravitinoTableMetadataProvider;
 
 /**
- * Central configuration holder for the optimizer/recommender runtime. Keys are grouped under the
- * {@code gravitino.optimizer.*} prefix and capture both core connectivity (URI, metalake, default
- * catalog) and pluggable implementation wiring (statistics provider, strategy provider, table
- * metadata provider, job submitter).
+ * Central configuration holder for the optimizer runtime. Keys are grouped under the {@code
+ * gravitino.optimizer.*} prefix and capture both core connectivity (URI, metalake, default catalog)
+ * and pluggable implementation wiring for recommender, updater, and monitor components.
  */
 public class OptimizerConfig extends Config {
 
@@ -56,6 +56,11 @@ public class OptimizerConfig extends Config {
   private static final String UPDATER_PREFIX = OPTIMIZER_PREFIX + "updater.";
   private static final String STATISTICS_UPDATER = UPDATER_PREFIX + "statisticsUpdater";
   private static final String METRICS_UPDATER = UPDATER_PREFIX + "metricsUpdater";
+  private static final String MONITOR_PREFIX = OPTIMIZER_PREFIX + "monitor.";
+  private static final String METRICS_PROVIDER = MONITOR_PREFIX + "metricsProvider";
+  private static final String JOB_PROVIDER = MONITOR_PREFIX + "jobProvider";
+  private static final String METRICS_EVALUATOR = MONITOR_PREFIX + "metricsEvaluator";
+  private static final String MONITOR_CALLBACKS = MONITOR_PREFIX + "callbacks";
 
   public static final ConfigEntry<String> STATISTICS_PROVIDER_CONFIG =
       new ConfigBuilder(STATISTICS_PROVIDER)
@@ -114,6 +119,45 @@ public class OptimizerConfig extends Config {
           .version(ConfigConstants.VERSION_1_2_0)
           .stringConf()
           .create();
+
+  public static final ConfigEntry<String> METRICS_PROVIDER_CONFIG =
+      new ConfigBuilder(METRICS_PROVIDER)
+          .doc(
+              "Monitor metrics provider implementation name (matches Provider.name()) "
+                  + "discoverable via ServiceLoader. Example: 'metrics-provider'.")
+          .version(ConfigConstants.VERSION_1_2_0)
+          .stringConf()
+          .create();
+
+  public static final ConfigEntry<String> JOB_PROVIDER_CONFIG =
+      new ConfigBuilder(JOB_PROVIDER)
+          .doc(
+              "Monitor job provider implementation name (matches Provider.name()) discoverable "
+                  + "via ServiceLoader. Example: 'job-provider'.")
+          .version(ConfigConstants.VERSION_1_2_0)
+          .stringConf()
+          .create();
+
+  public static final ConfigEntry<String> METRICS_EVALUATOR_CONFIG =
+      new ConfigBuilder(METRICS_EVALUATOR)
+          .doc(
+              "Monitor metrics evaluator implementation name discoverable via ServiceLoader. "
+                  + "The evaluator name must match MetricsEvaluator.name(). Example: "
+                  + "'metrics-evaluator'.")
+          .version(ConfigConstants.VERSION_1_2_0)
+          .stringConf()
+          .create();
+
+  public static final ConfigEntry<List<String>> MONITOR_CALLBACKS_CONFIG =
+      new ConfigBuilder(MONITOR_CALLBACKS)
+          .doc(
+              "Comma-separated monitor callback implementation names (each matches "
+                  + "Provider.name()) discoverable via ServiceLoader. Example: "
+                  + "'monitor-callback-a,monitor-callback-b'.")
+          .version(ConfigConstants.VERSION_1_2_0)
+          .stringConf()
+          .toSequence()
+          .createWithDefault(List.of());
 
   public static final ConfigEntry<String> GRAVITINO_URI_CONFIG =
       new ConfigBuilder(GRAVITINO_URI)
