@@ -510,3 +510,10 @@ CREATE TABLE IF NOT EXISTS partition_statistic_meta (
 );
 
 CREATE INDEX IF NOT EXISTS idx_table_partition ON partition_statistic_meta(table_id, partition_name);
+
+CREATE TABLE IF NOT EXISTS cache_invalidation_version (
+    id BIGINT NOT NULL,
+    version BIGINT NOT NULL DEFAULT 0,
+    updated_at BIGINT NOT NULL DEFAULT 0,
+    PRIMARY KEY (id)
+);
