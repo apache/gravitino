@@ -80,6 +80,12 @@ public class IcebergMetadataAuthorizationMethodInterceptor
               NameIdentifierUtil.ofTable(
                   metalakeName, catalog, schema, RESTUtil.decodeString(value)));
           break;
+        case VIEW:
+          nameIdentifierMap.put(
+              EntityType.VIEW,
+              NameIdentifierUtil.ofView(
+                  metalakeName, catalog, schema, RESTUtil.decodeString(value)));
+          break;
         default:
           break;
       }
@@ -105,6 +111,8 @@ public class IcebergMetadataAuthorizationMethodInterceptor
             return Optional.of(new LoadTableAuthzHandler(parameters, args));
           case RENAME_TABLE:
             return Optional.of(new RenameTableAuthzHandler(parameters, args));
+          case RENAME_VIEW:
+            return Optional.of(new RenameViewAuthzHandler(parameters, args));
           default:
             break;
         }
