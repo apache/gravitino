@@ -262,7 +262,7 @@ public class CatalogsPageDorisTest extends BaseWebIT {
   @Test
   @Order(7)
   public void testBackHomePage() throws InterruptedException {
-    clickAndWait(catalogsPage.backHomeBtn);
+    catalogsPage.clickBackHomeBtn();
     Assertions.assertTrue(catalogsPage.verifyBackHomePage());
   }
 }

@@ -127,7 +127,7 @@ export default function SchemaDetailsPage() {
             ? [
                 { label: 'Tables', key: 'Tables' },
                 { label: 'Functions', key: 'Functions' },
-                { label: 'Associated roles', key: 'Associated roles' }
+                { label: 'Associated Roles', key: 'Associated Roles' }
               ]
             : [
                 { label: 'Tables', key: 'Tables' },
@@ -145,7 +145,7 @@ export default function SchemaDetailsPage() {
             ? [
                 { label: 'Topics', key: 'Topics' },
                 { label: 'Functions', key: 'Functions' },
-                { label: 'Associated roles', key: 'Associated roles' }
+                { label: 'Associated Roles', key: 'Associated Roles' }
               ]
             : [
                 { label: 'Topics', key: 'Topics' },
@@ -163,7 +163,7 @@ export default function SchemaDetailsPage() {
             ? [
                 { label: 'Filesets', key: 'Filesets' },
                 { label: 'Functions', key: 'Functions' },
-                { label: 'Associated roles', key: 'Associated roles' }
+                { label: 'Associated Roles', key: 'Associated Roles' }
               ]
             : [
                 { label: 'Filesets', key: 'Filesets' },
@@ -181,7 +181,7 @@ export default function SchemaDetailsPage() {
             ? [
                 { label: 'Models', key: 'Models' },
                 { label: 'Functions', key: 'Functions' },
-                { label: 'Associated roles', key: 'Associated roles' }
+                { label: 'Associated Roles', key: 'Associated Roles' }
               ]
             : [
                 { label: 'Models', key: 'Models' },
@@ -536,7 +536,7 @@ export default function SchemaDetailsPage() {
         </Space>
       </Spin>
       <Tabs data-refer='details-tabs' defaultActiveKey={tabKey} onChange={onChangeTab} items={tabOptions} />
-      {tabKey === 'Associated roles' ? (
+      {tabKey === 'Associated Roles' ? (
         <AssociatedTable
           metalake={currentMetalake}
           metadataObjectType={'schema'}

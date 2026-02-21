@@ -438,6 +438,7 @@ export default function CreateTableDialog({ ...props }) {
               Object.entries(table.properties).forEach(([key, value]) => {
                 form.setFieldValue(['properties', idxProperty, 'key'], key)
                 form.setFieldValue(['properties', idxProperty, 'value'], value)
+                form.setFieldValue(['properties', idxProperty, 'isEdit'], true)
                 idxProperty++
               })
             }

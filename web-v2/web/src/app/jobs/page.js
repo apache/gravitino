@@ -22,7 +22,7 @@ import { createContext, useContext, useMemo, useState, useEffect } from 'react'
 import dynamic from 'next/dynamic'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { ArrowRightOutlined, ExclamationCircleFilled, PlusOutlined, RedoOutlined } from '@ant-design/icons'
-import { Button, Drawer, Flex, Input, Modal, Spin, Table, Tag, Tooltip, Typography, theme } from 'antd'
+import { Button, Descriptions, Drawer, Flex, Input, Modal, Spin, Table, Tag, Tooltip, Typography, theme } from 'antd'
 import { useAntdColumnResize } from 'react-antd-column-resize'
 import ConfirmInput from '@/components/ConfirmInput'
 import Icons from '@/components/Icons'
@@ -322,42 +322,29 @@ export default function JobsPage() {
         </Spin>
         {openDetailJob && (
           <Drawer
-            title={`View Job ${currentJob?.jobId} Details`}
+            title={`View Job "${currentJob?.jobId}" Details`}
             loading={jobDetailLoading}
             onClose={onClose}
             open={openDetailJob}
+            width={'40%'}
           >
-            <>
-              <div className='my-4'>
-                <div className='text-sm text-slate-400'>Job ID</div>
-                <span className='break-words text-base'>{currentJob?.jobId}</span>
-              </div>
-              <div className='my-4'>
-                <div className='text-sm text-slate-400'>Template Name</div>
-                <span className='break-words text-base'>{currentJob?.jobTemplateName}</span>
-              </div>
-              <div className='my-4'>
-                <div className='text-sm text-slate-400'>Status</div>
-                <span className='break-words text-base'>
-                  {<Tag color={getStatusColor(currentJob?.status || '')}>{currentJob?.status}</Tag>}
-                </span>
-              </div>
-              <div className='my-4'>
-                <div className='text-sm text-slate-400'>Details</div>
-                <div className='flex justify-between'>
-                  <span className='text-sm'>Creator: </span>
-                  <span className='text-sm'>{currentJob?.audit?.creator}</span>
-                </div>
-                <div className='flex justify-between'>
-                  <span className='text-sm'>Created At: </span>
-                  <span className='text-sm'>{formatToDateTime(currentJob?.audit?.createTime)}</span>
-                </div>
-                <div className='flex justify-between'>
-                  <span className='text-sm'>Updated At: </span>
-                  <span className='text-sm'>{formatToDateTime(currentJob?.audit?.lastModifiedTime)}</span>
-                </div>
-              </div>
-            </>
+            <Title level={5} className='mb-2'>
+              Basic Information
+            </Title>
+            <Descriptions column={1} bordered size='small'>
+              <Descriptions.Item label='Job ID'>{currentJob?.jobId}</Descriptions.Item>
+              <Descriptions.Item label='Template Name'>{currentJob?.jobTemplateName}</Descriptions.Item>
+              <Descriptions.Item label='Status'>
+                <Tag color={getStatusColor(currentJob?.status || '')}>{currentJob?.status}</Tag>
+              </Descriptions.Item>
+              <Descriptions.Item label='Creator'>{currentJob?.audit?.creator || '-'}</Descriptions.Item>
+              <Descriptions.Item label='Created At'>
+                {currentJob?.audit?.createTime ? formatToDateTime(currentJob?.audit?.createTime) : '-'}
+              </Descriptions.Item>
+              <Descriptions.Item label='Updated At'>
+                {currentJob?.audit?.lastModifiedTime ? formatToDateTime(currentJob?.audit?.lastModifiedTime) : '-'}
+              </Descriptions.Item>
+            </Descriptions>
           </Drawer>
         )}
         {open && (
