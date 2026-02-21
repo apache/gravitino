@@ -43,6 +43,7 @@ dependencies {
   compileOnly(libs.aliyun.credentials.sdk)
   compileOnly(libs.hadoop3.client.api)
   compileOnly(libs.hadoop3.oss)
+  compileOnly(libs.lombok)
 
   testImplementation(libs.junit.jupiter.api)
   testImplementation(libs.junit.jupiter.params)
