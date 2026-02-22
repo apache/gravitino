@@ -30,12 +30,14 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.google.common.collect.ImmutableList;
+import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Lists;
 import java.io.File;
 import java.io.IOException;
 import java.time.Instant;
 import java.util.Collections;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.Random;
 import java.util.UUID;
@@ -898,5 +900,98 @@ public class TestJobManager {
         .withAuditInfo(
             AuditInfo.builder().withCreator("test").withCreateTime(Instant.now()).build())
         .build();
+  }
+
+  @Test
+  public void testBuildArgumentsWithOptional() {
+    // Test Case 1: No optional arguments provided
+    List<String> templateArgs1 =
+        Lists.newArrayList(
+            "--catalog", "{{catalog}}", "--table", "{{table}}", "?--strategy", "?{{strategy}}");
+    Map<String, String> jobConf1 = ImmutableMap.of("catalog", "hive", "table", "db.table");
+
+    List<String> result1 = JobManager.buildArgumentsWithOptional(templateArgs1, jobConf1);
+    Assertions.assertEquals(
+        Lists.newArrayList("--catalog", "hive", "--table", "db.table"), result1);
+
+    // Test Case 2: One optional argument provided
+    Map<String, String> jobConf2 =
+        ImmutableMap.of("catalog", "hive", "table", "db.table", "strategy", "binpack");
+
+    List<String> result2 = JobManager.buildArgumentsWithOptional(templateArgs1, jobConf2);
+    Assertions.assertEquals(
+        Lists.newArrayList("--catalog", "hive", "--table", "db.table", "--strategy", "binpack"),
+        result2);
+
+    // Test Case 3: Empty string should be filtered
+    Map<String, String> jobConf3 =
+        ImmutableMap.of("catalog", "hive", "table", "db.table", "strategy", "");
+
+    List<String> result3 = JobManager.buildArgumentsWithOptional(templateArgs1, jobConf3);
+    Assertions.assertEquals(
+        Lists.newArrayList("--catalog", "hive", "--table", "db.table"), result3);
+
+    // Test Case 4: Whitespace should be filtered
+    Map<String, String> jobConf4 =
+        ImmutableMap.of("catalog", "hive", "table", "db.table", "strategy", "   ");
+
+    List<String> result4 = JobManager.buildArgumentsWithOptional(templateArgs1, jobConf4);
+    Assertions.assertEquals(
+        Lists.newArrayList("--catalog", "hive", "--table", "db.table"), result4);
+
+    // Test Case 5: Multiple optional arguments
+    List<String> templateArgs5 =
+        Lists.newArrayList(
+            "--catalog",
+            "{{catalog}}",
+            "?--strategy",
+            "?{{strategy}}",
+            "?--sort-order",
+            "?{{sort_order}}",
+            "?--where",
+            "?{{where}}");
+    Map<String, String> jobConf5 =
+        ImmutableMap.of("catalog", "hive", "strategy", "binpack", "where", "date > '2024-01-01'");
+
+    List<String> result5 = JobManager.buildArgumentsWithOptional(templateArgs5, jobConf5);
+    Assertions.assertEquals(
+        Lists.newArrayList(
+            "--catalog", "hive", "--strategy", "binpack", "--where", "date > '2024-01-01'"),
+        result5);
+
+    // Test Case 6: Non-prefixed arguments should always be included
+    List<String> templateArgs6 =
+        Lists.newArrayList(
+            "--catalog",
+            "{{catalog}}",
+            "--table",
+            "{{missing_placeholder}}", // Non-optional, placeholder missing
+            "?--strategy",
+            "?{{strategy}}");
+    Map<String, String> jobConf6 = ImmutableMap.of("catalog", "hive");
+
+    List<String> result6 = JobManager.buildArgumentsWithOptional(templateArgs6, jobConf6);
+    // Non-optional argument keeps placeholder if not found
+    Assertions.assertEquals(
+        Lists.newArrayList("--catalog", "hive", "--table", "{{missing_placeholder}}"), result6);
+  }
+
+  @Test
+  public void testIsEmptyValue() {
+    // Null should be considered empty
+    Assertions.assertTrue(JobManager.isEmptyValue(null));
+
+    // Empty string should be considered empty
+    Assertions.assertTrue(JobManager.isEmptyValue(""));
+
+    // Whitespace should be considered empty
+    Assertions.assertTrue(JobManager.isEmptyValue("   "));
+    Assertions.assertTrue(JobManager.isEmptyValue("\t"));
+    Assertions.assertTrue(JobManager.isEmptyValue("\n"));
+
+    // Non-empty values should not be considered empty
+    Assertions.assertFalse(JobManager.isEmptyValue("value"));
+    Assertions.assertFalse(JobManager.isEmptyValue("0"));
+    Assertions.assertFalse(JobManager.isEmptyValue("false"));
   }
 }
