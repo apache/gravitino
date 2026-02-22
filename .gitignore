@@ -60,3 +60,5 @@ derby.log
 web/node_modules
 web/dist
 web/.next
+
+.venv/

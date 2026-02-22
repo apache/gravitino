@@ -601,9 +601,9 @@ public class TestPostgreSqlTableOperations extends TestPostgreSql {
 
     Index[] indexes =
         new Index[] {
-          Indexes.primary("test_pk", new String[][] {{"col_1"}, {"col_2"}}),
-          Indexes.unique("u1_key", new String[][] {{"col_2"}, {"col_3"}}),
-          Indexes.unique("u2_key", new String[][] {{"col_3"}, {"col_4"}})
+          Indexes.primary("test_pk", new String[][] {{"col_1"}, {"col_2"}}, Map.of()),
+          Indexes.unique("u1_key", new String[][] {{"col_2"}, {"col_3"}}, Map.of()),
+          Indexes.unique("u2_key", new String[][] {{"col_3"}, {"col_4"}}, Map.of())
         };
 
     // Test create table index success.
@@ -627,8 +627,8 @@ public class TestPostgreSqlTableOperations extends TestPostgreSql {
     JdbcColumn[] jdbcColumns = columns.toArray(new JdbcColumn[0]);
     Index[] primaryIndex =
         new Index[] {
-          Indexes.primary("no_exist_pk", new String[][] {{"no_exist_1"}}),
-          Indexes.unique("no_exist_key", new String[][] {{"no_exist_2"}, {"no_exist_3"}})
+          Indexes.primary("no_exist_pk", new String[][] {{"no_exist_1"}}, Map.of()),
+          Indexes.unique("no_exist_key", new String[][] {{"no_exist_2"}, {"no_exist_3"}}, Map.of())
         };
     GravitinoRuntimeException gravitinoRuntimeException =
         Assertions.assertThrows(
@@ -655,9 +655,9 @@ public class TestPostgreSqlTableOperations extends TestPostgreSql {
     // Test append index sql success.
     Index[] indexes =
         new Index[] {
-          Indexes.primary("test_pk", new String[][] {{"col_1"}, {"col_2"}}),
-          Indexes.unique("u1_key", new String[][] {{"col_2"}, {"col_3"}}),
-          Indexes.unique("u2_key", new String[][] {{"col_3"}, {"col_4"}})
+          Indexes.primary("test_pk", new String[][] {{"col_1"}, {"col_2"}}, Map.of()),
+          Indexes.unique("u1_key", new String[][] {{"col_2"}, {"col_3"}}, Map.of()),
+          Indexes.unique("u2_key", new String[][] {{"col_3"}, {"col_4"}}, Map.of())
         };
     StringBuilder successBuilder = new StringBuilder();
     PostgreSqlTableOperations.appendIndexesSql(indexes, successBuilder);
@@ -671,9 +671,9 @@ public class TestPostgreSqlTableOperations extends TestPostgreSql {
     // Test append index sql not have name.
     indexes =
         new Index[] {
-          Indexes.primary(null, new String[][] {{"col_1"}, {"col_2"}}),
-          Indexes.unique(null, new String[][] {{"col_2"}, {"col_3"}}),
-          Indexes.unique(null, new String[][] {{"col_3"}, {"col_4"}})
+          Indexes.primary(null, new String[][] {{"col_1"}, {"col_2"}}, Map.of()),
+          Indexes.unique(null, new String[][] {{"col_2"}, {"col_3"}}, Map.of()),
+          Indexes.unique(null, new String[][] {{"col_3"}, {"col_4"}}, Map.of())
         };
     successBuilder = new StringBuilder();
     PostgreSqlTableOperations.appendIndexesSql(indexes, successBuilder);
@@ -685,9 +685,9 @@ public class TestPostgreSqlTableOperations extends TestPostgreSql {
         successBuilder.toString());
 
     // Test append index sql failed.
-    Index primary = Indexes.primary("test_pk", new String[][] {{"col_1", "col_2"}});
-    Index unique1 = Indexes.unique("u1_key", new String[][] {{"col_2", "col_3"}});
-    Index unique2 = Indexes.unique("u2_key", new String[][] {{"col_3", "col_4"}});
+    Index primary = Indexes.primary("test_pk", new String[][] {{"col_1", "col_2"}}, Map.of());
+    Index unique1 = Indexes.unique("u1_key", new String[][] {{"col_2", "col_3"}}, Map.of());
+    Index unique2 = Indexes.unique("u2_key", new String[][] {{"col_3", "col_4"}}, Map.of());
     StringBuilder stringBuilder = new StringBuilder();
 
     IllegalArgumentException illegalArgumentException =

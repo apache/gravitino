@@ -190,8 +190,8 @@ Column[] cols = new Column[] {
     Column.of("name", Types.VarCharType.of(500), "Name of the user", true, false, null)
 };
 Index[] indexes = new Index[] {
-    Indexes.of(IndexType.PRIMARY_KEY, "PRIMARY", new String[][]{{"id"}})
-}
+    Indexes.of(IndexType.PRIMARY_KEY, "PRIMARY", new String[][]{{"id"}}, Map.of())
+};
 ```
 
 </TabItem>
@@ -227,9 +227,9 @@ Index[] indexes = new Index[] {
 
 ```java
 Index[] indexes = new Index[] {
-    Indexes.of(IndexType.PRIMARY_KEY, "PRIMARY", new String[][]{{"id"}}),
-    Indexes.of(IndexType.UNIQUE_KEY, "id_name_uk", new String[][]{{"id"} , {"name"}}),
-}
+    Indexes.of(IndexType.PRIMARY_KEY, "PRIMARY", new String[][]{{"id"}}, Map.of()),
+    Indexes.of(IndexType.UNIQUE_KEY, "id_name_uk", new String[][]{{"id"} , {"name"}}, Map.of()),
+};
 ```
 
 </TabItem>

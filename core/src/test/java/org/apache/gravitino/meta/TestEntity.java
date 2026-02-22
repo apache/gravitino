@@ -165,7 +165,9 @@ public class TestEntity {
     SortOrder[] sortOrders =
         new SortOrder[] {SortOrders.of(NamedReference.field("col1"), SortDirection.ASCENDING)};
     Index[] indexes =
-        new Index[] {Indexes.of(Index.IndexType.BTREE, "idx1", new String[][] {{"col1"}})};
+        new Index[] {
+          Indexes.of(Index.IndexType.BTREE, "idx1", new String[][] {{"col1"}}, Map.of())
+        };
     Distribution distribution = Distributions.hash(4, NamedReference.field("col1"));
 
     TableEntity testTable =

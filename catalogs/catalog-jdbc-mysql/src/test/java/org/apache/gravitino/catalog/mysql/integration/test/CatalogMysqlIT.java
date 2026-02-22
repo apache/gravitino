@@ -1002,13 +1002,14 @@ public class CatalogMysqlIT extends BaseIT {
 
     Index[] indexes =
         new Index[] {
-          Indexes.createMysqlPrimaryKey(new String[][] {{"col_1"}, {"col_2"}}),
-          Indexes.unique("u1_key", new String[][] {{"col_2"}, {"col_3"}}),
-          Indexes.unique("u2_key", new String[][] {{"col_3"}, {"col_4"}}),
-          Indexes.unique("u3_key", new String[][] {{"col_5"}, {"col_4"}}),
-          Indexes.unique("u4_key", new String[][] {{"col_2"}, {"col_3"}, {"col_4"}}),
-          Indexes.unique("u5_key", new String[][] {{"col_3"}, {"col_2"}, {"col_4"}}),
-          Indexes.unique("u6_key", new String[][] {{"col_3"}, {"col_4"}, {"col_1"}, {"col_2"}}),
+          Indexes.createMysqlPrimaryKey(new String[][] {{"col_1"}, {"col_2"}}, Map.of()),
+          Indexes.unique("u1_key", new String[][] {{"col_2"}, {"col_3"}}, Map.of()),
+          Indexes.unique("u2_key", new String[][] {{"col_3"}, {"col_4"}}, Map.of()),
+          Indexes.unique("u3_key", new String[][] {{"col_5"}, {"col_4"}}, Map.of()),
+          Indexes.unique("u4_key", new String[][] {{"col_2"}, {"col_3"}, {"col_4"}}, Map.of()),
+          Indexes.unique("u5_key", new String[][] {{"col_3"}, {"col_2"}, {"col_4"}}, Map.of()),
+          Indexes.unique(
+              "u6_key", new String[][] {{"col_3"}, {"col_4"}, {"col_1"}, {"col_2"}}, Map.of()),
         };
 
     NameIdentifier tableIdentifier = NameIdentifier.of(schemaName, tableName);
@@ -1045,7 +1046,7 @@ public class CatalogMysqlIT extends BaseIT {
 
     NameIdentifier id = NameIdentifier.of(schemaName, "test_failed");
     Index[] indexes2 =
-        new Index[] {Indexes.createMysqlPrimaryKey(new String[][] {{"col_1", "col_2"}})};
+        new Index[] {Indexes.createMysqlPrimaryKey(new String[][] {{"col_1", "col_2"}}, Map.of())};
     SortOrder[] sortOrder = new SortOrder[0];
     IllegalArgumentException illegalArgumentException =
         assertThrows(
@@ -1066,7 +1067,8 @@ public class CatalogMysqlIT extends BaseIT {
             illegalArgumentException.getMessage(),
             "Index does not support complex fields in this Catalog"));
 
-    Index[] indexes3 = new Index[] {Indexes.unique("u1_key", new String[][] {{"col_2", "col_3"}})};
+    Index[] indexes3 =
+        new Index[] {Indexes.unique("u1_key", new String[][] {{"col_2", "col_3"}}, Map.of())};
     illegalArgumentException =
         assertThrows(
             IllegalArgumentException.class,
@@ -1097,8 +1099,11 @@ public class CatalogMysqlIT extends BaseIT {
         new SortOrder[0],
         new Index[] {
           Indexes.of(
-              Index.IndexType.UNIQUE_KEY, null, new String[][] {{"col_1"}, {"col_3"}, {"col_4"}}),
-          Indexes.of(Index.IndexType.UNIQUE_KEY, null, new String[][] {{"col_4"}}),
+              Index.IndexType.UNIQUE_KEY,
+              null,
+              new String[][] {{"col_1"}, {"col_3"}, {"col_4"}},
+              Map.of()),
+          Indexes.of(Index.IndexType.UNIQUE_KEY, null, new String[][] {{"col_4"}}, Map.of()),
         });
     table = tableCatalog.loadTable(tableIdent);
 
@@ -1126,7 +1131,8 @@ public class CatalogMysqlIT extends BaseIT {
                       Indexes.of(
                           Index.IndexType.UNIQUE_KEY,
                           "u_key",
-                          new String[][] {{"col_7"}, {"col_6"}}),
+                          new String[][] {{"col_7"}, {"col_6"}},
+                          Map.of()),
                     }));
     Assertions.assertTrue(
         uniqueKeyNotExistException
@@ -1146,7 +1152,11 @@ public class CatalogMysqlIT extends BaseIT {
                     Distributions.NONE,
                     new SortOrder[0],
                     new Index[] {
-                      Indexes.of(Index.IndexType.UNIQUE_KEY, "u_key", new String[][] {{"col_6"}}),
+                      Indexes.of(
+                          Index.IndexType.UNIQUE_KEY,
+                          "u_key",
+                          new String[][] {{"col_6"}},
+                          Map.of()),
                     }));
     Assertions.assertTrue(
         uniqueKeyNotNullException
@@ -1165,7 +1175,7 @@ public class CatalogMysqlIT extends BaseIT {
         Distributions.NONE,
         new SortOrder[0],
         new Index[] {
-          Indexes.of(Index.IndexType.UNIQUE_KEY, "u_key", new String[][] {{"col_7"}}),
+          Indexes.of(Index.IndexType.UNIQUE_KEY, "u_key", new String[][] {{"col_7"}}, Map.of()),
         });
     table = tableCatalog.loadTable(nullableTableIdent);
 
@@ -1185,7 +1195,7 @@ public class CatalogMysqlIT extends BaseIT {
                     Distributions.NONE,
                     new SortOrder[0],
                     new Index[] {
-                      Indexes.createMysqlPrimaryKey(new String[][] {{"col_8"}}),
+                      Indexes.createMysqlPrimaryKey(new String[][] {{"col_8"}}, Map.of()),
                     }));
     Assertions.assertTrue(
         primaryKeyNotExistexception
@@ -1205,7 +1215,7 @@ public class CatalogMysqlIT extends BaseIT {
                     Distributions.NONE,
                     new SortOrder[0],
                     new Index[] {
-                      Indexes.createMysqlPrimaryKey(new String[][] {{"col_7"}}),
+                      Indexes.createMysqlPrimaryKey(new String[][] {{"col_7"}}, Map.of()),
                     }));
     Assertions.assertTrue(
         primaryKeyNotNullException
@@ -1224,8 +1234,8 @@ public class CatalogMysqlIT extends BaseIT {
 
     Index[] indexes =
         new Index[] {
-          Indexes.createMysqlPrimaryKey(new String[][] {{"col_1"}, {"col_2"}}),
-          Indexes.unique("u1_key", new String[][] {{"col_2"}, {"col_3"}})
+          Indexes.createMysqlPrimaryKey(new String[][] {{"col_1"}, {"col_2"}}, Map.of()),
+          Indexes.unique("u1_key", new String[][] {{"col_2"}, {"col_3"}}, Map.of())
         };
 
     NameIdentifier tableIdentifier = NameIdentifier.of(schemaName, tableName);
@@ -1319,8 +1329,8 @@ public class CatalogMysqlIT extends BaseIT {
         };
     indexes =
         new Index[] {
-          Indexes.createMysqlPrimaryKey(new String[][] {{"col_1_1"}, {"col_2"}}),
-          Indexes.unique("u1_key", new String[][] {{"col_2"}, {"col_3"}})
+          Indexes.createMysqlPrimaryKey(new String[][] {{"col_1_1"}, {"col_2"}}, Map.of()),
+          Indexes.unique("u1_key", new String[][] {{"col_2"}, {"col_3"}}, Map.of())
         };
     ITUtils.assertionsTableInfo(
         tableName,
@@ -1356,7 +1366,9 @@ public class CatalogMysqlIT extends BaseIT {
     ColumnImpl column = Column.of("col_6", Types.LongType.get(), "id2", false, true, null);
     SortOrder[] sortOrder = new SortOrder[0];
     Index[] index2 =
-        new Index[] {Indexes.createMysqlPrimaryKey(new String[][] {{"col_1"}, {"col_6"}})};
+        new Index[] {
+          Indexes.createMysqlPrimaryKey(new String[][] {{"col_1"}, {"col_6"}}, Map.of())
+        };
 
     runtimeException =
         assertThrows(
@@ -1445,7 +1457,7 @@ public class CatalogMysqlIT extends BaseIT {
     Column t1_col = Column.of(t1_name, Types.LongType.get(), "id", false, false, null);
     Column[] columns = {t1_col};
 
-    Index[] t1_indexes = {Indexes.unique("u1_key", new String[][] {{t1_name}})};
+    Index[] t1_indexes = {Indexes.unique("u1_key", new String[][] {{t1_name}}, Map.of())};
 
     NameIdentifier tableIdentifier = NameIdentifier.of(schemaName, t1_name);
     tableCatalog.createTable(
@@ -1460,7 +1472,7 @@ public class CatalogMysqlIT extends BaseIT {
 
     String t2_name = "t212";
     Column t2_col = Column.of(t2_name, Types.LongType.get(), "id", false, false, null);
-    Index[] t2_indexes = {Indexes.unique("u2_key", new String[][] {{t2_name}})};
+    Index[] t2_indexes = {Indexes.unique("u2_key", new String[][] {{t2_name}}, Map.of())};
     columns = new Column[] {t2_col};
     tableIdentifier = NameIdentifier.of(schemaName, t2_name);
     tableCatalog.createTable(
@@ -1475,7 +1487,7 @@ public class CatalogMysqlIT extends BaseIT {
 
     String t3_name = "t_12";
     Column t3_col = Column.of(t3_name, Types.LongType.get(), "id", false, false, null);
-    Index[] t3_indexes = {Indexes.unique("u3_key", new String[][] {{t3_name}})};
+    Index[] t3_indexes = {Indexes.unique("u3_key", new String[][] {{t3_name}}, Map.of())};
     columns = new Column[] {t3_col};
     tableIdentifier = NameIdentifier.of(schemaName, t3_name);
     tableCatalog.createTable(
@@ -1490,7 +1502,7 @@ public class CatalogMysqlIT extends BaseIT {
 
     String t4_name = "_1__";
     Column t4_col = Column.of(t4_name, Types.LongType.get(), "id", false, false, null);
-    Index[] t4_indexes = {Indexes.unique("u4_key", new String[][] {{t4_name}})};
+    Index[] t4_indexes = {Indexes.unique("u4_key", new String[][] {{t4_name}}, Map.of())};
     columns = new Column[] {t4_col};
     tableIdentifier = NameIdentifier.of(schemaName, t4_name);
     tableCatalog.createTable(
@@ -1557,7 +1569,7 @@ public class CatalogMysqlIT extends BaseIT {
     String t1_name = table_name + "`; DROP TABLE important_table; -- ";
     Column t1_col = Column.of(t1_name, Types.LongType.get(), "id", false, false, null);
     Column[] columns = {t1_col};
-    Index[] t1_indexes = {Indexes.unique("u1_key", new String[][] {{t1_name}})};
+    Index[] t1_indexes = {Indexes.unique("u1_key", new String[][] {{t1_name}}, Map.of())};
     NameIdentifier tableIdentifier =
         NameIdentifier.of(metalakeName, catalogName, schemaName, t1_name);
 
@@ -1582,7 +1594,7 @@ public class CatalogMysqlIT extends BaseIT {
 
     String t2_name = table_name + "`; SLEEP(10); -- ";
     Column t2_col = Column.of(t2_name, Types.LongType.get(), "id", false, false, null);
-    Index[] t2_indexes = {Indexes.unique("u2_key", new String[][] {{t2_name}})};
+    Index[] t2_indexes = {Indexes.unique("u2_key", new String[][] {{t2_name}}, Map.of())};
     Column[] columns2 = new Column[] {t2_col};
     NameIdentifier tableIdentifier2 =
         NameIdentifier.of(metalakeName, catalogName, schemaName, t2_name);
@@ -1609,7 +1621,7 @@ public class CatalogMysqlIT extends BaseIT {
     String t3_name =
         table_name + "`; UPDATE Users SET password = 'newpassword' WHERE username = 'admin'; -- ";
     Column t3_col = Column.of(t3_name, Types.LongType.get(), "id", false, false, null);
-    Index[] t3_indexes = {Indexes.unique("u3_key", new String[][] {{t3_name}})};
+    Index[] t3_indexes = {Indexes.unique("u3_key", new String[][] {{t3_name}}, Map.of())};
     Column[] columns3 = new Column[] {t3_col};
     NameIdentifier tableIdentifier3 =
         NameIdentifier.of(metalakeName, catalogName, schemaName, t3_name);
@@ -1635,7 +1647,7 @@ public class CatalogMysqlIT extends BaseIT {
 
     String invalidInput = StringUtils.repeat("a", 65);
     Column t4_col = Column.of(invalidInput, Types.LongType.get(), "id", false, false, null);
-    Index[] t4_indexes = {Indexes.unique("u4_key", new String[][] {{invalidInput}})};
+    Index[] t4_indexes = {Indexes.unique("u4_key", new String[][] {{invalidInput}}, Map.of())};
     Column[] columns4 = new Column[] {t4_col};
     NameIdentifier tableIdentifier4 =
         NameIdentifier.of(metalakeName, catalogName, schemaName, invalidInput);
@@ -1671,8 +1683,8 @@ public class CatalogMysqlIT extends BaseIT {
 
     Index[] indexes =
         new Index[] {
-          Indexes.createMysqlPrimaryKey(new String[][] {{"col_1"}, {"col_2"}}),
-          Indexes.unique("u1_key", new String[][] {{"col_2"}, {"col_3"}})
+          Indexes.createMysqlPrimaryKey(new String[][] {{"col_1"}, {"col_2"}}, Map.of()),
+          Indexes.unique("u1_key", new String[][] {{"col_2"}, {"col_3"}}, Map.of())
         };
 
     NameIdentifier tableIdentifier = NameIdentifier.of(schemaName, "tableName");
@@ -1844,7 +1856,8 @@ public class CatalogMysqlIT extends BaseIT {
     Column col3 = Column.of("col_3", Types.VarCharType.of(255), "config", false, false, null);
     Column[] newColumns = new Column[] {col1, col2, col3};
 
-    Index[] indexes = new Index[] {Indexes.unique("u1_key", new String[][] {{"col_2"}, {"col_3"}})};
+    Index[] indexes =
+        new Index[] {Indexes.unique("u1_key", new String[][] {{"col_2"}, {"col_3"}}, Map.of())};
 
     String[] schemas = {"db_", "db_1", "db_2", "db12"};
     SupportsSchemas schemaSupport = catalog.asSchemas();
@@ -1940,8 +1953,8 @@ public class CatalogMysqlIT extends BaseIT {
     Table table = tableCatalog.loadTable(NameIdentifier.of(schemaName, tableName));
     Index[] indexes =
         new Index[] {
-          Indexes.unique("u1_key", new String[][] {{"col_2"}, {"col_3"}}),
-          Indexes.createMysqlPrimaryKey(new String[][] {{"col_1"}})
+          Indexes.unique("u1_key", new String[][] {{"col_2"}, {"col_3"}}, Map.of()),
+          Indexes.createMysqlPrimaryKey(new String[][] {{"col_1"}}, Map.of())
         };
     ITUtils.assertionsTableInfo(
         tableName,
@@ -1964,8 +1977,8 @@ public class CatalogMysqlIT extends BaseIT {
 
     indexes =
         new Index[] {
-          Indexes.createMysqlPrimaryKey(new String[][] {{"col_1"}}),
-          Indexes.unique("u2_key", new String[][] {{"col_4"}})
+          Indexes.createMysqlPrimaryKey(new String[][] {{"col_1"}}, Map.of()),
+          Indexes.unique("u2_key", new String[][] {{"col_4"}}, Map.of())
         };
     table = tableCatalog.loadTable(NameIdentifier.of(schemaName, tableName));
     Column col4 = Column.of("col_4", Types.VarCharType.of(255), null, true, false, null);
@@ -1989,10 +2002,10 @@ public class CatalogMysqlIT extends BaseIT {
 
     indexes =
         new Index[] {
-          Indexes.createMysqlPrimaryKey(new String[][] {{"col_1"}}),
-          Indexes.unique("u2_key", new String[][] {{"col_4"}}),
-          Indexes.unique("u1_key", new String[][] {{"col_2"}, {"col_3"}}),
-          Indexes.unique("u3_key", new String[][] {{"col_1"}, {"col_4"}})
+          Indexes.createMysqlPrimaryKey(new String[][] {{"col_1"}}, Map.of()),
+          Indexes.unique("u2_key", new String[][] {{"col_4"}}, Map.of()),
+          Indexes.unique("u1_key", new String[][] {{"col_2"}, {"col_3"}}, Map.of()),
+          Indexes.unique("u3_key", new String[][] {{"col_1"}, {"col_4"}}, Map.of())
         };
     table = tableCatalog.loadTable(NameIdentifier.of(schemaName, tableName));
     ITUtils.assertionsTableInfo(
@@ -2065,7 +2078,8 @@ public class CatalogMysqlIT extends BaseIT {
     Table table = tableCatalog.loadTable(tableIdentifier);
 
     Column col6 = Column.of("col_6", Types.LongType.get(), "id", false, true, null);
-    Index[] indices = new Index[] {Indexes.createMysqlPrimaryKey(new String[][] {{"col_6"}})};
+    Index[] indices =
+        new Index[] {Indexes.createMysqlPrimaryKey(new String[][] {{"col_6"}}, Map.of())};
     newColumns = new Column[] {col1, col2, col3, col4, col5, col6};
     ITUtils.assertionsTableInfo(
         tableName,
@@ -2081,7 +2095,7 @@ public class CatalogMysqlIT extends BaseIT {
         tableIdentifier, TableChange.updateColumnAutoIncrement(new String[] {"col_6"}, false));
     table = tableCatalog.loadTable(tableIdentifier);
     col6 = Column.of("col_6", Types.LongType.get(), "id", false, false, null);
-    indices = new Index[] {Indexes.createMysqlPrimaryKey(new String[][] {{"col_6"}})};
+    indices = new Index[] {Indexes.createMysqlPrimaryKey(new String[][] {{"col_6"}}, Map.of())};
     newColumns = new Column[] {col1, col2, col3, col4, col5, col6};
     ITUtils.assertionsTableInfo(
         tableName,
@@ -2097,7 +2111,7 @@ public class CatalogMysqlIT extends BaseIT {
         tableIdentifier, TableChange.updateColumnAutoIncrement(new String[] {"col_6"}, true));
     table = tableCatalog.loadTable(tableIdentifier);
     col6 = Column.of("col_6", Types.LongType.get(), "id", false, true, null);
-    indices = new Index[] {Indexes.createMysqlPrimaryKey(new String[][] {{"col_6"}})};
+    indices = new Index[] {Indexes.createMysqlPrimaryKey(new String[][] {{"col_6"}}, Map.of())};
     newColumns = new Column[] {col1, col2, col3, col4, col5, col6};
     ITUtils.assertionsTableInfo(
         tableName,

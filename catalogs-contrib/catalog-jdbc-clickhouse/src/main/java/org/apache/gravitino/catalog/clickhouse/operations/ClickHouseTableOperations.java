@@ -103,7 +103,8 @@ public class ClickHouseTableOperations extends JdbcTableOperations {
         String indexName = resultSet.getString("PK_NAME");
         String columnName = resultSet.getString("COLUMN_NAME");
         indexes.add(
-            Indexes.of(Index.IndexType.PRIMARY_KEY, indexName, new String[][] {{columnName}}));
+            Indexes.of(
+                Index.IndexType.PRIMARY_KEY, indexName, new String[][] {{columnName}}, Map.of()));
       }
       indexes.addAll(getSecondaryIndexes(connection, databaseName, tableName));
       return indexes;
