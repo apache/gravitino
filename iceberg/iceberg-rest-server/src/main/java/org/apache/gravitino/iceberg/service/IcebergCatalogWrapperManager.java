@@ -49,7 +49,10 @@ public class IcebergCatalogWrapperManager implements AutoCloseable {
   private final IcebergConfigProvider configProvider;
 
   public IcebergCatalogWrapperManager(
-      Map<String, String> properties, IcebergConfigProvider configProvider) {
+      Map<String, String> properties,
+      IcebergConfigProvider configProvider,
+      boolean auxMode,
+      String metalakeName) {
     this.configProvider = configProvider;
     this.catalogWrapperCache =
         Caffeine.newBuilder()
@@ -72,13 +75,12 @@ public class IcebergCatalogWrapperManager implements AutoCloseable {
                             .setNameFormat("iceberg-catalog-wrapper-cleaner-%d")
                             .build())))
             .build();
-    IcebergRESTServerContext context = IcebergRESTServerContext.getInstance();
-    if (context.isAuxMode()) {
+    if (auxMode) {
       GravitinoEnv.getInstance()
           .catalogManager()
           .addCatalogCacheRemoveListener(
               ident -> {
-                if (ident.namespace().level(0).equals(context.metalakeName())) {
+                if (ident.namespace().level(0).equals(metalakeName)) {
                   catalogWrapperCache.invalidate(ident.name());
                 }
               });
