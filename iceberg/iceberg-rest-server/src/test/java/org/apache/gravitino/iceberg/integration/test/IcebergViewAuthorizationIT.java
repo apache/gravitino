@@ -189,9 +189,8 @@ public class IcebergViewAuthorizationIT extends IcebergAuthorizationIT {
     String viewName = "test_drop_view";
     createViewAsAdmin(viewName);
 
-    // Note: NORMAL_USER physically executes CREATE VIEW via Spark, so they retain
-    // implicit creator privileges even after ownership transfer. We test that explicit
-    // ownership grants drop privileges.
+    // No privileges - should fail
+    Assertions.assertThrowsExactly(ForbiddenException.class, () -> sql("DROP VIEW %s", viewName));
 
     // View owner can drop
     setViewOwner(viewName);
@@ -229,6 +228,15 @@ public class IcebergViewAuthorizationIT extends IcebergAuthorizationIT {
                 "CREATE OR REPLACE VIEW %s AS SELECT col_1 FROM %s",
                 viewName, fullTableName(BASE_TABLE_NAME)));
     revokeRole(ownerTableRole);
+
+    // Schema owner can also replace (schema ownership covers the base table in the same schema)
+    setSchemaOwner(NORMAL_USER);
+    Assertions.assertDoesNotThrow(
+        () ->
+            sql(
+                "CREATE OR REPLACE VIEW %s AS SELECT col_1 FROM %s",
+                viewName, fullTableName(BASE_TABLE_NAME)));
+    setSchemaOwner(SUPER_USER);
   }
 
   @Test
@@ -248,6 +256,16 @@ public class IcebergViewAuthorizationIT extends IcebergAuthorizationIT {
     Assertions.assertEquals(1, viewNames.size());
     Assertions.assertTrue(viewNames.contains(view1));
     Assertions.assertFalse(viewNames.contains(view2));
+
+    // Schema owner can see all views
+    revokeUserRoles();
+    grantUseSchemaRole(SCHEMA_NAME);
+    setSchemaOwner(NORMAL_USER);
+    viewNames = listViewNames(SCHEMA_NAME);
+    Assertions.assertEquals(2, viewNames.size());
+    Assertions.assertTrue(viewNames.contains(view1));
+    Assertions.assertTrue(viewNames.contains(view2));
+    setSchemaOwner(SUPER_USER);
   }
 
   @Test
@@ -255,8 +273,10 @@ public class IcebergViewAuthorizationIT extends IcebergAuthorizationIT {
     String viewName = "test_rename_same_ns";
     createViewAsAdmin(viewName);
 
-    // Note: NORMAL_USER physically executes CREATE VIEW via Spark, so they retain
-    // implicit creator privileges. We test that explicit ownership allows rename.
+    // No privileges - should fail
+    Assertions.assertThrowsExactly(
+        ForbiddenException.class,
+        () -> sql("ALTER VIEW %s RENAME TO %s", viewName, viewName + "_renamed"));
 
     // View owner can rename within same namespace
     setViewOwner(viewName);
@@ -288,12 +308,35 @@ public class IcebergViewAuthorizationIT extends IcebergAuthorizationIT {
     // Create view in source schema
     createViewAsAdmin(viewName);
 
-    // Note: NORMAL_USER physically executes CREATE VIEW via Spark, retaining implicit
-    // creator privileges. Test that explicit ownership + CREATE_VIEW on dest allows rename.
+    // No privileges - should fail
+    Assertions.assertThrowsExactly(
+        ForbiddenException.class,
+        () ->
+            sql(
+                "ALTER VIEW %s.%s RENAME TO %s.%s",
+                sourceSchema, viewName, destSchema, viewName + "_renamed1"));
+
+    // Only CREATE_VIEW on dest (no view ownership on source) - should fail
+    String createViewRole = grantCreateViewRole(destSchema);
+    Assertions.assertThrowsExactly(
+        ForbiddenException.class,
+        () ->
+            sql(
+                "ALTER VIEW %s.%s RENAME TO %s.%s",
+                sourceSchema, viewName, destSchema, viewName + "_renamed2"));
+    revokeRole(createViewRole);
+
+    // View owner only (no CREATE_VIEW on dest) - should fail
+    setViewOwner(viewName);
+    Assertions.assertThrowsExactly(
+        ForbiddenException.class,
+        () ->
+            sql(
+                "ALTER VIEW %s.%s RENAME TO %s.%s",
+                sourceSchema, viewName, destSchema, viewName + "_renamed3"));
 
     // View owner + CREATE_VIEW on dest - should succeed
-    setViewOwner(viewName);
-    String createViewRole = grantCreateViewRole(destSchema);
+    createViewRole = grantCreateViewRole(destSchema);
     Assertions.assertDoesNotThrow(
         () ->
             sql(
@@ -361,13 +404,26 @@ public class IcebergViewAuthorizationIT extends IcebergAuthorizationIT {
     String roleName = grantSelectViewRole(viewName);
     // INVOKER model requires SELECT on base table to read from view
     String tableRoleName = grantSelectTableRole(BASE_TABLE_NAME);
-
-    // User should be able to read the view
     Assertions.assertDoesNotThrow(() -> sql("SELECT * FROM %s", viewName));
 
-    // Note: NORMAL_USER physically created the view via Spark, so they retain implicit
-    // privileges. In a real deployment with separate admin/user sessions, SELECT_VIEW
-    // would not grant modification privileges. This test verifies SELECT works.
+    // SELECT_VIEW privilege must NOT grant the ability to modify the view
+    Assertions.assertThrowsExactly(
+        ForbiddenException.class,
+        () -> sql("DROP VIEW %s", viewName),
+        "SELECT_VIEW should not allow DROP VIEW");
+
+    Assertions.assertThrowsExactly(
+        ForbiddenException.class,
+        () ->
+            sql(
+                "CREATE OR REPLACE VIEW %s AS SELECT col_1 FROM %s",
+                viewName, fullTableName(BASE_TABLE_NAME)),
+        "SELECT_VIEW should not allow REPLACE VIEW");
+
+    Assertions.assertThrowsExactly(
+        ForbiddenException.class,
+        () -> sql("ALTER VIEW %s RENAME TO %s", viewName, viewName + "_renamed"),
+        "SELECT_VIEW should not allow RENAME VIEW");
 
     revokeRole(roleName);
     revokeRole(tableRoleName);
@@ -388,7 +444,7 @@ public class IcebergViewAuthorizationIT extends IcebergAuthorizationIT {
     setSchemaOwner(NORMAL_USER);
     sql("CREATE VIEW %s AS SELECT * FROM %s", viewName, fullTableName(BASE_TABLE_NAME));
 
-    // CRITICAL: Revoke ALL roles from NORMAL_USER to eliminate residual privileges
+    // Revoke ALL roles from NORMAL_USER to eliminate residual privileges
     // This ensures ownership transfer is clean and NORMAL_USER has no implicit access
     revokeUserRoles();
 
@@ -401,7 +457,7 @@ public class IcebergViewAuthorizationIT extends IcebergAuthorizationIT {
     // Restore schema ownership to SUPER_USER
     setSchemaOwner(SUPER_USER);
 
-    // Re-grant the basic USE schema role that tests expect (must be after revokeUserRoles)
+    // Re-grant the basic USE schema role that tests expect
     grantUseSchemaRole(SCHEMA_NAME);
   }
 
