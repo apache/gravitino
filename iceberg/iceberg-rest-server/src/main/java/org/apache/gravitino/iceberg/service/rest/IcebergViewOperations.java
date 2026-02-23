@@ -162,10 +162,7 @@ public class IcebergViewOperations {
   @Timed(name = "load-view." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
   @ResponseMetered(name = "load-view", absolute = true)
   @AuthorizationExpression(
-      expression =
-          "ANY(OWNER, METALAKE, CATALOG) || "
-              + "SCHEMA_OWNER_WITH_USE_CATALOG || "
-              + "ANY_USE_CATALOG && ANY_USE_SCHEMA && (VIEW::OWNER || ANY_SELECT_VIEW || ANY_CREATE_VIEW)",
+      expression = AuthorizationExpressionConstants.ICEBERG_LOAD_VIEW_AUTHORIZATION_EXPRESSION,
       accessMetadataType = MetadataObject.Type.VIEW)
   public Response loadView(
       @AuthorizationMetadata(type = Entity.EntityType.CATALOG) @PathParam("prefix") String prefix,
@@ -283,10 +280,7 @@ public class IcebergViewOperations {
   @Timed(name = "view-exists." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
   @ResponseMetered(name = "view-exists", absolute = true)
   @AuthorizationExpression(
-      expression =
-          "ANY(OWNER, METALAKE, CATALOG) || "
-              + "SCHEMA_OWNER_WITH_USE_CATALOG || "
-              + "ANY_USE_CATALOG && ANY_USE_SCHEMA && (VIEW::OWNER || ANY_SELECT_VIEW || ANY_CREATE_VIEW)",
+      expression = AuthorizationExpressionConstants.ICEBERG_LOAD_VIEW_AUTHORIZATION_EXPRESSION,
       accessMetadataType = MetadataObject.Type.VIEW)
   public Response viewExists(
       @AuthorizationMetadata(type = Entity.EntityType.CATALOG) @PathParam("prefix") String prefix,
