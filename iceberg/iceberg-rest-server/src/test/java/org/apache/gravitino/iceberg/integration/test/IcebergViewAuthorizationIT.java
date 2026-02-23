@@ -70,8 +70,8 @@ public class IcebergViewAuthorizationIT extends IcebergAuthorizationIT {
         MetadataObjects.of(
             Arrays.asList(GRAVITINO_CATALOG_NAME, SCHEMA_NAME), MetadataObject.Type.SCHEMA);
     metalakeClientWithAllPrivilege.setOwner(schemaObject, SUPER_USER, Owner.Type.USER);
-    clearViews();
     grantUseSchemaRole(SCHEMA_NAME);
+    clearViews();
     sql("USE %s;", SPARK_CATALOG_NAME);
     sql("USE %s;", SCHEMA_NAME);
   }
@@ -309,10 +309,8 @@ public class IcebergViewAuthorizationIT extends IcebergAuthorizationIT {
     Assertions.assertTrue(owner.isPresent());
     Assertions.assertEquals(NORMAL_USER, owner.get().name());
 
-    // Clean up
-    revokeRole(createViewRole);
-    // NORMAL_USER still owns the renamed view, so they can drop it
     sql("DROP VIEW IF EXISTS %s.%s", destSchema, viewName + "_renamed");
+    revokeRole(createViewRole);
     catalogClientWithAllPrivilege.asSchemas().dropSchema(destSchema, false);
   }
 
@@ -463,7 +461,9 @@ public class IcebergViewAuthorizationIT extends IcebergAuthorizationIT {
     securableObjects.add(catalogObject);
     SecurableObject schemaObject =
         SecurableObjects.ofSchema(
-            catalogObject, schema, ImmutableList.of(Privileges.CreateView.allow()));
+            catalogObject,
+            schema,
+            ImmutableList.of(Privileges.UseSchema.allow(), Privileges.CreateView.allow()));
     securableObjects.add(schemaObject);
     metalakeClientWithAllPrivilege.createRole(roleName, new HashMap<>(), securableObjects);
     metalakeClientWithAllPrivilege.grantRolesToUser(ImmutableList.of(roleName), NORMAL_USER);
