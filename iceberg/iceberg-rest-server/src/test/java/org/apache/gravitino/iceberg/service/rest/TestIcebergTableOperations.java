@@ -74,6 +74,7 @@ import org.apache.iceberg.metrics.CommitReport;
 import org.apache.iceberg.metrics.ImmutableCommitMetricsResult;
 import org.apache.iceberg.metrics.ImmutableCommitReport;
 import org.apache.iceberg.rest.PlanStatus;
+import org.apache.iceberg.rest.RESTUtil;
 import org.apache.iceberg.rest.requests.CreateTableRequest;
 import org.apache.iceberg.rest.requests.PlanTableScanRequest;
 import org.apache.iceberg.rest.requests.RenameTableRequest;
@@ -675,6 +676,40 @@ public class TestIcebergTableOperations extends IcebergNamespaceTestBase {
     Assertions.assertTrue(
         errorBody.contains("remote signing") || errorBody.contains("remote-signing"),
         "Error message should mention remote signing: " + errorBody);
+  }
+
+  @ParameterizedTest
+  @MethodSource("org.apache.gravitino.iceberg.service.rest.IcebergRestTestUtil#testNamespaces")
+  void testTableOperationsWithEncodedName(Namespace namespace) {
+    // Table names with special characters that require percent-encoding in URL paths.
+    // RESTUtil.encodeString encodes them for the URL, and the server should decode
+    // them back via RESTUtil.decodeString thanks to @Encoded on the path parameter.
+    String[] specialNames = {"table.with.dots", "table@special"};
+
+    verifyCreateNamespaceSucc(namespace);
+
+    for (String originalName : specialNames) {
+      String encodedName = RESTUtil.encodeString(originalName);
+
+      // Create uses the original name in the request body, not in the URL path
+      verifyCreateTableSucc(namespace, originalName);
+
+      // Load, exists use the encoded name in the URL path
+      verifyLoadTableSucc(namespace, encodedName);
+      verifyTableExistsStatusCode(namespace, encodedName, 204);
+
+      // Update: load metadata with encoded path, then update with encoded path
+      TableMetadata metadata = getTableMeta(namespace, encodedName);
+      verifyUpdateSucc(namespace, encodedName, metadata);
+    }
+
+    // Verify list returns the original (decoded) table names
+    verifyListTableSucc(namespace, ImmutableSet.copyOf(specialNames));
+
+    for (String originalName : specialNames) {
+      verifyDropTableSucc(namespace, RESTUtil.encodeString(originalName));
+    }
+    verifyDropNamespaceSucc(namespace);
   }
 
   @ParameterizedTest
