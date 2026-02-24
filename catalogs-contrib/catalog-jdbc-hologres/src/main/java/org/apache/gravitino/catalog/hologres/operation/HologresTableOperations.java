@@ -20,6 +20,7 @@ package org.apache.gravitino.catalog.hologres.operation;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
+import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Lists;
 import java.sql.Connection;
 import java.sql.DatabaseMetaData;
@@ -32,6 +33,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Set;
 import java.util.stream.Collectors;
 import javax.sql.DataSource;
 import org.apache.commons.collections4.MapUtils;
@@ -81,6 +83,10 @@ public class HologresTableOperations extends JdbcTableOperations
 
   private static final String HOLOGRES_NOT_SUPPORT_NESTED_COLUMN_MSG =
       "Hologres does not support nested column names.";
+
+  /** Properties that are handled separately or read-only, excluded from the WITH clause. */
+  private static final Set<String> EXCLUDED_TABLE_PROPERTIES =
+      ImmutableSet.of("distribution_key", "is_logical_partitioned_table", "primary_key");
 
   private String database;
   private HologresSchemaOperations schemaOperations;
@@ -218,9 +224,7 @@ public class HologresTableOperations extends JdbcTableOperations
     if (MapUtils.isNotEmpty(properties)) {
       properties.forEach(
           (key, value) -> {
-            if (!"distribution_key".equals(key)
-                && !"is_logical_partitioned_table".equals(key)
-                && !"primary_key".equals(key)) {
+            if (!EXCLUDED_TABLE_PROPERTIES.contains(key)) {
               withEntries.add(key + " = '" + value + "'");
             }
           });
@@ -491,7 +495,8 @@ public class HologresTableOperations extends JdbcTableOperations
       }
     }
 
-    // If there is no change, return directly
+    // Filter out empty strings and check if there are any actual changes
+    alterSql.removeIf(String::isEmpty);
     if (alterSql.isEmpty()) {
       return "";
     }
