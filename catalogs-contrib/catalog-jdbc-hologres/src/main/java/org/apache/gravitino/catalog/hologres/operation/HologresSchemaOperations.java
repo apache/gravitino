@@ -103,16 +103,12 @@ public class HologresSchemaOperations extends JdbcDatabaseOperations {
           "Hologres does not support properties on schema create.");
     }
 
-    StringBuilder sqlBuilder = new StringBuilder("CREATE SCHEMA \"" + schema + "\";");
+    StringBuilder sqlBuilder =
+        new StringBuilder(String.format("CREATE SCHEMA %s%s%s;", HOLO_QUOTE, schema, HOLO_QUOTE));
     if (StringUtils.isNotEmpty(comment)) {
-      sqlBuilder
-          .append("COMMENT ON SCHEMA ")
-          .append(HOLO_QUOTE)
-          .append(schema)
-          .append(HOLO_QUOTE)
-          .append(" IS '")
-          .append(comment)
-          .append("'");
+      sqlBuilder.append(
+          String.format(
+              "COMMENT ON SCHEMA %s%s%s IS '%s'", HOLO_QUOTE, schema, HOLO_QUOTE, comment));
     }
     return sqlBuilder.toString();
   }
