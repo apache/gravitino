@@ -27,7 +27,7 @@ import org.apache.gravitino.maintenance.optimizer.api.recommender.StrategyHandle
  * Strategy definition supplied by the control plane. The recommender pulls strategies from a {@link
  * org.apache.gravitino.maintenance.optimizer.api.recommender.StrategyProvider}, routes them to a
  * {@link StrategyHandler} by {@link #strategyType()}, and lets the handler interpret the remaining
- * fields as needed.
+ * fields as needed. For partition-specific behavior, implement {@link PartitionStrategy}.
  */
 @DeveloperApi
 public interface Strategy {

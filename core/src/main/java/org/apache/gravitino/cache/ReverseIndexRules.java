@@ -115,12 +115,16 @@ public class ReverseIndexRules {
 
   // Keep policies/tags to objects reverse index for metadata objects, so the key are objects and
   // the values are policies/tags.
+  // Only processes GenericEntity objects without namespace (metadata objects from tag/policy
+  // queries).
+  // Entities with namespace (views, tables) are skipped.
   public static final ReverseIndexCache.ReverseIndexRule GENERIC_METADATA_OBJECT_REVERSE_RULE =
       (entity, key, reverseIndexCache) -> {
-        // Name in GenericEntity contains no metalake.
         GenericEntity genericEntity = (GenericEntity) entity;
         EntityType type = entity.type();
-        if (genericEntity.name() != null) {
+        if (genericEntity.name() != null
+            && (genericEntity.namespace() == null || genericEntity.namespace().isEmpty())) {
+          // Name contains catalog.schema.object format without metalake, so prepend it.
           String[] levels = genericEntity.name().split("\\.");
           String metalakeName = key.identifier().namespace().levels()[0];
           NameIdentifier objectNameIdentifier =
