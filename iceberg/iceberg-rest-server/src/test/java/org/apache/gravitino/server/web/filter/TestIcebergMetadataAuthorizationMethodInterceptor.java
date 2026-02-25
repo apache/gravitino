@@ -53,7 +53,7 @@ public class TestIcebergMetadataAuthorizationMethodInterceptor {
     IcebergConfigProvider mockConfigProvider = Mockito.mock(IcebergConfigProvider.class);
     Mockito.when(mockConfigProvider.getMetalakeName()).thenReturn(TEST_METALAKE);
     Mockito.when(mockConfigProvider.getDefaultCatalogName()).thenReturn(TEST_CATALOG);
-    IcebergRESTServerContext.create(mockConfigProvider, false, false);
+    IcebergRESTServerContext.create(mockConfigProvider, false);
   }
 
   @Test
