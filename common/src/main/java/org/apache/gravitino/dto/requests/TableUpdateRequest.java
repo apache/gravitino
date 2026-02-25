@@ -29,7 +29,6 @@ import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
 import com.fasterxml.jackson.databind.annotation.JsonSerialize;
 import com.google.common.base.Preconditions;
 import java.util.Arrays;
-import java.util.Map;
 import javax.annotation.Nullable;
 import lombok.EqualsAndHashCode;
 import lombok.Getter;
@@ -822,7 +821,7 @@ public interface TableUpdateRequest extends RESTRequest {
      * @param fieldNames The field names under the table contained in the index.
      */
     public AddTableIndexRequest(Index.IndexType type, String name, String[][] fieldNames) {
-      this.index = Indexes.of(type, name, fieldNames, Map.of());
+      this.index = Indexes.of(type, name, fieldNames);
     }
 
     /**

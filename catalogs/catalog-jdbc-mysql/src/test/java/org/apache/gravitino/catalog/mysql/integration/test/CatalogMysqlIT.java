@@ -1098,10 +1098,7 @@ public class CatalogMysqlIT extends BaseIT {
         new SortOrder[0],
         new Index[] {
           Indexes.of(
-              Index.IndexType.UNIQUE_KEY,
-              null,
-              new String[][] {{"col_1"}, {"col_3"}, {"col_4"}},
-              Map.of()),
+              Index.IndexType.UNIQUE_KEY, null, new String[][] {{"col_1"}, {"col_3"}, {"col_4"}}),
           Indexes.of(Index.IndexType.UNIQUE_KEY, null, new String[][] {{"col_4"}}),
         });
     table = tableCatalog.loadTable(tableIdent);
