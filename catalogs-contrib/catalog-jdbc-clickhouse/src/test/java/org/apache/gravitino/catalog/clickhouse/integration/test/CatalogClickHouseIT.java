@@ -1008,6 +1008,63 @@ public class CatalogClickHouseIT extends BaseIT {
   }
 
   @Test
+  void testRecreateSchemaAndTable() {
+    TableCatalog tableCatalog = catalog.asTableCatalog();
+    Column[] columns = createColumns();
+    String recreateTableName = GravitinoITUtils.genRandomName("recreate_table");
+    NameIdentifier tableIdentifier = NameIdentifier.of(schemaName, recreateTableName);
+
+    tableCatalog.createTable(
+        tableIdentifier,
+        columns,
+        table_comment,
+        createProperties(),
+        Transforms.EMPTY_TRANSFORM,
+        Distributions.NONE,
+        getSortOrders(CLICKHOUSE_COL_NAME3));
+
+    String updatedComment = table_comment + "_updated";
+    tableCatalog.alterTable(tableIdentifier, TableChange.updateComment(updatedComment));
+
+    Table loadedTable = tableCatalog.loadTable(tableIdentifier);
+    Assertions.assertEquals(recreateTableName, loadedTable.name());
+    Assertions.assertEquals(updatedComment, loadedTable.comment());
+
+    Assertions.assertTrue(tableCatalog.dropTable(tableIdentifier));
+    Assertions.assertFalse(tableCatalog.tableExists(tableIdentifier));
+
+    String recreatedComment = table_comment + "_recreated";
+    tableCatalog.createTable(
+        tableIdentifier,
+        columns,
+        recreatedComment,
+        createProperties(),
+        Transforms.EMPTY_TRANSFORM,
+        Distributions.NONE,
+        getSortOrders(CLICKHOUSE_COL_NAME3));
+
+    Table recreatedTable = tableCatalog.loadTable(tableIdentifier);
+    Assertions.assertEquals(recreateTableName, recreatedTable.name());
+    Assertions.assertEquals(recreatedComment, recreatedTable.comment());
+    Assertions.assertEquals(columns.length, recreatedTable.columns().length);
+
+    SupportsSchemas schemaSupport = catalog.asSchemas();
+    String recreateSchemaName = GravitinoITUtils.genRandomName("recreate_schema");
+    Map<String, String> schemaProperties = ImmutableMap.of();
+
+    schemaSupport.createSchema(recreateSchemaName, schema_comment, schemaProperties);
+
+    Assertions.assertTrue(schemaSupport.dropSchema(recreateSchemaName, true));
+    Assertions.assertFalse(schemaSupport.schemaExists(recreateSchemaName));
+
+    schemaSupport.createSchema(recreateSchemaName, schema_comment, schemaProperties);
+    schemaSupport.loadSchema(recreateSchemaName);
+
+    schemaSupport.dropSchema(recreateSchemaName, true);
+    tableCatalog.dropTable(tableIdentifier);
+  }
+
+  @Test
   void testUpdateColumnDefaultValue() {
     Column[] columns = createColumnsWithDefaultValue();
     Table table =
