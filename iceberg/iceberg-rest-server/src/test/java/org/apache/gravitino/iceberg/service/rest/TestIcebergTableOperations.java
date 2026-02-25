@@ -74,6 +74,7 @@ import org.apache.iceberg.metrics.CommitReport;
 import org.apache.iceberg.metrics.ImmutableCommitMetricsResult;
 import org.apache.iceberg.metrics.ImmutableCommitReport;
 import org.apache.iceberg.rest.PlanStatus;
+import org.apache.iceberg.rest.RESTUtil;
 import org.apache.iceberg.rest.requests.CreateTableRequest;
 import org.apache.iceberg.rest.requests.PlanTableScanRequest;
 import org.apache.iceberg.rest.requests.RenameTableRequest;
@@ -176,8 +177,7 @@ public class TestIcebergTableOperations extends IcebergNamespaceTestBase {
         metadata.currentSnapshot() == null ? null : metadata.currentSnapshot().snapshotId();
     JsonNode planResponse = verifyPlanTableScanSucc(namespace, "plan_scan_table", snapshotId);
 
-    Assertions.assertEquals(
-        PlanStatus.COMPLETED.status(), planResponse.get("plan-status").asText());
+    Assertions.assertEquals(PlanStatus.COMPLETED.status(), planResponse.get("status").asText());
     Assertions.assertTrue(planResponse.has("plan-tasks"));
     Assertions.assertTrue(planResponse.get("plan-tasks").isArray());
     Assertions.assertTrue(planResponse.get("plan-tasks").size() > 0);
@@ -223,8 +223,7 @@ public class TestIcebergTableOperations extends IcebergNamespaceTestBase {
     JsonNode planResponse =
         verifyPlanTableScanSuccWithRange(
             namespace, "incremental_scan_valid_table", startSnapshotId, endSnapshotId);
-    Assertions.assertEquals(
-        PlanStatus.COMPLETED.status(), planResponse.get("plan-status").asText());
+    Assertions.assertEquals(PlanStatus.COMPLETED.status(), planResponse.get("status").asText());
     Assertions.assertTrue(planResponse.has("plan-tasks"));
     Assertions.assertTrue(planResponse.get("plan-tasks").isArray());
 
@@ -573,7 +572,7 @@ public class TestIcebergTableOperations extends IcebergNamespaceTestBase {
   }
 
   private PlanTableScanRequest buildPlanTableScanRequest(Long snapshotId) {
-    PlanTableScanRequest.Builder builder = new PlanTableScanRequest.Builder();
+    PlanTableScanRequest.Builder builder = PlanTableScanRequest.builder();
     if (snapshotId != null) {
       builder = builder.withSnapshotId(snapshotId);
     } else {
@@ -584,7 +583,7 @@ public class TestIcebergTableOperations extends IcebergNamespaceTestBase {
 
   private PlanTableScanRequest buildPlanTableScanRequestWithRange(
       Long startSnapshotId, Long endSnapshotId) {
-    PlanTableScanRequest.Builder builder = new PlanTableScanRequest.Builder();
+    PlanTableScanRequest.Builder builder = PlanTableScanRequest.builder();
     if (startSnapshotId != null) {
       builder = builder.withStartSnapshotId(startSnapshotId);
     }
@@ -692,6 +691,40 @@ public class TestIcebergTableOperations extends IcebergNamespaceTestBase {
     Assertions.assertTrue(
         errorBody.contains("remote signing") || errorBody.contains("remote-signing"),
         "Error message should mention remote signing: " + errorBody);
+  }
+
+  @ParameterizedTest
+  @MethodSource("org.apache.gravitino.iceberg.service.rest.IcebergRestTestUtil#testNamespaces")
+  void testTableOperationsWithEncodedName(Namespace namespace) {
+    // Table names with special characters that require percent-encoding in URL paths.
+    // RESTUtil.encodeString encodes them for the URL, and the server should decode
+    // them back via RESTUtil.decodeString thanks to @Encoded on the path parameter.
+    String[] specialNames = {"table.with.dots", "table@special"};
+
+    verifyCreateNamespaceSucc(namespace);
+
+    for (String originalName : specialNames) {
+      String encodedName = RESTUtil.encodeString(originalName);
+
+      // Create uses the original name in the request body, not in the URL path
+      verifyCreateTableSucc(namespace, originalName);
+
+      // Load, exists use the encoded name in the URL path
+      verifyLoadTableSucc(namespace, encodedName);
+      verifyTableExistsStatusCode(namespace, encodedName, 204);
+
+      // Update: load metadata with encoded path, then update with encoded path
+      TableMetadata metadata = getTableMeta(namespace, encodedName);
+      verifyUpdateSucc(namespace, encodedName, metadata);
+    }
+
+    // Verify list returns the original (decoded) table names
+    verifyListTableSucc(namespace, ImmutableSet.copyOf(specialNames));
+
+    for (String originalName : specialNames) {
+      verifyDropTableSucc(namespace, RESTUtil.encodeString(originalName));
+    }
+    verifyDropNamespaceSucc(namespace);
   }
 
   @ParameterizedTest

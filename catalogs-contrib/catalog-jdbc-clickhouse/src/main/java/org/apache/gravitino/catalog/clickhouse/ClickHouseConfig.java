@@ -32,7 +32,7 @@ public class ClickHouseConfig {
 
   // Constants part
   public static final ConfigEntry<String> CK_CLUSTER_NAME =
-      new ConfigBuilder(ClusterConstants.NAME)
+      new ConfigBuilder(ClusterConstants.CLUSTER_NAME)
           .doc("Cluster name for ClickHouse distributed tables")
           .version(ConfigConstants.VERSION_1_2_0)
           .stringConf()

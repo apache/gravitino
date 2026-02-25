@@ -776,6 +776,75 @@ public class TestEntityStorageRelationCache extends AbstractEntityStorageTest {
 
   @ParameterizedTest
   @MethodSource("storageProvider")
+  void testViewNotIndexedInReverseCache(String type, boolean enableCache) throws Exception {
+    Config config = Mockito.mock(Config.class);
+    Mockito.when(config.get(Configs.CACHE_ENABLED)).thenReturn(enableCache);
+    init(type, config);
+
+    AuditInfo auditInfo =
+        AuditInfo.builder().withCreator("creator").withCreateTime(Instant.now()).build();
+
+    try (EntityStore store = EntityStoreFactory.createEntityStore(config)) {
+      store.initialize(config);
+
+      // Create parent entities required by relational store
+      BaseMetalake metalake =
+          createBaseMakeLake(RandomIdGenerator.INSTANCE.nextId(), "metalake", auditInfo);
+      store.put(metalake, false);
+
+      CatalogEntity catalog =
+          createCatalog(
+              RandomIdGenerator.INSTANCE.nextId(),
+              NamespaceUtil.ofCatalog("metalake"),
+              "catalog",
+              auditInfo);
+      store.put(catalog, false);
+
+      SchemaEntity schema =
+          createSchemaEntity(
+              RandomIdGenerator.INSTANCE.nextId(),
+              Namespace.of("metalake", "catalog"),
+              "schema",
+              auditInfo);
+      store.put(schema, false);
+
+      Namespace viewNamespace = Namespace.of("metalake", "catalog", "schema");
+      GenericEntity view =
+          GenericEntity.builder()
+              .withId(RandomIdGenerator.INSTANCE.nextId())
+              .withName("test_view")
+              .withNamespace(viewNamespace)
+              .withEntityType(Entity.EntityType.VIEW)
+              .build();
+
+      // Use store.put() to trigger the actual cache + reverse index flow
+      store.put(view, false);
+
+      // Verify view IS in forward cache (performance cache for get operations)
+      GenericEntity retrievedView =
+          store.get(view.nameIdentifier(), Entity.EntityType.VIEW, GenericEntity.class);
+      Assertions.assertNotNull(retrievedView);
+      Assertions.assertEquals(view.id(), retrievedView.id());
+      Assertions.assertEquals(view.name(), retrievedView.name());
+
+      // Get reverse index cache to verify view is NOT indexed
+      ReverseIndexCache reverseIndexCache =
+          ((CaffeineEntityCache) ((RelationalEntityStore) store).getCache()).getReverseIndex();
+
+      // Verify view is NOT in reverse index cache
+      // Views have namespace and should be skipped by GENERIC_METADATA_OBJECT_REVERSE_RULE
+      List<EntityCacheKey> reverseIndexValue =
+          reverseIndexCache.get(view.nameIdentifier(), Entity.EntityType.VIEW);
+      Assertions.assertNull(
+          reverseIndexValue,
+          "Views should NOT be indexed in reverse cache - they have namespace and don't support tags/policies");
+
+      destroy(type);
+    }
+  }
+
+  @ParameterizedTest
+  @MethodSource("storageProvider")
   void testCacheInvalidationOnNewRelation(String type, boolean enableCache) throws Exception {
     Config config = Mockito.mock(Config.class);
     Mockito.when(config.get(Configs.CACHE_ENABLED)).thenReturn(enableCache);
