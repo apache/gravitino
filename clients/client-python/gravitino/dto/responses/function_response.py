@@ -48,5 +48,5 @@ class FunctionResponse(BaseResponse):
             raise IllegalArgumentException("function 'name' must not be null or empty")
         if self._function.function_type() is None:
             raise IllegalArgumentException("function 'functionType' must not be null")
-        if self._function._definitions is None:
+        if self._function.definitions() is None:
             raise IllegalArgumentException("function 'definitions' must not be null")

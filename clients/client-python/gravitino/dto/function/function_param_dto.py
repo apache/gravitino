@@ -31,13 +31,19 @@ from gravitino.dto.rel.expressions.json_serdes._helper.serdes_utils import (
 from gravitino.dto.util.dto_converters import DTOConverters
 
 
-def _encode_default_value(default_value: Optional[Expression]) -> Optional[Dict[str, Any]]:
+def _encode_default_value(
+    default_value: Optional[Expression],
+) -> Optional[Dict[str, Any]]:
     if default_value is None:
         return None
-    return ExpressionSerdesUtils.write_function_arg(DTOConverters.to_function_arg(default_value))
+    return ExpressionSerdesUtils.write_function_arg(
+        DTOConverters.to_function_arg(default_value)
+    )
 
 
-def _decode_default_value(default_value_dict: Optional[Dict[str, Any]]) -> Optional[FunctionArg]:
+def _decode_default_value(
+    default_value_dict: Optional[Dict[str, Any]]
+) -> Optional[FunctionArg]:
     if default_value_dict is None:
         return None
     return ExpressionSerdesUtils.read_function_arg(default_value_dict)
@@ -98,7 +104,9 @@ class FunctionParamDTO(FunctionParam, DataClassJsonMixin):
             _data_type=param.data_type(),
             _comment=param.comment(),
             _default_value=(
-                None if default_value is None else DTOConverters.to_function_arg(default_value)
+                None
+                if default_value is None
+                else DTOConverters.to_function_arg(default_value)
             ),
         )
 

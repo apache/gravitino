@@ -80,10 +80,10 @@ class FunctionDTO(Function, DataClassJsonMixin):
         """Returns the optional comment of the function."""
         return self._comment
 
-    def definitions(self) -> List[FunctionDefinition]:
+    def definitions(self) -> Optional[List[FunctionDefinition]]:
         """Returns the definitions of the function."""
         if self._definitions is None:
-            return []
+            return None
         return list(self._definitions)
 
     def audit_info(self) -> Optional[AuditDTO]:
