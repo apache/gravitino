@@ -90,6 +90,26 @@ class SQLImplDTO(FunctionImplDTO):
             _properties=impl.properties() if impl.properties() else None,
         )
 
+    def __eq__(self, other) -> bool:
+        if not isinstance(other, SQLImplDTO):
+            return False
+        return (
+            self._runtime == other._runtime
+            and self._sql == other._sql
+            and self._resources == other._resources
+            and self._properties == other._properties
+        )
+
+    def __hash__(self) -> int:
+        return hash(
+            (
+                self._runtime,
+                self._sql,
+                self._resources,
+                frozenset(self._properties.items()) if self._properties else None,
+            )
+        )
+
 
 @dataclass
 class JavaImplDTO(FunctionImplDTO):
@@ -137,6 +157,26 @@ class JavaImplDTO(FunctionImplDTO):
             _class_name=impl.class_name(),
             _resources=FunctionResourcesDTO.from_function_resources(impl.resources()),
             _properties=impl.properties() if impl.properties() else None,
+        )
+
+    def __eq__(self, other) -> bool:
+        if not isinstance(other, JavaImplDTO):
+            return False
+        return (
+            self._runtime == other._runtime
+            and self._class_name == other._class_name
+            and self._resources == other._resources
+            and self._properties == other._properties
+        )
+
+    def __hash__(self) -> int:
+        return hash(
+            (
+                self._runtime,
+                self._class_name,
+                self._resources,
+                frozenset(self._properties.items()) if self._properties else None,
+            )
         )
 
 
@@ -194,6 +234,28 @@ class PythonImplDTO(FunctionImplDTO):
             _code_block=impl.code_block(),
             _resources=FunctionResourcesDTO.from_function_resources(impl.resources()),
             _properties=impl.properties() if impl.properties() else None,
+        )
+
+    def __eq__(self, other) -> bool:
+        if not isinstance(other, PythonImplDTO):
+            return False
+        return (
+            self._runtime == other._runtime
+            and self._handler == other._handler
+            and self._code_block == other._code_block
+            and self._resources == other._resources
+            and self._properties == other._properties
+        )
+
+    def __hash__(self) -> int:
+        return hash(
+            (
+                self._runtime,
+                self._handler,
+                self._code_block,
+                self._resources,
+                frozenset(self._properties.items()) if self._properties else None,
+            )
         )
 
 

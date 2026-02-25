@@ -51,7 +51,9 @@ class FunctionResourcesDTO(DataClassJsonMixin):
         return FunctionResources.of(self._jars, self._files, self._archives)
 
     @classmethod
-    def from_function_resources(cls, resources) -> "FunctionResourcesDTO":
+    def from_function_resources(
+        cls, resources: Optional[FunctionResources]
+    ) -> Optional["FunctionResourcesDTO"]:
         """Create a FunctionResourcesDTO from a FunctionResources instance."""
         if resources is None:
             return None

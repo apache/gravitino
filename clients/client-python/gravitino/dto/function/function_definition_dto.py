@@ -40,7 +40,7 @@ from gravitino.dto.function.function_impl_dto import (
 from gravitino.dto.function.function_param_dto import FunctionParamDTO
 
 
-def _decode_impl(impl_dict: Dict[str, Any]) -> FunctionImplDTO:
+def _decode_impl(impl_dict: Optional[Dict[str, Any]]) -> Optional[FunctionImplDTO]:
     """Decode a function implementation DTO from a dictionary."""
     if impl_dict is None:
         return None
@@ -63,7 +63,7 @@ def _decode_impls(impls_list: List[Dict[str, Any]]) -> List[FunctionImplDTO]:
     return [_decode_impl(impl) for impl in impls_list]
 
 
-def _encode_impl(impl: FunctionImplDTO) -> Dict[str, Any]:
+def _encode_impl(impl: Optional[FunctionImplDTO]) -> Optional[Dict[str, Any]]:
     """Encode a function implementation DTO to a dictionary."""
     if impl is None:
         return None
@@ -197,6 +197,6 @@ class FunctionDefinitionDTO(FunctionDefinition, DataClassJsonMixin):
                 tuple(self._parameters) if self._parameters else None,
                 self._return_type,
                 tuple(self._return_columns) if self._return_columns else None,
-                len(self._impls) if self._impls is not None else None,
+                tuple(self._impls) if self._impls else None,
             )
         )

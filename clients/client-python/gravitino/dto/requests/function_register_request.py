@@ -82,10 +82,8 @@ class FunctionRegisterRequest(RESTRequest):
         # Validate each definition has appropriate return type/columns based on function type
         for definition in self._definitions:
             if self._function_type == FunctionType.TABLE:
-                if (
-                    not definition.return_columns()
-                    or len(definition.return_columns()) == 0
-                ):
+                return_columns = definition.return_columns()
+                if not return_columns:
                     raise IllegalArgumentException(
                         "'returnColumns' is required in each definition for TABLE function type"
                     )
