@@ -87,6 +87,7 @@ Gravitino currently supports the following catalogs:
 * [**PostgreSQL catalog**](./jdbc-postgresql-catalog.md)
 * [**OceanBase catalog**](./jdbc-oceanbase-catalog.md)
 * [**StarRocks catalog**](./jdbc-starrocks-catalog.md)
+* [**ClickHouse catalog**](./jdbc-clickhouse-catalog.md)
 * [**Lakehouse generic catalog**](./lakehouse-generic-catalog.md)
 
 If you want to operate table and partition statistics, you can refer to the [document](./manage-statistics-in-gravitino.md).
