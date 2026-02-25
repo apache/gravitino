@@ -82,7 +82,7 @@ Map<String, String> ckProps = ImmutableMap.<String, String>builder()
     .put("jdbc-url", "jdbc:clickhouse://localhost:8123")
     .put("jdbc-driver", "com.clickhouse.jdbc.ClickHouseDriver")
     .put("jdbc-user", "default")
-    .put("jdbc-password", "passw0rd")
+    .put("jdbc-password", "password")
     .build();
 
 Catalog catalog =
@@ -98,19 +98,19 @@ See [Manage Relational Metadata Using Gravitino](./manage-relational-metadata-us
 
 ### Schema capabilities
 
-| Item         | Description                                                                                  |
-|--------------|----------------------------------------------------------------------------------------------|
-| Mapping      | Gravitino schema maps to a ClickHouse database                                               |
-| Operations   | Create / drop (ClickHouse supports cascade drop)                                             |
-| Comments     | Schema comments supported                                                                    |
-| Cluster mode | Optional `ON CLUSTER` for creation when `cluster-name` is provided                           |
+| Item         | Description                                                        |
+|--------------|--------------------------------------------------------------------|
+| Mapping      | Gravitino schema maps to a ClickHouse database                     |
+| Operations   | Create / drop / load / list (ClickHouse supports cascade drop)     |
+| Comments     | Schema comments supported                                          |
+| Cluster mode | Optional `ON CLUSTER` for creation when `cluster-name` is provided |
 
 ### Schema properties
 
-| Property Name  | Description                                                                                     | Default Value | Required | Immutable | Since version |
-|----------------|-------------------------------------------------------------------------------------------------|---------------|----------|-----------|---------------|
-| `on-cluster`   | Use `ON CLUSTER` when creating the database                                                     | `false`       | No       | No        | 1.2.0         |
-| `cluster-name` | Cluster name used with `ON CLUSTER` (must align with table-level cluster settings)             | (none)        | No       | No        | 1.2.0         |
+| Property Name  | Description                                                                        | Default Value | Required | Immutable | Since version |
+|----------------|------------------------------------------------------------------------------------|---------------|----------|-----------|---------------|
+| `on-cluster`   | Use `ON CLUSTER` when creating the database                                        | `false`       | No       | No        | 1.2.0         |
+| `cluster-name` | Cluster name used with `ON CLUSTER` (must align with table-level cluster settings) | (none)        | No       | No        | 1.2.0         |
 
 ### Create a schema
 
