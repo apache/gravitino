@@ -117,8 +117,7 @@ public class TestSerializer {
   void testIndexImplSerializer() throws JsonProcessingException {
     IndexImpl index =
         (IndexImpl)
-            Indexes.of(
-                IndexType.PRIMARY_KEY, "index_1", new String[][] {new String[] {"col1"}}, Map.of());
+            Indexes.of(IndexType.PRIMARY_KEY, "index_1", new String[][] {new String[] {"col1"}});
 
     String actualJson = JsonUtils.anyFieldMapper().writeValueAsString((DTOConverters.toDTO(index)));
     String expectedJson =
@@ -133,8 +132,7 @@ public class TestSerializer {
             Indexes.of(
                 IndexType.UNIQUE_KEY,
                 "index_2",
-                new String[][] {new String[] {"col1"}, new String[] {"col2"}},
-                Map.of());
+                new String[][] {new String[] {"col1"}, new String[] {"col2"}});
     actualJson = JsonUtils.anyFieldMapper().writeValueAsString(index);
     expectedJson =
         "{\"indexType\":\"unique_key\",\"name\":\"index_2\","

@@ -22,7 +22,6 @@ package org.apache.gravitino.audit;
 import com.google.common.collect.ImmutableMap;
 import java.time.LocalDate;
 import java.util.HashMap;
-import java.util.Map;
 import org.apache.gravitino.Catalog;
 import org.apache.gravitino.CatalogChange;
 import org.apache.gravitino.MetalakeChange;
@@ -536,7 +535,7 @@ public class TestOperation {
         new Transform[] {Transforms.identity("a")},
         Distributions.of(Strategy.HASH, 10, NamedReference.field("a")),
         new SortOrder[] {SortOrders.ascending(NamedReference.field("a"))},
-        new Index[] {Indexes.primary("p", new String[][] {{"a"}, {"b"}}, Map.of())},
+        new Index[] {Indexes.primary("p", new String[][] {{"a"}, {"b"}})},
         null);
   }
 

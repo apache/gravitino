@@ -755,12 +755,12 @@ public class CatalogPostgreSqlIT extends BaseIT {
 
     Index[] indexes =
         new Index[] {
-          Indexes.primary("k1_pk", new String[][] {{"col_2"}, {"col_1"}}, Map.of()),
-          Indexes.unique("u1_key", new String[][] {{"col_2"}, {"col_3"}}, Map.of()),
-          Indexes.unique("u2_key", new String[][] {{"col_3"}, {"col_4"}}, Map.of()),
-          Indexes.unique("u3_key", new String[][] {{"col_5"}, {"col_4"}}, Map.of()),
-          Indexes.unique("u4_key", new String[][] {{"col_2"}, {"col_4"}, {"col_3"}}, Map.of()),
-          Indexes.unique("u5_key", new String[][] {{"col_5"}, {"col_3"}, {"col_2"}}, Map.of()),
+          Indexes.primary("k1_pk", new String[][] {{"col_2"}, {"col_1"}}),
+          Indexes.unique("u1_key", new String[][] {{"col_2"}, {"col_3"}}),
+          Indexes.unique("u2_key", new String[][] {{"col_3"}, {"col_4"}}),
+          Indexes.unique("u3_key", new String[][] {{"col_5"}, {"col_4"}}),
+          Indexes.unique("u4_key", new String[][] {{"col_2"}, {"col_4"}, {"col_3"}}),
+          Indexes.unique("u5_key", new String[][] {{"col_5"}, {"col_3"}, {"col_2"}}),
           Indexes.unique(
               "u6_key", new String[][] {{"col_1"}, {"col_3"}, {"col_2"}, {"col_4"}}, Map.of()),
         };
@@ -802,7 +802,7 @@ public class CatalogPostgreSqlIT extends BaseIT {
     NameIdentifier id = NameIdentifier.of(schemaName, "test_failed");
     SortOrder[] sortOrder = new SortOrder[0];
     Index[] primaryIndex =
-        new Index[] {Indexes.createMysqlPrimaryKey(new String[][] {{"col_1", "col_2"}}, Map.of())};
+        new Index[] {Indexes.createMysqlPrimaryKey(new String[][] {{"col_1", "col_2"}})};
     IllegalArgumentException illegalArgumentException =
         assertThrows(
             IllegalArgumentException.class,
@@ -855,11 +855,8 @@ public class CatalogPostgreSqlIT extends BaseIT {
         new SortOrder[0],
         new Index[] {
           Indexes.of(
-              Index.IndexType.UNIQUE_KEY,
-              null,
-              new String[][] {{"col_1"}, {"col_3"}, {"col_4"}},
-              Map.of()),
-          Indexes.of(Index.IndexType.UNIQUE_KEY, null, new String[][] {{"col_4"}}, Map.of()),
+              Index.IndexType.UNIQUE_KEY, null, new String[][] {{"col_1"}, {"col_3"}, {"col_4"}}),
+          Indexes.of(Index.IndexType.UNIQUE_KEY, null, new String[][] {{"col_4"}}),
         });
     table = tableCatalog.loadTable(tableIdent);
 
@@ -1655,8 +1652,8 @@ public class CatalogPostgreSqlIT extends BaseIT {
     Table table = tableCatalog.loadTable(NameIdentifier.of(schemaName, tableName));
     Index[] indexes =
         new Index[] {
-          Indexes.unique("u1_key", new String[][] {{"col_2"}, {"col_3"}}, Map.of()),
-          Indexes.primary("pk1_key", new String[][] {{"col_1"}}, Map.of())
+          Indexes.unique("u1_key", new String[][] {{"col_2"}, {"col_3"}}),
+          Indexes.primary("pk1_key", new String[][] {{"col_1"}})
         };
     ITUtils.assertionsTableInfo(
         tableName,
@@ -1679,8 +1676,8 @@ public class CatalogPostgreSqlIT extends BaseIT {
 
     indexes =
         new Index[] {
-          Indexes.primary("pk1_key", new String[][] {{"col_1"}}, Map.of()),
-          Indexes.unique("u2_key", new String[][] {{"col_4"}}, Map.of())
+          Indexes.primary("pk1_key", new String[][] {{"col_1"}}),
+          Indexes.unique("u2_key", new String[][] {{"col_4"}})
         };
     table = tableCatalog.loadTable(NameIdentifier.of(schemaName, tableName));
     Column col4 = Column.of("col_4", Types.VarCharType.of(255), null, true, false, null);
@@ -1704,10 +1701,10 @@ public class CatalogPostgreSqlIT extends BaseIT {
 
     indexes =
         new Index[] {
-          Indexes.primary("pk1_key", new String[][] {{"col_1"}}, Map.of()),
-          Indexes.unique("u2_key", new String[][] {{"col_4"}}, Map.of()),
-          Indexes.unique("u1_key", new String[][] {{"col_2"}, {"col_3"}}, Map.of()),
-          Indexes.unique("u3_key", new String[][] {{"col_1"}, {"col_4"}}, Map.of())
+          Indexes.primary("pk1_key", new String[][] {{"col_1"}}),
+          Indexes.unique("u2_key", new String[][] {{"col_4"}}),
+          Indexes.unique("u1_key", new String[][] {{"col_2"}, {"col_3"}}),
+          Indexes.unique("u3_key", new String[][] {{"col_1"}, {"col_4"}})
         };
     table = tableCatalog.loadTable(NameIdentifier.of(schemaName, tableName));
     ITUtils.assertionsTableInfo(

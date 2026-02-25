@@ -127,9 +127,9 @@ public class TestGravitinoTable {
 
     // test with indexes
     Index[] indexes = {
-      Indexes.createMysqlPrimaryKey(new String[][] {{"f1"}}, Map.of()),
-      Indexes.unique("unique_key1", new String[][] {{"f2"}}, Map.of()),
-      Indexes.unique("unique_key2", new String[][] {{"f3"}, {"f4"}}, Map.of())
+      Indexes.createMysqlPrimaryKey(new String[][] {{"f1"}}),
+      Indexes.unique("unique_key1", new String[][] {{"f2"}}),
+      Indexes.unique("unique_key2", new String[][] {{"f3"}, {"f4"}})
     };
     Table mockTableWithIndexes = mockTable("tableWithIndexes", columns, null, indexes);
     GravitinoTable tableWithIndexes =

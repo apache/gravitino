@@ -249,8 +249,7 @@ public class CatalogGenericCatalogLanceIT extends BaseIT {
         };
     Index[] indexes =
         new Index[] {
-          Indexes.of(
-              IndexType.UNIQUE_KEY, "unique_index", new String[][] {{LANCE_COL_NAME3}}, Map.of())
+          Indexes.of(IndexType.UNIQUE_KEY, "unique_index", new String[][] {{LANCE_COL_NAME3}})
         };
 
     RangePartition p1 =

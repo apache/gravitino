@@ -50,7 +50,6 @@ import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
 import java.io.IOException;
 import java.io.UnsupportedEncodingException;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
@@ -1476,10 +1475,6 @@ public class JsonUtils {
       gen.writeFieldName(INDEX_FIELD_NAMES);
       gen.writeObject(value.fieldNames());
       Map<String, String> props = value.properties();
-      if (props == null) {
-        props = Collections.emptyMap();
-      }
-
       gen.writeFieldName("properties");
       Map<String, String> sortedProps = new java.util.TreeMap<>(props);
       gen.writeObject(sortedProps);

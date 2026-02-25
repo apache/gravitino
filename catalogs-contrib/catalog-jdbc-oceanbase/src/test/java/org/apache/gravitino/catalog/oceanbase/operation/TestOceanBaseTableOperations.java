@@ -93,8 +93,7 @@ public class TestOceanBaseTableOperations extends TestOceanBase {
             .build());
     Map<String, String> properties = new HashMap<>();
 
-    Index[] indexes =
-        new Index[] {Indexes.unique("test", new String[][] {{"col_1"}, {"col_2"}}, Map.of())};
+    Index[] indexes = new Index[] {Indexes.unique("test", new String[][] {{"col_1"}, {"col_2"}})};
     // create table
     TABLE_OPERATIONS.create(
         TEST_DB_NAME,
@@ -217,8 +216,8 @@ public class TestOceanBaseTableOperations extends TestOceanBase {
 
     Index[] indexes =
         new Index[] {
-          Indexes.createMysqlPrimaryKey(new String[][] {{"col_1"}, {"col_2"}}, Map.of()),
-          Indexes.unique("uk_2", new String[][] {{"col_1"}, {"col_2"}}, Map.of())
+          Indexes.createMysqlPrimaryKey(new String[][] {{"col_1"}, {"col_2"}}),
+          Indexes.unique("uk_2", new String[][] {{"col_1"}, {"col_2"}})
         };
     // create table
     TABLE_OPERATIONS.create(
@@ -481,8 +480,8 @@ public class TestOceanBaseTableOperations extends TestOceanBase {
 
     Index[] indexes =
         new Index[] {
-          Indexes.createMysqlPrimaryKey(new String[][] {{"col_2"}}, Map.of()),
-          Indexes.unique("uk_col_4", new String[][] {{"col_4"}}, Map.of())
+          Indexes.createMysqlPrimaryKey(new String[][] {{"col_2"}}),
+          Indexes.unique("uk_col_4", new String[][] {{"col_4"}})
         };
     // create table
     TABLE_OPERATIONS.create(
@@ -565,8 +564,8 @@ public class TestOceanBaseTableOperations extends TestOceanBase {
 
     Index[] indexes =
         new Index[] {
-          Indexes.createMysqlPrimaryKey(new String[][] {{"col_2"}}, Map.of()),
-          Indexes.unique("uk_col_4", new String[][] {{"col_4"}}, Map.of())
+          Indexes.createMysqlPrimaryKey(new String[][] {{"col_2"}}),
+          Indexes.unique("uk_col_4", new String[][] {{"col_4"}})
         };
     // create table
     TABLE_OPERATIONS.create(
@@ -822,8 +821,8 @@ public class TestOceanBaseTableOperations extends TestOceanBase {
     // Test create increment key for unique index.
     Index[] indexes =
         new Index[] {
-          Indexes.createMysqlPrimaryKey(new String[][] {{"col_2"}}, Map.of()),
-          Indexes.unique("uk_1", new String[][] {{"col_1"}}, Map.of())
+          Indexes.createMysqlPrimaryKey(new String[][] {{"col_2"}}),
+          Indexes.unique("uk_1", new String[][] {{"col_1"}})
         };
     TABLE_OPERATIONS.create(
         TEST_DB_NAME, tableName, columns, comment, properties, null, Distributions.NONE, indexes);
@@ -842,8 +841,8 @@ public class TestOceanBaseTableOperations extends TestOceanBase {
     // Test create increment key for primary index.
     indexes =
         new Index[] {
-          Indexes.createMysqlPrimaryKey(new String[][] {{"col_1"}}, Map.of()),
-          Indexes.unique("uk_2", new String[][] {{"col_2"}}, Map.of())
+          Indexes.createMysqlPrimaryKey(new String[][] {{"col_1"}}),
+          Indexes.unique("uk_2", new String[][] {{"col_2"}})
         };
     TABLE_OPERATIONS.create(
         TEST_DB_NAME, tableName, columns, comment, properties, null, Distributions.NONE, indexes);
@@ -860,8 +859,7 @@ public class TestOceanBaseTableOperations extends TestOceanBase {
     TABLE_OPERATIONS.drop(TEST_DB_NAME, tableName);
 
     // Test create increment key for col_1 + col_3 uk.
-    indexes =
-        new Index[] {Indexes.unique("uk_2_3", new String[][] {{"col_1"}, {"col_3"}}, Map.of())};
+    indexes = new Index[] {Indexes.unique("uk_2_3", new String[][] {{"col_1"}, {"col_3"}})};
     TABLE_OPERATIONS.create(
         TEST_DB_NAME, tableName, columns, comment, properties, null, Distributions.NONE, indexes);
 
@@ -936,10 +934,10 @@ public class TestOceanBaseTableOperations extends TestOceanBase {
   public void testAppendIndexesBuilder() {
     Index[] indexes =
         new Index[] {
-          Indexes.createMysqlPrimaryKey(new String[][] {{"col_2"}, {"col_1"}}, Map.of()),
-          Indexes.unique("uk_col_4", new String[][] {{"col_4"}}, Map.of()),
-          Indexes.unique("uk_col_5", new String[][] {{"col_4"}, {"col_5"}}, Map.of()),
-          Indexes.unique("uk_col_6", new String[][] {{"col_4"}, {"col_5"}, {"col_6"}}, Map.of())
+          Indexes.createMysqlPrimaryKey(new String[][] {{"col_2"}, {"col_1"}}),
+          Indexes.unique("uk_col_4", new String[][] {{"col_4"}}),
+          Indexes.unique("uk_col_5", new String[][] {{"col_4"}, {"col_5"}}),
+          Indexes.unique("uk_col_6", new String[][] {{"col_4"}, {"col_5"}, {"col_6"}})
         };
     StringBuilder sql = new StringBuilder();
     OceanBaseTableOperations.appendIndexesSql(indexes, sql);
@@ -953,11 +951,10 @@ public class TestOceanBaseTableOperations extends TestOceanBase {
 
     indexes =
         new Index[] {
-          Indexes.unique("uk_1", new String[][] {{"col_4"}}, Map.of()),
-          Indexes.unique("uk_2", new String[][] {{"col_4"}, {"col_3"}}, Map.of()),
-          Indexes.createMysqlPrimaryKey(new String[][] {{"col_2"}, {"col_1"}, {"col_3"}}, Map.of()),
-          Indexes.unique(
-              "uk_3", new String[][] {{"col_4"}, {"col_5"}, {"col_6"}, {"col_7"}}, Map.of())
+          Indexes.unique("uk_1", new String[][] {{"col_4"}}),
+          Indexes.unique("uk_2", new String[][] {{"col_4"}, {"col_3"}}),
+          Indexes.createMysqlPrimaryKey(new String[][] {{"col_2"}, {"col_1"}, {"col_3"}}),
+          Indexes.unique("uk_3", new String[][] {{"col_4"}, {"col_5"}, {"col_6"}, {"col_7"}})
         };
     sql = new StringBuilder();
     OceanBaseTableOperations.appendIndexesSql(indexes, sql);
@@ -1016,7 +1013,7 @@ public class TestOceanBaseTableOperations extends TestOceanBase {
             .build());
     Map<String, String> properties = new HashMap<>();
 
-    Index[] indexes = new Index[] {Indexes.unique("uk_2", new String[][] {{"col_1"}}, Map.of())};
+    Index[] indexes = new Index[] {Indexes.unique("uk_2", new String[][] {{"col_1"}})};
     // create table
     TABLE_OPERATIONS.create(
         TEST_DB_NAME,

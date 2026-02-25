@@ -19,6 +19,7 @@
 
 package org.apache.gravitino.rel.indexes;
 
+import com.google.common.collect.ImmutableMap;
 import java.util.Map;
 import org.apache.gravitino.annotation.Evolving;
 
@@ -48,7 +49,9 @@ public interface Index {
   /**
    * @return Extra properties for index configuration
    */
-  Map<String, String> properties();
+  default Map<String, String> properties() {
+    return ImmutableMap.of();
+  }
 
   /**
    * The enum IndexType defines the type of the index. Currently, PRIMARY_KEY and UNIQUE_KEY are
