@@ -23,7 +23,7 @@ readme = "README.md"
 requires-python = ">=3.10"
 dependencies = [
     # fastmcp has been release 3.0.x, which makes some incompatible changes, so we temporarily pin
-    # it to 2.14.5 and will upgrade to 3.0.x in the future.
+    # it to 2.14.5 to avoid breaking changes.
     "fastmcp==2.14.5",
     "parameterized>=0.9.0",
     "pytest>=8.4.1",
