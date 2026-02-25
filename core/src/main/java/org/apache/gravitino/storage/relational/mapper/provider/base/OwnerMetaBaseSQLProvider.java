@@ -74,22 +74,6 @@ public class OwnerMetaBaseSQLProvider {
         + " ot.deleted_at = 0 AND gt.deleted_at = 0";
   }
 
-  public String listOwnerRelsByOwnerIdAndType(
-      @Param("ownerId") Long ownerId, @Param("ownerType") String ownerType) {
-    return "SELECT metalake_id as metalakeId,"
-        + " owner_id as ownerId,"
-        + " owner_type as ownerType,"
-        + " metadata_object_id as metadataObjectId,"
-        + " metadata_object_type as metadataObjectType,"
-        + " audit_info as auditInfo,"
-        + " current_version as currentVersion,"
-        + " last_version as lastVersion,"
-        + " deleted_at as deletedAt"
-        + " FROM "
-        + OWNER_TABLE_NAME
-        + " WHERE owner_id = #{ownerId} AND owner_type = #{ownerType} AND deleted_at = 0";
-  }
-
   public String insertOwnerRel(@Param("ownerRelPO") OwnerRelPO ownerRelPO) {
     return "INSERT INTO "
         + OWNER_TABLE_NAME

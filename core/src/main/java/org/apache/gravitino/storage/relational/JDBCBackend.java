@@ -34,7 +34,6 @@ import org.apache.commons.lang3.tuple.Pair;
 import org.apache.gravitino.Config;
 import org.apache.gravitino.Configs;
 import org.apache.gravitino.Entity;
-import org.apache.gravitino.Entity.EntityType;
 import org.apache.gravitino.EntityAlreadyExistsException;
 import org.apache.gravitino.HasIdentifier;
 import org.apache.gravitino.NameIdentifier;
@@ -620,18 +619,11 @@ public class JDBCBackend implements RelationalBackend {
       throws IOException {
     switch (relType) {
       case OWNER_REL:
-        // Query entities by owner
-        if (identType == EntityType.USER || identType == EntityType.GROUP) {
-          return (List<E>)
-              OwnerMetaService.getInstance().getEntitiesByOwner(nameIdentifier, identType);
-        } else {
-          // Query owner by entity
-          List<E> list = Lists.newArrayList();
-          OwnerMetaService.getInstance()
-              .getOwner(nameIdentifier, identType)
-              .ifPresent(e -> list.add((E) e));
-          return list;
-        }
+        List<E> list = Lists.newArrayList();
+        OwnerMetaService.getInstance()
+            .getOwner(nameIdentifier, identType)
+            .ifPresent(e -> list.add((E) e));
+        return list;
       case METADATA_OBJECT_ROLE_REL:
         return (List<E>)
             RoleMetaService.getInstance()

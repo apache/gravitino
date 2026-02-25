@@ -23,9 +23,6 @@ import java.sql.Connection;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
-import java.util.List;
-import java.util.Set;
-import java.util.stream.Collectors;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.authorization.AuthorizationUtils;
@@ -33,7 +30,6 @@ import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.meta.BaseMetalake;
 import org.apache.gravitino.meta.CatalogEntity;
 import org.apache.gravitino.meta.FilesetEntity;
-import org.apache.gravitino.meta.GenericEntity;
 import org.apache.gravitino.meta.GroupEntity;
 import org.apache.gravitino.meta.ModelEntity;
 import org.apache.gravitino.meta.RoleEntity;
@@ -205,65 +201,6 @@ class TestOwnerMetaService extends TestJDBCBackend {
     entity = OwnerMetaService.getInstance().getOwner(role.nameIdentifier(), role.type()).get();
     Assertions.assertInstanceOf(UserEntity.class, entity);
     Assertions.assertEquals("user", ((UserEntity) entity).name());
-  }
-
-  @TestTemplate
-  void testGetEntitiesByOwner() throws IOException {
-    BaseMetalake metalake = createAndInsertMakeLake(METALAKE_NAME);
-    CatalogEntity catalog = createAndInsertCatalog(METALAKE_NAME, CATALOG_NAME);
-    SchemaEntity schema = createAndInsertSchema(METALAKE_NAME, CATALOG_NAME, SCHEMA_NAME);
-    TableEntity table =
-        createTableEntity(
-            RandomIdGenerator.INSTANCE.nextId(),
-            Namespace.of(METALAKE_NAME, CATALOG_NAME, SCHEMA_NAME),
-            TABLE_NAME,
-            AUDIT_INFO);
-    backend.insert(table, false);
-
-    UserEntity user =
-        createUserEntity(
-            RandomIdGenerator.INSTANCE.nextId(),
-            AuthorizationUtils.ofUserNamespace(METALAKE_NAME),
-            "user",
-            AUDIT_INFO);
-    backend.insert(user, false);
-
-    OwnerMetaService.getInstance()
-        .setOwner(metalake.nameIdentifier(), metalake.type(), user.nameIdentifier(), user.type());
-    OwnerMetaService.getInstance()
-        .setOwner(catalog.nameIdentifier(), catalog.type(), user.nameIdentifier(), user.type());
-    OwnerMetaService.getInstance()
-        .setOwner(schema.nameIdentifier(), schema.type(), user.nameIdentifier(), user.type());
-    OwnerMetaService.getInstance()
-        .setOwner(table.nameIdentifier(), table.type(), user.nameIdentifier(), user.type());
-
-    List<GenericEntity> entities =
-        OwnerMetaService.getInstance().getEntitiesByOwner(user.nameIdentifier(), user.type());
-
-    Set<String> expected =
-        Set.of(
-            metalake.id() + "#" + metalake.type().name(),
-            catalog.id() + "#" + catalog.type().name(),
-            schema.id() + "#" + schema.type().name(),
-            table.id() + "#" + table.type().name());
-
-    Assertions.assertEquals(
-        expected,
-        entities.stream().map(e -> e.id() + "#" + e.type().name()).collect(Collectors.toSet()));
-
-    TableMetaService.getInstance().deleteTable(table.nameIdentifier());
-
-    List<GenericEntity> afterDeletion =
-        OwnerMetaService.getInstance().getEntitiesByOwner(user.nameIdentifier(), user.type());
-
-    Assertions.assertEquals(
-        Set.of(
-            metalake.id() + "#" + metalake.type().name(),
-            catalog.id() + "#" + catalog.type().name(),
-            schema.id() + "#" + schema.type().name()),
-        afterDeletion.stream()
-            .map(e -> e.id() + "#" + e.type().name())
-            .collect(Collectors.toSet()));
   }
 
   @TestTemplate

@@ -64,11 +64,6 @@ public class OwnerMetaSQLProviderFactory {
         .selectGroupOwnerMetaByMetadataObjectIdAndType(metadataObjectId, metadataObjectType);
   }
 
-  public static String listOwnerRelsByOwnerIdAndType(
-      @Param("ownerId") Long ownerId, @Param("ownerType") String ownerType) {
-    return getProvider().listOwnerRelsByOwnerIdAndType(ownerId, ownerType);
-  }
-
   public static String insertOwnerRel(@Param("ownerRelPO") OwnerRelPO ownerRelPO) {
     return getProvider().insertOwnerRel(ownerRelPO);
   }

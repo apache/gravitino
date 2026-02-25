@@ -21,14 +21,10 @@ package org.apache.gravitino.storage.relational.service;
 import static org.apache.gravitino.metrics.source.MetricsSource.GRAVITINO_RELATIONAL_STORE_METRIC_NAME;
 
 import java.util.Collections;
-import java.util.List;
 import java.util.Optional;
-import java.util.stream.Collectors;
 import org.apache.gravitino.Entity;
-import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.authorization.AuthorizationUtils;
-import org.apache.gravitino.meta.GenericEntity;
 import org.apache.gravitino.metrics.Monitored;
 import org.apache.gravitino.storage.relational.mapper.OwnerMetaMapper;
 import org.apache.gravitino.storage.relational.po.GroupPO;
@@ -36,7 +32,6 @@ import org.apache.gravitino.storage.relational.po.OwnerRelPO;
 import org.apache.gravitino.storage.relational.po.UserPO;
 import org.apache.gravitino.storage.relational.utils.POConverters;
 import org.apache.gravitino.storage.relational.utils.SessionUtils;
-import org.apache.gravitino.utils.MetadataObjectUtil;
 import org.apache.gravitino.utils.NameIdentifierUtil;
 
 /** This class is an utilization class to retrieve owner relation. */
@@ -48,29 +43,6 @@ public class OwnerMetaService {
 
   public static OwnerMetaService getInstance() {
     return INSTANCE;
-  }
-
-  @Monitored(
-      metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME,
-      baseMetricName = "getEntitiesByOwner")
-  public List<GenericEntity> getEntitiesByOwner(NameIdentifier owner, Entity.EntityType ownerType) {
-    Long ownerId = EntityIdService.getEntityId(owner, ownerType);
-
-    List<OwnerRelPO> ownerRelPOs =
-        SessionUtils.doWithCommitAndFetchResult(
-            OwnerMetaMapper.class,
-            mapper -> mapper.listOwnerRelsByOwnerIdAndType(ownerId, ownerType.name()));
-
-    return ownerRelPOs.stream()
-        .map(
-            rel ->
-                GenericEntity.builder()
-                    .withId(rel.getMetadataObjectId())
-                    .withEntityType(
-                        MetadataObjectUtil.toEntityType(
-                            MetadataObject.Type.valueOf(rel.getMetadataObjectType())))
-                    .build())
-        .collect(Collectors.toList());
   }
 
   @Monitored(metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME, baseMetricName = "getOwner")
