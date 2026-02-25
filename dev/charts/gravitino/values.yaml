@@ -31,7 +31,7 @@ global:
 image:
   registry: docker.io
   repository: apache/gravitino
-  tag: 1.2.0
+  tag: 1.2.1-SNAPSHOT
   pullPolicy: IfNotPresent
 
 ## MySQL chart configuration
