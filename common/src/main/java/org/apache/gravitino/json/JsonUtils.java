@@ -51,6 +51,7 @@ import com.google.common.collect.Maps;
 import java.io.IOException;
 import java.io.UnsupportedEncodingException;
 import java.util.HashMap;
+import java.util.TreeMap;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Locale;
@@ -1476,7 +1477,7 @@ public class JsonUtils {
       gen.writeObject(value.fieldNames());
       Map<String, String> props = value.properties();
       gen.writeFieldName("properties");
-      Map<String, String> sortedProps = new java.util.TreeMap<>(props);
+      Map<String, String> sortedProps = new TreeMap<>(props);
       gen.writeObject(sortedProps);
       gen.writeEndObject();
     }
