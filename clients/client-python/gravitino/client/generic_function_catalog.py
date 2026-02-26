@@ -230,6 +230,10 @@ class FunctionCatalogOperations(FunctionCatalog):
             IllegalArgumentException: If the change is rejected by the implementation.
         """
         self._check_function_name_identifier(ident)
+        if not changes:
+            raise IllegalArgumentException(
+                "At least one FunctionChange must be provided to alter_function"
+            )
 
         full_namespace = self._get_function_full_namespace(ident.namespace())
         updates = [self._to_function_update_request(change) for change in changes]

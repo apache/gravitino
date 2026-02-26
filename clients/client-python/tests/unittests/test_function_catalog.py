@@ -22,7 +22,6 @@ from gravitino.api.function.function_change import FunctionChange
 from gravitino.api.function.function_type import FunctionType
 from gravitino.api.rel.types.types import Types
 from gravitino.client.relational_catalog import RelationalCatalog
-from gravitino.constants.error import ErrorConstants
 from gravitino.dto.audit_dto import AuditDTO
 from gravitino.dto.function.function_definition_dto import FunctionDefinitionDTO
 from gravitino.dto.function.function_dto import FunctionDTO
@@ -32,7 +31,6 @@ from gravitino.dto.function.function_impl_dto import (
 from gravitino.dto.function.function_param_dto import FunctionParamDTO
 from gravitino.dto.responses.drop_response import DropResponse
 from gravitino.dto.responses.entity_list_response import EntityListResponse
-from gravitino.dto.responses.error_response import ErrorResponse
 from gravitino.dto.responses.function_list_response import FunctionListResponse
 from gravitino.dto.responses.function_response import FunctionResponse
 from gravitino.exceptions.base import (
@@ -118,13 +116,6 @@ class TestFunctionCatalog(unittest.TestCase):
             self.assertEqual("func2", functions[1].name())
 
         # Test NoSuchSchemaException
-        error_resp = ErrorResponse(
-            _code=ErrorConstants.NOT_FOUND_CODE,
-            _type=NoSuchSchemaException.__name__,
-            _message="schema not found",
-            _stack=None,
-        )
-        mock_resp = self._get_mock_http_resp(error_resp.to_json(), 404)
         with patch(
             "gravitino.utils.http_client.HTTPClient.get",
             side_effect=NoSuchSchemaException("schema not found"),
