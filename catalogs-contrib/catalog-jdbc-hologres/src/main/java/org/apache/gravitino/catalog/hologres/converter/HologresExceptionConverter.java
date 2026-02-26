@@ -54,31 +54,33 @@ public class HologresExceptionConverter extends JdbcExceptionConverter {
   @SuppressWarnings("FormatStringAnnotation")
   @Override
   public GravitinoRuntimeException toGravitinoException(SQLException se) {
+    String message = se.getMessage() != null ? se.getMessage() : "";
+
     if (null != se.getSQLState()) {
       switch (se.getSQLState()) {
         case DUPLICATE_DATABASE:
         case DUPLICATE_SCHEMA:
-          return new SchemaAlreadyExistsException(se.getMessage(), se);
+          return new SchemaAlreadyExistsException(message, se);
         case DUPLICATE_TABLE:
-          return new TableAlreadyExistsException(se.getMessage(), se);
+          return new TableAlreadyExistsException(message, se);
         case INVALID_SCHEMA_NAME:
         case INVALID_SCHEMA:
-          return new NoSuchSchemaException(se.getMessage(), se);
+          return new NoSuchSchemaException(message, se);
         case UNDEFINED_TABLE:
-          return new NoSuchTableException(se.getMessage(), se);
+          return new NoSuchTableException(message, se);
         default:
           {
             if (se.getSQLState().startsWith(CONNECTION_EXCEPTION)) {
-              return new ConnectionFailedException(se.getMessage(), se);
+              return new ConnectionFailedException(message, se);
             }
-            return new GravitinoRuntimeException(se.getMessage(), se);
+            return new GravitinoRuntimeException(message, se);
           }
       }
     } else {
-      if (se.getMessage() != null && se.getMessage().contains("password authentication failed")) {
-        return new ConnectionFailedException(se.getMessage(), se);
+      if (message.contains("password authentication failed")) {
+        return new ConnectionFailedException(message, se);
       }
-      return new GravitinoRuntimeException(se.getMessage(), se);
+      return new GravitinoRuntimeException(message, se);
     }
   }
 }
