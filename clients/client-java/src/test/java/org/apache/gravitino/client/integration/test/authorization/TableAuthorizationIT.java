@@ -131,6 +131,11 @@ public class TableAuthorizationIT extends BaseRestApiAuthorizationIT {
     TableCatalog tableCatalog = client.loadMetalake(METALAKE).loadCatalog(CATALOG).asTableCatalog();
     tableCatalog.createTable(
         NameIdentifier.of(SCHEMA, "table1"), createColumns(), "test", new HashMap<>());
+
+    // ISSUE-9982: Schema default isn't imported before
+    tableCatalog.createTable(
+        NameIdentifier.of("default", "table2"), createColumns(), "test", new HashMap<>());
+
     // normal user cannot create table
     TableCatalog tableCatalogNormalUser =
         normalUserClient.loadMetalake(METALAKE).loadCatalog(CATALOG).asTableCatalog();
