@@ -277,11 +277,18 @@ public class TrinoQueryITBase {
     }
   }
 
-  public static String[] listDirectory(String dirname) throws Exception {
+  public static String[] listTestSetDirectory(String dirname) throws Exception {
     File dir = new File(dirname);
-    if (dir.exists()) {
-      return dir.list();
+    if (!dir.exists()) {
+      throw new Exception("Test queries directory " + dirname + " does not exist");
     }
-    throw new Exception("Test queries directory " + dirname + " does not exist");
+    if (!dir.isDirectory()) {
+      throw new Exception("Path " + dirname + " is not a directory");
+    }
+    String[] files = dir.list();
+    if (files == null) {
+      throw new Exception("Failed to list directory " + dirname + " (I/O error)");
+    }
+    return files;
   }
 }

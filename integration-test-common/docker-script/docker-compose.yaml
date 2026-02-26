@@ -79,7 +79,7 @@ services:
       retries: 5
 
   trino:
-    image: trinodb/trino:${TRINO_VERSION:-446}
+    image: trinodb/trino:${TRINO_VERSION:-452}
     networks:
       - trino-net
     container_name: trino-ci-trino
@@ -94,7 +94,7 @@ services:
     entrypoint:  /bin/bash /tmp/trino/init.sh
     volumes:
       - ./init/trino:/tmp/trino
-      - ${GRAVITINO_TRINO_CONNECTOR_DIR:-../../trino-connector/trino-connector-446-451/build/libs}:/usr/lib/trino/plugin/gravitino
+      - ${GRAVITINO_TRINO_CONNECTOR_DIR:-../../trino-connector/trino-connector-452-468/build/libs}:/usr/lib/trino/plugin/gravitino
     extra_hosts:
       - "host.docker.internal:host-gateway"
     healthcheck:
@@ -113,7 +113,7 @@ services:
         condition: service_healthy
 
   trino-worker:
-    image: trinodb/trino:${TRINO_VERSION:-446}
+    image: trinodb/trino:${TRINO_VERSION:-452}
     networks:
       - trino-net
     deploy:
@@ -128,7 +128,7 @@ services:
     entrypoint:  /bin/bash /tmp/trino/init.sh
     volumes:
       - ./init/trino:/tmp/trino
-      - ${GRAVITINO_TRINO_CONNECTOR_DIR:-../../trino-connector/trino-connector-446-451/build/libs}:/usr/lib/trino/plugin/gravitino
+      - ${GRAVITINO_TRINO_CONNECTOR_DIR:-../../trino-connector/trino-connector-452-468/build/libs}:/usr/lib/trino/plugin/gravitino
     extra_hosts:
       - "host.docker.internal:host-gateway"
     depends_on:
