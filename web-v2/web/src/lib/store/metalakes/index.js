@@ -79,6 +79,16 @@ import {
 } from '@/lib/api/models'
 import { getFunctionsApi } from '@/lib/api/functions'
 
+const remapExpandedAndLoadedNodes = ({ getState, mapNode, expandedFilter, loadedFilter }) => {
+  const expandedNodes = getState().metalakes.expandedNodes.map(mapNode)
+  const loadedNodes = getState().metalakes.loadedNodes.map(mapNode)
+
+  return {
+    expanded: expandedFilter ? expandedNodes.filter(expandedFilter) : expandedNodes,
+    loaded: loadedFilter ? loadedNodes.filter(loadedFilter) : loadedNodes
+  }
+}
+
 export const fetchMetalakes = createAsyncThunk('appMetalakes/fetchMetalakes', async (params, { getState }) => {
   const [err, res] = await to(getMetalakesApi())
 
@@ -723,36 +733,23 @@ export const updateCatalog = createAsyncThunk(
 
         dispatch(setMetalakeTree(tree))
 
-        const expandedNodes = getState().metalakes.expandedNodes.map(node => {
-          const [currentMetalake, currentCatalog, schema, table] = extractPlaceholder(node)
-          if (currentCatalog === catalog) {
-            const updatedNode = `{{${currentMetalake}}}{{${res.catalog.name}}}{{${res.catalog.type}}}${
-              schema ? `{{${schema}}}` : ''
-            }${table ? `{{${table}}}` : ''}`
+        const { expanded, loaded } = remapExpandedAndLoadedNodes({
+          getState,
+          mapNode: node => {
+            const [currentMetalake, currentCatalog, currentType, currentSchema, entity] = extractPlaceholder(node)
+            if (currentCatalog !== catalog) {
+              return node
+            }
 
-            return updatedNode
-          }
-
-          return node
+            return `{{${currentMetalake}}}{{${res.catalog.name}}}{{${res.catalog.type}}}${
+              currentSchema ? `{{${currentSchema}}}` : ''
+            }${entity ? `{{${entity}}}` : ''}`
+          },
+          expandedFilter: node => !node.includes(`{{${catalog}}}`),
+          loadedFilter: node => !node.includes(`{{${catalog}}}`)
         })
 
-        const expanded = expandedNodes.filter(i => !i.startsWith(`{{${metalake}}}{{${catalog}}}`))
         dispatch(setExpanded(expanded))
-
-        const loadedNodes = getState().metalakes.loadedNodes.map(node => {
-          const [currentMetalake, currentCatalog, schema, table] = extractPlaceholder(node)
-          if (currentCatalog === catalog) {
-            const updatedNode = `{{${currentMetalake}}}{{${res.catalog.name}}}{{${res.catalog.type}}}${
-              schema ? `{{${schema}}}` : ''
-            }${table ? `{{${table}}}` : ''}`
-
-            return updatedNode
-          }
-
-          return node
-        })
-
-        const loaded = loadedNodes.filter(i => !i.startsWith(`{{${metalake}}}{{${catalog}}}`))
         dispatch(setLoadedNodes(loaded))
       }
     }
@@ -960,36 +957,23 @@ export const updateSchema = createAsyncThunk(
 
         dispatch(setMetalakeTree(tree))
 
-        const expandedNodes = getState().metalakes.expandedNodes.map(node => {
-          const [currentMetalake, currentCatalog, currentType, currentSchema, table] = extractPlaceholder(node)
-          if (currentCatalog === catalog && currentType === catalogType && currentSchema === schema) {
-            return `{{${currentMetalake}}}{{${currentCatalog}}}{{${currentType}}}{{${res.schema.name}}}${
-              table ? `{{${table}}}` : ''
-            }`
-          }
+        const { expanded, loaded } = remapExpandedAndLoadedNodes({
+          getState,
+          mapNode: node => {
+            const [currentMetalake, currentCatalog, currentType, currentSchema, table] = extractPlaceholder(node)
+            if (currentCatalog === catalog && currentType === catalogType && currentSchema === schema) {
+              return `{{${currentMetalake}}}{{${currentCatalog}}}{{${currentType}}}{{${res.schema.name}}}${
+                table ? `{{${table}}}` : ''
+              }`
+            }
 
-          return node
+            return node
+          },
+          expandedFilter: node => !node.startsWith(`{{${metalake}}}{{${catalog}}}{{${catalogType}}}{{${schema}}}`),
+          loadedFilter: node => !node.startsWith(`{{${metalake}}}{{${catalog}}}{{${catalogType}}}{{${schema}}}`)
         })
 
-        const expanded = expandedNodes.filter(
-          i => !i.startsWith(`{{${metalake}}}{{${catalog}}}{{${catalogType}}}{{${schema}}}`)
-        )
         dispatch(setExpanded(expanded))
-
-        const loadedNodes = getState().metalakes.loadedNodes.map(node => {
-          const [currentMetalake, currentCatalog, currentType, currentSchema, table] = extractPlaceholder(node)
-          if (currentCatalog === catalog && currentType === catalogType && currentSchema === schema) {
-            return `{{${currentMetalake}}}{{${currentCatalog}}}{{${currentType}}}{{${res.schema.name}}}${
-              table ? `{{${table}}}` : ''
-            }`
-          }
-
-          return node
-        })
-
-        const loaded = loadedNodes.filter(
-          i => !i.startsWith(`{{${metalake}}}{{${catalog}}}{{${catalogType}}}{{${schema}}}`)
-        )
         dispatch(setLoadedNodes(loaded))
       }
     }
@@ -1286,42 +1270,28 @@ export const updateTable = createAsyncThunk(
 
         dispatch(setMetalakeTree(tree))
 
-        const expandedNodes = getState().metalakes.expandedNodes.map(node => {
-          const [currentMetalake, currentCatalog, currentType, currentSchema, currentTable] = extractPlaceholder(node)
-          if (
-            currentCatalog === catalog &&
-            currentType === catalogType &&
-            currentSchema === schema &&
-            currentTable === table
-          ) {
-            return `{{${currentMetalake}}}{{${currentCatalog}}}{{${currentType}}}{{${currentSchema}}}{{${res.table.name}}}`
-          }
+        const { expanded, loaded } = remapExpandedAndLoadedNodes({
+          getState,
+          mapNode: node => {
+            const [currentMetalake, currentCatalog, currentType, currentSchema, currentTable] = extractPlaceholder(node)
+            if (
+              currentCatalog === catalog &&
+              currentType === catalogType &&
+              currentSchema === schema &&
+              currentTable === table
+            ) {
+              return `{{${currentMetalake}}}{{${currentCatalog}}}{{${currentType}}}{{${currentSchema}}}{{${res.table.name}}}`
+            }
 
-          return node
+            return node
+          },
+          expandedFilter: node =>
+            !node.startsWith(`{{${metalake}}}{{${catalog}}}{{${catalogType}}}{{${schema}}}{{${table}}}`),
+          loadedFilter: node =>
+            !node.startsWith(`{{${metalake}}}{{${catalog}}}{{${catalogType}}}{{${schema}}}{{${table}}}`)
         })
 
-        const expanded = expandedNodes.filter(
-          i => !i.startsWith(`{{${metalake}}}{{${catalog}}}{{${catalogType}}}{{${schema}}}{{${table}}}`)
-        )
         dispatch(setExpanded(expanded))
-
-        const loadedNodes = getState().metalakes.loadedNodes.map(node => {
-          const [currentMetalake, currentCatalog, currentType, currentSchema, currentTable] = extractPlaceholder(node)
-          if (
-            currentCatalog === catalog &&
-            currentType === catalogType &&
-            currentSchema === schema &&
-            currentTable === table
-          ) {
-            return `{{${currentMetalake}}}{{${currentCatalog}}}{{${currentType}}}{{${currentSchema}}}{{${res.table.name}}}`
-          }
-
-          return node
-        })
-
-        const loaded = loadedNodes.filter(
-          i => !i.startsWith(`{{${metalake}}}{{${catalog}}}{{${catalogType}}}{{${schema}}}{{${table}}}`)
-        )
         dispatch(setLoadedNodes(loaded))
       }
     }
@@ -1526,42 +1496,29 @@ export const updateFileset = createAsyncThunk(
 
         dispatch(setMetalakeTree(tree))
 
-        const expandedNodes = getState().metalakes.expandedNodes.map(node => {
-          const [currentMetalake, currentCatalog, currentType, currentSchema, currentFileset] = extractPlaceholder(node)
-          if (
-            currentCatalog === catalog &&
-            currentType === catalogType &&
-            currentSchema === schema &&
-            currentFileset === fileset
-          ) {
-            return `{{${currentMetalake}}}{{${currentCatalog}}}{{${currentType}}}{{${currentSchema}}}{{${res.fileset.name}}}`
-          }
+        const { expanded, loaded } = remapExpandedAndLoadedNodes({
+          getState,
+          mapNode: node => {
+            const [currentMetalake, currentCatalog, currentType, currentSchema, currentFileset] =
+              extractPlaceholder(node)
+            if (
+              currentCatalog === catalog &&
+              currentType === catalogType &&
+              currentSchema === schema &&
+              currentFileset === fileset
+            ) {
+              return `{{${currentMetalake}}}{{${currentCatalog}}}{{${currentType}}}{{${currentSchema}}}{{${res.fileset.name}}}`
+            }
 
-          return node
+            return node
+          },
+          expandedFilter: node =>
+            !node.startsWith(`{{${metalake}}}{{${catalog}}}{{${catalogType}}}{{${schema}}}{{${fileset}}}`),
+          loadedFilter: node =>
+            !node.startsWith(`{{${metalake}}}{{${catalog}}}{{${catalogType}}}{{${schema}}}{{${fileset}}}`)
         })
 
-        const expanded = expandedNodes.filter(
-          i => !i.startsWith(`{{${metalake}}}{{${catalog}}}{{${catalogType}}}{{${schema}}}{{${fileset}}}`)
-        )
         dispatch(setExpanded(expanded))
-
-        const loadedNodes = getState().metalakes.loadedNodes.map(node => {
-          const [currentMetalake, currentCatalog, currentType, currentSchema, currentFileset] = extractPlaceholder(node)
-          if (
-            currentCatalog === catalog &&
-            currentType === catalogType &&
-            currentSchema === schema &&
-            currentFileset === fileset
-          ) {
-            return `{{${currentMetalake}}}{{${currentCatalog}}}{{${currentType}}}{{${currentSchema}}}{{${res.fileset.name}}}`
-          }
-
-          return node
-        })
-
-        const loaded = loadedNodes.filter(
-          i => !i.startsWith(`{{${metalake}}}{{${catalog}}}{{${catalogType}}}{{${schema}}}{{${fileset}}}`)
-        )
         dispatch(setLoadedNodes(loaded))
       }
     }
@@ -1782,42 +1739,28 @@ export const updateTopic = createAsyncThunk(
 
         dispatch(setMetalakeTree(tree))
 
-        const expandedNodes = getState().metalakes.expandedNodes.map(node => {
-          const [currentMetalake, currentCatalog, currentType, currentSchema, currentTopic] = extractPlaceholder(node)
-          if (
-            currentCatalog === catalog &&
-            currentType === catalogType &&
-            currentSchema === schema &&
-            currentTopic === topic
-          ) {
-            return `{{${currentMetalake}}}{{${currentCatalog}}}{{${currentType}}}{{${currentSchema}}}{{${res.topic.name}}}`
-          }
+        const { expanded, loaded } = remapExpandedAndLoadedNodes({
+          getState,
+          mapNode: node => {
+            const [currentMetalake, currentCatalog, currentType, currentSchema, currentTopic] = extractPlaceholder(node)
+            if (
+              currentCatalog === catalog &&
+              currentType === catalogType &&
+              currentSchema === schema &&
+              currentTopic === topic
+            ) {
+              return `{{${currentMetalake}}}{{${currentCatalog}}}{{${currentType}}}{{${currentSchema}}}{{${res.topic.name}}}`
+            }
 
-          return node
+            return node
+          },
+          expandedFilter: node =>
+            !node.startsWith(`{{${metalake}}}{{${catalog}}}{{${catalogType}}}{{${schema}}}{{${topic}}}`),
+          loadedFilter: node =>
+            !node.startsWith(`{{${metalake}}}{{${catalog}}}{{${catalogType}}}{{${schema}}}{{${topic}}}`)
         })
 
-        const expanded = expandedNodes.filter(
-          i => !i.startsWith(`{{${metalake}}}{{${catalog}}}{{${catalogType}}}{{${schema}}}{{${topic}}}`)
-        )
         dispatch(setExpanded(expanded))
-
-        const loadedNodes = getState().metalakes.loadedNodes.map(node => {
-          const [currentMetalake, currentCatalog, currentType, currentSchema, currentTopic] = extractPlaceholder(node)
-          if (
-            currentCatalog === catalog &&
-            currentType === catalogType &&
-            currentSchema === schema &&
-            currentTopic === topic
-          ) {
-            return `{{${currentMetalake}}}{{${currentCatalog}}}{{${currentType}}}{{${currentSchema}}}{{${res.topic.name}}}`
-          }
-
-          return node
-        })
-
-        const loaded = loadedNodes.filter(
-          i => !i.startsWith(`{{${metalake}}}{{${catalog}}}{{${catalogType}}}{{${schema}}}{{${topic}}}`)
-        )
         dispatch(setLoadedNodes(loaded))
       }
     }
@@ -2004,42 +1947,28 @@ export const updateModel = createAsyncThunk(
 
         dispatch(setMetalakeTree(tree))
 
-        const expandedNodes = getState().metalakes.expandedNodes.map(node => {
-          const [currentMetalake, currentCatalog, currentType, currentSchema, currentModel] = extractPlaceholder(node)
-          if (
-            currentCatalog === catalog &&
-            currentType === catalogType &&
-            currentSchema === schema &&
-            currentModel === model
-          ) {
-            return `{{${currentMetalake}}}{{${currentCatalog}}}{{${currentType}}}{{${currentSchema}}}{{${res.model.name}}}`
-          }
+        const { expanded, loaded } = remapExpandedAndLoadedNodes({
+          getState,
+          mapNode: node => {
+            const [currentMetalake, currentCatalog, currentType, currentSchema, currentModel] = extractPlaceholder(node)
+            if (
+              currentCatalog === catalog &&
+              currentType === catalogType &&
+              currentSchema === schema &&
+              currentModel === model
+            ) {
+              return `{{${currentMetalake}}}{{${currentCatalog}}}{{${currentType}}}{{${currentSchema}}}{{${res.model.name}}}`
+            }
 
-          return node
+            return node
+          },
+          expandedFilter: node =>
+            !node.startsWith(`{{${metalake}}}{{${catalog}}}{{${catalogType}}}{{${schema}}}{{${model}}}`),
+          loadedFilter: node =>
+            !node.startsWith(`{{${metalake}}}{{${catalog}}}{{${catalogType}}}{{${schema}}}{{${model}}}`)
         })
 
-        const expanded = expandedNodes.filter(
-          i => !i.startsWith(`{{${metalake}}}{{${catalog}}}{{${catalogType}}}{{${schema}}}{{${model}}}`)
-        )
         dispatch(setExpanded(expanded))
-
-        const loadedNodes = getState().metalakes.loadedNodes.map(node => {
-          const [currentMetalake, currentCatalog, currentType, currentSchema, currentModel] = extractPlaceholder(node)
-          if (
-            currentCatalog === catalog &&
-            currentType === catalogType &&
-            currentSchema === schema &&
-            currentModel === model
-          ) {
-            return `{{${currentMetalake}}}{{${currentCatalog}}}{{${currentType}}}{{${currentSchema}}}{{${res.model.name}}}`
-          }
-
-          return node
-        })
-
-        const loaded = loadedNodes.filter(
-          i => !i.startsWith(`{{${metalake}}}{{${catalog}}}{{${catalogType}}}{{${schema}}}{{${model}}}`)
-        )
         dispatch(setLoadedNodes(loaded))
       }
     }
