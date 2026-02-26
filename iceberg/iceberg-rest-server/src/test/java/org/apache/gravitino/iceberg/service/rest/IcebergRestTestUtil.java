@@ -131,10 +131,11 @@ public class IcebergRestTestUtil {
           "true");
       IcebergConfigProvider configProvider = IcebergConfigProviderFactory.create(catalogConf);
       configProvider.initialize(catalogConf);
-      IcebergRESTServerContext.create(configProvider, false, false);
       // used to override register table interface
       IcebergCatalogWrapperManager icebergCatalogWrapperManager =
-          new IcebergCatalogWrapperManagerForTest(catalogConf, configProvider);
+          new IcebergCatalogWrapperManagerForTest(
+              catalogConf, configProvider, false, configProvider.getMetalakeName());
+      IcebergRESTServerContext.create(configProvider, false, false, icebergCatalogWrapperManager);
 
       EventBus eventBus = new EventBus(eventListenerPlugins);
 

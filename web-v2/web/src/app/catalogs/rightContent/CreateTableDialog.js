@@ -52,7 +52,7 @@ import { validateMessages, mismatchName } from '@/config'
 import {
   ColumnSpesicalType,
   ColumnType,
-  ColumnTypeForMysql,
+  ColumnTypeForUnsigned,
   ColumnTypeSupportAutoIncrement,
   ColumnWithParamType,
   UnsupportColumnType,
@@ -462,8 +462,8 @@ export default function CreateTableDialog({ ...props }) {
           item => !UnsupportColumnType[provider]?.includes(item)
         )
 
-        if (provider === 'jdbc-mysql') {
-          columnTypes = [...columnTypes, ...ColumnTypeForMysql]
+        if (['jdbc-mysql', 'jdbc-clickhouse'].includes(provider)) {
+          columnTypes = [...columnTypes, ...ColumnTypeForUnsigned]
         }
         setColumnTypes(columnTypes.sort((a, b) => a.localeCompare(b)))
       }
@@ -539,180 +539,198 @@ export default function CreateTableDialog({ ...props }) {
       .then(async () => {
         setConfirmLoading(true)
 
-        const submitData = {
-          name: values.name.trim(),
-          comment: values.comment,
-          tagsToAdd: values.tags,
-          columns: values.columns.map(col => {
-            const column = {
-              uniqueId: col.uniqueId || col.name,
-              name: col.name,
-              type: getColumnType(col.typeObj),
-              nullable: !col.required,
-              comment: col.comment || ''
-            }
-            if (autoIncrementInfo) {
-              column['autoIncrement'] = col.autoIncrement
-            }
-            if (col.defaultValue) {
-              switch (col.defaultValue.type) {
-                case 'field':
-                  column['defaultValue'] = {
-                    type: 'field',
-                    fieldName: [col.defaultValue?.fieldName]
-                  }
-                  break
-                case 'function':
-                  column['defaultValue'] = {
-                    type: 'function',
-                    funcName: col.defaultValue?.funcName,
-                    funcArgs: col.defaultValue?.funcArgs.map(f => {
-                      const func = {}
-                      if (f.type === 'literal') {
-                        func['type'] = 'literal'
-                        func['dataType'] = 'string'
-                        func['value'] = f.value
-                      } else {
-                        func['type'] = 'field'
-                        func['fieldName'] = [f.fieldName]
-                      }
+        let submitted = false
 
-                      return func
-                    })
-                  }
-                  break
-                default:
-                  column['defaultValue'] = {
-                    type: 'literal',
-                    dataType: col.defaultValue?.dataType || 'string',
-                    value: col.defaultValue?.value
-                  }
+        try {
+          const submitData = {
+            name: values.name.trim(),
+            comment: values.comment,
+            tagsToAdd: values.tags,
+            columns: values.columns.map(col => {
+              const column = {
+                uniqueId: col.uniqueId || col.name,
+                name: col.name,
+                type: getColumnType(col.typeObj),
+                nullable: !col.required,
+                comment: col.comment || ''
               }
-            }
-
-            return column
-          }),
-          properties:
-            values.properties &&
-            values.properties.reduce((acc, item) => {
-              acc[item.key] = values[item.key] || item.value
-
-              return acc
-            }, {})
-        }
-        if (partitioningInfo) {
-          submitData['partitioning'] = values.partitions?.map(p => {
-            const field = {}
-            if (p.strategy === 'list') {
-              field['fieldNames'] = [[p.fieldName]]
-            } else if (p.strategy === 'bucket') {
-              field['numBuckets'] = p.number
-              field['fieldNames'] = [[p.fieldName]]
-            } else if (p.strategy === 'truncate') {
-              field['width'] = p.number
-              field['fieldName'] = [p.fieldName]
-            } else {
-              field['fieldName'] = [p.fieldName]
-            }
-
-            return {
-              strategy: p.strategy,
-              ...field
-            }
-          })
-        }
-        if (sortOredsInfo) {
-          submitData['sortOrders'] = values.sortOrders?.map(s => {
-            const field = {
-              sortTerm: {}
-            }
-            if (s.strategy !== 'field') {
-              field.sortTerm['type'] = 'function'
-              field.sortTerm['funcName'] = s.strategy
-              field.sortTerm['funcArgs'] = []
-              if (['truncate', 'bucket'].includes(s.strategy)) {
-                field.sortTerm['funcArgs'] = [
-                  {
-                    type: 'literal',
-                    dataType: 'integer',
-                    value: s.number + ''
-                  },
-                  {
-                    type: 'field',
-                    fieldName: [s.fieldName]
-                  }
-                ]
-              } else {
-                field.sortTerm['funcArgs'] = [
-                  {
-                    type: 'field',
-                    fieldName: [s.fieldName]
-                  }
-                ]
+              if (autoIncrementInfo) {
+                column['autoIncrement'] = col.autoIncrement
               }
-            } else {
-              field.sortTerm = {
-                type: s.strategy,
-                fieldName: [s.fieldName]
-              }
-            }
-            field['direction'] = s.direction
-            field['nullOrdering'] = s.nullOrdering
+              if (col.defaultValue) {
+                switch (col.defaultValue.type) {
+                  case 'field':
+                    column['defaultValue'] = {
+                      type: 'field',
+                      fieldName: [col.defaultValue?.fieldName]
+                    }
+                    break
+                  case 'function':
+                    column['defaultValue'] = {
+                      type: 'function',
+                      funcName: col.defaultValue?.funcName,
+                      funcArgs: col.defaultValue?.funcArgs.map(f => {
+                        const func = {}
+                        if (f.type === 'literal') {
+                          func['type'] = 'literal'
+                          func['dataType'] = 'string'
+                          func['value'] = f.value
+                        } else {
+                          func['type'] = 'field'
+                          func['fieldName'] = [f.fieldName]
+                        }
 
-            return field
-          })
-        }
-        if (indexesInfo) {
-          submitData['indexes'] = values.indexes?.map(i => {
-            return {
-              indexType: i.indexType,
-              name: i.name,
-              fieldNames: i.fieldName.map(f => [f])
-            }
-          })
-        }
-        if (
-          distributionInfo &&
-          (values?.distribution?.strategy || values?.distribution?.number || values?.distribution?.field)
-        ) {
-          submitData['distribution'] = {
-            strategy: values.distribution?.strategy,
-            number: values.distribution?.number || 0,
-            funcArgs:
-              values.distribution?.field?.map(f => {
-                return {
-                  type: 'field',
-                  fieldName: [f]
+                        return func
+                      })
+                    }
+                    break
+                  default:
+                    column['defaultValue'] = {
+                      type: 'literal',
+                      dataType: col.defaultValue?.dataType || 'string',
+                      value: col.defaultValue?.value
+                    }
                 }
-              }) || []
+              }
+
+              return column
+            }),
+            properties:
+              values.properties &&
+              values.properties.reduce((acc, item) => {
+                acc[item.key] = values[item.key] || item.value
+
+                return acc
+              }, {})
           }
-        }
-        if (editTable) {
-          // update table
-          const reqData = {
-            updates: genUpdates(cacheData, submitData, ['lakehouse-iceberg', 'lakehouse-paimon'].includes(provider))
-          }
-          if (reqData.updates.length) {
-            await dispatch(
-              updateTable({ init, metalake, catalog, catalogType, schema, table: cacheData.name, data: reqData })
-            )
-          }
-        } else {
-          submitData.columns.forEach(col => {
-            delete col.uniqueId
-          })
-          if (tableDefaultProps[provider]) {
-            tableDefaultProps[provider].forEach(item => {
-              if (values[item.key]) {
-                submitData.properties[item.key] = values[item.key]
+          if (partitioningInfo) {
+            submitData['partitioning'] = values.partitions?.map(p => {
+              const field = {}
+              if (p.strategy === 'list') {
+                field['fieldNames'] = [[p.fieldName]]
+              } else if (p.strategy === 'bucket') {
+                field['numBuckets'] = p.number
+                field['fieldNames'] = [[p.fieldName]]
+              } else if (p.strategy === 'truncate') {
+                field['width'] = p.number
+                field['fieldName'] = [p.fieldName]
+              } else {
+                field['fieldName'] = [p.fieldName]
+              }
+
+              return {
+                strategy: p.strategy,
+                ...field
               }
             })
           }
-          await dispatch(createTable({ data: submitData, metalake, catalog, schema, catalogType }))
+          if (sortOredsInfo) {
+            submitData['sortOrders'] = values.sortOrders?.map(s => {
+              const field = {
+                sortTerm: {}
+              }
+              if (s.strategy !== 'field') {
+                field.sortTerm['type'] = 'function'
+                field.sortTerm['funcName'] = s.strategy
+                field.sortTerm['funcArgs'] = []
+                if (['truncate', 'bucket'].includes(s.strategy)) {
+                  field.sortTerm['funcArgs'] = [
+                    {
+                      type: 'literal',
+                      dataType: 'integer',
+                      value: s.number + ''
+                    },
+                    {
+                      type: 'field',
+                      fieldName: [s.fieldName]
+                    }
+                  ]
+                } else {
+                  field.sortTerm['funcArgs'] = [
+                    {
+                      type: 'field',
+                      fieldName: [s.fieldName]
+                    }
+                  ]
+                }
+              } else {
+                field.sortTerm = {
+                  type: s.strategy,
+                  fieldName: [s.fieldName]
+                }
+              }
+              field['direction'] = s.direction
+              field['nullOrdering'] = s.nullOrdering
+
+              return field
+            })
+          }
+          if (indexesInfo) {
+            submitData['indexes'] = values.indexes?.map(i => {
+              return {
+                indexType: i.indexType,
+                name: i.name,
+                fieldNames: i.fieldName.map(f => [f])
+              }
+            })
+          }
+          if (
+            distributionInfo &&
+            (values?.distribution?.strategy || values?.distribution?.number || values?.distribution?.field)
+          ) {
+            submitData['distribution'] = {
+              strategy: values.distribution?.strategy,
+              number: values.distribution?.number || 0,
+              funcArgs:
+                values.distribution?.field?.map(f => {
+                  return {
+                    type: 'field',
+                    fieldName: [f]
+                  }
+                }) || []
+            }
+          }
+          if (editTable) {
+            // update table
+            const reqData = {
+              updates: genUpdates(cacheData, submitData, ['lakehouse-iceberg', 'lakehouse-paimon'].includes(provider))
+            }
+            if (reqData.updates.length) {
+              const action = await dispatch(
+                updateTable({ init, metalake, catalog, catalogType, schema, table: cacheData.name, data: reqData })
+              )
+              if (action?.payload?.err) {
+                throw new Error('Failed to update table')
+              }
+            }
+            submitted = true
+          } else {
+            submitData.columns.forEach(col => {
+              delete col.uniqueId
+            })
+            if (tableDefaultProps[provider]) {
+              tableDefaultProps[provider].forEach(item => {
+                if (values[item.key]) {
+                  submitData.properties[item.key] = values[item.key]
+                }
+              })
+            }
+            const action = await dispatch(createTable({ data: submitData, metalake, catalog, schema, catalogType }))
+            if (action?.payload?.err) {
+              throw new Error('Failed to create table')
+            }
+            submitted = true
+          }
+
+          if (submitted) {
+            treeRef.current.onLoadData({ key: `${catalog}/${schema}`, nodeType: 'schema' })
+            setOpen(false)
+          }
+        } catch (error) {
+          console.error(error)
+        } finally {
+          setConfirmLoading(false)
         }
-        treeRef.current.onLoadData({ key: `${catalog}/${schema}`, nodeType: 'schema' })
-        setConfirmLoading(false)
-        setOpen(false)
       })
       .catch(info => {
         console.error(info)

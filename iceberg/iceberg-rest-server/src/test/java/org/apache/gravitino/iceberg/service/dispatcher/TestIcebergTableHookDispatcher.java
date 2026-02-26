@@ -92,7 +92,7 @@ public class TestIcebergTableHookDispatcher {
     IcebergConfigProvider mockConfigProvider = mock(IcebergConfigProvider.class);
     when(mockConfigProvider.getMetalakeName()).thenReturn(TEST_METALAKE);
     when(mockConfigProvider.getDefaultCatalogName()).thenReturn(TEST_CATALOG);
-    IcebergRESTServerContext.create(mockConfigProvider, false, false);
+    IcebergRESTServerContext.create(mockConfigProvider, false, false, null);
 
     // Create hook dispatcher
     hookDispatcher = new IcebergTableHookDispatcher(mockDispatcher);
