@@ -338,7 +338,7 @@ public class TrinoQueryIT extends TrinoQueryITBase {
     CompletionService<Integer> completionService = new ExecutorCompletionService<>(executor);
 
     String[] testSetNames =
-        Arrays.stream(TrinoQueryITBase.listDirectory(testsetsDir))
+        Arrays.stream(TrinoQueryITBase.listTestSetDirectory(testsetsDir))
             .filter(s -> new File(ITUtils.joinPath(testsetsDir, s)).isDirectory())
             .filter(s -> ciTestsets.isEmpty() || ciTestsets.contains(s))
             .toArray(String[]::new);
@@ -529,14 +529,14 @@ public class TrinoQueryIT extends TrinoQueryITBase {
   }
 
   static String[] getTesterNames(String testSetDirName, String testFilterPrefix) throws Exception {
-    return Arrays.stream(listDirectory(testSetDirName))
+    return Arrays.stream(listTestSetDirectory(testSetDirName))
         .filter(s -> !s.endsWith("prepare.sql") && !s.endsWith("cleanup.sql") && s.endsWith(".sql"))
         .filter(s -> testFilterPrefix.isEmpty() || s.startsWith(testFilterPrefix))
         .toArray(String[]::new);
   }
 
   static String[] getTesterCatalogNames(String testSetDirName, String catalog) throws Exception {
-    return Arrays.stream(listDirectory(testSetDirName))
+    return Arrays.stream(listTestSetDirectory(testSetDirName))
         .filter(s -> s.matches("catalog_.*_prepare.sql"))
         .filter(s -> catalog.isEmpty() || s.equals("catalog_" + catalog + "_prepare.sql"))
         .map(s -> s.replace("catalog_", "").replace("_prepare.sql", ""))

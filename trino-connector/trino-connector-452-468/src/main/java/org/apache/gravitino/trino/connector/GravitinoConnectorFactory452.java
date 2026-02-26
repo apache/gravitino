@@ -23,35 +23,40 @@ import org.apache.gravitino.trino.connector.catalog.CatalogConnectorContext;
 import org.apache.gravitino.trino.connector.system.GravitinoSystemConnector;
 import org.apache.gravitino.trino.connector.system.storedprocedure.GravitinoStoredProcedureFactory;
 
-public class GravitinoConnectorFactory446 extends GravitinoConnectorFactory {
+public class GravitinoConnectorFactory452 extends GravitinoConnectorFactory {
 
-  public GravitinoConnectorFactory446(GravitinoAdminClient client) {
+  public GravitinoConnectorFactory452(GravitinoAdminClient client) {
     super(client);
   }
 
   @Override
   protected int getMinSupportTrinoSpiVersion() {
-    return 446;
+    return 452;
   }
 
   @Override
   protected int getMaxSupportTrinoSpiVersion() {
-    return 451;
+    return 468;
+  }
+
+  @Override
+  protected String getTrinoCatalogName(String metalake, String catalog) {
+    return "\"" + metalake + "." + catalog + "\"";
   }
 
   @Override
   protected boolean supportCatalogNameWithMetalake() {
-    return true;
+    return false;
   }
 
   @Override
   protected GravitinoConnector createConnector(CatalogConnectorContext connectorContext) {
-    return new GravitinoConnector446(connectorContext);
+    return new GravitinoConnector452(connectorContext);
   }
 
   @Override
   protected GravitinoSystemConnector createSystemConnector(
       GravitinoStoredProcedureFactory storedProcedureFactory) {
-    return new GravitinoSystemConnector446(storedProcedureFactory);
+    return new GravitinoSystemConnector452(storedProcedureFactory);
   }
 }
