@@ -365,8 +365,13 @@ public class HologresTableOperations extends JdbcTableOperations
   static void appendPartitioningSql(
       Transform[] partitioning, boolean isLogicalPartition, StringBuilder sqlBuilder) {
     Preconditions.checkArgument(
-        partitioning.length == 1 && partitioning[0] instanceof Transforms.ListTransform,
-        "Hologres only supports LIST partitioning");
+        partitioning.length == 1,
+        "Hologres only supports single partition transform, but got %s",
+        partitioning.length);
+    Preconditions.checkArgument(
+        partitioning[0] instanceof Transforms.ListTransform,
+        "Hologres only supports LIST partitioning, but got %s",
+        partitioning[0].getClass().getSimpleName());
 
     Transforms.ListTransform listTransform = (Transforms.ListTransform) partitioning[0];
     String[][] fieldNames = listTransform.fieldNames();
