@@ -106,9 +106,10 @@ public class HologresSchemaOperations extends JdbcDatabaseOperations {
     StringBuilder sqlBuilder =
         new StringBuilder(String.format("CREATE SCHEMA %s%s%s;", HOLO_QUOTE, schema, HOLO_QUOTE));
     if (StringUtils.isNotEmpty(comment)) {
+      String escapedComment = comment.replace("'", "''");
       sqlBuilder.append(
           String.format(
-              "COMMENT ON SCHEMA %s%s%s IS '%s'", HOLO_QUOTE, schema, HOLO_QUOTE, comment));
+              "COMMENT ON SCHEMA %s%s%s IS '%s'", HOLO_QUOTE, schema, HOLO_QUOTE, escapedComment));
     }
     return sqlBuilder.toString();
   }

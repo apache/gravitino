@@ -518,7 +518,8 @@ public class HologresTableOperations extends JdbcTableOperations
       }
     }
     return String.format(
-        "%s%s%s%s%s%s';", TABLE_COMMENT, HOLO_QUOTE, jdbcTable.name(), HOLO_QUOTE, IS, newComment);
+        "COMMENT ON TABLE %s%s%s IS '%s';",
+        HOLO_QUOTE, jdbcTable.name(), HOLO_QUOTE, newComment.replace("'", "''"));
   }
 
   private String deleteColumnFieldDefinition(
@@ -609,18 +610,17 @@ public class HologresTableOperations extends JdbcTableOperations
 
     // Append comment if available
     if (StringUtils.isNotEmpty(addColumn.getComment())) {
+      String escapedComment = addColumn.getComment().replace("'", "''");
       result.add(
           String.format(
-              "%s%s%s%s.%s%s%s%s%s';",
-              COLUMN_COMMENT,
+              "COMMENT ON COLUMN %s%s%s.%s%s%s IS '%s';",
               HOLO_QUOTE,
               lazyLoadTable.name(),
               HOLO_QUOTE,
               HOLO_QUOTE,
               col,
               HOLO_QUOTE,
-              IS,
-              addColumn.getComment()));
+              escapedComment));
     }
     return result;
   }
@@ -633,16 +633,14 @@ public class HologresTableOperations extends JdbcTableOperations
     }
     String col = updateColumnComment.fieldName()[0];
     return String.format(
-        "%s%s%s%s.%s%s%s%s%s';",
-        COLUMN_COMMENT,
+        "COMMENT ON COLUMN %s%s%s.%s%s%s IS '%s';",
         HOLO_QUOTE,
         tableName,
         HOLO_QUOTE,
         HOLO_QUOTE,
         col,
         HOLO_QUOTE,
-        IS,
-        newComment);
+        newComment.replace("'", "''"));
   }
 
   @Override
