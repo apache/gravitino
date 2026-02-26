@@ -502,6 +502,7 @@ export default function CatalogDetailsPage() {
               locationProviders={store.activatedDetails?.properties?.['filesystem-providers']?.split(',') || []}
               catalogBackend={store.activatedDetails?.properties?.['catalog-backend']}
               editSchema={editSchema}
+              init={false}
             />
           )}
         </>
@@ -520,6 +521,7 @@ export default function CatalogDetailsPage() {
           editCatalog={catalog}
           catalogType={catalogType}
           systemConfig={systemConfig}
+          init={true}
         />
       )}
       {openOwner && (
