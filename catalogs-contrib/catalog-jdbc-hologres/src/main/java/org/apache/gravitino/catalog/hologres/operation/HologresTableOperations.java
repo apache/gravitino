@@ -553,9 +553,11 @@ public class HologresTableOperations extends JdbcTableOperations
       throw new UnsupportedOperationException(HOLOGRES_NOT_SUPPORT_NESTED_COLUMN_MSG);
     }
     return String.format(
-        "%s%s RENAME COLUMN %s%s%s TO %s%s%s;",
+        "%s%s%s%s RENAME COLUMN %s%s%s TO %s%s%s;",
         ALTER_TABLE,
+        HOLO_QUOTE,
         tableName,
+        HOLO_QUOTE,
         HOLO_QUOTE,
         renameColumn.fieldName()[0],
         HOLO_QUOTE,
