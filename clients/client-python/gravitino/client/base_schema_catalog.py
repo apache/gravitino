@@ -16,7 +16,7 @@
 # under the License.
 
 import logging
-from typing import Dict, List
+from typing import Dict, List, Optional
 
 from gravitino.api.catalog import Catalog
 from gravitino.api.metadata_object import MetadataObject
@@ -249,10 +249,10 @@ class BaseSchemaCatalog(CatalogDTO, SupportsSchemas, FunctionCatalog):
     def register_function(
         self,
         ident: NameIdentifier,
-        comment: str = None,
-        function_type: FunctionType = None,
-        deterministic: bool = True,
-        definitions: List[FunctionDefinition] = None,
+        comment: Optional[str],
+        function_type: FunctionType,
+        deterministic: bool,
+        definitions: List[FunctionDefinition],
     ) -> Function:
         return self._function_operations.register_function(
             ident,
