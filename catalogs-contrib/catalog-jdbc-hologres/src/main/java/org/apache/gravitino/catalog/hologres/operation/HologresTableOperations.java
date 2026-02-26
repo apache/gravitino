@@ -258,37 +258,32 @@ public class HologresTableOperations extends JdbcTableOperations
 
     // Add table comment if specified
     if (StringUtils.isNotEmpty(comment)) {
+      String escapedComment = comment.replace("'", "''");
       sqlBuilder
           .append(NEW_LINE)
           .append(
               String.format(
-                  "%s%s%s%s%s%s';",
-                  TABLE_COMMENT,
-                  HOLO_QUOTE,
-                  tableName,
-                  HOLO_QUOTE,
-                  IS,
-                  comment.replace("'", "''")));
+                  "COMMENT ON TABLE %s%s%s IS '%s';",
+                  HOLO_QUOTE, tableName, HOLO_QUOTE, escapedComment));
     }
     Arrays.stream(columns)
         .filter(jdbcColumn -> StringUtils.isNotEmpty(jdbcColumn.comment()))
         .forEach(
-            jdbcColumn ->
-                sqlBuilder
-                    .append(NEW_LINE)
-                    .append(
-                        String.format(
-                            "%s%s%s%s.%s%s%s%s%s';",
-                            COLUMN_COMMENT,
-                            HOLO_QUOTE,
-                            tableName,
-                            HOLO_QUOTE,
-                            HOLO_QUOTE,
-                            jdbcColumn.name(),
-                            HOLO_QUOTE,
-                            IS,
-                            jdbcColumn.comment().replace("'", "''"))));
-
+            jdbcColumn -> {
+              String escapedColComment = jdbcColumn.comment().replace("'", "''");
+              sqlBuilder
+                  .append(NEW_LINE)
+                  .append(
+                      String.format(
+                          "COMMENT ON COLUMN %s%s%s.%s%s%s IS '%s';",
+                          HOLO_QUOTE,
+                          tableName,
+                          HOLO_QUOTE,
+                          HOLO_QUOTE,
+                          jdbcColumn.name(),
+                          HOLO_QUOTE,
+                          escapedColComment));
+            });
     // Return the generated SQL statement
     String result = sqlBuilder.toString();
 
