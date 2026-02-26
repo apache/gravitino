@@ -189,6 +189,18 @@ class Catalog(Auditable):
         """
         raise UnsupportedOperationException("Catalog does not support model operations")
 
+    def as_function_catalog(self) -> "FunctionCatalog":  # noqa: F821
+        """
+        Returns:
+            the {@link FunctionCatalog} if the catalog supports function operations.
+
+        Raises:
+            UnsupportedOperationException if the catalog does not support function operations.
+        """
+        raise UnsupportedOperationException(
+            "Catalog does not support function operations"
+        )
+
 
 class UnsupportedOperationException(Exception):
     pass

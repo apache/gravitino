@@ -773,4 +773,299 @@ public class TestEntityStorageRelationCache extends AbstractEntityStorageTest {
       destroy(type);
     }
   }
+
+  @ParameterizedTest
+  @MethodSource("storageProvider")
+  void testViewNotIndexedInReverseCache(String type, boolean enableCache) throws Exception {
+    Config config = Mockito.mock(Config.class);
+    Mockito.when(config.get(Configs.CACHE_ENABLED)).thenReturn(enableCache);
+    init(type, config);
+
+    AuditInfo auditInfo =
+        AuditInfo.builder().withCreator("creator").withCreateTime(Instant.now()).build();
+
+    try (EntityStore store = EntityStoreFactory.createEntityStore(config)) {
+      store.initialize(config);
+
+      // Create parent entities required by relational store
+      BaseMetalake metalake =
+          createBaseMakeLake(RandomIdGenerator.INSTANCE.nextId(), "metalake", auditInfo);
+      store.put(metalake, false);
+
+      CatalogEntity catalog =
+          createCatalog(
+              RandomIdGenerator.INSTANCE.nextId(),
+              NamespaceUtil.ofCatalog("metalake"),
+              "catalog",
+              auditInfo);
+      store.put(catalog, false);
+
+      SchemaEntity schema =
+          createSchemaEntity(
+              RandomIdGenerator.INSTANCE.nextId(),
+              Namespace.of("metalake", "catalog"),
+              "schema",
+              auditInfo);
+      store.put(schema, false);
+
+      Namespace viewNamespace = Namespace.of("metalake", "catalog", "schema");
+      GenericEntity view =
+          GenericEntity.builder()
+              .withId(RandomIdGenerator.INSTANCE.nextId())
+              .withName("test_view")
+              .withNamespace(viewNamespace)
+              .withEntityType(Entity.EntityType.VIEW)
+              .build();
+
+      // Use store.put() to trigger the actual cache + reverse index flow
+      store.put(view, false);
+
+      // Verify view IS in forward cache (performance cache for get operations)
+      GenericEntity retrievedView =
+          store.get(view.nameIdentifier(), Entity.EntityType.VIEW, GenericEntity.class);
+      Assertions.assertNotNull(retrievedView);
+      Assertions.assertEquals(view.id(), retrievedView.id());
+      Assertions.assertEquals(view.name(), retrievedView.name());
+
+      // Get reverse index cache to verify view is NOT indexed
+      ReverseIndexCache reverseIndexCache =
+          ((CaffeineEntityCache) ((RelationalEntityStore) store).getCache()).getReverseIndex();
+
+      // Verify view is NOT in reverse index cache
+      // Views have namespace and should be skipped by GENERIC_METADATA_OBJECT_REVERSE_RULE
+      List<EntityCacheKey> reverseIndexValue =
+          reverseIndexCache.get(view.nameIdentifier(), Entity.EntityType.VIEW);
+      Assertions.assertNull(
+          reverseIndexValue,
+          "Views should NOT be indexed in reverse cache - they have namespace and don't support tags/policies");
+
+      destroy(type);
+    }
+  }
+
+  @ParameterizedTest
+  @MethodSource("storageProvider")
+  void testCacheInvalidationOnNewRelation(String type, boolean enableCache) throws Exception {
+    Config config = Mockito.mock(Config.class);
+    Mockito.when(config.get(Configs.CACHE_ENABLED)).thenReturn(enableCache);
+    init(type, config);
+
+    AuditInfo auditInfo =
+        AuditInfo.builder().withCreator("creator").withCreateTime(Instant.now()).build();
+
+    try (EntityStore store = EntityStoreFactory.createEntityStore(config)) {
+      store.initialize(config);
+
+      BaseMetalake metalake =
+          createBaseMakeLake(RandomIdGenerator.INSTANCE.nextId(), "metalake", auditInfo);
+      store.put(metalake, false);
+
+      CatalogEntity catalog =
+          createCatalog(
+              RandomIdGenerator.INSTANCE.nextId(),
+              NamespaceUtil.ofCatalog("metalake"),
+              "catalog",
+              auditInfo);
+      store.put(catalog, false);
+
+      SupportsRelationOperations relationOperations = (SupportsRelationOperations) store;
+
+      // 1. Fetch relation, it should be empty
+      List<TagEntity> tags =
+          relationOperations.listEntitiesByRelation(
+              SupportsRelationOperations.Type.TAG_METADATA_OBJECT_REL,
+              catalog.nameIdentifier(),
+              Entity.EntityType.CATALOG,
+              true);
+      Assertions.assertTrue(tags.isEmpty());
+
+      // 2. Verify cache has empty list if cache is enabled
+      if (enableCache && store instanceof RelationalEntityStore) {
+        RelationalEntityStore relationalEntityStore = (RelationalEntityStore) store;
+        if (relationalEntityStore.getCache() instanceof CaffeineEntityCache) {
+          CaffeineEntityCache cache = (CaffeineEntityCache) relationalEntityStore.getCache();
+          List<Entity> cachedEntities =
+              cache
+                  .getCacheData()
+                  .getIfPresent(
+                      EntityCacheRelationKey.of(
+                          catalog.nameIdentifier(),
+                          Entity.EntityType.CATALOG,
+                          SupportsRelationOperations.Type.TAG_METADATA_OBJECT_REL));
+          Assertions.assertNotNull(cachedEntities);
+          Assertions.assertTrue(cachedEntities.isEmpty());
+        }
+      }
+
+      // 3. Create a tag and add relation
+      Namespace tagNamespace = NameIdentifierUtil.ofTag("metalake", "tag1").namespace();
+      TagEntity tag1 =
+          TagEntity.builder()
+              .withId(RandomIdGenerator.INSTANCE.nextId())
+              .withNamespace(tagNamespace)
+              .withName("tag1")
+              .withAuditInfo(auditInfo)
+              .withProperties(Collections.emptyMap())
+              .build();
+      store.put(tag1, false);
+
+      relationOperations.updateEntityRelations(
+          SupportsRelationOperations.Type.TAG_METADATA_OBJECT_REL,
+          catalog.nameIdentifier(),
+          Entity.EntityType.CATALOG,
+          new NameIdentifier[] {tag1.nameIdentifier()},
+          new NameIdentifier[] {});
+
+      // 4. Fetch relation again, it should not be empty
+      tags =
+          relationOperations.listEntitiesByRelation(
+              SupportsRelationOperations.Type.TAG_METADATA_OBJECT_REL,
+              catalog.nameIdentifier(),
+              Entity.EntityType.CATALOG,
+              true);
+      Assertions.assertEquals(1, tags.size());
+      Assertions.assertEquals(tag1.name(), tags.get(0).name());
+
+      List<UserEntity> owners =
+          relationOperations.listEntitiesByRelation(
+              SupportsRelationOperations.Type.OWNER_REL,
+              catalog.nameIdentifier(),
+              Entity.EntityType.CATALOG,
+              true);
+      Assertions.assertTrue(owners.isEmpty());
+
+      if (enableCache && store instanceof RelationalEntityStore) {
+        RelationalEntityStore relationalEntityStore = (RelationalEntityStore) store;
+        if (relationalEntityStore.getCache() instanceof CaffeineEntityCache) {
+          CaffeineEntityCache cache = (CaffeineEntityCache) relationalEntityStore.getCache();
+          List<Entity> cachedOwners =
+              cache
+                  .getCacheData()
+                  .getIfPresent(
+                      EntityCacheRelationKey.of(
+                          catalog.nameIdentifier(),
+                          Entity.EntityType.CATALOG,
+                          SupportsRelationOperations.Type.OWNER_REL));
+          Assertions.assertNotNull(cachedOwners);
+          Assertions.assertTrue(cachedOwners.isEmpty());
+        }
+      }
+
+      UserEntity ownerUser =
+          createUserEntity(
+              RandomIdGenerator.INSTANCE.nextId(),
+              AuthorizationUtils.ofUserNamespace("metalake"),
+              "ownerUser",
+              auditInfo);
+      store.put(ownerUser, false);
+
+      relationOperations.insertRelation(
+          SupportsRelationOperations.Type.OWNER_REL,
+          catalog.nameIdentifier(),
+          Entity.EntityType.CATALOG,
+          ownerUser.nameIdentifier(),
+          Entity.EntityType.USER,
+          true);
+
+      owners =
+          relationOperations.listEntitiesByRelation(
+              SupportsRelationOperations.Type.OWNER_REL,
+              catalog.nameIdentifier(),
+              Entity.EntityType.CATALOG,
+              true);
+      Assertions.assertEquals(1, owners.size());
+      Assertions.assertEquals(ownerUser.name(), owners.get(0).name());
+
+      destroy(type);
+    }
+  }
+
+  @ParameterizedTest
+  @MethodSource("storageProvider")
+  void testCacheInvalidationOnNewRelationReverse(String type, boolean enableCache)
+      throws Exception {
+    Config config = Mockito.mock(Config.class);
+    Mockito.when(config.get(Configs.CACHE_ENABLED)).thenReturn(enableCache);
+    init(type, config);
+
+    AuditInfo auditInfo =
+        AuditInfo.builder().withCreator("creator").withCreateTime(Instant.now()).build();
+
+    try (EntityStore store = EntityStoreFactory.createEntityStore(config)) {
+      store.initialize(config);
+
+      BaseMetalake metalake =
+          createBaseMakeLake(RandomIdGenerator.INSTANCE.nextId(), "metalake", auditInfo);
+      store.put(metalake, false);
+
+      CatalogEntity catalog =
+          createCatalog(
+              RandomIdGenerator.INSTANCE.nextId(),
+              NamespaceUtil.ofCatalog("metalake"),
+              "catalog",
+              auditInfo);
+      store.put(catalog, false);
+
+      Namespace tagNamespace = NameIdentifierUtil.ofTag("metalake", "tag1").namespace();
+      TagEntity tag1 =
+          TagEntity.builder()
+              .withId(RandomIdGenerator.INSTANCE.nextId())
+              .withNamespace(tagNamespace)
+              .withName("tag1")
+              .withAuditInfo(auditInfo)
+              .withProperties(Collections.emptyMap())
+              .build();
+      store.put(tag1, false);
+
+      SupportsRelationOperations relationOperations = (SupportsRelationOperations) store;
+
+      // 1. Fetch relation for Tag (Target side), it should be empty
+      // This populates the cache for (Tag, TAG, REL) with empty list
+      List<GenericEntity> entities =
+          relationOperations.listEntitiesByRelation(
+              SupportsRelationOperations.Type.TAG_METADATA_OBJECT_REL,
+              tag1.nameIdentifier(),
+              Entity.EntityType.TAG,
+              true);
+      Assertions.assertTrue(entities.isEmpty());
+
+      // 2. Verify cache has empty list if cache is enabled
+      if (enableCache && store instanceof RelationalEntityStore) {
+        RelationalEntityStore relationalEntityStore = (RelationalEntityStore) store;
+        if (relationalEntityStore.getCache() instanceof CaffeineEntityCache) {
+          CaffeineEntityCache cache = (CaffeineEntityCache) relationalEntityStore.getCache();
+          List<Entity> cachedEntities =
+              cache
+                  .getCacheData()
+                  .getIfPresent(
+                      EntityCacheRelationKey.of(
+                          tag1.nameIdentifier(),
+                          Entity.EntityType.TAG,
+                          SupportsRelationOperations.Type.TAG_METADATA_OBJECT_REL));
+          Assertions.assertNotNull(cachedEntities);
+          Assertions.assertTrue(cachedEntities.isEmpty());
+        }
+      }
+
+      // 3. Add relation from Catalog (Source side)
+      relationOperations.updateEntityRelations(
+          SupportsRelationOperations.Type.TAG_METADATA_OBJECT_REL,
+          catalog.nameIdentifier(),
+          Entity.EntityType.CATALOG,
+          new NameIdentifier[] {tag1.nameIdentifier()},
+          new NameIdentifier[] {});
+
+      // 4. Fetch relation for Tag again, it should NOT be empty
+      entities =
+          relationOperations.listEntitiesByRelation(
+              SupportsRelationOperations.Type.TAG_METADATA_OBJECT_REL,
+              tag1.nameIdentifier(),
+              Entity.EntityType.TAG,
+              true);
+      Assertions.assertEquals(1, entities.size());
+      Assertions.assertEquals(catalog.name(), entities.get(0).name());
+
+      destroy(type);
+    }
+  }
 }

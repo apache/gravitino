@@ -53,6 +53,7 @@ import java.util.ServiceLoader;
 import java.util.Set;
 import java.util.concurrent.ScheduledThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
+import java.util.function.Consumer;
 import java.util.stream.Collectors;
 import javax.annotation.Nullable;
 import lombok.Getter;
@@ -98,6 +99,7 @@ import org.apache.gravitino.model.ModelCatalog;
 import org.apache.gravitino.rel.SupportsPartitions;
 import org.apache.gravitino.rel.Table;
 import org.apache.gravitino.rel.TableCatalog;
+import org.apache.gravitino.rel.ViewCatalog;
 import org.apache.gravitino.storage.IdGenerator;
 import org.apache.gravitino.utils.IsolatedClassLoader;
 import org.apache.gravitino.utils.NamespaceUtil;
@@ -145,6 +147,16 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
               throw new UnsupportedOperationException("Catalog does not support table operations");
             }
             return fn.apply(asTables());
+          });
+    }
+
+    public <R> R doWithViewOps(ThrowableFunction<ViewCatalog, R> fn) throws Exception {
+      return classLoader.withClassLoader(
+          cl -> {
+            if (asViews() == null) {
+              throw new UnsupportedOperationException("Catalog does not support view operations");
+            }
+            return fn.apply(asViews());
           });
     }
 
@@ -246,6 +258,10 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
       return catalog.ops() instanceof TableCatalog ? (TableCatalog) catalog.ops() : null;
     }
 
+    private ViewCatalog asViews() {
+      return catalog.ops() instanceof ViewCatalog ? (ViewCatalog) catalog.ops() : null;
+    }
+
     private FilesetCatalog asFilesets() {
       return catalog.ops() instanceof FilesetCatalog ? (FilesetCatalog) catalog.ops() : null;
     }
@@ -270,6 +286,7 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
   private final EntityStore store;
 
   private final IdGenerator idGenerator;
+  private final List<Consumer<NameIdentifier>> removalListeners = Lists.newArrayList();
 
   /**
    * Constructs a CatalogManager instance.
@@ -289,6 +306,11 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
             .expireAfterAccess(cacheEvictionIntervalInMs, TimeUnit.MILLISECONDS)
             .removalListener(
                 (k, v, c) -> {
+                  for (Consumer<NameIdentifier> listener : removalListeners) {
+                    if (k != null) {
+                      listener.accept((NameIdentifier) k);
+                    }
+                  }
                   LOG.info("Closing catalog {}.", k);
                   ((CatalogWrapper) v).close();
                 })
@@ -310,6 +332,21 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
   @Override
   public void close() {
     catalogCache.invalidateAll();
+  }
+
+  /**
+   * Adds a listener that will be notified when a catalog is removed from the cache.
+   *
+   * <p>Note: Cache eviction is invoked asynchronously but uses a single thread to process removal
+   * events. To avoid blocking the eviction thread and delaying subsequent cache operations,
+   * listeners should avoid performing heavy operations (such as I/O, network calls, or complex
+   * computations) directly. Instead, consider offloading heavy work to a separate thread or
+   * executor.
+   *
+   * @param listener The consumer to be called with the NameIdentifier of the removed catalog.
+   */
+  public void addCatalogCacheRemoveListener(Consumer<NameIdentifier> listener) {
+    removalListeners.add(listener);
   }
 
   /**

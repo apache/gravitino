@@ -18,6 +18,7 @@
  */
 package org.apache.gravitino.storage.relational.mapper.provider.base;
 
+import java.util.List;
 import org.apache.gravitino.storage.relational.mapper.JobTemplateMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.MetalakeMetaMapper;
 import org.apache.gravitino.storage.relational.po.JobTemplatePO;
@@ -160,5 +161,30 @@ public class JobTemplateMetaBaseSQLProvider {
         + " jtm"
         + " WHERE jtm.job_template_id = #{jobTemplateId}"
         + " AND jtm.deleted_at = 0";
+  }
+
+  public String batchSelectJobTemplateByIdentifier(
+      @Param("metalakeName") String metalakeName,
+      @Param("jobTemplateNames") List<String> jobTemplateNames) {
+    return "<script>"
+        + "SELECT jtm.job_template_id AS jobTemplateId, jtm.job_template_name AS jobTemplateName,"
+        + " jtm.metalake_id AS metalakeId, jtm.job_template_comment AS jobTemplateComment,"
+        + " jtm.job_template_content AS jobTemplateContent, jtm.audit_info AS auditInfo,"
+        + " jtm.current_version AS currentVersion, jtm.last_version AS lastVersion,"
+        + " jtm.deleted_at AS deletedAt"
+        + " FROM "
+        + JobTemplateMetaMapper.TABLE_NAME
+        + " jtm"
+        + " JOIN "
+        + MetalakeMetaMapper.TABLE_NAME
+        + " mm ON jtm.metalake_id = mm.metalake_id"
+        + " WHERE mm.metalake_name = #{metalakeName}"
+        + " AND jtm.job_template_name IN ("
+        + "<foreach collection='jobTemplateNames' item='jobTemplateName' separator=','>"
+        + "#{jobTemplateName}"
+        + "</foreach>"
+        + " )"
+        + " AND jtm.deleted_at = 0 AND mm.deleted_at = 0"
+        + "</script>";
   }
 }

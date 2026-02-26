@@ -1,0 +1,850 @@
+# Licensed to the Apache Software Foundation (ASF) under one
+# or more contributor license agreements.  See the NOTICE file
+# distributed with this work for additional information
+# regarding copyright ownership.  The ASF licenses this file
+# to you under the Apache License, Version 2.0 (the
+# "License"); you may not use this file except in compliance
+# with the License.  You may obtain a copy of the License at
+#
+#   http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing,
+# software distributed under the License is distributed on an
+# "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+# KIND, either express or implied.  See the License for the
+# specific language governing permissions and limitations
+# under the License.
+
+---
+
+paths:
+
+  /metalakes/{metalake}/catalogs/{catalog}/schemas/{schema}/functions:
+    parameters:
+      - $ref: "./openapi.yaml#/components/parameters/metalake"
+      - $ref: "./openapi.yaml#/components/parameters/catalog"
+      - $ref: "./openapi.yaml#/components/parameters/schema"
+
+    get:
+      tags:
+        - function
+      summary: List functions
+      operationId: listFunctions
+      parameters:
+        - $ref: "#/components/parameters/details"
+      responses:
+        "200":
+          description: Returns the list of function objects if {details} is true, otherwise returns the list of function identifiers
+          content:
+            application/vnd.gravitino.v1+json:
+              schema:
+                oneOf:
+                  - $ref: "./openapi.yaml#/components/responses/EntityListResponse/content/application~1vnd.gravitino.v1%2Bjson/schema"
+                  - $ref: "#/components/schemas/FunctionListResponse"
+              examples:
+                FunctionListResponse:
+                  $ref: "#/components/examples/FunctionListResponse"
+        "400":
+          $ref: "./openapi.yaml#/components/responses/BadRequestErrorResponse"
+        "5xx":
+          $ref: "./openapi.yaml#/components/responses/ServerErrorResponse"
+
+    post:
+      tags:
+        - function
+      summary: Register function
+      operationId: registerFunction
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/FunctionRegisterRequest"
+            examples:
+              FunctionRegisterRequest:
+                $ref: "#/components/examples/FunctionRegisterRequest"
+      responses:
+        "200":
+          $ref: "#/components/responses/FunctionResponse"
+        "409":
+          description: Conflict - The target function already exists
+          content:
+            application/vnd.gravitino.v1+json:
+              schema:
+                $ref: "./openapi.yaml#/components/schemas/ErrorModel"
+              examples:
+                FunctionAlreadyExistsException:
+                  $ref: "#/components/examples/FunctionAlreadyExistsException"
+        "404":
+          description: Not Found - The schema does not exist
+          content:
+            application/vnd.gravitino.v1+json:
+              schema:
+                $ref: "./openapi.yaml#/components/schemas/ErrorModel"
+              examples:
+                NoSuchSchemaException:
+                  $ref: "./schemas.yaml#/components/examples/NoSuchSchemaException"
+        "5xx":
+          $ref: "./openapi.yaml#/components/responses/ServerErrorResponse"
+
+  /metalakes/{metalake}/catalogs/{catalog}/schemas/{schema}/functions/{function}:
+    parameters:
+      - $ref: "./openapi.yaml#/components/parameters/metalake"
+      - $ref: "./openapi.yaml#/components/parameters/catalog"
+      - $ref: "./openapi.yaml#/components/parameters/schema"
+      - $ref: "./openapi.yaml#/components/parameters/function"
+
+    get:
+      tags:
+        - function
+      summary: Get function
+      operationId: getFunction
+      description: Returns the specified function object
+      responses:
+        "200":
+          $ref: "#/components/responses/FunctionResponse"
+        "404":
+          description: Not Found - The target function does not exist
+          content:
+            application/vnd.gravitino.v1+json:
+              schema:
+                $ref: "./openapi.yaml#/components/schemas/ErrorModel"
+              examples:
+                NoSuchMetalakeException:
+                  $ref: "./metalakes.yaml#/components/examples/NoSuchMetalakeException"
+                NoSuchCatalogException:
+                  $ref: "./catalogs.yaml#/components/examples/NoSuchCatalogException"
+                NoSuchSchemaException:
+                  $ref: "./schemas.yaml#/components/examples/NoSuchSchemaException"
+                NoSuchFunctionException:
+                  $ref: "#/components/examples/NoSuchFunctionException"
+        "5xx":
+          $ref: "./openapi.yaml#/components/responses/ServerErrorResponse"
+
+    put:
+      tags:
+        - function
+      summary: Alter function
+      operationId: alterFunction
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/FunctionUpdatesRequest"
+      responses:
+        "200":
+          $ref: "#/components/responses/FunctionResponse"
+        "400":
+          $ref: "./openapi.yaml#/components/responses/BadRequestErrorResponse"
+        "404":
+          description: Not Found - The target function does not exist
+          content:
+            application/vnd.gravitino.v1+json:
+              schema:
+                $ref: "./openapi.yaml#/components/schemas/ErrorModel"
+              examples:
+                NoSuchFunctionException:
+                  $ref: "#/components/examples/NoSuchFunctionException"
+        "5xx":
+          $ref: "./openapi.yaml#/components/responses/ServerErrorResponse"
+
+    delete:
+      tags:
+        - function
+      summary: Drop function
+      operationId: dropFunction
+      responses:
+        "200":
+          $ref: "./openapi.yaml#/components/responses/DropResponse"
+        "400":
+          $ref: "./openapi.yaml#/components/responses/BadRequestErrorResponse"
+        "5xx":
+          $ref: "./openapi.yaml#/components/responses/ServerErrorResponse"
+
+components:
+  parameters:
+    details:
+      name: details
+      in: query
+      description: Include detailed information about the functions
+      required: false
+      schema:
+        type: boolean
+        default: false
+
+  schemas:
+    Function:
+      type: object
+      required:
+        - name
+        - functionType
+        - definitions
+        - audit
+      properties:
+        name:
+          type: string
+          description: The name of the function
+        functionType:
+          type: string
+          description: The type of the function
+          enum:
+            - SCALAR
+            - AGGREGATE
+            - TABLE
+        deterministic:
+          type: boolean
+          description: Whether the function is deterministic
+          default: false
+        comment:
+          type: string
+          description: The comment of the function
+          nullable: true
+        definitions:
+          type: array
+          description: The definitions of the function
+          items:
+            $ref: "#/components/schemas/FunctionDefinition"
+        audit:
+          $ref: "./openapi.yaml#/components/schemas/Audit"
+
+    FunctionDefinition:
+      type: object
+      properties:
+        parameters:
+          type: array
+          description: The parameters of the function definition
+          items:
+            $ref: "#/components/schemas/FunctionParam"
+        returnType:
+          $ref: "./datatype.yaml#/components/schemas/DataType"
+          description: The return type of the function (for SCALAR and AGGREGATE functions)
+        returnColumns:
+          type: array
+          description: The return columns of the function (for TABLE functions)
+          nullable: true
+          items:
+            $ref: "#/components/schemas/FunctionColumn"
+        impls:
+          type: array
+          description: The implementations of the function definition
+          items:
+            $ref: "#/components/schemas/FunctionImpl"
+
+    FunctionParam:
+      type: object
+      required:
+        - name
+        - dataType
+      properties:
+        name:
+          type: string
+          description: The name of the parameter
+        dataType:
+          $ref: "./datatype.yaml#/components/schemas/DataType"
+          description: The data type of the parameter
+        comment:
+          type: string
+          description: The comment of the parameter
+          nullable: true
+        defaultValue:
+          $ref: "./expression.yaml#/components/schemas/FunctionArg"
+          description: The default value expression of the parameter
+
+    FunctionColumn:
+      type: object
+      required:
+        - name
+        - dataType
+      properties:
+        name:
+          type: string
+          description: The name of the return column
+        dataType:
+          $ref: "./datatype.yaml#/components/schemas/DataType"
+          description: The data type of the return column
+        comment:
+          type: string
+          description: The comment of the return column
+          nullable: true
+
+    FunctionImpl:
+      type: object
+      description: A function implementation, discriminated by the language field
+      required:
+        - language
+        - runtime
+      discriminator:
+        propertyName: language
+        mapping:
+          SQL: "#/components/schemas/SQLImpl"
+          JAVA: "#/components/schemas/JavaImpl"
+          PYTHON: "#/components/schemas/PythonImpl"
+      oneOf:
+        - $ref: "#/components/schemas/SQLImpl"
+        - $ref: "#/components/schemas/JavaImpl"
+        - $ref: "#/components/schemas/PythonImpl"
+
+    SQLImpl:
+      type: object
+      required:
+        - language
+        - runtime
+        - sql
+      properties:
+        language:
+          type: string
+          enum:
+            - SQL
+        runtime:
+          type: string
+          description: The runtime type of the implementation
+          enum:
+            - SPARK
+            - TRINO
+        sql:
+          type: string
+          description: The SQL expression
+        resources:
+          $ref: "#/components/schemas/FunctionResources"
+        properties:
+          type: object
+          description: Additional properties
+          nullable: true
+          additionalProperties:
+            type: string
+
+    JavaImpl:
+      type: object
+      required:
+        - language
+        - runtime
+        - className
+      properties:
+        language:
+          type: string
+          enum:
+            - JAVA
+        runtime:
+          type: string
+          description: The runtime type of the implementation
+          enum:
+            - SPARK
+            - TRINO
+        className:
+          type: string
+          description: The fully qualified class name
+        resources:
+          $ref: "#/components/schemas/FunctionResources"
+        properties:
+          type: object
+          description: Additional properties
+          nullable: true
+          additionalProperties:
+            type: string
+
+    PythonImpl:
+      type: object
+      required:
+        - language
+        - runtime
+      properties:
+        language:
+          type: string
+          enum:
+            - PYTHON
+        runtime:
+          type: string
+          description: The runtime type of the implementation
+          enum:
+            - SPARK
+            - TRINO
+        handler:
+          type: string
+          description: The Python handler function
+          nullable: true
+        codeBlock:
+          type: string
+          description: The Python code block
+          nullable: true
+        resources:
+          $ref: "#/components/schemas/FunctionResources"
+        properties:
+          type: object
+          description: Additional properties
+          nullable: true
+          additionalProperties:
+            type: string
+
+    FunctionResources:
+      type: object
+      description: External resources required by a function implementation
+      properties:
+        jars:
+          type: array
+          description: JAR file URIs
+          nullable: true
+          items:
+            type: string
+        files:
+          type: array
+          description: File URIs
+          nullable: true
+          items:
+            type: string
+        archives:
+          type: array
+          description: Archive URIs
+          nullable: true
+          items:
+            type: string
+
+    FunctionRegisterRequest:
+      type: object
+      required:
+        - name
+        - functionType
+        - definitions
+      properties:
+        name:
+          type: string
+          description: The name of the function. Cannot be empty.
+        functionType:
+          type: string
+          description: The type of the function
+          enum:
+            - SCALAR
+            - AGGREGATE
+            - TABLE
+        deterministic:
+          type: boolean
+          description: Whether the function is deterministic
+          default: false
+        comment:
+          type: string
+          description: The comment of the function
+          nullable: true
+        definitions:
+          type: array
+          description: The function definitions. Must contain at least one definition.
+          minItems: 1
+          items:
+            $ref: "#/components/schemas/FunctionDefinition"
+
+    FunctionUpdatesRequest:
+      type: object
+      required:
+        - updates
+      properties:
+        updates:
+          type: array
+          items:
+            $ref: "#/components/schemas/FunctionUpdateRequest"
+
+    FunctionUpdateRequest:
+      type: object
+      oneOf:
+        - $ref: "#/components/schemas/UpdateFunctionCommentRequest"
+        - $ref: "#/components/schemas/AddFunctionDefinitionRequest"
+        - $ref: "#/components/schemas/RemoveFunctionDefinitionRequest"
+        - $ref: "#/components/schemas/AddFunctionImplRequest"
+        - $ref: "#/components/schemas/UpdateFunctionImplRequest"
+        - $ref: "#/components/schemas/RemoveFunctionImplRequest"
+      discriminator:
+        propertyName: "@type"
+        mapping:
+          updateComment: "#/components/schemas/UpdateFunctionCommentRequest"
+          addDefinition: "#/components/schemas/AddFunctionDefinitionRequest"
+          removeDefinition: "#/components/schemas/RemoveFunctionDefinitionRequest"
+          addImpl: "#/components/schemas/AddFunctionImplRequest"
+          updateImpl: "#/components/schemas/UpdateFunctionImplRequest"
+          removeImpl: "#/components/schemas/RemoveFunctionImplRequest"
+
+    UpdateFunctionCommentRequest:
+      type: object
+      required:
+        - "@type"
+      properties:
+        "@type":
+          type: string
+          enum:
+            - "updateComment"
+        newComment:
+          type: string
+          description: The new comment of the function. Can be null to clear the comment.
+          nullable: true
+      example: {
+        "@type": "updateComment",
+        "newComment": "This is a new comment"
+      }
+
+    AddFunctionDefinitionRequest:
+      type: object
+      required:
+        - "@type"
+        - definition
+      properties:
+        "@type":
+          type: string
+          enum:
+            - "addDefinition"
+        definition:
+          $ref: "#/components/schemas/FunctionDefinition"
+      example: {
+        "@type": "addDefinition",
+        "definition": {
+          "parameters": [
+            {"name": "x", "dataType": "integer"}
+          ],
+          "returnType": "integer",
+          "impls": [
+            {
+              "language": "SQL",
+              "runtime": "SPARK",
+              "sql": "x + 1"
+            }
+          ]
+        }
+      }
+
+    RemoveFunctionDefinitionRequest:
+      type: object
+      required:
+        - "@type"
+        - parameters
+      properties:
+        "@type":
+          type: string
+          enum:
+            - "removeDefinition"
+        parameters:
+          type: array
+          description: The parameters that identify the definition to remove
+          items:
+            $ref: "#/components/schemas/FunctionParam"
+      example: {
+        "@type": "removeDefinition",
+        "parameters": [
+          {"name": "x", "dataType": "integer"}
+        ]
+      }
+
+    AddFunctionImplRequest:
+      type: object
+      required:
+        - "@type"
+        - parameters
+        - implementation
+      properties:
+        "@type":
+          type: string
+          enum:
+            - "addImpl"
+        parameters:
+          type: array
+          description: The parameters that identify the target definition
+          items:
+            $ref: "#/components/schemas/FunctionParam"
+        implementation:
+          $ref: "#/components/schemas/FunctionImpl"
+      example: {
+        "@type": "addImpl",
+        "parameters": [
+          {"name": "x", "dataType": "integer"}
+        ],
+        "implementation": {
+          "language": "JAVA",
+          "runtime": "SPARK",
+          "className": "com.example.MyFunction"
+        }
+      }
+
+    UpdateFunctionImplRequest:
+      type: object
+      required:
+        - "@type"
+        - parameters
+        - runtime
+        - implementation
+      properties:
+        "@type":
+          type: string
+          enum:
+            - "updateImpl"
+        parameters:
+          type: array
+          description: The parameters that identify the target definition
+          items:
+            $ref: "#/components/schemas/FunctionParam"
+        runtime:
+          type: string
+          description: The runtime of the implementation to update
+          enum:
+            - SPARK
+            - TRINO
+        implementation:
+          $ref: "#/components/schemas/FunctionImpl"
+      example: {
+        "@type": "updateImpl",
+        "parameters": [
+          {"name": "x", "dataType": "integer"}
+        ],
+        "runtime": "SPARK",
+        "implementation": {
+          "language": "JAVA",
+          "runtime": "SPARK",
+          "className": "com.example.MyFunctionV2"
+        }
+      }
+
+    RemoveFunctionImplRequest:
+      type: object
+      required:
+        - "@type"
+        - parameters
+        - runtime
+      properties:
+        "@type":
+          type: string
+          enum:
+            - "removeImpl"
+        parameters:
+          type: array
+          description: The parameters that identify the target definition
+          items:
+            $ref: "#/components/schemas/FunctionParam"
+        runtime:
+          type: string
+          description: The runtime of the implementation to remove
+          enum:
+            - SPARK
+            - TRINO
+      example: {
+        "@type": "removeImpl",
+        "parameters": [
+          {"name": "x", "dataType": "integer"}
+        ],
+        "runtime": "SPARK"
+      }
+
+    FunctionListResponse:
+      type: object
+      properties:
+        code:
+          type: integer
+          format: int32
+          description: Status code of the response
+          enum:
+            - 0
+        functions:
+          type: array
+          description: The list of function objects
+          items:
+            $ref: "#/components/schemas/Function"
+
+  responses:
+    FunctionResponse:
+      description: The response of function object
+      content:
+        application/vnd.gravitino.v1+json:
+          schema:
+            type: object
+            properties:
+              code:
+                type: integer
+                format: int32
+                description: Status code of the response
+                enum:
+                  - 0
+              function:
+                $ref: "#/components/schemas/Function"
+          examples:
+            FunctionResponse:
+              $ref: "#/components/examples/FunctionResponse"
+
+  examples:
+    FunctionRegisterRequest:
+      value: {
+        "name": "add_one",
+        "functionType": "SCALAR",
+        "deterministic": true,
+        "comment": "A simple scalar function that adds one",
+        "definitions": [
+          {
+            "parameters": [
+              {"name": "x", "dataType": "integer"}
+            ],
+            "returnType": "integer",
+            "impls": [
+              {
+                "language": "SQL",
+                "runtime": "SPARK",
+                "sql": "x + 1"
+              },
+              {
+                "language": "JAVA",
+                "runtime": "SPARK",
+                "className": "com.example.AddOneFunction",
+                "resources": {
+                  "jars": ["hdfs:///path/to/udf.jar"]
+                }
+              }
+            ]
+          }
+        ]
+      }
+
+    TableFunctionRegisterRequest:
+      value: {
+        "name": "generate_series",
+        "functionType": "TABLE",
+        "deterministic": true,
+        "comment": "A table function that generates a series of integers",
+        "definitions": [
+          {
+            "parameters": [
+              {"name": "start_val", "dataType": "integer"},
+              {"name": "end_val", "dataType": "integer"}
+            ],
+            "returnColumns": [
+              {"name": "value", "dataType": "integer", "comment": "The generated integer value"}
+            ],
+            "impls": [
+              {
+                "language": "JAVA",
+                "runtime": "SPARK",
+                "className": "com.example.GenerateSeriesFunction",
+                "resources": {
+                  "jars": ["hdfs:///path/to/udtf.jar"]
+                }
+              },
+              {
+                "language": "PYTHON",
+                "runtime": "SPARK",
+                "handler": "generate_series_handler",
+                "codeBlock": "def generate_series_handler(start_val, end_val):\n  for i in range(start_val, end_val + 1):\n    yield (i,)"
+              }
+            ]
+          }
+        ]
+      }
+
+    FunctionResponse:
+      value: {
+        "code": 0,
+        "function": {
+          "name": "add_one",
+          "functionType": "SCALAR",
+          "deterministic": true,
+          "comment": "A simple scalar function that adds one",
+          "definitions": [
+            {
+              "parameters": [
+                {"name": "x", "dataType": "integer"}
+              ],
+              "returnType": "integer",
+              "impls": [
+                {
+                  "language": "SQL",
+                  "runtime": "SPARK",
+                  "sql": "x + 1"
+                }
+              ]
+            }
+          ],
+          "audit": {
+            "creator": "user1",
+            "createTime": "2021-01-01T00:00:00Z",
+            "lastModifier": "user1",
+            "lastModifiedTime": "2021-01-01T00:00:00Z"
+          }
+        }
+      }
+
+    TableFunctionResponse:
+      value: {
+        "code": 0,
+        "function": {
+          "name": "generate_series",
+          "functionType": "TABLE",
+          "deterministic": true,
+          "comment": "A table function that generates a series of integers",
+          "definitions": [
+            {
+              "parameters": [
+                {"name": "start_val", "dataType": "integer"},
+                {"name": "end_val", "dataType": "integer"}
+              ],
+              "returnColumns": [
+                {"name": "value", "dataType": "integer", "comment": "The generated integer value"}
+              ],
+              "impls": [
+                {
+                  "language": "JAVA",
+                  "runtime": "SPARK",
+                  "className": "com.example.GenerateSeriesFunction",
+                  "resources": {
+                    "jars": ["hdfs:///path/to/udtf.jar"]
+                  }
+                }
+              ]
+            }
+          ],
+          "audit": {
+            "creator": "user1",
+            "createTime": "2021-01-01T00:00:00Z",
+            "lastModifier": "user1",
+            "lastModifiedTime": "2021-01-01T00:00:00Z"
+          }
+        }
+      }
+
+    FunctionListResponse:
+      value: {
+        "code": 0,
+        "functions": [
+          {
+            "name": "add_one",
+            "functionType": "SCALAR",
+            "deterministic": true,
+            "comment": "A simple scalar function",
+            "definitions": [
+              {
+                "parameters": [
+                  {"name": "x", "dataType": "integer"}
+                ],
+                "returnType": "integer",
+                "impls": [
+                  {
+                    "language": "SQL",
+                    "runtime": "SPARK",
+                    "sql": "x + 1"
+                  }
+                ]
+              }
+            ],
+            "audit": {
+              "creator": "user1",
+              "createTime": "2021-01-01T00:00:00Z"
+            }
+          }
+        ]
+      }
+
+    FunctionAlreadyExistsException:
+      value: {
+        "code": 1004,
+        "type": "FunctionAlreadyExistsException",
+        "message": "Function already exists",
+        "stack": [
+          "org.apache.gravitino.exceptions.FunctionAlreadyExistsException: Function already exists"
+        ]
+      }
+
+    NoSuchFunctionException:
+      value: {
+        "code": 1003,
+        "type": "NoSuchFunctionException",
+        "message": "Function does not exist",
+        "stack": [
+          "org.apache.gravitino.exceptions.NoSuchFunctionException: Function does not exist"
+        ]
+      }

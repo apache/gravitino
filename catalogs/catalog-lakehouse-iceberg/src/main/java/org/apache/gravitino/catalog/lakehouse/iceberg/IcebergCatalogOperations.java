@@ -46,6 +46,7 @@ import org.apache.gravitino.exceptions.ConnectionFailedException;
 import org.apache.gravitino.exceptions.NoSuchCatalogException;
 import org.apache.gravitino.exceptions.NoSuchSchemaException;
 import org.apache.gravitino.exceptions.NoSuchTableException;
+import org.apache.gravitino.exceptions.NoSuchViewException;
 import org.apache.gravitino.exceptions.NonEmptySchemaException;
 import org.apache.gravitino.exceptions.SchemaAlreadyExistsException;
 import org.apache.gravitino.exceptions.TableAlreadyExistsException;
@@ -60,6 +61,8 @@ import org.apache.gravitino.rel.Column;
 import org.apache.gravitino.rel.Table;
 import org.apache.gravitino.rel.TableCatalog;
 import org.apache.gravitino.rel.TableChange;
+import org.apache.gravitino.rel.View;
+import org.apache.gravitino.rel.ViewCatalog;
 import org.apache.gravitino.rel.expressions.distributions.Distribution;
 import org.apache.gravitino.rel.expressions.distributions.Distributions;
 import org.apache.gravitino.rel.expressions.sorts.SortOrder;
@@ -77,12 +80,14 @@ import org.apache.iceberg.rest.requests.UpdateNamespacePropertiesRequest;
 import org.apache.iceberg.rest.responses.GetNamespaceResponse;
 import org.apache.iceberg.rest.responses.ListTablesResponse;
 import org.apache.iceberg.rest.responses.LoadTableResponse;
+import org.apache.iceberg.rest.responses.LoadViewResponse;
 import org.apache.iceberg.rest.responses.UpdateNamespacePropertiesResponse;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /** Operations for interacting with an Apache Iceberg catalog in Apache Gravitino. */
-public class IcebergCatalogOperations implements CatalogOperations, SupportsSchemas, TableCatalog {
+public class IcebergCatalogOperations
+    implements CatalogOperations, SupportsSchemas, TableCatalog, ViewCatalog {
 
   private static final String ICEBERG_TABLE_DOES_NOT_EXIST_MSG = "Iceberg table does not exist: %s";
 
@@ -617,6 +622,29 @@ public class IcebergCatalogOperations implements CatalogOperations, SupportsSche
     } catch (Exception e) {
       throw new ConnectionFailedException(
           e, "Failed to run listNamespace on Iceberg catalog: %s", e.getMessage());
+    }
+  }
+
+  /**
+   * Load view metadata from the Iceberg catalog.
+   *
+   * <p>Delegates to the underlying Iceberg REST catalog to load view metadata.
+   *
+   * @param ident The identifier of the view to load.
+   * @return The loaded view metadata.
+   * @throws NoSuchViewException If the view does not exist.
+   */
+  @Override
+  public View loadView(NameIdentifier ident) throws NoSuchViewException {
+    try {
+      LoadViewResponse response =
+          icebergCatalogWrapper.loadView(
+              IcebergCatalogWrapperHelper.buildIcebergTableIdentifier(ident));
+
+      return IcebergView.fromLoadViewResponse(response, ident.name());
+    } catch (Exception e) {
+      throw new NoSuchViewException(
+          e, "Failed to load view %s from Iceberg catalog: %s", ident, e.getMessage());
     }
   }
 

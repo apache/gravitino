@@ -23,6 +23,9 @@ import org.apache.gravitino.maintenance.optimizer.api.recommender.JobSubmitter;
 import org.apache.gravitino.maintenance.optimizer.api.recommender.StatisticsProvider;
 import org.apache.gravitino.maintenance.optimizer.api.recommender.StrategyProvider;
 import org.apache.gravitino.maintenance.optimizer.api.recommender.TableMetadataProvider;
+import org.apache.gravitino.maintenance.optimizer.monitor.callback.MonitorCallbackForTest;
+import org.apache.gravitino.maintenance.optimizer.monitor.job.JobProviderForTest;
+import org.apache.gravitino.maintenance.optimizer.monitor.metrics.MetricsProviderForTest;
 import org.apache.gravitino.maintenance.optimizer.recommender.job.GravitinoJobSubmitter;
 import org.apache.gravitino.maintenance.optimizer.recommender.job.NoopJobSubmitter;
 import org.apache.gravitino.maintenance.optimizer.recommender.statistics.GravitinoStatisticsProvider;
@@ -69,5 +72,16 @@ public class TestProviderUtils {
     Assertions.assertTrue(tableMetadataProvider instanceof GravitinoTableMetadataProvider);
   }
 
-  // Updater/monitor providers removed for recommender-only scope.
+  @Test
+  public void testCreateMonitorProviders() {
+    Assertions.assertTrue(
+        ProviderUtils.createMetricsProviderInstance(MetricsProviderForTest.NAME)
+            instanceof MetricsProviderForTest);
+    Assertions.assertTrue(
+        ProviderUtils.createJobProviderInstance(JobProviderForTest.NAME)
+            instanceof JobProviderForTest);
+    Assertions.assertTrue(
+        ProviderUtils.createMonitorCallbackInstance(MonitorCallbackForTest.NAME)
+            instanceof MonitorCallbackForTest);
+  }
 }

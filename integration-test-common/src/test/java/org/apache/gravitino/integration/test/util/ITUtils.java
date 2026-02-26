@@ -46,8 +46,13 @@ import org.apache.gravitino.rel.expressions.transforms.Transform;
 import org.apache.gravitino.rel.indexes.Index;
 import org.apache.gravitino.rel.partitions.Partition;
 import org.junit.jupiter.api.Assertions;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 public class ITUtils {
+  private static final Logger LOG = LoggerFactory.getLogger(ITUtils.class);
+  private static final String CI_ENV = "CI";
+  private static final String GITHUB_ACTIONS_ENV = "GITHUB_ACTIONS";
 
   public static final String TEST_MODE = "testMode";
   public static final String EMBEDDED_TEST_MODE = "embedded";
@@ -204,6 +209,52 @@ public class ITUtils {
   public static String getBundleJarDirectory(String bundleName) {
     return ITUtils.joinPath(
         System.getenv("GRAVITINO_ROOT_DIR"), "bundles", bundleName, "build", "libs");
+  }
+
+  public static void cleanDisk() {
+    if (!isCiEnvironment(System.getenv())) {
+      LOG.info("Skip disk cleanup because current environment is not CI.");
+      return;
+    }
+
+    Object output =
+        CommandExecutor.executeCommandLocalHost(
+            "df -h", false, ProcessData.TypesOfData.STREAMS_MERGED, Map.of());
+    LOG.info("Before clean: Command df -h output:\n{}", output);
+    output =
+        CommandExecutor.executeCommandLocalHost(
+            "free -m", false, ProcessData.TypesOfData.STREAMS_MERGED, Map.of());
+    LOG.info("Before clean: Command free -m output:\n{}", output);
+
+    // Execute docker container prune -f to clean only stopped containers in CI.
+    ProcessBuilder processBuilder =
+        new ProcessBuilder("/bin/bash", "-c", "docker container prune -f");
+    try {
+      Process process = processBuilder.start();
+      int exitCode = process.waitFor();
+      if (exitCode != 0) {
+        throw new RuntimeException("Failed to execute free memory exit code: " + exitCode);
+      }
+    } catch (IOException e) {
+      throw new RuntimeException("Failed to execute free memory command", e);
+    } catch (InterruptedException e) {
+      Thread.currentThread().interrupt();
+      throw new RuntimeException("Interrupted while waiting for util_free_space.sh to finish", e);
+    }
+
+    output =
+        CommandExecutor.executeCommandLocalHost(
+            "df -h", false, ProcessData.TypesOfData.STREAMS_MERGED, Map.of());
+    LOG.info("After clean: Command df -h output:\n{}", output);
+    output =
+        CommandExecutor.executeCommandLocalHost(
+            "free -m", false, ProcessData.TypesOfData.STREAMS_MERGED, Map.of());
+    LOG.info("After clean: Command free -m output:\n{}", output);
+  }
+
+  static boolean isCiEnvironment(Map<String, String> env) {
+    return "true".equalsIgnoreCase(env.get(CI_ENV))
+        || "true".equalsIgnoreCase(env.get(GITHUB_ACTIONS_ENV));
   }
 
   private ITUtils() {}
