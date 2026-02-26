@@ -44,7 +44,9 @@ from gravitino.utils import HTTPClient
 logger = logging.getLogger(__name__)
 
 
-class FilesetCatalog(BaseSchemaCatalog, SupportsCredentials):
+class FilesetCatalog(
+    BaseSchemaCatalog, SupportsCredentials
+):  # pylint: disable=too-many-ancestors
     """
     Fileset catalog is a catalog implementation that supports fileset like metadata operations, for
     example, schemas and filesets list, creation, update and deletion. A Fileset catalog is under the metalake.

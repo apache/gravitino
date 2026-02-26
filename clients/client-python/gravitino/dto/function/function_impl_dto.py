@@ -48,6 +48,7 @@ class SQLImplDTO(FunctionImplDTO):
 
     _runtime: str = field(metadata=config(field_name="runtime"))
     _sql: str = field(metadata=config(field_name="sql"))
+    _language: str = field(default="SQL", metadata=config(field_name="language"))
     _resources: Optional[FunctionResourcesDTO] = field(
         default=None, metadata=config(field_name="resources")
     )
@@ -117,6 +118,7 @@ class JavaImplDTO(FunctionImplDTO):
 
     _runtime: str = field(metadata=config(field_name="runtime"))
     _class_name: str = field(metadata=config(field_name="className"))
+    _language: str = field(default="JAVA", metadata=config(field_name="language"))
     _resources: Optional[FunctionResourcesDTO] = field(
         default=None, metadata=config(field_name="resources")
     )
@@ -186,6 +188,7 @@ class PythonImplDTO(FunctionImplDTO):
 
     _runtime: str = field(metadata=config(field_name="runtime"))
     _handler: str = field(metadata=config(field_name="handler"))
+    _language: str = field(default="PYTHON", metadata=config(field_name="language"))
     _code_block: Optional[str] = field(
         default=None, metadata=config(field_name="codeBlock")
     )
