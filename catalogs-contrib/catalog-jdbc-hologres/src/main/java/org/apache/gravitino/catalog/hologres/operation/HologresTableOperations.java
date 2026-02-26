@@ -88,6 +88,25 @@ public class HologresTableOperations extends JdbcTableOperations
   private static final Set<String> EXCLUDED_TABLE_PROPERTIES =
       ImmutableSet.of("distribution_key", "is_logical_partitioned_table", "primary_key");
 
+  /** Properties that are meaningful for users, filtering out internal system properties. */
+  private static final Set<String> USER_RELEVANT_PROPERTIES =
+      ImmutableSet.of(
+          "orientation",
+          "clustering_key",
+          "segment_key",
+          "bitmap_columns",
+          "dictionary_encoding_columns",
+          "time_to_live_in_seconds",
+          "table_group",
+          "storage_format",
+          "binlog.level",
+          "binlog.ttl",
+          "is_logical_partitioned_table",
+          "partition_expiration_time",
+          "partition_keep_hot_window",
+          "partition_require_filter",
+          "partition_generate_binlog_window");
+
   private String database;
   private HologresSchemaOperations schemaOperations;
 
@@ -1064,27 +1083,6 @@ public class HologresTableOperations extends JdbcTableOperations
    * @return true if the property is relevant for users
    */
   private boolean isUserRelevantProperty(String propertyKey) {
-    // List of properties that are meaningful for users
-    switch (propertyKey) {
-      case "orientation":
-      case "clustering_key":
-      case "segment_key": // event_time_column
-      case "bitmap_columns":
-      case "dictionary_encoding_columns":
-      case "time_to_live_in_seconds":
-      case "table_group":
-      case "storage_format":
-      case "binlog.level":
-      case "binlog.ttl":
-      case "is_logical_partitioned_table":
-      case "partition_expiration_time":
-      case "partition_keep_hot_window":
-      case "partition_require_filter":
-      case "partition_generate_binlog_window":
-        return true;
-      default:
-        // Exclude internal properties like table_id, schema_version, etc.
-        return false;
-    }
+    return USER_RELEVANT_PROPERTIES.contains(propertyKey);
   }
 }
