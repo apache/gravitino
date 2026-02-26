@@ -1323,7 +1323,13 @@ public class JsonUtils {
         builder.withNumber(getInt(NUMBER, node));
       }
       List<FunctionArg> args = Lists.newArrayList();
-      node.get(FUNCTION_ARGS).forEach(arg -> args.add(readFunctionArg(arg)));
+      JsonNode funcArgsNode = node.get(FUNCTION_ARGS);
+      Preconditions.checkArgument(
+          funcArgsNode != null && funcArgsNode.isArray(),
+          "Cannot parse distribution from invalid JSON, field '%s' must be a JSON array: %s",
+          FUNCTION_ARGS,
+          node);
+      funcArgsNode.forEach(arg -> args.add(readFunctionArg(arg)));
       return builder.withArgs(args.toArray(FunctionArg.EMPTY_ARGS)).build();
     }
   }
