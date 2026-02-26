@@ -94,18 +94,18 @@ Refer to [Manage Relational Metadata Using Gravitino](./manage-relational-metada
 
 Hologres-specific table properties are set via the `WITH` clause during CREATE TABLE and read from the `hologres.hg_table_properties` system table. The following user-relevant properties are supported:
 
-| Property Key                        | Description                       | Example Value    |
-|-------------------------------------|-----------------------------------|------------------|
-| `orientation`                       | Storage format                    | `column`, `row`, `row,column` |
-| `clustering_key`                    | Clustering key columns            | `id:asc`         |
-| `segment_key`                       | Event time column (segment key)   | `create_time`    |
-| `bitmap_columns`                    | Bitmap index columns              | `status,category`|
-| `dictionary_encoding_columns`       | Dictionary encoding columns       | `city,province`  |
-| `time_to_live_in_seconds`           | Data TTL setting                  | `2592000`        |
-| `table_group`                       | Table group name                  | `my_table_group` |
-| `storage_format`                    | Internal storage format           | `orc`, `sst`     |
-| `binlog_level`                      | Binlog level                      | `replica`, `none`|
-| `binlog_ttl`                        | Binlog TTL                        | `86400`          |
+| Property Key                        | Description                       | Example Value                  |
+|-------------------------------------|-----------------------------------|--------------------------------|
+| `orientation`                       | Storage format                    | `column`, `row`, `row,column`  |
+| `clustering_key`                    | Clustering key columns            | `id:asc`                       |
+| `segment_key`                       | Event time column (segment key)   | `create_time`                  |
+| `bitmap_columns`                    | Bitmap index columns              | `status,category`              |
+| `dictionary_encoding_columns`       | Dictionary encoding columns       | `city,province`                |
+| `time_to_live_in_seconds`           | Data TTL setting                  | `2592000`                      |
+| `table_group`                       | Table group name                  | `my_table_group`               |
+| `storage_format`                    | Internal storage format           | `orc`, `sst`                   |
+| `binlog_level`                      | Binlog level                      | `replica`, `none`              |
+| `binlog_ttl`                        | Binlog TTL                        | `86400`                        |
 
 :::info
 - Modifying table properties via ALTER TABLE `SetProperty` / `RemoveProperty` is not yet supported.
