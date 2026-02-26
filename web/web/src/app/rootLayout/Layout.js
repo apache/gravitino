@@ -43,7 +43,7 @@ const Layout = ({ children, scrollToTop }) => {
 
   useEffect(() => {
     try {
-      const dismissed = localStorage.getItem(WEB_V2_NOTICE_DISMISSED_KEY)
+      const dismissed = sessionStorage.getItem(WEB_V2_NOTICE_DISMISSED_KEY)
       if (dismissed === 'true') {
         setShowNotice(false)
       }
@@ -55,7 +55,7 @@ const Layout = ({ children, scrollToTop }) => {
   const handleDismissNotice = () => {
     setShowNotice(false)
     try {
-      localStorage.setItem(WEB_V2_NOTICE_DISMISSED_KEY, 'true')
+      sessionStorage.setItem(WEB_V2_NOTICE_DISMISSED_KEY, 'true')
     } catch (error) {
       // Ignore storage errors.
     }
@@ -79,7 +79,7 @@ const Layout = ({ children, scrollToTop }) => {
                 <Box sx={{ flex: 1 }}>
                   <Typography variant='body2' component='div'>
                     <Box component='span' sx={{ fontWeight: 600 }}>
-                      Try the new Web V2 UI.
+                      Try the new Web V2 Web UI.
                     </Box>
                     <Box component='div' sx={{ fontFamily: 'monospace', mt: 1 }}>
                       # In &lt;path-to-gravitino&gt;/conf/gravitino-env.sh
