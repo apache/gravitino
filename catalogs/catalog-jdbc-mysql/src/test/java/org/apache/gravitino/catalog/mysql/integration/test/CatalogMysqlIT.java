@@ -356,7 +356,7 @@ public class CatalogMysqlIT extends BaseIT {
     // create failed check.
     NameIdentifier table = NameIdentifier.of(testSchemaName, "test_table");
     Assertions.assertThrows(
-        NoSuchSchemaException.class,
+        NotFoundException.class,
         () ->
             tableCatalog.createTable(
                 table,

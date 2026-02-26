@@ -62,3 +62,4 @@ web/dist
 web/.next
 
 .venv/
+.worktrees/

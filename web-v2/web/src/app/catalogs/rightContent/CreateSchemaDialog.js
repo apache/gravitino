@@ -45,7 +45,18 @@ const defaultValues = {
 }
 
 export default function CreateSchemaDialog({ ...props }) {
-  const { open, setOpen, metalake, catalog, catalogType, provider, locationProviders, editSchema, init } = props
+  const {
+    open,
+    setOpen,
+    metalake,
+    catalog,
+    catalogType,
+    provider,
+    locationProviders,
+    catalogBackend,
+    editSchema,
+    init
+  } = props
   const [confirmLoading, setConfirmLoading] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
   const [cacheData, setCacheData] = useState()
@@ -58,6 +69,8 @@ export default function CreateSchemaDialog({ ...props }) {
   const currentSelectBefore = locationProviders?.map(p => filesetLocationProviders[p])
   const selectBefore = [...new Set(['file:/', 'hdfs://', ...currentSelectBefore])]
   const dispatch = useAppDispatch()
+
+  const paimonCatalogBackend = provider === 'lakehouse-paimon' && ['hive', 'jdbc'].includes(catalogBackend)
 
   const [form] = Form.useForm()
   const values = Form.useWatch([], form)
@@ -219,12 +232,13 @@ export default function CreateSchemaDialog({ ...props }) {
                 >
                   <Input placeholder={mismatchName} disabled={editSchema} />
                 </Form.Item>
-                {!['jdbc-mysql', 'lakehouse-paimon'].includes(provider) && (
+                {(!['jdbc-mysql', 'lakehouse-paimon', 'jdbc-oceanbase'].includes(provider) || paimonCatalogBackend) && (
                   <Form.Item name='comment' label='Comment' data-refer='schema-comment-field'>
                     <TextArea disabled={editSchema} />
                   </Form.Item>
                 )}
-                {!['jdbc-postgresql', 'lakehouse-paimon', 'kafka', 'jdbc-mysql'].includes(provider) && (
+                {(!['jdbc-postgresql', 'lakehouse-paimon', 'kafka', 'jdbc-mysql'].includes(provider) ||
+                  paimonCatalogBackend) && (
                   <Form.Item label='Properties'>
                     <Form.List name='properties'>
                       {(fields, subOpt) => (
