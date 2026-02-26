@@ -29,7 +29,7 @@ from gravitino.api.function.function_type import FunctionType
 from gravitino.api.schema import Schema
 from gravitino.api.schema_change import SchemaChange
 from gravitino.api.supports_schemas import SupportsSchemas
-from gravitino.client.generic_function_catalog import FunctionCatalogOperations
+from gravitino.client.function_catalog_operations import FunctionCatalogOperations
 from gravitino.client.metadata_object_credential_operations import (
     MetadataObjectCredentialOperations,
 )

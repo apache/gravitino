@@ -20,6 +20,8 @@ from random import randint
 from gravitino import Catalog, GravitinoAdminClient, GravitinoClient, NameIdentifier
 from gravitino.api.function.function_change import FunctionChange
 from gravitino.api.function.function_definition import FunctionDefinitions
+from gravitino.api.function.function_impl import FunctionImpl
+from gravitino.api.function.function_param import FunctionParams
 from gravitino.api.function.function_type import FunctionType
 from gravitino.api.function.sql_impl import SQLImpl
 from gravitino.api.rel.types.types import Types
@@ -79,15 +81,29 @@ class TestFunctionCatalog(IntegrationTestEnv):
         """Drop schema after each test."""
         self._catalog.as_schemas().drop_schema(self._schema_name, True)
 
-    def _create_scalar_definition(self):
-        """Create a scalar function definition for testing."""
-        sql_impl = (
+    def _create_spark_impl(self, sql: str = "SELECT 1") -> SQLImpl:
+        """Create a Spark SQL implementation for testing."""
+        return (
             SQLImpl.builder()
             .with_runtime_type(SQLImpl.RuntimeType.SPARK)
-            .with_sql("SELECT 1")
+            .with_sql(sql)
             .build()
         )
-        return FunctionDefinitions.of([], Types.IntegerType.get(), [sql_impl])
+
+    def _create_trino_impl(self, sql: str = "SELECT 1") -> SQLImpl:
+        """Create a Trino SQL implementation for testing."""
+        return (
+            SQLImpl.builder()
+            .with_runtime_type(SQLImpl.RuntimeType.TRINO)
+            .with_sql(sql)
+            .build()
+        )
+
+    def _create_scalar_definition(self):
+        """Create a scalar function definition with no parameters for testing."""
+        return FunctionDefinitions.of(
+            [], Types.IntegerType.get(), [self._create_spark_impl()]
+        )
 
     def test_create_get_function(self):
         """Test creating and retrieving a function."""
@@ -166,7 +182,7 @@ class TestFunctionCatalog(IntegrationTestEnv):
         self.assertEqual(function_name2, functions[1].name())
 
     def test_alter_function(self):
-        """Test altering a function."""
+        """Test altering a function with all supported FunctionChange types."""
         function_name = "function_it_function" + str(randint(0, 1000))
         function_ident = NameIdentifier.of(self._schema_name, function_name)
         definition = self._create_scalar_definition()
@@ -180,14 +196,79 @@ class TestFunctionCatalog(IntegrationTestEnv):
         )
 
         # Test update comment
-        changes = [FunctionChange.update_comment("new comment")]
         function = self._catalog.as_function_catalog().alter_function(
-            function_ident, *changes
+            function_ident, FunctionChange.update_comment("new comment")
         )
         self.assertEqual("new comment", function.comment())
-
         function = self._catalog.as_function_catalog().get_function(function_ident)
         self.assertEqual("new comment", function.comment())
+
+        # Test add_definition: add an overload with one parameter
+        x_param = FunctionParams.of("x", Types.IntegerType.get())
+        new_definition = FunctionDefinitions.of(
+            [x_param], Types.IntegerType.get(), [self._create_spark_impl("SELECT x")]
+        )
+        function = self._catalog.as_function_catalog().alter_function(
+            function_ident, FunctionChange.add_definition(new_definition)
+        )
+        self.assertEqual(2, len(function.definitions()))
+
+        function = self._catalog.as_function_catalog().get_function(function_ident)
+        self.assertEqual(2, len(function.definitions()))
+
+        # Test add_impl: add a Trino implementation to the no-arg definition
+        trino_impl = self._create_trino_impl()
+        function = self._catalog.as_function_catalog().alter_function(
+            function_ident,
+            FunctionChange.add_impl([], trino_impl),
+        )
+        no_arg_def = next(d for d in function.definitions() if not d.parameters())
+        impl_runtimes = [i.runtime() for i in no_arg_def.impls()]
+        self.assertIn(FunctionImpl.RuntimeType.TRINO, impl_runtimes)
+
+        function = self._catalog.as_function_catalog().get_function(function_ident)
+        no_arg_def = next(d for d in function.definitions() if not d.parameters())
+        impl_runtimes = [i.runtime() for i in no_arg_def.impls()]
+        self.assertIn(FunctionImpl.RuntimeType.TRINO, impl_runtimes)
+
+        # Test update_impl: replace the Trino implementation with new SQL
+        updated_trino_impl = self._create_trino_impl("SELECT 2")
+        function = self._catalog.as_function_catalog().alter_function(
+            function_ident,
+            FunctionChange.update_impl([], FunctionImpl.RuntimeType.TRINO, updated_trino_impl),
+        )
+        no_arg_def = next(d for d in function.definitions() if not d.parameters())
+        trino_impls = [i for i in no_arg_def.impls() if i.runtime() == FunctionImpl.RuntimeType.TRINO]
+        self.assertEqual(1, len(trino_impls))
+        self.assertEqual("SELECT 2", trino_impls[0].sql())
+
+        function = self._catalog.as_function_catalog().get_function(function_ident)
+        no_arg_def = next(d for d in function.definitions() if not d.parameters())
+        trino_impls = [i for i in no_arg_def.impls() if i.runtime() == FunctionImpl.RuntimeType.TRINO]
+        self.assertEqual("SELECT 2", trino_impls[0].sql())
+
+        # Test remove_impl: remove the Trino implementation from the no-arg definition
+        function = self._catalog.as_function_catalog().alter_function(
+            function_ident,
+            FunctionChange.remove_impl([], FunctionImpl.RuntimeType.TRINO),
+        )
+        no_arg_def = next(d for d in function.definitions() if not d.parameters())
+        impl_runtimes = [i.runtime() for i in no_arg_def.impls()]
+        self.assertNotIn(FunctionImpl.RuntimeType.TRINO, impl_runtimes)
+
+        function = self._catalog.as_function_catalog().get_function(function_ident)
+        no_arg_def = next(d for d in function.definitions() if not d.parameters())
+        impl_runtimes = [i.runtime() for i in no_arg_def.impls()]
+        self.assertNotIn(FunctionImpl.RuntimeType.TRINO, impl_runtimes)
+
+        # Test remove_definition: remove the parameterized overload
+        function = self._catalog.as_function_catalog().alter_function(
+            function_ident, FunctionChange.remove_definition([x_param])
+        )
+        self.assertEqual(1, len(function.definitions()))
+
+        function = self._catalog.as_function_catalog().get_function(function_ident)
+        self.assertEqual(1, len(function.definitions()))
 
     def test_drop_function(self):
         """Test dropping a function."""
