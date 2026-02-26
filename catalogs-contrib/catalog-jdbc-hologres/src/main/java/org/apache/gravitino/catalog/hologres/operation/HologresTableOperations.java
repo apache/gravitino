@@ -298,21 +298,11 @@ public class HologresTableOperations extends JdbcTableOperations
       sqlBuilder.append(String.format(",%s", NEW_LINE));
       switch (index.type()) {
         case PRIMARY_KEY:
-          if (StringUtils.isNotEmpty(index.name())) {
-            sqlBuilder.append(
-                String.format("CONSTRAINT %s%s%s", HOLO_QUOTE, index.name(), HOLO_QUOTE));
-          }
-          sqlBuilder.append(String.format(" PRIMARY KEY (%s)", fieldStr));
-          break;
-        case UNIQUE_KEY:
-          if (StringUtils.isNotEmpty(index.name())) {
-            sqlBuilder.append(
-                String.format("CONSTRAINT %s%s%s", HOLO_QUOTE, index.name(), HOLO_QUOTE));
-          }
-          sqlBuilder.append(String.format(" UNIQUE (%s)", fieldStr));
+          sqlBuilder.append(String.format("PRIMARY KEY (%s)", fieldStr));
           break;
         default:
-          throw new IllegalArgumentException("Hologres doesn't support index : " + index.type());
+          throw new IllegalArgumentException(
+              "Hologres only supports PRIMARY_KEY index, but got: " + index.type());
       }
     }
   }

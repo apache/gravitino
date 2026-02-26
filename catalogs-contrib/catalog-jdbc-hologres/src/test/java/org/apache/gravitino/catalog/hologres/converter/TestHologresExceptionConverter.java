@@ -117,9 +117,10 @@ public class TestHologresExceptionConverter {
 
   @Test
   public void testNullSqlStateWithNullMessage() {
-    // GravitinoRuntimeException uses String.format internally, so null message causes NPE.
-    // This verifies the converter's behavior with null message and null SQL state.
+    // After null-message fix, converter should return GravitinoRuntimeException with empty message
+    // instead of throwing NPE.
     SQLException se = new SQLException((String) null);
-    Assertions.assertThrows(NullPointerException.class, () -> converter.toGravitinoException(se));
+    GravitinoRuntimeException result = converter.toGravitinoException(se);
+    Assertions.assertInstanceOf(GravitinoRuntimeException.class, result);
   }
 }

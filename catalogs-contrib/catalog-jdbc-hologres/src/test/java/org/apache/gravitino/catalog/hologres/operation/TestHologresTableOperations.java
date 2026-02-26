@@ -178,11 +178,12 @@ public class TestHologresTableOperations {
 
   @Test
   void testAppendIndexesSqlPrimaryKey() {
+    // Hologres does not support custom constraint names, so the name is ignored
     Index pk = Indexes.primary("pk_test", new String[][] {{"id"}});
     StringBuilder sqlBuilder = new StringBuilder();
     HologresTableOperations.appendIndexesSql(new Index[] {pk}, sqlBuilder);
     String result = sqlBuilder.toString();
-    assertTrue(result.contains("CONSTRAINT \"pk_test\""));
+    assertFalse(result.contains("CONSTRAINT"));
     assertTrue(result.contains("PRIMARY KEY (\"id\")"));
   }
 
@@ -197,13 +198,13 @@ public class TestHologresTableOperations {
   }
 
   @Test
-  void testAppendIndexesSqlUniqueKey() {
+  void testAppendIndexesSqlUniqueKeyThrows() {
+    // Hologres does not support UNIQUE KEY index separately
     Index uk = Indexes.unique("uk_name", new String[][] {{"name"}});
     StringBuilder sqlBuilder = new StringBuilder();
-    HologresTableOperations.appendIndexesSql(new Index[] {uk}, sqlBuilder);
-    String result = sqlBuilder.toString();
-    assertTrue(result.contains("CONSTRAINT \"uk_name\""));
-    assertTrue(result.contains("UNIQUE (\"name\")"));
+    assertThrows(
+        IllegalArgumentException.class,
+        () -> HologresTableOperations.appendIndexesSql(new Index[] {uk}, sqlBuilder));
   }
 
   @Test
@@ -216,14 +217,14 @@ public class TestHologresTableOperations {
   }
 
   @Test
-  void testAppendIndexesSqlMultipleIndexes() {
+  void testAppendIndexesSqlMultipleIndexesWithUniqueKeyThrows() {
+    // Hologres does not support UNIQUE KEY, so mixing PK and UK should throw
     Index pk = Indexes.primary("pk_id", new String[][] {{"id"}});
     Index uk = Indexes.unique("uk_email", new String[][] {{"email"}});
     StringBuilder sqlBuilder = new StringBuilder();
-    HologresTableOperations.appendIndexesSql(new Index[] {pk, uk}, sqlBuilder);
-    String result = sqlBuilder.toString();
-    assertTrue(result.contains("PRIMARY KEY"));
-    assertTrue(result.contains("UNIQUE"));
+    assertThrows(
+        IllegalArgumentException.class,
+        () -> HologresTableOperations.appendIndexesSql(new Index[] {pk, uk}, sqlBuilder));
   }
 
   // ==================== generateCreateTableSql tests ====================
@@ -508,7 +509,8 @@ public class TestHologresTableOperations {
             Distributions.NONE,
             new Index[] {pk});
     assertTrue(sql.contains("PRIMARY KEY (\"id\")"));
-    assertTrue(sql.contains("CONSTRAINT \"pk_id\""));
+    // Hologres does not support custom constraint names, so CONSTRAINT should not appear
+    assertFalse(sql.contains("CONSTRAINT"));
   }
 
   @Test
