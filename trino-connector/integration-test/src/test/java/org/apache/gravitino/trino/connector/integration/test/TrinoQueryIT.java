@@ -18,6 +18,7 @@
  */
 package org.apache.gravitino.trino.connector.integration.test;
 
+import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
@@ -338,7 +339,7 @@ public class TrinoQueryIT extends TrinoQueryITBase {
 
     String[] testSetNames =
         Arrays.stream(TrinoQueryITBase.listDirectory(testsetsDir))
-            .filter(s -> new java.io.File(ITUtils.joinPath(testsetsDir, s)).isDirectory())
+            .filter(s -> new File(ITUtils.joinPath(testsetsDir, s)).isDirectory())
             .filter(s -> ciTestsets.isEmpty() || ciTestsets.contains(s))
             .toArray(String[]::new);
     List<Future<Integer>> allFutures = new ArrayList<>();
