@@ -197,27 +197,22 @@ public class HologresTableOperations extends JdbcTableOperations
         MapUtils.isNotEmpty(properties)
             && "true".equalsIgnoreCase(properties.get("is_logical_partitioned_table"));
     StringBuilder sqlBuilder = new StringBuilder();
-    sqlBuilder
-        .append("CREATE TABLE ")
-        .append(HOLO_QUOTE)
-        .append(tableName)
-        .append(HOLO_QUOTE)
-        .append(" (")
-        .append(NEW_LINE);
+    sqlBuilder.append(
+        String.format("CREATE TABLE %s%s%s (%s", HOLO_QUOTE, tableName, HOLO_QUOTE, NEW_LINE));
 
     // Add columns
     for (int i = 0; i < columns.length; i++) {
       JdbcColumn column = columns[i];
-      sqlBuilder.append("    ").append(HOLO_QUOTE).append(column.name()).append(HOLO_QUOTE);
+      sqlBuilder.append(String.format("    %s%s%s", HOLO_QUOTE, column.name(), HOLO_QUOTE));
 
       appendColumnDefinition(column, sqlBuilder);
       // Add a comma for the next column, unless it's the last one
       if (i < columns.length - 1) {
-        sqlBuilder.append(",").append(NEW_LINE);
+        sqlBuilder.append(String.format(",%s", NEW_LINE));
       }
     }
     appendIndexesSql(indexes, sqlBuilder);
-    sqlBuilder.append(NEW_LINE).append(")");
+    sqlBuilder.append(String.format("%s)", NEW_LINE));
 
     // Append partitioning clause if specified
     if (ArrayUtils.isNotEmpty(partitioning)) {
@@ -236,7 +231,7 @@ public class HologresTableOperations extends JdbcTableOperations
           Arrays.stream(distribution.expressions())
               .map(Object::toString)
               .collect(Collectors.joining(","));
-      withEntries.add("distribution_key = '" + distributionColumns + "'");
+      withEntries.add(String.format("distribution_key = '%s'", distributionColumns));
     }
 
     // Add user-specified properties (filter out read-only / internally-handled properties)
@@ -244,19 +239,19 @@ public class HologresTableOperations extends JdbcTableOperations
       properties.forEach(
           (key, value) -> {
             if (!EXCLUDED_TABLE_PROPERTIES.contains(key)) {
-              withEntries.add(key + " = '" + value + "'");
+              withEntries.add(String.format("%s = '%s'", key, value));
             }
           });
     }
 
     // Generate WITH clause
     if (!withEntries.isEmpty()) {
-      sqlBuilder.append(NEW_LINE).append("WITH (").append(NEW_LINE);
+      sqlBuilder.append(String.format("%sWITH (%s", NEW_LINE, NEW_LINE));
       sqlBuilder.append(
           withEntries.stream()
-              .map(entry -> "    " + entry)
-              .collect(Collectors.joining("," + NEW_LINE)));
-      sqlBuilder.append(NEW_LINE).append(")");
+              .map(entry -> String.format("    %s", entry))
+              .collect(Collectors.joining(String.format(",%s", NEW_LINE))));
+      sqlBuilder.append(String.format("%s)", NEW_LINE));
     }
 
     sqlBuilder.append(";");
@@ -305,27 +300,21 @@ public class HologresTableOperations extends JdbcTableOperations
   static void appendIndexesSql(Index[] indexes, StringBuilder sqlBuilder) {
     for (Index index : indexes) {
       String fieldStr = getIndexFieldStr(index.fieldNames());
-      sqlBuilder.append(",").append(NEW_LINE);
+      sqlBuilder.append(String.format(",%s", NEW_LINE));
       switch (index.type()) {
         case PRIMARY_KEY:
           if (StringUtils.isNotEmpty(index.name())) {
-            sqlBuilder
-                .append("CONSTRAINT ")
-                .append(HOLO_QUOTE)
-                .append(index.name())
-                .append(HOLO_QUOTE);
+            sqlBuilder.append(
+                String.format("CONSTRAINT %s%s%s", HOLO_QUOTE, index.name(), HOLO_QUOTE));
           }
-          sqlBuilder.append(" PRIMARY KEY (").append(fieldStr).append(")");
+          sqlBuilder.append(String.format(" PRIMARY KEY (%s)", fieldStr));
           break;
         case UNIQUE_KEY:
           if (StringUtils.isNotEmpty(index.name())) {
-            sqlBuilder
-                .append("CONSTRAINT ")
-                .append(HOLO_QUOTE)
-                .append(index.name())
-                .append(HOLO_QUOTE);
+            sqlBuilder.append(
+                String.format("CONSTRAINT %s%s%s", HOLO_QUOTE, index.name(), HOLO_QUOTE));
           }
-          sqlBuilder.append(" UNIQUE (").append(fieldStr).append(")");
+          sqlBuilder.append(String.format(" UNIQUE (%s)", fieldStr));
           break;
         default:
           throw new IllegalArgumentException("Hologres doesn't support index : " + index.type());
@@ -341,7 +330,7 @@ public class HologresTableOperations extends JdbcTableOperations
                 throw new IllegalArgumentException(
                     "Index does not support complex fields in Hologres");
               }
-              return HOLO_QUOTE + colNames[0] + HOLO_QUOTE;
+              return String.format("%s%s%s", HOLO_QUOTE, colNames[0], HOLO_QUOTE);
             })
         .collect(Collectors.joining(", "));
   }
@@ -397,15 +386,15 @@ public class HologresTableOperations extends JdbcTableOperations
                   Preconditions.checkArgument(
                       colNames.length == 1,
                       "Hologres partition does not support nested field names");
-                  return HOLO_QUOTE + colNames[0] + HOLO_QUOTE;
+                  return String.format("%s%s%s", HOLO_QUOTE, colNames[0], HOLO_QUOTE);
                 })
             .collect(Collectors.joining(", "));
 
     sqlBuilder.append(NEW_LINE);
     if (isLogicalPartition) {
-      sqlBuilder.append("LOGICAL PARTITION BY LIST(").append(partitionColumns).append(")");
+      sqlBuilder.append(String.format("LOGICAL PARTITION BY LIST(%s)", partitionColumns));
     } else {
-      sqlBuilder.append("PARTITION BY LIST(").append(partitionColumns).append(")");
+      sqlBuilder.append(String.format("PARTITION BY LIST(%s)", partitionColumns));
     }
   }
 
@@ -424,7 +413,7 @@ public class HologresTableOperations extends JdbcTableOperations
     // GENERATED ALWAYS AS (expr) STORED must come before nullable constraints.
     if (column.defaultValue() instanceof UnparsedExpression) {
       String expr = ((UnparsedExpression) column.defaultValue()).unparsedExpression();
-      sqlBuilder.append("GENERATED ALWAYS AS (").append(expr).append(") STORED ");
+      sqlBuilder.append(String.format("GENERATED ALWAYS AS (%s) STORED ", expr));
       if (column.nullable()) {
         sqlBuilder.append("NULL ");
       } else {
