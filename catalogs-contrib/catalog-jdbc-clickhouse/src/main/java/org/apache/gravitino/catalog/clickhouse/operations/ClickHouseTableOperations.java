@@ -84,6 +84,11 @@ public class ClickHouseTableOperations extends JdbcTableOperations {
       Pattern.compile("ORDER\\s+BY\\s+([^\\n]+)", Pattern.CASE_INSENSITIVE);
   private static final Pattern PARTITION_BY_PATTERN =
       Pattern.compile("PARTITION\\s+BY\\s+([^\\n]+)", Pattern.CASE_INSENSITIVE);
+  private static final Pattern ON_CLUSTER_PATTERN =
+      Pattern.compile("(?i)\\bON\\s+CLUSTER\\s+`?([^`\\s(]+)`?");
+  private static final Pattern DISTRIBUTED_ENGINE_PATTERN =
+      Pattern.compile(
+          "(?i)^Distributed\\(([^,]+),\\s*([^,]+),\\s*([^,]+),\\s*(.+)\\)$", Pattern.DOTALL);
 
   private static final String QUERY_INDEXES_SQL =
       """
@@ -512,7 +517,35 @@ public class ClickHouseTableOperations extends JdbcTableOperations {
                 new HashMap<String, String>() {
                   {
                     put(COMMENT, resultSet.getString(COMMENT));
-                    put(GRAVITINO_ENGINE_KEY, resultSet.getString(CLICKHOUSE_ENGINE_KEY));
+                    String engine = resultSet.getString(CLICKHOUSE_ENGINE_KEY);
+                    put(GRAVITINO_ENGINE_KEY, engine);
+                    String createSql = parseShowCreateTableSql(connection, tableName);
+                    Matcher onClusterMatcher = ON_CLUSTER_PATTERN.matcher(createSql);
+                    if (onClusterMatcher.find()) {
+                      put(ClusterConstants.ON_CLUSTER, String.valueOf(true));
+                      put(ClusterConstants.CLUSTER_NAME, unquote(onClusterMatcher.group(1)));
+                    } else {
+                      put(ClusterConstants.ON_CLUSTER, String.valueOf(false));
+                    }
+
+                    if (StringUtils.equalsIgnoreCase(engine, ENGINE.DISTRIBUTED.getValue())) {
+                      String engineFull = resultSet.getString("engine_full");
+                      Matcher distributedEngineMatcher =
+                          DISTRIBUTED_ENGINE_PATTERN.matcher(StringUtils.trimToEmpty(engineFull));
+                      if (distributedEngineMatcher.matches()) {
+                        String distributedClusterName = unquote(distributedEngineMatcher.group(1));
+                        put(ClusterConstants.CLUSTER_NAME, distributedClusterName);
+                        put(
+                            DistributedTableConstants.REMOTE_DATABASE,
+                            unquote(distributedEngineMatcher.group(2)));
+                        put(
+                            DistributedTableConstants.REMOTE_TABLE,
+                            unquote(distributedEngineMatcher.group(3)));
+                        put(
+                            DistributedTableConstants.SHARDING_KEY,
+                            StringUtils.trim(distributedEngineMatcher.group(4)));
+                      }
+                    }
                   }
                 });
           }
@@ -971,15 +1004,32 @@ public class ClickHouseTableOperations extends JdbcTableOperations {
 
   private ShowCreateTableMetadata parseShowCreateTable(Connection connection, String tableName)
       throws SQLException {
+    String createSql = parseShowCreateTableSql(connection, tableName);
+    return parseCreateStatement(createSql);
+  }
+
+  private String parseShowCreateTableSql(Connection connection, String tableName)
+      throws SQLException {
     String sql = "SHOW CREATE TABLE " + quoteIdentifier(tableName);
     try (Statement statement = connection.createStatement();
         ResultSet resultSet = statement.executeQuery(sql)) {
       if (resultSet.next()) {
-        String createSql = resultSet.getString(1);
-        return parseCreateStatement(createSql);
+        return resultSet.getString(1);
       }
       throw new SQLException("SHOW CREATE TABLE returned no rows for " + tableName);
     }
+  }
+
+  private String unquote(String value) {
+    String trimmed = StringUtils.trimToEmpty(value);
+    if (StringUtils.length(trimmed) >= 2) {
+      char first = trimmed.charAt(0);
+      char last = trimmed.charAt(trimmed.length() - 1);
+      if ((first == '\'' && last == '\'') || (first == '`' && last == '`')) {
+        return trimmed.substring(1, trimmed.length() - 1);
+      }
+    }
+    return trimmed;
   }
 
   private SortOrder[] parseOrderByClause(String orderClause) {

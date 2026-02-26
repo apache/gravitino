@@ -77,6 +77,15 @@ public class CatalogClickHouseClusterIT extends BaseIT {
   private final String schemaName = GravitinoITUtils.genRandomName("ck_cluster_schema");
   private final String localTableName = GravitinoITUtils.genRandomName("ck_cluster_local");
   private final String distributedTableName = GravitinoITUtils.genRandomName("ck_cluster_dist");
+  private final String nonClusterTableName = GravitinoITUtils.genRandomName("ck_non_cluster_local");
+  private final String sqlClusterLocalTableName =
+      GravitinoITUtils.genRandomName("ck_sql_cluster_local");
+  private final String sqlClusterDistributedTableName =
+      GravitinoITUtils.genRandomName("ck_sql_cluster_dist");
+  private final String sqlNonClusterLocalTableName =
+      GravitinoITUtils.genRandomName("ck_sql_non_cluster_local");
+  private final String sqlNonClusterDistributedTableName =
+      GravitinoITUtils.genRandomName("ck_sql_non_cluster_dist");
   private final String tableComment = "cluster_table_comment";
 
   private GravitinoMetalake metalake;
@@ -209,6 +218,11 @@ public class CatalogClickHouseClusterIT extends BaseIT {
             getSortOrders("col_3"));
 
     Assertions.assertTrue(localTable != null && localTable.name().equals(localTableName));
+    Table loadedLocalTable = tableCatalog.loadTable(localTableIdent);
+    Assertions.assertEquals(
+        ENGINE.MERGETREE.getValue(), loadedLocalTable.properties().get(GRAVITINO_ENGINE_KEY));
+    Assertions.assertEquals("false", loadedLocalTable.properties().get(ON_CLUSTER));
+    Assertions.assertFalse(loadedLocalTable.properties().containsKey(CLUSTER_NAME));
 
     Table distributedTable =
         tableCatalog.createTable(
@@ -221,6 +235,34 @@ public class CatalogClickHouseClusterIT extends BaseIT {
             null);
     Assertions.assertTrue(
         distributedTable != null && distributedTable.name().equals(distributedTableName));
+    Table loadedDistributedTable = tableCatalog.loadTable(distributedTableIdent);
+    Assertions.assertEquals(
+        ENGINE.DISTRIBUTED.getValue(),
+        loadedDistributedTable.properties().get(GRAVITINO_ENGINE_KEY));
+    Assertions.assertEquals("false", loadedDistributedTable.properties().get(ON_CLUSTER));
+    Assertions.assertEquals(
+        ClickHouseContainer.DEFAULT_CLUSTER_NAME,
+        loadedDistributedTable.properties().get(CLUSTER_NAME));
+    Assertions.assertEquals(schemaName, loadedDistributedTable.properties().get(REMOTE_DATABASE));
+    Assertions.assertEquals(localTableName, loadedDistributedTable.properties().get(REMOTE_TABLE));
+
+    NameIdentifier nonClusterTableIdent = NameIdentifier.of(schemaName, nonClusterTableName);
+    Table nonClusterTable =
+        tableCatalog.createTable(
+            nonClusterTableIdent,
+            columns,
+            tableComment,
+            Collections.singletonMap(GRAVITINO_ENGINE_KEY, ENGINE.MERGETREE.getValue()),
+            partitioning,
+            distribution,
+            getSortOrders("col_3"));
+    Assertions.assertTrue(
+        nonClusterTable != null && nonClusterTable.name().equals(nonClusterTableName));
+    Table loadedNonClusterTable = tableCatalog.loadTable(nonClusterTableIdent);
+    Assertions.assertEquals(
+        ENGINE.MERGETREE.getValue(), loadedNonClusterTable.properties().get(GRAVITINO_ENGINE_KEY));
+    Assertions.assertEquals("false", loadedNonClusterTable.properties().get(ON_CLUSTER));
+    Assertions.assertFalse(loadedNonClusterTable.properties().containsKey(CLUSTER_NAME));
 
     try (Connection connection =
             DriverManager.getConnection(
@@ -239,5 +281,79 @@ public class CatalogClickHouseClusterIT extends BaseIT {
         Assertions.assertEquals(1L, resultSet.getLong(1));
       }
     }
+  }
+
+  @Test
+  public void testLoadSqlCreatedLocalAndDistributedTableProperties() {
+    clickHouseService.executeQuery(
+        String.format(
+            "CREATE TABLE `%s`.`%s` ON CLUSTER `%s` ("
+                + "col_1 Int32, col_2 Date, col_3 String) "
+                + "ENGINE = MergeTree ORDER BY col_1",
+            schemaName, sqlClusterLocalTableName, ClickHouseContainer.DEFAULT_CLUSTER_NAME));
+
+    clickHouseService.executeQuery(
+        String.format(
+            "CREATE TABLE `%s`.`%s` ON CLUSTER `%s` AS `%s`.`%s` "
+                + "ENGINE = Distributed('%s', '%s', '%s', cityHash64(col_1))",
+            schemaName,
+            sqlClusterDistributedTableName,
+            ClickHouseContainer.DEFAULT_CLUSTER_NAME,
+            schemaName,
+            sqlClusterLocalTableName,
+            ClickHouseContainer.DEFAULT_CLUSTER_NAME,
+            schemaName,
+            sqlClusterLocalTableName));
+
+    clickHouseService.executeQuery(
+        String.format(
+            "CREATE TABLE `%s`.`%s` (col_1 Int32, col_2 Date, col_3 String) "
+                + "ENGINE = MergeTree ORDER BY col_1",
+            schemaName, sqlNonClusterLocalTableName));
+
+    clickHouseService.executeQuery(
+        String.format(
+            "CREATE TABLE `%s`.`%s` AS `%s`.`%s` "
+                + "ENGINE = Distributed('%s', '%s', '%s', cityHash64(col_1))",
+            schemaName,
+            sqlNonClusterDistributedTableName,
+            schemaName,
+            sqlNonClusterLocalTableName,
+            ClickHouseContainer.DEFAULT_CLUSTER_NAME,
+            schemaName,
+            sqlNonClusterLocalTableName));
+
+    TableCatalog tableCatalog = catalog.asTableCatalog();
+    Table sqlLocalTable =
+        tableCatalog.loadTable(NameIdentifier.of(schemaName, sqlClusterLocalTableName));
+    Assertions.assertEquals(
+        ENGINE.MERGETREE.getValue(), sqlLocalTable.properties().get(GRAVITINO_ENGINE_KEY));
+    Assertions.assertEquals("false", sqlLocalTable.properties().get(ON_CLUSTER));
+
+    Table sqlDistributedTable =
+        tableCatalog.loadTable(NameIdentifier.of(schemaName, sqlClusterDistributedTableName));
+    Assertions.assertEquals(
+        ENGINE.DISTRIBUTED.getValue(), sqlDistributedTable.properties().get(GRAVITINO_ENGINE_KEY));
+    Assertions.assertEquals("false", sqlDistributedTable.properties().get(ON_CLUSTER));
+    Assertions.assertEquals(
+        ClickHouseContainer.DEFAULT_CLUSTER_NAME,
+        sqlDistributedTable.properties().get(CLUSTER_NAME));
+    Assertions.assertEquals(schemaName, sqlDistributedTable.properties().get(REMOTE_DATABASE));
+    Assertions.assertEquals(
+        sqlClusterLocalTableName, sqlDistributedTable.properties().get(REMOTE_TABLE));
+
+    Table sqlNonClusterDistributedTable =
+        tableCatalog.loadTable(NameIdentifier.of(schemaName, sqlNonClusterDistributedTableName));
+    Assertions.assertEquals(
+        ENGINE.DISTRIBUTED.getValue(),
+        sqlNonClusterDistributedTable.properties().get(GRAVITINO_ENGINE_KEY));
+    Assertions.assertEquals("false", sqlNonClusterDistributedTable.properties().get(ON_CLUSTER));
+    Assertions.assertEquals(
+        ClickHouseContainer.DEFAULT_CLUSTER_NAME,
+        sqlNonClusterDistributedTable.properties().get(CLUSTER_NAME));
+    Assertions.assertEquals(
+        schemaName, sqlNonClusterDistributedTable.properties().get(REMOTE_DATABASE));
+    Assertions.assertEquals(
+        sqlNonClusterLocalTableName, sqlNonClusterDistributedTable.properties().get(REMOTE_TABLE));
   }
 }

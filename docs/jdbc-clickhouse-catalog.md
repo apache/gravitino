@@ -219,9 +219,9 @@ Other ClickHouse types are exposed as [External Type](./manage-relational-metada
    In all, the following partitioning expressions are supported:
    - Identity: `PARTITION BY column_name`
    - Functions: `PARTITION BY toDate(column_name)`, `PARTITION BY toYear(column_name)`, `PARTITION BY toYYYYMM(column_name)`. Other functions are not supported.
-   - Not support: `PARTITION BY (column_name + 1)`, `PARTITION BY (toYear(column_name) + 1)`, etc.
+   - Not support: `PARTITION BY (column_name + 1)`, `PARTITION BY (toYear(column_name) + 1)`, etc. (Note: ClickHouse itself does support arbitrary partitioning expressions, but Gravitino currently only supports the above patterns for partitioning). 
 
-- Distribution: fixed to `Distributions.NONE` (no custom distribution). ClickHouse does not support custom distribution strategies since distribution is handled by the engine (for example `Distributed` engine with sharding key).
+- Distribution: fixed to `Distributions.NONE`. For a `Distributed` engine table, you can specify the sharding key and remote database/table through table properties to fulfill the same use cases. We will later consider adding more flexible distribution strategies if there is demand.
 
 ### Create a table
 
