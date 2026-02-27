@@ -705,11 +705,12 @@ public class TableOperationDispatcher extends OperationDispatcher implements Tab
         columnsNeedsUpdate = true;
 
       } else if (!isSameColumn(columnPair.getRight(), columnPair.getLeft(), entry.getValue())) {
-        // If the column need to be updated, we create a new ColumnEntity with the same id
+        // Add debug log to print the difference between the two columns
         LOG.debug(
-            "Column {} is found in the table from underlying source, but it is different "
+            "Column {} of table: {} is found in the table from underlying source, but it is different "
                 + "from the one in the table entity, it will be updated",
-            entry.getKey());
+            entry.getKey(),
+            tableFromGravitino.id());
 
         Column column = columnPair.getRight();
         ColumnEntity updatedColumnEntity =
@@ -744,9 +745,10 @@ public class TableOperationDispatcher extends OperationDispatcher implements Tab
     for (Map.Entry<String, Pair<Integer, Column>> entry : columnsFromCatalogTable.entrySet()) {
       if (!columnsFromTableEntity.containsKey(entry.getKey())) {
         LOG.debug(
-            "Column {} is found in the table from underlying source but not in the table "
+            "Column {} of table: {} is found in the table from underlying source but not in the table "
                 + "entity, it will be added to the table entity",
-            entry.getKey());
+            entry.getKey(),
+            tableFromGravitino.id());
         ColumnEntity newColumnEntity =
             ColumnEntity.toColumnEntity(
                 entry.getValue().getRight(),

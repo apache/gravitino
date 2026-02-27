@@ -529,6 +529,70 @@ public class TestTableColumnMetaService extends TestJDBCBackend {
         () -> TableColumnMetaService.getInstance().getColumnPOById(updatedColumn.id()));
   }
 
+  @TestTemplate
+  public void testGetColumnIdByNamePrefersNonDeleteRecordInSameVersion() throws IOException {
+    String catalogName = "catalog1";
+    String schemaName = "schema1";
+    createParentEntities(METALAKE_NAME, catalogName, schemaName, AUDIT_INFO);
+
+    ColumnEntity oldColumn =
+        ColumnEntity.builder()
+            .withId(RandomIdGenerator.INSTANCE.nextId())
+            .withName("column1")
+            .withPosition(0)
+            .withComment("comment1")
+            .withDataType(Types.IntegerType.get())
+            .withNullable(true)
+            .withAutoIncrement(false)
+            .withDefaultValue(Literals.integerLiteral(1))
+            .withAuditInfo(AUDIT_INFO)
+            .build();
+
+    TableEntity createdTable =
+        TableEntity.builder()
+            .withId(RandomIdGenerator.INSTANCE.nextId())
+            .withName("table_same_name")
+            .withNamespace(Namespace.of(METALAKE_NAME, catalogName, schemaName))
+            .withColumns(Lists.newArrayList(oldColumn))
+            .withAuditInfo(AUDIT_INFO)
+            .build();
+    TableMetaService.getInstance().insertTable(createdTable, false);
+
+    TableEntity retrievedTable =
+        TableMetaService.getInstance().getTableByIdentifier(createdTable.nameIdentifier());
+
+    // Replace the column with a new column id but the same name in one table update.
+    ColumnEntity newColumn =
+        ColumnEntity.builder()
+            .withId(RandomIdGenerator.INSTANCE.nextId())
+            .withName("column1")
+            .withPosition(0)
+            .withComment("comment1_new")
+            .withDataType(Types.LongType.get())
+            .withNullable(true)
+            .withAutoIncrement(false)
+            .withDefaultValue(Literals.longLiteral(2L))
+            .withAuditInfo(AUDIT_INFO)
+            .build();
+
+    TableEntity updatedTable =
+        TableEntity.builder()
+            .withId(retrievedTable.id())
+            .withName(retrievedTable.name())
+            .withNamespace(retrievedTable.namespace())
+            .withColumns(Lists.newArrayList(newColumn))
+            .withAuditInfo(retrievedTable.auditInfo())
+            .build();
+
+    TableMetaService.getInstance()
+        .updateTable(retrievedTable.nameIdentifier(), old -> updatedTable);
+
+    Long selectedColumnId =
+        TableColumnMetaService.getInstance()
+            .getColumnIdByTableIdAndName(retrievedTable.id(), newColumn.name());
+    Assertions.assertEquals(newColumn.id(), selectedColumnId);
+  }
+
   private void compareTwoColumns(
       List<ColumnEntity> expectedColumns, List<ColumnEntity> actualColumns) {
     Assertions.assertEquals(expectedColumns.size(), actualColumns.size());

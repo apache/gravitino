@@ -123,7 +123,7 @@ public class TableColumnBaseSQLProvider {
         + " FROM "
         + TableColumnMapper.COLUMN_TABLE_NAME
         + " WHERE table_id = #{tableId} AND column_name = #{columnName} AND deleted_at = 0"
-        + " ORDER BY table_version DESC LIMIT 1";
+        + " ORDER BY table_version DESC, column_op_type ASC, id DESC LIMIT 1";
   }
 
   public String selectColumnPOById(@Param("columnId") Long columnId) {
