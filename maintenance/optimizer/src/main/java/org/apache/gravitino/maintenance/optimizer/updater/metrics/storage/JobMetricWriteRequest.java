@@ -17,20 +17,34 @@
  * under the License.
  */
 
-package org.apache.gravitino.maintenance.optimizer.api.updater;
+package org.apache.gravitino.maintenance.optimizer.updater.metrics.storage;
 
+import com.google.common.base.Preconditions;
 import org.apache.gravitino.NameIdentifier;
-import org.apache.gravitino.annotation.DeveloperApi;
-import org.apache.gravitino.maintenance.optimizer.api.common.TableAndPartitionStatistics;
 
-/** Represents a provider that supports table statistics. */
-@DeveloperApi
-public interface SupportsCalculateTableStatistics extends StatisticsCalculator {
-  /**
-   * Calculate table-level and partition-level statistics to be persisted.
-   *
-   * @param tableIdentifier catalog/schema/table identifier
-   * @return statistics bundle; contains table statistics and partition statistics
-   */
-  TableAndPartitionStatistics calculateTableStatistics(NameIdentifier tableIdentifier);
+/** Write request for one job metric record. */
+public class JobMetricWriteRequest {
+  private final NameIdentifier nameIdentifier;
+  private final String metricName;
+  private final MetricRecord metric;
+
+  public JobMetricWriteRequest(
+      NameIdentifier nameIdentifier, String metricName, MetricRecord metric) {
+    Preconditions.checkArgument(nameIdentifier != null, "nameIdentifier must not be null");
+    this.nameIdentifier = nameIdentifier;
+    this.metricName = metricName;
+    this.metric = metric;
+  }
+
+  public NameIdentifier nameIdentifier() {
+    return nameIdentifier;
+  }
+
+  public String metricName() {
+    return metricName;
+  }
+
+  public MetricRecord metric() {
+    return metric;
+  }
 }
