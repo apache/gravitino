@@ -24,6 +24,7 @@ For more details, please refer to the related doc.
 - [**Apache Doris**](./jdbc-doris-catalog.md)
 - [**StarRocks**](./jdbc-starrocks-catalog.md)
 - [**OceanBase**](./jdbc-oceanbase-catalog.md)
+- [**Hologres**](./jdbc-hologres-catalog.md)
 - [**Apache Iceberg**](./lakehouse-iceberg-catalog.md)
 - [**Apache Paimon**](./lakehouse-paimon-catalog.md)
 - [**Apache Hudi**](./lakehouse-hudi-catalog.md)
@@ -122,6 +123,7 @@ Currently, Gravitino supports the following catalog providers:
 | `jdbc-postgresql`   | [PostgreSQL catalog property](./jdbc-postgresql-catalog.md#catalog-properties)          |
 | `jdbc-doris`        | [Doris catalog property](./jdbc-doris-catalog.md#catalog-properties)                    |
 | `jdbc-oceanbase`    | [OceanBase catalog property](./jdbc-oceanbase-catalog.md#catalog-properties)            |
+| `jdbc-hologres`     | [Hologres catalog property](./jdbc-hologres-catalog.md#catalog-properties)              |
 | `jdbc-starrocks`    | [StarRocks catalog property](./jdbc-starrocks-catalog.md#catalog-properties)            |
 | `lakehouse-generic` | [Lakehouse generic catalog property](./lakehouse-generic-catalog.md#catalog-properties) |
 
@@ -507,6 +509,7 @@ Currently, Gravitino supports the following schema property:
 | `jdbc-postgresql`   | [PostgreSQL schema property](./jdbc-postgresql-catalog.md#schema-properties) |
 | `jdbc-doris`        | [Doris schema property](./jdbc-doris-catalog.md#schema-properties)           |
 | `jdbc-oceanbase`    | [OceanBase schema property](./jdbc-oceanbase-catalog.md#schema-properties)   |
+| `jdbc-hologres`     | [Hologres schema property](./jdbc-hologres-catalog.md#schema-properties)     |
 | `jdbc-starrocks`    | [StarRocks schema property](./jdbc-starrocks-catalog.md#schema-properties)   |
 | `lakehouse-generic` | [Lakehouse generic schema property](./lakehouse-generic-catalog.md#schema-properties) |
 
@@ -987,6 +990,7 @@ The following is a table of the column default value that Gravitino supports for
 | `jdbc-postgresql`   | &#10004;                |
 | `jdbc-doris`        | &#10004;                |
 | `jdbc-oceanbase`    | &#10004;                |
+| `jdbc-hologres`     | &#10004;                |
 | `jdbc-starrocks`    | &#10004;                |
 | `lakehouse-generic` | &#10008;                |
 
@@ -1005,6 +1009,7 @@ The following table shows the column auto-increment that Gravitino supports for 
 | `jdbc-postgresql`   | &#10004;                                                                         |
 | `jdbc-doris`        | &#10008;                                                                         |
 | `jdbc-oceanbase`    | &#10004;([limitations](./jdbc-oceanbase-catalog.md#table-column-auto-increment)) |
+| `jdbc-hologres`     | &#10008;                                                                         |
 | `jdbc-starrocks`    | &#10004;                                                                         |
 | `lakehouse-generic` | &#10008;                                                                        |
 
@@ -1022,6 +1027,7 @@ The following is the table property that Gravitino supports:
 | `jdbc-postgresql`   | [PostgreSQL table property](./jdbc-postgresql-catalog.md#table-properties)                                                                                                                                                | [PostgreSQL type mapping](./jdbc-postgresql-catalog.md#table-column-types)                                                                                  |
 | `jdbc-doris`        | [Doris table property](./jdbc-doris-catalog.md#table-properties)                                                                                                                                                          | [Doris type mapping](./jdbc-doris-catalog.md#table-column-types)                                                                                            |
 | `jdbc-oceanbase`    | [OceanBase table property](./jdbc-oceanbase-catalog.md#table-properties)                                                                                                                                                  | [OceanBase type mapping](./jdbc-oceanbase-catalog.md#table-column-types)                                                                                    |
+| `jdbc-hologres`     | [Hologres table property](./jdbc-hologres-catalog.md#table-properties)                                                                                                                                                    | [Hologres type mapping](./jdbc-hologres-catalog.md#table-column-types)                                                                                      |
 | `jdbc-starrocks`    | [StarRocks table property](./jdbc-starrocks-catalog.md#table-properties)                                                                                                                                                  | [StarRocks type mapping](./jdbc-starrocks-catalog.md#table-column-types)                                                                                    |
 | `lakehouse-generic` | Lakehouse generic table property depends on specific table implementation, for Lance table, please refer to [doc](./lakehouse-generic-lance-table.md#table-properties), other table format, please refer to related docs. | Lakehouse generic type mapping. Similar to table properties, for Lance table, please refer to [docs](./lakehouse-generic-lance-table.md#data-type-mappings) |
 
