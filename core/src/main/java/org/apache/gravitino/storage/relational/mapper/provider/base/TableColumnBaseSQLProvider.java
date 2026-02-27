@@ -123,6 +123,9 @@ public class TableColumnBaseSQLProvider {
         + " FROM "
         + TableColumnMapper.COLUMN_TABLE_NAME
         + " WHERE table_id = #{tableId} AND column_name = #{columnName} AND deleted_at = 0"
+        // Update a column will generate two records with the same version, one with op_type = 2
+        // (update) and another with op_type = 3 (delete). We should not return NULL if both records
+        // exist with the same version, otherwise the caller will think the column does not exist.
         + " ORDER BY table_version DESC, column_op_type ASC, id DESC LIMIT 1";
   }
 
