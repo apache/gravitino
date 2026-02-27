@@ -57,3 +57,11 @@
 - **Unit Tests**: `./gradlew test -PskipITs -PskipDockerTests=false`
 - **Integration Tests**: `./gradlew test -PskipTests -PskipDockerTests=false`
 - **OpenAPI Docs Validation**: `./gradlew :docs:build` — Run this after any changes to `docs/open-api/*.yaml` to validate OpenAPI specification correctness.
+
+## Claude Memory Usage
+- Before starting any task, use mcp-search to check if similar work has been done before.
+  When encountering unfamiliar code or configuration, search memory for prior context.
+- When hitting a problem, search memory first for known solutions before debugging from scratch.
+- After completing a task, save key findings and solutions to claude-mem for future reference.
+- Use multiple keyword combinations when searching (e.g., module name + issue type, class name + error).
+
