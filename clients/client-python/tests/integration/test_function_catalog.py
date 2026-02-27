@@ -235,16 +235,26 @@ class TestFunctionCatalog(IntegrationTestEnv):
         updated_trino_impl = self._create_trino_impl("SELECT 2")
         function = self._catalog.as_function_catalog().alter_function(
             function_ident,
-            FunctionChange.update_impl([], FunctionImpl.RuntimeType.TRINO, updated_trino_impl),
+            FunctionChange.update_impl(
+                [], FunctionImpl.RuntimeType.TRINO, updated_trino_impl
+            ),
         )
         no_arg_def = next(d for d in function.definitions() if not d.parameters())
-        trino_impls = [i for i in no_arg_def.impls() if i.runtime() == FunctionImpl.RuntimeType.TRINO]
+        trino_impls = [
+            i
+            for i in no_arg_def.impls()
+            if i.runtime() == FunctionImpl.RuntimeType.TRINO
+        ]
         self.assertEqual(1, len(trino_impls))
         self.assertEqual("SELECT 2", trino_impls[0].sql())
 
         function = self._catalog.as_function_catalog().get_function(function_ident)
         no_arg_def = next(d for d in function.definitions() if not d.parameters())
-        trino_impls = [i for i in no_arg_def.impls() if i.runtime() == FunctionImpl.RuntimeType.TRINO]
+        trino_impls = [
+            i
+            for i in no_arg_def.impls()
+            if i.runtime() == FunctionImpl.RuntimeType.TRINO
+        ]
         self.assertEqual("SELECT 2", trino_impls[0].sql())
 
         # Test remove_impl: remove the Trino implementation from the no-arg definition
