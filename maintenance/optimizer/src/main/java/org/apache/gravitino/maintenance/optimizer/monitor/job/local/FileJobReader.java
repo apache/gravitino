@@ -17,7 +17,7 @@
  * under the License.
  */
 
-package org.apache.gravitino.maintenance.optimizer.monitor.job;
+package org.apache.gravitino.maintenance.optimizer.monitor.job.local;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.google.common.base.Preconditions;

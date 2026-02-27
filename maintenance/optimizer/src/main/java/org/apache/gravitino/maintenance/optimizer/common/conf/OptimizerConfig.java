@@ -27,7 +27,7 @@ import org.apache.gravitino.config.ConfigBuilder;
 import org.apache.gravitino.config.ConfigConstants;
 import org.apache.gravitino.config.ConfigEntry;
 import org.apache.gravitino.maintenance.optimizer.monitor.evaluator.GravitinoMetricsEvaluator;
-import org.apache.gravitino.maintenance.optimizer.monitor.job.DummyJobProvider;
+import org.apache.gravitino.maintenance.optimizer.monitor.job.dummy.DummyJobProvider;
 import org.apache.gravitino.maintenance.optimizer.monitor.metrics.GravitinoMetricsProvider;
 import org.apache.gravitino.maintenance.optimizer.recommender.job.NoopJobSubmitter;
 import org.apache.gravitino.maintenance.optimizer.recommender.statistics.GravitinoStatisticsProvider;

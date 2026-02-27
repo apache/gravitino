@@ -26,8 +26,8 @@ import org.apache.gravitino.maintenance.optimizer.api.recommender.StrategyProvid
 import org.apache.gravitino.maintenance.optimizer.api.recommender.TableMetadataProvider;
 import org.apache.gravitino.maintenance.optimizer.monitor.callback.ConsoleMonitorCallback;
 import org.apache.gravitino.maintenance.optimizer.monitor.callback.MonitorCallbackForTest;
-import org.apache.gravitino.maintenance.optimizer.monitor.job.DummyJobProvider;
 import org.apache.gravitino.maintenance.optimizer.monitor.job.JobProviderForTest;
+import org.apache.gravitino.maintenance.optimizer.monitor.job.dummy.DummyJobProvider;
 import org.apache.gravitino.maintenance.optimizer.monitor.metrics.MetricsProviderForTest;
 import org.apache.gravitino.maintenance.optimizer.recommender.job.GravitinoJobSubmitter;
 import org.apache.gravitino.maintenance.optimizer.recommender.job.NoopJobSubmitter;

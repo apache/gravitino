@@ -17,7 +17,7 @@
  * under the License.
  */
 
-package org.apache.gravitino.maintenance.optimizer.monitor.job;
+package org.apache.gravitino.maintenance.optimizer.monitor.job.local;
 
 import java.nio.file.Files;
 import java.nio.file.Path;
