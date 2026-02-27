@@ -17,7 +17,7 @@ Apache Gravitino provides the ability to manage OceanBase metadata.
 
 :::caution
 1. Gravitino saves some system information in schema and table comment, like `(From Gravitino, DO NOT EDIT: gravitino.v1.uid1078334182909406185)`, please don't change or remove this message.
-2. Since 1.2.0, Oceanbase catalog is not included in standard Gravitino distribution, but you can still build it from source if you need it. Check [build from source](./how-to-build.md) for more details.
+2. Since 1.2.0, OceanBase catalog is not included in standard Gravitino distribution, but you can still build it from source if you need it. Check [build from source](./how-to-build.md) for more details.
 :::
 
 ## Catalog

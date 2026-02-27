@@ -99,7 +99,7 @@ license: "This software is licensed under the Apache License version 2."
    ./gradlew compileDistribution
    ```
 
-  The `compileDistribution` command creates a `distribution` directory in the Gravitino root directory, it contains two subdirectories: `package` and `package-all`. The difference between these two subdirectories is that `package` only contains the Gravitino server distribution package, while `package-all` contains extra catalogs in `catalogs-contrib` and all contents in `package`. 
+   The `compileDistribution` command creates a `distribution` directory in the Gravitino root directory. It contains two subdirectories: `package` and `package-all`. The difference between these two subdirectories is that `package` only contains the Gravitino server distribution package, while `package-all` contains extra catalogs in `catalogs-contrib` and all contents in `package`.
 
   :::note
   The `./gradlew clean` command deletes the `distribution` directory.
