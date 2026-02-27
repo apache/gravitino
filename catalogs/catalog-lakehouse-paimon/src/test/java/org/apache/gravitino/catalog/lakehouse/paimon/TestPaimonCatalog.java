@@ -37,8 +37,12 @@ import org.apache.gravitino.catalog.lakehouse.paimon.ops.PaimonCatalogOps;
 import org.apache.gravitino.connector.CatalogOperations;
 import org.apache.gravitino.connector.HasPropertyMetadata;
 import org.apache.gravitino.connector.PropertiesMetadata;
+import org.apache.gravitino.credential.CredentialConstants;
+import org.apache.gravitino.credential.JdbcCredential;
+import org.apache.gravitino.credential.S3SecretKeyCredential;
 import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.meta.CatalogEntity;
+import org.apache.gravitino.storage.S3Properties;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
@@ -182,5 +186,141 @@ public class TestPaimonCatalog {
               .getMessage()
               .contains(PaimonCatalogPropertiesMetadata.GRAVITINO_CATALOG_BACKEND));
     }
+  }
+
+  @Test
+  void testJdbcBackendDefaultCredentialProviders() {
+    AuditInfo auditInfo =
+        AuditInfo.builder().withCreator("creator").withCreateTime(Instant.now()).build();
+
+    // Test JDBC backend with jdbc-user and jdbc-password
+    Map<String, String> jdbcProps = Maps.newHashMap();
+    jdbcProps.put(PaimonConstants.CATALOG_BACKEND, "jdbc");
+    jdbcProps.put(PaimonConstants.URI, "jdbc:sqlite::memory:");
+    jdbcProps.put(PaimonConstants.WAREHOUSE, tempDir);
+    jdbcProps.put(PaimonConstants.GRAVITINO_JDBC_USER, "test-user");
+    jdbcProps.put(PaimonConstants.GRAVITINO_JDBC_PASSWORD, "test-password");
+
+    CatalogEntity jdbcEntity =
+        CatalogEntity.builder()
+            .withId(1L)
+            .withName("jdbc-catalog")
+            .withNamespace(Namespace.of("metalake"))
+            .withType(PaimonCatalog.Type.RELATIONAL)
+            .withProvider("lakehouse-paimon")
+            .withAuditInfo(auditInfo)
+            .withProperties(jdbcProps)
+            .build();
+
+    PaimonCatalog jdbcCatalog =
+        new PaimonCatalog().withCatalogConf(jdbcProps).withCatalogEntity(jdbcEntity);
+    Map<String, String> properties = jdbcCatalog.properties();
+
+    // Should have jdbc credential provider
+    String credentialProviders = properties.get(CredentialConstants.CREDENTIAL_PROVIDERS);
+    Assertions.assertNotNull(credentialProviders);
+    Assertions.assertTrue(credentialProviders.contains(JdbcCredential.JDBC_CREDENTIAL_TYPE));
+  }
+
+  @Test
+  void testJdbcBackendWithS3CredentialProviders() {
+    AuditInfo auditInfo =
+        AuditInfo.builder().withCreator("creator").withCreateTime(Instant.now()).build();
+
+    // Test JDBC backend with jdbc-user, jdbc-password, and S3 credentials
+    Map<String, String> jdbcS3Props = Maps.newHashMap();
+    jdbcS3Props.put(PaimonConstants.CATALOG_BACKEND, "jdbc");
+    jdbcS3Props.put(PaimonConstants.URI, "jdbc:sqlite::memory:");
+    jdbcS3Props.put(PaimonConstants.WAREHOUSE, tempDir);
+    jdbcS3Props.put(PaimonConstants.GRAVITINO_JDBC_USER, "test-user");
+    jdbcS3Props.put(PaimonConstants.GRAVITINO_JDBC_PASSWORD, "test-password");
+    jdbcS3Props.put(S3Properties.GRAVITINO_S3_ACCESS_KEY_ID, "access-key");
+    jdbcS3Props.put(S3Properties.GRAVITINO_S3_SECRET_ACCESS_KEY, "secret-key");
+
+    CatalogEntity jdbcS3Entity =
+        CatalogEntity.builder()
+            .withId(2L)
+            .withName("jdbc-s3-catalog")
+            .withNamespace(Namespace.of("metalake"))
+            .withType(PaimonCatalog.Type.RELATIONAL)
+            .withProvider("lakehouse-paimon")
+            .withAuditInfo(auditInfo)
+            .withProperties(jdbcS3Props)
+            .build();
+
+    PaimonCatalog jdbcS3Catalog =
+        new PaimonCatalog().withCatalogConf(jdbcS3Props).withCatalogEntity(jdbcS3Entity);
+    Map<String, String> properties = jdbcS3Catalog.properties();
+
+    // Should have both jdbc and s3-secret-key credential providers
+    String credentialProviders = properties.get(CredentialConstants.CREDENTIAL_PROVIDERS);
+    Assertions.assertNotNull(credentialProviders);
+    Assertions.assertTrue(credentialProviders.contains(JdbcCredential.JDBC_CREDENTIAL_TYPE));
+    Assertions.assertTrue(
+        credentialProviders.contains(S3SecretKeyCredential.S3_SECRET_KEY_CREDENTIAL_TYPE));
+  }
+
+  @Test
+  void testNonJdbcBackendNoDefaultCredentialProviders() {
+    AuditInfo auditInfo =
+        AuditInfo.builder().withCreator("creator").withCreateTime(Instant.now()).build();
+
+    // Test non-JDBC backend (filesystem) - should not add default credential providers
+    Map<String, String> fsProps = Maps.newHashMap();
+    fsProps.put(PaimonConstants.CATALOG_BACKEND, "filesystem");
+    fsProps.put(PaimonConstants.WAREHOUSE, tempDir);
+
+    CatalogEntity fsEntity =
+        CatalogEntity.builder()
+            .withId(3L)
+            .withName("fs-catalog")
+            .withNamespace(Namespace.of("metalake"))
+            .withType(PaimonCatalog.Type.RELATIONAL)
+            .withProvider("lakehouse-paimon")
+            .withAuditInfo(auditInfo)
+            .withProperties(fsProps)
+            .build();
+
+    PaimonCatalog fsCatalog =
+        new PaimonCatalog().withCatalogConf(fsProps).withCatalogEntity(fsEntity);
+    Map<String, String> properties = fsCatalog.properties();
+
+    // Should not have credential providers for non-JDBC backend
+    String credentialProviders = properties.get(CredentialConstants.CREDENTIAL_PROVIDERS);
+    Assertions.assertNull(credentialProviders);
+  }
+
+  @Test
+  void testExplicitCredentialProvidersNotOverridden() {
+    AuditInfo auditInfo =
+        AuditInfo.builder().withCreator("creator").withCreateTime(Instant.now()).build();
+
+    // Test that explicit credential-providers setting is not overridden
+    Map<String, String> explicitProps = Maps.newHashMap();
+    explicitProps.put(PaimonConstants.CATALOG_BACKEND, "jdbc");
+    explicitProps.put(PaimonConstants.URI, "jdbc:sqlite::memory:");
+    explicitProps.put(PaimonConstants.WAREHOUSE, tempDir);
+    explicitProps.put(PaimonConstants.GRAVITINO_JDBC_USER, "test-user");
+    explicitProps.put(PaimonConstants.GRAVITINO_JDBC_PASSWORD, "test-password");
+    explicitProps.put(CredentialConstants.CREDENTIAL_PROVIDERS, "custom-provider");
+
+    CatalogEntity explicitEntity =
+        CatalogEntity.builder()
+            .withId(4L)
+            .withName("explicit-catalog")
+            .withNamespace(Namespace.of("metalake"))
+            .withType(PaimonCatalog.Type.RELATIONAL)
+            .withProvider("lakehouse-paimon")
+            .withAuditInfo(auditInfo)
+            .withProperties(explicitProps)
+            .build();
+
+    PaimonCatalog explicitCatalog =
+        new PaimonCatalog().withCatalogConf(explicitProps).withCatalogEntity(explicitEntity);
+    Map<String, String> properties = explicitCatalog.properties();
+
+    // Should keep explicit credential providers, not override
+    String credentialProviders = properties.get(CredentialConstants.CREDENTIAL_PROVIDERS);
+    Assertions.assertEquals("custom-provider", credentialProviders);
   }
 }
