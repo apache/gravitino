@@ -99,7 +99,7 @@ license: "This software is licensed under the Apache License version 2."
    ./gradlew compileDistribution
    ```
 
-  The `compileDistribution` command creates a `distribution` directory in the Gravitino root directory.
+  The `compileDistribution` command creates a `distribution` directory in the Gravitino root directory, it contains two subdirectories: `package` and `package-all`. The difference between these two subdirectories is that `package` only contains the Gravitino server distribution package, while `package-all` contains extra catalogs in `catalogs-contrib` and all contents in `package`. 
 
   :::note
   The `./gradlew clean` command deletes the `distribution` directory.
@@ -111,7 +111,9 @@ license: "This software is licensed under the Apache License version 2."
    ./gradlew assembleDistribution
    ```
 
-  The `assembleDistribution` command creates `gravitino-{version}-bin.tar.gz` and `gravitino-{version}-bin.tar.gz.sha256` under the `distribution` directory.
+  The `assembleDistribution` command creates `gravitino-{version}-bin.tar.gz`, `gravitino-{version}-bin.tar.gz.sha256`, `gravitino-all-{version}-bin.tar.gz`, `gravitino-all-{version}-bin.tar.gz.sha256` under the `distribution` directory.
+
+  About the difference between `gravitino-{version}-bin.tar.gz` and `gravitino-all-{version}-bin.tar.gz`, please refer to the explanation of the difference between `package` and `package-all` in the previous step.
 
   You can deploy these to your production environment.
 
