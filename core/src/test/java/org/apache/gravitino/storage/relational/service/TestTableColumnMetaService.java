@@ -530,7 +530,7 @@ public class TestTableColumnMetaService extends TestJDBCBackend {
   }
 
   @TestTemplate
-  public void testGetColumnIdByNamePrefersNonDeleteRecordInSameVersion() throws IOException {
+  public void testGetColumnIdByNamePrefersNonDeletedRecordInSameVersion() throws IOException {
     String catalogName = "catalog1";
     String schemaName = "schema1";
     createParentEntities(METALAKE_NAME, catalogName, schemaName, AUDIT_INFO);
