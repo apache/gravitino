@@ -343,6 +343,8 @@ export default function CreateCatalogDialog({ ...props }) {
           return <Icons.paimon className={small ? 'size-6' : 'size-12'}></Icons.paimon>
         case 'custom-icons-hudi':
           return <Icons.hudi className={small ? 'size-6' : 'size-12'}></Icons.hudi>
+        case 'custom-icons-hologres':
+          return <Icons.hologres className={small ? 'size-6' : 'size-12'}></Icons.hologres>
         case 'custom-icons-oceanbase':
           return <Icons.oceanbase className={small ? 'size-6' : 'size-12'}></Icons.oceanbase>
         case 'custom-icons-starrocks':

@@ -79,6 +79,7 @@ Gravitino currently supports the following catalogs:
 **Relational catalogs:**
 
 * [**Doris catalog**](./jdbc-doris-catalog.md)
+* [**Hologres catalog**](./jdbc-hologres-catalog.md)
 * [**Hudi catalog**](./lakehouse-hudi-catalog.md)
 * [**Hive catalog**](./apache-hive-catalog.md)
 * [**Iceberg catalog**](./lakehouse-iceberg-catalog.md)
@@ -125,6 +126,7 @@ complete environment. To experience all the features, see
 Gravitino supports different catalogs to manage the metadata in different sources. Please see:
 
 * [Doris catalog](./jdbc-doris-catalog.md): a complete guide to using Gravitino to manage Doris data.
+* [Hologres catalog](./jdbc-hologres-catalog.md): a complete guide to using Gravitino to manage Hologres data.
 * [StarRocks catalog](./jdbc-starrocks-catalog.md): a complete guide to using Gravitino to manage StarRocks data.
 * [Fileset catalog](./fileset-catalog.md): a complete guide to using Gravitino to manage fileset
   using Hadoop Compatible File System (HCFS).

@@ -162,7 +162,7 @@ Creating a catalog requires these fields:
 1. **Catalog name**(**_required_**): the name of the catalog
 2. **Type**(**_required_**): `relational`/`fileset`/`messaging`/`model`, the default value is `relational`
 3. **Provider**(**_required_**):
-    1. Type `relational` - `hive`/`iceberg`/`mysql`/`postgresql`/`doris`/`paimon`/`hudi`/`oceanbase`
+    1. Type `relational` - `hive`/`iceberg`/`mysql`/`postgresql`/`doris`/`paimon`/`hudi`/`oceanbase`/`hologres`
     2. Type `fileset` has no provider
     3. Type `messaging` - `kafka`
     4. Type `model` has no provider
@@ -347,6 +347,18 @@ Creating a catalog requires these fields:
     |jdbc-url     |e.g. jdbc:mysql://localhost:2881 or jdbc:oceanbase://localhost:2881                |
     |jdbc-user    |The JDBC user name                                                                 |
     |jdbc-password|The JDBC password                                                                  |
+
+  </TabItem>
+  <TabItem value='Hologres' label='Hologres'>
+    Follow the [jdbc-hologres-catalog](./jdbc-hologres-catalog.md) document.
+
+    |Key          |Description                                                                                       |
+    |-------------|--------------------------------------------------------------------------------------------------|
+    |jdbc-driver  |e.g. `org.postgresql.Driver`                                                                      |
+    |jdbc-url     |e.g. `jdbc:postgresql://hgprecn-cn-xxx.hologres.aliyuncs.com:80/my_database`                      |
+    |jdbc-user    |The JDBC user name (AccessKey ID or database username)                                            |
+    |jdbc-password|The JDBC password (AccessKey Secret or database password)                                         |
+    |jdbc-database|e.g. `my_database`                                                                                |
 
   </TabItem>
 </Tabs>
