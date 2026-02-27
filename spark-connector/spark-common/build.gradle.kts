@@ -49,10 +49,7 @@ dependencies {
   implementation(libs.guava)
   implementation(libs.caffeine)
 
-  compileOnly(project(":api"))
-  compileOnly(project(":clients:client-java"))
-  compileOnly(project(":common"))
-
+  compileOnly(project(":clients:client-java-runtime", configuration = "shadow"))
   compileOnly("org.apache.iceberg:iceberg-spark-runtime-${sparkMajorVersion}_$scalaVersion:$icebergVersion")
   compileOnly("org.apache.kyuubi:kyuubi-spark-connector-hive_$scalaVersion:$kyuubiVersion")
   compileOnly("org.apache.spark:spark-catalyst_$scalaVersion:$sparkVersion")

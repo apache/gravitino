@@ -46,9 +46,7 @@ dependencies {
   }
   implementation(libs.guava)
 
-  compileOnly(project(":api"))
-  compileOnly(project(":clients:client-java"))
-  compileOnly(project(":common"))
+  compileOnly(project(":clients:client-java-runtime", configuration = "shadow"))
 
   compileOnly("org.apache.iceberg:iceberg-flink-runtime-$flinkMajorVersion:$icebergVersion")
   compileOnly("org.apache.flink:flink-connector-hive_$scalaVersion:$flinkVersion")

@@ -57,12 +57,6 @@ dependencies {
   testImplementation(project(":bundles:gcp-bundle", configuration = "shadow"))
   testImplementation(project(":bundles:aliyun-bundle", configuration = "shadow"))
   testImplementation(project(":bundles:azure-bundle", configuration = "shadow"))
-
-  testCompileOnly(project(":bundles:aws"))
-  testCompileOnly(project(":bundles:gcp"))
-  testCompileOnly(project(":bundles:aliyun"))
-  testCompileOnly(project(":bundles:azure"))
-
   testImplementation(project(":integration-test-common", "testArtifacts"))
   testImplementation(project(":server"))
   testImplementation(project(":server-common"))
