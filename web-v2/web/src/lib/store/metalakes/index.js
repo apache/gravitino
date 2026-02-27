@@ -79,16 +79,13 @@ import {
 } from '@/lib/api/models'
 import { getFunctionsApi } from '@/lib/api/functions'
 
-const remapExpandedAndLoadedNodes = ({ getState, mapNode, expandedFilter, loadedFilter }) => {
-  const originalExpandedNodes = getState().metalakes.expandedNodes
-  const originalLoadedNodes = getState().metalakes.loadedNodes
-
-  const filteredExpandedNodes = expandedFilter ? originalExpandedNodes.filter(expandedFilter) : originalExpandedNodes
-  const filteredLoadedNodes = loadedFilter ? originalLoadedNodes.filter(loadedFilter) : originalLoadedNodes
+const remapExpandedAndLoadedNodes = ({ getState, mapNode }) => {
+  const expandedNodes = getState().metalakes.expandedNodes.map(mapNode)
+  const loadedNodes = getState().metalakes.loadedNodes.map(mapNode)
 
   return {
-    expanded: filteredExpandedNodes.map(mapNode),
-    loaded: filteredLoadedNodes.map(mapNode)
+    expanded: expandedNodes,
+    loaded: loadedNodes
   }
 }
 
@@ -747,9 +744,7 @@ export const updateCatalog = createAsyncThunk(
             return `{{${currentMetalake}}}{{${res.catalog.name}}}{{${res.catalog.type}}}${
               currentSchema ? `{{${currentSchema}}}` : ''
             }${entity ? `{{${entity}}}` : ''}`
-          },
-          expandedFilter: node => !node.includes(`{{${catalog}}}`),
-          loadedFilter: node => !node.includes(`{{${catalog}}}`)
+          }
         })
 
         dispatch(setExpanded(expanded))
@@ -969,9 +964,7 @@ export const updateSchema = createAsyncThunk(
             }
 
             return node
-          },
-          expandedFilter: node => !node.startsWith(`{{${metalake}}}{{${catalog}}}{{${catalogType}}}{{${schema}}}`),
-          loadedFilter: node => !node.startsWith(`{{${metalake}}}{{${catalog}}}{{${catalogType}}}{{${schema}}}`)
+          }
         })
 
         dispatch(setExpanded(expanded))
@@ -1285,11 +1278,7 @@ export const updateTable = createAsyncThunk(
             }
 
             return node
-          },
-          expandedFilter: node =>
-            !node.startsWith(`{{${metalake}}}{{${catalog}}}{{${catalogType}}}{{${schema}}}{{${table}}}`),
-          loadedFilter: node =>
-            !node.startsWith(`{{${metalake}}}{{${catalog}}}{{${catalogType}}}{{${schema}}}{{${table}}}`)
+          }
         })
 
         dispatch(setExpanded(expanded))
@@ -1512,11 +1501,7 @@ export const updateFileset = createAsyncThunk(
             }
 
             return node
-          },
-          expandedFilter: node =>
-            !node.startsWith(`{{${metalake}}}{{${catalog}}}{{${catalogType}}}{{${schema}}}{{${fileset}}}`),
-          loadedFilter: node =>
-            !node.startsWith(`{{${metalake}}}{{${catalog}}}{{${catalogType}}}{{${schema}}}{{${fileset}}}`)
+          }
         })
 
         dispatch(setExpanded(expanded))
@@ -1754,11 +1739,7 @@ export const updateTopic = createAsyncThunk(
             }
 
             return node
-          },
-          expandedFilter: node =>
-            !node.startsWith(`{{${metalake}}}{{${catalog}}}{{${catalogType}}}{{${schema}}}{{${topic}}}`),
-          loadedFilter: node =>
-            !node.startsWith(`{{${metalake}}}{{${catalog}}}{{${catalogType}}}{{${schema}}}{{${topic}}}`)
+          }
         })
 
         dispatch(setExpanded(expanded))
@@ -1962,11 +1943,7 @@ export const updateModel = createAsyncThunk(
             }
 
             return node
-          },
-          expandedFilter: node =>
-            !node.startsWith(`{{${metalake}}}{{${catalog}}}{{${catalogType}}}{{${schema}}}{{${model}}}`),
-          loadedFilter: node =>
-            !node.startsWith(`{{${metalake}}}{{${catalog}}}{{${catalogType}}}{{${schema}}}{{${model}}}`)
+          }
         })
 
         dispatch(setExpanded(expanded))
