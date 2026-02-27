@@ -671,6 +671,48 @@ public class TableOperationDispatcher extends OperationDispatcher implements Tab
         && Objects.equal(left.defaultValue(), right.defaultValue());
   }
 
+  private String columnDifferenceContent(
+      Column catalogColumn, int catalogPosition, ColumnEntity entityColumn) {
+    List<String> differences = Lists.newArrayList();
+    if (!Objects.equal(catalogColumn.name(), entityColumn.name())) {
+      differences.add(
+          String.format("name[catalog=%s, store=%s]", catalogColumn.name(), entityColumn.name()));
+    }
+    if (catalogPosition != entityColumn.position()) {
+      differences.add(
+          String.format(
+              "position[catalog=%s, store=%s]", catalogPosition, entityColumn.position()));
+    }
+    if (!Objects.equal(catalogColumn.dataType(), entityColumn.dataType())) {
+      differences.add(
+          String.format(
+              "type[catalog=%s, store=%s]", catalogColumn.dataType(), entityColumn.dataType()));
+    }
+    if (!Objects.equal(catalogColumn.comment(), entityColumn.comment())) {
+      differences.add(
+          String.format(
+              "comment[catalog=%s, store=%s]", catalogColumn.comment(), entityColumn.comment()));
+    }
+    if (catalogColumn.nullable() != entityColumn.nullable()) {
+      differences.add(
+          String.format(
+              "nullable[catalog=%s, store=%s]", catalogColumn.nullable(), entityColumn.nullable()));
+    }
+    if (catalogColumn.autoIncrement() != entityColumn.autoIncrement()) {
+      differences.add(
+          String.format(
+              "autoIncrement[catalog=%s, store=%s]",
+              catalogColumn.autoIncrement(), entityColumn.autoIncrement()));
+    }
+    if (!Objects.equal(catalogColumn.defaultValue(), entityColumn.defaultValue())) {
+      differences.add(
+          String.format(
+              "defaultValue[catalog=%s, store=%s]",
+              catalogColumn.defaultValue(), entityColumn.defaultValue()));
+    }
+    return String.join(", ", differences);
+  }
+
   private Pair<Boolean, List<ColumnEntity>> updateColumnsIfNecessary(
       Table tableFromCatalog, TableEntity tableFromGravitino) {
     if (tableFromCatalog == null || tableFromGravitino == null) {
@@ -705,11 +747,12 @@ public class TableOperationDispatcher extends OperationDispatcher implements Tab
         columnsNeedsUpdate = true;
 
       } else if (!isSameColumn(columnPair.getRight(), columnPair.getLeft(), entry.getValue())) {
-        // If the column need to be updated, we create a new ColumnEntity with the same id
+        // Add debug log to print the difference between the two columns
         LOG.debug(
             "Column {} is found in the table from underlying source, but it is different "
-                + "from the one in the table entity, it will be updated",
-            entry.getKey());
+                + "from the one in the table entity, it will be updated, differences: {}",
+            entry.getKey(),
+            columnDifferenceContent(columnPair.getRight(), columnPair.getLeft(), entry.getValue()));
 
         Column column = columnPair.getRight();
         ColumnEntity updatedColumnEntity =
@@ -744,9 +787,10 @@ public class TableOperationDispatcher extends OperationDispatcher implements Tab
     for (Map.Entry<String, Pair<Integer, Column>> entry : columnsFromCatalogTable.entrySet()) {
       if (!columnsFromTableEntity.containsKey(entry.getKey())) {
         LOG.debug(
-            "Column {} is found in the table from underlying source but not in the table "
+            "Column {} of table: {} is found in the table from underlying source but not in the table "
                 + "entity, it will be added to the table entity",
-            entry.getKey());
+            entry.getKey(),
+            tableFromGravitino.id());
         ColumnEntity newColumnEntity =
             ColumnEntity.toColumnEntity(
                 entry.getValue().getRight(),
