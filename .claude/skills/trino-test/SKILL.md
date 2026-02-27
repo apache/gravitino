@@ -88,15 +88,13 @@ cd /home/ubuntu/git/gravitino
   --auto=all  --test_set=tpch --catalog=hive
 
 
-### Test with Trino 452
+### Test specific Trino version with specific trino connector
 ```bash
 ./trino-connector/integration-test/trino-test-tools/trino_integration_test.sh \
   --auto=all \
-  --trino_version=452 \
-  --trino_connector_dir=/home/ubuntu/git/gravitino/trino-connector/trino-connector-452-468/build/libs
+  --trino_version=<VERSION> \
+  --trino_connector_dir=<WORKSPACE>/trino-connector/trino-connector-<VERSION_RANGE>/build/libs
 ```
-
----
 
 ## Check test status
 

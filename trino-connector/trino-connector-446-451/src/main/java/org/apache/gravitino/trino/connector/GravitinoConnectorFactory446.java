@@ -40,11 +40,6 @@ public class GravitinoConnectorFactory446 extends GravitinoConnectorFactory {
   }
 
   @Override
-  protected String getTrinoCatalogName(String metalake, String catalog) {
-    return "\"" + metalake + "." + catalog + "\"";
-  }
-
-  @Override
   protected boolean supportCatalogNameWithMetalake() {
     return true;
   }
