@@ -20,6 +20,7 @@ package org.apache.gravitino.integration.test.container;
 
 import static java.lang.String.format;
 
+import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
 import java.sql.Connection;
 import java.sql.DriverManager;
@@ -43,8 +44,12 @@ public class ClickHouseContainer extends BaseContainer {
   public static final String DEFAULT_IMAGE = "clickhouse:24.8.14";
   public static final String HOST_NAME = "gravitino-ci-clickhouse";
   public static final int CLICKHOUSE_PORT = 8123;
+  public static final int CLICKHOUSE_NATIVE_PORT = 9000;
   public static final String USER_NAME = "default";
   public static final String PASSWORD = "default";
+  public static final String DEFAULT_CLUSTER_NAME = "gravitino_cluster";
+  public static final String ZOOKEEPER_HOST_KEY = "ZOOKEEPER_HOST";
+  public static final String ZOOKEEPER_PORT_KEY = "ZOOKEEPER_PORT";
 
   public static Builder builder() {
     return new Builder();
@@ -116,7 +121,8 @@ public class ClickHouseContainer extends BaseContainer {
       LOG.info(
           String.format("clickHouse container database %s has been created", testDatabaseName));
     } catch (Exception e) {
-      LOG.error(e.getMessage(), e);
+      throw new RuntimeException(
+          "Failed to create database on clickHouse container: " + e.getMessage(), e);
     }
   }
 
@@ -141,7 +147,32 @@ public class ClickHouseContainer extends BaseContainer {
     return DriverManager.getDriver(getJdbcUrl(testDatabaseName)).getClass().getName();
   }
 
+  public void createDatabaseOnCluster(TestDatabaseName testDatabaseName, String clusterName) {
+    String clickHouseJdbcUrl =
+        StringUtils.substring(
+            getJdbcUrl(testDatabaseName), 0, getJdbcUrl(testDatabaseName).lastIndexOf("/"));
+
+    try (Connection connection =
+            DriverManager.getConnection(clickHouseJdbcUrl, USER_NAME, getPassword());
+        Statement statement = connection.createStatement()) {
+
+      String query =
+          String.format(
+              "CREATE DATABASE IF NOT EXISTS %s ON CLUSTER %s;", testDatabaseName, clusterName);
+      statement.execute(query);
+      LOG.info(
+          String.format(
+              "clickHouse cluster database %s has been created with cluster %s",
+              testDatabaseName, clusterName));
+    } catch (Exception e) {
+      throw new RuntimeException(
+          "Failed to create database on clickHouse cluster: " + e.getMessage(), e);
+    }
+  }
+
   public static class Builder extends BaseContainer.Builder<Builder, ClickHouseContainer> {
+
+    private String remoteServersConfigPath;
 
     private Builder() {
       this.image = DEFAULT_IMAGE;
@@ -149,10 +180,28 @@ public class ClickHouseContainer extends BaseContainer {
       this.exposePorts = ImmutableSet.of(CLICKHOUSE_PORT);
     }
 
+    public Builder withRemoteServersConfig(String configPath) {
+      this.remoteServersConfigPath = configPath;
+      return this;
+    }
+
     @Override
     public ClickHouseContainer build() {
+      ImmutableSet<Integer> ports =
+          remoteServersConfigPath == null
+              ? ImmutableSet.copyOf(exposePorts)
+              : ImmutableSet.of(CLICKHOUSE_PORT, CLICKHOUSE_NATIVE_PORT);
+      ImmutableMap<String, String> mountFiles =
+          remoteServersConfigPath == null
+              ? ImmutableMap.copyOf(filesToMount)
+              : ImmutableMap.<String, String>builder()
+                  .putAll(filesToMount)
+                  .put(
+                      "/etc/clickhouse-server/config.d/remote_servers.xml", remoteServersConfigPath)
+                  .build();
+
       return new ClickHouseContainer(
-          image, hostName, exposePorts, extraHosts, filesToMount, envVars, network);
+          image, hostName, ports, extraHosts, mountFiles, envVars, network);
     }
   }
 }
