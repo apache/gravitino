@@ -15,6 +15,10 @@ import TabItem from '@theme/TabItem';
 
 Apache Gravitino can manage ClickHouse metadata through a JDBC catalog. This document describes the capabilities and limitations of the ClickHouse catalog, as well as the supported operations and properties for catalogs, schemas, and tables.
 
+:::caution
+ClickHouse catalog is not included in the standard Gravitino server distribution due to the large size of the ClickHouse JDBC driver and potential licensing issues. To use the ClickHouse catalog, you can build from source code, and refer to document [how-to-build](./how-to-build.md) for more details.
+:::
+
 ## Catalog
 
 ### Catalog capabilities
