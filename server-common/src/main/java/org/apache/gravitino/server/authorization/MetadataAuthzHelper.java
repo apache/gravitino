@@ -374,7 +374,7 @@ public class MetadataAuthzHelper {
       Namespace firstNamespace = nameIdentifiers[0].namespace();
       Preconditions.checkArgument(
           Arrays.stream(nameIdentifiers).allMatch(id -> id.namespace().equals(firstNamespace)),
-          "All identifiers must have the same namespace for batch get operation");
+          "All identifiers must have the same schema");
 
       if (!GravitinoEnv.getInstance()
           .schemaDispatcher()
