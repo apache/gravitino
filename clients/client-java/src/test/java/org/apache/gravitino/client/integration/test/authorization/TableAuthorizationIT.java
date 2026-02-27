@@ -146,6 +146,7 @@ public class TableAuthorizationIT extends BaseRestApiAuthorizationIT {
     // ISSUE-9982: Schema default isn't imported before
     tableCatalog.createTable(
         NameIdentifier.of("default", "table2"), createColumns(), "test", new HashMap<>());
+    tableCatalog.dropTable(NameIdentifier.of("default", "table2"));
 
     // normal user cannot create table
     TableCatalog tableCatalogNormalUser =
