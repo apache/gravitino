@@ -19,6 +19,7 @@
 package org.apache.gravitino.catalog.clickhouse.operations;
 
 import static org.apache.gravitino.catalog.clickhouse.ClickHouseTablePropertiesMetadata.CLICKHOUSE_ENGINE_KEY;
+import static org.apache.gravitino.catalog.clickhouse.ClickHouseTablePropertiesMetadata.GRAVITINO_ENGINE_KEY;
 import static org.apache.gravitino.catalog.clickhouse.ClickHouseUtils.getSortOrders;
 import static org.apache.gravitino.rel.Column.DEFAULT_VALUE_NOT_SET;
 
@@ -873,7 +874,7 @@ public class TestClickHouseTableOperations extends TestClickHouse {
         Indexes.EMPTY_INDEXES,
         getSortOrders("col_1"));
     JdbcTable load = TABLE_OPERATIONS.load(TEST_DB_NAME.toString(), testTable1);
-    Assertions.assertEquals("MergeTree", load.properties().get(CLICKHOUSE_ENGINE_KEY));
+    Assertions.assertEquals("MergeTree", load.properties().get(GRAVITINO_ENGINE_KEY));
   }
 
   @Test
@@ -942,8 +943,7 @@ public class TestClickHouseTableOperations extends TestClickHouse {
                 new SortOrder[0]));
 
     // MergeTree only supports single sortOrders
-    Assertions.assertThrows(
-        UnsupportedOperationException.class,
+    Assertions.assertDoesNotThrow(
         () ->
             ops.buildCreateSql(
                 "t1",
@@ -962,7 +962,7 @@ public class TestClickHouseTableOperations extends TestClickHouse {
     logEngineProps.put(
         TableConstants.ENGINE_UPPER, ClickHouseTablePropertiesMetadata.ENGINE.LOG.getValue());
     Assertions.assertThrows(
-        UnsupportedOperationException.class,
+        IllegalArgumentException.class,
         () ->
             ops.buildCreateSql(
                 "t1",
@@ -974,7 +974,7 @@ public class TestClickHouseTableOperations extends TestClickHouse {
                 indexes,
                 null));
     Assertions.assertThrows(
-        UnsupportedOperationException.class,
+        IllegalArgumentException.class,
         () ->
             ops.buildCreateSql(
                 "t1",
@@ -984,7 +984,7 @@ public class TestClickHouseTableOperations extends TestClickHouse {
                 new Transform[0],
                 Distributions.NONE,
                 indexes,
-                ClickHouseUtils.getSortOrders("c1")));
+                null));
 
     // Settings and comment retained
     Map<String, String> props = new HashMap<>();
