@@ -39,6 +39,12 @@ public class TestVersion {
         GravitinoRuntimeException.class, () -> Version.parseVersionNumber("1.1.0rc"));
     Assertions.assertThrowsExactly(
         GravitinoRuntimeException.class, () -> Version.parseVersionNumber("1.1.0rc-1"));
+    Assertions.assertThrowsExactly(
+        GravitinoRuntimeException.class, () -> Version.parseVersionNumber("1.1.0rc01"));
+    Assertions.assertThrowsExactly(
+        GravitinoRuntimeException.class, () -> Version.parseVersionNumber("1.1.0rc001"));
+    Assertions.assertThrowsExactly(
+        GravitinoRuntimeException.class, () -> Version.parseVersionNumber("1.1.0rc11xx"));
   }
 
   @Test

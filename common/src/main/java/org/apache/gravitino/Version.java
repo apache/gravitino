@@ -36,7 +36,7 @@ public class Version {
 
   private static final int VERSION_PART_NUMBER = 3;
   private static final Pattern PATTERN =
-      Pattern.compile("^(\\d+)\\.(\\d+)\\.(\\d+)(?:rc(\\d{1,9})|-.*|\\.([a-zA-Z].*))?$");
+      Pattern.compile("^(\\d+)\\.(\\d+)\\.(\\d+)(?:rc(0|[1-9]\\d*)|-.*|\\.([a-zA-Z].*))?$");
 
   private static final Version INSTANCE = new Version();
 
