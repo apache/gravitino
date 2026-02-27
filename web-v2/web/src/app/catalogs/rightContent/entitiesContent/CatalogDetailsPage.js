@@ -174,7 +174,7 @@ export default function CatalogDetailsPage() {
   const tabOptions = anthEnable
     ? [
         { label: 'Schemas', key: 'Schemas' },
-        { label: 'Associated roles', key: 'Associated roles' }
+        { label: 'Associated Roles', key: 'Associated Roles' }
       ]
     : [{ label: 'Schemas', key: 'Schemas' }]
 
@@ -500,6 +500,7 @@ export default function CatalogDetailsPage() {
               catalogType={catalogType}
               provider={store.activatedDetails?.provider}
               locationProviders={store.activatedDetails?.properties?.['filesystem-providers']?.split(',') || []}
+              catalogBackend={store.activatedDetails?.properties?.['catalog-backend']}
               editSchema={editSchema}
             />
           )}

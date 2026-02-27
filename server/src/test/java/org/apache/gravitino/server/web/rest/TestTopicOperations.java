@@ -43,6 +43,7 @@ import org.apache.gravitino.Audit;
 import org.apache.gravitino.Config;
 import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.NameIdentifier;
+import org.apache.gravitino.catalog.SchemaDispatcher;
 import org.apache.gravitino.catalog.TopicDispatcher;
 import org.apache.gravitino.catalog.TopicOperationDispatcher;
 import org.apache.gravitino.dto.messaging.TopicDTO;
@@ -79,6 +80,7 @@ public class TestTopicOperations extends BaseOperationsTest {
     }
   }
 
+  private static SchemaDispatcher schemaDispatcher = mock(SchemaDispatcher.class);
   private TopicOperationDispatcher dispatcher = mock(TopicOperationDispatcher.class);
   private final String metalake = "metalake";
   private final String catalog = "catalog1";
@@ -94,6 +96,8 @@ public class TestTopicOperations extends BaseOperationsTest {
     Mockito.doReturn(false).when(config).get(ENABLE_AUTHORIZATION);
     FieldUtils.writeField(GravitinoEnv.getInstance(), "config", config, true);
     FieldUtils.writeField(GravitinoEnv.getInstance(), "lockManager", new LockManager(config), true);
+    FieldUtils.writeField(GravitinoEnv.getInstance(), "schemaDispatcher", schemaDispatcher, true);
+    Mockito.doReturn(true).when(schemaDispatcher).schemaExists(any());
   }
 
   @Override
