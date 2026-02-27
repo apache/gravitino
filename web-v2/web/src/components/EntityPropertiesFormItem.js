@@ -34,6 +34,7 @@ export default function RenderPropertiesFormItem({ ...props }) {
   const { fields, subOpt, form, isEdit, isDisable, provider, selectBefore } = props
   const disableTableLevelPro = (provider && getPropInfo(provider).immutable) || []
   const reservedPro = provider ? getPropInfo(provider).reserved : []
+  const allowDeletePro = provider ? getPropInfo(provider).allowDelete : true
   const auth = useAppSelector(state => state.auth)
   const { systemConfig } = auth
 
@@ -106,7 +107,8 @@ export default function RenderPropertiesFormItem({ ...props }) {
   }
 
   const handlePropertiesKey = (e, index) => {
-    if (isEdit) return
+    const isFieldEdit = !!form.getFieldValue(['properties', index, 'isEdit'])
+    if (isFieldEdit) return
     const key = e.target.value
 
     const locationProviders =
@@ -131,155 +133,159 @@ export default function RenderPropertiesFormItem({ ...props }) {
 
   return (
     <div className='flex flex-col gap-2'>
-      {fields.map(subField => (
-        <Form.Item label={null} className='align-items-center mb-1' key={subField.key}>
-          <Flex gap='small' align='start'>
-            <Form.Item
-              name={[subField.name, 'key']}
-              className='mb-0 w-full grow'
-              label=''
-              data-refer={`props-key-${subField.name}`}
-              data-testid={`props-key-${subField.name}`}
-              rules={[
-                {
-                  pattern: new RegExp(keyRegex),
-                  message: mismatchForKey
-                },
-                ({ getFieldValue }) => ({
-                  validator(_, key) {
-                    if (getFieldValue('properties').length) {
-                      if (key) {
-                        let keys = getFieldValue('properties').map(p => p?.key)
-                        keys.splice(subField.name, 1)
-                        if (keys.includes(key)) {
-                          return Promise.reject(new Error('The key already exists!'))
-                        }
-                        if (reservedPro.includes(key) && !isEdit) {
-                          return Promise.reject(new Error('The key is reserved!'))
-                        }
-                        if (defaultPro[key]) {
-                          const { value, select, disabled, description } = defaultPro[key]
-                          form.setFieldValue(['properties', subField.name, 'select'], select)
-                          form.setFieldValue(['properties', subField.name, 'description'], description)
-                          !form.getFieldValue(['properties', subField.name, 'value']) &&
-                            value &&
-                            form.setFieldValue(['properties', subField.name, 'value'], value)
-                          form.setFieldValue(['properties', subField.name, 'disabled'], disabled)
-                        } else {
-                          form.setFieldValue(['properties', subField.name, 'select'], undefined)
-                          form.setFieldValue(['properties', subField.name, 'description'], '')
-                          form.setFieldValue(['properties', subField.name, 'disabled'], false)
-                        }
+      {fields.map(subField => {
+        const isFieldEdit = !!form.getFieldValue(['properties', subField.name, 'isEdit'])
 
-                        return Promise.resolve()
-                      } else {
-                        return Promise.reject(new Error('The key is required!'))
-                      }
-                    }
-                  }
-                })
-              ]}
-            >
-              <Input
-                placeholder={'Key'}
-                disabled={
-                  ([...reservedPro, ...disableTableLevelPro].includes(
-                    form.getFieldValue(['properties', subField.name, 'key'])
-                  ) &&
-                    isEdit) ||
-                  isDisable
-                }
-                onChange={e => handlePropertiesKey(e, subField.name)}
-              />
-            </Form.Item>
-            <span className='w-full'>
+        return (
+          <Form.Item label={null} className='align-items-center mb-1' key={subField.key}>
+            <Flex gap='small' align='start'>
               <Form.Item
-                name={[subField.name, 'value']}
+                name={[subField.name, 'key']}
                 className='mb-0 w-full grow'
                 label=''
-                data-refer={`props-value-${subField.name}`}
-                data-testid={`props-value-${subField.name}`}
+                data-refer={`props-key-${subField.name}`}
+                data-testid={`props-key-${subField.name}`}
+                rules={[
+                  {
+                    pattern: new RegExp(keyRegex),
+                    message: mismatchForKey
+                  },
+                  ({ getFieldValue }) => ({
+                    validator(_, key) {
+                      if (getFieldValue('properties').length) {
+                        if (key) {
+                          let keys = getFieldValue('properties').map(p => p?.key)
+                          keys.splice(subField.name, 1)
+                          if (keys.includes(key)) {
+                            return Promise.reject(new Error('The key already exists!'))
+                          }
+                          if (reservedPro.includes(key) && !isFieldEdit) {
+                            return Promise.reject(new Error('The key is reserved!'))
+                          }
+                          if (defaultPro[key]) {
+                            const { value, select, disabled, description } = defaultPro[key]
+                            form.setFieldValue(['properties', subField.name, 'select'], select)
+                            form.setFieldValue(['properties', subField.name, 'description'], description)
+                            !form.getFieldValue(['properties', subField.name, 'value']) &&
+                              value &&
+                              form.setFieldValue(['properties', subField.name, 'value'], value)
+                            form.setFieldValue(['properties', subField.name, 'disabled'], disabled)
+                          } else {
+                            form.setFieldValue(['properties', subField.name, 'select'], undefined)
+                            form.setFieldValue(['properties', subField.name, 'description'], '')
+                            form.setFieldValue(['properties', subField.name, 'disabled'], false)
+                          }
+
+                          return Promise.resolve()
+                        } else {
+                          return Promise.reject(new Error('The key is required!'))
+                        }
+                      }
+                    }
+                  })
+                ]}
               >
-                {form.getFieldValue(['properties', subField.name, 'select']) ? (
-                  <Select
-                    className='flex-none'
-                    mode={form.getFieldValue(['properties', subField.name, 'multiple']) ? 'multiple' : undefined}
-                    disabled={form.getFieldValue(['properties', subField.name, 'disabled'])}
-                    placeholder={
-                      form.getFieldValue(['properties', subField.name, 'description'])
-                        ? `${form.getFieldValue(['properties', subField.name, 'description'])}`
-                        : 'Value'
-                    }
-                  >
-                    {form.getFieldValue(['properties', subField.name, 'select']).map(item => (
-                      <Select.Option value={item} key={item}>
-                        {item}
-                      </Select.Option>
-                    ))}
-                  </Select>
-                ) : (
-                  <Input
-                    placeholder={
-                      form.getFieldValue(['properties', subField.name, 'description'])
-                        ? `${form.getFieldValue(['properties', subField.name, 'description'])}`
-                        : 'Value'
-                    }
-                    disabled={
-                      ([...reservedPro, ...disableTableLevelPro].includes(
-                        form.getFieldValue(['properties', subField.name, 'key'])
-                      ) &&
-                        isEdit) ||
-                      isDisable ||
-                      form.getFieldValue(['properties', subField.name, 'disabled'])
-                    }
-                    type={
-                      form.getFieldValue(['properties', subField.name, 'key'])?.includes('password')
-                        ? 'password'
-                        : 'text'
-                    }
-                    addonBefore={
-                      form.getFieldValue(['properties', subField.name, 'selectBefore']) ? (
-                        <Select
-                          value={form.getFieldValue(['properties', subField.name, 'prefix'])}
-                          key={form.getFieldValue(['properties', subField.name, 'selectBefore']).join(',')}
-                          onChange={value => form.setFieldValue(['properties', subField.name, 'prefix'], value)}
-                        >
-                          {form.getFieldValue(['properties', subField.name, 'selectBefore']).map(item => (
-                            <Select.Option key={item} value={item}>
-                              {item}
-                            </Select.Option>
-                          ))}
-                        </Select>
-                      ) : null
-                    }
-                  />
-                )}
+                <Input
+                  placeholder={'Key'}
+                  disabled={
+                    ([...reservedPro, ...disableTableLevelPro].includes(
+                      form.getFieldValue(['properties', subField.name, 'key'])
+                    ) &&
+                      isFieldEdit) ||
+                    isDisable
+                  }
+                  onChange={e => handlePropertiesKey(e, subField.name)}
+                />
               </Form.Item>
-            </span>
-            <Icons.Minus
-              className={cn('size-8 cursor-pointer text-gray-400 hover:text-defaultPrimary', {
-                'text-gray-100 hover:text-gray-200 cursor-not-allowed':
-                  ([...reservedPro, ...disableTableLevelPro].includes(
-                    form.getFieldValue(['properties', subField.name, 'key'])
-                  ) &&
-                    isEdit) ||
-                  isDisable
-              })}
-              onClick={() => {
-                if (
-                  ([...reservedPro, ...disableTableLevelPro].includes(
-                    form.getFieldValue(['properties', subField.name, 'key'])
-                  ) &&
-                    isEdit) ||
-                  isDisable
-                )
-                  return
-                subOpt.remove(subField.name)
-              }}
-            />
-          </Flex>
-        </Form.Item>
-      ))}
+              <span className='w-full'>
+                <Form.Item
+                  name={[subField.name, 'value']}
+                  className='mb-0 w-full grow'
+                  label=''
+                  data-refer={`props-value-${subField.name}`}
+                  data-testid={`props-value-${subField.name}`}
+                >
+                  {form.getFieldValue(['properties', subField.name, 'select']) ? (
+                    <Select
+                      className='flex-none'
+                      mode={form.getFieldValue(['properties', subField.name, 'multiple']) ? 'multiple' : undefined}
+                      disabled={form.getFieldValue(['properties', subField.name, 'disabled'])}
+                      placeholder={
+                        form.getFieldValue(['properties', subField.name, 'description'])
+                          ? `${form.getFieldValue(['properties', subField.name, 'description'])}`
+                          : 'Value'
+                      }
+                    >
+                      {form.getFieldValue(['properties', subField.name, 'select']).map(item => (
+                        <Select.Option value={item} key={item}>
+                          {item}
+                        </Select.Option>
+                      ))}
+                    </Select>
+                  ) : (
+                    <Input
+                      placeholder={
+                        form.getFieldValue(['properties', subField.name, 'description'])
+                          ? `${form.getFieldValue(['properties', subField.name, 'description'])}`
+                          : 'Value'
+                      }
+                      disabled={
+                        ([...reservedPro, ...disableTableLevelPro].includes(
+                          form.getFieldValue(['properties', subField.name, 'key'])
+                        ) &&
+                          isFieldEdit) ||
+                        isDisable ||
+                        form.getFieldValue(['properties', subField.name, 'disabled'])
+                      }
+                      type={
+                        form.getFieldValue(['properties', subField.name, 'key'])?.includes('password')
+                          ? 'password'
+                          : 'text'
+                      }
+                      addonBefore={
+                        form.getFieldValue(['properties', subField.name, 'selectBefore']) ? (
+                          <Select
+                            value={form.getFieldValue(['properties', subField.name, 'prefix'])}
+                            key={form.getFieldValue(['properties', subField.name, 'selectBefore']).join(',')}
+                            onChange={value => form.setFieldValue(['properties', subField.name, 'prefix'], value)}
+                          >
+                            {form.getFieldValue(['properties', subField.name, 'selectBefore']).map(item => (
+                              <Select.Option key={item} value={item}>
+                                {item}
+                              </Select.Option>
+                            ))}
+                          </Select>
+                        ) : null
+                      }
+                    />
+                  )}
+                </Form.Item>
+              </span>
+              <Icons.Minus
+                className={cn('size-8 cursor-pointer text-gray-400 hover:text-defaultPrimary', {
+                  'text-gray-100 hover:text-gray-200 cursor-not-allowed':
+                    ([...reservedPro, ...disableTableLevelPro].includes(
+                      form.getFieldValue(['properties', subField.name, 'key'])
+                    ) &&
+                      isFieldEdit) ||
+                    isDisable
+                })}
+                onClick={() => {
+                  if (
+                    ([...reservedPro, ...disableTableLevelPro].includes(
+                      form.getFieldValue(['properties', subField.name, 'key'])
+                    ) &&
+                      isFieldEdit) ||
+                    isDisable
+                  )
+                    return
+                  subOpt.remove(subField.name)
+                }}
+              />
+            </Flex>
+          </Form.Item>
+        )
+      })}
       {rangerAuthType && !isEdit ? (
         <Dropdown.Button
           data-refer='add-props'

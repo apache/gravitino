@@ -349,6 +349,8 @@ export default function CreateCatalogDialog({ ...props }) {
           return <Icons.starrocks className={small ? 'size-6' : 'size-12'}></Icons.starrocks>
         case 'custom-icons-lakehouse':
           return <Icons.lakehouse className={small ? 'size-6' : 'size-12'}></Icons.lakehouse>
+        case 'custom-icons-clickhouse':
+          return <Icons.clickhouse className={small ? 'size-6' : 'size-12'}></Icons.clickhouse>
       }
     } else {
       return <Icons.iconify icon={calalogIcon} className={small ? 'size-6' : 'size-12'} />
@@ -361,7 +363,7 @@ export default function CreateCatalogDialog({ ...props }) {
         key={idx}
         data-refer={`catalog-provider-${provider.value}`}
         className={cn('provider-card flex items-center justify-between', {
-          'actived-default': provider.value === currentProvider,
+          'actived-default bg-defaultPrimary': provider.value === currentProvider,
           disabled: editCatalog
         })}
         onClick={() => handleSelectProvider(provider.value)}
@@ -383,9 +385,9 @@ export default function CreateCatalogDialog({ ...props }) {
           </div>
         </div>
         {provider.value === currentProvider ? (
-          <Icons.CircleCheckBig className='provider-radio size-4 text-white default-theme-radio' />
+          <Icons.CircleCheckBig className='provider-radio size-4 shrink-0 text-white default-theme-radio' />
         ) : (
-          <Icons.Circle className='provider-radio size-4 text-gray-400 default-theme-radio' />
+          <Icons.Circle className='provider-radio size-4 shrink-0 text-gray-400 default-theme-radio' />
         )}
       </div>
     )

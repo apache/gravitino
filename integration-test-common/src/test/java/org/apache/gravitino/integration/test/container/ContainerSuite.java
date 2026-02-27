@@ -463,9 +463,9 @@ public class ContainerSuite implements Closeable {
                           "OB_DATAFILE_SIZE",
                           "1G",
                           "OB_LOG_DISK_SIZE",
-                          "2G",
+                          "8G",
                           "OB_MEMORY_LIMIT",
-                          "4G"))
+                          "6G"))
                   .withNetwork(network)
                   .withFilesToMount(
                       ImmutableMap.<String, String>builder().put("/tmp/obdata", "/root/ob").build())

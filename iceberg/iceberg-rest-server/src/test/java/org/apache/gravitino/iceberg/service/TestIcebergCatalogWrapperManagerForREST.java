@@ -64,8 +64,10 @@ public class TestIcebergCatalogWrapperManagerForREST {
     config.put(String.format("catalog.%s.catalog-backend-name", prefix), prefix);
     IcebergConfigProvider configProvider = IcebergConfigProviderFactory.create(config);
     configProvider.initialize(config);
-    IcebergRESTServerContext.create(configProvider, false, false);
-    IcebergCatalogWrapperManager manager = new IcebergCatalogWrapperManager(config, configProvider);
+    IcebergCatalogWrapperManager manager =
+        new IcebergCatalogWrapperManager(
+            config, configProvider, false, configProvider.getMetalakeName());
+    IcebergRESTServerContext.create(configProvider, false, false, manager);
 
     IcebergCatalogWrapper ops = manager.getOps(rawPrefix);
 
@@ -82,8 +84,10 @@ public class TestIcebergCatalogWrapperManagerForREST {
     Map<String, String> config = Maps.newHashMap();
     IcebergConfigProvider configProvider = IcebergConfigProviderFactory.create(config);
     configProvider.initialize(config);
-    IcebergRESTServerContext.create(configProvider, false, false);
-    IcebergCatalogWrapperManager manager = new IcebergCatalogWrapperManager(config, configProvider);
+    IcebergCatalogWrapperManager manager =
+        new IcebergCatalogWrapperManager(
+            config, configProvider, false, configProvider.getMetalakeName());
+    IcebergRESTServerContext.create(configProvider, false, false, manager);
 
     Assertions.assertThrowsExactly(IllegalArgumentException.class, () -> manager.getOps(rawPrefix));
   }
@@ -93,8 +97,10 @@ public class TestIcebergCatalogWrapperManagerForREST {
     Map<String, String> config = Maps.newHashMap();
     IcebergConfigProvider configProvider = IcebergConfigProviderFactory.create(config);
     configProvider.initialize(config);
-    IcebergRESTServerContext.create(configProvider, true, true);
-    IcebergCatalogWrapperManager manager = new IcebergCatalogWrapperManager(config, configProvider);
+    IcebergCatalogWrapperManager manager =
+        new IcebergCatalogWrapperManager(
+            config, configProvider, true, configProvider.getMetalakeName());
+    IcebergRESTServerContext.create(configProvider, true, true, manager);
 
     IllegalArgumentException exception =
         Assertions.assertThrowsExactly(
