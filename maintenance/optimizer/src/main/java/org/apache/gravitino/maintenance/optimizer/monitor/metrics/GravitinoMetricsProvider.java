@@ -32,12 +32,12 @@ import org.apache.gravitino.maintenance.optimizer.api.monitor.MetricsProvider;
 import org.apache.gravitino.maintenance.optimizer.common.MetricSampleImpl;
 import org.apache.gravitino.maintenance.optimizer.common.OptimizerEnv;
 import org.apache.gravitino.maintenance.optimizer.common.PartitionMetricSampleImpl;
+import org.apache.gravitino.maintenance.optimizer.common.StatisticEntryImpl;
 import org.apache.gravitino.maintenance.optimizer.common.util.StatisticValueUtils;
 import org.apache.gravitino.maintenance.optimizer.recommender.util.PartitionUtils;
-import org.apache.gravitino.maintenance.optimizer.updater.StatisticEntryImpl;
-import org.apache.gravitino.maintenance.optimizer.updater.metrics.storage.H2MetricsStorage;
 import org.apache.gravitino.maintenance.optimizer.updater.metrics.storage.MetricRecord;
 import org.apache.gravitino.maintenance.optimizer.updater.metrics.storage.MetricsRepository;
+import org.apache.gravitino.maintenance.optimizer.updater.metrics.storage.jdbc.GenericJdbcMetricsRepository;
 
 /**
  * {@link MetricsProvider} implementation backed by Gravitino metric storage.
@@ -47,8 +47,8 @@ import org.apache.gravitino.maintenance.optimizer.updater.metrics.storage.Metric
  * <ul>
  *   <li>Set {@link org.apache.gravitino.maintenance.optimizer.common.conf.OptimizerConfig
  *       #METRICS_PROVIDER_CONFIG} to {@value #NAME}.
- *   <li>This provider initializes an internal {@link H2MetricsStorage} and reads metrics through
- *       {@link MetricsRepository} APIs.
+ *   <li>This provider initializes an internal {@link GenericJdbcMetricsRepository} and reads
+ *       metrics through {@link MetricsRepository} APIs.
  * </ul>
  *
  * <p>Behavior:
@@ -66,7 +66,7 @@ import org.apache.gravitino.maintenance.optimizer.updater.metrics.storage.Metric
 public class GravitinoMetricsProvider implements MetricsProvider {
 
   public static final String NAME = "gravitino-metrics-provider";
-  private MetricsRepository metricsStorage;
+  private MetricsRepository metricsRepository;
 
   @Override
   public String name() {
@@ -75,8 +75,9 @@ public class GravitinoMetricsProvider implements MetricsProvider {
 
   @Override
   public void initialize(OptimizerEnv optimizerEnv) {
-    this.metricsStorage = new H2MetricsStorage();
-    metricsStorage.initialize(optimizerEnv.config().getAllConfig());
+    MetricsRepository repository = new GenericJdbcMetricsRepository();
+    repository.initialize(optimizerEnv.config().getAllConfig());
+    this.metricsRepository = repository;
   }
 
   @Override
@@ -84,7 +85,7 @@ public class GravitinoMetricsProvider implements MetricsProvider {
       NameIdentifier jobIdentifier, long startTime, long endTime) {
     ensureInitialized();
     Map<String, List<MetricRecord>> metrics =
-        metricsStorage.getJobMetrics(jobIdentifier, startTime, endTime);
+        metricsRepository.getJobMetrics(jobIdentifier, startTime, endTime);
 
     return toSingleMetrics(metrics, Optional.empty());
   }
@@ -94,7 +95,7 @@ public class GravitinoMetricsProvider implements MetricsProvider {
       NameIdentifier tableIdentifier, long startTime, long endTime) {
     ensureInitialized();
     Map<String, List<MetricRecord>> metrics =
-        metricsStorage.getTableMetrics(tableIdentifier, startTime, endTime);
+        metricsRepository.getTableMetrics(tableIdentifier, startTime, endTime);
 
     return toSingleMetrics(metrics, Optional.empty());
   }
@@ -104,7 +105,7 @@ public class GravitinoMetricsProvider implements MetricsProvider {
       NameIdentifier tableIdentifier, PartitionPath partitionPath, long startTime, long endTime) {
     ensureInitialized();
     Map<String, List<MetricRecord>> metrics =
-        metricsStorage.getPartitionMetrics(
+        metricsRepository.getPartitionMetrics(
             tableIdentifier, PartitionUtils.encodePartitionPath(partitionPath), startTime, endTime);
 
     return toSingleMetrics(metrics, Optional.of(partitionPath));
@@ -135,13 +136,14 @@ public class GravitinoMetricsProvider implements MetricsProvider {
   }
 
   private void ensureInitialized() {
-    Preconditions.checkState(metricsStorage != null, "GravitinoMetricsProvider is not initialized");
+    Preconditions.checkState(
+        metricsRepository != null, "GravitinoMetricsProvider is not initialized");
   }
 
   @Override
   public void close() throws Exception {
-    if (metricsStorage != null) {
-      metricsStorage.close();
+    if (metricsRepository != null) {
+      metricsRepository.close();
     }
   }
 }

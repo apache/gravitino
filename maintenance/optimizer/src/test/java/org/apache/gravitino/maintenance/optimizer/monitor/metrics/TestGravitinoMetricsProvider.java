@@ -32,8 +32,11 @@ import org.apache.gravitino.maintenance.optimizer.common.PartitionEntryImpl;
 import org.apache.gravitino.maintenance.optimizer.common.conf.OptimizerConfig;
 import org.apache.gravitino.maintenance.optimizer.common.util.StatisticValueUtils;
 import org.apache.gravitino.maintenance.optimizer.recommender.util.PartitionUtils;
-import org.apache.gravitino.maintenance.optimizer.updater.metrics.storage.H2MetricsStorage;
+import org.apache.gravitino.maintenance.optimizer.updater.metrics.storage.JobMetricWriteRequest;
 import org.apache.gravitino.maintenance.optimizer.updater.metrics.storage.MetricRecordImpl;
+import org.apache.gravitino.maintenance.optimizer.updater.metrics.storage.MetricsRepository;
+import org.apache.gravitino.maintenance.optimizer.updater.metrics.storage.TableMetricWriteRequest;
+import org.apache.gravitino.maintenance.optimizer.updater.metrics.storage.jdbc.GenericJdbcMetricsRepository;
 import org.apache.gravitino.stats.StatisticValues;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
@@ -46,12 +49,21 @@ public class TestGravitinoMetricsProvider {
   @Test
   public void testReadTableJobAndPartitionMetrics() throws Exception {
     Path metricsPath = tempDir.resolve("metrics-test");
+    String jdbcUrl = "jdbc:h2:file:" + metricsPath + ";DB_CLOSE_DELAY=-1;MODE=MYSQL";
     Map<String, String> configs =
         Map.of(
             OptimizerConfig.OPTIMIZER_PREFIX
-                + "h2-metrics."
-                + H2MetricsStorage.H2MetricsStorageConfig.H2_METRICS_STORAGE_PATH,
-            metricsPath.toString());
+                + GenericJdbcMetricsRepository.JDBC_METRICS_PREFIX
+                + GenericJdbcMetricsRepository.JDBC_URL,
+            jdbcUrl,
+            OptimizerConfig.OPTIMIZER_PREFIX
+                + GenericJdbcMetricsRepository.JDBC_METRICS_PREFIX
+                + GenericJdbcMetricsRepository.JDBC_USER,
+            "sa",
+            OptimizerConfig.OPTIMIZER_PREFIX
+                + GenericJdbcMetricsRepository.JDBC_METRICS_PREFIX
+                + GenericJdbcMetricsRepository.JDBC_PASSWORD,
+            "");
     OptimizerEnv optimizerEnv = new OptimizerEnv(new OptimizerConfig(configs));
 
     NameIdentifier table = NameIdentifier.parse("catalog.db.table1");
@@ -59,23 +71,32 @@ public class TestGravitinoMetricsProvider {
     PartitionPath partitionPath =
         PartitionPath.of(List.of(new PartitionEntryImpl("dt", "2026-02-14")));
 
-    H2MetricsStorage storage = new H2MetricsStorage();
-    storage.initialize(configs);
-    storage.storeTableMetric(
-        table,
-        "row_count",
-        Optional.empty(),
-        new MetricRecordImpl(100L, StatisticValueUtils.toString(StatisticValues.longValue(10L))));
-    storage.storeTableMetric(
-        table,
-        "row_count",
-        Optional.of(PartitionUtils.encodePartitionPath(partitionPath)),
-        new MetricRecordImpl(101L, StatisticValueUtils.toString(StatisticValues.longValue(11L))));
-    storage.storeJobMetric(
-        job,
-        "duration",
-        new MetricRecordImpl(102L, StatisticValueUtils.toString(StatisticValues.longValue(99L))));
-    storage.close();
+    try (MetricsRepository metricsRepository = new GenericJdbcMetricsRepository()) {
+      metricsRepository.initialize(configs);
+      metricsRepository.storeTableMetrics(
+          List.of(
+              new TableMetricWriteRequest(
+                  table,
+                  "row_count",
+                  Optional.empty(),
+                  new MetricRecordImpl(
+                      100L, StatisticValueUtils.toString(StatisticValues.longValue(10L))))));
+      metricsRepository.storeTableMetrics(
+          List.of(
+              new TableMetricWriteRequest(
+                  table,
+                  "row_count",
+                  Optional.of(PartitionUtils.encodePartitionPath(partitionPath)),
+                  new MetricRecordImpl(
+                      101L, StatisticValueUtils.toString(StatisticValues.longValue(11L))))));
+      metricsRepository.storeJobMetrics(
+          List.of(
+              new JobMetricWriteRequest(
+                  job,
+                  "duration",
+                  new MetricRecordImpl(
+                      102L, StatisticValueUtils.toString(StatisticValues.longValue(99L))))));
+    }
 
     GravitinoMetricsProvider provider = new GravitinoMetricsProvider();
     provider.initialize(optimizerEnv);
