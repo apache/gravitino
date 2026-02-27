@@ -19,14 +19,14 @@
 
 package org.apache.gravitino.maintenance.optimizer.monitor.job.local;
 
-import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+import com.fasterxml.jackson.annotation.JsonProperty;
 import com.google.common.base.Preconditions;
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.util.Iterator;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Set;
@@ -40,8 +40,6 @@ import org.slf4j.LoggerFactory;
 class FileJobReader {
 
   private static final Logger LOG = LoggerFactory.getLogger(FileJobReader.class);
-  private static final String IDENTIFIER_FIELD = "identifier";
-  private static final String JOB_IDENTIFIERS_FIELD = "job-identifiers";
 
   private final Path jobFilePath;
   private final String defaultCatalogName;
@@ -64,17 +62,17 @@ class FileJobReader {
           continue;
         }
 
-        JsonNode node = parseJson(line, lineNumber);
-        if (node == null) {
+        JobMappingLine mappingLine = parseJsonLine(line, lineNumber);
+        if (mappingLine == null) {
           continue;
         }
 
-        NameIdentifier identifier = parseIdentifier(node.get(IDENTIFIER_FIELD), lineNumber);
+        NameIdentifier identifier = parseIdentifier(mappingLine.identifier, lineNumber);
         if (identifier == null || !identifier.equals(tableIdentifier)) {
           continue;
         }
 
-        collectJobs(node.get(JOB_IDENTIFIERS_FIELD), jobs, lineNumber);
+        collectJobs(mappingLine.jobIdentifiers, jobs, lineNumber);
       }
     } catch (IOException e) {
       throw new RuntimeException("Failed to read job mappings", e);
@@ -83,20 +81,20 @@ class FileJobReader {
     return List.copyOf(jobs);
   }
 
-  private JsonNode parseJson(String line, int lineNumber) {
+  private JobMappingLine parseJsonLine(String line, int lineNumber) {
     try {
-      return JsonUtils.anyFieldMapper().readTree(line);
+      return JsonUtils.anyFieldMapper().readValue(line, JobMappingLine.class);
     } catch (IOException e) {
       LOG.warn("Skip malformed job mapping at line {}: {}", lineNumber, line);
       return null;
     }
   }
 
-  private NameIdentifier parseIdentifier(JsonNode identifierNode, int lineNumber) {
-    if (identifierNode == null || identifierNode.isNull() || !identifierNode.isTextual()) {
+  private NameIdentifier parseIdentifier(String identifierText, int lineNumber) {
+    if (StringUtils.isBlank(identifierText)) {
       return null;
     }
-    String identifierText = identifierNode.asText();
+
     try {
       NameIdentifier parsed = NameIdentifier.parse(identifierText);
       int levels = parsed.namespace().levels().length;
@@ -113,17 +111,15 @@ class FileJobReader {
     }
   }
 
-  private void collectJobs(JsonNode jobsNode, Set<NameIdentifier> jobs, int lineNumber) {
-    if (jobsNode == null || jobsNode.isNull() || !jobsNode.isArray()) {
+  private void collectJobs(List<Object> jobIdentifiers, Set<NameIdentifier> jobs, int lineNumber) {
+    if (jobIdentifiers == null || jobIdentifiers.isEmpty()) {
       return;
     }
-    Iterator<JsonNode> iterator = jobsNode.elements();
-    while (iterator.hasNext()) {
-      JsonNode jobNode = iterator.next();
-      if (jobNode == null || jobNode.isNull() || !jobNode.isTextual()) {
+    for (Object jobIdentifier : jobIdentifiers) {
+      if (!(jobIdentifier instanceof String)) {
         continue;
       }
-      String jobText = jobNode.asText();
+      String jobText = (String) jobIdentifier;
       if (StringUtils.isBlank(jobText)) {
         continue;
       }
@@ -133,5 +129,14 @@ class FileJobReader {
         LOG.warn("Skip invalid job identifier at line {}: {}", lineNumber, jobText);
       }
     }
+  }
+
+  @JsonIgnoreProperties(ignoreUnknown = true)
+  private static class JobMappingLine {
+    @JsonProperty("identifier")
+    private String identifier;
+
+    @JsonProperty("job-identifiers")
+    private List<Object> jobIdentifiers;
   }
 }
