@@ -33,6 +33,7 @@ import java.util.Set;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.json.JsonUtils;
+import org.apache.gravitino.maintenance.optimizer.common.util.IdentifierUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -95,20 +96,12 @@ class FileJobReader {
       return null;
     }
 
-    try {
-      NameIdentifier parsed = NameIdentifier.parse(identifierText);
-      int levels = parsed.namespace().levels().length;
-      if (levels == 1 && StringUtils.isNotBlank(defaultCatalogName)) {
-        return NameIdentifier.of(defaultCatalogName, parsed.namespace().levels()[0], parsed.name());
-      } else if (levels == 2) {
-        return parsed;
-      }
+    NameIdentifier parsed =
+        IdentifierUtils.parseTableIdentifier(identifierText, defaultCatalogName);
+    if (parsed == null) {
       LOG.warn("Skip invalid table identifier at line {}: {}", lineNumber, identifierText);
-      return null;
-    } catch (Exception e) {
-      LOG.warn("Skip invalid table identifier at line {}: {}", lineNumber, identifierText);
-      return null;
     }
+    return parsed;
   }
 
   private void collectJobs(List<Object> jobIdentifiers, Set<NameIdentifier> jobs, int lineNumber) {

@@ -20,6 +20,7 @@
 package org.apache.gravitino.maintenance.optimizer.common.util;
 
 import com.google.common.base.Preconditions;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
 
@@ -70,5 +71,65 @@ public class IdentifierUtils {
     Namespace namespace = tableIdentifier.namespace();
     Preconditions.checkArgument(
         namespace != null && namespace.levels().length == 2, NORMALIZED_IDENTIFIER_MESSAGE);
+  }
+
+  /**
+   * Parse table identifier text.
+   *
+   * <p>Accepted forms:
+   *
+   * <ul>
+   *   <li>{@code schema.table}, when default catalog is configured
+   *   <li>{@code catalog.schema.table}
+   * </ul>
+   *
+   * @param identifierText raw identifier text
+   * @param defaultCatalogName optional default catalog for {@code schema.table}
+   * @return parsed identifier, or {@code null} when input is blank/invalid or disallowed
+   */
+  public static NameIdentifier parseTableIdentifier(
+      String identifierText, String defaultCatalogName) {
+    if (StringUtils.isBlank(identifierText)) {
+      return null;
+    }
+
+    try {
+      NameIdentifier parsed = NameIdentifier.parse(identifierText);
+      int levels = parsed.namespace().levels().length;
+      if (levels == 0) {
+        return null;
+      }
+      if (levels == 1) {
+        if (StringUtils.isNotBlank(defaultCatalogName)) {
+          return NameIdentifier.of(
+              defaultCatalogName, parsed.namespace().levels()[0], parsed.name());
+        }
+        return null;
+      }
+      if (levels == 2) {
+        return parsed;
+      }
+      return null;
+    } catch (Exception e) {
+      return null;
+    }
+  }
+
+  /**
+   * Parse job identifier text.
+   *
+   * @param identifierText raw identifier text
+   * @return parsed identifier, or {@code null} when input is blank/invalid
+   */
+  public static NameIdentifier parseJobIdentifier(String identifierText) {
+    if (StringUtils.isBlank(identifierText)) {
+      return null;
+    }
+
+    try {
+      return NameIdentifier.parse(identifierText);
+    } catch (Exception e) {
+      return null;
+    }
   }
 }

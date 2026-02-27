@@ -44,6 +44,7 @@ import org.apache.gravitino.maintenance.optimizer.api.common.StatisticEntry;
 import org.apache.gravitino.maintenance.optimizer.api.common.TableAndPartitionStatistics;
 import org.apache.gravitino.maintenance.optimizer.common.PartitionEntryImpl;
 import org.apache.gravitino.maintenance.optimizer.common.StatisticEntryImpl;
+import org.apache.gravitino.maintenance.optimizer.common.util.IdentifierUtils;
 import org.apache.gravitino.stats.StatisticValue;
 import org.apache.gravitino.stats.StatisticValues;
 import org.slf4j.Logger;
@@ -410,38 +411,20 @@ abstract class AbstractStatisticsImporter implements StatisticsImporter {
     if (StringUtils.isBlank(identifierText)) {
       return null;
     }
-    try {
-      NameIdentifier parsed = NameIdentifier.parse(identifierText);
-      int levels = parsed.namespace().levels().length;
-      if (levels == 0) {
-        return parsed;
-      } else if (levels == 1) {
-        if (StringUtils.isNotBlank(defaultCatalogName)) {
-          return NameIdentifier.of(
-              defaultCatalogName, parsed.namespace().levels()[0], parsed.name());
-        }
-        return parsed;
-      } else if (levels == 2) {
-        return parsed;
-      } else {
-        return null;
-      }
-    } catch (Exception e) {
+    NameIdentifier parsed =
+        IdentifierUtils.parseTableIdentifier(identifierText, defaultCatalogName);
+    if (parsed == null) {
       LOG.warn("Skip line with invalid identifier: {}", identifierText);
-      return null;
     }
+    return parsed;
   }
 
   private NameIdentifier parseJobIdentifier(String identifierText) {
-    if (StringUtils.isBlank(identifierText)) {
-      return null;
-    }
-    try {
-      return NameIdentifier.parse(identifierText);
-    } catch (Exception e) {
+    NameIdentifier parsed = IdentifierUtils.parseJobIdentifier(identifierText);
+    if (parsed == null && StringUtils.isNotBlank(identifierText)) {
       LOG.warn("Skip line with invalid identifier: {}", identifierText);
-      return null;
     }
+    return parsed;
   }
 
   private static final class StatisticsRecord {

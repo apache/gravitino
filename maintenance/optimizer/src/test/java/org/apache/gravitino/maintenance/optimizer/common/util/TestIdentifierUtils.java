@@ -103,4 +103,64 @@ class TestIdentifierUtils {
         IllegalArgumentException.class,
         () -> IdentifierUtils.requireTableIdentifierNormalized(identifier));
   }
+
+  @Test
+  void testParseTableIdentifierWithDefaultCatalog() {
+    NameIdentifier result = IdentifierUtils.parseTableIdentifier("db.table", "catalog");
+
+    Assertions.assertEquals(NameIdentifier.of("catalog", "db", "table"), result);
+  }
+
+  @Test
+  void testParseTableIdentifierWithoutDefaultCatalogReturnsNull() {
+    NameIdentifier result = IdentifierUtils.parseTableIdentifier("db.table", null);
+
+    Assertions.assertNull(result);
+  }
+
+  @Test
+  void testParseTableIdentifierWithThreeLevelIdentifier() {
+    NameIdentifier result = IdentifierUtils.parseTableIdentifier("catalog.db.table", null);
+
+    Assertions.assertEquals(NameIdentifier.of("catalog", "db", "table"), result);
+  }
+
+  @Test
+  void testParseTableIdentifierWithSingleLevelReturnsNull() {
+    NameIdentifier result = IdentifierUtils.parseTableIdentifier("table", "catalog");
+
+    Assertions.assertNull(result);
+  }
+
+  @Test
+  void testParseTableIdentifierWithInvalidIdentifierReturnsNull() {
+    NameIdentifier result =
+        IdentifierUtils.parseTableIdentifier("catalog.db.schema.extra.table", "c");
+
+    Assertions.assertNull(result);
+  }
+
+  @Test
+  void testParseJobIdentifierWithValidIdentifier() {
+    NameIdentifier result = IdentifierUtils.parseJobIdentifier("org.team.pipeline.job1");
+    Assertions.assertEquals("org.team.pipeline.job1", result.toString());
+  }
+
+  @Test
+  void testParseJobIdentifierWithSingleLevelName() {
+    NameIdentifier result = IdentifierUtils.parseJobIdentifier("job");
+    Assertions.assertEquals("job", result.toString());
+  }
+
+  @Test
+  void testParseJobIdentifierWithTwoLevelName() {
+    NameIdentifier result = IdentifierUtils.parseJobIdentifier("team.job");
+    Assertions.assertEquals("team.job", result.toString());
+  }
+
+  @Test
+  void testParseJobIdentifierWithBlankOrInvalidIdentifierReturnsNull() {
+    Assertions.assertNull(IdentifierUtils.parseJobIdentifier(" "));
+    Assertions.assertNull(IdentifierUtils.parseJobIdentifier("invalid..job"));
+  }
 }
