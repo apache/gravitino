@@ -786,8 +786,6 @@ export const switchInUseCatalog = createAsyncThunk(
       throw new Error(err)
     }
 
-    dispatch(fetchCatalogs({ metalake, init: true }))
-
     return res
   }
 )
@@ -2398,6 +2396,26 @@ export const appMetalakesSlice = createSlice({
       state.models = state.models.map(updateModelItem)
       state.tableData = state.tableData.map(updateModelItem)
     },
+    updateCatalogInUse(state, action) {
+      const { catalog, isInUse } = action.payload
+      const inUseValue = isInUse ? 'true' : 'false'
+      state.tableData = state.tableData.map(item => {
+        if (item.name !== catalog) return item
+
+        return {
+          ...item,
+          properties: { ...(item.properties || {}), 'in-use': inUseValue }
+        }
+      })
+      state.catalogs = state.catalogs.map(item => {
+        if (item.name !== catalog) return item
+
+        return {
+          ...item,
+          properties: { ...(item.properties || {}), 'in-use': inUseValue }
+        }
+      })
+    },
     addCatalogToTree(state, action) {
       const catalogIndex = state.metalakeTree.findIndex(c => c.key === action.payload.key)
       if (catalogIndex === -1) {
@@ -2844,6 +2862,7 @@ export const {
   updateFilesetInStore,
   updateModelInStore,
   setCatalogInUse,
+  updateCatalogInUse,
   setMetalakeInUse,
   removeCatalogFromTree,
   setTableProps,
