@@ -34,6 +34,7 @@ import java.time.Instant;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.EntityAlreadyExistsException;
@@ -59,6 +60,7 @@ import org.apache.gravitino.storage.relational.session.SqlSessionFactoryHelper;
 import org.apache.gravitino.utils.NameIdentifierUtil;
 import org.apache.gravitino.utils.NamespaceUtil;
 import org.apache.ibatis.session.SqlSession;
+import org.awaitility.Awaitility;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.TestTemplate;
 
@@ -208,7 +210,14 @@ public class TestPolicyMetaService extends TestJDBCBackend {
     }
     assertFalse(legacyRecordExistsInDB(policy.id(), Entity.EntityType.POLICY));
     assertEquals(0, listPolicyVersions(policy.id()).size());
-    assertEquals(3, listPolicyVersions(anotherPolicy.id()).size());
+
+    Awaitility.await()
+        .atMost(30, TimeUnit.SECONDS)
+        .pollInterval(500, TimeUnit.MILLISECONDS)
+        .untilAsserted(
+            () -> {
+              assertEquals(3, listPolicyVersions(anotherPolicy.id()).size());
+            });
 
     // soft delete for old version policy
     for (Entity.EntityType entityType : Entity.EntityType.values()) {
