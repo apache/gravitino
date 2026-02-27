@@ -38,7 +38,10 @@ The Gravitino binary distribution package contains the following files:
     |   └── hive/                               # Apache Hive catalog dependencies and configurations.
     |   └── jdbc-doris/                         # JDBC doris catalog dependencies and configurations.
     |   └── jdbc-mysql/                         # JDBC MySQL catalog dependencies and configurations.
+    |   └── jdbc-doris/                         # JDBC Doris catalog dependencies and configurations.
+    |   └── jdbc-starrocks/                     # JDBC Starrocks catalog dependencies and configurations.
     |   └── jdbc-postgresql/                    # JDBC PostgreSQL catalog dependencies and configurations.
+    |   └── jdbc-hudi/                          # Hudi PostgreSQL catalog dependencies and configurations.
     |   └── kafka/                              # Apache Kafka PostgreSQL catalog dependencies and configurations.
     |   └── lakehouse-iceberg/                  # Apache Iceberg catalog dependencies and configurations.
     |   └── lakehouse-paimon/                   # Apache Paimon catalog dependencies and configurations.
@@ -54,6 +57,14 @@ The Gravitino binary distribution package contains the following files:
     |── iceberg-rest-server/                    # Gravitino Iceberg REST server package and dependencies libraries.
     └── scripts/                                # Extra scripts for Gravitino.
 ```
+
+:::note
+Catalogs `OceanBase` and `ClickHouse` are not included in the Gravitino binary distribution package(see above) by default due to package size limitations and License compatibility issues since 1.2.0.
+If you want to use these two catalogs, please build the Gravitino binary distribution package by yourself and use tarball `gravitino-all<version>-bin.tar.gz`, which contains all catalogs including those in the `catalogs-contrib` module. 
+
+If you need more details about it, please refer to [Reorg catalogs structure](https://github.com/apache/gravitino/pull/9781)
+:::
+
 
 #### Initialize the RDBMS (Optional)
 
