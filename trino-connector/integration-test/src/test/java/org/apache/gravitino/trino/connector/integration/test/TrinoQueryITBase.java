@@ -277,7 +277,7 @@ public class TrinoQueryITBase {
     }
   }
 
-  public static String[] listDirectory(String dirname) throws Exception {
+  public static String[] listTestSetDirectory(String dirname) throws Exception {
     File dir = new File(dirname);
     if (!dir.exists()) {
       throw new Exception("Test queries directory " + dirname + " does not exist");

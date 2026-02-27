@@ -227,7 +227,7 @@ public class TrinoQueryTestTool {
           }
         }
         if (Strings.isNotEmpty(testerId)) {
-          if (Arrays.stream(TrinoQueryIT.listDirectory(testSetDir))
+          if (Arrays.stream(TrinoQueryIT.listTestSetDirectory(testSetDir))
               .noneMatch(f -> f.startsWith(testerId))) {
             System.out.println("The tester " + testerId + " does not found in testset");
             System.exit(1);

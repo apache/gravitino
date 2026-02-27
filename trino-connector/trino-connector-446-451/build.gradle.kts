@@ -30,6 +30,7 @@ plugins {
 // This module supports Trino versions 446-451
 val minTrinoVersion = 446
 val maxTrinoVersion = 451
+val otelSemconvVersion = "1.25.0-alpha"
 
 val trinoVersion = providers.gradleProperty("trinoVersion")
   .map { it.trim().toInt() }
@@ -50,17 +51,12 @@ java {
 dependencies {
   implementation(project(":catalogs:catalog-common"))
   implementation(project(":clients:client-java-runtime", configuration = "shadow"))
-
-  compileOnly(project(":api"))
-  compileOnly(project(":clients:client-java"))
-  compileOnly(project(":common"))
-
   implementation(libs.airlift.json)
   implementation(libs.bundles.log4j)
   implementation(libs.commons.collections4)
   implementation(libs.commons.lang3)
   implementation("io.trino:trino-jdbc:$trinoVersion")
-  runtimeOnly("io.opentelemetry.semconv:opentelemetry-semconv:1.32.0")
+  runtimeOnly("io.opentelemetry.semconv:opentelemetry-semconv-incubating:$otelSemconvVersion")
   compileOnly(libs.airlift.resolver)
   compileOnly("io.trino:trino-spi:$trinoVersion") {
     exclude("org.apache.logging.log4j")
