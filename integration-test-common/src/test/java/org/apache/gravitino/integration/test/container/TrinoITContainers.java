@@ -72,7 +72,7 @@ public class TrinoITContainers implements AutoCloseable {
     }
     if (trinoConnectorDir != null) {
       File dir = new File(trinoConnectorDir);
-      if (!dir.exists() || dir.list().length == 0) {
+      if (!dir.exists() || !dir.isDirectory() || dir.list().length == 0) {
         throw new Exception(
             "Gravitino trino connector directory %s does not exist or is empty"
                 .formatted(trinoConnectorDir));

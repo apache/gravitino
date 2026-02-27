@@ -8,10 +8,58 @@ license: "This software is licensed under the Apache License version 2."
 To install the Apache Gravitino Trino connector, you should first deploy the Trino environment, and then install the Gravitino Trino connector plugin into Trino.
 Please refer to the [Deploying Trino documentation](https://trino.io/docs/current/installation/deployment.html) and do the following steps:
 
-1. [Download](https://github.com/apache/gravitino/releases) the Gravitino Trino connector tarball and unpack it.
-   The tarball contains a single top-level directory `gravitino-trino-connector-<version>`,
-   which called the connector directory.
-2. Copy the connector directory to the Trino's plugin directory.
+The examples in this document use Trino `469` by default.
+
+## Get the connector package
+
+Gravitino provides different Trino connector packages for different Trino version segments.
+You need to choose the package by your Trino server version first.
+
+| Trino server version | Connector package segment |
+|----------------------|---------------------------|
+| 435-439              | `trino-connector-435-439` |
+| 440-445              | `trino-connector-440-445` |
+| 446-451              | `trino-connector-446-451` |
+| 452-468              | `trino-connector-452-468` |
+| 469-472              | `trino-connector-469-472` |
+
+For Trino `469`, choose the `trino-connector-469-472` package.
+
+The release package naming format is:
+
+`gravitino-trino-connector-<segment>-<version>.tar.gz`
+
+For example:
+
+`gravitino-trino-connector-469-472-<version>.tar.gz`
+
+You can get the package in the following ways:
+
+1. Download a released package from [GitHub Releases](https://github.com/apache/gravitino/releases). For Trino `469`, download the `469-472` package:
+
+```shell
+cd /tmp
+wget https://github.com/apache/gravitino/releases/download/<version>/gravitino-trino-connector-469-472-<version>.tar.gz
+tar -zxvf gravitino-trino-connector-469-472-<version>.tar.gz
+```
+
+2. Build from source in the Gravitino project. For Trino `469`, build module `trino-connector-469-472`:
+
+```shell
+cd <gravitino-source-root>
+./gradlew :trino-connector:trino-connector-469-472:assembleTrinoConnector
+cd distribution
+tar -zxvf gravitino-trino-connector-469-472-<version>.tar.gz
+```
+
+After unpacking, you can see the connector directory:
+
+`gravitino-trino-connector-469-472-<version>`
+
+## Install the connector package
+
+1. Download and unpack the correct Gravitino Trino connector tarball for your Trino version.
+2. Rename the unpacked connector directory to `gravitino`, and then copy it to the Trino plugin directory.
    Normally, the directory location is `Trino-server-<version>/plugin`, and the directory contains other catalogs used by Trino.
 3. Add Trino JVM arguments `-Dlog4j.configurationFile=file:////etc/trino/log4j2.properties` to enable logging for the Gravitino Trino connector.
 4. Update Trino coordinator configuration. 
@@ -25,11 +73,6 @@ catalog.management=dynamic
 discovery.uri=http://0.0.0.0:8080
 ```
 
-Alternatively,
-you can build the Gravitino Trino connector package from the sources
-and obtain the `gravitino-trino-connector-<version>.tar.gz` file in the `$PROJECT/distribution` directory.
-Please refer to the [Gravitino Development documentation](../how-to-build.md)
-
 ## Example
 
 You can install the Gravitino Trino connector in Trino office docker images step by step.
@@ -40,7 +83,7 @@ Use the docker command to create a container from the `trinodb/trino` image. Ass
 Run it in the background, and map the default Trino port, which is 8080, from inside the container to port 8080 on your machine.
 
 ```shell
-docker run --name trino-gravitino -d -p 8080:8080 trinodb/trino:435
+docker run --name trino-gravitino -d -p 8080:8080 trinodb/trino:469
 ```
 
 Run `docker ps` to check whether the container is running.
@@ -48,20 +91,21 @@ Run `docker ps` to check whether the container is running.
 
 ### Installing the Apache Gravitino Trino connector
 
-Download the Gravitino Trino connector tarball and unpack it.
+Download the Gravitino Trino connector tarball for Trino `469` and unpack it.
 
 ```shell
 cd /tmp
-wget https://github.com/apache/gravitino/releases/gravitino-trino-connector-<version>.tar.gz
-tar -zxvf gravitino-trino-connector-<version>.tar.gz
+wget https://github.com/apache/gravitino/releases/download/<version>/gravitino-trino-connector-469-472-<version>.tar.gz
+tar -zxvf gravitino-trino-connector-469-472-<version>.tar.gz
 ```
 
-You can see the connector directory `gravitino-trino-connector-<version>` after unpacking.
+You can see the connector directory `gravitino-trino-connector-469-472-<version>` after unpacking.
 
-Copy the connector directory to the Trino container's plugin directory.
+Rename the connector directory to `gravitino`, then copy it to the Trino container's plugin directory.
 
 ```shell
-docker cp /tmp/gravitino-trino-connector-<version> trino-gravitino:/lib/trino/plugin
+mv /tmp/gravitino-trino-connector-469-472-<version> /tmp/gravitino
+docker cp /tmp/gravitino trino-gravitino:/lib/trino/plugin
 ```
 
 Check the plugin directory in the container.
