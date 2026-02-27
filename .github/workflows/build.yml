@@ -155,5 +155,7 @@ jobs:
           name: unit test report
           path: |
             build/reports
+            catalogs-contrib/**/*.log
+            catalogs-contrib/**/*.tar
             catalogs/**/*.log
             catalogs/**/*.tar

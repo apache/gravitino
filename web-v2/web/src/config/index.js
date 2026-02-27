@@ -108,7 +108,7 @@ export const ColumnType = [
   'decimal'
 ]
 
-export const ColumnTypeForMysql = ['byte unsigned', 'short unsigned', 'integer unsigned', 'long unsigned']
+export const ColumnTypeForUnsigned = ['byte unsigned', 'short unsigned', 'integer unsigned', 'long unsigned']
 
 export const ColumnTypeSupportAutoIncrement = [
   'byte',
@@ -155,7 +155,19 @@ export const UnsupportColumnType = {
     'time'
   ],
   'lakehouse-generic': ['char', 'varchar', 'time', 'timestamp_tz'],
-  'lakehouse-paimon': ['interval_day', 'interval_year', 'union', 'uuid']
+  'lakehouse-paimon': ['interval_day', 'interval_year', 'union', 'uuid'],
+  'jdbc-clickhouse': [
+    'binary',
+    'fixed',
+    'struct',
+    'list',
+    'map',
+    'interval_day',
+    'interval_year',
+    'union',
+    'time',
+    'timestamp_tz'
+  ]
 }
 
 const tableLevelPropInfoMap = {
@@ -288,7 +300,8 @@ export const transformsLimitMap = {
 
 export const sortOrdersInfoMap = {
   hive: ['field'],
-  'lakehouse-iceberg': ['field', 'bucket', 'truncate', 'year', 'month', 'day', 'hour']
+  'lakehouse-iceberg': ['field', 'bucket', 'truncate', 'year', 'month', 'day', 'hour'],
+  'jdbc-clickhouse': ['field', 'bucket', 'truncate', 'year', 'month', 'day', 'hour']
 }
 
 export const indexesInfoMap = {

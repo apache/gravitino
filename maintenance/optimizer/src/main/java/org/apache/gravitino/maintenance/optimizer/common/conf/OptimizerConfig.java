@@ -19,6 +19,7 @@
 
 package org.apache.gravitino.maintenance.optimizer.common.conf;
 
+import java.util.List;
 import java.util.Map;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.Config;
@@ -31,10 +32,9 @@ import org.apache.gravitino.maintenance.optimizer.recommender.strategy.Gravitino
 import org.apache.gravitino.maintenance.optimizer.recommender.table.GravitinoTableMetadataProvider;
 
 /**
- * Central configuration holder for the optimizer/recommender runtime. Keys are grouped under the
- * {@code gravitino.optimizer.*} prefix and capture both core connectivity (URI, metalake, default
- * catalog) and pluggable implementation wiring (statistics provider, strategy provider, table
- * metadata provider, job submitter).
+ * Central configuration holder for the optimizer runtime. Keys are grouped under the {@code
+ * gravitino.optimizer.*} prefix and capture both core connectivity (URI, metalake, default catalog)
+ * and pluggable implementation wiring for recommender, updater, and monitor components.
  */
 public class OptimizerConfig extends Config {
 
@@ -44,12 +44,23 @@ public class OptimizerConfig extends Config {
   public static final String GRAVITINO_METALAKE = OPTIMIZER_PREFIX + "gravitinoMetalake";
   public static final String GRAVITINO_DEFAULT_CATALOG =
       OPTIMIZER_PREFIX + "gravitinoDefaultCatalog";
+  public static final String JOB_ADAPTER_PREFIX = OPTIMIZER_PREFIX + "jobAdapter.";
+  public static final String JOB_SUBMITTER_CONFIG_PREFIX = OPTIMIZER_PREFIX + "jobSubmitterConfig.";
 
   private static final String RECOMMENDER_PREFIX = OPTIMIZER_PREFIX + "recommender.";
   private static final String STATISTICS_PROVIDER = RECOMMENDER_PREFIX + "statisticsProvider";
   private static final String STRATEGY_PROVIDER = RECOMMENDER_PREFIX + "strategyProvider";
   private static final String TABLE_META_PROVIDER = RECOMMENDER_PREFIX + "tableMetaProvider";
   private static final String JOB_SUBMITTER = RECOMMENDER_PREFIX + "jobSubmitter";
+
+  private static final String UPDATER_PREFIX = OPTIMIZER_PREFIX + "updater.";
+  private static final String STATISTICS_UPDATER = UPDATER_PREFIX + "statisticsUpdater";
+  private static final String METRICS_UPDATER = UPDATER_PREFIX + "metricsUpdater";
+  private static final String MONITOR_PREFIX = OPTIMIZER_PREFIX + "monitor.";
+  private static final String METRICS_PROVIDER = MONITOR_PREFIX + "metricsProvider";
+  private static final String JOB_PROVIDER = MONITOR_PREFIX + "jobProvider";
+  private static final String METRICS_EVALUATOR = MONITOR_PREFIX + "metricsEvaluator";
+  private static final String MONITOR_CALLBACKS = MONITOR_PREFIX + "callbacks";
 
   public static final ConfigEntry<String> STATISTICS_PROVIDER_CONFIG =
       new ConfigBuilder(STATISTICS_PROVIDER)
@@ -95,6 +106,59 @@ public class OptimizerConfig extends Config {
           .stringConf()
           .createWithDefault(NoopJobSubmitter.NAME);
 
+  public static final ConfigEntry<String> STATISTICS_UPDATER_CONFIG =
+      new ConfigBuilder(STATISTICS_UPDATER)
+          .doc("The statistics updater implementation name (matches Provider.name()).")
+          .version(ConfigConstants.VERSION_1_2_0)
+          .stringConf()
+          .create();
+
+  public static final ConfigEntry<String> METRICS_UPDATER_CONFIG =
+      new ConfigBuilder(METRICS_UPDATER)
+          .doc("The metrics updater implementation name (matches Provider.name()).")
+          .version(ConfigConstants.VERSION_1_2_0)
+          .stringConf()
+          .create();
+
+  public static final ConfigEntry<String> METRICS_PROVIDER_CONFIG =
+      new ConfigBuilder(METRICS_PROVIDER)
+          .doc(
+              "Monitor metrics provider implementation name (matches Provider.name()) "
+                  + "discoverable via ServiceLoader. Example: 'metrics-provider'.")
+          .version(ConfigConstants.VERSION_1_2_0)
+          .stringConf()
+          .create();
+
+  public static final ConfigEntry<String> JOB_PROVIDER_CONFIG =
+      new ConfigBuilder(JOB_PROVIDER)
+          .doc(
+              "Monitor job provider implementation name (matches Provider.name()) discoverable "
+                  + "via ServiceLoader. Example: 'job-provider'.")
+          .version(ConfigConstants.VERSION_1_2_0)
+          .stringConf()
+          .create();
+
+  public static final ConfigEntry<String> METRICS_EVALUATOR_CONFIG =
+      new ConfigBuilder(METRICS_EVALUATOR)
+          .doc(
+              "Monitor metrics evaluator implementation name discoverable via ServiceLoader. "
+                  + "The evaluator name must match MetricsEvaluator.name(). Example: "
+                  + "'metrics-evaluator'.")
+          .version(ConfigConstants.VERSION_1_2_0)
+          .stringConf()
+          .create();
+
+  public static final ConfigEntry<List<String>> MONITOR_CALLBACKS_CONFIG =
+      new ConfigBuilder(MONITOR_CALLBACKS)
+          .doc(
+              "Comma-separated monitor callback implementation names (each matches "
+                  + "Provider.name()) discoverable via ServiceLoader. Example: "
+                  + "'monitor-callback-a,monitor-callback-b'.")
+          .version(ConfigConstants.VERSION_1_2_0)
+          .stringConf()
+          .toSequence()
+          .createWithDefault(List.of());
+
   public static final ConfigEntry<String> GRAVITINO_URI_CONFIG =
       new ConfigBuilder(GRAVITINO_URI)
           .doc("The URI of the Gravitino server.")
@@ -131,5 +195,26 @@ public class OptimizerConfig extends Config {
   public OptimizerConfig(Map<String, String> properties) {
     super(false);
     loadFromMap(properties, k -> true);
+  }
+
+  /**
+   * Returns job submitter custom config entries with the {@code
+   * gravitino.optimizer.jobSubmitterConfig.} prefix stripped.
+   *
+   * @return custom job submitter config map
+   */
+  public Map<String, String> jobSubmitterConfigs() {
+    return getConfigsWithPrefix(JOB_SUBMITTER_CONFIG_PREFIX);
+  }
+
+  public String getStrategyHandlerClassName(String strategyHandlerName) {
+    String configKey =
+        String.format(OPTIMIZER_PREFIX + "strategyHandler.%s.className", strategyHandlerName);
+    return configMap.get(configKey);
+  }
+
+  public String getJobAdapterClassName(String jobTemplateName) {
+    String configKey = String.format(JOB_ADAPTER_PREFIX + "%s.className", jobTemplateName);
+    return configMap.get(configKey);
   }
 }

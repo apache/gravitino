@@ -72,8 +72,7 @@ public class TestScanPlanCache {
 
   @Test
   public void testCacheHit() {
-    PlanTableScanRequest scanRequest =
-        new PlanTableScanRequest.Builder().withSnapshotId(1L).build();
+    PlanTableScanRequest scanRequest = PlanTableScanRequest.builder().withSnapshotId(1L).build();
     PlanTableScanResponse response =
         PlanTableScanResponse.builder()
             .withPlanStatus(PlanStatus.COMPLETED)
@@ -95,9 +94,9 @@ public class TestScanPlanCache {
 
   @Test
   public void testCacheMiss() {
-    PlanTableScanRequest request1 = new PlanTableScanRequest.Builder().withSnapshotId(1L).build();
+    PlanTableScanRequest request1 = PlanTableScanRequest.builder().withSnapshotId(1L).build();
     PlanTableScanRequest request2 =
-        new PlanTableScanRequest.Builder()
+        PlanTableScanRequest.builder()
             .withSelect(Arrays.asList("id", "name"))
             .withSnapshotId(1L)
             .build();
@@ -133,12 +132,12 @@ public class TestScanPlanCache {
   @Test
   public void testCacheKeyWithDifferentSelectOrder() {
     PlanTableScanRequest request1 =
-        new PlanTableScanRequest.Builder()
+        PlanTableScanRequest.builder()
             .withSelect(Arrays.asList("id", "name"))
             .withSnapshotId(1L)
             .build();
     PlanTableScanRequest request2 =
-        new PlanTableScanRequest.Builder()
+        PlanTableScanRequest.builder()
             .withSelect(Arrays.asList("name", "id"))
             .withSnapshotId(1L)
             .build();
@@ -163,8 +162,7 @@ public class TestScanPlanCache {
     TableIdentifier table1 = TableIdentifier.of(Namespace.of("db1"), "table1");
     TableIdentifier table2 = TableIdentifier.of(Namespace.of("db2"), "table2");
 
-    PlanTableScanRequest scanRequest =
-        new PlanTableScanRequest.Builder().withSnapshotId(1L).build();
+    PlanTableScanRequest scanRequest = PlanTableScanRequest.builder().withSnapshotId(1L).build();
 
     PlanTableScanResponse response1 =
         PlanTableScanResponse.builder()
@@ -195,8 +193,8 @@ public class TestScanPlanCache {
 
   @Test
   public void testCacheKeyWithDifferentSnapshotId() {
-    PlanTableScanRequest request1 = new PlanTableScanRequest.Builder().withSnapshotId(1L).build();
-    PlanTableScanRequest request2 = new PlanTableScanRequest.Builder().withSnapshotId(2L).build();
+    PlanTableScanRequest request1 = PlanTableScanRequest.builder().withSnapshotId(1L).build();
+    PlanTableScanRequest request2 = PlanTableScanRequest.builder().withSnapshotId(2L).build();
 
     PlanTableScanResponse response1 =
         PlanTableScanResponse.builder()
@@ -229,9 +227,9 @@ public class TestScanPlanCache {
     // if they differ in other parameters
     when(mockTable.currentSnapshot()).thenReturn(null);
 
-    PlanTableScanRequest request1 = new PlanTableScanRequest.Builder().withSnapshotId(1L).build();
+    PlanTableScanRequest request1 = PlanTableScanRequest.builder().withSnapshotId(1L).build();
     PlanTableScanRequest request2 =
-        new PlanTableScanRequest.Builder()
+        PlanTableScanRequest.builder()
             .withSnapshotId(1L)
             .withSelect(Arrays.asList("id", "name"))
             .build();
@@ -281,9 +279,9 @@ public class TestScanPlanCache {
         "Standard isEquivalentTo() should return false for simple expression.");
 
     PlanTableScanRequest request1 =
-        new PlanTableScanRequest.Builder().withFilter(expr1).withSnapshotId(1L).build();
+        PlanTableScanRequest.builder().withFilter(expr1).withSnapshotId(1L).build();
     PlanTableScanRequest request2 =
-        new PlanTableScanRequest.Builder().withFilter(expr2).withSnapshotId(1L).build();
+        PlanTableScanRequest.builder().withFilter(expr2).withSnapshotId(1L).build();
 
     ScanPlanCacheKey key1 = ScanPlanCacheKey.create(tableIdentifier, mockTable, request1);
     ScanPlanCacheKey key2 = ScanPlanCacheKey.create(tableIdentifier, mockTable, request2);
