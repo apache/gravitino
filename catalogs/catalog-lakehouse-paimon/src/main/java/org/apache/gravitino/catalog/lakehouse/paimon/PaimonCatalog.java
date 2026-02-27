@@ -18,6 +18,7 @@
  */
 package org.apache.gravitino.catalog.lakehouse.paimon;
 
+import com.google.common.collect.Maps;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
@@ -91,8 +92,8 @@ public class PaimonCatalog extends BaseCatalog<PaimonCatalog> {
   }
 
   @Override
-  public Map<String, String> properties() {
-    Map<String, String> properties = super.properties();
+  public Map<String, String> propertiesWithCredentialProviders() {
+    Map<String, String> properties = Maps.newHashMap(super.propertiesWithCredentialProviders());
     return buildCredentialProvidersIfNecessary(properties);
   }
 

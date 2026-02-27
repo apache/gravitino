@@ -18,6 +18,7 @@
  */
 package org.apache.gravitino.catalog.lakehouse.iceberg;
 
+import com.google.common.collect.Maps;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
@@ -95,8 +96,8 @@ public class IcebergCatalog extends BaseCatalog<IcebergCatalog> {
   }
 
   @Override
-  public Map<String, String> properties() {
-    Map<String, String> properties = super.properties();
+  public Map<String, String> propertiesWithCredentialProviders() {
+    Map<String, String> properties = Maps.newHashMap(super.propertiesWithCredentialProviders());
     return buildCredentialProvidersIfNecessary(properties);
   }
 

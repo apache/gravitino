@@ -258,7 +258,7 @@ public class TestIcebergCatalog {
 
     IcebergCatalog jdbcCatalog =
         new IcebergCatalog().withCatalogConf(jdbcProps).withCatalogEntity(jdbcEntity);
-    Map<String, String> properties = jdbcCatalog.properties();
+    Map<String, String> properties = jdbcCatalog.propertiesWithCredentialProviders();
 
     // Should have jdbc credential provider
     String credentialProviders = properties.get(CredentialConstants.CREDENTIAL_PROVIDERS);
@@ -293,7 +293,7 @@ public class TestIcebergCatalog {
 
     IcebergCatalog jdbcS3Catalog =
         new IcebergCatalog().withCatalogConf(jdbcS3Props).withCatalogEntity(jdbcS3Entity);
-    Map<String, String> properties = jdbcS3Catalog.properties();
+    Map<String, String> properties = jdbcS3Catalog.propertiesWithCredentialProviders();
 
     // Should have both jdbc and s3-secret-key credential providers
     String credentialProviders = properties.get(CredentialConstants.CREDENTIAL_PROVIDERS);
@@ -326,7 +326,7 @@ public class TestIcebergCatalog {
 
     IcebergCatalog hiveCatalog =
         new IcebergCatalog().withCatalogConf(hiveProps).withCatalogEntity(hiveEntity);
-    Map<String, String> properties = hiveCatalog.properties();
+    Map<String, String> properties = hiveCatalog.propertiesWithCredentialProviders();
 
     // Should not have credential providers for non-JDBC backend
     String credentialProviders = properties.get(CredentialConstants.CREDENTIAL_PROVIDERS);
@@ -359,7 +359,7 @@ public class TestIcebergCatalog {
 
     IcebergCatalog explicitCatalog =
         new IcebergCatalog().withCatalogConf(explicitProps).withCatalogEntity(explicitEntity);
-    Map<String, String> properties = explicitCatalog.properties();
+    Map<String, String> properties = explicitCatalog.propertiesWithCredentialProviders();
 
     // Should keep explicit credential providers, not override
     String credentialProviders = properties.get(CredentialConstants.CREDENTIAL_PROVIDERS);
@@ -393,7 +393,7 @@ public class TestIcebergCatalog {
 
     IcebergCatalog jdbcOssCatalog =
         new IcebergCatalog().withCatalogConf(jdbcOssProps).withCatalogEntity(jdbcOssEntity);
-    Map<String, String> properties = jdbcOssCatalog.properties();
+    Map<String, String> properties = jdbcOssCatalog.propertiesWithCredentialProviders();
 
     // Should have both jdbc and oss-secret-key credential providers
     String credentialProviders = properties.get(CredentialConstants.CREDENTIAL_PROVIDERS);
@@ -430,7 +430,7 @@ public class TestIcebergCatalog {
 
     IcebergCatalog jdbcAzureCatalog =
         new IcebergCatalog().withCatalogConf(jdbcAzureProps).withCatalogEntity(jdbcAzureEntity);
-    Map<String, String> properties = jdbcAzureCatalog.properties();
+    Map<String, String> properties = jdbcAzureCatalog.propertiesWithCredentialProviders();
 
     // Should have both jdbc and azure-account-key credential providers
     String credentialProviders = properties.get(CredentialConstants.CREDENTIAL_PROVIDERS);

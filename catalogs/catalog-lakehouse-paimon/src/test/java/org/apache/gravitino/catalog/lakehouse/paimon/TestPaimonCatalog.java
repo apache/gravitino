@@ -214,7 +214,7 @@ public class TestPaimonCatalog {
 
     PaimonCatalog jdbcCatalog =
         new PaimonCatalog().withCatalogConf(jdbcProps).withCatalogEntity(jdbcEntity);
-    Map<String, String> properties = jdbcCatalog.properties();
+    Map<String, String> properties = jdbcCatalog.propertiesWithCredentialProviders();
 
     // Should have jdbc credential provider
     String credentialProviders = properties.get(CredentialConstants.CREDENTIAL_PROVIDERS);
@@ -250,7 +250,7 @@ public class TestPaimonCatalog {
 
     PaimonCatalog jdbcS3Catalog =
         new PaimonCatalog().withCatalogConf(jdbcS3Props).withCatalogEntity(jdbcS3Entity);
-    Map<String, String> properties = jdbcS3Catalog.properties();
+    Map<String, String> properties = jdbcS3Catalog.propertiesWithCredentialProviders();
 
     // Should have both jdbc and s3-secret-key credential providers
     String credentialProviders = properties.get(CredentialConstants.CREDENTIAL_PROVIDERS);
@@ -283,7 +283,7 @@ public class TestPaimonCatalog {
 
     PaimonCatalog fsCatalog =
         new PaimonCatalog().withCatalogConf(fsProps).withCatalogEntity(fsEntity);
-    Map<String, String> properties = fsCatalog.properties();
+    Map<String, String> properties = fsCatalog.propertiesWithCredentialProviders();
 
     // Should not have credential providers for non-JDBC backend
     String credentialProviders = properties.get(CredentialConstants.CREDENTIAL_PROVIDERS);
@@ -317,7 +317,7 @@ public class TestPaimonCatalog {
 
     PaimonCatalog explicitCatalog =
         new PaimonCatalog().withCatalogConf(explicitProps).withCatalogEntity(explicitEntity);
-    Map<String, String> properties = explicitCatalog.properties();
+    Map<String, String> properties = explicitCatalog.propertiesWithCredentialProviders();
 
     // Should keep explicit credential providers, not override
     String credentialProviders = properties.get(CredentialConstants.CREDENTIAL_PROVIDERS);
