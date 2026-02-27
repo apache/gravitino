@@ -356,15 +356,12 @@ public class MetadataAuthzHelper {
 
   private static void preloadToCache(
       Entity.EntityType entityType, NameIdentifier[] nameIdentifiers) {
-<<<<<<< HEAD
     Config config = GravitinoEnv.getInstance().config();
-    if (config == null || !config.get(Configs.CACHE_ENABLED)) {
-=======
     // If cache is not enabled or access control dispatcher is not set, skip preloading to cache
-    if (!GravitinoEnv.getInstance().cacheEnabled()
+    if (config == null
+        || !config.get(Configs.CACHE_ENABLED)
         || GravitinoEnv.getInstance().accessControlDispatcher() == null
         || nameIdentifiers.length == 0) {
->>>>>>> 7d0a8282f ([#10055] fix(authz): Fix `NoSuchEntityException` caused by unimported schema entity (#10059))
       return;
     }
 
