@@ -49,7 +49,6 @@ from tests.unittests.auth.mock_base import (
     mock_authentication_invalid_grant_error,
 )
 
-
 # pylint: disable=protected-access,too-many-lines,too-many-locals
 
 
