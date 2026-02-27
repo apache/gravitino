@@ -111,9 +111,9 @@ license: "This software is licensed under the Apache License version 2."
    ./gradlew assembleDistribution
    ```
 
-  The `assembleDistribution` command creates `gravitino-{version}-bin.tar.gz`, `gravitino-{version}-bin.tar.gz.sha256`, `gravitino-all-{version}-bin.tar.gz`, `gravitino-all-{version}-bin.tar.gz.sha256` under the `distribution` directory.
-
-  About the difference between `gravitino-{version}-bin.tar.gz` and `gravitino-all-{version}-bin.tar.gz`, please refer to the explanation of the difference between `package` and `package-all` in the previous step.
+  The `assembleDistribution` command creates `gravitino-{version}-bin.tar.gz`, `gravitino-{version}-bin.tar.gz.sha256`, `gravitino-{version}-bin-all.tar.gz`, `gravitino-{version}-bin-all.tar.gz.sha256` under the `distribution` directory.
+  
+  About the difference between `gravitino-{version}-bin.tar.gz` and `gravitino-{version}-bin-all.tar.gz`, please refer to the explanation of the difference between `package` and `package-all` in the previous step.  
 
   You can deploy these to your production environment.
 
