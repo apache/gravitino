@@ -1,5 +1,5 @@
 SELECT
-  sum(l.extendedprice)/7.0 as avg_yearly
+  CAST(sum(l.extendedprice)/7.0 AS DECIMAL(38, 2)) as avg_yearly
 FROM
   lineitem l,
   part p

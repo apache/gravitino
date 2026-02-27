@@ -28,8 +28,8 @@ rm -rf "${trino_dir}/packages"
 mkdir -p "${trino_dir}/packages"
 
 cd ${gravitino_home}
-${gravitino_home}/gradlew :trino-connector:trino-connector-469-472:assembleTrinoConnector -x test
-cp -r "${gravitino_home}/distribution/gravitino-trino-connector-469-472" "${trino_dir}/packages/gravitino-trino-connector"
+${gravitino_home}/gradlew :trino-connector:trino-connector-478:assembleTrinoConnector -x test
+cp -r "${gravitino_home}/distribution/gravitino-trino-connector-478" "${trino_dir}/packages/gravitino-trino-connector"
 
 MYSQL_VERSION="8.0.27"
 PG_VERSION="42.7.0"
