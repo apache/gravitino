@@ -1712,10 +1712,13 @@ public class POConverters {
    *
    * @param oldModelVersionAliasRelPOs The old ModelVersionAliasRelPOs object
    * @param newModelVersion The new {@link ModelVersionEntity} object
+   * @param modelId The DB ID of the model entity
    * @return The new ModelVersionAliasRelPO object
    */
   public static List<ModelVersionAliasRelPO> updateModelVersionAliasRelPO(
-      List<ModelVersionAliasRelPO> oldModelVersionAliasRelPOs, ModelVersionEntity newModelVersion) {
+      List<ModelVersionAliasRelPO> oldModelVersionAliasRelPOs,
+      ModelVersionEntity newModelVersion,
+      Long modelId) {
 
     if (!oldModelVersionAliasRelPOs.isEmpty()) {
       ModelVersionAliasRelPO oldModelVersionAliasRelPO = oldModelVersionAliasRelPOs.get(0);
@@ -1724,7 +1727,7 @@ public class POConverters {
           .collect(Collectors.toList());
     } else {
       return newModelVersion.aliases().stream()
-          .map(alias -> createAliasRelPO(newModelVersion, alias))
+          .map(alias -> createAliasRelPO(modelId, newModelVersion.version(), alias))
           .collect(Collectors.toList());
     }
   }
@@ -1785,11 +1788,11 @@ public class POConverters {
         .build();
   }
 
-  private static ModelVersionAliasRelPO createAliasRelPO(ModelVersionEntity entity, String alias) {
+  private static ModelVersionAliasRelPO createAliasRelPO(Long modelId, int version, String alias) {
     return ModelVersionAliasRelPO.builder()
-        .withModelVersion(entity.version())
+        .withModelVersion(version)
         .withModelVersionAlias(alias)
-        .withModelId(entity.id())
+        .withModelId(modelId)
         .withDeletedAt(DEFAULT_DELETED_AT)
         .build();
   }
