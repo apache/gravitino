@@ -44,6 +44,9 @@ dependencies {
   implementation(libs.guava)
   implementation(libs.h2db)
   implementation(libs.jackson.jaxrs.json.provider) // This is required by lance
+  implementation(libs.langchain4j.openai)
+  implementation(libs.langchain4j)
+
   implementation(libs.lance) {
     exclude(group = "com.fasterxml.jackson.core", module = "*") // provided by gravitino
     exclude(group = "com.fasterxml.jackson.datatype", module = "*") // provided by gravitino
@@ -56,6 +59,7 @@ dependencies {
     exclude(group = "com.lancedb", module = "lance-namespace-core") // This is unnecessary in the core module
   }
   implementation(libs.mybatis)
+  implementation(libs.mysql.driver)
 
   annotationProcessor(libs.lombok)
 
@@ -73,7 +77,7 @@ dependencies {
   testImplementation(libs.junit.jupiter.params)
   testImplementation(libs.mockito.core)
   testImplementation(libs.mockito.inline)
-  testImplementation(libs.mysql.driver)
+
   testImplementation(libs.postgresql.driver)
   testImplementation(libs.testcontainers)
 

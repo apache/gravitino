@@ -24,6 +24,7 @@ import org.apache.gravitino.Entity;
 import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
+import org.apache.gravitino.ai.AiService;
 import org.apache.gravitino.authorization.AuthorizationUtils;
 import org.apache.gravitino.authorization.Owner;
 import org.apache.gravitino.authorization.OwnerDispatcher;
@@ -87,6 +88,7 @@ public class TableHookDispatcher implements TableDispatcher {
           PrincipalUtils.getCurrentUserName(),
           Owner.Type.USER);
     }
+    AiService.getInstance().asyncAiEvaluation(table, ident);
     return table;
   }
 
