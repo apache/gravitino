@@ -17,6 +17,7 @@
 
 package org.apache.gravitino.server.authorization;
 
+import com.google.common.base.Preconditions;
 import java.lang.reflect.Array;
 import java.security.Principal;
 import java.util.ArrayList;
@@ -36,6 +37,7 @@ import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.Metalake;
 import org.apache.gravitino.NameIdentifier;
+import org.apache.gravitino.Namespace;
 import org.apache.gravitino.authorization.AuthorizationRequestContext;
 import org.apache.gravitino.authorization.GravitinoAuthorizer;
 import org.apache.gravitino.dto.tag.MetadataObjectDTO;
@@ -75,6 +77,13 @@ public class MetadataAuthzHelper {
           Entity.EntityType.POLICY,
           Entity.EntityType.JOB,
           Entity.EntityType.JOB_TEMPLATE);
+
+  /**
+   * Topic and Table may be from the external system and the schema may not exist in Gravitino, so
+   * we need to import the schema first
+   */
+  private static final List<Entity.EntityType> REQUIRE_SCHEMA_EXISTS =
+      Arrays.asList(Entity.EntityType.TABLE, Entity.EntityType.TOPIC);
 
   private MetadataAuthzHelper() {}
 
@@ -348,13 +357,32 @@ public class MetadataAuthzHelper {
   private static void preloadToCache(
       Entity.EntityType entityType, NameIdentifier[] nameIdentifiers) {
     Config config = GravitinoEnv.getInstance().config();
-    if (config == null || !config.get(Configs.CACHE_ENABLED)) {
+    // If cache is not enabled or access control dispatcher is not set, skip preloading to cache
+    if (config == null
+        || !config.get(Configs.CACHE_ENABLED)
+        || GravitinoEnv.getInstance().accessControlDispatcher() == null
+        || nameIdentifiers.length == 0) {
       return;
     }
 
     // Only preload entity types that support batch get operations
     if (!SUPPORTED_PRELOAD_ENTITY_TYPES.contains(entityType)) {
       return;
+    }
+
+    if (REQUIRE_SCHEMA_EXISTS.contains(entityType)) {
+      // For entity types that require schema existence, check if the schema exists before
+      // preloading to cache
+      Namespace firstNamespace = nameIdentifiers[0].namespace();
+      Preconditions.checkArgument(
+          Arrays.stream(nameIdentifiers).allMatch(id -> id.namespace().equals(firstNamespace)),
+          "All identifiers must have the same schema");
+
+      if (!GravitinoEnv.getInstance()
+          .schemaDispatcher()
+          .schemaExists(NameIdentifier.parse(firstNamespace.toString()))) {
+        return;
+      }
     }
 
     GravitinoEnv.getInstance()
