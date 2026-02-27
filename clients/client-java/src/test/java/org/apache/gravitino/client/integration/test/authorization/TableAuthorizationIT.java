@@ -134,7 +134,7 @@ public class TableAuthorizationIT extends BaseRestApiAuthorizationIT {
     // owner can create table
     TableCatalog tableCatalog = client.loadMetalake(METALAKE).loadCatalog(CATALOG).asTableCatalog();
 
-    // ISSUE-10005:  Fix SoSuchEntityException caused by unimported schema entity
+    // ISSUE-10005:  Fix NoSuchEntityException caused by unimported schema entity
     assertDoesNotThrow(
         () -> {
           tableCatalog.listTables(Namespace.of("default"));
