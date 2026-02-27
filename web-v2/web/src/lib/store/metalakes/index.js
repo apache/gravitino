@@ -80,12 +80,15 @@ import {
 import { getFunctionsApi } from '@/lib/api/functions'
 
 const remapExpandedAndLoadedNodes = ({ getState, mapNode, expandedFilter, loadedFilter }) => {
-  const expandedNodes = getState().metalakes.expandedNodes.map(mapNode)
-  const loadedNodes = getState().metalakes.loadedNodes.map(mapNode)
+  const originalExpandedNodes = getState().metalakes.expandedNodes
+  const originalLoadedNodes = getState().metalakes.loadedNodes
+
+  const filteredExpandedNodes = expandedFilter ? originalExpandedNodes.filter(expandedFilter) : originalExpandedNodes
+  const filteredLoadedNodes = loadedFilter ? originalLoadedNodes.filter(loadedFilter) : originalLoadedNodes
 
   return {
-    expanded: expandedFilter ? expandedNodes.filter(expandedFilter) : expandedNodes,
-    loaded: loadedFilter ? loadedNodes.filter(loadedFilter) : loadedNodes
+    expanded: filteredExpandedNodes.map(mapNode),
+    loaded: filteredLoadedNodes.map(mapNode)
   }
 }
 
