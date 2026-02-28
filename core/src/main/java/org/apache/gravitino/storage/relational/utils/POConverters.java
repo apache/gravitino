@@ -1724,7 +1724,12 @@ public class POConverters {
     if (!oldModelVersionAliasRelPOs.isEmpty()) {
       ModelVersionAliasRelPO oldModelVersionAliasRelPO = oldModelVersionAliasRelPOs.get(0);
       return newModelVersion.aliases().stream()
-          .map(alias -> createAliasRelPO(oldModelVersionAliasRelPO, alias))
+          .map(
+              alias ->
+                  createAliasRelPO(
+                      oldModelVersionAliasRelPO.getModelId(),
+                      oldModelVersionAliasRelPO.getModelVersion(),
+                      alias))
           .collect(Collectors.toList());
     } else {
       return newModelVersion.aliases().stream()
@@ -1777,16 +1782,6 @@ public class POConverters {
                     .withDeletedAt(DEFAULT_DELETED_AT)
                     .build())
         .collect(Collectors.toList());
-  }
-
-  private static ModelVersionAliasRelPO createAliasRelPO(
-      ModelVersionAliasRelPO oldModelVersionAliasRelPO, String alias) {
-    return ModelVersionAliasRelPO.builder()
-        .withModelVersion(oldModelVersionAliasRelPO.getModelVersion())
-        .withModelVersionAlias(alias)
-        .withModelId(oldModelVersionAliasRelPO.getModelId())
-        .withDeletedAt(DEFAULT_DELETED_AT)
-        .build();
   }
 
   private static ModelVersionAliasRelPO createAliasRelPO(Long modelId, int version, String alias) {
