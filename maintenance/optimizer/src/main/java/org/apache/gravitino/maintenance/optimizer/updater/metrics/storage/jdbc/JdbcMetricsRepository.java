@@ -65,8 +65,10 @@ public abstract class JdbcMetricsRepository implements MetricsRepository {
   private static final int MAX_METRIC_NAME_LENGTH = 1024;
   private static final long MAX_REASONABLE_EPOCH_SECONDS = 9_999_999_999L;
   private static final String DATABASE_PRODUCT_H2 = "h2";
+  private static final String DATABASE_PRODUCT_MYSQL = "mysql";
+  private static final String DATABASE_PRODUCT_POSTGRESQL = "postgresql";
   private static final String H2_SCHEMA_FILE_NAME =
-      "optimizer-metrics-schema-" + ConfigConstants.CURRENT_SCRIPT_VERSION + "-h2.sql";
+      "schema-" + ConfigConstants.CURRENT_SCRIPT_VERSION + "-h2.sql";
   private static final String TABLE_METRICS_TABLE = "table_metrics";
   private static final String JOB_METRICS_TABLE = "job_metrics";
   private static final Set<String> REQUIRED_TABLE_METRICS_COLUMNS =
@@ -185,6 +187,12 @@ public abstract class JdbcMetricsRepository implements MetricsRepository {
         connection.getMetaData().getDatabaseProductName().toLowerCase(Locale.ROOT);
     if (databaseProduct.contains(DATABASE_PRODUCT_H2)) {
       return new H2MetricsDialect();
+    }
+    if (databaseProduct.contains(DATABASE_PRODUCT_MYSQL)) {
+      return new MySQLMetricsDialect();
+    }
+    if (databaseProduct.contains(DATABASE_PRODUCT_POSTGRESQL)) {
+      return new PostgreSQLMetricsDialect();
     }
 
     throw new IllegalArgumentException(

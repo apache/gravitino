@@ -162,7 +162,7 @@ class TestGravitinoMetricsUpdater {
   @Test
   void testInitializeWithJdbcConfigStillUsesGenericJdbcRepository() throws Exception {
     GravitinoMetricsUpdater updater = new GravitinoMetricsUpdater();
-    String jdbcUrl = "jdbc:h2:mem:test_metrics_updater_repo_type;DB_CLOSE_DELAY=-1";
+    String jdbcUrl = "jdbc:h2:mem:test_metrics_updater_repo_type;DB_CLOSE_DELAY=-1;MODE=MYSQL";
     OptimizerConfig config =
         new OptimizerConfig(
             Map.of(
