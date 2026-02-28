@@ -30,6 +30,7 @@ import com.github.benmanes.caffeine.cache.Cache;
 import com.github.benmanes.caffeine.cache.Caffeine;
 import com.github.benmanes.caffeine.cache.Scheduler;
 import com.google.common.base.Preconditions;
+import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Iterables;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
@@ -114,6 +115,9 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
   private static final String CATALOG_DOES_NOT_EXIST_MSG = "Catalog %s does not exist";
 
   private static final Logger LOG = LoggerFactory.getLogger(CatalogManager.class);
+
+  private static final Set<String> CONTRIB_CATALOGS_TYPES =
+      ImmutableSet.of("jdbc-oceanbase", "jdbc-clickhouse");
 
   /** Wrapper class for a catalog instance and its class loader. */
   public static class CatalogWrapper {
@@ -1115,6 +1119,19 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
     if (pkg != null) {
       confPath = String.join(File.separator, pkg, "conf");
     } else if (testEnv) {
+      if (CONTRIB_CATALOGS_TYPES.contains(provider)) {
+        confPath =
+            String.join(
+                File.separator,
+                gravitinoHome,
+                "catalogs-contrib",
+                "catalog-" + provider,
+                "build",
+                "resources",
+                "main");
+        return confPath;
+      }
+
       confPath =
           String.join(
               File.separator,
@@ -1141,6 +1158,18 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
       pkgPath = String.join(File.separator, pkg, "libs");
     } else if (testEnv) {
       // In test, the catalog package is under the build directory.
+      if (CONTRIB_CATALOGS_TYPES.contains(provider)) {
+        pkgPath =
+            String.join(
+                File.separator,
+                gravitinoHome,
+                "catalogs-contrib",
+                "catalog-" + provider,
+                "build",
+                "libs");
+        return pkgPath;
+      }
+
       pkgPath =
           String.join(
               File.separator, gravitinoHome, "catalogs", "catalog-" + provider, "build", "libs");
