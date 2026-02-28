@@ -598,6 +598,29 @@ subprojects {
       initTest(this)
     }
 
+    doFirst {
+      extensions.extraProperties["testTaskStartTimeMs"] = System.currentTimeMillis()
+      logger.lifecycle(
+        "[TEST-TIMING] START module={} task={} at={}",
+        project.path,
+        path,
+        extensions.extraProperties["testTaskStartTimeMs"]
+      )
+    }
+
+    doLast {
+      val endTimeMs = System.currentTimeMillis()
+      val startTimeMs = extensions.extraProperties["testTaskStartTimeMs"] as? Long ?: endTimeMs
+      logger.lifecycle(
+        "[TEST-TIMING] END module={} task={} startMs={} endMs={} durationMs={}",
+        project.path,
+        path,
+        startTimeMs,
+        endTimeMs,
+        endTimeMs - startTimeMs
+      )
+    }
+
     testLogging {
       exceptionFormat = TestExceptionFormat.FULL
       showExceptions = true
