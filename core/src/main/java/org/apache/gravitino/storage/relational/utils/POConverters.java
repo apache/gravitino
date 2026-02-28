@@ -1708,12 +1708,13 @@ public class POConverters {
   }
 
   /**
-   * Construct a new ModelVersionAliasRelPO object with the given alias.
+   * Construct a list of new {@link ModelVersionAliasRelPO} objects for the updated model version,
+   * one entry per alias in the new model version.
    *
-   * @param oldModelVersionAliasRelPOs The old ModelVersionAliasRelPOs object
+   * @param oldModelVersionAliasRelPOs The old ModelVersionAliasRelPOs list
    * @param newModelVersion The new {@link ModelVersionEntity} object
    * @param modelId The DB ID of the model entity
-   * @return The new ModelVersionAliasRelPO object
+   * @return A list of new {@link ModelVersionAliasRelPO} objects, one per alias
    */
   public static List<ModelVersionAliasRelPO> updateModelVersionAliasRelPO(
       List<ModelVersionAliasRelPO> oldModelVersionAliasRelPOs,
