@@ -77,7 +77,11 @@ class LocalTableJobRelationReader {
         collectJobs(mappingLine.jobIdentifiers, jobs, lineNumber);
       }
     } catch (IOException e) {
-      throw new RuntimeException("Failed to read job mappings", e);
+      throw new RuntimeException(
+          String.format(
+              "Failed to read job mappings from file %s for table %s",
+              jobFilePath, tableIdentifier),
+          e);
     }
 
     return List.copyOf(jobs);

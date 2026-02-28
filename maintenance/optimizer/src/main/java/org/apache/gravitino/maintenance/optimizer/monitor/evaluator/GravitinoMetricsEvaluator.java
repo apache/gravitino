@@ -224,7 +224,7 @@ public class GravitinoMetricsEvaluator implements MetricsEvaluator {
       List<MetricSample> beforeSamples = sanitizeSamples(findMetricSamples(before, metricName));
       List<MetricSample> afterSamples = sanitizeSamples(findMetricSamples(after, metricName));
       if (beforeSamples.isEmpty() || afterSamples.isEmpty()) {
-        LOG.info(
+        LOG.debug(
             "Metric {} of {} ({}) has insufficient samples: beforeSize={}, afterSize={}",
             metricName,
             scope.identifier(),
@@ -238,7 +238,7 @@ public class GravitinoMetricsEvaluator implements MetricsEvaluator {
       OptionalDouble beforeValue = aggregate(beforeSamples, aggregation);
       OptionalDouble afterValue = aggregate(afterSamples, aggregation);
       if (beforeValue.isEmpty() || afterValue.isEmpty()) {
-        LOG.info(
+        LOG.debug(
             "Metric {} of {} ({}) cannot be aggregated by {}",
             metricName,
             scope.identifier(),
