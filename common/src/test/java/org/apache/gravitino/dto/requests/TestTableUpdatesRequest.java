@@ -312,11 +312,9 @@ public class TestTableUpdatesRequest {
 
   @Test
   public void testUpdateColumnCommentWithEmptyString() {
-    // Test that empty string comments are allowed (to clear comments)
     TableUpdateRequest.UpdateTableColumnCommentRequest request =
         new TableUpdateRequest.UpdateTableColumnCommentRequest(new String[] {"column1"}, "");
 
-    // validate() should NOT throw exception
     request.validate();
 
     Assertions.assertEquals("", request.getNewComment());
@@ -325,11 +323,9 @@ public class TestTableUpdatesRequest {
 
   @Test
   public void testUpdateColumnCommentWithNull() {
-    // Test that null comments are allowed (to clear comments)
     TableUpdateRequest.UpdateTableColumnCommentRequest request =
         new TableUpdateRequest.UpdateTableColumnCommentRequest(new String[] {"column1"}, null);
 
-    // validate() should NOT throw exception
     request.validate();
 
     Assertions.assertNull(request.getNewComment());
@@ -338,7 +334,6 @@ public class TestTableUpdatesRequest {
 
   @Test
   public void testUpdateColumnCommentWithValidValue() {
-    // Test that normal comments still work
     TableUpdateRequest.UpdateTableColumnCommentRequest request =
         new TableUpdateRequest.UpdateTableColumnCommentRequest(
             new String[] {"column1"}, "This is a valid comment");
