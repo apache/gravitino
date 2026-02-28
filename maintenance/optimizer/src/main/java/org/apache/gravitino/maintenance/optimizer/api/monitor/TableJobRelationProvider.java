@@ -17,32 +17,21 @@
  * under the License.
  */
 
-package org.apache.gravitino.maintenance.optimizer.monitor.job;
+package org.apache.gravitino.maintenance.optimizer.api.monitor;
 
 import java.util.List;
 import org.apache.gravitino.NameIdentifier;
-import org.apache.gravitino.maintenance.optimizer.api.monitor.JobProvider;
-import org.apache.gravitino.maintenance.optimizer.common.OptimizerEnv;
+import org.apache.gravitino.annotation.DeveloperApi;
+import org.apache.gravitino.maintenance.optimizer.api.common.Provider;
 
-public class JobProviderForTest implements JobProvider {
-
-  public static final String NAME = "job-provider-for-test";
-  public static final NameIdentifier JOB1 = NameIdentifier.parse("test.db.job1");
-  public static final NameIdentifier JOB2 = NameIdentifier.parse("test.db.job2");
-
-  @Override
-  public String name() {
-    return NAME;
-  }
-
-  @Override
-  public void initialize(OptimizerEnv optimizerEnv) {}
-
-  @Override
-  public List<NameIdentifier> jobIdentifiers(NameIdentifier tableIdentifier) {
-    return List.of(JOB1, JOB2);
-  }
-
-  @Override
-  public void close() throws Exception {}
+/** Represents a provider that provides upstream and downstream jobs for a table. */
+@DeveloperApi
+public interface TableJobRelationProvider extends Provider {
+  /**
+   * List jobs related to the provided table.
+   *
+   * @param tableIdentifier catalog/schema/table identifier
+   * @return identifiers for jobs touching this table
+   */
+  List<NameIdentifier> jobIdentifiers(NameIdentifier tableIdentifier);
 }

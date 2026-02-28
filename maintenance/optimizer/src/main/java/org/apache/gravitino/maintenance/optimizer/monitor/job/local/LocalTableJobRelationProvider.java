@@ -24,12 +24,13 @@ import java.nio.file.Path;
 import java.util.List;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.NameIdentifier;
-import org.apache.gravitino.maintenance.optimizer.api.monitor.JobProvider;
+import org.apache.gravitino.maintenance.optimizer.api.monitor.TableJobRelationProvider;
 import org.apache.gravitino.maintenance.optimizer.common.OptimizerEnv;
 import org.apache.gravitino.maintenance.optimizer.common.conf.OptimizerConfig;
 
 /**
- * A {@link JobProvider} that reads table-to-jobs mappings from a local JSON-lines file.
+ * A {@link TableJobRelationProvider} that reads table-to-jobs mappings from a local JSON-lines
+ * file.
  *
  * <p>Usage:
  *
@@ -58,7 +59,7 @@ import org.apache.gravitino.maintenance.optimizer.common.conf.OptimizerConfig;
  *   <li>Malformed lines and invalid entries are skipped with warning logs.
  * </ul>
  */
-public class LocalJobProvider implements JobProvider {
+public class LocalTableJobRelationProvider implements TableJobRelationProvider {
 
   public static final String NAME = "local-job-provider";
   public static final String CONFIG_NAME = "localJobProvider";
@@ -67,7 +68,7 @@ public class LocalJobProvider implements JobProvider {
   public static final String JOB_FILE_PATH_CONFIG =
       OptimizerConfig.MONITOR_PREFIX + CONFIG_NAME + ".filePath";
 
-  private FileJobReader jobReader;
+  private LocalTableJobRelationReader jobReader;
 
   @Override
   public String name() {
@@ -79,7 +80,7 @@ public class LocalJobProvider implements JobProvider {
     String path = optimizerEnv.config().getRawString(JOB_FILE_PATH_CONFIG);
     if (StringUtils.isBlank(path)) {
       throw new IllegalArgumentException(
-          JOB_FILE_PATH_CONFIG + " must be provided for LocalJobProvider");
+          JOB_FILE_PATH_CONFIG + " must be provided for LocalTableJobRelationProvider");
     }
     Path jobFilePath = Path.of(path).toAbsolutePath().normalize();
     if (!Files.exists(jobFilePath)
@@ -90,13 +91,13 @@ public class LocalJobProvider implements JobProvider {
     }
     String defaultCatalog =
         optimizerEnv.config().get(OptimizerConfig.GRAVITINO_DEFAULT_CATALOG_CONFIG);
-    this.jobReader = new FileJobReader(jobFilePath, defaultCatalog);
+    this.jobReader = new LocalTableJobRelationReader(jobFilePath, defaultCatalog);
   }
 
   @Override
   public List<NameIdentifier> jobIdentifiers(NameIdentifier tableIdentifier) {
     if (jobReader == null) {
-      throw new IllegalStateException("LocalJobProvider is not initialized");
+      throw new IllegalStateException("LocalTableJobRelationProvider is not initialized");
     }
     return jobReader.readJobIdentifiers(tableIdentifier);
   }

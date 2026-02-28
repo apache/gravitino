@@ -21,12 +21,12 @@ package org.apache.gravitino.maintenance.optimizer.monitor.job.dummy;
 
 import java.util.List;
 import org.apache.gravitino.NameIdentifier;
-import org.apache.gravitino.maintenance.optimizer.api.monitor.JobProvider;
+import org.apache.gravitino.maintenance.optimizer.api.monitor.TableJobRelationProvider;
 import org.apache.gravitino.maintenance.optimizer.common.OptimizerEnv;
 import org.apache.gravitino.maintenance.optimizer.common.conf.OptimizerConfig;
 
 /**
- * No-op {@link JobProvider} implementation.
+ * No-op {@link TableJobRelationProvider} implementation.
  *
  * <p>Usage:
  *
@@ -38,7 +38,7 @@ import org.apache.gravitino.maintenance.optimizer.common.conf.OptimizerConfig;
  *
  * <p>Configured by setting {@link OptimizerConfig#JOB_PROVIDER_CONFIG} to {@value #NAME}.
  */
-public class DummyJobProvider implements JobProvider {
+public class DummyJobProvider implements TableJobRelationProvider {
 
   public static final String NAME = "dummy-job-provider";
 

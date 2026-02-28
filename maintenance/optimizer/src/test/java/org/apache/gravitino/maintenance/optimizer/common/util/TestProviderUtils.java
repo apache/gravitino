@@ -26,7 +26,7 @@ import org.apache.gravitino.maintenance.optimizer.api.recommender.StrategyProvid
 import org.apache.gravitino.maintenance.optimizer.api.recommender.TableMetadataProvider;
 import org.apache.gravitino.maintenance.optimizer.monitor.callback.ConsoleMonitorCallback;
 import org.apache.gravitino.maintenance.optimizer.monitor.callback.MonitorCallbackForTest;
-import org.apache.gravitino.maintenance.optimizer.monitor.job.JobProviderForTest;
+import org.apache.gravitino.maintenance.optimizer.monitor.job.TableJobRelationProviderForTest;
 import org.apache.gravitino.maintenance.optimizer.monitor.job.dummy.DummyJobProvider;
 import org.apache.gravitino.maintenance.optimizer.monitor.metrics.MetricsProviderForTest;
 import org.apache.gravitino.maintenance.optimizer.recommender.job.GravitinoJobSubmitter;
@@ -81,10 +81,11 @@ public class TestProviderUtils {
         ProviderUtils.createMetricsProviderInstance(MetricsProviderForTest.NAME)
             instanceof MetricsProviderForTest);
     Assertions.assertTrue(
-        ProviderUtils.createJobProviderInstance(JobProviderForTest.NAME)
-            instanceof JobProviderForTest);
+        ProviderUtils.createTableJobRelationProviderInstance(TableJobRelationProviderForTest.NAME)
+            instanceof TableJobRelationProviderForTest);
     DummyJobProvider dummyJobProvider =
-        (DummyJobProvider) ProviderUtils.createJobProviderInstance(DummyJobProvider.NAME);
+        (DummyJobProvider)
+            ProviderUtils.createTableJobRelationProviderInstance(DummyJobProvider.NAME);
     Assertions.assertNotNull(dummyJobProvider);
     Assertions.assertTrue(
         dummyJobProvider.jobIdentifiers(NameIdentifier.parse("catalog.db.table")).isEmpty());

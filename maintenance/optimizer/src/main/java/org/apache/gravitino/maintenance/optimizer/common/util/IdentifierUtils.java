@@ -24,9 +24,12 @@ import java.util.Optional;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /** Utilities for working with fully qualified table identifiers. */
 public class IdentifierUtils {
+  private static final Logger LOG = LoggerFactory.getLogger(IdentifierUtils.class);
 
   private static final String NORMALIZED_IDENTIFIER_MESSAGE =
       "Identifier must be catalog.schema.table";
@@ -112,6 +115,7 @@ public class IdentifierUtils {
       }
       return Optional.empty();
     } catch (Exception e) {
+      LOG.warn("Failed to parse table identifier: {}", identifierText, e);
       return Optional.empty();
     }
   }
@@ -130,6 +134,7 @@ public class IdentifierUtils {
     try {
       return Optional.of(NameIdentifier.parse(identifierText));
     } catch (Exception e) {
+      LOG.warn("Failed to parse job identifier: {}", identifierText, e);
       return Optional.empty();
     }
   }

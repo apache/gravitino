@@ -39,14 +39,14 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /** Shared reader for file-based job providers. */
-class FileJobReader {
+class LocalTableJobRelationReader {
 
-  private static final Logger LOG = LoggerFactory.getLogger(FileJobReader.class);
+  private static final Logger LOG = LoggerFactory.getLogger(LocalTableJobRelationReader.class);
 
   private final Path jobFilePath;
   private final String defaultCatalogName;
 
-  FileJobReader(Path jobFilePath, String defaultCatalogName) {
+  LocalTableJobRelationReader(Path jobFilePath, String defaultCatalogName) {
     Preconditions.checkArgument(jobFilePath != null, "jobFilePath cannot be null");
     this.jobFilePath = jobFilePath;
     this.defaultCatalogName = defaultCatalogName;

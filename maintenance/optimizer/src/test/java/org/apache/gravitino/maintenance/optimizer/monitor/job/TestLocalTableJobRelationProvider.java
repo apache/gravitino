@@ -28,12 +28,12 @@ import java.util.Map;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.maintenance.optimizer.common.OptimizerEnv;
 import org.apache.gravitino.maintenance.optimizer.common.conf.OptimizerConfig;
-import org.apache.gravitino.maintenance.optimizer.monitor.job.local.LocalJobProvider;
+import org.apache.gravitino.maintenance.optimizer.monitor.job.local.LocalTableJobRelationProvider;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
-class TestLocalJobProvider {
+class TestLocalTableJobRelationProvider {
 
   @TempDir Path tempDir;
 
@@ -50,7 +50,7 @@ class TestLocalJobProvider {
             "{\"identifier\":\"other.table\",\"job-identifiers\":[\"jobX\"]}",
             "malformed json"));
 
-    LocalJobProvider provider = new LocalJobProvider();
+    LocalTableJobRelationProvider provider = new LocalTableJobRelationProvider();
     OptimizerEnv optimizerEnv = new OptimizerEnv(createConfig(jobFile));
     provider.initialize(optimizerEnv);
 
@@ -68,7 +68,7 @@ class TestLocalJobProvider {
 
   @Test
   void testInitializeRequiresFilePath() {
-    LocalJobProvider provider = new LocalJobProvider();
+    LocalTableJobRelationProvider provider = new LocalTableJobRelationProvider();
     OptimizerEnv optimizerEnv = new OptimizerEnv(new OptimizerConfig());
 
     Assertions.assertThrows(
@@ -77,7 +77,7 @@ class TestLocalJobProvider {
 
   @Test
   void testInitializeRejectsMissingFilePath() {
-    LocalJobProvider provider = new LocalJobProvider();
+    LocalTableJobRelationProvider provider = new LocalTableJobRelationProvider();
     Path missingFile = tempDir.resolve("missing-jobs.jsonl");
     OptimizerEnv optimizerEnv = new OptimizerEnv(createConfig(missingFile));
 
@@ -87,7 +87,7 @@ class TestLocalJobProvider {
 
   @Test
   void testJobIdentifiersRequiresInitialize() {
-    LocalJobProvider provider = new LocalJobProvider();
+    LocalTableJobRelationProvider provider = new LocalTableJobRelationProvider();
     Assertions.assertThrows(
         IllegalStateException.class,
         () -> provider.jobIdentifiers(NameIdentifier.parse("catalog.schema.table")));
@@ -95,7 +95,7 @@ class TestLocalJobProvider {
 
   private OptimizerConfig createConfig(Path jobFile) {
     Map<String, String> configs = new HashMap<>();
-    configs.put(LocalJobProvider.JOB_FILE_PATH_CONFIG, jobFile.toString());
+    configs.put(LocalTableJobRelationProvider.JOB_FILE_PATH_CONFIG, jobFile.toString());
     configs.put(OptimizerConfig.GRAVITINO_DEFAULT_CATALOG_CONFIG.getKey(), "catalog");
     return new OptimizerConfig(configs);
   }

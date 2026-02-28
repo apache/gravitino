@@ -32,7 +32,7 @@ import org.apache.gravitino.maintenance.optimizer.common.conf.OptimizerConfig;
 import org.apache.gravitino.maintenance.optimizer.monitor.callback.MonitorCallbackForTest;
 import org.apache.gravitino.maintenance.optimizer.monitor.evaluator.GravitinoMetricsEvaluator;
 import org.apache.gravitino.maintenance.optimizer.monitor.evaluator.MetricsEvaluatorForTest;
-import org.apache.gravitino.maintenance.optimizer.monitor.job.JobProviderForTest;
+import org.apache.gravitino.maintenance.optimizer.monitor.job.TableJobRelationProviderForTest;
 import org.apache.gravitino.maintenance.optimizer.monitor.metrics.MetricsProviderForTest;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
@@ -45,7 +45,9 @@ public class TestMonitor {
         new OptimizerConfig(
             ImmutableMap.<String, String>builder()
                 .put(OptimizerConfig.METRICS_PROVIDER_CONFIG.getKey(), MetricsProviderForTest.NAME)
-                .put(OptimizerConfig.JOB_PROVIDER_CONFIG.getKey(), JobProviderForTest.NAME)
+                .put(
+                    OptimizerConfig.JOB_PROVIDER_CONFIG.getKey(),
+                    TableJobRelationProviderForTest.NAME)
                 .put(
                     OptimizerConfig.METRICS_EVALUATOR_CONFIG.getKey(), MetricsEvaluatorForTest.NAME)
                 .put(OptimizerConfig.MONITOR_CALLBACKS_CONFIG.getKey(), MonitorCallbackForTest.NAME)
@@ -93,7 +95,7 @@ public class TestMonitor {
             .longValue());
 
     Assertions.assertEquals(MetricScope.Type.JOB, jobResult1.scope().type());
-    Assertions.assertEquals(JobProviderForTest.JOB1, jobResult1.scope().identifier());
+    Assertions.assertEquals(TableJobRelationProviderForTest.JOB1, jobResult1.scope().identifier());
     Assertions.assertTrue(jobResult1.evaluation());
     Assertions.assertEquals(99L, jobResult1.beforeMetrics().get("duration").get(0).timestamp());
     Assertions.assertEquals(102L, jobResult1.afterMetrics().get("duration").get(0).timestamp());
@@ -107,7 +109,7 @@ public class TestMonitor {
             .longValue());
 
     Assertions.assertEquals(MetricScope.Type.JOB, jobResult2.scope().type());
-    Assertions.assertEquals(JobProviderForTest.JOB2, jobResult2.scope().identifier());
+    Assertions.assertEquals(TableJobRelationProviderForTest.JOB2, jobResult2.scope().identifier());
     Assertions.assertFalse(jobResult2.evaluation());
     Assertions.assertEquals(98L, jobResult2.beforeMetrics().get("duration").get(0).timestamp());
     Assertions.assertEquals(104L, jobResult2.afterMetrics().get("duration").get(0).timestamp());
@@ -127,7 +129,9 @@ public class TestMonitor {
         new OptimizerConfig(
             ImmutableMap.<String, String>builder()
                 .put(OptimizerConfig.METRICS_PROVIDER_CONFIG.getKey(), MetricsProviderForTest.NAME)
-                .put(OptimizerConfig.JOB_PROVIDER_CONFIG.getKey(), JobProviderForTest.NAME)
+                .put(
+                    OptimizerConfig.JOB_PROVIDER_CONFIG.getKey(),
+                    TableJobRelationProviderForTest.NAME)
                 .put(
                     OptimizerConfig.METRICS_EVALUATOR_CONFIG.getKey(), MetricsEvaluatorForTest.NAME)
                 .put(OptimizerConfig.MONITOR_CALLBACKS_CONFIG.getKey(), MonitorCallbackForTest.NAME)
@@ -173,7 +177,9 @@ public class TestMonitor {
         new OptimizerConfig(
             ImmutableMap.<String, String>builder()
                 .put(OptimizerConfig.METRICS_PROVIDER_CONFIG.getKey(), MetricsProviderForTest.NAME)
-                .put(OptimizerConfig.JOB_PROVIDER_CONFIG.getKey(), JobProviderForTest.NAME)
+                .put(
+                    OptimizerConfig.JOB_PROVIDER_CONFIG.getKey(),
+                    TableJobRelationProviderForTest.NAME)
                 .put(
                     OptimizerConfig.METRICS_EVALUATOR_CONFIG.getKey(), MetricsEvaluatorForTest.NAME)
                 .put(OptimizerConfig.MONITOR_CALLBACKS_CONFIG.getKey(), MonitorCallbackForTest.NAME)
@@ -197,7 +203,9 @@ public class TestMonitor {
         new OptimizerConfig(
             ImmutableMap.<String, String>builder()
                 .put(OptimizerConfig.METRICS_PROVIDER_CONFIG.getKey(), MetricsProviderForTest.NAME)
-                .put(OptimizerConfig.JOB_PROVIDER_CONFIG.getKey(), JobProviderForTest.NAME)
+                .put(
+                    OptimizerConfig.JOB_PROVIDER_CONFIG.getKey(),
+                    TableJobRelationProviderForTest.NAME)
                 .put(
                     OptimizerConfig.METRICS_EVALUATOR_CONFIG.getKey(),
                     GravitinoMetricsEvaluator.NAME)

@@ -25,7 +25,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 import org.apache.gravitino.maintenance.optimizer.api.common.MetricSample;
 import org.apache.gravitino.maintenance.optimizer.api.monitor.MetricScope;
 import org.apache.gravitino.maintenance.optimizer.api.monitor.MetricsEvaluator;
-import org.apache.gravitino.maintenance.optimizer.monitor.job.JobProviderForTest;
+import org.apache.gravitino.maintenance.optimizer.monitor.job.TableJobRelationProviderForTest;
 
 public class MetricsEvaluatorForTest implements MetricsEvaluator {
 
@@ -46,7 +46,7 @@ public class MetricsEvaluatorForTest implements MetricsEvaluator {
     INVOCATIONS.incrementAndGet();
     if (FAIL_JOB2
         && scope.type() == MetricScope.Type.JOB
-        && JobProviderForTest.JOB2.equals(scope.identifier())) {
+        && TableJobRelationProviderForTest.JOB2.equals(scope.identifier())) {
       return false;
     }
     return true;
