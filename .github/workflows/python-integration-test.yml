@@ -40,7 +40,7 @@ jobs:
               - build.gradle.kts
               - gradle.properties
               - gradlew
-              - setting.gradle.kts
+              - settings.gradle.kts
     outputs:
       source_changes: ${{ steps.filter.outputs.source_changes }}
 

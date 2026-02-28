@@ -47,6 +47,8 @@ public class ClickHouseDatabaseOperations extends JdbcDatabaseOperations {
       ImmutableSet.of("information_schema", "default", "system", "INFORMATION_SCHEMA");
   private static final Pattern ON_CLUSTER_PATTERN =
       Pattern.compile("(?i)\\bON\\s+CLUSTER\\s+`?([^`\\s]+)`?");
+  private static final Pattern COMMENT_PATTERN =
+      Pattern.compile("(?i)\\bCOMMENT\\s+'((?:''|[^'])*)'");
 
   @Override
   protected boolean supportSchemaComment() {
@@ -144,6 +146,7 @@ public class ClickHouseDatabaseOperations extends JdbcDatabaseOperations {
 
     Map<String, String> schemaProperties = new HashMap<>();
     schemaProperties.put(ClusterConstants.ON_CLUSTER, String.valueOf(false));
+    String schemaComment = "";
 
     try (Connection connection = getConnection();
         Statement statement = connection.createStatement();
@@ -157,11 +160,19 @@ public class ClickHouseDatabaseOperations extends JdbcDatabaseOperations {
           schemaProperties.put(ClusterConstants.ON_CLUSTER, String.valueOf(true));
           schemaProperties.put(ClusterConstants.CLUSTER_NAME, matcher.group(1));
         } else {
-          String inferredClusterName = detectClusterName(connection, databaseName);
+          String inferredClusterName = detectClusterNameFromQueryLog(connection, databaseName);
+          if (StringUtils.isBlank(inferredClusterName)) {
+            inferredClusterName = detectClusterName(connection, databaseName);
+          }
           if (StringUtils.isNotBlank(inferredClusterName)) {
             schemaProperties.put(ClusterConstants.ON_CLUSTER, String.valueOf(true));
             schemaProperties.put(ClusterConstants.CLUSTER_NAME, inferredClusterName);
           }
+        }
+
+        Matcher commentMatcher = COMMENT_PATTERN.matcher(StringUtils.trimToEmpty(createSql));
+        if (commentMatcher.find()) {
+          schemaComment = commentMatcher.group(1).replace("''", "'");
         }
       }
     } catch (SQLException se) {
@@ -170,6 +181,7 @@ public class ClickHouseDatabaseOperations extends JdbcDatabaseOperations {
 
     return JdbcSchema.builder()
         .withName(databaseName)
+        .withComment(schemaComment)
         .withProperties(ImmutableMap.copyOf(schemaProperties))
         .withAuditInfo(AuditInfo.EMPTY)
         .build();
@@ -213,6 +225,9 @@ public class ClickHouseDatabaseOperations extends JdbcDatabaseOperations {
         }
         clusterHostCount = hostCountResultSet.getInt(1);
       }
+      if (clusterHostCount <= 1) {
+        continue;
+      }
 
       try (Statement statement = connection.createStatement();
           ResultSet dbHostCountResultSet =
@@ -223,6 +238,38 @@ public class ClickHouseDatabaseOperations extends JdbcDatabaseOperations {
                       escapedClusterName, escapedDatabaseName))) {
         if (dbHostCountResultSet.next() && dbHostCountResultSet.getInt(1) == clusterHostCount) {
           return clusterName;
+        }
+      }
+    }
+    return null;
+  }
+
+  private String detectClusterNameFromQueryLog(Connection connection, String databaseName)
+      throws SQLException {
+    String escapedDatabaseName = databaseName.replace("'", "''");
+    try (Statement flushLogStatement = connection.createStatement()) {
+      flushLogStatement.execute("SYSTEM FLUSH LOGS");
+    } catch (SQLException e) {
+      LOG.debug("Failed to flush ClickHouse logs before loading schema {}", databaseName, e);
+    }
+
+    String querySql =
+        String.format(
+            "SELECT query FROM system.query_log "
+                + "WHERE type = 'QueryFinish' "
+                + "AND is_initial_query = 1 "
+                + "AND query_kind = 'Create' "
+                + "AND startsWith(lower(query), 'create database') "
+                + "AND positionCaseInsensitive(query, '`%s`') > 0 "
+                + "ORDER BY event_time DESC LIMIT 20",
+            escapedDatabaseName);
+    try (Statement statement = connection.createStatement();
+        ResultSet resultSet = statement.executeQuery(querySql)) {
+      while (resultSet.next()) {
+        Matcher matcher =
+            ON_CLUSTER_PATTERN.matcher(StringUtils.trimToEmpty(resultSet.getString(1)));
+        if (matcher.find()) {
+          return matcher.group(1);
         }
       }
     }

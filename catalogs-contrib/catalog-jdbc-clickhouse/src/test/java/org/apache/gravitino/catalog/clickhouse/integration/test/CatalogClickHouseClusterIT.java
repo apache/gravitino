@@ -90,6 +90,10 @@ public class CatalogClickHouseClusterIT extends BaseIT {
       GravitinoITUtils.genRandomName("ck_api_cluster_schema");
   private final String sqlClusterSchemaName =
       GravitinoITUtils.genRandomName("ck_sql_cluster_schema");
+  private final String apiNonClusterSchemaName =
+      GravitinoITUtils.genRandomName("ck_api_non_cluster_schema");
+  private final String sqlNonClusterSchemaName =
+      GravitinoITUtils.genRandomName("ck_sql_non_cluster_schema");
   private final String tableComment = "cluster_table_comment";
 
   private GravitinoMetalake metalake;
@@ -370,15 +374,15 @@ public class CatalogClickHouseClusterIT extends BaseIT {
 
   @Test
   public void testCreateClusterSchemaByApiAndLoadSqlCreatedClusterDatabase() {
+    final String apiClusterComment = "cluster schema from gravitino api";
+    final String sqlClusterComment = "cluster schema from sql";
     Schema apiClusterSchema =
         catalog
             .asSchemas()
-            .createSchema(
-                apiClusterSchemaName,
-                "cluster schema from gravitino api",
-                clusterSchemaProperties());
+            .createSchema(apiClusterSchemaName, apiClusterComment, clusterSchemaProperties());
     Schema loadedApiClusterSchema = catalog.asSchemas().loadSchema(apiClusterSchemaName);
     Assertions.assertEquals(apiClusterSchema.name(), loadedApiClusterSchema.name());
+    Assertions.assertEquals(apiClusterComment, loadedApiClusterSchema.comment());
     Assertions.assertEquals("true", loadedApiClusterSchema.properties().get(ON_CLUSTER));
     Assertions.assertTrue(
         StringUtils.isNotBlank(loadedApiClusterSchema.properties().get(CLUSTER_NAME)));
@@ -390,6 +394,7 @@ public class CatalogClickHouseClusterIT extends BaseIT {
 
     Schema loadedSqlClusterSchema = catalog.asSchemas().loadSchema(sqlClusterSchemaName);
     Assertions.assertEquals(sqlClusterSchemaName, loadedSqlClusterSchema.name());
+    Assertions.assertEquals(sqlClusterComment, loadedSqlClusterSchema.comment());
     Assertions.assertEquals("true", loadedSqlClusterSchema.properties().get(ON_CLUSTER));
     Assertions.assertTrue(
         StringUtils.isNotBlank(loadedSqlClusterSchema.properties().get(CLUSTER_NAME)));
@@ -399,5 +404,33 @@ public class CatalogClickHouseClusterIT extends BaseIT {
 
     catalog.asSchemas().dropSchema(apiClusterSchemaName, false);
     catalog.asSchemas().dropSchema(sqlClusterSchemaName, false);
+  }
+
+  @Test
+  public void testLoadNonClusterDatabaseProperties() {
+    final String apiNonClusterComment = "non cluster schema from gravitino api";
+    final String sqlNonClusterComment = "non cluster schema from sql";
+
+    Schema apiNonClusterSchema =
+        catalog
+            .asSchemas()
+            .createSchema(apiNonClusterSchemaName, apiNonClusterComment, Collections.emptyMap());
+    Schema loadedApiNonClusterSchema = catalog.asSchemas().loadSchema(apiNonClusterSchemaName);
+    Assertions.assertEquals(apiNonClusterSchema.name(), loadedApiNonClusterSchema.name());
+    Assertions.assertEquals(apiNonClusterComment, loadedApiNonClusterSchema.comment());
+    Assertions.assertEquals("false", loadedApiNonClusterSchema.properties().get(ON_CLUSTER));
+    Assertions.assertFalse(loadedApiNonClusterSchema.properties().containsKey(CLUSTER_NAME));
+
+    clickHouseService.executeQuery(
+        String.format(
+            "CREATE DATABASE `%s` COMMENT '%s'", sqlNonClusterSchemaName, sqlNonClusterComment));
+    Schema loadedSqlNonClusterSchema = catalog.asSchemas().loadSchema(sqlNonClusterSchemaName);
+    Assertions.assertEquals(sqlNonClusterSchemaName, loadedSqlNonClusterSchema.name());
+    Assertions.assertEquals(sqlNonClusterComment, loadedSqlNonClusterSchema.comment());
+    Assertions.assertEquals("false", loadedSqlNonClusterSchema.properties().get(ON_CLUSTER));
+    Assertions.assertFalse(loadedSqlNonClusterSchema.properties().containsKey(CLUSTER_NAME));
+
+    catalog.asSchemas().dropSchema(apiNonClusterSchemaName, false);
+    catalog.asSchemas().dropSchema(sqlNonClusterSchemaName, false);
   }
 }

@@ -48,7 +48,7 @@ jobs:
               - build.gradle.kts
               - gradle.properties
               - gradlew
-              - setting.gradle.kts
+              - settings.gradle.kts
       - name: Detect changed catalogs-contrib modules
         id: contrib
         run: |
