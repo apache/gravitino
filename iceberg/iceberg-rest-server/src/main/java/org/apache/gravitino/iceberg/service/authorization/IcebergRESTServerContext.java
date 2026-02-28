@@ -20,6 +20,7 @@
 package org.apache.gravitino.iceberg.service.authorization;
 
 import com.google.common.base.Preconditions;
+import org.apache.gravitino.iceberg.service.IcebergCatalogWrapperManager;
 import org.apache.gravitino.iceberg.service.provider.IcebergConfigProvider;
 
 public class IcebergRESTServerContext {
@@ -27,16 +28,19 @@ public class IcebergRESTServerContext {
   private boolean auxMode;
   private String metalakeName;
   private String defaultCatalogName;
+  private IcebergCatalogWrapperManager catalogWrapperManager;
 
   private IcebergRESTServerContext(
       Boolean isAuthorizationEnabled,
       Boolean auxMode,
       String metalakeName,
-      String defaultCatalogName) {
+      String defaultCatalogName,
+      IcebergCatalogWrapperManager catalogWrapperManager) {
     this.isAuthorizationEnabled = isAuthorizationEnabled;
     this.auxMode = auxMode;
     this.metalakeName = metalakeName;
     this.defaultCatalogName = defaultCatalogName;
+    this.catalogWrapperManager = catalogWrapperManager;
   }
 
   private static class InstanceHolder {
@@ -44,13 +48,17 @@ public class IcebergRESTServerContext {
   }
 
   public static IcebergRESTServerContext create(
-      IcebergConfigProvider configProvider, Boolean enableAuth, Boolean auxMode) {
+      IcebergConfigProvider configProvider,
+      Boolean enableAuth,
+      Boolean auxMode,
+      IcebergCatalogWrapperManager catalogWrapperManager) {
     InstanceHolder.INSTANCE =
         new IcebergRESTServerContext(
             enableAuth,
             auxMode,
             configProvider.getMetalakeName(),
-            configProvider.getDefaultCatalogName());
+            configProvider.getDefaultCatalogName(),
+            catalogWrapperManager);
     return InstanceHolder.INSTANCE;
   }
 
@@ -73,5 +81,9 @@ public class IcebergRESTServerContext {
 
   public String defaultCatalogName() {
     return defaultCatalogName;
+  }
+
+  public IcebergCatalogWrapperManager catalogWrapperManager() {
+    return catalogWrapperManager;
   }
 }

@@ -18,13 +18,18 @@
  */
 package org.apache.gravitino.catalog.clickhouse.operations;
 
+import java.sql.Connection;
+import java.sql.Statement;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
+import javax.sql.DataSource;
 import org.apache.gravitino.catalog.clickhouse.ClickHouseConfig;
+import org.apache.gravitino.catalog.clickhouse.ClickHouseConstants.ClusterConstants;
 import org.apache.gravitino.catalog.jdbc.converter.JdbcExceptionConverter;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
+import org.mockito.Mockito;
 
 public class TestClickHouseDatabaseOperations {
 
@@ -58,6 +63,35 @@ public class TestClickHouseDatabaseOperations {
 
     String sql = newOps(conf).buildCreateSql("db_name", "comment", Collections.emptyMap());
     Assertions.assertEquals("CREATE DATABASE `db_name` COMMENT 'comment'", sql);
+  }
+
+  @Test
+  void testGenerateCreateDatabaseSqlWithClusterEnabled() {
+    Map<String, String> properties = new HashMap<>();
+    properties.put(ClusterConstants.CLUSTER_NAME, "ck_cluster");
+    properties.put(ClusterConstants.ON_CLUSTER, "true");
+
+    String sql = newOps(new HashMap<>()).buildCreateSql("db_name", null, properties);
+    Assertions.assertEquals("CREATE DATABASE `db_name` ON CLUSTER `ck_cluster`", sql);
+  }
+
+  @Test
+  void testCreateUsesSystemCatalogBeforeExecution() throws Exception {
+    DataSource dataSource = Mockito.mock(DataSource.class);
+    Connection connection = Mockito.mock(Connection.class);
+    Statement statement = Mockito.mock(Statement.class);
+
+    Mockito.when(dataSource.getConnection()).thenReturn(connection);
+    Mockito.when(connection.createStatement()).thenReturn(statement);
+    Mockito.when(statement.executeUpdate(Mockito.anyString())).thenReturn(0);
+
+    ClickHouseDatabaseOperations ops = new ClickHouseDatabaseOperations();
+    ops.initialize(dataSource, new JdbcExceptionConverter(), new HashMap<>());
+
+    ops.create("new_db", null, Collections.emptyMap());
+
+    Mockito.verify(connection).setCatalog("information_schema");
+    Mockito.verify(statement).executeUpdate("CREATE DATABASE `new_db`");
   }
 
   @Test

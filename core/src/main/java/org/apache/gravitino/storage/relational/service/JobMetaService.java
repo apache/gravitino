@@ -161,4 +161,34 @@ public class JobMetaService {
       throw new NoSuchEntityException("Invalid job run ID format %s", jobRunId);
     }
   }
+
+  @Monitored(
+      metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME,
+      baseMetricName = "batchGetJobByIdentifier")
+  public List<JobEntity> batchGetJobByIdentifier(List<NameIdentifier> identifiers) {
+    NameIdentifier firstIdent = identifiers.get(0);
+    NamespaceUtil.checkJob(firstIdent.namespace());
+    String metalakeName = firstIdent.namespace().level(0);
+
+    // Parse job names (e.g., "job-123") to extract job run IDs
+    List<Long> jobRunIds =
+        identifiers.stream().map(ident -> parseJobRunId(ident.name())).collect(Collectors.toList());
+
+    // Get job template name from the first job identifier's namespace
+    // Job namespace is: [metalake, system_catalog, job_schema_name]
+    // We need to query without filtering by template since job names contain the ID
+
+    return SessionUtils.doWithCommitAndFetchResult(
+        JobMetaMapper.class,
+        mapper -> {
+          // For jobs, we query by metalake and job run IDs
+          // Note: Jobs don't have a jobTemplateName in the identifier namespace like we thought
+          // The namespace is: [metalake, Entity.SYSTEM_CATALOG_RESERVED_NAME,
+          // Entity.JOB_SCHEMA_NAME]
+          List<JobPO> jobPOs = mapper.batchSelectJobByRunIds(metalakeName, jobRunIds);
+          return jobPOs.stream()
+              .map(po -> JobPO.fromJobPO(po, firstIdent.namespace()))
+              .collect(Collectors.toList());
+        });
+  }
 }

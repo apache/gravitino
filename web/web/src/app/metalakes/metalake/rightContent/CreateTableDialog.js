@@ -207,7 +207,7 @@ const CreateTableDialog = props => {
       updatedProps.forEach(item => (item.hasDuplicateKey = false))
     }
 
-    const isReserved = propInfo.reserved.includes(updatedProps[index].key)
+    const isReserved = propInfo.reserved?.includes(updatedProps[index].key) || false
     updatedProps[index].isReserved = isReserved
 
     setInnerProps(updatedProps)
@@ -549,7 +549,7 @@ const CreateTableDialog = props => {
         return {
           key,
           value,
-          disabled: propInfo.reserved.includes(key) || propInfo.immutable.includes(key)
+          disabled: propInfo.reserved?.includes(key) || propInfo.immutable?.includes(key)
         }
       })
 

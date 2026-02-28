@@ -30,6 +30,7 @@ import com.github.benmanes.caffeine.cache.Cache;
 import com.github.benmanes.caffeine.cache.Caffeine;
 import com.github.benmanes.caffeine.cache.Scheduler;
 import com.google.common.base.Preconditions;
+import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Iterables;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
@@ -53,6 +54,7 @@ import java.util.ServiceLoader;
 import java.util.Set;
 import java.util.concurrent.ScheduledThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
+import java.util.function.Consumer;
 import java.util.stream.Collectors;
 import javax.annotation.Nullable;
 import lombok.Getter;
@@ -98,6 +100,7 @@ import org.apache.gravitino.model.ModelCatalog;
 import org.apache.gravitino.rel.SupportsPartitions;
 import org.apache.gravitino.rel.Table;
 import org.apache.gravitino.rel.TableCatalog;
+import org.apache.gravitino.rel.ViewCatalog;
 import org.apache.gravitino.storage.IdGenerator;
 import org.apache.gravitino.utils.IsolatedClassLoader;
 import org.apache.gravitino.utils.NamespaceUtil;
@@ -112,6 +115,9 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
   private static final String CATALOG_DOES_NOT_EXIST_MSG = "Catalog %s does not exist";
 
   private static final Logger LOG = LoggerFactory.getLogger(CatalogManager.class);
+
+  private static final Set<String> CONTRIB_CATALOGS_TYPES =
+      ImmutableSet.of("jdbc-oceanbase", "jdbc-clickhouse");
 
   /** Wrapper class for a catalog instance and its class loader. */
   public static class CatalogWrapper {
@@ -145,6 +151,16 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
               throw new UnsupportedOperationException("Catalog does not support table operations");
             }
             return fn.apply(asTables());
+          });
+    }
+
+    public <R> R doWithViewOps(ThrowableFunction<ViewCatalog, R> fn) throws Exception {
+      return classLoader.withClassLoader(
+          cl -> {
+            if (asViews() == null) {
+              throw new UnsupportedOperationException("Catalog does not support view operations");
+            }
+            return fn.apply(asViews());
           });
     }
 
@@ -246,6 +262,10 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
       return catalog.ops() instanceof TableCatalog ? (TableCatalog) catalog.ops() : null;
     }
 
+    private ViewCatalog asViews() {
+      return catalog.ops() instanceof ViewCatalog ? (ViewCatalog) catalog.ops() : null;
+    }
+
     private FilesetCatalog asFilesets() {
       return catalog.ops() instanceof FilesetCatalog ? (FilesetCatalog) catalog.ops() : null;
     }
@@ -270,6 +290,7 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
   private final EntityStore store;
 
   private final IdGenerator idGenerator;
+  private final List<Consumer<NameIdentifier>> removalListeners = Lists.newArrayList();
 
   /**
    * Constructs a CatalogManager instance.
@@ -289,6 +310,11 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
             .expireAfterAccess(cacheEvictionIntervalInMs, TimeUnit.MILLISECONDS)
             .removalListener(
                 (k, v, c) -> {
+                  for (Consumer<NameIdentifier> listener : removalListeners) {
+                    if (k != null) {
+                      listener.accept((NameIdentifier) k);
+                    }
+                  }
                   LOG.info("Closing catalog {}.", k);
                   ((CatalogWrapper) v).close();
                 })
@@ -310,6 +336,21 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
   @Override
   public void close() {
     catalogCache.invalidateAll();
+  }
+
+  /**
+   * Adds a listener that will be notified when a catalog is removed from the cache.
+   *
+   * <p>Note: Cache eviction is invoked asynchronously but uses a single thread to process removal
+   * events. To avoid blocking the eviction thread and delaying subsequent cache operations,
+   * listeners should avoid performing heavy operations (such as I/O, network calls, or complex
+   * computations) directly. Instead, consider offloading heavy work to a separate thread or
+   * executor.
+   *
+   * @param listener The consumer to be called with the NameIdentifier of the removed catalog.
+   */
+  public void addCatalogCacheRemoveListener(Consumer<NameIdentifier> listener) {
+    removalListeners.add(listener);
   }
 
   /**
@@ -1078,6 +1119,19 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
     if (pkg != null) {
       confPath = String.join(File.separator, pkg, "conf");
     } else if (testEnv) {
+      if (CONTRIB_CATALOGS_TYPES.contains(provider)) {
+        confPath =
+            String.join(
+                File.separator,
+                gravitinoHome,
+                "catalogs-contrib",
+                "catalog-" + provider,
+                "build",
+                "resources",
+                "main");
+        return confPath;
+      }
+
       confPath =
           String.join(
               File.separator,
@@ -1104,6 +1158,18 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
       pkgPath = String.join(File.separator, pkg, "libs");
     } else if (testEnv) {
       // In test, the catalog package is under the build directory.
+      if (CONTRIB_CATALOGS_TYPES.contains(provider)) {
+        pkgPath =
+            String.join(
+                File.separator,
+                gravitinoHome,
+                "catalogs-contrib",
+                "catalog-" + provider,
+                "build",
+                "libs");
+        return pkgPath;
+      }
+
       pkgPath =
           String.join(
               File.separator, gravitinoHome, "catalogs", "catalog-" + provider, "build", "libs");

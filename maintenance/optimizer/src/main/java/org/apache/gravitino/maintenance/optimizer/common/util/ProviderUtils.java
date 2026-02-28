@@ -25,10 +25,15 @@ import java.util.List;
 import java.util.ServiceLoader;
 import java.util.stream.Collectors;
 import org.apache.gravitino.maintenance.optimizer.api.common.Provider;
+import org.apache.gravitino.maintenance.optimizer.api.monitor.JobProvider;
+import org.apache.gravitino.maintenance.optimizer.api.monitor.MetricsProvider;
+import org.apache.gravitino.maintenance.optimizer.api.monitor.MonitorCallback;
 import org.apache.gravitino.maintenance.optimizer.api.recommender.JobSubmitter;
 import org.apache.gravitino.maintenance.optimizer.api.recommender.StatisticsProvider;
 import org.apache.gravitino.maintenance.optimizer.api.recommender.StrategyProvider;
 import org.apache.gravitino.maintenance.optimizer.api.recommender.TableMetadataProvider;
+import org.apache.gravitino.maintenance.optimizer.api.updater.MetricsUpdater;
+import org.apache.gravitino.maintenance.optimizer.api.updater.StatisticsUpdater;
 
 /** Helper for loading optimizer providers via {@link ServiceLoader}. */
 public class ProviderUtils {
@@ -88,5 +93,25 @@ public class ProviderUtils {
 
   public static JobSubmitter createJobSubmitterInstance(String provider) {
     return createProviderInstance(JobSubmitter.class, provider);
+  }
+
+  public static StatisticsUpdater createStatisticsUpdaterInstance(String provider) {
+    return createProviderInstance(StatisticsUpdater.class, provider);
+  }
+
+  public static MetricsUpdater createMetricsUpdaterInstance(String provider) {
+    return createProviderInstance(MetricsUpdater.class, provider);
+  }
+
+  public static MetricsProvider createMetricsProviderInstance(String provider) {
+    return createProviderInstance(MetricsProvider.class, provider);
+  }
+
+  public static JobProvider createJobProviderInstance(String provider) {
+    return createProviderInstance(JobProvider.class, provider);
+  }
+
+  public static MonitorCallback createMonitorCallbackInstance(String provider) {
+    return createProviderInstance(MonitorCallback.class, provider);
   }
 }

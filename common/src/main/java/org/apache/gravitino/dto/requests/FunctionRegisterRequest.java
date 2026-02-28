@@ -19,8 +19,6 @@
 package org.apache.gravitino.dto.requests;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
-import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
-import com.fasterxml.jackson.databind.annotation.JsonSerialize;
 import com.google.common.base.Preconditions;
 import javax.annotation.Nullable;
 import lombok.AllArgsConstructor;
@@ -30,11 +28,8 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.ToString;
 import org.apache.commons.lang3.StringUtils;
-import org.apache.gravitino.dto.function.FunctionColumnDTO;
 import org.apache.gravitino.dto.function.FunctionDefinitionDTO;
 import org.apache.gravitino.function.FunctionType;
-import org.apache.gravitino.json.JsonUtils;
-import org.apache.gravitino.rel.types.Type;
 import org.apache.gravitino.rest.RESTRequest;
 
 /** Represents a request to register a function. */
@@ -59,16 +54,6 @@ public class FunctionRegisterRequest implements RESTRequest {
   @JsonProperty("comment")
   private String comment;
 
-  @Nullable
-  @JsonProperty("returnType")
-  @JsonSerialize(using = JsonUtils.TypeSerializer.class)
-  @JsonDeserialize(using = JsonUtils.TypeDeserializer.class)
-  private Type returnType;
-
-  @Nullable
-  @JsonProperty("returnColumns")
-  private FunctionColumnDTO[] returnColumns;
-
   @JsonProperty("definitions")
   private FunctionDefinitionDTO[] definitions;
 
@@ -86,15 +71,19 @@ public class FunctionRegisterRequest implements RESTRequest {
         definitions != null && definitions.length > 0,
         "\"definitions\" field is required and cannot be empty");
 
-    if (functionType == FunctionType.TABLE) {
-      Preconditions.checkArgument(
-          returnColumns != null && returnColumns.length > 0,
-          "\"returnColumns\" is required for TABLE function type");
-    } else if (functionType == FunctionType.SCALAR || functionType == FunctionType.AGGREGATE) {
-      Preconditions.checkArgument(
-          returnType != null, "\"returnType\" is required for SCALAR or AGGREGATE function type");
-    } else {
-      throw new IllegalArgumentException("Unsupported function type: " + functionType);
+    // Validate each definition has appropriate return type/columns based on function type
+    for (FunctionDefinitionDTO definition : definitions) {
+      if (functionType == FunctionType.TABLE) {
+        Preconditions.checkArgument(
+            definition.getReturnColumns() != null && definition.getReturnColumns().length > 0,
+            "\"returnColumns\" is required in each definition for TABLE function type");
+      } else if (functionType == FunctionType.SCALAR || functionType == FunctionType.AGGREGATE) {
+        Preconditions.checkArgument(
+            definition.getReturnType() != null,
+            "\"returnType\" is required in each definition for SCALAR or AGGREGATE function type");
+      } else {
+        throw new IllegalArgumentException("Unsupported function type: " + functionType);
+      }
     }
   }
 }

@@ -32,7 +32,6 @@ from gravitino import (
 from gravitino.filesystem.gvfs_config import GVFSConfig
 from tests.integration.test_gvfs_with_abs import TestGvfsWithABS
 
-
 logger = logging.getLogger(__name__)
 
 

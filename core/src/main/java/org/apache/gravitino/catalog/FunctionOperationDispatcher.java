@@ -18,6 +18,8 @@
  */
 package org.apache.gravitino.catalog;
 
+import static org.apache.gravitino.utils.NameIdentifierUtil.getCatalogIdentifier;
+
 import com.google.common.base.Preconditions;
 import java.util.Arrays;
 import org.apache.gravitino.EntityStore;
@@ -28,12 +30,10 @@ import org.apache.gravitino.exceptions.NoSuchFunctionException;
 import org.apache.gravitino.exceptions.NoSuchSchemaException;
 import org.apache.gravitino.function.Function;
 import org.apache.gravitino.function.FunctionChange;
-import org.apache.gravitino.function.FunctionColumn;
 import org.apache.gravitino.function.FunctionDefinition;
 import org.apache.gravitino.function.FunctionType;
 import org.apache.gravitino.lock.LockType;
 import org.apache.gravitino.lock.TreeLockUtils;
-import org.apache.gravitino.rel.types.Type;
 import org.apache.gravitino.storage.IdGenerator;
 
 /**
@@ -45,6 +45,9 @@ import org.apache.gravitino.storage.IdGenerator;
  * delegates actual storage operations to {@link ManagedFunctionOperations}.
  */
 public class FunctionOperationDispatcher extends OperationDispatcher implements FunctionDispatcher {
+
+  private static final String ICEBERG_PROVIDER = "lakehouse-iceberg";
+  private static final String ICEBERG_SYSTEM_SCHEMA = "system";
 
   private final SchemaOperationDispatcher schemaOps;
   private final ManagedFunctionOperations managedFunctionOps;
@@ -110,14 +113,15 @@ public class FunctionOperationDispatcher extends OperationDispatcher implements 
   }
 
   /**
-   * Register a scalar or aggregate function with one or more definitions (overloads).
+   * Register a function with one or more definitions (overloads). Each definition contains its own
+   * return type (for scalar/aggregate functions) or return columns (for table-valued functions).
    *
    * @param ident The function identifier.
    * @param comment The optional function comment.
-   * @param functionType The function type.
+   * @param functionType The function type (SCALAR, AGGREGATE, or TABLE).
    * @param deterministic Whether the function is deterministic.
-   * @param returnType The return type.
-   * @param definitions The function definitions.
+   * @param definitions The function definitions, each containing parameters, return type/columns,
+   *     and implementations.
    * @return The registered function.
    * @throws NoSuchSchemaException If the schema does not exist.
    * @throws FunctionAlreadyExistsException If the function already exists.
@@ -128,15 +132,13 @@ public class FunctionOperationDispatcher extends OperationDispatcher implements 
       String comment,
       FunctionType functionType,
       boolean deterministic,
-      Type returnType,
       FunctionDefinition[] definitions)
       throws NoSuchSchemaException, FunctionAlreadyExistsException {
-    Preconditions.checkArgument(
-        functionType == FunctionType.SCALAR || functionType == FunctionType.AGGREGATE,
-        "This method is for scalar or aggregate functions only");
-    Preconditions.checkArgument(returnType != null, "Return type is required");
+    Preconditions.checkArgument(functionType != null, "Function type is required");
     Preconditions.checkArgument(
         definitions != null && definitions.length > 0, "At least one definition is required");
+
+    validateNotIcebergReservedSchema(ident);
 
     NameIdentifier schemaIdent = NameIdentifier.of(ident.namespace().levels());
     // Validate schema exists in the underlying catalog
@@ -147,45 +149,7 @@ public class FunctionOperationDispatcher extends OperationDispatcher implements 
         LockType.WRITE,
         () ->
             managedFunctionOps.registerFunction(
-                ident, comment, functionType, deterministic, returnType, definitions));
-  }
-
-  /**
-   * Register a table-valued function with one or more definitions (overloads).
-   *
-   * @param ident The function identifier.
-   * @param comment The optional function comment.
-   * @param deterministic Whether the function is deterministic.
-   * @param returnColumns The return columns.
-   * @param definitions The function definitions.
-   * @return The registered function.
-   * @throws NoSuchSchemaException If the schema does not exist.
-   * @throws FunctionAlreadyExistsException If the function already exists.
-   */
-  @Override
-  public Function registerFunction(
-      NameIdentifier ident,
-      String comment,
-      boolean deterministic,
-      FunctionColumn[] returnColumns,
-      FunctionDefinition[] definitions)
-      throws NoSuchSchemaException, FunctionAlreadyExistsException {
-    Preconditions.checkArgument(
-        returnColumns != null && returnColumns.length > 0,
-        "At least one return column is required for table-valued function");
-    Preconditions.checkArgument(
-        definitions != null && definitions.length > 0, "At least one definition is required");
-
-    NameIdentifier schemaIdent = NameIdentifier.of(ident.namespace().levels());
-    // Validate schema exists in the underlying catalog
-    schemaOps.loadSchema(schemaIdent);
-
-    return TreeLockUtils.doWithTreeLock(
-        ident,
-        LockType.WRITE,
-        () ->
-            managedFunctionOps.registerFunction(
-                ident, comment, deterministic, returnColumns, definitions));
+                ident, comment, functionType, deterministic, definitions));
   }
 
   /**
@@ -202,6 +166,8 @@ public class FunctionOperationDispatcher extends OperationDispatcher implements 
       throws NoSuchFunctionException, IllegalArgumentException {
     Preconditions.checkArgument(
         changes != null && changes.length > 0, "At least one change is required");
+    validateNotIcebergReservedSchema(ident);
+
     NameIdentifier schemaIdent = NameIdentifier.of(ident.namespace().levels());
     if (!schemaOps.schemaExists(schemaIdent)) {
       throw new NoSuchFunctionException("Schema does not exist: %s", schemaIdent);
@@ -219,6 +185,8 @@ public class FunctionOperationDispatcher extends OperationDispatcher implements 
    */
   @Override
   public boolean dropFunction(NameIdentifier ident) {
+    validateNotIcebergReservedSchema(ident);
+
     NameIdentifier schemaIdent = NameIdentifier.of(ident.namespace().levels());
     if (!schemaOps.schemaExists(schemaIdent)) {
       return false;
@@ -226,5 +194,30 @@ public class FunctionOperationDispatcher extends OperationDispatcher implements 
 
     return TreeLockUtils.doWithTreeLock(
         ident, LockType.WRITE, () -> managedFunctionOps.dropFunction(ident));
+  }
+
+  /**
+   * Validates that the function operation is not targeting the Iceberg reserved "system" schema.
+   * Iceberg's "system" schema is reserved for built-in functions (e.g., iceberg_version, bucket,
+   * truncate) and should not allow user-managed function operations.
+   *
+   * @param ident The function identifier.
+   * @throws IllegalArgumentException If the function targets the Iceberg "system" schema.
+   */
+  private void validateNotIcebergReservedSchema(NameIdentifier ident) {
+    String schemaName = ident.namespace().level(ident.namespace().length() - 1);
+    if (!ICEBERG_SYSTEM_SCHEMA.equals(schemaName)) {
+      return;
+    }
+
+    NameIdentifier catalogIdent = getCatalogIdentifier(ident);
+    String provider =
+        doWithCatalog(catalogIdent, c -> c.catalog().provider(), IllegalArgumentException.class);
+    if (ICEBERG_PROVIDER.equals(provider)) {
+      throw new IllegalArgumentException(
+          String.format(
+              "Cannot operate on functions in the Iceberg reserved schema \"%s\"",
+              ICEBERG_SYSTEM_SCHEMA));
+    }
   }
 }

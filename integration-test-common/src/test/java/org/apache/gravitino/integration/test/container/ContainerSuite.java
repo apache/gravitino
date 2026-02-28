@@ -30,12 +30,21 @@ import java.io.Closeable;
 import java.io.IOException;
 import java.net.InetAddress;
 import java.nio.ByteBuffer;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.FileSystems;
+import java.nio.file.Files;
+import java.nio.file.Paths;
+import java.nio.file.attribute.PosixFilePermission;
 import java.util.EnumMap;
 import java.util.List;
 import java.util.Map;
 import java.util.NoSuchElementException;
 import java.util.Objects;
+import java.util.Set;
 import org.apache.gravitino.integration.test.util.CloseableGroup;
+import org.apache.gravitino.integration.test.util.CommandExecutor;
+import org.apache.gravitino.integration.test.util.ITUtils;
+import org.apache.gravitino.integration.test.util.ProcessData;
 import org.apache.gravitino.integration.test.util.TestDatabaseName;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -72,6 +81,9 @@ public class ContainerSuite implements Closeable {
   private static volatile Map<PGImageName, PostgreSQLContainer> pgContainerMap =
       new EnumMap<>(PGImageName.class);
   private static volatile OceanBaseContainer oceanBaseContainer;
+  private static volatile ClickHouseContainer clickHouseContainer;
+  private static volatile ClickHouseContainer clickHouseClusterContainer;
+  private static volatile ZooKeeperContainer zooKeeperContainer;
 
   private static volatile GravitinoLocalStackContainer gravitinoLocalStackContainer;
 
@@ -131,6 +143,7 @@ public class ContainerSuite implements Closeable {
     builder.putAll(env);
     builder.put("HADOOP_USER_NAME", "anonymous");
 
+    ITUtils.cleanDisk();
     if (hiveContainer == null) {
       synchronized (ContainerSuite.class) {
         if (hiveContainer == null) {
@@ -153,7 +166,7 @@ public class ContainerSuite implements Closeable {
     ImmutableMap.Builder<String, String> builder = ImmutableMap.builder();
     builder.putAll(env);
     builder.put("HADOOP_USER_NAME", "anonymous");
-
+    ITUtils.cleanDisk();
     if (hiveContainerWithS3 == null) {
       synchronized (ContainerSuite.class) {
         if (hiveContainerWithS3 == null) {
@@ -198,6 +211,7 @@ public class ContainerSuite implements Closeable {
       throw new IllegalArgumentException("Error environment variables for Hive Ranger container");
     }
 
+    ITUtils.cleanDisk();
     if (hiveRangerContainer == null) {
       synchronized (ContainerSuite.class) {
         if (hiveRangerContainer == null) {
@@ -216,6 +230,7 @@ public class ContainerSuite implements Closeable {
   }
 
   public void startKerberosHiveContainer(Map<String, String> envVars) {
+    ITUtils.cleanDisk();
     if (kerberosHiveContainer == null) {
       synchronized (ContainerSuite.class) {
         if (kerberosHiveContainer == null) {
@@ -272,6 +287,7 @@ public class ContainerSuite implements Closeable {
       String trinoConnectorLibDir,
       int gravitinoServerPort,
       String metalakeName) {
+    ITUtils.cleanDisk();
     if (trinoContainer == null) {
       synchronized (ContainerSuite.class) {
         if (trinoContainer == null) {
@@ -313,6 +329,7 @@ public class ContainerSuite implements Closeable {
   }
 
   public void startDorisContainer() {
+    ITUtils.cleanDisk();
     if (dorisContainer == null) {
       synchronized (ContainerSuite.class) {
         if (dorisContainer == null) {
@@ -329,6 +346,7 @@ public class ContainerSuite implements Closeable {
   }
 
   public void startMySQLContainer(TestDatabaseName testDatabaseName) {
+    ITUtils.cleanDisk();
     if (mySQLContainer == null) {
       synchronized (ContainerSuite.class) {
         if (mySQLContainer == null) {
@@ -356,6 +374,7 @@ public class ContainerSuite implements Closeable {
   }
 
   public void startMySQLVersion5Container(TestDatabaseName testDatabaseName) {
+    ITUtils.cleanDisk();
     if (mySQLVersion5Container == null) {
       synchronized (ContainerSuite.class) {
         if (mySQLVersion5Container == null) {
@@ -384,6 +403,7 @@ public class ContainerSuite implements Closeable {
   }
 
   public void startPostgreSQLContainer(TestDatabaseName testDatabaseName, PGImageName pgImageName) {
+    ITUtils.cleanDisk();
     if (!pgContainerMap.containsKey(pgImageName)) {
       synchronized (ContainerSuite.class) {
         if (!pgContainerMap.containsKey(pgImageName)) {
@@ -418,6 +438,13 @@ public class ContainerSuite implements Closeable {
   }
 
   public void startOceanBaseContainer() {
+    ITUtils.cleanDisk();
+    // create dir /tmp/obdata by CommandExecutor
+    Object o =
+        CommandExecutor.executeCommandLocalHost(
+            "mkdir -p /tmp/obdata", false, ProcessData.TypesOfData.STREAMS_MERGED);
+    LOG.info("Command mkdir -p /tmp/obdata output:\n{}", o);
+
     if (oceanBaseContainer == null) {
       synchronized (ContainerSuite.class) {
         if (oceanBaseContainer == null) {
@@ -428,16 +455,20 @@ public class ContainerSuite implements Closeable {
                   .withEnvVars(
                       ImmutableMap.of(
                           "MODE",
-                          "mini",
+                          "MINI",
                           "OB_SYS_PASSWORD",
                           OceanBaseContainer.PASSWORD,
                           "OB_TENANT_PASSWORD",
                           OceanBaseContainer.PASSWORD,
                           "OB_DATAFILE_SIZE",
-                          "2G",
+                          "1G",
                           "OB_LOG_DISK_SIZE",
-                          "4G"))
+                          "8G",
+                          "OB_MEMORY_LIMIT",
+                          "6G"))
                   .withNetwork(network)
+                  .withFilesToMount(
+                      ImmutableMap.<String, String>builder().put("/tmp/obdata", "/root/ob").build())
                   .withExposePorts(ImmutableSet.of(OceanBaseContainer.OCEANBASE_PORT));
           OceanBaseContainer container = closer.register(oceanBaseBuilder.build());
           container.start();
@@ -448,6 +479,7 @@ public class ContainerSuite implements Closeable {
   }
 
   public void startKafkaContainer() {
+    ITUtils.cleanDisk();
     if (kafkaContainer == null) {
       synchronized (ContainerSuite.class) {
         if (kafkaContainer == null) {
@@ -467,6 +499,7 @@ public class ContainerSuite implements Closeable {
   }
 
   public void startLocalStackContainer() {
+    ITUtils.cleanDisk();
     if (gravitinoLocalStackContainer == null) {
       synchronized (ContainerSuite.class) {
         if (gravitinoLocalStackContainer == null) {
@@ -486,6 +519,7 @@ public class ContainerSuite implements Closeable {
   }
 
   public void startStarRocksContainer() {
+    ITUtils.cleanDisk();
     if (starRocksContainer == null) {
       synchronized (ContainerSuite.class) {
         if (starRocksContainer == null) {
@@ -504,6 +538,126 @@ public class ContainerSuite implements Closeable {
         }
       }
     }
+  }
+
+  public void startClickHouseContainer(TestDatabaseName testDatabaseName) {
+    ITUtils.cleanDisk();
+    if (clickHouseContainer == null) {
+      synchronized (ContainerSuite.class) {
+        if (clickHouseContainer == null) {
+          initIfNecessary();
+          // Start ClickHouse container
+          ClickHouseContainer.Builder clickHouseBuilder =
+              ClickHouseContainer.builder()
+                  .withHostName("gravitino-ci-clickhouse")
+                  .withEnvVars(
+                      ImmutableMap.<String, String>builder()
+                          .put("CLICKHOUSE_PASSWORD", ClickHouseContainer.PASSWORD)
+                          .build())
+                  .withExposePorts(ImmutableSet.of(ClickHouseContainer.CLICKHOUSE_PORT))
+                  .withNetwork(network);
+
+          ClickHouseContainer container = closer.register(clickHouseBuilder.build());
+          container.start();
+          clickHouseContainer = container;
+        }
+      }
+    }
+    synchronized (ClickHouseContainer.class) {
+      clickHouseContainer.createDatabase(testDatabaseName);
+    }
+  }
+
+  public void startClickHouseClusterContainer(
+      TestDatabaseName testDatabaseName, String remoteServersTemplatePath) {
+    if (clickHouseClusterContainer == null) {
+      synchronized (ContainerSuite.class) {
+        if (clickHouseClusterContainer == null) {
+          initIfNecessary();
+          startZooKeeperContainer();
+          String zkHost = zooKeeperContainer.getContainerIpAddress();
+          String resolvedConfigPath = prepareRemoteServersConfig(remoteServersTemplatePath, zkHost);
+          ClickHouseContainer.Builder clickHouseBuilder =
+              ClickHouseContainer.builder()
+                  .withHostName("gravitino-ci-clickhouse-cluster")
+                  .withEnvVars(
+                      ImmutableMap.<String, String>builder()
+                          .put("CLICKHOUSE_PASSWORD", ClickHouseContainer.PASSWORD)
+                          .build())
+                  .withRemoteServersConfig(resolvedConfigPath)
+                  .withExposePorts(
+                      ImmutableSet.of(
+                          ClickHouseContainer.CLICKHOUSE_PORT,
+                          ClickHouseContainer.CLICKHOUSE_NATIVE_PORT))
+                  .withNetwork(network);
+
+          ClickHouseContainer container = closer.register(clickHouseBuilder.build());
+          container.start();
+          clickHouseClusterContainer = container;
+        }
+      }
+    }
+    synchronized (ClickHouseContainer.class) {
+      clickHouseClusterContainer.createDatabaseOnCluster(
+          testDatabaseName, ClickHouseContainer.DEFAULT_CLUSTER_NAME);
+    }
+  }
+
+  private String prepareRemoteServersConfig(String templatePath, String zkHost) {
+    try {
+      String content =
+          new String(Files.readAllBytes(Paths.get(templatePath)), StandardCharsets.UTF_8);
+      String replaced =
+          content
+              .replace("${ZOOKEEPER_HOST}", zkHost)
+              .replace("${ZOOKEEPER_PORT}", String.valueOf(ZooKeeperContainer.ZK_PORT));
+      java.nio.file.Path tempFile = Files.createTempFile("remote_servers", ".xml").toAbsolutePath();
+      Files.writeString(tempFile, replaced);
+      // Change the access mode of temFile to 644 to avoid permission issues when ClickHouse
+      // container read the file.
+      if (FileSystems.getDefault().supportedFileAttributeViews().contains("posix")) {
+        Files.setPosixFilePermissions(
+            tempFile,
+            Set.of(
+                PosixFilePermission.OWNER_READ,
+                PosixFilePermission.OWNER_WRITE,
+                PosixFilePermission.GROUP_READ,
+                PosixFilePermission.OTHERS_READ));
+      }
+      return tempFile.toString();
+    } catch (IOException e) {
+      throw new RuntimeException("Failed to prepare remote_servers.xml", e);
+    }
+  }
+
+  public void startZooKeeperContainer() {
+    if (zooKeeperContainer == null) {
+      synchronized (ContainerSuite.class) {
+        if (zooKeeperContainer == null) {
+          initIfNecessary();
+          ZooKeeperContainer.Builder zkBuilder =
+              ZooKeeperContainer.builder()
+                  .withHostName(ZooKeeperContainer.HOST_NAME)
+                  .withExposePorts(ImmutableSet.of(ZooKeeperContainer.ZK_PORT))
+                  .withNetwork(network);
+          ZooKeeperContainer container = closer.register(zkBuilder.build());
+          container.start();
+          zooKeeperContainer = container;
+        }
+      }
+    }
+  }
+
+  public ClickHouseContainer getClickHouseContainer() {
+    return clickHouseContainer;
+  }
+
+  public ClickHouseContainer getClickHouseClusterContainer() {
+    return clickHouseClusterContainer;
+  }
+
+  public ZooKeeperContainer getZooKeeperContainer() {
+    return zooKeeperContainer;
   }
 
   public GravitinoLocalStackContainer getLocalStackContainer() {
@@ -652,8 +806,7 @@ public class ContainerSuite implements Closeable {
       }
     }
 
-    com.github.dockerjava.api.model.Network.Ipam.Config ipamConfig =
-        new com.github.dockerjava.api.model.Network.Ipam.Config();
+    Config ipamConfig = new Config();
     ipamConfig
         .withSubnet(CONTAINER_NETWORK_SUBNET)
         .withGateway(CONTAINER_NETWORK_GATEWAY)

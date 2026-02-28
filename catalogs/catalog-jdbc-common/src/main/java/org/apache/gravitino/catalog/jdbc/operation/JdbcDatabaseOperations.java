@@ -69,6 +69,10 @@ public abstract class JdbcDatabaseOperations implements DatabaseOperation {
     }
 
     try (final Connection connection = getConnection()) {
+      if (connection.getCatalog().equals(databaseName)) {
+        connection.setCatalog(createSysDatabaseNameSet().iterator().next());
+      }
+
       JdbcConnectorUtils.executeUpdate(
           connection, generateCreateDatabaseSql(databaseName, comment, properties));
       LOG.info("Finished creating database {}", databaseName);

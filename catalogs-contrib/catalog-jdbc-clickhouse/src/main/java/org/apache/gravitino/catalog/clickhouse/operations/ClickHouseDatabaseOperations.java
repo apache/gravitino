@@ -27,9 +27,12 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import org.apache.commons.collections4.MapUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.StringIdentifier;
+import org.apache.gravitino.catalog.clickhouse.ClickHouseConstants.ClusterConstants;
 import org.apache.gravitino.catalog.jdbc.operation.JdbcDatabaseOperations;
+import org.apache.gravitino.catalog.jdbc.utils.JdbcConnectorUtils;
 
 public class ClickHouseDatabaseOperations extends JdbcDatabaseOperations {
 
@@ -85,11 +88,58 @@ public class ClickHouseDatabaseOperations extends JdbcDatabaseOperations {
     StringBuilder createDatabaseSql =
         new StringBuilder(String.format("CREATE DATABASE `%s`", databaseName));
 
+    if (onCluster(properties)) {
+      String clusterName = properties.get(ClusterConstants.CLUSTER_NAME);
+      createDatabaseSql.append(String.format(" ON CLUSTER `%s`", clusterName));
+    }
+
     if (StringUtils.isNotEmpty(originComment)) {
       createDatabaseSql.append(String.format(" COMMENT '%s'", originComment));
     }
 
     LOG.info("Generated create database:{} sql: {}", databaseName, createDatabaseSql);
     return createDatabaseSql.toString();
+  }
+
+  @Override
+  public void create(String databaseName, String comment, Map<String, String> properties) {
+    LOG.info("Beginning to create database {}", databaseName);
+    String originComment = StringIdentifier.removeIdFromComment(comment);
+    if (!supportSchemaComment() && StringUtils.isNotEmpty(originComment)) {
+      throw new UnsupportedOperationException(
+          "Doesn't support setting schema comment: " + originComment);
+    }
+
+    try (final Connection connection = getConnection()) {
+      connection.setCatalog(createSysDatabaseNameSet().iterator().next());
+      JdbcConnectorUtils.executeUpdate(
+          connection, generateCreateDatabaseSql(databaseName, comment, properties));
+      LOG.info("Finished creating database {}", databaseName);
+    } catch (final SQLException se) {
+      throw this.exceptionMapper.toGravitinoException(se);
+    }
+  }
+
+  @Override
+  protected void dropDatabase(String databaseName, boolean cascade) {
+    try (final Connection connection = getConnection()) {
+      connection.setCatalog(createSysDatabaseNameSet().iterator().next());
+      JdbcConnectorUtils.executeUpdate(connection, generateDropDatabaseSql(databaseName, cascade));
+    } catch (final SQLException se) {
+      throw this.exceptionMapper.toGravitinoException(se);
+    }
+  }
+
+  private boolean onCluster(Map<String, String> dbProperties) {
+    if (MapUtils.isEmpty(dbProperties)) {
+      return false;
+    }
+
+    String clusterName = dbProperties.get(ClusterConstants.CLUSTER_NAME);
+    if (StringUtils.isBlank(clusterName)) {
+      return false;
+    }
+
+    return Boolean.parseBoolean(dbProperties.getOrDefault(ClusterConstants.ON_CLUSTER, "false"));
   }
 }

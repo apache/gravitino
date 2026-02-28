@@ -40,6 +40,7 @@ import org.apache.gravitino.iceberg.service.dispatcher.IcebergTableHookDispatche
 import org.apache.gravitino.iceberg.service.dispatcher.IcebergTableOperationDispatcher;
 import org.apache.gravitino.iceberg.service.dispatcher.IcebergTableOperationExecutor;
 import org.apache.gravitino.iceberg.service.dispatcher.IcebergViewEventDispatcher;
+import org.apache.gravitino.iceberg.service.dispatcher.IcebergViewHookDispatcher;
 import org.apache.gravitino.iceberg.service.dispatcher.IcebergViewOperationDispatcher;
 import org.apache.gravitino.iceberg.service.dispatcher.IcebergViewOperationExecutor;
 import org.apache.gravitino.iceberg.service.metrics.IcebergMetricsManager;
@@ -97,12 +98,12 @@ public class RESTService implements GravitinoAuxiliaryService {
     String metalakeName = configProvider.getMetalakeName();
 
     Boolean enableAuth = GravitinoEnv.getInstance().config().get(Configs.ENABLE_AUTHORIZATION);
-    IcebergRESTServerContext authorizationContext =
-        IcebergRESTServerContext.create(configProvider, enableAuth, auxMode);
-
     EventBus eventBus = GravitinoEnv.getInstance().eventBus();
     this.icebergCatalogWrapperManager =
-        new IcebergCatalogWrapperManager(configProperties, configProvider);
+        new IcebergCatalogWrapperManager(configProperties, configProvider, auxMode, metalakeName);
+    IcebergRESTServerContext authorizationContext =
+        IcebergRESTServerContext.create(
+            configProvider, enableAuth, auxMode, icebergCatalogWrapperManager);
     this.icebergMetricsManager = new IcebergMetricsManager(icebergConfig);
     IcebergTableOperationDispatcher icebergTableOperationDispatcher =
         new IcebergTableOperationExecutor(icebergCatalogWrapperManager);
@@ -112,10 +113,14 @@ public class RESTService implements GravitinoAuxiliaryService {
     }
     IcebergTableEventDispatcher icebergTableEventDispatcher =
         new IcebergTableEventDispatcher(icebergTableOperationDispatcher, eventBus, metalakeName);
-    IcebergViewOperationExecutor icebergViewOperationExecutor =
+    IcebergViewOperationDispatcher icebergViewOperationDispatcher =
         new IcebergViewOperationExecutor(icebergCatalogWrapperManager);
+    if (authorizationContext.isAuthorizationEnabled()) {
+      icebergViewOperationDispatcher =
+          new IcebergViewHookDispatcher(icebergViewOperationDispatcher, metalakeName);
+    }
     IcebergViewEventDispatcher icebergViewEventDispatcher =
-        new IcebergViewEventDispatcher(icebergViewOperationExecutor, eventBus, metalakeName);
+        new IcebergViewEventDispatcher(icebergViewOperationDispatcher, eventBus, metalakeName);
 
     IcebergNamespaceOperationDispatcher namespaceOperationDispatcher =
         new IcebergNamespaceOperationExecutor(icebergCatalogWrapperManager);
