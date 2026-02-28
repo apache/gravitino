@@ -934,6 +934,26 @@ public class CatalogMysqlIT extends BaseIT {
   }
 
   @Test
+  void testClearColumnComment() {
+    Column[] columns = createColumns();
+    TableCatalog tableCatalog = catalog.asTableCatalog();
+    NameIdentifier tableIdentifier = NameIdentifier.of(schemaName, tableName);
+
+    tableCatalog.createTable(tableIdentifier, columns, table_comment, createProperties());
+    tableCatalog.alterTable(
+        tableIdentifier,
+        TableChange.updateColumnComment(new String[] {MYSQL_COL_NAME1}, "updated_comment"));
+
+    Table table = tableCatalog.loadTable(tableIdentifier);
+    Assertions.assertEquals("updated_comment", table.columns()[0].comment());
+
+    tableCatalog.alterTable(
+        tableIdentifier, TableChange.updateColumnComment(new String[] {MYSQL_COL_NAME1}, ""));
+    table = tableCatalog.loadTable(tableIdentifier);
+    Assertions.assertTrue(StringUtils.isBlank(table.columns()[0].comment()));
+  }
+
+  @Test
   void testUpdateColumnDefaultValue() {
     Column[] columns = createColumnsWithDefaultValue();
     Table table =
