@@ -38,7 +38,7 @@ import org.apache.gravitino.maintenance.optimizer.common.util.IdentifierUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-/** Shared reader for file-based job providers. */
+/** Shared reader for file-based table-job relation providers. */
 class LocalTableJobRelationReader {
 
   private static final Logger LOG = LoggerFactory.getLogger(LocalTableJobRelationReader.class);

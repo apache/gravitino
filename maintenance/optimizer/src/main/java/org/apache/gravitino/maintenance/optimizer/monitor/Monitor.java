@@ -61,7 +61,8 @@ import org.slf4j.LoggerFactory;
  *
  * <ul>
  *   <li>{@link OptimizerConfig#METRICS_PROVIDER_CONFIG} for {@link MetricsProvider}.
- *   <li>{@link OptimizerConfig#JOB_PROVIDER_CONFIG} for {@link TableJobRelationProvider}.
+ *   <li>{@link OptimizerConfig#TABLE_JOB_RELATION_PROVIDER_CONFIG} for {@link
+ *       TableJobRelationProvider}.
  *   <li>{@link OptimizerConfig#METRICS_EVALUATOR_CONFIG} for {@link MetricsEvaluator}.
  *   <li>{@link OptimizerConfig#MONITOR_CALLBACKS_CONFIG} for callback list.
  * </ul>
@@ -273,7 +274,7 @@ public class Monitor implements AutoCloseable {
 
   private TableJobRelationProvider loadTableJobRelationProvider(OptimizerConfig optimizerConfig) {
     return ProviderUtils.createTableJobRelationProviderInstance(
-        optimizerConfig.get(OptimizerConfig.JOB_PROVIDER_CONFIG));
+        optimizerConfig.get(OptimizerConfig.TABLE_JOB_RELATION_PROVIDER_CONFIG));
   }
 
   private MetricsEvaluator loadMetricsEvaluator(OptimizerConfig optimizerConfig) {

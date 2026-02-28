@@ -36,11 +36,12 @@ import org.apache.gravitino.maintenance.optimizer.common.conf.OptimizerConfig;
  *   <li>Always returns an empty job identifier list.
  * </ul>
  *
- * <p>Configured by setting {@link OptimizerConfig#JOB_PROVIDER_CONFIG} to {@value #NAME}.
+ * <p>Configured by setting {@link OptimizerConfig#TABLE_JOB_RELATION_PROVIDER_CONFIG} to {@value
+ * #NAME}.
  */
-public class DummyJobProvider implements TableJobRelationProvider {
+public class DummyTableJobRelationProvider implements TableJobRelationProvider {
 
-  public static final String NAME = "dummy-job-provider";
+  public static final String NAME = "dummy-table-job-relation-provider";
 
   @Override
   public List<NameIdentifier> jobIdentifiers(NameIdentifier tableIdentifier) {

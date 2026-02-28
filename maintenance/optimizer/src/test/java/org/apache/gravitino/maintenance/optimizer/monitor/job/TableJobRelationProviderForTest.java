@@ -26,7 +26,7 @@ import org.apache.gravitino.maintenance.optimizer.common.OptimizerEnv;
 
 public class TableJobRelationProviderForTest implements TableJobRelationProvider {
 
-  public static final String NAME = "job-provider-for-test";
+  public static final String NAME = "table-job-relation-provider-for-test";
   public static final NameIdentifier JOB1 = NameIdentifier.parse("test.db.job1");
   public static final NameIdentifier JOB2 = NameIdentifier.parse("test.db.job2");
 

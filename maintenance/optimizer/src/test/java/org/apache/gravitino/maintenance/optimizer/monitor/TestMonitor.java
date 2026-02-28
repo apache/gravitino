@@ -46,7 +46,7 @@ public class TestMonitor {
             ImmutableMap.<String, String>builder()
                 .put(OptimizerConfig.METRICS_PROVIDER_CONFIG.getKey(), MetricsProviderForTest.NAME)
                 .put(
-                    OptimizerConfig.JOB_PROVIDER_CONFIG.getKey(),
+                    OptimizerConfig.TABLE_JOB_RELATION_PROVIDER_CONFIG.getKey(),
                     TableJobRelationProviderForTest.NAME)
                 .put(
                     OptimizerConfig.METRICS_EVALUATOR_CONFIG.getKey(), MetricsEvaluatorForTest.NAME)
@@ -130,7 +130,7 @@ public class TestMonitor {
             ImmutableMap.<String, String>builder()
                 .put(OptimizerConfig.METRICS_PROVIDER_CONFIG.getKey(), MetricsProviderForTest.NAME)
                 .put(
-                    OptimizerConfig.JOB_PROVIDER_CONFIG.getKey(),
+                    OptimizerConfig.TABLE_JOB_RELATION_PROVIDER_CONFIG.getKey(),
                     TableJobRelationProviderForTest.NAME)
                 .put(
                     OptimizerConfig.METRICS_EVALUATOR_CONFIG.getKey(), MetricsEvaluatorForTest.NAME)
@@ -178,7 +178,7 @@ public class TestMonitor {
             ImmutableMap.<String, String>builder()
                 .put(OptimizerConfig.METRICS_PROVIDER_CONFIG.getKey(), MetricsProviderForTest.NAME)
                 .put(
-                    OptimizerConfig.JOB_PROVIDER_CONFIG.getKey(),
+                    OptimizerConfig.TABLE_JOB_RELATION_PROVIDER_CONFIG.getKey(),
                     TableJobRelationProviderForTest.NAME)
                 .put(
                     OptimizerConfig.METRICS_EVALUATOR_CONFIG.getKey(), MetricsEvaluatorForTest.NAME)
@@ -204,7 +204,7 @@ public class TestMonitor {
             ImmutableMap.<String, String>builder()
                 .put(OptimizerConfig.METRICS_PROVIDER_CONFIG.getKey(), MetricsProviderForTest.NAME)
                 .put(
-                    OptimizerConfig.JOB_PROVIDER_CONFIG.getKey(),
+                    OptimizerConfig.TABLE_JOB_RELATION_PROVIDER_CONFIG.getKey(),
                     TableJobRelationProviderForTest.NAME)
                 .put(
                     OptimizerConfig.METRICS_EVALUATOR_CONFIG.getKey(),

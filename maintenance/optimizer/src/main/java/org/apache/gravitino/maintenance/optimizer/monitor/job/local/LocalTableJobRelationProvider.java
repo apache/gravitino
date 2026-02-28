@@ -35,9 +35,10 @@ import org.apache.gravitino.maintenance.optimizer.common.conf.OptimizerConfig;
  * <p>Usage:
  *
  * <ul>
- *   <li>Set {@link OptimizerConfig#JOB_PROVIDER_CONFIG} to {@value #NAME}.
+ *   <li>Set {@link OptimizerConfig#TABLE_JOB_RELATION_PROVIDER_CONFIG} to {@value #NAME}.
  *   <li>Set {@link #JOB_FILE_PATH_CONFIG} ({@code
- *       gravitino.optimizer.monitor.localJobProvider.filePath}) to a readable JSON-lines file path.
+ *       gravitino.optimizer.monitor.localTableJobRelationProvider.filePath}) to a readable
+ *       JSON-lines file path.
  *   <li>Optional: set {@link OptimizerConfig#GRAVITINO_DEFAULT_CATALOG_CONFIG} to resolve two-level
  *       table identifiers ({@code schema.table}) into {@code <defaultCatalog>.schema.table}.
  * </ul>
@@ -61,8 +62,8 @@ import org.apache.gravitino.maintenance.optimizer.common.conf.OptimizerConfig;
  */
 public class LocalTableJobRelationProvider implements TableJobRelationProvider {
 
-  public static final String NAME = "local-job-provider";
-  public static final String CONFIG_NAME = "localJobProvider";
+  public static final String NAME = "local-table-job-relation-provider";
+  public static final String CONFIG_NAME = "localTableJobRelationProvider";
 
   /** Config key for the local JSON-lines job mapping file path. */
   public static final String JOB_FILE_PATH_CONFIG =
