@@ -1391,9 +1391,8 @@ export const deleteTopic = createAsyncThunk(
     if (err || !res) {
       throw new Error(err)
     }
-    await dispatch(setTableLoading(true))
-    await dispatch(fetchTopics({ metalake, catalog, catalogType, schema, page: 'topics', init: true }))
-    await dispatch(setTableLoading(false))
+
+    dispatch(removeTopicFromStore({ metalake, catalog, catalogType, schema, topic }))
 
     return res
   }
@@ -1829,6 +1828,24 @@ export const appMetalakesSlice = createSlice({
     setTableProps(state, action) {
       state.tableProps = action.payload
     },
+    removeTopicFromStore(state, action) {
+      const { metalake, catalog, catalogType, schema, topic } = action.payload
+      const schemaKey = `{{${metalake}}}{{${catalog}}}{{${catalogType}}}{{${schema}}}`
+      const topicKey = `{{${metalake}}}{{${catalog}}}{{${catalogType}}}{{${schema}}}{{${topic}}}`
+
+      state.topics = state.topics.filter(item => item.name !== topic)
+      state.tableData = state.tableData.filter(item => !(item?.node === 'topic' && item?.name === topic))
+      state.selectedNodes = state.selectedNodes.filter(key => key !== topicKey)
+
+      if (state.activatedDetails?.name === topic) {
+        state.activatedDetails = null
+      }
+
+      const schemaNode = findInTree(state.metalakeTree, 'key', schemaKey)
+      if (schemaNode?.children?.length) {
+        schemaNode.children = schemaNode.children.filter(item => item.key !== topicKey)
+      }
+    },
     resetMetalakeStore(state, action) {
       if (!action.payload?.isCacheMetalakes) {
         state.metalakes = []
@@ -2229,6 +2246,7 @@ export const {
   setCatalogInUse,
   updateCatalogInUse,
   setMetalakeInUse,
+  removeTopicFromStore,
   removeCatalogFromTree,
   setTableProps,
   resetActivatedDetails
