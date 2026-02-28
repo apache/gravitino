@@ -396,8 +396,9 @@ public class CatalogClickHouseClusterIT extends BaseIT {
     Assertions.assertEquals(sqlClusterSchemaName, loadedSqlClusterSchema.name());
     Assertions.assertEquals(sqlClusterComment, loadedSqlClusterSchema.comment());
     Assertions.assertEquals("true", loadedSqlClusterSchema.properties().get(ON_CLUSTER));
-    Assertions.assertTrue(
-        StringUtils.isNotBlank(loadedSqlClusterSchema.properties().get(CLUSTER_NAME)));
+    Assertions.assertEquals(
+        ClickHouseContainer.DEFAULT_CLUSTER_NAME,
+        loadedSqlClusterSchema.properties().get(CLUSTER_NAME));
     Assertions.assertEquals(
         sqlClusterSchemaName,
         clickHouseService.loadSchema(NameIdentifier.of(sqlClusterSchemaName)).name());

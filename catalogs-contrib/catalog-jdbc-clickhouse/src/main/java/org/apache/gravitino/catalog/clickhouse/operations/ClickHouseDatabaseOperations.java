@@ -98,11 +98,11 @@ public class ClickHouseDatabaseOperations extends JdbcDatabaseOperations {
 
     if (onCluster(properties)) {
       String clusterName = properties.get(ClusterConstants.CLUSTER_NAME);
-      createDatabaseSql.append(String.format(" ON CLUSTER `%s`", clusterName));
+      createDatabaseSql.append(String.format(" ON CLUSTER `%s`", clusterName.replace("`", "``")));
     }
 
     if (StringUtils.isNotEmpty(originComment)) {
-      createDatabaseSql.append(String.format(" COMMENT '%s'", originComment));
+      createDatabaseSql.append(String.format(" COMMENT '%s'", originComment.replace("'", "''")));
     }
 
     LOG.info("Generated create database:{} sql: {}", databaseName, createDatabaseSql);
@@ -202,7 +202,7 @@ public class ClickHouseDatabaseOperations extends JdbcDatabaseOperations {
 
   private String detectClusterName(Connection connection, String databaseName) throws SQLException {
     List<String> clusterNames = new ArrayList<>();
-    String escapedDatabaseName = databaseName.replace("'", "''");
+    String escapedDatabaseName = databaseName.replace("`", "``").replace("'", "''");
     try (Statement statement = connection.createStatement();
         ResultSet clusters =
             statement.executeQuery("SELECT DISTINCT cluster FROM system.clusters")) {
@@ -246,7 +246,7 @@ public class ClickHouseDatabaseOperations extends JdbcDatabaseOperations {
 
   private String detectClusterNameFromQueryLog(Connection connection, String databaseName)
       throws SQLException {
-    String escapedDatabaseName = databaseName.replace("'", "''");
+    String escapedDatabaseName = databaseName.replace("`", "``").replace("'", "''");
     try (Statement flushLogStatement = connection.createStatement()) {
       flushLogStatement.execute("SYSTEM FLUSH LOGS");
     } catch (SQLException e) {

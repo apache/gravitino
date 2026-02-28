@@ -100,4 +100,31 @@ public class TestClickHouseDatabaseOperations {
     String sql = newOps(conf).buildDropSql("db_name", true);
     Assertions.assertEquals("DROP DATABASE `db_name`", sql);
   }
+
+  @Test
+  void testGenerateCreateDatabaseSqlEscapesCommentSingleQuotes() {
+    Map<String, String> conf = new HashMap<>();
+    String sql = newOps(conf).buildCreateSql("db", "it's a test", Collections.emptyMap());
+    Assertions.assertEquals("CREATE DATABASE `db` COMMENT 'it''s a test'", sql);
+  }
+
+  @Test
+  void testGenerateCreateDatabaseSqlEscapesClusterNameBackticks() {
+    Map<String, String> properties = new HashMap<>();
+    properties.put(ClusterConstants.CLUSTER_NAME, "cluster`name");
+    properties.put(ClusterConstants.ON_CLUSTER, "true");
+
+    String sql = newOps(new HashMap<>()).buildCreateSql("db", null, properties);
+    Assertions.assertEquals("CREATE DATABASE `db` ON CLUSTER `cluster``name`", sql);
+  }
+
+  @Test
+  void testGenerateCreateDatabaseSqlEscapesBothCommentAndCluster() {
+    Map<String, String> properties = new HashMap<>();
+    properties.put(ClusterConstants.CLUSTER_NAME, "c`k");
+    properties.put(ClusterConstants.ON_CLUSTER, "true");
+
+    String sql = newOps(new HashMap<>()).buildCreateSql("db", "it's", properties);
+    Assertions.assertEquals("CREATE DATABASE `db` ON CLUSTER `c``k` COMMENT 'it''s'", sql);
+  }
 }
