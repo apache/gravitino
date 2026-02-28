@@ -41,8 +41,8 @@ import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.config.ConfigConstants;
 import org.apache.gravitino.maintenance.optimizer.api.common.DataScope;
 import org.apache.gravitino.maintenance.optimizer.api.common.MetricPoint;
-import org.apache.gravitino.maintenance.optimizer.common.util.StatisticValueUtils;
-import org.apache.gravitino.maintenance.optimizer.recommender.util.PartitionUtils;
+import org.apache.gravitino.maintenance.optimizer.common.util.PartitionPathSerdeUtils;
+import org.apache.gravitino.maintenance.optimizer.common.util.StatisticValueSerdeUtils;
 import org.apache.gravitino.maintenance.optimizer.updater.metrics.storage.MetricsRepository;
 import org.apache.gravitino.maintenance.optimizer.updater.metrics.storage.MetricsStorageException;
 import org.apache.gravitino.utils.jdbc.JdbcSqlScriptUtils;
@@ -247,13 +247,13 @@ public abstract class JdbcMetricsRepository implements MetricsRepository {
                 || metricPoint.scope() == DataScope.Type.PARTITION,
             "Unsupported scope %s for table/partition metrics",
             metricPoint.scope());
-        String serializedMetricValue = StatisticValueUtils.toString(metricPoint.value());
+        String serializedMetricValue = StatisticValueSerdeUtils.toString(metricPoint.value());
         validateWriteArguments(metricPoint, serializedMetricValue);
 
         String normalizedIdentifier = normalizeIdentifier(metricPoint.identifier());
         String normalizedMetricName = normalizeMetricName(metricPoint.metricName());
         String normalizedPartition =
-            metricPoint.partitionPath().map(PartitionUtils::encodePartitionPath).orElse(null);
+            metricPoint.partitionPath().map(PartitionPathSerdeUtils::encode).orElse(null);
         tableInsertStmt.setString(1, normalizedIdentifier);
         tableInsertStmt.setString(2, normalizedMetricName);
         tableInsertStmt.setString(3, normalizePartition(normalizedPartition).orElse(null));
@@ -295,7 +295,7 @@ public abstract class JdbcMetricsRepository implements MetricsRepository {
             metricPoint.scope() == DataScope.Type.JOB,
             "Unsupported scope %s for job metrics",
             metricPoint.scope());
-        String serializedMetricValue = StatisticValueUtils.toString(metricPoint.value());
+        String serializedMetricValue = StatisticValueSerdeUtils.toString(metricPoint.value());
         validateWriteArguments(metricPoint, serializedMetricValue);
 
         String normalizedIdentifier = normalizeIdentifier(metricPoint.identifier());
@@ -439,8 +439,7 @@ public abstract class JdbcMetricsRepository implements MetricsRepository {
         MAX_METRIC_VALUE_LENGTH,
         serializedMetricValue.length());
     if (metricPoint.partitionPath().isPresent()) {
-      String encodedPartition =
-          PartitionUtils.encodePartitionPath(metricPoint.partitionPath().get());
+      String encodedPartition = PartitionPathSerdeUtils.encode(metricPoint.partitionPath().get());
       Preconditions.checkArgument(
           StringUtils.isNotBlank(encodedPartition), "partition must not be blank");
     }
@@ -466,7 +465,7 @@ public abstract class JdbcMetricsRepository implements MetricsRepository {
               MetricPoint.forTable(
                   nameIdentifier,
                   rs.getString("metric_name"),
-                  StatisticValueUtils.fromString(rs.getString("metric_value")),
+                  StatisticValueSerdeUtils.fromString(rs.getString("metric_value")),
                   rs.getLong("metric_ts")));
         }
       }
@@ -487,7 +486,7 @@ public abstract class JdbcMetricsRepository implements MetricsRepository {
     Preconditions.checkArgument(
         scope.partition().isPresent(), "partition scope must contain partition path");
     NameIdentifier nameIdentifier = scope.identifier();
-    String partition = PartitionUtils.encodePartitionPath(scope.partition().get());
+    String partition = PartitionPathSerdeUtils.encode(scope.partition().get());
 
     List<MetricPoint> result = new ArrayList<>();
     String sql =
@@ -509,7 +508,7 @@ public abstract class JdbcMetricsRepository implements MetricsRepository {
                   nameIdentifier,
                   scope.partition().get(),
                   rs.getString("metric_name"),
-                  StatisticValueUtils.fromString(rs.getString("metric_value")),
+                  StatisticValueSerdeUtils.fromString(rs.getString("metric_value")),
                   rs.getLong("metric_ts")));
         }
       }
@@ -547,7 +546,7 @@ public abstract class JdbcMetricsRepository implements MetricsRepository {
               MetricPoint.forJob(
                   nameIdentifier,
                   rs.getString("metric_name"),
-                  StatisticValueUtils.fromString(rs.getString("metric_value")),
+                  StatisticValueSerdeUtils.fromString(rs.getString("metric_value")),
                   rs.getLong("metric_ts")));
         }
       }

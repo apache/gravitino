@@ -26,15 +26,6 @@ import org.apache.gravitino.Config;
 import org.apache.gravitino.config.ConfigBuilder;
 import org.apache.gravitino.config.ConfigConstants;
 import org.apache.gravitino.config.ConfigEntry;
-import org.apache.gravitino.maintenance.optimizer.monitor.evaluator.GravitinoMetricsEvaluator;
-import org.apache.gravitino.maintenance.optimizer.monitor.job.dummy.DummyTableJobRelationProvider;
-import org.apache.gravitino.maintenance.optimizer.monitor.metrics.GravitinoMetricsProvider;
-import org.apache.gravitino.maintenance.optimizer.recommender.job.NoopJobSubmitter;
-import org.apache.gravitino.maintenance.optimizer.recommender.statistics.GravitinoStatisticsProvider;
-import org.apache.gravitino.maintenance.optimizer.recommender.strategy.GravitinoStrategyProvider;
-import org.apache.gravitino.maintenance.optimizer.recommender.table.GravitinoTableMetadataProvider;
-import org.apache.gravitino.maintenance.optimizer.updater.metrics.GravitinoMetricsUpdater;
-import org.apache.gravitino.maintenance.optimizer.updater.statistics.GravitinoStatisticsUpdater;
 
 /**
  * Central configuration holder for the optimizer runtime. Keys are grouped under the {@code
@@ -67,64 +58,74 @@ public class OptimizerConfig extends Config {
       MONITOR_PREFIX + "tableJobRelationProvider";
   private static final String METRICS_EVALUATOR = MONITOR_PREFIX + "metricsEvaluator";
   private static final String MONITOR_CALLBACKS = MONITOR_PREFIX + "callbacks";
+  private static final String DEFAULT_STATISTICS_PROVIDER = "gravitino-statistics-provider";
+  private static final String DEFAULT_STRATEGY_PROVIDER = "gravitino-strategy-provider";
+  private static final String DEFAULT_TABLE_META_PROVIDER = "gravitino-table-metadata-provider";
+  private static final String DEFAULT_JOB_SUBMITTER = "noop-job-submitter";
+  private static final String DEFAULT_STATISTICS_UPDATER = "gravitino-statistics-updater";
+  private static final String DEFAULT_METRICS_UPDATER = "gravitino-metrics-updater";
+  private static final String DEFAULT_METRICS_PROVIDER = "gravitino-metrics-provider";
+  private static final String DEFAULT_TABLE_JOB_RELATION_PROVIDER =
+      "dummy-table-job-relation-provider";
+  private static final String DEFAULT_METRICS_EVALUATOR = "gravitino-metrics-evaluator";
 
   public static final ConfigEntry<String> STATISTICS_PROVIDER_CONFIG =
       new ConfigBuilder(STATISTICS_PROVIDER)
           .doc(
               "Statistics provider implementation name (matches Provider.name()) discoverable via "
                   + "ServiceLoader. Example: '"
-                  + GravitinoStatisticsProvider.NAME
+                  + DEFAULT_STATISTICS_PROVIDER
                   + "'.")
           .version(ConfigConstants.VERSION_1_2_0)
           .stringConf()
-          .createWithDefault(GravitinoStatisticsProvider.NAME);
+          .createWithDefault(DEFAULT_STATISTICS_PROVIDER);
 
   public static final ConfigEntry<String> STRATEGY_PROVIDER_CONFIG =
       new ConfigBuilder(STRATEGY_PROVIDER)
           .doc(
               "Strategy provider implementation name (matches Provider.name()) discoverable via "
                   + "ServiceLoader. Example: '"
-                  + GravitinoStrategyProvider.NAME
+                  + DEFAULT_STRATEGY_PROVIDER
                   + "'.")
           .version(ConfigConstants.VERSION_1_2_0)
           .stringConf()
-          .createWithDefault(GravitinoStrategyProvider.NAME);
+          .createWithDefault(DEFAULT_STRATEGY_PROVIDER);
 
   public static final ConfigEntry<String> TABLE_META_PROVIDER_CONFIG =
       new ConfigBuilder(TABLE_META_PROVIDER)
           .doc(
               "Table metadata provider implementation name (matches Provider.name()) discoverable "
                   + "via ServiceLoader. Example: '"
-                  + GravitinoTableMetadataProvider.NAME
+                  + DEFAULT_TABLE_META_PROVIDER
                   + "'.")
           .version(ConfigConstants.VERSION_1_2_0)
           .stringConf()
-          .createWithDefault(GravitinoTableMetadataProvider.NAME);
+          .createWithDefault(DEFAULT_TABLE_META_PROVIDER);
 
   public static final ConfigEntry<String> JOB_SUBMITTER_CONFIG =
       new ConfigBuilder(JOB_SUBMITTER)
           .doc(
               "Job submitter implementation name (matches Provider.name()) discoverable via "
                   + "ServiceLoader. Example: '"
-                  + NoopJobSubmitter.NAME
+                  + DEFAULT_JOB_SUBMITTER
                   + "'.")
           .version(ConfigConstants.VERSION_1_2_0)
           .stringConf()
-          .createWithDefault(NoopJobSubmitter.NAME);
+          .createWithDefault(DEFAULT_JOB_SUBMITTER);
 
   public static final ConfigEntry<String> STATISTICS_UPDATER_CONFIG =
       new ConfigBuilder(STATISTICS_UPDATER)
           .doc("The statistics updater implementation name (matches Provider.name()).")
           .version(ConfigConstants.VERSION_1_2_0)
           .stringConf()
-          .createWithDefault(GravitinoStatisticsUpdater.NAME);
+          .createWithDefault(DEFAULT_STATISTICS_UPDATER);
 
   public static final ConfigEntry<String> METRICS_UPDATER_CONFIG =
       new ConfigBuilder(METRICS_UPDATER)
           .doc("The metrics updater implementation name (matches Provider.name()).")
           .version(ConfigConstants.VERSION_1_2_0)
           .stringConf()
-          .createWithDefault(GravitinoMetricsUpdater.NAME);
+          .createWithDefault(DEFAULT_METRICS_UPDATER);
 
   public static final ConfigEntry<String> METRICS_PROVIDER_CONFIG =
       new ConfigBuilder(METRICS_PROVIDER)
@@ -133,7 +134,7 @@ public class OptimizerConfig extends Config {
                   + "discoverable via ServiceLoader. Example: 'metrics-provider'.")
           .version(ConfigConstants.VERSION_1_2_0)
           .stringConf()
-          .createWithDefault(GravitinoMetricsProvider.NAME);
+          .createWithDefault(DEFAULT_METRICS_PROVIDER);
 
   public static final ConfigEntry<String> TABLE_JOB_RELATION_PROVIDER_CONFIG =
       new ConfigBuilder(TABLE_JOB_RELATION_PROVIDER)
@@ -142,7 +143,7 @@ public class OptimizerConfig extends Config {
                   + "discoverable via ServiceLoader. Example: 'table-job-relation-provider'.")
           .version(ConfigConstants.VERSION_1_2_0)
           .stringConf()
-          .createWithDefault(DummyTableJobRelationProvider.NAME);
+          .createWithDefault(DEFAULT_TABLE_JOB_RELATION_PROVIDER);
 
   public static final ConfigEntry<String> METRICS_EVALUATOR_CONFIG =
       new ConfigBuilder(METRICS_EVALUATOR)
@@ -152,7 +153,7 @@ public class OptimizerConfig extends Config {
                   + "'metrics-evaluator'.")
           .version(ConfigConstants.VERSION_1_2_0)
           .stringConf()
-          .createWithDefault(GravitinoMetricsEvaluator.NAME);
+          .createWithDefault(DEFAULT_METRICS_EVALUATOR);
 
   public static final ConfigEntry<List<String>> MONITOR_CALLBACKS_CONFIG =
       new ConfigBuilder(MONITOR_CALLBACKS)

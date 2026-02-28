@@ -33,7 +33,7 @@ import org.apache.gravitino.maintenance.optimizer.api.updater.StatisticsUpdater;
 import org.apache.gravitino.maintenance.optimizer.common.OptimizerEnv;
 import org.apache.gravitino.maintenance.optimizer.common.util.GravitinoClientUtils;
 import org.apache.gravitino.maintenance.optimizer.common.util.IdentifierUtils;
-import org.apache.gravitino.maintenance.optimizer.recommender.util.PartitionUtils;
+import org.apache.gravitino.maintenance.optimizer.common.util.PartitionPathSerdeUtils;
 import org.apache.gravitino.stats.PartitionStatisticsUpdate;
 import org.apache.gravitino.stats.StatisticValue;
 
@@ -104,7 +104,7 @@ public class GravitinoStatisticsUpdater implements StatisticsUpdater {
               return new PartitionStatisticsUpdate() {
                 @Override
                 public String partitionName() {
-                  return PartitionUtils.encodePartitionPath(entry.getKey());
+                  return PartitionPathSerdeUtils.encode(entry.getKey());
                 }
 
                 @Override
