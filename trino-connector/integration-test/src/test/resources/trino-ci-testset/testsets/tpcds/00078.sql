@@ -51,7 +51,7 @@ SELECT
   "ss_sold_year"
 , "ss_item_sk"
 , "ss_customer_sk"
-, "round"((CAST("ss_qty" AS DECIMAL(10,2)) / COALESCE(("ws_qty" + "cs_qty"), 1)), 2) "ratio"
+, CAST((CAST("ss_qty" AS DECIMAL(10,2)) / COALESCE(("ws_qty" + "cs_qty"), 1)) AS DECIMAL(38, 2)) "ratio"
 , "ss_qty" "store_qty"
 , "ss_wc" "store_wholesale_cost"
 , "ss_sp" "store_sales_price"

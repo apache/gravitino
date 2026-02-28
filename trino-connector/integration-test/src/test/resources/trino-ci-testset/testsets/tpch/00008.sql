@@ -1,10 +1,10 @@
 SELECT
   o_year,
-  sum(CASE
+  CAST((sum(CASE
       WHEN nation = 'BRAZIL'
         THEN volume
       ELSE 0
-      END) / sum(volume) AS mkt_share
+      END) / sum(volume)) AS DECIMAL(38, 2)) AS mkt_share
 FROM (
        SELECT
          extract(YEAR FROM o.orderdate)     AS o_year,

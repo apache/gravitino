@@ -865,6 +865,7 @@ tasks {
     dependsOn("trino-connector:trino-connector-446-451:copyLibs")
     dependsOn("trino-connector:trino-connector-452-468:copyLibs")
     dependsOn("trino-connector:trino-connector-469-472:copyLibs")
+    dependsOn("trino-connector:trino-connector-478:copyLibs")
     group = "gravitino distribution"
   }
 
