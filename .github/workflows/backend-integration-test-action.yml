@@ -29,7 +29,7 @@ on:
 jobs:
   start-runner:
     name: JDK${{ inputs.java-version }}-${{ inputs.test-mode }}-${{ inputs.backend }}
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-22.04
     timeout-minutes: 90
     env:
       PLATFORM: ${{ inputs.architecture }}

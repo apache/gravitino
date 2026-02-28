@@ -33,7 +33,6 @@ from gravitino import (
 from gravitino.exceptions.base import GravitinoRuntimeException
 from gravitino.filesystem.gvfs_config import GVFSConfig
 
-
 logger = logging.getLogger(__name__)
 
 
