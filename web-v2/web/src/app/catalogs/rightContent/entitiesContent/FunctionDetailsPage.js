@@ -23,9 +23,8 @@ import { useEffect, useState } from 'react'
 import { Collapse, Descriptions, Space, Spin, Tag, Typography, Flex, Tooltip, Divider, Tabs } from 'antd'
 import { useSearchParams } from 'next/navigation'
 import { formatToDateTime, isValidDate } from '@/lib/utils/date'
-import { getFunctionDetailsApi } from '@/lib/api/functions'
-import { to } from '@/lib/utils'
 import Icons from '@/components/Icons'
+import { useAppSelector } from '@/lib/hooks/useStore'
 
 const { Title, Paragraph } = Typography
 
@@ -37,11 +36,30 @@ const formatType = type => {
   return JSON.stringify(type)
 }
 
+const formatDefaultValue = defaultValue => {
+  if (defaultValue == null) return ''
+
+  if (typeof defaultValue === 'string' || typeof defaultValue === 'number' || typeof defaultValue === 'boolean') {
+    return `${defaultValue}`
+  }
+
+  if (typeof defaultValue === 'object') {
+    if (Object.prototype.hasOwnProperty.call(defaultValue, 'value')) {
+      return `${defaultValue.value}`
+    }
+
+    return JSON.stringify(defaultValue)
+  }
+
+  return ''
+}
+
 const renderParameters = parameters => {
   if (!parameters?.length) return null
 
   return parameters.map((param, index) => {
     const comment = typeof param?.comment === 'string' ? param.comment.trim() : ''
+    const defaultText = formatDefaultValue(param?.defaultValue)
 
     return (
       <span key={`${param.name || 'param'}-${index}`}>
@@ -53,7 +71,7 @@ const renderParameters = parameters => {
             </span>
           </Tooltip>
         )}
-        <span>{`: ${formatType(param.dataType)}`}</span>
+        <span>{`: ${formatType(param.dataType)}${defaultText ? ` = ${defaultText}` : ''}`}</span>
         {index < parameters.length - 1 && <span>, </span>}
       </span>
     )
@@ -118,6 +136,10 @@ const buildImplDetails = impl => {
 const FunctionImplTabs = ({ impls }) => {
   const [activeKey, setActiveKey] = useState(impls[0]?.runtime || 'runtime-0')
 
+  useEffect(() => {
+    setActiveKey(impls[0]?.runtime || 'runtime-0')
+  }, [impls])
+
   const tabItems = impls.map((impl, implIndex) => {
     const runtimeKey = impl?.runtime || `runtime-${implIndex}`
     const tabLabel = impl?.runtime || `Runtime ${implIndex + 1}`
@@ -138,7 +160,14 @@ const FunctionImplTabs = ({ impls }) => {
   return (
     <div className='flex flex-col gap-2 w-full'>
       <Tabs size='small' className='w-full' items={tabItems} activeKey={activeKey} onChange={setActiveKey} />
-      <Descriptions layout='horizontal' column={1} size='small' bordered style={{ width: '100%' }}>
+      <Descriptions
+        layout='horizontal'
+        column={1}
+        size='small'
+        bordered
+        style={{ width: '100%' }}
+        labelStyle={{ width: '40%' }}
+      >
         {activeDetails.map(detail => (
           <Descriptions.Item key={`${activeKey}-${detail.label}`} label={detail.label}>
             {detail.value}
@@ -151,37 +180,14 @@ const FunctionImplTabs = ({ impls }) => {
 
 export default function FunctionDetailsPage() {
   const searchParams = useSearchParams()
-  const metalake = searchParams.get('metalake')
-  const catalog = searchParams.get('catalog')
-  const schema = searchParams.get('schema')
   const functionName = searchParams.get('function')
-  const [loading, setLoading] = useState(false)
-  const [functionData, setFunctionData] = useState(null)
+  const store = useAppSelector(state => state.metalakes)
+  const functionData = store.activatedDetails
+  const [activeDefinitionKeys, setActiveDefinitionKeys] = useState([])
 
   useEffect(() => {
-    const loadDetails = async () => {
-      if (!metalake || !catalog || !schema || !functionName) return
-      setLoading(true)
-
-      const [err, res] = await to(
-        getFunctionDetailsApi({
-          metalake,
-          catalog,
-          schema,
-          functionName
-        })
-      )
-      setLoading(false)
-      if (err || !res) {
-        setFunctionData(null)
-
-        return
-      }
-      setFunctionData(res.function)
-    }
-
-    loadDetails()
-  }, [metalake, catalog, schema, functionName])
+    setActiveDefinitionKeys([])
+  }, [functionName])
 
   const definitions = functionData?.definitions || []
   const createdAt = functionData?.audit?.createTime
@@ -211,7 +217,7 @@ export default function FunctionDetailsPage() {
   })
 
   return (
-    <Spin spinning={loading}>
+    <Spin spinning={store.activatedDetailsLoading}>
       <div className='bg-white min-h-[calc(100vh-24rem)]'>
         <Space direction='vertical' size='small' style={{ width: '100%' }}>
           <Flex className='mb-2' gap='small' align='flex-start'>
@@ -260,11 +266,19 @@ export default function FunctionDetailsPage() {
             </Space>
           </Space>
           <div className='max-h-[60vh] overflow-auto'>
-            <div className='mb-2 font-medium'>Definitions</div>
+            <Tabs
+              data-refer='details-tabs'
+              defaultActiveKey={'Definitions'}
+              items={[{ label: 'Definitions', key: 'Definitions' }]}
+            />
             {definitions.length === 0 ? (
               <span className='text-slate-400'>No definitions</span>
             ) : (
-              <Collapse items={definitionItems} defaultActiveKey={[]} />
+              <Collapse
+                items={definitionItems}
+                activeKey={activeDefinitionKeys}
+                onChange={keys => setActiveDefinitionKeys(Array.isArray(keys) ? keys : [keys])}
+              />
             )}
           </div>
         </Space>

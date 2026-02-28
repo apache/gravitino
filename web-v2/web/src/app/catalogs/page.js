@@ -40,6 +40,7 @@ import {
   fetchModels,
   fetchModelVersions,
   fetchFunctions,
+  getFunctionDetails,
   getMetalakeDetails,
   getCatalogDetails,
   getSchemaDetails,
@@ -67,7 +68,7 @@ const CatalogsListPage = () => {
   const treeRef = useRef()
 
   const buildNodePath = routeParams => {
-    const keys = ['metalake', 'catalog', 'catalogType', 'schema', 'table', 'fileset', 'topic', 'model']
+    const keys = ['metalake', 'catalog', 'catalogType', 'schema', 'table', 'fileset', 'topic', 'model', 'function']
 
     return keys.map(key => (routeParams[key] ? `{{${routeParams[key]}}}` : '')).join('')
   }
@@ -82,11 +83,23 @@ const CatalogsListPage = () => {
       fileset: searchParams.get('fileset'),
       topic: searchParams.get('topic'),
       model: searchParams.get('model'),
+      function: searchParams.get('function'),
       version: searchParams.get('version')
     }
     async function fetchDependsData() {
       if ([...searchParams.keys()].length) {
-        const { metalake, catalog, catalogType, schema, table, fileset, topic, model, version } = routeParams
+        const {
+          metalake,
+          catalog,
+          catalogType,
+          schema,
+          table,
+          fileset,
+          topic,
+          model,
+          function: func,
+          version
+        } = routeParams
 
         if (metalake) {
           dispatch(fetchTags({ metalake, details: true }))
@@ -171,115 +184,123 @@ const CatalogsListPage = () => {
           )
         }
 
-        if (paramsSize === 5 && catalog && catalogType && schema && (table || fileset || topic || model)) {
+        if (paramsSize === 5 && catalog && catalogType && schema) {
           if (!store.catalogs.length) {
             await dispatch(fetchCatalogs({ metalake }))
             await dispatch(fetchSchemas({ metalake, catalog, catalogType }))
           }
-          switch (catalogType) {
-            case 'relational':
-              store.tables.length === 0 &&
-                (await dispatch(fetchTables({ init: true, page: 'schemas', metalake, catalog, schema })))
-              await dispatch(resetActivatedDetails())
-              await dispatch(setActivatedDetailsLoading(true))
-              await dispatch(getTableDetails({ init: true, metalake, catalog, schema, table }))
-              await dispatch(setActivatedDetailsLoading(false))
-              dispatch(
-                getCurrentEntityTags({
-                  init: true,
-                  metalake,
-                  metadataObjectType: 'table',
-                  metadataObjectFullName: `${catalog}.${schema}.${table}`
-                })
-              )
-              dispatch(
-                getCurrentEntityPolicies({
-                  init: true,
-                  metalake,
-                  metadataObjectType: 'table',
-                  metadataObjectFullName: `${catalog}.${schema}.${table}`,
-                  details: true
-                })
-              )
-              break
-            case 'fileset':
-              store.filesets.length === 0 &&
-                (await dispatch(fetchFilesets({ init: true, page: 'schemas', metalake, catalog, schema })))
-              await dispatch(setActivatedDetailsLoading(true))
-              await dispatch(getFilesetDetails({ init: true, metalake, catalog, schema, fileset }))
-              await dispatch(setActivatedDetailsLoading(false))
-              dispatch(
-                getCurrentEntityTags({
-                  init: true,
-                  metalake,
-                  metadataObjectType: 'fileset',
-                  metadataObjectFullName: `${catalog}.${schema}.${fileset}`,
-                  details: true
-                })
-              )
-              dispatch(
-                getCurrentEntityPolicies({
-                  init: true,
-                  metalake,
-                  metadataObjectType: 'fileset',
-                  metadataObjectFullName: `${catalog}.${schema}.${fileset}`,
-                  details: true
-                })
-              )
-              break
-            case 'messaging':
-              store.topics.length === 0 &&
-                (await dispatch(fetchTopics({ init: true, page: 'schemas', metalake, catalog, schema })))
-              await dispatch(setActivatedDetailsLoading(true))
-              await dispatch(getTopicDetails({ init: true, metalake, catalog, schema, topic }))
-              await dispatch(setActivatedDetailsLoading(false))
-              dispatch(
-                getCurrentEntityTags({
-                  init: true,
-                  metalake,
-                  metadataObjectType: 'topic',
-                  metadataObjectFullName: `${catalog}.${schema}.${topic}`,
-                  details: true
-                })
-              )
-              dispatch(
-                getCurrentEntityPolicies({
-                  init: true,
-                  metalake,
-                  metadataObjectType: 'topic',
-                  metadataObjectFullName: `${catalog}.${schema}.${topic}`,
-                  details: true
-                })
-              )
-              break
-            case 'model':
-              store.models.length === 0 &&
-                (await dispatch(fetchModels({ init: true, page: 'schemas', metalake, catalog, schema })))
-              await dispatch(fetchModelVersions({ init: true, metalake, catalog, schema, model }))
-              await dispatch(setActivatedDetailsLoading(true))
-              await dispatch(getModelDetails({ init: true, metalake, catalog, schema, model }))
-              await dispatch(setActivatedDetailsLoading(false))
-              dispatch(
-                getCurrentEntityTags({
-                  init: true,
-                  metalake,
-                  metadataObjectType: 'model',
-                  metadataObjectFullName: `${catalog}.${schema}.${model}`,
-                  details: true
-                })
-              )
-              dispatch(
-                getCurrentEntityPolicies({
-                  init: true,
-                  metalake,
-                  metadataObjectType: 'model',
-                  metadataObjectFullName: `${catalog}.${schema}.${model}`,
-                  details: true
-                })
-              )
-              break
-            default:
-              break
+          if (table || fileset || topic || model) {
+            switch (catalogType) {
+              case 'relational':
+                store.tables.length === 0 &&
+                  (await dispatch(fetchTables({ init: true, page: 'schemas', metalake, catalog, schema })))
+                await dispatch(resetActivatedDetails())
+                await dispatch(setActivatedDetailsLoading(true))
+                await dispatch(getTableDetails({ init: true, metalake, catalog, schema, table }))
+                await dispatch(setActivatedDetailsLoading(false))
+                dispatch(
+                  getCurrentEntityTags({
+                    init: true,
+                    metalake,
+                    metadataObjectType: 'table',
+                    metadataObjectFullName: `${catalog}.${schema}.${table}`
+                  })
+                )
+                dispatch(
+                  getCurrentEntityPolicies({
+                    init: true,
+                    metalake,
+                    metadataObjectType: 'table',
+                    metadataObjectFullName: `${catalog}.${schema}.${table}`,
+                    details: true
+                  })
+                )
+                break
+              case 'fileset':
+                store.filesets.length === 0 &&
+                  (await dispatch(fetchFilesets({ init: true, page: 'schemas', metalake, catalog, schema })))
+                await dispatch(setActivatedDetailsLoading(true))
+                await dispatch(getFilesetDetails({ init: true, metalake, catalog, schema, fileset }))
+                await dispatch(setActivatedDetailsLoading(false))
+                dispatch(
+                  getCurrentEntityTags({
+                    init: true,
+                    metalake,
+                    metadataObjectType: 'fileset',
+                    metadataObjectFullName: `${catalog}.${schema}.${fileset}`,
+                    details: true
+                  })
+                )
+                dispatch(
+                  getCurrentEntityPolicies({
+                    init: true,
+                    metalake,
+                    metadataObjectType: 'fileset',
+                    metadataObjectFullName: `${catalog}.${schema}.${fileset}`,
+                    details: true
+                  })
+                )
+                break
+              case 'messaging':
+                store.topics.length === 0 &&
+                  (await dispatch(fetchTopics({ init: true, page: 'schemas', metalake, catalog, schema })))
+                await dispatch(setActivatedDetailsLoading(true))
+                await dispatch(getTopicDetails({ init: true, metalake, catalog, schema, topic }))
+                await dispatch(setActivatedDetailsLoading(false))
+                dispatch(
+                  getCurrentEntityTags({
+                    init: true,
+                    metalake,
+                    metadataObjectType: 'topic',
+                    metadataObjectFullName: `${catalog}.${schema}.${topic}`,
+                    details: true
+                  })
+                )
+                dispatch(
+                  getCurrentEntityPolicies({
+                    init: true,
+                    metalake,
+                    metadataObjectType: 'topic',
+                    metadataObjectFullName: `${catalog}.${schema}.${topic}`,
+                    details: true
+                  })
+                )
+                break
+              case 'model':
+                store.models.length === 0 &&
+                  (await dispatch(fetchModels({ init: true, page: 'schemas', metalake, catalog, schema })))
+                await dispatch(fetchModelVersions({ init: true, metalake, catalog, schema, model }))
+                await dispatch(setActivatedDetailsLoading(true))
+                await dispatch(getModelDetails({ init: true, metalake, catalog, schema, model }))
+                await dispatch(setActivatedDetailsLoading(false))
+                dispatch(
+                  getCurrentEntityTags({
+                    init: true,
+                    metalake,
+                    metadataObjectType: 'model',
+                    metadataObjectFullName: `${catalog}.${schema}.${model}`,
+                    details: true
+                  })
+                )
+                dispatch(
+                  getCurrentEntityPolicies({
+                    init: true,
+                    metalake,
+                    metadataObjectType: 'model',
+                    metadataObjectFullName: `${catalog}.${schema}.${model}`,
+                    details: true
+                  })
+                )
+                break
+              default:
+                break
+            }
+          }
+          if (func) {
+            store.functions.length === 0 && (await dispatch(fetchFunctions({ init: true, metalake, catalog, schema })))
+            await dispatch(setActivatedDetailsLoading(true))
+            await dispatch(getFunctionDetails({ init: true, metalake, catalog, schema, functionName: func }))
+            await dispatch(setActivatedDetailsLoading(false))
           }
         }
         if (paramsSize === 6 && version) {
