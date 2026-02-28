@@ -91,7 +91,7 @@ public class CatalogIcebergJdbcCredentialIT extends BaseIT {
         client = null;
       }
       try {
-        closer.close();
+        super.stopIntegrationTest();
       } catch (Exception e) {
         LOG.error("Exception in closing CloseableGroup", e);
       }
