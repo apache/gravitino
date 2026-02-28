@@ -1830,16 +1830,13 @@ export const appMetalakesSlice = createSlice({
     },
     removeTopicFromStore(state, action) {
       const { metalake, catalog, catalogType, schema, topic } = action.payload
-      const schemaKey = `{{${metalake}}}{{${catalog}}}{{${catalogType}}}{{${schema}}}`
-      const topicKey = `{{${metalake}}}{{${catalog}}}{{${catalogType}}}{{${schema}}}{{${topic}}}`
+      const effectiveCatalogType = catalogType || 'messaging'
+      const schemaKey = `{{${metalake}}}{{${catalog}}}{{${effectiveCatalogType}}}{{${schema}}}`
+      const topicKey = `{{${metalake}}}{{${catalog}}}{{${effectiveCatalogType}}}{{${schema}}}{{${topic}}}`
 
       state.topics = state.topics.filter(item => item.name !== topic)
       state.tableData = state.tableData.filter(item => !(item?.node === 'topic' && item?.name === topic))
       state.selectedNodes = state.selectedNodes.filter(key => key !== topicKey)
-
-      if (state.activatedDetails?.name === topic) {
-        state.activatedDetails = null
-      }
 
       const schemaNode = findInTree(state.metalakeTree, 'key', schemaKey)
       if (schemaNode?.children?.length) {
