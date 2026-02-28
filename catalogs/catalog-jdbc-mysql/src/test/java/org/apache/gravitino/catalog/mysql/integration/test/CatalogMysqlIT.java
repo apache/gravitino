@@ -895,7 +895,7 @@ public class CatalogMysqlIT extends BaseIT {
           catalog.asTableCatalog().dropTable(tableIdentifier);
         });
   }
-  
+
   @Test
   void testClearColumnComments() {
     Column col1 = Column.of("col_with_comment1", Types.IntegerType.get(), "original comment 1");
@@ -904,9 +904,7 @@ public class CatalogMysqlIT extends BaseIT {
     Column[] columns = new Column[] {col1, col2, col3};
     NameIdentifier tableIdentifier =
         NameIdentifier.of(schemaName, GravitinoITUtils.genRandomName("test_clear_comments"));
-    catalog
-        .asTableCatalog()
-        .createTable(tableIdentifier, columns, "test table", ImmutableMap.of());
+    catalog.asTableCatalog().createTable(tableIdentifier, columns, "test table", ImmutableMap.of());
     Table table = catalog.asTableCatalog().loadTable(tableIdentifier);
     Assertions.assertEquals("original comment 1", table.columns()[0].comment());
     Assertions.assertEquals("original comment 2", table.columns()[1].comment());
