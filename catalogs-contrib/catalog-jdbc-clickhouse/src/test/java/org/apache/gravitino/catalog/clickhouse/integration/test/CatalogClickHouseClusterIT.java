@@ -86,6 +86,10 @@ public class CatalogClickHouseClusterIT extends BaseIT {
       GravitinoITUtils.genRandomName("ck_sql_non_cluster_local");
   private final String sqlNonClusterDistributedTableName =
       GravitinoITUtils.genRandomName("ck_sql_non_cluster_dist");
+  private final String apiClusterSchemaName =
+      GravitinoITUtils.genRandomName("ck_api_cluster_schema");
+  private final String sqlClusterSchemaName =
+      GravitinoITUtils.genRandomName("ck_sql_cluster_schema");
   private final String tableComment = "cluster_table_comment";
 
   private GravitinoMetalake metalake;
@@ -195,6 +199,13 @@ public class CatalogClickHouseClusterIT extends BaseIT {
     properties.put(REMOTE_DATABASE, schemaName);
     properties.put(REMOTE_TABLE, remoteTable);
     properties.put(SHARDING_KEY, "cityHash64(col_1)");
+    return properties;
+  }
+
+  private Map<String, String> clusterSchemaProperties() {
+    Map<String, String> properties = new HashMap<>();
+    properties.put(CLUSTER_NAME, ClickHouseContainer.DEFAULT_CLUSTER_NAME);
+    properties.put(ON_CLUSTER, String.valueOf(true));
     return properties;
   }
 
@@ -355,5 +366,38 @@ public class CatalogClickHouseClusterIT extends BaseIT {
         schemaName, sqlNonClusterDistributedTable.properties().get(REMOTE_DATABASE));
     Assertions.assertEquals(
         sqlNonClusterLocalTableName, sqlNonClusterDistributedTable.properties().get(REMOTE_TABLE));
+  }
+
+  @Test
+  public void testCreateClusterSchemaByApiAndLoadSqlCreatedClusterDatabase() {
+    Schema apiClusterSchema =
+        catalog
+            .asSchemas()
+            .createSchema(
+                apiClusterSchemaName,
+                "cluster schema from gravitino api",
+                clusterSchemaProperties());
+    Schema loadedApiClusterSchema = catalog.asSchemas().loadSchema(apiClusterSchemaName);
+    Assertions.assertEquals(apiClusterSchema.name(), loadedApiClusterSchema.name());
+    Assertions.assertEquals("true", loadedApiClusterSchema.properties().get(ON_CLUSTER));
+    Assertions.assertTrue(
+        StringUtils.isNotBlank(loadedApiClusterSchema.properties().get(CLUSTER_NAME)));
+
+    clickHouseService.executeQuery(
+        String.format(
+            "CREATE DATABASE `%s` ON CLUSTER `%s` COMMENT 'cluster schema from sql'",
+            sqlClusterSchemaName, ClickHouseContainer.DEFAULT_CLUSTER_NAME));
+
+    Schema loadedSqlClusterSchema = catalog.asSchemas().loadSchema(sqlClusterSchemaName);
+    Assertions.assertEquals(sqlClusterSchemaName, loadedSqlClusterSchema.name());
+    Assertions.assertEquals("true", loadedSqlClusterSchema.properties().get(ON_CLUSTER));
+    Assertions.assertTrue(
+        StringUtils.isNotBlank(loadedSqlClusterSchema.properties().get(CLUSTER_NAME)));
+    Assertions.assertEquals(
+        sqlClusterSchemaName,
+        clickHouseService.loadSchema(NameIdentifier.of(sqlClusterSchemaName)).name());
+
+    catalog.asSchemas().dropSchema(apiClusterSchemaName, false);
+    catalog.asSchemas().dropSchema(sqlClusterSchemaName, false);
   }
 }
