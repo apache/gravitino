@@ -39,7 +39,7 @@ public class TestGravitinoMetricsEvaluator {
 
   @Test
   public void testEvaluateMetricsWithMaxOperation() {
-    GravitinoMetricsEvaluator evaluator = createEvaluator("table.row_count:max:le");
+    GravitinoMetricsEvaluator evaluator = createEvaluator("table:row_count:max:le");
     MetricScope scope = MetricScope.forTable(NameIdentifier.parse("catalog.db.table"));
 
     boolean result =
@@ -58,7 +58,7 @@ public class TestGravitinoMetricsEvaluator {
 
   @Test
   public void testEvaluateMetricsWithMinOperation() {
-    GravitinoMetricsEvaluator evaluator = createEvaluator("table.row_count:min:le");
+    GravitinoMetricsEvaluator evaluator = createEvaluator("table:row_count:min:le");
     MetricScope scope = MetricScope.forTable(NameIdentifier.parse("catalog.db.table"));
 
     boolean result =
@@ -74,7 +74,7 @@ public class TestGravitinoMetricsEvaluator {
 
   @Test
   public void testEvaluateMetricsWithAvgOperation() {
-    GravitinoMetricsEvaluator evaluator = createEvaluator("table.row_count:avg:le");
+    GravitinoMetricsEvaluator evaluator = createEvaluator("table:row_count:avg:le");
     MetricScope scope = MetricScope.forTable(NameIdentifier.parse("catalog.db.table"));
 
     boolean result =
@@ -90,7 +90,7 @@ public class TestGravitinoMetricsEvaluator {
 
   @Test
   public void testEvaluateMetricsWithLatestOperation() {
-    GravitinoMetricsEvaluator evaluator = createEvaluator("table.row_count:latest:le");
+    GravitinoMetricsEvaluator evaluator = createEvaluator("table:row_count:latest:le");
     MetricScope scope = MetricScope.forTable(NameIdentifier.parse("catalog.db.table"));
 
     boolean result =
@@ -106,7 +106,7 @@ public class TestGravitinoMetricsEvaluator {
 
   @Test
   public void testEvaluateMetricsForPartitionUsesTableRules() {
-    GravitinoMetricsEvaluator evaluator = createEvaluator("table.row_count:latest:le");
+    GravitinoMetricsEvaluator evaluator = createEvaluator("table:row_count:latest:le");
     PartitionPath partitionPath =
         PartitionPath.of(List.of(new PartitionEntryImpl("dt", "2026-02-14")));
     MetricScope scope =
@@ -126,7 +126,7 @@ public class TestGravitinoMetricsEvaluator {
   @Test
   public void testEvaluateMetricsDistinguishTableAndJobRules() {
     GravitinoMetricsEvaluator evaluator =
-        createEvaluator("table.row_count:avg:le,job.duration:latest:le");
+        createEvaluator("table:row_count:avg:le,job:duration:latest:le");
 
     boolean tableResult =
         evaluator.evaluateMetrics(
@@ -147,7 +147,7 @@ public class TestGravitinoMetricsEvaluator {
 
   @Test
   public void testEvaluateMetricsMissingSelectedMetricSkipsRule() {
-    GravitinoMetricsEvaluator evaluator = createEvaluator("table.row_count:avg:le");
+    GravitinoMetricsEvaluator evaluator = createEvaluator("table:row_count:avg:le");
     MetricScope scope = MetricScope.forTable(NameIdentifier.parse("catalog.db.table"));
 
     boolean result =
@@ -161,7 +161,7 @@ public class TestGravitinoMetricsEvaluator {
 
   @Test
   public void testEvaluateMetricsNonNumericValueSkipsRule() {
-    GravitinoMetricsEvaluator evaluator = createEvaluator("table.row_count:avg:le");
+    GravitinoMetricsEvaluator evaluator = createEvaluator("table:row_count:avg:le");
     MetricScope scope = MetricScope.forTable(NameIdentifier.parse("catalog.db.table"));
 
     boolean result =
@@ -175,7 +175,7 @@ public class TestGravitinoMetricsEvaluator {
 
   @Test
   public void testEvaluateMetricsWithoutRulesForScopeReturnsTrue() {
-    GravitinoMetricsEvaluator evaluator = createEvaluator("table.row_count:avg:le");
+    GravitinoMetricsEvaluator evaluator = createEvaluator("table:row_count:avg:le");
 
     boolean result =
         evaluator.evaluateMetrics(
@@ -188,7 +188,7 @@ public class TestGravitinoMetricsEvaluator {
 
   @Test
   public void testEvaluateMetricsWithMixedCaseRuleMetricName() {
-    GravitinoMetricsEvaluator evaluator = createEvaluator("table.Row_Count:avg:le");
+    GravitinoMetricsEvaluator evaluator = createEvaluator("table:Row_Count:avg:le");
     MetricScope scope = MetricScope.forTable(NameIdentifier.parse("catalog.db.table"));
 
     boolean result =
@@ -204,7 +204,7 @@ public class TestGravitinoMetricsEvaluator {
 
   @Test
   public void testEvaluateMetricsWithEmptyBeforeAndAfterMetricsReturnsTrue() {
-    GravitinoMetricsEvaluator evaluator = createEvaluator("table.row_count:avg:le");
+    GravitinoMetricsEvaluator evaluator = createEvaluator("table:row_count:avg:le");
     MetricScope scope = MetricScope.forTable(NameIdentifier.parse("catalog.db.table"));
 
     boolean result = evaluator.evaluateMetrics(scope, Map.of(), Map.of());
@@ -222,7 +222,7 @@ public class TestGravitinoMetricsEvaluator {
 
     Assertions.assertThrows(
         IllegalArgumentException.class,
-        () -> evaluator.initialize(optimizerEnv("table.row_count:sum:le")));
+        () -> evaluator.initialize(optimizerEnv("table:row_count:sum:le")));
   }
 
   @Test
@@ -231,7 +231,7 @@ public class TestGravitinoMetricsEvaluator {
 
     Assertions.assertThrows(
         IllegalArgumentException.class,
-        () -> evaluator.initialize(optimizerEnv("partition.row_count:avg:le")));
+        () -> evaluator.initialize(optimizerEnv("partition:row_count:avg:le")));
   }
 
   @Test
@@ -249,7 +249,7 @@ public class TestGravitinoMetricsEvaluator {
 
     Assertions.assertThrows(
         IllegalArgumentException.class,
-        () -> evaluator.initialize(optimizerEnv("table.row_count:avg:le,table.row_count:max:le")));
+        () -> evaluator.initialize(optimizerEnv("table:row_count:avg:le,table:row_count:max:le")));
   }
 
   @Test
@@ -258,7 +258,7 @@ public class TestGravitinoMetricsEvaluator {
 
     Assertions.assertThrows(
         IllegalArgumentException.class,
-        () -> evaluator.initialize(optimizerEnv("table.row_count:avg:le:extra")));
+        () -> evaluator.initialize(optimizerEnv("table:row_count:avg:le:extra")));
   }
 
   @Test
@@ -293,7 +293,7 @@ public class TestGravitinoMetricsEvaluator {
 
     Assertions.assertThrows(
         IllegalArgumentException.class,
-        () -> evaluator.initialize(optimizerEnv("table.row_count:avg:decrease")));
+        () -> evaluator.initialize(optimizerEnv("table:row_count:avg:decrease")));
   }
 
   private static GravitinoMetricsEvaluator createEvaluator(String rules) {

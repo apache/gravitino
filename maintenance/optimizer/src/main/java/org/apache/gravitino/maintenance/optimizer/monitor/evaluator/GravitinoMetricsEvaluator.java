@@ -51,7 +51,7 @@ import org.slf4j.LoggerFactory;
  * <p>Rule format:
  *
  * <ul>
- *   <li>{@code scope.metricName:aggregation:comparison}
+ *   <li>{@code scope:metricName:aggregation:comparison}
  *   <li>{@code scope}: {@code table|job}
  *   <li>{@code aggregation}: {@code max|min|avg|latest}
  *   <li>{@code comparison}: {@code lt|le|gt|ge|eq|ne}
@@ -73,7 +73,7 @@ import org.slf4j.LoggerFactory;
  * <pre>{@code
  * gravitino.optimizer.monitor.metricsEvaluator = gravitino-metrics-evaluator
  * gravitino.optimizer.monitor.gravitinoMetricsEvaluator.rules =
- *   table.row_count:avg:le,job.duration:latest:le
+ *   table:row_count:avg:le,job:duration:latest:le
  * }</pre>
  */
 public class GravitinoMetricsEvaluator implements MetricsEvaluator {
@@ -82,7 +82,7 @@ public class GravitinoMetricsEvaluator implements MetricsEvaluator {
   public static final String CONFIG_NAME = "gravitinoMetricsEvaluator";
 
   /**
-   * Comma-separated evaluation rules in format: {@code scope.metricName:aggregation:comparison}.
+   * Comma-separated evaluation rules in format: {@code scope:metricName:aggregation:comparison}.
    * Supported scope values are {@code table|job}. Supported aggregation values are {@code
    * max|min|avg|latest}. Supported comparison values are {@code lt|le|gt|ge|eq|ne}. Table rules are
    * applied to both table and partition metric scopes.
@@ -119,7 +119,7 @@ public class GravitinoMetricsEvaluator implements MetricsEvaluator {
   /**
    * Parse evaluator rules from raw config text.
    *
-   * <p>Rule format: {@code scope.metricName:aggregation:comparison}, separated by commas.
+   * <p>Rule format: {@code scope:metricName:aggregation:comparison}, separated by commas.
    *
    * @param rawRules raw rule text from config
    * @return immutable scoped rule map, or empty map when input is blank
@@ -138,25 +138,20 @@ public class GravitinoMetricsEvaluator implements MetricsEvaluator {
       }
 
       String[] parts = trimmed.split(":", -1);
-      if (parts.length != 3) {
+      if (parts.length != 4) {
         throw new IllegalArgumentException(
             "Invalid evaluator rule '"
                 + trimmed
-                + "'. Expected format is scope.metricName:aggregation:comparison");
+                + "'. Expected format is scope:metricName:aggregation:comparison");
       }
 
-      String scopedMetric = parts[0].trim();
-      String aggregationText = parts[1].trim();
-      String comparisonText = parts[2].trim();
+      String scopeText = parts[0].trim();
+      String metricText = parts[1].trim();
+      String aggregationText = parts[2].trim();
+      String comparisonText = parts[3].trim();
 
-      int dotIndex = scopedMetric.indexOf('.');
-      if (dotIndex <= 0 || dotIndex == scopedMetric.length() - 1) {
-        throw new IllegalArgumentException(
-            "Invalid scoped metric in rule '" + trimmed + "'. Expected format scope.metricName");
-      }
-
-      RuleScope scope = RuleScope.fromConfigValue(scopedMetric.substring(0, dotIndex));
-      String metricName = normalizeMetricName(scopedMetric.substring(dotIndex + 1).trim());
+      RuleScope scope = RuleScope.fromConfigValue(scopeText);
+      String metricName = normalizeMetricName(metricText);
       if (metricName.isEmpty()) {
         throw new IllegalArgumentException("Metric name must not be blank in rule: " + trimmed);
       }
@@ -171,7 +166,7 @@ public class GravitinoMetricsEvaluator implements MetricsEvaluator {
         throw new IllegalArgumentException(
             "Duplicate metric rule for '"
                 + scope.configValue
-                + "."
+                + ":"
                 + metricName
                 + "' in "
                 + EVALUATION_RULES_CONFIG);
@@ -290,7 +285,7 @@ public class GravitinoMetricsEvaluator implements MetricsEvaluator {
                     .map(
                         metricEntry ->
                             scopeEntry.getKey().configValue
-                                + "."
+                                + ":"
                                 + metricEntry.getKey()
                                 + ":"
                                 + metricEntry.getValue().aggregation.configValue

@@ -211,7 +211,7 @@ public class TestMonitor {
                     GravitinoMetricsEvaluator.NAME)
                 .put(
                     GravitinoMetricsEvaluator.EVALUATION_RULES_CONFIG,
-                    "table.row_count:avg:le,job.duration:latest:le")
+                    "table:row_count:avg:le,job:duration:latest:le")
                 .build());
 
     OptimizerEnv env = new OptimizerEnv(config);
