@@ -106,61 +106,64 @@ class TestIdentifierUtils {
 
   @Test
   void testParseTableIdentifierWithDefaultCatalog() {
-    NameIdentifier result = IdentifierUtils.parseTableIdentifier("db.table", "catalog");
+    NameIdentifier result =
+        IdentifierUtils.parseTableIdentifier("db.table", "catalog").orElseThrow();
 
     Assertions.assertEquals(NameIdentifier.of("catalog", "db", "table"), result);
   }
 
   @Test
-  void testParseTableIdentifierWithoutDefaultCatalogReturnsNull() {
-    NameIdentifier result = IdentifierUtils.parseTableIdentifier("db.table", null);
-
-    Assertions.assertNull(result);
+  void testParseTableIdentifierWithoutDefaultCatalogReturnsEmpty() {
+    Assertions.assertTrue(IdentifierUtils.parseTableIdentifier("db.table", null).isEmpty());
   }
 
   @Test
   void testParseTableIdentifierWithThreeLevelIdentifier() {
-    NameIdentifier result = IdentifierUtils.parseTableIdentifier("catalog.db.table", null);
+    NameIdentifier result =
+        IdentifierUtils.parseTableIdentifier("catalog.db.table", null).orElseThrow();
 
     Assertions.assertEquals(NameIdentifier.of("catalog", "db", "table"), result);
   }
 
   @Test
-  void testParseTableIdentifierWithSingleLevelReturnsNull() {
-    NameIdentifier result = IdentifierUtils.parseTableIdentifier("table", "catalog");
-
-    Assertions.assertNull(result);
+  void testParseTableIdentifierWithSingleLevelReturnsEmpty() {
+    Assertions.assertTrue(IdentifierUtils.parseTableIdentifier("table", "catalog").isEmpty());
   }
 
   @Test
-  void testParseTableIdentifierWithInvalidIdentifierReturnsNull() {
-    NameIdentifier result =
-        IdentifierUtils.parseTableIdentifier("catalog.db.schema.extra.table", "c");
-
-    Assertions.assertNull(result);
+  void testParseTableIdentifierWithInvalidIdentifierReturnsEmpty() {
+    Assertions.assertTrue(
+        IdentifierUtils.parseTableIdentifier("catalog.db.schema.extra.table", "c").isEmpty());
   }
 
   @Test
   void testParseJobIdentifierWithValidIdentifier() {
-    NameIdentifier result = IdentifierUtils.parseJobIdentifier("org.team.pipeline.job1");
+    NameIdentifier result =
+        IdentifierUtils.parseJobIdentifier("org.team.pipeline.job1").orElseThrow();
     Assertions.assertEquals("org.team.pipeline.job1", result.toString());
   }
 
   @Test
   void testParseJobIdentifierWithSingleLevelName() {
-    NameIdentifier result = IdentifierUtils.parseJobIdentifier("job");
+    NameIdentifier result = IdentifierUtils.parseJobIdentifier("job").orElseThrow();
     Assertions.assertEquals("job", result.toString());
   }
 
   @Test
   void testParseJobIdentifierWithTwoLevelName() {
-    NameIdentifier result = IdentifierUtils.parseJobIdentifier("team.job");
+    NameIdentifier result = IdentifierUtils.parseJobIdentifier("team.job").orElseThrow();
     Assertions.assertEquals("team.job", result.toString());
   }
 
   @Test
-  void testParseJobIdentifierWithBlankOrInvalidIdentifierReturnsNull() {
-    Assertions.assertNull(IdentifierUtils.parseJobIdentifier(" "));
-    Assertions.assertNull(IdentifierUtils.parseJobIdentifier("invalid..job"));
+  void testParseJobIdentifierWithBlankOrInvalidIdentifierReturnsEmpty() {
+    Assertions.assertTrue(IdentifierUtils.parseJobIdentifier(" ").isEmpty());
+    Assertions.assertTrue(IdentifierUtils.parseJobIdentifier("invalid..job").isEmpty());
+  }
+
+  @Test
+  void testParseJobIdentifierWithTooManyLevels() {
+    NameIdentifier result = IdentifierUtils.parseJobIdentifier("a.b.c.d.e").orElseThrow();
+    Assertions.assertEquals("a.b.c.d.e", result.toString());
   }
 }

@@ -29,6 +29,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Optional;
 import java.util.Set;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.NameIdentifier;
@@ -68,8 +69,8 @@ class FileJobReader {
           continue;
         }
 
-        NameIdentifier identifier = parseIdentifier(mappingLine.identifier, lineNumber);
-        if (identifier == null || !identifier.equals(tableIdentifier)) {
+        Optional<NameIdentifier> identifier = parseIdentifier(mappingLine.identifier, lineNumber);
+        if (identifier.isEmpty() || !identifier.get().equals(tableIdentifier)) {
           continue;
         }
 
@@ -91,14 +92,14 @@ class FileJobReader {
     }
   }
 
-  private NameIdentifier parseIdentifier(String identifierText, int lineNumber) {
+  private Optional<NameIdentifier> parseIdentifier(String identifierText, int lineNumber) {
     if (StringUtils.isBlank(identifierText)) {
-      return null;
+      return Optional.empty();
     }
 
-    NameIdentifier parsed =
+    Optional<NameIdentifier> parsed =
         IdentifierUtils.parseTableIdentifier(identifierText, defaultCatalogName);
-    if (parsed == null) {
+    if (parsed.isEmpty()) {
       LOG.warn("Skip invalid table identifier at line {}: {}", lineNumber, identifierText);
     }
     return parsed;
