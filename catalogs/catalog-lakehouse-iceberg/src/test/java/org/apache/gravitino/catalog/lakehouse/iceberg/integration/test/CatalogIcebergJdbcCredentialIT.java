@@ -61,6 +61,7 @@ public class CatalogIcebergJdbcCredentialIT extends BaseIT {
 
   @BeforeAll
   public void startUp() throws Exception {
+    super.ignoreIcebergAuxRestService = false;
     super.startIntegrationTest();
 
     Assertions.assertFalse(client.metalakeExists(metalakeName));

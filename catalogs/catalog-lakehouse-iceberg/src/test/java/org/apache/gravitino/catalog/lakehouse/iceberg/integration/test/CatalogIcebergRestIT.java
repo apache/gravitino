@@ -19,13 +19,10 @@
 package org.apache.gravitino.catalog.lakehouse.iceberg.integration.test;
 
 import java.util.Map;
-import java.util.concurrent.TimeUnit;
 import org.apache.gravitino.catalog.lakehouse.iceberg.IcebergConstants;
 import org.apache.gravitino.iceberg.common.IcebergConfig;
 import org.apache.gravitino.integration.test.container.HiveContainer;
-import org.apache.gravitino.integration.test.util.HttpUtils;
 import org.apache.gravitino.server.web.JettyServerConfig;
-import org.awaitility.Awaitility;
 import org.junit.jupiter.api.Tag;
 
 @Tag("gravitino-docker-test")
@@ -33,14 +30,6 @@ public class CatalogIcebergRestIT extends CatalogIcebergBaseIT {
 
   @Override
   protected void initIcebergCatalogProperties() {
-    if (!ignoreIcebergAuxRestService) {
-      String checkIcebergUrl = getIcebergRestServiceUri() + "v1/config";
-      Awaitility.await()
-          .atMost(60, TimeUnit.SECONDS)
-          .pollInterval(2, TimeUnit.MINUTES)
-          .until(() -> HttpUtils.isHttpServerUp(checkIcebergUrl));
-    }
-
     Map<String, String> map =
         serverConfig.getConfigsWithPrefix(
             String.format("gravitino.%s.", IcebergConstants.GRAVITINO_ICEBERG_REST_SERVICE_NAME));
