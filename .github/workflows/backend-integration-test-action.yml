@@ -84,3 +84,4 @@ jobs:
             catalogs-contrib/**/*.log
             catalogs-contrib/**/*.tar
             distribution/**/*.log
+            distribution/**/*.out
