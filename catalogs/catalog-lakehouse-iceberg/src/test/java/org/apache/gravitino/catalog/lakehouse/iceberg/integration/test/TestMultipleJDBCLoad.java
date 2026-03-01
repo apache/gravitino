@@ -31,6 +31,8 @@ import java.util.Map;
 import org.apache.gravitino.Catalog;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.client.GravitinoMetalake;
+import org.apache.gravitino.credential.Credential;
+import org.apache.gravitino.credential.JdbcCredential;
 import org.apache.gravitino.exceptions.ConnectionFailedException;
 import org.apache.gravitino.iceberg.common.IcebergConfig;
 import org.apache.gravitino.integration.test.container.MySQLContainer;
@@ -180,6 +182,16 @@ public class TestMultipleJDBCLoad extends BaseIT {
             new Column[] {col1},
             comment,
             Collections.emptyMap());
+
+    Credential credential =
+        postgreSqlCatalog.supportsCredentials().getCredential(JdbcCredential.JDBC_CREDENTIAL_TYPE);
+
+    Assertions.assertNotNull(credential);
+    Assertions.assertInstanceOf(JdbcCredential.class, credential);
+
+    JdbcCredential jdbcCredential = (JdbcCredential) credential;
+    Assertions.assertEquals(postgreSQLContainer.getUsername(), jdbcCredential.jdbcUser());
+    Assertions.assertEquals(postgreSQLContainer.getPassword(), jdbcCredential.jdbcPassword());
 
     Assertions.assertTrue(
         mysqlCatalog.asTableCatalog().tableExists(NameIdentifier.of(schemaName, tableName)));
