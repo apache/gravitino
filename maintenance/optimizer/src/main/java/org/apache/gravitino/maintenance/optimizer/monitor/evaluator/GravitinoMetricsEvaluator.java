@@ -102,7 +102,7 @@ public class GravitinoMetricsEvaluator implements MetricsEvaluator {
   @Override
   public void initialize(OptimizerEnv optimizerEnv) {
     String rawRules = optimizerEnv.config().getRawString(EVALUATION_RULES_CONFIG);
-    this.metricRulesByScope = initRuleConfig(rawRules);
+    this.metricRulesByScope = parseEvaluationRules(rawRules);
     if (metricRulesByScope.isEmpty()) {
       LOG.warn(
           "No evaluator rules configured in {}. All evaluations will pass until rules are set.",
@@ -124,7 +124,7 @@ public class GravitinoMetricsEvaluator implements MetricsEvaluator {
    * @param rawRules raw rule text from config
    * @return immutable scoped rule map, or empty map when input is blank
    */
-  private Map<RuleScope, Map<String, RuleConfig>> initRuleConfig(String rawRules) {
+  static Map<RuleScope, Map<String, RuleConfig>> parseEvaluationRules(String rawRules) {
     if (StringUtils.isBlank(rawRules)) {
       return Map.of();
     }

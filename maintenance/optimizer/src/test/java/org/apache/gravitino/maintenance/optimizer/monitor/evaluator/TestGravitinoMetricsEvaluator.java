@@ -217,48 +217,177 @@ public class TestGravitinoMetricsEvaluator {
   }
 
   @Test
-  public void testInitializeRejectsInvalidRule() {
-    GravitinoMetricsEvaluator evaluator = new GravitinoMetricsEvaluator();
+  public void testEvaluateMetricsReturnsFalseWhenAnyRuleFails() {
+    GravitinoMetricsEvaluator evaluator =
+        createEvaluator("table:row_count:avg:le,table:file_count:max:le");
+    MetricScope scope = MetricScope.forTable(NameIdentifier.parse("catalog.db.table"));
 
-    Assertions.assertThrows(
-        IllegalArgumentException.class,
-        () -> evaluator.initialize(optimizerEnv("table:row_count:sum:le")));
+    boolean result =
+        evaluator.evaluateMetrics(
+            scope,
+            Map.of(
+                "row_count",
+                List.of(metric(100L, "row_count", 10L), metric(101L, "row_count", 20L)),
+                "file_count",
+                List.of(metric(100L, "file_count", 5L), metric(101L, "file_count", 10L))),
+            Map.of(
+                "row_count",
+                List.of(metric(110L, "row_count", 15L)),
+                "file_count",
+                List.of(metric(110L, "file_count", 11L))));
+
+    Assertions.assertFalse(result);
   }
 
   @Test
-  public void testInitializeRejectsPartitionScopeInRule() {
-    GravitinoMetricsEvaluator evaluator = new GravitinoMetricsEvaluator();
+  public void testInitializeAcceptsWhitespaceAndCaseInsensitiveRuleTokens() {
+    GravitinoMetricsEvaluator evaluator =
+        createEvaluator(" TABLE : row_count : AVG : LE , JOB : duration : latest : le , ");
 
-    Assertions.assertThrows(
-        IllegalArgumentException.class,
-        () -> evaluator.initialize(optimizerEnv("partition:row_count:avg:le")));
+    boolean tableResult =
+        evaluator.evaluateMetrics(
+            MetricScope.forTable(NameIdentifier.parse("catalog.db.table")),
+            Map.of(
+                "row_count",
+                List.of(metric(100L, "row_count", 10L), metric(101L, "row_count", 20L))),
+            Map.of("row_count", List.of(metric(110L, "row_count", 15L))));
+    Assertions.assertTrue(tableResult);
+
+    boolean jobResult =
+        evaluator.evaluateMetrics(
+            MetricScope.forJob(NameIdentifier.parse("job1")),
+            Map.of("duration", List.of(metric(100L, "duration", 3L), metric(105L, "duration", 5L))),
+            Map.of("duration", List.of(metric(110L, "duration", 10L))));
+    Assertions.assertFalse(jobResult);
   }
 
   @Test
-  public void testInitializeRejectsRuleWithoutScope() {
-    GravitinoMetricsEvaluator evaluator = new GravitinoMetricsEvaluator();
-
-    Assertions.assertThrows(
-        IllegalArgumentException.class,
-        () -> evaluator.initialize(optimizerEnv("row_count:avg:le")));
+  public void testParseEvaluationRulesReturnsEmptyForBlankInput() {
+    Assertions.assertTrue(GravitinoMetricsEvaluator.parseEvaluationRules("  ").isEmpty());
   }
 
   @Test
-  public void testInitializeRejectsDuplicateRuleInSameScope() {
-    GravitinoMetricsEvaluator evaluator = new GravitinoMetricsEvaluator();
+  public void testParseEvaluationRulesParsesExpectedScopesAndRules() {
+    Map<?, ?> parsed =
+        GravitinoMetricsEvaluator.parseEvaluationRules(
+            "table:row_count:avg:le,job:duration:max:gt");
 
-    Assertions.assertThrows(
-        IllegalArgumentException.class,
-        () -> evaluator.initialize(optimizerEnv("table:row_count:avg:le,table:row_count:max:le")));
+    Assertions.assertEquals(2, parsed.size());
+    Map<?, ?> tableRules = findScopeRules(parsed, "TABLE");
+    Map<?, ?> jobRules = findScopeRules(parsed, "JOB");
+    Assertions.assertEquals(1, tableRules.size());
+    Assertions.assertEquals(1, jobRules.size());
+    Assertions.assertEquals("AVG:LE", tableRules.get("row_count").toString());
+    Assertions.assertEquals("MAX:GT", jobRules.get("duration").toString());
   }
 
   @Test
-  public void testInitializeRejectsMalformedRuleToken() {
-    GravitinoMetricsEvaluator evaluator = new GravitinoMetricsEvaluator();
+  public void testParseEvaluationRulesCreatesImmutableMaps() {
+    Map<?, ?> parsed = GravitinoMetricsEvaluator.parseEvaluationRules("table:row_count:avg:le");
 
+    @SuppressWarnings("unchecked")
+    Map<Object, Object> parsedMutableView = (Map<Object, Object>) parsed;
+    Assertions.assertThrows(
+        UnsupportedOperationException.class, () -> parsedMutableView.put("TABLE", Map.of()));
+    Map<?, ?> tableRules = findScopeRules(parsed, "TABLE");
+    @SuppressWarnings("unchecked")
+    Map<Object, Object> tableRulesMutableView = (Map<Object, Object>) tableRules;
+    Assertions.assertThrows(
+        UnsupportedOperationException.class, () -> tableRulesMutableView.put("x", "y"));
+  }
+
+  @Test
+  public void testParseEvaluationRulesRejectsInvalidAggregation() {
     Assertions.assertThrows(
         IllegalArgumentException.class,
-        () -> evaluator.initialize(optimizerEnv("table:row_count:avg:le:extra")));
+        () -> GravitinoMetricsEvaluator.parseEvaluationRules("table:row_count:sum:le"));
+  }
+
+  @Test
+  public void testParseEvaluationRulesRejectsPartitionScopeInRule() {
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () -> GravitinoMetricsEvaluator.parseEvaluationRules("partition:row_count:avg:le"));
+  }
+
+  @Test
+  public void testParseEvaluationRulesRejectsRuleWithoutScope() {
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () -> GravitinoMetricsEvaluator.parseEvaluationRules("row_count:avg:le"));
+  }
+
+  @Test
+  public void testParseEvaluationRulesRejectsDuplicateRuleInSameScope() {
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () ->
+            GravitinoMetricsEvaluator.parseEvaluationRules(
+                "table:row_count:avg:le,table:row_count:max:le"));
+  }
+
+  @Test
+  public void testParseEvaluationRulesRejectsMalformedRuleToken() {
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () -> GravitinoMetricsEvaluator.parseEvaluationRules("table:row_count:avg:le:extra"));
+  }
+
+  @Test
+  public void testParseEvaluationRulesRejectsLegacyScopeMetricRuleFormat() {
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () -> GravitinoMetricsEvaluator.parseEvaluationRules("table.row_count:avg:le"));
+  }
+
+  @Test
+  public void testParseEvaluationRulesRejectsRuleWithBlankMetricName() {
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () -> GravitinoMetricsEvaluator.parseEvaluationRules("table::avg:le"));
+  }
+
+  @Test
+  public void testParseEvaluationRulesRejectsRuleWithBlankScope() {
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () -> GravitinoMetricsEvaluator.parseEvaluationRules(":row_count:avg:le"));
+  }
+
+  @Test
+  public void testParseEvaluationRulesRejectsRuleWithBlankAggregation() {
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () -> GravitinoMetricsEvaluator.parseEvaluationRules("table:row_count::le"));
+  }
+
+  @Test
+  public void testParseEvaluationRulesRejectsRuleWithBlankComparison() {
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () -> GravitinoMetricsEvaluator.parseEvaluationRules("table:row_count:avg:"));
+  }
+
+  @Test
+  public void testParseEvaluationRulesRejectsDuplicateMetricRuleAfterNormalization() {
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () ->
+            GravitinoMetricsEvaluator.parseEvaluationRules(
+                "table:Row_Count:avg:le,table:row_count:max:le"));
+  }
+
+  @Test
+  public void testParseEvaluationRulesAllowsBlankRuleEntriesBetweenCommas() {
+    Map<?, ?> parsed =
+        GravitinoMetricsEvaluator.parseEvaluationRules(
+            "table:row_count:avg:le,,job:duration:latest:le,");
+
+    Assertions.assertEquals(2, parsed.size());
+    Map<?, ?> tableRules = findScopeRules(parsed, "TABLE");
+    Map<?, ?> jobRules = findScopeRules(parsed, "JOB");
+    Assertions.assertEquals("AVG:LE", tableRules.get("row_count").toString());
+    Assertions.assertEquals("LATEST:LE", jobRules.get("duration").toString());
   }
 
   @Test
@@ -318,5 +447,14 @@ public class TestGravitinoMetricsEvaluator {
   private static StatisticEntry<?> entry(
       String name, org.apache.gravitino.stats.StatisticValue<?> value) {
     return new StatisticEntryImpl(name, value);
+  }
+
+  private static Map<?, ?> findScopeRules(Map<?, ?> parsedRules, String scopeName) {
+    return parsedRules.entrySet().stream()
+        .filter(entry -> scopeName.equals(entry.getKey().toString()))
+        .map(Map.Entry::getValue)
+        .map(Map.class::cast)
+        .findFirst()
+        .orElseThrow(() -> new AssertionError("Missing expected scope " + scopeName));
   }
 }
