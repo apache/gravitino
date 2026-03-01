@@ -34,7 +34,7 @@
     "chroma-js": "^2.4.2",
     "clsx": "^2.1.1",
     "dayjs": "^1.11.11",
-    "lodash-es": "^4.17.21",
+    "lodash-es": "^4.17.23",
     "next": "14.2.32",
     "nprogress": "^0.2.0",
     "oidc-client-ts": "^3.3.0",
