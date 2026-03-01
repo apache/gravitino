@@ -406,6 +406,13 @@ public class BaseIT {
           .atMost(60, TimeUnit.SECONDS)
           .pollInterval(1, TimeUnit.SECONDS)
           .until(() -> HttpUtils.isHttpServerUp(checkServerUrl));
+      if (!ignoreIcebergAuxRestService) {
+        String checkIcebergUrl = getIcebergRestServiceUri() + "v1/config";
+        Awaitility.await()
+            .atMost(60, TimeUnit.SECONDS)
+            .pollInterval(1, TimeUnit.MINUTES)
+            .until(() -> HttpUtils.isHttpServerUp(checkIcebergUrl));
+      }
     }
 
     JettyServerConfig jettyServerConfig =
@@ -415,6 +422,8 @@ public class BaseIT {
 
     List<String> authenticators = new ArrayList<>();
     String authenticatorStr = customConfigs.get(Configs.AUTHENTICATORS.getKey());
+    LOG.warn("Creating authenticator {}", authenticatorStr);
+
     if (authenticatorStr != null) {
       authenticators = COMMA.splitToList(authenticatorStr);
     }

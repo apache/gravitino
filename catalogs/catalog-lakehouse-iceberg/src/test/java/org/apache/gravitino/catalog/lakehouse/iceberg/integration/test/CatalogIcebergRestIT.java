@@ -30,6 +30,7 @@ public class CatalogIcebergRestIT extends CatalogIcebergBaseIT {
 
   @Override
   protected void initIcebergCatalogProperties() {
+
     Map<String, String> map =
         serverConfig.getConfigsWithPrefix(
             String.format("gravitino.%s.", IcebergConstants.GRAVITINO_ICEBERG_REST_SERVICE_NAME));
