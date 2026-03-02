@@ -23,7 +23,6 @@ import com.google.common.annotations.VisibleForTesting;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
-import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
 import java.util.stream.Collectors;
@@ -97,8 +96,9 @@ public class Updater implements AutoCloseable {
    * @param statisticsCalculatorName The provider name of the statistics calculator.
    * @param nameIdentifiers The identifiers to update (table and/or job).
    * @param updateType The target update type: statistics or metrics.
+   * @return summary of processed record counts by scope
    */
-  public void update(
+  public UpdateSummary update(
       String statisticsCalculatorName,
       List<NameIdentifier> nameIdentifiers,
       UpdateType updateType) {
@@ -148,14 +148,7 @@ public class Updater implements AutoCloseable {
       }
     }
     updateTableAndJobMetrics(tableMetricWriteRequests, jobMetricWriteRequests);
-    System.out.println(
-        String.format(
-            "SUMMARY: %s totalRecords=%d tableRecords=%d partitionRecords=%d jobRecords=%d",
-            updateType.name().toLowerCase(Locale.ROOT),
-            tableRecords + partitionRecords + jobRecords,
-            tableRecords,
-            partitionRecords,
-            jobRecords));
+    return buildSummary(updateType, tableRecords, partitionRecords, jobRecords);
   }
 
   /**
@@ -169,8 +162,9 @@ public class Updater implements AutoCloseable {
    *
    * @param statisticsCalculatorName The provider name of the statistics calculator.
    * @param updateType The target update type: statistics or metrics.
+   * @return summary of processed record counts by scope
    */
-  public void updateAll(String statisticsCalculatorName, UpdateType updateType) {
+  public UpdateSummary updateAll(String statisticsCalculatorName, UpdateType updateType) {
     StatisticsCalculator calculator = getStatisticsCalculator(statisticsCalculatorName);
     List<TableMetricWriteRequest> tableMetricWriteRequests = new ArrayList<>();
     List<JobMetricWriteRequest> jobMetricWriteRequests = new ArrayList<>();
@@ -217,19 +211,58 @@ public class Updater implements AutoCloseable {
               jobMetricWriteRequests.addAll(collectJobMetrics(statistics, identifier)));
     }
     updateTableAndJobMetrics(tableMetricWriteRequests, jobMetricWriteRequests);
-    System.out.println(
-        String.format(
-            "SUMMARY: %s totalRecords=%d tableRecords=%d partitionRecords=%d jobRecords=%d",
-            updateType.name().toLowerCase(Locale.ROOT),
-            tableRecords + partitionRecords + jobRecords,
-            tableRecords,
-            partitionRecords,
-            jobRecords));
+    return buildSummary(updateType, tableRecords, partitionRecords, jobRecords);
   }
 
   @VisibleForTesting
   public MetricsUpdater getMetricsUpdater() {
     return metricsUpdater;
+  }
+
+  @VisibleForTesting
+  public StatisticsUpdater getStatisticsUpdater() {
+    return statisticsUpdater;
+  }
+
+  public static final class UpdateSummary {
+    private final UpdateType updateType;
+    private final long totalRecords;
+    private final long tableRecords;
+    private final long partitionRecords;
+    private final long jobRecords;
+
+    private UpdateSummary(
+        UpdateType updateType,
+        long totalRecords,
+        long tableRecords,
+        long partitionRecords,
+        long jobRecords) {
+      this.updateType = updateType;
+      this.totalRecords = totalRecords;
+      this.tableRecords = tableRecords;
+      this.partitionRecords = partitionRecords;
+      this.jobRecords = jobRecords;
+    }
+
+    public UpdateType updateType() {
+      return updateType;
+    }
+
+    public long totalRecords() {
+      return totalRecords;
+    }
+
+    public long tableRecords() {
+      return tableRecords;
+    }
+
+    public long partitionRecords() {
+      return partitionRecords;
+    }
+
+    public long jobRecords() {
+      return jobRecords;
+    }
   }
 
   @Override
@@ -460,5 +493,15 @@ public class Updater implements AutoCloseable {
     return partitionStatisticsByTable.values().stream()
         .mapToLong(bundle -> countPartitionStatistics(bundle.partitionStatistics()))
         .sum();
+  }
+
+  private UpdateSummary buildSummary(
+      UpdateType updateType, long tableRecords, long partitionRecords, long jobRecords) {
+    return new UpdateSummary(
+        updateType,
+        tableRecords + partitionRecords + jobRecords,
+        tableRecords,
+        partitionRecords,
+        jobRecords);
   }
 }

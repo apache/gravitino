@@ -60,9 +60,11 @@ import org.apache.gravitino.maintenance.optimizer.common.conf.OptimizerConfig;
 import org.apache.gravitino.maintenance.optimizer.common.util.ProviderUtils;
 import org.apache.gravitino.maintenance.optimizer.monitor.Monitor;
 import org.apache.gravitino.maintenance.optimizer.recommender.Recommender;
+import org.apache.gravitino.maintenance.optimizer.recommender.Recommender.RecommendationResult;
 import org.apache.gravitino.maintenance.optimizer.recommender.util.PartitionUtils;
 import org.apache.gravitino.maintenance.optimizer.updater.UpdateType;
 import org.apache.gravitino.maintenance.optimizer.updater.Updater;
+import org.apache.gravitino.maintenance.optimizer.updater.Updater.UpdateSummary;
 import org.apache.gravitino.maintenance.optimizer.updater.calculator.local.LocalStatisticsCalculator;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -295,6 +297,27 @@ public class OptimizerCmd {
         scopeType, identifier, partition, formatMetrics(metrics));
   }
 
+  private static void printUpdateSummary(PrintStream out, UpdateSummary summary) {
+    out.printf(
+        "SUMMARY: %s totalRecords=%d tableRecords=%d partitionRecords=%d jobRecords=%d%n",
+        summary.updateType().name().toLowerCase(Locale.ROOT),
+        summary.totalRecords(),
+        summary.tableRecords(),
+        summary.partitionRecords(),
+        summary.jobRecords());
+  }
+
+  private static void printRecommendationResult(PrintStream out, RecommendationResult result) {
+    out.printf(
+        "RECOMMEND: strategy=%s identifier=%s score=%d jobTemplate=%s jobOptions=%s jobId=%s%n",
+        result.strategyName(),
+        result.identifier(),
+        result.score(),
+        result.jobTemplate(),
+        result.jobOptions(),
+        result.jobId());
+  }
+
   private static String formatMetrics(Map<String, List<MetricSample>> metrics) {
     if (metrics == null || metrics.isEmpty()) {
       return "{}";
@@ -456,8 +479,10 @@ public class OptimizerCmd {
 
   private static void executeRecommendStrategyType(CommandContext context) throws Exception {
     try (Recommender recommender = new Recommender(context.optimizerEnv())) {
-      recommender.recommendForStrategyType(
-          parseIdentifiers(context.identifiers()), context.strategyType());
+      List<RecommendationResult> results =
+          recommender.recommendForStrategyType(
+              parseIdentifiers(context.identifiers()), context.strategyType());
+      results.forEach(result -> printRecommendationResult(context.output(), result));
     }
   }
 
@@ -465,14 +490,17 @@ public class OptimizerCmd {
     try (Updater updater =
         new Updater(
             withStatisticsInput(context.optimizerEnv(), context.statisticsInputContent()))) {
+      UpdateSummary summary;
       if (context.identifiers() == null || context.identifiers().length == 0) {
-        updater.updateAll(context.calculatorName(), UpdateType.STATISTICS);
+        summary = updater.updateAll(context.calculatorName(), UpdateType.STATISTICS);
       } else {
-        updater.update(
-            context.calculatorName(),
-            parseIdentifiers(context.identifiers()),
-            UpdateType.STATISTICS);
+        summary =
+            updater.update(
+                context.calculatorName(),
+                parseIdentifiers(context.identifiers()),
+                UpdateType.STATISTICS);
       }
+      printUpdateSummary(context.output(), summary);
     }
   }
 
@@ -480,12 +508,17 @@ public class OptimizerCmd {
     try (Updater updater =
         new Updater(
             withStatisticsInput(context.optimizerEnv(), context.statisticsInputContent()))) {
+      UpdateSummary summary;
       if (context.identifiers() == null || context.identifiers().length == 0) {
-        updater.updateAll(context.calculatorName(), UpdateType.METRICS);
+        summary = updater.updateAll(context.calculatorName(), UpdateType.METRICS);
       } else {
-        updater.update(
-            context.calculatorName(), parseIdentifiers(context.identifiers()), UpdateType.METRICS);
+        summary =
+            updater.update(
+                context.calculatorName(),
+                parseIdentifiers(context.identifiers()),
+                UpdateType.METRICS);
       }
+      printUpdateSummary(context.output(), summary);
     }
   }
 

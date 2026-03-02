@@ -130,13 +130,16 @@ public class Recommender implements AutoCloseable {
    *
    * @param nameIdentifiers fully qualified table identifiers to evaluate (catalog/schema/table)
    * @param strategyType strategy type to filter and evaluate
+   * @return submitted recommendation results in execution order
    */
-  public void recommendForStrategyType(List<NameIdentifier> nameIdentifiers, String strategyType) {
+  public List<RecommendationResult> recommendForStrategyType(
+      List<NameIdentifier> nameIdentifiers, String strategyType) {
     Preconditions.checkArgument(
         nameIdentifiers != null && !nameIdentifiers.isEmpty(), "nameIdentifiers must not be empty");
     Preconditions.checkArgument(
         StringUtils.isNotBlank(strategyType), "strategyType must not be blank");
 
+    List<RecommendationResult> results = new ArrayList<>();
     Map<String, List<NameIdentifier>> identifiersByStrategyName =
         getIdentifiersByStrategyName(nameIdentifiers, strategyType);
 
@@ -160,9 +163,10 @@ public class Recommender implements AutoCloseable {
             jobId,
             strategyName,
             jobExecutionContext);
-        logRecommendation(strategyName, evaluation);
+        results.add(toRecommendationResult(strategyName, evaluation, jobId));
       }
     }
+    return results;
   }
 
   /** Close all registered providers and job submitter, suppressing secondary failures. */
@@ -327,7 +331,8 @@ public class Recommender implements AutoCloseable {
             statisticsProvider.name()));
   }
 
-  private void logRecommendation(String strategyName, StrategyEvaluation evaluation) {
+  private RecommendationResult toRecommendationResult(
+      String strategyName, StrategyEvaluation evaluation, String jobId) {
     JobExecutionContext jobExecutionContext =
         evaluation
             .jobExecutionContext()
@@ -336,13 +341,60 @@ public class Recommender implements AutoCloseable {
                     new IllegalStateException(
                         "Job execution context is missing for evaluation of strategy "
                             + strategyName));
-    System.out.println(
-        String.format(
-            "RECOMMEND: strategy=%s identifier=%s score=%d jobTemplate=%s jobOptions=%s",
-            strategyName,
-            jobExecutionContext.nameIdentifier(),
-            evaluation.score(),
-            jobExecutionContext.jobTemplateName(),
-            jobExecutionContext.jobOptions()));
+    return new RecommendationResult(
+        strategyName,
+        jobExecutionContext.nameIdentifier(),
+        evaluation.score(),
+        jobExecutionContext.jobTemplateName(),
+        jobExecutionContext.jobOptions(),
+        jobId);
+  }
+
+  public static final class RecommendationResult {
+    private final String strategyName;
+    private final NameIdentifier identifier;
+    private final long score;
+    private final String jobTemplate;
+    private final Map<String, String> jobOptions;
+    private final String jobId;
+
+    private RecommendationResult(
+        String strategyName,
+        NameIdentifier identifier,
+        long score,
+        String jobTemplate,
+        Map<String, String> jobOptions,
+        String jobId) {
+      this.strategyName = strategyName;
+      this.identifier = identifier;
+      this.score = score;
+      this.jobTemplate = jobTemplate;
+      this.jobOptions = jobOptions;
+      this.jobId = jobId;
+    }
+
+    public String strategyName() {
+      return strategyName;
+    }
+
+    public NameIdentifier identifier() {
+      return identifier;
+    }
+
+    public long score() {
+      return score;
+    }
+
+    public String jobTemplate() {
+      return jobTemplate;
+    }
+
+    public Map<String, String> jobOptions() {
+      return jobOptions;
+    }
+
+    public String jobId() {
+      return jobId;
+    }
   }
 }
