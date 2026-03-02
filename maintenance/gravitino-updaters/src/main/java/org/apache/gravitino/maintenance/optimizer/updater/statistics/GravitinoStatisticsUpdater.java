@@ -20,19 +20,22 @@
 package org.apache.gravitino.maintenance.optimizer.updater.statistics;
 
 import com.google.common.base.Preconditions;
+import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.client.GravitinoClient;
+import org.apache.gravitino.json.JsonUtils;
+import org.apache.gravitino.maintenance.optimizer.api.common.PartitionEntry;
 import org.apache.gravitino.maintenance.optimizer.api.common.PartitionPath;
 import org.apache.gravitino.maintenance.optimizer.api.common.StatisticEntry;
 import org.apache.gravitino.maintenance.optimizer.api.updater.StatisticsUpdater;
 import org.apache.gravitino.maintenance.optimizer.common.OptimizerEnv;
 import org.apache.gravitino.maintenance.optimizer.common.util.GravitinoClientUtils;
 import org.apache.gravitino.maintenance.optimizer.common.util.IdentifierUtils;
-import org.apache.gravitino.maintenance.optimizer.recommender.util.PartitionUtils;
 import org.apache.gravitino.stats.PartitionStatisticsUpdate;
 import org.apache.gravitino.stats.StatisticValue;
 
@@ -103,7 +106,7 @@ public class GravitinoStatisticsUpdater implements StatisticsUpdater {
               return new PartitionStatisticsUpdate() {
                 @Override
                 public String partitionName() {
-                  return PartitionUtils.encodePartitionPath(entry.getKey());
+                  return encodePartitionPath(entry.getKey());
                 }
 
                 @Override
@@ -126,6 +129,29 @@ public class GravitinoStatisticsUpdater implements StatisticsUpdater {
       result.put(statistic.name(), statistic.value());
     }
     return result;
+  }
+
+  private String encodePartitionPath(PartitionPath partitionPath) {
+    Preconditions.checkArgument(partitionPath != null, "partitionPath must not be null");
+    List<PartitionEntry> entries = partitionPath.entries();
+    Preconditions.checkArgument(entries != null && !entries.isEmpty(), "partitionPath is empty");
+
+    List<Map<String, String>> encoded = new ArrayList<>(entries.size());
+    for (PartitionEntry entry : entries) {
+      String name = entry.partitionName();
+      String value = entry.partitionValue();
+      Preconditions.checkArgument(StringUtils.isNotBlank(name), "partitionName cannot be blank");
+      Preconditions.checkArgument(StringUtils.isNotBlank(value), "partitionValue cannot be blank");
+      Map<String, String> item = new LinkedHashMap<>(1);
+      item.put(name, value);
+      encoded.add(item);
+    }
+
+    try {
+      return JsonUtils.objectMapper().writeValueAsString(encoded);
+    } catch (Exception e) {
+      throw new IllegalArgumentException("Failed to encode partition path", e);
+    }
   }
 
   private void ensureInitialized() {

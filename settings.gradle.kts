@@ -101,4 +101,9 @@ include(":bundles:azure", ":bundles:azure-bundle", ":bundles:iceberg-azure-bundl
 include(":catalogs:hadoop-common")
 include(":lineage")
 include(":mcp-server")
-include(":maintenance:optimizer", ":maintenance:jobs")
+include(
+  ":maintenance:optimizer-api",
+  ":maintenance:gravitino-updaters",
+  ":maintenance:optimizer",
+  ":maintenance:jobs"
+)

@@ -18,7 +18,6 @@
  */
 
 import com.github.jengelman.gradle.plugins.shadow.tasks.ShadowJar
-import org.gradle.api.tasks.compile.JavaCompile
 
 plugins {
   `maven-publish`
@@ -42,7 +41,8 @@ val sparkMajorVersion = "3.5"
 
 dependencies {
   implementation(project(":api"))
-  implementation(project(":maintenance:optimizer"))
+  implementation(project(":maintenance:optimizer-api"))
+  implementation(project(":maintenance:gravitino-updaters"))
 
   compileOnly(libs.slf4j.api)
   compileOnly(libs.jackson.databind)
@@ -83,10 +83,6 @@ dependencies {
 
 tasks.test {
   useJUnitPlatform()
-}
-
-tasks.withType<JavaCompile>().configureEach {
-  dependsOn(":maintenance:optimizer:copyDepends")
 }
 
 tasks.withType(ShadowJar::class.java) {
