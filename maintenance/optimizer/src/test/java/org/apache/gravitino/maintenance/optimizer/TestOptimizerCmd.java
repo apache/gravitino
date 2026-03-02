@@ -142,6 +142,8 @@ class TestOptimizerCmd {
             "[{\"dt\":\"2026-02-12\"}]",
             "--conf-path",
             confPath.toString());
+    // MetricsProviderForTest returns deterministic in-memory samples (110/210) for partition
+    // metrics. This verifies CLI partition-path routing and output rendering, not storage reads.
     Assertions.assertTrue(output[1].isEmpty(), "stderr=" + output[1] + ", stdout=" + output[0]);
     Assertions.assertTrue(output[0].contains("MetricsResult{scopeType=PARTITION"));
     Assertions.assertTrue(output[0].contains("partitionPath="));
@@ -251,6 +253,7 @@ class TestOptimizerCmd {
 
   private Path createOptimizerConfForMetricsProvider() throws Exception {
     Path confPath = Files.createTempFile("optimizer-test-", ".conf");
+    // Route command reads to deterministic in-memory fixtures from MetricsProviderForTest.
     String content =
         String.join(
                 System.lineSeparator(),

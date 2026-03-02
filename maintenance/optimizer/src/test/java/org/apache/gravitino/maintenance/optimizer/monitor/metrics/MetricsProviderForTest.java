@@ -32,6 +32,12 @@ import org.apache.gravitino.maintenance.optimizer.monitor.job.TableJobRelationPr
 import org.apache.gravitino.stats.StatisticValue;
 import org.apache.gravitino.stats.StatisticValues;
 
+/**
+ * Deterministic in-memory metrics provider used by CLI and monitor tests.
+ *
+ * <p>This test double does not read from any external storage. It always returns fixed metric
+ * samples so tests can assert command output stably without depending on persisted state.
+ */
 public class MetricsProviderForTest implements MetricsProvider {
 
   public static final String NAME = "metrics-provider-for-test";
