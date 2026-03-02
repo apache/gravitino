@@ -96,9 +96,9 @@ public class CatalogMysqlCredentialIT extends BaseIT {
         client = null;
       }
       try {
-        closer.close();
+        super.stopIntegrationTest();
       } catch (Exception e) {
-        LOG.error("Exception in closing CloseableGroup", e);
+        LOG.error("Exception in closing BaseIT", e);
       }
     }
   }

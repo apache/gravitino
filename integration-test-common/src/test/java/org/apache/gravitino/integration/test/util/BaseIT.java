@@ -423,7 +423,7 @@ public class BaseIT {
 
     List<String> authenticators = new ArrayList<>();
     String authenticatorStr = customConfigs.get(Configs.AUTHENTICATORS.getKey());
-    LOG.warn("Creating authenticator {}", authenticatorStr);
+    LOG.info("Creating authenticator {}", authenticatorStr);
 
     if (authenticatorStr != null) {
       authenticators = COMMA.splitToList(authenticatorStr);
