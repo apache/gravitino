@@ -24,7 +24,17 @@ import java.util.Arrays;
 import java.util.List;
 import org.apache.commons.cli.CommandLine;
 
-/** Enforces that at least one option is provided from a given option set. */
+/**
+ * Enforces that at least one option is provided from a given option set.
+ *
+ * <p>Example:
+ *
+ * <pre>{@code
+ * new RequireAnyRule(
+ *     List.of("statistics-payload", "file-path"),
+ *     "Command '%s' requires one of --statistics-payload or --file-path.");
+ * }</pre>
+ */
 final class RequireAnyRule implements CommandRule {
   private final List<String> options;
   private final String messageTemplate;

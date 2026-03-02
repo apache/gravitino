@@ -22,7 +22,20 @@ package org.apache.gravitino.maintenance.optimizer.command.rule;
 import java.util.function.Predicate;
 import org.apache.commons.cli.CommandLine;
 
-/** Applies a nested rule only when the trigger option value satisfies the predicate. */
+/**
+ * Applies a nested rule only when the trigger option value satisfies the predicate.
+ *
+ * <p>Example:
+ *
+ * <pre>{@code
+ * new RequireWhenOptionRule(
+ *     "calculator-name",
+ *     "local-stats-calculator"::equals,
+ *     new RequireAnyRule(
+ *         List.of("statistics-payload", "file-path"),
+ *         "Command '%s' requires one of --statistics-payload or --file-path."));
+ * }</pre>
+ */
 final class RequireWhenOptionRule implements CommandRule {
   private final String triggerOption;
   private final Predicate<String> triggerPredicate;

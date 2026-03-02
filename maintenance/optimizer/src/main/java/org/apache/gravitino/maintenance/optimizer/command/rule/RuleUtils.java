@@ -25,6 +25,13 @@ import org.apache.commons.lang3.StringUtils;
 final class RuleUtils {
   private RuleUtils() {}
 
+  /**
+   * Checks whether an option is effectively present.
+   *
+   * <p>For options with value separators (for example {@code --identifiers a,b}), commons-cli
+   * stores parsed values in {@code getOptionValues}. For plain single-value options it is usually
+   * available from {@code getOptionValue}. This helper normalizes both read paths.
+   */
   static boolean hasEffectiveValue(CommandLine cmd, String longOpt) {
     String[] values = cmd.getOptionValues(longOpt);
     if (values != null) {

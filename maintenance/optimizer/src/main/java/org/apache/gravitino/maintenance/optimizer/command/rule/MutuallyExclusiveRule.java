@@ -23,7 +23,17 @@ import com.google.common.base.Preconditions;
 import java.util.List;
 import org.apache.commons.cli.CommandLine;
 
-/** Enforces that at most one option is provided from a given option set. */
+/**
+ * Enforces that at most one option is provided from a given option set.
+ *
+ * <p>Example:
+ *
+ * <pre>{@code
+ * new MutuallyExclusiveRule(
+ *     List.of("statistics-payload", "file-path"),
+ *     "--statistics-payload and --file-path cannot be used together");
+ * }</pre>
+ */
 final class MutuallyExclusiveRule implements CommandRule {
   private final List<String> options;
   private final String messageTemplate;

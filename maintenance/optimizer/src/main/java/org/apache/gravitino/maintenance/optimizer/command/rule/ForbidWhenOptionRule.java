@@ -25,7 +25,20 @@ import java.util.List;
 import java.util.function.Predicate;
 import org.apache.commons.cli.CommandLine;
 
-/** Forbids options when the trigger option value satisfies the predicate. */
+/**
+ * Forbids options when the trigger option value satisfies the predicate.
+ *
+ * <p>Example:
+ *
+ * <pre>{@code
+ * new ForbidWhenOptionRule(
+ *     "calculator-name",
+ *     value -> !"local-stats-calculator".equals(value),
+ *     List.of("statistics-payload", "file-path"),
+ *     "--statistics-payload and --file-path are only supported when --calculator-name is %s.",
+ *     "local-stats-calculator");
+ * }</pre>
+ */
 final class ForbidWhenOptionRule implements CommandRule {
   private final String triggerOption;
   private final Predicate<String> triggerPredicate;
