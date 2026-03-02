@@ -19,6 +19,7 @@
 
 package org.apache.gravitino.maintenance.optimizer.command.rule;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.function.Predicate;
 import org.apache.commons.cli.CommandLine;
@@ -54,7 +55,7 @@ public final class CommandRules {
   }
 
   public static final class Builder {
-    private final List<CommandRule> rules = new java.util.ArrayList<>();
+    private final List<CommandRule> rules = new ArrayList<>();
 
     public Builder addMutuallyExclusive(List<String> options, String messageTemplate) {
       rules.add(new MutuallyExclusiveRule(options, messageTemplate));

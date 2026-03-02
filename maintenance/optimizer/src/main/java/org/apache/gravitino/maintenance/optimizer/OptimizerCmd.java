@@ -30,6 +30,7 @@ import java.nio.file.Files;
 import java.nio.file.Paths;
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.Comparator;
 import java.util.EnumSet;
 import java.util.List;
 import java.util.Locale;
@@ -37,6 +38,7 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 import org.apache.commons.cli.CommandLine;
 import org.apache.commons.cli.CommandLineParser;
 import org.apache.commons.cli.DefaultParser;
@@ -307,7 +309,7 @@ public class OptimizerCmd {
       return "[]";
     }
     return samples.stream()
-        .sorted(java.util.Comparator.comparingLong(MetricSample::timestamp))
+        .sorted(Comparator.comparingLong(MetricSample::timestamp))
         .map(
             sample ->
                 String.format(
@@ -332,9 +334,8 @@ public class OptimizerCmd {
         joinOptions(spec.optionalOptions()));
 
     Set<String> allowedOptions =
-        java.util.stream.Stream.concat(
-                java.util.stream.Stream.concat(
-                    GLOBAL_OPTION_SPECS.stream(), spec.requiredOptions().stream()),
+        Stream.concat(
+                Stream.concat(GLOBAL_OPTION_SPECS.stream(), spec.requiredOptions().stream()),
                 spec.optionalOptions().stream())
             .map(CliOption::longOpt)
             .collect(Collectors.toSet());
@@ -342,7 +343,7 @@ public class OptimizerCmd {
 
     List<String> unsupportedOptions =
         Arrays.stream(cmd.getOptions())
-            .map(org.apache.commons.cli.Option::getLongOpt)
+            .map(Option::getLongOpt)
             .filter(StringUtils::isNotBlank)
             .filter(longOpt -> !allowedOptions.contains(longOpt))
             .map(longOpt -> "--" + longOpt)

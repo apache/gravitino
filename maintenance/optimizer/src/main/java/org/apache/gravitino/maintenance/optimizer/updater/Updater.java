@@ -25,6 +25,7 @@ import java.util.Collection;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Optional;
 import java.util.stream.Collectors;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.maintenance.optimizer.api.common.PartitionPath;
@@ -343,7 +344,7 @@ public class Updater implements AutoCloseable {
                   new TableMetricWriteRequest(
                       tableIdentifier,
                       stat.name(),
-                      java.util.Optional.empty(),
+                      Optional.empty(),
                       new MetricRecordImpl(
                           timestamp, StatisticValueUtils.toString(stat.value())))));
     }
@@ -364,8 +365,7 @@ public class Updater implements AutoCloseable {
                           new TableMetricWriteRequest(
                               tableIdentifier,
                               stat.name(),
-                              java.util.Optional.of(
-                                  PartitionUtils.encodePartitionPath(partitionPath)),
+                              Optional.of(PartitionUtils.encodePartitionPath(partitionPath)),
                               new MetricRecordImpl(
                                   timestamp, StatisticValueUtils.toString(stat.value()))))));
     }
