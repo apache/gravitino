@@ -17,18 +17,36 @@
  * under the License.
  */
 
-package org.apache.gravitino.maintenance.optimizer.monitor.job;
+package org.apache.gravitino.maintenance.optimizer.monitor.job.dummy;
 
 import java.util.List;
 import org.apache.gravitino.NameIdentifier;
-import org.apache.gravitino.maintenance.optimizer.api.monitor.JobProvider;
+import org.apache.gravitino.maintenance.optimizer.api.monitor.TableJobRelationProvider;
 import org.apache.gravitino.maintenance.optimizer.common.OptimizerEnv;
+import org.apache.gravitino.maintenance.optimizer.common.conf.OptimizerConfig;
 
-public class JobProviderForTest implements JobProvider {
+/**
+ * No-op {@link TableJobRelationProvider} implementation.
+ *
+ * <p>Usage:
+ *
+ * <ul>
+ *   <li>Use this provider when you only want table/partition metric evaluation.
+ *   <li>No external configuration is required.
+ *   <li>Always returns an empty job identifier list.
+ * </ul>
+ *
+ * <p>Configured by setting {@link OptimizerConfig#TABLE_JOB_RELATION_PROVIDER_CONFIG} to {@value
+ * #NAME}.
+ */
+public class DummyTableJobRelationProvider implements TableJobRelationProvider {
 
-  public static final String NAME = "job-provider-for-test";
-  public static final NameIdentifier JOB1 = NameIdentifier.parse("test.db.job1");
-  public static final NameIdentifier JOB2 = NameIdentifier.parse("test.db.job2");
+  public static final String NAME = "dummy-table-job-relation-provider";
+
+  @Override
+  public List<NameIdentifier> jobIdentifiers(NameIdentifier tableIdentifier) {
+    return List.of();
+  }
 
   @Override
   public String name() {
@@ -37,11 +55,6 @@ public class JobProviderForTest implements JobProvider {
 
   @Override
   public void initialize(OptimizerEnv optimizerEnv) {}
-
-  @Override
-  public List<NameIdentifier> jobIdentifiers(NameIdentifier tableIdentifier) {
-    return List.of(JOB1, JOB2);
-  }
 
   @Override
   public void close() throws Exception {}

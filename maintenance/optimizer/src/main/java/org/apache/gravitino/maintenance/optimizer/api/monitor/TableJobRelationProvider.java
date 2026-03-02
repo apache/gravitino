@@ -26,7 +26,7 @@ import org.apache.gravitino.maintenance.optimizer.api.common.Provider;
 
 /** Represents a provider that provides upstream and downstream jobs for a table. */
 @DeveloperApi
-public interface JobProvider extends Provider {
+public interface TableJobRelationProvider extends Provider {
   /**
    * List jobs related to the provided table.
    *

@@ -31,11 +31,11 @@ import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.maintenance.optimizer.api.common.MetricSample;
 import org.apache.gravitino.maintenance.optimizer.api.common.PartitionPath;
 import org.apache.gravitino.maintenance.optimizer.api.monitor.EvaluationResult;
-import org.apache.gravitino.maintenance.optimizer.api.monitor.JobProvider;
 import org.apache.gravitino.maintenance.optimizer.api.monitor.MetricScope;
 import org.apache.gravitino.maintenance.optimizer.api.monitor.MetricsEvaluator;
 import org.apache.gravitino.maintenance.optimizer.api.monitor.MetricsProvider;
 import org.apache.gravitino.maintenance.optimizer.api.monitor.MonitorCallback;
+import org.apache.gravitino.maintenance.optimizer.api.monitor.TableJobRelationProvider;
 import org.apache.gravitino.maintenance.optimizer.common.CloseableGroup;
 import org.apache.gravitino.maintenance.optimizer.common.OptimizerEnv;
 import org.apache.gravitino.maintenance.optimizer.common.conf.OptimizerConfig;
@@ -61,7 +61,8 @@ import org.slf4j.LoggerFactory;
  *
  * <ul>
  *   <li>{@link OptimizerConfig#METRICS_PROVIDER_CONFIG} for {@link MetricsProvider}.
- *   <li>{@link OptimizerConfig#JOB_PROVIDER_CONFIG} for {@link JobProvider}.
+ *   <li>{@link OptimizerConfig#TABLE_JOB_RELATION_PROVIDER_CONFIG} for {@link
+ *       TableJobRelationProvider}.
  *   <li>{@link OptimizerConfig#METRICS_EVALUATOR_CONFIG} for {@link MetricsEvaluator}.
  *   <li>{@link OptimizerConfig#MONITOR_CALLBACKS_CONFIG} for callback list.
  * </ul>
@@ -82,7 +83,7 @@ import org.slf4j.LoggerFactory;
  *   <li>Resolve a time range: {@code [actionTimeSeconds - rangeSeconds, actionTimeSeconds +
  *       rangeSeconds]}.
  *   <li>Read table/partition metrics and evaluate them.
- *   <li>Resolve related jobs from {@link JobProvider} and evaluate each job's metrics.
+ *   <li>Resolve related jobs from {@link TableJobRelationProvider} and evaluate each job's metrics.
  *   <li>Return ordered results (table first, then jobs).
  * </ol>
  */
@@ -90,7 +91,7 @@ public class Monitor implements AutoCloseable {
 
   private static final Logger LOG = LoggerFactory.getLogger(Monitor.class);
   private final MetricsProvider metricsProvider;
-  private final JobProvider jobProvider;
+  private final TableJobRelationProvider tableJobRelationProvider;
   private final MetricsEvaluator metricsEvaluator;
   private final List<MonitorCallback> callbacks;
   private final CloseableGroup closeableGroup = new CloseableGroup();
@@ -107,11 +108,13 @@ public class Monitor implements AutoCloseable {
     metricsProvider.initialize(optimizerEnv);
     closeableGroup.register(metricsProvider, MetricsProvider.class.getSimpleName());
 
-    this.jobProvider = loadJobProvider(optimizerEnv.config());
-    jobProvider.initialize(optimizerEnv);
-    closeableGroup.register(jobProvider, JobProvider.class.getSimpleName());
+    this.tableJobRelationProvider = loadTableJobRelationProvider(optimizerEnv.config());
+    tableJobRelationProvider.initialize(optimizerEnv);
+    closeableGroup.register(
+        tableJobRelationProvider, TableJobRelationProvider.class.getSimpleName());
 
     this.metricsEvaluator = loadMetricsEvaluator(optimizerEnv.config());
+    metricsEvaluator.initialize(optimizerEnv);
     this.callbacks = loadCallbacks(optimizerEnv.config());
     for (MonitorCallback callback : callbacks) {
       callback.initialize(optimizerEnv);
@@ -143,7 +146,7 @@ public class Monitor implements AutoCloseable {
       results.add(
           evaluateTableMetrics(
               metricsEvaluator, tableIdentifier, actionTimeSeconds, rangeSeconds, partitionPath));
-      List<NameIdentifier> jobs = jobProvider.jobIdentifiers(tableIdentifier);
+      List<NameIdentifier> jobs = tableJobRelationProvider.jobIdentifiers(tableIdentifier);
       if (jobs == null) {
         jobs = List.of();
       }
@@ -269,9 +272,9 @@ public class Monitor implements AutoCloseable {
         optimizerConfig.get(OptimizerConfig.METRICS_PROVIDER_CONFIG));
   }
 
-  private JobProvider loadJobProvider(OptimizerConfig optimizerConfig) {
-    return ProviderUtils.createJobProviderInstance(
-        optimizerConfig.get(OptimizerConfig.JOB_PROVIDER_CONFIG));
+  private TableJobRelationProvider loadTableJobRelationProvider(OptimizerConfig optimizerConfig) {
+    return ProviderUtils.createTableJobRelationProviderInstance(
+        optimizerConfig.get(OptimizerConfig.TABLE_JOB_RELATION_PROVIDER_CONFIG));
   }
 
   private MetricsEvaluator loadMetricsEvaluator(OptimizerConfig optimizerConfig) {

@@ -44,6 +44,7 @@ import org.apache.gravitino.maintenance.optimizer.api.common.StatisticEntry;
 import org.apache.gravitino.maintenance.optimizer.api.common.TableAndPartitionStatistics;
 import org.apache.gravitino.maintenance.optimizer.common.PartitionEntryImpl;
 import org.apache.gravitino.maintenance.optimizer.common.StatisticEntryImpl;
+import org.apache.gravitino.maintenance.optimizer.common.util.IdentifierUtils;
 import org.apache.gravitino.stats.StatisticValue;
 import org.apache.gravitino.stats.StatisticValues;
 import org.slf4j.Logger;
@@ -142,16 +143,16 @@ abstract class AbstractStatisticsImporter implements StatisticsImporter {
         new StatisticsRecordVisitor() {
           @Override
           public void onTable(StatisticsRecord record) {
-            NameIdentifier identifier = parseTableIdentifier(record.identifier());
-            if (identifier == null) {
+            Optional<NameIdentifier> identifier = parseTableIdentifier(record.identifier());
+            if (identifier.isEmpty()) {
               return;
             }
-            if (targetIdentifier != null && !targetIdentifier.equals(identifier)) {
+            if (targetIdentifier != null && !targetIdentifier.equals(identifier.get())) {
               return;
             }
 
             Map<String, StatisticValue<?>> statisticsByName =
-                aggregated.computeIfAbsent(identifier, k -> new LinkedHashMap<>());
+                aggregated.computeIfAbsent(identifier.get(), k -> new LinkedHashMap<>());
             populateStatistics(record, statisticsByName);
           }
         });
@@ -171,16 +172,16 @@ abstract class AbstractStatisticsImporter implements StatisticsImporter {
         new StatisticsRecordVisitor() {
           @Override
           public void onTable(StatisticsRecord record) {
-            NameIdentifier identifier = parseTableIdentifier(record.identifier());
-            if (targetIdentifier.equals(identifier)) {
+            Optional<NameIdentifier> identifier = parseTableIdentifier(record.identifier());
+            if (identifier.isPresent() && targetIdentifier.equals(identifier.get())) {
               populateStatistics(record, tableStatistics);
             }
           }
 
           @Override
           public void onPartition(StatisticsRecord record) {
-            NameIdentifier identifier = parseTableIdentifier(record.identifier());
-            if (!targetIdentifier.equals(identifier)) {
+            Optional<NameIdentifier> identifier = parseTableIdentifier(record.identifier());
+            if (identifier.isEmpty() || !targetIdentifier.equals(identifier.get())) {
               return;
             }
 
@@ -210,19 +211,20 @@ abstract class AbstractStatisticsImporter implements StatisticsImporter {
         new StatisticsRecordVisitor() {
           @Override
           public void onTable(StatisticsRecord record) {
-            NameIdentifier identifier = parseTableIdentifier(record.identifier());
-            if (identifier == null) {
+            Optional<NameIdentifier> identifier = parseTableIdentifier(record.identifier());
+            if (identifier.isEmpty()) {
               return;
             }
             Map<String, StatisticValue<?>> tableStats =
-                tableStatisticsByIdentifier.computeIfAbsent(identifier, k -> new LinkedHashMap<>());
+                tableStatisticsByIdentifier.computeIfAbsent(
+                    identifier.get(), k -> new LinkedHashMap<>());
             populateStatistics(record, tableStats);
           }
 
           @Override
           public void onPartition(StatisticsRecord record) {
-            NameIdentifier identifier = parseTableIdentifier(record.identifier());
-            if (identifier == null) {
+            Optional<NameIdentifier> identifier = parseTableIdentifier(record.identifier());
+            if (identifier.isEmpty()) {
               return;
             }
 
@@ -233,7 +235,7 @@ abstract class AbstractStatisticsImporter implements StatisticsImporter {
 
             Map<PartitionPath, Map<String, StatisticValue<?>>> partitionStatsByPath =
                 partitionStatisticsByIdentifier.computeIfAbsent(
-                    identifier, k -> new LinkedHashMap<>());
+                    identifier.get(), k -> new LinkedHashMap<>());
             Map<String, StatisticValue<?>> partitionStatsByName =
                 partitionStatsByPath.computeIfAbsent(
                     partitionPathOpt.get(), k -> new LinkedHashMap<>());
@@ -265,16 +267,16 @@ abstract class AbstractStatisticsImporter implements StatisticsImporter {
         new StatisticsRecordVisitor() {
           @Override
           public void onJob(StatisticsRecord record) {
-            NameIdentifier identifier = parseJobIdentifier(record.identifier());
-            if (identifier == null) {
+            Optional<NameIdentifier> identifier = parseJobIdentifier(record.identifier());
+            if (identifier.isEmpty()) {
               return;
             }
-            if (targetIdentifier != null && !targetIdentifier.equals(identifier)) {
+            if (targetIdentifier != null && !targetIdentifier.equals(identifier.get())) {
               return;
             }
 
             Map<String, StatisticValue<?>> statisticsByName =
-                aggregated.computeIfAbsent(identifier, k -> new LinkedHashMap<>());
+                aggregated.computeIfAbsent(identifier.get(), k -> new LinkedHashMap<>());
             populateStatistics(record, statisticsByName);
           }
         });
@@ -406,42 +408,24 @@ abstract class AbstractStatisticsImporter implements StatisticsImporter {
     }
   }
 
-  private NameIdentifier parseTableIdentifier(String identifierText) {
+  private Optional<NameIdentifier> parseTableIdentifier(String identifierText) {
     if (StringUtils.isBlank(identifierText)) {
-      return null;
+      return Optional.empty();
     }
-    try {
-      NameIdentifier parsed = NameIdentifier.parse(identifierText);
-      int levels = parsed.namespace().levels().length;
-      if (levels == 0) {
-        return parsed;
-      } else if (levels == 1) {
-        if (StringUtils.isNotBlank(defaultCatalogName)) {
-          return NameIdentifier.of(
-              defaultCatalogName, parsed.namespace().levels()[0], parsed.name());
-        }
-        return parsed;
-      } else if (levels == 2) {
-        return parsed;
-      } else {
-        return null;
-      }
-    } catch (Exception e) {
+    Optional<NameIdentifier> parsed =
+        IdentifierUtils.parseTableIdentifier(identifierText, defaultCatalogName);
+    if (parsed.isEmpty()) {
       LOG.warn("Skip line with invalid identifier: {}", identifierText);
-      return null;
     }
+    return parsed;
   }
 
-  private NameIdentifier parseJobIdentifier(String identifierText) {
-    if (StringUtils.isBlank(identifierText)) {
-      return null;
-    }
-    try {
-      return NameIdentifier.parse(identifierText);
-    } catch (Exception e) {
+  private Optional<NameIdentifier> parseJobIdentifier(String identifierText) {
+    Optional<NameIdentifier> parsed = IdentifierUtils.parseJobIdentifier(identifierText);
+    if (parsed.isEmpty() && StringUtils.isNotBlank(identifierText)) {
       LOG.warn("Skip line with invalid identifier: {}", identifierText);
-      return null;
     }
+    return parsed;
   }
 
   private static final class StatisticsRecord {
