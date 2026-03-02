@@ -323,6 +323,13 @@ public class GravitinoConfig {
         stringList.add(String.format("\"%s\"='%s'", entry.getKey(), value));
       }
     }
+    // copy the configuration by the prefix of GRAVITINO_CLIENT_CONFIG_PREFIX
+    config.entrySet().stream()
+        .filter(entry -> entry.getKey().startsWith(GRAVITINO_CLIENT_CONFIG_PREFIX.key))
+        .forEach(
+            entry -> {
+              stringList.add(String.format("\"%s\"='%s'", entry.getKey(), entry.getValue()));
+            });
     return StringUtils.join(stringList, ',');
   }
 
