@@ -94,7 +94,7 @@ curator = "2.12.0"
 awaitility = "4.2.1"
 servlet = "3.1.0"
 jodd = "3.5.2"
-flink = "1.18.0"
+flink = "1.18-SNAPSHOT"
 flinkjdbc = "3.2.0-1.18"
 # cglib upgraded from 2. to 3.3.0 for Java 17 compatibility.
 # Explicit ASM dependency (9.8) is required due to cglib's internal use and Java 17 module system.
