@@ -897,6 +897,61 @@ public class CatalogMysqlIT extends BaseIT {
   }
 
   @Test
+  void testClearColumnComments() {
+    Column col1 = Column.of("col_with_comment1", Types.IntegerType.get(), "original comment 1");
+    Column col2 = Column.of("col_with_comment2", Types.StringType.get(), "original comment 2");
+    Column col3 = Column.of("col_with_comment3", Types.DateType.get(), "original comment 3");
+    Column[] columns = new Column[] {col1, col2, col3};
+    NameIdentifier tableIdentifier =
+        NameIdentifier.of(schemaName, GravitinoITUtils.genRandomName("test_clear_comments"));
+    catalog.asTableCatalog().createTable(tableIdentifier, columns, "test table", ImmutableMap.of());
+    Table table = catalog.asTableCatalog().loadTable(tableIdentifier);
+    Assertions.assertEquals("original comment 1", table.columns()[0].comment());
+    Assertions.assertEquals("original comment 2", table.columns()[1].comment());
+    Assertions.assertEquals("original comment 3", table.columns()[2].comment());
+    catalog
+        .asTableCatalog()
+        .alterTable(
+            tableIdentifier,
+            TableChange.updateColumnComment(new String[] {"col_with_comment1"}, null));
+    catalog
+        .asTableCatalog()
+        .alterTable(
+            tableIdentifier,
+            TableChange.updateColumnComment(new String[] {"col_with_comment2"}, ""));
+    table = catalog.asTableCatalog().loadTable(tableIdentifier);
+    Assertions.assertTrue(
+        table.columns()[0].comment() == null || table.columns()[0].comment().isEmpty(),
+        "Comment should be null or empty after clearing with null");
+    Assertions.assertTrue(
+        table.columns()[1].comment() == null || table.columns()[1].comment().isEmpty(),
+        "Comment should be null or empty after clearing with empty string");
+    Assertions.assertEquals(
+        "original comment 3", table.columns()[2].comment(), "Unchanged comment should remain");
+    catalog.asTableCatalog().dropTable(tableIdentifier);
+  }
+
+  @Test
+  void testClearColumnComment() {
+    Column[] columns = createColumns();
+    TableCatalog tableCatalog = catalog.asTableCatalog();
+    NameIdentifier tableIdentifier = NameIdentifier.of(schemaName, tableName);
+
+    tableCatalog.createTable(tableIdentifier, columns, table_comment, createProperties());
+    tableCatalog.alterTable(
+        tableIdentifier,
+        TableChange.updateColumnComment(new String[] {MYSQL_COL_NAME1}, "updated_comment"));
+
+    Table table = tableCatalog.loadTable(tableIdentifier);
+    Assertions.assertEquals("updated_comment", table.columns()[0].comment());
+
+    tableCatalog.alterTable(
+        tableIdentifier, TableChange.updateColumnComment(new String[] {MYSQL_COL_NAME1}, ""));
+    table = tableCatalog.loadTable(tableIdentifier);
+    Assertions.assertTrue(StringUtils.isBlank(table.columns()[0].comment()));
+  }
+
+  @Test
   void testUpdateColumnDefaultValue() {
     Column[] columns = createColumnsWithDefaultValue();
     Table table =
