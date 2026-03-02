@@ -24,7 +24,12 @@ import java.io.PrintStream;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import org.apache.gravitino.maintenance.optimizer.monitor.evaluator.MetricsEvaluatorForTest;
+import org.apache.gravitino.maintenance.optimizer.monitor.job.TableJobRelationProviderForTest;
 import org.apache.gravitino.maintenance.optimizer.monitor.metrics.MetricsProviderForTest;
+import org.apache.gravitino.maintenance.optimizer.updater.MetricsUpdaterForTest;
+import org.apache.gravitino.maintenance.optimizer.updater.StatisticsCalculatorForTest;
+import org.apache.gravitino.maintenance.optimizer.updater.StatisticsUpdaterForTest;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
@@ -77,6 +82,21 @@ class TestOptimizerCmd {
   }
 
   @Test
+  void testConfPathNonexistentFailsClearly() {
+    String[] output =
+        runCommand(
+            "--type",
+            "list-job-metrics",
+            "--identifiers",
+            "test.db.job1",
+            "--conf-path",
+            "/tmp/not-exist-optimizer-conf-123456.conf");
+    Assertions.assertTrue(
+        output[1].contains(
+            "Specified optimizer config file does not exist: /tmp/not-exist-optimizer-conf-123456.conf"));
+  }
+
+  @Test
   void testRejectUnsupportedOptionForMonitorMetrics() {
     String[] output =
         runCommand(
@@ -110,6 +130,27 @@ class TestOptimizerCmd {
   }
 
   @Test
+  void testListTableMetricsWithPartitionPathImplemented() throws Exception {
+    Path confPath = createOptimizerConfForMetricsProvider();
+    String[] output =
+        runCommand(
+            "--type",
+            "list-table-metrics",
+            "--identifiers",
+            "test.db.table",
+            "--partition-path",
+            "[{\"dt\":\"2026-02-12\"}]",
+            "--conf-path",
+            confPath.toString());
+    Assertions.assertTrue(output[1].isEmpty(), "stderr=" + output[1] + ", stdout=" + output[0]);
+    Assertions.assertTrue(output[0].contains("MetricsResult{scopeType=PARTITION"));
+    Assertions.assertTrue(output[0].contains("partitionPath="));
+    Assertions.assertTrue(output[0].contains("2026-02-12"));
+    Assertions.assertTrue(output[0].contains("value=110"));
+    Assertions.assertTrue(output[0].contains("value=210"));
+  }
+
+  @Test
   void testListJobMetricsImplemented() throws Exception {
     Path confPath = createOptimizerConfForMetricsProvider();
     String[] output =
@@ -126,6 +167,88 @@ class TestOptimizerCmd {
     Assertions.assertTrue(output[0].contains("duration=["));
   }
 
+  @Test
+  void testMonitorMetricsImplemented() throws Exception {
+    Path confPath = createOptimizerConfForMonitor();
+    String[] output =
+        runCommand(
+            "--type",
+            "monitor-metrics",
+            "--identifiers",
+            "test.db.table",
+            "--action-time",
+            "100",
+            "--range-seconds",
+            "10",
+            "--conf-path",
+            confPath.toString());
+    Assertions.assertTrue(output[1].isEmpty(), "stderr=" + output[1] + ", stdout=" + output[0]);
+    Assertions.assertTrue(output[0].contains("EvaluationResult{scopeType=TABLE"));
+    Assertions.assertTrue(output[0].contains("EvaluationResult{scopeType=JOB"));
+    Assertions.assertTrue(output[0].contains("identifier=test.db.job1"));
+    Assertions.assertTrue(output[0].contains("identifier=test.db.job2"));
+  }
+
+  @Test
+  void testUpdateStatisticsWithoutIdentifiersUsesUpdateAllPath() throws Exception {
+    StatisticsUpdaterForTest.reset();
+    MetricsUpdaterForTest.reset();
+    Path confPath = createOptimizerConfForUpdater();
+    String[] output =
+        runCommand(
+            "--type",
+            "update-statistics",
+            "--calculator-name",
+            StatisticsCalculatorForTest.NAME,
+            "--conf-path",
+            confPath.toString());
+    Assertions.assertTrue(output[1].isEmpty(), "stderr=" + output[1] + ", stdout=" + output[0]);
+    int totalTableUpdates =
+        StatisticsUpdaterForTest.instances().stream()
+            .mapToInt(StatisticsUpdaterForTest::tableUpdates)
+            .sum();
+    int totalPartitionUpdates =
+        StatisticsUpdaterForTest.instances().stream()
+            .mapToInt(StatisticsUpdaterForTest::partitionUpdates)
+            .sum();
+    Assertions.assertTrue(
+        totalTableUpdates >= 1,
+        "Expected table updates from updateAll, but got " + totalTableUpdates);
+    Assertions.assertTrue(
+        totalPartitionUpdates >= 1,
+        "Expected partition updates from updateAll, but got " + totalPartitionUpdates);
+  }
+
+  @Test
+  void testAppendMetricsWithoutIdentifiersUsesUpdateAllPath() throws Exception {
+    StatisticsUpdaterForTest.reset();
+    MetricsUpdaterForTest.reset();
+    Path confPath = createOptimizerConfForUpdater();
+    String[] output =
+        runCommand(
+            "--type",
+            "append-metrics",
+            "--calculator-name",
+            StatisticsCalculatorForTest.NAME,
+            "--conf-path",
+            confPath.toString());
+    Assertions.assertTrue(output[1].isEmpty(), "stderr=" + output[1] + ", stdout=" + output[0]);
+    int totalTableUpdates =
+        MetricsUpdaterForTest.instances().stream()
+            .mapToInt(MetricsUpdaterForTest::tableUpdates)
+            .sum();
+    int totalJobUpdates =
+        MetricsUpdaterForTest.instances().stream()
+            .mapToInt(MetricsUpdaterForTest::jobUpdates)
+            .sum();
+    Assertions.assertTrue(
+        totalTableUpdates >= 1,
+        "Expected table metric updates from updateAll, but got " + totalTableUpdates);
+    Assertions.assertTrue(
+        totalJobUpdates >= 1,
+        "Expected job metric updates from updateAll, but got " + totalJobUpdates);
+  }
+
   private Path createOptimizerConfForMetricsProvider() throws Exception {
     Path confPath = Files.createTempFile("optimizer-test-", ".conf");
     String content =
@@ -134,6 +257,38 @@ class TestOptimizerCmd {
                 "gravitino.optimizer.gravitinoUri = http://localhost:8090",
                 "gravitino.optimizer.gravitinoMetalake = test",
                 "gravitino.optimizer.monitor.metricsProvider = " + MetricsProviderForTest.NAME)
+            + System.lineSeparator();
+    Files.writeString(confPath, content, StandardCharsets.UTF_8);
+    confPath.toFile().deleteOnExit();
+    return confPath;
+  }
+
+  private Path createOptimizerConfForMonitor() throws Exception {
+    Path confPath = Files.createTempFile("optimizer-monitor-test-", ".conf");
+    String content =
+        String.join(
+                System.lineSeparator(),
+                "gravitino.optimizer.gravitinoUri = http://localhost:8090",
+                "gravitino.optimizer.gravitinoMetalake = test",
+                "gravitino.optimizer.monitor.metricsProvider = " + MetricsProviderForTest.NAME,
+                "gravitino.optimizer.monitor.tableJobRelationProvider = "
+                    + TableJobRelationProviderForTest.NAME,
+                "gravitino.optimizer.monitor.metricsEvaluator = " + MetricsEvaluatorForTest.NAME)
+            + System.lineSeparator();
+    Files.writeString(confPath, content, StandardCharsets.UTF_8);
+    confPath.toFile().deleteOnExit();
+    return confPath;
+  }
+
+  private Path createOptimizerConfForUpdater() throws Exception {
+    Path confPath = Files.createTempFile("optimizer-updater-test-", ".conf");
+    String content =
+        String.join(
+                System.lineSeparator(),
+                "gravitino.optimizer.gravitinoUri = http://localhost:8090",
+                "gravitino.optimizer.gravitinoMetalake = test",
+                "gravitino.optimizer.updater.statisticsUpdater = " + StatisticsUpdaterForTest.NAME,
+                "gravitino.optimizer.updater.metricsUpdater = " + MetricsUpdaterForTest.NAME)
             + System.lineSeparator();
     Files.writeString(confPath, content, StandardCharsets.UTF_8);
     confPath.toFile().deleteOnExit();

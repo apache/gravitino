@@ -158,13 +158,22 @@ public final class CommandRules {
           new RequireAnyRule(options, messageTemplate, formatArgs));
     }
 
-    /** Finalizes the builder and returns an immutable validation plan. */
+    /**
+     * Adds a conditional rule that delegates to another rule when the trigger option matches the
+     * predicate.
+     *
+     * @param triggerOption The option whose value is evaluated by the predicate.
+     * @param triggerPredicate The predicate used to test the trigger option's value.
+     * @param delegate The rule to apply when the predicate evaluates to {@code true}.
+     * @return This builder for chaining.
+     */
     private Builder addRequireWhenOption(
         String triggerOption, Predicate<String> triggerPredicate, CommandRule delegate) {
       rules.add(new RequireWhenOptionRule(triggerOption, triggerPredicate, delegate));
       return this;
     }
 
+    /** Finalizes the builder and returns an immutable validation plan. */
     public ValidationPlan build() {
       return new ValidationPlan(rules);
     }

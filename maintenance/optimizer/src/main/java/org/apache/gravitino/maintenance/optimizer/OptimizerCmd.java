@@ -201,9 +201,14 @@ public class OptimizerCmd {
         if (Files.exists(confFile.toPath())) {
           config.loadFromProperties(config.loadPropertiesFromFile(confFile));
           return config;
+        } else {
+          throw new IllegalArgumentException(
+              "Specified optimizer config file does not exist: " + confPath);
         }
       }
       config.loadFromFile(confPath);
+    } catch (IllegalArgumentException e) {
+      throw e;
     } catch (Exception e) {
       throw new IllegalArgumentException("Failed to load optimizer config: " + confPath, e);
     }
