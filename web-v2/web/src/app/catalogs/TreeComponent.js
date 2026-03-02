@@ -301,7 +301,7 @@ export const TreeComponent = forwardRef(function TreeComponent(props, ref) {
   }, [dispatch, searchParams])
 
   useEffect(() => {
-    setTimeout(() => {
+    const timerId = setTimeout(() => {
       const metalake = searchParams.get('metalake')
       const catalog = searchParams.get('catalog')
       const catalogType = searchParams.get('catalogType')
@@ -314,7 +314,7 @@ export const TreeComponent = forwardRef(function TreeComponent(props, ref) {
       const entity = table || fileset || topic || model || func
 
       if (!metalake) {
-        dispatch(setExpandedNodes([]))
+        dispatch(setExpanded([]))
         dispatch(setSelectedNodes([]))
 
         return
@@ -340,12 +340,16 @@ export const TreeComponent = forwardRef(function TreeComponent(props, ref) {
         }
       }
 
-      dispatch(setExpandedNodes(Array.from(new Set(nextExpandedKeys))))
+      dispatch(setExpanded(Array.from(new Set(nextExpandedKeys))))
 
       if (nextSelectedKey) {
         dispatch(setSelectedNodes([nextSelectedKey]))
       }
     }, 1000)
+
+    return () => {
+      clearTimeout(timerId)
+    }
   }, [dispatch, searchParams])
 
   const renderTitle = title => {
@@ -497,7 +501,7 @@ export const TreeComponent = forwardRef(function TreeComponent(props, ref) {
       const catalogPrefix = `{{${currentMetalake}}}{{${name}}}{{${currentCatalogType}}}`
 
       // Remove from expanded and loaded nodes
-      dispatch(setExpandedNodes([...store.expandedNodes.filter(key => !key.startsWith(catalogPrefix))]))
+      dispatch(setExpanded([...store.expandedNodes.filter(key => !key.startsWith(catalogPrefix))]))
       dispatch(setLoadedNodes([...store.loadedNodes.filter(key => !key.startsWith(catalogPrefix))]))
     } else {
       const catalogKey = `{{${currentMetalake}}}{{${name}}}{{${currentCatalogType}}}`
