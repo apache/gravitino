@@ -28,7 +28,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
-import java.util.stream.Collectors;
 import org.apache.commons.collections4.CollectionUtils;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.NameIdentifier;
@@ -121,26 +120,13 @@ public class OwnerMetaService {
             mapper ->
                 mapper.batchSelectUserOwnerMetaByMetadataObjectIdAndType(entityIds, type.name()));
     if (CollectionUtils.isNotEmpty(userPOList)) {
-      Map<NameIdentifier, List<UserOwnerRelPO>> poMap =
-          userPOList.stream()
-              .collect(
-                  Collectors.groupingBy(
-                      userPO -> nameIdentifierMap.get(userPO.getMetadataObjectId())));
-      poMap.forEach(
-          (name, poList) -> {
-            EntityRelation<E> ownerRelation = new EntityRelation<>();
-            ownerRelation.setRelationEntity(
-                poList.stream()
-                    .map(
-                        userPO ->
-                            (E)
-                                POConverters.fromUserPO(
-                                    userPO,
-                                    Collections.emptyList(),
-                                    AuthorizationUtils.ofUserNamespace(metalake)))
-                    .toList());
-            ownerRelation.setSourceNameIdentity(name);
-            result.add(ownerRelation);
+      userPOList.forEach(
+          userPO -> {
+            EntityRelation<E> entityEntityRelation = new EntityRelation<>();
+            entityEntityRelation.setSourceNameIdentity(
+                nameIdentifierMap.get(userPO.getMetadataObjectId()));
+            entityEntityRelation.setRelationEntity((E) userPO);
+            result.add(entityEntityRelation);
           });
     }
     return result;

@@ -26,9 +26,11 @@ import com.google.common.collect.ImmutableMap;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.function.Function;
+import java.util.stream.Collectors;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.gravitino.Config;
 import org.apache.gravitino.Configs;
@@ -236,23 +238,46 @@ public class RelationalEntityStore implements EntityStore, SupportsRelationOpera
       boolean allFields)
       throws IOException {
     // TODO add lock
+    List<EntityRelation<E>> result = new ArrayList<>();
+    List<NameIdentifier> notInCache = new ArrayList<>();
+    for (NameIdentifier nameIdentifier : nameIdentifiers) {
+      Optional<List<E>> entities = cache.getIfPresent(relType, nameIdentifier, identType);
+      entities.ifPresentOrElse(
+          listInCache -> {
+            listInCache.forEach(
+                e -> {
+                  EntityRelation<E> entityEntityRelation = new EntityRelation<>();
+                  entityEntityRelation.setRelationEntity(e);
+                  entityEntityRelation.setSourceNameIdentity(nameIdentifier);
+                  result.add(entityEntityRelation);
+                });
+          },
+          () -> {
+            notInCache.add(nameIdentifier);
+          });
+    }
     if (Objects.requireNonNull(relType) == Type.OWNER_REL) {
       List<EntityRelation<E>> entityRelations =
-          backend.batchListEntitiesByRelation(relType, nameIdentifiers, identType, allFields);
+          backend.batchListEntitiesByRelation(relType, notInCache, identType, allFields);
       Preconditions.checkState(
-          entityRelations.size() == nameIdentifiers.size(),
+          entityRelations.size() == notInCache.size(),
           "Owner list size not equal to nameIdentifiers size");
-      for (int i = 0; i < entityRelations.size(); i++) {
-        EntityRelation<E> entityRelation = entityRelations.get(i);
-        cache.put(
-            entityRelation.getSourceNameIdentity(),
-            identType,
-            relType,
-            entityRelation.getRelationEntity());
-      }
-      return entityRelations;
+      result.addAll(entityRelations);
+      Map<NameIdentifier, List<EntityRelation<E>>> grouped =
+          entityRelations.stream()
+              .collect(
+                  Collectors.groupingBy(
+                      EntityRelation::getSourceNameIdentity, Collectors.toList()));
+      grouped.forEach(
+          (name, entities) -> {
+            cache.put(
+                name,
+                identType,
+                relType,
+                entities.stream().map(EntityRelation::getRelationEntity).toList());
+          });
     }
-    return List.of();
+    return result;
   }
 
   @Override

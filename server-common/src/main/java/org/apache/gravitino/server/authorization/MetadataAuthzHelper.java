@@ -17,6 +17,7 @@
 
 package org.apache.gravitino.server.authorization;
 
+import com.google.common.base.Preconditions;
 import java.lang.reflect.Array;
 import java.security.Principal;
 import java.util.ArrayList;
@@ -37,13 +38,14 @@ import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.Metalake;
 import org.apache.gravitino.NameIdentifier;
+import org.apache.gravitino.Namespace;
 import org.apache.gravitino.SupportsRelationOperations;
 import org.apache.gravitino.authorization.AuthorizationRequestContext;
 import org.apache.gravitino.authorization.GravitinoAuthorizer;
 import org.apache.gravitino.dto.tag.MetadataObjectDTO;
-import org.apache.gravitino.meta.TableEntity;
 import org.apache.gravitino.server.authorization.expression.AuthorizationExpressionConstants;
 import org.apache.gravitino.server.authorization.expression.AuthorizationExpressionEvaluator;
+import org.apache.gravitino.utils.EntityClassMapper;
 import org.apache.gravitino.utils.MetadataObjectUtil;
 import org.apache.gravitino.utils.NameIdentifierUtil;
 import org.apache.gravitino.utils.PrincipalUtils;
@@ -391,21 +393,21 @@ public class MetadataAuthzHelper {
             EntityClassMapper.getEntityClass(entityType));
   }
 
-    private static void preloadOwner(Entity.EntityType entityType, NameIdentifier[] nameIdentifiers) {
-        if (!GravitinoEnv.getInstance().cacheEnabled()) {
-            return;
-        }
-        EntityStore entityStore = GravitinoEnv.getInstance().entityStore();
-        try {
-            entityStore
-                    .relationOperations()
-                    .batchListEntitiesByRelation(
-                            SupportsRelationOperations.Type.OWNER_REL,
-                            Arrays.stream(nameIdentifiers).toList(),
-                            entityType,
-                            true);
-        } catch (Exception e) {
-            LOG.warn("Ignore preloadOwner error:{}", e.getMessage(), e);
-        }
+  private static void preloadOwner(Entity.EntityType entityType, NameIdentifier[] nameIdentifiers) {
+    if (!GravitinoEnv.getInstance().cacheEnabled()) {
+      return;
     }
+    EntityStore entityStore = GravitinoEnv.getInstance().entityStore();
+    try {
+      entityStore
+          .relationOperations()
+          .batchListEntitiesByRelation(
+              SupportsRelationOperations.Type.OWNER_REL,
+              Arrays.stream(nameIdentifiers).toList(),
+              entityType,
+              true);
+    } catch (Exception e) {
+      LOG.warn("Ignore preloadOwner error:{}", e.getMessage(), e);
+    }
+  }
 }

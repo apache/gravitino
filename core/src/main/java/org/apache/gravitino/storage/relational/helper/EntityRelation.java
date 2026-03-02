@@ -17,7 +17,6 @@
 
 package org.apache.gravitino.storage.relational.helper;
 
-import java.util.List;
 import lombok.Data;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.NameIdentifier;
@@ -25,7 +24,7 @@ import org.apache.gravitino.NameIdentifier;
 @Data
 public class EntityRelation<E extends Entity> {
 
-  private List<E> relationEntity;
+  private E relationEntity;
 
   private NameIdentifier sourceNameIdentity;
 }
