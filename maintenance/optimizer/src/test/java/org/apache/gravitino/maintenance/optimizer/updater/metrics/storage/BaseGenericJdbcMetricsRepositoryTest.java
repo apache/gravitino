@@ -19,55 +19,25 @@
 
 package org.apache.gravitino.maintenance.optimizer.updater.metrics.storage;
 
-import java.io.IOException;
-import java.nio.charset.StandardCharsets;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.nio.file.Paths;
-import java.sql.Connection;
-import java.sql.DriverManager;
-import java.sql.SQLException;
 import java.time.Instant;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
-import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.NameIdentifier;
-import org.apache.gravitino.config.ConfigConstants;
-import org.apache.gravitino.maintenance.optimizer.common.conf.OptimizerConfig;
 import org.apache.gravitino.maintenance.optimizer.updater.metrics.storage.jdbc.GenericJdbcMetricsRepository;
-import org.apache.gravitino.utils.jdbc.JdbcSqlScriptUtils;
-import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.Assertions;
-import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.TestInstance;
 
-@TestInstance(TestInstance.Lifecycle.PER_CLASS)
-class TestGenericJdbcMetricsRepository {
-  private static final long MAX_REASONABLE_EPOCH_SECONDS = 9_999_999_999L;
-  private GenericJdbcMetricsRepository storage;
-  private String jdbcUrl;
+/**
+ * Shared behavior tests for {@link GenericJdbcMetricsRepository}.
+ *
+ * <p>Environment setup (H2/MySQL/PostgreSQL) is provided by subclasses.
+ */
+public abstract class BaseGenericJdbcMetricsRepositoryTest {
 
-  @BeforeAll
-  void setUp() throws IOException {
-    cleanupLegacyDataFiles();
-    Path testDir = Files.createTempDirectory("optimizer-h2-metrics");
-    jdbcUrl = "jdbc:h2:file:" + testDir.resolve("metrics.db");
-    initializeSchema(jdbcUrl);
-    storage = new GenericJdbcMetricsRepository();
-    storage.initialize(createJdbcConfigs(jdbcUrl));
-    storage.cleanupTableMetricsBefore(MAX_REASONABLE_EPOCH_SECONDS);
-    storage.cleanupJobMetricsBefore(MAX_REASONABLE_EPOCH_SECONDS);
-  }
-
-  @AfterAll
-  void tearDown() {
-    storage.cleanupTableMetricsBefore(MAX_REASONABLE_EPOCH_SECONDS);
-    storage.cleanupJobMetricsBefore(MAX_REASONABLE_EPOCH_SECONDS);
-    storage.close();
-  }
+  protected static final long MAX_REASONABLE_EPOCH_SECONDS = 9_999_999_999L;
+  protected GenericJdbcMetricsRepository storage;
 
   @Test
   void testStoreAndRetrieveTableMetricsWithNullPartition() {
@@ -100,12 +70,9 @@ class TestGenericJdbcMetricsRepository {
         storage.getTableMetrics(nameIdentifier, 0, Long.MAX_VALUE);
 
     Assertions.assertEquals(2, metrics.size());
-
     Assertions.assertTrue(metrics.containsKey("metric1"));
     Assertions.assertEquals(Arrays.asList("value1"), getMetricValues(metrics.get("metric1")));
-
     Assertions.assertTrue(metrics.containsKey("metric2"));
-    Assertions.assertEquals(2, getMetricValues(metrics.get("metric2")).size());
     Assertions.assertEquals(
         Arrays.asList("value1", "value2"), getMetricValues(metrics.get("metric2")));
   }
@@ -128,7 +95,6 @@ class TestGenericJdbcMetricsRepository {
 
     Map<String, List<MetricRecord>> metrics =
         storage.getPartitionMetrics(nameIdentifier, partition1, 0, Long.MAX_VALUE);
-
     Assertions.assertEquals(1, metrics.size());
     Assertions.assertTrue(metrics.containsKey("metric"));
     Assertions.assertEquals(Arrays.asList("value1"), getMetricValues(metrics.get("metric")));
@@ -197,19 +163,6 @@ class TestGenericJdbcMetricsRepository {
     Map<String, List<MetricRecord>> jobMetrics = storage.getJobMetrics(queryId, 0, Long.MAX_VALUE);
     Assertions.assertTrue(jobMetrics.containsKey("job_metric"));
     Assertions.assertEquals(List.of("v1"), getMetricValues(jobMetrics.get("job_metric")));
-  }
-
-  @Test
-  void testInitializeTwiceFails() {
-    GenericJdbcMetricsRepository repository = new GenericJdbcMetricsRepository();
-    initializeSchema(jdbcUrl + "_init_twice");
-    repository.initialize(createJdbcConfigs(jdbcUrl + "_init_twice"));
-
-    IllegalStateException e =
-        Assertions.assertThrows(
-            IllegalStateException.class,
-            () -> repository.initialize(createJdbcConfigs(jdbcUrl + "_init_twice")));
-    Assertions.assertTrue(e.getMessage().contains("already been initialized"));
   }
 
   @Test
@@ -351,32 +304,11 @@ class TestGenericJdbcMetricsRepository {
     Assertions.assertEquals(longValue, jobMetrics.get("metric_long").get(0).getValue());
   }
 
-  @Test
-  void testInitializeWithoutSchemaAutoCreatesForH2() {
-    GenericJdbcMetricsRepository repository = new GenericJdbcMetricsRepository();
-    String autoCreateSchemaJdbcUrl = jdbcUrl + "_auto_create_schema";
-    repository.initialize(createJdbcConfigs(autoCreateSchemaJdbcUrl));
-
-    NameIdentifier tableId = NameIdentifier.of("catalog", "db", "auto_create_table");
-    long now = currentEpochSeconds();
-    repository.storeTableMetrics(
-        List.of(
-            new TableMetricWriteRequest(
-                tableId, "row_count", Optional.empty(), new MetricRecordImpl(now, "12"))));
-
-    Map<String, List<MetricRecord>> metrics = repository.getTableMetrics(tableId, now - 1, now + 1);
-    Assertions.assertTrue(metrics.containsKey("row_count"));
-    Assertions.assertEquals(List.of("12"), getMetricValues(metrics.get("row_count")));
-    repository.cleanupTableMetricsBefore(MAX_REASONABLE_EPOCH_SECONDS);
-    repository.cleanupJobMetricsBefore(MAX_REASONABLE_EPOCH_SECONDS);
-    repository.close();
-  }
-
-  private List<String> getMetricValues(List<MetricRecord> metrics) {
+  protected List<String> getMetricValues(List<MetricRecord> metrics) {
     return metrics.stream().map(MetricRecord::getValue).toList();
   }
 
-  private void storeTableMetric(
+  protected void storeTableMetric(
       NameIdentifier nameIdentifier,
       String metricName,
       Optional<String> partition,
@@ -385,75 +317,12 @@ class TestGenericJdbcMetricsRepository {
         List.of(new TableMetricWriteRequest(nameIdentifier, metricName, partition, metric)));
   }
 
-  private void storeJobMetric(
+  protected void storeJobMetric(
       NameIdentifier nameIdentifier, String metricName, MetricRecord metric) {
     storage.storeJobMetrics(List.of(new JobMetricWriteRequest(nameIdentifier, metricName, metric)));
   }
 
-  private long currentEpochSeconds() {
+  protected long currentEpochSeconds() {
     return Instant.now().getEpochSecond();
-  }
-
-  private void cleanupLegacyDataFiles() throws IOException {
-    deleteIfExists("data/metrics.db.mv.db");
-    deleteIfExists("data/metrics.db.trace.db");
-    deleteIfExists("maintenance/optimizer/data/metrics.db.mv.db");
-    deleteIfExists("maintenance/optimizer/data/metrics.db.trace.db");
-    deleteIfExists("maintenance/optimizer/metrics_db.mv.db");
-    deleteIfExists("maintenance/optimizer/metrics_db.trace.db");
-    deleteIfExists("metrics_db.mv.db");
-    deleteIfExists("metrics_db.trace.db");
-  }
-
-  private void deleteIfExists(String filePath) throws IOException {
-    Files.deleteIfExists(Path.of(filePath));
-  }
-
-  private Map<String, String> createJdbcConfigs(String jdbcUrl) {
-    return Map.of(
-        OptimizerConfig.OPTIMIZER_PREFIX
-            + GenericJdbcMetricsRepository.JDBC_METRICS_PREFIX
-            + GenericJdbcMetricsRepository.JDBC_URL,
-        jdbcUrl,
-        OptimizerConfig.OPTIMIZER_PREFIX
-            + GenericJdbcMetricsRepository.JDBC_METRICS_PREFIX
-            + GenericJdbcMetricsRepository.JDBC_USER,
-        "sa",
-        OptimizerConfig.OPTIMIZER_PREFIX
-            + GenericJdbcMetricsRepository.JDBC_METRICS_PREFIX
-            + GenericJdbcMetricsRepository.JDBC_PASSWORD,
-        "",
-        OptimizerConfig.OPTIMIZER_PREFIX
-            + GenericJdbcMetricsRepository.JDBC_METRICS_PREFIX
-            + GenericJdbcMetricsRepository.JDBC_DRIVER,
-        "org.h2.Driver");
-  }
-
-  private void initializeSchema(String jdbcUrl) {
-    String schemaSql = loadSchemaSql();
-    try (Connection conn = DriverManager.getConnection(jdbcUrl, "sa", "")) {
-      JdbcSqlScriptUtils.executeSqlScript(conn, schemaSql);
-    } catch (SQLException e) {
-      throw new RuntimeException("Failed to initialize test schema for metrics", e);
-    }
-  }
-
-  private String loadSchemaSql() {
-    String gravitinoHome = System.getenv("GRAVITINO_HOME");
-    if (StringUtils.isBlank(gravitinoHome)) {
-      throw new RuntimeException("GRAVITINO_HOME environment variable is not set");
-    }
-
-    Path scriptPath =
-        Paths.get(
-            gravitinoHome,
-            "scripts",
-            "h2",
-            "optimizer-metrics-schema-" + ConfigConstants.CURRENT_SCRIPT_VERSION + "-h2.sql");
-    try {
-      return Files.readString(scriptPath, StandardCharsets.UTF_8);
-    } catch (IOException e) {
-      throw new RuntimeException("Failed to load schema script: " + scriptPath, e);
-    }
   }
 }

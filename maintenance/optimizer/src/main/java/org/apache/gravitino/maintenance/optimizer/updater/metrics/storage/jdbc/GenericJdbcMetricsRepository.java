@@ -44,10 +44,7 @@ public class GenericJdbcMetricsRepository extends JdbcMetricsRepository {
 
   @Override
   public void initialize(Map<String, String> optimizerProperties) {
-    Map<String, String> jdbcProperties =
-        MapUtils.getPrefixMap(
-            optimizerProperties, OptimizerConfig.OPTIMIZER_PREFIX + JDBC_METRICS_PREFIX);
-    Map<String, String> effectiveJdbcProperties = new HashMap<>(jdbcProperties);
+    Map<String, String> effectiveJdbcProperties = buildEffectiveJdbcProperties(optimizerProperties);
 
     String jdbcUrl = effectiveJdbcProperties.getOrDefault(JDBC_URL, DEFAULT_H2_JDBC_URL);
     if (StringUtils.isBlank(jdbcUrl)) {
@@ -62,5 +59,12 @@ public class GenericJdbcMetricsRepository extends JdbcMetricsRepository {
     DataSourceJdbcConnectionProvider connectionProvider =
         new DataSourceJdbcConnectionProvider(effectiveJdbcProperties);
     initializeStorage(connectionProvider);
+  }
+
+  private Map<String, String> buildEffectiveJdbcProperties(
+      Map<String, String> optimizerProperties) {
+    return new HashMap<>(
+        MapUtils.getPrefixMap(
+            optimizerProperties, OptimizerConfig.OPTIMIZER_PREFIX + JDBC_METRICS_PREFIX));
   }
 }
