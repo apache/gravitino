@@ -105,7 +105,8 @@ If you want to operate table and partition statistics, you can refer to the [doc
 * [**Model catalog**](./model-catalog.md)
 
 Catalogs with an asterisk (\*) aren’t in the standard release tarball and Docker image since 1.2.0.  In 1.2.0, Gravitino introduces 
-folder `catalogs-contrib` to host the contributed catalogs, which aren’t in the standard release but can be built and used separately.  See [how to build Gravitino](./how-to-build.md#quick-start) for details.
+folder `catalogs-contrib` to host the contributed catalogs, which aren’t in the standard release but can be built and used separately. See [how to build Gravitino](./how-to-build.md#quick-start) for details.
+
 ## Apache Gravitino playground
 
 To experience Gravitino with other components easily, Gravitino provides a playground to run.
