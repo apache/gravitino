@@ -74,41 +74,42 @@ public class OptimizerCmd {
   private static final long METRICS_LIST_FROM_SECONDS = 0L;
   private static final long METRICS_LIST_TO_SECONDS = Long.MAX_VALUE;
   private static final Set<CliOption> GLOBAL_OPTION_SPECS = EnumSet.of(CliOption.CONF_PATH);
-  private static final String DEFAULT_USAGE = "gravitino-optimizer --type <command> [options]";
+  private static final String DEFAULT_USAGE =
+      "./bin/gravitino-optimizer.sh --type <command> [options]";
   private static final Map<OptimizerCommandType, CommandOptionSpec> COMMAND_OPTION_SPECS =
       Map.of(
           OptimizerCommandType.RECOMMEND_STRATEGY_TYPE,
           CommandOptionSpec.of(
               EnumSet.of(CliOption.IDENTIFIERS, CliOption.STRATEGY_TYPE),
               EnumSet.noneOf(CliOption.class),
-              "gravitino-optimizer --type recommend-strategy-type --identifiers c.db.t1,c.db.t2 --strategy-type compaction"),
+              "./bin/gravitino-optimizer.sh --type recommend-strategy-type --identifiers c.db.t1,c.db.t2 --strategy-type compaction"),
           OptimizerCommandType.UPDATE_STATISTICS,
           CommandOptionSpec.of(
               EnumSet.of(CliOption.CALCULATOR_NAME),
               EnumSet.of(CliOption.IDENTIFIERS, CliOption.STATISTICS_PAYLOAD, CliOption.FILE_PATH),
-              "gravitino-optimizer --type update-statistics --calculator-name local-stats-calculator --file-path ./table-stats.jsonl",
+              "./bin/gravitino-optimizer.sh --type update-statistics --calculator-name local-stats-calculator --file-path ./table-stats.jsonl",
               statisticsInputRules()),
           OptimizerCommandType.APPEND_METRICS,
           CommandOptionSpec.of(
               EnumSet.of(CliOption.CALCULATOR_NAME),
               EnumSet.of(CliOption.IDENTIFIERS, CliOption.STATISTICS_PAYLOAD, CliOption.FILE_PATH),
-              "gravitino-optimizer --type append-metrics --calculator-name local-stats-calculator --statistics-payload '<jsonl-lines>'",
+              "./bin/gravitino-optimizer.sh --type append-metrics --calculator-name local-stats-calculator --statistics-payload '<jsonl-lines>'",
               statisticsInputRules()),
           OptimizerCommandType.MONITOR_METRICS,
           CommandOptionSpec.of(
               EnumSet.of(CliOption.IDENTIFIERS, CliOption.ACTION_TIME),
               EnumSet.of(CliOption.RANGE_SECONDS, CliOption.PARTITION_PATH),
-              "gravitino-optimizer --type monitor-metrics --identifiers c.db.t --action-time 1735689600"),
+              "./bin/gravitino-optimizer.sh --type monitor-metrics --identifiers c.db.t --action-time 1735689600"),
           OptimizerCommandType.LIST_TABLE_METRICS,
           CommandOptionSpec.of(
               EnumSet.of(CliOption.IDENTIFIERS),
               EnumSet.of(CliOption.PARTITION_PATH),
-              "gravitino-optimizer --type list-table-metrics --identifiers c.db.t"),
+              "./bin/gravitino-optimizer.sh --type list-table-metrics --identifiers c.db.t"),
           OptimizerCommandType.LIST_JOB_METRICS,
           CommandOptionSpec.of(
               EnumSet.of(CliOption.IDENTIFIERS),
               EnumSet.noneOf(CliOption.class),
-              "gravitino-optimizer --type list-job-metrics --identifiers c.db.job"));
+              "./bin/gravitino-optimizer.sh --type list-job-metrics --identifiers c.db.job"));
   private static final Map<OptimizerCommandType, CommandHandler> COMMAND_HANDLERS =
       Map.of(
           OptimizerCommandType.RECOMMEND_STRATEGY_TYPE, OptimizerCmd::executeRecommendStrategyType,
