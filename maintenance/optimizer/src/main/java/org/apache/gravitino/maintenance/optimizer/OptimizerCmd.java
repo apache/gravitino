@@ -87,6 +87,11 @@ public class OptimizerCmd {
               EnumSet.of(CliOption.IDENTIFIERS, CliOption.STRATEGY_TYPE),
               EnumSet.noneOf(CliOption.class),
               "./bin/gravitino-optimizer.sh --type recommend-strategy-type --identifiers c.db.t1,c.db.t2 --strategy-type compaction"),
+          OptimizerCommandType.SUBMIT_STRATEGY_JOBS,
+          CommandOptionSpec.of(
+              EnumSet.of(CliOption.IDENTIFIERS, CliOption.STRATEGY_NAME),
+              EnumSet.noneOf(CliOption.class),
+              "./bin/gravitino-optimizer.sh --type submit-strategy-jobs --identifiers c.db.t1,c.db.t2 --strategy-name compaction-high-file-count"),
           OptimizerCommandType.UPDATE_STATISTICS,
           CommandOptionSpec.of(
               EnumSet.of(CliOption.CALCULATOR_NAME),
@@ -117,6 +122,7 @@ public class OptimizerCmd {
   private static final Map<OptimizerCommandType, CommandHandler> COMMAND_HANDLERS =
       Map.of(
           OptimizerCommandType.RECOMMEND_STRATEGY_TYPE, OptimizerCmd::executeRecommendStrategyType,
+          OptimizerCommandType.SUBMIT_STRATEGY_JOBS, OptimizerCmd::executeSubmitStrategyJobs,
           OptimizerCommandType.UPDATE_STATISTICS, OptimizerCmd::executeUpdateStatistics,
           OptimizerCommandType.APPEND_METRICS, OptimizerCmd::executeAppendMetrics,
           OptimizerCommandType.MONITOR_METRICS, OptimizerCmd::executeMonitorMetrics,
@@ -155,6 +161,7 @@ public class OptimizerCmd {
       String confPath = cmd.getOptionValue(CliOption.CONF_PATH.longOpt(), DEFAULT_CONF_PATH);
       String[] identifiers = cmd.getOptionValues(CliOption.IDENTIFIERS.longOpt());
       String strategyType = cmd.getOptionValue(CliOption.STRATEGY_TYPE.longOpt());
+      String strategyName = cmd.getOptionValue(CliOption.STRATEGY_NAME.longOpt());
       String calculatorName = cmd.getOptionValue(CliOption.CALCULATOR_NAME.longOpt());
       String actionTime = cmd.getOptionValue(CliOption.ACTION_TIME.longOpt());
       String rangeSeconds =
@@ -170,6 +177,7 @@ public class OptimizerCmd {
               new OptimizerEnv(loadOptimizerConfig(confPath)),
               identifiers,
               strategyType,
+              strategyName,
               calculatorName,
               actionTime,
               rangeSeconds,
@@ -309,7 +317,17 @@ public class OptimizerCmd {
 
   private static void printRecommendationResult(PrintStream out, RecommendationResult result) {
     out.printf(
-        "RECOMMEND: strategy=%s identifier=%s score=%d jobTemplate=%s jobOptions=%s jobId=%s%n",
+        "RECOMMEND: strategy=%s identifier=%s score=%d jobTemplate=%s jobOptions=%s%n",
+        result.strategyName(),
+        result.identifier(),
+        result.score(),
+        result.jobTemplate(),
+        result.jobOptions());
+  }
+
+  private static void printSubmitResult(PrintStream out, RecommendationResult result) {
+    out.printf(
+        "SUBMIT: strategy=%s identifier=%s score=%d jobTemplate=%s jobOptions=%s jobId=%s%n",
         result.strategyName(),
         result.identifier(),
         result.score(),
@@ -486,6 +504,15 @@ public class OptimizerCmd {
     }
   }
 
+  private static void executeSubmitStrategyJobs(CommandContext context) throws Exception {
+    try (Recommender recommender = new Recommender(context.optimizerEnv())) {
+      List<RecommendationResult> results =
+          recommender.submitForStrategyName(
+              parseIdentifiers(context.identifiers()), context.strategyName());
+      results.forEach(result -> printSubmitResult(context.output(), result));
+    }
+  }
+
   private static void executeUpdateStatistics(CommandContext context) throws Exception {
     try (Updater updater =
         new Updater(
@@ -646,6 +673,7 @@ public class OptimizerCmd {
     private final OptimizerEnv optimizerEnv;
     private final String[] identifiers;
     private final String strategyType;
+    private final String strategyName;
     private final String calculatorName;
     private final String actionTime;
     private final String rangeSeconds;
@@ -657,6 +685,7 @@ public class OptimizerCmd {
         OptimizerEnv optimizerEnv,
         String[] identifiers,
         String strategyType,
+        String strategyName,
         String calculatorName,
         String actionTime,
         String rangeSeconds,
@@ -666,6 +695,7 @@ public class OptimizerCmd {
       this.optimizerEnv = optimizerEnv;
       this.identifiers = identifiers;
       this.strategyType = strategyType;
+      this.strategyName = strategyName;
       this.calculatorName = calculatorName;
       this.actionTime = actionTime;
       this.rangeSeconds = rangeSeconds;
@@ -684,6 +714,10 @@ public class OptimizerCmd {
 
     private String strategyType() {
       return strategyType;
+    }
+
+    private String strategyName() {
+      return strategyName;
     }
 
     private String calculatorName() {
@@ -721,6 +755,7 @@ public class OptimizerCmd {
     CONF_PATH("conf-path", CliOptionArgType.SINGLE, null, "Optimizer configuration path"),
     IDENTIFIERS("identifiers", CliOptionArgType.MULTI, ',', "Comma separated identifier list"),
     STRATEGY_TYPE("strategy-type", CliOptionArgType.SINGLE, null, "Strategy type"),
+    STRATEGY_NAME("strategy-name", CliOptionArgType.SINGLE, null, "Strategy name"),
     CALCULATOR_NAME(
         "calculator-name",
         CliOptionArgType.SINGLE,
@@ -787,6 +822,7 @@ public class OptimizerCmd {
 
   enum OptimizerCommandType {
     RECOMMEND_STRATEGY_TYPE,
+    SUBMIT_STRATEGY_JOBS,
     UPDATE_STATISTICS,
     APPEND_METRICS,
     MONITOR_METRICS,

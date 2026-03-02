@@ -97,6 +97,32 @@ class TestOptimizerCmd {
   }
 
   @Test
+  void testSubmitStrategyJobsRequiresStrategyName() {
+    String[] output =
+        runCommand("--type", "submit-strategy-jobs", "--identifiers", "catalog.db.table");
+    Assertions.assertTrue(
+        output[1].contains(
+            "Missing required options for command 'submit-strategy-jobs': --strategy-name"));
+  }
+
+  @Test
+  void testSubmitStrategyJobsRejectsStrategyTypeOption() {
+    String[] output =
+        runCommand(
+            "--type",
+            "submit-strategy-jobs",
+            "--identifiers",
+            "catalog.db.table",
+            "--strategy-name",
+            "compaction-high-file-count",
+            "--strategy-type",
+            "compaction");
+    Assertions.assertTrue(
+        output[1].contains(
+            "Unsupported options for command 'submit-strategy-jobs': --strategy-type"));
+  }
+
+  @Test
   void testRejectUnsupportedOptionForMonitorMetrics() {
     String[] output =
         runCommand(

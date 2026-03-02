@@ -67,8 +67,8 @@ import org.slf4j.LoggerFactory;
  *   <li>Collect only the metadata and statistics the handler asked for via {@link
  *       StrategyHandler#dataRequirements()} and build a {@link StrategyHandlerContext}.
  *   <li>Invoke {@link StrategyHandler#shouldTrigger()} followed by {@link
- *       StrategyHandler#evaluate()} and hand the resulting {@link JobExecutionContext} to the
- *       {@link JobSubmitter}.
+ *       StrategyHandler#evaluate()} and optionally submit the resulting {@link JobExecutionContext}
+ *       through the {@link JobSubmitter}.
  * </ol>
  */
 public class Recommender implements AutoCloseable {
@@ -124,13 +124,13 @@ public class Recommender implements AutoCloseable {
   }
 
   /**
-   * Generate and submit recommendations for all identifiers that have a strategy of the specified
-   * type. Each matching strategy instance is evaluated independently and submitted through the
-   * configured job submitter.
+   * Generate recommendations for all identifiers that have a strategy of the specified type.
+   * Matching strategy instances are evaluated independently and returned for comparison. This
+   * method does not submit any jobs.
    *
    * @param nameIdentifiers fully qualified table identifiers to evaluate (catalog/schema/table)
    * @param strategyType strategy type to filter and evaluate
-   * @return submitted recommendation results in execution order
+   * @return recommendation results in execution order
    */
   public List<RecommendationResult> recommendForStrategyType(
       List<NameIdentifier> nameIdentifiers, String strategyType) {
@@ -148,23 +148,48 @@ public class Recommender implements AutoCloseable {
       List<StrategyEvaluation> evaluations =
           recommendForOneStrategy(entry.getValue(), strategyName);
       for (StrategyEvaluation evaluation : evaluations) {
-        JobExecutionContext jobExecutionContext =
-            evaluation
-                .jobExecutionContext()
-                .orElseThrow(
-                    () ->
-                        new IllegalStateException(
-                            "Job execution context is missing for evaluation of strategy "
-                                + strategyName));
-        String templateName = jobExecutionContext.jobTemplateName();
-        String jobId = jobSubmitter.submitJob(templateName, jobExecutionContext);
-        LOG.info(
-            "Submit job {} for strategy {} with context {}",
-            jobId,
-            strategyName,
-            jobExecutionContext);
-        results.add(toRecommendationResult(strategyName, evaluation, jobId));
+        results.add(toRecommendationResult(strategyName, evaluation, ""));
       }
+    }
+    return results;
+  }
+
+  /**
+   * Evaluate and submit recommendations for one concrete strategy name.
+   *
+   * @param nameIdentifiers fully qualified table identifiers to evaluate (catalog/schema/table)
+   * @param strategyName strategy name to evaluate and submit
+   * @return submitted recommendation results in execution order
+   */
+  public List<RecommendationResult> submitForStrategyName(
+      List<NameIdentifier> nameIdentifiers, String strategyName) {
+    Preconditions.checkArgument(
+        nameIdentifiers != null && !nameIdentifiers.isEmpty(), "nameIdentifiers must not be empty");
+    Preconditions.checkArgument(
+        StringUtils.isNotBlank(strategyName), "strategyName must not be blank");
+
+    List<RecommendationResult> results = new ArrayList<>();
+    List<NameIdentifier> identifiersForStrategy =
+        getIdentifiersByExactStrategyName(nameIdentifiers, strategyName);
+    List<StrategyEvaluation> evaluations =
+        recommendForOneStrategy(identifiersForStrategy, strategyName);
+    for (StrategyEvaluation evaluation : evaluations) {
+      JobExecutionContext jobExecutionContext =
+          evaluation
+              .jobExecutionContext()
+              .orElseThrow(
+                  () ->
+                      new IllegalStateException(
+                          "Job execution context is missing for evaluation of strategy "
+                              + strategyName));
+      String templateName = jobExecutionContext.jobTemplateName();
+      String jobId = jobSubmitter.submitJob(templateName, jobExecutionContext);
+      LOG.info(
+          "Submit job {} for strategy {} with context {}",
+          jobId,
+          strategyName,
+          jobExecutionContext);
+      results.add(toRecommendationResult(strategyName, evaluation, jobId));
     }
     return results;
   }
@@ -297,6 +322,20 @@ public class Recommender implements AutoCloseable {
                       .add(nameIdentifier));
     }
     return identifiersByStrategyName;
+  }
+
+  private List<NameIdentifier> getIdentifiersByExactStrategyName(
+      List<NameIdentifier> nameIdentifiers, String strategyName) {
+    List<NameIdentifier> identifiersForStrategy = new ArrayList<>();
+    for (NameIdentifier nameIdentifier : nameIdentifiers) {
+      boolean matched =
+          strategyProvider.strategies(nameIdentifier).stream()
+              .anyMatch(strategy -> strategyName.equals(strategy.name()));
+      if (matched) {
+        identifiersForStrategy.add(nameIdentifier);
+      }
+    }
+    return identifiersForStrategy;
   }
 
   private StrategyProvider loadStrategyProvider(OptimizerConfig config) {
