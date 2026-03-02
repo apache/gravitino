@@ -38,16 +38,28 @@ gravitino.optimizer.recommender.jobSubmitter = noop-job-submitter
 gravitino.optimizer.updater.statisticsUpdater = gravitino-statistics-updater
 # The metrics updater for the recommender/append_metrics tool.
 gravitino.optimizer.updater.metricsUpdater = gravitino-metrics-updater
+# Optional: configure JDBC metrics storage (H2 is used by default when omitted).
+# gravitino.optimizer.jdbcMetrics.jdbcUrl = jdbc:postgresql://localhost:5432/optimizer
+# gravitino.optimizer.jdbcMetrics.jdbcUser = postgres
+# gravitino.optimizer.jdbcMetrics.jdbcPassword = postgres
+# gravitino.optimizer.jdbcMetrics.jdbcDriver = org.postgresql.Driver
+# gravitino.optimizer.jdbcMetrics.poolMaxSize = 8
+# gravitino.optimizer.jdbcMetrics.poolMinIdle = 1
+# gravitino.optimizer.jdbcMetrics.connectionTimeoutMs = 30000
+# gravitino.optimizer.jdbcMetrics.testOnBorrow = true
 
 # Monitor plugins (pull metrics and evaluate actions)
 # The metrics provider for the monitor.
 gravitino.optimizer.monitor.metricsProvider = gravitino-metrics-provider
-# The job provider for the monitor (dummy by default).
-gravitino.optimizer.monitor.jobProvider = dummy-job-provider
+# The table-job relation provider for the monitor (dummy by default).
+gravitino.optimizer.monitor.tableJobRelationProvider = dummy-table-job-relation-provider
 # Optional: read table-job mappings from a local JSONL file.
-# gravitino.optimizer.monitor.jobProvider = file-job-provider
-# gravitino.optimizer.monitor.file-job-provider.file-path = /path/to/job-mappings.jsonl
+# gravitino.optimizer.monitor.tableJobRelationProvider = local-table-job-relation-provider
+# gravitino.optimizer.monitor.localTableJobRelationProvider.filePath = /path/to/job-mappings.jsonl
 # The metrics evaluator for the monitor.
 gravitino.optimizer.monitor.metricsEvaluator = gravitino-metrics-evaluator
+# Optional: evaluator rules in format scope:metricName:aggregation:comparison
+# scope: table|job; aggregation: max|min|avg|latest; comparison: lt|le|gt|ge|eq|ne
+# gravitino.optimizer.monitor.gravitinoMetricsEvaluator.rules = table:row_count:avg:le,job:duration:latest:le
 # The monitor callbacks to invoke after evaluation (comma-separated).
 gravitino.optimizer.monitor.callbacks = console

@@ -22,17 +22,18 @@ package org.apache.gravitino.maintenance.optimizer;
 import java.io.ByteArrayOutputStream;
 import java.io.PrintStream;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import org.apache.gravitino.maintenance.optimizer.monitor.metrics.MetricsProviderForTest;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
 class TestOptimizerCmd {
 
   @Test
-  void testGlobalHelpIncludesPlannedCommands() {
+  void testGlobalHelpNoLongerIncludesPlannedCommands() {
     String[] output = runCommand("--help");
-    Assertions.assertTrue(output[0].contains("Planned commands (not implemented):"));
-    Assertions.assertTrue(output[0].contains("list-table-metrics"));
-    Assertions.assertTrue(output[0].contains("list-job-metrics"));
+    Assertions.assertFalse(output[0].contains("Planned commands (not implemented):"));
   }
 
   @Test
@@ -89,6 +90,54 @@ class TestOptimizerCmd {
             "local-stats-calculator");
     Assertions.assertTrue(
         output[1].contains("Unsupported options for command 'monitor-metrics': --calculator-name"));
+  }
+
+  @Test
+  void testListTableMetricsImplemented() throws Exception {
+    Path confPath = createOptimizerConfForMetricsProvider();
+    String[] output =
+        runCommand(
+            "--type",
+            "list-table-metrics",
+            "--identifiers",
+            "test.db.table",
+            "--conf-path",
+            confPath.toString());
+    Assertions.assertTrue(output[1].isEmpty(), "stderr=" + output[1] + ", stdout=" + output[0]);
+    Assertions.assertTrue(output[0].contains("MetricsResult{scopeType=TABLE"));
+    Assertions.assertTrue(output[0].contains("identifier=test.db.table"));
+    Assertions.assertTrue(output[0].contains("row_count=["));
+  }
+
+  @Test
+  void testListJobMetricsImplemented() throws Exception {
+    Path confPath = createOptimizerConfForMetricsProvider();
+    String[] output =
+        runCommand(
+            "--type",
+            "list-job-metrics",
+            "--identifiers",
+            "test.db.job1",
+            "--conf-path",
+            confPath.toString());
+    Assertions.assertTrue(output[1].isEmpty(), "stderr=" + output[1] + ", stdout=" + output[0]);
+    Assertions.assertTrue(output[0].contains("MetricsResult{scopeType=JOB"));
+    Assertions.assertTrue(output[0].contains("identifier=test.db.job1"));
+    Assertions.assertTrue(output[0].contains("duration=["));
+  }
+
+  private Path createOptimizerConfForMetricsProvider() throws Exception {
+    Path confPath = Files.createTempFile("optimizer-test-", ".conf");
+    String content =
+        String.join(
+                System.lineSeparator(),
+                "gravitino.optimizer.gravitinoUri = http://localhost:8090",
+                "gravitino.optimizer.gravitinoMetalake = test",
+                "gravitino.optimizer.monitor.metricsProvider = " + MetricsProviderForTest.NAME)
+            + System.lineSeparator();
+    Files.writeString(confPath, content, StandardCharsets.UTF_8);
+    confPath.toFile().deleteOnExit();
+    return confPath;
   }
 
   private String[] runCommand(String... args) {

@@ -21,10 +21,12 @@ package org.apache.gravitino.maintenance.optimizer;
 
 import com.google.common.base.Preconditions;
 import java.io.BufferedWriter;
+import java.io.File;
 import java.io.OutputStreamWriter;
 import java.io.PrintStream;
 import java.io.PrintWriter;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
 import java.nio.file.Paths;
 import java.util.Arrays;
 import java.util.Collections;
@@ -44,13 +46,16 @@ import org.apache.commons.cli.Options;
 import org.apache.commons.cli.ParseException;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.NameIdentifier;
+import org.apache.gravitino.maintenance.optimizer.api.common.MetricSample;
 import org.apache.gravitino.maintenance.optimizer.api.common.PartitionPath;
 import org.apache.gravitino.maintenance.optimizer.api.monitor.EvaluationResult;
 import org.apache.gravitino.maintenance.optimizer.api.monitor.MetricScope;
+import org.apache.gravitino.maintenance.optimizer.api.monitor.MetricsProvider;
 import org.apache.gravitino.maintenance.optimizer.command.rule.CommandRules;
 import org.apache.gravitino.maintenance.optimizer.common.OptimizerEnv;
 import org.apache.gravitino.maintenance.optimizer.common.StatisticsInputContent;
 import org.apache.gravitino.maintenance.optimizer.common.conf.OptimizerConfig;
+import org.apache.gravitino.maintenance.optimizer.common.util.ProviderUtils;
 import org.apache.gravitino.maintenance.optimizer.monitor.Monitor;
 import org.apache.gravitino.maintenance.optimizer.recommender.Recommender;
 import org.apache.gravitino.maintenance.optimizer.recommender.util.PartitionUtils;
@@ -66,6 +71,8 @@ public class OptimizerCmd {
   private static final String DEFAULT_CONF_PATH =
       Paths.get("conf", "gravitino-optimizer.conf").toString();
   private static final long DEFAULT_RANGE_SECONDS = 24 * 3600L;
+  private static final long METRICS_LIST_FROM_SECONDS = 0L;
+  private static final long METRICS_LIST_TO_SECONDS = Long.MAX_VALUE;
   private static final Set<CliOption> GLOBAL_OPTION_SPECS = EnumSet.of(CliOption.CONF_PATH);
   private static final String DEFAULT_USAGE = "gravitino-optimizer --type <command> [options]";
   private static final Map<OptimizerCommandType, CommandOptionSpec> COMMAND_OPTION_SPECS =
@@ -74,39 +81,33 @@ public class OptimizerCmd {
           CommandOptionSpec.of(
               EnumSet.of(CliOption.IDENTIFIERS, CliOption.STRATEGY_TYPE),
               EnumSet.noneOf(CliOption.class),
-              true,
               "gravitino-optimizer --type recommend-strategy-type --identifiers c.db.t1,c.db.t2 --strategy-type compaction"),
           OptimizerCommandType.UPDATE_STATISTICS,
           CommandOptionSpec.of(
               EnumSet.of(CliOption.CALCULATOR_NAME),
               EnumSet.of(CliOption.IDENTIFIERS, CliOption.STATISTICS_PAYLOAD, CliOption.FILE_PATH),
-              true,
               "gravitino-optimizer --type update-statistics --calculator-name local-stats-calculator --file-path ./table-stats.jsonl",
               statisticsInputRules()),
           OptimizerCommandType.APPEND_METRICS,
           CommandOptionSpec.of(
               EnumSet.of(CliOption.CALCULATOR_NAME),
               EnumSet.of(CliOption.IDENTIFIERS, CliOption.STATISTICS_PAYLOAD, CliOption.FILE_PATH),
-              true,
               "gravitino-optimizer --type append-metrics --calculator-name local-stats-calculator --statistics-payload '<jsonl-lines>'",
               statisticsInputRules()),
           OptimizerCommandType.MONITOR_METRICS,
           CommandOptionSpec.of(
               EnumSet.of(CliOption.IDENTIFIERS, CliOption.ACTION_TIME),
               EnumSet.of(CliOption.RANGE_SECONDS, CliOption.PARTITION_PATH),
-              true,
               "gravitino-optimizer --type monitor-metrics --identifiers c.db.t --action-time 1735689600"),
           OptimizerCommandType.LIST_TABLE_METRICS,
           CommandOptionSpec.of(
               EnumSet.of(CliOption.IDENTIFIERS),
               EnumSet.of(CliOption.PARTITION_PATH),
-              false,
               "gravitino-optimizer --type list-table-metrics --identifiers c.db.t"),
           OptimizerCommandType.LIST_JOB_METRICS,
           CommandOptionSpec.of(
               EnumSet.of(CliOption.IDENTIFIERS),
               EnumSet.noneOf(CliOption.class),
-              false,
               "gravitino-optimizer --type list-job-metrics --identifiers c.db.job"));
   private static final Map<OptimizerCommandType, CommandHandler> COMMAND_HANDLERS =
       Map.of(
@@ -192,6 +193,13 @@ public class OptimizerCmd {
   private static OptimizerConfig loadOptimizerConfig(String confPath) {
     OptimizerConfig config = new OptimizerConfig();
     try {
+      if (StringUtils.isNotBlank(confPath)) {
+        File confFile = Paths.get(confPath).toFile();
+        if (Files.exists(confFile.toPath())) {
+          config.loadFromProperties(config.loadPropertiesFromFile(confFile));
+          return config;
+        }
+      }
       config.loadFromFile(confPath);
     } catch (Exception e) {
       throw new IllegalArgumentException("Failed to load optimizer config: " + confPath, e);
@@ -265,6 +273,46 @@ public class OptimizerCmd {
         result.rangeSeconds(),
         result.beforeMetrics(),
         result.afterMetrics());
+  }
+
+  private static void printMetricsResult(
+      PrintStream out,
+      MetricScope.Type scopeType,
+      NameIdentifier identifier,
+      Optional<PartitionPath> partitionPath,
+      Map<String, List<MetricSample>> metrics) {
+    String partition = partitionPath.map(PartitionPath::toString).orElse("<table-or-job-scope>");
+    out.printf(
+        "MetricsResult{scopeType=%s, identifier=%s, partitionPath=%s, metrics=%s}%n",
+        scopeType, identifier, partition, formatMetrics(metrics));
+  }
+
+  private static String formatMetrics(Map<String, List<MetricSample>> metrics) {
+    if (metrics == null || metrics.isEmpty()) {
+      return "{}";
+    }
+    return metrics.entrySet().stream()
+        .sorted(Map.Entry.comparingByKey())
+        .map(
+            entry ->
+                entry.getKey()
+                    + "="
+                    + formatMetricSamples(entry.getValue() == null ? List.of() : entry.getValue()))
+        .collect(Collectors.joining(", ", "{", "}"));
+  }
+
+  private static String formatMetricSamples(List<MetricSample> samples) {
+    if (samples.isEmpty()) {
+      return "[]";
+    }
+    return samples.stream()
+        .sorted(java.util.Comparator.comparingLong(MetricSample::timestamp))
+        .map(
+            sample ->
+                String.format(
+                    "{timestamp=%d, value=%s}",
+                    sample.timestamp(), String.valueOf(sample.statistic().value().value())))
+        .collect(Collectors.joining(", ", "[", "]"));
   }
 
   private static void validateCommandOptions(CommandLine cmd, OptimizerCommandType optimizerType) {
@@ -355,10 +403,6 @@ public class OptimizerCmd {
         formatter.getDescPadding(),
         null,
         true);
-    String plannedValues = plannedTypeValues();
-    if (StringUtils.isNotBlank(plannedValues)) {
-      out.printf("Planned commands (not implemented): %s%n", plannedValues);
-    }
   }
 
   private static Options buildOptions() {
@@ -373,7 +417,6 @@ public class OptimizerCmd {
     CommandOptionSpec spec = COMMAND_OPTION_SPECS.get(optimizerType);
     Preconditions.checkArgument(spec != null, "Missing command option spec for %s", optimizerType);
     out.printf("Command: %s%n", optimizerType.toCliType());
-    out.printf("Status: %s%n", spec.implemented() ? "implemented" : "planned");
     out.printf("Required options: %s%n", joinOptions(spec.requiredOptions()));
     out.printf("Optional options: %s%n", joinOptions(spec.optionalOptions()));
     out.printf("Example: %s%n", spec.example());
@@ -389,18 +432,8 @@ public class OptimizerCmd {
         handlerCommands);
   }
 
-  private static String implementedTypeValues() {
+  private static String typeValues() {
     return COMMAND_OPTION_SPECS.entrySet().stream()
-        .filter(entry -> entry.getValue().implemented())
-        .map(Map.Entry::getKey)
-        .map(OptimizerCommandType::toCliType)
-        .sorted()
-        .collect(Collectors.joining(","));
-  }
-
-  private static String plannedTypeValues() {
-    return COMMAND_OPTION_SPECS.entrySet().stream()
-        .filter(entry -> !entry.getValue().implemented())
         .map(Map.Entry::getKey)
         .map(OptimizerCommandType::toCliType)
         .sorted()
@@ -466,51 +499,85 @@ public class OptimizerCmd {
   }
 
   private static void executeListTableMetrics(CommandContext context) {
-    throw new UnsupportedOperationException(
-        "Command list-table-metrics is not implemented in this branch yet.");
+    Optional<PartitionPath> partitionPath = parsePartitionPath(context.partitionPathRaw());
+    Preconditions.checkArgument(
+        partitionPath.isEmpty() || context.identifiers().length == 1,
+        "--partition-path requires exactly one identifier");
+    try (MetricsProvider metricsProvider = createMetricsProvider(context.optimizerEnv())) {
+      for (NameIdentifier identifier : parseIdentifiers(context.identifiers())) {
+        Map<String, List<MetricSample>> metrics =
+            partitionPath
+                .map(
+                    path ->
+                        metricsProvider.partitionMetrics(
+                            identifier, path, METRICS_LIST_FROM_SECONDS, METRICS_LIST_TO_SECONDS))
+                .orElseGet(
+                    () ->
+                        metricsProvider.tableMetrics(
+                            identifier, METRICS_LIST_FROM_SECONDS, METRICS_LIST_TO_SECONDS));
+        printMetricsResult(
+            context.output(),
+            partitionPath.isPresent() ? MetricScope.Type.PARTITION : MetricScope.Type.TABLE,
+            identifier,
+            partitionPath,
+            metrics);
+      }
+    } catch (Exception e) {
+      throw new RuntimeException("Failed to list table metrics", e);
+    }
   }
 
   private static void executeListJobMetrics(CommandContext context) {
-    throw new UnsupportedOperationException(
-        "Command list-job-metrics is not implemented in this branch yet.");
+    try (MetricsProvider metricsProvider = createMetricsProvider(context.optimizerEnv())) {
+      for (NameIdentifier identifier : parseIdentifiers(context.identifiers())) {
+        Map<String, List<MetricSample>> metrics =
+            metricsProvider.jobMetrics(
+                identifier, METRICS_LIST_FROM_SECONDS, METRICS_LIST_TO_SECONDS);
+        printMetricsResult(
+            context.output(), MetricScope.Type.JOB, identifier, Optional.empty(), metrics);
+      }
+    } catch (Exception e) {
+      throw new RuntimeException("Failed to list job metrics", e);
+    }
+  }
+
+  private static MetricsProvider createMetricsProvider(OptimizerEnv optimizerEnv) {
+    MetricsProvider provider =
+        ProviderUtils.createMetricsProviderInstance(
+            optimizerEnv.config().get(OptimizerConfig.METRICS_PROVIDER_CONFIG));
+    provider.initialize(optimizerEnv);
+    return provider;
   }
 
   private static final class CommandOptionSpec {
     private final Set<CliOption> requiredOptions;
     private final Set<CliOption> optionalOptions;
-    private final boolean implemented;
     private final String example;
     private final CommandRules.ValidationPlan rules;
 
     private CommandOptionSpec(
         Set<CliOption> requiredOptions,
         Set<CliOption> optionalOptions,
-        boolean implemented,
         String example,
         CommandRules.ValidationPlan rules) {
       this.requiredOptions = Collections.unmodifiableSet(EnumSet.copyOf(requiredOptions));
       this.optionalOptions = Collections.unmodifiableSet(EnumSet.copyOf(optionalOptions));
-      this.implemented = implemented;
       this.example = example;
       this.rules = rules;
     }
 
     private static CommandOptionSpec of(
-        Set<CliOption> requiredOptions,
-        Set<CliOption> optionalOptions,
-        boolean implemented,
-        String example) {
+        Set<CliOption> requiredOptions, Set<CliOption> optionalOptions, String example) {
       return new CommandOptionSpec(
-          requiredOptions, optionalOptions, implemented, example, CommandRules.emptyPlan());
+          requiredOptions, optionalOptions, example, CommandRules.emptyPlan());
     }
 
     private static CommandOptionSpec of(
         Set<CliOption> requiredOptions,
         Set<CliOption> optionalOptions,
-        boolean implemented,
         String example,
         CommandRules.ValidationPlan rules) {
-      return new CommandOptionSpec(requiredOptions, optionalOptions, implemented, example, rules);
+      return new CommandOptionSpec(requiredOptions, optionalOptions, example, rules);
     }
 
     private Set<CliOption> requiredOptions() {
@@ -519,10 +586,6 @@ public class OptimizerCmd {
 
     private Set<CliOption> optionalOptions() {
       return optionalOptions;
-    }
-
-    private boolean implemented() {
-      return implemented;
     }
 
     private String example() {
@@ -661,9 +724,7 @@ public class OptimizerCmd {
 
     private Option toApacheOption() {
       String optionDescription =
-          this == TYPE
-              ? String.format("Optimizer type (implemented): %s", implementedTypeValues())
-              : description;
+          this == TYPE ? String.format("Optimizer type: %s", typeValues()) : description;
       Option.Builder builder =
           Option.builder().longOpt(longOpt).required(false).desc(optionDescription);
       if (argType == CliOptionArgType.SINGLE) {
