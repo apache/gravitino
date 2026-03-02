@@ -371,6 +371,7 @@ public class JdbcCatalogOperations implements CatalogOperations, SupportsSchemas
         .withName(tableName)
         .withColumns(load.columns())
         .withAuditInfo(load.auditInfo())
+        .withSortOrders(load.sortOrder())
         .withComment(comment)
         .withProperties(properties)
         .withDistribution(load.distribution())
@@ -450,8 +451,13 @@ public class JdbcCatalogOperations implements CatalogOperations, SupportsSchemas
       SortOrder[] sortOrders,
       Index[] indexes)
       throws NoSuchSchemaException, TableAlreadyExistsException {
-    Preconditions.checkArgument(
-        null == sortOrders || sortOrders.length == 0, "jdbc-catalog does not support sort orders");
+    JdbcTableOperations jdbcTableOperations = (JdbcTableOperations) tableOperation;
+    if (!jdbcTableOperations.supportsTableSortOrder()) {
+      Preconditions.checkArgument(
+          null == sortOrders || sortOrders.length == 0,
+          "The current JDBC connector: %s does not support sort orders",
+          jdbcTableOperations.getClass().getName());
+    }
 
     StringIdentifier identifier = StringIdentifier.fromProperties(properties);
     Preconditions.checkArgument(identifier != null, GRAVITINO_ATTRIBUTE_DOES_NOT_EXIST_MSG);
@@ -483,7 +489,8 @@ public class JdbcCatalogOperations implements CatalogOperations, SupportsSchemas
         resultProperties,
         partitioning,
         distribution,
-        indexes);
+        indexes,
+        sortOrders);
 
     return JdbcTable.builder()
         .withAuditInfo(

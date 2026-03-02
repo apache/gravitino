@@ -23,10 +23,10 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicInteger;
-import org.apache.gravitino.NameIdentifier;
-import org.apache.gravitino.maintenance.optimizer.api.common.MetricSample;
 import org.apache.gravitino.maintenance.optimizer.api.updater.MetricsUpdater;
 import org.apache.gravitino.maintenance.optimizer.common.OptimizerEnv;
+import org.apache.gravitino.maintenance.optimizer.updater.metrics.storage.JobMetricWriteRequest;
+import org.apache.gravitino.maintenance.optimizer.updater.metrics.storage.TableMetricWriteRequest;
 
 public class MetricsUpdaterForTest implements MetricsUpdater {
 
@@ -70,12 +70,12 @@ public class MetricsUpdaterForTest implements MetricsUpdater {
   public void initialize(OptimizerEnv optimizerEnv) {}
 
   @Override
-  public void updateTableMetrics(NameIdentifier nameIdentifier, List<MetricSample> metrics) {
+  public void updateTableMetrics(List<TableMetricWriteRequest> metrics) {
     tableUpdates.incrementAndGet();
   }
 
   @Override
-  public void updateJobMetrics(NameIdentifier nameIdentifier, List<MetricSample> metrics) {
+  public void updateJobMetrics(List<JobMetricWriteRequest> metrics) {
     jobUpdates.incrementAndGet();
   }
 

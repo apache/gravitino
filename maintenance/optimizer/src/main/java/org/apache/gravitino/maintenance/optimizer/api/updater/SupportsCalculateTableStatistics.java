@@ -21,7 +21,7 @@ package org.apache.gravitino.maintenance.optimizer.api.updater;
 
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.annotation.DeveloperApi;
-import org.apache.gravitino.maintenance.optimizer.api.common.TableStatisticsBundle;
+import org.apache.gravitino.maintenance.optimizer.api.common.TableAndPartitionStatistics;
 
 /** Represents a provider that supports table statistics. */
 @DeveloperApi
@@ -32,5 +32,5 @@ public interface SupportsCalculateTableStatistics extends StatisticsCalculator {
    * @param tableIdentifier catalog/schema/table identifier
    * @return statistics bundle; contains table statistics and partition statistics
    */
-  TableStatisticsBundle calculateTableStatistics(NameIdentifier tableIdentifier);
+  TableAndPartitionStatistics calculateTableStatistics(NameIdentifier tableIdentifier);
 }

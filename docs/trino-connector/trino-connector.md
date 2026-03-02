@@ -12,6 +12,8 @@ The Gravitino Trino connector uses the [Trino dynamic catalog managed mechanism]
 When the Gravitino Trino connector retrieves catalogs from the Gravitino server, it generates a `CREATE CATALOG` statement and executes
 the statement on the current Trino server to register the catalogs with Trino
 
+The connector supports multiple Trino versions. For the supported version ranges, see [Requirements](requirements.md). The examples in this document set Trino `469` as the default.
+
 :::note
 Once metadata such as catalogs are changed in Gravitino, Trino can update itself through Gravitino, this process usually takes 
 about 3~10 seconds. 
@@ -28,5 +30,4 @@ Usage in queries is as follows:
 ```text
 SELECT * from catalog.dbname.tablename
 ```
-
 

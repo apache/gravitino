@@ -695,8 +695,6 @@ export const switchInUseCatalog = createAsyncThunk(
       throw new Error(err)
     }
 
-    dispatch(fetchCatalogs({ metalake, init: true }))
-
     return res
   }
 )
@@ -1393,9 +1391,8 @@ export const deleteTopic = createAsyncThunk(
     if (err || !res) {
       throw new Error(err)
     }
-    await dispatch(setTableLoading(true))
-    await dispatch(fetchTopics({ metalake, catalog, catalogType, schema, page: 'topics', init: true }))
-    await dispatch(setTableLoading(false))
+
+    dispatch(removeTopicFromStore({ metalake, catalog, catalogType, schema, topic }))
 
     return res
   }
@@ -1769,6 +1766,26 @@ export const appMetalakesSlice = createSlice({
       const { key, data } = action.payload
       state.metalakeTree = updateTreeData(state.metalakeTree, key, data)
     },
+    updateCatalogInUse(state, action) {
+      const { catalog, isInUse } = action.payload
+      const inUseValue = isInUse ? 'true' : 'false'
+      state.tableData = state.tableData.map(item => {
+        if (item.name !== catalog) return item
+
+        return {
+          ...item,
+          properties: { ...(item.properties || {}), 'in-use': inUseValue }
+        }
+      })
+      state.catalogs = state.catalogs.map(item => {
+        if (item.name !== catalog) return item
+
+        return {
+          ...item,
+          properties: { ...(item.properties || {}), 'in-use': inUseValue }
+        }
+      })
+    },
     addCatalogToTree(state, action) {
       const catalogIndex = state.metalakeTree.findIndex(c => c.key === action.payload.key)
       if (catalogIndex === -1) {
@@ -1810,6 +1827,21 @@ export const appMetalakesSlice = createSlice({
     },
     setTableProps(state, action) {
       state.tableProps = action.payload
+    },
+    removeTopicFromStore(state, action) {
+      const { metalake, catalog, catalogType, schema, topic } = action.payload
+      const effectiveCatalogType = catalogType || 'messaging'
+      const schemaKey = `{{${metalake}}}{{${catalog}}}{{${effectiveCatalogType}}}{{${schema}}}`
+      const topicKey = `{{${metalake}}}{{${catalog}}}{{${effectiveCatalogType}}}{{${schema}}}{{${topic}}}`
+
+      state.topics = state.topics.filter(item => item.name !== topic)
+      state.tableData = state.tableData.filter(item => !(item?.node === 'topic' && item?.name === topic))
+      state.selectedNodes = state.selectedNodes.filter(key => key !== topicKey)
+
+      const schemaNode = findInTree(state.metalakeTree, 'key', schemaKey)
+      if (schemaNode?.children?.length) {
+        schemaNode.children = schemaNode.children.filter(item => item.key !== topicKey)
+      }
     },
     resetMetalakeStore(state, action) {
       if (!action.payload?.isCacheMetalakes) {
@@ -2209,7 +2241,9 @@ export const {
   setExpandedNodes,
   addCatalogToTree,
   setCatalogInUse,
+  updateCatalogInUse,
   setMetalakeInUse,
+  removeTopicFromStore,
   removeCatalogFromTree,
   setTableProps,
   resetActivatedDetails

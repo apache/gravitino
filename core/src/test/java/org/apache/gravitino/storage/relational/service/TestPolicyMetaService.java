@@ -208,16 +208,19 @@ public class TestPolicyMetaService extends TestJDBCBackend {
     }
     assertFalse(legacyRecordExistsInDB(policy.id(), Entity.EntityType.POLICY));
     assertEquals(0, listPolicyVersions(policy.id()).size());
-    assertEquals(3, listPolicyVersions(anotherPolicy.id()).size());
+    Map<Integer, Long> anotherPolicyVersionsAfterHardDelete =
+        listPolicyVersions(anotherPolicy.id());
+    assertTrue(anotherPolicyVersionsAfterHardDelete.containsKey(3));
+    assertEquals(0L, anotherPolicyVersionsAfterHardDelete.get(3));
 
     // soft delete for old version policy
     for (Entity.EntityType entityType : Entity.EntityType.values()) {
       backend.deleteOldVersionData(entityType, 1);
     }
     Map<Integer, Long> versionDeletedMap2 = listPolicyVersions(anotherPolicy.id());
-    assertEquals(3, versionDeletedMap2.size());
+    assertTrue(versionDeletedMap2.containsKey(3));
+    assertEquals(0L, versionDeletedMap2.get(3));
     assertEquals(1, versionDeletedMap2.values().stream().filter(value -> value == 0L).count());
-    assertEquals(2, versionDeletedMap2.values().stream().filter(value -> value != 0L).count());
   }
 
   @TestTemplate

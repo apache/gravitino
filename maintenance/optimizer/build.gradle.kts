@@ -45,7 +45,9 @@ dependencies {
   implementation(libs.jackson.databind)
   implementation(libs.jackson.annotations)
   implementation(libs.guava)
+  implementation(libs.commons.dbcp2)
   implementation(libs.ql.expression)
+  implementation(libs.h2db)
 
   annotationProcessor(libs.lombok)
   compileOnly(libs.lombok)
