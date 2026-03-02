@@ -30,6 +30,8 @@ import org.apache.gravitino.maintenance.optimizer.recommender.job.NoopJobSubmitt
 import org.apache.gravitino.maintenance.optimizer.recommender.statistics.GravitinoStatisticsProvider;
 import org.apache.gravitino.maintenance.optimizer.recommender.strategy.GravitinoStrategyProvider;
 import org.apache.gravitino.maintenance.optimizer.recommender.table.GravitinoTableMetadataProvider;
+import org.apache.gravitino.maintenance.optimizer.updater.metrics.GravitinoMetricsUpdater;
+import org.apache.gravitino.maintenance.optimizer.updater.statistics.GravitinoStatisticsUpdater;
 
 /**
  * Central configuration holder for the optimizer runtime. Keys are grouped under the {@code
@@ -53,7 +55,7 @@ public class OptimizerConfig extends Config {
   private static final String TABLE_META_PROVIDER = RECOMMENDER_PREFIX + "tableMetaProvider";
   private static final String JOB_SUBMITTER = RECOMMENDER_PREFIX + "jobSubmitter";
 
-  private static final String UPDATER_PREFIX = OPTIMIZER_PREFIX + "updater.";
+  public static final String UPDATER_PREFIX = OPTIMIZER_PREFIX + "updater.";
   private static final String STATISTICS_UPDATER = UPDATER_PREFIX + "statisticsUpdater";
   private static final String METRICS_UPDATER = UPDATER_PREFIX + "metricsUpdater";
   private static final String MONITOR_PREFIX = OPTIMIZER_PREFIX + "monitor.";
@@ -111,14 +113,14 @@ public class OptimizerConfig extends Config {
           .doc("The statistics updater implementation name (matches Provider.name()).")
           .version(ConfigConstants.VERSION_1_2_0)
           .stringConf()
-          .create();
+          .createWithDefault(GravitinoStatisticsUpdater.NAME);
 
   public static final ConfigEntry<String> METRICS_UPDATER_CONFIG =
       new ConfigBuilder(METRICS_UPDATER)
           .doc("The metrics updater implementation name (matches Provider.name()).")
           .version(ConfigConstants.VERSION_1_2_0)
           .stringConf()
-          .create();
+          .createWithDefault(GravitinoMetricsUpdater.NAME);
 
   public static final ConfigEntry<String> METRICS_PROVIDER_CONFIG =
       new ConfigBuilder(METRICS_PROVIDER)

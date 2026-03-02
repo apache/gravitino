@@ -17,49 +17,23 @@
  * under the License.
  */
 
-package org.apache.gravitino.maintenance.optimizer.updater;
+package org.apache.gravitino.maintenance.optimizer.updater.metrics;
 
-import java.util.ArrayList;
-import java.util.Collections;
+import com.google.common.base.Preconditions;
 import java.util.List;
-import java.util.concurrent.atomic.AtomicInteger;
 import org.apache.gravitino.maintenance.optimizer.api.updater.MetricsUpdater;
 import org.apache.gravitino.maintenance.optimizer.common.OptimizerEnv;
 import org.apache.gravitino.maintenance.optimizer.updater.metrics.storage.JobMetricWriteRequest;
+import org.apache.gravitino.maintenance.optimizer.updater.metrics.storage.MetricsRepository;
 import org.apache.gravitino.maintenance.optimizer.updater.metrics.storage.TableMetricWriteRequest;
+import org.apache.gravitino.maintenance.optimizer.updater.metrics.storage.jdbc.GenericJdbcMetricsRepository;
 
-public class MetricsUpdaterForTest implements MetricsUpdater {
+/** Metrics updater that persists table/job metrics into the configured metrics repository. */
+public class GravitinoMetricsUpdater implements MetricsUpdater {
 
-  public static final String NAME = "test-metrics-updater";
-  private static final List<MetricsUpdaterForTest> INSTANCES =
-      Collections.synchronizedList(new ArrayList<>());
-  private final AtomicInteger tableUpdates = new AtomicInteger();
-  private final AtomicInteger jobUpdates = new AtomicInteger();
-  private final AtomicInteger closeCalls = new AtomicInteger();
+  public static final String NAME = "gravitino-metrics-updater";
 
-  public MetricsUpdaterForTest() {
-    INSTANCES.add(this);
-  }
-
-  public static List<MetricsUpdaterForTest> instances() {
-    return new ArrayList<>(INSTANCES);
-  }
-
-  public static void reset() {
-    INSTANCES.clear();
-  }
-
-  public int tableUpdates() {
-    return tableUpdates.get();
-  }
-
-  public int jobUpdates() {
-    return jobUpdates.get();
-  }
-
-  public int closeCalls() {
-    return closeCalls.get();
-  }
+  private MetricsRepository metricsStorage;
 
   @Override
   public String name() {
@@ -67,20 +41,33 @@ public class MetricsUpdaterForTest implements MetricsUpdater {
   }
 
   @Override
-  public void initialize(OptimizerEnv optimizerEnv) {}
+  public void initialize(OptimizerEnv optimizerEnv) {
+    this.metricsStorage = new GenericJdbcMetricsRepository();
+    this.metricsStorage.initialize(optimizerEnv.config().getAllConfig());
+  }
 
   @Override
   public void updateTableMetrics(List<TableMetricWriteRequest> metrics) {
-    tableUpdates.incrementAndGet();
+    ensureInitialized();
+    metricsStorage.storeTableMetrics(metrics);
   }
 
   @Override
   public void updateJobMetrics(List<JobMetricWriteRequest> metrics) {
-    jobUpdates.incrementAndGet();
+    ensureInitialized();
+    metricsStorage.storeJobMetrics(metrics);
   }
 
   @Override
-  public void close() {
-    closeCalls.incrementAndGet();
+  public void close() throws Exception {
+    if (metricsStorage != null) {
+      metricsStorage.close();
+    }
+  }
+
+  private void ensureInitialized() {
+    Preconditions.checkState(
+        metricsStorage != null,
+        "GravitinoMetricsUpdater has not been initialized. Call initialize() first.");
   }
 }

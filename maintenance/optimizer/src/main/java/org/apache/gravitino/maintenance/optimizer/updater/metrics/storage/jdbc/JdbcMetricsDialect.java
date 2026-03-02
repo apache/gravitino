@@ -17,30 +17,11 @@
  * under the License.
  */
 
-package org.apache.gravitino.maintenance.optimizer.updater;
+package org.apache.gravitino.maintenance.optimizer.updater.metrics.storage.jdbc;
 
-import lombok.AllArgsConstructor;
-import lombok.EqualsAndHashCode;
-import lombok.Getter;
-import lombok.experimental.Accessors;
-import org.apache.gravitino.maintenance.optimizer.api.common.StatisticEntry;
-import org.apache.gravitino.stats.StatisticValue;
+/** SQL dialect marker for JDBC metrics storage. */
+public interface JdbcMetricsDialect {
 
-/**
- * Immutable {@link StatisticEntry} implementation used by the updater runtime.
- *
- * @param <T> underlying value type
- */
-@Accessors(fluent = true)
-@AllArgsConstructor
-@EqualsAndHashCode
-@Getter
-public final class StatisticEntryImpl<T> implements StatisticEntry<T> {
-  private final String name;
-  private final StatisticValue<T> value;
-
-  @Override
-  public String toString() {
-    return "{ " + name + " : " + value.value() + '}';
-  }
+  /** Dialect display name for logging. */
+  String name();
 }

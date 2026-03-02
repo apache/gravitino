@@ -17,22 +17,12 @@
  * under the License.
  */
 
-package org.apache.gravitino.maintenance.optimizer.updater.util;
+package org.apache.gravitino.maintenance.optimizer.updater.metrics.storage;
 
-import java.util.List;
-import org.apache.gravitino.maintenance.optimizer.api.common.StatisticEntry;
+/** Unchecked exception for metrics repository storage operations. */
+public class MetricsStorageException extends RuntimeException {
 
-/**
- * Represents an object that can be converted into statistics entries.
- *
- * <p>This interface is intended for updater components that need to expose their statistics in a
- * common format.
- */
-public interface ToStatistic {
-  /**
-   * Converts this object into a list of statistics entries.
-   *
-   * @return list of statistics entries; empty when no statistics are produced
-   */
-  List<StatisticEntry<?>> toStatistic();
+  public MetricsStorageException(String message, Throwable cause) {
+    super(message, cause);
+  }
 }

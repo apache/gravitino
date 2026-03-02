@@ -25,10 +25,11 @@ import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.maintenance.optimizer.api.common.PartitionEntry;
 import org.apache.gravitino.maintenance.optimizer.api.common.PartitionPath;
 import org.apache.gravitino.maintenance.optimizer.api.common.StatisticEntry;
-import org.apache.gravitino.maintenance.optimizer.api.common.TableStatisticsBundle;
+import org.apache.gravitino.maintenance.optimizer.api.common.TableAndPartitionStatistics;
 import org.apache.gravitino.maintenance.optimizer.api.updater.SupportsCalculateBulkJobStatistics;
 import org.apache.gravitino.maintenance.optimizer.api.updater.SupportsCalculateBulkTableStatistics;
 import org.apache.gravitino.maintenance.optimizer.common.OptimizerEnv;
+import org.apache.gravitino.maintenance.optimizer.common.StatisticEntryImpl;
 import org.apache.gravitino.stats.StatisticValue;
 import org.apache.gravitino.stats.StatisticValues;
 
@@ -46,7 +47,7 @@ public class StatisticsCalculatorForTest
   public void initialize(OptimizerEnv optimizerEnv) {}
 
   @Override
-  public TableStatisticsBundle calculateTableStatistics(NameIdentifier tableIdentifier) {
+  public TableAndPartitionStatistics calculateTableStatistics(NameIdentifier tableIdentifier) {
     List<StatisticEntry<?>> tableStatistics = List.of(entry("row_count", 10L));
     Map<PartitionPath, List<StatisticEntry<?>>> partitionStatistics =
         Map.of(
@@ -54,7 +55,7 @@ public class StatisticsCalculatorForTest
             List.of(entry("row_count", 3L)),
             PartitionPath.of(List.of(new TestPartitionEntry("p2", "v2"))),
             List.of(entry("row_count", 7L)));
-    return new TableStatisticsBundle(tableStatistics, partitionStatistics);
+    return new TableAndPartitionStatistics(tableStatistics, partitionStatistics);
   }
 
   @Override
@@ -63,7 +64,7 @@ public class StatisticsCalculatorForTest
   }
 
   @Override
-  public Map<NameIdentifier, TableStatisticsBundle> calculateBulkTableStatistics() {
+  public Map<NameIdentifier, TableAndPartitionStatistics> calculateBulkTableStatistics() {
     NameIdentifier identifier = NameIdentifier.of("catalog", "schema", "table");
     return Map.of(identifier, calculateTableStatistics(identifier));
   }
@@ -76,7 +77,7 @@ public class StatisticsCalculatorForTest
 
   private static StatisticEntry<?> entry(String name, long value) {
     StatisticValue statisticValue = StatisticValues.longValue(value);
-    return new StatisticEntryImpl(name, statisticValue);
+    return new StatisticEntryImpl<>(name, statisticValue);
   }
 
   private static final class TestPartitionEntry implements PartitionEntry {

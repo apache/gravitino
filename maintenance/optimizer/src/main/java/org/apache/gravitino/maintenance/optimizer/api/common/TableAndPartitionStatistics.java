@@ -25,11 +25,11 @@ import org.apache.gravitino.annotation.DeveloperApi;
 
 /** Container for table-level statistics and partition-level statistics. */
 @DeveloperApi
-public class TableStatisticsBundle {
+public class TableAndPartitionStatistics {
   private final List<StatisticEntry<?>> tableStatistics;
   private final Map<PartitionPath, List<StatisticEntry<?>>> partitionStatistics;
 
-  public TableStatisticsBundle(
+  public TableAndPartitionStatistics(
       List<StatisticEntry<?>> tableStatistics,
       Map<PartitionPath, List<StatisticEntry<?>>> partitionStatistics) {
     this.tableStatistics = tableStatistics != null ? List.copyOf(tableStatistics) : List.of();
