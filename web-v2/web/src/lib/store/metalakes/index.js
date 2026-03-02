@@ -77,7 +77,7 @@ import {
   updateVersionApi,
   deleteVersionApi
 } from '@/lib/api/models'
-import { getFunctionsApi } from '@/lib/api/functions'
+import { getFunctionsApi, getFunctionDetailsApi } from '@/lib/api/functions'
 
 const remapExpandedAndLoadedNodes = ({ getState, mapNode }) => {
   const expandedNodes = getState().metalakes.expandedNodes.map(mapNode)
@@ -87,6 +87,13 @@ const remapExpandedAndLoadedNodes = ({ getState, mapNode }) => {
     expanded: expandedNodes,
     loaded: loadedNodes
   }
+}
+
+const mergeWithFunctionNodes = ({ tree, key, entities }) => {
+  const existingNode = findInTree(tree, 'key', key)
+  const functions = existingNode?.children?.filter(child => child?.node === 'function') || []
+
+  return _.uniqBy([...entities, ...functions], 'key')
 }
 
 export const fetchMetalakes = createAsyncThunk('appMetalakes/fetchMetalakes', async (params, { getState }) => {
@@ -1035,10 +1042,11 @@ export const fetchTables = createAsyncThunk(
       init &&
       getState().metalakes.loadedNodes.includes(`{{${metalake}}}{{${catalog}}}{{${'relational'}}}{{${schema}}}`)
     ) {
+      const tableKey = `{{${metalake}}}{{${catalog}}}{{${'relational'}}}{{${schema}}}`
       dispatch(
         setIntoTreeNodes({
-          key: `{{${metalake}}}{{${catalog}}}{{${'relational'}}}{{${schema}}}`,
-          data: tables
+          key: tableKey,
+          data: mergeWithFunctionNodes({ tree: getState().metalakes.metalakeTree, key: tableKey, entities: tables })
         })
       )
     }
@@ -1348,10 +1356,11 @@ export const fetchFilesets = createAsyncThunk(
       init &&
       getState().metalakes.loadedNodes.includes(`{{${metalake}}}{{${catalog}}}{{${'fileset'}}}{{${schema}}}`)
     ) {
+      const filesetKey = `{{${metalake}}}{{${catalog}}}{{${'fileset'}}}{{${schema}}}`
       dispatch(
         setIntoTreeNodes({
-          key: `{{${metalake}}}{{${catalog}}}{{${'fileset'}}}{{${schema}}}`,
-          data: filesets
+          key: filesetKey,
+          data: mergeWithFunctionNodes({ tree: getState().metalakes.metalakeTree, key: filesetKey, entities: filesets })
         })
       )
     }
@@ -1588,10 +1597,11 @@ export const fetchTopics = createAsyncThunk(
       init &&
       getState().metalakes.loadedNodes.includes(`{{${metalake}}}{{${catalog}}}{{${'messaging'}}}{{${schema}}}`)
     ) {
+      const topicKey = `{{${metalake}}}{{${catalog}}}{{${'messaging'}}}{{${schema}}}`
       await dispatch(
         setIntoTreeNodes({
-          key: `{{${metalake}}}{{${catalog}}}{{${'messaging'}}}{{${schema}}}`,
-          data: topics
+          key: topicKey,
+          data: mergeWithFunctionNodes({ tree: getState().metalakes.metalakeTree, key: topicKey, entities: topics })
         })
       )
     }
@@ -1803,10 +1813,11 @@ export const fetchModels = createAsyncThunk(
     })
 
     if (init && getState().metalakes.loadedNodes.includes(`{{${metalake}}}{{${catalog}}}{{${'model'}}}{{${schema}}}`)) {
+      const modelKey = `{{${metalake}}}{{${catalog}}}{{${'model'}}}{{${schema}}}`
       await dispatch(
         setIntoTreeNodes({
-          key: `{{${metalake}}}{{${catalog}}}{{${'model'}}}{{${schema}}}`,
-          data: models
+          key: modelKey,
+          data: mergeWithFunctionNodes({ tree: getState().metalakes.metalakeTree, key: modelKey, entities: models })
         })
       )
     }
@@ -2102,6 +2113,19 @@ export const fetchFunctions = createAsyncThunk(
     })
 
     return { functions: normalized, init }
+  }
+)
+
+export const getFunctionDetails = createAsyncThunk(
+  'appMetalakes/getFunctionDetails',
+  async ({ init, metalake, catalog, schema, functionName }) => {
+    const [err, res] = await to(getFunctionDetailsApi({ metalake, catalog, schema, functionName }))
+
+    if (err || !res) {
+      throw new Error(err)
+    }
+
+    return { function: res.function || res, init }
   }
 )
 
@@ -2804,7 +2828,17 @@ export const appMetalakesSlice = createSlice({
     builder.addCase(fetchFunctions.fulfilled, (state, action) => {
       state.functions = action.payload.functions
     })
+    builder.addCase(getFunctionDetails.fulfilled, (state, action) => {
+      if (action.payload.init) {
+        state.activatedDetails = action.payload.function
+      }
+    })
     builder.addCase(fetchFunctions.rejected, (state, action) => {
+      if (!action.error.message.includes('CanceledError')) {
+        toast.error(action.error.message)
+      }
+    })
+    builder.addCase(getFunctionDetails.rejected, (state, action) => {
       if (!action.error.message.includes('CanceledError')) {
         toast.error(action.error.message)
       }
