@@ -20,6 +20,7 @@ package org.apache.gravitino.client.integration.test.authorization;
 
 import static org.junit.Assert.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
+import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
 import com.google.common.collect.ImmutableList;
@@ -132,8 +133,21 @@ public class TableAuthorizationIT extends BaseRestApiAuthorizationIT {
   public void testCreateTable() {
     // owner can create table
     TableCatalog tableCatalog = client.loadMetalake(METALAKE).loadCatalog(CATALOG).asTableCatalog();
+
+    // ISSUE-10005:  Fix NoSuchEntityException caused by unimported schema entity
+    assertDoesNotThrow(
+        () -> {
+          tableCatalog.listTables(Namespace.of("default"));
+        });
+
     tableCatalog.createTable(
         NameIdentifier.of(SCHEMA, "table1"), createColumns(), "test", new HashMap<>());
+
+    // ISSUE-9982: Schema default isn't imported before
+    tableCatalog.createTable(
+        NameIdentifier.of("default", "table2"), createColumns(), "test", new HashMap<>());
+    tableCatalog.dropTable(NameIdentifier.of("default", "table2"));
+
     // normal user cannot create table
     TableCatalog tableCatalogNormalUser =
         normalUserClient.loadMetalake(METALAKE).loadCatalog(CATALOG).asTableCatalog();

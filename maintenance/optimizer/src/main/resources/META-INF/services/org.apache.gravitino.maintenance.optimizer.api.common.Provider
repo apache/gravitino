@@ -21,3 +21,5 @@ org.apache.gravitino.maintenance.optimizer.recommender.statistics.GravitinoStati
 org.apache.gravitino.maintenance.optimizer.recommender.table.GravitinoTableMetadataProvider
 org.apache.gravitino.maintenance.optimizer.recommender.job.GravitinoJobSubmitter
 org.apache.gravitino.maintenance.optimizer.recommender.job.NoopJobSubmitter
+org.apache.gravitino.maintenance.optimizer.updater.statistics.GravitinoStatisticsUpdater
+org.apache.gravitino.maintenance.optimizer.updater.metrics.GravitinoMetricsUpdater

@@ -22,6 +22,7 @@ package org.apache.gravitino.maintenance.optimizer.recommender;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.PriorityQueue;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.maintenance.optimizer.api.recommender.JobExecutionContext;
@@ -55,7 +56,7 @@ class TestRecommenderOrdering {
 
     List<JobExecutionContext> ordered = new ArrayList<>(scoreQueue.size());
     while (!scoreQueue.isEmpty()) {
-      ordered.add(scoreQueue.poll().jobExecutionContext());
+      ordered.add(scoreQueue.poll().jobExecutionContext().orElseThrow());
     }
     return ordered;
   }
@@ -68,23 +69,24 @@ class TestRecommenderOrdering {
       }
 
       @Override
-      public JobExecutionContext jobExecutionContext() {
-        return new JobExecutionContext() {
-          @Override
-          public NameIdentifier nameIdentifier() {
-            return identifier;
-          }
+      public Optional<JobExecutionContext> jobExecutionContext() {
+        return Optional.of(
+            new JobExecutionContext() {
+              @Override
+              public NameIdentifier nameIdentifier() {
+                return identifier;
+              }
 
-          @Override
-          public Map<String, String> jobConfig() {
-            return Map.of();
-          }
+              @Override
+              public Map<String, String> jobOptions() {
+                return Map.of();
+              }
 
-          @Override
-          public String jobTemplateName() {
-            return "template";
-          }
-        };
+              @Override
+              public String jobTemplateName() {
+                return "template";
+              }
+            });
       }
     };
   }

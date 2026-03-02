@@ -67,7 +67,15 @@ include("iceberg:iceberg-rest-server")
 include("lance:lance-common")
 include("lance:lance-rest-server")
 include("authorizations:authorization-ranger", "authorizations:authorization-common", "authorizations:authorization-chain")
-include("trino-connector:trino-connector", "trino-connector:integration-test")
+include(
+  "trino-connector:trino-connector",
+  "trino-connector:trino-connector-435-439",
+  "trino-connector:trino-connector-440-445",
+  "trino-connector:trino-connector-446-451",
+  "trino-connector:trino-connector-452-468",
+  "trino-connector:trino-connector-469-472",
+  "trino-connector:integration-test"
+)
 include("spark-connector:spark-common")
 if (scalaVersion == "2.12") {
   // flink only support scala 2.12
@@ -83,6 +91,7 @@ project(":spark-connector:spark-runtime-3.4").projectDir = file("spark-connector
 project(":spark-connector:spark-3.5").projectDir = file("spark-connector/v3.5/spark")
 project(":spark-connector:spark-runtime-3.5").projectDir = file("spark-connector/v3.5/spark-runtime")
 include("web:web", "web:integration-test")
+include("web-v2:web", "web-v2:integration-test")
 include("docs")
 include("integration-test-common")
 include(":bundles:aws", ":bundles:aws-bundle", ":bundles:iceberg-aws-bundle")

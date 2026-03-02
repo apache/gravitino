@@ -514,9 +514,9 @@ Set the owner for each existing metalake using the Gravitino API:
 ```shell
 curl -X PUT -H "Accept: application/vnd.gravitino.v1+json" \
 -H "Content-Type: application/json" -d '{
-  "owner": "admin1",
-  "ownerType": "USER"
-}' http://localhost:8090/api/metalakes/{metalake}/owners
+  "name": "admin1",
+  "type": "USER"
+}' http://localhost:8090/api/metalakes/${metalake}/owners/metalake/${metalake}
 ```
 
 </TabItem>

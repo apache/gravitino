@@ -18,6 +18,7 @@
  */
 package org.apache.gravitino.trino.connector.integration.test;
 
+import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
@@ -42,16 +43,9 @@ import java.util.regex.Pattern;
 import org.apache.gravitino.integration.test.util.ITUtils;
 import org.apache.logging.log4j.util.Strings;
 import org.awaitility.Awaitility;
-import org.junit.jupiter.api.AfterAll;
-import org.junit.jupiter.api.BeforeAll;
-import org.junit.jupiter.api.Tag;
-import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.TestInstance;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-@Tag("gravitino-docker-test")
-@TestInstance(TestInstance.Lifecycle.PER_CLASS)
 public class TrinoQueryIT extends TrinoQueryITBase {
   private static final Logger LOG = LoggerFactory.getLogger(TrinoQueryIT.class);
 
@@ -71,16 +65,19 @@ public class TrinoQueryIT extends TrinoQueryITBase {
 
   static TrinoQueryITBase trinoQueryITBase;
 
-  static int trinoWorkerNum = 0;
+  static Integer trinoWorkerNum;
+
+  static Integer trinoVersion;
+
+  static String trinoConnectorDir;
 
   static {
     testsetsDir = TrinoQueryIT.class.getClassLoader().getResource("trino-ci-testset").getPath();
     testsetsDir = ITUtils.joinPath(testsetsDir, "testsets");
   }
 
-  @BeforeAll
   public void setup() throws Exception {
-    trinoQueryITBase = new TrinoQueryITBase(trinoWorkerNum);
+    trinoQueryITBase = new TrinoQueryITBase(trinoWorkerNum, trinoVersion, trinoConnectorDir);
     trinoQueryITBase.setup();
     cleanupTestEnv();
 
@@ -119,7 +116,6 @@ public class TrinoQueryIT extends TrinoQueryITBase {
     }
   }
 
-  @AfterAll
   public static void cleanup() {
     TrinoQueryITBase.cleanup();
   }
@@ -337,13 +333,13 @@ public class TrinoQueryIT extends TrinoQueryITBase {
     return match;
   }
 
-  @Test
   public void testSql() throws Exception {
     ExecutorService executor = Executors.newFixedThreadPool(testParallelism);
     CompletionService<Integer> completionService = new ExecutorCompletionService<>(executor);
 
     String[] testSetNames =
-        Arrays.stream(TrinoQueryITBase.listDirectory(testsetsDir))
+        Arrays.stream(TrinoQueryITBase.listTestSetDirectory(testsetsDir))
+            .filter(s -> new File(ITUtils.joinPath(testsetsDir, s)).isDirectory())
             .filter(s -> ciTestsets.isEmpty() || ciTestsets.contains(s))
             .toArray(String[]::new);
     List<Future<Integer>> allFutures = new ArrayList<>();
@@ -533,14 +529,14 @@ public class TrinoQueryIT extends TrinoQueryITBase {
   }
 
   static String[] getTesterNames(String testSetDirName, String testFilterPrefix) throws Exception {
-    return Arrays.stream(listDirectory(testSetDirName))
+    return Arrays.stream(listTestSetDirectory(testSetDirName))
         .filter(s -> !s.endsWith("prepare.sql") && !s.endsWith("cleanup.sql") && s.endsWith(".sql"))
         .filter(s -> testFilterPrefix.isEmpty() || s.startsWith(testFilterPrefix))
         .toArray(String[]::new);
   }
 
   static String[] getTesterCatalogNames(String testSetDirName, String catalog) throws Exception {
-    return Arrays.stream(listDirectory(testSetDirName))
+    return Arrays.stream(listTestSetDirectory(testSetDirName))
         .filter(s -> s.matches("catalog_.*_prepare.sql"))
         .filter(s -> catalog.isEmpty() || s.equals("catalog_" + catalog + "_prepare.sql"))
         .map(s -> s.replace("catalog_", "").replace("_prepare.sql", ""))

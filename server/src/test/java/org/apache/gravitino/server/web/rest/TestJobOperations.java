@@ -19,8 +19,11 @@
 package org.apache.gravitino.server.web.rest;
 
 import static javax.ws.rs.core.MediaType.APPLICATION_JSON_TYPE;
+import static org.apache.gravitino.Configs.CACHE_ENABLED;
+import static org.apache.gravitino.Configs.ENABLE_AUTHORIZATION;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.doNothing;
+import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
@@ -37,6 +40,7 @@ import javax.ws.rs.client.Entity;
 import javax.ws.rs.core.Application;
 import javax.ws.rs.core.Response;
 import org.apache.commons.lang3.reflect.FieldUtils;
+import org.apache.gravitino.Config;
 import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.dto.job.JobTemplateDTO;
 import org.apache.gravitino.dto.job.ShellTemplateUpdateDTO;
@@ -126,6 +130,11 @@ public class TestJobOperations extends JerseyTest {
 
   @BeforeAll
   public static void setup() throws IllegalAccessException {
+    Config config = mock(Config.class);
+    doReturn(false).when(config).get(CACHE_ENABLED);
+    doReturn(false).when(config).get(ENABLE_AUTHORIZATION);
+    FieldUtils.writeField(GravitinoEnv.getInstance(), "config", config, true);
+
     IdGenerator idGenerator = new RandomIdGenerator();
     FieldUtils.writeField(GravitinoEnv.getInstance(), "idGenerator", idGenerator, true);
   }

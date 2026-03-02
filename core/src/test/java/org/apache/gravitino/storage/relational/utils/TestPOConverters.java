@@ -1225,6 +1225,54 @@ public class TestPOConverters {
   }
 
   @Test
+  public void testUpdateModelVersionAliasRelPO() {
+    NameIdentifier modelIdent = NameIdentifierUtil.ofModel("m", "c", "s", "model1");
+    AuditInfo auditInfo =
+        AuditInfo.builder().withCreator("creator").withCreateTime(FIX_INSTANT).build();
+    List<String> newAliases = ImmutableList.of("alias3", "alias4");
+    Long modelId = 1L;
+
+    ModelVersionEntity newModelVersion =
+        ModelVersionEntity.builder()
+            .withModelIdentifier(modelIdent)
+            .withVersion(1)
+            .withAliases(newAliases)
+            .withComment("test")
+            .withProperties(null)
+            .withUris(ImmutableMap.of("uri", "hdfs://localhost/test"))
+            .withAuditInfo(auditInfo)
+            .build();
+
+    // Case 1: old alias list is non-empty — modelId/version copied from old PO
+    List<ModelVersionAliasRelPO> oldAliasPOs =
+        ImmutableList.of(
+            ModelVersionAliasRelPO.builder()
+                .withModelVersionAlias("alias1")
+                .withModelVersion(1)
+                .withModelId(modelId)
+                .withDeletedAt(0L)
+                .build());
+
+    List<ModelVersionAliasRelPO> result =
+        POConverters.updateModelVersionAliasRelPO(oldAliasPOs, newModelVersion, modelId);
+    assertEquals(2, result.size());
+    assertEquals("alias3", result.get(0).getModelVersionAlias());
+    assertEquals("alias4", result.get(1).getModelVersionAlias());
+    assertEquals(1, result.get(0).getModelVersion());
+    assertEquals(modelId, result.get(0).getModelId());
+
+    // Case 2: old alias list is empty (model version created without aliases) — should not throw
+    List<ModelVersionAliasRelPO> resultFromEmpty =
+        POConverters.updateModelVersionAliasRelPO(
+            Collections.emptyList(), newModelVersion, modelId);
+    assertEquals(2, resultFromEmpty.size());
+    assertEquals("alias3", resultFromEmpty.get(0).getModelVersionAlias());
+    assertEquals("alias4", resultFromEmpty.get(1).getModelVersionAlias());
+    assertEquals(1, resultFromEmpty.get(0).getModelVersion());
+    assertEquals(modelId, resultFromEmpty.get(0).getModelId());
+  }
+
+  @Test
   public void testStatisticPO() throws JsonProcessingException {
     List<StatisticEntity> statisticEntities = Lists.newArrayList();
     statisticEntities.add(
