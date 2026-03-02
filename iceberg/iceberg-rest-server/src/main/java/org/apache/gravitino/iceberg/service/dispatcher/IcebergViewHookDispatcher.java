@@ -18,10 +18,16 @@
  */
 package org.apache.gravitino.iceberg.service.dispatcher;
 
+import java.io.IOException;
+import org.apache.gravitino.Entity;
+import org.apache.gravitino.EntityStore;
 import org.apache.gravitino.GravitinoEnv;
+import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.catalog.ViewDispatcher;
+import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.iceberg.common.utils.IcebergIdentifierUtils;
 import org.apache.gravitino.listener.api.event.IcebergRequestContext;
+import org.apache.gravitino.meta.GenericEntity;
 import org.apache.iceberg.catalog.Namespace;
 import org.apache.iceberg.catalog.TableIdentifier;
 import org.apache.iceberg.rest.requests.CreateViewRequest;
@@ -62,16 +68,14 @@ public class IcebergViewHookDispatcher implements IcebergViewOperationDispatcher
     // Then import it into Gravitino so Gravitino is aware of the view
     importView(context.catalogName(), namespace, createViewRequest.name());
 
-    // TODO(#9746): Enable view ownership once ViewMetaService is implemented
-    // Currently disabled because VIEW entity type is not supported in
-    // RelationalEntityStoreIdResolver
-    // IcebergOwnershipUtils.setViewOwner(
-    //     metalake,
-    //     context.catalogName(),
-    //     namespace,
-    //     createViewRequest.name(),
-    //     context.userName(),
-    //     GravitinoEnv.getInstance().ownerDispatcher());
+    // Set ownership for the newly created view
+    IcebergOwnershipUtils.setViewOwner(
+        metalake,
+        context.catalogName(),
+        namespace,
+        createViewRequest.name(),
+        context.userName(),
+        GravitinoEnv.getInstance().ownerDispatcher());
 
     return response;
   }
@@ -92,8 +96,40 @@ public class IcebergViewHookDispatcher implements IcebergViewOperationDispatcher
   @Override
   public void dropView(IcebergRequestContext context, TableIdentifier viewIdentifier) {
     dispatcher.dropView(context, viewIdentifier);
-    // Note: We don't remove from Gravitino here as that will be handled by entity storage
-    // in future work (issue #9746)
+
+    // Remove view from Gravitino entity store
+    EntityStore store = GravitinoEnv.getInstance().entityStore();
+    try {
+      if (store != null) {
+        store.delete(
+            IcebergIdentifierUtils.toGravitinoTableIdentifier(
+                metalake, context.catalogName(), viewIdentifier),
+            Entity.EntityType.VIEW);
+        LOG.info(
+            "Successfully removed view from Gravitino entity store: {}.{}.{}.{}",
+            metalake,
+            context.catalogName(),
+            viewIdentifier.namespace(),
+            viewIdentifier.name());
+      }
+    } catch (NoSuchEntityException ignore) {
+      // Ignore if the view entity does not exist in the store
+      LOG.debug(
+          "View entity does not exist in store: {}.{}.{}.{}",
+          metalake,
+          context.catalogName(),
+          viewIdentifier.namespace(),
+          viewIdentifier.name());
+    } catch (IOException ioe) {
+      LOG.error(
+          "Failed to delete view entity from store: {}.{}.{}.{}",
+          metalake,
+          context.catalogName(),
+          viewIdentifier.namespace(),
+          viewIdentifier.name(),
+          ioe);
+      throw new RuntimeException("Failed to delete view entity from store", ioe);
+    }
   }
 
   @Override
@@ -109,7 +145,41 @@ public class IcebergViewHookDispatcher implements IcebergViewOperationDispatcher
   @Override
   public void renameView(IcebergRequestContext context, RenameTableRequest renameViewRequest) {
     dispatcher.renameView(context, renameViewRequest);
-    // Note: Rename handling in Gravitino will be added with full view support (issue #9746)
+
+    // Update view in Gravitino entity store with new name
+    NameIdentifier sourceIdent =
+        IcebergIdentifierUtils.toGravitinoTableIdentifier(
+            metalake, context.catalogName(), renameViewRequest.source());
+    NameIdentifier destIdent =
+        IcebergIdentifierUtils.toGravitinoTableIdentifier(
+            metalake, context.catalogName(), renameViewRequest.destination());
+
+    EntityStore store = GravitinoEnv.getInstance().entityStore();
+    try {
+      if (store != null) {
+        store.update(
+            sourceIdent,
+            GenericEntity.class,
+            Entity.EntityType.VIEW,
+            viewEntity ->
+                GenericEntity.builder()
+                    .withId(viewEntity.id())
+                    .withName(destIdent.name())
+                    .withNamespace(destIdent.namespace())
+                    .withEntityType(Entity.EntityType.VIEW)
+                    .build());
+        LOG.info(
+            "Successfully renamed view in Gravitino entity store from {} to {}",
+            sourceIdent,
+            destIdent);
+      }
+    } catch (NoSuchEntityException ignore) {
+      // Ignore if the source view entity does not exist in the store
+      LOG.debug("Source view entity does not exist in store: {}", sourceIdent);
+    } catch (IOException ioe) {
+      LOG.error("Failed to rename view entity in store from {} to {}", sourceIdent, destIdent, ioe);
+      throw new RuntimeException("Failed to rename view entity in store", ioe);
+    }
   }
 
   /**

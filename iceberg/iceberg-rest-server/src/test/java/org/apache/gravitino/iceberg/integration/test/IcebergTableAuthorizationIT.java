@@ -598,6 +598,7 @@ public class IcebergTableAuthorizationIT extends IcebergAuthorizationIT {
     SecurableObject schemaObject =
         SecurableObjects.ofSchema(
             catalogObject, SCHEMA_NAME, ImmutableList.of(Privileges.UseSchema.allow()));
+    securableObjects.add(schemaObject);
     SecurableObject tableObject =
         SecurableObjects.ofTable(
             schemaObject, tableName, ImmutableList.of(Privileges.SelectTable.allow()));
@@ -617,6 +618,7 @@ public class IcebergTableAuthorizationIT extends IcebergAuthorizationIT {
     SecurableObject schemaObject =
         SecurableObjects.ofSchema(
             catalogObject, SCHEMA_NAME, ImmutableList.of(Privileges.UseSchema.allow()));
+    securableObjects.add(schemaObject);
     SecurableObject tableObject =
         SecurableObjects.ofTable(
             schemaObject, tableName, ImmutableList.of(Privileges.ModifyTable.allow()));

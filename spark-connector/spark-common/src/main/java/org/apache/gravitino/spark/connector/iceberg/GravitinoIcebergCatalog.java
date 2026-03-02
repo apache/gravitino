@@ -109,12 +109,16 @@ public class GravitinoIcebergCatalog extends BaseCatalog
 
   @Override
   public Identifier[] listFunctions(String[] namespace) throws NoSuchNamespaceException {
-    return ((SparkCatalog) sparkCatalog).listFunctions(namespace);
+    return isIcebergFunctionNamespace(namespace)
+        ? ((SparkCatalog) sparkCatalog).listFunctions(namespace)
+        : super.listFunctions(namespace);
   }
 
   @Override
   public UnboundFunction loadFunction(Identifier ident) throws NoSuchFunctionException {
-    return ((SparkCatalog) sparkCatalog).loadFunction(ident);
+    return isIcebergFunctionNamespace(ident.namespace())
+        ? ((SparkCatalog) sparkCatalog).loadFunction(ident)
+        : super.loadFunction(ident);
   }
 
   /**
@@ -187,6 +191,17 @@ public class GravitinoIcebergCatalog extends BaseCatalog
           getSparkTypeConverter());
     } catch (org.apache.gravitino.exceptions.NoSuchTableException e) {
       throw new NoSuchTableException(ident);
+    }
+  }
+
+  private boolean isIcebergFunctionNamespace(String[] namespace) {
+    try {
+      return namespace.length == 0 || isSystemNamespace(namespace);
+    } catch (IllegalAccessException
+        | InvocationTargetException
+        | NoSuchMethodException
+        | ClassNotFoundException e) {
+      throw new RuntimeException("Failed to check Iceberg function namespace", e);
     }
   }
 

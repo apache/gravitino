@@ -678,11 +678,13 @@ const relationalTablePropInfoMap = {
   },
   'jdbc-starrocks': {
     reserved: [],
+    immutable: [],
     allowDelete: true,
     allowAdd: true
   },
   'jdbc-doris': {
     reserved: [],
+    immutable: [],
     allowDelete: true,
     allowAdd: true
   },

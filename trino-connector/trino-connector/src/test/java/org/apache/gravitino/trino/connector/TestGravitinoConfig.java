@@ -28,17 +28,9 @@ import com.google.common.collect.ImmutableMap;
 import io.trino.spi.TrinoException;
 import java.util.Map;
 import java.util.regex.Pattern;
-import org.junit.AfterClass;
-import org.junit.BeforeClass;
 import org.junit.jupiter.api.Test;
 
 public class TestGravitinoConfig {
-
-  @BeforeClass
-  public static void startup() throws Exception {}
-
-  @AfterClass
-  public static void shutdown() throws Exception {}
 
   @Test
   public void testGravitinoConfig() {

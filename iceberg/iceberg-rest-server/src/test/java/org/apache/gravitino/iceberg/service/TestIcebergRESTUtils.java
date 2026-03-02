@@ -45,7 +45,7 @@ public class TestIcebergRESTUtils {
     Mockito.when(icebergConfigProvider.getMetalakeName()).thenReturn("metalake");
     Mockito.when(icebergConfigProvider.getDefaultCatalogName())
         .thenReturn(IcebergConstants.ICEBERG_REST_DEFAULT_CATALOG);
-    IcebergRESTServerContext.create(icebergConfigProvider, false, false);
+    IcebergRESTServerContext.create(icebergConfigProvider, false, false, null);
   }
 
   @Test

@@ -68,6 +68,10 @@ public abstract class SparkUtilIT extends BaseIT {
     return convertToStringSet(sql("SHOW TABLES in " + database), 1);
   }
 
+  protected Set<String> listUserFunctions(String database) {
+    return convertToStringSet(sql("SHOW USER FUNCTIONS FROM " + database), 0);
+  }
+
   protected void dropDatabaseIfExists(String database) {
     sql("DROP DATABASE IF EXISTS " + database);
   }

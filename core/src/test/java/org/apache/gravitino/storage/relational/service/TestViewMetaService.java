@@ -71,6 +71,7 @@ public class TestViewMetaService extends TestJDBCBackend {
     assertNotNull(retrievedView);
     assertEquals(view.id(), retrievedView.id());
     assertEquals(view.name(), retrievedView.name());
+    assertEquals(viewNamespace, retrievedView.namespace());
     assertEquals(Entity.EntityType.VIEW, retrievedView.type());
   }
 
@@ -103,6 +104,7 @@ public class TestViewMetaService extends TestJDBCBackend {
     GenericEntity retrievedView = backend.get(viewIdent, Entity.EntityType.VIEW);
     assertNotNull(retrievedView);
     assertEquals(view.id(), retrievedView.id());
+    assertEquals(viewNamespace, retrievedView.namespace());
   }
 
   @TestTemplate
@@ -125,6 +127,8 @@ public class TestViewMetaService extends TestJDBCBackend {
     assertTrue(views.stream().anyMatch(v -> v.name().equals("view1")));
     assertTrue(views.stream().anyMatch(v -> v.name().equals("view2")));
     assertTrue(views.stream().anyMatch(v -> v.name().equals("view3")));
+    // Verify all views have namespace set
+    assertTrue(views.stream().allMatch(v -> viewNamespace.equals(v.namespace())));
   }
 
   @TestTemplate
@@ -160,6 +164,50 @@ public class TestViewMetaService extends TestJDBCBackend {
     GenericEntity retrievedView = backend.get(newViewIdent, Entity.EntityType.VIEW);
     assertNotNull(retrievedView);
     assertEquals("view_updated", retrievedView.name());
+    assertEquals(viewNamespace, retrievedView.namespace());
+  }
+
+  @TestTemplate
+  public void testUpdateViewCrossNamespace() throws IOException {
+    // Create a second schema for cross-namespace rename
+    String schemaName2 = "schema_for_view_test_2";
+    createAndInsertSchema(metalakeName, catalogName, schemaName2);
+
+    Namespace viewNamespace1 = NamespaceUtil.ofView(metalakeName, catalogName, schemaName);
+    Namespace viewNamespace2 = NamespaceUtil.ofView(metalakeName, catalogName, schemaName2);
+
+    GenericEntity view =
+        createViewEntity(
+            RandomIdGenerator.INSTANCE.nextId(), viewNamespace1, "view_cross_namespace");
+
+    backend.insert(view, false);
+
+    // Update view to move to different namespace
+    Function<GenericEntity, GenericEntity> updater =
+        oldView ->
+            GenericEntity.builder()
+                .withId(oldView.id())
+                .withName("view_cross_namespace_renamed")
+                .withNamespace(viewNamespace2)
+                .withEntityType(Entity.EntityType.VIEW)
+                .build();
+
+    NameIdentifier viewIdent = NameIdentifier.of(viewNamespace1, "view_cross_namespace");
+    GenericEntity updatedView = backend.update(viewIdent, Entity.EntityType.VIEW, updater);
+
+    assertNotNull(updatedView);
+    assertEquals("view_cross_namespace_renamed", updatedView.name());
+    assertEquals(view.id(), updatedView.id());
+
+    // Verify old namespace+name no longer exists
+    assertThrows(NoSuchEntityException.class, () -> backend.get(viewIdent, Entity.EntityType.VIEW));
+
+    // Verify new namespace+name exists
+    NameIdentifier newViewIdent = NameIdentifier.of(viewNamespace2, "view_cross_namespace_renamed");
+    GenericEntity retrievedView = backend.get(newViewIdent, Entity.EntityType.VIEW);
+    assertNotNull(retrievedView);
+    assertEquals("view_cross_namespace_renamed", retrievedView.name());
+    assertEquals(viewNamespace2, retrievedView.namespace());
   }
 
   @TestTemplate
@@ -245,6 +293,7 @@ public class TestViewMetaService extends TestJDBCBackend {
         backend.get(NameIdentifier.of(viewNamespace, "lifecycle_view"), Entity.EntityType.VIEW);
     assertEquals(view.id(), viewEntity.id());
     assertEquals(view.name(), viewEntity.name());
+    assertEquals(viewNamespace, viewEntity.namespace());
 
     // meta data soft delete
     backend.delete(

@@ -28,7 +28,6 @@ import java.util.Optional;
 import java.util.UUID;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.MetadataObjects;
-import org.apache.gravitino.SchemaChange;
 import org.apache.gravitino.authorization.Owner;
 import org.apache.gravitino.authorization.Privileges;
 import org.apache.gravitino.authorization.SecurableObject;
@@ -216,13 +215,8 @@ public class IcebergNamespaceAuthorizationIT extends IcebergAuthorizationIT {
         NORMAL_USER,
         Owner.Type.USER);
 
-    grantUseSchemaRole(namespace);
-
     Assertions.assertDoesNotThrow(
-        () ->
-            catalogClientWithAllPrivilege
-                .asSchemas()
-                .alterSchema(namespace, SchemaChange.setProperty("modified-by", "owner")));
+        () -> sql("ALTER DATABASE %s SET DBPROPERTIES ('key'='value')", namespace));
   }
 
   @Test

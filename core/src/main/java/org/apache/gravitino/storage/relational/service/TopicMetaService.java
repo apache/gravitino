@@ -321,4 +321,26 @@ public class TopicMetaService {
     }
     return topicId;
   }
+
+  @Monitored(
+      metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME,
+      baseMetricName = "batchGetTopicByIdentifier")
+  public List<TopicEntity> batchGetTopicByIdentifier(List<NameIdentifier> identifiers) {
+    NameIdentifier firstIdent = identifiers.get(0);
+    NameIdentifier schemaIdent = NameIdentifierUtil.getSchemaIdentifier(firstIdent);
+    List<String> topicNames =
+        identifiers.stream().map(NameIdentifier::name).collect(Collectors.toList());
+
+    return SessionUtils.doWithCommitAndFetchResult(
+        TopicMetaMapper.class,
+        mapper -> {
+          List<TopicPO> topicPOs =
+              mapper.batchSelectTopicByIdentifier(
+                  schemaIdent.namespace().level(0),
+                  schemaIdent.namespace().level(1),
+                  schemaIdent.name(),
+                  topicNames);
+          return POConverters.fromTopicPOs(topicPOs, firstIdent.namespace());
+        });
+  }
 }

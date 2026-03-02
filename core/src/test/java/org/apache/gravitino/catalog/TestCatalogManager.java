@@ -25,12 +25,14 @@ import static org.apache.gravitino.TestCatalog.PROPERTY_KEY3;
 import static org.apache.gravitino.TestCatalog.PROPERTY_KEY4;
 import static org.apache.gravitino.TestCatalog.PROPERTY_KEY5_PREFIX;
 import static org.apache.gravitino.TestCatalog.PROPERTY_KEY6_PREFIX;
+import static org.awaitility.Awaitility.await;
 import static org.mockito.ArgumentMatchers.any;
 
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Maps;
 import com.google.common.collect.Sets;
 import java.io.IOException;
+import java.time.Duration;
 import java.time.Instant;
 import java.util.Map;
 import java.util.Set;
@@ -678,6 +680,40 @@ public class TestCatalogManager {
     Assertions.assertEquals("true", enabled.getProperties().get(Catalog.PROPERTY_IN_USE));
 
     Assertions.assertNull(catalogManager.getCatalogCache().getIfPresent(ident));
+  }
+
+  @Test
+  public void testCatalogCacheRemoveListener() {
+    NameIdentifier ident = NameIdentifier.of(metalake, "catalog");
+    Map<String, String> props =
+        ImmutableMap.of(
+            PROPERTY_KEY1, "value1", PROPERTY_KEY2, "value2", PROPERTY_KEY5_PREFIX + "1", "value3");
+
+    // Create a catalog
+    catalogManager.createCatalog(ident, Catalog.Type.RELATIONAL, provider, "comment", props);
+
+    // Load the catalog to add it to the cache
+    catalogManager.loadCatalog(ident);
+    Assertions.assertNotNull(catalogManager.getCatalogCache().getIfPresent(ident));
+
+    // Add a listener to track removed catalogs
+    Set<NameIdentifier> removedCatalogs = Sets.newConcurrentHashSet();
+    catalogManager.addCatalogCacheRemoveListener(removedCatalogs::add);
+
+    // Invalidate the cache to trigger the removal listener
+    catalogManager.getCatalogCache().invalidate(ident);
+
+    // Wait for the async eviction to complete
+    await()
+        .atMost(Duration.ofSeconds(5))
+        .untilAsserted(
+            () -> {
+              Assertions.assertTrue(
+                  removedCatalogs.contains(ident),
+                  "Listener should be notified of catalog removal");
+              Assertions.assertEquals(
+                  1, removedCatalogs.size(), "Only one catalog should be removed");
+            });
   }
 
   private void testProperties(Map<String, String> expectedProps, Map<String, String> testProps) {

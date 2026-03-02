@@ -130,7 +130,7 @@ public class FilesetUtil {
    * Extract base location (scheme://authority) from a URI.
    *
    * @param uri the URI to extract base location from
-   * @return the base location in format "scheme://authority"
+   * @return the base location in the format "scheme://authority"
    */
   private static String getBaseLocation(URI uri) {
     return uri.getScheme() + "://" + (uri.getAuthority() == null ? "" : uri.getAuthority());

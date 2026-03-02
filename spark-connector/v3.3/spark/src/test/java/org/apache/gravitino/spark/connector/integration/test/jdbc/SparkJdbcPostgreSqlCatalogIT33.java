@@ -33,4 +33,10 @@ public class SparkJdbcPostgreSqlCatalogIT33 extends SparkJdbcPostgreSqlCatalogIT
             .getConfString("spark.sql.catalog." + getCatalogName());
     Assertions.assertEquals(GravitinoPostgreSqlCatalogSpark33.class.getName(), catalogClass);
   }
+
+  @Override
+  protected boolean supportsFunction() {
+    // Spark 3.3 does not support function operations
+    return false;
+  }
 }

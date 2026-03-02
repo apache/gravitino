@@ -60,6 +60,31 @@ public class MetadataAuthzHelper {
   private static final Logger LOG = LoggerFactory.getLogger(MetadataAuthzHelper.class);
   private static volatile Executor executor = null;
 
+  /**
+   * Entity types that support batch get operations for cache preloading. These types have
+   * implemented the batchGetByIdentifier method in their respective MetaService classes.
+   */
+  private static final List<Entity.EntityType> SUPPORTED_PRELOAD_ENTITY_TYPES =
+      Arrays.asList(
+          Entity.EntityType.METALAKE,
+          Entity.EntityType.CATALOG,
+          Entity.EntityType.SCHEMA,
+          Entity.EntityType.TABLE,
+          Entity.EntityType.FILESET,
+          Entity.EntityType.TOPIC,
+          Entity.EntityType.MODEL,
+          Entity.EntityType.TAG,
+          Entity.EntityType.POLICY,
+          Entity.EntityType.JOB,
+          Entity.EntityType.JOB_TEMPLATE);
+
+  /**
+   * Topic and Table may be from the external system and the schema may not exist in Gravitino, so
+   * we need to import the schema first
+   */
+  private static final List<Entity.EntityType> REQUIRE_SCHEMA_EXISTS =
+      Arrays.asList(Entity.EntityType.TABLE, Entity.EntityType.TOPIC);
+
   private MetadataAuthzHelper() {}
 
   public static Metalake[] filterMetalakes(Metalake[] metalakes, String expression) {
@@ -141,7 +166,6 @@ public class MetadataAuthzHelper {
       Entity.EntityType entityType,
       NameIdentifier[] nameIdentifiers) {
     preloadToCache(entityType, nameIdentifiers);
-    preloadOwner(entityType, nameIdentifiers);
     return filterByExpression(metalake, expression, entityType, nameIdentifiers, e -> e);
   }
 
@@ -332,35 +356,56 @@ public class MetadataAuthzHelper {
 
   private static void preloadToCache(
       Entity.EntityType entityType, NameIdentifier[] nameIdentifiers) {
-    if (!GravitinoEnv.getInstance().cacheEnabled()) {
+    // If cache is not enabled or access control dispatcher is not set, skip preloading to cache
+    if (!GravitinoEnv.getInstance().cacheEnabled()
+        || GravitinoEnv.getInstance().accessControlDispatcher() == null
+        || nameIdentifiers.length == 0) {
       return;
     }
-    try {
-      if (entityType == Entity.EntityType.TABLE) {
-        GravitinoEnv.getInstance()
-            .entityStore()
-            .batchGet(nameIdentifiers, entityType, TableEntity.class);
-      }
-    } catch (Exception e) {
-      LOG.warn("Ignore preload cache error:{}", e.getMessage(), e);
+
+    // Only preload entity types that support batch get operations
+    if (!SUPPORTED_PRELOAD_ENTITY_TYPES.contains(entityType)) {
+      return;
     }
+
+    if (REQUIRE_SCHEMA_EXISTS.contains(entityType)) {
+      // For entity types that require schema existence, check if the schema exists before
+      // preloading to cache
+      Namespace firstNamespace = nameIdentifiers[0].namespace();
+      Preconditions.checkArgument(
+          Arrays.stream(nameIdentifiers).allMatch(id -> id.namespace().equals(firstNamespace)),
+          "All identifiers must have the same schema");
+
+      if (!GravitinoEnv.getInstance()
+          .schemaDispatcher()
+          .schemaExists(NameIdentifier.parse(firstNamespace.toString()))) {
+        return;
+      }
+    }
+
+    GravitinoEnv.getInstance()
+        .entityStore()
+        .batchGet(
+            Arrays.asList(nameIdentifiers),
+            entityType,
+            EntityClassMapper.getEntityClass(entityType));
   }
 
-  private static void preloadOwner(Entity.EntityType entityType, NameIdentifier[] nameIdentifiers) {
-    if (!GravitinoEnv.getInstance().cacheEnabled()) {
-      return;
+    private static void preloadOwner(Entity.EntityType entityType, NameIdentifier[] nameIdentifiers) {
+        if (!GravitinoEnv.getInstance().cacheEnabled()) {
+            return;
+        }
+        EntityStore entityStore = GravitinoEnv.getInstance().entityStore();
+        try {
+            entityStore
+                    .relationOperations()
+                    .batchListEntitiesByRelation(
+                            SupportsRelationOperations.Type.OWNER_REL,
+                            Arrays.stream(nameIdentifiers).toList(),
+                            entityType,
+                            true);
+        } catch (Exception e) {
+            LOG.warn("Ignore preloadOwner error:{}", e.getMessage(), e);
+        }
     }
-    EntityStore entityStore = GravitinoEnv.getInstance().entityStore();
-    try {
-      entityStore
-          .relationOperations()
-          .batchListEntitiesByRelation(
-              SupportsRelationOperations.Type.OWNER_REL,
-              Arrays.stream(nameIdentifiers).toList(),
-              entityType,
-              true);
-    } catch (Exception e) {
-      LOG.warn("Ignore preloadOwner error:{}", e.getMessage(), e);
-    }
-  }
 }

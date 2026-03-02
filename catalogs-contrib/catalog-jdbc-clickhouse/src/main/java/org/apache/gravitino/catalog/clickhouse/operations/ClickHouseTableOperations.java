@@ -18,8 +18,11 @@
  */
 package org.apache.gravitino.catalog.clickhouse.operations;
 
+import static org.apache.gravitino.catalog.clickhouse.ClickHouseConstants.IndexConstants.DATA_SKIPPING_BLOOM_FILTER;
+import static org.apache.gravitino.catalog.clickhouse.ClickHouseConstants.IndexConstants.DATA_SKIPPING_MINMAX_VALUE;
 import static org.apache.gravitino.catalog.clickhouse.ClickHouseTablePropertiesMetadata.CLICKHOUSE_ENGINE_KEY;
 import static org.apache.gravitino.catalog.clickhouse.ClickHouseTablePropertiesMetadata.ENGINE_PROPERTY_ENTRY;
+import static org.apache.gravitino.catalog.clickhouse.ClickHouseTablePropertiesMetadata.GRAVITINO_ENGINE_KEY;
 import static org.apache.gravitino.rel.Column.DEFAULT_VALUE_NOT_SET;
 
 import com.google.common.annotations.VisibleForTesting;
@@ -29,6 +32,7 @@ import java.sql.DatabaseMetaData;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
+import java.sql.Statement;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -36,6 +40,8 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 import org.apache.commons.collections4.CollectionUtils;
 import org.apache.commons.collections4.MapUtils;
@@ -43,8 +49,11 @@ import org.apache.commons.lang3.ArrayUtils;
 import org.apache.commons.lang3.BooleanUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.StringIdentifier;
+import org.apache.gravitino.catalog.clickhouse.ClickHouseConstants.ClusterConstants;
+import org.apache.gravitino.catalog.clickhouse.ClickHouseConstants.DistributedTableConstants;
 import org.apache.gravitino.catalog.clickhouse.ClickHouseConstants.TableConstants;
 import org.apache.gravitino.catalog.clickhouse.ClickHouseTablePropertiesMetadata;
+import org.apache.gravitino.catalog.clickhouse.ClickHouseTablePropertiesMetadata.ENGINE;
 import org.apache.gravitino.catalog.jdbc.JdbcColumn;
 import org.apache.gravitino.catalog.jdbc.JdbcTable;
 import org.apache.gravitino.catalog.jdbc.operation.JdbcTableOperations;
@@ -52,12 +61,18 @@ import org.apache.gravitino.catalog.jdbc.utils.JdbcConnectorUtils;
 import org.apache.gravitino.exceptions.NoSuchTableException;
 import org.apache.gravitino.rel.Column;
 import org.apache.gravitino.rel.TableChange;
+import org.apache.gravitino.rel.expressions.Expression;
+import org.apache.gravitino.rel.expressions.FunctionExpression;
+import org.apache.gravitino.rel.expressions.NamedReference;
+import org.apache.gravitino.rel.expressions.UnparsedExpression;
 import org.apache.gravitino.rel.expressions.distributions.Distribution;
 import org.apache.gravitino.rel.expressions.distributions.Distributions;
 import org.apache.gravitino.rel.expressions.sorts.NullOrdering;
 import org.apache.gravitino.rel.expressions.sorts.SortDirection;
 import org.apache.gravitino.rel.expressions.sorts.SortOrder;
+import org.apache.gravitino.rel.expressions.sorts.SortOrders;
 import org.apache.gravitino.rel.expressions.transforms.Transform;
+import org.apache.gravitino.rel.expressions.transforms.Transforms;
 import org.apache.gravitino.rel.indexes.Index;
 import org.apache.gravitino.rel.indexes.Indexes;
 
@@ -65,6 +80,15 @@ public class ClickHouseTableOperations extends JdbcTableOperations {
 
   private static final String CLICKHOUSE_NOT_SUPPORT_NESTED_COLUMN_MSG =
       "Clickhouse does not support nested column names.";
+  private static final Pattern ORDER_BY_PATTERN =
+      Pattern.compile("ORDER\\s+BY\\s+([^\\n]+)", Pattern.CASE_INSENSITIVE);
+  private static final Pattern PARTITION_BY_PATTERN =
+      Pattern.compile("PARTITION\\s+BY\\s+([^\\n]+)", Pattern.CASE_INSENSITIVE);
+  private static final Pattern ON_CLUSTER_PATTERN =
+      Pattern.compile("(?i)\\bON\\s+CLUSTER\\s+`?([^`\\s(]+)`?");
+  private static final Pattern DISTRIBUTED_ENGINE_PATTERN =
+      Pattern.compile(
+          "(?i)^Distributed\\(([^,]+),\\s*([^,]+),\\s*([^,]+),\\s*(.+)\\)$", Pattern.DOTALL);
 
   private static final String QUERY_INDEXES_SQL =
       """
@@ -86,8 +110,7 @@ public class ClickHouseTableOperations extends JdbcTableOperations {
   protected List<Index> getIndexes(Connection connection, String databaseName, String tableName) {
     // cause clickhouse not impl getPrimaryKeys yet, ref:
     // https://github.com/ClickHouse/clickhouse-java/issues/1625
-    String sql =
-        QUERY_INDEXES_SQL.formatted(quoteIdentifier(databaseName), quoteIdentifier(tableName));
+    String sql = QUERY_INDEXES_SQL.formatted(databaseName, tableName);
     try (PreparedStatement preparedStatement = connection.prepareStatement(sql);
         ResultSet resultSet = preparedStatement.executeQuery()) {
 
@@ -98,10 +121,16 @@ public class ClickHouseTableOperations extends JdbcTableOperations {
         indexes.add(
             Indexes.of(Index.IndexType.PRIMARY_KEY, indexName, new String[][] {{columnName}}));
       }
+      indexes.addAll(getSecondaryIndexes(connection, databaseName, tableName));
       return indexes;
     } catch (SQLException e) {
       throw exceptionMapper.toGravitinoException(e);
     }
+  }
+
+  @Override
+  public boolean supportsTableSortOrder() {
+    return true;
   }
 
   @Override
@@ -128,31 +157,32 @@ public class ClickHouseTableOperations extends JdbcTableOperations {
       Index[] indexes,
       SortOrder[] sortOrders) {
 
-    // These two are not yet supported in Gravitino now and will be supported in the future.
-    if (ArrayUtils.isNotEmpty(partitioning)) {
-      throw new UnsupportedOperationException(
-          "Currently we do not support Partitioning in clickhouse");
-    }
     Preconditions.checkArgument(
         Distributions.NONE.equals(distribution), "ClickHouse does not support distribution");
 
-    // First build the CREATE TABLE statement
     StringBuilder sqlBuilder = new StringBuilder();
-    sqlBuilder.append("CREATE TABLE %s (\n".formatted(quoteIdentifier(tableName)));
+
+    Map<String, String> notNullProperties =
+        MapUtils.isNotEmpty(properties) ? properties : Collections.emptyMap();
+
+    // Add Create table clause
+    appendCreateTableClause(notNullProperties, sqlBuilder, tableName);
 
     // Add columns
     buildColumnsDefinition(columns, sqlBuilder);
 
-    // Index definition, we only support primary index now, secondary index will be supported in
-    // the future
+    // Index definition
     appendIndexesSql(indexes, sqlBuilder);
 
     sqlBuilder.append("\n)");
 
     // Extract engine from properties
-    ClickHouseTablePropertiesMetadata.ENGINE engine = appendTableEngine(properties, sqlBuilder);
+    ClickHouseTablePropertiesMetadata.ENGINE engine =
+        appendTableEngine(notNullProperties, sqlBuilder, columns);
 
     appendOrderBy(sortOrders, sqlBuilder, engine);
+
+    appendPartitionClause(partitioning, sqlBuilder, engine);
 
     // Add table comment if specified
     if (StringUtils.isNotEmpty(comment)) {
@@ -161,7 +191,7 @@ public class ClickHouseTableOperations extends JdbcTableOperations {
     }
 
     // Add setting clause if specified, clickhouse only supports predefine settings
-    appendTableProperties(properties, sqlBuilder);
+    appendTableProperties(notNullProperties, sqlBuilder);
 
     // Return the generated SQL statement
     String result = sqlBuilder.toString();
@@ -170,15 +200,51 @@ public class ClickHouseTableOperations extends JdbcTableOperations {
     return result;
   }
 
+  /**
+   * Append CREATE TABLE clause. If cluster name && on-cluster is specified in properties, append ON
+   * CLUSTER clause.
+   *
+   * @param properties Table properties
+   * @param sqlBuilder SQL builder
+   * @return true if ON CLUSTER clause is appended, false otherwise
+   */
+  private boolean appendCreateTableClause(
+      Map<String, String> properties, StringBuilder sqlBuilder, String tableName) {
+    String clusterName = properties.get(ClusterConstants.CLUSTER_NAME);
+    String onClusterValue = properties.get(ClusterConstants.ON_CLUSTER);
+
+    boolean onCluster =
+        StringUtils.isNotBlank(clusterName)
+            && StringUtils.isNotBlank(onClusterValue)
+            && Boolean.TRUE.equals(Boolean.parseBoolean(onClusterValue));
+
+    if (onCluster) {
+      sqlBuilder.append(
+          "CREATE TABLE %s ON CLUSTER %s (\n"
+              .formatted(quoteIdentifier(tableName), quoteIdentifier(clusterName)));
+    } else {
+      sqlBuilder.append("CREATE TABLE %s (\n".formatted(quoteIdentifier(tableName)));
+    }
+
+    return onCluster;
+  }
+
   private static void appendTableProperties(
       Map<String, String> properties, StringBuilder sqlBuilder) {
     if (MapUtils.isEmpty(properties)) {
       return;
     }
 
-    String settings =
+    Map<String, String> settingMap =
         properties.entrySet().stream()
             .filter(entry -> entry.getKey().startsWith(TableConstants.SETTINGS_PREFIX))
+            .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
+    if (MapUtils.isEmpty(settingMap)) {
+      return;
+    }
+
+    String settings =
+        settingMap.entrySet().stream()
             .map(
                 entry ->
                     entry.getKey().substring(TableConstants.SETTINGS_PREFIX.length())
@@ -188,7 +254,7 @@ public class ClickHouseTableOperations extends JdbcTableOperations {
     sqlBuilder.append(settings);
   }
 
-  private static void appendOrderBy(
+  private void appendOrderBy(
       SortOrder[] sortOrders,
       StringBuilder sqlBuilder,
       ClickHouseTablePropertiesMetadata.ENGINE engine) {
@@ -210,34 +276,145 @@ public class ClickHouseTableOperations extends JdbcTableOperations {
           "ORDER BY clause is required for engine: " + engine.getValue());
     }
 
-    if (sortOrders.length > 1) {
-      throw new UnsupportedOperationException(
-          "Currently ClickHouse does not support sortOrders with more than 1 element");
+    List<String> orderBySql = new ArrayList<>();
+    for (SortOrder sortOrder : sortOrders) {
+      NullOrdering nullOrdering = sortOrder.nullOrdering();
+      SortDirection sortDirection = sortOrder.direction();
+      if (nullOrdering != null) {
+        LOG.warn(
+            "ClickHouse currently does not support nullOrdering: {}, and will ignore it",
+            nullOrdering);
+      }
+
+      String exprSql = toOrderBySql(sortOrder.expression());
+      if (sortDirection == SortDirection.DESCENDING) {
+        exprSql = exprSql + " DESC";
+      }
+      orderBySql.add(exprSql);
     }
 
-    NullOrdering nullOrdering = sortOrders[0].nullOrdering();
-    SortDirection sortDirection = sortOrders[0].direction();
-    if (nullOrdering != null && sortDirection != null) {
-      // ClickHouse does not support NULLS FIRST/LAST now.
-      LOG.warn(
-          "ClickHouse currently does not support nullOrdering: {}, and will ignore it",
-          nullOrdering);
-    }
-
-    sqlBuilder.append("\n ORDER BY `%s`\n".formatted(sortOrders[0].expression()));
+    String renderedOrderBy =
+        orderBySql.size() == 1 ? orderBySql.get(0) : "(" + String.join(", ", orderBySql) + ")";
+    sqlBuilder.append("\n ORDER BY ").append(renderedOrderBy).append("\n");
   }
 
   private ClickHouseTablePropertiesMetadata.ENGINE appendTableEngine(
-      Map<String, String> properties, StringBuilder sqlBuilder) {
+      Map<String, String> properties, StringBuilder sqlBuilder, JdbcColumn[] columns) {
     ClickHouseTablePropertiesMetadata.ENGINE engine = ENGINE_PROPERTY_ENTRY.getDefaultValue();
     if (MapUtils.isNotEmpty(properties)) {
-      String userSetEngine = properties.remove(CLICKHOUSE_ENGINE_KEY);
+      String userSetEngine = properties.get(GRAVITINO_ENGINE_KEY);
       if (StringUtils.isNotEmpty(userSetEngine)) {
         engine = ClickHouseTablePropertiesMetadata.ENGINE.fromString(userSetEngine);
       }
     }
+
+    if (engine == ENGINE.DISTRIBUTED) {
+      handleDistributeTable(properties, sqlBuilder, columns);
+      return engine;
+    }
+
     sqlBuilder.append("\n ENGINE = %s".formatted(engine.getValue()));
     return engine;
+  }
+
+  private void handleDistributeTable(
+      Map<String, String> properties, StringBuilder sqlBuilder, JdbcColumn[] columns) {
+
+    // Check properties
+    String clusterName = properties.get(ClusterConstants.CLUSTER_NAME);
+    String remoteDatabase = properties.get(DistributedTableConstants.REMOTE_DATABASE);
+    String remoteTable = properties.get(DistributedTableConstants.REMOTE_TABLE);
+    String shardingKey = properties.get(DistributedTableConstants.SHARDING_KEY);
+
+    Preconditions.checkArgument(
+        StringUtils.isNotBlank(clusterName),
+        "Cluster name must be specified when engine is Distributed");
+    Preconditions.checkArgument(
+        StringUtils.isNotBlank(remoteDatabase),
+        "Remote database must be specified for Distributed");
+    Preconditions.checkArgument(
+        StringUtils.isNotBlank(remoteTable), "Remote table must be specified for Distributed");
+
+    // User must ensure the sharding key is a trusted value.
+    // TODO(yuqi) WE need to check the columns in shard keys should be integer and not nullable,
+    //  as clickhouse distributed table requires the sharding key to be integer and not nullable.
+    //  We can add this validation after we support user defined sharding key in index, as we can
+    //  reuse the index field definition for validation.
+    Preconditions.checkArgument(
+        StringUtils.isNotBlank(shardingKey), "Sharding key must be specified for Distributed");
+
+    List<String> shardingColumns = ClickHouseTableSqlUtils.extractShardingKeyColumns(shardingKey);
+    if (CollectionUtils.isNotEmpty(shardingColumns)) {
+      for (String columnName : shardingColumns) {
+        JdbcColumn shardingColumn = findColumn(columns, columnName);
+        Preconditions.checkArgument(
+            shardingColumn != null,
+            "Sharding key column %s must be defined in the table",
+            columnName);
+      }
+    }
+
+    String sanitizedShardingKey = ClickHouseTableSqlUtils.formatShardingKey(shardingKey);
+
+    sqlBuilder.append(
+        "\n ENGINE = %s(`%s`,`%s`,`%s`,%s)"
+            .formatted(
+                ENGINE.DISTRIBUTED.getValue(),
+                clusterName,
+                remoteDatabase,
+                remoteTable,
+                sanitizedShardingKey));
+  }
+
+  private void appendPartitionClause(
+      Transform[] partitioning,
+      StringBuilder sqlBuilder,
+      ClickHouseTablePropertiesMetadata.ENGINE engine) {
+    if (ArrayUtils.isEmpty(partitioning)) {
+      return;
+    }
+
+    if (!engine.acceptPartition()) {
+      throw new UnsupportedOperationException(
+          "Partitioning is only supported for MergeTree family engines");
+    }
+
+    List<String> partitionExprs =
+        Arrays.stream(partitioning)
+            .map(ClickHouseTableSqlUtils::toPartitionExpression)
+            .collect(Collectors.toList());
+    String partitionExpr =
+        partitionExprs.size() == 1
+            ? partitionExprs.get(0)
+            : "tuple(" + String.join(", ", partitionExprs) + ")";
+    sqlBuilder.append("\n PARTITION BY ").append(partitionExpr);
+  }
+
+  private JdbcColumn findColumn(JdbcColumn[] columns, String columnName) {
+    if (ArrayUtils.isEmpty(columns)) {
+      return null;
+    }
+
+    return Arrays.stream(columns)
+        .filter(column -> StringUtils.equals(column.name(), columnName))
+        .findFirst()
+        .orElse(null);
+  }
+
+  private String toPartitionExpression(Transform transform) {
+    Preconditions.checkArgument(transform != null, "Partition transform cannot be null");
+    Preconditions.checkArgument(
+        StringUtils.equalsIgnoreCase(transform.name(), Transforms.NAME_OF_IDENTITY),
+        "Unsupported partition transform: " + transform.name());
+    Preconditions.checkArgument(
+        transform.arguments().length == 1
+            && transform.arguments()[0] instanceof NamedReference
+            && ((NamedReference) transform.arguments()[0]).fieldName().length == 1,
+        "ClickHouse only supports single column identity partitioning");
+
+    String fieldName =
+        ((NamedReference) transform.arguments()[0]).fieldName()[0]; // already validated
+    return quoteIdentifier(fieldName);
   }
 
   private void buildColumnsDefinition(JdbcColumn[] columns, StringBuilder sqlBuilder) {
@@ -254,9 +431,9 @@ public class ClickHouseTableOperations extends JdbcTableOperations {
   }
 
   /**
-   * ClickHouse only supports primary key now, and some secondary index will be supported in future
+   * ClickHouse supports primary key and data skipping indexes.
    *
-   * <p>This method will not check the validity of the indexes. For clickhouse, the primary key must
+   * <p>This method will not check the validity of the indexes. For ClickHouse, the primary key must
    * be a subset of the order by columns. We will leave the underlying clickhouse to validate it.
    */
   private void appendIndexesSql(Index[] indexes, StringBuilder sqlBuilder) {
@@ -277,6 +454,25 @@ public class ClickHouseTableOperations extends JdbcTableOperations {
           }
           // fieldStr already quoted in getIndexFieldStr
           sqlBuilder.append(" PRIMARY KEY (").append(fieldStr).append(")");
+          break;
+        case DATA_SKIPPING_MINMAX:
+          Preconditions.checkArgument(
+              StringUtils.isNotBlank(index.name()), "Data skipping index name must not be blank");
+          // The GRANULARITY value is always 1 here currently as we can't set it by Index: there is
+          // no field for it.
+          // TODO(yuqi) add a properties field to Index to support user defined GRANULARITY value.
+          sqlBuilder.append(
+              " INDEX %s %s TYPE minmax GRANULARITY 1"
+                  .formatted(quoteIdentifier(index.name()), fieldStr));
+          break;
+        case DATA_SKIPPING_BLOOM_FILTER:
+          // The GRANULARITY value is always 3 here currently.
+          // TODO(yuqi) add a properties field to Index to support user defined GRANULARITY value.
+          Preconditions.checkArgument(
+              StringUtils.isNotBlank(index.name()), "Data skipping index name must not be blank");
+          sqlBuilder.append(
+              " INDEX %s %s TYPE bloom_filter GRANULARITY 3"
+                  .formatted(quoteIdentifier(index.name()), fieldStr));
           break;
         default:
           throw new IllegalArgumentException(
@@ -321,7 +517,35 @@ public class ClickHouseTableOperations extends JdbcTableOperations {
                 new HashMap<String, String>() {
                   {
                     put(COMMENT, resultSet.getString(COMMENT));
-                    put(CLICKHOUSE_ENGINE_KEY, resultSet.getString(CLICKHOUSE_ENGINE_KEY));
+                    String engine = resultSet.getString(CLICKHOUSE_ENGINE_KEY);
+                    put(GRAVITINO_ENGINE_KEY, engine);
+                    String createSql = parseShowCreateTableSql(connection, tableName);
+                    Matcher onClusterMatcher = ON_CLUSTER_PATTERN.matcher(createSql);
+                    if (onClusterMatcher.find()) {
+                      put(ClusterConstants.ON_CLUSTER, String.valueOf(true));
+                      put(ClusterConstants.CLUSTER_NAME, unquote(onClusterMatcher.group(1)));
+                    } else {
+                      put(ClusterConstants.ON_CLUSTER, String.valueOf(false));
+                    }
+
+                    if (StringUtils.equalsIgnoreCase(engine, ENGINE.DISTRIBUTED.getValue())) {
+                      String engineFull = resultSet.getString("engine_full");
+                      Matcher distributedEngineMatcher =
+                          DISTRIBUTED_ENGINE_PATTERN.matcher(StringUtils.trimToEmpty(engineFull));
+                      if (distributedEngineMatcher.matches()) {
+                        String distributedClusterName = unquote(distributedEngineMatcher.group(1));
+                        put(ClusterConstants.CLUSTER_NAME, distributedClusterName);
+                        put(
+                            DistributedTableConstants.REMOTE_DATABASE,
+                            unquote(distributedEngineMatcher.group(2)));
+                        put(
+                            DistributedTableConstants.REMOTE_TABLE,
+                            unquote(distributedEngineMatcher.group(3)));
+                        put(
+                            DistributedTableConstants.SHARDING_KEY,
+                            StringUtils.trim(distributedEngineMatcher.group(4)));
+                      }
+                    }
                   }
                 });
           }
@@ -331,6 +555,77 @@ public class ClickHouseTableOperations extends JdbcTableOperations {
             "Table %s does not exist in %s.", tableName, connection.getCatalog());
       }
     }
+  }
+
+  @Override
+  public JdbcTable load(String databaseName, String tableName) throws NoSuchTableException {
+    try (Connection connection = getConnection(databaseName)) {
+      ResultSet tables = getTable(connection, databaseName, tableName);
+      JdbcTable.Builder jdbcTableBuilder = getTableBuilder(tables, databaseName, tableName);
+
+      List<JdbcColumn> jdbcColumns = new ArrayList<>();
+      ResultSet columns = getColumns(connection, databaseName, tableName);
+      while (columns.next()) {
+        JdbcColumn.Builder columnBuilder = getColumnBuilder(columns, databaseName, tableName);
+        if (columnBuilder != null) {
+          boolean autoIncrement = getAutoIncrementInfo(columns);
+          columnBuilder.withAutoIncrement(autoIncrement);
+          jdbcColumns.add(columnBuilder.build());
+        }
+      }
+      jdbcTableBuilder.withColumns(jdbcColumns.toArray(new JdbcColumn[0]));
+
+      List<Index> indexes = getIndexes(connection, databaseName, tableName);
+      jdbcTableBuilder.withIndexes(indexes.toArray(new Index[0]));
+
+      ShowCreateTableMetadata metadata = parseShowCreateTable(connection, tableName);
+      Transform[] partitioning = metadata.partitioning;
+      if (ArrayUtils.isEmpty(partitioning)) {
+        partitioning = getTablePartitioning(connection, databaseName, tableName);
+      }
+      jdbcTableBuilder.withPartitioning(partitioning);
+      jdbcTableBuilder.withSortOrders(metadata.sortOrders);
+
+      Distribution distribution = getDistributionInfo(connection, databaseName, tableName);
+      jdbcTableBuilder.withDistribution(distribution);
+
+      Map<String, String> tableProperties = getTableProperties(connection, tableName);
+      jdbcTableBuilder.withProperties(tableProperties);
+
+      correctJdbcTableFields(connection, databaseName, tableName, jdbcTableBuilder);
+
+      return jdbcTableBuilder.withTableOperation(this).build();
+    } catch (SQLException e) {
+      throw exceptionMapper.toGravitinoException(e);
+    }
+  }
+
+  @Override
+  protected Transform[] getTablePartitioning(
+      Connection connection, String databaseName, String tableName) throws SQLException {
+    try (PreparedStatement statement =
+        connection.prepareStatement(
+            "SELECT partition_key FROM system.tables WHERE database = ? AND name = ?")) {
+      statement.setString(1, databaseName);
+      statement.setString(2, tableName);
+      try (ResultSet resultSet = statement.executeQuery()) {
+        if (resultSet.next()) {
+          String partitionKey = resultSet.getString("partition_key");
+          try {
+            return parsePartitioning(partitionKey);
+          } catch (IllegalArgumentException | UnsupportedOperationException e) {
+            LOG.warn(
+                "Skip unsupported partition expression {} for {}.{}",
+                partitionKey,
+                databaseName,
+                tableName);
+            return Transforms.EMPTY_TRANSFORM;
+          }
+        }
+      }
+    }
+
+    return Transforms.EMPTY_TRANSFORM;
   }
 
   protected ResultSet getTables(Connection connection) throws SQLException {
@@ -681,6 +976,206 @@ public class ClickHouseTableOperations extends JdbcTableOperations {
             .withAutoIncrement(column.autoIncrement())
             .build();
     return appendColumnDefinition(newColumn, sqlBuilder).toString();
+  }
+
+  @VisibleForTesting
+  Transform[] parsePartitioning(String partitionKey) {
+    return ClickHouseTableSqlUtils.parsePartitioning(partitionKey);
+  }
+
+  private ShowCreateTableMetadata parseCreateStatement(String createSql) {
+    ShowCreateTableMetadata metadata = new ShowCreateTableMetadata();
+    if (StringUtils.isBlank(createSql)) {
+      return metadata;
+    }
+
+    Matcher orderMatcher = ORDER_BY_PATTERN.matcher(createSql);
+    if (orderMatcher.find()) {
+      metadata.sortOrders = parseOrderByClause(orderMatcher.group(1));
+    }
+
+    Matcher partitionMatcher = PARTITION_BY_PATTERN.matcher(createSql);
+    if (partitionMatcher.find()) {
+      metadata.partitioning = parsePartitioning(partitionMatcher.group(1));
+    }
+
+    return metadata;
+  }
+
+  private ShowCreateTableMetadata parseShowCreateTable(Connection connection, String tableName)
+      throws SQLException {
+    String createSql = parseShowCreateTableSql(connection, tableName);
+    return parseCreateStatement(createSql);
+  }
+
+  private String parseShowCreateTableSql(Connection connection, String tableName)
+      throws SQLException {
+    String sql = "SHOW CREATE TABLE " + quoteIdentifier(tableName);
+    try (Statement statement = connection.createStatement();
+        ResultSet resultSet = statement.executeQuery(sql)) {
+      if (resultSet.next()) {
+        return resultSet.getString(1);
+      }
+      throw new SQLException("SHOW CREATE TABLE returned no rows for " + tableName);
+    }
+  }
+
+  private String unquote(String value) {
+    String trimmed = StringUtils.trimToEmpty(value);
+    if (StringUtils.length(trimmed) >= 2) {
+      char first = trimmed.charAt(0);
+      char last = trimmed.charAt(trimmed.length() - 1);
+      if ((first == '\'' && last == '\'') || (first == '`' && last == '`')) {
+        return trimmed.substring(1, trimmed.length() - 1);
+      }
+    }
+    return trimmed;
+  }
+
+  private SortOrder[] parseOrderByClause(String orderClause) {
+    if (StringUtils.isBlank(orderClause)) {
+      return SortOrders.NONE;
+    }
+    String trimmed = orderClause.trim();
+    if (trimmed.startsWith("(") && trimmed.endsWith(")")) {
+      trimmed = trimmed.substring(1, trimmed.length() - 1);
+    }
+
+    List<String> expressions = splitExpressions(trimmed);
+    List<SortOrder> sortOrders = new ArrayList<>();
+    for (String expression : expressions) {
+      Expression sortExpr = toSortExpression(expression);
+      sortOrders.add(SortOrders.of(sortExpr, SortDirection.ASCENDING));
+    }
+    return sortOrders.toArray(new SortOrder[0]);
+  }
+
+  private List<String> splitExpressions(String expressionList) {
+    List<String> expressions = new ArrayList<>();
+    StringBuilder current = new StringBuilder();
+    int depth = 0;
+    for (int i = 0; i < expressionList.length(); i++) {
+      char ch = expressionList.charAt(i);
+      if (ch == '(') {
+        depth++;
+      } else if (ch == ')') {
+        depth--;
+      } else if (ch == ',' && depth == 0) {
+        expressions.add(current.toString());
+        current.setLength(0);
+        continue;
+      }
+      current.append(ch);
+    }
+    if (current.length() > 0) {
+      expressions.add(current.toString());
+    }
+    return expressions;
+  }
+
+  private Expression toSortExpression(String expression) {
+    String trimmed = StringUtils.trim(expression);
+    if (StringUtils.isBlank(trimmed)) {
+      return UnparsedExpression.of(expression);
+    }
+    String unquoted = trimmed;
+    if (StringUtils.startsWith(unquoted, "`") && StringUtils.endsWith(unquoted, "`")) {
+      unquoted = unquoted.substring(1, unquoted.length() - 1);
+    }
+    if (unquoted.matches("[A-Za-z_][A-Za-z0-9_]*")) {
+      return NamedReference.field(unquoted);
+    }
+
+    int firstParen = unquoted.indexOf('(');
+    int lastParen = unquoted.lastIndexOf(')');
+    if (firstParen > 0 && lastParen > firstParen) {
+      String funcName = unquoted.substring(0, firstParen).trim();
+      if (funcName.matches("[A-Za-z_][A-Za-z0-9_]*")) {
+        String argsString = unquoted.substring(firstParen + 1, lastParen);
+        List<String> args = splitExpressions(argsString);
+        Expression[] parsedArgs =
+            args.stream().map(this::toSortExpression).toArray(Expression[]::new);
+        return FunctionExpression.of(funcName, parsedArgs);
+      }
+    }
+
+    return UnparsedExpression.of(trimmed);
+  }
+
+  private String toOrderBySql(Expression expression) {
+    if (expression instanceof NamedReference) {
+      String[] parts = ((NamedReference) expression).fieldName();
+      return "`" + String.join("`.`", parts) + "`";
+    } else if (expression instanceof FunctionExpression) {
+      FunctionExpression func = (FunctionExpression) expression;
+      return func.functionName()
+          + Arrays.stream(func.arguments())
+              .map(this::toOrderBySql)
+              .collect(Collectors.joining(", ", "(", ")"));
+    } else if (expression instanceof UnparsedExpression) {
+      return ((UnparsedExpression) expression).unparsedExpression();
+    }
+    return expression.toString();
+  }
+
+  private static final class ShowCreateTableMetadata {
+    private Transform[] partitioning = Transforms.EMPTY_TRANSFORM;
+    private SortOrder[] sortOrders = SortOrders.NONE;
+  }
+
+  @VisibleForTesting
+  String[][] parseIndexFields(String expression) {
+    return ClickHouseTableSqlUtils.parseIndexFields(expression);
+  }
+
+  private List<Index> getSecondaryIndexes(
+      Connection connection, String databaseName, String tableName) throws SQLException {
+    List<Index> secondaryIndexes = new ArrayList<>();
+    try (PreparedStatement preparedStatement =
+        connection.prepareStatement(
+            "SELECT name, type, expr FROM system.data_skipping_indices "
+                + "WHERE database = ? AND table = ? ORDER BY name")) {
+      preparedStatement.setString(1, databaseName);
+      preparedStatement.setString(2, tableName);
+      try (ResultSet resultSet = preparedStatement.executeQuery()) {
+        while (resultSet.next()) {
+          String name = resultSet.getString("name");
+          String type = resultSet.getString("type");
+          String expression = resultSet.getString("expr");
+          try {
+            String[][] fields = parseIndexFields(expression);
+            if (ArrayUtils.isEmpty(fields)) {
+              continue;
+            }
+            secondaryIndexes.add(Indexes.of(getClickHouseIndexType(type), name, fields));
+          } catch (IllegalArgumentException e) {
+            LOG.warn(
+                "Skip unsupported data skipping index {} for {}.{} with expression {}",
+                name,
+                databaseName,
+                tableName,
+                expression);
+          }
+        }
+      }
+    }
+
+    return secondaryIndexes;
+  }
+
+  private Index.IndexType getClickHouseIndexType(String rawType) {
+    if (StringUtils.isBlank(rawType)) {
+      return Index.IndexType.DATA_SKIPPING_MINMAX;
+    }
+
+    switch (rawType) {
+      case DATA_SKIPPING_MINMAX_VALUE:
+        return Index.IndexType.DATA_SKIPPING_MINMAX;
+      case DATA_SKIPPING_BLOOM_FILTER:
+        return Index.IndexType.DATA_SKIPPING_BLOOM_FILTER;
+      default:
+        throw new IllegalArgumentException("Unsupported data skipping index type: " + rawType);
+    }
   }
 
   private StringBuilder appendColumnDefinition(JdbcColumn column, StringBuilder sqlBuilder) {

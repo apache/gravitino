@@ -21,18 +21,23 @@ package org.apache.gravitino.trino.connector.system;
 import io.trino.spi.Page;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
+import org.mockito.Mockito;
 
 public class TestGravitinoSystemConnector {
   @Test
   public void testSystemTablePageSourceReturnsPageOnlyOnce() throws Exception {
     Page page = new Page(0);
     try (GravitinoSystemConnector.SystemTablePageSource pageSource =
-        new GravitinoSystemConnector.SystemTablePageSource(page)) {
+        Mockito.mock(
+            GravitinoSystemConnector.SystemTablePageSource.class,
+            Mockito.withSettings()
+                .useConstructor(page)
+                .defaultAnswer(Mockito.CALLS_REAL_METHODS))) {
 
       Assertions.assertFalse(pageSource.isFinished());
-      Assertions.assertSame(page, pageSource.getNextPage());
+      Assertions.assertSame(page, pageSource.nextPage());
       Assertions.assertTrue(pageSource.isFinished());
-      Assertions.assertNull(pageSource.getNextPage());
+      Assertions.assertNull(pageSource.nextPage());
     }
   }
 
@@ -40,18 +45,22 @@ public class TestGravitinoSystemConnector {
   public void testSystemTablePageSourceMultipleGetNextPageCalls() throws Exception {
     Page page = new Page(0);
     try (GravitinoSystemConnector.SystemTablePageSource pageSource =
-        new GravitinoSystemConnector.SystemTablePageSource(page)) {
+        Mockito.mock(
+            GravitinoSystemConnector.SystemTablePageSource.class,
+            Mockito.withSettings()
+                .useConstructor(page)
+                .defaultAnswer(Mockito.CALLS_REAL_METHODS))) {
 
       // First call should return the page
-      Page firstPage = pageSource.getNextPage();
+      Page firstPage = pageSource.nextPage();
       Assertions.assertNotNull(firstPage);
       Assertions.assertSame(page, firstPage);
       Assertions.assertTrue(pageSource.isFinished());
 
       // Subsequent calls should return null
-      Assertions.assertNull(pageSource.getNextPage());
-      Assertions.assertNull(pageSource.getNextPage());
-      Assertions.assertNull(pageSource.getNextPage());
+      Assertions.assertNull(pageSource.nextPage());
+      Assertions.assertNull(pageSource.nextPage());
+      Assertions.assertNull(pageSource.nextPage());
       Assertions.assertTrue(pageSource.isFinished());
     }
   }

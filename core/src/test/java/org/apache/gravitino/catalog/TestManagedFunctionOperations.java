@@ -531,6 +531,32 @@ public class TestManagedFunctionOperations {
   }
 
   @Test
+  public void testRegisterFunctionWithDuplicateRuntimeInDefinition() {
+    NameIdentifier funcIdent = getFunctionIdent("func_register_dup_runtime");
+    FunctionParam[] params = new FunctionParam[] {FunctionParams.of("a", Types.IntegerType.get())};
+    FunctionImpl sparkImpl1 =
+        FunctionImpls.ofJava(FunctionImpl.RuntimeType.SPARK, "com.example.SparkUDF1");
+    FunctionImpl sparkImpl2 =
+        FunctionImpls.ofJava(FunctionImpl.RuntimeType.SPARK, "com.example.SparkUDF2");
+
+    FunctionDefinition[] definitions =
+        new FunctionDefinition[] {
+          createDefinitionWithImpls(
+              params, Types.StringType.get(), new FunctionImpl[] {sparkImpl1, sparkImpl2})
+        };
+
+    IllegalArgumentException ex =
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () ->
+                functionOperations.registerFunction(
+                    funcIdent, "Test function", FunctionType.SCALAR, true, definitions));
+    Assertions.assertTrue(
+        ex.getMessage().contains("duplicate runtime"),
+        "Expected error about duplicate runtime, got: " + ex.getMessage());
+  }
+
+  @Test
   public void testAlterFunctionAddImplToNonExistingDefinition() {
     NameIdentifier funcIdent = getFunctionIdent("func_add_impl_nodef");
     FunctionParam[] params = new FunctionParam[] {FunctionParams.of("a", Types.IntegerType.get())};
@@ -601,12 +627,54 @@ public class TestManagedFunctionOperations {
     FunctionImpl trinoImpl =
         FunctionImpls.ofJava(FunctionImpl.RuntimeType.TRINO, "com.example.TrinoUDF");
 
-    Assertions.assertThrows(
-        IllegalArgumentException.class,
-        () ->
-            functionOperations.alterFunction(
-                funcIdent,
-                FunctionChange.updateImpl(params, FunctionImpl.RuntimeType.TRINO, trinoImpl)));
+    IllegalArgumentException ex =
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () ->
+                functionOperations.alterFunction(
+                    funcIdent,
+                    FunctionChange.updateImpl(params, FunctionImpl.RuntimeType.TRINO, trinoImpl)));
+    Assertions.assertTrue(
+        ex.getMessage().contains("TRINO"), "Error message should mention the missing runtime");
+    Assertions.assertTrue(
+        ex.getMessage().contains("SPARK"),
+        "Error message should list available runtimes in that definition");
+  }
+
+  @Test
+  public void testAlterFunctionUpdateImplWrongParameters() {
+    NameIdentifier funcIdent = getFunctionIdent("func_update_impl_wrongparams");
+    FunctionParam[] params = new FunctionParam[] {FunctionParams.of("a", Types.IntegerType.get())};
+    FunctionImpl sparkImpl =
+        FunctionImpls.ofJava(FunctionImpl.RuntimeType.SPARK, "com.example.SparkUDF");
+    FunctionDefinition[] definitions =
+        new FunctionDefinition[] {
+          createDefinitionWithImpls(params, Types.StringType.get(), new FunctionImpl[] {sparkImpl})
+        };
+
+    functionOperations.registerFunction(
+        funcIdent, "Test function", FunctionType.SCALAR, true, definitions);
+
+    // Try to update with wrong parameter name - definition won't be found
+    FunctionParam[] wrongParams =
+        new FunctionParam[] {FunctionParams.of("x", Types.IntegerType.get())};
+    FunctionImpl newImpl =
+        FunctionImpls.ofJava(FunctionImpl.RuntimeType.SPARK, "com.example.NewSparkUDF");
+
+    IllegalArgumentException ex =
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () ->
+                functionOperations.alterFunction(
+                    funcIdent,
+                    FunctionChange.updateImpl(
+                        wrongParams, FunctionImpl.RuntimeType.SPARK, newImpl)));
+    Assertions.assertTrue(
+        ex.getMessage().contains("(x: integer)"),
+        "Error message should include the specified parameter signature");
+    Assertions.assertTrue(
+        ex.getMessage().contains("(a: integer)"),
+        "Error message should list available parameter signatures");
   }
 
   @Test
@@ -673,11 +741,53 @@ public class TestManagedFunctionOperations {
         funcIdent, "Test function", FunctionType.SCALAR, true, definitions);
 
     // Try to remove Trino implementation which doesn't exist
-    Assertions.assertThrows(
-        IllegalArgumentException.class,
-        () ->
-            functionOperations.alterFunction(
-                funcIdent, FunctionChange.removeImpl(params, FunctionImpl.RuntimeType.TRINO)));
+    IllegalArgumentException ex =
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () ->
+                functionOperations.alterFunction(
+                    funcIdent, FunctionChange.removeImpl(params, FunctionImpl.RuntimeType.TRINO)));
+    Assertions.assertTrue(
+        ex.getMessage().contains("TRINO"), "Error message should mention the missing runtime");
+    Assertions.assertTrue(
+        ex.getMessage().contains("SPARK"),
+        "Error message should list available runtimes in that definition");
+  }
+
+  @Test
+  public void testAlterFunctionRemoveImplWrongParameters() {
+    NameIdentifier funcIdent = getFunctionIdent("func_remove_impl_wrongparams");
+    FunctionParam[] params = new FunctionParam[] {FunctionParams.of("a", Types.IntegerType.get())};
+    FunctionImpl sparkImpl =
+        FunctionImpls.ofJava(FunctionImpl.RuntimeType.SPARK, "com.example.SparkUDF");
+    FunctionImpl trinoImpl =
+        FunctionImpls.ofJava(FunctionImpl.RuntimeType.TRINO, "com.example.TrinoUDF");
+    FunctionDefinition[] definitions =
+        new FunctionDefinition[] {
+          createDefinitionWithImpls(
+              params, Types.StringType.get(), new FunctionImpl[] {sparkImpl, trinoImpl})
+        };
+
+    functionOperations.registerFunction(
+        funcIdent, "Test function", FunctionType.SCALAR, true, definitions);
+
+    // Try to remove with wrong parameter type - definition won't be found
+    FunctionParam[] wrongParams =
+        new FunctionParam[] {FunctionParams.of("a", Types.LongType.get())};
+
+    IllegalArgumentException ex =
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () ->
+                functionOperations.alterFunction(
+                    funcIdent,
+                    FunctionChange.removeImpl(wrongParams, FunctionImpl.RuntimeType.SPARK)));
+    Assertions.assertTrue(
+        ex.getMessage().contains("(a: long)"),
+        "Error message should include the specified parameter signature");
+    Assertions.assertTrue(
+        ex.getMessage().contains("(a: integer)"),
+        "Error message should list available parameter signatures");
   }
 
   @Test

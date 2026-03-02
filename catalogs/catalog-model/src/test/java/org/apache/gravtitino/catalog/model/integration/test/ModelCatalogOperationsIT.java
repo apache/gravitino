@@ -1073,6 +1073,48 @@ public class ModelCatalogOperationsIT extends BaseIT {
   }
 
   @Test
+  void testLinkAndUpdateModelVersionAliasesFromEmpty() {
+    // Regression test for https://github.com/apache/gravitino/issues/9727:
+    // updating aliases on a model version that was linked without any aliases must not throw.
+    String modelName = RandomNameUtils.genRandomName("model1");
+    Map<String, String> properties = ImmutableMap.of("key1", "val1");
+    NameIdentifier modelIdent = NameIdentifier.of(schemaName, modelName);
+
+    gravitinoCatalog.asModelCatalog().registerModel(modelIdent, null, null);
+
+    // Link a model version with NO aliases
+    gravitinoCatalog
+        .asModelCatalog()
+        .linkModelVersion(modelIdent, "uri", new String[] {}, "comment", properties);
+
+    ModelVersion modelVersion = gravitinoCatalog.asModelCatalog().getModelVersion(modelIdent, 0);
+    Assertions.assertEquals(0, modelVersion.version());
+    Assertions.assertEquals(0, modelVersion.aliases().length);
+
+    // Now add aliases to the version that previously had none — must not throw
+    ModelVersionChange change =
+        ModelVersionChange.updateAliases(new String[] {"alias1", "alias2"}, new String[] {});
+    ModelVersion updatedModelVersion =
+        Assertions.assertDoesNotThrow(
+            () -> gravitinoCatalog.asModelCatalog().alterModelVersion(modelIdent, 0, change));
+
+    String[] expectedAliases = {"alias1", "alias2"};
+    Assertions.assertEquals(0, updatedModelVersion.version());
+    Assertions.assertArrayEquals(expectedAliases, updatedModelVersion.aliases());
+
+    // Reload and verify aliases are persisted
+    ModelVersion reloadedModelVersion =
+        gravitinoCatalog.asModelCatalog().getModelVersion(modelIdent, 0);
+    Assertions.assertArrayEquals(expectedAliases, reloadedModelVersion.aliases());
+
+    // Verify lookups by alias now work
+    Assertions.assertDoesNotThrow(
+        () -> gravitinoCatalog.asModelCatalog().getModelVersion(modelIdent, "alias1"));
+    Assertions.assertDoesNotThrow(
+        () -> gravitinoCatalog.asModelCatalog().getModelVersion(modelIdent, "alias2"));
+  }
+
+  @Test
   public void testGetModelVersionUri() {
     // Test get model version without default uri name
     String modelName = RandomNameUtils.genRandomName("model1");

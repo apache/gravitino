@@ -31,6 +31,7 @@ public @interface IcebergAuthorizationMetadata {
   enum RequestType {
     LOAD_TABLE,
     RENAME_TABLE,
+    RENAME_VIEW,
   }
   /**
    * The type of the parameter to be used for authorization.

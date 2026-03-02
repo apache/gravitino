@@ -28,8 +28,11 @@ import org.apache.gravitino.iceberg.service.provider.IcebergConfigProvider;
 // Provide a custom catalogWrapper to do test like `registerTable`
 public class IcebergCatalogWrapperManagerForTest extends IcebergCatalogWrapperManager {
   public IcebergCatalogWrapperManagerForTest(
-      Map<String, String> properties, IcebergConfigProvider configProvider) {
-    super(properties, configProvider);
+      Map<String, String> properties,
+      IcebergConfigProvider configProvider,
+      boolean auxMode,
+      String metalakeName) {
+    super(properties, configProvider, auxMode, metalakeName);
   }
 
   @Override

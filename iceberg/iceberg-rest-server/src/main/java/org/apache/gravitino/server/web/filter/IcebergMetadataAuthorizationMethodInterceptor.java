@@ -76,7 +76,21 @@ public class IcebergMetadataAuthorizationMethodInterceptor
           break;
         case TABLE:
           nameIdentifierMap.put(
-              EntityType.TABLE, NameIdentifierUtil.ofTable(metalakeName, catalog, schema, value));
+              EntityType.TABLE,
+              NameIdentifierUtil.ofTable(
+                  metalakeName, catalog, schema, RESTUtil.decodeString(value)));
+          break;
+        case VIEW:
+          String decodedViewName = RESTUtil.decodeString(value);
+          nameIdentifierMap.put(
+              EntityType.VIEW,
+              NameIdentifierUtil.ofView(metalakeName, catalog, schema, decodedViewName));
+          // Also register as TABLE so ANY_SELECT_TABLE in
+          // ICEBERG_LOAD_VIEW_AUTHORIZATION_EXPRESSION
+          // matches when Spark probes viewExists(tableName) during table resolution.
+          nameIdentifierMap.put(
+              EntityType.TABLE,
+              NameIdentifierUtil.ofTable(metalakeName, catalog, schema, decodedViewName));
           break;
         default:
           break;
@@ -103,6 +117,8 @@ public class IcebergMetadataAuthorizationMethodInterceptor
             return Optional.of(new LoadTableAuthzHandler(parameters, args));
           case RENAME_TABLE:
             return Optional.of(new RenameTableAuthzHandler(parameters, args));
+          case RENAME_VIEW:
+            return Optional.of(new RenameViewAuthzHandler(parameters, args));
           default:
             break;
         }
