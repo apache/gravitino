@@ -288,6 +288,16 @@ public class Configs {
           .booleanConf()
           .createWithDefault(false);
 
+  public static final ConfigEntry<Boolean> FILTER_SENSITIVE_PROPERTIES =
+      new ConfigBuilder("gravitino.authorization.filterSensitiveProperties")
+          .doc(
+              "Whether to filter sensitive properties in catalog responses. "
+                  + "When enabled, sensitive properties like passwords and secret keys will be "
+                  + "hidden from users without appropriate permissions")
+          .version(ConfigConstants.VERSION_1_2_0)
+          .booleanConf()
+          .createWithDefault(true);
+
   public static final ConfigEntry<String> AUTHORIZATION_IMPL =
       new ConfigBuilder("gravitino.authorization.impl")
           .doc("Metadata authorization implementation")

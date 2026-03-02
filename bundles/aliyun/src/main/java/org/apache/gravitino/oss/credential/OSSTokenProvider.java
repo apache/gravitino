@@ -19,8 +19,11 @@
 
 package org.apache.gravitino.oss.credential;
 
+import com.google.common.collect.Sets;
+import java.util.Set;
 import org.apache.gravitino.credential.CredentialProviderDelegator;
 import org.apache.gravitino.credential.OSSTokenCredential;
+import org.apache.gravitino.credential.config.OSSCredentialConfig;
 
 /**
  * A lightweight credential provider for OSS. It delegates the actual credential generation to
@@ -36,5 +39,12 @@ public class OSSTokenProvider extends CredentialProviderDelegator<OSSTokenCreden
   @Override
   public String getGeneratorClassName() {
     return "org.apache.gravitino.oss.credential.OSSTokenGenerator";
+  }
+
+  @Override
+  public Set<String> sensitivePropertyKeys() {
+    return Sets.newHashSet(
+        OSSCredentialConfig.OSS_ACCESS_KEY_ID.getKey(),
+        OSSCredentialConfig.OSS_SECRET_ACCESS_KEY.getKey());
   }
 }

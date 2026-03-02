@@ -20,7 +20,9 @@
 package org.apache.gravitino.credential;
 
 import java.io.Closeable;
+import java.util.Collections;
 import java.util.Map;
+import java.util.Set;
 import javax.annotation.Nullable;
 
 /**
@@ -58,4 +60,36 @@ public interface CredentialProvider extends Closeable {
    */
   @Nullable
   Credential getCredential(CredentialContext context);
+
+  /**
+   * Returns the sensitive property keys used by this credential provider. These properties contain
+   * sensitive data such as passwords, secret keys, access tokens, etc.
+   *
+   * <p>The returned property keys have the following effects:
+   *
+   * <ul>
+   *   <li><b>Metadata registration:</b> Properties are automatically registered as sensitive in the
+   *       catalog's PropertiesMetadata, enabling proper validation and handling.
+   *   <li><b>API response filtering:</b> When the server configuration {@code
+   *       gravitino.authorization.filterSensitiveProperties} is enabled (default: true), these
+   *       properties are excluded from catalog API responses unless the requesting user has owner
+   *       or alter permissions on the catalog.
+   *   <li><b>Security protection:</b> Prevents accidental exposure of credentials in logs, API
+   *       responses, and UI displays.
+   * </ul>
+   *
+   * <p>Examples of sensitive properties include:
+   *
+   * <ul>
+   *   <li>S3: {@code s3-access-key-id}, {@code s3-secret-access-key}
+   *   <li>Azure: {@code azure-storage-client-secret}, {@code azure-storage-account-key}
+   *   <li>OSS: {@code oss-access-key-id}, {@code oss-access-key-secret}
+   * </ul>
+   *
+   * @return A set of sensitive property keys. Returns an empty set by default if this provider does
+   *     not use any sensitive catalog properties.
+   */
+  default Set<String> sensitivePropertyKeys() {
+    return Collections.emptySet();
+  }
 }

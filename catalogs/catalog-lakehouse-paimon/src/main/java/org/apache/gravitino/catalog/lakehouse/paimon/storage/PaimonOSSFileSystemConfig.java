@@ -87,7 +87,7 @@ public class PaimonOSSFileSystemConfig extends Config {
                   false /* hidden */))
           .put(
               OSS_ACCESS_KEY,
-              PropertyEntry.stringOptionalPropertyEntry(
+              PropertyEntry.stringOptionalSensitivePropertyEntry(
                   OSS_ACCESS_KEY,
                   "The access key of the Aliyun oss",
                   false /* immutable */,
@@ -95,7 +95,7 @@ public class PaimonOSSFileSystemConfig extends Config {
                   false /* hidden */))
           .put(
               OSS_SECRET_KEY,
-              PropertyEntry.stringOptionalPropertyEntry(
+              PropertyEntry.stringOptionalSensitivePropertyEntry(
                   OSS_SECRET_KEY,
                   "The secret key of the Aliyun oss",
                   false /* immutable */,

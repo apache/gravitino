@@ -266,6 +266,145 @@ public class MetadataAuthzHelper {
   }
 
   /**
+   * Partitions an array of entities into two arrays based on two authorization expressions. An
+   * entity that satisfies the first expression goes into the first array. An entity that does not
+   * satisfy the first expression but satisfies the second expression goes into the second array.
+   * Entities that satisfy neither expression are excluded from both arrays.
+   *
+   * @param metalake metalake name
+   * @param firstExpression authorization expression for the first array
+   * @param secondExpression authorization expression for the second array
+   * @param entityType entity type
+   * @param entities array of metadata entities to partition
+   * @param toNameIdentifier function to convert entity to NameIdentifier
+   * @return A FilterResult containing both partitioned arrays
+   * @param <E> Entity class
+   */
+  public static <E> FilterResult<E, E> partitionByTwoExpressions(
+      String metalake,
+      String firstExpression,
+      String secondExpression,
+      Entity.EntityType entityType,
+      E[] entities,
+      Function<E, NameIdentifier> toNameIdentifier) {
+    Class<?> componentType = entities.getClass().getComponentType();
+    if (!enableAuthorization()) {
+      E[] emptyArray = createArray(componentType, 0);
+      return new FilterResult<>(entities, emptyArray);
+    }
+    checkExecutor();
+
+    Principal currentPrincipal = PrincipalUtils.getCurrentPrincipal();
+    GravitinoAuthorizer authorizer =
+        GravitinoAuthorizerProvider.getInstance().getGravitinoAuthorizer();
+    AuthorizationRequestContext authorizationRequestContext = new AuthorizationRequestContext();
+    // Set the original authorization expression for better observability in debug logs
+    authorizationRequestContext.setOriginalAuthorizationExpression(
+        String.format("(%s) || (%s)", firstExpression, secondExpression));
+    List<CompletableFuture<int[]>> futures = new ArrayList<>();
+
+    for (int i = 0; i < entities.length; i++) {
+      final int index = i;
+      final E entity = entities[i];
+      futures.add(
+          CompletableFuture.supplyAsync(
+              () -> {
+                try {
+                  return PrincipalUtils.doAs(
+                      currentPrincipal,
+                      () -> {
+                        Map<Entity.EntityType, NameIdentifier> nameIdentifierMap =
+                            NameIdentifierUtil.splitNameIdentifier(
+                                metalake, entityType, toNameIdentifier.apply(entity));
+
+                        AuthorizationExpressionEvaluator firstEvaluator =
+                            new AuthorizationExpressionEvaluator(firstExpression, authorizer);
+                        if (firstEvaluator.evaluate(
+                            nameIdentifierMap,
+                            authorizationRequestContext,
+                            currentPrincipal,
+                            Optional.of(entityType.name()))) {
+                          // Satisfies first expression -> goes to first list
+                          return new int[] {index, 1};
+                        }
+
+                        AuthorizationExpressionEvaluator secondEvaluator =
+                            new AuthorizationExpressionEvaluator(secondExpression, authorizer);
+                        if (secondEvaluator.evaluate(
+                            nameIdentifierMap,
+                            authorizationRequestContext,
+                            currentPrincipal,
+                            Optional.of(entityType.name()))) {
+                          // Satisfies second expression (but not first) -> goes to second list
+                          return new int[] {index, 2};
+                        }
+
+                        // Satisfies neither -> excluded
+                        return new int[] {index, 0};
+                      });
+                } catch (Exception e) {
+                  LOG.error("GravitinoAuthorize error:{}", e.getMessage(), e);
+                  return new int[] {index, 0};
+                }
+              },
+              executor));
+    }
+
+    List<E> firstList = new ArrayList<>();
+    List<E> secondList = new ArrayList<>();
+
+    for (CompletableFuture<int[]> future : futures) {
+      int[] result = future.join();
+      int idx = result[0];
+      int listId = result[1];
+      if (listId == 1) {
+        firstList.add(entities[idx]);
+      } else if (listId == 2) {
+        secondList.add(entities[idx]);
+      }
+    }
+
+    E[] firstArray = firstList.toArray(createArray(componentType, firstList.size()));
+    E[] secondArray = secondList.toArray(createArray(componentType, secondList.size()));
+
+    return new FilterResult<>(firstArray, secondArray);
+  }
+
+  /**
+   * Result class that holds two partitioned arrays from {@link #partitionByTwoExpressions}.
+   *
+   * @param <E1> First entity type
+   * @param <E2> Second entity type
+   */
+  public static class FilterResult<E1, E2> {
+    private final E1[] filteredEntities1;
+    private final E2[] filteredEntities2;
+
+    public FilterResult(E1[] filteredEntities1, E2[] filteredEntities2) {
+      this.filteredEntities1 = filteredEntities1;
+      this.filteredEntities2 = filteredEntities2;
+    }
+
+    /**
+     * Gets the first filtered array.
+     *
+     * @return The first filtered array
+     */
+    public E1[] getFirst() {
+      return filteredEntities1;
+    }
+
+    /**
+     * Gets the second filtered array.
+     *
+     * @return The second filtered array
+     */
+    public E2[] getSecond() {
+      return filteredEntities2;
+    }
+  }
+
+  /**
    * Filters entities based on authorization expression evaluation.
    *
    * @param expression The authorization expression to evaluate

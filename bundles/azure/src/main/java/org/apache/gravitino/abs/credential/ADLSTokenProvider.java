@@ -19,8 +19,11 @@
 
 package org.apache.gravitino.abs.credential;
 
+import com.google.common.collect.Sets;
+import java.util.Set;
 import org.apache.gravitino.credential.ADLSTokenCredential;
 import org.apache.gravitino.credential.CredentialProviderDelegator;
+import org.apache.gravitino.credential.config.AzureCredentialConfig;
 
 /**
  * A lightweight credential provider for ADLS. It delegates the actual credential generation to
@@ -36,5 +39,12 @@ public class ADLSTokenProvider extends CredentialProviderDelegator<ADLSTokenCred
   @Override
   public String getGeneratorClassName() {
     return "org.apache.gravitino.abs.credential.ADLSTokenGenerator";
+  }
+
+  @Override
+  public Set<String> sensitivePropertyKeys() {
+    return Sets.newHashSet(
+        AzureCredentialConfig.AZURE_STORAGE_ACCOUNT_KEY.getKey(),
+        AzureCredentialConfig.AZURE_CLIENT_SECRET.getKey());
   }
 }

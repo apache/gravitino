@@ -60,6 +60,7 @@ import javax.annotation.Nullable;
 import lombok.Getter;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.tuple.Pair;
+import org.apache.gravitino.Audit;
 import org.apache.gravitino.Catalog;
 import org.apache.gravitino.CatalogChange;
 import org.apache.gravitino.CatalogChange.RemoveProperty;
@@ -75,8 +76,10 @@ import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.StringIdentifier;
 import org.apache.gravitino.connector.BaseCatalog;
+import org.apache.gravitino.connector.CatalogInfo;
 import org.apache.gravitino.connector.CatalogOperations;
 import org.apache.gravitino.connector.HasPropertyMetadata;
+import org.apache.gravitino.connector.PropertiesMetadata;
 import org.apache.gravitino.connector.SupportsSchemas;
 import org.apache.gravitino.connector.authorization.BaseAuthorization;
 import org.apache.gravitino.connector.capability.Capability;
@@ -398,7 +401,13 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
           // provider is "fileset", still using "hadoop" will lead to catalog loading issue. So
           // after reading the catalog entity, we convert it to the new fileset catalog entity.
           .map(this::convertFilesetCatalogEntity)
-          .map(e -> e.toCatalogInfoWithResolvedProps(getResolvedProperties(e)))
+          .map(
+              e -> {
+                BaseCatalog catalog = getBaseCatalog(e);
+                return new CatalogInfoWithPropertyMeta(
+                    e.toCatalogInfoWithResolvedProps(catalog.properties()),
+                    catalog.catalogPropertiesMetadata());
+              })
           .toArray(Catalog[]::new);
     } catch (IOException ioe) {
       LOG.error("Failed to list catalogs in metalake {}", metalakeIdent, ioe);
@@ -1014,15 +1023,16 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
    * properties) of the catalog entity.
    *
    * @param entity The catalog entity.
-   * @return The resolved properties.
+   * @return The resolved BaseCatalog instance.
    */
-  private Map<String, String> getResolvedProperties(CatalogEntity entity) {
+  private BaseCatalog getBaseCatalog(CatalogEntity entity) {
     Map<String, String> conf = entity.getProperties();
     String provider = entity.getProvider();
 
     try (IsolatedClassLoader classLoader = createClassLoader(provider, conf)) {
       BaseCatalog<?> catalog = createBaseCatalog(classLoader, entity);
-      return classLoader.withClassLoader(cl -> catalog.properties(), RuntimeException.class);
+      classLoader.withClassLoader(cl -> catalog.properties(), RuntimeException.class);
+      return catalog;
     }
   }
 
@@ -1310,6 +1320,84 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
     } catch (IOException ioe) {
       LOG.error("Failed to update catalog {} property {}", nameIdentifier, propertyKey, ioe);
       throw new RuntimeException(ioe);
+    }
+  }
+
+  private static class CatalogInfoWithPropertyMeta implements Catalog, HasPropertyMetadata {
+    private final CatalogInfo catalogInfo;
+    private final PropertiesMetadata catalogPropertiesMetadata;
+
+    public CatalogInfoWithPropertyMeta(
+        CatalogInfo catalogInfo, PropertiesMetadata catalogPropertiesMetadata) {
+      this.catalogInfo = catalogInfo;
+      this.catalogPropertiesMetadata = catalogPropertiesMetadata;
+    }
+
+    @Override
+    public String name() {
+      return catalogInfo.name();
+    }
+
+    @Override
+    public Type type() {
+      return catalogInfo.type();
+    }
+
+    @Override
+    public String provider() {
+      return catalogInfo.provider();
+    }
+
+    @Override
+    public String comment() {
+      return catalogInfo.comment();
+    }
+
+    @Override
+    public Map<String, String> properties() {
+      return catalogInfo.properties();
+    }
+
+    @Override
+    public Audit auditInfo() {
+      return catalogInfo.auditInfo();
+    }
+
+    @Override
+    public PropertiesMetadata tablePropertiesMetadata() throws UnsupportedOperationException {
+      throw new UnsupportedOperationException("Catalog info does not support table properties.");
+    }
+
+    @Override
+    public PropertiesMetadata catalogPropertiesMetadata() throws UnsupportedOperationException {
+      return catalogPropertiesMetadata;
+    }
+
+    @Override
+    public PropertiesMetadata schemaPropertiesMetadata() throws UnsupportedOperationException {
+      throw new UnsupportedOperationException("Catalog info does not support schema properties.");
+    }
+
+    @Override
+    public PropertiesMetadata filesetPropertiesMetadata() throws UnsupportedOperationException {
+      throw new UnsupportedOperationException("Catalog info does not support fileset properties.");
+    }
+
+    @Override
+    public PropertiesMetadata topicPropertiesMetadata() throws UnsupportedOperationException {
+      throw new UnsupportedOperationException("Catalog info does not support topic properties.");
+    }
+
+    @Override
+    public PropertiesMetadata modelPropertiesMetadata() throws UnsupportedOperationException {
+      throw new UnsupportedOperationException("Catalog info does not support model properties.");
+    }
+
+    @Override
+    public PropertiesMetadata modelVersionPropertiesMetadata()
+        throws UnsupportedOperationException {
+      throw new UnsupportedOperationException(
+          "Catalog info does not support model version properties");
     }
   }
 }

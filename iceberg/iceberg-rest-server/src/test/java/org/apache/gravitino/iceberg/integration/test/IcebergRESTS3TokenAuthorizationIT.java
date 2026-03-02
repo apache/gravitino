@@ -19,9 +19,11 @@
 
 package org.apache.gravitino.iceberg.integration.test;
 
+import com.google.common.collect.ImmutableSet;
 import java.io.IOException;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Set;
 import org.apache.gravitino.catalog.lakehouse.iceberg.IcebergConstants;
 import org.apache.gravitino.credential.CredentialConstants;
 import org.apache.gravitino.credential.S3TokenCredential;
@@ -60,6 +62,8 @@ public class IcebergRESTS3TokenAuthorizationIT extends IcebergRESTCloudTokenAuth
     catalogClientWithAllPrivilege.asSchemas().createSchema(SCHEMA_NAME, "test", new HashMap<>());
 
     setupCloudBundles();
+
+    testSensitiveProperties();
   }
 
   @Override
@@ -91,6 +95,12 @@ public class IcebergRESTS3TokenAuthorizationIT extends IcebergRESTCloudTokenAuth
     String gravitinoHome = System.getenv("GRAVITINO_HOME");
     String targetDir = String.format("%s/iceberg-rest-server/libs/", gravitinoHome);
     BaseIT.copyBundleJarsToDirectory("aws", targetDir);
+  }
+
+  @Override
+  protected Set<String> sensitiveProperties() {
+    return ImmutableSet.of(
+        S3Properties.GRAVITINO_S3_ACCESS_KEY_ID, S3Properties.GRAVITINO_S3_SECRET_ACCESS_KEY);
   }
 
   private Map<String, String> getS3Config() {

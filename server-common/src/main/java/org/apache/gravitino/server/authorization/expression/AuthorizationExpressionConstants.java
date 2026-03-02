@@ -17,6 +17,10 @@
 package org.apache.gravitino.server.authorization.expression;
 
 public class AuthorizationExpressionConstants {
+  public static final String CATALOG_OWNER_EXPRESSION = "ANY(OWNER, METALAKE, CATALOG)";
+
+  public static final String USE_CATALOG_EXPRESSION = "ANY_USE_CATALOG";
+
   public static final String LOAD_CATALOG_AUTHORIZATION_EXPRESSION =
       "ANY_USE_CATALOG || ANY(OWNER, METALAKE, CATALOG)";
 
