@@ -164,7 +164,10 @@ public class IcebergTableOperationExecutor implements IcebergTableOperationDispa
 
   private static CredentialPrivilege getCredentialPrivilege(
       IcebergRequestContext context, TableIdentifier tableIdentifier) {
-    String metalake = IcebergRESTServerContext.getInstance().metalakeName();
+    String metalake =
+        IcebergRESTServerContext.getInstance()
+            .metalakeName()
+            .orElse(IcebergConstants.ICEBERG_REST_DEFAULT_METALAKE);
     NameIdentifier identifier =
         IcebergIdentifierUtils.toGravitinoTableIdentifier(
             metalake, context.catalogName(), tableIdentifier);

@@ -18,6 +18,7 @@
  */
 package org.apache.gravitino.iceberg.service.dispatcher;
 
+import com.google.common.base.Preconditions;
 import java.io.IOException;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.EntityStore;
@@ -55,6 +56,8 @@ public class IcebergViewHookDispatcher implements IcebergViewOperationDispatcher
   private final String metalake;
 
   public IcebergViewHookDispatcher(IcebergViewOperationDispatcher dispatcher, String metalake) {
+    Preconditions.checkArgument(dispatcher != null, "dispatcher must not be null");
+    Preconditions.checkArgument(metalake != null, "metalake must not be null");
     this.dispatcher = dispatcher;
     this.metalake = metalake;
   }

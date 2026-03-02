@@ -18,6 +18,7 @@
  */
 package org.apache.gravitino.iceberg.service.dispatcher;
 
+import com.google.common.base.Preconditions;
 import java.io.IOException;
 import java.time.Instant;
 import org.apache.gravitino.Entity;
@@ -46,11 +47,14 @@ import org.apache.iceberg.rest.responses.PlanTableScanResponse;
 public class IcebergTableHookDispatcher implements IcebergTableOperationDispatcher {
 
   private final IcebergTableOperationDispatcher dispatcher;
-  private String metalake;
+  private final String metalake;
 
   public IcebergTableHookDispatcher(IcebergTableOperationDispatcher dispatcher) {
+    Preconditions.checkArgument(dispatcher != null, "dispatcher must not be null");
+    String metalakeName = IcebergRESTServerContext.getInstance().metalakeName().orElse(null);
+    Preconditions.checkArgument(metalakeName != null, "metalake must not be null");
     this.dispatcher = dispatcher;
-    this.metalake = IcebergRESTServerContext.getInstance().metalakeName();
+    this.metalake = metalakeName;
   }
 
   @Override

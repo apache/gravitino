@@ -21,6 +21,7 @@ package org.apache.gravitino.iceberg.service.dispatcher;
 
 import java.util.Optional;
 import org.apache.gravitino.NameIdentifier;
+import org.apache.gravitino.catalog.lakehouse.iceberg.IcebergConstants;
 import org.apache.gravitino.iceberg.service.IcebergRESTUtils;
 import org.apache.gravitino.listener.EventBus;
 import org.apache.gravitino.listener.api.event.BaseEvent;
@@ -77,10 +78,10 @@ public class IcebergTableEventDispatcher implements IcebergTableOperationDispatc
   public IcebergTableEventDispatcher(
       IcebergTableOperationDispatcher icebergTableOperationDispatcher,
       EventBus eventBus,
-      String metalakeName) {
+      Optional<String> metalakeName) {
     this.icebergTableOperationDispatcher = icebergTableOperationDispatcher;
     this.eventBus = eventBus;
-    this.metalakeName = metalakeName;
+    this.metalakeName = metalakeName.orElse(IcebergConstants.ICEBERG_REST_DEFAULT_METALAKE);
   }
 
   @Override

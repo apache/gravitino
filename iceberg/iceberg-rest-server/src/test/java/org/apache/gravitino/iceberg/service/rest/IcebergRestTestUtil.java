@@ -134,13 +134,11 @@ public class IcebergRestTestUtil {
       configProvider.initialize(catalogConf);
       // used to override register table interface
       // Static provider has no metalake; use null for cache-invalidation listener (auxMode=false
-      // so it's a no-op), and fall back to a test sentinel for event identity tagging.
+      // so it's a no-op). Event dispatchers resolve the default metalake name internally.
       Optional<String> metalakeOpt = configProvider.getMetalakeName();
       String metalakeName = metalakeOpt.orElse(null);
-      String metalakeNameForEvents = metalakeOpt.orElse("gravitino");
       IcebergCatalogWrapperManager icebergCatalogWrapperManager =
-          new IcebergCatalogWrapperManagerForTest(
-              catalogConf, configProvider, false, metalakeName);
+          new IcebergCatalogWrapperManagerForTest(catalogConf, configProvider, false, metalakeOpt);
       IcebergRESTServerContext.create(configProvider, false, false, icebergCatalogWrapperManager);
 
       EventBus eventBus = new EventBus(eventListenerPlugins);
@@ -148,18 +146,16 @@ public class IcebergRestTestUtil {
       IcebergTableOperationExecutor icebergTableOperationExecutor =
           new IcebergTableOperationExecutor(icebergCatalogWrapperManager);
       IcebergTableEventDispatcher icebergTableEventDispatcher =
-          new IcebergTableEventDispatcher(
-              icebergTableOperationExecutor, eventBus, metalakeNameForEvents);
+          new IcebergTableEventDispatcher(icebergTableOperationExecutor, eventBus, metalakeOpt);
       IcebergViewOperationExecutor icebergViewOperationExecutor =
           new IcebergViewOperationExecutor(icebergCatalogWrapperManager);
       IcebergViewEventDispatcher icebergViewEventDispatcher =
-          new IcebergViewEventDispatcher(
-              icebergViewOperationExecutor, eventBus, metalakeNameForEvents);
+          new IcebergViewEventDispatcher(icebergViewOperationExecutor, eventBus, metalakeOpt);
       IcebergNamespaceOperationExecutor icebergNamespaceOperationExecutor =
           new IcebergNamespaceOperationExecutor(icebergCatalogWrapperManager);
       IcebergNamespaceEventDispatcher icebergNamespaceEventDispatcher =
           new IcebergNamespaceEventDispatcher(
-              icebergNamespaceOperationExecutor, eventBus, metalakeNameForEvents);
+              icebergNamespaceOperationExecutor, eventBus, metalakeOpt);
 
       IcebergMetricsManager icebergMetricsManager = new IcebergMetricsManager(new IcebergConfig());
       resourceConfig.register(

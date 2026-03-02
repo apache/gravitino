@@ -20,6 +20,7 @@
 package org.apache.gravitino.iceberg.service.rest;
 
 import java.util.Map;
+import java.util.Optional;
 import org.apache.gravitino.iceberg.common.IcebergConfig;
 import org.apache.gravitino.iceberg.service.CatalogWrapperForREST;
 import org.apache.gravitino.iceberg.service.IcebergCatalogWrapperManager;
@@ -31,7 +32,7 @@ public class IcebergCatalogWrapperManagerForTest extends IcebergCatalogWrapperMa
       Map<String, String> properties,
       IcebergConfigProvider configProvider,
       boolean auxMode,
-      String metalakeName) {
+      Optional<String> metalakeName) {
     super(properties, configProvider, auxMode, metalakeName);
   }
 

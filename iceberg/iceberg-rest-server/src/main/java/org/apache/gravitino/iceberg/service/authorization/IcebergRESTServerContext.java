@@ -20,20 +20,21 @@
 package org.apache.gravitino.iceberg.service.authorization;
 
 import com.google.common.base.Preconditions;
+import java.util.Optional;
 import org.apache.gravitino.iceberg.service.IcebergCatalogWrapperManager;
 import org.apache.gravitino.iceberg.service.provider.IcebergConfigProvider;
 
 public class IcebergRESTServerContext {
   private boolean isAuthorizationEnabled;
   private boolean auxMode;
-  private String metalakeName;
+  private Optional<String> metalakeName;
   private String defaultCatalogName;
   private IcebergCatalogWrapperManager catalogWrapperManager;
 
   private IcebergRESTServerContext(
       Boolean isAuthorizationEnabled,
       Boolean auxMode,
-      String metalakeName,
+      Optional<String> metalakeName,
       String defaultCatalogName,
       IcebergCatalogWrapperManager catalogWrapperManager) {
     this.isAuthorizationEnabled = isAuthorizationEnabled;
@@ -56,7 +57,7 @@ public class IcebergRESTServerContext {
         new IcebergRESTServerContext(
             enableAuth,
             auxMode,
-            configProvider.getMetalakeName().orElse(null),
+            configProvider.getMetalakeName(),
             configProvider.getDefaultCatalogName(),
             catalogWrapperManager);
     return InstanceHolder.INSTANCE;
@@ -75,7 +76,7 @@ public class IcebergRESTServerContext {
     return auxMode;
   }
 
-  public String metalakeName() {
+  public Optional<String> metalakeName() {
     return metalakeName;
   }
 

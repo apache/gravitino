@@ -110,7 +110,7 @@ public class IcebergViewOperations {
             if (authContext.isAuthorizationEnabled()) {
               listTablesResponse =
                   filterListViewsResponse(
-                      listTablesResponse, authContext.metalakeName(), catalogName);
+                      listTablesResponse, authContext.metalakeName().orElse(null), catalogName);
             }
             return IcebergRESTUtils.ok(listTablesResponse);
           });

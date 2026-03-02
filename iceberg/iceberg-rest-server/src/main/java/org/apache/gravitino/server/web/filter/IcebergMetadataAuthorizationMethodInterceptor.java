@@ -42,7 +42,8 @@ import org.apache.iceberg.rest.RESTUtil;
 public class IcebergMetadataAuthorizationMethodInterceptor
     extends BaseMetadataAuthorizationMethodInterceptor {
 
-  private final String metalakeName = IcebergRESTServerContext.getInstance().metalakeName();
+  private final String metalakeName =
+      IcebergRESTServerContext.getInstance().metalakeName().orElse(null);
 
   @Override
   protected Map<Entity.EntityType, NameIdentifier> extractNameIdentifierFromParameters(

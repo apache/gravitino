@@ -115,7 +115,8 @@ public class IcebergNamespaceOperations {
             IcebergRESTServerContext authContext = IcebergRESTServerContext.getInstance();
             if (authContext.isAuthorizationEnabled()) {
               response =
-                  filterListNamespacesResponse(response, authContext.metalakeName(), catalogName);
+                  filterListNamespacesResponse(
+                      response, authContext.metalakeName().orElse(null), catalogName);
             }
             return IcebergRESTUtils.ok(response);
           });

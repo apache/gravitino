@@ -18,6 +18,7 @@
  */
 package org.apache.gravitino.iceberg.service.dispatcher;
 
+import com.google.common.base.Preconditions;
 import java.io.IOException;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.EntityStore;
@@ -50,8 +51,11 @@ public class IcebergNamespaceHookDispatcher implements IcebergNamespaceOperation
   private final String metalake;
 
   public IcebergNamespaceHookDispatcher(IcebergNamespaceOperationDispatcher dispatcher) {
+    Preconditions.checkArgument(dispatcher != null, "dispatcher must not be null");
+    String metalakeName = IcebergRESTServerContext.getInstance().metalakeName().orElse(null);
+    Preconditions.checkArgument(metalakeName != null, "metalake must not be null");
     this.dispatcher = dispatcher;
-    this.metalake = IcebergRESTServerContext.getInstance().metalakeName();
+    this.metalake = metalakeName;
   }
 
   @Override

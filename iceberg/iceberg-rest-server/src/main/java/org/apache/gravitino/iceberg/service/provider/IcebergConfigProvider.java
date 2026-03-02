@@ -49,8 +49,8 @@ public interface IcebergConfigProvider extends Closeable {
   /**
    * Get metalake name.
    *
-   * <p>Returns {@link Optional#empty()} for providers that do not have a Gravitino metalake
-   * concept (e.g. static config provider).
+   * <p>Returns {@link Optional#empty()} for providers that do not have a Gravitino metalake concept
+   * (e.g. static config provider).
    *
    * @return the name of metalake wrapped in Optional, or empty if not supported.
    */
