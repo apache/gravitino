@@ -204,21 +204,17 @@ public class OptimizerCmd {
   }
 
   private static OptimizerConfig loadOptimizerConfig(String confPath) {
+    Preconditions.checkArgument(
+        StringUtils.isNotBlank(confPath), "Optimizer config path is empty.");
+    File confFile = Paths.get(confPath).toFile();
+    if (!Files.exists(confFile.toPath())) {
+      throw new IllegalArgumentException(
+          "Specified optimizer config file does not exist: " + confPath);
+    }
+
     OptimizerConfig config = new OptimizerConfig();
     try {
-      if (StringUtils.isNotBlank(confPath)) {
-        File confFile = Paths.get(confPath).toFile();
-        if (Files.exists(confFile.toPath())) {
-          config.loadFromProperties(config.loadPropertiesFromFile(confFile));
-          return config;
-        } else {
-          throw new IllegalArgumentException(
-              "Specified optimizer config file does not exist: " + confPath);
-        }
-      }
-      config.loadFromFile(confPath);
-    } catch (IllegalArgumentException e) {
-      throw e;
+      config.loadFromProperties(config.loadPropertiesFromFile(confFile));
     } catch (Exception e) {
       throw new IllegalArgumentException("Failed to load optimizer config: " + confPath, e);
     }

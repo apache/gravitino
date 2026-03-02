@@ -171,6 +171,10 @@ public class Recommender implements AutoCloseable {
     List<RecommendationResult> results = new ArrayList<>();
     List<NameIdentifier> identifiersForStrategy =
         getIdentifiersByExactStrategyName(nameIdentifiers, strategyName);
+    Preconditions.checkArgument(
+        !identifiersForStrategy.isEmpty(),
+        "No identifiers matched strategy name '%s' in input list.",
+        strategyName);
     List<StrategyEvaluation> evaluations =
         recommendForOneStrategy(identifiersForStrategy, strategyName);
     for (StrategyEvaluation evaluation : evaluations) {

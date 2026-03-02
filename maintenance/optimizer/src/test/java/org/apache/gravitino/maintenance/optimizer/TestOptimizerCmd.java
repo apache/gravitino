@@ -27,6 +27,10 @@ import java.nio.file.Path;
 import org.apache.gravitino.maintenance.optimizer.monitor.evaluator.MetricsEvaluatorForTest;
 import org.apache.gravitino.maintenance.optimizer.monitor.job.TableJobRelationProviderForTest;
 import org.apache.gravitino.maintenance.optimizer.monitor.metrics.MetricsProviderForTest;
+import org.apache.gravitino.maintenance.optimizer.recommender.StatisticsProviderForCmdTest;
+import org.apache.gravitino.maintenance.optimizer.recommender.StrategyProviderForCmdTest;
+import org.apache.gravitino.maintenance.optimizer.recommender.SubmitStrategyHandlerForCmdTest;
+import org.apache.gravitino.maintenance.optimizer.recommender.TableMetadataProviderForCmdTest;
 import org.apache.gravitino.maintenance.optimizer.updater.MetricsUpdaterForTest;
 import org.apache.gravitino.maintenance.optimizer.updater.StatisticsCalculatorForTest;
 import org.apache.gravitino.maintenance.optimizer.updater.StatisticsUpdaterForTest;
@@ -120,6 +124,28 @@ class TestOptimizerCmd {
     Assertions.assertTrue(
         output[1].contains(
             "Unsupported options for command 'submit-strategy-jobs': --strategy-type"));
+  }
+
+  @Test
+  void testSubmitStrategyJobsHappyPath() throws Exception {
+    Path confPath = createOptimizerConfForSubmitStrategy();
+    String[] output =
+        runCommand(
+            "--type",
+            "submit-strategy-jobs",
+            "--identifiers",
+            "test.db.table",
+            "--strategy-name",
+            StrategyProviderForCmdTest.STRATEGY_NAME,
+            "--conf-path",
+            confPath.toString());
+    Assertions.assertTrue(output[1].isEmpty(), "stderr=" + output[1] + ", stdout=" + output[0]);
+    Assertions.assertTrue(
+        output[0].contains("SUBMIT: strategy=" + StrategyProviderForCmdTest.STRATEGY_NAME));
+    Assertions.assertTrue(output[0].contains("identifier=test.db.table"));
+    Assertions.assertTrue(
+        output[0].contains("jobTemplate=" + StrategyProviderForCmdTest.JOB_TEMPLATE));
+    Assertions.assertTrue(output[0].contains("jobId="));
   }
 
   @Test
@@ -318,6 +344,30 @@ class TestOptimizerCmd {
                 "gravitino.optimizer.gravitinoMetalake = test",
                 "gravitino.optimizer.updater.statisticsUpdater = " + StatisticsUpdaterForTest.NAME,
                 "gravitino.optimizer.updater.metricsUpdater = " + MetricsUpdaterForTest.NAME)
+            + System.lineSeparator();
+    Files.writeString(confPath, content, StandardCharsets.UTF_8);
+    confPath.toFile().deleteOnExit();
+    return confPath;
+  }
+
+  private Path createOptimizerConfForSubmitStrategy() throws Exception {
+    Path confPath = Files.createTempFile("optimizer-submit-test-", ".conf");
+    String content =
+        String.join(
+                System.lineSeparator(),
+                "gravitino.optimizer.gravitinoUri = http://localhost:8090",
+                "gravitino.optimizer.gravitinoMetalake = test",
+                "gravitino.optimizer.recommender.strategyProvider = "
+                    + StrategyProviderForCmdTest.NAME,
+                "gravitino.optimizer.recommender.statisticsProvider = "
+                    + StatisticsProviderForCmdTest.NAME,
+                "gravitino.optimizer.recommender.tableMetaProvider = "
+                    + TableMetadataProviderForCmdTest.NAME,
+                "gravitino.optimizer.recommender.jobSubmitter = noop-job-submitter",
+                "gravitino.optimizer.strategyHandler."
+                    + StrategyProviderForCmdTest.STRATEGY_TYPE
+                    + ".className = "
+                    + SubmitStrategyHandlerForCmdTest.class.getName())
             + System.lineSeparator();
     Files.writeString(confPath, content, StandardCharsets.UTF_8);
     confPath.toFile().deleteOnExit();
