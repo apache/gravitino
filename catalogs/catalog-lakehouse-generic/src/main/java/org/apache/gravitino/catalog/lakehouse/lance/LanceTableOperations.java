@@ -24,6 +24,7 @@ import static org.apache.gravitino.lance.common.utils.LanceConstants.LANCE_TABLE
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableMap;
 import com.lancedb.lance.Dataset;
+import com.lancedb.lance.ReadOptions;
 import com.lancedb.lance.WriteParams;
 import com.lancedb.lance.index.DistanceType;
 import com.lancedb.lance.index.IndexParams;
@@ -190,13 +191,40 @@ public class LanceTableOperations extends ManagedTableOperations {
     try {
       Table table = loadTable(ident);
       String location = table.properties().get(Table.PROPERTY_LOCATION);
+      boolean external =
+          Optional.ofNullable(table.properties().get(Table.PROPERTY_EXTERNAL))
+              .map(Boolean::parseBoolean)
+              .orElse(false);
 
       boolean purged = super.purgeTable(ident);
+      // If the table is a managed table, super.purgeTable will call dropTable to remove the
+      // underlying Lance dataset, so we don't need to do anything here.
+      if (!external) {
+        return purged;
+      }
+
+      Map<String, String> lanceStorageOptions =
+          LancePropertiesUtils.getLanceStorageOptions(table.properties());
       // If the table metadata is purged successfully, we can delete the Lance dataset.
       // Otherwise, we should not delete the dataset.
       if (purged) {
-        // Delete the Lance dataset at the location
-        Dataset.drop(location, LancePropertiesUtils.getLanceStorageOptions(table.properties()));
+        // Delete the Lance dataset at the location, first we try to detect whether the dataset
+        // still exists before the purge operation. If it does not exist, then it means there is
+        // not need to call DataSet#drop to delete the dataset. If it still exists, then we proceed
+        // to delete the dataset.
+        ReadOptions readOptions =
+            new ReadOptions.Builder().setStorageOptions(lanceStorageOptions).build();
+        try (Dataset ignored = Dataset.open(new RootAllocator(), location, readOptions)) {
+        } catch (Exception e) {
+          LOG.warn(
+              "Failed to open Lance dataset at location {} with options {}, it may have already been deleted. Skipping dataset deletion.",
+              location,
+              readOptions,
+              e);
+          return purged;
+        }
+
+        Dataset.drop(location, lanceStorageOptions);
         LOG.info("Deleted Lance dataset at location {}", location);
       }
 

@@ -899,7 +899,7 @@ public class LanceRESTServiceIT extends BaseIT {
     // Drop the table
     DropTableRequest dropTableRequest = new DropTableRequest();
     dropTableRequest.setId(ids);
-    Assertions.assertThrows(Exception.class, () -> ns.dropTable(dropTableRequest));
+    Assertions.assertDoesNotThrow(() -> ns.dropTable(dropTableRequest));
 
     // Describe the dropped table should fail
     DescribeTableRequest describeTableRequest = new DescribeTableRequest();
@@ -915,6 +915,53 @@ public class LanceRESTServiceIT extends BaseIT {
         Assertions.assertThrows(
             LanceNamespaceException.class, () -> ns.dropTable(dropTableRequest));
     Assertions.assertEquals(404, exception.getCode());
+  }
+
+  @Test
+  void testDropTableWhenLocationMissingOrNotCreated() {
+    catalog = createCatalog(CATALOG_NAME);
+    createSchema();
+
+    // Create table via register with non-existent location
+    List<String> registerIds = List.of(CATALOG_NAME, SCHEMA_NAME, "register_missing_location");
+    String missingLocation = tempDir + "/" + "register_missing_location/";
+    RegisterTableRequest registerTableRequest = new RegisterTableRequest();
+    registerTableRequest.setId(registerIds);
+    registerTableRequest.setLocation(missingLocation);
+    registerTableRequest.setMode(ModeEnum.CREATE);
+    RegisterTableResponse registerTableResponse =
+        Assertions.assertDoesNotThrow(() -> ns.registerTable(registerTableRequest));
+    Assertions.assertEquals(missingLocation, registerTableResponse.getLocation());
+    Assertions.assertFalse(new File(missingLocation).exists());
+
+    DropTableRequest dropRegisteredTable = new DropTableRequest();
+    dropRegisteredTable.setId(registerIds);
+    Assertions.assertDoesNotThrow(() -> ns.dropTable(dropRegisteredTable));
+    DescribeTableRequest describeRegistered = new DescribeTableRequest();
+    describeRegistered.setId(registerIds);
+    Assertions.assertThrows(
+        LanceNamespaceException.class, () -> ns.describeTable(describeRegistered));
+
+    // Create table via create-empty with existing location then remove location before drop
+    List<String> emptyIds = List.of(CATALOG_NAME, SCHEMA_NAME, "empty_missing_location");
+    String existingLocation = tempDir + "/" + "empty_missing_location/";
+    new File(existingLocation).mkdirs();
+    Assertions.assertTrue(new File(existingLocation).exists());
+
+    CreateEmptyTableRequest createEmptyTableRequest = new CreateEmptyTableRequest();
+    createEmptyTableRequest.setId(emptyIds);
+    createEmptyTableRequest.setLocation(existingLocation);
+    createEmptyTableRequest.setProperties(ImmutableMap.of());
+    Assertions.assertDoesNotThrow(() -> ns.createEmptyTable(createEmptyTableRequest));
+    FileUtils.deleteQuietly(new File(existingLocation));
+    Assertions.assertFalse(new File(existingLocation).exists());
+
+    DropTableRequest dropEmptyTable = new DropTableRequest();
+    dropEmptyTable.setId(emptyIds);
+    Assertions.assertDoesNotThrow(() -> ns.dropTable(dropEmptyTable));
+    DescribeTableRequest describeEmpty = new DescribeTableRequest();
+    describeEmpty.setId(emptyIds);
+    Assertions.assertThrows(LanceNamespaceException.class, () -> ns.describeTable(describeEmpty));
   }
 
   private GravitinoMetalake createMetalake(String metalakeName) {
