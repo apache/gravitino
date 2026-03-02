@@ -38,11 +38,13 @@ import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.SupportsRelationOperations;
 import org.apache.gravitino.cache.CacheFactory;
+import org.apache.gravitino.cache.CacheInvalidationCoordinator;
 import org.apache.gravitino.cache.CachedEntityIdResolver;
 import org.apache.gravitino.cache.EntityCache;
 import org.apache.gravitino.cache.EntityCacheRelationKey;
 import org.apache.gravitino.cache.NoOpsCache;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
+import org.apache.gravitino.storage.relational.service.CacheInvalidationVersionService;
 import org.apache.gravitino.storage.relational.service.EntityIdService;
 import org.apache.gravitino.utils.Executable;
 import org.slf4j.Logger;
@@ -61,6 +63,9 @@ public class RelationalEntityStore implements EntityStore, SupportsRelationOpera
   private RelationalBackend backend;
   private RelationalGarbageCollector garbageCollector;
   private EntityCache cache;
+  private CacheInvalidationCoordinator cacheInvalidationCoordinator;
+  private final CacheInvalidationVersionService cacheInvalidationVersionService =
+      CacheInvalidationVersionService.getInstance();
 
   @VisibleForTesting
   public EntityCache getCache() {
@@ -81,6 +86,11 @@ public class RelationalEntityStore implements EntityStore, SupportsRelationOpera
     this.backend = createRelationalEntityBackend(config);
     this.garbageCollector = new RelationalGarbageCollector(backend, config);
     this.garbageCollector.start();
+    if (config.get(Configs.CACHE_ENABLED)) {
+      this.cacheInvalidationCoordinator =
+          new CacheInvalidationCoordinator(config, cache, cacheInvalidationVersionService);
+      this.cacheInvalidationCoordinator.start();
+    }
   }
 
   private RelationalBackend createRelationalEntityBackend(Config config) {
@@ -126,6 +136,7 @@ public class RelationalEntityStore implements EntityStore, SupportsRelationOpera
       throws IOException, EntityAlreadyExistsException {
     backend.insert(e, overwritten);
     cache.put(e);
+    notifyCacheChanged();
   }
 
   @Override
@@ -133,7 +144,9 @@ public class RelationalEntityStore implements EntityStore, SupportsRelationOpera
       NameIdentifier ident, Class<E> type, Entity.EntityType entityType, Function<E, E> updater)
       throws IOException, NoSuchEntityException, EntityAlreadyExistsException {
     cache.invalidate(ident, entityType);
-    return backend.update(ident, entityType, updater);
+    E updated = backend.update(ident, entityType, updater);
+    notifyCacheChanged();
+    return updated;
   }
 
   @Override
@@ -180,7 +193,11 @@ public class RelationalEntityStore implements EntityStore, SupportsRelationOpera
       throws IOException {
     try {
       cache.invalidate(ident, entityType);
-      return backend.delete(ident, entityType, cascade);
+      boolean deleted = backend.delete(ident, entityType, cascade);
+      if (deleted) {
+        notifyCacheChanged();
+      }
+      return deleted;
     } catch (NoSuchEntityException e) {
       return false;
     }
@@ -193,6 +210,9 @@ public class RelationalEntityStore implements EntityStore, SupportsRelationOpera
 
   @Override
   public void close() throws IOException {
+    if (cacheInvalidationCoordinator != null) {
+      cacheInvalidationCoordinator.close();
+    }
     cache.clear();
     garbageCollector.close();
     backend.close();
@@ -277,6 +297,7 @@ public class RelationalEntityStore implements EntityStore, SupportsRelationOpera
     cache.invalidate(srcIdentifier, srcType, relType);
     cache.invalidate(dstIdentifier, dstType, relType);
     backend.insertRelation(relType, srcIdentifier, srcType, dstIdentifier, dstType, override);
+    notifyCacheChanged();
   }
 
   @Override
@@ -302,20 +323,34 @@ public class RelationalEntityStore implements EntityStore, SupportsRelationOpera
       cache.invalidate(destToRemove, srcEntityType, relType);
     }
 
-    return backend.updateEntityRelations(
-        relType, srcEntityIdent, srcEntityType, destEntitiesToAdd, destEntitiesToRemove);
+    List<E> entities =
+        backend.updateEntityRelations(
+            relType, srcEntityIdent, srcEntityType, destEntitiesToAdd, destEntitiesToRemove);
+    notifyCacheChanged();
+    return entities;
   }
 
   @Override
   public int batchDelete(
       List<Pair<NameIdentifier, Entity.EntityType>> entitiesToDelete, boolean cascade)
       throws IOException {
-    return backend.batchDelete(entitiesToDelete, cascade);
+    int deleted = backend.batchDelete(entitiesToDelete, cascade);
+    if (deleted > 0) {
+      notifyCacheChanged();
+    }
+    return deleted;
   }
 
   @Override
   public <E extends Entity & HasIdentifier> void batchPut(List<E> entities, boolean overwritten)
       throws IOException, EntityAlreadyExistsException {
     backend.batchPut(entities, overwritten);
+    notifyCacheChanged();
+  }
+
+  private void notifyCacheChanged() {
+    if (cacheInvalidationCoordinator != null) {
+      cacheInvalidationCoordinator.onWriteSuccess();
+    }
   }
 }
