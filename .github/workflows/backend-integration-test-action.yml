@@ -20,6 +20,11 @@ on:
         required: true
         description: 'run on embedded or deploy mode'
         type: string
+      changed-catalogs-contrib-modules:
+        required: false
+        description: 'space-separated changed catalogs-contrib module names, or __all__'
+        type: string
+        default: ''
 
 jobs:
   start-runner:
@@ -60,14 +65,26 @@ jobs:
 
       - name: Backend Integration Test (JDK${{ inputs.java-version }}-${{ inputs.test-mode }}-${{ inputs.backend }})
         id: integrationTest
-        run: >
-          ./gradlew test -PskipTests -PtestMode=${{ inputs.test-mode }} -PjdbcBackend=${{ inputs.backend }} -PskipDockerTests=false
-          -x :web:web:test -x :web:integration-test:test -x :web-v2:web:test -x :web-v2:integration-test:test -x :clients:client-python:test -x :flink-connector:flink:test -x :spark-connector:spark-common:test 
-          -x :spark-connector:spark-3.3:test -x :spark-connector:spark-3.4:test -x :spark-connector:spark-3.5:test 
-          -x :spark-connector:spark-runtime-3.3:test -x :spark-connector:spark-runtime-3.4:test -x :spark-connector:spark-runtime-3.5:test
-          -x :trino-connector:integration-test:test -x :trino-connector:trino-connector:test
-          -x :authorizations:authorization-chain:test -x :authorizations:authorization-ranger:test 
-          -x :catalogs-contrib:catalog-jdbc-oceanbase:test
+        run: |
+          ALL_CONTRIB_MODULES="$(find catalogs-contrib -mindepth 1 -maxdepth 1 -type d -name 'catalog-*' -exec basename {} \; | sort)"
+          CHANGED_CONTRIB_MODULES="${{ inputs.changed-catalogs-contrib-modules }}"
+
+          EXCLUDE_CONTRIB_TESTS=""
+          if [ "$CHANGED_CONTRIB_MODULES" != "__all__" ]; then
+            for module in $ALL_CONTRIB_MODULES; do
+              if [[ " $CHANGED_CONTRIB_MODULES " != *" $module "* ]]; then
+                EXCLUDE_CONTRIB_TESTS="$EXCLUDE_CONTRIB_TESTS -x :catalogs-contrib:$module:test"
+              fi
+            done
+          fi
+
+          ./gradlew test -PskipTests -PtestMode=${{ inputs.test-mode }} -PjdbcBackend=${{ inputs.backend }} -PskipDockerTests=false \
+            -x :web:web:test -x :web:integration-test:test -x :web-v2:web:test -x :web-v2:integration-test:test -x :clients:client-python:test -x :flink-connector:flink:test -x :spark-connector:spark-common:test \
+            -x :spark-connector:spark-3.3:test -x :spark-connector:spark-3.4:test -x :spark-connector:spark-3.5:test \
+            -x :spark-connector:spark-runtime-3.3:test -x :spark-connector:spark-runtime-3.4:test -x :spark-connector:spark-runtime-3.5:test \
+            -x :trino-connector:integration-test:test -x :trino-connector:trino-connector:test \
+            -x :authorizations:authorization-chain:test -x :authorizations:authorization-ranger:test \
+            $EXCLUDE_CONTRIB_TESTS
 
       - name: Upload integrate tests reports
         uses: actions/upload-artifact@v4

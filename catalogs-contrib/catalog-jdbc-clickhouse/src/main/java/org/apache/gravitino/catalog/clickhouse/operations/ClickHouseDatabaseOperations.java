@@ -18,29 +18,37 @@
  */
 package org.apache.gravitino.catalog.clickhouse.operations;
 
+import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
 import java.sql.Connection;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 import org.apache.commons.collections4.MapUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.StringIdentifier;
 import org.apache.gravitino.catalog.clickhouse.ClickHouseConstants.ClusterConstants;
+import org.apache.gravitino.catalog.jdbc.JdbcSchema;
 import org.apache.gravitino.catalog.jdbc.operation.JdbcDatabaseOperations;
 import org.apache.gravitino.catalog.jdbc.utils.JdbcConnectorUtils;
+import org.apache.gravitino.exceptions.NoSuchSchemaException;
+import org.apache.gravitino.meta.AuditInfo;
 
 public class ClickHouseDatabaseOperations extends JdbcDatabaseOperations {
 
   private static final Set<String> CLICK_HOUSE_SYSTEM_DATABASES =
       ImmutableSet.of("information_schema", "default", "system", "INFORMATION_SCHEMA");
-
-  // TODO: handle ClickHouse cluster properly when creating/dropping databases/tables
-  //  use https://github.com/apache/gravitino/issues/9820 to track it.
+  private static final Pattern ON_CLUSTER_PATTERN =
+      Pattern.compile("(?i)\\bON\\s+CLUSTER\\s+`?([^`\\s]+)`?");
+  private static final Pattern COMMENT_PATTERN =
+      Pattern.compile("(?i)\\bCOMMENT\\s+'((?:''|[^'])*)'");
 
   @Override
   protected boolean supportSchemaComment() {
@@ -90,11 +98,11 @@ public class ClickHouseDatabaseOperations extends JdbcDatabaseOperations {
 
     if (onCluster(properties)) {
       String clusterName = properties.get(ClusterConstants.CLUSTER_NAME);
-      createDatabaseSql.append(String.format(" ON CLUSTER `%s`", clusterName));
+      createDatabaseSql.append(String.format(" ON CLUSTER `%s`", clusterName.replace("`", "``")));
     }
 
     if (StringUtils.isNotEmpty(originComment)) {
-      createDatabaseSql.append(String.format(" COMMENT '%s'", originComment));
+      createDatabaseSql.append(String.format(" COMMENT '%s'", originComment.replace("'", "''")));
     }
 
     LOG.info("Generated create database:{} sql: {}", databaseName, createDatabaseSql);
@@ -130,6 +138,55 @@ public class ClickHouseDatabaseOperations extends JdbcDatabaseOperations {
     }
   }
 
+  @Override
+  public JdbcSchema load(String databaseName) throws NoSuchSchemaException {
+    if (!exist(databaseName)) {
+      throw new NoSuchSchemaException("Database %s could not be found", databaseName);
+    }
+
+    Map<String, String> schemaProperties = new HashMap<>();
+    schemaProperties.put(ClusterConstants.ON_CLUSTER, String.valueOf(false));
+    String schemaComment = "";
+
+    try (Connection connection = getConnection();
+        Statement statement = connection.createStatement();
+        ResultSet resultSet =
+            statement.executeQuery(
+                String.format("SHOW CREATE DATABASE `%s`", databaseName.replace("`", "``")))) {
+      if (resultSet.next()) {
+        String createSql = resultSet.getString(1);
+        Matcher matcher = ON_CLUSTER_PATTERN.matcher(StringUtils.trimToEmpty(createSql));
+        if (matcher.find()) {
+          schemaProperties.put(ClusterConstants.ON_CLUSTER, String.valueOf(true));
+          schemaProperties.put(ClusterConstants.CLUSTER_NAME, matcher.group(1));
+        } else {
+          String inferredClusterName = detectClusterNameFromQueryLog(connection, databaseName);
+          if (StringUtils.isBlank(inferredClusterName)) {
+            inferredClusterName = detectClusterName(connection, databaseName);
+          }
+          if (StringUtils.isNotBlank(inferredClusterName)) {
+            schemaProperties.put(ClusterConstants.ON_CLUSTER, String.valueOf(true));
+            schemaProperties.put(ClusterConstants.CLUSTER_NAME, inferredClusterName);
+          }
+        }
+
+        Matcher commentMatcher = COMMENT_PATTERN.matcher(StringUtils.trimToEmpty(createSql));
+        if (commentMatcher.find()) {
+          schemaComment = commentMatcher.group(1).replace("''", "'");
+        }
+      }
+    } catch (SQLException se) {
+      throw this.exceptionMapper.toGravitinoException(se);
+    }
+
+    return JdbcSchema.builder()
+        .withName(databaseName)
+        .withComment(schemaComment)
+        .withProperties(ImmutableMap.copyOf(schemaProperties))
+        .withAuditInfo(AuditInfo.EMPTY)
+        .build();
+  }
+
   private boolean onCluster(Map<String, String> dbProperties) {
     if (MapUtils.isEmpty(dbProperties)) {
       return false;
@@ -141,5 +198,81 @@ public class ClickHouseDatabaseOperations extends JdbcDatabaseOperations {
     }
 
     return Boolean.parseBoolean(dbProperties.getOrDefault(ClusterConstants.ON_CLUSTER, "false"));
+  }
+
+  private String detectClusterName(Connection connection, String databaseName) throws SQLException {
+    List<String> clusterNames = new ArrayList<>();
+    String escapedDatabaseName = databaseName.replace("`", "``").replace("'", "''");
+    try (Statement statement = connection.createStatement();
+        ResultSet clusters =
+            statement.executeQuery("SELECT DISTINCT cluster FROM system.clusters")) {
+      while (clusters.next()) {
+        clusterNames.add(clusters.getString(1));
+      }
+    }
+
+    for (String clusterName : clusterNames) {
+      String escapedClusterName = clusterName.replace("'", "''");
+      int clusterHostCount;
+      try (Statement statement = connection.createStatement();
+          ResultSet hostCountResultSet =
+              statement.executeQuery(
+                  String.format(
+                      "SELECT countDistinct(host_name) FROM system.clusters WHERE cluster = '%s'",
+                      escapedClusterName))) {
+        if (!hostCountResultSet.next()) {
+          continue;
+        }
+        clusterHostCount = hostCountResultSet.getInt(1);
+      }
+      if (clusterHostCount <= 1) {
+        continue;
+      }
+
+      try (Statement statement = connection.createStatement();
+          ResultSet dbHostCountResultSet =
+              statement.executeQuery(
+                  String.format(
+                      "SELECT countDistinct(hostName()) FROM clusterAllReplicas('%s', system.databases) "
+                          + "WHERE name = '%s'",
+                      escapedClusterName, escapedDatabaseName))) {
+        if (dbHostCountResultSet.next() && dbHostCountResultSet.getInt(1) == clusterHostCount) {
+          return clusterName;
+        }
+      }
+    }
+    return null;
+  }
+
+  private String detectClusterNameFromQueryLog(Connection connection, String databaseName)
+      throws SQLException {
+    String escapedDatabaseName = databaseName.replace("`", "``").replace("'", "''");
+    try (Statement flushLogStatement = connection.createStatement()) {
+      flushLogStatement.execute("SYSTEM FLUSH LOGS");
+    } catch (SQLException e) {
+      LOG.debug("Failed to flush ClickHouse logs before loading schema {}", databaseName, e);
+    }
+
+    String querySql =
+        String.format(
+            "SELECT query FROM system.query_log "
+                + "WHERE type = 'QueryFinish' "
+                + "AND is_initial_query = 1 "
+                + "AND query_kind = 'Create' "
+                + "AND startsWith(lower(query), 'create database') "
+                + "AND positionCaseInsensitive(query, '`%s`') > 0 "
+                + "ORDER BY event_time DESC LIMIT 20",
+            escapedDatabaseName);
+    try (Statement statement = connection.createStatement();
+        ResultSet resultSet = statement.executeQuery(querySql)) {
+      while (resultSet.next()) {
+        Matcher matcher =
+            ON_CLUSTER_PATTERN.matcher(StringUtils.trimToEmpty(resultSet.getString(1)));
+        if (matcher.find()) {
+          return matcher.group(1);
+        }
+      }
+    }
+    return null;
   }
 }
