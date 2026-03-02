@@ -205,7 +205,7 @@
    Apache Software License 2.0.
 
    Apache Zeppelin
-   ./web/web/WEB-INF/web.xml
+   ./web-v2/web/WEB-INF/web.xml
 
    @ampproject/remapping
    @eslint/config-array
