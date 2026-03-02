@@ -34,9 +34,9 @@ gravitino.optimizer.recommender.tableMetaProvider = gravitino-table-metadata-pro
 gravitino.optimizer.recommender.jobSubmitter = noop-job-submitter
 
 # Updater plugins (push statistics/metrics back into Gravitino)
-# The statistics updater for the recommender/update_statistics tool.
+# The statistics updater for the recommender/update-statistics tool.
 gravitino.optimizer.updater.statisticsUpdater = gravitino-statistics-updater
-# The metrics updater for the recommender/append_metrics tool.
+# The metrics updater for the recommender/append-metrics tool.
 gravitino.optimizer.updater.metricsUpdater = gravitino-metrics-updater
 # Optional: configure JDBC metrics storage (H2 is used by default when omitted).
 # gravitino.optimizer.jdbcMetrics.jdbcUrl = jdbc:postgresql://localhost:5432/optimizer

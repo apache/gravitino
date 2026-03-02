@@ -705,7 +705,7 @@ public class OptimizerCmd {
         "partition-path",
         CliOptionArgType.SINGLE,
         null,
-        "Partition path for monitor_metrics (JSON array, for example: [{\"p1\":\"v1\"},{\"p2\":\"v2\"}])");
+        "Partition path for monitor-metrics (JSON array, for example: [{\"p1\":\"v1\"},{\"p2\":\"v2\"}])");
 
     private final String longOpt;
     private final CliOptionArgType argType;
