@@ -37,6 +37,8 @@ import org.apache.gravitino.Catalog;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.authorization.Privilege;
+import org.apache.gravitino.credential.Credential;
+import org.apache.gravitino.credential.SupportsCredentials;
 import org.apache.gravitino.dto.AuditDTO;
 import org.apache.gravitino.dto.CatalogDTO;
 import org.apache.gravitino.dto.requests.TableCreateRequest;
@@ -63,7 +65,7 @@ import org.apache.gravitino.rest.RESTUtils;
  * operations, for example, schemas and tables list, creation, update and deletion. A Relational
  * catalog is under the metalake.
  */
-class RelationalCatalog extends BaseSchemaCatalog implements TableCatalog {
+class RelationalCatalog extends BaseSchemaCatalog implements TableCatalog, SupportsCredentials {
 
   public static final String PRIVILEGES = "privileges";
 
@@ -281,6 +283,16 @@ class RelationalCatalog extends BaseSchemaCatalog implements TableCatalog {
             ErrorHandlers.tableErrorHandler());
     resp.validate();
     return resp.dropped();
+  }
+
+  @Override
+  public SupportsCredentials supportsCredentials() throws UnsupportedOperationException {
+    return this;
+  }
+
+  @Override
+  public Credential[] getCredentials() {
+    return objectCredentialOperations.getCredentials();
   }
 
   @VisibleForTesting

@@ -72,7 +72,7 @@ public class CredentialOperationDispatcher extends OperationDispatcher {
   private Map<String, CredentialContext> getCredentialContexts(
       BaseCatalog baseCatalog, NameIdentifier nameIdentifier, CredentialPrivilege privilege) {
     if (nameIdentifier.equals(NameIdentifierUtil.getCatalogIdentifier(nameIdentifier))) {
-      return getCatalogCredentialContexts(baseCatalog.properties());
+      return getCatalogCredentialContexts(baseCatalog.propertiesWithCredentialProviders());
     }
 
     if (baseCatalog.ops() instanceof SupportsPathBasedCredentials) {

@@ -18,12 +18,25 @@
  */
 package org.apache.gravitino.catalog.lakehouse.paimon;
 
+import com.google.common.collect.Maps;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Locale;
 import java.util.Map;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.Catalog;
 import org.apache.gravitino.connector.BaseCatalog;
 import org.apache.gravitino.connector.CatalogOperations;
 import org.apache.gravitino.connector.PropertiesMetadata;
 import org.apache.gravitino.connector.capability.Capability;
+import org.apache.gravitino.credential.AzureAccountKeyCredential;
+import org.apache.gravitino.credential.CredentialConstants;
+import org.apache.gravitino.credential.JdbcCredential;
+import org.apache.gravitino.credential.OSSSecretKeyCredential;
+import org.apache.gravitino.credential.S3SecretKeyCredential;
+import org.apache.gravitino.storage.AzureProperties;
+import org.apache.gravitino.storage.OSSProperties;
+import org.apache.gravitino.storage.S3Properties;
 
 /**
  * Implementation of {@link Catalog} that represents an Apache Paimon catalog in Apache Gravitino.
@@ -76,5 +89,68 @@ public class PaimonCatalog extends BaseCatalog<PaimonCatalog> {
   @Override
   public PropertiesMetadata schemaPropertiesMetadata() throws UnsupportedOperationException {
     return SCHEMA_PROPERTIES_META;
+  }
+
+  @Override
+  public Map<String, String> propertiesWithCredentialProviders() {
+    Map<String, String> properties = Maps.newHashMap(super.propertiesWithCredentialProviders());
+    return buildCredentialProvidersIfNecessary(properties);
+  }
+
+  private Map<String, String> buildCredentialProvidersIfNecessary(Map<String, String> properties) {
+    // If credential providers already set, return as is
+    if (StringUtils.isNotBlank(properties.get(CredentialConstants.CREDENTIAL_PROVIDERS))) {
+      return properties;
+    }
+
+    String catalogBackend = properties.get(PaimonConstants.CATALOG_BACKEND);
+    if (catalogBackend == null) {
+      return properties;
+    }
+
+    // Check if it's JDBC backend
+    if (!PaimonCatalogBackend.JDBC
+        .name()
+        .equalsIgnoreCase(catalogBackend.toUpperCase(Locale.ROOT))) {
+      return properties;
+    }
+
+    // Build default credential providers for JDBC backend
+    List<String> credentialProviders = new ArrayList<>();
+
+    // Add JDBC credential provider if jdbc-user and jdbc-password are set
+    String jdbcUser = properties.get(PaimonConstants.GRAVITINO_JDBC_USER);
+    String jdbcPassword = properties.get(PaimonConstants.GRAVITINO_JDBC_PASSWORD);
+    if (StringUtils.isNotBlank(jdbcUser) && StringUtils.isNotBlank(jdbcPassword)) {
+      credentialProviders.add(JdbcCredential.JDBC_CREDENTIAL_TYPE);
+    }
+
+    // Add S3 secret key credential provider if S3 access key and secret key are set
+    String s3AccessKeyId = properties.get(S3Properties.GRAVITINO_S3_ACCESS_KEY_ID);
+    String s3SecretAccessKey = properties.get(S3Properties.GRAVITINO_S3_SECRET_ACCESS_KEY);
+    if (StringUtils.isNotBlank(s3AccessKeyId) && StringUtils.isNotBlank(s3SecretAccessKey)) {
+      credentialProviders.add(S3SecretKeyCredential.S3_SECRET_KEY_CREDENTIAL_TYPE);
+    }
+
+    // Add OSS secret key credential provider if OSS access key and secret key are set
+    String ossAccessKeyId = properties.get(OSSProperties.GRAVITINO_OSS_ACCESS_KEY_ID);
+    String ossSecretAccessKey = properties.get(OSSProperties.GRAVITINO_OSS_ACCESS_KEY_SECRET);
+    if (StringUtils.isNotBlank(ossAccessKeyId) && StringUtils.isNotBlank(ossSecretAccessKey)) {
+      credentialProviders.add(OSSSecretKeyCredential.OSS_SECRET_KEY_CREDENTIAL_TYPE);
+    }
+
+    // Add Azure account key credential provider if Azure account name and key are set
+    String azureAccountName = properties.get(AzureProperties.GRAVITINO_AZURE_STORAGE_ACCOUNT_NAME);
+    String azureAccountKey = properties.get(AzureProperties.GRAVITINO_AZURE_STORAGE_ACCOUNT_KEY);
+    if (StringUtils.isNotBlank(azureAccountName) && StringUtils.isNotBlank(azureAccountKey)) {
+      credentialProviders.add(AzureAccountKeyCredential.AZURE_ACCOUNT_KEY_CREDENTIAL_TYPE);
+    }
+
+    if (!credentialProviders.isEmpty()) {
+      properties.put(
+          CredentialConstants.CREDENTIAL_PROVIDERS, String.join(",", credentialProviders));
+    }
+
+    return properties;
   }
 }

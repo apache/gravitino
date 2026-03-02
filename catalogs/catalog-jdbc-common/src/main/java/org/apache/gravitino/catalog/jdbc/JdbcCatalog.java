@@ -18,8 +18,11 @@
  */
 package org.apache.gravitino.catalog.jdbc;
 
+import com.google.common.collect.Maps;
 import java.util.Collections;
 import java.util.Map;
+import org.apache.commons.lang3.StringUtils;
+import org.apache.gravitino.catalog.jdbc.config.JdbcConfig;
 import org.apache.gravitino.catalog.jdbc.converter.JdbcColumnDefaultValueConverter;
 import org.apache.gravitino.catalog.jdbc.converter.JdbcExceptionConverter;
 import org.apache.gravitino.catalog.jdbc.converter.JdbcTypeConverter;
@@ -30,6 +33,8 @@ import org.apache.gravitino.connector.CatalogOperations;
 import org.apache.gravitino.connector.PropertiesMetadata;
 import org.apache.gravitino.connector.PropertyEntry;
 import org.apache.gravitino.connector.capability.Capability;
+import org.apache.gravitino.credential.CredentialConstants;
+import org.apache.gravitino.credential.JdbcCredential;
 
 /** Implementation of an Jdbc catalog in Gravitino. */
 public abstract class JdbcCatalog extends BaseCatalog<JdbcCatalog> {
@@ -112,5 +117,27 @@ public abstract class JdbcCatalog extends BaseCatalog<JdbcCatalog> {
   @Override
   public PropertiesMetadata tablePropertiesMetadata() throws UnsupportedOperationException {
     return TABLE_PROPERTIES_META;
+  }
+
+  @Override
+  public Map<String, String> propertiesWithCredentialProviders() {
+    Map<String, String> properties = Maps.newHashMap(super.propertiesWithCredentialProviders());
+    return buildCredentialProvidersIfNecessary(properties);
+  }
+
+  private Map<String, String> buildCredentialProvidersIfNecessary(Map<String, String> properties) {
+    // If credential providers already set, return as is
+    if (StringUtils.isNotBlank(properties.get(CredentialConstants.CREDENTIAL_PROVIDERS))) {
+      return properties;
+    }
+
+    // Add JDBC credential provider if jdbc-user and jdbc-password are set
+    String jdbcUser = properties.get(JdbcConfig.USERNAME.getKey());
+    String jdbcPassword = properties.get(JdbcConfig.PASSWORD.getKey());
+    if (StringUtils.isNotBlank(jdbcUser) && StringUtils.isNotBlank(jdbcPassword)) {
+      properties.put(CredentialConstants.CREDENTIAL_PROVIDERS, JdbcCredential.JDBC_CREDENTIAL_TYPE);
+    }
+
+    return properties;
   }
 }
