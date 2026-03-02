@@ -65,7 +65,6 @@ If you want to use these two catalogs, please build the Gravitino binary distrib
 If you need more details about it, please refer to [Reorg catalogs structure](https://github.com/apache/gravitino/pull/9781)
 :::
 
-
 #### Initialize the RDBMS (Optional)
 
 If you want to use the relational backend storage, you need to initialize the RDBMS first. For the details on initializing the RDBMS, please check [How to use relational backend storage](./how-to-use-relational-backend-storage.md).
