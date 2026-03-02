@@ -48,6 +48,7 @@ import org.apache.gravitino.connector.CatalogInfo;
 import org.apache.gravitino.connector.CatalogOperations;
 import org.apache.gravitino.connector.HasPropertyMetadata;
 import org.apache.gravitino.connector.SupportsSchemas;
+import org.apache.gravitino.connector.TableCapability;
 import org.apache.gravitino.exceptions.NoSuchCatalogException;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.exceptions.NoSuchSchemaException;
@@ -231,22 +232,39 @@ public class GenericCatalogOperations implements CatalogOperations, SupportsSche
       SortOrder[] sortOrders,
       Index[] indexes)
       throws NoSuchSchemaException, TableAlreadyExistsException {
-    Schema schema = loadSchema(NameIdentifier.of(ident.namespace().levels()));
-    String tableLocation = calculateTableLocation(schema, ident, properties);
-
     String format = properties.getOrDefault(Table.PROPERTY_TABLE_FORMAT, null);
     Preconditions.checkArgument(
         format != null, "Table format must be specified in table properties");
     format = format.toLowerCase(Locale.ROOT);
 
-    Map<String, String> newProperties = Maps.newHashMap(properties);
-    newProperties.put(Table.PROPERTY_LOCATION, tableLocation);
-    newProperties.put(Table.PROPERTY_TABLE_FORMAT, format);
-
     // Get the table operations for the specified table format.
     Supplier<ManagedTableOperations> tableOpsSupplier = tableOpsCache.get(format);
     Preconditions.checkArgument(tableOpsSupplier != null, "Unsupported table format: %s", format);
     ManagedTableOperations tableOps = tableOpsSupplier.get();
+
+    Map<String, String> newProperties = Maps.newHashMap(properties);
+    newProperties.put(Table.PROPERTY_TABLE_FORMAT, format);
+
+    Schema schema = loadSchema(NameIdentifier.of(ident.namespace().levels()));
+    String tableLocation =
+        (String)
+            propertiesMetadata
+                .tablePropertiesMetadata()
+                .getOrDefault(properties, Table.PROPERTY_LOCATION);
+    if (StringUtils.isNotBlank(tableLocation)) {
+      newProperties.put(Table.PROPERTY_LOCATION, ensureTrailingSlash(tableLocation));
+    } else {
+      String generatedLocation = calculateTableLocation(schema, ident);
+      if (StringUtils.isNotBlank(generatedLocation)) {
+        newProperties.put(Table.PROPERTY_LOCATION, generatedLocation);
+      } else if (tableOps.capabilities().contains(TableCapability.REQUIRES_LOCATION)) {
+        throw new IllegalArgumentException(
+            "'location' property is neither set in table properties "
+                + "nor in schema properties, and no location is set in catalog properties either. "
+                + "Please set the 'location' in either of them to create the table "
+                + ident);
+      }
+    }
 
     Table createdTable =
         tableOps.createTable(
@@ -284,17 +302,7 @@ public class GenericCatalogOperations implements CatalogOperations, SupportsSche
     return dropped;
   }
 
-  private String calculateTableLocation(
-      Schema schema, NameIdentifier tableIdent, Map<String, String> tableProperties) {
-    String tableLocation =
-        (String)
-            propertiesMetadata
-                .tablePropertiesMetadata()
-                .getOrDefault(tableProperties, Table.PROPERTY_LOCATION);
-    if (StringUtils.isNotBlank(tableLocation)) {
-      return ensureTrailingSlash(tableLocation);
-    }
-
+  private String calculateTableLocation(Schema schema, NameIdentifier tableIdent) {
     String schemaLocation =
         schema.properties() == null ? null : schema.properties().get(Schema.PROPERTY_LOCATION);
 
@@ -304,14 +312,8 @@ public class GenericCatalogOperations implements CatalogOperations, SupportsSche
       return ensureTrailingSlash(schemaLocation) + tableIdent.name() + SLASH;
     }
 
-    // If the schema location is not set, use catalog lakehouse dir as the base path. Or else, throw
-    // an exception.
     if (catalogLocation.isEmpty()) {
-      throw new IllegalArgumentException(
-          "'location' property is neither set in table properties "
-              + "nor in schema properties, and no location is set in catalog properties either. "
-              + "Please set the 'location' in either of them to create the table "
-              + tableIdent);
+      return null;
     }
 
     return ensureTrailingSlash(catalogLocation.get())

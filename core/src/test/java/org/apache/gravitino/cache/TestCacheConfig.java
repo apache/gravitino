@@ -166,7 +166,7 @@ public class TestCacheConfig {
     Thread.sleep(1000);
 
     // Count how many filesets are still in cache
-    // Weight calculation: base(100) + filesets(15×200=3000) + tags(10×500=5000) = 8100 > 5000 limit
+    // Weight calculation: base(100) + filesets(15*200=3000) + tags(10*500=5000) = 8100 > 5000 limit
     // Filesets 5-14 have freq=5, tags have freq=1. With frequency advantage + lighter weight,
     // filesets should be strongly prioritized by Caffeine's W-TinyLFU
     long remainingFilesets =
