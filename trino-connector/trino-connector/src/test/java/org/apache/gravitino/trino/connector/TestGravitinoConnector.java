@@ -18,72 +18,37 @@
  */
 package org.apache.gravitino.trino.connector;
 
-import static io.trino.testing.TestingSession.testSessionBuilder;
 import static java.lang.String.format;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
 import com.google.common.base.Preconditions;
-import io.trino.Session;
-import io.trino.plugin.memory.MemoryPlugin;
-import io.trino.testing.AbstractTestQueryFramework;
 import io.trino.testing.DistributedQueryRunner;
 import io.trino.testing.MaterializedResult;
 import io.trino.testing.MaterializedRow;
-import io.trino.testing.QueryRunner;
 import java.util.HashMap;
 import java.util.List;
-import java.util.concurrent.TimeUnit;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import org.apache.gravitino.client.GravitinoAdminClient;
-import org.apache.gravitino.trino.connector.catalog.CatalogConnectorManager;
-import org.awaitility.Awaitility;
 import org.junit.jupiter.api.Test;
 
-public class TestGravitinoConnector extends AbstractTestQueryFramework {
+public abstract class TestGravitinoConnector extends AbstractGravitinoConnectorTest {
 
-  GravitinoMockServer server;
+  public static final int SPI_VERSION_TEST_SUPPORT_RENAME_COLUMN = 452;
+  public static final int SPI_VERSION_SUPPORT_ADD_COLUMN_WITH_POSITION = 468;
+  public static final int SPI_VERSION_TEST_SUPPORT_ADD_COLUMN = 452;
 
   @Override
-  protected QueryRunner createQueryRunner() throws Exception {
-    server = closeAfterClass(new GravitinoMockServer());
-    GravitinoAdminClient gravitinoClient = server.createGravitinoClient();
-
-    Session session = testSessionBuilder().setCatalog("gravitino").build();
-    try {
-
-      DistributedQueryRunner queryRunner =
-          DistributedQueryRunner.builder(session).setNodeCount(1).build();
-
-      TestGravitinoPlugin gravitinoPlugin = new TestGravitinoPlugin(gravitinoClient);
-      queryRunner.installPlugin(gravitinoPlugin);
-
-      // create a gravitino connector named gravitino using metalake test
-      HashMap<String, String> properties = new HashMap<>();
-      properties.put("gravitino.metalake", "test");
-      properties.put("gravitino.uri", "http://127.0.0.1:8090");
-      properties.put(
-          "catalog.config-dir", queryRunner.getCoordinator().getBaseDataDir().toString());
-      properties.put("discovery.uri", queryRunner.getCoordinator().getBaseUrl().toString());
-      queryRunner.createCatalog("gravitino", "gravitino", properties);
-
-      GravitinoConnectorPluginManager.instance(this.getClass().getClassLoader())
-          .installPlugin("memory", new MemoryPlugin());
-      CatalogConnectorManager catalogConnectorManager =
-          gravitinoPlugin.getCatalogConnectorManager();
-      server.setCatalogConnectorManager(catalogConnectorManager);
-
-      // Wait for the catalog to be created. Wait for at least 30 seconds.
-      Awaitility.await()
-          .atMost(30, TimeUnit.SECONDS)
-          .pollInterval(1, TimeUnit.SECONDS)
-          .until(() -> !catalogConnectorManager.getCatalogs().isEmpty());
-
-      return queryRunner;
-    } catch (Exception e) {
-      throw new RuntimeException("Create query runner failed", e);
-    }
+  protected void configureCatalogs(
+      DistributedQueryRunner queryRunner, GravitinoAdminClient gravitinoClient) {
+    // create a gravitino connector named gravitino using metalake test
+    HashMap<String, String> properties = new HashMap<>();
+    properties.put("gravitino.metalake", "test");
+    properties.put("gravitino.uri", "http://127.0.0.1:8090");
+    properties.put("catalog.config-dir", queryRunner.getCoordinator().getBaseDataDir().toString());
+    properties.put("discovery.uri", queryRunner.getCoordinator().getBaseUrl().toString());
+    queryRunner.createCatalog("gravitino", "gravitino", properties);
   }
 
   @Test
@@ -189,38 +154,51 @@ public class TestGravitinoConnector extends AbstractTestQueryFramework {
 
     createTestTable(fullTableName1);
 
-    // test add column and drop column, but the memory connector is not supported these operations.
-    assertQueryFails(
-        String.format("alter table %s add column if not exists c varchar", fullTableName1),
-        format("This connector does not support adding columns"));
-
-    assertQueryFails(
-        String.format("alter table %s drop column a", fullTableName1),
-        format("This connector does not support dropping columns"));
-
     // test set table comment
     assertUpdate(String.format("comment on table %s is 'test table comments'", fullTableName1));
     assertThat((String) computeScalar("show create table " + fullTableName1))
         .contains("COMMENT 'test table comments'");
-
-    // test rename column, but the memory connector is not supported these operations.
-    assertQueryFails(
-        String.format("alter table %s rename column a to c ", fullTableName1),
-        format("This connector does not support renaming columns"));
-
-    assertQueryFails(
-        String.format("alter table %s alter column a set DATA TYPE int", fullTableName1),
-        format("This connector does not support setting column types"));
 
     // test set column comment
     assertUpdate(String.format("comment on column %s.a is 'test column comments'", fullTableName1));
     assertThat((String) computeScalar("show create table " + fullTableName1))
         .contains("COMMENT 'test column comments'");
 
+    // test add column and drop column, but the memory connector is not supported these operations.
+    if (trinoVersion < SPI_VERSION_TEST_SUPPORT_ADD_COLUMN) {
+      assertQueryFails(
+          String.format("alter table %s add column if not exists c varchar", fullTableName1),
+          "This connector does not support adding columns");
+    } else {
+      assertUpdate(
+          String.format("alter table %s add column if not exists c varchar", fullTableName1));
+      assertThat((String) computeScalar("show create table " + fullTableName1))
+          .contains("c varchar");
+    }
+
+    assertQueryFails(
+        String.format("alter table %s drop column a", fullTableName1),
+        "This connector does not support dropping columns");
+
+    // test rename column, but the memory connector is not supported these operations.
+    if (trinoVersion < SPI_VERSION_TEST_SUPPORT_RENAME_COLUMN) {
+      assertQueryFails(
+          String.format("alter table %s rename column b to d ", fullTableName1),
+          "This connector does not support renaming columns");
+    } else {
+      assertUpdate(String.format("alter table %s rename column b to d ", fullTableName1));
+      assertThat((String) computeScalar("show create table " + fullTableName1))
+          .contains("d integer");
+    }
+
+    assertQueryFails(
+        String.format("alter table %s alter column a set DATA TYPE int", fullTableName1),
+        "This connector does not support setting column types");
+
     // test set table properties, but the memory connector is not supported these operations.
     assertQueryFails(
         String.format("alter table %s set properties \"max_ttl\" = 20", fullTableName1),
-        format("This connector does not support setting table properties"));
+        "This connector does not support setting table properties");
 
     dropTestTable(fullTableName1);
   }

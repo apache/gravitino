@@ -339,7 +339,8 @@ public class ModelVersionMetaService {
     boolean isAliasChanged =
         isModelVersionAliasUpdated(oldModelVersionEntity, newModelVersionEntity);
     List<ModelVersionAliasRelPO> newAliasRelPOs =
-        POConverters.updateModelVersionAliasRelPO(oldAliasRelPOs, newModelVersionEntity);
+        POConverters.updateModelVersionAliasRelPO(
+            oldAliasRelPOs, newModelVersionEntity, modelEntity.id());
 
     boolean isModelVersionUriUpdated =
         isModelVersionUriUpdated(oldModelVersionEntity, newModelVersionEntity);

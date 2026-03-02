@@ -73,7 +73,7 @@ public class TestUpdater {
     assertNotNull(metricsUpdater);
     assertEquals(0, statisticsUpdater.tableUpdates());
     assertEquals(0, statisticsUpdater.partitionUpdates());
-    assertEquals(2, metricsUpdater.tableUpdates());
+    assertEquals(1, metricsUpdater.tableUpdates());
     assertEquals(1, metricsUpdater.jobUpdates());
   }
 
@@ -107,7 +107,7 @@ public class TestUpdater {
     assertNotNull(metricsUpdater);
     assertEquals(0, statisticsUpdater.tableUpdates());
     assertEquals(0, statisticsUpdater.partitionUpdates());
-    assertEquals(2, metricsUpdater.tableUpdates());
+    assertEquals(1, metricsUpdater.tableUpdates());
     assertEquals(1, metricsUpdater.jobUpdates());
   }
 

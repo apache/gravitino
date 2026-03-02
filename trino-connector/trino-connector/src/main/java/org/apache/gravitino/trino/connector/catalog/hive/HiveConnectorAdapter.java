@@ -56,6 +56,7 @@ public class HiveConnectorAdapter implements CatalogConnectorAdapter {
     config.putAll(trinoProperty);
     config.put("hive.metastore.uri", metastoreUri);
     config.put("hive.security", "allow-all");
+    config.put("fs.hadoop.enabled", "true");
     return config;
   }
 

@@ -69,7 +69,7 @@ You can ues any IDE to develop Gravitino Python Client. Directly open the client
 
 ### Prerequisites
 
-+ Python 3.9+
++ Python 3.10+
 + Refer to [How to build Gravitino](./how-to-build.md#prerequisites) to have necessary build
   environment ready for building.
 
@@ -84,11 +84,11 @@ You can ues any IDE to develop Gravitino Python Client. Directly open the client
 2. Build the Gravitino Python client module
 
     ```shell
-    # Default Python version is 3.9
+    # Default Python version is 3.12
     ./gradlew :clients:client-python:build
     # If you want to build Python client with specific Python version,
     # add `-PpythonVersion` with version number:
-    ./gradlew :clients:client-python:build -PpythonVersion=3.10
+    ./gradlew :clients:client-python:build -PpythonVersion=3.11
     ```
  
 3. Run unit tests
@@ -146,7 +146,7 @@ SDK, you need to:
    find $(pwd)/.gradle/python/*/Miniforge3/envs/*/bin/python
    
    # example output
-   /Users/YOUR_USER_NAME/gravitino/.gradle/python/MacOSX/Miniforge3/envs/python-3.9/bin/python
+   /Users/YOUR_USER_NAME/gravitino/.gradle/python/MacOSX/Miniforge3/envs/python-3.12/bin/python
    ```
 
 6. Follow steps in [Create a conda environment](https://www.jetbrains.com/help/idea/configuring-python-sdk.html#gdizlj_44), 

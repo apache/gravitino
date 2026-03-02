@@ -31,7 +31,7 @@ import java.util.List;
  * The GravitinoFTransactionHandle is used to make Apache Gravitino metadata operations
  * transactional and wrap the inner connector transaction for data access.
  */
-public class GravitinoSplit implements ConnectorSplit, GravitinoHandle<ConnectorSplit> {
+public abstract class GravitinoSplit implements ConnectorSplit, GravitinoHandle<ConnectorSplit> {
 
   private HandleWrapper<ConnectorSplit> handleWrapper = new HandleWrapper<>(ConnectorSplit.class);
 
@@ -73,11 +73,6 @@ public class GravitinoSplit implements ConnectorSplit, GravitinoHandle<Connector
   @Override
   public List<HostAddress> getAddresses() {
     return handleWrapper.getHandle().getAddresses();
-  }
-
-  @Override
-  public Object getInfo() {
-    return handleWrapper.getHandle().getInfo();
   }
 
   @Override

@@ -40,6 +40,7 @@ dependencies {
   implementation(libs.slf4j.api)
 
   annotationProcessor(libs.lombok)
+  compileOnly(libs.commons.dbcp2)
   compileOnly(libs.lombok)
   testAnnotationProcessor(libs.lombok)
   testCompileOnly(libs.lombok)

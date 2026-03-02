@@ -724,7 +724,7 @@ export default function CreateTableDialog({ ...props }) {
           }
 
           if (submitted) {
-            treeRef.current.onLoadData({ key: `${catalog}/${schema}`, nodeType: 'schema' })
+            !editTable && treeRef.current.onLoadData({ key: `${catalog}/${schema}`, nodeType: 'schema' })
             setOpen(false)
           }
         } catch (error) {

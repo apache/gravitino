@@ -143,8 +143,7 @@ public abstract class JdbcTableOperations implements TableOperation {
       throws TableAlreadyExistsException {
     LOG.info("Attempting to create table {} in database {}", tableName, databaseName);
     try (Connection connection = getConnection(databaseName)) {
-      JdbcConnectorUtils.executeUpdate(
-          connection,
+      String sql =
           generateCreateTableSql(
               tableName,
               columns,
@@ -153,8 +152,10 @@ public abstract class JdbcTableOperations implements TableOperation {
               partitioning,
               distribution,
               indexes,
-              sortOrders));
-      LOG.info("Created table {} in database {}", tableName, databaseName);
+              sortOrders);
+
+      JdbcConnectorUtils.executeUpdate(connection, sql);
+      LOG.info("Created table {} in database {} with SQL:\n{}", tableName, databaseName, sql);
     } catch (final SQLException se) {
       throw this.exceptionMapper.toGravitinoException(se);
     }
@@ -232,6 +233,10 @@ public abstract class JdbcTableOperations implements TableOperation {
       builder = getBasicJdbcColumnInfo(columnsResult);
     }
     return builder;
+  }
+
+  public boolean supportsTableSortOrder() {
+    return false;
   }
 
   @Override
