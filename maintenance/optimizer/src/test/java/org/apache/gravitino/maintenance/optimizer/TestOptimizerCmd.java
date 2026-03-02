@@ -1,0 +1,387 @@
+/*
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ *
+ *  http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing,
+ * software distributed under the License is distributed on an
+ * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+ * KIND, either express or implied.  See the License for the
+ * specific language governing permissions and limitations
+ * under the License.
+ */
+
+package org.apache.gravitino.maintenance.optimizer;
+
+import java.io.ByteArrayOutputStream;
+import java.io.PrintStream;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import org.apache.gravitino.maintenance.optimizer.monitor.evaluator.MetricsEvaluatorForTest;
+import org.apache.gravitino.maintenance.optimizer.monitor.job.TableJobRelationProviderForTest;
+import org.apache.gravitino.maintenance.optimizer.monitor.metrics.MetricsProviderForTest;
+import org.apache.gravitino.maintenance.optimizer.recommender.StatisticsProviderForCmdTest;
+import org.apache.gravitino.maintenance.optimizer.recommender.StrategyProviderForCmdTest;
+import org.apache.gravitino.maintenance.optimizer.recommender.SubmitStrategyHandlerForCmdTest;
+import org.apache.gravitino.maintenance.optimizer.recommender.TableMetadataProviderForCmdTest;
+import org.apache.gravitino.maintenance.optimizer.updater.MetricsUpdaterForTest;
+import org.apache.gravitino.maintenance.optimizer.updater.StatisticsCalculatorForTest;
+import org.apache.gravitino.maintenance.optimizer.updater.StatisticsUpdaterForTest;
+import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.Test;
+
+class TestOptimizerCmd {
+
+  @Test
+  void testGlobalHelpNoLongerIncludesPlannedCommands() {
+    String[] output = runCommand("--help");
+    Assertions.assertFalse(output[0].contains("Planned commands (not implemented):"));
+  }
+
+  @Test
+  void testCommandHelpPrintsCommandScopedInfoOnly() {
+    String[] output = runCommand("--help", "--type", "update-statistics");
+    Assertions.assertTrue(output[0].contains("Command: update-statistics"));
+    Assertions.assertTrue(output[0].contains("Required options: --calculator-name"));
+    Assertions.assertFalse(output[0].contains("Planned commands (not implemented):"));
+  }
+
+  @Test
+  void testRejectStatisticsInputWhenCalculatorIsNotLocal() {
+    String[] output =
+        runCommand(
+            "--type",
+            "update-statistics",
+            "--calculator-name",
+            "mock-calculator",
+            "--statistics-payload",
+            "{\"identifier\":\"c.db.t\"}");
+    Assertions.assertTrue(
+        output[1].contains(
+            "--statistics-payload and --file-path are only supported when --calculator-name is local-stats-calculator."));
+  }
+
+  @Test
+  void testRequireStatisticsInputForLocalCalculator() {
+    String[] output =
+        runCommand("--type", "update-statistics", "--calculator-name", "local-stats-calculator");
+    Assertions.assertTrue(
+        output[1].contains(
+            "Command 'update-statistics' with --calculator-name local-stats-calculator requires one of --statistics-payload or --file-path."));
+  }
+
+  @Test
+  void testTypeMustUseKebabCase() {
+    String[] output = runCommand("--type", "update_statistics");
+    Assertions.assertTrue(
+        output[1].contains(
+            "Invalid --type: update_statistics. Use kebab-case format, for example: update-statistics."));
+  }
+
+  @Test
+  void testConfPathNonexistentFailsClearly() {
+    String[] output =
+        runCommand(
+            "--type",
+            "list-job-metrics",
+            "--identifiers",
+            "test.db.job1",
+            "--conf-path",
+            "/tmp/not-exist-optimizer-conf-123456.conf");
+    Assertions.assertTrue(
+        output[1].contains(
+            "Specified optimizer config file does not exist: /tmp/not-exist-optimizer-conf-123456.conf"));
+  }
+
+  @Test
+  void testSubmitStrategyJobsRequiresStrategyName() {
+    String[] output =
+        runCommand("--type", "submit-strategy-jobs", "--identifiers", "catalog.db.table");
+    Assertions.assertTrue(
+        output[1].contains(
+            "Missing required options for command 'submit-strategy-jobs': --strategy-name"));
+  }
+
+  @Test
+  void testSubmitStrategyJobsRejectsStrategyTypeOption() {
+    String[] output =
+        runCommand(
+            "--type",
+            "submit-strategy-jobs",
+            "--identifiers",
+            "catalog.db.table",
+            "--strategy-name",
+            "compaction-high-file-count",
+            "--strategy-type",
+            "compaction");
+    Assertions.assertTrue(
+        output[1].contains(
+            "Unsupported options for command 'submit-strategy-jobs': --strategy-type"));
+  }
+
+  @Test
+  void testSubmitStrategyJobsHappyPath() throws Exception {
+    Path confPath = createOptimizerConfForSubmitStrategy();
+    String[] output =
+        runCommand(
+            "--type",
+            "submit-strategy-jobs",
+            "--identifiers",
+            "test.db.table",
+            "--strategy-name",
+            StrategyProviderForCmdTest.STRATEGY_NAME,
+            "--conf-path",
+            confPath.toString());
+    Assertions.assertTrue(output[1].isEmpty(), "stderr=" + output[1] + ", stdout=" + output[0]);
+    Assertions.assertTrue(
+        output[0].contains("SUBMIT: strategy=" + StrategyProviderForCmdTest.STRATEGY_NAME));
+    Assertions.assertTrue(output[0].contains("identifier=test.db.table"));
+    Assertions.assertTrue(
+        output[0].contains("jobTemplate=" + StrategyProviderForCmdTest.JOB_TEMPLATE));
+    Assertions.assertTrue(output[0].contains("jobId="));
+  }
+
+  @Test
+  void testRejectUnsupportedOptionForMonitorMetrics() {
+    String[] output =
+        runCommand(
+            "--type",
+            "monitor-metrics",
+            "--identifiers",
+            "catalog.db.table",
+            "--action-time",
+            "1",
+            "--calculator-name",
+            "local-stats-calculator");
+    Assertions.assertTrue(
+        output[1].contains("Unsupported options for command 'monitor-metrics': --calculator-name"));
+  }
+
+  @Test
+  void testListTableMetricsImplemented() throws Exception {
+    Path confPath = createOptimizerConfForMetricsProvider();
+    String[] output =
+        runCommand(
+            "--type",
+            "list-table-metrics",
+            "--identifiers",
+            "test.db.table",
+            "--conf-path",
+            confPath.toString());
+    Assertions.assertTrue(output[1].isEmpty(), "stderr=" + output[1] + ", stdout=" + output[0]);
+    Assertions.assertTrue(output[0].contains("MetricsResult{scopeType=TABLE"));
+    Assertions.assertTrue(output[0].contains("identifier=test.db.table"));
+    Assertions.assertTrue(output[0].contains("row_count=["));
+  }
+
+  @Test
+  void testListTableMetricsWithPartitionPathImplemented() throws Exception {
+    Path confPath = createOptimizerConfForMetricsProvider();
+    String[] output =
+        runCommand(
+            "--type",
+            "list-table-metrics",
+            "--identifiers",
+            "test.db.table",
+            "--partition-path",
+            "[{\"dt\":\"2026-02-12\"}]",
+            "--conf-path",
+            confPath.toString());
+    // MetricsProviderForTest returns deterministic in-memory samples (110/210) for partition
+    // metrics. This verifies CLI partition-path routing and output rendering, not storage reads.
+    Assertions.assertTrue(output[1].isEmpty(), "stderr=" + output[1] + ", stdout=" + output[0]);
+    Assertions.assertTrue(output[0].contains("MetricsResult{scopeType=PARTITION"));
+    Assertions.assertTrue(output[0].contains("partitionPath="));
+    Assertions.assertTrue(output[0].contains("2026-02-12"));
+    Assertions.assertTrue(output[0].contains("value=110"));
+    Assertions.assertTrue(output[0].contains("value=210"));
+  }
+
+  @Test
+  void testListJobMetricsImplemented() throws Exception {
+    Path confPath = createOptimizerConfForMetricsProvider();
+    String[] output =
+        runCommand(
+            "--type",
+            "list-job-metrics",
+            "--identifiers",
+            "test.db.job1",
+            "--conf-path",
+            confPath.toString());
+    Assertions.assertTrue(output[1].isEmpty(), "stderr=" + output[1] + ", stdout=" + output[0]);
+    Assertions.assertTrue(output[0].contains("MetricsResult{scopeType=JOB"));
+    Assertions.assertTrue(output[0].contains("identifier=test.db.job1"));
+    Assertions.assertTrue(output[0].contains("duration=["));
+  }
+
+  @Test
+  void testMonitorMetricsImplemented() throws Exception {
+    Path confPath = createOptimizerConfForMonitor();
+    String[] output =
+        runCommand(
+            "--type",
+            "monitor-metrics",
+            "--identifiers",
+            "test.db.table",
+            "--action-time",
+            "100",
+            "--range-seconds",
+            "10",
+            "--conf-path",
+            confPath.toString());
+    Assertions.assertTrue(output[1].isEmpty(), "stderr=" + output[1] + ", stdout=" + output[0]);
+    Assertions.assertTrue(output[0].contains("EvaluationResult{scopeType=TABLE"));
+    Assertions.assertTrue(output[0].contains("EvaluationResult{scopeType=JOB"));
+    Assertions.assertTrue(output[0].contains("identifier=test.db.job1"));
+    Assertions.assertTrue(output[0].contains("identifier=test.db.job2"));
+  }
+
+  @Test
+  void testUpdateStatisticsWithoutIdentifiersUsesUpdateAllPath() throws Exception {
+    StatisticsUpdaterForTest.reset();
+    MetricsUpdaterForTest.reset();
+    Path confPath = createOptimizerConfForUpdater();
+    String[] output =
+        runCommand(
+            "--type",
+            "update-statistics",
+            "--calculator-name",
+            StatisticsCalculatorForTest.NAME,
+            "--conf-path",
+            confPath.toString());
+    Assertions.assertTrue(output[1].isEmpty(), "stderr=" + output[1] + ", stdout=" + output[0]);
+    int totalTableUpdates =
+        StatisticsUpdaterForTest.instances().stream()
+            .mapToInt(StatisticsUpdaterForTest::tableUpdates)
+            .sum();
+    int totalPartitionUpdates =
+        StatisticsUpdaterForTest.instances().stream()
+            .mapToInt(StatisticsUpdaterForTest::partitionUpdates)
+            .sum();
+    Assertions.assertTrue(
+        totalTableUpdates >= 1,
+        "Expected table updates from updateAll, but got " + totalTableUpdates);
+    Assertions.assertTrue(
+        totalPartitionUpdates >= 1,
+        "Expected partition updates from updateAll, but got " + totalPartitionUpdates);
+  }
+
+  @Test
+  void testAppendMetricsWithoutIdentifiersUsesUpdateAllPath() throws Exception {
+    StatisticsUpdaterForTest.reset();
+    MetricsUpdaterForTest.reset();
+    Path confPath = createOptimizerConfForUpdater();
+    String[] output =
+        runCommand(
+            "--type",
+            "append-metrics",
+            "--calculator-name",
+            StatisticsCalculatorForTest.NAME,
+            "--conf-path",
+            confPath.toString());
+    Assertions.assertTrue(output[1].isEmpty(), "stderr=" + output[1] + ", stdout=" + output[0]);
+    int totalTableUpdates =
+        MetricsUpdaterForTest.instances().stream()
+            .mapToInt(MetricsUpdaterForTest::tableUpdates)
+            .sum();
+    int totalJobUpdates =
+        MetricsUpdaterForTest.instances().stream()
+            .mapToInt(MetricsUpdaterForTest::jobUpdates)
+            .sum();
+    Assertions.assertTrue(
+        totalTableUpdates >= 1,
+        "Expected table metric updates from updateAll, but got " + totalTableUpdates);
+    Assertions.assertTrue(
+        totalJobUpdates >= 1,
+        "Expected job metric updates from updateAll, but got " + totalJobUpdates);
+  }
+
+  private Path createOptimizerConfForMetricsProvider() throws Exception {
+    Path confPath = Files.createTempFile("optimizer-test-", ".conf");
+    // Route command reads to deterministic in-memory fixtures from MetricsProviderForTest.
+    String content =
+        String.join(
+                System.lineSeparator(),
+                "gravitino.optimizer.gravitinoUri = http://localhost:8090",
+                "gravitino.optimizer.gravitinoMetalake = test",
+                "gravitino.optimizer.monitor.metricsProvider = " + MetricsProviderForTest.NAME)
+            + System.lineSeparator();
+    Files.writeString(confPath, content, StandardCharsets.UTF_8);
+    confPath.toFile().deleteOnExit();
+    return confPath;
+  }
+
+  private Path createOptimizerConfForMonitor() throws Exception {
+    Path confPath = Files.createTempFile("optimizer-monitor-test-", ".conf");
+    String content =
+        String.join(
+                System.lineSeparator(),
+                "gravitino.optimizer.gravitinoUri = http://localhost:8090",
+                "gravitino.optimizer.gravitinoMetalake = test",
+                "gravitino.optimizer.monitor.metricsProvider = " + MetricsProviderForTest.NAME,
+                "gravitino.optimizer.monitor.tableJobRelationProvider = "
+                    + TableJobRelationProviderForTest.NAME,
+                "gravitino.optimizer.monitor.metricsEvaluator = " + MetricsEvaluatorForTest.NAME)
+            + System.lineSeparator();
+    Files.writeString(confPath, content, StandardCharsets.UTF_8);
+    confPath.toFile().deleteOnExit();
+    return confPath;
+  }
+
+  private Path createOptimizerConfForUpdater() throws Exception {
+    Path confPath = Files.createTempFile("optimizer-updater-test-", ".conf");
+    String content =
+        String.join(
+                System.lineSeparator(),
+                "gravitino.optimizer.gravitinoUri = http://localhost:8090",
+                "gravitino.optimizer.gravitinoMetalake = test",
+                "gravitino.optimizer.updater.statisticsUpdater = " + StatisticsUpdaterForTest.NAME,
+                "gravitino.optimizer.updater.metricsUpdater = " + MetricsUpdaterForTest.NAME)
+            + System.lineSeparator();
+    Files.writeString(confPath, content, StandardCharsets.UTF_8);
+    confPath.toFile().deleteOnExit();
+    return confPath;
+  }
+
+  private Path createOptimizerConfForSubmitStrategy() throws Exception {
+    Path confPath = Files.createTempFile("optimizer-submit-test-", ".conf");
+    String content =
+        String.join(
+                System.lineSeparator(),
+                "gravitino.optimizer.gravitinoUri = http://localhost:8090",
+                "gravitino.optimizer.gravitinoMetalake = test",
+                "gravitino.optimizer.recommender.strategyProvider = "
+                    + StrategyProviderForCmdTest.NAME,
+                "gravitino.optimizer.recommender.statisticsProvider = "
+                    + StatisticsProviderForCmdTest.NAME,
+                "gravitino.optimizer.recommender.tableMetaProvider = "
+                    + TableMetadataProviderForCmdTest.NAME,
+                "gravitino.optimizer.recommender.jobSubmitter = noop-job-submitter",
+                "gravitino.optimizer.strategyHandler."
+                    + StrategyProviderForCmdTest.STRATEGY_TYPE
+                    + ".className = "
+                    + SubmitStrategyHandlerForCmdTest.class.getName())
+            + System.lineSeparator();
+    Files.writeString(confPath, content, StandardCharsets.UTF_8);
+    confPath.toFile().deleteOnExit();
+    return confPath;
+  }
+
+  private String[] runCommand(String... args) {
+    ByteArrayOutputStream outBuffer = new ByteArrayOutputStream();
+    ByteArrayOutputStream errBuffer = new ByteArrayOutputStream();
+    PrintStream out = new PrintStream(outBuffer, true, StandardCharsets.UTF_8);
+    PrintStream err = new PrintStream(errBuffer, true, StandardCharsets.UTF_8);
+    OptimizerCmd.run(args, out, err);
+    return new String[] {
+      outBuffer.toString(StandardCharsets.UTF_8), errBuffer.toString(StandardCharsets.UTF_8)
+    };
+  }
+}
