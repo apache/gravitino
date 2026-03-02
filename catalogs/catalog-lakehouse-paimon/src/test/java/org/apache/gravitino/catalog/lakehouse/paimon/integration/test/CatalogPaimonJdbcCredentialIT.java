@@ -93,7 +93,7 @@ public class CatalogPaimonJdbcCredentialIT extends BaseIT {
       try {
         super.stopIntegrationTest();
       } catch (Exception e) {
-        LOG.error("Exception in closing CloseableGroup", e);
+        LOG.error("Exception in closing BaseIT", e);
       }
     }
   }
