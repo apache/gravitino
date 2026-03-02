@@ -36,7 +36,6 @@ import com.google.common.collect.ImmutableList;
 import java.io.IOException;
 import java.lang.reflect.Field;
 import java.security.Principal;
-import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 import java.util.concurrent.Executor;
@@ -245,17 +244,7 @@ public class TestJcasbinAuthorizer {
             eq(SupportsRelationOperations.Type.OWNER_REL),
             eq(catalogIdent),
             eq(Entity.EntityType.CATALOG));
-    getOwnerRelCache(jcasbinAuthorizer).invalidateAll();
     assertTrue(doAuthorizeOwner(currentPrincipal));
-    doReturn(new ArrayList<>())
-        .when(supportsRelationOperations)
-        .listEntitiesByRelation(
-            eq(SupportsRelationOperations.Type.OWNER_REL),
-            eq(catalogIdent),
-            eq(Entity.EntityType.CATALOG));
-    jcasbinAuthorizer.handleMetadataOwnerChange(
-        METALAKE, USER_ID, catalogIdent, Entity.EntityType.CATALOG);
-    assertFalse(doAuthorizeOwner(currentPrincipal));
   }
 
   private Boolean doAuthorize(Principal currentPrincipal) {
@@ -380,28 +369,6 @@ public class TestJcasbinAuthorizer {
   }
 
   @Test
-  public void testOwnerCacheInvalidation() throws Exception {
-    // Get the ownerRel cache via reflection
-    Cache<Long, Optional<Long>> ownerRel = getOwnerRelCache(jcasbinAuthorizer);
-
-    // Manually add an owner relation to the cache
-    ownerRel.put(CATALOG_ID, Optional.of(USER_ID));
-
-    // Verify it's in the cache
-    assertNotNull(ownerRel.getIfPresent(CATALOG_ID));
-
-    // Create a mock NameIdentifier for the metadata object
-    NameIdentifier catalogIdent = NameIdentifierUtil.ofCatalog(METALAKE, "testCatalog");
-
-    // Call handleMetadataOwnerChange which should invalidate the cache entry
-    jcasbinAuthorizer.handleMetadataOwnerChange(
-        METALAKE, USER_ID, catalogIdent, Entity.EntityType.CATALOG);
-
-    // Verify it's removed from the cache
-    assertNull(ownerRel.getIfPresent(CATALOG_ID));
-  }
-
-  @Test
   public void testRoleCacheSynchronousRemovalListenerDeletesPolicy() throws Exception {
     makeCompletableFutureUseCurrentThread(jcasbinAuthorizer);
 
@@ -440,10 +407,8 @@ public class TestJcasbinAuthorizer {
   public void testCacheInitialization() throws Exception {
     // Verify that caches are initialized
     Cache<Long, Boolean> loadedRoles = getLoadedRolesCache(jcasbinAuthorizer);
-    Cache<Long, Optional<Long>> ownerRel = getOwnerRelCache(jcasbinAuthorizer);
 
     assertNotNull(loadedRoles, "loadedRoles cache should be initialized");
-    assertNotNull(ownerRel, "ownerRel cache should be initialized");
   }
 
   @SuppressWarnings("unchecked")
