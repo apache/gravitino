@@ -18,11 +18,17 @@
  */
 
 import com.github.jengelman.gradle.plugins.shadow.tasks.ShadowJar
+import org.gradle.api.tasks.compile.JavaCompile
 
 plugins {
   `maven-publish`
   id("java")
   alias(libs.plugins.shadow)
+}
+
+java {
+  sourceCompatibility = JavaVersion.VERSION_17
+  targetCompatibility = JavaVersion.VERSION_17
 }
 
 repositories {
@@ -36,6 +42,7 @@ val sparkMajorVersion = "3.5"
 
 dependencies {
   implementation(project(":api"))
+  implementation(project(":maintenance:optimizer"))
 
   compileOnly(libs.slf4j.api)
   compileOnly(libs.jackson.databind)
@@ -51,6 +58,8 @@ dependencies {
   }
 
   testImplementation(project(":api"))
+  testImplementation(project(":common"))
+  testImplementation(project(":clients:client-java"))
   testImplementation(libs.bundles.log4j)
   testImplementation(libs.hadoop3.common) {
     exclude("org.slf4j")
@@ -74,6 +83,10 @@ dependencies {
 
 tasks.test {
   useJUnitPlatform()
+}
+
+tasks.withType<JavaCompile>().configureEach {
+  dependsOn(":maintenance:optimizer:copyDepends")
 }
 
 tasks.withType(ShadowJar::class.java) {

@@ -28,6 +28,7 @@ import java.util.Map;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.client.GravitinoAdminClient;
+import org.apache.gravitino.client.GravitinoClient;
 import org.apache.gravitino.client.GravitinoMetalake;
 import org.apache.gravitino.dto.rel.ColumnDTO;
 import org.apache.gravitino.exceptions.NoSuchMetalakeException;
@@ -37,9 +38,11 @@ import org.apache.gravitino.maintenance.optimizer.common.PartitionEntryImpl;
 import org.apache.gravitino.maintenance.optimizer.common.conf.OptimizerConfig;
 import org.apache.gravitino.maintenance.optimizer.recommender.handler.compaction.CompactionJobContext;
 import org.apache.gravitino.rel.Column;
+import org.apache.gravitino.rel.Table;
 import org.apache.gravitino.rel.expressions.transforms.Transform;
 import org.apache.gravitino.rel.expressions.transforms.Transforms;
 import org.apache.gravitino.rel.types.Types;
+import org.apache.gravitino.stats.Statistic;
 import org.apache.spark.sql.Row;
 import org.apache.spark.sql.SparkSession;
 import org.awaitility.Awaitility;
@@ -55,6 +58,7 @@ public class TestBuiltinIcebergRewriteDataFiles {
   private static final String METALAKE_NAME = "test";
   private static final String ICEBERG_REST_URI = "http://localhost:9001/iceberg";
   private static final String JOB_TEMPLATE_NAME = "builtin-iceberg-rewrite-data-files";
+  private static final String UPDATE_STATS_JOB_TEMPLATE_NAME = "builtin-iceberg-update-stats";
   private static final String SPARK_CATALOG_NAME = "rest_catalog";
   private static final String WAREHOUSE_LOCATION = "";
 
@@ -210,6 +214,38 @@ public class TestBuiltinIcebergRewriteDataFiles {
         });
   }
 
+  @Test
+  void testSubmitBuiltinIcebergUpdateStatsJobAndPersistStatistics() throws Exception {
+    String tableName = "update_stats_table";
+    String fullTableName = SPARK_CATALOG_NAME + ".db." + tableName;
+    runWithSparkAndMetalake(
+        (spark, metalake) -> {
+          createTableAndInsertData(spark, fullTableName);
+
+          Map<String, String> jobConf = buildUpdateStatsJobConfig(tableName);
+          submitJob(metalake, UPDATE_STATS_JOB_TEMPLATE_NAME, jobConf);
+
+          try (GravitinoClient client =
+              GravitinoClient.builder(SERVER_URI).withMetalake(METALAKE_NAME).build()) {
+            Table table =
+                client
+                    .loadCatalog(SPARK_CATALOG_NAME)
+                    .asTableCatalog()
+                    .loadTable(NameIdentifier.of("db", tableName));
+            List<Statistic> stats = table.supportsStatistics().listStatistics();
+            Assertions.assertFalse(stats.isEmpty(), "Expected table statistics to be updated");
+
+            Map<String, Statistic> statsMap = new HashMap<>();
+            for (Statistic stat : stats) {
+              statsMap.put(stat.name(), stat);
+            }
+            Assertions.assertTrue(statsMap.containsKey("custom-file_count"));
+            Assertions.assertTrue(statsMap.containsKey("custom-datafile_mse"));
+            Assertions.assertTrue(statsMap.containsKey("custom-total_size"));
+          }
+        });
+  }
+
   private static GravitinoMetalake loadOrCreateMetalake(
       GravitinoAdminClient client, String metalakeName) {
     try {
@@ -235,7 +271,12 @@ public class TestBuiltinIcebergRewriteDataFiles {
   }
 
   private static void submitCompactionJob(GravitinoMetalake metalake, Map<String, String> jobConf) {
-    JobHandle jobHandle = metalake.runJob(JOB_TEMPLATE_NAME, jobConf);
+    submitJob(metalake, JOB_TEMPLATE_NAME, jobConf);
+  }
+
+  private static void submitJob(
+      GravitinoMetalake metalake, String jobTemplateName, Map<String, String> jobConf) {
+    JobHandle jobHandle = metalake.runJob(jobTemplateName, jobConf);
     System.out.println("Submitted job id: " + jobHandle.jobId());
     Assertions.assertTrue(StringUtils.isNotBlank(jobHandle.jobId()), "Job id should not be blank");
 
@@ -261,6 +302,17 @@ public class TestBuiltinIcebergRewriteDataFiles {
     jobConf.put("sort_order", "");
     jobConf.put("strategy", "binpack");
     jobConf.put("options", "{\"min-input-files\":\"1\"}");
+    jobConf.putAll(createOptimizerConfig().jobSubmitterConfigs());
+    return jobConf;
+  }
+
+  private static Map<String, String> buildUpdateStatsJobConfig(String tableName) {
+    Map<String, String> jobConf = new HashMap<>();
+    jobConf.put("table_identifier", "db." + tableName);
+    jobConf.put("gravitino_uri", SERVER_URI);
+    jobConf.put("metalake", METALAKE_NAME);
+    jobConf.put("target_file_size_bytes", "100000");
+    jobConf.put("statistics_updater", "gravitino-statistics-updater");
     jobConf.putAll(createOptimizerConfig().jobSubmitterConfigs());
     return jobConf;
   }
