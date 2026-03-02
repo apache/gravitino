@@ -56,7 +56,7 @@ public class IcebergRESTServerContext {
         new IcebergRESTServerContext(
             enableAuth,
             auxMode,
-            configProvider.getMetalakeName(),
+            configProvider.getMetalakeName().orElse(null),
             configProvider.getDefaultCatalogName(),
             catalogWrapperManager);
     return InstanceHolder.INSTANCE;

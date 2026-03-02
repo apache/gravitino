@@ -19,6 +19,7 @@
 
 package org.apache.gravitino.iceberg.service;
 
+import java.util.Optional;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.catalog.lakehouse.iceberg.IcebergConstants;
 import org.apache.gravitino.iceberg.service.authorization.IcebergRESTServerContext;
@@ -42,7 +43,7 @@ public class TestIcebergRESTUtils {
   @BeforeAll
   public void init() {
     IcebergConfigProvider icebergConfigProvider = Mockito.mock(IcebergConfigProvider.class);
-    Mockito.when(icebergConfigProvider.getMetalakeName()).thenReturn("metalake");
+    Mockito.when(icebergConfigProvider.getMetalakeName()).thenReturn(Optional.of("metalake"));
     Mockito.when(icebergConfigProvider.getDefaultCatalogName())
         .thenReturn(IcebergConstants.ICEBERG_REST_DEFAULT_CATALOG);
     IcebergRESTServerContext.create(icebergConfigProvider, false, false, null);

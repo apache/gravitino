@@ -29,6 +29,7 @@ import java.io.IOException;
 import java.time.Instant;
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.Optional;
 import org.apache.commons.lang3.reflect.FieldUtils;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.EntityStore;
@@ -90,7 +91,7 @@ public class TestIcebergTableHookDispatcher {
 
     // Create mock IcebergRESTServerContext
     IcebergConfigProvider mockConfigProvider = mock(IcebergConfigProvider.class);
-    when(mockConfigProvider.getMetalakeName()).thenReturn(TEST_METALAKE);
+    when(mockConfigProvider.getMetalakeName()).thenReturn(Optional.of(TEST_METALAKE));
     when(mockConfigProvider.getDefaultCatalogName()).thenReturn(TEST_CATALOG);
     IcebergRESTServerContext.create(mockConfigProvider, false, false, null);
 

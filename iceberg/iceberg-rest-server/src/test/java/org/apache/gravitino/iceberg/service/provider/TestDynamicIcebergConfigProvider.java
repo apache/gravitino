@@ -69,7 +69,7 @@ public class TestDynamicIcebergConfigProvider {
   private void createMockServerContext(boolean authorizationEnabled) throws IllegalAccessException {
     // Use reflection to set the IcebergRESTServerContext instance
     IcebergConfigProvider mockProvider = Mockito.mock(IcebergConfigProvider.class);
-    Mockito.when(mockProvider.getMetalakeName()).thenReturn("test_metalake");
+    Mockito.when(mockProvider.getMetalakeName()).thenReturn(Optional.of("test_metalake"));
     Mockito.when(mockProvider.getDefaultCatalogName()).thenReturn("default_catalog");
     // When authorization is enabled, it implies running in auxiliary mode
     IcebergRESTServerContext.create(mockProvider, authorizationEnabled, authorizationEnabled, null);

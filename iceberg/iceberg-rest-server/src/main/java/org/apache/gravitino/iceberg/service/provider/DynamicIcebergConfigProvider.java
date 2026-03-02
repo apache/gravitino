@@ -145,8 +145,8 @@ public class DynamicIcebergConfigProvider implements IcebergConfigProvider {
   }
 
   @Override
-  public String getMetalakeName() {
-    return gravitinoMetalake;
+  public Optional<String> getMetalakeName() {
+    return Optional.of(gravitinoMetalake);
   }
 
   @VisibleForTesting

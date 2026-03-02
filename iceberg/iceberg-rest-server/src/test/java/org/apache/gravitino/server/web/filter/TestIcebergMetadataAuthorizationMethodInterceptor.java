@@ -27,6 +27,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import java.lang.reflect.Method;
 import java.lang.reflect.Parameter;
 import java.util.Map;
+import java.util.Optional;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.iceberg.service.authorization.IcebergRESTServerContext;
@@ -51,7 +52,7 @@ public class TestIcebergMetadataAuthorizationMethodInterceptor {
   public void init() {
     // Initialize IcebergRESTServerContext with a mock config provider
     IcebergConfigProvider mockConfigProvider = Mockito.mock(IcebergConfigProvider.class);
-    Mockito.when(mockConfigProvider.getMetalakeName()).thenReturn(TEST_METALAKE);
+    Mockito.when(mockConfigProvider.getMetalakeName()).thenReturn(Optional.of(TEST_METALAKE));
     Mockito.when(mockConfigProvider.getDefaultCatalogName()).thenReturn(TEST_CATALOG);
     IcebergRESTServerContext.create(mockConfigProvider, false, false, null);
   }

@@ -20,6 +20,7 @@ package org.apache.gravitino.iceberg.service;
 
 import com.google.common.collect.Maps;
 import java.util.Map;
+import java.util.Optional;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.reflect.FieldUtils;
 import org.apache.gravitino.GravitinoEnv;
@@ -66,7 +67,7 @@ public class TestIcebergCatalogWrapperManagerForREST {
     configProvider.initialize(config);
     IcebergCatalogWrapperManager manager =
         new IcebergCatalogWrapperManager(
-            config, configProvider, false, configProvider.getMetalakeName());
+            config, configProvider, false, configProvider.getMetalakeName().orElse(null));
     IcebergRESTServerContext.create(configProvider, false, false, manager);
 
     IcebergCatalogWrapper ops = manager.getOps(rawPrefix);
@@ -86,7 +87,7 @@ public class TestIcebergCatalogWrapperManagerForREST {
     configProvider.initialize(config);
     IcebergCatalogWrapperManager manager =
         new IcebergCatalogWrapperManager(
-            config, configProvider, false, configProvider.getMetalakeName());
+            config, configProvider, false, configProvider.getMetalakeName().orElse(null));
     IcebergRESTServerContext.create(configProvider, false, false, manager);
 
     Assertions.assertThrowsExactly(IllegalArgumentException.class, () -> manager.getOps(rawPrefix));
@@ -99,7 +100,7 @@ public class TestIcebergCatalogWrapperManagerForREST {
     configProvider.initialize(config);
     IcebergCatalogWrapperManager manager =
         new IcebergCatalogWrapperManager(
-            config, configProvider, true, configProvider.getMetalakeName());
+            config, configProvider, true, configProvider.getMetalakeName().orElse(null));
     IcebergRESTServerContext.create(configProvider, true, true, manager);
 
     IllegalArgumentException exception =
