@@ -184,6 +184,15 @@ public class TestTableUpdatesRequest {
             IllegalArgumentException.class, updateTableColumnDefaultValueRequest::validate);
     Assertions.assertTrue(
         exception2.getMessage().contains("field is required and cannot be empty"));
+
+    // test validate clearing column comment is allowed (null or empty)
+    TableUpdateRequest.UpdateTableColumnCommentRequest clearCommentWithNull =
+        new TableUpdateRequest.UpdateTableColumnCommentRequest(new String[] {"column"}, null);
+    Assertions.assertDoesNotThrow(clearCommentWithNull::validate);
+
+    TableUpdateRequest.UpdateTableColumnCommentRequest clearCommentWithEmpty =
+        new TableUpdateRequest.UpdateTableColumnCommentRequest(new String[] {"column"}, "");
+    Assertions.assertDoesNotThrow(clearCommentWithEmpty::validate);
   }
 
   @Test
