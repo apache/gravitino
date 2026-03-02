@@ -236,9 +236,9 @@
    MIT license.
 
    Vben
-   ./web/lib/utils/axios
-   ./web/lib/enums/httpEnum.js
-   ./web/lib/utils/index.js (parts of)
+   ./src/lib/utils/axios
+   ./src/lib/enums/httpEnum.js
+   ./src/lib/utils/index.js (parts of)
 
    @alloc/quick-lru
    @ant-design/colors
@@ -886,7 +886,6 @@
    isexe
    lru-cache
    lucide-react
-   minimatch
    once
    picocolors
    saxes
@@ -896,7 +895,6 @@
    test-exclude
    which
    wrappy
-   yallist
 
    This product bundles various third-party components also under the
    CC0 1.0 license.
@@ -938,3 +936,8 @@
    0BSD license.
 
    tslib
+
+   This product bundles various third-party components also under the
+   WTFPL and MIT license
+   
+   opener
