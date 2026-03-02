@@ -233,7 +233,11 @@ public abstract class OperationDispatcher {
     try {
       return store.get(ident, type, entityClass);
     } catch (Exception e) {
-      LOG.warn(FormattedErrorMessages.STORE_OP_FAILURE, "get", ident, e.getMessage(), e);
+      // Fix unexpected error messages like "2026-02-26T14:33:11.810125Z Gravitino-webserver-91 WARN
+      // found 2 argument placeholders, but provided 4 for pattern `Failed to {} entity for {} in
+      // Gravitino, with this situation the returned object will not contain the metadata from
+      // Gravitino.`" in ${GRAVITINO_HOME}/logs/gravitino-server.out.
+      LOG.warn(FormattedErrorMessages.STORE_OP_FAILURE, "get", ident, e);
       return null;
     }
   }
