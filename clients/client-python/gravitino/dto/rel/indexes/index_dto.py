@@ -16,7 +16,7 @@
 # under the License.
 
 from functools import reduce
-from typing import ClassVar, List, Optional
+from typing import ClassVar, List, Optional, Dict
 
 from gravitino.api.rel.indexes.index import Index
 from gravitino.utils.precondition import Precondition
@@ -36,6 +36,7 @@ class IndexDTO(Index):
         index_type: Index.IndexType,
         name: Optional[str],
         field_names: List[List[str]],
+        properties: Optional[Dict[str, str]] = None,
     ):
         Precondition.check_argument(index_type is not None, "Index type cannot be null")
         Precondition.check_argument(
@@ -46,12 +47,16 @@ class IndexDTO(Index):
         self._index_type = index_type
         self._name = name
         self._field_names = field_names
+        self._properties = properties or {}
 
     def type(self) -> Index.IndexType:
         return self._index_type
 
     def name(self) -> Optional[str]:
         return self._name
+
+    def properties(self) -> Dict[str, str]:
+        return self._properties
 
     def field_names(self) -> List[List[str]]:
         return self._field_names

@@ -20,6 +20,7 @@
 package org.apache.gravitino.json;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
+import java.util.Map;
 import org.apache.gravitino.dto.rel.DistributionDTO;
 import org.apache.gravitino.dto.rel.SortOrderDTO;
 import org.apache.gravitino.dto.rel.expressions.LiteralDTO;
@@ -120,7 +121,8 @@ public class TestSerializer {
 
     String actualJson = JsonUtils.anyFieldMapper().writeValueAsString((DTOConverters.toDTO(index)));
     String expectedJson =
-        "{\"indexType\":\"PRIMARY_KEY\",\"name\":\"index_1\"," + "\"fieldNames\":[[\"col1\"]]}";
+        "{\"indexType\":\"PRIMARY_KEY\",\"name\":\"index_1\","
+            + "\"fieldNames\":[[\"col1\"]],\"properties\":{}}";
     Assertions.assertEquals(expectedJson, actualJson);
     IndexDTO deserialized = JsonUtils.anyFieldMapper().readValue(actualJson, IndexDTO.class);
     Assertions.assertEquals(index, DTOConverters.fromDTO(deserialized));
@@ -134,8 +136,34 @@ public class TestSerializer {
     actualJson = JsonUtils.anyFieldMapper().writeValueAsString(index);
     expectedJson =
         "{\"indexType\":\"unique_key\",\"name\":\"index_2\","
-            + "\"fieldNames\":[[\"col1\"],[\"col2\"]]}";
+            + "\"fieldNames\":[[\"col1\"],[\"col2\"]],\"properties\":{}}";
     Assertions.assertEquals(expectedJson, actualJson);
+
+    Map<String, String> props =
+        Map.of(
+            "compression", "lz4",
+            "level", "high");
+    index =
+        (IndexImpl)
+            Indexes.of(
+                IndexType.PRIMARY_KEY, "index_3", new String[][] {new String[] {"colA"}}, props);
+    actualJson = JsonUtils.anyFieldMapper().writeValueAsString(DTOConverters.toDTO(index));
+
+    expectedJson =
+        "{"
+            + "\"indexType\":\"PRIMARY_KEY\","
+            + "\"name\":\"index_3\","
+            + "\"fieldNames\":[[\"colA\"]],"
+            + "\"properties\":{"
+            + "\"compression\":\"lz4\","
+            + "\"level\":\"high\""
+            + "}"
+            + "}";
+    Assertions.assertEquals(expectedJson, actualJson);
+
+    deserialized = JsonUtils.anyFieldMapper().readValue(actualJson, IndexDTO.class);
+
+    Assertions.assertEquals(index, DTOConverters.fromDTO(deserialized));
   }
 
   @Test

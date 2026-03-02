@@ -19,7 +19,10 @@
 package org.apache.gravitino.rel.indexes;
 
 import com.google.common.base.Objects;
+import com.google.common.collect.ImmutableMap;
 import java.util.Arrays;
+import java.util.Map;
+import org.apache.gravitino.rel.indexes.Index.IndexType;
 
 /** Helper methods to create index to pass into Apache Gravitino. */
 public class Indexes {
@@ -41,7 +44,19 @@ public class Indexes {
    * @return The unique index
    */
   public static Index unique(String name, String[][] fieldNames) {
-    return of(Index.IndexType.UNIQUE_KEY, name, fieldNames);
+    return of(Index.IndexType.UNIQUE_KEY, name, fieldNames, ImmutableMap.of());
+  }
+
+  /**
+   * Create a unique index on columns. Like unique (a) or unique (a, b), for complex like unique
+   *
+   * @param name The name of the index
+   * @param fieldNames The field names under the table contained in the index.
+   * @param properties Extra properties for index configuration
+   * @return The unique index
+   */
+  public static Index unique(String name, String[][] fieldNames, Map<String, String> properties) {
+    return of(Index.IndexType.UNIQUE_KEY, name, fieldNames, properties);
   }
 
   /**
@@ -51,7 +66,18 @@ public class Indexes {
    * @return The primary key index
    */
   public static Index createMysqlPrimaryKey(String[][] fieldNames) {
-    return primary(DEFAULT_PRIMARY_KEY_NAME, fieldNames);
+    return primary(DEFAULT_PRIMARY_KEY_NAME, fieldNames, ImmutableMap.of());
+  }
+
+  /**
+   * To create a MySQL primary key, you need to use the default primary key name.
+   *
+   * @param properties Extra properties for index configuration
+   * @param fieldNames The field names under the table contained in the index.
+   * @return The primary key index
+   */
+  public static Index createMysqlPrimaryKey(String[][] fieldNames, Map<String, String> properties) {
+    return primary(DEFAULT_PRIMARY_KEY_NAME, fieldNames, properties);
   }
 
   /**
@@ -62,20 +88,48 @@ public class Indexes {
    * @return The primary index
    */
   public static Index primary(String name, String[][] fieldNames) {
-    return of(Index.IndexType.PRIMARY_KEY, name, fieldNames);
+    return of(Index.IndexType.PRIMARY_KEY, name, fieldNames, ImmutableMap.of());
+  }
+
+  /**
+   * Create a primary index on columns. Like primary (a), for complex like primary
+   *
+   * @param name The name of the index
+   * @param fieldNames The field names under the table contained in the index.
+   * @param properties Extra properties for index configuration
+   * @return The primary index
+   */
+  public static Index primary(String name, String[][] fieldNames, Map<String, String> properties) {
+    return of(Index.IndexType.PRIMARY_KEY, name, fieldNames, properties);
   }
 
   /**
    * @param indexType The type of the index
    * @param name The name of the index
    * @param fieldNames The field names under the table contained in the index.
+   * @return An {@link Index} instance with empty properties
+   */
+  public static Index of(IndexType indexType, String name, String[][] fieldNames) {
+    return of(indexType, name, fieldNames, Map.of());
+  }
+
+  /**
+   * @param indexType The type of the index
+   * @param name The name of the index
+   * @param fieldNames The field names under the table contained in the index.
+   * @param properties Extra properties for index configuration
    * @return The index
    */
-  public static Index of(Index.IndexType indexType, String name, String[][] fieldNames) {
+  public static Index of(
+      Index.IndexType indexType,
+      String name,
+      String[][] fieldNames,
+      Map<String, String> properties) {
     return IndexImpl.builder()
         .withIndexType(indexType)
         .withName(name)
         .withFieldNames(fieldNames)
+        .withProperties(properties)
         .build();
   }
 
@@ -87,17 +141,22 @@ public class Indexes {
 
     private final String[][] fieldNames;
 
+    private final Map<String, String> properties;
+
     /**
      * The constructor of the index.
      *
      * @param indexType The type of the index
      * @param name The name of the index
      * @param fieldNames The field names under the table contained in the index.
+     * @param properties The properties of the index.
      */
-    private IndexImpl(IndexType indexType, String name, String[][] fieldNames) {
+    private IndexImpl(
+        IndexType indexType, String name, String[][] fieldNames, Map<String, String> properties) {
       this.indexType = indexType;
       this.name = name;
       this.fieldNames = fieldNames;
+      this.properties = properties == null ? Map.of() : properties;
     }
 
     /**
@@ -124,6 +183,14 @@ public class Indexes {
       return fieldNames;
     }
 
+    /**
+     * @return Extra properties for index configuration
+     */
+    @Override
+    public Map<String, String> properties() {
+      return properties;
+    }
+
     @Override
     public boolean equals(Object o) {
       if (this == o) {
@@ -135,12 +202,13 @@ public class Indexes {
       IndexImpl index = (IndexImpl) o;
       return indexType == index.indexType
           && Objects.equal(name, index.name)
-          && Arrays.deepEquals(fieldNames, index.fieldNames);
+          && Arrays.deepEquals(fieldNames, index.fieldNames)
+          && Objects.equal(properties, index.properties);
     }
 
     @Override
     public int hashCode() {
-      return Objects.hashCode(indexType, name, Arrays.hashCode(fieldNames));
+      return Objects.hashCode(indexType, name, Arrays.deepHashCode(fieldNames), properties);
     }
 
     /**
@@ -161,6 +229,9 @@ public class Indexes {
 
       /** The field names of the index. */
       protected String[][] fieldNames;
+
+      /** The properties of the index. */
+      protected Map<String, String> properties;
 
       /**
        * Set the type of the index.
@@ -196,12 +267,23 @@ public class Indexes {
       }
 
       /**
+       * Set the properties of the index.
+       *
+       * @param properties The properties of the index
+       * @return The builder for creating a new instance of IndexImpl.
+       */
+      public Builder withProperties(Map<String, String> properties) {
+        this.properties = properties;
+        return this;
+      }
+
+      /**
        * Build a new instance of IndexImpl.
        *
        * @return The new instance.
        */
       public Index build() {
-        return new IndexImpl(indexType, name, fieldNames);
+        return new IndexImpl(indexType, name, fieldNames, properties);
       }
     }
   }

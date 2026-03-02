@@ -170,7 +170,7 @@ public class GravitinoPaimonTable extends BaseTable {
     if (table.primaryKeys() != null && !table.primaryKeys().isEmpty()) {
       String[][] filedNames = constructIndexFiledNames(table.primaryKeys());
       indexes =
-          Collections.singletonList(primary(PAIMON_PRIMARY_KEY_INDEX_NAME, filedNames))
+          Collections.singletonList(primary(PAIMON_PRIMARY_KEY_INDEX_NAME, filedNames, Map.of()))
               .toArray(new Index[0]);
     }
     return indexes;

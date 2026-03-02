@@ -288,7 +288,7 @@ public class TestTableUpdatesRequest {
             new String[][] {{"column1"}});
     String jsonString = JsonUtils.objectMapper().writeValueAsString(tableUpdateRequest);
     String expected =
-        "{\"@type\":\"addTableIndex\",\"index\":{\"indexType\":\"PRIMARY_KEY\",\"name\":\"PRIMARY\",\"fieldNames\":[[\"column1\"]]}}";
+        "{\"@type\":\"addTableIndex\",\"index\":{\"indexType\":\"PRIMARY_KEY\",\"name\":\"PRIMARY\",\"fieldNames\":[[\"column1\"]], \"properties\":{}}}";
     Assertions.assertEquals(
         JsonUtils.objectMapper().readTree(expected), JsonUtils.objectMapper().readTree(jsonString));
 
@@ -297,7 +297,7 @@ public class TestTableUpdatesRequest {
             Index.IndexType.UNIQUE_KEY, "uk_2", new String[][] {{"column2"}});
     jsonString = JsonUtils.objectMapper().writeValueAsString(tableUpdateRequest);
     expected =
-        "{\"@type\":\"addTableIndex\",\"index\":{\"indexType\":\"UNIQUE_KEY\",\"name\":\"uk_2\",\"fieldNames\":[[\"column2\"]]}}";
+        "{\"@type\":\"addTableIndex\",\"index\":{\"indexType\":\"UNIQUE_KEY\",\"name\":\"uk_2\",\"fieldNames\":[[\"column2\"]], \"properties\":{}}}";
     Assertions.assertEquals(
         JsonUtils.objectMapper().readTree(expected), JsonUtils.objectMapper().readTree(jsonString));
 
