@@ -385,7 +385,7 @@ export default function CatalogsPage() {
           metalake={currentMetalake}
           catalogType={catalogType}
           editCatalog={editCatalog}
-          init={true}
+          init={false}
         />
       )}
       {openOwner && (
