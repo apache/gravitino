@@ -199,20 +199,26 @@ public class TestFilesetMetaService extends TestJDBCBackend {
     }
     assertFalse(legacyRecordExistsInDB(fileset.id(), Entity.EntityType.FILESET));
     assertEquals(0, listFilesetVersions(fileset.id()).size());
-    assertEquals(3, listFilesetVersions(anotherFileset.id()).size());
+    Map<Integer, Long> anotherFilesetVersionsAfterHardDelete =
+        listFilesetVersions(anotherFileset.id());
+    assertTrue(anotherFilesetVersionsAfterHardDelete.containsKey(3));
+    assertEquals(0L, anotherFilesetVersionsAfterHardDelete.get(3));
 
     // soft delete for old version fileset
     for (Entity.EntityType entityType : Entity.EntityType.values()) {
       backend.deleteOldVersionData(entityType, 1);
     }
     Map<Integer, Long> versionDeletedMap = listFilesetVersions(anotherFileset.id());
-    assertEquals(3, versionDeletedMap.size());
+    assertTrue(versionDeletedMap.containsKey(3));
+    assertEquals(0L, versionDeletedMap.get(3));
     assertEquals(1, versionDeletedMap.values().stream().filter(value -> value == 0L).count());
-    assertEquals(2, versionDeletedMap.values().stream().filter(value -> value != 0L).count());
 
     // hard delete for old version fileset
     backend.hardDeleteLegacyData(Entity.EntityType.FILESET, Instant.now().toEpochMilli() + 1000);
-    assertEquals(1, listFilesetVersions(anotherFileset.id()).size());
+    Map<Integer, Long> finalFilesetVersions = listFilesetVersions(anotherFileset.id());
+    assertTrue(finalFilesetVersions.containsKey(3));
+    assertEquals(0L, finalFilesetVersions.get(3));
+    assertEquals(1, finalFilesetVersions.values().stream().filter(value -> value == 0L).count());
   }
 
   @TestTemplate

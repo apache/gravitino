@@ -170,7 +170,7 @@ class DTOConverters:
         Returns:
             Index: The index.
         """
-        return Indexes.of(dto.type(), dto.name(), dto.field_names())
+        return Indexes.of(dto.type(), dto.name(), dto.field_names(), dto.properties())
 
     @from_dto.register
     @staticmethod

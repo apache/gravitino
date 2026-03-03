@@ -176,13 +176,13 @@ export default function CreateFilesetDialog({ ...props }) {
           const reqData = { updates: genUpdates(cacheData, submitData) }
           if (reqData.updates.length) {
             await dispatch(
-              updateFileset({ data: reqData, metalake, catalog, catalogType, schema, fileset: cacheData.name })
+              updateFileset({ init, data: reqData, metalake, catalog, catalogType, schema, fileset: cacheData.name })
             )
           }
         } else {
           await dispatch(createFileset({ data: submitData, metalake, catalog, catalogType, schema }))
         }
-        treeRef.current.onLoadData({ key: `${catalog}/${schema}`, nodeType: 'schema' })
+        !editFileset && treeRef.current.onLoadData({ key: `${catalog}/${schema}`, nodeType: 'schema' })
         setConfirmLoading(false)
         setOpen(false)
       })

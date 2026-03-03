@@ -762,7 +762,8 @@ public class CatalogPostgreSqlIT extends BaseIT {
           Indexes.unique("u3_key", new String[][] {{"col_5"}, {"col_4"}}),
           Indexes.unique("u4_key", new String[][] {{"col_2"}, {"col_4"}, {"col_3"}}),
           Indexes.unique("u5_key", new String[][] {{"col_5"}, {"col_3"}, {"col_2"}}),
-          Indexes.unique("u6_key", new String[][] {{"col_1"}, {"col_3"}, {"col_2"}, {"col_4"}}),
+          Indexes.unique(
+              "u6_key", new String[][] {{"col_1"}, {"col_3"}, {"col_2"}, {"col_4"}}, Map.of()),
         };
 
     NameIdentifier tableIdentifier = NameIdentifier.of(schemaName, tableName);
@@ -823,7 +824,7 @@ public class CatalogPostgreSqlIT extends BaseIT {
             "Index does not support complex fields in PostgreSQL"));
 
     Index[] primaryIndex2 =
-        new Index[] {Indexes.unique("u1_key", new String[][] {{"col_2", "col_3"}})};
+        new Index[] {Indexes.unique("u1_key", new String[][] {{"col_2", "col_3"}}, Map.of())};
     illegalArgumentException =
         assertThrows(
             IllegalArgumentException.class,
@@ -875,8 +876,8 @@ public class CatalogPostgreSqlIT extends BaseIT {
         Distributions.NONE,
         new SortOrder[0],
         new Index[] {
-          Indexes.unique("u4_key_2", new String[][] {{"col_2"}, {"col_3"}, {"col_4"}}),
-          Indexes.unique("u5_key_3", new String[][] {{"col_2"}, {"col_3"}, {"col_4"}}),
+          Indexes.unique("u4_key_2", new String[][] {{"col_2"}, {"col_3"}, {"col_4"}}, Map.of()),
+          Indexes.unique("u5_key_3", new String[][] {{"col_2"}, {"col_3"}, {"col_4"}}, Map.of()),
         });
     table = tableCatalog.loadTable(tableIdent);
 
@@ -1138,7 +1139,7 @@ public class CatalogPostgreSqlIT extends BaseIT {
     Column t1_col = Column.of(t1_name, Types.LongType.get(), "id", false, false, null);
     Column[] columns = {t1_col};
 
-    Index[] t1_indexes = {Indexes.unique("u1_key", new String[][] {{t1_name}})};
+    Index[] t1_indexes = {Indexes.unique("u1_key", new String[][] {{t1_name}}, Map.of())};
 
     NameIdentifier tableIdentifier = NameIdentifier.of(schemaName, t1_name);
     tableCatalog.createTable(
@@ -1153,7 +1154,7 @@ public class CatalogPostgreSqlIT extends BaseIT {
 
     String t2_name = "t212";
     Column t2_col = Column.of(t2_name, Types.LongType.get(), "id", false, false, null);
-    Index[] t2_indexes = {Indexes.unique("u2_key", new String[][] {{t2_name}})};
+    Index[] t2_indexes = {Indexes.unique("u2_key", new String[][] {{t2_name}}, Map.of())};
     columns = new Column[] {t2_col};
     tableIdentifier = NameIdentifier.of(schemaName, t2_name);
     tableCatalog.createTable(
@@ -1168,7 +1169,7 @@ public class CatalogPostgreSqlIT extends BaseIT {
 
     String t3_name = "t_12";
     Column t3_col = Column.of(t3_name, Types.LongType.get(), "id", false, false, null);
-    Index[] t3_indexes = {Indexes.unique("u3_key", new String[][] {{t3_name}})};
+    Index[] t3_indexes = {Indexes.unique("u3_key", new String[][] {{t3_name}}, Map.of())};
     columns = new Column[] {t3_col};
     tableIdentifier = NameIdentifier.of(schemaName, t3_name);
     tableCatalog.createTable(
@@ -1183,7 +1184,7 @@ public class CatalogPostgreSqlIT extends BaseIT {
 
     String t4_name = "_1__";
     Column t4_col = Column.of(t4_name, Types.LongType.get(), "id", false, false, null);
-    Index[] t4_indexes = {Indexes.unique("u4_key", new String[][] {{t4_name}})};
+    Index[] t4_indexes = {Indexes.unique("u4_key", new String[][] {{t4_name}}, Map.of())};
     columns = new Column[] {t4_col};
     tableIdentifier = NameIdentifier.of(schemaName, t4_name);
     tableCatalog.createTable(
@@ -1250,7 +1251,7 @@ public class CatalogPostgreSqlIT extends BaseIT {
     String t1_name = table_name + "`; DROP TABLE important_table; -- ";
     Column t1_col = Column.of(t1_name, Types.LongType.get(), "id", false, false, null);
     Column[] columns = {t1_col};
-    Index[] t1_indexes = {Indexes.unique("u1_key", new String[][] {{t1_name}})};
+    Index[] t1_indexes = {Indexes.unique("u1_key", new String[][] {{t1_name}}, Map.of())};
     NameIdentifier tableIdentifier =
         NameIdentifier.of(metalakeName, catalogName, schemaName, t1_name);
 
@@ -1275,7 +1276,7 @@ public class CatalogPostgreSqlIT extends BaseIT {
 
     String t2_name = table_name + "`; SLEEP(10); -- ";
     Column t2_col = Column.of(t2_name, Types.LongType.get(), "id", false, false, null);
-    Index[] t2_indexes = {Indexes.unique("u2_key", new String[][] {{t2_name}})};
+    Index[] t2_indexes = {Indexes.unique("u2_key", new String[][] {{t2_name}}, Map.of())};
     Column[] columns2 = new Column[] {t2_col};
     NameIdentifier tableIdentifier2 =
         NameIdentifier.of(metalakeName, catalogName, schemaName, t2_name);
@@ -1302,7 +1303,7 @@ public class CatalogPostgreSqlIT extends BaseIT {
     String t3_name =
         table_name + "`; UPDATE Users SET password = 'newpassword' WHERE username = 'admin'; -- ";
     Column t3_col = Column.of(t3_name, Types.LongType.get(), "id", false, false, null);
-    Index[] t3_indexes = {Indexes.unique("u3_key", new String[][] {{t3_name}})};
+    Index[] t3_indexes = {Indexes.unique("u3_key", new String[][] {{t3_name}}, Map.of())};
     Column[] columns3 = new Column[] {t3_col};
     NameIdentifier tableIdentifier3 =
         NameIdentifier.of(metalakeName, catalogName, schemaName, t3_name);
@@ -1328,7 +1329,7 @@ public class CatalogPostgreSqlIT extends BaseIT {
 
     String invalidInput = StringUtils.repeat("a", 64);
     Column t4_col = Column.of(invalidInput, Types.LongType.get(), "id", false, false, null);
-    Index[] t4_indexes = {Indexes.unique("u4_key", new String[][] {{invalidInput}})};
+    Index[] t4_indexes = {Indexes.unique("u4_key", new String[][] {{invalidInput}}, Map.of())};
     Column[] columns4 = new Column[] {t4_col};
     NameIdentifier tableIdentifier4 =
         NameIdentifier.of(metalakeName, catalogName, schemaName, invalidInput);
@@ -1354,7 +1355,7 @@ public class CatalogPostgreSqlIT extends BaseIT {
 
     String invalidInput2 = RandomNameUtils.genRandomName("$test_db");
     Column t5_col = Column.of(invalidInput2, Types.LongType.get(), "id", false, false, null);
-    Index[] t5_indexes = {Indexes.unique("u5_key", new String[][] {{invalidInput2}})};
+    Index[] t5_indexes = {Indexes.unique("u5_key", new String[][] {{invalidInput2}}, Map.of())};
     Column[] columns5 = new Column[] {t5_col};
     NameIdentifier tableIdentifier5 =
         NameIdentifier.of(metalakeName, catalogName, schemaName, invalidInput2);
@@ -1563,7 +1564,8 @@ public class CatalogPostgreSqlIT extends BaseIT {
     Column col3 = Column.of("col_3", Types.VarCharType.of(255), "config", false, false, null);
     Column[] newColumns = new Column[] {col1, col2, col3};
 
-    Index[] indexes = new Index[] {Indexes.unique("u1_key", new String[][] {{"col_2"}, {"col_3"}})};
+    Index[] indexes =
+        new Index[] {Indexes.unique("u1_key", new String[][] {{"col_2"}, {"col_3"}}, Map.of())};
 
     String[] schemas = {"db_", "db_1", "db_2", "db12"};
     SupportsSchemas schemaSupport = catalog.asSchemas();

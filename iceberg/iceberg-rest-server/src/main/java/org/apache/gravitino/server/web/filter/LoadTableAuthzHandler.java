@@ -26,6 +26,7 @@ import java.util.Optional;
 import org.apache.gravitino.Entity.EntityType;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.authorization.AuthorizationRequestContext;
+import org.apache.gravitino.iceberg.common.ops.IcebergCatalogWrapper;
 import org.apache.gravitino.iceberg.service.IcebergCatalogWrapperManager;
 import org.apache.gravitino.iceberg.service.authorization.IcebergRESTServerContext;
 import org.apache.gravitino.server.authorization.annotations.AuthorizationMetadata;
@@ -111,9 +112,14 @@ public class LoadTableAuthzHandler implements AuthorizationHandler {
     // 3. Let request proceed - the actual loadTable() call will handle non-existence
     IcebergCatalogWrapperManager wrapperManager =
         IcebergRESTServerContext.getInstance().catalogWrapperManager();
+    IcebergCatalogWrapper catalogWrapper = wrapperManager.getCatalogWrapper(catalog);
     TableIdentifier tableIdentifier = TableIdentifier.of(namespace, tableName);
 
-    if (wrapperManager.getCatalogWrapper(catalog).viewExists(tableIdentifier)) {
+    // Only check view existence when the catalog supports view operations. Catalogs backed by
+    // JDBC without jdbc.schema-version=V1 throw UnsupportedOperationException from viewExists(),
+    // which would surface as a 500 error. When view operations are unsupported the identifier
+    // cannot be a view, so we skip the check entirely.
+    if (catalogWrapper.supportsViewOperations() && catalogWrapper.viewExists(tableIdentifier)) {
       throw new NoSuchTableException("Table %s not found", tableName);
     }
 

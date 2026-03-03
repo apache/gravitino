@@ -25,9 +25,9 @@ import java.util.List;
 import java.util.ServiceLoader;
 import java.util.stream.Collectors;
 import org.apache.gravitino.maintenance.optimizer.api.common.Provider;
-import org.apache.gravitino.maintenance.optimizer.api.monitor.JobProvider;
 import org.apache.gravitino.maintenance.optimizer.api.monitor.MetricsProvider;
 import org.apache.gravitino.maintenance.optimizer.api.monitor.MonitorCallback;
+import org.apache.gravitino.maintenance.optimizer.api.monitor.TableJobRelationProvider;
 import org.apache.gravitino.maintenance.optimizer.api.recommender.JobSubmitter;
 import org.apache.gravitino.maintenance.optimizer.api.recommender.StatisticsProvider;
 import org.apache.gravitino.maintenance.optimizer.api.recommender.StrategyProvider;
@@ -107,8 +107,8 @@ public class ProviderUtils {
     return createProviderInstance(MetricsProvider.class, provider);
   }
 
-  public static JobProvider createJobProviderInstance(String provider) {
-    return createProviderInstance(JobProvider.class, provider);
+  public static TableJobRelationProvider createTableJobRelationProviderInstance(String provider) {
+    return createProviderInstance(TableJobRelationProvider.class, provider);
   }
 
   public static MonitorCallback createMonitorCallbackInstance(String provider) {

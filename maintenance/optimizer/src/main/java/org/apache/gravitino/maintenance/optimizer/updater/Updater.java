@@ -27,10 +27,9 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.stream.Collectors;
 import org.apache.gravitino.NameIdentifier;
-import org.apache.gravitino.maintenance.optimizer.api.common.MetricSample;
 import org.apache.gravitino.maintenance.optimizer.api.common.PartitionPath;
 import org.apache.gravitino.maintenance.optimizer.api.common.StatisticEntry;
-import org.apache.gravitino.maintenance.optimizer.api.common.TableStatisticsBundle;
+import org.apache.gravitino.maintenance.optimizer.api.common.TableAndPartitionStatistics;
 import org.apache.gravitino.maintenance.optimizer.api.updater.MetricsUpdater;
 import org.apache.gravitino.maintenance.optimizer.api.updater.StatisticsCalculator;
 import org.apache.gravitino.maintenance.optimizer.api.updater.StatisticsUpdater;
@@ -39,13 +38,15 @@ import org.apache.gravitino.maintenance.optimizer.api.updater.SupportsCalculateB
 import org.apache.gravitino.maintenance.optimizer.api.updater.SupportsCalculateJobStatistics;
 import org.apache.gravitino.maintenance.optimizer.api.updater.SupportsCalculateTableStatistics;
 import org.apache.gravitino.maintenance.optimizer.common.CloseableGroup;
-import org.apache.gravitino.maintenance.optimizer.common.MetricSampleImpl;
 import org.apache.gravitino.maintenance.optimizer.common.OptimizerEnv;
-import org.apache.gravitino.maintenance.optimizer.common.PartitionMetricSampleImpl;
 import org.apache.gravitino.maintenance.optimizer.common.conf.OptimizerConfig;
 import org.apache.gravitino.maintenance.optimizer.common.util.InstanceLoaderUtils;
 import org.apache.gravitino.maintenance.optimizer.common.util.ProviderUtils;
+import org.apache.gravitino.maintenance.optimizer.common.util.StatisticValueUtils;
 import org.apache.gravitino.maintenance.optimizer.recommender.util.PartitionUtils;
+import org.apache.gravitino.maintenance.optimizer.updater.metrics.storage.JobMetricWriteRequest;
+import org.apache.gravitino.maintenance.optimizer.updater.metrics.storage.MetricRecordImpl;
+import org.apache.gravitino.maintenance.optimizer.updater.metrics.storage.TableMetricWriteRequest;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -101,6 +102,8 @@ public class Updater implements AutoCloseable {
       List<NameIdentifier> nameIdentifiers,
       UpdateType updateType) {
     StatisticsCalculator calculator = getStatisticsCalculator(statisticsCalculatorName);
+    List<TableMetricWriteRequest> tableMetricWriteRequests = new ArrayList<>();
+    List<JobMetricWriteRequest> jobMetricWriteRequests = new ArrayList<>();
     long tableRecords = 0;
     long partitionRecords = 0;
     long jobRecords = 0;
@@ -108,7 +111,7 @@ public class Updater implements AutoCloseable {
       if (calculator instanceof SupportsCalculateTableStatistics) {
         SupportsCalculateTableStatistics supportTableStatistics =
             ((SupportsCalculateTableStatistics) calculator);
-        TableStatisticsBundle bundle =
+        TableAndPartitionStatistics bundle =
             supportTableStatistics.calculateTableStatistics(nameIdentifier);
         List<StatisticEntry<?>> statistics = bundle != null ? bundle.tableStatistics() : List.of();
         Map<PartitionPath, List<StatisticEntry<?>>> partitionStatistics =
@@ -120,8 +123,14 @@ public class Updater implements AutoCloseable {
             statisticsCalculatorName,
             updateType,
             nameIdentifier);
-        updateTable(statistics, nameIdentifier, updateType);
-        updatePartition(partitionStatistics, nameIdentifier, updateType);
+        if (UpdateType.STATISTICS.equals(updateType)) {
+          updateTableStatistics(statistics, nameIdentifier);
+          updatePartitionStatistics(partitionStatistics, nameIdentifier);
+        } else {
+          tableMetricWriteRequests.addAll(collectTableMetrics(statistics, nameIdentifier));
+          tableMetricWriteRequests.addAll(
+              collectPartitionMetrics(partitionStatistics, nameIdentifier));
+        }
       }
       if (calculator instanceof SupportsCalculateJobStatistics
           && UpdateType.METRICS.equals(updateType)) {
@@ -134,9 +143,10 @@ public class Updater implements AutoCloseable {
             "Updating job metrics: calculator={}, identifier={}",
             statisticsCalculatorName,
             nameIdentifier);
-        updateJob(statistics, nameIdentifier);
+        jobMetricWriteRequests.addAll(collectJobMetrics(statistics, nameIdentifier));
       }
     }
+    updateTableAndJobMetrics(tableMetricWriteRequests, jobMetricWriteRequests);
     System.out.println(
         String.format(
             "SUMMARY: %s totalRecords=%d tableRecords=%d partitionRecords=%d jobRecords=%d",
@@ -161,12 +171,14 @@ public class Updater implements AutoCloseable {
    */
   public void updateAll(String statisticsCalculatorName, UpdateType updateType) {
     StatisticsCalculator calculator = getStatisticsCalculator(statisticsCalculatorName);
+    List<TableMetricWriteRequest> tableMetricWriteRequests = new ArrayList<>();
+    List<JobMetricWriteRequest> jobMetricWriteRequests = new ArrayList<>();
     long tableRecords = 0;
     long partitionRecords = 0;
     long jobRecords = 0;
 
     if (calculator instanceof SupportsCalculateBulkTableStatistics supportBulkTableStatistics) {
-      Map<NameIdentifier, TableStatisticsBundle> allTableStatistics =
+      Map<NameIdentifier, TableAndPartitionStatistics> allTableStatistics =
           supportBulkTableStatistics.calculateBulkTableStatistics();
       if (allTableStatistics == null) {
         allTableStatistics = Map.of();
@@ -180,8 +192,14 @@ public class Updater implements AutoCloseable {
                 bundle != null ? bundle.tableStatistics() : List.of();
             Map<PartitionPath, List<StatisticEntry<?>>> partitionStatistics =
                 bundle != null ? bundle.partitionStatistics() : Map.of();
-            updateTable(statistics, identifier, updateType);
-            updatePartition(partitionStatistics, identifier, updateType);
+            if (UpdateType.STATISTICS.equals(updateType)) {
+              updateTableStatistics(statistics, identifier);
+              updatePartitionStatistics(partitionStatistics, identifier);
+            } else {
+              tableMetricWriteRequests.addAll(collectTableMetrics(statistics, identifier));
+              tableMetricWriteRequests.addAll(
+                  collectPartitionMetrics(partitionStatistics, identifier));
+            }
           });
     }
 
@@ -193,8 +211,11 @@ public class Updater implements AutoCloseable {
         allJobStatistics = Map.of();
       }
       jobRecords += countAllStatistics(allJobStatistics);
-      allJobStatistics.forEach((identifier, statistics) -> updateJob(statistics, identifier));
+      allJobStatistics.forEach(
+          (identifier, statistics) ->
+              jobMetricWriteRequests.addAll(collectJobMetrics(statistics, identifier)));
     }
+    updateTableAndJobMetrics(tableMetricWriteRequests, jobMetricWriteRequests);
     System.out.println(
         String.format(
             "SUMMARY: %s totalRecords=%d tableRecords=%d partitionRecords=%d jobRecords=%d",
@@ -213,32 +234,6 @@ public class Updater implements AutoCloseable {
   @Override
   public void close() throws Exception {
     closeableGroup.close();
-  }
-
-  private void updateTable(
-      List<StatisticEntry<?>> statistics, NameIdentifier tableIdentifier, UpdateType updateType) {
-    switch (updateType) {
-      case STATISTICS:
-        updateTableStatistics(statistics, tableIdentifier);
-        break;
-      case METRICS:
-        updateTableMetrics(statistics, tableIdentifier);
-        break;
-    }
-  }
-
-  private void updatePartition(
-      Map<PartitionPath, List<StatisticEntry<?>>> partitionStatistics,
-      NameIdentifier tableIdentifier,
-      UpdateType updateType) {
-    switch (updateType) {
-      case STATISTICS:
-        updatePartitionStatistics(partitionStatistics, tableIdentifier);
-        break;
-      case METRICS:
-        updatePartitionMetrics(partitionStatistics, tableIdentifier);
-        break;
-    }
   }
 
   private void updateTableStatistics(
@@ -269,7 +264,7 @@ public class Updater implements AutoCloseable {
     statisticsUpdater.updatePartitionStatistics(tableIdentifier, partitionStatistics);
   }
 
-  private void updateTableMetrics(
+  private List<TableMetricWriteRequest> collectTableMetrics(
       List<StatisticEntry<?>> statistics, NameIdentifier tableIdentifier) {
     long timestampSeconds = System.currentTimeMillis() / 1000;
     LOG.info(
@@ -277,30 +272,30 @@ public class Updater implements AutoCloseable {
         tableIdentifier,
         statistics != null ? statistics.size() : 0,
         summarize(statistics));
-    metricsUpdater.updateTableMetrics(tableIdentifier, toMetrics(statistics, timestampSeconds));
+    return toTableMetricWriteRequests(tableIdentifier, statistics, timestampSeconds);
   }
 
-  private void updatePartitionMetrics(
+  private List<TableMetricWriteRequest> collectPartitionMetrics(
       Map<PartitionPath, List<StatisticEntry<?>>> partitionStatistics,
       NameIdentifier tableIdentifier) {
     if (partitionStatistics == null || partitionStatistics.isEmpty()) {
       LOG.info(
           "Persist partition metrics skipped: identifier={}, reason=empty partitions",
           tableIdentifier);
-      return;
+      return List.of();
     }
     long timestampSeconds = System.currentTimeMillis() / 1000;
-    List<MetricSample> partitionMetrics = toPartitionMetrics(partitionStatistics, timestampSeconds);
     LOG.info(
         "Persisting partition metrics: identifier={}, partitions={}, names={}, details={}",
         tableIdentifier,
         partitionStatistics.size(),
         partitionNames(partitionStatistics),
         summarize(partitionStatistics.values().stream().flatMap(Collection::stream).toList()));
-    metricsUpdater.updateTableMetrics(tableIdentifier, partitionMetrics);
+    return toPartitionMetricWriteRequests(tableIdentifier, partitionStatistics, timestampSeconds);
   }
 
-  private void updateJob(List<StatisticEntry<?>> statistics, NameIdentifier jobIdentifier) {
+  private List<JobMetricWriteRequest> collectJobMetrics(
+      List<StatisticEntry<?>> statistics, NameIdentifier jobIdentifier) {
     long timestampSeconds = System.currentTimeMillis() / 1000;
 
     LOG.info(
@@ -308,7 +303,18 @@ public class Updater implements AutoCloseable {
         jobIdentifier,
         statistics != null ? statistics.size() : 0,
         summarize(statistics));
-    metricsUpdater.updateJobMetrics(jobIdentifier, toMetrics(statistics, timestampSeconds));
+    return toJobMetricWriteRequests(jobIdentifier, statistics, timestampSeconds);
+  }
+
+  private void updateTableAndJobMetrics(
+      List<TableMetricWriteRequest> tableMetricWriteRequests,
+      List<JobMetricWriteRequest> jobMetricWriteRequests) {
+    if (!tableMetricWriteRequests.isEmpty()) {
+      metricsUpdater.updateTableMetrics(tableMetricWriteRequests);
+    }
+    if (!jobMetricWriteRequests.isEmpty()) {
+      metricsUpdater.updateJobMetrics(jobMetricWriteRequests);
+    }
   }
 
   private String summarize(List<StatisticEntry<?>> statistics) {
@@ -327,23 +333,57 @@ public class Updater implements AutoCloseable {
     return summary;
   }
 
-  private List<MetricSample> toMetrics(List<StatisticEntry<?>> statistics, long timestamp) {
-    List<MetricSample> metrics = new ArrayList<>();
+  private List<TableMetricWriteRequest> toTableMetricWriteRequests(
+      NameIdentifier tableIdentifier, List<StatisticEntry<?>> statistics, long timestamp) {
+    List<TableMetricWriteRequest> metrics = new ArrayList<>();
     if (statistics != null) {
-      statistics.forEach(stat -> metrics.add(new MetricSampleImpl(timestamp, stat)));
+      statistics.forEach(
+          stat ->
+              metrics.add(
+                  new TableMetricWriteRequest(
+                      tableIdentifier,
+                      stat.name(),
+                      java.util.Optional.empty(),
+                      new MetricRecordImpl(
+                          timestamp, StatisticValueUtils.toString(stat.value())))));
     }
     return metrics;
   }
 
-  private List<MetricSample> toPartitionMetrics(
-      Map<PartitionPath, List<StatisticEntry<?>>> partitionStatistics, long timestamp) {
-    List<MetricSample> metrics = new ArrayList<>();
+  private List<TableMetricWriteRequest> toPartitionMetricWriteRequests(
+      NameIdentifier tableIdentifier,
+      Map<PartitionPath, List<StatisticEntry<?>>> partitionStatistics,
+      long timestamp) {
+    List<TableMetricWriteRequest> metrics = new ArrayList<>();
     if (partitionStatistics != null) {
       partitionStatistics.forEach(
           (partitionPath, statisticEntries) ->
               statisticEntries.forEach(
                   stat ->
-                      metrics.add(new PartitionMetricSampleImpl(timestamp, stat, partitionPath))));
+                      metrics.add(
+                          new TableMetricWriteRequest(
+                              tableIdentifier,
+                              stat.name(),
+                              java.util.Optional.of(
+                                  PartitionUtils.encodePartitionPath(partitionPath)),
+                              new MetricRecordImpl(
+                                  timestamp, StatisticValueUtils.toString(stat.value()))))));
+    }
+    return metrics;
+  }
+
+  private List<JobMetricWriteRequest> toJobMetricWriteRequests(
+      NameIdentifier jobIdentifier, List<StatisticEntry<?>> statistics, long timestamp) {
+    List<JobMetricWriteRequest> metrics = new ArrayList<>();
+    if (statistics != null) {
+      statistics.forEach(
+          stat ->
+              metrics.add(
+                  new JobMetricWriteRequest(
+                      jobIdentifier,
+                      stat.name(),
+                      new MetricRecordImpl(
+                          timestamp, StatisticValueUtils.toString(stat.value())))));
     }
     return metrics;
   }
@@ -403,7 +443,7 @@ public class Updater implements AutoCloseable {
   }
 
   private long countAllTableStatistics(
-      Map<NameIdentifier, TableStatisticsBundle> statisticsByTable) {
+      Map<NameIdentifier, TableAndPartitionStatistics> statisticsByTable) {
     if (statisticsByTable == null) {
       return 0;
     }
@@ -413,7 +453,7 @@ public class Updater implements AutoCloseable {
   }
 
   private long countAllPartitionStatistics(
-      Map<NameIdentifier, TableStatisticsBundle> partitionStatisticsByTable) {
+      Map<NameIdentifier, TableAndPartitionStatistics> partitionStatisticsByTable) {
     if (partitionStatisticsByTable == null) {
       return 0;
     }
