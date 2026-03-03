@@ -378,6 +378,145 @@ public class TestLancePartitionStatisticStorage {
     storage.close();
   }
 
+  @Test
+  public void testExceedMaxStatisticsPerUpdateLimit() throws Exception {
+    PartitionStatisticStorageFactory factory = new LancePartitionStatisticStorageFactory();
+
+    String metalakeName = "metalake";
+    String catalogName = "catalog";
+    String schemaName = "schema";
+    String tableName = "table";
+
+    MetadataObject metadataObject =
+        MetadataObjects.of(
+            Lists.newArrayList(catalogName, schemaName, tableName), MetadataObject.Type.TABLE);
+
+    EntityStore entityStore = mock(EntityStore.class);
+    TableEntity tableEntity = mock(TableEntity.class);
+    when(entityStore.get(any(), any(), any())).thenReturn(tableEntity);
+    when(tableEntity.id()).thenReturn(101L);
+    FieldUtils.writeField(GravitinoEnv.getInstance(), "entityStore", entityStore, true);
+
+    String location = Files.createTempDirectory("lance_stats_exceed_test").toString();
+    Map<String, String> properties = Maps.newHashMap();
+    properties.put("location", location);
+    // Default limit is 100, generate 101 statistics to exceed the limit
+
+    LancePartitionStatisticStorage storage =
+        (LancePartitionStatisticStorage) factory.create(properties);
+
+    // Generate 101 statistics which exceeds the default limit of 100
+    int count = 101;
+    Map<MetadataObject, Map<String, Map<String, StatisticValue<?>>>> originData =
+        generateData(metadataObject, count, 1);
+    Map<MetadataObject, List<PartitionStatisticsUpdate>> statisticsToUpdate =
+        convertData(originData);
+
+    List<MetadataObjectStatisticsUpdate> objectUpdates = Lists.newArrayList();
+    for (Map.Entry<MetadataObject, List<PartitionStatisticsUpdate>> entry :
+        statisticsToUpdate.entrySet()) {
+      objectUpdates.add(MetadataObjectStatisticsUpdate.of(entry.getKey(), entry.getValue()));
+    }
+
+    IllegalArgumentException exception =
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () -> storage.updateStatistics(metalakeName, objectUpdates));
+    Assertions.assertTrue(exception.getMessage().contains("exceeds the maximum limit"));
+
+    storage.close();
+  }
+
+  @Test
+  public void testMaxStatisticsPerUpdateConfiguration() throws Exception {
+    PartitionStatisticStorageFactory factory = new LancePartitionStatisticStorageFactory();
+
+    // Prepare table entity
+    String metalakeName = "metalake";
+    String catalogName = "catalog";
+    String schemaName = "schema";
+    String tableName = "table";
+
+    MetadataObject metadataObject =
+        MetadataObjects.of(
+            Lists.newArrayList(catalogName, schemaName, tableName), MetadataObject.Type.TABLE);
+
+    EntityStore entityStore = mock(EntityStore.class);
+    TableEntity tableEntity = mock(TableEntity.class);
+    when(entityStore.get(any(), any(), any())).thenReturn(tableEntity);
+    when(tableEntity.id()).thenReturn(100L);
+    FieldUtils.writeField(GravitinoEnv.getInstance(), "entityStore", entityStore, true);
+
+    String location = Files.createTempDirectory("lance_stats_limit_test").toString();
+    Map<String, String> properties = Maps.newHashMap();
+    properties.put("location", location);
+    // Set a low limit for testing
+    properties.put("maxStatisticsPerUpdate", "5");
+
+    LancePartitionStatisticStorage storage =
+        (LancePartitionStatisticStorage) factory.create(properties);
+
+    // Generate data that exceeds the limit (10 statistics > 5 limit)
+    int count = 10;
+    int partitions = 2;
+    Map<MetadataObject, Map<String, Map<String, StatisticValue<?>>>> originData =
+        generateData(metadataObject, count, partitions);
+    Map<MetadataObject, List<PartitionStatisticsUpdate>> statisticsToUpdate =
+        convertData(originData);
+
+    List<MetadataObjectStatisticsUpdate> objectUpdates = Lists.newArrayList();
+    for (Map.Entry<MetadataObject, List<PartitionStatisticsUpdate>> entry :
+        statisticsToUpdate.entrySet()) {
+      MetadataObject metadata = entry.getKey();
+      List<PartitionStatisticsUpdate> updates = entry.getValue();
+      objectUpdates.add(MetadataObjectStatisticsUpdate.of(metadata, updates));
+    }
+
+    // Should throw an exception because total statistics count (10) exceeds limit (5)
+    IllegalArgumentException exception =
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () -> storage.updateStatistics(metalakeName, objectUpdates));
+    Assertions.assertTrue(exception.getMessage().contains("exceeds the maximum limit"));
+
+    // Generate data within the limit (3 statistics <= 5 limit)
+    int smallCount = 3;
+    Map<MetadataObject, Map<String, Map<String, StatisticValue<?>>>> smallOriginData =
+        generateData(metadataObject, smallCount, 1);
+    Map<MetadataObject, List<PartitionStatisticsUpdate>> smallStatisticsToUpdate =
+        convertData(smallOriginData);
+
+    List<MetadataObjectStatisticsUpdate> smallObjectUpdates = Lists.newArrayList();
+    for (Map.Entry<MetadataObject, List<PartitionStatisticsUpdate>> entry :
+        smallStatisticsToUpdate.entrySet()) {
+      MetadataObject metadata = entry.getKey();
+      List<PartitionStatisticsUpdate> updates = entry.getValue();
+      smallObjectUpdates.add(MetadataObjectStatisticsUpdate.of(metadata, updates));
+    }
+
+    // Should succeed without exception
+    Assertions.assertDoesNotThrow(() -> storage.updateStatistics(metalakeName, smallObjectUpdates));
+
+    FileUtils.deleteDirectory(new File(location + "/" + tableEntity.id() + ".lance"));
+    storage.close();
+  }
+
+  @Test
+  public void testInvalidMaxStatisticsPerUpdateConfiguration() {
+    // Test that negative value throws an exception
+    Map<String, String> properties = Maps.newHashMap();
+    properties.put("maxStatisticsPerUpdate", "-1");
+
+    Assertions.assertThrows(
+        IllegalArgumentException.class, () -> new LancePartitionStatisticStorage(properties));
+
+    // Test that zero value throws an exception
+    properties.put("maxStatisticsPerUpdate", "0");
+
+    Assertions.assertThrows(
+        IllegalArgumentException.class, () -> new LancePartitionStatisticStorage(properties));
+  }
+
   private Map<MetadataObject, Map<String, Map<String, StatisticValue<?>>>> generateData(
       MetadataObject metadataObject, int count, int partitions) {
     Map<MetadataObject, Map<String, Map<String, StatisticValue<?>>>> statisticsToUpdate =
