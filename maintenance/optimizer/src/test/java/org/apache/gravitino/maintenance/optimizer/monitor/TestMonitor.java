@@ -212,6 +212,36 @@ public class TestMonitor {
     Assertions.assertFalse(results.get(2).evaluation(), "Job2 latest duration rule should fail");
   }
 
+  @Test
+  public void testEvaluateMetricsSkipsInvalidScopeMetricPoints() throws Exception {
+    OptimizerConfig config =
+        new OptimizerConfig(
+            ImmutableMap.<String, String>builder()
+                .put(OptimizerConfig.METRICS_PROVIDER_CONFIG.getKey(), MetricsProviderForTest.NAME)
+                .put(
+                    OptimizerConfig.TABLE_JOB_RELATION_PROVIDER_CONFIG.getKey(),
+                    TableJobRelationProviderForTest.NAME)
+                .put(
+                    OptimizerConfig.METRICS_EVALUATOR_CONFIG.getKey(), MetricsEvaluatorForTest.NAME)
+                .build());
+    OptimizerEnv env = new OptimizerEnv(config);
+
+    MetricsEvaluatorForTest.reset();
+    MetricsProviderForTest.reset();
+    MetricsProviderForTest.includeInvalidScopeMetric(true);
+
+    List<EvaluationResult> results;
+    try (Monitor monitor = new Monitor(env)) {
+      results =
+          monitor.evaluateMetrics(
+              NameIdentifier.parse("test.db.table"), 100L, 10L, Optional.empty());
+    }
+
+    EvaluationResult tableResult = results.get(0);
+    MetricValueSample beforeRowCount = onlyMetric(tableResult.beforeSeries(), "row_count");
+    Assertions.assertEquals(95L, beforeRowCount.timestampSeconds());
+  }
+
   private static MetricValueSample onlyMetric(MetricSeries series, String metricName) {
     List<MetricValueSample> matched = series.samples(metricName);
     Assertions.assertEquals(1, matched.size());

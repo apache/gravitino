@@ -27,11 +27,11 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
-import java.util.Objects;
+import java.util.Optional;
 import org.apache.commons.lang3.StringUtils;
-import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.annotation.DeveloperApi;
 import org.apache.gravitino.maintenance.optimizer.api.monitor.MetricScope;
+import org.apache.gravitino.maintenance.optimizer.common.util.MetricScopePointValidator;
 
 /**
  * Immutable metric series for one scope, grouped by metric name into ordered samples.
@@ -62,8 +62,13 @@ public final class MetricSeries {
 
     Map<String, List<MetricValueSample>> grouped = new LinkedHashMap<>();
     for (MetricPoint point : points) {
-      Preconditions.checkArgument(point != null, "metric point must not be null");
-      validatePointBelongsToScope(scope, point);
+      Optional<String> invalidReason = MetricScopePointValidator.invalidReason(scope, point);
+      Preconditions.checkArgument(
+          invalidReason.isEmpty(),
+          "Metric point does not belong to scope type=%s, identifier=%s, reason=%s",
+          scope.type(),
+          scope.identifier(),
+          invalidReason.orElse("unknown"));
       String normalizedMetricName = normalizeMetricName(point.metricName());
       grouped
           .computeIfAbsent(normalizedMetricName, ignored -> new ArrayList<>())
@@ -81,20 +86,26 @@ public final class MetricSeries {
       return new MetricSeries(scope, Collections.emptyMap());
     }
 
-    Map<String, List<MetricValueSample>> immutableMap = new LinkedHashMap<>();
+    Map<String, List<MetricValueSample>> mergedMap = new LinkedHashMap<>();
     for (Map.Entry<String, List<MetricValueSample>> entry : samplesByMetricName.entrySet()) {
       String metricName = normalizeMetricName(entry.getKey());
       List<MetricValueSample> samples = entry.getValue();
       Preconditions.checkArgument(
           samples != null, "samples must not be null for metric %s", metricName);
-      List<MetricValueSample> sortedSamples = new ArrayList<>(samples.size());
+      List<MetricValueSample> mergedSamples =
+          mergedMap.computeIfAbsent(metricName, ignored -> new ArrayList<>());
       for (MetricValueSample sample : samples) {
         Preconditions.checkArgument(
             sample != null, "sample must not be null for metric %s", metricName);
-        sortedSamples.add(sample);
+        mergedSamples.add(sample);
       }
+    }
+
+    Map<String, List<MetricValueSample>> immutableMap = new LinkedHashMap<>();
+    for (Map.Entry<String, List<MetricValueSample>> entry : mergedMap.entrySet()) {
+      List<MetricValueSample> sortedSamples = new ArrayList<>(entry.getValue());
       sortedSamples.sort(Comparator.comparingLong(MetricValueSample::timestampSeconds));
-      immutableMap.put(metricName, Collections.unmodifiableList(sortedSamples));
+      immutableMap.put(entry.getKey(), Collections.unmodifiableList(sortedSamples));
     }
     return new MetricSeries(scope, Collections.unmodifiableMap(immutableMap));
   }
@@ -113,52 +124,6 @@ public final class MetricSeries {
 
   public boolean isEmpty() {
     return samplesByMetricName.isEmpty();
-  }
-
-  private static void validatePointBelongsToScope(MetricScope scope, MetricPoint point) {
-    NameIdentifier expectedIdentifier = scope.identifier();
-    Preconditions.checkArgument(
-        expectedIdentifier.equals(point.identifier()),
-        "Metric point identifier %s does not match scope identifier %s",
-        point.identifier(),
-        expectedIdentifier);
-
-    switch (scope.type()) {
-      case TABLE:
-        Preconditions.checkArgument(
-            point.scope() == MetricPoint.Scope.TABLE,
-            "Metric point scope %s does not match TABLE scope",
-            point.scope());
-        Preconditions.checkArgument(
-            !point.partitionPath().isPresent(),
-            "TABLE scope point must not contain partition path");
-        return;
-      case PARTITION:
-        Preconditions.checkArgument(
-            point.scope() == MetricPoint.Scope.PARTITION,
-            "Metric point scope %s does not match PARTITION scope",
-            point.scope());
-        Preconditions.checkArgument(
-            scope.partition().isPresent(), "PARTITION scope must contain partition path");
-        Preconditions.checkArgument(
-            point.partitionPath().isPresent(), "PARTITION scope point must contain partition path");
-        Preconditions.checkArgument(
-            Objects.equals(scope.partition().get(), point.partitionPath().get()),
-            "Metric point partition path %s does not match scope partition path %s",
-            point.partitionPath().get(),
-            scope.partition().get());
-        return;
-      case JOB:
-        Preconditions.checkArgument(
-            point.scope() == MetricPoint.Scope.JOB,
-            "Metric point scope %s does not match JOB scope",
-            point.scope());
-        Preconditions.checkArgument(
-            !point.partitionPath().isPresent(), "JOB scope point must not contain partition path");
-        return;
-      default:
-        throw new IllegalArgumentException("Unsupported metric scope type: " + scope.type());
-    }
   }
 
   private static String normalizeMetricName(String metricName) {

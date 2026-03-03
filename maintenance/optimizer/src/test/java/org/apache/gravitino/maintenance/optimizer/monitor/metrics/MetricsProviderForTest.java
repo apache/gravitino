@@ -19,6 +19,7 @@
 
 package org.apache.gravitino.maintenance.optimizer.monitor.metrics;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicInteger;
 import org.apache.gravitino.NameIdentifier;
@@ -34,6 +35,7 @@ public class MetricsProviderForTest implements MetricsProvider {
   public static final String NAME = "metrics-provider-for-test";
   public static final AtomicInteger PARTITION_METRICS_CALLS = new AtomicInteger();
   public static volatile PartitionPath LAST_PARTITION_PATH = null;
+  private static volatile boolean INCLUDE_INVALID_SCOPE_METRIC = false;
 
   @Override
   public String name() {
@@ -61,9 +63,13 @@ public class MetricsProviderForTest implements MetricsProvider {
   @Override
   public List<MetricPoint> tableMetrics(
       NameIdentifier tableIdentifier, long startTime, long endTime) {
-    return List.of(
-        metric(MetricPoint.Scope.TABLE, tableIdentifier, null, 95, "row_count", 100L),
-        metric(MetricPoint.Scope.TABLE, tableIdentifier, null, 100, "row_count", 200L));
+    List<MetricPoint> points = new ArrayList<>();
+    points.add(metric(MetricPoint.Scope.TABLE, tableIdentifier, null, 95, "row_count", 100L));
+    points.add(metric(MetricPoint.Scope.TABLE, tableIdentifier, null, 100, "row_count", 200L));
+    if (INCLUDE_INVALID_SCOPE_METRIC) {
+      points.add(metric(MetricPoint.Scope.JOB, tableIdentifier, null, 96, "row_count", 999L));
+    }
+    return List.copyOf(points);
   }
 
   @Override
@@ -83,6 +89,11 @@ public class MetricsProviderForTest implements MetricsProvider {
   public static void reset() {
     PARTITION_METRICS_CALLS.set(0);
     LAST_PARTITION_PATH = null;
+    INCLUDE_INVALID_SCOPE_METRIC = false;
+  }
+
+  public static void includeInvalidScopeMetric(boolean includeInvalidScopeMetric) {
+    INCLUDE_INVALID_SCOPE_METRIC = includeInvalidScopeMetric;
   }
 
   private static MetricPoint metric(

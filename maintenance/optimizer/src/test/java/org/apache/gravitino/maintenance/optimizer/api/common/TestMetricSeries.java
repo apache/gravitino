@@ -20,6 +20,7 @@
 package org.apache.gravitino.maintenance.optimizer.api.common;
 
 import java.util.List;
+import java.util.Map;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.maintenance.optimizer.api.monitor.MetricScope;
 import org.apache.gravitino.maintenance.optimizer.common.PartitionEntryImpl;
@@ -28,6 +29,26 @@ import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
 class TestMetricSeries {
+
+  @Test
+  void testOfSamplesMergesKeysAfterNormalization() {
+    NameIdentifier identifier = NameIdentifier.parse("catalog.db.table");
+    MetricScope scope = MetricScope.forTable(identifier);
+    MetricSeries series =
+        MetricSeries.ofSamples(
+            scope,
+            Map.of(
+                "Row_Count",
+                List.of(new MetricValueSample(101L, StatisticValues.longValue(2L))),
+                "row_count",
+                List.of(new MetricValueSample(100L, StatisticValues.longValue(1L)))));
+
+    Assertions.assertEquals(1, series.samplesByMetricName().size());
+    Assertions.assertTrue(series.samplesByMetricName().containsKey("row_count"));
+    Assertions.assertEquals(
+        List.of(100L, 101L),
+        series.samples("row_count").stream().map(MetricValueSample::timestampSeconds).toList());
+  }
 
   @Test
   void testFromPointsGroupsSortsAndNormalizesMetricName() {

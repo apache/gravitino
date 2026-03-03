@@ -22,7 +22,9 @@ package org.apache.gravitino.maintenance.optimizer.monitor;
 import com.google.common.base.Preconditions;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.gravitino.NameIdentifier;
@@ -39,6 +41,7 @@ import org.apache.gravitino.maintenance.optimizer.common.CloseableGroup;
 import org.apache.gravitino.maintenance.optimizer.common.OptimizerEnv;
 import org.apache.gravitino.maintenance.optimizer.common.conf.OptimizerConfig;
 import org.apache.gravitino.maintenance.optimizer.common.util.InstanceLoaderUtils;
+import org.apache.gravitino.maintenance.optimizer.common.util.MetricScopePointValidator;
 import org.apache.gravitino.maintenance.optimizer.common.util.ProviderUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -190,9 +193,10 @@ public class Monitor implements AutoCloseable {
                 () ->
                     metricsProvider.tableMetrics(
                         tableIdentifier, timeRange.getLeft(), timeRange.getRight()));
+    List<MetricPoint> filteredMetrics = filterMetricsByScope(metrics, scope);
 
     Pair<List<MetricPoint>, List<MetricPoint>> splitMetrics =
-        splitMetrics(metrics, actionTimeSeconds);
+        splitMetrics(filteredMetrics, actionTimeSeconds);
     MetricSeries beforeSeries = MetricSeries.fromPoints(scope, splitMetrics.getLeft());
     MetricSeries afterSeries = MetricSeries.fromPoints(scope, splitMetrics.getRight());
 
@@ -211,17 +215,20 @@ public class Monitor implements AutoCloseable {
 
   private Pair<List<MetricPoint>, List<MetricPoint>> splitMetrics(
       List<MetricPoint> metrics, long actionTimeInSeconds) {
-    // split metrics into metrics before and after action time
-    List<MetricPoint> source = metrics == null ? Collections.emptyList() : metrics;
-    List<MetricPoint> beforeMetrics =
-        source.stream()
-            .filter(metricPoint -> metricPoint.timestampSeconds() < actionTimeInSeconds)
-            .collect(java.util.stream.Collectors.toList());
-    List<MetricPoint> afterMetrics =
-        source.stream()
-            .filter(metricPoint -> metricPoint.timestampSeconds() >= actionTimeInSeconds)
-            .collect(java.util.stream.Collectors.toList());
-    return Pair.of(beforeMetrics, afterMetrics);
+    if (metrics == null || metrics.isEmpty()) {
+      return Pair.of(List.of(), List.of());
+    }
+
+    List<MetricPoint> beforeMetrics = new ArrayList<>();
+    List<MetricPoint> afterMetrics = new ArrayList<>();
+    for (MetricPoint metricPoint : metrics) {
+      if (metricPoint.timestampSeconds() < actionTimeInSeconds) {
+        beforeMetrics.add(metricPoint);
+      } else {
+        afterMetrics.add(metricPoint);
+      }
+    }
+    return Pair.of(List.copyOf(beforeMetrics), List.copyOf(afterMetrics));
   }
 
   private EvaluationResult evaluateJobMetrics(
@@ -233,8 +240,9 @@ public class Monitor implements AutoCloseable {
     MetricScope scope = MetricScope.forJob(jobIdentifier);
     List<MetricPoint> metrics =
         metricsProvider.jobMetrics(jobIdentifier, timeRange.getLeft(), timeRange.getRight());
+    List<MetricPoint> filteredMetrics = filterMetricsByScope(metrics, scope);
     Pair<List<MetricPoint>, List<MetricPoint>> splitMetrics =
-        splitMetrics(metrics, actionTimeSeconds);
+        splitMetrics(filteredMetrics, actionTimeSeconds);
     MetricSeries beforeSeries = MetricSeries.fromPoints(scope, splitMetrics.getLeft());
     MetricSeries afterSeries = MetricSeries.fromPoints(scope, splitMetrics.getRight());
     boolean evaluation = evaluator.evaluateMetrics(beforeSeries, afterSeries);
@@ -307,6 +315,34 @@ public class Monitor implements AutoCloseable {
       }
     }
     return result;
+  }
+
+  private List<MetricPoint> filterMetricsByScope(List<MetricPoint> metrics, MetricScope scope) {
+    if (metrics == null || metrics.isEmpty()) {
+      return List.of();
+    }
+
+    List<MetricPoint> filtered = new ArrayList<>(metrics.size());
+    Map<String, Integer> invalidReasonCounts = new LinkedHashMap<>();
+    for (MetricPoint metricPoint : metrics) {
+      Optional<String> invalidReason = MetricScopePointValidator.invalidReason(scope, metricPoint);
+      if (invalidReason.isPresent()) {
+        invalidReasonCounts.merge(invalidReason.get(), 1, Integer::sum);
+        continue;
+      }
+      filtered.add(metricPoint);
+    }
+    if (!invalidReasonCounts.isEmpty()) {
+      int totalInvalidCount =
+          invalidReasonCounts.values().stream().mapToInt(Integer::intValue).sum();
+      LOG.warn(
+          "Skipped {} metric points for scope type={}, identifier={}, reasonCounts={}",
+          totalInvalidCount,
+          scope.type(),
+          scope.identifier(),
+          invalidReasonCounts);
+    }
+    return List.copyOf(filtered);
   }
 
   /** Close all initialized monitor providers and callbacks. */
