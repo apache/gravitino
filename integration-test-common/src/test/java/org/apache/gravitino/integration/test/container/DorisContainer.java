@@ -177,8 +177,7 @@ public class DorisContainer extends BaseContainer {
 
   @Override
   protected boolean checkContainerStatus(int retryLimit) {
-    int feMysqlPort = composeContainer.getServicePort(FE_SERVICE, FE_MYSQL_PORT);
-    String dorisJdbcUrl = format("jdbc:mysql://%s:%d/", feIpAddress, feMysqlPort);
+    String dorisJdbcUrl = format("jdbc:mysql://%s:%d/", feIpAddress, FE_MYSQL_PORT);
     LOG.info("Doris JDBC url is {}", dorisJdbcUrl);
 
     await()
@@ -228,13 +227,11 @@ public class DorisContainer extends BaseContainer {
     // Use the host-accessible address from Testcontainers (works on macOS/Linux).
     // The internal Docker network IP is not reachable from the host on macOS.
     feIpAddress = composeContainer.getServiceHost(FE_SERVICE, FE_MYSQL_PORT);
-    int feMysqlPort = composeContainer.getServicePort(FE_SERVICE, FE_MYSQL_PORT);
-    LOG.info("Doris FE host address: {}:{}", feIpAddress, feMysqlPort);
+    LOG.info("Doris FE host address: {}", feIpAddress);
   }
 
   private boolean changePassword() {
-    int feMysqlPort = composeContainer.getServicePort(FE_SERVICE, FE_MYSQL_PORT);
-    String dorisJdbcUrl = format("jdbc:mysql://%s:%d/", feIpAddress, feMysqlPort);
+    String dorisJdbcUrl = format("jdbc:mysql://%s:%d/", feIpAddress, FE_MYSQL_PORT);
 
     // change password for root user, Gravitino API must set password in catalog properties
     try (Connection connection = DriverManager.getConnection(dorisJdbcUrl, USER_NAME, "");
