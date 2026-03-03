@@ -301,7 +301,7 @@ export const TreeComponent = forwardRef(function TreeComponent(props, ref) {
   }, [dispatch, searchParams])
 
   useEffect(() => {
-    setTimeout(() => {
+    const timerId = setTimeout(() => {
       const metalake = searchParams.get('metalake')
       const catalog = searchParams.get('catalog')
       const catalogType = searchParams.get('catalogType')
@@ -314,7 +314,7 @@ export const TreeComponent = forwardRef(function TreeComponent(props, ref) {
       const entity = table || fileset || topic || model || func
 
       if (!metalake) {
-        dispatch(setExpandedNodes([]))
+        dispatch(setExpanded([]))
         dispatch(setSelectedNodes([]))
 
         return
@@ -346,6 +346,10 @@ export const TreeComponent = forwardRef(function TreeComponent(props, ref) {
         dispatch(setSelectedNodes([nextSelectedKey]))
       }
     }, 1000)
+
+    return () => {
+      clearTimeout(timerId)
+    }
   }, [dispatch, searchParams])
 
   const renderTitle = title => {
