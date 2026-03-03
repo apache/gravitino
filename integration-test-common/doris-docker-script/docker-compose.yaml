@@ -26,6 +26,9 @@ services:
     volumes:
       - ./start-fe.sh:/opt/apache-doris/start-fe.sh
     command: ["bash", "start-fe.sh"]
+    ports:
+      - "8030:8030"
+      - "9030:9030"
     healthcheck:
       test: ["CMD", "bash", "-c", "curl -s http://localhost:8030/api/bootstrap | grep -q '\"msg\":\"success\"'"]
       interval: 10s
