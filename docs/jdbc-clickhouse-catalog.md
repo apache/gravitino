@@ -191,6 +191,7 @@ Other ClickHouse types are exposed as [External Type](./manage-relational-metada
 :::note
 - `settings.*` keys are passed to the ClickHouse `SETTINGS` clause verbatim.  
 - The `engine` value is immutable after creation.
+- When loading the table meta, Gravitino can't distinguish whether it's a cluster table or a local table as properties like `cluster-name` and `on-cluster` can't be fetched from the JDBC metadata currently. 
 :::
 
 | Property Name              | Description                                                                                              | Default Value | Required | Reserved | Immutable | Since version |
