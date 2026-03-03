@@ -53,6 +53,7 @@ done
 
 if [ "$fe_started" = false ]; then
   echo "ERROR: Doris FE failed to start"
+  exit 1
 fi
 
 # Keep container alive

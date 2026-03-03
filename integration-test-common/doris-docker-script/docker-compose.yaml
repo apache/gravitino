@@ -19,16 +19,13 @@
 services:
 
   doris-fe:
-    image: ${GRAVITINO_CI_DORIS_DOCKER_IMAGE} 
+    image: ${GRAVITINO_CI_DORIS_DOCKER_IMAGE:-apache/gravitino-ci:doris-0.1.5}
     hostname: doris-fe
     networks:
       - doris-net
     volumes:
       - ./start-fe.sh:/opt/apache-doris/start-fe.sh
     command: ["bash", "start-fe.sh"]
-    ports:
-      - "8030:8030"
-      - "9030:9030"
     healthcheck:
       test: ["CMD", "bash", "-c", "curl -s http://localhost:8030/api/bootstrap | grep -q '\"msg\":\"success\"'"]
       interval: 10s
@@ -37,7 +34,7 @@ services:
       start_period: 30s
 
   doris-be:
-    image: ${GRAVITINO_CI_DORIS_DOCKER_IMAGE} 
+    image: ${GRAVITINO_CI_DORIS_DOCKER_IMAGE:-apache/gravitino-ci:doris-0.1.5}
     networks:
       - doris-net
     volumes:
