@@ -356,7 +356,7 @@ public abstract class BaseGenericJdbcMetricsRepositoryTest {
               toStatisticValue(metric.getValue()),
               metric.getTimestamp());
     }
-    storage.storeMetrics(List.of(metricPoint));
+    storage.storeMetrics(Arrays.asList(metricPoint));
   }
 
   protected void storeJobMetric(
@@ -369,7 +369,7 @@ public abstract class BaseGenericJdbcMetricsRepositoryTest {
                 metricName,
                 toStatisticValue(metric.getValue()),
                 metric.getTimestamp());
-    storage.storeMetrics(List.of(metricPoint));
+    storage.storeMetrics(Arrays.asList(metricPoint));
   }
 
   protected Map<String, List<MetricRecord>> convertToMetricRecords(List<MetricPoint> metricPoints) {
