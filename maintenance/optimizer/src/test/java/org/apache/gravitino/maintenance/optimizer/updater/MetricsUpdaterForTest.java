@@ -23,10 +23,9 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicInteger;
+import org.apache.gravitino.maintenance.optimizer.api.common.MetricPoint;
 import org.apache.gravitino.maintenance.optimizer.api.updater.MetricsUpdater;
 import org.apache.gravitino.maintenance.optimizer.common.OptimizerEnv;
-import org.apache.gravitino.maintenance.optimizer.updater.metrics.storage.JobMetricWriteRequest;
-import org.apache.gravitino.maintenance.optimizer.updater.metrics.storage.TableMetricWriteRequest;
 
 public class MetricsUpdaterForTest implements MetricsUpdater {
 
@@ -36,6 +35,7 @@ public class MetricsUpdaterForTest implements MetricsUpdater {
   private final AtomicInteger tableUpdates = new AtomicInteger();
   private final AtomicInteger jobUpdates = new AtomicInteger();
   private final AtomicInteger closeCalls = new AtomicInteger();
+  private volatile List<MetricPoint> lastMetrics = List.of();
 
   public MetricsUpdaterForTest() {
     INSTANCES.add(this);
@@ -61,6 +61,10 @@ public class MetricsUpdaterForTest implements MetricsUpdater {
     return closeCalls.get();
   }
 
+  public List<MetricPoint> lastMetrics() {
+    return lastMetrics;
+  }
+
   @Override
   public String name() {
     return NAME;
@@ -70,13 +74,29 @@ public class MetricsUpdaterForTest implements MetricsUpdater {
   public void initialize(OptimizerEnv optimizerEnv) {}
 
   @Override
-  public void updateTableMetrics(List<TableMetricWriteRequest> metrics) {
-    tableUpdates.incrementAndGet();
-  }
-
-  @Override
-  public void updateJobMetrics(List<JobMetricWriteRequest> metrics) {
-    jobUpdates.incrementAndGet();
+  public void updateMetrics(List<MetricPoint> metrics) {
+    int tableCount =
+        metrics == null
+            ? 0
+            : (int)
+                metrics.stream()
+                    .filter(
+                        metric ->
+                            metric.scope() == MetricPoint.Scope.TABLE
+                                || metric.scope() == MetricPoint.Scope.PARTITION)
+                    .count();
+    int jobCount =
+        metrics == null
+            ? 0
+            : (int)
+                metrics.stream().filter(metric -> metric.scope() == MetricPoint.Scope.JOB).count();
+    if (tableCount > 0) {
+      tableUpdates.incrementAndGet();
+    }
+    if (jobCount > 0) {
+      jobUpdates.incrementAndGet();
+    }
+    lastMetrics = metrics == null ? List.of() : List.copyOf(metrics);
   }
 
   @Override

@@ -21,21 +21,12 @@ package org.apache.gravitino.maintenance.optimizer.monitor.metrics;
 
 import com.google.common.base.Preconditions;
 import java.util.List;
-import java.util.Map;
-import java.util.Optional;
-import java.util.stream.Collectors;
 import org.apache.gravitino.NameIdentifier;
-import org.apache.gravitino.maintenance.optimizer.api.common.MetricSample;
+import org.apache.gravitino.maintenance.optimizer.api.common.MetricPoint;
 import org.apache.gravitino.maintenance.optimizer.api.common.PartitionPath;
-import org.apache.gravitino.maintenance.optimizer.api.common.StatisticEntry;
+import org.apache.gravitino.maintenance.optimizer.api.monitor.MetricScope;
 import org.apache.gravitino.maintenance.optimizer.api.monitor.MetricsProvider;
-import org.apache.gravitino.maintenance.optimizer.common.MetricSampleImpl;
 import org.apache.gravitino.maintenance.optimizer.common.OptimizerEnv;
-import org.apache.gravitino.maintenance.optimizer.common.PartitionMetricSampleImpl;
-import org.apache.gravitino.maintenance.optimizer.common.StatisticEntryImpl;
-import org.apache.gravitino.maintenance.optimizer.common.util.StatisticValueUtils;
-import org.apache.gravitino.maintenance.optimizer.recommender.util.PartitionUtils;
-import org.apache.gravitino.maintenance.optimizer.updater.metrics.storage.MetricRecord;
 import org.apache.gravitino.maintenance.optimizer.updater.metrics.storage.MetricsRepository;
 import org.apache.gravitino.maintenance.optimizer.updater.metrics.storage.jdbc.GenericJdbcMetricsRepository;
 
@@ -60,7 +51,7 @@ import org.apache.gravitino.maintenance.optimizer.updater.metrics.storage.jdbc.G
  *       time range.
  *   <li>{@link #partitionMetrics(NameIdentifier, PartitionPath, long, long)} returns partition
  *       metrics using encoded partition path.
- *   <li>Storage records are converted to monitor-domain {@link MetricSample} values.
+ *   <li>Storage records are returned as monitor-domain {@link MetricPoint} values.
  * </ul>
  */
 public class GravitinoMetricsProvider implements MetricsProvider {
@@ -81,58 +72,24 @@ public class GravitinoMetricsProvider implements MetricsProvider {
   }
 
   @Override
-  public Map<String, List<MetricSample>> jobMetrics(
-      NameIdentifier jobIdentifier, long startTime, long endTime) {
+  public List<MetricPoint> jobMetrics(NameIdentifier jobIdentifier, long startTime, long endTime) {
     ensureInitialized();
-    Map<String, List<MetricRecord>> metrics =
-        metricsRepository.getJobMetrics(jobIdentifier, startTime, endTime);
-
-    return toSingleMetrics(metrics, Optional.empty());
+    return metricsRepository.getMetrics(MetricScope.forJob(jobIdentifier), startTime, endTime);
   }
 
   @Override
-  public Map<String, List<MetricSample>> tableMetrics(
+  public List<MetricPoint> tableMetrics(
       NameIdentifier tableIdentifier, long startTime, long endTime) {
     ensureInitialized();
-    Map<String, List<MetricRecord>> metrics =
-        metricsRepository.getTableMetrics(tableIdentifier, startTime, endTime);
-
-    return toSingleMetrics(metrics, Optional.empty());
+    return metricsRepository.getMetrics(MetricScope.forTable(tableIdentifier), startTime, endTime);
   }
 
   @Override
-  public Map<String, List<MetricSample>> partitionMetrics(
+  public List<MetricPoint> partitionMetrics(
       NameIdentifier tableIdentifier, PartitionPath partitionPath, long startTime, long endTime) {
     ensureInitialized();
-    Map<String, List<MetricRecord>> metrics =
-        metricsRepository.getPartitionMetrics(
-            tableIdentifier, PartitionUtils.encodePartitionPath(partitionPath), startTime, endTime);
-
-    return toSingleMetrics(metrics, Optional.of(partitionPath));
-  }
-
-  private Map<String, List<MetricSample>> toSingleMetrics(
-      Map<String, List<MetricRecord>> metrics, Optional<PartitionPath> partitionPath) {
-    return metrics.entrySet().stream()
-        .collect(
-            Collectors.toMap(
-                entry -> entry.getKey(),
-                entry ->
-                    entry.getValue().stream()
-                        .map(
-                            storageMetric ->
-                                toSingleMetric(storageMetric, partitionPath, entry.getKey()))
-                        .collect(Collectors.toList())));
-  }
-
-  private MetricSample toSingleMetric(
-      MetricRecord metric, Optional<PartitionPath> partitionPath, String metricName) {
-    StatisticEntry<?> statistic =
-        new StatisticEntryImpl<>(metricName, StatisticValueUtils.fromString(metric.getValue()));
-    return partitionPath
-        .<MetricSample>map(
-            partition -> new PartitionMetricSampleImpl(metric.getTimestamp(), statistic, partition))
-        .orElseGet(() -> new MetricSampleImpl(metric.getTimestamp(), statistic));
+    return metricsRepository.getMetrics(
+        MetricScope.forPartition(tableIdentifier, partitionPath), startTime, endTime);
   }
 
   private void ensureInitialized() {

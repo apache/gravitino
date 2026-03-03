@@ -23,6 +23,8 @@ import com.google.common.collect.ImmutableMap;
 import java.util.List;
 import java.util.Optional;
 import org.apache.gravitino.NameIdentifier;
+import org.apache.gravitino.maintenance.optimizer.api.common.MetricSeries;
+import org.apache.gravitino.maintenance.optimizer.api.common.MetricValueSample;
 import org.apache.gravitino.maintenance.optimizer.api.common.PartitionPath;
 import org.apache.gravitino.maintenance.optimizer.api.monitor.EvaluationResult;
 import org.apache.gravitino.maintenance.optimizer.api.monitor.MetricScope;
@@ -81,46 +83,32 @@ public class TestMonitor {
     Assertions.assertEquals(100L, tableResult.actionTimeSeconds());
     Assertions.assertEquals(10L, tableResult.rangeSeconds());
     Assertions.assertEquals(MetricsEvaluatorForTest.NAME, tableResult.evaluatorName());
-    Assertions.assertEquals(1, tableResult.beforeMetrics().get("row_count").size());
-    Assertions.assertEquals(1, tableResult.afterMetrics().get("row_count").size());
-    Assertions.assertEquals(95L, tableResult.beforeMetrics().get("row_count").get(0).timestamp());
-    Assertions.assertEquals(100L, tableResult.afterMetrics().get("row_count").get(0).timestamp());
-    Assertions.assertEquals(
-        100L,
-        ((Number) tableResult.beforeMetrics().get("row_count").get(0).statistic().value().value())
-            .longValue());
-    Assertions.assertEquals(
-        200L,
-        ((Number) tableResult.afterMetrics().get("row_count").get(0).statistic().value().value())
-            .longValue());
+    MetricValueSample tableBeforeRowCount = onlyMetric(tableResult.beforeSeries(), "row_count");
+    MetricValueSample tableAfterRowCount = onlyMetric(tableResult.afterSeries(), "row_count");
+    Assertions.assertEquals(95L, tableBeforeRowCount.timestampSeconds());
+    Assertions.assertEquals(100L, tableAfterRowCount.timestampSeconds());
+    Assertions.assertEquals(100L, metricLongValue(tableBeforeRowCount));
+    Assertions.assertEquals(200L, metricLongValue(tableAfterRowCount));
 
     Assertions.assertEquals(MetricScope.Type.JOB, jobResult1.scope().type());
     Assertions.assertEquals(TableJobRelationProviderForTest.JOB1, jobResult1.scope().identifier());
     Assertions.assertTrue(jobResult1.evaluation());
-    Assertions.assertEquals(99L, jobResult1.beforeMetrics().get("duration").get(0).timestamp());
-    Assertions.assertEquals(102L, jobResult1.afterMetrics().get("duration").get(0).timestamp());
-    Assertions.assertEquals(
-        10L,
-        ((Number) jobResult1.beforeMetrics().get("duration").get(0).statistic().value().value())
-            .longValue());
-    Assertions.assertEquals(
-        20L,
-        ((Number) jobResult1.afterMetrics().get("duration").get(0).statistic().value().value())
-            .longValue());
+    MetricValueSample job1BeforeDuration = onlyMetric(jobResult1.beforeSeries(), "duration");
+    MetricValueSample job1AfterDuration = onlyMetric(jobResult1.afterSeries(), "duration");
+    Assertions.assertEquals(99L, job1BeforeDuration.timestampSeconds());
+    Assertions.assertEquals(102L, job1AfterDuration.timestampSeconds());
+    Assertions.assertEquals(10L, metricLongValue(job1BeforeDuration));
+    Assertions.assertEquals(20L, metricLongValue(job1AfterDuration));
 
     Assertions.assertEquals(MetricScope.Type.JOB, jobResult2.scope().type());
     Assertions.assertEquals(TableJobRelationProviderForTest.JOB2, jobResult2.scope().identifier());
     Assertions.assertFalse(jobResult2.evaluation());
-    Assertions.assertEquals(98L, jobResult2.beforeMetrics().get("duration").get(0).timestamp());
-    Assertions.assertEquals(104L, jobResult2.afterMetrics().get("duration").get(0).timestamp());
-    Assertions.assertEquals(
-        30L,
-        ((Number) jobResult2.beforeMetrics().get("duration").get(0).statistic().value().value())
-            .longValue());
-    Assertions.assertEquals(
-        40L,
-        ((Number) jobResult2.afterMetrics().get("duration").get(0).statistic().value().value())
-            .longValue());
+    MetricValueSample job2BeforeDuration = onlyMetric(jobResult2.beforeSeries(), "duration");
+    MetricValueSample job2AfterDuration = onlyMetric(jobResult2.afterSeries(), "duration");
+    Assertions.assertEquals(98L, job2BeforeDuration.timestampSeconds());
+    Assertions.assertEquals(104L, job2AfterDuration.timestampSeconds());
+    Assertions.assertEquals(30L, metricLongValue(job2BeforeDuration));
+    Assertions.assertEquals(40L, metricLongValue(job2AfterDuration));
   }
 
   @Test
@@ -159,16 +147,12 @@ public class TestMonitor {
     EvaluationResult tableResult = results.get(0);
     Assertions.assertEquals(MetricScope.Type.PARTITION, tableResult.scope().type());
     Assertions.assertEquals(partitionPath, tableResult.scope().partition().orElseThrow());
-    Assertions.assertEquals(97L, tableResult.beforeMetrics().get("row_count").get(0).timestamp());
-    Assertions.assertEquals(101L, tableResult.afterMetrics().get("row_count").get(0).timestamp());
-    Assertions.assertEquals(
-        110L,
-        ((Number) tableResult.beforeMetrics().get("row_count").get(0).statistic().value().value())
-            .longValue());
-    Assertions.assertEquals(
-        210L,
-        ((Number) tableResult.afterMetrics().get("row_count").get(0).statistic().value().value())
-            .longValue());
+    MetricValueSample beforeRowCount = onlyMetric(tableResult.beforeSeries(), "row_count");
+    MetricValueSample afterRowCount = onlyMetric(tableResult.afterSeries(), "row_count");
+    Assertions.assertEquals(97L, beforeRowCount.timestampSeconds());
+    Assertions.assertEquals(101L, afterRowCount.timestampSeconds());
+    Assertions.assertEquals(110L, metricLongValue(beforeRowCount));
+    Assertions.assertEquals(210L, metricLongValue(afterRowCount));
   }
 
   @Test
@@ -226,5 +210,15 @@ public class TestMonitor {
     Assertions.assertFalse(results.get(0).evaluation(), "Table rule should fail for test metrics");
     Assertions.assertFalse(results.get(1).evaluation(), "Job1 latest duration rule should fail");
     Assertions.assertFalse(results.get(2).evaluation(), "Job2 latest duration rule should fail");
+  }
+
+  private static MetricValueSample onlyMetric(MetricSeries series, String metricName) {
+    List<MetricValueSample> matched = series.samples(metricName);
+    Assertions.assertEquals(1, matched.size());
+    return matched.get(0);
+  }
+
+  private static long metricLongValue(MetricValueSample metricValueSample) {
+    return ((Number) metricValueSample.value().value()).longValue();
   }
 }

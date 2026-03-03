@@ -22,13 +22,12 @@ package org.apache.gravitino.maintenance.optimizer.monitor;
 import com.google.common.base.Preconditions;
 import java.util.ArrayList;
 import java.util.Collections;
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
 import java.util.Optional;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.gravitino.NameIdentifier;
-import org.apache.gravitino.maintenance.optimizer.api.common.MetricSample;
+import org.apache.gravitino.maintenance.optimizer.api.common.MetricPoint;
+import org.apache.gravitino.maintenance.optimizer.api.common.MetricSeries;
 import org.apache.gravitino.maintenance.optimizer.api.common.PartitionPath;
 import org.apache.gravitino.maintenance.optimizer.api.monitor.EvaluationResult;
 import org.apache.gravitino.maintenance.optimizer.api.monitor.MetricScope;
@@ -176,8 +175,12 @@ public class Monitor implements AutoCloseable {
       long actionTimeSeconds,
       long rangeSeconds,
       Optional<PartitionPath> partitionPath) {
+    MetricScope scope =
+        partitionPath
+            .map(path -> MetricScope.forPartition(tableIdentifier, path))
+            .orElseGet(() -> MetricScope.forTable(tableIdentifier));
     Pair<Long, Long> timeRange = timeRange(actionTimeSeconds, rangeSeconds);
-    Map<String, List<MetricSample>> metrics =
+    List<MetricPoint> metrics =
         partitionPath
             .map(
                 path ->
@@ -188,43 +191,36 @@ public class Monitor implements AutoCloseable {
                     metricsProvider.tableMetrics(
                         tableIdentifier, timeRange.getLeft(), timeRange.getRight()));
 
-    Pair<Map<String, List<MetricSample>>, Map<String, List<MetricSample>>> splitMetrics =
+    Pair<List<MetricPoint>, List<MetricPoint>> splitMetrics =
         splitMetrics(metrics, actionTimeSeconds);
+    MetricSeries beforeSeries = MetricSeries.fromPoints(scope, splitMetrics.getLeft());
+    MetricSeries afterSeries = MetricSeries.fromPoints(scope, splitMetrics.getRight());
 
-    MetricScope scope =
-        partitionPath
-            .map(path -> MetricScope.forPartition(tableIdentifier, path))
-            .orElseGet(() -> MetricScope.forTable(tableIdentifier));
-    boolean evaluation =
-        evaluator.evaluateMetrics(scope, splitMetrics.getLeft(), splitMetrics.getRight());
+    boolean evaluation = evaluator.evaluateMetrics(beforeSeries, afterSeries);
     EvaluationResult result =
         new EvaluationResult(
             scope,
             evaluation,
-            splitMetrics.getLeft(),
-            splitMetrics.getRight(),
+            beforeSeries,
+            afterSeries,
             actionTimeSeconds,
             rangeSeconds,
             evaluator.name());
     return notifyCallbacks(result);
   }
 
-  private Pair<Map<String, List<MetricSample>>, Map<String, List<MetricSample>>> splitMetrics(
-      Map<String, List<MetricSample>> metrics, long actionTimeInSeconds) {
+  private Pair<List<MetricPoint>, List<MetricPoint>> splitMetrics(
+      List<MetricPoint> metrics, long actionTimeInSeconds) {
     // split metrics into metrics before and after action time
-    Map<String, List<MetricSample>> beforeMetrics = new HashMap<>();
-    Map<String, List<MetricSample>> afterMetrics = new HashMap<>();
-    Map<String, List<MetricSample>> source = metrics == null ? Collections.emptyMap() : metrics;
-    for (Map.Entry<String, List<MetricSample>> entry : source.entrySet()) {
-      String metricName = entry.getKey();
-      List<MetricSample> metricList = entry.getValue() == null ? List.of() : entry.getValue();
-      beforeMetrics.put(
-          metricName,
-          metricList.stream().filter(m -> m.timestamp() < actionTimeInSeconds).toList());
-      afterMetrics.put(
-          metricName,
-          metricList.stream().filter(m -> m.timestamp() >= actionTimeInSeconds).toList());
-    }
+    List<MetricPoint> source = metrics == null ? Collections.emptyList() : metrics;
+    List<MetricPoint> beforeMetrics =
+        source.stream()
+            .filter(metricPoint -> metricPoint.timestampSeconds() < actionTimeInSeconds)
+            .collect(java.util.stream.Collectors.toList());
+    List<MetricPoint> afterMetrics =
+        source.stream()
+            .filter(metricPoint -> metricPoint.timestampSeconds() >= actionTimeInSeconds)
+            .collect(java.util.stream.Collectors.toList());
     return Pair.of(beforeMetrics, afterMetrics);
   }
 
@@ -234,19 +230,20 @@ public class Monitor implements AutoCloseable {
       long actionTimeSeconds,
       long rangeSeconds) {
     Pair<Long, Long> timeRange = timeRange(actionTimeSeconds, rangeSeconds);
-    Map<String, List<MetricSample>> metrics =
-        metricsProvider.jobMetrics(jobIdentifier, timeRange.getLeft(), timeRange.getRight());
-    Pair<Map<String, List<MetricSample>>, Map<String, List<MetricSample>>> splitMetrics =
-        splitMetrics(metrics, actionTimeSeconds);
     MetricScope scope = MetricScope.forJob(jobIdentifier);
-    boolean evaluation =
-        evaluator.evaluateMetrics(scope, splitMetrics.getLeft(), splitMetrics.getRight());
+    List<MetricPoint> metrics =
+        metricsProvider.jobMetrics(jobIdentifier, timeRange.getLeft(), timeRange.getRight());
+    Pair<List<MetricPoint>, List<MetricPoint>> splitMetrics =
+        splitMetrics(metrics, actionTimeSeconds);
+    MetricSeries beforeSeries = MetricSeries.fromPoints(scope, splitMetrics.getLeft());
+    MetricSeries afterSeries = MetricSeries.fromPoints(scope, splitMetrics.getRight());
+    boolean evaluation = evaluator.evaluateMetrics(beforeSeries, afterSeries);
     EvaluationResult result =
         new EvaluationResult(
             scope,
             evaluation,
-            splitMetrics.getLeft(),
-            splitMetrics.getRight(),
+            beforeSeries,
+            afterSeries,
             actionTimeSeconds,
             rangeSeconds,
             evaluator.name());

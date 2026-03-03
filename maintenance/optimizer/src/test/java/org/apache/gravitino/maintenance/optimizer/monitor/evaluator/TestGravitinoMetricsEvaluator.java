@@ -22,28 +22,26 @@ package org.apache.gravitino.maintenance.optimizer.monitor.evaluator;
 import java.util.List;
 import java.util.Map;
 import org.apache.gravitino.NameIdentifier;
-import org.apache.gravitino.maintenance.optimizer.api.common.MetricSample;
+import org.apache.gravitino.maintenance.optimizer.api.common.MetricSeries;
+import org.apache.gravitino.maintenance.optimizer.api.common.MetricValueSample;
 import org.apache.gravitino.maintenance.optimizer.api.common.PartitionPath;
-import org.apache.gravitino.maintenance.optimizer.api.common.StatisticEntry;
 import org.apache.gravitino.maintenance.optimizer.api.monitor.MetricScope;
-import org.apache.gravitino.maintenance.optimizer.common.MetricSampleImpl;
 import org.apache.gravitino.maintenance.optimizer.common.OptimizerEnv;
 import org.apache.gravitino.maintenance.optimizer.common.PartitionEntryImpl;
-import org.apache.gravitino.maintenance.optimizer.common.StatisticEntryImpl;
 import org.apache.gravitino.maintenance.optimizer.common.conf.OptimizerConfig;
 import org.apache.gravitino.stats.StatisticValues;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
 public class TestGravitinoMetricsEvaluator {
-
   @Test
   public void testEvaluateMetricsWithMaxOperation() {
     GravitinoMetricsEvaluator evaluator = createEvaluator("table:row_count:max:le");
     MetricScope scope = MetricScope.forTable(NameIdentifier.parse("catalog.db.table"));
 
     boolean result =
-        evaluator.evaluateMetrics(
+        evaluateMetrics(
+            evaluator,
             scope,
             Map.of(
                 "row_count",
@@ -62,7 +60,8 @@ public class TestGravitinoMetricsEvaluator {
     MetricScope scope = MetricScope.forTable(NameIdentifier.parse("catalog.db.table"));
 
     boolean result =
-        evaluator.evaluateMetrics(
+        evaluateMetrics(
+            evaluator,
             scope,
             Map.of(
                 "row_count",
@@ -78,7 +77,8 @@ public class TestGravitinoMetricsEvaluator {
     MetricScope scope = MetricScope.forTable(NameIdentifier.parse("catalog.db.table"));
 
     boolean result =
-        evaluator.evaluateMetrics(
+        evaluateMetrics(
+            evaluator,
             scope,
             Map.of(
                 "row_count",
@@ -94,7 +94,8 @@ public class TestGravitinoMetricsEvaluator {
     MetricScope scope = MetricScope.forTable(NameIdentifier.parse("catalog.db.table"));
 
     boolean result =
-        evaluator.evaluateMetrics(
+        evaluateMetrics(
+            evaluator,
             scope,
             Map.of(
                 "row_count",
@@ -113,7 +114,8 @@ public class TestGravitinoMetricsEvaluator {
         MetricScope.forPartition(NameIdentifier.parse("catalog.db.table"), partitionPath);
 
     boolean result =
-        evaluator.evaluateMetrics(
+        evaluateMetrics(
+            evaluator,
             scope,
             Map.of(
                 "row_count",
@@ -129,7 +131,8 @@ public class TestGravitinoMetricsEvaluator {
         createEvaluator("table:row_count:avg:le,job:duration:latest:le");
 
     boolean tableResult =
-        evaluator.evaluateMetrics(
+        evaluateMetrics(
+            evaluator,
             MetricScope.forTable(NameIdentifier.parse("catalog.db.table")),
             Map.of(
                 "row_count",
@@ -138,7 +141,8 @@ public class TestGravitinoMetricsEvaluator {
     Assertions.assertTrue(tableResult);
 
     boolean jobResult =
-        evaluator.evaluateMetrics(
+        evaluateMetrics(
+            evaluator,
             MetricScope.forJob(NameIdentifier.parse("job1")),
             Map.of("duration", List.of(metric(100L, "duration", 3L), metric(105L, "duration", 5L))),
             Map.of("duration", List.of(metric(110L, "duration", 10L))));
@@ -151,7 +155,8 @@ public class TestGravitinoMetricsEvaluator {
     MetricScope scope = MetricScope.forTable(NameIdentifier.parse("catalog.db.table"));
 
     boolean result =
-        evaluator.evaluateMetrics(
+        evaluateMetrics(
+            evaluator,
             scope,
             Map.of("other_metric", List.of(metric(100L, "other_metric", 10L))),
             Map.of("other_metric", List.of(metric(110L, "other_metric", 5L))));
@@ -165,7 +170,8 @@ public class TestGravitinoMetricsEvaluator {
     MetricScope scope = MetricScope.forTable(NameIdentifier.parse("catalog.db.table"));
 
     boolean result =
-        evaluator.evaluateMetrics(
+        evaluateMetrics(
+            evaluator,
             scope,
             Map.of("row_count", List.of(metricString(100L, "row_count", "invalid"))),
             Map.of("row_count", List.of(metricString(110L, "row_count", "invalid2"))));
@@ -178,7 +184,8 @@ public class TestGravitinoMetricsEvaluator {
     GravitinoMetricsEvaluator evaluator = createEvaluator("table:row_count:avg:le");
 
     boolean result =
-        evaluator.evaluateMetrics(
+        evaluateMetrics(
+            evaluator,
             MetricScope.forJob(NameIdentifier.parse("job1")),
             Map.of("duration", List.of(metric(100L, "duration", 10L))),
             Map.of("duration", List.of(metric(110L, "duration", 20L))));
@@ -192,7 +199,8 @@ public class TestGravitinoMetricsEvaluator {
     MetricScope scope = MetricScope.forTable(NameIdentifier.parse("catalog.db.table"));
 
     boolean result =
-        evaluator.evaluateMetrics(
+        evaluateMetrics(
+            evaluator,
             scope,
             Map.of(
                 "row_count",
@@ -207,12 +215,12 @@ public class TestGravitinoMetricsEvaluator {
     GravitinoMetricsEvaluator evaluator = createEvaluator("table:row_count:avg:le");
     MetricScope scope = MetricScope.forTable(NameIdentifier.parse("catalog.db.table"));
 
-    boolean result = evaluator.evaluateMetrics(scope, Map.of(), Map.of());
+    boolean result = evaluateMetrics(evaluator, scope, Map.of(), Map.of());
     Assertions.assertTrue(result);
 
     boolean emptyListResult =
-        evaluator.evaluateMetrics(
-            scope, Map.of("row_count", List.of()), Map.of("row_count", List.of()));
+        evaluateMetrics(
+            evaluator, scope, Map.of("row_count", List.of()), Map.of("row_count", List.of()));
     Assertions.assertTrue(emptyListResult);
   }
 
@@ -223,7 +231,8 @@ public class TestGravitinoMetricsEvaluator {
     MetricScope scope = MetricScope.forTable(NameIdentifier.parse("catalog.db.table"));
 
     boolean result =
-        evaluator.evaluateMetrics(
+        evaluateMetrics(
+            evaluator,
             scope,
             Map.of(
                 "row_count",
@@ -245,7 +254,8 @@ public class TestGravitinoMetricsEvaluator {
         createEvaluator(" TABLE : row_count : AVG : LE , JOB : duration : latest : le , ");
 
     boolean tableResult =
-        evaluator.evaluateMetrics(
+        evaluateMetrics(
+            evaluator,
             MetricScope.forTable(NameIdentifier.parse("catalog.db.table")),
             Map.of(
                 "row_count",
@@ -254,7 +264,8 @@ public class TestGravitinoMetricsEvaluator {
     Assertions.assertTrue(tableResult);
 
     boolean jobResult =
-        evaluator.evaluateMetrics(
+        evaluateMetrics(
+            evaluator,
             MetricScope.forJob(NameIdentifier.parse("job1")),
             Map.of("duration", List.of(metric(100L, "duration", 3L), metric(105L, "duration", 5L))),
             Map.of("duration", List.of(metric(110L, "duration", 10L))));
@@ -396,7 +407,8 @@ public class TestGravitinoMetricsEvaluator {
     evaluator.initialize(optimizerEnv("  "));
 
     boolean result =
-        evaluator.evaluateMetrics(
+        evaluateMetrics(
+            evaluator,
             MetricScope.forTable(NameIdentifier.parse("catalog.db.table")),
             Map.of("row_count", List.of(metric(100L, "row_count", 10L))),
             Map.of("row_count", List.of(metric(110L, "row_count", 999L))));
@@ -409,7 +421,8 @@ public class TestGravitinoMetricsEvaluator {
     evaluator.initialize(new OptimizerEnv(new OptimizerConfig(Map.of())));
 
     boolean result =
-        evaluator.evaluateMetrics(
+        evaluateMetrics(
+            evaluator,
             MetricScope.forJob(NameIdentifier.parse("job1")),
             Map.of("duration", List.of(metric(100L, "duration", 1L))),
             Map.of("duration", List.of(metric(110L, "duration", 999L))));
@@ -436,17 +449,23 @@ public class TestGravitinoMetricsEvaluator {
         new OptimizerConfig(Map.of(GravitinoMetricsEvaluator.EVALUATION_RULES_CONFIG, rules)));
   }
 
-  private static MetricSample metric(long timestamp, String name, long value) {
-    return new MetricSampleImpl(timestamp, entry(name, StatisticValues.longValue(value)));
+  private static boolean evaluateMetrics(
+      GravitinoMetricsEvaluator evaluator,
+      MetricScope scope,
+      Map<String, List<MetricValueSample>> beforeMetrics,
+      Map<String, List<MetricValueSample>> afterMetrics) {
+    return evaluator.evaluateMetrics(
+        MetricSeries.ofSamples(scope, beforeMetrics), MetricSeries.ofSamples(scope, afterMetrics));
   }
 
-  private static MetricSample metricString(long timestamp, String name, String value) {
-    return new MetricSampleImpl(timestamp, entry(name, StatisticValues.stringValue(value)));
+  private static MetricValueSample metric(long timestamp, String name, long value) {
+    Assertions.assertFalse(name.isEmpty());
+    return new MetricValueSample(timestamp, StatisticValues.longValue(value));
   }
 
-  private static StatisticEntry<?> entry(
-      String name, org.apache.gravitino.stats.StatisticValue<?> value) {
-    return new StatisticEntryImpl(name, value);
+  private static MetricValueSample metricString(long timestamp, String name, String value) {
+    Assertions.assertFalse(name.isEmpty());
+    return new MetricValueSample(timestamp, StatisticValues.stringValue(value));
   }
 
   private static Map<?, ?> findScopeRules(Map<?, ?> parsedRules, String scopeName) {

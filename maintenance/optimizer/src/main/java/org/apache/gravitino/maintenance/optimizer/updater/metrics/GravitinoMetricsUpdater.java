@@ -21,11 +21,10 @@ package org.apache.gravitino.maintenance.optimizer.updater.metrics;
 
 import com.google.common.base.Preconditions;
 import java.util.List;
+import org.apache.gravitino.maintenance.optimizer.api.common.MetricPoint;
 import org.apache.gravitino.maintenance.optimizer.api.updater.MetricsUpdater;
 import org.apache.gravitino.maintenance.optimizer.common.OptimizerEnv;
-import org.apache.gravitino.maintenance.optimizer.updater.metrics.storage.JobMetricWriteRequest;
 import org.apache.gravitino.maintenance.optimizer.updater.metrics.storage.MetricsRepository;
-import org.apache.gravitino.maintenance.optimizer.updater.metrics.storage.TableMetricWriteRequest;
 import org.apache.gravitino.maintenance.optimizer.updater.metrics.storage.jdbc.GenericJdbcMetricsRepository;
 
 /** Metrics updater that persists table/job metrics into the configured metrics repository. */
@@ -47,15 +46,9 @@ public class GravitinoMetricsUpdater implements MetricsUpdater {
   }
 
   @Override
-  public void updateTableMetrics(List<TableMetricWriteRequest> metrics) {
+  public void updateMetrics(List<MetricPoint> metrics) {
     ensureInitialized();
-    metricsStorage.storeTableMetrics(metrics);
-  }
-
-  @Override
-  public void updateJobMetrics(List<JobMetricWriteRequest> metrics) {
-    ensureInitialized();
-    metricsStorage.storeJobMetrics(metrics);
+    metricsStorage.storeMetrics(metrics);
   }
 
   @Override

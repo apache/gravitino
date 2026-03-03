@@ -17,17 +17,25 @@
  * under the License.
  */
 
-package org.apache.gravitino.maintenance.optimizer.api.common;
+package org.apache.gravitino.maintenance.optimizer.updater.metrics.storage;
 
-import org.apache.gravitino.annotation.DeveloperApi;
+/** Immutable test-only {@link MetricRecord} implementation. */
+public class MetricRecordImpl implements MetricRecord {
+  private final long timestamp;
+  private final String value;
 
-/** Metric sample associated with a specific partition. */
-@DeveloperApi
-public interface PartitionMetricSample extends MetricSample {
-  /**
-   * Partition identifiers associated with this metric, ordered from outer to inner level.
-   *
-   * @return the partition path for this metric sample
-   */
-  PartitionPath partition();
+  public MetricRecordImpl(long timestamp, String value) {
+    this.timestamp = timestamp;
+    this.value = value;
+  }
+
+  @Override
+  public long getTimestamp() {
+    return timestamp;
+  }
+
+  @Override
+  public String getValue() {
+    return value;
+  }
 }

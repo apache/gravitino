@@ -19,32 +19,9 @@
 
 package org.apache.gravitino.maintenance.optimizer.updater.metrics.storage;
 
-import com.google.common.base.Preconditions;
-import org.apache.gravitino.NameIdentifier;
+/** Test-only metric record holder used by storage assertions. */
+public interface MetricRecord {
+  long getTimestamp();
 
-/** Write request for one job metric record. */
-public class JobMetricWriteRequest {
-  private final NameIdentifier nameIdentifier;
-  private final String metricName;
-  private final MetricRecord metric;
-
-  public JobMetricWriteRequest(
-      NameIdentifier nameIdentifier, String metricName, MetricRecord metric) {
-    Preconditions.checkArgument(nameIdentifier != null, "nameIdentifier must not be null");
-    this.nameIdentifier = nameIdentifier;
-    this.metricName = metricName;
-    this.metric = metric;
-  }
-
-  public NameIdentifier nameIdentifier() {
-    return nameIdentifier;
-  }
-
-  public String metricName() {
-    return metricName;
-  }
-
-  public MetricRecord metric() {
-    return metric;
-  }
+  String getValue();
 }

@@ -20,10 +20,9 @@
 package org.apache.gravitino.maintenance.optimizer.monitor.callback;
 
 import java.time.Instant;
-import java.util.List;
-import java.util.Map;
 import java.util.stream.Collectors;
-import org.apache.gravitino.maintenance.optimizer.api.common.MetricSample;
+import org.apache.gravitino.maintenance.optimizer.api.common.MetricSeries;
+import org.apache.gravitino.maintenance.optimizer.api.common.MetricValueSample;
 import org.apache.gravitino.maintenance.optimizer.api.monitor.EvaluationResult;
 import org.apache.gravitino.maintenance.optimizer.api.monitor.MonitorCallback;
 import org.apache.gravitino.maintenance.optimizer.common.OptimizerEnv;
@@ -54,39 +53,37 @@ public class ConsoleMonitorCallback implements MonitorCallback {
                 : "",
             result.evaluation(),
             result.evaluatorName()));
-    if (!result.beforeMetrics().isEmpty()) {
-      System.out.println("METRICS BEFORE: " + formatMetrics(result.beforeMetrics()));
+    if (!result.beforeSeries().isEmpty()) {
+      System.out.println("METRICS BEFORE: " + formatMetrics(result.beforeSeries()));
     }
-    if (!result.afterMetrics().isEmpty()) {
-      System.out.println("METRICS AFTER: " + formatMetrics(result.afterMetrics()));
+    if (!result.afterSeries().isEmpty()) {
+      System.out.println("METRICS AFTER: " + formatMetrics(result.afterSeries()));
     }
   }
 
   @Override
   public void close() throws Exception {}
 
-  private String formatMetrics(Map<String, List<MetricSample>> metrics) {
-    if (metrics == null || metrics.isEmpty()) {
-      return "{}";
+  private String formatMetrics(MetricSeries metricSeries) {
+    if (metricSeries == null || metricSeries.isEmpty()) {
+      return "[]";
     }
-    return metrics.entrySet().stream()
-        .map(entry -> entry.getKey() + "=" + formatMetricSamples(entry.getValue()))
+    return metricSeries.samplesByMetricName().entrySet().stream()
+        .map(
+            entry ->
+                entry.getKey()
+                    + "="
+                    + entry.getValue().stream()
+                        .map(this::formatMetricSample)
+                        .collect(Collectors.joining(", ", "[", "]")))
         .collect(Collectors.joining(", ", "{", "}"));
   }
 
-  private String formatMetricSamples(List<MetricSample> samples) {
-    if (samples == null || samples.isEmpty()) {
-      return "[]";
-    }
-    return samples.stream()
-        .map(sample -> sample.timestamp() + ":" + formatMetricValue(sample))
-        .collect(Collectors.joining(", ", "[", "]"));
-  }
-
-  private String formatMetricValue(MetricSample sample) {
-    if (sample == null || sample.statistic() == null || sample.statistic().value() == null) {
+  private String formatMetricSample(MetricValueSample sample) {
+    if (sample == null || sample.value() == null) {
       return "N/A";
     }
-    return String.valueOf(sample.statistic().value().value());
+    return String.format(
+        "%d:%s", sample.timestampSeconds(), String.valueOf(sample.value().value()));
   }
 }

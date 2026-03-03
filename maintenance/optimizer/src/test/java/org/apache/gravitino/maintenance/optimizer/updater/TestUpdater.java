@@ -21,10 +21,12 @@ package org.apache.gravitino.maintenance.optimizer.updater;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.util.Comparator;
 import java.util.List;
 import org.apache.gravitino.NameIdentifier;
+import org.apache.gravitino.maintenance.optimizer.api.common.MetricPoint;
 import org.apache.gravitino.maintenance.optimizer.common.OptimizerEnv;
 import org.apache.gravitino.maintenance.optimizer.common.conf.OptimizerConfig;
 import org.junit.jupiter.api.AfterEach;
@@ -75,6 +77,12 @@ public class TestUpdater {
     assertEquals(0, statisticsUpdater.partitionUpdates());
     assertEquals(1, metricsUpdater.tableUpdates());
     assertEquals(1, metricsUpdater.jobUpdates());
+    assertTrue(
+        metricsUpdater.lastMetrics().stream()
+            .allMatch(metric -> metric.timestampSeconds() == 123L));
+    assertTrue(
+        metricsUpdater.lastMetrics().stream()
+            .anyMatch(metric -> metric.scope() == MetricPoint.Scope.JOB));
   }
 
   @Test
@@ -109,6 +117,12 @@ public class TestUpdater {
     assertEquals(0, statisticsUpdater.partitionUpdates());
     assertEquals(1, metricsUpdater.tableUpdates());
     assertEquals(1, metricsUpdater.jobUpdates());
+    assertTrue(
+        metricsUpdater.lastMetrics().stream()
+            .allMatch(metric -> metric.timestampSeconds() == 123L));
+    assertTrue(
+        metricsUpdater.lastMetrics().stream()
+            .anyMatch(metric -> metric.scope() == MetricPoint.Scope.JOB));
   }
 
   @Test

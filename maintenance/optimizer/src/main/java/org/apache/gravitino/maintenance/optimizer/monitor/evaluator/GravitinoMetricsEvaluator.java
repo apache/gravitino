@@ -30,7 +30,8 @@ import java.util.Optional;
 import java.util.OptionalDouble;
 import java.util.stream.Collectors;
 import org.apache.commons.lang3.StringUtils;
-import org.apache.gravitino.maintenance.optimizer.api.common.MetricSample;
+import org.apache.gravitino.maintenance.optimizer.api.common.MetricSeries;
+import org.apache.gravitino.maintenance.optimizer.api.common.MetricValueSample;
 import org.apache.gravitino.maintenance.optimizer.api.monitor.MetricScope;
 import org.apache.gravitino.maintenance.optimizer.api.monitor.MetricsEvaluator;
 import org.apache.gravitino.maintenance.optimizer.common.OptimizerEnv;
@@ -185,10 +186,8 @@ public class GravitinoMetricsEvaluator implements MetricsEvaluator {
   }
 
   @Override
-  public boolean evaluateMetrics(
-      MetricScope scope,
-      Map<String, List<MetricSample>> beforeMetrics,
-      Map<String, List<MetricSample>> afterMetrics) {
+  public boolean evaluateMetrics(MetricSeries beforeSeries, MetricSeries afterSeries) {
+    MetricScope scope = validateAndGetScope(beforeSeries, afterSeries);
     if (metricRulesByScope.isEmpty()) {
       return true;
     }
@@ -203,9 +202,6 @@ public class GravitinoMetricsEvaluator implements MetricsEvaluator {
       return true;
     }
 
-    Map<String, List<MetricSample>> before = beforeMetrics == null ? Map.of() : beforeMetrics;
-    Map<String, List<MetricSample>> after = afterMetrics == null ? Map.of() : afterMetrics;
-
     int evaluatedCount = 0;
     int failedCount = 0;
     int skippedCount = 0;
@@ -216,8 +212,8 @@ public class GravitinoMetricsEvaluator implements MetricsEvaluator {
       AggregationOp aggregation = ruleConfig.aggregation;
       ComparisonOp comparison = ruleConfig.comparison;
 
-      List<MetricSample> beforeSamples = sanitizeSamples(findMetricSamples(before, metricName));
-      List<MetricSample> afterSamples = sanitizeSamples(findMetricSamples(after, metricName));
+      List<MetricValueSample> beforeSamples = beforeSeries.samples(metricName);
+      List<MetricValueSample> afterSamples = afterSeries.samples(metricName);
       if (beforeSamples.isEmpty() || afterSamples.isEmpty()) {
         LOG.debug(
             "Metric {} of {} ({}) has insufficient samples: beforeSize={}, afterSize={}",
@@ -294,32 +290,37 @@ public class GravitinoMetricsEvaluator implements MetricsEvaluator {
         .collect(Collectors.joining(", "));
   }
 
-  private static List<MetricSample> sanitizeSamples(List<MetricSample> samples) {
-    return samples == null ? List.of() : samples;
-  }
-
-  private static List<MetricSample> findMetricSamples(
-      Map<String, List<MetricSample>> metrics, String normalizedMetricName) {
-    if (metrics == null || metrics.isEmpty()) {
-      return List.of();
+  private static MetricScope validateAndGetScope(
+      MetricSeries beforeSeries, MetricSeries afterSeries) {
+    if (beforeSeries == null || afterSeries == null) {
+      throw new IllegalArgumentException("beforeSeries and afterSeries must not be null");
     }
-    List<MetricSample> exactMatch = metrics.get(normalizedMetricName);
-    if (exactMatch != null) {
-      return exactMatch;
+    MetricScope beforeScope = beforeSeries.scope();
+    MetricScope afterScope = afterSeries.scope();
+    boolean sameScope =
+        beforeScope.type() == afterScope.type()
+            && beforeScope.identifier().equals(afterScope.identifier())
+            && beforeScope.partition().equals(afterScope.partition());
+    if (!sameScope) {
+      throw new IllegalArgumentException(
+          "beforeSeries and afterSeries must have identical scope, before="
+              + beforeScope.type()
+              + ":"
+              + beforeScope.identifier()
+              + ", after="
+              + afterScope.type()
+              + ":"
+              + afterScope.identifier());
     }
-    for (Map.Entry<String, List<MetricSample>> entry : metrics.entrySet()) {
-      if (normalizeMetricName(entry.getKey()).equals(normalizedMetricName)) {
-        return entry.getValue();
-      }
-    }
-    return List.of();
+    return beforeScope;
   }
 
   private static String normalizeMetricName(String metricName) {
     return metricName == null ? "" : metricName.trim().toLowerCase(Locale.ROOT);
   }
 
-  private static OptionalDouble aggregate(List<MetricSample> metrics, AggregationOp operation) {
+  private static OptionalDouble aggregate(
+      List<MetricValueSample> metrics, AggregationOp operation) {
     try {
       return switch (operation) {
         case MAX -> metrics.stream()
@@ -338,16 +339,16 @@ public class GravitinoMetricsEvaluator implements MetricsEvaluator {
     }
   }
 
-  private static OptionalDouble latest(List<MetricSample> metrics) {
-    Optional<MetricSample> latest =
-        metrics.stream().max(Comparator.comparingLong(MetricSample::timestamp));
+  private static OptionalDouble latest(List<MetricValueSample> metrics) {
+    Optional<MetricValueSample> latest =
+        metrics.stream().max(Comparator.comparingLong(MetricValueSample::timestampSeconds));
     return latest
         .map(sample -> OptionalDouble.of(metricNumericValue(sample)))
         .orElseGet(OptionalDouble::empty);
   }
 
-  private static double metricNumericValue(MetricSample metric) {
-    Object value = metric.statistic().value().value();
+  private static double metricNumericValue(MetricValueSample metric) {
+    Object value = metric.value().value();
     if (value instanceof Number) {
       return ((Number) value).doubleValue();
     }

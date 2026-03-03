@@ -22,16 +22,13 @@ package org.apache.gravitino.maintenance.optimizer.updater.metrics;
 import java.lang.reflect.Field;
 import java.util.List;
 import java.util.Map;
-import java.util.Optional;
 import org.apache.gravitino.NameIdentifier;
+import org.apache.gravitino.maintenance.optimizer.api.common.MetricPoint;
 import org.apache.gravitino.maintenance.optimizer.common.OptimizerEnv;
 import org.apache.gravitino.maintenance.optimizer.common.conf.OptimizerConfig;
-import org.apache.gravitino.maintenance.optimizer.updater.metrics.storage.JobMetricWriteRequest;
-import org.apache.gravitino.maintenance.optimizer.updater.metrics.storage.MetricRecord;
-import org.apache.gravitino.maintenance.optimizer.updater.metrics.storage.MetricRecordImpl;
 import org.apache.gravitino.maintenance.optimizer.updater.metrics.storage.MetricsRepository;
-import org.apache.gravitino.maintenance.optimizer.updater.metrics.storage.TableMetricWriteRequest;
 import org.apache.gravitino.maintenance.optimizer.updater.metrics.storage.jdbc.GenericJdbcMetricsRepository;
+import org.apache.gravitino.stats.StatisticValues;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
@@ -40,88 +37,42 @@ import org.mockito.Mockito;
 class TestGravitinoMetricsUpdater {
 
   @Test
-  void testUpdateTableMetricsWithoutInitializeFailsFast() {
+  void testUpdateMetricsWithoutInitializeFailsFast() {
     GravitinoMetricsUpdater updater = new GravitinoMetricsUpdater();
     IllegalStateException exception =
         Assertions.assertThrows(
-            IllegalStateException.class, () -> updater.updateTableMetrics(List.of()));
+            IllegalStateException.class, () -> updater.updateMetrics(List.of()));
     Assertions.assertTrue(exception.getMessage().contains("has not been initialized"));
   }
 
   @Test
-  void testUpdateJobMetricsWithoutInitializeFailsFast() {
-    GravitinoMetricsUpdater updater = new GravitinoMetricsUpdater();
-    IllegalStateException exception =
-        Assertions.assertThrows(
-            IllegalStateException.class, () -> updater.updateJobMetrics(List.of()));
-    Assertions.assertTrue(exception.getMessage().contains("has not been initialized"));
-  }
-
-  @Test
-  void testUpdateTableMetricsPassThroughRequests() throws Exception {
+  void testUpdateMetricsPassThroughRequests() throws Exception {
     GravitinoMetricsUpdater updater = new GravitinoMetricsUpdater();
     MetricsRepository repository = Mockito.mock(MetricsRepository.class);
     setMetricsRepository(updater, repository);
     NameIdentifier tableId = NameIdentifier.of("catalog", "db", "table");
-    List<TableMetricWriteRequest> inputRequests =
-        List.of(
-            new TableMetricWriteRequest(
-                tableId, "row_count", Optional.empty(), new MetricRecordImpl(100L, "10")),
-            new TableMetricWriteRequest(
-                tableId,
-                "file_count",
-                Optional.of("dt=2026-01-01"),
-                new MetricRecordImpl(101L, "3")));
-
-    updater.updateTableMetrics(inputRequests);
-
-    @SuppressWarnings("unchecked")
-    ArgumentCaptor<List<TableMetricWriteRequest>> requestsCaptor =
-        ArgumentCaptor.forClass(List.class);
-
-    Mockito.verify(repository, Mockito.times(1)).storeTableMetrics(requestsCaptor.capture());
-
-    List<TableMetricWriteRequest> requests = requestsCaptor.getValue();
-    Assertions.assertEquals(2, requests.size());
-    Assertions.assertEquals(tableId, requests.get(0).nameIdentifier());
-    Assertions.assertEquals(tableId, requests.get(1).nameIdentifier());
-    Assertions.assertEquals(Optional.empty(), requests.get(0).partition());
-    Assertions.assertEquals(Optional.of("dt=2026-01-01"), requests.get(1).partition());
-
-    List<MetricRecord> records = requests.stream().map(TableMetricWriteRequest::metric).toList();
-    Assertions.assertEquals(100L, records.get(0).getTimestamp());
-    Assertions.assertEquals(101L, records.get(1).getTimestamp());
-
-    Assertions.assertEquals("10", records.get(0).getValue());
-    Assertions.assertEquals("3", records.get(1).getValue());
-  }
-
-  @Test
-  void testUpdateJobMetricsPassThroughRequests() throws Exception {
-    GravitinoMetricsUpdater updater = new GravitinoMetricsUpdater();
-    MetricsRepository repository = Mockito.mock(MetricsRepository.class);
-    setMetricsRepository(updater, repository);
     NameIdentifier jobId = NameIdentifier.of("catalog", "db", "job");
-    List<JobMetricWriteRequest> inputRequests =
+    List<MetricPoint> inputMetrics =
         List.of(
-            new JobMetricWriteRequest(jobId, "duration", new MetricRecordImpl(200L, "20")),
-            new JobMetricWriteRequest(jobId, "planning", new MetricRecordImpl(201L, "1.5")));
+            MetricPoint.forTable(tableId, "row_count", StatisticValues.longValue(10L), 100L),
+            MetricPoint.forJob(jobId, "duration", StatisticValues.longValue(20L), 200L));
 
-    updater.updateJobMetrics(inputRequests);
+    updater.updateMetrics(inputMetrics);
 
     @SuppressWarnings("unchecked")
-    ArgumentCaptor<List<JobMetricWriteRequest>> requestsCaptor =
-        ArgumentCaptor.forClass(List.class);
-    Mockito.verify(repository, Mockito.times(1)).storeJobMetrics(requestsCaptor.capture());
+    ArgumentCaptor<List<MetricPoint>> requestsCaptor = ArgumentCaptor.forClass(List.class);
+    Mockito.verify(repository, Mockito.times(1)).storeMetrics(requestsCaptor.capture());
 
-    List<JobMetricWriteRequest> requests = requestsCaptor.getValue();
-    Assertions.assertEquals(jobId, requests.get(0).nameIdentifier());
-    Assertions.assertEquals(jobId, requests.get(1).nameIdentifier());
-    List<MetricRecord> records = requests.stream().map(JobMetricWriteRequest::metric).toList();
-    Assertions.assertEquals(200L, records.get(0).getTimestamp());
-    Assertions.assertEquals(201L, records.get(1).getTimestamp());
-    Assertions.assertEquals("20", records.get(0).getValue());
-    Assertions.assertEquals("1.5", records.get(1).getValue());
+    List<MetricPoint> metrics = requestsCaptor.getValue();
+    Assertions.assertEquals(2, metrics.size());
+    Assertions.assertEquals(tableId, metrics.get(0).identifier());
+    Assertions.assertEquals(MetricPoint.Scope.TABLE, metrics.get(0).scope());
+    Assertions.assertEquals(100L, metrics.get(0).timestampSeconds());
+    Assertions.assertEquals(10L, ((Number) metrics.get(0).value().value()).longValue());
+    Assertions.assertEquals(jobId, metrics.get(1).identifier());
+    Assertions.assertEquals(MetricPoint.Scope.JOB, metrics.get(1).scope());
+    Assertions.assertEquals(200L, metrics.get(1).timestampSeconds());
+    Assertions.assertEquals(20L, ((Number) metrics.get(1).value().value()).longValue());
   }
 
   @Test

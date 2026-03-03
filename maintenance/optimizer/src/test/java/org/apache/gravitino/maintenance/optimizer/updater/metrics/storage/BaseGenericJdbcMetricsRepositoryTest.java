@@ -20,12 +20,21 @@
 package org.apache.gravitino.maintenance.optimizer.updater.metrics.storage;
 
 import java.time.Instant;
+import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import org.apache.gravitino.NameIdentifier;
+import org.apache.gravitino.maintenance.optimizer.api.common.MetricPoint;
+import org.apache.gravitino.maintenance.optimizer.api.common.PartitionEntry;
+import org.apache.gravitino.maintenance.optimizer.api.common.PartitionPath;
+import org.apache.gravitino.maintenance.optimizer.api.monitor.MetricScope;
+import org.apache.gravitino.maintenance.optimizer.common.PartitionEntryImpl;
 import org.apache.gravitino.maintenance.optimizer.updater.metrics.storage.jdbc.GenericJdbcMetricsRepository;
+import org.apache.gravitino.stats.StatisticValue;
+import org.apache.gravitino.stats.StatisticValues;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
@@ -66,8 +75,7 @@ public abstract class BaseGenericJdbcMetricsRepositoryTest {
         Optional.empty(),
         metric);
 
-    Map<String, List<MetricRecord>> metrics =
-        storage.getTableMetrics(nameIdentifier, 0, Long.MAX_VALUE);
+    Map<String, List<MetricRecord>> metrics = getTableMetrics(nameIdentifier, 0, Long.MAX_VALUE);
 
     Assertions.assertEquals(2, metrics.size());
     Assertions.assertTrue(metrics.containsKey("metric1"));
@@ -94,12 +102,12 @@ public abstract class BaseGenericJdbcMetricsRepositoryTest {
     storeTableMetric(nameIdentifier, "metric2", Optional.of(partition2), metric3);
 
     Map<String, List<MetricRecord>> metrics =
-        storage.getPartitionMetrics(nameIdentifier, partition1, 0, Long.MAX_VALUE);
+        getPartitionMetrics(nameIdentifier, partition1, 0, Long.MAX_VALUE);
     Assertions.assertEquals(1, metrics.size());
     Assertions.assertTrue(metrics.containsKey("metric"));
     Assertions.assertEquals(Arrays.asList("value1"), getMetricValues(metrics.get("metric")));
 
-    metrics = storage.getPartitionMetrics(nameIdentifier, partition2, 0, Long.MAX_VALUE);
+    metrics = getPartitionMetrics(nameIdentifier, partition2, 0, Long.MAX_VALUE);
     Assertions.assertEquals(2, metrics.size());
     Assertions.assertTrue(metrics.containsKey("metric"));
     Assertions.assertEquals(Arrays.asList("value1"), getMetricValues(metrics.get("metric")));
@@ -125,19 +133,18 @@ public abstract class BaseGenericJdbcMetricsRepositoryTest {
     storeTableMetric(nameIdentifier, "metric1", Optional.of(partition2), metric2);
     storeTableMetric(nameIdentifier, "metric1", Optional.of(partition2), metric3);
 
-    Map<String, List<MetricRecord>> metrics =
-        storage.getTableMetrics(nameIdentifier, 0, Long.MAX_VALUE);
+    Map<String, List<MetricRecord>> metrics = getTableMetrics(nameIdentifier, 0, Long.MAX_VALUE);
     Assertions.assertEquals(1, metrics.size());
     Assertions.assertTrue(metrics.containsKey("metric1"));
     Assertions.assertEquals(
         Arrays.asList("value1", "value2", "value3"), getMetricValues(metrics.get("metric1")));
 
-    metrics = storage.getPartitionMetrics(nameIdentifier, partition1, 0, Long.MAX_VALUE);
+    metrics = getPartitionMetrics(nameIdentifier, partition1, 0, Long.MAX_VALUE);
     Assertions.assertEquals(1, metrics.size());
     Assertions.assertTrue(metrics.containsKey("metric1"));
     Assertions.assertEquals(Arrays.asList("value1"), getMetricValues(metrics.get("metric1")));
 
-    metrics = storage.getPartitionMetrics(nameIdentifier, partition2, 0, Long.MAX_VALUE);
+    metrics = getPartitionMetrics(nameIdentifier, partition2, 0, Long.MAX_VALUE);
     Assertions.assertEquals(1, metrics.size());
     Assertions.assertTrue(metrics.containsKey("metric1"));
     Assertions.assertEquals(
@@ -156,11 +163,11 @@ public abstract class BaseGenericJdbcMetricsRepositoryTest {
     storeJobMetric(storedId, "JOB_METRIC", metric);
 
     Map<String, List<MetricRecord>> partitionMetrics =
-        storage.getPartitionMetrics(queryId, queryPartition, 0, Long.MAX_VALUE);
+        getPartitionMetrics(queryId, queryPartition, 0, Long.MAX_VALUE);
     Assertions.assertTrue(partitionMetrics.containsKey("metric_upper"));
     Assertions.assertEquals(List.of("v1"), getMetricValues(partitionMetrics.get("metric_upper")));
 
-    Map<String, List<MetricRecord>> jobMetrics = storage.getJobMetrics(queryId, 0, Long.MAX_VALUE);
+    Map<String, List<MetricRecord>> jobMetrics = getJobMetrics(queryId, 0, Long.MAX_VALUE);
     Assertions.assertTrue(jobMetrics.containsKey("job_metric"));
     Assertions.assertEquals(List.of("v1"), getMetricValues(jobMetrics.get("job_metric")));
   }
@@ -170,28 +177,24 @@ public abstract class BaseGenericJdbcMetricsRepositoryTest {
     NameIdentifier id = NameIdentifier.of("catalog", "db", "table");
 
     IllegalArgumentException tableException =
-        Assertions.assertThrows(
-            IllegalArgumentException.class, () -> storage.getTableMetrics(id, 10, 10));
+        Assertions.assertThrows(IllegalArgumentException.class, () -> getTableMetrics(id, 10, 10));
     Assertions.assertTrue(tableException.getMessage().contains("Invalid time window"));
 
     IllegalArgumentException partitionException =
         Assertions.assertThrows(
-            IllegalArgumentException.class, () -> storage.getPartitionMetrics(id, "p=1", 20, 10));
+            IllegalArgumentException.class, () -> getPartitionMetrics(id, "p=1", 20, 10));
     Assertions.assertTrue(partitionException.getMessage().contains("Invalid time window"));
 
     IllegalArgumentException jobException =
-        Assertions.assertThrows(
-            IllegalArgumentException.class, () -> storage.getJobMetrics(id, 30, 30));
+        Assertions.assertThrows(IllegalArgumentException.class, () -> getJobMetrics(id, 30, 30));
     Assertions.assertTrue(jobException.getMessage().contains("Invalid time window"));
 
+    Assertions.assertThrows(IllegalArgumentException.class, () -> getTableMetrics(null, 0, 1));
+    Assertions.assertThrows(IllegalArgumentException.class, () -> getJobMetrics(null, 0, 1));
     Assertions.assertThrows(
-        IllegalArgumentException.class, () -> storage.getTableMetrics(null, 0, 1));
+        IllegalArgumentException.class, () -> getPartitionMetrics(null, "p=1", 0, 1));
     Assertions.assertThrows(
-        IllegalArgumentException.class, () -> storage.getJobMetrics(null, 0, 1));
-    Assertions.assertThrows(
-        IllegalArgumentException.class, () -> storage.getPartitionMetrics(null, "p=1", 0, 1));
-    Assertions.assertThrows(
-        IllegalArgumentException.class, () -> storage.getPartitionMetrics(id, " ", 0, 1));
+        IllegalArgumentException.class, () -> getPartitionMetrics(id, " ", 0, 1));
   }
 
   @Test
@@ -295,11 +298,11 @@ public abstract class BaseGenericJdbcMetricsRepositoryTest {
     storeJobMetric(jobId, "metric_long", new MetricRecordImpl(now, longValue));
 
     Map<String, List<MetricRecord>> tableMetrics =
-        storage.getPartitionMetrics(tableId, partition, 0, Long.MAX_VALUE);
+        getPartitionMetrics(tableId, partition, 0, Long.MAX_VALUE);
     Assertions.assertTrue(tableMetrics.containsKey("metric_long"));
     Assertions.assertEquals(longValue, tableMetrics.get("metric_long").get(0).getValue());
 
-    Map<String, List<MetricRecord>> jobMetrics = storage.getJobMetrics(jobId, 0, Long.MAX_VALUE);
+    Map<String, List<MetricRecord>> jobMetrics = getJobMetrics(jobId, 0, Long.MAX_VALUE);
     Assertions.assertTrue(jobMetrics.containsKey("metric_long"));
     Assertions.assertEquals(longValue, jobMetrics.get("metric_long").get(0).getValue());
   }
@@ -308,18 +311,98 @@ public abstract class BaseGenericJdbcMetricsRepositoryTest {
     return metrics.stream().map(MetricRecord::getValue).toList();
   }
 
+  protected Map<String, List<MetricRecord>> getTableMetrics(
+      NameIdentifier nameIdentifier, long fromSecs, long toSecs) {
+    return convertToMetricRecords(
+        storage.getMetrics(MetricScope.forTable(nameIdentifier), fromSecs, toSecs));
+  }
+
+  protected Map<String, List<MetricRecord>> getPartitionMetrics(
+      NameIdentifier nameIdentifier, String partition, long fromSecs, long toSecs) {
+    return convertToMetricRecords(
+        storage.getMetrics(
+            MetricScope.forPartition(nameIdentifier, parsePartitionPath(partition)),
+            fromSecs,
+            toSecs));
+  }
+
+  protected Map<String, List<MetricRecord>> getJobMetrics(
+      NameIdentifier nameIdentifier, long fromSecs, long toSecs) {
+    return convertToMetricRecords(
+        storage.getMetrics(MetricScope.forJob(nameIdentifier), fromSecs, toSecs));
+  }
+
   protected void storeTableMetric(
       NameIdentifier nameIdentifier,
       String metricName,
       Optional<String> partition,
       MetricRecord metric) {
-    storage.storeTableMetrics(
-        List.of(new TableMetricWriteRequest(nameIdentifier, metricName, partition, metric)));
+    MetricPoint metricPoint;
+    if (metric == null) {
+      metricPoint = null;
+    } else if (partition != null && partition.isPresent()) {
+      metricPoint =
+          MetricPoint.forPartition(
+              nameIdentifier,
+              parsePartitionPath(partition.get()),
+              metricName,
+              toStatisticValue(metric.getValue()),
+              metric.getTimestamp());
+    } else {
+      metricPoint =
+          MetricPoint.forTable(
+              nameIdentifier,
+              metricName,
+              toStatisticValue(metric.getValue()),
+              metric.getTimestamp());
+    }
+    storage.storeMetrics(List.of(metricPoint));
   }
 
   protected void storeJobMetric(
       NameIdentifier nameIdentifier, String metricName, MetricRecord metric) {
-    storage.storeJobMetrics(List.of(new JobMetricWriteRequest(nameIdentifier, metricName, metric)));
+    MetricPoint metricPoint =
+        metric == null
+            ? null
+            : MetricPoint.forJob(
+                nameIdentifier,
+                metricName,
+                toStatisticValue(metric.getValue()),
+                metric.getTimestamp());
+    storage.storeMetrics(List.of(metricPoint));
+  }
+
+  protected Map<String, List<MetricRecord>> convertToMetricRecords(List<MetricPoint> metricPoints) {
+    Map<String, List<MetricRecord>> metrics = new LinkedHashMap<>();
+    for (MetricPoint metricPoint : metricPoints) {
+      MetricRecord metricRecord =
+          new MetricRecordImpl(
+              metricPoint.timestampSeconds(), String.valueOf(metricPoint.value().value()));
+      metrics
+          .computeIfAbsent(metricPoint.metricName(), ignored -> new ArrayList<>())
+          .add(metricRecord);
+    }
+    return metrics;
+  }
+
+  protected PartitionPath parsePartitionPath(String partition) {
+    if (partition == null || partition.trim().isEmpty()) {
+      throw new IllegalArgumentException("partition must not be blank");
+    }
+    String[] entries = partition.split("/");
+    List<PartitionEntry> partitionEntries = new ArrayList<>(entries.length);
+    for (String entry : entries) {
+      String[] kv = entry.split("=", 2);
+      if (kv.length != 2 || kv[0].trim().isEmpty() || kv[1].trim().isEmpty()) {
+        throw new IllegalArgumentException("Invalid partition entry: " + entry);
+      }
+      partitionEntries.add(new PartitionEntryImpl(kv[0], kv[1]));
+    }
+    return PartitionPath.of(partitionEntries);
+  }
+
+  private StatisticValue<?> toStatisticValue(String value) {
+    return value == null ? null : StatisticValues.stringValue(value);
   }
 
   protected long currentEpochSeconds() {

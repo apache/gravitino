@@ -20,13 +20,8 @@
 package org.apache.gravitino.maintenance.optimizer.api.monitor;
 
 import com.google.common.base.Preconditions;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
 import org.apache.gravitino.annotation.DeveloperApi;
-import org.apache.gravitino.maintenance.optimizer.api.common.MetricSample;
+import org.apache.gravitino.maintenance.optimizer.api.common.MetricSeries;
 
 /** Immutable evaluation result passed to monitor callbacks. */
 @DeveloperApi
@@ -34,8 +29,8 @@ public class EvaluationResult {
 
   private final MetricScope scope;
   private final boolean evaluation;
-  private final Map<String, List<MetricSample>> beforeMetrics;
-  private final Map<String, List<MetricSample>> afterMetrics;
+  private final MetricSeries beforeSeries;
+  private final MetricSeries afterSeries;
   private final long actionTimeSeconds;
   private final long rangeSeconds;
   private final String evaluatorName;
@@ -45,8 +40,8 @@ public class EvaluationResult {
    *
    * @param scope scope of the evaluated metrics
    * @param evaluation evaluation outcome from the evaluator
-   * @param beforeMetrics metrics collected before the action timestamp
-   * @param afterMetrics metrics collected at/after the action timestamp
+   * @param beforeSeries metric series collected before the action timestamp
+   * @param afterSeries metric series collected at/after the action timestamp
    * @param actionTimeSeconds action timestamp in epoch seconds
    * @param rangeSeconds evaluation half-window in seconds
    * @param evaluatorName evaluator implementation name
@@ -54,17 +49,24 @@ public class EvaluationResult {
   public EvaluationResult(
       MetricScope scope,
       boolean evaluation,
-      Map<String, List<MetricSample>> beforeMetrics,
-      Map<String, List<MetricSample>> afterMetrics,
+      MetricSeries beforeSeries,
+      MetricSeries afterSeries,
       long actionTimeSeconds,
       long rangeSeconds,
       String evaluatorName) {
     Preconditions.checkArgument(scope != null, "scope must not be null");
+    Preconditions.checkArgument(beforeSeries != null, "beforeSeries must not be null");
+    Preconditions.checkArgument(afterSeries != null, "afterSeries must not be null");
+    Preconditions.checkArgument(
+        sameScope(scope, beforeSeries.scope()),
+        "beforeSeries scope does not match evaluation scope");
+    Preconditions.checkArgument(
+        sameScope(scope, afterSeries.scope()), "afterSeries scope does not match evaluation scope");
     Preconditions.checkArgument(evaluatorName != null, "evaluatorName must not be null");
     this.scope = scope;
     this.evaluation = evaluation;
-    this.beforeMetrics = immutableMetrics(beforeMetrics);
-    this.afterMetrics = immutableMetrics(afterMetrics);
+    this.beforeSeries = beforeSeries;
+    this.afterSeries = afterSeries;
     this.actionTimeSeconds = actionTimeSeconds;
     this.rangeSeconds = rangeSeconds;
     this.evaluatorName = evaluatorName;
@@ -85,17 +87,17 @@ public class EvaluationResult {
   }
 
   /**
-   * @return immutable metrics map for samples before the action timestamp.
+   * @return immutable metric series before the action timestamp.
    */
-  public Map<String, List<MetricSample>> beforeMetrics() {
-    return beforeMetrics;
+  public MetricSeries beforeSeries() {
+    return beforeSeries;
   }
 
   /**
-   * @return immutable metrics map for samples at/after the action timestamp.
+   * @return immutable metric series at/after the action timestamp.
    */
-  public Map<String, List<MetricSample>> afterMetrics() {
-    return afterMetrics;
+  public MetricSeries afterSeries() {
+    return afterSeries;
   }
 
   /**
@@ -119,18 +121,9 @@ public class EvaluationResult {
     return evaluatorName;
   }
 
-  private static Map<String, List<MetricSample>> immutableMetrics(
-      Map<String, List<MetricSample>> metrics) {
-    if (metrics == null || metrics.isEmpty()) {
-      return Collections.emptyMap();
-    }
-
-    Map<String, List<MetricSample>> copied = new HashMap<>();
-    for (Map.Entry<String, List<MetricSample>> entry : metrics.entrySet()) {
-      List<MetricSample> samples =
-          entry.getValue() == null ? List.of() : new ArrayList<>(entry.getValue());
-      copied.put(entry.getKey(), Collections.unmodifiableList(samples));
-    }
-    return Collections.unmodifiableMap(copied);
+  private static boolean sameScope(MetricScope left, MetricScope right) {
+    return left.type() == right.type()
+        && left.identifier().equals(right.identifier())
+        && left.partition().equals(right.partition());
   }
 }

@@ -17,13 +17,19 @@
  * under the License.
  */
 
-package org.apache.gravitino.maintenance.optimizer.updater.metrics.storage;
+package org.apache.gravitino.maintenance.optimizer.api.updater;
 
-/** Serializable metric record used by {@link MetricsRepository}. */
-public interface MetricRecord {
-  /** Timestamp in epoch seconds. */
-  long getTimestamp();
+import java.util.List;
+import org.apache.gravitino.annotation.DeveloperApi;
+import org.apache.gravitino.maintenance.optimizer.api.common.MetricPoint;
 
-  /** Encoded metric value. */
-  String getValue();
+/** Represents a provider that supports bulk job metrics calculation. */
+@DeveloperApi
+public interface SupportsCalculateBulkJobMetrics extends SupportsCalculateJobMetrics {
+  /**
+   * Calculate job metric points for all jobs discoverable by this calculator.
+   *
+   * @return metric points
+   */
+  List<MetricPoint> calculateAllJobMetrics();
 }

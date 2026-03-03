@@ -22,20 +22,13 @@ package org.apache.gravitino.maintenance.optimizer.monitor.metrics;
 import java.nio.file.Path;
 import java.util.List;
 import java.util.Map;
-import java.util.Optional;
 import org.apache.gravitino.NameIdentifier;
-import org.apache.gravitino.maintenance.optimizer.api.common.MetricSample;
-import org.apache.gravitino.maintenance.optimizer.api.common.PartitionMetricSample;
+import org.apache.gravitino.maintenance.optimizer.api.common.MetricPoint;
 import org.apache.gravitino.maintenance.optimizer.api.common.PartitionPath;
 import org.apache.gravitino.maintenance.optimizer.common.OptimizerEnv;
 import org.apache.gravitino.maintenance.optimizer.common.PartitionEntryImpl;
 import org.apache.gravitino.maintenance.optimizer.common.conf.OptimizerConfig;
-import org.apache.gravitino.maintenance.optimizer.common.util.StatisticValueUtils;
-import org.apache.gravitino.maintenance.optimizer.recommender.util.PartitionUtils;
-import org.apache.gravitino.maintenance.optimizer.updater.metrics.storage.JobMetricWriteRequest;
-import org.apache.gravitino.maintenance.optimizer.updater.metrics.storage.MetricRecordImpl;
 import org.apache.gravitino.maintenance.optimizer.updater.metrics.storage.MetricsRepository;
-import org.apache.gravitino.maintenance.optimizer.updater.metrics.storage.TableMetricWriteRequest;
 import org.apache.gravitino.maintenance.optimizer.updater.metrics.storage.jdbc.GenericJdbcMetricsRepository;
 import org.apache.gravitino.stats.StatisticValues;
 import org.junit.jupiter.api.Assertions;
@@ -73,48 +66,29 @@ public class TestGravitinoMetricsProvider {
 
     try (MetricsRepository metricsRepository = new GenericJdbcMetricsRepository()) {
       metricsRepository.initialize(configs);
-      metricsRepository.storeTableMetrics(
+      metricsRepository.storeMetrics(
           List.of(
-              new TableMetricWriteRequest(
-                  table,
-                  "row_count",
-                  Optional.empty(),
-                  new MetricRecordImpl(
-                      100L, StatisticValueUtils.toString(StatisticValues.longValue(10L))))));
-      metricsRepository.storeTableMetrics(
-          List.of(
-              new TableMetricWriteRequest(
-                  table,
-                  "row_count",
-                  Optional.of(PartitionUtils.encodePartitionPath(partitionPath)),
-                  new MetricRecordImpl(
-                      101L, StatisticValueUtils.toString(StatisticValues.longValue(11L))))));
-      metricsRepository.storeJobMetrics(
-          List.of(
-              new JobMetricWriteRequest(
-                  job,
-                  "duration",
-                  new MetricRecordImpl(
-                      102L, StatisticValueUtils.toString(StatisticValues.longValue(99L))))));
+              MetricPoint.forTable(table, "row_count", StatisticValues.longValue(10L), 100L),
+              MetricPoint.forPartition(
+                  table, partitionPath, "row_count", StatisticValues.longValue(11L), 101L),
+              MetricPoint.forJob(job, "duration", StatisticValues.longValue(99L), 102L)));
     }
 
     GravitinoMetricsProvider provider = new GravitinoMetricsProvider();
     provider.initialize(optimizerEnv);
     try {
-      Map<String, List<MetricSample>> tableMetrics = provider.tableMetrics(table, 0L, 200L);
-      Assertions.assertEquals(1, tableMetrics.get("row_count").size());
-      Assertions.assertEquals(
-          10L, tableMetrics.get("row_count").get(0).statistic().value().value());
+      List<MetricPoint> tableMetrics = provider.tableMetrics(table, 0L, 200L);
+      Assertions.assertEquals(1, tableMetrics.size());
+      Assertions.assertEquals(10L, tableMetrics.get(0).value().value());
 
-      Map<String, List<MetricSample>> partitionMetrics =
+      List<MetricPoint> partitionMetrics =
           provider.partitionMetrics(table, partitionPath, 0L, 200L);
-      Assertions.assertEquals(1, partitionMetrics.get("row_count").size());
-      Assertions.assertTrue(
-          partitionMetrics.get("row_count").get(0) instanceof PartitionMetricSample);
+      Assertions.assertEquals(1, partitionMetrics.size());
+      Assertions.assertEquals(MetricPoint.Scope.PARTITION, partitionMetrics.get(0).scope());
 
-      Map<String, List<MetricSample>> jobMetrics = provider.jobMetrics(job, 0L, 200L);
-      Assertions.assertEquals(1, jobMetrics.get("duration").size());
-      Assertions.assertEquals(99L, jobMetrics.get("duration").get(0).statistic().value().value());
+      List<MetricPoint> jobMetrics = provider.jobMetrics(job, 0L, 200L);
+      Assertions.assertEquals(1, jobMetrics.size());
+      Assertions.assertEquals(99L, jobMetrics.get(0).value().value());
     } finally {
       provider.close();
     }

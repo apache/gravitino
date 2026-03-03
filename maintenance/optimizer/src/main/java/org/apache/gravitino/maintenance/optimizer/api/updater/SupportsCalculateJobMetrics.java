@@ -17,25 +17,21 @@
  * under the License.
  */
 
-package org.apache.gravitino.maintenance.optimizer.api.common;
+package org.apache.gravitino.maintenance.optimizer.api.updater;
 
+import java.util.List;
+import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.annotation.DeveloperApi;
+import org.apache.gravitino.maintenance.optimizer.api.common.MetricPoint;
 
-/** Represents a single metric sample with a timestamp and associated statistic. */
+/** Represents a provider that supports job metrics. */
 @DeveloperApi
-public interface MetricSample {
-
+public interface SupportsCalculateJobMetrics extends StatisticsCalculator {
   /**
-   * Metric event time in epoch seconds.
+   * Calculate job metric points for one job.
    *
-   * @return the metric timestamp in epoch seconds
+   * @param jobIdentifier job identifier
+   * @return metric points
    */
-  long timestamp();
-
-  /**
-   * The statistic value sampled at this timestamp.
-   *
-   * @return the statistic entry for this sample
-   */
-  StatisticEntry<?> statistic();
+  List<MetricPoint> calculateJobMetrics(NameIdentifier jobIdentifier);
 }
