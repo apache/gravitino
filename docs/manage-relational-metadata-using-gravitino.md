@@ -46,7 +46,7 @@ as multiple catalogs operating on the same source may result in unpredictable be
 :::
 
 :::caution
-If you plan to use the [Flink connector](./flink-connector/flink-connector.md), the catalog name **cannot start with a number**. 
+If you plan to use the [Flink connector](./flink-connector/flink-connector.md), the catalog name **cannot start with a number**.
 This is a Flink limitation. For example, `catalog_hive` is valid, but `1_catalog` is not.
 :::
 
