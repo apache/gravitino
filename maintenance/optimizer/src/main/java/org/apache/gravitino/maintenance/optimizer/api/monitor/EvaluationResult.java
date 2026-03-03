@@ -20,19 +20,19 @@
 package org.apache.gravitino.maintenance.optimizer.api.monitor;
 
 import com.google.common.base.Preconditions;
-import java.util.ArrayList;
 import java.util.Collections;
-import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import org.apache.gravitino.annotation.DeveloperApi;
+import org.apache.gravitino.maintenance.optimizer.api.common.DataScope;
 import org.apache.gravitino.maintenance.optimizer.api.common.MetricSample;
 
 /** Immutable evaluation result passed to monitor callbacks. */
 @DeveloperApi
 public class EvaluationResult {
 
-  private final MetricScope scope;
+  private final DataScope scope;
   private final boolean evaluation;
   private final Map<String, List<MetricSample>> beforeMetrics;
   private final Map<String, List<MetricSample>> afterMetrics;
@@ -45,14 +45,14 @@ public class EvaluationResult {
    *
    * @param scope scope of the evaluated metrics
    * @param evaluation evaluation outcome from the evaluator
-   * @param beforeMetrics metrics collected before the action timestamp
-   * @param afterMetrics metrics collected at/after the action timestamp
+   * @param beforeMetrics metric samples collected before the action timestamp
+   * @param afterMetrics metric samples collected at/after the action timestamp
    * @param actionTimeSeconds action timestamp in epoch seconds
    * @param rangeSeconds evaluation half-window in seconds
    * @param evaluatorName evaluator implementation name
    */
   public EvaluationResult(
-      MetricScope scope,
+      DataScope scope,
       boolean evaluation,
       Map<String, List<MetricSample>> beforeMetrics,
       Map<String, List<MetricSample>> afterMetrics,
@@ -60,11 +60,13 @@ public class EvaluationResult {
       long rangeSeconds,
       String evaluatorName) {
     Preconditions.checkArgument(scope != null, "scope must not be null");
+    Preconditions.checkArgument(beforeMetrics != null, "beforeMetrics must not be null");
+    Preconditions.checkArgument(afterMetrics != null, "afterMetrics must not be null");
     Preconditions.checkArgument(evaluatorName != null, "evaluatorName must not be null");
     this.scope = scope;
     this.evaluation = evaluation;
-    this.beforeMetrics = immutableMetrics(beforeMetrics);
-    this.afterMetrics = immutableMetrics(afterMetrics);
+    this.beforeMetrics = immutableCopy(beforeMetrics);
+    this.afterMetrics = immutableCopy(afterMetrics);
     this.actionTimeSeconds = actionTimeSeconds;
     this.rangeSeconds = rangeSeconds;
     this.evaluatorName = evaluatorName;
@@ -73,7 +75,7 @@ public class EvaluationResult {
   /**
    * @return evaluated scope (table/partition/job).
    */
-  public MetricScope scope() {
+  public DataScope scope() {
     return scope;
   }
 
@@ -85,14 +87,14 @@ public class EvaluationResult {
   }
 
   /**
-   * @return immutable metrics map for samples before the action timestamp.
+   * @return immutable metric samples before the action timestamp.
    */
   public Map<String, List<MetricSample>> beforeMetrics() {
     return beforeMetrics;
   }
 
   /**
-   * @return immutable metrics map for samples at/after the action timestamp.
+   * @return immutable metric samples at/after the action timestamp.
    */
   public Map<String, List<MetricSample>> afterMetrics() {
     return afterMetrics;
@@ -119,17 +121,18 @@ public class EvaluationResult {
     return evaluatorName;
   }
 
-  private static Map<String, List<MetricSample>> immutableMetrics(
+  private static Map<String, List<MetricSample>> immutableCopy(
       Map<String, List<MetricSample>> metrics) {
-    if (metrics == null || metrics.isEmpty()) {
-      return Collections.emptyMap();
+    if (metrics.isEmpty()) {
+      return Map.of();
     }
 
-    Map<String, List<MetricSample>> copied = new HashMap<>();
+    Map<String, List<MetricSample>> copied = new LinkedHashMap<>();
     for (Map.Entry<String, List<MetricSample>> entry : metrics.entrySet()) {
-      List<MetricSample> samples =
-          entry.getValue() == null ? List.of() : new ArrayList<>(entry.getValue());
-      copied.put(entry.getKey(), Collections.unmodifiableList(samples));
+      Preconditions.checkArgument(entry.getKey() != null, "metric name must not be null");
+      List<MetricSample> values = entry.getValue();
+      Preconditions.checkArgument(values != null, "metric values must not be null");
+      copied.put(entry.getKey(), Collections.unmodifiableList(List.copyOf(values)));
     }
     return Collections.unmodifiableMap(copied);
   }
