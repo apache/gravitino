@@ -64,7 +64,7 @@ jobs:
             BASE_SHA="$(git rev-list --max-parents=0 "$HEAD_SHA" | tail -n 1)"
           fi
 
-          MERGE_BASE_SHA="$(git merge-base "$BASE_SHA" "$HEAD_SHA")"
+          MERGE_BASE_SHA="$(git merge-base "$BASE_SHA" "$HEAD_SHA" || true)"
           if [ -z "$MERGE_BASE_SHA" ]; then
             MERGE_BASE_SHA="$BASE_SHA"
           fi

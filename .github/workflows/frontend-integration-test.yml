@@ -25,7 +25,7 @@ jobs:
               - api/**
               - bin/**
               - authorizations/**
-              - bundler/**
+              - bundles/**
               - catalogs/**
               - catalogs-contrib/**
               - clients/**
@@ -41,6 +41,7 @@ jobs:
               - server/** 
               - meta/**
               - server-common/**
+              - integration-test-common/**
               - web-v2/**
               - '**/*.kts'
               - '**/*.py'
