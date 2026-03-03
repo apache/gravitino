@@ -25,8 +25,8 @@ import java.nio.file.Path;
 import java.util.List;
 import java.util.Map;
 import org.apache.gravitino.NameIdentifier;
+import org.apache.gravitino.maintenance.optimizer.api.common.DataScope;
 import org.apache.gravitino.maintenance.optimizer.api.common.MetricPoint;
-import org.apache.gravitino.maintenance.optimizer.api.monitor.MetricScope;
 import org.apache.gravitino.maintenance.optimizer.common.conf.OptimizerConfig;
 import org.apache.gravitino.maintenance.optimizer.updater.metrics.storage.BaseGenericJdbcMetricsRepositoryTest;
 import org.apache.gravitino.maintenance.optimizer.updater.metrics.storage.MetricRecord;
@@ -94,7 +94,7 @@ class TestH2GenericJdbcMetricsRepositoryIT extends BaseGenericJdbcMetricsReposit
 
       Map<String, List<MetricRecord>> metrics =
           convertToMetricRecords(
-              repository.getMetrics(MetricScope.forTable(tableId), now - 1, now + 1));
+              repository.getMetrics(DataScope.forTable(tableId), now - 1, now + 1));
       Assertions.assertTrue(metrics.containsKey("row_count"));
       Assertions.assertEquals(List.of("12"), getMetricValues(metrics.get("row_count")));
     } finally {

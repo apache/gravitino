@@ -26,7 +26,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import java.util.Comparator;
 import java.util.List;
 import org.apache.gravitino.NameIdentifier;
-import org.apache.gravitino.maintenance.optimizer.api.common.MetricPoint;
+import org.apache.gravitino.maintenance.optimizer.api.common.DataScope;
 import org.apache.gravitino.maintenance.optimizer.common.OptimizerEnv;
 import org.apache.gravitino.maintenance.optimizer.common.conf.OptimizerConfig;
 import org.junit.jupiter.api.AfterEach;
@@ -82,7 +82,7 @@ public class TestUpdater {
             .allMatch(metric -> metric.timestampSeconds() == 123L));
     assertTrue(
         metricsUpdater.lastJobMetrics().stream()
-            .anyMatch(metric -> metric.scope() == MetricPoint.Scope.JOB));
+            .anyMatch(metric -> metric.scope() == DataScope.Type.JOB));
   }
 
   @Test
@@ -142,7 +142,7 @@ public class TestUpdater {
             .allMatch(metric -> metric.timestampSeconds() == 123L));
     assertTrue(
         metricsUpdater.lastJobMetrics().stream()
-            .anyMatch(metric -> metric.scope() == MetricPoint.Scope.JOB));
+            .anyMatch(metric -> metric.scope() == DataScope.Type.JOB));
   }
 
   @Test

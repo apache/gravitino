@@ -30,9 +30,9 @@ import java.util.Optional;
 import java.util.OptionalDouble;
 import java.util.stream.Collectors;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.gravitino.maintenance.optimizer.api.common.DataScope;
 import org.apache.gravitino.maintenance.optimizer.api.common.MetricSeries;
 import org.apache.gravitino.maintenance.optimizer.api.common.MetricValueSample;
-import org.apache.gravitino.maintenance.optimizer.api.monitor.MetricScope;
 import org.apache.gravitino.maintenance.optimizer.api.monitor.MetricsEvaluator;
 import org.apache.gravitino.maintenance.optimizer.common.OptimizerEnv;
 import org.apache.gravitino.maintenance.optimizer.common.conf.OptimizerConfig;
@@ -187,7 +187,7 @@ public class GravitinoMetricsEvaluator implements MetricsEvaluator {
 
   @Override
   public boolean evaluateMetrics(MetricSeries beforeSeries, MetricSeries afterSeries) {
-    MetricScope scope = validateAndGetScope(beforeSeries, afterSeries);
+    DataScope scope = validateAndGetScope(beforeSeries, afterSeries);
     if (metricRulesByScope.isEmpty()) {
       return true;
     }
@@ -290,13 +290,13 @@ public class GravitinoMetricsEvaluator implements MetricsEvaluator {
         .collect(Collectors.joining(", "));
   }
 
-  private static MetricScope validateAndGetScope(
+  private static DataScope validateAndGetScope(
       MetricSeries beforeSeries, MetricSeries afterSeries) {
     if (beforeSeries == null || afterSeries == null) {
       throw new IllegalArgumentException("beforeSeries and afterSeries must not be null");
     }
-    MetricScope beforeScope = beforeSeries.scope();
-    MetricScope afterScope = afterSeries.scope();
+    DataScope beforeScope = beforeSeries.scope();
+    DataScope afterScope = afterSeries.scope();
     boolean sameScope =
         beforeScope.type() == afterScope.type()
             && beforeScope.identifier().equals(afterScope.identifier())
@@ -381,7 +381,7 @@ public class GravitinoMetricsEvaluator implements MetricsEvaluator {
               + RuleScope.supportedValues());
     }
 
-    private static RuleScope fromMetricScopeType(MetricScope.Type type) {
+    private static RuleScope fromMetricScopeType(DataScope.Type type) {
       return switch (type) {
         case TABLE -> TABLE;
         case PARTITION -> TABLE;

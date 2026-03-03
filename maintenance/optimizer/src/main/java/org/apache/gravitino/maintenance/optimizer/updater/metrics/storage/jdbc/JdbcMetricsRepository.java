@@ -39,8 +39,8 @@ import java.util.Set;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.config.ConfigConstants;
+import org.apache.gravitino.maintenance.optimizer.api.common.DataScope;
 import org.apache.gravitino.maintenance.optimizer.api.common.MetricPoint;
-import org.apache.gravitino.maintenance.optimizer.api.monitor.MetricScope;
 import org.apache.gravitino.maintenance.optimizer.common.util.StatisticValueUtils;
 import org.apache.gravitino.maintenance.optimizer.recommender.util.PartitionUtils;
 import org.apache.gravitino.maintenance.optimizer.updater.metrics.storage.MetricsRepository;
@@ -243,8 +243,8 @@ public abstract class JdbcMetricsRepository implements MetricsRepository {
       for (MetricPoint metricPoint : metrics) {
         Preconditions.checkArgument(metricPoint != null, "metric point must not be null");
         Preconditions.checkArgument(
-            metricPoint.scope() == MetricPoint.Scope.TABLE
-                || metricPoint.scope() == MetricPoint.Scope.PARTITION,
+            metricPoint.scope() == DataScope.Type.TABLE
+                || metricPoint.scope() == DataScope.Type.PARTITION,
             "Unsupported scope %s for table/partition metrics",
             metricPoint.scope());
         String serializedMetricValue = StatisticValueUtils.toString(metricPoint.value());
@@ -292,7 +292,7 @@ public abstract class JdbcMetricsRepository implements MetricsRepository {
       for (MetricPoint metricPoint : metrics) {
         Preconditions.checkArgument(metricPoint != null, "metric point must not be null");
         Preconditions.checkArgument(
-            metricPoint.scope() == MetricPoint.Scope.JOB,
+            metricPoint.scope() == DataScope.Type.JOB,
             "Unsupported scope %s for job metrics",
             metricPoint.scope());
         String serializedMetricValue = StatisticValueUtils.toString(metricPoint.value());
@@ -322,7 +322,7 @@ public abstract class JdbcMetricsRepository implements MetricsRepository {
   }
 
   @Override
-  public List<MetricPoint> getMetrics(MetricScope scope, long fromSecs, long toSecs) {
+  public List<MetricPoint> getMetrics(DataScope scope, long fromSecs, long toSecs) {
     Preconditions.checkArgument(scope != null, "scope must not be null");
     validateTimeWindow(fromSecs, toSecs);
     switch (scope.type()) {
@@ -483,7 +483,7 @@ public abstract class JdbcMetricsRepository implements MetricsRepository {
     return result;
   }
 
-  private List<MetricPoint> getPartitionMetrics(MetricScope scope, long fromSecs, long toSecs) {
+  private List<MetricPoint> getPartitionMetrics(DataScope scope, long fromSecs, long toSecs) {
     Preconditions.checkArgument(
         scope.partition().isPresent(), "partition scope must contain partition path");
     NameIdentifier nameIdentifier = scope.identifier();

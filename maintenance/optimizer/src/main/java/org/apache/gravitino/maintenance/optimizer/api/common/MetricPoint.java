@@ -31,40 +31,19 @@ import org.apache.gravitino.stats.StatisticValue;
 @DeveloperApi
 public final class MetricPoint {
 
-  /** Metric scope. */
-  public enum Scope {
-    TABLE,
-    PARTITION,
-    JOB
-  }
-
-  private final NameIdentifier identifier;
-  private final Scope scope;
-  private final Optional<PartitionPath> partitionPath;
+  private final DataScope scope;
   private final String metricName;
   private final StatisticValue<?> value;
   private final long timestampSeconds;
 
   public MetricPoint(
-      NameIdentifier identifier,
-      Scope scope,
-      Optional<PartitionPath> partitionPath,
-      String metricName,
-      StatisticValue<?> value,
-      long timestampSeconds) {
-    Preconditions.checkArgument(identifier != null, "identifier must not be null");
+      DataScope scope, String metricName, StatisticValue<?> value, long timestampSeconds) {
     Preconditions.checkArgument(scope != null, "scope must not be null");
-    Preconditions.checkArgument(partitionPath != null, "partitionPath must not be null");
     Preconditions.checkArgument(StringUtils.isNotBlank(metricName), "metricName must not be blank");
     Preconditions.checkArgument(value != null, "value must not be null");
     Preconditions.checkArgument(timestampSeconds >= 0, "timestampSeconds must be non-negative");
-    Preconditions.checkArgument(
-        (scope == Scope.PARTITION) == partitionPath.isPresent(),
-        "partitionPath must be present only for PARTITION scope");
 
-    this.identifier = identifier;
     this.scope = scope;
-    this.partitionPath = partitionPath;
     this.metricName = metricName;
     this.value = value;
     this.timestampSeconds = timestampSeconds;
@@ -75,8 +54,7 @@ public final class MetricPoint {
       String metricName,
       StatisticValue<?> value,
       long timestampSeconds) {
-    return new MetricPoint(
-        identifier, Scope.TABLE, Optional.empty(), metricName, value, timestampSeconds);
+    return new MetricPoint(DataScope.forTable(identifier), metricName, value, timestampSeconds);
   }
 
   public static MetricPoint forPartition(
@@ -86,12 +64,7 @@ public final class MetricPoint {
       StatisticValue<?> value,
       long timestampSeconds) {
     return new MetricPoint(
-        identifier,
-        Scope.PARTITION,
-        Optional.of(partitionPath),
-        metricName,
-        value,
-        timestampSeconds);
+        DataScope.forPartition(identifier, partitionPath), metricName, value, timestampSeconds);
   }
 
   public static MetricPoint forJob(
@@ -99,20 +72,23 @@ public final class MetricPoint {
       String metricName,
       StatisticValue<?> value,
       long timestampSeconds) {
-    return new MetricPoint(
-        identifier, Scope.JOB, Optional.empty(), metricName, value, timestampSeconds);
+    return new MetricPoint(DataScope.forJob(identifier), metricName, value, timestampSeconds);
   }
 
   public NameIdentifier identifier() {
-    return identifier;
+    return scope.identifier();
   }
 
-  public Scope scope() {
+  public DataScope dataScope() {
     return scope;
   }
 
+  public DataScope.Type scope() {
+    return scope.type();
+  }
+
   public Optional<PartitionPath> partitionPath() {
-    return partitionPath;
+    return scope.partition();
   }
 
   public String metricName() {
@@ -137,27 +113,21 @@ public final class MetricPoint {
     }
     MetricPoint other = (MetricPoint) obj;
     return timestampSeconds == other.timestampSeconds
-        && Objects.equals(identifier, other.identifier)
-        && scope == other.scope
-        && Objects.equals(partitionPath, other.partitionPath)
+        && Objects.equals(scope, other.scope)
         && Objects.equals(metricName, other.metricName)
         && Objects.equals(value, other.value);
   }
 
   @Override
   public int hashCode() {
-    return Objects.hash(identifier, scope, partitionPath, metricName, value, timestampSeconds);
+    return Objects.hash(scope, metricName, value, timestampSeconds);
   }
 
   @Override
   public String toString() {
     return "MetricPoint{"
-        + "identifier="
-        + identifier
-        + ", scope="
+        + "scope="
         + scope
-        + ", partitionPath="
-        + partitionPath
         + ", metricName='"
         + metricName
         + '\''

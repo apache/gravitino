@@ -22,9 +22,9 @@ package org.apache.gravitino.maintenance.optimizer.monitor.metrics;
 import com.google.common.base.Preconditions;
 import java.util.List;
 import org.apache.gravitino.NameIdentifier;
+import org.apache.gravitino.maintenance.optimizer.api.common.DataScope;
 import org.apache.gravitino.maintenance.optimizer.api.common.MetricPoint;
 import org.apache.gravitino.maintenance.optimizer.api.common.PartitionPath;
-import org.apache.gravitino.maintenance.optimizer.api.monitor.MetricScope;
 import org.apache.gravitino.maintenance.optimizer.api.monitor.MetricsProvider;
 import org.apache.gravitino.maintenance.optimizer.common.OptimizerEnv;
 import org.apache.gravitino.maintenance.optimizer.updater.metrics.storage.MetricsRepository;
@@ -74,14 +74,14 @@ public class GravitinoMetricsProvider implements MetricsProvider {
   @Override
   public List<MetricPoint> jobMetrics(NameIdentifier jobIdentifier, long startTime, long endTime) {
     ensureInitialized();
-    return metricsRepository.getMetrics(MetricScope.forJob(jobIdentifier), startTime, endTime);
+    return metricsRepository.getMetrics(DataScope.forJob(jobIdentifier), startTime, endTime);
   }
 
   @Override
   public List<MetricPoint> tableMetrics(
       NameIdentifier tableIdentifier, long startTime, long endTime) {
     ensureInitialized();
-    return metricsRepository.getMetrics(MetricScope.forTable(tableIdentifier), startTime, endTime);
+    return metricsRepository.getMetrics(DataScope.forTable(tableIdentifier), startTime, endTime);
   }
 
   @Override
@@ -89,7 +89,7 @@ public class GravitinoMetricsProvider implements MetricsProvider {
       NameIdentifier tableIdentifier, PartitionPath partitionPath, long startTime, long endTime) {
     ensureInitialized();
     return metricsRepository.getMetrics(
-        MetricScope.forPartition(tableIdentifier, partitionPath), startTime, endTime);
+        DataScope.forPartition(tableIdentifier, partitionPath), startTime, endTime);
   }
 
   private void ensureInitialized() {

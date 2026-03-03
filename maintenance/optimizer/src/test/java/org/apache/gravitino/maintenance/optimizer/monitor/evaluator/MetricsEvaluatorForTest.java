@@ -20,8 +20,8 @@
 package org.apache.gravitino.maintenance.optimizer.monitor.evaluator;
 
 import java.util.concurrent.atomic.AtomicInteger;
+import org.apache.gravitino.maintenance.optimizer.api.common.DataScope;
 import org.apache.gravitino.maintenance.optimizer.api.common.MetricSeries;
-import org.apache.gravitino.maintenance.optimizer.api.monitor.MetricScope;
 import org.apache.gravitino.maintenance.optimizer.api.monitor.MetricsEvaluator;
 import org.apache.gravitino.maintenance.optimizer.monitor.job.TableJobRelationProviderForTest;
 
@@ -38,10 +38,10 @@ public class MetricsEvaluatorForTest implements MetricsEvaluator {
 
   @Override
   public boolean evaluateMetrics(MetricSeries beforeSeries, MetricSeries afterSeries) {
-    MetricScope scope = beforeSeries.scope();
+    DataScope scope = beforeSeries.scope();
     INVOCATIONS.incrementAndGet();
     if (FAIL_JOB2
-        && scope.type() == MetricScope.Type.JOB
+        && scope.type() == DataScope.Type.JOB
         && TableJobRelationProviderForTest.JOB2.equals(scope.identifier())) {
       return false;
     }

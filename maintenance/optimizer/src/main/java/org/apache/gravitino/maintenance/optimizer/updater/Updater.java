@@ -27,6 +27,7 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.stream.Collectors;
 import org.apache.gravitino.NameIdentifier;
+import org.apache.gravitino.maintenance.optimizer.api.common.DataScope;
 import org.apache.gravitino.maintenance.optimizer.api.common.MetricPoint;
 import org.apache.gravitino.maintenance.optimizer.api.common.PartitionPath;
 import org.apache.gravitino.maintenance.optimizer.api.common.StatisticEntry;
@@ -195,8 +196,8 @@ public class Updater implements AutoCloseable {
       if (hasTableMetricsCalculator) {
         List<MetricPoint> metrics =
             ((SupportsCalculateTableMetrics) calculator).calculateTableMetrics(nameIdentifier);
-        tableRecords += countMetricsByScope(metrics, MetricPoint.Scope.TABLE);
-        partitionRecords += countMetricsByScope(metrics, MetricPoint.Scope.PARTITION);
+        tableRecords += countMetricsByScope(metrics, DataScope.Type.TABLE);
+        partitionRecords += countMetricsByScope(metrics, DataScope.Type.PARTITION);
         LOG.info(
             "Updating table/partition metrics: calculator={}, identifier={}, count={}",
             statisticsCalculatorName,
@@ -208,7 +209,7 @@ public class Updater implements AutoCloseable {
       if (hasJobMetricsCalculator) {
         List<MetricPoint> metrics =
             ((SupportsCalculateJobMetrics) calculator).calculateJobMetrics(nameIdentifier);
-        jobRecords += countMetricsByScope(metrics, MetricPoint.Scope.JOB);
+        jobRecords += countMetricsByScope(metrics, DataScope.Type.JOB);
         LOG.info(
             "Updating job metrics: calculator={}, identifier={}, count={}",
             statisticsCalculatorName,
@@ -290,15 +291,15 @@ public class Updater implements AutoCloseable {
     if (hasTableMetricsCalculator) {
       List<MetricPoint> metrics =
           ((SupportsCalculateBulkTableMetrics) calculator).calculateAllTableMetrics();
-      tableRecords += countMetricsByScope(metrics, MetricPoint.Scope.TABLE);
-      partitionRecords += countMetricsByScope(metrics, MetricPoint.Scope.PARTITION);
+      tableRecords += countMetricsByScope(metrics, DataScope.Type.TABLE);
+      partitionRecords += countMetricsByScope(metrics, DataScope.Type.PARTITION);
       appendMetrics(pendingTableAndPartitionMetrics, metrics);
     }
 
     if (hasJobMetricsCalculator) {
       List<MetricPoint> metrics =
           ((SupportsCalculateBulkJobMetrics) calculator).calculateAllJobMetrics();
-      jobRecords += countMetricsByScope(metrics, MetricPoint.Scope.JOB);
+      jobRecords += countMetricsByScope(metrics, DataScope.Type.JOB);
       appendMetrics(pendingJobMetrics, metrics);
     }
 
@@ -450,7 +451,7 @@ public class Updater implements AutoCloseable {
         .sum();
   }
 
-  private long countMetricsByScope(List<MetricPoint> metrics, MetricPoint.Scope scope) {
+  private long countMetricsByScope(List<MetricPoint> metrics, DataScope.Type scope) {
     if (metrics == null || metrics.isEmpty()) {
       return 0;
     }

@@ -23,6 +23,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicInteger;
 import org.apache.gravitino.NameIdentifier;
+import org.apache.gravitino.maintenance.optimizer.api.common.DataScope;
 import org.apache.gravitino.maintenance.optimizer.api.common.MetricPoint;
 import org.apache.gravitino.maintenance.optimizer.api.common.PartitionPath;
 import org.apache.gravitino.maintenance.optimizer.api.monitor.MetricsProvider;
@@ -49,13 +50,13 @@ public class MetricsProviderForTest implements MetricsProvider {
   public List<MetricPoint> jobMetrics(NameIdentifier jobIdentifier, long startTime, long endTime) {
     if (TableJobRelationProviderForTest.JOB1.equals(jobIdentifier)) {
       return List.of(
-          metric(MetricPoint.Scope.JOB, jobIdentifier, null, 99, "duration", 10L),
-          metric(MetricPoint.Scope.JOB, jobIdentifier, null, 102, "duration", 20L));
+          metric(DataScope.Type.JOB, jobIdentifier, null, 99, "duration", 10L),
+          metric(DataScope.Type.JOB, jobIdentifier, null, 102, "duration", 20L));
     }
     if (TableJobRelationProviderForTest.JOB2.equals(jobIdentifier)) {
       return List.of(
-          metric(MetricPoint.Scope.JOB, jobIdentifier, null, 98, "duration", 30L),
-          metric(MetricPoint.Scope.JOB, jobIdentifier, null, 104, "duration", 40L));
+          metric(DataScope.Type.JOB, jobIdentifier, null, 98, "duration", 30L),
+          metric(DataScope.Type.JOB, jobIdentifier, null, 104, "duration", 40L));
     }
     return List.of();
   }
@@ -64,10 +65,10 @@ public class MetricsProviderForTest implements MetricsProvider {
   public List<MetricPoint> tableMetrics(
       NameIdentifier tableIdentifier, long startTime, long endTime) {
     List<MetricPoint> points = new ArrayList<>();
-    points.add(metric(MetricPoint.Scope.TABLE, tableIdentifier, null, 95, "row_count", 100L));
-    points.add(metric(MetricPoint.Scope.TABLE, tableIdentifier, null, 100, "row_count", 200L));
+    points.add(metric(DataScope.Type.TABLE, tableIdentifier, null, 95, "row_count", 100L));
+    points.add(metric(DataScope.Type.TABLE, tableIdentifier, null, 100, "row_count", 200L));
     if (INCLUDE_INVALID_SCOPE_METRIC) {
-      points.add(metric(MetricPoint.Scope.JOB, tableIdentifier, null, 96, "row_count", 999L));
+      points.add(metric(DataScope.Type.JOB, tableIdentifier, null, 96, "row_count", 999L));
     }
     return List.copyOf(points);
   }
@@ -78,9 +79,8 @@ public class MetricsProviderForTest implements MetricsProvider {
     PARTITION_METRICS_CALLS.incrementAndGet();
     LAST_PARTITION_PATH = partitionPath;
     return List.of(
-        metric(MetricPoint.Scope.PARTITION, tableIdentifier, partitionPath, 97, "row_count", 110L),
-        metric(
-            MetricPoint.Scope.PARTITION, tableIdentifier, partitionPath, 101, "row_count", 210L));
+        metric(DataScope.Type.PARTITION, tableIdentifier, partitionPath, 97, "row_count", 110L),
+        metric(DataScope.Type.PARTITION, tableIdentifier, partitionPath, 101, "row_count", 210L));
   }
 
   @Override
@@ -97,7 +97,7 @@ public class MetricsProviderForTest implements MetricsProvider {
   }
 
   private static MetricPoint metric(
-      MetricPoint.Scope scope,
+      DataScope.Type scope,
       NameIdentifier identifier,
       PartitionPath partitionPath,
       long timestamp,

@@ -23,6 +23,7 @@ import java.lang.reflect.Field;
 import java.util.List;
 import java.util.Map;
 import org.apache.gravitino.NameIdentifier;
+import org.apache.gravitino.maintenance.optimizer.api.common.DataScope;
 import org.apache.gravitino.maintenance.optimizer.api.common.MetricPoint;
 import org.apache.gravitino.maintenance.optimizer.api.common.PartitionEntry;
 import org.apache.gravitino.maintenance.optimizer.api.common.PartitionPath;
@@ -83,11 +84,11 @@ class TestGravitinoMetricsUpdater {
     List<MetricPoint> metrics = requestsCaptor.getValue();
     Assertions.assertEquals(2, metrics.size());
     Assertions.assertEquals(tableId, metrics.get(0).identifier());
-    Assertions.assertEquals(MetricPoint.Scope.TABLE, metrics.get(0).scope());
+    Assertions.assertEquals(DataScope.Type.TABLE, metrics.get(0).scope());
     Assertions.assertEquals(100L, metrics.get(0).timestampSeconds());
     Assertions.assertEquals(10L, ((Number) metrics.get(0).value().value()).longValue());
     Assertions.assertEquals(tableId, metrics.get(1).identifier());
-    Assertions.assertEquals(MetricPoint.Scope.PARTITION, metrics.get(1).scope());
+    Assertions.assertEquals(DataScope.Type.PARTITION, metrics.get(1).scope());
     Assertions.assertEquals(110L, metrics.get(1).timestampSeconds());
     Assertions.assertEquals(9L, ((Number) metrics.get(1).value().value()).longValue());
   }
@@ -110,7 +111,7 @@ class TestGravitinoMetricsUpdater {
     List<MetricPoint> metrics = requestsCaptor.getValue();
     Assertions.assertEquals(1, metrics.size());
     Assertions.assertEquals(jobId, metrics.get(0).identifier());
-    Assertions.assertEquals(MetricPoint.Scope.JOB, metrics.get(0).scope());
+    Assertions.assertEquals(DataScope.Type.JOB, metrics.get(0).scope());
     Assertions.assertEquals(200L, metrics.get(0).timestampSeconds());
     Assertions.assertEquals(20L, ((Number) metrics.get(0).value().value()).longValue());
   }

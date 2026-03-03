@@ -21,6 +21,7 @@ package org.apache.gravitino.maintenance.optimizer.updater.metrics;
 
 import com.google.common.base.Preconditions;
 import java.util.List;
+import org.apache.gravitino.maintenance.optimizer.api.common.DataScope;
 import org.apache.gravitino.maintenance.optimizer.api.common.MetricPoint;
 import org.apache.gravitino.maintenance.optimizer.api.updater.MetricsUpdater;
 import org.apache.gravitino.maintenance.optimizer.common.OptimizerEnv;
@@ -49,14 +50,14 @@ public class GravitinoMetricsUpdater implements MetricsUpdater {
   public void updateTableAndPartitionMetrics(List<MetricPoint> metrics) {
     ensureInitialized();
     validateScopes(
-        metrics, List.of(MetricPoint.Scope.TABLE, MetricPoint.Scope.PARTITION), "table/partition");
+        metrics, List.of(DataScope.Type.TABLE, DataScope.Type.PARTITION), "table/partition");
     metricsStorage.storeTableAndPartitionMetrics(metrics);
   }
 
   @Override
   public void updateJobMetrics(List<MetricPoint> metrics) {
     ensureInitialized();
-    validateScopes(metrics, List.of(MetricPoint.Scope.JOB), "job");
+    validateScopes(metrics, List.of(DataScope.Type.JOB), "job");
     metricsStorage.storeJobMetrics(metrics);
   }
 
@@ -74,7 +75,7 @@ public class GravitinoMetricsUpdater implements MetricsUpdater {
   }
 
   private void validateScopes(
-      List<MetricPoint> metrics, List<MetricPoint.Scope> allowedScopes, String updateType) {
+      List<MetricPoint> metrics, List<DataScope.Type> allowedScopes, String updateType) {
     Preconditions.checkArgument(metrics != null, "metrics must not be null");
     for (MetricPoint metric : metrics) {
       Preconditions.checkArgument(metric != null, "metric must not be null");

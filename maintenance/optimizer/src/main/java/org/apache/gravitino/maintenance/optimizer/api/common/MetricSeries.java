@@ -29,7 +29,6 @@ import java.util.Map;
 import java.util.Optional;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.annotation.DeveloperApi;
-import org.apache.gravitino.maintenance.optimizer.api.monitor.MetricScope;
 import org.apache.gravitino.maintenance.optimizer.common.util.MetricScopePointValidator;
 
 /**
@@ -40,11 +39,10 @@ import org.apache.gravitino.maintenance.optimizer.common.util.MetricScopePointVa
 @DeveloperApi
 public final class MetricSeries {
 
-  private final MetricScope scope;
+  private final DataScope scope;
   private final Map<String, List<MetricValueSample>> samplesByMetricName;
 
-  private MetricSeries(
-      MetricScope scope, Map<String, List<MetricValueSample>> samplesByMetricName) {
+  private MetricSeries(DataScope scope, Map<String, List<MetricValueSample>> samplesByMetricName) {
     Preconditions.checkArgument(scope != null, "scope must not be null");
     Preconditions.checkArgument(
         samplesByMetricName != null, "samplesByMetricName must not be null");
@@ -53,7 +51,7 @@ public final class MetricSeries {
   }
 
   /** Build one scope series from metric points and validate each point belongs to the scope. */
-  public static MetricSeries fromPoints(MetricScope scope, List<MetricPoint> points) {
+  public static MetricSeries fromPoints(DataScope scope, List<MetricPoint> points) {
     Preconditions.checkArgument(scope != null, "scope must not be null");
     if (points == null || points.isEmpty()) {
       return new MetricSeries(scope, Collections.emptyMap());
@@ -79,7 +77,7 @@ public final class MetricSeries {
 
   /** Build one scope series from grouped samples. */
   public static MetricSeries ofSamples(
-      MetricScope scope, Map<String, List<MetricValueSample>> samplesByMetricName) {
+      DataScope scope, Map<String, List<MetricValueSample>> samplesByMetricName) {
     Preconditions.checkArgument(scope != null, "scope must not be null");
     if (samplesByMetricName == null || samplesByMetricName.isEmpty()) {
       return new MetricSeries(scope, Collections.emptyMap());
@@ -108,7 +106,7 @@ public final class MetricSeries {
     return new MetricSeries(scope, Collections.unmodifiableMap(immutableMap));
   }
 
-  public MetricScope scope() {
+  public DataScope scope() {
     return scope;
   }
 

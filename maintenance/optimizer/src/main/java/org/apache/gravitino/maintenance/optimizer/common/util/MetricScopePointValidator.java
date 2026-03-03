@@ -21,8 +21,8 @@ package org.apache.gravitino.maintenance.optimizer.common.util;
 
 import com.google.common.base.Preconditions;
 import java.util.Optional;
+import org.apache.gravitino.maintenance.optimizer.api.common.DataScope;
 import org.apache.gravitino.maintenance.optimizer.api.common.MetricPoint;
-import org.apache.gravitino.maintenance.optimizer.api.monitor.MetricScope;
 
 /** Validator for checking whether one metric point belongs to a target metric scope. */
 public final class MetricScopePointValidator {
@@ -36,7 +36,7 @@ public final class MetricScopePointValidator {
    * @param metricPoint metric point to validate
    * @return empty if valid; otherwise one invalid reason
    */
-  public static Optional<String> invalidReason(MetricScope scope, MetricPoint metricPoint) {
+  public static Optional<String> invalidReason(DataScope scope, MetricPoint metricPoint) {
     Preconditions.checkArgument(scope != null, "scope must not be null");
     if (metricPoint == null) {
       return Optional.of("metric point is null");
@@ -48,7 +48,7 @@ public final class MetricScopePointValidator {
 
     switch (scope.type()) {
       case TABLE:
-        if (metricPoint.scope() != MetricPoint.Scope.TABLE) {
+        if (metricPoint.scope() != DataScope.Type.TABLE) {
           return Optional.of("scope mismatch");
         }
         if (metricPoint.partitionPath().isPresent()) {
@@ -56,7 +56,7 @@ public final class MetricScopePointValidator {
         }
         return Optional.empty();
       case PARTITION:
-        if (metricPoint.scope() != MetricPoint.Scope.PARTITION) {
+        if (metricPoint.scope() != DataScope.Type.PARTITION) {
           return Optional.of("scope mismatch");
         }
         if (!scope.partition().isPresent()) {
@@ -70,7 +70,7 @@ public final class MetricScopePointValidator {
         }
         return Optional.empty();
       case JOB:
-        if (metricPoint.scope() != MetricPoint.Scope.JOB) {
+        if (metricPoint.scope() != DataScope.Type.JOB) {
           return Optional.of("scope mismatch");
         }
         if (metricPoint.partitionPath().isPresent()) {

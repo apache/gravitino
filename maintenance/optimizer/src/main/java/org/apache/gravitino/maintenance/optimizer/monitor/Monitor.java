@@ -28,11 +28,11 @@ import java.util.Map;
 import java.util.Optional;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.gravitino.NameIdentifier;
+import org.apache.gravitino.maintenance.optimizer.api.common.DataScope;
 import org.apache.gravitino.maintenance.optimizer.api.common.MetricPoint;
 import org.apache.gravitino.maintenance.optimizer.api.common.MetricSeries;
 import org.apache.gravitino.maintenance.optimizer.api.common.PartitionPath;
 import org.apache.gravitino.maintenance.optimizer.api.monitor.EvaluationResult;
-import org.apache.gravitino.maintenance.optimizer.api.monitor.MetricScope;
 import org.apache.gravitino.maintenance.optimizer.api.monitor.MetricsEvaluator;
 import org.apache.gravitino.maintenance.optimizer.api.monitor.MetricsProvider;
 import org.apache.gravitino.maintenance.optimizer.api.monitor.MonitorCallback;
@@ -178,10 +178,10 @@ public class Monitor implements AutoCloseable {
       long actionTimeSeconds,
       long rangeSeconds,
       Optional<PartitionPath> partitionPath) {
-    MetricScope scope =
+    DataScope scope =
         partitionPath
-            .map(path -> MetricScope.forPartition(tableIdentifier, path))
-            .orElseGet(() -> MetricScope.forTable(tableIdentifier));
+            .map(path -> DataScope.forPartition(tableIdentifier, path))
+            .orElseGet(() -> DataScope.forTable(tableIdentifier));
     Pair<Long, Long> timeRange = timeRange(actionTimeSeconds, rangeSeconds);
     List<MetricPoint> metrics =
         partitionPath
@@ -237,7 +237,7 @@ public class Monitor implements AutoCloseable {
       long actionTimeSeconds,
       long rangeSeconds) {
     Pair<Long, Long> timeRange = timeRange(actionTimeSeconds, rangeSeconds);
-    MetricScope scope = MetricScope.forJob(jobIdentifier);
+    DataScope scope = DataScope.forJob(jobIdentifier);
     List<MetricPoint> metrics =
         metricsProvider.jobMetrics(jobIdentifier, timeRange.getLeft(), timeRange.getRight());
     List<MetricPoint> filteredMetrics = filterMetricsByScope(metrics, scope);
@@ -317,7 +317,7 @@ public class Monitor implements AutoCloseable {
     return result;
   }
 
-  private List<MetricPoint> filterMetricsByScope(List<MetricPoint> metrics, MetricScope scope) {
+  private List<MetricPoint> filterMetricsByScope(List<MetricPoint> metrics, DataScope scope) {
     if (metrics == null || metrics.isEmpty()) {
       return List.of();
     }

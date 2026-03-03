@@ -23,7 +23,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import org.apache.gravitino.NameIdentifier;
-import org.apache.gravitino.maintenance.optimizer.api.monitor.MetricScope;
 import org.apache.gravitino.maintenance.optimizer.common.PartitionEntryImpl;
 import org.apache.gravitino.stats.StatisticValues;
 import org.junit.jupiter.api.Assertions;
@@ -34,7 +33,7 @@ class TestMetricSeries {
   @Test
   void testOfSamplesMergesKeysAfterNormalization() {
     NameIdentifier identifier = NameIdentifier.parse("catalog.db.table");
-    MetricScope scope = MetricScope.forTable(identifier);
+    DataScope scope = DataScope.forTable(identifier);
     MetricSeries series =
         MetricSeries.ofSamples(
             scope,
@@ -56,7 +55,7 @@ class TestMetricSeries {
   @Test
   void testFromPointsGroupsAndNormalizesMetricName() {
     NameIdentifier identifier = NameIdentifier.parse("catalog.db.table");
-    MetricScope scope = MetricScope.forTable(identifier);
+    DataScope scope = DataScope.forTable(identifier);
     List<MetricPoint> points =
         List.of(
             MetricPoint.forTable(identifier, "Row_Count", StatisticValues.longValue(2L), 101L),
@@ -78,7 +77,7 @@ class TestMetricSeries {
   void testFromPointsRejectsIdentifierMismatch() {
     NameIdentifier scopeIdentifier = NameIdentifier.parse("catalog.db.table");
     NameIdentifier metricIdentifier = NameIdentifier.parse("catalog.db.other_table");
-    MetricScope scope = MetricScope.forTable(scopeIdentifier);
+    DataScope scope = DataScope.forTable(scopeIdentifier);
     List<MetricPoint> points =
         List.of(
             MetricPoint.forTable(
@@ -95,7 +94,7 @@ class TestMetricSeries {
         PartitionPath.of(List.of(new PartitionEntryImpl("dt", "2026-03-02")));
     PartitionPath metricPartition =
         PartitionPath.of(List.of(new PartitionEntryImpl("dt", "2026-03-01")));
-    MetricScope scope = MetricScope.forPartition(identifier, scopePartition);
+    DataScope scope = DataScope.forPartition(identifier, scopePartition);
     List<MetricPoint> points =
         List.of(
             MetricPoint.forPartition(

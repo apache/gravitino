@@ -27,10 +27,10 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import org.apache.gravitino.NameIdentifier;
+import org.apache.gravitino.maintenance.optimizer.api.common.DataScope;
 import org.apache.gravitino.maintenance.optimizer.api.common.MetricPoint;
 import org.apache.gravitino.maintenance.optimizer.api.common.PartitionEntry;
 import org.apache.gravitino.maintenance.optimizer.api.common.PartitionPath;
-import org.apache.gravitino.maintenance.optimizer.api.monitor.MetricScope;
 import org.apache.gravitino.maintenance.optimizer.common.PartitionEntryImpl;
 import org.apache.gravitino.maintenance.optimizer.updater.metrics.storage.jdbc.GenericJdbcMetricsRepository;
 import org.apache.gravitino.stats.StatisticValue;
@@ -314,14 +314,14 @@ public abstract class BaseGenericJdbcMetricsRepositoryTest {
   protected Map<String, List<MetricRecord>> getTableMetrics(
       NameIdentifier nameIdentifier, long fromSecs, long toSecs) {
     return convertToMetricRecords(
-        storage.getMetrics(MetricScope.forTable(nameIdentifier), fromSecs, toSecs));
+        storage.getMetrics(DataScope.forTable(nameIdentifier), fromSecs, toSecs));
   }
 
   protected Map<String, List<MetricRecord>> getPartitionMetrics(
       NameIdentifier nameIdentifier, String partition, long fromSecs, long toSecs) {
     return convertToMetricRecords(
         storage.getMetrics(
-            MetricScope.forPartition(nameIdentifier, parsePartitionPath(partition)),
+            DataScope.forPartition(nameIdentifier, parsePartitionPath(partition)),
             fromSecs,
             toSecs));
   }
@@ -329,7 +329,7 @@ public abstract class BaseGenericJdbcMetricsRepositoryTest {
   protected Map<String, List<MetricRecord>> getJobMetrics(
       NameIdentifier nameIdentifier, long fromSecs, long toSecs) {
     return convertToMetricRecords(
-        storage.getMetrics(MetricScope.forJob(nameIdentifier), fromSecs, toSecs));
+        storage.getMetrics(DataScope.forJob(nameIdentifier), fromSecs, toSecs));
   }
 
   protected void storeTableMetric(

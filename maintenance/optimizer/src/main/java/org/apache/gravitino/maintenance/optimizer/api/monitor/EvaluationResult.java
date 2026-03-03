@@ -21,13 +21,14 @@ package org.apache.gravitino.maintenance.optimizer.api.monitor;
 
 import com.google.common.base.Preconditions;
 import org.apache.gravitino.annotation.DeveloperApi;
+import org.apache.gravitino.maintenance.optimizer.api.common.DataScope;
 import org.apache.gravitino.maintenance.optimizer.api.common.MetricSeries;
 
 /** Immutable evaluation result passed to monitor callbacks. */
 @DeveloperApi
 public class EvaluationResult {
 
-  private final MetricScope scope;
+  private final DataScope scope;
   private final boolean evaluation;
   private final MetricSeries beforeSeries;
   private final MetricSeries afterSeries;
@@ -47,7 +48,7 @@ public class EvaluationResult {
    * @param evaluatorName evaluator implementation name
    */
   public EvaluationResult(
-      MetricScope scope,
+      DataScope scope,
       boolean evaluation,
       MetricSeries beforeSeries,
       MetricSeries afterSeries,
@@ -75,7 +76,7 @@ public class EvaluationResult {
   /**
    * @return evaluated scope (table/partition/job).
    */
-  public MetricScope scope() {
+  public DataScope scope() {
     return scope;
   }
 
@@ -121,7 +122,7 @@ public class EvaluationResult {
     return evaluatorName;
   }
 
-  private static boolean sameScope(MetricScope left, MetricScope right) {
+  private static boolean sameScope(DataScope left, DataScope right) {
     return left.type() == right.type()
         && left.identifier().equals(right.identifier())
         && left.partition().equals(right.partition());

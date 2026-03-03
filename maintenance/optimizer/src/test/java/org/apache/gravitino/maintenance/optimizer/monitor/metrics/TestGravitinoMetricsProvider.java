@@ -23,6 +23,7 @@ import java.nio.file.Path;
 import java.util.List;
 import java.util.Map;
 import org.apache.gravitino.NameIdentifier;
+import org.apache.gravitino.maintenance.optimizer.api.common.DataScope;
 import org.apache.gravitino.maintenance.optimizer.api.common.MetricPoint;
 import org.apache.gravitino.maintenance.optimizer.api.common.PartitionPath;
 import org.apache.gravitino.maintenance.optimizer.common.OptimizerEnv;
@@ -85,7 +86,7 @@ public class TestGravitinoMetricsProvider {
       List<MetricPoint> partitionMetrics =
           provider.partitionMetrics(table, partitionPath, 0L, 200L);
       Assertions.assertEquals(1, partitionMetrics.size());
-      Assertions.assertEquals(MetricPoint.Scope.PARTITION, partitionMetrics.get(0).scope());
+      Assertions.assertEquals(DataScope.Type.PARTITION, partitionMetrics.get(0).scope());
 
       List<MetricPoint> jobMetrics = provider.jobMetrics(job, 0L, 200L);
       Assertions.assertEquals(1, jobMetrics.size());
