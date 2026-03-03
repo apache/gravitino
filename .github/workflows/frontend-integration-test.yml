@@ -42,10 +42,10 @@ jobs:
               - meta/**
               - server-common/**
               - web-v2/**
-              - **/*.kts
-              - **/*.py
-              - **/*.properties
-              - **/*.sh
+              - '**/*.kts'
+              - '**/*.py'
+              - '**/*.properties'
+              - '**/*.sh'
               - build.gradle.kts
               - gradle.properties
               - gradlew

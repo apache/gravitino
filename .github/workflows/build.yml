@@ -143,7 +143,7 @@ jobs:
 
       - name: Build with Gradle (skip mcp-server tests)
         if: needs.changes.outputs.mcp_server_changes != 'true'
-        run: ./gradlew build -PskipITs -PskipDockerTests=false -x :clients:client-python:build -x :mcp-server:build -x :mcp-server:test -x :mcp-server:pylint -x :web-v2:build -x :web-v2:test
+        run: ./gradlew build -PskipITs -PskipDockerTests=false -x :clients:client-python:build -x :mcp-server:build -x :mcp-server:test -x :mcp-server:pylint -x :web-v2:web:build
 
       - name: Release with Gradle
         run: ./gradlew clean && ./gradlew release -x test --rerun-tasks
