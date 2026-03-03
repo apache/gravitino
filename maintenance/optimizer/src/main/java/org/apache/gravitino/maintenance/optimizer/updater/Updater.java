@@ -20,6 +20,7 @@
 package org.apache.gravitino.maintenance.optimizer.updater;
 
 import com.google.common.annotations.VisibleForTesting;
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
 import java.util.Locale;
@@ -65,6 +66,7 @@ import org.slf4j.LoggerFactory;
  */
 public class Updater implements AutoCloseable {
   private static final Logger LOG = LoggerFactory.getLogger(Updater.class);
+  private static final int METRICS_FLUSH_THRESHOLD = 10_000;
 
   private StatisticsUpdater statisticsUpdater;
   private MetricsUpdater metricsUpdater;
@@ -187,6 +189,7 @@ public class Updater implements AutoCloseable {
     long tableRecords = 0;
     long partitionRecords = 0;
     long jobRecords = 0;
+    List<MetricPoint> pendingMetrics = new ArrayList<>();
 
     for (NameIdentifier nameIdentifier : nameIdentifiers) {
       if (hasTableMetricsCalculator) {
@@ -199,7 +202,7 @@ public class Updater implements AutoCloseable {
             statisticsCalculatorName,
             nameIdentifier,
             metrics == null ? 0 : metrics.size());
-        updateMetrics(metrics);
+        appendAndFlushMetrics(pendingMetrics, metrics);
       }
 
       if (hasJobMetricsCalculator) {
@@ -211,9 +214,11 @@ public class Updater implements AutoCloseable {
             statisticsCalculatorName,
             nameIdentifier,
             metrics == null ? 0 : metrics.size());
-        updateMetrics(metrics);
+        appendAndFlushMetrics(pendingMetrics, metrics);
       }
     }
+
+    flushPendingMetrics(pendingMetrics);
 
     System.out.println(
         String.format(
@@ -278,21 +283,24 @@ public class Updater implements AutoCloseable {
     long tableRecords = 0;
     long partitionRecords = 0;
     long jobRecords = 0;
+    List<MetricPoint> pendingMetrics = new ArrayList<>();
 
     if (hasTableMetricsCalculator) {
       List<MetricPoint> metrics =
           ((SupportsCalculateBulkTableMetrics) calculator).calculateAllTableMetrics();
       tableRecords += countMetricsByScope(metrics, MetricPoint.Scope.TABLE);
       partitionRecords += countMetricsByScope(metrics, MetricPoint.Scope.PARTITION);
-      updateMetrics(metrics);
+      appendAndFlushMetrics(pendingMetrics, metrics);
     }
 
     if (hasJobMetricsCalculator) {
       List<MetricPoint> metrics =
           ((SupportsCalculateBulkJobMetrics) calculator).calculateAllJobMetrics();
       jobRecords += countMetricsByScope(metrics, MetricPoint.Scope.JOB);
-      updateMetrics(metrics);
+      appendAndFlushMetrics(pendingMetrics, metrics);
     }
+
+    flushPendingMetrics(pendingMetrics);
 
     System.out.println(
         String.format(
@@ -340,6 +348,27 @@ public class Updater implements AutoCloseable {
       return;
     }
     metricsUpdater.updateMetrics(metrics);
+  }
+
+  private void appendAndFlushMetrics(
+      List<MetricPoint> pendingMetrics, List<MetricPoint> metricsToAppend) {
+    if (metricsToAppend == null || metricsToAppend.isEmpty()) {
+      return;
+    }
+
+    pendingMetrics.addAll(metricsToAppend);
+    if (pendingMetrics.size() >= METRICS_FLUSH_THRESHOLD) {
+      flushPendingMetrics(pendingMetrics);
+    }
+  }
+
+  private void flushPendingMetrics(List<MetricPoint> pendingMetrics) {
+    if (pendingMetrics.isEmpty()) {
+      return;
+    }
+
+    updateMetrics(List.copyOf(pendingMetrics));
+    pendingMetrics.clear();
   }
 
   private String summarize(List<StatisticEntry<?>> statistics) {

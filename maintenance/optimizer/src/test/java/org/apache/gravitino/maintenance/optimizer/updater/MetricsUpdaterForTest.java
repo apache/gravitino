@@ -32,6 +32,7 @@ public class MetricsUpdaterForTest implements MetricsUpdater {
   public static final String NAME = "test-metrics-updater";
   private static final List<MetricsUpdaterForTest> INSTANCES =
       Collections.synchronizedList(new ArrayList<>());
+  private final AtomicInteger updateCalls = new AtomicInteger();
   private final AtomicInteger tableUpdates = new AtomicInteger();
   private final AtomicInteger jobUpdates = new AtomicInteger();
   private final AtomicInteger closeCalls = new AtomicInteger();
@@ -51,6 +52,10 @@ public class MetricsUpdaterForTest implements MetricsUpdater {
 
   public int tableUpdates() {
     return tableUpdates.get();
+  }
+
+  public int updateCalls() {
+    return updateCalls.get();
   }
 
   public int jobUpdates() {
@@ -75,6 +80,7 @@ public class MetricsUpdaterForTest implements MetricsUpdater {
 
   @Override
   public void updateMetrics(List<MetricPoint> metrics) {
+    updateCalls.incrementAndGet();
     int tableCount =
         metrics == null
             ? 0

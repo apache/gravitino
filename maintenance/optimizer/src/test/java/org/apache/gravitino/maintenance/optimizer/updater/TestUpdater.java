@@ -86,6 +86,26 @@ public class TestUpdater {
   }
 
   @Test
+  void testUpdateMetricsBatchAcrossIdentifiers() {
+    OptimizerEnv optimizerEnv =
+        mockOptimizerEnv(StatisticsUpdaterForTest.NAME, MetricsUpdaterForTest.NAME);
+    List<NameIdentifier> identifiers =
+        List.of(
+            NameIdentifier.of("catalog", "schema", "table1"),
+            NameIdentifier.of("catalog", "schema", "table2"));
+
+    createUpdater(optimizerEnv)
+        .update(StatisticsCalculatorForTest.NAME, identifiers, UpdateType.METRICS);
+
+    MetricsUpdaterForTest metricsUpdater = selectMetricsUpdater();
+    assertNotNull(metricsUpdater);
+    assertEquals(1, metricsUpdater.updateCalls());
+    assertEquals(1, metricsUpdater.tableUpdates());
+    assertEquals(1, metricsUpdater.jobUpdates());
+    assertEquals(8, metricsUpdater.lastMetrics().size());
+  }
+
+  @Test
   void testUpdateAllStatistics() {
     OptimizerEnv optimizerEnv =
         mockOptimizerEnv(StatisticsUpdaterForTest.NAME, MetricsUpdaterForTest.NAME);
