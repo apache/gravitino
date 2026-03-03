@@ -405,26 +405,58 @@ public class TestLancePartitionStatisticStorage {
     LancePartitionStatisticStorage storage =
         (LancePartitionStatisticStorage) factory.create(properties);
 
-    // Generate 101 statistics which exceeds the default limit of 100
-    int count = 101;
-    Map<MetadataObject, Map<String, Map<String, StatisticValue<?>>>> originData =
-        generateData(metadataObject, count, 1);
-    Map<MetadataObject, List<PartitionStatisticsUpdate>> statisticsToUpdate =
-        convertData(originData);
+    try {
+      // Generate 101 statistics which exceeds the default limit of 100
+      int count = 101;
+      Map<MetadataObject, Map<String, Map<String, StatisticValue<?>>>> originData =
+          generateData(metadataObject, count, 1);
+      Map<MetadataObject, List<PartitionStatisticsUpdate>> statisticsToUpdate =
+          convertData(originData);
 
-    List<MetadataObjectStatisticsUpdate> objectUpdates = Lists.newArrayList();
-    for (Map.Entry<MetadataObject, List<PartitionStatisticsUpdate>> entry :
-        statisticsToUpdate.entrySet()) {
-      objectUpdates.add(MetadataObjectStatisticsUpdate.of(entry.getKey(), entry.getValue()));
+      List<MetadataObjectStatisticsUpdate> objectUpdates = Lists.newArrayList();
+      for (Map.Entry<MetadataObject, List<PartitionStatisticsUpdate>> entry :
+          statisticsToUpdate.entrySet()) {
+        objectUpdates.add(MetadataObjectStatisticsUpdate.of(entry.getKey(), entry.getValue()));
+      }
+
+      IllegalArgumentException exception =
+          Assertions.assertThrows(
+              IllegalArgumentException.class,
+              () -> storage.updateStatistics(metalakeName, objectUpdates));
+      Assertions.assertTrue(exception.getMessage().contains("exceeds the maximum limit"));
+    } finally {
+      FileUtils.deleteDirectory(new File(location + "/" + tableEntity.id() + ".lance"));
+      storage.close();
     }
+  }
 
-    IllegalArgumentException exception =
-        Assertions.assertThrows(
-            IllegalArgumentException.class,
-            () -> storage.updateStatistics(metalakeName, objectUpdates));
-    Assertions.assertTrue(exception.getMessage().contains("exceeds the maximum limit"));
+  @Test
+  public void testInvalidMaxStatisticsPerUpdateConfiguration() throws Exception {
+    String location = Files.createTempDirectory("lance_stats_invalid_config_test").toString();
 
-    storage.close();
+    try {
+      // Test that zero value throws an exception
+      Map<String, String> properties = Maps.newHashMap();
+      properties.put("location", location);
+      properties.put("maxStatisticsPerUpdate", "0");
+
+      IllegalArgumentException exception =
+          Assertions.assertThrows(
+              IllegalArgumentException.class, () -> new LancePartitionStatisticStorage(properties));
+      Assertions.assertTrue(
+          exception.getMessage().contains("maxStatisticsPerUpdate must be positive"));
+
+      // Test that negative value throws an exception
+      properties.put("maxStatisticsPerUpdate", "-1");
+
+      exception =
+          Assertions.assertThrows(
+              IllegalArgumentException.class, () -> new LancePartitionStatisticStorage(properties));
+      Assertions.assertTrue(
+          exception.getMessage().contains("maxStatisticsPerUpdate must be positive"));
+    } finally {
+      FileUtils.deleteDirectory(new File(location));
+    }
   }
 
   private Map<MetadataObject, Map<String, Map<String, StatisticValue<?>>>> generateData(

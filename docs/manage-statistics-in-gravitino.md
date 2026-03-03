@@ -317,7 +317,7 @@ For Lance remote storage, you can refer to the document [here](https://lancedb.g
 | `gravitino.stats.partition.storageOption.datasetCacheSize`           | size of dataset cache for Lance                            | `0`, It means we don't use the cache | No       | 1.0.0         |
 | `gravitino.stats.partition.storageOption.metadataFileCacheSizeBytes` | The Lance's metadata file cache size                       | `102400`                             | No       | 1.0.0         |
 | `gravitino.stats.partition.storageOption.indexCacheSizeBytes`        | The Lance's index cache size                               | `102400`                             | No       | 1.0.0         |
-| `gravitino.stats.partition.storageOption.maxStatisticsPerUpdate`     | Maximum number of statistics allowed per update operation  | `100`                                | No       | 1.0.0         |
+| `gravitino.stats.partition.storageOption.maxStatisticsPerUpdate`     | Maximum number of statistics allowed per update operation  | `100`                                | No       | 1.2.0         |
 
 If you have many tables with a small number of partitions, you should set a smaller metadataFileCacheSizeBytes and indexCacheSizeBytes.
 
