@@ -1008,7 +1008,8 @@ public class CatalogMysqlIT extends BaseIT {
           Indexes.unique("u3_key", new String[][] {{"col_5"}, {"col_4"}}),
           Indexes.unique("u4_key", new String[][] {{"col_2"}, {"col_3"}, {"col_4"}}),
           Indexes.unique("u5_key", new String[][] {{"col_3"}, {"col_2"}, {"col_4"}}),
-          Indexes.unique("u6_key", new String[][] {{"col_3"}, {"col_4"}, {"col_1"}, {"col_2"}}),
+          Indexes.unique(
+              "u6_key", new String[][] {{"col_3"}, {"col_4"}, {"col_1"}, {"col_2"}}, Map.of()),
         };
 
     NameIdentifier tableIdentifier = NameIdentifier.of(schemaName, tableName);

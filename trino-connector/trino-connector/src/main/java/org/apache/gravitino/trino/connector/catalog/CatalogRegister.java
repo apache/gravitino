@@ -23,7 +23,6 @@ import static org.apache.gravitino.trino.connector.GravitinoConfig.GRAVITINO_DYN
 
 import io.trino.jdbc.TrinoDriver;
 import io.trino.spi.TrinoException;
-import io.trino.spi.connector.ConnectorContext;
 import java.io.File;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -47,60 +46,13 @@ public class CatalogRegister {
 
   private static final Logger LOG = LoggerFactory.getLogger(CatalogRegister.class);
 
-  private static final int MIN_SUPPORT_TRINO_SPI_VERSION = 435;
-  private static final int MAX_SUPPORT_TRINO_SPI_VERSION = 439;
-  private static final int MIN_SUPPORT_CATALOG_NAME_WITH_METALAKE_TRINO_SPI_VERSION = 446;
   private static final int EXECUTE_QUERY_MAX_RETRIES = 6;
   private static final int EXECUTE_QUERY_BACKOFF_TIME_SECOND = 5;
 
-  private String trinoVersion;
   private Connection connection;
-  private boolean isCoordinator;
   private boolean isStarted = false;
   private String catalogStoreDirectory;
   private GravitinoConfig config;
-
-  private void checkTrinoSpiVersion(ConnectorContext context) {
-    this.trinoVersion = context.getSpiVersion();
-
-    int version = Integer.parseInt(trinoVersion);
-
-    if (version < MIN_SUPPORT_TRINO_SPI_VERSION || version > MAX_SUPPORT_TRINO_SPI_VERSION) {
-      Boolean skipTrinoVersionValidation = config.isSkipTrinoVersionValidation();
-      if (!skipTrinoVersionValidation) {
-        String errmsg =
-            String.format(
-                "Unsupported Trino-%s version. The Supported version for the Gravitino-Trino-connector from Trino-%d to Trino-%d."
-                    + "Maybe you can set gravitino.trino.skip-version-validation to skip version validation.",
-                trinoVersion, MIN_SUPPORT_TRINO_SPI_VERSION, MAX_SUPPORT_TRINO_SPI_VERSION);
-        throw new TrinoException(GravitinoErrorCode.GRAVITINO_UNSUPPORTED_TRINO_VERSION, errmsg);
-      } else {
-        LOG.warn(
-            "The version %s has not undergone thorough testing with Gravitino, there may be compatiablity problem.",
-            trinoVersion);
-      }
-    }
-
-    isCoordinator = context.getNodeManager().getCurrentNode().isCoordinator();
-  }
-
-  private void checkSupportCatalogNameWithMetalake(
-      ConnectorContext context, GravitinoConfig config) {
-    if (!config.singleMetalakeMode()) {
-      int version = Integer.parseInt(context.getSpiVersion());
-      if (version < MIN_SUPPORT_CATALOG_NAME_WITH_METALAKE_TRINO_SPI_VERSION) {
-        LOG.warn(
-            "Trino-{} does not support catalog name with dots, The minimal required version is Trino-{}."
-                + "Some errors may occur when using the USE <CATALOG>.<SCHEMA> statement in Trino",
-            trinoVersion,
-            MIN_SUPPORT_CATALOG_NAME_WITH_METALAKE_TRINO_SPI_VERSION);
-      }
-    }
-  }
-
-  boolean isCoordinator() {
-    return isCoordinator;
-  }
 
   boolean isTrinoStarted() {
     if (isStarted) {
@@ -121,14 +73,11 @@ public class CatalogRegister {
    * Initializes the catalog register with the specified Trino connector context and Gravitino
    * configuration.
    *
-   * @param context the Trino connector context
    * @param config the Gravitino configuration
    * @throws Exception if the catalog register fails to initialize
    */
-  public void init(ConnectorContext context, GravitinoConfig config) throws Exception {
+  public void init(GravitinoConfig config) throws Exception {
     this.config = config;
-    checkTrinoSpiVersion(context);
-    checkSupportCatalogNameWithMetalake(context, config);
 
     TrinoDriver driver = new TrinoDriver();
     DriverManager.registerDriver(driver);
@@ -203,6 +152,8 @@ public class CatalogRegister {
       String createCatalogCommand = generateCreateCatalogCommand(name, catalog);
       executeSql(createCatalogCommand);
       LOG.info("Register catalog {} successfully: {}", name, createCatalogCommand);
+    } catch (SQLException e) {
+      throw new TrinoException(GravitinoErrorCode.GRAVITINO_RUNTIME_ERROR, e.getMessage(), e);
     } catch (Exception e) {
       String message = String.format("Failed to register catalog %s", name);
       LOG.error(message);
@@ -211,7 +162,7 @@ public class CatalogRegister {
   }
 
   private boolean checkCatalogExist(String name) {
-    String showCatalogCommand = String.format("SHOW CATALOGS like '%s'", name);
+    String showCatalogCommand = "SHOW CATALOGS";
     Exception failedException = null;
     try {
       int retries = EXECUTE_QUERY_MAX_RETRIES;
@@ -222,11 +173,17 @@ public class CatalogRegister {
           ResultSet rs = statement.getResultSet();
           while (rs.next()) {
             String catalogName = rs.getString(1);
-            if (catalogName.equals(name) || catalogName.equals("\"" + name + "\"")) {
+            // In some Trino version catalog name may be quoted, so we need to check both quoted and
+            // unquoted names
+            if (name.equals(catalogName)
+                || name.equals("\"" + catalogName + "\"")
+                || ("\"" + name + "\"").equals(catalogName)) {
               return true;
             }
           }
           return false;
+        } catch (SQLException e) {
+          throw e;
         } catch (Exception e) {
           failedException = e;
           LOG.warn("Execute command failed: {}, ", showCatalogCommand, e);
@@ -252,6 +209,8 @@ public class CatalogRegister {
           // check the catalog is already created
           statement.execute(sql);
           return;
+        } catch (SQLException e) {
+          throw e;
         } catch (Exception e) {
           failedException = e;
           LOG.warn("Execute command failed: {}, ", sql, e);

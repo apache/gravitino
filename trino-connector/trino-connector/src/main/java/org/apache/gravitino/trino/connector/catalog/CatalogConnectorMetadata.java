@@ -327,6 +327,27 @@ public class CatalogConnectorMetadata {
   }
 
   /**
+   * Adds a new column to the specified table with a position hint.
+   *
+   * @param schemaTableName the name of the schema and table
+   * @param column the Gravitino column to add
+   * @param position the target position for the new column
+   */
+  public void addColumn(
+      SchemaTableName schemaTableName,
+      GravitinoColumn column,
+      TableChange.ColumnPosition position) {
+    String[] columnNames = {column.getName()};
+    String comment = Strings.isNullOrEmpty(column.getComment()) ? null : column.getComment();
+    TableChange.ColumnPosition targetPosition =
+        position == null ? TableChange.ColumnPosition.defaultPos() : position;
+    applyAlter(
+        schemaTableName,
+        TableChange.addColumn(
+            columnNames, column.getType(), comment, targetPosition, column.isNullable()));
+  }
+
+  /**
    * Drops a column from the specified table.
    *
    * @param schemaTableName the name of the schema and table

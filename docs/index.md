@@ -85,7 +85,7 @@ Gravitino currently supports the following catalogs:
 * [**MySQL catalog**](./jdbc-mysql-catalog.md)
 * [**Paimon catalog**](./lakehouse-paimon-catalog.md)
 * [**PostgreSQL catalog**](./jdbc-postgresql-catalog.md)
-* [**OceanBase catalog**](./jdbc-oceanbase-catalog.md)
+* [**OceanBase catalog**](./jdbc-oceanbase-catalog.md)\*
 * [**StarRocks catalog**](./jdbc-starrocks-catalog.md)
 * [**ClickHouse catalog**](./jdbc-clickhouse-catalog.md)\*
 * [**Lakehouse generic catalog**](./lakehouse-generic-catalog.md)
@@ -103,6 +103,9 @@ If you want to operate table and partition statistics, you can refer to the [doc
 **Model catalogs:**
 
 * [**Model catalog**](./model-catalog.md)
+
+Catalogs with an asterisk (\*) aren’t in the standard release tarball and Docker image since 1.2.0.  In 1.2.0, Gravitino introduces 
+folder `catalogs-contrib` to host the contributed catalogs, which aren’t in the standard release but can be built and used separately. See [how to build Gravitino](./how-to-build.md#quick-start) for details.
 
 ## Apache Gravitino playground
 

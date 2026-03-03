@@ -20,12 +20,13 @@
 package org.apache.gravitino.maintenance.optimizer.common.util;
 
 import com.google.common.base.Preconditions;
+import java.util.Optional;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
 
 /** Utilities for working with fully qualified table identifiers. */
 public class IdentifierUtils {
-
   private static final String NORMALIZED_IDENTIFIER_MESSAGE =
       "Identifier must be catalog.schema.table";
 
@@ -70,5 +71,65 @@ public class IdentifierUtils {
     Namespace namespace = tableIdentifier.namespace();
     Preconditions.checkArgument(
         namespace != null && namespace.levels().length == 2, NORMALIZED_IDENTIFIER_MESSAGE);
+  }
+
+  /**
+   * Parse table identifier text.
+   *
+   * <p>Accepted forms:
+   *
+   * <ul>
+   *   <li>{@code schema.table}, when default catalog is configured
+   *   <li>{@code catalog.schema.table}
+   * </ul>
+   *
+   * @param identifierText raw identifier text
+   * @param defaultCatalogName optional default catalog for {@code schema.table}
+   * @return parsed identifier
+   */
+  public static Optional<NameIdentifier> parseTableIdentifier(
+      String identifierText, String defaultCatalogName) {
+    if (StringUtils.isBlank(identifierText)) {
+      return Optional.empty();
+    }
+
+    try {
+      NameIdentifier parsed = NameIdentifier.parse(identifierText);
+      int levels = parsed.namespace().levels().length;
+      if (levels == 0) {
+        return Optional.empty();
+      }
+      if (levels == 1) {
+        if (StringUtils.isNotBlank(defaultCatalogName)) {
+          return Optional.of(
+              NameIdentifier.of(defaultCatalogName, parsed.namespace().levels()[0], parsed.name()));
+        }
+        return Optional.empty();
+      }
+      if (levels == 2) {
+        return Optional.of(parsed);
+      }
+      return Optional.empty();
+    } catch (Exception e) {
+      return Optional.empty();
+    }
+  }
+
+  /**
+   * Parse job identifier text.
+   *
+   * @param identifierText raw identifier text
+   * @return parsed identifier
+   */
+  public static Optional<NameIdentifier> parseJobIdentifier(String identifierText) {
+    if (StringUtils.isBlank(identifierText)) {
+      return Optional.empty();
+    }
+
+    try {
+      return Optional.of(NameIdentifier.parse(identifierText));
+    } catch (Exception e) {
+      return Optional.empty();
+    }
   }
 }

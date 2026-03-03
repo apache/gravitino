@@ -22,7 +22,7 @@ package org.apache.gravitino.maintenance.optimizer.api.updater;
 import java.util.Map;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.annotation.DeveloperApi;
-import org.apache.gravitino.maintenance.optimizer.api.common.TableStatisticsBundle;
+import org.apache.gravitino.maintenance.optimizer.api.common.TableAndPartitionStatistics;
 
 /** Represents a provider that supports bulk table statistics calculation. */
 @DeveloperApi
@@ -33,5 +33,5 @@ public interface SupportsCalculateBulkTableStatistics extends SupportsCalculateT
    *
    * @return map of table identifier to its statistics bundle; empty when none are produced
    */
-  Map<NameIdentifier, TableStatisticsBundle> calculateBulkTableStatistics();
+  Map<NameIdentifier, TableAndPartitionStatistics> calculateBulkTableStatistics();
 }

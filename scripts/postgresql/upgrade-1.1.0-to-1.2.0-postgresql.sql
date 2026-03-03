@@ -125,3 +125,42 @@ COMMENT ON COLUMN partition_statistic_meta.statistic_value IS 'statistic value a
 COMMENT ON COLUMN partition_statistic_meta.audit_info IS 'audit information as JSON';
 COMMENT ON COLUMN partition_statistic_meta.created_at IS 'creation timestamp in milliseconds';
 COMMENT ON COLUMN partition_statistic_meta.updated_at IS 'last update timestamp in milliseconds';
+
+-- Add optimizer metrics storage tables
+CREATE TABLE IF NOT EXISTS table_metrics (
+    id BIGSERIAL PRIMARY KEY,
+    table_identifier VARCHAR(1024) NOT NULL,
+    metric_name VARCHAR(1024) NOT NULL,
+    table_partition VARCHAR(1024),
+    metric_ts BIGINT NOT NULL,
+    metric_value VARCHAR(1024) NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS job_metrics (
+    id BIGSERIAL PRIMARY KEY,
+    job_identifier VARCHAR(1024) NOT NULL,
+    metric_name VARCHAR(1024) NOT NULL,
+    metric_ts BIGINT NOT NULL,
+    metric_value VARCHAR(1024) NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_table_metrics_metric_ts ON table_metrics(metric_ts);
+CREATE INDEX IF NOT EXISTS idx_job_metrics_metric_ts ON job_metrics(metric_ts);
+CREATE INDEX IF NOT EXISTS idx_table_metrics_composite
+  ON table_metrics(table_identifier, table_partition, metric_ts);
+CREATE INDEX IF NOT EXISTS idx_job_metrics_identifier_metric_ts
+  ON job_metrics(job_identifier, metric_ts);
+
+COMMENT ON TABLE table_metrics IS 'optimizer table metrics';
+COMMENT ON TABLE job_metrics IS 'optimizer job metrics';
+COMMENT ON COLUMN table_metrics.id IS 'auto increment id';
+COMMENT ON COLUMN table_metrics.table_identifier IS 'normalized table identifier';
+COMMENT ON COLUMN table_metrics.metric_name IS 'metric name';
+COMMENT ON COLUMN table_metrics.table_partition IS 'normalized partition identifier';
+COMMENT ON COLUMN table_metrics.metric_ts IS 'metric timestamp in epoch seconds';
+COMMENT ON COLUMN table_metrics.metric_value IS 'metric value payload';
+COMMENT ON COLUMN job_metrics.id IS 'auto increment id';
+COMMENT ON COLUMN job_metrics.job_identifier IS 'normalized job identifier';
+COMMENT ON COLUMN job_metrics.metric_name IS 'metric name';
+COMMENT ON COLUMN job_metrics.metric_ts IS 'metric timestamp in epoch seconds';
+COMMENT ON COLUMN job_metrics.metric_value IS 'metric value payload';

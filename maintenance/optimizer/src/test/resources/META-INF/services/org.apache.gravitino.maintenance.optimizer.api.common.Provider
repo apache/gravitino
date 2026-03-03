@@ -19,6 +19,6 @@
 
 org.apache.gravitino.maintenance.optimizer.updater.StatisticsUpdaterForTest
 org.apache.gravitino.maintenance.optimizer.updater.MetricsUpdaterForTest
-org.apache.gravitino.maintenance.optimizer.monitor.job.JobProviderForTest
+org.apache.gravitino.maintenance.optimizer.monitor.job.TableJobRelationProviderForTest
 org.apache.gravitino.maintenance.optimizer.monitor.metrics.MetricsProviderForTest
 org.apache.gravitino.maintenance.optimizer.monitor.callback.MonitorCallbackForTest
