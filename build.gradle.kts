@@ -909,6 +909,10 @@ tasks {
 
   val assembleDistribution by registering(Tar::class) {
     dependsOn(
+      ":trino-connector:trino-connector-435-439:assembleTrinoConnector",
+      ":trino-connector:trino-connector-440-445:assembleTrinoConnector",
+      ":trino-connector:trino-connector-446-451:assembleTrinoConnector",
+      ":trino-connector:trino-connector-452-468:assembleTrinoConnector",
       ":trino-connector:trino-connector-469-472:assembleTrinoConnector",
       "assembleIcebergRESTServer",
       "assembleLanceRESTServer"
