@@ -31,7 +31,7 @@ import java.util.OptionalDouble;
 import java.util.stream.Collectors;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.maintenance.optimizer.api.common.DataScope;
-import org.apache.gravitino.maintenance.optimizer.api.common.MetricValueSample;
+import org.apache.gravitino.maintenance.optimizer.api.common.MetricSample;
 import org.apache.gravitino.maintenance.optimizer.api.monitor.MetricsEvaluator;
 import org.apache.gravitino.maintenance.optimizer.common.OptimizerEnv;
 import org.apache.gravitino.maintenance.optimizer.common.conf.OptimizerConfig;
@@ -187,8 +187,8 @@ public class GravitinoMetricsEvaluator implements MetricsEvaluator {
   @Override
   public boolean evaluateMetrics(
       DataScope scope,
-      Map<String, List<MetricValueSample>> beforeMetrics,
-      Map<String, List<MetricValueSample>> afterMetrics) {
+      Map<String, List<MetricSample>> beforeMetrics,
+      Map<String, List<MetricSample>> afterMetrics) {
     validateInputs(scope, beforeMetrics, afterMetrics);
     if (metricRulesByScope.isEmpty()) {
       return true;
@@ -214,8 +214,8 @@ public class GravitinoMetricsEvaluator implements MetricsEvaluator {
       AggregationOp aggregation = ruleConfig.aggregation;
       ComparisonOp comparison = ruleConfig.comparison;
 
-      List<MetricValueSample> beforeSamples = samples(beforeMetrics, metricName);
-      List<MetricValueSample> afterSamples = samples(afterMetrics, metricName);
+      List<MetricSample> beforeSamples = samples(beforeMetrics, metricName);
+      List<MetricSample> afterSamples = samples(afterMetrics, metricName);
       if (beforeSamples.isEmpty() || afterSamples.isEmpty()) {
         LOG.debug(
             "Metric {} of {} ({}) has insufficient samples: beforeSize={}, afterSize={}",
@@ -294,8 +294,8 @@ public class GravitinoMetricsEvaluator implements MetricsEvaluator {
 
   private static void validateInputs(
       DataScope scope,
-      Map<String, List<MetricValueSample>> beforeMetrics,
-      Map<String, List<MetricValueSample>> afterMetrics) {
+      Map<String, List<MetricSample>> beforeMetrics,
+      Map<String, List<MetricSample>> afterMetrics) {
     if (scope == null) {
       throw new IllegalArgumentException("scope must not be null");
     }
@@ -308,16 +308,15 @@ public class GravitinoMetricsEvaluator implements MetricsEvaluator {
     return metricName == null ? "" : metricName.trim().toLowerCase(Locale.ROOT);
   }
 
-  private static List<MetricValueSample> samples(
-      Map<String, List<MetricValueSample>> metrics, String metricName) {
+  private static List<MetricSample> samples(
+      Map<String, List<MetricSample>> metrics, String metricName) {
     if (metrics.isEmpty()) {
       return List.of();
     }
     return metrics.getOrDefault(normalizeMetricName(metricName), List.of());
   }
 
-  private static OptionalDouble aggregate(
-      List<MetricValueSample> metrics, AggregationOp operation) {
+  private static OptionalDouble aggregate(List<MetricSample> metrics, AggregationOp operation) {
     try {
       return switch (operation) {
         case MAX -> metrics.stream()
@@ -336,15 +335,15 @@ public class GravitinoMetricsEvaluator implements MetricsEvaluator {
     }
   }
 
-  private static OptionalDouble latest(List<MetricValueSample> metrics) {
-    Optional<MetricValueSample> latest =
-        metrics.stream().max(Comparator.comparingLong(MetricValueSample::timestampSeconds));
+  private static OptionalDouble latest(List<MetricSample> metrics) {
+    Optional<MetricSample> latest =
+        metrics.stream().max(Comparator.comparingLong(MetricSample::timestampSeconds));
     return latest
         .map(sample -> OptionalDouble.of(metricNumericValue(sample)))
         .orElseGet(OptionalDouble::empty);
   }
 
-  private static double metricNumericValue(MetricValueSample metric) {
+  private static double metricNumericValue(MetricSample metric) {
     Object value = metric.value().value();
     if (value instanceof Number) {
       return ((Number) value).doubleValue();

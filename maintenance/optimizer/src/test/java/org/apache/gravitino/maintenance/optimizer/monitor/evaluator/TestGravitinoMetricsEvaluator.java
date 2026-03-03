@@ -23,7 +23,7 @@ import java.util.List;
 import java.util.Map;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.maintenance.optimizer.api.common.DataScope;
-import org.apache.gravitino.maintenance.optimizer.api.common.MetricValueSample;
+import org.apache.gravitino.maintenance.optimizer.api.common.MetricSample;
 import org.apache.gravitino.maintenance.optimizer.api.common.PartitionPath;
 import org.apache.gravitino.maintenance.optimizer.common.OptimizerEnv;
 import org.apache.gravitino.maintenance.optimizer.common.PartitionEntryImpl;
@@ -451,19 +451,19 @@ public class TestGravitinoMetricsEvaluator {
   private static boolean evaluateMetrics(
       GravitinoMetricsEvaluator evaluator,
       DataScope scope,
-      Map<String, List<MetricValueSample>> beforeMetrics,
-      Map<String, List<MetricValueSample>> afterMetrics) {
+      Map<String, List<MetricSample>> beforeMetrics,
+      Map<String, List<MetricSample>> afterMetrics) {
     return evaluator.evaluateMetrics(scope, beforeMetrics, afterMetrics);
   }
 
-  private static MetricValueSample metric(long timestamp, String name, long value) {
+  private static MetricSample metric(long timestamp, String name, long value) {
     Assertions.assertFalse(name.isEmpty());
-    return new MetricValueSample(timestamp, StatisticValues.longValue(value));
+    return new MetricSample(timestamp, StatisticValues.longValue(value));
   }
 
-  private static MetricValueSample metricString(long timestamp, String name, String value) {
+  private static MetricSample metricString(long timestamp, String name, String value) {
     Assertions.assertFalse(name.isEmpty());
-    return new MetricValueSample(timestamp, StatisticValues.stringValue(value));
+    return new MetricSample(timestamp, StatisticValues.stringValue(value));
   }
 
   private static Map<?, ?> findScopeRules(Map<?, ?> parsedRules, String scopeName) {

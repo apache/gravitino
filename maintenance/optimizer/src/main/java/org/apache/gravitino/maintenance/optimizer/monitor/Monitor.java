@@ -31,7 +31,7 @@ import org.apache.commons.lang3.tuple.Pair;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.maintenance.optimizer.api.common.DataScope;
 import org.apache.gravitino.maintenance.optimizer.api.common.MetricPoint;
-import org.apache.gravitino.maintenance.optimizer.api.common.MetricValueSample;
+import org.apache.gravitino.maintenance.optimizer.api.common.MetricSample;
 import org.apache.gravitino.maintenance.optimizer.api.common.PartitionPath;
 import org.apache.gravitino.maintenance.optimizer.api.monitor.EvaluationResult;
 import org.apache.gravitino.maintenance.optimizer.api.monitor.MetricsEvaluator;
@@ -198,8 +198,8 @@ public class Monitor implements AutoCloseable {
 
     Pair<List<MetricPoint>, List<MetricPoint>> splitMetrics =
         splitMetrics(filteredMetrics, actionTimeSeconds);
-    Map<String, List<MetricValueSample>> beforeMetrics = toMetricSamples(splitMetrics.getLeft());
-    Map<String, List<MetricValueSample>> afterMetrics = toMetricSamples(splitMetrics.getRight());
+    Map<String, List<MetricSample>> beforeMetrics = toMetricSamples(splitMetrics.getLeft());
+    Map<String, List<MetricSample>> afterMetrics = toMetricSamples(splitMetrics.getRight());
 
     boolean evaluation = evaluator.evaluateMetrics(scope, beforeMetrics, afterMetrics);
     EvaluationResult result =
@@ -244,8 +244,8 @@ public class Monitor implements AutoCloseable {
     List<MetricPoint> filteredMetrics = filterMetricsByScope(metrics, scope);
     Pair<List<MetricPoint>, List<MetricPoint>> splitMetrics =
         splitMetrics(filteredMetrics, actionTimeSeconds);
-    Map<String, List<MetricValueSample>> beforeMetrics = toMetricSamples(splitMetrics.getLeft());
-    Map<String, List<MetricValueSample>> afterMetrics = toMetricSamples(splitMetrics.getRight());
+    Map<String, List<MetricSample>> beforeMetrics = toMetricSamples(splitMetrics.getLeft());
+    Map<String, List<MetricSample>> afterMetrics = toMetricSamples(splitMetrics.getRight());
     boolean evaluation = evaluator.evaluateMetrics(scope, beforeMetrics, afterMetrics);
     EvaluationResult result =
         new EvaluationResult(
@@ -346,21 +346,21 @@ public class Monitor implements AutoCloseable {
     return List.copyOf(filtered);
   }
 
-  private Map<String, List<MetricValueSample>> toMetricSamples(List<MetricPoint> points) {
+  private Map<String, List<MetricSample>> toMetricSamples(List<MetricPoint> points) {
     if (points == null || points.isEmpty()) {
       return Map.of();
     }
 
-    Map<String, List<MetricValueSample>> grouped = new LinkedHashMap<>();
+    Map<String, List<MetricSample>> grouped = new LinkedHashMap<>();
     for (MetricPoint point : points) {
       String metricName = point.metricName().trim().toLowerCase(Locale.ROOT);
       grouped
           .computeIfAbsent(metricName, ignored -> new ArrayList<>())
-          .add(new MetricValueSample(point.timestampSeconds(), point.value()));
+          .add(new MetricSample(point.timestampSeconds(), point.value()));
     }
 
-    Map<String, List<MetricValueSample>> immutableGrouped = new LinkedHashMap<>();
-    for (Map.Entry<String, List<MetricValueSample>> entry : grouped.entrySet()) {
+    Map<String, List<MetricSample>> immutableGrouped = new LinkedHashMap<>();
+    for (Map.Entry<String, List<MetricSample>> entry : grouped.entrySet()) {
       immutableGrouped.put(entry.getKey(), List.copyOf(entry.getValue()));
     }
     return Collections.unmodifiableMap(immutableGrouped);

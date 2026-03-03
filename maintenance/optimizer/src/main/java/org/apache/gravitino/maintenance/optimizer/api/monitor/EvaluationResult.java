@@ -26,7 +26,7 @@ import java.util.List;
 import java.util.Map;
 import org.apache.gravitino.annotation.DeveloperApi;
 import org.apache.gravitino.maintenance.optimizer.api.common.DataScope;
-import org.apache.gravitino.maintenance.optimizer.api.common.MetricValueSample;
+import org.apache.gravitino.maintenance.optimizer.api.common.MetricSample;
 
 /** Immutable evaluation result passed to monitor callbacks. */
 @DeveloperApi
@@ -34,8 +34,8 @@ public class EvaluationResult {
 
   private final DataScope scope;
   private final boolean evaluation;
-  private final Map<String, List<MetricValueSample>> beforeMetrics;
-  private final Map<String, List<MetricValueSample>> afterMetrics;
+  private final Map<String, List<MetricSample>> beforeMetrics;
+  private final Map<String, List<MetricSample>> afterMetrics;
   private final long actionTimeSeconds;
   private final long rangeSeconds;
   private final String evaluatorName;
@@ -54,8 +54,8 @@ public class EvaluationResult {
   public EvaluationResult(
       DataScope scope,
       boolean evaluation,
-      Map<String, List<MetricValueSample>> beforeMetrics,
-      Map<String, List<MetricValueSample>> afterMetrics,
+      Map<String, List<MetricSample>> beforeMetrics,
+      Map<String, List<MetricSample>> afterMetrics,
       long actionTimeSeconds,
       long rangeSeconds,
       String evaluatorName) {
@@ -89,14 +89,14 @@ public class EvaluationResult {
   /**
    * @return immutable metric samples before the action timestamp.
    */
-  public Map<String, List<MetricValueSample>> beforeMetrics() {
+  public Map<String, List<MetricSample>> beforeMetrics() {
     return beforeMetrics;
   }
 
   /**
    * @return immutable metric samples at/after the action timestamp.
    */
-  public Map<String, List<MetricValueSample>> afterMetrics() {
+  public Map<String, List<MetricSample>> afterMetrics() {
     return afterMetrics;
   }
 
@@ -121,16 +121,16 @@ public class EvaluationResult {
     return evaluatorName;
   }
 
-  private static Map<String, List<MetricValueSample>> immutableCopy(
-      Map<String, List<MetricValueSample>> metrics) {
+  private static Map<String, List<MetricSample>> immutableCopy(
+      Map<String, List<MetricSample>> metrics) {
     if (metrics.isEmpty()) {
       return Map.of();
     }
 
-    Map<String, List<MetricValueSample>> copied = new LinkedHashMap<>();
-    for (Map.Entry<String, List<MetricValueSample>> entry : metrics.entrySet()) {
+    Map<String, List<MetricSample>> copied = new LinkedHashMap<>();
+    for (Map.Entry<String, List<MetricSample>> entry : metrics.entrySet()) {
       Preconditions.checkArgument(entry.getKey() != null, "metric name must not be null");
-      List<MetricValueSample> values = entry.getValue();
+      List<MetricSample> values = entry.getValue();
       Preconditions.checkArgument(values != null, "metric values must not be null");
       copied.put(entry.getKey(), Collections.unmodifiableList(List.copyOf(values)));
     }

@@ -23,7 +23,7 @@ import java.time.Instant;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
-import org.apache.gravitino.maintenance.optimizer.api.common.MetricValueSample;
+import org.apache.gravitino.maintenance.optimizer.api.common.MetricSample;
 import org.apache.gravitino.maintenance.optimizer.api.monitor.EvaluationResult;
 import org.apache.gravitino.maintenance.optimizer.api.monitor.MonitorCallback;
 import org.apache.gravitino.maintenance.optimizer.common.OptimizerEnv;
@@ -65,7 +65,7 @@ public class ConsoleMonitorCallback implements MonitorCallback {
   @Override
   public void close() throws Exception {}
 
-  private String formatMetrics(Map<String, List<MetricValueSample>> metrics) {
+  private String formatMetrics(Map<String, List<MetricSample>> metrics) {
     if (metrics == null || metrics.isEmpty()) {
       return "[]";
     }
@@ -80,7 +80,7 @@ public class ConsoleMonitorCallback implements MonitorCallback {
         .collect(Collectors.joining(", ", "{", "}"));
   }
 
-  private String formatMetricSample(MetricValueSample sample) {
+  private String formatMetricSample(MetricSample sample) {
     if (sample == null || sample.value() == null) {
       return "N/A";
     }

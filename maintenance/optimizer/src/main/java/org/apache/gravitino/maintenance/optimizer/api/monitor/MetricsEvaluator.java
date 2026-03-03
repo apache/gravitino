@@ -23,7 +23,7 @@ import java.util.List;
 import java.util.Map;
 import org.apache.gravitino.annotation.DeveloperApi;
 import org.apache.gravitino.maintenance.optimizer.api.common.DataScope;
-import org.apache.gravitino.maintenance.optimizer.api.common.MetricValueSample;
+import org.apache.gravitino.maintenance.optimizer.api.common.MetricSample;
 import org.apache.gravitino.maintenance.optimizer.common.OptimizerEnv;
 
 /**
@@ -52,6 +52,6 @@ public interface MetricsEvaluator {
    */
   boolean evaluateMetrics(
       DataScope scope,
-      Map<String, List<MetricValueSample>> beforeMetrics,
-      Map<String, List<MetricValueSample>> afterMetrics);
+      Map<String, List<MetricSample>> beforeMetrics,
+      Map<String, List<MetricSample>> afterMetrics);
 }
