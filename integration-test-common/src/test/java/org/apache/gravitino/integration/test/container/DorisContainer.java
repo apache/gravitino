@@ -93,9 +93,16 @@ public class DorisContainer extends BaseContainer {
         ITUtils.joinPath(
             dir, "integration-test-common", "doris-docker-script", "docker-compose.yaml");
 
+    String effectiveImage =
+        (DEFAULT_IMAGE != null && !DEFAULT_IMAGE.isEmpty()) ? DEFAULT_IMAGE : image;
+    Preconditions.checkArgument(
+        effectiveImage != null && !effectiveImage.isEmpty(),
+        "Doris Docker image must be configured via GRAVITINO_CI_DORIS_DOCKER_IMAGE or "
+            + "DorisContainer builder image");
+
     composeContainer =
         new ComposeContainer(new File(composeFile))
-            .withEnv("GRAVITINO_CI_DORIS_DOCKER_IMAGE", DEFAULT_IMAGE)
+            .withEnv("GRAVITINO_CI_DORIS_DOCKER_IMAGE", effectiveImage)
             .withExposedService(
                 FE_SERVICE,
                 FE_MYSQL_PORT,
@@ -187,7 +194,6 @@ public class DorisContainer extends BaseContainer {
                 int aliveCount = 0;
                 try (ResultSet resultSet = statement.executeQuery(query)) {
                   while (resultSet.next()) {
-                    LOG.info("Test " + resultSet.toString());
                     String alive = resultSet.getString("Alive");
                     String totalCapacity = resultSet.getString("TotalCapacity");
                     float totalCapacityFloat = Float.parseFloat(totalCapacity.split(" ")[0]);

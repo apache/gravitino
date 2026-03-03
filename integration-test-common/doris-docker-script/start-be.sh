@@ -60,6 +60,7 @@ done
 
 if [ "$be_started" = false ]; then
   echo "ERROR: Doris BE failed to start"
+  exit 1
 fi
 
 # Register this BE to the central FE
@@ -81,6 +82,7 @@ done
 
 if [ "$be_added" = false ]; then
   echo "ERROR: Doris BE failed to add to FE"
+  exit 1
 fi
 
 # Keep container alive
