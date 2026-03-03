@@ -21,6 +21,7 @@ package org.apache.gravitino.maintenance.optimizer.api.common;
 
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.maintenance.optimizer.api.monitor.MetricScope;
 import org.apache.gravitino.maintenance.optimizer.common.PartitionEntryImpl;
@@ -46,12 +47,14 @@ class TestMetricSeries {
     Assertions.assertEquals(1, series.samplesByMetricName().size());
     Assertions.assertTrue(series.samplesByMetricName().containsKey("row_count"));
     Assertions.assertEquals(
-        List.of(100L, 101L),
-        series.samples("row_count").stream().map(MetricValueSample::timestampSeconds).toList());
+        Set.of(100L, 101L),
+        series.samples("row_count").stream()
+            .map(MetricValueSample::timestampSeconds)
+            .collect(java.util.stream.Collectors.toSet()));
   }
 
   @Test
-  void testFromPointsGroupsSortsAndNormalizesMetricName() {
+  void testFromPointsGroupsAndNormalizesMetricName() {
     NameIdentifier identifier = NameIdentifier.parse("catalog.db.table");
     MetricScope scope = MetricScope.forTable(identifier);
     List<MetricPoint> points =
@@ -65,10 +68,10 @@ class TestMetricSeries {
     Assertions.assertEquals(2, metricSeries.samplesByMetricName().size());
     Assertions.assertTrue(metricSeries.samplesByMetricName().containsKey("row_count"));
     Assertions.assertEquals(
-        List.of(100L, 101L),
+        Set.of(100L, 101L),
         metricSeries.samples("row_count").stream()
             .map(MetricValueSample::timestampSeconds)
-            .toList());
+            .collect(java.util.stream.Collectors.toSet()));
   }
 
   @Test

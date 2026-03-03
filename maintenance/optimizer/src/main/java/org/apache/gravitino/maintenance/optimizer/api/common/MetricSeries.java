@@ -22,7 +22,6 @@ package org.apache.gravitino.maintenance.optimizer.api.common;
 import com.google.common.base.Preconditions;
 import java.util.ArrayList;
 import java.util.Collections;
-import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
@@ -34,7 +33,7 @@ import org.apache.gravitino.maintenance.optimizer.api.monitor.MetricScope;
 import org.apache.gravitino.maintenance.optimizer.common.util.MetricScopePointValidator;
 
 /**
- * Immutable metric series for one scope, grouped by metric name into ordered samples.
+ * Immutable metric series for one scope, grouped by metric name into samples.
  *
  * <p>This class is an evaluator-facing view derived from {@link MetricPoint}.
  */
@@ -103,9 +102,8 @@ public final class MetricSeries {
 
     Map<String, List<MetricValueSample>> immutableMap = new LinkedHashMap<>();
     for (Map.Entry<String, List<MetricValueSample>> entry : mergedMap.entrySet()) {
-      List<MetricValueSample> sortedSamples = new ArrayList<>(entry.getValue());
-      sortedSamples.sort(Comparator.comparingLong(MetricValueSample::timestampSeconds));
-      immutableMap.put(entry.getKey(), Collections.unmodifiableList(sortedSamples));
+      immutableMap.put(
+          entry.getKey(), Collections.unmodifiableList(new ArrayList<>(entry.getValue())));
     }
     return new MetricSeries(scope, Collections.unmodifiableMap(immutableMap));
   }
