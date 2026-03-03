@@ -444,6 +444,10 @@ public class Recommender implements AutoCloseable {
         jobId);
   }
 
+  /**
+   * Immutable result of one strategy evaluation, including strategy name, target identifier,
+   * recommendation score, job template/options, and optional submitted job id.
+   */
   public static final class RecommendationResult {
     private final String strategyName;
     private final NameIdentifier identifier;

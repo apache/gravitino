@@ -131,6 +131,7 @@ public class Updater implements AutoCloseable {
     return statisticsUpdater;
   }
 
+  /** Immutable summary of record counts processed by one update execution. */
   public static final class UpdateSummary {
     private final UpdateType updateType;
     private final long totalRecords;
