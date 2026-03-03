@@ -17,17 +17,21 @@
  * under the License.
  */
 
-package org.apache.gravitino.maintenance.optimizer.api.common;
+package org.apache.gravitino.maintenance.optimizer.api.updater;
 
+import java.util.List;
+import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.annotation.DeveloperApi;
+import org.apache.gravitino.maintenance.optimizer.api.common.MetricPoint;
 
-/** Metric sample associated with a specific partition. */
+/** Represents a provider that supports job metrics. */
 @DeveloperApi
-public interface PartitionMetricSample extends MetricSample {
+public interface SupportsCalculateJobMetrics extends StatisticsCalculator {
   /**
-   * Partition identifiers associated with this metric, ordered from outer to inner level.
+   * Calculate job metric points for one job.
    *
-   * @return the partition path for this metric sample
+   * @param jobIdentifier job identifier
+   * @return metric points
    */
-  PartitionPath partition();
+  List<MetricPoint> calculateJobMetrics(NameIdentifier jobIdentifier);
 }

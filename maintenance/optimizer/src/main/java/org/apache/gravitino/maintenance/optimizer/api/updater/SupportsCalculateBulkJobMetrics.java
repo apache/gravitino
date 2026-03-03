@@ -17,27 +17,19 @@
  * under the License.
  */
 
-package org.apache.gravitino.maintenance.optimizer.common;
+package org.apache.gravitino.maintenance.optimizer.api.updater;
 
-import lombok.AllArgsConstructor;
-import lombok.EqualsAndHashCode;
-import lombok.Getter;
-import lombok.NonNull;
-import lombok.experimental.Accessors;
-import org.apache.gravitino.maintenance.optimizer.api.common.MetricSample;
-import org.apache.gravitino.maintenance.optimizer.api.common.StatisticEntry;
+import java.util.List;
+import org.apache.gravitino.annotation.DeveloperApi;
+import org.apache.gravitino.maintenance.optimizer.api.common.MetricPoint;
 
-/** Immutable {@link MetricSample} implementation that binds a statistic to an event timestamp. */
-@Accessors(fluent = true)
-@AllArgsConstructor
-@EqualsAndHashCode
-@Getter
-public final class MetricSampleImpl implements MetricSample {
-  private final long timestamp;
-  @NonNull private final StatisticEntry<?> statistic;
-
-  @Override
-  public String toString() {
-    return "{" + timestamp + ": " + statistic + " }";
-  }
+/** Represents a provider that supports bulk job metrics calculation. */
+@DeveloperApi
+public interface SupportsCalculateBulkJobMetrics extends SupportsCalculateJobMetrics {
+  /**
+   * Calculate job metric points for all jobs discoverable by this calculator.
+   *
+   * @return metric points
+   */
+  List<MetricPoint> calculateAllJobMetrics();
 }
