@@ -22,6 +22,7 @@ package org.apache.gravitino.maintenance.optimizer.updater.calculator.local;
 import java.util.List;
 import java.util.Map;
 import org.apache.gravitino.NameIdentifier;
+import org.apache.gravitino.maintenance.optimizer.api.common.MetricPoint;
 import org.apache.gravitino.maintenance.optimizer.api.common.StatisticEntry;
 import org.apache.gravitino.maintenance.optimizer.api.common.TableAndPartitionStatistics;
 
@@ -56,4 +57,34 @@ public interface StatisticsImporter {
    * @return map keyed by job identifier
    */
   Map<NameIdentifier, List<StatisticEntry<?>>> bulkReadAllJobStatistics();
+
+  /**
+   * Reads table and partition metrics for a single table.
+   *
+   * @param tableIdentifier table identifier
+   * @return metric points for the table/partitions
+   */
+  List<MetricPoint> readTableMetrics(NameIdentifier tableIdentifier);
+
+  /**
+   * Reads table and partition metrics for all tables in the source.
+   *
+   * @return metric points for all tables
+   */
+  List<MetricPoint> bulkReadAllTableMetrics();
+
+  /**
+   * Reads job metrics for a single job.
+   *
+   * @param jobIdentifier job identifier
+   * @return job metric points
+   */
+  List<MetricPoint> readJobMetrics(NameIdentifier jobIdentifier);
+
+  /**
+   * Reads job metrics for all jobs in the source.
+   *
+   * @return job metric points
+   */
+  List<MetricPoint> bulkReadAllJobMetrics();
 }

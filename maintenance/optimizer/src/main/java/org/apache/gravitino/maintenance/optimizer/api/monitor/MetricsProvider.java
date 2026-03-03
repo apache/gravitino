@@ -20,14 +20,17 @@
 package org.apache.gravitino.maintenance.optimizer.api.monitor;
 
 import java.util.List;
-import java.util.Map;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.annotation.DeveloperApi;
-import org.apache.gravitino.maintenance.optimizer.api.common.MetricSample;
+import org.apache.gravitino.maintenance.optimizer.api.common.MetricPoint;
 import org.apache.gravitino.maintenance.optimizer.api.common.PartitionPath;
 import org.apache.gravitino.maintenance.optimizer.api.common.Provider;
 
-/** Represents a provider that provides table and job related metrics. */
+/**
+ * Represents a provider that provides table and job related metrics.
+ *
+ * <p>Metric names are case-insensitive by contract.
+ */
 @DeveloperApi
 public interface MetricsProvider extends Provider {
   /**
@@ -36,10 +39,9 @@ public interface MetricsProvider extends Provider {
    * @param jobIdentifier catalog/schema/job identifier
    * @param startTime start timestamp (seconds)
    * @param endTime end timestamp (seconds)
-   * @return map keyed by metric name, each containing a metric sample series
+   * @return metric points in the requested time range
    */
-  Map<String, List<MetricSample>> jobMetrics(
-      NameIdentifier jobIdentifier, long startTime, long endTime);
+  List<MetricPoint> jobMetrics(NameIdentifier jobIdentifier, long startTime, long endTime);
 
   /**
    * Retrieve metrics for a table.
@@ -47,10 +49,9 @@ public interface MetricsProvider extends Provider {
    * @param tableIdentifier catalog/schema/table identifier
    * @param startTime start timestamp (seconds)
    * @param endTime end timestamp (seconds)
-   * @return map keyed by metric name, each containing a metric sample series
+   * @return metric points in the requested time range
    */
-  Map<String, List<MetricSample>> tableMetrics(
-      NameIdentifier tableIdentifier, long startTime, long endTime);
+  List<MetricPoint> tableMetrics(NameIdentifier tableIdentifier, long startTime, long endTime);
 
   /**
    * Retrieve metrics for a specific partition of a table.
@@ -59,8 +60,8 @@ public interface MetricsProvider extends Provider {
    * @param partitionPath partition path
    * @param startTime start timestamp (seconds)
    * @param endTime end timestamp (seconds)
-   * @return map keyed by metric name, each containing a metric sample series
+   * @return metric points in the requested time range
    */
-  Map<String, List<MetricSample>> partitionMetrics(
+  List<MetricPoint> partitionMetrics(
       NameIdentifier tableIdentifier, PartitionPath partitionPath, long startTime, long endTime);
 }
