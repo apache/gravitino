@@ -25,9 +25,12 @@ import java.util.List;
 import java.util.Map;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.NameIdentifier;
+import org.apache.gravitino.maintenance.optimizer.api.common.MetricPoint;
 import org.apache.gravitino.maintenance.optimizer.api.common.StatisticEntry;
 import org.apache.gravitino.maintenance.optimizer.api.common.TableAndPartitionStatistics;
+import org.apache.gravitino.maintenance.optimizer.api.updater.SupportsCalculateBulkJobMetrics;
 import org.apache.gravitino.maintenance.optimizer.api.updater.SupportsCalculateBulkJobStatistics;
+import org.apache.gravitino.maintenance.optimizer.api.updater.SupportsCalculateBulkTableMetrics;
 import org.apache.gravitino.maintenance.optimizer.api.updater.SupportsCalculateBulkTableStatistics;
 import org.apache.gravitino.maintenance.optimizer.common.OptimizerEnv;
 import org.apache.gravitino.maintenance.optimizer.common.conf.OptimizerConfig;
@@ -36,7 +39,10 @@ import org.apache.gravitino.maintenance.optimizer.common.conf.OptimizerConfig;
  * Statistics calculator that reads statistics from either a local file path or an inline payload.
  */
 public class LocalStatisticsCalculator
-    implements SupportsCalculateBulkTableStatistics, SupportsCalculateBulkJobStatistics {
+    implements SupportsCalculateBulkTableStatistics,
+        SupportsCalculateBulkJobStatistics,
+        SupportsCalculateBulkTableMetrics,
+        SupportsCalculateBulkJobMetrics {
 
   public static final String NAME = "local-stats-calculator";
   private static final String CONFIG_KEY = "localStatsCalculator";
@@ -105,6 +111,32 @@ public class LocalStatisticsCalculator
   public Map<NameIdentifier, List<StatisticEntry<?>>> calculateAllJobStatistics() {
     ensureInitialized();
     return statisticsImporter.bulkReadAllJobStatistics();
+  }
+
+  @Override
+  public List<MetricPoint> calculateTableMetrics(NameIdentifier tableIdentifier) {
+    ensureInitialized();
+    Preconditions.checkArgument(tableIdentifier != null, "tableIdentifier must not be null");
+    return statisticsImporter.readTableMetrics(tableIdentifier);
+  }
+
+  @Override
+  public List<MetricPoint> calculateAllTableMetrics() {
+    ensureInitialized();
+    return statisticsImporter.bulkReadAllTableMetrics();
+  }
+
+  @Override
+  public List<MetricPoint> calculateJobMetrics(NameIdentifier jobIdentifier) {
+    ensureInitialized();
+    Preconditions.checkArgument(jobIdentifier != null, "jobIdentifier must not be null");
+    return statisticsImporter.readJobMetrics(jobIdentifier);
+  }
+
+  @Override
+  public List<MetricPoint> calculateAllJobMetrics() {
+    ensureInitialized();
+    return statisticsImporter.bulkReadAllJobMetrics();
   }
 
   private void ensureInitialized() {

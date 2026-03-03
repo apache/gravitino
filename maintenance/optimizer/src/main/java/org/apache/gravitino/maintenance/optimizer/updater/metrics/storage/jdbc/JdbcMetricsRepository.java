@@ -31,22 +31,20 @@ import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
-import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.config.ConfigConstants;
-import org.apache.gravitino.maintenance.optimizer.updater.metrics.storage.JobMetricWriteRequest;
-import org.apache.gravitino.maintenance.optimizer.updater.metrics.storage.MetricRecord;
-import org.apache.gravitino.maintenance.optimizer.updater.metrics.storage.MetricRecordImpl;
+import org.apache.gravitino.maintenance.optimizer.api.common.DataScope;
+import org.apache.gravitino.maintenance.optimizer.api.common.MetricPoint;
+import org.apache.gravitino.maintenance.optimizer.common.util.StatisticValueUtils;
+import org.apache.gravitino.maintenance.optimizer.recommender.util.PartitionUtils;
 import org.apache.gravitino.maintenance.optimizer.updater.metrics.storage.MetricsRepository;
 import org.apache.gravitino.maintenance.optimizer.updater.metrics.storage.MetricsStorageException;
-import org.apache.gravitino.maintenance.optimizer.updater.metrics.storage.TableMetricWriteRequest;
 import org.apache.gravitino.utils.jdbc.JdbcSqlScriptUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -230,163 +228,92 @@ public abstract class JdbcMetricsRepository implements MetricsRepository {
   }
 
   @Override
-  public void storeTableMetrics(List<TableMetricWriteRequest> metrics) {
+  public void storeTableAndPartitionMetrics(List<MetricPoint> metrics) {
     Preconditions.checkArgument(metrics != null, "metrics must not be null");
     if (metrics.isEmpty()) {
       return;
     }
 
-    String insertSql =
+    String tableInsertSql =
         "INSERT INTO table_metrics (table_identifier, metric_name, table_partition, metric_ts, metric_value) VALUES (?, ?, ?, ?, ?)";
 
     try (Connection conn = getConnection();
-        PreparedStatement insertStmt = conn.prepareStatement(insertSql)) {
-      int batchCount = 0;
-      for (TableMetricWriteRequest request : metrics) {
-        Preconditions.checkArgument(request != null, "table metric request must not be null");
-        validateWriteArguments(
-            request.nameIdentifier(), request.metricName(), request.partition(), request.metric());
-        String normalizedIdentifier = normalizeIdentifier(request.nameIdentifier());
-        String normalizedMetricName = normalizeMetricName(request.metricName());
-        Optional<String> normalizedPartition = normalizePartition(request.partition());
-        MetricRecord metric = request.metric();
-        insertStmt.setString(1, normalizedIdentifier);
-        insertStmt.setString(2, normalizedMetricName);
-        insertStmt.setString(3, normalizedPartition.orElse(null));
-        insertStmt.setLong(4, metric.getTimestamp());
-        insertStmt.setString(5, metric.getValue());
-        insertStmt.addBatch();
-        batchCount++;
-        if (batchCount >= BATCH_UPDATE_SIZE) {
-          insertStmt.executeBatch();
-          batchCount = 0;
+        PreparedStatement tableInsertStmt = conn.prepareStatement(tableInsertSql)) {
+      int tableBatchCount = 0;
+      for (MetricPoint metricPoint : metrics) {
+        Preconditions.checkArgument(metricPoint != null, "metric point must not be null");
+        Preconditions.checkArgument(
+            metricPoint.scope() == DataScope.Type.TABLE
+                || metricPoint.scope() == DataScope.Type.PARTITION,
+            "Unsupported scope %s for table/partition metrics",
+            metricPoint.scope());
+        String serializedMetricValue = StatisticValueUtils.toString(metricPoint.value());
+        validateWriteArguments(metricPoint, serializedMetricValue);
+
+        String normalizedIdentifier = normalizeIdentifier(metricPoint.identifier());
+        String normalizedMetricName = normalizeMetricName(metricPoint.metricName());
+        String normalizedPartition =
+            metricPoint.partitionPath().map(PartitionUtils::encodePartitionPath).orElse(null);
+        tableInsertStmt.setString(1, normalizedIdentifier);
+        tableInsertStmt.setString(2, normalizedMetricName);
+        tableInsertStmt.setString(3, normalizePartition(normalizedPartition).orElse(null));
+        tableInsertStmt.setLong(4, metricPoint.timestampSeconds());
+        tableInsertStmt.setString(5, serializedMetricValue);
+        tableInsertStmt.addBatch();
+        tableBatchCount++;
+        if (tableBatchCount >= BATCH_UPDATE_SIZE) {
+          tableInsertStmt.executeBatch();
+          tableBatchCount = 0;
         }
       }
-      if (batchCount > 0) {
-        insertStmt.executeBatch();
+
+      if (tableBatchCount > 0) {
+        tableInsertStmt.executeBatch();
       }
     } catch (SQLException e) {
       throw new MetricsStorageException(
-          "Failed to batch store table metrics, size=" + metrics.size(), e);
+          "Failed to batch store table/partition metrics, size=" + metrics.size(), e);
     }
   }
 
   @Override
-  public Map<String, List<MetricRecord>> getTableMetrics(
-      NameIdentifier nameIdentifier, long fromSecs, long toSecs) {
-    Preconditions.checkArgument(nameIdentifier != null, "nameIdentifier must not be null");
-    validateTimeWindow(fromSecs, toSecs);
-    Map<String, List<MetricRecord>> resultMap = new HashMap<>();
-    String sql =
-        "SELECT metric_name, metric_ts, metric_value FROM table_metrics "
-            + "WHERE table_identifier = ? AND metric_ts >= ? AND metric_ts < ? "
-            + "AND table_partition IS NULL";
-
-    try (Connection conn = getConnection();
-        PreparedStatement pstmt = conn.prepareStatement(sql)) {
-      pstmt.setString(1, normalizeIdentifier(nameIdentifier));
-      pstmt.setLong(2, fromSecs);
-      pstmt.setLong(3, toSecs);
-
-      try (ResultSet rs = pstmt.executeQuery()) {
-        while (rs.next()) {
-          String metricName = rs.getString("metric_name");
-          long timestamp = rs.getLong("metric_ts");
-          String value = rs.getString("metric_value");
-          MetricRecord metric = new MetricRecordImpl(timestamp, value);
-          resultMap.computeIfAbsent(metricName, k -> new ArrayList<>()).add(metric);
-        }
-      }
-    } catch (SQLException e) {
-      throw new MetricsStorageException(
-          "Failed to retrieve table metrics: identifier="
-              + nameIdentifier
-              + ", from="
-              + fromSecs
-              + ", to="
-              + toSecs,
-          e);
-    }
-    return resultMap;
-  }
-
-  @Override
-  public Map<String, List<MetricRecord>> getPartitionMetrics(
-      NameIdentifier nameIdentifier, String partition, long fromSecs, long toSecs) {
-    Preconditions.checkArgument(nameIdentifier != null, "nameIdentifier must not be null");
-    Preconditions.checkArgument(StringUtils.isNotBlank(partition), "partition must not be blank");
-    validateTimeWindow(fromSecs, toSecs);
-    Map<String, List<MetricRecord>> resultMap = new HashMap<>();
-    String normalizedPartition = normalizePartition(partition).orElse(null);
-    String sql =
-        "SELECT metric_name, metric_ts, metric_value FROM table_metrics "
-            + "WHERE table_identifier = ? AND table_partition = ? "
-            + "AND metric_ts >= ? AND metric_ts < ?";
-
-    try (Connection conn = getConnection();
-        PreparedStatement pstmt = conn.prepareStatement(sql)) {
-      pstmt.setString(1, normalizeIdentifier(nameIdentifier));
-      pstmt.setString(2, normalizedPartition);
-      pstmt.setLong(3, fromSecs);
-      pstmt.setLong(4, toSecs);
-
-      try (ResultSet rs = pstmt.executeQuery()) {
-        while (rs.next()) {
-          String metricName = rs.getString("metric_name");
-          long timestamp = rs.getLong("metric_ts");
-          String value = rs.getString("metric_value");
-          MetricRecord metric = new MetricRecordImpl(timestamp, value);
-          resultMap.computeIfAbsent(metricName, k -> new ArrayList<>()).add(metric);
-        }
-      }
-    } catch (SQLException e) {
-      throw new MetricsStorageException(
-          "Failed to retrieve partition metrics: identifier="
-              + nameIdentifier
-              + ", partition="
-              + partition
-              + ", from="
-              + fromSecs
-              + ", to="
-              + toSecs,
-          e);
-    }
-    return resultMap;
-  }
-
-  @Override
-  public void storeJobMetrics(List<JobMetricWriteRequest> metrics) {
+  public void storeJobMetrics(List<MetricPoint> metrics) {
     Preconditions.checkArgument(metrics != null, "metrics must not be null");
     if (metrics.isEmpty()) {
       return;
     }
 
-    String insertSql =
+    String jobInsertSql =
         "INSERT INTO job_metrics (job_identifier, metric_name, metric_ts, metric_value) VALUES (?, ?, ?, ?)";
 
     try (Connection conn = getConnection();
-        PreparedStatement insertStmt = conn.prepareStatement(insertSql)) {
-      int batchCount = 0;
-      for (JobMetricWriteRequest request : metrics) {
-        Preconditions.checkArgument(request != null, "job metric request must not be null");
-        validateWriteArguments(
-            request.nameIdentifier(), request.metricName(), Optional.empty(), request.metric());
-        String normalizedIdentifier = normalizeIdentifier(request.nameIdentifier());
-        String normalizedMetricName = normalizeMetricName(request.metricName());
-        MetricRecord metric = request.metric();
-        insertStmt.setString(1, normalizedIdentifier);
-        insertStmt.setString(2, normalizedMetricName);
-        insertStmt.setLong(3, metric.getTimestamp());
-        insertStmt.setString(4, metric.getValue());
-        insertStmt.addBatch();
-        batchCount++;
-        if (batchCount >= BATCH_UPDATE_SIZE) {
-          insertStmt.executeBatch();
-          batchCount = 0;
+        PreparedStatement jobInsertStmt = conn.prepareStatement(jobInsertSql)) {
+      int jobBatchCount = 0;
+      for (MetricPoint metricPoint : metrics) {
+        Preconditions.checkArgument(metricPoint != null, "metric point must not be null");
+        Preconditions.checkArgument(
+            metricPoint.scope() == DataScope.Type.JOB,
+            "Unsupported scope %s for job metrics",
+            metricPoint.scope());
+        String serializedMetricValue = StatisticValueUtils.toString(metricPoint.value());
+        validateWriteArguments(metricPoint, serializedMetricValue);
+
+        String normalizedIdentifier = normalizeIdentifier(metricPoint.identifier());
+        String normalizedMetricName = normalizeMetricName(metricPoint.metricName());
+        jobInsertStmt.setString(1, normalizedIdentifier);
+        jobInsertStmt.setString(2, normalizedMetricName);
+        jobInsertStmt.setLong(3, metricPoint.timestampSeconds());
+        jobInsertStmt.setString(4, serializedMetricValue);
+        jobInsertStmt.addBatch();
+        jobBatchCount++;
+        if (jobBatchCount >= BATCH_UPDATE_SIZE) {
+          jobInsertStmt.executeBatch();
+          jobBatchCount = 0;
         }
       }
-      if (batchCount > 0) {
-        insertStmt.executeBatch();
+
+      if (jobBatchCount > 0) {
+        jobInsertStmt.executeBatch();
       }
     } catch (SQLException e) {
       throw new MetricsStorageException(
@@ -395,41 +322,19 @@ public abstract class JdbcMetricsRepository implements MetricsRepository {
   }
 
   @Override
-  public Map<String, List<MetricRecord>> getJobMetrics(
-      NameIdentifier nameIdentifier, long fromSecs, long toSecs) {
-    Preconditions.checkArgument(nameIdentifier != null, "nameIdentifier must not be null");
+  public List<MetricPoint> getMetrics(DataScope scope, long fromSecs, long toSecs) {
+    Preconditions.checkArgument(scope != null, "scope must not be null");
     validateTimeWindow(fromSecs, toSecs);
-    Map<String, List<MetricRecord>> resultMap = new HashMap<>();
-    String sql =
-        "SELECT metric_name, metric_ts, metric_value FROM job_metrics "
-            + "WHERE job_identifier = ? AND metric_ts >= ? AND metric_ts < ?";
-
-    try (Connection conn = getConnection();
-        PreparedStatement pstmt = conn.prepareStatement(sql)) {
-      pstmt.setString(1, normalizeIdentifier(nameIdentifier));
-      pstmt.setLong(2, fromSecs);
-      pstmt.setLong(3, toSecs);
-
-      try (ResultSet rs = pstmt.executeQuery()) {
-        while (rs.next()) {
-          String metricName = rs.getString("metric_name");
-          long timestamp = rs.getLong("metric_ts");
-          String value = rs.getString("metric_value");
-          MetricRecord metric = new MetricRecordImpl(timestamp, value);
-          resultMap.computeIfAbsent(metricName, k -> new ArrayList<>()).add(metric);
-        }
-      }
-    } catch (SQLException e) {
-      throw new MetricsStorageException(
-          "Failed to retrieve job metrics: identifier="
-              + nameIdentifier
-              + ", from="
-              + fromSecs
-              + ", to="
-              + toSecs,
-          e);
+    switch (scope.type()) {
+      case TABLE:
+        return getTableMetrics(scope.identifier(), fromSecs, toSecs);
+      case PARTITION:
+        return getPartitionMetrics(scope, fromSecs, toSecs);
+      case JOB:
+        return getJobMetrics(scope.identifier(), fromSecs, toSecs);
+      default:
+        throw new IllegalArgumentException("Unsupported metric scope: " + scope.type());
     }
-    return resultMap;
   }
 
   @Override
@@ -502,11 +407,11 @@ public abstract class JdbcMetricsRepository implements MetricsRepository {
         toSecs);
   }
 
-  private void validateWriteArguments(
-      NameIdentifier nameIdentifier,
-      String metricName,
-      Optional<String> partition,
-      MetricRecord metric) {
+  private void validateWriteArguments(MetricPoint metricPoint, String serializedMetricValue) {
+    Preconditions.checkArgument(metricPoint != null, "metricPoint must not be null");
+    NameIdentifier nameIdentifier = metricPoint.identifier();
+    String metricName = metricPoint.metricName();
+
     Preconditions.checkArgument(nameIdentifier != null, "nameIdentifier must not be null");
     Preconditions.checkArgument(StringUtils.isNotBlank(metricName), "metricName must not be blank");
     Preconditions.checkArgument(
@@ -519,25 +424,144 @@ public abstract class JdbcMetricsRepository implements MetricsRepository {
         "metricName length exceeds max %s: actual=%s",
         MAX_METRIC_NAME_LENGTH,
         metricName.length());
-    Preconditions.checkArgument(metric != null, "metric record must not be null");
     Preconditions.checkArgument(
-        metric.getTimestamp() >= 0,
+        metricPoint.timestampSeconds() >= 0,
         "metric timestamp must be non-negative, but got %s",
-        metric.getTimestamp());
+        metricPoint.timestampSeconds());
     Preconditions.checkArgument(
-        metric.getTimestamp() <= MAX_REASONABLE_EPOCH_SECONDS,
+        metricPoint.timestampSeconds() <= MAX_REASONABLE_EPOCH_SECONDS,
         "metric timestamp must be epoch seconds, but got suspiciously large value %s",
-        metric.getTimestamp());
-    Preconditions.checkArgument(metric.getValue() != null, "metric value must not be null");
+        metricPoint.timestampSeconds());
+    Preconditions.checkArgument(serializedMetricValue != null, "metric value must not be null");
     Preconditions.checkArgument(
-        metric.getValue().length() <= MAX_METRIC_VALUE_LENGTH,
+        serializedMetricValue.length() <= MAX_METRIC_VALUE_LENGTH,
         "metric value length exceeds max %s: actual=%s",
         MAX_METRIC_VALUE_LENGTH,
-        metric.getValue().length());
-    if (partition.isPresent()) {
+        serializedMetricValue.length());
+    if (metricPoint.partitionPath().isPresent()) {
+      String encodedPartition =
+          PartitionUtils.encodePartitionPath(metricPoint.partitionPath().get());
       Preconditions.checkArgument(
-          StringUtils.isNotBlank(partition.get()), "partition must not be blank");
+          StringUtils.isNotBlank(encodedPartition), "partition must not be blank");
     }
+  }
+
+  private List<MetricPoint> getTableMetrics(
+      NameIdentifier nameIdentifier, long fromSecs, long toSecs) {
+    List<MetricPoint> result = new ArrayList<>();
+    String sql =
+        "SELECT metric_name, metric_ts, metric_value FROM table_metrics "
+            + "WHERE table_identifier = ? AND metric_ts >= ? AND metric_ts < ? "
+            + "AND table_partition IS NULL";
+
+    try (Connection conn = getConnection();
+        PreparedStatement pstmt = conn.prepareStatement(sql)) {
+      pstmt.setString(1, normalizeIdentifier(nameIdentifier));
+      pstmt.setLong(2, fromSecs);
+      pstmt.setLong(3, toSecs);
+
+      try (ResultSet rs = pstmt.executeQuery()) {
+        while (rs.next()) {
+          result.add(
+              MetricPoint.forTable(
+                  nameIdentifier,
+                  rs.getString("metric_name"),
+                  StatisticValueUtils.fromString(rs.getString("metric_value")),
+                  rs.getLong("metric_ts")));
+        }
+      }
+    } catch (SQLException e) {
+      throw new MetricsStorageException(
+          "Failed to retrieve table metrics: identifier="
+              + nameIdentifier
+              + ", from="
+              + fromSecs
+              + ", to="
+              + toSecs,
+          e);
+    }
+    return result;
+  }
+
+  private List<MetricPoint> getPartitionMetrics(DataScope scope, long fromSecs, long toSecs) {
+    Preconditions.checkArgument(
+        scope.partition().isPresent(), "partition scope must contain partition path");
+    NameIdentifier nameIdentifier = scope.identifier();
+    String partition = PartitionUtils.encodePartitionPath(scope.partition().get());
+
+    List<MetricPoint> result = new ArrayList<>();
+    String sql =
+        "SELECT metric_name, metric_ts, metric_value FROM table_metrics "
+            + "WHERE table_identifier = ? AND table_partition = ? "
+            + "AND metric_ts >= ? AND metric_ts < ?";
+
+    try (Connection conn = getConnection();
+        PreparedStatement pstmt = conn.prepareStatement(sql)) {
+      pstmt.setString(1, normalizeIdentifier(nameIdentifier));
+      pstmt.setString(2, normalizePartition(partition).orElse(null));
+      pstmt.setLong(3, fromSecs);
+      pstmt.setLong(4, toSecs);
+
+      try (ResultSet rs = pstmt.executeQuery()) {
+        while (rs.next()) {
+          result.add(
+              MetricPoint.forPartition(
+                  nameIdentifier,
+                  scope.partition().get(),
+                  rs.getString("metric_name"),
+                  StatisticValueUtils.fromString(rs.getString("metric_value")),
+                  rs.getLong("metric_ts")));
+        }
+      }
+    } catch (SQLException e) {
+      throw new MetricsStorageException(
+          "Failed to retrieve partition metrics: identifier="
+              + nameIdentifier
+              + ", partition="
+              + partition
+              + ", from="
+              + fromSecs
+              + ", to="
+              + toSecs,
+          e);
+    }
+    return result;
+  }
+
+  private List<MetricPoint> getJobMetrics(
+      NameIdentifier nameIdentifier, long fromSecs, long toSecs) {
+    List<MetricPoint> result = new ArrayList<>();
+    String sql =
+        "SELECT metric_name, metric_ts, metric_value FROM job_metrics "
+            + "WHERE job_identifier = ? AND metric_ts >= ? AND metric_ts < ?";
+
+    try (Connection conn = getConnection();
+        PreparedStatement pstmt = conn.prepareStatement(sql)) {
+      pstmt.setString(1, normalizeIdentifier(nameIdentifier));
+      pstmt.setLong(2, fromSecs);
+      pstmt.setLong(3, toSecs);
+
+      try (ResultSet rs = pstmt.executeQuery()) {
+        while (rs.next()) {
+          result.add(
+              MetricPoint.forJob(
+                  nameIdentifier,
+                  rs.getString("metric_name"),
+                  StatisticValueUtils.fromString(rs.getString("metric_value")),
+                  rs.getLong("metric_ts")));
+        }
+      }
+    } catch (SQLException e) {
+      throw new MetricsStorageException(
+          "Failed to retrieve job metrics: identifier="
+              + nameIdentifier
+              + ", from="
+              + fromSecs
+              + ", to="
+              + toSecs,
+          e);
+    }
+    return result;
   }
 
   private String normalizeIdentifier(NameIdentifier identifier) {

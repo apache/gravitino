@@ -22,14 +22,14 @@ package org.apache.gravitino.maintenance.optimizer.api.updater;
 import java.util.List;
 import org.apache.gravitino.annotation.DeveloperApi;
 import org.apache.gravitino.maintenance.optimizer.api.common.MetricPoint;
-import org.apache.gravitino.maintenance.optimizer.api.common.Provider;
 
-/** Represents an updater that can persist metric points. */
+/** Represents a provider that supports bulk table and partition metrics calculation. */
 @DeveloperApi
-public interface MetricsUpdater extends Provider {
-  /** Persist metrics for table and partition scopes. */
-  void updateTableAndPartitionMetrics(List<MetricPoint> metrics);
-
-  /** Persist metrics for job scope. */
-  void updateJobMetrics(List<MetricPoint> metrics);
+public interface SupportsCalculateBulkTableMetrics extends SupportsCalculateTableMetrics {
+  /**
+   * Calculate table/partition metric points for all tables discoverable by this calculator.
+   *
+   * @return metric points
+   */
+  List<MetricPoint> calculateAllTableMetrics();
 }

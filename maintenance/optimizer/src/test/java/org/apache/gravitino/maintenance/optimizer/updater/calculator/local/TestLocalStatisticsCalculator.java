@@ -26,6 +26,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import org.apache.gravitino.NameIdentifier;
+import org.apache.gravitino.maintenance.optimizer.api.common.MetricPoint;
 import org.apache.gravitino.maintenance.optimizer.api.common.PartitionPath;
 import org.apache.gravitino.maintenance.optimizer.api.common.StatisticEntry;
 import org.apache.gravitino.maintenance.optimizer.api.common.TableAndPartitionStatistics;
@@ -139,6 +140,33 @@ class TestLocalStatisticsCalculator {
     Assertions.assertEquals(1L, map.get("s1").value().value());
     Assertions.assertEquals(2.5D, map.get("s2").value().value());
     Assertions.assertFalse(map.containsKey("text_metric"));
+  }
+
+  @Test
+  void testMetricTimestampFromRecordAndField() {
+    String payload =
+        String.join(
+            "\n",
+            "{\"identifier\":\"catalog.schema.table\",\"stats-type\":\"table\",\"timestamp\":100,"
+                + "\"rows\":{\"value\":10,\"timestamp\":101},\"size\":{\"value\":\"2.5\"}}",
+            "{\"identifier\":\"catalog.schema.job1\",\"stats-type\":\"job\",\"timestamp\":\"200\","
+                + "\"duration\":3}");
+
+    LocalStatisticsCalculator calculator = new LocalStatisticsCalculator();
+    OptimizerEnv env = new OptimizerEnv(createConfig(null, payload));
+    calculator.initialize(env);
+
+    Map<String, MetricPoint> tableMetrics =
+        toMetricNameMap(
+            calculator.calculateTableMetrics(NameIdentifier.parse("catalog.schema.table")));
+    Assertions.assertEquals(2, tableMetrics.size());
+    Assertions.assertEquals(101L, tableMetrics.get("rows").timestampSeconds());
+    Assertions.assertEquals(100L, tableMetrics.get("size").timestampSeconds());
+
+    Map<String, MetricPoint> jobMetrics =
+        toMetricNameMap(
+            calculator.calculateJobMetrics(NameIdentifier.parse("catalog.schema.job1")));
+    Assertions.assertEquals(200L, jobMetrics.get("duration").timestampSeconds());
   }
 
   @Test
@@ -466,6 +494,14 @@ class TestLocalStatisticsCalculator {
     Map<String, StatisticEntry<?>> map = new HashMap<>();
     for (StatisticEntry<?> stat : stats) {
       map.put(stat.name(), stat);
+    }
+    return map;
+  }
+
+  private Map<String, MetricPoint> toMetricNameMap(List<MetricPoint> metrics) {
+    Map<String, MetricPoint> map = new HashMap<>();
+    for (MetricPoint metric : metrics) {
+      map.put(metric.metricName(), metric);
     }
     return map;
   }
