@@ -56,7 +56,6 @@ const ListFiles = ({ metalake, catalog, schema, fileset, storageLocations, defau
   }, [sub_path])
 
   useEffect(() => {
-    console.log('sub_path changed:', sub_path)
     if (metalake && catalog && schema && fileset) {
       dispatch(
         getFilesetFiles({
