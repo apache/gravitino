@@ -347,20 +347,26 @@ public class TestFunctionMetaService extends TestJDBCBackend {
     }
     assertFalse(legacyRecordExistsInDB(function.id(), Entity.EntityType.FUNCTION));
     assertEquals(0, listFunctionVersions(function.id()).size());
-    assertEquals(3, listFunctionVersions(anotherFunction.id()).size());
+    Map<Integer, Long> anotherFunctionVersionsAfterHardDelete =
+        listFunctionVersions(anotherFunction.id());
+    assertTrue(anotherFunctionVersionsAfterHardDelete.containsKey(3));
+    assertEquals(0L, anotherFunctionVersionsAfterHardDelete.get(3));
 
     // Soft delete old versions
     for (Entity.EntityType entityType : Entity.EntityType.values()) {
       backend.deleteOldVersionData(entityType, 1);
     }
     Map<Integer, Long> versionDeletedMap = listFunctionVersions(anotherFunction.id());
-    assertEquals(3, versionDeletedMap.size());
+    assertTrue(versionDeletedMap.containsKey(3));
+    assertEquals(0L, versionDeletedMap.get(3));
     assertEquals(1, versionDeletedMap.values().stream().filter(value -> value == 0L).count());
-    assertEquals(2, versionDeletedMap.values().stream().filter(value -> value != 0L).count());
 
     // Hard delete old versions
     backend.hardDeleteLegacyData(Entity.EntityType.FUNCTION, Instant.now().toEpochMilli() + 1000);
-    assertEquals(1, listFunctionVersions(anotherFunction.id()).size());
+    Map<Integer, Long> finalFunctionVersions = listFunctionVersions(anotherFunction.id());
+    assertTrue(finalFunctionVersions.containsKey(3));
+    assertEquals(0L, finalFunctionVersions.get(3));
+    assertEquals(1, finalFunctionVersions.values().stream().filter(value -> value == 0L).count());
   }
 
   @TestTemplate
