@@ -427,7 +427,6 @@ public class TestLancePartitionStatisticStorage {
     storage.close();
   }
 
-
   private Map<MetadataObject, Map<String, Map<String, StatisticValue<?>>>> generateData(
       MetadataObject metadataObject, int count, int partitions) {
     Map<MetadataObject, Map<String, Map<String, StatisticValue<?>>>> statisticsToUpdate =
