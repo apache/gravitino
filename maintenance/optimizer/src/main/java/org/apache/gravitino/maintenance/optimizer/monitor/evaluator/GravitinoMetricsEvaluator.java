@@ -31,7 +31,6 @@ import java.util.OptionalDouble;
 import java.util.stream.Collectors;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.maintenance.optimizer.api.common.DataScope;
-import org.apache.gravitino.maintenance.optimizer.api.common.MetricSeries;
 import org.apache.gravitino.maintenance.optimizer.api.common.MetricValueSample;
 import org.apache.gravitino.maintenance.optimizer.api.monitor.MetricsEvaluator;
 import org.apache.gravitino.maintenance.optimizer.common.OptimizerEnv;
@@ -186,8 +185,11 @@ public class GravitinoMetricsEvaluator implements MetricsEvaluator {
   }
 
   @Override
-  public boolean evaluateMetrics(MetricSeries beforeSeries, MetricSeries afterSeries) {
-    DataScope scope = validateAndGetScope(beforeSeries, afterSeries);
+  public boolean evaluateMetrics(
+      DataScope scope,
+      Map<String, List<MetricValueSample>> beforeMetrics,
+      Map<String, List<MetricValueSample>> afterMetrics) {
+    validateInputs(scope, beforeMetrics, afterMetrics);
     if (metricRulesByScope.isEmpty()) {
       return true;
     }
@@ -212,8 +214,8 @@ public class GravitinoMetricsEvaluator implements MetricsEvaluator {
       AggregationOp aggregation = ruleConfig.aggregation;
       ComparisonOp comparison = ruleConfig.comparison;
 
-      List<MetricValueSample> beforeSamples = beforeSeries.samples(metricName);
-      List<MetricValueSample> afterSamples = afterSeries.samples(metricName);
+      List<MetricValueSample> beforeSamples = samples(beforeMetrics, metricName);
+      List<MetricValueSample> afterSamples = samples(afterMetrics, metricName);
       if (beforeSamples.isEmpty() || afterSamples.isEmpty()) {
         LOG.debug(
             "Metric {} of {} ({}) has insufficient samples: beforeSize={}, afterSize={}",
@@ -290,33 +292,28 @@ public class GravitinoMetricsEvaluator implements MetricsEvaluator {
         .collect(Collectors.joining(", "));
   }
 
-  private static DataScope validateAndGetScope(
-      MetricSeries beforeSeries, MetricSeries afterSeries) {
-    if (beforeSeries == null || afterSeries == null) {
-      throw new IllegalArgumentException("beforeSeries and afterSeries must not be null");
+  private static void validateInputs(
+      DataScope scope,
+      Map<String, List<MetricValueSample>> beforeMetrics,
+      Map<String, List<MetricValueSample>> afterMetrics) {
+    if (scope == null) {
+      throw new IllegalArgumentException("scope must not be null");
     }
-    DataScope beforeScope = beforeSeries.scope();
-    DataScope afterScope = afterSeries.scope();
-    boolean sameScope =
-        beforeScope.type() == afterScope.type()
-            && beforeScope.identifier().equals(afterScope.identifier())
-            && beforeScope.partition().equals(afterScope.partition());
-    if (!sameScope) {
-      throw new IllegalArgumentException(
-          "beforeSeries and afterSeries must have identical scope, before="
-              + beforeScope.type()
-              + ":"
-              + beforeScope.identifier()
-              + ", after="
-              + afterScope.type()
-              + ":"
-              + afterScope.identifier());
+    if (beforeMetrics == null || afterMetrics == null) {
+      throw new IllegalArgumentException("beforeMetrics and afterMetrics must not be null");
     }
-    return beforeScope;
   }
 
   private static String normalizeMetricName(String metricName) {
     return metricName == null ? "" : metricName.trim().toLowerCase(Locale.ROOT);
+  }
+
+  private static List<MetricValueSample> samples(
+      Map<String, List<MetricValueSample>> metrics, String metricName) {
+    if (metrics.isEmpty()) {
+      return List.of();
+    }
+    return metrics.getOrDefault(normalizeMetricName(metricName), List.of());
   }
 
   private static OptionalDouble aggregate(

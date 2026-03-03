@@ -20,9 +20,13 @@
 package org.apache.gravitino.maintenance.optimizer.api.monitor;
 
 import com.google.common.base.Preconditions;
+import java.util.Collections;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
 import org.apache.gravitino.annotation.DeveloperApi;
 import org.apache.gravitino.maintenance.optimizer.api.common.DataScope;
-import org.apache.gravitino.maintenance.optimizer.api.common.MetricSeries;
+import org.apache.gravitino.maintenance.optimizer.api.common.MetricValueSample;
 
 /** Immutable evaluation result passed to monitor callbacks. */
 @DeveloperApi
@@ -30,8 +34,8 @@ public class EvaluationResult {
 
   private final DataScope scope;
   private final boolean evaluation;
-  private final MetricSeries beforeSeries;
-  private final MetricSeries afterSeries;
+  private final Map<String, List<MetricValueSample>> beforeMetrics;
+  private final Map<String, List<MetricValueSample>> afterMetrics;
   private final long actionTimeSeconds;
   private final long rangeSeconds;
   private final String evaluatorName;
@@ -41,8 +45,8 @@ public class EvaluationResult {
    *
    * @param scope scope of the evaluated metrics
    * @param evaluation evaluation outcome from the evaluator
-   * @param beforeSeries metric series collected before the action timestamp
-   * @param afterSeries metric series collected at/after the action timestamp
+   * @param beforeMetrics metric samples collected before the action timestamp
+   * @param afterMetrics metric samples collected at/after the action timestamp
    * @param actionTimeSeconds action timestamp in epoch seconds
    * @param rangeSeconds evaluation half-window in seconds
    * @param evaluatorName evaluator implementation name
@@ -50,24 +54,19 @@ public class EvaluationResult {
   public EvaluationResult(
       DataScope scope,
       boolean evaluation,
-      MetricSeries beforeSeries,
-      MetricSeries afterSeries,
+      Map<String, List<MetricValueSample>> beforeMetrics,
+      Map<String, List<MetricValueSample>> afterMetrics,
       long actionTimeSeconds,
       long rangeSeconds,
       String evaluatorName) {
     Preconditions.checkArgument(scope != null, "scope must not be null");
-    Preconditions.checkArgument(beforeSeries != null, "beforeSeries must not be null");
-    Preconditions.checkArgument(afterSeries != null, "afterSeries must not be null");
-    Preconditions.checkArgument(
-        sameScope(scope, beforeSeries.scope()),
-        "beforeSeries scope does not match evaluation scope");
-    Preconditions.checkArgument(
-        sameScope(scope, afterSeries.scope()), "afterSeries scope does not match evaluation scope");
+    Preconditions.checkArgument(beforeMetrics != null, "beforeMetrics must not be null");
+    Preconditions.checkArgument(afterMetrics != null, "afterMetrics must not be null");
     Preconditions.checkArgument(evaluatorName != null, "evaluatorName must not be null");
     this.scope = scope;
     this.evaluation = evaluation;
-    this.beforeSeries = beforeSeries;
-    this.afterSeries = afterSeries;
+    this.beforeMetrics = immutableCopy(beforeMetrics);
+    this.afterMetrics = immutableCopy(afterMetrics);
     this.actionTimeSeconds = actionTimeSeconds;
     this.rangeSeconds = rangeSeconds;
     this.evaluatorName = evaluatorName;
@@ -88,17 +87,17 @@ public class EvaluationResult {
   }
 
   /**
-   * @return immutable metric series before the action timestamp.
+   * @return immutable metric samples before the action timestamp.
    */
-  public MetricSeries beforeSeries() {
-    return beforeSeries;
+  public Map<String, List<MetricValueSample>> beforeMetrics() {
+    return beforeMetrics;
   }
 
   /**
-   * @return immutable metric series at/after the action timestamp.
+   * @return immutable metric samples at/after the action timestamp.
    */
-  public MetricSeries afterSeries() {
-    return afterSeries;
+  public Map<String, List<MetricValueSample>> afterMetrics() {
+    return afterMetrics;
   }
 
   /**
@@ -122,9 +121,19 @@ public class EvaluationResult {
     return evaluatorName;
   }
 
-  private static boolean sameScope(DataScope left, DataScope right) {
-    return left.type() == right.type()
-        && left.identifier().equals(right.identifier())
-        && left.partition().equals(right.partition());
+  private static Map<String, List<MetricValueSample>> immutableCopy(
+      Map<String, List<MetricValueSample>> metrics) {
+    if (metrics.isEmpty()) {
+      return Map.of();
+    }
+
+    Map<String, List<MetricValueSample>> copied = new LinkedHashMap<>();
+    for (Map.Entry<String, List<MetricValueSample>> entry : metrics.entrySet()) {
+      Preconditions.checkArgument(entry.getKey() != null, "metric name must not be null");
+      List<MetricValueSample> values = entry.getValue();
+      Preconditions.checkArgument(values != null, "metric values must not be null");
+      copied.put(entry.getKey(), Collections.unmodifiableList(List.copyOf(values)));
+    }
+    return Collections.unmodifiableMap(copied);
   }
 }

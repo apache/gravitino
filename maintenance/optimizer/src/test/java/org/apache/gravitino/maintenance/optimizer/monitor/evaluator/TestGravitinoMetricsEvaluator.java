@@ -23,7 +23,6 @@ import java.util.List;
 import java.util.Map;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.maintenance.optimizer.api.common.DataScope;
-import org.apache.gravitino.maintenance.optimizer.api.common.MetricSeries;
 import org.apache.gravitino.maintenance.optimizer.api.common.MetricValueSample;
 import org.apache.gravitino.maintenance.optimizer.api.common.PartitionPath;
 import org.apache.gravitino.maintenance.optimizer.common.OptimizerEnv;
@@ -454,8 +453,7 @@ public class TestGravitinoMetricsEvaluator {
       DataScope scope,
       Map<String, List<MetricValueSample>> beforeMetrics,
       Map<String, List<MetricValueSample>> afterMetrics) {
-    return evaluator.evaluateMetrics(
-        MetricSeries.ofSamples(scope, beforeMetrics), MetricSeries.ofSamples(scope, afterMetrics));
+    return evaluator.evaluateMetrics(scope, beforeMetrics, afterMetrics);
   }
 
   private static MetricValueSample metric(long timestamp, String name, long value) {

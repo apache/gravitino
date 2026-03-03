@@ -19,8 +19,11 @@
 
 package org.apache.gravitino.maintenance.optimizer.api.monitor;
 
+import java.util.List;
+import java.util.Map;
 import org.apache.gravitino.annotation.DeveloperApi;
-import org.apache.gravitino.maintenance.optimizer.api.common.MetricSeries;
+import org.apache.gravitino.maintenance.optimizer.api.common.DataScope;
+import org.apache.gravitino.maintenance.optimizer.api.common.MetricValueSample;
 import org.apache.gravitino.maintenance.optimizer.common.OptimizerEnv;
 
 /**
@@ -42,9 +45,13 @@ public interface MetricsEvaluator {
   /**
    * Evaluate metrics before/after optimization to decide success/failure.
    *
-   * @param beforeSeries metric series collected before the action timestamp
-   * @param afterSeries metric series collected at/after the action timestamp
+   * @param scope evaluated scope
+   * @param beforeMetrics metric samples collected before the action timestamp
+   * @param afterMetrics metric samples collected at/after the action timestamp
    * @return true when metrics meet expectations
    */
-  boolean evaluateMetrics(MetricSeries beforeSeries, MetricSeries afterSeries);
+  boolean evaluateMetrics(
+      DataScope scope,
+      Map<String, List<MetricValueSample>> beforeMetrics,
+      Map<String, List<MetricValueSample>> afterMetrics);
 }

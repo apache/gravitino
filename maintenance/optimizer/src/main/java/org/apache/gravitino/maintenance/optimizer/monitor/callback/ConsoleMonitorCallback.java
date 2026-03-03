@@ -20,8 +20,9 @@
 package org.apache.gravitino.maintenance.optimizer.monitor.callback;
 
 import java.time.Instant;
+import java.util.List;
+import java.util.Map;
 import java.util.stream.Collectors;
-import org.apache.gravitino.maintenance.optimizer.api.common.MetricSeries;
 import org.apache.gravitino.maintenance.optimizer.api.common.MetricValueSample;
 import org.apache.gravitino.maintenance.optimizer.api.monitor.EvaluationResult;
 import org.apache.gravitino.maintenance.optimizer.api.monitor.MonitorCallback;
@@ -53,22 +54,22 @@ public class ConsoleMonitorCallback implements MonitorCallback {
                 : "",
             result.evaluation(),
             result.evaluatorName()));
-    if (!result.beforeSeries().isEmpty()) {
-      System.out.println("METRICS BEFORE: " + formatMetrics(result.beforeSeries()));
+    if (!result.beforeMetrics().isEmpty()) {
+      System.out.println("METRICS BEFORE: " + formatMetrics(result.beforeMetrics()));
     }
-    if (!result.afterSeries().isEmpty()) {
-      System.out.println("METRICS AFTER: " + formatMetrics(result.afterSeries()));
+    if (!result.afterMetrics().isEmpty()) {
+      System.out.println("METRICS AFTER: " + formatMetrics(result.afterMetrics()));
     }
   }
 
   @Override
   public void close() throws Exception {}
 
-  private String formatMetrics(MetricSeries metricSeries) {
-    if (metricSeries == null || metricSeries.isEmpty()) {
+  private String formatMetrics(Map<String, List<MetricValueSample>> metrics) {
+    if (metrics == null || metrics.isEmpty()) {
       return "[]";
     }
-    return metricSeries.samplesByMetricName().entrySet().stream()
+    return metrics.entrySet().stream()
         .map(
             entry ->
                 entry.getKey()

@@ -24,13 +24,14 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.maintenance.optimizer.api.common.DataScope;
 import org.apache.gravitino.maintenance.optimizer.api.common.MetricPoint;
-import org.apache.gravitino.maintenance.optimizer.api.common.MetricSeries;
+import org.apache.gravitino.maintenance.optimizer.api.common.MetricValueSample;
 import org.apache.gravitino.maintenance.optimizer.api.common.PartitionPath;
 import org.apache.gravitino.maintenance.optimizer.api.monitor.EvaluationResult;
 import org.apache.gravitino.maintenance.optimizer.api.monitor.MetricsEvaluator;
@@ -197,16 +198,16 @@ public class Monitor implements AutoCloseable {
 
     Pair<List<MetricPoint>, List<MetricPoint>> splitMetrics =
         splitMetrics(filteredMetrics, actionTimeSeconds);
-    MetricSeries beforeSeries = MetricSeries.fromPoints(scope, splitMetrics.getLeft());
-    MetricSeries afterSeries = MetricSeries.fromPoints(scope, splitMetrics.getRight());
+    Map<String, List<MetricValueSample>> beforeMetrics = toMetricSamples(splitMetrics.getLeft());
+    Map<String, List<MetricValueSample>> afterMetrics = toMetricSamples(splitMetrics.getRight());
 
-    boolean evaluation = evaluator.evaluateMetrics(beforeSeries, afterSeries);
+    boolean evaluation = evaluator.evaluateMetrics(scope, beforeMetrics, afterMetrics);
     EvaluationResult result =
         new EvaluationResult(
             scope,
             evaluation,
-            beforeSeries,
-            afterSeries,
+            beforeMetrics,
+            afterMetrics,
             actionTimeSeconds,
             rangeSeconds,
             evaluator.name());
@@ -243,15 +244,15 @@ public class Monitor implements AutoCloseable {
     List<MetricPoint> filteredMetrics = filterMetricsByScope(metrics, scope);
     Pair<List<MetricPoint>, List<MetricPoint>> splitMetrics =
         splitMetrics(filteredMetrics, actionTimeSeconds);
-    MetricSeries beforeSeries = MetricSeries.fromPoints(scope, splitMetrics.getLeft());
-    MetricSeries afterSeries = MetricSeries.fromPoints(scope, splitMetrics.getRight());
-    boolean evaluation = evaluator.evaluateMetrics(beforeSeries, afterSeries);
+    Map<String, List<MetricValueSample>> beforeMetrics = toMetricSamples(splitMetrics.getLeft());
+    Map<String, List<MetricValueSample>> afterMetrics = toMetricSamples(splitMetrics.getRight());
+    boolean evaluation = evaluator.evaluateMetrics(scope, beforeMetrics, afterMetrics);
     EvaluationResult result =
         new EvaluationResult(
             scope,
             evaluation,
-            beforeSeries,
-            afterSeries,
+            beforeMetrics,
+            afterMetrics,
             actionTimeSeconds,
             rangeSeconds,
             evaluator.name());
@@ -343,6 +344,26 @@ public class Monitor implements AutoCloseable {
           invalidReasonCounts);
     }
     return List.copyOf(filtered);
+  }
+
+  private Map<String, List<MetricValueSample>> toMetricSamples(List<MetricPoint> points) {
+    if (points == null || points.isEmpty()) {
+      return Map.of();
+    }
+
+    Map<String, List<MetricValueSample>> grouped = new LinkedHashMap<>();
+    for (MetricPoint point : points) {
+      String metricName = point.metricName().trim().toLowerCase(Locale.ROOT);
+      grouped
+          .computeIfAbsent(metricName, ignored -> new ArrayList<>())
+          .add(new MetricValueSample(point.timestampSeconds(), point.value()));
+    }
+
+    Map<String, List<MetricValueSample>> immutableGrouped = new LinkedHashMap<>();
+    for (Map.Entry<String, List<MetricValueSample>> entry : grouped.entrySet()) {
+      immutableGrouped.put(entry.getKey(), List.copyOf(entry.getValue()));
+    }
+    return Collections.unmodifiableMap(immutableGrouped);
   }
 
   /** Close all initialized monitor providers and callbacks. */

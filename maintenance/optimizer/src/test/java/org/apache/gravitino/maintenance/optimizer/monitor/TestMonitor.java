@@ -21,10 +21,10 @@ package org.apache.gravitino.maintenance.optimizer.monitor;
 
 import com.google.common.collect.ImmutableMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.maintenance.optimizer.api.common.DataScope;
-import org.apache.gravitino.maintenance.optimizer.api.common.MetricSeries;
 import org.apache.gravitino.maintenance.optimizer.api.common.MetricValueSample;
 import org.apache.gravitino.maintenance.optimizer.api.common.PartitionPath;
 import org.apache.gravitino.maintenance.optimizer.api.monitor.EvaluationResult;
@@ -83,8 +83,8 @@ public class TestMonitor {
     Assertions.assertEquals(100L, tableResult.actionTimeSeconds());
     Assertions.assertEquals(10L, tableResult.rangeSeconds());
     Assertions.assertEquals(MetricsEvaluatorForTest.NAME, tableResult.evaluatorName());
-    MetricValueSample tableBeforeRowCount = onlyMetric(tableResult.beforeSeries(), "row_count");
-    MetricValueSample tableAfterRowCount = onlyMetric(tableResult.afterSeries(), "row_count");
+    MetricValueSample tableBeforeRowCount = onlyMetric(tableResult.beforeMetrics(), "row_count");
+    MetricValueSample tableAfterRowCount = onlyMetric(tableResult.afterMetrics(), "row_count");
     Assertions.assertEquals(95L, tableBeforeRowCount.timestampSeconds());
     Assertions.assertEquals(100L, tableAfterRowCount.timestampSeconds());
     Assertions.assertEquals(100L, metricLongValue(tableBeforeRowCount));
@@ -93,8 +93,8 @@ public class TestMonitor {
     Assertions.assertEquals(DataScope.Type.JOB, jobResult1.scope().type());
     Assertions.assertEquals(TableJobRelationProviderForTest.JOB1, jobResult1.scope().identifier());
     Assertions.assertTrue(jobResult1.evaluation());
-    MetricValueSample job1BeforeDuration = onlyMetric(jobResult1.beforeSeries(), "duration");
-    MetricValueSample job1AfterDuration = onlyMetric(jobResult1.afterSeries(), "duration");
+    MetricValueSample job1BeforeDuration = onlyMetric(jobResult1.beforeMetrics(), "duration");
+    MetricValueSample job1AfterDuration = onlyMetric(jobResult1.afterMetrics(), "duration");
     Assertions.assertEquals(99L, job1BeforeDuration.timestampSeconds());
     Assertions.assertEquals(102L, job1AfterDuration.timestampSeconds());
     Assertions.assertEquals(10L, metricLongValue(job1BeforeDuration));
@@ -103,8 +103,8 @@ public class TestMonitor {
     Assertions.assertEquals(DataScope.Type.JOB, jobResult2.scope().type());
     Assertions.assertEquals(TableJobRelationProviderForTest.JOB2, jobResult2.scope().identifier());
     Assertions.assertFalse(jobResult2.evaluation());
-    MetricValueSample job2BeforeDuration = onlyMetric(jobResult2.beforeSeries(), "duration");
-    MetricValueSample job2AfterDuration = onlyMetric(jobResult2.afterSeries(), "duration");
+    MetricValueSample job2BeforeDuration = onlyMetric(jobResult2.beforeMetrics(), "duration");
+    MetricValueSample job2AfterDuration = onlyMetric(jobResult2.afterMetrics(), "duration");
     Assertions.assertEquals(98L, job2BeforeDuration.timestampSeconds());
     Assertions.assertEquals(104L, job2AfterDuration.timestampSeconds());
     Assertions.assertEquals(30L, metricLongValue(job2BeforeDuration));
@@ -147,8 +147,8 @@ public class TestMonitor {
     EvaluationResult tableResult = results.get(0);
     Assertions.assertEquals(DataScope.Type.PARTITION, tableResult.scope().type());
     Assertions.assertEquals(partitionPath, tableResult.scope().partition().orElseThrow());
-    MetricValueSample beforeRowCount = onlyMetric(tableResult.beforeSeries(), "row_count");
-    MetricValueSample afterRowCount = onlyMetric(tableResult.afterSeries(), "row_count");
+    MetricValueSample beforeRowCount = onlyMetric(tableResult.beforeMetrics(), "row_count");
+    MetricValueSample afterRowCount = onlyMetric(tableResult.afterMetrics(), "row_count");
     Assertions.assertEquals(97L, beforeRowCount.timestampSeconds());
     Assertions.assertEquals(101L, afterRowCount.timestampSeconds());
     Assertions.assertEquals(110L, metricLongValue(beforeRowCount));
@@ -238,12 +238,13 @@ public class TestMonitor {
     }
 
     EvaluationResult tableResult = results.get(0);
-    MetricValueSample beforeRowCount = onlyMetric(tableResult.beforeSeries(), "row_count");
+    MetricValueSample beforeRowCount = onlyMetric(tableResult.beforeMetrics(), "row_count");
     Assertions.assertEquals(95L, beforeRowCount.timestampSeconds());
   }
 
-  private static MetricValueSample onlyMetric(MetricSeries series, String metricName) {
-    List<MetricValueSample> matched = series.samples(metricName);
+  private static MetricValueSample onlyMetric(
+      Map<String, List<MetricValueSample>> metrics, String metricName) {
+    List<MetricValueSample> matched = metrics.getOrDefault(metricName, List.of());
     Assertions.assertEquals(1, matched.size());
     return matched.get(0);
   }
