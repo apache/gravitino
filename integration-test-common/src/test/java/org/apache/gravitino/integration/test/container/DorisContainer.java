@@ -95,10 +95,10 @@ public class DorisContainer extends BaseContainer {
 
     String effectiveImage =
         (DEFAULT_IMAGE != null && !DEFAULT_IMAGE.isEmpty()) ? DEFAULT_IMAGE : image;
-    Preconditions.check("Doris Docker image must be configured via GRAVITINO_CI_DORIS_DOCKER_IMAGE or "
-                    + "DorisContainer builder image",
-        effectiveImage != null && !effectiveImage.isEmpty()
-        );
+    Preconditions.check(
+        "Doris Docker image must be configured via GRAVITINO_CI_DORIS_DOCKER_IMAGE or "
+            + "DorisContainer builder image",
+        effectiveImage != null && !effectiveImage.isEmpty());
 
     composeContainer =
         new ComposeContainer(new File(composeFile))
