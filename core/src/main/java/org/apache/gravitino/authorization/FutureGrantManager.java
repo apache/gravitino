@@ -57,15 +57,20 @@ public class FutureGrantManager {
 
   public void grantNewlyCreatedCatalog(String metalake, BaseCatalog catalog) {
     try {
+      AuthorizationPlugin authorizationPlugin = catalog.getAuthorizationPlugin();
+
+      if (authorizationPlugin == null) {
+        // If the authorization plugin is null, it means the catalog does not support authorization,
+        // so we can skip the future grant process to avoid overhead.
+        return;
+      }
       MetadataObject metalakeObject =
           MetadataObjects.of(null, metalake, MetadataObject.Type.METALAKE);
       Optional<Owner> ownerOptional = ownerDispatcher.getOwner(metalake, metalakeObject);
+
       ownerOptional.ifPresent(
           owner -> {
-            AuthorizationPlugin authorizationPlugin = catalog.getAuthorizationPlugin();
-            if (authorizationPlugin != null) {
-              authorizationPlugin.onOwnerSet(metalakeObject, null, owner);
-            }
+            authorizationPlugin.onOwnerSet(metalakeObject, null, owner);
           });
 
       Map<UserEntity, Set<RoleEntity>> userGrantRoles = Maps.newHashMap();
@@ -129,20 +134,13 @@ public class FutureGrantManager {
       }
 
       for (Map.Entry<UserEntity, Set<RoleEntity>> entry : userGrantRoles.entrySet()) {
-        AuthorizationPlugin authorizationPlugin = catalog.getAuthorizationPlugin();
-        if (authorizationPlugin != null) {
-          authorizationPlugin.onGrantedRolesToUser(
-              Lists.newArrayList(entry.getValue()), entry.getKey());
-        }
+        authorizationPlugin.onGrantedRolesToUser(
+            Lists.newArrayList(entry.getValue()), entry.getKey());
       }
 
       for (Map.Entry<GroupEntity, Set<RoleEntity>> entry : groupGrantRoles.entrySet()) {
-        AuthorizationPlugin authorizationPlugin = catalog.getAuthorizationPlugin();
-
-        if (authorizationPlugin != null) {
-          authorizationPlugin.onGrantedRolesToGroup(
-              Lists.newArrayList(entry.getValue()), entry.getKey());
-        }
+        authorizationPlugin.onGrantedRolesToGroup(
+            Lists.newArrayList(entry.getValue()), entry.getKey());
       }
     } catch (IOException e) {
       throw new RuntimeException(e);

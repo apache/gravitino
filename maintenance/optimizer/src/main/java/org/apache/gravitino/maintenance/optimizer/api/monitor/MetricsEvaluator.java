@@ -23,14 +23,23 @@ import java.util.List;
 import java.util.Map;
 import org.apache.gravitino.annotation.DeveloperApi;
 import org.apache.gravitino.maintenance.optimizer.api.common.MetricSample;
+import org.apache.gravitino.maintenance.optimizer.common.OptimizerEnv;
 
 /**
  * Evaluator interface for the table and related job metrics before and after optimization actions.
  */
 @DeveloperApi
 public interface MetricsEvaluator {
+
   /** Human-readable evaluator name, primarily for logging and selection. */
   String name();
+
+  /**
+   * Optional initialization hook for evaluators that need runtime configuration.
+   *
+   * @param optimizerEnv shared optimizer environment/configuration
+   */
+  default void initialize(OptimizerEnv optimizerEnv) {}
 
   /**
    * Evaluate metrics before/after optimization to decide success/failure.

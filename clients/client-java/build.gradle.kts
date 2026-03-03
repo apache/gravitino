@@ -90,7 +90,7 @@ tasks.javadoc {
 
   classpath = configurations["compileClasspath"] +
     project(":api").configurations["runtimeClasspath"] +
-    project(":common").configurations["runtimeClasspath"]
+    project(":common").configurations["compileClasspath"]
 }
 
 tasks.clean {

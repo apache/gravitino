@@ -564,6 +564,50 @@ class TestModelCatalog(IntegrationTestEnv):
         self.assertEqual("comment", updated_model_version.comment())
         self.assertEqual({"k1": "v1", "k2": "v2"}, updated_model_version.properties())
 
+    def test_link_update_model_version_aliases_from_empty(self):
+        # Regression test for https://github.com/apache/gravitino/issues/9727:
+        # updating aliases on a model version that was linked without any aliases must not throw.
+        model_name = f"model_it_model{str(randint(0, 1000))}"
+        model_ident = NameIdentifier.of(self._schema_name, model_name)
+        properties = {"k1": "v1"}
+        self._catalog.as_model_catalog().register_model(
+            model_ident, "comment", properties
+        )
+
+        # Link a model version with NO aliases
+        self._catalog.as_model_catalog().link_model_version(
+            model_ident,
+            uri="uri",
+            aliases=[],
+            comment="comment",
+            properties=properties,
+        )
+
+        original_model_version = self._catalog.as_model_catalog().get_model_version(
+            model_ident, 0
+        )
+        self.assertEqual(0, original_model_version.version())
+        self.assertEqual([], original_model_version.aliases())
+
+        # Add aliases to the version that previously had none — must not raise
+        changes = [ModelVersionChange.update_aliases(["alias1", "alias2"], [])]
+        updated_model_version = self._catalog.as_model_catalog().alter_model_version(
+            model_ident, 0, *changes
+        )
+
+        self.assertEqual(0, updated_model_version.version())
+        self.assertCountEqual(["alias1", "alias2"], updated_model_version.aliases())
+
+        # Reload and verify aliases are persisted
+        reloaded = self._catalog.as_model_catalog().get_model_version(model_ident, 0)
+        self.assertCountEqual(["alias1", "alias2"], reloaded.aliases())
+
+        # Verify lookup by alias works
+        by_alias = self._catalog.as_model_catalog().get_model_version_by_alias(
+            model_ident, "alias1"
+        )
+        self.assertEqual(0, by_alias.version())
+
     def test_link_get_model_version(self):
         model_name = "model_it_model" + str(randint(0, 1000))
         model_ident = NameIdentifier.of(self._schema_name, model_name)

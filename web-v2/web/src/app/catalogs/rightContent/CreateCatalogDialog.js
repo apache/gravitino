@@ -494,7 +494,7 @@ export default function CreateCatalogDialog({ ...props }) {
                       messageVariables={{ label: 'catalog name' }}
                       data-refer='catalog-name-field'
                     >
-                      <Input placeholder={mismatchName} disabled={!init} />
+                      <Input placeholder={mismatchName} disabled={init} />
                     </Form.Item>
                     {providerBase[catalogType === 'model' ? 'model' : currentProvider]?.defaultProps
                       ?.filter(p => !isHidden(p))

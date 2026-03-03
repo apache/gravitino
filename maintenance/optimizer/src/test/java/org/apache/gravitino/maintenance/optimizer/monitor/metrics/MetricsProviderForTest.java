@@ -28,7 +28,7 @@ import org.apache.gravitino.maintenance.optimizer.api.common.PartitionPath;
 import org.apache.gravitino.maintenance.optimizer.api.common.StatisticEntry;
 import org.apache.gravitino.maintenance.optimizer.api.monitor.MetricsProvider;
 import org.apache.gravitino.maintenance.optimizer.common.OptimizerEnv;
-import org.apache.gravitino.maintenance.optimizer.monitor.job.JobProviderForTest;
+import org.apache.gravitino.maintenance.optimizer.monitor.job.TableJobRelationProviderForTest;
 import org.apache.gravitino.stats.StatisticValue;
 import org.apache.gravitino.stats.StatisticValues;
 
@@ -49,14 +49,14 @@ public class MetricsProviderForTest implements MetricsProvider {
   @Override
   public Map<String, List<MetricSample>> jobMetrics(
       NameIdentifier jobIdentifier, long startTime, long endTime) {
-    if (JobProviderForTest.JOB1.equals(jobIdentifier)) {
+    if (TableJobRelationProviderForTest.JOB1.equals(jobIdentifier)) {
       return Map.of(
           "duration",
           List.of(
               metric(99, "duration", StatisticValues.longValue(10L)),
               metric(102, "duration", StatisticValues.longValue(20L))));
     }
-    if (JobProviderForTest.JOB2.equals(jobIdentifier)) {
+    if (TableJobRelationProviderForTest.JOB2.equals(jobIdentifier)) {
       return Map.of(
           "duration",
           List.of(
