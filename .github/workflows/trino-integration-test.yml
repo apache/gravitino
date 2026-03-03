@@ -42,7 +42,7 @@ jobs:
               - build.gradle.kts
               - gradle.properties
               - gradlew
-              - setting.gradle.kts
+              - settings.gradle.kts
     outputs:
       source_changes: ${{ steps.filter.outputs.source_changes }}
 
@@ -74,9 +74,9 @@ jobs:
         run: |
           dev/ci/check_commands.sh
 
-      - name: Build Gravitino
+      - name: Package Gravitino
         run: |
-          ./gradlew build -x test
+          ./gradlew compileDistribution compileTrinoConnector -x test
 
       - name: Free up disk space
         run: |
@@ -85,7 +85,8 @@ jobs:
       - name: Trino Integration Test
         id: integrationTest
         run: |
-          trino-connector/integration-test/trino-test-tools/trino_integration_test.sh
+          ./gradlew -PskipTests -PtestMode=embedded -PskipDockerTests=false :trino-connector:integration-test:test
+          ./gradlew -PskipTests -PtestMode=deploy -PskipDockerTests=false :trino-connector:integration-test:test
           # Disable the Trino cascading query integration test, because the connector jars are private now.
           #trino-connector/integration-test/trino-test-tools/run_test.sh
 
