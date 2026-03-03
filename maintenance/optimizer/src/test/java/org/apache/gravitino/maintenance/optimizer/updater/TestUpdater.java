@@ -56,7 +56,7 @@ public class TestUpdater {
     assertNotNull(metricsUpdater);
     assertEquals(1, statisticsUpdater.tableUpdates());
     assertEquals(1, statisticsUpdater.partitionUpdates());
-    assertEquals(0, metricsUpdater.tableUpdates());
+    assertEquals(0, metricsUpdater.tableAndPartitionUpdates());
     assertEquals(0, metricsUpdater.jobUpdates());
   }
 
@@ -75,13 +75,13 @@ public class TestUpdater {
     assertNotNull(metricsUpdater);
     assertEquals(0, statisticsUpdater.tableUpdates());
     assertEquals(0, statisticsUpdater.partitionUpdates());
-    assertEquals(1, metricsUpdater.tableUpdates());
+    assertEquals(1, metricsUpdater.tableAndPartitionUpdates());
     assertEquals(1, metricsUpdater.jobUpdates());
     assertTrue(
-        metricsUpdater.lastMetrics().stream()
+        metricsUpdater.lastTableAndPartitionMetrics().stream()
             .allMatch(metric -> metric.timestampSeconds() == 123L));
     assertTrue(
-        metricsUpdater.lastMetrics().stream()
+        metricsUpdater.lastJobMetrics().stream()
             .anyMatch(metric -> metric.scope() == MetricPoint.Scope.JOB));
   }
 
@@ -99,10 +99,10 @@ public class TestUpdater {
 
     MetricsUpdaterForTest metricsUpdater = selectMetricsUpdater();
     assertNotNull(metricsUpdater);
-    assertEquals(1, metricsUpdater.updateCalls());
-    assertEquals(1, metricsUpdater.tableUpdates());
+    assertEquals(1, metricsUpdater.tableAndPartitionUpdates());
     assertEquals(1, metricsUpdater.jobUpdates());
-    assertEquals(8, metricsUpdater.lastMetrics().size());
+    assertEquals(6, metricsUpdater.lastTableAndPartitionMetrics().size());
+    assertEquals(2, metricsUpdater.lastJobMetrics().size());
   }
 
   @Test
@@ -118,7 +118,7 @@ public class TestUpdater {
     assertNotNull(metricsUpdater);
     assertEquals(1, statisticsUpdater.tableUpdates());
     assertEquals(1, statisticsUpdater.partitionUpdates());
-    assertEquals(0, metricsUpdater.tableUpdates());
+    assertEquals(0, metricsUpdater.tableAndPartitionUpdates());
     assertEquals(0, metricsUpdater.jobUpdates());
   }
 
@@ -135,13 +135,13 @@ public class TestUpdater {
     assertNotNull(metricsUpdater);
     assertEquals(0, statisticsUpdater.tableUpdates());
     assertEquals(0, statisticsUpdater.partitionUpdates());
-    assertEquals(1, metricsUpdater.tableUpdates());
+    assertEquals(1, metricsUpdater.tableAndPartitionUpdates());
     assertEquals(1, metricsUpdater.jobUpdates());
     assertTrue(
-        metricsUpdater.lastMetrics().stream()
+        metricsUpdater.lastTableAndPartitionMetrics().stream()
             .allMatch(metric -> metric.timestampSeconds() == 123L));
     assertTrue(
-        metricsUpdater.lastMetrics().stream()
+        metricsUpdater.lastJobMetrics().stream()
             .anyMatch(metric -> metric.scope() == MetricPoint.Scope.JOB));
   }
 
@@ -178,7 +178,10 @@ public class TestUpdater {
     return MetricsUpdaterForTest.instances().stream()
         .max(
             Comparator.comparingInt(
-                updater -> updater.tableUpdates() + updater.jobUpdates() + updater.closeCalls()))
+                updater ->
+                    updater.tableAndPartitionUpdates()
+                        + updater.jobUpdates()
+                        + updater.closeCalls()))
         .orElse(null);
   }
 

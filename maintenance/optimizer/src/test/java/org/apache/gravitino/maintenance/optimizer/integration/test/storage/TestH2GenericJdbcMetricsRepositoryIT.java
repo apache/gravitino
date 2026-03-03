@@ -88,7 +88,7 @@ class TestH2GenericJdbcMetricsRepositoryIT extends BaseGenericJdbcMetricsReposit
     try {
       NameIdentifier tableId = NameIdentifier.of("catalog", "db", "auto_create_table");
       long now = currentEpochSeconds();
-      repository.storeMetrics(
+      repository.storeTableAndPartitionMetrics(
           List.of(
               MetricPoint.forTable(tableId, "row_count", StatisticValues.stringValue("12"), now)));
 

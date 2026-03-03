@@ -66,7 +66,6 @@ import org.slf4j.LoggerFactory;
  */
 public class Updater implements AutoCloseable {
   private static final Logger LOG = LoggerFactory.getLogger(Updater.class);
-  private static final int METRICS_FLUSH_THRESHOLD = 10_000;
 
   private StatisticsUpdater statisticsUpdater;
   private MetricsUpdater metricsUpdater;
@@ -189,7 +188,8 @@ public class Updater implements AutoCloseable {
     long tableRecords = 0;
     long partitionRecords = 0;
     long jobRecords = 0;
-    List<MetricPoint> pendingMetrics = new ArrayList<>();
+    List<MetricPoint> pendingTableAndPartitionMetrics = new ArrayList<>();
+    List<MetricPoint> pendingJobMetrics = new ArrayList<>();
 
     for (NameIdentifier nameIdentifier : nameIdentifiers) {
       if (hasTableMetricsCalculator) {
@@ -202,7 +202,7 @@ public class Updater implements AutoCloseable {
             statisticsCalculatorName,
             nameIdentifier,
             metrics == null ? 0 : metrics.size());
-        appendAndFlushMetrics(pendingMetrics, metrics);
+        appendMetrics(pendingTableAndPartitionMetrics, metrics);
       }
 
       if (hasJobMetricsCalculator) {
@@ -214,11 +214,12 @@ public class Updater implements AutoCloseable {
             statisticsCalculatorName,
             nameIdentifier,
             metrics == null ? 0 : metrics.size());
-        appendAndFlushMetrics(pendingMetrics, metrics);
+        appendMetrics(pendingJobMetrics, metrics);
       }
     }
 
-    flushPendingMetrics(pendingMetrics);
+    updateTableAndPartitionMetrics(pendingTableAndPartitionMetrics);
+    updateJobMetrics(pendingJobMetrics);
 
     System.out.println(
         String.format(
@@ -283,24 +284,26 @@ public class Updater implements AutoCloseable {
     long tableRecords = 0;
     long partitionRecords = 0;
     long jobRecords = 0;
-    List<MetricPoint> pendingMetrics = new ArrayList<>();
+    List<MetricPoint> pendingTableAndPartitionMetrics = new ArrayList<>();
+    List<MetricPoint> pendingJobMetrics = new ArrayList<>();
 
     if (hasTableMetricsCalculator) {
       List<MetricPoint> metrics =
           ((SupportsCalculateBulkTableMetrics) calculator).calculateAllTableMetrics();
       tableRecords += countMetricsByScope(metrics, MetricPoint.Scope.TABLE);
       partitionRecords += countMetricsByScope(metrics, MetricPoint.Scope.PARTITION);
-      appendAndFlushMetrics(pendingMetrics, metrics);
+      appendMetrics(pendingTableAndPartitionMetrics, metrics);
     }
 
     if (hasJobMetricsCalculator) {
       List<MetricPoint> metrics =
           ((SupportsCalculateBulkJobMetrics) calculator).calculateAllJobMetrics();
       jobRecords += countMetricsByScope(metrics, MetricPoint.Scope.JOB);
-      appendAndFlushMetrics(pendingMetrics, metrics);
+      appendMetrics(pendingJobMetrics, metrics);
     }
 
-    flushPendingMetrics(pendingMetrics);
+    updateTableAndPartitionMetrics(pendingTableAndPartitionMetrics);
+    updateJobMetrics(pendingJobMetrics);
 
     System.out.println(
         String.format(
@@ -343,32 +346,25 @@ public class Updater implements AutoCloseable {
     statisticsUpdater.updatePartitionStatistics(tableIdentifier, partitionStatistics);
   }
 
-  private void updateMetrics(List<MetricPoint> metrics) {
+  private void updateTableAndPartitionMetrics(List<MetricPoint> metrics) {
     if (metrics == null || metrics.isEmpty()) {
       return;
     }
-    metricsUpdater.updateMetrics(metrics);
+    metricsUpdater.updateTableAndPartitionMetrics(metrics);
   }
 
-  private void appendAndFlushMetrics(
-      List<MetricPoint> pendingMetrics, List<MetricPoint> metricsToAppend) {
+  private void updateJobMetrics(List<MetricPoint> metrics) {
+    if (metrics == null || metrics.isEmpty()) {
+      return;
+    }
+    metricsUpdater.updateJobMetrics(metrics);
+  }
+
+  private void appendMetrics(List<MetricPoint> pendingMetrics, List<MetricPoint> metricsToAppend) {
     if (metricsToAppend == null || metricsToAppend.isEmpty()) {
       return;
     }
-
     pendingMetrics.addAll(metricsToAppend);
-    if (pendingMetrics.size() >= METRICS_FLUSH_THRESHOLD) {
-      flushPendingMetrics(pendingMetrics);
-    }
-  }
-
-  private void flushPendingMetrics(List<MetricPoint> pendingMetrics) {
-    if (pendingMetrics.isEmpty()) {
-      return;
-    }
-
-    updateMetrics(List.copyOf(pendingMetrics));
-    pendingMetrics.clear();
   }
 
   private String summarize(List<StatisticEntry<?>> statistics) {

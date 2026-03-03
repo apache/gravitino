@@ -46,9 +46,18 @@ public class GravitinoMetricsUpdater implements MetricsUpdater {
   }
 
   @Override
-  public void updateMetrics(List<MetricPoint> metrics) {
+  public void updateTableAndPartitionMetrics(List<MetricPoint> metrics) {
     ensureInitialized();
-    metricsStorage.storeMetrics(metrics);
+    validateScopes(
+        metrics, List.of(MetricPoint.Scope.TABLE, MetricPoint.Scope.PARTITION), "table/partition");
+    metricsStorage.storeTableAndPartitionMetrics(metrics);
+  }
+
+  @Override
+  public void updateJobMetrics(List<MetricPoint> metrics) {
+    ensureInitialized();
+    validateScopes(metrics, List.of(MetricPoint.Scope.JOB), "job");
+    metricsStorage.storeJobMetrics(metrics);
   }
 
   @Override
@@ -62,5 +71,18 @@ public class GravitinoMetricsUpdater implements MetricsUpdater {
     Preconditions.checkState(
         metricsStorage != null,
         "GravitinoMetricsUpdater has not been initialized. Call initialize() first.");
+  }
+
+  private void validateScopes(
+      List<MetricPoint> metrics, List<MetricPoint.Scope> allowedScopes, String updateType) {
+    Preconditions.checkArgument(metrics != null, "metrics must not be null");
+    for (MetricPoint metric : metrics) {
+      Preconditions.checkArgument(metric != null, "metric must not be null");
+      Preconditions.checkArgument(
+          allowedScopes.contains(metric.scope()),
+          "Unsupported scope %s for %s metrics update",
+          metric.scope(),
+          updateType);
+    }
   }
 }

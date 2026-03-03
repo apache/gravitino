@@ -27,6 +27,9 @@ import org.apache.gravitino.maintenance.optimizer.api.common.Provider;
 /** Represents an updater that can persist metric points. */
 @DeveloperApi
 public interface MetricsUpdater extends Provider {
-  /** Persist metrics for table/partition/job scopes. */
-  void updateMetrics(List<MetricPoint> metrics);
+  /** Persist metrics for table and partition scopes. */
+  void updateTableAndPartitionMetrics(List<MetricPoint> metrics);
+
+  /** Persist metrics for job scope. */
+  void updateJobMetrics(List<MetricPoint> metrics);
 }

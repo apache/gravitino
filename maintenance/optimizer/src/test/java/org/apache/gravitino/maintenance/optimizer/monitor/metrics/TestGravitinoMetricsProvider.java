@@ -66,12 +66,13 @@ public class TestGravitinoMetricsProvider {
 
     try (MetricsRepository metricsRepository = new GenericJdbcMetricsRepository()) {
       metricsRepository.initialize(configs);
-      metricsRepository.storeMetrics(
+      metricsRepository.storeTableAndPartitionMetrics(
           List.of(
               MetricPoint.forTable(table, "row_count", StatisticValues.longValue(10L), 100L),
               MetricPoint.forPartition(
-                  table, partitionPath, "row_count", StatisticValues.longValue(11L), 101L),
-              MetricPoint.forJob(job, "duration", StatisticValues.longValue(99L), 102L)));
+                  table, partitionPath, "row_count", StatisticValues.longValue(11L), 101L)));
+      metricsRepository.storeJobMetrics(
+          List.of(MetricPoint.forJob(job, "duration", StatisticValues.longValue(99L), 102L)));
     }
 
     GravitinoMetricsProvider provider = new GravitinoMetricsProvider();

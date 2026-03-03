@@ -32,11 +32,11 @@ public class MetricsUpdaterForTest implements MetricsUpdater {
   public static final String NAME = "test-metrics-updater";
   private static final List<MetricsUpdaterForTest> INSTANCES =
       Collections.synchronizedList(new ArrayList<>());
-  private final AtomicInteger updateCalls = new AtomicInteger();
-  private final AtomicInteger tableUpdates = new AtomicInteger();
+  private final AtomicInteger tableAndPartitionUpdates = new AtomicInteger();
   private final AtomicInteger jobUpdates = new AtomicInteger();
   private final AtomicInteger closeCalls = new AtomicInteger();
-  private volatile List<MetricPoint> lastMetrics = List.of();
+  private volatile List<MetricPoint> lastTableAndPartitionMetrics = List.of();
+  private volatile List<MetricPoint> lastJobMetrics = List.of();
 
   public MetricsUpdaterForTest() {
     INSTANCES.add(this);
@@ -50,24 +50,24 @@ public class MetricsUpdaterForTest implements MetricsUpdater {
     INSTANCES.clear();
   }
 
-  public int tableUpdates() {
-    return tableUpdates.get();
+  public int tableAndPartitionUpdates() {
+    return tableAndPartitionUpdates.get();
   }
 
-  public int updateCalls() {
-    return updateCalls.get();
+  public List<MetricPoint> lastTableAndPartitionMetrics() {
+    return lastTableAndPartitionMetrics;
   }
 
   public int jobUpdates() {
     return jobUpdates.get();
   }
 
-  public int closeCalls() {
-    return closeCalls.get();
+  public List<MetricPoint> lastJobMetrics() {
+    return lastJobMetrics;
   }
 
-  public List<MetricPoint> lastMetrics() {
-    return lastMetrics;
+  public int closeCalls() {
+    return closeCalls.get();
   }
 
   @Override
@@ -79,30 +79,15 @@ public class MetricsUpdaterForTest implements MetricsUpdater {
   public void initialize(OptimizerEnv optimizerEnv) {}
 
   @Override
-  public void updateMetrics(List<MetricPoint> metrics) {
-    updateCalls.incrementAndGet();
-    int tableCount =
-        metrics == null
-            ? 0
-            : (int)
-                metrics.stream()
-                    .filter(
-                        metric ->
-                            metric.scope() == MetricPoint.Scope.TABLE
-                                || metric.scope() == MetricPoint.Scope.PARTITION)
-                    .count();
-    int jobCount =
-        metrics == null
-            ? 0
-            : (int)
-                metrics.stream().filter(metric -> metric.scope() == MetricPoint.Scope.JOB).count();
-    if (tableCount > 0) {
-      tableUpdates.incrementAndGet();
-    }
-    if (jobCount > 0) {
-      jobUpdates.incrementAndGet();
-    }
-    lastMetrics = metrics == null ? List.of() : List.copyOf(metrics);
+  public void updateTableAndPartitionMetrics(List<MetricPoint> metrics) {
+    tableAndPartitionUpdates.incrementAndGet();
+    lastTableAndPartitionMetrics = metrics == null ? List.of() : List.copyOf(metrics);
+  }
+
+  @Override
+  public void updateJobMetrics(List<MetricPoint> metrics) {
+    jobUpdates.incrementAndGet();
+    lastJobMetrics = metrics == null ? List.of() : List.copyOf(metrics);
   }
 
   @Override

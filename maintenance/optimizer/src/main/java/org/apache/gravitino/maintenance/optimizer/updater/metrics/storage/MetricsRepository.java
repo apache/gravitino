@@ -30,8 +30,11 @@ public interface MetricsRepository extends AutoCloseable {
   /** Initialize the storage backend with configuration properties. */
   void initialize(Map<String, String> properties);
 
-  /** Persist metric points in one call. */
-  void storeMetrics(List<MetricPoint> metrics);
+  /** Persist metric points for table and partition scopes. */
+  void storeTableAndPartitionMetrics(List<MetricPoint> metrics);
+
+  /** Persist metric points for job scope. */
+  void storeJobMetrics(List<MetricPoint> metrics);
 
   /** Load metrics within a time window [fromSecs, toSecs) in epoch seconds. */
   List<MetricPoint> getMetrics(MetricScope scope, long fromSecs, long toSecs);

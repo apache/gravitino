@@ -228,7 +228,7 @@ public abstract class JdbcMetricsRepository implements MetricsRepository {
   }
 
   @Override
-  public void storeMetrics(List<MetricPoint> metrics) {
+  public void storeTableAndPartitionMetrics(List<MetricPoint> metrics) {
     Preconditions.checkArgument(metrics != null, "metrics must not be null");
     if (metrics.isEmpty()) {
       return;
@@ -236,56 +236,88 @@ public abstract class JdbcMetricsRepository implements MetricsRepository {
 
     String tableInsertSql =
         "INSERT INTO table_metrics (table_identifier, metric_name, table_partition, metric_ts, metric_value) VALUES (?, ?, ?, ?, ?)";
-    String jobInsertSql =
-        "INSERT INTO job_metrics (job_identifier, metric_name, metric_ts, metric_value) VALUES (?, ?, ?, ?)";
 
     try (Connection conn = getConnection();
-        PreparedStatement tableInsertStmt = conn.prepareStatement(tableInsertSql);
-        PreparedStatement jobInsertStmt = conn.prepareStatement(jobInsertSql)) {
+        PreparedStatement tableInsertStmt = conn.prepareStatement(tableInsertSql)) {
       int tableBatchCount = 0;
-      int jobBatchCount = 0;
       for (MetricPoint metricPoint : metrics) {
         Preconditions.checkArgument(metricPoint != null, "metric point must not be null");
+        Preconditions.checkArgument(
+            metricPoint.scope() == MetricPoint.Scope.TABLE
+                || metricPoint.scope() == MetricPoint.Scope.PARTITION,
+            "Unsupported scope %s for table/partition metrics",
+            metricPoint.scope());
         String serializedMetricValue = StatisticValueUtils.toString(metricPoint.value());
         validateWriteArguments(metricPoint, serializedMetricValue);
 
         String normalizedIdentifier = normalizeIdentifier(metricPoint.identifier());
         String normalizedMetricName = normalizeMetricName(metricPoint.metricName());
-        if (metricPoint.scope() == MetricPoint.Scope.JOB) {
-          jobInsertStmt.setString(1, normalizedIdentifier);
-          jobInsertStmt.setString(2, normalizedMetricName);
-          jobInsertStmt.setLong(3, metricPoint.timestampSeconds());
-          jobInsertStmt.setString(4, serializedMetricValue);
-          jobInsertStmt.addBatch();
-          jobBatchCount++;
-          if (jobBatchCount >= BATCH_UPDATE_SIZE) {
-            jobInsertStmt.executeBatch();
-            jobBatchCount = 0;
-          }
-        } else {
-          String normalizedPartition =
-              metricPoint.partitionPath().map(PartitionUtils::encodePartitionPath).orElse(null);
-          tableInsertStmt.setString(1, normalizedIdentifier);
-          tableInsertStmt.setString(2, normalizedMetricName);
-          tableInsertStmt.setString(3, normalizePartition(normalizedPartition).orElse(null));
-          tableInsertStmt.setLong(4, metricPoint.timestampSeconds());
-          tableInsertStmt.setString(5, serializedMetricValue);
-          tableInsertStmt.addBatch();
-          tableBatchCount++;
-          if (tableBatchCount >= BATCH_UPDATE_SIZE) {
-            tableInsertStmt.executeBatch();
-            tableBatchCount = 0;
-          }
+        String normalizedPartition =
+            metricPoint.partitionPath().map(PartitionUtils::encodePartitionPath).orElse(null);
+        tableInsertStmt.setString(1, normalizedIdentifier);
+        tableInsertStmt.setString(2, normalizedMetricName);
+        tableInsertStmt.setString(3, normalizePartition(normalizedPartition).orElse(null));
+        tableInsertStmt.setLong(4, metricPoint.timestampSeconds());
+        tableInsertStmt.setString(5, serializedMetricValue);
+        tableInsertStmt.addBatch();
+        tableBatchCount++;
+        if (tableBatchCount >= BATCH_UPDATE_SIZE) {
+          tableInsertStmt.executeBatch();
+          tableBatchCount = 0;
         }
       }
+
       if (tableBatchCount > 0) {
         tableInsertStmt.executeBatch();
       }
+    } catch (SQLException e) {
+      throw new MetricsStorageException(
+          "Failed to batch store table/partition metrics, size=" + metrics.size(), e);
+    }
+  }
+
+  @Override
+  public void storeJobMetrics(List<MetricPoint> metrics) {
+    Preconditions.checkArgument(metrics != null, "metrics must not be null");
+    if (metrics.isEmpty()) {
+      return;
+    }
+
+    String jobInsertSql =
+        "INSERT INTO job_metrics (job_identifier, metric_name, metric_ts, metric_value) VALUES (?, ?, ?, ?)";
+
+    try (Connection conn = getConnection();
+        PreparedStatement jobInsertStmt = conn.prepareStatement(jobInsertSql)) {
+      int jobBatchCount = 0;
+      for (MetricPoint metricPoint : metrics) {
+        Preconditions.checkArgument(metricPoint != null, "metric point must not be null");
+        Preconditions.checkArgument(
+            metricPoint.scope() == MetricPoint.Scope.JOB,
+            "Unsupported scope %s for job metrics",
+            metricPoint.scope());
+        String serializedMetricValue = StatisticValueUtils.toString(metricPoint.value());
+        validateWriteArguments(metricPoint, serializedMetricValue);
+
+        String normalizedIdentifier = normalizeIdentifier(metricPoint.identifier());
+        String normalizedMetricName = normalizeMetricName(metricPoint.metricName());
+        jobInsertStmt.setString(1, normalizedIdentifier);
+        jobInsertStmt.setString(2, normalizedMetricName);
+        jobInsertStmt.setLong(3, metricPoint.timestampSeconds());
+        jobInsertStmt.setString(4, serializedMetricValue);
+        jobInsertStmt.addBatch();
+        jobBatchCount++;
+        if (jobBatchCount >= BATCH_UPDATE_SIZE) {
+          jobInsertStmt.executeBatch();
+          jobBatchCount = 0;
+        }
+      }
+
       if (jobBatchCount > 0) {
         jobInsertStmt.executeBatch();
       }
     } catch (SQLException e) {
-      throw new MetricsStorageException("Failed to batch store metrics, size=" + metrics.size(), e);
+      throw new MetricsStorageException(
+          "Failed to batch store job metrics, size=" + metrics.size(), e);
     }
   }
 
