@@ -806,6 +806,24 @@ export const fetchSchemas = createAsyncThunk(
     await dispatch(setTableLoading(false))
 
     if (err || !res) {
+      const isCanceledRequest =
+        err?.name === 'CanceledError' ||
+        err?.code === 'ERR_CANCELED' ||
+        err?.message?.includes?.('canceled') ||
+        err?.message?.includes?.('aborted')
+
+      if (isCanceledRequest) {
+        const catalogKey = `{{${metalake}}}{{${catalog}}}{{${catalogType}}}`
+        const catalogNode = findInTree(getState().metalakes.metalakeTree, 'key', catalogKey)
+        const cachedSchemas = (catalogNode?.children || []).filter(item => item?.node === 'schema')
+
+        if (cachedSchemas.length > 0) {
+          dispatch(setExpandedNodes([`{{${metalake}}}`, catalogKey]))
+
+          return { schemas: cachedSchemas, page, init }
+        }
+      }
+
       throw new Error(err)
     }
 

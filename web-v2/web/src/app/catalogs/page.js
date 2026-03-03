@@ -53,7 +53,8 @@ import {
   getCurrentEntityTags,
   getCurrentEntityPolicies,
   resetActivatedDetails,
-  setActivatedDetailsLoading
+  setActivatedDetailsLoading,
+  setLoadedNodes
 } from '@/lib/store/metalakes'
 
 import { fetchTags } from '@/lib/store/tags'
@@ -112,6 +113,13 @@ const CatalogsListPage = () => {
         }
 
         if (paramsSize === 3 && catalog) {
+          if (catalogType) {
+            const catalogKey = `{{${metalake}}}{{${catalog}}}{{${catalogType}}}`
+            if (!store.loadedNodes.includes(catalogKey)) {
+              await dispatch(setLoadedNodes([...new Set([...store.loadedNodes, catalogKey])]))
+            }
+          }
+
           if (!store.catalogs.length) {
             await dispatch(fetchCatalogs({ metalake }))
           }
