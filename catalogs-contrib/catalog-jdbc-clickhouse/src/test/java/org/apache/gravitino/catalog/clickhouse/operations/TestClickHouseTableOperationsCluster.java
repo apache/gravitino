@@ -55,14 +55,7 @@ class TestClickHouseTableOperationsCluster {
 
   @Test
   void testGenerateCreateTableSqlWithClusterDistributedEngine() {
-    JdbcColumn[] columns =
-        new JdbcColumn[] {
-          JdbcColumn.builder()
-              .withName("user_id")
-              .withType(Types.IntegerType.get())
-              .withNullable(false)
-              .build()
-        };
+    JdbcColumn[] columns = new JdbcColumn[] {};
 
     Map<String, String> props = new HashMap<>();
     props.put(ClusterConstants.CLUSTER_NAME, "ck_cluster");
@@ -155,14 +148,7 @@ class TestClickHouseTableOperationsCluster {
     props.put(DistributedTableConstants.REMOTE_TABLE, "remote_table");
     props.put(DistributedTableConstants.SHARDING_KEY, "rand()");
 
-    JdbcColumn[] columns =
-        new JdbcColumn[] {
-          JdbcColumn.builder()
-              .withName("user_id")
-              .withType(Types.IntegerType.get())
-              .withNullable(false)
-              .build()
-        };
+    JdbcColumn[] columns = new JdbcColumn[] {};
 
     String sql =
         ops.buildCreateSql(
@@ -173,10 +159,7 @@ class TestClickHouseTableOperationsCluster {
 
   @Test
   void testGenerateCreateTableSqlWithDistributedEngineWithoutOnCluster() {
-    JdbcColumn[] columns =
-        new JdbcColumn[] {
-          JdbcColumn.builder().withName("user_id").withType(Types.IntegerType.get()).build()
-        };
+    JdbcColumn[] columns = new JdbcColumn[] {};
 
     Map<String, String> props = new HashMap<>();
     props.put(ClusterConstants.CLUSTER_NAME, "ck_cluster");
@@ -189,7 +172,7 @@ class TestClickHouseTableOperationsCluster {
         ops.buildCreateSql(
             "tbl", columns, "comment", props, null, Distributions.NONE, new Index[0], null);
 
-    Assertions.assertTrue(sql.startsWith("CREATE TABLE `tbl` ("));
+    Assertions.assertTrue(sql.startsWith("CREATE TABLE `tbl`"));
     Assertions.assertTrue(
         sql.contains("ENGINE = Distributed(`ck_cluster`,`remote_db`,`remote_table`,`user_id`)"));
   }

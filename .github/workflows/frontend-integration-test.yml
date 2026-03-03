@@ -41,7 +41,7 @@ jobs:
               - build.gradle.kts
               - gradle.properties
               - gradlew
-              - settings.gradle.kts
+              - setting.gradle.kts
     outputs:
       source_changes: ${{ steps.filter.outputs.source_changes }}
 
@@ -75,7 +75,7 @@ jobs:
 
       - name: Package Gravitino
         run: |
-          GRAVITINO_USE_WEB_V2=true ./gradlew compileDistribution -x test 
+          GRAVITINO_USE_WEB_V2=true ./gradlew compileDistribution compileTrinoConnector -x test
 
       - name: Free up disk space
         run: |
