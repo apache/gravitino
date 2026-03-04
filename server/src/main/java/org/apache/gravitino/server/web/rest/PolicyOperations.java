@@ -333,11 +333,15 @@ public class PolicyOperations {
   }
 
   static PolicyDTO toDTO(PolicyEntity policy, Optional<Boolean> inherited) {
+    String policyType =
+        policy.policyType() == Policy.BuiltInType.CUSTOM
+            ? policy.policyType().policyType()
+            : policy.policyType().name();
     PolicyDTO.Builder builder =
         PolicyDTO.builder()
             .withName(policy.name())
             .withComment(policy.comment())
-            .withPolicyType(policy.policyType().name())
+            .withPolicyType(policyType)
             .withEnabled(policy.enabled())
             .withContent(DTOConverters.toDTO(policy.content()))
             .withInherited(inherited)

@@ -299,6 +299,7 @@ public class TestPolicyOperations extends BaseOperationsTest {
     Policy respPolicy = policyResp.getPolicy();
     Assertions.assertEquals(policy1.name(), respPolicy.name());
     Assertions.assertEquals(policy1.comment(), respPolicy.comment());
+    Assertions.assertEquals("custom", respPolicy.policyType());
     Assertions.assertEquals(Optional.empty(), respPolicy.inherited());
 
     // Test throw PolicyAlreadyExistsException
