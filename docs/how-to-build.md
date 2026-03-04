@@ -13,7 +13,7 @@ license: "This software is licensed under the Apache License version 2."
 + Linux or macOS operating system
 + Git
 + A Java Development Kit, version 17, installed in your environment to launch Gradle
-+ Python 3.10, 3.11, 3.12, or 3.13 to build the Gravitino Python client
++ Python 3.10, 3.11, or 3.12 to build the Gravitino Python client. 
 + Optionally, Docker to run integration tests
 
 :::info Please read the following notes before trying to build Gravitino.
@@ -47,7 +47,7 @@ license: "This software is licensed under the Apache License version 2."
 
   The `./gradlew build` command builds all the Gravitino components, including the Gravitino server, Java and Python clients, Trino and Spark connectors, and more.
 
-  For the Python client, the `./gradlew build` command builds the Python client with Python 3.12 by default. If you want to use Python 3.10, 3.11, or 3.13 to build, please modify the property `pythonVersion` to 3.10, 3.11, or 3.13 in the `gradle.properties` file, or specify the version with `-P` like:
+  For the Python client, the `./gradlew build` command builds the Python client with Python 3.12 by default. If you want to use Python 3.10 or 3.11 to build, please modify the property `pythonVersion` to 3.10 or 3.11 in the `gradle.properties` file, or specify the version with `-P` like:
 
    ```shell
    ./gradlew build -PpythonVersion=3.10
