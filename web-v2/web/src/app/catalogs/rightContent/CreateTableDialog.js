@@ -117,8 +117,7 @@ export default function CreateTableDialog({ ...props }) {
 
   const isClickHouseDistributedEngine =
     provider === 'jdbc-clickhouse' &&
-    (values?.engine || values?.properties?.find(item => item?.key === 'engine')?.value)?.toLowerCase?.() ===
-      'distributed'
+    values?.properties?.find(item => item?.key === 'engine')?.value?.toLowerCase?.() === 'distributed'
   const isColumnsRequired = !isClickHouseDistributedEngine
 
   const defaultValues = {
