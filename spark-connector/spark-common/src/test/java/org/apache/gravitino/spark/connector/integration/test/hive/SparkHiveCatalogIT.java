@@ -352,7 +352,7 @@ public abstract class SparkHiveCatalogIT extends SparkCommonIT {
 
               SparkTableInfo tableInfo = getTableInfo(tableName);
               checkTableReadWrite(tableInfo);
-              Assertions.assertTrue(tableInfo.getTableLocation().equals(location));
+              Assertions.assertEquals(location, tableInfo.getTableLocation());
             });
   }
 
