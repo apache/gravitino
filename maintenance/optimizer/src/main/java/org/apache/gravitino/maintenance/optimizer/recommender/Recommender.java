@@ -148,6 +148,12 @@ public class Recommender implements AutoCloseable {
       String strategyName = entry.getKey();
       List<StrategyEvaluation> evaluations =
           recommendForOneStrategy(entry.getValue(), strategyName);
+
+      if (evaluations.isEmpty()) {
+        LOG.info("No evaluations for strategy {}", strategyName);
+        continue;
+      }
+
       for (StrategyEvaluation evaluation : evaluations) {
         results.add(toRecommendationResult(strategyName, evaluation, ""));
       }
@@ -260,6 +266,10 @@ public class Recommender implements AutoCloseable {
     for (NameIdentifier identifier : identifiers) {
       StrategyHandler strategyHandler = loadStrategyHandler(strategy, identifier);
       if (!strategyHandler.shouldTrigger()) {
+        LOG.info(
+            "Skip strategy {} for identifier {} because strategy handler trigger condition is not met",
+            strategyName,
+            identifier);
         continue;
       }
       StrategyEvaluation evaluation = strategyHandler.evaluate();
