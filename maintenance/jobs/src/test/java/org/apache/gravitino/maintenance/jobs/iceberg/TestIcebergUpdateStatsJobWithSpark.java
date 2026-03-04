@@ -24,9 +24,11 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.File;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.sql.Connection;
 import java.sql.DriverManager;
-import java.sql.Statement;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.HashMap;
@@ -41,6 +43,7 @@ import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.client.GravitinoAdminClient;
 import org.apache.gravitino.client.GravitinoClient;
 import org.apache.gravitino.client.GravitinoMetalake;
+import org.apache.gravitino.config.ConfigConstants;
 import org.apache.gravitino.exceptions.NoSuchMetalakeException;
 import org.apache.gravitino.job.JobHandle;
 import org.apache.gravitino.maintenance.optimizer.api.common.DataScope;
@@ -56,6 +59,7 @@ import org.apache.gravitino.maintenance.optimizer.updater.metrics.GravitinoMetri
 import org.apache.gravitino.maintenance.optimizer.updater.metrics.storage.jdbc.GenericJdbcMetricsRepository;
 import org.apache.gravitino.rel.Table;
 import org.apache.gravitino.stats.Statistic;
+import org.apache.gravitino.utils.jdbc.JdbcSqlScriptUtils;
 import org.apache.spark.sql.SparkSession;
 import org.awaitility.Awaitility;
 import org.junit.jupiter.api.AfterAll;
@@ -250,6 +254,56 @@ public class TestIcebergUpdateStatsJobWithSpark {
   }
 
   @Test
+  public void testUpdateNonPartitionedTableMetricsOnly() {
+    RecordingMetricsUpdater metricsUpdater = new RecordingMetricsUpdater();
+
+    IcebergUpdateStatsJob.updateStatistics(
+        spark,
+        null,
+        metricsUpdater,
+        IcebergUpdateStatsJob.UpdateMode.METRICS,
+        catalogName,
+        "db.non_partitioned",
+        100_000L);
+
+    assertEquals(8, metricsUpdater.tableMetrics.size());
+    assertTrue(
+        metricsUpdater.tableMetrics.stream()
+            .allMatch(metric -> metric.scope() == DataScope.Type.TABLE));
+    assertTrue(
+        metricsUpdater.tableMetrics.stream().allMatch(metric -> metric.partitionPath().isEmpty()));
+    assertTrue(metricsUpdater.jobMetrics.isEmpty());
+  }
+
+  @Test
+  public void testUpdateNonPartitionedTableStatisticsAndMetrics() {
+    RecordingStatisticsUpdater statisticsUpdater = new RecordingStatisticsUpdater();
+    RecordingMetricsUpdater metricsUpdater = new RecordingMetricsUpdater();
+
+    IcebergUpdateStatsJob.updateStatistics(
+        spark,
+        statisticsUpdater,
+        metricsUpdater,
+        IcebergUpdateStatsJob.UpdateMode.ALL,
+        catalogName,
+        "db.non_partitioned",
+        100_000L);
+
+    assertEquals(
+        NameIdentifier.of(catalogName, "db", "non_partitioned"), statisticsUpdater.tableIdentifier);
+    assertNotNull(statisticsUpdater.tableStatistics);
+    assertEquals(8, statisticsUpdater.tableStatistics.size());
+
+    assertEquals(8, metricsUpdater.tableMetrics.size());
+    assertTrue(
+        metricsUpdater.tableMetrics.stream()
+            .allMatch(metric -> metric.scope() == DataScope.Type.TABLE));
+    assertTrue(
+        metricsUpdater.tableMetrics.stream().allMatch(metric -> metric.partitionPath().isEmpty()));
+    assertTrue(metricsUpdater.jobMetrics.isEmpty());
+  }
+
+  @Test
   @Tag("gravitino-docker-test")
   public void testUpdatePartitionedTableMetricsStoredInMySql() throws Exception {
     try (MySQLContainer<?> mysql = new MySQLContainer<>("mysql:8.0.33")) {
@@ -296,36 +350,27 @@ public class TestIcebergUpdateStatsJobWithSpark {
   }
 
   private static void initializeMySqlMetricsSchema(MySQLContainer<?> mysql) throws Exception {
-    String createTableMetrics =
-        "CREATE TABLE IF NOT EXISTS `table_metrics` ("
-            + "`id` BIGINT(20) UNSIGNED NOT NULL AUTO_INCREMENT,"
-            + "`table_identifier` VARCHAR(1024) NOT NULL,"
-            + "`metric_name` VARCHAR(1024) NOT NULL,"
-            + "`table_partition` VARCHAR(1024) DEFAULT NULL,"
-            + "`metric_ts` BIGINT(20) NOT NULL,"
-            + "`metric_value` VARCHAR(1024) NOT NULL,"
-            + "PRIMARY KEY (`id`),"
-            + "KEY `idx_table_metrics_metric_ts` (`metric_ts`),"
-            + "KEY `idx_table_metrics_composite` (`table_identifier`(255), `table_partition`(255), `metric_ts`)"
-            + ") ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin";
-    String createJobMetrics =
-        "CREATE TABLE IF NOT EXISTS `job_metrics` ("
-            + "`id` BIGINT(20) UNSIGNED NOT NULL AUTO_INCREMENT,"
-            + "`job_identifier` VARCHAR(1024) NOT NULL,"
-            + "`metric_name` VARCHAR(1024) NOT NULL,"
-            + "`metric_ts` BIGINT(20) NOT NULL,"
-            + "`metric_value` VARCHAR(1024) NOT NULL,"
-            + "PRIMARY KEY (`id`),"
-            + "KEY `idx_job_metrics_metric_ts` (`metric_ts`),"
-            + "KEY `idx_job_metrics_identifier_metric_ts` (`job_identifier`(255), `metric_ts`)"
-            + ") ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin";
+    Path schemaPath =
+        findRepoRoot()
+            .resolve("scripts")
+            .resolve("mysql")
+            .resolve("schema-" + ConfigConstants.CURRENT_SCRIPT_VERSION + "-mysql.sql");
+    String schemaSql = Files.readString(schemaPath, StandardCharsets.UTF_8);
     try (Connection connection =
-            DriverManager.getConnection(
-                mysql.getJdbcUrl(), mysql.getUsername(), mysql.getPassword());
-        Statement statement = connection.createStatement()) {
-      statement.execute(createTableMetrics);
-      statement.execute(createJobMetrics);
+        DriverManager.getConnection(mysql.getJdbcUrl(), mysql.getUsername(), mysql.getPassword())) {
+      JdbcSqlScriptUtils.executeSqlScript(connection, schemaSql);
     }
+  }
+
+  private static Path findRepoRoot() {
+    Path current = Path.of("").toAbsolutePath();
+    while (current != null) {
+      if (Files.exists(current.resolve("gradlew"))) {
+        return current;
+      }
+      current = current.getParent();
+    }
+    throw new IllegalStateException("Failed to locate repository root containing gradlew");
   }
 
   @Test

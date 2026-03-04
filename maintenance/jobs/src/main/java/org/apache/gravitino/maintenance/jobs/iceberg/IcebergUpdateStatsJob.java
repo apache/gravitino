@@ -407,7 +407,15 @@ public class IcebergUpdateStatsJob implements BuiltInJob {
           mapper.readValue(json, new TypeReference<Map<String, Object>>() {});
       Map<String, String> configs = new HashMap<>();
       for (Map.Entry<String, Object> entry : parsedMap.entrySet()) {
-        configs.put(entry.getKey(), entry.getValue() == null ? "" : entry.getValue().toString());
+        Object value = entry.getValue();
+        if (value instanceof Map || value instanceof List) {
+          throw new IllegalArgumentException(
+              String.format(
+                  Locale.ROOT,
+                  "JSON options must be a flat key-value map, but key '%s' has non-scalar value",
+                  entry.getKey()));
+        }
+        configs.put(entry.getKey(), value == null ? "" : value.toString());
       }
       return configs;
     } catch (Exception e) {

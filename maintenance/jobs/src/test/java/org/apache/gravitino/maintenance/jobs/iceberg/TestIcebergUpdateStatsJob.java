@@ -132,6 +132,12 @@ public class TestIcebergUpdateStatsJob {
     assertEquals("", parsed.get("nil"));
     assertThrows(
         IllegalArgumentException.class, () -> IcebergUpdateStatsJob.parseJsonOptions("{not_json}"));
+    assertThrows(
+        IllegalArgumentException.class,
+        () -> IcebergUpdateStatsJob.parseJsonOptions("{\"nested\":{\"a\":1}}"));
+    assertThrows(
+        IllegalArgumentException.class,
+        () -> IcebergUpdateStatsJob.parseJsonOptions("{\"array\":[1,2,3]}"));
   }
 
   @Test
