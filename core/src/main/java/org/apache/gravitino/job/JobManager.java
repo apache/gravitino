@@ -812,8 +812,7 @@ public class JobManager implements JobOperationDispatcher {
           java.nio.file.Path sourcePath = new File(fileUri.getPath()).toPath();
           if (!Files.exists(sourcePath)) {
             throw new IOException(
-                String.format(
-                    "Source file does not exist: %s", sourcePath.toAbsolutePath()));
+                String.format("Source file does not exist: %s", sourcePath.toAbsolutePath()));
           }
           Files.createSymbolicLink(destFile.toPath(), sourcePath);
           break;
