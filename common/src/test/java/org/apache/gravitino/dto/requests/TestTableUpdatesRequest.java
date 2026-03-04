@@ -316,6 +316,9 @@ public class TestTableUpdatesRequest {
     Throwable exception =
         Assertions.assertThrows(IllegalArgumentException.class, request::validate);
     Assertions.assertEquals("updates must not be empty", exception.getMessage());
+  }
+
+  @Test
   public void testUpdateColumnCommentWithEmptyString() {
     TableUpdateRequest.UpdateTableColumnCommentRequest request =
         new TableUpdateRequest.UpdateTableColumnCommentRequest(new String[] {"column1"}, "");
