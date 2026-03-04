@@ -41,6 +41,7 @@ dependencies {
     exclude("*")
   }
   implementation(libs.bundles.log4j)
+  implementation(libs.commons.cli.new)
   implementation(libs.commons.lang3)
   implementation(libs.jackson.databind)
   implementation(libs.jackson.annotations)

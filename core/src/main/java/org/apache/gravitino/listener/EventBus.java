@@ -74,6 +74,7 @@ public class EventBus {
    *     SupportsChangingPreEvent}, otherwise {@link Optional#empty() empty}
    */
   public Optional<BaseEvent> dispatchEvent(BaseEvent baseEvent) {
+    Preconditions.checkNotNull(baseEvent, "baseEvent cannot be null");
     if (baseEvent instanceof PreEvent) {
       return dispatchAndTransformPreEvent((PreEvent) baseEvent);
     } else if (baseEvent instanceof Event) {

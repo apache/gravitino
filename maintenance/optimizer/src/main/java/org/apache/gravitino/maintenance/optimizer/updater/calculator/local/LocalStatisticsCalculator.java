@@ -23,27 +23,29 @@ import com.google.common.base.Preconditions;
 import java.nio.file.Path;
 import java.util.List;
 import java.util.Map;
-import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.NameIdentifier;
+import org.apache.gravitino.maintenance.optimizer.api.common.MetricPoint;
 import org.apache.gravitino.maintenance.optimizer.api.common.StatisticEntry;
 import org.apache.gravitino.maintenance.optimizer.api.common.TableAndPartitionStatistics;
+import org.apache.gravitino.maintenance.optimizer.api.updater.SupportsCalculateBulkJobMetrics;
 import org.apache.gravitino.maintenance.optimizer.api.updater.SupportsCalculateBulkJobStatistics;
+import org.apache.gravitino.maintenance.optimizer.api.updater.SupportsCalculateBulkTableMetrics;
 import org.apache.gravitino.maintenance.optimizer.api.updater.SupportsCalculateBulkTableStatistics;
+import org.apache.gravitino.maintenance.optimizer.common.OptimizerContent;
 import org.apache.gravitino.maintenance.optimizer.common.OptimizerEnv;
+import org.apache.gravitino.maintenance.optimizer.common.StatisticsInputContent;
 import org.apache.gravitino.maintenance.optimizer.common.conf.OptimizerConfig;
 
 /**
  * Statistics calculator that reads statistics from either a local file path or an inline payload.
  */
 public class LocalStatisticsCalculator
-    implements SupportsCalculateBulkTableStatistics, SupportsCalculateBulkJobStatistics {
+    implements SupportsCalculateBulkTableStatistics,
+        SupportsCalculateBulkJobStatistics,
+        SupportsCalculateBulkTableMetrics,
+        SupportsCalculateBulkJobMetrics {
 
   public static final String NAME = "local-stats-calculator";
-  private static final String CONFIG_KEY = "localStatsCalculator";
-  public static final String STATISTICS_FILE_PATH_CONFIG =
-      OptimizerConfig.UPDATER_PREFIX + CONFIG_KEY + ".statisticsFilePath";
-  public static final String STATISTICS_PAYLOAD_CONFIG =
-      OptimizerConfig.UPDATER_PREFIX + CONFIG_KEY + ".statisticsPayload";
 
   private StatisticsImporter statisticsImporter;
 
@@ -56,29 +58,29 @@ public class LocalStatisticsCalculator
   public void initialize(OptimizerEnv optimizerEnv) {
     String defaultCatalog =
         optimizerEnv.config().get(OptimizerConfig.GRAVITINO_DEFAULT_CATALOG_CONFIG);
-    String statisticsFilePath = optimizerEnv.config().getRawString(STATISTICS_FILE_PATH_CONFIG);
-    String statisticsPayload = optimizerEnv.config().getRawString(STATISTICS_PAYLOAD_CONFIG);
-    boolean hasStatisticsFilePath = StringUtils.isNotBlank(statisticsFilePath);
-    boolean hasStatisticsPayload = StringUtils.isNotBlank(statisticsPayload);
-
+    OptimizerContent optimizerContent =
+        optimizerEnv
+            .content()
+            .orElseThrow(
+                () ->
+                    new IllegalArgumentException(
+                        "LocalStatisticsCalculator requires runtime statistics input content."));
     Preconditions.checkArgument(
-        hasStatisticsFilePath || hasStatisticsPayload,
-        "One of %s or %s must be provided",
-        STATISTICS_FILE_PATH_CONFIG,
-        STATISTICS_PAYLOAD_CONFIG);
+        optimizerContent instanceof StatisticsInputContent,
+        "LocalStatisticsCalculator expects StatisticsInputContent, but got: %s",
+        optimizerContent.getClass().getSimpleName());
+    StatisticsInputContent statisticsInputContent = (StatisticsInputContent) optimizerContent;
 
-    Preconditions.checkArgument(
-        !(hasStatisticsFilePath && hasStatisticsPayload),
-        "Only one of %s or %s can be provided",
-        STATISTICS_FILE_PATH_CONFIG,
-        STATISTICS_PAYLOAD_CONFIG);
-
-    if (hasStatisticsFilePath) {
+    if (statisticsInputContent.hasFilePath()) {
       this.statisticsImporter =
-          new FileStatisticsImporter(Path.of(statisticsFilePath), defaultCatalog);
-      return;
+          new FileStatisticsImporter(Path.of(statisticsInputContent.filePath()), defaultCatalog);
+    } else if (statisticsInputContent.hasPayload()) {
+      this.statisticsImporter =
+          new PayloadStatisticsImporter(statisticsInputContent.payload(), defaultCatalog);
+    } else {
+      throw new IllegalArgumentException(
+          "StatisticsInputContent must provide either file path or payload.");
     }
-    this.statisticsImporter = new PayloadStatisticsImporter(statisticsPayload, defaultCatalog);
   }
 
   @Override
@@ -105,6 +107,32 @@ public class LocalStatisticsCalculator
   public Map<NameIdentifier, List<StatisticEntry<?>>> calculateAllJobStatistics() {
     ensureInitialized();
     return statisticsImporter.bulkReadAllJobStatistics();
+  }
+
+  @Override
+  public List<MetricPoint> calculateTableMetrics(NameIdentifier tableIdentifier) {
+    ensureInitialized();
+    Preconditions.checkArgument(tableIdentifier != null, "tableIdentifier must not be null");
+    return statisticsImporter.readTableMetrics(tableIdentifier);
+  }
+
+  @Override
+  public List<MetricPoint> calculateAllTableMetrics() {
+    ensureInitialized();
+    return statisticsImporter.bulkReadAllTableMetrics();
+  }
+
+  @Override
+  public List<MetricPoint> calculateJobMetrics(NameIdentifier jobIdentifier) {
+    ensureInitialized();
+    Preconditions.checkArgument(jobIdentifier != null, "jobIdentifier must not be null");
+    return statisticsImporter.readJobMetrics(jobIdentifier);
+  }
+
+  @Override
+  public List<MetricPoint> calculateAllJobMetrics() {
+    ensureInitialized();
+    return statisticsImporter.bulkReadAllJobMetrics();
   }
 
   private void ensureInitialized() {

@@ -97,6 +97,8 @@ public class LancePartitionStatisticStorage implements PartitionStatisticStorage
   private static final long DEFAULT_METADATA_FILE_CACHE_SIZE = 100L * 1024; // 100KB
   private static final String INDEX_CACHE_SIZE = "indexCacheSizeBytes";
   private static final long DEFAULT_INDEX_CACHE_SIZE = 100L * 1024; // 100KB
+  private static final String MAX_STATISTICS_PER_UPDATE = "maxStatisticsPerUpdate";
+  private static final int DEFAULT_MAX_STATISTICS_PER_UPDATE = 100;
   // The schema is `table_id`, `partition_name`,  `statistic_name`, `statistic_value`, `audit_info`
   private static final String TABLE_ID_COLUMN = "table_id";
   private static final String PARTITION_NAME_COLUMN = "partition_name";
@@ -124,6 +126,7 @@ public class LancePartitionStatisticStorage implements PartitionStatisticStorage
   private final int readBatchSize;
   private final long metadataFileCacheSize;
   private final long indexCacheSize;
+  private final int maxStatisticsPerUpdate;
   private final ScheduledThreadPoolExecutor scheduler;
 
   private final EntityStore entityStore = GravitinoEnv.getInstance().entityStore();
@@ -176,6 +179,14 @@ public class LancePartitionStatisticStorage implements PartitionStatisticStorage
     Preconditions.checkArgument(
         indexCacheSize > 0,
         "Lance partition statistics storage indexCacheSizeBytes must be positive");
+
+    this.maxStatisticsPerUpdate =
+        Integer.parseInt(
+            properties.getOrDefault(
+                MAX_STATISTICS_PER_UPDATE, String.valueOf(DEFAULT_MAX_STATISTICS_PER_UPDATE)));
+    Preconditions.checkArgument(
+        maxStatisticsPerUpdate > 0,
+        "Lance partition statistics storage maxStatisticsPerUpdate must be positive");
 
     this.properties = properties;
     if (datasetCacheSize != 0) {
@@ -234,6 +245,17 @@ public class LancePartitionStatisticStorage implements PartitionStatisticStorage
   @Override
   public void updateStatistics(
       String metalake, List<MetadataObjectStatisticsUpdate> statisticsToUpdate) throws IOException {
+    int totalStatisticsCount =
+        statisticsToUpdate.stream()
+            .flatMap(update -> update.partitionUpdates().stream())
+            .mapToInt(partitionUpdate -> partitionUpdate.statistics().size())
+            .sum();
+    Preconditions.checkArgument(
+        totalStatisticsCount <= maxStatisticsPerUpdate,
+        "Total statistics count %s exceeds the maximum limit %s",
+        totalStatisticsCount,
+        maxStatisticsPerUpdate);
+
     try {
       //  TODO: The small updates and deletion may cause performance issues. The storage need to add
       // compaction operations.

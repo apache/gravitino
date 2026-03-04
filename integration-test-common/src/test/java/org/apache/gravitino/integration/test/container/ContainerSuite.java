@@ -334,7 +334,7 @@ public class ContainerSuite implements Closeable {
       synchronized (ContainerSuite.class) {
         if (dorisContainer == null) {
           initIfNecessary();
-          // Start Doris container
+          // Start Doris docker-compose containers
           DorisContainer.Builder dorisBuilder =
               DorisContainer.builder().withHostName("gravitino-ci-doris").withNetwork(network);
           DorisContainer container = closer.register(dorisBuilder.build());

@@ -21,24 +21,15 @@ package org.apache.gravitino.maintenance.optimizer.api.updater;
 
 import java.util.List;
 import org.apache.gravitino.annotation.DeveloperApi;
+import org.apache.gravitino.maintenance.optimizer.api.common.MetricPoint;
 import org.apache.gravitino.maintenance.optimizer.api.common.Provider;
-import org.apache.gravitino.maintenance.optimizer.updater.metrics.storage.JobMetricWriteRequest;
-import org.apache.gravitino.maintenance.optimizer.updater.metrics.storage.TableMetricWriteRequest;
 
-/** Represents an updater that can update metrics for a table or job. */
+/** Represents an updater that can persist metric points. */
 @DeveloperApi
 public interface MetricsUpdater extends Provider {
-  /**
-   * Persist table metrics.
-   *
-   * @param metrics table metric write requests
-   */
-  void updateTableMetrics(List<TableMetricWriteRequest> metrics);
+  /** Persist metrics for table and partition scopes. */
+  void updateTableAndPartitionMetrics(List<MetricPoint> metrics);
 
-  /**
-   * Persist job metrics.
-   *
-   * @param metrics job metric write requests
-   */
-  void updateJobMetrics(List<JobMetricWriteRequest> metrics);
+  /** Persist metrics for job scope. */
+  void updateJobMetrics(List<MetricPoint> metrics);
 }

@@ -17,17 +17,21 @@
  * under the License.
  */
 
-package org.apache.gravitino.maintenance.optimizer.updater.metrics.storage;
+package org.apache.gravitino.maintenance.optimizer.api.updater;
 
-import lombok.AllArgsConstructor;
-import lombok.EqualsAndHashCode;
-import lombok.Getter;
+import java.util.List;
+import org.apache.gravitino.NameIdentifier;
+import org.apache.gravitino.annotation.DeveloperApi;
+import org.apache.gravitino.maintenance.optimizer.api.common.MetricPoint;
 
-/** Immutable {@link MetricRecord} implementation backed by timestamp and encoded value. */
-@AllArgsConstructor
-@EqualsAndHashCode
-@Getter
-public final class MetricRecordImpl implements MetricRecord {
-  private final long timestamp;
-  private final String value;
+/** Represents a provider that supports table and partition metrics. */
+@DeveloperApi
+public interface SupportsCalculateTableMetrics extends StatisticsCalculator {
+  /**
+   * Calculate table/partition metric points for one table.
+   *
+   * @param tableIdentifier table identifier
+   * @return metric points
+   */
+  List<MetricPoint> calculateTableMetrics(NameIdentifier tableIdentifier);
 }

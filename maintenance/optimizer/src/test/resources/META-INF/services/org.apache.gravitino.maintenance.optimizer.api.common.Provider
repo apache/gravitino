@@ -22,3 +22,6 @@ org.apache.gravitino.maintenance.optimizer.updater.MetricsUpdaterForTest
 org.apache.gravitino.maintenance.optimizer.monitor.job.TableJobRelationProviderForTest
 org.apache.gravitino.maintenance.optimizer.monitor.metrics.MetricsProviderForTest
 org.apache.gravitino.maintenance.optimizer.monitor.callback.MonitorCallbackForTest
+org.apache.gravitino.maintenance.optimizer.recommender.StrategyProviderForCmdTest
+org.apache.gravitino.maintenance.optimizer.recommender.StatisticsProviderForCmdTest
+org.apache.gravitino.maintenance.optimizer.recommender.TableMetadataProviderForCmdTest
