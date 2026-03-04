@@ -5,8 +5,18 @@ on:
   # Triggers the workflow on push or pull request events but only for the "main" branch
   push:
     branches: [ "main", "branch-*" ]
+    paths-ignore:
+      - '**/*.md'
+      - '**/*.mdx'
+      - 'docs/assets/**'
+      - 'web-v2/**'
   pull_request:
     branches: [ "main", "branch-*" ]
+    paths-ignore:
+      - '**/*.md'
+      - '**/*.mdx'
+      - 'docs/assets/**'
+      - 'web-v2/**'
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
@@ -42,8 +52,13 @@ jobs:
               - '**/resources/**'
               - '**/src/**'
               - '!**/*.md'
-              - '!**/*.png'
-              - '!**/*.svg'
+              - '!**/*.mdx'
+              - '!docs/**/*.png'
+              - '!docs/**/*.svg'
+              - '!docs/**/*.jpg'
+              - '!docs/**/*.jpeg'
+              - '!docs/**/*.gif'
+              - '!docs/**/*.webp'
               - 'mcp-server/**'
             spark_connector_changes:
               - spark-connector/**
@@ -143,7 +158,7 @@ jobs:
 
       - name: Build with Gradle (skip mcp-server tests)
         if: needs.changes.outputs.mcp_server_changes != 'true'
-        run: ./gradlew build -PskipITs -PskipDockerTests=false -x :clients:client-python:build -x :mcp-server:build -x :mcp-server:test -x :mcp-server:pylint
+        run: ./gradlew build -PskipITs -PskipDockerTests=false -x :clients:client-python:build -x :mcp-server:build -x :mcp-server:test -x :mcp-server:pylint -x :web-v2:web:build
 
       - name: Fetch base branch for coverage diff
         if: github.event_name == 'pull_request'
