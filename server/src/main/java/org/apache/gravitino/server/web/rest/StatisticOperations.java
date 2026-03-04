@@ -79,6 +79,9 @@ import org.slf4j.LoggerFactory;
 @Produces(MediaType.APPLICATION_JSON)
 public class StatisticOperations {
 
+  private static final String NULL_STATS_UPDATE_REQUEST_BODY_ERROR =
+      "Statistics update request body cannot be null";
+
   private static final Logger LOG = LoggerFactory.getLogger(StatisticOperations.class);
 
   @Context private HttpServletRequest httpRequest;
@@ -160,7 +163,7 @@ public class StatisticOperations {
       return Utils.doAs(
           httpRequest,
           () -> {
-            request.validate();
+            validateStatisticsUpdateRequest(request);
             MetadataObject object =
                 MetadataObjects.parse(
                     fullName, MetadataObject.Type.valueOf(type.toUpperCase(Locale.ROOT)));
@@ -188,7 +191,7 @@ public class StatisticOperations {
           });
     } catch (Exception e) {
       return ExceptionHandlers.handleStatisticException(
-          OperationType.UPDATE, StringUtils.join(request.getUpdates().keySet(), ","), fullName, e);
+          OperationType.UPDATE, getUpdatedStatisticNames(request), fullName, e);
     }
   }
 
@@ -474,6 +477,21 @@ public class StatisticOperations {
   @VisibleForTesting
   static PartitionRange.BoundType getFromBoundType(boolean inclusive) {
     return inclusive ? PartitionRange.BoundType.CLOSED : PartitionRange.BoundType.OPEN;
+  }
+
+  private static void validateStatisticsUpdateRequest(StatisticsUpdateRequest request) {
+    if (request == null) {
+      throw new IllegalArgumentException(NULL_STATS_UPDATE_REQUEST_BODY_ERROR);
+    }
+    request.validate();
+  }
+
+  private static String getUpdatedStatisticNames(StatisticsUpdateRequest request) {
+    if (request == null || request.getUpdates() == null) {
+      return "";
+    }
+
+    return StringUtils.join(request.getUpdates().keySet(), ",");
   }
 
   private static String getFormattedFromPartitionName(
