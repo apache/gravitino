@@ -974,6 +974,31 @@ public class TestJobManager {
     // Non-optional argument keeps placeholder if not found
     Assertions.assertEquals(
         Lists.newArrayList("--catalog", "hive", "--table", "{{missing_placeholder}}"), result6);
+
+    // Test Case 7: Independent consecutive optional placeholders — each evaluated individually.
+    // Regression guard: absence of opt2 must NOT suppress opt1.
+    List<String> templateArgs7 = Lists.newArrayList("?{{opt1}}", "?{{opt2}}");
+
+    // Only opt1 set — opt1 must appear even though opt2 is absent
+    List<String> result7a =
+        JobManager.buildArgumentsWithOptional(templateArgs7, ImmutableMap.of("opt1", "value1"));
+    Assertions.assertEquals(Lists.newArrayList("value1"), result7a);
+
+    // Both set — both must appear
+    List<String> result7b =
+        JobManager.buildArgumentsWithOptional(
+            templateArgs7, ImmutableMap.of("opt1", "value1", "opt2", "value2"));
+    Assertions.assertEquals(Lists.newArrayList("value1", "value2"), result7b);
+
+    // Only opt2 set — opt2 must appear
+    List<String> result7c =
+        JobManager.buildArgumentsWithOptional(templateArgs7, ImmutableMap.of("opt2", "value2"));
+    Assertions.assertEquals(Lists.newArrayList("value2"), result7c);
+
+    // Neither set — result is empty
+    List<String> result7d =
+        JobManager.buildArgumentsWithOptional(templateArgs7, ImmutableMap.of());
+    Assertions.assertEquals(Lists.newArrayList(), result7d);
   }
 
   @Test
@@ -988,6 +1013,9 @@ public class TestJobManager {
     Assertions.assertTrue(JobManager.isEmptyValue("   "));
     Assertions.assertTrue(JobManager.isEmptyValue("\t"));
     Assertions.assertTrue(JobManager.isEmptyValue("\n"));
+
+    // Unreplaced placeholder should be considered empty
+    Assertions.assertTrue(JobManager.isEmptyValue("{{strategy}}"));
 
     // Non-empty values should not be considered empty
     Assertions.assertFalse(JobManager.isEmptyValue("value"));

@@ -811,9 +811,12 @@ public class JobManager implements JobOperationDispatcher {
         continue;
       }
 
-      // If this is an optional argument and the next argument is also optional but empty,
-      // skip both (they form a pair like ?--flag ?{{value}})
-      if (isOptional && i + 1 < templateArgs.size()) {
+      // If this is an optional flag (not a placeholder itself) and the next argument is also
+      // optional but empty, skip both (they form a pair like ?--flag ?{{value}}).
+      // Independent optional placeholders like ?{{opt1}} ?{{opt2}} are handled individually.
+      if (isOptional
+          && !PLACEHOLDER_PATTERN.matcher(cleanArg).find()
+          && i + 1 < templateArgs.size()) {
         String nextArg = templateArgs.get(i + 1);
         if (nextArg.startsWith("?")) {
           String cleanNextArg = nextArg.substring(1);

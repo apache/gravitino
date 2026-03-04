@@ -455,82 +455,96 @@ public class JobIT extends BaseIT {
 
   @Test
   public void testJobTemplateWithOptionalArguments() throws Exception {
-    // Register template with optional arguments
+    String optArgTestScriptPath = generateOptionalArgTestScript();
+
+    // Template with flag/value optional pairs. The first positional arg ({{mode}})
+    // tells the validation script which flags it should or should not receive.
     ShellJobTemplate template =
         ShellJobTemplate.builder()
             .withName("test_optional_args_template")
-            .withComment("Test template with optional arguments")
-            .withExecutable(testEntryScriptPath)
+            .withComment("Test template with optional flag/value pairs")
+            .withExecutable(optArgTestScriptPath)
             .withArguments(
                 Lists.newArrayList(
-                    "{{required_arg}}", "success", "?{{optional_arg1}}", "?{{optional_arg2}}"))
-            .withEnvironments(ImmutableMap.of("ENV_VAR", "test_value"))
-            .withScripts(Lists.newArrayList(testLibScriptPath))
+                    "{{mode}}",
+                    "?--opt1",
+                    "?{{optional_arg1}}",
+                    "?--opt2",
+                    "?{{optional_arg2}}"))
+            .withEnvironments(Collections.emptyMap())
+            .withScripts(Collections.emptyList())
             .withCustomFields(Collections.emptyMap())
             .build();
 
     metalake.registerJobTemplate(template);
+    Assertions.assertNotNull(metalake.getJobTemplate(template.name()));
 
-    // Verify template was registered
-    JobTemplate retrievedTemplate = metalake.getJobTemplate(template.name());
-    Assertions.assertNotNull(retrievedTemplate);
+    // Case 1: No optional args — script asserts neither flag is received.
+    runJobAndAwait(
+        template, ImmutableMap.of("mode", "no_optionals"), JobHandle.Status.SUCCEEDED);
 
-    // Case 1: Run with only required arguments
-    Map<String, String> jobConf1 = ImmutableMap.of("required_arg", "value1");
-    JobHandle job1 = metalake.runJob(template.name(), jobConf1);
-    Assertions.assertNotNull(job1);
+    // Case 2: opt1 provided, opt2 absent — script asserts --opt1 is present and --opt2 is absent.
+    runJobAndAwait(
+        template,
+        ImmutableMap.of("mode", "opt1_only", "optional_arg1", "val1"),
+        JobHandle.Status.SUCCEEDED);
 
-    // Wait for job to complete
-    Awaitility.await()
-        .atMost(30, TimeUnit.SECONDS)
-        .pollInterval(1, TimeUnit.SECONDS)
-        .until(
-            () -> {
-              JobHandle handle = metalake.getJob(job1.jobId());
-              return handle.jobStatus() == JobHandle.Status.SUCCEEDED
-                  || handle.jobStatus() == JobHandle.Status.FAILED;
-            });
-
-    JobHandle completedJob1 = metalake.getJob(job1.jobId());
-    Assertions.assertEquals(JobHandle.Status.SUCCEEDED, completedJob1.jobStatus());
-
-    // Case 2: Run with one optional argument
-    Map<String, String> jobConf2 =
-        ImmutableMap.of("required_arg", "value1", "optional_arg1", "opt_value1");
-    JobHandle job2 = metalake.runJob(template.name(), jobConf2);
-    Assertions.assertNotNull(job2);
-
-    Awaitility.await()
-        .atMost(30, TimeUnit.SECONDS)
-        .pollInterval(1, TimeUnit.SECONDS)
-        .until(
-            () -> {
-              JobHandle handle = metalake.getJob(job2.jobId());
-              return handle.jobStatus() == JobHandle.Status.SUCCEEDED
-                  || handle.jobStatus() == JobHandle.Status.FAILED;
-            });
-
-    JobHandle completedJob2 = metalake.getJob(job2.jobId());
-    Assertions.assertEquals(JobHandle.Status.SUCCEEDED, completedJob2.jobStatus());
-
-    // Case 3: Run with all arguments
-    Map<String, String> jobConf3 =
+    // Case 3: Both optional args provided — script asserts both flags are received.
+    runJobAndAwait(
+        template,
         ImmutableMap.of(
-            "required_arg", "value1", "optional_arg1", "opt_value1", "optional_arg2", "opt_value2");
-    JobHandle job3 = metalake.runJob(template.name(), jobConf3);
-    Assertions.assertNotNull(job3);
+            "mode", "both_optionals", "optional_arg1", "val1", "optional_arg2", "val2"),
+        JobHandle.Status.SUCCEEDED);
+  }
 
+  private void runJobAndAwait(
+      JobTemplate template, Map<String, String> jobConf, JobHandle.Status expectedStatus) {
+    JobHandle job = metalake.runJob(template.name(), jobConf);
+    Assertions.assertNotNull(job);
     Awaitility.await()
         .atMost(30, TimeUnit.SECONDS)
         .pollInterval(1, TimeUnit.SECONDS)
         .until(
             () -> {
-              JobHandle handle = metalake.getJob(job3.jobId());
+              JobHandle handle = metalake.getJob(job.jobId());
               return handle.jobStatus() == JobHandle.Status.SUCCEEDED
                   || handle.jobStatus() == JobHandle.Status.FAILED;
             });
+    Assertions.assertEquals(expectedStatus, metalake.getJob(job.jobId()).jobStatus());
+  }
 
-    JobHandle completedJob3 = metalake.getJob(job3.jobId());
-    Assertions.assertEquals(JobHandle.Status.SUCCEEDED, completedJob3.jobStatus());
+  // $1 = mode; remaining args are parsed for --opt1 and --opt2 flags.
+  // Exits 0 when the received flags match the state encoded in mode, 1 otherwise.
+  private String generateOptionalArgTestScript() {
+    String content =
+        "#!/bin/bash\n"
+            + "MODE=\"$1\"\n"
+            + "shift\n"
+            + "OPT1_PRESENT=0\n"
+            + "OPT2_PRESENT=0\n"
+            + "while [[ $# -gt 0 ]]; do\n"
+            + "  case \"$1\" in\n"
+            + "    --opt1) OPT1_PRESENT=1; shift 2;;\n"
+            + "    --opt2) OPT2_PRESENT=1; shift 2;;\n"
+            + "    *) shift;;\n"
+            + "  esac\n"
+            + "done\n"
+            + "case \"$MODE\" in\n"
+            + "  no_optionals)\n"
+            + "    [[ $OPT1_PRESENT -eq 0 && $OPT2_PRESENT -eq 0 ]] && exit 0 || exit 1;;\n"
+            + "  opt1_only)\n"
+            + "    [[ $OPT1_PRESENT -eq 1 && $OPT2_PRESENT -eq 0 ]] && exit 0 || exit 1;;\n"
+            + "  both_optionals)\n"
+            + "    [[ $OPT1_PRESENT -eq 1 && $OPT2_PRESENT -eq 1 ]] && exit 0 || exit 1;;\n"
+            + "  *) exit 1;;\n"
+            + "esac\n";
+    try {
+      File scriptFile = new File(testStagingDir, "optional-arg-test.sh");
+      Files.writeString(scriptFile.toPath(), content);
+      scriptFile.setExecutable(true);
+      return scriptFile.getAbsolutePath();
+    } catch (Exception e) {
+      throw new RuntimeException("Failed to create optional arg test script", e);
+    }
   }
 }
