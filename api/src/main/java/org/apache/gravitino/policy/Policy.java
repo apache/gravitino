@@ -39,6 +39,7 @@ public interface Policy extends Auditable {
 
   /** The built-in policy types. Predefined policy types that are provided by the system. */
   enum BuiltInType {
+    /** Built-in policy type for Iceberg compaction strategy. */
     ICEBERG_COMPACTION(
         BUILT_IN_TYPE_PREFIX + "iceberg_compaction", PolicyContents.IcebergCompactionContent.class),
 

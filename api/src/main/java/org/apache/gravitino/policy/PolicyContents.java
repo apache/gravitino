@@ -150,17 +150,27 @@ public class PolicyContents {
 
   /** Built-in policy content for Iceberg compaction strategy. */
   public static class IcebergCompactionContent implements PolicyContent {
-
+    /** Property key for strategy type. */
     public static final String STRATEGY_TYPE_KEY = "strategy.type";
+    /** Strategy type value for compaction. */
     public static final String STRATEGY_TYPE_VALUE = "compaction";
+    /** Property key for job template name. */
     public static final String JOB_TEMPLATE_NAME_KEY = "job.template-name";
+    /** Built-in job template name for Iceberg rewrite data files. */
     public static final String JOB_TEMPLATE_NAME_VALUE = "builtin-iceberg-rewrite-data-files";
+    /** Prefix for rewrite options propagated to job options. */
     public static final String JOB_OPTIONS_PREFIX = "job.options.";
+    /** Rule key for trigger expression. */
     public static final String TRIGGER_EXPR_KEY = "trigger-expr";
+    /** Rule key for score expression. */
     public static final String SCORE_EXPR_KEY = "score-expr";
+    /** Rule key for minimum data file MSE threshold. */
     public static final String MIN_DATAFILE_MSE_KEY = "minDatafileMse";
+    /** Rule key for minimum delete file count threshold. */
     public static final String MIN_DELETE_FILE_NUMBER_KEY = "minDeleteFileNumber";
+    /** Metric name for data file MSE. */
     public static final String DATAFILE_MSE_METRIC = "custom-datafile_mse";
+    /** Metric name for delete file number. */
     public static final String DELETE_FILE_NUMBER_METRIC = "custom-delete_file_number";
 
     private static final Pattern OPTION_KEY_PATTERN = Pattern.compile("[A-Za-z0-9._-]+");
@@ -196,14 +206,29 @@ public class PolicyContents {
               : Collections.unmodifiableMap(new LinkedHashMap<>(rewriteOptions));
     }
 
+    /**
+     * Returns the minimum threshold for {@value DATAFILE_MSE_METRIC}.
+     *
+     * @return minimum data file MSE threshold
+     */
     public Long minDatafileMse() {
       return minDatafileMse;
     }
 
+    /**
+     * Returns the minimum threshold for {@value DELETE_FILE_NUMBER_METRIC}.
+     *
+     * @return minimum delete file number threshold
+     */
     public Long minDeleteFileNumber() {
       return minDeleteFileNumber;
     }
 
+    /**
+     * Returns rewrite options that are expanded to {@code job.options.*} rule entries.
+     *
+     * @return rewrite options
+     */
     public Map<String, String> rewriteOptions() {
       return rewriteOptions;
     }
