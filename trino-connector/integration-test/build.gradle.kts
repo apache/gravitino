@@ -76,6 +76,7 @@ tasks.register("setupDependencies") {
   dependsOn(":trino-connector:trino-connector-446-451:copyLibs")
   dependsOn(":trino-connector:trino-connector-452-468:copyLibs")
   dependsOn(":trino-connector:trino-connector-469-472:copyLibs")
+  dependsOn(":trino-connector:trino-connector-473-478:copyLibs")
   dependsOn(":catalogs:catalog-lakehouse-iceberg:jar", ":catalogs:catalog-lakehouse-iceberg:runtimeJars")
   dependsOn(":catalogs:catalog-jdbc-mysql:jar", ":catalogs:catalog-jdbc-mysql:runtimeJars")
   dependsOn(":catalogs:catalog-jdbc-postgresql:jar", ":catalogs:catalog-jdbc-postgresql:runtimeJars")
