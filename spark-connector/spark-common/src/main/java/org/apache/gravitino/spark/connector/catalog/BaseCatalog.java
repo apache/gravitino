@@ -515,21 +515,17 @@ public abstract class BaseCatalog implements TableCatalog, SupportsNamespaces, F
   }
 
   protected Table loadTableForWriting(Identifier ident) throws NoSuchTableException {
-    try {
-      org.apache.gravitino.rel.Table gravitinoTable = loadGravitinoTableForWriting(ident);
-      org.apache.spark.sql.connector.catalog.Table sparkTable = loadSparkTable(ident);
-      // Will create a catalog specific table
-      return createSparkTable(
-          ident,
-          gravitinoTable,
-          sparkTable,
-          sparkCatalog,
-          propertiesConverter,
-          sparkTransformConverter,
-          sparkTypeConverter);
-    } catch (org.apache.gravitino.exceptions.NoSuchTableException e) {
-      throw new NoSuchTableException(ident);
-    }
+    org.apache.gravitino.rel.Table gravitinoTable = loadGravitinoTableForWriting(ident);
+    org.apache.spark.sql.connector.catalog.Table sparkTable = loadSparkTable(ident);
+    // Will create a catalog specific table
+    return createSparkTable(
+        ident,
+        gravitinoTable,
+        sparkTable,
+        sparkCatalog,
+        propertiesConverter,
+        sparkTransformConverter,
+        sparkTypeConverter);
   }
 
   private void validateNamespace(String[] namespace) {
