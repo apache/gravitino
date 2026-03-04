@@ -274,6 +274,21 @@ public class TestTopicOperationDispatcher extends TestOperationDispatcher {
     Assertions.assertTrue(entityStore.exists(topicIdent, Entity.EntityType.TOPIC));
   }
 
+  @Test
+  public void testCreateTopicShouldFailWhenStorePutFails() throws IOException {
+    Namespace topicNs = Namespace.of(metalake, catalog, "schema171");
+    Map<String, String> props = ImmutableMap.of("k1", "v1", "k2", "v2");
+    schemaOperationDispatcher.createSchema(NameIdentifier.of(topicNs.levels()), "comment", props);
+
+    reset(entityStore);
+    doThrow(new IOException("store put failed")).when(entityStore).put(any(), eq(true));
+
+    NameIdentifier topicIdent = NameIdentifier.of(topicNs, "topic71");
+    Assertions.assertThrows(
+        RuntimeException.class,
+        () -> topicOperationDispatcher.createTopic(topicIdent, "comment", null, props));
+  }
+
   public static SchemaOperationDispatcher getSchemaOperationDispatcher() {
     return schemaOperationDispatcher;
   }

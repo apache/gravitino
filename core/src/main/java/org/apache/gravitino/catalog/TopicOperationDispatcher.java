@@ -395,10 +395,8 @@ public class TopicOperationDispatcher extends OperationDispatcher implements Top
       store.put(topicEntity, true /* overwrite */);
     } catch (Exception e) {
       LOG.error(OperationDispatcher.FormattedErrorMessages.STORE_OP_FAILURE, "put", ident, e);
-      return EntityCombinedTopic.of(topic)
-          .withHiddenProperties(
-              getHiddenPropertyNames(
-                  catalogIdent, HasPropertyMetadata::topicPropertiesMetadata, topic.properties()));
+      throw new RuntimeException(
+          "Failed to persist topic entity for " + ident + " in the store", e);
     }
 
     return EntityCombinedTopic.of(topic, topicEntity)
