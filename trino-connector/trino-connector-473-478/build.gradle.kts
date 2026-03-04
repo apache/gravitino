@@ -27,14 +27,14 @@ plugins {
   `maven-publish`
 }
 
-// This module supports Trino versions 478+
-val minTrinoVersion = 478
+// This module supports Trino versions 473-478
+val minTrinoVersion = 473
 val maxTrinoVersion = 478
 val otelSemconvVersion = "1.32.0"
 
 val trinoVersion = providers.gradleProperty("trinoVersion")
   .map { it.trim().toInt() }
-  .orElse(minTrinoVersion)
+  .orElse(maxTrinoVersion)
   .get()
 
 // Validate version range

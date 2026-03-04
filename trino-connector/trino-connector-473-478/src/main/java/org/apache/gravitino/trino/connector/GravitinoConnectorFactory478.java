@@ -31,7 +31,7 @@ public class GravitinoConnectorFactory478 extends GravitinoConnectorFactory {
 
   @Override
   protected int getMinSupportTrinoSpiVersion() {
-    return 478;
+    return 473;
   }
 
   @Override
