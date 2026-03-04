@@ -335,8 +335,7 @@ public abstract class SparkAuthorizationIT extends BaseIT {
                 Privileges.UseCatalog.allow(),
                 Privileges.UseSchema.allow(),
                 Privileges.SelectTable.allow(),
-                Privileges.CreateTable.allow(),
-                Privileges.ModifyTable.allow()));
+                Privileges.CreateTable.allow()));
     gravitinoMetalake.createRole(testRole, new HashMap<>(), ImmutableList.of(catalogObject));
     gravitinoMetalake.grantRolesToUser(ImmutableList.of(testRole), NORMAL_USER);
 
