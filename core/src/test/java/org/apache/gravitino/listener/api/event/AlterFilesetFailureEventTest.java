@@ -30,6 +30,9 @@ public class AlterFilesetFailureEventTest {
     Assertions.assertDoesNotThrow(
         () ->
             new AlterFilesetFailureEvent(
-                "user", NameIdentifier.of("metalake", "catalog", "fileset"), new Exception(), null));
+                "user",
+                NameIdentifier.of("metalake", "catalog", "fileset"),
+                new Exception(),
+                null));
   }
 }
