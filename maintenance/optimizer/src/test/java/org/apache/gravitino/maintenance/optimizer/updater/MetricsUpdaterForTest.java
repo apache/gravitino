@@ -23,8 +23,7 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicInteger;
-import org.apache.gravitino.NameIdentifier;
-import org.apache.gravitino.maintenance.optimizer.api.common.MetricSample;
+import org.apache.gravitino.maintenance.optimizer.api.common.MetricPoint;
 import org.apache.gravitino.maintenance.optimizer.api.updater.MetricsUpdater;
 import org.apache.gravitino.maintenance.optimizer.common.OptimizerEnv;
 
@@ -33,9 +32,11 @@ public class MetricsUpdaterForTest implements MetricsUpdater {
   public static final String NAME = "test-metrics-updater";
   private static final List<MetricsUpdaterForTest> INSTANCES =
       Collections.synchronizedList(new ArrayList<>());
-  private final AtomicInteger tableUpdates = new AtomicInteger();
+  private final AtomicInteger tableAndPartitionUpdates = new AtomicInteger();
   private final AtomicInteger jobUpdates = new AtomicInteger();
   private final AtomicInteger closeCalls = new AtomicInteger();
+  private volatile List<MetricPoint> lastTableAndPartitionMetrics = List.of();
+  private volatile List<MetricPoint> lastJobMetrics = List.of();
 
   public MetricsUpdaterForTest() {
     INSTANCES.add(this);
@@ -49,12 +50,20 @@ public class MetricsUpdaterForTest implements MetricsUpdater {
     INSTANCES.clear();
   }
 
-  public int tableUpdates() {
-    return tableUpdates.get();
+  public int tableAndPartitionUpdates() {
+    return tableAndPartitionUpdates.get();
+  }
+
+  public List<MetricPoint> lastTableAndPartitionMetrics() {
+    return lastTableAndPartitionMetrics;
   }
 
   public int jobUpdates() {
     return jobUpdates.get();
+  }
+
+  public List<MetricPoint> lastJobMetrics() {
+    return lastJobMetrics;
   }
 
   public int closeCalls() {
@@ -70,13 +79,15 @@ public class MetricsUpdaterForTest implements MetricsUpdater {
   public void initialize(OptimizerEnv optimizerEnv) {}
 
   @Override
-  public void updateTableMetrics(NameIdentifier nameIdentifier, List<MetricSample> metrics) {
-    tableUpdates.incrementAndGet();
+  public void updateTableAndPartitionMetrics(List<MetricPoint> metrics) {
+    tableAndPartitionUpdates.incrementAndGet();
+    lastTableAndPartitionMetrics = metrics == null ? List.of() : List.copyOf(metrics);
   }
 
   @Override
-  public void updateJobMetrics(NameIdentifier nameIdentifier, List<MetricSample> metrics) {
+  public void updateJobMetrics(List<MetricPoint> metrics) {
     jobUpdates.incrementAndGet();
+    lastJobMetrics = metrics == null ? List.of() : List.copyOf(metrics);
   }
 
   @Override

@@ -22,11 +22,12 @@
 import { createContext, useMemo, useState, useEffect } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { ExclamationCircleFilled, PlusOutlined } from '@ant-design/icons'
-import { Button, Flex, Input, Modal, Spin, Table, Tag, Tooltip, Typography } from 'antd'
+import { Button, Descriptions, Drawer, Flex, Input, Modal, Spin, Table, Tag, Tooltip, Typography } from 'antd'
 import { useAntdColumnResize } from 'react-antd-column-resize'
 import ConfirmInput from '@/components/ConfirmInput'
 import Icons from '@/components/Icons'
 import SectionContainer from '@/components/SectionContainer'
+import AssociatedTable from '@/components/AssociatedTable'
 import CreateTagDialog from './CreateTagDialog'
 import { formatToDateTime } from '@/lib/utils'
 import { useAppSelector, useAppDispatch } from '@/lib/hooks/useStore'
@@ -40,12 +41,16 @@ export default function TagsPage() {
   const [open, setOpen] = useState(false)
   const [editTag, setEditTag] = useState('')
   const [search, setSearch] = useState('')
+  const [drawerOpen, setDrawerOpen] = useState(false)
+  const [selectedTag, setSelectedTag] = useState(null)
   const [modal, contextHolder] = Modal.useModal()
   const router = useRouter()
   const dispatch = useAppDispatch()
   const store = useAppSelector(state => state.tags)
   const searchParams = useSearchParams()
   const currentMetalake = searchParams.get('metalake')
+  const auth = useAppSelector(state => state.auth)
+  const { anthEnable } = auth
 
   useEffect(() => {
     currentMetalake && dispatch(fetchTags({ metalake: currentMetalake, details: true }))
@@ -118,6 +123,16 @@ export default function TagsPage() {
     router.push(`/metadataObjectsForTag?tag=${name}&metalake=${currentMetalake}`)
   }
 
+  const handleViewTag = record => {
+    setSelectedTag(record)
+    setDrawerOpen(true)
+  }
+
+  const handleCloseDrawer = () => {
+    setDrawerOpen(false)
+    setSelectedTag(null)
+  }
+
   const columns = useMemo(
     () => [
       {
@@ -159,7 +174,7 @@ export default function TagsPage() {
       {
         title: 'Actions',
         key: 'action',
-        width: 100,
+        width: 140,
         render: (_, record) => {
           const NameContext = createContext(record.name)
 
@@ -169,6 +184,11 @@ export default function TagsPage() {
               <a>
                 <Tooltip title='Edit'>
                   <Icons.Pencil className='size-4' onClick={() => handleEditTag(record.name)} />
+                </Tooltip>
+              </a>
+              <a>
+                <Tooltip title='View'>
+                  <Icons.Eye className='size-4' onClick={() => handleViewTag(record)} />
                 </Tooltip>
               </a>
               <a>
@@ -211,6 +231,43 @@ export default function TagsPage() {
         />
       </Spin>
       <CreateTagDialog open={open} setOpen={setOpen} metalake={currentMetalake} editTag={editTag} />
+      <Drawer
+        title={`View Tag "${selectedTag?.name || ''}" Details`}
+        placement='right'
+        width={'40%'}
+        onClose={handleCloseDrawer}
+        open={drawerOpen}
+      >
+        {selectedTag && (
+          <>
+            <Title level={5} className='mb-2'>
+              Basic Information
+            </Title>
+            <Descriptions column={1} bordered size='small'>
+              <Descriptions.Item label='Tag Name'>
+                <Tag color={selectedTag.properties?.color}>{selectedTag.name}</Tag>
+              </Descriptions.Item>
+              <Descriptions.Item label='Comment'>{selectedTag.comment || '-'}</Descriptions.Item>
+              <Descriptions.Item label='Created At'>
+                {selectedTag.createTime ? formatToDateTime(selectedTag.createTime) : '-'}
+              </Descriptions.Item>
+              <Descriptions.Item label='Creator'>{selectedTag.audit?.creator || '-'}</Descriptions.Item>
+            </Descriptions>
+            {anthEnable && (
+              <>
+                <Title level={5} className='mt-4 mb-2'>
+                  Associated Roles
+                </Title>
+                <AssociatedTable
+                  metalake={currentMetalake}
+                  metadataObjectType={'tag'}
+                  metadataObjectFullName={selectedTag?.name}
+                />
+              </>
+            )}
+          </>
+        )}
+      </Drawer>
     </SectionContainer>
   )
 }

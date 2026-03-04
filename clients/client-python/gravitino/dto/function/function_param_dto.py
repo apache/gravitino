@@ -42,7 +42,7 @@ def _encode_default_value(
 
 
 def _decode_default_value(
-    default_value_dict: Optional[Dict[str, Any]]
+    default_value_dict: Optional[Dict[str, Any]],
 ) -> Optional[FunctionArg]:
     if default_value_dict is None:
         return None

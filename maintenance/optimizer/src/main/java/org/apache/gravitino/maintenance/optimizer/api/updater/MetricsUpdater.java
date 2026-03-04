@@ -20,27 +20,16 @@
 package org.apache.gravitino.maintenance.optimizer.api.updater;
 
 import java.util.List;
-import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.annotation.DeveloperApi;
-import org.apache.gravitino.maintenance.optimizer.api.common.MetricSample;
+import org.apache.gravitino.maintenance.optimizer.api.common.MetricPoint;
 import org.apache.gravitino.maintenance.optimizer.api.common.Provider;
 
-/** Represents an updater that can update metrics for a table or job. */
+/** Represents an updater that can persist metric points. */
 @DeveloperApi
 public interface MetricsUpdater extends Provider {
-  /**
-   * Persist table metrics.
-   *
-   * @param nameIdentifier catalog/schema/table identifier
-   * @param metrics time-series samples to write
-   */
-  void updateTableMetrics(NameIdentifier nameIdentifier, List<MetricSample> metrics);
+  /** Persist metrics for table and partition scopes. */
+  void updateTableAndPartitionMetrics(List<MetricPoint> metrics);
 
-  /**
-   * Persist job metrics.
-   *
-   * @param nameIdentifier job identifier
-   * @param metrics time-series samples to write
-   */
-  void updateJobMetrics(NameIdentifier nameIdentifier, List<MetricSample> metrics);
+  /** Persist metrics for job scope. */
+  void updateJobMetrics(List<MetricPoint> metrics);
 }

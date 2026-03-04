@@ -345,7 +345,7 @@ export default function TableDetailsPage({ ...props }) {
 
   const tabOptions = [
     { label: 'Columns', key: 'Columns' },
-    ...(anthEnable ? [{ label: 'Associated roles', key: 'Associated roles' }] : [])
+    ...(anthEnable ? [{ label: 'Associated Roles', key: 'Associated Roles' }] : [])
   ]
 
   const onChangeTab = key => {
@@ -613,7 +613,7 @@ export default function TableDetailsPage({ ...props }) {
           </Spin>
         </>
       )}
-      {tabKey === 'Associated roles' && anthEnable && (
+      {tabKey === 'Associated Roles' && anthEnable && (
         <AssociatedTable
           metalake={currentMetalake}
           metadataObjectType={'table'}

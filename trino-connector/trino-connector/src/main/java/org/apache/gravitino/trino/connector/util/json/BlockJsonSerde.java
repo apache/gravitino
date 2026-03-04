@@ -37,6 +37,7 @@ import java.lang.reflect.Method;
  */
 public final class BlockJsonSerde {
   private static final String BLOCK_SERDE_UTIL_CLASS_NAME = "io.trino.block.BlockSerdeUtil";
+  private static final int DEFAULT_BLOCK_ENCODING_NAME_LENGTH = 64;
 
   /**
    * Jackson serializer for Trino {@link Block} objects. Serializes block instances using Trino's
@@ -65,11 +66,13 @@ public final class BlockJsonSerde {
     public void serialize(
         Block block, JsonGenerator jsonGenerator, SerializerProvider serializerProvider)
         throws IOException {
-      //  Encoding name is length prefixed as are many block encodings
-      SliceOutput output =
-          new DynamicSliceOutput(
-              toIntExact(
-                  block.getSizeInBytes() + block.getEncodingName().length() + (2 * Integer.BYTES)));
+      // estimate size to avoid multiple resizes, encoding name is length prefixed as are many block
+      // like : SIZE_OF_INT + blockEncoding.getName().length() + block.getSizeInBytes();
+      // we use a default length for encoding name to avoid calculating actual length
+      int estimatedSize =
+          toIntExact(
+              block.getSizeInBytes() + (2 * Integer.BYTES) + DEFAULT_BLOCK_ENCODING_NAME_LENGTH);
+      SliceOutput output = new DynamicSliceOutput(estimatedSize);
 
       try {
         writeBlock.invoke(null, blockEncodingSerde, output, block);
