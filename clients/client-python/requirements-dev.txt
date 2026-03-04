@@ -17,21 +17,19 @@
 
 requests==2.32.5
 dataclasses-json==0.6.7
-pylint==3.2.2
-black==24.4.2
-twine==5.1.1
-coverage==7.5.1
-pandas==2.2.3
-pyarrow==15.0.2
+pylint==4.0.5
+black==26.1.0
+twine==6.2.0
+coverage==7.13.4
+pandas==2.3.3
+pyarrow==23.0.1
 llama-index==0.13.0
-tenacity==8.3.0
-cachetools==6.2.1
+tenacity==9.1.4
+cachetools==7.0.1
 readerwriterlock==1.0.9
 docker==7.1.0
-pyjwt[crypto]==2.10.1
+pyjwt[crypto]==2.11.0
 jwcrypto==1.5.6
 sphinx==7.1.2
 furo==2024.8.6
-# banks 2.4.0 does not support python 3.9.* or lower, so we limit the version here. We can also
-# consider upgrading the python version to 3.10.x or higher in the future to avoid this issue.
-banks==2.3.0
+banks==2.4.1

@@ -51,6 +51,8 @@ import org.slf4j.LoggerFactory;
 
 public class ITUtils {
   private static final Logger LOG = LoggerFactory.getLogger(ITUtils.class);
+  private static final String CI_ENV = "CI";
+  private static final String GITHUB_ACTIONS_ENV = "GITHUB_ACTIONS";
 
   public static final String TEST_MODE = "testMode";
   public static final String EMBEDDED_TEST_MODE = "embedded";
@@ -210,6 +212,10 @@ public class ITUtils {
   }
 
   public static void cleanDisk() {
+    if (!isCiEnvironment(System.getenv())) {
+      LOG.info("Skip disk cleanup because current environment is not CI.");
+      return;
+    }
 
     Object output =
         CommandExecutor.executeCommandLocalHost(
@@ -220,8 +226,9 @@ public class ITUtils {
             "free -m", false, ProcessData.TypesOfData.STREAMS_MERGED, Map.of());
     LOG.info("Before clean: Command free -m output:\n{}", output);
 
-    // Execute docker system prune -af to free up space before starting the OceanBase container
-    ProcessBuilder processBuilder = new ProcessBuilder("/bin/bash", "-c", "docker system prune -f");
+    // Execute docker container prune -f to clean only stopped containers in CI.
+    ProcessBuilder processBuilder =
+        new ProcessBuilder("/bin/bash", "-c", "docker container prune -f");
     try {
       Process process = processBuilder.start();
       int exitCode = process.waitFor();
@@ -243,6 +250,11 @@ public class ITUtils {
         CommandExecutor.executeCommandLocalHost(
             "free -m", false, ProcessData.TypesOfData.STREAMS_MERGED, Map.of());
     LOG.info("After clean: Command free -m output:\n{}", output);
+  }
+
+  static boolean isCiEnvironment(Map<String, String> env) {
+    return "true".equalsIgnoreCase(env.get(CI_ENV))
+        || "true".equalsIgnoreCase(env.get(GITHUB_ACTIONS_ENV));
   }
 
   private ITUtils() {}

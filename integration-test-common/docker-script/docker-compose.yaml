@@ -19,7 +19,7 @@
 services:
 
   hive:
-    image: apache/gravitino-ci:hive-0.1.13
+    image: apache/gravitino-ci:hive-0.1.20
     networks:
       - trino-net
     container_name: trino-ci-hive
@@ -79,7 +79,7 @@ services:
       retries: 5
 
   trino:
-    image: trinodb/trino:435
+    image: trinodb/trino:${TRINO_VERSION:-469}
     networks:
       - trino-net
     container_name: trino-ci-trino
@@ -94,7 +94,7 @@ services:
     entrypoint:  /bin/bash /tmp/trino/init.sh
     volumes:
       - ./init/trino:/tmp/trino
-      - ../../trino-connector/trino-connector/build/libs:/usr/lib/trino/plugin/gravitino
+      - ${GRAVITINO_TRINO_CONNECTOR_DIR:-../../trino-connector/trino-connector-469-472/build/libs}:/usr/lib/trino/plugin/gravitino
     extra_hosts:
       - "host.docker.internal:host-gateway"
     healthcheck:
@@ -113,7 +113,7 @@ services:
         condition: service_healthy
 
   trino-worker:
-    image: trinodb/trino:435
+    image: trinodb/trino:${TRINO_VERSION:-469}
     networks:
       - trino-net
     deploy:
@@ -128,7 +128,7 @@ services:
     entrypoint:  /bin/bash /tmp/trino/init.sh
     volumes:
       - ./init/trino:/tmp/trino
-      - ../../trino-connector/trino-connector/build/libs:/usr/lib/trino/plugin/gravitino
+      - ${GRAVITINO_TRINO_CONNECTOR_DIR:-../../trino-connector/trino-connector-469-472/build/libs}:/usr/lib/trino/plugin/gravitino
     extra_hosts:
       - "host.docker.internal:host-gateway"
     depends_on:

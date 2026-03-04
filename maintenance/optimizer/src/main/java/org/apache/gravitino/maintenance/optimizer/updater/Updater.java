@@ -23,25 +23,25 @@ import com.google.common.annotations.VisibleForTesting;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
-import java.util.Locale;
 import java.util.Map;
 import java.util.stream.Collectors;
 import org.apache.gravitino.NameIdentifier;
-import org.apache.gravitino.maintenance.optimizer.api.common.MetricSample;
+import org.apache.gravitino.maintenance.optimizer.api.common.DataScope;
+import org.apache.gravitino.maintenance.optimizer.api.common.MetricPoint;
 import org.apache.gravitino.maintenance.optimizer.api.common.PartitionPath;
 import org.apache.gravitino.maintenance.optimizer.api.common.StatisticEntry;
-import org.apache.gravitino.maintenance.optimizer.api.common.TableStatisticsBundle;
+import org.apache.gravitino.maintenance.optimizer.api.common.TableAndPartitionStatistics;
 import org.apache.gravitino.maintenance.optimizer.api.updater.MetricsUpdater;
 import org.apache.gravitino.maintenance.optimizer.api.updater.StatisticsCalculator;
 import org.apache.gravitino.maintenance.optimizer.api.updater.StatisticsUpdater;
-import org.apache.gravitino.maintenance.optimizer.api.updater.SupportsCalculateBulkJobStatistics;
+import org.apache.gravitino.maintenance.optimizer.api.updater.SupportsCalculateBulkJobMetrics;
+import org.apache.gravitino.maintenance.optimizer.api.updater.SupportsCalculateBulkTableMetrics;
 import org.apache.gravitino.maintenance.optimizer.api.updater.SupportsCalculateBulkTableStatistics;
-import org.apache.gravitino.maintenance.optimizer.api.updater.SupportsCalculateJobStatistics;
+import org.apache.gravitino.maintenance.optimizer.api.updater.SupportsCalculateJobMetrics;
+import org.apache.gravitino.maintenance.optimizer.api.updater.SupportsCalculateTableMetrics;
 import org.apache.gravitino.maintenance.optimizer.api.updater.SupportsCalculateTableStatistics;
 import org.apache.gravitino.maintenance.optimizer.common.CloseableGroup;
-import org.apache.gravitino.maintenance.optimizer.common.MetricSampleImpl;
 import org.apache.gravitino.maintenance.optimizer.common.OptimizerEnv;
-import org.apache.gravitino.maintenance.optimizer.common.PartitionMetricSampleImpl;
 import org.apache.gravitino.maintenance.optimizer.common.conf.OptimizerConfig;
 import org.apache.gravitino.maintenance.optimizer.common.util.InstanceLoaderUtils;
 import org.apache.gravitino.maintenance.optimizer.common.util.ProviderUtils;
@@ -86,123 +86,39 @@ public class Updater implements AutoCloseable {
   /**
    * Updates statistics or metrics for the provided identifiers.
    *
-   * <p>This is the main entry point for updating a bounded set of targets. The updater resolves the
-   * {@link StatisticsCalculator} by name, calculates table and partition statistics, and persists
-   * either raw statistics or derived metrics based on {@code updateType}. If the calculator
-   * implements {@link SupportsCalculateJobStatistics} and {@code updateType} is {@link
-   * UpdateType#METRICS}, job metrics are also emitted.
-   *
    * @param statisticsCalculatorName The provider name of the statistics calculator.
    * @param nameIdentifiers The identifiers to update (table and/or job).
    * @param updateType The target update type: statistics or metrics.
+   * @return summary of processed record counts by scope
    */
-  public void update(
+  public UpdateSummary update(
       String statisticsCalculatorName,
       List<NameIdentifier> nameIdentifiers,
       UpdateType updateType) {
     StatisticsCalculator calculator = getStatisticsCalculator(statisticsCalculatorName);
-    long tableRecords = 0;
-    long partitionRecords = 0;
-    long jobRecords = 0;
-    for (NameIdentifier nameIdentifier : nameIdentifiers) {
-      if (calculator instanceof SupportsCalculateTableStatistics) {
-        SupportsCalculateTableStatistics supportTableStatistics =
-            ((SupportsCalculateTableStatistics) calculator);
-        TableStatisticsBundle bundle =
-            supportTableStatistics.calculateTableStatistics(nameIdentifier);
-        List<StatisticEntry<?>> statistics = bundle != null ? bundle.tableStatistics() : List.of();
-        Map<PartitionPath, List<StatisticEntry<?>>> partitionStatistics =
-            bundle != null ? bundle.partitionStatistics() : Map.of();
-        tableRecords += countStatistics(statistics);
-        partitionRecords += countPartitionStatistics(partitionStatistics);
-        LOG.info(
-            "Updating table statistics/metrics: calculator={}, updateType={}, identifier={}",
-            statisticsCalculatorName,
-            updateType,
-            nameIdentifier);
-        updateTable(statistics, nameIdentifier, updateType);
-        updatePartition(partitionStatistics, nameIdentifier, updateType);
-      }
-      if (calculator instanceof SupportsCalculateJobStatistics
-          && UpdateType.METRICS.equals(updateType)) {
-        SupportsCalculateJobStatistics supportJobStatistics =
-            ((SupportsCalculateJobStatistics) calculator);
-        List<StatisticEntry<?>> statistics =
-            supportJobStatistics.calculateJobStatistics(nameIdentifier);
-        jobRecords += countStatistics(statistics);
-        LOG.info(
-            "Updating job metrics: calculator={}, identifier={}",
-            statisticsCalculatorName,
-            nameIdentifier);
-        updateJob(statistics, nameIdentifier);
-      }
+
+    if (UpdateType.STATISTICS.equals(updateType)) {
+      return updateStatisticsForIdentifiers(statisticsCalculatorName, nameIdentifiers, calculator);
     }
-    System.out.println(
-        String.format(
-            "SUMMARY: %s totalRecords=%d tableRecords=%d partitionRecords=%d jobRecords=%d",
-            updateType.name().toLowerCase(Locale.ROOT),
-            tableRecords + partitionRecords + jobRecords,
-            tableRecords,
-            partitionRecords,
-            jobRecords));
+
+    return updateMetricsForIdentifiers(statisticsCalculatorName, nameIdentifiers, calculator);
   }
 
   /**
    * Updates statistics or metrics for all identifiers returned by the calculator.
    *
-   * <p>This is the main entry point for batch refreshes. The updater asks the {@link
-   * StatisticsCalculator} for all table statistics (and optionally job statistics) and persists
-   * them according to {@code updateType}. If the calculator implements {@link
-   * SupportsCalculateBulkJobStatistics} and {@code updateType} is {@link UpdateType#METRICS}, job
-   * metrics are also emitted.
-   *
    * @param statisticsCalculatorName The provider name of the statistics calculator.
    * @param updateType The target update type: statistics or metrics.
+   * @return summary of processed record counts by scope
    */
-  public void updateAll(String statisticsCalculatorName, UpdateType updateType) {
+  public UpdateSummary updateAll(String statisticsCalculatorName, UpdateType updateType) {
     StatisticsCalculator calculator = getStatisticsCalculator(statisticsCalculatorName);
-    long tableRecords = 0;
-    long partitionRecords = 0;
-    long jobRecords = 0;
 
-    if (calculator instanceof SupportsCalculateBulkTableStatistics supportBulkTableStatistics) {
-      Map<NameIdentifier, TableStatisticsBundle> allTableStatistics =
-          supportBulkTableStatistics.calculateBulkTableStatistics();
-      if (allTableStatistics == null) {
-        allTableStatistics = Map.of();
-      }
-
-      tableRecords += countAllTableStatistics(allTableStatistics);
-      partitionRecords += countAllPartitionStatistics(allTableStatistics);
-      allTableStatistics.forEach(
-          (identifier, bundle) -> {
-            List<StatisticEntry<?>> statistics =
-                bundle != null ? bundle.tableStatistics() : List.of();
-            Map<PartitionPath, List<StatisticEntry<?>>> partitionStatistics =
-                bundle != null ? bundle.partitionStatistics() : Map.of();
-            updateTable(statistics, identifier, updateType);
-            updatePartition(partitionStatistics, identifier, updateType);
-          });
+    if (UpdateType.STATISTICS.equals(updateType)) {
+      return updateAllStatistics(statisticsCalculatorName, calculator);
     }
 
-    if (calculator instanceof SupportsCalculateBulkJobStatistics supportJobStatistics
-        && UpdateType.METRICS.equals(updateType)) {
-      Map<NameIdentifier, List<StatisticEntry<?>>> allJobStatistics =
-          supportJobStatistics.calculateAllJobStatistics();
-      if (allJobStatistics == null) {
-        allJobStatistics = Map.of();
-      }
-      jobRecords += countAllStatistics(allJobStatistics);
-      allJobStatistics.forEach((identifier, statistics) -> updateJob(statistics, identifier));
-    }
-    System.out.println(
-        String.format(
-            "SUMMARY: %s totalRecords=%d tableRecords=%d partitionRecords=%d jobRecords=%d",
-            updateType.name().toLowerCase(Locale.ROOT),
-            tableRecords + partitionRecords + jobRecords,
-            tableRecords,
-            partitionRecords,
-            jobRecords));
+    return updateAllMetrics(statisticsCalculatorName, calculator);
   }
 
   @VisibleForTesting
@@ -210,35 +126,209 @@ public class Updater implements AutoCloseable {
     return metricsUpdater;
   }
 
+  @VisibleForTesting
+  public StatisticsUpdater getStatisticsUpdater() {
+    return statisticsUpdater;
+  }
+
+  /** Immutable summary of record counts processed by one update execution. */
+  public static final class UpdateSummary {
+    private final UpdateType updateType;
+    private final long totalRecords;
+    private final long tableRecords;
+    private final long partitionRecords;
+    private final long jobRecords;
+
+    private UpdateSummary(
+        UpdateType updateType,
+        long totalRecords,
+        long tableRecords,
+        long partitionRecords,
+        long jobRecords) {
+      this.updateType = updateType;
+      this.totalRecords = totalRecords;
+      this.tableRecords = tableRecords;
+      this.partitionRecords = partitionRecords;
+      this.jobRecords = jobRecords;
+    }
+
+    public UpdateType updateType() {
+      return updateType;
+    }
+
+    public long totalRecords() {
+      return totalRecords;
+    }
+
+    public long tableRecords() {
+      return tableRecords;
+    }
+
+    public long partitionRecords() {
+      return partitionRecords;
+    }
+
+    public long jobRecords() {
+      return jobRecords;
+    }
+  }
+
   @Override
   public void close() throws Exception {
     closeableGroup.close();
   }
 
-  private void updateTable(
-      List<StatisticEntry<?>> statistics, NameIdentifier tableIdentifier, UpdateType updateType) {
-    switch (updateType) {
-      case STATISTICS:
-        updateTableStatistics(statistics, tableIdentifier);
-        break;
-      case METRICS:
-        updateTableMetrics(statistics, tableIdentifier);
-        break;
+  private UpdateSummary updateStatisticsForIdentifiers(
+      String statisticsCalculatorName,
+      List<NameIdentifier> nameIdentifiers,
+      StatisticsCalculator calculator) {
+    long tableRecords = 0;
+    long partitionRecords = 0;
+
+    for (NameIdentifier nameIdentifier : nameIdentifiers) {
+      if (!(calculator instanceof SupportsCalculateTableStatistics)) {
+        continue;
+      }
+      SupportsCalculateTableStatistics supportTableStatistics =
+          (SupportsCalculateTableStatistics) calculator;
+      TableAndPartitionStatistics bundle =
+          supportTableStatistics.calculateTableStatistics(nameIdentifier);
+      List<StatisticEntry<?>> statistics = bundle != null ? bundle.tableStatistics() : List.of();
+      Map<PartitionPath, List<StatisticEntry<?>>> partitionStatistics =
+          bundle != null ? bundle.partitionStatistics() : Map.of();
+
+      tableRecords += countStatistics(statistics);
+      partitionRecords += countPartitionStatistics(partitionStatistics);
+      LOG.info(
+          "Updating table statistics: calculator={}, identifier={}",
+          statisticsCalculatorName,
+          nameIdentifier);
+
+      updateTableStatistics(statistics, nameIdentifier);
+      updatePartitionStatistics(partitionStatistics, nameIdentifier);
     }
+    return buildSummary(UpdateType.STATISTICS, tableRecords, partitionRecords, 0L);
   }
 
-  private void updatePartition(
-      Map<PartitionPath, List<StatisticEntry<?>>> partitionStatistics,
-      NameIdentifier tableIdentifier,
-      UpdateType updateType) {
-    switch (updateType) {
-      case STATISTICS:
-        updatePartitionStatistics(partitionStatistics, tableIdentifier);
-        break;
-      case METRICS:
-        updatePartitionMetrics(partitionStatistics, tableIdentifier);
-        break;
+  private UpdateSummary updateMetricsForIdentifiers(
+      String statisticsCalculatorName,
+      List<NameIdentifier> nameIdentifiers,
+      StatisticsCalculator calculator) {
+    boolean hasTableMetricsCalculator = calculator instanceof SupportsCalculateTableMetrics;
+    boolean hasJobMetricsCalculator = calculator instanceof SupportsCalculateJobMetrics;
+    if (!hasTableMetricsCalculator && !hasJobMetricsCalculator) {
+      throw new IllegalArgumentException(
+          String.format(
+              "Statistics calculator '%s' does not implement metric interfaces. "
+                  + "Expected SupportsCalculateTableMetrics and/or SupportsCalculateJobMetrics.",
+              statisticsCalculatorName));
     }
+
+    long tableRecords = 0;
+    long partitionRecords = 0;
+    long jobRecords = 0;
+    List<MetricPoint> pendingTableAndPartitionMetrics = new ArrayList<>();
+    List<MetricPoint> pendingJobMetrics = new ArrayList<>();
+
+    for (NameIdentifier nameIdentifier : nameIdentifiers) {
+      if (hasTableMetricsCalculator) {
+        List<MetricPoint> metrics =
+            ((SupportsCalculateTableMetrics) calculator).calculateTableMetrics(nameIdentifier);
+        tableRecords += countMetricsByScope(metrics, DataScope.Type.TABLE);
+        partitionRecords += countMetricsByScope(metrics, DataScope.Type.PARTITION);
+        LOG.info(
+            "Updating table/partition metrics: calculator={}, identifier={}, count={}",
+            statisticsCalculatorName,
+            nameIdentifier,
+            metrics == null ? 0 : metrics.size());
+        appendMetrics(pendingTableAndPartitionMetrics, metrics);
+      }
+
+      if (hasJobMetricsCalculator) {
+        List<MetricPoint> metrics =
+            ((SupportsCalculateJobMetrics) calculator).calculateJobMetrics(nameIdentifier);
+        jobRecords += countMetricsByScope(metrics, DataScope.Type.JOB);
+        LOG.info(
+            "Updating job metrics: calculator={}, identifier={}, count={}",
+            statisticsCalculatorName,
+            nameIdentifier,
+            metrics == null ? 0 : metrics.size());
+        appendMetrics(pendingJobMetrics, metrics);
+      }
+    }
+
+    updateTableAndPartitionMetrics(pendingTableAndPartitionMetrics);
+    updateJobMetrics(pendingJobMetrics);
+    return buildSummary(UpdateType.METRICS, tableRecords, partitionRecords, jobRecords);
+  }
+
+  private UpdateSummary updateAllStatistics(
+      String statisticsCalculatorName, StatisticsCalculator calculator) {
+    if (!(calculator instanceof SupportsCalculateBulkTableStatistics)) {
+      throw new IllegalArgumentException(
+          String.format(
+              "Statistics calculator '%s' does not implement %s",
+              statisticsCalculatorName,
+              SupportsCalculateBulkTableStatistics.class.getSimpleName()));
+    }
+
+    Map<NameIdentifier, TableAndPartitionStatistics> allTableStatistics =
+        ((SupportsCalculateBulkTableStatistics) calculator).calculateBulkTableStatistics();
+    if (allTableStatistics == null) {
+      allTableStatistics = Map.of();
+    }
+
+    long tableRecords = countAllTableStatistics(allTableStatistics);
+    long partitionRecords = countAllPartitionStatistics(allTableStatistics);
+
+    allTableStatistics.forEach(
+        (identifier, bundle) -> {
+          List<StatisticEntry<?>> statistics =
+              bundle != null ? bundle.tableStatistics() : List.of();
+          Map<PartitionPath, List<StatisticEntry<?>>> partitionStatistics =
+              bundle != null ? bundle.partitionStatistics() : Map.of();
+          updateTableStatistics(statistics, identifier);
+          updatePartitionStatistics(partitionStatistics, identifier);
+        });
+    return buildSummary(UpdateType.STATISTICS, tableRecords, partitionRecords, 0L);
+  }
+
+  private UpdateSummary updateAllMetrics(
+      String statisticsCalculatorName, StatisticsCalculator calculator) {
+    boolean hasTableMetricsCalculator = calculator instanceof SupportsCalculateBulkTableMetrics;
+    boolean hasJobMetricsCalculator = calculator instanceof SupportsCalculateBulkJobMetrics;
+    if (!hasTableMetricsCalculator && !hasJobMetricsCalculator) {
+      throw new IllegalArgumentException(
+          String.format(
+              "Statistics calculator '%s' does not implement bulk metric interfaces. "
+                  + "Expected SupportsCalculateBulkTableMetrics and/or SupportsCalculateBulkJobMetrics.",
+              statisticsCalculatorName));
+    }
+
+    long tableRecords = 0;
+    long partitionRecords = 0;
+    long jobRecords = 0;
+    List<MetricPoint> pendingTableAndPartitionMetrics = new ArrayList<>();
+    List<MetricPoint> pendingJobMetrics = new ArrayList<>();
+
+    if (hasTableMetricsCalculator) {
+      List<MetricPoint> metrics =
+          ((SupportsCalculateBulkTableMetrics) calculator).calculateAllTableMetrics();
+      tableRecords += countMetricsByScope(metrics, DataScope.Type.TABLE);
+      partitionRecords += countMetricsByScope(metrics, DataScope.Type.PARTITION);
+      appendMetrics(pendingTableAndPartitionMetrics, metrics);
+    }
+
+    if (hasJobMetricsCalculator) {
+      List<MetricPoint> metrics =
+          ((SupportsCalculateBulkJobMetrics) calculator).calculateAllJobMetrics();
+      jobRecords += countMetricsByScope(metrics, DataScope.Type.JOB);
+      appendMetrics(pendingJobMetrics, metrics);
+    }
+
+    updateTableAndPartitionMetrics(pendingTableAndPartitionMetrics);
+    updateJobMetrics(pendingJobMetrics);
+    return buildSummary(UpdateType.METRICS, tableRecords, partitionRecords, jobRecords);
   }
 
   private void updateTableStatistics(
@@ -265,50 +355,32 @@ public class Updater implements AutoCloseable {
         tableIdentifier,
         partitionStatistics.size(),
         partitionNames(partitionStatistics),
-        summarize(partitionStatistics.values().stream().flatMap(Collection::stream).toList()));
+        summarize(
+            partitionStatistics.values().stream()
+                .flatMap(Collection::stream)
+                .collect(Collectors.toList())));
     statisticsUpdater.updatePartitionStatistics(tableIdentifier, partitionStatistics);
   }
 
-  private void updateTableMetrics(
-      List<StatisticEntry<?>> statistics, NameIdentifier tableIdentifier) {
-    long timestampSeconds = System.currentTimeMillis() / 1000;
-    LOG.info(
-        "Persisting table metrics: identifier={}, count={}, details={}",
-        tableIdentifier,
-        statistics != null ? statistics.size() : 0,
-        summarize(statistics));
-    metricsUpdater.updateTableMetrics(tableIdentifier, toMetrics(statistics, timestampSeconds));
-  }
-
-  private void updatePartitionMetrics(
-      Map<PartitionPath, List<StatisticEntry<?>>> partitionStatistics,
-      NameIdentifier tableIdentifier) {
-    if (partitionStatistics == null || partitionStatistics.isEmpty()) {
-      LOG.info(
-          "Persist partition metrics skipped: identifier={}, reason=empty partitions",
-          tableIdentifier);
+  private void updateTableAndPartitionMetrics(List<MetricPoint> metrics) {
+    if (metrics == null || metrics.isEmpty()) {
       return;
     }
-    long timestampSeconds = System.currentTimeMillis() / 1000;
-    List<MetricSample> partitionMetrics = toPartitionMetrics(partitionStatistics, timestampSeconds);
-    LOG.info(
-        "Persisting partition metrics: identifier={}, partitions={}, names={}, details={}",
-        tableIdentifier,
-        partitionStatistics.size(),
-        partitionNames(partitionStatistics),
-        summarize(partitionStatistics.values().stream().flatMap(Collection::stream).toList()));
-    metricsUpdater.updateTableMetrics(tableIdentifier, partitionMetrics);
+    metricsUpdater.updateTableAndPartitionMetrics(metrics);
   }
 
-  private void updateJob(List<StatisticEntry<?>> statistics, NameIdentifier jobIdentifier) {
-    long timestampSeconds = System.currentTimeMillis() / 1000;
+  private void updateJobMetrics(List<MetricPoint> metrics) {
+    if (metrics == null || metrics.isEmpty()) {
+      return;
+    }
+    metricsUpdater.updateJobMetrics(metrics);
+  }
 
-    LOG.info(
-        "Persisting job metrics: identifier={}, count={}, details={}",
-        jobIdentifier,
-        statistics != null ? statistics.size() : 0,
-        summarize(statistics));
-    metricsUpdater.updateJobMetrics(jobIdentifier, toMetrics(statistics, timestampSeconds));
+  private void appendMetrics(List<MetricPoint> pendingMetrics, List<MetricPoint> metricsToAppend) {
+    if (metricsToAppend == null || metricsToAppend.isEmpty()) {
+      return;
+    }
+    pendingMetrics.addAll(metricsToAppend);
   }
 
   private String summarize(List<StatisticEntry<?>> statistics) {
@@ -325,27 +397,6 @@ public class Updater implements AutoCloseable {
       summary = summary + " ... (" + statistics.size() + " total)";
     }
     return summary;
-  }
-
-  private List<MetricSample> toMetrics(List<StatisticEntry<?>> statistics, long timestamp) {
-    List<MetricSample> metrics = new ArrayList<>();
-    if (statistics != null) {
-      statistics.forEach(stat -> metrics.add(new MetricSampleImpl(timestamp, stat)));
-    }
-    return metrics;
-  }
-
-  private List<MetricSample> toPartitionMetrics(
-      Map<PartitionPath, List<StatisticEntry<?>>> partitionStatistics, long timestamp) {
-    List<MetricSample> metrics = new ArrayList<>();
-    if (partitionStatistics != null) {
-      partitionStatistics.forEach(
-          (partitionPath, statisticEntries) ->
-              statisticEntries.forEach(
-                  stat ->
-                      metrics.add(new PartitionMetricSampleImpl(timestamp, stat, partitionPath))));
-    }
-    return metrics;
   }
 
   private StatisticsCalculator getStatisticsCalculator(String statisticsCalculatorName) {
@@ -395,15 +446,8 @@ public class Updater implements AutoCloseable {
     return partitionStatistics.values().stream().mapToLong(this::countStatistics).sum();
   }
 
-  private long countAllStatistics(Map<NameIdentifier, List<StatisticEntry<?>>> statisticsByTable) {
-    if (statisticsByTable == null) {
-      return 0;
-    }
-    return statisticsByTable.values().stream().mapToLong(this::countStatistics).sum();
-  }
-
   private long countAllTableStatistics(
-      Map<NameIdentifier, TableStatisticsBundle> statisticsByTable) {
+      Map<NameIdentifier, TableAndPartitionStatistics> statisticsByTable) {
     if (statisticsByTable == null) {
       return 0;
     }
@@ -413,12 +457,29 @@ public class Updater implements AutoCloseable {
   }
 
   private long countAllPartitionStatistics(
-      Map<NameIdentifier, TableStatisticsBundle> partitionStatisticsByTable) {
+      Map<NameIdentifier, TableAndPartitionStatistics> partitionStatisticsByTable) {
     if (partitionStatisticsByTable == null) {
       return 0;
     }
     return partitionStatisticsByTable.values().stream()
         .mapToLong(bundle -> countPartitionStatistics(bundle.partitionStatistics()))
         .sum();
+  }
+
+  private long countMetricsByScope(List<MetricPoint> metrics, DataScope.Type scope) {
+    if (metrics == null || metrics.isEmpty()) {
+      return 0;
+    }
+    return metrics.stream().filter(metric -> metric.scope() == scope).count();
+  }
+
+  private UpdateSummary buildSummary(
+      UpdateType updateType, long tableRecords, long partitionRecords, long jobRecords) {
+    return new UpdateSummary(
+        updateType,
+        tableRecords + partitionRecords + jobRecords,
+        tableRecords,
+        partitionRecords,
+        jobRecords);
   }
 }

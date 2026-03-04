@@ -92,7 +92,7 @@ export default function TopicDetailsPage({ ...props }) {
   const propertyContent = (
     <PropertiesContent properties={properties} dataReferPrefix='props' contentDataRefer='properties-popover-content' />
   )
-  const tabOptions = [{ label: 'Associated roles', key: 'Associated roles' }]
+  const tabOptions = [{ label: 'Associated Roles', key: 'Associated Roles' }]
 
   const handleEditTable = () => {
     setOpen(true)
@@ -194,6 +194,7 @@ export default function TopicDetailsPage({ ...props }) {
           catalog={catalog}
           schema={schema}
           editTopic={topic}
+          init={true}
         />
       )}
       {openOwner && (

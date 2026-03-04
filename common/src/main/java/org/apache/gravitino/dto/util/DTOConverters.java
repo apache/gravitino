@@ -407,6 +407,7 @@ public class DTOConverters {
         .withIndexType(index.type())
         .withName(index.name())
         .withFieldNames(index.fieldNames())
+        .withProperties(index.properties())
         .build();
   }
 
@@ -606,8 +607,10 @@ public class DTOConverters {
       if (Literals.NULL.equals(expression)) {
         return LiteralDTO.NULL;
       }
+
+      Object value = ((Literal) expression).value();
       return LiteralDTO.builder()
-          .withValue((((Literal) expression).value().toString()))
+          .withValue(value == null ? null : value.toString())
           .withDataType(((Literal) expression).dataType())
           .build();
     } else if (expression instanceof NamedReference.FieldReference) {
@@ -959,7 +962,8 @@ public class DTOConverters {
    * @return The index.
    */
   public static Index fromDTO(IndexDTO indexDTO) {
-    return Indexes.of(indexDTO.type(), indexDTO.name(), indexDTO.fieldNames());
+    return Indexes.of(
+        indexDTO.type(), indexDTO.name(), indexDTO.fieldNames(), indexDTO.properties());
   }
 
   /**

@@ -19,22 +19,27 @@
 
 package org.apache.gravitino.maintenance.optimizer.common.conf;
 
+import java.util.List;
 import java.util.Map;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.Config;
 import org.apache.gravitino.config.ConfigBuilder;
 import org.apache.gravitino.config.ConfigConstants;
 import org.apache.gravitino.config.ConfigEntry;
+import org.apache.gravitino.maintenance.optimizer.monitor.evaluator.GravitinoMetricsEvaluator;
+import org.apache.gravitino.maintenance.optimizer.monitor.job.dummy.DummyTableJobRelationProvider;
+import org.apache.gravitino.maintenance.optimizer.monitor.metrics.GravitinoMetricsProvider;
 import org.apache.gravitino.maintenance.optimizer.recommender.job.NoopJobSubmitter;
 import org.apache.gravitino.maintenance.optimizer.recommender.statistics.GravitinoStatisticsProvider;
 import org.apache.gravitino.maintenance.optimizer.recommender.strategy.GravitinoStrategyProvider;
 import org.apache.gravitino.maintenance.optimizer.recommender.table.GravitinoTableMetadataProvider;
+import org.apache.gravitino.maintenance.optimizer.updater.metrics.GravitinoMetricsUpdater;
+import org.apache.gravitino.maintenance.optimizer.updater.statistics.GravitinoStatisticsUpdater;
 
 /**
- * Central configuration holder for the optimizer/recommender runtime. Keys are grouped under the
- * {@code gravitino.optimizer.*} prefix and capture both core connectivity (URI, metalake, default
- * catalog) and pluggable implementation wiring (statistics provider, strategy provider, table
- * metadata provider, job submitter).
+ * Central configuration holder for the optimizer runtime. Keys are grouped under the {@code
+ * gravitino.optimizer.*} prefix and capture both core connectivity (URI, metalake, default catalog)
+ * and pluggable implementation wiring for recommender, updater, and monitor components.
  */
 public class OptimizerConfig extends Config {
 
@@ -53,9 +58,15 @@ public class OptimizerConfig extends Config {
   private static final String TABLE_META_PROVIDER = RECOMMENDER_PREFIX + "tableMetaProvider";
   private static final String JOB_SUBMITTER = RECOMMENDER_PREFIX + "jobSubmitter";
 
-  private static final String UPDATER_PREFIX = OPTIMIZER_PREFIX + "updater.";
+  public static final String UPDATER_PREFIX = OPTIMIZER_PREFIX + "updater.";
   private static final String STATISTICS_UPDATER = UPDATER_PREFIX + "statisticsUpdater";
   private static final String METRICS_UPDATER = UPDATER_PREFIX + "metricsUpdater";
+  public static final String MONITOR_PREFIX = OPTIMIZER_PREFIX + "monitor.";
+  private static final String METRICS_PROVIDER = MONITOR_PREFIX + "metricsProvider";
+  private static final String TABLE_JOB_RELATION_PROVIDER =
+      MONITOR_PREFIX + "tableJobRelationProvider";
+  private static final String METRICS_EVALUATOR = MONITOR_PREFIX + "metricsEvaluator";
+  private static final String MONITOR_CALLBACKS = MONITOR_PREFIX + "callbacks";
 
   public static final ConfigEntry<String> STATISTICS_PROVIDER_CONFIG =
       new ConfigBuilder(STATISTICS_PROVIDER)
@@ -106,14 +117,53 @@ public class OptimizerConfig extends Config {
           .doc("The statistics updater implementation name (matches Provider.name()).")
           .version(ConfigConstants.VERSION_1_2_0)
           .stringConf()
-          .create();
+          .createWithDefault(GravitinoStatisticsUpdater.NAME);
 
   public static final ConfigEntry<String> METRICS_UPDATER_CONFIG =
       new ConfigBuilder(METRICS_UPDATER)
           .doc("The metrics updater implementation name (matches Provider.name()).")
           .version(ConfigConstants.VERSION_1_2_0)
           .stringConf()
-          .create();
+          .createWithDefault(GravitinoMetricsUpdater.NAME);
+
+  public static final ConfigEntry<String> METRICS_PROVIDER_CONFIG =
+      new ConfigBuilder(METRICS_PROVIDER)
+          .doc(
+              "Monitor metrics provider implementation name (matches Provider.name()) "
+                  + "discoverable via ServiceLoader. Example: 'metrics-provider'.")
+          .version(ConfigConstants.VERSION_1_2_0)
+          .stringConf()
+          .createWithDefault(GravitinoMetricsProvider.NAME);
+
+  public static final ConfigEntry<String> TABLE_JOB_RELATION_PROVIDER_CONFIG =
+      new ConfigBuilder(TABLE_JOB_RELATION_PROVIDER)
+          .doc(
+              "Monitor table-job relation provider implementation name (matches Provider.name()) "
+                  + "discoverable via ServiceLoader. Example: 'table-job-relation-provider'.")
+          .version(ConfigConstants.VERSION_1_2_0)
+          .stringConf()
+          .createWithDefault(DummyTableJobRelationProvider.NAME);
+
+  public static final ConfigEntry<String> METRICS_EVALUATOR_CONFIG =
+      new ConfigBuilder(METRICS_EVALUATOR)
+          .doc(
+              "Monitor metrics evaluator implementation name discoverable via ServiceLoader. "
+                  + "The evaluator name must match MetricsEvaluator.name(). Example: "
+                  + "'metrics-evaluator'.")
+          .version(ConfigConstants.VERSION_1_2_0)
+          .stringConf()
+          .createWithDefault(GravitinoMetricsEvaluator.NAME);
+
+  public static final ConfigEntry<List<String>> MONITOR_CALLBACKS_CONFIG =
+      new ConfigBuilder(MONITOR_CALLBACKS)
+          .doc(
+              "Comma-separated monitor callback implementation names (each matches "
+                  + "Provider.name()) discoverable via ServiceLoader. Example: "
+                  + "'monitor-callback-a,monitor-callback-b'.")
+          .version(ConfigConstants.VERSION_1_2_0)
+          .stringConf()
+          .toSequence()
+          .createWithDefault(List.of());
 
   public static final ConfigEntry<String> GRAVITINO_URI_CONFIG =
       new ConfigBuilder(GRAVITINO_URI)

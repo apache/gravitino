@@ -15,7 +15,7 @@ concurrency:
 # A workflow run is made up of one or more jobs that can run sequentially or in parallel
 jobs:
   changes:
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - uses: dorny/paths-filter@de90cc6fb38fc0963ad72b210f1f284cd68cea36
@@ -111,7 +111,7 @@ jobs:
     strategy:
       matrix:
         java-version: [ 17 ]
-    timeout-minutes: 60
+    timeout-minutes: 90
     needs: changes
     if: needs.changes.outputs.source_changes == 'true'
     # Steps represent a sequence of tasks that will be executed as part of the job
@@ -144,6 +144,41 @@ jobs:
       - name: Build with Gradle (skip mcp-server tests)
         if: needs.changes.outputs.mcp_server_changes != 'true'
         run: ./gradlew build -PskipITs -PskipDockerTests=false -x :clients:client-python:build -x :mcp-server:build -x :mcp-server:test -x :mcp-server:pylint
+
+      - name: Fetch base branch for coverage diff
+        if: github.event_name == 'pull_request'
+        run: git fetch origin ${{ github.base_ref }} --depth=1
+
+      - name: Generate Coverage Report
+        id: coverage
+        if: github.event_name == 'pull_request'
+        run: |
+          python3 dev/ci/jacoco_report.py \
+            --base-ref "${{ github.base_ref }}" \
+            --head-sha "${{ github.event.pull_request.head.sha }}" \
+            --repo-url "${{ github.event.pull_request.head.repo.html_url }}" \
+            --min-overall 40 \
+            --min-changed 60 \
+            --output coverage-report.md
+
+      - name: Save PR number
+        if: github.event_name == 'pull_request' && steps.coverage.outputs.has_reports == 'true'
+        run: echo "${{ github.event.pull_request.number }}" > pr-number.txt
+
+      - name: Upload Coverage Report
+        if: github.event_name == 'pull_request' && steps.coverage.outputs.has_reports == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-report
+          path: |
+            coverage-report.md
+            pr-number.txt
+
+      - name: Output Coverage Info
+        if: github.event_name == 'pull_request' && steps.coverage.outputs.has_reports == 'true'
+        run: |
+          echo "Total coverage ${{ steps.coverage.outputs.coverage-overall }}"
+          echo "Changed Files coverage ${{ steps.coverage.outputs.coverage-changed-files }}"
 
       - name: Release with Gradle
         run: ./gradlew clean && ./gradlew release -x test --rerun-tasks

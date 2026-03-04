@@ -269,7 +269,7 @@ To define an indexed table, you should utilize the following three components to
 <TabItem value="java" label="Java">
 
 ```java
-Indexes.of(IndexType.PRIMARY_KEY, "PRIMARY", new String[][]{{"col_1"}, {"col_2"}});
+Indexes.of(IndexType.PRIMARY_KEY, "PRIMARY", new String[][]{{"col_1"}, {"col_2"}}, Map.of());
 ```
 
 </TabItem>
@@ -344,8 +344,8 @@ tableCatalog.createTable(
     Distributions.NONE,
     new SortOrder[0],
     new Index[] {
-      Indexes.of(IndexType.PRIMARY_KEY, "PRIMARY", new String[][]{{"id"}}),
-      Indexes.of(IndexType.UNIQUE_KEY, "name_age_score_uk", new String[][]{{"name"}, {"age"}, {"score"}})
+      Indexes.of(IndexType.PRIMARY_KEY, "PRIMARY", new String[][]{{"id"}}, Map.of()),
+      Indexes.of(IndexType.UNIQUE_KEY, "name_age_score_uk", new String[][]{{"name"}, {"age"}, {"score"}}, Map.of())
     });
 ```
 

@@ -19,23 +19,52 @@
 
 package org.apache.gravitino.maintenance.optimizer.api.common;
 
+import com.google.common.base.Preconditions;
+import java.util.Objects;
 import org.apache.gravitino.annotation.DeveloperApi;
+import org.apache.gravitino.stats.StatisticValue;
 
-/** Represents a single metric sample with a timestamp and associated statistic. */
+/** Immutable metric sample that keeps only timestamp and value for evaluation. */
 @DeveloperApi
-public interface MetricSample {
+public final class MetricSample {
 
-  /**
-   * Metric event time in epoch seconds.
-   *
-   * @return the metric timestamp in epoch seconds
-   */
-  long timestamp();
+  private final long timestampSeconds;
+  private final StatisticValue<?> value;
 
-  /**
-   * The statistic value sampled at this timestamp.
-   *
-   * @return the statistic entry for this sample
-   */
-  StatisticEntry<?> statistic();
+  public MetricSample(long timestampSeconds, StatisticValue<?> value) {
+    Preconditions.checkArgument(timestampSeconds >= 0, "timestampSeconds must be non-negative");
+    Preconditions.checkArgument(value != null, "value must not be null");
+    this.timestampSeconds = timestampSeconds;
+    this.value = value;
+  }
+
+  public long timestampSeconds() {
+    return timestampSeconds;
+  }
+
+  public StatisticValue<?> value() {
+    return value;
+  }
+
+  @Override
+  public boolean equals(Object obj) {
+    if (this == obj) {
+      return true;
+    }
+    if (!(obj instanceof MetricSample)) {
+      return false;
+    }
+    MetricSample other = (MetricSample) obj;
+    return timestampSeconds == other.timestampSeconds && Objects.equals(value, other.value);
+  }
+
+  @Override
+  public int hashCode() {
+    return Objects.hash(timestampSeconds, value);
+  }
+
+  @Override
+  public String toString() {
+    return "MetricSample{" + "timestampSeconds=" + timestampSeconds + ", value=" + value + '}';
+  }
 }

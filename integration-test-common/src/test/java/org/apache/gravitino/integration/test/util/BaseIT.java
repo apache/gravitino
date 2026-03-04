@@ -110,16 +110,20 @@ public class BaseIT {
 
   protected boolean ignoreLanceAuxRestService = true;
 
-  public String DOWNLOAD_MYSQL_JDBC_DRIVER_URL =
+  public static String DOWNLOAD_MYSQL_JDBC_DRIVER_URL =
       "https://repo1.maven.org/maven2/mysql/mysql-connector-java/8.0.26/mysql-connector-java-8.0.26.jar";
 
   public static final String DOWNLOAD_POSTGRESQL_JDBC_DRIVER_URL =
       "https://jdbc.postgresql.org/download/postgresql-42.7.0.jar";
 
+  public static final String DOWNLOAD_CLICKHOUSE_JDBC_DRIVER_URL =
+      "https://repo1.maven.org/maven2/com/clickhouse/clickhouse-jdbc/0.7.1/clickhouse-jdbc-0.7.1-all.jar";
+
   public static final Map<String, Pattern> SUPPORTED_CLEAN_CONFLICTS_DRIVER_TYPES =
       ImmutableMap.of(
           "mysql", Pattern.compile("mysql-connector-java-([\\d.]+)\\.jar"),
-          "postgresql", Pattern.compile("postgresql-([\\d.]+)\\.jar"));
+          "postgresql", Pattern.compile("postgresql-([\\d.]+)\\.jar"),
+          "clickhouse", Pattern.compile("clickhouse-jdbc-([\\d.]+)(-all)?\\.jar"));
 
   private TestDatabaseName META_DATA;
   private MySQLContainer MYSQL_CONTAINER;
@@ -194,7 +198,11 @@ public class BaseIT {
   }
 
   private void setupJdbcDrivers() throws IOException {
-    String[] driverUrls = {DOWNLOAD_MYSQL_JDBC_DRIVER_URL, DOWNLOAD_POSTGRESQL_JDBC_DRIVER_URL};
+    String[] driverUrls = {
+      DOWNLOAD_MYSQL_JDBC_DRIVER_URL,
+      DOWNLOAD_POSTGRESQL_JDBC_DRIVER_URL,
+      DOWNLOAD_CLICKHOUSE_JDBC_DRIVER_URL
+    };
     String[] dirs = getJdbcDriverDownloadDirs();
     downloadJdbcDrivers(driverUrls, dirs);
     cleanJdbcDriverConflicts(driverUrls, dirs);

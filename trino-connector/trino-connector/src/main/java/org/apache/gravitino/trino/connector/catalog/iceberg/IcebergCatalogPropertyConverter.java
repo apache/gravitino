@@ -68,6 +68,7 @@ public class IcebergCatalogPropertyConverter extends CatalogPropertyConverter {
     // The order of put operations determines the priority of parameters.
     config.putAll(super.gravitinoToEngineProperties(properties));
     config.putAll(stringStringMap);
+    config.put("fs.hadoop.enabled", "true");
     return config;
   }
 

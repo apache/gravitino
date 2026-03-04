@@ -31,6 +31,9 @@ public class IcebergConstants {
   public static final String ICEBERG_JDBC_PASSWORD = "jdbc.password";
   public static final String ICEBERG_JDBC_INITIALIZE = "jdbc-initialize";
 
+  public static final String GRAVITINO_JDBC_SCHEMA_VERSION = "jdbc-schema-version";
+  public static final String ICEBERG_JDBC_SCHEMA_VERSION = "jdbc.schema-version";
+
   public static final String GRAVITINO_JDBC_DRIVER = "jdbc-driver";
   public static final String WAREHOUSE = "warehouse";
   public static final String URI = "uri";

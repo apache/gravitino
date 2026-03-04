@@ -43,12 +43,10 @@ import org.apache.gravitino.rel.types.Types;
 import org.apache.gravitino.utils.RandomNameUtils;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
-import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 
 @Tag("gravitino-docker-test")
-@Disabled
 public class TestOceanBaseTableOperations extends TestOceanBase {
   private static final Type VARCHAR = Types.VarCharType.of(255);
   private static final Type INT = Types.IntegerType.get();
@@ -908,7 +906,9 @@ public class TestOceanBaseTableOperations extends TestOceanBase {
     };
 
     final Index[] primaryIndex =
-        new Index[] {Indexes.createMysqlPrimaryKey(new String[][] {{"col_1"}, {"col_4"}})};
+        new Index[] {
+          Indexes.createMysqlPrimaryKey(new String[][] {{"col_1"}, {"col_4"}}, Map.of())
+        };
     exception =
         Assertions.assertThrows(
             IllegalArgumentException.class,

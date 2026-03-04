@@ -23,12 +23,10 @@ import java.util.List;
 import java.util.Map;
 import org.apache.gravitino.utils.RandomNameUtils;
 import org.junit.jupiter.api.Assertions;
-import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 
 @Tag("gravitino-docker-test")
-@Disabled
 public class TestOceanBaseDatabaseOperations extends TestOceanBase {
 
   @Test
