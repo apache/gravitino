@@ -162,7 +162,7 @@ public class CatalogOperations {
 
     } catch (Exception e) {
       return ExceptionHandlers.handleCatalogException(
-          OperationType.CREATE, request.getName(), metalake, e);
+          OperationType.CREATE, request != null ? request.getName() : "", metalake, e);
     }
   }
 
@@ -198,7 +198,10 @@ public class CatalogOperations {
           });
 
     } catch (Exception e) {
-      LOG.info("Failed to test connection for catalog: {}.{}", metalake, request.getName());
+      LOG.info(
+          "Failed to test connection for catalog: {}.{}",
+          metalake,
+          request != null ? request.getName() : "");
       return ExceptionHandlers.handleTestConnectionException(e);
     }
   }
@@ -244,7 +247,7 @@ public class CatalogOperations {
     } catch (Exception e) {
       LOG.info(
           "Failed to {} catalog: {}.{}",
-          request.isInUse() ? "enable" : "disable",
+          request != null ? (request.isInUse() ? "enable" : "disable") : "set",
           metalake,
           catalogName);
       return ExceptionHandlers.handleCatalogException(op, catalogName, metalake, e);

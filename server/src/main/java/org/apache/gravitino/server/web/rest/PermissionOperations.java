@@ -102,7 +102,10 @@ public class PermissionOperations {
           });
     } catch (Exception e) {
       return ExceptionHandlers.handleUserPermissionOperationException(
-          OperationType.GRANT, StringUtils.join(request.getRoleNames(), ","), user, e);
+          OperationType.GRANT,
+          request != null ? StringUtils.join(request.getRoleNames(), ",") : "",
+          user,
+          e);
     }
   }
 
@@ -131,7 +134,10 @@ public class PermissionOperations {
           });
     } catch (Exception e) {
       return ExceptionHandlers.handleGroupPermissionOperationException(
-          OperationType.GRANT, StringUtils.join(request.getRoleNames(), ","), group, e);
+          OperationType.GRANT,
+          request != null ? StringUtils.join(request.getRoleNames(), ",") : "",
+          group,
+          e);
     }
   }
 
@@ -160,7 +166,10 @@ public class PermissionOperations {
           });
     } catch (Exception e) {
       return ExceptionHandlers.handleUserPermissionOperationException(
-          OperationType.REVOKE, StringUtils.join(request.getRoleNames(), ","), user, e);
+          OperationType.REVOKE,
+          request != null ? StringUtils.join(request.getRoleNames(), ",") : "",
+          user,
+          e);
     }
   }
 
@@ -189,7 +198,10 @@ public class PermissionOperations {
           });
     } catch (Exception e) {
       return ExceptionHandlers.handleGroupPermissionOperationException(
-          OperationType.REVOKE, StringUtils.join(request.getRoleNames()), group, e);
+          OperationType.REVOKE,
+          request != null ? StringUtils.join(request.getRoleNames()) : "",
+          group,
+          e);
     }
   }
 

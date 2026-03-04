@@ -139,7 +139,7 @@ public class SchemaOperations {
 
     } catch (Exception e) {
       return ExceptionHandlers.handleSchemaException(
-          OperationType.CREATE, request.getName(), catalog, e);
+          OperationType.CREATE, request != null ? request.getName() : "", catalog, e);
     }
   }
 

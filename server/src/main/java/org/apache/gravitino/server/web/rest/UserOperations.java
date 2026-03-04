@@ -166,7 +166,7 @@ public class UserOperations {
           });
     } catch (Exception e) {
       return ExceptionHandlers.handleUserException(
-          OperationType.ADD, request.getName(), metalake, e);
+          OperationType.ADD, request != null ? request.getName() : "", metalake, e);
     }
   }
 

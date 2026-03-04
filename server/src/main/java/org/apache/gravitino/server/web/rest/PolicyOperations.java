@@ -163,7 +163,7 @@ public class PolicyOperations {
           });
     } catch (Exception e) {
       return ExceptionHandlers.handlePolicyException(
-          OperationType.CREATE, request.getName(), metalake, e);
+          OperationType.CREATE, request != null ? request.getName() : "", metalake, e);
     }
   }
 

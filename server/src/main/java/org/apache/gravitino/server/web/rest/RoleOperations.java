@@ -198,7 +198,7 @@ public class RoleOperations {
 
     } catch (Exception e) {
       return ExceptionHandlers.handleRoleException(
-          OperationType.CREATE, request.getName(), metalake, e);
+          OperationType.CREATE, request != null ? request.getName() : "", metalake, e);
     }
   }
 

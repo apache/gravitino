@@ -164,7 +164,7 @@ public class TagOperations {
           });
     } catch (Exception e) {
       return ExceptionHandlers.handleTagException(
-          OperationType.CREATE, request.getName(), metalake, e);
+          OperationType.CREATE, request != null ? request.getName() : "", metalake, e);
     }
   }
 
