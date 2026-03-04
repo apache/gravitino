@@ -24,9 +24,8 @@ import org.apache.gravitino.maintenance.optimizer.api.common.Provider;
 
 /**
  * Marker interface for providers that can supply statistics to {@link StrategyHandler} instances.
- * Implementations are invoked by the {@link
- * org.apache.gravitino.maintenance.optimizer.recommender.Recommender} only when a handler declares
- * the matching {@link
+ * Implementations are invoked by the optimizer recommender only when a handler declares the
+ * matching {@link
  * org.apache.gravitino.maintenance.optimizer.api.recommender.StrategyHandler.DataRequirement}. Most
  * providers should also implement a narrower contract such as {@link SupportTableStatistics} to
  * expose concrete capabilities.
