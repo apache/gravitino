@@ -30,10 +30,14 @@ import org.apache.gravitino.client.GravitinoClient;
 import org.apache.gravitino.exceptions.NoSuchMetadataObjectException;
 import org.apache.gravitino.exceptions.NoSuchMetalakeException;
 
+/** Represents the detail information of an owner of an entity. */
 public class OwnerDetails extends Command {
 
+  /** The name of the metalake. */
   protected final String metalake;
+  /** The name of the entity. */
   protected final String entity;
+  /** The type of the entity. */
   protected final MetadataObject.Type entityType;
 
   /**

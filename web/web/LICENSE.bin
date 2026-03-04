@@ -332,12 +332,6 @@
    @typescript-eslint/types
    @typescript-eslint/typescript-estree
    @typescript-eslint/visitor-keys
-   @vitest/coverage-v8
-   @vitest/expect
-   @vitest/runner
-   @vitest/snapshot
-   @vitest/spy
-   @vitest/utils
    @xobotyi/scrollbar-width
    acorn
    acorn-jsx

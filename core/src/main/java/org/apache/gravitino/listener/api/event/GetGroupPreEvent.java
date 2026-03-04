@@ -35,7 +35,7 @@ public class GetGroupPreEvent extends GroupPreEvent {
    * @param metalake the name of the metalake from which the group is being retrieved.
    * @param groupName the name of the group that is requested to be retrieved.
    */
-  protected GetGroupPreEvent(String initiator, String metalake, String groupName) {
+  public GetGroupPreEvent(String initiator, String metalake, String groupName) {
     super(initiator, NameIdentifierUtil.ofGroup(metalake, groupName));
 
     this.groupName = groupName;

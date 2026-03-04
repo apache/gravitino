@@ -7,7 +7,7 @@ license: "This software is licensed under the Apache License version 2."
 ## Install Apache Gravitino from scratch
 
 :::note
-Apache Gravitino supports running on Java 8, 11, and 17. Make sure you have Java installed and
+Apache Gravitino supports running on Java 17, and higher versions should also work but not fully tested. Make sure you have Java installed and
 `JAVA_HOME` configured correctly. To confirm the Java version, run the
 `${JAVA_HOME}/bin/java -version` command.
 :::
@@ -19,9 +19,11 @@ The Gravitino package comprises both the Gravitino server and the Gravitino Iceb
 Before installing Gravitino, make sure you have the Gravitino binary distribution package. You can download the latest Gravitino binary distribution package from [GitHub](https://github.com/apache/gravitino/releases).
 You can also build it yourself by following the instructions in [How to Build Gravitino](./how-to-build.md).
 
-  - If you build Gravitino yourself using the `./gradlew compileDistribution` command, you can find the Gravitino binary distribution package in the `distribution/package` directory.
+- If you build Gravitino yourself using the `./gradlew compileDistribution` command, you can find the Gravitino binary distribution package in the `distribution/package` and `distribution/package-all` directory. The main difference between these two packages is that the `package-all` package contains all catalogs including catalog under folder `catalogs-contrib`, while the `package` package only contains the main catalogs under folder `catalogs`.
 
-  - If you build Gravitino yourself using the `./gradlew assembleDistribution` command, you can get the compressed Gravitino binary distribution package with the name `gravitino-<version>-bin.tar.gz` in the `distribution` directory with sha256 checksum file `gravitino-<version>-bin.tar.gz.sha256`.
+- If you build Gravitino yourself using the `./gradlew assembleDistribution` command, you can get the compressed Gravitino binary distribution package with the name `gravitino-<version>-bin.tar.gz` in the `distribution` directory with sha256 checksum file `gravitino-<version>-bin.tar.gz.sha256`. Also, you can get the complete compressed Gravitino binary distribution package with the name `gravitino-<version>-bin-all.tar.gz` in the `distribution` directory with sha256 checksum file `gravitino-<version>-bin-all.tar.gz.sha256`. The main difference between these two packages is that the `-all` package contains all catalogs including catalog under folder `catalogs-contrib` while the normal package only contains the main catalogs under folder `catalogs`.
+
+Note: **Apache Gravitino only releases `gravitino-<version>-bin.tar.gz` packages on GitHub releases and the `gravitino-<version>-bin-all.tar.gz` packages are only for users who build Gravitino from source code by themselves if interested.**
 
 The Gravitino binary distribution package contains the following files:
 
@@ -36,8 +38,10 @@ The Gravitino binary distribution package contains the following files:
     |   └── hive/                               # Apache Hive catalog dependencies and configurations.
     |   └── jdbc-doris/                         # JDBC doris catalog dependencies and configurations.
     |   └── jdbc-mysql/                         # JDBC MySQL catalog dependencies and configurations.
+    |   └── jdbc-starrocks/                     # JDBC Starrocks catalog dependencies and configurations.
     |   └── jdbc-postgresql/                    # JDBC PostgreSQL catalog dependencies and configurations.
-    |   └── kafka/                              # Apache Kafka PostgreSQL catalog dependencies and configurations.
+    |   └── jdbc-hudi/                          # Hudi catalog dependencies and configurations.
+    |   └── kafka/                              # Apache Kafka catalog dependencies and configurations.
     |   └── lakehouse-iceberg/                  # Apache Iceberg catalog dependencies and configurations.
     |   └── lakehouse-paimon/                   # Apache Paimon catalog dependencies and configurations.
     |   └── model/                              # Model catalog dependencies and configurations.
@@ -52,6 +56,12 @@ The Gravitino binary distribution package contains the following files:
     |── iceberg-rest-server/                    # Gravitino Iceberg REST server package and dependencies libraries.
     └── scripts/                                # Extra scripts for Gravitino.
 ```
+
+:::note
+Catalogs `OceanBase` and `ClickHouse` are not included in the Gravitino binary distribution package (see above) by default due to package size limitations and License compatibility issues since 1.2.0.
+If you want to use these two catalogs, please build the Gravitino binary distribution package by yourself and use tarball `gravitino-<version>-bin-all.tar.gz`, which contains all catalogs including those in the `catalogs-contrib` module.
+For more details about it, please refer to [Reorg catalogs structure](https://github.com/apache/gravitino/pull/9781)
+:::
 
 #### Initialize the RDBMS (Optional)
 

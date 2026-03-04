@@ -48,7 +48,7 @@ jobs:
     needs: changes
     if: needs.changes.outputs.source_changes == 'true'
     runs-on: ubuntu-latest
-    timeout-minutes: 60
+    timeout-minutes: 90
     strategy:
       matrix:
         # Integration test for AMD64 architecture
@@ -68,15 +68,19 @@ jobs:
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v3
 
+      - name: Free up disk space
+        run: |
+          dev/ci/util_free_space.sh  
+
       - name: Python Client Integration Test
         id: integrationTest
         run: |
-          ./gradlew compileDistribution -x test -PjdkVersion=${{ matrix.java-version }}
+          ./gradlew compileDistribution -x test 
 
-          for pythonVersion in "3.8" "3.9" "3.10" "3.11" "3.12"
+          for pythonVersion in "3.10" "3.11" "3.12"
           do
             echo "Use Python version ${pythonVersion} to test the Python client."
-            ./gradlew -PjdkVersion=${{ matrix.java-version }} -PpythonVersion=${pythonVersion} -PskipDockerTests=false :clients:client-python:test
+            ./gradlew -PpythonVersion=${pythonVersion} -PskipDockerTests=false :clients:client-python:test
             # Clean Gravitino database to clean test data
             rm -rf ./distribution/package/data
           done

@@ -270,6 +270,11 @@ public class TestExpressionUtil {
         SortOrders.of(
             NamedReference.field("F4"), SortDirection.DESCENDING, NullOrdering.NULLS_FIRST),
         sortOrders[3]);
+
+    sortOrderFiled = List.of("f1 ASC");
+    sortOrders = ExpressionUtil.sortOrderFiledToExpression(sortOrderFiled);
+    Assertions.assertEquals(1, sortOrders.length);
+    Assertions.assertEquals(SortOrders.ascending(NamedReference.field("f1")), sortOrders[0]);
   }
 
   @Test

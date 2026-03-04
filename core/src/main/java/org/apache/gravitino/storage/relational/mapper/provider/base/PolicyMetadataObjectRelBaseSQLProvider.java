@@ -98,7 +98,7 @@ public class PolicyMetadataObjectRelBaseSQLProvider {
     return "<script>"
         + "INSERT INTO "
         + PolicyMetadataObjectRelMapper.POLICY_METADATA_OBJECT_RELATION_TABLE_NAME
-        + "(policy_id, metadata_object_id, metadata_object_type, audit_info,"
+        + " (policy_id, metadata_object_id, metadata_object_type, audit_info,"
         + " current_version, last_version, deleted_at)"
         + " VALUES "
         + "<foreach collection='policyRels' item='item' separator=','>"

@@ -35,7 +35,7 @@ public class RemoveGroupPreEvent extends GroupPreEvent {
    * @param metalake the name of the metalake from which the group will be removed.
    * @param groupName the name of the group that is requested to be removed from the metalake.
    */
-  protected RemoveGroupPreEvent(String initiator, String metalake, String groupName) {
+  public RemoveGroupPreEvent(String initiator, String metalake, String groupName) {
     super(initiator, NameIdentifierUtil.ofGroup(metalake, groupName));
 
     this.groupName = groupName;

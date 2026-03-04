@@ -34,6 +34,8 @@ class MockGVFSHook(GravitinoVirtualFileSystemHook):
     # pylint: disable=too-many-instance-attributes
 
     def __init__(self):
+        self.set_operations_context_called = False
+        self.operations = None
         self.ls_called = False
         self.info_called = False
         self.exists_called = False
@@ -64,6 +66,26 @@ class MockGVFSHook(GravitinoVirtualFileSystemHook):
         self.post_get_file_called = False
         self.post_created_called = False
         self.post_modified_called = False
+        # Failure callback tracking
+        self.on_ls_failure_called = False
+        self.on_info_failure_called = False
+        self.on_exists_failure_called = False
+        self.on_open_failure_called = False
+        self.on_cp_file_failure_called = False
+        self.on_mv_failure_called = False
+        self.on_rm_failure_called = False
+        self.on_rm_file_failure_called = False
+        self.on_rmdir_failure_called = False
+        self.on_mkdir_failure_called = False
+        self.on_makedirs_failure_called = False
+        self.on_cat_file_failure_called = False
+        self.on_get_file_failure_called = False
+        self.on_created_failure_called = False
+        self.on_modified_failure_called = False
+
+    def set_operations_context(self, operations):
+        self.set_operations_context_called = True
+        self.operations = operations
 
     def initialize(self, config: Optional[Dict[str, str]]):
         pass
@@ -210,6 +232,102 @@ class MockGVFSHook(GravitinoVirtualFileSystemHook):
         self.post_created_called = True
         return created
 
+    # Failure callback implementations
+    def on_ls_failure(self, path: str, exception: Exception, **kwargs):
+        self.on_ls_failure_called = True
+        super().on_ls_failure(path, exception, **kwargs)
+
+    def on_info_failure(self, path: str, exception: Exception, **kwargs):
+        self.on_info_failure_called = True
+        super().on_info_failure(path, exception, **kwargs)
+
+    def on_exists_failure(self, path: str, exception: Exception, **kwargs):
+        self.on_exists_failure_called = True
+        super().on_exists_failure(path, exception, **kwargs)
+
+    def on_open_failure(
+        self,
+        path: str,
+        mode: str,
+        block_size: int,
+        cache_options: dict,
+        compression: str,
+        exception: Exception,
+        **kwargs,
+    ):
+        self.on_open_failure_called = True
+        super().on_open_failure(
+            path, mode, block_size, cache_options, compression, exception, **kwargs
+        )
+
+    def on_cp_file_failure(self, src: str, dst: str, exception: Exception, **kwargs):
+        self.on_cp_file_failure_called = True
+        super().on_cp_file_failure(src, dst, exception, **kwargs)
+
+    def on_mv_failure(
+        self,
+        src: str,
+        dst: str,
+        recursive: bool,
+        maxdepth: int,
+        exception: Exception,
+        **kwargs,
+    ):
+        self.on_mv_failure_called = True
+        super().on_mv_failure(src, dst, recursive, maxdepth, exception, **kwargs)
+
+    def on_rm_failure(
+        self, path: str, recursive: bool, maxdepth: int, exception: Exception
+    ):
+        self.on_rm_failure_called = True
+        super().on_rm_failure(path, recursive, maxdepth, exception)
+
+    def on_rm_file_failure(self, path: str, exception: Exception):
+        self.on_rm_file_failure_called = True
+        super().on_rm_file_failure(path, exception)
+
+    def on_rmdir_failure(self, path: str, exception: Exception):
+        self.on_rmdir_failure_called = True
+        super().on_rmdir_failure(path, exception)
+
+    def on_mkdir_failure(
+        self, path: str, create_parents: bool, exception: Exception, **kwargs
+    ):
+        self.on_mkdir_failure_called = True
+        super().on_mkdir_failure(path, create_parents, exception, **kwargs)
+
+    def on_makedirs_failure(self, path: str, exist_ok: bool, exception: Exception):
+        self.on_makedirs_failure_called = True
+        super().on_makedirs_failure(path, exist_ok, exception)
+
+    def on_cat_file_failure(
+        self, path: str, start: int, end: int, exception: Exception, **kwargs
+    ):
+        self.on_cat_file_failure_called = True
+        super().on_cat_file_failure(path, start, end, exception, **kwargs)
+
+    def on_get_file_failure(
+        self,
+        rpath: str,
+        lpath: str,
+        callback: Callback,
+        outfile: str,
+        exception: Exception,
+        **kwargs,
+    ):
+        self.on_get_file_failure_called = True
+        super().on_get_file_failure(
+            rpath, lpath, callback, outfile, exception, **kwargs
+        )
+
+    def on_created_failure(self, path: str, exception: Exception):
+        self.on_created_failure_called = True
+        super().on_created_failure(path, exception)
+
+    def on_modified_failure(self, path: str, exception: Exception):
+        self.on_modified_failure_called = True
+        super().on_modified_failure(path, exception)
+
 
 @patch(
     "gravitino.client.generic_fileset.GenericFileset.get_credentials",
@@ -259,6 +377,11 @@ class TestGVFSHook(unittest.TestCase):
                     GVFSConfig.GVFS_FILESYSTEM_HOOK: "tests.unittests.test_gvfs_with_hook.MockGVFSHook"
                 },
             )
+
+            # Test that set_operations_context was called during initialization
+            self.assertTrue(fs.hook.set_operations_context_called)
+            self.assertIsNotNone(fs.hook.operations)
+            self.assertEqual(fs.operations, fs.hook.operations)
 
             # Test pre_exists and post_exists hook
             fs.exists(fileset_virtual_path)
@@ -384,3 +507,81 @@ class TestGVFSHook(unittest.TestCase):
             fs.rmdir(f"{fileset_virtual_path}/test_dir")
             self.assertTrue(fs.hook.rmdir_called)
             self.assertTrue(fs.hook.post_rmdir_called)
+
+    def test_failure_callbacks(self, *mock_method):
+        """Test that failure callbacks are invoked when operations fail."""
+        fileset_storage_location = f"{self._fileset_dir}/test_failure_location"
+        fileset_virtual_path = "fileset/fileset_catalog/tmp/test_failure_location"
+
+        with patch.multiple(
+            "gravitino.client.fileset_catalog.FilesetCatalog",
+            load_fileset=mock.MagicMock(
+                return_value=mock_base.mock_load_fileset(
+                    "fileset", fileset_storage_location
+                )
+            ),
+            get_file_location=mock.MagicMock(return_value=fileset_storage_location),
+        ):
+            fs = gvfs.GravitinoVirtualFileSystem(
+                server_uri="http://localhost:9090",
+                metalake_name="metalake_demo",
+                skip_instance_catch=True,
+                options={
+                    GVFSConfig.GVFS_FILESYSTEM_HOOK: "tests.unittests.test_gvfs_with_hook.MockGVFSHook"
+                },
+            )
+
+            # Test on_ls_failure
+            with patch.object(
+                fs.operations, "ls", side_effect=RuntimeError("ls failed")
+            ):
+                with self.assertRaises(RuntimeError):
+                    fs.ls(fileset_virtual_path)
+                self.assertTrue(
+                    fs.hook.on_ls_failure_called,
+                    "on_ls_failure should be called when ls operation fails",
+                )
+
+            # Test on_info_failure
+            with patch.object(
+                fs.operations, "info", side_effect=RuntimeError("info failed")
+            ):
+                with self.assertRaises(RuntimeError):
+                    fs.info(fileset_virtual_path)
+                self.assertTrue(
+                    fs.hook.on_info_failure_called,
+                    "on_info_failure should be called when info operation fails",
+                )
+
+            # Test on_open_failure
+            with patch.object(
+                fs.operations, "open", side_effect=RuntimeError("open failed")
+            ):
+                with self.assertRaises(RuntimeError):
+                    fs.open(fileset_virtual_path, mode="rb")
+                self.assertTrue(
+                    fs.hook.on_open_failure_called,
+                    "on_open_failure should be called when open operation fails",
+                )
+
+            # Test on_mkdir_failure
+            with patch.object(
+                fs.operations, "mkdir", side_effect=RuntimeError("mkdir failed")
+            ):
+                with self.assertRaises(RuntimeError):
+                    fs.mkdir(fileset_virtual_path)
+                self.assertTrue(
+                    fs.hook.on_mkdir_failure_called,
+                    "on_mkdir_failure should be called when mkdir operation fails",
+                )
+
+            # Test on_rm_file_failure
+            with patch.object(
+                fs.operations, "rm_file", side_effect=RuntimeError("rm_file failed")
+            ):
+                with self.assertRaises(RuntimeError):
+                    fs.rm_file(fileset_virtual_path)
+                self.assertTrue(
+                    fs.hook.on_rm_file_failure_called,
+                    "on_rm_file_failure should be called when rm_file operation fails",
+                )

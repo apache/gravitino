@@ -40,11 +40,14 @@ import org.apache.gravitino.model.ModelCatalog;
 import org.apache.gravitino.rel.Table;
 import org.apache.gravitino.rel.TableCatalog;
 
-/* Removes all the tags of an entity. */
+/** Removes all the tags of an entity. */
 public class RemoveAllTags extends Command {
 
+  /** The name of the metalake. */
   protected String metalake;
+  /** The full name of the entity. */
   protected FullName name;
+  /** If true, the command will not prompt for confirmation. */
   protected final boolean force;
 
   /**

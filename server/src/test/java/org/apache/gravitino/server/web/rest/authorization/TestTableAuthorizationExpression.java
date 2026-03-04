@@ -27,6 +27,7 @@ import ognl.OgnlException;
 import org.apache.gravitino.dto.requests.TableCreateRequest;
 import org.apache.gravitino.dto.requests.TableUpdatesRequest;
 import org.apache.gravitino.server.authorization.annotations.AuthorizationExpression;
+import org.apache.gravitino.server.authorization.expression.AuthorizationExpressionConstants;
 import org.apache.gravitino.server.web.rest.TableOperations;
 import org.junit.jupiter.api.Test;
 
@@ -49,6 +50,8 @@ public class TestTableAuthorizationExpression {
     assertTrue(mockEvaluator.getResult(ImmutableSet.of("SCHEMA::OWNER", "CATALOG::USE_CATALOG")));
     assertTrue(mockEvaluator.getResult(ImmutableSet.of("SCHEMA::OWNER", "METALAKE::USE_CATALOG")));
     assertFalse(mockEvaluator.getResult(ImmutableSet.of("SCHEMA::CREATE_TABLE")));
+    assertFalse(
+        mockEvaluator.getResult(ImmutableSet.of("CATALOG::USE_CATALOG", "SCHEMA::USE_SCHEMA")));
     assertFalse(
         mockEvaluator.getResult(ImmutableSet.of("SCHEMA::CREATE_TABLE", "SCHEMA::USE_SCHEMA")));
     assertTrue(
@@ -81,7 +84,8 @@ public class TestTableAuthorizationExpression {
   @Test
   public void testListTable() throws IllegalAccessException, OgnlException, NoSuchFieldException {
     Field loadTableAuthorizationExpressionField =
-        TableOperations.class.getDeclaredField("loadTableAuthorizationExpression");
+        AuthorizationExpressionConstants.class.getDeclaredField(
+            "LOAD_TABLE_AUTHORIZATION_EXPRESSION");
     loadTableAuthorizationExpressionField.setAccessible(true);
     String loadTableAuthExpression = (String) loadTableAuthorizationExpressionField.get(null);
     MockAuthorizationExpressionEvaluator mockEvaluator =
@@ -125,7 +129,7 @@ public class TestTableAuthorizationExpression {
   public void testLoadTable() throws NoSuchMethodException, OgnlException {
     Method method =
         TableOperations.class.getMethod(
-            "loadTable", String.class, String.class, String.class, String.class);
+            "loadTable", String.class, String.class, String.class, String.class, String.class);
     AuthorizationExpression authorizationExpressionAnnotation =
         method.getAnnotation(AuthorizationExpression.class);
     String expression = authorizationExpressionAnnotation.expression();

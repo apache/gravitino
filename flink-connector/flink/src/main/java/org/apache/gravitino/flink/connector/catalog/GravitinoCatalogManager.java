@@ -19,18 +19,25 @@
 package org.apache.gravitino.flink.connector.catalog;
 
 import com.google.common.base.Preconditions;
+import com.google.common.base.Strings;
 import com.google.common.collect.Sets;
+import java.security.PrivilegedAction;
 import java.util.Arrays;
 import java.util.Map;
 import java.util.Set;
 import org.apache.gravitino.Catalog;
+import org.apache.gravitino.client.DefaultOAuth2TokenProvider;
 import org.apache.gravitino.client.GravitinoAdminClient;
 import org.apache.gravitino.client.GravitinoMetalake;
+import org.apache.gravitino.client.KerberosTokenProvider;
+import org.apache.gravitino.flink.connector.store.GravitinoCatalogStoreFactoryOptions;
+import org.apache.hadoop.security.UserGroupInformation;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /** GravitinoCatalogManager is used to retrieve catalogs from Apache Gravitino server. */
 public class GravitinoCatalogManager {
+
   private static final Logger LOG = LoggerFactory.getLogger(GravitinoCatalogManager.class);
   private static GravitinoCatalogManager gravitinoCatalogManager;
 
@@ -38,10 +45,54 @@ public class GravitinoCatalogManager {
   private final GravitinoMetalake metalake;
   private final GravitinoAdminClient gravitinoClient;
 
+  private final String gravitinoUri;
+  private final String metalakeName;
+  private final Map<String, String> gravitinoClientConfig;
+
   private GravitinoCatalogManager(
       String gravitinoUri, String metalakeName, Map<String, String> gravitinoClientConfig) {
-    this.gravitinoClient =
-        GravitinoAdminClient.builder(gravitinoUri).withClientConfig(gravitinoClientConfig).build();
+    Preconditions.checkArgument(
+        !Strings.isNullOrEmpty(gravitinoUri), "Gravitino uri cannot be null or empty");
+    Preconditions.checkArgument(
+        !Strings.isNullOrEmpty(metalakeName), "MetalakeName cannot be null or empty");
+    Preconditions.checkNotNull(gravitinoClientConfig, "GravitinoClientConfig cannot be null");
+    this.gravitinoUri = gravitinoUri;
+    this.metalakeName = metalakeName;
+    this.gravitinoClientConfig = gravitinoClientConfig;
+
+    String authType = gravitinoClientConfig.get(GravitinoCatalogStoreFactoryOptions.AUTH_TYPE);
+
+    // Only OAuth is explicitly configured; otherwise follow Flink security (Kerberos if enabled,
+    // simple auth otherwise).
+    if (GravitinoCatalogStoreFactoryOptions.OAUTH2.equalsIgnoreCase(authType)) {
+      this.gravitinoClient = buildOAuthClient(gravitinoUri, gravitinoClientConfig);
+    } else {
+      if (authType != null) {
+        throw new IllegalArgumentException(
+            String.format(
+                "Unsupported auth type '%s'. Only OAUTH is supported; leave %s unset to use Flink Kerberos settings (or simple auth if security is disabled).",
+                authType, GravitinoCatalogStoreFactoryOptions.AUTH_TYPE));
+      }
+
+      LOG.info(
+          "Flink security enabled: {}, Current user: {}",
+          UserGroupInformation.isSecurityEnabled(),
+          getUgi().getUserName());
+
+      if (UserGroupInformation.isSecurityEnabled()) {
+        if (getUgi().getAuthenticationMethod()
+            != UserGroupInformation.AuthenticationMethod.KERBEROS) {
+          throw new IllegalStateException(
+              String.format(
+                  "Flink security is enabled, but current user authentication method is %s rather than KERBEROS",
+                  getUgi().getAuthenticationMethod()));
+        }
+        this.gravitinoClient = buildKerberosClient(gravitinoUri, gravitinoClientConfig);
+      } else {
+        this.gravitinoClient = buildSimpleClient(gravitinoUri, gravitinoClientConfig);
+      }
+    }
+
     this.metalake = gravitinoClient.loadMetalake(metalakeName);
   }
 
@@ -56,10 +107,18 @@ public class GravitinoCatalogManager {
    */
   public static GravitinoCatalogManager create(
       String gravitinoUri, String metalakeName, Map<String, String> gravitinoClientConfig) {
-    Preconditions.checkState(
-        gravitinoCatalogManager == null, "Should not create duplicate GravitinoCatalogManager");
-    gravitinoCatalogManager =
-        new GravitinoCatalogManager(gravitinoUri, metalakeName, gravitinoClientConfig);
+    if (gravitinoCatalogManager == null) {
+      gravitinoCatalogManager =
+          new GravitinoCatalogManager(gravitinoUri, metalakeName, gravitinoClientConfig);
+    } else {
+      Preconditions.checkState(
+          checkEqual(gravitinoUri, metalakeName, gravitinoClientConfig),
+          String.format(
+              "Creating GravitinoCatalogManager with different configuration is not supported. "
+                  + "Current singleton %s. "
+                  + "Creating with gravitinoUri=%s, metalakeName=%s, gravitinoClientConfig=%s",
+              gravitinoCatalogManager, gravitinoUri, metalakeName, gravitinoClientConfig));
+    }
     return gravitinoCatalogManager;
   }
 
@@ -154,5 +213,100 @@ public class GravitinoCatalogManager {
    */
   public boolean contains(String catalogName) {
     return metalake.catalogExists(catalogName);
+  }
+
+  @Override
+  public String toString() {
+    return "GravitinoCatalogManager{"
+        + "gravitinoUri='"
+        + gravitinoUri
+        + '\''
+        + ", metalakeName='"
+        + metalakeName
+        + '\''
+        + ", gravitinoClientConfig="
+        + gravitinoClientConfig
+        + '}';
+  }
+
+  /**
+   * Check whether the parameters are the same as the configuration of the GravitinoCatalogManager
+   * static variable.
+   *
+   * @param gravitinoUri Gravitino server uri
+   * @param metalakeName Metalake name
+   * @param gravitinoClientConfig Gravitino client properties map
+   */
+  private static boolean checkEqual(
+      String gravitinoUri, String metalakeName, Map<String, String> gravitinoClientConfig) {
+    return gravitinoCatalogManager.gravitinoUri.equals(gravitinoUri)
+        && gravitinoCatalogManager.metalakeName.equals(metalakeName)
+        && gravitinoCatalogManager.gravitinoClientConfig.equals(gravitinoClientConfig);
+  }
+
+  private static GravitinoAdminClient buildOAuthClient(
+      String gravitinoUri, Map<String, String> config) {
+    String serverUri = config.get(GravitinoCatalogStoreFactoryOptions.OAUTH2_SERVER_URI);
+    String credential = config.get(GravitinoCatalogStoreFactoryOptions.OAUTH2_CREDENTIAL);
+    String path = config.get(GravitinoCatalogStoreFactoryOptions.OAUTH2_TOKEN_PATH);
+    String scope = config.get(GravitinoCatalogStoreFactoryOptions.OAUTH2_SCOPE);
+
+    // Remove OAuth-specific config entries from the client config map. These keys are only
+    // used to construct the OAuth2 token provider and are not valid GravitinoAdminClient
+    // client configuration options; passing them to withClientConfig() could cause validation
+    // errors or other unexpected behavior.
+    Set<String> oauthConfigKeys =
+        Sets.newHashSet(
+            GravitinoCatalogStoreFactoryOptions.AUTH_TYPE,
+            GravitinoCatalogStoreFactoryOptions.OAUTH2_SERVER_URI,
+            GravitinoCatalogStoreFactoryOptions.OAUTH2_CREDENTIAL,
+            GravitinoCatalogStoreFactoryOptions.OAUTH2_TOKEN_PATH,
+            GravitinoCatalogStoreFactoryOptions.OAUTH2_SCOPE);
+    for (String key : oauthConfigKeys) {
+      config.remove(key);
+    }
+
+    DefaultOAuth2TokenProvider provider =
+        DefaultOAuth2TokenProvider.builder()
+            .withUri(serverUri)
+            .withCredential(credential)
+            .withPath(path)
+            .withScope(scope)
+            .build();
+
+    return GravitinoAdminClient.builder(gravitinoUri)
+        .withOAuth(provider)
+        .withClientConfig(config)
+        .build();
+  }
+
+  private static GravitinoAdminClient buildKerberosClient(
+      String gravitinoUri, Map<String, String> config) {
+
+    return getUgi()
+        .doAs(
+            (PrivilegedAction<GravitinoAdminClient>)
+                () ->
+                    GravitinoAdminClient.builder(gravitinoUri)
+                        .withKerberosAuth(KerberosTokenProvider.builder().build())
+                        .withClientConfig(config)
+                        .build());
+  }
+
+  private static GravitinoAdminClient buildSimpleClient(
+      String gravitinoUri, Map<String, String> config) {
+    String userName = getUgi().getUserName();
+    return GravitinoAdminClient.builder(gravitinoUri)
+        .withSimpleAuth(userName)
+        .withClientConfig(config)
+        .build();
+  }
+
+  private static UserGroupInformation getUgi() {
+    try {
+      return UserGroupInformation.getCurrentUser();
+    } catch (Exception e) {
+      throw new IllegalStateException("Unable to get current user group information", e);
+    }
   }
 }

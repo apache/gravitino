@@ -20,7 +20,7 @@ from collections.abc import Mapping
 from types import MappingProxyType
 from typing import Final, Pattern, Set
 
-from gravitino.api.types.types import Name, Types
+from gravitino.api.rel.types.types import Name, Types
 
 
 class SerdesUtilsBase:
@@ -59,6 +59,17 @@ class SerdesUtilsBase:
     LIST_PARTITION_LISTS: Final[str] = "lists"
     RANGE_PARTITION_UPPER: Final[str] = "upper"
     RANGE_PARTITION_LOWER: Final[str] = "lower"
+    STRATEGY: Final[str] = "strategy"
+    NUM_BUCKETS: Final[str] = "numBuckets"
+    WIDTH: Final[str] = "width"
+    ASSIGNMENTS_NAME: Final[str] = "assignments"
+    SORT_TERM: Final[str] = "sortTerm"
+    DIRECTION: Final[str] = "direction"
+    NULL_ORDERING: Final[str] = "nullOrdering"
+    INDEX_TYPE: Final[str] = "indexType"
+    INDEX_NAME: Final[str] = "name"
+    INDEX_FIELD_NAMES: Final[str] = "fieldNames"
+    NUMBER: Final[str] = "number"
 
     NON_PRIMITIVE_TYPES: Final[Set[Name]] = {
         Name.STRUCT,
@@ -76,6 +87,11 @@ class SerdesUtilsBase:
     FIXED_PATTERN: Final[Pattern[str]] = re.compile(r"fixed\(\s*(\d+)\s*\)")
     FIXEDCHAR_PATTERN: Final[Pattern[str]] = re.compile(r"char\(\s*(\d+)\s*\)")
     VARCHAR_PATTERN: Final[Pattern[str]] = re.compile(r"varchar\(\s*(\d+)\s*\)")
+    TIME_PATTERN: Final[Pattern[str]] = re.compile(r"time\(\s*(\d+)\s*\)")
+    TIMESTAMP_PATTERN: Final[Pattern[str]] = re.compile(r"timestamp\(\s*(\d+)\s*\)")
+    TIMESTAMP_TZ_PATTERN: Final[Pattern[str]] = re.compile(
+        r"timestamp_tz\(\s*(\d+)\s*\)"
+    )
     TYPES: Final[Mapping] = MappingProxyType(
         {
             type_instance.simple_string(): type_instance

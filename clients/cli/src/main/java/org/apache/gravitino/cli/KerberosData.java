@@ -19,8 +19,11 @@
 
 package org.apache.gravitino.cli;
 
+/** Represents the Kerberos data required to authenticate with a remote server. */
 public class KerberosData {
+  /** The Kerberos principal (e.g. a user or service identity). */
   protected final String principal;
+  /** The path to the keytab file. */
   protected final String keytabFile;
 
   /**

@@ -23,6 +23,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.util.Map;
+import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
 public class PropertiesTest {
@@ -180,5 +181,48 @@ public class PropertiesTest {
     assertEquals(2, result.size());
     assertEquals("value2", result.get("key1"), "Last value should overwrite previous ones");
     assertEquals("value3", result.get("key2"));
+  }
+
+  @Test
+  public void testDelimiterWithRegexSpecialChar() {
+    Properties properties = new Properties("|", "=");
+    String[] input = {"key1=value1|key2=value2"};
+
+    Map<String, String> result = properties.parse(input);
+
+    assertEquals(2, result.size());
+    assertEquals("value1", result.get("key1"));
+    assertEquals("value2", result.get("key2"));
+  }
+
+  @Test
+  public void testSeparatorWithRegexSpecialChar() {
+    Properties properties = new Properties(",", "|");
+    String[] input = {"key1|value1,key2|value2"};
+
+    Map<String, String> result = properties.parse(input);
+
+    assertEquals(2, result.size());
+    assertEquals("value1", result.get("key1"));
+    assertEquals("value2", result.get("key2"));
+  }
+
+  @Test
+  public void testSeparatorWithNullOrEmptyInput() {
+    Throwable ex1 =
+        Assertions.assertThrows(IllegalArgumentException.class, () -> new Properties(null, "="));
+    Assertions.assertTrue(ex1.getMessage().contains("delimiter cannot be null or empty"));
+
+    Throwable ex2 =
+        Assertions.assertThrows(IllegalArgumentException.class, () -> new Properties("", "="));
+    Assertions.assertTrue(ex2.getMessage().contains("delimiter cannot be null or empty"));
+
+    Throwable ex3 =
+        Assertions.assertThrows(IllegalArgumentException.class, () -> new Properties(",", null));
+    Assertions.assertTrue(ex3.getMessage().contains("keyValueSeparator cannot be null or empty"));
+
+    Throwable ex4 =
+        Assertions.assertThrows(IllegalArgumentException.class, () -> new Properties(",", ""));
+    Assertions.assertTrue(ex4.getMessage().contains("keyValueSeparator cannot be null or empty"));
   }
 }

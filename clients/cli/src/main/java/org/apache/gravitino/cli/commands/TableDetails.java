@@ -26,7 +26,9 @@ import org.apache.gravitino.rel.Table;
 /** Displays the details of a table. */
 public class TableDetails extends TableCommand {
 
+  /** The name of the schema. */
   protected final String schema;
+  /** The name of the table. */
   protected final String table;
 
   /**

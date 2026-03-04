@@ -26,6 +26,7 @@ import org.apache.flink.table.factories.FactoryUtil;
 import org.apache.flink.util.Preconditions;
 import org.apache.gravitino.Catalog;
 import org.apache.gravitino.flink.connector.PartitionConverter;
+import org.apache.gravitino.flink.connector.SchemaAndTablePropertiesConverter;
 import org.apache.gravitino.flink.connector.UnsupportPartitionConverter;
 import org.apache.gravitino.flink.connector.catalog.BaseCatalogFactory;
 import org.apache.gravitino.flink.connector.utils.FactoryUtils;
@@ -36,6 +37,8 @@ import org.apache.gravitino.flink.connector.utils.FactoryUtils;
  */
 public abstract class GravitinoJdbcCatalogFactory implements BaseCatalogFactory {
 
+  protected abstract SchemaAndTablePropertiesConverter schemaAndTablePropertiesConverter();
+
   @Override
   public org.apache.flink.table.catalog.Catalog createCatalog(Context context) {
     // FlinkJdbcCatalog does not support 'driver' as an option, but Gravitino JdbcCatalog requires
@@ -45,11 +48,11 @@ public abstract class GravitinoJdbcCatalogFactory implements BaseCatalogFactory 
         FactoryUtils.createCatalogFactoryHelper(this, context);
     String defaultDatabase =
         helper.getOptions().get(GravitinoJdbcCatalogFactoryOptions.DEFAULT_DATABASE);
-    Preconditions.checkNotNull(
-        defaultDatabase,
+    Preconditions.checkArgument(
+        defaultDatabase != null,
         GravitinoJdbcCatalogFactoryOptions.DEFAULT_DATABASE.key() + " should not be null.");
     return new GravitinoJdbcCatalog(
-        context, defaultDatabase, propertiesConverter(), partitionConverter());
+        context, defaultDatabase, schemaAndTablePropertiesConverter(), partitionConverter());
   }
 
   @Override

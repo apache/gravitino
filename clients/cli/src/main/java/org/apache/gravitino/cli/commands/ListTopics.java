@@ -32,8 +32,11 @@ import org.apache.gravitino.messaging.Topic;
 /** List the topics. */
 public class ListTopics extends Command {
 
+  /** The name of the metalake. */
   protected final String metalake;
+  /** The name of the catalog. */
   protected final String catalog;
+  /** The name of the schema. */
   protected final String schema;
 
   /**

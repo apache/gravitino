@@ -11,10 +11,9 @@ With the Apache Gravitino Spark connector, accessing data or managing metadata i
 
 Supports most DDL and DML operations in SparkSQL, except such operations:
 
-- Function operations 
+- Function operations (Gravitino UDFs are supported, see [Spark connector - User-defined functions](spark-connector-udf.md))
 - Partition operations
 - View operations
-- Querying UDF
 - `LOAD` clause
 - `CREATE TABLE LIKE` clause
 - `TRUCATE TABLE` clause

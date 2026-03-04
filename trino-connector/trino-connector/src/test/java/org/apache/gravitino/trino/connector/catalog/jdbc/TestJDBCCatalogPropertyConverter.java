@@ -58,4 +58,17 @@ public class TestJDBCCatalogPropertyConverter {
           propertyConverter.gravitinoToEngineProperties(gravitinoPropertiesWithoutPassword);
         });
   }
+
+  @Test
+  public void testMissingConnectionUrl() {
+    PropertyConverter propertyConverter = new JDBCCatalogPropertyConverter();
+    Map<String, String> gravitinoPropertiesWithoutUrl =
+        ImmutableMap.of("jdbc-user", "root", "jdbc-password", "root");
+
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () -> {
+          propertyConverter.gravitinoToEngineProperties(gravitinoPropertiesWithoutUrl);
+        });
+  }
 }

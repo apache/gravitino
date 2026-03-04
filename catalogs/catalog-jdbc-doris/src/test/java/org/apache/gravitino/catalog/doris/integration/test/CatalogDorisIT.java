@@ -78,13 +78,13 @@ import org.apache.gravitino.rel.partitions.Partitions;
 import org.apache.gravitino.rel.partitions.RangePartition;
 import org.apache.gravitino.rel.types.Types;
 import org.apache.gravitino.utils.RandomNameUtils;
+import org.awaitility.Awaitility;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
-import org.testcontainers.shaded.org.awaitility.Awaitility;
 
 @Tag("gravitino-docker-test")
 public class CatalogDorisIT extends BaseIT {
@@ -564,10 +564,14 @@ public class CatalogDorisIT extends BaseIT {
         .pollInterval(WAIT_INTERVAL_IN_SECONDS, TimeUnit.SECONDS)
         .untilAsserted(
             () -> assertEquals(5, tableCatalog.loadTable(tableIdentifier).columns().length));
-
-    ITUtils.assertColumn(
-        Column.of("col_5", Types.VarCharType.of(255), "col_5_comment"),
-        tableCatalog.loadTable(tableIdentifier).columns()[4]);
+    Awaitility.await()
+        .atMost(MAX_WAIT_IN_SECONDS, TimeUnit.SECONDS)
+        .pollInterval(WAIT_INTERVAL_IN_SECONDS, TimeUnit.SECONDS)
+        .untilAsserted(
+            () ->
+                ITUtils.assertColumn(
+                    Column.of("col_5", Types.VarCharType.of(255), "col_5_comment"),
+                    tableCatalog.loadTable(tableIdentifier).columns()[4]));
 
     // change column position
     // TODO: change column position is unstable, add it later

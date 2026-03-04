@@ -19,7 +19,7 @@
 package org.apache.gravitino.catalog.hive;
 
 import static org.apache.gravitino.catalog.hive.HiveCatalogPropertiesMetadata.METASTORE_URIS;
-import static org.apache.gravitino.catalog.hive.HiveTablePropertiesMetadata.TABLE_TYPE;
+import static org.apache.gravitino.catalog.hive.HiveConstants.TABLE_TYPE;
 import static org.apache.gravitino.connector.BaseCatalog.CATALOG_BYPASS_PREFIX;
 import static org.apache.gravitino.rel.expressions.transforms.Transforms.day;
 import static org.apache.gravitino.rel.expressions.transforms.Transforms.identity;
@@ -35,6 +35,8 @@ import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.exceptions.NoSuchSchemaException;
 import org.apache.gravitino.exceptions.TableAlreadyExistsException;
+import org.apache.gravitino.hive.HiveColumn;
+import org.apache.gravitino.hive.HiveSchema;
 import org.apache.gravitino.hive.hms.MiniHiveMetastoreService;
 import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.meta.CatalogEntity;
@@ -217,7 +219,10 @@ public class TestHiveTable extends MiniHiveMetastoreService {
                     new Transform[0],
                     distribution,
                     sortOrders));
-    Assertions.assertTrue(exception.getMessage().contains("Table already exists"));
+    Assertions.assertTrue(
+        exception
+            .getMessage()
+            .contains(String.format("Hive table %s already exists", hiveTableName)));
 
     // Test struct field with comment
     HiveColumn structCol =

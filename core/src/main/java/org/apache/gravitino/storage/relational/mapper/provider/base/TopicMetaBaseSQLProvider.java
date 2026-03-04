@@ -22,6 +22,9 @@ package org.apache.gravitino.storage.relational.mapper.provider.base;
 import static org.apache.gravitino.storage.relational.mapper.TopicMetaMapper.TABLE_NAME;
 
 import java.util.List;
+import org.apache.gravitino.storage.relational.mapper.CatalogMetaMapper;
+import org.apache.gravitino.storage.relational.mapper.MetalakeMetaMapper;
+import org.apache.gravitino.storage.relational.mapper.SchemaMetaMapper;
 import org.apache.gravitino.storage.relational.po.TopicPO;
 import org.apache.ibatis.annotations.Param;
 
@@ -30,10 +33,10 @@ public class TopicMetaBaseSQLProvider {
   public String insertTopicMeta(@Param("topicMeta") TopicPO topicPO) {
     return "INSERT INTO "
         + TABLE_NAME
-        + "(topic_id, topic_name, metalake_id, catalog_id, schema_id,"
+        + " (topic_id, topic_name, metalake_id, catalog_id, schema_id,"
         + " comment, properties, audit_info, current_version, last_version,"
         + " deleted_at)"
-        + " VALUES("
+        + " VALUES ("
         + " #{topicMeta.topicId},"
         + " #{topicMeta.topicName},"
         + " #{topicMeta.metalakeId},"
@@ -51,10 +54,10 @@ public class TopicMetaBaseSQLProvider {
   public String insertTopicMetaOnDuplicateKeyUpdate(@Param("topicMeta") TopicPO topicPO) {
     return "INSERT INTO "
         + TABLE_NAME
-        + "(topic_id, topic_name, metalake_id, catalog_id, schema_id,"
+        + " (topic_id, topic_name, metalake_id, catalog_id, schema_id,"
         + " comment, properties, audit_info, current_version, last_version,"
         + " deleted_at)"
-        + " VALUES("
+        + " VALUES ("
         + " #{topicMeta.topicId},"
         + " #{topicMeta.topicName},"
         + " #{topicMeta.metalakeId},"
@@ -91,6 +94,47 @@ public class TopicMetaBaseSQLProvider {
         + " WHERE schema_id = #{schemaId} AND deleted_at = 0";
   }
 
+  public String listTopicPOsByFullQualifiedName(
+      @Param("metalakeName") String metalakeName,
+      @Param("catalogName") String catalogName,
+      @Param("schemaName") String schemaName) {
+    return """
+        SELECT
+            mm.metalake_id as metalakeId,
+            sm.schema_id as schemaId,
+            cm.catalog_id as catalogId,
+            tm.topic_id as topicId,
+            tm.topic_name as topicName,
+            tm.comment as comment,
+            tm.properties as properties,
+            tm.audit_info as auditInfo,
+            tm.current_version as currentVersion,
+            tm.last_version as lastVersion,
+            tm.deleted_at as deletedAt
+        FROM
+            %s mm
+        INNER JOIN
+            %s cm ON mm.metalake_id = cm.metalake_id
+            AND cm.catalog_name = #{catalogName}
+            AND cm.deleted_at = 0
+        LEFT JOIN
+            %s sm ON cm.catalog_id = sm.catalog_id
+            AND sm.schema_name = #{schemaName}
+            AND sm.deleted_at = 0
+        LEFT JOIN
+            %s tm ON sm.schema_id = tm.schema_id
+            AND tm.deleted_at = 0
+        WHERE
+            mm.metalake_name = #{metalakeName}
+            AND mm.deleted_at = 0;
+            """
+        .formatted(
+            MetalakeMetaMapper.TABLE_NAME,
+            CatalogMetaMapper.TABLE_NAME,
+            SchemaMetaMapper.TABLE_NAME,
+            TABLE_NAME);
+  }
+
   public String listTopicPOsByTopicIds(@Param("topicIds") List<Long> topicIds) {
     return "<script>"
         + " SELECT topic_id as topicId, topic_name as topicName, metalake_id as metalakeId,"
@@ -101,7 +145,7 @@ public class TopicMetaBaseSQLProvider {
         + " FROM "
         + TABLE_NAME
         + " WHERE deleted_at = 0"
-        + " AND topic_id in ("
+        + " AND topic_id IN ("
         + "<foreach collection='topicIds' item='topicId' separator=','>"
         + "#{topicId}"
         + "</foreach>"
@@ -119,6 +163,49 @@ public class TopicMetaBaseSQLProvider {
         + " FROM "
         + TABLE_NAME
         + " WHERE schema_id = #{schemaId} AND topic_name = #{topicName} AND deleted_at = 0";
+  }
+
+  public String selectTopicByFullQualifiedName(
+      @Param("metalakeName") String metalakeName,
+      @Param("catalogName") String catalogName,
+      @Param("schemaName") String schemaName,
+      @Param("topicName") String topicName) {
+    return """
+        SELECT
+            mm.metalake_id as metalakeId,
+            sm.schema_id as schemaId,
+            cm.catalog_id as catalogId,
+            tm.topic_id as topicId,
+            tm.topic_name as topicName,
+            tm.comment as comment,
+            tm.properties as properties,
+            tm.audit_info as auditInfo,
+            tm.current_version as currentVersion,
+            tm.last_version as lastVersion,
+            tm.deleted_at as deletedAt
+        FROM
+            %s mm
+        INNER JOIN
+            %s cm ON mm.metalake_id = cm.metalake_id
+            AND cm.catalog_name = #{catalogName}
+            AND cm.deleted_at = 0
+        LEFT JOIN
+            %s sm ON cm.catalog_id = sm.catalog_id
+            AND sm.schema_name = #{schemaName}
+            AND sm.deleted_at = 0
+        LEFT JOIN
+            %s tm ON sm.schema_id = tm.schema_id
+            AND tm.topic_name = #{topicName}
+            AND tm.deleted_at = 0
+        WHERE
+            mm.metalake_name = #{metalakeName}
+            AND mm.deleted_at = 0;
+            """
+        .formatted(
+            MetalakeMetaMapper.TABLE_NAME,
+            CatalogMetaMapper.TABLE_NAME,
+            SchemaMetaMapper.TABLE_NAME,
+            TABLE_NAME);
   }
 
   public String selectTopicMetaById(@Param("topicId") Long topicId) {
@@ -151,7 +238,8 @@ public class TopicMetaBaseSQLProvider {
         + " AND metalake_id = #{oldTopicMeta.metalakeId}"
         + " AND catalog_id = #{oldTopicMeta.catalogId}"
         + " AND schema_id = #{oldTopicMeta.schemaId}"
-        + " AND comment = #{oldTopicMeta.comment}"
+        + " AND (comment = #{oldTopicMeta.comment}"
+        + "   OR (comment IS NULL and #{oldTopicMeta.comment} IS NULL))"
         + " AND properties = #{oldTopicMeta.properties}"
         + " AND audit_info = #{oldTopicMeta.auditInfo}"
         + " AND current_version = #{oldTopicMeta.currentVersion}"
@@ -204,5 +292,40 @@ public class TopicMetaBaseSQLProvider {
     return "DELETE FROM "
         + TABLE_NAME
         + " WHERE deleted_at != 0 AND deleted_at < #{legacyTimeline} LIMIT #{limit}";
+  }
+
+  public String batchSelectTopicByIdentifier(
+      @Param("metalakeName") String metalakeName,
+      @Param("catalogName") String catalogName,
+      @Param("schemaName") String schemaName,
+      @Param("topicNames") List<String> topicNames) {
+    return "<script>"
+        + "SELECT tm.topic_id as topicId, tm.topic_name as topicName,"
+        + " tm.metalake_id as metalakeId, tm.catalog_id as catalogId, tm.schema_id as schemaId,"
+        + " tm.comment as comment, tm.properties as properties, tm.audit_info as auditInfo,"
+        + " tm.current_version as currentVersion, tm.last_version as lastVersion,"
+        + " tm.deleted_at as deletedAt"
+        + " FROM "
+        + TABLE_NAME
+        + " tm"
+        + " JOIN "
+        + SchemaMetaMapper.TABLE_NAME
+        + " sm ON tm.schema_id = sm.schema_id"
+        + " JOIN "
+        + CatalogMetaMapper.TABLE_NAME
+        + " cm ON sm.catalog_id = cm.catalog_id"
+        + " JOIN "
+        + MetalakeMetaMapper.TABLE_NAME
+        + " mm ON cm.metalake_id = mm.metalake_id"
+        + " WHERE mm.metalake_name = #{metalakeName}"
+        + " AND cm.catalog_name = #{catalogName}"
+        + " AND sm.schema_name = #{schemaName}"
+        + " AND tm.topic_name IN ("
+        + "<foreach collection='topicNames' item='topicName' separator=','>"
+        + "#{topicName}"
+        + "</foreach>"
+        + " )"
+        + " AND tm.deleted_at = 0 AND sm.deleted_at = 0 AND cm.deleted_at = 0 AND mm.deleted_at = 0"
+        + "</script>";
   }
 }

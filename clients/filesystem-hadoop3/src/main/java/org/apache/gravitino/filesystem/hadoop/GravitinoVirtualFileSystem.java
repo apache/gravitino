@@ -21,6 +21,7 @@ package org.apache.gravitino.filesystem.hadoop;
 import static org.apache.gravitino.filesystem.hadoop.GravitinoVirtualFileSystemUtils.getConfigMap;
 
 import com.google.common.annotations.VisibleForTesting;
+import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.lang.reflect.InvocationTargetException;
 import java.net.URI;
@@ -98,6 +99,8 @@ public class GravitinoVirtualFileSystem extends FileSystem {
           e, "Cannot create operations instance: %s", operationsClassName);
     }
 
+    hook.setOperationsContext(operations);
+
     this.workingDirectory = new Path(name);
     this.uri = URI.create(name.getScheme() + "://" + name.getAuthority());
 
@@ -127,29 +130,33 @@ public class GravitinoVirtualFileSystem extends FileSystem {
 
   @Override
   public synchronized void setWorkingDirectory(Path newDir) {
-    Path newPath = hook.preSetWorkingDirectory(newDir);
     try {
+      Path newPath = hook.preSetWorkingDirectory(newDir);
       runWithExceptionTranslation(
           () -> {
             operations.setWorkingDirectory(newPath);
             return null;
           },
           FilesetDataOperation.SET_WORKING_DIR);
-    } catch (FilesetPathNotFoundException e) {
-      throw new RuntimeException(e);
+      this.workingDirectory = newPath;
+      hook.postSetWorkingDirectory(newPath);
+    } catch (Exception e) {
+      hook.onSetWorkingDirectoryFailure(newDir, e);
     }
-    this.workingDirectory = newPath;
-    hook.postSetWorkingDirectory(newPath);
   }
 
   @Override
   public FSDataInputStream open(Path path, int bufferSize) throws IOException {
-    Path newPath = hook.preOpen(path, bufferSize);
-    return hook.postOpen(
-        newPath,
-        bufferSize,
-        runWithExceptionTranslation(
-            () -> operations.open(newPath, bufferSize), FilesetDataOperation.OPEN));
+    try {
+      Path newPath = hook.preOpen(path, bufferSize);
+      return hook.postOpen(
+          newPath,
+          bufferSize,
+          runWithExceptionTranslation(
+              () -> operations.open(newPath, bufferSize), FilesetDataOperation.OPEN));
+    } catch (Exception e) {
+      return hook.onOpenFailure(path, bufferSize, e);
+    }
   }
 
   @Override
@@ -162,8 +169,9 @@ public class GravitinoVirtualFileSystem extends FileSystem {
       long blockSize,
       Progressable progress)
       throws IOException {
-    Path newPath = hook.preCreate(path, permission, overwrite, bufferSize, replication, blockSize);
     try {
+      Path newPath =
+          hook.preCreate(path, permission, overwrite, bufferSize, replication, blockSize);
       return hook.postCreate(
           newPath,
           permission,
@@ -173,117 +181,115 @@ public class GravitinoVirtualFileSystem extends FileSystem {
           blockSize,
           operations.create(
               newPath, permission, overwrite, bufferSize, replication, blockSize, progress));
-    } catch (NoSuchCatalogException
-        | CatalogNotInUseException
-        | NoSuchFilesetException
-        | NoSuchLocationNameException
-        | FilesetPathNotFoundException e) {
-      String message =
-          "Fileset is not found for path: "
-              + path
-              + " for operation CREATE. "
-              + "This may be caused by fileset related metadata not found or not in use in "
-              + "Gravitino, please check the fileset metadata in Gravitino.";
-      throw new IOException(message, e);
+    } catch (Exception e) {
+      return hook.onCreateFailure(
+          path, permission, overwrite, bufferSize, replication, blockSize, progress, e);
     }
   }
 
   @Override
   public FSDataOutputStream append(Path path, int bufferSize, Progressable progress)
       throws IOException {
-    Path newPath = hook.preAppend(path, bufferSize);
-    return hook.postAppend(
-        newPath,
-        bufferSize,
-        runWithExceptionTranslation(
-            () -> operations.append(newPath, bufferSize, progress), FilesetDataOperation.APPEND));
+    try {
+      Path newPath = hook.preAppend(path, bufferSize);
+      return hook.postAppend(
+          newPath,
+          bufferSize,
+          runWithExceptionTranslation(
+              () -> operations.append(newPath, bufferSize, progress), FilesetDataOperation.APPEND));
+    } catch (Exception e) {
+      return hook.onAppendFailure(path, bufferSize, progress, e);
+    }
   }
 
   @Override
   public boolean rename(Path src, Path dst) throws IOException {
-    Pair<Path, Path> pair = hook.preRename(src, dst);
-    return hook.postRename(
-        pair.getLeft(),
-        pair.getRight(),
-        runWithExceptionTranslation(
-            () -> operations.rename(pair.getLeft(), pair.getRight()), FilesetDataOperation.RENAME));
+    try {
+      Pair<Path, Path> pair = hook.preRename(src, dst);
+      return hook.postRename(
+          pair.getLeft(),
+          pair.getRight(),
+          runWithExceptionTranslation(
+              () -> operations.rename(pair.getLeft(), pair.getRight()),
+              FilesetDataOperation.RENAME));
+    } catch (Exception e) {
+      return hook.onRenameFailure(src, dst, e);
+    }
   }
 
   @Override
   public boolean delete(Path path, boolean recursive) throws IOException {
-    Path newPath = hook.preDelete(path, recursive);
     try {
+      Path newPath = hook.preDelete(path, recursive);
       return hook.postDelete(
           newPath,
           recursive,
           runWithExceptionTranslation(
               () -> operations.delete(newPath, recursive), FilesetDataOperation.DELETE));
-    } catch (FilesetPathNotFoundException e) {
-      return false;
+    } catch (Exception e) {
+      return hook.onDeleteFailure(path, recursive, e);
     }
   }
 
   @Override
   public FileStatus getFileStatus(Path path) throws IOException {
-    Path newPath = hook.preGetFileStatus(path);
-    return hook.postGetFileStatus(
-        runWithExceptionTranslation(
-            () -> operations.getFileStatus(newPath), FilesetDataOperation.GET_FILE_STATUS));
+    try {
+      Path newPath = hook.preGetFileStatus(path);
+      return hook.postGetFileStatus(
+          runWithExceptionTranslation(
+              () -> operations.getFileStatus(newPath), FilesetDataOperation.GET_FILE_STATUS));
+    } catch (Exception e) {
+      return hook.onGetFileStatusFailure(path, e);
+    }
   }
 
   @Override
   public FileStatus[] listStatus(Path path) throws IOException {
-    Path newPath = hook.preListStatus(path);
-    return hook.postListStatus(
-        runWithExceptionTranslation(
-            () -> operations.listStatus(newPath), FilesetDataOperation.LIST_STATUS));
+    try {
+      Path newPath = hook.preListStatus(path);
+      return hook.postListStatus(
+          runWithExceptionTranslation(
+              () -> operations.listStatus(newPath), FilesetDataOperation.LIST_STATUS));
+    } catch (Exception e) {
+      return hook.onListStatusFailure(path, e);
+    }
   }
 
   @Override
   public boolean mkdirs(Path path, FsPermission permission) throws IOException {
-    Path newPath = hook.preMkdirs(path, permission);
     try {
+      Path newPath = hook.preMkdirs(path, permission);
       return hook.postMkdirs(newPath, permission, operations.mkdirs(newPath, permission));
-    } catch (NoSuchCatalogException
-        | CatalogNotInUseException
-        | NoSuchFilesetException
-        | NoSuchLocationNameException
-        | FilesetPathNotFoundException e) {
-      String message =
-          "Fileset is not found for path: "
-              + newPath
-              + " for operation MKDIRS. "
-              + "This may be caused by fileset related metadata not found or not in use in "
-              + "Gravitino, please check the fileset metadata in Gravitino.";
-      throw new IOException(message, e);
+    } catch (Exception e) {
+      return hook.onMkdirsFailure(path, permission, e);
     }
   }
 
   @Override
   public short getDefaultReplication(Path f) {
-    Path newPath = hook.preGetDefaultReplication(f);
     try {
+      Path newPath = hook.preGetDefaultReplication(f);
       return hook.postGetDefaultReplication(
           newPath,
           runWithExceptionTranslation(
               () -> operations.getDefaultReplication(newPath),
               FilesetDataOperation.GET_DEFAULT_REPLICATION));
-    } catch (IOException e) {
-      return 1;
+    } catch (Exception e) {
+      return hook.onGetDefaultReplicationFailure(f, e);
     }
   }
 
   @Override
   public long getDefaultBlockSize(Path f) {
-    Path newPath = hook.preGetDefaultBlockSize(f);
     try {
+      Path newPath = hook.preGetDefaultBlockSize(f);
       return hook.postGetDefaultBlockSize(
           newPath,
           runWithExceptionTranslation(
               () -> operations.getDefaultBlockSize(newPath),
               FilesetDataOperation.GET_DEFAULT_BLOCK_SIZE));
-    } catch (IOException e) {
-      return operations.defaultBlockSize();
+    } catch (Exception e) {
+      return hook.onGetDefaultBlockSizeFailure(f, e, operations.defaultBlockSize());
     }
   }
 
@@ -310,24 +316,23 @@ public class GravitinoVirtualFileSystem extends FileSystem {
   }
 
   private <R, E extends IOException> R runWithExceptionTranslation(
-      Executable<R, E> executable, FilesetDataOperation operation)
-      throws FilesetPathNotFoundException, E {
+      Executable<R, E> executable, FilesetDataOperation operation) throws FileNotFoundException, E {
     try {
       return executable.execute();
     } catch (NoSuchCatalogException | CatalogNotInUseException e) {
       String message = String.format("Cannot get fileset catalog during %s", operation);
       LOG.warn(message, e);
-      throw new FilesetPathNotFoundException(message, e);
+      throw (FileNotFoundException) new FileNotFoundException(message).initCause(e);
 
     } catch (NoSuchFilesetException e) {
       String message = String.format("Cannot get fileset during %s", operation);
       LOG.warn(message, e);
-      throw new FilesetPathNotFoundException(message, e);
+      throw (FileNotFoundException) new FileNotFoundException(message).initCause(e);
 
     } catch (NoSuchLocationNameException e) {
       String message = String.format("Cannot find location name during %s", operation);
       LOG.warn(message, e);
-      throw new FilesetPathNotFoundException(message, e);
+      throw (FileNotFoundException) new FileNotFoundException(message).initCause(e);
 
     } catch (IOException e) {
       throw e;

@@ -145,7 +145,9 @@ public class KerberosUtils {
     }
   }
 
-  /** @return The Kerberos login module name. */
+  /**
+   * @return The Kerberos login module name.
+   */
   public static String getKrb5LoginModuleName() {
     return "com.sun.security.auth.module.Krb5LoginModule";
   }

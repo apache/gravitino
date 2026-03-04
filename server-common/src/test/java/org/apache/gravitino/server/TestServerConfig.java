@@ -67,7 +67,8 @@ public class TestServerConfig {
     for (Map.Entry<Object, Object> entry : properties.entrySet()) {
       String propKey = (String) entry.getKey();
       if (propKey.startsWith(AuxiliaryServiceManager.GRAVITINO_AUX_SERVICE_PREFIX)
-          || propKey.startsWith("gravitino.iceberg-rest.")) {
+          || propKey.startsWith("gravitino.iceberg-rest.")
+          || propKey.startsWith("gravitino.lance-rest.")) {
         continue;
       }
       Assertions.assertTrue(

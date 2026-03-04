@@ -125,6 +125,7 @@ public class TestMemoryEntityStore {
 
             E newE = updater.apply(e);
             NameIdentifier newIdent = NameIdentifier.of(newE.namespace(), newE.name());
+            // If the schema is changed for rename table operation, delete the old entry first
             if (!newIdent.equals(ident)) {
               delete(ident, entityType);
             }
@@ -143,6 +144,12 @@ public class TestMemoryEntityStore {
       }
 
       return e;
+    }
+
+    @Override
+    public <E extends Entity & HasIdentifier> List<E> batchGet(
+        List<NameIdentifier> idents, EntityType entityType, Class<E> e) {
+      return idents.stream().map(ident -> (E) entityMap.get(ident)).toList();
     }
 
     @Override

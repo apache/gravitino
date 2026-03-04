@@ -22,6 +22,7 @@ import java.io.File;
 import java.util.Map;
 import org.apache.gravitino.job.JobTemplate;
 import org.apache.gravitino.job.ShellJobTemplate;
+import org.apache.gravitino.job.SparkJobTemplate;
 
 public abstract class LocalProcessBuilder {
 
@@ -41,8 +42,11 @@ public abstract class LocalProcessBuilder {
   public static LocalProcessBuilder create(JobTemplate jobTemplate, Map<String, String> configs) {
     if (jobTemplate instanceof ShellJobTemplate) {
       return new ShellProcessBuilder((ShellJobTemplate) jobTemplate, configs);
+    } else if (jobTemplate instanceof SparkJobTemplate) {
+      return new SparkProcessBuilder((SparkJobTemplate) jobTemplate, configs);
     } else {
-      throw new IllegalArgumentException("Unsupported job template type: " + jobTemplate.jobType());
+      throw new IllegalArgumentException(
+          "Unsupported job template type: " + jobTemplate.getClass().getName());
     }
   }
 }

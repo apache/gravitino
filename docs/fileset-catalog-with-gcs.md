@@ -29,11 +29,14 @@ Apart from configurations mentioned in [Fileset-catalog-catalog-configuration](.
 
 | Configuration item            | Description                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             | Default value   | Required | Since version    |
 |-------------------------------|-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|-----------------|----------|------------------|
-| `filesystem-providers`        | The file system providers to add. Set it to `gcs` if it's a GCS fileset, a comma separated string that contains `gcs` like `gcs,s3` to support multiple kinds of fileset including `gcs`.                                                                                                                                                                                                                                                                                                                               | (none)          | Yes      | 0.7.0-incubating |
-| `default-filesystem-provider` | The name default filesystem providers of this Fileset catalog if users do not specify the scheme in the URI. Default value is `builtin-local`, for GCS, if we set this value, we can omit the prefix 'gs://' in the location.                                                                                                                                                                                                                                                                                           | `builtin-local` | No       | 0.7.0-incubating |
+| `filesystem-providers`        | (deprecated) The file system providers to add. Set it to `gcs` if it's a GCS fileset, a comma separated string that contains `gcs` like `gcs,s3` to support multiple kinds of fileset including `gcs`.                                                                                                                                                                                                                                                                                                                   | (none)          | Yes      | 0.7.0-incubating |
+| `default-filesystem-provider` | (deprecated) The name default filesystem providers of this Fileset catalog if users do not specify the scheme in the URI. Default value is `builtin-local`, for GCS, if we set this value, we can omit the prefix 'gs://' in the location.                                                                                                                                                                                                                                                                               | `builtin-local` | No       | 0.7.0-incubating |
 | `gcs-service-account-file`    | The path of GCS service account JSON file.                                                                                                                                                                                                                                                                                                                                                                                                                                                                              | (none)          | Yes      | 0.7.0-incubating |
 | `credential-providers`        | The credential provider types, separated by comma, possible value can be `gcs-token`. As the default authentication type is using service account as the above, this configuration can enable credential vending provided by Gravitino server and client will no longer need to provide authentication information like service account to access GCS by GVFS. Once it's set, more configuration items are needed to make it works, please see [gcs-credential-vending](security/credential-vending.md#gcs-credentials) | (none)          | No       | 0.8.0-incubating |
 
+:::note
+`default-filesystem-provider` and `filesystem-providers` are deprecated since 1.2.0. The fileset catalog automatically loads filesystem providers on the classpath, including buildin filesystem provider and cloud providers when the corresponding bundle jar is present (for example, `gravitino-gcp-bundle`).
+:::
 
 ### Configurations for a schema
 
@@ -62,8 +65,7 @@ curl -X POST -H "Accept: application/vnd.gravitino.v1+json" \
   "comment": "This is a GCS fileset catalog",
   "properties": {
     "location": "gs://bucket/root",
-    "gcs-service-account-file": "path_of_gcs_service_account_file",
-    "filesystem-providers": "gcs"
+    "gcs-service-account-file": "path_of_gcs_service_account_file"
   }
 }' http://localhost:8090/api/metalakes/metalake/catalogs
 ```
@@ -80,7 +82,6 @@ GravitinoClient gravitinoClient = GravitinoClient
 Map<String, String> gcsProperties = ImmutableMap.<String, String>builder()
     .put("location", "gs://bucket/root")
     .put("gcs-service-account-file", "path_of_gcs_service_account_file")
-    .put("filesystem-providers", "gcs")
     .build();
 
 Catalog gcsCatalog = gravitinoClient.createCatalog("test_catalog", 
@@ -98,8 +99,7 @@ Catalog gcsCatalog = gravitinoClient.createCatalog("test_catalog",
 gravitino_client: GravitinoClient = GravitinoClient(uri="http://localhost:8090", metalake_name="metalake")
 gcs_properties = {
     "location": "gs://bucket/root",
-    "gcs-service-account-file": "path_of_gcs_service_account_file",
-    "filesystem-providers": "gcs"
+    "gcs-service-account-file": "path_of_gcs_service_account_file"
 }
 
 gcs_properties = gravitino_client.create_catalog(name="test_catalog",
@@ -114,7 +114,7 @@ gcs_properties = gravitino_client.create_catalog(name="test_catalog",
 
 ### Step2: Create a schema
 
-Once you have created a Fileset catalog with GCS, you can create a schema. The following example shows how to create a schema:
+Once you’ve created a Fileset catalog with GCS, you can create a schema. The following example shows how to create a schema:
 
 <Tabs groupId="language" queryString>
 <TabItem value="shell" label="Shell">
@@ -271,13 +271,11 @@ If your wants to custom your hadoop version or there is already a hadoop version
     <artifactId>gravitino-filesystem-hadoop3-runtime</artifactId>
     <version>${GRAVITINO_VERSION}</version>
   </dependency>
-
-  <dependency>
-    <groupId>org.apache.gravitino</groupId>
-    <artifactId>gravitino-gcp</artifactId>
-    <version>${GRAVITINO_VERSION}</version>
-  </dependency>
 ```
+
+:::note
+Since version 1.1.0, the `gravitino-gcp` JAR is no longer required, as it is now included in the `gravitino-filesystem-hadoop3-runtime` JAR.
+:::
 
 Or use the bundle jar with Hadoop environment if there is no Hadoop environment:
 
@@ -297,12 +295,12 @@ Or use the bundle jar with Hadoop environment if there is no Hadoop environment:
 
 ### Using Spark to access the fileset
 
-The following code snippet shows how to use **PySpark 3.1.3 with Hadoop environment(Hadoop 3.2.0)** to access the fileset:
+The following code snippet shows how to use **PySpark 3.5.0 with Hadoop environment(Hadoop 3.3.4)** to access the fileset:
 
 Before running the following code, you need to install required packages:
 
 ```bash
-pip install pyspark==3.1.3
+pip install pyspark==3.5.0
 pip install apache-gravitino==${GRAVITINO_VERSION}
 ```
 Then you can run the following code:
@@ -318,7 +316,8 @@ catalog_name = "your_gcs_catalog"
 schema_name = "your_gcs_schema"
 fileset_name = "your_gcs_fileset"
 
-os.environ["PYSPARK_SUBMIT_ARGS"] = "--jars /path/to/gravitino-gcp-{gravitino-version}.jar,/path/to/gravitino-filesystem-hadoop3-runtime-{gravitino-version}.jar,/path/to/gcs-connector-hadoop3-2.2.22-shaded.jar --master local[1] pyspark-shell"
+# JDK8 as follows, JDK17 will be slightly different, you need to add '--conf \"spark.driver.extraJavaOptions=--add-opens=java.base/sun.nio.ch=ALL-UNNAMED\" --conf \"spark.executor.extraJavaOptions=--add-opens=java.base/sun.nio.ch=ALL-UNNAMED\"' to the submit args.
+os.environ["PYSPARK_SUBMIT_ARGS"] = "--jars /path/to/gravitino-filesystem-hadoop3-runtime-{gravitino-version}.jar,/path/to/gcs-connector-hadoop3-2.2.22-shaded.jar --master local[1] pyspark-shell"
 spark = SparkSession.builder
     .appName("gcs_fielset_test")
     .config("spark.hadoop.fs.AbstractFileSystem.gvfs.impl", "org.apache.gravitino.filesystem.hadoop.Gvfs")
@@ -349,8 +348,25 @@ If your Spark **without Hadoop environment**, you can use the following code sni
 os.environ["PYSPARK_SUBMIT_ARGS"] = "--jars /path/to/gravitino-gcp-bundle-{gravitino-version}.jar,/path/to/gravitino-filesystem-hadoop3-runtime-{gravitino-version}.jar, --master local[1] pyspark-shell"
 ```
 
-- [`gravitino-gcp-bundle-${gravitino-version}.jar`](https://mvnrepository.com/artifact/org.apache.gravitino/gravitino-gcp-bundle) is the Gravitino GCP jar with Hadoop environment(3.3.1) and `gcs-connector`.
-- [`gravitino-gcp-${gravitino-version}.jar`](https://mvnrepository.com/artifact/org.apache.gravitino/gravitino-gcp) is a condensed version of the Gravitino GCP bundle jar without Hadoop environment and [`gcs-connector`](https://github.com/GoogleCloudDataproc/hadoop-connectors/releases/download/v2.2.22/gcs-connector-hadoop3-2.2.22-shaded.jar) 
+If Spark can't start with the above configuration (no Hadoop environment available and use bundle jar), you can try to set the jars to the classpath directly:
+
+```python
+jars_path = (
+    "/path/to/gravitino-gcp-bundle-{gravitino-version}.jar:"
+    "/path/to/gravitino-filesystem-hadoop3-runtime-{gravitino-version}.jar"
+)
+
+os.environ["PYSPARK_SUBMIT_ARGS"] = (
+    f'--conf "spark.driver.extraClassPath={jars_path}" '
+    f'--conf "spark.executor.extraClassPath={jars_path}" '
+    '--master local[1] pyspark-shell'
+)
+```
+
+- [`gravitino-gcp-bundle-${gravitino-version}.jar`](https://mvnrepository.com/artifact/org.apache.gravitino/gravitino-gcp-bundle): A "fat" JAR that includes `gravitino-gcp` functionality and all necessary dependencies like `gcs-connector` (hadoop3-2.2.22). Use this if your Spark environment doesn't have a pre-existing Hadoop setup.
+- [`gravitino-filesystem-hadoop3-runtime-${gravitino-version}.jar`](https://mvnrepository.com/artifact/org.apache.gravitino/gravitino-filesystem-hadoop3-runtime): A "fat" JAR that bundles Gravitino's virtual filesystem client and includes the functionality of `gravitino-gcp`. It is required for accessing Gravitino filesets.
+- [`gcs-connector-hadoop3-2.2.22-shaded.jar`](https://github.com/GoogleCloudDataproc/hadoop-connectors/releases/download/v2.2.22/gcs-connector-hadoop3-2.2.22-shaded.jar): Standard Hadoop dependency for GCS access. If you are running in an existing Hadoop environment, you need to provide this JAR.
+- [`gravitino-gcp-${gravitino-version}.jar`](https://mvnrepository.com/artifact/org.apache.gravitino/gravitino-gcp): A "thin" JAR that only provides the GCP integration code. Its functionality is already included in the `gravitino-gcp-bundle` and `gravitino-filesystem-hadoop3-runtime` JARs, so you do not need to add it as a direct dependency unless you want to manage all Hadoop and GCP dependencies manually.
 
 Please choose the correct jar according to your environment.
 
@@ -393,7 +409,7 @@ The following are examples of how to use the `hadoop fs` command to access the f
 
 2. Add the necessary jars to the Hadoop classpath.
 
-For GCS, you need to add `gravitino-filesystem-hadoop3-runtime-${gravitino-version}.jar`, `gravitino-gcp-${gravitino-version}.jar` and [`gcs-connector-hadoop3-2.2.22-shaded.jar`](https://github.com/GoogleCloudDataproc/hadoop-connectors/releases/download/v2.2.22/gcs-connector-hadoop3-2.2.22-shaded.jar) to Hadoop classpath.
+For GCS, you need to add `gravitino-filesystem-hadoop3-runtime-${gravitino-version}.jar` and [`gcs-connector-hadoop3-2.2.22-shaded.jar`](https://github.com/GoogleCloudDataproc/hadoop-connectors/releases/download/v2.2.22/gcs-connector-hadoop3-2.2.22-shaded.jar) to Hadoop classpath.
 
 3. Run the following command to access the fileset:
 
@@ -472,7 +488,6 @@ curl -X POST -H "Accept: application/vnd.gravitino.v1+json" \
   "properties": {
     "location": "gs://bucket/root",
     "gcs-service-account-file": "path_of_gcs_service_account_file",
-    "filesystem-providers": "gcs",
     "credential-providers": "gcs-token"
   }
 }' http://localhost:8090/api/metalakes/metalake/catalogs

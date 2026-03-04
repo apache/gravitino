@@ -18,18 +18,24 @@
  */
 package org.apache.gravitino.storage.relational.service;
 
+import static org.apache.gravitino.metrics.source.MetricsSource.GRAVITINO_RELATIONAL_STORE_METRIC_NAME;
+
 import com.google.common.base.Preconditions;
 import java.io.IOException;
 import java.util.List;
 import java.util.Objects;
 import java.util.function.Function;
+import java.util.stream.Collectors;
 import org.apache.gravitino.Entity;
+import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.HasIdentifier;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.meta.FilesetEntity;
+import org.apache.gravitino.meta.NamespacedEntityId;
+import org.apache.gravitino.metrics.Monitored;
 import org.apache.gravitino.storage.relational.mapper.FilesetMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.FilesetVersionMapper;
 import org.apache.gravitino.storage.relational.mapper.OwnerMetaMapper;
@@ -62,6 +68,9 @@ public class FilesetMetaService {
 
   private FilesetMetaService() {}
 
+  @Monitored(
+      metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME,
+      baseMetricName = "getFilesetPOBySchemaIdAndName")
   public FilesetPO getFilesetPOBySchemaIdAndName(Long schemaId, String filesetName) {
     FilesetPO filesetPO =
         SessionUtils.getWithoutCommit(
@@ -77,14 +86,9 @@ public class FilesetMetaService {
     return filesetPO;
   }
 
-  // Fileset may be deleted, so the FilesetPO may be null.
-  public FilesetPO getFilesetPOById(Long filesetId) {
-    FilesetPO filesetPO =
-        SessionUtils.getWithoutCommit(
-            FilesetMetaMapper.class, mapper -> mapper.selectFilesetMetaById(filesetId));
-    return filesetPO;
-  }
-
+  @Monitored(
+      metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME,
+      baseMetricName = "getFilesetIdBySchemaIdAndName")
   public Long getFilesetIdBySchemaIdAndName(Long schemaId, String filesetName) {
     Long filesetId =
         SessionUtils.getWithoutCommit(
@@ -100,31 +104,56 @@ public class FilesetMetaService {
     return filesetId;
   }
 
+  @Monitored(
+      metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME,
+      baseMetricName = "getFilesetByIdentifier")
   public FilesetEntity getFilesetByIdentifier(NameIdentifier identifier) {
-    NameIdentifierUtil.checkFileset(identifier);
-
-    String filesetName = identifier.name();
-
-    Long schemaId =
-        CommonMetaService.getInstance().getParentEntityIdByNamespace(identifier.namespace());
-
-    FilesetPO filesetPO = getFilesetPOBySchemaIdAndName(schemaId, filesetName);
-
+    FilesetPO filesetPO = getFilesetPOByIdentifier(identifier);
     return POConverters.fromFilesetPO(filesetPO, identifier.namespace());
   }
 
+  @Monitored(
+      metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME,
+      baseMetricName = "listFilesetsByNamespace")
   public List<FilesetEntity> listFilesetsByNamespace(Namespace namespace) {
     NamespaceUtil.checkFileset(namespace);
 
-    Long schemaId = CommonMetaService.getInstance().getParentEntityIdByNamespace(namespace);
-
-    List<FilesetPO> filesetPOs =
-        SessionUtils.getWithoutCommit(
-            FilesetMetaMapper.class, mapper -> mapper.listFilesetPOsBySchemaId(schemaId));
-
+    List<FilesetPO> filesetPOs = listFilesetPOs(namespace);
     return POConverters.fromFilesetPOs(filesetPOs, namespace);
   }
 
+  private List<FilesetPO> listFilesetPOs(Namespace namespace) {
+    return filesetListFetcher().apply(namespace);
+  }
+
+  private List<FilesetPO> listFilesetPOsBySchemaId(Namespace namespace) {
+    Long schemaId =
+        EntityIdService.getEntityId(
+            NameIdentifier.of(namespace.levels()), Entity.EntityType.SCHEMA);
+    return SessionUtils.getWithoutCommit(
+        FilesetMetaMapper.class, mapper -> mapper.listFilesetPOsBySchemaId(schemaId));
+  }
+
+  private List<FilesetPO> listFilesetPOsByFullQualifiedName(Namespace namespace) {
+    String[] namespaceLevels = namespace.levels();
+    List<FilesetPO> filesetPOs =
+        SessionUtils.getWithoutCommit(
+            FilesetMetaMapper.class,
+            mapper ->
+                mapper.listFilesetPOsByFullQualifiedName(
+                    namespaceLevels[0], namespaceLevels[1], namespaceLevels[2]));
+    if (filesetPOs.isEmpty() || filesetPOs.get(0).getSchemaId() == null) {
+      throw new NoSuchEntityException(
+          NoSuchEntityException.NO_SUCH_ENTITY_MESSAGE,
+          Entity.EntityType.SCHEMA.name().toLowerCase(),
+          namespaceLevels[2]);
+    }
+    return filesetPOs.stream().filter(po -> po.getFilesetId() != null).collect(Collectors.toList());
+  }
+
+  @Monitored(
+      metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME,
+      baseMetricName = "insertFileset")
   public void insertFileset(FilesetEntity filesetEntity, boolean overwrite) throws IOException {
     try {
       NameIdentifierUtil.checkFileset(filesetEntity.nameIdentifier());
@@ -163,16 +192,12 @@ public class FilesetMetaService {
     }
   }
 
+  @Monitored(
+      metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME,
+      baseMetricName = "updateFileset")
   public <E extends Entity & HasIdentifier> FilesetEntity updateFileset(
       NameIdentifier identifier, Function<E, E> updater) throws IOException {
-    NameIdentifierUtil.checkFileset(identifier);
-
-    String filesetName = identifier.name();
-
-    Long schemaId =
-        CommonMetaService.getInstance().getParentEntityIdByNamespace(identifier.namespace());
-
-    FilesetPO oldFilesetPO = getFilesetPOBySchemaIdAndName(schemaId, filesetName);
+    FilesetPO oldFilesetPO = getFilesetPOByIdentifier(identifier);
     FilesetEntity oldFilesetEntity =
         POConverters.fromFilesetPO(oldFilesetPO, identifier.namespace());
     FilesetEntity newEntity = (FilesetEntity) updater.apply((E) oldFilesetEntity);
@@ -225,15 +250,12 @@ public class FilesetMetaService {
     }
   }
 
+  @Monitored(
+      metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME,
+      baseMetricName = "deleteFileset")
   public boolean deleteFileset(NameIdentifier identifier) {
-    NameIdentifierUtil.checkFileset(identifier);
-
-    String filesetName = identifier.name();
-
-    Long schemaId =
-        CommonMetaService.getInstance().getParentEntityIdByNamespace(identifier.namespace());
-
-    Long filesetId = getFilesetIdBySchemaIdAndName(schemaId, filesetName);
+    FilesetPO filesetPO = getFilesetPOByIdentifier(identifier);
+    Long filesetId = filesetPO.getFilesetId();
 
     // We should delete meta and version info
     SessionUtils.doMultipleWithCommit(
@@ -277,6 +299,9 @@ public class FilesetMetaService {
     return true;
   }
 
+  @Monitored(
+      metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME,
+      baseMetricName = "deleteFilesetAndVersionMetasByLegacyTimeline")
   public int deleteFilesetAndVersionMetasByLegacyTimeline(Long legacyTimeline, int limit) {
     int filesetDeletedCount =
         SessionUtils.doWithCommitAndFetchResult(
@@ -293,6 +318,9 @@ public class FilesetMetaService {
     return filesetDeletedCount + filesetVersionDeletedCount;
   }
 
+  @Monitored(
+      metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME,
+      baseMetricName = "deleteFilesetVersionsByRetentionCount")
   public int deleteFilesetVersionsByRetentionCount(Long versionRetentionCount, int limit) {
     // get the current version of all filesets.
     List<FilesetMaxVersionPO> filesetCurVersions =
@@ -325,12 +353,101 @@ public class FilesetMetaService {
     return totalDeletedCount;
   }
 
+  private FilesetPO getFilesetPOByIdentifier(NameIdentifier identifier) {
+    NameIdentifierUtil.checkFileset(identifier);
+
+    return filesetPOFetcher().apply(identifier);
+  }
+
+  private FilesetPO getFilesetPOBySchemaId(NameIdentifier identifier) {
+    Long schemaId =
+        EntityIdService.getEntityId(
+            NameIdentifier.of(identifier.namespace().levels()), Entity.EntityType.SCHEMA);
+    return getFilesetPOBySchemaIdAndName(schemaId, identifier.name());
+  }
+
+  private FilesetPO getFilesetPOByFullQualifiedName(NameIdentifier identifier) {
+    String[] namespaceLevels = identifier.namespace().levels();
+    FilesetPO filesetPO =
+        getFilesetByFullQualifiedName(
+            namespaceLevels[0], namespaceLevels[1], namespaceLevels[2], identifier.name());
+
+    if (filesetPO.getSchemaId() == null) {
+      throw new NoSuchEntityException(
+          NoSuchEntityException.NO_SUCH_ENTITY_MESSAGE,
+          Entity.EntityType.SCHEMA.name().toLowerCase(),
+          namespaceLevels[2]);
+    }
+
+    if (filesetPO.getFilesetId() == null) {
+      throw new NoSuchEntityException(
+          NoSuchEntityException.NO_SUCH_ENTITY_MESSAGE,
+          Entity.EntityType.FILESET.name().toLowerCase(),
+          identifier.name());
+    }
+
+    return filesetPO;
+  }
+
+  private Function<Namespace, List<FilesetPO>> filesetListFetcher() {
+    return GravitinoEnv.getInstance().cacheEnabled()
+        ? this::listFilesetPOsBySchemaId
+        : this::listFilesetPOsByFullQualifiedName;
+  }
+
+  private Function<NameIdentifier, FilesetPO> filesetPOFetcher() {
+    return GravitinoEnv.getInstance().cacheEnabled()
+        ? this::getFilesetPOBySchemaId
+        : this::getFilesetPOByFullQualifiedName;
+  }
+
   private void fillFilesetPOBuilderParentEntityId(FilesetPO.Builder builder, Namespace namespace) {
     NamespaceUtil.checkFileset(namespace);
-    Long[] parentEntityIds =
-        CommonMetaService.getInstance().getParentEntityIdsByNamespace(namespace);
-    builder.withMetalakeId(parentEntityIds[0]);
-    builder.withCatalogId(parentEntityIds[1]);
-    builder.withSchemaId(parentEntityIds[2]);
+    NamespacedEntityId namespacedEntityId =
+        EntityIdService.getEntityIds(
+            NameIdentifier.of(namespace.levels()), Entity.EntityType.SCHEMA);
+    builder.withMetalakeId(namespacedEntityId.namespaceIds()[0]);
+    builder.withCatalogId(namespacedEntityId.namespaceIds()[1]);
+    builder.withSchemaId(namespacedEntityId.entityId());
+  }
+
+  private FilesetPO getFilesetByFullQualifiedName(
+      String metalakeName, String catalogName, String schemaName, String filesetName) {
+    FilesetPO filesetPO =
+        SessionUtils.getWithoutCommit(
+            FilesetMetaMapper.class,
+            mapper ->
+                mapper.selectFilesetByFullQualifiedName(
+                    metalakeName, catalogName, schemaName, filesetName));
+    if (filesetPO == null) {
+      throw new NoSuchEntityException(
+          NoSuchEntityException.NO_SUCH_ENTITY_MESSAGE,
+          Entity.EntityType.FILESET.name().toLowerCase(),
+          filesetName);
+    }
+
+    return filesetPO;
+  }
+
+  @Monitored(
+      metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME,
+      baseMetricName = "batchGetFilesetByIdentifier")
+  public List<FilesetEntity> batchGetFilesetByIdentifier(List<NameIdentifier> identifiers) {
+    NameIdentifier firstIdent = identifiers.get(0);
+    NameIdentifier schemaIdent = NameIdentifierUtil.getSchemaIdentifier(firstIdent);
+    List<String> filesetNames =
+        identifiers.stream().map(NameIdentifier::name).collect(Collectors.toList());
+
+    return SessionUtils.doWithCommitAndFetchResult(
+        FilesetMetaMapper.class,
+        mapper -> {
+          List<FilesetPO> filesetPOs =
+              mapper.batchSelectFilesetByIdentifier(
+                  schemaIdent.namespace().level(0),
+                  schemaIdent.namespace().level(1),
+                  schemaIdent.name(),
+                  filesetNames);
+          return POConverters.fromFilesetPOs(filesetPOs, firstIdent.namespace());
+        });
   }
 }

@@ -75,10 +75,6 @@ public class FilesetHookDispatcher implements FilesetDispatcher {
       Map<String, String> storageLocations,
       Map<String, String> properties)
       throws NoSuchSchemaException, FilesetAlreadyExistsException {
-    // Check whether the current user exists or not
-    AuthorizationUtils.checkCurrentUser(
-        ident.namespace().level(0), PrincipalUtils.getCurrentUserName());
-
     Fileset fileset =
         dispatcher.createMultipleLocationFileset(
             ident, comment, type, storageLocations, properties);

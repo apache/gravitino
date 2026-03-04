@@ -31,6 +31,7 @@ import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
 import java.util.Map;
 import java.util.Random;
+import org.apache.gravitino.exceptions.GravitinoRuntimeException;
 
 /**
  * Referred from Apache Iceberg's RESTUtil implementation
@@ -104,8 +105,7 @@ public class RESTUtils {
     try {
       return URLEncoder.encode(toEncode, StandardCharsets.UTF_8.name());
     } catch (UnsupportedEncodingException e) {
-      throw new UncheckedIOException(
-          String.format("Failed to URL encode '%s': UTF-8 encoding is not supported", toEncode), e);
+      throw new GravitinoRuntimeException("Failed to encode string: %s", toEncode);
     }
   }
 
@@ -122,8 +122,7 @@ public class RESTUtils {
     try {
       return URLDecoder.decode(encoded, StandardCharsets.UTF_8.name());
     } catch (UnsupportedEncodingException e) {
-      throw new UncheckedIOException(
-          String.format("Failed to URL decode '%s': UTF-8 encoding is not supported", encoded), e);
+      throw new GravitinoRuntimeException("Failed to decode string: %s", encoded);
     }
   }
 

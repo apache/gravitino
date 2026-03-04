@@ -46,7 +46,7 @@ public class ListRoleNamesEvent extends RoleEvent {
    * @param metalake the metalake name where the roles are listed.
    * @param object the {@code MetadataObject} related to the role names.
    */
-  protected ListRoleNamesEvent(String initiator, String metalake, MetadataObject object) {
+  public ListRoleNamesEvent(String initiator, String metalake, MetadataObject object) {
     super(initiator, NameIdentifierUtil.ofMetalake(metalake));
 
     this.object = Optional.ofNullable(object);

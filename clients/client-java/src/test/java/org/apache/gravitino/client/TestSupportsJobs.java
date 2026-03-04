@@ -32,6 +32,8 @@ import org.apache.gravitino.dto.job.ShellJobTemplateDTO;
 import org.apache.gravitino.dto.job.SparkJobTemplateDTO;
 import org.apache.gravitino.dto.requests.JobRunRequest;
 import org.apache.gravitino.dto.requests.JobTemplateRegisterRequest;
+import org.apache.gravitino.dto.requests.JobTemplateUpdateRequest;
+import org.apache.gravitino.dto.requests.JobTemplateUpdatesRequest;
 import org.apache.gravitino.dto.responses.BaseResponse;
 import org.apache.gravitino.dto.responses.DropResponse;
 import org.apache.gravitino.dto.responses.ErrorResponse;
@@ -175,6 +177,61 @@ public class TestSupportsJobs extends TestBase {
         HttpStatus.SC_CONFLICT);
     Assertions.assertThrows(
         InUseException.class, () -> metalake.deleteJobTemplate(jobTemplateName));
+  }
+
+  @Test
+  public void testAlterJobTemplate() throws JsonProcessingException {
+    String jobTemplateName = "shell-job-template";
+    JobTemplateDTO templateDTO = newShellJobTemplateDTO(jobTemplateName);
+    JobTemplate expected = org.apache.gravitino.dto.util.DTOConverters.fromDTO(templateDTO);
+    JobTemplateResponse resp = new JobTemplateResponse(templateDTO);
+
+    JobTemplateUpdateRequest rename =
+        new JobTemplateUpdateRequest.RenameJobTemplateRequest(jobTemplateName);
+    JobTemplateUpdatesRequest req = new JobTemplateUpdatesRequest(Lists.newArrayList(rename));
+
+    buildMockResource(
+        Method.PUT, jobTemplatesPath() + "/" + jobTemplateName, req, resp, HttpStatus.SC_OK);
+
+    JobTemplate actual = metalake.alterJobTemplate(jobTemplateName, rename.jobTemplateChange());
+    Assertions.assertEquals(expected, actual);
+
+    // Test throw NoSuchJobTemplateException
+    ErrorResponse errorResp =
+        ErrorResponse.notFound(NoSuchJobTemplateException.class.getSimpleName(), "mock error");
+    buildMockResource(
+        Method.PUT,
+        jobTemplatesPath() + "/" + jobTemplateName,
+        req,
+        errorResp,
+        HttpStatus.SC_NOT_FOUND);
+    Assertions.assertThrows(
+        NoSuchJobTemplateException.class,
+        () -> metalake.alterJobTemplate(jobTemplateName, rename.jobTemplateChange()));
+
+    // Test throw IllegalArgumentException
+    ErrorResponse errorResp2 = ErrorResponse.illegalArguments("mock error");
+    buildMockResource(
+        Method.PUT,
+        jobTemplatesPath() + "/" + jobTemplateName,
+        req,
+        errorResp2,
+        HttpStatus.SC_BAD_REQUEST);
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () -> metalake.alterJobTemplate(jobTemplateName, rename.jobTemplateChange()));
+
+    // Test throw RuntimeException
+    ErrorResponse errorResp3 = ErrorResponse.internalError("mock error");
+    buildMockResource(
+        Method.PUT,
+        jobTemplatesPath() + "/" + jobTemplateName,
+        req,
+        errorResp3,
+        HttpStatus.SC_INTERNAL_SERVER_ERROR);
+    Assertions.assertThrows(
+        RuntimeException.class,
+        () -> metalake.alterJobTemplate(jobTemplateName, rename.jobTemplateChange()));
   }
 
   @Test

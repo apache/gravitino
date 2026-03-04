@@ -21,6 +21,7 @@ package org.apache.gravitino.trino.connector.catalog.iceberg;
 import static org.apache.gravitino.catalog.lakehouse.iceberg.IcebergConstants.FORMAT;
 import static org.apache.gravitino.catalog.lakehouse.iceberg.IcebergConstants.FORMAT_VERSION;
 import static org.apache.gravitino.catalog.lakehouse.iceberg.IcebergConstants.PROVIDER;
+import static org.apache.gravitino.trino.connector.catalog.iceberg.IcebergPropertyMeta.DEFAULT_ICEBERG_FORMAT_VERSION;
 import static org.apache.gravitino.trino.connector.catalog.iceberg.IcebergPropertyMeta.ICEBERG_FORMAT_PROPERTY;
 import static org.apache.gravitino.trino.connector.catalog.iceberg.IcebergPropertyMeta.ICEBERG_FORMAT_VERSION_PROPERTY;
 import static org.apache.gravitino.trino.connector.catalog.iceberg.IcebergTablePropertyConverter.convertTableFormatToTrino;
@@ -117,13 +118,12 @@ public class IcebergMetadataAdapter extends CatalogConnectorMetadataAdapter {
         toGravitinoTableProperties(
             removeKeys(tableMetadata.getProperties(), ICEBERG_PROPERTIES_TO_REMOVE));
 
-    if (propertyMap.containsKey(ICEBERG_FORMAT_PROPERTY)) {
-      String format = propertyMap.get(ICEBERG_FORMAT_PROPERTY).toString();
-      properties.put(PROVIDER, format);
-      if (propertyMap.containsKey((ICEBERG_FORMAT_VERSION_PROPERTY))) {
-        properties.put(FORMAT_VERSION, propertyMap.get(ICEBERG_FORMAT_VERSION_PROPERTY).toString());
-      }
-    }
+    properties.put(PROVIDER, propertyMap.get(ICEBERG_FORMAT_PROPERTY).toString());
+    properties.put(
+        FORMAT_VERSION,
+        propertyMap
+            .getOrDefault(ICEBERG_FORMAT_VERSION_PROPERTY, DEFAULT_ICEBERG_FORMAT_VERSION)
+            .toString());
 
     List<GravitinoColumn> columns = new ArrayList<>();
     for (int i = 0; i < tableMetadata.getColumns().size(); i++) {

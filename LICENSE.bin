@@ -379,6 +379,13 @@
    npgall concurrent-trees
    reyerizo jcstress-gradle-plugin
    melix jmh-gradle-plugin
+   Lance
+   JCasbin
+   OGNL
+   Google FlatBuffers
+   IPAddress
+   Aliyun SDK OSS
+   QLExpress
 
    This product bundles various third-party components also under the
    Apache Software Foundation License 1.1
@@ -408,6 +415,10 @@
    fsspec
    Google auth HTTP
    Google auth Credentials
+   Apache HttpComponents Client5
+   Apache HttpComponents Core5
+   Helger Profiler
+   OpenAPI Tools Jackson Databind Nullable
 
    This product bundles various third-party components also under the
    MIT license
@@ -442,6 +453,7 @@
    Eclipse Public License 1.0
 
    Logback
+   Eclipse Collections
    Eclipse Jetty
    Eclipse Jetty Continuation
    Eclipse Jetty Security
@@ -460,6 +472,7 @@
    This product bundles various third-party components also under the
    Eclipse Public License 2.0
 
+   Eclipse AspectJ
    Eclipse Jetty
    Eclipse Jersey
    Eclipse GlassFish
@@ -486,3 +499,5 @@
 
    AOP Alliance
    XZ For Java
+   HdrHistogram
+   LatencyUtils

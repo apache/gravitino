@@ -36,9 +36,11 @@ import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.NameIdentifier;
+import org.apache.gravitino.audit.CallerContext;
 import org.apache.gravitino.client.DefaultOAuth2TokenProvider;
 import org.apache.gravitino.client.GravitinoClient;
 import org.apache.gravitino.client.KerberosTokenProvider;
+import org.apache.gravitino.credential.CredentialConstants;
 import org.apache.hadoop.conf.Configuration;
 
 /** Utility class for Gravitino Virtual File System. */
@@ -62,6 +64,29 @@ public class GravitinoVirtualFileSystemUtils {
     // Don't use entry.getKey() directly in the lambda, because it cannot
     // handle variable expansion in the Configuration values.
     configuration.forEach(entry -> maps.put(entry.getKey(), configuration.get(entry.getKey())));
+    return maps;
+  }
+
+  /**
+   * Extract non-default configuration from Hadoop Configuration.
+   *
+   * @param configuration The Hadoop configuration.
+   * @return The configuration map.
+   */
+  public static Map<String, String> extractNonDefaultConfig(Configuration configuration) {
+    Map<String, String> maps = Maps.newHashMap();
+    // Don't use entry.getKey() directly in the lambda, because it cannot
+    // handle variable expansion in the Configuration values.
+    Configuration defaultConf = new Configuration();
+    configuration.forEach(
+        entry -> {
+          String key = entry.getKey();
+          String value = configuration.get(key);
+          // ignore the default configuration
+          if (!StringUtils.equals(value, defaultConf.get(key))) {
+            maps.put(key, value);
+          }
+        });
     return maps;
   }
 
@@ -299,6 +324,13 @@ public class GravitinoVirtualFileSystemUtils {
         identifier);
 
     return gvfsPath.substring(prefix.length());
+  }
+
+  static void setCallerContextForGetCredentials(String locationName) {
+    Map<String, String> contextMap = Maps.newHashMap();
+    contextMap.put(CredentialConstants.HTTP_HEADER_CURRENT_LOCATION_NAME, locationName);
+    CallerContext callerContext = CallerContext.builder().withContext(contextMap).build();
+    CallerContext.CallerContextHolder.set(callerContext);
   }
 
   private static void checkAuthConfig(String authType, String configKey, String configValue) {

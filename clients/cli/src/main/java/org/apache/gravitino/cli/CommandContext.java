@@ -23,7 +23,7 @@ import com.google.common.base.Preconditions;
 import org.apache.commons.cli.CommandLine;
 import org.apache.gravitino.cli.commands.Command;
 
-/* Context for a command */
+/** Context for a command */
 public class CommandContext {
   private final boolean force;
   private final boolean ignoreVersions;
@@ -47,7 +47,7 @@ public class CommandContext {
    * @param line The command line.
    */
   public CommandContext(CommandLine line) {
-    Preconditions.checkNotNull(line);
+    Preconditions.checkArgument(line != null, "line cannot be null");
     this.line = line;
     this.force = line.hasOption(GravitinoOptions.FORCE);
     this.outputFormat =

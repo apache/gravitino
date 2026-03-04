@@ -175,6 +175,27 @@ public class TestOAuth2TokenAuthenticator {
   }
 
   @Test
+  public void testInitializeStaticKeyValidatorRequiresServerUriAndTokenPath() {
+    OAuth2TokenAuthenticator authenticator = new OAuth2TokenAuthenticator();
+    Config config = new Config(false) {};
+    config.set(OAuthConfig.SERVICE_AUDIENCE, "test-service");
+    Key tempKey = Keys.secretKeyFor(SignatureAlgorithm.HS256);
+    config.set(
+        OAuthConfig.DEFAULT_SIGN_KEY, Base64.getEncoder().encodeToString(tempKey.getEncoded()));
+    // Use default StaticSignKeyValidator which requires serverUri and tokenPath
+    config.set(
+        OAuthConfig.TOKEN_VALIDATOR_CLASS,
+        "org.apache.gravitino.server.authentication.StaticSignKeyValidator");
+
+    // Should fail when serverUri and tokenPath are missing for StaticSignKeyValidator
+    IllegalArgumentException e =
+        assertThrows(IllegalArgumentException.class, () -> authenticator.initialize(config));
+    assertTrue(
+        e.getMessage().contains("token") || e.getMessage().contains("uri"),
+        "Expected error message about token path or server URI, got: " + e.getMessage());
+  }
+
+  @Test
   public void testInitializeWithJwksConfiguration() {
     OAuth2TokenAuthenticator authenticator = new OAuth2TokenAuthenticator();
 
@@ -183,13 +204,10 @@ public class TestOAuth2TokenAuthenticator {
     config.set(
         OAuthConfig.JWKS_URI, "https://login.microsoftonline.com/common/discovery/v2.0/keys");
     config.set(OAuthConfig.AUTHORITY, "https://login.microsoftonline.com");
-    config.set(OAuthConfig.DEFAULT_TOKEN_PATH, "/token");
-    config.set(OAuthConfig.DEFAULT_SERVER_URI, "http://localhost:8080");
+    // Note: DEFAULT_TOKEN_PATH and DEFAULT_SERVER_URI are not required for JWKS validator
     config.set(
         OAuthConfig.TOKEN_VALIDATOR_CLASS,
         "org.apache.gravitino.server.authentication.JwksTokenValidator");
-
-    // Should initialize with JWKS validator
     authenticator.initialize(config);
     assertTrue(authenticator.isDataFromToken());
   }

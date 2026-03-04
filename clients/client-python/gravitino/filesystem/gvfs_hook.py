@@ -30,6 +30,17 @@ class GravitinoVirtualFileSystemHook(ABC):
     idempotent issues if required.
     """
 
+    def set_operations_context(self, operations):
+        """
+        Set the operations context for this hook. This method will be called during GVFS initialization
+        to provide the hook with access to the BaseGVFSOperations instance.
+
+        Args:
+            operations: The BaseGVFSOperations instance.
+        """
+        # Default implementation does nothing - hooks can override if they need operations access
+        pass
+
     @abstractmethod
     def initialize(self, config: Optional[Dict[str, str]]):
         """
@@ -513,6 +524,279 @@ class GravitinoVirtualFileSystemHook(ABC):
         Returns:
             The modification time to get.
         """
+
+    def on_ls_failure(self, path: str, exception: Exception, **kwargs):
+        """
+        Called when listing directory contents fails.
+
+        Args:
+            path: The path that failed to list contents for.
+            exception: The exception that caused the failure.
+            **kwargs: Additional arguments.
+
+        Returns:
+            The fallback entries list if available.
+
+        Raises:
+            Exception: Re-raises the exception if no fallback is available.
+        """
+        raise exception
+
+    def on_info_failure(self, path: str, exception: Exception, **kwargs):
+        """
+        Called when getting file info fails.
+
+        Args:
+            path: The path that failed to get info for.
+            exception: The exception that caused the failure.
+            **kwargs: Additional arguments.
+
+        Returns:
+            The fallback file info dict if available.
+
+        Raises:
+            Exception: Re-raises the exception if no fallback is available.
+        """
+        raise exception
+
+    def on_exists_failure(self, path: str, exception: Exception, **kwargs):
+        """
+        Called when checking file existence fails.
+
+        Args:
+            path: The path that failed to check existence for.
+            exception: The exception that caused the failure.
+            **kwargs: Additional arguments.
+
+        Returns:
+            The fallback boolean value if available.
+
+        Raises:
+            Exception: Re-raises the exception if no fallback is available.
+        """
+        raise exception
+
+    def on_open_failure(
+        self,
+        path: str,
+        mode: str,
+        block_size: int,
+        cache_options: dict,
+        compression: str,
+        exception: Exception,
+        **kwargs
+    ):
+        """
+        Called when opening a file fails.
+
+        Args:
+            path: The path of the file that failed to open.
+            mode: The mode to open the file.
+            block_size: The block size of the file.
+            cache_options: The cache options of the file.
+            compression: The compression of the file.
+            exception: The exception that caused the failure.
+            **kwargs: Additional arguments.
+
+        Returns:
+            The fallback file object if available.
+
+        Raises:
+            Exception: Re-raises the exception if no fallback is available.
+        """
+        raise exception
+
+    def on_cp_file_failure(self, src: str, dst: str, exception: Exception, **kwargs):
+        """
+        Called when copying a file fails.
+
+        Args:
+            src: The source path that failed to copy.
+            dst: The destination path for the copy operation.
+            exception: The exception that caused the failure.
+            **kwargs: Additional arguments.
+
+        Raises:
+            Exception: Can re-raise the exception if no fallback is available.
+        """
+        raise exception
+
+    def on_mv_failure(
+        self,
+        src: str,
+        dst: str,
+        recursive: bool,
+        maxdepth: int,
+        exception: Exception,
+        **kwargs
+    ):
+        """
+        Called when moving a file or directory fails.
+
+        Args:
+            src: The source path that failed to be moved.
+            dst: The destination path for the move operation.
+            recursive: Whether the move was requested to be recursive.
+            maxdepth: The maximum depth to move.
+            exception: The exception that caused the failure.
+            **kwargs: Additional arguments.
+
+        Raises:
+            Exception: Can re-raise the exception if no fallback is available.
+        """
+        raise exception
+
+    def on_rm_failure(
+        self, path: str, recursive: bool, maxdepth: int, exception: Exception
+    ):
+        """
+        Called when deleting a file or directory fails.
+
+        Args:
+            path: The path that failed to be deleted.
+            recursive: Whether the deletion was requested to be recursive.
+            maxdepth: The maximum depth to delete.
+            exception: The exception that caused the failure.
+
+        Raises:
+            Exception: Re-raises the exception if no fallback is available.
+        """
+        raise exception
+
+    def on_rm_file_failure(self, path: str, exception: Exception):
+        """
+        Called when deleting a file fails.
+
+        Args:
+            path: The path that failed to be deleted.
+            exception: The exception that caused the failure.
+
+        Raises:
+            Exception: Can re-raise the exception if no fallback is available.
+        """
+        raise exception
+
+    def on_rmdir_failure(self, path: str, exception: Exception):
+        """
+        Called when deleting a directory fails.
+
+        Args:
+            path: The path that failed to be deleted.
+            exception: The exception that caused the failure.
+
+        Raises:
+            Exception: Can re-raise the exception if no fallback is available.
+        """
+        raise exception
+
+    def on_mkdir_failure(
+        self, path: str, create_parents: bool, exception: Exception, **kwargs
+    ):
+        """
+        Called when creating a directory fails.
+
+        Args:
+            path: The path that failed to create directory for.
+            create_parents: Whether to create parent directories.
+            exception: The exception that caused the failure.
+            **kwargs: Additional arguments.
+
+        Raises:
+            Exception: Re-raises the exception if no fallback is available.
+        """
+        raise exception
+
+    def on_makedirs_failure(self, path: str, exist_ok: bool, exception: Exception):
+        """
+        Called when creating directories fails.
+
+        Args:
+            path: The path that failed to create directories for.
+            exist_ok: Whether it's okay if the directory already exists.
+            exception: The exception that caused the failure.
+
+        Raises:
+            Exception: Can re-raise the exception if no fallback is available.
+        """
+        raise exception
+
+    def on_cat_file_failure(
+        self, path: str, start: int, end: int, exception: Exception, **kwargs
+    ):
+        """
+        Called when reading file contents fails.
+
+        Args:
+            path: The path of the file that failed to read.
+            start: The start position to read.
+            end: The end position to read.
+            exception: The exception that caused the failure.
+            **kwargs: Additional arguments.
+
+        Returns:
+            The fallback content if available.
+
+        Raises:
+            Exception: Re-raises the exception if no fallback is available.
+        """
+        raise exception
+
+    def on_get_file_failure(
+        self,
+        rpath: str,
+        lpath: str,
+        callback: Callback,
+        outfile: str,
+        exception: Exception,
+        **kwargs
+    ):
+        """
+        Called when downloading a file fails.
+
+        Args:
+            rpath: The remote path that failed to download.
+            lpath: The local path for the file.
+            callback: The callback to call.
+            outfile: The output file.
+            exception: The exception that caused the failure.
+            **kwargs: Additional arguments.
+
+        Raises:
+            Exception: Can re-raise the exception if no fallback is available.
+        """
+        raise exception
+
+    def on_created_failure(self, path: str, exception: Exception):
+        """
+        Called when getting file creation time fails.
+
+        Args:
+            path: The path that failed to get creation time for.
+            exception: The exception that caused the failure.
+
+        Returns:
+            The fallback creation time if available.
+
+        Raises:
+            Exception: Re-raises the exception if no fallback is available.
+        """
+        raise exception
+
+    def on_modified_failure(self, path: str, exception: Exception):
+        """
+        Called when getting file modification time fails.
+
+        Args:
+            path: The path that failed to get modification time for.
+            exception: The exception that caused the failure.
+
+        Returns:
+            The fallback modification time if available.
+
+        Raises:
+            Exception: Re-raises the exception if no fallback is available.
+        """
+        raise exception
 
 
 class NoOpHook(GravitinoVirtualFileSystemHook):

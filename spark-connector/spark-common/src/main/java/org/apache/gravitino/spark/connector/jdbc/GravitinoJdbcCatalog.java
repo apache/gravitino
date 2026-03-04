@@ -21,6 +21,7 @@ package org.apache.gravitino.spark.connector.jdbc;
 
 import com.google.common.collect.Maps;
 import java.util.Map;
+import org.apache.commons.collections4.MapUtils;
 import org.apache.gravitino.spark.connector.PropertiesConverter;
 import org.apache.gravitino.spark.connector.SparkTransformConverter;
 import org.apache.gravitino.spark.connector.SparkTypeConverter;
@@ -85,7 +86,7 @@ public class GravitinoJdbcCatalog extends BaseCatalog {
   public void createNamespace(String[] namespace, Map<String, String> metadata)
       throws NamespaceAlreadyExistsException {
     Map<String, String> properties = Maps.newHashMap();
-    if (!metadata.isEmpty()) {
+    if (MapUtils.isNotEmpty(metadata)) {
       metadata.forEach(
           (k, v) -> {
             switch (k) {

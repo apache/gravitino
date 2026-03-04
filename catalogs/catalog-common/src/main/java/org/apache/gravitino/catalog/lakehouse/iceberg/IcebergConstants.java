@@ -31,6 +31,9 @@ public class IcebergConstants {
   public static final String ICEBERG_JDBC_PASSWORD = "jdbc.password";
   public static final String ICEBERG_JDBC_INITIALIZE = "jdbc-initialize";
 
+  public static final String GRAVITINO_JDBC_SCHEMA_VERSION = "jdbc-schema-version";
+  public static final String ICEBERG_JDBC_SCHEMA_VERSION = "jdbc.schema-version";
+
   public static final String GRAVITINO_JDBC_DRIVER = "jdbc-driver";
   public static final String WAREHOUSE = "warehouse";
   public static final String URI = "uri";
@@ -57,6 +60,7 @@ public class IcebergConstants {
 
   public static final String COMMENT = "comment";
   public static final String CREATOR = "creator";
+  public static final String OWNER = "owner";
   public static final String LOCATION = "location";
   public static final String CURRENT_SNAPSHOT_ID = "current-snapshot-id";
   public static final String CHERRY_PICK_SNAPSHOT_ID = "cherry-pick-snapshot-id";
@@ -92,4 +96,14 @@ public class IcebergConstants {
 
   public static final String ICEBERG_REST_DEFAULT_METALAKE = "gravitino";
   public static final String ICEBERG_REST_DEFAULT_CATALOG = "default_catalog";
+  public static final String ICEBERG_REST_DEFAULT_DYNAMIC_CATALOG_NAME = "default-catalog-name";
+
+  public static final String TABLE_METADATA_CACHE_IMPL = "table-metadata-cache-impl";
+  public static final String TABLE_METADATA_CACHE_CAPACITY = "table-metadata-cache-capacity";
+  public static final String TABLE_METADATA_CACHE_EXPIRE_MINUTES =
+      "table-metadata-cache-expire-minutes";
+
+  public static final String SCAN_PLAN_CACHE_IMPL = "scan-plan-cache-impl";
+  public static final String SCAN_PLAN_CACHE_CAPACITY = "scan-plan-cache-capacity";
+  public static final String SCAN_PLAN_CACHE_EXPIRE_MINUTES = "scan-plan-cache-expire-minutes";
 }

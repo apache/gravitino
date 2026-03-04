@@ -22,7 +22,7 @@ package org.apache.gravitino.cli;
 import java.nio.charset.StandardCharsets;
 import java.util.Scanner;
 
-/* Ask are you sure you want to do this? */
+/** Ask are you sure you want to do this? */
 public class AreYouSure {
 
   /**

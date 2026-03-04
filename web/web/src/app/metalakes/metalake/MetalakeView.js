@@ -152,8 +152,6 @@ const MetalakeView = () => {
     fetchDependsData()
 
     dispatch(setSelectedNodes(routeParams.catalog ? [buildNodePath(routeParams)] : []))
-
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [searchParams])
 
   return (

@@ -74,7 +74,7 @@ class OAuth2ClientUtil {
   }
 
   private static Pair<String, String> parseCredential(String credential) {
-    Preconditions.checkNotNull(credential, "Invalid credential: null");
+    Preconditions.checkArgument(credential != null, "Invalid credential: null");
     List<String> parts = CREDENTIAL_SPLITTER.splitToList(credential);
     switch (parts.size()) {
       case 2:

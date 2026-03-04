@@ -32,11 +32,17 @@ import org.apache.gravitino.messaging.TopicChange;
 /** Set a property of a topic. */
 public class SetTopicProperty extends Command {
 
+  /** The name of the metalake. */
   protected final String metalake;
+  /** The name of the catalog. */
   protected final String catalog;
+  /** The name of the schema. */
   protected final String schema;
+  /** The name of the topic. */
   protected final String topic;
+  /** The name of the property. */
   protected final String property;
+  /** The value of the property. */
   protected final String value;
 
   /**

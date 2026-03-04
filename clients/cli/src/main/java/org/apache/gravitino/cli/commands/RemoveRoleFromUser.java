@@ -30,8 +30,11 @@ import org.apache.gravitino.exceptions.NoSuchUserException;
 /** Removes a role from a user. */
 public class RemoveRoleFromUser extends Command {
 
+  /** The name of the metalake. */
   protected String metalake;
+  /** The name of the user. */
   protected String user;
+  /** The name of the role. */
   protected String role;
 
   /**

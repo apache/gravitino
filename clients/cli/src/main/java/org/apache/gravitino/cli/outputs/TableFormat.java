@@ -42,6 +42,7 @@ import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.OutputStreamWriter;
 import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
@@ -71,6 +72,7 @@ import org.apache.gravitino.tag.Tag;
  * numbers - Data limiting and sorting
  */
 public abstract class TableFormat<T> extends BaseOutputFormat<T> {
+  /** Default padding size for column alignment. */
   public static final int PADDING = 1;
 
   /**
@@ -844,7 +846,9 @@ public abstract class TableFormat<T> extends BaseOutputFormat<T> {
       Column columnRoles = new Column(context, "roles");
 
       columnName.addCell(user.name());
-      columnRoles.addCell(Command.COMMA_JOINER.join(user.roles()));
+
+      List<String> roleList = user.roles() == null ? new ArrayList<>() : user.roles();
+      columnRoles.addCell(Command.COMMA_JOINER.join(roleList));
 
       return getTableFormat(columnName, columnRoles);
     }

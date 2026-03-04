@@ -172,7 +172,7 @@ public class MySQLMetadataAdapter extends CatalogConnectorMetadataAdapter {
                 primaryKeyColumn, TABLE_PRIMARY_KEY));
       }
     }
-    return Indexes.createMysqlPrimaryKey(convertIndexFieldNames(primaryKeys));
+    return Indexes.createMysqlPrimaryKey(convertIndexFieldNames(primaryKeys), Map.of());
   }
 
   private static List<Index> convertUniqueKey(
@@ -189,7 +189,7 @@ public class MySQLMetadataAdapter extends CatalogConnectorMetadataAdapter {
                   uniqueKeyColumn, TABLE_UNIQUE_KEY));
         }
       }
-      builder.add(Indexes.unique(uniqueKey, convertIndexFieldNames(uniqueKeyColumns)));
+      builder.add(Indexes.unique(uniqueKey, convertIndexFieldNames(uniqueKeyColumns), Map.of()));
     }
     return builder.build();
   }
@@ -283,6 +283,8 @@ public class MySQLMetadataAdapter extends CatalogConnectorMetadataAdapter {
                     .collect(Collectors.toUnmodifiableList());
             uniqueKeys.add(String.format("%s:%s", index.name(), Strings.join(columns, ',')));
             break;
+          default:
+            throw new UnsupportedOperationException("Unsupported index type: " + index.type());
         }
       }
       if (!primaryKeys.isEmpty()) {

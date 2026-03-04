@@ -21,7 +21,6 @@ package org.apache.gravitino.cache;
 
 import java.util.List;
 import java.util.Optional;
-import java.util.concurrent.locks.ReentrantLock;
 import org.apache.gravitino.Config;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.HasIdentifier;
@@ -30,7 +29,7 @@ import org.apache.gravitino.SupportsRelationOperations;
 
 /** A cache implementation that does not cache anything. */
 public class NoOpsCache extends BaseEntityCache {
-  private final ReentrantLock opLock = new ReentrantLock();
+  private final SegmentedLock opLock = new SegmentedLock(1);
   /**
    * Constructs a new {@link BaseEntityCache} instance.
    *
@@ -60,34 +59,16 @@ public class NoOpsCache extends BaseEntityCache {
 
   /** {@inheritDoc} */
   @Override
-  public <E extends Exception> void withCacheLock(ThrowingRunnable<E> action) throws E {
-    try {
-      opLock.lockInterruptibly();
-      try {
-        action.run();
-      } finally {
-        opLock.unlock();
-      }
-    } catch (InterruptedException e) {
-      Thread.currentThread().interrupt();
-      throw new IllegalStateException("Thread was interrupted while waiting for lock", e);
-    }
+  public <E extends Exception> void withCacheLock(EntityCacheKey key, ThrowingRunnable<E> action)
+      throws E {
+    opLock.withLockAndThrow(key, action);
   }
 
   /** {@inheritDoc} */
   @Override
-  public <T, E extends Exception> T withCacheLock(ThrowingSupplier<T, E> action) throws E {
-    try {
-      opLock.lockInterruptibly();
-      try {
-        return action.get();
-      } finally {
-        opLock.unlock();
-      }
-    } catch (InterruptedException e) {
-      Thread.currentThread().interrupt();
-      throw new IllegalStateException("Thread was interrupted while waiting for lock", e);
-    }
+  public <T, E extends Exception> T withCacheLock(EntityCacheKey key, ThrowingSupplier<T, E> action)
+      throws E {
+    return opLock.withLockAndThrow(key, action);
   }
 
   /** {@inheritDoc} */

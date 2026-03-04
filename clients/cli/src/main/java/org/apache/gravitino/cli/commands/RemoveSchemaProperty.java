@@ -30,9 +30,13 @@ import org.apache.gravitino.exceptions.NoSuchSchemaException;
 /** Remove a property of a schema. */
 public class RemoveSchemaProperty extends Command {
 
+  /** The name of the metalake. */
   protected final String metalake;
+  /** The name of the catalog. */
   protected final String catalog;
+  /** The name of the schema. */
   protected final String schema;
+  /** The name of the property. */
   protected final String property;
 
   /**

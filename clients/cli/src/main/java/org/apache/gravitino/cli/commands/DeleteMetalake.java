@@ -26,8 +26,11 @@ import org.apache.gravitino.client.GravitinoAdminClient;
 import org.apache.gravitino.exceptions.MetalakeInUseException;
 import org.apache.gravitino.exceptions.NoSuchMetalakeException;
 
+/** Represents delete a metalake */
 public class DeleteMetalake extends Command {
+  /** The name of the metalake to delete. */
   protected final String metalake;
+  /** Whether to force the deletion. */
   protected final boolean force;
 
   /**

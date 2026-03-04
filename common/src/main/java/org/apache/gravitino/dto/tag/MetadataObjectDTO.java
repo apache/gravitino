@@ -50,7 +50,9 @@ public class MetadataObjectDTO implements MetadataObject {
     return type;
   }
 
-  /** @return The full name of the metadata object. */
+  /**
+   * @return The full name of the metadata object.
+   */
   @JsonProperty("fullName")
   public String getFullName() {
     return fullName();
@@ -73,7 +75,9 @@ public class MetadataObjectDTO implements MetadataObject {
     }
   }
 
-  /** @return a new builder for constructing a Metadata Object DTO. */
+  /**
+   * @return a new builder for constructing a Metadata Object DTO.
+   */
   public static Builder builder() {
     return new Builder();
   }
@@ -116,7 +120,9 @@ public class MetadataObjectDTO implements MetadataObject {
       return this;
     }
 
-    /** @return The constructed Metadata Object DTO. */
+    /**
+     * @return The constructed Metadata Object DTO.
+     */
     public MetadataObjectDTO build() {
       return metadataObjectDTO;
     }

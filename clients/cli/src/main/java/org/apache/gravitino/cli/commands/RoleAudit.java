@@ -26,9 +26,12 @@ import org.apache.gravitino.client.GravitinoClient;
 import org.apache.gravitino.exceptions.NoSuchMetalakeException;
 import org.apache.gravitino.exceptions.NoSuchRoleException;
 
+/** Represents the audit information of a role. */
 public class RoleAudit extends AuditCommand {
 
+  /** The name of the metalake. */
   protected final String metalake;
+  /** The name of the role. */
   protected final String role;
 
   /**

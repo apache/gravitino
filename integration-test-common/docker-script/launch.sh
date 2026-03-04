@@ -36,14 +36,20 @@ cd ${playground_dir}
 LOG_DIR=../build/trino-ci-container-log
 rm -fr $LOG_DIR
 mkdir -p $LOG_DIR
+LOG_PATH=$LOG_DIR/trino-ci-docker-compose.log
+echo "The docker compose log is: $LOG_PATH"
 
 docker compose up -d
 
-LOG_PATH=$LOG_DIR/trino-ci-docker-compose.log
-
-echo "The docker compose log is: $LOG_PATH"
-
-nohup docker compose logs -f  -t > $LOG_PATH &
+# Stream logs directly to the log file (no console output).
+nohup docker compose logs -f -t | tee -a "$LOG_PATH" &
+LOG_FOLLOW_PID=$!
+cleanup_log_follow() {
+  if [ -n "$LOG_FOLLOW_PID" ] && kill -0 "$LOG_FOLLOW_PID" 2>/dev/null; then
+    kill "$LOG_FOLLOW_PID" >/dev/null 2>&1
+  fi
+}
+trap cleanup_log_follow EXIT
 
 max_attempts=300
 attempts=0

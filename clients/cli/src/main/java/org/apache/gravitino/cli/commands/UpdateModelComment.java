@@ -31,10 +31,15 @@ import org.apache.gravitino.model.ModelChange;
 
 /** Update the comment of a model. */
 public class UpdateModelComment extends Command {
+  /** The metalake name. */
   protected final String metalake;
+  /** The catalog name. */
   protected final String catalog;
+  /** The schema name. */
   protected final String schema;
+  /** The model name. */
   protected final String model;
+  /** The new comment. */
   protected final String comment;
 
   /**

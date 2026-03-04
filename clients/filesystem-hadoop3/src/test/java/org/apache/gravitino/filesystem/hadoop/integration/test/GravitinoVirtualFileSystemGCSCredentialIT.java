@@ -91,9 +91,7 @@ public class GravitinoVirtualFileSystemGCSCredentialIT extends GravitinoVirtualF
     conf.set("fs.gvfs.impl.disable.cache", "true");
     conf.set("fs.gravitino.server.uri", serverUri);
     conf.set("fs.gravitino.client.metalake", metalakeName);
-
-    // Pass this configuration to the real file system
-    conf.set(GCSProperties.GRAVITINO_GCS_SERVICE_ACCOUNT_FILE, SERVICE_ACCOUNT_FILE);
+    conf.set("fs.gravitino.enableCredentialVending", "true");
   }
 
   @AfterAll
@@ -124,6 +122,9 @@ public class GravitinoVirtualFileSystemGCSCredentialIT extends GravitinoVirtualF
     Configuration gcsConf = new Configuration();
     Map<String, String> map = Maps.newHashMap();
 
+    // Pass this configuration to the real file system
+    map.put(GCSProperties.GRAVITINO_GCS_SERVICE_ACCOUNT_FILE, SERVICE_ACCOUNT_FILE);
+
     gvfsConf.forEach(entry -> map.put(entry.getKey(), entry.getValue()));
 
     Map<String, String> hadoopConfMap =
@@ -136,7 +137,7 @@ public class GravitinoVirtualFileSystemGCSCredentialIT extends GravitinoVirtualF
   }
 
   protected String genStorageLocation(String fileset) {
-    return String.format("gs://%s/dir1/dir2/%s/", BUCKET_NAME, fileset);
+    return String.format("gs://%s/dir1/dir2/%s", BUCKET_NAME, fileset);
   }
 
   @Disabled(

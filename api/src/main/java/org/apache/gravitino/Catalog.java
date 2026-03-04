@@ -24,10 +24,12 @@ import org.apache.gravitino.annotation.Evolving;
 import org.apache.gravitino.authorization.SupportsRoles;
 import org.apache.gravitino.credential.SupportsCredentials;
 import org.apache.gravitino.file.FilesetCatalog;
+import org.apache.gravitino.function.FunctionCatalog;
 import org.apache.gravitino.messaging.TopicCatalog;
 import org.apache.gravitino.model.ModelCatalog;
 import org.apache.gravitino.policy.SupportsPolicies;
 import org.apache.gravitino.rel.TableCatalog;
+import org.apache.gravitino.rel.ViewCatalog;
 import org.apache.gravitino.tag.SupportsTags;
 
 /**
@@ -133,6 +135,20 @@ public interface Catalog extends Auditable {
   String PROPERTY_IN_USE = "in-use";
 
   /**
+   * The property name for the catalog location. This property indicates the physical location of
+   * the catalog's data, such as a file path or a URI.
+   *
+   * <p>The location property is optional, it can be specified when creating the catalog.
+   *
+   * <p>It depends on the catalog implementation to decide whether to leverage this property. It
+   * also depends on the catalog implementation to decide whether to allow altering this property
+   * after catalog creation.
+   *
+   * <p>The behavior of altering this property (moving the catalog data) is also catalog specific.
+   */
+  String PROPERTY_LOCATION = "location";
+
+  /**
    * The property to specify the cloud that the catalog is running on. The value should be one of
    * the {@link CloudName}.
    */
@@ -150,13 +166,19 @@ public interface Catalog extends Auditable {
    */
   String AUTHORIZATION_PROVIDER = "authorization-provider";
 
-  /** @return The name of the catalog. */
+  /**
+   * @return The name of the catalog.
+   */
   String name();
 
-  /** @return The type of the catalog. */
+  /**
+   * @return The type of the catalog.
+   */
   Type type();
 
-  /** @return The provider of the catalog. */
+  /**
+   * @return The provider of the catalog.
+   */
   String provider();
 
   /**
@@ -215,6 +237,22 @@ public interface Catalog extends Auditable {
    */
   default ModelCatalog asModelCatalog() throws UnsupportedOperationException {
     throw new UnsupportedOperationException("Catalog does not support model operations");
+  }
+
+  /**
+   * @return the {@link FunctionCatalog} if the catalog supports function operations.
+   * @throws UnsupportedOperationException if the catalog does not support function operations.
+   */
+  default FunctionCatalog asFunctionCatalog() throws UnsupportedOperationException {
+    throw new UnsupportedOperationException("Catalog does not support function operations");
+  }
+
+  /**
+   * @return the {@link ViewCatalog} if the catalog supports view operations.
+   * @throws UnsupportedOperationException if the catalog does not support view operations.
+   */
+  default ViewCatalog asViewCatalog() throws UnsupportedOperationException {
+    throw new UnsupportedOperationException("Catalog does not support view operations");
   }
 
   /**

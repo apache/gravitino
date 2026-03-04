@@ -136,8 +136,7 @@ if [[ "$1" == "finalize" ]]; then
   echo "Uploading Gravitino to PyPi"
   twine upload -u __token__  -p $PYPI_API_TOKEN \
     --repository-url https://upload.pypi.org/legacy/ \
-    "apache_gravitino-$PYGRAVITINO_VERSION.tar.gz" \
-    "apache_gravitino-$PYGRAVITINO_VERSION.tar.gz.asc"
+    "apache_gravitino-$PYGRAVITINO_VERSION.tar.gz"
   echo "Python Gravitino package uploaded"
   rm -fr gravitino
 
@@ -170,7 +169,7 @@ if [ -z "$GRAVITINO_VERSION" ]; then
   GRAVITINO_VERSION=$(cat gradle.properties | parse_version)
 fi
 
-if [ -z "$PYGRAVITINO_VERSION"]; then
+if [ -z "$PYGRAVITINO_VERSION" ]; then
   PYGRAVITINO_VERSION=$(cat clients/client-python/setup.py | grep "version=" | awk -F"\"" '{print $2}')
 fi
 
@@ -248,12 +247,22 @@ if [[ "$1" == "package" ]]; then
       --detach-sig gravitino-iceberg-rest-server-$GRAVITINO_VERSION-bin.tar.gz
     shasum -a 512 gravitino-iceberg-rest-server-$GRAVITINO_VERSION-bin.tar.gz > gravitino-iceberg-rest-server-$GRAVITINO_VERSION-bin.tar.gz.sha512
 
-    echo "Copying and signing Gravitino Trino connector binary distribution"
-    cp gravitino-$GRAVITINO_VERSION-bin/distribution/gravitino-trino-connector-$GRAVITINO_VERSION.tar.gz .
+    echo "Copying and signing Gravitino Lance REST server binary distribution"
+    cp gravitino-$GRAVITINO_VERSION-bin/distribution/gravitino-lance-rest-server-$GRAVITINO_VERSION-bin.tar.gz .
     echo $GPG_PASSPHRASE | $GPG --passphrase-fd 0 --armour \
-      --output gravitino-trino-connector-$GRAVITINO_VERSION.tar.gz.asc \
-      --detach-sig gravitino-trino-connector-$GRAVITINO_VERSION.tar.gz
-    shasum -a 512 gravitino-trino-connector-$GRAVITINO_VERSION.tar.gz > gravitino-trino-connector-$GRAVITINO_VERSION.tar.gz.sha512
+      --output gravitino-lance-rest-server-$GRAVITINO_VERSION-bin.tar.gz.asc \
+      --detach-sig gravitino-lance-rest-server-$GRAVITINO_VERSION-bin.tar.gz
+    shasum -a 512 gravitino-lance-rest-server-$GRAVITINO_VERSION-bin.tar.gz > gravitino-lance-rest-server-$GRAVITINO_VERSION-bin.tar.gz.sha512
+
+    echo "Copying and signing Gravitino Trino connector binary distributions"
+    for trino_tar in gravitino-$GRAVITINO_VERSION-bin/distribution/gravitino-trino-connector-*-$GRAVITINO_VERSION.tar.gz; do
+      trino_connector_name=$(basename "$trino_tar" .tar.gz)
+      cp "$trino_tar" .
+      echo $GPG_PASSPHRASE | $GPG --passphrase-fd 0 --armour \
+        --output ${trino_connector_name}.tar.gz.asc \
+        --detach-sig ${trino_connector_name}.tar.gz
+      shasum -a 512 ${trino_connector_name}.tar.gz > ${trino_connector_name}.tar.gz.sha512
+    done
 
     echo "Copying and signing Gravitino Python client binary distribution"
     cp gravitino-$GRAVITINO_VERSION-bin/clients/client-python/dist/apache_gravitino-$RC_PYGRAVITINO_VERSION.tar.gz .
@@ -271,11 +280,10 @@ if [[ "$1" == "package" ]]; then
       error 'The environment variable PYPI_API_TOKEN is not set. Exiting.'
     fi
 
-    echo "Uploading Gravitino Python package $RC_RC_PYGRAVITINO_VERSION to PyPi"
+    echo "Uploading Gravitino Python package $RC_PYGRAVITINO_VERSION to PyPi"
     twine upload -u __token__  -p $PYPI_API_TOKEN \
       --repository-url https://upload.pypi.org/legacy/ \
-      "apache_gravitino-$RC_PYGRAVITINO_VERSION.tar.gz" \
-      "apache_gravitino-$RC_PYGRAVITINO_VERSION.tar.gz.asc"
+      "apache_gravitino-$RC_PYGRAVITINO_VERSION.tar.gz"
 
     svn co --depth=empty $RELEASE_STAGING_LOCATION svn-gravitino
     rm -rf "svn-gravitino/${DEST_DIR_NAME}"

@@ -26,7 +26,9 @@ import org.apache.gravitino.rel.expressions.Expression;
 @Evolving
 public interface Distribution extends Expression {
 
-  /** @return the distribution strategy name. */
+  /**
+   * @return the distribution strategy name.
+   */
   Strategy strategy();
 
   /**
@@ -35,7 +37,9 @@ public interface Distribution extends Expression {
    */
   int number();
 
-  /** @return The expressions passed to the distribution function. */
+  /**
+   * @return The expressions passed to the distribution function.
+   */
   Expression[] expressions();
 
   @Override

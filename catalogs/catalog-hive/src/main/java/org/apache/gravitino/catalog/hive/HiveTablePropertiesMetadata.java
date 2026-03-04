@@ -18,6 +18,18 @@
  */
 package org.apache.gravitino.catalog.hive;
 
+import static org.apache.gravitino.catalog.hive.HiveConstants.COMMENT;
+import static org.apache.gravitino.catalog.hive.HiveConstants.EXTERNAL;
+import static org.apache.gravitino.catalog.hive.HiveConstants.FORMAT;
+import static org.apache.gravitino.catalog.hive.HiveConstants.INPUT_FORMAT;
+import static org.apache.gravitino.catalog.hive.HiveConstants.LOCATION;
+import static org.apache.gravitino.catalog.hive.HiveConstants.NUM_FILES;
+import static org.apache.gravitino.catalog.hive.HiveConstants.OUTPUT_FORMAT;
+import static org.apache.gravitino.catalog.hive.HiveConstants.SERDE_LIB;
+import static org.apache.gravitino.catalog.hive.HiveConstants.SERDE_NAME;
+import static org.apache.gravitino.catalog.hive.HiveConstants.TABLE_TYPE;
+import static org.apache.gravitino.catalog.hive.HiveConstants.TOTAL_SIZE;
+import static org.apache.gravitino.catalog.hive.HiveConstants.TRANSIENT_LAST_DDL_TIME;
 import static org.apache.gravitino.connector.PropertyEntry.booleanReservedPropertyEntry;
 import static org.apache.gravitino.connector.PropertyEntry.enumImmutablePropertyEntry;
 import static org.apache.gravitino.connector.PropertyEntry.stringImmutablePropertyEntry;
@@ -31,19 +43,6 @@ import org.apache.gravitino.connector.BasePropertiesMetadata;
 import org.apache.gravitino.connector.PropertyEntry;
 
 public class HiveTablePropertiesMetadata extends BasePropertiesMetadata {
-  public static final String COMMENT = HiveConstants.COMMENT;
-  public static final String NUM_FILES = HiveConstants.NUM_FILES;
-  public static final String TOTAL_SIZE = HiveConstants.TOTAL_SIZE;
-  public static final String EXTERNAL = HiveConstants.EXTERNAL;
-  public static final String LOCATION = HiveConstants.LOCATION;
-  public static final String FORMAT = HiveConstants.FORMAT;
-  public static final String TABLE_TYPE = HiveConstants.TABLE_TYPE;
-  public static final String INPUT_FORMAT = HiveConstants.INPUT_FORMAT;
-  public static final String OUTPUT_FORMAT = HiveConstants.OUTPUT_FORMAT;
-  public static final String SERDE_NAME = HiveConstants.SERDE_NAME;
-  public static final String SERDE_LIB = HiveConstants.SERDE_LIB;
-  public static final String SERDE_PARAMETER_PREFIX = HiveConstants.SERDE_PARAMETER_PREFIX;
-  public static final String TRANSIENT_LAST_DDL_TIME = HiveConstants.TRANSIENT_LAST_DDL_TIME;
 
   private static final Map<String, PropertyEntry<?>> propertiesMetadata;
 

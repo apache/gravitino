@@ -81,3 +81,12 @@ Return the proper MySQL image name for the init-mysql initContainer
   {{- include "common.images.image" (dict "imageRoot" .Values.mysql.image "global" .Values.global) -}}
 {{- end -}}
 {{- end -}}
+
+{{/*
+Return the proper Postgresql image name for the init-postgresql initContainer
+*/}}
+{{- define "init-postgresql.image" -}}
+{{- if .Values.postgresql.enabled -}}
+  {{- include "common.images.image" (dict "imageRoot" .Values.postgresql.image "global" .Values.global) -}}
+{{- end -}}
+{{- end -}}

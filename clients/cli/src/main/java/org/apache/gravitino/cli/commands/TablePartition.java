@@ -27,7 +27,9 @@ import org.apache.gravitino.rel.partitions.Partition;
 /** Displays the details of a table's partition. */
 public class TablePartition extends TableCommand {
 
+  /** The name of the schema. */
   protected final String schema;
+  /** The name of the table. */
   protected final String table;
 
   /**

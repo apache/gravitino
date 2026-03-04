@@ -45,38 +45,50 @@ public abstract class BaseFileset implements Fileset {
 
   protected AuditInfo auditInfo;
 
-  /** @return The name of the fileset. */
+  /**
+   * @return The name of the fileset.
+   */
   @Override
   public String name() {
     return name;
   }
 
-  /** @return The comment or description for the fileset. */
+  /**
+   * @return The comment or description for the fileset.
+   */
   @Nullable
   @Override
   public String comment() {
     return comment;
   }
 
-  /** @return The {@link Type} of the fileset. */
+  /**
+   * @return The {@link Type} of the fileset.
+   */
   @Override
   public Type type() {
     return type;
   }
 
-  /** @return The storage locations of the fileset. */
+  /**
+   * @return The storage locations of the fileset.
+   */
   @Override
   public Map<String, String> storageLocations() {
     return storageLocations;
   }
 
-  /** @return The audit information for the fileset. */
+  /**
+   * @return The audit information for the fileset.
+   */
   @Override
   public AuditInfo auditInfo() {
     return auditInfo;
   }
 
-  /** @return The associated properties of the fileset. */
+  /**
+   * @return The associated properties of the fileset.
+   */
   @Nullable
   @Override
   public Map<String, String> properties() {

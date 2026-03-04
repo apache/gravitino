@@ -30,9 +30,10 @@ import org.apache.gravitino.cli.ErrorMessages;
 import org.apache.gravitino.client.GravitinoClient;
 import org.apache.gravitino.exceptions.NoSuchMetalakeException;
 
-/* Lists all roles in a metalake. */
+/** Lists all roles in a metalake. */
 public class ListRoles extends Command {
 
+  /** The name of the metalake. */
   protected String metalake;
 
   /**

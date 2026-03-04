@@ -80,6 +80,7 @@ public class SchemaAuthorizationIT extends BaseRestApiAuthorizationIT {
         () -> {
           normalUserClient.loadMetalake(METALAKE).loadCatalog(CATALOG);
         });
+
     // grant tester load catalog privilege
     List<SecurableObject> securableObjects = new ArrayList<>();
     GravitinoMetalake gravitinoMetalake = client.loadMetalake(METALAKE);
@@ -108,6 +109,7 @@ public class SchemaAuthorizationIT extends BaseRestApiAuthorizationIT {
         () -> {
           catalogEntityLoadByTester2.asSchemas().createSchema("schema2", "test2", new HashMap<>());
         });
+
     GravitinoMetalake gravitinoMetalake = client.loadMetalake(METALAKE);
     // test grant create schema privilege
     gravitinoMetalake.grantPrivilegesToRole(

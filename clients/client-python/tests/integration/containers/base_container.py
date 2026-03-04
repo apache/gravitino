@@ -16,6 +16,7 @@
 # under the License.
 
 import logging
+import os
 from typing import Dict
 
 import docker
@@ -89,6 +90,44 @@ class BaseContainer:
 
     def get_ip(self):
         return self._ip
+
+    def get_tar_from_docker(self, src_path: str, dest_path: str):
+        """Copies a file or directory from the container to the host as a tar archive.
+
+        Args:
+            src_path: The source path inside the container.
+            dest_path: The destination file path on the host for the tar archive.
+        """
+        if self._container is None:
+            raise GravitinoRuntimeException(
+                f"The container {self._container_name} has not been initialized."
+            )
+
+        try:
+            bits, stat = self._container.get_archive(src_path)
+
+            if os.path.isdir(dest_path):
+                base_name = os.path.basename(src_path.strip("/"))
+                dest_file_path = os.path.join(dest_path, f"{base_name}.tar")
+            else:
+                dest_file_path = dest_path
+
+            # Write the tar stream directly to the destination file.
+            with open(dest_file_path, "wb") as f:
+                for chunk in bits:
+                    f.write(chunk)
+
+            logger.info(
+                f"Successfully copied '{src_path}' from container '{self._container_name}' to '{dest_file_path}'."
+            )
+
+        except Exception as e:
+            logger.error(
+                f"Failed to copy '{src_path}' from container '{self._container_name}' to '{dest_path}': {e}"
+            )
+            raise GravitinoRuntimeException(
+                f"Failed to copy directory from container: {e}"
+            ) from e
 
     def close(self):
         try:

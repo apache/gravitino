@@ -111,6 +111,7 @@ public class TestOwnerManager {
     Mockito.when(config.get(Configs.CACHE_WEIGHER_ENABLED)).thenReturn(true);
     Mockito.when(config.get(Configs.CACHE_STATS_ENABLED)).thenReturn(false);
     Mockito.when(config.get(Configs.CACHE_IMPLEMENTATION)).thenReturn("caffeine");
+    Mockito.when(config.get(Configs.CACHE_LOCK_SEGMENTS)).thenReturn(16);
 
     Mockito.doReturn(100000L).when(config).get(TREE_LOCK_MAX_NODE_IN_MEMORY);
     Mockito.doReturn(1000L).when(config).get(TREE_LOCK_MIN_NODE_IN_MEMORY);
@@ -197,18 +198,25 @@ public class TestOwnerManager {
     Assertions.assertEquals(USER, owner.name());
     Assertions.assertEquals(Owner.Type.USER, owner.type());
 
-    // Test to set the group as the owner
-    Mockito.reset(authorizationPlugin);
-    ownerManager.setOwner(METALAKE, metalakeObject, GROUP, Owner.Type.GROUP);
-    Mockito.verify(authorizationPlugin).onOwnerSet(Mockito.any(), Mockito.any(), Mockito.any());
-
-    // Test not-existed metadata object
+    // Test not-existed metadata object when setting owner
     Assertions.assertThrows(
         NotFoundException.class,
-        () -> ownerManager.setOwner(METALAKE, notExistObject, GROUP, Owner.Type.GROUP));
+        () -> ownerManager.setOwner(METALAKE, notExistObject, USER, Owner.Type.USER));
+  }
 
-    owner = ownerManager.getOwner(METALAKE, metalakeObject).get();
-    Assertions.assertEquals(GROUP, owner.name());
-    Assertions.assertEquals(Owner.Type.GROUP, owner.type());
+  @Test
+  public void testGroupTypeOwnerNotSupported() {
+    // Test that GROUP type owner is not supported and throws IllegalArgumentException
+    MetadataObject metalakeObject =
+        MetadataObjects.of(Lists.newArrayList(METALAKE), MetadataObject.Type.METALAKE);
+
+    // Verify that setting GROUP type owner throws IllegalArgumentException
+    IllegalArgumentException exception =
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () -> ownerManager.setOwner(METALAKE, metalakeObject, GROUP, Owner.Type.GROUP));
+
+    Assertions.assertEquals(
+        "Only USER type is supported as owner currently.", exception.getMessage());
   }
 }

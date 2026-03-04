@@ -29,20 +29,27 @@ include("api", "common", "core", "server", "server-common")
 include("catalogs:catalog-common")
 include("catalogs:catalog-hive")
 include("catalogs:hive-metastore-common")
+include("catalogs:hive-metastore2-libs", "catalogs:hive-metastore3-libs")
 include("catalogs:catalog-lakehouse-iceberg")
 include("catalogs:catalog-lakehouse-paimon")
 include("catalogs:catalog-lakehouse-hudi")
+include("catalogs:catalog-lakehouse-generic")
 include(
   "catalogs:catalog-jdbc-common",
   "catalogs:catalog-jdbc-doris",
   "catalogs:catalog-jdbc-mysql",
   "catalogs:catalog-jdbc-postgresql",
-  "catalogs:catalog-jdbc-oceanbase",
   "catalogs:catalog-jdbc-starrocks"
 )
+
 include("catalogs:catalog-fileset")
 include("catalogs:catalog-kafka")
 include("catalogs:catalog-model")
+
+include("catalogs-contrib:catalog-jdbc-clickhouse")
+include("catalogs-contrib:catalog-jdbc-hologres")
+include("catalogs-contrib:catalog-jdbc-oceanbase")
+
 include(
   "clients:client-java",
   "clients:client-java-runtime",
@@ -58,8 +65,18 @@ if (gradle.startParameter.projectProperties["enableFuse"]?.toBoolean() == true) 
 }
 include("iceberg:iceberg-common")
 include("iceberg:iceberg-rest-server")
+include("lance:lance-common")
+include("lance:lance-rest-server")
 include("authorizations:authorization-ranger", "authorizations:authorization-common", "authorizations:authorization-chain")
-include("trino-connector:trino-connector", "trino-connector:integration-test")
+include(
+  "trino-connector:trino-connector",
+  "trino-connector:trino-connector-435-439",
+  "trino-connector:trino-connector-440-445",
+  "trino-connector:trino-connector-446-451",
+  "trino-connector:trino-connector-452-468",
+  "trino-connector:trino-connector-469-472",
+  "trino-connector:integration-test"
+)
 include("spark-connector:spark-common")
 if (scalaVersion == "2.12") {
   // flink only support scala 2.12
@@ -75,12 +92,14 @@ project(":spark-connector:spark-runtime-3.4").projectDir = file("spark-connector
 project(":spark-connector:spark-3.5").projectDir = file("spark-connector/v3.5/spark")
 project(":spark-connector:spark-runtime-3.5").projectDir = file("spark-connector/v3.5/spark-runtime")
 include("web:web", "web:integration-test")
+include("web-v2:web", "web-v2:integration-test")
 include("docs")
 include("integration-test-common")
-include(":bundles:aws", ":bundles:aws-bundle")
-include(":bundles:gcp", ":bundles:gcp-bundle")
-include(":bundles:aliyun", ":bundles:aliyun-bundle")
-include(":bundles:azure", ":bundles:azure-bundle")
+include(":bundles:aws", ":bundles:aws-bundle", ":bundles:iceberg-aws-bundle")
+include(":bundles:gcp", ":bundles:gcp-bundle", ":bundles:iceberg-gcp-bundle")
+include(":bundles:aliyun", ":bundles:aliyun-bundle", ":bundles:iceberg-aliyun-bundle")
+include(":bundles:azure", ":bundles:azure-bundle", ":bundles:iceberg-azure-bundle")
 include(":catalogs:hadoop-common")
 include(":lineage")
 include(":mcp-server")
+include(":maintenance:optimizer", ":maintenance:jobs")

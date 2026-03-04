@@ -59,6 +59,13 @@ public class TableMetaSQLProviderFactory {
     return getProvider().listTablePOsByTableIds(tableIds);
   }
 
+  public static String listTablePOsByFullQualifiedName(
+      @Param("metalakeName") String metalakeName,
+      @Param("catalogName") String catalogName,
+      @Param("schemaName") String schemaName) {
+    return getProvider().listTablePOsByFullQualifiedName(metalakeName, catalogName, schemaName);
+  }
+
   public static String selectTableIdBySchemaIdAndName(
       @Param("schemaId") Long schemaId, @Param("tableName") String name) {
     return getProvider().selectTableIdBySchemaIdAndName(schemaId, name);
@@ -67,6 +74,15 @@ public class TableMetaSQLProviderFactory {
   public static String selectTableMetaBySchemaIdAndName(
       @Param("schemaId") Long schemaId, @Param("tableName") String name) {
     return getProvider().selectTableMetaBySchemaIdAndName(schemaId, name);
+  }
+
+  public static String selectTableByFullQualifiedName(
+      @Param("metalakeName") String metalakeName,
+      @Param("catalogName") String catalogName,
+      @Param("schemaName") String schemaName,
+      @Param("tableName") String tableName) {
+    return getProvider()
+        .selectTableByFullQualifiedName(metalakeName, catalogName, schemaName, tableName);
   }
 
   public static String selectTableMetaById(@Param("tableId") Long tableId) {
@@ -82,8 +98,10 @@ public class TableMetaSQLProviderFactory {
   }
 
   public static String updateTableMeta(
-      @Param("newTableMeta") TablePO newTablePO, @Param("oldTableMeta") TablePO oldTablePO) {
-    return getProvider().updateTableMeta(newTablePO, oldTablePO);
+      @Param("newTableMeta") TablePO newTablePO,
+      @Param("oldTableMeta") TablePO oldTablePO,
+      @Param("newSchemaId") Long newSchemaId) {
+    return getProvider().updateTableMeta(newTablePO, oldTablePO, newSchemaId);
   }
 
   public static String softDeleteTableMetasByTableId(@Param("tableId") Long tableId) {
@@ -105,5 +123,10 @@ public class TableMetaSQLProviderFactory {
   public static String deleteTableMetasByLegacyTimeline(
       @Param("legacyTimeline") Long legacyTimeline, @Param("limit") int limit) {
     return getProvider().deleteTableMetasByLegacyTimeline(legacyTimeline, limit);
+  }
+
+  public static String batchSelectTableByIdentifier(
+      @Param("schemaId") Long schemaId, @Param("tableNames") List<String> tableNames) {
+    return getProvider().batchSelectTableByIdentifier(schemaId, tableNames);
   }
 }

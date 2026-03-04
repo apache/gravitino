@@ -234,10 +234,72 @@ table.dropPartitionStatistics(statisticsToDrop);
 
 ### Server configuration
 
-| Configuration item                                  | Description                                                                                                                                                                                                                          | Default value                                                              | Required                                        | Since version |
-|-----------------------------------------------------|--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|----------------------------------------------------------------------------|-------------------------------------------------|---------------|
-| `gravitino.stats.partition.storageFactoryClass`     | The storage factory class for partition statistics, which is used to store partition statistics in the different storage. The `org.apache.gravitino.stats.storage.MemoryPartitionStatsStorageFactory`  can only be used for testing. | `org.apache.gravitino.stats.storage.LancePartitionStatisticStorageFactory` |  No                                             | 1.0.0         |
+| Configuration item                              | Description                                                                                                                                                                                                                          | Default value                                                            | Required  | Since version |
+|-------------------------------------------------|--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|--------------------------------------------------------------------------|-----------|---------------|
+| `gravitino.stats.partition.storageFactoryClass` | The storage factory class for partition statistics, which is used to store partition statistics in the different storage. The `org.apache.gravitino.stats.storage.MemoryPartitionStatsStorageFactory`  can only be used for testing. | `org.apache.gravitino.stats.storage.JdbcPartitionStatisticStorageFactory` |  No       | 1.0.0         |
 
+
+#### JDBC Storage (Default)
+
+Starting from version 1.2.0, Gravitino uses JDBC-based storage as the default partition statistics storage backend.
+This provides a reliable, production-ready solution that supports multiple database backends:
+
+- **MySQL** (recommended for production)
+- **PostgreSQL**
+- **H2** (suitable for testing and development)
+
+To use JDBC storage, configure the following options by adding the prefix `gravitino.stats.partition.storageOption.`:
+
+| Configuration item                                              | Description                                                        | Default value              | Required | Since version |
+|-----------------------------------------------------------------|--------------------------------------------------------------------|----------------------------|----------|---------------|
+| `gravitino.stats.partition.storageOption.jdbcUrl`               | JDBC connection URL (e.g., jdbc:mysql://localhost:3306/gravitino) | None                       | Yes      | 1.2.0         |
+| `gravitino.stats.partition.storageOption.jdbcUser`              | Database username                                                  | None                       | Yes      | 1.2.0         |
+| `gravitino.stats.partition.storageOption.jdbcPassword`          | Database password                                                  | None                       | Yes      | 1.2.0         |
+| `gravitino.stats.partition.storageOption.jdbcDriver`            | JDBC driver class name                                             | `com.mysql.cj.jdbc.Driver` | No       | 1.2.0         |
+| `gravitino.stats.partition.storageOption.poolMaxSize`           | Maximum connection pool size                                       | `10`                       | No       | 1.2.0         |
+| `gravitino.stats.partition.storageOption.poolMinIdle`           | Minimum idle connections in pool                                   | `2`                        | No       | 1.2.0         |
+| `gravitino.stats.partition.storageOption.connectionTimeoutMs`   | Connection timeout in milliseconds                                 | `30000`                    | No       | 1.2.0         |
+| `gravitino.stats.partition.storageOption.testOnBorrow`          | Test connections before use                                        | `true`                     | No       | 1.2.0         |
+
+**Example MySQL Configuration:**
+
+```properties
+gravitino.stats.partition.storageFactoryClass = org.apache.gravitino.stats.storage.JdbcPartitionStatisticStorageFactory
+gravitino.stats.partition.storageOption.jdbcUrl = jdbc:mysql://localhost:3306/gravitino
+gravitino.stats.partition.storageOption.jdbcUser = gravitino
+gravitino.stats.partition.storageOption.jdbcPassword = gravitino123
+gravitino.stats.partition.storageOption.poolMaxSize = 20
+```
+
+**Example PostgreSQL Configuration:**
+
+```properties
+gravitino.stats.partition.storageFactoryClass = org.apache.gravitino.stats.storage.JdbcPartitionStatisticStorageFactory
+gravitino.stats.partition.storageOption.jdbcUrl = jdbc:postgresql://localhost:5432/gravitino
+gravitino.stats.partition.storageOption.jdbcUser = gravitino
+gravitino.stats.partition.storageOption.jdbcPassword = gravitino123
+gravitino.stats.partition.storageOption.jdbcDriver = org.postgresql.Driver
+```
+
+**Database Schema Setup:**
+
+Before using JDBC storage, you need to create the database schema. Schema files are provided for all supported databases:
+
+- MySQL: `scripts/mysql/schema-${GRAVITINO_VERSION}-mysql.sql`
+- PostgreSQL: `scripts/postgresql/schema-${GRAVITINO_VERSION}-postgresql.sql`
+- H2: `scripts/h2/schema-${GRAVITINO_VERSION}-h2.sql`
+
+For MySQL:
+```bash
+mysql -u root -p < scripts/mysql/schema-${GRAVITINO_VERSION}-mysql.sql
+```
+
+For PostgreSQL:
+```bash
+psql -U postgres -d gravitino -f scripts/postgresql/schema-${GRAVITINO_VERSION}-postgresql.sql
+```
+
+#### Lance Storage (Alternative)
 
 If you use [Lance](https://lancedb.github.io/lance/) as the partition statistics storage, you can set the options below, if you have other lance storage options, you can pass it by adding prefix `gravitino.stats.partition.storageOption.`.
 For example, if you set an extra property `foo` to `bar` for Lance storage option, you can add a configuration item `gravitino.stats.partition.storageOption.foo` with value `bar`.
@@ -245,15 +307,28 @@ For example, if you set an extra property `foo` to `bar` for Lance storage optio
 For Lance remote storage, you can refer to the document [here](https://lancedb.github.io/lance/usage/storage/).
 
 
-| Configuration item                                        | Description                          | Default value                  | Required                                        | Since version |
-|-----------------------------------------------------------|--------------------------------------|--------------------------------|-------------------------------------------------|---------------|
-| `gravitino.stats.partition.storageOption.location`        | The location of Lance files          | `${GRAVITINO_HOME}/data/lance` | No                                              | 1.0.0         |
-| `gravitino.stats.partition.storageOption.maxRowsPerFile`  | The maximum rows per file            | `1000000`                      | No                                              | 1.0.0         |
-| `gravitino.stats.partition.storageOption.maxBytesPerFile` | The maximum bytes per file           | `104857600`                    | No                                              | 1.0.0         |
-| `gravitino.stats.partition.storageOption.maxRowsPerGroup` | The maximum rows per group           | `1000000`                      | No                                              | 1.0.0         |
-| `gravitino.stats.partition.storageOption.readBatchSize`   | The batch record number when reading | `10000`                        | No                                              | 1.0.0         |
+| Configuration item                                                   | Description                                                | Default value                        | Required | Since version |
+|----------------------------------------------------------------------|------------------------------------------------------------|--------------------------------------|----------|---------------|
+| `gravitino.stats.partition.storageOption.location`                   | The location of Lance files                                | `${GRAVITINO_HOME}/data/lance`       | No       | 1.0.0         |
+| `gravitino.stats.partition.storageOption.maxRowsPerFile`             | The maximum rows per file                                  | `1000000`                            | No       | 1.0.0         |
+| `gravitino.stats.partition.storageOption.maxBytesPerFile`            | The maximum bytes per file                                 | `104857600`                          | No       | 1.0.0         |
+| `gravitino.stats.partition.storageOption.maxRowsPerGroup`            | The maximum rows per group                                 | `1000000`                            | No       | 1.0.0         |
+| `gravitino.stats.partition.storageOption.readBatchSize`              | The batch record number when reading                       | `10000`                              | No       | 1.0.0         |
+| `gravitino.stats.partition.storageOption.datasetCacheSize`           | size of dataset cache for Lance                            | `0`, It means we don't use the cache | No       | 1.0.0         |
+| `gravitino.stats.partition.storageOption.metadataFileCacheSizeBytes` | The Lance's metadata file cache size                       | `102400`                             | No       | 1.0.0         |
+| `gravitino.stats.partition.storageOption.indexCacheSizeBytes`        | The Lance's index cache size                               | `102400`                             | No       | 1.0.0         |
+| `gravitino.stats.partition.storageOption.maxStatisticsPerUpdate`     | Maximum number of statistics allowed per update operation  | `100`                                | No       | 1.2.0         |
 
-### Implementation a custom partition storage
+If you have many tables with a small number of partitions, you should set a smaller metadataFileCacheSizeBytes and indexCacheSizeBytes.
+
+**To use Lance storage, configure:**
+
+```properties
+gravitino.stats.partition.storageFactoryClass = org.apache.gravitino.stats.storage.LancePartitionStatisticStorageFactory
+gravitino.stats.partition.storageOption.location = /data/lance
+```
+
+### Implement a custom partition storage
 
 You can implement a custom partition storage by implementing the interface `org.apache.gravitino.stats.storage.PartitionStatisticStorageFactory` and
 setting the configuration item `gravitino.stats.partition.storageFactoryClass` to your class name.

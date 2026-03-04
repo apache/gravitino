@@ -26,6 +26,7 @@ import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.Map;
+import org.apache.commons.io.FileUtils;
 import org.apache.gravitino.Catalog;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
@@ -40,7 +41,6 @@ import org.apache.gravitino.rel.TableCatalog;
 import org.junit.jupiter.api.Assertions;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.testcontainers.shaded.org.apache.commons.io.FileUtils;
 
 public class TrinoQueryITBase {
   private static final Logger LOG = LoggerFactory.getLogger(TrinoQueryITBase.class);
@@ -70,6 +70,20 @@ public class TrinoQueryITBase {
 
   private static BaseIT baseIT;
 
+  protected Integer trinoWorkerNum;
+
+  protected Integer trinoVersion;
+
+  protected String trinoConnectorDir;
+
+  public TrinoQueryITBase() {}
+
+  public TrinoQueryITBase(Integer trinoWorkerNum, Integer trinoVersion, String trinoConnectorDir) {
+    this.trinoWorkerNum = trinoWorkerNum;
+    this.trinoVersion = trinoVersion;
+    this.trinoConnectorDir = trinoConnectorDir;
+  }
+
   private void setEnv() throws Exception {
     baseIT = new BaseIT();
     if (autoStart) {
@@ -78,7 +92,27 @@ public class TrinoQueryITBase {
       gravitinoUri = String.format("http://127.0.0.1:%d", baseIT.getGravitinoServerPort());
 
       trinoITContainers = ContainerSuite.getTrinoITContainers();
-      trinoITContainers.launch(baseIT.getGravitinoServerPort());
+
+      /**
+       * When connecting to a Hive metastore version 3.x, the Hive connector supports reading from
+       * and writing to insert-only and ACID tables, with full support for partitioning and
+       * bucketing
+       */
+      String hiveRuntimeVersion = "hive3";
+
+      /**
+       * Only Trino connector test will create Hive ACID table when deploy Hive with
+       * `/integration-test-common/docker-script/init/hive/init.sh`
+       */
+      Boolean isTrinoConnectorTest = true;
+
+      trinoITContainers.launch(
+          baseIT.getGravitinoServerPort(),
+          hiveRuntimeVersion,
+          isTrinoConnectorTest,
+          trinoWorkerNum,
+          trinoVersion,
+          trinoConnectorDir);
 
       trinoUri = trinoITContainers.getTrinoUri();
       hiveMetastoreUri = trinoITContainers.getHiveMetastoreUri();
@@ -116,7 +150,7 @@ public class TrinoQueryITBase {
     try {
       if (autoStart) {
         if (trinoITContainers != null) trinoITContainers.shutdown();
-        baseIT.stopIntegrationTest();
+        if (baseIT != null) baseIT.stopIntegrationTest();
       }
     } catch (Exception e) {
       LOG.error("Error in cleanup", e);
@@ -243,11 +277,18 @@ public class TrinoQueryITBase {
     }
   }
 
-  public static String[] listDirectory(String dirname) throws Exception {
+  public static String[] listTestSetDirectory(String dirname) throws Exception {
     File dir = new File(dirname);
-    if (dir.exists()) {
-      return dir.list();
+    if (!dir.exists()) {
+      throw new Exception("Test queries directory " + dirname + " does not exist");
     }
-    throw new Exception("Test queries directory " + dirname + " does not exist");
+    if (!dir.isDirectory()) {
+      throw new Exception("Path " + dirname + " is not a directory");
+    }
+    String[] files = dir.list();
+    if (files == null) {
+      throw new Exception("Failed to list directory " + dirname + " (I/O error)");
+    }
+    return files;
   }
 }

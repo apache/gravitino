@@ -26,9 +26,12 @@ import org.apache.gravitino.client.GravitinoClient;
 import org.apache.gravitino.exceptions.NoSuchMetalakeException;
 import org.apache.gravitino.exceptions.NoSuchUserException;
 
+/** Represents the "user audit" command. */
 public class UserAudit extends AuditCommand {
 
+  /** The name of the metalake. */
   protected final String metalake;
+  /** The name of the user. */
   protected final String user;
 
   /**

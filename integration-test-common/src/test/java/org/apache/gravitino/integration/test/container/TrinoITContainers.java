@@ -18,6 +18,8 @@
  */
 package org.apache.gravitino.integration.test.container;
 
+import com.google.common.collect.ImmutableSet;
+import java.io.File;
 import java.util.HashMap;
 import java.util.Map;
 import org.apache.gravitino.integration.test.util.CommandExecutor;
@@ -27,7 +29,6 @@ import org.apache.logging.log4j.util.Strings;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.testcontainers.containers.ContainerLaunchException;
-import org.testcontainers.shaded.com.google.common.collect.ImmutableSet;
 
 public class TrinoITContainers implements AutoCloseable {
   private static final Logger LOG = LoggerFactory.getLogger(TrinoITContainers.class);
@@ -49,14 +50,43 @@ public class TrinoITContainers implements AutoCloseable {
   }
 
   public void launch(int gravitinoServerPort) throws Exception {
+    launch(gravitinoServerPort, "hive2", false, null, null, null);
+  }
+
+  public void launch(
+      int gravitinoServerPort,
+      String hiveRuntimeVersion,
+      boolean isTrinoConnectorTest,
+      Integer trinoWorkerNum,
+      Integer trinoVersion,
+      String trinoConnectorDir)
+      throws Exception {
     shutdown();
 
     Map<String, String> env = new HashMap<>();
+    if (trinoWorkerNum != null) {
+      env.put("TRINO_WORKER_NUM", String.valueOf(trinoWorkerNum));
+    }
+    if (trinoVersion != null) {
+      env.put("TRINO_VERSION", String.valueOf(trinoVersion));
+    }
+    if (trinoConnectorDir != null) {
+      File dir = new File(trinoConnectorDir);
+      if (!dir.exists() || !dir.isDirectory() || dir.list().length == 0) {
+        throw new Exception(
+            "Gravitino trino connector directory %s does not exist or is empty"
+                .formatted(trinoConnectorDir));
+      }
+      env.put("GRAVITINO_TRINO_CONNECTOR_DIR", trinoConnectorDir);
+    }
     env.put("GRAVITINO_SERVER_PORT", String.valueOf(gravitinoServerPort));
+    env.put("HIVE_RUNTIME_VERSION", hiveRuntimeVersion);
+    env.put("TRINO_CONNECTOR_TEST", String.valueOf(isTrinoConnectorTest));
     if (System.getProperty("gravitino.log.path") != null) {
       env.put("GRAVITINO_LOG_PATH", System.getProperty("gravitino.log.path"));
     }
 
+    LOG.info("Launching containers with env: {}", env);
     String command = ITUtils.joinPath(dockerComposeDir, "launch.sh");
     Object output =
         CommandExecutor.executeCommandLocalHost(

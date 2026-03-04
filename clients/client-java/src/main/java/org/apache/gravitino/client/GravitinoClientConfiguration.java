@@ -44,8 +44,31 @@ public class GravitinoClientConfiguration {
   /** An optional http socket timeout in milliseconds. */
   public static final String CLIENT_SOCKET_TIMEOUT_MS = "gravitino.client.socketTimeoutMs";
 
+  /**
+   * A default value for max total HTTP connections in the connection pool. This is the same as the
+   * default value of Apache HttpClient 5.x
+   */
+  public static final int CLIENT_MAX_CONNECTIONS_DEFAULT = 25;
+
+  /** An optional max total HTTP connections. */
+  public static final String CLIENT_MAX_CONNECTIONS = "gravitino.client.maxConnections";
+
+  /**
+   * A default value for max HTTP connections per route. This is the same as the default value of
+   * Apache HttpClient 5.x
+   */
+  public static final int CLIENT_MAX_CONNECTIONS_PER_ROUTE_DEFAULT = 5;
+
+  /** An optional max HTTP connections per route. */
+  public static final String CLIENT_MAX_CONNECTIONS_PER_ROUTE =
+      "gravitino.client.maxConnectionsPerRoute";
+
   private static final Set<String> SUPPORT_CLIENT_CONFIG_KEYS =
-      ImmutableSet.of(CLIENT_CONNECTION_TIMEOUT_MS, CLIENT_SOCKET_TIMEOUT_MS);
+      ImmutableSet.of(
+          CLIENT_CONNECTION_TIMEOUT_MS,
+          CLIENT_SOCKET_TIMEOUT_MS,
+          CLIENT_MAX_CONNECTIONS,
+          CLIENT_MAX_CONNECTIONS_PER_ROUTE);
 
   private Map<String, String> properties;
 
@@ -65,7 +88,9 @@ public class GravitinoClientConfiguration {
         throw new IllegalArgumentException(String.format("Invalid property for client: %s", key));
       }
     }
-    return new GravitinoClientConfiguration(properties);
+    GravitinoClientConfiguration config = new GravitinoClientConfiguration(properties);
+    config.validateConnectionPoolSettings();
+    return config;
   }
 
   /**
@@ -102,11 +127,63 @@ public class GravitinoClientConfiguration {
     return socketTimeoutMillis;
   }
 
+  /**
+   * Extract max total connections from the properties map
+   *
+   * @return max total connections in the HTTP connection pool
+   */
+  public int getClientMaxConnections() {
+    int maxConnections =
+        MapUtils.propertyAsInt(properties, CLIENT_MAX_CONNECTIONS, CLIENT_MAX_CONNECTIONS_DEFAULT);
+    checkValue(
+        value -> value > 0, CLIENT_MAX_CONNECTIONS, maxConnections, POSITIVE_NUMBER_ERROR_MSG);
+    return maxConnections;
+  }
+
+  /**
+   * Extract max connections per route from the properties map
+   *
+   * @return max connections per route in the HTTP connection pool
+   */
+  public int getClientMaxConnectionsPerRoute() {
+    int maxConnectionsPerRoute =
+        MapUtils.propertyAsInt(
+            properties, CLIENT_MAX_CONNECTIONS_PER_ROUTE, CLIENT_MAX_CONNECTIONS_PER_ROUTE_DEFAULT);
+    checkValue(
+        value -> value > 0,
+        CLIENT_MAX_CONNECTIONS_PER_ROUTE,
+        maxConnectionsPerRoute,
+        POSITIVE_NUMBER_ERROR_MSG);
+    return maxConnectionsPerRoute;
+  }
+
   private static <T> void checkValue(
       Function<T, Boolean> checkValueFunc, String key, T value, String errorMsg) {
     if (!checkValueFunc.apply(value)) {
       throw new IllegalArgumentException(
           String.format("%s in %s is invalid. %s", value, key, errorMsg));
+    }
+  }
+
+  /**
+   * Validate the relationship between connection pool settings. This method ensures that the total
+   * maximum connections is greater than or equal to the maximum connections per route.
+   *
+   * @throws IllegalArgumentException if maxConnections < maxConnectionsPerRoute
+   */
+  private void validateConnectionPoolSettings() {
+    int maxConnections = getClientMaxConnections();
+    int maxConnectionsPerRoute = getClientMaxConnectionsPerRoute();
+
+    if (maxConnections < maxConnectionsPerRoute) {
+      throw new IllegalArgumentException(
+          String.format(
+              "Invalid HTTP connection pool configuration: %s (%d) must be greater than or equal to %s (%d). "
+                  + "The total connection pool size cannot be smaller than the per-route connection limit.",
+              CLIENT_MAX_CONNECTIONS,
+              maxConnections,
+              CLIENT_MAX_CONNECTIONS_PER_ROUTE,
+              maxConnectionsPerRoute));
     }
   }
 }

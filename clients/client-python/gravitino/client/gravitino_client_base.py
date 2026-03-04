@@ -17,6 +17,7 @@
 
 import logging
 import configparser
+import os
 import os.path
 
 from gravitino.auth.auth_data_provider import AuthDataProvider
@@ -51,6 +52,9 @@ class GravitinoClientBase:
     API_METALAKES_IDENTIFIER_PATH = f"{API_METALAKES_LIST_PATH}/"
     """The REST API path prefix for load a specific metalake"""
 
+    CLIENT_VERSION_HEADER = "X-Client-Version"
+    VERSION_CHECK_DISABLED_ENV = "GRAVITINO_VERSION_CHECK_DISABLED"
+
     def __init__(
         self,
         uri: str,
@@ -59,14 +63,22 @@ class GravitinoClientBase:
         request_headers: dict = None,
         client_config: dict = None,
     ):
+        new_headers = request_headers.copy() if request_headers else {}
+        client_version = self.get_client_version().version()
+        if client_version is not None:
+            new_headers[self.CLIENT_VERSION_HEADER] = client_version.strip()
         self._rest_client = HTTPClient(
             uri,
             auth_data_provider=auth_data_provider,
-            request_headers=request_headers,
+            request_headers=new_headers,
             client_config=client_config,
         )
-        if check_version:
+        if check_version and not self._is_version_check_disabled_by_env():
             self.check_version()
+
+    def _is_version_check_disabled_by_env(self) -> bool:
+        env_value = os.getenv(self.VERSION_CHECK_DISABLED_ENV)
+        return env_value is not None and env_value.strip().lower() == "true"
 
     def load_metalake(self, name: str) -> GravitinoMetalake:
         """Loads a specific Metalake from the Gravitino API.
@@ -105,7 +117,7 @@ class GravitinoClientBase:
         if not client_version.compatible_with_server_version(server_version):
             raise GravitinoRuntimeException(
                 "Gravitino does not support the case that "
-                "the client-side major version is higher than the server-side version."
+                "the client-side version is higher than the server-side version."
                 f"The client version is {client_version.version()}, and the server version {server_version.version()}"
             )
 

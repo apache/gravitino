@@ -229,8 +229,8 @@ public class ColumnDTO implements Column {
      * @throws NullPointerException If required, fields name and data type are not set.
      */
     public ColumnDTO build() {
-      Preconditions.checkNotNull(name, "Column name cannot be null");
-      Preconditions.checkNotNull(dataType, "Column data type cannot be null");
+      Preconditions.checkArgument(name != null, "Column name cannot be null");
+      Preconditions.checkArgument(dataType != null, "Column data type cannot be null");
       return new ColumnDTO(name, dataType, comment, nullable, autoIncrement, defaultValue);
     }
   }

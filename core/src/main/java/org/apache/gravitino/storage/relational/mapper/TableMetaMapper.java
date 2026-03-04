@@ -41,6 +41,14 @@ public interface TableMetaMapper {
   @SelectProvider(type = TableMetaSQLProviderFactory.class, method = "listTablePOsBySchemaId")
   List<TablePO> listTablePOsBySchemaId(@Param("schemaId") Long schemaId);
 
+  @SelectProvider(
+      type = TableMetaSQLProviderFactory.class,
+      method = "listTablePOsByFullQualifiedName")
+  List<TablePO> listTablePOsByFullQualifiedName(
+      @Param("metalakeName") String metalakeName,
+      @Param("catalogName") String catalogName,
+      @Param("schemaName") String schemaName);
+
   @SelectProvider(type = TableMetaSQLProviderFactory.class, method = "listTablePOsByTableIds")
   List<TablePO> listTablePOsByTableIds(@Param("tableIds") List<Long> tableIds);
 
@@ -56,8 +64,14 @@ public interface TableMetaMapper {
   TablePO selectTableMetaBySchemaIdAndName(
       @Param("schemaId") Long schemaId, @Param("tableName") String name);
 
-  @SelectProvider(type = TableMetaSQLProviderFactory.class, method = "selectTableMetaById")
-  TablePO selectTableMetaById(@Param("tableId") Long tableId);
+  @SelectProvider(
+      type = TableMetaSQLProviderFactory.class,
+      method = "selectTableByFullQualifiedName")
+  TablePO selectTableByFullQualifiedName(
+      @Param("metalakeName") String metalakeName,
+      @Param("catalogName") String catalogName,
+      @Param("schemaName") String schemaName,
+      @Param("tableName") String tableName);
 
   @InsertProvider(type = TableMetaSQLProviderFactory.class, method = "insertTableMeta")
   void insertTableMeta(@Param("tableMeta") TablePO tablePO);
@@ -69,7 +83,9 @@ public interface TableMetaMapper {
 
   @UpdateProvider(type = TableMetaSQLProviderFactory.class, method = "updateTableMeta")
   Integer updateTableMeta(
-      @Param("newTableMeta") TablePO newTablePO, @Param("oldTableMeta") TablePO oldTablePO);
+      @Param("newTableMeta") TablePO newTablePO,
+      @Param("oldTableMeta") TablePO oldTablePO,
+      @Param("newSchemaId") Long newSchemaId);
 
   @UpdateProvider(
       type = TableMetaSQLProviderFactory.class,
@@ -96,4 +112,8 @@ public interface TableMetaMapper {
       method = "deleteTableMetasByLegacyTimeline")
   Integer deleteTableMetasByLegacyTimeline(
       @Param("legacyTimeline") Long legacyTimeline, @Param("limit") int limit);
+
+  @SelectProvider(type = TableMetaSQLProviderFactory.class, method = "batchSelectTableByIdentifier")
+  List<TablePO> batchSelectTableByIdentifier(
+      @Param("schemaId") Long schemaId, @Param("tableNames") List<String> tableNames);
 }

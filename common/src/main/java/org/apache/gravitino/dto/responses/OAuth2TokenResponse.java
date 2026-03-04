@@ -100,6 +100,9 @@ public class OAuth2TokenResponse extends BaseResponse {
    */
   @Override
   public void validate() throws IllegalArgumentException {
+
+    super.validate();
+
     Preconditions.checkArgument(StringUtils.isNotBlank(accessToken), "Invalid access token: null");
     Preconditions.checkArgument(
         "bearer".equalsIgnoreCase(tokenType),

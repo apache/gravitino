@@ -84,15 +84,54 @@ sed -i".tmp1" 's/version = .*$/version = '"$RELEASE_VERSION"'/g' gradle.properti
 sed -i".tmp2" 's/    version=.*$/    version="'"$PYGRAVITINO_RELEASE_VERSION"'",/g' clients/client-python/setup.py
 sed -i".tmp3" 's/^version = .*$/version = \"'"$RELEASE_VERSION"'\"/g' clients/filesystem-fuse/Cargo.toml
 sed -i".tmp4" 's/^appVersion: .*$/appVersion: '"$RELEASE_VERSION"'/g' dev/charts/gravitino/Chart.yaml
-sed -i".tmp5" '22s/  tag: .*$/  tag: '"$RELEASE_VERSION"'/g' dev/charts/gravitino/values.yaml
+
+if [[ $(sed -n '34p' dev/charts/gravitino/values.yaml) =~ ^"  tag: " ]]; then
+  sed -i".tmp5" '34s/  tag: .*$/  tag: '"$RELEASE_VERSION"'/g' dev/charts/gravitino/values.yaml
+else
+  echo "Error: Could not find 'tag:' in line 34 of dev/charts/gravitino/values.yaml"
+  exit 1
+fi
+
+sed -i".tmp6" 's/^appVersion: .*$/appVersion: '"$RELEASE_VERSION"'/g' dev/charts/gravitino-iceberg-rest-server/Chart.yaml
+
+if [[ $(sed -n '24p' dev/charts/gravitino-iceberg-rest-server/values.yaml) =~ ^"  tag: " ]]; then
+  sed -i".tmp7" '24s/  tag: .*$/  tag: '"$RELEASE_VERSION"'/g' dev/charts/gravitino-iceberg-rest-server/values.yaml
+else
+  echo "Error: Could not find 'tag:' in line 24 of dev/charts/gravitino-iceberg-rest-server/values.yaml"
+  exit 1
+fi
+
+sed -i".tmp8" 's/^appVersion: .*$/appVersion: '"$RELEASE_VERSION"'/g' dev/charts/gravitino-lance-rest-server/Chart.yaml
+
+if [[ $(sed -n '30p' dev/charts/gravitino-lance-rest-server/values.yaml) =~ ^"  tag: " ]]; then
+  sed -i".tmp9" '30s/  tag: .*$/  tag: '"$RELEASE_VERSION"'/g' dev/charts/gravitino-lance-rest-server/values.yaml
+else
+  echo "Error: Could not find 'tag:' in line 30 of dev/charts/gravitino-lance-rest-server/values.yaml"
+  exit 1
+fi
+
+sed -i".tmp10" 's/^version = .*$/version = "'"$PYGRAVITINO_RELEASE_VERSION"'"/g' mcp-server/pyproject.toml
 
 CHART_VERSION=$(grep -e '^version: .*' dev/charts/gravitino/Chart.yaml | cut -d':' -f2 | sed 's/^ *//;s/ *$//')
 CHART_SHORT_VERSION=$(echo "$CHART_VERSION" | cut -d . -f 1-2)
 CHART_REV=$(echo "$CHART_VERSION" | cut -d . -f 3 | cut -d '-' -f 1)
 CHART_REV=$((CHART_REV + 1))
 NEXT_CHART_VERSION="${CHART_SHORT_VERSION}.${CHART_REV}"
-sed -i".tmp6" 's/^version: .*$/version: '"$NEXT_CHART_VERSION"'/g' dev/charts/gravitino/Chart.yaml
+sed -i".tmp11" 's/^version: .*$/version: '"$NEXT_CHART_VERSION"'/g' dev/charts/gravitino/Chart.yaml
 
+IRC_CHART_VERSION=$(grep -e '^version: .*' dev/charts/gravitino-iceberg-rest-server/Chart.yaml | cut -d':' -f2 | sed 's/^ *//;s/ *$//')
+IRC_CHART_SHORT_VERSION=$(echo "$IRC_CHART_VERSION" | cut -d . -f 1-2)
+IRC_CHART_REV=$(echo "$IRC_CHART_VERSION" | cut -d . -f 3 | cut -d '-' -f 1)
+IRC_CHART_REV=$((IRC_CHART_REV + 1))
+NEXT_IRC_CHART_VERSION="${IRC_CHART_SHORT_VERSION}.${IRC_CHART_REV}"
+sed -i".tmp12" 's/^version: .*$/version: '"$NEXT_IRC_CHART_VERSION"'/g' dev/charts/gravitino-iceberg-rest-server/Chart.yaml
+
+LRC_CHART_VERSION=$(grep -e '^version: .*' dev/charts/gravitino-lance-rest-server/Chart.yaml | cut -d':' -f2 | sed 's/^ *//;s/ *$//')
+LRC_CHART_SHORT_VERSION=$(echo "$LRC_CHART_VERSION" | cut -d . -f 1-2)
+LRC_CHART_REV=$(echo "$LRC_CHART_VERSION" | cut -d . -f 3 | cut -d '-' -f 1)
+LRC_CHART_REV=$((LRC_CHART_REV + 1))
+NEXT_LRC_CHART_VERSION="${LRC_CHART_SHORT_VERSION}.${LRC_CHART_REV}"
+sed -i".tmp13" 's/^version: .*$/version: '"$NEXT_LRC_CHART_VERSION"'/g' dev/charts/gravitino-lance-rest-server/Chart.yaml
 
 # update docs version
 "$SELF/update-java-doc-version.sh" "$RELEASE_VERSION" "$SELF/gravitino"
@@ -102,14 +141,32 @@ echo "Creating tag $RELEASE_TAG at the head of $GIT_BRANCH"
 git tag $RELEASE_TAG
 
 # Create next version
-sed -i".tmp7" 's/version = .*$/version = '"$NEXT_VERSION"'/g' gradle.properties
-sed -i".tmp8" 's/    version=.*$/    version="'"$PYGRAVITINO_NEXT_VERSION"'",/g' clients/client-python/setup.py
-sed -i".tmp9" 's/^version = .*$/version = \"'"$NEXT_VERSION"'\"/g' clients/filesystem-fuse/Cargo.toml
-sed -i".tmp10" 's/appVersion: .*$/appVersion: '"$NEXT_VERSION"'/g' dev/charts/gravitino/Chart.yaml
-sed -i".tmp11" '22s/  tag: .*$/  tag: '"$NEXT_VERSION"'/' dev/charts/gravitino/values.yaml
+sed -i".tmp14" 's/version = .*$/version = '"$NEXT_VERSION"'/g' gradle.properties
+sed -i".tmp15" 's/    version=.*$/    version="'"$PYGRAVITINO_NEXT_VERSION"'",/g' clients/client-python/setup.py
+sed -i".tmp16" 's/^version = .*$/version = \"'"$NEXT_VERSION"'\"/g' clients/filesystem-fuse/Cargo.toml
+
+# Increase the chart version of Gravitino
+sed -i".tmp17" 's/appVersion: .*$/appVersion: '"$NEXT_VERSION"'/g' dev/charts/gravitino/Chart.yaml
+sed -i".tmp18" '34s/  tag: .*$/  tag: '"$NEXT_VERSION"'/g' dev/charts/gravitino/values.yaml
 CHART_REV=$((CHART_REV + 1))
 NEXT_CHART_VERSION="${CHART_SHORT_VERSION}.${CHART_REV}"
-sed -i".tmp12" 's/^version: .*$/version: '"$NEXT_CHART_VERSION"'/g' dev/charts/gravitino/Chart.yaml
+sed -i".tmp19" 's/^version: .*$/version: '"$NEXT_CHART_VERSION"'/g' dev/charts/gravitino/Chart.yaml
+
+# Increase the chart version of Gravitino Iceberg REST server chart
+IRC_CHART_REV=$((IRC_CHART_REV + 1))
+NEXT_IRC_CHART_VERSION="${IRC_CHART_SHORT_VERSION}.${IRC_CHART_REV}"
+sed -i".tmp20" 's/appVersion: .*$/appVersion: '"$NEXT_VERSION"'/g' dev/charts/gravitino-iceberg-rest-server/Chart.yaml
+sed -i".tmp21" '24s/  tag: .*$/  tag: '"$NEXT_VERSION"'/g' dev/charts/gravitino-iceberg-rest-server/values.yaml
+sed -i".tmp22" 's/^version: .*$/version: '"$NEXT_IRC_CHART_VERSION"'/g' dev/charts/gravitino-iceberg-rest-server/Chart.yaml
+
+# Increase the chart version of Gravitino Lance REST server chart
+LRC_CHART_REV=$((LRC_CHART_REV + 1))
+NEXT_LRC_CHART_VERSION="${LRC_CHART_SHORT_VERSION}.${LRC_CHART_REV}"
+sed -i".tmp23" 's/appVersion: .*$/appVersion: '"$NEXT_VERSION"'/g' dev/charts/gravitino-lance-rest-server/Chart.yaml
+sed -i".tmp24" '30s/  tag: .*$/  tag: '"$NEXT_VERSION"'/g' dev/charts/gravitino-lance-rest-server/values.yaml
+sed -i".tmp25" 's/^version: .*$/version: '"$NEXT_LRC_CHART_VERSION"'/g' dev/charts/gravitino-lance-rest-server/Chart.yaml
+
+sed -i".tmp26" 's/^version = .*$/version = "'"$PYGRAVITINO_NEXT_VERSION"'"/g' mcp-server/pyproject.toml
 
 git commit -a -m "Preparing development version $NEXT_VERSION"
 

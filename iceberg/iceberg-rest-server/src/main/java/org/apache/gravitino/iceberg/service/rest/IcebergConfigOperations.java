@@ -41,7 +41,7 @@ import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.catalog.lakehouse.iceberg.IcebergConstants;
 import org.apache.gravitino.iceberg.service.CatalogWrapperForREST;
 import org.apache.gravitino.iceberg.service.IcebergCatalogWrapperManager;
-import org.apache.gravitino.iceberg.service.IcebergRestUtils;
+import org.apache.gravitino.iceberg.service.IcebergRESTUtils;
 import org.apache.gravitino.metrics.MetricNames;
 import org.apache.iceberg.rest.Endpoint;
 import org.apache.iceberg.rest.responses.ConfigResponse;
@@ -74,7 +74,8 @@ public class IcebergConfigOperations {
           .add(Endpoint.V1_TABLE_EXISTS)
           .add(Endpoint.V1_REGISTER_TABLE)
           .add(Endpoint.V1_REPORT_METRICS)
-          .add(Endpoint.V1_COMMIT_TRANSACTION)
+          .add(Endpoint.V1_TABLE_CREDENTIALS)
+          .add(Endpoint.V1_SUBMIT_TABLE_SCAN_PLAN)
           .build();
 
   private static final List<Endpoint> DEFAULT_VIEW_ENDPOINTS =
@@ -105,7 +106,7 @@ public class IcebergConfigOperations {
     if (StringUtils.isNotBlank(warehouse)) {
       builder.withDefault("prefix", warehouse);
     }
-    return IcebergRestUtils.ok(builder.build());
+    return IcebergRESTUtils.ok(builder.build());
   }
 
   private List<Endpoint> getEndpoints(boolean supportsViewOperations) {

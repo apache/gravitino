@@ -26,9 +26,12 @@ import org.apache.gravitino.exceptions.NoSuchCatalogException;
 import org.apache.gravitino.exceptions.NoSuchMetalakeException;
 import org.apache.gravitino.tag.Tag;
 
+/** Represents the detail information of a tag. */
 public class TagDetails extends Command {
 
+  /** The name of the metalake. */
   protected final String metalake;
+  /** The name of the tag. */
   protected final String tag;
 
   /**

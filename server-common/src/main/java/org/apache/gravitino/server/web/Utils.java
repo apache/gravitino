@@ -19,15 +19,19 @@
 package org.apache.gravitino.server.web;
 
 import com.google.common.collect.Maps;
+import java.lang.reflect.Parameter;
 import java.security.PrivilegedExceptionAction;
+import java.util.HashMap;
 import java.util.Map;
 import java.util.Optional;
 import javax.servlet.http.HttpServletRequest;
+import javax.ws.rs.PathParam;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 import javax.ws.rs.core.Response.Status;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.UserPrincipal;
+import org.apache.gravitino.Version;
 import org.apache.gravitino.audit.FilesetAuditConstants;
 import org.apache.gravitino.audit.FilesetDataOperation;
 import org.apache.gravitino.audit.InternalClientType;
@@ -233,5 +237,29 @@ public class Utils {
           CredentialConstants.HTTP_HEADER_CURRENT_LOCATION_NAME, currentLocationName);
     }
     return filteredHeaders;
+  }
+
+  public static int[] getClientVersion(HttpServletRequest request) {
+    String clientVersion = request.getHeader(Version.CLIENT_VERSION_HEADER);
+    if (StringUtils.isBlank(clientVersion)) {
+      // If the client does not send the version, we assume it is the current version.
+      clientVersion = Version.getCurrentVersion().version;
+    }
+
+    return StringUtils.isBlank(clientVersion) ? null : Version.parseVersionNumber(clientVersion);
+  }
+
+  public static Map<String, Object> extractPathParamsFromParameters(
+      Parameter[] parameters, Object[] args) {
+    Map<String, Object> pathParams = new HashMap<>();
+    for (int i = 0; i < parameters.length; i++) {
+      Parameter parameter = parameters[i];
+      PathParam pathParam = parameter.getAnnotation(PathParam.class);
+      if (pathParam == null) {
+        continue;
+      }
+      pathParams.put("p_" + pathParam.value(), args[i]);
+    }
+    return pathParams;
   }
 }

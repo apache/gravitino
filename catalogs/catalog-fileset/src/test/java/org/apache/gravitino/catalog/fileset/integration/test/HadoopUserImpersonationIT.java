@@ -19,10 +19,10 @@
 
 package org.apache.gravitino.catalog.fileset.integration.test;
 
-import static org.apache.gravitino.catalog.fileset.authentication.AuthenticationConfig.AUTH_TYPE_KEY;
-import static org.apache.gravitino.catalog.fileset.authentication.kerberos.KerberosConfig.IMPERSONATION_ENABLE_KEY;
-import static org.apache.gravitino.catalog.fileset.authentication.kerberos.KerberosConfig.KEY_TAB_URI_KEY;
-import static org.apache.gravitino.catalog.fileset.authentication.kerberos.KerberosConfig.PRINCIPAL_KEY;
+import static org.apache.gravitino.catalog.hadoop.fs.kerberos.AuthenticationConfig.AUTH_TYPE_KEY;
+import static org.apache.gravitino.catalog.hadoop.fs.kerberos.KerberosConfig.IMPERSONATION_ENABLE_KEY;
+import static org.apache.gravitino.catalog.hadoop.fs.kerberos.KerberosConfig.KEY_TAB_URI_KEY;
+import static org.apache.gravitino.catalog.hadoop.fs.kerberos.KerberosConfig.PRINCIPAL_KEY;
 import static org.apache.hadoop.hdfs.client.HdfsClientConfigKeys.DFS_DATA_TRANSFER_PROTECTION_KEY;
 
 import com.google.common.collect.ImmutableMap;
@@ -36,6 +36,8 @@ import java.util.Collections;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Properties;
+import org.apache.commons.lang3.JavaVersion;
+import org.apache.commons.lang3.SystemUtils;
 import org.apache.gravitino.Catalog;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Schema;
@@ -63,8 +65,6 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.condition.EnabledIf;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.testcontainers.shaded.org.apache.commons.lang3.JavaVersion;
-import org.testcontainers.shaded.org.apache.commons.lang3.SystemUtils;
 
 @Tag("gravitino-docker-test")
 public class HadoopUserImpersonationIT extends BaseIT {
@@ -103,8 +103,8 @@ public class HadoopUserImpersonationIT extends BaseIT {
         classRef = Class.forName("sun.security.krb5.Config");
       }
 
-      Method refershMethod = classRef.getMethod("refresh");
-      refershMethod.invoke(null);
+      Method refreshMethod = classRef.getMethod("refresh");
+      refreshMethod.invoke(null);
     } catch (Exception e) {
       throw new RuntimeException(e);
     }

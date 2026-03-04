@@ -131,7 +131,8 @@ public class CapabilityHelpers {
     if (identScope == Capability.Scope.TABLE
         || identScope == Capability.Scope.FILESET
         || identScope == Capability.Scope.TOPIC
-        || identScope == Capability.Scope.MODEL) {
+        || identScope == Capability.Scope.MODEL
+        || identScope == Capability.Scope.FUNCTION) {
       String schema = namespace.level(namespace.length() - 1);
       schema = applyCaseSensitiveOnName(Capability.Scope.SCHEMA, schema, capabilities);
       return Namespace.of(metalake, catalog, schema);
@@ -201,7 +202,8 @@ public class CapabilityHelpers {
     String catalog = namespace.level(1);
     if (identScope == Capability.Scope.TABLE
         || identScope == Capability.Scope.FILESET
-        || identScope == Capability.Scope.TOPIC) {
+        || identScope == Capability.Scope.TOPIC
+        || identScope == Capability.Scope.FUNCTION) {
       String schema = namespace.level(namespace.length() - 1);
       schema = applyCapabilitiesOnName(Capability.Scope.SCHEMA, schema, capabilities);
       return Namespace.of(metalake, catalog, schema);
@@ -211,7 +213,10 @@ public class CapabilityHelpers {
 
   private static Index applyCapabilities(Index index, Capability capabilities) {
     return Indexes.of(
-        index.type(), index.name(), applyCapabilities(index.fieldNames(), capabilities));
+        index.type(),
+        index.name(),
+        applyCapabilities(index.fieldNames(), capabilities),
+        index.properties());
   }
 
   private static String[][] applyCapabilities(String[][] fieldNames, Capability capabilities) {
@@ -325,8 +330,13 @@ public class CapabilityHelpers {
       TableChange.RenameTable renameTable, Capability capabilities) {
     String newName =
         applyCaseSensitiveOnName(Capability.Scope.TABLE, renameTable.getNewName(), capabilities);
+    String newSchemaName =
+        renameTable
+            .getNewSchemaName()
+            .map(s -> applyCaseSensitiveOnName(Capability.Scope.SCHEMA, s, capabilities))
+            .orElse(null);
     applyNameSpecification(Capability.Scope.TABLE, newName, capabilities);
-    return TableChange.rename(newName);
+    return TableChange.rename(newName, newSchemaName);
   }
 
   private static TableChange applyCapabilities(

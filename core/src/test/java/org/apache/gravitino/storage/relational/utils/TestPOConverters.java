@@ -65,7 +65,13 @@ import org.apache.gravitino.policy.Policy;
 import org.apache.gravitino.policy.PolicyContent;
 import org.apache.gravitino.policy.PolicyContents;
 import org.apache.gravitino.rel.expressions.Expression;
+import org.apache.gravitino.rel.expressions.NamedReference;
+import org.apache.gravitino.rel.expressions.distributions.Distributions;
+import org.apache.gravitino.rel.expressions.distributions.Strategy;
 import org.apache.gravitino.rel.expressions.literals.Literals;
+import org.apache.gravitino.rel.expressions.sorts.SortDirection;
+import org.apache.gravitino.rel.expressions.sorts.SortOrder;
+import org.apache.gravitino.rel.expressions.sorts.SortOrders;
 import org.apache.gravitino.rel.types.Type;
 import org.apache.gravitino.rel.types.Types;
 import org.apache.gravitino.stats.StatisticValues;
@@ -616,6 +622,15 @@ public class TestPOConverters {
     assertEquals(1, initPO.getCurrentVersion());
     assertEquals(1, initPO.getLastVersion());
     assertEquals(0, initPO.getDeletedAt());
+
+    TableEntity entity =
+        POConverters.fromTableAndColumnPOs(
+            initPO,
+            Lists.newArrayList(),
+            NamespaceUtil.ofTable("test_metalake", "test_catalog", "test_schema"));
+
+    Assertions.assertEquals(tableEntity.distribution(), entity.distribution());
+    Assertions.assertArrayEquals(tableEntity.partitioning(), entity.partitioning());
   }
 
   @Test
@@ -694,7 +709,7 @@ public class TestPOConverters {
     TablePO.Builder builder =
         TablePO.builder().withMetalakeId(1L).withCatalogId(1L).withSchemaId(1L);
     TablePO initPO = POConverters.initializeTablePOWithVersion(tableEntity, builder);
-    TablePO updatePO = POConverters.updateTablePOWithVersion(initPO, updatedTable, false);
+    TablePO updatePO = POConverters.updateTablePOWithVersionAndSchemaId(initPO, updatedTable, 1L);
     assertEquals(1, initPO.getCurrentVersion());
     assertEquals(1, initPO.getLastVersion());
     assertEquals(0, initPO.getDeletedAt());
@@ -1210,6 +1225,54 @@ public class TestPOConverters {
   }
 
   @Test
+  public void testUpdateModelVersionAliasRelPO() {
+    NameIdentifier modelIdent = NameIdentifierUtil.ofModel("m", "c", "s", "model1");
+    AuditInfo auditInfo =
+        AuditInfo.builder().withCreator("creator").withCreateTime(FIX_INSTANT).build();
+    List<String> newAliases = ImmutableList.of("alias3", "alias4");
+    Long modelId = 1L;
+
+    ModelVersionEntity newModelVersion =
+        ModelVersionEntity.builder()
+            .withModelIdentifier(modelIdent)
+            .withVersion(1)
+            .withAliases(newAliases)
+            .withComment("test")
+            .withProperties(null)
+            .withUris(ImmutableMap.of("uri", "hdfs://localhost/test"))
+            .withAuditInfo(auditInfo)
+            .build();
+
+    // Case 1: old alias list is non-empty — modelId/version copied from old PO
+    List<ModelVersionAliasRelPO> oldAliasPOs =
+        ImmutableList.of(
+            ModelVersionAliasRelPO.builder()
+                .withModelVersionAlias("alias1")
+                .withModelVersion(1)
+                .withModelId(modelId)
+                .withDeletedAt(0L)
+                .build());
+
+    List<ModelVersionAliasRelPO> result =
+        POConverters.updateModelVersionAliasRelPO(oldAliasPOs, newModelVersion, modelId);
+    assertEquals(2, result.size());
+    assertEquals("alias3", result.get(0).getModelVersionAlias());
+    assertEquals("alias4", result.get(1).getModelVersionAlias());
+    assertEquals(1, result.get(0).getModelVersion());
+    assertEquals(modelId, result.get(0).getModelId());
+
+    // Case 2: old alias list is empty (model version created without aliases) — should not throw
+    List<ModelVersionAliasRelPO> resultFromEmpty =
+        POConverters.updateModelVersionAliasRelPO(
+            Collections.emptyList(), newModelVersion, modelId);
+    assertEquals(2, resultFromEmpty.size());
+    assertEquals("alias3", resultFromEmpty.get(0).getModelVersionAlias());
+    assertEquals("alias4", resultFromEmpty.get(1).getModelVersionAlias());
+    assertEquals(1, resultFromEmpty.get(0).getModelVersion());
+    assertEquals(modelId, resultFromEmpty.get(0).getModelId());
+  }
+
+  @Test
   public void testStatisticPO() throws JsonProcessingException {
     List<StatisticEntity> statisticEntities = Lists.newArrayList();
     statisticEntities.add(
@@ -1382,6 +1445,9 @@ public class TestPOConverters {
         .withName(name)
         .withNamespace(namespace)
         .withColumns(columns)
+        .withDistribution(Distributions.of(Strategy.EVEN, 10, NamedReference.field("key")))
+        .withSortOrders(
+            new SortOrder[] {SortOrders.of(NamedReference.field("col1"), SortDirection.ASCENDING)})
         .withAuditInfo(auditInfo)
         .build();
   }

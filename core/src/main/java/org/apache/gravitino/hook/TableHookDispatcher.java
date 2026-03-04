@@ -74,10 +74,6 @@ public class TableHookDispatcher implements TableDispatcher {
       SortOrder[] sortOrders,
       Index[] indexes)
       throws NoSuchSchemaException, TableAlreadyExistsException {
-    // Check whether the current user exists or not
-    AuthorizationUtils.checkCurrentUser(
-        ident.namespace().level(0), PrincipalUtils.getCurrentUserName());
-
     Table table =
         dispatcher.createTable(
             ident, columns, comment, properties, partitions, distribution, sortOrders, indexes);
@@ -110,6 +106,7 @@ public class TableHookDispatcher implements TableDispatcher {
     Table alteredTable = dispatcher.alterTable(ident, changes);
 
     if (lastRenameChange != null) {
+      // todo: support rename across different schemas
       AuthorizationUtils.authorizationPluginRenamePrivileges(
           ident, Entity.EntityType.TABLE, lastRenameChange.getNewName(), locations);
     }

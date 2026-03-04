@@ -157,7 +157,9 @@ public class FilesetOperationDispatcher extends OperationDispatcher implements F
 
     Fileset createdFileset =
         TreeLockUtils.doWithTreeLock(
-            NameIdentifier.of(ident.namespace().levels()),
+            // Lock at fileset level (not schema level) to allow concurrent fileset creation.
+            // Trade-off: listFilesets() may temporarily miss in-progress creations until complete.
+            ident,
             LockType.WRITE,
             () ->
                 doWithCatalog(

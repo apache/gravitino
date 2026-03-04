@@ -37,6 +37,7 @@ import org.apache.gravitino.catalog.jdbc.converter.JdbcTypeConverter;
 import org.apache.gravitino.catalog.jdbc.operation.JdbcTablePartitionOperations;
 import org.apache.gravitino.catalog.starrocks.converter.StarRocksTypeConverter;
 import org.apache.gravitino.catalog.starrocks.operations.StarRocksTablePartitionOperations;
+import org.apache.gravitino.exceptions.GravitinoRuntimeException;
 import org.apache.gravitino.integration.test.util.GravitinoITUtils;
 import org.apache.gravitino.rel.TableChange;
 import org.apache.gravitino.rel.expressions.Expression;
@@ -56,11 +57,11 @@ import org.apache.gravitino.rel.partitions.RangePartition;
 import org.apache.gravitino.rel.types.Type;
 import org.apache.gravitino.rel.types.Types;
 import org.apache.gravitino.utils.RandomNameUtils;
+import org.awaitility.Awaitility;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
-import org.testcontainers.shaded.org.awaitility.Awaitility;
 
 @Tag("gravitino-docker-test")
 public class TestStarRocksTableOperations extends TestStarRocks {
@@ -579,5 +580,54 @@ public class TestStarRocksTableOperations extends TestStarRocks {
     assertTrue(Arrays.deepEquals(listPartition1.lists(), loadedListPartitions.get("p1").lists()));
     assertTrue(loadedListPartitions.containsKey("p2"));
     assertTrue(Arrays.deepEquals(listPartition2.lists(), loadedListPartitions.get("p2").lists()));
+  }
+
+  @Test
+  public void testAlterTableSetPropertyBehavior() {
+    String tableName = GravitinoITUtils.genRandomName("starrocks_alter_test_table");
+
+    String tableComment = "test_comment";
+    List<JdbcColumn> columns = new ArrayList<>();
+    JdbcColumn col1 =
+        JdbcColumn.builder().withName("col_1").withType(INT).withComment("id").build();
+    columns.add(col1);
+    Map<String, String> properties = new HashMap<>();
+    Index[] indexes = new Index[] {};
+
+    // create table
+    TABLE_OPERATIONS.create(
+        databaseName,
+        tableName,
+        columns.toArray(new JdbcColumn[0]),
+        tableComment,
+        properties,
+        null,
+        null,
+        indexes);
+
+    Assertions.assertDoesNotThrow(
+        () ->
+            TABLE_OPERATIONS.alterTable(
+                databaseName, tableName, TableChange.setProperty("replication_num", "1")));
+
+    Assertions.assertThrows(
+        GravitinoRuntimeException.class,
+        () ->
+            TABLE_OPERATIONS.alterTable(
+                databaseName,
+                tableName,
+                TableChange.setProperty("dynamic_partition.enable", "true")));
+
+    Assertions.assertThrows(
+        GravitinoRuntimeException.class,
+        () ->
+            TABLE_OPERATIONS.alterTable(
+                databaseName, tableName, TableChange.setProperty("binlog.enable", "true")));
+
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () ->
+            TABLE_OPERATIONS.alterTable(
+                databaseName, tableName, TableChange.setProperty("unsupported.property", "VIEW")));
   }
 }

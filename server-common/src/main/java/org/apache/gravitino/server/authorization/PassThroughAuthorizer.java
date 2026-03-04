@@ -20,10 +20,15 @@ package org.apache.gravitino.server.authorization;
 import java.io.IOException;
 import java.security.Principal;
 import org.apache.gravitino.Entity;
+import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.NameIdentifier;
+import org.apache.gravitino.authorization.AccessControlDispatcher;
+import org.apache.gravitino.authorization.AuthorizationRequestContext;
 import org.apache.gravitino.authorization.GravitinoAuthorizer;
 import org.apache.gravitino.authorization.Privilege;
+import org.apache.gravitino.exceptions.NoSuchUserException;
+import org.apache.gravitino.utils.PrincipalUtils;
 
 /**
  * The default implementation of GravitinoAuthorizer, indicating that metadata permission control is
@@ -39,7 +44,8 @@ public class PassThroughAuthorizer implements GravitinoAuthorizer {
       Principal principal,
       String metalake,
       MetadataObject metadataObject,
-      Privilege.Name privilege) {
+      Privilege.Name privilege,
+      AuthorizationRequestContext requestContext) {
     return true;
   }
 
@@ -48,12 +54,17 @@ public class PassThroughAuthorizer implements GravitinoAuthorizer {
       Principal principal,
       String metalake,
       MetadataObject metadataObject,
-      Privilege.Name privilege) {
+      Privilege.Name privilege,
+      AuthorizationRequestContext requestContext) {
     return false;
   }
 
   @Override
-  public boolean isOwner(Principal principal, String metalake, MetadataObject metadataObject) {
+  public boolean isOwner(
+      Principal principal,
+      String metalake,
+      MetadataObject metadataObject,
+      AuthorizationRequestContext requestContext) {
     return true;
   }
 
@@ -69,16 +80,26 @@ public class PassThroughAuthorizer implements GravitinoAuthorizer {
 
   @Override
   public boolean isMetalakeUser(String metalake) {
+    AccessControlDispatcher dispatcher = GravitinoEnv.getInstance().accessControlDispatcher();
+    if (dispatcher != null) {
+      try {
+        dispatcher.getUser(metalake, PrincipalUtils.getCurrentUserName());
+      } catch (NoSuchUserException e) {
+        dispatcher.addUser(metalake, PrincipalUtils.getCurrentUserName());
+      }
+    }
     return true;
   }
 
   @Override
-  public boolean hasSetOwnerPermission(String metalake, String type, String fullName) {
+  public boolean hasSetOwnerPermission(
+      String metalake, String type, String fullName, AuthorizationRequestContext requestContext) {
     return true;
   }
 
   @Override
-  public boolean hasMetadataPrivilegePermission(String metalake, String type, String fullName) {
+  public boolean hasMetadataPrivilegePermission(
+      String metalake, String type, String fullName, AuthorizationRequestContext requestContext) {
     return true;
   }
 

@@ -76,6 +76,9 @@ public class GravitinoSystemTableCatalog extends GravitinoSystemTable {
               GravitinoMetalake metalake = catalogConnectorManager.getMetalake(metalakeName);
               Catalog[] catalogs = metalake.listCatalogsInfo();
               for (Catalog catalog : catalogs) {
+                if (catalogConnectorManager.skipCatalog(catalog.name())) {
+                  continue;
+                }
                 if (catalog.type() == Catalog.Type.RELATIONAL) {
                   gravitinoCatalogs.add(new GravitinoCatalog(metalakeName, catalog));
                 }
@@ -88,7 +91,7 @@ public class GravitinoSystemTableCatalog extends GravitinoSystemTable {
     BlockBuilder propertyColumnBuilder = VARCHAR.createBlockBuilder(null, size);
 
     for (GravitinoCatalog catalog : gravitinoCatalogs) {
-      Preconditions.checkNotNull(catalog, "catalog should not be null");
+      Preconditions.checkArgument(catalog != null, "catalog should not be null");
 
       VARCHAR.writeString(nameColumnBuilder, catalog.getName());
       VARCHAR.writeString(providerColumnBuilder, catalog.getProvider());

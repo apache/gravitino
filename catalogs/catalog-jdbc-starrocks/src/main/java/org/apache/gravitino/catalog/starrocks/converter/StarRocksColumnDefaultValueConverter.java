@@ -95,7 +95,7 @@ public class StarRocksColumnDefaultValueConverter extends JdbcColumnDefaultValue
       case CHAR:
         return Literals.of(columnDefaultValue, Types.FixedCharType.of(columnType.getColumnSize()));
       default:
-        throw new IllegalArgumentException("Unknown data columnType for literal: " + columnType);
+        return UnparsedExpression.of(columnDefaultValue);
     }
   }
 }

@@ -22,6 +22,7 @@ import java.util.Arrays;
 import org.apache.commons.cli.CommandLine;
 import org.apache.gravitino.cli.commands.Command;
 
+/** Handler for the "tag" command. */
 public class TagCommandHandler extends CommandHandler {
   private final GravitinoCommandLine gravitinoCommandLine;
   private final CommandLine line;
@@ -30,6 +31,14 @@ public class TagCommandHandler extends CommandHandler {
   private String[] tags;
   private String metalake;
 
+  /**
+   * Create a new instance of TagCommandHandler.
+   *
+   * @param gravitinoCommandLine The main command line object.
+   * @param line The command line object for the tag command.
+   * @param command The command name.
+   * @param context The command context.
+   */
   public TagCommandHandler(
       GravitinoCommandLine gravitinoCommandLine,
       CommandLine line,

@@ -95,7 +95,7 @@ public class TagMetadataObjectRelBaseSQLProvider {
     return "<script>"
         + "INSERT INTO "
         + TagMetadataObjectRelMapper.TAG_METADATA_OBJECT_RELATION_TABLE_NAME
-        + "(tag_id, metadata_object_id, metadata_object_type, audit_info,"
+        + " (tag_id, metadata_object_id, metadata_object_type, audit_info,"
         + " current_version, last_version, deleted_at)"
         + " VALUES "
         + "<foreach collection='tagRels' item='item' separator=','>"
@@ -123,7 +123,7 @@ public class TagMetadataObjectRelBaseSQLProvider {
         + "<foreach item='tagId' collection='tagIds' open='(' separator=',' close=')'>"
         + "#{tagId}"
         + "</foreach>"
-        + " And metadata_object_id = #{metadataObjectId}"
+        + " AND metadata_object_id = #{metadataObjectId}"
         + " AND metadata_object_type = #{metadataObjectType} AND deleted_at = 0"
         + "</script>";
   }
@@ -172,34 +172,34 @@ public class TagMetadataObjectRelBaseSQLProvider {
         + " WHERE tmt.deleted_at = 0 AND EXISTS ("
         + " SELECT ct.catalog_id FROM "
         + CatalogMetaMapper.TABLE_NAME
-        + " ct WHERE ct.catalog_id = #{catalogId}  AND "
-        + "ct.catalog_id = tmt.metadata_object_id AND tmt.metadata_object_type = 'CATALOG'"
-        + " UNION "
+        + " ct WHERE ct.catalog_id = #{catalogId} AND"
+        + " ct.catalog_id = tmt.metadata_object_id AND tmt.metadata_object_type = 'CATALOG'"
+        + " UNION"
         + " SELECT st.catalog_id FROM "
         + SchemaMetaMapper.TABLE_NAME
-        + " st WHERE st.catalog_id = #{catalogId} AND "
-        + "st.schema_id = tmt.metadata_object_id AND tmt.metadata_object_type = 'SCHEMA'"
-        + " UNION "
+        + " st WHERE st.catalog_id = #{catalogId} AND"
+        + " st.schema_id = tmt.metadata_object_id AND tmt.metadata_object_type = 'SCHEMA'"
+        + " UNION"
         + " SELECT tt.catalog_id FROM "
         + TopicMetaMapper.TABLE_NAME
-        + " tt WHERE tt.catalog_id = #{catalogId} AND "
-        + "tt.topic_id = tmt.metadata_object_id AND tmt.metadata_object_type = 'TOPIC'"
-        + " UNION "
+        + " tt WHERE tt.catalog_id = #{catalogId} AND"
+        + " tt.topic_id = tmt.metadata_object_id AND tmt.metadata_object_type = 'TOPIC'"
+        + " UNION"
         + " SELECT tat.catalog_id FROM "
         + TableMetaMapper.TABLE_NAME
-        + " tat WHERE tat.catalog_id = #{catalogId} AND "
-        + "tat.table_id = tmt.metadata_object_id AND tmt.metadata_object_type = 'TABLE'"
-        + " UNION "
+        + " tat WHERE tat.catalog_id = #{catalogId} AND"
+        + " tat.table_id = tmt.metadata_object_id AND tmt.metadata_object_type = 'TABLE'"
+        + " UNION"
         + " SELECT ft.catalog_id FROM "
         + FilesetMetaMapper.META_TABLE_NAME
-        + " ft WHERE ft.catalog_id = #{catalogId}  AND"
+        + " ft WHERE ft.catalog_id = #{catalogId} AND"
         + " ft.fileset_id = tmt.metadata_object_id AND tmt.metadata_object_type = 'FILESET'"
-        + " UNION "
+        + " UNION"
         + " SELECT cot.catalog_id FROM "
         + TableColumnMapper.COLUMN_TABLE_NAME
         + " cot WHERE cot.catalog_id = #{catalogId} AND"
         + " cot.column_id = tmt.metadata_object_id AND tmt.metadata_object_type = 'COLUMN'"
-        + " UNION "
+        + " UNION"
         + " SELECT mt.catalog_id FROM "
         + ModelMetaMapper.TABLE_NAME
         + " mt WHERE mt.catalog_id = #{catalogId} AND"
@@ -215,32 +215,32 @@ public class TagMetadataObjectRelBaseSQLProvider {
         + " WHERE tmt.deleted_at = 0 AND EXISTS ("
         + " SELECT st.schema_id FROM "
         + SchemaMetaMapper.TABLE_NAME
-        + " st WHERE st.schema_id = #{schemaId} AND "
+        + " st WHERE st.schema_id = #{schemaId} AND"
         + " st.schema_id = tmt.metadata_object_id AND tmt.metadata_object_type = 'SCHEMA'"
-        + " UNION "
+        + " UNION"
         + " SELECT tt.schema_id FROM "
         + TopicMetaMapper.TABLE_NAME
-        + " tt WHERE tt.schema_id = #{schemaId} AND "
-        + "tt.topic_id = tmt.metadata_object_id AND tmt.metadata_object_type = 'TOPIC'"
-        + " UNION "
+        + " tt WHERE tt.schema_id = #{schemaId} AND"
+        + " tt.topic_id = tmt.metadata_object_id AND tmt.metadata_object_type = 'TOPIC'"
+        + " UNION"
         + " SELECT tat.schema_id FROM "
         + TableMetaMapper.TABLE_NAME
-        + " tat WHERE tat.schema_id = #{schemaId} AND "
-        + "tat.table_id = tmt.metadata_object_id AND tmt.metadata_object_type = 'TABLE'"
-        + " UNION "
+        + " tat WHERE tat.schema_id = #{schemaId} AND"
+        + " tat.table_id = tmt.metadata_object_id AND tmt.metadata_object_type = 'TABLE'"
+        + " UNION"
         + " SELECT ft.schema_id FROM "
         + FilesetMetaMapper.META_TABLE_NAME
-        + " ft WHERE ft.schema_id = #{schemaId} AND "
+        + " ft WHERE ft.schema_id = #{schemaId} AND"
         + " ft.fileset_id = tmt.metadata_object_id AND tmt.metadata_object_type = 'FILESET'"
-        + " UNION "
+        + " UNION"
         + " SELECT cot.schema_id FROM "
         + TableColumnMapper.COLUMN_TABLE_NAME
-        + " cot WHERE cot.schema_id = #{schemaId} AND "
+        + " cot WHERE cot.schema_id = #{schemaId} AND"
         + " cot.column_id = tmt.metadata_object_id AND tmt.metadata_object_type = 'COLUMN'"
-        + " UNION "
+        + " UNION"
         + " SELECT mt.schema_id FROM "
         + ModelMetaMapper.TABLE_NAME
-        + " mt WHERE mt.schema_id = #{schemaId} AND "
+        + " mt WHERE mt.schema_id = #{schemaId} AND"
         + " mt.model_id = tmt.metadata_object_id AND tmt.metadata_object_type = 'MODEL'"
         + ")";
   }
@@ -253,9 +253,9 @@ public class TagMetadataObjectRelBaseSQLProvider {
         + " WHERE tmt.deleted_at = 0 AND EXISTS ("
         + " SELECT tat.table_id FROM "
         + TableMetaMapper.TABLE_NAME
-        + " tat WHERE tat.table_id = #{tableId} AND "
+        + " tat WHERE tat.table_id = #{tableId} AND"
         + " tat.table_id = tmt.metadata_object_id AND tmt.metadata_object_type = 'TABLE'"
-        + " UNION "
+        + " UNION"
         + " SELECT cot.table_id FROM "
         + TableColumnMapper.COLUMN_TABLE_NAME
         + " cot WHERE cot.table_id = #{tableId} AND"

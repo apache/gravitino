@@ -173,10 +173,10 @@ class DefaultGVFSOperations(BaseGVFSOperations):
 
         if storage_handler.storage_type() == StorageType.LOCAL:
             actual_fs.mv(
-                storage_handler.strip_storage_protocol(src_actual_path),
-                storage_handler.strip_storage_protocol(dst_actual_path),
-                recursive,
-                maxdepth,
+                path1=storage_handler.strip_storage_protocol(src_actual_path),
+                path2=storage_handler.strip_storage_protocol(dst_actual_path),
+                recursive=recursive,
+                maxdepth=maxdepth,
             )
         else:
             actual_fs.mv(

@@ -178,10 +178,10 @@ public class StarRocksTableOperations extends JdbcTableOperations {
         }
         TableChange.SetProperty setProperty = (TableChange.SetProperty) change;
         if (!SUPPORTED_MODIFY_PROPERTIES.contains(setProperty.getProperty())
-            && setProperty
+            && !setProperty
                 .getProperty()
                 .startsWith(SUPPORTED_MODIFY_PROPERTIES_PREFIX_DYNAMIC_PARTITION)
-            && setProperty.getProperty().startsWith(SUPPORTED_MODIFY_PROPERTIES_PREFIX_BINLOG)) {
+            && !setProperty.getProperty().startsWith(SUPPORTED_MODIFY_PROPERTIES_PREFIX_BINLOG)) {
           throw new IllegalArgumentException(
               "Current StarRocks not support modify this table property "
                   + setProperty.getProperty());
@@ -324,12 +324,7 @@ public class StarRocksTableOperations extends JdbcTableOperations {
     }
 
     // Add DEFAULT value if specified
-    if (!DEFAULT_VALUE_NOT_SET.equals(column.defaultValue())) {
-      sqlBuilder
-          .append("DEFAULT ")
-          .append(columnDefaultValueConverter.fromGravitino(column.defaultValue()))
-          .append(SPACE);
-    }
+    appendDefaultValue(column, sqlBuilder);
 
     // Add column auto_increment if specified
     if (column.autoIncrement()) {

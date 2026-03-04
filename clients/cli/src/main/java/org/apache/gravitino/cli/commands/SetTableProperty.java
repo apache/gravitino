@@ -32,11 +32,17 @@ import org.apache.gravitino.rel.TableChange;
 /** Set a property of a table. */
 public class SetTableProperty extends Command {
 
+  /** The name of the metalake. */
   protected final String metalake;
+  /** The name of the catalog. */
   protected final String catalog;
+  /** The name of the schema. */
   protected final String schema;
+  /** The name of the table. */
   protected final String table;
+  /** The name of the property. */
   protected final String property;
+  /** The value of the property. */
   protected final String value;
 
   /**

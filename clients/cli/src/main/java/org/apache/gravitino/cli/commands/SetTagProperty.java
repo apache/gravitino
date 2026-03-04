@@ -29,9 +29,13 @@ import org.apache.gravitino.tag.TagChange;
 /** Set a property of a tag. */
 public class SetTagProperty extends Command {
 
+  /** The name of the metalake. */
   protected final String metalake;
+  /** The name of the tag. */
   protected final String tag;
+  /** The name of the property. */
   protected final String property;
+  /** The value of the property. */
   protected final String value;
 
   /**

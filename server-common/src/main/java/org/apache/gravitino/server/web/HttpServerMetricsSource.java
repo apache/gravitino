@@ -25,6 +25,8 @@ import com.codahale.metrics.jersey2.InstrumentedResourceMethodApplicationListene
 import java.util.concurrent.TimeUnit;
 import org.apache.gravitino.metrics.MetricNames;
 import org.apache.gravitino.metrics.source.MetricsSource;
+import org.eclipse.jetty.util.thread.QueuedThreadPool;
+import org.eclipse.jetty.util.thread.ThreadPool;
 import org.glassfish.jersey.server.ResourceConfig;
 
 public class HttpServerMetricsSource extends MetricsSource {
@@ -38,7 +40,18 @@ public class HttpServerMetricsSource extends MetricsSource {
             () ->
                 new SlidingTimeWindowArrayReservoir(
                     getTimeSlidingWindowSeconds(), TimeUnit.SECONDS)));
-    registerGauge(
-        MetricNames.SERVER_IDLE_THREAD_NUM, () -> server.getThreadPool().getIdleThreads());
+
+    // Register QueuedThreadPool specific metrics with instance checks
+    ThreadPool threadPool = server.getThreadPool();
+    registerGauge(MetricNames.SERVER_IDLE_THREAD_NUM, () -> threadPool.getIdleThreads());
+    registerGauge(MetricNames.SERVER_TOTAL_THREAD_NUM, () -> threadPool.getThreads());
+
+    if (threadPool instanceof QueuedThreadPool) {
+      QueuedThreadPool queuedThreadPool = (QueuedThreadPool) threadPool;
+      registerGauge(MetricNames.SERVER_BUSY_THREAD_NUM, () -> queuedThreadPool.getBusyThreads());
+      registerGauge(MetricNames.SERVER_QUEUED_REQUEST_NUM, () -> queuedThreadPool.getQueueSize());
+      registerGauge(MetricNames.SERVER_MIN_THREAD_NUM, () -> queuedThreadPool.getMinThreads());
+      registerGauge(MetricNames.SERVER_MAX_THREAD_NUM, () -> queuedThreadPool.getMaxThreads());
+    }
   }
 }

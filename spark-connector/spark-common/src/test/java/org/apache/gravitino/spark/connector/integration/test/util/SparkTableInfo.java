@@ -32,7 +32,6 @@ import org.apache.gravitino.spark.connector.ConnectorConstants;
 import org.apache.gravitino.spark.connector.hive.SparkHiveTable;
 import org.apache.gravitino.spark.connector.iceberg.SparkIcebergTable;
 import org.apache.gravitino.spark.connector.jdbc.SparkJdbcTable;
-import org.apache.gravitino.spark.connector.paimon.SparkPaimonTable;
 import org.apache.spark.sql.connector.catalog.SupportsMetadataColumns;
 import org.apache.spark.sql.connector.catalog.Table;
 import org.apache.spark.sql.connector.catalog.TableCatalog;
@@ -192,8 +191,8 @@ public class SparkTableInfo {
       return ((SparkHiveTable) baseTable).schema();
     } else if (baseTable instanceof SparkIcebergTable) {
       return ((SparkIcebergTable) baseTable).schema();
-    } else if (baseTable instanceof SparkPaimonTable) {
-      return ((SparkPaimonTable) baseTable).schema();
+    } else if (baseTable.getClass().getSimpleName().equals("SparkPaimonTable")) {
+      return baseTable.schema();
     } else if (baseTable instanceof SparkJdbcTable) {
       return ((SparkJdbcTable) baseTable).schema();
     } else {

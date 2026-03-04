@@ -18,6 +18,7 @@
  */
 package org.apache.gravitino.catalog.hive.integration.test;
 
+import com.google.common.collect.ImmutableMap;
 import java.io.IOException;
 import java.net.URI;
 import java.util.HashMap;
@@ -28,8 +29,8 @@ import org.apache.gravitino.integration.test.util.GravitinoITUtils;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.spark.sql.SparkSession;
+import org.junit.jupiter.api.TestInstance;
 import org.junit.jupiter.api.condition.EnabledIf;
-import org.testcontainers.shaded.com.google.common.collect.ImmutableMap;
 
 // Apart from the following dependencies on environment, this test also needs hadoop3-common, please
 // refer to L135 in the file `${GRAVITINO_HOME}/catalogs/catalog-hive/build.gradle.kts`, otherwise
@@ -37,7 +38,8 @@ import org.testcontainers.shaded.com.google.common.collect.ImmutableMap;
 @EnabledIf(
     value = "isAzureBlobStorageConfigured",
     disabledReason = "Azure Blob Storage is not prepared.")
-public class CatalogHiveABSIT extends CatalogHiveIT {
+@TestInstance(TestInstance.Lifecycle.PER_CLASS)
+public class CatalogHiveABSIT extends CatalogHive2IT {
 
   private static final String ABS_BUCKET_NAME = System.getenv("ABS_CONTAINER_NAME");
   private static final String ABS_USER_ACCOUNT_NAME = System.getenv("ABS_ACCOUNT_NAME");
@@ -56,7 +58,7 @@ public class CatalogHiveABSIT extends CatalogHiveIT {
 
     containerSuite.startHiveContainerWithS3(hiveContainerEnv);
 
-    HIVE_METASTORE_URIS =
+    hiveMetastoreUris =
         String.format(
             "thrift://%s:%d",
             containerSuite.getHiveContainerWithS3().getContainerIpAddress(),
@@ -83,7 +85,7 @@ public class CatalogHiveABSIT extends CatalogHiveIT {
         SparkSession.builder()
             .master("local[1]")
             .appName("Hive Catalog integration test")
-            .config("hive.metastore.uris", HIVE_METASTORE_URIS)
+            .config("hive.metastore.uris", hiveMetastoreUris)
             .config(
                 "spark.sql.warehouse.dir",
                 String.format(

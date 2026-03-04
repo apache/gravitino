@@ -22,6 +22,7 @@ import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
 import com.fasterxml.jackson.databind.annotation.JsonSerialize;
 import com.google.common.base.Preconditions;
 import java.util.Arrays;
+import java.util.Map;
 import java.util.Objects;
 import org.apache.gravitino.json.JsonUtils.IndexDeserializer;
 import org.apache.gravitino.json.JsonUtils.IndexSerializer;
@@ -38,6 +39,7 @@ public class IndexDTO implements Index {
   private IndexType indexType;
   private String name;
   private String[][] fieldNames;
+  private Map<String, String> properties;
 
   /** Default constructor for Jackson deserialization. */
   public IndexDTO() {}
@@ -48,29 +50,46 @@ public class IndexDTO implements Index {
    * @param indexType The type of the index.
    * @param name The name of the index.
    * @param fieldNames The names of the fields.
+   * @param properties Extra properties for index configuration
    */
-  public IndexDTO(IndexType indexType, String name, String[][] fieldNames) {
+  public IndexDTO(
+      IndexType indexType, String name, String[][] fieldNames, Map<String, String> properties) {
     this.indexType = indexType;
     this.name = name;
     this.fieldNames = fieldNames;
+    this.properties = properties == null ? Map.of() : properties;
   }
 
-  /** @return The type of the index. */
+  /**
+   * @return The type of the index.
+   */
   @Override
   public IndexType type() {
     return indexType;
   }
 
-  /** @return The name of the index. */
+  /**
+   * @return The name of the index.
+   */
   @Override
   public String name() {
     return name;
   }
 
-  /** @return The field name under the table contained in the index. */
+  /**
+   * @return The field name under the table contained in the index.
+   */
   @Override
   public String[][] fieldNames() {
     return fieldNames;
+  }
+
+  /**
+   * @return Extra properties for index configuration
+   */
+  @Override
+  public Map<String, String> properties() {
+    return properties;
   }
 
   @Override
@@ -81,6 +100,7 @@ public class IndexDTO implements Index {
 
     return indexType == indexDTO.indexType
         && Objects.equals(name, indexDTO.name)
+        && Objects.equals(properties, indexDTO.properties)
         && compareStringArrays(fieldNames, indexDTO.fieldNames);
   }
 
@@ -98,7 +118,7 @@ public class IndexDTO implements Index {
 
   @Override
   public int hashCode() {
-    int result = Objects.hash(indexType, name);
+    int result = Objects.hash(indexType, name, properties);
     for (String[] fieldName : fieldNames) {
       result = 31 * result + Arrays.hashCode(fieldName);
     }
@@ -124,6 +144,8 @@ public class IndexDTO implements Index {
     protected String name;
     /** The names of the fields. */
     protected String[][] fieldNames;
+    /** The properties of the index. */
+    protected Map<String, String> properties;
 
     /** Default constructor. */
     public Builder() {}
@@ -162,6 +184,17 @@ public class IndexDTO implements Index {
     }
 
     /**
+     * Sets the properties of the index.
+     *
+     * @param properties The properties of the index.
+     * @return The builder.
+     */
+    public S withProperties(Map<String, String> properties) {
+      this.properties = properties;
+      return (S) this;
+    }
+
+    /**
      * Builds a new instance of IndexDTO.
      *
      * @return The new instance.
@@ -171,7 +204,7 @@ public class IndexDTO implements Index {
       Preconditions.checkArgument(
           fieldNames != null && fieldNames.length > 0,
           "The index must be set with corresponding column names");
-      return new IndexDTO(indexType, name, fieldNames);
+      return new IndexDTO(indexType, name, fieldNames, properties);
     }
   }
 }

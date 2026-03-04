@@ -1,0 +1,36 @@
+INSERT: 2 rows
+
+"1","bob","12"
+"2","tom","13"
+
+DELETE: 1 row
+
+"2","tom","13"
+
+DELETE: 1 row
+
+"0"
+
+CREATE SCHEMA
+
+CREATE TABLE
+
+INSERT: 3 rows
+
+"1","bob","2025-08-27"
+"2","tom","2025-08-27"
+"3","nancy","2025-08-28"
+
+DELETE
+""
+
+"3","nancy","2025-08-28"
+
+DELETE
+""
+
+"0"
+
+DROP TABLE
+
+DROP SCHEMA

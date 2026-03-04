@@ -19,10 +19,10 @@
 
 package org.apache.gravitino.credential;
 
+import com.google.common.collect.ImmutableSet;
 import java.util.Set;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
-import org.testcontainers.shaded.com.google.common.collect.ImmutableSet;
 
 public class TestCredentialCacheKey {
 
@@ -52,5 +52,14 @@ public class TestCredentialCacheKey {
     // different credential type
     CredentialCacheKey key4 = new CredentialCacheKey("s3-token1", context);
     Assertions.assertFalse(cache.contains(key4));
+  }
+
+  @Test
+  void testToStringContainsSpaceBetweenFields() {
+    PathBasedCredentialContext context =
+        new PathBasedCredentialContext("user", ImmutableSet.of(), ImmutableSet.of());
+    CredentialCacheKey key = new CredentialCacheKey("s3-token", context);
+
+    Assertions.assertTrue(key.toString().contains("credentialType: s3-token credentialContext:"));
   }
 }

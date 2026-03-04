@@ -42,6 +42,7 @@ import javax.ws.rs.core.Context;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.gravitino.Entity;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.MetadataObjects;
 import org.apache.gravitino.dto.requests.PartitionStatisticsDropRequest;
@@ -58,12 +59,16 @@ import org.apache.gravitino.dto.stats.PartitionStatisticsUpdateDTO;
 import org.apache.gravitino.dto.util.DTOConverters;
 import org.apache.gravitino.exceptions.IllegalStatisticNameException;
 import org.apache.gravitino.metrics.MetricNames;
+import org.apache.gravitino.server.authorization.annotations.AuthorizationExpression;
+import org.apache.gravitino.server.authorization.annotations.AuthorizationFullName;
+import org.apache.gravitino.server.authorization.annotations.AuthorizationMetadata;
+import org.apache.gravitino.server.authorization.annotations.AuthorizationObjectType;
 import org.apache.gravitino.server.web.Utils;
 import org.apache.gravitino.stats.PartitionRange;
 import org.apache.gravitino.stats.PartitionStatistics;
 import org.apache.gravitino.stats.PartitionStatisticsModification;
 import org.apache.gravitino.stats.Statistic;
-import org.apache.gravitino.stats.StatisticManager;
+import org.apache.gravitino.stats.StatisticDispatcher;
 import org.apache.gravitino.stats.StatisticValue;
 import org.apache.gravitino.utils.MetadataObjectUtil;
 import org.slf4j.Logger;
@@ -78,21 +83,28 @@ public class StatisticOperations {
 
   @Context private HttpServletRequest httpRequest;
 
-  private final StatisticManager statisticManager;
+  private final StatisticDispatcher statisticDispatcher;
 
   @Inject
-  public StatisticOperations(StatisticManager statisticManager) {
-    this.statisticManager = statisticManager;
+  public StatisticOperations(StatisticDispatcher statisticDispatcher) {
+    this.statisticDispatcher = statisticDispatcher;
   }
 
   @GET
   @Produces("application/vnd.gravitino.v1+json")
   @Timed(name = "list-stats." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
   @ResponseMetered(name = "list-stats", absolute = true)
+  @AuthorizationExpression(
+      expression =
+          "ANY(OWNER, METALAKE, CATALOG) || "
+              + "SCHEMA_OWNER_WITH_USE_CATALOG || "
+              + "ANY_USE_CATALOG && ANY_USE_SCHEMA  && (TABLE::OWNER || ANY_SELECT_TABLE|| ANY_MODIFY_TABLE)",
+      accessMetadataType = MetadataObject.Type.TABLE)
   public Response listStatistics(
-      @PathParam("metalake") String metalake,
-      @PathParam("type") String type,
-      @PathParam("fullName") String fullName) {
+      @PathParam("metalake") @AuthorizationMetadata(type = Entity.EntityType.METALAKE)
+          String metalake,
+      @PathParam("type") @AuthorizationObjectType String type,
+      @PathParam("fullName") @AuthorizationFullName String fullName) {
     LOG.info(
         "Received list statistics request for object full name: {} type: {} in the metalake {}",
         fullName,
@@ -113,7 +125,7 @@ public class StatisticOperations {
 
             MetadataObjectUtil.checkMetadataObject(metalake, object);
 
-            List<Statistic> statistics = statisticManager.listStatistics(metalake, object);
+            List<Statistic> statistics = statisticDispatcher.listStatistics(metalake, object);
             return Utils.ok(
                 new StatisticListResponse(
                     DTOConverters.toDTOs(statistics.toArray(new Statistic[0]))));
@@ -127,10 +139,17 @@ public class StatisticOperations {
   @Produces("application/vnd.gravitino.v1+json")
   @Timed(name = "update-stats." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
   @ResponseMetered(name = "update-stats", absolute = true)
+  @AuthorizationExpression(
+      expression =
+          "ANY(OWNER, METALAKE, CATALOG) || "
+              + "SCHEMA_OWNER_WITH_USE_CATALOG || "
+              + "ANY_USE_CATALOG && ANY_USE_SCHEMA  && (TABLE::OWNER || ANY_MODIFY_TABLE)",
+      accessMetadataType = MetadataObject.Type.TABLE)
   public Response updateStatistics(
-      @PathParam("metalake") String metalake,
-      @PathParam("type") String type,
-      @PathParam("fullName") String fullName,
+      @PathParam("metalake") @AuthorizationMetadata(type = Entity.EntityType.METALAKE)
+          String metalake,
+      @PathParam("type") @AuthorizationObjectType String type,
+      @PathParam("fullName") @AuthorizationFullName String fullName,
       StatisticsUpdateRequest request) {
     try {
       LOG.info(
@@ -164,7 +183,7 @@ public class StatisticOperations {
 
             MetadataObjectUtil.checkMetadataObject(metalake, object);
 
-            statisticManager.updateStatistics(metalake, object, statisticMaps);
+            statisticDispatcher.updateStatistics(metalake, object, statisticMaps);
             return Utils.ok(new BaseResponse(0));
           });
     } catch (Exception e) {
@@ -177,10 +196,17 @@ public class StatisticOperations {
   @Produces("application/vnd.gravitino.v1+json")
   @Timed(name = "drop-stats." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
   @ResponseMetered(name = "drop-stats", absolute = true)
+  @AuthorizationExpression(
+      expression =
+          "ANY(OWNER, METALAKE, CATALOG) || "
+              + "SCHEMA_OWNER_WITH_USE_CATALOG || "
+              + "ANY_USE_CATALOG && ANY_USE_SCHEMA  && (TABLE::OWNER || ANY_MODIFY_TABLE)",
+      accessMetadataType = MetadataObject.Type.TABLE)
   public Response dropStatistics(
-      @PathParam("metalake") String metalake,
-      @PathParam("type") String type,
-      @PathParam("fullName") String fullName,
+      @PathParam("metalake") @AuthorizationMetadata(type = Entity.EntityType.METALAKE)
+          String metalake,
+      @PathParam("type") @AuthorizationObjectType String type,
+      @PathParam("fullName") @AuthorizationFullName String fullName,
       StatisticsDropRequest request) {
     try {
       LOG.info(
@@ -204,7 +230,7 @@ public class StatisticOperations {
             MetadataObjectUtil.checkMetadataObject(metalake, object);
 
             boolean dropped =
-                statisticManager.dropStatistics(
+                statisticDispatcher.dropStatistics(
                     metalake, object, Lists.newArrayList(request.getNames()));
             return Utils.ok(new DropResponse(dropped));
           });
@@ -219,10 +245,17 @@ public class StatisticOperations {
   @Produces("application/vnd.gravitino.v1+json")
   @Timed(name = "list-partition-stats." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
   @ResponseMetered(name = "list-partition-stats", absolute = true)
+  @AuthorizationExpression(
+      expression =
+          "ANY(OWNER, METALAKE, CATALOG) || "
+              + "SCHEMA_OWNER_WITH_USE_CATALOG || "
+              + "ANY_USE_CATALOG && ANY_USE_SCHEMA  && (TABLE::OWNER || ANY_SELECT_TABLE|| ANY_MODIFY_TABLE)",
+      accessMetadataType = MetadataObject.Type.TABLE)
   public Response listPartitionStatistics(
-      @PathParam("metalake") String metalake,
-      @PathParam("type") String type,
-      @PathParam("fullName") String fullName,
+      @PathParam("metalake") @AuthorizationMetadata(type = Entity.EntityType.METALAKE)
+          String metalake,
+      @PathParam("type") @AuthorizationObjectType String type,
+      @PathParam("fullName") @AuthorizationFullName String fullName,
       @QueryParam("from") String fromPartitionName,
       @QueryParam("to") String toPartitionName,
       @QueryParam("fromInclusive") @DefaultValue("true") boolean fromInclusive,
@@ -250,17 +283,14 @@ public class StatisticOperations {
                   "Listing partition statistics is only supported for tables now.");
             }
 
-            if (fromPartitionName == null && toPartitionName == null) {
-              throw new IllegalArgumentException(
-                  "Both 'from' and 'to' parameters cannot be null at the same time.");
-            }
-
             MetadataObjectUtil.checkMetadataObject(metalake, object);
 
             PartitionRange range;
             PartitionRange.BoundType fromBoundType = getFromBoundType(fromInclusive);
             PartitionRange.BoundType toBoundType = getFromBoundType(toInclusive);
-            if (fromPartitionName != null && toPartitionName != null) {
+            if (fromPartitionName == null && toPartitionName == null) {
+              range = PartitionRange.ALL_PARTITIONS;
+            } else if (fromPartitionName != null && toPartitionName != null) {
               range =
                   PartitionRange.between(
                       fromPartitionName, fromBoundType, toPartitionName, toBoundType);
@@ -271,7 +301,7 @@ public class StatisticOperations {
             }
 
             List<PartitionStatistics> statistics =
-                statisticManager.listPartitionStatistics(metalake, object, range);
+                statisticDispatcher.listPartitionStatistics(metalake, object, range);
 
             PartitionStatisticsDTO[] partitionStatistics =
                 statistics.stream()
@@ -305,10 +335,17 @@ public class StatisticOperations {
   @Produces("application/vnd.gravitino.v1+json")
   @Timed(name = "update-partitions-stats." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
   @ResponseMetered(name = "update-partitions-stats", absolute = true)
+  @AuthorizationExpression(
+      expression =
+          "ANY(OWNER, METALAKE, CATALOG) || "
+              + "SCHEMA_OWNER_WITH_USE_CATALOG || "
+              + "ANY_USE_CATALOG && ANY_USE_SCHEMA  && (TABLE::OWNER || ANY_MODIFY_TABLE)",
+      accessMetadataType = MetadataObject.Type.TABLE)
   public Response updatePartitionStatistics(
-      @PathParam("metalake") String metalake,
-      @PathParam("type") String type,
-      @PathParam("fullName") String fullName,
+      @PathParam("metalake") @AuthorizationMetadata(type = Entity.EntityType.METALAKE)
+          String metalake,
+      @PathParam("type") @AuthorizationObjectType String type,
+      @PathParam("fullName") @AuthorizationFullName String fullName,
       PartitionStatisticsUpdateRequest request) {
     LOG.info("Updating partition statistics for table: {} in the metalake {}", fullName, metalake);
     try {
@@ -343,7 +380,7 @@ public class StatisticOperations {
 
             MetadataObjectUtil.checkMetadataObject(metalake, object);
 
-            statisticManager.updatePartitionStatistics(
+            statisticDispatcher.updatePartitionStatistics(
                 metalake,
                 object,
                 updates.stream()
@@ -377,10 +414,17 @@ public class StatisticOperations {
   @Produces("application/vnd.gravitino.v1+json")
   @Timed(name = "drop-partitions-stats." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
   @ResponseMetered(name = "drop-partitions-stats", absolute = true)
+  @AuthorizationExpression(
+      expression =
+          "ANY(OWNER, METALAKE, CATALOG) || "
+              + "SCHEMA_OWNER_WITH_USE_CATALOG || "
+              + "ANY_USE_CATALOG && ANY_USE_SCHEMA  && (TABLE::OWNER || ANY_MODIFY_TABLE)",
+      accessMetadataType = MetadataObject.Type.TABLE)
   public Response dropPartitionStatistics(
-      @PathParam("metalake") String metalake,
-      @PathParam("type") String type,
-      @PathParam("fullName") String fullName,
+      @PathParam("metalake") @AuthorizationMetadata(type = Entity.EntityType.METALAKE)
+          String metalake,
+      @PathParam("type") @AuthorizationObjectType String type,
+      @PathParam("fullName") @AuthorizationFullName String fullName,
       PartitionStatisticsDropRequest request) {
 
     try {
@@ -400,7 +444,7 @@ public class StatisticOperations {
 
             return Utils.ok(
                 new DropResponse(
-                    statisticManager.dropPartitionStatistics(
+                    statisticDispatcher.dropPartitionStatistics(
                         metalake,
                         object,
                         request.getDrops().stream()

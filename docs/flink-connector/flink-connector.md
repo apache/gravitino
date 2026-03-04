@@ -22,7 +22,7 @@ This capability allows users to perform federation queries, accessing data from 
 
 * Flink 1.18
 * Scala 2.12
-* JDK 8 or 11 or 17
+* JDK 8, 11 or 17
 
 ## How to use it
 
@@ -82,6 +82,16 @@ CREATE TABLE hive_students (id INT, name STRING);
 INSERT INTO hive_students VALUES (1, 'Alice'), (2, 'Bob');
 SELECT * FROM hive_students;
 ```
+
+## Catalog naming restrictions
+
+:::caution
+When creating catalogs that will be used with the Flink connector, the catalog name **cannot start with a number**. This is a Flink limitation. For example:
+- ✅ Valid: `catalog_hive`, `hive_catalog`, `my_catalog_1`
+- ❌ Invalid: `1_catalog`, `123catalog`, `2hive`
+
+If you create a catalog with a name starting with a number, it will not be accessible from Flink.
+:::
 
 ## Datatype mapping
 

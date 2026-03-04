@@ -16,8 +16,7 @@ Apache Gravitino offers the capability to utilize [Apache Hive](https://hive.apa
 * Gravitino must have network access to the Hive metastore service using the Thrift protocol.
 
 :::note
-Although the Hive catalog uses the Hive2 metastore client, it can be compatible with the Hive3 metastore service because the called HMS APIs are still available in Hive3.
-If there is any compatibility issue, please create an [issue](https://github.com/apache/gravitino/issues).
+The Hive catalog supports HMS versions 2.x and 3.x. it can automatically detect the HMS version.
 :::
 
 ## Catalog
@@ -42,6 +41,7 @@ Besides the [common catalog properties](./gravitino-server-config.md#apache-grav
 | `kerberos.check-interval-sec`            | The interval to check validness of the principal                                                                                                                                                                                                    | 60            | No                           | 0.4.0         |
 | `kerberos.keytab-fetch-timeout-sec`      | The timeout to fetch key tab                                                                                                                                                                                                                        | 60            | No                           | 0.4.0         |
 | `list-all-tables`                        | Lists all tables in a database, including non-Hive tables, such as Iceberg, Hudi, etc.                                                                                                                                                              | false         | No                           | 0.5.1         |
+| `default.catalog`                        | The default catalog name for the Hive3 metastore backend; this configuration is ignored when using a Hive2 metastore.                                                                                                                               | hive          | No                           | 1.1.0         |
 
 :::note
 For `list-all-tables=false`, the Hive catalog will filter out:

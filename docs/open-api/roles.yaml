@@ -211,6 +211,16 @@ components:
             - MANAGE_GROUPS
             - CREATE_ROLE
             - MANAGE_GRANTS
+            - REGISTER_MODEL
+            - LINK_MODEL_VERSION
+            - USE_MODEL
+            - CREATE_TAG
+            - APPLY_TAG
+            - CREATE_POLICY
+            - APPLY_POLICY
+            - REGISTER_JOB_TEMPLATE
+            - USE_JOB_TEMPLATE
+            - RUN_JOB
           description: The name of the privilege
         condition:
           type: string
@@ -231,12 +241,17 @@ components:
         type:
           type: string
           enum:
+            - "METALAKE"
             - "CATALOG"
             - "SCHEMA"
             - "TABLE"
             - "FILESET"
             - "TOPIC"
-            - "METALAKE"
+            - "ROLE"
+            - "MODEL"
+            - "TAG"
+            - "POLICY"
+            - "JOB_TEMPLATE"
           description: The type of the securable object
         privileges:
           type: array
@@ -402,3 +417,8 @@ components:
           - "TABLE"
           - "FILESET"
           - "TOPIC"
+          - "ROLE"
+          - "MODEL"
+          - "TAG"
+          - "POLICY"
+          - "JOB_TEMPLATE"

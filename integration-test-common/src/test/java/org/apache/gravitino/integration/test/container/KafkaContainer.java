@@ -21,6 +21,8 @@ package org.apache.gravitino.integration.test.container;
 import static org.testcontainers.shaded.org.awaitility.Awaitility.await;
 
 import com.google.common.base.Preconditions;
+import com.google.common.collect.ImmutableMap;
+import com.google.common.collect.ImmutableSet;
 import java.net.Socket;
 import java.nio.file.Paths;
 import java.util.Map;
@@ -32,8 +34,6 @@ import org.apache.logging.log4j.util.Strings;
 import org.testcontainers.containers.Container;
 import org.testcontainers.containers.GenericContainer;
 import org.testcontainers.containers.Network;
-import org.testcontainers.shaded.com.google.common.collect.ImmutableMap;
-import org.testcontainers.shaded.com.google.common.collect.ImmutableSet;
 
 public class KafkaContainer extends BaseContainer {
 

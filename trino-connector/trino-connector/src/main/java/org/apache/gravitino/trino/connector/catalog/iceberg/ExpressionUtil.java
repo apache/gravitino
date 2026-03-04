@@ -297,7 +297,7 @@ public class ExpressionUtil {
                 (m) -> {
                   NamedReference.FieldReference sortField = NamedReference.field(m.group(1));
                   SortDirection sortDirection =
-                      m.group(1).equalsIgnoreCase(SORT_DIRECTION_ASC)
+                      m.group(2).equalsIgnoreCase(SORT_DIRECTION_ASC)
                           ? SortDirection.ASCENDING
                           : SortDirection.DESCENDING;
                   NullOrdering nullOrdering =

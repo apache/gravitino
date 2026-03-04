@@ -29,6 +29,7 @@ import static org.mockito.Mockito.when;
 import com.google.common.collect.Lists;
 import java.io.IOException;
 import java.time.Instant;
+import java.util.Collections;
 import javax.servlet.http.HttpServletRequest;
 import javax.ws.rs.client.Entity;
 import javax.ws.rs.core.Application;
@@ -36,16 +37,23 @@ import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 import org.apache.commons.lang3.reflect.FieldUtils;
 import org.apache.gravitino.Config;
+import org.apache.gravitino.EntityStore;
 import org.apache.gravitino.GravitinoEnv;
+import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.authorization.AccessControlManager;
 import org.apache.gravitino.authorization.Group;
 import org.apache.gravitino.authorization.Privilege;
 import org.apache.gravitino.authorization.Privileges;
 import org.apache.gravitino.authorization.Role;
+import org.apache.gravitino.authorization.SecurableObject;
 import org.apache.gravitino.authorization.SecurableObjects;
 import org.apache.gravitino.authorization.User;
+import org.apache.gravitino.catalog.TableDispatcher;
+import org.apache.gravitino.connector.PropertiesMetadata;
 import org.apache.gravitino.dto.authorization.PrivilegeDTO;
+import org.apache.gravitino.dto.authorization.SecurableObjectDTO;
 import org.apache.gravitino.dto.requests.PrivilegeGrantRequest;
+import org.apache.gravitino.dto.requests.PrivilegeOverrideRequest;
 import org.apache.gravitino.dto.requests.PrivilegeRevokeRequest;
 import org.apache.gravitino.dto.requests.RoleGrantRequest;
 import org.apache.gravitino.dto.requests.RoleRevokeRequest;
@@ -56,10 +64,14 @@ import org.apache.gravitino.dto.responses.RoleResponse;
 import org.apache.gravitino.dto.responses.UserResponse;
 import org.apache.gravitino.exceptions.IllegalPrivilegeException;
 import org.apache.gravitino.exceptions.IllegalRoleException;
+import org.apache.gravitino.exceptions.NoSuchEntityException;
+import org.apache.gravitino.exceptions.NoSuchGroupException;
+import org.apache.gravitino.exceptions.NoSuchMetadataObjectException;
 import org.apache.gravitino.exceptions.NoSuchMetalakeException;
 import org.apache.gravitino.exceptions.NoSuchUserException;
 import org.apache.gravitino.lock.LockManager;
 import org.apache.gravitino.meta.AuditInfo;
+import org.apache.gravitino.meta.BaseMetalake;
 import org.apache.gravitino.meta.GroupEntity;
 import org.apache.gravitino.meta.RoleEntity;
 import org.apache.gravitino.meta.UserEntity;
@@ -77,6 +89,8 @@ public class TestPermissionOperations extends BaseOperationsTest {
 
   private static final AccessControlManager manager = mock(AccessControlManager.class);
   private static final MetalakeDispatcher metalakeDispatcher = mock(MetalakeDispatcher.class);
+  private static final TableDispatcher tableDispatcher = mock(TableDispatcher.class);
+  private static final EntityStore entityStore = mock(EntityStore.class);
 
   private static class MockServletRequestFactory extends ServletRequestFactoryBase {
     @Override
@@ -97,6 +111,8 @@ public class TestPermissionOperations extends BaseOperationsTest {
     FieldUtils.writeField(GravitinoEnv.getInstance(), "accessControlDispatcher", manager, true);
     FieldUtils.writeField(
         GravitinoEnv.getInstance(), "metalakeDispatcher", metalakeDispatcher, true);
+    FieldUtils.writeField(GravitinoEnv.getInstance(), "tableDispatcher", tableDispatcher, true);
+    FieldUtils.writeField(GravitinoEnv.getInstance(), "entityStore", entityStore, true);
   }
 
   @Override
@@ -122,7 +138,7 @@ public class TestPermissionOperations extends BaseOperationsTest {
   }
 
   @Test
-  public void testGrantRolesToUser() {
+  public void testGrantRolesToUser() throws IOException {
     UserEntity userEntity =
         UserEntity.builder()
             .withId(1L)
@@ -133,6 +149,13 @@ public class TestPermissionOperations extends BaseOperationsTest {
                 AuditInfo.builder().withCreator("test").withCreateTime(Instant.now()).build())
             .build();
     when(manager.grantRolesToUser(any(), any(), any())).thenReturn(userEntity);
+
+    // Mock metalake with in-use property
+    BaseMetalake metalake = mock(BaseMetalake.class);
+    PropertiesMetadata propertiesMetadata = mock(PropertiesMetadata.class);
+    when(propertiesMetadata.getOrDefault(any(), any())).thenReturn(true);
+    when(metalake.propertiesMetadata()).thenReturn(propertiesMetadata);
+    when(entityStore.get(any(), any(), any())).thenReturn(metalake);
 
     RoleGrantRequest illegalReq = new RoleGrantRequest(null);
     Response illegalResp =
@@ -159,9 +182,7 @@ public class TestPermissionOperations extends BaseOperationsTest {
     Assertions.assertEquals(userEntity.name(), user.name());
 
     // Test to throw NoSuchMetalakeException
-    doThrow(new NoSuchMetalakeException("mock error"))
-        .when(manager)
-        .grantRolesToUser(any(), any(), any());
+    doThrow(new NoSuchEntityException("mock error")).when(entityStore).get(any(), any(), any());
     Response resp1 =
         target("/metalakes/metalake1/permissions/users/user/grant")
             .request(MediaType.APPLICATION_JSON_TYPE)
@@ -176,6 +197,12 @@ public class TestPermissionOperations extends BaseOperationsTest {
     Assertions.assertEquals(NoSuchMetalakeException.class.getSimpleName(), errorResponse.getType());
 
     // Test to throw NoSuchUserException
+    Mockito.reset(entityStore);
+    BaseMetalake metalake1 = mock(BaseMetalake.class);
+    PropertiesMetadata propertiesMetadata1 = mock(PropertiesMetadata.class);
+    when(propertiesMetadata1.getOrDefault(any(), any())).thenReturn(true);
+    when(metalake1.propertiesMetadata()).thenReturn(propertiesMetadata1);
+    when(entityStore.get(any(), any(), any())).thenReturn(metalake1);
     doThrow(new NoSuchUserException("mock error"))
         .when(manager)
         .grantRolesToUser(any(), any(), any());
@@ -226,7 +253,7 @@ public class TestPermissionOperations extends BaseOperationsTest {
   }
 
   @Test
-  public void testGrantRolesToGroup() {
+  public void testGrantRolesToGroup() throws IOException {
     GroupEntity groupEntity =
         GroupEntity.builder()
             .withId(1L)
@@ -238,7 +265,13 @@ public class TestPermissionOperations extends BaseOperationsTest {
             .build();
     when(manager.grantRolesToGroup(any(), any(), any())).thenReturn(groupEntity);
 
-    // Test with Illegal request
+    // Mock metalake with in-use property
+    BaseMetalake metalake = mock(BaseMetalake.class);
+    PropertiesMetadata propertiesMetadata = mock(PropertiesMetadata.class);
+    when(propertiesMetadata.getOrDefault(any(), any())).thenReturn(true);
+    when(metalake.propertiesMetadata()).thenReturn(propertiesMetadata);
+    when(entityStore.get(any(), any(), any())).thenReturn(metalake);
+
     RoleGrantRequest illegalReq = new RoleGrantRequest(null);
     Response illegalResp =
         target("/metalakes/metalake1/permissions/groups/group/grant")
@@ -248,7 +281,6 @@ public class TestPermissionOperations extends BaseOperationsTest {
     Assertions.assertEquals(Response.Status.BAD_REQUEST.getStatusCode(), illegalResp.getStatus());
 
     RoleGrantRequest request = new RoleGrantRequest(Lists.newArrayList("role1"));
-
     Response resp =
         target("/metalakes/metalake1/permissions/groups/group/grant")
             .request(MediaType.APPLICATION_JSON_TYPE)
@@ -258,17 +290,14 @@ public class TestPermissionOperations extends BaseOperationsTest {
     Assertions.assertEquals(Response.Status.OK.getStatusCode(), resp.getStatus());
     Assertions.assertEquals(MediaType.APPLICATION_JSON_TYPE, resp.getMediaType());
 
-    GroupResponse grantResponse = resp.readEntity(GroupResponse.class);
-    Assertions.assertEquals(0, grantResponse.getCode());
-
-    Group group = grantResponse.getGroup();
+    GroupResponse groupResponse = resp.readEntity(GroupResponse.class);
+    Assertions.assertEquals(0, groupResponse.getCode());
+    Group group = groupResponse.getGroup();
     Assertions.assertEquals(groupEntity.roles(), group.roles());
     Assertions.assertEquals(groupEntity.name(), group.name());
 
     // Test to throw NoSuchMetalakeException
-    doThrow(new NoSuchMetalakeException("mock error"))
-        .when(manager)
-        .grantRolesToGroup(any(), any(), any());
+    doThrow(new NoSuchEntityException("mock error")).when(entityStore).get(any(), any(), any());
     Response resp1 =
         target("/metalakes/metalake1/permissions/groups/group/grant")
             .request(MediaType.APPLICATION_JSON_TYPE)
@@ -282,8 +311,14 @@ public class TestPermissionOperations extends BaseOperationsTest {
     Assertions.assertEquals(ErrorConstants.NOT_FOUND_CODE, errorResponse.getCode());
     Assertions.assertEquals(NoSuchMetalakeException.class.getSimpleName(), errorResponse.getType());
 
-    // Test to throw NoSuchUserException
-    doThrow(new NoSuchUserException("mock error"))
+    // Test to throw NoSuchGroupException
+    Mockito.reset(entityStore);
+    BaseMetalake metalake1 = mock(BaseMetalake.class);
+    PropertiesMetadata propertiesMetadata1 = mock(PropertiesMetadata.class);
+    when(propertiesMetadata1.getOrDefault(any(), any())).thenReturn(true);
+    when(metalake1.propertiesMetadata()).thenReturn(propertiesMetadata1);
+    when(entityStore.get(any(), any(), any())).thenReturn(metalake1);
+    doThrow(new NoSuchGroupException("mock error"))
         .when(manager)
         .grantRolesToGroup(any(), any(), any());
     resp1 =
@@ -297,7 +332,7 @@ public class TestPermissionOperations extends BaseOperationsTest {
 
     errorResponse = resp1.readEntity(ErrorResponse.class);
     Assertions.assertEquals(ErrorConstants.NOT_FOUND_CODE, errorResponse.getCode());
-    Assertions.assertEquals(NoSuchUserException.class.getSimpleName(), errorResponse.getType());
+    Assertions.assertEquals(NoSuchGroupException.class.getSimpleName(), errorResponse.getType());
 
     // Test to throw IllegalRoleException
     doThrow(new IllegalRoleException("mock error"))
@@ -335,7 +370,7 @@ public class TestPermissionOperations extends BaseOperationsTest {
   }
 
   @Test
-  public void testRevokeRolesFromUser() {
+  public void testRevokeRolesFromUser() throws IOException {
     UserEntity userEntity =
         UserEntity.builder()
             .withId(1L)
@@ -346,6 +381,13 @@ public class TestPermissionOperations extends BaseOperationsTest {
                 AuditInfo.builder().withCreator("test").withCreateTime(Instant.now()).build())
             .build();
     when(manager.revokeRolesFromUser(any(), any(), any())).thenReturn(userEntity);
+
+    // Mock metalake with in-use property
+    BaseMetalake metalake = mock(BaseMetalake.class);
+    PropertiesMetadata propertiesMetadata = mock(PropertiesMetadata.class);
+    when(propertiesMetadata.getOrDefault(any(), any())).thenReturn(true);
+    when(metalake.propertiesMetadata()).thenReturn(propertiesMetadata);
+    when(entityStore.get(any(), any(), any())).thenReturn(metalake);
 
     // Test with illegal request
     RoleRevokeRequest illegalReq = new RoleRevokeRequest(null);
@@ -407,7 +449,7 @@ public class TestPermissionOperations extends BaseOperationsTest {
   }
 
   @Test
-  public void testRevokeRolesFromGroup() {
+  public void testRevokeRolesFromGroup() throws IOException {
     GroupEntity groupEntity =
         GroupEntity.builder()
             .withId(1L)
@@ -418,6 +460,14 @@ public class TestPermissionOperations extends BaseOperationsTest {
                 AuditInfo.builder().withCreator("test").withCreateTime(Instant.now()).build())
             .build();
     when(manager.revokeRolesFromGroup(any(), any(), any())).thenReturn(groupEntity);
+
+    // Mock metalake with in-use property
+    BaseMetalake metalake = mock(BaseMetalake.class);
+    PropertiesMetadata propertiesMetadata = mock(PropertiesMetadata.class);
+    when(propertiesMetadata.getOrDefault(any(), any())).thenReturn(true);
+    when(metalake.propertiesMetadata()).thenReturn(propertiesMetadata);
+    when(entityStore.get(any(), any(), any())).thenReturn(metalake);
+
     // Test with illegal request
     RoleRevokeRequest illegalReq = new RoleRevokeRequest(null);
     Response illegalResp =
@@ -478,7 +528,7 @@ public class TestPermissionOperations extends BaseOperationsTest {
   }
 
   @Test
-  public void testGrantPrivilegesToRole() {
+  public void testGrantPrivilegesToRole() throws IOException {
     RoleEntity roleEntity =
         RoleEntity.builder()
             .withId(1L)
@@ -492,6 +542,14 @@ public class TestPermissionOperations extends BaseOperationsTest {
             .build();
     when(manager.grantPrivilegeToRole(any(), any(), any(), any())).thenReturn(roleEntity);
     when(metalakeDispatcher.metalakeExists(any())).thenReturn(true);
+
+    // Mock metalake with in-use property
+    BaseMetalake metalake = mock(BaseMetalake.class);
+    PropertiesMetadata propertiesMetadata = mock(PropertiesMetadata.class);
+    when(propertiesMetadata.getOrDefault(any(), any())).thenReturn(true);
+    when(metalake.propertiesMetadata()).thenReturn(propertiesMetadata);
+    when(entityStore.get(any(), any(), any())).thenReturn(metalake);
+
     PrivilegeGrantRequest request =
         new PrivilegeGrantRequest(
             Lists.newArrayList(
@@ -561,7 +619,7 @@ public class TestPermissionOperations extends BaseOperationsTest {
   }
 
   @Test
-  public void testRevokePrivilegesFromRole() {
+  public void testRevokePrivilegesFromRole() throws IOException {
     RoleEntity roleEntity =
         RoleEntity.builder()
             .withId(1L)
@@ -572,6 +630,13 @@ public class TestPermissionOperations extends BaseOperationsTest {
             .build();
     when(manager.revokePrivilegesFromRole(any(), any(), any(), any())).thenReturn(roleEntity);
     when(metalakeDispatcher.metalakeExists(any())).thenReturn(true);
+
+    // Mock metalake with in-use property
+    BaseMetalake metalake = mock(BaseMetalake.class);
+    PropertiesMetadata propertiesMetadata = mock(PropertiesMetadata.class);
+    when(propertiesMetadata.getOrDefault(any(), any())).thenReturn(true);
+    when(metalake.propertiesMetadata()).thenReturn(propertiesMetadata);
+    when(entityStore.get(any(), any(), any())).thenReturn(metalake);
 
     // Test with illegal request
     PrivilegeRevokeRequest illegalReq = new PrivilegeRevokeRequest(null);
@@ -643,5 +708,108 @@ public class TestPermissionOperations extends BaseOperationsTest {
     Assertions.assertEquals(ErrorConstants.ILLEGAL_ARGUMENTS_CODE, wrongPriErrorResp.getCode());
     Assertions.assertEquals(
         IllegalPrivilegeException.class.getSimpleName(), wrongPriErrorResp.getType());
+  }
+
+  @Test
+  public void testOverridePrivileges() throws IOException {
+    // Mock metalake with in-use property
+    BaseMetalake metalake = mock(BaseMetalake.class);
+    PropertiesMetadata propertiesMetadata = mock(PropertiesMetadata.class);
+    when(propertiesMetadata.getOrDefault(any(), any())).thenReturn(true);
+    when(metalake.propertiesMetadata()).thenReturn(propertiesMetadata);
+    when(entityStore.get(any(), any(), any())).thenReturn(metalake);
+
+    SecurableObjectDTO[] updates =
+        new SecurableObjectDTO[] {
+          SecurableObjectDTO.builder()
+              .withPrivileges(
+                  new PrivilegeDTO[] {
+                    PrivilegeDTO.builder()
+                        .withName(Privilege.Name.SELECT_TABLE)
+                        .withCondition(Privilege.Condition.ALLOW)
+                        .build()
+                  })
+              .withType(MetadataObject.Type.TABLE)
+              .withFullName("test1.test2.test3")
+              .build()
+        };
+
+    SecurableObject catalog =
+        SecurableObjects.ofCatalog("catalog", Lists.newArrayList(Privileges.UseCatalog.allow()));
+    SecurableObject anotherSecurableObject =
+        SecurableObjects.ofCatalog(
+            "another_catalog", Lists.newArrayList(Privileges.CreateSchema.deny()));
+
+    Role roleEntity =
+        RoleEntity.builder()
+            .withId(1L)
+            .withName("role1")
+            .withProperties(Collections.emptyMap())
+            .withSecurableObjects(Lists.newArrayList(catalog, anotherSecurableObject))
+            .withAuditInfo(
+                AuditInfo.builder().withCreator("creator").withCreateTime(Instant.now()).build())
+            .build();
+
+    PrivilegeOverrideRequest req = new PrivilegeOverrideRequest(updates);
+
+    when(manager.overridePrivilegesInRole(any(), any(), any())).thenReturn(roleEntity);
+    when(tableDispatcher.tableExists(any())).thenReturn(true);
+
+    Response resp =
+        target("/metalakes/metalake1/permissions/roles/role1")
+            .request(MediaType.APPLICATION_JSON_TYPE)
+            .accept("application/vnd.gravitino.v1+json")
+            .put(Entity.entity(req, MediaType.APPLICATION_JSON_TYPE));
+
+    Assertions.assertEquals(Response.Status.OK.getStatusCode(), resp.getStatus());
+    Assertions.assertEquals(MediaType.APPLICATION_JSON_TYPE, resp.getMediaType());
+
+    RoleResponse roleResponse = resp.readEntity(RoleResponse.class);
+    Assertions.assertEquals(0, roleResponse.getCode());
+    Role roleDTO = roleResponse.getRole();
+    Assertions.assertEquals("role1", roleDTO.name());
+    Assertions.assertTrue(roleDTO.properties().isEmpty());
+    Assertions.assertEquals(
+        SecurableObjects.ofCatalog("catalog", Lists.newArrayList(Privileges.UseCatalog.allow()))
+            .fullName(),
+        roleDTO.securableObjects().get(0).fullName());
+    Assertions.assertEquals(1, roleDTO.securableObjects().get(0).privileges().size());
+    Assertions.assertEquals(
+        Privileges.UseCatalog.allow().name(),
+        roleDTO.securableObjects().get(0).privileges().get(0).name());
+    Assertions.assertEquals(
+        Privileges.UseCatalog.allow().condition(),
+        roleDTO.securableObjects().get(0).privileges().get(0).condition());
+
+    // Throw no found exception
+    when(tableDispatcher.tableExists(any())).thenReturn(false);
+    Response resp1 =
+        target("/metalakes/metalake1/permissions/roles/role1/")
+            .request(MediaType.APPLICATION_JSON_TYPE)
+            .accept("application/vnd.gravitino.v1+json")
+            .put(Entity.entity(req, MediaType.APPLICATION_JSON_TYPE));
+
+    Assertions.assertEquals(Response.Status.NOT_FOUND.getStatusCode(), resp1.getStatus());
+
+    ErrorResponse errorResponse = resp1.readEntity(ErrorResponse.class);
+    Assertions.assertEquals(ErrorConstants.NOT_FOUND_CODE, errorResponse.getCode());
+    Assertions.assertEquals(
+        NoSuchMetadataObjectException.class.getSimpleName(), errorResponse.getType());
+
+    // Throw runtime exception
+    when(tableDispatcher.tableExists(any())).thenReturn(true);
+    when(manager.overridePrivilegesInRole(any(), any(), any()))
+        .thenThrow(new RuntimeException("Test exception"));
+    Response resp2 =
+        target("/metalakes/metalake1/permissions/roles/role1/")
+            .request(MediaType.APPLICATION_JSON_TYPE)
+            .accept("application/vnd.gravitino.v1+json")
+            .put(Entity.entity(req, MediaType.APPLICATION_JSON_TYPE));
+
+    Assertions.assertEquals(
+        Response.Status.INTERNAL_SERVER_ERROR.getStatusCode(), resp2.getStatus());
+    ErrorResponse errorResponse2 = resp2.readEntity(ErrorResponse.class);
+    Assertions.assertEquals(ErrorConstants.INTERNAL_ERROR_CODE, errorResponse2.getCode());
+    Assertions.assertEquals(RuntimeException.class.getSimpleName(), errorResponse2.getType());
   }
 }

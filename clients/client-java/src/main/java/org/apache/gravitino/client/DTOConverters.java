@@ -36,11 +36,20 @@ import org.apache.gravitino.dto.CatalogDTO;
 import org.apache.gravitino.dto.MetalakeDTO;
 import org.apache.gravitino.dto.authorization.PrivilegeDTO;
 import org.apache.gravitino.dto.authorization.SecurableObjectDTO;
+import org.apache.gravitino.dto.function.FunctionColumnDTO;
+import org.apache.gravitino.dto.function.FunctionDefinitionDTO;
+import org.apache.gravitino.dto.function.FunctionImplDTO;
+import org.apache.gravitino.dto.function.FunctionParamDTO;
 import org.apache.gravitino.dto.job.JobTemplateDTO;
 import org.apache.gravitino.dto.job.ShellJobTemplateDTO;
+import org.apache.gravitino.dto.job.ShellTemplateUpdateDTO;
 import org.apache.gravitino.dto.job.SparkJobTemplateDTO;
+import org.apache.gravitino.dto.job.SparkTemplateUpdateDTO;
+import org.apache.gravitino.dto.job.TemplateUpdateDTO;
 import org.apache.gravitino.dto.requests.CatalogUpdateRequest;
 import org.apache.gravitino.dto.requests.FilesetUpdateRequest;
+import org.apache.gravitino.dto.requests.FunctionUpdateRequest;
+import org.apache.gravitino.dto.requests.JobTemplateUpdateRequest;
 import org.apache.gravitino.dto.requests.MetalakeUpdateRequest;
 import org.apache.gravitino.dto.requests.ModelUpdateRequest;
 import org.apache.gravitino.dto.requests.ModelVersionUpdateRequest;
@@ -50,7 +59,12 @@ import org.apache.gravitino.dto.requests.TableUpdateRequest;
 import org.apache.gravitino.dto.requests.TagUpdateRequest;
 import org.apache.gravitino.dto.requests.TopicUpdateRequest;
 import org.apache.gravitino.file.FilesetChange;
+import org.apache.gravitino.function.FunctionChange;
+import org.apache.gravitino.function.FunctionColumn;
+import org.apache.gravitino.function.FunctionDefinition;
+import org.apache.gravitino.function.FunctionParam;
 import org.apache.gravitino.job.JobTemplate;
+import org.apache.gravitino.job.JobTemplateChange;
 import org.apache.gravitino.job.ShellJobTemplate;
 import org.apache.gravitino.job.SparkJobTemplate;
 import org.apache.gravitino.messaging.TopicChange;
@@ -197,8 +211,9 @@ class DTOConverters {
 
   static TableUpdateRequest toTableUpdateRequest(TableChange change) {
     if (change instanceof TableChange.RenameTable) {
+      TableChange.RenameTable renameTable = (TableChange.RenameTable) change;
       return new TableUpdateRequest.RenameTableRequest(
-          ((TableChange.RenameTable) change).getNewName());
+          renameTable.getNewName(), renameTable.getNewSchemaName().orElse(null));
 
     } else if (change instanceof TableChange.UpdateComment) {
       return new TableUpdateRequest.UpdateTableCommentRequest(
@@ -493,5 +508,114 @@ class DTOConverters {
       default:
         throw new IllegalArgumentException("Unsupported job type: " + jobTemplate.jobType());
     }
+  }
+
+  static JobTemplateUpdateRequest toJobTemplateUpdateRequest(JobTemplateChange change) {
+    if (change instanceof JobTemplateChange.RenameJobTemplate) {
+      return new JobTemplateUpdateRequest.RenameJobTemplateRequest(
+          ((JobTemplateChange.RenameJobTemplate) change).getNewName());
+
+    } else if (change instanceof JobTemplateChange.UpdateJobTemplateComment) {
+      return new JobTemplateUpdateRequest.UpdateJobTemplateCommentRequest(
+          ((JobTemplateChange.UpdateJobTemplateComment) change).getNewComment());
+
+    } else if (change instanceof JobTemplateChange.UpdateJobTemplate) {
+      return new JobTemplateUpdateRequest.UpdateJobTemplateContentRequest(
+          toTemplateUpdateDTO(((JobTemplateChange.UpdateJobTemplate) change).getTemplateUpdate()));
+
+    } else {
+      throw new IllegalArgumentException(
+          "Unknown change type: " + change.getClass().getSimpleName());
+    }
+  }
+
+  static TemplateUpdateDTO toTemplateUpdateDTO(JobTemplateChange.TemplateUpdate change) {
+    if (change instanceof JobTemplateChange.ShellTemplateUpdate) {
+      JobTemplateChange.ShellTemplateUpdate shellUpdate =
+          (JobTemplateChange.ShellTemplateUpdate) change;
+      return ShellTemplateUpdateDTO.builder()
+          .withNewExecutable(shellUpdate.getNewExecutable())
+          .withNewArguments(shellUpdate.getNewArguments())
+          .withNewEnvironments(shellUpdate.getNewEnvironments())
+          .withNewCustomFields(shellUpdate.getNewCustomFields())
+          .withNewScripts(shellUpdate.getNewScripts())
+          .build();
+
+    } else if (change instanceof JobTemplateChange.SparkTemplateUpdate) {
+      JobTemplateChange.SparkTemplateUpdate sparkUpdate =
+          (JobTemplateChange.SparkTemplateUpdate) change;
+      return SparkTemplateUpdateDTO.builder()
+          .withNewExecutable(sparkUpdate.getNewExecutable())
+          .withNewArguments(sparkUpdate.getNewArguments())
+          .withNewEnvironments(sparkUpdate.getNewEnvironments())
+          .withNewCustomFields(sparkUpdate.getNewCustomFields())
+          .withNewClassName(sparkUpdate.getNewClassName())
+          .withNewJars(sparkUpdate.getNewJars())
+          .withNewFiles(sparkUpdate.getNewFiles())
+          .withNewArchives(sparkUpdate.getNewArchives())
+          .withNewConfigs(sparkUpdate.getNewConfigs())
+          .build();
+
+    } else {
+      throw new IllegalArgumentException(
+          "Unknown template update type: " + change.getClass().getSimpleName());
+    }
+  }
+
+  static FunctionUpdateRequest toFunctionUpdateRequest(FunctionChange change) {
+    if (change instanceof FunctionChange.UpdateComment) {
+      return new FunctionUpdateRequest.UpdateCommentRequest(
+          ((FunctionChange.UpdateComment) change).newComment());
+
+    } else if (change instanceof FunctionChange.AddDefinition) {
+      FunctionDefinition def = ((FunctionChange.AddDefinition) change).definition();
+      return new FunctionUpdateRequest.AddDefinitionRequest(
+          FunctionDefinitionDTO.fromFunctionDefinition(def));
+
+    } else if (change instanceof FunctionChange.RemoveDefinition) {
+      FunctionParam[] params = ((FunctionChange.RemoveDefinition) change).parameters();
+      return new FunctionUpdateRequest.RemoveDefinitionRequest(toFunctionParamDTOs(params));
+
+    } else if (change instanceof FunctionChange.AddImpl) {
+      FunctionChange.AddImpl addImpl = (FunctionChange.AddImpl) change;
+      return new FunctionUpdateRequest.AddImplRequest(
+          toFunctionParamDTOs(addImpl.parameters()),
+          FunctionImplDTO.fromFunctionImpl(addImpl.implementation()));
+
+    } else if (change instanceof FunctionChange.UpdateImpl) {
+      FunctionChange.UpdateImpl updateImpl = (FunctionChange.UpdateImpl) change;
+      return new FunctionUpdateRequest.UpdateImplRequest(
+          toFunctionParamDTOs(updateImpl.parameters()),
+          updateImpl.runtime().name(),
+          FunctionImplDTO.fromFunctionImpl(updateImpl.implementation()));
+
+    } else if (change instanceof FunctionChange.RemoveImpl) {
+      FunctionChange.RemoveImpl removeImpl = (FunctionChange.RemoveImpl) change;
+      return new FunctionUpdateRequest.RemoveImplRequest(
+          toFunctionParamDTOs(removeImpl.parameters()), removeImpl.runtime().name());
+
+    } else {
+      throw new IllegalArgumentException(
+          "Unknown function change type: " + change.getClass().getSimpleName());
+    }
+  }
+
+  static FunctionDefinitionDTO toFunctionDefinitionDTO(FunctionDefinition definition) {
+    return FunctionDefinitionDTO.fromFunctionDefinition(definition);
+  }
+
+  static FunctionColumnDTO toFunctionColumnDTO(FunctionColumn column) {
+    return FunctionColumnDTO.fromFunctionColumn(column);
+  }
+
+  private static FunctionParamDTO[] toFunctionParamDTOs(FunctionParam[] params) {
+    if (params == null) {
+      return new FunctionParamDTO[0];
+    }
+    FunctionParamDTO[] dtos = new FunctionParamDTO[params.length];
+    for (int i = 0; i < params.length; i++) {
+      dtos[i] = FunctionParamDTO.fromFunctionParam(params[i]);
+    }
+    return dtos;
   }
 }

@@ -1,6 +1,6 @@
 ---
 title: "Getting started with Apache Gravitino"
-slug: /getting-started
+slug: /getting-started/index
 license: "This software is licensed under the Apache License version 2."
 ---
 
@@ -10,7 +10,7 @@ There are several options for getting started with Apache Gravitino.
 Installing and configuring Hive and Trino can be a little complex.
 If you are unfamiliar with the technologies, using Docker might be a good choice.
 There are pre-packaged containers for Gravitino, Apache Hive, Apache Hadoop,
-Trino, MySQL, PostgesSQL, and others.
+Trino, MySQL, PostgreSQL, and others.
 Check [installing Gravitino playground](./playground.md) for more details.
 
 <!--Build from source-->
@@ -64,7 +64,7 @@ To work in an AWS environment, follow these steps:
    <!--TODO: need Red Hat commands?-->
    You may need to reboot the instance for all changes to take effect.
 
-1. Install the Java Development Kit (JDK). Java 8, 11 and 17 are supported.
+1. Install the Java Development Kit (JDK). Java 17 is supported.
 
    ```shell
    sudo apt install openjdk-<version>-jdk-headless
@@ -99,7 +99,7 @@ To work on the GCP platform, follow these steps:
 
    You may need to reboot the instance for all changes to take effect.
 
-1. Install the Java Development Kit (JDK), Java 8, 11 and 17 are supported.
+1. Install the Java Development Kit (JDK), Java 17 is supported.
 
    ```shell
    wget -O - https://apt.corretto.aws/corretto.key | sudo gpg --dearmor -o /usr/share/keyrings/corretto-keyring.gpg
@@ -121,7 +121,7 @@ To work on the GCP platform, follow these steps:
 To build and install Gravitino locally on a macOS or a Linux workstation,
 follow these steps:
 
-1. Install the Java Development Kit (JDK). Java 8, 11 and 17 are supported.
+1. Install the Java Development Kit (JDK). Java 17 is supported.
    This can be done using [sdkman](https://sdkman.io/), for example:
 
    ```shell
@@ -232,7 +232,7 @@ You may need to revise it based on your environment.
   for advanced features and configuration options.
 
 - Bookmark [Gravitino Website](https://gravitino.apache.org) for updates,
-   laest releases, new features, optimizations, and security enhancements.
+   latest releases, new features, optimizations, and security enhancements.
 
 - Read our [blogs](https://gravitino.apache.org/blog)
 

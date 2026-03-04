@@ -25,10 +25,10 @@ jobs:
       with:
         version: 9
     
-    - name: Setup Node.js 20
+    - name: Setup Node.js 20.19.0
       uses: actions/setup-node@v4
       with:
-        node-version: 20
+        node-version: '20.19.0'
         cache: 'pnpm'
         cache-dependency-path: 'web/web/pnpm-lock.yaml'
     

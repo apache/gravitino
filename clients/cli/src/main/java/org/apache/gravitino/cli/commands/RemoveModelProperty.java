@@ -31,10 +31,15 @@ import org.apache.gravitino.model.ModelChange;
 
 /** Removes a property of a model. */
 public class RemoveModelProperty extends Command {
+  /** The name of the metalake. */
   protected final String metalake;
+  /** The name of the catalog. */
   protected final String catalog;
+  /** The name of the schema. */
   protected final String schema;
+  /** The name of the model. */
   protected final String model;
+  /** The name of the property to remove. */
   protected final String property;
 
   /**

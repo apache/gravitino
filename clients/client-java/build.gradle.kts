@@ -47,6 +47,7 @@ dependencies {
   testImplementation(project(":server"))
   testImplementation(project(":server-common"))
 
+  testImplementation(libs.awaitility)
   testImplementation(libs.bundles.jersey)
   testImplementation(libs.bundles.jwt)
   testImplementation(libs.commons.lang3)
@@ -89,7 +90,7 @@ tasks.javadoc {
 
   classpath = configurations["compileClasspath"] +
     project(":api").configurations["runtimeClasspath"] +
-    project(":common").configurations["runtimeClasspath"]
+    project(":common").configurations["compileClasspath"]
 }
 
 tasks.clean {

@@ -27,10 +27,14 @@ import org.apache.gravitino.exceptions.CatalogInUseException;
 import org.apache.gravitino.exceptions.NoSuchCatalogException;
 import org.apache.gravitino.exceptions.NoSuchMetalakeException;
 
+/** Represents delete a catalog */
 public class DeleteCatalog extends Command {
 
+  /** The name of the metalake. */
   protected final String metalake;
+  /** The name of the catalog. */
   protected final String catalog;
+  /** The force flag. */
   protected final boolean force;
 
   /**

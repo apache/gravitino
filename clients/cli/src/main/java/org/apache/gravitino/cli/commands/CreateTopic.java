@@ -30,10 +30,15 @@ import org.apache.gravitino.exceptions.TopicAlreadyExistsException;
 /** Add a topic. */
 public class CreateTopic extends Command {
 
+  /** The name of the metalake. */
   protected final String metalake;
+  /** The name of the catalog. */
   protected final String catalog;
+  /** The name of the schema. */
   protected final String schema;
+  /** The name of the topic. */
   protected final String topic;
+  /** The comment for the topic. */
   protected final String comment;
 
   /**

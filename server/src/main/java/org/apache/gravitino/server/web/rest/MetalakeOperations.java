@@ -54,9 +54,10 @@ import org.apache.gravitino.dto.responses.MetalakeResponse;
 import org.apache.gravitino.dto.util.DTOConverters;
 import org.apache.gravitino.metalake.MetalakeDispatcher;
 import org.apache.gravitino.metrics.MetricNames;
-import org.apache.gravitino.server.authorization.MetadataFilterHelper;
+import org.apache.gravitino.server.authorization.MetadataAuthzHelper;
 import org.apache.gravitino.server.authorization.annotations.AuthorizationExpression;
 import org.apache.gravitino.server.authorization.annotations.AuthorizationMetadata;
+import org.apache.gravitino.server.authorization.expression.AuthorizationExpressionConstants;
 import org.apache.gravitino.server.web.Utils;
 import org.apache.gravitino.utils.NameIdentifierUtil;
 import org.slf4j.Logger;
@@ -90,21 +91,9 @@ public class MetalakeOperations {
           () -> {
             Metalake[] metalakes = metalakeDispatcher.listMetalakes();
             metalakes =
-                Arrays.stream(metalakes)
-                    .filter(
-                        metalake -> {
-                          NameIdentifier[] nameIdentifiers =
-                              new NameIdentifier[] {NameIdentifierUtil.ofMetalake(metalake.name())};
-                          return MetadataFilterHelper.filterByExpression(
-                                      metalake.name(),
-                                      "METALAKE_USER",
-                                      Entity.EntityType.METALAKE,
-                                      nameIdentifiers)
-                                  .length
-                              > 0;
-                        })
-                    .toList()
-                    .toArray(new Metalake[0]);
+                MetadataAuthzHelper.filterMetalakes(
+                    metalakes,
+                    AuthorizationExpressionConstants.LOAD_METALAKE_AUTHORIZATION_EXPRESSION);
             MetalakeDTO[] metalakeDTOs =
                 Arrays.stream(metalakes).map(DTOConverters::toDTO).toArray(MetalakeDTO[]::new);
             Response response = Utils.ok(new MetalakeListResponse(metalakeDTOs));
@@ -128,6 +117,12 @@ public class MetalakeOperations {
           "Only service admins can create metalakes, current user can't create the metalake,"
               + "  you should configure it in the server configuration first")
   public Response createMetalake(MetalakeCreateRequest request) {
+    if (request == null) {
+      LOG.warn("Received create metalake request with null request body");
+      return ExceptionHandlers.handleMetalakeException(
+          OperationType.CREATE, "", new IllegalArgumentException("Request body cannot be null"));
+    }
+
     LOG.info("Received create metalake request for {}", request.getName());
     try {
       return Utils.doAs(
@@ -144,7 +139,8 @@ public class MetalakeOperations {
           });
 
     } catch (Exception e) {
-      return ExceptionHandlers.handleMetalakeException(OperationType.CREATE, request.getName(), e);
+      String metalakeName = request != null ? request.getName() : "";
+      return ExceptionHandlers.handleMetalakeException(OperationType.CREATE, metalakeName, e);
     }
   }
 
@@ -153,7 +149,8 @@ public class MetalakeOperations {
   @Produces("application/vnd.gravitino.v1+json")
   @Timed(name = "load-metalake." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
   @ResponseMetered(name = "load-metalake", absolute = true)
-  @AuthorizationExpression(expression = "METALAKE_USER")
+  @AuthorizationExpression(
+      expression = AuthorizationExpressionConstants.LOAD_METALAKE_AUTHORIZATION_EXPRESSION)
   public Response loadMetalake(
       @PathParam("name") @AuthorizationMetadata(type = Entity.EntityType.METALAKE)
           String metalakeName) {

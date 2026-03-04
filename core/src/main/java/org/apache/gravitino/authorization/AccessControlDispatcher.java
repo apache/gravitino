@@ -260,6 +260,10 @@ public interface AccessControlDispatcher {
    */
   boolean deleteRole(String metalake, String role) throws NoSuchMetalakeException;
 
+  Role overridePrivilegesInRole(
+      String metalake, String role, List<SecurableObject> securableObjectsToOverride)
+      throws NoSuchRoleException, NoSuchMetalakeException;
+
   /**
    * Lists the role names.
    *
@@ -296,7 +300,7 @@ public interface AccessControlDispatcher {
    */
   Role grantPrivilegeToRole(
       String metalake, String role, MetadataObject object, Set<Privilege> privileges)
-      throws NoSuchGroupException, NoSuchRoleException;
+      throws NoSuchMetalakeException, NoSuchRoleException;
 
   /**
    * Revoke privileges from a role.

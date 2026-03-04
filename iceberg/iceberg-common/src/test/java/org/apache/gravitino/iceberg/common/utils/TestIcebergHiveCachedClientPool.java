@@ -99,4 +99,18 @@ public class TestIcebergHiveCachedClientPool {
                 () -> IcebergHiveCachedClientPool.extractKey("ugi", configuration));
     Assertions.assertNotEquals(key9, key10);
   }
+
+  @Test
+  void testCloseMultipleInstances() throws IOException {
+    Configuration configuration = new Configuration();
+    Map<String, String> properties = Maps.newHashMap();
+    IcebergHiveCachedClientPool pool1 = new IcebergHiveCachedClientPool(configuration, properties);
+    IcebergHiveCachedClientPool pool2 = new IcebergHiveCachedClientPool(configuration, properties);
+
+    Assertions.assertDoesNotThrow(
+        () -> {
+          pool1.close();
+          pool2.close();
+        });
+  }
 }

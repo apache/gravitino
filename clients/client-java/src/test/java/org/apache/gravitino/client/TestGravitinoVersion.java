@@ -108,6 +108,12 @@ public class TestGravitinoVersion {
     assertEquals(9, versionNumber[1]);
     assertEquals(0, versionNumber[2]);
 
+    version = new GravitinoVersion("1.0.0.dev0", "2023-01-01", "1234567");
+    versionNumber = version.getVersionNumber();
+    assertEquals(1, versionNumber[0]);
+    assertEquals(0, versionNumber[1]);
+    assertEquals(0, versionNumber[2]);
+
     // Test an invalid the version string with 2 part
     version = new GravitinoVersion("2.5", "2023-01-01", "1234567");
     assertThrows(GravitinoRuntimeException.class, version::getVersionNumber);
@@ -135,8 +141,8 @@ public class TestGravitinoVersion {
 
   @Test
   void testVersionCompatibility() {
-    GravitinoVersion version1 = new GravitinoVersion("2.5.3", "2023-01-01", "1234567");
-    GravitinoVersion version2 = new GravitinoVersion("2.5.4", "2023-01-01", "1234567");
+    GravitinoVersion version1 = new GravitinoVersion("2.6.3", "2023-01-01", "1234567");
+    GravitinoVersion version2 = new GravitinoVersion("2.6.4", "2023-01-01", "1234567");
     assertTrue(version1.compatibleWithServerVersion(version2));
 
     version1 = new GravitinoVersion("2.6.3", "2023-01-01", "1234567");
@@ -144,12 +150,16 @@ public class TestGravitinoVersion {
     assertTrue(version1.compatibleWithServerVersion(version2));
 
     version1 = new GravitinoVersion("2.6.3", "2023-01-01", "1234567");
-    version2 = new GravitinoVersion("2.5.4", "2023-01-01", "1234567");
+    version2 = new GravitinoVersion("2.6.2", "2023-01-01", "1234567");
     assertTrue(version1.compatibleWithServerVersion(version2));
 
     version1 = new GravitinoVersion("2.6.3", "2023-01-01", "1234567");
     version2 = new GravitinoVersion("3.5.4", "2023-01-01", "1234567");
     assertTrue(version1.compatibleWithServerVersion(version2));
+
+    version1 = new GravitinoVersion("2.6.3", "2023-01-01", "1234567");
+    version2 = new GravitinoVersion("2.5.3", "2023-01-01", "1234567");
+    assertFalse(version1.compatibleWithServerVersion(version2));
 
     version1 = new GravitinoVersion("3.6.3", "2023-01-01", "1234567");
     version2 = new GravitinoVersion("2.5.4", "2023-01-01", "1234567");

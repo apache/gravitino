@@ -22,11 +22,14 @@ package org.apache.gravitino.cli.commands;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.cli.CommandContext;
 import org.apache.gravitino.rel.expressions.distributions.Distribution;
+import org.apache.gravitino.rel.expressions.distributions.Strategy;
 
 /** Displays the details of a table's distirbution. */
 public class TableDistribution extends TableCommand {
 
+  /** The name of the schema. */
   protected final String schema;
+  /** The name of the table. */
   protected final String table;
 
   /**
@@ -57,6 +60,10 @@ public class TableDistribution extends TableCommand {
       exitWithError(exp.getMessage());
     }
 
-    printInformation(distribution.strategy() + "," + distribution.number());
+    if (distribution.strategy() == Strategy.NONE) {
+      printInformation(distribution.strategy().toString());
+    } else {
+      printInformation(distribution.strategy() + "," + distribution.number());
+    }
   }
 }

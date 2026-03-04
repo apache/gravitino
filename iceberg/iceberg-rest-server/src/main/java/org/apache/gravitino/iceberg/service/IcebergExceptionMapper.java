@@ -76,7 +76,7 @@ public class IcebergExceptionMapper implements ExceptionMapper<Exception> {
     return toRESTResponse(ex);
   }
 
-  public static Response toRESTResponse(Exception ex) {
+  public static Response toRESTResponse(Throwable ex) {
     int status =
         EXCEPTION_ERROR_CODES.getOrDefault(
             ex.getClass(), Status.INTERNAL_SERVER_ERROR.getStatusCode());
@@ -89,6 +89,6 @@ public class IcebergExceptionMapper implements ExceptionMapper<Exception> {
           ex.getClass(),
           ex.getMessage());
     }
-    return IcebergRestUtils.errorResponse(ex, status);
+    return IcebergRESTUtils.errorResponse(ex, status);
   }
 }

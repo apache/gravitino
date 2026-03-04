@@ -51,4 +51,18 @@ public @interface AuthorizationExpression {
    * @return error message
    */
   String errorMessage() default "";
+
+  /**
+   * The secondary expression to evaluate for authorization, which represents multiple privileges.
+   *
+   * @return the secondary expression to evaluate for authorization.
+   */
+  String secondaryExpression() default "";
+
+  /**
+   * The condition under which the secondary expression is evaluated.
+   *
+   * @return the condition for evaluating the secondary expression.
+   */
+  String secondaryExpressionCondition() default "";
 }

@@ -36,7 +36,12 @@ public class PartitionRange {
 
   private SortOrder comparator;
 
-  private PartitionRange() {}
+  private PartitionRange() {
+    this.comparator = DEFAULT_COMPARATOR;
+  }
+
+  /** A PartitionRange that includes all partitions. */
+  public static final PartitionRange ALL_PARTITIONS = new PartitionRange();
 
   /**
    * Creates a PartitionRange which only has upper bound partition name.
@@ -64,6 +69,7 @@ public class PartitionRange {
     Preconditions.checkArgument(upperBoundType != null, "Upper bound type cannot be null");
     Preconditions.checkArgument(
         !upperPartitionName.isEmpty(), "Upper partition name cannot be empty");
+    Preconditions.checkArgument(comparator != null, "Comparator cannot be null");
     PartitionRange partitionRange = new PartitionRange();
     partitionRange.upperPartitionName = Optional.of(upperPartitionName);
     partitionRange.upperBoundType = Optional.of(upperBoundType);

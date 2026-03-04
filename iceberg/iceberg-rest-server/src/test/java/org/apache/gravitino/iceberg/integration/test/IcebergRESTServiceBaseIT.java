@@ -33,6 +33,7 @@ import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.catalog.lakehouse.iceberg.IcebergCatalogBackend;
 import org.apache.gravitino.iceberg.common.IcebergConfig;
+import org.apache.gravitino.iceberg.common.cache.LocalTableMetadataCache;
 import org.apache.gravitino.iceberg.integration.test.util.IcebergRESTServerManager;
 import org.apache.gravitino.integration.test.util.ITUtils;
 import org.apache.gravitino.server.web.JettyServerConfig;
@@ -53,7 +54,7 @@ import org.slf4j.LoggerFactory;
 public abstract class IcebergRESTServiceBaseIT {
 
   public static final Logger LOG = LoggerFactory.getLogger(IcebergRESTServiceBaseIT.class);
-  private SparkSession sparkSession;
+  protected SparkSession sparkSession;
   protected IcebergCatalogBackend catalogType = IcebergCatalogBackend.MEMORY;
   private IcebergRESTServerManager icebergRESTServerManager;
 
@@ -117,18 +118,21 @@ public abstract class IcebergRESTServiceBaseIT {
 
   private void registerIcebergCatalogConfig() {
     Map<String, String> icebergConfigs = getCatalogConfig();
+    icebergConfigs.put(
+        IcebergConfig.ICEBERG_CONFIG_PREFIX + IcebergConfig.TABLE_METADATA_CACHE_IMPL.getKey(),
+        LocalTableMetadataCache.class.getName());
     icebergRESTServerManager.registerCustomConfigs(icebergConfigs);
     LOG.info("Iceberg REST service config registered, {}", StringUtils.join(icebergConfigs));
   }
 
-  private int getServerPort() {
+  protected int getServerPort() {
     JettyServerConfig jettyServerConfig =
         JettyServerConfig.fromConfig(
             icebergRESTServerManager.getServerConfig(), IcebergConfig.ICEBERG_CONFIG_PREFIX);
     return jettyServerConfig.getHttpPort();
   }
 
-  private void initSparkEnv() {
+  protected void initSparkEnv() {
     int port = getServerPort();
     LOG.info("Iceberg REST server port:{}", port);
     String icebergRESTUri = String.format("http://127.0.0.1:%d/iceberg/", port);

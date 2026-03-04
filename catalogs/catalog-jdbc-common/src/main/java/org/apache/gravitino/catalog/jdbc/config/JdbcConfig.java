@@ -92,6 +92,14 @@ public class JdbcConfig extends Config {
           .booleanConf()
           .createWithDefault(true);
 
+  public static final ConfigEntry<Long> POOL_MAX_WAIT_MS =
+      new ConfigBuilder("jdbc.pool.max-wait-ms")
+          .doc("The maximum Duration that the pool will wait for a connection to be returned")
+          .version(ConfigConstants.VERSION_1_1_0)
+          .longConf()
+          .checkValue(value -> value > 0, ConfigConstants.POSITIVE_NUMBER_ERROR_MSG)
+          .createWithDefault(30000L);
+
   public String getJdbcUrl() {
     return get(JDBC_URL);
   }
@@ -122,6 +130,10 @@ public class JdbcConfig extends Config {
 
   public boolean getTestOnBorrow() {
     return get(TEST_ON_BORROW);
+  }
+
+  public long getMaxWaitMs() {
+    return get(POOL_MAX_WAIT_MS);
   }
 
   public JdbcConfig(Map<String, String> properties) {

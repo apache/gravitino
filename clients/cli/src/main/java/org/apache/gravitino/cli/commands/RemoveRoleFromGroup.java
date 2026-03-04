@@ -23,6 +23,7 @@ import java.util.ArrayList;
 import org.apache.gravitino.cli.CommandContext;
 import org.apache.gravitino.cli.ErrorMessages;
 import org.apache.gravitino.client.GravitinoClient;
+import org.apache.gravitino.exceptions.NoSuchGroupException;
 import org.apache.gravitino.exceptions.NoSuchMetalakeException;
 import org.apache.gravitino.exceptions.NoSuchRoleException;
 import org.apache.gravitino.exceptions.NoSuchUserException;
@@ -30,8 +31,11 @@ import org.apache.gravitino.exceptions.NoSuchUserException;
 /** Removes a role from a group. */
 public class RemoveRoleFromGroup extends Command {
 
+  /** The name of the metalake. */
   protected String metalake;
+  /** The name of the group. */
   protected String group;
+  /** The name of the role. */
   protected String role;
 
   /**
@@ -63,6 +67,8 @@ public class RemoveRoleFromGroup extends Command {
       exitWithError(ErrorMessages.UNKNOWN_ROLE);
     } catch (NoSuchUserException err) {
       exitWithError(ErrorMessages.UNKNOWN_USER);
+    } catch (NoSuchGroupException err) {
+      exitWithError(ErrorMessages.UNKNOWN_GROUP);
     } catch (Exception exp) {
       exitWithError(exp.getMessage());
     }

@@ -52,7 +52,7 @@ public class TableColumnBaseSQLProvider {
     return "<script>"
         + "INSERT INTO "
         + TableColumnMapper.COLUMN_TABLE_NAME
-        + "(column_id, column_name, column_position, metalake_id, catalog_id, schema_id,"
+        + " (column_id, column_name, column_position, metalake_id, catalog_id, schema_id,"
         + " table_id, table_version,"
         + " column_type, column_comment, column_nullable, column_auto_increment,"
         + " column_default_value, column_op_type, deleted_at, audit_info)"
@@ -64,6 +64,14 @@ public class TableColumnBaseSQLProvider {
         + " #{item.defaultValue}, #{item.columnOpType}, #{item.deletedAt}, #{item.auditInfo})"
         + "</foreach>"
         + "</script>";
+  }
+
+  public String updateSchemaIdByTableId(
+      @Param("tableId") Long tableId, @Param("newSchemaId") Long newSchemaId) {
+    return "UPDATE "
+        + TableColumnMapper.COLUMN_TABLE_NAME
+        + " SET schema_id = #{newSchemaId}"
+        + " WHERE table_id = #{tableId} AND deleted_at = 0";
   }
 
   public String softDeleteColumnsByTableId(@Param("tableId") Long tableId) {
@@ -115,7 +123,10 @@ public class TableColumnBaseSQLProvider {
         + " FROM "
         + TableColumnMapper.COLUMN_TABLE_NAME
         + " WHERE table_id = #{tableId} AND column_name = #{columnName} AND deleted_at = 0"
-        + " ORDER BY table_version DESC LIMIT 1";
+        // Update a column will generate two records with the same version, one with op_type = 2
+        // (update) and another with op_type = 3 (delete). We should not return NULL if both records
+        // exist with the same version, otherwise the caller will think the column does not exist.
+        + " ORDER BY table_version DESC, column_op_type ASC, id DESC LIMIT 1";
   }
 
   public String selectColumnPOById(@Param("columnId") Long columnId) {
@@ -145,8 +156,8 @@ public class TableColumnBaseSQLProvider {
         + " c.deleted_at AS deletedAt, c.audit_info AS auditInfo"
         + " FROM "
         + TableColumnMapper.COLUMN_TABLE_NAME
-        + " c "
-        + "JOIN ("
+        + " c"
+        + " JOIN ("
         + "    SELECT column_id, MAX(table_version) AS max_version"
         + "    FROM "
         + TableColumnMapper.COLUMN_TABLE_NAME
@@ -155,13 +166,13 @@ public class TableColumnBaseSQLProvider {
         + "          #{columnId}"
         + "        </foreach>"
         + "    ) AND deleted_at = 0 GROUP BY column_id"
-        + ") latest "
-        + "ON c.column_id = latest.column_id AND c.table_version = latest.max_version"
+        + " ) latest"
+        + " ON c.column_id = latest.column_id AND c.table_version = latest.max_version"
         + " WHERE c.column_id IN ("
         + "<foreach collection='columnIds' item='columnId' separator=','>"
         + "#{columnId}"
         + "</foreach>"
-        + ") "
+        + ")"
         + " AND c.deleted_at = 0"
         + "</script>";
   }

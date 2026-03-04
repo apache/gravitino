@@ -69,13 +69,13 @@ public class TestTypeUtils {
     Assertions.assertEquals(Types.ByteType.get(), TypeUtils.toGravitinoType(new TinyIntType()));
     Assertions.assertEquals(Types.ShortType.get(), TypeUtils.toGravitinoType(new SmallIntType()));
     Assertions.assertEquals(
-        Types.TimestampType.withoutTimeZone(), TypeUtils.toGravitinoType(new TimestampType()));
+        Types.TimestampType.withoutTimeZone(6), TypeUtils.toGravitinoType(new TimestampType()));
     Assertions.assertEquals(
-        Types.TimestampType.withTimeZone(), TypeUtils.toGravitinoType(new ZonedTimestampType()));
+        Types.TimestampType.withTimeZone(6), TypeUtils.toGravitinoType(new ZonedTimestampType()));
     Assertions.assertEquals(
-        Types.TimestampType.withTimeZone(),
+        Types.TimestampType.withTimeZone(6),
         TypeUtils.toGravitinoType(new LocalZonedTimestampType()));
-    Assertions.assertEquals(Types.TimeType.get(), TypeUtils.toGravitinoType(new TimeType()));
+    Assertions.assertEquals(Types.TimeType.of(0), TypeUtils.toGravitinoType(new TimeType()));
     Assertions.assertEquals(
         Types.IntervalDayType.get(),
         TypeUtils.toGravitinoType(
@@ -86,18 +86,29 @@ public class TestTypeUtils {
             new YearMonthIntervalType(YearMonthIntervalType.YearMonthResolution.YEAR)));
     Assertions.assertEquals(
         Types.ListType.notNull(Types.IntegerType.get()),
-        TypeUtils.toGravitinoType(new ArrayType(false, new IntType())));
+        TypeUtils.toGravitinoType(new ArrayType(false, new IntType(false))));
     Assertions.assertEquals(
         Types.ListType.nullable(Types.IntegerType.get()),
-        TypeUtils.toGravitinoType(new ArrayType(true, new IntType())));
+        TypeUtils.toGravitinoType(new ArrayType(true, new IntType(true))));
+    Assertions.assertEquals(
+        Types.ListType.nullable(Types.IntegerType.get()),
+        TypeUtils.toGravitinoType(new ArrayType(false, new IntType(true))));
     Assertions.assertEquals(
         Types.MapType.of(Types.StringType.get(), Types.IntegerType.get(), true),
         TypeUtils.toGravitinoType(
-            new MapType(true, new VarCharType(Integer.MAX_VALUE), new IntType())));
+            new MapType(true, new VarCharType(Integer.MAX_VALUE), new IntType(true))));
     Assertions.assertEquals(
         Types.MapType.of(Types.StringType.get(), Types.IntegerType.get(), false),
         TypeUtils.toGravitinoType(
-            new MapType(false, new VarCharType(Integer.MAX_VALUE), new IntType())));
+            new MapType(true, new VarCharType(Integer.MAX_VALUE), new IntType(false))));
+    Assertions.assertEquals(
+        Types.MapType.of(Types.StringType.get(), Types.IntegerType.get(), false),
+        TypeUtils.toGravitinoType(
+            new MapType(false, new VarCharType(Integer.MAX_VALUE), new IntType(false))));
+    Assertions.assertEquals(
+        Types.MapType.of(Types.StringType.get(), Types.IntegerType.get(), true),
+        TypeUtils.toGravitinoType(
+            new MapType(false, new VarCharType(Integer.MAX_VALUE), new IntType(true))));
     Assertions.assertEquals(
         Types.StructType.of(
             Types.StructType.Field.nullableField("a", Types.IntegerType.get()),
@@ -132,11 +143,10 @@ public class TestTypeUtils {
     Assertions.assertEquals(DataTypes.BYTES(), TypeUtils.toFlinkType(Types.BinaryType.get()));
     Assertions.assertEquals(DataTypes.BINARY(10), TypeUtils.toFlinkType(Types.FixedType.of(10)));
     Assertions.assertEquals(
-        DataTypes.TIMESTAMP(6), TypeUtils.toFlinkType(Types.TimestampType.withoutTimeZone()));
+        DataTypes.TIMESTAMP(6), TypeUtils.toFlinkType(Types.TimestampType.withoutTimeZone(6)));
     Assertions.assertEquals(
-        DataTypes.TIMESTAMP_WITH_LOCAL_TIME_ZONE(6),
-        TypeUtils.toFlinkType(Types.TimestampType.withTimeZone()));
-    Assertions.assertEquals(DataTypes.TIME(), TypeUtils.toFlinkType(Types.TimeType.get()));
+        DataTypes.TIMESTAMP_LTZ(6), TypeUtils.toFlinkType(Types.TimestampType.withTimeZone(6)));
+    Assertions.assertEquals(DataTypes.TIME(0), TypeUtils.toFlinkType(Types.TimeType.of(0)));
     Assertions.assertEquals(
         DataTypes.INTERVAL(DataTypes.DAY()), TypeUtils.toFlinkType(Types.IntervalDayType.get()));
     Assertions.assertEquals(
@@ -152,6 +162,10 @@ public class TestTypeUtils {
         TypeUtils.toFlinkType(
             Types.MapType.of(Types.StringType.get(), Types.IntegerType.get(), true)));
     Assertions.assertEquals(
+        DataTypes.MAP(DataTypes.STRING(), DataTypes.INT().notNull()),
+        TypeUtils.toFlinkType(
+            Types.MapType.of(Types.StringType.get(), Types.IntegerType.get(), false)));
+    Assertions.assertEquals(
         DataTypes.ROW(
             DataTypes.FIELD("a", DataTypes.INT().nullable()),
             DataTypes.FIELD("b", DataTypes.INT().notNull())),
@@ -163,5 +177,80 @@ public class TestTypeUtils {
     Assertions.assertThrows(
         UnsupportedOperationException.class,
         () -> TypeUtils.toFlinkType(Types.UnparsedType.of("unknown")));
+  }
+
+  @Test
+  public void testTimePrecisionConversion() {
+    // TIME
+    Assertions.assertEquals(Types.TimeType.of(0), TypeUtils.toGravitinoType(new TimeType(0)));
+    Assertions.assertEquals(Types.TimeType.of(3), TypeUtils.toGravitinoType(new TimeType(3)));
+    Assertions.assertEquals(Types.TimeType.of(6), TypeUtils.toGravitinoType(new TimeType(6)));
+    Assertions.assertEquals(Types.TimeType.of(9), TypeUtils.toGravitinoType(new TimeType(9)));
+
+    // Test converting back
+    Assertions.assertEquals(DataTypes.TIME(0), TypeUtils.toFlinkType(Types.TimeType.of(0)));
+    Assertions.assertEquals(DataTypes.TIME(3), TypeUtils.toFlinkType(Types.TimeType.of(3)));
+    Assertions.assertEquals(DataTypes.TIME(6), TypeUtils.toFlinkType(Types.TimeType.of(6)));
+    Assertions.assertEquals(DataTypes.TIME(9), TypeUtils.toFlinkType(Types.TimeType.of(9)));
+  }
+
+  @Test
+  public void testTimestampPrecisionConversion() {
+    // TIMESTAMP without timezone
+    Assertions.assertEquals(
+        Types.TimestampType.withoutTimeZone(0), TypeUtils.toGravitinoType(new TimestampType(0)));
+    Assertions.assertEquals(
+        Types.TimestampType.withoutTimeZone(3), TypeUtils.toGravitinoType(new TimestampType(3)));
+    Assertions.assertEquals(
+        Types.TimestampType.withoutTimeZone(6), TypeUtils.toGravitinoType(new TimestampType(6)));
+    Assertions.assertEquals(
+        Types.TimestampType.withoutTimeZone(9), TypeUtils.toGravitinoType(new TimestampType(9)));
+
+    // TIMESTAMP with timezone (LocalZoned)
+    Assertions.assertEquals(
+        Types.TimestampType.withTimeZone(0),
+        TypeUtils.toGravitinoType(new LocalZonedTimestampType(0)));
+    Assertions.assertEquals(
+        Types.TimestampType.withTimeZone(3),
+        TypeUtils.toGravitinoType(new LocalZonedTimestampType(3)));
+    Assertions.assertEquals(
+        Types.TimestampType.withTimeZone(6),
+        TypeUtils.toGravitinoType(new LocalZonedTimestampType(6)));
+    Assertions.assertEquals(
+        Types.TimestampType.withTimeZone(9),
+        TypeUtils.toGravitinoType(new LocalZonedTimestampType(9)));
+
+    // Test converting back
+    Assertions.assertEquals(
+        DataTypes.TIMESTAMP(0), TypeUtils.toFlinkType(Types.TimestampType.withoutTimeZone(0)));
+    Assertions.assertEquals(
+        DataTypes.TIMESTAMP(3), TypeUtils.toFlinkType(Types.TimestampType.withoutTimeZone(3)));
+    Assertions.assertEquals(
+        DataTypes.TIMESTAMP(6), TypeUtils.toFlinkType(Types.TimestampType.withoutTimeZone(6)));
+    Assertions.assertEquals(
+        DataTypes.TIMESTAMP(9), TypeUtils.toFlinkType(Types.TimestampType.withoutTimeZone(9)));
+
+    Assertions.assertEquals(
+        DataTypes.TIMESTAMP_LTZ(0), TypeUtils.toFlinkType(Types.TimestampType.withTimeZone(0)));
+    Assertions.assertEquals(
+        DataTypes.TIMESTAMP_LTZ(3), TypeUtils.toFlinkType(Types.TimestampType.withTimeZone(3)));
+    Assertions.assertEquals(
+        DataTypes.TIMESTAMP_LTZ(6), TypeUtils.toFlinkType(Types.TimestampType.withTimeZone(6)));
+    Assertions.assertEquals(
+        DataTypes.TIMESTAMP_LTZ(9), TypeUtils.toFlinkType(Types.TimestampType.withTimeZone(9)));
+  }
+
+  @Test
+  public void testInvalidPrecisionHandling() {
+    Assertions.assertThrows(
+        UnsupportedOperationException.class, () -> TypeUtils.toFlinkType(Types.TimeType.of(10)));
+
+    Assertions.assertThrows(
+        UnsupportedOperationException.class,
+        () -> TypeUtils.toFlinkType(Types.TimestampType.withoutTimeZone(10)));
+
+    Assertions.assertThrows(
+        UnsupportedOperationException.class,
+        () -> TypeUtils.toFlinkType(Types.TimestampType.withTimeZone(10)));
   }
 }

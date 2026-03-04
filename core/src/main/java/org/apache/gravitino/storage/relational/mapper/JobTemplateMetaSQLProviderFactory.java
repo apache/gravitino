@@ -19,6 +19,7 @@
 package org.apache.gravitino.storage.relational.mapper;
 
 import com.google.common.collect.ImmutableMap;
+import java.util.List;
 import java.util.Map;
 import org.apache.gravitino.storage.relational.JDBCBackend;
 import org.apache.gravitino.storage.relational.mapper.provider.base.JobTemplateMetaBaseSQLProvider;
@@ -86,5 +87,26 @@ public class JobTemplateMetaSQLProviderFactory {
   public static String deleteJobTemplateMetasByLegacyTimeline(
       @Param("legacyTimeline") Long legacyTimeline, @Param("limit") int limit) {
     return getProvider().deleteJobTemplateMetasByLegacyTimeline(legacyTimeline, limit);
+  }
+
+  public static String updateJobTemplateMeta(
+      @Param("newJobTemplateMeta") JobTemplatePO newJobTemplatePO,
+      @Param("oldJobTemplateMeta") JobTemplatePO oldJobTemplatePO) {
+    return getProvider().updateJobTemplateMeta(newJobTemplatePO, oldJobTemplatePO);
+  }
+
+  public static String selectJobTemplateIdByMetalakeAndName(
+      @Param("metalakeId") Long metalakeId, @Param("jobTemplateName") String jobTemplateName) {
+    return getProvider().selectJobTemplateIdByMetalakeAndName(metalakeId, jobTemplateName);
+  }
+
+  public static String selectJobTemplateById(@Param("jobTemplateId") Long jobTemplateId) {
+    return getProvider().selectJobTemplateById(jobTemplateId);
+  }
+
+  public static String batchSelectJobTemplateByIdentifier(
+      @Param("metalakeName") String metalakeName,
+      @Param("jobTemplateNames") List<String> jobTemplateNames) {
+    return getProvider().batchSelectJobTemplateByIdentifier(metalakeName, jobTemplateNames);
   }
 }

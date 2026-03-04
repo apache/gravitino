@@ -19,6 +19,7 @@
 package org.apache.gravitino.catalog.jdbc.utils;
 
 import java.sql.SQLException;
+import java.time.Duration;
 import java.util.Map;
 import java.util.Properties;
 import javax.sql.DataSource;
@@ -70,6 +71,7 @@ public class DataSourceUtils {
     // executed to confirm whether the connection is valid.
     basicDataSource.setTestOnBorrow(jdbcConfig.getTestOnBorrow());
     basicDataSource.setValidationQuery(POOL_TEST_QUERY);
+    basicDataSource.setMaxWait(Duration.ofMillis(jdbcConfig.getMaxWaitMs()));
     return basicDataSource;
   }
 

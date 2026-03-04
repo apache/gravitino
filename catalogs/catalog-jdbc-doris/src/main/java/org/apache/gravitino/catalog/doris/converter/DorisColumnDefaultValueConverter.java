@@ -96,7 +96,7 @@ public class DorisColumnDefaultValueConverter extends JdbcColumnDefaultValueConv
       case JdbcTypeConverter.TEXT:
         return Literals.stringLiteral(columnDefaultValue);
       default:
-        throw new IllegalArgumentException("Unknown data columnType for literal: " + columnType);
+        return UnparsedExpression.of(columnDefaultValue);
     }
   }
 }

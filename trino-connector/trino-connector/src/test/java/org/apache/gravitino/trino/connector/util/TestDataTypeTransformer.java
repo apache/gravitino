@@ -21,6 +21,7 @@ package org.apache.gravitino.trino.connector.util;
 import static org.apache.gravitino.trino.connector.GravitinoErrorCode.GRAVITINO_UNSUPPORTED_GRAVITINO_DATATYPE;
 import static org.apache.gravitino.trino.connector.GravitinoErrorCode.GRAVITINO_UNSUPPORTED_TRINO_DATATYPE;
 
+import com.google.common.collect.ImmutableList;
 import io.trino.spi.TrinoException;
 import io.trino.spi.type.ArrayType;
 import io.trino.spi.type.BigintType;
@@ -47,7 +48,6 @@ import java.util.Optional;
 import org.apache.gravitino.rel.types.Types;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
-import org.testcontainers.shaded.com.google.common.collect.ImmutableList;
 
 public class TestDataTypeTransformer {
 
@@ -88,13 +88,13 @@ public class TestDataTypeTransformer {
     Assertions.assertEquals(
         dataTypeTransformer.getGravitinoType(DateType.DATE), Types.DateType.get());
     Assertions.assertEquals(
-        dataTypeTransformer.getGravitinoType(TimeType.TIME_MILLIS), Types.TimeType.get());
+        dataTypeTransformer.getGravitinoType(TimeType.TIME_MILLIS), Types.TimeType.of(3));
     Assertions.assertEquals(
         dataTypeTransformer.getGravitinoType(TimestampType.TIMESTAMP_MILLIS),
-        Types.TimestampType.withoutTimeZone());
+        Types.TimestampType.withoutTimeZone(3));
     Assertions.assertEquals(
         dataTypeTransformer.getGravitinoType(TimestampWithTimeZoneType.TIMESTAMP_TZ_MILLIS),
-        Types.TimestampType.withTimeZone());
+        Types.TimestampType.withTimeZone(3));
 
     Assertions.assertEquals(
         dataTypeTransformer.getGravitinoType(new ArrayType(IntegerType.INTEGER)),

@@ -50,6 +50,7 @@ dependencies {
   testImplementation(project(":server"))
   testImplementation(project(":server-common"))
 
+  testImplementation(libs.awaitility)
   testImplementation(libs.junit.jupiter.api)
   testImplementation(libs.junit.jupiter.params)
   testImplementation(libs.mysql.driver)
@@ -62,7 +63,7 @@ dependencies {
 }
 
 tasks {
-  val runtimeJars by registering(Copy::class) {
+  register("runtimeJars", Copy::class) {
     from(configurations.runtimeClasspath)
     into("build/libs")
   }
@@ -90,7 +91,7 @@ tasks {
     fileMode = 0b111101101
   }
 
-  val copyLibAndConfig by registering(Copy::class) {
+  register("copyLibAndConfig", Copy::class) {
     dependsOn(copyCatalogLibs, copyCatalogConfig)
   }
 }

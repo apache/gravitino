@@ -36,7 +36,7 @@ public class GetUserEvent extends UserEvent {
    * @param metalake the name of the metalake from which the user is retrieved.
    * @param loadedUserInfo the user information of the retrieved user.
    */
-  protected GetUserEvent(String initiator, String metalake, UserInfo loadedUserInfo) {
+  public GetUserEvent(String initiator, String metalake, UserInfo loadedUserInfo) {
     super(initiator, NameIdentifierUtil.ofUser(metalake, loadedUserInfo.name()));
 
     this.loadedUserInfo = loadedUserInfo;

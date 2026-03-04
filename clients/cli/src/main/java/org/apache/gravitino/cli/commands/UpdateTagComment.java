@@ -29,8 +29,11 @@ import org.apache.gravitino.tag.TagChange;
 /** Update the comment of a tag. */
 public class UpdateTagComment extends Command {
 
+  /** The name of the metalake. */
   protected final String metalake;
+  /** The name of the tag. */
   protected final String tag;
+  /** New tag comment. */
   protected final String comment;
 
   /**

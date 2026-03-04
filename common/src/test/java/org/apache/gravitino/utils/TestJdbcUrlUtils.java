@@ -39,7 +39,8 @@ public class TestJdbcUrlUtils {
 
   @Test
   public void testValidateJdbcConfigWhenDriverClassNameIsNull() {
-    Assertions.assertDoesNotThrow(
+    Assertions.assertThrowsExactly(
+        IllegalArgumentException.class,
         () ->
             JdbcUrlUtils.validateJdbcConfig(
                 null, "jdbc:mysql://localhost:0000/test", Map.of("test", "test")));
@@ -124,5 +125,29 @@ public class TestJdbcUrlUtils {
                     Map.of("test", "test")));
     Assertions.assertEquals(
         "Unsafe PostgreSQL parameter 'socketFactory' detected in JDBC URL", gre.getMessage());
+  }
+
+  @Test
+  void testValidateNullArguments() {
+    Assertions.assertThrowsExactly(
+        IllegalArgumentException.class,
+        () ->
+            JdbcUrlUtils.validateJdbcConfig(
+                null, "jdbc:postgresql://localhost:0000/test", Map.of("test", "test")));
+
+    Assertions.assertThrowsExactly(
+        IllegalArgumentException.class,
+        () -> JdbcUrlUtils.validateJdbcConfig("testDriver", null, Map.of("test", "test")));
+
+    Assertions.assertThrowsExactly(
+        IllegalArgumentException.class, () -> JdbcUrlUtils.validateJdbcConfig(null, null, null));
+
+    Assertions.assertThrowsExactly(
+        IllegalArgumentException.class,
+        () -> JdbcUrlUtils.validateJdbcConfig("", "jdbc:postgresql://localhost:0000/test", null));
+
+    Assertions.assertThrowsExactly(
+        IllegalArgumentException.class,
+        () -> JdbcUrlUtils.validateJdbcConfig("testDriver", "", null));
   }
 }

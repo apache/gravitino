@@ -27,9 +27,12 @@ import org.apache.gravitino.client.GravitinoClient;
 import org.apache.gravitino.exceptions.NoSuchMetalakeException;
 import org.apache.gravitino.exceptions.NoSuchRoleException;
 
+/** Represents the detail information of a role. */
 public class RoleDetails extends Command {
 
+  /** The name of the metalake. */
   protected String metalake;
+  /** The name of the role. */
   protected String role;
 
   /**

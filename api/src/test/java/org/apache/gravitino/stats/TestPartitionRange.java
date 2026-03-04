@@ -43,7 +43,7 @@ public class TestPartitionRange {
     Assertions.assertFalse(range2.upperPartitionName().isPresent());
     Assertions.assertTrue(range2.lowerPartitionName().isPresent());
     Assertions.assertEquals("lower", range2.lowerPartitionName().get());
-    Assertions.assertEquals(defaultSortOrder, defaultSortOrder);
+    Assertions.assertEquals(defaultSortOrder, range2.comparator());
     Assertions.assertEquals(PartitionRange.BoundType.CLOSED, range2.lowerBoundType().get());
 
     PartitionRange range3 =
@@ -87,5 +87,24 @@ public class TestPartitionRange {
     Assertions.assertEquals(defaultSortOrder, range6.comparator());
     Assertions.assertEquals(PartitionRange.BoundType.CLOSED, range6.lowerBoundType().get());
     Assertions.assertEquals(PartitionRange.BoundType.OPEN, range6.upperBoundType().get());
+  }
+
+  @Test
+  public void testUpToWithNullComparator() {
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () -> PartitionRange.upTo("upper", PartitionRange.BoundType.CLOSED, null));
+  }
+
+  @Test
+  public void testAllPartitionsComparator() {
+    SortOrder defaultSortOrder =
+        SortOrders.of(NamedReference.MetadataField.PARTITION_NAME_FIELD, SortDirection.ASCENDING);
+
+    PartitionRange allPartitions = PartitionRange.ALL_PARTITIONS;
+
+    Assertions.assertFalse(allPartitions.lowerPartitionName().isPresent());
+    Assertions.assertFalse(allPartitions.upperPartitionName().isPresent());
+    Assertions.assertEquals(defaultSortOrder, allPartitions.comparator());
   }
 }

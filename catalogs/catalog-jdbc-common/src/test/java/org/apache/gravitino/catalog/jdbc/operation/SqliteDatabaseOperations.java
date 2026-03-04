@@ -43,7 +43,8 @@ public class SqliteDatabaseOperations extends JdbcDatabaseOperations {
   private String dbPath;
 
   public SqliteDatabaseOperations(String baseFileDir) {
-    this.dbPath = Preconditions.checkNotNull(baseFileDir);
+    Preconditions.checkArgument(baseFileDir != null, "Base file directory cannot be null");
+    this.dbPath = baseFileDir;
   }
 
   @Override

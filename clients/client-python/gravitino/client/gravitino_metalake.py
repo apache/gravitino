@@ -16,15 +16,19 @@
 # under the License.
 
 import logging
-from typing import List, Dict
+from typing import Dict, List
 
 from gravitino.api.catalog import Catalog
 from gravitino.api.catalog_change import CatalogChange
 from gravitino.api.job.job_handle import JobHandle
 from gravitino.api.job.job_template import JobTemplate
+from gravitino.api.job.job_template_change import JobTemplateChange
 from gravitino.api.job.supports_jobs import SupportsJobs
+from gravitino.api.tag.tag import Tag
+from gravitino.api.tag.tag_operations import TagOperations
 from gravitino.client.dto_converters import DTOConverters
 from gravitino.client.generic_job_handle import GenericJobHandle
+from gravitino.client.generic_tag import GenericTag
 from gravitino.dto.metalake_dto import MetalakeDTO
 from gravitino.dto.requests.catalog_create_request import CatalogCreateRequest
 from gravitino.dto.requests.catalog_set_request import CatalogSetRequest
@@ -33,6 +37,10 @@ from gravitino.dto.requests.job_run_request import JobRunRequest
 from gravitino.dto.requests.job_template_register_request import (
     JobTemplateRegisterRequest,
 )
+from gravitino.dto.requests.job_template_updates_request import (
+    JobTemplateUpdatesRequest,
+)
+from gravitino.dto.requests.tag_create_request import TagCreateRequest
 from gravitino.dto.responses.catalog_list_response import CatalogListResponse
 from gravitino.dto.responses.catalog_response import CatalogResponse
 from gravitino.dto.responses.drop_response import DropResponse
@@ -41,16 +49,22 @@ from gravitino.dto.responses.job_list_response import JobListResponse
 from gravitino.dto.responses.job_response import JobResponse
 from gravitino.dto.responses.job_template_list_response import JobTemplateListResponse
 from gravitino.dto.responses.job_template_response import JobTemplateResponse
+from gravitino.dto.responses.tag_response import TagNamesListResponse, TagResponse
 from gravitino.exceptions.handlers.catalog_error_handler import CATALOG_ERROR_HANDLER
 from gravitino.exceptions.handlers.job_error_handler import JOB_ERROR_HANDLER
+from gravitino.exceptions.handlers.tag_error_handler import TAG_ERROR_HANDLER
 from gravitino.rest.rest_utils import encode_string
-from gravitino.utils import HTTPClient
-
+from gravitino.utils.http_client import HTTPClient
+from gravitino.utils.precondition import Precondition
 
 logger = logging.getLogger(__name__)
 
 
-class GravitinoMetalake(MetalakeDTO, SupportsJobs):
+class GravitinoMetalake(
+    MetalakeDTO,
+    SupportsJobs,
+    TagOperations,
+):
     """
     Gravitino Metalake is the top-level metadata repository for users. It contains a list of catalogs
     as sub-level metadata collections. With GravitinoMetalake, users can list, create, load,
@@ -62,6 +76,8 @@ class GravitinoMetalake(MetalakeDTO, SupportsJobs):
     API_METALAKES_CATALOGS_PATH = "api/metalakes/{}/catalogs/{}"
     API_METALAKES_JOB_TEMPLATES_PATH = "api/metalakes/{}/jobs/templates"
     API_METALAKES_JOB_RUNS_PATH = "api/metalakes/{}/jobs/runs"
+    API_METALAKES_TAG_PATH = "api/metalakes/{}/tags/{}"
+    API_METALAKES_TAGS_PATH = "api/metalakes/{}/tags"
 
     def __init__(self, metalake: MetalakeDTO = None, client: HTTPClient = None):
         super().__init__(
@@ -81,7 +97,7 @@ class GravitinoMetalake(MetalakeDTO, SupportsJobs):
         Returns:
             A list of the catalog names under this metalake.
         """
-        url = f"api/metalakes/{self.name()}/catalogs"
+        url = f"api/metalakes/{encode_string(self.name())}/catalogs"
         response = self.rest_client.get(url, error_handler=CATALOG_ERROR_HANDLER)
         entity_list = EntityListResponse.from_json(response.body, infer_missing=True)
         entity_list.validate()
@@ -97,7 +113,7 @@ class GravitinoMetalake(MetalakeDTO, SupportsJobs):
             A list of Catalog under the specified namespace.
         """
         params = {"details": "true"}
-        url = f"api/metalakes/{self.name()}/catalogs"
+        url = f"api/metalakes/{encode_string(self.name())}/catalogs"
         response = self.rest_client.get(
             url, params=params, error_handler=CATALOG_ERROR_HANDLER
         )
@@ -271,6 +287,10 @@ class GravitinoMetalake(MetalakeDTO, SupportsJobs):
             url, json=catalog_disable_request, error_handler=CATALOG_ERROR_HANDLER
         )
 
+    ##########
+    # Job operations
+    ##########
+
     def list_job_templates(self) -> List[JobTemplate]:
         """List all the registered job templates in Gravitino.
 
@@ -365,6 +385,42 @@ class GravitinoMetalake(MetalakeDTO, SupportsJobs):
 
         return drop_response.dropped()
 
+    def alter_job_template(
+        self, job_template_name: str, *changes: JobTemplateChange
+    ) -> JobTemplate:
+        """Alter the job template with specified name by applying the changes.
+
+        Args:
+            job_template_name: the name of the job template.
+            changes: the changes to apply to the job template.
+
+        Raises:
+            NoSuchJobTemplateException if the job template with specified name does not exist.
+            IllegalArgumentException if the changes are invalid.
+
+        Returns:
+            the altered JobTemplate.
+        """
+
+        reqs = [
+            DTOConverters.to_job_template_update_request(change) for change in changes
+        ]
+        updates_request = JobTemplateUpdatesRequest(reqs)
+
+        url = (
+            f"{self.API_METALAKES_JOB_TEMPLATES_PATH.format(encode_string(self.name()))}/"
+            f"{encode_string(job_template_name)}"
+        )
+        response = self.rest_client.put(
+            url, json=updates_request, error_handler=JOB_ERROR_HANDLER
+        )
+        job_template_response = JobTemplateResponse.from_json(
+            response.body, infer_missing=True
+        )
+        job_template_response.validate()
+
+        return DTOConverters.from_job_template_dto(job_template_response.job_template())
+
     def list_jobs(self, job_template_name: str = None) -> List[JobHandle]:
         """List all the jobs under this metalake.
 
@@ -374,11 +430,7 @@ class GravitinoMetalake(MetalakeDTO, SupportsJobs):
         Returns:
             A list of JobHandle objects representing the jobs.
         """
-        params = (
-            {"jobTemplateName": encode_string(job_template_name)}
-            if job_template_name
-            else {}
-        )
+        params = {"jobTemplateName": job_template_name} if job_template_name else {}
         url = self.API_METALAKES_JOB_RUNS_PATH.format(encode_string(self.name()))
         response = self.rest_client.get(
             url, params=params, error_handler=JOB_ERROR_HANDLER
@@ -461,3 +513,132 @@ class GravitinoMetalake(MetalakeDTO, SupportsJobs):
         resp.validate()
 
         return GenericJobHandle(resp.job())
+
+    #########
+    # Tag operations
+    #########
+    def list_tags(self) -> list[str]:
+        """List all the tag names under a metalake.
+
+        Returns:
+            list[str]: The list of tag names.
+
+        Raises:
+            NoSuchMetalakeException: If the metalake does not exist.
+        """
+        url = self.API_METALAKES_TAGS_PATH.format(encode_string(self.name()))
+
+        response = self.rest_client.get(url, error_handler=TAG_ERROR_HANDLER)
+        resp = TagNamesListResponse.from_json(response.body, infer_missing=True)
+        resp.validate()
+
+        return resp.tag_names()
+
+    def list_tags_info(self) -> List[Tag]:
+        """
+        List tags information under a metalake.
+
+        Returns:
+            list[Tag]: The list of tag information.
+
+        Raises:
+            NoSuchMetalakeException: If the metalake does not exist.
+        """
+        # TODO implement list_tags_info
+        raise NotImplementedError()
+
+    def get_tag(self, tag_name) -> Tag:
+        """
+        Get a tag by its name under a metalake.
+
+        Args:
+            tag_name (str): The name of the tag.
+
+        Returns:
+            Tag: The tag information.
+
+        Raises:
+            NoSuchTagException: If the tag does not exist.
+        """
+        Precondition.check_string_not_empty(
+            tag_name, "tag name must not be null or empty"
+        )
+        url = self.API_METALAKES_TAG_PATH.format(
+            encode_string(self.name()), encode_string(tag_name)
+        )
+        response = self.rest_client.get(url, error_handler=TAG_ERROR_HANDLER)
+
+        tag_resp = TagResponse.from_json(response.body, infer_missing=True)
+        tag_resp.validate()
+
+        return GenericTag(self.name(), tag_resp.tag(), self.rest_client)
+
+    def create_tag(self, tag_name, comment, properties) -> Tag:
+        """
+        Create a new tag under a metalake.
+
+        Raises:
+            NoSuchMetalakeException: If the metalake does not exist.
+            TagAlreadyExistsException: If the tag already exists.
+
+        Args:
+            tag_name (str): The name of the tag.
+            comment (str): The comment of the tag.
+            properties (dict[str, str]): The properties of the tag.
+
+        Returns:
+            Tag: The tag information.
+        """
+        tag_create_request = TagCreateRequest(
+            tag_name,
+            comment,
+            properties,
+        )
+        tag_create_request.validate()
+
+        url = self.API_METALAKES_TAGS_PATH.format(encode_string(self.name()))
+
+        response = self.rest_client.post(
+            url,
+            json=tag_create_request,
+            error_handler=TAG_ERROR_HANDLER,
+        )
+        tag_resp = TagResponse.from_json(response.body, infer_missing=True)
+        tag_resp.validate()
+
+        return GenericTag(self.name(), tag_resp.tag(), self.rest_client)
+
+    def alter_tag(self, tag_name, *changes) -> Tag:
+        """
+        Alter a tag under a metalake.
+
+        Args:
+            tag_name (str): The name of the tag.
+            changes (TagChange): The changes to apply to the tag.
+
+        Returns:
+            Tag: The altered tag.
+
+        Raises:
+            NoSuchTagException: If the tag does not exist.
+            NoSuchMetalakeException: If the metalake does not exist.
+        """
+        # TODO implement alter_tag
+        raise NotImplementedError()
+
+    def delete_tag(self, tag_name) -> bool:
+        """
+        Delete a tag under a metalake.
+
+        Args:
+            tag_name (str): The name of the tag.
+
+        Returns:
+            bool: True if the tag was deleted, False otherwise.
+
+        Raises:
+            NoSuchTagException: If the tag does not exist.
+            NoSuchMetalakeException: If the metalake does not exist.
+        """
+        # TODO implement delete_tag
+        raise NotImplementedError()

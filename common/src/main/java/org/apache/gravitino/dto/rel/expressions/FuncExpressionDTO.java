@@ -18,6 +18,7 @@
  */
 package org.apache.gravitino.dto.rel.expressions;
 
+import java.util.Arrays;
 import lombok.EqualsAndHashCode;
 import org.apache.gravitino.rel.expressions.Expression;
 import org.apache.gravitino.rel.expressions.FunctionExpression;
@@ -33,27 +34,51 @@ public class FuncExpressionDTO implements FunctionExpression, FunctionArg {
     this.functionArgs = functionArgs;
   }
 
-  /** @return The function arguments. */
+  /**
+   * @return The function arguments.
+   */
   public FunctionArg[] args() {
     return functionArgs;
   }
 
-  /** @return The function name. */
+  /**
+   * @return The function name.
+   */
   @Override
   public String functionName() {
     return functionName;
   }
 
-  /** @return The function arguments. */
+  /**
+   * @return The function arguments.
+   */
   @Override
   public Expression[] arguments() {
     return functionArgs;
   }
 
-  /** @return The type of the function argument. */
+  /**
+   * @return The type of the function argument.
+   */
   @Override
   public ArgType argType() {
     return ArgType.FUNCTION;
+  }
+
+  /**
+   * @return The string representation of the function expression.
+   */
+  @Override
+  public String toString() {
+    if (functionArgs.length == 0) {
+      return functionName + "()";
+    }
+
+    return functionName
+        + "("
+        + String.join(
+            ", ", Arrays.stream(functionArgs).map(Object::toString).toArray(String[]::new))
+        + ")";
   }
 
   /** Builder for {@link FuncExpressionDTO}. */
@@ -96,7 +121,9 @@ public class FuncExpressionDTO implements FunctionExpression, FunctionArg {
     }
   }
 
-  /** @return the builder for creating a new instance of FuncExpressionDTO. */
+  /**
+   * @return the builder for creating a new instance of FuncExpressionDTO.
+   */
   public static Builder builder() {
     return new Builder();
   }

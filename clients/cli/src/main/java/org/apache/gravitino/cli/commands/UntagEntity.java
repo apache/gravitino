@@ -35,9 +35,13 @@ import org.apache.gravitino.messaging.Topic;
 import org.apache.gravitino.model.Model;
 import org.apache.gravitino.rel.Table;
 
+/** Represents untag entity command. */
 public class UntagEntity extends Command {
+  /** The name of the metalake. */
   protected final String metalake;
+  /** The full name of the entity. */
   protected final FullName name;
+  /** The names of the tags to remove. */
   protected final String[] tags;
 
   /**

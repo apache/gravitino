@@ -19,13 +19,18 @@
 
 package org.apache.gravitino.job.local;
 
+import com.google.common.base.Joiner;
 import com.google.common.collect.Lists;
 import java.io.File;
 import java.util.List;
 import java.util.Map;
 import org.apache.gravitino.job.ShellJobTemplate;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 public class ShellProcessBuilder extends LocalProcessBuilder {
+
+  private static final Logger LOG = LoggerFactory.getLogger(ShellProcessBuilder.class);
 
   protected ShellProcessBuilder(ShellJobTemplate shellJobTemplate, Map<String, String> configs) {
     super(shellJobTemplate, configs);
@@ -50,6 +55,8 @@ public class ShellProcessBuilder extends LocalProcessBuilder {
     File errorFile = new File(workingDirectory, "error.log");
     builder.redirectOutput(outputFile);
     builder.redirectError(errorFile);
+
+    LOG.info("Starting local shell job with command: {}", Joiner.on(" ").join(commandList));
 
     try {
       return builder.start();

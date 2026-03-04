@@ -18,25 +18,34 @@
  */
 package org.apache.gravitino.storage.relational.service;
 
+import static org.apache.gravitino.metrics.source.MetricsSource.GRAVITINO_RELATIONAL_STORE_METRIC_NAME;
+
 import com.google.common.base.Preconditions;
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Function;
+import java.util.stream.Collectors;
 import org.apache.gravitino.Entity;
+import org.apache.gravitino.Entity.EntityType;
+import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.HasIdentifier;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
+import org.apache.gravitino.meta.NamespacedEntityId;
 import org.apache.gravitino.meta.TableEntity;
+import org.apache.gravitino.metrics.Monitored;
 import org.apache.gravitino.storage.relational.mapper.OwnerMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.PolicyMetadataObjectRelMapper;
 import org.apache.gravitino.storage.relational.mapper.SecurableObjectMapper;
 import org.apache.gravitino.storage.relational.mapper.StatisticMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.TableMetaMapper;
+import org.apache.gravitino.storage.relational.mapper.TableVersionMapper;
 import org.apache.gravitino.storage.relational.mapper.TagMetadataObjectRelMapper;
 import org.apache.gravitino.storage.relational.po.ColumnPO;
 import org.apache.gravitino.storage.relational.po.TablePO;
@@ -56,14 +65,9 @@ public class TableMetaService {
 
   private TableMetaService() {}
 
-  // Table may be deleted, so the TablePO may be null.
-  public TablePO getTablePOById(Long tableId) {
-    TablePO tablePO =
-        SessionUtils.getWithoutCommit(
-            TableMetaMapper.class, mapper -> mapper.selectTableMetaById(tableId));
-    return tablePO;
-  }
-
+  @Monitored(
+      metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME,
+      baseMetricName = "getTableIdBySchemaIdAndName")
   public Long getTableIdBySchemaIdAndName(Long schemaId, String tableName) {
     Long tableId =
         SessionUtils.getWithoutCommit(
@@ -79,13 +83,12 @@ public class TableMetaService {
     return tableId;
   }
 
+  @Monitored(
+      metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME,
+      baseMetricName = "getTableByIdentifier")
   public TableEntity getTableByIdentifier(NameIdentifier identifier) {
-    NameIdentifierUtil.checkTable(identifier);
+    TablePO tablePO = getTablePOByIdentifier(identifier);
 
-    Long schemaId =
-        CommonMetaService.getInstance().getParentEntityIdByNamespace(identifier.namespace());
-
-    TablePO tablePO = getTablePOBySchemaIdAndName(schemaId, identifier.name());
     List<ColumnPO> columnPOs =
         TableColumnMetaService.getInstance()
             .getColumnsByTableIdAndVersion(tablePO.getTableId(), tablePO.getCurrentVersion());
@@ -93,18 +96,17 @@ public class TableMetaService {
     return POConverters.fromTableAndColumnPOs(tablePO, columnPOs, identifier.namespace());
   }
 
+  @Monitored(
+      metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME,
+      baseMetricName = "listTablesByNamespace")
   public List<TableEntity> listTablesByNamespace(Namespace namespace) {
     NamespaceUtil.checkTable(namespace);
 
-    Long schemaId = CommonMetaService.getInstance().getParentEntityIdByNamespace(namespace);
-
-    List<TablePO> tablePOs =
-        SessionUtils.getWithoutCommit(
-            TableMetaMapper.class, mapper -> mapper.listTablePOsBySchemaId(schemaId));
-
+    List<TablePO> tablePOs = listTablePOs(namespace);
     return POConverters.fromTablePOs(tablePOs, namespace);
   }
 
+  @Monitored(metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME, baseMetricName = "insertTable")
   public void insertTable(TableEntity tableEntity, boolean overwrite) throws IOException {
     try {
       NameIdentifierUtil.checkTable(tableEntity.nameIdentifier());
@@ -113,17 +115,27 @@ public class TableMetaService {
       fillTablePOBuilderParentEntityId(builder, tableEntity.namespace());
 
       AtomicReference<TablePO> tablePORef = new AtomicReference<>();
+      TablePO po = POConverters.initializeTablePOWithVersion(tableEntity, builder);
       SessionUtils.doMultipleWithCommit(
           () ->
               SessionUtils.doWithoutCommit(
                   TableMetaMapper.class,
                   mapper -> {
-                    TablePO po = POConverters.initializeTablePOWithVersion(tableEntity, builder);
                     tablePORef.set(po);
                     if (overwrite) {
                       mapper.insertTableMetaOnDuplicateKeyUpdate(po);
                     } else {
                       mapper.insertTableMeta(po);
+                    }
+                  }),
+          () ->
+              SessionUtils.doWithoutCommit(
+                  TableVersionMapper.class,
+                  mapper -> {
+                    if (overwrite) {
+                      mapper.insertTableVersionOnDuplicateKeyUpdate(po);
+                    } else {
+                      mapper.insertTableVersion(po);
                     }
                   }),
           () -> {
@@ -147,16 +159,10 @@ public class TableMetaService {
     }
   }
 
+  @Monitored(metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME, baseMetricName = "updateTable")
   public <E extends Entity & HasIdentifier> TableEntity updateTable(
       NameIdentifier identifier, Function<E, E> updater) throws IOException {
-    NameIdentifierUtil.checkTable(identifier);
-
-    String tableName = identifier.name();
-
-    Long schemaId =
-        CommonMetaService.getInstance().getParentEntityIdByNamespace(identifier.namespace());
-
-    TablePO oldTablePO = getTablePOBySchemaIdAndName(schemaId, tableName);
+    TablePO oldTablePO = getTablePOByIdentifier(identifier);
     List<ColumnPO> oldTableColumns =
         TableColumnMetaService.getInstance()
             .getColumnsByTableIdAndVersion(oldTablePO.getTableId(), oldTablePO.getCurrentVersion());
@@ -170,10 +176,15 @@ public class TableMetaService {
         newTableEntity.id(),
         oldTableEntity.id());
 
-    boolean isColumnChanged =
-        TableColumnMetaService.getInstance().isColumnUpdated(oldTableEntity, newTableEntity);
+    boolean isSchemaChanged = !newTableEntity.namespace().equals(oldTableEntity.namespace());
+    Long newSchemaId =
+        isSchemaChanged
+            ? EntityIdService.getEntityId(
+                NameIdentifier.of(newTableEntity.namespace().levels()), Entity.EntityType.SCHEMA)
+            : oldTablePO.getSchemaId();
+
     TablePO newTablePO =
-        POConverters.updateTablePOWithVersion(oldTablePO, newTableEntity, isColumnChanged);
+        POConverters.updateTablePOWithVersionAndSchemaId(oldTablePO, newTableEntity, newSchemaId);
 
     final AtomicInteger updateResult = new AtomicInteger(0);
     try {
@@ -182,9 +193,17 @@ public class TableMetaService {
               updateResult.set(
                   SessionUtils.getWithoutCommit(
                       TableMetaMapper.class,
-                      mapper -> mapper.updateTableMeta(newTablePO, oldTablePO))),
+                      mapper -> mapper.updateTableMeta(newTablePO, oldTablePO, newSchemaId))),
+          () ->
+              SessionUtils.doWithoutCommit(
+                  TableVersionMapper.class,
+                  mapper -> {
+                    mapper.softDeleteTableVersionByTableIdAndVersion(
+                        oldTablePO.getTableId(), oldTablePO.getCurrentVersion());
+                    mapper.insertTableVersionOnDuplicateKeyUpdate(newTablePO);
+                  }),
           () -> {
-            if (updateResult.get() > 0 && isColumnChanged) {
+            if (updateResult.get() > 0) {
               TableColumnMetaService.getInstance()
                   .updateColumnPOsFromTableDiff(oldTableEntity, newTableEntity, newTablePO);
             }
@@ -203,15 +222,9 @@ public class TableMetaService {
     }
   }
 
+  @Monitored(metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME, baseMetricName = "deleteTable")
   public boolean deleteTable(NameIdentifier identifier) {
-    NameIdentifierUtil.checkTable(identifier);
-
-    String tableName = identifier.name();
-
-    Long schemaId =
-        CommonMetaService.getInstance().getParentEntityIdByNamespace(identifier.namespace());
-
-    Long tableId = getTableIdBySchemaIdAndName(schemaId, tableName);
+    TablePO tablePO = getTablePOByIdentifier(identifier);
 
     AtomicInteger deleteResult = new AtomicInteger(0);
     SessionUtils.doMultipleWithCommit(
@@ -219,54 +232,102 @@ public class TableMetaService {
             deleteResult.set(
                 SessionUtils.getWithoutCommit(
                     TableMetaMapper.class,
-                    mapper -> mapper.softDeleteTableMetasByTableId(tableId))),
+                    mapper -> mapper.softDeleteTableMetasByTableId(tablePO.getTableId()))),
         () -> {
           if (deleteResult.get() > 0) {
             SessionUtils.doWithoutCommit(
                 OwnerMetaMapper.class,
                 mapper ->
                     mapper.softDeleteOwnerRelByMetadataObjectIdAndType(
-                        tableId, MetadataObject.Type.TABLE.name()));
-            TableColumnMetaService.getInstance().deleteColumnsByTableId(tableId);
+                        tablePO.getTableId(), MetadataObject.Type.TABLE.name()));
+            TableColumnMetaService.getInstance().deleteColumnsByTableId(tablePO.getTableId());
             SessionUtils.doWithoutCommit(
                 SecurableObjectMapper.class,
                 mapper ->
                     mapper.softDeleteObjectRelsByMetadataObject(
-                        tableId, MetadataObject.Type.TABLE.name()));
+                        tablePO.getTableId(), MetadataObject.Type.TABLE.name()));
             SessionUtils.doWithoutCommit(
                 TagMetadataObjectRelMapper.class,
                 mapper ->
                     mapper.softDeleteTagMetadataObjectRelsByMetadataObject(
-                        tableId, MetadataObject.Type.TABLE.name()));
+                        tablePO.getTableId(), MetadataObject.Type.TABLE.name()));
             SessionUtils.doWithoutCommit(
                 TagMetadataObjectRelMapper.class,
-                mapper -> mapper.softDeleteTagMetadataObjectRelsByTableId(tableId));
+                mapper -> mapper.softDeleteTagMetadataObjectRelsByTableId(tablePO.getTableId()));
 
             SessionUtils.doWithoutCommit(
                 StatisticMetaMapper.class,
-                mapper -> mapper.softDeleteStatisticsByEntityId(tableId));
+                mapper -> mapper.softDeleteStatisticsByEntityId(tablePO.getTableId()));
             SessionUtils.doWithoutCommit(
                 PolicyMetadataObjectRelMapper.class,
-                mapper -> mapper.softDeletePolicyMetadataObjectRelsByTableId(tableId));
+                mapper -> mapper.softDeletePolicyMetadataObjectRelsByTableId(tablePO.getTableId()));
+            SessionUtils.doWithoutCommit(
+                TableVersionMapper.class,
+                mapper ->
+                    mapper.softDeleteTableVersionByTableIdAndVersion(
+                        tablePO.getTableId(), tablePO.getCurrentVersion()));
           }
         });
 
     return deleteResult.get() > 0;
   }
 
+  @Monitored(
+      metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME,
+      baseMetricName = "deleteTableMetasByLegacyTimeline")
   public int deleteTableMetasByLegacyTimeline(Long legacyTimeline, int limit) {
     return SessionUtils.doWithCommitAndFetchResult(
+            TableMetaMapper.class,
+            mapper -> mapper.deleteTableMetasByLegacyTimeline(legacyTimeline, limit))
+        + deleteTableVersionByLegacyTimeline(legacyTimeline, limit);
+  }
+
+  @Monitored(
+      metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME,
+      baseMetricName = "deleteTableVersionByLegacyTimeline")
+  public int deleteTableVersionByLegacyTimeline(Long legacyTimeline, int limit) {
+    return SessionUtils.doWithCommitAndFetchResult(
+        TableVersionMapper.class,
+        mapper -> mapper.deleteTableVersionByLegacyTimeline(legacyTimeline, limit));
+  }
+
+  @Monitored(
+      metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME,
+      baseMetricName = "batchGetTableByIdentifier")
+  public List<TableEntity> batchGetTableByIdentifier(List<NameIdentifier> identifiers) {
+    NameIdentifier firstIdent = identifiers.get(0);
+    NameIdentifier schemaIdent = NameIdentifierUtil.getSchemaIdentifier(firstIdent);
+    List<String> tableNames = new ArrayList<>(identifiers.size());
+    tableNames.add(identifiers.get(0).name());
+    for (int i = 1; i < identifiers.size(); i++) {
+      NameIdentifier ident = identifiers.get(i);
+      Preconditions.checkArgument(
+          Objects.equals(schemaIdent, NameIdentifierUtil.getSchemaIdentifier(ident)));
+      tableNames.add(ident.name());
+    }
+    Long schemaId = EntityIdService.getEntityId(schemaIdent, Entity.EntityType.SCHEMA);
+    return SessionUtils.doWithCommitAndFetchResult(
         TableMetaMapper.class,
-        mapper -> mapper.deleteTableMetasByLegacyTimeline(legacyTimeline, limit));
+        mapper -> {
+          List<TablePO> tableList = mapper.batchSelectTableByIdentifier(schemaId, tableNames);
+          return POConverters.fromTablePOs(tableList, firstIdent.namespace());
+        });
   }
 
   private void fillTablePOBuilderParentEntityId(TablePO.Builder builder, Namespace namespace) {
     NamespaceUtil.checkTable(namespace);
-    Long[] parentEntityIds =
-        CommonMetaService.getInstance().getParentEntityIdsByNamespace(namespace);
-    builder.withMetalakeId(parentEntityIds[0]);
-    builder.withCatalogId(parentEntityIds[1]);
-    builder.withSchemaId(parentEntityIds[2]);
+    NamespacedEntityId namespacedEntityId =
+        EntityIdService.getEntityIds(
+            NameIdentifier.of(namespace.levels()), Entity.EntityType.SCHEMA);
+    builder.withMetalakeId(namespacedEntityId.namespaceIds()[0]);
+    builder.withCatalogId(namespacedEntityId.namespaceIds()[1]);
+    builder.withSchemaId(namespacedEntityId.entityId());
+  }
+
+  private TablePO getTablePOByIdentifier(NameIdentifier identifier) {
+    NameIdentifierUtil.checkTable(identifier);
+
+    return tablePOFetcher().apply(identifier);
   }
 
   private TablePO getTablePOBySchemaIdAndName(Long schemaId, String tableName) {
@@ -274,7 +335,6 @@ public class TableMetaService {
         SessionUtils.getWithoutCommit(
             TableMetaMapper.class,
             mapper -> mapper.selectTableMetaBySchemaIdAndName(schemaId, tableName));
-
     if (tablePO == null) {
       throw new NoSuchEntityException(
           NoSuchEntityException.NO_SUCH_ENTITY_MESSAGE,
@@ -282,5 +342,94 @@ public class TableMetaService {
           tableName);
     }
     return tablePO;
+  }
+
+  private TablePO getTableByFullQualifiedName(
+      String metalakeName, String catalogName, String schemaName, String tableName) {
+    TablePO tablePO =
+        SessionUtils.getWithoutCommit(
+            TableMetaMapper.class,
+            mapper ->
+                mapper.selectTableByFullQualifiedName(
+                    metalakeName, catalogName, schemaName, tableName));
+    if (tablePO == null) {
+      throw new NoSuchEntityException(
+          NoSuchEntityException.NO_SUCH_ENTITY_MESSAGE,
+          Entity.EntityType.TABLE.name().toLowerCase(),
+          tableName);
+    }
+
+    return tablePO;
+  }
+
+  private List<TablePO> listTablePOs(Namespace namespace) {
+    return tableListFetcher().apply(namespace);
+  }
+
+  private List<TablePO> listTablePOsBySchemaId(Namespace namespace) {
+    Long schemaId =
+        EntityIdService.getEntityId(
+            NameIdentifier.of(namespace.levels()), Entity.EntityType.SCHEMA);
+    return SessionUtils.getWithoutCommit(
+        TableMetaMapper.class, mapper -> mapper.listTablePOsBySchemaId(schemaId));
+  }
+
+  private List<TablePO> listTablePOsByFullQualifiedName(Namespace namespace) {
+    String[] namespaceLevels = namespace.levels();
+    List<TablePO> tablePOs =
+        SessionUtils.getWithoutCommit(
+            TableMetaMapper.class,
+            mapper ->
+                mapper.listTablePOsByFullQualifiedName(
+                    namespaceLevels[0], namespaceLevels[1], namespaceLevels[2]));
+    if (tablePOs.isEmpty() || tablePOs.get(0).getSchemaId() == null) {
+      throw new NoSuchEntityException(
+          NoSuchEntityException.NO_SUCH_ENTITY_MESSAGE,
+          EntityType.SCHEMA.name().toLowerCase(),
+          namespaceLevels[2]);
+    }
+    return tablePOs.stream().filter(po -> po.getTableId() != null).collect(Collectors.toList());
+  }
+
+  private TablePO getTablePOBySchemaId(NameIdentifier identifier) {
+    Long schemaId =
+        EntityIdService.getEntityId(
+            NameIdentifier.of(identifier.namespace().levels()), Entity.EntityType.SCHEMA);
+    return getTablePOBySchemaIdAndName(schemaId, identifier.name());
+  }
+
+  private TablePO getTablePOByFullQualifiedName(NameIdentifier identifier) {
+    String[] namespaceLevels = identifier.namespace().levels();
+    TablePO tablePO =
+        getTableByFullQualifiedName(
+            namespaceLevels[0], namespaceLevels[1], namespaceLevels[2], identifier.name());
+
+    if (tablePO.getSchemaId() == null) {
+      throw new NoSuchEntityException(
+          NoSuchEntityException.NO_SUCH_ENTITY_MESSAGE,
+          EntityType.SCHEMA.name().toLowerCase(),
+          namespaceLevels[2]);
+    }
+
+    if (tablePO.getTableId() == null) {
+      throw new NoSuchEntityException(
+          NoSuchEntityException.NO_SUCH_ENTITY_MESSAGE,
+          EntityType.TABLE.name().toLowerCase(),
+          identifier.name());
+    }
+
+    return tablePO;
+  }
+
+  private Function<Namespace, List<TablePO>> tableListFetcher() {
+    return GravitinoEnv.getInstance().cacheEnabled()
+        ? this::listTablePOsBySchemaId
+        : this::listTablePOsByFullQualifiedName;
+  }
+
+  private Function<NameIdentifier, TablePO> tablePOFetcher() {
+    return GravitinoEnv.getInstance().cacheEnabled()
+        ? this::getTablePOBySchemaId
+        : this::getTablePOByFullQualifiedName;
   }
 }

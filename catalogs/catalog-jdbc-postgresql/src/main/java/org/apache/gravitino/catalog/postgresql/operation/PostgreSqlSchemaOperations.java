@@ -76,8 +76,8 @@ public class PostgreSqlSchemaOperations extends JdbcDatabaseOperations {
   @Override
   public List<String> listDatabases() {
     List<String> result = new ArrayList<>();
-    try (Connection connection = getConnection()) {
-      ResultSet resultSet = getSchema(connection, null);
+    try (Connection connection = getConnection();
+        ResultSet resultSet = getSchema(connection, null)) {
       while (resultSet.next()) {
         String schemaName = resultSet.getString(1);
         if (!isSystemDatabase(schemaName)) {
@@ -162,10 +162,11 @@ public class PostgreSqlSchemaOperations extends JdbcDatabaseOperations {
   }
 
   public boolean schemaExists(Connection connection, String schema) throws SQLException {
-    ResultSet resultSet = getSchema(connection, schema);
-    while (resultSet.next()) {
-      if (Objects.equals(resultSet.getString(1), schema)) {
-        return true;
+    try (ResultSet resultSet = getSchema(connection, schema)) {
+      while (resultSet.next()) {
+        if (Objects.equals(resultSet.getString(1), schema)) {
+          return true;
+        }
       }
     }
     return false;

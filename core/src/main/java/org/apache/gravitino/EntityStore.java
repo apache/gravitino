@@ -20,12 +20,13 @@ package org.apache.gravitino;
 
 import java.io.Closeable;
 import java.io.IOException;
+import java.lang.reflect.Array;
+import java.util.Arrays;
 import java.util.List;
 import java.util.function.Function;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.gravitino.Entity.EntityType;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
-import org.apache.gravitino.tag.SupportsTagOperations;
 import org.apache.gravitino.utils.Executable;
 
 public interface EntityStore extends Closeable {
@@ -167,6 +168,35 @@ public interface EntityStore extends Closeable {
       throws NoSuchEntityException, IOException;
 
   /**
+   * Batch get the entity from the underlying storage.
+   *
+   * @param idents the unique identifier of the entity
+   * @param entityType the general type of the entity
+   * @param clazz the entity class instance
+   * @param <E> the class of entity
+   * @return the entity retrieved from the underlying storage
+   * @throws NoSuchEntityException if the entity does not exist
+   */
+  <E extends Entity & HasIdentifier> List<E> batchGet(
+      List<NameIdentifier> idents, EntityType entityType, Class<E> clazz);
+
+  /**
+   * Batch get the entity from the underlying storage.
+   *
+   * @param idents the unique identifier of the entity
+   * @param entityType the general type of the entity
+   * @param clazz the entity class instance
+   * @param <E> the class of entity
+   * @return the entity retrieved from the underlying storage
+   * @throws NoSuchEntityException if the entity does not exist
+   */
+  default <E extends Entity & HasIdentifier> E[] batchGet(
+      NameIdentifier[] idents, EntityType entityType, Class<E> clazz) {
+    return batchGet(Arrays.asList(idents), entityType, clazz)
+        .toArray(size -> (E[]) Array.newInstance(clazz, size));
+  }
+
+  /**
    * Delete the entity from the underlying storage by the specified {@link
    * org.apache.gravitino.NameIdentifier}.
    *
@@ -228,16 +258,6 @@ public interface EntityStore extends Closeable {
    */
   <R, E extends Exception> R executeInTransaction(Executable<R, E> executable)
       throws E, IOException;
-
-  /**
-   * Get the extra tag operations that are supported by the entity store.
-   *
-   * @return the tag operations object that are supported by the entity store
-   * @throws UnsupportedOperationException if the extra operations are not supported
-   */
-  default SupportsTagOperations tagOperations() {
-    throw new UnsupportedOperationException("tag operations are not supported");
-  }
 
   /**
    * Get the extra relation operations that are supported by the entity store.

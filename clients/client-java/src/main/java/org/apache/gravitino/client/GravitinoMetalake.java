@@ -56,6 +56,8 @@ import org.apache.gravitino.dto.requests.CatalogUpdatesRequest;
 import org.apache.gravitino.dto.requests.GroupAddRequest;
 import org.apache.gravitino.dto.requests.JobRunRequest;
 import org.apache.gravitino.dto.requests.JobTemplateRegisterRequest;
+import org.apache.gravitino.dto.requests.JobTemplateUpdateRequest;
+import org.apache.gravitino.dto.requests.JobTemplateUpdatesRequest;
 import org.apache.gravitino.dto.requests.OwnerSetRequest;
 import org.apache.gravitino.dto.requests.PolicyCreateRequest;
 import org.apache.gravitino.dto.requests.PolicySetRequest;
@@ -119,6 +121,7 @@ import org.apache.gravitino.exceptions.TagAlreadyExistsException;
 import org.apache.gravitino.exceptions.UserAlreadyExistsException;
 import org.apache.gravitino.job.JobHandle;
 import org.apache.gravitino.job.JobTemplate;
+import org.apache.gravitino.job.JobTemplateChange;
 import org.apache.gravitino.job.SupportsJobs;
 import org.apache.gravitino.policy.Policy;
 import org.apache.gravitino.policy.PolicyChange;
@@ -175,7 +178,7 @@ public class GravitinoMetalake extends MetalakeDTO
 
     EntityListResponse resp =
         restClient.get(
-            String.format("api/metalakes/%s/catalogs", this.name()),
+            String.format("api/metalakes/%s/catalogs", RESTUtils.encodeString(this.name())),
             EntityListResponse.class,
             Collections.emptyMap(),
             ErrorHandlers.catalogErrorHandler());
@@ -197,7 +200,7 @@ public class GravitinoMetalake extends MetalakeDTO
     params.put("details", "true");
     CatalogListResponse resp =
         restClient.get(
-            String.format("api/metalakes/%s/catalogs", this.name()),
+            String.format("api/metalakes/%s/catalogs", RESTUtils.encodeString(this.name())),
             params,
             CatalogListResponse.class,
             Collections.emptyMap(),
@@ -220,7 +223,10 @@ public class GravitinoMetalake extends MetalakeDTO
 
     CatalogResponse resp =
         restClient.get(
-            String.format(API_METALAKES_CATALOGS_PATH, this.name(), catalogName),
+            String.format(
+                API_METALAKES_CATALOGS_PATH,
+                RESTUtils.encodeString(this.name()),
+                RESTUtils.encodeString(catalogName)),
             CatalogResponse.class,
             Collections.emptyMap(),
             ErrorHandlers.catalogErrorHandler());
@@ -255,7 +261,7 @@ public class GravitinoMetalake extends MetalakeDTO
 
     CatalogResponse resp =
         restClient.post(
-            String.format("api/metalakes/%s/catalogs", this.name()),
+            String.format("api/metalakes/%s/catalogs", RESTUtils.encodeString(this.name())),
             req,
             CatalogResponse.class,
             Collections.emptyMap(),
@@ -1465,6 +1471,32 @@ public class GravitinoMetalake extends MetalakeDTO
   }
 
   @Override
+  public JobTemplate alterJobTemplate(String jobTemplateName, JobTemplateChange... changes)
+      throws NoSuchJobTemplateException, IllegalArgumentException {
+    Preconditions.checkArgument(
+        StringUtils.isNotBlank(jobTemplateName), "job template name must not be null or empty");
+
+    List<JobTemplateUpdateRequest> updates =
+        Arrays.stream(changes)
+            .map(DTOConverters::toJobTemplateUpdateRequest)
+            .collect(Collectors.toList());
+    JobTemplateUpdatesRequest req = new JobTemplateUpdatesRequest(updates);
+
+    JobTemplateResponse resp =
+        restClient.put(
+            String.format(API_METALAKES_JOB_TEMPLATES_PATH, RESTUtils.encodeString(this.name()))
+                + "/"
+                + RESTUtils.encodeString(jobTemplateName),
+            req,
+            JobTemplateResponse.class,
+            Collections.emptyMap(),
+            ErrorHandlers.jobErrorHandler());
+    resp.validate();
+
+    return org.apache.gravitino.dto.util.DTOConverters.fromDTO(resp.getJobTemplate());
+  }
+
+  @Override
   public List<JobHandle> listJobs(String jobTemplateName) throws NoSuchJobTemplateException {
     Preconditions.checkArgument(
         StringUtils.isNotBlank(jobTemplateName), "job template name must not be null or empty");
@@ -1472,7 +1504,7 @@ public class GravitinoMetalake extends MetalakeDTO
     JobListResponse resp =
         restClient.get(
             String.format(API_METALAKES_JOB_PATH, RESTUtils.encodeString(this.name())),
-            ImmutableMap.of("jobTemplateName", RESTUtils.encodeString(jobTemplateName)),
+            ImmutableMap.of("jobTemplateName", jobTemplateName),
             JobListResponse.class,
             Collections.emptyMap(),
             ErrorHandlers.jobErrorHandler());
@@ -1564,7 +1596,7 @@ public class GravitinoMetalake extends MetalakeDTO
 
     @Override
     public GravitinoMetalake build() {
-      Preconditions.checkNotNull(restClient, "restClient must be set");
+      Preconditions.checkArgument(restClient != null, "restClient must be set");
       Preconditions.checkArgument(StringUtils.isNotBlank(name), "name must not be null or empty");
       Preconditions.checkArgument(audit != null, "audit must not be null");
 
@@ -1586,7 +1618,9 @@ public class GravitinoMetalake extends MetalakeDTO
     return super.equals(that);
   }
 
-  /** @return the builder for creating a new instance of GravitinoMetaLake. */
+  /**
+   * @return the builder for creating a new instance of GravitinoMetaLake.
+   */
   public static Builder builder() {
     return new Builder();
   }

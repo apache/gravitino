@@ -18,11 +18,15 @@
  */
 package org.apache.gravitino.trino.connector;
 
+import static io.trino.spi.StandardErrorCode.NOT_SUPPORTED;
+
 import com.google.common.base.Preconditions;
+import io.trino.spi.TrinoException;
 import io.trino.spi.connector.Connector;
 import io.trino.spi.connector.ConnectorAccessControl;
 import io.trino.spi.connector.ConnectorCapabilities;
 import io.trino.spi.connector.ConnectorMetadata;
+import io.trino.spi.connector.ConnectorNodePartitioningProvider;
 import io.trino.spi.connector.ConnectorPageSinkProvider;
 import io.trino.spi.connector.ConnectorPageSourceProvider;
 import io.trino.spi.connector.ConnectorRecordSetProvider;
@@ -34,9 +38,9 @@ import io.trino.spi.transaction.IsolationLevel;
 import java.util.List;
 import java.util.Set;
 import org.apache.gravitino.NameIdentifier;
-import org.apache.gravitino.client.GravitinoMetalake;
 import org.apache.gravitino.trino.connector.catalog.CatalogConnectorContext;
 import org.apache.gravitino.trino.connector.catalog.CatalogConnectorMetadata;
+import org.apache.gravitino.trino.connector.catalog.CatalogConnectorMetadataAdapter;
 
 /**
  * GravitinoConnector serves as the entry point for operations on the connector managed by Trino and
@@ -46,30 +50,32 @@ import org.apache.gravitino.trino.connector.catalog.CatalogConnectorMetadata;
 public class GravitinoConnector implements Connector {
 
   private final NameIdentifier catalogIdentifier;
-  private final CatalogConnectorContext catalogConnectorContext;
+  protected final CatalogConnectorContext catalogConnectorContext;
+  private final CatalogConnectorMetadata connectorMetadata;
 
   /**
    * Constructs a new GravitinoConnector with the specified catalog identifier and catalog connector
    * context.
    *
-   * @param catalogIdentifier the catalog identifier
    * @param catalogConnectorContext the catalog connector context
    */
-  public GravitinoConnector(
-      NameIdentifier catalogIdentifier, CatalogConnectorContext catalogConnectorContext) {
-    this.catalogIdentifier = catalogIdentifier;
+  public GravitinoConnector(CatalogConnectorContext catalogConnectorContext) {
+    this.catalogIdentifier = catalogConnectorContext.getCatalog().geNameIdentifier();
     this.catalogConnectorContext = catalogConnectorContext;
+    this.connectorMetadata =
+        new CatalogConnectorMetadata(catalogConnectorContext.getMetalake(), this.catalogIdentifier);
   }
 
   @Override
   public ConnectorTransactionHandle beginTransaction(
       IsolationLevel isolationLevel, boolean readOnly, boolean autoCommit) {
     Connector internalConnector = catalogConnectorContext.getInternalConnector();
-    Preconditions.checkNotNull(internalConnector, "Internal connector must not be null");
+    Preconditions.checkArgument(internalConnector != null, "Internal connector must not be null");
 
     ConnectorTransactionHandle internalTransactionHandler =
         internalConnector.beginTransaction(isolationLevel, readOnly, autoCommit);
-    Preconditions.checkNotNull(internalTransactionHandler, "Transaction handler must not be null");
+    Preconditions.checkArgument(
+        internalTransactionHandler != null, "Transaction handler must not be null");
 
     return new GravitinoTransactionHandle(internalTransactionHandler);
   }
@@ -83,15 +89,16 @@ public class GravitinoConnector implements Connector {
     Connector internalConnector = catalogConnectorContext.getInternalConnector();
     ConnectorMetadata internalMetadata =
         internalConnector.getMetadata(session, gravitinoTransactionHandle.getInternalHandle());
-    Preconditions.checkNotNull(internalMetadata);
+    Preconditions.checkArgument(internalMetadata != null, "Internal metadata must not be null");
+    return createGravitinoMetadata(
+        connectorMetadata, catalogConnectorContext.getMetadataAdapter(), internalMetadata);
+  }
 
-    GravitinoMetalake metalake = catalogConnectorContext.getMetalake();
-
-    CatalogConnectorMetadata catalogConnectorMetadata =
-        new CatalogConnectorMetadata(metalake, catalogIdentifier);
-
-    return new GravitinoMetadata(
-        catalogConnectorMetadata, catalogConnectorContext.getMetadataAdapter(), internalMetadata);
+  protected GravitinoMetadata createGravitinoMetadata(
+      CatalogConnectorMetadata catalogConnectorMetadata,
+      CatalogConnectorMetadataAdapter metadataAdapter,
+      ConnectorMetadata internalMetadata) {
+    throw new TrinoException(NOT_SUPPORTED, "Should be overridden in subclass");
   }
 
   @Override
@@ -161,5 +168,19 @@ public class GravitinoConnector implements Connector {
   @Override
   public Set<ConnectorCapabilities> getCapabilities() {
     return catalogConnectorContext.getInternalConnector().getCapabilities();
+  }
+
+  @Override
+  public ConnectorNodePartitioningProvider getNodePartitioningProvider() {
+    Connector internalConnector = catalogConnectorContext.getInternalConnector();
+    ConnectorNodePartitioningProvider nodePartitioningProvider =
+        internalConnector.getNodePartitioningProvider();
+    return new GravitinoNodePartitioningProvider(nodePartitioningProvider);
+  }
+
+  public void shutdown() {
+    Connector internalConnector = catalogConnectorContext.getInternalConnector();
+    internalConnector.shutdown();
+    catalogConnectorContext.close();
   }
 }

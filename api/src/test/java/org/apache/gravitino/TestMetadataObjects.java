@@ -99,4 +99,84 @@ public class TestMetadataObjects {
     MetadataObject roleObject3 = MetadataObjects.parse("role", MetadataObject.Type.ROLE);
     Assertions.assertEquals("role", roleObject3.fullName());
   }
+
+  @Test
+  public void testJobObject() {
+    MetadataObject jobObject = MetadataObjects.of(null, "job_12345", MetadataObject.Type.JOB);
+    Assertions.assertEquals("job_12345", jobObject.fullName());
+
+    MetadataObject jobObject2 = MetadataObjects.parse("job_12345", MetadataObject.Type.JOB);
+    Assertions.assertEquals("job_12345", jobObject2.fullName());
+
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () -> MetadataObjects.of("parent", "job_12345", MetadataObject.Type.JOB));
+  }
+
+  @Test
+  public void testJobTemplateObject() {
+    MetadataObject jobTemplateObject =
+        MetadataObjects.of(null, "template_abc", MetadataObject.Type.JOB_TEMPLATE);
+    Assertions.assertEquals("template_abc", jobTemplateObject.fullName());
+
+    MetadataObject jobTemplateObject2 =
+        MetadataObjects.parse("template_abc", MetadataObject.Type.JOB_TEMPLATE);
+    Assertions.assertEquals("template_abc", jobTemplateObject2.fullName());
+
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () -> MetadataObjects.of("parent", "template_abc", MetadataObject.Type.JOB_TEMPLATE));
+  }
+
+  @Test
+  public void testViewObject() {
+    MetadataObject viewObject =
+        MetadataObjects.of("catalog.schema", "view1", MetadataObject.Type.VIEW);
+    Assertions.assertEquals("catalog.schema", viewObject.parent());
+    Assertions.assertEquals("view1", viewObject.name());
+    Assertions.assertEquals(MetadataObject.Type.VIEW, viewObject.type());
+    Assertions.assertEquals("catalog.schema.view1", viewObject.fullName());
+
+    MetadataObject viewObject2 =
+        MetadataObjects.of(
+            Lists.newArrayList("catalog", "schema", "view2"), MetadataObject.Type.VIEW);
+    Assertions.assertEquals("catalog.schema", viewObject2.parent());
+    Assertions.assertEquals("view2", viewObject2.name());
+    Assertions.assertEquals(MetadataObject.Type.VIEW, viewObject2.type());
+    Assertions.assertEquals("catalog.schema.view2", viewObject2.fullName());
+
+    MetadataObject viewObject3 =
+        MetadataObjects.parse("catalog.schema.view3", MetadataObject.Type.VIEW);
+    Assertions.assertEquals("catalog.schema", viewObject3.parent());
+    Assertions.assertEquals("view3", viewObject3.name());
+    Assertions.assertEquals(MetadataObject.Type.VIEW, viewObject3.type());
+    Assertions.assertEquals("catalog.schema.view3", viewObject3.fullName());
+
+    // Test parent
+    MetadataObject parent = MetadataObjects.parent(viewObject);
+    Assertions.assertEquals("catalog.schema", parent.fullName());
+    Assertions.assertEquals("catalog", parent.parent());
+    Assertions.assertEquals("schema", parent.name());
+    Assertions.assertEquals(MetadataObject.Type.SCHEMA, parent.type());
+
+    // Test incomplete name
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () -> MetadataObjects.parse("view1", MetadataObject.Type.VIEW));
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () -> MetadataObjects.parse("catalog", MetadataObject.Type.VIEW));
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () -> MetadataObjects.parse("catalog.schema", MetadataObject.Type.VIEW));
+
+    // Test incomplete name list
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () -> MetadataObjects.of(Lists.newArrayList("catalog"), MetadataObject.Type.VIEW));
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () ->
+            MetadataObjects.of(Lists.newArrayList("catalog", "schema"), MetadataObject.Type.VIEW));
+  }
 }

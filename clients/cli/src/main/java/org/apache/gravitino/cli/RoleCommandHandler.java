@@ -23,6 +23,7 @@ import java.util.Arrays;
 import org.apache.commons.cli.CommandLine;
 import org.apache.gravitino.cli.commands.Command;
 
+/** Handles the role command execution logic. */
 public class RoleCommandHandler extends CommandHandler {
 
   private final GravitinoCommandLine gravitinoCommandLine;
@@ -33,6 +34,14 @@ public class RoleCommandHandler extends CommandHandler {
   private String[] roles;
   private String[] privileges;
 
+  /**
+   * Create a new instance of the RoleCommandHandler.
+   *
+   * @param gravitinoCommandLine the main command line object
+   * @param line the parsed command line object
+   * @param command the command name
+   * @param context the command context
+   */
   public RoleCommandHandler(
       GravitinoCommandLine gravitinoCommandLine,
       CommandLine line,

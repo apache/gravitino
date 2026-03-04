@@ -25,9 +25,10 @@ import org.apache.gravitino.client.GravitinoClient;
 import org.apache.gravitino.exceptions.NoSuchMetalakeException;
 import org.apache.gravitino.tag.Tag;
 
-/* Lists all tags in a metalake. */
+/** Lists all tags in a metalake. */
 public class ListAllTags extends Command {
 
+  /** The name of the metalake. */
   protected final String metalake;
 
   /**

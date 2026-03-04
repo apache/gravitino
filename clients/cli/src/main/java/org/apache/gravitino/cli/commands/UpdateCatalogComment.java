@@ -29,8 +29,11 @@ import org.apache.gravitino.exceptions.NoSuchMetalakeException;
 /** Update the comment of a catalog. */
 public class UpdateCatalogComment extends Command {
 
+  /** The name of the command. */
   protected final String metalake;
+  /** The name of the catalog. */
   protected final String catalog;
+  /** New metalake comment. */
   protected final String comment;
 
   /**

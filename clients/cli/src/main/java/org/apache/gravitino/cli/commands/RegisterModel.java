@@ -34,11 +34,17 @@ import org.apache.gravitino.model.ModelCatalog;
 /** Register a model in the catalog */
 public class RegisterModel extends Command {
 
+  /** The name of the metalake. */
   protected final String metalake;
+  /** The name of the catalog. */
   protected final String catalog;
+  /** The name of the schema. */
   protected final String schema;
+  /** The name of the model. */
   protected final String model;
+  /** The comment of the model version. */
   protected final String comment;
+  /** The properties of the model version. */
   protected final Map<String, String> properties;
 
   /**

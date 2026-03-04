@@ -18,6 +18,7 @@
  */
 package org.apache.gravitino.catalog.postgresql.operation;
 
+import com.google.common.collect.Maps;
 import java.sql.Connection;
 import java.sql.SQLException;
 import java.util.HashMap;
@@ -34,7 +35,6 @@ import org.apache.gravitino.utils.RandomNameUtils;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
-import org.testcontainers.shaded.com.google.common.collect.Maps;
 
 @Tag("gravitino-docker-test")
 public class TestPostgreSqlSchemaOperations extends TestPostgreSql {

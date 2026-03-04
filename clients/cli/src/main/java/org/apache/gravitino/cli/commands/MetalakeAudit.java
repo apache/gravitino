@@ -27,6 +27,7 @@ import org.apache.gravitino.exceptions.NoSuchMetalakeException;
 
 /** Displays the audit information of a metalake. */
 public class MetalakeAudit extends AuditCommand {
+  /** The name of the metalake. */
   protected final String metalake;
 
   /**

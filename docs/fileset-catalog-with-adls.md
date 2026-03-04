@@ -30,12 +30,15 @@ Apart from configurations mentioned in [fileset-catalog-catalog-configuration](.
 
 | Configuration item            | Description                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            | Default value   | Required | Since version    |
 |-------------------------------|------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|-----------------|----------|------------------|
-| `filesystem-providers`        | The file system providers to add. Set it to `abs` if it's a Azure Blob Storage fileset, or a comma separated string that contains `abs` like `oss,abs,s3` to support multiple kinds of fileset including `abs`.                                                                                                                                                                                                                                                                                                                                                        | (none)          | Yes      | 0.8.0-incubating |
-| `default-filesystem-provider` | The name default filesystem providers of this Fileset catalog if users do not specify the scheme in the URI. Default value is `builtin-local`, for Azure Blob Storage, if we set this value, we can omit the prefix 'abfss://' in the location.                                                                                                                                                                                                                                                                                                                        | `builtin-local` | No       | 0.8.0-incubating |
+| `filesystem-providers`        | (deprecated) The file system providers to add. Set it to `abs` if it's a Azure Blob Storage fileset, or a comma separated string that contains `abs` like `oss,abs,s3` to support multiple kinds of fileset including `abs`.                                                                                                                                                                                                                                                                                                                                            | (none)          | Yes      | 0.8.0-incubating |
+| `default-filesystem-provider` | (deprecated) The name default filesystem providers of this Fileset catalog if users do not specify the scheme in the URI. Default value is `builtin-local`, for Azure Blob Storage, if we set this value, we can omit the prefix 'abfss://' in the location.                                                                                                                                                                                                                                                                                                            | `builtin-local` | No       | 0.8.0-incubating |
 | `azure-storage-account-name ` | The account name of Azure Blob Storage.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                | (none)          | Yes      | 0.8.0-incubating |
 | `azure-storage-account-key`   | The account key of Azure Blob Storage.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 | (none)          | Yes      | 0.8.0-incubating |
 | `credential-providers`        | The credential provider types, separated by comma, possible value can be `adls-token`, `azure-account-key`. As the default authentication type is using account name and account key as the above, this configuration can enable credential vending provided by Gravitino server and client will no longer need to provide authentication information like account_name/account_key to access ADLS by GVFS. Once it's set, more configuration items are needed to make it works, please see [adls-credential-vending](security/credential-vending.md#adls-credentials) | (none)          | No       | 0.8.0-incubating |
 
+:::note
+`default-filesystem-provider` and `filesystem-providers` are deprecated since 1.2.0. The fileset catalog automatically loads filesystem providers on the classpath, including buildin filesystem provider and cloud providers when the corresponding bundle jar is present (for example, `gravitino-azure-bundle`).
+:::
 
 ### Configurations for a schema
 
@@ -65,8 +68,7 @@ curl -X POST -H "Accept: application/vnd.gravitino.v1+json" \
   "properties": {
     "location": "abfss://container@account-name.dfs.core.windows.net/path",
     "azure-storage-account-name": "The account name of the Azure Blob Storage",
-    "azure-storage-account-key": "The account key of the Azure Blob Storage",
-    "filesystem-providers": "abs"
+    "azure-storage-account-key": "The account key of the Azure Blob Storage"
   }
 }' http://localhost:8090/api/metalakes/metalake/catalogs
 ```
@@ -84,7 +86,6 @@ Map<String, String> adlsProperties = ImmutableMap.<String, String>builder()
     .put("location", "abfss://container@account-name.dfs.core.windows.net/path")
     .put("azure-storage-account-name", "azure storage account name")
     .put("azure-storage-account-key", "azure storage account key")
-    .put("filesystem-providers", "abs")
     .build();
 
 Catalog adlsCatalog = gravitinoClient.createCatalog("example_catalog",
@@ -103,8 +104,7 @@ gravitino_client: GravitinoClient = GravitinoClient(uri="http://localhost:8090",
 adls_properties = {
     "location": "abfss://container@account-name.dfs.core.windows.net/path",
     "azure-storage-account-name": "azure storage account name",
-    "azure-storage-account-key": "azure storage account key",
-    "filesystem-providers": "abs"
+    "azure-storage-account-key": "azure storage account key"
 }
 
 adls_properties = gravitino_client.create_catalog(name="example_catalog",
@@ -260,7 +260,7 @@ fs.mkdirs(filesetPath);
 
 Similar to Spark configurations, you need to add ADLS (bundle) jars to the classpath according to your environment.
 
-If your wants to custom your hadoop version or there is already a hadoop version in your project, you can add the following dependencies to your `pom.xml`:
+If you want to custom your hadoop version or there is already a hadoop version in your project, you can add the following dependencies to your `pom.xml`:
 
 ```xml
   <dependency>
@@ -280,13 +280,11 @@ If your wants to custom your hadoop version or there is already a hadoop version
     <artifactId>gravitino-filesystem-hadoop3-runtime</artifactId>
     <version>${GRAVITINO_VERSION}</version>
   </dependency>
-
-  <dependency>
-    <groupId>org.apache.gravitino</groupId>
-    <artifactId>gravitino-azure</artifactId>
-    <version>${GRAVITINO_VERSION}</version>
-  </dependency>
 ```
+
+:::note
+Since version 1.1.0, the `gravitino-azure` JAR is no longer required, as it is now included in the `gravitino-filesystem-hadoop3-runtime` JAR.
+:::
 
 Or use the bundle jar with Hadoop environment if there is no Hadoop environment:
 
@@ -306,12 +304,12 @@ Or use the bundle jar with Hadoop environment if there is no Hadoop environment:
 
 ### Using Spark to access the fileset
 
-The following code snippet shows how to use **PySpark 3.1.3 with Hadoop environment(Hadoop 3.2.0)** to access the fileset:
+The following code snippet shows how to use **PySpark 3.5.0 with Hadoop environment(Hadoop 3.3.4)** to access the fileset:
 
 Before running the following code, you need to install required packages:
 
 ```bash
-pip install pyspark==3.1.3
+pip install pyspark==3.5.0
 pip install apache-gravitino==${GRAVITINO_VERSION}
 ```
 Then you can run the following code:
@@ -326,8 +324,8 @@ metalake_name = "test"
 catalog_name = "your_adls_catalog"
 schema_name = "your_adls_schema"
 fileset_name = "your_adls_fileset"
-
-os.environ["PYSPARK_SUBMIT_ARGS"] = "--jars /path/to/gravitino-azure-{gravitino-version}.jar,/path/to/gravitino-filesystem-hadoop3-runtime-{gravitino-version}.jar,/path/to/hadoop-azure-3.2.0.jar,/path/to/azure-storage-7.0.0.jar,/path/to/wildfly-openssl-1.0.4.Final.jar --master local[1] pyspark-shell"
+# JDK8 as follows, JDK17 will be slightly different, you need to add '--conf \"spark.driver.extraJavaOptions=--add-opens=java.base/sun.nio.ch=ALL-UNNAMED\" --conf \"spark.executor.extraJavaOptions=--add-opens=java.base/sun.nio.ch=ALL-UNNAMED\"' to the submit args.
+os.environ["PYSPARK_SUBMIT_ARGS"] = "--jars /path/to/gravitino-filesystem-hadoop3-runtime-{gravitino-version}.jar,/path/to/hadoop-azure-3.3.4.jar,/path/to/azure-storage-7.0.1.jar,/path/to/wildfly-openssl-1.0.7.Final.jar --master local[1] pyspark-shell"
 spark = SparkSession.builder
     .appName("adls_fileset_test")
     .config("spark.hadoop.fs.AbstractFileSystem.gvfs.impl", "org.apache.gravitino.filesystem.hadoop.Gvfs")
@@ -335,7 +333,7 @@ spark = SparkSession.builder
     .config("spark.hadoop.fs.gravitino.server.uri", "http://localhost:8090")
     .config("spark.hadoop.fs.gravitino.client.metalake", "test")
     .config("spark.hadoop.azure-storage-account-name", "azure_account_name")
-    .config("spark.hadoop.azure-storage-account-key", "azure_account_name")
+    .config("spark.hadoop.azure-storage-account-key", "azure_account_key")
     .config("spark.hadoop.fs.azure.skipUserGroupMetadataDuringInitialization", "true")
     .config("spark.driver.memory", "2g")
     .config("spark.driver.port", "2048")
@@ -359,11 +357,25 @@ If your Spark **without Hadoop environment**, you can use the following code sni
 
 os.environ["PYSPARK_SUBMIT_ARGS"] = "--jars /path/to/gravitino-azure-bundle-{gravitino-version}.jar,/path/to/gravitino-filesystem-hadoop3-runtime-{gravitino-version}.jar --master local[1] pyspark-shell"
 ```
+If Spark can't start with the above configuration (no Hadoop environment available and use bundle jar), you can try to set the jars to the classpath directly:
 
-- [`gravitino-azure-bundle-${gravitino-version}.jar`](https://mvnrepository.com/artifact/org.apache.gravitino/gravitino-azure-bundle) is the Gravitino ADLS jar with Hadoop environment(3.3.1) and `hadoop-azure` jar.
-- [`gravitino-azure-${gravitino-version}.jar`](https://mvnrepository.com/artifact/org.apache.gravitino/gravitino-azure) is a condensed version of the Gravitino ADLS bundle jar without Hadoop environment and `hadoop-azure` jar.
-- `hadoop-azure-3.2.0.jar` and `azure-storage-7.0.0.jar` can be found in the Hadoop distribution in the `${HADOOP_HOME}/share/hadoop/tools/lib` directory.
+```python
+jars_path = (
+    "/path/to/gravitino-azure-bundle-{gravitino-version}.jar:"
+    "/path/to/gravitino-filesystem-hadoop3-runtime-{gravitino-version}.jar"
+)
 
+os.environ["PYSPARK_SUBMIT_ARGS"] = (
+    f'--conf "spark.driver.extraClassPath={jars_path}" '
+    f'--conf "spark.executor.extraClassPath={jars_path}" '
+    '--master local[1] pyspark-shell'
+)
+```
+
+- [`gravitino-azure-bundle-${gravitino-version}.jar`](https://mvnrepository.com/artifact/org.apache.gravitino/gravitino-azure-bundle): A "fat" JAR that includes `gravitino-azure` functionality and all necessary dependencies like `hadoop-azure` (3.3.1) and other packages needed to access ADLS. Use this if your Spark environment doesn't have a pre-existing Hadoop setup.
+- [`gravitino-filesystem-hadoop3-runtime-${gravitino-version}.jar`](https://mvnrepository.com/artifact/org.apache.gravitino/gravitino-filesystem-hadoop3-runtime): A "fat" JAR that bundles Gravitino's virtual filesystem client and includes the functionality of `gravitino-azure`. It is required for accessing Gravitino filesets.
+- `hadoop-azure-3.3.4.jar`, `azure-storage-7.0.1.jar`, and `wildfly-openssl-1.0.7.Final.jar`: Standard Hadoop dependencies for ADLS access. If you are running in an existing Hadoop environment, you need to provide these JARs. They are typically located in the `${HADOOP_HOME}/share/hadoop/tools/lib` directory.
+- [`gravitino-azure-${gravitino-version}.jar`](https://mvnrepository.com/artifact/org.apache.gravitino/gravitino-azure): A "thin" JAR that only provides the Azure integration code. Its functionality is already included in the `gravitino-azure-bundle` and `gravitino-filesystem-hadoop3-runtime` JARs, so you do not need to add it as a direct dependency unless you want to manage all Hadoop and Azure dependencies manually.
 
 Please choose the correct jar according to your environment.
 
@@ -410,7 +422,7 @@ The following are examples of how to use the `hadoop fs` command to access the f
 
 2. Add the necessary jars to the Hadoop classpath.
 
-For ADLS, you need to add `gravitino-filesystem-hadoop3-runtime-${gravitino-version}.jar`, `gravitino-azure-${gravitino-version}.jar` and `hadoop-azure-${hadoop-version}.jar` located at `${HADOOP_HOME}/share/hadoop/tools/lib/` to the Hadoop classpath. 
+For ADLS, you need to add `gravitino-filesystem-hadoop3-runtime-${gravitino-version}.jar` and `hadoop-azure-${hadoop-version}.jar` located at `${HADOOP_HOME}/share/hadoop/tools/lib/` to the Hadoop classpath. 
 
 3. Run the following command to access the fileset:
 
@@ -494,7 +506,6 @@ curl -X POST -H "Accept: application/vnd.gravitino.v1+json" \
     "location": "abfss://container@account-name.dfs.core.windows.net/path",
     "azure-storage-account-name": "The account name of the Azure Blob Storage",
     "azure-storage-account-key": "The account key of the Azure Blob Storage",
-    "filesystem-providers": "abs",
     "credential-providers": "adls-token",
     "azure-tenant-id":"The Azure tenant id",
     "azure-client-id":"The Azure client id",
@@ -528,7 +539,7 @@ Spark:
 
 ```python
 spark = SparkSession.builder
-    .appName("adls_fielset_test")
+    .appName("adls_fileset_test")
     .config("spark.hadoop.fs.gravitino.enableCredentialVending", "true")
     .config("spark.hadoop.fs.AbstractFileSystem.gvfs.impl", "org.apache.gravitino.filesystem.hadoop.Gvfs")
     .config("spark.hadoop.fs.gvfs.impl", "org.apache.gravitino.filesystem.hadoop.GravitinoVirtualFileSystem")

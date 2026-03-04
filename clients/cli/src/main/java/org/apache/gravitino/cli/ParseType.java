@@ -24,6 +24,10 @@ import java.util.regex.Pattern;
 import org.apache.gravitino.rel.types.Type;
 import org.apache.gravitino.rel.types.Types;
 
+/**
+ * Utility class for parsing and converting data type strings into Gravitino {@link
+ * org.apache.gravitino.rel.types.Type} objects.
+ */
 public class ParseType {
 
   /**
@@ -38,7 +42,7 @@ public class ParseType {
    * @throws IllegalArgumentException if the data type format is unsupported or malformed
    */
   public static ParsedType parseBasicType(String datatype) {
-    Pattern pattern = Pattern.compile("^(\\w+)\\(\\s*(\\d+)\\s*(?:,\\s*(\\d+)\\s*)?\\)$");
+    Pattern pattern = Pattern.compile("^(\\w+)\\s*\\(\\s*(\\d+)\\s*(?:,\\s*(\\d+)\\s*)?\\)$");
     Matcher matcher = pattern.matcher(datatype);
 
     if (matcher.matches()) {
@@ -62,6 +66,21 @@ public class ParseType {
     ParsedType parsed = parseBasicType(datatype);
 
     if (parsed != null) {
+      // Special handling for DECIMAL type
+      // If only one argument is provided (e.g., "decimal(10)"),
+      // treat it as DECIMAL with precision = arg and scale = 0.
+      if ("decimal".equalsIgnoreCase(parsed.getTypeName())) {
+        if (parsed.getPrecision() != null && parsed.getScale() != null) {
+          // Standard case: decimal(p, s)
+          return TypeConverter.convert(datatype, parsed.getPrecision(), parsed.getScale());
+        } else if (parsed.getLength() != null) {
+          // decimal(p) → precision=p, scale=0
+          int precision = parsed.getLength();
+          return Types.DecimalType.of(precision, 0);
+        }
+      }
+
+      // Fallback for other types (e.g., varchar, char, etc.)
       if (parsed.getPrecision() != null && parsed.getScale() != null) {
         return TypeConverter.convert(datatype, parsed.getPrecision(), parsed.getScale());
       } else if (parsed.getLength() != null) {
@@ -69,6 +88,7 @@ public class ParseType {
       }
     }
 
+    // If no match, use generic conversion
     return TypeConverter.convert(datatype);
   }
 
@@ -93,14 +113,20 @@ public class ParseType {
     throw new IllegalArgumentException("Malformed map type: " + datatype);
   }
 
+  /**
+   * Parses a data type string and returns a {@link org.apache.gravitino.rel.types.Type} object
+   * representing the parsed type.
+   *
+   * @param datatype The data type string to parse.
+   * @return a {@link org.apache.gravitino.rel.types.Type} object representing the parsed type.
+   */
   public static Type toType(String datatype) {
-    if (datatype.startsWith("list")) {
-      return toListType(datatype);
-    } else if (datatype.startsWith("map")) {
-      return toMapType(datatype);
+    String dt = datatype.trim(); // normalize input
+    if (dt.startsWith("list")) {
+      return toListType(dt);
+    } else if (dt.startsWith("map")) {
+      return toMapType(dt);
     }
-
-    // fallback: if not complex type, parse as primitive type
-    return toBasicType(datatype);
+    return toBasicType(dt);
   }
 }

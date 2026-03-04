@@ -32,12 +32,19 @@ import org.apache.gravitino.exceptions.NoSuchSchemaException;
 import org.apache.gravitino.file.Fileset;
 import org.apache.gravitino.utils.MapUtils;
 
+/** Represents create a new fileset command. */
 public class CreateFileset extends Command {
+  /** The name of the metalake. */
   protected final String metalake;
+  /** The name of the catalog. */
   protected final String catalog;
+  /** The name of the schema. */
   protected final String schema;
+  /** The name of the fileset. */
   protected final String fileset;
+  /** The fileset's comment. */
   protected final String comment;
+  /** The catalog's properties. */
   protected final Map<String, String> properties;
 
   /**

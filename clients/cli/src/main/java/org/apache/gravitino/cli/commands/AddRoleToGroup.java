@@ -30,8 +30,11 @@ import org.apache.gravitino.exceptions.NoSuchUserException;
 /** Adds a role to a group. */
 public class AddRoleToGroup extends Command {
 
+  /** The name of the metalake. */
   protected String metalake;
+  /** The name of the group. */
   protected String group;
+  /** The name of the role. */
   protected String role;
 
   /**

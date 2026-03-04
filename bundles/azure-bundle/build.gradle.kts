@@ -25,7 +25,14 @@ plugins {
 }
 
 dependencies {
-  implementation(project(":bundles:azure"))
+  implementation(project(":bundles:azure")) {
+    // There is already a dependency on commons-logging v1.2 in hadoop-azure, so exclude the one
+    // from the bundle.
+    exclude(group = "commons-logging", module = "commons-logging")
+  }
+
+  implementation(libs.azure.identity)
+  implementation(libs.azure.storage.file.datalake)
   implementation(libs.hadoop3.abs)
   implementation(libs.hadoop3.client.api)
   implementation(libs.hadoop3.client.runtime)
@@ -38,6 +45,16 @@ tasks.withType(ShadowJar::class.java) {
 
   dependencies {
     exclude(dependency("org.slf4j:slf4j-api"))
+
+    // Exclude Gravitino modules to prevent class duplication and "Split Packages" issues.
+    // These modules (api, common, catalogs) are already provided by the Gravitino server and gravitino-filesystem-hadoop3-runtime.
+    // Including them here would cause the Relocation rules below to incorrectly modify
+    // method signatures (e.g., JsonUtils.anyFieldMapper returning a shaded ObjectMapper),
+    // leading to java.lang.NoSuchMethodError at runtime.
+    exclude(project(":api"))
+    exclude(project(":common"))
+    exclude(project(":catalogs:catalog-common"))
+    exclude(project(":catalogs:hadoop-common"))
   }
 
   // Relocate dependencies to avoid conflicts
@@ -47,7 +64,6 @@ tasks.withType(ShadowJar::class.java) {
   relocate("com.microsoft.aad", "org.apache.gravitino.azure.shaded.com.microsoft.aad")
   relocate("com.nimbusds", "org.apache.gravitino.azure.shaded.com.nimbusds")
   relocate("com.sun.jna", "org.apache.gravitino.azure.shaded.com.sun.jna")
-  relocate("com.sun.xml", "org.apache.gravitino.azure.shaded.com.sun.xml")
   relocate("io.netty", "org.apache.gravitino.azure.shaded.io.netty")
   relocate("net.minidev", "org.apache.gravitino.azure.shaded.net.minidev")
   relocate("net.jcip.annotations", "org.apache.gravitino.azure.shaded.net.jcip.annotations")

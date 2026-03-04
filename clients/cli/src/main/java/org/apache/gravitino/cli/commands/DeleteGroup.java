@@ -26,10 +26,14 @@ import org.apache.gravitino.client.GravitinoClient;
 import org.apache.gravitino.exceptions.NoSuchGroupException;
 import org.apache.gravitino.exceptions.NoSuchMetalakeException;
 
+/** Represents delete a group */
 public class DeleteGroup extends Command {
 
+  /** The name of the metalake. */
   protected final String metalake;
+  /** The name of the group. */
   protected final String group;
+  /** The force flag. */
   protected final boolean force;
 
   /**

@@ -30,7 +30,9 @@ import org.apache.gravitino.exceptions.NoSuchMetalakeException;
 /** List the properties of a catalog. */
 public class ListCatalogProperties extends ListProperties {
 
+  /** The name of the metalake. */
   protected final String metalake;
+  /** The name of the catalog. */
   protected final String catalog;
 
   /**

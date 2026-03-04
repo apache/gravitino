@@ -19,6 +19,7 @@
 package org.apache.gravitino.dto.requests;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
+import com.google.common.base.Preconditions;
 import java.util.List;
 import lombok.EqualsAndHashCode;
 import lombok.Getter;
@@ -55,6 +56,7 @@ public class MetalakeUpdatesRequest implements RESTRequest {
    */
   @Override
   public void validate() throws IllegalArgumentException {
+    Preconditions.checkArgument(updates != null, "updates must not be null");
     updates.forEach(RESTRequest::validate);
   }
 }

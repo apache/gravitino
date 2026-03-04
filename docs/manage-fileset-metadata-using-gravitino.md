@@ -473,7 +473,6 @@ curl -X POST -H "Accept: application/vnd.gravitino.v1+json" \
   "type": "FILESET",
   "comment": "comment",
   "properties": {
-    "filesystem-providers": "builtin-local,builtin-hdfs,s3,gcs",
     "location-l1": "file:///{{catalog}}/{{schema}}/workspace_{{project}}/{{user}}",
     "location-l2": "hdfs:///{{catalog}}/{{schema}}/workspace_{{project}}/{{user}}"
   }
@@ -539,7 +538,6 @@ Catalog catalog = gravitinoClient.createCatalog(
     Type.FILESET,
     "comment",
     ImmutableMap.of(
-        "filesystem-providers", "builtin-local,builtin-hdfs,s3,gcs",
         "location-l1", "file:///{{catalog}}/{{schema}}/workspace_{{project}}/{{user}}",
         "location-l2", "hdfs:///{{catalog}}/{{schema}}/workspace_{{project}}/{{user}}"));
 FilesetCatalog filesetCatalog = catalog.asFilesetCatalog();
@@ -595,7 +593,6 @@ catalog: Catalog = gravitino_client.create_catalog(
    provider=None,
    comment="comment",
    properties={
-      "filesystem-providers": "builtin-local,builtin-hdfs,s3,gcs",
       "location-l1": "file:///{{catalog}}/{{schema}}/workspace_{{project}}/{{user}}",
       "location-l2": "hdfs:///{{catalog}}/{{schema}}/workspace_{{project}}/{{user}}",
     }
@@ -697,7 +694,7 @@ gravitino_client: GravitinoClient = GravitinoClient(uri="http://localhost:8090",
 catalog: Catalog = gravitino_client.load_catalog(name="catalog")
 changes = (
    FilesetChange.remove_property("fileset_properties_key1"),
-   FilesetChange.set_property("fileset_properties_key2", "fileset_propertie_new_value"),
+   FilesetChange.set_property("fileset_properties_key2", "fileset_properties_new_value"),
 )
 fileset_new = catalog.as_fileset_catalog().alter_fileset(NameIdentifier.of("schema", "fileset"), 
                                                          *changes)
@@ -802,3 +799,164 @@ fileset_list: List[NameIdentifier] = catalog.as_fileset_catalog().list_filesets(
 
 </TabItem>
 </Tabs>
+
+
+## Manage fileset with multiple clusters
+
+
+In general, the locations of all schemas and filesets under a fileset
+catalog belong to a single Hadoop cluster if they are HDFS location.
+
+The example for creating a fileset is as follows:
+```text
+# create fileset catalog
+curl -X POST -H "Accept: application/vnd.gravitino.v1+json" \
+-H "Content-Type: application/json" -d '{
+  "name": "fileset_catalog",
+  "type": "FILESET",
+  "comment": "This is a fileset catalog",
+  "provider": "fileset",
+  "properties": {
+    "location": "hdfs://172.17.0.2:9000/fileset_catalog"
+  }
+}' http://localhost:8090/api/metalakes/test/catalogs
+
+# create a fileset schema under the catalog with inherited properties
+curl -X POST -H "Accept: application/vnd.gravitino.v1+json" \
+-H "Content-Type: application/json" -d '{
+  "name": "test_schema",
+  "comment": "This is a schema",
+  "properties": {
+  }
+}' http://localhost:8090/api/metalakes/test/catalogs/fileset_catalog/schemas
+
+# create a fileset under the schema with inherited properties
+curl -X POST -H "Accept: application/vnd.gravitino.v1+json"
+-H "Content-Type: application/json" -d '{
+  "name": "fs1",
+  "comment": "This is an example fileset",
+  "type": "MANAGED",
+  "properties": {
+  }
+}' http://localhost:8090/api/metalakes/test/catalogs/fileset_catalog/schemas/test_schema/filesets
+```
+
+Within a fileset catalog, schemas and filesets can automatically inherit configuration properties
+from their parent catalog. For example, the location property can be inherited — a schema can inherit
+the catalog’s location as its base path, and a fileset can in turn inherit the schema’s location as its base path.
+
+The property inheritance priority is as follows: catalog < schema < fileset.
+
+If a fileset needs to use a different storage path, it can specify its own location configuration to
+override the inherited one.
+
+The fileset catalog also supports multiple clusters. Each schema and fileset under a catalog can independently
+specify their own cluster locations and connection configurations.
+
+For example, a complex catalog structure might look like this:
+
+```text
+catalog1 -> hdfs://cluster1/catalog1
+    schema1 -> hdfs://cluster1/catalog1/schema1
+        fileset1 -> hdfs://cluster1/catalog1/schema1/fileset1
+        fileset2 -> hdfs://cluster1/catalog1/schema1/fileset2
+    schema2 -> hdfs://cluster2/tmp/schema2
+        fileset3 -> hdfs://cluster2/tmp/schema2/fsd
+        fileset4 -> hdfs://cluster3/customers
+```
+
+In this example, the default location of catalog1 is hdfs://cluster1/catalog1.
+schema1 and its filesets are stored in the same cluster as defined by the catalog (cluster1).
+However, schema2 and its filesets (fileset3, fileset4) are located in different clusters (cluster2 and cluster3, respectively).
+
+
+The example for creating Filesets with different clusters as follows:
+
+```text
+# create fileset catalog
+curl -X POST -H "Accept: application/vnd.gravitino.v1+json" \
+-H "Content-Type: application/json" -d '{
+  "name": "fileset_catalog",
+  "type": "FILESET",
+  "comment": "This is a fileset catalog",
+  "provider": "fileset",
+  "properties": {
+    "location": "hdfs://172.17.0.2:9000/fileset_catalog"
+  }
+}' http://localhost:8090/api/metalakes/test/catalogs
+
+# create a fileset schema under the catalog with inherited properties
+curl -X POST -H "Accept: application/vnd.gravitino.v1+json" \
+-H "Content-Type: application/json" -d '{
+  "name": "test_schema",
+  "comment": "This is a schema",
+  "properties": {
+  }
+}' http://localhost:8090/api/metalakes/test/catalogs/fileset_catalog/schemas
+
+
+# create fileset fs1 in the default HDFS cluster
+curl -X POST -H "Accept: application/vnd.gravitino.v1+json"
+-H "Content-Type: application/json" -d '{
+  "name": "fs1",
+  "comment": "This is an example fileset",
+  "type": "MANAGED",
+  "properties": {
+  }
+}' http://localhost:8090/api/metalakes/test/catalogs/fileset_catalog/schemas/test_schema/filesets
+
+# create fileset fs2 in another HDFS cluster
+curl -X POST -H "Accept: application/vnd.gravitino.v1+json" \
+-H "Content-Type: application/json" -d '{
+  "name": "fs2",
+  "comment": "This is an example fileset",
+  "type": "MANAGED",
+  "storageLocation": "hdfs://172.17.0.3:9000/tmp/fs2",
+  "properties": {
+    "config.resources": "/etc/conf/cluster1/core-site.xml,/etc/conf/cluster1/hdfs-site.xml"
+  }
+}' http://localhost:8090/api/metalakes/test/catalogs/fileset_catalog/schemas/test_schema/filesets
+```
+
+Alternatively, you can pass configurations for multiple clusters using the `fs.path.config.{cluster_name}.*` format when creating the fileset catalog.
+All schemas and filesets under the catalog can inherit configuration based on the cluster name,
+and the configuration can be overridden at the schema or fileset level if needed.
+The system can automatically retrieve the appropriate configuration from `fs.path.config` configuration based on the fileset’s storage location
+and override the corresponding fileset properties by key.
+
+```text
+# create fileset catalog with multiple cluster configurations, and specify HDFS and S3 clusters configurations by logical names
+curl -X POST -H "Accept: application/vnd.gravitino.v1+json" \
+-H "Content-Type: application/json" -d '{
+  "name": "fileset_catalog",
+  "type": "FILESET",
+  "comment": "This is a fileset catalog",
+  "provider": "fileset",
+  "properties": {
+    "location": "hdfs://172.17.0.2:9000/fileset_catalog",
+    "fs.path.config.hadoop1"="hdfs://172.17.0.2:9000",
+    "fs.path.config.hadoop1.config.resources"="/etc/conf/cluster1/core-site.xml,/etc/conf/cluster1/hdfs-site.xml",
+    "fs.path.config.aws1"="s3://mybuctket",
+    "fs.path.config.aws1.access.key"="your_access_key",
+    "fs.path.config.aws1.secret.key"="your_secret_key"
+  }
+}' http://localhost:8090/api/metalakes/test/catalogs
+
+# create fileset fs1 in the default HDFS cluster, it will inherit the hadoop1 cluster configuration from the catalog
+curl -X POST -H "Accept: application/vnd.gravitino.v1+json"
+-H "Content-Type: application/json" -d '{
+  "name": "fs1",
+  "comment": "This is an example fileset",
+  "type": "MANAGED",
+  "storageLocation": "hdfs://172.17.0.2:9000/datawarehouse/fs1"
+}' http://localhost:8090/api/metalakes/test/catalogs/fileset_catalog/schemas/test_schema/filesets
+
+# create fileset fs2 in another s3 cluster, it will inherit the aws1 cluster configuration from the catalog
+curl -X POST -H "Accept: application/vnd.gravitino.v1+json" \
+-H "Content-Type: application/json" -d '{
+  "name": "fs2",
+  "comment": "This is an example fileset",
+  "type": "MANAGED",
+  "storageLocation": "s3://mybuctket/datawarehouse/fs2"
+}' http://localhost:8090/api/metalakes/test/catalogs/fileset_catalog/schemas/test_schema/filesets
+```

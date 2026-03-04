@@ -27,7 +27,9 @@ import org.apache.gravitino.annotation.Evolving;
 @Evolving
 public interface PropertiesMetadata {
 
-  /** @return the defined property entries for the entity. */
+  /**
+   * @return the defined property entries for the entity.
+   */
   Map<String, PropertyEntry<?>> propertyEntries();
 
   /**

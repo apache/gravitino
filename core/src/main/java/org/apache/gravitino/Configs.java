@@ -28,7 +28,7 @@ import org.apache.gravitino.audit.v2.SimpleFormatterV2;
 import org.apache.gravitino.config.ConfigBuilder;
 import org.apache.gravitino.config.ConfigConstants;
 import org.apache.gravitino.config.ConfigEntry;
-import org.apache.gravitino.stats.storage.LancePartitionStatisticStorageFactory;
+import org.apache.gravitino.stats.storage.JdbcPartitionStatisticStorageFactory;
 
 public class Configs {
 
@@ -92,6 +92,8 @@ public class Configs {
   public static final String DEFAULT_RELATIONAL_JDBC_BACKEND_PASSWORD = "gravitino";
 
   public static final int DEFAULT_RELATIONAL_JDBC_BACKEND_MAX_CONNECTIONS = 100;
+
+  public static final int DEFAULT_GRAVITINO_AUTHORIZATION_THREAD_POOL_SIZE = 100;
 
   public static final long DEFAULT_RELATIONAL_JDBC_BACKEND_MAX_WAIT_MILLISECONDS = 1000L;
 
@@ -293,6 +295,40 @@ public class Configs {
           .stringConf()
           .createWithDefault("org.apache.gravitino.server.authorization.jcasbin.JcasbinAuthorizer");
 
+  public static final ConfigEntry<Integer> GRAVITINO_AUTHORIZATION_THREAD_POOL_SIZE =
+      new ConfigBuilder("gravitino.authorization.threadPoolSize")
+          .doc("The thread pool size of metadata authorization requests")
+          .version(ConfigConstants.VERSION_1_0_0)
+          .intConf()
+          .createWithDefault(DEFAULT_GRAVITINO_AUTHORIZATION_THREAD_POOL_SIZE);
+
+  public static final long DEFAULT_GRAVITINO_AUTHORIZATION_CACHE_EXPIRATION_SECS = 3600L;
+
+  public static final ConfigEntry<Long> GRAVITINO_AUTHORIZATION_CACHE_EXPIRATION_SECS =
+      new ConfigBuilder("gravitino.authorization.jcasbin.cacheExpirationSecs")
+          .doc("The expiration time in seconds for authorization cache entries")
+          .version(ConfigConstants.VERSION_1_1_1)
+          .longConf()
+          .createWithDefault(DEFAULT_GRAVITINO_AUTHORIZATION_CACHE_EXPIRATION_SECS);
+
+  public static final long DEFAULT_GRAVITINO_AUTHORIZATION_ROLE_CACHE_SIZE = 10000L;
+
+  public static final ConfigEntry<Long> GRAVITINO_AUTHORIZATION_ROLE_CACHE_SIZE =
+      new ConfigBuilder("gravitino.authorization.jcasbin.roleCacheSize")
+          .doc("The maximum size of the role cache for authorization")
+          .version(ConfigConstants.VERSION_1_1_1)
+          .longConf()
+          .createWithDefault(DEFAULT_GRAVITINO_AUTHORIZATION_ROLE_CACHE_SIZE);
+
+  public static final long DEFAULT_GRAVITINO_AUTHORIZATION_OWNER_CACHE_SIZE = 100000L;
+
+  public static final ConfigEntry<Long> GRAVITINO_AUTHORIZATION_OWNER_CACHE_SIZE =
+      new ConfigBuilder("gravitino.authorization.jcasbin.ownerCacheSize")
+          .doc("The maximum size of the owner cache for authorization")
+          .version(ConfigConstants.VERSION_1_1_1)
+          .longConf()
+          .createWithDefault(DEFAULT_GRAVITINO_AUTHORIZATION_OWNER_CACHE_SIZE);
+
   public static final ConfigEntry<List<String>> SERVICE_ADMINS =
       new ConfigBuilder("gravitino.authorization.serviceAdmins")
           .doc("The admins of Gravitino service")
@@ -408,6 +444,23 @@ public class Configs {
           .checkValue(StringUtils::isNotBlank, ConfigConstants.NOT_BLANK_ERROR_MSG)
           .createWithDefault("caffeine");
 
+  // Number of lock segments for cache concurrency optimization
+  public static final ConfigEntry<Integer> CACHE_LOCK_SEGMENTS =
+      new ConfigBuilder("gravitino.cache.lockSegments")
+          .doc(
+              "Number of lock segments for cache concurrency optimization. "
+                  + "This configuration controls the granularity of locking in the cache system. "
+                  + "Instead of using a single global lock, Gravitino uses Guava's Striped<Lock> "
+                  + "to divide locks into segments, allowing concurrent access to different cache "
+                  + "entries while maintaining thread safety. Higher values reduce lock contention "
+                  + "but increase memory overhead. The actual number of segments will be rounded "
+                  + "up to the nearest power of 2 for optimal performance. "
+                  + "See: https://github.com/google/guava/wiki/StripedExplained")
+          .version(ConfigConstants.VERSION_1_0_0)
+          .intConf()
+          .checkValue(value -> value > 0, "Lock segments must be positive.")
+          .createWithDefault(16);
+
   public static final ConfigEntry<String> JOB_STAGING_DIR =
       new ConfigBuilder("gravitino.job.stagingDir")
           .doc("Directory for managing staging files when running jobs.")
@@ -449,8 +502,11 @@ public class Configs {
 
   public static final ConfigEntry<String> PARTITION_STATS_STORAGE_FACTORY_CLASS =
       new ConfigBuilder("gravitino.stats.partition.storageFactoryClass")
-          .doc("The partition stats storage factory class.")
+          .doc(
+              "The partition stats storage factory class. "
+                  + "Default is JDBC-based storage using the same database as entity storage. "
+                  + "Set to LancePartitionStatisticStorageFactory for Lance-based storage.")
           .version(ConfigConstants.VERSION_1_0_0)
           .stringConf()
-          .createWithDefault(LancePartitionStatisticStorageFactory.class.getCanonicalName());
+          .createWithDefault(JdbcPartitionStatisticStorageFactory.class.getCanonicalName());
 }

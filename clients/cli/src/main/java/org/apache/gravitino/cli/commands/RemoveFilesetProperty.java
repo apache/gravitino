@@ -32,10 +32,15 @@ import org.apache.gravitino.file.FilesetChange;
 /** Remove a property of a fileset. */
 public class RemoveFilesetProperty extends Command {
 
+  /** The name of the metalake. */
   protected final String metalake;
+  /** The name of the catalog. */
   protected final String catalog;
+  /** The name of the schema. */
   protected final String schema;
+  /** The name of the fileset. */
   protected final String fileset;
+  /** The name of the property. */
   protected final String property;
 
   /**

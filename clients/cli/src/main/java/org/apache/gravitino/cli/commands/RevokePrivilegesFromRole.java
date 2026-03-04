@@ -36,9 +36,13 @@ import org.apache.gravitino.exceptions.NoSuchRoleException;
 /** Revokes one or more privileges. */
 public class RevokePrivilegesFromRole extends MetadataCommand {
 
+  /** The name of the metalake. */
   protected final String metalake;
+  /** The name of the role. */
   protected final String role;
+  /** The full name of the entity. */
   protected final FullName entity;
+  /** The list of privileges. */
   protected final String[] privileges;
 
   /**
@@ -85,7 +89,7 @@ public class RevokePrivilegesFromRole extends MetadataCommand {
     } catch (NoSuchRoleException err) {
       exitWithError(ErrorMessages.UNKNOWN_ROLE);
     } catch (NoSuchMetadataObjectException err) {
-      exitWithError(ErrorMessages.UNKNOWN_USER);
+      exitWithError(ErrorMessages.UNKNOWN_ENTITY);
     } catch (Exception exp) {
       exitWithError(exp.getMessage());
     }

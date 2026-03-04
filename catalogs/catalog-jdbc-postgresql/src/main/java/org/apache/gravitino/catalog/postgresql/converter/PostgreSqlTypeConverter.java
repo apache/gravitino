@@ -78,7 +78,9 @@ public class PostgreSqlTypeConverter extends JdbcTypeConverter {
       case NUMERIC:
         return Types.DecimalType.of(typeBean.getColumnSize(), typeBean.getScale());
       case VARCHAR:
-        return Types.VarCharType.of(typeBean.getColumnSize());
+        return typeBean.getColumnSize() == null
+            ? Types.StringType.get()
+            : Types.VarCharType.of(typeBean.getColumnSize());
       case BPCHAR:
         return Types.FixedCharType.of(typeBean.getColumnSize());
       case TEXT:

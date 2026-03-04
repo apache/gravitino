@@ -30,12 +30,17 @@ import org.apache.gravitino.exceptions.NoSuchSchemaException;
 import org.apache.gravitino.exceptions.NoSuchTableException;
 import org.apache.gravitino.rel.TableChange;
 
+/** Represents delete a column of a table */
 public class DeleteColumn extends Command {
-
+  /** The name of the command. */
   protected final String metalake;
+  /** The name of the catalog. */
   protected final String catalog;
+  /** The name of the schema. */
   protected final String schema;
+  /** The name of the table. */
   protected final String table;
+  /** The name of the column. */
   protected final String column;
 
   /**

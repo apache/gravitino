@@ -203,6 +203,103 @@ public class TestHTTPClient {
   }
 
   @Test
+  public void testConnectionPoolDefaults() {
+    // Test that HTTPClient can be built with default connection pool settings
+    Map<String, String> emptyProps = ImmutableMap.of();
+    GravitinoClientConfiguration config =
+        GravitinoClientConfiguration.buildFromProperties(emptyProps);
+
+    Assertions.assertEquals(
+        GravitinoClientConfiguration.CLIENT_MAX_CONNECTIONS_DEFAULT,
+        config.getClientMaxConnections());
+    Assertions.assertEquals(
+        GravitinoClientConfiguration.CLIENT_MAX_CONNECTIONS_PER_ROUTE_DEFAULT,
+        config.getClientMaxConnectionsPerRoute());
+
+    // Verify HTTPClient can be built with these defaults
+    HTTPClient client =
+        HTTPClient.builder(emptyProps)
+            .uri(String.format("http://127.0.0.1:%d", mockServer.getPort()))
+            .build();
+    Assertions.assertNotNull(client);
+  }
+
+  @Test
+  public void testConnectionPoolCustomValues() {
+    // Test that HTTPClient can be built with custom connection pool settings
+    Map<String, String> properties =
+        ImmutableMap.of(
+            GravitinoClientConfiguration.CLIENT_MAX_CONNECTIONS,
+            "400",
+            GravitinoClientConfiguration.CLIENT_MAX_CONNECTIONS_PER_ROUTE,
+            "400");
+
+    GravitinoClientConfiguration config =
+        GravitinoClientConfiguration.buildFromProperties(properties);
+
+    Assertions.assertEquals(400, config.getClientMaxConnections());
+    Assertions.assertEquals(400, config.getClientMaxConnectionsPerRoute());
+
+    // Verify HTTPClient can be built with custom values
+    HTTPClient client =
+        HTTPClient.builder(properties)
+            .uri(String.format("http://127.0.0.1:%d", mockServer.getPort()))
+            .build();
+    Assertions.assertNotNull(client);
+  }
+
+  @Test
+  public void testConnectionPoolHighThroughputConfig() {
+    // Test configuration for high-throughput scenario (like Lance REST server)
+    Map<String, String> properties =
+        ImmutableMap.<String, String>builder()
+            .put(GravitinoClientConfiguration.CLIENT_MAX_CONNECTIONS, "800")
+            .put(GravitinoClientConfiguration.CLIENT_MAX_CONNECTIONS_PER_ROUTE, "800")
+            .put(GravitinoClientConfiguration.CLIENT_CONNECTION_TIMEOUT_MS, "5000")
+            .put(GravitinoClientConfiguration.CLIENT_SOCKET_TIMEOUT_MS, "30000")
+            .build();
+
+    GravitinoClientConfiguration config =
+        GravitinoClientConfiguration.buildFromProperties(properties);
+
+    Assertions.assertEquals(800, config.getClientMaxConnections());
+    Assertions.assertEquals(800, config.getClientMaxConnectionsPerRoute());
+    Assertions.assertEquals(5000L, config.getClientConnectionTimeoutMs());
+    Assertions.assertEquals(30000, config.getClientSocketTimeoutMs());
+
+    // Verify HTTPClient can be built with high-throughput settings
+    HTTPClient client =
+        HTTPClient.builder(properties)
+            .uri(String.format("http://127.0.0.1:%d", mockServer.getPort()))
+            .build();
+    Assertions.assertNotNull(client);
+  }
+
+  @Test
+  public void testConnectionPoolSingleRoutePattern() {
+    // Test the recommended pattern for single-route scenarios (maxPerRoute = maxTotal)
+    Map<String, String> properties =
+        ImmutableMap.of(
+            GravitinoClientConfiguration.CLIENT_MAX_CONNECTIONS,
+            "200",
+            GravitinoClientConfiguration.CLIENT_MAX_CONNECTIONS_PER_ROUTE,
+            "200");
+
+    GravitinoClientConfiguration config =
+        GravitinoClientConfiguration.buildFromProperties(properties);
+
+    // For single-route clients, maxPerRoute should equal maxTotal
+    Assertions.assertEquals(
+        config.getClientMaxConnections(), config.getClientMaxConnectionsPerRoute());
+
+    HTTPClient client =
+        HTTPClient.builder(properties)
+            .uri(String.format("http://127.0.0.1:%d", mockServer.getPort()))
+            .build();
+    Assertions.assertNotNull(client);
+  }
+
+  @Test
   public void testConnectionTimeout() throws IOException {
     String path = "test_connection_timeout";
     long connectionTimeoutMs = 2000;

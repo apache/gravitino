@@ -18,6 +18,10 @@
  */
 package org.apache.gravitino.json;
 
+import static org.apache.gravitino.dto.rel.expressions.FunctionArg.ArgType.FIELD;
+import static org.apache.gravitino.dto.rel.expressions.FunctionArg.ArgType.FUNCTION;
+import static org.apache.gravitino.dto.rel.expressions.FunctionArg.ArgType.LITERAL;
+
 import com.fasterxml.jackson.annotation.JsonAutoDetect;
 import com.fasterxml.jackson.annotation.PropertyAccessor;
 import com.fasterxml.jackson.core.JacksonException;
@@ -46,10 +50,12 @@ import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
 import java.io.IOException;
 import java.io.UnsupportedEncodingException;
+import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.TreeMap;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import org.apache.gravitino.NameIdentifier;
@@ -304,6 +310,8 @@ public class JsonUtils {
                 new SimpleModule()
                     .addDeserializer(Type.class, new TypeDeserializer())
                     .addSerializer(Type.class, new TypeSerializer())
+                    .addDeserializer(Partitioning.class, new PartitioningDeserializer())
+                    .addSerializer(Partitioning.class, new PartitioningSerializer())
                     .addDeserializer(Expression.class, new ColumnDefaultValueDeserializer())
                     .addSerializer(Expression.class, new ColumnDefaultValueSerializer())
                     .addDeserializer(StatisticValue.class, new StatisticValueDeserializer())
@@ -715,7 +723,7 @@ public class JsonUtils {
       String text = node.asText().toLowerCase();
       return text.equals(Types.NullType.get().simpleString())
           ? Types.NullType.get()
-          : fromPrimitiveTypeString(text);
+          : fromPrimitiveTypeString(text, node.asText());
     }
 
     if (node.isObject() && node.has(TYPE)) {
@@ -834,49 +842,49 @@ public class JsonUtils {
     gen.writeEndObject();
   }
 
-  private static Type fromPrimitiveTypeString(String typeString) {
-    Type.PrimitiveType primitiveType = TYPES.get(typeString);
+  private static Type fromPrimitiveTypeString(String lowerTypeString, String orignalTypeString) {
+    Type.PrimitiveType primitiveType = TYPES.get(lowerTypeString);
     if (primitiveType != null) {
       return primitiveType;
     }
 
-    Matcher fixed = FIXED.matcher(typeString);
+    Matcher fixed = FIXED.matcher(lowerTypeString);
     if (fixed.matches()) {
       return Types.FixedType.of(Integer.parseInt(fixed.group(1)));
     }
 
-    Matcher fixedChar = FIXEDCHAR.matcher(typeString);
+    Matcher fixedChar = FIXEDCHAR.matcher(lowerTypeString);
     if (fixedChar.matches()) {
       return Types.FixedCharType.of(Integer.parseInt(fixedChar.group(1)));
     }
 
-    Matcher varchar = VARCHAR.matcher(typeString);
+    Matcher varchar = VARCHAR.matcher(lowerTypeString);
     if (varchar.matches()) {
       return Types.VarCharType.of(Integer.parseInt(varchar.group(1)));
     }
 
-    Matcher decimal = DECIMAL.matcher(typeString);
+    Matcher decimal = DECIMAL.matcher(lowerTypeString);
     if (decimal.matches()) {
       return Types.DecimalType.of(
           Integer.parseInt(decimal.group(1)), Integer.parseInt(decimal.group(2)));
     }
 
-    Matcher time = TIME.matcher(typeString);
+    Matcher time = TIME.matcher(lowerTypeString);
     if (time.matches()) {
       return Types.TimeType.of(Integer.parseInt(time.group(1)));
     }
 
-    Matcher timestampTz = TIMESTAMP_TZ.matcher(typeString);
+    Matcher timestampTz = TIMESTAMP_TZ.matcher(lowerTypeString);
     if (timestampTz.matches()) {
       return Types.TimestampType.withTimeZone(Integer.parseInt(timestampTz.group(1)));
     }
 
-    Matcher timestamp = TIMESTAMP.matcher(typeString);
+    Matcher timestamp = TIMESTAMP.matcher(lowerTypeString);
     if (timestamp.matches()) {
       return Types.TimestampType.withoutTimeZone(Integer.parseInt(timestamp.group(1)));
     }
 
-    return Types.UnparsedType.of(typeString);
+    return Types.UnparsedType.of(orignalTypeString);
   }
 
   private static Types.StructType readStructType(JsonNode node) {
@@ -1467,14 +1475,18 @@ public class JsonUtils {
       }
       gen.writeFieldName(INDEX_FIELD_NAMES);
       gen.writeObject(value.fieldNames());
+      Map<String, String> props = value.properties();
+      gen.writeFieldName("properties");
+      Map<String, String> sortedProps = new TreeMap<>(props);
+      gen.writeObject(sortedProps);
       gen.writeEndObject();
     }
   }
 
   /** Custom JSON deserializer for Index objects. */
-  public static class IndexDeserializer extends JsonDeserializer<Index> {
+  public static class IndexDeserializer extends JsonDeserializer<IndexDTO> {
     @Override
-    public Index deserialize(JsonParser p, DeserializationContext ctxt) throws IOException {
+    public IndexDTO deserialize(JsonParser p, DeserializationContext ctxt) throws IOException {
       JsonNode node = p.getCodec().readTree(p);
       Preconditions.checkArgument(
           node != null && !node.isNull() && node.isObject(),
@@ -1495,6 +1507,20 @@ public class JsonUtils {
       node.get(INDEX_FIELD_NAMES)
           .forEach(field -> fieldNames.add(getStringArray((ArrayNode) field)));
       builder.withFieldNames(fieldNames.toArray(new String[0][0]));
+      Map<String, String> properties = Map.of();
+
+      if (node.has("properties") && node.get("properties").isObject()) {
+
+        Map<String, String> props = new HashMap<>();
+
+        node.get("properties")
+            .fields()
+            .forEachRemaining(entry -> props.put(entry.getKey(), entry.getValue().asText()));
+
+        properties = props;
+      }
+
+      builder.withProperties(properties);
       return builder.build();
     }
   }

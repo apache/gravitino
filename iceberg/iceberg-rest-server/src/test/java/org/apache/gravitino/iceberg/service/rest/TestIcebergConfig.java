@@ -88,7 +88,9 @@ public class TestIcebergConfig extends IcebergTestBase {
             IcebergConstants.AWS_S3_REGION,
             "us-west-2",
             IcebergConstants.ICEBERG_OSS_ENDPOINT,
-            "https://oss-endpoint.example.com");
+            "https://oss-endpoint.example.com",
+            IcebergConstants.ICEBERG_S3_PATH_STYLE_ACCESS,
+            "true");
     Assertions.assertEquals(expectedConfig, response.defaults());
     Assertions.assertEquals(0, response.overrides().size());
   }
@@ -116,5 +118,27 @@ public class TestIcebergConfig extends IcebergTestBase {
     String path = injectPrefixToPath(IcebergRestTestUtil.CONFIG_PATH, prefix);
     Response response = getIcebergClientBuilder(path, Optional.empty()).get();
     Assertions.assertEquals(500, response.getStatus());
+  }
+
+  @ParameterizedTest
+  @ValueSource(strings = {"", IcebergRestTestUtil.PREFIX})
+  public void testConfigEndpointsContainViewOperations(String prefix) {
+    setUrlPathWithPrefix(prefix);
+    String warehouseName = IcebergRestTestUtil.PREFIX;
+    Map<String, String> queryParams = ImmutableMap.of("warehouse", warehouseName);
+    Response resp =
+        getIcebergClientBuilder(IcebergRestTestUtil.CONFIG_PATH, Optional.of(queryParams)).get();
+    Assertions.assertEquals(Response.Status.OK.getStatusCode(), resp.getStatus());
+
+    ConfigResponse response = resp.readEntity(ConfigResponse.class);
+
+    // Verify that view endpoints are present
+    boolean hasViewListEndpoint =
+        response.endpoints().stream()
+            .anyMatch(endpoint -> endpoint.path().contains("namespaces/{namespace}/views"));
+
+    Assertions.assertTrue(
+        hasViewListEndpoint,
+        "Config response should contain view list endpoint for catalog that supports views");
   }
 }

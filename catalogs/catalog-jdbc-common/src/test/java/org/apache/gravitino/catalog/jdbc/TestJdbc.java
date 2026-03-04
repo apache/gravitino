@@ -20,6 +20,7 @@ package org.apache.gravitino.catalog.jdbc;
 
 import static org.apache.gravitino.dto.util.DTOConverters.toDTO;
 
+import com.google.common.collect.Maps;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
@@ -44,7 +45,6 @@ import org.apache.gravitino.utils.RandomNameUtils;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.Assertions;
 import org.testcontainers.containers.JdbcDatabaseContainer;
-import org.testcontainers.shaded.com.google.common.collect.Maps;
 
 public abstract class TestJdbc {
   protected static JdbcDatabaseContainer<?> CONTAINER;

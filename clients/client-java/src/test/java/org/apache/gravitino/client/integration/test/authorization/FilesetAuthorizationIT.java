@@ -155,6 +155,12 @@ public class FilesetAuthorizationIT extends BaseRestApiAuthorizationIT {
               storageLocation(GravitinoITUtils.genRandomName("FilesetAuthorizationIT_fileset2")),
               new HashMap<>());
         });
+
+    assertThrows(
+        "Can not access metadata {" + CATALOG + "." + SCHEMA + "}.",
+        ForbiddenException.class,
+        () -> filesetCatalogNormalUser.listFilesets(Namespace.of(SCHEMA)));
+
     // grant privileges
     GravitinoMetalake gravitinoMetalake = client.loadMetalake(METALAKE);
     gravitinoMetalake.grantPrivilegesToRole(

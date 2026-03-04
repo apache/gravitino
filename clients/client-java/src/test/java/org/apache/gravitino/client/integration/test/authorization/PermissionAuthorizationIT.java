@@ -19,6 +19,7 @@ package org.apache.gravitino.client.integration.test.authorization;
 
 import static org.junit.Assert.assertThrows;
 
+import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
 import java.util.Collections;
 import java.util.HashMap;
@@ -29,7 +30,6 @@ import org.apache.gravitino.client.GravitinoMetalake;
 import org.apache.gravitino.exceptions.ForbiddenException;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
-import org.testcontainers.shaded.com.google.common.collect.ImmutableList;
 
 @Tag("gravitino-docker-test")
 public class PermissionAuthorizationIT extends BaseRestApiAuthorizationIT {

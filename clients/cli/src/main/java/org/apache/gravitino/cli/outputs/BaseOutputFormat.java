@@ -32,6 +32,7 @@ import org.apache.gravitino.cli.CommandContext;
  * various output format implementations.
  */
 public abstract class BaseOutputFormat<T> implements OutputFormat<T> {
+  /** The command context. */
   protected CommandContext context;
 
   /**

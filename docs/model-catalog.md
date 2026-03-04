@@ -66,7 +66,9 @@ The Model catalog supports registering, listing and deleting models and model ve
 
 ### Model properties
 
-Model doesn't have predefined properties. Users can define the properties for each model and model version.
+| Property name      | Description                                         | Default value | Required | Immutable | Since Version |
+|--------------------|-----------------------------------------------------|---------------|----------|-----------|---------------|
+| `default-uri-name` | The default URI name for the versions of the model. | (none)        | No       | No        | 1.0.0         |
 
 ### Model operations
 
@@ -80,7 +82,9 @@ The Model catalog supports linking, listing and deleting model versions.
 
 ### ModelVersion properties
 
-ModelVersion doesn't have predefined properties. Users can define the properties for each version.
+| Property name      | Description                                                                                                          | Default value | Required | Immutable | Since Version |
+|--------------------|----------------------------------------------------------------------------------------------------------------------|---------------|----------|-----------|---------------|
+| `default-uri-name` | The default URI name for the model version. If set, it will override the `default-uri-name` property at model level. | (none)        | No       | No        | 1.0.0         |
 
 ### ModelVersion operations
 

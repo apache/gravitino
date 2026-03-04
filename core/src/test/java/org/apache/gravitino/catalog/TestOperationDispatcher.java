@@ -98,6 +98,7 @@ public abstract class TestOperationDispatcher {
     entityStore.put(metalakeEntity, true);
 
     catalogManager = new CatalogManager(config, entityStore, idGenerator);
+    FieldUtils.writeField(GravitinoEnv.getInstance(), "catalogManager", catalogManager, true);
 
     Config config = mock(Config.class);
     doReturn(100000L).when(config).get(TREE_LOCK_MAX_NODE_IN_MEMORY);

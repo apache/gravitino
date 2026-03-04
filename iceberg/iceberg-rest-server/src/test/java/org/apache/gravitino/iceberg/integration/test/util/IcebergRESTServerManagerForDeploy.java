@@ -18,6 +18,7 @@
  */
 package org.apache.gravitino.iceberg.integration.test.util;
 
+import com.google.common.collect.ImmutableMap;
 import java.io.File;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
@@ -30,7 +31,6 @@ import org.apache.gravitino.integration.test.util.CommandExecutor;
 import org.apache.gravitino.integration.test.util.DownloaderUtils;
 import org.apache.gravitino.integration.test.util.ProcessData;
 import org.apache.gravitino.integration.test.util.ProcessData.TypesOfData;
-import org.testcontainers.shaded.com.google.common.collect.ImmutableMap;
 
 public class IcebergRESTServerManagerForDeploy extends IcebergRESTServerManager {
 

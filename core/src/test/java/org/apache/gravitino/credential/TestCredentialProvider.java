@@ -19,12 +19,12 @@
 
 package org.apache.gravitino.credential;
 
+import com.google.common.collect.ImmutableMap;
+import com.google.common.collect.ImmutableSet;
 import java.util.Map;
 import org.apache.gravitino.credential.DummyCredentialProvider.DummyCredential;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
-import org.testcontainers.shaded.com.google.common.collect.ImmutableMap;
-import org.testcontainers.shaded.com.google.common.collect.ImmutableSet;
 
 public class TestCredentialProvider {
   @Test

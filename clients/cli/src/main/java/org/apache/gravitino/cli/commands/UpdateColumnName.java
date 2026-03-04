@@ -33,11 +33,17 @@ import org.apache.gravitino.rel.TableChange;
 /** Update the name of a column. */
 public class UpdateColumnName extends Command {
 
+  /** The name of the metalake. */
   protected final String metalake;
+  /** The name of the catalog. */
   protected final String catalog;
+  /** The name of the schema. */
   protected final String schema;
+  /** The name of the table. */
   protected final String table;
+  /** The name of the column. */
   protected final String column;
+  /** The new column name. */
   protected final String name;
 
   /**

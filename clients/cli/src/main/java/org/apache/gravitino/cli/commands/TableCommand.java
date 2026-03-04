@@ -28,19 +28,28 @@ import org.apache.gravitino.exceptions.NoSuchSchemaException;
 import org.apache.gravitino.exceptions.NoSuchTableException;
 import org.apache.gravitino.rel.TableCatalog;
 
-/* Common code for all table commands. */
+/** Common code for all table commands. */
 public class TableCommand extends AuditCommand {
 
+  /** The metalake and catalog for the table. */
   protected final String metalake;
+  /** The catalog for the table. */
   protected final String catalog;
 
+  /**
+   * Create a new instance of the command.
+   *
+   * @param context The command context.
+   * @param metalake The metalake for the table.
+   * @param catalog The catalog for the table.
+   */
   public TableCommand(CommandContext context, String metalake, String catalog) {
     super(context);
     this.metalake = metalake;
     this.catalog = catalog;
   }
 
-  /* Overridden in parent - do nothing  */
+  /** Overridden in parent - do nothing */
   @Override
   public void handle() {}
 

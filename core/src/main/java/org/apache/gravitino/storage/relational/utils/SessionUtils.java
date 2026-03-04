@@ -106,4 +106,16 @@ public class SessionUtils {
       throw e;
     }
   }
+
+  public static void beginTransaction() {
+    SqlSessions.getSqlSession();
+  }
+
+  public static void commitTransaction() {
+    SqlSessions.commitAndCloseSqlSession();
+  }
+
+  public static void rollbackTransaction() {
+    SqlSessions.rollbackAndCloseSqlSession();
+  }
 }

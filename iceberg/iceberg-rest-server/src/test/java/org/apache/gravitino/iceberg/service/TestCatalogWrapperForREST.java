@@ -19,10 +19,10 @@
 
 package org.apache.gravitino.iceberg.service;
 
+import com.google.common.collect.ImmutableMap;
 import java.util.Map;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
-import org.testcontainers.shaded.com.google.common.collect.ImmutableMap;
 
 public class TestCatalogWrapperForREST {
 
@@ -45,5 +45,33 @@ public class TestCatalogWrapperForREST {
     Assertions.assertThrowsExactly(
         IllegalArgumentException.class,
         () -> CatalogWrapperForREST.checkForCompatibility(propertiesWithBothKey, deprecatedMap));
+  }
+
+  @Test
+  void testIsLocalOrHdfsLocation() {
+    Assertions.assertTrue(CatalogWrapperForREST.isLocalOrHdfsLocation("/tmp/warehouse"));
+    Assertions.assertTrue(CatalogWrapperForREST.isLocalOrHdfsLocation("file:///tmp/warehouse"));
+    Assertions.assertTrue(
+        CatalogWrapperForREST.isLocalOrHdfsLocation("hdfs://localhost:9000/warehouse"));
+
+    Assertions.assertFalse(CatalogWrapperForREST.isLocalOrHdfsLocation("s3://bucket/warehouse"));
+    Assertions.assertFalse(
+        CatalogWrapperForREST.isLocalOrHdfsLocation("abfs://container@account/warehouse"));
+    Assertions.assertFalse(CatalogWrapperForREST.isLocalOrHdfsLocation(""));
+    Assertions.assertFalse(CatalogWrapperForREST.isLocalOrHdfsLocation("   "));
+  }
+
+  @Test
+  void testValidateCredentialLocation() {
+    Assertions.assertDoesNotThrow(
+        () -> CatalogWrapperForREST.validateCredentialLocation("/tmp/warehouse"));
+    Assertions.assertDoesNotThrow(
+        () -> CatalogWrapperForREST.validateCredentialLocation("file:///tmp/warehouse"));
+
+    Assertions.assertThrowsExactly(
+        IllegalArgumentException.class, () -> CatalogWrapperForREST.validateCredentialLocation(""));
+    Assertions.assertThrowsExactly(
+        IllegalArgumentException.class,
+        () -> CatalogWrapperForREST.validateCredentialLocation("   "));
   }
 }

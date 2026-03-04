@@ -25,7 +25,7 @@ import org.apache.gravitino.model.ModelChange;
 /**
  * Represents an event that is triggered when an attempt to alter a model fails due to an exception.
  */
-public class AlterModelFailureEvent extends FailureEvent {
+public class AlterModelFailureEvent extends ModelFailureEvent {
   private final ModelChange[] modelChanges;
 
   /**

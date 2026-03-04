@@ -36,7 +36,6 @@ from pyarrow.fs import HadoopFileSystem
 from gravitino import (
     gvfs,
     NameIdentifier,
-    GravitinoAdminClient,
     GravitinoClient,
     Catalog,
     Fileset,
@@ -92,9 +91,6 @@ class TestGvfsWithHDFS(IntegrationTestEnv):
         schema_name, multiple_locations_fileset_name
     )
 
-    gravitino_admin_client: GravitinoAdminClient = GravitinoAdminClient(
-        uri="http://localhost:8090"
-    )
     gravitino_client: GravitinoClient = None
     options = {}
 
@@ -104,6 +100,13 @@ class TestGvfsWithHDFS(IntegrationTestEnv):
 
         cls.hdfs_container = HDFSContainer()
         hdfs_container_ip = cls.hdfs_container.get_ip()
+        # copy hadoop tar from hdfs container
+        build_path = os.environ.get("PYTHON_BUILD_PATH")
+        dest_dir = os.path.join(build_path, "tmp")
+        os.makedirs(dest_dir, exist_ok=True)
+        cls.hdfs_container.get_tar_from_docker(
+            f"/opt/{BaseHadoopEnvironment.BASE_DIR_NAME}", dest_dir
+        )
         # init hadoop env
         BaseHadoopEnvironment.init_hadoop_env()
         cls.config = {
@@ -209,7 +212,9 @@ class TestGvfsWithHDFS(IntegrationTestEnv):
     @classmethod
     def _clean_test_data(cls):
         cls.gravitino_client = GravitinoClient(
-            uri="http://localhost:8090", metalake_name=cls.metalake_name
+            uri="http://localhost:8090",
+            metalake_name=cls.metalake_name,
+            client_config={"gravitino_client_request_timeout": 180},
         )
         catalog = cls.gravitino_client.load_catalog(name=cls.catalog_name)
 
@@ -219,8 +224,8 @@ class TestGvfsWithHDFS(IntegrationTestEnv):
                 cls.fileset_ident,
                 catalog.as_fileset_catalog().drop_fileset(ident=cls.fileset_ident),
             )
-        except GravitinoRuntimeException:
-            logger.warning("Failed to drop fileset %s", cls.fileset_ident)
+        except GravitinoRuntimeException as e:
+            logger.warning("Failed to drop fileset %s: %s", cls.fileset_ident, str(e))
 
         try:
             logger.info(
@@ -230,8 +235,8 @@ class TestGvfsWithHDFS(IntegrationTestEnv):
                     schema_name=cls.schema_name, cascade=True
                 ),
             )
-        except GravitinoRuntimeException:
-            logger.warning("Failed to drop schema %s", cls.schema_name)
+        except GravitinoRuntimeException as e:
+            logger.warning("Failed to drop schema %s: %s", cls.schema_name, str(e))
 
         try:
             logger.info(
@@ -239,17 +244,17 @@ class TestGvfsWithHDFS(IntegrationTestEnv):
                 cls.catalog_name,
                 cls.gravitino_client.drop_catalog(name=cls.catalog_name, force=True),
             )
-        except GravitinoRuntimeException:
-            logger.warning("Failed to drop catalog %s", cls.catalog_name)
+        except GravitinoRuntimeException as e:
+            logger.warning("Failed to drop catalog %s: %s", cls.catalog_name, str(e))
 
         try:
             logger.info(
                 "Drop metalake %s[%s]",
                 cls.metalake_name,
-                cls.gravitino_admin_client.drop_metalake(cls.metalake_name),
+                cls.gravitino_admin_client.drop_metalake(cls.metalake_name, force=True),
             )
-        except GravitinoRuntimeException:
-            logger.warning("Failed to drop metalake %s", cls.metalake_name)
+        except GravitinoRuntimeException as e:
+            logger.warning("Failed to drop metalake %s: %s", cls.metalake_name, str(e))
 
     def test_simple_auth(self):
         options = {"auth_type": "simple"}
@@ -263,7 +268,9 @@ class TestGvfsWithHDFS(IntegrationTestEnv):
             metalake_name=self.metalake_name,
             options=options,
         )
-        token = fs._operations._client._rest_client.auth_data_provider.get_token_data()
+        # Trigger lazy client initialization
+        client = fs._operations._get_gravitino_client()
+        token = client._rest_client.auth_data_provider.get_token_data()
         token_string = base64.b64decode(
             token.decode("utf-8")[len(AuthConstants.AUTHORIZATION_BASIC_HEADER) :]
         ).decode("utf-8")

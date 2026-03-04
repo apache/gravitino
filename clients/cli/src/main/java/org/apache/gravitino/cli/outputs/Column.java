@@ -28,7 +28,9 @@ import org.apache.gravitino.cli.CommandContext;
  * alignment, and content cells. Handles width calculations.
  */
 public class Column {
+  /** The character used to indicate that a cell has been truncated. */
   public static final char ELLIPSIS = '…';
+
   private final String header;
   private final HorizontalAlign headerAlign;
   private final HorizontalAlign dataAlign;
@@ -74,8 +76,11 @@ public class Column {
    * enum provides options for standard left-to-right text positioning.
    */
   public enum HorizontalAlign {
+    /** Aligns text to the left. */
     LEFT,
+    /** Aligns text to the center. */
     CENTER,
+    /** Aligns text to the right. */
     RIGHT
   }
 

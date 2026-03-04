@@ -55,10 +55,23 @@ Support for the following alter table operations:
 - Change a column type
 - Set a table property
 
-## Select
+### Select
 
 The Apache Gravitino Trino connector supports most SELECT statements, allowing the execution of queries successfully.
 Currently, it doesn't support certain query optimizations, such as pushdown and pruning functionalities.
+
+### Update
+
+`UPDATE` is only supported for table using v2 or higher of the Iceberg specification. 
+
+### Delete
+
+Support the deletion of entire partitions and deletion of individual rows for table using v2 or higher of the Iceberg specification.
+See also [Delete limitation](https://trino.io/docs/current/connector/iceberg.html#data-management).
+
+### Merge
+
+`MERGE` is only supported for table using v2 or higher of the Iceberg specification.
 
 ## Table and Schema properties
 
@@ -184,6 +197,33 @@ Insert data into the table `table_01` from select:
 INSERT INTO iceberg_test.database_01.table_01 (name, salary) SELECT * FROM iceberg_test.database_01.table_01;
 ```
 
+Update data into the table `table_01`:
+
+```sql
+UPDATE iceberg_test.database_01.table_01 SET name='ice_update' WHERE salary=12;
+```
+
+Delete data into the table `table_01`:
+
+```sql
+DELETE FROM iceberg_test.database_01.table_01 WHERE name='ice';
+```
+
+Merge data into the table `table_01`:
+
+```sql
+MERGE INTO iceberg_test.database_01.table_01 t USING iceberg_test.database_01.table_02 s
+    ON (t.name = s.name)
+    WHEN MATCHED AND s.name = 'bob'
+        THEN DELETE
+    WHEN MATCHED
+        THEN UPDATE
+            SET salary = s.salary + t.salary
+    WHEN NOT MATCHED
+        THEN INSERT (name, salary)
+              VALUES (s.name, s.salary);
+```
+
 ### Querying data
 
 Query the `table_01` table:
@@ -241,7 +281,7 @@ replacing hdfs_user with the appropriate username:
 
 When using AWS S3 within the Iceberg catalog, users need to configure the Trino Iceberg connector's
 AWS S3-related properties in the catalog's properties. Please refer to the documentation
-of [Hive connector with Amazon S3](https://trino.io/docs/435/connector/hive-s3.html).
+of [Hive connector with Amazon S3](https://trino.io/docs/current/connector/hive-s3.html).
 These configurations must use the `trino.bypass.` prefix in the Iceberg catalog's attributes to be effective.
 
 To create an Iceberg catalog with AWS S3 configuration in the Trino CLI, use the following command:

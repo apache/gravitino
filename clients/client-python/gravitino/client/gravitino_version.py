@@ -84,4 +84,4 @@ class GravitinoVersion(VersionDTO):
         Compatibility is defined such that the client major version is less than or equal
         to the server major version.
         """
-        return self.major <= server_version.major
+        return (self.major, self.minor) <= (server_version.major, server_version.minor)

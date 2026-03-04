@@ -184,5 +184,46 @@ public class TestDorisUtils {
         "CREATE TABLE `testTable` (\n`col1` date NOT NULL\n) ENGINE=OLAP\n PARTITION BY RANGE(`col1`)\n()\n DISTRIBUTED BY HASH(`col1`) BUCKETS AUTO";
     Distribution distribution2 = DorisUtils.extractDistributionInfoFromSql(createTableSqlWithAuto);
     assertEquals(distribution2.number(), -1);
+
+    String createTableSqlWithRandomAuto =
+        "CREATE TABLE `testTable` (\n`col1` date NOT NULL\n) ENGINE=OLAP\n PARTITION BY RANGE(`col1`)\n()\n DISTRIBUTED BY RANDOM BUCKETS AUTO";
+    Distribution distribution3 =
+        DorisUtils.extractDistributionInfoFromSql(createTableSqlWithRandomAuto);
+    assertEquals(distribution3.number(), -1);
+  }
+
+  @Test
+  public void testExtractBucketNumFromSql() {
+    String createTableSql =
+        "CREATE TABLE `testTable` (\n`col1` int NOT NULL\n) ENGINE=OLAP\n DISTRIBUTED BY HASH(`col1`) BUCKETS 8";
+    Distribution distribution = DorisUtils.extractDistributionInfoFromSql(createTableSql);
+    assertEquals(8, distribution.number());
+
+    String createTableSqlWithoutBucket =
+        "CREATE TABLE `testTable` (\n`col1` int NOT NULL\n) ENGINE=OLAP\n DISTRIBUTED BY HASH(`col1`)";
+    Distribution distributionDefault =
+        DorisUtils.extractDistributionInfoFromSql(createTableSqlWithoutBucket);
+    assertEquals(1, distributionDefault.number());
+  }
+
+  @Test
+  public void testExtractBucketNumWithWhitespace() {
+    String createTableSqlWithWhitespace =
+        "CREATE TABLE `testTable` (\n`col1` int NOT NULL\n) ENGINE=OLAP\n DISTRIBUTED BY HASH(`col1`) BUCKETS  16 ";
+    Distribution distribution =
+        DorisUtils.extractDistributionInfoFromSql(createTableSqlWithWhitespace);
+    assertEquals(16, distribution.number());
+
+    String createTableSqlWithAutoWhitespace =
+        "CREATE TABLE `testTable` (\n`col1` int NOT NULL\n) ENGINE=OLAP\n DISTRIBUTED BY HASH(`col1`) BUCKETS  AUTO ";
+    Distribution distributionAuto =
+        DorisUtils.extractDistributionInfoFromSql(createTableSqlWithAutoWhitespace);
+    assertEquals(-1, distributionAuto.number());
+
+    String createTableSqlWithAutoLeadingWhitespace =
+        "CREATE TABLE `testTable` (\n`col1` int NOT NULL\n) ENGINE=OLAP\n DISTRIBUTED BY HASH(`col1`) BUCKETS  AUTO";
+    Distribution distributionAutoLeading =
+        DorisUtils.extractDistributionInfoFromSql(createTableSqlWithAutoLeadingWhitespace);
+    assertEquals(-1, distributionAutoLeading.number());
   }
 }

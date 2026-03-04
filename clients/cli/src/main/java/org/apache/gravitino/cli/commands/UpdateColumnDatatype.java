@@ -35,11 +35,17 @@ import org.apache.gravitino.rel.types.Type;
 /** Update the data type of a column. */
 public class UpdateColumnDatatype extends Command {
 
+  /** The name of the command. */
   protected final String metalake;
+  /** The name of the catalog. */
   protected final String catalog;
+  /** The name of the schema. */
   protected final String schema;
+  /** The name of the table. */
   protected final String table;
+  /** The name of the column. */
   protected final String column;
+  /** The new data type name. */
   protected final String datatype;
 
   /**

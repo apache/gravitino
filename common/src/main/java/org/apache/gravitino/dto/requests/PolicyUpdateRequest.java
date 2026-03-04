@@ -167,6 +167,7 @@ public interface PolicyUpdateRequest extends RESTRequest {
 
     @Override
     public void validate() throws IllegalArgumentException {
+      Preconditions.checkArgument(policyType != null, "\"policyType\" must not be null");
       Preconditions.checkArgument(newContent != null, "\"newContent\" must not be null");
       newContent.validate();
     }

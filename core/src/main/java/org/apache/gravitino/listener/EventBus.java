@@ -74,6 +74,7 @@ public class EventBus {
    *     SupportsChangingPreEvent}, otherwise {@link Optional#empty() empty}
    */
   public Optional<BaseEvent> dispatchEvent(BaseEvent baseEvent) {
+    Preconditions.checkNotNull(baseEvent, "baseEvent cannot be null");
     if (baseEvent instanceof PreEvent) {
       return dispatchAndTransformPreEvent((PreEvent) baseEvent);
     } else if (baseEvent instanceof Event) {
@@ -121,8 +122,8 @@ public class EventBus {
     SupportsChangingPreEvent tmpPreEvent = preEvent;
     for (EventListenerPlugin eventListener : eventListeners) {
       tmpPreEvent = eventListener.transformPreEvent(tmpPreEvent);
-      Preconditions.checkNotNull(
-          tmpPreEvent,
+      Preconditions.checkArgument(
+          tmpPreEvent != null,
           String.format("%s transformPreEvent return null", getListenerName(eventListener)));
     }
     return tmpPreEvent;

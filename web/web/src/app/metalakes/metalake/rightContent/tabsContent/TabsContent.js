@@ -142,8 +142,6 @@ const TabsContent = () => {
     } else {
       setTab('table')
     }
-
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [searchParams])
 
   return (

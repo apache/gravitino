@@ -21,16 +21,37 @@ package org.apache.gravitino.iceberg.service;
 import com.google.common.collect.Maps;
 import java.util.Map;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.commons.lang3.reflect.FieldUtils;
+import org.apache.gravitino.GravitinoEnv;
+import org.apache.gravitino.catalog.CatalogManager;
 import org.apache.gravitino.iceberg.common.ops.IcebergCatalogWrapper;
+import org.apache.gravitino.iceberg.service.authorization.IcebergRESTServerContext;
 import org.apache.gravitino.iceberg.service.provider.IcebergConfigProvider;
 import org.apache.gravitino.iceberg.service.provider.IcebergConfigProviderFactory;
+import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
+import org.mockito.Mockito;
 
 public class TestIcebergCatalogWrapperManagerForREST {
 
   private static final String DEFAULT_CATALOG = "memory";
+
+  @BeforeAll
+  public static void setup() throws IllegalAccessException {
+    // Mock CatalogManager for GravitinoEnv to avoid initialization errors
+    CatalogManager mockCatalogManager = Mockito.mock(CatalogManager.class);
+    FieldUtils.writeField(GravitinoEnv.getInstance(), "catalogManager", mockCatalogManager, true);
+  }
+
+  @AfterAll
+  public static void tearDown() throws IllegalAccessException {
+    // Clean up GravitinoEnv
+    FieldUtils.writeField(GravitinoEnv.getInstance(), "catalogManager", null, true);
+  }
 
   @ParameterizedTest
   @ValueSource(strings = {"", "hello/", "\\\n\t\\\'/", "\u0024/", "\100/", "[_~/"})
@@ -43,7 +64,10 @@ public class TestIcebergCatalogWrapperManagerForREST {
     config.put(String.format("catalog.%s.catalog-backend-name", prefix), prefix);
     IcebergConfigProvider configProvider = IcebergConfigProviderFactory.create(config);
     configProvider.initialize(config);
-    IcebergCatalogWrapperManager manager = new IcebergCatalogWrapperManager(config, configProvider);
+    IcebergCatalogWrapperManager manager =
+        new IcebergCatalogWrapperManager(
+            config, configProvider, false, configProvider.getMetalakeName());
+    IcebergRESTServerContext.create(configProvider, false, false, manager);
 
     IcebergCatalogWrapper ops = manager.getOps(rawPrefix);
 
@@ -60,8 +84,30 @@ public class TestIcebergCatalogWrapperManagerForREST {
     Map<String, String> config = Maps.newHashMap();
     IcebergConfigProvider configProvider = IcebergConfigProviderFactory.create(config);
     configProvider.initialize(config);
-    IcebergCatalogWrapperManager manager = new IcebergCatalogWrapperManager(config, configProvider);
+    IcebergCatalogWrapperManager manager =
+        new IcebergCatalogWrapperManager(
+            config, configProvider, false, configProvider.getMetalakeName());
+    IcebergRESTServerContext.create(configProvider, false, false, manager);
 
     Assertions.assertThrowsExactly(IllegalArgumentException.class, () -> manager.getOps(rawPrefix));
+  }
+
+  @Test
+  public void testAuthorizationRequiresDynamicProvider() {
+    Map<String, String> config = Maps.newHashMap();
+    IcebergConfigProvider configProvider = IcebergConfigProviderFactory.create(config);
+    configProvider.initialize(config);
+    IcebergCatalogWrapperManager manager =
+        new IcebergCatalogWrapperManager(
+            config, configProvider, true, configProvider.getMetalakeName());
+    IcebergRESTServerContext.create(configProvider, true, true, manager);
+
+    IllegalArgumentException exception =
+        Assertions.assertThrowsExactly(
+            IllegalArgumentException.class, () -> manager.getCatalogWrapper("any"));
+    Assertions.assertTrue(
+        exception
+            .getMessage()
+            .contains("gravitino.iceberg-rest.catalog-config-provider=dynamic-config-provider"));
   }
 }

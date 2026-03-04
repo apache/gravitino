@@ -28,14 +28,18 @@ Once the server is up and running, you can proceed to configure the Fileset cata
 
 In addition to the basic configurations mentioned in [Fileset-catalog-catalog-configuration](./fileset-catalog.md#catalog-properties), the following properties are necessary to configure a Fileset catalog with S3:
 
-| Configuration item             | Description                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    | Default value   | Required | Since version    |
-|--------------------------------|----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|-----------------|----------|------------------|
-| `filesystem-providers`         | The file system providers to add. Set it to `s3` if it's a S3 fileset, or a comma separated string that contains `s3` like `gs,s3` to support multiple kinds of fileset including `s3`.                                                                                                                                                                                                                                                                                                                        | (none)          | Yes      | 0.7.0-incubating |
-| `default-filesystem-provider`  | The name default filesystem providers of this Fileset catalog if users do not specify the scheme in the URI. Default value is `builtin-local`, for S3, if we set this value, we can omit the prefix 's3a://' in the location.                                                                                                                                                                                                                                                                                  | `builtin-local` | No       | 0.7.0-incubating |
-| `s3-endpoint`                  | The endpoint of the AWS S3.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    | (none)          | Yes      | 0.7.0-incubating |
-| `s3-access-key-id`             | The access key of the AWS S3.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  | (none)          | Yes      | 0.7.0-incubating |
-| `s3-secret-access-key`         | The secret key of the AWS S3.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  | (none)          | Yes      | 0.7.0-incubating |
-| `credential-providers`         | The credential provider types, separated by comma, possible value can be `s3-token`, `s3-secret-key`. As the default authentication type is using AKSK as the above, this configuration can enable credential vending provided by Gravitino server and client will no longer need to provide authentication information like AKSK to access S3 by GVFS. Once it's set, more configuration items are needed to make it works, please see [s3-credential-vending](security/credential-vending.md#s3-credentials) | (none)          | No       | 0.8.0-incubating |
+| Configuration item            | Description                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    | Default value   | Required | Since version    |
+|-------------------------------|----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|-----------------|----------|------------------|
+| `filesystem-providers`        | (deprecated) The file system providers to add. Set it to `s3` if it's a S3 fileset, or a comma separated string that contains `s3` like `gs,s3` to support multiple kinds of fileset including `s3`.                                                                                                                                                                                                                                                                                                            | (none)          | Yes      | 0.7.0-incubating |
+| `default-filesystem-provider` | (deprecated) The name default filesystem providers of this Fileset catalog if users do not specify the scheme in the URI. Default value is `builtin-local`, for S3, if we set this value, we can omit the prefix 's3a://' in the location.                                                                                                                                                                                                                                                                      | `builtin-local` | No       | 0.7.0-incubating |
+| `s3-endpoint`                 | The endpoint of the AWS S3.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    | (none)          | Yes      | 0.7.0-incubating |
+| `s3-access-key-id`            | The access key of the AWS S3.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  | (none)          | Yes      | 0.7.0-incubating |
+| `s3-secret-access-key`        | The secret key of the AWS S3.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  | (none)          | Yes      | 0.7.0-incubating |
+| `credential-providers`        | The credential provider types, separated by comma, possible value can be `s3-token`, `s3-secret-key`. As the default authentication type is using AKSK as the above, this configuration can enable credential vending provided by Gravitino server and client will no longer need to provide authentication information like AKSK to access S3 by GVFS. Once it's set, more configuration items are needed to make it works, please see [s3-credential-vending](security/credential-vending.md#s3-credentials) | (none)          | No       | 0.8.0-incubating |
+
+:::note
+`default-filesystem-provider` and `filesystem-providers` are deprecated since 1.2.0. The fileset catalog automatically loads filesystem providers on the classpath, including buildin filesystem provider and cloud providers when the corresponding bundle jar is present (for example, `gravitino-aws-bundle`).
+:::
 
 ### Configurations for a schema
 
@@ -66,8 +70,7 @@ curl -X POST -H "Accept: application/vnd.gravitino.v1+json" \
     "location": "s3a://bucket/root",
     "s3-access-key-id": "access_key",
     "s3-secret-access-key": "secret_key",
-    "s3-endpoint": "http://s3.ap-northeast-1.amazonaws.com",
-    "filesystem-providers": "s3"
+    "s3-endpoint": "http://s3.ap-northeast-1.amazonaws.com"
   }
 }' http://localhost:8090/api/metalakes/metalake/catalogs
 ```
@@ -86,7 +89,6 @@ Map<String, String> s3Properties = ImmutableMap.<String, String>builder()
     .put("s3-access-key-id", "access_key")
     .put("s3-secret-access-key", "secret_key")
     .put("s3-endpoint", "http://s3.ap-northeast-1.amazonaws.com")
-    .put("filesystem-providers", "s3")
     .build();
 
 Catalog s3Catalog = gravitinoClient.createCatalog("test_catalog",
@@ -106,8 +108,7 @@ s3_properties = {
     "location": "s3a://bucket/root",
     "s3-access-key-id": "access_key"
     "s3-secret-access-key": "secret_key",
-    "s3-endpoint": "http://s3.ap-northeast-1.amazonaws.com",
-    "filesystem-providers": "s3"
+    "s3-endpoint": "http://s3.ap-northeast-1.amazonaws.com"
 }
 
 s3_catalog = gravitino_client.create_catalog(name="test_catalog",
@@ -121,7 +122,13 @@ s3_catalog = gravitino_client.create_catalog(name="test_catalog",
 </Tabs>
 
 :::note
-When using S3, ensure that the location value starts with s3a:// (not s3://) for AWS S3. For example, use s3a://bucket/root, as the s3:// format is not supported by the hadoop-aws library.
+- When using S3, ensure that the location value starts with s3a:// (not s3://) for AWS S3. For example, use s3a://bucket/root, as the s3:// format is not supported by the hadoop-aws library.
+- When using MinIO or other S3-compatible storage services, make sure to set the `s3-endpoint` property to the appropriate endpoint URL. 
+- When using MinIO or other S3-compatible storage services, you may need to set additional properties such as `s3-path-style-access` to `true` depending on the storage service requirements. You can do this in Gravitino's `fileset.conf` file with the "gravitino.bypass." prefix: 
+```bash
+$ cat $GRAVITINO_HOME/catalogs/fileset/conf/fileset.conf
+gravitino.bypass.fs.s3a.path.style.access=true
+```
 :::
 
 ### Step2: Create a schema
@@ -215,7 +222,7 @@ filesetCatalog.createFileset(
     "This is an example fileset",
     Fileset.Type.MANAGED,
     "s3a://bucket/root/schema/example_fileset",
-    propertiesMap,
+    propertiesMap
 );
 ```
 
@@ -258,11 +265,11 @@ conf.set("fs.AbstractFileSystem.gvfs.impl", "org.apache.gravitino.filesystem.had
 conf.set("fs.gvfs.impl", "org.apache.gravitino.filesystem.hadoop.GravitinoVirtualFileSystem");
 conf.set("fs.gravitino.server.uri", "http://localhost:8090");
 conf.set("fs.gravitino.client.metalake", "test_metalake");
-conf.set("s3-endpoint", "http://localhost:8090");
+conf.set("s3-endpoint", "http://localhost:9000");
 conf.set("s3-access-key-id", "minio");
 conf.set("s3-secret-access-key", "minio123");
 
-Path filesetPath = new Path("gvfs://fileset/adls_catalog/adls_schema/adls_fileset/new_dir");
+Path filesetPath = new Path("gvfs://fileset/fileset_catalog/fileset_schema/my_fileset/new_dir");
 FileSystem fs = filesetPath.getFileSystem(conf);
 fs.mkdirs(filesetPath);
 ...
@@ -288,13 +295,11 @@ Similar to Spark configurations, you need to add S3 (bundle) jars to the classpa
     <artifactId>gravitino-filesystem-hadoop3-runtime</artifactId>
     <version>${GRAVITINO_VERSION}</version>
   </dependency>
-
-  <dependency>
-    <groupId>org.apache.gravitino</groupId>
-    <artifactId>gravitino-aws</artifactId>
-    <version>${GRAVITINO_VERSION}</version>
-  </dependency>
 ```
+
+:::note
+Since version 1.1.0, the `gravitino-aws` JAR is no longer required, as it is now included in the `gravitino-filesystem-hadoop3-runtime` JAR.
+:::
 
 Or use the bundle jar with Hadoop environment if there is no Hadoop environment:
 
@@ -315,12 +320,12 @@ Or use the bundle jar with Hadoop environment if there is no Hadoop environment:
 
 ### Using Spark to access the fileset
 
-The following Python code demonstrates how to use **PySpark 3.1.3 with Hadoop environment(Hadoop 3.2.0)** to access the fileset:
+The following Python code demonstrates how to use **PySpark 3.5.0 with Hadoop environment(Hadoop 3.3.4)** to access the fileset:
 
 Before running the following code, you need to install required packages:
 
 ```bash
-pip install pyspark==3.1.3
+pip install pyspark==3.5.0
 pip install apache-gravitino==${GRAVITINO_VERSION}
 ```
 Then you can run the following code:
@@ -336,7 +341,8 @@ catalog_name = "your_s3_catalog"
 schema_name = "your_s3_schema"
 fileset_name = "your_s3_fileset"
 
-os.environ["PYSPARK_SUBMIT_ARGS"] = "--jars /path/to/gravitino-aws-${gravitino-version}.jar,/path/to/gravitino-filesystem-hadoop3-runtime-${gravitino-version}-SNAPSHOT.jar,/path/to/hadoop-aws-3.2.0.jar,/path/to/aws-java-sdk-bundle-1.11.375.jar --master local[1] pyspark-shell"
+# JDK8 as follows, JDK17 will be slightly different, you need to add '--conf \"spark.driver.extraJavaOptions=--add-opens=java.base/sun.nio.ch=ALL-UNNAMED\" --conf \"spark.executor.extraJavaOptions=--add-opens=java.base/sun.nio.ch=ALL-UNNAMED\"' to the submit args.
+os.environ["PYSPARK_SUBMIT_ARGS"] = "--jars /path/to/gravitino-filesystem-hadoop3-runtime-${gravitino-version}-SNAPSHOT.jar,/path/to/hadoop-aws-3.3.4.jar,/path/to/aws-java-sdk-bundle-1.12.262.jar --master local[1] pyspark-shell"
 spark = SparkSession.builder
     .appName("s3_fileset_test")
     .config("spark.hadoop.fs.AbstractFileSystem.gvfs.impl", "org.apache.gravitino.filesystem.hadoop.Gvfs")
@@ -368,9 +374,10 @@ If your Spark **without Hadoop environment**, you can use the following code sni
 os.environ["PYSPARK_SUBMIT_ARGS"] = "--jars /path/to/gravitino-aws-bundle-${gravitino-version}.jar,/path/to/gravitino-filesystem-hadoop3-runtime-${gravitino-version}-SNAPSHOT.jar --master local[1] pyspark-shell"
 ```
 
-- [`gravitino-aws-bundle-${gravitino-version}.jar`](https://mvnrepository.com/artifact/org.apache.gravitino/gravitino-aws-bundle) is the Gravitino AWS jar with Hadoop environment(3.3.1) and `hadoop-aws` jar.
-- [`gravitino-aws-${gravitino-version}.jar`](https://mvnrepository.com/artifact/org.apache.gravitino/gravitino-aws) is a condensed version of the Gravitino AWS bundle jar without Hadoop environment and `hadoop-aws` jar.
-- `hadoop-aws-3.2.0.jar` and `aws-java-sdk-bundle-1.11.375.jar` can be found in the Hadoop distribution in the `${HADOOP_HOME}/share/hadoop/tools/lib` directory. 
+- [`gravitino-aws-bundle-${gravitino-version}.jar`](https://mvnrepository.com/artifact/org.apache.gravitino/gravitino-aws-bundle): A "fat" JAR that includes `gravitino-aws` functionality and all necessary dependencies like `hadoop-aws` (3.3.1) and the `AWS SDK`. Use this if your Spark environment doesn't have a pre-existing Hadoop setup.
+- [`gravitino-filesystem-hadoop3-runtime-${gravitino-version}.jar`](https://mvnrepository.com/artifact/org.apache.gravitino/gravitino-filesystem-hadoop3-runtime): A "fat" JAR that bundles Gravitino's virtual filesystem client and includes the functionality of `gravitino-aws`. It is required for accessing Gravitino filesets.
+- `hadoop-aws-3.3.4.jar` and `aws-java-sdk-bundle-1.12.262.jar`: Standard Hadoop dependencies for S3 access. If you are running in an existing Hadoop environment, you need to provide these JARs. They are typically located in the `${HADOOP_HOME}/share/hadoop/tools/lib` directory.
+- [`gravitino-aws-${gravitino-version}.jar`](https://mvnrepository.com/artifact/org.apache.gravitino/gravitino-aws): A "thin" JAR that only provides the AWS integration code. Its functionality is already included in the `gravitino-aws-bundle` and `gravitino-filesystem-hadoop3-runtime` JARs, so you do not need to add it as a direct dependency unless you want to manage all Hadoop and AWS dependencies manually.
 
 Please choose the correct jar according to your environment.
 
@@ -423,7 +430,7 @@ The following are examples of how to use the `hadoop fs` command to access the f
 
 2. Add the necessary jars to the Hadoop classpath. 
 
-For S3, you need to add `gravitino-filesystem-hadoop3-runtime-${gravitino-version}.jar`, `gravitino-aws-${gravitino-version}.jar` and `hadoop-aws-${hadoop-version}.jar` located at `${HADOOP_HOME}/share/hadoop/tools/lib/` to Hadoop classpath. 
+For S3, you need to add `gravitino-filesystem-hadoop3-runtime-${gravitino-version}.jar` and `hadoop-aws-${hadoop-version}.jar` located at `${HADOOP_HOME}/share/hadoop/tools/lib/` to Hadoop classpath. 
 
 3. Run the following command to access the fileset:
 
@@ -459,7 +466,7 @@ options = {
     "cache_size": 20,
     "cache_expired_time": 3600,
     "auth_type": "simple",
-    "s3_endpoint": "http://localhost:8090",
+    "s3_endpoint": "http://localhost:9000",
     "s3_access_key_id": "minio",
     "s3_secret_access_key": "minio123"
 }
@@ -511,7 +518,6 @@ curl -X POST -H "Accept: application/vnd.gravitino.v1+json" \
     "s3-access-key-id": "access_key",
     "s3-secret-access-key": "secret_key",
     "s3-endpoint": "http://s3.ap-northeast-1.amazonaws.com",
-    "filesystem-providers": "s3",
     "credential-providers": "s3-token",
     "s3-region":"ap-northeast-1",
     "s3-role-arn":"The ARN of the role to access the S3 data"
@@ -557,5 +563,4 @@ spark = SparkSession.builder
 ```
 
 Python client and Hadoop command are similar to the above examples.
-
 

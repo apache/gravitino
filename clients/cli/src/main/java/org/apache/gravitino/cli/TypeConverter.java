@@ -22,6 +22,7 @@ package org.apache.gravitino.cli;
 import org.apache.gravitino.rel.types.Type;
 import org.apache.gravitino.rel.types.Types;
 
+/** Utility class for converting type names to Type instances. */
 public class TypeConverter {
 
   /**

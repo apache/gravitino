@@ -249,9 +249,9 @@ class FilesetCatalog extends BaseSchemaCatalog
       CallerContext callerContext = CallerContext.CallerContextHolder.get();
 
       Map<String, String> params = new HashMap<>();
-      params.put("sub_path", RESTUtils.encodeString(subPath));
+      params.put("sub_path", subPath);
       if (locationName != null) {
-        params.put("location_name", RESTUtils.encodeString(locationName));
+        params.put("location_name", locationName);
       }
       FileLocationResponse resp =
           restClient.get(

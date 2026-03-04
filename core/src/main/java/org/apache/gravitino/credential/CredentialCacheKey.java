@@ -57,7 +57,7 @@ public class CredentialCacheKey {
     stringBuilder
         .append("credentialType: ")
         .append(credentialType)
-        .append("credentialContext: ")
+        .append(" credentialContext: ")
         .append(credentialContext);
     return stringBuilder.toString();
   }

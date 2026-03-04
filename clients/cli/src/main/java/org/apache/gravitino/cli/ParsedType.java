@@ -19,6 +19,15 @@
 
 package org.apache.gravitino.cli;
 
+/**
+ * Represents a parsed data type, encapsulating its name and attributes like length, precision, and
+ * scale.
+ *
+ * <p>This class is a data container used to hold the components of a data type string that has been
+ * parsed from a format like "varchar(10)" or "decimal(10,5)". It provides methods to access the
+ * extracted type name and its associated attributes, which are mutually exclusive (i.e., a type has
+ * either a length or a precision/scale, but not both).
+ */
 public class ParsedType {
   private String typeName;
   private Integer length;
@@ -39,11 +48,12 @@ public class ParsedType {
     this.scale = scale;
   }
 
-  /*
+  /**
    * Constructs a ParsedType with specified type name and length.
    *
    * @param typeName The name of the data type.
-   * @param length The length of the data type, which typically defines the maximum number of characters.
+   * @param length The length of the data type, which typically defines the maximum number of
+   *     characters.
    */
   public ParsedType(String typeName, Integer length) {
     this.typeName = typeName;

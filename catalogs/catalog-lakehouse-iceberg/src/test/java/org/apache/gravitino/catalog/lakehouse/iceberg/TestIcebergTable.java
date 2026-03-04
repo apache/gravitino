@@ -492,6 +492,90 @@ public class TestIcebergTable {
   }
 
   @Test
+  public void testRenameTableAcrossSchema() {
+    NameIdentifier tableIdentifier =
+        NameIdentifier.of(
+            META_LAKE_NAME, icebergCatalog.name(), icebergSchema.name(), "test_iceberg_table");
+    Map<String, String> properties = Maps.newHashMap();
+    properties.put("key1", "val1");
+
+    IcebergColumn col1 =
+        IcebergColumn.builder()
+            .withName("col_1")
+            .withType(Types.IntegerType.get())
+            .withComment(ICEBERG_COMMENT)
+            .build();
+    Column[] columns = new Column[] {col1};
+
+    String targetSchemaName = "target_schema_" + genRandomName();
+    NameIdentifier targetSchemaIdent =
+        NameIdentifier.of(META_LAKE_NAME, icebergCatalog.name(), targetSchemaName);
+    NameIdentifier renamedIdentifier =
+        NameIdentifier.of(META_LAKE_NAME, icebergCatalog.name(), targetSchemaName, "renamed_table");
+
+    try {
+      icebergCatalogOperations.createSchema(targetSchemaIdent, ICEBERG_COMMENT, Maps.newHashMap());
+      icebergCatalogOperations.createTable(
+          tableIdentifier,
+          columns,
+          ICEBERG_COMMENT,
+          properties,
+          new Transform[0],
+          Distributions.NONE,
+          new SortOrder[0]);
+
+      icebergCatalogOperations.alterTable(
+          tableIdentifier, TableChange.rename("renamed_table", targetSchemaName));
+
+      Assertions.assertFalse(icebergCatalogOperations.tableExists(tableIdentifier));
+      Assertions.assertTrue(icebergCatalogOperations.tableExists(renamedIdentifier));
+      Assertions.assertEquals(
+          "renamed_table", icebergCatalogOperations.loadTable(renamedIdentifier).name());
+    } finally {
+      if (icebergCatalogOperations.tableExists(renamedIdentifier)) {
+        icebergCatalogOperations.dropTable(renamedIdentifier);
+      }
+      if (icebergCatalogOperations.schemaExists(targetSchemaIdent)) {
+        icebergCatalogOperations.dropSchema(targetSchemaIdent, false);
+      }
+    }
+  }
+
+  @Test
+  public void testRenameTableToMissingSchema() {
+    NameIdentifier tableIdentifier =
+        NameIdentifier.of(
+            META_LAKE_NAME, icebergCatalog.name(), icebergSchema.name(), "test_iceberg_table");
+    Map<String, String> properties = Maps.newHashMap();
+    properties.put("key1", "val1");
+
+    IcebergColumn col1 =
+        IcebergColumn.builder()
+            .withName("col_1")
+            .withType(Types.IntegerType.get())
+            .withComment(ICEBERG_COMMENT)
+            .build();
+    Column[] columns = new Column[] {col1};
+
+    icebergCatalogOperations.createTable(
+        tableIdentifier,
+        columns,
+        ICEBERG_COMMENT,
+        properties,
+        new Transform[0],
+        Distributions.NONE,
+        new SortOrder[0]);
+
+    String missingSchemaName = "missing_schema_" + genRandomName();
+    Assertions.assertThrows(
+        NoSuchSchemaException.class,
+        () ->
+            icebergCatalogOperations.alterTable(
+                tableIdentifier, TableChange.rename("renamed_table", missingSchemaName)));
+    Assertions.assertTrue(icebergCatalogOperations.tableExists(tableIdentifier));
+  }
+
+  @Test
   public void testTableProperty() {
     CatalogEntity entity = createDefaultCatalogEntity();
     try (IcebergCatalogOperations ops = new IcebergCatalogOperations()) {

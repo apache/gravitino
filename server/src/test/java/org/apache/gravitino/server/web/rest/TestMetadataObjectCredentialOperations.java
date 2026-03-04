@@ -98,7 +98,8 @@ public class TestMetadataObjectCredentialOperations extends JerseyTest {
 
     S3SecretKeyCredential credential = new S3SecretKeyCredential("access-id", "secret-key");
     // Test return one credential
-    when(credentialOperationDispatcher.getCredentials(any())).thenReturn(Arrays.asList(credential));
+    when(credentialOperationDispatcher.getCredentials(any(), any()))
+        .thenReturn(Arrays.asList(credential));
     Response response =
         target(basePath(metalake))
             .path(metadataObject.type().toString())
@@ -120,7 +121,7 @@ public class TestMetadataObjectCredentialOperations extends JerseyTest {
     Assertions.assertEquals(0, credentialToTest.expireTimeInMs());
 
     // Test doesn't return credential
-    when(credentialOperationDispatcher.getCredentials(any())).thenReturn(null);
+    when(credentialOperationDispatcher.getCredentials(any(), any())).thenReturn(null);
     response =
         target(basePath(metalake))
             .path(metadataObject.type().toString())

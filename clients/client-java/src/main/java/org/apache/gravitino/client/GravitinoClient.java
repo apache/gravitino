@@ -61,6 +61,7 @@ import org.apache.gravitino.exceptions.TagAlreadyExistsException;
 import org.apache.gravitino.exceptions.UserAlreadyExistsException;
 import org.apache.gravitino.job.JobHandle;
 import org.apache.gravitino.job.JobTemplate;
+import org.apache.gravitino.job.JobTemplateChange;
 import org.apache.gravitino.job.SupportsJobs;
 import org.apache.gravitino.policy.Policy;
 import org.apache.gravitino.policy.PolicyChange;
@@ -595,6 +596,12 @@ public class GravitinoClient extends GravitinoClientBase
   }
 
   @Override
+  public JobTemplate alterJobTemplate(String jobTemplateName, JobTemplateChange... changes)
+      throws NoSuchJobTemplateException, IllegalArgumentException {
+    return getMetalake().alterJobTemplate(jobTemplateName, changes);
+  }
+
+  @Override
   public List<JobHandle> listJobs(String jobTemplateName) throws NoSuchJobTemplateException {
     return getMetalake().listJobs(jobTemplateName);
   }
@@ -705,7 +712,7 @@ public class GravitinoClient extends GravitinoClientBase
           "The argument 'metalakeName' must be a valid name");
 
       return new GravitinoClient(
-          uri, metalakeName, authDataProvider, checkVersion, headers, properties);
+          uri, metalakeName, authDataProvider, isVersionCheckEnabled(), headers, properties);
     }
   }
 }

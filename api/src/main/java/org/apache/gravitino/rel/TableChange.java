@@ -23,6 +23,7 @@ package org.apache.gravitino.rel;
 import com.google.common.base.Preconditions;
 import java.util.Arrays;
 import java.util.Objects;
+import java.util.Optional;
 import org.apache.gravitino.annotation.Evolving;
 import org.apache.gravitino.rel.expressions.Expression;
 import org.apache.gravitino.rel.indexes.Index.IndexType;
@@ -42,6 +43,17 @@ public interface TableChange {
    */
   static TableChange rename(String newName) {
     return new RenameTable(newName);
+  }
+
+  /**
+   * Create a TableChange for renaming a table, possibly moving it to a new schema.
+   *
+   * @param newName the new table name
+   * @param newSchemaName the new schema name, or null to leave the schema unchanged
+   * @return A TableChange for the rename.
+   */
+  static TableChange rename(String newName, String newSchemaName) {
+    return new RenameTable(newName, Optional.ofNullable(newSchemaName));
   }
 
   /**
@@ -467,9 +479,15 @@ public interface TableChange {
   /** A TableChange to rename a table. */
   final class RenameTable implements TableChange {
     private final String newName;
+    private final Optional<String> newSchemaName;
 
     private RenameTable(String newName) {
+      this(newName, Optional.empty());
+    }
+
+    private RenameTable(String newName, Optional<String> newSchemaName) {
       this.newName = newName;
+      this.newSchemaName = newSchemaName;
     }
 
     /**
@@ -479,6 +497,15 @@ public interface TableChange {
      */
     public String getNewName() {
       return newName;
+    }
+
+    /**
+     * Retrieves the new schema name for the table, if provided.
+     *
+     * @return An Optional containing the new schema of the table, or empty if not provided.
+     */
+    public Optional<String> getNewSchemaName() {
+      return newSchemaName;
     }
 
     /**
@@ -493,7 +520,7 @@ public interface TableChange {
       if (this == o) return true;
       if (o == null || getClass() != o.getClass()) return false;
       RenameTable that = (RenameTable) o;
-      return newName.equals(that.newName);
+      return newName.equals(that.newName) && newSchemaName.equals(that.newSchemaName);
     }
 
     /**
@@ -504,7 +531,7 @@ public interface TableChange {
      */
     @Override
     public int hashCode() {
-      return newName.hashCode();
+      return Objects.hash(newName, newSchemaName);
     }
 
     /**
@@ -515,7 +542,7 @@ public interface TableChange {
      */
     @Override
     public String toString() {
-      return "RENAMETABLE " + newName;
+      return "RENAMETABLE " + newSchemaName.map(s -> s + "." + newName).orElse(newName);
     }
   }
 
@@ -731,17 +758,23 @@ public interface TableChange {
       this.fieldNames = fieldNames;
     }
 
-    /** @return The type of the index. */
+    /**
+     * @return The type of the index.
+     */
     public IndexType getType() {
       return type;
     }
 
-    /** @return The name of the index. */
+    /**
+     * @return The name of the index.
+     */
     public String getName() {
       return name;
     }
 
-    /** @return The field names of the index. */
+    /**
+     * @return The field names of the index.
+     */
     public String[][] getFieldNames() {
       return fieldNames;
     }
@@ -782,12 +815,16 @@ public interface TableChange {
       this.ifExists = ifExists;
     }
 
-    /** @return The name of the index to be deleted. */
+    /**
+     * @return The name of the index to be deleted.
+     */
     public String getName() {
       return name;
     }
 
-    /** @return If true, silence the error if index does not exist during drop. */
+    /**
+     * @return If true, silence the error if index does not exist during drop.
+     */
     public boolean isIfExists() {
       return ifExists;
     }
@@ -812,7 +849,9 @@ public interface TableChange {
    */
   interface ColumnPosition {
 
-    /** @return The first position of ColumnPosition instance. */
+    /**
+     * @return The first position of ColumnPosition instance.
+     */
     static ColumnPosition first() {
       return First.INSTANCE;
     }
@@ -827,7 +866,9 @@ public interface TableChange {
       return new After(column);
     }
 
-    /** @return The default position of ColumnPosition instance. */
+    /**
+     * @return The default position of ColumnPosition instance.
+     */
     static ColumnPosition defaultPos() {
       return Default.INSTANCE;
     }

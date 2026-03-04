@@ -25,7 +25,7 @@ plugins {
 }
 
 val scalaVersion: String = project.properties["scalaVersion"] as? String ?: extra["defaultScalaVersion"].toString()
-val sparkVersion: String = libs.versions.spark34.get()
+val sparkVersion: String = libs.versions.spark35.get()
 val sparkMajorVersion: String = sparkVersion.substringBeforeLast(".")
 val paimonVersion: String = libs.versions.paimon.get()
 
@@ -148,7 +148,10 @@ dependencies {
   testImplementation("org.apache.paimon:paimon-spark-$sparkMajorVersion:$paimonVersion") {
     exclude("org.apache.hadoop")
   }
+
+  testImplementation(libs.awaitility)
   testImplementation(libs.slf4j.api)
+  testImplementation(libs.awaitility)
   testImplementation(libs.junit.jupiter.api)
   testImplementation(libs.mysql.driver)
   testImplementation(libs.postgresql.driver)
@@ -166,7 +169,7 @@ dependencies {
 }
 
 tasks {
-  val runtimeJars by registering(Copy::class) {
+  register("runtimeJars", Copy::class) {
     from(configurations.runtimeClasspath)
     into("build/libs")
   }

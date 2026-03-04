@@ -52,6 +52,8 @@ public interface MetadataObject {
     FILESET,
     /** A table is mapped the table of relational data sources like Apache Hive, MySQL, etc. */
     TABLE,
+    /** A view is mapped to the view of relational data sources like Apache Hive, MySQL, etc. */
+    VIEW,
     /**
      * A topic is mapped the topic of messaging data sources like Apache Kafka, Apache Pulsar, etc.
      */
@@ -61,7 +63,17 @@ public interface MetadataObject {
     /** A role is an object contains specific securable objects with privileges */
     ROLE,
     /** A model is mapped to the model artifact in ML. */
-    MODEL
+    MODEL,
+    /** A tag is used to help manage other metadata object. */
+    TAG,
+    /**
+     * A policy can be associated with a metadata object for data governance and similar purposes.
+     */
+    POLICY,
+    /** A job represents a data processing task in Gravitino. */
+    JOB,
+    /** A job template represents a reusable template for creating jobs in Gravitino. */
+    JOB_TEMPLATE;
   }
 
   /**

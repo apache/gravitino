@@ -19,7 +19,6 @@
 
 package org.apache.gravitino.iceberg.integration.test;
 
-import java.io.IOException;
 import java.util.HashMap;
 import java.util.Map;
 import org.apache.gravitino.catalog.lakehouse.iceberg.IcebergConstants;
@@ -27,7 +26,6 @@ import org.apache.gravitino.credential.CredentialConstants;
 import org.apache.gravitino.credential.GCSTokenCredential;
 import org.apache.gravitino.iceberg.common.IcebergConfig;
 import org.apache.gravitino.integration.test.util.BaseIT;
-import org.apache.gravitino.integration.test.util.DownloaderUtils;
 import org.apache.gravitino.integration.test.util.ITUtils;
 import org.apache.gravitino.storage.GCSProperties;
 import org.junit.jupiter.api.condition.EnabledIfEnvironmentVariable;
@@ -48,12 +46,6 @@ public class IcebergRESTGCSIT extends IcebergRESTJdbcCatalogIT {
         System.getenv().getOrDefault("GOOGLE_APPLICATION_CREDENTIALS", "credential.json");
     if (ITUtils.isEmbedded()) {
       return;
-    }
-
-    try {
-      downloadIcebergBundleJar();
-    } catch (IOException e) {
-      throw new RuntimeException(e);
     }
     copyGCSBundleJar();
   }
@@ -89,17 +81,6 @@ public class IcebergRESTGCSIT extends IcebergRESTJdbcCatalogIT {
   private void copyGCSBundleJar() {
     String gravitinoHome = System.getenv("GRAVITINO_HOME");
     String targetDir = String.format("%s/iceberg-rest-server/libs/", gravitinoHome);
-    BaseIT.copyBundleJarsToDirectory("gcp", targetDir);
-  }
-
-  private void downloadIcebergBundleJar() throws IOException {
-    String icebergBundleJarUri =
-        String.format(
-            "https://repo1.maven.org/maven2/org/apache/iceberg/"
-                + "iceberg-gcp-bundle/%s/iceberg-gcp-bundle-%s.jar",
-            ITUtils.icebergVersion(), ITUtils.icebergVersion());
-    String gravitinoHome = System.getenv("GRAVITINO_HOME");
-    String targetDir = String.format("%s/iceberg-rest-server/libs/", gravitinoHome);
-    DownloaderUtils.downloadFile(icebergBundleJarUri, targetDir);
+    BaseIT.copyBundleJarsToDirectory("iceberg-gcp-bundle", targetDir);
   }
 }

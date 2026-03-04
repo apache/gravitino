@@ -34,12 +34,19 @@ import org.apache.gravitino.rel.TableChange;
 /** Update the default type of a column. */
 public class UpdateColumnDefault extends Command {
 
+  /** The name of the command. */
   protected final String metalake;
+  /** The name of the catalog. */
   protected final String catalog;
+  /** The name of the schema. */
   protected final String schema;
+  /** The name of the table. */
   protected final String table;
+  /** The name of the column. */
   protected final String column;
+  /** The new default value. */
   protected final String defaultValue;
+  /** The new default data type. */
   protected final String dataType;
 
   /**

@@ -46,5 +46,16 @@ public class TestDorisExceptionConverter {
     Assertions.assertEquals(
         DorisExceptionConverter.CODE_NO_SUCH_TABLE,
         DorisExceptionConverter.getErrorCodeFromMessage(msg));
+
+    msg = "errCode = 2, detailMessage = Syntax error in line 3: unexpected token: AUTO";
+    Assertions.assertEquals(
+        DorisExceptionConverter.CODE_BUCKETS_AUTO_NOT_SUPPORTED,
+        DorisExceptionConverter.getErrorCodeFromMessage(msg));
+
+    msg =
+        "You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'AUTO' at line 1";
+    Assertions.assertEquals(
+        DorisExceptionConverter.CODE_BUCKETS_AUTO_NOT_SUPPORTED,
+        DorisExceptionConverter.getErrorCodeFromMessage(msg));
   }
 }

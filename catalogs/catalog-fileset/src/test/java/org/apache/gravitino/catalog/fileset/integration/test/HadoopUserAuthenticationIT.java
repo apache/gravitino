@@ -19,10 +19,11 @@
 
 package org.apache.gravitino.catalog.fileset.integration.test;
 
-import static org.apache.gravitino.catalog.fileset.authentication.AuthenticationConfig.AUTH_TYPE_KEY;
-import static org.apache.gravitino.catalog.fileset.authentication.kerberos.KerberosConfig.IMPERSONATION_ENABLE_KEY;
-import static org.apache.gravitino.catalog.fileset.authentication.kerberos.KerberosConfig.KEY_TAB_URI_KEY;
-import static org.apache.gravitino.catalog.fileset.authentication.kerberos.KerberosConfig.PRINCIPAL_KEY;
+import static org.apache.gravitino.catalog.fileset.FilesetCatalogPropertiesMetadata.FILESYSTEM_CONNECTION_TIMEOUT_SECONDS;
+import static org.apache.gravitino.catalog.hadoop.fs.kerberos.AuthenticationConfig.AUTH_TYPE_KEY;
+import static org.apache.gravitino.catalog.hadoop.fs.kerberos.KerberosConfig.IMPERSONATION_ENABLE_KEY;
+import static org.apache.gravitino.catalog.hadoop.fs.kerberos.KerberosConfig.KEY_TAB_URI_KEY;
+import static org.apache.gravitino.catalog.hadoop.fs.kerberos.KerberosConfig.PRINCIPAL_KEY;
 
 import com.google.common.base.Throwables;
 import com.google.common.collect.ImmutableMap;
@@ -252,6 +253,7 @@ public class HadoopUserAuthenticationIT extends BaseIT {
     properties.put(KEY_TAB_URI_KEY, TMP_DIR + HADOOP_CLIENT_KEYTAB);
     properties.put(PRINCIPAL_KEY, HADOOP_CLIENT_PRINCIPAL);
     properties.put("location", HDFS_URL + "/user/hadoop/");
+    properties.put("gravitino.bypass.dfs.namenode.kerberos.principal.pattern", "*");
 
     kerberosHiveContainer.executeInContainer("hadoop", "fs", "-mkdir", "/user/hadoop");
 
@@ -311,7 +313,17 @@ public class HadoopUserAuthenticationIT extends BaseIT {
             .withClientPrincipal(GRAVITINO_CLIENT_PRINCIPAL)
             .withKeyTabFile(new File(TMP_DIR + GRAVITINO_CLIENT_KEYTAB))
             .build();
-    adminClient = GravitinoAdminClient.builder(serverUri).withKerberosAuth(provider).build();
+    Map<String, String> clientProperties =
+        ImmutableMap.of(
+            "gravitino.client.connectionTimeoutMs",
+            "600000",
+            "gravitino.client.socketTimeoutMs",
+            "600000");
+    adminClient =
+        GravitinoAdminClient.builder(serverUri)
+            .withKerberosAuth(provider)
+            .withClientConfig(clientProperties)
+            .build();
 
     String metalakeName = GravitinoITUtils.genRandomName("metalake");
     String catalogName = GravitinoITUtils.genRandomName("catalog");
@@ -326,7 +338,9 @@ public class HadoopUserAuthenticationIT extends BaseIT {
     properties.put(IMPERSONATION_ENABLE_KEY, "true");
     properties.put(KEY_TAB_URI_KEY, TMP_DIR + HADOOP_CLIENT_KEYTAB);
     properties.put(PRINCIPAL_KEY, HADOOP_CLIENT_PRINCIPAL);
+    properties.put(FILESYSTEM_CONNECTION_TIMEOUT_SECONDS, "600");
     properties.put("location", location);
+    properties.put("gravitino.bypass.dfs.namenode.kerberos.principal.pattern", "*");
 
     kerberosHiveContainer.executeInContainer(
         "hadoop", "fs", "-mkdir", "-p", "/user/hadoop/" + catalogName);
@@ -430,6 +444,7 @@ public class HadoopUserAuthenticationIT extends BaseIT {
     properties.put(KEY_TAB_URI_KEY, TMP_DIR + HADOOP_CLIENT_KEYTAB);
     properties.put(PRINCIPAL_KEY, HADOOP_CLIENT_PRINCIPAL);
     properties.put("location", location);
+    properties.put("gravitino.bypass.dfs.namenode.kerberos.principal.pattern", "*");
 
     kerberosHiveContainer.executeInContainer(
         "hadoop", "fs", "-mkdir", "-p", "/user/hadoop/" + catalogName);
@@ -549,7 +564,8 @@ public class HadoopUserAuthenticationIT extends BaseIT {
     Assertions.assertDoesNotThrow(
         () -> catalog.asFilesetCatalog().dropFileset(NameIdentifier.of(SCHEMA_NAME, fileset2)));
 
-    Assertions.assertDoesNotThrow(() -> catalog.asSchemas().dropSchema(SCHEMA_NAME, true));
+    Assertions.assertThrows(
+        Exception.class, () -> catalog.asSchemas().dropSchema(SCHEMA_NAME, true));
     kerberosHiveContainer.executeInContainer(
         "hadoop", "fs", "-chown", "-R", "cli_schema", "/user/hadoop/" + catalogName);
     Assertions.assertDoesNotThrow(() -> catalog.asSchemas().dropSchema(SCHEMA_NAME, true));
@@ -578,6 +594,7 @@ public class HadoopUserAuthenticationIT extends BaseIT {
     properties.put(PRINCIPAL_KEY, HADOOP_CLIENT_PRINCIPAL);
     properties.put(AUTH_TYPE_KEY, "kerberos");
     properties.put("location", localtion);
+    properties.put("gravitino.bypass.dfs.namenode.kerberos.principal.pattern", "*");
 
     kerberosHiveContainer.executeInContainer(
         "hadoop", "fs", "-mkdir", "-p", "/user/hadoop/" + catalogName);

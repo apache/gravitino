@@ -22,8 +22,11 @@ import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
 import com.google.common.collect.Maps;
+import java.lang.reflect.Method;
 import java.util.Map;
 import org.apache.gravitino.Catalog;
+import org.apache.gravitino.client.GravitinoMetalake;
+import org.apache.gravitino.dto.MetalakeDTO;
 import org.apache.gravitino.exceptions.ForbiddenException;
 import org.apache.gravitino.integration.test.container.ContainerSuite;
 import org.apache.gravitino.integration.test.container.HiveContainer;
@@ -59,9 +62,17 @@ public class CatalogAuthorizationIT extends BaseRestApiAuthorizationIT {
 
   @Test
   @Order(1)
-  public void testCreateCatalog() {
+  public void testCreateCatalog() throws Exception {
     Map<String, String> properties = Maps.newHashMap();
     properties.put("metastore.uris", hmsUri);
+    assertThrows(
+        "Can not access metadata {" + catalog1 + "}.",
+        ForbiddenException.class,
+        () -> {
+          normalUserClient
+              .loadMetalake(METALAKE)
+              .testConnection(catalog1, Catalog.Type.RELATIONAL, "hive", "comment", properties);
+        });
     assertThrows(
         "Can not access metadata {" + catalog1 + "}.",
         ForbiddenException.class,
@@ -72,7 +83,13 @@ public class CatalogAuthorizationIT extends BaseRestApiAuthorizationIT {
         });
     client
         .loadMetalake(METALAKE)
+        .testConnection(catalog1, Catalog.Type.RELATIONAL, "hive", "comment", properties);
+    client
+        .loadMetalake(METALAKE)
         .createCatalog(catalog1, Catalog.Type.RELATIONAL, "hive", "comment", properties);
+    client
+        .loadMetalake(METALAKE)
+        .testConnection(catalog2, Catalog.Type.RELATIONAL, "hive", "comment", properties);
     client
         .loadMetalake(METALAKE)
         .createCatalog(catalog2, Catalog.Type.RELATIONAL, "hive", "comment", properties);
@@ -131,5 +148,49 @@ public class CatalogAuthorizationIT extends BaseRestApiAuthorizationIT {
     client.loadMetalake(METALAKE).dropCatalog(catalog2, true);
     catalogs = client.loadMetalake(METALAKE).listCatalogs();
     assertEquals(0, catalogs.length);
+  }
+
+  @Test
+  @Order(4)
+  public void testListCatalogsWithNonExistentMetalake() throws Exception {
+    // Test that listCatalogs with @AuthorizationExpression returns 403 Forbidden
+    // when the metalake doesn't exist, instead of 404 response
+    String nonExistentMetalake = "nonExistentMetalake";
+
+    // Access the restClient from normalUserClient using reflection
+    Method restClientMethod =
+        normalUserClient.getClass().getSuperclass().getDeclaredMethod("restClient");
+    restClientMethod.setAccessible(true);
+    Object restClient = restClientMethod.invoke(normalUserClient);
+
+    // Create a MetalakeDTO for the non-existent metalake
+    MetalakeDTO metalakeDTO =
+        MetalakeDTO.builder()
+            .withName(nonExistentMetalake)
+            .withComment("test")
+            .withProperties(Maps.newHashMap())
+            .withAudit(
+                org.apache.gravitino.dto.AuditDTO.builder()
+                    .withCreator("test")
+                    .withCreateTime(java.time.Instant.now())
+                    .build())
+            .build();
+
+    // Use DTOConverters.toMetaLake() via reflection to create GravitinoMetalake
+    Class<?> dtoConvertersClass = Class.forName("org.apache.gravitino.client.DTOConverters");
+    Method toMetaLakeMethod =
+        dtoConvertersClass.getDeclaredMethod(
+            "toMetaLake",
+            MetalakeDTO.class,
+            Class.forName("org.apache.gravitino.client.RESTClient"));
+    toMetaLakeMethod.setAccessible(true);
+    GravitinoMetalake nonExistentMetalakeObj =
+        (GravitinoMetalake) toMetaLakeMethod.invoke(null, metalakeDTO, restClient);
+
+    // Test listCatalogs - should return 403 ForbiddenException
+    assertThrows(ForbiddenException.class, nonExistentMetalakeObj::listCatalogs);
+
+    // Test listCatalogsInfo - should return 403 ForbiddenException
+    assertThrows(ForbiddenException.class, nonExistentMetalakeObj::listCatalogsInfo);
   }
 }

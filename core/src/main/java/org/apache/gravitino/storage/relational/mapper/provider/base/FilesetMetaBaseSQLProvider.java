@@ -23,6 +23,9 @@ import static org.apache.gravitino.storage.relational.mapper.FilesetMetaMapper.M
 import static org.apache.gravitino.storage.relational.mapper.FilesetMetaMapper.VERSION_TABLE_NAME;
 
 import java.util.List;
+import org.apache.gravitino.storage.relational.mapper.CatalogMetaMapper;
+import org.apache.gravitino.storage.relational.mapper.MetalakeMetaMapper;
+import org.apache.gravitino.storage.relational.mapper.SchemaMetaMapper;
 import org.apache.gravitino.storage.relational.po.FilesetPO;
 import org.apache.ibatis.annotations.Param;
 
@@ -41,6 +44,62 @@ public class FilesetMetaBaseSQLProvider {
         + VERSION_TABLE_NAME
         + " vi ON fm.fileset_id = vi.fileset_id AND fm.current_version = vi.version"
         + " WHERE fm.schema_id = #{schemaId} AND fm.deleted_at = 0 AND vi.deleted_at = 0";
+  }
+
+  public String listFilesetPOsByFullQualifiedName(
+      @Param("metalakeName") String metalakeName,
+      @Param("catalogName") String catalogName,
+      @Param("schemaName") String schemaName) {
+    return """
+        SELECT
+            mm.metalake_id,
+            cm.catalog_id,
+            sm.schema_id,
+            vi.fileset_id,
+            fm.fileset_name,
+            fm.type,
+            fm.audit_info,
+            fm.current_version,
+            fm.last_version,
+            fm.deleted_at,
+            vi.id,
+            vi.metalake_id as version_metalake_id,
+            vi.catalog_id as version_catalog_id,
+            vi.schema_id as version_schema_id,
+            vi.fileset_id as version_fileset_id,
+            vi.version,
+            vi.fileset_comment,
+            vi.properties,
+            vi.storage_location_name,
+            vi.storage_location,
+            vi.deleted_at as version_deleted_at
+        FROM
+            %s mm
+        INNER JOIN
+            %s cm ON mm.metalake_id = cm.metalake_id
+            AND cm.catalog_name = #{catalogName}
+            AND cm.deleted_at = 0
+        LEFT JOIN
+            %s sm ON cm.catalog_id = sm.catalog_id
+            AND sm.schema_name = #{schemaName}
+            AND sm.deleted_at = 0
+        LEFT JOIN
+            %s fm ON sm.schema_id = fm.schema_id
+            AND fm.deleted_at = 0
+        LEFT JOIN
+            %s vi ON fm.fileset_id = vi.fileset_id
+            AND fm.current_version = vi.version
+            AND vi.deleted_at = 0
+        WHERE
+            mm.metalake_name = #{metalakeName}
+            AND mm.deleted_at = 0;
+            """
+        .formatted(
+            MetalakeMetaMapper.TABLE_NAME,
+            CatalogMetaMapper.TABLE_NAME,
+            SchemaMetaMapper.TABLE_NAME,
+            META_TABLE_NAME,
+            VERSION_TABLE_NAME);
   }
 
   public String selectFilesetIdBySchemaIdAndName(
@@ -64,7 +123,7 @@ public class FilesetMetaBaseSQLProvider {
         + " fm INNER JOIN "
         + VERSION_TABLE_NAME
         + " vi ON fm.fileset_id = vi.fileset_id AND fm.current_version = vi.version"
-        + " WHERE fm.fileset_id in ("
+        + " WHERE fm.fileset_id IN ("
         + "<foreach collection='filesetIds' item='filesetId' separator=','>"
         + "#{filesetId}"
         + "</foreach>"
@@ -90,6 +149,64 @@ public class FilesetMetaBaseSQLProvider {
         + " AND fm.deleted_at = 0 AND vi.deleted_at = 0";
   }
 
+  public String selectFilesetByFullQualifiedName(
+      @Param("metalakeName") String metalakeName,
+      @Param("catalogName") String catalogName,
+      @Param("schemaName") String schemaName,
+      @Param("filesetName") String filesetName) {
+    return """
+        SELECT
+            mm.metalake_id,
+            cm.catalog_id,
+            sm.schema_id,
+            vi.fileset_id,
+            fm.fileset_name,
+            fm.type,
+            fm.audit_info,
+            fm.current_version,
+            fm.last_version,
+            fm.deleted_at,
+            vi.id,
+            vi.metalake_id as version_metalake_id,
+            vi.catalog_id as version_catalog_id,
+            vi.schema_id as version_schema_id,
+            vi.fileset_id as version_fileset_id,
+            vi.version,
+            vi.fileset_comment,
+            vi.properties,
+            vi.storage_location_name,
+            vi.storage_location,
+            vi.deleted_at as version_deleted_at
+        FROM
+            %s mm
+        INNER JOIN
+            %s cm ON mm.metalake_id = cm.metalake_id
+            AND cm.catalog_name = #{catalogName}
+            AND cm.deleted_at = 0
+        LEFT JOIN
+            %s sm ON cm.catalog_id = sm.catalog_id
+            AND sm.schema_name = #{schemaName}
+            AND sm.deleted_at = 0
+        LEFT JOIN
+            %s fm ON sm.schema_id = fm.schema_id
+            AND fm.fileset_name = #{filesetName}
+            AND fm.deleted_at = 0
+        LEFT JOIN
+            %s vi ON fm.fileset_id = vi.fileset_id
+            AND fm.current_version = vi.version
+            AND vi.deleted_at = 0
+        WHERE
+            mm.metalake_name = #{metalakeName}
+            AND mm.deleted_at = 0;
+            """
+        .formatted(
+            MetalakeMetaMapper.TABLE_NAME,
+            CatalogMetaMapper.TABLE_NAME,
+            SchemaMetaMapper.TABLE_NAME,
+            META_TABLE_NAME,
+            VERSION_TABLE_NAME);
+  }
+
   public String selectFilesetMetaById(@Param("filesetId") Long filesetId) {
     return "SELECT fm.fileset_id, fm.fileset_name, fm.metalake_id, fm.catalog_id, fm.schema_id,"
         + " fm.type, fm.audit_info, fm.current_version, fm.last_version, fm.deleted_at,"
@@ -109,10 +226,10 @@ public class FilesetMetaBaseSQLProvider {
   public String insertFilesetMeta(@Param("filesetMeta") FilesetPO filesetPO) {
     return "INSERT INTO "
         + META_TABLE_NAME
-        + "(fileset_id, fileset_name, metalake_id,"
+        + " (fileset_id, fileset_name, metalake_id,"
         + " catalog_id, schema_id, type, audit_info,"
         + " current_version, last_version, deleted_at)"
-        + " VALUES("
+        + " VALUES ("
         + " #{filesetMeta.filesetId},"
         + " #{filesetMeta.filesetName},"
         + " #{filesetMeta.metalakeId},"
@@ -129,10 +246,10 @@ public class FilesetMetaBaseSQLProvider {
   public String insertFilesetMetaOnDuplicateKeyUpdate(@Param("filesetMeta") FilesetPO filesetPO) {
     return "INSERT INTO "
         + META_TABLE_NAME
-        + "(fileset_id, fileset_name, metalake_id,"
+        + " (fileset_id, fileset_name, metalake_id,"
         + " catalog_id, schema_id, type, audit_info,"
         + " current_version, last_version, deleted_at)"
-        + " VALUES("
+        + " VALUES ("
         + " #{filesetMeta.filesetId},"
         + " #{filesetMeta.filesetName},"
         + " #{filesetMeta.metalakeId},"
@@ -219,5 +336,45 @@ public class FilesetMetaBaseSQLProvider {
     return "DELETE FROM "
         + META_TABLE_NAME
         + " WHERE deleted_at > 0 AND deleted_at < #{legacyTimeline} LIMIT #{limit}";
+  }
+
+  public String batchSelectFilesetByIdentifier(
+      @Param("metalakeName") String metalakeName,
+      @Param("catalogName") String catalogName,
+      @Param("schemaName") String schemaName,
+      @Param("filesetNames") List<String> filesetNames) {
+    return "<script>"
+        + "SELECT fm.fileset_id, fm.fileset_name, fm.metalake_id, fm.catalog_id, fm.schema_id,"
+        + " fm.type, fm.audit_info, fm.current_version, fm.last_version, fm.deleted_at,"
+        + " vi.id, vi.metalake_id as version_metalake_id, vi.catalog_id as version_catalog_id,"
+        + " vi.schema_id as version_schema_id, vi.fileset_id as version_fileset_id,"
+        + " vi.version, vi.fileset_comment, vi.properties, vi.storage_location_name, vi.storage_location,"
+        + " vi.deleted_at as version_deleted_at"
+        + " FROM "
+        + META_TABLE_NAME
+        + " fm"
+        + " INNER JOIN "
+        + VERSION_TABLE_NAME
+        + " vi ON fm.fileset_id = vi.fileset_id AND fm.current_version = vi.version"
+        + " JOIN "
+        + SchemaMetaMapper.TABLE_NAME
+        + " sm ON fm.schema_id = sm.schema_id"
+        + " JOIN "
+        + CatalogMetaMapper.TABLE_NAME
+        + " cm ON sm.catalog_id = cm.catalog_id"
+        + " JOIN "
+        + MetalakeMetaMapper.TABLE_NAME
+        + " mm ON cm.metalake_id = mm.metalake_id"
+        + " WHERE mm.metalake_name = #{metalakeName}"
+        + " AND cm.catalog_name = #{catalogName}"
+        + " AND sm.schema_name = #{schemaName}"
+        + " AND fm.fileset_name IN ("
+        + "<foreach collection='filesetNames' item='filesetName' separator=','>"
+        + "#{filesetName}"
+        + "</foreach>"
+        + " )"
+        + " AND fm.deleted_at = 0 AND vi.deleted_at = 0 AND sm.deleted_at = 0"
+        + " AND cm.deleted_at = 0 AND mm.deleted_at = 0"
+        + "</script>";
   }
 }

@@ -20,7 +20,6 @@ package org.apache.gravitino.spark.connector.version;
 
 import org.apache.gravitino.spark.connector.hive.GravitinoHiveCatalogSpark33;
 import org.apache.gravitino.spark.connector.iceberg.GravitinoIcebergCatalogSpark33;
-import org.apache.gravitino.spark.connector.paimon.GravitinoPaimonCatalogSpark33;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
@@ -34,6 +33,8 @@ public class TestCatalogNameAdaptor {
     Assertions.assertEquals(GravitinoIcebergCatalogSpark33.class.getName(), icebergCatalogName);
 
     String paimonCatalogName = CatalogNameAdaptor.getCatalogName("lakehouse-paimon");
-    Assertions.assertEquals(GravitinoPaimonCatalogSpark33.class.getName(), paimonCatalogName);
+    Assertions.assertEquals(
+        "org.apache.gravitino.spark.connector.paimon.GravitinoPaimonCatalogSpark33",
+        paimonCatalogName);
   }
 }

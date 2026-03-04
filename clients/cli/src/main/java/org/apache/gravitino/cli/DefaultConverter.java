@@ -24,6 +24,10 @@ import org.apache.gravitino.rel.expressions.Expression;
 import org.apache.gravitino.rel.expressions.literals.Literals;
 import org.apache.gravitino.rel.types.Type;
 
+/**
+ * DefaultConverter is a utility class that converts a default value string to the appropriate
+ * internal default value.
+ */
 public class DefaultConverter {
 
   /**

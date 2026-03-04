@@ -25,6 +25,7 @@ import com.google.common.collect.Lists;
 import com.google.common.collect.MapDifference;
 import com.google.common.collect.Maps;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -71,7 +72,7 @@ import org.apache.gravitino.exceptions.NonEmptySchemaException;
 import org.apache.gravitino.exceptions.SchemaAlreadyExistsException;
 import org.apache.gravitino.exceptions.TableAlreadyExistsException;
 import org.apache.gravitino.flink.connector.PartitionConverter;
-import org.apache.gravitino.flink.connector.PropertiesConverter;
+import org.apache.gravitino.flink.connector.SchemaAndTablePropertiesConverter;
 import org.apache.gravitino.flink.connector.utils.TableUtils;
 import org.apache.gravitino.flink.connector.utils.TypeUtils;
 import org.apache.gravitino.rel.Column;
@@ -88,7 +89,7 @@ import org.apache.gravitino.rel.indexes.Indexes;
  * org.apache.flink.table.catalog.Catalog} interface.
  */
 public abstract class BaseCatalog extends AbstractCatalog {
-  private final PropertiesConverter propertiesConverter;
+  private final SchemaAndTablePropertiesConverter schemaAndTablePropertiesConverter;
   private final PartitionConverter partitionConverter;
   private final Map<String, String> catalogOptions;
 
@@ -96,10 +97,10 @@ public abstract class BaseCatalog extends AbstractCatalog {
       String catalogName,
       Map<String, String> catalogOptions,
       String defaultDatabase,
-      PropertiesConverter propertiesConverter,
+      SchemaAndTablePropertiesConverter schemaAndTablePropertiesConverter,
       PartitionConverter partitionConverter) {
     super(catalogName, defaultDatabase);
-    this.propertiesConverter = propertiesConverter;
+    this.schemaAndTablePropertiesConverter = schemaAndTablePropertiesConverter;
     this.partitionConverter = partitionConverter;
     this.catalogOptions = catalogOptions;
   }
@@ -127,7 +128,7 @@ public abstract class BaseCatalog extends AbstractCatalog {
     try {
       Schema schema = catalog().asSchemas().loadSchema(databaseName);
       Map<String, String> properties =
-          propertiesConverter.toFlinkDatabaseProperties(schema.properties());
+          schemaAndTablePropertiesConverter.toFlinkDatabaseProperties(schema.properties());
       return new CatalogDatabaseImpl(properties, schema.comment());
     } catch (NoSuchSchemaException e) {
       throw new DatabaseNotExistException(catalogName(), databaseName);
@@ -145,7 +146,8 @@ public abstract class BaseCatalog extends AbstractCatalog {
       throws DatabaseAlreadyExistException, CatalogException {
     try {
       Map<String, String> properties =
-          propertiesConverter.toGravitinoSchemaProperties(catalogDatabase.getProperties());
+          schemaAndTablePropertiesConverter.toGravitinoSchemaProperties(
+              catalogDatabase.getProperties());
       catalog().asSchemas().createSchema(databaseName, catalogDatabase.getComment(), properties);
     } catch (SchemaAlreadyExistsException e) {
       if (!ignoreIfExists) {
@@ -202,8 +204,10 @@ public abstract class BaseCatalog extends AbstractCatalog {
   }
 
   @Override
-  public List<String> listViews(String s) throws DatabaseNotExistException, CatalogException {
-    throw new UnsupportedOperationException();
+  public List<String> listViews(String databaseName)
+      throws DatabaseNotExistException, CatalogException {
+    // Gravitino does not support views yet; return empty to keep Flink callers happy.
+    return Collections.emptyList();
   }
 
   @Override
@@ -286,13 +290,12 @@ public abstract class BaseCatalog extends AbstractCatalog {
             .toArray(Column[]::new);
     String comment = table.getComment();
     Map<String, String> properties =
-        propertiesConverter.toGravitinoTableProperties(table.getOptions());
+        schemaAndTablePropertiesConverter.toGravitinoTableProperties(table.getOptions());
     Transform[] partitions =
         partitionConverter.toGravitinoPartitions(((CatalogTable) table).getPartitionKeys());
+    Index[] indices = getGrivatinoIndices(resolvedTable);
 
     try {
-
-      Index[] indices = getGrivatinoIndices(resolvedTable);
       catalog()
           .asTableCatalog()
           .createTable(
@@ -325,7 +328,7 @@ public abstract class BaseCatalog extends AbstractCatalog {
         primaryColumns.stream()
             .map(primaryColumn -> new String[] {primaryColumn})
             .toArray(String[][]::new);
-    Index primary = Indexes.primary("primary", primaryField);
+    Index primary = Indexes.primary("primary", primaryField, Map.of());
     return new Index[] {primary};
   }
 
@@ -564,7 +567,8 @@ public abstract class BaseCatalog extends AbstractCatalog {
     Optional<List<String>> flinkPrimaryKey = getFlinkPrimaryKey(table);
     flinkPrimaryKey.ifPresent(builder::primaryKey);
     Map<String, String> flinkTableProperties =
-        propertiesConverter.toFlinkTableProperties(catalogOptions, table.properties(), tablePath);
+        schemaAndTablePropertiesConverter.toFlinkTableProperties(
+            catalogOptions, table.properties(), tablePath);
     List<String> partitionKeys = partitionConverter.toFlinkPartitionKeys(table.partitioning());
     return CatalogTable.of(builder.build(), table.comment(), partitionKeys, flinkTableProperties);
   }
@@ -668,7 +672,8 @@ public abstract class BaseCatalog extends AbstractCatalog {
   @VisibleForTesting
   static TableChange[] getGravitinoTableChanges(
       CatalogBaseTable existingTable, CatalogBaseTable newTable) {
-    Preconditions.checkNotNull(newTable.getComment(), "The new comment should not be null");
+    Preconditions.checkArgument(
+        newTable.getComment() != null, "The new comment should not be null");
     List<TableChange> changes = Lists.newArrayList();
     if (!Objects.equals(newTable.getComment(), existingTable.getComment())) {
       changes.add(TableChange.updateComment(newTable.getComment()));

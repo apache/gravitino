@@ -35,6 +35,7 @@ import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 import org.apache.commons.lang3.reflect.FieldUtils;
 import org.apache.gravitino.Config;
+import org.apache.gravitino.EntityStore;
 import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.MetadataObjects;
@@ -42,6 +43,7 @@ import org.apache.gravitino.authorization.AccessControlDispatcher;
 import org.apache.gravitino.authorization.Owner;
 import org.apache.gravitino.authorization.OwnerManager;
 import org.apache.gravitino.authorization.Role;
+import org.apache.gravitino.connector.PropertiesMetadata;
 import org.apache.gravitino.dto.authorization.OwnerDTO;
 import org.apache.gravitino.dto.requests.OwnerSetRequest;
 import org.apache.gravitino.dto.responses.ErrorConstants;
@@ -52,6 +54,7 @@ import org.apache.gravitino.exceptions.NoSuchMetadataObjectException;
 import org.apache.gravitino.exceptions.NoSuchRoleException;
 import org.apache.gravitino.exceptions.NotFoundException;
 import org.apache.gravitino.lock.LockManager;
+import org.apache.gravitino.meta.BaseMetalake;
 import org.apache.gravitino.metalake.MetalakeDispatcher;
 import org.apache.gravitino.rest.RESTUtils;
 import org.apache.gravitino.utils.MetadataObjectUtil;
@@ -68,6 +71,7 @@ class TestOwnerOperations extends BaseOperationsTest {
   private static final MetalakeDispatcher metalakeDispatcher = mock(MetalakeDispatcher.class);
   private static final AccessControlDispatcher accessControlDispatcher =
       mock(AccessControlDispatcher.class);
+  private static final EntityStore entityStore = mock(EntityStore.class);
 
   private static class MockServletRequestFactory extends ServletRequestFactoryBase {
     @Override
@@ -90,6 +94,7 @@ class TestOwnerOperations extends BaseOperationsTest {
         GravitinoEnv.getInstance(), "metalakeDispatcher", metalakeDispatcher, true);
     FieldUtils.writeField(
         GravitinoEnv.getInstance(), "accessControlDispatcher", accessControlDispatcher, true);
+    FieldUtils.writeField(GravitinoEnv.getInstance(), "entityStore", entityStore, true);
   }
 
   @Override
@@ -115,7 +120,7 @@ class TestOwnerOperations extends BaseOperationsTest {
   }
 
   @Test
-  void testGetOwnerForObject() {
+  void testGetOwnerForObject() throws IOException {
     Owner owner =
         new Owner() {
           @Override
@@ -131,6 +136,13 @@ class TestOwnerOperations extends BaseOperationsTest {
 
     when(manager.getOwner(any(), any())).thenReturn(Optional.of(owner));
     when(metalakeDispatcher.metalakeExists(any())).thenReturn(true);
+
+    // Mock metalake with in-use property
+    BaseMetalake metalake = mock(BaseMetalake.class);
+    PropertiesMetadata propertiesMetadata = mock(PropertiesMetadata.class);
+    when(propertiesMetadata.getOrDefault(any(), any())).thenReturn(true);
+    when(metalake.propertiesMetadata()).thenReturn(propertiesMetadata);
+    when(entityStore.get(any(), any(), any())).thenReturn(metalake);
 
     Response resp =
         target("/metalakes/metalake1/owners/metalake/metalake1")
@@ -199,8 +211,16 @@ class TestOwnerOperations extends BaseOperationsTest {
   }
 
   @Test
-  void testSetOwnerForObject() {
+  void testSetOwnerForObject() throws IOException {
     when(metalakeDispatcher.metalakeExists(any())).thenReturn(true);
+
+    // Mock metalake with in-use property
+    BaseMetalake metalake = mock(BaseMetalake.class);
+    PropertiesMetadata propertiesMetadata = mock(PropertiesMetadata.class);
+    when(propertiesMetadata.getOrDefault(any(), any())).thenReturn(true);
+    when(metalake.propertiesMetadata()).thenReturn(propertiesMetadata);
+    when(entityStore.get(any(), any(), any())).thenReturn(metalake);
+
     OwnerSetRequest invalidRequest = new OwnerSetRequest(null, Owner.Type.USER);
     Response invalidResp =
         target("/metalakes/metalake1/owners/metalake/metalake1")

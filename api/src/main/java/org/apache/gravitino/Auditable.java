@@ -27,6 +27,8 @@ import org.apache.gravitino.annotation.Evolving;
 @Evolving
 public interface Auditable {
 
-  /** @return The audit information of the entity. */
+  /**
+   * @return The audit information of the entity.
+   */
   Audit auditInfo();
 }

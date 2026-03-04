@@ -19,6 +19,10 @@
 
 package org.apache.gravitino.iceberg.service.dispatcher;
 
+import java.util.HashMap;
+import java.util.Map;
+import org.apache.gravitino.auth.AuthConstants;
+import org.apache.gravitino.catalog.lakehouse.iceberg.IcebergConstants;
 import org.apache.gravitino.iceberg.service.IcebergCatalogWrapperManager;
 import org.apache.gravitino.listener.api.event.IcebergRequestContext;
 import org.apache.iceberg.catalog.Namespace;
@@ -30,8 +34,13 @@ import org.apache.iceberg.rest.responses.GetNamespaceResponse;
 import org.apache.iceberg.rest.responses.ListNamespacesResponse;
 import org.apache.iceberg.rest.responses.LoadTableResponse;
 import org.apache.iceberg.rest.responses.UpdateNamespacePropertiesResponse;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 public class IcebergNamespaceOperationExecutor implements IcebergNamespaceOperationDispatcher {
+
+  private static final Logger LOG =
+      LoggerFactory.getLogger(IcebergNamespaceOperationExecutor.class);
 
   private IcebergCatalogWrapperManager icebergCatalogWrapperManager;
 
@@ -43,6 +52,28 @@ public class IcebergNamespaceOperationExecutor implements IcebergNamespaceOperat
   @Override
   public CreateNamespaceResponse createNamespace(
       IcebergRequestContext context, CreateNamespaceRequest createNamespaceRequest) {
+    String authenticatedUser = context.userName();
+    if (!AuthConstants.ANONYMOUS_USER.equals(authenticatedUser)) {
+      String existingOwner = createNamespaceRequest.properties().get(IcebergConstants.OWNER);
+
+      // Override the owner as the authenticated user if different from authenticated user
+      if (!authenticatedUser.equals(existingOwner)) {
+        Map<String, String> properties = new HashMap<>(createNamespaceRequest.properties());
+        properties.put(IcebergConstants.OWNER, authenticatedUser);
+        LOG.debug(
+            "Overriding namespace owner from '{}' to authenticated user: '{}'",
+            existingOwner,
+            authenticatedUser);
+
+        // CreateNamespaceRequest is immutable, so we need to rebuild it with modified properties
+        createNamespaceRequest =
+            CreateNamespaceRequest.builder()
+                .withNamespace(createNamespaceRequest.namespace())
+                .setProperties(properties)
+                .build();
+      }
+    }
+
     return icebergCatalogWrapperManager
         .getCatalogWrapper(context.catalogName())
         .createNamespace(createNamespaceRequest);

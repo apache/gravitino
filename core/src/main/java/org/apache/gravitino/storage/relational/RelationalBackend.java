@@ -31,11 +31,9 @@ import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.SupportsRelationOperations;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
-import org.apache.gravitino.tag.SupportsTagOperations;
 
 /** Interface defining the operations for a Relation Backend. */
-public interface RelationalBackend
-    extends Closeable, SupportsTagOperations, SupportsRelationOperations {
+public interface RelationalBackend extends Closeable, SupportsRelationOperations {
 
   /**
    * Initializes the Relational Backend environment with the provided configuration.
@@ -114,6 +112,18 @@ public interface RelationalBackend
    */
   <E extends Entity & HasIdentifier> E get(NameIdentifier ident, Entity.EntityType entityType)
       throws IOException;
+
+  /**
+   * Batch retrieves the entities associated with the identifiers and the entity type.
+   *
+   * @param <E> The type of the entity returned.
+   * @param identifiers The identifiers of the entities.
+   * @param entityType The type of the entity.
+   * @return The entities associated with the identifiers and the entity type, or null if the key
+   *     does not exist.
+   */
+  <E extends Entity & HasIdentifier> List<E> batchGet(
+      List<NameIdentifier> identifiers, Entity.EntityType entityType);
 
   /**
    * Soft deletes the entity associated with the identifier and the entity type.

@@ -195,7 +195,7 @@ public abstract class CatalogPaimonBaseIT extends BaseIT {
     Assertions.assertThrows(
         DatabaseNotExistException.class,
         () -> {
-          paimonCatalog.loadDatabaseProperties(schemaIdent.name());
+          paimonCatalog.getDatabase(schemaIdent.name());
         });
 
     schemaNames = new HashSet<>(Arrays.asList(schemas.listSchemas()));
@@ -433,7 +433,8 @@ public abstract class CatalogPaimonBaseIT extends BaseIT {
         Collections.singletonList(
                 primary(
                     PAIMON_PRIMARY_KEY_INDEX_NAME,
-                    new String[][] {new String[] {PAIMON_COL_NAME5}}))
+                    new String[][] {new String[] {PAIMON_COL_NAME5}},
+                    Map.of()))
             .toArray(new Index[0]);
 
     Map<String, String> properties = createProperties();
@@ -1118,6 +1119,7 @@ public abstract class CatalogPaimonBaseIT extends BaseIT {
     Map<String, String> properties = Maps.newHashMap();
     properties.put("key1", "val1");
     properties.put("key2", "val2");
+    properties.put("alter-column-null-to-not-null.disabled", "false");
     return properties;
   }
 

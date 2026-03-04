@@ -87,7 +87,7 @@ public class TestTableOpsUtils {
         AddColumn.class,
         schemaChange -> {
           AddColumn addColumn = (AddColumn) schemaChange;
-          assertEquals("col_1", addColumn.fieldName());
+          assertEquals("col_1", addColumn.fieldNames()[0]);
           assertEquals(DataTypeRoot.INTEGER, addColumn.dataType().getTypeRoot());
           assertEquals(AddColumn.class.getSimpleName(), addColumn.description());
           assertNotNull(addColumn.move());
@@ -111,7 +111,7 @@ public class TestTableOpsUtils {
         AddColumn.class,
         schemaChange -> {
           AddColumn addColumn = (AddColumn) schemaChange;
-          assertEquals("col_2", addColumn.fieldName());
+          assertEquals("col_2", addColumn.fieldNames()[0]);
           assertEquals(DataTypeRoot.FLOAT, addColumn.dataType().getTypeRoot());
           assertEquals(AddColumn.class.getSimpleName(), addColumn.description());
           assertNotNull(addColumn.move());
@@ -135,7 +135,7 @@ public class TestTableOpsUtils {
         AddColumn.class,
         schemaChange -> {
           AddColumn addColumn = (AddColumn) schemaChange;
-          assertEquals("col_3", addColumn.fieldName());
+          assertEquals("col_3", addColumn.fieldNames()[0]);
           assertEquals(DataTypeRoot.ARRAY, addColumn.dataType().getTypeRoot());
           assertEquals(AddColumn.class.getSimpleName(), addColumn.description());
           assertNull(addColumn.move());
@@ -156,7 +156,7 @@ public class TestTableOpsUtils {
         AddColumn.class,
         schemaChange -> {
           AddColumn addColumn = (AddColumn) schemaChange;
-          assertEquals("col_4", addColumn.fieldName());
+          assertEquals("col_4", addColumn.fieldNames()[0]);
           assertEquals(DataTypeRoot.MAP, addColumn.dataType().getTypeRoot());
           assertEquals(AddColumn.class.getSimpleName(), addColumn.description());
           assertNull(addColumn.move());
@@ -196,7 +196,7 @@ public class TestTableOpsUtils {
         UpdateColumnType.class,
         schemaChange -> {
           UpdateColumnType updateColumnType = (UpdateColumnType) schemaChange;
-          assertEquals("col_4", updateColumnType.fieldName());
+          assertEquals("col_4", updateColumnType.fieldNames()[0]);
           assertEquals(DataTypeRoot.DOUBLE, updateColumnType.newDataType().getTypeRoot());
         });
   }
@@ -208,7 +208,7 @@ public class TestTableOpsUtils {
         RenameColumn.class,
         schemaChange -> {
           RenameColumn renameColumn = (RenameColumn) schemaChange;
-          assertEquals("col_1", renameColumn.fieldName());
+          assertEquals("col_1", renameColumn.fieldNames()[0]);
           assertEquals("col_5", renameColumn.newName());
         });
   }
@@ -220,7 +220,7 @@ public class TestTableOpsUtils {
         DropColumn.class,
         schemaChange -> {
           DropColumn dropColumn = (DropColumn) schemaChange;
-          assertEquals("col_2", dropColumn.fieldName());
+          assertEquals("col_2", dropColumn.fieldNames()[0]);
         });
   }
 

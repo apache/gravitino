@@ -27,7 +27,9 @@ import org.apache.gravitino.rel.indexes.Index;
 /** Displays the index of a table. */
 public class ListIndexes extends TableCommand {
 
+  /** The name of the schema. */
   protected final String schema;
+  /** The name of the table. */
   protected final String table;
 
   /**

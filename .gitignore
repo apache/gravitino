@@ -36,6 +36,7 @@ gen
 out/**
 *.iws
 *.ipr
+**/keytabs/
 
 distribution
 common/src/main/resources/gravitino-build-info.properties
@@ -59,3 +60,6 @@ derby.log
 web/node_modules
 web/dist
 web/.next
+
+.venv/
+.worktrees/

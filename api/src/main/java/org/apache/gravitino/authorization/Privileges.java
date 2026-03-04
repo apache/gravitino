@@ -57,6 +57,13 @@ public class Privileges {
           MetadataObject.Type.SCHEMA,
           MetadataObject.Type.FILESET);
 
+  private static final Set<MetadataObject.Type> VIEW_SUPPORTED_TYPES =
+      Sets.immutableEnumSet(
+          MetadataObject.Type.METALAKE,
+          MetadataObject.Type.CATALOG,
+          MetadataObject.Type.SCHEMA,
+          MetadataObject.Type.VIEW);
+
   /**
    * Returns the Privilege with allow condition from the string representation.
    *
@@ -127,12 +134,44 @@ public class Privileges {
         return ManageGrants.allow();
 
         //  Model
+      case REGISTER_MODEL:
+        return RegisterModel.allow();
       case CREATE_MODEL:
         return CreateModel.allow();
+      case LINK_MODEL_VERSION:
+        return LinkModelVersion.allow();
       case CREATE_MODEL_VERSION:
         return CreateModelVersion.allow();
       case USE_MODEL:
         return UseModel.allow();
+
+        // Tag
+      case CREATE_TAG:
+        return CreateTag.allow();
+      case APPLY_TAG:
+        return ApplyTag.allow();
+
+        // Policy
+      case APPLY_POLICY:
+        return ApplyPolicy.allow();
+      case CREATE_POLICY:
+        return CreatePolicy.allow();
+
+        // Job template
+      case REGISTER_JOB_TEMPLATE:
+        return RegisterJobTemplate.allow();
+      case USE_JOB_TEMPLATE:
+        return UseJobTemplate.allow();
+
+        // Job
+      case RUN_JOB:
+        return RunJob.allow();
+
+        // View
+      case CREATE_VIEW:
+        return CreateView.allow();
+      case SELECT_VIEW:
+        return SelectView.allow();
 
       default:
         throw new IllegalArgumentException("Doesn't support the privilege: " + name);
@@ -209,12 +248,44 @@ public class Privileges {
         return ManageGrants.deny();
 
         // Model
+      case REGISTER_MODEL:
+        return RegisterModel.deny();
       case CREATE_MODEL:
         return CreateModel.deny();
+      case LINK_MODEL_VERSION:
+        return LinkModelVersion.deny();
       case CREATE_MODEL_VERSION:
         return CreateModelVersion.deny();
       case USE_MODEL:
         return UseModel.deny();
+
+        // Tag
+      case CREATE_TAG:
+        return CreateTag.deny();
+      case APPLY_TAG:
+        return ApplyTag.deny();
+
+        // Policy
+      case APPLY_POLICY:
+        return ApplyPolicy.deny();
+      case CREATE_POLICY:
+        return CreatePolicy.deny();
+
+        // Job template
+      case REGISTER_JOB_TEMPLATE:
+        return RegisterJobTemplate.deny();
+      case USE_JOB_TEMPLATE:
+        return UseJobTemplate.deny();
+
+        // Job
+      case RUN_JOB:
+        return RunJob.deny();
+
+        // View
+      case CREATE_VIEW:
+        return CreateView.deny();
+      case SELECT_VIEW:
+        return SelectView.deny();
 
       default:
         throw new IllegalArgumentException("Doesn't support the privilege: " + name);
@@ -282,12 +353,16 @@ public class Privileges {
       super(condition, name);
     }
 
-    /** @return The instance with allow condition of the privilege. */
+    /**
+     * @return The instance with allow condition of the privilege.
+     */
     public static CreateCatalog allow() {
       return ALLOW_INSTANCE;
     }
 
-    /** @return The instance with deny condition of the privilege. */
+    /**
+     * @return The instance with deny condition of the privilege.
+     */
     public static CreateCatalog deny() {
       return DENY_INSTANCE;
     }
@@ -309,12 +384,16 @@ public class Privileges {
       super(condition, name);
     }
 
-    /** @return The instance with allow condition of the privilege. */
+    /**
+     * @return The instance with allow condition of the privilege.
+     */
     public static UseCatalog allow() {
       return ALLOW_INSTANCE;
     }
 
-    /** @return The instance with deny condition of the privilege. */
+    /**
+     * @return The instance with deny condition of the privilege.
+     */
     public static UseCatalog deny() {
       return DENY_INSTANCE;
     }
@@ -334,12 +413,16 @@ public class Privileges {
       super(condition, name);
     }
 
-    /** @return The instance with allow condition of the privilege. */
+    /**
+     * @return The instance with allow condition of the privilege.
+     */
     public static UseSchema allow() {
       return ALLOW_INSTANCE;
     }
 
-    /** @return The instance with deny condition of the privilege. */
+    /**
+     * @return The instance with deny condition of the privilege.
+     */
     public static UseSchema deny() {
       return DENY_INSTANCE;
     }
@@ -361,12 +444,16 @@ public class Privileges {
       super(condition, name);
     }
 
-    /** @return The instance with allow condition of the privilege. */
+    /**
+     * @return The instance with allow condition of the privilege.
+     */
     public static CreateSchema allow() {
       return ALLOW_INSTANCE;
     }
 
-    /** @return The instance with deny condition of the privilege. */
+    /**
+     * @return The instance with deny condition of the privilege.
+     */
     public static CreateSchema deny() {
       return DENY_INSTANCE;
     }
@@ -388,12 +475,16 @@ public class Privileges {
       super(condition, name);
     }
 
-    /** @return The instance with allow condition of the privilege. */
+    /**
+     * @return The instance with allow condition of the privilege.
+     */
     public static CreateTable allow() {
       return ALLOW_INSTANCE;
     }
 
-    /** @return The instance with deny condition of the privilege. */
+    /**
+     * @return The instance with deny condition of the privilege.
+     */
     public static CreateTable deny() {
       return DENY_INSTANCE;
     }
@@ -415,12 +506,16 @@ public class Privileges {
       super(condition, name);
     }
 
-    /** @return The instance with allow condition of the privilege. */
+    /**
+     * @return The instance with allow condition of the privilege.
+     */
     public static SelectTable allow() {
       return ALLOW_INSTANCE;
     }
 
-    /** @return The instance with deny condition of the privilege. */
+    /**
+     * @return The instance with deny condition of the privilege.
+     */
     public static SelectTable deny() {
       return DENY_INSTANCE;
     }
@@ -442,12 +537,16 @@ public class Privileges {
       super(condition, name);
     }
 
-    /** @return The instance with allow condition of the privilege. */
+    /**
+     * @return The instance with allow condition of the privilege.
+     */
     public static ModifyTable allow() {
       return ALLOW_INSTANCE;
     }
 
-    /** @return The instance with deny condition of the privilege. */
+    /**
+     * @return The instance with deny condition of the privilege.
+     */
     public static ModifyTable deny() {
       return DENY_INSTANCE;
     }
@@ -469,12 +568,16 @@ public class Privileges {
       super(condition, name);
     }
 
-    /** @return The instance with allow condition of the privilege. */
+    /**
+     * @return The instance with allow condition of the privilege.
+     */
     public static CreateFileset allow() {
       return ALLOW_INSTANCE;
     }
 
-    /** @return The instance with deny condition of the privilege. */
+    /**
+     * @return The instance with deny condition of the privilege.
+     */
     public static CreateFileset deny() {
       return DENY_INSTANCE;
     }
@@ -496,12 +599,16 @@ public class Privileges {
       super(condition, name);
     }
 
-    /** @return The instance with allow condition of the privilege. */
+    /**
+     * @return The instance with allow condition of the privilege.
+     */
     public static ReadFileset allow() {
       return ALLOW_INSTANCE;
     }
 
-    /** @return The instance with deny condition of the privilege. */
+    /**
+     * @return The instance with deny condition of the privilege.
+     */
     public static ReadFileset deny() {
       return DENY_INSTANCE;
     }
@@ -523,12 +630,16 @@ public class Privileges {
       super(condition, name);
     }
 
-    /** @return The instance with allow condition of the privilege. */
+    /**
+     * @return The instance with allow condition of the privilege.
+     */
     public static WriteFileset allow() {
       return ALLOW_INSTANCE;
     }
 
-    /** @return The instance with deny condition of the privilege. */
+    /**
+     * @return The instance with deny condition of the privilege.
+     */
     public static WriteFileset deny() {
       return DENY_INSTANCE;
     }
@@ -550,12 +661,16 @@ public class Privileges {
       super(condition, name);
     }
 
-    /** @return The instance with allow condition of the privilege. */
+    /**
+     * @return The instance with allow condition of the privilege.
+     */
     public static CreateTopic allow() {
       return ALLOW_INSTANCE;
     }
 
-    /** @return The instance with deny condition of the privilege. */
+    /**
+     * @return The instance with deny condition of the privilege.
+     */
     public static CreateTopic deny() {
       return DENY_INSTANCE;
     }
@@ -577,12 +692,16 @@ public class Privileges {
       super(condition, name);
     }
 
-    /** @return The instance with allow condition of the privilege. */
+    /**
+     * @return The instance with allow condition of the privilege.
+     */
     public static ConsumeTopic allow() {
       return ALLOW_INSTANCE;
     }
 
-    /** @return The instance with deny condition of the privilege. */
+    /**
+     * @return The instance with deny condition of the privilege.
+     */
     public static ConsumeTopic deny() {
       return DENY_INSTANCE;
     }
@@ -604,12 +723,16 @@ public class Privileges {
       super(condition, name);
     }
 
-    /** @return The instance with allow condition of the privilege. */
+    /**
+     * @return The instance with allow condition of the privilege.
+     */
     public static ProduceTopic allow() {
       return ALLOW_INSTANCE;
     }
 
-    /** @return The instance with deny condition of the privilege. */
+    /**
+     * @return The instance with deny condition of the privilege.
+     */
     public static ProduceTopic deny() {
       return DENY_INSTANCE;
     }
@@ -631,12 +754,16 @@ public class Privileges {
       super(condition, name);
     }
 
-    /** @return The instance with allow condition of the privilege. */
+    /**
+     * @return The instance with allow condition of the privilege.
+     */
     public static ManageUsers allow() {
       return ALLOW_INSTANCE;
     }
 
-    /** @return The instance with deny condition of the privilege. */
+    /**
+     * @return The instance with deny condition of the privilege.
+     */
     public static ManageUsers deny() {
       return DENY_INSTANCE;
     }
@@ -658,12 +785,16 @@ public class Privileges {
       super(condition, name);
     }
 
-    /** @return The instance with allow condition of the privilege. */
+    /**
+     * @return The instance with allow condition of the privilege.
+     */
     public static ManageGroups allow() {
       return ALLOW_INSTANCE;
     }
 
-    /** @return The instance with deny condition of the privilege. */
+    /**
+     * @return The instance with deny condition of the privilege.
+     */
     public static ManageGroups deny() {
       return DENY_INSTANCE;
     }
@@ -685,12 +816,16 @@ public class Privileges {
       super(condition, name);
     }
 
-    /** @return The instance with allow condition of the privilege. */
+    /**
+     * @return The instance with allow condition of the privilege.
+     */
     public static CreateRole allow() {
       return ALLOW_INSTANCE;
     }
 
-    /** @return The instance with deny condition of the privilege. */
+    /**
+     * @return The instance with deny condition of the privilege.
+     */
     public static CreateRole deny() {
       return DENY_INSTANCE;
     }
@@ -712,12 +847,16 @@ public class Privileges {
       super(condition, name);
     }
 
-    /** @return The instance with allow condition of the privilege. */
+    /**
+     * @return The instance with allow condition of the privilege.
+     */
     public static ManageGrants allow() {
       return ALLOW_INSTANCE;
     }
 
-    /** @return The instance with deny condition of the privilege. */
+    /**
+     * @return The instance with deny condition of the privilege.
+     */
     public static ManageGrants deny() {
       return DENY_INSTANCE;
     }
@@ -728,24 +867,28 @@ public class Privileges {
     }
   }
 
-  /** The privilege to create a model */
-  public static class CreateModel extends GenericPrivilege<CreateModel> {
-    private static final CreateModel ALLOW_INSTANCE =
-        new CreateModel(Condition.ALLOW, Name.CREATE_MODEL);
-    private static final CreateModel DENY_INSTANCE =
-        new CreateModel(Condition.DENY, Name.CREATE_MODEL);
+  /** The privilege to register a model */
+  public static class RegisterModel extends GenericPrivilege<RegisterModel> {
+    private static final RegisterModel ALLOW_INSTANCE =
+        new RegisterModel(Condition.ALLOW, Name.REGISTER_MODEL);
+    private static final RegisterModel DENY_INSTANCE =
+        new RegisterModel(Condition.DENY, Name.REGISTER_MODEL);
 
-    private CreateModel(Condition condition, Name name) {
+    private RegisterModel(Condition condition, Name name) {
       super(condition, name);
     }
 
-    /** @return The instance with allow condition of the privilege. */
-    public static CreateModel allow() {
+    /**
+     * @return The instance with allow condition of the privilege.
+     */
+    public static RegisterModel allow() {
       return ALLOW_INSTANCE;
     }
 
-    /** @return The instance with deny condition of the privilege. */
-    public static CreateModel deny() {
+    /**
+     * @return The instance with deny condition of the privilege.
+     */
+    public static RegisterModel deny() {
       return DENY_INSTANCE;
     }
 
@@ -764,12 +907,16 @@ public class Privileges {
       super(condition, name);
     }
 
-    /** @return The instance with allow condition of the privilege. */
+    /**
+     * @return The instance with allow condition of the privilege.
+     */
     public static UseModel allow() {
       return ALLOW_INSTANCE;
     }
 
-    /** @return The instance with deny condition of the privilege. */
+    /**
+     * @return The instance with deny condition of the privilege.
+     */
     public static UseModel deny() {
       return DENY_INSTANCE;
     }
@@ -780,7 +927,71 @@ public class Privileges {
     }
   }
 
+  /** The privilege to link a model version */
+  public static class LinkModelVersion extends GenericPrivilege<LinkModelVersion> {
+    private static final LinkModelVersion ALLOW_INSTANCE =
+        new LinkModelVersion(Condition.ALLOW, Name.LINK_MODEL_VERSION);
+    private static final LinkModelVersion DENY_INSTANCE =
+        new LinkModelVersion(Condition.DENY, Name.LINK_MODEL_VERSION);
+
+    private LinkModelVersion(Condition condition, Name name) {
+      super(condition, name);
+    }
+
+    /**
+     * @return The instance with allow condition of the privilege.
+     */
+    public static LinkModelVersion allow() {
+      return ALLOW_INSTANCE;
+    }
+
+    /**
+     * @return The instance with deny condition of the privilege.
+     */
+    public static LinkModelVersion deny() {
+      return DENY_INSTANCE;
+    }
+
+    @Override
+    public boolean canBindTo(MetadataObject.Type type) {
+      return MODEL_SUPPORTED_TYPES.contains(type);
+    }
+  }
+
+  /** The privilege to create a model. */
+  @Deprecated
+  public static class CreateModel extends GenericPrivilege<CreateModel> {
+    private static final CreateModel ALLOW_INSTANCE =
+        new CreateModel(Condition.ALLOW, Name.CREATE_MODEL);
+    private static final CreateModel DENY_INSTANCE =
+        new CreateModel(Condition.DENY, Name.CREATE_MODEL);
+
+    private CreateModel(Condition condition, Name name) {
+      super(condition, name);
+    }
+
+    /**
+     * @return The instance with allow condition of the privilege.
+     */
+    public static CreateModel allow() {
+      return ALLOW_INSTANCE;
+    }
+
+    /**
+     * @return The instance with deny condition of the privilege.
+     */
+    public static CreateModel deny() {
+      return DENY_INSTANCE;
+    }
+
+    @Override
+    public boolean canBindTo(MetadataObject.Type type) {
+      return SCHEMA_SUPPORTED_TYPES.contains(type);
+    }
+  }
+
   /** The privilege to create a model version */
+  @Deprecated
   public static class CreateModelVersion extends GenericPrivilege<CreateModelVersion> {
     private static final CreateModelVersion ALLOW_INSTANCE =
         new CreateModelVersion(Condition.ALLOW, Name.CREATE_MODEL_VERSION);
@@ -791,12 +1002,16 @@ public class Privileges {
       super(condition, name);
     }
 
-    /** @return The instance with allow condition of the privilege. */
+    /**
+     * @return The instance with allow condition of the privilege.
+     */
     public static CreateModelVersion allow() {
       return ALLOW_INSTANCE;
     }
 
-    /** @return The instance with deny condition of the privilege. */
+    /**
+     * @return The instance with deny condition of the privilege.
+     */
     public static CreateModelVersion deny() {
       return DENY_INSTANCE;
     }
@@ -804,6 +1019,304 @@ public class Privileges {
     @Override
     public boolean canBindTo(MetadataObject.Type type) {
       return MODEL_SUPPORTED_TYPES.contains(type);
+    }
+  }
+
+  /** The privilege to create a tag */
+  public static class CreateTag extends GenericPrivilege<CreateTag> {
+    private static final CreateTag ALLOW_INSTANCE = new CreateTag(Condition.ALLOW, Name.CREATE_TAG);
+    private static final CreateTag DENY_INSTANCE = new CreateTag(Condition.DENY, Name.CREATE_TAG);
+
+    /**
+     * Constructor for GenericPrivilege.
+     *
+     * @param condition the condition of the privilege
+     * @param name the name of the privilege
+     */
+    protected CreateTag(Condition condition, Name name) {
+      super(condition, name);
+    }
+
+    /**
+     * @return The instance with allow condition of the privilege.
+     */
+    public static CreateTag allow() {
+      return ALLOW_INSTANCE;
+    }
+
+    /**
+     * @return The instance with deny condition of the privilege.
+     */
+    public static CreateTag deny() {
+      return DENY_INSTANCE;
+    }
+
+    @Override
+    public boolean canBindTo(MetadataObject.Type type) {
+      return type == MetadataObject.Type.METALAKE;
+    }
+  }
+
+  /** The privilege to apply tag to object. */
+  public static final class ApplyTag extends GenericPrivilege<ApplyTag> {
+
+    private static final ApplyTag ALLOW_INSTANCE = new ApplyTag(Condition.ALLOW, Name.APPLY_TAG);
+    private static final ApplyTag DENY_INSTANCE = new ApplyTag(Condition.DENY, Name.APPLY_TAG);
+
+    /**
+     * Constructor for GenericPrivilege.
+     *
+     * @param condition the condition of the privilege
+     * @param name the name of the privilege
+     */
+    ApplyTag(Condition condition, Name name) {
+      super(condition, name);
+    }
+
+    /**
+     * @return The instance with allow condition of the privilege.
+     */
+    public static ApplyTag allow() {
+      return ALLOW_INSTANCE;
+    }
+
+    /**
+     * @return The instance with deny condition of the privilege.
+     */
+    public static ApplyTag deny() {
+      return DENY_INSTANCE;
+    }
+
+    @Override
+    public boolean canBindTo(MetadataObject.Type type) {
+      return type == MetadataObject.Type.METALAKE || type == MetadataObject.Type.TAG;
+    }
+  }
+
+  /** The privilege to create a tag */
+  public static class CreatePolicy extends GenericPrivilege<CreatePolicy> {
+    private static final CreatePolicy ALLOW_INSTANCE =
+        new CreatePolicy(Condition.ALLOW, Name.CREATE_POLICY);
+    private static final CreatePolicy DENY_INSTANCE =
+        new CreatePolicy(Condition.DENY, Name.CREATE_POLICY);
+
+    /**
+     * Constructor for GenericPrivilege.
+     *
+     * @param condition the condition of the privilege
+     * @param name the name of the privilege
+     */
+    protected CreatePolicy(Condition condition, Name name) {
+      super(condition, name);
+    }
+    /**
+     * @return The instance with allow condition of the privilege.
+     */
+    public static CreatePolicy allow() {
+      return ALLOW_INSTANCE;
+    }
+
+    /**
+     * @return The instance with deny condition of the privilege.
+     */
+    public static CreatePolicy deny() {
+      return DENY_INSTANCE;
+    }
+
+    @Override
+    public boolean canBindTo(MetadataObject.Type type) {
+      return type == MetadataObject.Type.METALAKE;
+    }
+  }
+
+  /** The privilege to run a job. */
+  public static class RunJob extends GenericPrivilege<RunJob> {
+    private static final RunJob ALLOW_INSTANCE = new RunJob(Condition.ALLOW, Name.RUN_JOB);
+    private static final RunJob DENY_INSTANCE = new RunJob(Condition.DENY, Name.RUN_JOB);
+
+    private RunJob(Condition condition, Name name) {
+      super(condition, name);
+    }
+
+    /**
+     * @return The instance with allow condition of the privilege.
+     */
+    public static RunJob allow() {
+      return ALLOW_INSTANCE;
+    }
+
+    /**
+     * @return The instance with deny condition of the privilege.
+     */
+    public static RunJob deny() {
+      return DENY_INSTANCE;
+    }
+
+    @Override
+    public boolean canBindTo(MetadataObject.Type type) {
+      return type == MetadataObject.Type.METALAKE;
+    }
+  }
+
+  /** The privilege to apply policy to object. */
+  public static final class ApplyPolicy extends GenericPrivilege<ApplyPolicy> {
+
+    private static final ApplyPolicy ALLOW_INSTANCE =
+        new ApplyPolicy(Condition.ALLOW, Name.APPLY_POLICY);
+    private static final ApplyPolicy DENY_INSTANCE =
+        new ApplyPolicy(Condition.DENY, Name.APPLY_POLICY);
+
+    /**
+     * Constructor for GenericPrivilege.
+     *
+     * @param condition the condition of the privilege
+     * @param name the name of the privilege
+     */
+    ApplyPolicy(Condition condition, Name name) {
+      super(condition, name);
+    }
+
+    /**
+     * @return The instance with allow condition of the privilege.
+     */
+    public static ApplyPolicy allow() {
+      return ALLOW_INSTANCE;
+    }
+
+    /**
+     * @return The instance with deny condition of the privilege.
+     */
+    public static ApplyPolicy deny() {
+      return DENY_INSTANCE;
+    }
+
+    @Override
+    public boolean canBindTo(MetadataObject.Type type) {
+      return type == MetadataObject.Type.METALAKE || type == MetadataObject.Type.POLICY;
+    }
+  }
+
+  /** The privilege to register a job template. */
+  public static class RegisterJobTemplate extends GenericPrivilege<RegisterJobTemplate> {
+    private static final RegisterJobTemplate ALLOW_INSTANCE =
+        new RegisterJobTemplate(Condition.ALLOW, Name.REGISTER_JOB_TEMPLATE);
+    private static final RegisterJobTemplate DENY_INSTANCE =
+        new RegisterJobTemplate(Condition.DENY, Name.REGISTER_JOB_TEMPLATE);
+
+    private RegisterJobTemplate(Condition condition, Name name) {
+      super(condition, name);
+    }
+
+    /**
+     * @return The instance with allow condition of the privilege.
+     */
+    public static RegisterJobTemplate allow() {
+      return ALLOW_INSTANCE;
+    }
+
+    /**
+     * @return The instance with deny condition of the privilege.
+     */
+    public static RegisterJobTemplate deny() {
+      return DENY_INSTANCE;
+    }
+
+    @Override
+    public boolean canBindTo(MetadataObject.Type type) {
+      return type == MetadataObject.Type.METALAKE;
+    }
+  }
+
+  /** The privilege to use a job template. */
+  public static class UseJobTemplate extends GenericPrivilege<UseJobTemplate> {
+    private static final UseJobTemplate ALLOW_INSTANCE =
+        new UseJobTemplate(Condition.ALLOW, Name.USE_JOB_TEMPLATE);
+    private static final UseJobTemplate DENY_INSTANCE =
+        new UseJobTemplate(Condition.DENY, Name.USE_JOB_TEMPLATE);
+
+    private UseJobTemplate(Condition condition, Name name) {
+      super(condition, name);
+    }
+
+    /**
+     * @return The instance with allow condition of the privilege.
+     */
+    public static UseJobTemplate allow() {
+      return ALLOW_INSTANCE;
+    }
+
+    /**
+     * @return The instance with deny condition of the privilege.
+     */
+    public static UseJobTemplate deny() {
+      return DENY_INSTANCE;
+    }
+
+    @Override
+    public boolean canBindTo(MetadataObject.Type type) {
+      return type == MetadataObject.Type.METALAKE || type == MetadataObject.Type.JOB_TEMPLATE;
+    }
+  }
+
+  /** The privilege to create a view. */
+  public static class CreateView extends GenericPrivilege<CreateView> {
+    private static final CreateView ALLOW_INSTANCE =
+        new CreateView(Condition.ALLOW, Name.CREATE_VIEW);
+    private static final CreateView DENY_INSTANCE =
+        new CreateView(Condition.DENY, Name.CREATE_VIEW);
+
+    private CreateView(Condition condition, Name name) {
+      super(condition, name);
+    }
+
+    /**
+     * @return The instance with allow condition of the privilege.
+     */
+    public static CreateView allow() {
+      return ALLOW_INSTANCE;
+    }
+
+    /**
+     * @return The instance with deny condition of the privilege.
+     */
+    public static CreateView deny() {
+      return DENY_INSTANCE;
+    }
+
+    @Override
+    public boolean canBindTo(MetadataObject.Type type) {
+      return SCHEMA_SUPPORTED_TYPES.contains(type);
+    }
+  }
+
+  /** The privilege to select data from a view. */
+  public static class SelectView extends GenericPrivilege<SelectView> {
+    private static final SelectView ALLOW_INSTANCE =
+        new SelectView(Condition.ALLOW, Name.SELECT_VIEW);
+    private static final SelectView DENY_INSTANCE =
+        new SelectView(Condition.DENY, Name.SELECT_VIEW);
+
+    private SelectView(Condition condition, Name name) {
+      super(condition, name);
+    }
+
+    /**
+     * @return The instance with allow condition of the privilege.
+     */
+    public static SelectView allow() {
+      return ALLOW_INSTANCE;
+    }
+
+    /**
+     * @return The instance with deny condition of the privilege.
+     */
+    public static SelectView deny() {
+      return DENY_INSTANCE;
+    }
+
+    @Override
+    public boolean canBindTo(MetadataObject.Type type) {
+      return VIEW_SUPPORTED_TYPES.contains(type);
     }
   }
 }

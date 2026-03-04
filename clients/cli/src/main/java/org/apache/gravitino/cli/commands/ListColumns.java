@@ -29,7 +29,9 @@ import org.apache.gravitino.rel.Column;
 /** Displays the details of a table's columns. */
 public class ListColumns extends TableCommand {
 
+  /** The name of the schema. */
   protected final String schema;
+  /** The name of the table. */
   protected final String table;
 
   /**

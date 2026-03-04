@@ -18,6 +18,8 @@
  */
 package org.apache.gravitino.connector;
 
+import static org.apache.gravitino.connector.BaseCatalogPropertiesMetadata.PROPERTY_METALAKE_IN_USE;
+
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Maps;
 import java.io.Closeable;
@@ -32,6 +34,8 @@ import org.apache.gravitino.connector.authorization.AuthorizationPlugin;
 import org.apache.gravitino.connector.authorization.BaseAuthorization;
 import org.apache.gravitino.connector.capability.Capability;
 import org.apache.gravitino.credential.CatalogCredentialManager;
+import org.apache.gravitino.exceptions.CatalogNotInUseException;
+import org.apache.gravitino.exceptions.MetalakeNotInUseException;
 import org.apache.gravitino.meta.CatalogEntity;
 import org.apache.gravitino.utils.IsolatedClassLoader;
 import org.slf4j.Logger;
@@ -175,6 +179,8 @@ public abstract class BaseCatalog<T extends BaseCatalog>
           Preconditions.checkArgument(
               entity != null && conf != null, "entity and conf must be set before calling ops()");
           CatalogOperations newOps = createOps(conf);
+          // Check metalake and catalog in use
+          checkMetalakeAndCatalogInUse();
           newOps.initialize(conf, entity.toCatalogInfo(), this);
           ops =
               newProxyPlugin(conf)
@@ -188,6 +194,54 @@ public abstract class BaseCatalog<T extends BaseCatalog>
     }
 
     return ops;
+  }
+
+  public void checkMetalakeAndCatalogInUse() {
+    Map<String, String> catalogProperties = entity.getProperties();
+    if (catalogProperties == null) {
+      return;
+    }
+
+    boolean metalakeInuse =
+        Boolean.parseBoolean(catalogProperties.getOrDefault(PROPERTY_METALAKE_IN_USE, "true"));
+    if (!metalakeInuse) {
+      throw new MetalakeNotInUseException(
+          "The metalake that holds catalog %s is not in use", entity.name());
+    }
+
+    // Check the stack and find whether its within method `dropCatalog` as we don't need to check
+    // the catalog in use status when dropping the catalog.
+    if (isInvokedBy("dropCatalog")) {
+      LOG.info("Skip checking catalog in use status since it's invoked by dropCatalog method.");
+      return;
+    }
+
+    boolean catalogInuse =
+        Boolean.parseBoolean(catalogProperties.getOrDefault(PROPERTY_IN_USE, "true"));
+    if (!catalogInuse) {
+      throw new CatalogNotInUseException("The catalog %s is not in use", entity.name());
+    }
+  }
+
+  public void checkMetalakeInUse() {
+    Map<String, String> catalogProperties = entity().getProperties();
+    String metaLakeInUseStr = catalogProperties.getOrDefault(PROPERTY_METALAKE_IN_USE, "true");
+    boolean metalakeInuse = Boolean.parseBoolean(metaLakeInUseStr);
+    if (!metalakeInuse) {
+      throw new MetalakeNotInUseException(
+          "Metalake %s is not in use, please enable it first", entity().name());
+    }
+  }
+
+  public boolean catalogInUse() {
+    Map<String, String> catalogProperties = entity().getProperties();
+    String catalogInUseStr = catalogProperties.getOrDefault(Catalog.PROPERTY_IN_USE, "true");
+    return Boolean.parseBoolean(catalogInUseStr);
+  }
+
+  private boolean isInvokedBy(String methodName) {
+    return StackWalker.getInstance()
+        .walk(frames -> frames.anyMatch(frame -> frame.getMethodName().equals(methodName)));
   }
 
   public AuthorizationPlugin getAuthorizationPlugin() {

@@ -23,6 +23,7 @@ import com.google.common.collect.Lists;
 import java.io.Closeable;
 import java.io.IOException;
 import java.time.Instant;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -38,7 +39,6 @@ import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.exceptions.NoSuchMetadataObjectException;
-import org.apache.gravitino.exceptions.UnmodifiableStatisticException;
 import org.apache.gravitino.lock.LockType;
 import org.apache.gravitino.lock.TreeLockUtils;
 import org.apache.gravitino.meta.AuditInfo;
@@ -56,7 +56,7 @@ import org.apache.gravitino.utils.PrincipalUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-public class StatisticManager implements Closeable {
+public class StatisticManager implements Closeable, StatisticDispatcher {
 
   private static final String OPTIONS_PREFIX = "gravitino.stats.partition.storageOption.";
   private static final Logger LOG = LoggerFactory.getLogger(StatisticManager.class);
@@ -70,7 +70,7 @@ public class StatisticManager implements Closeable {
     this.store = store;
     this.idGenerator = idGenerator;
     String className = config.get(Configs.PARTITION_STATS_STORAGE_FACTORY_CLASS);
-    Map<String, String> options = config.getConfigsWithPrefix(OPTIONS_PREFIX);
+    Map<String, String> options = buildStorageOptions(config);
     try {
       PartitionStatisticStorageFactory factory =
           (PartitionStatisticStorageFactory)
@@ -86,6 +86,57 @@ public class StatisticManager implements Closeable {
     }
   }
 
+  /**
+   * Builds storage options map by merging entity store JDBC configs (as defaults) with
+   * partition-specific configs (which override defaults).
+   *
+   * @param config the configuration
+   * @return merged options map
+   */
+  private Map<String, String> buildStorageOptions(Config config) {
+    Map<String, String> options = new HashMap<>();
+
+    // First, add entity store JDBC configs as defaults
+    // These will be used if partition-specific configs are not provided
+    String entityJdbcUrl = config.get(Configs.ENTITY_RELATIONAL_JDBC_BACKEND_URL);
+    if (entityJdbcUrl != null && !entityJdbcUrl.isEmpty()) {
+      options.put("jdbcUrl", entityJdbcUrl);
+    }
+
+    String entityJdbcDriver = config.get(Configs.ENTITY_RELATIONAL_JDBC_BACKEND_DRIVER);
+    if (entityJdbcDriver != null && !entityJdbcDriver.isEmpty()) {
+      options.put("jdbcDriver", entityJdbcDriver);
+    }
+
+    String entityJdbcUser = config.get(Configs.ENTITY_RELATIONAL_JDBC_BACKEND_USER);
+    if (entityJdbcUser != null && !entityJdbcUser.isEmpty()) {
+      options.put("jdbcUser", entityJdbcUser);
+    }
+
+    String entityJdbcPassword = config.get(Configs.ENTITY_RELATIONAL_JDBC_BACKEND_PASSWORD);
+    if (entityJdbcPassword != null && !entityJdbcPassword.isEmpty()) {
+      options.put("jdbcPassword", entityJdbcPassword);
+    }
+
+    Integer entityMaxConnections =
+        config.get(Configs.ENTITY_RELATIONAL_JDBC_BACKEND_MAX_CONNECTIONS);
+    if (entityMaxConnections != null) {
+      options.put("poolMaxSize", String.valueOf(entityMaxConnections));
+    }
+
+    Long entityWaitMs = config.get(Configs.ENTITY_RELATIONAL_JDBC_BACKEND_WAIT_MILLISECONDS);
+    if (entityWaitMs != null) {
+      options.put("connectionTimeoutMs", String.valueOf(entityWaitMs));
+    }
+
+    // Then, overlay partition-specific configs (these override entity store configs)
+    Map<String, String> partitionOptions = config.getConfigsWithPrefix(OPTIONS_PREFIX);
+    options.putAll(partitionOptions);
+
+    return options;
+  }
+
+  @Override
   public List<Statistic> listStatistics(String metalake, MetadataObject metadataObject) {
     try {
       NameIdentifier identifier = MetadataObjectUtil.toEntityIdent(metalake, metadataObject);
@@ -94,7 +145,8 @@ public class StatisticManager implements Closeable {
           identifier,
           LockType.READ,
           () ->
-              store.list(Namespace.fromString(identifier.toString()), StatisticEntity.class, type)
+              store
+                  .list(Namespace.fromString(identifier.toString()), StatisticEntity.class, type)
                   .stream()
                   .map(
                       entity -> {
@@ -122,6 +174,7 @@ public class StatisticManager implements Closeable {
     }
   }
 
+  @Override
   public void updateStatistics(
       String metalake, MetadataObject metadataObject, Map<String, StatisticValue<?>> statistics) {
     try {
@@ -170,9 +223,9 @@ public class StatisticManager implements Closeable {
     }
   }
 
+  @Override
   public boolean dropStatistics(
-      String metalake, MetadataObject metadataObject, List<String> statistics)
-      throws UnmodifiableStatisticException {
+      String metalake, MetadataObject metadataObject, List<String> statistics) {
     try {
       NameIdentifier identifier = MetadataObjectUtil.toEntityIdent(metalake, metadataObject);
       Entity.EntityType type = StatisticEntity.getStatisticType(metadataObject.type());
@@ -207,6 +260,7 @@ public class StatisticManager implements Closeable {
     }
   }
 
+  @Override
   public boolean dropPartitionStatistics(
       String metalake,
       MetadataObject metadataObject,
@@ -231,6 +285,7 @@ public class StatisticManager implements Closeable {
     }
   }
 
+  @Override
   public void updatePartitionStatistics(
       String metalake,
       MetadataObject metadataObject,
@@ -259,6 +314,7 @@ public class StatisticManager implements Closeable {
     }
   }
 
+  @Override
   public List<PartitionStatistics> listPartitionStatistics(
       String metalake, MetadataObject metadataObject, PartitionRange range) {
     try {

@@ -21,4 +21,6 @@ Gravitino has supported the following security features:
 
 ### [Access Control](access-control.md)
 
+### [Credential vending](credential-vending.md)
+
 ### [CORS](how-to-use-cors.md)

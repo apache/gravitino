@@ -27,8 +27,11 @@ import org.apache.gravitino.client.GravitinoClient;
 import org.apache.gravitino.exceptions.NoSuchMetalakeException;
 import org.apache.gravitino.exceptions.RoleAlreadyExistsException;
 
+/** Represent create a new role of a metalake */
 public class CreateRole extends Command {
+  /** The name of the metalake. */
   protected String metalake;
+  /** The array of roles. */
   protected String[] roles;
 
   /**

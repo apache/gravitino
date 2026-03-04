@@ -25,7 +25,6 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 import java.util.stream.Collectors;
-import javax.ws.rs.NotAuthorizedException;
 import javax.ws.rs.NotSupportedException;
 import org.apache.gravitino.EntityStore;
 import org.apache.gravitino.NameIdentifier;
@@ -47,9 +46,7 @@ public class CredentialOperationDispatcher extends OperationDispatcher {
     super(catalogManager, store, idGenerator);
   }
 
-  public List<Credential> getCredentials(NameIdentifier identifier) {
-    CredentialPrivilege privilege =
-        getCredentialPrivilege(PrincipalUtils.getCurrentUserName(), identifier);
+  public List<Credential> getCredentials(NameIdentifier identifier, CredentialPrivilege privilege) {
     return doWithCatalog(
         NameIdentifierUtil.getCatalogIdentifier(identifier),
         catalogWrapper ->
@@ -112,13 +109,16 @@ public class CredentialOperationDispatcher extends OperationDispatcher {
                   }
                   return new PathBasedCredentialContext(
                       PrincipalUtils.getCurrentUserName(), writePaths, readPaths);
-                }));
+                },
+                CredentialOperationDispatcher::mergeContexts));
   }
 
-  @SuppressWarnings("UnusedVariable")
-  private CredentialPrivilege getCredentialPrivilege(String user, NameIdentifier identifier)
-      throws NotAuthorizedException {
-    // TODO: will implement in another PR
-    return CredentialPrivilege.WRITE;
+  private static PathBasedCredentialContext mergeContexts(
+      CredentialContext oldValue, CredentialContext newValue) {
+    PathBasedCredentialContext oldContext = (PathBasedCredentialContext) oldValue;
+    PathBasedCredentialContext newContext = (PathBasedCredentialContext) newValue;
+    oldContext.getWritePaths().addAll(newContext.getWritePaths());
+    oldContext.getReadPaths().addAll(newContext.getReadPaths());
+    return oldContext;
   }
 }

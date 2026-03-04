@@ -31,7 +31,9 @@ public class RangePartitionDTO implements PartitionDTO, RangePartition {
   private final LiteralDTO upper;
   private final LiteralDTO lower;
 
-  /** @return A builder instance for {@link RangePartitionDTO}. */
+  /**
+   * @return A builder instance for {@link RangePartitionDTO}.
+   */
   public static Builder builder() {
     return new Builder();
   }
@@ -48,25 +50,33 @@ public class RangePartitionDTO implements PartitionDTO, RangePartition {
     this.lower = lower;
   }
 
-  /** @return The name of the partition. */
+  /**
+   * @return The name of the partition.
+   */
   @Override
   public String name() {
     return name;
   }
 
-  /** @return The upper bound. */
+  /**
+   * @return The upper bound.
+   */
   @Override
   public LiteralDTO upper() {
     return upper;
   }
 
-  /** @return The lower bound. */
+  /**
+   * @return The lower bound.
+   */
   @Override
   public LiteralDTO lower() {
     return lower;
   }
 
-  /** @return The properties. */
+  /**
+   * @return The properties.
+   */
   @Override
   public Map<String, String> properties() {
     return properties;
@@ -92,7 +102,9 @@ public class RangePartitionDTO implements PartitionDTO, RangePartition {
     return Objects.hash(name, properties, upper, lower);
   }
 
-  /** @return The type of the partition. */
+  /**
+   * @return The type of the partition.
+   */
   @Override
   public Type type() {
     return Type.RANGE;
@@ -149,7 +161,9 @@ public class RangePartitionDTO implements PartitionDTO, RangePartition {
       return this;
     }
 
-    /** @return The range partition instance. */
+    /**
+     * @return The range partition instance.
+     */
     public RangePartitionDTO build() {
       return new RangePartitionDTO(name, properties, upper, lower);
     }

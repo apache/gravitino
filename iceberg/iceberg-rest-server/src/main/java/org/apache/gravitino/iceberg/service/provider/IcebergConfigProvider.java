@@ -54,4 +54,13 @@ public interface IcebergConfigProvider extends Closeable {
   default String getMetalakeName() {
     return IcebergConstants.ICEBERG_REST_DEFAULT_METALAKE;
   }
+
+  /**
+   * Get default catalog name.
+   *
+   * @return the name of default catalog.
+   */
+  default String getDefaultCatalogName() {
+    return IcebergConstants.ICEBERG_REST_DEFAULT_CATALOG;
+  }
 }

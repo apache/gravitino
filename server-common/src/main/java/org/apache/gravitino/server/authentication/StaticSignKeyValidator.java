@@ -38,7 +38,8 @@ import java.util.Base64;
 import java.util.List;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.Config;
-import org.apache.gravitino.UserPrincipal;
+import org.apache.gravitino.auth.PrincipalMapper;
+import org.apache.gravitino.auth.PrincipalMapperFactory;
 import org.apache.gravitino.auth.SignatureAlgorithmFamilyType;
 import org.apache.gravitino.exceptions.UnauthorizedException;
 
@@ -52,6 +53,8 @@ import org.apache.gravitino.exceptions.UnauthorizedException;
 public class StaticSignKeyValidator implements OAuthTokenValidator {
   private long allowSkewSeconds;
   private Key defaultSigningKey;
+  private PrincipalMapper principalMapper;
+  private List<String> principalFields;
 
   @Override
   public void initialize(Config config) {
@@ -65,6 +68,11 @@ public class StaticSignKeyValidator implements OAuthTokenValidator {
         "The uri of the default OAuth server can't be blank");
     String algType = config.get(OAuthConfig.SIGNATURE_ALGORITHM_TYPE);
     this.defaultSigningKey = decodeSignKey(Base64.getDecoder().decode(configuredSignKey), algType);
+    this.principalFields = config.get(OAuthConfig.PRINCIPAL_FIELDS);
+    // Create principal mapper based on configuration
+    String mapperType = config.get(OAuthConfig.PRINCIPAL_MAPPER);
+    String regexPattern = config.get(OAuthConfig.PRINCIPAL_MAPPER_REGEX_PATTERN);
+    this.principalMapper = PrincipalMapperFactory.create(mapperType, regexPattern);
   }
 
   @Override
@@ -97,7 +105,12 @@ public class StaticSignKeyValidator implements OAuthTokenValidator {
         throw new UnauthorizedException(
             "Audiences in token is not in expected format: %s", audienceObject);
       }
-      return new UserPrincipal(jwt.getBody().getSubject());
+
+      // Extract principal from JWT claims using configured field(s)
+      String principal = extractPrincipal(jwt.getBody());
+
+      // Use principal mapper to extract username
+      return principalMapper.map(principal);
     } catch (ExpiredJwtException
         | UnsupportedJwtException
         | MalformedJwtException
@@ -107,22 +120,50 @@ public class StaticSignKeyValidator implements OAuthTokenValidator {
     }
   }
 
+  /** Extracts the principal from the JWT claims using configured field(s). */
+  private String extractPrincipal(Claims claims) {
+    // Try the principal field(s) one by one in order
+    if (principalFields != null && !principalFields.isEmpty()) {
+      for (String field : principalFields) {
+        if (StringUtils.isNotBlank(field)) {
+          Object claimValue = claims.get(field);
+          if (claimValue != null) {
+            return claimValue.toString();
+          }
+        }
+      }
+    }
+
+    throw new UnauthorizedException(
+        "No valid principal found in token. Checked fields: %s", principalFields);
+  }
+
   private static Key decodeSignKey(byte[] key, String algType) {
     try {
       SignatureAlgorithmFamilyType algFamilyType =
           SignatureAlgorithmFamilyType.valueOf(SignatureAlgorithm.valueOf(algType).getFamilyName());
 
-      if (SignatureAlgorithmFamilyType.HMAC == algFamilyType) {
-        return Keys.hmacShaKeyFor(key);
-      } else if (SignatureAlgorithmFamilyType.RSA == algFamilyType
-          || SignatureAlgorithmFamilyType.ECDSA == algFamilyType) {
-        X509EncodedKeySpec spec = new X509EncodedKeySpec(key);
-        KeyFactory kf = KeyFactory.getInstance(algFamilyType.name());
-        return kf.generatePublic(spec);
-      }
+      return generateKeyByFamilyType(algFamilyType, key, algType);
     } catch (Exception e) {
       throw new IllegalArgumentException("Failed to decode key", e);
     }
-    throw new IllegalArgumentException("Unsupported signature algorithm type: " + algType);
+  }
+
+  private static Key generateKeyByFamilyType(
+      SignatureAlgorithmFamilyType algFamilyType, byte[] key, String algType) throws Exception {
+
+    switch (algFamilyType) {
+      case RSA:
+        return KeyFactory.getInstance("RSA").generatePublic(new X509EncodedKeySpec(key));
+
+      case ECDSA:
+        return KeyFactory.getInstance("EC").generatePublic(new X509EncodedKeySpec(key));
+
+      case HMAC:
+        return Keys.hmacShaKeyFor(key);
+
+      default:
+        throw new IllegalArgumentException("Unsupported signature algorithm type: " + algType);
+    }
   }
 }

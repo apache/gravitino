@@ -19,10 +19,15 @@
 
 package org.apache.gravitino.cli;
 
+/** Represents the OAuth data required to authenticate with an OAuth server. */
 public class OAuthData {
+  /** The URI of the OAuth server. */
   protected final String serverURI;
+  /** The credential used for authentication. */
   protected final String credential;
+  /** The access token obtained after authentication. */
   protected final String token;
+  /** The scope of access granted by the OAuth token. */
   protected final String scope;
 
   /**

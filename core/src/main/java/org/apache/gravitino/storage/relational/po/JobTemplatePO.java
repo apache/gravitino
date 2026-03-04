@@ -111,6 +111,31 @@ public class JobTemplatePO {
     }
   }
 
+  public static JobTemplatePO updateJobTemplatePO(
+      JobTemplatePO oldJobTemplatePO,
+      JobTemplateEntity newJobTemplateEntity,
+      JobTemplatePOBuilder builder) {
+    try {
+      Long lastVersion = oldJobTemplatePO.lastVersion() + 1;
+      Long currentVersion = lastVersion;
+
+      return builder
+          .withJobTemplateId(newJobTemplateEntity.id())
+          .withJobTemplateName(newJobTemplateEntity.name())
+          .withJobTemplateComment(newJobTemplateEntity.comment())
+          .withJobTemplateContent(
+              JsonUtils.anyFieldMapper().writeValueAsString(newJobTemplateEntity.templateContent()))
+          .withAuditInfo(
+              JsonUtils.anyFieldMapper().writeValueAsString(newJobTemplateEntity.auditInfo()))
+          .withCurrentVersion(currentVersion)
+          .withLastVersion(lastVersion)
+          .withDeletedAt(DEFAULT_DELETED_AT)
+          .build();
+    } catch (JsonProcessingException e) {
+      throw new RuntimeException("Failed to serialize job template entity", e);
+    }
+  }
+
   public static JobTemplateEntity fromJobTemplatePO(
       JobTemplatePO jobTemplatePO, Namespace namespace) {
     try {

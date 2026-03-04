@@ -1,0 +1,28 @@
+CREATE SCHEMA
+
+CREATE TABLE
+
+INSERT: 4 rows
+
+"bob","14"
+"hoho","16"
+"nancy","15"
+"tom","12"
+
+DELETE: 1 row
+
+"hoho","16"
+"nancy","15"
+"tom","12"
+
+DELETE: 2 rows
+
+"hoho","16"
+
+DELETE: 1 row
+
+"0"
+
+DROP TABLE
+
+DROP SCHEMA

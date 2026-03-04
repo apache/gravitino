@@ -27,16 +27,27 @@ import org.apache.gravitino.Catalog;
  * Gravitino CLI. It also can validate if a given entity is a valid entity.
  */
 public class Providers {
+  /** Represents the Hive provider. */
   public static final String HIVE = "hive";
+  /** Represents the Hadoop provider. */
   public static final String HADOOP = "hadoop";
+  /** Represents the Iceberg provider. */
   public static final String ICEBERG = "iceberg";
+  /** Represents the MySQL provider. */
   public static final String MYSQL = "mysql";
+  /** Represents the Postgres provider. */
   public static final String POSTGRES = "postgres";
+  /** Represents the Kafka provider. */
   public static final String KAFKA = "kafka";
+  /** Represents the Doris provider. */
   public static final String DORIS = "doris";
+  /** Represents the paimon provider. */
   public static final String PAIMON = "paimon";
+  /** Represents the Hudi provider. */
   public static final String HUDI = "hudi";
+  /** Represents the OceanBase provider. */
   public static final String OCEANBASE = "oceanbase";
+  /** Represents the Model provider. */
   public static final String MODEL = "model";
 
   private static final HashSet<String> VALID_PROVIDERS = new HashSet<>();
@@ -65,6 +76,12 @@ public class Providers {
     return VALID_PROVIDERS.contains(provider);
   }
 
+  /**
+   * Returns the internal name of a given provider.
+   *
+   * @param provider The provider to get the internal name for.
+   * @return The internal name of the provider.
+   */
   public static String internal(String provider) {
     switch (provider) {
       case HIVE:
@@ -94,6 +111,12 @@ public class Providers {
     }
   }
 
+  /**
+   * Returns the catalog type for a given provider.
+   *
+   * @param provider The provider to get the catalog type for.
+   * @return The catalog type for the provider.
+   */
   public static Catalog.Type catalogType(String provider) {
     switch (provider) {
       case HADOOP:

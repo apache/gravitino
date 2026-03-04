@@ -15,9 +15,10 @@
 # specific language governing permissions and limitations
 # under the License.
 
+from __future__ import annotations
 
 from abc import ABC, abstractmethod
-from typing import ClassVar, Dict, List, Optional
+from typing import ClassVar, Optional
 
 from gravitino.api.auditable import Auditable
 from gravitino.api.metadata_object import MetadataObject
@@ -38,11 +39,11 @@ class AssociatedObjects(ABC):
         return 0 if objects is None else len(objects)
 
     @abstractmethod
-    def objects(self) -> Optional[List[MetadataObject]]:
+    def objects(self) -> Optional[list[MetadataObject]]:
         """Get the associated objects.
 
         Returns:
-            Optional[List[MetadataObject]]: The list of objects that are associated with this tag..
+            Optional[list[MetadataObject]]: The list of objects that are associated with this tag..
         """
         pass
 
@@ -68,7 +69,7 @@ class Tag(Auditable):
         Returns:
             str: The name of the tag.
         """
-        pass
+        raise NotImplementedError()
 
     @abstractmethod
     def comment(self) -> str:
@@ -77,16 +78,16 @@ class Tag(Auditable):
         Returns:
             str: The comment of the tag.
         """
-        pass
+        raise NotImplementedError()
 
     @abstractmethod
-    def properties(self) -> Dict[str, str]:
+    def properties(self) -> dict[str, str]:
         """Get the properties of the tag.
 
         Returns:
             Dict[str, str]: The properties of the tag.
         """
-        pass
+        raise NotImplementedError()
 
     @abstractmethod
     def inherited(self) -> Optional[bool]:
@@ -102,7 +103,7 @@ class Tag(Auditable):
                 True if the tag is inherited, false if it is owned by the object itself. Empty if the
                 tag is not associated with any object.
         """
-        pass
+        raise NotImplementedError()
 
     def associated_objects(self) -> AssociatedObjects:
         """The associated objects of the tag.
@@ -116,3 +117,28 @@ class Tag(Auditable):
         raise UnsupportedOperationException(
             "The associated_objects method is not supported."
         )
+
+    class AssociatedObjects(ABC):
+        """The interface of the associated objects of the tag."""
+
+        def count(self) -> int:
+            """
+            Retrieve the number of objects that are associated with this Tag
+
+            Returns:
+                int: The number of objects that are associated with this Tag
+            """
+            return 0 if (s := self.objects()) is None else len(s)
+
+        @abstractmethod
+        def objects(self) -> list[MetadataObject]:
+            """
+            Retrieve the list of objects that are associated with this tag.
+
+            Raises:
+                NotImplementedError: if the method is not implemented.
+
+            Returns:
+                list[MetadataObject]: The list of objects that are associated with this tag.
+            """
+            raise NotImplementedError()

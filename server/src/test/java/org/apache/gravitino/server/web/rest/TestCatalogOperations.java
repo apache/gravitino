@@ -20,6 +20,8 @@ package org.apache.gravitino.server.web.rest;
 
 import static javax.ws.rs.core.Response.Status.INTERNAL_SERVER_ERROR;
 import static org.apache.gravitino.Catalog.PROPERTY_IN_USE;
+import static org.apache.gravitino.Configs.CACHE_ENABLED;
+import static org.apache.gravitino.Configs.ENABLE_AUTHORIZATION;
 import static org.apache.gravitino.Configs.TREE_LOCK_CLEAN_INTERVAL;
 import static org.apache.gravitino.Configs.TREE_LOCK_MAX_NODE_IN_MEMORY;
 import static org.apache.gravitino.Configs.TREE_LOCK_MIN_NODE_IN_MEMORY;
@@ -95,7 +97,10 @@ public class TestCatalogOperations extends BaseOperationsTest {
     Mockito.doReturn(100000L).when(config).get(TREE_LOCK_MAX_NODE_IN_MEMORY);
     Mockito.doReturn(1000L).when(config).get(TREE_LOCK_MIN_NODE_IN_MEMORY);
     Mockito.doReturn(36000L).when(config).get(TREE_LOCK_CLEAN_INTERVAL);
+    Mockito.doReturn(false).when(config).get(CACHE_ENABLED);
+    Mockito.doReturn(false).when(config).get(ENABLE_AUTHORIZATION);
     FieldUtils.writeField(GravitinoEnv.getInstance(), "lockManager", new LockManager(config), true);
+    FieldUtils.writeField(GravitinoEnv.getInstance(), "config", config, true);
   }
 
   @Override
@@ -520,6 +525,7 @@ public class TestCatalogOperations extends BaseOperationsTest {
 
   @Test
   public void testSetCatalog() {
+    // Test enable catalog
     CatalogSetRequest req = new CatalogSetRequest(true);
     doNothing().when(manager).enableCatalog(any());
 
@@ -534,6 +540,7 @@ public class TestCatalogOperations extends BaseOperationsTest {
     BaseResponse baseResponse = resp.readEntity(BaseResponse.class);
     Assertions.assertEquals(0, baseResponse.getCode());
 
+    // Test disable catalog
     req = new CatalogSetRequest(false);
     doNothing().when(manager).disableCatalog(any());
 
@@ -547,6 +554,38 @@ public class TestCatalogOperations extends BaseOperationsTest {
     Assertions.assertEquals(Response.Status.OK.getStatusCode(), resp.getStatus());
     baseResponse = resp.readEntity(BaseResponse.class);
     Assertions.assertEquals(0, baseResponse.getCode());
+
+    // Test throw NoSuchCatalogException when enabling catalog
+    req = new CatalogSetRequest(true);
+    doThrow(new RuntimeException("mock error")).when(manager).enableCatalog(any());
+
+    resp =
+        target("/metalakes/metalake1/catalogs/catalog1")
+            .property(HttpUrlConnectorProvider.SET_METHOD_WORKAROUND, true)
+            .request(MediaType.APPLICATION_JSON_TYPE)
+            .accept("application/vnd.gravitino.v1+json")
+            .method("PATCH", Entity.entity(req, MediaType.APPLICATION_JSON_TYPE));
+
+    Assertions.assertEquals(INTERNAL_SERVER_ERROR.getStatusCode(), resp.getStatus());
+    ErrorResponse errorResponse = resp.readEntity(ErrorResponse.class);
+    Assertions.assertEquals(ErrorConstants.INTERNAL_ERROR_CODE, errorResponse.getCode());
+    Assertions.assertEquals(RuntimeException.class.getSimpleName(), errorResponse.getType());
+
+    // Test throw NoSuchCatalogException when disabling catalog
+    req = new CatalogSetRequest(false);
+    doThrow(new RuntimeException("mock error")).when(manager).disableCatalog(any());
+
+    resp =
+        target("/metalakes/metalake1/catalogs/catalog1")
+            .property(HttpUrlConnectorProvider.SET_METHOD_WORKAROUND, true)
+            .request(MediaType.APPLICATION_JSON_TYPE)
+            .accept("application/vnd.gravitino.v1+json")
+            .method("PATCH", Entity.entity(req, MediaType.APPLICATION_JSON_TYPE));
+
+    Assertions.assertEquals(INTERNAL_SERVER_ERROR.getStatusCode(), resp.getStatus());
+    ErrorResponse errorResponse1 = resp.readEntity(ErrorResponse.class);
+    Assertions.assertEquals(ErrorConstants.INTERNAL_ERROR_CODE, errorResponse1.getCode());
+    Assertions.assertEquals(RuntimeException.class.getSimpleName(), errorResponse1.getType());
   }
 
   private static TestCatalog buildCatalog(String metalake, String catalogName) {

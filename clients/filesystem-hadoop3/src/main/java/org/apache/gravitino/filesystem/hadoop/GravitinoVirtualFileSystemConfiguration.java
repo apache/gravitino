@@ -165,15 +165,30 @@ public class GravitinoVirtualFileSystemConfiguration {
       ImmutableList.of(FS_GRAVITINO_CLIENT_METALAKE_KEY, FS_GRAVITINO_CLIENT_AUTH_TYPE_KEY);
 
   /**
-   * The configuration key for whether to enable fileset catalog cache. The default is false. Note
-   * that this cache causes a side effect: if you modify the fileset or fileset catalog metadata,
-   * the client can not see the latest changes.
+   * The configuration key for whether to enable fileset and catalog cache. The default is false.
+   * Note that this cache causes a side effect: if you modify the fileset or fileset catalog
+   * metadata, the client can not see the latest changes.
    */
-  public static final String FS_GRAVITINO_FILESET_CATALOG_CACHE_ENABLE =
-      "fs.gravitino.filesetCatalog.cache.enable";
+  public static final String FS_GRAVITINO_FILESET_METADATA_CACHE_ENABLE =
+      "fs.gravitino.filesetMetadataCache.cache.enable";
 
-  /** The default value for whether to enable fileset catalog cache. */
-  public static final boolean FS_GRAVITINO_FILESET_CATALOG_CACHE_ENABLE_DEFAULT = false;
+  /** The default value for whether to enable fileset and catalog cache. */
+  public static final boolean FS_GRAVITINO_FILESET_METADATA_CACHE_ENABLE_DEFAULT = false;
+
+  /**
+   * The configuration key for whether to enable auto-creation of fileset location when the
+   * server-side filesystem ops are disabled and the location does not exist. The default is true.
+   */
+  public static final String FS_GRAVITINO_AUTO_CREATE_LOCATION = "fs.gravitino.autoCreateLocation";
+
+  /** The default value for whether to enable auto-creation of fileset location. */
+  public static final boolean FS_GRAVITINO_AUTO_CREATE_LOCATION_DEFAULT = true;
+
+  /**
+   * The prefix for user-defined location configs: {@code
+   * fs.path.config.<locationName>.<property_name>=<property_value>}.
+   */
+  public static final String FS_GRAVITINO_PATH_CONFIG_PREFIX = "fs.path.config.";
 
   private GravitinoVirtualFileSystemConfiguration() {}
 }
