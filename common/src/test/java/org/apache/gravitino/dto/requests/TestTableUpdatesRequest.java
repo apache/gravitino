@@ -309,4 +309,12 @@ public class TestTableUpdatesRequest {
     Assertions.assertEquals(
         JsonUtils.objectMapper().readTree(expected), JsonUtils.objectMapper().readTree(jsonString));
   }
+
+  @Test
+  public void testValidateEmptyUpdates() {
+    TableUpdatesRequest request = new TableUpdatesRequest(ImmutableList.of());
+    Throwable exception =
+        Assertions.assertThrows(IllegalArgumentException.class, request::validate);
+    Assertions.assertEquals("updates must not be empty", exception.getMessage());
+  }
 }
