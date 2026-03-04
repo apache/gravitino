@@ -60,7 +60,7 @@ public class DorisContainer extends BaseContainer {
   public static final int FE_HTTP_PORT = 8030;
   public static final int FE_MYSQL_PORT = 9030;
   public static final long STARTUP_TIMEOUT_SECONDS =
-      Long.parseLong(System.getenv().getOrDefault("GRAVITINO_CI_DORIS_STARTUP_TIMEOUT_SECONDS", "300"));
+      Long.parseLong(System.getenv().getOrDefault("GRAVITINO_CI_DORIS_STARTUP_TIMEOUT_SECONDS", "120"));
 
   private static final String FE_SERVICE = "doris-fe";
   private static final String BE_SERVICE = "doris-be";
