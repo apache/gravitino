@@ -37,6 +37,12 @@ public final class OptimizerCommandContext {
   private final String actionTime;
   private final String rangeSeconds;
   private final String partitionPathRaw;
+  private final String updateMode;
+  private final String targetFileSizeBytes;
+  private final String updaterOptions;
+  private final String updaterOptionsFile;
+  private final String sparkConf;
+  private final String sparkConfFile;
   private final Optional<StatisticsInputContent> statisticsInputContent;
   private final PrintStream output;
 
@@ -50,6 +56,12 @@ public final class OptimizerCommandContext {
       String actionTime,
       String rangeSeconds,
       String partitionPathRaw,
+      String updateMode,
+      String targetFileSizeBytes,
+      String updaterOptions,
+      String updaterOptionsFile,
+      String sparkConf,
+      String sparkConfFile,
       Optional<StatisticsInputContent> statisticsInputContent,
       PrintStream output) {
     this.optimizerEnv = optimizerEnv;
@@ -61,6 +73,12 @@ public final class OptimizerCommandContext {
     this.actionTime = actionTime;
     this.rangeSeconds = rangeSeconds;
     this.partitionPathRaw = partitionPathRaw;
+    this.updateMode = updateMode;
+    this.targetFileSizeBytes = targetFileSizeBytes;
+    this.updaterOptions = updaterOptions;
+    this.updaterOptionsFile = updaterOptionsFile;
+    this.sparkConf = sparkConf;
+    this.sparkConfFile = sparkConfFile;
     this.statisticsInputContent = statisticsInputContent;
     this.output = output;
   }
@@ -107,6 +125,30 @@ public final class OptimizerCommandContext {
 
   public String partitionPathRaw() {
     return partitionPathRaw;
+  }
+
+  public String updateMode() {
+    return updateMode;
+  }
+
+  public String targetFileSizeBytes() {
+    return targetFileSizeBytes;
+  }
+
+  public String updaterOptions() {
+    return updaterOptions;
+  }
+
+  public String updaterOptionsFile() {
+    return updaterOptionsFile;
+  }
+
+  public String sparkConf() {
+    return sparkConf;
+  }
+
+  public String sparkConfFile() {
+    return sparkConfFile;
   }
 
   public Optional<StatisticsInputContent> statisticsInputContent() {

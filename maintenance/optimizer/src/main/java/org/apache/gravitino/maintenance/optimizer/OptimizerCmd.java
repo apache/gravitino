@@ -53,6 +53,7 @@ import org.apache.gravitino.maintenance.optimizer.command.MonitorMetricsCommand;
 import org.apache.gravitino.maintenance.optimizer.command.OptimizerCommandContext;
 import org.apache.gravitino.maintenance.optimizer.command.OptimizerCommandExecutor;
 import org.apache.gravitino.maintenance.optimizer.command.SubmitStrategyJobsCommand;
+import org.apache.gravitino.maintenance.optimizer.command.SubmitUpdateStatsJobCommand;
 import org.apache.gravitino.maintenance.optimizer.command.UpdateStatisticsCommand;
 import org.apache.gravitino.maintenance.optimizer.command.rule.CommandRules;
 import org.apache.gravitino.maintenance.optimizer.common.OptimizerEnv;
@@ -114,7 +115,23 @@ public class OptimizerCmd {
               EnumSet.of(CliOption.IDENTIFIERS),
               EnumSet.noneOf(CliOption.class),
               "List stored job metrics.",
-              "./bin/gravitino-optimizer.sh --type list-job-metrics --identifiers c.db.job"));
+              "./bin/gravitino-optimizer.sh --type list-job-metrics --identifiers c.db.job"),
+          OptimizerCommandType.SUBMIT_UPDATE_STATS_JOB,
+          CommandOptionSpec.of(
+              EnumSet.of(CliOption.IDENTIFIERS),
+              EnumSet.of(
+                  CliOption.DRY_RUN,
+                  CliOption.LIMIT,
+                  CliOption.UPDATE_MODE,
+                  CliOption.TARGET_FILE_SIZE_BYTES,
+                  CliOption.UPDATER_OPTIONS,
+                  CliOption.UPDATER_OPTIONS_FILE,
+                  CliOption.SPARK_CONF,
+                  CliOption.SPARK_CONF_FILE),
+              "Submit built-in Iceberg update stats jobs for given table identifiers.",
+              "./bin/gravitino-optimizer.sh --type submit-update-stats-job --identifiers "
+                  + "rest.ab.t1,rest.ab.t2 --update-mode stats --dry-run",
+              updateStatsJobInputRules()));
   private static final Map<OptimizerCommandType, OptimizerCommandExecutor> COMMAND_HANDLERS =
       Map.of(
           OptimizerCommandType.SUBMIT_STRATEGY_JOBS, new SubmitStrategyJobsCommand(),
@@ -122,7 +139,8 @@ public class OptimizerCmd {
           OptimizerCommandType.APPEND_METRICS, new AppendMetricsCommand(),
           OptimizerCommandType.MONITOR_METRICS, new MonitorMetricsCommand(),
           OptimizerCommandType.LIST_TABLE_METRICS, new ListTableMetricsCommand(),
-          OptimizerCommandType.LIST_JOB_METRICS, new ListJobMetricsCommand());
+          OptimizerCommandType.LIST_JOB_METRICS, new ListJobMetricsCommand(),
+          OptimizerCommandType.SUBMIT_UPDATE_STATS_JOB, new SubmitUpdateStatsJobCommand());
   private static final String LOCAL_STATS_CALCULATOR_NAME = "local-stats-calculator";
 
   static {
@@ -164,6 +182,12 @@ public class OptimizerCmd {
           cmd.getOptionValue(
               CliOption.RANGE_SECONDS.longOpt(), Long.toString(DEFAULT_RANGE_SECONDS));
       String partitionPathRaw = cmd.getOptionValue(CliOption.PARTITION_PATH.longOpt());
+      String updateMode = cmd.getOptionValue(CliOption.UPDATE_MODE.longOpt());
+      String targetFileSizeBytes = cmd.getOptionValue(CliOption.TARGET_FILE_SIZE_BYTES.longOpt());
+      String updaterOptions = cmd.getOptionValue(CliOption.UPDATER_OPTIONS.longOpt());
+      String updaterOptionsFile = cmd.getOptionValue(CliOption.UPDATER_OPTIONS_FILE.longOpt());
+      String sparkConf = cmd.getOptionValue(CliOption.SPARK_CONF.longOpt());
+      String sparkConfFile = cmd.getOptionValue(CliOption.SPARK_CONF_FILE.longOpt());
       String statisticsPayload = cmd.getOptionValue(CliOption.STATISTICS_PAYLOAD.longOpt());
       String filePath = cmd.getOptionValue(CliOption.FILE_PATH.longOpt());
       Optional<StatisticsInputContent> statisticsInputContent =
@@ -179,6 +203,12 @@ public class OptimizerCmd {
               actionTime,
               rangeSeconds,
               partitionPathRaw,
+              updateMode,
+              targetFileSizeBytes,
+              updaterOptions,
+              updaterOptionsFile,
+              sparkConf,
+              sparkConfFile,
               statisticsInputContent,
               out);
       executeCommand(optimizerType, context);
@@ -306,6 +336,17 @@ public class OptimizerCmd {
             List.of(CliOption.STATISTICS_PAYLOAD.longOpt(), CliOption.FILE_PATH.longOpt()),
             "--statistics-payload and --file-path are only supported when --calculator-name is %s.",
             LOCAL_STATS_CALCULATOR_NAME)
+        .build();
+  }
+
+  private static CommandRules.ValidationPlan updateStatsJobInputRules() {
+    return CommandRules.newBuilder()
+        .addMutuallyExclusive(
+            List.of(CliOption.UPDATER_OPTIONS.longOpt(), CliOption.UPDATER_OPTIONS_FILE.longOpt()),
+            "--updater-options and --updater-options-file cannot be used together")
+        .addMutuallyExclusive(
+            List.of(CliOption.SPARK_CONF.longOpt(), CliOption.SPARK_CONF_FILE.longOpt()),
+            "--spark-conf and --spark-conf-file cannot be used together")
         .build();
   }
 
@@ -461,7 +502,37 @@ public class OptimizerCmd {
         CliOptionArgType.SINGLE,
         null,
         "Partition path for monitor-metrics "
-            + "(JSON array, for example: [{\"p1\":\"v1\"},{\"p2\":\"v2\"}])");
+            + "(JSON array, for example: [{\"p1\":\"v1\"},{\"p2\":\"v2\"}])"),
+    UPDATE_MODE(
+        "update-mode",
+        CliOptionArgType.SINGLE,
+        null,
+        "Update mode for submit-update-stats-job: stats|metrics|all"),
+    TARGET_FILE_SIZE_BYTES(
+        "target-file-size-bytes",
+        CliOptionArgType.SINGLE,
+        null,
+        "Target file size bytes for submit-update-stats-job"),
+    UPDATER_OPTIONS(
+        "updater-options",
+        CliOptionArgType.SINGLE,
+        null,
+        "JSON map for updater options in submit-update-stats-job"),
+    UPDATER_OPTIONS_FILE(
+        "updater-options-file",
+        CliOptionArgType.SINGLE,
+        null,
+        "Path to JSON file for updater options in submit-update-stats-job"),
+    SPARK_CONF(
+        "spark-conf",
+        CliOptionArgType.SINGLE,
+        null,
+        "JSON map for Spark configs in submit-update-stats-job"),
+    SPARK_CONF_FILE(
+        "spark-conf-file",
+        CliOptionArgType.SINGLE,
+        null,
+        "Path to JSON file for Spark configs in submit-update-stats-job");
 
     private final String longOpt;
     private final CliOptionArgType argType;
@@ -509,7 +580,8 @@ public class OptimizerCmd {
     APPEND_METRICS,
     MONITOR_METRICS,
     LIST_TABLE_METRICS,
-    LIST_JOB_METRICS;
+    LIST_JOB_METRICS,
+    SUBMIT_UPDATE_STATS_JOB;
 
     public static String allValues() {
       return Arrays.stream(values())
