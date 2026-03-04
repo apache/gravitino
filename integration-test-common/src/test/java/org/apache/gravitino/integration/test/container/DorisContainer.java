@@ -60,7 +60,8 @@ public class DorisContainer extends BaseContainer {
   public static final int FE_HTTP_PORT = 8030;
   public static final int FE_MYSQL_PORT = 9030;
   public static final long STARTUP_TIMEOUT_SECONDS =
-      Long.parseLong(System.getenv().getOrDefault("GRAVITINO_CI_DORIS_STARTUP_TIMEOUT_SECONDS", "120"));
+      Long.parseLong(
+          System.getenv().getOrDefault("GRAVITINO_CI_DORIS_STARTUP_TIMEOUT_SECONDS", "120"));
 
   private static final String FE_SERVICE = "doris-fe";
   private static final String BE_SERVICE = "doris-be";
@@ -108,7 +109,8 @@ public class DorisContainer extends BaseContainer {
             .withExposedService(
                 FE_SERVICE,
                 FE_MYSQL_PORT,
-                Wait.forListeningPort().withStartupTimeout(Duration.ofSeconds(STARTUP_TIMEOUT_SECONDS)))
+                Wait.forListeningPort()
+                    .withStartupTimeout(Duration.ofSeconds(STARTUP_TIMEOUT_SECONDS)))
             .withExposedService(FE_SERVICE, FE_HTTP_PORT)
             .withScaledService(BE_SERVICE, BE_SCALE)
             .withStartupTimeout(Duration.ofSeconds(STARTUP_TIMEOUT_SECONDS))
@@ -122,7 +124,8 @@ public class DorisContainer extends BaseContainer {
               BE_SERVICE,
               i,
               BE_HEARTBEAT_PORT,
-              Wait.forListeningPort().withStartupTimeout(Duration.ofSeconds(STARTUP_TIMEOUT_SECONDS)))
+              Wait.forListeningPort()
+                  .withStartupTimeout(Duration.ofSeconds(STARTUP_TIMEOUT_SECONDS)))
           .withExposedService(BE_SERVICE, i, BE_WEBSERVER_PORT);
     }
   }
