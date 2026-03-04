@@ -19,11 +19,23 @@
 
 package org.apache.gravitino.maintenance.optimizer.updater.metrics.storage;
 
-/** Serializable metric record used by {@link MetricsRepository}. */
-public interface MetricRecord {
-  /** Timestamp in epoch seconds. */
-  long getTimestamp();
+/** Immutable test-only {@link MetricRecord} implementation. */
+public class MetricRecordImpl implements MetricRecord {
+  private final long timestamp;
+  private final String value;
 
-  /** Encoded metric value. */
-  String getValue();
+  public MetricRecordImpl(long timestamp, String value) {
+    this.timestamp = timestamp;
+    this.value = value;
+  }
+
+  @Override
+  public long getTimestamp() {
+    return timestamp;
+  }
+
+  @Override
+  public String getValue() {
+    return value;
+  }
 }

@@ -21,10 +21,12 @@ package org.apache.gravitino.maintenance.optimizer.updater;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.util.Comparator;
 import java.util.List;
 import org.apache.gravitino.NameIdentifier;
+import org.apache.gravitino.maintenance.optimizer.api.common.DataScope;
 import org.apache.gravitino.maintenance.optimizer.common.OptimizerEnv;
 import org.apache.gravitino.maintenance.optimizer.common.conf.OptimizerConfig;
 import org.junit.jupiter.api.AfterEach;
@@ -54,7 +56,7 @@ public class TestUpdater {
     assertNotNull(metricsUpdater);
     assertEquals(1, statisticsUpdater.tableUpdates());
     assertEquals(1, statisticsUpdater.partitionUpdates());
-    assertEquals(0, metricsUpdater.tableUpdates());
+    assertEquals(0, metricsUpdater.tableAndPartitionUpdates());
     assertEquals(0, metricsUpdater.jobUpdates());
   }
 
@@ -73,8 +75,34 @@ public class TestUpdater {
     assertNotNull(metricsUpdater);
     assertEquals(0, statisticsUpdater.tableUpdates());
     assertEquals(0, statisticsUpdater.partitionUpdates());
-    assertEquals(1, metricsUpdater.tableUpdates());
+    assertEquals(1, metricsUpdater.tableAndPartitionUpdates());
     assertEquals(1, metricsUpdater.jobUpdates());
+    assertTrue(
+        metricsUpdater.lastTableAndPartitionMetrics().stream()
+            .allMatch(metric -> metric.timestampSeconds() == 123L));
+    assertTrue(
+        metricsUpdater.lastJobMetrics().stream()
+            .anyMatch(metric -> metric.scope() == DataScope.Type.JOB));
+  }
+
+  @Test
+  void testUpdateMetricsBatchAcrossIdentifiers() {
+    OptimizerEnv optimizerEnv =
+        mockOptimizerEnv(StatisticsUpdaterForTest.NAME, MetricsUpdaterForTest.NAME);
+    List<NameIdentifier> identifiers =
+        List.of(
+            NameIdentifier.of("catalog", "schema", "table1"),
+            NameIdentifier.of("catalog", "schema", "table2"));
+
+    createUpdater(optimizerEnv)
+        .update(StatisticsCalculatorForTest.NAME, identifiers, UpdateType.METRICS);
+
+    MetricsUpdaterForTest metricsUpdater = selectMetricsUpdater();
+    assertNotNull(metricsUpdater);
+    assertEquals(1, metricsUpdater.tableAndPartitionUpdates());
+    assertEquals(1, metricsUpdater.jobUpdates());
+    assertEquals(6, metricsUpdater.lastTableAndPartitionMetrics().size());
+    assertEquals(2, metricsUpdater.lastJobMetrics().size());
   }
 
   @Test
@@ -90,7 +118,7 @@ public class TestUpdater {
     assertNotNull(metricsUpdater);
     assertEquals(1, statisticsUpdater.tableUpdates());
     assertEquals(1, statisticsUpdater.partitionUpdates());
-    assertEquals(0, metricsUpdater.tableUpdates());
+    assertEquals(0, metricsUpdater.tableAndPartitionUpdates());
     assertEquals(0, metricsUpdater.jobUpdates());
   }
 
@@ -107,8 +135,14 @@ public class TestUpdater {
     assertNotNull(metricsUpdater);
     assertEquals(0, statisticsUpdater.tableUpdates());
     assertEquals(0, statisticsUpdater.partitionUpdates());
-    assertEquals(1, metricsUpdater.tableUpdates());
+    assertEquals(1, metricsUpdater.tableAndPartitionUpdates());
     assertEquals(1, metricsUpdater.jobUpdates());
+    assertTrue(
+        metricsUpdater.lastTableAndPartitionMetrics().stream()
+            .allMatch(metric -> metric.timestampSeconds() == 123L));
+    assertTrue(
+        metricsUpdater.lastJobMetrics().stream()
+            .anyMatch(metric -> metric.scope() == DataScope.Type.JOB));
   }
 
   @Test
@@ -144,7 +178,10 @@ public class TestUpdater {
     return MetricsUpdaterForTest.instances().stream()
         .max(
             Comparator.comparingInt(
-                updater -> updater.tableUpdates() + updater.jobUpdates() + updater.closeCalls()))
+                updater ->
+                    updater.tableAndPartitionUpdates()
+                        + updater.jobUpdates()
+                        + updater.closeCalls()))
         .orElse(null);
   }
 
