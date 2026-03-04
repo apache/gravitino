@@ -84,9 +84,9 @@ public abstract class JobTemplate {
    * <p>Two consecutive optional arguments can form a flag-value pair. When the flag (the first
    * element) is a literal and the value placeholder (the second element) resolves to empty, both
    * elements are dropped together. For example, given the pair {@code ["?--strategy",
-   * "?{{strategy}}"]} and a job configuration that does not contain {@code strategy}, both
-   * {@code --strategy} and the placeholder are omitted. If {@code strategy=binpack} is supplied,
-   * both elements are included as {@code --strategy binpack}.
+   * "?{{strategy}}"]} and a job configuration that does not contain {@code strategy}, both {@code
+   * --strategy} and the placeholder are omitted. If {@code strategy=binpack} is supplied, both
+   * elements are included as {@code --strategy binpack}.
    *
    * <p>Independent optional placeholders such as {@code ["?{{opt1}}", "?{{opt2}}"]} are evaluated
    * individually: {@code opt1} and {@code opt2} are each included or excluded based solely on
