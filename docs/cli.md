@@ -1065,4 +1065,6 @@ gcli.sh model set --name catalog_model.schema.model --version 0 --property k --v
 gcli.sh model remove --name catalog_model.schema.model --version 0 --property k
 ```
 
+To link a model version you need to specify the model version artifact URIs and at least one alias. The URIs are specified as a comma separated list of protocol=URI pairs. The alias is used to refer to the model version and must be unique across the metalake.
+
 <img src="https://analytics.apache.org/matomo.php?idsite=62&rec=1&bots=1&action_name=CLI" alt="" />
