@@ -367,8 +367,8 @@ public abstract class SparkAuthorizationIT extends BaseIT {
       // Clean up
       try {
         tableCatalog.dropTable(NameIdentifier.of(JDBC_DATABASE, testTable));
-      } catch (Exception ignored) {
-        // Ignore cleanup errors
+      } catch (Exception e) {
+        Assertions.fail("Failed to drop test table " + testTable, e);
       }
       gravitinoMetalake.revokeRolesFromUser(ImmutableList.of(testRole), NORMAL_USER);
       gravitinoMetalake.deleteRole(testRole);
