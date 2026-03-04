@@ -31,14 +31,14 @@ val icebergVersion: String = libs.versions.iceberg.get()
 val scalaCollectionCompatVersion: String = libs.versions.scala.collection.compat.get()
 
 dependencies {
-  implementation(project(":api")) {
+  compileOnly(project(":api")) {
     exclude("*")
   }
   implementation(project(":catalogs:catalog-common"))
-  implementation(project(":common")) {
+  compileOnly(project(":common")) {
     exclude("*")
   }
-  implementation(project(":core")) {
+  compileOnly(project(":core")) {
     exclude("*")
   }
   implementation(project(":iceberg:iceberg-common"))
@@ -60,6 +60,9 @@ dependencies {
   compileOnly(libs.lombok)
 
   testImplementation(project(":catalogs:catalog-jdbc-common", "testArtifacts"))
+  testImplementation(project(":api"))
+  testImplementation(project(":common"))
+  testImplementation(project(":core"))
   testImplementation(project(":clients:client-java"))
   testImplementation(project(":integration-test-common", "testArtifacts"))
   testImplementation(project(":server"))

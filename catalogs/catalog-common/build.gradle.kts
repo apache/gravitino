@@ -23,7 +23,7 @@ plugins {
 
 // try to avoid adding extra dependencies because it is used by catalogs and connectors.
 dependencies {
-  implementation(project(":common")) {
+  compileOnly(project(":common")) {
     exclude("*")
   }
 
@@ -33,6 +33,7 @@ dependencies {
   implementation(libs.slf4j.api)
 
   testImplementation(libs.junit.jupiter.api)
+  testImplementation(project(":common"))
   testImplementation(libs.junit.jupiter.params)
 
   testRuntimeOnly(libs.junit.jupiter.engine)

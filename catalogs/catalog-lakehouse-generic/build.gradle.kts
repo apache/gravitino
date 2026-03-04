@@ -25,14 +25,14 @@ plugins {
 }
 
 dependencies {
-  implementation(project(":api")) {
+  compileOnly(project(":api")) {
     exclude("*")
   }
   implementation(project(":catalogs:catalog-common"))
-  implementation(project(":common")) {
+  compileOnly(project(":common")) {
     exclude("*")
   }
-  implementation(project(":core")) {
+  compileOnly(project(":core")) {
     exclude("*")
   }
   implementation(project(":lance:lance-common")) {
@@ -49,6 +49,9 @@ dependencies {
   compileOnly(libs.lombok)
 
   testImplementation(project(":clients:client-java"))
+  testImplementation(project(":api"))
+  testImplementation(project(":common"))
+  testImplementation(project(":core"))
   testImplementation(project(":integration-test-common", "testArtifacts"))
   testImplementation(project(":server"))
   testImplementation(project(":server-common"))

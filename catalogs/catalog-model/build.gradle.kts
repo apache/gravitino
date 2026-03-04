@@ -25,23 +25,26 @@ plugins {
 }
 
 dependencies {
-  implementation(project(":api")) {
+  compileOnly(project(":api")) {
     exclude(group = "*")
   }
 
   implementation(project(":catalogs:catalog-common")) {
     exclude(group = "*")
   }
-  implementation(project(":common")) {
+  compileOnly(project(":common")) {
     exclude(group = "*")
   }
-  implementation(project(":core")) {
+  compileOnly(project(":core")) {
     exclude(group = "*")
   }
   implementation(libs.guava)
   implementation(libs.slf4j.api)
 
   testImplementation(project(":clients:client-java"))
+  testImplementation(project(":api"))
+  testImplementation(project(":common"))
+  testImplementation(project(":core"))
   testImplementation(project(":integration-test-common", "testArtifacts"))
   testImplementation(project(":server"))
   testImplementation(project(":server-common"))

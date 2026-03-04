@@ -38,10 +38,10 @@ artifacts {
 }
 
 dependencies {
-  implementation(project(":api"))
+  compileOnly(project(":api"))
   implementation(project(":catalogs:catalog-common"))
-  implementation(project(":common"))
-  implementation(project(":core"))
+  compileOnly(project(":common"))
+  compileOnly(project(":core"))
 
   implementation(libs.bundles.log4j)
   implementation(libs.commons.collections4)
@@ -54,6 +54,9 @@ dependencies {
   implementation(libs.jackson.datatype.jsr310)
 
   testImplementation(libs.commons.io)
+  testImplementation(project(":api"))
+  testImplementation(project(":common"))
+  testImplementation(project(":core"))
   testImplementation(libs.junit.jupiter.api)
   testImplementation(libs.junit.jupiter.params)
   testImplementation(libs.sqlite.jdbc)

@@ -24,17 +24,17 @@ plugins {
 }
 
 dependencies {
-  implementation(project(":api")) {
+  compileOnly(project(":api")) {
     exclude("*")
   }
 
   implementation(project(":catalogs:catalog-common")) {
     exclude("*")
   }
-  implementation(project(":common")) {
+  compileOnly(project(":common")) {
     exclude("*")
   }
-  implementation(project(":core")) {
+  compileOnly(project(":core")) {
     exclude("*")
   }
   implementation(project(":clients:client-java-runtime", configuration = "shadow"))
@@ -51,6 +51,9 @@ dependencies {
   annotationProcessor(libs.lombok)
 
   testImplementation(libs.bundles.log4j)
+  testImplementation(project(":api"))
+  testImplementation(project(":common"))
+  testImplementation(project(":core"))
   testImplementation(libs.commons.collections3)
   testImplementation(libs.commons.configuration1)
   testImplementation(libs.datanucleus.core)

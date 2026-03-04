@@ -25,7 +25,7 @@ plugins {
 }
 
 dependencies {
-  implementation(project(":api")) {
+  compileOnly(project(":api")) {
     exclude(group = "*")
   }
   implementation(project(":catalogs:catalog-common")) {
@@ -34,10 +34,10 @@ dependencies {
   implementation(project(":catalogs:hadoop-common")) {
     exclude(group = "*")
   }
-  implementation(project(":common")) {
+  compileOnly(project(":common")) {
     exclude(group = "*")
   }
-  implementation(project(":core")) {
+  compileOnly(project(":core")) {
     exclude(group = "*")
   }
   implementation(libs.awaitility)
@@ -54,6 +54,9 @@ dependencies {
   compileOnly(libs.guava)
 
   testImplementation(project(":clients:client-java"))
+  testImplementation(project(":api"))
+  testImplementation(project(":common"))
+  testImplementation(project(":core"))
   testImplementation(project(":bundles:aws-bundle", configuration = "shadow"))
   testImplementation(project(":bundles:gcp-bundle", configuration = "shadow"))
   testImplementation(project(":bundles:aliyun-bundle", configuration = "shadow"))

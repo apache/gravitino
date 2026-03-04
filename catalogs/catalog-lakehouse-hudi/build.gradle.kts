@@ -30,17 +30,17 @@ val sparkVersion = fullSparkVersion.split(".").take(2).joinToString(".")
 val hudiVersion = libs.versions.hudi.get()
 
 dependencies {
-  implementation(project(":api")) {
+  compileOnly(project(":api")) {
     exclude("*")
   }
   implementation(project(":catalogs:catalog-common")) {
     exclude("*")
   }
   implementation(project(":catalogs:hive-metastore-common"))
-  implementation(project(":core")) {
+  compileOnly(project(":core")) {
     exclude("*")
   }
-  implementation(project(":common")) {
+  compileOnly(project(":common")) {
     exclude("*")
   }
 
@@ -64,6 +64,9 @@ dependencies {
   annotationProcessor(libs.lombok)
 
   testImplementation(project(":catalogs:hive-metastore-common", "testArtifacts"))
+  testImplementation(project(":api"))
+  testImplementation(project(":common"))
+  testImplementation(project(":core"))
   testImplementation(project(":clients:client-java")) {
     exclude("org.apache.logging.log4j")
   }

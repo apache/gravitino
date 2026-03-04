@@ -23,8 +23,8 @@ plugins {
 
 // try to avoid adding extra dependencies because it is used by catalogs and connectors.
 dependencies {
-  implementation(project(":api"))
-  implementation(project(":common"))
+  compileOnly(project(":api"))
+  compileOnly(project(":common"))
 
   implementation(libs.cglib)
   implementation(libs.commons.lang3)
@@ -35,6 +35,8 @@ dependencies {
   implementation(libs.slf4j.api)
 
   testImplementation(libs.junit.jupiter.api)
+  testImplementation(project(":api"))
+  testImplementation(project(":common"))
   testImplementation(libs.junit.jupiter.params)
 
   testRuntimeOnly(libs.junit.jupiter.engine)
