@@ -20,17 +20,16 @@
 package org.apache.gravitino.maintenance.optimizer.integration.test;
 
 import com.google.common.collect.ImmutableMap;
-import java.lang.reflect.Method;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
+import java.util.UUID;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.maintenance.optimizer.api.common.PartitionEntry;
 import org.apache.gravitino.maintenance.optimizer.api.common.PartitionPath;
 import org.apache.gravitino.maintenance.optimizer.api.recommender.JobExecutionContext;
-import org.apache.gravitino.maintenance.optimizer.api.recommender.StrategyEvaluation;
 import org.apache.gravitino.maintenance.optimizer.api.updater.StatisticsUpdater;
 import org.apache.gravitino.maintenance.optimizer.common.PartitionEntryImpl;
 import org.apache.gravitino.maintenance.optimizer.common.StatisticEntryImpl;
@@ -55,6 +54,7 @@ public class RecommenderIT extends GravitinoOptimizerEnvIT {
   private static final String STATISTICS_PREFIX = "custom-";
   private static final String DATAFILE_MSE = STATISTICS_PREFIX + "datafile_size_mse";
   private static final String DELETE_FILE_NUM = STATISTICS_PREFIX + "position_delete_file_number";
+  private static final String SESSION_ID = "recommender-it-" + UUID.randomUUID();
 
   private StatisticsUpdater statisticsUpdater;
 
@@ -65,7 +65,11 @@ public class RecommenderIT extends GravitinoOptimizerEnvIT {
             + "strategyHandler."
             + CompactionStrategyHandler.NAME
             + ".className",
-        CompactionStrategyHandler.class.getName());
+        CompactionStrategyHandler.class.getName(),
+        OptimizerConfig.JOB_SUBMITTER_CONFIG.getKey(),
+        RecordingJobSubmitterForIT.NAME,
+        RecordingJobSubmitterForIT.SESSION_ID_KEY,
+        SESSION_ID);
   }
 
   @BeforeAll
@@ -175,6 +179,7 @@ public class RecommenderIT extends GravitinoOptimizerEnvIT {
             DELETE_FILE_NUM + " * 100 + " + DATAFILE_MSE),
         CompactionStrategyHandler.NAME);
     associatePoliciesToTable(policyName, tableName);
+    associatePoliciesToTable(policyName, tableName2);
 
     List<PartitionEntry> partition1 =
         Arrays.asList(new PartitionEntryImpl("col1", "1"), new PartitionEntryImpl("col2", "3"));
@@ -257,27 +262,12 @@ public class RecommenderIT extends GravitinoOptimizerEnvIT {
 
   private List<JobExecutionContext> recommendForOneStrategy(
       Recommender recommender, List<NameIdentifier> identifiers, String strategyName) {
+    RecordingJobSubmitterForIT.reset(SESSION_ID);
     try {
-      Method method =
-          Recommender.class.getDeclaredMethod("recommendForOneStrategy", List.class, String.class);
-      method.setAccessible(true);
-      @SuppressWarnings("unchecked")
-      List<StrategyEvaluation> evaluations =
-          (List<StrategyEvaluation>) method.invoke(recommender, identifiers, strategyName);
-      return evaluations.stream()
-          .map(
-              evaluation ->
-                  evaluation
-                      .jobExecutionContext()
-                      .orElseThrow(
-                          () ->
-                              new IllegalStateException(
-                                  String.format(
-                                      "Job execution context is missing for strategy %s",
-                                      strategyName))))
-          .toList();
-    } catch (ReflectiveOperationException e) {
-      throw new IllegalStateException("Failed to invoke recommender internals", e);
+      recommender.submitForStrategyName(identifiers, strategyName, Integer.MAX_VALUE);
+      return RecordingJobSubmitterForIT.submittedContexts(SESSION_ID);
+    } finally {
+      RecordingJobSubmitterForIT.clear(SESSION_ID);
     }
   }
 }

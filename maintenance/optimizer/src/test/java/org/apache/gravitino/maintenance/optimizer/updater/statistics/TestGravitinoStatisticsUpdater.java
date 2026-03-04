@@ -19,7 +19,6 @@
 
 package org.apache.gravitino.maintenance.optimizer.updater.statistics;
 
-import java.lang.reflect.Field;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -57,7 +56,7 @@ class TestGravitinoStatisticsUpdater {
   void testUpdateTableStatisticsDuplicateNameLastWins() throws Exception {
     GravitinoStatisticsUpdater updater = new GravitinoStatisticsUpdater();
     GravitinoClient client = Mockito.mock(GravitinoClient.class, Mockito.RETURNS_DEEP_STUBS);
-    setClient(updater, client);
+    updater.setGravitinoClientForTest(client);
     NameIdentifier tableIdentifier = NameIdentifier.of("catalog", "db", "table");
 
     updater.updateTableStatistics(
@@ -82,7 +81,7 @@ class TestGravitinoStatisticsUpdater {
   void testUpdatePartitionStatisticsNullPartitionPathFails() throws Exception {
     GravitinoStatisticsUpdater updater = new GravitinoStatisticsUpdater();
     GravitinoClient client = Mockito.mock(GravitinoClient.class, Mockito.RETURNS_DEEP_STUBS);
-    setClient(updater, client);
+    updater.setGravitinoClientForTest(client);
 
     Map<PartitionPath, List<StatisticEntry<?>>> partitionStatistics = new HashMap<>();
     partitionStatistics.put(null, List.of(stat("s1", 1L)));
@@ -101,7 +100,7 @@ class TestGravitinoStatisticsUpdater {
   void testUpdatePartitionStatisticsDuplicateNameLastWins() throws Exception {
     GravitinoStatisticsUpdater updater = new GravitinoStatisticsUpdater();
     GravitinoClient client = Mockito.mock(GravitinoClient.class, Mockito.RETURNS_DEEP_STUBS);
-    setClient(updater, client);
+    updater.setGravitinoClientForTest(client);
     NameIdentifier tableIdentifier = NameIdentifier.of("catalog", "db", "table");
     PartitionPath partitionPath = PartitionPath.of(List.of(new PartitionEntryImpl("p", "1")));
 
@@ -127,12 +126,5 @@ class TestGravitinoStatisticsUpdater {
 
   private StatisticEntry<?> stat(String name, long value) {
     return new StatisticEntryImpl<>(name, StatisticValues.longValue(value));
-  }
-
-  private void setClient(GravitinoStatisticsUpdater updater, GravitinoClient client)
-      throws ReflectiveOperationException {
-    Field field = GravitinoStatisticsUpdater.class.getDeclaredField("gravitinoClient");
-    field.setAccessible(true);
-    field.set(updater, client);
   }
 }

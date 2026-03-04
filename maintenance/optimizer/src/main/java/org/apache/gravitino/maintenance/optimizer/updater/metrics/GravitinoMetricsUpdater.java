@@ -68,6 +68,14 @@ public class GravitinoMetricsUpdater implements MetricsUpdater {
     }
   }
 
+  void setMetricsRepositoryForTest(MetricsRepository metricsRepository) {
+    this.metricsStorage = metricsRepository;
+  }
+
+  MetricsRepository metricsRepositoryForTest() {
+    return metricsStorage;
+  }
+
   private void ensureInitialized() {
     Preconditions.checkState(
         metricsStorage != null,

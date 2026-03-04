@@ -153,4 +153,8 @@ public class GravitinoStatisticsUpdater implements StatisticsUpdater {
       gravitinoClient.close();
     }
   }
+
+  void setGravitinoClientForTest(GravitinoClient gravitinoClient) {
+    this.gravitinoClient = gravitinoClient;
+  }
 }
