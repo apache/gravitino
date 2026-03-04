@@ -188,7 +188,10 @@ public class StatisticOperations {
           });
     } catch (Exception e) {
       return ExceptionHandlers.handleStatisticException(
-          OperationType.UPDATE, StringUtils.join(request.getUpdates().keySet(), ","), fullName, e);
+          OperationType.UPDATE,
+          request != null ? StringUtils.join(request.getUpdates().keySet(), ",") : "",
+          fullName,
+          e);
     }
   }
 
@@ -236,7 +239,10 @@ public class StatisticOperations {
           });
     } catch (Exception e) {
       return ExceptionHandlers.handleStatisticException(
-          OperationType.DROP, StringUtils.join(request.getNames(), ","), fullName, e);
+          OperationType.DROP,
+          request != null ? StringUtils.join(request.getNames(), ",") : "",
+          fullName,
+          e);
     }
   }
 
@@ -399,11 +405,13 @@ public class StatisticOperations {
           metalake,
           e);
       String partitions =
-          StringUtils.joinWith(
-              ",",
-              request.getUpdates().stream()
-                  .map(PartitionStatisticsUpdateDTO::partitionName)
-                  .collect(Collectors.toList()));
+          request != null
+              ? StringUtils.joinWith(
+                  ",",
+                  request.getUpdates().stream()
+                      .map(PartitionStatisticsUpdateDTO::partitionName)
+                      .collect(Collectors.toList()))
+              : "";
       return ExceptionHandlers.handlePartitionStatsException(
           OperationType.UPDATE, partitions, fullName, e);
     }
@@ -461,11 +469,13 @@ public class StatisticOperations {
           metalake,
           e);
       String partitions =
-          StringUtils.joinWith(
-              ",",
-              request.getDrops().stream()
-                  .map(PartitionStatisticsDropDTO::partitionName)
-                  .collect(Collectors.toList()));
+          request != null
+              ? StringUtils.joinWith(
+                  ",",
+                  request.getDrops().stream()
+                      .map(PartitionStatisticsDropDTO::partitionName)
+                      .collect(Collectors.toList()))
+              : "";
       return ExceptionHandlers.handlePartitionStatsException(
           OperationType.DROP, partitions, fullName, e);
     }

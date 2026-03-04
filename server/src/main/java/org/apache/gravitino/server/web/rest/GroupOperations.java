@@ -116,7 +116,7 @@ public class GroupOperations {
           });
     } catch (Exception e) {
       return ExceptionHandlers.handleGroupException(
-          OperationType.ADD, request.getName(), metalake, e);
+          OperationType.ADD, request != null ? request.getName() : "", metalake, e);
     }
   }
 

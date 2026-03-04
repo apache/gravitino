@@ -181,7 +181,7 @@ public class FilesetOperations {
 
     } catch (Exception e) {
       return ExceptionHandlers.handleFilesetException(
-          OperationType.CREATE, request.getName(), schema, e);
+          OperationType.CREATE, request != null ? request.getName() : "", schema, e);
     }
   }
 

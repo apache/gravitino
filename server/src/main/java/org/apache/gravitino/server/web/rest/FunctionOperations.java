@@ -161,7 +161,7 @@ public class FunctionOperations {
           });
     } catch (Exception e) {
       return ExceptionHandlers.handleFunctionException(
-          OperationType.REGISTER, request.getName(), schema, e);
+          OperationType.REGISTER, request != null ? request.getName() : "", schema, e);
     }
   }
 

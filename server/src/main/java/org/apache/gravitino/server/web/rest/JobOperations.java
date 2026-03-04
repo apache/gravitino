@@ -173,7 +173,12 @@ public class JobOperations {
 
     } catch (Exception e) {
       return ExceptionHandlers.handleJobTemplateException(
-          OperationType.REGISTER, request.getJobTemplate().name(), metalake, e);
+          OperationType.REGISTER,
+          request != null && request.getJobTemplate() != null
+              ? request.getJobTemplate().name()
+              : "",
+          metalake,
+          e);
     }
   }
 

@@ -160,7 +160,7 @@ public class TopicOperations {
           });
     } catch (Exception e) {
       return ExceptionHandlers.handleTopicException(
-          OperationType.CREATE, request.getName(), schema, e);
+          OperationType.CREATE, request != null ? request.getName() : "", schema, e);
     }
   }
 
