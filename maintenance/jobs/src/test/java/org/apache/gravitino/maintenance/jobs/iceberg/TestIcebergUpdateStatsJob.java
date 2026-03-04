@@ -19,7 +19,6 @@
 package org.apache.gravitino.maintenance.jobs.iceberg;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -27,6 +26,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import java.util.Map;
 import org.apache.gravitino.job.JobTemplateProvider;
 import org.apache.gravitino.job.SparkJobTemplate;
+import org.apache.gravitino.maintenance.optimizer.common.conf.OptimizerConfig;
 import org.junit.jupiter.api.Test;
 
 public class TestIcebergUpdateStatsJob {
@@ -48,23 +48,19 @@ public class TestIcebergUpdateStatsJob {
     SparkJobTemplate template = job.jobTemplate();
 
     assertNotNull(template.arguments());
-    assertEquals(18, template.arguments().size());
+    assertEquals(12, template.arguments().size());
     assertTrue(template.arguments().contains("--catalog"));
     assertTrue(template.arguments().contains("{{catalog_name}}"));
     assertTrue(template.arguments().contains("--table"));
     assertTrue(template.arguments().contains("{{table_identifier}}"));
-    assertTrue(template.arguments().contains("--gravitino-uri"));
-    assertTrue(template.arguments().contains("{{gravitino_uri}}"));
-    assertTrue(template.arguments().contains("--metalake"));
-    assertTrue(template.arguments().contains("{{metalake}}"));
+    assertTrue(template.arguments().contains("--update-mode"));
+    assertTrue(template.arguments().contains("{{update_mode}}"));
     assertTrue(template.arguments().contains("--target-file-size-bytes"));
     assertTrue(template.arguments().contains("{{target_file_size_bytes}}"));
-    assertTrue(template.arguments().contains("--statistics-updater"));
-    assertTrue(template.arguments().contains("{{statistics_updater}}"));
-    assertTrue(template.arguments().contains("--enable-metrics"));
-    assertTrue(template.arguments().contains("{{enable_metrics}}"));
-    assertTrue(template.arguments().contains("--metrics-updater"));
-    assertTrue(template.arguments().contains("{{metrics_updater}}"));
+    assertTrue(template.arguments().contains("--updater-options"));
+    assertTrue(template.arguments().contains("{{updater_options}}"));
+    assertTrue(template.arguments().contains("--spark-conf"));
+    assertTrue(template.arguments().contains("{{spark_conf}}"));
   }
 
   @Test
@@ -72,21 +68,21 @@ public class TestIcebergUpdateStatsJob {
     String[] args = {
       "--catalog", "cat",
       "--table", "db.tbl",
-      "--gravitino-uri", "http://localhost:8090",
-      "--metalake", "ml",
+      "--update-mode", "metrics",
       "--target-file-size-bytes", "2048",
-      "--enable-metrics", "true",
-      "--metrics-updater", "gravitino-metrics-updater"
+      "--updater-options", "{\"metalake\":\"ml\",\"gravitino_uri\":\"http://localhost:8090\"}",
+      "--spark-conf", "{\"spark.master\":\"local[2]\"}"
     };
 
     Map<String, String> parsed = IcebergUpdateStatsJob.parseArguments(args);
     assertEquals("cat", parsed.get("catalog"));
     assertEquals("db.tbl", parsed.get("table"));
-    assertEquals("http://localhost:8090", parsed.get("gravitino-uri"));
-    assertEquals("ml", parsed.get("metalake"));
+    assertEquals("metrics", parsed.get("update-mode"));
     assertEquals("2048", parsed.get("target-file-size-bytes"));
-    assertEquals("true", parsed.get("enable-metrics"));
-    assertEquals("gravitino-metrics-updater", parsed.get("metrics-updater"));
+    assertEquals(
+        "{\"metalake\":\"ml\",\"gravitino_uri\":\"http://localhost:8090\"}",
+        parsed.get("updater-options"));
+    assertEquals("{\"spark.master\":\"local[2]\"}", parsed.get("spark-conf"));
   }
 
   @Test
@@ -95,7 +91,6 @@ public class TestIcebergUpdateStatsJob {
     String partitionSql = IcebergUpdateStatsJob.buildPartitionStatsSql("cat", "db.tbl", 100000L);
 
     assertTrue(tableSql.contains("FROM cat.db.tbl.files"));
-    assertFalse(tableSql.contains("GROUP BY partition"));
     assertTrue(tableSql.contains("AS datafile_mse"));
     assertTrue(partitionSql.contains("FROM cat.db.tbl.files"));
     assertTrue(partitionSql.contains("GROUP BY partition"));
@@ -114,13 +109,59 @@ public class TestIcebergUpdateStatsJob {
   }
 
   @Test
-  public void testParseEnableMetrics() {
-    assertFalse(IcebergUpdateStatsJob.parseEnableMetrics(null));
-    assertFalse(IcebergUpdateStatsJob.parseEnableMetrics(""));
-    assertFalse(IcebergUpdateStatsJob.parseEnableMetrics("false"));
-    assertTrue(IcebergUpdateStatsJob.parseEnableMetrics("true"));
-    assertTrue(IcebergUpdateStatsJob.parseEnableMetrics("TRUE"));
+  public void testParseUpdateMode() {
+    assertEquals(IcebergUpdateStatsJob.UpdateMode.ALL, IcebergUpdateStatsJob.parseUpdateMode(null));
+    assertEquals(IcebergUpdateStatsJob.UpdateMode.ALL, IcebergUpdateStatsJob.parseUpdateMode(""));
+    assertEquals(
+        IcebergUpdateStatsJob.UpdateMode.STATS, IcebergUpdateStatsJob.parseUpdateMode("stats"));
+    assertEquals(
+        IcebergUpdateStatsJob.UpdateMode.METRICS, IcebergUpdateStatsJob.parseUpdateMode("metrics"));
+    assertEquals(
+        IcebergUpdateStatsJob.UpdateMode.ALL, IcebergUpdateStatsJob.parseUpdateMode("all"));
     assertThrows(
-        IllegalArgumentException.class, () -> IcebergUpdateStatsJob.parseEnableMetrics("yes"));
+        IllegalArgumentException.class, () -> IcebergUpdateStatsJob.parseUpdateMode("invalid"));
+  }
+
+  @Test
+  public void testParseJsonOptions() {
+    Map<String, String> parsed =
+        IcebergUpdateStatsJob.parseJsonOptions("{\"a\":\"b\",\"x\":1,\"flag\":true,\"nil\":null}");
+    assertEquals("b", parsed.get("a"));
+    assertEquals("1", parsed.get("x"));
+    assertEquals("true", parsed.get("flag"));
+    assertEquals("", parsed.get("nil"));
+    assertThrows(
+        IllegalArgumentException.class, () -> IcebergUpdateStatsJob.parseJsonOptions("{not_json}"));
+  }
+
+  @Test
+  public void testBuildOptimizerProperties() {
+    Map<String, String> options =
+        Map.of(
+            "gravitino_uri", "http://localhost:8090",
+            "metalake", "ml",
+            "gravitino.optimizer.jdbcMetrics.jdbcUrl", "jdbc:mysql://localhost:3306/metrics");
+    Map<String, String> optimizerProperties =
+        IcebergUpdateStatsJob.buildOptimizerProperties(options);
+
+    assertEquals("http://localhost:8090", optimizerProperties.get(OptimizerConfig.GRAVITINO_URI));
+    assertEquals("ml", optimizerProperties.get(OptimizerConfig.GRAVITINO_METALAKE));
+    assertEquals(
+        "jdbc:mysql://localhost:3306/metrics",
+        optimizerProperties.get("gravitino.optimizer.jdbcMetrics.jdbcUrl"));
+  }
+
+  @Test
+  public void testRequireGravitinoConfig() {
+    Map<String, String> optimizerProperties =
+        Map.of(
+            OptimizerConfig.GRAVITINO_URI, "http://localhost:8090",
+            OptimizerConfig.GRAVITINO_METALAKE, "ml");
+    assertEquals(
+        optimizerProperties, IcebergUpdateStatsJob.requireGravitinoConfig(optimizerProperties));
+
+    assertThrows(
+        IllegalArgumentException.class,
+        () -> IcebergUpdateStatsJob.requireGravitinoConfig(Map.of()));
   }
 }

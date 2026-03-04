@@ -309,10 +309,15 @@ public class TestBuiltinIcebergRewriteDataFiles {
   private static Map<String, String> buildUpdateStatsJobConfig(String tableName) {
     Map<String, String> jobConf = new HashMap<>();
     jobConf.put("table_identifier", "db." + tableName);
-    jobConf.put("gravitino_uri", SERVER_URI);
-    jobConf.put("metalake", METALAKE_NAME);
+    jobConf.put("update_mode", "all");
     jobConf.put("target_file_size_bytes", "100000");
-    jobConf.put("statistics_updater", "gravitino-statistics-updater");
+    jobConf.put(
+        "updater_options",
+        "{\"gravitino_uri\":\""
+            + SERVER_URI
+            + "\",\"metalake\":\""
+            + METALAKE_NAME
+            + "\",\"statistics_updater\":\"gravitino-statistics-updater\"}");
     jobConf.putAll(createOptimizerConfig().jobSubmitterConfigs());
     return jobConf;
   }

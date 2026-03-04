@@ -114,20 +114,41 @@ public class TestBuiltinIcebergUpdateStatsJob {
   private static Map<String, String> buildUpdateStatsJobConfig(String tableName) {
     Map<String, String> jobConf = new HashMap<>();
     jobConf.put("table_identifier", "db." + tableName);
-    jobConf.put("gravitino_uri", SERVER_URI);
-    jobConf.put("metalake", METALAKE_NAME);
+    jobConf.put("update_mode", "all");
     jobConf.put("target_file_size_bytes", "100000");
-    jobConf.put("statistics_updater", "gravitino-statistics-updater");
+    jobConf.put(
+        "updater_options",
+        "{\"gravitino_uri\":\""
+            + SERVER_URI
+            + "\",\"metalake\":\""
+            + METALAKE_NAME
+            + "\",\"statistics_updater\":\"gravitino-statistics-updater\"}");
     jobConf.put("catalog_name", SPARK_CATALOG_NAME);
-    jobConf.put("catalog_type", "rest");
-    jobConf.put("catalog_uri", ICEBERG_REST_URI);
-    jobConf.put("warehouse_location", WAREHOUSE_LOCATION);
-    jobConf.put("spark_master", "local[2]");
-    jobConf.put("spark_executor_instances", "1");
-    jobConf.put("spark_executor_cores", "1");
-    jobConf.put("spark_executor_memory", "1g");
-    jobConf.put("spark_driver_memory", "1g");
-    jobConf.put("spark_conf", "{\"spark.hadoop.fs.defaultFS\":\"file:///\"}");
+    jobConf.put(
+        "spark_conf",
+        "{\"spark.master\":\"local[2]\","
+            + "\"spark.executor.instances\":\"1\","
+            + "\"spark.executor.cores\":\"1\","
+            + "\"spark.executor.memory\":\"1g\","
+            + "\"spark.driver.memory\":\"1g\","
+            + "\"spark.hadoop.fs.defaultFS\":\"file:///\","
+            + "\"spark.sql.catalog."
+            + SPARK_CATALOG_NAME
+            + "\":\"org.apache.iceberg.spark.SparkCatalog\","
+            + "\"spark.sql.catalog."
+            + SPARK_CATALOG_NAME
+            + ".type\":\"rest\","
+            + "\"spark.sql.catalog."
+            + SPARK_CATALOG_NAME
+            + ".uri\":\""
+            + ICEBERG_REST_URI
+            + "\","
+            + "\"spark.sql.catalog."
+            + SPARK_CATALOG_NAME
+            + ".warehouse\":\""
+            + WAREHOUSE_LOCATION
+            + "\","
+            + "\"spark.sql.extensions\":\"org.apache.iceberg.spark.extensions.IcebergSparkSessionExtensions\"}");
     return jobConf;
   }
 
