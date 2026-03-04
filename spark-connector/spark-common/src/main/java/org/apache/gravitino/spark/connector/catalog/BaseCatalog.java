@@ -20,6 +20,7 @@
 package org.apache.gravitino.spark.connector.catalog;
 
 import com.google.common.base.Preconditions;
+import com.google.common.collect.Sets;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Map;
@@ -30,6 +31,7 @@ import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.Schema;
 import org.apache.gravitino.SchemaChange;
+import org.apache.gravitino.authorization.Privilege;
 import org.apache.gravitino.exceptions.ForbiddenException;
 import org.apache.gravitino.exceptions.NoSuchSchemaException;
 import org.apache.gravitino.exceptions.NonEmptySchemaException;
@@ -431,6 +433,20 @@ public abstract class BaseCatalog implements TableCatalog, SupportsNamespaces, F
     }
   }
 
+  protected org.apache.gravitino.rel.Table loadGravitinoTableForWriting(Identifier ident)
+      throws NoSuchTableException {
+    try {
+      String database = getDatabase(ident);
+      return gravitinoCatalogClient
+          .asTableCatalog()
+          .loadTable(
+              NameIdentifier.of(database, ident.name()),
+              Sets.newHashSet(Privilege.Name.MODIFY_TABLE));
+    } catch (org.apache.gravitino.exceptions.NoSuchTableException e) {
+      throw new NoSuchTableException(ident);
+    }
+  }
+
   protected String getDatabase(Identifier sparkIdentifier) {
     return getDatabase(sparkIdentifier.namespace());
   }
@@ -496,6 +512,24 @@ public abstract class BaseCatalog implements TableCatalog, SupportsNamespaces, F
       throw new NoSuchFunctionException(ident);
     }
     throw new NoSuchFunctionException(ident);
+  }
+
+  protected Table loadTableForWriting(Identifier ident) throws NoSuchTableException {
+    try {
+      org.apache.gravitino.rel.Table gravitinoTable = loadGravitinoTableForWriting(ident);
+      org.apache.spark.sql.connector.catalog.Table sparkTable = loadSparkTable(ident);
+      // Will create a catalog specific table
+      return createSparkTable(
+          ident,
+          gravitinoTable,
+          sparkTable,
+          sparkCatalog,
+          propertiesConverter,
+          sparkTransformConverter,
+          sparkTypeConverter);
+    } catch (org.apache.gravitino.exceptions.NoSuchTableException e) {
+      throw new NoSuchTableException(ident);
+    }
   }
 
   private void validateNamespace(String[] namespace) {

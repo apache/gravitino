@@ -337,7 +337,8 @@ public abstract class SparkHiveCatalogIT extends SparkCommonIT {
   @Test
   void testHiveFormatWithLocationTable() {
     String tableName = "test_hive_format_with_location_table";
-    String location = "/user/hive/external_db";
+
+    String location = hdfs.getUri() + "/user/hive/external_db";
     Boolean[] isExternals = {Boolean.TRUE, Boolean.FALSE};
 
     Arrays.stream(isExternals)
@@ -351,7 +352,7 @@ public abstract class SparkHiveCatalogIT extends SparkCommonIT {
 
               SparkTableInfo tableInfo = getTableInfo(tableName);
               checkTableReadWrite(tableInfo);
-              Assertions.assertTrue(tableInfo.getTableLocation().equals(hdfs.getUri() + location));
+              Assertions.assertTrue(tableInfo.getTableLocation().equals(location));
             });
   }
 
