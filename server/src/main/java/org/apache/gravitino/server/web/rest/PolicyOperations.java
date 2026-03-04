@@ -23,7 +23,6 @@ import static org.apache.gravitino.dto.util.DTOConverters.fromDTO;
 import com.codahale.metrics.annotation.ResponseMetered;
 import com.codahale.metrics.annotation.Timed;
 import java.util.Arrays;
-import java.util.Locale;
 import java.util.Optional;
 import javax.inject.Inject;
 import javax.servlet.http.HttpServletRequest;
@@ -338,7 +337,7 @@ public class PolicyOperations {
         PolicyDTO.builder()
             .withName(policy.name())
             .withComment(policy.comment())
-            .withPolicyType(policy.policyType().name().toLowerCase(Locale.ROOT))
+            .withPolicyType(policy.policyType().policyType())
             .withEnabled(policy.enabled())
             .withContent(DTOConverters.toDTO(policy.content()))
             .withInherited(inherited)

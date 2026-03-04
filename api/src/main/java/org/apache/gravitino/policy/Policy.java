@@ -43,6 +43,8 @@ public interface Policy extends Auditable {
     //    DATA_COMPACTION(BUILT_IN_TYPE_PREFIX + "data_compaction",
     //    PolicyContent.DataCompactionContent.class)
 
+    ICEBERG_COMPACTION("iceberg-compaction", PolicyContents.CustomContent.class),
+
     /**
      * Custom policy type. "custom" is a fixed string that indicates the policy is a non-built-in
      * type.
@@ -66,7 +68,8 @@ public interface Policy extends Auditable {
     public static BuiltInType fromPolicyType(String policyType) {
       Preconditions.checkArgument(StringUtils.isNotBlank(policyType), "policyType cannot be blank");
       for (BuiltInType type : BuiltInType.values()) {
-        if (type.policyType.equalsIgnoreCase(policyType)) {
+        if (type.policyType.equalsIgnoreCase(policyType)
+            || type.name().equalsIgnoreCase(policyType)) {
           return type;
         }
       }

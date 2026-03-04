@@ -338,6 +338,47 @@ public class TestPolicyOperations extends BaseOperationsTest {
   }
 
   @Test
+  public void testCreatePolicyWithIcebergCompactionType() {
+    ImmutableMap<String, Object> contentFields =
+        ImmutableMap.of(
+            "trigger-expr", "custom-datafile_mse > 1000 || custom-delete_file_number > 1",
+            "score-expr", "custom-datafile_mse / 100 + custom-delete_file_number * 100");
+    PolicyContent content =
+        PolicyContents.custom(contentFields, ImmutableSet.of(MetadataObject.Type.TABLE), null);
+    PolicyEntity policy1 =
+        PolicyEntity.builder()
+            .withId(1L)
+            .withName("iceberg-compaction")
+            .withPolicyType(Policy.BuiltInType.ICEBERG_COMPACTION)
+            .withEnabled(true)
+            .withContent(content)
+            .withAuditInfo(testAuditInfo1)
+            .build();
+    when(policyManager.createPolicy(
+            metalake,
+            "iceberg-compaction",
+            Policy.BuiltInType.ICEBERG_COMPACTION,
+            null,
+            true,
+            content))
+        .thenReturn(policy1);
+
+    PolicyCreateRequest request =
+        new PolicyCreateRequest(
+            "iceberg-compaction", "iceberg-compaction", null, true, toDTO(content));
+    Response resp =
+        target(policyPath(metalake))
+            .request(MediaType.APPLICATION_JSON_TYPE)
+            .accept("application/vnd.gravitino.v1+json")
+            .post(Entity.entity(request, MediaType.APPLICATION_JSON_TYPE));
+
+    Assertions.assertEquals(Response.Status.OK.getStatusCode(), resp.getStatus());
+    PolicyResponse policyResp = resp.readEntity(PolicyResponse.class);
+    Assertions.assertEquals(0, policyResp.getCode());
+    Assertions.assertEquals("iceberg-compaction", policyResp.getPolicy().policyType());
+  }
+
+  @Test
   public void testGetPolicy() {
     ImmutableMap<String, Object> contentFields = ImmutableMap.of("target_file_size_bytes", 1000);
     PolicyContent content =
