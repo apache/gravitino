@@ -1,7 +1,7 @@
 SELECT
   "promotions"
 , "total"
-, ((CAST("promotions" AS DECIMAL(15,4)) / CAST("total" AS DECIMAL(15,4))) * 100)
+, (CAST((CAST("promotions" AS DECIMAL(15,4)) / CAST("total" AS DECIMAL(15,4))) AS DECIMAL(15,4)) * 100)
 FROM
   (
    SELECT "sum"("ss_ext_sales_price") "promotions"
