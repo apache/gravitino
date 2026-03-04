@@ -337,7 +337,7 @@ public class PolicyOperations {
         PolicyDTO.builder()
             .withName(policy.name())
             .withComment(policy.comment())
-            .withPolicyType(policy.policyType().policyType())
+            .withPolicyType(policy.policyType().name())
             .withEnabled(policy.enabled())
             .withContent(DTOConverters.toDTO(policy.content()))
             .withInherited(inherited)

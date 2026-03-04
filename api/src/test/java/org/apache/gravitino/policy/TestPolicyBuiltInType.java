@@ -25,10 +25,10 @@ import org.junit.jupiter.api.Test;
 public class TestPolicyBuiltInType {
 
   @Test
-  void testFromPolicyTypeWithApiName() {
+  void testFromPolicyTypeWithBuiltInTypeValue() {
     Assertions.assertEquals(
         Policy.BuiltInType.ICEBERG_COMPACTION,
-        Policy.BuiltInType.fromPolicyType("iceberg-compaction"));
+        Policy.BuiltInType.fromPolicyType("system_iceberg_compaction"));
   }
 
   @Test
@@ -41,7 +41,7 @@ public class TestPolicyBuiltInType {
   @Test
   void testBuiltInTypePolicyTypeValue() {
     Assertions.assertEquals(
-        "iceberg-compaction", Policy.BuiltInType.ICEBERG_COMPACTION.policyType());
+        "system_iceberg_compaction", Policy.BuiltInType.ICEBERG_COMPACTION.policyType());
   }
 
   @Test

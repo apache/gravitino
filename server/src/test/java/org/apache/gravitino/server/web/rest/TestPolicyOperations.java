@@ -364,7 +364,7 @@ public class TestPolicyOperations extends BaseOperationsTest {
 
     PolicyCreateRequest request =
         new PolicyCreateRequest(
-            "iceberg-compaction", "iceberg-compaction", null, true, toDTO(content));
+            "iceberg-compaction", "ICEBERG_COMPACTION", null, true, toDTO(content));
     Response resp =
         target(policyPath(metalake))
             .request(MediaType.APPLICATION_JSON_TYPE)
@@ -374,7 +374,7 @@ public class TestPolicyOperations extends BaseOperationsTest {
     Assertions.assertEquals(Response.Status.OK.getStatusCode(), resp.getStatus());
     PolicyResponse policyResp = resp.readEntity(PolicyResponse.class);
     Assertions.assertEquals(0, policyResp.getCode());
-    Assertions.assertEquals("iceberg-compaction", policyResp.getPolicy().policyType());
+    Assertions.assertEquals("ICEBERG_COMPACTION", policyResp.getPolicy().policyType());
   }
 
   @Test
