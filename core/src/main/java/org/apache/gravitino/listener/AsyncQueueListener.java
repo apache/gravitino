@@ -28,6 +28,7 @@ import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
+import java.util.concurrent.atomic.AtomicReference;
 import org.apache.gravitino.listener.api.EventListenerPlugin;
 import org.apache.gravitino.listener.api.event.BaseEvent;
 import org.apache.gravitino.listener.api.event.Event;
@@ -53,7 +54,8 @@ public class AsyncQueueListener implements EventListenerPlugin {
   private final AtomicBoolean stopped = new AtomicBoolean(false);
   private final AtomicLong dropEventCounters = new AtomicLong(0);
   private final AtomicLong lastDropEventCounters = new AtomicLong(0);
-  private Instant lastRecordDropEventTime = Instant.EPOCH;
+  private final AtomicReference<Instant> lastRecordDropEventTime =
+      new AtomicReference<>(Instant.EPOCH);
   private final String asyncQueueListenerName;
   private final int highWatermarkThreshold;
 
@@ -151,14 +153,15 @@ public class AsyncQueueListener implements EventListenerPlugin {
     // 2. Thread B increment dropEventCounters and update lastDropEventCounters
     // 3. Thread A get lastDropEventCounters
     long dropEvents = currentDropEvents - lastDropEvents;
-    if (dropEvents > 0 && Instant.now().isAfter(lastRecordDropEventTime.plusSeconds(60))) {
+    Instant lastDropTime = lastRecordDropEventTime.get();
+    if (dropEvents > 0 && Instant.now().isAfter(lastDropTime.plusSeconds(60))) {
       if (lastDropEventCounters.compareAndSet(lastDropEvents, currentDropEvents)) {
         LOG.warn(
             "{} drop {} events since {}",
             asyncQueueListenerName,
             dropEvents,
-            lastRecordDropEventTime);
-        lastRecordDropEventTime = Instant.now();
+            lastDropTime);
+        lastRecordDropEventTime.set(Instant.now());
       }
     }
   }
