@@ -487,7 +487,7 @@ public class StatisticOperations {
   }
 
   private static String getUpdatedStatisticNames(StatisticsUpdateRequest request) {
-    if (request == null || request.getUpdates() == null) {
+    if (request == null) {
       return "";
     }
 
