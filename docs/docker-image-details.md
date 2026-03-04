@@ -23,6 +23,9 @@ JVM heap and metaspace are controlled by `GRAVITINO_MEM` (default `-Xms1024m -Xm
 
 Changelog
 
+- apache/gravitino:1.2.0
+  - Based on Gravitino 1.2.0, you can know more information from 1.2.0 [release notes](https://github.com/apache/gravitino/releases/tag/v1.2.0).
+
 - apache/gravitino:1.1.0
   - Based on Gravitino 1.1.0, you can know more information from 1.1.0 [release notes](https://github.com/apache/gravitino/releases/tag/v1.1.0).
 
@@ -83,6 +86,13 @@ Use `GRAVITINO_MEM` to size the JVM (default `-Xms1024m -Xmx1024m -XX:MaxMetaspa
 
 Changelog
 
+- apache/gravitino-iceberg-rest:1.2.0
+  - Upgrade Iceberg to 1.10.1
+  - Support view management and authorization
+  - Support cross-namespace table rename
+  - Add scan planning cache to improve repeated query performance
+  - For more information, see 1.2.0 [release notes](https://github.com/apache/gravitino/releases/tag/v1.2.0).
+
 - apache/gravitino-iceberg-rest:1.1.0
   - Support scan planning endpoint
   - Support get credentials endpoint
@@ -135,6 +145,9 @@ docker run --rm -d -p 8000:8000 apache/gravitino-mcp-server:latest --metalake te
 
 Changelog
 
+- apache/gravitino-mcp-server:1.2.0
+  - Built with Gravitino 1.2.0. For more information, see 1.2.0 [release notes](https://github.com/apache/gravitino/releases/tag/v1.2.0).
+
 - apache/gravitino-mcp-server:1.1.0
   - Built with Gravitino 1.1.0. For more information, see 1.1.0 [release notes](https://github.com/apache/gravitino/releases/tag/v1.1.0).
 
@@ -167,6 +180,11 @@ It's not advised to change `LANCE_REST_NAMESPACE_BACKEND`, `LANCE_REST_HOST` and
 
 Changelog
 
+- apache/gravitino-lance-rest:1.2.0
+  - Support delete and rename column operations
+  - Include dataset version information in loadTable and createTable responses
+  - Built with Gravitino 1.2.0. For more information, see 1.2.0 [release notes](https://github.com/apache/gravitino/releases/tag/v1.2.0).
+
 - apache/gravitino-lance-rest:1.1.0
   - Initial release of Lance REST server
   - Support Lance tables integration through REST API
@@ -196,6 +214,9 @@ Changelog
 ### Trino image
 
 Changelog
+
+- apache/gravitino-playground:trino-435-gravitino-1.2.0
+  - Use Gravitino release 1.2.0 Dockerfile to build the image.
 
 - apache/gravitino-playground:trino-435-gravitino-1.1.0
   - Use Gravitino release 1.1.0 Dockerfile to build the image.
