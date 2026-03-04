@@ -47,7 +47,7 @@ import org.apache.gravitino.rel.types.Types;
 import org.junit.jupiter.api.BeforeAll;
 
 // Set up the Gravitino server, metalake, Iceberg catalogs
-public class GravitinoOptimizerEnvIT extends BaseIT {
+public abstract class AbstractGravitinoOptimizerEnvIT extends BaseIT {
 
   protected static final String METALAKE_NAME = "test_metalake";
   protected static final String GRAVITINO_CATALOG_NAME = "iceberg";

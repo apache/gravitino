@@ -50,7 +50,7 @@ import org.junit.jupiter.api.Test;
  * 2. add policy
  * 3. run recommender to get optimize result
  */
-public class RecommenderIT extends GravitinoOptimizerEnvIT {
+public class RecommenderIT extends AbstractGravitinoOptimizerEnvIT {
 
   private static final String STATISTICS_PREFIX = "custom-";
   private static final String DATAFILE_MSE = STATISTICS_PREFIX + "datafile_size_mse";

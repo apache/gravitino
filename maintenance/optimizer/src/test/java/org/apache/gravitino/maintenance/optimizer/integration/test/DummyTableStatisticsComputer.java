@@ -55,7 +55,7 @@ public class DummyTableStatisticsComputer
         List.of(new StatisticEntryImpl<>(TABLE_STAT_NAME, StatisticValues.longValue(1L)));
     Map<PartitionPath, List<StatisticEntry<?>>> partitionStatistics =
         Map.of(
-            PartitionPath.of(getPartitionName()),
+            PartitionPath.of(getPartitionEntries()),
             List.of(new StatisticEntryImpl<>(TABLE_STAT_NAME, StatisticValues.longValue(2L))));
     return new TableAndPartitionStatistics(tableStatistics, partitionStatistics);
   }
@@ -63,7 +63,7 @@ public class DummyTableStatisticsComputer
   @Override
   public List<MetricPoint> calculateTableMetrics(NameIdentifier tableIdentifier) {
     long timestampSeconds = System.currentTimeMillis() / 1000;
-    PartitionPath partitionPath = PartitionPath.of(getPartitionName());
+    PartitionPath partitionPath = PartitionPath.of(getPartitionEntries());
     return List.of(
         MetricPoint.forTable(
             tableIdentifier, TABLE_STAT_NAME, StatisticValues.longValue(1L), timestampSeconds),
@@ -76,7 +76,7 @@ public class DummyTableStatisticsComputer
   }
 
   @VisibleForTesting
-  public static List<PartitionEntry> getPartitionName() {
+  public static List<PartitionEntry> getPartitionEntries() {
     return List.of(new PartitionEntryImpl("p1", "v1"));
   }
 }

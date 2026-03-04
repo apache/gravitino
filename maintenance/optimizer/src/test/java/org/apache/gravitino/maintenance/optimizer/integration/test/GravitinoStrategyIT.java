@@ -28,7 +28,7 @@ import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 
-public class GravitinoStrategyIT extends GravitinoOptimizerEnvIT {
+public class GravitinoStrategyIT extends AbstractGravitinoOptimizerEnvIT {
 
   private GravitinoStrategyProvider strategyProvider;
 

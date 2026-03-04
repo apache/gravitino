@@ -26,7 +26,7 @@ import org.apache.gravitino.maintenance.optimizer.api.updater.SupportsCalculateJ
 import org.apache.gravitino.maintenance.optimizer.common.OptimizerEnv;
 import org.apache.gravitino.stats.StatisticValues;
 
-public class DummyJobMetricsComputer implements SupportsCalculateJobMetrics {
+public class DummyJobMetricsCalculator implements SupportsCalculateJobMetrics {
 
   public static final String DUMMY_JOB_METRICS = "dummy-job-metrics";
   public static final String JOB_STAT_NAME = "dummy-job-stat-name";

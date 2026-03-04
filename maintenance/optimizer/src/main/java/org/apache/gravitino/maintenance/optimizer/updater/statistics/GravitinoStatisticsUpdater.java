@@ -19,6 +19,7 @@
 
 package org.apache.gravitino.maintenance.optimizer.updater.statistics;
 
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -154,6 +155,7 @@ public class GravitinoStatisticsUpdater implements StatisticsUpdater {
     }
   }
 
+  @VisibleForTesting
   void setGravitinoClientForTest(GravitinoClient gravitinoClient) {
     this.gravitinoClient = gravitinoClient;
   }

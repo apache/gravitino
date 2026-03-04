@@ -29,7 +29,7 @@ import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 
-public class GravitinoTableMetaIT extends GravitinoOptimizerEnvIT {
+public class GravitinoTableMetaIT extends AbstractGravitinoOptimizerEnvIT {
   private GravitinoTableMetadataProvider tableMetadataProvider;
 
   @BeforeAll
@@ -46,7 +46,7 @@ public class GravitinoTableMetaIT extends GravitinoOptimizerEnvIT {
   }
 
   @Test
-  void testTableStatisticsUpdaterAndProvider() {
+  void testTableMetadataProviderTableAndPartitioningMetadata() {
     String tableName = "test_table_metadata";
     createPartitionTable(tableName);
     Table table = tableMetadataProvider.tableMetadata(getTableIdentifier(tableName));

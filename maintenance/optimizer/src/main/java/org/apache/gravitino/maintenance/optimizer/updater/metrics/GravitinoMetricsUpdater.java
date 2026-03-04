@@ -19,6 +19,7 @@
 
 package org.apache.gravitino.maintenance.optimizer.updater.metrics;
 
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import java.util.List;
 import org.apache.gravitino.maintenance.optimizer.api.common.DataScope;
@@ -68,10 +69,12 @@ public class GravitinoMetricsUpdater implements MetricsUpdater {
     }
   }
 
+  @VisibleForTesting
   void setMetricsRepositoryForTest(MetricsRepository metricsRepository) {
     this.metricsStorage = metricsRepository;
   }
 
+  @VisibleForTesting
   MetricsRepository metricsRepositoryForTest() {
     return metricsStorage;
   }

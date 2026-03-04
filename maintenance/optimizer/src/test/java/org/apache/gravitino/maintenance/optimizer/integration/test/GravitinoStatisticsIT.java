@@ -34,7 +34,7 @@ import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 
-public class GravitinoStatisticsIT extends GravitinoOptimizerEnvIT {
+public class GravitinoStatisticsIT extends AbstractGravitinoOptimizerEnvIT {
 
   private static final String TEST_TABLE = "test_stats_table";
   private static final String TEST_PARTITION_TABLE = "test_stats_partition_table";

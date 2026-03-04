@@ -36,7 +36,7 @@ import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 
-public class UpdaterIT extends GravitinoOptimizerEnvIT {
+public class UpdaterIT extends AbstractGravitinoOptimizerEnvIT {
 
   private Updater updater;
   private GravitinoStatisticsProvider statisticsProvider;
@@ -95,7 +95,7 @@ public class UpdaterIT extends GravitinoOptimizerEnvIT {
     Assertions.assertEquals(2L, ((Number) partitionEntries.get(0).value().value()).longValue());
     Assertions.assertEquals(
         PartitionUtils.encodePartitionPath(
-            PartitionPath.of(DummyTableStatisticsComputer.getPartitionName())),
+            PartitionPath.of(DummyTableStatisticsComputer.getPartitionEntries())),
         PartitionUtils.encodePartitionPath(
             partitionStats.keySet().stream().findFirst().orElseThrow(IllegalStateException::new)));
   }
@@ -120,7 +120,7 @@ public class UpdaterIT extends GravitinoOptimizerEnvIT {
     Assertions.assertEquals(1L, ((Number) tableMetric.value().value()).longValue());
 
     PartitionPath expectedPartition =
-        PartitionPath.of(DummyTableStatisticsComputer.getPartitionName());
+        PartitionPath.of(DummyTableStatisticsComputer.getPartitionEntries());
     List<MetricPoint> partitionMetrics =
         metricsProvider.partitionMetrics(tableIdentifier, expectedPartition, 0, Long.MAX_VALUE);
     Assertions.assertEquals(1, partitionMetrics.size());
@@ -140,14 +140,14 @@ public class UpdaterIT extends GravitinoOptimizerEnvIT {
     String jobName = "update-job-metrics";
     NameIdentifier jobIdentifier = NameIdentifier.of(jobName);
     updater.update(
-        DummyJobMetricsComputer.DUMMY_JOB_METRICS,
+        DummyJobMetricsCalculator.DUMMY_JOB_METRICS,
         Arrays.asList(jobIdentifier),
         UpdateType.METRICS);
 
     List<MetricPoint> jobMetrics = metricsProvider.jobMetrics(jobIdentifier, 0, Long.MAX_VALUE);
     Assertions.assertEquals(1, jobMetrics.size());
     MetricPoint jobMetric = jobMetrics.get(0);
-    Assertions.assertEquals(DummyJobMetricsComputer.JOB_STAT_NAME, jobMetric.metricName());
+    Assertions.assertEquals(DummyJobMetricsCalculator.JOB_STAT_NAME, jobMetric.metricName());
     long diff = System.currentTimeMillis() / 1000 - jobMetric.timestampSeconds();
     Assertions.assertTrue(diff >= 0 && diff <= 10000);
     Assertions.assertEquals(1L, ((Number) jobMetric.value().value()).longValue());

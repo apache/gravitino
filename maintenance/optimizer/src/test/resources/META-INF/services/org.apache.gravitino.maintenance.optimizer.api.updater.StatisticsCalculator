@@ -17,4 +17,4 @@
 
 org.apache.gravitino.maintenance.optimizer.updater.StatisticsCalculatorForTest
 org.apache.gravitino.maintenance.optimizer.integration.test.DummyTableStatisticsComputer
-org.apache.gravitino.maintenance.optimizer.integration.test.DummyJobMetricsComputer
+org.apache.gravitino.maintenance.optimizer.integration.test.DummyJobMetricsCalculator
