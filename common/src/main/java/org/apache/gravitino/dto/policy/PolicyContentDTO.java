@@ -98,14 +98,29 @@ public interface PolicyContentDTO extends PolicyContent {
     // Default constructor for Jackson deserialization only.
     private IcebergCompactionContentDTO() {}
 
+    /**
+     * Returns the minimum threshold for custom-datafile_mse metric.
+     *
+     * @return minimum data file MSE threshold
+     */
     public Long minDatafileMse() {
       return minDatafileMse;
     }
 
+    /**
+     * Returns the minimum threshold for custom-delete_file_number metric.
+     *
+     * @return minimum delete file number threshold
+     */
     public Long minDeleteFileNumber() {
       return minDeleteFileNumber;
     }
 
+    /**
+     * Returns rewrite options expanded to job.options.* during rule generation.
+     *
+     * @return rewrite options map
+     */
     public Map<String, String> rewriteOptions() {
       return rewriteOptions == null
           ? Map.of()
