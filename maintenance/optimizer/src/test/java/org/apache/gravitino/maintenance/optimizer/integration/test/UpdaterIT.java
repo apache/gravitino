@@ -31,6 +31,7 @@ import org.apache.gravitino.maintenance.optimizer.recommender.statistics.Graviti
 import org.apache.gravitino.maintenance.optimizer.recommender.util.PartitionUtils;
 import org.apache.gravitino.maintenance.optimizer.updater.UpdateType;
 import org.apache.gravitino.maintenance.optimizer.updater.Updater;
+import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
@@ -53,6 +54,19 @@ public class UpdaterIT extends GravitinoOptimizerEnvIT {
     statisticsProvider.initialize(optimizerEnv);
     this.metricsProvider = new GravitinoMetricsProvider();
     metricsProvider.initialize(optimizerEnv);
+  }
+
+  @AfterAll
+  void closeResources() throws Exception {
+    if (metricsProvider != null) {
+      metricsProvider.close();
+    }
+    if (statisticsProvider != null) {
+      statisticsProvider.close();
+    }
+    if (updater != null) {
+      updater.close();
+    }
   }
 
   @Test

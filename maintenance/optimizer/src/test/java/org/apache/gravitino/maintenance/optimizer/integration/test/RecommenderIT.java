@@ -40,6 +40,7 @@ import org.apache.gravitino.maintenance.optimizer.recommender.handler.compaction
 import org.apache.gravitino.maintenance.optimizer.recommender.util.StrategyUtils;
 import org.apache.gravitino.maintenance.optimizer.updater.statistics.GravitinoStatisticsUpdater;
 import org.apache.gravitino.stats.StatisticValues;
+import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
@@ -76,6 +77,13 @@ public class RecommenderIT extends GravitinoOptimizerEnvIT {
   void init() {
     this.statisticsUpdater = new GravitinoStatisticsUpdater();
     statisticsUpdater.initialize(optimizerEnv);
+  }
+
+  @AfterAll
+  void closeResources() throws Exception {
+    if (statisticsUpdater != null) {
+      statisticsUpdater.close();
+    }
   }
 
   @Test

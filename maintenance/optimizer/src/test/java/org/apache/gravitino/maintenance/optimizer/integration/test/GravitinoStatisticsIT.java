@@ -29,6 +29,7 @@ import org.apache.gravitino.maintenance.optimizer.common.StatisticEntryImpl;
 import org.apache.gravitino.maintenance.optimizer.recommender.statistics.GravitinoStatisticsProvider;
 import org.apache.gravitino.maintenance.optimizer.updater.statistics.GravitinoStatisticsUpdater;
 import org.apache.gravitino.stats.StatisticValues;
+import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
@@ -51,6 +52,16 @@ public class GravitinoStatisticsIT extends GravitinoOptimizerEnvIT {
     statisticsProvider.initialize(optimizerEnv);
     createTable(TEST_TABLE);
     createPartitionTable(TEST_PARTITION_TABLE);
+  }
+
+  @AfterAll
+  void closeResources() throws Exception {
+    if (statisticsProvider != null) {
+      statisticsProvider.close();
+    }
+    if (statisticsUpdater != null) {
+      statisticsUpdater.close();
+    }
   }
 
   @Test

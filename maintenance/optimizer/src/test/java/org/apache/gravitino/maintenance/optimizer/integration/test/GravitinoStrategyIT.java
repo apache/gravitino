@@ -23,6 +23,7 @@ import com.google.common.collect.ImmutableMap;
 import java.util.List;
 import org.apache.gravitino.maintenance.optimizer.api.common.Strategy;
 import org.apache.gravitino.maintenance.optimizer.recommender.strategy.GravitinoStrategyProvider;
+import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
@@ -35,6 +36,13 @@ public class GravitinoStrategyIT extends GravitinoOptimizerEnvIT {
   void init() {
     this.strategyProvider = new GravitinoStrategyProvider();
     strategyProvider.initialize(optimizerEnv);
+  }
+
+  @AfterAll
+  void closeResources() throws Exception {
+    if (strategyProvider != null) {
+      strategyProvider.close();
+    }
   }
 
   @Test

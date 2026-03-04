@@ -163,8 +163,7 @@ public class GravitinoMetricsIT {
   private OptimizerEnv createOptimizerEnv() {
     String jdbcUrl =
         String.format(
-            "jdbc:h2:file:/tmp/gravitino-metrics-it-%d;DB_CLOSE_DELAY=-1;MODE=MYSQL;AUTO_SERVER=TRUE",
-            System.nanoTime());
+            "jdbc:h2:mem:gravitino-metrics-it-%d;DB_CLOSE_DELAY=-1;MODE=MYSQL", System.nanoTime());
 
     Map<String, String> config =
         Map.of(

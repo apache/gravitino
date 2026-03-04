@@ -41,6 +41,7 @@ import org.apache.gravitino.maintenance.optimizer.recommender.util.PartitionUtil
 import org.apache.gravitino.maintenance.optimizer.updater.metrics.GravitinoMetricsUpdater;
 import org.apache.gravitino.maintenance.optimizer.updater.metrics.storage.jdbc.GenericJdbcMetricsRepository;
 import org.apache.gravitino.stats.StatisticValues;
+import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
@@ -59,6 +60,16 @@ public class MonitorIT {
     updater.initialize(env);
     this.monitor = new Monitor(env);
     MonitorCallbackForTest.reset();
+  }
+
+  @AfterAll
+  public void closeResources() throws Exception {
+    if (monitor != null) {
+      monitor.close();
+    }
+    if (updater != null) {
+      updater.close();
+    }
   }
 
   @Test
@@ -227,8 +238,7 @@ public class MonitorIT {
   private OptimizerEnv createOptimizerEnv() {
     String jdbcUrl =
         String.format(
-            "jdbc:h2:file:/tmp/gravitino-monitor-it-%d;DB_CLOSE_DELAY=-1;MODE=MYSQL;AUTO_SERVER=TRUE",
-            System.nanoTime());
+            "jdbc:h2:mem:gravitino-monitor-it-%d;DB_CLOSE_DELAY=-1;MODE=MYSQL", System.nanoTime());
 
     Map<String, String> configs =
         ImmutableMap.<String, String>builder()

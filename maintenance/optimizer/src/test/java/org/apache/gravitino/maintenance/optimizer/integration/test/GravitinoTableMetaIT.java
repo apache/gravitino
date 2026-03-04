@@ -24,6 +24,7 @@ import org.apache.gravitino.rel.Column;
 import org.apache.gravitino.rel.Table;
 import org.apache.gravitino.rel.expressions.transforms.Transform;
 import org.apache.gravitino.rel.expressions.transforms.Transforms;
+import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
@@ -35,6 +36,13 @@ public class GravitinoTableMetaIT extends GravitinoOptimizerEnvIT {
   void init() {
     this.tableMetadataProvider = new GravitinoTableMetadataProvider();
     tableMetadataProvider.initialize(optimizerEnv);
+  }
+
+  @AfterAll
+  void closeResources() throws Exception {
+    if (tableMetadataProvider != null) {
+      tableMetadataProvider.close();
+    }
   }
 
   @Test

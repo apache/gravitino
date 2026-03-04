@@ -21,6 +21,9 @@ package org.apache.gravitino.maintenance.optimizer.integration.test;
 
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.HashMap;
 import java.util.Map;
 import org.apache.gravitino.Catalog;
@@ -53,13 +56,21 @@ public class GravitinoOptimizerEnvIT extends BaseIT {
   protected Catalog catalogClient;
   protected GravitinoMetalake metalakeClient;
   protected OptimizerEnv optimizerEnv;
+  protected String icebergWarehouseLocation;
 
   @BeforeAll
   @Override
   public void startIntegrationTest() throws Exception {
     super.startIntegrationTest();
+    this.icebergWarehouseLocation = createWarehouseLocation();
     initMetalakeAndCatalog();
     this.optimizerEnv = initOptimizerEnv();
+  }
+
+  private String createWarehouseLocation() throws IOException {
+    Path path = Files.createTempDirectory("gravitino-optimizer-warehouse-");
+    path.toFile().deleteOnExit();
+    return path.toUri().toString();
   }
 
   protected void createTable(String tableName) {
@@ -132,7 +143,7 @@ public class GravitinoOptimizerEnvIT extends BaseIT {
   private Map<String, String> getJdbcMetricsConfigs() {
     String jdbcUrl =
         String.format(
-            "jdbc:h2:file:/tmp/gravitino-optimizer-it-%d;DB_CLOSE_DELAY=-1;MODE=MYSQL;AUTO_SERVER=TRUE",
+            "jdbc:h2:mem:gravitino-optimizer-it-%d;DB_CLOSE_DELAY=-1;MODE=MYSQL",
             System.nanoTime());
 
     return Map.of(
@@ -179,6 +190,6 @@ public class GravitinoOptimizerEnvIT extends BaseIT {
             IcebergConstants.CATALOG_BACKEND,
             "memory",
             IcebergConstants.WAREHOUSE,
-            "file:///tmp/gravitino-optimizer/"));
+            icebergWarehouseLocation));
   }
 }
