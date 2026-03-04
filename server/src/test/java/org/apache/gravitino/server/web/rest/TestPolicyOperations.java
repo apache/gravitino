@@ -339,12 +339,11 @@ public class TestPolicyOperations extends BaseOperationsTest {
 
   @Test
   public void testCreatePolicyWithIcebergCompactionType() {
-    ImmutableMap<String, Object> contentFields =
-        ImmutableMap.of(
-            "trigger-expr", "custom-datafile_mse > 1000 || custom-delete_file_number > 1",
-            "score-expr", "custom-datafile_mse / 100 + custom-delete_file_number * 100");
     PolicyContent content =
-        PolicyContents.custom(contentFields, ImmutableSet.of(MetadataObject.Type.TABLE), null);
+        PolicyContents.icebergCompaction(
+            1000L,
+            1L,
+            ImmutableMap.of("target-file-size-bytes", "1048576", "min-input-files", "1"));
     PolicyEntity policy1 =
         PolicyEntity.builder()
             .withId(1L)

@@ -43,7 +43,7 @@ public interface Policy extends Auditable {
     //    DATA_COMPACTION(BUILT_IN_TYPE_PREFIX + "data_compaction",
     //    PolicyContent.DataCompactionContent.class)
 
-    ICEBERG_COMPACTION("iceberg-compaction", PolicyContents.CustomContent.class),
+    ICEBERG_COMPACTION("iceberg-compaction", PolicyContents.IcebergCompactionContent.class),
 
     /**
      * Custom policy type. "custom" is a fixed string that indicates the policy is a non-built-in

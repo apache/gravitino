@@ -117,4 +117,41 @@ public class TestPolicyEntity {
                     AuditInfo.builder().withCreator("test").withCreateTime(Instant.now()).build())
                 .build());
   }
+
+  @Test
+  public void testBuiltInPolicyContentTypeValidation() {
+    Namespace namespace = Namespace.of("m1", "c1", "s1");
+    AuditInfo auditInfo =
+        AuditInfo.builder().withCreator("test").withCreateTime(Instant.now()).build();
+
+    PolicyContent icebergCompactionContent =
+        PolicyContents.icebergCompaction(1000L, 1L, Map.of("target-file-size-bytes", "1048576"));
+    Assertions.assertDoesNotThrow(
+        () ->
+            PolicyEntity.builder()
+                .withId(1L)
+                .withName("iceberg-compaction")
+                .withNamespace(namespace)
+                .withPolicyType(Policy.BuiltInType.ICEBERG_COMPACTION)
+                .withEnabled(true)
+                .withContent(icebergCompactionContent)
+                .withAuditInfo(auditInfo)
+                .build());
+
+    PolicyContent customContent =
+        PolicyContents.custom(
+            ImmutableMap.of("k", "v"), ImmutableSet.of(MetadataObject.Type.TABLE), Map.of());
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () ->
+            PolicyEntity.builder()
+                .withId(1L)
+                .withName("iceberg-compaction")
+                .withNamespace(namespace)
+                .withPolicyType(Policy.BuiltInType.ICEBERG_COMPACTION)
+                .withEnabled(true)
+                .withContent(customContent)
+                .withAuditInfo(auditInfo)
+                .build());
+  }
 }

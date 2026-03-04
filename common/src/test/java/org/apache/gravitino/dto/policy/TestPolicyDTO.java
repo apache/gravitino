@@ -107,4 +107,33 @@ public class TestPolicyDTO {
     PolicyDTO deserPolicyDTO4 = JsonUtils.objectMapper().readValue(serJson, PolicyDTO.class);
     Assertions.assertEquals(Optional.of(true), deserPolicyDTO4.inherited());
   }
+
+  @Test
+  public void testIcebergCompactionPolicySerDe() throws JsonProcessingException {
+    AuditDTO audit = AuditDTO.builder().withCreator("user1").withCreateTime(Instant.now()).build();
+    PolicyContentDTO.IcebergCompactionContentDTO typedContent =
+        PolicyContentDTO.IcebergCompactionContentDTO.builder()
+            .withMinDatafileMse(1000L)
+            .withMinDeleteFileNumber(1L)
+            .withRewriteOptions(
+                ImmutableMap.of("target-file-size-bytes", "1048576", "min-input-files", "1"))
+            .build();
+
+    PolicyDTO policyDTO =
+        PolicyDTO.builder()
+            .withName("iceberg-compaction")
+            .withComment("typed policy")
+            .withPolicyType("iceberg-compaction")
+            .withEnabled(true)
+            .withContent(typedContent)
+            .withAudit(audit)
+            .build();
+
+    String serJson = JsonUtils.objectMapper().writeValueAsString(policyDTO);
+    PolicyDTO deserPolicyDTO = JsonUtils.objectMapper().readValue(serJson, PolicyDTO.class);
+
+    Assertions.assertEquals(policyDTO, deserPolicyDTO);
+    Assertions.assertInstanceOf(
+        PolicyContentDTO.IcebergCompactionContentDTO.class, deserPolicyDTO.content());
+  }
 }

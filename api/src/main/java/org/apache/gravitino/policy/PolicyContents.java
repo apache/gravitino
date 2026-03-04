@@ -18,10 +18,16 @@
  */
 package org.apache.gravitino.policy;
 
+import com.google.common.base.Preconditions;
+import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
+import java.util.Collections;
+import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
+import java.util.regex.Pattern;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.MetadataObject;
 
 /** Utility class for creating instances of {@link PolicyContent}. */
@@ -40,6 +46,19 @@ public class PolicyContents {
       Set<MetadataObject.Type> supportedObjectTypes,
       Map<String, String> properties) {
     return new CustomContent(rules, supportedObjectTypes, properties);
+  }
+
+  /**
+   * Creates an iceberg compaction policy content.
+   *
+   * @param minDatafileMse minimum threshold for custom-datafile_mse
+   * @param minDeleteFileNumber minimum threshold for custom-delete_file_number
+   * @param rewriteOptions rewrite options forwarded as job.options.*
+   * @return iceberg compaction policy content
+   */
+  public static PolicyContent icebergCompaction(
+      long minDatafileMse, long minDeleteFileNumber, Map<String, String> rewriteOptions) {
+    return new IcebergCompactionContent(minDatafileMse, minDeleteFileNumber, rewriteOptions);
   }
 
   private PolicyContents() {}
@@ -125,6 +144,146 @@ public class PolicyContents {
           + properties
           + ", supportedObjectTypes="
           + supportedObjectTypes
+          + '}';
+    }
+  }
+
+  /** Built-in policy content for Iceberg compaction strategy. */
+  public static class IcebergCompactionContent implements PolicyContent {
+
+    public static final String STRATEGY_TYPE_KEY = "strategy.type";
+    public static final String STRATEGY_TYPE_VALUE = "compaction";
+    public static final String JOB_TEMPLATE_NAME_KEY = "job.template-name";
+    public static final String JOB_TEMPLATE_NAME_VALUE = "builtin-iceberg-rewrite-data-files";
+    public static final String JOB_OPTIONS_PREFIX = "job.options.";
+    public static final String TRIGGER_EXPR_KEY = "trigger-expr";
+    public static final String SCORE_EXPR_KEY = "score-expr";
+    public static final String MIN_DATAFILE_MSE_KEY = "minDatafileMse";
+    public static final String MIN_DELETE_FILE_NUMBER_KEY = "minDeleteFileNumber";
+    public static final String DATAFILE_MSE_METRIC = "custom-datafile_mse";
+    public static final String DELETE_FILE_NUMBER_METRIC = "custom-delete_file_number";
+
+    private static final Pattern OPTION_KEY_PATTERN = Pattern.compile("[A-Za-z0-9._-]+");
+    private static final Set<MetadataObject.Type> SUPPORTED_OBJECT_TYPES =
+        ImmutableSet.of(MetadataObject.Type.TABLE);
+    private static final String TRIGGER_EXPR =
+        DATAFILE_MSE_METRIC
+            + " > "
+            + MIN_DATAFILE_MSE_KEY
+            + " || "
+            + DELETE_FILE_NUMBER_METRIC
+            + " > "
+            + MIN_DELETE_FILE_NUMBER_KEY;
+    private static final String SCORE_EXPR =
+        DATAFILE_MSE_METRIC + " / 100 + " + DELETE_FILE_NUMBER_METRIC + " * 100";
+
+    private final Long minDatafileMse;
+    private final Long minDeleteFileNumber;
+    private final Map<String, String> rewriteOptions;
+
+    /** Default constructor for Jackson deserialization only. */
+    private IcebergCompactionContent() {
+      this(null, null, null);
+    }
+
+    private IcebergCompactionContent(
+        Long minDatafileMse, Long minDeleteFileNumber, Map<String, String> rewriteOptions) {
+      this.minDatafileMse = minDatafileMse;
+      this.minDeleteFileNumber = minDeleteFileNumber;
+      this.rewriteOptions =
+          rewriteOptions == null
+              ? Map.of()
+              : Collections.unmodifiableMap(new LinkedHashMap<>(rewriteOptions));
+    }
+
+    public Long minDatafileMse() {
+      return minDatafileMse;
+    }
+
+    public Long minDeleteFileNumber() {
+      return minDeleteFileNumber;
+    }
+
+    public Map<String, String> rewriteOptions() {
+      return rewriteOptions;
+    }
+
+    @Override
+    public Set<MetadataObject.Type> supportedObjectTypes() {
+      return SUPPORTED_OBJECT_TYPES;
+    }
+
+    @Override
+    public Map<String, String> properties() {
+      return ImmutableMap.of(
+          STRATEGY_TYPE_KEY, STRATEGY_TYPE_VALUE, JOB_TEMPLATE_NAME_KEY, JOB_TEMPLATE_NAME_VALUE);
+    }
+
+    @Override
+    public Map<String, Object> rules() {
+      Map<String, Object> rules = new LinkedHashMap<>();
+      rules.put(MIN_DATAFILE_MSE_KEY, minDatafileMse);
+      rules.put(MIN_DELETE_FILE_NUMBER_KEY, minDeleteFileNumber);
+      rules.put(TRIGGER_EXPR_KEY, TRIGGER_EXPR);
+      rules.put(SCORE_EXPR_KEY, SCORE_EXPR);
+      rewriteOptions.forEach((key, value) -> rules.put(JOB_OPTIONS_PREFIX + key, value));
+      return Collections.unmodifiableMap(rules);
+    }
+
+    @Override
+    public void validate() throws IllegalArgumentException {
+      PolicyContent.super.validate();
+      Preconditions.checkArgument(
+          minDatafileMse != null && minDatafileMse >= 0,
+          "minDatafileMse must not be null and must be >= 0");
+      Preconditions.checkArgument(
+          minDeleteFileNumber != null && minDeleteFileNumber >= 0,
+          "minDeleteFileNumber must not be null and must be >= 0");
+
+      rewriteOptions.forEach(
+          (key, value) -> {
+            Preconditions.checkArgument(StringUtils.isNotBlank(key), "rewrite option key is blank");
+            Preconditions.checkArgument(
+                OPTION_KEY_PATTERN.matcher(key).matches(),
+                "rewrite option key '%s' contains illegal characters",
+                key);
+            Preconditions.checkArgument(
+                !key.startsWith(JOB_OPTIONS_PREFIX),
+                "rewrite option key '%s' must not start with '%s'",
+                key,
+                JOB_OPTIONS_PREFIX);
+            Preconditions.checkArgument(
+                StringUtils.isNotBlank(value),
+                "rewrite option '%s' must have non-empty value",
+                key);
+          });
+    }
+
+    @Override
+    public boolean equals(Object o) {
+      if (!(o instanceof IcebergCompactionContent)) {
+        return false;
+      }
+      IcebergCompactionContent that = (IcebergCompactionContent) o;
+      return Objects.equals(minDatafileMse, that.minDatafileMse)
+          && Objects.equals(minDeleteFileNumber, that.minDeleteFileNumber)
+          && Objects.equals(rewriteOptions, that.rewriteOptions);
+    }
+
+    @Override
+    public int hashCode() {
+      return Objects.hash(minDatafileMse, minDeleteFileNumber, rewriteOptions);
+    }
+
+    @Override
+    public String toString() {
+      return "IcebergCompactionContent{"
+          + "minDatafileMse="
+          + minDatafileMse
+          + ", minDeleteFileNumber="
+          + minDeleteFileNumber
+          + ", rewriteOptions="
+          + rewriteOptions
           + '}';
     }
   }

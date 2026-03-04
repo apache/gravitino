@@ -20,6 +20,7 @@ package org.apache.gravitino.dto.util;
 
 import static org.apache.gravitino.rel.expressions.transforms.Transforms.NAME_OF_IDENTITY;
 
+import com.google.common.base.Preconditions;
 import java.util.Arrays;
 import java.util.Map;
 import java.util.Optional;
@@ -561,6 +562,16 @@ public class DTOConverters {
           .withCustomRules(customContent.customRules())
           .withSupportedObjectTypes(customContent.supportedObjectTypes())
           .withProperties(customContent.properties())
+          .build();
+    }
+
+    if (policyContent instanceof PolicyContents.IcebergCompactionContent) {
+      PolicyContents.IcebergCompactionContent icebergCompactionContent =
+          (PolicyContents.IcebergCompactionContent) policyContent;
+      return PolicyContentDTO.IcebergCompactionContentDTO.builder()
+          .withMinDatafileMse(icebergCompactionContent.minDatafileMse())
+          .withMinDeleteFileNumber(icebergCompactionContent.minDeleteFileNumber())
+          .withRewriteOptions(icebergCompactionContent.rewriteOptions())
           .build();
     }
 
@@ -1297,7 +1308,21 @@ public class DTOConverters {
           customContentDTO.properties());
     }
 
+    if (policyContentDTO instanceof PolicyContentDTO.IcebergCompactionContentDTO) {
+      PolicyContentDTO.IcebergCompactionContentDTO icebergCompactionContentDTO =
+          (PolicyContentDTO.IcebergCompactionContentDTO) policyContentDTO;
+      return PolicyContents.icebergCompaction(
+          require(icebergCompactionContentDTO.minDatafileMse(), "minDatafileMse"),
+          require(icebergCompactionContentDTO.minDeleteFileNumber(), "minDeleteFileNumber"),
+          icebergCompactionContentDTO.rewriteOptions());
+    }
+
     throw new IllegalArgumentException(
         "Unsupported policy content type: " + policyContentDTO.getClass());
+  }
+
+  private static long require(Long value, String fieldName) {
+    Preconditions.checkArgument(value != null, "%s must not be null", fieldName);
+    return value;
   }
 }
