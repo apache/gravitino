@@ -90,6 +90,12 @@ public interface PolicyContentDTO extends PolicyContent {
     @JsonProperty("minDeleteFileNumber")
     private Long minDeleteFileNumber;
 
+    @JsonProperty("datafileMseWeight")
+    private Long datafileMseWeight;
+
+    @JsonProperty("deleteFileNumberWeight")
+    private Long deleteFileNumberWeight;
+
     @JsonProperty("rewriteOptions")
     private Map<String, String> rewriteOptions;
 
@@ -117,6 +123,28 @@ public interface PolicyContentDTO extends PolicyContent {
     }
 
     /**
+     * Returns the weight for custom-datafile_mse metric in score expression.
+     *
+     * @return data file MSE score weight
+     */
+    public Long datafileMseWeight() {
+      return datafileMseWeight == null
+          ? PolicyContents.IcebergCompactionContent.DEFAULT_DATAFILE_MSE_WEIGHT
+          : datafileMseWeight;
+    }
+
+    /**
+     * Returns the weight for custom-delete_file_number metric in score expression.
+     *
+     * @return delete file number score weight
+     */
+    public Long deleteFileNumberWeight() {
+      return deleteFileNumberWeight == null
+          ? PolicyContents.IcebergCompactionContent.DEFAULT_DELETE_FILE_NUMBER_WEIGHT
+          : deleteFileNumberWeight;
+    }
+
+    /**
      * Returns rewrite options expanded to job.options.* during rule generation.
      *
      * @return rewrite options map
@@ -137,6 +165,8 @@ public interface PolicyContentDTO extends PolicyContent {
       return PolicyContents.icebergCompaction(
               require(minDatafileMse, "minDatafileMse"),
               require(minDeleteFileNumber, "minDeleteFileNumber"),
+              datafileMseWeight(),
+              deleteFileNumberWeight(),
               rewriteOptions())
           .properties();
     }
@@ -146,6 +176,8 @@ public interface PolicyContentDTO extends PolicyContent {
       return PolicyContents.icebergCompaction(
               require(minDatafileMse, "minDatafileMse"),
               require(minDeleteFileNumber, "minDeleteFileNumber"),
+              datafileMseWeight(),
+              deleteFileNumberWeight(),
               rewriteOptions())
           .rules();
     }
@@ -159,6 +191,9 @@ public interface PolicyContentDTO extends PolicyContent {
       Preconditions.checkArgument(
           minDeleteFileNumber != null && minDeleteFileNumber >= 0,
           "minDeleteFileNumber must not be null and must be >= 0");
+      Preconditions.checkArgument(datafileMseWeight() >= 0, "datafileMseWeight must be >= 0");
+      Preconditions.checkArgument(
+          deleteFileNumberWeight() >= 0, "deleteFileNumberWeight must be >= 0");
       rewriteOptions()
           .forEach(
               (key, value) -> {

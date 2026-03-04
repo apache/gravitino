@@ -115,6 +115,8 @@ public class TestPolicyDTO {
         PolicyContentDTO.IcebergCompactionContentDTO.builder()
             .withMinDatafileMse(1000L)
             .withMinDeleteFileNumber(1L)
+            .withDatafileMseWeight(2L)
+            .withDeleteFileNumberWeight(150L)
             .withRewriteOptions(
                 ImmutableMap.of("target-file-size-bytes", "1048576", "min-input-files", "1"))
             .build();

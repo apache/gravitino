@@ -37,14 +37,33 @@ public class TestPolicyContents {
         "builtin-iceberg-rewrite-data-files", content.properties().get("job.template-name"));
     Assertions.assertEquals(1000L, content.rules().get("minDatafileMse"));
     Assertions.assertEquals(1L, content.rules().get("minDeleteFileNumber"));
+    Assertions.assertEquals(1L, content.rules().get("datafileMseWeight"));
+    Assertions.assertEquals(100L, content.rules().get("deleteFileNumberWeight"));
     Assertions.assertEquals(
         "custom-datafile_mse > minDatafileMse || custom-delete_file_number > minDeleteFileNumber",
         content.rules().get("trigger-expr"));
     Assertions.assertEquals(
-        "custom-datafile_mse / 100 + custom-delete_file_number * 100",
+        "custom-datafile_mse * datafileMseWeight / 100"
+            + " + custom-delete_file_number * deleteFileNumberWeight",
         content.rules().get("score-expr"));
     Assertions.assertEquals("1048576", content.rules().get("job.options.target-file-size-bytes"));
     Assertions.assertEquals("1", content.rules().get("job.options.min-input-files"));
+  }
+
+  @Test
+  void testIcebergCompactionContentSupportsCustomWeights() {
+    PolicyContents.IcebergCompactionContent content =
+        (PolicyContents.IcebergCompactionContent)
+            PolicyContents.icebergCompaction(
+                1000L,
+                1L,
+                3L,
+                200L,
+                Map.of("target-file-size-bytes", "1048576", "min-input-files", "1"));
+
+    Assertions.assertEquals(3L, content.rules().get("datafileMseWeight"));
+    Assertions.assertEquals(200L, content.rules().get("deleteFileNumberWeight"));
+    Assertions.assertDoesNotThrow(content::validate);
   }
 
   @Test

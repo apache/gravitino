@@ -58,7 +58,36 @@ public class PolicyContents {
    */
   public static PolicyContent icebergCompaction(
       long minDatafileMse, long minDeleteFileNumber, Map<String, String> rewriteOptions) {
-    return new IcebergCompactionContent(minDatafileMse, minDeleteFileNumber, rewriteOptions);
+    return new IcebergCompactionContent(
+        minDatafileMse,
+        minDeleteFileNumber,
+        IcebergCompactionContent.DEFAULT_DATAFILE_MSE_WEIGHT,
+        IcebergCompactionContent.DEFAULT_DELETE_FILE_NUMBER_WEIGHT,
+        rewriteOptions);
+  }
+
+  /**
+   * Creates an iceberg compaction policy content with configurable score weights.
+   *
+   * @param minDatafileMse minimum threshold for custom-datafile_mse
+   * @param minDeleteFileNumber minimum threshold for custom-delete_file_number
+   * @param datafileMseWeight weight used for custom-datafile_mse score contribution
+   * @param deleteFileNumberWeight weight used for custom-delete_file_number score contribution
+   * @param rewriteOptions rewrite options forwarded as job.options.*
+   * @return iceberg compaction policy content
+   */
+  public static PolicyContent icebergCompaction(
+      long minDatafileMse,
+      long minDeleteFileNumber,
+      long datafileMseWeight,
+      long deleteFileNumberWeight,
+      Map<String, String> rewriteOptions) {
+    return new IcebergCompactionContent(
+        minDatafileMse,
+        minDeleteFileNumber,
+        datafileMseWeight,
+        deleteFileNumberWeight,
+        rewriteOptions);
   }
 
   private PolicyContents() {}
@@ -168,10 +197,18 @@ public class PolicyContents {
     public static final String MIN_DATAFILE_MSE_KEY = "minDatafileMse";
     /** Rule key for minimum delete file count threshold. */
     public static final String MIN_DELETE_FILE_NUMBER_KEY = "minDeleteFileNumber";
+    /** Rule key for data file MSE score weight. */
+    public static final String DATAFILE_MSE_WEIGHT_KEY = "datafileMseWeight";
+    /** Rule key for delete file number score weight. */
+    public static final String DELETE_FILE_NUMBER_WEIGHT_KEY = "deleteFileNumberWeight";
     /** Metric name for data file MSE. */
     public static final String DATAFILE_MSE_METRIC = "custom-datafile_mse";
     /** Metric name for delete file number. */
     public static final String DELETE_FILE_NUMBER_METRIC = "custom-delete_file_number";
+    /** Default score weight for data file MSE. */
+    public static final long DEFAULT_DATAFILE_MSE_WEIGHT = 1L;
+    /** Default score weight for delete file number. */
+    public static final long DEFAULT_DELETE_FILE_NUMBER_WEIGHT = 100L;
 
     private static final Pattern OPTION_KEY_PATTERN = Pattern.compile("[A-Za-z0-9._-]+");
     private static final Set<MetadataObject.Type> SUPPORTED_OBJECT_TYPES =
@@ -185,21 +222,39 @@ public class PolicyContents {
             + " > "
             + MIN_DELETE_FILE_NUMBER_KEY;
     private static final String SCORE_EXPR =
-        DATAFILE_MSE_METRIC + " / 100 + " + DELETE_FILE_NUMBER_METRIC + " * 100";
+        DATAFILE_MSE_METRIC
+            + " * "
+            + DATAFILE_MSE_WEIGHT_KEY
+            + " / 100 + "
+            + DELETE_FILE_NUMBER_METRIC
+            + " * "
+            + DELETE_FILE_NUMBER_WEIGHT_KEY;
 
     private final Long minDatafileMse;
     private final Long minDeleteFileNumber;
+    private final Long datafileMseWeight;
+    private final Long deleteFileNumberWeight;
     private final Map<String, String> rewriteOptions;
 
     /** Default constructor for Jackson deserialization only. */
     private IcebergCompactionContent() {
-      this(null, null, null);
+      this(null, null, null, null, null);
     }
 
     private IcebergCompactionContent(
-        Long minDatafileMse, Long minDeleteFileNumber, Map<String, String> rewriteOptions) {
+        Long minDatafileMse,
+        Long minDeleteFileNumber,
+        Long datafileMseWeight,
+        Long deleteFileNumberWeight,
+        Map<String, String> rewriteOptions) {
       this.minDatafileMse = minDatafileMse;
       this.minDeleteFileNumber = minDeleteFileNumber;
+      this.datafileMseWeight =
+          datafileMseWeight == null ? DEFAULT_DATAFILE_MSE_WEIGHT : datafileMseWeight;
+      this.deleteFileNumberWeight =
+          deleteFileNumberWeight == null
+              ? DEFAULT_DELETE_FILE_NUMBER_WEIGHT
+              : deleteFileNumberWeight;
       this.rewriteOptions =
           rewriteOptions == null
               ? Map.of()
@@ -222,6 +277,24 @@ public class PolicyContents {
      */
     public Long minDeleteFileNumber() {
       return minDeleteFileNumber;
+    }
+
+    /**
+     * Returns the weight used by {@value DATAFILE_MSE_METRIC} in score expression.
+     *
+     * @return data file MSE score weight
+     */
+    public Long datafileMseWeight() {
+      return datafileMseWeight;
+    }
+
+    /**
+     * Returns the weight used by {@value DELETE_FILE_NUMBER_METRIC} in score expression.
+     *
+     * @return delete file number score weight
+     */
+    public Long deleteFileNumberWeight() {
+      return deleteFileNumberWeight;
     }
 
     /**
@@ -249,6 +322,8 @@ public class PolicyContents {
       Map<String, Object> rules = new LinkedHashMap<>();
       rules.put(MIN_DATAFILE_MSE_KEY, minDatafileMse);
       rules.put(MIN_DELETE_FILE_NUMBER_KEY, minDeleteFileNumber);
+      rules.put(DATAFILE_MSE_WEIGHT_KEY, datafileMseWeight);
+      rules.put(DELETE_FILE_NUMBER_WEIGHT_KEY, deleteFileNumberWeight);
       rules.put(TRIGGER_EXPR_KEY, TRIGGER_EXPR);
       rules.put(SCORE_EXPR_KEY, SCORE_EXPR);
       rewriteOptions.forEach((key, value) -> rules.put(JOB_OPTIONS_PREFIX + key, value));
@@ -264,6 +339,12 @@ public class PolicyContents {
       Preconditions.checkArgument(
           minDeleteFileNumber != null && minDeleteFileNumber >= 0,
           "minDeleteFileNumber must not be null and must be >= 0");
+      Preconditions.checkArgument(
+          datafileMseWeight != null && datafileMseWeight >= 0,
+          "datafileMseWeight must not be null and must be >= 0");
+      Preconditions.checkArgument(
+          deleteFileNumberWeight != null && deleteFileNumberWeight >= 0,
+          "deleteFileNumberWeight must not be null and must be >= 0");
 
       rewriteOptions.forEach(
           (key, value) -> {
@@ -292,12 +373,19 @@ public class PolicyContents {
       IcebergCompactionContent that = (IcebergCompactionContent) o;
       return Objects.equals(minDatafileMse, that.minDatafileMse)
           && Objects.equals(minDeleteFileNumber, that.minDeleteFileNumber)
+          && Objects.equals(datafileMseWeight, that.datafileMseWeight)
+          && Objects.equals(deleteFileNumberWeight, that.deleteFileNumberWeight)
           && Objects.equals(rewriteOptions, that.rewriteOptions);
     }
 
     @Override
     public int hashCode() {
-      return Objects.hash(minDatafileMse, minDeleteFileNumber, rewriteOptions);
+      return Objects.hash(
+          minDatafileMse,
+          minDeleteFileNumber,
+          datafileMseWeight,
+          deleteFileNumberWeight,
+          rewriteOptions);
     }
 
     @Override
@@ -307,6 +395,10 @@ public class PolicyContents {
           + minDatafileMse
           + ", minDeleteFileNumber="
           + minDeleteFileNumber
+          + ", datafileMseWeight="
+          + datafileMseWeight
+          + ", deleteFileNumberWeight="
+          + deleteFileNumberWeight
           + ", rewriteOptions="
           + rewriteOptions
           + '}';

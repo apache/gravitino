@@ -571,6 +571,8 @@ public class DTOConverters {
       return PolicyContentDTO.IcebergCompactionContentDTO.builder()
           .withMinDatafileMse(icebergCompactionContent.minDatafileMse())
           .withMinDeleteFileNumber(icebergCompactionContent.minDeleteFileNumber())
+          .withDatafileMseWeight(icebergCompactionContent.datafileMseWeight())
+          .withDeleteFileNumberWeight(icebergCompactionContent.deleteFileNumberWeight())
           .withRewriteOptions(icebergCompactionContent.rewriteOptions())
           .build();
     }
@@ -1314,6 +1316,8 @@ public class DTOConverters {
       return PolicyContents.icebergCompaction(
           require(icebergCompactionContentDTO.minDatafileMse(), "minDatafileMse"),
           require(icebergCompactionContentDTO.minDeleteFileNumber(), "minDeleteFileNumber"),
+          require(icebergCompactionContentDTO.datafileMseWeight(), "datafileMseWeight"),
+          require(icebergCompactionContentDTO.deleteFileNumberWeight(), "deleteFileNumberWeight"),
           icebergCompactionContentDTO.rewriteOptions());
     }
 
