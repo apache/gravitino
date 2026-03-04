@@ -84,6 +84,7 @@ jobs:
             -x :spark-connector:spark-runtime-3.3:test -x :spark-connector:spark-runtime-3.4:test -x :spark-connector:spark-runtime-3.5:test \
             -x :trino-connector:integration-test:test -x :trino-connector:trino-connector:test \
             -x :authorizations:authorization-chain:test -x :authorizations:authorization-ranger:test \
+            -x :clients:cli:test -x :maintenance:jobs:test -x :maintenance:optimizer:test \
             $EXCLUDE_CONTRIB_TESTS
 
       - name: Upload integrate tests reports
