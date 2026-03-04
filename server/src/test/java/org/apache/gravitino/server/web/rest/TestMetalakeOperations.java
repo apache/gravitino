@@ -234,6 +234,22 @@ public class TestMetalakeOperations extends BaseOperationsTest {
   }
 
   @Test
+  public void testCreateMetalakeWithNullRequest() {
+    Response resp =
+        target("/metalakes")
+            .request(MediaType.APPLICATION_JSON_TYPE)
+            .accept("application/vnd.gravitino.v1+json")
+            .post(Entity.entity("null", MediaType.APPLICATION_JSON_TYPE));
+
+    Assertions.assertEquals(Response.Status.BAD_REQUEST.getStatusCode(), resp.getStatus());
+
+    ErrorResponse errorResponse = resp.readEntity(ErrorResponse.class);
+    Assertions.assertEquals(ErrorConstants.ILLEGAL_ARGUMENTS_CODE, errorResponse.getCode());
+    Assertions.assertEquals(
+        IllegalArgumentException.class.getSimpleName(), errorResponse.getType());
+  }
+
+  @Test
   public void testLoadMetalake() {
     String metalakeName = "test";
     Long id = 1L;
