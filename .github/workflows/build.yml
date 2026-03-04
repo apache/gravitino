@@ -5,8 +5,16 @@ on:
   # Triggers the workflow on push or pull request events but only for the "main" branch
   push:
     branches: [ "main", "branch-*" ]
+    paths-ignore:
+      - '**/*.md'
+      - '**/*.mdx'
+      - 'docs/assets/**'
   pull_request:
     branches: [ "main", "branch-*" ]
+    paths-ignore:
+      - '**/*.md'
+      - '**/*.mdx'
+      - 'docs/assets/**'
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
@@ -42,8 +50,13 @@ jobs:
               - '**/resources/**'
               - '**/src/**'
               - '!**/*.md'
-              - '!**/*.png'
-              - '!**/*.svg'
+              - '!**/*.mdx'
+              - '!docs/**/*.png'
+              - '!docs/**/*.svg'
+              - '!docs/**/*.jpg'
+              - '!docs/**/*.jpeg'
+              - '!docs/**/*.gif'
+              - '!docs/**/*.webp'
               - 'mcp-server/**'
             spark_connector_changes:
               - spark-connector/**
