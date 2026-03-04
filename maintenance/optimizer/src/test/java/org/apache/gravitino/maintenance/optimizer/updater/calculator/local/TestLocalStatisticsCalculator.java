@@ -32,6 +32,7 @@ import org.apache.gravitino.maintenance.optimizer.api.common.StatisticEntry;
 import org.apache.gravitino.maintenance.optimizer.api.common.TableAndPartitionStatistics;
 import org.apache.gravitino.maintenance.optimizer.common.OptimizerEnv;
 import org.apache.gravitino.maintenance.optimizer.common.PartitionEntryImpl;
+import org.apache.gravitino.maintenance.optimizer.common.StatisticsInputContent;
 import org.apache.gravitino.maintenance.optimizer.common.conf.OptimizerConfig;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
@@ -52,7 +53,7 @@ class TestLocalStatisticsCalculator {
             "{\"identifier\":\"other\",\"stats-type\":\"table\",\"s1\":100}"));
 
     LocalStatisticsCalculator calculator = new LocalStatisticsCalculator();
-    OptimizerEnv env = new OptimizerEnv(createConfig(statsFile.toString(), null));
+    OptimizerEnv env = createEnv(statsFile.toString(), null);
     calculator.initialize(env);
 
     List<StatisticEntry<?>> stats =
@@ -75,7 +76,7 @@ class TestLocalStatisticsCalculator {
             "{\"identifier\":\"catalog.schema.other\",\"stats-type\":\"table\",\"s1\":10}"));
 
     LocalStatisticsCalculator calculator = new LocalStatisticsCalculator();
-    OptimizerEnv env = new OptimizerEnv(createConfig(statsFile.toString(), null));
+    OptimizerEnv env = createEnv(statsFile.toString(), null);
     calculator.initialize(env);
 
     Map<NameIdentifier, TableAndPartitionStatistics> allStatistics =
@@ -105,7 +106,7 @@ class TestLocalStatisticsCalculator {
             "{\"identifier\":\"catalog.schema.table\",\"stats-type\":\"table\",\"s1\":3}");
 
     LocalStatisticsCalculator calculator = new LocalStatisticsCalculator();
-    OptimizerEnv env = new OptimizerEnv(createConfig(null, payload));
+    OptimizerEnv env = createEnv(null, payload);
     calculator.initialize(env);
 
     List<StatisticEntry<?>> stats =
@@ -128,7 +129,7 @@ class TestLocalStatisticsCalculator {
             "{\"identifier\":\"catalog.schema.table\",\"stats-type\":\"table\",\"s2\":\"2.5\"}");
 
     LocalStatisticsCalculator calculator = new LocalStatisticsCalculator();
-    OptimizerEnv env = new OptimizerEnv(createConfig(null, payload));
+    OptimizerEnv env = createEnv(null, payload);
     calculator.initialize(env);
 
     List<StatisticEntry<?>> stats =
@@ -153,7 +154,7 @@ class TestLocalStatisticsCalculator {
                 + "\"duration\":3}");
 
     LocalStatisticsCalculator calculator = new LocalStatisticsCalculator();
-    OptimizerEnv env = new OptimizerEnv(createConfig(null, payload));
+    OptimizerEnv env = createEnv(null, payload);
     calculator.initialize(env);
 
     Map<String, MetricPoint> tableMetrics =
@@ -180,7 +181,7 @@ class TestLocalStatisticsCalculator {
             "{\"identifier\":\"catalog.schema.job2\",\"stats-type\":\"job\",\"duration\":1}");
 
     LocalStatisticsCalculator calculator = new LocalStatisticsCalculator();
-    OptimizerEnv env = new OptimizerEnv(createConfig(null, payload));
+    OptimizerEnv env = createEnv(null, payload);
     calculator.initialize(env);
 
     List<StatisticEntry<?>> stats =
@@ -197,7 +198,7 @@ class TestLocalStatisticsCalculator {
         "{\"identifier\":\"org.team.pipeline.stage.job42\",\"stats-type\":\"job\",\"duration\":10}";
 
     LocalStatisticsCalculator calculator = new LocalStatisticsCalculator();
-    OptimizerEnv env = new OptimizerEnv(createConfig(null, payload));
+    OptimizerEnv env = createEnv(null, payload);
     calculator.initialize(env);
 
     List<StatisticEntry<?>> stats =
@@ -212,7 +213,7 @@ class TestLocalStatisticsCalculator {
         "{\"identifier\":\"catalog.db.schema.extra.table\",\"stats-type\":\"table\",\"rows\":10}";
 
     LocalStatisticsCalculator calculator = new LocalStatisticsCalculator();
-    OptimizerEnv env = new OptimizerEnv(createConfig(null, payload));
+    OptimizerEnv env = createEnv(null, payload);
     calculator.initialize(env);
 
     List<StatisticEntry<?>> stats =
@@ -235,7 +236,7 @@ class TestLocalStatisticsCalculator {
                 + "\"partition-path\":{\"dt\":\"2024-01-02\"},\"rows\":5}");
 
     LocalStatisticsCalculator calculator = new LocalStatisticsCalculator();
-    OptimizerEnv env = new OptimizerEnv(createConfig(null, payload));
+    OptimizerEnv env = createEnv(null, payload);
     calculator.initialize(env);
 
     Map<PartitionPath, List<StatisticEntry<?>>> partitionStatistics =
@@ -268,7 +269,7 @@ class TestLocalStatisticsCalculator {
                 + "\"partition-path\":{\"dt\":\"2024-01-02\"},\"rows\":30}");
 
     LocalStatisticsCalculator calculator = new LocalStatisticsCalculator();
-    OptimizerEnv env = new OptimizerEnv(createConfig(null, payload));
+    OptimizerEnv env = createEnv(null, payload);
     calculator.initialize(env);
 
     Map<NameIdentifier, TableAndPartitionStatistics> allStatistics =
@@ -307,7 +308,7 @@ class TestLocalStatisticsCalculator {
             "{\"identifier\":\"catalog.schema.job2\",\"stats-type\":\"job\",\"duration\":7}");
 
     LocalStatisticsCalculator calculator = new LocalStatisticsCalculator();
-    OptimizerEnv env = new OptimizerEnv(createConfig(null, payload));
+    OptimizerEnv env = createEnv(null, payload);
     calculator.initialize(env);
 
     Map<NameIdentifier, List<StatisticEntry<?>>> allStatistics =
@@ -337,7 +338,7 @@ class TestLocalStatisticsCalculator {
             "{\"identifier\":\"catalog.schema.table\",\"stats-type\":\"table\",\"s2\":2}");
 
     LocalStatisticsCalculator calculator = new LocalStatisticsCalculator();
-    OptimizerEnv env = new OptimizerEnv(createConfig(null, payload));
+    OptimizerEnv env = createEnv(null, payload);
     calculator.initialize(env);
 
     List<StatisticEntry<?>> stats =
@@ -360,7 +361,7 @@ class TestLocalStatisticsCalculator {
             "{\"identifier\":\"catalog.schema.table\",\"stats-type\":\"table\",\"s3\":3}");
 
     LocalStatisticsCalculator calculator = new LocalStatisticsCalculator();
-    OptimizerEnv env = new OptimizerEnv(createConfig(null, payload));
+    OptimizerEnv env = createEnv(null, payload);
     calculator.initialize(env);
 
     List<StatisticEntry<?>> stats =
@@ -385,7 +386,7 @@ class TestLocalStatisticsCalculator {
                 + "\"partition-path\":{\"dt\":\"2024-01-02\"},\"rows\":3}");
 
     LocalStatisticsCalculator calculator = new LocalStatisticsCalculator();
-    OptimizerEnv env = new OptimizerEnv(createConfig(null, payload));
+    OptimizerEnv env = createEnv(null, payload);
     calculator.initialize(env);
 
     Map<PartitionPath, List<StatisticEntry<?>>> partitionStatistics =
@@ -406,7 +407,7 @@ class TestLocalStatisticsCalculator {
             + "\"partition-path\":{\"p1\":\"v1\",\"p2\":\"v2\"},\"rows\":1}";
 
     LocalStatisticsCalculator calculator = new LocalStatisticsCalculator();
-    OptimizerEnv env = new OptimizerEnv(createConfig(null, payload));
+    OptimizerEnv env = createEnv(null, payload);
     calculator.initialize(env);
 
     Map<PartitionPath, List<StatisticEntry<?>>> partitionStatistics =
@@ -428,7 +429,7 @@ class TestLocalStatisticsCalculator {
     String payload = "{\"identifier\":\"job-1\",\"stats-type\":\"job\",\"duration\":10}";
 
     LocalStatisticsCalculator calculator = new LocalStatisticsCalculator();
-    OptimizerEnv env = new OptimizerEnv(createConfig(null, payload));
+    OptimizerEnv env = createEnv(null, payload);
     calculator.initialize(env);
 
     List<StatisticEntry<?>> stats =
@@ -456,7 +457,7 @@ class TestLocalStatisticsCalculator {
   void testNullIdentifierFailsFast() {
     String payload = "{\"identifier\":\"catalog.schema.table\",\"stats-type\":\"table\",\"s1\":1}";
     LocalStatisticsCalculator calculator = new LocalStatisticsCalculator();
-    OptimizerEnv env = new OptimizerEnv(createConfig(null, payload));
+    OptimizerEnv env = createEnv(null, payload);
     calculator.initialize(env);
 
     Assertions.assertThrows(
@@ -468,26 +469,27 @@ class TestLocalStatisticsCalculator {
   @Test
   void testInitializeWithoutFilePathAndPayloadFails() {
     LocalStatisticsCalculator calculator = new LocalStatisticsCalculator();
-    OptimizerEnv env = new OptimizerEnv(createConfig(null, null));
+    OptimizerEnv env = createEnv(null, null);
 
     IllegalArgumentException exception =
         Assertions.assertThrows(IllegalArgumentException.class, () -> calculator.initialize(env));
     Assertions.assertTrue(
-        exception.getMessage().contains(LocalStatisticsCalculator.STATISTICS_FILE_PATH_CONFIG));
-    Assertions.assertTrue(
-        exception.getMessage().contains(LocalStatisticsCalculator.STATISTICS_PAYLOAD_CONFIG));
+        exception
+            .getMessage()
+            .contains("LocalStatisticsCalculator requires runtime statistics input content."));
   }
 
-  private OptimizerConfig createConfig(String statisticsFilePath, String statisticsPayload) {
+  private OptimizerEnv createEnv(String statisticsFilePath, String statisticsPayload) {
     Map<String, String> configs = new HashMap<>();
     configs.put(OptimizerConfig.GRAVITINO_DEFAULT_CATALOG_CONFIG.getKey(), "catalog");
+    OptimizerEnv env = new OptimizerEnv(new OptimizerConfig(configs));
     if (statisticsFilePath != null) {
-      configs.put(LocalStatisticsCalculator.STATISTICS_FILE_PATH_CONFIG, statisticsFilePath);
+      return env.withContent(StatisticsInputContent.fromFilePath(statisticsFilePath));
     }
     if (statisticsPayload != null) {
-      configs.put(LocalStatisticsCalculator.STATISTICS_PAYLOAD_CONFIG, statisticsPayload);
+      return env.withContent(StatisticsInputContent.fromPayload(statisticsPayload));
     }
-    return new OptimizerConfig(configs);
+    return env;
   }
 
   private Map<String, StatisticEntry<?>> toNameMap(List<StatisticEntry<?>> stats) {
