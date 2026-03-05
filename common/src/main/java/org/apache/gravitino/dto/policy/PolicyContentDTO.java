@@ -18,6 +18,7 @@
  */
 package org.apache.gravitino.dto.policy;
 
+import com.fasterxml.jackson.annotation.JsonAlias;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableSet;
@@ -32,6 +33,7 @@ import lombok.EqualsAndHashCode;
 import lombok.ToString;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.MetadataObject;
+import org.apache.gravitino.policy.IcebergCompactionContent;
 import org.apache.gravitino.policy.PolicyContent;
 import org.apache.gravitino.policy.PolicyContents;
 
@@ -84,14 +86,16 @@ public interface PolicyContentDTO extends PolicyContent {
   @AllArgsConstructor(access = lombok.AccessLevel.PRIVATE)
   class IcebergCompactionContentDTO implements PolicyContentDTO {
 
-    @JsonProperty("minDatafileMse")
-    private Long minDatafileMse;
+    @JsonProperty("minDataFileMse")
+    @JsonAlias("minDatafileMse")
+    private Long minDataFileMse;
 
     @JsonProperty("minDeleteFileNumber")
     private Long minDeleteFileNumber;
 
-    @JsonProperty("datafileMseWeight")
-    private Long datafileMseWeight;
+    @JsonProperty("dataFileMseWeight")
+    @JsonAlias("datafileMseWeight")
+    private Long dataFileMseWeight;
 
     @JsonProperty("deleteFileNumberWeight")
     private Long deleteFileNumberWeight;
@@ -105,12 +109,12 @@ public interface PolicyContentDTO extends PolicyContent {
     private IcebergCompactionContentDTO() {}
 
     /**
-     * Returns the minimum threshold for custom-datafile_mse metric.
+     * Returns the minimum threshold for custom-data_file_mse metric.
      *
      * @return minimum data file MSE threshold
      */
-    public Long minDatafileMse() {
-      return minDatafileMse;
+    public Long minDataFileMse() {
+      return minDataFileMse;
     }
 
     /**
@@ -123,14 +127,14 @@ public interface PolicyContentDTO extends PolicyContent {
     }
 
     /**
-     * Returns the weight for custom-datafile_mse metric in score expression.
+     * Returns the weight for custom-data_file_mse metric in score expression.
      *
      * @return data file MSE score weight
      */
-    public Long datafileMseWeight() {
-      return datafileMseWeight == null
-          ? PolicyContents.IcebergCompactionContent.DEFAULT_DATAFILE_MSE_WEIGHT
-          : datafileMseWeight;
+    public Long dataFileMseWeight() {
+      return dataFileMseWeight == null
+          ? IcebergCompactionContent.DEFAULT_DATA_FILE_MSE_WEIGHT
+          : dataFileMseWeight;
     }
 
     /**
@@ -140,7 +144,7 @@ public interface PolicyContentDTO extends PolicyContent {
      */
     public Long deleteFileNumberWeight() {
       return deleteFileNumberWeight == null
-          ? PolicyContents.IcebergCompactionContent.DEFAULT_DELETE_FILE_NUMBER_WEIGHT
+          ? IcebergCompactionContent.DEFAULT_DELETE_FILE_NUMBER_WEIGHT
           : deleteFileNumberWeight;
     }
 
@@ -164,9 +168,9 @@ public interface PolicyContentDTO extends PolicyContent {
     @Override
     public Map<String, String> properties() {
       return PolicyContents.icebergCompaction(
-              require(minDatafileMse, "minDatafileMse"),
+              require(minDataFileMse, "minDataFileMse"),
               require(minDeleteFileNumber, "minDeleteFileNumber"),
-              datafileMseWeight(),
+              dataFileMseWeight(),
               deleteFileNumberWeight(),
               rewriteOptions())
           .properties();
@@ -175,9 +179,9 @@ public interface PolicyContentDTO extends PolicyContent {
     @Override
     public Map<String, Object> rules() {
       return PolicyContents.icebergCompaction(
-              require(minDatafileMse, "minDatafileMse"),
+              require(minDataFileMse, "minDataFileMse"),
               require(minDeleteFileNumber, "minDeleteFileNumber"),
-              datafileMseWeight(),
+              dataFileMseWeight(),
               deleteFileNumberWeight(),
               rewriteOptions())
           .rules();
@@ -187,12 +191,12 @@ public interface PolicyContentDTO extends PolicyContent {
     public void validate() throws IllegalArgumentException {
       PolicyContentDTO.super.validate();
       Preconditions.checkArgument(
-          minDatafileMse != null && minDatafileMse >= 0,
-          "minDatafileMse must not be null and must be >= 0");
+          minDataFileMse != null && minDataFileMse >= 0,
+          "minDataFileMse must not be null and must be >= 0");
       Preconditions.checkArgument(
           minDeleteFileNumber != null && minDeleteFileNumber >= 0,
           "minDeleteFileNumber must not be null and must be >= 0");
-      Preconditions.checkArgument(datafileMseWeight() >= 0, "datafileMseWeight must be >= 0");
+      Preconditions.checkArgument(dataFileMseWeight() >= 0, "dataFileMseWeight must be >= 0");
       Preconditions.checkArgument(
           deleteFileNumberWeight() >= 0, "deleteFileNumberWeight must be >= 0");
       rewriteOptions()
@@ -205,10 +209,10 @@ public interface PolicyContentDTO extends PolicyContent {
                     "rewrite option key '%s' contains illegal characters",
                     key);
                 Preconditions.checkArgument(
-                    !key.startsWith(PolicyContents.IcebergCompactionContent.JOB_OPTIONS_PREFIX),
+                    !key.startsWith(IcebergCompactionContent.JOB_OPTIONS_PREFIX),
                     "rewrite option key '%s' must not start with '%s'",
                     key,
-                    PolicyContents.IcebergCompactionContent.JOB_OPTIONS_PREFIX);
+                    IcebergCompactionContent.JOB_OPTIONS_PREFIX);
                 Preconditions.checkArgument(
                     StringUtils.isNotBlank(value),
                     "rewrite option '%s' must have non-empty value",

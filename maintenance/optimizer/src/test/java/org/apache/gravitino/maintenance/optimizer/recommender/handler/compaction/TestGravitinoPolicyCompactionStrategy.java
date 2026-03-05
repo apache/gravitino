@@ -65,7 +65,7 @@ class TestGravitinoPolicyCompactionStrategy {
     Mockito.when(tableMetadata.columns()).thenReturn(new Column[0]);
     List<StatisticEntry<?>> tableStatistics =
         List.of(
-            new StatisticEntryImpl("custom-datafile_mse", StatisticValues.longValue(3000L)),
+            new StatisticEntryImpl("custom-data_file_mse", StatisticValues.longValue(3000L)),
             new StatisticEntryImpl("custom-delete_file_number", StatisticValues.longValue(5L)));
 
     StrategyHandlerContext context =
@@ -89,5 +89,36 @@ class TestGravitinoPolicyCompactionStrategy {
         Map.of("target-file-size-bytes", "1048576", "min-input-files", "4"),
         jobContext.jobOptions());
     Assertions.assertTrue(jobContext.getPartitions().isEmpty());
+  }
+
+  @Test
+  void testPolicySupportsLegacyDataFileMetricName() {
+    PolicyContent content =
+        PolicyContents.icebergCompaction(1000L, 1L, 2L, 10L, Map.of("min-input-files", "4"));
+    Policy policy = Mockito.mock(Policy.class);
+    Mockito.when(policy.name()).thenReturn("iceberg-compaction-policy");
+    Mockito.when(policy.content()).thenReturn(content);
+
+    GravitinoStrategy strategy = new GravitinoStrategy(policy);
+    NameIdentifier tableId = NameIdentifier.of("db", "table");
+    Table tableMetadata = Mockito.mock(Table.class);
+    Mockito.when(tableMetadata.partitioning()).thenReturn(new Transform[0]);
+    Mockito.when(tableMetadata.columns()).thenReturn(new Column[0]);
+    List<StatisticEntry<?>> tableStatistics =
+        List.of(
+            new StatisticEntryImpl("custom-datafile_mse", StatisticValues.longValue(3000L)),
+            new StatisticEntryImpl("custom-delete_file_number", StatisticValues.longValue(5L)));
+
+    StrategyHandlerContext context =
+        StrategyHandlerContext.builder(tableId, strategy)
+            .withTableMetadata(tableMetadata)
+            .withTableStatistics(tableStatistics)
+            .build();
+
+    CompactionStrategyHandler handler = new CompactionStrategyHandler();
+    handler.initialize(context);
+
+    Assertions.assertTrue(handler.shouldTrigger());
+    Assertions.assertEquals(110L, handler.evaluate().score());
   }
 }

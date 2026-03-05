@@ -98,6 +98,7 @@ import org.apache.gravitino.job.SparkJobTemplate;
 import org.apache.gravitino.messaging.Topic;
 import org.apache.gravitino.model.Model;
 import org.apache.gravitino.model.ModelVersion;
+import org.apache.gravitino.policy.IcebergCompactionContent;
 import org.apache.gravitino.policy.PolicyContent;
 import org.apache.gravitino.policy.PolicyContents;
 import org.apache.gravitino.rel.Column;
@@ -565,13 +566,12 @@ public class DTOConverters {
           .build();
     }
 
-    if (policyContent instanceof PolicyContents.IcebergCompactionContent) {
-      PolicyContents.IcebergCompactionContent icebergCompactionContent =
-          (PolicyContents.IcebergCompactionContent) policyContent;
+    if (policyContent instanceof IcebergCompactionContent) {
+      IcebergCompactionContent icebergCompactionContent = (IcebergCompactionContent) policyContent;
       return PolicyContentDTO.IcebergCompactionContentDTO.builder()
-          .withMinDatafileMse(icebergCompactionContent.minDatafileMse())
+          .withMinDataFileMse(icebergCompactionContent.minDataFileMse())
           .withMinDeleteFileNumber(icebergCompactionContent.minDeleteFileNumber())
-          .withDatafileMseWeight(icebergCompactionContent.datafileMseWeight())
+          .withDataFileMseWeight(icebergCompactionContent.dataFileMseWeight())
           .withDeleteFileNumberWeight(icebergCompactionContent.deleteFileNumberWeight())
           .withRewriteOptions(icebergCompactionContent.rewriteOptions())
           .build();
@@ -1314,9 +1314,9 @@ public class DTOConverters {
       PolicyContentDTO.IcebergCompactionContentDTO icebergCompactionContentDTO =
           (PolicyContentDTO.IcebergCompactionContentDTO) policyContentDTO;
       return PolicyContents.icebergCompaction(
-          require(icebergCompactionContentDTO.minDatafileMse(), "minDatafileMse"),
+          require(icebergCompactionContentDTO.minDataFileMse(), "minDataFileMse"),
           require(icebergCompactionContentDTO.minDeleteFileNumber(), "minDeleteFileNumber"),
-          require(icebergCompactionContentDTO.datafileMseWeight(), "datafileMseWeight"),
+          require(icebergCompactionContentDTO.dataFileMseWeight(), "dataFileMseWeight"),
           require(icebergCompactionContentDTO.deleteFileNumberWeight(), "deleteFileNumberWeight"),
           icebergCompactionContentDTO.rewriteOptions());
     }
