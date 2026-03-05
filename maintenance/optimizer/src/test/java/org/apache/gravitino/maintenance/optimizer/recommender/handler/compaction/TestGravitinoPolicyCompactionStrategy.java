@@ -65,8 +65,8 @@ class TestGravitinoPolicyCompactionStrategy {
     Mockito.when(tableMetadata.columns()).thenReturn(new Column[0]);
     List<StatisticEntry<?>> tableStatistics =
         List.of(
-            new StatisticEntryImpl("custom-data_file_mse", StatisticValues.longValue(3000L)),
-            new StatisticEntryImpl("custom-delete_file_number", StatisticValues.longValue(5L)));
+            new StatisticEntryImpl("custom-data-file-mse", StatisticValues.longValue(3000L)),
+            new StatisticEntryImpl("custom-delete-file-number", StatisticValues.longValue(5L)));
 
     StrategyHandlerContext context =
         StrategyHandlerContext.builder(tableId, strategy)

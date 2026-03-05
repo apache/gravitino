@@ -109,7 +109,7 @@ public interface PolicyContentDTO extends PolicyContent {
     private IcebergCompactionContentDTO() {}
 
     /**
-     * Returns the minimum threshold for custom-data_file_mse metric.
+     * Returns the minimum threshold for custom-data-file-mse metric.
      *
      * @return minimum data file MSE threshold
      */
@@ -118,7 +118,7 @@ public interface PolicyContentDTO extends PolicyContent {
     }
 
     /**
-     * Returns the minimum threshold for custom-delete_file_number metric.
+     * Returns the minimum threshold for custom-delete-file-number metric.
      *
      * @return minimum delete file number threshold
      */
@@ -127,7 +127,7 @@ public interface PolicyContentDTO extends PolicyContent {
     }
 
     /**
-     * Returns the weight for custom-data_file_mse metric in score expression.
+     * Returns the weight for custom-data-file-mse metric in score expression.
      *
      * @return data file MSE score weight
      */
@@ -138,7 +138,7 @@ public interface PolicyContentDTO extends PolicyContent {
     }
 
     /**
-     * Returns the weight for custom-delete_file_number metric in score expression.
+     * Returns the weight for custom-delete-file-number metric in score expression.
      *
      * @return delete file number score weight
      */

@@ -55,9 +55,9 @@ public class IcebergCompactionContent implements PolicyContent {
   /** Rule key for delete file number score weight. */
   public static final String DELETE_FILE_NUMBER_WEIGHT_KEY = "deleteFileNumberWeight";
   /** Metric name for data file MSE. */
-  public static final String DATA_FILE_MSE_METRIC = "custom-data_file_mse";
+  public static final String DATA_FILE_MSE_METRIC = "custom-data-file-mse";
   /** Metric name for delete file number. */
-  public static final String DELETE_FILE_NUMBER_METRIC = "custom-delete_file_number";
+  public static final String DELETE_FILE_NUMBER_METRIC = "custom-delete-file-number";
   /** Default score weight for data file MSE. */
   public static final long DEFAULT_DATA_FILE_MSE_WEIGHT = 1L;
   /** Default score weight for delete file number. */

@@ -42,11 +42,11 @@ public class TestPolicyContents {
     Assertions.assertEquals(1L, content.rules().get("dataFileMseWeight"));
     Assertions.assertEquals(100L, content.rules().get("deleteFileNumberWeight"));
     Assertions.assertEquals(
-        "custom-data_file_mse > minDataFileMse || custom-delete_file_number > minDeleteFileNumber",
+        "custom-data-file-mse > minDataFileMse || custom-delete-file-number > minDeleteFileNumber",
         content.rules().get("trigger-expr"));
     Assertions.assertEquals(
-        "custom-data_file_mse * dataFileMseWeight / 100"
-            + " + custom-delete_file_number * deleteFileNumberWeight",
+        "custom-data-file-mse * dataFileMseWeight / 100"
+            + " + custom-delete-file-number * deleteFileNumberWeight",
         content.rules().get("score-expr"));
     Assertions.assertEquals("1048576", content.rules().get("job.options.target-file-size-bytes"));
     Assertions.assertEquals("1", content.rules().get("job.options.min-input-files"));

@@ -45,8 +45,8 @@ public class PolicyContents {
   /**
    * Creates an iceberg compaction policy content.
    *
-   * @param minDataFileMse minimum threshold for custom-data_file_mse
-   * @param minDeleteFileNumber minimum threshold for custom-delete_file_number
+   * @param minDataFileMse minimum threshold for custom-data-file-mse
+   * @param minDeleteFileNumber minimum threshold for custom-delete-file-number
    * @param rewriteOptions rewrite options forwarded as job.options.*
    * @return iceberg compaction policy content
    */
@@ -63,10 +63,10 @@ public class PolicyContents {
   /**
    * Creates an iceberg compaction policy content with configurable score weights.
    *
-   * @param minDataFileMse minimum threshold for custom-data_file_mse
-   * @param minDeleteFileNumber minimum threshold for custom-delete_file_number
-   * @param dataFileMseWeight weight used for custom-data_file_mse score contribution
-   * @param deleteFileNumberWeight weight used for custom-delete_file_number score contribution
+   * @param minDataFileMse minimum threshold for custom-data-file-mse
+   * @param minDeleteFileNumber minimum threshold for custom-delete-file-number
+   * @param dataFileMseWeight weight used for custom-data-file-mse score contribution
+   * @param deleteFileNumberWeight weight used for custom-delete-file-number score contribution
    * @param rewriteOptions rewrite options forwarded as job.options.*
    * @return iceberg compaction policy content
    */
