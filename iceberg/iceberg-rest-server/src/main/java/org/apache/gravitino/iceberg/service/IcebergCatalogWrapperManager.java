@@ -52,7 +52,7 @@ public class IcebergCatalogWrapperManager implements AutoCloseable {
     this.configProvider = configProvider;
     this.icebergCatalogWrapperCache =
         Caffeine.newBuilder()
-            .expireAfterWrite(
+            .expireAfterAccess(
                 (new IcebergConfig(properties))
                     .get(IcebergConfig.ICEBERG_REST_CATALOG_CACHE_EVICTION_INTERVAL),
                 TimeUnit.MILLISECONDS)
