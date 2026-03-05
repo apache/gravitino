@@ -23,7 +23,6 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import org.apache.gravitino.maintenance.optimizer.api.common.StatisticEntry;
-import org.apache.gravitino.policy.IcebergCompactionContent;
 
 public class StatisticsUtils {
 
@@ -38,12 +37,6 @@ public class StatisticsUtils {
     for (StatisticEntry<?> statistic : tableStatistics) {
       if (statistic != null && statistic.name() != null) {
         context.put(statistic.name(), statistic.value().value());
-        if (IcebergCompactionContent.LEGACY_DATA_FILE_MSE_METRIC.equals(statistic.name())) {
-          context.put(IcebergCompactionContent.DATA_FILE_MSE_METRIC, statistic.value().value());
-        } else if (IcebergCompactionContent.DATA_FILE_MSE_METRIC.equals(statistic.name())) {
-          context.put(
-              IcebergCompactionContent.LEGACY_DATA_FILE_MSE_METRIC, statistic.value().value());
-        }
       }
     }
     return context;

@@ -56,8 +56,6 @@ public class IcebergCompactionContent implements PolicyContent {
   public static final String DELETE_FILE_NUMBER_WEIGHT_KEY = "deleteFileNumberWeight";
   /** Metric name for data file MSE. */
   public static final String DATA_FILE_MSE_METRIC = "custom-data_file_mse";
-  /** Legacy metric name for data file MSE. */
-  public static final String LEGACY_DATA_FILE_MSE_METRIC = "custom-datafile_mse";
   /** Metric name for delete file number. */
   public static final String DELETE_FILE_NUMBER_METRIC = "custom-delete_file_number";
   /** Default score weight for data file MSE. */
