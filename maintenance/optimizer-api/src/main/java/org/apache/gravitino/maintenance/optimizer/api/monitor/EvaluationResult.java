@@ -20,6 +20,7 @@
 package org.apache.gravitino.maintenance.optimizer.api.monitor;
 
 import com.google.common.base.Preconditions;
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -124,7 +125,7 @@ public class EvaluationResult {
   private static Map<String, List<MetricSample>> immutableCopy(
       Map<String, List<MetricSample>> metrics) {
     if (metrics.isEmpty()) {
-      return Map.of();
+      return Collections.emptyMap();
     }
 
     Map<String, List<MetricSample>> copied = new LinkedHashMap<>();
@@ -132,7 +133,10 @@ public class EvaluationResult {
       Preconditions.checkArgument(entry.getKey() != null, "metric name must not be null");
       List<MetricSample> values = entry.getValue();
       Preconditions.checkArgument(values != null, "metric values must not be null");
-      copied.put(entry.getKey(), Collections.unmodifiableList(List.copyOf(values)));
+      for (MetricSample value : values) {
+        Preconditions.checkArgument(value != null, "metric sample must not be null");
+      }
+      copied.put(entry.getKey(), Collections.unmodifiableList(new ArrayList<>(values)));
     }
     return Collections.unmodifiableMap(copied);
   }

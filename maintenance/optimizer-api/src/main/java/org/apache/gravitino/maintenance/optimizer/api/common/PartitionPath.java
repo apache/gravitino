@@ -20,6 +20,8 @@
 package org.apache.gravitino.maintenance.optimizer.api.common;
 
 import com.google.common.base.Preconditions;
+import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 
 /**
@@ -42,7 +44,7 @@ public final class PartitionPath {
   public static PartitionPath of(List<PartitionEntry> entries) {
     Preconditions.checkArgument(
         entries != null && !entries.isEmpty(), "partition entries must not be empty");
-    return new PartitionPath(List.copyOf(entries));
+    return new PartitionPath(Collections.unmodifiableList(new ArrayList<>(entries)));
   }
 
   /**

@@ -19,6 +19,7 @@
 
 package org.apache.gravitino.maintenance.optimizer.api.recommender;
 
+import java.util.Collections;
 import java.util.Set;
 import org.apache.gravitino.annotation.DeveloperApi;
 
@@ -46,7 +47,7 @@ public interface StrategyHandler {
    * @return set of requested data items; empty means no additional data needed
    */
   default Set<DataRequirement> dataRequirements() {
-    return Set.of();
+    return Collections.emptySet();
   }
 
   /**

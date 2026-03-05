@@ -31,6 +31,8 @@ import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
@@ -70,9 +72,10 @@ public abstract class JdbcMetricsRepository implements MetricsRepository {
   private static final String TABLE_METRICS_TABLE = "table_metrics";
   private static final String JOB_METRICS_TABLE = "job_metrics";
   private static final Set<String> REQUIRED_TABLE_METRICS_COLUMNS =
-      Set.of("table_identifier", "metric_name", "table_partition", "metric_ts", "metric_value");
+      buildRequiredColumnsSet(
+          "table_identifier", "metric_name", "table_partition", "metric_ts", "metric_value");
   private static final Set<String> REQUIRED_JOB_METRICS_COLUMNS =
-      Set.of("job_identifier", "metric_name", "metric_ts", "metric_value");
+      buildRequiredColumnsSet("job_identifier", "metric_name", "metric_ts", "metric_value");
 
   protected static final String DEFAULT_USER = "sa";
   protected static final String DEFAULT_PASSWORD = "";
@@ -80,6 +83,10 @@ public abstract class JdbcMetricsRepository implements MetricsRepository {
   private DataSourceJdbcConnectionProvider connectionProvider;
   private JdbcMetricsDialect dialect;
   private volatile boolean initialized = false;
+
+  private static Set<String> buildRequiredColumnsSet(String... columns) {
+    return Collections.unmodifiableSet(new HashSet<>(Arrays.asList(columns)));
+  }
 
   protected final void initializeStorage(DataSourceJdbcConnectionProvider connectionProvider) {
     Preconditions.checkState(!initialized, "JdbcMetricsRepository has already been initialized.");
@@ -220,7 +227,8 @@ public abstract class JdbcMetricsRepository implements MetricsRepository {
         Files.exists(scriptPath),
         "H2 metrics schema script not found at %s. Please ensure distribution scripts are present.",
         scriptPath);
-    executeSchemaSql(connection, Files.readString(scriptPath, StandardCharsets.UTF_8));
+    executeSchemaSql(
+        connection, new String(Files.readAllBytes(scriptPath), StandardCharsets.UTF_8));
   }
 
   private void executeSchemaSql(Connection connection, String sqlContent) throws SQLException {

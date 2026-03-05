@@ -249,7 +249,7 @@ public class IcebergUpdateStatsJob implements BuiltInJob {
       String sql = buildTableStatsSql(catalogName, tableIdentifier, targetFileSizeBytes);
       Row[] rows = (Row[]) spark.sql(sql).collect();
       List<StatisticEntry<?>> tableStatistics =
-          rows.length == 0 ? List.of() : toStatistics(rows[0]);
+          rows.length == 0 ? Collections.emptyList() : toStatistics(rows[0]);
 
       if (updateMode.updateStats) {
         statisticsUpdater.updateTableStatistics(gravitinoTableIdentifier, tableStatistics);

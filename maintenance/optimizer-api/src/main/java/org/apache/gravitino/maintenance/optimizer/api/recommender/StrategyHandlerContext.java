@@ -19,7 +19,9 @@
 
 package org.apache.gravitino.maintenance.optimizer.api.recommender;
 
+import java.util.ArrayList;
 import java.util.Collections;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -139,7 +141,10 @@ public final class StrategyHandlerContext {
      * @return builder for chaining
      */
     public Builder withTableStatistics(List<StatisticEntry<?>> statistics) {
-      this.tableStatistics = statistics == null ? Collections.emptyList() : List.copyOf(statistics);
+      this.tableStatistics =
+          statistics == null
+              ? Collections.emptyList()
+              : Collections.unmodifiableList(new ArrayList<>(statistics));
       return this;
     }
 
@@ -152,7 +157,9 @@ public final class StrategyHandlerContext {
     public Builder withPartitionStatistics(
         Map<PartitionPath, List<StatisticEntry<?>>> partitionStatistics) {
       this.partitionStatistics =
-          partitionStatistics == null ? Collections.emptyMap() : Map.copyOf(partitionStatistics);
+          partitionStatistics == null
+              ? Collections.emptyMap()
+              : Collections.unmodifiableMap(new LinkedHashMap<>(partitionStatistics));
       return this;
     }
 

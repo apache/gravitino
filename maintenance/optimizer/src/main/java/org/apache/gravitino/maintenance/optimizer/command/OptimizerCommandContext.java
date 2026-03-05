@@ -21,6 +21,7 @@ package org.apache.gravitino.maintenance.optimizer.command;
 
 import java.io.PrintStream;
 import java.util.List;
+import java.util.Objects;
 import java.util.Optional;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.maintenance.optimizer.common.OptimizerEnv;
@@ -37,12 +38,7 @@ public final class OptimizerCommandContext {
   private final String actionTime;
   private final String rangeSeconds;
   private final String partitionPathRaw;
-  private final String updateMode;
-  private final String targetFileSizeBytes;
-  private final String updaterOptions;
-  private final String updaterOptionsFile;
-  private final String sparkConf;
-  private final String sparkConfFile;
+  private final UpdateStatsJobOptions updateStatsJobOptions;
   private final Optional<StatisticsInputContent> statisticsInputContent;
   private final PrintStream output;
 
@@ -56,12 +52,7 @@ public final class OptimizerCommandContext {
       String actionTime,
       String rangeSeconds,
       String partitionPathRaw,
-      String updateMode,
-      String targetFileSizeBytes,
-      String updaterOptions,
-      String updaterOptionsFile,
-      String sparkConf,
-      String sparkConfFile,
+      UpdateStatsJobOptions updateStatsJobOptions,
       Optional<StatisticsInputContent> statisticsInputContent,
       PrintStream output) {
     this.optimizerEnv = optimizerEnv;
@@ -73,12 +64,8 @@ public final class OptimizerCommandContext {
     this.actionTime = actionTime;
     this.rangeSeconds = rangeSeconds;
     this.partitionPathRaw = partitionPathRaw;
-    this.updateMode = updateMode;
-    this.targetFileSizeBytes = targetFileSizeBytes;
-    this.updaterOptions = updaterOptions;
-    this.updaterOptionsFile = updaterOptionsFile;
-    this.sparkConf = sparkConf;
-    this.sparkConfFile = sparkConfFile;
+    this.updateStatsJobOptions =
+        Objects.requireNonNull(updateStatsJobOptions, "updateStatsJobOptions must not be null");
     this.statisticsInputContent = statisticsInputContent;
     this.output = output;
   }
@@ -127,28 +114,24 @@ public final class OptimizerCommandContext {
     return partitionPathRaw;
   }
 
+  public UpdateStatsJobOptions updateStatsJobOptions() {
+    return updateStatsJobOptions;
+  }
+
   public String updateMode() {
-    return updateMode;
+    return updateStatsJobOptions.updateMode();
   }
 
   public String targetFileSizeBytes() {
-    return targetFileSizeBytes;
+    return updateStatsJobOptions.targetFileSizeBytes();
   }
 
   public String updaterOptions() {
-    return updaterOptions;
-  }
-
-  public String updaterOptionsFile() {
-    return updaterOptionsFile;
+    return updateStatsJobOptions.updaterOptions();
   }
 
   public String sparkConf() {
-    return sparkConf;
-  }
-
-  public String sparkConfFile() {
-    return sparkConfFile;
+    return updateStatsJobOptions.sparkConf();
   }
 
   public Optional<StatisticsInputContent> statisticsInputContent() {
@@ -157,5 +140,37 @@ public final class OptimizerCommandContext {
 
   public PrintStream output() {
     return output;
+  }
+
+  /** Submit-update-stats-job specific command options. */
+  public static final class UpdateStatsJobOptions {
+    private final String updateMode;
+    private final String targetFileSizeBytes;
+    private final String updaterOptions;
+    private final String sparkConf;
+
+    public UpdateStatsJobOptions(
+        String updateMode, String targetFileSizeBytes, String updaterOptions, String sparkConf) {
+      this.updateMode = updateMode;
+      this.targetFileSizeBytes = targetFileSizeBytes;
+      this.updaterOptions = updaterOptions;
+      this.sparkConf = sparkConf;
+    }
+
+    public String updateMode() {
+      return updateMode;
+    }
+
+    public String targetFileSizeBytes() {
+      return targetFileSizeBytes;
+    }
+
+    public String updaterOptions() {
+      return updaterOptions;
+    }
+
+    public String sparkConf() {
+      return sparkConf;
+    }
   }
 }

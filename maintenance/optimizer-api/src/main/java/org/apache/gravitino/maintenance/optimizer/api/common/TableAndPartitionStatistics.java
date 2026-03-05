@@ -19,6 +19,9 @@
 
 package org.apache.gravitino.maintenance.optimizer.api.common;
 
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import org.apache.gravitino.annotation.DeveloperApi;
@@ -32,9 +35,14 @@ public class TableAndPartitionStatistics {
   public TableAndPartitionStatistics(
       List<StatisticEntry<?>> tableStatistics,
       Map<PartitionPath, List<StatisticEntry<?>>> partitionStatistics) {
-    this.tableStatistics = tableStatistics != null ? List.copyOf(tableStatistics) : List.of();
+    this.tableStatistics =
+        tableStatistics != null
+            ? Collections.unmodifiableList(new ArrayList<>(tableStatistics))
+            : Collections.emptyList();
     this.partitionStatistics =
-        partitionStatistics != null ? Map.copyOf(partitionStatistics) : Map.of();
+        partitionStatistics != null
+            ? Collections.unmodifiableMap(new LinkedHashMap<>(partitionStatistics))
+            : Collections.emptyMap();
   }
 
   public List<StatisticEntry<?>> tableStatistics() {

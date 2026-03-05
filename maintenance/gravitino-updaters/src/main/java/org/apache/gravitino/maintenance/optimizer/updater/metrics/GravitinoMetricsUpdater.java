@@ -21,6 +21,8 @@ package org.apache.gravitino.maintenance.optimizer.updater.metrics;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
+import java.util.Arrays;
+import java.util.Collections;
 import java.util.List;
 import org.apache.gravitino.maintenance.optimizer.api.common.DataScope;
 import org.apache.gravitino.maintenance.optimizer.api.common.MetricPoint;
@@ -51,14 +53,14 @@ public class GravitinoMetricsUpdater implements MetricsUpdater {
   public void updateTableAndPartitionMetrics(List<MetricPoint> metrics) {
     ensureInitialized();
     validateScopes(
-        metrics, List.of(DataScope.Type.TABLE, DataScope.Type.PARTITION), "table/partition");
+        metrics, Arrays.asList(DataScope.Type.TABLE, DataScope.Type.PARTITION), "table/partition");
     metricsStorage.storeTableAndPartitionMetrics(metrics);
   }
 
   @Override
   public void updateJobMetrics(List<MetricPoint> metrics) {
     ensureInitialized();
-    validateScopes(metrics, List.of(DataScope.Type.JOB), "job");
+    validateScopes(metrics, Collections.singletonList(DataScope.Type.JOB), "job");
     metricsStorage.storeJobMetrics(metrics);
   }
 

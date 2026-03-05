@@ -19,6 +19,7 @@
 
 package org.apache.gravitino.maintenance.optimizer.common.conf;
 
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import org.apache.commons.lang3.StringUtils;
@@ -164,7 +165,7 @@ public class OptimizerConfig extends Config {
           .version(ConfigConstants.VERSION_1_2_0)
           .stringConf()
           .toSequence()
-          .createWithDefault(List.of());
+          .createWithDefault(Collections.emptyList());
 
   public static final ConfigEntry<String> GRAVITINO_URI_CONFIG =
       new ConfigBuilder(GRAVITINO_URI)

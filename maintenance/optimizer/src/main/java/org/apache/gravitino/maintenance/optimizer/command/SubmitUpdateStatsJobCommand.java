@@ -22,9 +22,6 @@ package org.apache.gravitino.maintenance.optimizer.command;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.common.base.Preconditions;
-import java.nio.charset.StandardCharsets;
-import java.nio.file.Files;
-import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -47,22 +44,18 @@ public class SubmitUpdateStatsJobCommand implements OptimizerCommandExecutor {
   private static final String DEFAULT_UPDATE_MODE = "stats";
   private static final long DEFAULT_TARGET_FILE_SIZE_BYTES = 100_000L;
   private static final String OPTION_UPDATER_OPTIONS = "updater-options";
-  private static final String OPTION_UPDATER_OPTIONS_FILE = "updater-options-file";
   private static final String OPTION_SPARK_CONF = "spark-conf";
-  private static final String OPTION_SPARK_CONF_FILE = "spark-conf-file";
 
   private static final ObjectMapper MAPPER = new ObjectMapper();
 
   @Override
   public void execute(OptimizerCommandContext context) throws Exception {
     Map<String, String> submitterConfigs = context.optimizerEnv().config().jobSubmitterConfigs();
-    int limit = parseLimit(context.limit());
 
     List<TableTarget> tableTargets =
         parseTableTargets(
             context.identifiers(),
-            context.optimizerEnv().config().get(OptimizerConfig.GRAVITINO_DEFAULT_CATALOG_CONFIG),
-            limit);
+            context.optimizerEnv().config().get(OptimizerConfig.GRAVITINO_DEFAULT_CATALOG_CONFIG));
 
     String updateMode =
         parseUpdateMode(
@@ -73,19 +66,9 @@ public class SubmitUpdateStatsJobCommand implements OptimizerCommandExecutor {
                 context.targetFileSizeBytes(), submitterConfigs.get("target_file_size_bytes")));
 
     String updaterOptionsJson =
-        resolveJsonOption(
-            OPTION_UPDATER_OPTIONS,
-            context.updaterOptions(),
-            OPTION_UPDATER_OPTIONS_FILE,
-            context.updaterOptionsFile(),
-            submitterConfigs.get("updater_options"));
+        resolveJsonOption(context.updaterOptions(), submitterConfigs.get("updater_options"));
     String sparkConfJson =
-        resolveJsonOption(
-            OPTION_SPARK_CONF,
-            context.sparkConf(),
-            OPTION_SPARK_CONF_FILE,
-            context.sparkConfFile(),
-            submitterConfigs.get("spark_conf"));
+        resolveJsonOption(context.sparkConf(), submitterConfigs.get("spark_conf"));
 
     Map<String, String> updaterOptions =
         parseFlatJsonMap(updaterOptionsJson, OPTION_UPDATER_OPTIONS);
@@ -156,31 +139,9 @@ public class SubmitUpdateStatsJobCommand implements OptimizerCommandExecutor {
     return StringUtils.isBlank(confValue) ? null : confValue.trim();
   }
 
-  private static String resolveJsonOption(
-      String cliOptionName,
-      String cliValue,
-      String fileOptionName,
-      String filePath,
-      String confValue) {
+  private static String resolveJsonOption(String cliValue, String confValue) {
     if (StringUtils.isNotBlank(cliValue)) {
       return cliValue.trim();
-    }
-    if (StringUtils.isNotBlank(filePath)) {
-      try {
-        Path path = Path.of(filePath.trim());
-        Preconditions.checkArgument(
-            Files.exists(path), "Option %s file does not exist: %s", fileOptionName, filePath);
-        return Files.readString(path, StandardCharsets.UTF_8).trim();
-      } catch (Exception e) {
-        throw new IllegalArgumentException(
-            String.format(
-                Locale.ROOT,
-                "Failed to read option %s from %s: %s",
-                cliOptionName,
-                filePath,
-                e.getMessage()),
-            e);
-      }
     }
     return StringUtils.isBlank(confValue) ? null : confValue.trim();
   }
@@ -202,27 +163,13 @@ public class SubmitUpdateStatsJobCommand implements OptimizerCommandExecutor {
     return OptimizerCommandUtils.parseLongOption("target-file-size-bytes", value.trim(), false);
   }
 
-  private static int parseLimit(String limit) {
-    if (StringUtils.isBlank(limit)) {
-      return Integer.MAX_VALUE;
-    }
-    long parsed = OptimizerCommandUtils.parseLongOption("limit", limit.trim(), false);
-    Preconditions.checkArgument(
-        parsed <= Integer.MAX_VALUE, "Option limit must be <= %s", Integer.MAX_VALUE);
-    return (int) parsed;
-  }
-
-  private static List<TableTarget> parseTableTargets(
-      String[] identifiers, String defaultCatalog, int limit) {
+  private static List<TableTarget> parseTableTargets(String[] identifiers, String defaultCatalog) {
     Preconditions.checkArgument(
         identifiers != null && identifiers.length > 0,
         "Missing required option --identifiers for command 'submit-update-stats-job'");
 
     List<TableTarget> tableTargets = new ArrayList<>();
     for (String rawIdentifier : identifiers) {
-      if (tableTargets.size() >= limit) {
-        break;
-      }
       Preconditions.checkArgument(
           StringUtils.isNotBlank(rawIdentifier), "--identifiers contains blank identifier");
       String[] levels = rawIdentifier.trim().split("\\.");
@@ -265,14 +212,8 @@ public class SubmitUpdateStatsJobCommand implements OptimizerCommandExecutor {
     if (!"stats".equals(updateMode) && !"all".equals(updateMode)) {
       return;
     }
-    String gravitinoUri =
-        firstNonBlank(
-            updaterOptions.get("gravitino_uri"),
-            updaterOptions.get("gravitino-uri"),
-            updaterOptions.get(OptimizerConfig.GRAVITINO_URI));
-    String metalake =
-        firstNonBlank(
-            updaterOptions.get("metalake"), updaterOptions.get(OptimizerConfig.GRAVITINO_METALAKE));
+    String gravitinoUri = StringUtils.trimToNull(updaterOptions.get("gravitino_uri"));
+    String metalake = StringUtils.trimToNull(updaterOptions.get("metalake"));
     Preconditions.checkArgument(
         StringUtils.isNotBlank(gravitinoUri),
         "Option --updater-options (or config key jobSubmitterConfig.updater_options) "
@@ -287,7 +228,7 @@ public class SubmitUpdateStatsJobCommand implements OptimizerCommandExecutor {
       List<TableTarget> tableTargets, Map<String, String> sparkConfigs) {
     Preconditions.checkArgument(
         !sparkConfigs.isEmpty(),
-        "Missing spark config. Set --spark-conf/--spark-conf-file or "
+        "Missing spark config. Set --spark-conf or "
             + "gravitino.optimizer.jobSubmitterConfig.spark_conf in the config file");
     for (TableTarget tableTarget : tableTargets) {
       String requiredKey = "spark.sql.catalog." + tableTarget.catalogName;
@@ -331,15 +272,6 @@ public class SubmitUpdateStatsJobCommand implements OptimizerCommandExecutor {
     } catch (Exception e) {
       throw new IllegalStateException("Failed to serialize options as JSON", e);
     }
-  }
-
-  private static String firstNonBlank(String... values) {
-    for (String value : values) {
-      if (StringUtils.isNotBlank(value)) {
-        return value.trim();
-      }
-    }
-    return null;
   }
 
   private static final class TableTarget {

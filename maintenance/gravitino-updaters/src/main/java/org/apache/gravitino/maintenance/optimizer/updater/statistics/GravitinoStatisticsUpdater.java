@@ -21,6 +21,7 @@ package org.apache.gravitino.maintenance.optimizer.updater.statistics;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
+import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -86,7 +87,7 @@ public class GravitinoStatisticsUpdater implements StatisticsUpdater {
 
   private Map<String, StatisticValue<?>> getTableStatisticsMap(List<StatisticEntry<?>> statistics) {
     if (statistics == null || statistics.isEmpty()) {
-      return Map.of();
+      return Collections.emptyMap();
     }
     return toStatisticValueMap(statistics, "table statistics");
   }
@@ -94,7 +95,7 @@ public class GravitinoStatisticsUpdater implements StatisticsUpdater {
   private List<PartitionStatisticsUpdate> getPartitionStatisticsUpdates(
       Map<PartitionPath, List<StatisticEntry<?>>> partitionStatistics) {
     if (partitionStatistics == null || partitionStatistics.isEmpty()) {
-      return List.of();
+      return Collections.emptyList();
     }
     return partitionStatistics.entrySet().stream()
         .map(

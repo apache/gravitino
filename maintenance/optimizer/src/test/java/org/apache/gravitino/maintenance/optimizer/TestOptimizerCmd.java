@@ -421,22 +421,8 @@ class TestOptimizerCmd {
   }
 
   @Test
-  void testSubmitUpdateStatsJobSupportsJsonFileOverrides() throws Exception {
+  void testSubmitUpdateStatsJobSupportsJsonOverrides() throws Exception {
     Path confPath = createOptimizerConfForSubmitUpdateStatsJob();
-    Path updaterOptionsFile = Files.createTempFile("optimizer-updater-options-", ".json");
-    Path sparkConfFile = Files.createTempFile("optimizer-spark-conf-", ".json");
-    Files.writeString(
-        updaterOptionsFile,
-        "{\"metrics_updater\":\"custom-metrics-updater\"}",
-        StandardCharsets.UTF_8);
-    Files.writeString(
-        sparkConfFile,
-        "{\"spark.sql.catalog.rest\":\"org.apache.iceberg.spark.SparkCatalog\","
-            + "\"spark.sql.catalog.rest.type\":\"rest\","
-            + "\"spark.sql.catalog.rest.uri\":\"http://localhost:9001/iceberg\"}",
-        StandardCharsets.UTF_8);
-    updaterOptionsFile.toFile().deleteOnExit();
-    sparkConfFile.toFile().deleteOnExit();
 
     String[] output =
         runCommand(
@@ -446,39 +432,18 @@ class TestOptimizerCmd {
             "rest.ab.t1",
             "--update-mode",
             "metrics",
-            "--updater-options-file",
-            updaterOptionsFile.toString(),
-            "--spark-conf-file",
-            sparkConfFile.toString(),
+            "--updater-options",
+            "{\"metrics_updater\":\"custom-metrics-updater\"}",
+            "--spark-conf",
+            "{\"spark.sql.catalog.rest\":\"org.apache.iceberg.spark.SparkCatalog\","
+                + "\"spark.sql.catalog.rest.type\":\"rest\","
+                + "\"spark.sql.catalog.rest.uri\":\"http://localhost:9001/iceberg\"}",
             "--dry-run",
             "--conf-path",
             confPath.toString());
     Assertions.assertTrue(output[1].isEmpty(), "stderr=" + output[1] + ", stdout=" + output[0]);
     Assertions.assertTrue(output[0].contains("custom-metrics-updater"));
     Assertions.assertTrue(output[0].contains("spark.sql.catalog.rest"));
-  }
-
-  @Test
-  void testSubmitUpdateStatsJobRejectsMutuallyExclusiveUpdaterInputs() throws Exception {
-    Path confPath = createOptimizerConfForSubmitUpdateStatsJob();
-    Path updaterOptionsFile = Files.createTempFile("optimizer-updater-options-", ".json");
-    Files.writeString(updaterOptionsFile, "{\"metrics_updater\":\"m\"}", StandardCharsets.UTF_8);
-    updaterOptionsFile.toFile().deleteOnExit();
-    String[] output =
-        runCommand(
-            "--type",
-            "submit-update-stats-job",
-            "--identifiers",
-            "rest.ab.t1",
-            "--updater-options",
-            "{\"metrics_updater\":\"m1\"}",
-            "--updater-options-file",
-            updaterOptionsFile.toString(),
-            "--dry-run",
-            "--conf-path",
-            confPath.toString());
-    Assertions.assertTrue(
-        output[1].contains("--updater-options and --updater-options-file cannot be used together"));
   }
 
   private Path createOptimizerConfForMetricsProvider() throws Exception {

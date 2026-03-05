@@ -31,7 +31,9 @@ import java.sql.Connection;
 import java.sql.DriverManager;
 import java.time.Duration;
 import java.time.Instant;
+import java.util.Arrays;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -78,6 +80,18 @@ public class TestIcebergUpdateStatsJobWithSpark {
   private static final String JOB_TEMPLATE_NAME = "builtin-iceberg-update-stats";
   private static final String SPARK_CATALOG_NAME = "rest_catalog";
   private static final String METALAKE_NAME = "test";
+  private static final int EXPECTED_METRIC_COUNT_PER_SCOPE = 8;
+  private static final Set<String> EXPECTED_METRIC_NAMES =
+      new HashSet<>(
+          Arrays.asList(
+              "custom-file_count",
+              "custom-data_files",
+              "custom-position_delete_files",
+              "custom-equality_delete_files",
+              "custom-small_files",
+              "custom-datafile_mse",
+              "custom-avg_size",
+              "custom-total_size"));
 
   @TempDir static File tempDir;
 
@@ -142,6 +156,100 @@ public class TestIcebergUpdateStatsJobWithSpark {
       spark.sql("DROP TABLE IF EXISTS " + catalogName + ".db.multi_partitioned");
       spark.sql("DROP NAMESPACE IF EXISTS " + catalogName + ".db");
       spark.stop();
+    }
+  }
+
+  // Requires a running deploy-mode Gravitino server and Spark environment.
+  @Test
+  @Tag("gravitino-docker-test")
+  @EnabledIfEnvironmentVariable(named = "GRAVITINO_ENV_IT", matches = "true")
+  public void testRunBuiltInUpdateStatsJobViaServerForAllModes() throws Exception {
+    String suffix = UUID.randomUUID().toString().replace("-", "");
+    String statsTableName = "jobs_it_update_stats_mode_stats_" + suffix;
+    String metricsTableName = "jobs_it_update_stats_mode_metrics_" + suffix;
+    String partitionMetricsTableName = "jobs_it_update_stats_mode_partition_metrics_" + suffix;
+    String allModeTableName = "jobs_it_update_stats_mode_all_" + suffix;
+    String statsFullTableName = SPARK_CATALOG_NAME + ".db." + statsTableName;
+    String metricsFullTableName = SPARK_CATALOG_NAME + ".db." + metricsTableName;
+    String partitionMetricsFullTableName = SPARK_CATALOG_NAME + ".db." + partitionMetricsTableName;
+    String allModeFullTableName = SPARK_CATALOG_NAME + ".db." + allModeTableName;
+
+    SparkSession restSpark = createRestSparkSession();
+    try (MySQLContainer<?> mysql = new MySQLContainer<>("mysql:8.0.33");
+        GravitinoAdminClient adminClient = GravitinoAdminClient.builder(SERVER_URI).build()) {
+      mysql.start();
+      initializeMySqlMetricsSchema(mysql);
+
+      GravitinoMetalake metalake = loadOrCreateMetalake(adminClient, METALAKE_NAME);
+      recreateRestCatalog(metalake);
+      createTableAndInsertData(restSpark, statsFullTableName);
+      createTableAndInsertData(restSpark, metricsFullTableName);
+      createPartitionedTableAndInsertData(restSpark, partitionMetricsFullTableName);
+      createTableAndInsertData(restSpark, allModeFullTableName);
+
+      NameIdentifier statsTableIdentifier =
+          NameIdentifier.of(SPARK_CATALOG_NAME, "db", statsTableName);
+      NameIdentifier metricsTableIdentifier =
+          NameIdentifier.of(SPARK_CATALOG_NAME, "db", metricsTableName);
+      NameIdentifier partitionMetricsTableIdentifier =
+          NameIdentifier.of(SPARK_CATALOG_NAME, "db", partitionMetricsTableName);
+      NameIdentifier allModeTableIdentifier =
+          NameIdentifier.of(SPARK_CATALOG_NAME, "db", allModeTableName);
+
+      PartitionPath dsPartition1 =
+          PartitionPath.of(List.of(new PartitionEntryImpl("ds", "2026-03-01")));
+      PartitionPath dsPartition2 =
+          PartitionPath.of(List.of(new PartitionEntryImpl("ds", "2026-03-02")));
+
+      try (GenericJdbcMetricsRepository repository = new GenericJdbcMetricsRepository()) {
+        repository.initialize(buildJdbcMetricsConfigs(mysql));
+
+        submitJob(
+            metalake,
+            buildUpdateStatsJobConfig(
+                statsTableName, "stats", buildUpdaterOptionsForStatsUpdaterOnly()));
+        awaitCustomStatisticsVisible(statsTableName);
+        assertEquals(0, getTableMetricsCount(repository, statsTableIdentifier));
+
+        submitJob(
+            metalake,
+            buildUpdateStatsJobConfig(
+                metricsTableName, "metrics", buildUpdaterOptionsForMetricsUpdaterOnly(mysql)));
+        assertFalse(containsCustomStatistics(metricsTableName));
+        awaitTableMetricsExactly(
+            repository, metricsTableIdentifier, EXPECTED_METRIC_COUNT_PER_SCOPE);
+        assertTableMetricsMatch(repository, metricsTableIdentifier);
+
+        submitJob(
+            metalake,
+            buildUpdateStatsJobConfig(
+                partitionMetricsTableName,
+                "metrics",
+                buildUpdaterOptionsForMetricsUpdaterOnly(mysql)));
+        assertFalse(containsCustomStatistics(partitionMetricsTableName));
+        assertEquals(0, getTableMetricsCount(repository, partitionMetricsTableIdentifier));
+        awaitPartitionMetricsExactly(
+            repository,
+            partitionMetricsTableIdentifier,
+            dsPartition1,
+            EXPECTED_METRIC_COUNT_PER_SCOPE);
+        awaitPartitionMetricsExactly(
+            repository,
+            partitionMetricsTableIdentifier,
+            dsPartition2,
+            EXPECTED_METRIC_COUNT_PER_SCOPE);
+        assertPartitionMetricsMatch(repository, partitionMetricsTableIdentifier, dsPartition1);
+        assertPartitionMetricsMatch(repository, partitionMetricsTableIdentifier, dsPartition2);
+
+        submitJob(
+            metalake,
+            buildUpdateStatsJobConfig(
+                allModeTableName, "all", buildUpdaterOptionsForAllMode(mysql)));
+        awaitCustomStatisticsVisible(allModeTableName);
+        awaitTableMetricsExactly(
+            repository, allModeTableIdentifier, EXPECTED_METRIC_COUNT_PER_SCOPE);
+        assertTableMetricsMatch(repository, allModeTableIdentifier);
+      }
     }
   }
 
@@ -414,65 +522,6 @@ public class TestIcebergUpdateStatsJobWithSpark {
         parsedPartitions);
   }
 
-  // Requires a running deploy-mode Gravitino server and Spark environment.
-  @Test
-  @Tag("gravitino-docker-test")
-  @EnabledIfEnvironmentVariable(named = "GRAVITINO_ENV_IT", matches = "true")
-  public void testRunBuiltInUpdateStatsJobViaServerForAllModes() throws Exception {
-    String suffix = UUID.randomUUID().toString().replace("-", "");
-    String statsTableName = "jobs_it_update_stats_mode_stats_" + suffix;
-    String metricsTableName = "jobs_it_update_stats_mode_metrics_" + suffix;
-    String allModeTableName = "jobs_it_update_stats_mode_all_" + suffix;
-    String statsFullTableName = SPARK_CATALOG_NAME + ".db." + statsTableName;
-    String metricsFullTableName = SPARK_CATALOG_NAME + ".db." + metricsTableName;
-    String allModeFullTableName = SPARK_CATALOG_NAME + ".db." + allModeTableName;
-
-    SparkSession restSpark = createRestSparkSession();
-    try (MySQLContainer<?> mysql = new MySQLContainer<>("mysql:8.0.33");
-        GravitinoAdminClient adminClient = GravitinoAdminClient.builder(SERVER_URI).build()) {
-      mysql.start();
-      initializeMySqlMetricsSchema(mysql);
-
-      GravitinoMetalake metalake = loadOrCreateMetalake(adminClient, METALAKE_NAME);
-      recreateRestCatalog(metalake);
-      createTableAndInsertData(restSpark, statsFullTableName);
-      createTableAndInsertData(restSpark, metricsFullTableName);
-      createTableAndInsertData(restSpark, allModeFullTableName);
-
-      NameIdentifier statsTableIdentifier =
-          NameIdentifier.of(SPARK_CATALOG_NAME, "db", statsTableName);
-      NameIdentifier metricsTableIdentifier =
-          NameIdentifier.of(SPARK_CATALOG_NAME, "db", metricsTableName);
-      NameIdentifier allModeTableIdentifier =
-          NameIdentifier.of(SPARK_CATALOG_NAME, "db", allModeTableName);
-
-      try (GenericJdbcMetricsRepository repository = new GenericJdbcMetricsRepository()) {
-        repository.initialize(buildJdbcMetricsConfigs(mysql));
-
-        submitJob(
-            metalake,
-            buildUpdateStatsJobConfig(
-                statsTableName, "stats", buildUpdaterOptionsForStatsUpdaterOnly()));
-        awaitCustomStatisticsVisible(statsTableName);
-        assertEquals(0, getTableMetricsCount(repository, statsTableIdentifier));
-
-        submitJob(
-            metalake,
-            buildUpdateStatsJobConfig(
-                metricsTableName, "metrics", buildUpdaterOptionsForMetricsUpdaterOnly(mysql)));
-        assertFalse(containsCustomStatistics(metricsTableName));
-        awaitTableMetricsAtLeast(repository, metricsTableIdentifier, 1);
-
-        submitJob(
-            metalake,
-            buildUpdateStatsJobConfig(
-                allModeTableName, "all", buildUpdaterOptionsForAllMode(mysql)));
-        awaitCustomStatisticsVisible(allModeTableName);
-        awaitTableMetricsAtLeast(repository, allModeTableIdentifier, 1);
-      }
-    }
-  }
-
   private void awaitCustomStatisticsVisible(String tableName) throws Exception {
     Awaitility.await()
         .atMost(Duration.ofSeconds(30))
@@ -498,22 +547,77 @@ public class TestIcebergUpdateStatsJobWithSpark {
     }
   }
 
-  private static void awaitTableMetricsAtLeast(
-      GenericJdbcMetricsRepository repository,
-      NameIdentifier tableIdentifier,
-      int expectedLowerBound) {
+  private static void awaitTableMetricsExactly(
+      GenericJdbcMetricsRepository repository, NameIdentifier tableIdentifier, int expectedCount) {
     Awaitility.await()
         .atMost(Duration.ofSeconds(30))
         .pollInterval(Duration.ofSeconds(2))
-        .until(() -> getTableMetricsCount(repository, tableIdentifier) >= expectedLowerBound);
+        .until(() -> getTableMetricsCount(repository, tableIdentifier) == expectedCount);
+  }
+
+  private static void awaitPartitionMetricsExactly(
+      GenericJdbcMetricsRepository repository,
+      NameIdentifier tableIdentifier,
+      PartitionPath partitionPath,
+      int expectedCount) {
+    Awaitility.await()
+        .atMost(Duration.ofSeconds(30))
+        .pollInterval(Duration.ofSeconds(2))
+        .until(
+            () ->
+                getPartitionMetricsCount(repository, tableIdentifier, partitionPath)
+                    == expectedCount);
+  }
+
+  private static void assertTableMetricsMatch(
+      GenericJdbcMetricsRepository repository, NameIdentifier tableIdentifier) {
+    List<MetricPoint> metrics = getTableMetrics(repository, tableIdentifier);
+    assertEquals(EXPECTED_METRIC_COUNT_PER_SCOPE, metrics.size());
+    assertTrue(metrics.stream().allMatch(metric -> metric.scope() == DataScope.Type.TABLE));
+    assertTrue(metrics.stream().allMatch(metric -> metric.partitionPath().isEmpty()));
+    assertEquals(
+        EXPECTED_METRIC_NAMES,
+        metrics.stream().map(MetricPoint::metricName).collect(Collectors.toSet()));
+  }
+
+  private static void assertPartitionMetricsMatch(
+      GenericJdbcMetricsRepository repository,
+      NameIdentifier tableIdentifier,
+      PartitionPath partitionPath) {
+    List<MetricPoint> metrics = getPartitionMetrics(repository, tableIdentifier, partitionPath);
+    assertEquals(EXPECTED_METRIC_COUNT_PER_SCOPE, metrics.size());
+    assertTrue(metrics.stream().allMatch(metric -> metric.scope() == DataScope.Type.PARTITION));
+    assertTrue(metrics.stream().allMatch(metric -> metric.partitionPath().isPresent()));
+    assertEquals(
+        EXPECTED_METRIC_NAMES,
+        metrics.stream().map(MetricPoint::metricName).collect(Collectors.toSet()));
   }
 
   private static int getTableMetricsCount(
       GenericJdbcMetricsRepository repository, NameIdentifier tableIdentifier) {
+    return getTableMetrics(repository, tableIdentifier).size();
+  }
+
+  private static List<MetricPoint> getTableMetrics(
+      GenericJdbcMetricsRepository repository, NameIdentifier tableIdentifier) {
     long now = Instant.now().getEpochSecond();
-    return repository
-        .getMetrics(DataScope.forTable(tableIdentifier), now - 1800, now + 1800)
-        .size();
+    return repository.getMetrics(DataScope.forTable(tableIdentifier), now - 1800, now + 1800);
+  }
+
+  private static int getPartitionMetricsCount(
+      GenericJdbcMetricsRepository repository,
+      NameIdentifier tableIdentifier,
+      PartitionPath partitionPath) {
+    return getPartitionMetrics(repository, tableIdentifier, partitionPath).size();
+  }
+
+  private static List<MetricPoint> getPartitionMetrics(
+      GenericJdbcMetricsRepository repository,
+      NameIdentifier tableIdentifier,
+      PartitionPath partitionPath) {
+    long now = Instant.now().getEpochSecond();
+    return repository.getMetrics(
+        DataScope.forPartition(tableIdentifier, partitionPath), now - 1800, now + 1800);
   }
 
   private static Map<String, String> buildJdbcMetricsConfigs(MySQLContainer<?> mysql) {
@@ -595,6 +699,25 @@ public class TestIcebergUpdateStatsJobWithSpark {
             + " SET TBLPROPERTIES ('write.target-file-size-bytes'='1024000')");
     for (int i = 0; i < 10; i++) {
       sparkSession.sql("INSERT INTO " + fullTableName + " VALUES (" + i + ", 'value_" + i + "')");
+    }
+  }
+
+  private static void createPartitionedTableAndInsertData(
+      SparkSession sparkSession, String fullTableName) {
+    sparkSession.sql("CREATE NAMESPACE IF NOT EXISTS " + SPARK_CATALOG_NAME + ".db");
+    sparkSession.sql("DROP TABLE IF EXISTS " + fullTableName);
+    sparkSession.sql(
+        "CREATE TABLE "
+            + fullTableName
+            + " (id INT, data STRING, ds STRING) USING iceberg PARTITIONED BY (ds)");
+    sparkSession.sql(
+        "ALTER TABLE "
+            + fullTableName
+            + " SET TBLPROPERTIES ('write.target-file-size-bytes'='1024000')");
+    for (int i = 0; i < 10; i++) {
+      String ds = i < 5 ? "2026-03-01" : "2026-03-02";
+      sparkSession.sql(
+          "INSERT INTO " + fullTableName + " VALUES (" + i + ", 'value_" + i + "', '" + ds + "')");
     }
   }
 
