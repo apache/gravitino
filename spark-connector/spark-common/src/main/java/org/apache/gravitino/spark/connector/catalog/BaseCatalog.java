@@ -514,7 +514,8 @@ public abstract class BaseCatalog implements TableCatalog, SupportsNamespaces, F
     throw new NoSuchFunctionException(ident);
   }
 
-  protected Table loadTableForWriting(Identifier ident) throws NoSuchTableException {
+  protected Table loadTableForWriting(Identifier ident)
+      throws NoSuchTableException, ForbiddenException {
     org.apache.gravitino.rel.Table gravitinoTable = loadGravitinoTableForWriting(ident);
     org.apache.spark.sql.connector.catalog.Table sparkTable = loadSparkTable(ident);
     // Will create a catalog specific table
