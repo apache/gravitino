@@ -43,6 +43,19 @@ To configure the Gravitino client, use properties prefixed with `table.catalog-s
 
 **Note:** Invalid configuration properties will result in exceptions. Please see [Gravitino Java client configurations](../how-to-use-gravitino-client.md#gravitino-java-client-configuration) for more support client configuration.
 
+:::caution
+**Important for Authorization Setup:**  
+When authorization is enabled in Gravitino, the Flink connector may need access to sensitive catalog properties (such as passwords, secret keys, and authentication tokens) to connect to underlying data sources. 
+
+By default, Gravitino filters sensitive properties from catalog responses for security. To ensure the Flink connector can retrieve necessary credentials, you must set `gravitino.authorization.filterSensitiveProperties` to `false` in the Gravitino server configuration file (`gravitino.conf`):
+
+```properties
+gravitino.authorization.filterSensitiveProperties = false
+```
+
+This allows authorized users to access the credentials needed for Flink to connect to catalogs. For more information about sensitive property filtering, see [Access Control](../security/access-control.md#sensitive-properties-filtering).
+:::
+
 Set the flink configuration in flink-conf.yaml.
 ```yaml
 table.catalog-store.kind: gravitino
