@@ -16,10 +16,34 @@
  * specific language governing permissions and limitations
  * under the License.
  */
+import org.gradle.api.attributes.java.TargetJvmVersion
+import org.gradle.api.tasks.compile.JavaCompile
+
 plugins {
   `maven-publish`
   id("java")
   id("idea")
+}
+
+java {
+  sourceCompatibility = JavaVersion.VERSION_1_8
+  targetCompatibility = JavaVersion.VERSION_1_8
+}
+
+tasks.named<JavaCompile>("compileJava") {
+  options.release.set(8)
+}
+
+tasks.named<JavaCompile>("compileTestJava") {
+  options.release.set(17)
+}
+
+val targetJvmVersionAttribute = TargetJvmVersion.TARGET_JVM_VERSION_ATTRIBUTE
+configurations.named("testCompileClasspath") {
+  attributes.attribute(targetJvmVersionAttribute, 17)
+}
+configurations.named("testRuntimeClasspath") {
+  attributes.attribute(targetJvmVersionAttribute, 17)
 }
 
 dependencies {
@@ -70,6 +94,12 @@ tasks.build {
 }
 
 tasks.test {
+  javaLauncher.set(
+    javaToolchains.launcherFor {
+      languageVersion.set(JavaLanguageVersion.of(17))
+    }
+  )
+
   val skipITs = project.hasProperty("skipITs")
   if (skipITs) {
     exclude("**/integration/test/**")
