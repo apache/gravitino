@@ -227,7 +227,7 @@ public class CatalogClickHouseClusterIT extends BaseIT {
     Table distributedTable =
         tableCatalog.createTable(
             distributedTableIdent,
-            columns,
+            new Column[] {},
             tableComment,
             distributedProperties(localTableName),
             partitioning,
