@@ -25,3 +25,4 @@ org.apache.gravitino.maintenance.optimizer.monitor.callback.MonitorCallbackForTe
 org.apache.gravitino.maintenance.optimizer.recommender.StrategyProviderForCmdTest
 org.apache.gravitino.maintenance.optimizer.recommender.StatisticsProviderForCmdTest
 org.apache.gravitino.maintenance.optimizer.recommender.TableMetadataProviderForCmdTest
+org.apache.gravitino.maintenance.optimizer.integration.test.RecordingJobSubmitterForIT

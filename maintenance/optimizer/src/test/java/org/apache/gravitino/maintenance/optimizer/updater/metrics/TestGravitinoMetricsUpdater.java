@@ -19,7 +19,6 @@
 
 package org.apache.gravitino.maintenance.optimizer.updater.metrics;
 
-import java.lang.reflect.Field;
 import java.util.List;
 import java.util.Map;
 import org.apache.gravitino.NameIdentifier;
@@ -62,7 +61,7 @@ class TestGravitinoMetricsUpdater {
   void testUpdateTableAndPartitionMetricsPassThroughRequests() throws Exception {
     GravitinoMetricsUpdater updater = new GravitinoMetricsUpdater();
     MetricsRepository repository = Mockito.mock(MetricsRepository.class);
-    setMetricsRepository(updater, repository);
+    updater.setMetricsRepositoryForTest(repository);
     NameIdentifier tableId = NameIdentifier.of("catalog", "db", "table");
     List<MetricPoint> inputMetrics =
         List.of(
@@ -97,7 +96,7 @@ class TestGravitinoMetricsUpdater {
   void testUpdateJobMetricsPassThroughRequests() throws Exception {
     GravitinoMetricsUpdater updater = new GravitinoMetricsUpdater();
     MetricsRepository repository = Mockito.mock(MetricsRepository.class);
-    setMetricsRepository(updater, repository);
+    updater.setMetricsRepositoryForTest(repository);
     NameIdentifier jobId = NameIdentifier.of("catalog", "db", "job");
     List<MetricPoint> inputMetrics =
         List.of(MetricPoint.forJob(jobId, "duration", StatisticValues.longValue(20L), 200L));
@@ -120,7 +119,7 @@ class TestGravitinoMetricsUpdater {
   void testUpdateTableAndPartitionMetricsRejectsJobScope() throws Exception {
     GravitinoMetricsUpdater updater = new GravitinoMetricsUpdater();
     MetricsRepository repository = Mockito.mock(MetricsRepository.class);
-    setMetricsRepository(updater, repository);
+    updater.setMetricsRepositoryForTest(repository);
     NameIdentifier jobId = NameIdentifier.of("catalog", "db", "job");
 
     Assertions.assertThrows(
@@ -135,7 +134,7 @@ class TestGravitinoMetricsUpdater {
   void testUpdateJobMetricsRejectsTableScope() throws Exception {
     GravitinoMetricsUpdater updater = new GravitinoMetricsUpdater();
     MetricsRepository repository = Mockito.mock(MetricsRepository.class);
-    setMetricsRepository(updater, repository);
+    updater.setMetricsRepositoryForTest(repository);
     NameIdentifier tableId = NameIdentifier.of("catalog", "db", "table");
 
     Assertions.assertThrows(
@@ -151,7 +150,7 @@ class TestGravitinoMetricsUpdater {
   void testCloseDelegatesToRepository() throws Exception {
     GravitinoMetricsUpdater updater = new GravitinoMetricsUpdater();
     MetricsRepository repository = Mockito.mock(MetricsRepository.class);
-    setMetricsRepository(updater, repository);
+    updater.setMetricsRepositoryForTest(repository);
 
     updater.close();
 
@@ -177,7 +176,7 @@ class TestGravitinoMetricsUpdater {
                     "org.h2.Driver",
                     OptimizerConfig.OPTIMIZER_PREFIX + "jdbcMetrics." + "testOnBorrow",
                     "false"))));
-    MetricsRepository repository = getMetricsRepository(updater);
+    MetricsRepository repository = updater.metricsRepositoryForTest();
     Assertions.assertInstanceOf(GenericJdbcMetricsRepository.class, repository);
     updater.close();
   }
@@ -196,23 +195,9 @@ class TestGravitinoMetricsUpdater {
                 "gravitino.optimizer.jdbcMetrics.jdbcPassword",
                 ""));
     updater.initialize(new OptimizerEnv(config));
-    MetricsRepository repository = getMetricsRepository(updater);
+    MetricsRepository repository = updater.metricsRepositoryForTest();
     Assertions.assertInstanceOf(GenericJdbcMetricsRepository.class, repository);
     updater.close();
-  }
-
-  private void setMetricsRepository(GravitinoMetricsUpdater updater, MetricsRepository repository)
-      throws ReflectiveOperationException {
-    Field field = GravitinoMetricsUpdater.class.getDeclaredField("metricsStorage");
-    field.setAccessible(true);
-    field.set(updater, repository);
-  }
-
-  private MetricsRepository getMetricsRepository(GravitinoMetricsUpdater updater)
-      throws ReflectiveOperationException {
-    Field field = GravitinoMetricsUpdater.class.getDeclaredField("metricsStorage");
-    field.setAccessible(true);
-    return (MetricsRepository) field.get(updater);
   }
 
   private PartitionPath parsePartitionPath(String partition) {
