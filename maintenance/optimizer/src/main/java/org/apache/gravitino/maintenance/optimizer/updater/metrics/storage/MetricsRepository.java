@@ -21,7 +21,8 @@ package org.apache.gravitino.maintenance.optimizer.updater.metrics.storage;
 
 import java.util.List;
 import java.util.Map;
-import org.apache.gravitino.NameIdentifier;
+import org.apache.gravitino.maintenance.optimizer.api.common.DataScope;
+import org.apache.gravitino.maintenance.optimizer.api.common.MetricPoint;
 
 /** SPI for persisting metrics produced by the optimizer updater. */
 public interface MetricsRepository extends AutoCloseable {
@@ -29,26 +30,17 @@ public interface MetricsRepository extends AutoCloseable {
   /** Initialize the storage backend with configuration properties. */
   void initialize(Map<String, String> properties);
 
-  /** Persist multiple table metrics in one call. */
-  void storeTableMetrics(List<TableMetricWriteRequest> metrics);
+  /** Persist metric points for table and partition scopes. */
+  void storeTableAndPartitionMetrics(List<MetricPoint> metrics);
 
-  /** Load table-level metrics within a time window [fromSecs, toSecs) in epoch seconds. */
-  Map<String, List<MetricRecord>> getTableMetrics(
-      NameIdentifier nameIdentifier, long fromSecs, long toSecs);
+  /** Persist metric points for job scope. */
+  void storeJobMetrics(List<MetricPoint> metrics);
 
-  /** Load partition-level metrics within a time window [fromSecs, toSecs) in epoch seconds. */
-  Map<String, List<MetricRecord>> getPartitionMetrics(
-      NameIdentifier nameIdentifier, String partition, long fromSecs, long toSecs);
+  /** Load metrics within a time window [fromSecs, toSecs) in epoch seconds. */
+  List<MetricPoint> getMetrics(DataScope scope, long fromSecs, long toSecs);
 
   /** Delete table metrics older than the supplied timestamp (epoch seconds), exclusive. */
   int cleanupTableMetricsBefore(long timestamp);
-
-  /** Persist multiple job metrics in one call. */
-  void storeJobMetrics(List<JobMetricWriteRequest> metrics);
-
-  /** Load job metrics within a time window [fromSecs, toSecs) in epoch seconds. */
-  Map<String, List<MetricRecord>> getJobMetrics(
-      NameIdentifier nameIdentifier, long fromSecs, long toSecs);
 
   /** Delete job metrics older than the supplied timestamp (epoch seconds), exclusive. */
   int cleanupJobMetricsBefore(long timestamp);

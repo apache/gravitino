@@ -19,32 +19,23 @@
 
 package org.apache.gravitino.maintenance.optimizer.updater.metrics.storage;
 
-import com.google.common.base.Preconditions;
-import org.apache.gravitino.NameIdentifier;
+/** Immutable test-only {@link MetricRecord} implementation. */
+public class MetricRecordImpl implements MetricRecord {
+  private final long timestamp;
+  private final String value;
 
-/** Write request for one job metric record. */
-public class JobMetricWriteRequest {
-  private final NameIdentifier nameIdentifier;
-  private final String metricName;
-  private final MetricRecord metric;
-
-  public JobMetricWriteRequest(
-      NameIdentifier nameIdentifier, String metricName, MetricRecord metric) {
-    Preconditions.checkArgument(nameIdentifier != null, "nameIdentifier must not be null");
-    this.nameIdentifier = nameIdentifier;
-    this.metricName = metricName;
-    this.metric = metric;
+  public MetricRecordImpl(long timestamp, String value) {
+    this.timestamp = timestamp;
+    this.value = value;
   }
 
-  public NameIdentifier nameIdentifier() {
-    return nameIdentifier;
+  @Override
+  public long getTimestamp() {
+    return timestamp;
   }
 
-  public String metricName() {
-    return metricName;
-  }
-
-  public MetricRecord metric() {
-    return metric;
+  @Override
+  public String getValue() {
+    return value;
   }
 }
