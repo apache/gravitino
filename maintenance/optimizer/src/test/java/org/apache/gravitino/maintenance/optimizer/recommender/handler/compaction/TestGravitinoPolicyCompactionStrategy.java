@@ -48,6 +48,7 @@ class TestGravitinoPolicyCompactionStrategy {
             1L,
             2L,
             10L,
+            20L,
             Map.of("target-file-size-bytes", "1048576", "min-input-files", "4"));
     Policy policy = Mockito.mock(Policy.class);
     Mockito.when(policy.name()).thenReturn("iceberg-compaction-policy");

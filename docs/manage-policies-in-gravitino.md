@@ -104,6 +104,10 @@ Policy policy = client.createPolicy(
 </TabItem>
 </Tabs>
 
+### Built-in Iceberg compaction policy
+
+For the built-in `ICEBERG_COMPACTION` policy content, field definitions, and examples, see [Iceberg compaction policy](./iceberg-compaction-policy.md).
+
 ### List created policies
 
 You can list all the created policy names as well as policy objects in a metalake in Gravitino.
@@ -465,4 +469,3 @@ int count = policy.associatedObjects().count();
 
 </TabItem>
 </Tabs>
-

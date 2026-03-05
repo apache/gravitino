@@ -100,6 +100,9 @@ public interface PolicyContentDTO extends PolicyContent {
     @JsonProperty("deleteFileNumberWeight")
     private Long deleteFileNumberWeight;
 
+    @JsonProperty("maxPartitionNum")
+    private Long maxPartitionNum;
+
     @JsonProperty("rewriteOptions")
     private Map<String, String> rewriteOptions;
 
@@ -149,6 +152,17 @@ public interface PolicyContentDTO extends PolicyContent {
     }
 
     /**
+     * Returns max partition number selected for compaction.
+     *
+     * @return max partition number
+     */
+    public Long maxPartitionNum() {
+      return maxPartitionNum == null
+          ? IcebergCompactionContent.DEFAULT_MAX_PARTITION_NUM
+          : maxPartitionNum;
+    }
+
+    /**
      * Returns rewrite options expanded to job.options.* during rule generation.
      *
      * @return rewrite options map
@@ -172,6 +186,7 @@ public interface PolicyContentDTO extends PolicyContent {
               require(minDeleteFileNumber, "minDeleteFileNumber"),
               dataFileMseWeight(),
               deleteFileNumberWeight(),
+              maxPartitionNum(),
               rewriteOptions())
           .properties();
     }
@@ -183,6 +198,7 @@ public interface PolicyContentDTO extends PolicyContent {
               require(minDeleteFileNumber, "minDeleteFileNumber"),
               dataFileMseWeight(),
               deleteFileNumberWeight(),
+              maxPartitionNum(),
               rewriteOptions())
           .rules();
     }
@@ -199,6 +215,7 @@ public interface PolicyContentDTO extends PolicyContent {
       Preconditions.checkArgument(dataFileMseWeight() >= 0, "dataFileMseWeight must be >= 0");
       Preconditions.checkArgument(
           deleteFileNumberWeight() >= 0, "deleteFileNumberWeight must be >= 0");
+      Preconditions.checkArgument(maxPartitionNum() > 0, "maxPartitionNum must be > 0");
       rewriteOptions()
           .forEach(
               (key, value) -> {

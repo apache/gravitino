@@ -573,6 +573,7 @@ public class DTOConverters {
           .withMinDeleteFileNumber(icebergCompactionContent.minDeleteFileNumber())
           .withDataFileMseWeight(icebergCompactionContent.dataFileMseWeight())
           .withDeleteFileNumberWeight(icebergCompactionContent.deleteFileNumberWeight())
+          .withMaxPartitionNum(icebergCompactionContent.maxPartitionNum())
           .withRewriteOptions(icebergCompactionContent.rewriteOptions())
           .build();
     }
@@ -1318,6 +1319,7 @@ public class DTOConverters {
           require(icebergCompactionContentDTO.minDeleteFileNumber(), "minDeleteFileNumber"),
           require(icebergCompactionContentDTO.dataFileMseWeight(), "dataFileMseWeight"),
           require(icebergCompactionContentDTO.deleteFileNumberWeight(), "deleteFileNumberWeight"),
+          require(icebergCompactionContentDTO.maxPartitionNum(), "maxPartitionNum"),
           icebergCompactionContentDTO.rewriteOptions());
     }
 

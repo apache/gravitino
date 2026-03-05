@@ -54,6 +54,8 @@ public class IcebergCompactionContent implements PolicyContent {
   public static final String DATA_FILE_MSE_WEIGHT_KEY = "dataFileMseWeight";
   /** Rule key for delete file number score weight. */
   public static final String DELETE_FILE_NUMBER_WEIGHT_KEY = "deleteFileNumberWeight";
+  /** Rule key for max partition number selected for compaction. */
+  public static final String MAX_PARTITION_NUM_KEY = "max_partition_num";
   /** Metric name for data file MSE. */
   public static final String DATA_FILE_MSE_METRIC = "custom-data-file-mse";
   /** Metric name for delete file number. */
@@ -62,6 +64,8 @@ public class IcebergCompactionContent implements PolicyContent {
   public static final long DEFAULT_DATA_FILE_MSE_WEIGHT = 1L;
   /** Default score weight for delete file number. */
   public static final long DEFAULT_DELETE_FILE_NUMBER_WEIGHT = 100L;
+  /** Default max partition number for compaction. */
+  public static final long DEFAULT_MAX_PARTITION_NUM = 100L;
 
   private static final Pattern OPTION_KEY_PATTERN = Pattern.compile("[A-Za-z0-9._-]+");
   private static final Set<MetadataObject.Type> SUPPORTED_OBJECT_TYPES =
@@ -88,11 +92,12 @@ public class IcebergCompactionContent implements PolicyContent {
   private final Long minDeleteFileNumber;
   private final Long dataFileMseWeight;
   private final Long deleteFileNumberWeight;
+  private final Long maxPartitionNum;
   private final Map<String, String> rewriteOptions;
 
   /** Default constructor for Jackson deserialization only. */
   private IcebergCompactionContent() {
-    this(null, null, null, null, null);
+    this(null, null, null, null, null, null);
   }
 
   IcebergCompactionContent(
@@ -100,6 +105,7 @@ public class IcebergCompactionContent implements PolicyContent {
       Long minDeleteFileNumber,
       Long dataFileMseWeight,
       Long deleteFileNumberWeight,
+      Long maxPartitionNum,
       Map<String, String> rewriteOptions) {
     this.minDataFileMse = minDataFileMse;
     this.minDeleteFileNumber = minDeleteFileNumber;
@@ -107,6 +113,7 @@ public class IcebergCompactionContent implements PolicyContent {
         dataFileMseWeight == null ? DEFAULT_DATA_FILE_MSE_WEIGHT : dataFileMseWeight;
     this.deleteFileNumberWeight =
         deleteFileNumberWeight == null ? DEFAULT_DELETE_FILE_NUMBER_WEIGHT : deleteFileNumberWeight;
+    this.maxPartitionNum = maxPartitionNum == null ? DEFAULT_MAX_PARTITION_NUM : maxPartitionNum;
     this.rewriteOptions =
         rewriteOptions == null
             ? Collections.emptyMap()
@@ -150,6 +157,15 @@ public class IcebergCompactionContent implements PolicyContent {
   }
 
   /**
+   * Returns max partition number selected for compaction.
+   *
+   * @return max partition number
+   */
+  public Long maxPartitionNum() {
+    return maxPartitionNum;
+  }
+
+  /**
    * Returns rewrite options that are expanded to {@code job.options.*} rule entries.
    *
    * @return rewrite options
@@ -176,6 +192,7 @@ public class IcebergCompactionContent implements PolicyContent {
     rules.put(MIN_DELETE_FILE_NUMBER_KEY, minDeleteFileNumber);
     rules.put(DATA_FILE_MSE_WEIGHT_KEY, dataFileMseWeight);
     rules.put(DELETE_FILE_NUMBER_WEIGHT_KEY, deleteFileNumberWeight);
+    rules.put(MAX_PARTITION_NUM_KEY, maxPartitionNum);
     rules.put(TRIGGER_EXPR_KEY, TRIGGER_EXPR);
     rules.put(SCORE_EXPR_KEY, SCORE_EXPR);
     rewriteOptions.forEach((key, value) -> rules.put(JOB_OPTIONS_PREFIX + key, value));
@@ -197,6 +214,9 @@ public class IcebergCompactionContent implements PolicyContent {
     Preconditions.checkArgument(
         deleteFileNumberWeight != null && deleteFileNumberWeight >= 0,
         "deleteFileNumberWeight must not be null and must be >= 0");
+    Preconditions.checkArgument(
+        maxPartitionNum != null && maxPartitionNum > 0,
+        "maxPartitionNum must not be null and must be > 0");
 
     rewriteOptions.forEach(
         (key, value) -> {
@@ -225,6 +245,7 @@ public class IcebergCompactionContent implements PolicyContent {
         && Objects.equals(minDeleteFileNumber, that.minDeleteFileNumber)
         && Objects.equals(dataFileMseWeight, that.dataFileMseWeight)
         && Objects.equals(deleteFileNumberWeight, that.deleteFileNumberWeight)
+        && Objects.equals(maxPartitionNum, that.maxPartitionNum)
         && Objects.equals(rewriteOptions, that.rewriteOptions);
   }
 
@@ -235,6 +256,7 @@ public class IcebergCompactionContent implements PolicyContent {
         minDeleteFileNumber,
         dataFileMseWeight,
         deleteFileNumberWeight,
+        maxPartitionNum,
         rewriteOptions);
   }
 
@@ -249,6 +271,8 @@ public class IcebergCompactionContent implements PolicyContent {
         + dataFileMseWeight
         + ", deleteFileNumberWeight="
         + deleteFileNumberWeight
+        + ", maxPartitionNum="
+        + maxPartitionNum
         + ", rewriteOptions="
         + rewriteOptions
         + '}';

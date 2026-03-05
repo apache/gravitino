@@ -41,6 +41,7 @@ public class TestPolicyContents {
     Assertions.assertEquals(1L, content.rules().get("minDeleteFileNumber"));
     Assertions.assertEquals(1L, content.rules().get("dataFileMseWeight"));
     Assertions.assertEquals(100L, content.rules().get("deleteFileNumberWeight"));
+    Assertions.assertEquals(100L, content.rules().get("max_partition_num"));
     Assertions.assertEquals(
         "custom-data-file-mse > minDataFileMse || custom-delete-file-number > minDeleteFileNumber",
         content.rules().get("trigger-expr"));
@@ -65,10 +66,12 @@ public class TestPolicyContents {
                 1L,
                 3L,
                 200L,
+                88L,
                 Map.of("target-file-size-bytes", "1048576", "min-input-files", "1"));
 
     Assertions.assertEquals(3L, content.rules().get("dataFileMseWeight"));
     Assertions.assertEquals(200L, content.rules().get("deleteFileNumberWeight"));
+    Assertions.assertEquals(88L, content.rules().get("max_partition_num"));
     Assertions.assertDoesNotThrow(content::validate);
   }
 
@@ -82,5 +85,17 @@ public class TestPolicyContents {
     IllegalArgumentException exception =
         Assertions.assertThrows(IllegalArgumentException.class, content::validate);
     Assertions.assertTrue(exception.getMessage().contains("must not start with"));
+  }
+
+  @Test
+  void testIcebergCompactionContentRejectsInvalidMaxPartitionNum() {
+    IcebergCompactionContent content =
+        (IcebergCompactionContent)
+            PolicyContents.icebergCompaction(
+                1000L, 1L, 2L, 10L, 0L, Map.of("target-file-size-bytes", "1048576"));
+
+    IllegalArgumentException exception =
+        Assertions.assertThrows(IllegalArgumentException.class, content::validate);
+    Assertions.assertTrue(exception.getMessage().contains("maxPartitionNum"));
   }
 }

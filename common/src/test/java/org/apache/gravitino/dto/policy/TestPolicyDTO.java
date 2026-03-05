@@ -117,6 +117,7 @@ public class TestPolicyDTO {
             .withMinDeleteFileNumber(1L)
             .withDataFileMseWeight(2L)
             .withDeleteFileNumberWeight(150L)
+            .withMaxPartitionNum(99L)
             .withRewriteOptions(
                 ImmutableMap.of("target-file-size-bytes", "1048576", "min-input-files", "1"))
             .build();
