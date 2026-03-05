@@ -1322,6 +1322,17 @@ public class TestPOConverters {
     Assertions.assertEquals("test", entity.value().value());
   }
 
+  @Test
+  public void testFromModelVersionPOWithEmptyModelVersionPOs() {
+    NameIdentifier modelIdent = NameIdentifierUtil.ofModel("m", "c", "s", "model1");
+
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () ->
+            POConverters.fromModelVersionPO(
+                modelIdent, Collections.emptyList(), Collections.emptyList()));
+  }
+
   private static BaseMetalake createMetalake(Long id, String name, String comment) {
     AuditInfo auditInfo =
         AuditInfo.builder().withCreator("creator").withCreateTime(FIX_INSTANT).build();
