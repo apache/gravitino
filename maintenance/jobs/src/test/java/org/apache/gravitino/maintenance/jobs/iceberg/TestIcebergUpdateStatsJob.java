@@ -48,19 +48,38 @@ public class TestIcebergUpdateStatsJob {
     SparkJobTemplate template = job.jobTemplate();
 
     assertNotNull(template.arguments());
-    assertEquals(12, template.arguments().size());
+    assertEquals(10, template.arguments().size());
     assertTrue(template.arguments().contains("--catalog"));
     assertTrue(template.arguments().contains("{{catalog_name}}"));
     assertTrue(template.arguments().contains("--table"));
     assertTrue(template.arguments().contains("{{table_identifier}}"));
     assertTrue(template.arguments().contains("--update-mode"));
     assertTrue(template.arguments().contains("{{update_mode}}"));
-    assertTrue(template.arguments().contains("--target-file-size-bytes"));
-    assertTrue(template.arguments().contains("{{target_file_size_bytes}}"));
     assertTrue(template.arguments().contains("--updater-options"));
     assertTrue(template.arguments().contains("{{updater_options}}"));
     assertTrue(template.arguments().contains("--spark-conf"));
     assertTrue(template.arguments().contains("{{spark_conf}}"));
+  }
+
+  @Test
+  public void testJobTemplateHasSparkConfigs() {
+    IcebergUpdateStatsAndMetricsJob job = new IcebergUpdateStatsAndMetricsJob();
+    SparkJobTemplate template = job.jobTemplate();
+
+    Map<String, String> configs = template.configs();
+    assertNotNull(configs);
+    assertTrue(configs.containsKey("spark.master"));
+    assertTrue(configs.containsKey("spark.executor.instances"));
+    assertTrue(configs.containsKey("spark.executor.cores"));
+    assertTrue(configs.containsKey("spark.executor.memory"));
+    assertTrue(configs.containsKey("spark.driver.memory"));
+    assertTrue(configs.containsKey("spark.sql.catalog.{{catalog_name}}"));
+    assertTrue(configs.containsKey("spark.sql.catalog.{{catalog_name}}.type"));
+    assertTrue(configs.containsKey("spark.sql.catalog.{{catalog_name}}.uri"));
+    assertTrue(configs.containsKey("spark.sql.catalog.{{catalog_name}}.warehouse"));
+    assertEquals(
+        "org.apache.iceberg.spark.extensions.IcebergSparkSessionExtensions",
+        configs.get("spark.sql.extensions"));
   }
 
   @Test
@@ -69,7 +88,6 @@ public class TestIcebergUpdateStatsJob {
       "--catalog", "cat",
       "--table", "db.tbl",
       "--update-mode", "metrics",
-      "--target-file-size-bytes", "2048",
       "--updater-options", "{\"metalake\":\"ml\",\"gravitino_uri\":\"http://localhost:8090\"}",
       "--spark-conf", "{\"spark.master\":\"local[2]\"}"
     };
@@ -78,7 +96,6 @@ public class TestIcebergUpdateStatsJob {
     assertEquals("cat", parsed.get("catalog"));
     assertEquals("db.tbl", parsed.get("table"));
     assertEquals("metrics", parsed.get("update-mode"));
-    assertEquals("2048", parsed.get("target-file-size-bytes"));
     assertEquals(
         "{\"metalake\":\"ml\",\"gravitino_uri\":\"http://localhost:8090\"}",
         parsed.get("updater-options"));
@@ -87,10 +104,8 @@ public class TestIcebergUpdateStatsJob {
 
   @Test
   public void testBuildStatsSql() {
-    String tableSql =
-        IcebergUpdateStatsAndMetricsJob.buildTableStatsSql("cat", "db.tbl", 134_217_728L);
-    String partitionSql =
-        IcebergUpdateStatsAndMetricsJob.buildPartitionStatsSql("cat", "db.tbl", 134_217_728L);
+    String tableSql = IcebergUpdateStatsAndMetricsJob.buildTableStatsSql("cat", "db.tbl");
+    String partitionSql = IcebergUpdateStatsAndMetricsJob.buildPartitionStatsSql("cat", "db.tbl");
 
     assertTrue(tableSql.contains("FROM cat.db.tbl.files"));
     assertTrue(tableSql.contains("AS datafile_mse"));
@@ -101,19 +116,6 @@ public class TestIcebergUpdateStatsJob {
     assertTrue(partitionSql.startsWith("SELECT partition"));
     assertTrue(partitionSql.contains("file_size_in_bytes < 33554432"));
     assertTrue(partitionSql.contains("134217728 - LEAST(134217728, file_size_in_bytes)"));
-  }
-
-  @Test
-  public void testParseTargetFileSize() {
-    assertEquals(134_217_728L, IcebergUpdateStatsAndMetricsJob.parseTargetFileSize(null));
-    assertEquals(134_217_728L, IcebergUpdateStatsAndMetricsJob.parseTargetFileSize(""));
-    assertEquals(2048L, IcebergUpdateStatsAndMetricsJob.parseTargetFileSize("2048"));
-    assertThrows(
-        IllegalArgumentException.class,
-        () -> IcebergUpdateStatsAndMetricsJob.parseTargetFileSize("-1"));
-    assertThrows(
-        IllegalArgumentException.class,
-        () -> IcebergUpdateStatsAndMetricsJob.parseTargetFileSize("abc"));
   }
 
   @Test

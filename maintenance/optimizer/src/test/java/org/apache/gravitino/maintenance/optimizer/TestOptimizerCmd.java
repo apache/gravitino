@@ -437,13 +437,46 @@ class TestOptimizerCmd {
             "--spark-conf",
             "{\"spark.sql.catalog.rest\":\"org.apache.iceberg.spark.SparkCatalog\","
                 + "\"spark.sql.catalog.rest.type\":\"rest\","
-                + "\"spark.sql.catalog.rest.uri\":\"http://localhost:9001/iceberg\"}",
+                + "\"spark.sql.catalog.rest.uri\":\"http://localhost:9001/iceberg\","
+                + "\"spark.sql.catalog.rest.warehouse\":\"/tmp/warehouse\","
+                + "\"spark.sql.extensions\":\"org.apache.iceberg.spark.extensions.IcebergSparkSessionExtensions\"}",
             "--dry-run",
             "--conf-path",
             confPath.toString());
     Assertions.assertTrue(output[1].isEmpty(), "stderr=" + output[1] + ", stdout=" + output[0]);
     Assertions.assertTrue(output[0].contains("custom-metrics-updater"));
     Assertions.assertTrue(output[0].contains("spark.sql.catalog.rest"));
+  }
+
+  @Test
+  void testSubmitUpdateStatsJobRequiresSparkSqlExtensions() throws Exception {
+    Path confPath = createOptimizerConfForSubmitUpdateStatsWithoutExtensions();
+    String[] output =
+        runCommand(
+            "--type",
+            "submit-update-stats-job",
+            "--identifiers",
+            "rest.ab.t1",
+            "--dry-run",
+            "--conf-path",
+            confPath.toString());
+    Assertions.assertTrue(output[1].contains("spark.sql.extensions"));
+  }
+
+  @Test
+  void testSubmitUpdateStatsJobRequiresCatalogUriForRestCatalog() throws Exception {
+    Path confPath = createOptimizerConfForSubmitUpdateStatsWithoutCatalogUri();
+    String[] output =
+        runCommand(
+            "--type",
+            "submit-update-stats-job",
+            "--identifiers",
+            "rest.ab.t1",
+            "--dry-run",
+            "--conf-path",
+            confPath.toString());
+    Assertions.assertTrue(output[1].contains("spark.sql.catalog.rest.uri"));
+    Assertions.assertTrue(output[1].contains("catalog type is 'rest'"));
   }
 
   private Path createOptimizerConfForMetricsProvider() throws Exception {
@@ -526,13 +559,15 @@ class TestOptimizerCmd {
                 "gravitino.optimizer.gravitinoMetalake = test",
                 "gravitino.optimizer.gravitinoDefaultCatalog = rest",
                 "gravitino.optimizer.jobSubmitterConfig.update_mode = stats",
-                "gravitino.optimizer.jobSubmitterConfig.target_file_size_bytes = 134217728",
                 "gravitino.optimizer.jobSubmitterConfig.updater_options = "
                     + "{\"gravitino_uri\":\"http://localhost:8090\",\"metalake\":\"test\"}",
                 "gravitino.optimizer.jobSubmitterConfig.spark_conf = "
                     + "{\"spark.sql.catalog.rest\":\"org.apache.iceberg.spark.SparkCatalog\","
                     + "\"spark.sql.catalog.rest.type\":\"rest\","
-                    + "\"spark.sql.catalog.rest.uri\":\"http://localhost:9001/iceberg\"}")
+                    + "\"spark.sql.catalog.rest.uri\":\"http://localhost:9001/iceberg\","
+                    + "\"spark.sql.catalog.rest.warehouse\":\"/tmp/warehouse\","
+                    + "\"spark.sql.extensions\":"
+                    + "\"org.apache.iceberg.spark.extensions.IcebergSparkSessionExtensions\"}")
             + System.lineSeparator();
     Files.writeString(confPath, content, StandardCharsets.UTF_8);
     confPath.toFile().deleteOnExit();
@@ -550,6 +585,52 @@ class TestOptimizerCmd {
                 "gravitino.optimizer.jobSubmitterConfig.update_mode = stats",
                 "gravitino.optimizer.jobSubmitterConfig.updater_options = "
                     + "{\"gravitino_uri\":\"http://localhost:8090\",\"metalake\":\"test\"}")
+            + System.lineSeparator();
+    Files.writeString(confPath, content, StandardCharsets.UTF_8);
+    confPath.toFile().deleteOnExit();
+    return confPath;
+  }
+
+  private Path createOptimizerConfForSubmitUpdateStatsWithoutExtensions() throws Exception {
+    Path confPath =
+        Files.createTempFile("optimizer-submit-update-stats-without-extensions-", ".conf");
+    String content =
+        String.join(
+                System.lineSeparator(),
+                "gravitino.optimizer.gravitinoUri = http://localhost:8090",
+                "gravitino.optimizer.gravitinoMetalake = test",
+                "gravitino.optimizer.gravitinoDefaultCatalog = rest",
+                "gravitino.optimizer.jobSubmitterConfig.update_mode = stats",
+                "gravitino.optimizer.jobSubmitterConfig.updater_options = "
+                    + "{\"gravitino_uri\":\"http://localhost:8090\",\"metalake\":\"test\"}",
+                "gravitino.optimizer.jobSubmitterConfig.spark_conf = "
+                    + "{\"spark.sql.catalog.rest\":\"org.apache.iceberg.spark.SparkCatalog\","
+                    + "\"spark.sql.catalog.rest.type\":\"rest\","
+                    + "\"spark.sql.catalog.rest.uri\":\"http://localhost:9001/iceberg\","
+                    + "\"spark.sql.catalog.rest.warehouse\":\"/tmp/warehouse\"}")
+            + System.lineSeparator();
+    Files.writeString(confPath, content, StandardCharsets.UTF_8);
+    confPath.toFile().deleteOnExit();
+    return confPath;
+  }
+
+  private Path createOptimizerConfForSubmitUpdateStatsWithoutCatalogUri() throws Exception {
+    Path confPath = Files.createTempFile("optimizer-submit-update-stats-without-uri-", ".conf");
+    String content =
+        String.join(
+                System.lineSeparator(),
+                "gravitino.optimizer.gravitinoUri = http://localhost:8090",
+                "gravitino.optimizer.gravitinoMetalake = test",
+                "gravitino.optimizer.gravitinoDefaultCatalog = rest",
+                "gravitino.optimizer.jobSubmitterConfig.update_mode = stats",
+                "gravitino.optimizer.jobSubmitterConfig.updater_options = "
+                    + "{\"gravitino_uri\":\"http://localhost:8090\",\"metalake\":\"test\"}",
+                "gravitino.optimizer.jobSubmitterConfig.spark_conf = "
+                    + "{\"spark.sql.catalog.rest\":\"org.apache.iceberg.spark.SparkCatalog\","
+                    + "\"spark.sql.catalog.rest.type\":\"rest\","
+                    + "\"spark.sql.catalog.rest.warehouse\":\"/tmp/warehouse\","
+                    + "\"spark.sql.extensions\":"
+                    + "\"org.apache.iceberg.spark.extensions.IcebergSparkSessionExtensions\"}")
             + System.lineSeparator();
     Files.writeString(confPath, content, StandardCharsets.UTF_8);
     confPath.toFile().deleteOnExit();

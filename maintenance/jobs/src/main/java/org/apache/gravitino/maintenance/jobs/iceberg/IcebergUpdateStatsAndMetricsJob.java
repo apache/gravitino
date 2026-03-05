@@ -44,6 +44,7 @@ import org.apache.gravitino.maintenance.optimizer.common.OptimizerEnv;
 import org.apache.gravitino.maintenance.optimizer.common.PartitionEntryImpl;
 import org.apache.gravitino.maintenance.optimizer.common.StatisticEntryImpl;
 import org.apache.gravitino.maintenance.optimizer.common.conf.OptimizerConfig;
+import org.apache.gravitino.maintenance.optimizer.common.util.IcebergSparkConfigUtils;
 import org.apache.gravitino.maintenance.optimizer.common.util.ProviderUtils;
 import org.apache.gravitino.stats.StatisticValues;
 import org.apache.spark.sql.Row;
@@ -96,7 +97,6 @@ public class IcebergUpdateStatsAndMetricsJob implements BuiltInJob {
       System.exit(1);
     }
 
-    long targetFileSizeBytes = parseTargetFileSize(argMap.get("target-file-size-bytes"));
     Map<String, String> updaterOptions = parseJsonOptions(argMap.get("updater-options"));
     String sparkConfJson = argMap.get("spark-conf");
 
@@ -129,13 +129,7 @@ public class IcebergUpdateStatsAndMetricsJob implements BuiltInJob {
       }
 
       updateStatistics(
-          spark,
-          statisticsUpdater,
-          metricsUpdater,
-          updateMode,
-          catalogName,
-          tableIdentifier,
-          targetFileSizeBytes);
+          spark, statisticsUpdater, metricsUpdater, updateMode, catalogName, tableIdentifier);
     } catch (Exception e) {
       LOG.error("Failed to update Iceberg statistics/metrics", e);
       System.exit(1);
@@ -162,16 +156,9 @@ public class IcebergUpdateStatsAndMetricsJob implements BuiltInJob {
       SparkSession spark,
       StatisticsUpdater statisticsUpdater,
       String catalogName,
-      String tableIdentifier,
-      long targetFileSizeBytes) {
+      String tableIdentifier) {
     updateStatistics(
-        spark,
-        statisticsUpdater,
-        null,
-        UpdateMode.STATS,
-        catalogName,
-        tableIdentifier,
-        targetFileSizeBytes);
+        spark, statisticsUpdater, null, UpdateMode.STATS, catalogName, tableIdentifier);
   }
 
   static void updateStatistics(
@@ -179,16 +166,9 @@ public class IcebergUpdateStatsAndMetricsJob implements BuiltInJob {
       StatisticsUpdater statisticsUpdater,
       MetricsUpdater metricsUpdater,
       String catalogName,
-      String tableIdentifier,
-      long targetFileSizeBytes) {
+      String tableIdentifier) {
     updateStatistics(
-        spark,
-        statisticsUpdater,
-        metricsUpdater,
-        UpdateMode.ALL,
-        catalogName,
-        tableIdentifier,
-        targetFileSizeBytes);
+        spark, statisticsUpdater, metricsUpdater, UpdateMode.ALL, catalogName, tableIdentifier);
   }
 
   static void updateStatistics(
@@ -197,8 +177,7 @@ public class IcebergUpdateStatsAndMetricsJob implements BuiltInJob {
       MetricsUpdater metricsUpdater,
       UpdateMode updateMode,
       String catalogName,
-      String tableIdentifier,
-      long targetFileSizeBytes) {
+      String tableIdentifier) {
     Objects.requireNonNull(updateMode, "updateMode must not be null");
 
     if (updateMode.updateStats && statisticsUpdater == null) {
@@ -216,7 +195,7 @@ public class IcebergUpdateStatsAndMetricsJob implements BuiltInJob {
     long metricTimestamp = System.currentTimeMillis() / 1000L;
     boolean partitioned = isPartitionedTable(spark, catalogName, tableIdentifier);
     if (partitioned) {
-      String sql = buildPartitionStatsSql(catalogName, tableIdentifier, targetFileSizeBytes);
+      String sql = buildPartitionStatsSql(catalogName, tableIdentifier);
       Row[] rows = (Row[]) spark.sql(sql).collect();
       Map<PartitionPath, List<StatisticEntry<?>>> partitionStatistics = new LinkedHashMap<>();
       List<MetricPoint> tableAndPartitionMetrics = new ArrayList<>();
@@ -247,7 +226,7 @@ public class IcebergUpdateStatsAndMetricsJob implements BuiltInJob {
           rows.length,
           gravitinoTableIdentifier);
     } else {
-      String sql = buildTableStatsSql(catalogName, tableIdentifier, targetFileSizeBytes);
+      String sql = buildTableStatsSql(catalogName, tableIdentifier);
       Row[] rows = (Row[]) spark.sql(sql).collect();
       List<StatisticEntry<?>> tableStatistics =
           rows.length == 0 ? Collections.emptyList() : toStatistics(rows[0]);
@@ -269,8 +248,7 @@ public class IcebergUpdateStatsAndMetricsJob implements BuiltInJob {
     }
   }
 
-  static String buildTableStatsSql(
-      String catalogName, String tableIdentifier, long targetFileSizeBytes) {
+  static String buildTableStatsSql(String catalogName, String tableIdentifier) {
     String filesTable = buildFilesTableIdentifier(catalogName, tableIdentifier);
     return "SELECT "
         + "COUNT(*) AS file_count, "
@@ -281,9 +259,9 @@ public class IcebergUpdateStatsAndMetricsJob implements BuiltInJob {
         + SMALL_FILE_THRESHOLD_BYTES
         + " THEN 1 ELSE 0 END) AS small_files, "
         + "AVG(POWER("
-        + targetFileSizeBytes
+        + DEFAULT_TARGET_FILE_SIZE_BYTES
         + " - LEAST("
-        + targetFileSizeBytes
+        + DEFAULT_TARGET_FILE_SIZE_BYTES
         + ", file_size_in_bytes), 2)) AS datafile_mse, "
         + "AVG(file_size_in_bytes) AS avg_size, "
         + "SUM(file_size_in_bytes) AS total_size "
@@ -291,8 +269,7 @@ public class IcebergUpdateStatsAndMetricsJob implements BuiltInJob {
         + filesTable;
   }
 
-  static String buildPartitionStatsSql(
-      String catalogName, String tableIdentifier, long targetFileSizeBytes) {
+  static String buildPartitionStatsSql(String catalogName, String tableIdentifier) {
     String filesTable = buildFilesTableIdentifier(catalogName, tableIdentifier);
     return "SELECT "
         + "partition, "
@@ -304,9 +281,9 @@ public class IcebergUpdateStatsAndMetricsJob implements BuiltInJob {
         + SMALL_FILE_THRESHOLD_BYTES
         + " THEN 1 ELSE 0 END) AS small_files, "
         + "AVG(POWER("
-        + targetFileSizeBytes
+        + DEFAULT_TARGET_FILE_SIZE_BYTES
         + " - LEAST("
-        + targetFileSizeBytes
+        + DEFAULT_TARGET_FILE_SIZE_BYTES
         + ", file_size_in_bytes), 2)) AS datafile_mse, "
         + "AVG(file_size_in_bytes) AS avg_size, "
         + "SUM(file_size_in_bytes) AS total_size "
@@ -422,21 +399,6 @@ public class IcebergUpdateStatsAndMetricsJob implements BuiltInJob {
     } catch (Exception e) {
       throw new IllegalArgumentException(
           "Failed to parse JSON options: " + json + ". Error: " + e.getMessage(), e);
-    }
-  }
-
-  static long parseTargetFileSize(String value) {
-    if (value == null || value.trim().isEmpty()) {
-      return DEFAULT_TARGET_FILE_SIZE_BYTES;
-    }
-    try {
-      long parsed = Long.parseLong(value.trim());
-      if (parsed <= 0) {
-        throw new IllegalArgumentException("target-file-size-bytes must be > 0");
-      }
-      return parsed;
-    } catch (NumberFormatException e) {
-      throw new IllegalArgumentException("Invalid target-file-size-bytes: " + value, e);
     }
   }
 
@@ -582,8 +544,6 @@ public class IcebergUpdateStatsAndMetricsJob implements BuiltInJob {
         "{{table_identifier}}",
         "--update-mode",
         "{{update_mode}}",
-        "--target-file-size-bytes",
-        "{{target_file_size_bytes}}",
         "--updater-options",
         "{{updater_options}}",
         "--spark-conf",
@@ -591,7 +551,7 @@ public class IcebergUpdateStatsAndMetricsJob implements BuiltInJob {
   }
 
   private static Map<String, String> buildSparkConfigs() {
-    return Collections.emptyMap();
+    return IcebergSparkConfigUtils.buildTemplateSparkConfigs();
   }
 
   private static void printUsage() {
@@ -604,8 +564,7 @@ public class IcebergUpdateStatsAndMetricsJob implements BuiltInJob {
             + "\\n"
             + "Optional Options:\\n"
             + "  --update-mode <stats|metrics|all> Update behavior mode, default: all\\n"
-            + "  --target-file-size-bytes <bytes>   MSE target file size in bytes\\n"
-            + "                                     Default: 134217728 (128MB)\\n"
+            + "  datafile_mse target file size is fixed at 134217728 (128MB)\\n"
             + "                                     small_files threshold is fixed at 33554432 (32MB)\\n"
             + "  --updater-options <json>           JSON map for updater and repository settings\\n"
             + "                                     Example: '{\"gravitino_uri\":\"http://localhost:8090\",\\n"

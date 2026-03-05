@@ -270,8 +270,7 @@ public class TestIcebergUpdateStatsJobWithSpark {
         null,
         IcebergUpdateStatsAndMetricsJob.UpdateMode.STATS,
         catalogName,
-        "db.non_partitioned",
-        100_000L);
+        "db.non_partitioned");
 
     assertEquals(NameIdentifier.of(catalogName, "db", "non_partitioned"), updater.tableIdentifier);
     assertNotNull(updater.tableStatistics);
@@ -296,8 +295,7 @@ public class TestIcebergUpdateStatsJobWithSpark {
         null,
         IcebergUpdateStatsAndMetricsJob.UpdateMode.STATS,
         catalogName,
-        "db.partitioned",
-        100_000L);
+        "db.partitioned");
 
     assertEquals(NameIdentifier.of(catalogName, "db", "partitioned"), updater.tableIdentifier);
     assertTrue(updater.tableStatistics.isEmpty());
@@ -327,8 +325,7 @@ public class TestIcebergUpdateStatsJobWithSpark {
         metricsUpdater,
         IcebergUpdateStatsAndMetricsJob.UpdateMode.ALL,
         catalogName,
-        "db.partitioned",
-        100_000L);
+        "db.partitioned");
 
     assertEquals(
         NameIdentifier.of(catalogName, "db", "partitioned"), statisticsUpdater.tableIdentifier);
@@ -358,8 +355,7 @@ public class TestIcebergUpdateStatsJobWithSpark {
         metricsUpdater,
         IcebergUpdateStatsAndMetricsJob.UpdateMode.METRICS,
         catalogName,
-        "db.partitioned",
-        100_000L);
+        "db.partitioned");
 
     assertEquals(16, metricsUpdater.tableMetrics.size());
     assertTrue(
@@ -378,8 +374,7 @@ public class TestIcebergUpdateStatsJobWithSpark {
         metricsUpdater,
         IcebergUpdateStatsAndMetricsJob.UpdateMode.METRICS,
         catalogName,
-        "db.non_partitioned",
-        100_000L);
+        "db.non_partitioned");
 
     assertEquals(8, metricsUpdater.tableMetrics.size());
     assertTrue(
@@ -401,8 +396,7 @@ public class TestIcebergUpdateStatsJobWithSpark {
         metricsUpdater,
         IcebergUpdateStatsAndMetricsJob.UpdateMode.ALL,
         catalogName,
-        "db.non_partitioned",
-        100_000L);
+        "db.non_partitioned");
 
     assertEquals(
         NameIdentifier.of(catalogName, "db", "non_partitioned"), statisticsUpdater.tableIdentifier);
@@ -440,8 +434,7 @@ public class TestIcebergUpdateStatsJobWithSpark {
             metricsUpdater,
             IcebergUpdateStatsAndMetricsJob.UpdateMode.METRICS,
             catalogName,
-            "db.partitioned",
-            100_000L);
+            "db.partitioned");
       } finally {
         metricsUpdater.close();
       }
@@ -498,8 +491,7 @@ public class TestIcebergUpdateStatsJobWithSpark {
         null,
         IcebergUpdateStatsAndMetricsJob.UpdateMode.STATS,
         catalogName,
-        "db.multi_partitioned",
-        100_000L);
+        "db.multi_partitioned");
 
     assertEquals(
         NameIdentifier.of(catalogName, "db", "multi_partitioned"), updater.tableIdentifier);
@@ -733,7 +725,6 @@ public class TestIcebergUpdateStatsJobWithSpark {
     Map<String, String> jobConf = new HashMap<>();
     jobConf.put("table_identifier", "db." + tableName);
     jobConf.put("update_mode", updateMode);
-    jobConf.put("target_file_size_bytes", "100000");
     jobConf.put("updater_options", updaterOptions);
     jobConf.put("catalog_name", SPARK_CATALOG_NAME);
     // Keep compatibility with old built-in template placeholders in deploy package.

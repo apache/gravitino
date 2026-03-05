@@ -115,7 +115,6 @@ public class TestBuiltinIcebergUpdateStatsJob {
     Map<String, String> jobConf = new HashMap<>();
     jobConf.put("table_identifier", "db." + tableName);
     jobConf.put("update_mode", "all");
-    jobConf.put("target_file_size_bytes", "100000");
     jobConf.put(
         "updater_options",
         "{\"gravitino_uri\":\""

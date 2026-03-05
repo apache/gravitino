@@ -19,7 +19,6 @@
 
 package org.apache.gravitino.maintenance.optimizer.command;
 
-import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.common.base.Preconditions;
 import java.util.ArrayList;
@@ -33,6 +32,7 @@ import org.apache.gravitino.client.GravitinoClient;
 import org.apache.gravitino.job.JobHandle;
 import org.apache.gravitino.maintenance.optimizer.common.conf.OptimizerConfig;
 import org.apache.gravitino.maintenance.optimizer.common.util.GravitinoClientUtils;
+import org.apache.gravitino.maintenance.optimizer.common.util.IcebergSparkConfigUtils;
 
 /**
  * Handles CLI command {@code submit-update-stats-job} for submitting built-in Iceberg update stats
@@ -42,7 +42,6 @@ public class SubmitUpdateStatsJobCommand implements OptimizerCommandExecutor {
 
   private static final String JOB_TEMPLATE_NAME = "builtin-iceberg-update-stats";
   private static final String DEFAULT_UPDATE_MODE = "stats";
-  private static final long DEFAULT_TARGET_FILE_SIZE_BYTES = 128L * 1024 * 1024;
   private static final String OPTION_UPDATER_OPTIONS = "updater-options";
   private static final String OPTION_SPARK_CONF = "spark-conf";
 
@@ -60,10 +59,6 @@ public class SubmitUpdateStatsJobCommand implements OptimizerCommandExecutor {
     String updateMode =
         parseUpdateMode(
             resolveScalarOption(context.updateMode(), submitterConfigs.get("update_mode")));
-    long targetFileSizeBytes =
-        parseTargetFileSize(
-            resolveScalarOption(
-                context.targetFileSizeBytes(), submitterConfigs.get("target_file_size_bytes")));
 
     String updaterOptionsJson =
         resolveJsonOption(context.updaterOptions(), submitterConfigs.get("updater_options"));
@@ -71,8 +66,9 @@ public class SubmitUpdateStatsJobCommand implements OptimizerCommandExecutor {
         resolveJsonOption(context.sparkConf(), submitterConfigs.get("spark_conf"));
 
     Map<String, String> updaterOptions =
-        parseFlatJsonMap(updaterOptionsJson, OPTION_UPDATER_OPTIONS);
-    Map<String, String> sparkConfigs = parseFlatJsonMap(sparkConfJson, OPTION_SPARK_CONF);
+        IcebergSparkConfigUtils.parseFlatJsonMap(updaterOptionsJson, OPTION_UPDATER_OPTIONS);
+    Map<String, String> sparkConfigs =
+        IcebergSparkConfigUtils.parseFlatJsonMap(sparkConfJson, OPTION_SPARK_CONF);
 
     validateUpdaterOptions(updateMode, updaterOptions);
     validateSparkConfigs(tableTargets, sparkConfigs);
@@ -80,8 +76,7 @@ public class SubmitUpdateStatsJobCommand implements OptimizerCommandExecutor {
     if (context.dryRun()) {
       for (TableTarget tableTarget : tableTargets) {
         Map<String, String> jobConfig =
-            buildJobConfig(
-                tableTarget, updateMode, targetFileSizeBytes, updaterOptions, sparkConfigs);
+            buildJobConfig(tableTarget, updateMode, updaterOptions, sparkConfigs);
         context
             .output()
             .printf(
@@ -98,8 +93,7 @@ public class SubmitUpdateStatsJobCommand implements OptimizerCommandExecutor {
       int submitted = 0;
       for (TableTarget tableTarget : tableTargets) {
         Map<String, String> jobConfig =
-            buildJobConfig(
-                tableTarget, updateMode, targetFileSizeBytes, updaterOptions, sparkConfigs);
+            buildJobConfig(tableTarget, updateMode, updaterOptions, sparkConfigs);
         JobHandle jobHandle = client.runJob(JOB_TEMPLATE_NAME, jobConfig);
         submitted++;
         context
@@ -119,14 +113,12 @@ public class SubmitUpdateStatsJobCommand implements OptimizerCommandExecutor {
   private static Map<String, String> buildJobConfig(
       TableTarget tableTarget,
       String updateMode,
-      long targetFileSizeBytes,
       Map<String, String> updaterOptions,
       Map<String, String> sparkConfigs) {
     Map<String, String> jobConfig = new LinkedHashMap<>();
     jobConfig.put("catalog_name", tableTarget.catalogName);
     jobConfig.put("table_identifier", tableTarget.schemaAndTable);
     jobConfig.put("update_mode", updateMode);
-    jobConfig.put("target_file_size_bytes", Long.toString(targetFileSizeBytes));
     jobConfig.put("updater_options", toCanonicalJson(updaterOptions));
     jobConfig.put("spark_conf", toCanonicalJson(sparkConfigs));
     return jobConfig;
@@ -154,13 +146,6 @@ public class SubmitUpdateStatsJobCommand implements OptimizerCommandExecutor {
         "Invalid --update-mode: %s. Supported values are: stats, metrics, all",
         value);
     return normalized;
-  }
-
-  private static long parseTargetFileSize(String value) {
-    if (StringUtils.isBlank(value)) {
-      return DEFAULT_TARGET_FILE_SIZE_BYTES;
-    }
-    return OptimizerCommandUtils.parseLongOption("target-file-size-bytes", value.trim(), false);
   }
 
   private static List<TableTarget> parseTableTargets(String[] identifiers, String defaultCatalog) {
@@ -234,39 +219,10 @@ public class SubmitUpdateStatsJobCommand implements OptimizerCommandExecutor {
         !sparkConfigs.isEmpty(),
         "Missing spark config. Set --spark-conf or "
             + "gravitino.optimizer.jobSubmitterConfig.spark_conf in the config file");
-    for (TableTarget tableTarget : tableTargets) {
-      String requiredKey = "spark.sql.catalog." + tableTarget.catalogName;
-      Preconditions.checkArgument(
-          StringUtils.isNotBlank(sparkConfigs.get(requiredKey)),
-          "Spark config must contain key '%s' for identifier '%s'",
-          requiredKey,
-          tableTarget.fullIdentifier);
-    }
-  }
 
-  private static Map<String, String> parseFlatJsonMap(String json, String optionName) {
-    if (StringUtils.isBlank(json)) {
-      return Map.of();
-    }
-    try {
-      Map<String, Object> parsedMap =
-          MAPPER.readValue(json, new TypeReference<Map<String, Object>>() {});
-      Map<String, String> result = new LinkedHashMap<>();
-      for (Map.Entry<String, Object> entry : parsedMap.entrySet()) {
-        Object value = entry.getValue();
-        Preconditions.checkArgument(
-            !(value instanceof Map || value instanceof List),
-            "Option --%s must be a flat key-value JSON map, but key '%s' has non-scalar value",
-            optionName,
-            entry.getKey());
-        result.put(entry.getKey(), value == null ? "" : value.toString());
-      }
-      return result;
-    } catch (Exception e) {
-      throw new IllegalArgumentException(
-          String.format(
-              Locale.ROOT, "Option --%s is not valid JSON: %s", optionName, e.getMessage()),
-          e);
+    for (TableTarget tableTarget : tableTargets) {
+      IcebergSparkConfigUtils.validateSparkConfigsForCatalog(
+          sparkConfigs, tableTarget.catalogName, tableTarget.fullIdentifier);
     }
   }
 

@@ -122,7 +122,6 @@ public class OptimizerCmd {
               EnumSet.of(
                   CliOption.DRY_RUN,
                   CliOption.UPDATE_MODE,
-                  CliOption.TARGET_FILE_SIZE_BYTES,
                   CliOption.UPDATER_OPTIONS,
                   CliOption.SPARK_CONF),
               "Submit built-in Iceberg update stats jobs for given table identifiers.",
@@ -180,12 +179,10 @@ public class OptimizerCmd {
               CliOption.RANGE_SECONDS.longOpt(), Long.toString(DEFAULT_RANGE_SECONDS));
       String partitionPathRaw = cmd.getOptionValue(CliOption.PARTITION_PATH.longOpt());
       String updateMode = cmd.getOptionValue(CliOption.UPDATE_MODE.longOpt());
-      String targetFileSizeBytes = cmd.getOptionValue(CliOption.TARGET_FILE_SIZE_BYTES.longOpt());
       String updaterOptions = cmd.getOptionValue(CliOption.UPDATER_OPTIONS.longOpt());
       String sparkConf = cmd.getOptionValue(CliOption.SPARK_CONF.longOpt());
       OptimizerCommandContext.UpdateStatsJobOptions updateStatsJobOptions =
-          new OptimizerCommandContext.UpdateStatsJobOptions(
-              updateMode, targetFileSizeBytes, updaterOptions, sparkConf);
+          new OptimizerCommandContext.UpdateStatsJobOptions(updateMode, updaterOptions, sparkConf);
       String statisticsPayload = cmd.getOptionValue(CliOption.STATISTICS_PAYLOAD.longOpt());
       String filePath = cmd.getOptionValue(CliOption.FILE_PATH.longOpt());
       Optional<StatisticsInputContent> statisticsInputContent =
@@ -494,11 +491,6 @@ public class OptimizerCmd {
         CliOptionArgType.SINGLE,
         null,
         "Update mode for submit-update-stats-job: stats|metrics|all"),
-    TARGET_FILE_SIZE_BYTES(
-        "target-file-size-bytes",
-        CliOptionArgType.SINGLE,
-        null,
-        "Target file size bytes for submit-update-stats-job"),
     UPDATER_OPTIONS(
         "updater-options",
         CliOptionArgType.SINGLE,

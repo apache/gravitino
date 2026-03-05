@@ -122,10 +122,6 @@ public final class OptimizerCommandContext {
     return updateStatsJobOptions.updateMode();
   }
 
-  public String targetFileSizeBytes() {
-    return updateStatsJobOptions.targetFileSizeBytes();
-  }
-
   public String updaterOptions() {
     return updateStatsJobOptions.updaterOptions();
   }
@@ -145,24 +141,17 @@ public final class OptimizerCommandContext {
   /** Submit-update-stats-job specific command options. */
   public static final class UpdateStatsJobOptions {
     private final String updateMode;
-    private final String targetFileSizeBytes;
     private final String updaterOptions;
     private final String sparkConf;
 
-    public UpdateStatsJobOptions(
-        String updateMode, String targetFileSizeBytes, String updaterOptions, String sparkConf) {
+    public UpdateStatsJobOptions(String updateMode, String updaterOptions, String sparkConf) {
       this.updateMode = updateMode;
-      this.targetFileSizeBytes = targetFileSizeBytes;
       this.updaterOptions = updaterOptions;
       this.sparkConf = sparkConf;
     }
 
     public String updateMode() {
       return updateMode;
-    }
-
-    public String targetFileSizeBytes() {
-      return targetFileSizeBytes;
     }
 
     public String updaterOptions() {
