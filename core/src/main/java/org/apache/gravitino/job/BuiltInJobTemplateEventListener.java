@@ -310,7 +310,7 @@ public class BuiltInJobTemplateEventListener implements EventListenerPlugin {
 
   private void updateBuiltInJobTemplate(
       String metalake, JobTemplateEntity existing, JobTemplate newTemplate) {
-    NameIdentifier identifier = NameIdentifierUtil.ofJobTemplate(metalake, newTemplate.name());
+    NameIdentifier identifier = NameIdentifierUtil.ofJobTemplate(metalake, existing.name());
 
     TreeLockUtils.doWithTreeLock(
         identifier,

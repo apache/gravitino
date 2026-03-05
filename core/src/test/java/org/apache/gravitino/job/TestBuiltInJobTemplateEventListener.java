@@ -486,6 +486,29 @@ public class TestBuiltInJobTemplateEventListener {
     listener.reconcileBuiltInJobTemplates(metalakeName, builtInTemplates);
   }
 
+  @Test
+  public void testReconcileBuiltInJobTemplatesUpdateUsesExistingIdentifier() throws IOException {
+    String metalakeName = "test_metalake";
+    Map<String, JobTemplate> builtInTemplates = new HashMap<>();
+
+    ShellJobTemplate renamedTemplate =
+        ShellJobTemplate.builder()
+            .withName("builtin-renamed")
+            .withComment("updated")
+            .withExecutable("/bin/echo")
+            .withCustomFields(Collections.singletonMap("version", "v2"))
+            .build();
+    builtInTemplates.put("builtin-existing", renamedTemplate);
+
+    JobTemplateEntity existingEntity = createJobTemplateEntity("builtin-existing", "v1");
+    entityStore.put(existingEntity, false);
+
+    when(jobManager.listJobTemplates(metalakeName))
+        .thenReturn(Collections.singletonList(existingEntity));
+
+    listener.reconcileBuiltInJobTemplates(metalakeName, builtInTemplates);
+  }
+
   private void createMetalake(String name, boolean inUse) throws IOException {
     Map<String, String> props = new HashMap<>();
     props.put(PROPERTY_IN_USE, String.valueOf(inUse));
