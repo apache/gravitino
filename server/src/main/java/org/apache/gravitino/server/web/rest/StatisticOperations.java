@@ -163,7 +163,10 @@ public class StatisticOperations {
       return Utils.doAs(
           httpRequest,
           () -> {
-            validateStatisticsUpdateRequest(request);
+            if (request == null) {
+              throw new IllegalArgumentException(NULL_STATS_UPDATE_REQUEST_BODY_ERROR);
+            }
+            request.validate();
             MetadataObject object =
                 MetadataObjects.parse(
                     fullName, MetadataObject.Type.valueOf(type.toUpperCase(Locale.ROOT)));
@@ -479,15 +482,8 @@ public class StatisticOperations {
     return inclusive ? PartitionRange.BoundType.CLOSED : PartitionRange.BoundType.OPEN;
   }
 
-  private static void validateStatisticsUpdateRequest(StatisticsUpdateRequest request) {
-    if (request == null) {
-      throw new IllegalArgumentException(NULL_STATS_UPDATE_REQUEST_BODY_ERROR);
-    }
-    request.validate();
-  }
-
   private static String getUpdatedStatisticNames(StatisticsUpdateRequest request) {
-    if (request == null) {
+    if (request == null || request.getUpdates() == null) {
       return "";
     }
 
