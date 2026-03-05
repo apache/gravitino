@@ -88,6 +88,8 @@ dependencies {
   testImplementation(libs.testcontainers.junit.jupiter)
   testImplementation(libs.testcontainers.mysql)
   testImplementation(libs.testcontainers.postgresql)
+  testImplementation(project(":integration-test-common", "testArtifacts"))
+  testImplementation(project(":server"))
   testRuntimeOnly(libs.mysql.driver)
   testRuntimeOnly(libs.postgresql.driver)
   testAnnotationProcessor(libs.lombok)
