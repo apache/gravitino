@@ -5,7 +5,7 @@ SELECT
 , "i_class"
 , "i_current_price"
 , "sum"("cs_ext_sales_price") "itemrevenue"
-, (("sum"("cs_ext_sales_price") * 100) / "sum"("sum"("cs_ext_sales_price")) OVER (PARTITION BY "i_class")) "revenueratio"
+, CAST((("sum"("cs_ext_sales_price") * 100) / "sum"("sum"("cs_ext_sales_price")) OVER (PARTITION BY "i_class")) AS DECIMAL(38,2)) "revenueratio"
 FROM
   catalog_sales
 , item

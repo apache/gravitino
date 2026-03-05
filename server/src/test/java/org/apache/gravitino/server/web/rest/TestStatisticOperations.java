@@ -762,6 +762,28 @@ public class TestStatisticOperations extends JerseyTest {
   }
 
   @Test
+  public void testUpdatePartitionStatisticsWithNullUpdates() {
+    when(tableDispatcher.tableExists(any())).thenReturn(true);
+    MetadataObject tableObject =
+        MetadataObjects.parse(
+            String.format("%s.%s.%s", catalog, schema, table), MetadataObject.Type.TABLE);
+
+    Response resp =
+        target(
+                "/metalakes/"
+                    + metalake
+                    + "/objects/"
+                    + tableObject.type()
+                    + "/"
+                    + tableObject.fullName()
+                    + "/statistics/partitions")
+            .request(MediaType.APPLICATION_JSON_TYPE)
+            .accept("application/vnd.gravitino.v1+json")
+            .put(entity("{\"updates\":null}", MediaType.APPLICATION_JSON_TYPE));
+    Assertions.assertEquals(Response.Status.BAD_REQUEST.getStatusCode(), resp.getStatus());
+  }
+
+  @Test
   public void testDropPartitionStatistics() {
     List<PartitionStatisticsDropDTO> partitionStatistics = Lists.newArrayList();
     partitionStatistics.add(

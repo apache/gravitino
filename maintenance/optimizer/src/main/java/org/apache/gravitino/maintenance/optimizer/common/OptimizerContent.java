@@ -19,27 +19,5 @@
 
 package org.apache.gravitino.maintenance.optimizer.common;
 
-import lombok.AllArgsConstructor;
-import lombok.EqualsAndHashCode;
-import lombok.Getter;
-import lombok.NonNull;
-import lombok.experimental.Accessors;
-import org.apache.gravitino.maintenance.optimizer.api.common.PartitionMetricSample;
-import org.apache.gravitino.maintenance.optimizer.api.common.PartitionPath;
-import org.apache.gravitino.maintenance.optimizer.api.common.StatisticEntry;
-
-/** Metric sample tied to a specific partition. */
-@Accessors(fluent = true)
-@AllArgsConstructor
-@EqualsAndHashCode
-@Getter
-public final class PartitionMetricSampleImpl implements PartitionMetricSample {
-  private final long timestamp;
-  @NonNull private final StatisticEntry<?> statistic;
-  @NonNull private final PartitionPath partition;
-
-  @Override
-  public String toString() {
-    return "{" + timestamp + ": " + statistic + ", partition=" + partition + " }";
-  }
-}
+/** Marker interface for runtime optimizer request content. */
+public interface OptimizerContent {}

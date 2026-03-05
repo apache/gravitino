@@ -16,28 +16,17 @@
  * specific language governing permissions and limitations
  * under the License.
  */
+package org.apache.gravitino.listener;
 
-package org.apache.gravitino.maintenance.optimizer.common;
+import java.util.Collections;
+import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.Test;
 
-import lombok.AllArgsConstructor;
-import lombok.EqualsAndHashCode;
-import lombok.Getter;
-import lombok.NonNull;
-import lombok.experimental.Accessors;
-import org.apache.gravitino.maintenance.optimizer.api.common.MetricSample;
-import org.apache.gravitino.maintenance.optimizer.api.common.StatisticEntry;
+public class TestEventBus {
 
-/** Immutable {@link MetricSample} implementation that binds a statistic to an event timestamp. */
-@Accessors(fluent = true)
-@AllArgsConstructor
-@EqualsAndHashCode
-@Getter
-public final class MetricSampleImpl implements MetricSample {
-  private final long timestamp;
-  @NonNull private final StatisticEntry<?> statistic;
-
-  @Override
-  public String toString() {
-    return "{" + timestamp + ": " + statistic + " }";
+  @Test
+  void testDispatchNullEventThrowsNullPointerException() {
+    EventBus eventBus = new EventBus(Collections.emptyList());
+    Assertions.assertThrows(NullPointerException.class, () -> eventBus.dispatchEvent(null));
   }
 }

@@ -194,7 +194,7 @@ public class StatisticOperations {
           });
     } catch (Exception e) {
       return ExceptionHandlers.handleStatisticException(
-          OperationType.UPDATE, getUpdatedStatisticNames(request), fullName, e);
+          OperationType.UPDATE, getStatisticNames(request), fullName, e);
     }
   }
 
@@ -404,12 +404,7 @@ public class StatisticOperations {
           fullName,
           metalake,
           e);
-      String partitions =
-          StringUtils.joinWith(
-              ",",
-              request.getUpdates().stream()
-                  .map(PartitionStatisticsUpdateDTO::partitionName)
-                  .collect(Collectors.toList()));
+      String partitions = getPartitionNames(request);
       return ExceptionHandlers.handlePartitionStatsException(
           OperationType.UPDATE, partitions, fullName, e);
     }
@@ -513,5 +508,25 @@ public class StatisticOperations {
         return toPartitionName + ")";
       }
     }
+  }
+
+  private static String getStatisticNames(StatisticsUpdateRequest request) {
+    if (request == null || request.getUpdates() == null) {
+      return "";
+    }
+
+    return StringUtils.join(request.getUpdates().keySet(), ",");
+  }
+
+  private static String getPartitionNames(PartitionStatisticsUpdateRequest request) {
+    if (request == null || request.getUpdates() == null) {
+      return "";
+    }
+
+    return StringUtils.joinWith(
+        ",",
+        request.getUpdates().stream()
+            .map(PartitionStatisticsUpdateDTO::partitionName)
+            .collect(Collectors.toList()));
   }
 }
