@@ -309,4 +309,45 @@ public class TestTableUpdatesRequest {
     Assertions.assertEquals(
         JsonUtils.objectMapper().readTree(expected), JsonUtils.objectMapper().readTree(jsonString));
   }
+
+  @Test
+  public void testValidateEmptyUpdates() {
+    TableUpdatesRequest request = new TableUpdatesRequest(ImmutableList.of());
+    Throwable exception =
+        Assertions.assertThrows(IllegalArgumentException.class, request::validate);
+    Assertions.assertEquals("updates must not be empty", exception.getMessage());
+  }
+
+  @Test
+  public void testUpdateColumnCommentWithEmptyString() {
+    TableUpdateRequest.UpdateTableColumnCommentRequest request =
+        new TableUpdateRequest.UpdateTableColumnCommentRequest(new String[] {"column1"}, "");
+
+    request.validate();
+
+    Assertions.assertEquals("", request.getNewComment());
+    Assertions.assertArrayEquals(new String[] {"column1"}, request.getFieldName());
+  }
+
+  @Test
+  public void testUpdateColumnCommentWithNull() {
+    TableUpdateRequest.UpdateTableColumnCommentRequest request =
+        new TableUpdateRequest.UpdateTableColumnCommentRequest(new String[] {"column1"}, null);
+
+    request.validate();
+
+    Assertions.assertNull(request.getNewComment());
+    Assertions.assertArrayEquals(new String[] {"column1"}, request.getFieldName());
+  }
+
+  @Test
+  public void testUpdateColumnCommentWithValidValue() {
+    TableUpdateRequest.UpdateTableColumnCommentRequest request =
+        new TableUpdateRequest.UpdateTableColumnCommentRequest(
+            new String[] {"column1"}, "This is a valid comment");
+
+    request.validate();
+
+    Assertions.assertEquals("This is a valid comment", request.getNewComment());
+  }
 }

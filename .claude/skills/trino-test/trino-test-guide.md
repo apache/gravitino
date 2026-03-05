@@ -500,6 +500,13 @@ testsets/
 └── tpcds/                   # TPC-DS benchmark tests
 ```
 
+All test sets are located in the testsets directory. Each test set contains one or more catalogs to test.
+Each catalog in a test set requires two files for initialization and cleanup:
+- `catalog_xxx_prepare.txt`: Initialization script
+- `catalog_xxx_clean.txt`: Cleanup script
+
+Each test file will be executed against every catalog in the test set.
+
 #### Test File Naming Convention
 
 Use 5-digit number prefix for easy sorting and reference:

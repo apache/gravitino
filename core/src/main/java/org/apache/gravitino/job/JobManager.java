@@ -809,7 +809,12 @@ public class JobManager implements JobOperationDispatcher {
           break;
 
         case "file":
-          Files.createSymbolicLink(destFile.toPath(), new File(fileUri.getPath()).toPath());
+          java.nio.file.Path sourcePath = new File(fileUri.getPath()).toPath();
+          if (!Files.exists(sourcePath)) {
+            throw new IOException(
+                String.format("Source file does not exist: %s", sourcePath.toAbsolutePath()));
+          }
+          Files.createSymbolicLink(destFile.toPath(), sourcePath);
           break;
 
         default:
