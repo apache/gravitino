@@ -216,11 +216,15 @@ public class SubmitUpdateStatsJobCommand implements OptimizerCommandExecutor {
     String metalake = StringUtils.trimToNull(updaterOptions.get("metalake"));
     Preconditions.checkArgument(
         StringUtils.isNotBlank(gravitinoUri),
-        "Option --updater-options (or config key jobSubmitterConfig.updater_options) "
+        "Option --updater-options (or config key "
+            + OptimizerConfig.JOB_SUBMITTER_CONFIG_PREFIX
+            + "updater_options) "
             + "must contain 'gravitino_uri' when update_mode is stats or all");
     Preconditions.checkArgument(
         StringUtils.isNotBlank(metalake),
-        "Option --updater-options (or config key jobSubmitterConfig.updater_options) "
+        "Option --updater-options (or config key "
+            + OptimizerConfig.JOB_SUBMITTER_CONFIG_PREFIX
+            + "updater_options) "
             + "must contain 'metalake' when update_mode is stats or all");
   }
 

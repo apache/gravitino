@@ -174,81 +174,88 @@ public class TestIcebergUpdateStatsJobWithSpark {
     String partitionMetricsFullTableName = SPARK_CATALOG_NAME + ".db." + partitionMetricsTableName;
     String allModeFullTableName = SPARK_CATALOG_NAME + ".db." + allModeTableName;
 
-    SparkSession restSpark = createRestSparkSession();
-    try (MySQLContainer<?> mysql = new MySQLContainer<>("mysql:8.0.33");
-        GravitinoAdminClient adminClient = GravitinoAdminClient.builder(SERVER_URI).build()) {
-      mysql.start();
-      initializeMySqlMetricsSchema(mysql);
+    SparkSession restSpark = null;
+    try {
+      restSpark = createRestSparkSession();
+      try (MySQLContainer<?> mysql = new MySQLContainer<>("mysql:8.0.33");
+          GravitinoAdminClient adminClient = GravitinoAdminClient.builder(SERVER_URI).build()) {
+        mysql.start();
+        initializeMySqlMetricsSchema(mysql);
 
-      GravitinoMetalake metalake = loadOrCreateMetalake(adminClient, METALAKE_NAME);
-      recreateRestCatalog(metalake);
-      createTableAndInsertData(restSpark, statsFullTableName);
-      createTableAndInsertData(restSpark, metricsFullTableName);
-      createPartitionedTableAndInsertData(restSpark, partitionMetricsFullTableName);
-      createTableAndInsertData(restSpark, allModeFullTableName);
+        GravitinoMetalake metalake = loadOrCreateMetalake(adminClient, METALAKE_NAME);
+        recreateRestCatalog(metalake);
+        createTableAndInsertData(restSpark, statsFullTableName);
+        createTableAndInsertData(restSpark, metricsFullTableName);
+        createPartitionedTableAndInsertData(restSpark, partitionMetricsFullTableName);
+        createTableAndInsertData(restSpark, allModeFullTableName);
 
-      NameIdentifier statsTableIdentifier =
-          NameIdentifier.of(SPARK_CATALOG_NAME, "db", statsTableName);
-      NameIdentifier metricsTableIdentifier =
-          NameIdentifier.of(SPARK_CATALOG_NAME, "db", metricsTableName);
-      NameIdentifier partitionMetricsTableIdentifier =
-          NameIdentifier.of(SPARK_CATALOG_NAME, "db", partitionMetricsTableName);
-      NameIdentifier allModeTableIdentifier =
-          NameIdentifier.of(SPARK_CATALOG_NAME, "db", allModeTableName);
+        NameIdentifier statsTableIdentifier =
+            NameIdentifier.of(SPARK_CATALOG_NAME, "db", statsTableName);
+        NameIdentifier metricsTableIdentifier =
+            NameIdentifier.of(SPARK_CATALOG_NAME, "db", metricsTableName);
+        NameIdentifier partitionMetricsTableIdentifier =
+            NameIdentifier.of(SPARK_CATALOG_NAME, "db", partitionMetricsTableName);
+        NameIdentifier allModeTableIdentifier =
+            NameIdentifier.of(SPARK_CATALOG_NAME, "db", allModeTableName);
 
-      PartitionPath dsPartition1 =
-          PartitionPath.of(List.of(new PartitionEntryImpl("ds", "2026-03-01")));
-      PartitionPath dsPartition2 =
-          PartitionPath.of(List.of(new PartitionEntryImpl("ds", "2026-03-02")));
+        PartitionPath dsPartition1 =
+            PartitionPath.of(List.of(new PartitionEntryImpl("ds", "2026-03-01")));
+        PartitionPath dsPartition2 =
+            PartitionPath.of(List.of(new PartitionEntryImpl("ds", "2026-03-02")));
 
-      try (GenericJdbcMetricsRepository repository = new GenericJdbcMetricsRepository()) {
-        repository.initialize(buildJdbcMetricsConfigs(mysql));
+        try (GenericJdbcMetricsRepository repository = new GenericJdbcMetricsRepository()) {
+          repository.initialize(buildJdbcMetricsConfigs(mysql));
 
-        submitJob(
-            metalake,
-            buildUpdateStatsJobConfig(
-                statsTableName, "stats", buildUpdaterOptionsForStatsUpdaterOnly()));
-        awaitCustomStatisticsVisible(statsTableName);
-        assertEquals(0, getTableMetricsCount(repository, statsTableIdentifier));
+          submitJob(
+              metalake,
+              buildUpdateStatsJobConfig(
+                  statsTableName, "stats", buildUpdaterOptionsForStatsUpdaterOnly()));
+          awaitCustomStatisticsVisible(statsTableName);
+          assertEquals(0, getTableMetricsCount(repository, statsTableIdentifier));
 
-        submitJob(
-            metalake,
-            buildUpdateStatsJobConfig(
-                metricsTableName, "metrics", buildUpdaterOptionsForMetricsUpdaterOnly(mysql)));
-        assertFalse(containsCustomStatistics(metricsTableName));
-        awaitTableMetricsExactly(
-            repository, metricsTableIdentifier, EXPECTED_METRIC_COUNT_PER_SCOPE);
-        assertTableMetricsMatch(repository, metricsTableIdentifier);
+          submitJob(
+              metalake,
+              buildUpdateStatsJobConfig(
+                  metricsTableName, "metrics", buildUpdaterOptionsForMetricsUpdaterOnly(mysql)));
+          assertFalse(containsCustomStatistics(metricsTableName));
+          awaitTableMetricsExactly(
+              repository, metricsTableIdentifier, EXPECTED_METRIC_COUNT_PER_SCOPE);
+          assertTableMetricsMatch(repository, metricsTableIdentifier);
 
-        submitJob(
-            metalake,
-            buildUpdateStatsJobConfig(
-                partitionMetricsTableName,
-                "metrics",
-                buildUpdaterOptionsForMetricsUpdaterOnly(mysql)));
-        assertFalse(containsCustomStatistics(partitionMetricsTableName));
-        assertEquals(0, getTableMetricsCount(repository, partitionMetricsTableIdentifier));
-        awaitPartitionMetricsExactly(
-            repository,
-            partitionMetricsTableIdentifier,
-            dsPartition1,
-            EXPECTED_METRIC_COUNT_PER_SCOPE);
-        awaitPartitionMetricsExactly(
-            repository,
-            partitionMetricsTableIdentifier,
-            dsPartition2,
-            EXPECTED_METRIC_COUNT_PER_SCOPE);
-        assertPartitionMetricsMatch(repository, partitionMetricsTableIdentifier, dsPartition1);
-        assertPartitionMetricsMatch(repository, partitionMetricsTableIdentifier, dsPartition2);
+          submitJob(
+              metalake,
+              buildUpdateStatsJobConfig(
+                  partitionMetricsTableName,
+                  "metrics",
+                  buildUpdaterOptionsForMetricsUpdaterOnly(mysql)));
+          assertFalse(containsCustomStatistics(partitionMetricsTableName));
+          assertEquals(0, getTableMetricsCount(repository, partitionMetricsTableIdentifier));
+          awaitPartitionMetricsExactly(
+              repository,
+              partitionMetricsTableIdentifier,
+              dsPartition1,
+              EXPECTED_METRIC_COUNT_PER_SCOPE);
+          awaitPartitionMetricsExactly(
+              repository,
+              partitionMetricsTableIdentifier,
+              dsPartition2,
+              EXPECTED_METRIC_COUNT_PER_SCOPE);
+          assertPartitionMetricsMatch(repository, partitionMetricsTableIdentifier, dsPartition1);
+          assertPartitionMetricsMatch(repository, partitionMetricsTableIdentifier, dsPartition2);
 
-        submitJob(
-            metalake,
-            buildUpdateStatsJobConfig(
-                allModeTableName, "all", buildUpdaterOptionsForAllMode(mysql)));
-        awaitCustomStatisticsVisible(allModeTableName);
-        awaitTableMetricsExactly(
-            repository, allModeTableIdentifier, EXPECTED_METRIC_COUNT_PER_SCOPE);
-        assertTableMetricsMatch(repository, allModeTableIdentifier);
+          submitJob(
+              metalake,
+              buildUpdateStatsJobConfig(
+                  allModeTableName, "all", buildUpdaterOptionsForAllMode(mysql)));
+          awaitCustomStatisticsVisible(allModeTableName);
+          awaitTableMetricsExactly(
+              repository, allModeTableIdentifier, EXPECTED_METRIC_COUNT_PER_SCOPE);
+          assertTableMetricsMatch(repository, allModeTableIdentifier);
+        }
+      }
+    } finally {
+      if (restSpark != null) {
+        restSpark.stop();
       }
     }
   }

@@ -241,7 +241,6 @@ public class TestBuiltinIcebergRewriteDataFiles {
   private static void submitJob(
       GravitinoMetalake metalake, String jobTemplateName, Map<String, String> jobConf) {
     JobHandle jobHandle = metalake.runJob(jobTemplateName, jobConf);
-    System.out.println("Submitted job id: " + jobHandle.jobId());
     Assertions.assertTrue(StringUtils.isNotBlank(jobHandle.jobId()), "Job id should not be blank");
 
     Awaitility.await()
