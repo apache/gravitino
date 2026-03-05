@@ -81,7 +81,7 @@ class TestGravitinoPolicyCompactionStrategy {
     Assertions.assertTrue(handler.shouldTrigger());
 
     StrategyEvaluation evaluation = handler.evaluate();
-    Assertions.assertEquals(110L, evaluation.score());
+    Assertions.assertEquals(6050L, evaluation.score());
     CompactionJobContext jobContext =
         (CompactionJobContext) evaluation.jobExecutionContext().orElseThrow();
     Assertions.assertEquals(tableId, jobContext.nameIdentifier());

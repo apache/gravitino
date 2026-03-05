@@ -46,7 +46,7 @@ public class TestPolicyContents {
         "custom-data-file-mse > minDataFileMse || custom-delete-file-number > minDeleteFileNumber",
         content.rules().get("trigger-expr"));
     Assertions.assertEquals(
-        "custom-data-file-mse * dataFileMseWeight / 100"
+        "custom-data-file-mse * dataFileMseWeight"
             + " + custom-delete-file-number * deleteFileNumberWeight",
         content.rules().get("score-expr"));
     Assertions.assertEquals("1048576", content.rules().get("job.options.target-file-size-bytes"));

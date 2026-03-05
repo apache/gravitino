@@ -83,7 +83,7 @@ public class IcebergCompactionContent implements PolicyContent {
       DATA_FILE_MSE_METRIC
           + " * "
           + DATA_FILE_MSE_WEIGHT_KEY
-          + " / 100 + "
+          + " + "
           + DELETE_FILE_NUMBER_METRIC
           + " * "
           + DELETE_FILE_NUMBER_WEIGHT_KEY;
