@@ -108,7 +108,9 @@ public class TestIcebergUpdateStatsJob {
     String partitionSql = IcebergUpdateStatsAndMetricsJob.buildPartitionStatsSql("cat", "db.tbl");
 
     assertTrue(tableSql.contains("FROM cat.db.tbl.files"));
-    assertTrue(tableSql.contains("AS datafile_mse"));
+    assertTrue(tableSql.contains("AS `data-file-mse`"));
+    assertTrue(tableSql.contains("AS `delete-file-number`"));
+    assertTrue(tableSql.contains("CASE WHEN content = 0 THEN POWER("));
     assertTrue(tableSql.contains("file_size_in_bytes < 33554432"));
     assertTrue(tableSql.contains("134217728 - LEAST(134217728, file_size_in_bytes)"));
     assertTrue(partitionSql.contains("FROM cat.db.tbl.files"));

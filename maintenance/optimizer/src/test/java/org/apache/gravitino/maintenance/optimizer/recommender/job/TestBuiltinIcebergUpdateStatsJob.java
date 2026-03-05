@@ -74,9 +74,10 @@ public class TestBuiltinIcebergUpdateStatsJob {
         List<Statistic> statistics = table.supportsStatistics().listStatistics();
         Map<String, Statistic> statisticMap =
             statistics.stream().collect(Collectors.toMap(Statistic::name, s -> s));
-        Assertions.assertTrue(statisticMap.containsKey("custom-file_count"));
-        Assertions.assertTrue(statisticMap.containsKey("custom-datafile_mse"));
-        Assertions.assertTrue(statisticMap.containsKey("custom-total_size"));
+        Assertions.assertTrue(statisticMap.containsKey("custom-file-number"));
+        Assertions.assertTrue(statisticMap.containsKey("custom-data-file-mse"));
+        Assertions.assertTrue(statisticMap.containsKey("custom-delete-file-number"));
+        Assertions.assertTrue(statisticMap.containsKey("custom-total-file-size"));
       }
     } finally {
       spark.stop();

@@ -80,18 +80,19 @@ public class TestIcebergUpdateStatsJobWithSpark {
   private static final String JOB_TEMPLATE_NAME = "builtin-iceberg-update-stats";
   private static final String SPARK_CATALOG_NAME = "rest_catalog";
   private static final String METALAKE_NAME = "test";
-  private static final int EXPECTED_METRIC_COUNT_PER_SCOPE = 8;
+  private static final int EXPECTED_METRIC_COUNT_PER_SCOPE = 9;
   private static final Set<String> EXPECTED_METRIC_NAMES =
       new HashSet<>(
           Arrays.asList(
-              "custom-file_count",
-              "custom-data_files",
-              "custom-position_delete_files",
-              "custom-equality_delete_files",
-              "custom-small_files",
-              "custom-datafile_mse",
-              "custom-avg_size",
-              "custom-total_size"));
+              "custom-file-number",
+              "custom-data-file-number",
+              "custom-position-delete-file-number",
+              "custom-equality-delete-file-number",
+              "custom-delete-file-number",
+              "custom-small-file-number",
+              "custom-data-file-mse",
+              "custom-avg-file-size",
+              "custom-total-file-size"));
 
   @TempDir static File tempDir;
 
@@ -274,15 +275,17 @@ public class TestIcebergUpdateStatsJobWithSpark {
 
     assertEquals(NameIdentifier.of(catalogName, "db", "non_partitioned"), updater.tableIdentifier);
     assertNotNull(updater.tableStatistics);
-    assertEquals(8, updater.tableStatistics.size());
+    assertEquals(9, updater.tableStatistics.size());
     assertTrue(updater.partitionStatistics.isEmpty());
 
     Map<String, Object> stats =
         updater.tableStatistics.stream()
             .collect(Collectors.toMap(StatisticEntry::name, stat -> stat.value().value()));
-    assertTrue((Long) stats.get("custom-file_count") > 0L);
-    assertTrue((Double) stats.get("custom-datafile_mse") >= 0D);
-    assertTrue((Long) stats.get("custom-total_size") > 0L);
+    assertTrue((Long) stats.get("custom-file-number") > 0L);
+    assertTrue((Long) stats.get("custom-data-file-number") > 0L);
+    assertTrue((Long) stats.get("custom-delete-file-number") >= 0L);
+    assertTrue((Double) stats.get("custom-data-file-mse") >= 0D);
+    assertTrue((Long) stats.get("custom-total-file-size") > 0L);
   }
 
   @Test
@@ -309,8 +312,9 @@ public class TestIcebergUpdateStatsJobWithSpark {
           Map<String, Object> statMap =
               statistics.stream()
                   .collect(Collectors.toMap(StatisticEntry::name, stat -> stat.value().value()));
-          assertTrue(statMap.containsKey("custom-datafile_mse"));
-          assertTrue((Long) statMap.get("custom-file_count") > 0L);
+          assertTrue(statMap.containsKey("custom-data-file-mse"));
+          assertTrue(statMap.containsKey("custom-delete-file-number"));
+          assertTrue((Long) statMap.get("custom-file-number") > 0L);
         });
   }
 
@@ -332,7 +336,7 @@ public class TestIcebergUpdateStatsJobWithSpark {
     assertFalse(statisticsUpdater.partitionStatistics.isEmpty());
     assertEquals(2, statisticsUpdater.partitionStatistics.size());
 
-    assertEquals(16, metricsUpdater.tableMetrics.size());
+    assertEquals(18, metricsUpdater.tableMetrics.size());
     assertTrue(
         metricsUpdater.tableMetrics.stream()
             .allMatch(metric -> metric.scope() == DataScope.Type.PARTITION));
@@ -357,7 +361,7 @@ public class TestIcebergUpdateStatsJobWithSpark {
         catalogName,
         "db.partitioned");
 
-    assertEquals(16, metricsUpdater.tableMetrics.size());
+    assertEquals(18, metricsUpdater.tableMetrics.size());
     assertTrue(
         metricsUpdater.tableMetrics.stream()
             .allMatch(metric -> metric.scope() == DataScope.Type.PARTITION));
@@ -376,7 +380,7 @@ public class TestIcebergUpdateStatsJobWithSpark {
         catalogName,
         "db.non_partitioned");
 
-    assertEquals(8, metricsUpdater.tableMetrics.size());
+    assertEquals(9, metricsUpdater.tableMetrics.size());
     assertTrue(
         metricsUpdater.tableMetrics.stream()
             .allMatch(metric -> metric.scope() == DataScope.Type.TABLE));
@@ -401,9 +405,9 @@ public class TestIcebergUpdateStatsJobWithSpark {
     assertEquals(
         NameIdentifier.of(catalogName, "db", "non_partitioned"), statisticsUpdater.tableIdentifier);
     assertNotNull(statisticsUpdater.tableStatistics);
-    assertEquals(8, statisticsUpdater.tableStatistics.size());
+    assertEquals(9, statisticsUpdater.tableStatistics.size());
 
-    assertEquals(8, metricsUpdater.tableMetrics.size());
+    assertEquals(9, metricsUpdater.tableMetrics.size());
     assertTrue(
         metricsUpdater.tableMetrics.stream()
             .allMatch(metric -> metric.scope() == DataScope.Type.TABLE));
@@ -450,7 +454,7 @@ public class TestIcebergUpdateStatsJobWithSpark {
         List<MetricPoint> partitionMetrics =
             repository.getMetrics(
                 DataScope.forPartition(identifier, partitionPath), now - 300, now + 300);
-        assertEquals(8, partitionMetrics.size());
+        assertEquals(9, partitionMetrics.size());
       } finally {
         repository.close();
       }
@@ -540,9 +544,10 @@ public class TestIcebergUpdateStatsJobWithSpark {
           table.supportsStatistics().listStatistics().stream()
               .map(Statistic::name)
               .collect(Collectors.toSet());
-      return statisticNames.contains("custom-file_count")
-          && statisticNames.contains("custom-datafile_mse")
-          && statisticNames.contains("custom-total_size");
+      return statisticNames.contains("custom-file-number")
+          && statisticNames.contains("custom-data-file-mse")
+          && statisticNames.contains("custom-total-file-size")
+          && statisticNames.contains("custom-delete-file-number");
     }
   }
 

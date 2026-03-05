@@ -251,20 +251,21 @@ public class IcebergUpdateStatsAndMetricsJob implements BuiltInJob {
   static String buildTableStatsSql(String catalogName, String tableIdentifier) {
     String filesTable = buildFilesTableIdentifier(catalogName, tableIdentifier);
     return "SELECT "
-        + "COUNT(*) AS file_count, "
-        + "SUM(CASE WHEN content = 0 THEN 1 ELSE 0 END) AS data_files, "
-        + "SUM(CASE WHEN content = 1 THEN 1 ELSE 0 END) AS position_delete_files, "
-        + "SUM(CASE WHEN content = 2 THEN 1 ELSE 0 END) AS equality_delete_files, "
+        + "COUNT(*) AS `file-number`, "
+        + "SUM(CASE WHEN content = 0 THEN 1 ELSE 0 END) AS `data-file-number`, "
+        + "SUM(CASE WHEN content = 1 THEN 1 ELSE 0 END) AS `position-delete-file-number`, "
+        + "SUM(CASE WHEN content = 2 THEN 1 ELSE 0 END) AS `equality-delete-file-number`, "
+        + "SUM(CASE WHEN content IN (1, 2) THEN 1 ELSE 0 END) AS `delete-file-number`, "
         + "SUM(CASE WHEN file_size_in_bytes < "
         + SMALL_FILE_THRESHOLD_BYTES
-        + " THEN 1 ELSE 0 END) AS small_files, "
-        + "AVG(POWER("
+        + " THEN 1 ELSE 0 END) AS `small-file-number`, "
+        + "AVG(CASE WHEN content = 0 THEN POWER("
         + DEFAULT_TARGET_FILE_SIZE_BYTES
         + " - LEAST("
         + DEFAULT_TARGET_FILE_SIZE_BYTES
-        + ", file_size_in_bytes), 2)) AS datafile_mse, "
-        + "AVG(file_size_in_bytes) AS avg_size, "
-        + "SUM(file_size_in_bytes) AS total_size "
+        + ", file_size_in_bytes), 2) ELSE NULL END) AS `data-file-mse`, "
+        + "AVG(file_size_in_bytes) AS `avg-file-size`, "
+        + "SUM(file_size_in_bytes) AS `total-file-size` "
         + "FROM "
         + filesTable;
   }
@@ -273,20 +274,21 @@ public class IcebergUpdateStatsAndMetricsJob implements BuiltInJob {
     String filesTable = buildFilesTableIdentifier(catalogName, tableIdentifier);
     return "SELECT "
         + "partition, "
-        + "COUNT(*) AS file_count, "
-        + "SUM(CASE WHEN content = 0 THEN 1 ELSE 0 END) AS data_files, "
-        + "SUM(CASE WHEN content = 1 THEN 1 ELSE 0 END) AS position_delete_files, "
-        + "SUM(CASE WHEN content = 2 THEN 1 ELSE 0 END) AS equality_delete_files, "
+        + "COUNT(*) AS `file-number`, "
+        + "SUM(CASE WHEN content = 0 THEN 1 ELSE 0 END) AS `data-file-number`, "
+        + "SUM(CASE WHEN content = 1 THEN 1 ELSE 0 END) AS `position-delete-file-number`, "
+        + "SUM(CASE WHEN content = 2 THEN 1 ELSE 0 END) AS `equality-delete-file-number`, "
+        + "SUM(CASE WHEN content IN (1, 2) THEN 1 ELSE 0 END) AS `delete-file-number`, "
         + "SUM(CASE WHEN file_size_in_bytes < "
         + SMALL_FILE_THRESHOLD_BYTES
-        + " THEN 1 ELSE 0 END) AS small_files, "
-        + "AVG(POWER("
+        + " THEN 1 ELSE 0 END) AS `small-file-number`, "
+        + "AVG(CASE WHEN content = 0 THEN POWER("
         + DEFAULT_TARGET_FILE_SIZE_BYTES
         + " - LEAST("
         + DEFAULT_TARGET_FILE_SIZE_BYTES
-        + ", file_size_in_bytes), 2)) AS datafile_mse, "
-        + "AVG(file_size_in_bytes) AS avg_size, "
-        + "SUM(file_size_in_bytes) AS total_size "
+        + ", file_size_in_bytes), 2) ELSE NULL END) AS `data-file-mse`, "
+        + "AVG(file_size_in_bytes) AS `avg-file-size`, "
+        + "SUM(file_size_in_bytes) AS `total-file-size` "
         + "FROM "
         + filesTable
         + " GROUP BY partition";
@@ -310,36 +312,40 @@ public class IcebergUpdateStatsAndMetricsJob implements BuiltInJob {
     List<StatisticEntry<?>> statistics = new ArrayList<>();
     statistics.add(
         new StatisticEntryImpl<>(
-            CUSTOM_STAT_PREFIX + "file_count",
-            StatisticValues.longValue(toLongValue(row, "file_count"))));
+            CUSTOM_STAT_PREFIX + "file-number",
+            StatisticValues.longValue(toLongValue(row, "file-number"))));
     statistics.add(
         new StatisticEntryImpl<>(
-            CUSTOM_STAT_PREFIX + "data_files",
-            StatisticValues.longValue(toLongValue(row, "data_files"))));
+            CUSTOM_STAT_PREFIX + "data-file-number",
+            StatisticValues.longValue(toLongValue(row, "data-file-number"))));
     statistics.add(
         new StatisticEntryImpl<>(
-            CUSTOM_STAT_PREFIX + "position_delete_files",
-            StatisticValues.longValue(toLongValue(row, "position_delete_files"))));
+            CUSTOM_STAT_PREFIX + "position-delete-file-number",
+            StatisticValues.longValue(toLongValue(row, "position-delete-file-number"))));
     statistics.add(
         new StatisticEntryImpl<>(
-            CUSTOM_STAT_PREFIX + "equality_delete_files",
-            StatisticValues.longValue(toLongValue(row, "equality_delete_files"))));
+            CUSTOM_STAT_PREFIX + "equality-delete-file-number",
+            StatisticValues.longValue(toLongValue(row, "equality-delete-file-number"))));
     statistics.add(
         new StatisticEntryImpl<>(
-            CUSTOM_STAT_PREFIX + "small_files",
-            StatisticValues.longValue(toLongValue(row, "small_files"))));
+            CUSTOM_STAT_PREFIX + "delete-file-number",
+            StatisticValues.longValue(toLongValue(row, "delete-file-number"))));
     statistics.add(
         new StatisticEntryImpl<>(
-            CUSTOM_STAT_PREFIX + "datafile_mse",
-            StatisticValues.doubleValue(toDoubleValue(row, "datafile_mse"))));
+            CUSTOM_STAT_PREFIX + "small-file-number",
+            StatisticValues.longValue(toLongValue(row, "small-file-number"))));
     statistics.add(
         new StatisticEntryImpl<>(
-            CUSTOM_STAT_PREFIX + "avg_size",
-            StatisticValues.doubleValue(toDoubleValue(row, "avg_size"))));
+            CUSTOM_STAT_PREFIX + "data-file-mse",
+            StatisticValues.doubleValue(toDoubleValue(row, "data-file-mse"))));
     statistics.add(
         new StatisticEntryImpl<>(
-            CUSTOM_STAT_PREFIX + "total_size",
-            StatisticValues.longValue(toLongValue(row, "total_size"))));
+            CUSTOM_STAT_PREFIX + "avg-file-size",
+            StatisticValues.doubleValue(toDoubleValue(row, "avg-file-size"))));
+    statistics.add(
+        new StatisticEntryImpl<>(
+            CUSTOM_STAT_PREFIX + "total-file-size",
+            StatisticValues.longValue(toLongValue(row, "total-file-size"))));
     return statistics;
   }
 
@@ -564,8 +570,8 @@ public class IcebergUpdateStatsAndMetricsJob implements BuiltInJob {
             + "\\n"
             + "Optional Options:\\n"
             + "  --update-mode <stats|metrics|all> Update behavior mode, default: all\\n"
-            + "  datafile_mse target file size is fixed at 134217728 (128MB)\\n"
-            + "                                     small_files threshold is fixed at 33554432 (32MB)\\n"
+            + "  data-file-mse target file size is fixed at 134217728 (128MB)\\n"
+            + "                                     small-file-number threshold is fixed at 33554432 (32MB)\\n"
             + "  --updater-options <json>           JSON map for updater and repository settings\\n"
             + "                                     Example: '{\"gravitino_uri\":\"http://localhost:8090\",\\n"
             + "                                     \"metalake\":\"test\",\"statistics_updater\":\"gravitino-statistics-updater\",\\n"
