@@ -258,7 +258,7 @@ public class PolicyContents {
               : deleteFileNumberWeight;
       this.rewriteOptions =
           rewriteOptions == null
-              ? Map.of()
+              ? Collections.emptyMap()
               : Collections.unmodifiableMap(new LinkedHashMap<>(rewriteOptions));
     }
 

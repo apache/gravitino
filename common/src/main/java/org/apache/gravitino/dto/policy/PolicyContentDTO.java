@@ -151,7 +151,7 @@ public interface PolicyContentDTO extends PolicyContent {
      */
     public Map<String, String> rewriteOptions() {
       return rewriteOptions == null
-          ? Map.of()
+          ? Collections.emptyMap()
           : Collections.unmodifiableMap(new LinkedHashMap<>(rewriteOptions));
     }
 
