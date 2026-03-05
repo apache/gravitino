@@ -212,7 +212,8 @@ public class PolicyContents {
 
     private static final Pattern OPTION_KEY_PATTERN = Pattern.compile("[A-Za-z0-9._-]+");
     private static final Set<MetadataObject.Type> SUPPORTED_OBJECT_TYPES =
-        ImmutableSet.of(MetadataObject.Type.TABLE);
+        ImmutableSet.of(
+            MetadataObject.Type.CATALOG, MetadataObject.Type.SCHEMA, MetadataObject.Type.TABLE);
     private static final String TRIGGER_EXPR =
         DATAFILE_MSE_METRIC
             + " > "

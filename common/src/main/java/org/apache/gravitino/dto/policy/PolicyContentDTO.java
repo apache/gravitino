@@ -157,7 +157,8 @@ public interface PolicyContentDTO extends PolicyContent {
 
     @Override
     public Set<MetadataObject.Type> supportedObjectTypes() {
-      return ImmutableSet.of(MetadataObject.Type.TABLE);
+      return ImmutableSet.of(
+          MetadataObject.Type.CATALOG, MetadataObject.Type.SCHEMA, MetadataObject.Type.TABLE);
     }
 
     @Override

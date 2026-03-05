@@ -19,7 +19,9 @@
 
 package org.apache.gravitino.policy;
 
+import com.google.common.collect.ImmutableSet;
 import java.util.Map;
+import org.apache.gravitino.MetadataObject;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
@@ -48,6 +50,10 @@ public class TestPolicyContents {
         content.rules().get("score-expr"));
     Assertions.assertEquals("1048576", content.rules().get("job.options.target-file-size-bytes"));
     Assertions.assertEquals("1", content.rules().get("job.options.min-input-files"));
+    Assertions.assertEquals(
+        ImmutableSet.of(
+            MetadataObject.Type.CATALOG, MetadataObject.Type.SCHEMA, MetadataObject.Type.TABLE),
+        content.supportedObjectTypes());
   }
 
   @Test
