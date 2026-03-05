@@ -214,7 +214,7 @@ class TestClickHouseTableOperationsCluster {
             "tbl", columns, "comment", props, null, Distributions.NONE, new Index[0], null);
 
     Assertions.assertTrue(sql.startsWith("CREATE TABLE `tbl`"));
-    Assertions.assertEquals(sql.contains("AS `remote_db`.`remote_table`"), true);
+    Assertions.assertTrue(sql.contains("AS `remote_db`.`remote_table`"));
     Assertions.assertTrue(
         sql.contains("ENGINE = Distributed(`ck_cluster`,`remote_db`,`remote_table`,`user_id`)"));
   }

@@ -168,7 +168,7 @@ public class ClickHouseTableOperations extends JdbcTableOperations {
     // Add Create table clause
     appendCreateTableClause(notNullProperties, sqlBuilder, tableName);
 
-    // Add columns, if columns are empty, it means it's a distributed table.
+    // We still allow empty columns when the engine is distributed.
     if (columns.length > 0) {
       buildColumnsDefinition(columns, sqlBuilder);
 
@@ -347,8 +347,7 @@ public class ClickHouseTableOperations extends JdbcTableOperations {
 
     // Users have defined the columns explicitly for the distributed table, we will check the
     // columns should contain the sharding key, as clickhouse requires the sharding key must be
-    // defined in the columns of the distributed table, and the sharding key column must be integer
-    // and not nullable.
+    // defined in the columns of the distributed table.
     if (ArrayUtils.isNotEmpty(columns)) {
       List<String> shardingColumns = ClickHouseTableSqlUtils.extractShardingKeyColumns(shardingKey);
       if (CollectionUtils.isNotEmpty(shardingColumns)) {
@@ -361,7 +360,6 @@ public class ClickHouseTableOperations extends JdbcTableOperations {
         }
       }
     }
-
 
     if (ArrayUtils.isEmpty(columns)) {
       sqlBuilder.append(" AS `%s`.`%s` ".formatted(remoteDatabase, remoteTable));
