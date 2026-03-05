@@ -927,7 +927,7 @@ tasks {
   }
 
   val compileTrinoConnector by registering {
-    dependsOn("trino-connector:trino-connector-469-472:copyLibs")
+    dependsOn("trino-connector:trino-connector-473-478:copyLibs")
     group = "gravitino distribution"
   }
 
@@ -938,6 +938,7 @@ tasks {
       ":trino-connector:trino-connector-446-451:assembleTrinoConnector",
       ":trino-connector:trino-connector-452-468:assembleTrinoConnector",
       ":trino-connector:trino-connector-469-472:assembleTrinoConnector",
+      ":trino-connector:trino-connector-473-478:assembleTrinoConnector",
       "assembleIcebergRESTServer",
       "assembleLanceRESTServer"
     )
