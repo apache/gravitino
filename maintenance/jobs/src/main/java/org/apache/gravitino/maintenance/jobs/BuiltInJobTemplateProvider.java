@@ -26,7 +26,7 @@ import java.util.stream.Collectors;
 import org.apache.gravitino.job.JobTemplate;
 import org.apache.gravitino.job.JobTemplateProvider;
 import org.apache.gravitino.maintenance.jobs.iceberg.IcebergRewriteDataFilesJob;
-import org.apache.gravitino.maintenance.jobs.iceberg.IcebergUpdateStatsJob;
+import org.apache.gravitino.maintenance.jobs.iceberg.IcebergUpdateStatsAndMetricsJob;
 import org.apache.gravitino.maintenance.jobs.spark.SparkPiJob;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -43,7 +43,9 @@ public class BuiltInJobTemplateProvider implements JobTemplateProvider {
 
   private static final List<BuiltInJob> BUILT_IN_JOBS =
       ImmutableList.of(
-          new SparkPiJob(), new IcebergRewriteDataFilesJob(), new IcebergUpdateStatsJob());
+          new SparkPiJob(),
+          new IcebergRewriteDataFilesJob(),
+          new IcebergUpdateStatsAndMetricsJob());
 
   @Override
   public List<? extends JobTemplate> jobTemplates() {

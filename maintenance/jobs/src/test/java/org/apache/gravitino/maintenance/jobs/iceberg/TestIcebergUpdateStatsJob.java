@@ -33,7 +33,7 @@ public class TestIcebergUpdateStatsJob {
 
   @Test
   public void testJobTemplateHasCorrectNameAndVersion() {
-    IcebergUpdateStatsJob job = new IcebergUpdateStatsJob();
+    IcebergUpdateStatsAndMetricsJob job = new IcebergUpdateStatsAndMetricsJob();
     SparkJobTemplate template = job.jobTemplate();
 
     assertNotNull(template);
@@ -44,7 +44,7 @@ public class TestIcebergUpdateStatsJob {
 
   @Test
   public void testJobTemplateArguments() {
-    IcebergUpdateStatsJob job = new IcebergUpdateStatsJob();
+    IcebergUpdateStatsAndMetricsJob job = new IcebergUpdateStatsAndMetricsJob();
     SparkJobTemplate template = job.jobTemplate();
 
     assertNotNull(template.arguments());
@@ -74,7 +74,7 @@ public class TestIcebergUpdateStatsJob {
       "--spark-conf", "{\"spark.master\":\"local[2]\"}"
     };
 
-    Map<String, String> parsed = IcebergUpdateStatsJob.parseArguments(args);
+    Map<String, String> parsed = IcebergUpdateStatsAndMetricsJob.parseArguments(args);
     assertEquals("cat", parsed.get("catalog"));
     assertEquals("db.tbl", parsed.get("table"));
     assertEquals("metrics", parsed.get("update-mode"));
@@ -87,8 +87,9 @@ public class TestIcebergUpdateStatsJob {
 
   @Test
   public void testBuildStatsSql() {
-    String tableSql = IcebergUpdateStatsJob.buildTableStatsSql("cat", "db.tbl", 100000L);
-    String partitionSql = IcebergUpdateStatsJob.buildPartitionStatsSql("cat", "db.tbl", 100000L);
+    String tableSql = IcebergUpdateStatsAndMetricsJob.buildTableStatsSql("cat", "db.tbl", 100000L);
+    String partitionSql =
+        IcebergUpdateStatsAndMetricsJob.buildPartitionStatsSql("cat", "db.tbl", 100000L);
 
     assertTrue(tableSql.contains("FROM cat.db.tbl.files"));
     assertTrue(tableSql.contains("AS datafile_mse"));
@@ -99,45 +100,57 @@ public class TestIcebergUpdateStatsJob {
 
   @Test
   public void testParseTargetFileSize() {
-    assertEquals(100000L, IcebergUpdateStatsJob.parseTargetFileSize(null));
-    assertEquals(100000L, IcebergUpdateStatsJob.parseTargetFileSize(""));
-    assertEquals(2048L, IcebergUpdateStatsJob.parseTargetFileSize("2048"));
+    assertEquals(100000L, IcebergUpdateStatsAndMetricsJob.parseTargetFileSize(null));
+    assertEquals(100000L, IcebergUpdateStatsAndMetricsJob.parseTargetFileSize(""));
+    assertEquals(2048L, IcebergUpdateStatsAndMetricsJob.parseTargetFileSize("2048"));
     assertThrows(
-        IllegalArgumentException.class, () -> IcebergUpdateStatsJob.parseTargetFileSize("-1"));
+        IllegalArgumentException.class,
+        () -> IcebergUpdateStatsAndMetricsJob.parseTargetFileSize("-1"));
     assertThrows(
-        IllegalArgumentException.class, () -> IcebergUpdateStatsJob.parseTargetFileSize("abc"));
+        IllegalArgumentException.class,
+        () -> IcebergUpdateStatsAndMetricsJob.parseTargetFileSize("abc"));
   }
 
   @Test
   public void testParseUpdateMode() {
-    assertEquals(IcebergUpdateStatsJob.UpdateMode.ALL, IcebergUpdateStatsJob.parseUpdateMode(null));
-    assertEquals(IcebergUpdateStatsJob.UpdateMode.ALL, IcebergUpdateStatsJob.parseUpdateMode(""));
     assertEquals(
-        IcebergUpdateStatsJob.UpdateMode.STATS, IcebergUpdateStatsJob.parseUpdateMode("stats"));
+        IcebergUpdateStatsAndMetricsJob.UpdateMode.ALL,
+        IcebergUpdateStatsAndMetricsJob.parseUpdateMode(null));
     assertEquals(
-        IcebergUpdateStatsJob.UpdateMode.METRICS, IcebergUpdateStatsJob.parseUpdateMode("metrics"));
+        IcebergUpdateStatsAndMetricsJob.UpdateMode.ALL,
+        IcebergUpdateStatsAndMetricsJob.parseUpdateMode(""));
     assertEquals(
-        IcebergUpdateStatsJob.UpdateMode.ALL, IcebergUpdateStatsJob.parseUpdateMode("all"));
+        IcebergUpdateStatsAndMetricsJob.UpdateMode.STATS,
+        IcebergUpdateStatsAndMetricsJob.parseUpdateMode("stats"));
+    assertEquals(
+        IcebergUpdateStatsAndMetricsJob.UpdateMode.METRICS,
+        IcebergUpdateStatsAndMetricsJob.parseUpdateMode("metrics"));
+    assertEquals(
+        IcebergUpdateStatsAndMetricsJob.UpdateMode.ALL,
+        IcebergUpdateStatsAndMetricsJob.parseUpdateMode("all"));
     assertThrows(
-        IllegalArgumentException.class, () -> IcebergUpdateStatsJob.parseUpdateMode("invalid"));
+        IllegalArgumentException.class,
+        () -> IcebergUpdateStatsAndMetricsJob.parseUpdateMode("invalid"));
   }
 
   @Test
   public void testParseJsonOptions() {
     Map<String, String> parsed =
-        IcebergUpdateStatsJob.parseJsonOptions("{\"a\":\"b\",\"x\":1,\"flag\":true,\"nil\":null}");
+        IcebergUpdateStatsAndMetricsJob.parseJsonOptions(
+            "{\"a\":\"b\",\"x\":1,\"flag\":true,\"nil\":null}");
     assertEquals("b", parsed.get("a"));
     assertEquals("1", parsed.get("x"));
     assertEquals("true", parsed.get("flag"));
     assertEquals("", parsed.get("nil"));
     assertThrows(
-        IllegalArgumentException.class, () -> IcebergUpdateStatsJob.parseJsonOptions("{not_json}"));
+        IllegalArgumentException.class,
+        () -> IcebergUpdateStatsAndMetricsJob.parseJsonOptions("{not_json}"));
     assertThrows(
         IllegalArgumentException.class,
-        () -> IcebergUpdateStatsJob.parseJsonOptions("{\"nested\":{\"a\":1}}"));
+        () -> IcebergUpdateStatsAndMetricsJob.parseJsonOptions("{\"nested\":{\"a\":1}}"));
     assertThrows(
         IllegalArgumentException.class,
-        () -> IcebergUpdateStatsJob.parseJsonOptions("{\"array\":[1,2,3]}"));
+        () -> IcebergUpdateStatsAndMetricsJob.parseJsonOptions("{\"array\":[1,2,3]}"));
   }
 
   @Test
@@ -148,7 +161,7 @@ public class TestIcebergUpdateStatsJob {
             "metalake", "ml",
             "gravitino.optimizer.jdbcMetrics.jdbcUrl", "jdbc:mysql://localhost:3306/metrics");
     Map<String, String> optimizerProperties =
-        IcebergUpdateStatsJob.buildOptimizerProperties(options);
+        IcebergUpdateStatsAndMetricsJob.buildOptimizerProperties(options);
 
     assertEquals("http://localhost:8090", optimizerProperties.get(OptimizerConfig.GRAVITINO_URI));
     assertEquals("ml", optimizerProperties.get(OptimizerConfig.GRAVITINO_METALAKE));
@@ -164,10 +177,11 @@ public class TestIcebergUpdateStatsJob {
             OptimizerConfig.GRAVITINO_URI, "http://localhost:8090",
             OptimizerConfig.GRAVITINO_METALAKE, "ml");
     assertEquals(
-        optimizerProperties, IcebergUpdateStatsJob.requireGravitinoConfig(optimizerProperties));
+        optimizerProperties,
+        IcebergUpdateStatsAndMetricsJob.requireGravitinoConfig(optimizerProperties));
 
     assertThrows(
         IllegalArgumentException.class,
-        () -> IcebergUpdateStatsJob.requireGravitinoConfig(Map.of()));
+        () -> IcebergUpdateStatsAndMetricsJob.requireGravitinoConfig(Map.of()));
   }
 }

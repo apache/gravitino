@@ -72,7 +72,7 @@ import org.junit.jupiter.api.condition.EnabledIfEnvironmentVariable;
 import org.junit.jupiter.api.io.TempDir;
 import org.testcontainers.containers.MySQLContainer;
 
-/** Integration tests for IcebergUpdateStatsJob with a real Spark+Iceberg runtime. */
+/** Integration tests for IcebergUpdateStatsAndMetricsJob with a real Spark+Iceberg runtime. */
 public class TestIcebergUpdateStatsJobWithSpark {
 
   private static final String SERVER_URI = "http://localhost:8090";
@@ -105,7 +105,7 @@ public class TestIcebergUpdateStatsJobWithSpark {
 
     spark =
         SparkSession.builder()
-            .appName("TestIcebergUpdateStatsJob")
+            .appName("TestIcebergUpdateStatsAndMetricsJob")
             .master("local[2]")
             .config(
                 "spark.sql.extensions",
@@ -264,11 +264,11 @@ public class TestIcebergUpdateStatsJobWithSpark {
   public void testUpdateNonPartitionedTableStatistics() {
     RecordingStatisticsUpdater updater = new RecordingStatisticsUpdater();
 
-    IcebergUpdateStatsJob.updateStatistics(
+    IcebergUpdateStatsAndMetricsJob.updateStatistics(
         spark,
         updater,
         null,
-        IcebergUpdateStatsJob.UpdateMode.STATS,
+        IcebergUpdateStatsAndMetricsJob.UpdateMode.STATS,
         catalogName,
         "db.non_partitioned",
         100_000L);
@@ -290,11 +290,11 @@ public class TestIcebergUpdateStatsJobWithSpark {
   public void testUpdatePartitionedTableStatistics() {
     RecordingStatisticsUpdater updater = new RecordingStatisticsUpdater();
 
-    IcebergUpdateStatsJob.updateStatistics(
+    IcebergUpdateStatsAndMetricsJob.updateStatistics(
         spark,
         updater,
         null,
-        IcebergUpdateStatsJob.UpdateMode.STATS,
+        IcebergUpdateStatsAndMetricsJob.UpdateMode.STATS,
         catalogName,
         "db.partitioned",
         100_000L);
@@ -321,11 +321,11 @@ public class TestIcebergUpdateStatsJobWithSpark {
     RecordingStatisticsUpdater statisticsUpdater = new RecordingStatisticsUpdater();
     RecordingMetricsUpdater metricsUpdater = new RecordingMetricsUpdater();
 
-    IcebergUpdateStatsJob.updateStatistics(
+    IcebergUpdateStatsAndMetricsJob.updateStatistics(
         spark,
         statisticsUpdater,
         metricsUpdater,
-        IcebergUpdateStatsJob.UpdateMode.ALL,
+        IcebergUpdateStatsAndMetricsJob.UpdateMode.ALL,
         catalogName,
         "db.partitioned",
         100_000L);
@@ -352,11 +352,11 @@ public class TestIcebergUpdateStatsJobWithSpark {
   public void testUpdatePartitionedTableMetricsOnly() {
     RecordingMetricsUpdater metricsUpdater = new RecordingMetricsUpdater();
 
-    IcebergUpdateStatsJob.updateStatistics(
+    IcebergUpdateStatsAndMetricsJob.updateStatistics(
         spark,
         null,
         metricsUpdater,
-        IcebergUpdateStatsJob.UpdateMode.METRICS,
+        IcebergUpdateStatsAndMetricsJob.UpdateMode.METRICS,
         catalogName,
         "db.partitioned",
         100_000L);
@@ -372,11 +372,11 @@ public class TestIcebergUpdateStatsJobWithSpark {
   public void testUpdateNonPartitionedTableMetricsOnly() {
     RecordingMetricsUpdater metricsUpdater = new RecordingMetricsUpdater();
 
-    IcebergUpdateStatsJob.updateStatistics(
+    IcebergUpdateStatsAndMetricsJob.updateStatistics(
         spark,
         null,
         metricsUpdater,
-        IcebergUpdateStatsJob.UpdateMode.METRICS,
+        IcebergUpdateStatsAndMetricsJob.UpdateMode.METRICS,
         catalogName,
         "db.non_partitioned",
         100_000L);
@@ -395,11 +395,11 @@ public class TestIcebergUpdateStatsJobWithSpark {
     RecordingStatisticsUpdater statisticsUpdater = new RecordingStatisticsUpdater();
     RecordingMetricsUpdater metricsUpdater = new RecordingMetricsUpdater();
 
-    IcebergUpdateStatsJob.updateStatistics(
+    IcebergUpdateStatsAndMetricsJob.updateStatistics(
         spark,
         statisticsUpdater,
         metricsUpdater,
-        IcebergUpdateStatsJob.UpdateMode.ALL,
+        IcebergUpdateStatsAndMetricsJob.UpdateMode.ALL,
         catalogName,
         "db.non_partitioned",
         100_000L);
@@ -434,11 +434,11 @@ public class TestIcebergUpdateStatsJobWithSpark {
       GravitinoMetricsUpdater metricsUpdater = new GravitinoMetricsUpdater();
       metricsUpdater.initialize(new OptimizerEnv(new OptimizerConfig(conf)));
       try {
-        IcebergUpdateStatsJob.updateStatistics(
+        IcebergUpdateStatsAndMetricsJob.updateStatistics(
             spark,
             null,
             metricsUpdater,
-            IcebergUpdateStatsJob.UpdateMode.METRICS,
+            IcebergUpdateStatsAndMetricsJob.UpdateMode.METRICS,
             catalogName,
             "db.partitioned",
             100_000L);
@@ -492,11 +492,11 @@ public class TestIcebergUpdateStatsJobWithSpark {
   public void testUpdateMultiLevelPartitionedTableStatistics() {
     RecordingStatisticsUpdater updater = new RecordingStatisticsUpdater();
 
-    IcebergUpdateStatsJob.updateStatistics(
+    IcebergUpdateStatsAndMetricsJob.updateStatistics(
         spark,
         updater,
         null,
-        IcebergUpdateStatsJob.UpdateMode.STATS,
+        IcebergUpdateStatsAndMetricsJob.UpdateMode.STATS,
         catalogName,
         "db.multi_partitioned",
         100_000L);

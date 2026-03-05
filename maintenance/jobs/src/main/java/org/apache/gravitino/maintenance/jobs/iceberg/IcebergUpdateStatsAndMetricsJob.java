@@ -54,9 +54,9 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /** Built-in job for computing Iceberg table file statistics and persisting them to Gravitino. */
-public class IcebergUpdateStatsJob implements BuiltInJob {
+public class IcebergUpdateStatsAndMetricsJob implements BuiltInJob {
 
-  private static final Logger LOG = LoggerFactory.getLogger(IcebergUpdateStatsJob.class);
+  private static final Logger LOG = LoggerFactory.getLogger(IcebergUpdateStatsAndMetricsJob.class);
 
   private static final String NAME =
       JobTemplateProvider.BUILTIN_NAME_PREFIX + "iceberg-update-stats";
@@ -73,8 +73,8 @@ public class IcebergUpdateStatsJob implements BuiltInJob {
         .withName(NAME)
         .withComment(
             "Built-in Iceberg update stats job template for computing datafile MSE and file metrics")
-        .withExecutable(resolveExecutable(IcebergUpdateStatsJob.class))
-        .withClassName(IcebergUpdateStatsJob.class.getName())
+        .withExecutable(resolveExecutable(IcebergUpdateStatsAndMetricsJob.class))
+        .withClassName(IcebergUpdateStatsAndMetricsJob.class.getName())
         .withArguments(buildArguments())
         .withConfigs(buildSparkConfigs())
         .withCustomFields(
@@ -595,7 +595,7 @@ public class IcebergUpdateStatsJob implements BuiltInJob {
 
   private static void printUsage() {
     System.err.println(
-        "Usage: IcebergUpdateStatsJob [OPTIONS]\\n"
+        "Usage: IcebergUpdateStatsAndMetricsJob [OPTIONS]\\n"
             + "\\n"
             + "Required Options:\\n"
             + "  --catalog <name>                   Iceberg catalog name registered in Spark\\n"
