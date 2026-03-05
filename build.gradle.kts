@@ -598,19 +598,20 @@ subprojects {
       initTest(this)
     }
 
+    val testTaskStartTimeMsKey = "testTaskStartTimeMs"
     doFirst {
-      extensions.extraProperties["testTaskStartTimeMs"] = System.currentTimeMillis()
+      extensions.extraProperties[testTaskStartTimeMsKey] = System.currentTimeMillis()
       logger.lifecycle(
         "[TEST-TIMING] START module={} task={} at={}",
         project.path,
         path,
-        extensions.extraProperties["testTaskStartTimeMs"]
+        extensions.extraProperties[testTaskStartTimeMsKey]
       )
     }
 
     doLast {
       val endTimeMs = System.currentTimeMillis()
-      val startTimeMs = extensions.extraProperties["testTaskStartTimeMs"] as? Long ?: endTimeMs
+      val startTimeMs = extensions.extraProperties[testTaskStartTimeMsKey] as? Long ?: endTimeMs
       logger.lifecycle(
         "[TEST-TIMING] END module={} task={} startMs={} endMs={} durationMs={}",
         project.path,
