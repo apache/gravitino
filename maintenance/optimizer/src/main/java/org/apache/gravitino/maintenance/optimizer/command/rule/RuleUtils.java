@@ -17,13 +17,26 @@
  * under the License.
  */
 
-package org.apache.gravitino.maintenance.optimizer.updater.metrics.storage;
+package org.apache.gravitino.maintenance.optimizer.command.rule;
 
-/** Serializable metric record used by {@link MetricsRepository}. */
-public interface MetricRecord {
-  /** Timestamp in epoch seconds. */
-  long getTimestamp();
+import org.apache.commons.cli.CommandLine;
+import org.apache.commons.lang3.StringUtils;
 
-  /** Encoded metric value. */
-  String getValue();
+final class RuleUtils {
+  private RuleUtils() {}
+
+  /**
+   * Checks whether an option is effectively present.
+   *
+   * <p>For options with value separators (for example {@code --identifiers a,b}), commons-cli
+   * stores parsed values in {@code getOptionValues}. For plain single-value options it is usually
+   * available from {@code getOptionValue}. This helper normalizes both read paths.
+   */
+  static boolean hasEffectiveValue(CommandLine cmd, String longOpt) {
+    String[] values = cmd.getOptionValues(longOpt);
+    if (values != null) {
+      return values.length > 0;
+    }
+    return StringUtils.isNotBlank(cmd.getOptionValue(longOpt));
+  }
 }

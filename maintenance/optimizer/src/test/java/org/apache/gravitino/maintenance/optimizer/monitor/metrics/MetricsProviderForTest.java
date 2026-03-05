@@ -19,24 +19,30 @@
 
 package org.apache.gravitino.maintenance.optimizer.monitor.metrics;
 
+import java.util.ArrayList;
 import java.util.List;
-import java.util.Map;
 import java.util.concurrent.atomic.AtomicInteger;
 import org.apache.gravitino.NameIdentifier;
-import org.apache.gravitino.maintenance.optimizer.api.common.MetricSample;
+import org.apache.gravitino.maintenance.optimizer.api.common.DataScope;
+import org.apache.gravitino.maintenance.optimizer.api.common.MetricPoint;
 import org.apache.gravitino.maintenance.optimizer.api.common.PartitionPath;
-import org.apache.gravitino.maintenance.optimizer.api.common.StatisticEntry;
 import org.apache.gravitino.maintenance.optimizer.api.monitor.MetricsProvider;
 import org.apache.gravitino.maintenance.optimizer.common.OptimizerEnv;
 import org.apache.gravitino.maintenance.optimizer.monitor.job.TableJobRelationProviderForTest;
-import org.apache.gravitino.stats.StatisticValue;
 import org.apache.gravitino.stats.StatisticValues;
 
+/**
+ * Deterministic in-memory metrics provider used by CLI and monitor tests.
+ *
+ * <p>This test double does not read from any external storage. It always returns fixed metric
+ * samples so tests can assert command output stably without depending on persisted state.
+ */
 public class MetricsProviderForTest implements MetricsProvider {
 
   public static final String NAME = "metrics-provider-for-test";
   public static final AtomicInteger PARTITION_METRICS_CALLS = new AtomicInteger();
   public static volatile PartitionPath LAST_PARTITION_PATH = null;
+  private static volatile boolean INCLUDE_INVALID_SCOPE_METRIC = false;
 
   @Override
   public String name() {
@@ -47,45 +53,40 @@ public class MetricsProviderForTest implements MetricsProvider {
   public void initialize(OptimizerEnv optimizerEnv) {}
 
   @Override
-  public Map<String, List<MetricSample>> jobMetrics(
-      NameIdentifier jobIdentifier, long startTime, long endTime) {
+  public List<MetricPoint> jobMetrics(NameIdentifier jobIdentifier, long startTime, long endTime) {
     if (TableJobRelationProviderForTest.JOB1.equals(jobIdentifier)) {
-      return Map.of(
-          "duration",
-          List.of(
-              metric(99, "duration", StatisticValues.longValue(10L)),
-              metric(102, "duration", StatisticValues.longValue(20L))));
+      return List.of(
+          metric(DataScope.Type.JOB, jobIdentifier, null, 99, "duration", 10L),
+          metric(DataScope.Type.JOB, jobIdentifier, null, 102, "duration", 20L));
     }
     if (TableJobRelationProviderForTest.JOB2.equals(jobIdentifier)) {
-      return Map.of(
-          "duration",
-          List.of(
-              metric(98, "duration", StatisticValues.longValue(30L)),
-              metric(104, "duration", StatisticValues.longValue(40L))));
+      return List.of(
+          metric(DataScope.Type.JOB, jobIdentifier, null, 98, "duration", 30L),
+          metric(DataScope.Type.JOB, jobIdentifier, null, 104, "duration", 40L));
     }
-    return Map.of();
+    return List.of();
   }
 
   @Override
-  public Map<String, List<MetricSample>> tableMetrics(
+  public List<MetricPoint> tableMetrics(
       NameIdentifier tableIdentifier, long startTime, long endTime) {
-    return Map.of(
-        "row_count",
-        List.of(
-            metric(95, "row_count", StatisticValues.longValue(100L)),
-            metric(100, "row_count", StatisticValues.longValue(200L))));
+    List<MetricPoint> points = new ArrayList<>();
+    points.add(metric(DataScope.Type.TABLE, tableIdentifier, null, 95, "row_count", 100L));
+    points.add(metric(DataScope.Type.TABLE, tableIdentifier, null, 100, "row_count", 200L));
+    if (INCLUDE_INVALID_SCOPE_METRIC) {
+      points.add(metric(DataScope.Type.JOB, tableIdentifier, null, 96, "row_count", 999L));
+    }
+    return List.copyOf(points);
   }
 
   @Override
-  public Map<String, List<MetricSample>> partitionMetrics(
+  public List<MetricPoint> partitionMetrics(
       NameIdentifier tableIdentifier, PartitionPath partitionPath, long startTime, long endTime) {
     PARTITION_METRICS_CALLS.incrementAndGet();
     LAST_PARTITION_PATH = partitionPath;
-    return Map.of(
-        "row_count",
-        List.of(
-            metric(97, "row_count", StatisticValues.longValue(110L)),
-            metric(101, "row_count", StatisticValues.longValue(210L))));
+    return List.of(
+        metric(DataScope.Type.PARTITION, tableIdentifier, partitionPath, 97, "row_count", 110L),
+        metric(DataScope.Type.PARTITION, tableIdentifier, partitionPath, 101, "row_count", 210L));
   }
 
   @Override
@@ -94,30 +95,32 @@ public class MetricsProviderForTest implements MetricsProvider {
   public static void reset() {
     PARTITION_METRICS_CALLS.set(0);
     LAST_PARTITION_PATH = null;
+    INCLUDE_INVALID_SCOPE_METRIC = false;
   }
 
-  private static <T> MetricSample metric(
-      long timestamp, String metricName, StatisticValue<T> statisticValue) {
-    return new MetricSample() {
-      @Override
-      public long timestamp() {
-        return timestamp;
-      }
+  public static void includeInvalidScopeMetric(boolean includeInvalidScopeMetric) {
+    INCLUDE_INVALID_SCOPE_METRIC = includeInvalidScopeMetric;
+  }
 
-      @Override
-      public StatisticEntry<?> statistic() {
-        return new StatisticEntry<T>() {
-          @Override
-          public String name() {
-            return metricName;
-          }
-
-          @Override
-          public StatisticValue<T> value() {
-            return statisticValue;
-          }
-        };
-      }
-    };
+  private static MetricPoint metric(
+      DataScope.Type scope,
+      NameIdentifier identifier,
+      PartitionPath partitionPath,
+      long timestamp,
+      String metricName,
+      long value) {
+    switch (scope) {
+      case TABLE:
+        return MetricPoint.forTable(
+            identifier, metricName, StatisticValues.longValue(value), timestamp);
+      case PARTITION:
+        return MetricPoint.forPartition(
+            identifier, partitionPath, metricName, StatisticValues.longValue(value), timestamp);
+      case JOB:
+        return MetricPoint.forJob(
+            identifier, metricName, StatisticValues.longValue(value), timestamp);
+      default:
+        throw new IllegalArgumentException("Unsupported scope: " + scope);
+    }
   }
 }

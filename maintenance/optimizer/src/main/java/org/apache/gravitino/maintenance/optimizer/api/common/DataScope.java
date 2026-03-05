@@ -17,18 +17,18 @@
  * under the License.
  */
 
-package org.apache.gravitino.maintenance.optimizer.api.monitor;
+package org.apache.gravitino.maintenance.optimizer.api.common;
 
 import com.google.common.base.Preconditions;
+import java.util.Objects;
 import java.util.Optional;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.annotation.DeveloperApi;
-import org.apache.gravitino.maintenance.optimizer.api.common.PartitionPath;
 
-/** Scope of metrics being evaluated (table, partition, or job). */
+/** Generic scope for data observations such as metrics and statistics. */
 @DeveloperApi
-public final class MetricScope {
-  /** Supported scope kinds for monitor evaluation. */
+public final class DataScope {
+  /** Supported scope kinds. */
   public enum Type {
     TABLE,
     PARTITION,
@@ -39,64 +39,70 @@ public final class MetricScope {
   private final Type type;
   private final Optional<PartitionPath> partition;
 
-  private MetricScope(NameIdentifier identifier, Type type, Optional<PartitionPath> partition) {
+  private DataScope(NameIdentifier identifier, Type type, Optional<PartitionPath> partition) {
     Preconditions.checkArgument(identifier != null, "identifier must not be null");
     Preconditions.checkArgument(type != null, "type must not be null");
     Preconditions.checkArgument(partition != null, "partition must not be null");
+    Preconditions.checkArgument(
+        (type == Type.PARTITION) == partition.isPresent(),
+        "partition must be present only for PARTITION scope");
     this.identifier = identifier;
     this.type = type;
     this.partition = partition;
   }
 
-  /**
-   * Create a table scope.
-   *
-   * @param identifier table identifier
-   * @return table metric scope
-   */
-  public static MetricScope forTable(NameIdentifier identifier) {
-    return new MetricScope(identifier, Type.TABLE, Optional.empty());
+  public static DataScope forTable(NameIdentifier identifier) {
+    return new DataScope(identifier, Type.TABLE, Optional.empty());
   }
 
-  /**
-   * Create a partition scope.
-   *
-   * @param identifier table identifier
-   * @param partition partition path under the table
-   * @return partition metric scope
-   */
-  public static MetricScope forPartition(NameIdentifier identifier, PartitionPath partition) {
-    return new MetricScope(identifier, Type.PARTITION, Optional.of(partition));
+  public static DataScope forPartition(NameIdentifier identifier, PartitionPath partition) {
+    return new DataScope(identifier, Type.PARTITION, Optional.of(partition));
   }
 
-  /**
-   * Create a job scope.
-   *
-   * @param identifier job identifier
-   * @return job metric scope
-   */
-  public static MetricScope forJob(NameIdentifier identifier) {
-    return new MetricScope(identifier, Type.JOB, Optional.empty());
+  public static DataScope forJob(NameIdentifier identifier) {
+    return new DataScope(identifier, Type.JOB, Optional.empty());
   }
 
-  /**
-   * @return evaluated identifier (table or job).
-   */
   public NameIdentifier identifier() {
     return identifier;
   }
 
-  /**
-   * @return scope type.
-   */
   public Type type() {
     return type;
   }
 
-  /**
-   * @return partition path when {@link #type()} is {@link Type#PARTITION}; otherwise empty.
-   */
   public Optional<PartitionPath> partition() {
     return partition;
+  }
+
+  @Override
+  public boolean equals(Object obj) {
+    if (this == obj) {
+      return true;
+    }
+    if (!(obj instanceof DataScope)) {
+      return false;
+    }
+    DataScope other = (DataScope) obj;
+    return Objects.equals(identifier, other.identifier)
+        && type == other.type
+        && Objects.equals(partition, other.partition);
+  }
+
+  @Override
+  public int hashCode() {
+    return Objects.hash(identifier, type, partition);
+  }
+
+  @Override
+  public String toString() {
+    return "DataScope{"
+        + "identifier="
+        + identifier
+        + ", type="
+        + type
+        + ", partition="
+        + partition
+        + '}';
   }
 }

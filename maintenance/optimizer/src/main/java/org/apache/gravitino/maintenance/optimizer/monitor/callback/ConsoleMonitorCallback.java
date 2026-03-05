@@ -67,26 +67,24 @@ public class ConsoleMonitorCallback implements MonitorCallback {
 
   private String formatMetrics(Map<String, List<MetricSample>> metrics) {
     if (metrics == null || metrics.isEmpty()) {
-      return "{}";
+      return "[]";
     }
     return metrics.entrySet().stream()
-        .map(entry -> entry.getKey() + "=" + formatMetricSamples(entry.getValue()))
+        .map(
+            entry ->
+                entry.getKey()
+                    + "="
+                    + entry.getValue().stream()
+                        .map(this::formatMetricSample)
+                        .collect(Collectors.joining(", ", "[", "]")))
         .collect(Collectors.joining(", ", "{", "}"));
   }
 
-  private String formatMetricSamples(List<MetricSample> samples) {
-    if (samples == null || samples.isEmpty()) {
-      return "[]";
-    }
-    return samples.stream()
-        .map(sample -> sample.timestamp() + ":" + formatMetricValue(sample))
-        .collect(Collectors.joining(", ", "[", "]"));
-  }
-
-  private String formatMetricValue(MetricSample sample) {
-    if (sample == null || sample.statistic() == null || sample.statistic().value() == null) {
+  private String formatMetricSample(MetricSample sample) {
+    if (sample == null || sample.value() == null) {
       return "N/A";
     }
-    return String.valueOf(sample.statistic().value().value());
+    return String.format(
+        "%d:%s", sample.timestampSeconds(), String.valueOf(sample.value().value()));
   }
 }

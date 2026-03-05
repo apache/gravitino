@@ -19,10 +19,15 @@
 
 package org.apache.gravitino.spark.connector.jdbc;
 
+import java.util.Set;
 import org.apache.gravitino.spark.connector.SparkTableChangeConverter;
 import org.apache.gravitino.spark.connector.SparkTableChangeConverter34;
 import org.apache.gravitino.spark.connector.SparkTypeConverter;
 import org.apache.gravitino.spark.connector.SparkTypeConverter34;
+import org.apache.spark.sql.catalyst.analysis.NoSuchTableException;
+import org.apache.spark.sql.connector.catalog.Identifier;
+import org.apache.spark.sql.connector.catalog.Table;
+import org.apache.spark.sql.connector.catalog.TableWritePrivilege;
 
 public class GravitinoJdbcCatalogSpark35 extends GravitinoJdbcCatalog {
 
@@ -35,5 +40,11 @@ public class GravitinoJdbcCatalogSpark35 extends GravitinoJdbcCatalog {
   protected SparkTableChangeConverter getSparkTableChangeConverter(
       SparkTypeConverter sparkTypeConverter) {
     return new SparkTableChangeConverter34(sparkTypeConverter);
+  }
+
+  @Override
+  public Table loadTable(Identifier ident, Set<TableWritePrivilege> writePrivileges)
+      throws NoSuchTableException {
+    return loadTableForWriting(ident);
   }
 }

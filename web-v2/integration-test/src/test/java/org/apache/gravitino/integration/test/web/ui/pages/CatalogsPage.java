@@ -1618,25 +1618,45 @@ public class CatalogsPage extends BaseWebIT {
 
   public boolean verifyTreeNodes(List<String> treeNodes) {
     WebDriverWait wait = new WebDriverWait(driver, Duration.ofSeconds(ACTION_SLEEP));
-    List<WebElement> list =
-        wait.until(
-            ExpectedConditions.visibilityOfAllElementsLocatedBy(
-                By.xpath(
-                    "//div[@data-refer='tree-view']"
-                        + "//div[@class='ant-tree-list-holder']"
-                        + "/div/div[@class='ant-tree-list-holder-inner']"
-                        + "/div[contains(@class, 'ant-tree-treenode')]")));
-    List<String> texts = new ArrayList<>();
-    for (WebElement webElement : list) {
-      String nodeName =
-          webElement.findElement(By.xpath(".//span[@class='ant-tree-title']")).getText();
-      texts.add(nodeName);
+
+    // Retry logic to handle stale element references
+    int maxRetries = 3;
+    for (int attempt = 0; attempt < maxRetries; attempt++) {
+      try {
+        List<WebElement> list =
+            wait.until(
+                ExpectedConditions.visibilityOfAllElementsLocatedBy(
+                    By.xpath(
+                        "//div[@data-refer='tree-view']"
+                            + "//div[@class='ant-tree-list-holder']"
+                            + "/div/div[@class='ant-tree-list-holder-inner']"
+                            + "/div[contains(@class, 'ant-tree-treenode')]")));
+        List<String> texts = new ArrayList<>();
+        for (WebElement webElement : list) {
+          String nodeName =
+              webElement.findElement(By.xpath(".//span[@class='ant-tree-title']")).getText();
+          texts.add(nodeName);
+        }
+        if (!treeNodes.containsAll(texts)) {
+          LOG.error("tree nodes list: {} does not containsAll treeNodes: {}", texts, treeNodes);
+          return false;
+        }
+        return true;
+      } catch (org.openqa.selenium.StaleElementReferenceException e) {
+        if (attempt == maxRetries - 1) {
+          LOG.error(
+              "Failed to verify tree nodes after {} attempts due to stale elements", maxRetries);
+          throw e;
+        }
+        LOG.warn("Stale element encountered, retrying... (attempt {}/{})", attempt + 1, maxRetries);
+        try {
+          Thread.sleep(500);
+        } catch (InterruptedException ie) {
+          Thread.currentThread().interrupt();
+        }
+      }
     }
-    if (!treeNodes.containsAll(texts)) {
-      LOG.error("tree nodes list: {} does not containsAll treeNodes: {}", texts, treeNodes);
-      return false;
-    }
-    return true;
+    return false;
   }
 
   public boolean verifySelectedNode(String nodeName) {

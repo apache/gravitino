@@ -19,22 +19,37 @@
 
 package org.apache.gravitino.maintenance.optimizer.common;
 
+import java.util.Optional;
 import org.apache.gravitino.maintenance.optimizer.common.conf.OptimizerConfig;
 
 /**
- * Immutable container for runtime optimizer context passed into pluggable components. Today it only
- * exposes {@link OptimizerConfig}, but it is intended to carry additional shared resources (client
- * handles, metrics) as the optimizer matures.
+ * Immutable container for runtime optimizer context passed into pluggable components. It carries
+ * static configuration ({@link OptimizerConfig}) and optional command-scoped runtime content
+ * ({@link OptimizerContent}).
  */
 public class OptimizerEnv {
   // The config items from the config file
   private final OptimizerConfig config;
+  private final OptimizerContent content;
 
   public OptimizerEnv(OptimizerConfig config) {
+    this(config, null);
+  }
+
+  public OptimizerEnv(OptimizerConfig config, OptimizerContent content) {
     this.config = config;
+    this.content = content;
   }
 
   public OptimizerConfig config() {
     return config;
+  }
+
+  public Optional<OptimizerContent> content() {
+    return Optional.ofNullable(content);
+  }
+
+  public OptimizerEnv withContent(OptimizerContent content) {
+    return new OptimizerEnv(config, content);
   }
 }

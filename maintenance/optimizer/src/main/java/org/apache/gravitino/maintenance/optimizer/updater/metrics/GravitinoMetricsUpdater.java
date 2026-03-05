@@ -19,13 +19,14 @@
 
 package org.apache.gravitino.maintenance.optimizer.updater.metrics;
 
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import java.util.List;
+import org.apache.gravitino.maintenance.optimizer.api.common.DataScope;
+import org.apache.gravitino.maintenance.optimizer.api.common.MetricPoint;
 import org.apache.gravitino.maintenance.optimizer.api.updater.MetricsUpdater;
 import org.apache.gravitino.maintenance.optimizer.common.OptimizerEnv;
-import org.apache.gravitino.maintenance.optimizer.updater.metrics.storage.JobMetricWriteRequest;
 import org.apache.gravitino.maintenance.optimizer.updater.metrics.storage.MetricsRepository;
-import org.apache.gravitino.maintenance.optimizer.updater.metrics.storage.TableMetricWriteRequest;
 import org.apache.gravitino.maintenance.optimizer.updater.metrics.storage.jdbc.GenericJdbcMetricsRepository;
 
 /** Metrics updater that persists table/job metrics into the configured metrics repository. */
@@ -47,14 +48,17 @@ public class GravitinoMetricsUpdater implements MetricsUpdater {
   }
 
   @Override
-  public void updateTableMetrics(List<TableMetricWriteRequest> metrics) {
+  public void updateTableAndPartitionMetrics(List<MetricPoint> metrics) {
     ensureInitialized();
-    metricsStorage.storeTableMetrics(metrics);
+    validateScopes(
+        metrics, List.of(DataScope.Type.TABLE, DataScope.Type.PARTITION), "table/partition");
+    metricsStorage.storeTableAndPartitionMetrics(metrics);
   }
 
   @Override
-  public void updateJobMetrics(List<JobMetricWriteRequest> metrics) {
+  public void updateJobMetrics(List<MetricPoint> metrics) {
     ensureInitialized();
+    validateScopes(metrics, List.of(DataScope.Type.JOB), "job");
     metricsStorage.storeJobMetrics(metrics);
   }
 
@@ -65,9 +69,32 @@ public class GravitinoMetricsUpdater implements MetricsUpdater {
     }
   }
 
+  @VisibleForTesting
+  void setMetricsRepositoryForTest(MetricsRepository metricsRepository) {
+    this.metricsStorage = metricsRepository;
+  }
+
+  @VisibleForTesting
+  MetricsRepository metricsRepositoryForTest() {
+    return metricsStorage;
+  }
+
   private void ensureInitialized() {
     Preconditions.checkState(
         metricsStorage != null,
         "GravitinoMetricsUpdater has not been initialized. Call initialize() first.");
+  }
+
+  private void validateScopes(
+      List<MetricPoint> metrics, List<DataScope.Type> allowedScopes, String updateType) {
+    Preconditions.checkArgument(metrics != null, "metrics must not be null");
+    for (MetricPoint metric : metrics) {
+      Preconditions.checkArgument(metric != null, "metric must not be null");
+      Preconditions.checkArgument(
+          allowedScopes.contains(metric.scope()),
+          "Unsupported scope %s for %s metrics update",
+          metric.scope(),
+          updateType);
+    }
   }
 }

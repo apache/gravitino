@@ -1,0 +1,384 @@
+diff --git a/trino-connector/integration-test/src/test/resources/trino-ci-testset/testsets/hive/catalog_hive_prepare.sql b/trino-connector/integration-test/src/test/resources/trino-ci-testset/testsets/hive/catalog_hive_prepare.sql
+index 67ea924ba..b392ae230 100644
+--- a/trino-connector/integration-test/src/test/resources/trino-ci-testset/testsets/hive/catalog_hive_prepare.sql
++++ b/trino-connector/integration-test/src/test/resources/trino-ci-testset/testsets/hive/catalog_hive_prepare.sql
+@@ -2,7 +2,7 @@ call gravitino.system.create_catalog(
+     'gt_hive',
+     'hive',
+     map(
+-        array['metastore.uris', 'trino.bypass.fs.hadoop.enabled'],
+-        array['${hive_uri}', 'true']
++        array['metastore.uris'],
++        array['${hive_uri}']
+     )
+ );
+\ No newline at end of file
+diff --git a/trino-connector/integration-test/src/test/resources/trino-ci-testset/testsets/jdbc-postgresql/00004_query_pushdown.txt b/trino-connector/integration-test/src/test/resources/trino-ci-testset/testsets/jdbc-postgresql/00004_query_pushdown.txt
+index edd8257ad..c4f271add 100644
+--- a/trino-connector/integration-test/src/test/resources/trino-ci-testset/testsets/jdbc-postgresql/00004_query_pushdown.txt
++++ b/trino-connector/integration-test/src/test/resources/trino-ci-testset/testsets/jdbc-postgresql/00004_query_pushdown.txt
+@@ -12,26 +12,26 @@ INSERT: 15000 rows
+ 
+ "Trino version: %
+ %
+-    └─ TableScan[table = gt_postgresql:gt_db1.customer->gt_db1.customer gt_db.gt_db1.customer limit=10 columns=[custkey:bigint:int8]]
++    %TableScan[table = gt_postgresql:gt_db1.customer->gt_db1.customer gt_db1.customer limit=10 columns=[custkey:bigint:int8]]
+            Layout: [custkey:bigint]
+ %
+ "
+ 
+ "Trino version: %
+ %
+-    └─ TableScan[table = gt_postgresql:gt_db1.customer->gt_db1.customer gt_db.gt_db1.customer%constraints=%phone%LIKE%]
++    %TableScan[table = gt_postgresql:gt_db1.customer->gt_db1.customer gt_db1.customer%constraints=%phone%LIKE%]
+ %
+ "
+ 
+ "Trino version: %
+ %
+-    └─ TableScan[table = gt_postgresql:gt_db1.orders->Query[SELECT sum(""totalprice"") AS ""_pfgnrtd_0"" FROM ""gt_db"".""gt_db1"".""orders""]%columns=[_pfgnrtd_0:decimal(38,2):decimal]]
++    %TableScan[table = gt_postgresql:gt_db1.orders->Query[SELECT sum(""totalprice"") AS ""_pfgnrtd_0"" FROM ""gt_db1"".""orders""]%columns=[_pfgnrtd_0:decimal(38,2):decimal]]
+ %
+ "
+ 
+ "Trino version: %
+ %
+-    └─ TableScan[table = gt_postgresql:gt_db1.%->Query[SELECT ""orderdate"", sum(""totalprice"") AS ""_pfgnrtd_0"" FROM ""gt_db"".""gt_db1"".""orders"" GROUP BY ""orderdate""]%sortOrder=[orderdate:date:date ASC NULLS LAST]%limit=10%columns=[orderdate:date:date, _pfgnrtd_0:decimal(38,2):decimal]]
++    %TableScan[table = gt_postgresql:gt_db1.%->Query[SELECT ""orderdate"", sum(""totalprice"") AS ""_pfgnrtd_0"" FROM ""gt_db1"".""orders"" GROUP BY ""orderdate""]%sortOrder=[orderdate:date:date ASC NULLS LAST]%limit=10%columns=[orderdate:date:date, _pfgnrtd_0:decimal(38,2):decimal]]
+ %
+ "
+ 
+diff --git a/trino-connector/integration-test/src/test/resources/trino-ci-testset/testsets/lakehouse-iceberg/catalog_iceberg_prepare.sql b/trino-connector/integration-test/src/test/resources/trino-ci-testset/testsets/lakehouse-iceberg/catalog_iceberg_prepare.sql
+index e310c051d..46ad6a38c 100644
+--- a/trino-connector/integration-test/src/test/resources/trino-ci-testset/testsets/lakehouse-iceberg/catalog_iceberg_prepare.sql
++++ b/trino-connector/integration-test/src/test/resources/trino-ci-testset/testsets/lakehouse-iceberg/catalog_iceberg_prepare.sql
+@@ -2,8 +2,8 @@ call gravitino.system.create_catalog(
+     'gt_iceberg',
+     'lakehouse-iceberg',
+     map(
+-        array['uri', 'catalog-backend', 'warehouse', 'trino.bypass.fs.hadoop.enabled'],
+-        array['${hive_uri}', 'hive', '${hdfs_uri}/user/iceberg/warehouse/TrinoQueryIT', 'true']
++        array['uri', 'catalog-backend', 'warehouse'],
++        array['${hive_uri}', 'hive', '${hdfs_uri}/user/iceberg/warehouse/TrinoQueryIT']
+     )
+ );
+ 
+diff --git a/trino-connector/integration-test/src/test/resources/trino-ci-testset/testsets/tpcds/00002.sql b/trino-connector/integration-test/src/test/resources/trino-ci-testset/testsets/tpcds/00002.sql
+index 7ed8fbf18..0e797b639 100644
+--- a/trino-connector/integration-test/src/test/resources/trino-ci-testset/testsets/tpcds/00002.sql
++++ b/trino-connector/integration-test/src/test/resources/trino-ci-testset/testsets/tpcds/00002.sql
+@@ -36,13 +36,13 @@ UNION ALL (
+ ) 
+ SELECT
+   "d_week_seq1"
+-, CAST(("sun_sales1" / "sun_sales2") as DECIMAL(38,2))
+-, CAST(("mon_sales1" / "mon_sales2") as DECIMAL(38,2))
+-, CAST(("tue_sales1" / "tue_sales2") as DECIMAL(38,2))
+-, CAST(("wed_sales1" / "wed_sales2") as DECIMAL(38,2))
+-, CAST(("thu_sales1" / "thu_sales2") as DECIMAL(38,2))
+-, CAST(("fri_sales1" / "fri_sales2") as DECIMAL(38,2))
+-, CAST(("sat_sales1" / "sat_sales2") as DECIMAL(38,2))
++, "round"(("sun_sales1" / "sun_sales2"), 2)
++, "round"(("mon_sales1" / "mon_sales2"), 2)
++, "round"(("tue_sales1" / "tue_sales2"), 2)
++, "round"(("wed_sales1" / "wed_sales2"), 2)
++, "round"(("thu_sales1" / "thu_sales2"), 2)
++, "round"(("fri_sales1" / "fri_sales2"), 2)
++, "round"(("sat_sales1" / "sat_sales2"), 2)
+ FROM
+   (
+    SELECT
+diff --git a/trino-connector/integration-test/src/test/resources/trino-ci-testset/testsets/tpcds/00020.sql b/trino-connector/integration-test/src/test/resources/trino-ci-testset/testsets/tpcds/00020.sql
+index e64089005..7f28d3700 100644
+--- a/trino-connector/integration-test/src/test/resources/trino-ci-testset/testsets/tpcds/00020.sql
++++ b/trino-connector/integration-test/src/test/resources/trino-ci-testset/testsets/tpcds/00020.sql
+@@ -5,7 +5,7 @@ SELECT
+ , "i_class"
+ , "i_current_price"
+ , "sum"("cs_ext_sales_price") "itemrevenue"
+-, CAST((("sum"("cs_ext_sales_price") * 100) / "sum"("sum"("cs_ext_sales_price")) OVER (PARTITION BY "i_class")) AS DECIMAL(38,2)) "revenueratio"
++, (("sum"("cs_ext_sales_price") * 100) / "sum"("sum"("cs_ext_sales_price")) OVER (PARTITION BY "i_class")) "revenueratio"
+ FROM
+   catalog_sales
+ , item
+diff --git a/trino-connector/integration-test/src/test/resources/trino-ci-testset/testsets/tpcds/00036.sql b/trino-connector/integration-test/src/test/resources/trino-ci-testset/testsets/tpcds/00036.sql
+index 77611c637..bb2b27e58 100644
+--- a/trino-connector/integration-test/src/test/resources/trino-ci-testset/testsets/tpcds/00036.sql
++++ b/trino-connector/integration-test/src/test/resources/trino-ci-testset/testsets/tpcds/00036.sql
+@@ -1,9 +1,9 @@
+ SELECT
+-  CAST("sum"("ss_net_profit") / "sum"("ss_ext_sales_price") AS DECIMAL(38,2)) "gross_margin"
++  ("sum"("ss_net_profit") / "sum"("ss_ext_sales_price")) "gross_margin"
+ , "i_category"
+ , "i_class"
+ , (GROUPING ("i_category") + GROUPING ("i_class")) "lochierarchy"
+-, "rank"() OVER (PARTITION BY (GROUPING ("i_category") + GROUPING ("i_class")), (CASE WHEN (GROUPING ("i_class") = 0) THEN "i_category" END) ORDER BY CAST(("sum"("ss_net_profit") / "sum"("ss_ext_sales_price")) AS DECIMAL(38, 2)) ASC) "rank_within_parent"
++, "rank"() OVER (PARTITION BY (GROUPING ("i_category") + GROUPING ("i_class")), (CASE WHEN (GROUPING ("i_class") = 0) THEN "i_category" END) ORDER BY ("sum"("ss_net_profit") / "sum"("ss_ext_sales_price")) ASC) "rank_within_parent"
+ FROM
+   store_sales
+ , date_dim d1
+diff --git a/trino-connector/integration-test/src/test/resources/trino-ci-testset/testsets/tpcds/00049.sql b/trino-connector/integration-test/src/test/resources/trino-ci-testset/testsets/tpcds/00049.sql
+index a50bd4083..c65d1a14a 100644
+--- a/trino-connector/integration-test/src/test/resources/trino-ci-testset/testsets/tpcds/00049.sql
++++ b/trino-connector/integration-test/src/test/resources/trino-ci-testset/testsets/tpcds/00049.sql
+@@ -16,8 +16,8 @@ FROM
+      (
+       SELECT
+         "ws"."ws_item_sk" "item"
+-      , (CAST(CAST("sum"(COALESCE("wr"."wr_return_quantity", 0)) AS DECIMAL(15,4)) / CAST("sum"(COALESCE("ws"."ws_quantity", 0)) AS DECIMAL(15,4)) AS DECIMAL(15,4))) "return_ratio"
+-      , (CAST(CAST("sum"(COALESCE("wr"."wr_return_amt", 0)) AS DECIMAL(15,4)) / CAST("sum"(COALESCE("ws"."ws_net_paid", 0)) AS DECIMAL(15,4)) AS DECIMAL(15,4))) "currency_ratio"
++      , (CAST("sum"(COALESCE("wr"."wr_return_quantity", 0)) AS DECIMAL(15,4)) / CAST("sum"(COALESCE("ws"."ws_quantity", 0)) AS DECIMAL(15,4))) "return_ratio"
++      , (CAST("sum"(COALESCE("wr"."wr_return_amt", 0)) AS DECIMAL(15,4)) / CAST("sum"(COALESCE("ws"."ws_net_paid", 0)) AS DECIMAL(15,4))) "currency_ratio"
+       FROM
+         (web_sales ws
+       LEFT JOIN web_returns wr ON ("ws"."ws_order_number" = "wr"."wr_order_number")
+@@ -53,8 +53,8 @@ FROM
+      (
+       SELECT
+         "cs"."cs_item_sk" "item"
+-      , (CAST(CAST("sum"(COALESCE("cr"."cr_return_quantity", 0)) AS DECIMAL(15,4)) / CAST("sum"(COALESCE("cs"."cs_quantity", 0)) AS DECIMAL(15,4)) AS DECIMAL(15,4))) "return_ratio"
+-      , (CAST(CAST("sum"(COALESCE("cr"."cr_return_amount", 0)) AS DECIMAL(15,4)) / CAST("sum"(COALESCE("cs"."cs_net_paid", 0)) AS DECIMAL(15,4)) AS DECIMAL(15,4))) "currency_ratio"
++      , (CAST("sum"(COALESCE("cr"."cr_return_quantity", 0)) AS DECIMAL(15,4)) / CAST("sum"(COALESCE("cs"."cs_quantity", 0)) AS DECIMAL(15,4))) "return_ratio"
++      , (CAST("sum"(COALESCE("cr"."cr_return_amount", 0)) AS DECIMAL(15,4)) / CAST("sum"(COALESCE("cs"."cs_net_paid", 0)) AS DECIMAL(15,4))) "currency_ratio"
+       FROM
+         (catalog_sales cs
+       LEFT JOIN catalog_returns cr ON ("cs"."cs_order_number" = "cr"."cr_order_number")
+@@ -90,8 +90,8 @@ FROM
+      (
+       SELECT
+         "sts"."ss_item_sk" "item"
+-      , (CAST(CAST("sum"(COALESCE("sr"."sr_return_quantity", 0)) AS DECIMAL(15,4)) / CAST("sum"(COALESCE("sts"."ss_quantity", 0)) AS DECIMAL(15,4)) AS DECIMAL(15,4))) "return_ratio"
+-      , (CAST(CAST("sum"(COALESCE("sr"."sr_return_amt", 0)) AS DECIMAL(15,4)) / CAST("sum"(COALESCE("sts"."ss_net_paid", 0)) AS DECIMAL(15,4)) AS DECIMAL(15,4))) "currency_ratio"
++      , (CAST("sum"(COALESCE("sr"."sr_return_quantity", 0)) AS DECIMAL(15,4)) / CAST("sum"(COALESCE("sts"."ss_quantity", 0)) AS DECIMAL(15,4))) "return_ratio"
++      , (CAST("sum"(COALESCE("sr"."sr_return_amt", 0)) AS DECIMAL(15,4)) / CAST("sum"(COALESCE("sts"."ss_net_paid", 0)) AS DECIMAL(15,4))) "currency_ratio"
+       FROM
+         (store_sales sts
+       LEFT JOIN store_returns sr ON ("sts"."ss_ticket_number" = "sr"."sr_ticket_number")
+diff --git a/trino-connector/integration-test/src/test/resources/trino-ci-testset/testsets/tpcds/00059.sql b/trino-connector/integration-test/src/test/resources/trino-ci-testset/testsets/tpcds/00059.sql
+index ac2baa60c..9114f353d 100644
+--- a/trino-connector/integration-test/src/test/resources/trino-ci-testset/testsets/tpcds/00059.sql
++++ b/trino-connector/integration-test/src/test/resources/trino-ci-testset/testsets/tpcds/00059.sql
+@@ -20,13 +20,13 @@ SELECT
+   "s_store_name1"
+ , "s_store_id1"
+ , "d_week_seq1"
+-, CAST(("sun_sales1" / "sun_sales2") AS DECIMAL(38,2))
+-, CAST(("mon_sales1" / "mon_sales2") AS DECIMAL(38,2))
+-, CAST(("tue_sales1" / "tue_sales2") AS DECIMAL(38,2))
+-, CAST(("wed_sales1" / "wed_sales2") AS DECIMAL(38,2))
+-, CAST(("thu_sales1" / "thu_sales2") AS DECIMAL(38,2))
+-, CAST(("fri_sales1" / "fri_sales2") AS DECIMAL(38,2))
+-, CAST(("sat_sales1" / "sat_sales2") AS DECIMAL(38,2))
++, ("sun_sales1" / "sun_sales2")
++, ("mon_sales1" / "mon_sales2")
++, ("tue_sales1" / "tue_sales2")
++, ("wed_sales1" / "wed_sales2")
++, ("thu_sales1" / "thu_sales2")
++, ("fri_sales1" / "fri_sales2")
++, ("sat_sales1" / "sat_sales2")
+ FROM
+   (
+    SELECT
+diff --git a/trino-connector/integration-test/src/test/resources/trino-ci-testset/testsets/tpcds/00061.sql b/trino-connector/integration-test/src/test/resources/trino-ci-testset/testsets/tpcds/00061.sql
+index e23b0574f..17cd19338 100644
+--- a/trino-connector/integration-test/src/test/resources/trino-ci-testset/testsets/tpcds/00061.sql
++++ b/trino-connector/integration-test/src/test/resources/trino-ci-testset/testsets/tpcds/00061.sql
+@@ -1,7 +1,7 @@
+ SELECT
+   "promotions"
+ , "total"
+-, (CAST((CAST("promotions" AS DECIMAL(15,4)) / CAST("total" AS DECIMAL(15,4))) AS DECIMAL(15,4)) * 100)
++, ((CAST("promotions" AS DECIMAL(15,4)) / CAST("total" AS DECIMAL(15,4))) * 100)
+ FROM
+   (
+    SELECT "sum"("ss_ext_sales_price") "promotions"
+diff --git a/trino-connector/integration-test/src/test/resources/trino-ci-testset/testsets/tpcds/00066.sql b/trino-connector/integration-test/src/test/resources/trino-ci-testset/testsets/tpcds/00066.sql
+index 02befa740..50a163329 100644
+--- a/trino-connector/integration-test/src/test/resources/trino-ci-testset/testsets/tpcds/00066.sql
++++ b/trino-connector/integration-test/src/test/resources/trino-ci-testset/testsets/tpcds/00066.sql
+@@ -19,18 +19,18 @@ SELECT
+ , "sum"("oct_sales") "oct_sales"
+ , "sum"("nov_sales") "nov_sales"
+ , "sum"("dec_sales") "dec_sales"
+-, CAST("sum"(("jan_sales" / "w_warehouse_sq_ft")) AS DECIMAL(38,2)) "jan_sales_per_sq_foot"
+-, CAST("sum"(("feb_sales" / "w_warehouse_sq_ft")) AS DECIMAL(38,2)) "feb_sales_per_sq_foot"
+-, CAST("sum"(("mar_sales" / "w_warehouse_sq_ft")) AS DECIMAL(38,2)) "mar_sales_per_sq_foot"
+-, CAST("sum"(("apr_sales" / "w_warehouse_sq_ft")) AS DECIMAL(38,2)) "apr_sales_per_sq_foot"
+-, CAST("sum"(("may_sales" / "w_warehouse_sq_ft")) AS DECIMAL(38,2)) "may_sales_per_sq_foot"
+-, CAST("sum"(("jun_sales" / "w_warehouse_sq_ft")) AS DECIMAL(38,2)) "jun_sales_per_sq_foot"
+-, CAST("sum"(("jul_sales" / "w_warehouse_sq_ft")) AS DECIMAL(38,2)) "jul_sales_per_sq_foot"
+-, CAST("sum"(("aug_sales" / "w_warehouse_sq_ft")) AS DECIMAL(38,2)) "aug_sales_per_sq_foot"
+-, CAST("sum"(("sep_sales" / "w_warehouse_sq_ft")) AS DECIMAL(38,2)) "sep_sales_per_sq_foot"
+-, CAST("sum"(("oct_sales" / "w_warehouse_sq_ft")) AS DECIMAL(38,2)) "oct_sales_per_sq_foot"
+-, CAST("sum"(("nov_sales" / "w_warehouse_sq_ft")) AS DECIMAL(38,2)) "nov_sales_per_sq_foot"
+-, CAST("sum"(("dec_sales" / "w_warehouse_sq_ft")) AS DECIMAL(38,2)) "dec_sales_per_sq_foot"
++, "sum"(("jan_sales" / "w_warehouse_sq_ft")) "jan_sales_per_sq_foot"
++, "sum"(("feb_sales" / "w_warehouse_sq_ft")) "feb_sales_per_sq_foot"
++, "sum"(("mar_sales" / "w_warehouse_sq_ft")) "mar_sales_per_sq_foot"
++, "sum"(("apr_sales" / "w_warehouse_sq_ft")) "apr_sales_per_sq_foot"
++, "sum"(("may_sales" / "w_warehouse_sq_ft")) "may_sales_per_sq_foot"
++, "sum"(("jun_sales" / "w_warehouse_sq_ft")) "jun_sales_per_sq_foot"
++, "sum"(("jul_sales" / "w_warehouse_sq_ft")) "jul_sales_per_sq_foot"
++, "sum"(("aug_sales" / "w_warehouse_sq_ft")) "aug_sales_per_sq_foot"
++, "sum"(("sep_sales" / "w_warehouse_sq_ft")) "sep_sales_per_sq_foot"
++, "sum"(("oct_sales" / "w_warehouse_sq_ft")) "oct_sales_per_sq_foot"
++, "sum"(("nov_sales" / "w_warehouse_sq_ft")) "nov_sales_per_sq_foot"
++, "sum"(("dec_sales" / "w_warehouse_sq_ft")) "dec_sales_per_sq_foot"
+ , "sum"("jan_net") "jan_net"
+ , "sum"("feb_net") "feb_net"
+ , "sum"("mar_net") "mar_net"
+diff --git a/trino-connector/integration-test/src/test/resources/trino-ci-testset/testsets/tpcds/00066.txt b/trino-connector/integration-test/src/test/resources/trino-ci-testset/testsets/tpcds/00066.txt
+index fd045292e..813eb8a07 100644
+--- a/trino-connector/integration-test/src/test/resources/trino-ci-testset/testsets/tpcds/00066.txt
++++ b/trino-connector/integration-test/src/test/resources/trino-ci-testset/testsets/tpcds/00066.txt
+@@ -1 +1 @@
+-"Conventional childr","977787","Midway","Williamson County","TN","United States","DHL,BARIAN","2001","661407.18","766942.78","307720.05","333390.59","1904937.34","2308974.68","1310866.26","2298210.15","1497771.61","2900278.47","5213564.64","2706805.34","0.68","0.78","0.31","0.34","1.95","2.36","1.34","2.35","1.53","2.97","5.33","2.77","7554063.29","8213766.03","7574329.97","4142886.32","3575413.31","4126236.48","5015953.55","9665997.01","10823343.90","13418884.62","23331407.18","19502364.49"
+\ No newline at end of file
++"Conventional childr","977787","Midway","Williamson County","TN","United States","DHL,BARIAN","2001","661407.18","766942.78","307720.05","333390.59","1904937.34","2308974.68","1310866.26","2298210.15","1497771.61","2900278.47","5213564.64","2706805.34","0.68","0.78","0.32","0.35","1.94","2.36","1.34","2.35","1.53","2.97","5.33","2.77","7554063.29","8213766.03","7574329.97","4142886.32","3575413.31","4126236.48","5015953.55","9665997.01","10823343.90","13418884.62","23331407.18","19502364.49"
+\ No newline at end of file
+diff --git a/trino-connector/integration-test/src/test/resources/trino-ci-testset/testsets/tpcds/00075.sql b/trino-connector/integration-test/src/test/resources/trino-ci-testset/testsets/tpcds/00075.sql
+index abc085c9e..33017f9fd 100644
+--- a/trino-connector/integration-test/src/test/resources/trino-ci-testset/testsets/tpcds/00075.sql
++++ b/trino-connector/integration-test/src/test/resources/trino-ci-testset/testsets/tpcds/00075.sql
+@@ -78,7 +78,7 @@ WHERE ("curr_yr"."i_brand_id" = "prev_yr"."i_brand_id")
+    AND ("curr_yr"."i_manufact_id" = "prev_yr"."i_manufact_id")
+    AND ("curr_yr"."d_year" = 2002)
+    AND ("prev_yr"."d_year" = (2002 - 1))
+-   AND ((CAST((CAST("curr_yr"."sales_cnt" AS DECIMAL(17,2)) / CAST("prev_yr"."sales_cnt" AS DECIMAL(17,2))) AS DECIMAL(17,2))) < DECIMAL '0.9')
++   AND ((CAST("curr_yr"."sales_cnt" AS DECIMAL(17,2)) / CAST("prev_yr"."sales_cnt" AS DECIMAL(17,2))) < DECIMAL '0.9')
+ ORDER BY "sales_cnt_diff" ASC, "sales_amt_diff" ASC
+ LIMIT 100
+ ;
+\ No newline at end of file
+diff --git a/trino-connector/integration-test/src/test/resources/trino-ci-testset/testsets/tpcds/00078.sql b/trino-connector/integration-test/src/test/resources/trino-ci-testset/testsets/tpcds/00078.sql
+index 0c455627b..c3fdb2a26 100644
+--- a/trino-connector/integration-test/src/test/resources/trino-ci-testset/testsets/tpcds/00078.sql
++++ b/trino-connector/integration-test/src/test/resources/trino-ci-testset/testsets/tpcds/00078.sql
+@@ -51,7 +51,7 @@ SELECT
+   "ss_sold_year"
+ , "ss_item_sk"
+ , "ss_customer_sk"
+-, CAST((CAST("ss_qty" AS DECIMAL(10,2)) / COALESCE(("ws_qty" + "cs_qty"), 1)) AS DECIMAL(38, 2)) "ratio"
++, "round"((CAST("ss_qty" AS DECIMAL(10,2)) / COALESCE(("ws_qty" + "cs_qty"), 1)), 2) "ratio"
+ , "ss_qty" "store_qty"
+ , "ss_wc" "store_wholesale_cost"
+ , "ss_sp" "store_sales_price"
+diff --git a/trino-connector/integration-test/src/test/resources/trino-ci-testset/testsets/tpcds/00089.sql b/trino-connector/integration-test/src/test/resources/trino-ci-testset/testsets/tpcds/00089.sql
+index bbc16a21b..934b8cdf0 100644
+--- a/trino-connector/integration-test/src/test/resources/trino-ci-testset/testsets/tpcds/00089.sql
++++ b/trino-connector/integration-test/src/test/resources/trino-ci-testset/testsets/tpcds/00089.sql
+@@ -25,7 +25,7 @@ FROM
+             AND ("i_class" IN ('shirts'         , 'birdal'         , 'dresses'))))
+    GROUP BY "i_category", "i_class", "i_brand", "s_store_name", "s_company_name", "d_moy"
+ )  tmp1
+-WHERE ((CASE WHEN ("avg_monthly_sales" <> 0) THEN CAST(("abs"(("sum_sales" - "avg_monthly_sales")) / "avg_monthly_sales") AS DECIMAL(38,2)) ELSE null END) > DECIMAL '0.1')
++WHERE ((CASE WHEN ("avg_monthly_sales" <> 0) THEN ("abs"(("sum_sales" - "avg_monthly_sales")) / "avg_monthly_sales") ELSE null END) > DECIMAL '0.1')
+ ORDER BY ("sum_sales" - "avg_monthly_sales") ASC, "s_store_name" ASC
+ LIMIT 100
+ ;
+\ No newline at end of file
+diff --git a/trino-connector/integration-test/src/test/resources/trino-ci-testset/testsets/tpcds/00090.sql b/trino-connector/integration-test/src/test/resources/trino-ci-testset/testsets/tpcds/00090.sql
+index edcb1d548..106349bf3 100644
+--- a/trino-connector/integration-test/src/test/resources/trino-ci-testset/testsets/tpcds/00090.sql
++++ b/trino-connector/integration-test/src/test/resources/trino-ci-testset/testsets/tpcds/00090.sql
+@@ -1,4 +1,4 @@
+-SELECT CAST((CAST("amc" AS DECIMAL(15,4)) / CAST("pmc" + 0.001 AS DECIMAL(15,4))) AS DECIMAL(15,4)) "am_pm_ratio"
++SELECT (CAST("amc" AS DECIMAL(15,4)) / CAST("pmc" + 0.001 AS DECIMAL(15,4))) "am_pm_ratio"
+ FROM
+   (
+    SELECT "count"(*) "amc"
+diff --git a/trino-connector/integration-test/src/test/resources/trino-ci-testset/testsets/tpcds/00098.sql b/trino-connector/integration-test/src/test/resources/trino-ci-testset/testsets/tpcds/00098.sql
+index 10e47d07e..72ddd155e 100644
+--- a/trino-connector/integration-test/src/test/resources/trino-ci-testset/testsets/tpcds/00098.sql
++++ b/trino-connector/integration-test/src/test/resources/trino-ci-testset/testsets/tpcds/00098.sql
+@@ -5,7 +5,7 @@ SELECT
+ , "i_class"
+ , "i_current_price"
+ , "sum"("ss_ext_sales_price") "itemrevenue"
+-, CAST((("sum"("ss_ext_sales_price") * 100) / "sum"("sum"("ss_ext_sales_price")) OVER (PARTITION BY "i_class")) AS DECIMAL(38, 2)) "revenueratio"
++, (("sum"("ss_ext_sales_price") * 100) / "sum"("sum"("ss_ext_sales_price")) OVER (PARTITION BY "i_class")) "revenueratio"
+ FROM
+   store_sales
+ , item
+diff --git a/trino-connector/integration-test/src/test/resources/trino-ci-testset/testsets/tpch/00008.sql b/trino-connector/integration-test/src/test/resources/trino-ci-testset/testsets/tpch/00008.sql
+index 11b768749..ea3b1fa72 100644
+--- a/trino-connector/integration-test/src/test/resources/trino-ci-testset/testsets/tpch/00008.sql
++++ b/trino-connector/integration-test/src/test/resources/trino-ci-testset/testsets/tpch/00008.sql
+@@ -1,10 +1,10 @@
+ SELECT
+   o_year,
+-  CAST((sum(CASE
++  sum(CASE
+       WHEN nation = 'BRAZIL'
+         THEN volume
+       ELSE 0
+-      END) / sum(volume)) AS DECIMAL(38, 2)) AS mkt_share
++      END) / sum(volume) AS mkt_share
+ FROM (
+        SELECT
+          extract(YEAR FROM o.orderdate)     AS o_year,
+diff --git a/trino-connector/integration-test/src/test/resources/trino-ci-testset/testsets/tpch/00008.txt b/trino-connector/integration-test/src/test/resources/trino-ci-testset/testsets/tpch/00008.txt
+index cdea0396b..8be6da155 100644
+--- a/trino-connector/integration-test/src/test/resources/trino-ci-testset/testsets/tpch/00008.txt
++++ b/trino-connector/integration-test/src/test/resources/trino-ci-testset/testsets/tpch/00008.txt
+@@ -1,2 +1,2 @@
+-"1995","0.00"
+-"1996","0.00"
+\ No newline at end of file
++"1995","0.0000"
++"1996","0.0000"
+\ No newline at end of file
+diff --git a/trino-connector/integration-test/src/test/resources/trino-ci-testset/testsets/tpch/00017.sql b/trino-connector/integration-test/src/test/resources/trino-ci-testset/testsets/tpch/00017.sql
+index d712f45bb..7150e90ec 100644
+--- a/trino-connector/integration-test/src/test/resources/trino-ci-testset/testsets/tpch/00017.sql
++++ b/trino-connector/integration-test/src/test/resources/trino-ci-testset/testsets/tpch/00017.sql
+@@ -1,5 +1,5 @@
+ SELECT
+-  CAST(sum(l.extendedprice)/7.0 AS DECIMAL(38, 2)) as avg_yearly
++  sum(l.extendedprice)/7.0 as avg_yearly
+ FROM
+   lineitem l,
+   part p
+diff --git a/trino-connector/integration-test/src/test/resources/trino-ci-testset/testsets/tpch/catalog_hive_prepare.sql b/trino-connector/integration-test/src/test/resources/trino-ci-testset/testsets/tpch/catalog_hive_prepare.sql
+index 2a35d4340..2fb4294af 100644
+--- a/trino-connector/integration-test/src/test/resources/trino-ci-testset/testsets/tpch/catalog_hive_prepare.sql
++++ b/trino-connector/integration-test/src/test/resources/trino-ci-testset/testsets/tpch/catalog_hive_prepare.sql
+@@ -2,8 +2,8 @@ call gravitino.system.create_catalog(
+     'gt_hive2',
+     'hive',
+     map(
+-        array['metastore.uris', 'trino.bypass.fs.hadoop.enabled'],
+-        array['${hive_uri}', 'true']
++        array['metastore.uris'],
++        array['${hive_uri}']
+     )
+ );
+ 
+diff --git a/trino-connector/integration-test/src/test/resources/trino-ci-testset/testsets/tpch/catalog_iceberg_prepare.sql b/trino-connector/integration-test/src/test/resources/trino-ci-testset/testsets/tpch/catalog_iceberg_prepare.sql
+index 22826aa98..a5a0669f8 100644
+--- a/trino-connector/integration-test/src/test/resources/trino-ci-testset/testsets/tpch/catalog_iceberg_prepare.sql
++++ b/trino-connector/integration-test/src/test/resources/trino-ci-testset/testsets/tpch/catalog_iceberg_prepare.sql
+@@ -2,8 +2,8 @@ call gravitino.system.create_catalog(
+     'gt_iceberg2',
+     'lakehouse-iceberg',
+     map(
+-        array['uri', 'catalog-backend', 'warehouse', 'trino.bypass.fs.hadoop.enabled'],
+-        array['${hive_uri}', 'hive', '${hdfs_uri}/user/iceberg/warehouse/TrinoQueryIT', 'true']
++        array['uri', 'catalog-backend', 'warehouse'],
++        array['${hive_uri}', 'hive', '${hdfs_uri}/user/iceberg/warehouse/TrinoQueryIT']
+     )
+ );
+ 
+diff --git a/trino-connector/integration-test/src/test/resources/trino-ci-testset/testsets/hive/00008_decimal.sql b/trino-connector/integration-test/src/test/resources/trino-ci-testset/testsets/hive/00008_decimal.sql
+index 46cf682b1..4d3fcb5d2 100644
+--- a/trino-connector/integration-test/src/test/resources/trino-ci-testset/testsets/hive/00008_decimal.sql
++++ b/trino-connector/integration-test/src/test/resources/trino-ci-testset/testsets/hive/00008_decimal.sql
+@@ -26,7 +26,7 @@ SELECT val1 + val2 FROM tb03;
+ 
+ SELECT val1 * val2 FROM tb03;
+ 
+-SELECT CAST(val1 / val2 AS DECIMAL(38, 2)) FROM tb03;
++SELECT val1 / val2 FROM tb03;
+ 
+ CREATE TABLE tb04 (max_min_val DECIMAL(18, 4));
+ 

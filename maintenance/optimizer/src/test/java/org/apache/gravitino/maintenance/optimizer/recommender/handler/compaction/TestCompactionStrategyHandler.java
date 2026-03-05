@@ -241,6 +241,162 @@ class TestCompactionStrategyHandler {
     Assertions.assertEquals(midPartition, selected.get(1), "Second highest score expected");
   }
 
+  @Test
+  void testEvaluateFiltersOutNonMatchedPartitions() {
+    NameIdentifier tableId = NameIdentifier.of("db", "table");
+    Table tableMetadata = Mockito.mock(Table.class);
+    Mockito.when(tableMetadata.partitioning())
+        .thenReturn(
+            new org.apache.gravitino.rel.expressions.transforms.Transform[] {
+              Transforms.identity("p")
+            });
+    Mockito.when(tableMetadata.columns()).thenReturn(new Column[0]);
+
+    PartitionPath partition1 = PartitionPath.of(Arrays.asList(new PartitionEntryImpl("p", "1")));
+    PartitionPath partition2 = PartitionPath.of(Arrays.asList(new PartitionEntryImpl("p", "2")));
+    PartitionPath partition3 = PartitionPath.of(Arrays.asList(new PartitionEntryImpl("p", "3")));
+    PartitionPath partition4 = PartitionPath.of(Arrays.asList(new PartitionEntryImpl("p", "4")));
+    PartitionPath partition5 = PartitionPath.of(Arrays.asList(new PartitionEntryImpl("p", "5")));
+    PartitionPath partition6 = PartitionPath.of(Arrays.asList(new PartitionEntryImpl("p", "6")));
+
+    Map<PartitionPath, List<StatisticEntry<?>>> partitionStats =
+        Map.of(
+            partition1,
+            List.of(
+                new StatisticEntryImpl("datafile_mse", StatisticValues.longValue(0L)),
+                new StatisticEntryImpl("delete_file_num", StatisticValues.longValue(1L))),
+            partition2,
+            List.of(
+                new StatisticEntryImpl("datafile_mse", StatisticValues.longValue(10L)),
+                new StatisticEntryImpl("delete_file_num", StatisticValues.longValue(1L))),
+            partition3,
+            List.of(
+                new StatisticEntryImpl("datafile_mse", StatisticValues.longValue(999L)),
+                new StatisticEntryImpl("delete_file_num", StatisticValues.longValue(1L))),
+            partition4,
+            List.of(
+                new StatisticEntryImpl("datafile_mse", StatisticValues.longValue(1000L)),
+                new StatisticEntryImpl("delete_file_num", StatisticValues.longValue(5L))),
+            partition5,
+            List.of(
+                new StatisticEntryImpl("datafile_mse", StatisticValues.longValue(1001L)),
+                new StatisticEntryImpl("delete_file_num", StatisticValues.longValue(3L))),
+            partition6,
+            List.of(
+                new StatisticEntryImpl("datafile_mse", StatisticValues.longValue(1100L)),
+                new StatisticEntryImpl("delete_file_num", StatisticValues.longValue(6L))));
+
+    StrategyHandlerContext context =
+        StrategyHandlerContext.builder(tableId, strategy)
+            .withTableMetadata(tableMetadata)
+            .withTableStatistics(List.of())
+            .withPartitionStatistics(partitionStats)
+            .build();
+
+    CompactionStrategyHandler handler = new CompactionStrategyHandler();
+    handler.initialize(context);
+    StrategyEvaluation evaluation = handler.evaluate();
+
+    CompactionJobContext jobContext =
+        (CompactionJobContext) evaluation.jobExecutionContext().orElseThrow();
+    List<PartitionPath> selected = jobContext.getPartitions();
+
+    Assertions.assertEquals(
+        2, selected.size(), "Only partitions with datafile_mse > 1000 should be included");
+    Assertions.assertTrue(
+        selected.contains(partition5), "Partition with datafile_mse=1001 should be included");
+    Assertions.assertTrue(
+        selected.contains(partition6), "Partition with datafile_mse=1100 should be included");
+    Assertions.assertFalse(
+        selected.contains(partition1), "Partition with datafile_mse=0 should be filtered out");
+    Assertions.assertFalse(
+        selected.contains(partition2), "Partition with datafile_mse=10 should be filtered out");
+    Assertions.assertFalse(
+        selected.contains(partition3), "Partition with datafile_mse=999 should be filtered out");
+    Assertions.assertFalse(
+        selected.contains(partition4), "Partition with datafile_mse=1000 should be filtered out");
+  }
+
+  @Test
+  void testEvaluateWithNoMatchingPartitions() {
+    NameIdentifier tableId = NameIdentifier.of("db", "table");
+    Table tableMetadata = Mockito.mock(Table.class);
+    Mockito.when(tableMetadata.partitioning())
+        .thenReturn(
+            new org.apache.gravitino.rel.expressions.transforms.Transform[] {
+              Transforms.identity("p")
+            });
+    Mockito.when(tableMetadata.columns()).thenReturn(new Column[0]);
+
+    PartitionPath partition1 = PartitionPath.of(Arrays.asList(new PartitionEntryImpl("p", "1")));
+    PartitionPath partition2 = PartitionPath.of(Arrays.asList(new PartitionEntryImpl("p", "2")));
+    PartitionPath partition3 = PartitionPath.of(Arrays.asList(new PartitionEntryImpl("p", "3")));
+    PartitionPath partition4 = PartitionPath.of(Arrays.asList(new PartitionEntryImpl("p", "4")));
+
+    Map<PartitionPath, List<StatisticEntry<?>>> partitionStats =
+        Map.of(
+            partition1,
+            List.of(
+                new StatisticEntryImpl("datafile_mse", StatisticValues.longValue(0L)),
+                new StatisticEntryImpl("delete_file_num", StatisticValues.longValue(1L))),
+            partition2,
+            List.of(
+                new StatisticEntryImpl("datafile_mse", StatisticValues.longValue(10L)),
+                new StatisticEntryImpl("delete_file_num", StatisticValues.longValue(2L))),
+            partition3,
+            List.of(
+                new StatisticEntryImpl("datafile_mse", StatisticValues.longValue(500L)),
+                new StatisticEntryImpl("delete_file_num", StatisticValues.longValue(3L))),
+            partition4,
+            List.of(
+                new StatisticEntryImpl("datafile_mse", StatisticValues.longValue(1000L)),
+                new StatisticEntryImpl("delete_file_num", StatisticValues.longValue(4L))));
+
+    StrategyHandlerContext context =
+        StrategyHandlerContext.builder(tableId, strategy)
+            .withTableMetadata(tableMetadata)
+            .withTableStatistics(List.of())
+            .withPartitionStatistics(partitionStats)
+            .build();
+
+    CompactionStrategyHandler handler = new CompactionStrategyHandler();
+    handler.initialize(context);
+    StrategyEvaluation evaluation = handler.evaluate();
+
+    Assertions.assertTrue(
+        evaluation.jobExecutionContext().isEmpty(),
+        "No job context should be created for partitioned table with no partitions");
+  }
+
+  @Test
+  void testEvaluatePartitionedTableWithNoPartitions() {
+    NameIdentifier tableId = NameIdentifier.of("db", "table");
+    Table tableMetadata = Mockito.mock(Table.class);
+    Mockito.when(tableMetadata.partitioning())
+        .thenReturn(
+            new org.apache.gravitino.rel.expressions.transforms.Transform[] {
+              Transforms.identity("p")
+            });
+    Mockito.when(tableMetadata.columns()).thenReturn(new Column[0]);
+
+    Map<PartitionPath, List<StatisticEntry<?>>> emptyPartitionStats = Map.of();
+
+    StrategyHandlerContext context =
+        StrategyHandlerContext.builder(tableId, strategy)
+            .withTableMetadata(tableMetadata)
+            .withTableStatistics(List.of())
+            .withPartitionStatistics(emptyPartitionStats)
+            .build();
+
+    CompactionStrategyHandler handler = new CompactionStrategyHandler();
+    handler.initialize(context);
+    StrategyEvaluation evaluation = handler.evaluate();
+
+    Assertions.assertTrue(
+        evaluation.jobExecutionContext().isEmpty(),
+        "No job context should be created for partitioned table with no partitions");
+  }
+
   private long evaluatePartitionScore(
       NameIdentifier tableId,
       Table tableMetadata,

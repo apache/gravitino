@@ -598,6 +598,30 @@ subprojects {
       initTest(this)
     }
 
+    val testTaskStartTimeMsKey = "testTaskStartTimeMs"
+    doFirst {
+      extensions.extraProperties[testTaskStartTimeMsKey] = System.currentTimeMillis()
+      logger.lifecycle(
+        "[TEST-TIMING] START module={} task={} at={}",
+        project.path,
+        path,
+        extensions.extraProperties[testTaskStartTimeMsKey]
+      )
+    }
+
+    doLast {
+      val endTimeMs = System.currentTimeMillis()
+      val startTimeMs = extensions.extraProperties[testTaskStartTimeMsKey] as? Long ?: endTimeMs
+      logger.lifecycle(
+        "[TEST-TIMING] END module={} task={} startMs={} endMs={} durationMs={}",
+        project.path,
+        path,
+        startTimeMs,
+        endTimeMs,
+        endTimeMs - startTimeMs
+      )
+    }
+
     testLogging {
       exceptionFormat = TestExceptionFormat.FULL
       showExceptions = true
@@ -903,7 +927,7 @@ tasks {
   }
 
   val compileTrinoConnector by registering {
-    dependsOn("trino-connector:trino-connector-469-472:copyLibs")
+    dependsOn("trino-connector:trino-connector-473-478:copyLibs")
     group = "gravitino distribution"
   }
 
@@ -914,6 +938,7 @@ tasks {
       ":trino-connector:trino-connector-446-451:assembleTrinoConnector",
       ":trino-connector:trino-connector-452-468:assembleTrinoConnector",
       ":trino-connector:trino-connector-469-472:assembleTrinoConnector",
+      ":trino-connector:trino-connector-473-478:assembleTrinoConnector",
       "assembleIcebergRESTServer",
       "assembleLanceRESTServer"
     )

@@ -403,7 +403,7 @@ public class CaffeineEntityCache extends BaseEntityCache {
     }
 
     if (cacheConfig.get(Configs.CACHE_EXPIRATION_TIME) > 0) {
-      builder.expireAfterWrite(
+      builder.expireAfterAccess(
           cacheConfig.get(Configs.CACHE_EXPIRATION_TIME), TimeUnit.MILLISECONDS);
     }
 

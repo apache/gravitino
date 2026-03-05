@@ -24,14 +24,14 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
 import java.util.Map;
-import java.util.Optional;
 import org.apache.gravitino.NameIdentifier;
+import org.apache.gravitino.maintenance.optimizer.api.common.DataScope;
+import org.apache.gravitino.maintenance.optimizer.api.common.MetricPoint;
 import org.apache.gravitino.maintenance.optimizer.common.conf.OptimizerConfig;
 import org.apache.gravitino.maintenance.optimizer.updater.metrics.storage.BaseGenericJdbcMetricsRepositoryTest;
 import org.apache.gravitino.maintenance.optimizer.updater.metrics.storage.MetricRecord;
-import org.apache.gravitino.maintenance.optimizer.updater.metrics.storage.MetricRecordImpl;
-import org.apache.gravitino.maintenance.optimizer.updater.metrics.storage.TableMetricWriteRequest;
 import org.apache.gravitino.maintenance.optimizer.updater.metrics.storage.jdbc.GenericJdbcMetricsRepository;
+import org.apache.gravitino.stats.StatisticValues;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
@@ -88,13 +88,13 @@ class TestH2GenericJdbcMetricsRepositoryIT extends BaseGenericJdbcMetricsReposit
     try {
       NameIdentifier tableId = NameIdentifier.of("catalog", "db", "auto_create_table");
       long now = currentEpochSeconds();
-      repository.storeTableMetrics(
+      repository.storeTableAndPartitionMetrics(
           List.of(
-              new TableMetricWriteRequest(
-                  tableId, "row_count", Optional.empty(), new MetricRecordImpl(now, "12"))));
+              MetricPoint.forTable(tableId, "row_count", StatisticValues.stringValue("12"), now)));
 
       Map<String, List<MetricRecord>> metrics =
-          repository.getTableMetrics(tableId, now - 1, now + 1);
+          convertToMetricRecords(
+              repository.getMetrics(DataScope.forTable(tableId), now - 1, now + 1));
       Assertions.assertTrue(metrics.containsKey("row_count"));
       Assertions.assertEquals(List.of("12"), getMetricValues(metrics.get("row_count")));
     } finally {

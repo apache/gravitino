@@ -33,6 +33,7 @@ import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Lists;
 import java.io.File;
 import java.io.IOException;
+import java.nio.file.Path;
 import java.time.Instant;
 import java.util.Collections;
 import java.util.List;
@@ -898,5 +899,18 @@ public class TestJobManager {
         .withAuditInfo(
             AuditInfo.builder().withCreator("test").withCreateTime(Instant.now()).build())
         .build();
+  }
+
+  @Test
+  public void testFetchFileFromUriWithMissingLocalFileShouldFail() throws IOException {
+    File stagingDir = new File(testStagingDir);
+    Assertions.assertTrue(stagingDir.mkdirs() || stagingDir.exists());
+
+    Path missingFilePath =
+        Path.of(System.getProperty("java.io.tmpdir"), "missing-job-file-" + UUID.randomUUID());
+    String uri = missingFilePath.toUri().toString();
+
+    Assertions.assertThrows(
+        RuntimeException.class, () -> JobManager.fetchFileFromUri(uri, stagingDir, 1000));
   }
 }
