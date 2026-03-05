@@ -307,7 +307,7 @@ export const providerBase = {
         key: 'jdbc-driver',
         value: '',
         required: true,
-        description: 'e.g. com.clickhouse.ClickHouseDriver'
+        description: 'e.g. com.clickhouse.jdbc.ClickHouseDriver'
       },
       {
         label: 'JDBC User',
