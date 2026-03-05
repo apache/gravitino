@@ -39,20 +39,10 @@ const PropertiesContent = ({ properties, dataReferPrefix, contentDataRefer }) =>
 
           return (
             <div key={`prop-row-${key}`} className='grid grid-cols-2 border-t border-gray-100'>
-              <span
-                className='block min-w-24 max-w-60 truncate p-1 leading-6'
-                title={key}
-                key={`prop-key-${key}`}
-                {...keyProps(key)}
-              >
+              <span className='block min-w-24 max-w-60 truncate p-1 leading-6' title={key} {...keyProps(key)}>
                 {key}
               </span>
-              <span
-                className='block min-w-24 max-w-60 truncate p-1 leading-6'
-                title={safeValue}
-                key={`prop-val-${key}`}
-                {...valueProps(key)}
-              >
+              <span className='block min-w-24 max-w-60 truncate p-1 leading-6' title={safeValue} {...valueProps(key)}>
                 {safeValue}
               </span>
             </div>
