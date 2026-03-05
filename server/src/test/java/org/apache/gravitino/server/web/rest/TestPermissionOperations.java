@@ -812,4 +812,66 @@ public class TestPermissionOperations extends BaseOperationsTest {
     Assertions.assertEquals(ErrorConstants.INTERNAL_ERROR_CODE, errorResponse2.getCode());
     Assertions.assertEquals(RuntimeException.class.getSimpleName(), errorResponse2.getType());
   }
+
+  @Test
+  public void testGrantRolesToUserWithNullRequest() throws Exception {
+    Mockito.reset(entityStore);
+    BaseMetalake metalake = mock(BaseMetalake.class);
+    PropertiesMetadata propertiesMetadata = mock(PropertiesMetadata.class);
+    when(propertiesMetadata.getOrDefault(any(), any())).thenReturn(true);
+    when(metalake.propertiesMetadata()).thenReturn(propertiesMetadata);
+    when(entityStore.get(any(), any(), any())).thenReturn(metalake);
+
+    PermissionOperations operations = new PermissionOperations();
+    HttpServletRequest request = mock(HttpServletRequest.class);
+    when(request.getAttribute(any())).thenReturn(null);
+    FieldUtils.writeField(operations, "httpRequest", request, true);
+
+    Response response = operations.grantRolesToUser("metalake1", "user1", null);
+    Assertions.assertEquals(
+        Response.Status.INTERNAL_SERVER_ERROR.getStatusCode(), response.getStatus());
+  }
+
+  @Test
+  public void testGrantRolesToGroupWithNullRequest() throws Exception {
+    Mockito.reset(entityStore);
+    BaseMetalake metalake = mock(BaseMetalake.class);
+    PropertiesMetadata propertiesMetadata = mock(PropertiesMetadata.class);
+    when(propertiesMetadata.getOrDefault(any(), any())).thenReturn(true);
+    when(metalake.propertiesMetadata()).thenReturn(propertiesMetadata);
+    when(entityStore.get(any(), any(), any())).thenReturn(metalake);
+
+    PermissionOperations operations = new PermissionOperations();
+    HttpServletRequest request = mock(HttpServletRequest.class);
+    when(request.getAttribute(any())).thenReturn(null);
+    FieldUtils.writeField(operations, "httpRequest", request, true);
+
+    Response response = operations.grantRolesToGroup("metalake1", "group1", null);
+    Assertions.assertEquals(
+        Response.Status.INTERNAL_SERVER_ERROR.getStatusCode(), response.getStatus());
+  }
+
+  @Test
+  public void testRevokeRolesFromUserWithNullRequest() throws Exception {
+    PermissionOperations operations = new PermissionOperations();
+    HttpServletRequest request = mock(HttpServletRequest.class);
+    when(request.getAttribute(any())).thenReturn(null);
+    FieldUtils.writeField(operations, "httpRequest", request, true);
+
+    Response response = operations.revokeRolesFromUser("metalake1", "user1", null);
+    Assertions.assertEquals(
+        Response.Status.INTERNAL_SERVER_ERROR.getStatusCode(), response.getStatus());
+  }
+
+  @Test
+  public void testRevokeRolesFromGroupWithNullRequest() throws Exception {
+    PermissionOperations operations = new PermissionOperations();
+    HttpServletRequest request = mock(HttpServletRequest.class);
+    when(request.getAttribute(any())).thenReturn(null);
+    FieldUtils.writeField(operations, "httpRequest", request, true);
+
+    Response response = operations.revokeRolesFromGroup("metalake1", "group1", null);
+    Assertions.assertEquals(
+        Response.Status.INTERNAL_SERVER_ERROR.getStatusCode(), response.getStatus());
+  }
 }
