@@ -34,6 +34,7 @@ import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Lists;
 import java.io.File;
 import java.io.IOException;
+import java.nio.file.Path;
 import java.time.Instant;
 import java.util.Collections;
 import java.util.List;
@@ -1021,5 +1022,18 @@ public class TestJobManager {
     Assertions.assertFalse(JobManager.isEmptyValue("value"));
     Assertions.assertFalse(JobManager.isEmptyValue("0"));
     Assertions.assertFalse(JobManager.isEmptyValue("false"));
+  }
+
+  @Test
+  public void testFetchFileFromUriWithMissingLocalFileShouldFail() throws IOException {
+    File stagingDir = new File(testStagingDir);
+    Assertions.assertTrue(stagingDir.mkdirs() || stagingDir.exists());
+
+    Path missingFilePath =
+        Path.of(System.getProperty("java.io.tmpdir"), "missing-job-file-" + UUID.randomUUID());
+    String uri = missingFilePath.toUri().toString();
+
+    Assertions.assertThrows(
+        RuntimeException.class, () -> JobManager.fetchFileFromUri(uri, stagingDir, 1000));
   }
 }
