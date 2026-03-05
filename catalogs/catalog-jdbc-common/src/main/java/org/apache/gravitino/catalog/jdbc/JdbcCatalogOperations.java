@@ -206,7 +206,7 @@ public class JdbcCatalogOperations implements CatalogOperations, SupportsSchemas
       if (driver != null) {
         deregisterDriver(driver);
       }
-    } catch (Exception e) {
+    } catch (SQLException e) {
       LOG.warn("Failed to deregister JDBC driver", e);
     }
   }
