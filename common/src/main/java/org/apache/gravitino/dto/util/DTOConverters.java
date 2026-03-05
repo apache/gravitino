@@ -20,7 +20,6 @@ package org.apache.gravitino.dto.util;
 
 import static org.apache.gravitino.rel.expressions.transforms.Transforms.NAME_OF_IDENTITY;
 
-import com.google.common.base.Preconditions;
 import java.util.Arrays;
 import java.util.Map;
 import java.util.Optional;
@@ -1315,20 +1314,15 @@ public class DTOConverters {
       PolicyContentDTO.IcebergCompactionContentDTO icebergCompactionContentDTO =
           (PolicyContentDTO.IcebergCompactionContentDTO) policyContentDTO;
       return PolicyContents.icebergCompaction(
-          require(icebergCompactionContentDTO.minDataFileMse(), "minDataFileMse"),
-          require(icebergCompactionContentDTO.minDeleteFileNumber(), "minDeleteFileNumber"),
-          require(icebergCompactionContentDTO.dataFileMseWeight(), "dataFileMseWeight"),
-          require(icebergCompactionContentDTO.deleteFileNumberWeight(), "deleteFileNumberWeight"),
-          require(icebergCompactionContentDTO.maxPartitionNum(), "maxPartitionNum"),
+          icebergCompactionContentDTO.minDataFileMse(),
+          icebergCompactionContentDTO.minDeleteFileNumber(),
+          icebergCompactionContentDTO.dataFileMseWeight(),
+          icebergCompactionContentDTO.deleteFileNumberWeight(),
+          icebergCompactionContentDTO.maxPartitionNum(),
           icebergCompactionContentDTO.rewriteOptions());
     }
 
     throw new IllegalArgumentException(
         "Unsupported policy content type: " + policyContentDTO.getClass());
-  }
-
-  private static long require(Long value, String fieldName) {
-    Preconditions.checkArgument(value != null, "%s must not be null", fieldName);
-    return value;
   }
 }

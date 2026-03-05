@@ -28,6 +28,24 @@ import org.junit.jupiter.api.Test;
 public class TestPolicyContents {
 
   @Test
+  void testIcebergCompactionContentUsesDefaults() {
+    IcebergCompactionContent content =
+        (IcebergCompactionContent) PolicyContents.icebergCompaction();
+
+    Assertions.assertEquals(
+        IcebergCompactionContent.DEFAULT_MIN_DATA_FILE_MSE, content.rules().get("minDataFileMse"));
+    Assertions.assertEquals(
+        IcebergCompactionContent.DEFAULT_MIN_DELETE_FILE_NUMBER,
+        content.rules().get("minDeleteFileNumber"));
+    Assertions.assertEquals(1L, content.rules().get("dataFileMseWeight"));
+    Assertions.assertEquals(100L, content.rules().get("deleteFileNumberWeight"));
+    Assertions.assertEquals(50L, content.rules().get("max_partition_num"));
+    Assertions.assertNull(content.rules().get("job.options.target-file-size-bytes"));
+    Assertions.assertNull(content.rules().get("job.options.min-input-files"));
+    Assertions.assertNull(content.rules().get("job.options.delete-file-threshold"));
+  }
+
+  @Test
   void testIcebergCompactionContentGeneratesOptimizerFields() {
     IcebergCompactionContent content =
         (IcebergCompactionContent)
@@ -41,9 +59,9 @@ public class TestPolicyContents {
     Assertions.assertEquals(1L, content.rules().get("minDeleteFileNumber"));
     Assertions.assertEquals(1L, content.rules().get("dataFileMseWeight"));
     Assertions.assertEquals(100L, content.rules().get("deleteFileNumberWeight"));
-    Assertions.assertEquals(100L, content.rules().get("max_partition_num"));
+    Assertions.assertEquals(50L, content.rules().get("max_partition_num"));
     Assertions.assertEquals(
-        "custom-data-file-mse > minDataFileMse || custom-delete-file-number > minDeleteFileNumber",
+        "custom-data-file-mse >= minDataFileMse || custom-delete-file-number >= minDeleteFileNumber",
         content.rules().get("trigger-expr"));
     Assertions.assertEquals(
         "custom-data-file-mse * dataFileMseWeight"

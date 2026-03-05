@@ -26,6 +26,7 @@ import java.util.Optional;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.dto.AuditDTO;
 import org.apache.gravitino.json.JsonUtils;
+import org.apache.gravitino.policy.IcebergCompactionContent;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
@@ -144,5 +145,35 @@ public class TestPolicyDTO {
         JsonUtils.objectMapper().readValue(prefixedTypeJson, PolicyDTO.class);
     Assertions.assertInstanceOf(
         PolicyContentDTO.IcebergCompactionContentDTO.class, deserWithPrefixedType.content());
+  }
+
+  @Test
+  public void testIcebergCompactionPolicyDefaultValues() throws JsonProcessingException {
+    String json =
+        "{"
+            + "\"name\":\"iceberg-compaction-default\","
+            + "\"comment\":\"typed policy\","
+            + "\"policyType\":\"ICEBERG_COMPACTION\","
+            + "\"enabled\":true,"
+            + "\"content\":{}"
+            + "}";
+
+    PolicyDTO policyDTO = JsonUtils.objectMapper().readValue(json, PolicyDTO.class);
+    PolicyContentDTO.IcebergCompactionContentDTO contentDTO =
+        (PolicyContentDTO.IcebergCompactionContentDTO) policyDTO.content();
+
+    Assertions.assertEquals(
+        IcebergCompactionContent.DEFAULT_MIN_DATA_FILE_MSE, contentDTO.minDataFileMse());
+    Assertions.assertEquals(
+        IcebergCompactionContent.DEFAULT_MIN_DELETE_FILE_NUMBER, contentDTO.minDeleteFileNumber());
+    Assertions.assertEquals(
+        IcebergCompactionContent.DEFAULT_DATA_FILE_MSE_WEIGHT, contentDTO.dataFileMseWeight());
+    Assertions.assertEquals(
+        IcebergCompactionContent.DEFAULT_DELETE_FILE_NUMBER_WEIGHT,
+        contentDTO.deleteFileNumberWeight());
+    Assertions.assertEquals(
+        IcebergCompactionContent.DEFAULT_MAX_PARTITION_NUM, contentDTO.maxPartitionNum());
+    Assertions.assertTrue(contentDTO.rewriteOptions().isEmpty());
+    Assertions.assertDoesNotThrow(contentDTO::validate);
   }
 }

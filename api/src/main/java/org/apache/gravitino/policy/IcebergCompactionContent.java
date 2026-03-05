@@ -60,12 +60,18 @@ public class IcebergCompactionContent implements PolicyContent {
   public static final String DATA_FILE_MSE_METRIC = "custom-data-file-mse";
   /** Metric name for delete file number. */
   public static final String DELETE_FILE_NUMBER_METRIC = "custom-delete-file-number";
+  /** Default minimum threshold for data file MSE metric. */
+  public static final long DEFAULT_MIN_DATA_FILE_MSE = 405323966463344L;
+  /** Default minimum threshold for delete file number metric. */
+  public static final long DEFAULT_MIN_DELETE_FILE_NUMBER = 1L;
   /** Default score weight for data file MSE. */
   public static final long DEFAULT_DATA_FILE_MSE_WEIGHT = 1L;
   /** Default score weight for delete file number. */
   public static final long DEFAULT_DELETE_FILE_NUMBER_WEIGHT = 100L;
   /** Default max partition number for compaction. */
-  public static final long DEFAULT_MAX_PARTITION_NUM = 100L;
+  public static final long DEFAULT_MAX_PARTITION_NUM = 50L;
+  /** Default rewrite options for Iceberg rewrite data files. */
+  public static final Map<String, String> DEFAULT_REWRITE_OPTIONS = ImmutableMap.of();
 
   private static final Pattern OPTION_KEY_PATTERN = Pattern.compile("[A-Za-z0-9._-]+");
   private static final Set<MetadataObject.Type> SUPPORTED_OBJECT_TYPES =
@@ -73,11 +79,11 @@ public class IcebergCompactionContent implements PolicyContent {
           MetadataObject.Type.CATALOG, MetadataObject.Type.SCHEMA, MetadataObject.Type.TABLE);
   private static final String TRIGGER_EXPR =
       DATA_FILE_MSE_METRIC
-          + " > "
+          + " >= "
           + MIN_DATA_FILE_MSE_KEY
           + " || "
           + DELETE_FILE_NUMBER_METRIC
-          + " > "
+          + " >= "
           + MIN_DELETE_FILE_NUMBER_KEY;
   private static final String SCORE_EXPR =
       DATA_FILE_MSE_METRIC
@@ -107,8 +113,9 @@ public class IcebergCompactionContent implements PolicyContent {
       Long deleteFileNumberWeight,
       Long maxPartitionNum,
       Map<String, String> rewriteOptions) {
-    this.minDataFileMse = minDataFileMse;
-    this.minDeleteFileNumber = minDeleteFileNumber;
+    this.minDataFileMse = minDataFileMse == null ? DEFAULT_MIN_DATA_FILE_MSE : minDataFileMse;
+    this.minDeleteFileNumber =
+        minDeleteFileNumber == null ? DEFAULT_MIN_DELETE_FILE_NUMBER : minDeleteFileNumber;
     this.dataFileMseWeight =
         dataFileMseWeight == null ? DEFAULT_DATA_FILE_MSE_WEIGHT : dataFileMseWeight;
     this.deleteFileNumberWeight =
@@ -116,7 +123,7 @@ public class IcebergCompactionContent implements PolicyContent {
     this.maxPartitionNum = maxPartitionNum == null ? DEFAULT_MAX_PARTITION_NUM : maxPartitionNum;
     this.rewriteOptions =
         rewriteOptions == null
-            ? Collections.emptyMap()
+            ? DEFAULT_REWRITE_OPTIONS
             : Collections.unmodifiableMap(new LinkedHashMap<>(rewriteOptions));
   }
 
@@ -202,21 +209,11 @@ public class IcebergCompactionContent implements PolicyContent {
   @Override
   public void validate() throws IllegalArgumentException {
     PolicyContent.super.validate();
-    Preconditions.checkArgument(
-        minDataFileMse != null && minDataFileMse >= 0,
-        "minDataFileMse must not be null and must be >= 0");
-    Preconditions.checkArgument(
-        minDeleteFileNumber != null && minDeleteFileNumber >= 0,
-        "minDeleteFileNumber must not be null and must be >= 0");
-    Preconditions.checkArgument(
-        dataFileMseWeight != null && dataFileMseWeight >= 0,
-        "dataFileMseWeight must not be null and must be >= 0");
-    Preconditions.checkArgument(
-        deleteFileNumberWeight != null && deleteFileNumberWeight >= 0,
-        "deleteFileNumberWeight must not be null and must be >= 0");
-    Preconditions.checkArgument(
-        maxPartitionNum != null && maxPartitionNum > 0,
-        "maxPartitionNum must not be null and must be > 0");
+    Preconditions.checkArgument(minDataFileMse >= 0, "minDataFileMse must be >= 0");
+    Preconditions.checkArgument(minDeleteFileNumber >= 0, "minDeleteFileNumber must be >= 0");
+    Preconditions.checkArgument(dataFileMseWeight >= 0, "dataFileMseWeight must be >= 0");
+    Preconditions.checkArgument(deleteFileNumberWeight >= 0, "deleteFileNumberWeight must be >= 0");
+    Preconditions.checkArgument(maxPartitionNum > 0, "maxPartitionNum must be > 0");
 
     rewriteOptions.forEach(
         (key, value) -> {

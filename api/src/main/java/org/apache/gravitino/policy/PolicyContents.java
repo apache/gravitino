@@ -43,6 +43,21 @@ public class PolicyContents {
   }
 
   /**
+   * Creates an iceberg compaction policy content with default values.
+   *
+   * @return iceberg compaction policy content with defaults
+   */
+  public static PolicyContent icebergCompaction() {
+    return icebergCompaction(
+        IcebergCompactionContent.DEFAULT_MIN_DATA_FILE_MSE,
+        IcebergCompactionContent.DEFAULT_MIN_DELETE_FILE_NUMBER,
+        IcebergCompactionContent.DEFAULT_DATA_FILE_MSE_WEIGHT,
+        IcebergCompactionContent.DEFAULT_DELETE_FILE_NUMBER_WEIGHT,
+        IcebergCompactionContent.DEFAULT_MAX_PARTITION_NUM,
+        IcebergCompactionContent.DEFAULT_REWRITE_OPTIONS);
+  }
+
+  /**
    * Creates an iceberg compaction policy content.
    *
    * @param minDataFileMse minimum threshold for custom-data-file-mse

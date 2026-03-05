@@ -44,6 +44,7 @@ import org.apache.gravitino.Config;
 import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.MetadataObjects;
+import org.apache.gravitino.dto.policy.PolicyContentDTO;
 import org.apache.gravitino.dto.requests.PolicyCreateRequest;
 import org.apache.gravitino.dto.requests.PolicySetRequest;
 import org.apache.gravitino.dto.requests.PolicyUpdateRequest;
@@ -366,6 +367,45 @@ public class TestPolicyOperations extends BaseOperationsTest {
     PolicyCreateRequest request =
         new PolicyCreateRequest(
             "iceberg-compaction", "ICEBERG_COMPACTION", null, true, toDTO(content));
+    Response resp =
+        target(policyPath(metalake))
+            .request(MediaType.APPLICATION_JSON_TYPE)
+            .accept("application/vnd.gravitino.v1+json")
+            .post(Entity.entity(request, MediaType.APPLICATION_JSON_TYPE));
+
+    Assertions.assertEquals(Response.Status.OK.getStatusCode(), resp.getStatus());
+    PolicyResponse policyResp = resp.readEntity(PolicyResponse.class);
+    Assertions.assertEquals(0, policyResp.getCode());
+    Assertions.assertEquals("ICEBERG_COMPACTION", policyResp.getPolicy().policyType());
+  }
+
+  @Test
+  public void testCreatePolicyWithIcebergCompactionTypeDefaults() {
+    PolicyContent content = PolicyContents.icebergCompaction();
+    PolicyEntity policy =
+        PolicyEntity.builder()
+            .withId(1L)
+            .withName("iceberg-compaction-default")
+            .withPolicyType(Policy.BuiltInType.ICEBERG_COMPACTION)
+            .withEnabled(true)
+            .withContent(content)
+            .withAuditInfo(testAuditInfo1)
+            .build();
+    when(policyManager.createPolicy(
+            metalake,
+            "iceberg-compaction-default",
+            Policy.BuiltInType.ICEBERG_COMPACTION,
+            null,
+            true,
+            content))
+        .thenReturn(policy);
+
+    PolicyContentDTO.IcebergCompactionContentDTO minimalContent =
+        PolicyContentDTO.IcebergCompactionContentDTO.builder().build();
+    PolicyCreateRequest request =
+        new PolicyCreateRequest(
+            "iceberg-compaction-default", "ICEBERG_COMPACTION", null, true, minimalContent);
+
     Response resp =
         target(policyPath(metalake))
             .request(MediaType.APPLICATION_JSON_TYPE)

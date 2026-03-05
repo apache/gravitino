@@ -117,7 +117,9 @@ public interface PolicyContentDTO extends PolicyContent {
      * @return minimum data file MSE threshold
      */
     public Long minDataFileMse() {
-      return minDataFileMse;
+      return minDataFileMse == null
+          ? IcebergCompactionContent.DEFAULT_MIN_DATA_FILE_MSE
+          : minDataFileMse;
     }
 
     /**
@@ -126,7 +128,9 @@ public interface PolicyContentDTO extends PolicyContent {
      * @return minimum delete file number threshold
      */
     public Long minDeleteFileNumber() {
-      return minDeleteFileNumber;
+      return minDeleteFileNumber == null
+          ? IcebergCompactionContent.DEFAULT_MIN_DELETE_FILE_NUMBER
+          : minDeleteFileNumber;
     }
 
     /**
@@ -169,7 +173,7 @@ public interface PolicyContentDTO extends PolicyContent {
      */
     public Map<String, String> rewriteOptions() {
       return rewriteOptions == null
-          ? Collections.emptyMap()
+          ? IcebergCompactionContent.DEFAULT_REWRITE_OPTIONS
           : Collections.unmodifiableMap(new LinkedHashMap<>(rewriteOptions));
     }
 
@@ -182,8 +186,8 @@ public interface PolicyContentDTO extends PolicyContent {
     @Override
     public Map<String, String> properties() {
       return PolicyContents.icebergCompaction(
-              require(minDataFileMse, "minDataFileMse"),
-              require(minDeleteFileNumber, "minDeleteFileNumber"),
+              minDataFileMse(),
+              minDeleteFileNumber(),
               dataFileMseWeight(),
               deleteFileNumberWeight(),
               maxPartitionNum(),
@@ -194,8 +198,8 @@ public interface PolicyContentDTO extends PolicyContent {
     @Override
     public Map<String, Object> rules() {
       return PolicyContents.icebergCompaction(
-              require(minDataFileMse, "minDataFileMse"),
-              require(minDeleteFileNumber, "minDeleteFileNumber"),
+              minDataFileMse(),
+              minDeleteFileNumber(),
               dataFileMseWeight(),
               deleteFileNumberWeight(),
               maxPartitionNum(),
@@ -206,12 +210,8 @@ public interface PolicyContentDTO extends PolicyContent {
     @Override
     public void validate() throws IllegalArgumentException {
       PolicyContentDTO.super.validate();
-      Preconditions.checkArgument(
-          minDataFileMse != null && minDataFileMse >= 0,
-          "minDataFileMse must not be null and must be >= 0");
-      Preconditions.checkArgument(
-          minDeleteFileNumber != null && minDeleteFileNumber >= 0,
-          "minDeleteFileNumber must not be null and must be >= 0");
+      Preconditions.checkArgument(minDataFileMse() >= 0, "minDataFileMse must be >= 0");
+      Preconditions.checkArgument(minDeleteFileNumber() >= 0, "minDeleteFileNumber must be >= 0");
       Preconditions.checkArgument(dataFileMseWeight() >= 0, "dataFileMseWeight must be >= 0");
       Preconditions.checkArgument(
           deleteFileNumberWeight() >= 0, "deleteFileNumberWeight must be >= 0");
@@ -235,11 +235,6 @@ public interface PolicyContentDTO extends PolicyContent {
                     "rewrite option '%s' must have non-empty value",
                     key);
               });
-    }
-
-    private static long require(Long value, String fieldName) {
-      Preconditions.checkArgument(value != null, "%s must not be null", fieldName);
-      return value;
     }
   }
 }
