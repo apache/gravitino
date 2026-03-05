@@ -346,11 +346,9 @@ public class ClickHouseTableOperations extends JdbcTableOperations {
         StringUtils.isNotBlank(shardingKey), "Sharding key must be specified for Distributed");
 
     // Users have defined the columns explicitly for the distributed table, we will check the
-    // columns
-    // should contain the sharding key, as clickhouse requires the sharding key must be defined in
-    // the columns of the distributed table, and the sharding key column must be integer and not
-    // nullable.
-
+    // columns should contain the sharding key, as clickhouse requires the sharding key must be
+    // defined in the columns of the distributed table, and the sharding key column must be integer
+    // and not nullable.
     if (ArrayUtils.isNotEmpty(columns)) {
       List<String> shardingColumns = ClickHouseTableSqlUtils.extractShardingKeyColumns(shardingKey);
       if (CollectionUtils.isNotEmpty(shardingColumns)) {
@@ -364,12 +362,12 @@ public class ClickHouseTableOperations extends JdbcTableOperations {
       }
     }
 
-    String sanitizedShardingKey = ClickHouseTableSqlUtils.formatShardingKey(shardingKey);
 
     if (ArrayUtils.isEmpty(columns)) {
       sqlBuilder.append(" AS `%s`.`%s` ".formatted(remoteDatabase, remoteTable));
     }
 
+    String sanitizedShardingKey = ClickHouseTableSqlUtils.formatShardingKey(shardingKey);
     sqlBuilder.append(
         " ENGINE = %s(`%s`,`%s`,`%s`,%s)"
             .formatted(
