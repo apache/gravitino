@@ -39,7 +39,7 @@ public class TestPolicyContents {
         content.rules().get("minDeleteFileNumber"));
     Assertions.assertEquals(1L, content.rules().get("dataFileMseWeight"));
     Assertions.assertEquals(100L, content.rules().get("deleteFileNumberWeight"));
-    Assertions.assertEquals(50L, content.rules().get("max_partition_num"));
+    Assertions.assertEquals(50L, content.rules().get("max-partition-num"));
     Assertions.assertNull(content.rules().get("job.options.target-file-size-bytes"));
     Assertions.assertNull(content.rules().get("job.options.min-input-files"));
     Assertions.assertNull(content.rules().get("job.options.delete-file-threshold"));
@@ -59,7 +59,7 @@ public class TestPolicyContents {
     Assertions.assertEquals(1L, content.rules().get("minDeleteFileNumber"));
     Assertions.assertEquals(1L, content.rules().get("dataFileMseWeight"));
     Assertions.assertEquals(100L, content.rules().get("deleteFileNumberWeight"));
-    Assertions.assertEquals(50L, content.rules().get("max_partition_num"));
+    Assertions.assertEquals(50L, content.rules().get("max-partition-num"));
     Assertions.assertEquals(
         "custom-data-file-mse >= minDataFileMse || custom-delete-file-number >= minDeleteFileNumber",
         content.rules().get("trigger-expr"));
@@ -89,7 +89,7 @@ public class TestPolicyContents {
 
     Assertions.assertEquals(3L, content.rules().get("dataFileMseWeight"));
     Assertions.assertEquals(200L, content.rules().get("deleteFileNumberWeight"));
-    Assertions.assertEquals(88L, content.rules().get("max_partition_num"));
+    Assertions.assertEquals(88L, content.rules().get("max-partition-num"));
     Assertions.assertDoesNotThrow(content::validate);
   }
 

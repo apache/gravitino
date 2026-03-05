@@ -38,7 +38,7 @@ The policy content is converted to:
 - Rules:
   - `trigger-expr=custom-data-file-mse >= minDataFileMse || custom-delete-file-number >= minDeleteFileNumber`
   - `score-expr=custom-data-file-mse * dataFileMseWeight + custom-delete-file-number * deleteFileNumberWeight`
-  - `max_partition_num=<maxPartitionNum>`
+  - `max-partition-num=<maxPartitionNum>`
   - `job.options.<key>=<value>` for each rewrite option
 
 ## Parameter tuning guide

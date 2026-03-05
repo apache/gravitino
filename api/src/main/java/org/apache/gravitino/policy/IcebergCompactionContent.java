@@ -55,7 +55,7 @@ public class IcebergCompactionContent implements PolicyContent {
   /** Rule key for delete file number score weight. */
   public static final String DELETE_FILE_NUMBER_WEIGHT_KEY = "deleteFileNumberWeight";
   /** Rule key for max partition number selected for compaction. */
-  public static final String MAX_PARTITION_NUM_KEY = "max_partition_num";
+  public static final String MAX_PARTITION_NUM_KEY = "max-partition-num";
   /** Metric name for data file MSE. */
   public static final String DATA_FILE_MSE_METRIC = "custom-data-file-mse";
   /** Metric name for delete file number. */
