@@ -38,6 +38,7 @@ import org.apache.gravitino.stats.Statistic;
 import org.apache.spark.sql.SparkSession;
 import org.awaitility.Awaitility;
 import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.Assumptions;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.condition.EnabledIfEnvironmentVariable;
 
@@ -49,11 +50,16 @@ public class TestBuiltinIcebergUpdateStatsJob {
   private static final String ICEBERG_REST_URI = "http://localhost:9001/iceberg";
   private static final String JOB_TEMPLATE_NAME = "builtin-iceberg-update-stats";
   private static final String SPARK_CATALOG_NAME = "rest_catalog";
-  private static final String WAREHOUSE_LOCATION = "";
+  private static final String WAREHOUSE_LOCATION =
+      System.getenv().getOrDefault("GRAVITINO_TEST_WAREHOUSE", "/tmp/gravitino-test-warehouse");
   private static final String METALAKE_NAME = "test";
 
   @Test
   void testRunBuiltinUpdateStatsJobAndPersistStatistics() throws Exception {
+    Assumptions.assumeTrue(
+        StringUtils.isNotBlank(WAREHOUSE_LOCATION),
+        "GRAVITINO_TEST_WAREHOUSE is empty, skip built-in update-stats environment test");
+
     String tableName = "update_stats_table_" + UUID.randomUUID().toString().replace("-", "");
     String fullTableName = SPARK_CATALOG_NAME + ".db." + tableName;
 

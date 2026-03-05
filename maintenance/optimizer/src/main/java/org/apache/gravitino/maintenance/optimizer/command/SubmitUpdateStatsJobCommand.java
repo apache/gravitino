@@ -41,7 +41,7 @@ import org.apache.gravitino.maintenance.optimizer.common.util.IcebergSparkConfig
 public class SubmitUpdateStatsJobCommand implements OptimizerCommandExecutor {
 
   private static final String JOB_TEMPLATE_NAME = "builtin-iceberg-update-stats";
-  private static final String DEFAULT_UPDATE_MODE = "stats";
+  private static final String DEFAULT_UPDATE_MODE = "all";
   private static final String OPTION_UPDATER_OPTIONS = "updater-options";
   private static final String OPTION_SPARK_CONF = "spark-conf";
 

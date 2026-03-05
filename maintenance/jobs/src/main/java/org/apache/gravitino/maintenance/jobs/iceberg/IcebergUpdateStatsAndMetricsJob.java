@@ -18,8 +18,7 @@
  */
 package org.apache.gravitino.maintenance.jobs.iceberg;
 
-import com.fasterxml.jackson.core.type.TypeReference;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import com.google.common.annotations.VisibleForTesting;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -152,6 +151,7 @@ public class IcebergUpdateStatsAndMetricsJob implements BuiltInJob {
     }
   }
 
+  @VisibleForTesting
   static void updateStatistics(
       SparkSession spark,
       StatisticsUpdater statisticsUpdater,
@@ -161,6 +161,7 @@ public class IcebergUpdateStatsAndMetricsJob implements BuiltInJob {
         spark, statisticsUpdater, null, UpdateMode.STATS, catalogName, tableIdentifier);
   }
 
+  @VisibleForTesting
   static void updateStatistics(
       SparkSession spark,
       StatisticsUpdater statisticsUpdater,
@@ -171,6 +172,7 @@ public class IcebergUpdateStatsAndMetricsJob implements BuiltInJob {
         spark, statisticsUpdater, metricsUpdater, UpdateMode.ALL, catalogName, tableIdentifier);
   }
 
+  @VisibleForTesting
   static void updateStatistics(
       SparkSession spark,
       StatisticsUpdater statisticsUpdater,
@@ -248,6 +250,7 @@ public class IcebergUpdateStatsAndMetricsJob implements BuiltInJob {
     }
   }
 
+  @VisibleForTesting
   static String buildTableStatsSql(String catalogName, String tableIdentifier) {
     String filesTable = buildFilesTableIdentifier(catalogName, tableIdentifier);
     return "SELECT "
@@ -270,6 +273,7 @@ public class IcebergUpdateStatsAndMetricsJob implements BuiltInJob {
         + filesTable;
   }
 
+  @VisibleForTesting
   static String buildPartitionStatsSql(String catalogName, String tableIdentifier) {
     String filesTable = buildFilesTableIdentifier(catalogName, tableIdentifier);
     return "SELECT "
@@ -294,6 +298,7 @@ public class IcebergUpdateStatsAndMetricsJob implements BuiltInJob {
         + " GROUP BY partition";
   }
 
+  @VisibleForTesting
   static boolean isPartitionedTable(
       SparkSession spark, String catalogName, String tableIdentifier) {
     StructType filesSchema =
@@ -308,6 +313,7 @@ public class IcebergUpdateStatsAndMetricsJob implements BuiltInJob {
     return ((StructType) partitionField.dataType()).fields().length > 0;
   }
 
+  @VisibleForTesting
   static List<StatisticEntry<?>> toStatistics(Row row) {
     List<StatisticEntry<?>> statistics = new ArrayList<>();
     statistics.add(
@@ -349,17 +355,23 @@ public class IcebergUpdateStatsAndMetricsJob implements BuiltInJob {
     return statistics;
   }
 
+  @VisibleForTesting
   static PartitionPath toPartitionPath(Row partitionRow) {
     StructType partitionSchema = partitionRow.schema();
     List<PartitionEntry> entries = new ArrayList<>(partitionSchema.fields().length);
     for (int i = 0; i < partitionSchema.fields().length; i++) {
       String name = partitionSchema.fields()[i].name();
       Object value = partitionRow.get(i);
+      if (value == null) {
+        throw new IllegalArgumentException(
+            String.format(Locale.ROOT, "Partition value for column '%s' is null", name));
+      }
       entries.add(new PartitionEntryImpl(name, String.valueOf(value)));
     }
     return PartitionPath.of(entries);
   }
 
+  @VisibleForTesting
   static Map<String, String> parseArguments(String[] args) {
     Map<String, String> argMap = new HashMap<>();
     for (int i = 0; i < args.length; i++) {
@@ -377,37 +389,20 @@ public class IcebergUpdateStatsAndMetricsJob implements BuiltInJob {
     return argMap;
   }
 
+  @VisibleForTesting
   static Map<String, String> parseCustomSparkConfigs(String sparkConfJson) {
     return parseJsonOptions(sparkConfJson);
   }
 
+  @VisibleForTesting
   static Map<String, String> parseJsonOptions(String json) {
     if (json == null || json.isEmpty()) {
       return new HashMap<>();
     }
-    try {
-      ObjectMapper mapper = new ObjectMapper();
-      Map<String, Object> parsedMap =
-          mapper.readValue(json, new TypeReference<Map<String, Object>>() {});
-      Map<String, String> configs = new HashMap<>();
-      for (Map.Entry<String, Object> entry : parsedMap.entrySet()) {
-        Object value = entry.getValue();
-        if (value instanceof Map || value instanceof List) {
-          throw new IllegalArgumentException(
-              String.format(
-                  Locale.ROOT,
-                  "JSON options must be a flat key-value map, but key '%s' has non-scalar value",
-                  entry.getKey()));
-        }
-        configs.put(entry.getKey(), value == null ? "" : value.toString());
-      }
-      return configs;
-    } catch (Exception e) {
-      throw new IllegalArgumentException(
-          "Failed to parse JSON options: " + json + ". Error: " + e.getMessage(), e);
-    }
+    return IcebergSparkConfigUtils.parseFlatJsonMap(json, "json-options");
   }
 
+  @VisibleForTesting
   static UpdateMode parseUpdateMode(String value) {
     if (value == null || value.trim().isEmpty()) {
       return UpdateMode.from(DEFAULT_UPDATE_MODE);
@@ -415,6 +410,7 @@ public class IcebergUpdateStatsAndMetricsJob implements BuiltInJob {
     return UpdateMode.from(value);
   }
 
+  @VisibleForTesting
   static Map<String, String> buildOptimizerProperties(Map<String, String> updaterOptions) {
     Map<String, String> optimizerProperties = new HashMap<>(updaterOptions);
 
@@ -432,6 +428,7 @@ public class IcebergUpdateStatsAndMetricsJob implements BuiltInJob {
     return optimizerProperties;
   }
 
+  @VisibleForTesting
   static Map<String, String> requireGravitinoConfig(Map<String, String> optimizerProperties) {
     String gravitinoUri = optimizerProperties.get(OptimizerConfig.GRAVITINO_URI);
     String metalake = optimizerProperties.get(OptimizerConfig.GRAVITINO_METALAKE);
@@ -516,11 +513,12 @@ public class IcebergUpdateStatsAndMetricsJob implements BuiltInJob {
         + escapeSqlIdentifier(levels[0])
         + "."
         + escapeSqlIdentifier(levels[1])
-        + ".files";
+        + ".`files`";
   }
 
   private static String escapeSqlIdentifier(String identifier) {
-    return identifier.replace("`", "``");
+    String escaped = identifier.replace("`", "``");
+    return "`" + escaped + "`";
   }
 
   private static long toLongValue(Row row, String fieldName) {

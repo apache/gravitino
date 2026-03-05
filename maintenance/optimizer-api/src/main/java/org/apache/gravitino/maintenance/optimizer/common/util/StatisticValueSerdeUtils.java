@@ -29,6 +29,13 @@ public final class StatisticValueSerdeUtils {
 
   private StatisticValueSerdeUtils() {}
 
+  /**
+   * Serialize a {@link StatisticValue} to JSON string.
+   *
+   * @param value statistic value instance
+   * @return serialized JSON string
+   * @throws IllegalArgumentException if serialization fails
+   */
   public static String toString(StatisticValue<?> value) {
     Preconditions.checkArgument(value != null, "StatisticValue cannot be null");
     try {
@@ -38,6 +45,13 @@ public final class StatisticValueSerdeUtils {
     }
   }
 
+  /**
+   * Deserialize a JSON string to {@link StatisticValue}.
+   *
+   * @param valueStr JSON string
+   * @return deserialized statistic value instance
+   * @throws IllegalArgumentException if deserialization fails
+   */
   public static StatisticValue<?> fromString(String valueStr) {
     Preconditions.checkArgument(valueStr != null, "StatisticValue string cannot be null");
     try {

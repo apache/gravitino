@@ -26,6 +26,8 @@ plugins {
 }
 
 tasks.named<JavaCompile>("compileTestJava") {
+  // client-java main artifact targets Java 8; tests depend on modules that publish Java 17 variants.
+  // Compile tests with release 17 to make Gradle variant matching for :core/:server test classpath deterministic.
   options.release.set(17)
 }
 
