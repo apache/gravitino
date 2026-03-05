@@ -42,7 +42,7 @@ public class SubmitUpdateStatsJobCommand implements OptimizerCommandExecutor {
 
   private static final String JOB_TEMPLATE_NAME = "builtin-iceberg-update-stats";
   private static final String DEFAULT_UPDATE_MODE = "stats";
-  private static final long DEFAULT_TARGET_FILE_SIZE_BYTES = 100_000L;
+  private static final long DEFAULT_TARGET_FILE_SIZE_BYTES = 128L * 1024 * 1024;
   private static final String OPTION_UPDATER_OPTIONS = "updater-options";
   private static final String OPTION_SPARK_CONF = "spark-conf";
 

@@ -63,7 +63,8 @@ public class IcebergUpdateStatsAndMetricsJob implements BuiltInJob {
   private static final String VERSION = "v1";
   private static final String DEFAULT_STATISTICS_UPDATER = "gravitino-statistics-updater";
   private static final String DEFAULT_METRICS_UPDATER = "gravitino-metrics-updater";
-  private static final long DEFAULT_TARGET_FILE_SIZE_BYTES = 100_000L;
+  private static final long DEFAULT_TARGET_FILE_SIZE_BYTES = 128L * 1024 * 1024;
+  private static final long SMALL_FILE_THRESHOLD_BYTES = 32L * 1024 * 1024;
   private static final String DEFAULT_UPDATE_MODE = UpdateMode.ALL.modeName;
   private static final String CUSTOM_STAT_PREFIX = "custom-";
 
@@ -277,7 +278,7 @@ public class IcebergUpdateStatsAndMetricsJob implements BuiltInJob {
         + "SUM(CASE WHEN content = 1 THEN 1 ELSE 0 END) AS position_delete_files, "
         + "SUM(CASE WHEN content = 2 THEN 1 ELSE 0 END) AS equality_delete_files, "
         + "SUM(CASE WHEN file_size_in_bytes < "
-        + targetFileSizeBytes
+        + SMALL_FILE_THRESHOLD_BYTES
         + " THEN 1 ELSE 0 END) AS small_files, "
         + "AVG(POWER("
         + targetFileSizeBytes
@@ -300,7 +301,7 @@ public class IcebergUpdateStatsAndMetricsJob implements BuiltInJob {
         + "SUM(CASE WHEN content = 1 THEN 1 ELSE 0 END) AS position_delete_files, "
         + "SUM(CASE WHEN content = 2 THEN 1 ELSE 0 END) AS equality_delete_files, "
         + "SUM(CASE WHEN file_size_in_bytes < "
-        + targetFileSizeBytes
+        + SMALL_FILE_THRESHOLD_BYTES
         + " THEN 1 ELSE 0 END) AS small_files, "
         + "AVG(POWER("
         + targetFileSizeBytes
@@ -603,8 +604,9 @@ public class IcebergUpdateStatsAndMetricsJob implements BuiltInJob {
             + "\\n"
             + "Optional Options:\\n"
             + "  --update-mode <stats|metrics|all> Update behavior mode, default: all\\n"
-            + "  --target-file-size-bytes <bytes>   Small-file threshold and MSE target\\n"
-            + "                                     Default: 100000\\n"
+            + "  --target-file-size-bytes <bytes>   MSE target file size in bytes\\n"
+            + "                                     Default: 134217728 (128MB)\\n"
+            + "                                     small_files threshold is fixed at 33554432 (32MB)\\n"
             + "  --updater-options <json>           JSON map for updater and repository settings\\n"
             + "                                     Example: '{\"gravitino_uri\":\"http://localhost:8090\",\\n"
             + "                                     \"metalake\":\"test\",\"statistics_updater\":\"gravitino-statistics-updater\",\\n"

@@ -87,21 +87,26 @@ public class TestIcebergUpdateStatsJob {
 
   @Test
   public void testBuildStatsSql() {
-    String tableSql = IcebergUpdateStatsAndMetricsJob.buildTableStatsSql("cat", "db.tbl", 100000L);
+    String tableSql =
+        IcebergUpdateStatsAndMetricsJob.buildTableStatsSql("cat", "db.tbl", 134_217_728L);
     String partitionSql =
-        IcebergUpdateStatsAndMetricsJob.buildPartitionStatsSql("cat", "db.tbl", 100000L);
+        IcebergUpdateStatsAndMetricsJob.buildPartitionStatsSql("cat", "db.tbl", 134_217_728L);
 
     assertTrue(tableSql.contains("FROM cat.db.tbl.files"));
     assertTrue(tableSql.contains("AS datafile_mse"));
+    assertTrue(tableSql.contains("file_size_in_bytes < 33554432"));
+    assertTrue(tableSql.contains("134217728 - LEAST(134217728, file_size_in_bytes)"));
     assertTrue(partitionSql.contains("FROM cat.db.tbl.files"));
     assertTrue(partitionSql.contains("GROUP BY partition"));
     assertTrue(partitionSql.startsWith("SELECT partition"));
+    assertTrue(partitionSql.contains("file_size_in_bytes < 33554432"));
+    assertTrue(partitionSql.contains("134217728 - LEAST(134217728, file_size_in_bytes)"));
   }
 
   @Test
   public void testParseTargetFileSize() {
-    assertEquals(100000L, IcebergUpdateStatsAndMetricsJob.parseTargetFileSize(null));
-    assertEquals(100000L, IcebergUpdateStatsAndMetricsJob.parseTargetFileSize(""));
+    assertEquals(134_217_728L, IcebergUpdateStatsAndMetricsJob.parseTargetFileSize(null));
+    assertEquals(134_217_728L, IcebergUpdateStatsAndMetricsJob.parseTargetFileSize(""));
     assertEquals(2048L, IcebergUpdateStatsAndMetricsJob.parseTargetFileSize("2048"));
     assertThrows(
         IllegalArgumentException.class,

@@ -526,7 +526,7 @@ class TestOptimizerCmd {
                 "gravitino.optimizer.gravitinoMetalake = test",
                 "gravitino.optimizer.gravitinoDefaultCatalog = rest",
                 "gravitino.optimizer.jobSubmitterConfig.update_mode = stats",
-                "gravitino.optimizer.jobSubmitterConfig.target_file_size_bytes = 100000",
+                "gravitino.optimizer.jobSubmitterConfig.target_file_size_bytes = 134217728",
                 "gravitino.optimizer.jobSubmitterConfig.updater_options = "
                     + "{\"gravitino_uri\":\"http://localhost:8090\",\"metalake\":\"test\"}",
                 "gravitino.optimizer.jobSubmitterConfig.spark_conf = "
