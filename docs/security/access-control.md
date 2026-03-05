@@ -449,7 +449,7 @@ To enable access control in Gravitino, configure the following settings in your 
 
 ### Authorization Cache
 
-Gravitino uses Caffeine caches to improve authorization performance by caching role and owner information. The cache configuration options allow you to tune the cache behavior:
+Gravitino uses Caffeine caches to improve authorization performance by caching role information. The cache configuration options allow you to tune the cache behavior:
 
 - **`cacheExpirationSecs`**: Controls how long cache entries remain valid. After this time, entries are automatically evicted and reloaded from the backend on the next access. Lower values provide more up-to-date authorization decisions but may increase load on the backend.
 

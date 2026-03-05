@@ -495,7 +495,6 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
   }
 
   private boolean checkOwner(String metalake, MetadataObject metadataObject, String userName) {
-
     try {
       NameIdentifier entityIdent = MetadataObjectUtil.toEntityIdent(metalake, metadataObject);
       EntityStore entityStore = GravitinoEnv.getInstance().entityStore();

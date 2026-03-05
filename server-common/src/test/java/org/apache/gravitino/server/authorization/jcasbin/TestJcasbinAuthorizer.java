@@ -37,7 +37,6 @@ import java.io.IOException;
 import java.lang.reflect.Field;
 import java.security.Principal;
 import java.util.List;
-import java.util.Optional;
 import java.util.concurrent.Executor;
 import java.util.stream.Collectors;
 import org.apache.commons.lang3.reflect.FieldUtils;
@@ -417,14 +416,6 @@ public class TestJcasbinAuthorizer {
     Field field = JcasbinAuthorizer.class.getDeclaredField("loadedRoles");
     field.setAccessible(true);
     return (Cache<Long, Boolean>) field.get(authorizer);
-  }
-
-  @SuppressWarnings("unchecked")
-  private static Cache<Long, Optional<Long>> getOwnerRelCache(JcasbinAuthorizer authorizer)
-      throws Exception {
-    Field field = JcasbinAuthorizer.class.getDeclaredField("ownerRel");
-    field.setAccessible(true);
-    return (Cache<Long, Optional<Long>>) field.get(authorizer);
   }
 
   private static Enforcer getAllowEnforcer(JcasbinAuthorizer authorizer) throws Exception {
