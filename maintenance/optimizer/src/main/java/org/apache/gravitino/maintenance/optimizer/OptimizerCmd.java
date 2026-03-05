@@ -124,9 +124,15 @@ public class OptimizerCmd {
                   CliOption.UPDATE_MODE,
                   CliOption.UPDATER_OPTIONS,
                   CliOption.SPARK_CONF),
-              "Submit built-in Iceberg update stats jobs for given table identifiers.",
+              "Submit built-in Iceberg update stats/metrics Spark jobs for table identifiers.",
               "./bin/gravitino-optimizer.sh --type submit-update-stats-job --identifiers "
-                  + "rest.ab.t1,rest.ab.t2 --update-mode stats --dry-run",
+                  + "rest.ab.t1,rest.ab.t2 --update-mode all "
+                  + "--updater-options '{\"gravitino_uri\":\"http://localhost:8090\",\"metalake\":\"test\"}' "
+                  + "--spark-conf '{\"spark.sql.catalog.rest\":\"org.apache.iceberg.spark.SparkCatalog\","
+                  + "\"spark.sql.catalog.rest.type\":\"rest\","
+                  + "\"spark.sql.catalog.rest.uri\":\"http://localhost:9001/iceberg\","
+                  + "\"spark.sql.catalog.rest.warehouse\":\"/tmp/warehouse\","
+                  + "\"spark.sql.extensions\":\"org.apache.iceberg.spark.extensions.IcebergSparkSessionExtensions\"}'",
               updateStatsJobInputRules()));
   private static final Map<OptimizerCommandType, OptimizerCommandExecutor> COMMAND_HANDLERS =
       Map.of(
@@ -364,6 +370,27 @@ public class OptimizerCmd {
     out.printf("Required options: %s%n", joinOptions(spec.requiredOptions()));
     out.printf("Optional options: %s%n", joinOptions(spec.optionalOptions()));
     out.printf("Usage example: %s%n", spec.example());
+    if (optimizerType == OptimizerCommandType.SUBMIT_UPDATE_STATS_JOB) {
+      printSubmitUpdateStatsHelpNotes(out);
+    }
+  }
+
+  private static void printSubmitUpdateStatsHelpNotes(PrintStream out) {
+    out.println("Notes:");
+    out.println(
+        "  - --identifiers supports catalog.schema.table or schema.table "
+            + "(uses gravitino.optimizer.gravitinoDefaultCatalog).");
+    out.println("  - --update-mode default is all. Supported values: stats | metrics | all.");
+    out.println(
+        "  - --updater-options and --spark-conf must be flat JSON maps; CLI overrides config file.");
+    out.println("  - stats/all mode requires updater option keys: gravitino_uri and metalake.");
+    out.println(
+        "  - --spark-conf must include Iceberg catalog connection keys for each "
+            + "catalog in --identifiers:");
+    out.println("      spark.sql.catalog.<catalog>.type");
+    out.println("      spark.sql.catalog.<catalog>.uri (for rest/hive)");
+    out.println("      spark.sql.catalog.<catalog>.warehouse (for hadoop)");
+    out.println("  - spark.sql.catalog.<catalog> is auto-filled by CLI if absent.");
   }
 
   private static void validateCommandDefinitions() {
@@ -458,7 +485,11 @@ public class OptimizerCmd {
         null,
         "Show help. Combine with --type to show command help."),
     CONF_PATH("conf-path", CliOptionArgType.SINGLE, null, "Optimizer configuration path"),
-    IDENTIFIERS("identifiers", CliOptionArgType.MULTI, ',', "Comma separated identifier list"),
+    IDENTIFIERS(
+        "identifiers",
+        CliOptionArgType.MULTI,
+        ',',
+        "Comma separated table/job identifiers. Table format: catalog.schema.table or schema.table"),
     STRATEGY_NAME("strategy-name", CliOptionArgType.SINGLE, null, "Strategy name"),
     DRY_RUN("dry-run", CliOptionArgType.NONE, null, "Preview strategy jobs without submitting"),
     LIMIT("limit", CliOptionArgType.SINGLE, null, "Maximum number of strategy jobs to process"),
@@ -490,17 +521,18 @@ public class OptimizerCmd {
         "update-mode",
         CliOptionArgType.SINGLE,
         null,
-        "Update mode for submit-update-stats-job: stats|metrics|all"),
+        "Update mode for submit-update-stats-job: stats|metrics|all (default: all)"),
     UPDATER_OPTIONS(
         "updater-options",
         CliOptionArgType.SINGLE,
         null,
-        "JSON map for updater options in submit-update-stats-job"),
+        "Flat JSON map for updater options in submit-update-stats-job "
+            + "(for stats/all includes gravitino_uri and metalake)"),
     SPARK_CONF(
         "spark-conf",
         CliOptionArgType.SINGLE,
         null,
-        "JSON map for Spark configs in submit-update-stats-job");
+        "Flat JSON map for Spark configs in submit-update-stats-job");
 
     private final String longOpt;
     private final CliOptionArgType argType;

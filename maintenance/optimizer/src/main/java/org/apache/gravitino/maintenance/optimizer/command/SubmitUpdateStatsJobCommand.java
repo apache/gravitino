@@ -44,6 +44,18 @@ public class SubmitUpdateStatsJobCommand implements OptimizerCommandExecutor {
   private static final String DEFAULT_UPDATE_MODE = "all";
   private static final String OPTION_UPDATER_OPTIONS = "updater-options";
   private static final String OPTION_SPARK_CONF = "spark-conf";
+  private static final String DEFAULT_SPARK_MASTER = "local[*]";
+  private static final String DEFAULT_SPARK_EXECUTOR_INSTANCES = "1";
+  private static final String DEFAULT_SPARK_EXECUTOR_CORES = "1";
+  private static final String DEFAULT_SPARK_EXECUTOR_MEMORY = "1g";
+  private static final String DEFAULT_SPARK_DRIVER_MEMORY = "1g";
+  private static final String SPARK_MASTER_KEY = "spark.master";
+  private static final String SPARK_EXECUTOR_INSTANCES_KEY = "spark.executor.instances";
+  private static final String SPARK_EXECUTOR_CORES_KEY = "spark.executor.cores";
+  private static final String SPARK_EXECUTOR_MEMORY_KEY = "spark.executor.memory";
+  private static final String SPARK_DRIVER_MEMORY_KEY = "spark.driver.memory";
+  private static final String SPARK_SQL_CATALOG_PREFIX = "spark.sql.catalog.";
+  private static final String ICEBERG_SPARK_CATALOG_IMPL = "org.apache.iceberg.spark.SparkCatalog";
 
   private static final ObjectMapper MAPPER = new ObjectMapper();
 
@@ -68,7 +80,9 @@ public class SubmitUpdateStatsJobCommand implements OptimizerCommandExecutor {
     Map<String, String> updaterOptions =
         IcebergSparkConfigUtils.parseFlatJsonMap(updaterOptionsJson, OPTION_UPDATER_OPTIONS);
     Map<String, String> sparkConfigs =
-        IcebergSparkConfigUtils.parseFlatJsonMap(sparkConfJson, OPTION_SPARK_CONF);
+        normalizeSparkConfigs(
+            tableTargets,
+            IcebergSparkConfigUtils.parseFlatJsonMap(sparkConfJson, OPTION_SPARK_CONF));
 
     validateUpdaterOptions(updateMode, updaterOptions);
     validateSparkConfigs(tableTargets, sparkConfigs);
@@ -76,7 +90,7 @@ public class SubmitUpdateStatsJobCommand implements OptimizerCommandExecutor {
     if (context.dryRun()) {
       for (TableTarget tableTarget : tableTargets) {
         Map<String, String> jobConfig =
-            buildJobConfig(tableTarget, updateMode, updaterOptions, sparkConfigs);
+            buildJobConfig(tableTarget, updateMode, updaterOptions, sparkConfigs, submitterConfigs);
         context
             .output()
             .printf(
@@ -93,7 +107,7 @@ public class SubmitUpdateStatsJobCommand implements OptimizerCommandExecutor {
       int submitted = 0;
       for (TableTarget tableTarget : tableTargets) {
         Map<String, String> jobConfig =
-            buildJobConfig(tableTarget, updateMode, updaterOptions, sparkConfigs);
+            buildJobConfig(tableTarget, updateMode, updaterOptions, sparkConfigs, submitterConfigs);
         JobHandle jobHandle = client.runJob(JOB_TEMPLATE_NAME, jobConfig);
         submitted++;
         context
@@ -114,9 +128,12 @@ public class SubmitUpdateStatsJobCommand implements OptimizerCommandExecutor {
       TableTarget tableTarget,
       String updateMode,
       Map<String, String> updaterOptions,
-      Map<String, String> sparkConfigs) {
+      Map<String, String> sparkConfigs,
+      Map<String, String> submitterConfigs) {
     Map<String, String> jobConfig = new LinkedHashMap<>();
     jobConfig.put("catalog_name", tableTarget.catalogName);
+    jobConfig.putAll(
+        resolveTemplateSparkPlaceholders(tableTarget.catalogName, sparkConfigs, submitterConfigs));
     jobConfig.put("table_identifier", tableTarget.schemaAndTable);
     jobConfig.put("update_mode", updateMode);
     jobConfig.put("updater_options", toCanonicalJson(updaterOptions));
@@ -226,12 +243,89 @@ public class SubmitUpdateStatsJobCommand implements OptimizerCommandExecutor {
     }
   }
 
+  /**
+   * Fill Spark/Iceberg defaults that are already defined in built-in template configs so users do
+   * not need to repeat them in --spark-conf.
+   */
+  private static Map<String, String> normalizeSparkConfigs(
+      List<TableTarget> tableTargets, Map<String, String> sparkConfigs) {
+    Map<String, String> normalized = new LinkedHashMap<>(sparkConfigs);
+
+    for (TableTarget tableTarget : tableTargets) {
+      normalized.putIfAbsent(
+          SPARK_SQL_CATALOG_PREFIX + tableTarget.catalogName, ICEBERG_SPARK_CATALOG_IMPL);
+    }
+
+    return normalized;
+  }
+
   private static String toCanonicalJson(Map<String, String> options) {
     try {
       return MAPPER.writeValueAsString(new TreeMap<>(options == null ? Map.of() : options));
     } catch (Exception e) {
       throw new IllegalStateException("Failed to serialize options as JSON", e);
     }
+  }
+
+  private static Map<String, String> resolveTemplateSparkPlaceholders(
+      String catalogName, Map<String, String> sparkConfigs, Map<String, String> submitterConfigs) {
+    Map<String, String> placeholders = new LinkedHashMap<>();
+    String catalogPrefix = SPARK_SQL_CATALOG_PREFIX + catalogName;
+
+    placeholders.put(
+        "spark_master",
+        firstNonBlank(
+            submitterConfigs.get("spark_master"),
+            sparkConfigs.get(SPARK_MASTER_KEY),
+            DEFAULT_SPARK_MASTER));
+    placeholders.put(
+        "spark_executor_instances",
+        firstNonBlank(
+            submitterConfigs.get("spark_executor_instances"),
+            sparkConfigs.get(SPARK_EXECUTOR_INSTANCES_KEY),
+            DEFAULT_SPARK_EXECUTOR_INSTANCES));
+    placeholders.put(
+        "spark_executor_cores",
+        firstNonBlank(
+            submitterConfigs.get("spark_executor_cores"),
+            sparkConfigs.get(SPARK_EXECUTOR_CORES_KEY),
+            DEFAULT_SPARK_EXECUTOR_CORES));
+    placeholders.put(
+        "spark_executor_memory",
+        firstNonBlank(
+            submitterConfigs.get("spark_executor_memory"),
+            sparkConfigs.get(SPARK_EXECUTOR_MEMORY_KEY),
+            DEFAULT_SPARK_EXECUTOR_MEMORY));
+    placeholders.put(
+        "spark_driver_memory",
+        firstNonBlank(
+            submitterConfigs.get("spark_driver_memory"),
+            sparkConfigs.get(SPARK_DRIVER_MEMORY_KEY),
+            DEFAULT_SPARK_DRIVER_MEMORY));
+    placeholders.put(
+        "catalog_type",
+        firstNonBlank(
+            submitterConfigs.get("catalog_type"), sparkConfigs.get(catalogPrefix + ".type")));
+    placeholders.put(
+        "catalog_uri",
+        firstNonBlank(
+            submitterConfigs.get("catalog_uri"), sparkConfigs.get(catalogPrefix + ".uri"), ""));
+    placeholders.put(
+        "warehouse_location",
+        firstNonBlank(
+            submitterConfigs.get("warehouse_location"),
+            sparkConfigs.get(catalogPrefix + ".warehouse"),
+            ""));
+    return placeholders;
+  }
+
+  private static String firstNonBlank(String... candidates) {
+    for (String candidate : candidates) {
+      if (StringUtils.isNotBlank(candidate)) {
+        return candidate.trim();
+      }
+    }
+    return "";
   }
 
   private static final class TableTarget {

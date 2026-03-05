@@ -386,6 +386,10 @@ class TestOptimizerCmd {
     Assertions.assertTrue(output[0].contains("jobTemplate=builtin-iceberg-update-stats"));
     Assertions.assertTrue(output[0].contains("update_mode=stats"));
     Assertions.assertTrue(output[0].contains("table_identifier=ab.t1"));
+    Assertions.assertTrue(output[0].contains("spark_master=local[*]"));
+    Assertions.assertTrue(output[0].contains("catalog_type=rest"));
+    Assertions.assertTrue(output[0].contains("catalog_uri=http://localhost:9001/iceberg"));
+    Assertions.assertTrue(output[0].contains("warehouse_location=/tmp/warehouse"));
   }
 
   @Test
@@ -417,7 +421,7 @@ class TestOptimizerCmd {
             "--dry-run",
             "--conf-path",
             confPath.toString());
-    Assertions.assertTrue(output[1].contains("Missing spark config."));
+    Assertions.assertTrue(output[1].contains("spark.sql.catalog.rest.type"));
   }
 
   @Test
@@ -449,7 +453,7 @@ class TestOptimizerCmd {
   }
 
   @Test
-  void testSubmitUpdateStatsJobRequiresSparkSqlExtensions() throws Exception {
+  void testSubmitUpdateStatsJobAllowsMissingSparkSqlExtensions() throws Exception {
     Path confPath = createOptimizerConfForSubmitUpdateStatsWithoutExtensions();
     String[] output =
         runCommand(
@@ -460,7 +464,8 @@ class TestOptimizerCmd {
             "--dry-run",
             "--conf-path",
             confPath.toString());
-    Assertions.assertTrue(output[1].contains("spark.sql.extensions"));
+    Assertions.assertTrue(output[1].isEmpty(), "stderr=" + output[1] + ", stdout=" + output[0]);
+    Assertions.assertTrue(output[0].contains("DRY-RUN: identifier=rest.ab.t1"));
   }
 
   @Test

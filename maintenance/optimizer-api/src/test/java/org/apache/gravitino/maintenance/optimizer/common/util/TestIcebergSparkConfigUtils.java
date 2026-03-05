@@ -86,18 +86,11 @@ public class TestIcebergSparkConfigUtils {
   }
 
   @Test
-  public void testValidateSparkConfigsMissingExtensions() {
+  public void testValidateSparkConfigsAllowsMissingExtensions() {
     Map<String, String> sparkConfigs = baseSparkConfigs("rest");
     sparkConfigs.remove("spark.sql.extensions");
     sparkConfigs.put("spark.sql.catalog.rest.uri", "http://localhost:9001/iceberg");
-
-    IllegalArgumentException e =
-        assertThrows(
-            IllegalArgumentException.class,
-            () ->
-                IcebergSparkConfigUtils.validateSparkConfigsForCatalog(
-                    sparkConfigs, "rest", "rest.ab.t1"));
-    assertTrue(e.getMessage().contains("spark.sql.extensions"));
+    IcebergSparkConfigUtils.validateSparkConfigsForCatalog(sparkConfigs, "rest", "rest.ab.t1");
   }
 
   @Test

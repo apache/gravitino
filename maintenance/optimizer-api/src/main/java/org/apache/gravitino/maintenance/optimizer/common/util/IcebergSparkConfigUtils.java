@@ -106,18 +106,6 @@ public final class IcebergSparkConfigUtils {
     Preconditions.checkArgument(
         StringUtils.isNotBlank(tableIdentifier), "tableIdentifier is blank");
 
-    String extensions = StringUtils.trimToNull(sparkConfigs.get(SPARK_SQL_EXTENSIONS_KEY));
-    Preconditions.checkArgument(
-        StringUtils.isNotBlank(extensions),
-        "Spark config must contain key '%s' and include '%s'",
-        SPARK_SQL_EXTENSIONS_KEY,
-        ICEBERG_SPARK_EXTENSIONS);
-    Preconditions.checkArgument(
-        extensions.contains(ICEBERG_SPARK_EXTENSIONS),
-        "Spark config key '%s' must include '%s'",
-        SPARK_SQL_EXTENSIONS_KEY,
-        ICEBERG_SPARK_EXTENSIONS);
-
     String catalogPrefix = SPARK_SQL_CATALOG_PREFIX + catalogName;
     Preconditions.checkArgument(
         StringUtils.isNotBlank(sparkConfigs.get(catalogPrefix)),
