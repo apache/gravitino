@@ -28,6 +28,7 @@ import org.apache.gravitino.maintenance.optimizer.api.common.PartitionPath;
 import org.apache.gravitino.maintenance.optimizer.api.common.Strategy;
 import org.apache.gravitino.maintenance.optimizer.api.recommender.JobExecutionContext;
 import org.apache.gravitino.maintenance.optimizer.recommender.handler.BaseExpressionStrategyHandler;
+import org.apache.gravitino.policy.PolicyContents;
 import org.apache.gravitino.rel.Table;
 
 /**
@@ -35,7 +36,7 @@ import org.apache.gravitino.rel.Table;
  */
 public class CompactionStrategyHandler extends BaseExpressionStrategyHandler {
 
-  public static final String NAME = "compaction";
+  public static final String NAME = PolicyContents.IcebergCompactionContent.STRATEGY_TYPE_VALUE;
 
   @Override
   public Set<DataRequirement> dataRequirements() {
