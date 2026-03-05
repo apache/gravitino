@@ -25,15 +25,6 @@ plugins {
   id("idea")
 }
 
-java {
-  sourceCompatibility = JavaVersion.VERSION_1_8
-  targetCompatibility = JavaVersion.VERSION_1_8
-}
-
-tasks.named<JavaCompile>("compileJava") {
-  options.release.set(8)
-}
-
 tasks.named<JavaCompile>("compileTestJava") {
   options.release.set(17)
 }

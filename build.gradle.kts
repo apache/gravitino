@@ -337,6 +337,7 @@ subprojects {
     if (path.startsWith(":maintenance:jobs") ||
       path.startsWith(":maintenance:optimizer-api") ||
       path.startsWith(":maintenance:gravitino-updaters") ||
+      path.startsWith(":clients:client-java") ||
       name == "api" ||
       name == "common" ||
       name == "catalog-common" ||
