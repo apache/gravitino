@@ -61,7 +61,8 @@ public interface Policy extends Auditable {
      * Get the built-in policy type from the policy type string.
      *
      * @param policyType the policy type string
-     * @return the built-in policy type if it matches, otherwise returns CUSTOM type
+     * @return the matched built-in policy type
+     * @throws IllegalArgumentException if the policy type is unknown or blank
      */
     public static BuiltInType fromPolicyType(String policyType) {
       Preconditions.checkArgument(StringUtils.isNotBlank(policyType), "policyType cannot be blank");

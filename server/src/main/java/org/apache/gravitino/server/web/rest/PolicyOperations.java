@@ -345,8 +345,7 @@ public class PolicyOperations {
             .withEnabled(policy.enabled())
             .withContent(DTOConverters.toDTO(policy.content()))
             .withInherited(inherited)
-            .withAudit(DTOConverters.toDTO(policy.auditInfo()))
-            .withInherited(inherited);
+            .withAudit(DTOConverters.toDTO(policy.auditInfo()));
 
     return builder.build();
   }
