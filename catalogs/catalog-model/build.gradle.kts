@@ -25,19 +25,13 @@ plugins {
 }
 
 dependencies {
-  compileOnly(project(":api")) {
-    exclude(group = "*")
-  }
+  compileOnly(project(":api"))
 
   implementation(project(":catalogs:catalog-common")) {
     exclude(group = "*")
   }
-  compileOnly(project(":common")) {
-    exclude(group = "*")
-  }
-  compileOnly(project(":core")) {
-    exclude(group = "*")
-  }
+  compileOnly(project(":common"))
+  compileOnly(project(":core"))
   implementation(libs.guava)
   implementation(libs.slf4j.api)
 

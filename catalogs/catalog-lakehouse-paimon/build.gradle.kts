@@ -30,18 +30,12 @@ val sparkMajorVersion: String = sparkVersion.substringBeforeLast(".")
 val paimonVersion: String = libs.versions.paimon.get()
 
 dependencies {
-  compileOnly(project(":api")) {
-    exclude("*")
-  }
+  compileOnly(project(":api"))
   implementation(project(":catalogs:catalog-common")) {
     exclude("*")
   }
-  compileOnly(project(":common")) {
-    exclude("*")
-  }
-  compileOnly(project(":core")) {
-    exclude("*")
-  }
+  compileOnly(project(":common"))
+  compileOnly(project(":core"))
   implementation(libs.bundles.paimon) {
     exclude("com.sun.jersey")
     exclude("javax.servlet")

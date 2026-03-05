@@ -24,19 +24,13 @@ plugins {
 }
 
 dependencies {
-  compileOnly(project(":api")) {
-    exclude("*")
-  }
+  compileOnly(project(":api"))
 
   implementation(project(":catalogs:catalog-common")) {
     exclude("*")
   }
-  compileOnly(project(":common")) {
-    exclude("*")
-  }
-  compileOnly(project(":core")) {
-    exclude("*")
-  }
+  compileOnly(project(":common"))
+  compileOnly(project(":core"))
   implementation(project(":clients:client-java-runtime", configuration = "shadow"))
 
   implementation(libs.caffeine)

@@ -30,19 +30,13 @@ val sparkVersion = fullSparkVersion.split(".").take(2).joinToString(".")
 val hudiVersion = libs.versions.hudi.get()
 
 dependencies {
-  compileOnly(project(":api")) {
-    exclude("*")
-  }
+  compileOnly(project(":api"))
   implementation(project(":catalogs:catalog-common")) {
     exclude("*")
   }
   implementation(project(":catalogs:hive-metastore-common"))
-  compileOnly(project(":core")) {
-    exclude("*")
-  }
-  compileOnly(project(":common")) {
-    exclude("*")
-  }
+  compileOnly(project(":core"))
+  compileOnly(project(":common"))
 
   implementation(libs.commons.collections3)
   implementation(libs.commons.lang3)

@@ -23,9 +23,7 @@ plugins {
 
 // try to avoid adding extra dependencies because it is used by catalogs and connectors.
 dependencies {
-  compileOnly(project(":common")) {
-    exclude("*")
-  }
+  compileOnly(project(":common"))
 
   implementation(libs.commons.lang3)
   implementation(libs.guava)

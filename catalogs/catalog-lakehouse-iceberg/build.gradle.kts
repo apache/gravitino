@@ -31,16 +31,10 @@ val icebergVersion: String = libs.versions.iceberg.get()
 val scalaCollectionCompatVersion: String = libs.versions.scala.collection.compat.get()
 
 dependencies {
-  compileOnly(project(":api")) {
-    exclude("*")
-  }
+  compileOnly(project(":api"))
   implementation(project(":catalogs:catalog-common"))
-  compileOnly(project(":common")) {
-    exclude("*")
-  }
-  compileOnly(project(":core")) {
-    exclude("*")
-  }
+  compileOnly(project(":common"))
+  compileOnly(project(":core"))
   implementation(project(":iceberg:iceberg-common"))
   implementation(libs.bundles.iceberg)
 

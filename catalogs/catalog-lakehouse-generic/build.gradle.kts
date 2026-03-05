@@ -25,16 +25,10 @@ plugins {
 }
 
 dependencies {
-  compileOnly(project(":api")) {
-    exclude("*")
-  }
+  compileOnly(project(":api"))
   implementation(project(":catalogs:catalog-common"))
-  compileOnly(project(":common")) {
-    exclude("*")
-  }
-  compileOnly(project(":core")) {
-    exclude("*")
-  }
+  compileOnly(project(":common"))
+  compileOnly(project(":core"))
   implementation(project(":lance:lance-common")) {
     exclude("*")
   }

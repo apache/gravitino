@@ -30,19 +30,13 @@ val icebergVersion: String = libs.versions.iceberg.get()
 val scalaCollectionCompatVersion: String = libs.versions.scala.collection.compat.get()
 
 dependencies {
-  compileOnly(project(":api")) {
-    exclude("*")
-  }
+  compileOnly(project(":api"))
   implementation(project(":catalogs:catalog-common")) {
     exclude("*")
   }
-  compileOnly(project(":common")) {
-    exclude("*")
-  }
+  compileOnly(project(":common"))
   implementation(project(":catalogs:hive-metastore-common"))
-  compileOnly(project(":core")) {
-    exclude("*")
-  }
+  compileOnly(project(":core"))
 
   implementation(libs.commons.collections3)
   implementation(libs.commons.lang3)

@@ -25,15 +25,9 @@ plugins {
 }
 
 dependencies {
-  compileOnly(project(":api")) {
-    exclude("*")
-  }
-  compileOnly(project(":core")) {
-    exclude("*")
-  }
-  compileOnly(project(":common")) {
-    exclude("*")
-  }
+  compileOnly(project(":api"))
+  compileOnly(project(":core"))
+  compileOnly(project(":common"))
 
   testImplementation(project(":clients:client-java"))
   testImplementation(project(":api"))

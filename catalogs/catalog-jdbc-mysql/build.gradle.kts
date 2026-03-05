@@ -25,21 +25,15 @@ plugins {
 }
 
 dependencies {
-  compileOnly(project(":api")) {
-    exclude(group = "*")
-  }
+  compileOnly(project(":api"))
   implementation(project(":catalogs:catalog-common")) {
     exclude(group = "*")
   }
   implementation(project(":catalogs:catalog-jdbc-common")) {
     exclude(group = "*")
   }
-  compileOnly(project(":common")) {
-    exclude(group = "*")
-  }
-  compileOnly(project(":core")) {
-    exclude(group = "*")
-  }
+  compileOnly(project(":common"))
+  compileOnly(project(":core"))
 
   implementation(libs.bundles.log4j)
   implementation(libs.commons.collections4)
