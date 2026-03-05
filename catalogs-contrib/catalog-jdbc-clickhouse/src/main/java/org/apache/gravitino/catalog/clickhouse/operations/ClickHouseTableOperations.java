@@ -168,13 +168,15 @@ public class ClickHouseTableOperations extends JdbcTableOperations {
     // Add Create table clause
     appendCreateTableClause(notNullProperties, sqlBuilder, tableName);
 
-    // Add columns
-    buildColumnsDefinition(columns, sqlBuilder);
+    // We still allow empty columns when the engine is distributed.
+    if (columns.length > 0) {
+      buildColumnsDefinition(columns, sqlBuilder);
 
-    // Index definition
-    appendIndexesSql(indexes, sqlBuilder);
+      // Index definition
+      appendIndexesSql(indexes, sqlBuilder);
 
-    sqlBuilder.append("\n)");
+      sqlBuilder.append("\n)");
+    }
 
     // Extract engine from properties
     ClickHouseTablePropertiesMetadata.ENGINE engine =
@@ -220,10 +222,10 @@ public class ClickHouseTableOperations extends JdbcTableOperations {
 
     if (onCluster) {
       sqlBuilder.append(
-          "CREATE TABLE %s ON CLUSTER %s (\n"
+          "CREATE TABLE %s ON CLUSTER %s \n"
               .formatted(quoteIdentifier(tableName), quoteIdentifier(clusterName)));
     } else {
-      sqlBuilder.append("CREATE TABLE %s (\n".formatted(quoteIdentifier(tableName)));
+      sqlBuilder.append("CREATE TABLE %s \n".formatted(quoteIdentifier(tableName)));
     }
 
     return onCluster;
@@ -343,21 +345,29 @@ public class ClickHouseTableOperations extends JdbcTableOperations {
     Preconditions.checkArgument(
         StringUtils.isNotBlank(shardingKey), "Sharding key must be specified for Distributed");
 
-    List<String> shardingColumns = ClickHouseTableSqlUtils.extractShardingKeyColumns(shardingKey);
-    if (CollectionUtils.isNotEmpty(shardingColumns)) {
-      for (String columnName : shardingColumns) {
-        JdbcColumn shardingColumn = findColumn(columns, columnName);
-        Preconditions.checkArgument(
-            shardingColumn != null,
-            "Sharding key column %s must be defined in the table",
-            columnName);
+    // Users have defined the columns explicitly for the distributed table, we will check the
+    // columns should contain the sharding key, as clickhouse requires the sharding key must be
+    // defined in the columns of the distributed table.
+    if (ArrayUtils.isNotEmpty(columns)) {
+      List<String> shardingColumns = ClickHouseTableSqlUtils.extractShardingKeyColumns(shardingKey);
+      if (CollectionUtils.isNotEmpty(shardingColumns)) {
+        for (String columnName : shardingColumns) {
+          JdbcColumn shardingColumn = findColumn(columns, columnName);
+          Preconditions.checkArgument(
+              shardingColumn != null,
+              "Sharding key column %s must be defined in the table",
+              columnName);
+        }
       }
     }
 
-    String sanitizedShardingKey = ClickHouseTableSqlUtils.formatShardingKey(shardingKey);
+    if (ArrayUtils.isEmpty(columns)) {
+      sqlBuilder.append(" AS `%s`.`%s` ".formatted(remoteDatabase, remoteTable));
+    }
 
+    String sanitizedShardingKey = ClickHouseTableSqlUtils.formatShardingKey(shardingKey);
     sqlBuilder.append(
-        "\n ENGINE = %s(`%s`,`%s`,`%s`,%s)"
+        " ENGINE = %s(`%s`,`%s`,`%s`,%s)"
             .formatted(
                 ENGINE.DISTRIBUTED.getValue(),
                 clusterName,
@@ -418,6 +428,11 @@ public class ClickHouseTableOperations extends JdbcTableOperations {
   }
 
   private void buildColumnsDefinition(JdbcColumn[] columns, StringBuilder sqlBuilder) {
+    if (ArrayUtils.isEmpty(columns)) {
+      return;
+    }
+
+    sqlBuilder.append(" (");
     for (int i = 0; i < columns.length; i++) {
       JdbcColumn column = columns[i];
       sqlBuilder.append("  %s".formatted(quoteIdentifier(column.name())));
