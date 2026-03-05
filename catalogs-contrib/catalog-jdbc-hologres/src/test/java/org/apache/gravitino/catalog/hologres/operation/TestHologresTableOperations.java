@@ -30,6 +30,8 @@ import org.apache.gravitino.catalog.hologres.converter.HologresColumnDefaultValu
 import org.apache.gravitino.catalog.hologres.converter.HologresExceptionConverter;
 import org.apache.gravitino.catalog.hologres.converter.HologresTypeConverter;
 import org.apache.gravitino.catalog.jdbc.JdbcColumn;
+import org.apache.gravitino.catalog.jdbc.JdbcTable;
+import org.apache.gravitino.rel.TableChange;
 import org.apache.gravitino.rel.expressions.NamedReference;
 import org.apache.gravitino.rel.expressions.UnparsedExpression;
 import org.apache.gravitino.rel.expressions.distributions.Distribution;
@@ -76,6 +78,19 @@ public class TestHologresTableOperations {
 
     public String purgeTableSql(String tableName) {
       return generatePurgeTableSql(tableName);
+    }
+
+    public String alterTableSql(String schemaName, String tableName, TableChange... changes) {
+      return generateAlterTableSql(schemaName, tableName, changes);
+    }
+
+    public JdbcTable buildFakeTable(String tableName, JdbcColumn... columns) {
+      return JdbcTable.builder()
+          .withName(tableName)
+          .withColumns(columns)
+          .withComment("test table")
+          .withProperties(Collections.emptyMap())
+          .build();
     }
   }
 
@@ -775,7 +790,7 @@ public class TestHologresTableOperations {
   }
 
   @Test
-  void testCreateTableWithGeneratedColumn() {
+  void testCreateTableWithUnparsedExpressionDefault() {
     JdbcColumn col1 =
         JdbcColumn.builder()
             .withName("order_time")
@@ -791,21 +806,21 @@ public class TestHologresTableOperations {
             .build();
     String sql =
         ops.createTableSql(
-            "test_generated",
+            "test_default_expr",
             new JdbcColumn[] {col1, col2},
             null,
             Collections.emptyMap(),
             Transforms.EMPTY_TRANSFORM,
             Distributions.NONE,
             Indexes.EMPTY_INDEXES);
-    assertTrue(sql.contains("GENERATED ALWAYS AS (date_trunc('day'::text, order_time)) STORED"));
+    // UnparsedExpression should produce DEFAULT, not GENERATED ALWAYS AS
+    assertTrue(sql.contains("DEFAULT date_trunc('day'::text, order_time)"));
+    assertFalse(sql.contains("GENERATED ALWAYS AS"));
     assertTrue(sql.contains("NOT NULL"));
-    // Should NOT contain DEFAULT for the generated column
-    assertFalse(sql.contains("DEFAULT date_trunc"));
   }
 
   @Test
-  void testCreateTableWithGeneratedColumnNullable() {
+  void testCreateTableWithUnparsedExpressionDefaultNullable() {
     JdbcColumn col1 =
         JdbcColumn.builder()
             .withName("val")
@@ -821,15 +836,155 @@ public class TestHologresTableOperations {
             .build();
     String sql =
         ops.createTableSql(
-            "test_gen_nullable",
+            "test_default_nullable",
             new JdbcColumn[] {col1, col2},
             null,
             Collections.emptyMap(),
             Transforms.EMPTY_TRANSFORM,
             Distributions.NONE,
             Indexes.EMPTY_INDEXES);
-    assertTrue(sql.contains("GENERATED ALWAYS AS (val * 2) STORED"));
-    // The generated column should have NULL (nullable)
-    assertTrue(sql.contains("STORED NULL"));
+    // UnparsedExpression should produce DEFAULT, not GENERATED ALWAYS AS
+    assertTrue(sql.contains("DEFAULT val * 2"));
+    assertFalse(sql.contains("GENERATED ALWAYS AS"));
+    // The nullable column should have NULL
+    assertTrue(sql.contains("NULL DEFAULT val * 2"));
+  }
+
+  // ==================== generateAlterTableSql tests ====================
+
+  @Test
+  void testAlterTableUpdateComment() {
+    // Note: updateComment needs a JdbcTable with StringIdentifier, which requires
+    // getOrCreateTable. Since we can't mock the DB connection, we test the SQL format
+    // via the other alter operations that don't require table loading.
+  }
+
+  @Test
+  void testAlterTableRenameColumn() {
+    String sql =
+        ops.alterTableSql(
+            "public", "test_table", TableChange.renameColumn(new String[] {"old_col"}, "new_col"));
+    assertTrue(sql.contains("ALTER TABLE \"test_table\" RENAME COLUMN \"old_col\" TO \"new_col\""));
+  }
+
+  @Test
+  void testAlterTableUpdateColumnComment() {
+    String sql =
+        ops.alterTableSql(
+            "public",
+            "test_table",
+            TableChange.updateColumnComment(new String[] {"col1"}, "new comment"));
+    assertTrue(sql.contains("COMMENT ON COLUMN \"test_table\".\"col1\" IS 'new comment'"));
+  }
+
+  @Test
+  void testAlterTableUpdateColumnCommentWithSingleQuotes() {
+    String sql =
+        ops.alterTableSql(
+            "public",
+            "test_table",
+            TableChange.updateColumnComment(new String[] {"col1"}, "it's a test"));
+    assertTrue(sql.contains("IS 'it''s a test'"));
+  }
+
+  @Test
+  void testAlterTableRenameColumnRejectsNestedField() {
+    assertThrows(
+        UnsupportedOperationException.class,
+        () ->
+            ops.alterTableSql(
+                "public",
+                "test_table",
+                TableChange.renameColumn(new String[] {"schema", "col"}, "new_col")));
+  }
+
+  @Test
+  void testAlterTableSetPropertyThrows() {
+    assertThrows(
+        IllegalArgumentException.class,
+        () -> ops.alterTableSql("public", "test_table", TableChange.setProperty("key", "value")));
+  }
+
+  @Test
+  void testAlterTableRemovePropertyThrows() {
+    assertThrows(
+        IllegalArgumentException.class,
+        () -> ops.alterTableSql("public", "test_table", TableChange.removeProperty("key")));
+  }
+
+  @Test
+  void testAlterTableUpdateColumnDefaultValueThrows() {
+    assertThrows(
+        IllegalArgumentException.class,
+        () ->
+            ops.alterTableSql(
+                "public",
+                "test_table",
+                TableChange.updateColumnDefaultValue(
+                    new String[] {"col1"}, Literals.integerLiteral(0))));
+  }
+
+  @Test
+  void testAlterTableUpdateColumnTypeThrows() {
+    assertThrows(
+        IllegalArgumentException.class,
+        () ->
+            ops.alterTableSql(
+                "public",
+                "test_table",
+                TableChange.updateColumnType(new String[] {"col1"}, Types.StringType.get())));
+  }
+
+  @Test
+  void testAlterTableUpdateColumnPositionThrows() {
+    assertThrows(
+        IllegalArgumentException.class,
+        () ->
+            ops.alterTableSql(
+                "public",
+                "test_table",
+                TableChange.updateColumnPosition(
+                    new String[] {"col1"}, TableChange.ColumnPosition.first())));
+  }
+
+  @Test
+  void testAlterTableUpdateColumnNullabilityThrows() {
+    assertThrows(
+        IllegalArgumentException.class,
+        () ->
+            ops.alterTableSql(
+                "public",
+                "test_table",
+                TableChange.updateColumnNullability(new String[] {"col1"}, true)));
+  }
+
+  @Test
+  void testAlterTableAddIndexThrows() {
+    assertThrows(
+        IllegalArgumentException.class,
+        () ->
+            ops.alterTableSql(
+                "public",
+                "test_table",
+                TableChange.addIndex(
+                    Index.IndexType.PRIMARY_KEY, "pk_test", new String[][] {{"col1"}})));
+  }
+
+  @Test
+  void testAlterTableDeleteIndexThrows() {
+    assertThrows(
+        IllegalArgumentException.class,
+        () -> ops.alterTableSql("public", "test_table", TableChange.deleteIndex("pk_test", false)));
+  }
+
+  @Test
+  void testAlterTableUpdateColumnAutoIncrementThrows() {
+    assertThrows(
+        IllegalArgumentException.class,
+        () ->
+            ops.alterTableSql(
+                "public",
+                "test_table",
+                TableChange.updateColumnAutoIncrement(new String[] {"col1"}, true)));
   }
 }

@@ -55,7 +55,6 @@ import org.apache.gravitino.exceptions.NoSuchTableException;
 import org.apache.gravitino.rel.Column;
 import org.apache.gravitino.rel.TableChange;
 import org.apache.gravitino.rel.expressions.NamedReference;
-import org.apache.gravitino.rel.expressions.UnparsedExpression;
 import org.apache.gravitino.rel.expressions.distributions.Distribution;
 import org.apache.gravitino.rel.expressions.distributions.Distributions;
 import org.apache.gravitino.rel.expressions.distributions.Strategy;
@@ -73,7 +72,6 @@ import org.apache.gravitino.rel.indexes.Index;
 public class HologresTableOperations extends JdbcTableOperations
     implements RequireDatabaseOperation {
 
-  public static final String HOLO_QUOTE = "\"";
   public static final String NEW_LINE = "\n";
   public static final String ALTER_TABLE = "ALTER TABLE ";
   public static final String ALTER_COLUMN = "ALTER COLUMN ";
@@ -109,6 +107,11 @@ public class HologresTableOperations extends JdbcTableOperations
 
   private String database;
   private HologresSchemaOperations schemaOperations;
+
+  @Override
+  protected String quoteIdentifier(String identifier) {
+    return "\"" + identifier + "\"";
+  }
 
   @Override
   public void initialize(
@@ -197,13 +200,12 @@ public class HologresTableOperations extends JdbcTableOperations
         MapUtils.isNotEmpty(properties)
             && "true".equalsIgnoreCase(properties.get("is_logical_partitioned_table"));
     StringBuilder sqlBuilder = new StringBuilder();
-    sqlBuilder.append(
-        String.format("CREATE TABLE %s%s%s (%s", HOLO_QUOTE, tableName, HOLO_QUOTE, NEW_LINE));
+    sqlBuilder.append(String.format("CREATE TABLE %s (%s", quoteIdentifier(tableName), NEW_LINE));
 
     // Add columns
     for (int i = 0; i < columns.length; i++) {
       JdbcColumn column = columns[i];
-      sqlBuilder.append(String.format("    %s%s%s", HOLO_QUOTE, column.name(), HOLO_QUOTE));
+      sqlBuilder.append(String.format("    %s", quoteIdentifier(column.name())));
 
       appendColumnDefinition(column, sqlBuilder);
       // Add a comma for the next column, unless it's the last one
@@ -229,7 +231,17 @@ public class HologresTableOperations extends JdbcTableOperations
       validateDistribution(distribution);
       String distributionColumns =
           Arrays.stream(distribution.expressions())
-              .map(Object::toString)
+              .map(
+                  expression -> {
+                    Preconditions.checkArgument(
+                        expression instanceof NamedReference,
+                        "Hologres distribution expressions must be simple column references");
+                    String[] fieldNames = ((NamedReference) expression).fieldName();
+                    Preconditions.checkArgument(
+                        fieldNames != null && fieldNames.length == 1,
+                        "Hologres distribution expressions must reference a single column");
+                    return fieldNames[0];
+                  })
               .collect(Collectors.joining(","));
       withEntries.add(String.format("distribution_key = '%s'", distributionColumns));
     }
@@ -263,8 +275,7 @@ public class HologresTableOperations extends JdbcTableOperations
           .append(NEW_LINE)
           .append(
               String.format(
-                  "COMMENT ON TABLE %s%s%s IS '%s';",
-                  HOLO_QUOTE, tableName, HOLO_QUOTE, escapedComment));
+                  "COMMENT ON TABLE %s IS '%s';", quoteIdentifier(tableName), escapedComment));
     }
     Arrays.stream(columns)
         .filter(jdbcColumn -> StringUtils.isNotEmpty(jdbcColumn.comment()))
@@ -275,13 +286,9 @@ public class HologresTableOperations extends JdbcTableOperations
                   .append(NEW_LINE)
                   .append(
                       String.format(
-                          "COMMENT ON COLUMN %s%s%s.%s%s%s IS '%s';",
-                          HOLO_QUOTE,
-                          tableName,
-                          HOLO_QUOTE,
-                          HOLO_QUOTE,
-                          jdbcColumn.name(),
-                          HOLO_QUOTE,
+                          "COMMENT ON COLUMN %s.%s IS '%s';",
+                          quoteIdentifier(tableName),
+                          quoteIdentifier(jdbcColumn.name()),
                           escapedColComment));
             });
     // Return the generated SQL statement
@@ -315,7 +322,7 @@ public class HologresTableOperations extends JdbcTableOperations
                 throw new IllegalArgumentException(
                     "Index does not support complex fields in Hologres");
               }
-              return String.format("%s%s%s", HOLO_QUOTE, colNames[0], HOLO_QUOTE);
+              return "\"" + colNames[0] + "\"";
             })
         .collect(Collectors.joining(", "));
   }
@@ -371,7 +378,7 @@ public class HologresTableOperations extends JdbcTableOperations
                   Preconditions.checkArgument(
                       colNames.length == 1,
                       "Hologres partition does not support nested field names");
-                  return String.format("%s%s%s", HOLO_QUOTE, colNames[0], HOLO_QUOTE);
+                  return "\"" + colNames[0] + "\"";
                 })
             .collect(Collectors.joining(", "));
 
@@ -394,20 +401,7 @@ public class HologresTableOperations extends JdbcTableOperations
               + column.name());
     }
 
-    // Handle generated (stored computed) columns:
-    // GENERATED ALWAYS AS (expr) STORED must come before nullable constraints.
-    if (column.defaultValue() instanceof UnparsedExpression) {
-      String expr = ((UnparsedExpression) column.defaultValue()).unparsedExpression();
-      sqlBuilder.append(String.format("GENERATED ALWAYS AS (%s) STORED ", expr));
-      if (column.nullable()) {
-        sqlBuilder.append("NULL ");
-      } else {
-        sqlBuilder.append("NOT NULL ");
-      }
-      return;
-    }
-
-    // Add NOT NULL if the column is marked as such
+    // Add NULL / NOT NULL constraint
     if (column.nullable()) {
       sqlBuilder.append("NULL ");
     } else {
@@ -420,13 +414,13 @@ public class HologresTableOperations extends JdbcTableOperations
   @Override
   protected String generateRenameTableSql(String oldTableName, String newTableName) {
     return String.format(
-        "%s%s%s%s RENAME TO %s%s%s",
-        ALTER_TABLE, HOLO_QUOTE, oldTableName, HOLO_QUOTE, HOLO_QUOTE, newTableName, HOLO_QUOTE);
+        "%s%s RENAME TO %s",
+        ALTER_TABLE, quoteIdentifier(oldTableName), quoteIdentifier(newTableName));
   }
 
   @Override
   protected String generateDropTableSql(String tableName) {
-    return String.format("DROP TABLE %s%s%s", HOLO_QUOTE, tableName, HOLO_QUOTE);
+    return String.format("DROP TABLE %s", quoteIdentifier(tableName));
   }
 
   @Override
@@ -518,8 +512,8 @@ public class HologresTableOperations extends JdbcTableOperations
       }
     }
     return String.format(
-        "COMMENT ON TABLE %s%s%s IS '%s';",
-        HOLO_QUOTE, jdbcTable.name(), HOLO_QUOTE, newComment.replace("'", "''"));
+        "COMMENT ON TABLE %s IS '%s';",
+        quoteIdentifier(jdbcTable.name()), newComment.replace("'", "''"));
   }
 
   private String deleteColumnFieldDefinition(
@@ -538,14 +532,8 @@ public class HologresTableOperations extends JdbcTableOperations
       }
     }
     return String.format(
-        "%s%s%s%s DROP COLUMN %s%s%s;",
-        ALTER_TABLE,
-        HOLO_QUOTE,
-        table.name(),
-        HOLO_QUOTE,
-        HOLO_QUOTE,
-        deleteColumn.fieldName()[0],
-        HOLO_QUOTE);
+        "%s%s DROP COLUMN %s;",
+        ALTER_TABLE, quoteIdentifier(table.name()), quoteIdentifier(deleteColumn.fieldName()[0]));
   }
 
   private String renameColumnFieldDefinition(
@@ -554,17 +542,11 @@ public class HologresTableOperations extends JdbcTableOperations
       throw new UnsupportedOperationException(HOLOGRES_NOT_SUPPORT_NESTED_COLUMN_MSG);
     }
     return String.format(
-        "%s%s%s%s RENAME COLUMN %s%s%s TO %s%s%s;",
+        "%s%s RENAME COLUMN %s TO %s;",
         ALTER_TABLE,
-        HOLO_QUOTE,
-        tableName,
-        HOLO_QUOTE,
-        HOLO_QUOTE,
-        renameColumn.fieldName()[0],
-        HOLO_QUOTE,
-        HOLO_QUOTE,
-        renameColumn.getNewName(),
-        HOLO_QUOTE);
+        quoteIdentifier(tableName),
+        quoteIdentifier(renameColumn.fieldName()[0]),
+        quoteIdentifier(renameColumn.getNewName()));
   }
 
   private List<String> addColumnFieldDefinition(
@@ -592,14 +574,10 @@ public class HologresTableOperations extends JdbcTableOperations
 
     String columnDefinition =
         String.format(
-            "%s%s%s%s ADD COLUMN %s%s%s %s",
+            "%s%s ADD COLUMN %s %s",
             ALTER_TABLE,
-            HOLO_QUOTE,
-            lazyLoadTable.name(),
-            HOLO_QUOTE,
-            HOLO_QUOTE,
-            col,
-            HOLO_QUOTE,
+            quoteIdentifier(lazyLoadTable.name()),
+            quoteIdentifier(col),
             typeConverter.fromGravitino(addColumn.getDataType()));
 
     // Append position if available
@@ -613,14 +591,8 @@ public class HologresTableOperations extends JdbcTableOperations
       String escapedComment = addColumn.getComment().replace("'", "''");
       result.add(
           String.format(
-              "COMMENT ON COLUMN %s%s%s.%s%s%s IS '%s';",
-              HOLO_QUOTE,
-              lazyLoadTable.name(),
-              HOLO_QUOTE,
-              HOLO_QUOTE,
-              col,
-              HOLO_QUOTE,
-              escapedComment));
+              "COMMENT ON COLUMN %s.%s IS '%s';",
+              quoteIdentifier(lazyLoadTable.name()), quoteIdentifier(col), escapedComment));
     }
     return result;
   }
@@ -633,14 +605,8 @@ public class HologresTableOperations extends JdbcTableOperations
     }
     String col = updateColumnComment.fieldName()[0];
     return String.format(
-        "COMMENT ON COLUMN %s%s%s.%s%s%s IS '%s';",
-        HOLO_QUOTE,
-        tableName,
-        HOLO_QUOTE,
-        HOLO_QUOTE,
-        col,
-        HOLO_QUOTE,
-        newComment.replace("'", "''"));
+        "COMMENT ON COLUMN %s.%s IS '%s';",
+        quoteIdentifier(tableName), quoteIdentifier(col), newComment.replace("'", "''"));
   }
 
   @Override
