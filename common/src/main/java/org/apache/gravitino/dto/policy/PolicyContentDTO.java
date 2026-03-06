@@ -18,7 +18,6 @@
  */
 package org.apache.gravitino.dto.policy;
 
-import com.fasterxml.jackson.annotation.JsonAlias;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import java.util.Collections;
 import java.util.LinkedHashMap;
@@ -83,16 +82,12 @@ public interface PolicyContentDTO extends PolicyContent {
   class IcebergCompactionContentDTO implements PolicyContentDTO {
 
     @JsonProperty("minDataFileMse")
-    // Backward-compat alias for legacy payloads using old datafile-style naming.
-    @JsonAlias("minDatafileMse")
     private Long minDataFileMse;
 
     @JsonProperty("minDeleteFileNumber")
     private Long minDeleteFileNumber;
 
     @JsonProperty("dataFileMseWeight")
-    // Backward-compat alias for legacy payloads using old datafile-style naming.
-    @JsonAlias("datafileMseWeight")
     private Long dataFileMseWeight;
 
     @JsonProperty("deleteFileNumberWeight")
