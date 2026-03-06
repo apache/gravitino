@@ -96,7 +96,6 @@ public class TestTopicOperations extends BaseOperationsTest {
     Mockito.doReturn(false).when(config).get(ENABLE_AUTHORIZATION);
     FieldUtils.writeField(GravitinoEnv.getInstance(), "config", config, true);
     FieldUtils.writeField(GravitinoEnv.getInstance(), "lockManager", new LockManager(config), true);
-    FieldUtils.writeField(GravitinoEnv.getInstance(), "schemaDispatcher", schemaDispatcher, true);
     Mockito.doReturn(true).when(schemaDispatcher).schemaExists(any());
   }
 
@@ -116,6 +115,7 @@ public class TestTopicOperations extends BaseOperationsTest {
           @Override
           protected void configure() {
             bind(dispatcher).to(TopicDispatcher.class).ranked(2);
+            bind(schemaDispatcher).to(SchemaDispatcher.class).ranked(2);
             bindFactory(TestTopicOperations.MockServletRequestFactory.class)
                 .to(HttpServletRequest.class);
           }
