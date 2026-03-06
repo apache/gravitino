@@ -446,20 +446,17 @@ To enable access control in Gravitino, configure the following settings in your 
 | `gravitino.authorization.serviceAdmins`                 | Comma-separated list of service administrator usernames                   | (none)        | Yes (when authorization is enabled)         | 0.5.0         |
 | `gravitino.authorization.jcasbin.cacheExpirationSecs`   | The expiration time in seconds for authorization cache entries            | `3600`        | No                                          | 1.1.1         |
 | `gravitino.authorization.jcasbin.roleCacheSize`         | The maximum size of the role cache for authorization                      | `10000`       | No                                          | 1.1.1         |
-| `gravitino.authorization.jcasbin.ownerCacheSize`        | The maximum size of the owner cache for authorization                     | `100000`      | No                                          | 1.1.1         |
 
 ### Authorization Cache
 
-Gravitino uses Caffeine caches to improve authorization performance by caching role and owner information. The cache configuration options allow you to tune the cache behavior:
+Gravitino uses Caffeine caches to improve authorization performance by caching role information. The cache configuration options allow you to tune the cache behavior:
 
 - **`cacheExpirationSecs`**: Controls how long cache entries remain valid. After this time, entries are automatically evicted and reloaded from the backend on the next access. Lower values provide more up-to-date authorization decisions but may increase load on the backend.
 
 - **`roleCacheSize`**: Controls the maximum number of role entries that can be cached. When the cache reaches this size, the least recently used entries are evicted.
 
-- **`ownerCacheSize`**: Controls the maximum number of owner relationship entries that can be cached. This cache maps metadata object IDs to their owner IDs.
-
 :::info
-When role privileges or ownership are changed through the Gravitino API, the corresponding cache entries are automatically invalidated to ensure authorization decisions reflect the latest state.
+When role privileges are changed through the Gravitino API, the corresponding cache entries are automatically invalidated to ensure authorization decisions reflect the latest state.
 :::
 
 ### Important Notes
