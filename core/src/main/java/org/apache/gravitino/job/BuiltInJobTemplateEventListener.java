@@ -310,16 +310,9 @@ public class BuiltInJobTemplateEventListener implements EventListenerPlugin {
 
   private void updateBuiltInJobTemplate(
       String metalake, JobTemplateEntity existing, JobTemplate newTemplate) {
-    // Use existing.name() instead of newTemplate.name() to construct the identifier.
-    // Although in the current code path (loadBuiltInJobTemplates) the two names are always
-    // equal — because the map is keyed by template.name() — we prefer the stored entity's
-    // name here as a defensive measure.
-    //
-    // If a built-in template is ever renamed between Gravitino versions, the map key
-    // would reflect the new name while the already-persisted entity still carries the
-    // old name. Using newTemplate.name() in that case would cause
-    // a NoSuchEntityException when looking up the entity in the store.
-    // See: https://github.com/apache/gravitino/issues/10176
+    // Use existing.name() (not newTemplate.name()) so the EntityStore can locate the
+    // already-persisted record. Using newTemplate.name() would cause NoSuchEntityException
+    // if the template is ever renamed between Gravitino versions. See #10176.
     NameIdentifier identifier = NameIdentifierUtil.ofJobTemplate(metalake, existing.name());
 
     TreeLockUtils.doWithTreeLock(
