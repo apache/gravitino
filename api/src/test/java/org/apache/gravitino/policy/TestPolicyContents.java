@@ -52,7 +52,7 @@ public class TestPolicyContents {
             PolicyContents.icebergCompaction(
                 1000L, 1L, Map.of("target-file-size-bytes", "1048576", "min-input-files", "1"));
 
-    Assertions.assertEquals("compaction", content.properties().get("strategy.type"));
+    Assertions.assertEquals("iceberg-data-compaction", content.properties().get("strategy.type"));
     Assertions.assertEquals(
         "builtin-iceberg-rewrite-data-files", content.properties().get("job.template-name"));
     Assertions.assertEquals(1000L, content.rules().get("minDataFileMse"));

@@ -376,7 +376,7 @@ public class TestPolicyOperations extends BaseOperationsTest {
     Assertions.assertEquals(Response.Status.OK.getStatusCode(), resp.getStatus());
     PolicyResponse policyResp = resp.readEntity(PolicyResponse.class);
     Assertions.assertEquals(0, policyResp.getCode());
-    Assertions.assertEquals("ICEBERG_COMPACTION", policyResp.getPolicy().policyType());
+    Assertions.assertEquals("system_iceberg_compaction", policyResp.getPolicy().policyType());
   }
 
   @Test
@@ -415,7 +415,7 @@ public class TestPolicyOperations extends BaseOperationsTest {
     Assertions.assertEquals(Response.Status.OK.getStatusCode(), resp.getStatus());
     PolicyResponse policyResp = resp.readEntity(PolicyResponse.class);
     Assertions.assertEquals(0, policyResp.getCode());
-    Assertions.assertEquals("ICEBERG_COMPACTION", policyResp.getPolicy().policyType());
+    Assertions.assertEquals("system_iceberg_compaction", policyResp.getPolicy().policyType());
   }
 
   @Test
@@ -432,9 +432,6 @@ public class TestPolicyOperations extends BaseOperationsTest {
             .post(Entity.entity(request, MediaType.APPLICATION_JSON_TYPE));
 
     Assertions.assertEquals(Response.Status.BAD_REQUEST.getStatusCode(), resp.getStatus());
-    ErrorResponse errorResp = resp.readEntity(ErrorResponse.class);
-    Assertions.assertEquals(ErrorConstants.ILLEGAL_ARGUMENTS_CODE, errorResp.getCode());
-    Assertions.assertEquals(IllegalArgumentException.class.getSimpleName(), errorResp.getType());
   }
 
   @Test

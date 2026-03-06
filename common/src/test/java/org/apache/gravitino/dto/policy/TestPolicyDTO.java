@@ -127,7 +127,7 @@ public class TestPolicyDTO {
         PolicyDTO.builder()
             .withName("iceberg-compaction")
             .withComment("typed policy")
-            .withPolicyType("ICEBERG_COMPACTION")
+            .withPolicyType("system_iceberg_compaction")
             .withEnabled(true)
             .withContent(typedContent)
             .withAudit(audit)
@@ -139,12 +139,6 @@ public class TestPolicyDTO {
     Assertions.assertEquals(policyDTO, deserPolicyDTO);
     Assertions.assertInstanceOf(
         PolicyContentDTO.IcebergCompactionContentDTO.class, deserPolicyDTO.content());
-
-    String prefixedTypeJson = serJson.replace("ICEBERG_COMPACTION", "system_iceberg_compaction");
-    PolicyDTO deserWithPrefixedType =
-        JsonUtils.objectMapper().readValue(prefixedTypeJson, PolicyDTO.class);
-    Assertions.assertInstanceOf(
-        PolicyContentDTO.IcebergCompactionContentDTO.class, deserWithPrefixedType.content());
   }
 
   @Test
@@ -153,7 +147,7 @@ public class TestPolicyDTO {
         "{"
             + "\"name\":\"iceberg-compaction-default\","
             + "\"comment\":\"typed policy\","
-            + "\"policyType\":\"ICEBERG_COMPACTION\","
+            + "\"policyType\":\"system_iceberg_compaction\","
             + "\"enabled\":true,"
             + "\"content\":{}"
             + "}";

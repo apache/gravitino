@@ -33,7 +33,7 @@ The typed content for `system_iceberg_compaction` supports the following fields:
 The policy content is converted to:
 
 - Properties:
-  - `strategy.type=compaction`
+  - `strategy.type=iceberg-data-compaction`
   - `job.template-name=builtin-iceberg-rewrite-data-files`
 - Rules:
   - `trigger-expr=custom-data-file-mse >= minDataFileMse || custom-delete-file-number >= minDeleteFileNumber`

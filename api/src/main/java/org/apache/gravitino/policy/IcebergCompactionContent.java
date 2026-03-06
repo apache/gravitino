@@ -34,8 +34,8 @@ import org.apache.gravitino.MetadataObject;
 public class IcebergCompactionContent implements PolicyContent {
   /** Property key for strategy type. */
   public static final String STRATEGY_TYPE_KEY = "strategy.type";
-  /** Strategy type value for compaction. */
-  public static final String STRATEGY_TYPE_VALUE = "compaction";
+  /** Strategy type value for iceberg data compaction. */
+  public static final String STRATEGY_TYPE_VALUE = "iceberg-data-compaction";
   /** Property key for job template name. */
   public static final String JOB_TEMPLATE_NAME_KEY = "job.template-name";
   /** Built-in job template name for Iceberg rewrite data files. */
