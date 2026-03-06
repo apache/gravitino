@@ -113,6 +113,7 @@ public class IcebergCompactionContent implements PolicyContent {
       Long deleteFileNumberWeight,
       Long maxPartitionNum,
       Map<String, String> rewriteOptions) {
+    // Nullable inputs are treated as "use default" to simplify policy creation.
     this.minDataFileMse = minDataFileMse == null ? DEFAULT_MIN_DATA_FILE_MSE : minDataFileMse;
     this.minDeleteFileNumber =
         minDeleteFileNumber == null ? DEFAULT_MIN_DELETE_FILE_NUMBER : minDeleteFileNumber;
@@ -209,6 +210,7 @@ public class IcebergCompactionContent implements PolicyContent {
   @Override
   public void validate() throws IllegalArgumentException {
     PolicyContent.super.validate();
+    // All fields are defaulted in the constructor, so only range checks are needed here.
     Preconditions.checkArgument(minDataFileMse >= 0, "minDataFileMse must be >= 0");
     Preconditions.checkArgument(minDeleteFileNumber >= 0, "minDeleteFileNumber must be >= 0");
     Preconditions.checkArgument(dataFileMseWeight >= 0, "dataFileMseWeight must be >= 0");
