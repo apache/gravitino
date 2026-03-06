@@ -1,3 +1,11 @@
+All packages under `src/` are licensed according to the terms in
+their respective `LICENSE` or `LICENSE.md` files.
+
+The remainder of this project is licensed under the Blue Oak
+Model License, as follows:
+
+-----
+
 # Blue Oak Model License
 
 Version 1.0.0
