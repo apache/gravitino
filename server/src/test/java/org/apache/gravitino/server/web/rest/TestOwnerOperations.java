@@ -50,7 +50,6 @@ import org.apache.gravitino.dto.responses.ErrorConstants;
 import org.apache.gravitino.dto.responses.ErrorResponse;
 import org.apache.gravitino.dto.responses.OwnerResponse;
 import org.apache.gravitino.dto.responses.SetResponse;
-import org.apache.gravitino.exceptions.NoSuchMetadataObjectException;
 import org.apache.gravitino.exceptions.NoSuchRoleException;
 import org.apache.gravitino.exceptions.NotFoundException;
 import org.apache.gravitino.lock.LockManager;
@@ -288,7 +287,6 @@ class TestOwnerOperations extends BaseOperationsTest {
 
     doThrow(new NoSuchRoleException("test")).when(accessControlDispatcher).getRole(any(), any());
     Assertions.assertThrows(
-        NoSuchMetadataObjectException.class,
-        () -> MetadataObjectUtil.checkMetadataObject("metalake", role));
+        NoSuchRoleException.class, () -> MetadataObjectUtil.checkMetadataObject("metalake", role));
   }
 }

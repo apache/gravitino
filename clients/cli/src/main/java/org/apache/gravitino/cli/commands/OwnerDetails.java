@@ -27,8 +27,8 @@ import org.apache.gravitino.cli.CommandContext;
 import org.apache.gravitino.cli.CommandEntities;
 import org.apache.gravitino.cli.ErrorMessages;
 import org.apache.gravitino.client.GravitinoClient;
-import org.apache.gravitino.exceptions.NoSuchMetadataObjectException;
 import org.apache.gravitino.exceptions.NoSuchMetalakeException;
+import org.apache.gravitino.exceptions.NotFoundException;
 
 /** Represents the detail information of an owner of an entity. */
 public class OwnerDetails extends Command {
@@ -83,7 +83,7 @@ public class OwnerDetails extends Command {
       owner = client.getOwner(metadata);
     } catch (NoSuchMetalakeException err) {
       exitWithError(ErrorMessages.UNKNOWN_METALAKE);
-    } catch (NoSuchMetadataObjectException err) {
+    } catch (NotFoundException err) {
       exitWithError(ErrorMessages.UNKNOWN_ENTITY);
     } catch (Exception exp) {
       exitWithError(exp.getMessage());

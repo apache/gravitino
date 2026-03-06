@@ -51,7 +51,7 @@ import org.apache.gravitino.dto.responses.NameListResponse;
 import org.apache.gravitino.dto.responses.RoleResponse;
 import org.apache.gravitino.dto.util.DTOConverters;
 import org.apache.gravitino.exceptions.IllegalMetadataObjectException;
-import org.apache.gravitino.exceptions.NoSuchMetadataObjectException;
+import org.apache.gravitino.exceptions.NotFoundException;
 import org.apache.gravitino.metalake.MetalakeManager;
 import org.apache.gravitino.metrics.MetricNames;
 import org.apache.gravitino.server.authorization.MetadataAuthzHelper;
@@ -167,7 +167,7 @@ public class RoleOperations {
                   AuthorizationUtils.checkPrivilege((PrivilegeDTO) privilege, object, metalake);
                 }
                 MetadataObjectUtil.checkMetadataObject(metalake, object);
-              } catch (NoSuchMetadataObjectException nsm) {
+              } catch (NotFoundException nsm) {
                 throw new IllegalMetadataObjectException(nsm);
               }
             }

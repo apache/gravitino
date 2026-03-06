@@ -29,9 +29,9 @@ import org.apache.gravitino.cli.FullName;
 import org.apache.gravitino.cli.Privileges;
 import org.apache.gravitino.client.GravitinoClient;
 import org.apache.gravitino.dto.authorization.PrivilegeDTO;
-import org.apache.gravitino.exceptions.NoSuchMetadataObjectException;
 import org.apache.gravitino.exceptions.NoSuchMetalakeException;
 import org.apache.gravitino.exceptions.NoSuchRoleException;
+import org.apache.gravitino.exceptions.NotFoundException;
 
 /** Revokes one or more privileges. */
 public class RevokePrivilegesFromRole extends MetadataCommand {
@@ -88,7 +88,7 @@ public class RevokePrivilegesFromRole extends MetadataCommand {
       exitWithError(ErrorMessages.UNKNOWN_METALAKE);
     } catch (NoSuchRoleException err) {
       exitWithError(ErrorMessages.UNKNOWN_ROLE);
-    } catch (NoSuchMetadataObjectException err) {
+    } catch (NotFoundException err) {
       exitWithError(ErrorMessages.UNKNOWN_ENTITY);
     } catch (Exception exp) {
       exitWithError(exp.getMessage());
