@@ -37,7 +37,7 @@ jobs:
               - iceberg/**
               - lance/**
               - scripts/**
-              - server/** 
+              - server/**
               - meta/**
               - server-common/**
               - integration-test-common/**
