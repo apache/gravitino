@@ -87,6 +87,7 @@ import org.apache.gravitino.storage.relational.po.OwnerRelPO;
 import org.apache.gravitino.storage.relational.po.PolicyPO;
 import org.apache.gravitino.storage.relational.po.PolicyVersionPO;
 import org.apache.gravitino.storage.relational.po.SchemaPO;
+import org.apache.gravitino.storage.relational.po.SecurableObjectPO;
 import org.apache.gravitino.storage.relational.po.StatisticPO;
 import org.apache.gravitino.storage.relational.po.TablePO;
 import org.apache.gravitino.storage.relational.po.TagMetadataObjectRelPO;
@@ -1736,5 +1737,26 @@ public class TestPOConverters {
         .withProperties(properties)
         .withAuditInfo(auditInfo)
         .build();
+  }
+
+  @Test
+  public void testFromSecurableObjectPOWithMismatchedPrivileges() {
+    SecurableObjectPO securableObjectPO =
+        SecurableObjectPO.builder()
+            .withRoleId(1L)
+            .withMetadataObjectId(1L)
+            .withType(MetadataObject.Type.CATALOG.name())
+            .withPrivilegeNames("[\"USE_CATALOG\", \"CREATE_SCHEMA\"]")
+            .withPrivilegeConditions("[\"ALLOW\"]")
+            .withCurrentVersion(1L)
+            .withLastVersion(1L)
+            .withDeletedAt(0L)
+            .build();
+
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () ->
+            POConverters.fromSecurableObjectPO(
+                "test_catalog", securableObjectPO, MetadataObject.Type.CATALOG));
   }
 }
