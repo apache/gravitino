@@ -47,14 +47,14 @@ public class PolicyContents {
    *
    * @return iceberg compaction policy content with defaults
    */
-  public static PolicyContent icebergCompaction() {
-    return icebergCompaction(
-        IcebergCompactionContent.DEFAULT_MIN_DATA_FILE_MSE,
-        IcebergCompactionContent.DEFAULT_MIN_DELETE_FILE_NUMBER,
-        IcebergCompactionContent.DEFAULT_DATA_FILE_MSE_WEIGHT,
-        IcebergCompactionContent.DEFAULT_DELETE_FILE_NUMBER_WEIGHT,
-        IcebergCompactionContent.DEFAULT_MAX_PARTITION_NUM,
-        IcebergCompactionContent.DEFAULT_REWRITE_OPTIONS);
+  public static PolicyContent icebergDataCompaction() {
+    return icebergDataCompaction(
+        IcebergDataCompactionContent.DEFAULT_MIN_DATA_FILE_MSE,
+        IcebergDataCompactionContent.DEFAULT_MIN_DELETE_FILE_NUMBER,
+        IcebergDataCompactionContent.DEFAULT_DATA_FILE_MSE_WEIGHT,
+        IcebergDataCompactionContent.DEFAULT_DELETE_FILE_NUMBER_WEIGHT,
+        IcebergDataCompactionContent.DEFAULT_MAX_PARTITION_NUM,
+        IcebergDataCompactionContent.DEFAULT_REWRITE_OPTIONS);
   }
 
   /**
@@ -65,14 +65,14 @@ public class PolicyContents {
    * @param rewriteOptions rewrite options forwarded as job.options.*
    * @return iceberg compaction policy content
    */
-  public static PolicyContent icebergCompaction(
+  public static PolicyContent icebergDataCompaction(
       long minDataFileMse, long minDeleteFileNumber, Map<String, String> rewriteOptions) {
-    return icebergCompaction(
+    return icebergDataCompaction(
         minDataFileMse,
         minDeleteFileNumber,
-        IcebergCompactionContent.DEFAULT_DATA_FILE_MSE_WEIGHT,
-        IcebergCompactionContent.DEFAULT_DELETE_FILE_NUMBER_WEIGHT,
-        IcebergCompactionContent.DEFAULT_MAX_PARTITION_NUM,
+        IcebergDataCompactionContent.DEFAULT_DATA_FILE_MSE_WEIGHT,
+        IcebergDataCompactionContent.DEFAULT_DELETE_FILE_NUMBER_WEIGHT,
+        IcebergDataCompactionContent.DEFAULT_MAX_PARTITION_NUM,
         rewriteOptions);
   }
 
@@ -87,14 +87,14 @@ public class PolicyContents {
    * @param rewriteOptions rewrite options forwarded as job.options.*
    * @return iceberg compaction policy content
    */
-  public static PolicyContent icebergCompaction(
+  public static PolicyContent icebergDataCompaction(
       long minDataFileMse,
       long minDeleteFileNumber,
       long dataFileMseWeight,
       long deleteFileNumberWeight,
       long maxPartitionNum,
       Map<String, String> rewriteOptions) {
-    return new IcebergCompactionContent(
+    return new IcebergDataCompactionContent(
         minDataFileMse,
         minDeleteFileNumber,
         dataFileMseWeight,

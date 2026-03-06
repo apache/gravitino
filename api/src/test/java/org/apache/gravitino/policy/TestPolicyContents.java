@@ -29,13 +29,14 @@ public class TestPolicyContents {
 
   @Test
   void testIcebergCompactionContentUsesDefaults() {
-    IcebergCompactionContent content =
-        (IcebergCompactionContent) PolicyContents.icebergCompaction();
+    IcebergDataCompactionContent content =
+        (IcebergDataCompactionContent) PolicyContents.icebergDataCompaction();
 
     Assertions.assertEquals(
-        IcebergCompactionContent.DEFAULT_MIN_DATA_FILE_MSE, content.rules().get("minDataFileMse"));
+        IcebergDataCompactionContent.DEFAULT_MIN_DATA_FILE_MSE,
+        content.rules().get("minDataFileMse"));
     Assertions.assertEquals(
-        IcebergCompactionContent.DEFAULT_MIN_DELETE_FILE_NUMBER,
+        IcebergDataCompactionContent.DEFAULT_MIN_DELETE_FILE_NUMBER,
         content.rules().get("minDeleteFileNumber"));
     Assertions.assertEquals(1L, content.rules().get("dataFileMseWeight"));
     Assertions.assertEquals(100L, content.rules().get("deleteFileNumberWeight"));
@@ -47,9 +48,9 @@ public class TestPolicyContents {
 
   @Test
   void testIcebergCompactionContentGeneratesOptimizerFields() {
-    IcebergCompactionContent content =
-        (IcebergCompactionContent)
-            PolicyContents.icebergCompaction(
+    IcebergDataCompactionContent content =
+        (IcebergDataCompactionContent)
+            PolicyContents.icebergDataCompaction(
                 1000L, 1L, Map.of("target-file-size-bytes", "1048576", "min-input-files", "1"));
 
     Assertions.assertEquals("iceberg-data-compaction", content.properties().get("strategy.type"));
@@ -77,9 +78,9 @@ public class TestPolicyContents {
 
   @Test
   void testIcebergCompactionContentSupportsCustomWeights() {
-    IcebergCompactionContent content =
-        (IcebergCompactionContent)
-            PolicyContents.icebergCompaction(
+    IcebergDataCompactionContent content =
+        (IcebergDataCompactionContent)
+            PolicyContents.icebergDataCompaction(
                 1000L,
                 1L,
                 3L,
@@ -95,9 +96,9 @@ public class TestPolicyContents {
 
   @Test
   void testIcebergCompactionContentRejectsInvalidRewriteOptionKey() {
-    IcebergCompactionContent content =
-        (IcebergCompactionContent)
-            PolicyContents.icebergCompaction(
+    IcebergDataCompactionContent content =
+        (IcebergDataCompactionContent)
+            PolicyContents.icebergDataCompaction(
                 1000L, 1L, Map.of("job.options.target-file-size-bytes", "1048576"));
 
     IllegalArgumentException exception =
@@ -107,9 +108,9 @@ public class TestPolicyContents {
 
   @Test
   void testIcebergCompactionContentRejectsInvalidMaxPartitionNum() {
-    IcebergCompactionContent content =
-        (IcebergCompactionContent)
-            PolicyContents.icebergCompaction(
+    IcebergDataCompactionContent content =
+        (IcebergDataCompactionContent)
+            PolicyContents.icebergDataCompaction(
                 1000L, 1L, 2L, 10L, 0L, Map.of("target-file-size-bytes", "1048576"));
 
     IllegalArgumentException exception =

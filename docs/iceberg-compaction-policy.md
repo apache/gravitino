@@ -114,7 +114,7 @@ curl -X POST -H "Accept: application/vnd.gravitino.v1+json" \
 ```java
 GravitinoClient client = ...;
 
-PolicyContent content = PolicyContents.icebergCompaction();
+PolicyContent content = PolicyContents.icebergDataCompaction();
 
 Policy policy =
     client.createPolicy(

@@ -28,7 +28,7 @@ import lombok.Builder;
 import lombok.EqualsAndHashCode;
 import lombok.ToString;
 import org.apache.gravitino.MetadataObject;
-import org.apache.gravitino.policy.IcebergCompactionContent;
+import org.apache.gravitino.policy.IcebergDataCompactionContent;
 import org.apache.gravitino.policy.PolicyContent;
 import org.apache.gravitino.policy.PolicyContents;
 
@@ -109,7 +109,7 @@ public interface PolicyContentDTO extends PolicyContent {
      */
     public Long minDataFileMse() {
       return minDataFileMse == null
-          ? IcebergCompactionContent.DEFAULT_MIN_DATA_FILE_MSE
+          ? IcebergDataCompactionContent.DEFAULT_MIN_DATA_FILE_MSE
           : minDataFileMse;
     }
 
@@ -120,7 +120,7 @@ public interface PolicyContentDTO extends PolicyContent {
      */
     public Long minDeleteFileNumber() {
       return minDeleteFileNumber == null
-          ? IcebergCompactionContent.DEFAULT_MIN_DELETE_FILE_NUMBER
+          ? IcebergDataCompactionContent.DEFAULT_MIN_DELETE_FILE_NUMBER
           : minDeleteFileNumber;
     }
 
@@ -131,7 +131,7 @@ public interface PolicyContentDTO extends PolicyContent {
      */
     public Long dataFileMseWeight() {
       return dataFileMseWeight == null
-          ? IcebergCompactionContent.DEFAULT_DATA_FILE_MSE_WEIGHT
+          ? IcebergDataCompactionContent.DEFAULT_DATA_FILE_MSE_WEIGHT
           : dataFileMseWeight;
     }
 
@@ -142,7 +142,7 @@ public interface PolicyContentDTO extends PolicyContent {
      */
     public Long deleteFileNumberWeight() {
       return deleteFileNumberWeight == null
-          ? IcebergCompactionContent.DEFAULT_DELETE_FILE_NUMBER_WEIGHT
+          ? IcebergDataCompactionContent.DEFAULT_DELETE_FILE_NUMBER_WEIGHT
           : deleteFileNumberWeight;
     }
 
@@ -153,7 +153,7 @@ public interface PolicyContentDTO extends PolicyContent {
      */
     public Long maxPartitionNum() {
       return maxPartitionNum == null
-          ? IcebergCompactionContent.DEFAULT_MAX_PARTITION_NUM
+          ? IcebergDataCompactionContent.DEFAULT_MAX_PARTITION_NUM
           : maxPartitionNum;
     }
 
@@ -164,7 +164,7 @@ public interface PolicyContentDTO extends PolicyContent {
      */
     public Map<String, String> rewriteOptions() {
       return rewriteOptions == null
-          ? IcebergCompactionContent.DEFAULT_REWRITE_OPTIONS
+          ? IcebergDataCompactionContent.DEFAULT_REWRITE_OPTIONS
           : Collections.unmodifiableMap(new LinkedHashMap<>(rewriteOptions));
     }
 
@@ -190,7 +190,7 @@ public interface PolicyContentDTO extends PolicyContent {
     }
 
     private PolicyContent toDomainContent() {
-      return PolicyContents.icebergCompaction(
+      return PolicyContents.icebergDataCompaction(
           minDataFileMse(),
           minDeleteFileNumber(),
           dataFileMseWeight(),

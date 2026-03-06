@@ -97,7 +97,7 @@ import org.apache.gravitino.job.SparkJobTemplate;
 import org.apache.gravitino.messaging.Topic;
 import org.apache.gravitino.model.Model;
 import org.apache.gravitino.model.ModelVersion;
-import org.apache.gravitino.policy.IcebergCompactionContent;
+import org.apache.gravitino.policy.IcebergDataCompactionContent;
 import org.apache.gravitino.policy.PolicyContent;
 import org.apache.gravitino.policy.PolicyContents;
 import org.apache.gravitino.rel.Column;
@@ -565,8 +565,9 @@ public class DTOConverters {
           .build();
     }
 
-    if (policyContent instanceof IcebergCompactionContent) {
-      IcebergCompactionContent icebergCompactionContent = (IcebergCompactionContent) policyContent;
+    if (policyContent instanceof IcebergDataCompactionContent) {
+      IcebergDataCompactionContent icebergCompactionContent =
+          (IcebergDataCompactionContent) policyContent;
       return PolicyContentDTO.IcebergCompactionContentDTO.builder()
           .withMinDataFileMse(icebergCompactionContent.minDataFileMse())
           .withMinDeleteFileNumber(icebergCompactionContent.minDeleteFileNumber())
@@ -1313,7 +1314,7 @@ public class DTOConverters {
     if (policyContentDTO instanceof PolicyContentDTO.IcebergCompactionContentDTO) {
       PolicyContentDTO.IcebergCompactionContentDTO icebergCompactionContentDTO =
           (PolicyContentDTO.IcebergCompactionContentDTO) policyContentDTO;
-      return PolicyContents.icebergCompaction(
+      return PolicyContents.icebergDataCompaction(
           icebergCompactionContentDTO.minDataFileMse(),
           icebergCompactionContentDTO.minDeleteFileNumber(),
           icebergCompactionContentDTO.dataFileMseWeight(),

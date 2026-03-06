@@ -43,7 +43,7 @@ class TestGravitinoPolicyCompactionStrategy {
   @Test
   void testPolicyGeneratesExpectedStrategyAndJobContext() {
     PolicyContent content =
-        PolicyContents.icebergCompaction(
+        PolicyContents.icebergDataCompaction(
             1000L,
             1L,
             2L,

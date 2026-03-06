@@ -125,7 +125,8 @@ public class TestPolicyEntity {
         AuditInfo.builder().withCreator("test").withCreateTime(Instant.now()).build();
 
     PolicyContent icebergCompactionContent =
-        PolicyContents.icebergCompaction(1000L, 1L, Map.of("target-file-size-bytes", "1048576"));
+        PolicyContents.icebergDataCompaction(
+            1000L, 1L, Map.of("target-file-size-bytes", "1048576"));
     Assertions.assertDoesNotThrow(
         () ->
             PolicyEntity.builder()

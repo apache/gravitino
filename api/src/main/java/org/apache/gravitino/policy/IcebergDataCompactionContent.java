@@ -31,7 +31,7 @@ import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.MetadataObject;
 
 /** Built-in policy content for Iceberg compaction strategy. */
-public class IcebergCompactionContent implements PolicyContent {
+public class IcebergDataCompactionContent implements PolicyContent {
   /** Property key for strategy type. */
   public static final String STRATEGY_TYPE_KEY = "strategy.type";
   /** Strategy type value for iceberg data compaction. */
@@ -102,11 +102,11 @@ public class IcebergCompactionContent implements PolicyContent {
   private final Map<String, String> rewriteOptions;
 
   /** Default constructor for Jackson deserialization only. */
-  private IcebergCompactionContent() {
+  private IcebergDataCompactionContent() {
     this(null, null, null, null, null, null);
   }
 
-  IcebergCompactionContent(
+  IcebergDataCompactionContent(
       Long minDataFileMse,
       Long minDeleteFileNumber,
       Long dataFileMseWeight,
@@ -236,10 +236,10 @@ public class IcebergCompactionContent implements PolicyContent {
 
   @Override
   public boolean equals(Object o) {
-    if (!(o instanceof IcebergCompactionContent)) {
+    if (!(o instanceof IcebergDataCompactionContent)) {
       return false;
     }
-    IcebergCompactionContent that = (IcebergCompactionContent) o;
+    IcebergDataCompactionContent that = (IcebergDataCompactionContent) o;
     return Objects.equals(minDataFileMse, that.minDataFileMse)
         && Objects.equals(minDeleteFileNumber, that.minDeleteFileNumber)
         && Objects.equals(dataFileMseWeight, that.dataFileMseWeight)
@@ -261,7 +261,7 @@ public class IcebergCompactionContent implements PolicyContent {
 
   @Override
   public String toString() {
-    return "IcebergCompactionContent{"
+    return "IcebergDataCompactionContent{"
         + "minDataFileMse="
         + minDataFileMse
         + ", minDeleteFileNumber="

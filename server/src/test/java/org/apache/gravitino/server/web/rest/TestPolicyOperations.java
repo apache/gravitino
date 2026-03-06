@@ -342,7 +342,7 @@ public class TestPolicyOperations extends BaseOperationsTest {
   @Test
   public void testCreatePolicyWithIcebergCompactionType() {
     PolicyContent content =
-        PolicyContents.icebergCompaction(
+        PolicyContents.icebergDataCompaction(
             1000L,
             1L,
             ImmutableMap.of("target-file-size-bytes", "1048576", "min-input-files", "1"));
@@ -381,7 +381,7 @@ public class TestPolicyOperations extends BaseOperationsTest {
 
   @Test
   public void testCreatePolicyWithIcebergCompactionTypeDefaults() {
-    PolicyContent content = PolicyContents.icebergCompaction();
+    PolicyContent content = PolicyContents.icebergDataCompaction();
     PolicyEntity policy =
         PolicyEntity.builder()
             .withId(1L)
@@ -420,7 +420,7 @@ public class TestPolicyOperations extends BaseOperationsTest {
 
   @Test
   public void testCreatePolicyWithIcebergCompactionEnumTypeRejected() {
-    PolicyContent content = PolicyContents.icebergCompaction();
+    PolicyContent content = PolicyContents.icebergDataCompaction();
     PolicyCreateRequest request =
         new PolicyCreateRequest(
             "iceberg-compaction", "ICEBERG_COMPACTION", null, true, toDTO(content));

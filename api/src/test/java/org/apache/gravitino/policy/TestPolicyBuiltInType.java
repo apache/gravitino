@@ -49,6 +49,6 @@ public class TestPolicyBuiltInType {
   @Test
   void testBuiltInTypeContentClass() {
     Assertions.assertEquals(
-        IcebergCompactionContent.class, Policy.BuiltInType.ICEBERG_COMPACTION.contentClass());
+        IcebergDataCompactionContent.class, Policy.BuiltInType.ICEBERG_COMPACTION.contentClass());
   }
 }

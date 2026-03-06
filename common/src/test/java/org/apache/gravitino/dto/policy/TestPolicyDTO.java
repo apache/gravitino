@@ -26,7 +26,7 @@ import java.util.Optional;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.dto.AuditDTO;
 import org.apache.gravitino.json.JsonUtils;
-import org.apache.gravitino.policy.IcebergCompactionContent;
+import org.apache.gravitino.policy.IcebergDataCompactionContent;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
@@ -157,16 +157,17 @@ public class TestPolicyDTO {
         (PolicyContentDTO.IcebergCompactionContentDTO) policyDTO.content();
 
     Assertions.assertEquals(
-        IcebergCompactionContent.DEFAULT_MIN_DATA_FILE_MSE, contentDTO.minDataFileMse());
+        IcebergDataCompactionContent.DEFAULT_MIN_DATA_FILE_MSE, contentDTO.minDataFileMse());
     Assertions.assertEquals(
-        IcebergCompactionContent.DEFAULT_MIN_DELETE_FILE_NUMBER, contentDTO.minDeleteFileNumber());
+        IcebergDataCompactionContent.DEFAULT_MIN_DELETE_FILE_NUMBER,
+        contentDTO.minDeleteFileNumber());
     Assertions.assertEquals(
-        IcebergCompactionContent.DEFAULT_DATA_FILE_MSE_WEIGHT, contentDTO.dataFileMseWeight());
+        IcebergDataCompactionContent.DEFAULT_DATA_FILE_MSE_WEIGHT, contentDTO.dataFileMseWeight());
     Assertions.assertEquals(
-        IcebergCompactionContent.DEFAULT_DELETE_FILE_NUMBER_WEIGHT,
+        IcebergDataCompactionContent.DEFAULT_DELETE_FILE_NUMBER_WEIGHT,
         contentDTO.deleteFileNumberWeight());
     Assertions.assertEquals(
-        IcebergCompactionContent.DEFAULT_MAX_PARTITION_NUM, contentDTO.maxPartitionNum());
+        IcebergDataCompactionContent.DEFAULT_MAX_PARTITION_NUM, contentDTO.maxPartitionNum());
     Assertions.assertTrue(contentDTO.rewriteOptions().isEmpty());
     Assertions.assertDoesNotThrow(contentDTO::validate);
   }
