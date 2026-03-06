@@ -1,4 +1,16 @@
+<<<<<<< HEAD:web-v2/web/licenses/tar.txt
 The ISC License
+=======
+All packages under `src/` are licensed according to the terms in
+their respective `LICENSE` or `LICENSE.md` files.
+
+The remainder of this project is licensed under the Blue Oak
+Model License, as follows:
+
+-----
+
+# Blue Oak Model License
+>>>>>>> 35ca6ba75 ([#10242] web-v2(security): upgrade dependabot affected versions (#10244)):web-v2/web/licenses/sax.txt
 
 Copyright (c) Isaac Z. Schlueter and Contributors
 

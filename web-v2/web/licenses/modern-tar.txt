@@ -1,10 +1,6 @@
 MIT License
 
-<<<<<<<< HEAD:web-v2/web/licenses/array-prototype-toreversed.txt
-Copyright (c) 2021 ECMAScript Shims
-========
-Copyright (c) 2025-PRESENT Vjacheslav Trushkin
->>>>>>>> 35ca6ba75 ([#10242] web-v2(security): upgrade dependabot affected versions (#10244)):web-v2/web/licenses/cyberalien-svg-utils.txt
+Copyright (c) 2025 Ayuhito
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
