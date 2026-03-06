@@ -307,7 +307,7 @@ export const providerBase = {
         key: 'jdbc-driver',
         value: '',
         required: true,
-        description: 'e.g. com.clickhouse.ClickHouseDriver'
+        description: 'e.g. com.clickhouse.jdbc.ClickHouseDriver'
       },
       {
         label: 'JDBC User',
@@ -322,13 +322,6 @@ export const providerBase = {
         value: '',
         required: true,
         description: 'The password to connect to ClickHouse'
-      },
-      {
-        label: 'Pool Min Size',
-        key: 'jdbc.pool.min-size',
-        value: '2',
-        required: false,
-        description: 'The minimum number of connections in the connection pool'
       }
     ]
   },
