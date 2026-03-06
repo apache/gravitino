@@ -16,10 +16,27 @@
  * specific language governing permissions and limitations
  * under the License.
  */
+import org.gradle.api.attributes.java.TargetJvmVersion
+import org.gradle.api.tasks.compile.JavaCompile
+
 plugins {
   `maven-publish`
   id("java")
   id("idea")
+}
+
+tasks.named<JavaCompile>("compileTestJava") {
+  // client-java main artifact targets Java 8; tests depend on modules that publish Java 17 variants.
+  // Compile tests with release 17 to make Gradle variant matching for :core/:server test classpath deterministic.
+  options.release.set(17)
+}
+
+val targetJvmVersionAttribute = TargetJvmVersion.TARGET_JVM_VERSION_ATTRIBUTE
+configurations.named("testCompileClasspath") {
+  attributes.attribute(targetJvmVersionAttribute, 17)
+}
+configurations.named("testRuntimeClasspath") {
+  attributes.attribute(targetJvmVersionAttribute, 17)
 }
 
 dependencies {
@@ -70,6 +87,12 @@ tasks.build {
 }
 
 tasks.test {
+  javaLauncher.set(
+    javaToolchains.launcherFor {
+      languageVersion.set(JavaLanguageVersion.of(17))
+    }
+  )
+
   val skipITs = project.hasProperty("skipITs")
   if (skipITs) {
     exclude("**/integration/test/**")

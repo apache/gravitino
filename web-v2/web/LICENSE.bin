@@ -273,6 +273,7 @@
    @csstools/css-color-parser
    @csstools/css-parser-algorithms
    @csstools/css-tokenizer
+   @cyberalien/svg-utils
    @discoveryjs/json-ext
    @emnapi/core
    @emnapi/runtime
@@ -394,7 +395,6 @@
    chai
    chalk
    check-error
-   cheerio
    chokidar
    classnames
    client-only
@@ -468,6 +468,7 @@
    fastest-stable-stringify
    fd-slicer
    fdir
+   fflate
    file-entry-cache
    fill-range
    find-up
@@ -582,6 +583,7 @@
    minimist
    minizlib
    mlly
+   modern-tar
    mrmime
    ms
    mz
@@ -777,7 +779,6 @@
    ufo
    unbox-primitive
    undici-types
-   undici
    universalify
    unrs-resolver
    update-browserslist-db
@@ -842,7 +843,6 @@
    esrecurse
    estraverse
    esutils
-   extract-zip
    nth-check
    uri-js
    webidl-conversions
@@ -872,7 +872,6 @@
 
    @isaacs/cliui
    @isaacs/fs-minipass
-   @trysound/sax
    anymatch
    boolbase
    electron-to-chromium
@@ -929,7 +928,7 @@
    minipass
    package-json-from-dist
    path-scurry
-   tar
+   sax
    yallist
 
    This product bundles various third-party components also under the
