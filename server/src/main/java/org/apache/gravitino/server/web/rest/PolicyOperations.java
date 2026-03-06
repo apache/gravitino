@@ -333,6 +333,7 @@ public class PolicyOperations {
   }
 
   static PolicyDTO toDTO(PolicyEntity policy, Optional<Boolean> inherited) {
+    // Keep "custom" lowercase for backward compatibility, and return enum name for built-ins.
     String policyType =
         policy.policyType() == Policy.BuiltInType.CUSTOM
             ? policy.policyType().policyType()

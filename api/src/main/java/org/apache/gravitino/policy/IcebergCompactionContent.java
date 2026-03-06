@@ -60,7 +60,7 @@ public class IcebergCompactionContent implements PolicyContent {
   public static final String DATA_FILE_MSE_METRIC = "custom-data-file-mse";
   /** Metric name for delete file number. */
   public static final String DELETE_FILE_NUMBER_METRIC = "custom-delete-file-number";
-  /** Default minimum threshold for data file MSE metric. */
+  /** Default minimum threshold for data file MSE metric, equals (128 MiB * 0.15)^2. */
   public static final long DEFAULT_MIN_DATA_FILE_MSE = 405323966463344L;
   /** Default minimum threshold for delete file number metric. */
   public static final long DEFAULT_MIN_DELETE_FILE_NUMBER = 1L;

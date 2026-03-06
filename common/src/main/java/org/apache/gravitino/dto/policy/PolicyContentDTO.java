@@ -20,18 +20,15 @@ package org.apache.gravitino.dto.policy;
 
 import com.fasterxml.jackson.annotation.JsonAlias;
 import com.fasterxml.jackson.annotation.JsonProperty;
-import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableSet;
 import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Set;
-import java.util.regex.Pattern;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.EqualsAndHashCode;
 import lombok.ToString;
-import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.policy.IcebergCompactionContent;
 import org.apache.gravitino.policy.PolicyContent;
@@ -105,8 +102,6 @@ public interface PolicyContentDTO extends PolicyContent {
 
     @JsonProperty("rewriteOptions")
     private Map<String, String> rewriteOptions;
-
-    private static final Pattern OPTION_KEY_PATTERN = Pattern.compile("[A-Za-z0-9._-]+");
 
     // Default constructor for Jackson deserialization only.
     private IcebergCompactionContentDTO() {}
@@ -185,56 +180,28 @@ public interface PolicyContentDTO extends PolicyContent {
 
     @Override
     public Map<String, String> properties() {
-      return PolicyContents.icebergCompaction(
-              minDataFileMse(),
-              minDeleteFileNumber(),
-              dataFileMseWeight(),
-              deleteFileNumberWeight(),
-              maxPartitionNum(),
-              rewriteOptions())
-          .properties();
+      return toDomainContent().properties();
     }
 
     @Override
     public Map<String, Object> rules() {
-      return PolicyContents.icebergCompaction(
-              minDataFileMse(),
-              minDeleteFileNumber(),
-              dataFileMseWeight(),
-              deleteFileNumberWeight(),
-              maxPartitionNum(),
-              rewriteOptions())
-          .rules();
+      return toDomainContent().rules();
     }
 
     @Override
     public void validate() throws IllegalArgumentException {
       PolicyContentDTO.super.validate();
-      Preconditions.checkArgument(minDataFileMse() >= 0, "minDataFileMse must be >= 0");
-      Preconditions.checkArgument(minDeleteFileNumber() >= 0, "minDeleteFileNumber must be >= 0");
-      Preconditions.checkArgument(dataFileMseWeight() >= 0, "dataFileMseWeight must be >= 0");
-      Preconditions.checkArgument(
-          deleteFileNumberWeight() >= 0, "deleteFileNumberWeight must be >= 0");
-      Preconditions.checkArgument(maxPartitionNum() > 0, "maxPartitionNum must be > 0");
-      rewriteOptions()
-          .forEach(
-              (key, value) -> {
-                Preconditions.checkArgument(
-                    StringUtils.isNotBlank(key), "rewrite option key is blank");
-                Preconditions.checkArgument(
-                    OPTION_KEY_PATTERN.matcher(key).matches(),
-                    "rewrite option key '%s' contains illegal characters",
-                    key);
-                Preconditions.checkArgument(
-                    !key.startsWith(IcebergCompactionContent.JOB_OPTIONS_PREFIX),
-                    "rewrite option key '%s' must not start with '%s'",
-                    key,
-                    IcebergCompactionContent.JOB_OPTIONS_PREFIX);
-                Preconditions.checkArgument(
-                    StringUtils.isNotBlank(value),
-                    "rewrite option '%s' must have non-empty value",
-                    key);
-              });
+      toDomainContent().validate();
+    }
+
+    private PolicyContent toDomainContent() {
+      return PolicyContents.icebergCompaction(
+          minDataFileMse(),
+          minDeleteFileNumber(),
+          dataFileMseWeight(),
+          deleteFileNumberWeight(),
+          maxPartitionNum(),
+          rewriteOptions());
     }
   }
 }
