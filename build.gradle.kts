@@ -345,7 +345,8 @@ subprojects {
 
     val isReleaseRun = gradle.startParameter.taskNames.any {
       it == "release" || it == "publish" || it == "publishToMavenLocal" || it.endsWith(":release") || it.endsWith(
-        ":publish") || it.endsWith(":publishToMavenLocal")
+        ":publish"
+      ) || it.endsWith(":publishToMavenLocal")
     }
     if (!isReleaseRun) {
       return false
