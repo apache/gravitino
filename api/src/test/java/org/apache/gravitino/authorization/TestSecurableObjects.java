@@ -372,13 +372,15 @@ public class TestSecurableObjects {
     Assertions.assertFalse(manageGroups.canBindTo(MetadataObject.Type.ROLE));
     Assertions.assertFalse(manageGroups.canBindTo(MetadataObject.Type.COLUMN));
 
-    // Test manager grants
+    // Test manager grants — MANAGE_GRANTS can now be scoped to any object level
     Assertions.assertTrue(manageGrants.canBindTo(MetadataObject.Type.METALAKE));
-    Assertions.assertFalse(manageGrants.canBindTo(MetadataObject.Type.CATALOG));
-    Assertions.assertFalse(manageGrants.canBindTo(MetadataObject.Type.SCHEMA));
-    Assertions.assertFalse(manageGrants.canBindTo(MetadataObject.Type.TABLE));
-    Assertions.assertFalse(manageGrants.canBindTo(MetadataObject.Type.TOPIC));
-    Assertions.assertFalse(manageGrants.canBindTo(MetadataObject.Type.FILESET));
+    Assertions.assertTrue(manageGrants.canBindTo(MetadataObject.Type.CATALOG));
+    Assertions.assertTrue(manageGrants.canBindTo(MetadataObject.Type.SCHEMA));
+    Assertions.assertTrue(manageGrants.canBindTo(MetadataObject.Type.TABLE));
+    Assertions.assertTrue(manageGrants.canBindTo(MetadataObject.Type.TOPIC));
+    Assertions.assertTrue(manageGrants.canBindTo(MetadataObject.Type.FILESET));
+    Assertions.assertTrue(manageGrants.canBindTo(MetadataObject.Type.VIEW));
+    Assertions.assertTrue(manageGrants.canBindTo(MetadataObject.Type.MODEL));
     Assertions.assertFalse(manageGrants.canBindTo(MetadataObject.Type.ROLE));
     Assertions.assertFalse(manageGrants.canBindTo(MetadataObject.Type.COLUMN));
 
