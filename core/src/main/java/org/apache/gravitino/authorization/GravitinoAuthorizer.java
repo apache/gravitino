@@ -152,16 +152,4 @@ public interface GravitinoAuthorizer extends Closeable {
       throw new RuntimeException("Can not get Role Entity", e);
     }
   }
-
-  /**
-   * This method is called to clear the owner relationship in jcasbin when the owner of the metadata
-   * changes.
-   *
-   * @param metalake metalake;
-   * @param oldOwnerId The old owner id;
-   * @param nameIdentifier The metadata name identifier;
-   * @param type entity type
-   */
-  void handleMetadataOwnerChange(
-      String metalake, Long oldOwnerId, NameIdentifier nameIdentifier, Entity.EntityType type);
 }

@@ -25,7 +25,6 @@ import java.util.Optional;
 import lombok.Getter;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.EntityStore;
-import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.SupportsRelationOperations;
@@ -37,7 +36,6 @@ import org.apache.gravitino.lock.TreeLockUtils;
 import org.apache.gravitino.meta.GroupEntity;
 import org.apache.gravitino.meta.UserEntity;
 import org.apache.gravitino.utils.MetadataObjectUtil;
-import org.apache.gravitino.utils.NameIdentifierUtil;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -120,7 +118,6 @@ public class OwnerManager implements OwnerDispatcher {
           metadataObject,
           authorizationPlugin ->
               authorizationPlugin.onOwnerSet(metadataObject, originOwner.orElse(null), newOwner));
-      originOwner.ifPresent(owner -> notifyOwnerChange(owner, metalake, metadataObject));
     } catch (NoSuchEntityException nse) {
       LOG.warn(
           "Metadata object {} or owner {} is not found", metadataObject.fullName(), ownerName, nse);
@@ -133,33 +130,6 @@ public class OwnerManager implements OwnerDispatcher {
           metadataObject.fullName(),
           ioe);
       throw new RuntimeException(ioe);
-    }
-  }
-
-  private void notifyOwnerChange(Owner oldOwner, String metalake, MetadataObject metadataObject) {
-    GravitinoAuthorizer gravitinoAuthorizer = GravitinoEnv.getInstance().gravitinoAuthorizer();
-    if (gravitinoAuthorizer != null) {
-      if (oldOwner.type() == Owner.Type.USER) {
-        try {
-          UserEntity userEntity =
-              GravitinoEnv.getInstance()
-                  .entityStore()
-                  .get(
-                      NameIdentifierUtil.ofUser(metalake, oldOwner.name()),
-                      Entity.EntityType.USER,
-                      UserEntity.class);
-          gravitinoAuthorizer.handleMetadataOwnerChange(
-              metalake,
-              userEntity.id(),
-              MetadataObjectUtil.toEntityIdent(metalake, metadataObject),
-              Entity.EntityType.valueOf(metadataObject.type().name()));
-        } catch (IOException e) {
-          LOG.warn(e.getMessage(), e);
-        }
-      } else {
-        throw new UnsupportedOperationException(
-            "Notification for Group Owner is not supported yet.");
-      }
     }
   }
 
