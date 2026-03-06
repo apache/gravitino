@@ -254,7 +254,16 @@
    @babel/template
    @babel/traverse
    @babel/types
+<<<<<<< HEAD
    @ctrl/tinycolor
+=======
+   @bcoe/v8-coverage
+   @csstools/css-calc
+   @csstools/css-color-parser
+   @csstools/css-parser-algorithms
+   @csstools/css-tokenizer
+   @cyberalien/svg-utils
+>>>>>>> 35ca6ba75 ([#10242] web-v2(security): upgrade dependabot affected versions (#10244))
    @discoveryjs/json-ext
    @emotion/babel-plugin
    @emotion/cache
@@ -373,7 +382,11 @@
    callsites
    camelcase-css
    chalk
+<<<<<<< HEAD
    cheerio
+=======
+   check-error
+>>>>>>> 35ca6ba75 ([#10242] web-v2(security): upgrade dependabot affected versions (#10244))
    chokidar
    classnames
    client-only
@@ -446,6 +459,11 @@
    fast-loops
    fastest-stable-stringify
    fd-slicer
+<<<<<<< HEAD
+=======
+   fdir
+   fflate
+>>>>>>> 35ca6ba75 ([#10242] web-v2(security): upgrade dependabot affected versions (#10244))
    file-entry-cache
    fill-range
    find-root
@@ -552,6 +570,7 @@
    minizlib
    mkdirp
    mlly
+   modern-tar
    mrmime
    ms
    mz
@@ -727,6 +746,11 @@
    ufo
    unbox-primitive
    undici-types
+<<<<<<< HEAD
+=======
+   universalify
+   unrs-resolver
+>>>>>>> 35ca6ba75 ([#10242] web-v2(security): upgrade dependabot affected versions (#10244))
    update-browserslist-db
    use-resize-observer
    use-sync-external-store
@@ -774,7 +798,6 @@
    esrecurse
    estraverse
    esutils
-   extract-zip
    nth-check
    uri-js
 
@@ -799,9 +822,13 @@
    ISC license.
 
    @isaacs/cliui
+<<<<<<< HEAD
    @trysound/sax
    @types/tar
    @ungap/structured-clone
+=======
+   @isaacs/fs-minipass
+>>>>>>> 35ca6ba75 ([#10242] web-v2(security): upgrade dependabot affected versions (#10244))
    anymatch
    boolbase
    electron-to-chromium
@@ -862,6 +889,11 @@
    chownr
    jackspeak
    path-scurry
+<<<<<<< HEAD
+=======
+   sax
+   yallist
+>>>>>>> 35ca6ba75 ([#10242] web-v2(security): upgrade dependabot affected versions (#10244))
 
    This product bundles various third-party components also under the
    0BSD license.
