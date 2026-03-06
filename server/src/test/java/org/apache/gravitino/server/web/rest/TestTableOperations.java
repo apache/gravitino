@@ -994,4 +994,41 @@ public class TestTableOperations extends BaseOperationsTest {
 
     return table;
   }
+
+  @Test
+  public void testCreateTableWithNonExistentSchema() {
+    String nonExistentSchema = "non_existent_schema";
+    NameIdentifier schemaIdent = NameIdentifier.of(metalake, catalog, nonExistentSchema);
+
+    // Mock schema not exists
+    when(schemaDispatcher.schemaExists(schemaIdent)).thenReturn(false);
+
+    TableCreateRequest req =
+        new TableCreateRequest(
+            "table1",
+            "comment",
+            new ColumnDTO[] {
+              new ColumnDTO.Builder()
+                  .withName("col1")
+                  .withDataType(Types.IntegerType.get())
+                  .withComment("col_comment")
+                  .build()
+            },
+            ImmutableMap.of(),
+            new SortOrderDTO[0],
+            null,
+            new Partitioning[0],
+            new IndexDTO[0]);
+
+    Response resp =
+        target(tablePath(metalake, catalog, nonExistentSchema))
+            .request(MediaType.APPLICATION_JSON_TYPE)
+            .accept("application/vnd.gravitino.v1+json")
+            .post(Entity.entity(req, MediaType.APPLICATION_JSON_TYPE));
+
+    Assertions.assertEquals(Response.Status.NOT_FOUND.getStatusCode(), resp.getStatus());
+
+    ErrorResponse errorResp = resp.readEntity(ErrorResponse.class);
+    Assertions.assertEquals(NoSuchSchemaException.class.getSimpleName(), errorResp.getType());
+  }
 }

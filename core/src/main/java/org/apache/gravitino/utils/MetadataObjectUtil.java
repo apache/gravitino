@@ -18,8 +18,6 @@
  */
 package org.apache.gravitino.utils;
 
-import static com.google.common.base.Preconditions.checkNotNull;
-
 import com.google.common.base.Joiner;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.BiMap;
@@ -33,12 +31,20 @@ import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.authorization.AuthorizationUtils;
 import org.apache.gravitino.exceptions.IllegalMetadataObjectException;
+import org.apache.gravitino.exceptions.NoSuchCatalogException;
+import org.apache.gravitino.exceptions.NoSuchFilesetException;
 import org.apache.gravitino.exceptions.NoSuchJobException;
 import org.apache.gravitino.exceptions.NoSuchJobTemplateException;
 import org.apache.gravitino.exceptions.NoSuchMetadataObjectException;
+import org.apache.gravitino.exceptions.NoSuchMetalakeException;
+import org.apache.gravitino.exceptions.NoSuchModelException;
 import org.apache.gravitino.exceptions.NoSuchPolicyException;
 import org.apache.gravitino.exceptions.NoSuchRoleException;
+import org.apache.gravitino.exceptions.NoSuchSchemaException;
+import org.apache.gravitino.exceptions.NoSuchTableException;
 import org.apache.gravitino.exceptions.NoSuchTagException;
+import org.apache.gravitino.exceptions.NoSuchTopicException;
+import org.apache.gravitino.exceptions.NoSuchViewException;
 
 public class MetadataObjectUtil {
 
@@ -151,59 +157,72 @@ public class MetadataObjectUtil {
     GravitinoEnv env = GravitinoEnv.getInstance();
     NameIdentifier identifier = toEntityIdent(metalake, object);
 
-    Supplier<NoSuchMetadataObjectException> exceptionToThrowSupplier =
-        () ->
-            new NoSuchMetadataObjectException(
-                "Metadata object %s type %s doesn't exist", object.fullName(), object.type());
-
     switch (object.type()) {
       case METALAKE:
         if (!metalake.equals(object.name())) {
           throw new IllegalMetadataObjectException("The metalake object name must be %s", metalake);
         }
         NameIdentifierUtil.checkMetalake(identifier);
-        check(env.metalakeDispatcher().metalakeExists(identifier), exceptionToThrowSupplier);
+        check(
+            env.metalakeDispatcher().metalakeExists(identifier),
+            () -> new NoSuchMetalakeException("Metalake %s doesn't exist", object.fullName()));
         break;
 
       case CATALOG:
         NameIdentifierUtil.checkCatalog(identifier);
-        check(env.catalogDispatcher().catalogExists(identifier), exceptionToThrowSupplier);
+        check(
+            env.catalogDispatcher().catalogExists(identifier),
+            () -> new NoSuchCatalogException("Catalog %s doesn't exist", object.fullName()));
         break;
 
       case SCHEMA:
         NameIdentifierUtil.checkSchema(identifier);
-        check(env.schemaDispatcher().schemaExists(identifier), exceptionToThrowSupplier);
+        check(
+            env.schemaDispatcher().schemaExists(identifier),
+            () -> new NoSuchSchemaException("Schema %s doesn't exist", object.fullName()));
         break;
 
       case FILESET:
         NameIdentifierUtil.checkFileset(identifier);
-        check(env.filesetDispatcher().filesetExists(identifier), exceptionToThrowSupplier);
+        check(
+            env.filesetDispatcher().filesetExists(identifier),
+            () -> new NoSuchFilesetException("Fileset %s doesn't exist", object.fullName()));
         break;
 
       case TABLE:
         NameIdentifierUtil.checkTable(identifier);
-        check(env.tableDispatcher().tableExists(identifier), exceptionToThrowSupplier);
+        check(
+            env.tableDispatcher().tableExists(identifier),
+            () -> new NoSuchTableException("Table %s doesn't exist", object.fullName()));
         break;
 
       case COLUMN:
         NameIdentifierUtil.checkColumn(identifier);
         NameIdentifier tableIdent = NameIdentifier.of(identifier.namespace().levels());
-        check(env.tableDispatcher().tableExists(tableIdent), exceptionToThrowSupplier);
+        check(
+            env.tableDispatcher().tableExists(tableIdent),
+            () -> new NoSuchTableException("Table %s doesn't exist", tableIdent.toString()));
         break;
 
       case TOPIC:
         NameIdentifierUtil.checkTopic(identifier);
-        check(env.topicDispatcher().topicExists(identifier), exceptionToThrowSupplier);
+        check(
+            env.topicDispatcher().topicExists(identifier),
+            () -> new NoSuchTopicException("Topic %s doesn't exist", object.fullName()));
         break;
 
       case MODEL:
         NameIdentifierUtil.checkModel(identifier);
-        check(env.modelDispatcher().modelExists(identifier), exceptionToThrowSupplier);
+        check(
+            env.modelDispatcher().modelExists(identifier),
+            () -> new NoSuchModelException("Model %s doesn't exist", object.fullName()));
         break;
 
       case VIEW:
         NameIdentifierUtil.checkView(identifier);
-        check(env.viewDispatcher().viewExists(identifier), exceptionToThrowSupplier);
+        check(
+            env.viewDispatcher().viewExists(identifier),
+            () -> new NoSuchViewException("View %s doesn't exist", object.fullName()));
         break;
 
       case ROLE:
@@ -211,7 +230,7 @@ public class MetadataObjectUtil {
         try {
           env.accessControlDispatcher().getRole(metalake, object.fullName());
         } catch (NoSuchRoleException nsr) {
-          throw exceptionToThrowSupplier.get();
+          throw nsr;
         }
         break;
 
@@ -220,7 +239,7 @@ public class MetadataObjectUtil {
         try {
           env.tagDispatcher().getTag(metalake, object.fullName());
         } catch (NoSuchTagException nsr) {
-          throw exceptionToThrowSupplier.get();
+          throw nsr;
         }
         break;
 
@@ -229,7 +248,7 @@ public class MetadataObjectUtil {
         try {
           env.policyDispatcher().getPolicy(metalake, object.fullName());
         } catch (NoSuchPolicyException nsr) {
-          throw checkNotNull(exceptionToThrowSupplier).get();
+          throw nsr;
         }
         break;
 
@@ -238,7 +257,7 @@ public class MetadataObjectUtil {
         try {
           env.jobOperationDispatcher().getJob(metalake, object.fullName());
         } catch (NoSuchJobException e) {
-          throw exceptionToThrowSupplier.get();
+          throw e;
         }
         break;
 
@@ -247,7 +266,7 @@ public class MetadataObjectUtil {
         try {
           env.jobOperationDispatcher().getJobTemplate(metalake, object.fullName());
         } catch (NoSuchJobTemplateException e) {
-          throw exceptionToThrowSupplier.get();
+          throw e;
         }
         break;
 
