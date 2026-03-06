@@ -110,5 +110,9 @@ public class PassThroughAuthorizer implements GravitinoAuthorizer {
   public void handleRolePrivilegeChange(String metalake, String roleName) {}
 
   @Override
+  public void handleMetadataOwnerChange(
+      String metalake, Long oldOwnerId, NameIdentifier nameIdentifier, Entity.EntityType type) {}
+
+  @Override
   public void close() throws IOException {}
 }

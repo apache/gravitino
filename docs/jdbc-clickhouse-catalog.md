@@ -23,13 +23,13 @@ ClickHouse catalog is not included in the standard Gravitino server distribution
 
 ### Catalog capabilities
 
-| Item              | Description                                                                                             |
-|-------------------|---------------------------------------------------------------------------------------------------------|
-| Scope             | One catalog maps to one ClickHouse instance                                                             |
-| Metadata/DDL      | Supports JDBC-based metadata management and DDL                                                         |
-| Column defaults   | Supports column default values                                                                          |
-| Drivers           | Requires user-provided ClickHouse JDBC driver in `catalogs-contrib/catalog-jdbc-clickhouse/libs`        |
-| Supported version | All the codes are tested by ClickHouse `24.8.14`, but should be compatible with other versions as well. |                                                
+| Item              | Description                                                                                                                                                                                                   |
+|-------------------|---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| Scope             | One catalog maps to one ClickHouse instance                                                                                                                                                                   |
+| Metadata/DDL      | Supports JDBC-based metadata management and DDL                                                                                                                                                               |
+| Column defaults   | Supports column default values                                                                                                                                                                                |
+| Drivers           | Requires user-provided ClickHouse JDBC driver in `${GRAVITINO_HOME}/catalogs/jdbc-clickhouse/libs`, please download the jar from [link](https://repo1.maven.org/maven2/com/clickhouse/clickhouse-jdbc/0.7.1/) |
+| Supported version | All the codes are tested by ClickHouse `24.8.14`, but should be compatible with other versions as well.                                                                                                       |                                                
 
 ### Catalog properties
 
@@ -49,7 +49,7 @@ When using the JDBC catalog you must provide `jdbc-url`, `jdbc-driver`, `jdbc-us
 
 ### Create a ClickHouse catalog
 
-The following example creates a ClickHouse catalog with the required JDBC properties and optional connection pool settings. Note that the `jdbc-driver` class must be available in the Gravitino classpath (for example by placing the ClickHouse JDBC driver JAR in `catalogs/catalog-jdbc-clickhouse/libs`).
+The following example creates a ClickHouse catalog with the required JDBC properties and optional connection pool settings. Note that the `jdbc-driver` class must be available in the Gravitino classpath (for example by placing the ClickHouse JDBC driver JAR in `${GRAVITINO_HOME}/catalogs/jdbc-clickhouse/libs`).
 Description about some of the properties:
 - provider: must be `jdbc-clickhouse` for Gravitino to recognize the catalog as ClickHouse;
 - type: must be `RELATIONAL` since ClickHouse is a relational database; 
