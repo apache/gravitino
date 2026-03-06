@@ -27,16 +27,17 @@ dependencies {
   compileOnly(project(":common"))
 
   implementation(libs.cglib)
-  implementation(libs.commons.lang3)
   implementation(libs.commons.io)
+  implementation(libs.commons.lang3)
+  implementation(libs.guava)
   implementation(libs.hadoop3.client.api)
   implementation(libs.hadoop3.client.runtime)
-  implementation(libs.guava)
   implementation(libs.slf4j.api)
 
-  testImplementation(libs.junit.jupiter.api)
   testImplementation(project(":api"))
   testImplementation(project(":common"))
+
+  testImplementation(libs.junit.jupiter.api)
   testImplementation(libs.junit.jupiter.params)
 
   testRuntimeOnly(libs.junit.jupiter.engine)

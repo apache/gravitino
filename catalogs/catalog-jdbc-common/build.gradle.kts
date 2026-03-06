@@ -39,9 +39,12 @@ artifacts {
 
 dependencies {
   compileOnly(project(":api"))
-  implementation(project(":catalogs:catalog-common"))
   compileOnly(project(":common"))
   compileOnly(project(":core"))
+
+  compileOnly(libs.lombok)
+
+  implementation(project(":catalogs:catalog-common"))
 
   implementation(libs.bundles.log4j)
   implementation(libs.commons.collections4)
@@ -53,10 +56,13 @@ dependencies {
   implementation(libs.jackson.datatype.jdk8)
   implementation(libs.jackson.datatype.jsr310)
 
-  testImplementation(libs.commons.io)
+  annotationProcessor(libs.lombok)
+
   testImplementation(project(":api"))
   testImplementation(project(":common"))
   testImplementation(project(":core"))
+
+  testImplementation(libs.commons.io)
   testImplementation(libs.junit.jupiter.api)
   testImplementation(libs.junit.jupiter.params)
   testImplementation(libs.sqlite.jdbc)
@@ -65,6 +71,4 @@ dependencies {
   testImplementation(libs.testcontainers.postgresql)
 
   testRuntimeOnly(libs.junit.jupiter.engine)
-  compileOnly(libs.lombok)
-  annotationProcessor(libs.lombok)
 }

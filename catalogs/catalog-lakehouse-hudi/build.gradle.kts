@@ -31,39 +31,40 @@ val hudiVersion = libs.versions.hudi.get()
 
 dependencies {
   compileOnly(project(":api"))
+  compileOnly(project(":common"))
+  compileOnly(project(":core"))
+
+  compileOnly(libs.lombok)
+
   implementation(project(":catalogs:catalog-common")) {
     exclude("*")
   }
   implementation(project(":catalogs:hive-metastore-common"))
-  compileOnly(project(":core"))
-  compileOnly(project(":common"))
 
   implementation(libs.commons.collections3)
-  implementation(libs.commons.lang3)
   implementation(libs.commons.configuration1)
   implementation(libs.commons.io)
-  implementation(libs.htrace.core4)
+  implementation(libs.commons.lang3)
   implementation(libs.guava)
   implementation(libs.hadoop2.auth) {
     exclude("*")
   }
-  implementation(libs.woodstox.core)
   implementation(libs.hadoop2.common) {
     exclude("*")
   }
+  implementation(libs.htrace.core4)
   implementation(libs.slf4j.api)
-
-  compileOnly(libs.lombok)
+  implementation(libs.woodstox.core)
 
   annotationProcessor(libs.lombok)
 
-  testImplementation(project(":catalogs:hive-metastore-common", "testArtifacts"))
   testImplementation(project(":api"))
-  testImplementation(project(":common"))
-  testImplementation(project(":core"))
+  testImplementation(project(":catalogs:hive-metastore-common", "testArtifacts"))
   testImplementation(project(":clients:client-java")) {
     exclude("org.apache.logging.log4j")
   }
+  testImplementation(project(":common"))
+  testImplementation(project(":core"))
   testImplementation(project(":integration-test-common", "testArtifacts"))
   testImplementation(project(":server")) {
     exclude("org.apache.logging.log4j")
@@ -72,15 +73,41 @@ dependencies {
     exclude("org.apache.logging.log4j")
   }
 
+  testImplementation("org.apache.spark:spark-hive_$scalaVersion:$fullSparkVersion") {
+    exclude("org.apache.hadoop")
+    exclude("io.dropwizard.metrics")
+    exclude("com.fasterxml.jackson.core")
+    exclude("com.fasterxml.jackson.module", "jackson-module-scala_2.12")
+  }
+  testImplementation("org.apache.spark:spark-hive_$scalaVersion:$fullSparkVersion") {
+    exclude("org.apache.hadoop")
+    exclude("io.dropwizard.metrics")
+    exclude("com.fasterxml.jackson.core")
+    exclude("com.fasterxml.jackson.module", "jackson-module-scala_2.12")
+  }
+  testImplementation("org.apache.spark:spark-sql_$scalaVersion:$fullSparkVersion") {
+    exclude("org.apache.avro")
+    exclude("org.apache.hadoop")
+    exclude("org.apache.zookeeper")
+    exclude("io.dropwizard.metrics")
+    exclude("org.rocksdb")
+  }
+  testImplementation("org.apache.spark:spark-sql_$scalaVersion:$fullSparkVersion") {
+    exclude("org.apache.avro")
+    exclude("org.apache.hadoop")
+    exclude("org.apache.zookeeper")
+    exclude("io.dropwizard.metrics")
+    exclude("org.rocksdb")
+  }
   testImplementation(libs.awaitility)
-  testImplementation(libs.bundles.jetty)
   testImplementation(libs.bundles.jersey)
+  testImplementation(libs.bundles.jetty)
   testImplementation(libs.commons.collections3)
   testImplementation(libs.commons.configuration1)
-  testImplementation(libs.datanucleus.core)
   testImplementation(libs.datanucleus.api.jdo)
-  testImplementation(libs.datanucleus.rdbms)
+  testImplementation(libs.datanucleus.core)
   testImplementation(libs.datanucleus.jdo)
+  testImplementation(libs.datanucleus.rdbms)
   testImplementation(libs.derby)
   testImplementation(libs.hadoop2.auth) {
     exclude("*")
@@ -94,33 +121,7 @@ dependencies {
   testImplementation(libs.mysql.driver)
   testImplementation(libs.postgresql.driver)
   testImplementation(libs.prometheus.dropwizard)
-  testImplementation("org.apache.spark:spark-hive_$scalaVersion:$fullSparkVersion") {
-    exclude("org.apache.hadoop")
-    exclude("io.dropwizard.metrics")
-    exclude("com.fasterxml.jackson.core")
-    exclude("com.fasterxml.jackson.module", "jackson-module-scala_2.12")
-  }
-  testImplementation("org.apache.spark:spark-sql_$scalaVersion:$fullSparkVersion") {
-    exclude("org.apache.avro")
-    exclude("org.apache.hadoop")
-    exclude("org.apache.zookeeper")
-    exclude("io.dropwizard.metrics")
-    exclude("org.rocksdb")
-  }
   testImplementation(libs.testcontainers)
-  testImplementation("org.apache.spark:spark-hive_$scalaVersion:$fullSparkVersion") {
-    exclude("org.apache.hadoop")
-    exclude("io.dropwizard.metrics")
-    exclude("com.fasterxml.jackson.core")
-    exclude("com.fasterxml.jackson.module", "jackson-module-scala_2.12")
-  }
-  testImplementation("org.apache.spark:spark-sql_$scalaVersion:$fullSparkVersion") {
-    exclude("org.apache.avro")
-    exclude("org.apache.hadoop")
-    exclude("org.apache.zookeeper")
-    exclude("io.dropwizard.metrics")
-    exclude("org.rocksdb")
-  }
 
   testRuntimeOnly("org.apache.hudi:hudi-spark$sparkVersion-bundle_$scalaVersion:$hudiVersion")
   testRuntimeOnly(libs.junit.jupiter.engine)

@@ -26,9 +26,13 @@ plugins {
 
 dependencies {
   compileOnly(project(":api"))
-  implementation(project(":catalogs:catalog-common"))
   compileOnly(project(":common"))
   compileOnly(project(":core"))
+
+  compileOnly(libs.lance) // This will be provided by core module at runtime
+  compileOnly(libs.lombok)
+
+  implementation(project(":catalogs:catalog-common"))
   implementation(project(":lance:lance-common")) {
     exclude("*")
   }
@@ -39,11 +43,8 @@ dependencies {
 
   annotationProcessor(libs.lombok)
 
-  compileOnly(libs.lance) // This will be provided by core module at runtime
-  compileOnly(libs.lombok)
-
-  testImplementation(project(":clients:client-java"))
   testImplementation(project(":api"))
+  testImplementation(project(":clients:client-java"))
   testImplementation(project(":common"))
   testImplementation(project(":core"))
   testImplementation(project(":integration-test-common", "testArtifacts"))

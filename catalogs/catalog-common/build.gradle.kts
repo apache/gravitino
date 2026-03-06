@@ -30,8 +30,9 @@ dependencies {
   implementation(libs.jakarta.validation.api)
   implementation(libs.slf4j.api)
 
-  testImplementation(libs.junit.jupiter.api)
   testImplementation(project(":common"))
+
+  testImplementation(libs.junit.jupiter.api)
   testImplementation(libs.junit.jupiter.params)
 
   testRuntimeOnly(libs.junit.jupiter.engine)

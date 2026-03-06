@@ -26,8 +26,15 @@ plugins {
 }
 
 dependencies {
-  implementation(libs.hive2.metastore)
   implementation(libs.hadoop2.common)
+  implementation(libs.hive2.metastore)
+    implementation(libs.jackson.annotations)
+  constraints {
+    implementation(libs.jackson.databind)
+    implementation(libs.jackson.datatype.jdk8)
+    implementation(libs.jackson.datatype.jsr310)
+
+  }
 }
 
 tasks {

@@ -26,22 +26,23 @@ plugins {
 
 dependencies {
   compileOnly(project(":api"))
+  compileOnly(project(":common"))
+  compileOnly(project(":core"))
+
   implementation(project(":catalogs:catalog-jdbc-common")) {
     exclude(group = "*")
   }
-  compileOnly(project(":common"))
-  compileOnly(project(":core"))
 
   implementation(libs.bundles.log4j)
   implementation(libs.commons.collections4)
   implementation(libs.commons.lang3)
   implementation(libs.guava)
 
-  testImplementation(project(":catalogs:catalog-jdbc-common", "testArtifacts"))
   testImplementation(project(":api"))
+  testImplementation(project(":catalogs:catalog-jdbc-common", "testArtifacts"))
+  testImplementation(project(":clients:client-java"))
   testImplementation(project(":common"))
   testImplementation(project(":core"))
-  testImplementation(project(":clients:client-java"))
   testImplementation(project(":integration-test-common", "testArtifacts"))
   testImplementation(project(":server"))
   testImplementation(project(":server-common"))

@@ -32,18 +32,21 @@ val scalaCollectionCompatVersion: String = libs.versions.scala.collection.compat
 
 dependencies {
   compileOnly(project(":api"))
-  implementation(project(":catalogs:catalog-common"))
   compileOnly(project(":common"))
   compileOnly(project(":core"))
-  implementation(project(":iceberg:iceberg-common"))
-  implementation(libs.bundles.iceberg)
 
+  compileOnly(libs.lombok)
+
+  implementation(project(":catalogs:catalog-common"))
+  implementation(project(":iceberg:iceberg-common"))
+
+  implementation(libs.asm)
+  implementation(libs.bundles.iceberg)
   implementation(libs.bundles.log4j)
   implementation(libs.cglib) {
     // The version of build-in asm is 7.1, which is not compatible with Java 17 well
     exclude("org.ow2.asm")
   }
-  implementation(libs.asm)
   implementation(libs.commons.collections4)
   implementation(libs.commons.io)
   implementation(libs.commons.lang3)
@@ -51,18 +54,15 @@ dependencies {
 
   annotationProcessor(libs.lombok)
 
-  compileOnly(libs.lombok)
-
-  testImplementation(project(":catalogs:catalog-jdbc-common", "testArtifacts"))
   testImplementation(project(":api"))
+  testImplementation(project(":catalogs:catalog-jdbc-common", "testArtifacts"))
+  testImplementation(project(":clients:client-java"))
   testImplementation(project(":common"))
   testImplementation(project(":core"))
-  testImplementation(project(":clients:client-java"))
   testImplementation(project(":integration-test-common", "testArtifacts"))
   testImplementation(project(":server"))
   testImplementation(project(":server-common"))
 
-  testImplementation("org.scala-lang.modules:scala-collection-compat_$scalaVersion:$scalaCollectionCompatVersion")
   testImplementation("org.apache.iceberg:iceberg-spark-runtime-${sparkMajorVersion}_$scalaVersion:$icebergVersion")
   testImplementation("org.apache.spark:spark-hive_$scalaVersion:$sparkVersion") {
     exclude("org.apache.hive")
@@ -74,8 +74,12 @@ dependencies {
     exclude("io.dropwizard.metrics")
     exclude("org.rocksdb")
   }
-
+  testImplementation("org.scala-lang.modules:scala-collection-compat_$scalaVersion:$scalaCollectionCompatVersion")
   testImplementation(libs.awaitility)
+  // Add Hadoop 3.3+ dependencies since Spark's Hadoop is excluded
+  // Required for Iceberg 1.10+ which uses newer Hadoop APIs like FileSystem.openFile()
+  testImplementation(libs.hadoop3.client.api)
+  testImplementation(libs.hadoop3.client.runtime)
   testImplementation(libs.junit.jupiter.api)
   testImplementation(libs.junit.jupiter.params)
   testImplementation(libs.mockito.core)
@@ -86,11 +90,6 @@ dependencies {
   testImplementation(libs.testcontainers)
   testImplementation(libs.testcontainers.mysql)
   testImplementation(libs.testcontainers.postgresql)
-
-  // Add Hadoop 3.3+ dependencies since Spark's Hadoop is excluded
-  // Required for Iceberg 1.10+ which uses newer Hadoop APIs like FileSystem.openFile()
-  testImplementation(libs.hadoop3.client.api)
-  testImplementation(libs.hadoop3.client.runtime)
 
   testRuntimeOnly(libs.junit.jupiter.engine)
 }

@@ -26,25 +26,25 @@ plugins {
 
 dependencies {
   compileOnly(project(":api"))
-  compileOnly(project(":core"))
   compileOnly(project(":common"))
+  compileOnly(project(":core"))
 
-  testImplementation(project(":clients:client-java"))
+  implementation(libs.guava)
+  implementation(libs.kafka.clients)
+  implementation(libs.slf4j.api)
+
   testImplementation(project(":api"))
+  testImplementation(project(":clients:client-java"))
   testImplementation(project(":common"))
   testImplementation(project(":core"))
   testImplementation(project(":integration-test-common", "testArtifacts"))
   testImplementation(project(":server"))
   testImplementation(project(":server-common"))
 
-  implementation(libs.guava)
-  implementation(libs.kafka.clients)
-  implementation(libs.slf4j.api)
-
   testImplementation(libs.awaitility)
   testImplementation(libs.commons.io)
-  testImplementation(libs.curator.test)
   testImplementation(libs.commons.lang3)
+  testImplementation(libs.curator.test)
   testImplementation(libs.junit.jupiter.api)
   testImplementation(libs.kafka)
   testImplementation(libs.mockito.core)

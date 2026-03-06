@@ -26,14 +26,15 @@ plugins {
 
 dependencies {
   compileOnly(project(":api"))
+  compileOnly(project(":common"))
+  compileOnly(project(":core"))
+
   implementation(project(":catalogs:catalog-common")) {
     exclude(group = "*")
   }
   implementation(project(":catalogs:catalog-jdbc-common")) {
     exclude(group = "*")
   }
-  compileOnly(project(":common"))
-  compileOnly(project(":core"))
 
   implementation(libs.bundles.log4j)
   implementation(libs.commons.collections4)

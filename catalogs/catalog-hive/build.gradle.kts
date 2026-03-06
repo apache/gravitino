@@ -31,18 +31,21 @@ val scalaCollectionCompatVersion: String = libs.versions.scala.collection.compat
 
 dependencies {
   compileOnly(project(":api"))
+  compileOnly(project(":common"))
+  compileOnly(project(":core"))
+
+  compileOnly(libs.immutables.value)
+  compileOnly(libs.lombok)
+
   implementation(project(":catalogs:catalog-common")) {
     exclude("*")
   }
-  compileOnly(project(":common"))
   implementation(project(":catalogs:hive-metastore-common"))
-  compileOnly(project(":core"))
 
   implementation(libs.commons.collections3)
-  implementation(libs.commons.lang3)
   implementation(libs.commons.configuration1)
-  implementation(libs.htrace.core4)
   implementation(libs.commons.io)
+  implementation(libs.commons.lang3)
   implementation(libs.guava)
   implementation(libs.hadoop2.auth) {
     exclude("*")
@@ -50,31 +53,41 @@ dependencies {
   implementation(libs.hadoop2.common) {
     exclude("*")
   }
-  implementation(libs.woodstox.core)
+  implementation(libs.htrace.core4)
   implementation(libs.slf4j.api)
-
-  compileOnly(libs.immutables.value)
-  compileOnly(libs.lombok)
+  implementation(libs.woodstox.core)
 
   annotationProcessor(libs.immutables.value)
   annotationProcessor(libs.lombok)
 
-  testImplementation(libs.awaitility)
   testImplementation(project(":api"))
-  testImplementation(project(":catalogs:hive-metastore-common", "testArtifacts"))
-  testImplementation(project(":common"))
-  testImplementation(project(":core"))
-  testImplementation(project(":clients:client-java"))
-  testImplementation(project(":integration-test-common", "testArtifacts"))
-  testImplementation(project(":server"))
-  testImplementation(project(":server-common"))
   testImplementation(project(":catalogs:hadoop-common")) {
     exclude("*")
   }
+  testImplementation(project(":catalogs:hive-metastore-common", "testArtifacts"))
+  testImplementation(project(":clients:client-java"))
+  testImplementation(project(":common"))
+  testImplementation(project(":core"))
+  testImplementation(project(":integration-test-common", "testArtifacts"))
+  testImplementation(project(":server"))
+  testImplementation(project(":server-common"))
 
-  testImplementation(libs.bundles.jetty)
+  testImplementation("org.apache.spark:spark-hive_$scalaVersion:$sparkVersion") {
+    exclude("org.apache.hadoop")
+  }
+  testImplementation("org.apache.spark:spark-sql_$scalaVersion:$sparkVersion") {
+    exclude("org.apache.avro")
+    exclude("org.apache.hadoop")
+    exclude("org.apache.zookeeper")
+    exclude("io.dropwizard.metrics")
+    exclude("org.rocksdb")
+  }
+  testImplementation("org.scala-lang.modules:scala-collection-compat_$scalaVersion:$scalaCollectionCompatVersion")
+  testImplementation(libs.awaitility)
   testImplementation(libs.bundles.jersey)
+  testImplementation(libs.bundles.jetty)
   testImplementation(libs.bundles.log4j)
+  testImplementation(libs.hadoop2.aws)
   testImplementation(libs.hadoop2.common) {
     exclude("*")
   }
@@ -82,6 +95,8 @@ dependencies {
   testImplementation(libs.hadoop2.mapreduce.client.core) {
     exclude("*")
   }
+  testImplementation(libs.hadoop3.abs)
+  testImplementation(libs.hadoop3.gcs)
   testImplementation(libs.hive2.common) {
     exclude("org.eclipse.jetty.aggregate", "jetty-all")
     exclude("org.eclipse.jetty.orbit", "javax.servlet")
@@ -90,25 +105,10 @@ dependencies {
   testImplementation(libs.mockito.core)
   testImplementation(libs.mysql.driver)
   testImplementation(libs.postgresql.driver)
-
-  testImplementation("org.apache.spark:spark-hive_$scalaVersion:$sparkVersion") {
-    exclude("org.apache.hadoop")
-  }
-  testImplementation("org.scala-lang.modules:scala-collection-compat_$scalaVersion:$scalaCollectionCompatVersion")
-  testImplementation("org.apache.spark:spark-sql_$scalaVersion:$sparkVersion") {
-    exclude("org.apache.avro")
-    exclude("org.apache.hadoop")
-    exclude("org.apache.zookeeper")
-    exclude("io.dropwizard.metrics")
-    exclude("org.rocksdb")
-  }
   testImplementation(libs.slf4j.api)
   testImplementation(libs.testcontainers)
-  testImplementation(libs.testcontainers.mysql)
   testImplementation(libs.testcontainers.localstack)
-  testImplementation(libs.hadoop2.aws)
-  testImplementation(libs.hadoop3.abs)
-  testImplementation(libs.hadoop3.gcs)
+  testImplementation(libs.testcontainers.mysql)
 
   // You need this to run test CatalogHiveABSIT as it required hadoop3 environment introduced by hadoop3.abs
   // (The protocol `abfss` was first introduced in Hadoop 3.2.0), However, as the there already exists
