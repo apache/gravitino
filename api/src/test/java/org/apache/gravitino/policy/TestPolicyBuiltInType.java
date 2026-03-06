@@ -32,10 +32,12 @@ public class TestPolicyBuiltInType {
   }
 
   @Test
-  void testFromPolicyTypeWithEnumNameForStorageCompatibility() {
-    Assertions.assertEquals(
-        Policy.BuiltInType.ICEBERG_COMPACTION,
-        Policy.BuiltInType.fromPolicyType("ICEBERG_COMPACTION"));
+  void testFromPolicyTypeWithEnumName() {
+    IllegalArgumentException exception =
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () -> Policy.BuiltInType.fromPolicyType("ICEBERG_COMPACTION"));
+    Assertions.assertTrue(exception.getMessage().contains("Unknown policy type"));
   }
 
   @Test

@@ -66,8 +66,7 @@ public interface Policy extends Auditable {
     public static BuiltInType fromPolicyType(String policyType) {
       Preconditions.checkArgument(StringUtils.isNotBlank(policyType), "policyType cannot be blank");
       for (BuiltInType type : BuiltInType.values()) {
-        if (type.policyType.equalsIgnoreCase(policyType)
-            || type.name().equalsIgnoreCase(policyType)) {
+        if (type.policyType.equalsIgnoreCase(policyType)) {
           return type;
         }
       }

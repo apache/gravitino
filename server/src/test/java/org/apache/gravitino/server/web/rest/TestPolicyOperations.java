@@ -366,7 +366,7 @@ public class TestPolicyOperations extends BaseOperationsTest {
 
     PolicyCreateRequest request =
         new PolicyCreateRequest(
-            "iceberg-compaction", "ICEBERG_COMPACTION", null, true, toDTO(content));
+            "iceberg-compaction", "system_iceberg_compaction", null, true, toDTO(content));
     Response resp =
         target(policyPath(metalake))
             .request(MediaType.APPLICATION_JSON_TYPE)
@@ -404,7 +404,7 @@ public class TestPolicyOperations extends BaseOperationsTest {
         PolicyContentDTO.IcebergCompactionContentDTO.builder().build();
     PolicyCreateRequest request =
         new PolicyCreateRequest(
-            "iceberg-compaction-default", "ICEBERG_COMPACTION", null, true, minimalContent);
+            "iceberg-compaction-default", "system_iceberg_compaction", null, true, minimalContent);
 
     Response resp =
         target(policyPath(metalake))
@@ -416,6 +416,25 @@ public class TestPolicyOperations extends BaseOperationsTest {
     PolicyResponse policyResp = resp.readEntity(PolicyResponse.class);
     Assertions.assertEquals(0, policyResp.getCode());
     Assertions.assertEquals("ICEBERG_COMPACTION", policyResp.getPolicy().policyType());
+  }
+
+  @Test
+  public void testCreatePolicyWithIcebergCompactionEnumTypeRejected() {
+    PolicyContent content = PolicyContents.icebergCompaction();
+    PolicyCreateRequest request =
+        new PolicyCreateRequest(
+            "iceberg-compaction", "ICEBERG_COMPACTION", null, true, toDTO(content));
+
+    Response resp =
+        target(policyPath(metalake))
+            .request(MediaType.APPLICATION_JSON_TYPE)
+            .accept("application/vnd.gravitino.v1+json")
+            .post(Entity.entity(request, MediaType.APPLICATION_JSON_TYPE));
+
+    Assertions.assertEquals(Response.Status.BAD_REQUEST.getStatusCode(), resp.getStatus());
+    ErrorResponse errorResp = resp.readEntity(ErrorResponse.class);
+    Assertions.assertEquals(ErrorConstants.ILLEGAL_ARGUMENTS_CODE, errorResp.getCode());
+    Assertions.assertEquals(IllegalArgumentException.class.getSimpleName(), errorResp.getType());
   }
 
   @Test

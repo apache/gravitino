@@ -148,6 +148,7 @@ public class PolicyOperations {
           httpRequest,
           () -> {
             request.validate();
+            validateCreatePolicyType(request.getPolicyType());
             PolicyEntity policy =
                 policyDispatcher.createPolicy(
                     metalake,
@@ -349,5 +350,16 @@ public class PolicyOperations {
             .withAudit(DTOConverters.toDTO(policy.auditInfo()));
 
     return builder.build();
+  }
+
+  private static void validateCreatePolicyType(String policyType) {
+    Policy.BuiltInType builtInType = Policy.BuiltInType.fromPolicyType(policyType);
+    if (builtInType != Policy.BuiltInType.CUSTOM
+        && !builtInType.policyType().equalsIgnoreCase(policyType)) {
+      throw new IllegalArgumentException(
+          String.format(
+              "Built-in policy type must use prefixed value '%s', but got: %s",
+              builtInType.policyType(), policyType));
+    }
   }
 }

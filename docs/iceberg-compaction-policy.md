@@ -11,13 +11,13 @@ import TabItem from '@theme/TabItem';
 
 ## Overview
 
-`ICEBERG_COMPACTION` is a built-in policy type used by the optimizer to generate compaction strategies and job contexts for Iceberg tables.
+`system_iceberg_compaction` is a built-in policy type used by the optimizer to generate compaction strategies and job contexts for Iceberg tables.
 
 This policy supports `CATALOG`, `SCHEMA`, and `TABLE` metadata objects.
 
 ## Policy content
 
-The typed content for `ICEBERG_COMPACTION` supports the following fields:
+The typed content for `system_iceberg_compaction` supports the following fields:
 
 | Field | Required | Default | Description |
 |---|---|---|---|
@@ -101,7 +101,7 @@ curl -X POST -H "Accept: application/vnd.gravitino.v1+json" \
   -d '{
     "name": "iceberg_compaction_default",
     "comment": "Built-in iceberg compaction policy",
-    "policyType": "ICEBERG_COMPACTION",
+    "policyType": "system_iceberg_compaction",
     "enabled": true,
     "content": {}
   }' \
@@ -119,7 +119,7 @@ PolicyContent content = PolicyContents.icebergCompaction();
 Policy policy =
     client.createPolicy(
         "iceberg_compaction_default",
-        "ICEBERG_COMPACTION",
+        "system_iceberg_compaction",
         "Built-in iceberg compaction policy",
         true,
         content);
