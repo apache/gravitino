@@ -25,29 +25,26 @@ plugins {
 }
 
 dependencies {
-  implementation(project(":api")) {
-    exclude("*")
-  }
-  implementation(project(":core")) {
-    exclude("*")
-  }
-  implementation(project(":common")) {
-    exclude("*")
-  }
-
-  testImplementation(project(":clients:client-java"))
-  testImplementation(project(":integration-test-common", "testArtifacts"))
-  testImplementation(project(":server"))
-  testImplementation(project(":server-common"))
+  compileOnly(project(":api"))
+  compileOnly(project(":common"))
+  compileOnly(project(":core"))
 
   implementation(libs.guava)
   implementation(libs.kafka.clients)
   implementation(libs.slf4j.api)
 
+  testImplementation(project(":api"))
+  testImplementation(project(":clients:client-java"))
+  testImplementation(project(":common"))
+  testImplementation(project(":core"))
+  testImplementation(project(":integration-test-common", "testArtifacts"))
+  testImplementation(project(":server"))
+  testImplementation(project(":server-common"))
+
   testImplementation(libs.awaitility)
   testImplementation(libs.commons.io)
-  testImplementation(libs.curator.test)
   testImplementation(libs.commons.lang3)
+  testImplementation(libs.curator.test)
   testImplementation(libs.junit.jupiter.api)
   testImplementation(libs.kafka)
   testImplementation(libs.mockito.core)

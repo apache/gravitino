@@ -36,6 +36,8 @@ val sparkMajorVersion = "3.5"
 
 dependencies {
   implementation(project(":api"))
+  implementation(project(":maintenance:optimizer-api"))
+  implementation(project(":maintenance:gravitino-updaters"))
 
   compileOnly(libs.slf4j.api)
   compileOnly(libs.jackson.databind)
@@ -51,6 +53,8 @@ dependencies {
   }
 
   testImplementation(project(":api"))
+  testImplementation(project(":common"))
+  testImplementation(project(":clients:client-java"))
   testImplementation(libs.bundles.log4j)
   testImplementation(libs.hadoop3.common) {
     exclude("org.slf4j")
@@ -59,6 +63,11 @@ dependencies {
     exclude("javax.servlet")
   }
   testImplementation(libs.junit.jupiter.api)
+  testImplementation(libs.awaitility)
+  testImplementation(libs.testcontainers)
+  testImplementation(libs.testcontainers.junit.jupiter)
+  testImplementation(libs.testcontainers.mysql)
+  testRuntimeOnly(libs.mysql.driver)
   testImplementation("org.apache.iceberg:iceberg-spark-runtime-${sparkMajorVersion}_$scalaVersion:$icebergVersion") {
     exclude("org.slf4j")
     exclude("org.apache.logging.log4j")

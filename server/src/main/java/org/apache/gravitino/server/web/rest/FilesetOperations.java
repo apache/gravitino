@@ -264,7 +264,7 @@ public class FilesetOperations {
             return response;
           });
     } catch (Exception e) {
-      return ExceptionHandlers.handleFilesetException(OperationType.LOAD, fileset, schema, e);
+      return ExceptionHandlers.handleFilesetException(OperationType.LIST, fileset, schema, e);
     }
   }
 
