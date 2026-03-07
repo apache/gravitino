@@ -79,6 +79,11 @@ public class ListModelVersionProperties extends ListProperties {
   /** List the properties of a model version. */
   @Override
   public void handle() {
+    if (version == null && alias == null) {
+      exitWithError("Either --version or --alias must be specified.");
+      return;
+    }
+
     ModelVersion gModelVersion = null;
     try {
       NameIdentifier name = NameIdentifier.of(schema, model);

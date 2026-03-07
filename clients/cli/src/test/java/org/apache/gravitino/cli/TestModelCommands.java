@@ -230,8 +230,8 @@ public class TestModelCommands {
             eq("catalog"),
             eq("schema"),
             eq("model"),
-            any(),
-            any());
+            eq(1),
+            isNull());
     doReturn(mockList).when(mockList).validate();
     commandLine.handleCommandLine();
     verify(mockList).handle();
@@ -261,8 +261,8 @@ public class TestModelCommands {
             eq("catalog"),
             eq("schema"),
             eq("model"),
-            any(),
-            any());
+            isNull(),
+            eq("aliasA"));
     doReturn(mockList).when(mockList).validate();
     commandLine.handleCommandLine();
     verify(mockList).handle();
