@@ -189,6 +189,7 @@ public class IcebergDataCompactionContent implements PolicyContent {
 
   @Override
   public Map<String, String> properties() {
+    // properties keep stable strategy/job identity; thresholds and scoring knobs belong to rules.
     return ImmutableMap.of(
         STRATEGY_TYPE_KEY, STRATEGY_TYPE_VALUE, JOB_TEMPLATE_NAME_KEY, JOB_TEMPLATE_NAME_VALUE);
   }
