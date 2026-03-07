@@ -19,9 +19,7 @@
 package org.apache.gravitino.server.web.rest;
 
 import com.google.common.annotations.VisibleForTesting;
-import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
-import org.apache.gravitino.dto.responses.ErrorResponse;
 import org.apache.gravitino.exceptions.AlreadyExistsException;
 import org.apache.gravitino.exceptions.CatalogAlreadyExistsException;
 import org.apache.gravitino.exceptions.ConnectionFailedException;
@@ -159,30 +157,24 @@ public class ExceptionHandlers {
   }
 
   public static Response handleTestConnectionException(Exception e) {
-    ErrorResponse response;
     if (e instanceof IllegalArgumentException) {
-      response = ErrorResponse.illegalArguments(e.getMessage(), e);
+      return Utils.illegalArguments(e.getMessage(), e);
 
     } else if (e instanceof ConnectionFailedException) {
-      response = ErrorResponse.connectionFailed(e.getMessage(), e);
+      return Utils.connectionFailed(e.getMessage(), e);
 
     } else if (e instanceof NotFoundException) {
-      response = ErrorResponse.notFound(e.getClass().getSimpleName(), e.getMessage(), e);
+      return Utils.notFound(e.getMessage(), e);
 
     } else if (e instanceof AlreadyExistsException) {
-      response = ErrorResponse.alreadyExists(e.getClass().getSimpleName(), e.getMessage(), e);
+      return Utils.alreadyExists(e.getMessage(), e);
 
     } else if (e instanceof NotInUseException) {
-      response = ErrorResponse.notInUse(e.getClass().getSimpleName(), e.getMessage(), e);
+      return Utils.notInUse(e.getMessage(), e);
 
     } else {
       return Utils.internalError(e.getMessage(), e);
     }
-
-    return Response.status(Response.Status.OK)
-        .entity(response)
-        .type(MediaType.APPLICATION_JSON)
-        .build();
   }
 
   public static Response handleOwnerException(

@@ -323,6 +323,27 @@ public class TestCatalogOperations extends BaseOperationsTest {
     BaseResponse testResponse = resp.readEntity(BaseResponse.class);
     Assertions.assertEquals(0, testResponse.getCode());
 
+    // Test throw IllegalArgumentException
+    doThrow(new IllegalArgumentException("invalid properties"))
+        .when(manager)
+        .testConnection(any(), any(), any(), any(), any());
+    Response respInvalidProperties =
+        target("/metalakes/metalake1/catalogs/testConnection")
+            .request(MediaType.APPLICATION_JSON_TYPE)
+            .accept("application/vnd.gravitino.v1+json")
+            .post(Entity.entity(req, MediaType.APPLICATION_JSON_TYPE));
+
+    Assertions.assertEquals(
+        Response.Status.BAD_REQUEST.getStatusCode(), respInvalidProperties.getStatus());
+    Assertions.assertEquals(MediaType.APPLICATION_JSON_TYPE, respInvalidProperties.getMediaType());
+
+    ErrorResponse invalidPropertiesErrorResponse =
+        respInvalidProperties.readEntity(ErrorResponse.class);
+    Assertions.assertEquals(
+        ErrorConstants.ILLEGAL_ARGUMENTS_CODE, invalidPropertiesErrorResponse.getCode());
+    Assertions.assertEquals(
+        IllegalArgumentException.class.getSimpleName(), invalidPropertiesErrorResponse.getType());
+
     // test throw RuntimeException
     doThrow(new RuntimeException("connection failed"))
         .when(manager)

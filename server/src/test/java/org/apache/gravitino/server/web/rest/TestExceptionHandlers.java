@@ -18,6 +18,11 @@
  */
 package org.apache.gravitino.server.web.rest;
 
+import javax.ws.rs.core.Response;
+import org.apache.gravitino.exceptions.AlreadyExistsException;
+import org.apache.gravitino.exceptions.ConnectionFailedException;
+import org.apache.gravitino.exceptions.NotFoundException;
+import org.apache.gravitino.exceptions.NotInUseException;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
@@ -49,5 +54,40 @@ public class TestExceptionHandlers {
 
     String msg6 = ExceptionHandlers.BaseExceptionHandler.getErrorMsg(e6);
     Assertions.assertEquals("", msg6);
+  }
+
+  @Test
+  public void testHandleTestConnectionExceptionShouldReturnErrorStatus() {
+    Response illegalArgumentsResponse =
+        ExceptionHandlers.handleTestConnectionException(
+            new IllegalArgumentException("invalid properties"));
+    Assertions.assertEquals(
+        Response.Status.BAD_REQUEST.getStatusCode(), illegalArgumentsResponse.getStatus());
+
+    Response notFoundResponse =
+        ExceptionHandlers.handleTestConnectionException(new NotFoundException("catalog not found"));
+    Assertions.assertEquals(
+        Response.Status.NOT_FOUND.getStatusCode(), notFoundResponse.getStatus());
+
+    Response alreadyExistsResponse =
+        ExceptionHandlers.handleTestConnectionException(
+            new AlreadyExistsException("catalog already exists"));
+    Assertions.assertEquals(
+        Response.Status.CONFLICT.getStatusCode(), alreadyExistsResponse.getStatus());
+
+    Response notInUseResponse =
+        ExceptionHandlers.handleTestConnectionException(new NotInUseException("catalog disabled"));
+    Assertions.assertEquals(Response.Status.CONFLICT.getStatusCode(), notInUseResponse.getStatus());
+
+    Response connectionFailedResponse =
+        ExceptionHandlers.handleTestConnectionException(
+            new ConnectionFailedException("connection failed"));
+    Assertions.assertEquals(
+        Response.Status.BAD_GATEWAY.getStatusCode(), connectionFailedResponse.getStatus());
+
+    Response fallbackResponse =
+        ExceptionHandlers.handleTestConnectionException(new RuntimeException("unexpected"));
+    Assertions.assertEquals(
+        Response.Status.INTERNAL_SERVER_ERROR.getStatusCode(), fallbackResponse.getStatus());
   }
 }
