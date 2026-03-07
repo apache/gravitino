@@ -525,7 +525,7 @@ public class TestJcasbinAuthorizer {
             METALAKE, "SCHEMA", "testCatalog.testSchema", new AuthorizationRequestContext()),
         "CATALOG-level MANAGE_GRANTS should cover SCHEMA within it");
 
-    // --- Case 5: TABLE-level MANAGE_GRANTS covers the table itself ---
+    // --- Case 4: TABLE-level MANAGE_GRANTS covers the table itself ---
     Long tableGrantRoleId = 202L;
     RoleEntity tableGrantRole =
         getRoleEntity(
