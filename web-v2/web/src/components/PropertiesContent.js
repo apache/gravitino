@@ -18,7 +18,6 @@
  */
 
 import React from 'react'
-import { Space } from 'antd'
 import { sanitizeText } from '@/lib/utils/index'
 
 const PropertiesContent = ({ properties, dataReferPrefix, contentDataRefer }) => {
@@ -29,33 +28,28 @@ const PropertiesContent = ({ properties, dataReferPrefix, contentDataRefer }) =>
   const contentProps = contentDataRefer ? { 'data-refer': contentDataRefer } : {}
 
   return (
-    <Space.Compact className='max-h-80 overflow-auto' {...contentProps}>
-      <Space.Compact direction='vertical' className='divide-y border-gray-100'>
-        <span className='min-w-24 bg-gray-100 p-1'>Key</span>
-        {entries.map(([key]) => (
-          <span className='p-1 block min-w-24 max-w-60 truncate' title={key} key={`prop-key-${key}`} {...keyProps(key)}>
-            {key}
-          </span>
-        ))}
-      </Space.Compact>
-      <Space.Compact direction='vertical' className='divide-y border-gray-100'>
-        <span className='min-w-24 bg-gray-100 p-1'>Value</span>
+    <div className='max-h-80 overflow-auto' {...contentProps}>
+      <div className='min-w-[28rem]'>
+        <div className='sticky top-0 z-10 grid grid-cols-2 bg-gray-100'>
+          <span className='p-1 font-medium'>Key</span>
+          <span className='p-1 font-medium'>Value</span>
+        </div>
         {entries.map(([key, value]) => {
           const safeValue = sanitizeText(value) || '-'
 
           return (
-            <span
-              className='p-1 block min-w-24 max-w-60 truncate'
-              title={safeValue}
-              key={`prop-val-${key}`}
-              {...valueProps(key)}
-            >
-              {safeValue}
-            </span>
+            <div key={`prop-row-${key}`} className='grid grid-cols-2 border-t border-gray-100'>
+              <span className='block min-w-24 max-w-60 truncate p-1 leading-6' title={key} {...keyProps(key)}>
+                {key}
+              </span>
+              <span className='block min-w-24 max-w-60 truncate p-1 leading-6' title={safeValue} {...valueProps(key)}>
+                {safeValue}
+              </span>
+            </div>
           )
         })}
-      </Space.Compact>
-    </Space.Compact>
+      </div>
+    </div>
   )
 }
 

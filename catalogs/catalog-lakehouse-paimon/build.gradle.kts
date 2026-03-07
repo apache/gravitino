@@ -30,18 +30,17 @@ val sparkMajorVersion: String = sparkVersion.substringBeforeLast(".")
 val paimonVersion: String = libs.versions.paimon.get()
 
 dependencies {
-  implementation(project(":api")) {
-    exclude("*")
-  }
+  compileOnly(project(":api"))
+  compileOnly(project(":common"))
+  compileOnly(project(":core"))
+
+  compileOnly(libs.lombok)
+
   implementation(project(":catalogs:catalog-common")) {
     exclude("*")
   }
-  implementation(project(":common")) {
-    exclude("*")
-  }
-  implementation(project(":core")) {
-    exclude("*")
-  }
+
+  implementation(libs.bundles.log4j)
   implementation(libs.bundles.paimon) {
     exclude("com.sun.jersey")
     exclude("javax.servlet")
@@ -101,7 +100,6 @@ dependencies {
     exclude("com.google.code.findbugs")
     exclude("com.github.spotbugs")
   }
-  implementation(libs.bundles.log4j)
   implementation(libs.commons.lang3)
   implementation(libs.guava)
   implementation(libs.hadoop2.common) {
@@ -124,15 +122,22 @@ dependencies {
   implementation(libs.hadoop2.mapreduce.client.core) {
     exclude("*")
   }
-  annotationProcessor(libs.lombok)
-  compileOnly(libs.lombok)
 
+  annotationProcessor(libs.lombok)
+
+  testImplementation(project(":api"))
   testImplementation(project(":clients:client-java"))
+  testImplementation(project(":common"))
+  testImplementation(project(":core"))
   testImplementation(project(":integration-test-common", "testArtifacts"))
   testImplementation(project(":server"))
   testImplementation(project(":server-common")) {
     exclude("org.mortbay.jetty")
     exclude("com.sun.jersey.contribs")
+  }
+
+  testImplementation("org.apache.paimon:paimon-spark-$sparkMajorVersion:$paimonVersion") {
+    exclude("org.apache.hadoop")
   }
   testImplementation("org.apache.spark:spark-hive_$scalaVersion:$sparkVersion") {
     exclude("org.apache.hadoop")
@@ -145,22 +150,18 @@ dependencies {
     exclude("io.dropwizard.metrics")
     exclude("org.rocksdb")
   }
-  testImplementation("org.apache.paimon:paimon-spark-$sparkMajorVersion:$paimonVersion") {
-    exclude("org.apache.hadoop")
-  }
-
   testImplementation(libs.awaitility)
-  testImplementation(libs.slf4j.api)
   testImplementation(libs.awaitility)
-  testImplementation(libs.junit.jupiter.api)
-  testImplementation(libs.mysql.driver)
-  testImplementation(libs.postgresql.driver)
-  testImplementation(libs.h2db)
   testImplementation(libs.bundles.log4j)
+  testImplementation(libs.h2db)
+  testImplementation(libs.junit.jupiter.api)
   testImplementation(libs.junit.jupiter.params)
+  testImplementation(libs.mysql.driver)
   testImplementation(libs.paimon.oss)
   testImplementation(libs.paimon.s3)
   testImplementation(libs.paimon.spark)
+  testImplementation(libs.postgresql.driver)
+  testImplementation(libs.slf4j.api)
   testImplementation(libs.testcontainers)
   testImplementation(libs.testcontainers.localstack)
   testImplementation(libs.testcontainers.mysql)
