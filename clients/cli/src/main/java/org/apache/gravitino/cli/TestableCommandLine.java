@@ -21,6 +21,7 @@
 package org.apache.gravitino.cli;
 
 import java.util.Map;
+import javax.annotation.Nullable;
 import org.apache.gravitino.cli.commands.AddColumn;
 import org.apache.gravitino.cli.commands.AddRoleToGroup;
 import org.apache.gravitino.cli.commands.AddRoleToUser;
@@ -1936,8 +1937,8 @@ public class TestableCommandLine {
       String catalog,
       String schema,
       String model,
-      Integer version,
-      String alias) {
+      @Nullable Integer version,
+      @Nullable String alias) {
     return new ListModelVersionProperties(
         context, metalake, catalog, schema, model, version, alias);
   }

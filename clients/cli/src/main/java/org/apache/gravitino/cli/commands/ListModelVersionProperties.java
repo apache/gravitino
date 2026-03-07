@@ -20,6 +20,7 @@
 package org.apache.gravitino.cli.commands;
 
 import java.util.Map;
+import javax.annotation.Nullable;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.cli.CommandContext;
 import org.apache.gravitino.cli.ErrorMessages;
@@ -44,9 +45,9 @@ public class ListModelVersionProperties extends ListProperties {
   /** The name of the model. */
   protected final String model;
   /** The version number of the model version. */
-  protected final Integer version;
+  @Nullable protected final Integer version;
   /** The alias of the model version. */
-  protected final String alias;
+  @Nullable protected final String alias;
 
   /**
    * List the properties of a model version.
@@ -65,8 +66,8 @@ public class ListModelVersionProperties extends ListProperties {
       String catalog,
       String schema,
       String model,
-      Integer version,
-      String alias) {
+      @Nullable Integer version,
+      @Nullable String alias) {
     super(context);
     this.metalake = metalake;
     this.catalog = catalog;
