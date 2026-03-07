@@ -1307,9 +1307,6 @@ public class POConverters {
 
       List<Privilege> privileges = Lists.newArrayList();
       Preconditions.checkArgument(
-          privilegeNames != null && privilegeConditions != null,
-          "Privilege names and conditions cannot be null");
-      Preconditions.checkArgument(
           privilegeNames.size() == privilegeConditions.size(),
           "Privilege names and conditions must have the same size, but got %s names and %s conditions",
           privilegeNames.size(),

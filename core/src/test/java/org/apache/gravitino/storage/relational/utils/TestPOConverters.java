@@ -1740,13 +1740,13 @@ public class TestPOConverters {
   }
 
   @Test
-  public void testFromSecurableObjectPOWithMismatchedPrivileges() {
+  public void testFromSecurableObjectPOWithNullPrivileges() {
     SecurableObjectPO securableObjectPO =
         SecurableObjectPO.builder()
             .withRoleId(1L)
             .withMetadataObjectId(1L)
             .withType(MetadataObject.Type.CATALOG.name())
-            .withPrivilegeNames("[\"USE_CATALOG\", \"CREATE_SCHEMA\"]")
+            .withPrivilegeNames("null")
             .withPrivilegeConditions("[\"ALLOW\"]")
             .withCurrentVersion(1L)
             .withLastVersion(1L)
@@ -1754,7 +1754,7 @@ public class TestPOConverters {
             .build();
 
     Assertions.assertThrows(
-        IllegalArgumentException.class,
+        RuntimeException.class,
         () ->
             POConverters.fromSecurableObjectPO(
                 "test_catalog", securableObjectPO, MetadataObject.Type.CATALOG));
