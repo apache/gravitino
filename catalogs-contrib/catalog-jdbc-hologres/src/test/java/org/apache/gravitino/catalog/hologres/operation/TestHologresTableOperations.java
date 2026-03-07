@@ -987,4 +987,98 @@ public class TestHologresTableOperations {
                 "test_table",
                 TableChange.updateColumnAutoIncrement(new String[] {"col1"}, true)));
   }
+
+  // ==================== quoteIdentifier tests ====================
+
+  @Test
+  void testQuoteIdentifierEscapesEmbeddedDoubleQuotes() {
+    // Table name with embedded double quote should be escaped by doubling
+    JdbcColumn col =
+        JdbcColumn.builder()
+            .withName("id")
+            .withType(Types.IntegerType.get())
+            .withNullable(false)
+            .build();
+    String sql =
+        ops.createTableSql(
+            "table\"name",
+            new JdbcColumn[] {col},
+            null,
+            Collections.emptyMap(),
+            Transforms.EMPTY_TRANSFORM,
+            Distributions.NONE,
+            Indexes.EMPTY_INDEXES);
+    assertTrue(sql.contains("CREATE TABLE \"table\"\"name\""));
+  }
+
+  // ==================== Property key/value sanitization tests ====================
+
+  @Test
+  void testCreateTablePropertyValueEscapesSingleQuotes() {
+    JdbcColumn col =
+        JdbcColumn.builder()
+            .withName("id")
+            .withType(Types.IntegerType.get())
+            .withNullable(false)
+            .build();
+    Map<String, String> properties = new HashMap<>();
+    properties.put("clustering_key", "col1:asc,col2's:desc");
+    String sql =
+        ops.createTableSql(
+            "test_table",
+            new JdbcColumn[] {col},
+            null,
+            properties,
+            Transforms.EMPTY_TRANSFORM,
+            Distributions.NONE,
+            Indexes.EMPTY_INDEXES);
+    // Single quote in value should be escaped
+    assertTrue(sql.contains("clustering_key = 'col1:asc,col2''s:desc'"));
+  }
+
+  @Test
+  void testCreateTableInvalidPropertyKeyThrows() {
+    JdbcColumn col =
+        JdbcColumn.builder()
+            .withName("id")
+            .withType(Types.IntegerType.get())
+            .withNullable(false)
+            .build();
+    Map<String, String> properties = new HashMap<>();
+    properties.put("invalid-key!", "value");
+    assertThrows(
+        IllegalArgumentException.class,
+        () ->
+            ops.createTableSql(
+                "test_table",
+                new JdbcColumn[] {col},
+                null,
+                properties,
+                Transforms.EMPTY_TRANSFORM,
+                Distributions.NONE,
+                Indexes.EMPTY_INDEXES));
+  }
+
+  @Test
+  void testCreateTableSqlInjectionPropertyKeyThrows() {
+    JdbcColumn col =
+        JdbcColumn.builder()
+            .withName("id")
+            .withType(Types.IntegerType.get())
+            .withNullable(false)
+            .build();
+    Map<String, String> properties = new HashMap<>();
+    properties.put("key'); DROP TABLE users; --", "value");
+    assertThrows(
+        IllegalArgumentException.class,
+        () ->
+            ops.createTableSql(
+                "test_table",
+                new JdbcColumn[] {col},
+                null,
+                properties,
+                Transforms.EMPTY_TRANSFORM,
+                Distributions.NONE,
+                Indexes.EMPTY_INDEXES));
+  }
 }

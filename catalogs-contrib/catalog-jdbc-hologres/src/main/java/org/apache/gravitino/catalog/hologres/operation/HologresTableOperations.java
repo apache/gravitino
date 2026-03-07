@@ -74,10 +74,6 @@ public class HologresTableOperations extends JdbcTableOperations
 
   public static final String NEW_LINE = "\n";
   public static final String ALTER_TABLE = "ALTER TABLE ";
-  public static final String ALTER_COLUMN = "ALTER COLUMN ";
-  public static final String IS = " IS '";
-  public static final String COLUMN_COMMENT = "COMMENT ON COLUMN ";
-  public static final String TABLE_COMMENT = "COMMENT ON TABLE ";
 
   private static final String HOLOGRES_NOT_SUPPORT_NESTED_COLUMN_MSG =
       "Hologres does not support nested column names.";
@@ -110,7 +106,7 @@ public class HologresTableOperations extends JdbcTableOperations
 
   @Override
   protected String quoteIdentifier(String identifier) {
-    return "\"" + identifier + "\"";
+    return "\"" + identifier.replace("\"", "\"\"") + "\"";
   }
 
   @Override
@@ -147,7 +143,7 @@ public class HologresTableOperations extends JdbcTableOperations
           }
         }
       }
-      LOG.info("Finished listing tables size {} for schema name {} ", names.size(), schemaName);
+      LOG.debug("Finished listing tables size {} for schema name {} ", names.size(), schemaName);
       return names;
     } catch (final SQLException se) {
       throw this.exceptionMapper.toGravitinoException(se);
@@ -161,9 +157,9 @@ public class HologresTableOperations extends JdbcTableOperations
     JdbcTable.Builder builder = null;
     while (tablesResult.next() && !found) {
       String tableNameInResult = tablesResult.getString("TABLE_NAME");
-      String tableSchemaInResultLowerCase = tablesResult.getString("TABLE_SCHEM");
+      String tableSchemaInResult = tablesResult.getString("TABLE_SCHEM");
       if (Objects.equals(tableNameInResult, tableName)
-          && Objects.equals(tableSchemaInResultLowerCase, databaseName)) {
+          && Objects.equals(tableSchemaInResult, databaseName)) {
         builder = getBasicJdbcTableInfo(tablesResult);
         found = true;
       }
@@ -251,7 +247,11 @@ public class HologresTableOperations extends JdbcTableOperations
       properties.forEach(
           (key, value) -> {
             if (!EXCLUDED_TABLE_PROPERTIES.contains(key)) {
-              withEntries.add(String.format("%s = '%s'", key, value));
+              Preconditions.checkArgument(
+                  key.matches("[a-zA-Z_][a-zA-Z0-9_]*"),
+                  "Invalid property key: %s. Property key must be a valid identifier.",
+                  key);
+              withEntries.add(String.format("%s = '%s'", key, value.replace("'", "''")));
             }
           });
     }
@@ -294,7 +294,7 @@ public class HologresTableOperations extends JdbcTableOperations
     // Return the generated SQL statement
     String result = sqlBuilder.toString();
 
-    LOG.info("Generated create table:{} sql: {}", tableName, result);
+    LOG.debug("Generated create table:{} sql: {}", tableName, result);
     return result;
   }
 
@@ -495,7 +495,7 @@ public class HologresTableOperations extends JdbcTableOperations
 
     // Return the generated SQL statement
     String result = String.join("\n", alterSql);
-    LOG.info("Generated alter table:{}.{} sql: {}", schemaName, tableName, result);
+    LOG.debug("Generated alter table:{}.{} sql: {}", schemaName, tableName, result);
     return result;
   }
 
@@ -905,24 +905,28 @@ public class HologresTableOperations extends JdbcTableOperations
     String[] attrNums = partAttrs.trim().split("\\s+");
     List<String[]> partitionColumnNames = new ArrayList<>();
 
-    // Resolve attribute numbers to column names
+    // Resolve attribute numbers to column names using a single batch query
+    String placeholders = Arrays.stream(attrNums).map(a -> "?").collect(Collectors.joining(","));
     String attrSql =
-        "SELECT attname FROM pg_catalog.pg_attribute "
+        "SELECT attnum, attname FROM pg_catalog.pg_attribute "
             + "WHERE attrelid = (SELECT c.oid FROM pg_catalog.pg_class c "
             + "  JOIN pg_catalog.pg_namespace n ON n.oid = c.relnamespace "
             + "  WHERE n.nspname = ? AND c.relname = ?) "
-            + "AND attnum = ?";
+            + "AND attnum IN ("
+            + placeholders
+            + ") "
+            + "ORDER BY attnum";
 
-    for (String attrNum : attrNums) {
-      try (PreparedStatement statement = connection.prepareStatement(attrSql)) {
-        statement.setString(1, databaseName);
-        statement.setString(2, tableName);
-        statement.setInt(3, Integer.parseInt(attrNum));
+    try (PreparedStatement statement = connection.prepareStatement(attrSql)) {
+      statement.setString(1, databaseName);
+      statement.setString(2, tableName);
+      for (int i = 0; i < attrNums.length; i++) {
+        statement.setInt(3 + i, Integer.parseInt(attrNums[i]));
+      }
 
-        try (ResultSet resultSet = statement.executeQuery()) {
-          if (resultSet.next()) {
-            partitionColumnNames.add(new String[] {resultSet.getString("attname")});
-          }
+      try (ResultSet resultSet = statement.executeQuery()) {
+        while (resultSet.next()) {
+          partitionColumnNames.add(new String[] {resultSet.getString("attname")});
         }
       }
     }
