@@ -72,14 +72,19 @@ public class ListModelProperties extends ListProperties {
       gModel = modelCatalog.getModel(name);
     } catch (NoSuchMetalakeException err) {
       exitWithError(ErrorMessages.UNKNOWN_METALAKE);
+      return;
     } catch (NoSuchCatalogException err) {
       exitWithError(ErrorMessages.UNKNOWN_CATALOG);
+      return;
     } catch (NoSuchSchemaException err) {
       exitWithError(ErrorMessages.UNKNOWN_SCHEMA);
+      return;
     } catch (NoSuchModelException err) {
       exitWithError(ErrorMessages.UNKNOWN_MODEL);
+      return;
     } catch (Exception exp) {
       exitWithError(exp.getMessage());
+      return;
     }
 
     Map<String, String> properties = gModel.properties();
