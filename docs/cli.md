@@ -1074,7 +1074,7 @@ gcli.sh model remove --name catalog_model.schema.model --version 0 --property k
 #### List a model version's properties
 
 ```bash
-gcli.sh model properties --name catalog_model.schema.model --version 0
+gcli.sh model properties --name catalog_model.schema.model --version 1
 ```
 
 Or by alias:
