@@ -372,7 +372,7 @@ public class TestSecurableObjects {
     Assertions.assertFalse(manageGroups.canBindTo(MetadataObject.Type.ROLE));
     Assertions.assertFalse(manageGroups.canBindTo(MetadataObject.Type.COLUMN));
 
-    // Test manager grants — MANAGE_GRANTS can now be scoped to any object level
+    // Test manager grants — MANAGE_GRANTS can be scoped to any object level
     Assertions.assertTrue(manageGrants.canBindTo(MetadataObject.Type.METALAKE));
     Assertions.assertTrue(manageGrants.canBindTo(MetadataObject.Type.CATALOG));
     Assertions.assertTrue(manageGrants.canBindTo(MetadataObject.Type.SCHEMA));

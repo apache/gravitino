@@ -858,8 +858,7 @@ public class Privileges {
    *
    * <p>Unlike most privileges, this can be bound at any level of the object hierarchy — METALAKE,
    * CATALOG, SCHEMA, TABLE, VIEW, TOPIC, FILESET, or MODEL. A grant at a parent level implicitly
-   * covers all descendants within it, enabling delegated, domain-scoped grant management analogous
-   * to SQL {@code WITH GRANT OPTION}.
+   * covers all descendants within it.
    */
   public static class ManageGrants extends GenericPrivilege<ManageGrants> {
     private static final ManageGrants ALLOW_INSTANCE =
