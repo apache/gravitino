@@ -125,6 +125,19 @@ class TestListModelVersionProperties {
   }
 
   @Test
+  void validateWithBothVersionAndAliasShouldExitWithError() {
+    CommandLine mockCmdLine = Mockito.mock(CommandLine.class);
+    CommandContext context = new CommandContext(mockCmdLine);
+
+    ListModelVersionProperties command =
+        new ListModelVersionProperties(
+            context, "metalake1", "catalog1", "schema1", "model1", 1, "alias1");
+
+    RuntimeException ex = Assertions.assertThrows(RuntimeException.class, command::validate);
+    Assertions.assertTrue(ex.getMessage().contains("Exit with code"));
+  }
+
+  @Test
   void handleWithEmptyProperties() throws Exception {
     CommandLine mockCmdLine = Mockito.mock(CommandLine.class);
     CommandContext context = new CommandContext(mockCmdLine);
