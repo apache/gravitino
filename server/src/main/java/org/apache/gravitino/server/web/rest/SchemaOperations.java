@@ -226,19 +226,24 @@ public class SchemaOperations {
     LOG.info("Received drop schema request: {}.{}.{}", metalake, catalog, schema);
     try {
       return Utils.doAs(
-          httpRequest,
-          () -> {
-            NameIdentifier ident = NameIdentifierUtil.ofSchema(metalake, catalog, schema);
-            boolean dropped = dispatcher.dropSchema(ident, cascade);
-            if (!dropped) {
-              LOG.warn("Fail to drop schema {} under namespace {}", schema, ident.namespace());
-            }
-            Response response = Utils.ok(new DropResponse(dropped));
+        httpRequest,
+        () -> {
+          NameIdentifier ident = NameIdentifierUtil.ofSchema(metalake, catalog, schema);
+          boolean dropped = dispatcher.dropSchema(ident, cascade);
+
+          if (dropped) {
             LOG.info("Schema dropped: {}.{}.{}", metalake, catalog, schema);
-            return response;
-          });
+          } else {
+            LOG.warn("Fail to drop schema {} under namespace {}", schema, ident.namespace());
+          }
+
+          Response response = Utils.ok(new DropResponse(dropped));
+          return response;
+        });
     } catch (Exception e) {
       return ExceptionHandlers.handleSchemaException(OperationType.DROP, schema, catalog, e);
     }
   }
 }
+
+
