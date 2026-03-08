@@ -80,11 +80,6 @@ public class ListModelVersionProperties extends ListProperties {
   /** List the properties of a model version. */
   @Override
   public void handle() {
-    if (version == null && alias == null) {
-      exitWithError("Either --version or --alias must be specified.");
-      return;
-    }
-
     ModelVersion gModelVersion = null;
     try {
       NameIdentifier name = NameIdentifier.of(schema, model);
@@ -111,5 +106,17 @@ public class ListModelVersionProperties extends ListProperties {
 
     Map<String, String> properties = gModelVersion.properties();
     printProperties(properties);
+  }
+
+  /** {@inheritDoc} */
+  @Override
+  public Command validate() {
+    if (alias != null && version != null) {
+      exitWithError("Cannot specify both alias and version");
+    }
+    if (alias == null && version == null) {
+      exitWithError("Either alias or version must be specified");
+    }
+    return this;
   }
 }
