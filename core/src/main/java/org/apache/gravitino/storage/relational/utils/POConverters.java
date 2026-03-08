@@ -1620,7 +1620,7 @@ public class POConverters {
       List<ModelVersionPO> modelVersionPOs,
       List<ModelVersionAliasRelPO> aliasRelPOs) {
     Preconditions.checkArgument(
-        modelVersionPOs != null && modelVersionPOs.size() > 0,
+        modelVersionPOs != null && !modelVersionPOs.isEmpty(),
         "modelVersionPOs cannot be null or empty.");
     List<String> aliases =
         aliasRelPOs.stream()
