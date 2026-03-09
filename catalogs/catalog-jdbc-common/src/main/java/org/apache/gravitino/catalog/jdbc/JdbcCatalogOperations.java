@@ -102,6 +102,7 @@ public class JdbcCatalogOperations implements CatalogOperations, SupportsSchemas
   private final TableOperation tableOperation;
 
   private DataSource dataSource;
+  private String jdbcUrl;
 
   private final JdbcColumnDefaultValueConverter columnDefaultValueConverter;
 
@@ -170,6 +171,7 @@ public class JdbcCatalogOperations implements CatalogOperations, SupportsSchemas
     resultConf.putAll(gravitinoConfig);
 
     JdbcConfig jdbcConfig = new JdbcConfig(resultConf);
+    this.jdbcUrl = jdbcConfig.getJdbcUrl();
     this.dataSource = DataSourceUtils.createDataSource(jdbcConfig);
 
     checkJDBCDriverVersion();
@@ -199,6 +201,28 @@ public class JdbcCatalogOperations implements CatalogOperations, SupportsSchemas
       metricsSystem.unregister(catalogMetricsSource);
     }
     DataSourceUtils.closeDataSource(dataSource);
+    try {
+      Driver driver = getDriver();
+      if (driver != null) {
+        deregisterDriver(driver);
+      }
+    } catch (SQLException e) {
+      LOG.warn("Failed to deregister JDBC driver", e);
+    }
+  }
+
+  /**
+   * Gets the JDBC driver for the provided JDBC URL.
+   *
+   * @return The JDBC driver instance if the JDBC URL is not blank; null if the JDBC URL is blank.
+   * @throws SQLException if failing to get driver from JDBC URL.
+   */
+  protected Driver getDriver() throws SQLException {
+    if (StringUtils.isBlank(jdbcUrl)) {
+      return null;
+    }
+
+    return DriverManager.getDriver(jdbcUrl);
   }
 
   /**
