@@ -17,6 +17,7 @@
 
 from __future__ import annotations
 
+import builtins
 import typing
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
@@ -25,10 +26,10 @@ from typing import ClassVar
 from dataclasses_json import config, dataclass_json
 
 from gravitino.api.rel.expressions.expression import Expression
-from gravitino.api.rel.json_serdes.column_position_serdes import ColumnPositionSerdes
-from gravitino.api.rel.json_serdes.table_index_serdes import TableIndexSerdes
 from gravitino.api.rel.indexes.index import Index
 from gravitino.api.rel.indexes.indexes import Indexes
+from gravitino.api.rel.json_serdes.column_position_serdes import ColumnPositionSerdes
+from gravitino.api.rel.json_serdes.table_index_serdes import TableIndexSerdes
 from gravitino.api.rel.table_change import (
     DeleteColumn,
     RenameColumn,
@@ -116,14 +117,8 @@ class TableUpdateRequest:
         def new_name(self) -> str:
             return self._new_name
 
-        def get_new_name(self) -> str:
-            return self._new_name
-
         @property
         def new_schema_name(self) -> typing.Optional[str]:
-            return self._new_schema_name
-
-        def get_new_schema_name(self) -> typing.Optional[str]:
             return self._new_schema_name
 
         def table_change(self) -> TableChange.RenameTable:
@@ -160,7 +155,8 @@ class TableUpdateRequest:
             # Validates the fields of the request. Always pass.
             pass
 
-        def get_new_comment(self) -> str:
+        @property
+        def new_comment(self) -> str:
             return self._new_comment
 
         def table_change(self) -> TableChange.UpdateComment:
@@ -197,15 +193,21 @@ class TableUpdateRequest:
             Raises:
                 ValueError: If the request is invalid, this exception is thrown.
             """
-            if not self._property:
-                raise ValueError('"property" field is required')
-            if not self._value:
-                raise ValueError('"value" field is required')
+            Precondition.check_argument(
+                self._property is not None and self._property != "",
+                '"property" field is required',
+            )
+            Precondition.check_argument(
+                self._value is not None and self._value != "",
+                '"value" field is required',
+            )
 
-        def get_property(self) -> str:
+        @property
+        def property(self) -> str:
             return self._property
 
-        def get_value(self) -> str:
+        @builtins.property
+        def value(self) -> str:
             return self._value
 
         def table_change(self) -> TableChange.SetProperty:
@@ -239,10 +241,13 @@ class TableUpdateRequest:
             Raises:
                 ValueError: If the request is invalid, this exception is thrown.
             """
-            if not self._property:
-                raise ValueError('"property" field is required')
+            Precondition.check_argument(
+                self._property is not None and self._property != "",
+                '"property" field is required',
+            )
 
-        def get_property(self) -> str:
+        @property
+        def property(self) -> str:
             return self._property
 
         def table_change(self) -> TableChange.RemoveProperty:
@@ -322,33 +327,44 @@ class TableUpdateRequest:
             Raises:
                 ValueError: If the request is invalid, this exception is thrown.
             """
-            if not self._field_name:
-                raise ValueError("Field name must be specified")
+            Precondition.check_argument(
+                self._field_name is not None and len(self._field_name) > 0,
+                "Field name must be specified",
+            )
+            Precondition.check_argument(
+                all(name for name in self._field_name),
+                'elements in "field_name" cannot be empty',
+            )
+            Precondition.check_argument(
+                self._data_type is not None,
+                '"type" field is required and cannot be empty',
+            )
 
-            if any(not name for name in self._field_name):
-                raise ValueError('elements in "field_name" cannot be empty')
-
-            if not self._data_type:
-                raise ValueError('"type" field is required and cannot be empty')
-
-        def get_field_name(self) -> list[str]:
+        @property
+        def field_name(self) -> list[str]:
             return self._field_name
 
-        def get_data_type(self) -> Type:
+        @property
+        def data_type(self) -> Type:
             return self._data_type
 
-        def get_comment(self) -> typing.Optional[str]:
+        @property
+        def comment(self) -> typing.Optional[str]:
             return self._comment
 
-        def get_position(self) -> typing.Optional[TableChange.ColumnPosition]:
+        @property
+        def position(self) -> typing.Optional[TableChange.ColumnPosition]:
             return self._position
 
-        def get_default_value(self) -> typing.Optional[Expression]:
+        @property
+        def default_value(self) -> typing.Optional[Expression]:
             return self._default_value
 
+        @property
         def is_nullable(self) -> bool:
             return self._nullable
 
+        @property
         def is_auto_increment(self) -> bool:
             return self._auto_increment
 
@@ -392,16 +408,18 @@ class TableUpdateRequest:
             Raises:
                 ValueError: If the request is invalid, this exception is thrown.
             """
-            if not self._old_field_name:
-                raise ValueError(
-                    '"old_field_name" field is required and must contain at least one element'
-                )
-
-            if any(not name for name in self._old_field_name):
-                raise ValueError('elements in "old_field_name" cannot be empty')
-
-            if not self._new_field_name:
-                raise ValueError('"newFieldName" field is required and cannot be empty')
+            Precondition.check_argument(
+                self._old_field_name is not None and len(self._old_field_name) > 0,
+                '"old_field_name" field is required and must contain at least one element',
+            )
+            Precondition.check_argument(
+                all(name for name in self._old_field_name),
+                'elements in "old_field_name" cannot be empty',
+            )
+            Precondition.check_argument(
+                self._new_field_name is not None and self._new_field_name != "",
+                '"newFieldName" field is required and cannot be empty',
+            )
 
         def table_change(self) -> RenameColumn:
             return TableChange.rename_column(self._old_field_name, self._new_field_name)
@@ -443,26 +461,26 @@ class TableUpdateRequest:
             Raises:
                 ValueError: If the request is invalid, this exception is thrown.
             """
-            if not self._field_name:
-                raise ValueError(
-                    '"field_name" field is required and must contain at least one element'
-                )
+            Precondition.check_argument(
+                self._field_name is not None and len(self._field_name) > 0,
+                '"field_name" field is required and must contain at least one element',
+            )
+            Precondition.check_argument(
+                all(name for name in self._field_name),
+                'elements in "field_name" cannot be empty',
+            )
+            Precondition.check_argument(
+                self._new_default_value is not None
+                and self._new_default_value != Expression.EMPTY_EXPRESSION,
+                '"newDefaultValue" field is required and cannot be empty',
+            )
 
-            if any(not name for name in self._field_name):
-                raise ValueError('elements in "field_name" cannot be empty')
-
-            if (
-                not self._new_default_value
-                or self._new_default_value == Expression.EMPTY_EXPRESSION
-            ):
-                raise ValueError(
-                    '"newDefaultValue" field is required and cannot be empty'
-                )
-
-        def get_field_name(self) -> list[str]:
+        @property
+        def field_name(self) -> list[str]:
             return self._field_name
 
-        def get_new_default_value(self) -> Expression:
+        @property
+        def new_default_value(self) -> Expression:
             return self._new_default_value
 
         def table_change(self) -> UpdateColumnDefaultValue:
@@ -505,21 +523,25 @@ class TableUpdateRequest:
             Raises:
                 ValueError: If the request is invalid, this exception is thrown.
             """
-            if not self._field_name:
-                raise ValueError(
-                    '"field_name" field is required and must contain at least one element'
-                )
+            Precondition.check_argument(
+                self._field_name is not None and len(self._field_name) > 0,
+                '"field_name" field is required and must contain at least one element',
+            )
+            Precondition.check_argument(
+                all(name for name in self._field_name),
+                'elements in "field_name" cannot be empty',
+            )
+            Precondition.check_argument(
+                self._new_type is not None,
+                '"newType" field is required and cannot be null',
+            )
 
-            if any(not name for name in self._field_name):
-                raise ValueError('elements in "field_name" cannot be empty')
-
-            if not self._new_type:
-                raise ValueError('"newType" field is required and cannot be null')
-
-        def get_field_name(self) -> list[str]:
+        @property
+        def field_name(self) -> list[str]:
             return self._field_name
 
-        def get_new_type(self) -> Type:
+        @property
+        def new_type(self) -> Type:
             return self._new_type
 
         def table_change(self) -> UpdateColumnType:
@@ -556,21 +578,25 @@ class TableUpdateRequest:
             Raises:
                 ValueError: If the request is invalid, this exception is thrown.
             """
-            if not self._field_name:
-                raise ValueError(
-                    '"field_name" field is required and must contain at least one element'
-                )
+            Precondition.check_argument(
+                self._field_name is not None and len(self._field_name) > 0,
+                '"field_name" field is required and must contain at least one element',
+            )
+            Precondition.check_argument(
+                all(name for name in self._field_name),
+                'elements in "field_name" cannot be empty',
+            )
+            Precondition.check_argument(
+                self._new_comment is not None and self._new_comment != "",
+                '"newComment" field is required and cannot be empty',
+            )
 
-            if any(not name for name in self._field_name):
-                raise ValueError('elements in "field_name" cannot be empty')
-
-            if not self._new_comment:
-                raise ValueError('"newComment" field is required and cannot be empty')
-
-        def get_field_name(self) -> list[str]:
+        @property
+        def field_name(self) -> list[str]:
             return self._field_name
 
-        def get_new_comment(self) -> str:
+        @property
+        def new_comment(self) -> str:
             return self._new_comment
 
         def table_change(self) -> UpdateColumnComment:
@@ -617,20 +643,24 @@ class TableUpdateRequest:
             Raises:
                 ValueError: If the request is invalid, this exception is thrown.
             """
-            if not self._field_name:
-                raise ValueError(
-                    '"field_name" field is required and must contain at least one element'
-                )
+            Precondition.check_argument(
+                self._field_name is not None and len(self._field_name) > 0,
+                '"field_name" field is required and must contain at least one element',
+            )
+            Precondition.check_argument(
+                all(name for name in self._field_name),
+                'elements in "field_name" cannot be empty',
+            )
+            Precondition.check_argument(
+                self._new_position is not None,
+                '"newPosition" field is required and cannot be null',
+            )
 
-            if any(not name for name in self._field_name):
-                raise ValueError('elements in "field_name" cannot be empty')
-
-            if not self._new_position:
-                raise ValueError('"newPosition" field is required and cannot be null')
-
+        @property
         def field_name(self) -> list[str]:
             return self._field_name
 
+        @property
         def new_position(self) -> TableChange.ColumnPosition:
             return self._new_position
 
@@ -670,17 +700,20 @@ class TableUpdateRequest:
             Raises:
                 ValueError: If the request is invalid, this exception is thrown.
             """
-            if not self._field_name:
-                raise ValueError(
-                    '"field_name" field is required and must contain at least one element'
-                )
+            Precondition.check_argument(
+                self._field_name is not None and len(self._field_name) > 0,
+                '"field_name" field is required and must contain at least one element',
+            )
+            Precondition.check_argument(
+                all(name for name in self._field_name),
+                'elements in "field_name" cannot be empty',
+            )
 
-            if any(not name for name in self._field_name):
-                raise ValueError('elements in "field_name" cannot be empty')
-
+        @property
         def field_name(self) -> list[str]:
             return self._field_name
 
+        @property
         def nullable(self) -> bool:
             return self._nullable
 
@@ -720,18 +753,21 @@ class TableUpdateRequest:
             Raises:
                 ValueError: If the request is invalid, this exception is thrown.
             """
-            if not self._field_name:
-                raise ValueError(
-                    '"field_name" field is required and must contain at least one element'
-                )
+            Precondition.check_argument(
+                self._field_name is not None and len(self._field_name) > 0,
+                '"field_name" field is required and must contain at least one element',
+            )
+            Precondition.check_argument(
+                all(name for name in self._field_name),
+                'elements in "field_name" cannot be empty',
+            )
 
-            if any(not name for name in self._field_name):
-                raise ValueError('elements in "field_name" cannot be empty')
-
-        def get_field_name(self) -> list[str]:
+        @property
+        def field_name(self) -> list[str]:
             return self._field_name
 
-        def get_if_exists(self) -> bool:
+        @property
+        def if_exists(self) -> bool:
             return self._if_exists
 
         def table_change(self) -> DeleteColumn:
@@ -778,21 +814,23 @@ class TableUpdateRequest:
             Raises:
                 ValueError: If the request is invalid, this exception is thrown.
             """
-            if not self._index:
-                raise ValueError("Index cannot be null")
+            Precondition.check_argument(self._index is not None, "Index cannot be null")
+            Precondition.check_argument(
+                self._index.type() is not None,
+                "Index type cannot be null",
+            )
+            Precondition.check_argument(
+                self._index.name() is not None and self._index.name() != "",
+                '"name" field is required',
+            )
+            Precondition.check_argument(
+                self._index.field_names() is not None
+                and len(self._index.field_names()) > 0,
+                "The index must be set with corresponding column names",
+            )
 
-            if not self._index.type():
-                raise ValueError("Index type cannot be null")
-
-            if not self._index.name():
-                raise ValueError('"name" field is required')
-
-            if not self._index.field_names():
-                raise ValueError(
-                    "The index must be set with corresponding column names"
-                )
-
-        def get_index(self) -> Index:
+        @property
+        def index(self) -> Index:
             return self._index
 
         def table_change(self) -> TableChange.AddIndex:
@@ -831,13 +869,17 @@ class TableUpdateRequest:
             Raises:
                 ValueError: If the request is invalid, this exception is thrown.
             """
-            if not self._name:
-                raise ValueError('"name" field is required')
+            Precondition.check_argument(
+                self._name is not None and self._name != "",
+                '"name" field is required',
+            )
 
-        def get_name(self) -> str:
+        @property
+        def name(self) -> str:
             return self._name
 
-        def get_if_exists(self) -> bool:
+        @property
+        def if_exists(self) -> bool:
             return self._if_exists
 
         def table_change(self) -> TableChange.DeleteIndex:
@@ -874,17 +916,20 @@ class TableUpdateRequest:
             Raises:
                 ValueError: If the request is invalid, this exception is thrown.
             """
-            if not self._field_name:
-                raise ValueError(
-                    '"field_name" field is required and must contain at least one element'
-                )
+            Precondition.check_argument(
+                self._field_name is not None and len(self._field_name) > 0,
+                '"field_name" field is required and must contain at least one element',
+            )
+            Precondition.check_argument(
+                all(name for name in self._field_name),
+                'elements in "field_name" cannot be empty',
+            )
 
-            if any(not name for name in self._field_name):
-                raise ValueError('elements in "field_name" cannot be empty')
-
+        @property
         def field_name(self) -> list[str]:
             return self._field_name
 
+        @property
         def auto_increment(self) -> bool:
             return self._auto_increment
 
