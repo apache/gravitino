@@ -36,6 +36,7 @@ import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.MetadataObjects;
 import org.apache.gravitino.meta.TableEntity;
 import org.apache.gravitino.stats.PartitionRange;
+import org.apache.gravitino.stats.PartitionStatisticsDrop;
 import org.apache.gravitino.stats.PartitionStatisticsModification;
 import org.apache.gravitino.stats.PartitionStatisticsUpdate;
 import org.apache.gravitino.stats.StatisticValue;
@@ -492,5 +493,53 @@ public class TestLancePartitionStatisticStorage {
       }
     }
     return newData;
+  }
+
+  @Test
+  public void testDropStatisticsWithQuoteInPartitionName() throws Exception {
+    PartitionStatisticStorageFactory factory = new LancePartitionStatisticStorageFactory();
+    String metalakeName = "metalake";
+    MetadataObject metadataObject =
+        MetadataObjects.of(
+            Lists.newArrayList("catalog", "schema", "table"), MetadataObject.Type.TABLE);
+
+    EntityStore entityStore = mock(EntityStore.class);
+    TableEntity tableEntity = mock(TableEntity.class);
+    when(entityStore.get(any(), any(), any())).thenReturn(tableEntity);
+    when(tableEntity.id()).thenReturn(1L);
+    FieldUtils.writeField(GravitinoEnv.getInstance(), "entityStore", entityStore, true);
+
+    String location = Files.createTempDirectory("lance_stats_test_quote").toString();
+    Map<String, String> properties = Maps.newHashMap();
+    properties.put("location", location);
+
+    LancePartitionStatisticStorage storage =
+        (LancePartitionStatisticStorage) factory.create(properties);
+    try {
+      String quotedPartition = "partition'01";
+      Map<String, StatisticValue<?>> stats = Maps.newHashMap();
+      stats.put("statistic0", StatisticValues.stringValue("value0"));
+
+      storage.updateStatistics(
+          metalakeName,
+          Lists.newArrayList(
+              MetadataObjectStatisticsUpdate.of(
+                  metadataObject,
+                  Lists.newArrayList(
+                      PartitionStatisticsModification.update(quotedPartition, stats)))));
+
+      PartitionStatisticsDrop drop =
+          PartitionStatisticsModification.drop(quotedPartition, Lists.newArrayList("statistic0"));
+
+      Assertions.assertDoesNotThrow(
+          () ->
+              storage.dropStatistics(
+                  metalakeName,
+                  Lists.newArrayList(
+                      MetadataObjectStatisticsDrop.of(metadataObject, Lists.newArrayList(drop)))));
+    } finally {
+      FileUtils.deleteDirectory(new File(location + "/" + tableEntity.id() + ".lance"));
+      storage.close();
+    }
   }
 }
