@@ -230,43 +230,6 @@ grep -E "Rewritten data files|Added data files|completed successfully" \
 By default, Gravitino pulls job status every `300000` ms (`gravitino.job.statusPullIntervalInMs`).
 REST status may lag real Spark process state by up to about 5 minutes.
 
-## Quick start B: optimizer CLI local calculator
-
-### 1. Minimal configuration
-
-Set these in `conf/gravitino-optimizer.conf`:
-
-```properties
-gravitino.optimizer.gravitinoUri = http://localhost:8090
-gravitino.optimizer.gravitinoMetalake = test
-gravitino.optimizer.gravitinoDefaultCatalog = generic
-```
-
-### 2. Prepare local JSONL input
-
-Create `table-stats.jsonl`:
-
-```json
-{"stats-type":"table","identifier":"catalog.db.sales","row_count":100000,"data_size":8388608,"timestamp":1735689600}
-{"stats-type":"partition","identifier":"catalog.db.sales","partition-path":{"dt":"2026-01-01"},"row_count":12000,"data_size":1048576,"timestamp":1735689600}
-```
-
-### 3. Update statistics
-
-```bash
-./bin/gravitino-optimizer.sh \
-  --type update-statistics \
-  --calculator-name local-stats-calculator \
-  --file-path ./table-stats.jsonl \
-  --conf-path ./conf/gravitino-optimizer.conf
-```
-
-Expected output:
-
-```text
-SUMMARY: statistics totalRecords=... tableRecords=... partitionRecords=... jobRecords=...
-```
-
 ## Next read
 
 - [Optimizer Configuration](./optimizer-configuration.md)
