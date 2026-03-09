@@ -53,16 +53,22 @@ Global option:
 - `stats-type`: `table`, `partition`, or `job`
 - `identifier`: object identifier
 - `partition-path`: only for partition data, for example `{"dt":"2026-01-01"}`
-- `timestamp`: epoch seconds
+- `timestamp`: optional epoch seconds (record-level default timestamp for metric points)
 
 All other fields are treated as metric or statistic values.
 
-### Supported value forms
+### Supported examples by scope
 
-Use the simple numeric form as the default example:
+Use JSON Lines (one JSON object per line). The following examples focus on table, partition, and
+job scopes with multiple metric/statistic fields:
 
 ```json
 {"stats-type":"table","identifier":"catalog.db.t1","timestamp":1735689600,"row_count":100}
+{"stats-type":"table","identifier":"catalog.db.t1","row_count":100,"total_file_size":1048576}
+{"stats-type":"table","identifier":"catalog.db.t1","timestamp":1735689660,"row_count":120,"file_count":24,"avg_file_size":10485.76}
+{"stats-type":"partition","identifier":"catalog.db.t1","timestamp":1735689720,"partition-path":{"dt":"2026-01-01"},"row_count":20}
+{"stats-type":"partition","identifier":"catalog.db.t1","partition-path":{"dt":"2026-01-01","region":"us"},"row_count":12,"file_count":3}
+{"stats-type":"job","identifier":"job-1","timestamp":1735689800,"duration_ms":12500,"rewritten_files":18}
 ```
 
 ### Identifier rules
