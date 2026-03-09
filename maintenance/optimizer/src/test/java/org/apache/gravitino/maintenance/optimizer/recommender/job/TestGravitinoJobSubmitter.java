@@ -24,16 +24,15 @@ import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.maintenance.optimizer.api.recommender.JobExecutionContext;
 import org.apache.gravitino.maintenance.optimizer.common.OptimizerEnv;
 import org.apache.gravitino.maintenance.optimizer.common.conf.OptimizerConfig;
-import org.apache.gravitino.policy.IcebergDataCompactionContent;
+import org.apache.gravitino.maintenance.optimizer.recommender.handler.compaction.CompactionStrategyHandler;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
 public class TestGravitinoJobSubmitter {
   @Test
-  void loadJobAdapterReturnsCompactionAdapterForBuiltInTemplateName() {
+  void loadJobAdapterReturnsCompactionAdapter() {
     GravitinoJobSubmitter submitter = new GravitinoJobSubmitter();
-    GravitinoJobAdapter adapter =
-        submitter.loadJobAdapter(IcebergDataCompactionContent.JOB_TEMPLATE_NAME_VALUE);
+    GravitinoJobAdapter adapter = submitter.loadJobAdapter(CompactionStrategyHandler.NAME);
     Assertions.assertTrue(adapter instanceof GravitinoCompactionJobAdapter);
   }
 
