@@ -92,8 +92,6 @@ Gravitino currently supports the following catalogs:
 
 If you want to operate table and partition statistics, you can refer to the [document](./manage-statistics-in-gravitino.md).
 
-If you want an operations guide for automated maintenance workflows (statistics, metrics, monitoring, and strategy jobs), see [Table Maintenance Service (Optimizer)](./table-maintenance-service/optimizer.md). You can start with Gravitino built-in policies and built-in job templates first, and use custom extension interfaces when built-ins do not meet your requirements.
-
 **Fileset catalogs:**
 
 * [**Fileset catalog**](./fileset-catalog.md)
@@ -105,6 +103,8 @@ If you want an operations guide for automated maintenance workflows (statistics,
 **Model catalogs:**
 
 * [**Model catalog**](./model-catalog.md)
+
+If you want an operations guide for automated maintenance workflows (statistics, metrics, monitoring, and strategy jobs), see [Table Maintenance Service (Optimizer)](./table-maintenance-service/optimizer.md). You can start with Gravitino built-in policies and built-in job templates first, and use custom extension interfaces when built-ins do not meet your requirements.
 
 Catalogs with an asterisk (\*) aren’t in the standard release tarball and Docker image since 1.2.0.  In 1.2.0, Gravitino introduces 
 folder `catalogs-contrib` to host the contributed catalogs, which aren’t in the standard release but can be built and used separately. See [how to build Gravitino](./how-to-build.md#quick-start) for details.
