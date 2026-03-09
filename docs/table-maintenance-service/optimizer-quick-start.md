@@ -50,9 +50,6 @@ If missing, verify `gravitino-jobs` JAR in `auxlib`, then restart Gravitino.
 
 Create a REST Iceberg catalog, schema, and table:
 
-This quick start uses a standalone Iceberg REST service endpoint
-(`http://localhost:9001/iceberg`) as the catalog backend.
-
 ```bash
 # Create catalog (ignore "already exists" errors)
 curl -X POST -H "Accept: application/vnd.gravitino.v1+json" \
