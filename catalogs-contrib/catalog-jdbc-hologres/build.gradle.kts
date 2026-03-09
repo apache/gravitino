@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-description = "catalog-jdbc-mysql"
+description = "catalog-jdbc-hologres"
 
 plugins {
   `maven-publish`
@@ -53,10 +53,9 @@ dependencies {
   testImplementation(libs.awaitility)
   testImplementation(libs.junit.jupiter.api)
   testImplementation(libs.junit.jupiter.params)
-  testImplementation(libs.mysql.driver)
   testImplementation(libs.postgresql.driver)
   testImplementation(libs.testcontainers)
-  testImplementation(libs.testcontainers.mysql)
+  testImplementation(libs.testcontainers.postgresql)
 
   testRuntimeOnly(libs.junit.jupiter.engine)
 }
@@ -74,14 +73,14 @@ tasks {
       exclude("log4j-*.jar")
       exclude("slf4j-*.jar")
     }
-    into("$rootDir/distribution/package/catalogs/jdbc-mysql/libs")
+    into("$rootDir/distribution/package/catalogs/jdbc-hologres/libs")
   }
 
   val copyCatalogConfig by registering(Copy::class) {
     from("src/main/resources")
-    into("$rootDir/distribution/package/catalogs/jdbc-mysql/conf")
+    into("$rootDir/distribution/package/catalogs/jdbc-hologres/conf")
 
-    include("jdbc-mysql.conf")
+    include("jdbc-hologres.conf")
 
     exclude { details ->
       details.file.isDirectory()
