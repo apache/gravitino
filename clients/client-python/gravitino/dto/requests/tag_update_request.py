@@ -24,11 +24,14 @@ from dataclasses_json import config, dataclass_json
 
 from gravitino.api.tag.tag_change import TagChange
 from gravitino.rest.rest_message import RESTRequest
+from gravitino.utils.precondition import Precondition
 
 
 @dataclass
 @dataclass_json
 class TagUpdateRequestBase(RESTRequest, ABC):
+    _type: str = field(init=False, metadata=config(field_name="@type"))
+
     @abstractmethod
     def tag_change(self) -> TagChange:
         """
@@ -51,11 +54,10 @@ class TagUpdateRequest:
     class RenameTagRequest(TagUpdateRequestBase):
         """The tag update request for renaming a tag."""
 
-        _type: str = field(
-            init=False, default="rename", metadata=config(field_name="@type")
-        )
-
         _new_name: str = field(init=True, metadata=config(field_name="newName"))
+
+        def __post_init__(self) -> None:
+            self._type = "rename"
 
         def validate(self) -> None:
             """
@@ -64,9 +66,11 @@ class TagUpdateRequest:
             Raises:
                 ValueError: If the request is invalid, this exception is thrown.
             """
-            if not self._new_name:
-                raise ValueError('"newName" must not be blank')
+            Precondition.check_argument(
+                self._new_name, '"newName" must not be blank'
+            )
 
+        @property
         def new_name(self) -> str:
             return self._new_name
 
@@ -78,11 +82,10 @@ class TagUpdateRequest:
     class UpdateTagCommentRequest(TagUpdateRequestBase):
         """The tag update request for updating a tag comment."""
 
-        _type: str = field(
-            init=False, default="updateComment", metadata=config(field_name="@type")
-        )
-
         _new_comment: str = field(metadata=config(field_name="newComment"))
+
+        def __post_init__(self) -> None:
+            self._type = "updateComment"
 
         def validate(self) -> None:
             """
@@ -94,6 +97,7 @@ class TagUpdateRequest:
             # always pass
             pass
 
+        @property
         def new_comment(self) -> str:
             return self._new_comment
 
@@ -105,12 +109,11 @@ class TagUpdateRequest:
     class SetTagPropertyRequest(TagUpdateRequestBase):
         """The tag update request for setting a tag property."""
 
-        _type: str = field(
-            init=False, default="setProperty", metadata=config(field_name="@type")
-        )
-
         _property: str = field(metadata=config(field_name="property"))
         _value: str = field(metadata=config(field_name="value"))
+
+        def __post_init__(self) -> None:
+            self._type = "setProperty"
 
         def validate(self) -> None:
             """
@@ -125,10 +128,12 @@ class TagUpdateRequest:
             if not self._value:
                 raise ValueError('"value" must not be blank')
 
-        def get_prop(self) -> str:
+        @property
+        def prop(self) -> str:
             return self._property
 
-        def get_value(self) -> str:
+        @property
+        def value(self) -> str:
             return self._value
 
         def tag_change(self) -> TagChange.SetProperty:
@@ -139,11 +144,10 @@ class TagUpdateRequest:
     class RemoveTagPropertyRequest(TagUpdateRequestBase):
         """The tag update request for removing a tag property."""
 
-        _type: str = field(
-            init=False, default="removeProperty", metadata=config(field_name="@type")
-        )
-
         _property: str = field(metadata=config(field_name="property"))
+
+        def __post_init__(self) -> None:
+            self._type = "removeProperty"
 
         def validate(self) -> None:
             """
@@ -155,7 +159,8 @@ class TagUpdateRequest:
             if not self._property:
                 raise ValueError('"property" must not be blank')
 
-        def get_prop(self) -> str:
+        @property
+        def prop(self) -> str:
             return self._property
 
         def tag_change(self) -> TagChange.RemoveProperty:
