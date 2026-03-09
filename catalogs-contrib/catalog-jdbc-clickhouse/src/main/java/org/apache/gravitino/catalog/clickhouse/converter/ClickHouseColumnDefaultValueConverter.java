@@ -21,6 +21,7 @@ package org.apache.gravitino.catalog.clickhouse.converter;
 import static org.apache.gravitino.rel.Column.DEFAULT_VALUE_NOT_SET;
 import static org.apache.gravitino.rel.Column.DEFAULT_VALUE_OF_CURRENT_TIMESTAMP;
 
+import com.google.common.base.Preconditions;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import org.apache.commons.lang3.StringUtils;
@@ -57,6 +58,8 @@ public class ClickHouseColumnDefaultValueConverter extends JdbcColumnDefaultValu
         return literal.value().toString();
       } else {
         Object value = literal.value();
+        Preconditions.checkArgument(
+            value != null, "Null default literal value is not supported for ClickHouse.");
         if (value instanceof LocalDateTime) {
           value = ((LocalDateTime) value).format(DATE_TIME_FORMATTER);
         } else if (value instanceof String str
@@ -65,7 +68,7 @@ public class ClickHouseColumnDefaultValueConverter extends JdbcColumnDefaultValu
             && str.endsWith("'")) {
           // The API caller may pass quoted string literals (e.g. "'active'"), but DDL generation
           // is responsible for adding the outer quotes.
-          value = str.substring(1, str.length() - 1);
+          value = str.substring(1, str.length() - 1).replace("''", "'");
         }
         return String.format("'%s'", value.toString().replace("'", "''"));
       }
