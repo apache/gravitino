@@ -15,12 +15,6 @@ The Table Maintenance Service (Optimizer) automates table maintenance by connect
 
 The CLI command and configuration keys keep using the `optimizer` name for compatibility.
 
-## Who should read this page
-
-- Platform administrators: deploy and configure server-side job execution and templates.
-- Data platform engineers: define policies and run built-in maintenance workflows.
-- CLI users: run local calculators and submit or observe jobs from scripts.
-
 ## Architecture overview
 
 The optimizer workflow is based on six parts:
@@ -81,6 +75,16 @@ Check REST job status and validate resulting statistics, metrics, or rewritten d
 | Gravitino server config | Runtime for job manager and executor | `gravitino.job.executor`, `gravitino.job.statusPullIntervalInMs`, `gravitino.jobExecutor.local.sparkHome` |
 | Job submission `jobConf` | Per job run | `catalog_name`, `table_identifier`, `spark_*`, template-specific args |
 | Optimizer CLI config | CLI commands | `gravitino.optimizer.*` in `conf/gravitino-optimizer.conf` |
+
+## Terminology mapping
+
+| Term | Example value | Used in |
+| --- | --- | --- |
+| Policy name | `iceberg_compaction_default` | Policy identity and CLI `--strategy-name` |
+| Policy type | `system_iceberg_compaction` | REST policy creation field `policyType` |
+| Strategy type | `iceberg-data-compaction` | Policy content field `strategy.type` and strategy handler config key |
+
+For strategy submission, `--strategy-name` must use policy name, not policy type or strategy type.
 
 ## Before you start
 

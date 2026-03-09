@@ -33,7 +33,7 @@ Check `gravitino.job.statusPullIntervalInMs` and local staging logs under:
 
 ## `No identifiers matched strategy name ...`
 
-`--strategy-name` must be the policy name (for example `iceberg_compaction_default`), not the strategy type (`iceberg-data-compaction`).
+`--strategy-name` must be the policy name (for example `iceberg_compaction_default`), not the policy type (`system_iceberg_compaction`) and not the strategy type (`iceberg-data-compaction`).
 
 ## Dry-run returns no `DRY-RUN` or `SUBMIT` lines
 
