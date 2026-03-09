@@ -655,6 +655,101 @@ public class CatalogClickHouseIT extends BaseIT {
   }
 
   @Test
+  void testCreateTableWithCommonTypeLiteralDefaults() {
+    String name = GravitinoITUtils.genRandomName("default_literal_table");
+    NameIdentifier tableIdentifier = NameIdentifier.of(schemaName, name);
+
+    Column[] columns =
+        new Column[] {
+          Column.of(
+              "int_col", Types.IntegerType.get(), "int", false, false, Literals.integerLiteral(7)),
+          Column.of(
+              "double_col",
+              Types.DoubleType.get(),
+              "double",
+              false,
+              false,
+              Literals.doubleLiteral(123.45)),
+          Column.of(
+              "string_col",
+              Types.VarCharType.of(255),
+              "string",
+              false,
+              false,
+              Literals.stringLiteral("hello")),
+          Column.of(
+              "date_col",
+              Types.DateType.get(),
+              "date",
+              false,
+              false,
+              Literals.dateLiteral(LocalDate.of(2024, 4, 1))),
+          Column.of(
+              "decimal_col",
+              Types.DecimalType.of(5, 2),
+              "decimal",
+              false,
+              false,
+              Literals.decimalLiteral(Decimal.of("9.99", 5, 2)))
+        };
+
+    catalog
+        .asTableCatalog()
+        .createTable(
+            tableIdentifier,
+            columns,
+            table_comment,
+            createProperties(),
+            Transforms.EMPTY_TRANSFORM,
+            Distributions.NONE,
+            getSortOrders("int_col"));
+
+    Table loadedTable = catalog.asTableCatalog().loadTable(tableIdentifier);
+    Assertions.assertEquals(Literals.integerLiteral(7), loadedTable.columns()[0].defaultValue());
+    Assertions.assertEquals(
+        Literals.doubleLiteral(123.45), loadedTable.columns()[1].defaultValue());
+    Assertions.assertEquals(
+        Literals.stringLiteral("hello"), loadedTable.columns()[2].defaultValue());
+    Assertions.assertEquals(
+        Literals.dateLiteral(LocalDate.of(2024, 4, 1)), loadedTable.columns()[3].defaultValue());
+    Assertions.assertEquals(
+        Literals.decimalLiteral(Decimal.of("9.99", 5, 2)), loadedTable.columns()[4].defaultValue());
+  }
+
+  @Test
+  void testCreateTableWithQuotedStringDefaultLiteral() {
+    String name = GravitinoITUtils.genRandomName("quoted_default_table");
+    NameIdentifier tableIdentifier = NameIdentifier.of(schemaName, name);
+
+    Column[] columns =
+        new Column[] {
+          Column.of("id", Types.IntegerType.get(), "id", false, false, DEFAULT_VALUE_NOT_SET),
+          Column.of(
+              "status",
+              Types.StringType.get(),
+              "Status",
+              false,
+              false,
+              Literals.stringLiteral("'active'"))
+        };
+
+    catalog
+        .asTableCatalog()
+        .createTable(
+            tableIdentifier,
+            columns,
+            table_comment,
+            createProperties(),
+            Transforms.EMPTY_TRANSFORM,
+            Distributions.NONE,
+            getSortOrders("id"));
+
+    Table loadedTable = catalog.asTableCatalog().loadTable(tableIdentifier);
+    Assertions.assertEquals(
+        Literals.stringLiteral("active"), loadedTable.columns()[1].defaultValue());
+  }
+
+  @Test
   // see https://dev.clickhouse.com/doc/refman/8.0/en/data-type-defaults.html
   @EnabledIf("supportColumnDefaultValueExpression")
   void testColumnDefaultValueConverter() {

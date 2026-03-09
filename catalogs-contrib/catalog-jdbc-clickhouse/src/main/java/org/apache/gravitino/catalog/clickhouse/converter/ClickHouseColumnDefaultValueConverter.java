@@ -59,8 +59,15 @@ public class ClickHouseColumnDefaultValueConverter extends JdbcColumnDefaultValu
         Object value = literal.value();
         if (value instanceof LocalDateTime) {
           value = ((LocalDateTime) value).format(DATE_TIME_FORMATTER);
+        } else if (value instanceof String str
+            && str.length() >= 2
+            && str.startsWith("'")
+            && str.endsWith("'")) {
+          // The API caller may pass quoted string literals (e.g. "'active'"), but DDL generation
+          // is responsible for adding the outer quotes.
+          value = str.substring(1, str.length() - 1);
         }
-        return String.format("'%s'", value);
+        return String.format("'%s'", value.toString().replace("'", "''"));
       }
     }
 
