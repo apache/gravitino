@@ -23,6 +23,7 @@ from dataclasses_json import config
 
 from gravitino.dto.requests.table_update_request import TableUpdateRequest
 from gravitino.rest.rest_message import RESTRequest
+from gravitino.utils.precondition import Precondition
 
 
 @dataclass
@@ -42,7 +43,9 @@ class TableUpdatesRequest(RESTRequest):
         Raises:
             ValueError: If the request is invalid.
         """
-        if not self._updates:
-            raise ValueError("Updates cannot be empty")
+        Precondition.check_argument(
+            self._updates is not None and len(self._updates) > 0,
+            "Updates cannot be empty",
+        )
         for update_request in self._updates:
             update_request.validate()

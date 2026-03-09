@@ -46,6 +46,19 @@ class TestTableUpdateRequest(unittest.TestCase):
 
         self.assertEqual(json_str, request.to_json())
 
+    def test_rename_table_request_serialize_with_new_schema_name(self) -> None:
+        request = TableUpdateRequest.RenameTableRequest("newTable", "newSchema")
+        json_str = _json.dumps(
+            {
+                "@type": "rename",
+                "newName": "newTable",
+                "newSchemaName": "newSchema",
+            },
+            ensure_ascii=False,
+        )
+
+        self.assertEqual(json_str, request.to_json())
+
     def test_update_table_comment_request_serialize(self) -> None:
         request = TableUpdateRequest.UpdateTableCommentRequest("new comment")
         json_str = _json.dumps(
