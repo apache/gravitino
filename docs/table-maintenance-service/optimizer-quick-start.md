@@ -38,8 +38,6 @@ curl -sS "http://localhost:8090/api/metalakes/test" | jq
 curl -sS "http://localhost:8090/api/metalakes/test/jobs/templates?details=true" | jq '.jobTemplates[].name'
 ```
 
-`details=true` is a supported query parameter for the jobs template list API.
-
 Expected names include:
 
 - `builtin-iceberg-update-stats`
