@@ -403,13 +403,60 @@ class GCSStorageHandler(StorageHandler):
                     catalog_props,
                 )
                 if isinstance(credential, GCSTokenCredential):
-                    return (
-                        expire_time,
-                        self.get_filesystem(
-                            token=credential.token(),
-                            **kwargs,
-                        ),
-                    )
+                    # gcsfs expects a google.auth.credentials.Credentials object
+                    # We need to create a credentials object from the access token
+                    from datetime import datetime, timezone
+                    
+                    try:
+                        from google.auth.credentials import Credentials
+                        from google.auth import _helpers
+                        
+                        # Create a credentials object that wraps the access token
+                        class StaticCredentials(Credentials):
+                            """A credentials object that uses a static access token."""
+                            
+                            def __init__(self, token_value, expiry_time_ms):
+                                super().__init__()
+                                self.token = token_value
+                                # Convert milliseconds to datetime
+                                self.expiry = datetime.fromtimestamp(
+                                    expiry_time_ms / 1000.0, tz=timezone.utc
+                                )
+                            
+                            def refresh(self, request):
+                                # Static token cannot be refreshed
+                                raise RuntimeError(
+                                    "Cannot refresh static access token. "
+                                    "Please request a new credential from Gravitino."
+                                )
+                            
+                            @property
+                            def expired(self):
+                                if not self.expiry:
+                                    return False
+                                return _helpers.utcnow() >= self.expiry
+                            
+                            @property
+                            def valid(self):
+                                return self.token is not None and not self.expired
+                        
+                        creds = StaticCredentials(
+                            credential.token(),
+                            credential.expire_time_in_ms()
+                        )
+                        
+                        return (
+                            expire_time,
+                            self.get_filesystem(
+                                token=creds,
+                                **kwargs,
+                            ),
+                        )
+                    except ImportError as e:
+                        raise GravitinoRuntimeException(
+                            f"Failed to import google.auth: {e}. "
+                            "Please ensure google-auth is installed."
+                        )
 
         # get 'service-account-key' from gcs_options, if the key is not found, throw an exception
         service_account_key_path = catalog_props.get(
