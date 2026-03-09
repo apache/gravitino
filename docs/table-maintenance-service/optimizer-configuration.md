@@ -96,6 +96,7 @@ Without this, Spark jobs may try `hdfs://localhost:9000` and fail.
 ## Related docs
 
 - [Table Maintenance Service (Optimizer)](./optimizer.md)
+- [Optimizer Extension Guide](./optimizer-extension-guide.md)
 - [Optimizer Quick Start and Verification](./optimizer-quick-start.md)
 - [Optimizer CLI Reference](./optimizer-cli-reference.md)
 - [Optimizer Troubleshooting](./optimizer-troubleshooting.md)

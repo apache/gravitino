@@ -46,6 +46,7 @@ Use CLI local calculator when you want to feed JSONL input directly.
 ## Start here
 
 - Configuration first: read [Optimizer Configuration](./optimizer-configuration.md).
+- Need custom integrations: read [Optimizer Extension Guide](./optimizer-extension-guide.md).
 - First-time enablement: run [Optimizer Quick Start and Verification](./optimizer-quick-start.md).
 - CLI-only usage: read [Optimizer CLI Reference](./optimizer-cli-reference.md).
 - Runtime failures or mismatched results: check [Optimizer Troubleshooting](./optimizer-troubleshooting.md).
@@ -104,6 +105,7 @@ For strategy submission, `--strategy-name` must use policy name, not policy type
 ## Related docs
 
 - [Optimizer Configuration](./optimizer-configuration.md)
+- [Optimizer Extension Guide](./optimizer-extension-guide.md)
 - [Optimizer Quick Start and Verification](./optimizer-quick-start.md)
 - [Optimizer CLI Reference](./optimizer-cli-reference.md)
 - [Optimizer Troubleshooting](./optimizer-troubleshooting.md)

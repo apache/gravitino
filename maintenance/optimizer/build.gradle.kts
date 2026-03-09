@@ -117,6 +117,7 @@ tasks {
 
   register("copyConfigs", Copy::class) {
     from("src/main/resources")
+    include("**/*.conf", "**/*.template")
     into("$rootDir/distribution/package/optimizer/conf")
 
     rename { original ->

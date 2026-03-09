@@ -207,5 +207,6 @@ Query stored metrics at job scope.
 
 - [Table Maintenance Service (Optimizer)](./optimizer.md)
 - [Optimizer Configuration](./optimizer-configuration.md)
+- [Optimizer Extension Guide](./optimizer-extension-guide.md)
 - [Optimizer Quick Start and Verification](./optimizer-quick-start.md)
 - [Optimizer Troubleshooting](./optimizer-troubleshooting.md)
