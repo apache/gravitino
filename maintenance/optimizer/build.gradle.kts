@@ -116,8 +116,12 @@ tasks {
   }
 
   register("copyConfigs", Copy::class) {
-    from("src/main/resources")
-    include("**/*.conf", "**/*.template")
+    from("src/main/resources") {
+      include("**/*.conf", "**/*.template")
+    }
+    from("$rootDir/conf") {
+      include("gravitino-optimizer.conf.template")
+    }
     into("$rootDir/distribution/package/optimizer/conf")
 
     rename { original ->

@@ -38,6 +38,8 @@ curl -sS "http://localhost:8090/api/metalakes/test" | jq
 curl -sS "http://localhost:8090/api/metalakes/test/jobs/templates?details=true" | jq '.jobTemplates[].name'
 ```
 
+`details=true` is a supported query parameter for the jobs template list API.
+
 Expected names include:
 
 - `builtin-iceberg-update-stats`
@@ -186,6 +188,7 @@ gravitino.optimizer.jobSubmitterConfig.spark_executor_memory = 1g
 gravitino.optimizer.jobSubmitterConfig.spark_driver_memory = 1g
 gravitino.optimizer.jobSubmitterConfig.catalog_type = rest
 gravitino.optimizer.jobSubmitterConfig.catalog_uri = http://localhost:9001/iceberg
+# Leave empty for local filesystem; set to your warehouse URI for cloud/HDFS storage.
 gravitino.optimizer.jobSubmitterConfig.warehouse_location =
 gravitino.optimizer.jobSubmitterConfig.spark_conf = {"spark.master":"local[2]","spark.hadoop.fs.defaultFS":"file:///"}
 EOF_CONF
@@ -209,6 +212,7 @@ submit_output=$(./bin/gravitino-optimizer.sh \
 echo "${submit_output}"
 
 strategy_job_id=$(echo "${submit_output}" | sed -n 's/.*jobId=\([^[:space:]]*\).*/\1/p')
+[[ -z "${strategy_job_id}" ]] && echo 'ERROR: failed to extract strategy job ID' && exit 1
 echo "strategy rewrite job id: ${strategy_job_id}"
 ```
 
@@ -222,6 +226,7 @@ curl -sS "http://localhost:8090/api/metalakes/test/jobs/runs/${strategy_job_id}"
 # Verify table statistics after update-stats
 curl -sS "http://localhost:8090/api/metalakes/test/objects/table/rest_catalog.db.t1/statistics" | jq
 
+# Staging path is controlled by `gravitino.job.stagingDir` (default: `/tmp/gravitino/jobs/staging`).
 # Verify rewrite actually rewrote files (N should be > 0 for non-empty table)
 grep -E "Rewritten data files|Added data files|completed successfully" \
   "/tmp/gravitino/jobs/staging/test/builtin-iceberg-rewrite-data-files/${strategy_job_id}/error.log"

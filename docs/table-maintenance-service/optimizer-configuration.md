@@ -1,6 +1,6 @@
 ---
 title: "Optimizer Configuration"
-slug: /table-maintenance-service/configuration
+slug: /table-maintenance-service/optimizer-configuration
 keyword: table maintenance, optimizer, configuration, job template, spark
 license: This software is licensed under the Apache License version 2.
 ---
@@ -49,6 +49,9 @@ Use `builtin-iceberg-update-stats` with at least these keys:
 }
 ```
 
+`warehouse_location` can be empty for local filesystem testing. Set it to your warehouse URI
+for HDFS or cloud object storage environments.
+
 ## Strategy submission configuration
 
 `submit-strategy-jobs` needs optimizer CLI config. This is a minimal working example:
@@ -70,6 +73,7 @@ gravitino.optimizer.jobSubmitterConfig.spark_executor_memory = 1g
 gravitino.optimizer.jobSubmitterConfig.spark_driver_memory = 1g
 gravitino.optimizer.jobSubmitterConfig.catalog_type = rest
 gravitino.optimizer.jobSubmitterConfig.catalog_uri = http://localhost:9001/iceberg
+# Leave empty for local filesystem; set to your warehouse URI for cloud/HDFS storage.
 gravitino.optimizer.jobSubmitterConfig.warehouse_location =
 gravitino.optimizer.jobSubmitterConfig.spark_conf = {"spark.master":"local[2]","spark.hadoop.fs.defaultFS":"file:///"}
 ```

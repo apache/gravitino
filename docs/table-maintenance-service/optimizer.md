@@ -1,6 +1,6 @@
 ---
 title: "Table Maintenance Service (Optimizer)"
-slug: /table-maintenance-service
+slug: /table-maintenance-service/optimizer
 keyword: table maintenance, optimizer, statistics, metrics, monitor
 license: This software is licensed under the Apache License version 2.
 ---
@@ -87,20 +87,10 @@ Check REST job status and validate resulting statistics, metrics, or rewritten d
 
 For strategy submission, `--strategy-name` must use policy name, not policy type or strategy type.
 
-## Before you start
+## Prerequisites and verification
 
-- Prepare a running Gravitino server.
-- Ensure target metalake exists (examples use `test`).
-- Configure `SPARK_HOME` or `gravitino.jobExecutor.local.sparkHome` for Spark templates.
-- For CLI mode, prepare `conf/gravitino-optimizer.conf` from template.
-- Use fully qualified identifiers where possible, for example `catalog.schema.table`.
-- If your Iceberg REST backend is in-memory, metadata is reset after restart.
-
-## Success criteria
-
-- Update-stats job finishes and statistics include `custom-data-file-mse` and `custom-delete-file-number`.
-- `submit-strategy-jobs` prints `SUBMIT` with a rewrite job ID.
-- Rewrite job log shows `Rewritten data files: <N>` where `N > 0` for non-empty tables.
+Quick start prerequisites and success checks are documented in
+[Optimizer Quick Start and Verification](./optimizer-quick-start.md).
 
 ## Related docs
 

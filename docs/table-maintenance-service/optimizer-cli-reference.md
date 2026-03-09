@@ -1,6 +1,6 @@
 ---
 title: "Optimizer CLI Reference"
-slug: /table-maintenance-service/cli-reference
+slug: /table-maintenance-service/optimizer-cli-reference
 keyword: table maintenance, optimizer, cli, commands, metrics, statistics
 license: This software is licensed under the Apache License version 2.
 ---
@@ -14,7 +14,7 @@ directory. Use `--conf-path` only when you need a custom config file.
 
 | Command (`--type`) | Required options | Optional options | Purpose |
 | --- | --- | --- | --- |
-| `submit-strategy-jobs` | `--identifiers`, `--strategy-name` (policy name) | `--dry-run`, `--limit` | Recommend and optionally submit jobs |
+| `submit-strategy-jobs` | `--identifiers`, `--strategy-name` | `--dry-run`, `--limit` | Recommend and optionally submit jobs |
 | `update-statistics` | `--calculator-name` | `--identifiers`, `--statistics-payload`, `--file-path` | Calculate and persist statistics |
 | `append-metrics` | `--calculator-name` | `--identifiers`, `--statistics-payload`, `--file-path` | Calculate and append metrics |
 | `monitor-metrics` | `--identifiers`, `--action-time` | `--range-seconds`, `--partition-path` | Evaluate rules with before/after metrics |
