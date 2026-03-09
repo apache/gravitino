@@ -997,9 +997,109 @@ public class TestJobManager {
     Assertions.assertEquals(Lists.newArrayList("value2"), result7c);
 
     // Neither set — result is empty
-    List<String> result7d =
-        JobManager.buildArgumentsWithOptional(templateArgs7, ImmutableMap.of());
+    List<String> result7d = JobManager.buildArgumentsWithOptional(templateArgs7, ImmutableMap.of());
     Assertions.assertEquals(Lists.newArrayList(), result7d);
+
+    // Test Case 8: ?--flag followed by value WITHOUT ? marker (regression for pair-skip bug).
+    // When the value arg has no ? prefix the pair must still be skipped when strategy is absent.
+    List<String> templateArgs8 = Lists.newArrayList("?--strategy", "{{strategy}}");
+
+    // 8a: strategy is provided — both flag and value must appear
+    List<String> result8a =
+        JobManager.buildArgumentsWithOptional(
+            templateArgs8, ImmutableMap.of("strategy", "binpack"));
+    Assertions.assertEquals(Lists.newArrayList("--strategy", "binpack"), result8a);
+
+    // 8b: strategy is absent — the pair must be entirely skipped (was the bug: emitted
+    // ["--strategy", "{{strategy}}"])
+    List<String> result8b = JobManager.buildArgumentsWithOptional(templateArgs8, ImmutableMap.of());
+    Assertions.assertEquals(Lists.newArrayList(), result8b);
+
+    // Test Case 9: optional flag-value pair (value without ?) mixed with required args.
+    List<String> templateArgs9 =
+        Lists.newArrayList("?--strategy", "{{strategy}}", "--table", "my_table");
+
+    // strategy absent — only the required args should appear
+    List<String> result9 = JobManager.buildArgumentsWithOptional(templateArgs9, ImmutableMap.of());
+    Assertions.assertEquals(Lists.newArrayList("--table", "my_table"), result9);
+
+    // Test Case 10: standalone ?--flag at the end of the list.
+    // A ?-prefixed literal flag with no following value arg is always emitted because there is no
+    // placeholder to evaluate — the ? has no effect on a bare flag. This is documented behavior.
+    List<String> templateArgs10 = Lists.newArrayList("--catalog", "{{catalog}}", "?--dry-run");
+
+    List<String> result10 =
+        JobManager.buildArgumentsWithOptional(templateArgs10, ImmutableMap.of("catalog", "hive"));
+    // "?--dry-run" is always included regardless of jobConf
+    Assertions.assertEquals(Lists.newArrayList("--catalog", "hive", "--dry-run"), result10);
+
+    // Test Case 11: ?{{prefix}}/{{suffix}} — optional compound placeholder with a non-whitespace
+    // separator. Because the literal "/" between the two placeholders is not blank, isEmptyValue
+    // returns false even when both keys are absent, so the unresolved string leaks into the result.
+    // This is a documented limitation: use whitespace-free compound placeholders (e.g.
+    // ?{{prefix}}{{suffix}}) or a sentinel pattern to avoid the leak.
+    List<String> templateArgs11 = Lists.newArrayList("?{{prefix}}/{{suffix}}");
+
+    List<String> result11 =
+        JobManager.buildArgumentsWithOptional(templateArgs11, ImmutableMap.of());
+    // Known limitation: "{{prefix}}/{{suffix}}" is not treated as empty due to the "/" separator.
+    Assertions.assertEquals(Lists.newArrayList("{{prefix}}/{{suffix}}"), result11);
+
+    // By contrast, a compound optional placeholder without separator IS treated as empty.
+    List<String> templateArgs11b = Lists.newArrayList("?{{prefix}}{{suffix}}");
+    List<String> result11b =
+        JobManager.buildArgumentsWithOptional(templateArgs11b, ImmutableMap.of());
+    Assertions.assertEquals(Lists.newArrayList(), result11b);
+  }
+
+  @Test
+  public void testWarnIfMissingOptionalValueMarker() {
+    // No warning for well-formed ?--flag ?{{value}} pair
+    Assertions.assertDoesNotThrow(
+        () ->
+            JobManager.warnIfMissingOptionalValueMarker(
+                Lists.newArrayList("?--strategy", "?{{strategy}}"), "tpl"));
+
+    // No warning when neither arg is flagged optional
+    Assertions.assertDoesNotThrow(
+        () ->
+            JobManager.warnIfMissingOptionalValueMarker(
+                Lists.newArrayList("--strategy", "{{strategy}}"), "tpl"));
+
+    // No warning for optional placeholder (not a literal flag)
+    Assertions.assertDoesNotThrow(
+        () ->
+            JobManager.warnIfMissingOptionalValueMarker(
+                Lists.newArrayList("?{{opt1}}", "?{{opt2}}"), "tpl"));
+
+    // No warning for standalone ?--flag at end of list (nothing follows it)
+    Assertions.assertDoesNotThrow(
+        () ->
+            JobManager.warnIfMissingOptionalValueMarker(
+                Lists.newArrayList("--catalog", "{{catalog}}", "?--dry-run"), "tpl"));
+
+    // No warning when ?--flag is followed by another literal flag (not a value placeholder)
+    Assertions.assertDoesNotThrow(
+        () ->
+            JobManager.warnIfMissingOptionalValueMarker(
+                Lists.newArrayList("?--flag-a", "?--flag-b"), "tpl"));
+
+    // Warning IS expected: ?--flag followed by value without ?
+    // We cannot assert on LOG output directly, so we at least verify it doesn't throw.
+    // The presence of a log message can be verified via a log-capturing framework if needed;
+    // here we guard against regressions that cause exceptions.
+    Assertions.assertDoesNotThrow(
+        () ->
+            JobManager.warnIfMissingOptionalValueMarker(
+                Lists.newArrayList("?--strategy", "{{strategy}}"), "tpl"));
+
+    // Warning IS expected: multiple problematic pairs — must not throw
+    Assertions.assertDoesNotThrow(
+        () ->
+            JobManager.warnIfMissingOptionalValueMarker(
+                Lists.newArrayList(
+                    "?--strategy", "{{strategy}}", "?--sort-order", "{{sort_order}}"),
+                "tpl"));
   }
 
   @Test
@@ -1017,6 +1117,14 @@ public class TestJobManager {
 
     // Unreplaced placeholder should be considered empty
     Assertions.assertTrue(JobManager.isEmptyValue("{{strategy}}"));
+
+    // Compound placeholders — both keys absent: all tokens resolved to nothing → empty
+    Assertions.assertTrue(JobManager.isEmptyValue("{{prefix}}{{suffix}}"));
+    Assertions.assertTrue(JobManager.isEmptyValue("{{a}} {{b}}"));
+
+    // Compound placeholder with non-whitespace separator — NOT considered empty, because the
+    // literal "/" is meaningful content even when both keys are absent.
+    Assertions.assertFalse(JobManager.isEmptyValue("{{k1}}/{{k2}}"));
 
     // Non-empty values should not be considered empty
     Assertions.assertFalse(JobManager.isEmptyValue("value"));

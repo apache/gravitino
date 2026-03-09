@@ -466,11 +466,7 @@ public class JobIT extends BaseIT {
             .withExecutable(optArgTestScriptPath)
             .withArguments(
                 Lists.newArrayList(
-                    "{{mode}}",
-                    "?--opt1",
-                    "?{{optional_arg1}}",
-                    "?--opt2",
-                    "?{{optional_arg2}}"))
+                    "{{mode}}", "?--opt1", "?{{optional_arg1}}", "?--opt2", "?{{optional_arg2}}"))
             .withEnvironments(Collections.emptyMap())
             .withScripts(Collections.emptyList())
             .withCustomFields(Collections.emptyMap())
@@ -480,8 +476,7 @@ public class JobIT extends BaseIT {
     Assertions.assertNotNull(metalake.getJobTemplate(template.name()));
 
     // Case 1: No optional args — script asserts neither flag is received.
-    runJobAndAwait(
-        template, ImmutableMap.of("mode", "no_optionals"), JobHandle.Status.SUCCEEDED);
+    runJobAndAwait(template, ImmutableMap.of("mode", "no_optionals"), JobHandle.Status.SUCCEEDED);
 
     // Case 2: opt1 provided, opt2 absent — script asserts --opt1 is present and --opt2 is absent.
     runJobAndAwait(
@@ -492,8 +487,7 @@ public class JobIT extends BaseIT {
     // Case 3: Both optional args provided — script asserts both flags are received.
     runJobAndAwait(
         template,
-        ImmutableMap.of(
-            "mode", "both_optionals", "optional_arg1", "val1", "optional_arg2", "val2"),
+        ImmutableMap.of("mode", "both_optionals", "optional_arg1", "val1", "optional_arg2", "val2"),
         JobHandle.Status.SUCCEEDED);
   }
 
