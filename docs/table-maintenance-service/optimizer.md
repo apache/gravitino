@@ -13,7 +13,7 @@ The Table Maintenance Service (Optimizer) automates table maintenance by connect
 - Rule evaluation and strategy recommendation
 - Job template based execution
 
-The CLI command and configuration keys keep using the `optimizer` name for compatibility.
+The CLI commands and configuration keys use the `optimizer` name.
 
 ## Architecture overview
 

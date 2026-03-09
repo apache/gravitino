@@ -59,11 +59,10 @@ All other fields are treated as metric or statistic values.
 
 ### Supported value forms
 
-Both forms are supported:
+Use the simple numeric form as the default example:
 
 ```json
-{"stats-type":"table","identifier":"catalog.db.t1","row_count":100}
-{"stats-type":"table","identifier":"catalog.db.t1","timestamp":1735689600,"row_count":{"value":100}}
+{"stats-type":"table","identifier":"catalog.db.t1","timestamp":1735689600,"row_count":100}
 ```
 
 ### Identifier rules
