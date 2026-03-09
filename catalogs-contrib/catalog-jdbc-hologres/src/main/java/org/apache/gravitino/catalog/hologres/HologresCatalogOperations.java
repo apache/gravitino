@@ -16,27 +16,27 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-
-package org.apache.gravitino.catalog.jdbc;
+package org.apache.gravitino.catalog.hologres;
 
 import java.sql.Driver;
 import java.sql.DriverManager;
 import java.sql.SQLException;
+import org.apache.gravitino.catalog.jdbc.JdbcCatalogOperations;
 import org.apache.gravitino.catalog.jdbc.converter.JdbcColumnDefaultValueConverter;
 import org.apache.gravitino.catalog.jdbc.converter.JdbcExceptionConverter;
 import org.apache.gravitino.catalog.jdbc.converter.JdbcTypeConverter;
 import org.apache.gravitino.catalog.jdbc.operation.JdbcDatabaseOperations;
 import org.apache.gravitino.catalog.jdbc.operation.JdbcTableOperations;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
-public class MySQLProtocolCompatibleCatalogOperations extends JdbcCatalogOperations {
-  private static final Logger LOG =
-      LoggerFactory.getLogger(MySQLProtocolCompatibleCatalogOperations.class);
+/**
+ * Hologres catalog operations implementation.
+ *
+ * <p>Since Hologres uses the PostgreSQL JDBC driver, this class handles the driver deregistration
+ * properly to avoid memory leaks when the catalog is closed.
+ */
+public class HologresCatalogOperations extends JdbcCatalogOperations {
 
-  private static final int MYSQL_JDBC_DRIVER_MINIMAL_SUPPORT_VERSION = 8;
-
-  public MySQLProtocolCompatibleCatalogOperations(
+  public HologresCatalogOperations(
       JdbcExceptionConverter exceptionConverter,
       JdbcTypeConverter jdbcTypeConverter,
       JdbcDatabaseOperations databaseOperation,
@@ -51,33 +51,7 @@ public class MySQLProtocolCompatibleCatalogOperations extends JdbcCatalogOperati
   }
 
   @Override
-  public void checkJDBCDriverVersion() {
-    JDBCDriverInfo driverInfo = getDiverInfo();
-    if (driverInfo.majorVersion < MYSQL_JDBC_DRIVER_MINIMAL_SUPPORT_VERSION) {
-      throw new RuntimeException(
-          String.format(
-              "Mysql catalog does not support the jdbc driver version %s, minimal required version is 8.0",
-              driverInfo.version));
-    }
-  }
-
-  @Override
-  public void close() {
-    super.close();
-
-    try {
-      // Close thread AbandonedConnectionCleanupThread
-      Class.forName("com.mysql.cj.jdbc.AbandonedConnectionCleanupThread")
-          .getMethod("uncheckedShutdown")
-          .invoke(null);
-      LOG.info("AbandonedConnectionCleanupThread has been shutdown...");
-    } catch (Exception e) {
-      LOG.warn("Failed to shutdown AbandonedConnectionCleanupThread", e);
-    }
-  }
-
-  @Override
   protected Driver getDriver() throws SQLException {
-    return DriverManager.getDriver("jdbc:mysql://dummy_address");
+    return DriverManager.getDriver("jdbc:postgresql://dummy_address:12345/");
   }
 }
