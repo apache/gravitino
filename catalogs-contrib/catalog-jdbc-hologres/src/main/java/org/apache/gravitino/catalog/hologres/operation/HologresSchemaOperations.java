@@ -18,8 +18,6 @@
  */
 package org.apache.gravitino.catalog.hologres.operation;
 
-import static org.apache.gravitino.catalog.hologres.operation.HologresTableOperations.HOLO_QUOTE;
-
 import com.google.common.collect.ImmutableSet;
 import java.sql.Connection;
 import java.sql.DatabaseMetaData;
@@ -103,13 +101,10 @@ public class HologresSchemaOperations extends JdbcDatabaseOperations {
           "Hologres does not support properties on schema create.");
     }
 
-    StringBuilder sqlBuilder =
-        new StringBuilder(String.format("CREATE SCHEMA %s%s%s;", HOLO_QUOTE, schema, HOLO_QUOTE));
+    StringBuilder sqlBuilder = new StringBuilder(String.format("CREATE SCHEMA \"%s\";", schema));
     if (StringUtils.isNotEmpty(comment)) {
       String escapedComment = comment.replace("'", "''");
-      sqlBuilder.append(
-          String.format(
-              "COMMENT ON SCHEMA %s%s%s IS '%s'", HOLO_QUOTE, schema, HOLO_QUOTE, escapedComment));
+      sqlBuilder.append(String.format("COMMENT ON SCHEMA \"%s\" IS '%s'", schema, escapedComment));
     }
     return sqlBuilder.toString();
   }
@@ -133,8 +128,7 @@ public class HologresSchemaOperations extends JdbcDatabaseOperations {
 
   @Override
   public String generateDropDatabaseSql(String schema, boolean cascade) {
-    StringBuilder sqlBuilder =
-        new StringBuilder(String.format("DROP SCHEMA %s%s%s", HOLO_QUOTE, schema, HOLO_QUOTE));
+    StringBuilder sqlBuilder = new StringBuilder(String.format("DROP SCHEMA \"%s\"", schema));
     if (cascade) {
       sqlBuilder.append(" CASCADE");
     }
