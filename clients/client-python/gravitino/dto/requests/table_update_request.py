@@ -21,7 +21,6 @@ import builtins
 import typing
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
-from typing import ClassVar
 
 from dataclasses_json import config, dataclass_json
 
@@ -56,10 +55,6 @@ class TableUpdateRequestBase(RESTRequest, ABC):
     """Base class for all table update requests."""
 
     _type: str = field(init=False, metadata=config(field_name="@type"))
-    _TYPE: ClassVar[str]
-
-    def __post_init__(self) -> None:
-        self._type = self._TYPE
 
     @abstractmethod
     def table_change(self) -> TableChange:
@@ -77,8 +72,6 @@ class TableUpdateRequest:
         Update request to rename a table
         """
 
-        _TYPE: ClassVar[str] = "rename"
-
         _new_name: str = field(metadata=config(field_name="newName"))
         _new_schema_name: typing.Optional[str] = field(
             default=None,
@@ -87,6 +80,9 @@ class TableUpdateRequest:
                 exclude=lambda value: value is None,
             ),
         )
+
+        def __post_init__(self) -> None:
+            self._type = "rename"
 
         def __init__(
             self, new_name: str, new_schema_name: typing.Optional[str] = None
@@ -131,9 +127,10 @@ class TableUpdateRequest:
         Update request to change a table comment
         """
 
-        _TYPE: ClassVar[str] = "updateComment"
-
         _new_comment: str = field(metadata=config(field_name="newComment"))
+
+        def __post_init__(self) -> None:
+            self._type = "updateComment"
 
         def __init__(self, new_comment: str) -> None:
             """
@@ -169,10 +166,11 @@ class TableUpdateRequest:
         Update request to set a table property
         """
 
-        _TYPE: ClassVar[str] = "setProperty"
-
         _property: str = field(metadata=config(field_name="property"))
         _value: str = field(metadata=config(field_name="value"))
+
+        def __post_init__(self) -> None:
+            self._type = "setProperty"
 
         def __init__(self, prop: str, value: str) -> None:
             """
@@ -220,9 +218,10 @@ class TableUpdateRequest:
         Update request to remove a table property
         """
 
-        _TYPE: ClassVar[str] = "removeProperty"
-
         _property: str = field(metadata=config(field_name="property"))
+
+        def __post_init__(self) -> None:
+            self._type = "removeProperty"
 
         def __init__(self, prop: str) -> None:
             """
@@ -255,10 +254,9 @@ class TableUpdateRequest:
 
     @dataclass_json
     @dataclass
+    # pylint: disable=too-many-instance-attributes
     class AddTableColumnRequest(TableUpdateRequestBase):
         """Represents a request to add a column to a table."""
-
-        _TYPE: ClassVar[str] = "addColumn"
 
         _field_name: list[str] = field(metadata=config(field_name="fieldName"))
         _data_type: Type = field(
@@ -288,6 +286,9 @@ class TableUpdateRequest:
         _auto_increment: bool = field(
             default=False, metadata=config(field_name="autoIncrement")
         )
+
+        def __post_init__(self) -> None:
+            self._type = "addColumn"
 
         def __init__(
             self,
@@ -384,10 +385,11 @@ class TableUpdateRequest:
     class RenameTableColumnRequest(TableUpdateRequestBase):
         """Represents a request to rename a column of a table."""
 
-        _TYPE: ClassVar[str] = "renameColumn"
-
         _old_field_name: list[str] = field(metadata=config(field_name="oldFieldName"))
         _new_field_name: str = field(metadata=config(field_name="newFieldName"))
+
+        def __post_init__(self) -> None:
+            self._type = "renameColumn"
 
         def __init__(self, old_field_name: list[str], new_field_name: str) -> None:
             """
@@ -429,8 +431,6 @@ class TableUpdateRequest:
     class UpdateTableColumnDefaultValueRequest(TableUpdateRequestBase):
         """Represents a request to update the default value of a column of a table."""
 
-        _TYPE: ClassVar[str] = "updateColumnDefaultValue"
-
         _field_name: list[str] = field(metadata=config(field_name="fieldName"))
         _new_default_value: Expression = field(
             metadata=config(
@@ -439,6 +439,9 @@ class TableUpdateRequest:
                 decoder=ColumnDefaultValueSerdes.deserialize,
             )
         )
+
+        def __post_init__(self) -> None:
+            self._type = "updateColumnDefaultValue"
 
         def __init__(
             self, field_name: list[str], new_default_value: Expression
@@ -493,8 +496,6 @@ class TableUpdateRequest:
     class UpdateTableColumnTypeRequest(TableUpdateRequestBase):
         """Represents a request to update the type of a column of a table."""
 
-        _TYPE: ClassVar[str] = "updateColumnType"
-
         _field_name: list[str] = field(metadata=config(field_name="fieldName"))
         _new_type: Type = field(
             metadata=config(
@@ -503,6 +504,9 @@ class TableUpdateRequest:
                 decoder=TypeSerdes.deserialize,
             )
         )
+
+        def __post_init__(self) -> None:
+            self._type = "updateColumnType"
 
         def __init__(self, field_name: list[str], new_type: Type) -> None:
             """
@@ -554,10 +558,11 @@ class TableUpdateRequest:
         Represents a request to update the comment of a column of a table.
         """
 
-        _TYPE: ClassVar[str] = "updateColumnComment"
-
         _field_name: list[str] = field(metadata=config(field_name="fieldName"))
         _new_comment: str = field(metadata=config(field_name="newComment"))
+
+        def __post_init__(self) -> None:
+            self._type = "updateColumnComment"
 
         def __init__(self, field_name: list[str], new_comment: str) -> None:
             """
@@ -609,8 +614,6 @@ class TableUpdateRequest:
     class UpdateTableColumnPositionRequest(TableUpdateRequestBase):
         """Represents a request to update the position of a column of a table."""
 
-        _TYPE: ClassVar[str] = "updateColumnPosition"
-
         _field_name: list[str] = field(metadata=config(field_name="fieldName"))
         _new_position: TableChange.ColumnPosition = field(
             metadata=config(
@@ -619,6 +622,9 @@ class TableUpdateRequest:
                 decoder=ColumnPositionSerdes.deserialize,
             )
         )
+
+        def __post_init__(self) -> None:
+            self._type = "updateColumnPosition"
 
         def __init__(
             self,
@@ -676,10 +682,11 @@ class TableUpdateRequest:
         Represents a request to update the nullability of a column of a table.
         """
 
-        _TYPE: ClassVar[str] = "updateColumnNullability"
-
         _field_name: list[str] = field(metadata=config(field_name="fieldName"))
         _nullable: bool = field(metadata=config(field_name="nullable"))
+
+        def __post_init__(self) -> None:
+            self._type = "updateColumnNullability"
 
         def __init__(self, field_name: list[str], nullable: bool) -> None:
             """
@@ -729,10 +736,11 @@ class TableUpdateRequest:
         Represents a request to delete a column from a table.
         """
 
-        _TYPE: ClassVar[str] = "deleteColumn"
-
         _field_name: list[str] = field(metadata=config(field_name="fieldName"))
         _if_exists: bool = field(metadata=config(field_name="ifExists"))
+
+        def __post_init__(self) -> None:
+            self._type = "deleteColumn"
 
         def __init__(self, field_name: list[str], if_exists: bool) -> None:
             """
@@ -780,8 +788,6 @@ class TableUpdateRequest:
         Represents a request to add an index to a table.
         """
 
-        _TYPE: ClassVar[str] = "addTableIndex"
-
         _index: Index = field(
             metadata=config(
                 field_name="index",
@@ -789,6 +795,9 @@ class TableUpdateRequest:
                 decoder=TableIndexSerdes.deserialize,
             )
         )
+
+        def __post_init__(self) -> None:
+            self._type = "addTableIndex"
 
         def __init__(
             self,
@@ -845,10 +854,11 @@ class TableUpdateRequest:
         Represents a request to delete an index from a table.
         """
 
-        _TYPE: ClassVar[str] = "deleteTableIndex"
-
         _name: str = field(metadata=config(field_name="name"))
         _if_exists: bool = field(metadata=config(field_name="ifExists"))
+
+        def __post_init__(self) -> None:
+            self._type = "deleteTableIndex"
 
         def __init__(self, name: str, if_exists: bool) -> None:
             """
@@ -892,10 +902,11 @@ class TableUpdateRequest:
         Represents a request to update a column autoIncrement from a table.
         """
 
-        _TYPE: ClassVar[str] = "updateColumnAutoIncrement"
-
         _field_name: list[str] = field(metadata=config(field_name="fieldName"))
         _auto_increment: bool = field(metadata=config(field_name="autoIncrement"))
+
+        def __post_init__(self) -> None:
+            self._type = "updateColumnAutoIncrement"
 
         def __init__(self, field_name: list[str], auto_increment: bool) -> None:
             """
