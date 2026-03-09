@@ -10,7 +10,8 @@ license: This software is licensed under the Apache License version 2.
 - Prepare a running Gravitino server.
 - Ensure target metalake exists (examples use `test`).
 - Configure `SPARK_HOME` or `gravitino.jobExecutor.local.sparkHome` for Spark templates.
-- If your Iceberg REST backend is in-memory, metadata is reset after restart.
+- If your Iceberg REST backend is in-memory, avoid restarting it during this quick start because
+  restart resets metadata and data files.
 
 For full config details, see [Optimizer Configuration](./optimizer-configuration.md).
 
@@ -48,6 +49,9 @@ If missing, verify `gravitino-jobs` JAR in `auxlib`, then restart Gravitino.
 ### 2. Prepare demo metadata objects
 
 Create a REST Iceberg catalog, schema, and table:
+
+This quick start uses a standalone Iceberg REST service endpoint
+(`http://localhost:9001/iceberg`) as the catalog backend.
 
 ```bash
 # Create catalog (ignore "already exists" errors)

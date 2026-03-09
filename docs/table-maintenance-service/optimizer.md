@@ -26,6 +26,27 @@ The optimizer workflow is based on six parts:
 5. Job executor: local or custom backend that runs submitted jobs.
 6. Status and logs: REST job state plus local staging logs.
 
+Relationship graph:
+
+```text
+Metadata objects (catalog/schema/table)
+          |
+          v
+Statistics and metrics
+          |
+          v
+Policies and strategy recommendation
+          |
+          v
+Job templates + jobConf
+          |
+          v
+Job executor (local or custom)
+          |
+          v
+Job status/logs + updated table metadata
+```
+
 Typical data flow:
 
 1. Collect statistics and metrics for target tables.
