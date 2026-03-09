@@ -92,7 +92,7 @@ Gravitino currently supports the following catalogs:
 
 If you want to operate table and partition statistics, you can refer to the [document](./manage-statistics-in-gravitino.md).
 
-If you want an operations guide for automated maintenance workflows (statistics, metrics, monitoring, and strategy jobs), see [Table Maintenance Service (Optimizer)](./optimizer.md).
+If you want an operations guide for automated maintenance workflows (statistics, metrics, monitoring, and strategy jobs), see [Table Maintenance Service (Optimizer)](./table-maintenance-service/optimizer.md).
 
 **Fileset catalogs:**
 
