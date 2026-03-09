@@ -42,8 +42,8 @@ Javadoc and REST API documentation.
 The first step to managing policies is to create new policies. You can create a new policy by providing a policy
 name, type, and other optional fields like comment, enabled, etc.
 
-Gravitino supports two kinds of policies: built-in policies and custom policies. 
-For built-in policies, the `policyType` starts with `system.` and the `supportedObjectTypes` in the policy content is predefined.
+Gravitino supports two kinds of policies: built-in policies and custom policies.
+For built-in policies, the `policyType` starts with `system_` and the `supportedObjectTypes` in the policy content is predefined.
 For custom policies, the `policyType` must be `custom` and the `supportedObjectTypes` can be any combination of metadata object types.
 
 :::note
@@ -103,6 +103,10 @@ Policy policy = client.createPolicy(
 
 </TabItem>
 </Tabs>
+
+### Built-in Iceberg compaction policy
+
+For the built-in `system_iceberg_compaction` policy content, field definitions, and examples, see [Iceberg compaction policy](./iceberg-compaction-policy.md).
 
 ### List created policies
 
@@ -465,4 +469,3 @@ int count = policy.associatedObjects().count();
 
 </TabItem>
 </Tabs>
-
