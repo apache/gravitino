@@ -20,7 +20,7 @@ package org.apache.gravitino.catalog.oceanbase;
 
 import java.util.Map;
 import org.apache.gravitino.catalog.jdbc.JdbcCatalog;
-import org.apache.gravitino.catalog.jdbc.MySQLProtocolCompatibleCatalogOperations;
+import org.apache.gravitino.catalog.jdbc.JdbcCatalogOperations;
 import org.apache.gravitino.catalog.jdbc.converter.JdbcColumnDefaultValueConverter;
 import org.apache.gravitino.catalog.jdbc.converter.JdbcTypeConverter;
 import org.apache.gravitino.catalog.jdbc.operation.JdbcDatabaseOperations;
@@ -42,7 +42,7 @@ public class OceanBaseCatalog extends JdbcCatalog {
 
   @Override
   protected CatalogOperations newOps(Map<String, String> config) {
-    return new MySQLProtocolCompatibleCatalogOperations(
+    return new JdbcCatalogOperations(
         createExceptionConverter(),
         createJdbcTypeConverter(),
         createJdbcDatabaseOperations(),
