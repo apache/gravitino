@@ -346,7 +346,11 @@ subprojects {
       return true
     }
 
-    val isReleaseRun = gradle.startParameter.taskNames.any { it == "release" || it == "publish" || it == "publishToMavenLocal" }
+    val isReleaseRun = gradle.startParameter.taskNames.any {
+      it == "release" || it == "publish" || it == "publishToMavenLocal" || it.endsWith(":release") || it.endsWith(
+        ":publish"
+      ) || it.endsWith(":publishToMavenLocal")
+    }
     if (!isReleaseRun) {
       return false
     }
@@ -849,7 +853,7 @@ tasks {
           include(
             "${rootProject.name}-iceberg-rest-server.conf.template",
             "${rootProject.name}-env.sh.template",
-            "log4j2.properties.template"
+            "${rootProject.name}-iceberg-rest-log4j2.properties.template"
           )
           into("${rootProject.name}-iceberg-rest-server/conf")
         }
@@ -894,7 +898,7 @@ tasks {
           include(
             "${rootProject.name}-lance-rest-server.conf.template",
             "${rootProject.name}-env.sh.template",
-            "log4j2.properties.template"
+            "${rootProject.name}-lance-rest-log4j2.properties.template"
           )
           into("${rootProject.name}-lance-rest-server/conf")
         }
