@@ -27,7 +27,7 @@ class TypeSerdes(JsonSerializable[Type]):
     """Custom JSON serializer for Gravitino Type objects."""
 
     @classmethod
-    def serialize(cls, data_type: Type) -> Json:
+    def serialize(cls, value: Type) -> Json:
         """Serialize the given Gravitino Type.
 
         Args:
@@ -37,7 +37,7 @@ class TypeSerdes(JsonSerializable[Type]):
             Json: The serialized data corresponding to the given Gravitino Type.
         """
 
-        return SerdesUtils.write_data_type(data_type)
+        return SerdesUtils.write_value(value)
 
     @classmethod
     def deserialize(cls, data: Json) -> Type:

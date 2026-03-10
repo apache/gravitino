@@ -73,10 +73,10 @@ class SerdesUtils(SerdesUtilsBase):
         )
         try:
             arg_type = FunctionArg.ArgType(data[cls.EXPRESSION_TYPE].lower())
-        except ValueError:
+        except ValueError as exc:
             raise IllegalArgumentException(
                 f"Unknown function argument type: {data[cls.EXPRESSION_TYPE]}"
-            )
+            ) from exc
 
         if arg_type is FunctionArg.ArgType.LITERAL:
             Precondition.check_argument(
@@ -124,9 +124,12 @@ class SerdesUtils(SerdesUtilsBase):
                 .build()
             )
 
-        if arg_type is FunctionArg.ArgType.UNPARSED:
-            Precondition.check_argument(
-                isinstance(data.get(cls.UNPARSED_EXPRESSION), str),
-                f"Cannot parse unparsed expression from missing string field unparsedExpression: {data}",
-            )
-            return UnparsedExpressionDTO(data[cls.UNPARSED_EXPRESSION])
+        Precondition.check_argument(
+            arg_type is FunctionArg.ArgType.UNPARSED,
+            f"Unknown function argument type: {arg_type}",
+        )
+        Precondition.check_argument(
+            isinstance(data.get(cls.UNPARSED_EXPRESSION), str),
+            f"Cannot parse unparsed expression from missing string field unparsedExpression: {data}",
+        )
+        return UnparsedExpressionDTO(data[cls.UNPARSED_EXPRESSION])
