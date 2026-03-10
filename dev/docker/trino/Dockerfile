@@ -16,7 +16,7 @@
 # specific language governing permissions and limitations
 # under the License.
 #
-FROM trinodb/trino:469
+FROM trinodb/trino:478
 LABEL maintainer="dev@gravitino.apache.org"
 
 USER root
