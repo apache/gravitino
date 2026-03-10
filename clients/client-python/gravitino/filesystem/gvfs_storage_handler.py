@@ -42,8 +42,8 @@ from gravitino.exceptions.base import GravitinoRuntimeException
 from gravitino.filesystem.gvfs_config import GVFSConfig
 
 try:
-    from google.auth import _helpers
     from google.auth.credentials import Credentials
+    from google.auth.exceptions import RefreshError
 
     GOOGLE_AUTH_AVAILABLE = True
 except ImportError:
@@ -433,7 +433,7 @@ class GCSStorageHandler(StorageHandler):
 
                         def refresh(self, request):
                             # Static token cannot be refreshed
-                            raise RuntimeError(
+                            raise RefreshError(
                                 "Cannot refresh static access token. "
                                 "Please request a new credential from Gravitino."
                             )
@@ -442,7 +442,7 @@ class GCSStorageHandler(StorageHandler):
                         def expired(self):
                             if not self.expiry:
                                 return False
-                            return _helpers.utcnow() >= self.expiry
+                            return datetime.now(timezone.utc) >= self.expiry
 
                         @property
                         def valid(self):
