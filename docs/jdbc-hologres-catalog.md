@@ -45,16 +45,16 @@ Besides the [common catalog properties](./gravitino-server-config.md#apache-grav
 
 | Configuration item      | Description                                                                                                                                                           | Default value | Required | Since Version    |
 |-------------------------|-----------------------------------------------------------------------------------------------------------------------------------------------------------------------|---------------|----------|------------------|
-| `jdbc-url`              | JDBC URL for connecting to the database. For example, `jdbc:postgresql://hgprecn-cn-xxx.hologres.aliyuncs.com:80/my_database`                                        | (none)        | Yes      | 0.9.0-incubating |
-| `jdbc-driver`           | The driver of the JDBC connection. Must be `org.postgresql.Driver`.                                                                                                   | (none)        | Yes      | 0.9.0-incubating |
-| `jdbc-database`         | The database name. This is mandatory for Hologres.                                                                                                                    | (none)        | Yes      | 0.9.0-incubating |
-| `jdbc-user`             | The JDBC user name (AccessKey ID or database username).                                                                                                               | (none)        | Yes      | 0.9.0-incubating |
-| `jdbc-password`         | The JDBC password (AccessKey Secret or database password).                                                                                                            | (none)        | Yes      | 0.9.0-incubating |
-| `jdbc.pool.min-size`    | The minimum number of connections in the pool. `2` by default.                                                                                                        | `2`           | No       | 0.9.0-incubating |
-| `jdbc.pool.max-size`    | The maximum number of connections in the pool. `10` by default.                                                                                                       | `10`          | No       | 0.9.0-incubating |
+| `jdbc-url`              | JDBC URL for connecting to the database. For example, `jdbc:postgresql://hgprecn-cn-xxx.hologres.aliyuncs.com:80/my_database`                                        | (none)        | Yes      | 1.3.0 |
+| `jdbc-driver`           | The driver of the JDBC connection. Must be `org.postgresql.Driver`.                                                                                                   | (none)        | Yes      | 1.3.0 |
+| `jdbc-database`         | The database name. This is mandatory for Hologres.                                                                                                                    | (none)        | Yes      | 1.3.0 |
+| `jdbc-user`             | The JDBC user name (AccessKey ID or database username).                                                                                                               | (none)        | Yes      | 1.3.0 |
+| `jdbc-password`         | The JDBC password (AccessKey Secret or database password).                                                                                                            | (none)        | Yes      | 1.3.0 |
+| `jdbc.pool.min-size`    | The minimum number of connections in the pool. `2` by default.                                                                                                        | `2`           | No       | 1.3.0 |
+| `jdbc.pool.max-size`    | The maximum number of connections in the pool. `10` by default.                                                                                                       | `10`          | No       | 1.3.0 |
 
 :::caution
-Hologres uses the PostgreSQL JDBC Driver (version 42.3.2 or later recommended). Since the PostgreSQL JDBC Driver is already bundled with the Hologres catalog, you don't need to download it separately.
+Hologres uses the PostgreSQL JDBC Driver (version 42.3.2 or later recommended). You need to download the PostgreSQL JDBC Driver and place it in the `catalogs/jdbc-hologres/libs` directory under the Gravitino distribution (e.g., `distribution/package/catalogs/jdbc-hologres/libs` or `distribution/package-all/catalogs/jdbc-hologres/libs`).
 :::
 
 ### Catalog operations
@@ -86,7 +86,7 @@ Refer to [Manage Relational Metadata Using Gravitino](./manage-relational-metada
 - Supports DDL operation for Hologres tables.
 - Supports PRIMARY KEY index in CREATE TABLE.
 - Supports [column default value](./manage-relational-metadata-using-gravitino.md#table-column-default-value).
-- Supports generated (stored computed) columns.
+- Supports expression columns via DEFAULT expressions (note: Gravitino maps these as column default values, not as true generated/computed columns in the Hologres sense).
 - Supports LIST partitioning (physical and logical).
 - Does not support [auto-increment](./manage-relational-metadata-using-gravitino.md#table-column-auto-increment). Creating auto-increment columns is rejected in both CREATE TABLE and ALTER TABLE.
 
@@ -108,7 +108,7 @@ Hologres-specific table properties are set via the `WITH` clause during CREATE T
 | `binlog_ttl`                        | Binlog TTL                        | `86400`                        |
 
 :::info
-- Modifying table properties via ALTER TABLE `SetProperty` / `RemoveProperty` is not yet supported.
+- Modifying table properties via ALTER TABLE `SetProperty` / `RemoveProperty` is not yet supported by Gravitino (Hologres natively supports property modification via the `CALL HG_UPDATE_TABLE_PROPERTY` or rebuild commands, but this is not yet implemented in Gravitino).
 - The properties `distribution_key`, `is_logical_partitioned_table`, and `primary_key` are managed via their dedicated parameters (Distribution, Partitioning, Indexes) and should not be set directly in table properties.
 :::
 
@@ -216,7 +216,7 @@ Creating partition child tables (e.g., `CREATE TABLE child PARTITION OF parent F
 ### Table indexes
 
 - Supports PRIMARY_KEY in CREATE TABLE.
-- Adding or deleting indexes via ALTER TABLE is not supported.
+- Adding or deleting indexes via ALTER TABLE is not yet supported by Gravitino (Hologres natively supports index modification via rebuild commands, but this is not yet implemented in Gravitino).
 
 <Tabs groupId='language' queryString>
 <TabItem value="json" label="Json">
