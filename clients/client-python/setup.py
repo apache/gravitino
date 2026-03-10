@@ -15,7 +15,7 @@
 # specific language governing permissions and limitations
 # under the License.
 
-from setuptools import find_packages, setup
+from setuptools import find_namespace_packages, setup
 
 
 try:
@@ -38,7 +38,7 @@ setup(
     url="https://github.com/apache/gravitino",
     python_requires=">=3.10",
     keywords="Data, AI, metadata, catalog",
-    packages=find_packages(exclude=["tests*", "scripts*"]),
+    packages=find_namespace_packages(exclude=["tests*", "scripts*"]),
     project_urls={
         "Homepage": "https://gravitino.apache.org/",
         "Source Code": "https://github.com/apache/gravitino",
