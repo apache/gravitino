@@ -854,7 +854,8 @@ public class Privileges {
   }
 
   /**
-   * The privilege to grant or revoke privileges on securable objects.
+   * The privilege to grant or revoke privileges on securable objects. If bound on the metalake, we
+   * can grant or revoke the role for users or groups.
    *
    * <p>Unlike most privileges, this can be bound at any level of the object hierarchy — METALAKE,
    * CATALOG, SCHEMA, TABLE, VIEW, TOPIC, FILESET, or MODEL. A grant at a parent level implicitly
