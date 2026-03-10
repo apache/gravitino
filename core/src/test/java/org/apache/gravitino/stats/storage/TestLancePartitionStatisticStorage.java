@@ -36,7 +36,6 @@ import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.MetadataObjects;
 import org.apache.gravitino.meta.TableEntity;
 import org.apache.gravitino.stats.PartitionRange;
-import org.apache.gravitino.stats.PartitionStatisticsDrop;
 import org.apache.gravitino.stats.PartitionStatisticsModification;
 import org.apache.gravitino.stats.PartitionStatisticsUpdate;
 import org.apache.gravitino.stats.StatisticValue;
@@ -496,7 +495,7 @@ public class TestLancePartitionStatisticStorage {
   }
 
   @Test
-  public void testDropStatisticsWithQuoteInPartitionName() throws Exception {
+  public void testDropStatisticsWithQuoteInPartitionAndStatisticName() throws Exception {
     PartitionStatisticStorageFactory factory = new LancePartitionStatisticStorageFactory();
     String metalakeName = "metalake";
     MetadataObject metadataObject =
@@ -517,8 +516,12 @@ public class TestLancePartitionStatisticStorage {
         (LancePartitionStatisticStorage) factory.create(properties);
     try {
       String quotedPartition = "partition'01";
+      String quotedStatistic = "statistic'0";
+      String normalStatistic = "statistic1";
+
       Map<String, StatisticValue<?>> stats = Maps.newHashMap();
-      stats.put("statistic0", StatisticValues.stringValue("value0"));
+      stats.put(quotedStatistic, StatisticValues.stringValue("value0"));
+      stats.put(normalStatistic, StatisticValues.stringValue("value1"));
 
       storage.updateStatistics(
           metalakeName,
@@ -528,15 +531,64 @@ public class TestLancePartitionStatisticStorage {
                   Lists.newArrayList(
                       PartitionStatisticsModification.update(quotedPartition, stats)))));
 
-      PartitionStatisticsDrop drop =
-          PartitionStatisticsModification.drop(quotedPartition, Lists.newArrayList("statistic0"));
+      List<PersistedPartitionStatistics> listedStats =
+          storage.listStatistics(
+              metalakeName,
+              metadataObject,
+              PartitionRange.between(
+                  quotedPartition,
+                  PartitionRange.BoundType.CLOSED,
+                  quotedPartition,
+                  PartitionRange.BoundType.CLOSED));
 
-      Assertions.assertDoesNotThrow(
-          () ->
-              storage.dropStatistics(
-                  metalakeName,
+      Assertions.assertEquals(1, listedStats.size());
+      Assertions.assertEquals(quotedPartition, listedStats.get(0).partitionName());
+      Assertions.assertEquals(2, listedStats.get(0).statistics().size());
+
+      storage.dropStatistics(
+          metalakeName,
+          Lists.newArrayList(
+              MetadataObjectStatisticsDrop.of(
+                  metadataObject,
                   Lists.newArrayList(
-                      MetadataObjectStatisticsDrop.of(metadataObject, Lists.newArrayList(drop)))));
+                      PartitionStatisticsModification.drop(
+                          quotedPartition, Lists.newArrayList(quotedStatistic))))));
+
+      listedStats =
+          storage.listStatistics(
+              metalakeName,
+              metadataObject,
+              PartitionRange.between(
+                  quotedPartition,
+                  PartitionRange.BoundType.CLOSED,
+                  quotedPartition,
+                  PartitionRange.BoundType.CLOSED));
+
+      Assertions.assertEquals(1, listedStats.size());
+      Assertions.assertEquals(quotedPartition, listedStats.get(0).partitionName());
+      Assertions.assertEquals(1, listedStats.get(0).statistics().size());
+      Assertions.assertEquals(normalStatistic, listedStats.get(0).statistics().get(0).name());
+
+      storage.dropStatistics(
+          metalakeName,
+          Lists.newArrayList(
+              MetadataObjectStatisticsDrop.of(
+                  metadataObject,
+                  Lists.newArrayList(
+                      PartitionStatisticsModification.drop(
+                          quotedPartition, Lists.newArrayList(normalStatistic))))));
+
+      listedStats =
+          storage.listStatistics(
+              metalakeName,
+              metadataObject,
+              PartitionRange.between(
+                  quotedPartition,
+                  PartitionRange.BoundType.CLOSED,
+                  quotedPartition,
+                  PartitionRange.BoundType.CLOSED));
+
+      Assertions.assertTrue(listedStats.isEmpty());
     } finally {
       FileUtils.deleteDirectory(new File(location + "/" + tableEntity.id() + ".lance"));
       storage.close();
