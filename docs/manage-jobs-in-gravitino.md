@@ -477,6 +477,13 @@ that the local job executor is only for testing. If you want to run the job in a
 you need to implement your own `JobExecutor` and set the configuration, please see
 [Implement a custom job executor](#implement-a-custom-job-executor) section below.
 
+When running a Spark job template with the local executor, configure one of:
+
+- `gravitino.jobExecutor.local.sparkHome`
+- `SPARK_HOME`
+
+If neither is set before the Gravitino server starts, Spark jobs may fail to start.
+
 <Tabs groupId='language' queryString>
 <TabItem value="shell" label="Shell">
 
