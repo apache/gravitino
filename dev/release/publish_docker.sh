@@ -20,22 +20,31 @@
 # Build and publish Gravitino Docker images via GitHub Actions
 #
 # Usage: ./publish_docker.sh <tag|branch> [--dry-run]
-# Example:
-#   ./publish_docker.sh v1.2.0-rc5
-#   ./publish_docker.sh branch-1.2.0-rc5
-#   ./publish_docker.sh v1.2.0-rc5 --dry-run
+#
+# Arguments:
+#   <tag>     A Git tag, typically a release candidate (e.g., v1.2.0-rc5).
+#             The tag must already exist locally or be fetched via: git fetch --tags origin
+#   <branch>  A Git branch name (e.g., main, branch-1.2). The workflow will
+#             build from the latest commit on that branch.
+#   --dry-run Print the workflow commands that would be triggered without
+#             actually running them. Useful for previewing before publishing.
+#
+# Examples:
+#   ./publish_docker.sh v1.2.0-rc5              # Publish images for release candidate tag
+#   ./publish_docker.sh v1.2.0-rc5 --dry-run   # Preview without triggering workflows
+#   ./publish_docker.sh main                    # Publish images from the main branch
 #
 # Environment variables required (set in env file or shell profile):
-#   DOCKER_USERNAME        - Docker Hub username
-#   PUBLISH_DOCKER_TOKEN  - Docker Hub access token
-#   GH_TOKEN              - GitHub token with repo/workflow permissions
+#   DOCKER_USERNAME       - Docker Hub username
+#   PUBLISH_DOCKER_TOKEN  - Docker Hub access token with push permission
+#   GH_TOKEN              - GitHub personal access token with repo and workflow scopes
 #
 # This script triggers the docker-image.yml workflow for the following images:
-#   - apache/gravitino:v${VERSION}
-#   - apache/gravitino-iceberg-rest:${VERSION}
-#   - apache/gravitino-lance-rest:${VERSION}
-#   - apache/gravitino-mcp-server:${VERSION}
-#   - apache/gravitino-playground:trino-478-gravitino-${VERSION}
+#   - apache/gravitino:<tag>
+#   - apache/gravitino-iceberg-rest-server:<tag>
+#   - apache/gravitino-lance-rest-server:<tag>
+#   - apache/gravitino-mcp-server:<tag>
+#   - apache/gravitino-playground:trino-478-gravitino-<tag>
 #
 
 set -e
