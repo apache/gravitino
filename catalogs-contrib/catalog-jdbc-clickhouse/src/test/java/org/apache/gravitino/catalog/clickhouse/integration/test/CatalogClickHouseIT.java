@@ -1294,27 +1294,26 @@ public class CatalogClickHouseIT extends BaseIT {
 
     tableCatalog.alterTable(
         tableIdentifier,
-        TableChange.deleteIndex("idx_score_minmax", false),
-        TableChange.deleteIndex("idx_note_bloom", false));
+        TableChange.addIndex(
+            Index.IndexType.DATA_SKIPPING_MINMAX, "idx_new", new String[][] {{"score"}}));
     Table loaded = tableCatalog.loadTable(tableIdentifier);
+    Assertions.assertTrue(
+        Arrays.stream(loaded.index()).anyMatch(index -> Objects.equals(index.name(), "idx_new")));
+
+    tableCatalog.alterTable(
+        tableIdentifier,
+        TableChange.deleteIndex("idx_score_minmax", false),
+        TableChange.deleteIndex("idx_note_bloom", false),
+        TableChange.deleteIndex("idx_new", false));
+    loaded = tableCatalog.loadTable(tableIdentifier);
     Assertions.assertFalse(
         Arrays.stream(loaded.index())
             .anyMatch(index -> Objects.equals(index.name(), "idx_score_minmax")));
     Assertions.assertFalse(
         Arrays.stream(loaded.index())
             .anyMatch(index -> Objects.equals(index.name(), "idx_note_bloom")));
-
-    RuntimeException addIndexException =
-        Assertions.assertThrows(
-            RuntimeException.class,
-            () ->
-                tableCatalog.alterTable(
-                    tableIdentifier,
-                    TableChange.addIndex(
-                        Index.IndexType.DATA_SKIPPING_MINMAX,
-                        "idx_new",
-                        new String[][] {{"score"}})));
-    Assertions.assertTrue(addIndexException.getMessage().contains("Unsupported table change type"));
+    Assertions.assertFalse(
+        Arrays.stream(loaded.index()).anyMatch(index -> Objects.equals(index.name(), "idx_new")));
 
     RuntimeException autoIncrementTrueException =
         Assertions.assertThrows(

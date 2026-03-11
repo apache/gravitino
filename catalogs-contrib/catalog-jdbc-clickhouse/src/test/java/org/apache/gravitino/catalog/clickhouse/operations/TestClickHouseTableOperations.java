@@ -1121,6 +1121,8 @@ public class TestClickHouseTableOperations extends TestClickHouse {
           TableChange.updateColumnPosition(new String[] {"c1"}, TableChange.ColumnPosition.first()),
           TableChange.deleteColumn(new String[] {"c3"}, false),
           TableChange.updateColumnNullability(new String[] {"c2"}, false),
+          TableChange.addIndex(
+              Index.IndexType.DATA_SKIPPING_MINMAX, "idx2", new String[][] {{"c2"}}),
           TableChange.deleteIndex("idx1", false),
           TableChange.renameColumn(new String[] {"c2"}, "c2_new"),
           TableChange.updateComment("new_table_comment")
@@ -1135,6 +1137,7 @@ public class TestClickHouseTableOperations extends TestClickHouse {
     Assertions.assertTrue(sql.contains("COMMENT 'c1_comment'"));
     Assertions.assertTrue(sql.contains("FIRST"));
     Assertions.assertTrue(sql.contains("DROP COLUMN `c3`"));
+    Assertions.assertTrue(sql.contains("ADD INDEX `idx2` `c2` TYPE minmax GRANULARITY 1"));
     Assertions.assertTrue(sql.contains("DROP INDEX `idx1`"));
     Assertions.assertTrue(sql.contains("MODIFY COMMENT 'new_table_comment'"));
     Assertions.assertTrue(sql.startsWith("ALTER TABLE `tbl`"));
@@ -1180,6 +1183,61 @@ public class TestClickHouseTableOperations extends TestClickHouse {
         () ->
             ops.buildAlterSql(
                 "db", "tbl", new TableChange[] {TableChange.deleteIndex("missing", false)}));
+  }
+
+  @Test
+  public void testAlterTableAddIndexBranches() {
+    StubClickHouseTableOperations ops = new StubClickHouseTableOperations();
+    ops.initialize(
+        null,
+        new ClickHouseExceptionConverter(),
+        new ClickHouseTypeConverter(),
+        new ClickHouseColumnDefaultValueConverter(),
+        new HashMap<>());
+    ops.setTable(buildStubTable());
+
+    String minMaxSql =
+        ops.buildAlterSql(
+            "db",
+            "tbl",
+            new TableChange[] {
+              TableChange.addIndex(
+                  Index.IndexType.DATA_SKIPPING_MINMAX, "idx_new", new String[][] {{"c2"}})
+            });
+    Assertions.assertTrue(minMaxSql.contains("ADD INDEX `idx_new` `c2` TYPE minmax GRANULARITY 1"));
+
+    String bloomSql =
+        ops.buildAlterSql(
+            "db",
+            "tbl",
+            new TableChange[] {
+              TableChange.addIndex(
+                  Index.IndexType.DATA_SKIPPING_BLOOM_FILTER, "idx_bf", new String[][] {{"c2"}})
+            });
+    Assertions.assertTrue(
+        bloomSql.contains("ADD INDEX `idx_bf` `c2` TYPE bloom_filter GRANULARITY 3"));
+
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () ->
+            ops.buildAlterSql(
+                "db",
+                "tbl",
+                new TableChange[] {
+                  TableChange.addIndex(
+                      Index.IndexType.DATA_SKIPPING_MINMAX, "idx1", new String[][] {{"c2"}})
+                }));
+
+    Assertions.assertThrows(
+        UnsupportedOperationException.class,
+        () ->
+            ops.buildAlterSql(
+                "db",
+                "tbl",
+                new TableChange[] {
+                  TableChange.addIndex(
+                      Index.IndexType.PRIMARY_KEY, "pk_new", new String[][] {{"c1"}})
+                }));
   }
 
   @Test

@@ -719,6 +719,10 @@ public class ClickHouseTableOperations extends JdbcTableOperations {
             updateColumnNullabilityDefinition(
                 (TableChange.UpdateColumnNullability) change, lazyLoadTable));
 
+      } else if (change instanceof TableChange.AddIndex addIndex) {
+        lazyLoadTable = getOrCreateTable(databaseName, tableName, lazyLoadTable);
+        alterSql.add(addIndexDefinition(lazyLoadTable, addIndex));
+
       } else if (change instanceof TableChange.DeleteIndex) {
         lazyLoadTable = getOrCreateTable(databaseName, tableName, lazyLoadTable);
         alterSql.add(deleteIndexDefinition(lazyLoadTable, (TableChange.DeleteIndex) change));
@@ -766,6 +770,37 @@ public class ClickHouseTableOperations extends JdbcTableOperations {
             .formatted(quoteIdentifier(tableName), String.join(",\n", nonEmptySQLs));
     LOG.info("Generated alter table:{} sql: {}", databaseName + "." + tableName, result);
     return result;
+  }
+
+  @VisibleForTesting
+  private String addIndexDefinition(JdbcTable table, TableChange.AddIndex addIndex) {
+    Preconditions.checkArgument(
+        StringUtils.isNotBlank(addIndex.getName()), "Index name is required");
+    Preconditions.checkArgument(
+        ArrayUtils.isNotEmpty(addIndex.getFieldNames()), "Index field names are required");
+
+    boolean indexExists =
+        Arrays.stream(table.index()).anyMatch(index -> index.name().equals(addIndex.getName()));
+    Preconditions.checkArgument(!indexExists, "Index '%s' already exists", addIndex.getName());
+
+    String fieldStr = getIndexFieldStr(addIndex.getFieldNames());
+    switch (addIndex.getType()) {
+      case DATA_SKIPPING_MINMAX:
+        return "ADD INDEX %s %s TYPE minmax GRANULARITY 1"
+            .formatted(quoteIdentifier(addIndex.getName()), fieldStr);
+
+      case DATA_SKIPPING_BLOOM_FILTER:
+        return "ADD INDEX %s %s TYPE bloom_filter GRANULARITY 3"
+            .formatted(quoteIdentifier(addIndex.getName()), fieldStr);
+
+      case PRIMARY_KEY:
+        throw new UnsupportedOperationException(
+            "ClickHouse does not support adding primary key via ALTER TABLE");
+
+      default:
+        throw new IllegalArgumentException(
+            "Gravitino Clickhouse doesn't support index : " + addIndex.getType());
+    }
   }
 
   @VisibleForTesting

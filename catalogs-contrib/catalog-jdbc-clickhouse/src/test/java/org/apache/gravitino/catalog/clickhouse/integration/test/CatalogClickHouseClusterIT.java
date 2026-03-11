@@ -466,17 +466,19 @@ public class CatalogClickHouseClusterIT extends BaseIT {
         getSortOrders("col_3"),
         Indexes.EMPTY_INDEXES);
 
-    RuntimeException addIndexException =
-        Assertions.assertThrows(
-            RuntimeException.class,
-            () ->
-                tableCatalog.alterTable(
-                    tableIdentifier,
-                    TableChange.addIndex(
-                        Index.IndexType.DATA_SKIPPING_MINMAX,
-                        "idx_col_1_new",
-                        new String[][] {{"col_1"}})));
-    Assertions.assertTrue(addIndexException.getMessage().contains("Unsupported table change type"));
+    tableCatalog.alterTable(
+        tableIdentifier,
+        TableChange.addIndex(
+            Index.IndexType.DATA_SKIPPING_MINMAX, "idx_col_1_new", new String[][] {{"col_1"}}));
+    Table loaded = tableCatalog.loadTable(tableIdentifier);
+    Assertions.assertTrue(
+        Arrays.stream(loaded.index())
+            .anyMatch(index -> Objects.equals(index.name(), "idx_col_1_new")));
+    tableCatalog.alterTable(tableIdentifier, TableChange.deleteIndex("idx_col_1_new", false));
+    loaded = tableCatalog.loadTable(tableIdentifier);
+    Assertions.assertFalse(
+        Arrays.stream(loaded.index())
+            .anyMatch(index -> Objects.equals(index.name(), "idx_col_1_new")));
 
     RuntimeException autoIncrementTrueException =
         Assertions.assertThrows(
