@@ -79,6 +79,7 @@ Gravitino currently supports the following catalogs:
 **Relational catalogs:**
 
 * [**Doris catalog**](./jdbc-doris-catalog.md)
+* [**Hologres catalog**](./jdbc-hologres-catalog.md)
 * [**Hudi catalog**](./lakehouse-hudi-catalog.md)
 * [**Hive catalog**](./apache-hive-catalog.md)
 * [**Iceberg catalog**](./lakehouse-iceberg-catalog.md)
@@ -103,6 +104,9 @@ If you want to operate table and partition statistics, you can refer to the [doc
 **Model catalogs:**
 
 * [**Model catalog**](./model-catalog.md)
+
+If you want to automate table maintenance workflows, see [Table Maintenance Service (Optimizer)](./table-maintenance-service/optimizer.md).
+Start with Gravitino built-in policies and built-in job templates, and extend via optimizer interfaces when needed.
 
 Catalogs with an asterisk (\*) aren’t in the standard release tarball and Docker image since 1.2.0.  In 1.2.0, Gravitino introduces 
 folder `catalogs-contrib` to host the contributed catalogs, which aren’t in the standard release but can be built and used separately. See [how to build Gravitino](./how-to-build.md#quick-start) for details.
@@ -129,6 +133,7 @@ complete environment. To experience all the features, see
 Gravitino supports different catalogs to manage the metadata in different sources. Please see:
 
 * [Doris catalog](./jdbc-doris-catalog.md): a complete guide to using Gravitino to manage Doris data.
+* [Hologres catalog](./jdbc-hologres-catalog.md): a complete guide to using Gravitino to manage Hologres data.
 * [StarRocks catalog](./jdbc-starrocks-catalog.md): a complete guide to using Gravitino to manage StarRocks data.
 * [Fileset catalog](./fileset-catalog.md): a complete guide to using Gravitino to manage fileset
   using Hadoop Compatible File System (HCFS).

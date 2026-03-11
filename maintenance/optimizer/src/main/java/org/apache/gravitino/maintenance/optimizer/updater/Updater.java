@@ -23,7 +23,6 @@ import com.google.common.annotations.VisibleForTesting;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
-import java.util.Locale;
 import java.util.Map;
 import java.util.stream.Collectors;
 import org.apache.gravitino.NameIdentifier;
@@ -90,19 +89,19 @@ public class Updater implements AutoCloseable {
    * @param statisticsCalculatorName The provider name of the statistics calculator.
    * @param nameIdentifiers The identifiers to update (table and/or job).
    * @param updateType The target update type: statistics or metrics.
+   * @return summary of processed record counts by scope
    */
-  public void update(
+  public UpdateSummary update(
       String statisticsCalculatorName,
       List<NameIdentifier> nameIdentifiers,
       UpdateType updateType) {
     StatisticsCalculator calculator = getStatisticsCalculator(statisticsCalculatorName);
 
     if (UpdateType.STATISTICS.equals(updateType)) {
-      updateStatisticsForIdentifiers(statisticsCalculatorName, nameIdentifiers, calculator);
-      return;
+      return updateStatisticsForIdentifiers(statisticsCalculatorName, nameIdentifiers, calculator);
     }
 
-    updateMetricsForIdentifiers(statisticsCalculatorName, nameIdentifiers, calculator);
+    return updateMetricsForIdentifiers(statisticsCalculatorName, nameIdentifiers, calculator);
   }
 
   /**
@@ -110,16 +109,16 @@ public class Updater implements AutoCloseable {
    *
    * @param statisticsCalculatorName The provider name of the statistics calculator.
    * @param updateType The target update type: statistics or metrics.
+   * @return summary of processed record counts by scope
    */
-  public void updateAll(String statisticsCalculatorName, UpdateType updateType) {
+  public UpdateSummary updateAll(String statisticsCalculatorName, UpdateType updateType) {
     StatisticsCalculator calculator = getStatisticsCalculator(statisticsCalculatorName);
 
     if (UpdateType.STATISTICS.equals(updateType)) {
-      updateAllStatistics(statisticsCalculatorName, calculator);
-      return;
+      return updateAllStatistics(statisticsCalculatorName, calculator);
     }
 
-    updateAllMetrics(statisticsCalculatorName, calculator);
+    return updateAllMetrics(statisticsCalculatorName, calculator);
   }
 
   @VisibleForTesting
@@ -127,12 +126,59 @@ public class Updater implements AutoCloseable {
     return metricsUpdater;
   }
 
+  @VisibleForTesting
+  public StatisticsUpdater getStatisticsUpdater() {
+    return statisticsUpdater;
+  }
+
+  /** Immutable summary of record counts processed by one update execution. */
+  public static final class UpdateSummary {
+    private final UpdateType updateType;
+    private final long totalRecords;
+    private final long tableRecords;
+    private final long partitionRecords;
+    private final long jobRecords;
+
+    private UpdateSummary(
+        UpdateType updateType,
+        long totalRecords,
+        long tableRecords,
+        long partitionRecords,
+        long jobRecords) {
+      this.updateType = updateType;
+      this.totalRecords = totalRecords;
+      this.tableRecords = tableRecords;
+      this.partitionRecords = partitionRecords;
+      this.jobRecords = jobRecords;
+    }
+
+    public UpdateType updateType() {
+      return updateType;
+    }
+
+    public long totalRecords() {
+      return totalRecords;
+    }
+
+    public long tableRecords() {
+      return tableRecords;
+    }
+
+    public long partitionRecords() {
+      return partitionRecords;
+    }
+
+    public long jobRecords() {
+      return jobRecords;
+    }
+  }
+
   @Override
   public void close() throws Exception {
     closeableGroup.close();
   }
 
-  private void updateStatisticsForIdentifiers(
+  private UpdateSummary updateStatisticsForIdentifiers(
       String statisticsCalculatorName,
       List<NameIdentifier> nameIdentifiers,
       StatisticsCalculator calculator) {
@@ -161,18 +207,10 @@ public class Updater implements AutoCloseable {
       updateTableStatistics(statistics, nameIdentifier);
       updatePartitionStatistics(partitionStatistics, nameIdentifier);
     }
-
-    System.out.println(
-        String.format(
-            "SUMMARY: %s totalRecords=%d tableRecords=%d partitionRecords=%d jobRecords=%d",
-            UpdateType.STATISTICS.name().toLowerCase(Locale.ROOT),
-            tableRecords + partitionRecords,
-            tableRecords,
-            partitionRecords,
-            0L));
+    return buildSummary(UpdateType.STATISTICS, tableRecords, partitionRecords, 0L);
   }
 
-  private void updateMetricsForIdentifiers(
+  private UpdateSummary updateMetricsForIdentifiers(
       String statisticsCalculatorName,
       List<NameIdentifier> nameIdentifiers,
       StatisticsCalculator calculator) {
@@ -221,18 +259,10 @@ public class Updater implements AutoCloseable {
 
     updateTableAndPartitionMetrics(pendingTableAndPartitionMetrics);
     updateJobMetrics(pendingJobMetrics);
-
-    System.out.println(
-        String.format(
-            "SUMMARY: %s totalRecords=%d tableRecords=%d partitionRecords=%d jobRecords=%d",
-            UpdateType.METRICS.name().toLowerCase(Locale.ROOT),
-            tableRecords + partitionRecords + jobRecords,
-            tableRecords,
-            partitionRecords,
-            jobRecords));
+    return buildSummary(UpdateType.METRICS, tableRecords, partitionRecords, jobRecords);
   }
 
-  private void updateAllStatistics(
+  private UpdateSummary updateAllStatistics(
       String statisticsCalculatorName, StatisticsCalculator calculator) {
     if (!(calculator instanceof SupportsCalculateBulkTableStatistics)) {
       throw new IllegalArgumentException(
@@ -260,18 +290,11 @@ public class Updater implements AutoCloseable {
           updateTableStatistics(statistics, identifier);
           updatePartitionStatistics(partitionStatistics, identifier);
         });
-
-    System.out.println(
-        String.format(
-            "SUMMARY: %s totalRecords=%d tableRecords=%d partitionRecords=%d jobRecords=%d",
-            UpdateType.STATISTICS.name().toLowerCase(Locale.ROOT),
-            tableRecords + partitionRecords,
-            tableRecords,
-            partitionRecords,
-            0L));
+    return buildSummary(UpdateType.STATISTICS, tableRecords, partitionRecords, 0L);
   }
 
-  private void updateAllMetrics(String statisticsCalculatorName, StatisticsCalculator calculator) {
+  private UpdateSummary updateAllMetrics(
+      String statisticsCalculatorName, StatisticsCalculator calculator) {
     boolean hasTableMetricsCalculator = calculator instanceof SupportsCalculateBulkTableMetrics;
     boolean hasJobMetricsCalculator = calculator instanceof SupportsCalculateBulkJobMetrics;
     if (!hasTableMetricsCalculator && !hasJobMetricsCalculator) {
@@ -305,15 +328,7 @@ public class Updater implements AutoCloseable {
 
     updateTableAndPartitionMetrics(pendingTableAndPartitionMetrics);
     updateJobMetrics(pendingJobMetrics);
-
-    System.out.println(
-        String.format(
-            "SUMMARY: %s totalRecords=%d tableRecords=%d partitionRecords=%d jobRecords=%d",
-            UpdateType.METRICS.name().toLowerCase(Locale.ROOT),
-            tableRecords + partitionRecords + jobRecords,
-            tableRecords,
-            partitionRecords,
-            jobRecords));
+    return buildSummary(UpdateType.METRICS, tableRecords, partitionRecords, jobRecords);
   }
 
   private void updateTableStatistics(
@@ -456,5 +471,15 @@ public class Updater implements AutoCloseable {
       return 0;
     }
     return metrics.stream().filter(metric -> metric.scope() == scope).count();
+  }
+
+  private UpdateSummary buildSummary(
+      UpdateType updateType, long tableRecords, long partitionRecords, long jobRecords) {
+    return new UpdateSummary(
+        updateType,
+        tableRecords + partitionRecords + jobRecords,
+        tableRecords,
+        partitionRecords,
+        jobRecords);
   }
 }

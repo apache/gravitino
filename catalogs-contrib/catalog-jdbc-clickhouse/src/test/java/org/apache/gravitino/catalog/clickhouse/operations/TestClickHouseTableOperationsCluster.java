@@ -175,7 +175,11 @@ class TestClickHouseTableOperationsCluster {
   void testGenerateCreateTableSqlWithDistributedEngineWithoutOnCluster() {
     JdbcColumn[] columns =
         new JdbcColumn[] {
-          JdbcColumn.builder().withName("user_id").withType(Types.IntegerType.get()).build()
+          JdbcColumn.builder()
+              .withName("user_id")
+              .withType(Types.IntegerType.get())
+              .withNullable(false)
+              .build()
         };
 
     Map<String, String> props = new HashMap<>();
@@ -189,7 +193,28 @@ class TestClickHouseTableOperationsCluster {
         ops.buildCreateSql(
             "tbl", columns, "comment", props, null, Distributions.NONE, new Index[0], null);
 
-    Assertions.assertTrue(sql.startsWith("CREATE TABLE `tbl` ("));
+    Assertions.assertTrue(sql.startsWith("CREATE TABLE `tbl`"));
+    Assertions.assertTrue(
+        sql.contains("ENGINE = Distributed(`ck_cluster`,`remote_db`,`remote_table`,`user_id`)"));
+  }
+
+  @Test
+  void testDistributedTableWithEmptyColumns() {
+    JdbcColumn[] columns = new JdbcColumn[] {};
+
+    Map<String, String> props = new HashMap<>();
+    props.put(ClusterConstants.CLUSTER_NAME, "ck_cluster");
+    props.put(GRAVITINO_ENGINE_KEY, "Distributed");
+    props.put(DistributedTableConstants.REMOTE_DATABASE, "remote_db");
+    props.put(DistributedTableConstants.REMOTE_TABLE, "remote_table");
+    props.put(DistributedTableConstants.SHARDING_KEY, "user_id");
+
+    String sql =
+        ops.buildCreateSql(
+            "tbl", columns, "comment", props, null, Distributions.NONE, new Index[0], null);
+
+    Assertions.assertTrue(sql.startsWith("CREATE TABLE `tbl`"));
+    Assertions.assertTrue(sql.contains("AS `remote_db`.`remote_table`"));
     Assertions.assertTrue(
         sql.contains("ENGINE = Distributed(`ck_cluster`,`remote_db`,`remote_table`,`user_id`)"));
   }

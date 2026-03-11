@@ -75,6 +75,7 @@ include(
   "trino-connector:trino-connector-446-451",
   "trino-connector:trino-connector-452-468",
   "trino-connector:trino-connector-469-472",
+  "trino-connector:trino-connector-473-478",
   "trino-connector:integration-test"
 )
 include("spark-connector:spark-common")
@@ -102,4 +103,9 @@ include(":bundles:azure", ":bundles:azure-bundle", ":bundles:iceberg-azure-bundl
 include(":catalogs:hadoop-common")
 include(":lineage")
 include(":mcp-server")
-include(":maintenance:optimizer", ":maintenance:jobs")
+include(
+  ":maintenance:optimizer-api",
+  ":maintenance:gravitino-updaters",
+  ":maintenance:optimizer",
+  ":maintenance:jobs"
+)

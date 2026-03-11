@@ -92,6 +92,10 @@ public abstract class SparkAuthorizationIT extends BaseIT {
 
   protected final String TIME_ZONE_UTC = "UTC";
 
+  protected SparkSession getSparkSession() {
+    return normalUserSparkSession;
+  }
+
   @BeforeAll
   @Override
   public void startIntegrationTest() throws Exception {
@@ -311,6 +315,75 @@ public abstract class SparkAuthorizationIT extends BaseIT {
       gravitinoMetalake.deleteRole(testRole);
       gravitinoMetalake.grantRolesToUser(ImmutableList.of(ROLE), NORMAL_USER);
     }
+  }
+
+  @Test
+  @Order(6)
+  public void testLoadTableForWriting() {
+    GravitinoMetalake gravitinoMetalake = client.loadMetalake(METALAKE);
+    String testTable = "test_write_table";
+    String testRole = "role_no_modify";
+
+    // Temporarily revoke ROLE from user
+    gravitinoMetalake.revokeRolesFromUser(ImmutableList.of(ROLE), NORMAL_USER);
+
+    // Create a role with SELECT_TABLE but without MODIFY_TABLE privilege
+    SecurableObject catalogObject =
+        SecurableObjects.ofCatalog(
+            JDBC_CATALOG,
+            ImmutableList.of(
+                Privileges.UseCatalog.allow(),
+                Privileges.UseSchema.allow(),
+                Privileges.SelectTable.allow(),
+                Privileges.CreateTable.allow()));
+    gravitinoMetalake.createRole(testRole, new HashMap<>(), ImmutableList.of(catalogObject));
+    gravitinoMetalake.grantRolesToUser(ImmutableList.of(testRole), NORMAL_USER);
+
+    TableCatalog tableCatalog = gravitinoMetalake.loadCatalog(JDBC_CATALOG).asTableCatalog();
+    try {
+      // Create a test table first
+      normalUserSparkSession.sql("use " + JDBC_CATALOG);
+      normalUserSparkSession.sql("use " + JDBC_DATABASE);
+      tableCatalog.createTable(
+          NameIdentifier.of(JDBC_DATABASE, testTable),
+          new Column[] {
+            Column.of("id", Types.StringType.get()), Column.of("name", Types.StringType.get())
+          },
+          "",
+          new HashMap<>());
+
+      // Deny MODIFY_TABLE privilege explicitly
+      gravitinoMetalake.grantPrivilegesToRole(
+          testRole,
+          MetadataObjects.of(
+              ImmutableList.of(JDBC_CATALOG, JDBC_DATABASE, testTable), MetadataObject.Type.TABLE),
+          ImmutableList.of(Privileges.ModifyTable.deny()));
+
+      // Assert INSERT behavior - Spark 3.5+ should throw ForbiddenException,
+      // lower versions won't because they don't support TableWritePrivilege
+      assertInsertBehaviorWithoutModifyPrivilege(testTable);
+    } finally {
+      // Clean up
+      try {
+        tableCatalog.dropTable(NameIdentifier.of(JDBC_DATABASE, testTable));
+      } catch (Exception e) {
+        Assertions.fail("Failed to drop test table " + testTable, e);
+      }
+      gravitinoMetalake.revokeRolesFromUser(ImmutableList.of(testRole), NORMAL_USER);
+      gravitinoMetalake.deleteRole(testRole);
+      gravitinoMetalake.grantRolesToUser(ImmutableList.of(ROLE), NORMAL_USER);
+    }
+  }
+
+  /**
+   * Assert the behavior when user tries to INSERT without MODIFY_TABLE privilege. Spark 3.3/3.4
+   * don't support TableWritePrivilege, so INSERT will succeed. Spark 3.5+ supports it, so INSERT
+   * should throw ForbiddenException. Subclasses can override this method to assert the expected
+   * behavior.
+   */
+  protected void assertInsertBehaviorWithoutModifyPrivilege(String tableName) {
+    // Spark 3.3/3.4 don't support TableWritePrivilege, so INSERT will succeed
+    normalUserSparkSession.sql(String.format("INSERT INTO %s VALUES (1, 'test')", tableName));
   }
 
   private void assertEqualsRows(List<Row> exceptRows, List<Row> actualRows) {

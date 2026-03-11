@@ -1,0 +1,65 @@
+#
+# Licensed to the Apache Software Foundation (ASF) under one
+# or more contributor license agreements.  See the NOTICE file
+# distributed with this work for additional information
+# regarding copyright ownership.  The ASF licenses this file
+# to you under the Apache License, Version 2.0 (the
+# "License"); you may not use this file except in compliance
+# with the License.  You may obtain a copy of the License at
+#
+#  http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing,
+# software distributed under the License is distributed on an
+# "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+# KIND, either express or implied.  See the License for the
+# specific language governing permissions and limitations
+# under the License.
+#
+
+# Core Gravitino connection (URI default matches local dev; metalake is required)
+gravitino.optimizer.gravitinoUri = http://localhost:8090
+gravitino.optimizer.gravitinoMetalake = test
+# Optional default catalog used when identifiers are missing a catalog prefix
+gravitino.optimizer.gravitinoDefaultCatalog = generic
+
+# Recommender plugins (defaults point to built-in Gravitino implementations)
+# The statistics provider for the recommender.
+gravitino.optimizer.recommender.statisticsProvider = gravitino-statistics-provider
+# The strategy provider for the recommender.
+gravitino.optimizer.recommender.strategyProvider = gravitino-strategy-provider
+# The table metadata provider for the recommender.
+gravitino.optimizer.recommender.tableMetaProvider = gravitino-table-metadata-provider
+# The job submitter for the recommender (noop-job-submitter keeps recommendations local).
+gravitino.optimizer.recommender.jobSubmitter = noop-job-submitter
+
+# Updater plugins (push statistics/metrics back into Gravitino)
+# The statistics updater for the recommender/update-statistics tool.
+gravitino.optimizer.updater.statisticsUpdater = gravitino-statistics-updater
+# The metrics updater for the recommender/append-metrics tool.
+gravitino.optimizer.updater.metricsUpdater = gravitino-metrics-updater
+# Optional: configure JDBC metrics storage (H2 is used by default when omitted).
+# gravitino.optimizer.jdbcMetrics.jdbcUrl = jdbc:postgresql://localhost:5432/optimizer
+# gravitino.optimizer.jdbcMetrics.jdbcUser = postgres
+# gravitino.optimizer.jdbcMetrics.jdbcPassword = postgres
+# gravitino.optimizer.jdbcMetrics.jdbcDriver = org.postgresql.Driver
+# gravitino.optimizer.jdbcMetrics.poolMaxSize = 8
+# gravitino.optimizer.jdbcMetrics.poolMinIdle = 1
+# gravitino.optimizer.jdbcMetrics.connectionTimeoutMs = 30000
+# gravitino.optimizer.jdbcMetrics.testOnBorrow = true
+
+# Monitor plugins (pull metrics and evaluate actions)
+# The metrics provider for the monitor.
+gravitino.optimizer.monitor.metricsProvider = gravitino-metrics-provider
+# The table-job relation provider for the monitor (dummy by default).
+gravitino.optimizer.monitor.tableJobRelationProvider = dummy-table-job-relation-provider
+# Optional: read table-job mappings from a local JSONL file.
+# gravitino.optimizer.monitor.tableJobRelationProvider = local-table-job-relation-provider
+# gravitino.optimizer.monitor.localTableJobRelationProvider.filePath = /path/to/job-mappings.jsonl
+# The metrics evaluator for the monitor.
+gravitino.optimizer.monitor.metricsEvaluator = gravitino-metrics-evaluator
+# Optional: evaluator rules in format scope:metricName:aggregation:comparison
+# scope: table|job; aggregation: max|min|avg|latest; comparison: lt|le|gt|ge|eq|ne
+# gravitino.optimizer.monitor.gravitinoMetricsEvaluator.rules = table:row_count:avg:le,job:duration:latest:le
+# The monitor callbacks to invoke after evaluation (comma-separated).
+gravitino.optimizer.monitor.callbacks = console

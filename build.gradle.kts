@@ -335,6 +335,9 @@ subprojects {
     val name = project.name.lowercase()
     val path = project.path.lowercase()
     if (path.startsWith(":maintenance:jobs") ||
+      path.startsWith(":maintenance:optimizer-api") ||
+      path.startsWith(":maintenance:gravitino-updaters") ||
+      path.startsWith(":clients:client-java") ||
       name == "api" ||
       name == "common" ||
       name == "catalog-common" ||
@@ -343,7 +346,11 @@ subprojects {
       return true
     }
 
-    val isReleaseRun = gradle.startParameter.taskNames.any { it == "release" || it == "publish" || it == "publishToMavenLocal" }
+    val isReleaseRun = gradle.startParameter.taskNames.any {
+      it == "release" || it == "publish" || it == "publishToMavenLocal" || it.endsWith(":release") || it.endsWith(
+        ":publish"
+      ) || it.endsWith(":publishToMavenLocal")
+    }
     if (!isReleaseRun) {
       return false
     }
@@ -598,6 +605,30 @@ subprojects {
       initTest(this)
     }
 
+    val testTaskStartTimeMsKey = "testTaskStartTimeMs"
+    doFirst {
+      extensions.extraProperties[testTaskStartTimeMsKey] = System.currentTimeMillis()
+      logger.lifecycle(
+        "[TEST-TIMING] START module={} task={} at={}",
+        project.path,
+        path,
+        extensions.extraProperties[testTaskStartTimeMsKey]
+      )
+    }
+
+    doLast {
+      val endTimeMs = System.currentTimeMillis()
+      val startTimeMs = extensions.extraProperties[testTaskStartTimeMsKey] as? Long ?: endTimeMs
+      logger.lifecycle(
+        "[TEST-TIMING] END module={} task={} startMs={} endMs={} durationMs={}",
+        project.path,
+        path,
+        startTimeMs,
+        endTimeMs,
+        endTimeMs - startTimeMs
+      )
+    }
+
     testLogging {
       exceptionFormat = TestExceptionFormat.FULL
       showExceptions = true
@@ -822,7 +853,7 @@ tasks {
           include(
             "${rootProject.name}-iceberg-rest-server.conf.template",
             "${rootProject.name}-env.sh.template",
-            "log4j2.properties.template"
+            "${rootProject.name}-iceberg-rest-log4j2.properties.template"
           )
           into("${rootProject.name}-iceberg-rest-server/conf")
         }
@@ -867,7 +898,7 @@ tasks {
           include(
             "${rootProject.name}-lance-rest-server.conf.template",
             "${rootProject.name}-env.sh.template",
-            "log4j2.properties.template"
+            "${rootProject.name}-lance-rest-log4j2.properties.template"
           )
           into("${rootProject.name}-lance-rest-server/conf")
         }
@@ -903,7 +934,7 @@ tasks {
   }
 
   val compileTrinoConnector by registering {
-    dependsOn("trino-connector:trino-connector-469-472:copyLibs")
+    dependsOn("trino-connector:trino-connector-473-478:copyLibs")
     group = "gravitino distribution"
   }
 
@@ -914,6 +945,7 @@ tasks {
       ":trino-connector:trino-connector-446-451:assembleTrinoConnector",
       ":trino-connector:trino-connector-452-468:assembleTrinoConnector",
       ":trino-connector:trino-connector-469-472:assembleTrinoConnector",
+      ":trino-connector:trino-connector-473-478:assembleTrinoConnector",
       "assembleIcebergRESTServer",
       "assembleLanceRESTServer"
     )

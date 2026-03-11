@@ -24,24 +24,32 @@ jobs:
               - .github/**
               - api/**
               - bin/**
+              - authorizations/**
+              - bundles/**
               - catalogs/**
-              - clients/client-java/**
+              - catalogs-contrib/**
+              - clients/**
               - common/**
               - conf/**
               - core/**
               - dev/**
               - gradle/**
               - iceberg/**
-              - integration-test-common/**
-              - meta/**
+              - lance/**
               - scripts/**
               - server/**
+              - meta/**
               - server-common/**
+              - integration-test-common/**
               - web-v2/**
+              - '**/*.kts'
+              - '**/*.py'
+              - '**/*.properties'
+              - '**/*.sh'
               - build.gradle.kts
               - gradle.properties
               - gradlew
-              - setting.gradle.kts
+              - settings.gradle.kts
     outputs:
       source_changes: ${{ steps.filter.outputs.source_changes }}
 
@@ -84,7 +92,6 @@ jobs:
       - name: Frontend Integration Test
         id: integrationTest
         run: |
-          GRAVITINO_USE_WEB_V2=true ./gradlew -PskipTests -PtestMode=embedded -PskipDockerTests=false :web-v2:integration-test:test
           GRAVITINO_USE_WEB_V2=true ./gradlew -PskipTests -PtestMode=deploy -PskipDockerTests=false :web-v2:integration-test:test
 
       - name: Upload integrate tests reports
