@@ -65,6 +65,23 @@ public class Privileges {
           MetadataObject.Type.VIEW);
 
   /**
+   * Object types that {@link ManageGrants} can be bound to.
+   *
+   * <p>Binding at a parent level implicitly covers all children — for example, a grant on a SCHEMA
+   * lets the holder manage privileges on every TABLE, VIEW, TOPIC, FILESET, and MODEL inside it.
+   */
+  private static final Set<MetadataObject.Type> MANAGE_GRANTS_SUPPORTED_TYPES =
+      Sets.immutableEnumSet(
+          MetadataObject.Type.METALAKE,
+          MetadataObject.Type.CATALOG,
+          MetadataObject.Type.SCHEMA,
+          MetadataObject.Type.TABLE,
+          MetadataObject.Type.VIEW,
+          MetadataObject.Type.TOPIC,
+          MetadataObject.Type.FILESET,
+          MetadataObject.Type.MODEL);
+
+  /**
    * Returns the Privilege with allow condition from the string representation.
    *
    * @param privilege The string representation of the privilege.
@@ -836,7 +853,14 @@ public class Privileges {
     }
   }
 
-  /** The privilege to grant or revoke a role for the user or the group. */
+  /**
+   * The privilege to grant or revoke privileges on securable objects. If bound on the metalake, we
+   * can grant or revoke the role for users or groups.
+   *
+   * <p>Unlike most privileges, this can be bound at any level of the object hierarchy — METALAKE,
+   * CATALOG, SCHEMA, TABLE, VIEW, TOPIC, FILESET, or MODEL. A grant at a parent level implicitly
+   * covers all descendants within it.
+   */
   public static class ManageGrants extends GenericPrivilege<ManageGrants> {
     private static final ManageGrants ALLOW_INSTANCE =
         new ManageGrants(Condition.ALLOW, Name.MANAGE_GRANTS);
@@ -863,7 +887,7 @@ public class Privileges {
 
     @Override
     public boolean canBindTo(MetadataObject.Type type) {
-      return type == MetadataObject.Type.METALAKE;
+      return MANAGE_GRANTS_SUPPORTED_TYPES.contains(type);
     }
   }
 

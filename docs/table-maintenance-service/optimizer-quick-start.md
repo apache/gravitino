@@ -10,6 +10,8 @@ license: This software is licensed under the Apache License version 2.
 - Prepare a running Gravitino server.
 - Ensure target metalake exists (examples use `test`).
 - Configure `SPARK_HOME` or `gravitino.jobExecutor.local.sparkHome` for Spark templates.
+- For faster status feedback during verification, set `gravitino.job.statusPullIntervalInMs`
+  to a smaller value (for example `10000`) and restart Gravitino.
 - If your Iceberg REST backend is in-memory, avoid restarting it during this quick start because
   restart resets metadata and data files.
 
@@ -17,7 +19,8 @@ For full config details, see [Optimizer Configuration](./optimizer-configuration
 
 ## Success criteria
 
-- Update-stats job finishes and statistics include `custom-data-file-mse` and `custom-delete-file-number`.
+- Update-stats job finishes and table statistics/metrics include `custom-data-file-mse` and
+  `custom-delete-file-number`.
 - `submit-strategy-jobs` prints `SUBMIT` with a rewrite job ID.
 - Rewrite job log shows `Rewritten data files: <N>` where `N > 0` for non-empty tables.
 
@@ -98,12 +101,12 @@ Use Spark SQL to create enough small files so compaction has visible effect:
 ```bash
 ${SPARK_HOME}/bin/spark-sql \
   --conf spark.hadoop.fs.defaultFS=file:/// \
-  --conf spark.sql.catalog.rest_demo=org.apache.iceberg.spark.SparkCatalog \
-  --conf spark.sql.catalog.rest_demo.type=rest \
-  --conf spark.sql.catalog.rest_demo.uri=http://localhost:9001/iceberg \
-  -e "CREATE NAMESPACE IF NOT EXISTS rest_demo.db; \
+  --conf spark.sql.catalog.rest_catalog=org.apache.iceberg.spark.SparkCatalog \
+  --conf spark.sql.catalog.rest_catalog.type=rest \
+  --conf spark.sql.catalog.rest_catalog.uri=http://localhost:9001/iceberg \
+  -e "CREATE NAMESPACE IF NOT EXISTS rest_catalog.db; \
       SET spark.sql.files.maxRecordsPerFile=1000; \
-      INSERT INTO rest_demo.db.t1 \
+      INSERT INTO rest_catalog.db.t1 \
       SELECT id, concat('name_', CAST(id AS STRING)) FROM range(0, 100000);"
 ```
 
@@ -226,9 +229,10 @@ curl -sS "http://localhost:8090/api/metalakes/test/jobs/runs/${strategy_job_id}"
 curl -sS "http://localhost:8090/api/metalakes/test/objects/table/rest_catalog.db.t1/statistics" | jq
 
 # Staging path is controlled by `gravitino.job.stagingDir` (default: `/tmp/gravitino/jobs/staging`).
-# Verify rewrite actually rewrote files (N should be > 0 for non-empty table)
+# Verify rewrite actually rewrote files (N should be > 0 for non-empty table).
+log_dir="/tmp/gravitino/jobs/staging/test/builtin-iceberg-rewrite-data-files/${strategy_job_id}"
 grep -E "Rewritten data files|Added data files|completed successfully" \
-  "/tmp/gravitino/jobs/staging/test/builtin-iceberg-rewrite-data-files/${strategy_job_id}/error.log"
+  "${log_dir}/output.log"
 ```
 
 By default, Gravitino pulls job status every `300000` ms (`gravitino.job.statusPullIntervalInMs`).

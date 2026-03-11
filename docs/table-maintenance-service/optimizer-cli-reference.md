@@ -150,6 +150,10 @@ Rule format is `scope:metricName:aggregation:comparison`:
 - `aggregation`: `max|min|avg|latest`
 - `comparison`: `lt|le|gt|ge|eq|ne`
 
+When metrics are produced by `submit-update-stats-job --update-mode metrics`, metric names are
+often `custom-*` (for example `custom-data-file-mse`). Use `list-table-metrics` first and
+configure rules with the exact metric names returned by your environment.
+
 ### Submit built-in update stats jobs
 
 Submit built-in Iceberg update stats/metrics Spark jobs directly.
@@ -168,6 +172,9 @@ Notes:
 - `--identifiers` supports `catalog.schema.table` or `schema.table` (when default catalog is configured).
 - `--update-mode` supports `stats|metrics|all` (default `all`).
 - For `stats` or `all`, `--updater-options` must include `gravitino_uri` and `metalake`.
+- If `--updater-options` includes external JDBC metrics settings
+  (`gravitino.optimizer.jdbcMetrics.*`), ensure the JDBC driver JAR is available to Spark
+  runtime classpath (for example via `spark.jars` in `--spark-conf`).
 - `--spark-conf` and `--updater-options` are flat JSON maps.
 
 ### List table metrics
