@@ -1263,6 +1263,81 @@ public class CatalogClickHouseIT extends BaseIT {
   }
 
   @Test
+  void testAlterIndexAndAutoIncrementBranches() {
+    String tableWithIndexes = GravitinoITUtils.genRandomName("alter_idx_branch");
+    NameIdentifier tableIdentifier = NameIdentifier.of(schemaName, tableWithIndexes);
+    Column[] columns =
+        new Column[] {
+          Column.of("id", Types.IntegerType.get(), "id", false, false, DEFAULT_VALUE_NOT_SET),
+          Column.of("score", Types.IntegerType.get(), "score", false, false, DEFAULT_VALUE_NOT_SET),
+          Column.of("note", Types.StringType.get(), "note")
+        };
+    Index[] indexes =
+        new Index[] {
+          Indexes.of(
+              Index.IndexType.DATA_SKIPPING_MINMAX, "idx_score_minmax", new String[][] {{"score"}}),
+          Indexes.of(
+              Index.IndexType.DATA_SKIPPING_BLOOM_FILTER,
+              "idx_note_bloom",
+              new String[][] {{"note"}})
+        };
+    TableCatalog tableCatalog = catalog.asTableCatalog();
+    tableCatalog.createTable(
+        tableIdentifier,
+        columns,
+        table_comment,
+        createProperties(),
+        Transforms.EMPTY_TRANSFORM,
+        Distributions.NONE,
+        getSortOrders("id"),
+        indexes);
+
+    tableCatalog.alterTable(
+        tableIdentifier,
+        TableChange.deleteIndex("idx_score_minmax", false),
+        TableChange.deleteIndex("idx_note_bloom", false));
+    Table loaded = tableCatalog.loadTable(tableIdentifier);
+    Assertions.assertFalse(
+        Arrays.stream(loaded.index())
+            .anyMatch(index -> Objects.equals(index.name(), "idx_score_minmax")));
+    Assertions.assertFalse(
+        Arrays.stream(loaded.index())
+            .anyMatch(index -> Objects.equals(index.name(), "idx_note_bloom")));
+
+    RuntimeException addIndexException =
+        Assertions.assertThrows(
+            RuntimeException.class,
+            () ->
+                tableCatalog.alterTable(
+                    tableIdentifier,
+                    TableChange.addIndex(
+                        Index.IndexType.DATA_SKIPPING_MINMAX,
+                        "idx_new",
+                        new String[][] {{"score"}})));
+    Assertions.assertTrue(addIndexException.getMessage().contains("Unsupported table change type"));
+
+    RuntimeException autoIncrementTrueException =
+        Assertions.assertThrows(
+            RuntimeException.class,
+            () ->
+                tableCatalog.alterTable(
+                    tableIdentifier,
+                    TableChange.updateColumnAutoIncrement(new String[] {"id"}, true)));
+    Assertions.assertTrue(
+        autoIncrementTrueException.getMessage().contains("auto increment is not supported"));
+
+    RuntimeException autoIncrementFalseException =
+        Assertions.assertThrows(
+            RuntimeException.class,
+            () ->
+                tableCatalog.alterTable(
+                    tableIdentifier,
+                    TableChange.updateColumnAutoIncrement(new String[] {"id"}, false)));
+    Assertions.assertTrue(
+        autoIncrementFalseException.getMessage().contains("auto increment is not supported"));
+  }
+
+  @Test
   void testDropClickHouseDatabase() {
     String schemaName = GravitinoITUtils.genRandomName("clickhouse_schema").toLowerCase();
     String tableName = GravitinoITUtils.genRandomName("clickhouse_table").toLowerCase();

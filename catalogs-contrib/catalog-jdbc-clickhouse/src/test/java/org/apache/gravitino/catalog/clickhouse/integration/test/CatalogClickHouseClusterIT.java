@@ -449,4 +449,53 @@ public class CatalogClickHouseClusterIT extends BaseIT {
                 tableIdentifier,
                 TableChange.updateColumnAutoIncrement(new String[] {"col_1"}, true)));
   }
+
+  @Test
+  public void testAlterAddIndexAndAutoIncrementInCluster() {
+    String tableName = GravitinoITUtils.genRandomName("ck_cluster_alter_idx");
+    NameIdentifier tableIdentifier = NameIdentifier.of(schemaName, tableName);
+    Column[] columns = createColumns();
+    TableCatalog tableCatalog = catalog.asTableCatalog();
+    tableCatalog.createTable(
+        tableIdentifier,
+        columns,
+        tableComment,
+        clusterMergeTreeProperties(),
+        Transforms.EMPTY_TRANSFORM,
+        Distributions.NONE,
+        getSortOrders("col_3"),
+        Indexes.EMPTY_INDEXES);
+
+    RuntimeException addIndexException =
+        Assertions.assertThrows(
+            RuntimeException.class,
+            () ->
+                tableCatalog.alterTable(
+                    tableIdentifier,
+                    TableChange.addIndex(
+                        Index.IndexType.DATA_SKIPPING_MINMAX,
+                        "idx_col_1_new",
+                        new String[][] {{"col_1"}})));
+    Assertions.assertTrue(addIndexException.getMessage().contains("Unsupported table change type"));
+
+    RuntimeException autoIncrementTrueException =
+        Assertions.assertThrows(
+            RuntimeException.class,
+            () ->
+                tableCatalog.alterTable(
+                    tableIdentifier,
+                    TableChange.updateColumnAutoIncrement(new String[] {"col_1"}, true)));
+    Assertions.assertTrue(
+        autoIncrementTrueException.getMessage().contains("auto increment is not supported"));
+
+    RuntimeException autoIncrementFalseException =
+        Assertions.assertThrows(
+            RuntimeException.class,
+            () ->
+                tableCatalog.alterTable(
+                    tableIdentifier,
+                    TableChange.updateColumnAutoIncrement(new String[] {"col_1"}, false)));
+    Assertions.assertTrue(
+        autoIncrementFalseException.getMessage().contains("auto increment is not supported"));
+  }
 }
