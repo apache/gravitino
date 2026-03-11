@@ -63,3 +63,6 @@ web/.next
 
 .venv/
 .worktrees/
+
+# Agent
+.qoder/
