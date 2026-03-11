@@ -15,6 +15,30 @@ The Table Maintenance Service (Optimizer) automates table maintenance by connect
 
 The CLI commands and configuration keys use the `optimizer` name.
 
+## Alpha status and current limitations
+
+The current Table Maintenance Service is in **alpha** stage.
+
+Current limitations:
+
+- It is operated through the optimizer CLI workflow.
+- The built-in maintenance strategy focuses on Iceberg table compaction.
+- Compaction support is currently limited to Iceberg tables with identity partition transforms.
+
+## Extensibility and roadmap
+
+Although the built-in capability is intentionally narrow in alpha, the framework is designed for
+extension:
+
+- Integrate external systems by implementing custom providers and adapters.
+- Add new strategies and handlers beyond built-in compaction.
+- Plug in custom metrics, evaluators, and job submitters for different environments.
+
+See [Optimizer Extension Guide](./optimizer-extension-guide.md) for extension points.
+
+Future versions will continue improving the out-of-the-box experience and evolve toward a more
+ready-to-use maintenance service.
+
 ## Architecture overview
 
 The optimizer workflow is based on six parts:
