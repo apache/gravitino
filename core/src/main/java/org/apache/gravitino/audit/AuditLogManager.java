@@ -49,7 +49,7 @@ public class AuditLogManager {
     }
     String formatterClassName = config.get(Configs.AUDIT_LOG_FORMATTER_CLASS_NAME);
     Formatter formatter = loadFormatter(formatterClassName);
-    LOG.info("Audit log formatter class name:{}", formatterClassName);
+    LOG.info("Audit log formatter class name: {}", formatterClassName);
 
     String writerClassName = config.get(Configs.AUDIT_LOG_WRITER_CLASS_NAME);
     auditLogWriter =
@@ -57,7 +57,7 @@ public class AuditLogManager {
             writerClassName,
             config.getConfigsWithPrefix(Configs.AUDIT_LOG_WRITER_CONFIG_PREFIX),
             formatter);
-    LOG.info("Audit log writer class name:{}", writerClassName);
+    LOG.info("Audit log writer class name: {}", writerClassName);
 
     eventBusManager.addEventListener(
         "audit-log",
@@ -83,7 +83,7 @@ public class AuditLogManager {
             try {
               auditLogWriter.write(event);
             } catch (Exception e) {
-              LOG.warn("Failed to write audit log {}.", event, e);
+              LOG.warn("Failed to write audit log {}", event, e);
             }
           }
 
@@ -111,7 +111,7 @@ public class AuditLogManager {
     try {
       return (Formatter) Class.forName(className).getDeclaredConstructor().newInstance();
     } catch (Exception e) {
-      throw new GravitinoRuntimeException(e, "Failed to load formatter class name %s", className);
+      throw new GravitinoRuntimeException(e, "Failed to load audit log formatter class %s", className);
     }
   }
 

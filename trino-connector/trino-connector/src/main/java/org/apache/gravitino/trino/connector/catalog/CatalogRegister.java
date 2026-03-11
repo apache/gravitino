@@ -186,14 +186,14 @@ public class CatalogRegister {
           throw e;
         } catch (Exception e) {
           failedException = e;
-          LOG.warn("Execute command failed: {}, ", showCatalogCommand, e);
+          LOG.warn("Failed to execute command: {}", showCatalogCommand, e);
           Thread.sleep(EXECUTE_QUERY_BACKOFF_TIME_SECOND * 1000);
         }
       }
       throw failedException;
     } catch (Exception e) {
       throw new TrinoException(
-          GravitinoErrorCode.GRAVITINO_RUNTIME_ERROR, "Failed to check catalog exist", e);
+          GravitinoErrorCode.GRAVITINO_RUNTIME_ERROR, "Failed to check if catalog exists", e);
     }
   }
 
@@ -203,7 +203,7 @@ public class CatalogRegister {
       Exception failedException =
           new TrinoException(
               GravitinoErrorCode.GRAVITINO_RUNTIME_ERROR,
-              "Initial placeholder exception - this should be replaced with a real exception if retries fail.");
+              "All retry attempts failed");
       while (retries-- > 0) {
         try (Statement statement = connection.createStatement()) {
           // check the catalog is already created
@@ -213,7 +213,7 @@ public class CatalogRegister {
           throw e;
         } catch (Exception e) {
           failedException = e;
-          LOG.warn("Execute command failed: {}, ", sql, e);
+          LOG.warn("Failed to execute command: {}", sql, e);
           Thread.sleep(EXECUTE_QUERY_BACKOFF_TIME_SECOND * 1000);
         }
       }

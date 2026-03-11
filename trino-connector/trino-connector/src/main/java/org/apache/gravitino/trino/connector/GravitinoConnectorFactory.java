@@ -174,7 +174,7 @@ public class GravitinoConnectorFactory implements ConnectorFactory {
       if (trinoVersion < getMinSupportTrinoSpiVersion()
           || trinoVersion > getMaxSupportTrinoSpiVersion()) {
         LOG.warn(
-            "The version {} has not undergone thorough testing with Gravitino, there may be compatibility problem.",
+            "Trino version {} has not been tested with Gravitino and may have compatibility issues",
             trinoVersion);
       }
       return;
@@ -185,8 +185,8 @@ public class GravitinoConnectorFactory implements ConnectorFactory {
         || trinoVersion > getMaxSupportTrinoSpiVersion()) {
       String errmsg =
           String.format(
-              "Unsupported Trino-%s version. The Supported version for the Gravitino-Trino-connector from Trino-%d to Trino-%d."
-                  + "Maybe you can set gravitino.trino.skip-version-validation to skip version validation.",
+              "Unsupported Trino version %s. Supported versions are %d to %d. "
+                  + "To bypass this check, set gravitino.trino.skip-version-validation=true",
               trinoVersion, getMinSupportTrinoSpiVersion(), getMaxSupportTrinoSpiVersion());
       throw new TrinoException(GravitinoErrorCode.GRAVITINO_UNSUPPORTED_TRINO_VERSION, errmsg);
     }
@@ -225,7 +225,7 @@ public class GravitinoConnectorFactory implements ConnectorFactory {
       return (CatalogConnectorFactory) obj;
     } catch (Exception e) {
       throw new TrinoException(
-          GRAVITINO_RUNTIME_ERROR, "Can not create CatalogConnectorFactory ", e);
+          GRAVITINO_RUNTIME_ERROR, "Cannot create CatalogConnectorFactory", e);
     }
   }
 

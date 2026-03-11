@@ -71,7 +71,7 @@ public final class RelationalGarbageCollector implements Closeable {
   @VisibleForTesting
   public void collectAndClean() {
     long threadId = Thread.currentThread().getId();
-    LOG.debug("Thread {} start to collect garbage...", threadId);
+    LOG.debug("Thread {} starting garbage collection", threadId);
 
     try {
       LOG.debug("Start to collect and delete legacy data by thread {}", threadId);
@@ -103,13 +103,13 @@ public final class RelationalGarbageCollector implements Closeable {
             deletedCount = backend.deleteOldVersionData(entityType, versionRetentionCount);
           }
         } catch (RuntimeException e) {
-          LOG.error("Failed to softly delete type of " + entityType + "'s old version data: ", e);
+          LOG.error("Failed to soft-delete old version data for entity type " + entityType + ": ", e);
         }
       }
     } catch (Exception e) {
-      LOG.error("Thread {} failed to collect and clean garbage.", threadId, e);
+      LOG.error("Thread {} failed to collect and clean garbage", threadId, e);
     } finally {
-      LOG.debug("Thread {} finish to collect garbage.", threadId);
+      LOG.debug("Thread {} finished collecting garbage", threadId);
     }
   }
 

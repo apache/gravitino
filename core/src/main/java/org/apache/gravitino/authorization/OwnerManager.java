@@ -128,7 +128,7 @@ public class OwnerManager implements OwnerDispatcher {
           nse, "Metadata object %s or owner %s is not found", metadataObject.fullName(), ownerName);
     } catch (IOException ioe) {
       LOG.info(
-          "Fail to set the owner {} of metadata object {}",
+          "Failed to set the owner {} of metadata object {}",
           ownerName,
           metadataObject.fullName(),
           ioe);
@@ -210,7 +210,7 @@ public class OwnerManager implements OwnerDispatcher {
       throw new NoSuchMetadataObjectException(
           "The metadata object of %s isn't found", metadataObject.fullName());
     } catch (IOException ioe) {
-      LOG.info("Fail to get the owner of entity {}", metadataObject.fullName(), ioe);
+      LOG.info("Failed to get the owner of entity {}", metadataObject.fullName(), ioe);
       throw new RuntimeException(ioe);
     }
   }
