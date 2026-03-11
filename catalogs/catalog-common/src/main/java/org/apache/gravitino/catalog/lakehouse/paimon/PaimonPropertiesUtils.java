@@ -60,6 +60,8 @@ public class PaimonPropertiesUtils {
         OSSProperties.GRAVITINO_OSS_ACCESS_KEY_ID, PaimonConstants.OSS_ACCESS_KEY);
     gravitinoConfigToPaimon.put(
         OSSProperties.GRAVITINO_OSS_ACCESS_KEY_SECRET, PaimonConstants.OSS_SECRET_KEY);
+    gravitinoConfigToPaimon.put(
+        OSSProperties.GRAVITINO_OSS_IMPLEMENT, PaimonConstants.OSS_IMPLEMENT);
     GRAVITINO_CONFIG_TO_PAIMON = Collections.unmodifiableMap(gravitinoConfigToPaimon);
     gravitinoConfigToPaimon.forEach(
         (key, value) -> {

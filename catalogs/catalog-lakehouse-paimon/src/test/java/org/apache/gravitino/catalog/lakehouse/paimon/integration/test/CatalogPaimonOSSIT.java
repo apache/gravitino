@@ -41,6 +41,7 @@ public class CatalogPaimonOSSIT extends CatalogPaimonBaseIT {
   private static final String secretKey = "YOUR_SECRET_KEY";
   private static final String endpoint = "OSS_ENDPOINT";
   private static final String warehouse = "oss://" + OSS_BUCKET_NAME + "/paimon-test";
+  private static final String ossImpl = "OSS_IMPL";
 
   private static final String PAIMON_OSS_JAR_URL =
       "https://repo1.maven.org/maven2/org/apache/paimon/paimon-oss/0.8.0/paimon-oss-0.8.0.jar";
@@ -60,6 +61,7 @@ public class CatalogPaimonOSSIT extends CatalogPaimonBaseIT {
     catalogProperties.put(OSSProperties.GRAVITINO_OSS_ACCESS_KEY_ID, accessKey);
     catalogProperties.put(OSSProperties.GRAVITINO_OSS_ACCESS_KEY_SECRET, secretKey);
     catalogProperties.put(OSSProperties.GRAVITINO_OSS_ENDPOINT, endpoint);
+    catalogProperties.put(OSSProperties.GRAVITINO_OSS_IMPLEMENT, ossImpl);
 
     // Need to download the OSS dependency in the deploy mode.
     downloadOSSDependency();
