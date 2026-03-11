@@ -81,8 +81,6 @@ const MetalakeTree = props => {
             return 'material-symbols:houseboat-outline'
           case 'jdbc-oceanbase':
             return 'custom-icons-oceanbase'
-          case 'jdbc-hologres':
-            return 'custom-icons-hologres'
           default:
             return 'bx:book'
         }
