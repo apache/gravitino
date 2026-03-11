@@ -36,10 +36,8 @@
 #                             actually running them. Useful for previewing before publishing.
 #
 # Examples:
-#   ./publish_docker.sh v1.2.0-rc5 --docker-version 1.2.0-rc5                              # Publish with default Trino 478
-#   ./publish_docker.sh v1.2.0-rc5 --docker-version 1.2.0-rc5 --trino-version 478         # Publish with Trino 478
-#   ./publish_docker.sh v1.2.0-rc5 --docker-version 1.2.0-rc5 --trino-version 478 --dry-run  # Preview only
-#   ./publish_docker.sh main --docker-version 1.2.0-SNAPSHOT                               # Publish from main branch
+#   ./publish_docker.sh v1.2.0-rc5 --docker-version 1.2.0-rc5 --trino-version 478 --dry-run
+#   ./publish_docker.sh v1.2.0-rc5 --docker-version 1.2.0-rc5 --trino-version 478
 #
 # Environment variables required (set in env file or shell profile):
 #   DOCKER_USERNAME       - Docker Hub username
@@ -47,11 +45,11 @@
 #   GH_TOKEN              - GitHub personal access token with repo and workflow scopes
 #
 # This script triggers the docker-image.yml workflow for the following images:
-#   - apache/gravitino:<tag>
-#   - apache/gravitino-iceberg-rest-server:<tag>
-#   - apache/gravitino-lance-rest-server:<tag>
-#   - apache/gravitino-mcp-server:<tag>
-#   - apache/gravitino-playground:<trino-version>-gravitino-<tag>
+#   - apache/gravitino:<docker-version>
+#   - apache/gravitino-iceberg-rest-server:<docker-version>
+#   - apache/gravitino-lance-rest-server:<docker-version>
+#   - apache/gravitino-mcp-server:<docker-version>
+#   - apache/gravitino-playground:<trino-version>-gravitino-<docker-version>
 #
 
 set -e
@@ -77,12 +75,15 @@ while [[ $# -gt 0 ]]; do
       shift 2
       ;;
     -h|--help)
-      cat << EOF
-Usage: $0 <tag|branch> [--dry-run]
+      cat << 'EOF'
+Usage: publish_docker.sh <tag|branch> --docker-version <version> [--trino-version <version>] [--dry-run]
 
 Arguments:
-  <tag|branch>   Git tag or branch name to build (e.g., v1.2.0-rc5, branch-1.2.0-rc5)
-  --dry-run      Preview mode, print commands without triggering workflows
+  <tag|branch>              Git tag (e.g., v1.2.0-rc5) or branch (e.g., main) to use as
+                            workflow source (--ref). Must exist locally or be fetched first.
+  --docker-version <ver>    Docker image version tag to publish (e.g., 1.2.0-rc5). Required.
+  --trino-version <ver>     Trino version for the playground image (default: 478).
+  --dry-run                 Preview mode, print commands without triggering workflows.
 
 Environment variables:
   DOCKER_USERNAME        Docker Hub username (required for actual run)
@@ -90,16 +91,15 @@ Environment variables:
   GH_TOKEN               GitHub token with repo/workflow permissions
 
 Examples:
-  $0 v1.2.0-rc5                  # Build version 1.2.0-rc5
-  $0 branch-1.2.0-rc5            # Build from branch
-  $0 v1.2.0-rc5 --dry-run        # Preview commands only
+  publish_docker.sh v1.2.0-rc5 --docker-version 1.2.0-rc5 --trino-version 478 --dry-run
+  publish_docker.sh v1.2.0-rc5 --docker-version 1.2.0-rc5 --trino-version 478
 
 Images built:
-  apache/gravitino:${VERSION}
-  apache/gravitino-iceberg-rest-server:${VERSION}
-  apache/gravitino-lance-rest-server:${VERSION}
-  apache/gravitino-mcp-server:${VERSION}
-  apache/gravitino-playground:trino-478-gravitino-${VERSION}
+  apache/gravitino:<docker-version>
+  apache/gravitino-iceberg-rest-server:<docker-version>
+  apache/gravitino-lance-rest-server:<docker-version>
+  apache/gravitino-mcp-server:<docker-version>
+  apache/gravitino-playground:<trino-version>-gravitino-<docker-version>
 
 EOF
       exit 0
