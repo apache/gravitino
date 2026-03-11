@@ -229,9 +229,10 @@ curl -sS "http://localhost:8090/api/metalakes/test/jobs/runs/${strategy_job_id}"
 curl -sS "http://localhost:8090/api/metalakes/test/objects/table/rest_catalog.db.t1/statistics" | jq
 
 # Staging path is controlled by `gravitino.job.stagingDir` (default: `/tmp/gravitino/jobs/staging`).
-# Verify rewrite actually rewrote files (N should be > 0 for non-empty table)
+# Verify rewrite actually rewrote files (N should be > 0 for non-empty table).
+log_dir="/tmp/gravitino/jobs/staging/test/builtin-iceberg-rewrite-data-files/${strategy_job_id}"
 grep -E "Rewritten data files|Added data files|completed successfully" \
-  "/tmp/gravitino/jobs/staging/test/builtin-iceberg-rewrite-data-files/${strategy_job_id}/error.log"
+  "${log_dir}/output.log"
 ```
 
 By default, Gravitino pulls job status every `300000` ms (`gravitino.job.statusPullIntervalInMs`).
