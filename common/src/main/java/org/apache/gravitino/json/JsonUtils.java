@@ -1507,7 +1507,7 @@ public class JsonUtils {
       node.get(INDEX_FIELD_NAMES)
           .forEach(field -> fieldNames.add(getStringArray((ArrayNode) field)));
       builder.withFieldNames(fieldNames.toArray(new String[0][0]));
-      Map<String, String> properties = Maps.newHashMap();
+      Map<String, String> properties = ImmutableMap.of();
 
       if (node.has("properties") && node.get("properties").isObject()) {
 

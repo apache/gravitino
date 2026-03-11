@@ -21,7 +21,7 @@ package org.apache.gravitino.dto.rel.indexes;
 import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
 import com.fasterxml.jackson.databind.annotation.JsonSerialize;
 import com.google.common.base.Preconditions;
-import com.google.common.collect.Maps;
+import com.google.common.collect.ImmutableMap;
 import java.util.Arrays;
 import java.util.Map;
 import java.util.Objects;
@@ -58,7 +58,7 @@ public class IndexDTO implements Index {
     this.indexType = indexType;
     this.name = name;
     this.fieldNames = fieldNames;
-    this.properties = properties == null ? Maps.newHashMap() : properties;
+    this.properties = properties == null ? ImmutableMap.of() : properties;
   }
 
   /**

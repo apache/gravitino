@@ -20,7 +20,6 @@ package org.apache.gravitino.rel.indexes;
 
 import com.google.common.base.Objects;
 import com.google.common.collect.ImmutableMap;
-import com.google.common.collect.Maps;
 import java.util.Arrays;
 import java.util.Map;
 import org.apache.gravitino.rel.indexes.Index.IndexType;
@@ -111,7 +110,7 @@ public class Indexes {
    * @return An {@link Index} instance with empty properties
    */
   public static Index of(IndexType indexType, String name, String[][] fieldNames) {
-    return of(indexType, name, fieldNames, Maps.newHashMap());
+    return of(indexType, name, fieldNames, ImmutableMap.of());
   }
 
   /**
@@ -157,7 +156,7 @@ public class Indexes {
       this.indexType = indexType;
       this.name = name;
       this.fieldNames = fieldNames;
-      this.properties = properties == null ? Maps.newHashMap() : properties;
+      this.properties = properties == null ? ImmutableMap.of() : properties;
     }
 
     /**
