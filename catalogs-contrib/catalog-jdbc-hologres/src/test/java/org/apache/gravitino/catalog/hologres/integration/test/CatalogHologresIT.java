@@ -414,12 +414,8 @@ public class CatalogHologresIT extends BaseIT {
     table = catalog.asTableCatalog().loadTable(newTableIdentifier);
     Assertions.assertEquals("new_comment", table.columns()[0].comment());
 
-    // Test delete column
-    catalog
-        .asTableCatalog()
-        .alterTable(newTableIdentifier, TableChange.deleteColumn(new String[] {"col_4"}, true));
-    table = catalog.asTableCatalog().loadTable(newTableIdentifier);
-    Assertions.assertEquals(3, table.columns().length);
+    // Note: Hologres does not support ALTER TABLE DROP COLUMN, so we skip the delete column test.
+    // The added column col_4 will remain in the table.
 
     // Test drop table
     Assertions.assertTrue(catalog.asTableCatalog().dropTable(newTableIdentifier));
@@ -469,9 +465,10 @@ public class CatalogHologresIT extends BaseIT {
     String propsTableName = GravitinoITUtils.genRandomName("props_table");
     NameIdentifier tableIdentifier = NameIdentifier.of(schemaName, propsTableName);
 
+    // Note: time_to_live_in_seconds is only supported in serverless Hologres instances,
+    // so we only test the orientation property which is supported in all instances.
     Map<String, String> properties = Maps.newHashMap();
     properties.put("orientation", "column");
-    properties.put("time_to_live_in_seconds", "3600");
 
     Index[] indexes = new Index[] {Indexes.primary("pk", new String[][] {{"id"}})};
 
@@ -491,7 +488,6 @@ public class CatalogHologresIT extends BaseIT {
 
     Map<String, String> loadedProps = loadedTable.properties();
     Assertions.assertEquals("column", loadedProps.get("orientation"));
-    Assertions.assertEquals("3600", loadedProps.get("time_to_live_in_seconds"));
   }
 
   @Test
