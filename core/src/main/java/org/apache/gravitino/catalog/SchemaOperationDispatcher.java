@@ -146,6 +146,8 @@ public class SchemaOperationDispatcher extends OperationDispatcher implements Sc
                   .withId(uid)
                   .withName(ident.name())
                   .withNamespace(ident.namespace())
+                  .withComment(comment)
+                  .withProperties(properties)
                   .withAuditInfo(
                       AuditInfo.builder()
                           .withCreator(PrincipalUtils.getCurrentPrincipal().getName())
@@ -274,6 +276,10 @@ public class SchemaOperationDispatcher extends OperationDispatcher implements Sc
                                   .withId(schemaEntity.id())
                                   .withName(schemaEntity.name())
                                   .withNamespace(ident.namespace())
+                                  .withComment(schemaEntity.comment())
+                                  .withProperties(
+                                      StringIdentifier.newPropertiesWithoutId(
+                                          alteredSchema.properties()))
                                   .withAuditInfo(
                                       AuditInfo.builder()
                                           .withCreator(schemaEntity.auditInfo().creator())
