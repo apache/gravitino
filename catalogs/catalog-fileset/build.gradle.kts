@@ -87,6 +87,7 @@ tasks {
     from("build/libs") {
       exclude("slf4j-*.jar")
       exclude("guava-*.jar")
+      exclude("error_prone_annotations-*.jar")
       exclude("curator-*.jar")
       exclude("netty-*.jar")
       exclude("snappy-*.jar")

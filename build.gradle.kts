@@ -1080,10 +1080,13 @@ tasks {
         it.parent?.name != "maintenance" &&
         it.name != "mcp-server"
       ) {
-        from(it.configurations.runtimeClasspath)
+        from(it.configurations.runtimeClasspath) {
+          exclude("error_prone_annotations-*.jar")
+        }
         into("distribution/package/libs")
       }
     }
+    setDuplicatesStrategy(DuplicatesStrategy.EXCLUDE)
   }
 
   register("copyCliLib", Copy::class) {
@@ -1131,7 +1134,7 @@ tasks {
         dependsOn("${it.name}:build")
         from("${it.name}/build/libs") {
           include("*.jar")
-          exclude("*-jcstress.jar", "*-jmh.jar")
+          exclude("*-jcstress.jar", "*-jmh.jar", "error_prone_annotations-*.jar")
         }
         into("distribution/package/libs")
         setDuplicatesStrategy(DuplicatesStrategy.INCLUDE)
