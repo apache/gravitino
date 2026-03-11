@@ -78,6 +78,10 @@ public class HologresTableOperations extends JdbcTableOperations
   private static final String HOLOGRES_NOT_SUPPORT_NESTED_COLUMN_MSG =
       "Hologres does not support nested column names.";
 
+  /** GUC parameter to enable DROP COLUMN functionality in Hologres. */
+  private static final String HOLOGRES_ENABLE_DROP_COLUMN_GUC =
+      "SET hg_experimental_enable_drop_column = on;";
+
   /** Properties that are handled separately or read-only, excluded from the WITH clause. */
   private static final Set<String> EXCLUDED_TABLE_PROPERTIES =
       ImmutableSet.of("distribution_key", "is_logical_partitioned_table", "primary_key");
@@ -531,9 +535,15 @@ public class HologresTableOperations extends JdbcTableOperations
         throw new IllegalArgumentException("Delete column does not exist: " + col);
       }
     }
+    // Hologres requires enabling the GUC parameter before dropping a column.
+    // Reference: https://help.aliyun.com/zh/hologres/developer-reference/alter-table
     return String.format(
-        "%s%s DROP COLUMN %s;",
-        ALTER_TABLE, quoteIdentifier(table.name()), quoteIdentifier(deleteColumn.fieldName()[0]));
+        "%s%s%s%s DROP COLUMN %s;",
+        HOLOGRES_ENABLE_DROP_COLUMN_GUC,
+        NEW_LINE,
+        ALTER_TABLE,
+        quoteIdentifier(table.name()),
+        quoteIdentifier(deleteColumn.fieldName()[0]));
   }
 
   private String renameColumnFieldDefinition(
