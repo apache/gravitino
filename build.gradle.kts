@@ -24,6 +24,7 @@ import com.github.jk1.license.render.InventoryHtmlReportRenderer
 import com.github.jk1.license.render.ReportRenderer
 import com.github.vlsi.gradle.dsl.configureEach
 import net.ltgt.gradle.errorprone.errorprone
+import org.gradle.api.attributes.java.TargetJvmVersion
 import org.gradle.api.tasks.testing.logging.TestExceptionFormat
 import org.gradle.internal.hash.ChecksumService
 import org.gradle.internal.os.OperatingSystem
@@ -331,39 +332,35 @@ subprojects {
     mavenLocal()
   }
 
+  val jdk8CompatibleProjectNames = setOf("api", "common", "catalog-common", "hadoop-common")
+  val jdk8CompatibleProjectPrefixes = listOf(
+    ":maintenance:jobs",
+    ":maintenance:optimizer-api",
+    ":maintenance:updaters",
+    ":clients",
+    ":bundles",
+    ":spark-connector",
+    ":flink-connector"
+  )
+  val mainRelease8ProjectPrefixes = listOf(
+    ":spark-connector",
+    ":flink-connector",
+    ":clients:client-java"
+  )
+
+  fun hasProjectPrefix(path: String, prefixes: List<String>): Boolean {
+    return prefixes.any { path.startsWith(it) }
+  }
+
   fun compatibleWithJDK8(project: Project): Boolean {
-    val name = project.name.lowercase()
     val path = project.path.lowercase()
-    if (path.startsWith(":maintenance:jobs") ||
-      path.startsWith(":maintenance:optimizer-api") ||
-      path.startsWith(":maintenance:updaters") ||
-      path.startsWith(":clients:client-java") ||
-      name == "api" ||
-      name == "common" ||
-      name == "catalog-common" ||
-      name == "hadoop-common"
-    ) {
-      return true
-    }
+    val name = project.name.lowercase()
+    return name in jdk8CompatibleProjectNames || hasProjectPrefix(path, jdk8CompatibleProjectPrefixes)
+  }
 
-    val isReleaseRun = gradle.startParameter.taskNames.any {
-      it == "release" || it == "publish" || it == "publishToMavenLocal" || it.endsWith(":release") || it.endsWith(
-        ":publish"
-      ) || it.endsWith(":publishToMavenLocal")
-    }
-    if (!isReleaseRun) {
-      return false
-    }
-
-    if (path.startsWith(":client") ||
-      path.startsWith(":spark-connector") ||
-      path.startsWith(":flink-connector") ||
-      path.startsWith(":bundles")
-    ) {
-      return true
-    }
-
-    return false
+  fun enforceMainRelease8(project: Project): Boolean {
+    val path = project.path.lowercase()
+    return hasProjectPrefix(path, mainRelease8ProjectPrefixes)
   }
   extensions.extraProperties.set("excludePackagesForSparkConnector", ::excludePackagesForSparkConnector)
 
@@ -424,6 +421,22 @@ subprojects {
         languageVersion.set(JavaLanguageVersion.of(17))
       }
     }
+  }
+
+  if (enforceMainRelease8(project)) {
+    tasks.named<JavaCompile>("compileJava") {
+      options.release.set(8)
+    }
+
+    tasks.named<JavaCompile>("compileTestJava") {
+      options.release.set(17)
+    }
+
+    val targetJvmVersionAttribute = TargetJvmVersion.TARGET_JVM_VERSION_ATTRIBUTE
+    configurations.matching { it.name in setOf("testCompileClasspath", "testRuntimeClasspath") }
+      .configureEach {
+        attributes.attribute(targetJvmVersionAttribute, 17)
+      }
   }
 
   gradle.projectsEvaluated {
@@ -1313,21 +1326,3 @@ fun checkOrbStackStatus() {
 }
 
 printDockerCheckInfo()
-
-tasks.register("release") {
-  group = "release"
-  description = "Builds and package a release version."
-  doFirst {
-    println("Releasing project...")
-  }
-
-  // Use 'assemble' instead of 'build' to skip tests during release
-  // Tests have JDK version conflicts (some need JDK 8, some need JDK 17)
-  // and should be run separately in CI/CD with appropriate JDK configurations
-  // Only include subprojects that apply the Java plugin (exclude client-python)
-  dependsOn(
-    subprojects
-      .filter { it.name != "client-python" }
-      .map { it.tasks.named("assemble") }
-  )
-}
