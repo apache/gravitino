@@ -26,7 +26,7 @@ import lombok.ToString;
  * Represents a response for a delete operation. This class is deprecated and will be removed in
  * future versions, please use {@link DropResponse} instead.
  */
-@Deprecated(since = "1.0.0")
+@Deprecated()
 @ToString
 @EqualsAndHashCode(callSuper = true)
 public class DeleteResponse extends BaseResponse {
