@@ -326,12 +326,6 @@ public class OptimizerCmd {
             "Command '%s' with --calculator-name %s requires one of --statistics-payload "
                 + "or --file-path.",
             LOCAL_STATS_CALCULATOR_NAME)
-        .addForbidWhenOption(
-            CliOption.CALCULATOR_NAME.longOpt(),
-            value -> !LOCAL_STATS_CALCULATOR_NAME.equals(value),
-            List.of(CliOption.STATISTICS_PAYLOAD.longOpt(), CliOption.FILE_PATH.longOpt()),
-            "--statistics-payload and --file-path are only supported when --calculator-name is %s.",
-            LOCAL_STATS_CALCULATOR_NAME)
         .build();
   }
 
@@ -502,12 +496,12 @@ public class OptimizerCmd {
         "statistics-payload",
         CliOptionArgType.SINGLE,
         null,
-        "Inline statistics payload for local-stats-calculator"),
+        "Inline statistics payload for the selected calculator"),
     FILE_PATH(
         "file-path",
         CliOptionArgType.SINGLE,
         null,
-        "Path to statistics input file for local-stats-calculator"),
+        "Path to statistics input file for the selected calculator"),
     ACTION_TIME("action-time", CliOptionArgType.SINGLE, null, "Action time in epoch seconds"),
     RANGE_SECONDS(
         "range-seconds", CliOptionArgType.SINGLE, null, "Range seconds for monitor evaluation"),
