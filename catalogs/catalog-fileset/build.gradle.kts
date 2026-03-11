@@ -38,7 +38,6 @@ dependencies {
     exclude(group = "*")
   }
 
-  implementation(libs.awaitility)
   implementation(libs.caffeine)
   implementation(libs.cglib)
   implementation(libs.commons.io)
@@ -60,7 +59,7 @@ dependencies {
   testImplementation(project(":integration-test-common", "testArtifacts"))
   testImplementation(project(":server"))
   testImplementation(project(":server-common"))
-
+  testImplementation(libs.awaitility)
   testImplementation(libs.bundles.log4j)
   testImplementation(libs.hadoop3.gcs)
   testImplementation(libs.hadoop3.minicluster)
