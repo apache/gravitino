@@ -50,6 +50,11 @@ The optimizer workflow is based on six parts:
 5. Job executor: local or custom backend that runs submitted jobs.
 6. Status and logs: REST job state plus local staging logs.
 
+![Optimizer architecture and workflow](../assets/table-maintenance-service/optimizer-architecture-workflow.svg)
+
+The following diagram shows the end-to-end interactions between CLI, Gravitino server, Spark jobs,
+JDBC metrics repository, and the Recommender/Updater/Monitor modules.
+
 Typical data flow:
 
 1. Collect statistics and metrics for target tables.
