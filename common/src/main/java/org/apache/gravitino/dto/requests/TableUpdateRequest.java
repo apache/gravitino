@@ -844,7 +844,10 @@ public interface TableUpdateRequest extends RESTRequest {
     }
   }
 
-  /** Represents a request to delete an index from a table. */
+  /**
+   * Represents a request to delete an index from a table. If `ifExists` is null, it will be treated
+   * as false, which means the request will fail if the index does not exist.
+   */
   @EqualsAndHashCode
   @ToString
   class DeleteTableIndexRequest implements TableUpdateRequest {
