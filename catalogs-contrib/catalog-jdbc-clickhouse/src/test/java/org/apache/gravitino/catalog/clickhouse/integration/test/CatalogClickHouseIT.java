@@ -1184,6 +1184,85 @@ public class CatalogClickHouseIT extends BaseIT {
   }
 
   @Test
+  void testAlterTableBranchCoverage() {
+    String branchTableName = GravitinoITUtils.genRandomName("alter_branch");
+    NameIdentifier tableIdentifier = NameIdentifier.of(schemaName, branchTableName);
+    Column[] columns =
+        new Column[] {
+          Column.of(
+              "id", Types.IntegerType.get(), "id column", false, false, Literals.integerLiteral(1)),
+          Column.of(
+              "score", Types.IntegerType.get(), "score", false, false, Literals.integerLiteral(10)),
+          Column.of("note", Types.StringType.get(), "note")
+        };
+    Index[] indexes =
+        new Index[] {
+          Indexes.of(Index.IndexType.DATA_SKIPPING_MINMAX, "idx_note", new String[][] {{"note"}})
+        };
+    TableCatalog tableCatalog = catalog.asTableCatalog();
+    tableCatalog.createTable(
+        tableIdentifier,
+        columns,
+        table_comment,
+        createProperties(),
+        Transforms.EMPTY_TRANSFORM,
+        Distributions.NONE,
+        getSortOrders("id"),
+        indexes);
+
+    tableCatalog.alterTable(
+        tableIdentifier, TableChange.updateColumnNullability(new String[] {"score"}, true));
+    tableCatalog.alterTable(
+        tableIdentifier,
+        TableChange.updateColumnComment(new String[] {"score"}, "score column changed"));
+    tableCatalog.alterTable(tableIdentifier, TableChange.deleteIndex("idx_note", false));
+    Table loaded = tableCatalog.loadTable(tableIdentifier);
+    Assertions.assertTrue(loaded.columns()[1].nullable());
+    Assertions.assertEquals("score column changed", loaded.columns()[1].comment());
+    Assertions.assertFalse(
+        Arrays.stream(loaded.index()).anyMatch(index -> Objects.equals(index.name(), "idx_note")));
+
+    Assertions.assertDoesNotThrow(
+        () ->
+            tableCatalog.alterTable(
+                tableIdentifier,
+                TableChange.deleteColumn(new String[] {"missing_col"}, true),
+                TableChange.deleteIndex("missing_idx", true)));
+
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () ->
+            tableCatalog.alterTable(
+                tableIdentifier, TableChange.deleteIndex("missing_idx", false)));
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () ->
+            tableCatalog.alterTable(
+                tableIdentifier, TableChange.deleteColumn(new String[] {"missing_col"}, false)));
+    Assertions.assertThrows(
+        UnsupportedOperationException.class,
+        () -> tableCatalog.alterTable(tableIdentifier, TableChange.setProperty("k", "v")));
+    Assertions.assertThrows(
+        UnsupportedOperationException.class,
+        () -> tableCatalog.alterTable(tableIdentifier, TableChange.removeProperty("k")));
+    Assertions.assertThrows(
+        UnsupportedOperationException.class,
+        () ->
+            tableCatalog.alterTable(
+                tableIdentifier, TableChange.updateColumnAutoIncrement(new String[] {"id"}, true)));
+    Assertions.assertThrows(
+        UnsupportedOperationException.class,
+        () ->
+            tableCatalog.alterTable(
+                tableIdentifier,
+                TableChange.addColumn(
+                    new String[] {"parent", "nested"},
+                    Types.IntegerType.get(),
+                    "nested",
+                    TableChange.ColumnPosition.defaultPos())));
+  }
+
+  @Test
   void testDropClickHouseDatabase() {
     String schemaName = GravitinoITUtils.genRandomName("clickhouse_schema").toLowerCase();
     String tableName = GravitinoITUtils.genRandomName("clickhouse_table").toLowerCase();
