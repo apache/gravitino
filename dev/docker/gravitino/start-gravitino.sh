@@ -26,6 +26,15 @@ cd ${gravitino_dir}
 
 python bin/rewrite_gravitino_server_config.py
 
+# Create soft links for Iceberg bundle jars
+iceberg_bundle_dir="${gravitino_dir}/iceberg-bundles"
+lakehouse_iceberg_lib_dir="${gravitino_dir}/catalogs/lakehouse-iceberg/libs"
+iceberg_rest_lib_dir="${gravitino_dir}/iceberg-rest-server/libs"
+
+if [ -d "${iceberg_bundle_dir}" ]; then
+  find ${iceberg_bundle_dir} -name '*.jar' -exec ln -sv {} "${lakehouse_iceberg_lib_dir}" \; -exec ln -sv {} "${iceberg_rest_lib_dir}" \;
+fi
+
 JAVA_OPTS+=" -XX:-UseContainerSupport"
 export JAVA_OPTS
 

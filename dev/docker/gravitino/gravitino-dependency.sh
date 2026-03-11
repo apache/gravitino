@@ -95,11 +95,15 @@ find ${gravitino_home}/bundles/aws-bundle/build/libs/ -name 'gravitino-aws-bundl
 find ${gravitino_home}/bundles/gcp-bundle/build/libs/ -name 'gravitino-gcp-bundle-*.jar' ! -name '*-empty.jar' -exec cp -v {} "${fileset_lib_dir}" \;
 find ${gravitino_home}/bundles/azure-bundle/build/libs/ -name 'gravitino-azure-bundle-*.jar' ! -name '*-empty.jar' -exec cp -v {} "${fileset_lib_dir}" \;
 
-# Copy the Aliyun, AWS, GCP and Azure bundles to the Iceberg REST server libs
-find ${gravitino_home}/bundles/iceberg-gcp-bundle/build/libs/ -name 'gravitino-iceberg-gcp-bundle-*.jar' ! -name '*-empty.jar' -exec cp -v {} "${gravitino_iceberg_rest_dir}" \;
-find ${gravitino_home}/bundles/iceberg-aws-bundle/build/libs/ -name 'gravitino-iceberg-aws-bundle-*.jar' ! -name '*-empty.jar' -exec cp -v {} "${gravitino_iceberg_rest_dir}" \;
-find ${gravitino_home}/bundles/iceberg-azure-bundle/build/libs/ -name 'gravitino-iceberg-azure-bundle-*.jar' ! -name '*-empty.jar' -exec cp -v {} "${gravitino_iceberg_rest_dir}" \;
-find ${gravitino_home}/bundles/iceberg-aliyun-bundle/build/libs/ -name 'gravitino-iceberg-aliyun-bundle-*.jar' ! -name '*-empty.jar' -exec cp -v {} "${gravitino_iceberg_rest_dir}" \;
+iceberg_bundle_dir="${gravitino_dir}/packages/gravitino/iceberg-bundles"
+
+# Copy the Aliyun, AWS, GCP and Azure bundles to the Iceberg bundles directory
+mkdir -p "${iceberg_bundle_dir}"
+find ${gravitino_home}/bundles/iceberg-gcp-bundle/build/libs/ -name 'gravitino-iceberg-gcp-bundle-*.jar' ! -name '*-empty.jar' -exec cp -v {} "${iceberg_bundle_dir}" \;
+find ${gravitino_home}/bundles/iceberg-aws-bundle/build/libs/ -name 'gravitino-iceberg-aws-bundle-*.jar' ! -name '*-empty.jar' -exec cp -v {} "${iceberg_bundle_dir}" \;
+find ${gravitino_home}/bundles/iceberg-azure-bundle/build/libs/ -name 'gravitino-iceberg-azure-bundle-*.jar' ! -name '*-empty.jar' -exec cp -v {} "${iceberg_bundle_dir}" \;
+find ${gravitino_home}/bundles/iceberg-aliyun-bundle/build/libs/ -name 'gravitino-iceberg-aliyun-bundle-*.jar' ! -name '*-empty.jar' -exec cp -v {} "${iceberg_bundle_dir}" \;
+
 
 download_gcs_connector
 
