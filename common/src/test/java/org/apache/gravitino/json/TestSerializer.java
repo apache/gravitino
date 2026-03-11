@@ -20,6 +20,7 @@
 package org.apache.gravitino.json;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
+import com.google.common.collect.ImmutableMap;
 import java.util.Map;
 import org.apache.gravitino.dto.rel.DistributionDTO;
 import org.apache.gravitino.dto.rel.SortOrderDTO;
@@ -139,10 +140,7 @@ public class TestSerializer {
             + "\"fieldNames\":[[\"col1\"],[\"col2\"]],\"properties\":{}}";
     Assertions.assertEquals(expectedJson, actualJson);
 
-    Map<String, String> props =
-        Map.of(
-            "compression", "lz4",
-            "level", "high");
+    Map<String, String> props = ImmutableMap.of("compression", "lz4", "level", "high");
     index =
         (IndexImpl)
             Indexes.of(
