@@ -14,19 +14,3 @@
 # KIND, either express or implied.  See the License for the
 # specific language governing permissions and limitations
 # under the License.
-
-from typing import Any, Dict
-
-from gravitino.api.rel.types.json_serdes.base import JsonSerializable
-from gravitino.dto.rel.partitions.json_serdes._helper.serdes_utils import SerdesUtils
-from gravitino.dto.rel.partitions.partition_dto import PartitionDTO
-
-
-class PartitionDTOSerdes(JsonSerializable[PartitionDTO]):
-    @classmethod
-    def serialize(cls, value: PartitionDTO) -> Dict[str, Any]:
-        return SerdesUtils.write_partition(value)
-
-    @classmethod
-    def deserialize(cls, data: Dict[str, Any]) -> PartitionDTO:
-        return SerdesUtils.read_partition(data)
