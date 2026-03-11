@@ -702,6 +702,9 @@ public class POConverters {
       FilesetPO oldFilesetPO, FilesetEntity newFileset, boolean needUpdateVersion) {
     try {
       Long lastVersion = oldFilesetPO.getLastVersion();
+      if (lastVersion == null) {
+        lastVersion = INIT_VERSION;
+      }
       Long currentVersion;
       List<FilesetVersionPO> newFilesetVersionPOs;
       // Will set the version to the last version + 1
