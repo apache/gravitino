@@ -465,7 +465,7 @@ public class CatalogHologresIT extends BaseIT {
     String propsTableName = GravitinoITUtils.genRandomName("props_table");
     NameIdentifier tableIdentifier = NameIdentifier.of(schemaName, propsTableName);
 
-    // Note: time_to_live_in_seconds is only supported in serverless Hologres instances,
+    // Note: time_to_live_in_seconds is only supported in warehouse Hologres instances,
     // so we only test the orientation property which is supported in all instances.
     Map<String, String> properties = Maps.newHashMap();
     properties.put("orientation", "column");
@@ -623,5 +623,276 @@ public class CatalogHologresIT extends BaseIT {
     // Check schema has been dropped
     SupportsSchemas schemas = catalog.asSchemas();
     Assertions.assertThrows(NoSuchSchemaException.class, () -> schemas.loadSchema(testSchemaName));
+  }
+
+  @Test
+  void testCreateTableWithMultipleProperties() {
+    // Test table with bitmap_columns, clustering_key, dictionary_encoding_columns, segment_key
+    Column[] columns =
+        new Column[] {
+          Column.of("l_orderkey", Types.LongType.get(), "order key", false, false, null),
+          Column.of("l_partkey", Types.IntegerType.get(), "part key", false, false, null),
+          Column.of("l_shipdate", Types.DateType.get(), "ship date", false, false, null),
+          Column.of("l_returnflag", Types.StringType.get(), "return flag", false, false, null),
+          Column.of("l_quantity", Types.DecimalType.of(15, 2), "quantity", false, false, null),
+        };
+
+    String tableName = GravitinoITUtils.genRandomName("multi_props_table");
+    NameIdentifier tableIdentifier = NameIdentifier.of(schemaName, tableName);
+
+    Map<String, String> properties = Maps.newHashMap();
+    properties.put("orientation", "column");
+    properties.put("bitmap_columns", "l_returnflag");
+    properties.put("clustering_key", "l_shipdate:asc");
+    properties.put("dictionary_encoding_columns", "l_returnflag:auto");
+    properties.put("segment_key", "l_shipdate");
+
+    Index[] indexes =
+        new Index[] {Indexes.primary("pk", new String[][] {{"l_orderkey"}, {"l_partkey"}})};
+    Distribution distribution = Distributions.hash(0, NamedReference.field("l_orderkey"));
+
+    TableCatalog tableCatalog = catalog.asTableCatalog();
+    tableCatalog.createTable(
+        tableIdentifier,
+        columns,
+        "table with multiple properties",
+        properties,
+        Transforms.EMPTY_TRANSFORM,
+        distribution,
+        new SortOrder[0],
+        indexes);
+
+    Table loadedTable = tableCatalog.loadTable(tableIdentifier);
+    Assertions.assertEquals(tableName, loadedTable.name());
+
+    Map<String, String> loadedProps = loadedTable.properties();
+    Assertions.assertEquals("column", loadedProps.get("orientation"));
+    Assertions.assertNotNull(loadedProps.get("bitmap_columns"));
+    Assertions.assertNotNull(loadedProps.get("clustering_key"));
+  }
+
+  @Test
+  void testCreateTableWithBinlogProperties() {
+    // Test table with binlog properties
+    // Note: orientation = "column,row" is only supported in warehouse instances,
+    // so we use "column" orientation which is supported in all instances.
+    Column[] columns =
+        new Column[] {
+          Column.of("order_id", Types.LongType.get(), "order id", false, false, null),
+          Column.of("shop_id", Types.IntegerType.get(), "shop id", false, false, null),
+          Column.of("user_id", Types.StringType.get(), "user id", false, false, null),
+          Column.of("order_amount", Types.DecimalType.of(12, 2), "order amount", true, false, null),
+          Column.of(
+              "order_time", Types.TimestampType.withTimeZone(), "order time", false, false, null),
+        };
+
+    String tableName = GravitinoITUtils.genRandomName("binlog_table");
+    NameIdentifier tableIdentifier = NameIdentifier.of(schemaName, tableName);
+
+    Map<String, String> properties = Maps.newHashMap();
+    properties.put("orientation", "column");
+    properties.put("binlog_level", "replica");
+    properties.put("binlog_ttl", "86400");
+
+    Index[] indexes = new Index[] {Indexes.primary("pk", new String[][] {{"order_id"}})};
+    Distribution distribution = Distributions.hash(0, NamedReference.field("order_id"));
+
+    TableCatalog tableCatalog = catalog.asTableCatalog();
+    tableCatalog.createTable(
+        tableIdentifier,
+        columns,
+        "table with binlog",
+        properties,
+        Transforms.EMPTY_TRANSFORM,
+        distribution,
+        new SortOrder[0],
+        indexes);
+
+    Table loadedTable = tableCatalog.loadTable(tableIdentifier);
+    Assertions.assertEquals(tableName, loadedTable.name());
+
+    Map<String, String> loadedProps = loadedTable.properties();
+    // Note: binlog properties may not be returned by some Hologres instance types
+    // (e.g., Serverless instances). We verify the table was created successfully,
+    // but don't strictly assert on binlog properties.
+    // If binlog properties exist, verify they were set correctly.
+    if (loadedProps.containsKey("binlog.level")) {
+      Assertions.assertEquals("replica", loadedProps.get("binlog.level"));
+    }
+  }
+
+  @Test
+  void testCreateTableWithoutPrimaryKeyAndDistribution() {
+    // Test table without primary key and distribution key
+    Column[] columns =
+        new Column[] {
+          Column.of("order_id", Types.LongType.get(), "order id", false, false, null),
+          Column.of("shop_id", Types.IntegerType.get(), "shop id", false, false, null),
+          Column.of("user_id", Types.StringType.get(), "user id", false, false, null),
+          Column.of("order_amount", Types.DecimalType.of(12, 2), "order amount", true, false, null),
+        };
+
+    String tableName = GravitinoITUtils.genRandomName("no_pk_dist_table");
+    NameIdentifier tableIdentifier = NameIdentifier.of(schemaName, tableName);
+
+    Map<String, String> properties = Maps.newHashMap();
+    properties.put("orientation", "column");
+    properties.put("clustering_key", "order_id:asc");
+
+    TableCatalog tableCatalog = catalog.asTableCatalog();
+    tableCatalog.createTable(
+        tableIdentifier,
+        columns,
+        "table without pk and distribution",
+        properties,
+        Transforms.EMPTY_TRANSFORM,
+        Distributions.NONE,
+        new SortOrder[0],
+        Indexes.EMPTY_INDEXES);
+
+    Table loadedTable = tableCatalog.loadTable(tableIdentifier);
+    Assertions.assertEquals(tableName, loadedTable.name());
+
+    // Verify no primary key
+    Index[] loadedIndexes = loadedTable.index();
+    boolean hasPrimaryKey =
+        Arrays.stream(loadedIndexes).anyMatch(idx -> idx.type() == Index.IndexType.PRIMARY_KEY);
+    Assertions.assertFalse(hasPrimaryKey, "Table should not have a primary key");
+  }
+
+  @Test
+  void testCreatePhysicalPartitionTable() {
+    // Test physical partition table: PARTITION BY LIST
+    Column[] columns =
+        new Column[] {
+          Column.of("order_id", Types.LongType.get(), "order id", false, false, null),
+          Column.of("shop_id", Types.IntegerType.get(), "shop id", false, false, null),
+          Column.of("ds", Types.StringType.get(), "partition column", false, false, null),
+        };
+
+    String tableName = GravitinoITUtils.genRandomName("physical_pt_table");
+    NameIdentifier tableIdentifier = NameIdentifier.of(schemaName, tableName);
+
+    Map<String, String> properties = Maps.newHashMap();
+    properties.put("orientation", "column");
+
+    Index[] indexes = new Index[] {Indexes.primary("pk", new String[][] {{"order_id"}, {"ds"}})};
+    Distribution distribution = Distributions.hash(0, NamedReference.field("order_id"));
+
+    // Physical partition: PARTITION BY LIST(ds)
+    Transform[] partitioning = new Transform[] {Transforms.list(new String[][] {{"ds"}})};
+
+    TableCatalog tableCatalog = catalog.asTableCatalog();
+    tableCatalog.createTable(
+        tableIdentifier,
+        columns,
+        "physical partition table",
+        properties,
+        partitioning,
+        distribution,
+        new SortOrder[0],
+        indexes);
+
+    Table loadedTable = tableCatalog.loadTable(tableIdentifier);
+    Assertions.assertEquals(tableName, loadedTable.name());
+
+    // Verify partitioning
+    Transform[] loadedPartitioning = loadedTable.partitioning();
+    Assertions.assertEquals(1, loadedPartitioning.length);
+    Assertions.assertTrue(loadedPartitioning[0] instanceof Transforms.ListTransform);
+  }
+
+  @Test
+  void testCreateLogicalPartitionTable() {
+    // Test logical partition table: LOGICAL PARTITION BY LIST
+    Column[] columns =
+        new Column[] {
+          Column.of("order_id", Types.LongType.get(), "order id", false, false, null),
+          Column.of("shop_id", Types.IntegerType.get(), "shop id", false, false, null),
+          Column.of("ds", Types.DateType.get(), "partition column", false, false, null),
+        };
+
+    String tableName = GravitinoITUtils.genRandomName("logical_pt_table");
+    NameIdentifier tableIdentifier = NameIdentifier.of(schemaName, tableName);
+
+    Map<String, String> properties = Maps.newHashMap();
+    properties.put("orientation", "column");
+    properties.put("is_logical_partitioned_table", "true");
+    properties.put("partition_expiration_time", "30 day");
+
+    Index[] indexes = new Index[] {Indexes.primary("pk", new String[][] {{"order_id"}, {"ds"}})};
+    Distribution distribution = Distributions.hash(0, NamedReference.field("order_id"));
+
+    // Logical partition: LOGICAL PARTITION BY LIST(ds)
+    Transform[] partitioning = new Transform[] {Transforms.list(new String[][] {{"ds"}})};
+
+    TableCatalog tableCatalog = catalog.asTableCatalog();
+    tableCatalog.createTable(
+        tableIdentifier,
+        columns,
+        "logical partition table",
+        properties,
+        partitioning,
+        distribution,
+        new SortOrder[0],
+        indexes);
+
+    Table loadedTable = tableCatalog.loadTable(tableIdentifier);
+    Assertions.assertEquals(tableName, loadedTable.name());
+
+    // Verify partitioning
+    Transform[] loadedPartitioning = loadedTable.partitioning();
+    Assertions.assertEquals(1, loadedPartitioning.length);
+    Assertions.assertTrue(loadedPartitioning[0] instanceof Transforms.ListTransform);
+
+    // Verify logical partition property
+    Map<String, String> loadedProps = loadedTable.properties();
+    Assertions.assertEquals("true", loadedProps.get("is_logical_partitioned_table"));
+  }
+
+  @Test
+  void testCreateTwoLevelLogicalPartitionTable() {
+    // Test two-level logical partition table: LOGICAL PARTITION BY LIST(yy, mm)
+    Column[] columns =
+        new Column[] {
+          Column.of("order_id", Types.LongType.get(), "order id", false, false, null),
+          Column.of("yy", Types.StringType.get(), "year partition", false, false, null),
+          Column.of("mm", Types.StringType.get(), "month partition", false, false, null),
+        };
+
+    String tableName = GravitinoITUtils.genRandomName("two_level_pt_table");
+    NameIdentifier tableIdentifier = NameIdentifier.of(schemaName, tableName);
+
+    Map<String, String> properties = Maps.newHashMap();
+    properties.put("orientation", "column");
+    properties.put("is_logical_partitioned_table", "true");
+
+    Distribution distribution = Distributions.hash(0, NamedReference.field("order_id"));
+
+    // Two-level logical partition: LOGICAL PARTITION BY LIST(yy, mm)
+    Transform[] partitioning = new Transform[] {Transforms.list(new String[][] {{"yy"}, {"mm"}})};
+
+    TableCatalog tableCatalog = catalog.asTableCatalog();
+    tableCatalog.createTable(
+        tableIdentifier,
+        columns,
+        "two-level logical partition table",
+        properties,
+        partitioning,
+        distribution,
+        new SortOrder[0],
+        Indexes.EMPTY_INDEXES);
+
+    Table loadedTable = tableCatalog.loadTable(tableIdentifier);
+    Assertions.assertEquals(tableName, loadedTable.name());
+
+    // Verify partitioning
+    Transform[] loadedPartitioning = loadedTable.partitioning();
+    Assertions.assertEquals(1, loadedPartitioning.length);
+    Assertions.assertTrue(loadedPartitioning[0] instanceof Transforms.ListTransform);
+
+    // Verify logical partition property
+    Map<String, String> loadedProps = loadedTable.properties();
+    Assertions.assertEquals("true", loadedProps.get("is_logical_partitioned_table"));
   }
 }
