@@ -25,7 +25,8 @@ gravitino.job.statusPullIntervalInMs=300000
 gravitino.jobExecutor.local.sparkHome=/path/to/spark
 ```
 
-For local demo environments, you can reduce `gravitino.job.statusPullIntervalInMs` to get faster status updates.
+For local demo environments, you can reduce `gravitino.job.statusPullIntervalInMs` (for example
+`10000`) to get faster status updates. Restart Gravitino after changing this value.
 
 ## Built-in update stats `jobConf`
 
