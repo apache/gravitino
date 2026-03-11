@@ -39,7 +39,8 @@
   4. Constructors.
   5. Methods (Group by visibility, putting `private` methods at the end).
 
-## Issue and PR Guidelines
+## Create Issue and PR Guidelines
+[IMPORTANT] Before creating an issue or PR using the gh command or the GitHub MCP server, please show a preview of the PR/issue first. Submit it only after I confirm. The issue/PR format should follow the reference and keep the content concise and clear.
 - **Issue Templates**: Use the appropriate template from `.github/ISSUE_TEMPLATE/`
 - **PR Description**: Follow the template in `.github/PULL_REQUEST_TEMPLATE`
 
