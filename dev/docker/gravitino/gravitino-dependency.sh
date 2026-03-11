@@ -64,22 +64,14 @@ mkdir -p "${gravitino_staging_dir}"
 
 echo "Start to download the jar package"
 
-mysql_driver="mysql-connector-java-8.0.27.jar"
-wget "https://repo1.maven.org/maven2/mysql/mysql-connector-java/8.0.27/$mysql_driver" -O "${gravitino_staging_dir}/${mysql_driver}"
-cp "${gravitino_staging_dir}/${mysql_driver}" "${gravitino_package_dir}/catalogs/jdbc-mysql/libs/"
-cp "${gravitino_staging_dir}/${mysql_driver}" "${gravitino_package_dir}/catalogs/jdbc-doris/libs/"
-cp "${gravitino_staging_dir}/${mysql_driver}" "${gravitino_package_dir}/catalogs/jdbc-starrocks/libs/"
-cp "${gravitino_staging_dir}/${mysql_driver}" "${gravitino_package_dir}/catalogs/lakehouse-iceberg/libs/"
-cp "${gravitino_staging_dir}/${mysql_driver}" "${gravitino_iceberg_rest_dir}"
-cp "${gravitino_staging_dir}/${mysql_driver}" "${gravitino_package_dir}/libs/"
+jdbc_driver_dir="${gravitino_dir}/packages/gravitino/jdbc-drivers"
+mkdir -p "${jdbc_driver_dir}"
 
+mysql_driver="mysql-connector-java-8.0.27.jar"
+wget "https://repo1.maven.org/maven2/mysql/mysql-connector-java/8.0.27/$mysql_driver" -O "${jdbc_driver_dir}/${mysql_driver}"
 
 pg_driver="postgresql-42.7.0.jar"
-wget "https://jdbc.postgresql.org/download/${pg_driver}" -O "${gravitino_staging_dir}/${pg_driver}"
-cp "${gravitino_staging_dir}/${pg_driver}" "${gravitino_package_dir}/catalogs/jdbc-postgresql/libs/"
-cp "${gravitino_staging_dir}/${pg_driver}" "${gravitino_package_dir}/catalogs/lakehouse-iceberg/libs/"
-cp "${gravitino_staging_dir}/${pg_driver}" "${gravitino_iceberg_rest_dir}"
-cp "${gravitino_staging_dir}/${pg_driver}" "${gravitino_package_dir}/libs/"
+wget "https://jdbc.postgresql.org/download/${pg_driver}" -O "${jdbc_driver_dir}/${pg_driver}"
 
 echo "Finish downloading"
 
