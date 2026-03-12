@@ -538,9 +538,8 @@ public class HologresTableOperations extends JdbcTableOperations
     // Hologres requires enabling the GUC parameter before dropping a column.
     // Reference: https://help.aliyun.com/zh/hologres/developer-reference/alter-table
     return String.format(
-        "%s%s%s%s DROP COLUMN %s;",
+        "%s %s%s DROP COLUMN %s;",
         HOLOGRES_ENABLE_DROP_COLUMN_GUC,
-        NEW_LINE,
         ALTER_TABLE,
         quoteIdentifier(table.name()),
         quoteIdentifier(deleteColumn.fieldName()[0]));
