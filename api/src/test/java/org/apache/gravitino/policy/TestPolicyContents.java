@@ -20,6 +20,7 @@
 package org.apache.gravitino.policy;
 
 import com.google.common.collect.ImmutableSet;
+import java.util.HashMap;
 import java.util.Map;
 import org.apache.gravitino.MetadataObject;
 import org.junit.jupiter.api.Assertions;
@@ -51,7 +52,7 @@ public class TestPolicyContents {
     IcebergDataCompactionContent content =
         (IcebergDataCompactionContent)
             PolicyContents.icebergDataCompaction(
-                1000L, 1L, Map.of("target-file-size-bytes", "1048576", "min-input-files", "1"));
+                1000L, 1L, mapOf("target-file-size-bytes", "1048576", "min-input-files", "1"));
 
     Assertions.assertEquals("iceberg-data-compaction", content.properties().get("strategy.type"));
     Assertions.assertEquals(
@@ -86,7 +87,7 @@ public class TestPolicyContents {
                 3L,
                 200L,
                 88L,
-                Map.of("target-file-size-bytes", "1048576", "min-input-files", "1"));
+                mapOf("target-file-size-bytes", "1048576", "min-input-files", "1"));
 
     Assertions.assertEquals(3L, content.rules().get("dataFileMseWeight"));
     Assertions.assertEquals(200L, content.rules().get("deleteFileNumberWeight"));
@@ -99,7 +100,7 @@ public class TestPolicyContents {
     IcebergDataCompactionContent content =
         (IcebergDataCompactionContent)
             PolicyContents.icebergDataCompaction(
-                1000L, 1L, Map.of("job.options.target-file-size-bytes", "1048576"));
+                1000L, 1L, mapOf("job.options.target-file-size-bytes", "1048576"));
 
     IllegalArgumentException exception =
         Assertions.assertThrows(IllegalArgumentException.class, content::validate);
@@ -111,10 +112,23 @@ public class TestPolicyContents {
     IcebergDataCompactionContent content =
         (IcebergDataCompactionContent)
             PolicyContents.icebergDataCompaction(
-                1000L, 1L, 2L, 10L, 0L, Map.of("target-file-size-bytes", "1048576"));
+                1000L, 1L, 2L, 10L, 0L, mapOf("target-file-size-bytes", "1048576"));
 
     IllegalArgumentException exception =
         Assertions.assertThrows(IllegalArgumentException.class, content::validate);
     Assertions.assertTrue(exception.getMessage().contains("maxPartitionNum"));
+  }
+
+  private static Map<String, String> mapOf(String key, String value) {
+    Map<String, String> map = new HashMap<>();
+    map.put(key, value);
+    return map;
+  }
+
+  private static Map<String, String> mapOf(String key1, String value1, String key2, String value2) {
+    Map<String, String> map = new HashMap<>();
+    map.put(key1, value1);
+    map.put(key2, value2);
+    return map;
   }
 }

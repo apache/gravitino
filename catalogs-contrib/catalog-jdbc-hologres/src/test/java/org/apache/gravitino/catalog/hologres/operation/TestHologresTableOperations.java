@@ -50,10 +50,25 @@ public class TestHologresTableOperations {
   // ==================== Helper inner class for SQL generation tests ====================
 
   private static class TestableHologresTableOperations extends HologresTableOperations {
+    private JdbcTable mockTable;
+
     public TestableHologresTableOperations() {
       super.exceptionMapper = new HologresExceptionConverter();
       super.typeConverter = new HologresTypeConverter();
       super.columnDefaultValueConverter = new HologresColumnDefaultValueConverter();
+    }
+
+    public void setMockTable(JdbcTable table) {
+      this.mockTable = table;
+    }
+
+    @Override
+    protected JdbcTable getOrCreateTable(
+        String databaseName, String tableName, JdbcTable lazyLoadCreateTable) {
+      if (mockTable != null) {
+        return mockTable;
+      }
+      return lazyLoadCreateTable;
     }
 
     public String createTableSql(
@@ -986,6 +1001,77 @@ public class TestHologresTableOperations {
                 "public",
                 "test_table",
                 TableChange.updateColumnAutoIncrement(new String[] {"col1"}, true)));
+  }
+
+  // ==================== deleteColumn (DROP COLUMN) tests ====================
+
+  @Test
+  void testAlterTableDeleteColumn() {
+    JdbcColumn col1 =
+        JdbcColumn.builder()
+            .withName("id")
+            .withType(Types.IntegerType.get())
+            .withNullable(false)
+            .build();
+    JdbcColumn col2 =
+        JdbcColumn.builder()
+            .withName("name")
+            .withType(Types.StringType.get())
+            .withNullable(true)
+            .build();
+    ops.setMockTable(ops.buildFakeTable("test_table", col1, col2));
+    String sql =
+        ops.alterTableSql(
+            "public", "test_table", TableChange.deleteColumn(new String[] {"name"}, false));
+    // Hologres requires GUC to enable DROP COLUMN
+    assertTrue(sql.contains("SET hg_experimental_enable_drop_column = on;"));
+    assertTrue(sql.contains("ALTER TABLE \"test_table\" DROP COLUMN \"name\""));
+  }
+
+  @Test
+  void testAlterTableDeleteColumnIfExists() {
+    JdbcColumn col1 =
+        JdbcColumn.builder()
+            .withName("id")
+            .withType(Types.IntegerType.get())
+            .withNullable(false)
+            .build();
+    ops.setMockTable(ops.buildFakeTable("test_table", col1));
+    // When column doesn't exist and IF EXISTS is true, should return empty string
+    String sql =
+        ops.alterTableSql(
+            "public", "test_table", TableChange.deleteColumn(new String[] {"non_existent"}, true));
+    assertEquals("", sql);
+  }
+
+  @Test
+  void testAlterTableDeleteColumnNotExistsThrows() {
+    JdbcColumn col1 =
+        JdbcColumn.builder()
+            .withName("id")
+            .withType(Types.IntegerType.get())
+            .withNullable(false)
+            .build();
+    ops.setMockTable(ops.buildFakeTable("test_table", col1));
+    // When column doesn't exist and IF EXISTS is false, should throw
+    assertThrows(
+        IllegalArgumentException.class,
+        () ->
+            ops.alterTableSql(
+                "public",
+                "test_table",
+                TableChange.deleteColumn(new String[] {"non_existent"}, false)));
+  }
+
+  @Test
+  void testAlterTableDeleteColumnRejectsNestedField() {
+    assertThrows(
+        UnsupportedOperationException.class,
+        () ->
+            ops.alterTableSql(
+                "public",
+                "test_table",
+                TableChange.deleteColumn(new String[] {"schema", "col"}, false)));
   }
 
   // ==================== quoteIdentifier tests ====================
