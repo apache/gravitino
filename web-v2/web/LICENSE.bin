@@ -808,7 +808,6 @@
    ISC license.
 
    @isaacs/cliui
-
    anymatch
    boolbase
    electron-to-chromium
