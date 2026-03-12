@@ -33,7 +33,7 @@ public class PaimonOSSFileSystemConfig extends Config {
   public static final String OSS_ENDPOINT = PaimonConstants.OSS_ENDPOINT;
   public static final String OSS_ACCESS_KEY = PaimonConstants.OSS_ACCESS_KEY;
   public static final String OSS_SECRET_KEY = PaimonConstants.OSS_SECRET_KEY;
-  public static final String OSS_IMPLEMENT = PaimonConstants.OSS_IMPLEMENT;
+  public static final String OSS_IMPLEMENTATION = PaimonConstants.OSS_IMPLEMENTATION;
 
   public PaimonOSSFileSystemConfig(Map<String, String> properties) {
     super(false);
@@ -64,9 +64,9 @@ public class PaimonOSSFileSystemConfig extends Config {
           .checkValue(StringUtils::isNotBlank, ConfigConstants.NOT_BLANK_ERROR_MSG)
           .create();
 
-  public static final ConfigEntry<String> PAIMON_OSS_IMPLEMENT_ENTRY =
-      new ConfigBuilder(OSS_IMPLEMENT)
-          .doc("The filesystem implement of the Aliyun oss")
+  public static final ConfigEntry<String> PAIMON_OSS_IMPLEMENTATION_ENTRY =
+      new ConfigBuilder(OSS_IMPLEMENTATION)
+          .doc("The filesystem implementation of the Aliyun oss")
           .version(ConfigConstants.VERSION_1_2_0)
           .stringConf()
           .checkValue(StringUtils::isNotBlank, ConfigConstants.NOT_BLANK_ERROR_MSG)
@@ -84,8 +84,8 @@ public class PaimonOSSFileSystemConfig extends Config {
     return get(PAIMON_OSS_SECRET_KEY_ENTRY);
   }
 
-  public String getOSSImplement() {
-    return get(PAIMON_OSS_IMPLEMENT_ENTRY);
+  public String getOSSImplementation() {
+    return get(PAIMON_OSS_IMPLEMENTATION_ENTRY);
   }
 
   public static final Map<String, PropertyEntry<?>> OSS_FILESYSTEM_PROPERTY_ENTRIES =
@@ -117,7 +117,7 @@ public class PaimonOSSFileSystemConfig extends Config {
           .put(
               OSS_IMPLEMENT,
               PropertyEntry.stringOptionalPropertyEntry(
-                  OSS_IMPLEMENT,
+                  OSS_IMPLEMENTATION,
                   "The filesystem implementation of the Aliyun oss",
                   false /* immutable */,
                   null /* defaultValue */,
