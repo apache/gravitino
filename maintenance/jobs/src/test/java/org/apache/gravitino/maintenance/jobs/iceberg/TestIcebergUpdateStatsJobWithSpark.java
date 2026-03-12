@@ -27,11 +27,13 @@ import java.io.File;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.sql.Connection;
 import java.sql.DriverManager;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -200,9 +202,9 @@ public class TestIcebergUpdateStatsJobWithSpark {
             NameIdentifier.of(SPARK_CATALOG_NAME, "db", allModeTableName);
 
         PartitionPath dsPartition1 =
-            PartitionPath.of(List.of(new PartitionEntryImpl("ds", "2026-03-01")));
+            PartitionPath.of(Collections.singletonList(new PartitionEntryImpl("ds", "2026-03-01")));
         PartitionPath dsPartition2 =
-            PartitionPath.of(List.of(new PartitionEntryImpl("ds", "2026-03-02")));
+            PartitionPath.of(Collections.singletonList(new PartitionEntryImpl("ds", "2026-03-02")));
 
         try (GenericJdbcMetricsRepository repository = new GenericJdbcMetricsRepository()) {
           repository.initialize(buildJdbcMetricsConfigs(mysql));
@@ -385,7 +387,8 @@ public class TestIcebergUpdateStatsJobWithSpark {
         metricsUpdater.tableMetrics.stream()
             .allMatch(metric -> metric.scope() == DataScope.Type.TABLE));
     assertTrue(
-        metricsUpdater.tableMetrics.stream().allMatch(metric -> metric.partitionPath().isEmpty()));
+        metricsUpdater.tableMetrics.stream()
+            .allMatch(metric -> !metric.partitionPath().isPresent()));
     assertTrue(metricsUpdater.jobMetrics.isEmpty());
   }
 
@@ -412,7 +415,8 @@ public class TestIcebergUpdateStatsJobWithSpark {
         metricsUpdater.tableMetrics.stream()
             .allMatch(metric -> metric.scope() == DataScope.Type.TABLE));
     assertTrue(
-        metricsUpdater.tableMetrics.stream().allMatch(metric -> metric.partitionPath().isEmpty()));
+        metricsUpdater.tableMetrics.stream()
+            .allMatch(metric -> !metric.partitionPath().isPresent()));
     assertTrue(metricsUpdater.jobMetrics.isEmpty());
   }
 
@@ -450,7 +454,7 @@ public class TestIcebergUpdateStatsJobWithSpark {
         long now = Instant.now().getEpochSecond();
 
         PartitionPath partitionPath =
-            PartitionPath.of(List.of(new PartitionEntryImpl("ds", "2026-01-01")));
+            PartitionPath.of(Collections.singletonList(new PartitionEntryImpl("ds", "2026-01-01")));
         List<MetricPoint> partitionMetrics =
             repository.getMetrics(
                 DataScope.forPartition(identifier, partitionPath), now - 300, now + 300);
@@ -467,7 +471,7 @@ public class TestIcebergUpdateStatsJobWithSpark {
             .resolve("scripts")
             .resolve("mysql")
             .resolve("schema-" + ConfigConstants.CURRENT_SCRIPT_VERSION + "-mysql.sql");
-    String schemaSql = Files.readString(schemaPath, StandardCharsets.UTF_8);
+    String schemaSql = new String(Files.readAllBytes(schemaPath), StandardCharsets.UTF_8);
     try (Connection connection =
         DriverManager.getConnection(mysql.getJdbcUrl(), mysql.getUsername(), mysql.getPassword())) {
       JdbcSqlScriptUtils.executeSqlScript(connection, schemaSql);
@@ -475,7 +479,7 @@ public class TestIcebergUpdateStatsJobWithSpark {
   }
 
   private static Path findRepoRoot() {
-    Path current = Path.of("").toAbsolutePath();
+    Path current = Paths.get("").toAbsolutePath();
     while (current != null) {
       if (Files.exists(current.resolve("gradlew"))) {
         return current;
@@ -517,11 +521,12 @@ public class TestIcebergUpdateStatsJobWithSpark {
             .collect(Collectors.toSet());
 
     assertEquals(
-        Set.of(
-            "event_ts_day=2026-01-01,region=ap-south",
-            "event_ts_day=2026-01-01,region=us-east",
-            "event_ts_day=2026-01-02,region=ap-south",
-            "event_ts_day=2026-01-02,region=us-east"),
+        new HashSet<>(
+            Arrays.asList(
+                "event_ts_day=2026-01-01,region=ap-south",
+                "event_ts_day=2026-01-01,region=us-east",
+                "event_ts_day=2026-01-02,region=ap-south",
+                "event_ts_day=2026-01-02,region=us-east")),
         parsedPartitions);
   }
 
@@ -578,7 +583,7 @@ public class TestIcebergUpdateStatsJobWithSpark {
     List<MetricPoint> metrics = getTableMetrics(repository, tableIdentifier);
     assertEquals(EXPECTED_METRIC_COUNT_PER_SCOPE, metrics.size());
     assertTrue(metrics.stream().allMatch(metric -> metric.scope() == DataScope.Type.TABLE));
-    assertTrue(metrics.stream().allMatch(metric -> metric.partitionPath().isEmpty()));
+    assertTrue(metrics.stream().allMatch(metric -> !metric.partitionPath().isPresent()));
     assertEquals(
         EXPECTED_METRIC_NAMES,
         metrics.stream().map(MetricPoint::metricName).collect(Collectors.toSet()));
@@ -801,7 +806,7 @@ public class TestIcebergUpdateStatsJobWithSpark {
     try {
       return client.loadMetalake(metalakeName);
     } catch (NoSuchMetalakeException ignored) {
-      return client.createMetalake(metalakeName, "IT metalake", Map.of());
+      return client.createMetalake(metalakeName, "IT metalake", Collections.emptyMap());
     }
   }
 
@@ -826,8 +831,9 @@ public class TestIcebergUpdateStatsJobWithSpark {
 
   private static final class RecordingStatisticsUpdater implements StatisticsUpdater {
     private NameIdentifier tableIdentifier;
-    private List<StatisticEntry<?>> tableStatistics = List.of();
-    private Map<PartitionPath, List<StatisticEntry<?>>> partitionStatistics = Map.of();
+    private List<StatisticEntry<?>> tableStatistics = Collections.emptyList();
+    private Map<PartitionPath, List<StatisticEntry<?>>> partitionStatistics =
+        Collections.emptyMap();
 
     @Override
     public String name() {
@@ -857,8 +863,8 @@ public class TestIcebergUpdateStatsJobWithSpark {
   }
 
   private static final class RecordingMetricsUpdater implements MetricsUpdater {
-    private List<MetricPoint> tableMetrics = List.of();
-    private List<MetricPoint> jobMetrics = List.of();
+    private List<MetricPoint> tableMetrics = Collections.emptyList();
+    private List<MetricPoint> jobMetrics = Collections.emptyList();
 
     @Override
     public String name() {
