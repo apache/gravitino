@@ -64,10 +64,26 @@ jobs:
               - spark-connector/**
             mcp_server_changes:
               - mcp-server/**
+            maintenance_changes:
+              - maintenance/**
+              - api/**
+              - common/**
+              - core/**
+              - catalogs/catalog-common/**
+              - clients/client-java/**
+              - integration-test-common/**
+              - server/**
+              - server-common/**
+              - build.gradle.kts
+              - settings.gradle.kts
+              - gradle.properties
+              - gradlew
+              - gradle/**
     outputs:
       source_changes: ${{ steps.filter.outputs.source_changes }}
       spark_connector_changes: ${{ steps.filter.outputs.spark_connector_changes }}
       mcp_server_changes: ${{ steps.filter.outputs.mcp_server_changes }}
+      maintenance_changes: ${{ steps.filter.outputs.maintenance_changes }}
 
   compile-check:
     runs-on: ubuntu-latest
@@ -153,12 +169,37 @@ jobs:
           sudo dpkg -i libssl1.1_1.1.1f-1ubuntu2_amd64.deb  
 
       - name: Build with Gradle
-        if: needs.changes.outputs.mcp_server_changes == 'true'
-        run: ./gradlew build -PskipITs -PskipDockerTests=false -x :clients:client-python:build
+        run: |
+          gradle_args=(
+            build
+            -PskipITs
+            -PskipDockerTests=false
+            -x :clients:client-python:build
+          )
 
-      - name: Build with Gradle (skip mcp-server tests)
-        if: needs.changes.outputs.mcp_server_changes != 'true'
-        run: ./gradlew build -PskipITs -PskipDockerTests=false -x :clients:client-python:build -x :mcp-server:build -x :mcp-server:test -x :mcp-server:pylint -x :web-v2:web:build
+          if [ "${{ needs.changes.outputs.mcp_server_changes }}" != "true" ]; then
+            gradle_args+=(
+              -x :mcp-server:build
+              -x :mcp-server:test
+              -x :mcp-server:pylint
+              -x :web-v2:web:build
+            )
+          fi
+
+          if [ "${{ needs.changes.outputs.maintenance_changes }}" != "true" ]; then
+            gradle_args+=(
+              -x :maintenance:optimizer-api:test
+              -x :maintenance:gravitino-updaters:test
+              -x :maintenance:optimizer:test
+              -x :maintenance:jobs:test
+            )
+          fi
+
+          printf './gradlew'
+          printf ' %q' "${gradle_args[@]}"
+          printf '\n'
+
+          ./gradlew "${gradle_args[@]}"
 
       - name: Fetch base branch for coverage diff
         if: github.event_name == 'pull_request'
