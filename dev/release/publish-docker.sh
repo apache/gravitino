@@ -19,7 +19,7 @@
 
 # Build and publish Gravitino Docker images via GitHub Actions
 #
-# Usage: ./publish_docker.sh <tag|branch> --docker-version <version> [--trino-version <version>] [--dry-run]
+# Usage: ./publish-docker.sh <tag|branch> --docker-version <version> [--trino-version <version>] [--dry-run]
 #
 # Arguments:
 #   <tag>                     A Git tag, typically a release candidate (e.g., v1.2.0-rc5).
@@ -36,8 +36,8 @@
 #                             actually running them. Useful for previewing before publishing.
 #
 # Examples:
-#   ./publish_docker.sh v1.2.0-rc5 --docker-version 1.2.0-rc5 --trino-version 478 --dry-run
-#   ./publish_docker.sh v1.2.0-rc5 --docker-version 1.2.0-rc5 --trino-version 478
+#   ./publish-docker.sh v1.2.0-rc5 --docker-version 1.2.0-rc5 --trino-version 478 --dry-run
+#   ./publish-docker.sh v1.2.0-rc5 --docker-version 1.2.0-rc5 --trino-version 478
 #
 # Environment variables required (set in env file or shell profile):
 #   DOCKER_USERNAME       - Docker Hub username
@@ -53,6 +53,14 @@
 #
 
 set -e
+
+# Check required commands
+for cmd in git gh; do
+  if ! command -v "$cmd" > /dev/null 2>&1; then
+    echo "ERROR: Required command '$cmd' is not installed or not in PATH."
+    exit 1
+  fi
+done
 
 # Parse arguments
 DRY_RUN=false
@@ -76,7 +84,7 @@ while [[ $# -gt 0 ]]; do
       ;;
     -h|--help)
       cat << 'EOF'
-Usage: publish_docker.sh <tag|branch> --docker-version <version> [--trino-version <version>] [--dry-run]
+Usage: publish-docker.sh <tag|branch> --docker-version <version> [--trino-version <version>] [--dry-run]
 
 Arguments:
   <tag|branch>              Git tag (e.g., v1.2.0-rc5) or branch (e.g., main) to use as
@@ -91,8 +99,8 @@ Environment variables:
   GH_TOKEN               GitHub token with repo/workflow permissions
 
 Examples:
-  publish_docker.sh v1.2.0-rc5 --docker-version 1.2.0-rc5 --trino-version 478 --dry-run
-  publish_docker.sh v1.2.0-rc5 --docker-version 1.2.0-rc5 --trino-version 478
+  publish-docker.sh v1.2.0-rc5 --docker-version 1.2.0-rc5 --trino-version 478 --dry-run
+  publish-docker.sh v1.2.0-rc5 --docker-version 1.2.0-rc5 --trino-version 478
 
 Images built:
   apache/gravitino:<docker-version>
@@ -129,9 +137,9 @@ if [[ -z "$DOCKER_VERSION" ]]; then
   exit 1
 fi
 
-# Verify tag or branch exists
-if ! git rev-parse "$INPUT_TAG" >/dev/null 2>&1; then
-  echo "ERROR: Tag or branch '$INPUT_TAG' does not exist"
+# Verify tag or branch exists on the remote
+if ! git ls-remote --exit-code https://github.com/apache/gravitino.git "$INPUT_TAG" > /dev/null 2>&1; then
+  echo "ERROR: Tag or branch '$INPUT_TAG' does not exist on remote 'apache/gravitino'"
   exit 1
 fi
 
@@ -150,6 +158,10 @@ echo "Docker Version: ${DOCKER_VERSION}"
 echo "Trino Version: ${TRINO_VERSION}"
 
 if [[ "$DRY_RUN" == "false" ]]; then
+  if [[ -z "$GH_TOKEN" ]]; then
+    echo "ERROR: GH_TOKEN environment variable not set"
+    exit 1
+  fi
   if [[ -z "$DOCKER_USERNAME" ]]; then
     echo "ERROR: DOCKER_USERNAME environment variable not set"
     exit 1
@@ -158,6 +170,9 @@ if [[ "$DRY_RUN" == "false" ]]; then
     echo "ERROR: PUBLISH_DOCKER_TOKEN environment variable not set"
     exit 1
   fi
+  # NOTE: PUBLISH_DOCKER_TOKEN is passed as a plaintext workflow input (-f token=...).
+  # GitHub Actions workflow_dispatch string inputs are not masked in the UI or API,
+  # so this value may be visible to anyone with read access to the repository.
   echo "Username: ${DOCKER_USERNAME}"
 fi
 echo ""
