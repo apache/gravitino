@@ -408,6 +408,17 @@ public class CatalogClickHouseClusterIT extends BaseIT {
     Table alteredTable = tableCatalog.loadTable(tableIdentifier);
     Assertions.assertEquals(4, alteredTable.columns().length);
     Assertions.assertEquals("col_4", alteredTable.columns()[0].name());
+    int col2Position = -1;
+    int col3Position = -1;
+    for (int i = 0; i < alteredTable.columns().length; i++) {
+      if (Objects.equals("col_2", alteredTable.columns()[i].name())) {
+        col2Position = i;
+      }
+      if (Objects.equals("col_3", alteredTable.columns()[i].name())) {
+        col3Position = i;
+      }
+    }
+    Assertions.assertTrue(col2Position > col3Position, "col_2 should appear after col_3");
     Column alteredCol1 =
         Arrays.stream(alteredTable.columns())
             .filter(column -> Objects.equals("col_1", column.name()))
@@ -416,6 +427,7 @@ public class CatalogClickHouseClusterIT extends BaseIT {
     Assertions.assertTrue(alteredCol1.nullable());
     Assertions.assertEquals(Types.LongType.get(), alteredCol1.dataType());
     Assertions.assertEquals("col_1_new_comment", alteredCol1.comment());
+    Assertions.assertEquals(Literals.of("2", Types.LongType.get()), alteredCol1.defaultValue());
     Assertions.assertFalse(
         Arrays.stream(alteredTable.index())
             .anyMatch(index -> Objects.equals(index.name(), "idx_col_2")));
