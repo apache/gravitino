@@ -461,6 +461,14 @@ public class Configs {
           .checkValue(value -> value > 0, "Lock segments must be positive.")
           .createWithDefault(16);
 
+  // Whether to enable cache invalidation event dispatch
+  public static final ConfigEntry<Boolean> CACHE_INVALIDATION_ENABLED =
+      new ConfigBuilder("gravitino.cache.invalidation.enabled")
+          .doc("Whether to enable the cache invalidation service and event dispatch.")
+          .version(ConfigConstants.VERSION_1_2_0)
+          .booleanConf()
+          .createWithDefault(true);
+
   public static final ConfigEntry<String> JOB_STAGING_DIR =
       new ConfigBuilder("gravitino.job.stagingDir")
           .doc("Directory for managing staging files when running jobs.")

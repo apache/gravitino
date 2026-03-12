@@ -42,6 +42,12 @@ import org.apache.gravitino.cache.CachedEntityIdResolver;
 import org.apache.gravitino.cache.EntityCache;
 import org.apache.gravitino.cache.EntityCacheRelationKey;
 import org.apache.gravitino.cache.NoOpsCache;
+import org.apache.gravitino.cache.invalidation.CacheDomain;
+import org.apache.gravitino.cache.invalidation.CacheInvalidationEvent;
+import org.apache.gravitino.cache.invalidation.CacheInvalidationOperation;
+import org.apache.gravitino.cache.invalidation.CacheInvalidationService;
+import org.apache.gravitino.cache.invalidation.CacheInvalidationServiceFactory;
+import org.apache.gravitino.cache.invalidation.EntityCacheInvalidationKey;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.storage.relational.service.EntityIdService;
 import org.apache.gravitino.utils.Executable;
@@ -61,6 +67,8 @@ public class RelationalEntityStore implements EntityStore, SupportsRelationOpera
   private RelationalBackend backend;
   private RelationalGarbageCollector garbageCollector;
   private EntityCache cache;
+  private CacheInvalidationService cacheInvalidationService;
+  private String cacheInvalidationHandlerId;
 
   @VisibleForTesting
   public EntityCache getCache() {
@@ -81,6 +89,11 @@ public class RelationalEntityStore implements EntityStore, SupportsRelationOpera
     this.backend = createRelationalEntityBackend(config);
     this.garbageCollector = new RelationalGarbageCollector(backend, config);
     this.garbageCollector.start();
+
+    this.cacheInvalidationService = CacheInvalidationServiceFactory.getOrCreate(config);
+    this.cacheInvalidationHandlerId = "relational-entity-store-" + System.identityHashCode(this);
+    cacheInvalidationService.registerHandler(
+        CacheDomain.ENTITY, cacheInvalidationHandlerId, this::handleEntityInvalidationEvent);
   }
 
   private RelationalBackend createRelationalEntityBackend(Config config) {
@@ -126,14 +139,16 @@ public class RelationalEntityStore implements EntityStore, SupportsRelationOpera
       throws IOException, EntityAlreadyExistsException {
     backend.insert(e, overwritten);
     cache.put(e);
+    publishOrApplyEntityUpsert(e.nameIdentifier(), e.type());
   }
 
   @Override
   public <E extends Entity & HasIdentifier> E update(
       NameIdentifier ident, Class<E> type, Entity.EntityType entityType, Function<E, E> updater)
       throws IOException, NoSuchEntityException, EntityAlreadyExistsException {
-    cache.invalidate(ident, entityType);
-    return backend.update(ident, entityType, updater);
+    E entity = backend.update(ident, entityType, updater);
+    publishOrApplyEntityInvalidation(ident, entityType);
+    return entity;
   }
 
   @Override
@@ -179,8 +194,11 @@ public class RelationalEntityStore implements EntityStore, SupportsRelationOpera
   public boolean delete(NameIdentifier ident, Entity.EntityType entityType, boolean cascade)
       throws IOException {
     try {
-      cache.invalidate(ident, entityType);
-      return backend.delete(ident, entityType, cascade);
+      boolean deleted = backend.delete(ident, entityType, cascade);
+      if (deleted) {
+        publishOrApplyEntityInvalidation(ident, entityType);
+      }
+      return deleted;
     } catch (NoSuchEntityException e) {
       return false;
     }
@@ -194,6 +212,9 @@ public class RelationalEntityStore implements EntityStore, SupportsRelationOpera
   @Override
   public void close() throws IOException {
     cache.clear();
+    if (cacheInvalidationService != null && cacheInvalidationHandlerId != null) {
+      cacheInvalidationService.unregisterHandler(CacheDomain.ENTITY, cacheInvalidationHandlerId);
+    }
     garbageCollector.close();
     backend.close();
   }
@@ -274,9 +295,9 @@ public class RelationalEntityStore implements EntityStore, SupportsRelationOpera
       Entity.EntityType dstType,
       boolean override)
       throws IOException {
-    cache.invalidate(srcIdentifier, srcType, relType);
-    cache.invalidate(dstIdentifier, dstType, relType);
     backend.insertRelation(relType, srcIdentifier, srcType, dstIdentifier, dstType, override);
+    publishOrApplyRelationInvalidation(srcIdentifier, srcType, relType);
+    publishOrApplyRelationInvalidation(dstIdentifier, dstType, relType);
   }
 
   @Override
@@ -293,29 +314,98 @@ public class RelationalEntityStore implements EntityStore, SupportsRelationOpera
     // backend. For example, if we are adding a tag to table, we need to invalidate the cache for
     // that table and the tag being added or removed. Otherwise, we might return stale data if we
     // list all tags for that table or all tables for that tag.
-    cache.invalidate(srcEntityIdent, srcEntityType, relType);
+    List<E> updated =
+        backend.updateEntityRelations(
+            relType, srcEntityIdent, srcEntityType, destEntitiesToAdd, destEntitiesToRemove);
+    publishOrApplyRelationInvalidation(srcEntityIdent, srcEntityType, relType);
     for (NameIdentifier destToAdd : destEntitiesToAdd) {
-      cache.invalidate(destToAdd, srcEntityType, relType);
+      publishOrApplyRelationInvalidation(destToAdd, srcEntityType, relType);
     }
 
     for (NameIdentifier destToRemove : destEntitiesToRemove) {
-      cache.invalidate(destToRemove, srcEntityType, relType);
+      publishOrApplyRelationInvalidation(destToRemove, srcEntityType, relType);
     }
-
-    return backend.updateEntityRelations(
-        relType, srcEntityIdent, srcEntityType, destEntitiesToAdd, destEntitiesToRemove);
+    return updated;
   }
 
   @Override
   public int batchDelete(
       List<Pair<NameIdentifier, Entity.EntityType>> entitiesToDelete, boolean cascade)
       throws IOException {
-    return backend.batchDelete(entitiesToDelete, cascade);
+    int result = backend.batchDelete(entitiesToDelete, cascade);
+    for (Pair<NameIdentifier, Entity.EntityType> entity : entitiesToDelete) {
+      publishOrApplyEntityInvalidation(entity.getLeft(), entity.getRight());
+    }
+    return result;
   }
 
   @Override
   public <E extends Entity & HasIdentifier> void batchPut(List<E> entities, boolean overwritten)
       throws IOException, EntityAlreadyExistsException {
     backend.batchPut(entities, overwritten);
+    entities.forEach(entity -> publishOrApplyEntityUpsert(entity.nameIdentifier(), entity.type()));
+  }
+
+  private void publishOrApplyEntityInvalidation(
+      NameIdentifier ident, Entity.EntityType entityType) {
+    if (!cacheInvalidationService.isEnabled()) {
+      cache.invalidate(ident, entityType);
+      return;
+    }
+
+    cacheInvalidationService.publish(
+        CacheInvalidationEvent.of(
+            CacheDomain.ENTITY,
+            CacheInvalidationOperation.INVALIDATE_KEY,
+            EntityCacheInvalidationKey.of(ident, entityType, null),
+            cacheInvalidationService.localNodeId()));
+  }
+
+  private void publishOrApplyRelationInvalidation(
+      NameIdentifier ident, Entity.EntityType entityType, SupportsRelationOperations.Type relType) {
+    if (!cacheInvalidationService.isEnabled()) {
+      cache.invalidate(ident, entityType, relType);
+      return;
+    }
+
+    cacheInvalidationService.publish(
+        CacheInvalidationEvent.of(
+            CacheDomain.ENTITY,
+            CacheInvalidationOperation.INVALIDATE_KEY,
+            EntityCacheInvalidationKey.of(ident, entityType, relType),
+            cacheInvalidationService.localNodeId()));
+  }
+
+  private void publishOrApplyEntityUpsert(NameIdentifier ident, Entity.EntityType entityType) {
+    if (!cacheInvalidationService.isEnabled()) {
+      return;
+    }
+
+    cacheInvalidationService.publish(
+        CacheInvalidationEvent.of(
+            CacheDomain.ENTITY,
+            CacheInvalidationOperation.UPSERT_KEY,
+            EntityCacheInvalidationKey.of(ident, entityType, null),
+            cacheInvalidationService.localNodeId()));
+  }
+
+  private void handleEntityInvalidationEvent(CacheInvalidationEvent event) {
+    if (event.operation() == CacheInvalidationOperation.INVALIDATE_ALL) {
+      cache.clear();
+      return;
+    }
+
+    if (event.operation() != CacheInvalidationOperation.INVALIDATE_KEY
+        || !(event.key() instanceof EntityCacheInvalidationKey)) {
+      return;
+    }
+
+    EntityCacheInvalidationKey key = (EntityCacheInvalidationKey) event.key();
+    if (key.relationType() == null) {
+      cache.invalidate(key.identifier(), key.entityType());
+      return;
+    }
+
+    cache.invalidate(key.identifier(), key.entityType(), key.relationType());
   }
 }

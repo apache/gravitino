@@ -51,6 +51,13 @@ import org.apache.gravitino.authorization.AuthorizationUtils;
 import org.apache.gravitino.authorization.GravitinoAuthorizer;
 import org.apache.gravitino.authorization.Privilege;
 import org.apache.gravitino.authorization.SecurableObject;
+import org.apache.gravitino.cache.invalidation.CacheDomain;
+import org.apache.gravitino.cache.invalidation.CacheInvalidationEvent;
+import org.apache.gravitino.cache.invalidation.CacheInvalidationOperation;
+import org.apache.gravitino.cache.invalidation.CacheInvalidationService;
+import org.apache.gravitino.cache.invalidation.CacheInvalidationServiceFactory;
+import org.apache.gravitino.cache.invalidation.OwnerCacheInvalidationKey;
+import org.apache.gravitino.cache.invalidation.RoleCacheInvalidationKey;
 import org.apache.gravitino.exceptions.NoSuchUserException;
 import org.apache.gravitino.meta.RoleEntity;
 import org.apache.gravitino.meta.UserEntity;
@@ -90,6 +97,9 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
   private Cache<Long, Optional<Long>> ownerRel;
 
   private Executor executor = null;
+  private CacheInvalidationService cacheInvalidationService;
+  private String roleInvalidationHandlerId;
+  private String ownerInvalidationHandlerId;
 
   @Override
   public void initialize() {
@@ -126,6 +136,14 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
             .expireAfterAccess(cacheExpirationSecs, TimeUnit.SECONDS)
             .maximumSize(ownerCacheSize)
             .build();
+    cacheInvalidationService =
+        CacheInvalidationServiceFactory.getOrCreate(GravitinoEnv.getInstance().config());
+    roleInvalidationHandlerId = "jcasbin-role-" + System.identityHashCode(this);
+    ownerInvalidationHandlerId = "jcasbin-owner-" + System.identityHashCode(this);
+    cacheInvalidationService.registerHandler(
+        CacheDomain.AUTH_ROLE, roleInvalidationHandlerId, this::handleRoleInvalidationEvent);
+    cacheInvalidationService.registerHandler(
+        CacheDomain.AUTH_OWNER, ownerInvalidationHandlerId, this::handleOwnerInvalidationEvent);
     executor =
         Executors.newFixedThreadPool(
             GravitinoEnv.getInstance()
@@ -401,7 +419,17 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
 
   @Override
   public void handleRolePrivilegeChange(Long roleId) {
-    loadedRoles.invalidate(roleId);
+    if (!cacheInvalidationService.isEnabled()) {
+      loadedRoles.invalidate(roleId);
+      return;
+    }
+
+    cacheInvalidationService.publish(
+        CacheInvalidationEvent.of(
+            CacheDomain.AUTH_ROLE,
+            CacheInvalidationOperation.INVALIDATE_KEY,
+            RoleCacheInvalidationKey.of(roleId),
+            cacheInvalidationService.localNodeId()));
   }
 
   @Override
@@ -409,11 +437,26 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
       String metalake, Long oldOwnerId, NameIdentifier nameIdentifier, Entity.EntityType type) {
     MetadataObject metadataObject = NameIdentifierUtil.toMetadataObject(nameIdentifier, type);
     Long metadataId = MetadataIdConverter.getID(metadataObject, metalake);
-    ownerRel.invalidate(metadataId);
+    if (!cacheInvalidationService.isEnabled()) {
+      ownerRel.invalidate(metadataId);
+      return;
+    }
+
+    cacheInvalidationService.publish(
+        CacheInvalidationEvent.of(
+            CacheDomain.AUTH_OWNER,
+            CacheInvalidationOperation.INVALIDATE_KEY,
+            OwnerCacheInvalidationKey.of(metadataId),
+            cacheInvalidationService.localNodeId()));
   }
 
   @Override
   public void close() throws IOException {
+    if (cacheInvalidationService != null) {
+      cacheInvalidationService.unregisterHandler(CacheDomain.AUTH_ROLE, roleInvalidationHandlerId);
+      cacheInvalidationService.unregisterHandler(
+          CacheDomain.AUTH_OWNER, ownerInvalidationHandlerId);
+    }
     if (executor != null) {
       if (executor instanceof ThreadPoolExecutor) {
         ThreadPoolExecutor threadPoolExecutor = (ThreadPoolExecutor) executor;
@@ -600,5 +643,25 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
             condition.name().toLowerCase(java.util.Locale.ROOT));
       }
     }
+  }
+
+  private void handleRoleInvalidationEvent(CacheInvalidationEvent event) {
+    if (event.operation() != CacheInvalidationOperation.INVALIDATE_KEY
+        || !(event.key() instanceof RoleCacheInvalidationKey)) {
+      return;
+    }
+
+    RoleCacheInvalidationKey key = (RoleCacheInvalidationKey) event.key();
+    loadedRoles.invalidate(key.roleId());
+  }
+
+  private void handleOwnerInvalidationEvent(CacheInvalidationEvent event) {
+    if (event.operation() != CacheInvalidationOperation.INVALIDATE_KEY
+        || !(event.key() instanceof OwnerCacheInvalidationKey)) {
+      return;
+    }
+
+    OwnerCacheInvalidationKey key = (OwnerCacheInvalidationKey) event.key();
+    ownerRel.invalidate(key.metadataId());
   }
 }
