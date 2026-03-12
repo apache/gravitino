@@ -69,6 +69,20 @@ public class Indexes {
    * @param indexType The type of the index
    * @param name The name of the index
    * @param fieldNames The field names under the table contained in the index.
+<<<<<<< HEAD
+=======
+   * @return An {@link Index} instance with empty properties
+   */
+  public static Index of(IndexType indexType, String name, String[][] fieldNames) {
+    return of(indexType, name, fieldNames, ImmutableMap.of());
+  }
+
+  /**
+   * @param indexType The type of the index
+   * @param name The name of the index
+   * @param fieldNames The field names under the table contained in the index.
+   * @param properties Extra properties for index configuration
+>>>>>>> 63d176b80 ([#10373] fix(client): Support runing JDK8 with Gravitino client (#10376))
    * @return The index
    */
   public static Index of(Index.IndexType indexType, String name, String[][] fieldNames) {
@@ -98,6 +112,10 @@ public class Indexes {
       this.indexType = indexType;
       this.name = name;
       this.fieldNames = fieldNames;
+<<<<<<< HEAD
+=======
+      this.properties = properties == null ? ImmutableMap.of() : properties;
+>>>>>>> 63d176b80 ([#10373] fix(client): Support runing JDK8 with Gravitino client (#10376))
     }
 
     /**

@@ -20,6 +20,11 @@
 package org.apache.gravitino.json;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
+<<<<<<< HEAD
+=======
+import com.google.common.collect.ImmutableMap;
+import java.util.Map;
+>>>>>>> 63d176b80 ([#10373] fix(client): Support runing JDK8 with Gravitino client (#10376))
 import org.apache.gravitino.dto.rel.DistributionDTO;
 import org.apache.gravitino.dto.rel.SortOrderDTO;
 import org.apache.gravitino.dto.rel.expressions.LiteralDTO;
@@ -136,6 +141,32 @@ public class TestSerializer {
         "{\"indexType\":\"unique_key\",\"name\":\"index_2\","
             + "\"fieldNames\":[[\"col1\"],[\"col2\"]]}";
     Assertions.assertEquals(expectedJson, actualJson);
+<<<<<<< HEAD
+=======
+
+    Map<String, String> props = ImmutableMap.of("compression", "lz4", "level", "high");
+    index =
+        (IndexImpl)
+            Indexes.of(
+                IndexType.PRIMARY_KEY, "index_3", new String[][] {new String[] {"colA"}}, props);
+    actualJson = JsonUtils.anyFieldMapper().writeValueAsString(DTOConverters.toDTO(index));
+
+    expectedJson =
+        "{"
+            + "\"indexType\":\"PRIMARY_KEY\","
+            + "\"name\":\"index_3\","
+            + "\"fieldNames\":[[\"colA\"]],"
+            + "\"properties\":{"
+            + "\"compression\":\"lz4\","
+            + "\"level\":\"high\""
+            + "}"
+            + "}";
+    Assertions.assertEquals(expectedJson, actualJson);
+
+    deserialized = JsonUtils.anyFieldMapper().readValue(actualJson, IndexDTO.class);
+
+    Assertions.assertEquals(index, DTOConverters.fromDTO(deserialized));
+>>>>>>> 63d176b80 ([#10373] fix(client): Support runing JDK8 with Gravitino client (#10376))
   }
 
   @Test
