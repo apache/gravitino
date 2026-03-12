@@ -808,6 +808,7 @@
    ISC license.
 
    @isaacs/cliui
+   @isaacs/fs-minipass
    anymatch
    boolbase
    electron-to-chromium
