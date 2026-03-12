@@ -29,7 +29,7 @@ public class OSSProperties {
   public static final String GRAVITINO_OSS_ACCESS_KEY_ID = "oss-access-key-id";
   // The static access key secret used to access OSS data.
   public static final String GRAVITINO_OSS_ACCESS_KEY_SECRET = "oss-secret-access-key";
-  // The filesystem implement of Aliyun OSS.
+  // The filesystem implementation of Aliyun OSS.
   public static final String GRAVITINO_OSS_IMPLEMENT = "oss-impl";
 
   // OSS role arn
