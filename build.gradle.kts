@@ -372,6 +372,12 @@ subprojects {
     }
   }
 
+  tasks.withType<JavaCompile>().configureEach {
+    if (compatibleWithJDK8(project)) {
+      options.release.set(8)
+    }
+  }
+
   java {
     toolchain {
       // Some JDK vendors like Homebrew installed OpenJDK 17 have problems in building trino-connector:
