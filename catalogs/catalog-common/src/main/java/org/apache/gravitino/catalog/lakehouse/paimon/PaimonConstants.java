@@ -48,7 +48,7 @@ public class PaimonConstants {
   public static final String OSS_ENDPOINT = "fs.oss.endpoint";
   public static final String OSS_ACCESS_KEY = "fs.oss.accessKeyId";
   public static final String OSS_SECRET_KEY = "fs.oss.accessKeySecret";
-  public static final String OSS_IMPLEMENTATION = "hadoop.fs.oss.impl";
+  public static final String OSS_FILESYSTEM_IMPLEMENTATION = "hadoop.fs.oss.impl";
 
   // DLF (Data Lake Formation) related properties
   public static final String GRAVITINO_DLF_ACCESS_KEY_ID = "dlf-access-key-id";
