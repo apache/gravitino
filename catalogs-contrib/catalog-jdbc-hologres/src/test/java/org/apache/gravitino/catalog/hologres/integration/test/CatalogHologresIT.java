@@ -416,12 +416,64 @@ public class CatalogHologresIT extends BaseIT {
     table = catalog.asTableCatalog().loadTable(newTableIdentifier);
     Assertions.assertEquals("new_comment", table.columns()[0].comment());
 
-    // Note: Hologres does not support ALTER TABLE DROP COLUMN, so we skip the delete column test.
-    // The added column col_4 will remain in the table.
-
     // Test drop table
     Assertions.assertTrue(catalog.asTableCatalog().dropTable(newTableIdentifier));
     Assertions.assertFalse(catalog.asTableCatalog().dropTable(newTableIdentifier));
+  }
+
+  @Test
+  void testDropColumn() {
+    // Setup: Create a table with multiple columns
+    Column col1 = Column.of("id", Types.LongType.get(), "id column", false, false, null);
+    Column col2 = Column.of("name", Types.StringType.get(), "name column", true, false, null);
+    Column col3 = Column.of("value", Types.IntegerType.get(), "value column", true, false, null);
+    Column[] columns = new Column[] {col1, col2, col3};
+
+    String dropTableName = GravitinoITUtils.genRandomName("drop_col_table");
+    NameIdentifier tableIdentifier = NameIdentifier.of(schemaName, dropTableName);
+
+    catalog
+        .asTableCatalog()
+        .createTable(tableIdentifier, columns, tableComment, createProperties());
+
+    // Test 1: Delete an existing column
+    catalog
+        .asTableCatalog()
+        .alterTable(tableIdentifier, TableChange.deleteColumn(new String[] {"value"}, false));
+
+    Table table = catalog.asTableCatalog().loadTable(tableIdentifier);
+    Assertions.assertEquals(2, table.columns().length);
+    Assertions.assertFalse(Arrays.stream(table.columns()).anyMatch(c -> c.name().equals("value")));
+
+    // Test 2: Delete non-existent column with ifExists=true (should succeed without error)
+    Assertions.assertDoesNotThrow(
+        () ->
+            catalog
+                .asTableCatalog()
+                .alterTable(
+                    tableIdentifier,
+                    TableChange.deleteColumn(new String[] {"non_existent_column"}, true)));
+
+    // Test 3: Delete non-existent column with ifExists=false (should throw
+    // IllegalArgumentException)
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () ->
+            catalog
+                .asTableCatalog()
+                .alterTable(
+                    tableIdentifier,
+                    TableChange.deleteColumn(new String[] {"non_existent_column"}, false)));
+
+    // Test 4: Delete nested column (should throw UnsupportedOperationException)
+    Assertions.assertThrows(
+        UnsupportedOperationException.class,
+        () ->
+            catalog
+                .asTableCatalog()
+                .alterTable(
+                    tableIdentifier,
+                    TableChange.deleteColumn(new String[] {"nested", "column"}, false)));
   }
 
   @Test
