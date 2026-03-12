@@ -489,4 +489,10 @@ public class TestSchemaOperations extends BaseOperationsTest {
 
     return mockSchema;
   }
+
+  @Test
+  public void testCreateSchemaWithNullRequestShouldNotThrow() {
+    SchemaOperations operations = new SchemaOperations(dispatcher);
+    Assertions.assertDoesNotThrow(() -> operations.createSchema(metalake, catalog, null));
+  }
 }
