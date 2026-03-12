@@ -146,8 +146,6 @@ public class SchemaOperationDispatcher extends OperationDispatcher implements Sc
                   .withId(uid)
                   .withName(ident.name())
                   .withNamespace(ident.namespace())
-                  .withComment(comment)
-                  .withProperties(properties)
                   .withAuditInfo(
                       AuditInfo.builder()
                           .withCreator(PrincipalUtils.getCurrentPrincipal().getName())
