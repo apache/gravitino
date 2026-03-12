@@ -276,39 +276,4 @@ public class IcebergViewOperations {
       return replaceViewRequest.toString();
     }
   }
-<<<<<<< HEAD
-=======
-
-  private NameIdentifier[] toViewNameIdentifiers(
-      ListTablesResponse listTablesResponse, String metalake, String catalogName) {
-    List<TableIdentifier> identifiers = listTablesResponse.identifiers();
-    NameIdentifier[] nameIdentifiers = new NameIdentifier[identifiers.size()];
-    for (int i = 0; i < identifiers.size(); i++) {
-      TableIdentifier identifier = identifiers.get(i);
-      nameIdentifiers[i] =
-          NameIdentifier.of(
-              metalake, catalogName, identifier.namespace().level(0), identifier.name());
-    }
-    return nameIdentifiers;
-  }
-
-  private ListTablesResponse filterListViewsResponse(
-      ListTablesResponse listTablesResponse, String metalake, String catalogName) {
-    NameIdentifier[] idents =
-        MetadataAuthzHelper.filterByExpression(
-            metalake,
-            AuthorizationExpressionConstants.FILTER_VIEW_AUTHORIZATION_EXPRESSION,
-            Entity.EntityType.VIEW,
-            toViewNameIdentifiers(listTablesResponse, metalake, catalogName));
-    List<TableIdentifier> filteredIdentifiers = new ArrayList<>();
-    for (NameIdentifier ident : idents) {
-      filteredIdentifiers.add(
-          TableIdentifier.of(Namespace.of(ident.namespace().level(2)), ident.name()));
-    }
-    return ListTablesResponse.builder()
-        .addAll(filteredIdentifiers)
-        .nextPageToken(listTablesResponse.nextPageToken())
-        .build();
-  }
->>>>>>> e30102470 ([#10397] fix(iceberg): Fix wrong namespaces when listing tables or views (#10398))
 }
