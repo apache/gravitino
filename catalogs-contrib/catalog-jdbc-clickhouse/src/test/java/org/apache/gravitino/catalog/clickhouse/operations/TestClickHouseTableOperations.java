@@ -1113,6 +1113,28 @@ public class TestClickHouseTableOperations extends TestClickHouse {
     Assertions.assertArrayEquals(new String[][] {{"c4"}}, bloomFields);
   }
 
+  @Test
+  void testParseSortOrdersFromMultilineShowCreateSql() {
+    TestableClickHouseTableOperations ops = new TestableClickHouseTableOperations();
+    String showCreateSql =
+        """
+        CREATE TABLE `t1`
+        (
+          `id` Int32,
+          `event_time` DateTime
+        )
+        ENGINE = MergeTree
+        ORDER BY
+          (`id`, toDate(`event_time`))
+        SETTINGS index_granularity = 8192
+        """;
+
+    SortOrder[] sortOrders = ops.parseSortOrders(showCreateSql);
+    Assertions.assertEquals(2, sortOrders.length);
+    Assertions.assertTrue(sortOrders[0].expression() instanceof NamedReference);
+    Assertions.assertEquals("id", ((NamedReference) sortOrders[0].expression()).fieldName()[0]);
+  }
+
   private static final class TestableClickHouseTableOperations extends ClickHouseTableOperations {
     String buildCreateSql(
         String tableName,
@@ -1125,6 +1147,10 @@ public class TestClickHouseTableOperations extends TestClickHouse {
         SortOrder[] sortOrders) {
       return generateCreateTableSql(
           tableName, columns, comment, properties, partitioning, distribution, indexes, sortOrders);
+    }
+
+    SortOrder[] parseSortOrders(String createSql) {
+      return parseSortOrdersFromCreateSql(createSql);
     }
   }
 

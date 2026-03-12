@@ -55,6 +55,7 @@ import org.apache.gravitino.rel.Column;
 import org.apache.gravitino.rel.Table;
 import org.apache.gravitino.rel.TableCatalog;
 import org.apache.gravitino.rel.TableChange;
+import org.apache.gravitino.rel.expressions.NamedReference;
 import org.apache.gravitino.rel.expressions.distributions.Distribution;
 import org.apache.gravitino.rel.expressions.distributions.Distributions;
 import org.apache.gravitino.rel.expressions.literals.Literals;
@@ -228,6 +229,10 @@ public class CatalogClickHouseClusterIT extends BaseIT {
         ENGINE.MERGETREE.getValue(), loadedLocalTable.properties().get(GRAVITINO_ENGINE_KEY));
     Assertions.assertEquals("false", loadedLocalTable.properties().get(ON_CLUSTER));
     Assertions.assertFalse(loadedLocalTable.properties().containsKey(CLUSTER_NAME));
+    Assertions.assertEquals(1, loadedLocalTable.sortOrder().length);
+    Assertions.assertTrue(loadedLocalTable.sortOrder()[0].expression() instanceof NamedReference);
+    Assertions.assertEquals(
+        "col_3", ((NamedReference) loadedLocalTable.sortOrder()[0].expression()).fieldName()[0]);
 
     Table distributedTable =
         tableCatalog.createTable(
@@ -268,6 +273,12 @@ public class CatalogClickHouseClusterIT extends BaseIT {
         ENGINE.MERGETREE.getValue(), loadedNonClusterTable.properties().get(GRAVITINO_ENGINE_KEY));
     Assertions.assertEquals("false", loadedNonClusterTable.properties().get(ON_CLUSTER));
     Assertions.assertFalse(loadedNonClusterTable.properties().containsKey(CLUSTER_NAME));
+    Assertions.assertEquals(1, loadedNonClusterTable.sortOrder().length);
+    Assertions.assertTrue(
+        loadedNonClusterTable.sortOrder()[0].expression() instanceof NamedReference);
+    Assertions.assertEquals(
+        "col_3",
+        ((NamedReference) loadedNonClusterTable.sortOrder()[0].expression()).fieldName()[0]);
 
     try (Connection connection =
             DriverManager.getConnection(

@@ -81,9 +81,11 @@ public class ClickHouseTableOperations extends JdbcTableOperations {
   private static final String CLICKHOUSE_NOT_SUPPORT_NESTED_COLUMN_MSG =
       "Clickhouse does not support nested column names.";
   private static final Pattern ORDER_BY_PATTERN =
-      Pattern.compile("ORDER\\s+BY\\s+([^\\n]+)", Pattern.CASE_INSENSITIVE);
+      Pattern.compile(
+          "(?is)\\bORDER\\s+BY\\s*(.+?)(?=\\bPARTITION\\s+BY\\b|\\bPRIMARY\\s+KEY\\b|\\bSAMPLE\\s+BY\\b|\\bTTL\\b|\\bSETTINGS\\b|\\bCOMMENT\\b|$)");
   private static final Pattern PARTITION_BY_PATTERN =
-      Pattern.compile("PARTITION\\s+BY\\s+([^\\n]+)", Pattern.CASE_INSENSITIVE);
+      Pattern.compile(
+          "(?is)\\bPARTITION\\s+BY\\s*(.+?)(?=\\bORDER\\s+BY\\b|\\bPRIMARY\\s+KEY\\b|\\bSAMPLE\\s+BY\\b|\\bTTL\\b|\\bSETTINGS\\b|\\bCOMMENT\\b|$)");
   private static final Pattern ON_CLUSTER_PATTERN =
       Pattern.compile("(?i)\\bON\\s+CLUSTER\\s+`?([^`\\s(]+)`?");
   private static final Pattern DISTRIBUTED_ENGINE_PATTERN =
@@ -1065,6 +1067,11 @@ public class ClickHouseTableOperations extends JdbcTableOperations {
     }
 
     return metadata;
+  }
+
+  @VisibleForTesting
+  SortOrder[] parseSortOrdersFromCreateSql(String createSql) {
+    return parseCreateStatement(createSql).sortOrders;
   }
 
   private ShowCreateTableMetadata parseShowCreateTable(Connection connection, String tableName)
