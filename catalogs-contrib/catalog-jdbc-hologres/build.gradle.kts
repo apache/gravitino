@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-description = "catalog-jdbc-starrocks"
+description = "catalog-jdbc-hologres"
 
 plugins {
   `maven-publish`
@@ -29,6 +29,9 @@ dependencies {
   compileOnly(project(":common"))
   compileOnly(project(":core"))
 
+  implementation(project(":catalogs:catalog-common")) {
+    exclude(group = "*")
+  }
   implementation(project(":catalogs:catalog-jdbc-common")) {
     exclude(group = "*")
   }
@@ -50,10 +53,9 @@ dependencies {
   testImplementation(libs.awaitility)
   testImplementation(libs.junit.jupiter.api)
   testImplementation(libs.junit.jupiter.params)
-  testImplementation(libs.mysql.driver)
   testImplementation(libs.postgresql.driver)
   testImplementation(libs.testcontainers)
-  testImplementation(libs.testcontainers.mysql)
+  testImplementation(libs.testcontainers.postgresql)
 
   testRuntimeOnly(libs.junit.jupiter.engine)
 }
@@ -63,6 +65,7 @@ tasks {
     from(configurations.runtimeClasspath)
     into("build/libs")
   }
+
   val copyCatalogLibs by registering(Copy::class) {
     dependsOn("jar", "runtimeJars")
     from("build/libs") {
@@ -71,14 +74,14 @@ tasks {
       exclude("slf4j-*.jar")
       exclude("error_prone_annotations-*.jar")
     }
-    into("$rootDir/distribution/package/catalogs/jdbc-starrocks/libs")
+    into("$rootDir/distribution/package/catalogs/jdbc-hologres/libs")
   }
 
   val copyCatalogConfig by registering(Copy::class) {
     from("src/main/resources")
-    into("$rootDir/distribution/package/catalogs/jdbc-starrocks/conf")
+    into("$rootDir/distribution/package/catalogs/jdbc-hologres/conf")
 
-    include("jdbc-starrocks.conf")
+    include("jdbc-hologres.conf")
 
     exclude { details ->
       details.file.isDirectory()

@@ -73,6 +73,7 @@ tasks {
       exclude("guava-*.jar")
       exclude("log4j-*.jar")
       exclude("slf4j-*.jar")
+      exclude("error_prone_annotations-*.jar")
     }
     into("$rootDir/distribution/package/catalogs/jdbc-oceanbase/libs")
   }
