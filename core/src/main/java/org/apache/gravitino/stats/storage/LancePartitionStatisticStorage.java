@@ -199,7 +199,7 @@ public class LancePartitionStatisticStorage implements PartitionStatisticStorage
               Caffeine.newBuilder()
                   .maximumSize(datasetCacheSize)
                   .scheduler(Scheduler.forScheduledExecutorService(this.scheduler))
-                  .evictionListener(
+                  .removalListener(
                       (RemovalListener<Long, Dataset>)
                           (key, value, cause) -> {
                             if (value != null) {
