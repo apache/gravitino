@@ -61,7 +61,7 @@ public class CatalogPaimonOSSIT extends CatalogPaimonBaseIT {
     catalogProperties.put(OSSProperties.GRAVITINO_OSS_ACCESS_KEY_ID, accessKey);
     catalogProperties.put(OSSProperties.GRAVITINO_OSS_ACCESS_KEY_SECRET, secretKey);
     catalogProperties.put(OSSProperties.GRAVITINO_OSS_ENDPOINT, endpoint);
-    catalogProperties.put(OSSProperties.GRAVITINO_OSS_IMPLEMENT, ossImpl);
+    catalogProperties.put(OSSProperties.GRAVITINO_OSS_IMPLEMENTATION, ossImpl);
 
     // Need to download the OSS dependency in the deploy mode.
     downloadOSSDependency();
