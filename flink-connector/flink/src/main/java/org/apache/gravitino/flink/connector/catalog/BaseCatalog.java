@@ -328,11 +328,7 @@ public abstract class BaseCatalog extends AbstractCatalog {
         primaryColumns.stream()
             .map(primaryColumn -> new String[] {primaryColumn})
             .toArray(String[][]::new);
-<<<<<<< HEAD
     Index primary = Indexes.primary("primary", primaryField);
-=======
-    Index primary = Indexes.primary("primary", primaryField, Collections.emptyMap());
->>>>>>> 63d176b80 ([#10373] fix(client): Support runing JDK8 with Gravitino client (#10376))
     return new Index[] {primary};
   }
 

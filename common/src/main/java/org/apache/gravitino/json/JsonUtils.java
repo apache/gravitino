@@ -1501,23 +1501,6 @@ public class JsonUtils {
       node.get(INDEX_FIELD_NAMES)
           .forEach(field -> fieldNames.add(getStringArray((ArrayNode) field)));
       builder.withFieldNames(fieldNames.toArray(new String[0][0]));
-<<<<<<< HEAD
-=======
-      Map<String, String> properties = ImmutableMap.of();
-
-      if (node.has("properties") && node.get("properties").isObject()) {
-
-        Map<String, String> props = new HashMap<>();
-
-        node.get("properties")
-            .fields()
-            .forEachRemaining(entry -> props.put(entry.getKey(), entry.getValue().asText()));
-
-        properties = props;
-      }
-
-      builder.withProperties(properties);
->>>>>>> 63d176b80 ([#10373] fix(client): Support runing JDK8 with Gravitino client (#10376))
       return builder.build();
     }
   }

@@ -21,7 +21,6 @@ package org.apache.gravitino.dto.rel.indexes;
 import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
 import com.fasterxml.jackson.databind.annotation.JsonSerialize;
 import com.google.common.base.Preconditions;
-import com.google.common.collect.ImmutableMap;
 import java.util.Arrays;
 import java.util.Objects;
 import org.apache.gravitino.json.JsonUtils.IndexDeserializer;
@@ -54,10 +53,6 @@ public class IndexDTO implements Index {
     this.indexType = indexType;
     this.name = name;
     this.fieldNames = fieldNames;
-<<<<<<< HEAD
-=======
-    this.properties = properties == null ? ImmutableMap.of() : properties;
->>>>>>> 63d176b80 ([#10373] fix(client): Support runing JDK8 with Gravitino client (#10376))
   }
 
   /**
