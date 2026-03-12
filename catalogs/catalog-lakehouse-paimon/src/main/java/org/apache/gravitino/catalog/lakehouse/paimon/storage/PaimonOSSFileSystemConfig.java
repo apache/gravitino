@@ -118,7 +118,7 @@ public class PaimonOSSFileSystemConfig extends Config {
               OSS_IMPLEMENT,
               PropertyEntry.stringOptionalPropertyEntry(
                   OSS_IMPLEMENT,
-                  "The filesystem implement of the Aliyun oss",
+                  "The filesystem implementation of the Aliyun oss",
                   false /* immutable */,
                   null /* defaultValue */,
                   false /* hidden */))
