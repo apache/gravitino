@@ -32,7 +32,7 @@ Since Hologres is a cloud service hosted on Alibaba Cloud, integration tests req
 ### Environment Variables
 
 | Variable | Required | Description |
-|---|---|---|
+|:---------|:---------|:------------|
 | `GRAVITINO_HOLOGRES_JDBC_URL` | Yes | Hologres JDBC URL, e.g. `jdbc:postgresql://<host>:<port>/<database>` |
 | `GRAVITINO_HOLOGRES_USERNAME` | Yes | Hologres access key ID or username |
 | `GRAVITINO_HOLOGRES_PASSWORD` | Yes | Hologres access key secret or password |

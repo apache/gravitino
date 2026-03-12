@@ -62,6 +62,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestInstance;
 import org.junit.jupiter.api.TestInstance.Lifecycle;
 import org.junit.jupiter.api.condition.EnabledIf;
+import org.junit.jupiter.api.condition.EnabledIfEnvironmentVariable;
 import org.junit.platform.commons.util.StringUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -79,6 +80,7 @@ import org.slf4j.LoggerFactory;
  *   <li>{@code GRAVITINO_HOLOGRES_PASSWORD} - Hologres password
  * </ul>
  */
+@EnabledIfEnvironmentVariable(named = "GRAVITINO_TEST_CLOUD_IT", matches = "true")
 @EnabledIf(value = "hologresIsConfigured", disabledReason = "Hologres is not configured")
 @TestInstance(Lifecycle.PER_CLASS)
 public class CatalogHologresIT extends BaseIT {

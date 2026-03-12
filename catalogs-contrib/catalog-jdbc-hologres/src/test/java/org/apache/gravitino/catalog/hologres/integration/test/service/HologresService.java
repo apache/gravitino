@@ -43,7 +43,7 @@ public class HologresService {
   public HologresService(String jdbcUrl, String username, String password) {
     try {
       connection = DriverManager.getConnection(jdbcUrl, username, password);
-    } catch (Exception e) {
+    } catch (SQLException e) {
       throw new RuntimeException("Failed to connect to Hologres: " + e.getMessage(), e);
     }
   }
