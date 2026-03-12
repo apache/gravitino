@@ -165,6 +165,8 @@ public class ClickHouseTableOperations extends JdbcTableOperations {
     Map<String, String> notNullProperties =
         MapUtils.isNotEmpty(properties) ? properties : Collections.emptyMap();
 
+    validateNoAutoIncrementColumns(columns);
+
     // Add Create table clause
     appendCreateTableClause(notNullProperties, sqlBuilder, tableName);
 
@@ -425,6 +427,19 @@ public class ClickHouseTableOperations extends JdbcTableOperations {
     String fieldName =
         ((NamedReference) transform.arguments()[0]).fieldName()[0]; // already validated
     return quoteIdentifier(fieldName);
+  }
+
+  private void validateNoAutoIncrementColumns(JdbcColumn[] columns) {
+    if (ArrayUtils.isEmpty(columns)) {
+      return;
+    }
+
+    for (JdbcColumn column : columns) {
+      if (column.autoIncrement()) {
+        throw new UnsupportedOperationException(
+            "ClickHouse does not support auto increment column in CREATE TABLE");
+      }
+    }
   }
 
   private void buildColumnsDefinition(JdbcColumn[] columns, StringBuilder sqlBuilder) {

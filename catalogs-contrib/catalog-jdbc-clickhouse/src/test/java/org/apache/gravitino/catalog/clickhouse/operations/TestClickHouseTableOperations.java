@@ -1059,6 +1059,43 @@ public class TestClickHouseTableOperations extends TestClickHouse {
   }
 
   @Test
+  void testGenerateCreateTableSqlWithAutoIncrementColumnUnsupported() {
+    TestableClickHouseTableOperations ops = new TestableClickHouseTableOperations();
+    ops.initialize(
+        null,
+        new ClickHouseExceptionConverter(),
+        new ClickHouseTypeConverter(),
+        new ClickHouseColumnDefaultValueConverter(),
+        new HashMap<>());
+
+    JdbcColumn[] cols =
+        new JdbcColumn[] {
+          JdbcColumn.builder()
+              .withName("id")
+              .withType(Types.IntegerType.get())
+              .withNullable(false)
+              .withAutoIncrement(true)
+              .withDefaultValue(DEFAULT_VALUE_NOT_SET)
+              .build()
+        };
+
+    UnsupportedOperationException exception =
+        Assertions.assertThrows(
+            UnsupportedOperationException.class,
+            () ->
+                ops.buildCreateSql(
+                    "t_auto_inc",
+                    cols,
+                    null,
+                    new HashMap<>(),
+                    Transforms.EMPTY_TRANSFORM,
+                    Distributions.NONE,
+                    Indexes.EMPTY_INDEXES,
+                    ClickHouseUtils.getSortOrders("id")));
+    Assertions.assertTrue(exception.getMessage().contains("auto increment"));
+  }
+
+  @Test
   void testParsePartitioningAndIndexExpressions() {
     TestableClickHouseTableOperations ops = new TestableClickHouseTableOperations();
 

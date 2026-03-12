@@ -1337,6 +1337,33 @@ public class CatalogClickHouseIT extends BaseIT {
   }
 
   @Test
+  void testCreateTableWithAutoIncrementUnsupported() {
+    String tableName = GravitinoITUtils.genRandomName("create_auto_inc");
+    NameIdentifier tableIdentifier = NameIdentifier.of(schemaName, tableName);
+    Column[] columns =
+        new Column[] {
+          Column.of("id", Types.IntegerType.get(), "id", false, true, DEFAULT_VALUE_NOT_SET),
+          Column.of("name", Types.StringType.get(), "name", true, false, DEFAULT_VALUE_NOT_SET)
+        };
+
+    RuntimeException exception =
+        Assertions.assertThrows(
+            RuntimeException.class,
+            () ->
+                catalog
+                    .asTableCatalog()
+                    .createTable(
+                        tableIdentifier,
+                        columns,
+                        table_comment,
+                        createProperties(),
+                        Transforms.EMPTY_TRANSFORM,
+                        Distributions.NONE,
+                        getSortOrders("id")));
+    Assertions.assertTrue(exception.getMessage().contains("auto increment"));
+  }
+
+  @Test
   void testDropClickHouseDatabase() {
     String schemaName = GravitinoITUtils.genRandomName("clickhouse_schema").toLowerCase();
     String tableName = GravitinoITUtils.genRandomName("clickhouse_table").toLowerCase();
