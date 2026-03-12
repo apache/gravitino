@@ -67,7 +67,7 @@ public class PaimonOSSFileSystemConfig extends Config {
   public static final ConfigEntry<String> PAIMON_OSS_IMPLEMENTATION_ENTRY =
       new ConfigBuilder(OSS_IMPLEMENTATION)
           .doc("The filesystem implementation of the Aliyun oss")
-          .version(ConfigConstants.VERSION_1_2_0)
+          .version(ConfigConstants.VERSION_1_3_0)
           .stringConf()
           .checkValue(StringUtils::isNotBlank, ConfigConstants.NOT_BLANK_ERROR_MSG)
           .create();
