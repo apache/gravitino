@@ -43,13 +43,13 @@ public class GravitinoPaimonCatalog extends BaseCatalog {
     TableCatalog paimonCatalog = new SparkCatalog();
     Map<String, String> all =
         getPropertiesConverter().toSparkCatalogProperties(options, properties);
-    all.entrySet().stream()
-        .forEach(
-            entry ->
-                SparkSession.active()
-                    .sessionState()
-                    .conf()
-                    .setConfString(entry.getKey(), entry.getValue()));
+    for (Map.Entry<String, String> entry : all.entrySet()) {
+      String key = entry.getKey();
+      String value = entry.getValue();
+      if (key != null && key.startsWith("fs.")) {
+        SparkSession.active().sessionState().conf().setConfString(key, value);
+      }
+    }
     paimonCatalog.initialize(catalogBackendName, new CaseInsensitiveStringMap(all));
     return paimonCatalog;
   }
