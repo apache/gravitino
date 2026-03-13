@@ -274,7 +274,7 @@ public class SchemaOperationDispatcher extends OperationDispatcher implements Sc
                                   .withId(schemaEntity.id())
                                   .withName(schemaEntity.name())
                                   .withNamespace(ident.namespace())
-                                  .withComment(schemaEntity.comment())
+                                  .withComment(alteredSchema.comment())
                                   .withProperties(
                                       StringIdentifier.newPropertiesWithoutId(
                                           alteredSchema.properties()))
