@@ -23,6 +23,7 @@ import com.google.common.collect.Maps;
 import java.util.Map;
 import org.apache.flink.configuration.Configuration;
 import org.apache.flink.table.catalog.CommonCatalogOptions;
+import org.apache.gravitino.catalog.lakehouse.paimon.PaimonConstants;
 
 /**
  * CatalogPropertiesConverter converts properties between Flink catalog properties and Apache
@@ -81,7 +82,11 @@ public interface CatalogPropertiesConverter {
           } else {
             String convertedKey = transformPropertyToFlinkCatalog(flinkConfigKey);
             if (convertedKey != null) {
-              allProperties.put(convertedKey, value);
+              if (convertedKey.equals(PaimonConstants.OSS_FILESYSTEM_IMPLEMENTATION)) {
+                allProperties.put("hadoop." + convertedKey, value);
+              } else {
+                allProperties.put(convertedKey, value);
+              }
             }
           }
         });

@@ -33,6 +33,8 @@ public class PaimonOSSFileSystemConfig extends Config {
   public static final String OSS_ENDPOINT = PaimonConstants.OSS_ENDPOINT;
   public static final String OSS_ACCESS_KEY = PaimonConstants.OSS_ACCESS_KEY;
   public static final String OSS_SECRET_KEY = PaimonConstants.OSS_SECRET_KEY;
+  public static final String OSS_FILESYSTEM_IMPLEMENTATION =
+      PaimonConstants.OSS_FILESYSTEM_IMPLEMENTATION;
 
   public PaimonOSSFileSystemConfig(Map<String, String> properties) {
     super(false);
@@ -41,7 +43,7 @@ public class PaimonOSSFileSystemConfig extends Config {
 
   public static final ConfigEntry<String> PAIMON_OSS_ENDPOINT_ENTRY =
       new ConfigBuilder(OSS_ENDPOINT)
-          .doc("The endpoint of the Aliyun oss")
+          .doc("The endpoint of the Aliyun OSS")
           .version(ConfigConstants.VERSION_0_7_0)
           .stringConf()
           .checkValue(StringUtils::isNotBlank, ConfigConstants.NOT_BLANK_ERROR_MSG)
@@ -49,7 +51,7 @@ public class PaimonOSSFileSystemConfig extends Config {
 
   public static final ConfigEntry<String> PAIMON_OSS_ACCESS_KEY_ENTRY =
       new ConfigBuilder(OSS_ACCESS_KEY)
-          .doc("The access key of the Aliyun oss")
+          .doc("The access key of the Aliyun OSS")
           .version(ConfigConstants.VERSION_0_7_0)
           .stringConf()
           .checkValue(StringUtils::isNotBlank, ConfigConstants.NOT_BLANK_ERROR_MSG)
@@ -57,8 +59,16 @@ public class PaimonOSSFileSystemConfig extends Config {
 
   public static final ConfigEntry<String> PAIMON_OSS_SECRET_KEY_ENTRY =
       new ConfigBuilder(OSS_SECRET_KEY)
-          .doc("The secret key of the Aliyun oss")
+          .doc("The secret key of the Aliyun OSS")
           .version(ConfigConstants.VERSION_0_7_0)
+          .stringConf()
+          .checkValue(StringUtils::isNotBlank, ConfigConstants.NOT_BLANK_ERROR_MSG)
+          .create();
+
+  public static final ConfigEntry<String> PAIMON_OSS_FILESYSTEM_IMPLEMENTATION_ENTRY =
+      new ConfigBuilder(OSS_FILESYSTEM_IMPLEMENTATION)
+          .doc("The filesystem implementation of the Aliyun OSS")
+          .version(ConfigConstants.VERSION_1_3_0)
           .stringConf()
           .checkValue(StringUtils::isNotBlank, ConfigConstants.NOT_BLANK_ERROR_MSG)
           .create();
@@ -75,13 +85,17 @@ public class PaimonOSSFileSystemConfig extends Config {
     return get(PAIMON_OSS_SECRET_KEY_ENTRY);
   }
 
+  public String getOSSFilesystemImplementation() {
+    return get(PAIMON_OSS_FILESYSTEM_IMPLEMENTATION_ENTRY);
+  }
+
   public static final Map<String, PropertyEntry<?>> OSS_FILESYSTEM_PROPERTY_ENTRIES =
       new ImmutableMap.Builder<String, PropertyEntry<?>>()
           .put(
               OSS_ENDPOINT,
               PropertyEntry.stringOptionalPropertyEntry(
                   OSS_ENDPOINT,
-                  "The endpoint of the Aliyun oss",
+                  "The endpoint of the Aliyun OSS",
                   false /* immutable */,
                   null /* defaultValue */,
                   false /* hidden */))
@@ -89,7 +103,7 @@ public class PaimonOSSFileSystemConfig extends Config {
               OSS_ACCESS_KEY,
               PropertyEntry.stringOptionalPropertyEntry(
                   OSS_ACCESS_KEY,
-                  "The access key of the Aliyun oss",
+                  "The access key of the Aliyun OSS",
                   false /* immutable */,
                   null /* defaultValue */,
                   false /* hidden */))
@@ -97,7 +111,15 @@ public class PaimonOSSFileSystemConfig extends Config {
               OSS_SECRET_KEY,
               PropertyEntry.stringOptionalPropertyEntry(
                   OSS_SECRET_KEY,
-                  "The secret key of the Aliyun oss",
+                  "The secret key of the Aliyun OSS",
+                  false /* immutable */,
+                  null /* defaultValue */,
+                  false /* hidden */))
+          .put(
+              OSS_FILESYSTEM_IMPLEMENTATION,
+              PropertyEntry.stringOptionalPropertyEntry(
+                  OSS_FILESYSTEM_IMPLEMENTATION,
+                  "The filesystem implementation of the Aliyun OSS",
                   false /* immutable */,
                   null /* defaultValue */,
                   false /* hidden */))

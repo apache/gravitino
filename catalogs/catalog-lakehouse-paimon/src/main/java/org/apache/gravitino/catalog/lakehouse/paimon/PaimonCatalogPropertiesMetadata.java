@@ -107,7 +107,9 @@ public class PaimonCatalogPropertiesMetadata extends BaseCatalogPropertiesMetada
       ImmutableMap.of(
           OSSProperties.GRAVITINO_OSS_ACCESS_KEY_ID, PaimonOSSFileSystemConfig.OSS_ACCESS_KEY,
           OSSProperties.GRAVITINO_OSS_ACCESS_KEY_SECRET, PaimonOSSFileSystemConfig.OSS_SECRET_KEY,
-          OSSProperties.GRAVITINO_OSS_ENDPOINT, PaimonOSSFileSystemConfig.OSS_ENDPOINT);
+          OSSProperties.GRAVITINO_OSS_ENDPOINT, PaimonOSSFileSystemConfig.OSS_ENDPOINT,
+          OSSProperties.GRAVITINO_OSS_FILESYSTEM_IMPLEMENTATION,
+              PaimonOSSFileSystemConfig.OSS_FILESYSTEM_IMPLEMENTATION);
 
   public static final Map<String, PropertyEntry<?>> REST_PROPERTY_ENTRIES =
       new ImmutableMap.Builder<String, PropertyEntry<?>>()

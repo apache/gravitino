@@ -28,6 +28,7 @@ import org.apache.gravitino.spark.connector.SparkTypeConverter;
 import org.apache.gravitino.spark.connector.catalog.BaseCatalog;
 import org.apache.paimon.spark.SparkCatalog;
 import org.apache.paimon.spark.SparkTable;
+import org.apache.spark.sql.SparkSession;
 import org.apache.spark.sql.connector.catalog.Identifier;
 import org.apache.spark.sql.connector.catalog.Table;
 import org.apache.spark.sql.connector.catalog.TableCatalog;
@@ -42,6 +43,13 @@ public class GravitinoPaimonCatalog extends BaseCatalog {
     TableCatalog paimonCatalog = new SparkCatalog();
     Map<String, String> all =
         getPropertiesConverter().toSparkCatalogProperties(options, properties);
+    all.entrySet().stream()
+        .forEach(
+            entry ->
+                SparkSession.active()
+                    .sessionState()
+                    .conf()
+                    .setConfString(entry.getKey(), entry.getValue()));
     paimonCatalog.initialize(catalogBackendName, new CaseInsensitiveStringMap(all));
     return paimonCatalog;
   }

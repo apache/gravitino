@@ -41,6 +41,7 @@ import org.apache.gravitino.catalog.lakehouse.paimon.authentication.Authenticati
 import org.apache.gravitino.catalog.lakehouse.paimon.authentication.kerberos.KerberosClient;
 import org.apache.gravitino.catalog.lakehouse.paimon.ops.PaimonBackendCatalogWrapper;
 import org.apache.gravitino.exceptions.ConnectionFailedException;
+import org.apache.gravitino.storage.OSSProperties;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.paimon.catalog.Catalog;
 import org.apache.paimon.catalog.CatalogContext;
@@ -160,7 +161,11 @@ public class CatalogUtils {
           } else if (S3_CONFIGURATION.containsKey(key)) {
             gravitinoConfig.put(S3_CONFIGURATION.get(key), value);
           } else if (OSS_CONFIGURATION.containsKey(key)) {
-            gravitinoConfig.put(OSS_CONFIGURATION.get(key), value);
+            if (key.equals(OSSProperties.GRAVITINO_OSS_FILESYSTEM_IMPLEMENTATION)) {
+              gravitinoConfig.put("hadoop." + OSS_CONFIGURATION.get(key), value);
+            } else {
+              gravitinoConfig.put(OSS_CONFIGURATION.get(key), value);
+            }
           } else if (keepUnknown) {
             gravitinoConfig.put(key, value);
           }
