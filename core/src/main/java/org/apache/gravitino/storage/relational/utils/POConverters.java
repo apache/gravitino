@@ -20,6 +20,7 @@
 package org.apache.gravitino.storage.relational.utils;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
+import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
 import java.time.Instant;
@@ -1618,6 +1619,9 @@ public class POConverters {
       NameIdentifier modelIdent,
       List<ModelVersionPO> modelVersionPOs,
       List<ModelVersionAliasRelPO> aliasRelPOs) {
+    Preconditions.checkArgument(
+        modelVersionPOs != null && !modelVersionPOs.isEmpty(),
+        "modelVersionPOs cannot be null or empty.");
     List<String> aliases =
         aliasRelPOs.stream()
             .map(ModelVersionAliasRelPO::getModelVersionAlias)
