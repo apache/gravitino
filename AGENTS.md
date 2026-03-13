@@ -32,6 +32,8 @@
   - Use `TestXxx` naming pattern (e.g., `TestCatalogService`).
   - Run tests: `./gradlew test -PskipITs`.
   - Docker tests: Tag with `@Tag("gravitino-docker-test")`.
+ - **Documents**
+  - Ensure proper column alignment for every table in the Markdown (.md) file.
 - **Class Member Ordering**: Follow the order:
   1. `static` constants (e.g., `LOG`).
   2. `static` fields.
