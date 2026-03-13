@@ -127,7 +127,7 @@ public class SparkProcessBuilder extends LocalProcessBuilder {
     LOG.info(
         "Starting local Spark job with command: {}, environment variables: {}",
         Joiner.on(" ").join(commandList),
-        Joiner.on(", ").withKeyValueSeparator(": ").join(sparkJobTemplate.environments()));
+        sparkJobTemplate.environments().keySet());
 
     try {
       return builder.start();
