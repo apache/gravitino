@@ -21,12 +21,16 @@ package org.apache.gravitino.storage.relational;
 import static org.apache.gravitino.Configs.ENTITY_RELATIONAL_STORE;
 
 import com.google.common.annotations.VisibleForTesting;
+import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableMap;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.function.Function;
+import java.util.stream.Collectors;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.gravitino.Config;
 import org.apache.gravitino.Configs;
@@ -43,6 +47,7 @@ import org.apache.gravitino.cache.EntityCache;
 import org.apache.gravitino.cache.EntityCacheRelationKey;
 import org.apache.gravitino.cache.NoOpsCache;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
+import org.apache.gravitino.storage.relational.helper.EntityRelation;
 import org.apache.gravitino.storage.relational.service.EntityIdService;
 import org.apache.gravitino.utils.Executable;
 import org.slf4j.Logger;
@@ -223,6 +228,56 @@ public class RelationalEntityStore implements EntityStore, SupportsRelationOpera
 
           return backendEntities;
         });
+  }
+
+  @Override
+  public <E extends Entity & HasIdentifier> List<EntityRelation<E>> batchListEntitiesByRelation(
+      Type relType,
+      List<NameIdentifier> nameIdentifiers,
+      Entity.EntityType identType,
+      boolean allFields)
+      throws IOException {
+    // TODO add lock
+    List<EntityRelation<E>> result = new ArrayList<>();
+    List<NameIdentifier> notInCache = new ArrayList<>();
+    for (NameIdentifier nameIdentifier : nameIdentifiers) {
+      Optional<List<E>> entities = cache.getIfPresent(relType, nameIdentifier, identType);
+      entities.ifPresentOrElse(
+          listInCache -> {
+            listInCache.forEach(
+                e -> {
+                  EntityRelation<E> entityEntityRelation = new EntityRelation<>();
+                  entityEntityRelation.setRelationEntity(e);
+                  entityEntityRelation.setSourceNameIdentity(nameIdentifier);
+                  result.add(entityEntityRelation);
+                });
+          },
+          () -> {
+            notInCache.add(nameIdentifier);
+          });
+    }
+    if (Objects.requireNonNull(relType) == Type.OWNER_REL) {
+      List<EntityRelation<E>> entityRelations =
+          backend.batchListEntitiesByRelation(relType, notInCache, identType, allFields);
+      Preconditions.checkState(
+          entityRelations.size() == notInCache.size(),
+          "Owner list size not equal to nameIdentifiers size");
+      result.addAll(entityRelations);
+      Map<NameIdentifier, List<EntityRelation<E>>> grouped =
+          entityRelations.stream()
+              .collect(
+                  Collectors.groupingBy(
+                      EntityRelation::getSourceNameIdentity, Collectors.toList()));
+      grouped.forEach(
+          (name, entities) -> {
+            cache.put(
+                name,
+                identType,
+                relType,
+                entities.stream().map(EntityRelation::getRelationEntity).toList());
+          });
+    }
+    return result;
   }
 
   @Override

@@ -33,11 +33,13 @@ import java.util.function.Function;
 import org.apache.gravitino.Config;
 import org.apache.gravitino.Configs;
 import org.apache.gravitino.Entity;
+import org.apache.gravitino.EntityStore;
 import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.Metalake;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
+import org.apache.gravitino.SupportsRelationOperations;
 import org.apache.gravitino.authorization.AuthorizationRequestContext;
 import org.apache.gravitino.authorization.GravitinoAuthorizer;
 import org.apache.gravitino.dto.tag.MetadataObjectDTO;
@@ -389,5 +391,23 @@ public class MetadataAuthzHelper {
             Arrays.asList(nameIdentifiers),
             entityType,
             EntityClassMapper.getEntityClass(entityType));
+  }
+
+  private static void preloadOwner(Entity.EntityType entityType, NameIdentifier[] nameIdentifiers) {
+    if (!GravitinoEnv.getInstance().cacheEnabled()) {
+      return;
+    }
+    EntityStore entityStore = GravitinoEnv.getInstance().entityStore();
+    try {
+      entityStore
+          .relationOperations()
+          .batchListEntitiesByRelation(
+              SupportsRelationOperations.Type.OWNER_REL,
+              Arrays.stream(nameIdentifiers).toList(),
+              entityType,
+              true);
+    } catch (Exception e) {
+      LOG.warn("Ignore preloadOwner error:{}", e.getMessage(), e);
+    }
   }
 }

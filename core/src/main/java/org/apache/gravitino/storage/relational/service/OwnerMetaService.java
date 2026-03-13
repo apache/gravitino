@@ -20,15 +20,24 @@ package org.apache.gravitino.storage.relational.service;
 
 import static org.apache.gravitino.metrics.source.MetricsSource.GRAVITINO_RELATIONAL_STORE_METRIC_NAME;
 
+import com.google.common.base.Preconditions;
+import java.util.ArrayList;
 import java.util.Collections;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
+import org.apache.commons.collections4.CollectionUtils;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.authorization.AuthorizationUtils;
 import org.apache.gravitino.metrics.Monitored;
+import org.apache.gravitino.storage.relational.helper.EntityRelation;
 import org.apache.gravitino.storage.relational.mapper.OwnerMetaMapper;
 import org.apache.gravitino.storage.relational.po.GroupPO;
 import org.apache.gravitino.storage.relational.po.OwnerRelPO;
+import org.apache.gravitino.storage.relational.po.UserOwnerRelPO;
 import org.apache.gravitino.storage.relational.po.UserPO;
 import org.apache.gravitino.storage.relational.utils.POConverters;
 import org.apache.gravitino.storage.relational.utils.SessionUtils;
@@ -77,6 +86,50 @@ public class OwnerMetaService {
     }
 
     return Optional.empty();
+  }
+
+  @Monitored(
+      metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME,
+      baseMetricName = "batchGetOwner")
+  public <E extends Entity> List<EntityRelation<E>> batchGetOwner(
+      List<NameIdentifier> identifiers, Entity.EntityType type) {
+    if (CollectionUtils.isEmpty(identifiers)) {
+      return new ArrayList<>();
+    }
+    List<EntityRelation<E>> result = new ArrayList<>();
+    Map<Long, NameIdentifier> nameIdentifierMap = new HashMap<>();
+    List<Long> entityIds =
+        identifiers.stream()
+            .map(
+                identifier -> {
+                  long entityId = EntityIdService.getEntityId(identifier, type);
+                  nameIdentifierMap.put(entityId, identifier);
+                  return entityId;
+                })
+            .toList();
+    NameIdentifier nameIdentifier = identifiers.get(0);
+    String metalake = NameIdentifierUtil.getMetalake(nameIdentifier);
+    for (NameIdentifier identifier : identifiers) {
+      Preconditions.checkArgument(
+          Objects.equals(NameIdentifierUtil.getMetalake(identifier), metalake),
+          "identifiers should in one metalake");
+    }
+    List<UserOwnerRelPO> userPOList =
+        SessionUtils.getWithoutCommit(
+            OwnerMetaMapper.class,
+            mapper ->
+                mapper.batchSelectUserOwnerMetaByMetadataObjectIdAndType(entityIds, type.name()));
+    if (CollectionUtils.isNotEmpty(userPOList)) {
+      userPOList.forEach(
+          userPO -> {
+            EntityRelation<E> entityEntityRelation = new EntityRelation<>();
+            entityEntityRelation.setSourceNameIdentity(
+                nameIdentifierMap.get(userPO.getMetadataObjectId()));
+            entityEntityRelation.setRelationEntity((E) userPO);
+            result.add(entityEntityRelation);
+          });
+    }
+    return result;
   }
 
   @Monitored(metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME, baseMetricName = "setOwner")

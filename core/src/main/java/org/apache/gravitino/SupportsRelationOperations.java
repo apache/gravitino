@@ -21,6 +21,7 @@ package org.apache.gravitino;
 import java.io.IOException;
 import java.util.List;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
+import org.apache.gravitino.storage.relational.helper.EntityRelation;
 
 /**
  * This is an extended interface. This is mainly used for strengthen the ability of querying
@@ -90,6 +91,13 @@ public interface SupportsRelationOperations {
    */
   <E extends Entity & HasIdentifier> List<E> listEntitiesByRelation(
       Type relType, NameIdentifier nameIdentifier, Entity.EntityType identType, boolean allFields)
+      throws IOException;
+
+  <E extends Entity & HasIdentifier> List<EntityRelation<E>> batchListEntitiesByRelation(
+      Type relType,
+      List<NameIdentifier> nameIdentifiers,
+      Entity.EntityType identType,
+      boolean allFields)
       throws IOException;
 
   /**

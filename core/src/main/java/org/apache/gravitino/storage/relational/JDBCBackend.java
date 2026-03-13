@@ -61,6 +61,7 @@ import org.apache.gravitino.meta.TopicEntity;
 import org.apache.gravitino.meta.UserEntity;
 import org.apache.gravitino.storage.relational.converters.SQLExceptionConverterFactory;
 import org.apache.gravitino.storage.relational.database.H2Database;
+import org.apache.gravitino.storage.relational.helper.EntityRelation;
 import org.apache.gravitino.storage.relational.service.CatalogMetaService;
 import org.apache.gravitino.storage.relational.service.FilesetMetaService;
 import org.apache.gravitino.storage.relational.service.FunctionMetaService;
@@ -663,6 +664,22 @@ public class JDBCBackend implements RelationalBackend {
           return (List<E>)
               TagMetaService.getInstance().listTagsForMetadataObject(nameIdentifier, identType);
         }
+      default:
+        throw new IllegalArgumentException(
+            String.format("Doesn't support the relation type %s", relType));
+    }
+  }
+
+  @Override
+  public <E extends Entity & HasIdentifier> List<EntityRelation<E>> batchListEntitiesByRelation(
+      Type relType,
+      List<NameIdentifier> nameIdentifiers,
+      Entity.EntityType identType,
+      boolean allFields)
+      throws IOException {
+    switch (relType) {
+      case OWNER_REL:
+        return OwnerMetaService.getInstance().batchGetOwner(nameIdentifiers, identType);
       default:
         throw new IllegalArgumentException(
             String.format("Doesn't support the relation type %s", relType));
