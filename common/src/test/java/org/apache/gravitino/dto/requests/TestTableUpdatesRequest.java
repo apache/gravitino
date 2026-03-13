@@ -26,6 +26,7 @@ import java.util.List;
 import org.apache.gravitino.dto.rel.expressions.LiteralDTO;
 import org.apache.gravitino.json.JsonUtils;
 import org.apache.gravitino.rel.TableChange;
+import org.apache.gravitino.rel.TableChange.DeleteIndex;
 import org.apache.gravitino.rel.indexes.Index;
 import org.apache.gravitino.rel.indexes.Indexes;
 import org.apache.gravitino.rel.types.Types;
@@ -308,5 +309,14 @@ public class TestTableUpdatesRequest {
     expected = "{\"@type\":\"deleteTableIndex\",\"name\":\"uk_2\",\"ifExists\":true}";
     Assertions.assertEquals(
         JsonUtils.objectMapper().readTree(expected), JsonUtils.objectMapper().readTree(jsonString));
+
+    deleteTableIndexRequest =
+        JsonUtils.objectMapper()
+            .readValue(
+                "{\"@type\":\"deleteTableIndex\",\"name\":\"uk_3\"}",
+                TableUpdateRequest.DeleteTableIndexRequest.class);
+    DeleteIndex deleteIndex = (DeleteIndex) deleteTableIndexRequest.tableChange();
+    Assertions.assertEquals("uk_3", deleteIndex.getName());
+    Assertions.assertFalse(deleteIndex.isIfExists());
   }
 }
