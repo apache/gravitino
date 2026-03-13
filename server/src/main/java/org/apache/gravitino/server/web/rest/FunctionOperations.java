@@ -127,6 +127,12 @@ public class FunctionOperations {
       @PathParam("catalog") String catalog,
       @PathParam("schema") String schema,
       FunctionRegisterRequest request) {
+    if (request == null) {
+      LOG.warn("Received register function request with null request body");
+      return ExceptionHandlers.handleFunctionException(
+          OperationType.REGISTER, "", schema, new IllegalArgumentException("Request body cannot be null"));
+    }
+
     LOG.info(
         "Received register function request: {}.{}.{}.{}",
         metalake,

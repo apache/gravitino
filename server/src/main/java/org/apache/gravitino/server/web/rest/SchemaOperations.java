@@ -122,6 +122,12 @@ public class SchemaOperations {
           String metalake,
       @PathParam("catalog") @AuthorizationMetadata(type = Entity.EntityType.CATALOG) String catalog,
       SchemaCreateRequest request) {
+    if (request == null) {
+      LOG.warn("Received create schema request with null request body");
+      return ExceptionHandlers.handleSchemaException(
+          OperationType.CREATE, "", catalog, new IllegalArgumentException("Request body cannot be null"));
+    }
+
     LOG.info("Received create schema request: {}.{}.{}", metalake, catalog, request.getName());
     try {
       return Utils.doAs(
