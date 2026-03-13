@@ -171,7 +171,7 @@ jobs:
         java-version: [ 17 ]
     timeout-minutes: 90
     needs: changes
-    if: needs.changes.outputs.source_changes == 'true' && needs.changes.outputs.maintenance_only_source_changes != 'true'
+    if: needs.changes.outputs.source_changes == 'true'
     # Steps represent a sequence of tasks that will be executed as part of the job
     steps:
       # Checks-out your repository under $GITHUB_WORKSPACE, so your job can access it
@@ -184,7 +184,17 @@ jobs:
           cache: 'gradle'
 
       - name: Test publish to local
-        run: ./gradlew publishToMavenLocal -x test
+        run: |
+          if [ "${{ needs.changes.outputs.maintenance_only_source_changes }}" = "true" ]; then
+            ./gradlew \
+              :maintenance:optimizer-api:publishToMavenLocal \
+              :maintenance:gravitino-updaters:publishToMavenLocal \
+              :maintenance:optimizer:publishToMavenLocal \
+              :maintenance:jobs:publishToMavenLocal \
+              -x test
+          else
+            ./gradlew publishToMavenLocal -x test
+          fi
 
       - name: Free up disk space
         run: |
@@ -197,6 +207,17 @@ jobs:
 
       - name: Build with Gradle
         run: |
+          if [ "${{ needs.changes.outputs.maintenance_only_source_changes }}" = "true" ]; then
+            ./gradlew \
+              :maintenance:optimizer-api:build \
+              :maintenance:gravitino-updaters:build \
+              :maintenance:optimizer:build \
+              :maintenance:jobs:build \
+              -PskipITs \
+              -PskipDockerTests=false
+            exit 0
+          fi
+
           gradle_args=(
             build
             -PskipITs
@@ -222,6 +243,17 @@ jobs:
           printf '\n'
 
           ./gradlew "${gradle_args[@]}"
+
+      - name: Run maintenance unit tests
+        if: needs.changes.outputs.maintenance_changes == 'true' && needs.changes.outputs.maintenance_only_source_changes != 'true'
+        run: |
+          ./gradlew \
+            :maintenance:optimizer-api:test \
+            :maintenance:gravitino-updaters:test \
+            :maintenance:optimizer:test \
+            :maintenance:jobs:test \
+            -PskipITs \
+            -PskipDockerTests=false
 
       - name: Fetch base branch for coverage diff
         if: github.event_name == 'pull_request'
@@ -259,6 +291,7 @@ jobs:
           echo "Changed Files coverage ${{ steps.coverage.outputs.coverage-changed-files }}"
 
       - name: Release with Gradle
+        if: needs.changes.outputs.maintenance_only_source_changes != 'true'
         run: ./gradlew clean && ./gradlew release -x test --rerun-tasks
 
       - name: Upload unit tests report
@@ -272,58 +305,3 @@ jobs:
             catalogs-contrib/**/*.tar
             catalogs/**/*.log
             catalogs/**/*.tar
-
-  maintenance-build:
-    runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        java-version: [ 17 ]
-    timeout-minutes: 90
-    needs: changes
-    if: needs.changes.outputs.maintenance_changes == 'true'
-    steps:
-      - uses: actions/checkout@v4
-
-      - uses: actions/setup-java@v4
-        with:
-          java-version: ${{ matrix.java-version }}
-          distribution: 'temurin'
-          cache: 'gradle'
-
-      - name: Test publish maintenance modules to local
-        run: |
-          ./gradlew \
-            :maintenance:optimizer-api:publishToMavenLocal \
-            :maintenance:gravitino-updaters:publishToMavenLocal \
-            :maintenance:optimizer:publishToMavenLocal \
-            :maintenance:jobs:publishToMavenLocal \
-            -x test
-
-      - name: Free up disk space
-        run: |
-          dev/ci/util_free_space.sh
-
-      - name: Install dependencies
-        run: |
-          wget https://nz2.archive.ubuntu.com/ubuntu/pool/main/o/openssl/libssl1.1_1.1.1f-1ubuntu2_amd64.deb
-          sudo dpkg -i libssl1.1_1.1.1f-1ubuntu2_amd64.deb
-
-      - name: Build maintenance modules with Gradle
-        run: |
-          ./gradlew \
-            :maintenance:optimizer-api:build \
-            :maintenance:gravitino-updaters:build \
-            :maintenance:optimizer:build \
-            :maintenance:jobs:build \
-            -PskipITs \
-            -PskipDockerTests=false
-
-      - name: Upload maintenance unit tests report
-        uses: actions/upload-artifact@v4
-        if: failure()
-        with:
-          name: maintenance-unit-test-report
-          path: |
-            build/reports
-            maintenance/**/*.log
-            maintenance/**/*.tar
