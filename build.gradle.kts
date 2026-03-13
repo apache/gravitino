@@ -342,12 +342,6 @@ subprojects {
     ":spark-connector",
     ":flink-connector"
   )
-  val mainRelease8ProjectPrefixes = listOf(
-    ":spark-connector",
-    ":flink-connector",
-    ":clients:client-java"
-  )
-
   fun hasProjectPrefix(path: String, prefixes: List<String>): Boolean {
     return prefixes.any { path.startsWith(it) }
   }
@@ -356,11 +350,6 @@ subprojects {
     val path = project.path.lowercase()
     val name = project.name.lowercase()
     return name in jdk8CompatibleProjectNames || hasProjectPrefix(path, jdk8CompatibleProjectPrefixes)
-  }
-
-  fun enforceMainRelease8(project: Project): Boolean {
-    val path = project.path.lowercase()
-    return hasProjectPrefix(path, mainRelease8ProjectPrefixes)
   }
   extensions.extraProperties.set("excludePackagesForSparkConnector", ::excludePackagesForSparkConnector)
 
@@ -396,12 +385,6 @@ subprojects {
     }
   }
 
-  tasks.withType<JavaCompile>().configureEach {
-    if (compatibleWithJDK8(project)) {
-      options.release.set(8)
-    }
-  }
-
   java {
     toolchain {
       // Some JDK vendors like Homebrew installed OpenJDK 17 have problems in building trino-connector:
@@ -423,7 +406,7 @@ subprojects {
     }
   }
 
-  if (enforceMainRelease8(project)) {
+  if (compatibleWithJDK8(project)) {
     tasks.named<JavaCompile>("compileJava") {
       options.release.set(8)
     }
@@ -463,6 +446,7 @@ subprojects {
   }
 
   tasks.withType<JavaCompile>().configureEach {
+    options.encoding = "UTF-8"
     options.errorprone.isEnabled.set(true)
     options.errorprone.disableWarningsInGeneratedCode.set(true)
     options.errorprone.disable(
