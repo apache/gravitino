@@ -16,3 +16,4 @@
 # under the License.
 
 org.apache.gravitino.maintenance.optimizer.updater.StatisticsUpdaterForTest
+# CI validation routing case: maintenance-only
