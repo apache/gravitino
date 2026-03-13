@@ -115,7 +115,6 @@ public class TestTopicOperations extends BaseOperationsTest {
           @Override
           protected void configure() {
             bind(dispatcher).to(TopicDispatcher.class).ranked(2);
-            bind(schemaDispatcher).to(SchemaDispatcher.class).ranked(2);
             bindFactory(TestTopicOperations.MockServletRequestFactory.class)
                 .to(HttpServletRequest.class);
           }

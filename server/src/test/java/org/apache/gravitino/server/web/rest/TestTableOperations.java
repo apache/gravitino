@@ -146,7 +146,6 @@ public class TestTableOperations extends BaseOperationsTest {
           @Override
           protected void configure() {
             bind(dispatcher).to(TableDispatcher.class).ranked(2);
-            bind(schemaDispatcher).to(SchemaDispatcher.class).ranked(2);
             bindFactory(MockServletRequestFactory.class).to(HttpServletRequest.class);
           }
         });

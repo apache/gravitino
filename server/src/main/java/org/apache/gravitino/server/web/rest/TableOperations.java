@@ -40,7 +40,6 @@ import org.apache.gravitino.Entity;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
-import org.apache.gravitino.catalog.SchemaDispatcher;
 import org.apache.gravitino.catalog.TableDispatcher;
 import org.apache.gravitino.dto.requests.TableCreateRequest;
 import org.apache.gravitino.dto.requests.TableUpdateRequest;
@@ -69,14 +68,12 @@ public class TableOperations {
   private static final Logger LOG = LoggerFactory.getLogger(TableOperations.class);
 
   private final TableDispatcher dispatcher;
-  private final SchemaDispatcher schemaDispatcher;
 
   @Context private HttpServletRequest httpRequest;
 
   @Inject
-  public TableOperations(TableDispatcher dispatcher, SchemaDispatcher schemaDispatcher) {
+  public TableOperations(TableDispatcher dispatcher) {
     this.dispatcher = dispatcher;
-    this.schemaDispatcher = schemaDispatcher;
   }
 
   @GET

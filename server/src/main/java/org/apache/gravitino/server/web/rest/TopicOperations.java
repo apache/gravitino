@@ -35,7 +35,6 @@ import org.apache.gravitino.Entity;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
-import org.apache.gravitino.catalog.SchemaDispatcher;
 import org.apache.gravitino.catalog.TopicDispatcher;
 import org.apache.gravitino.dto.requests.TopicCreateRequest;
 import org.apache.gravitino.dto.requests.TopicUpdateRequest;
@@ -62,14 +61,12 @@ public class TopicOperations {
   private static final Logger LOG = LoggerFactory.getLogger(TopicOperations.class);
 
   private final TopicDispatcher dispatcher;
-  private final SchemaDispatcher schemaDispatcher;
 
   @Context private HttpServletRequest httpRequest;
 
   @Inject
-  public TopicOperations(TopicDispatcher dispatcher, SchemaDispatcher schemaDispatcher) {
+  public TopicOperations(TopicDispatcher dispatcher) {
     this.dispatcher = dispatcher;
-    this.schemaDispatcher = schemaDispatcher;
   }
 
   @GET
