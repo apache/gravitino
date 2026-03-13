@@ -68,6 +68,9 @@ public class CredentialPropertyUtils {
           .put(AwsIrsaCredential.ACCESS_KEY_ID, ICEBERG_S3_ACCESS_KEY_ID)
           .put(AwsIrsaCredential.SECRET_ACCESS_KEY, ICEBERG_S3_SECRET_ACCESS_KEY)
           .put(AwsIrsaCredential.SESSION_TOKEN, ICEBERG_S3_TOKEN)
+          .put(AwsPodIdentityCredential.ACCESS_KEY_ID, ICEBERG_S3_ACCESS_KEY_ID)
+          .put(AwsPodIdentityCredential.SECRET_ACCESS_KEY, ICEBERG_S3_SECRET_ACCESS_KEY)
+          .put(AwsPodIdentityCredential.SESSION_TOKEN, ICEBERG_S3_TOKEN)
           .build();
 
   /**
@@ -82,7 +85,8 @@ public class CredentialPropertyUtils {
         || credential instanceof OSSTokenCredential
         || credential instanceof OSSSecretKeyCredential
         || credential instanceof AzureAccountKeyCredential
-        || credential instanceof AwsIrsaCredential) {
+        || credential instanceof AwsIrsaCredential
+        || credential instanceof AwsPodIdentityCredential) {
       return transformProperties(credential.credentialInfo(), icebergCredentialPropertyMap);
     }
 
