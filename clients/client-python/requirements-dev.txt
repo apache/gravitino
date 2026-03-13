@@ -23,7 +23,7 @@ twine==6.2.0
 coverage==7.13.4
 pandas==2.3.3
 pyarrow==23.0.1
-llama-index==0.13.0
+llama-index==0.14.15
 tenacity==9.1.4
 cachetools==7.0.1
 readerwriterlock==1.0.9
