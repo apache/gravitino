@@ -142,9 +142,6 @@ public class TopicOperations {
             NameIdentifier ident =
                 NameIdentifierUtil.ofTopic(metalake, catalog, schema, request.getName());
 
-            // Make sure schema is imported, otherwise set owner for the topic may fail.
-            schemaDispatcher.loadSchema(NameIdentifierUtil.ofSchema(metalake, catalog, schema));
-
             Topic topic =
                 dispatcher.createTopic(
                     ident,

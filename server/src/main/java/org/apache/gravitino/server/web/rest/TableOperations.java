@@ -141,9 +141,6 @@ public class TableOperations {
             NameIdentifier ident =
                 NameIdentifierUtil.ofTable(metalake, catalog, schema, request.getName());
 
-            // Make sure schema is imported, otherwise set owner for the table may fail.
-            schemaDispatcher.loadSchema(NameIdentifierUtil.ofSchema(metalake, catalog, schema));
-
             Table table =
                 dispatcher.createTable(
                     ident,
