@@ -26,6 +26,7 @@ import javax.inject.Singleton;
 import javax.servlet.Servlet;
 import org.apache.gravitino.Configs;
 import org.apache.gravitino.GravitinoEnv;
+import org.apache.gravitino.ai.ChatModelProvider;
 import org.apache.gravitino.catalog.CatalogDispatcher;
 import org.apache.gravitino.catalog.FilesetDispatcher;
 import org.apache.gravitino.catalog.FunctionDispatcher;
@@ -178,6 +179,7 @@ public class GravitinoServer extends ResourceConfig {
 
     server.addFilter(new WebUIFilter(), "/"); // Redirect to the /ui/index html page.
     server.addFilter(new WebUIFilter(), "/ui/*"); // Redirect to the static html file.
+    ChatModelProvider.getInstance().init(serverConfig);
   }
 
   public void start() throws Exception {
