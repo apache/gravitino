@@ -902,6 +902,28 @@ public class TestJobManager {
   }
 
   @Test
+  public void testRunJobShouldCancelSubmittedJobWhenStorePutFails() throws IOException {
+    mockedMetalake
+            .when(() -> MetalakeManager.checkMetalake(metalakeIdent, entityStore))
+            .thenAnswer(a -> null);
+
+    JobTemplateEntity shellJobTemplate =
+            newShellJobTemplateEntity("shell_job", "A shell job template");
+    when(jobManager.getJobTemplate(metalake, shellJobTemplate.name())).thenReturn(shellJobTemplate);
+
+    String jobExecutionId = "job_execution_id_for_test";
+    when(jobExecutor.submitJob(any())).thenReturn(jobExecutionId);
+    doThrow(new IOException("Entity store error"))
+            .when(entityStore)
+            .put(any(JobEntity.class), anyBoolean());
+
+    Assertions.assertThrows(
+            RuntimeException.class, () -> jobManager.runJob(metalake, "shell_job", Collections.emptyMap()));
+
+    verify(jobExecutor, times(1)).cancelJob(jobExecutionId);
+  }
+
+  @Test
   public void testFetchFileFromUriWithMissingLocalFileShouldFail() throws IOException {
     File stagingDir = new File(testStagingDir);
     Assertions.assertTrue(stagingDir.mkdirs() || stagingDir.exists());
