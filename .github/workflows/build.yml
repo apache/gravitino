@@ -184,17 +184,7 @@ jobs:
           cache: 'gradle'
 
       - name: Test publish to local
-        run: |
-          if [ "${{ needs.changes.outputs.maintenance_only_source_changes }}" = "true" ]; then
-            ./gradlew \
-              :maintenance:optimizer-api:publishToMavenLocal \
-              :maintenance:gravitino-updaters:publishToMavenLocal \
-              :maintenance:optimizer:publishToMavenLocal \
-              :maintenance:jobs:publishToMavenLocal \
-              -x test
-          else
-            ./gradlew publishToMavenLocal -x test
-          fi
+        run: ./gradlew publishToMavenLocal -x test
 
       - name: Free up disk space
         run: |
