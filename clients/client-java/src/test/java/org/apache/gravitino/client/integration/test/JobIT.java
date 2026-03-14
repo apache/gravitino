@@ -21,6 +21,7 @@ package org.apache.gravitino.client.integration.test;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Lists;
 import java.io.File;
+import java.io.IOException;
 import java.nio.file.Files;
 import java.util.Collections;
 import java.util.List;
@@ -476,23 +477,33 @@ public class JobIT extends BaseIT {
     Assertions.assertNotNull(metalake.getJobTemplate(template.name()));
 
     // Case 1: No optional args — script asserts neither flag is received.
-    runJobAndAwait(template, ImmutableMap.of("mode", "no_optionals"), JobHandle.Status.SUCCEEDED);
+    runJobAndAwait(
+        template,
+        ImmutableMap.of("mode", "no_optionals"),
+        Lists.newArrayList("no_optionals"),
+        JobHandle.Status.SUCCEEDED);
 
     // Case 2: opt1 provided, opt2 absent — script asserts --opt1 is present and --opt2 is absent.
     runJobAndAwait(
         template,
         ImmutableMap.of("mode", "opt1_only", "optional_arg1", "val1"),
+        Lists.newArrayList("opt1_only", "--opt1", "val1"),
         JobHandle.Status.SUCCEEDED);
 
     // Case 3: Both optional args provided — script asserts both flags are received.
     runJobAndAwait(
         template,
         ImmutableMap.of("mode", "both_optionals", "optional_arg1", "val1", "optional_arg2", "val2"),
+        Lists.newArrayList("both_optionals", "--opt1", "val1", "--opt2", "val2"),
         JobHandle.Status.SUCCEEDED);
   }
 
   private void runJobAndAwait(
-      JobTemplate template, Map<String, String> jobConf, JobHandle.Status expectedStatus) {
+      JobTemplate template,
+      Map<String, String> jobConf,
+      List<String> expectedArgs,
+      JobHandle.Status expectedStatus)
+      throws IOException {
     JobHandle job = metalake.runJob(template.name(), jobConf);
     Assertions.assertNotNull(job);
     Awaitility.await()
@@ -505,6 +516,15 @@ public class JobIT extends BaseIT {
                   || handle.jobStatus() == JobHandle.Status.FAILED;
             });
     Assertions.assertEquals(expectedStatus, metalake.getJob(job.jobId()).jobStatus());
+    Assertions.assertEquals(expectedArgs, readJobArgs(template.name(), job.jobId()));
+  }
+
+  private List<String> readJobArgs(String templateName, String jobId) throws IOException {
+    File outputLog =
+        new File(
+            new File(new File(new File(testStagingDir, METALAKE_NAME), templateName), jobId),
+            "output.log");
+    return Files.readAllLines(outputLog.toPath());
   }
 
   // $1 = mode; remaining args are parsed for --opt1 and --opt2 flags.
@@ -512,6 +532,7 @@ public class JobIT extends BaseIT {
   private String generateOptionalArgTestScript() {
     String content =
         "#!/bin/bash\n"
+            + "printf '%s\\n' \"$@\"\n"
             + "MODE=\"$1\"\n"
             + "shift\n"
             + "OPT1_PRESENT=0\n"
