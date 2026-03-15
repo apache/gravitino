@@ -28,7 +28,7 @@ export const getAuthConfigsApi = () => {
 
 export const getAuthMeApi = () => {
   return defHttp.get({
-    url: '/api/auth/me'
+    url: '/api/authn/me'
   })
 }
 

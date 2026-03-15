@@ -36,7 +36,7 @@ import org.apache.gravitino.utils.PrincipalUtils;
  * principal name, ensuring the UI identity matches the server-side identity derived from the
  * configured {@code principalFields} and {@code principalMapper}.
  */
-@Path("/auth")
+@Path("/authn")
 public class AuthOperations {
 
   @Context private HttpServletRequest httpRequest;
