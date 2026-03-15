@@ -64,22 +64,14 @@ mkdir -p "${gravitino_staging_dir}"
 
 echo "Start to download the jar package"
 
-mysql_driver="mysql-connector-java-8.0.27.jar"
-wget "https://repo1.maven.org/maven2/mysql/mysql-connector-java/8.0.27/$mysql_driver" -O "${gravitino_staging_dir}/${mysql_driver}"
-cp "${gravitino_staging_dir}/${mysql_driver}" "${gravitino_package_dir}/catalogs/jdbc-mysql/libs/"
-cp "${gravitino_staging_dir}/${mysql_driver}" "${gravitino_package_dir}/catalogs/jdbc-doris/libs/"
-cp "${gravitino_staging_dir}/${mysql_driver}" "${gravitino_package_dir}/catalogs/jdbc-starrocks/libs/"
-cp "${gravitino_staging_dir}/${mysql_driver}" "${gravitino_package_dir}/catalogs/lakehouse-iceberg/libs/"
-cp "${gravitino_staging_dir}/${mysql_driver}" "${gravitino_iceberg_rest_dir}"
-cp "${gravitino_staging_dir}/${mysql_driver}" "${gravitino_package_dir}/libs/"
+jdbc_driver_dir="${gravitino_dir}/packages/gravitino/jdbc-drivers"
+mkdir -p "${jdbc_driver_dir}"
 
+mysql_driver="mysql-connector-java-8.0.27.jar"
+wget "https://repo1.maven.org/maven2/mysql/mysql-connector-java/8.0.27/$mysql_driver" -O "${jdbc_driver_dir}/${mysql_driver}"
 
 pg_driver="postgresql-42.7.0.jar"
-wget "https://jdbc.postgresql.org/download/${pg_driver}" -O "${gravitino_staging_dir}/${pg_driver}"
-cp "${gravitino_staging_dir}/${pg_driver}" "${gravitino_package_dir}/catalogs/jdbc-postgresql/libs/"
-cp "${gravitino_staging_dir}/${pg_driver}" "${gravitino_package_dir}/catalogs/lakehouse-iceberg/libs/"
-cp "${gravitino_staging_dir}/${pg_driver}" "${gravitino_iceberg_rest_dir}"
-cp "${gravitino_staging_dir}/${pg_driver}" "${gravitino_package_dir}/libs/"
+wget "https://jdbc.postgresql.org/download/${pg_driver}" -O "${jdbc_driver_dir}/${pg_driver}"
 
 echo "Finish downloading"
 
@@ -95,11 +87,15 @@ find ${gravitino_home}/bundles/aws-bundle/build/libs/ -name 'gravitino-aws-bundl
 find ${gravitino_home}/bundles/gcp-bundle/build/libs/ -name 'gravitino-gcp-bundle-*.jar' ! -name '*-empty.jar' -exec cp -v {} "${fileset_lib_dir}" \;
 find ${gravitino_home}/bundles/azure-bundle/build/libs/ -name 'gravitino-azure-bundle-*.jar' ! -name '*-empty.jar' -exec cp -v {} "${fileset_lib_dir}" \;
 
-# Copy the Aliyun, AWS, GCP and Azure bundles to the Iceberg REST server libs
-find ${gravitino_home}/bundles/iceberg-gcp-bundle/build/libs/ -name 'gravitino-iceberg-gcp-bundle-*.jar' ! -name '*-empty.jar' -exec cp -v {} "${gravitino_iceberg_rest_dir}" \;
-find ${gravitino_home}/bundles/iceberg-aws-bundle/build/libs/ -name 'gravitino-iceberg-aws-bundle-*.jar' ! -name '*-empty.jar' -exec cp -v {} "${gravitino_iceberg_rest_dir}" \;
-find ${gravitino_home}/bundles/iceberg-azure-bundle/build/libs/ -name 'gravitino-iceberg-azure-bundle-*.jar' ! -name '*-empty.jar' -exec cp -v {} "${gravitino_iceberg_rest_dir}" \;
-find ${gravitino_home}/bundles/iceberg-aliyun-bundle/build/libs/ -name 'gravitino-iceberg-aliyun-bundle-*.jar' ! -name '*-empty.jar' -exec cp -v {} "${gravitino_iceberg_rest_dir}" \;
+iceberg_bundle_dir="${gravitino_dir}/packages/gravitino/iceberg-bundles"
+
+# Copy the Aliyun, AWS, GCP and Azure bundles to the Iceberg bundles directory
+mkdir -p "${iceberg_bundle_dir}"
+find ${gravitino_home}/bundles/iceberg-gcp-bundle/build/libs/ -name 'gravitino-iceberg-gcp-bundle-*.jar' ! -name '*-empty.jar' -exec cp -v {} "${iceberg_bundle_dir}" \;
+find ${gravitino_home}/bundles/iceberg-aws-bundle/build/libs/ -name 'gravitino-iceberg-aws-bundle-*.jar' ! -name '*-empty.jar' -exec cp -v {} "${iceberg_bundle_dir}" \;
+find ${gravitino_home}/bundles/iceberg-azure-bundle/build/libs/ -name 'gravitino-iceberg-azure-bundle-*.jar' ! -name '*-empty.jar' -exec cp -v {} "${iceberg_bundle_dir}" \;
+find ${gravitino_home}/bundles/iceberg-aliyun-bundle/build/libs/ -name 'gravitino-iceberg-aliyun-bundle-*.jar' ! -name '*-empty.jar' -exec cp -v {} "${iceberg_bundle_dir}" \;
+
 
 download_gcs_connector
 
