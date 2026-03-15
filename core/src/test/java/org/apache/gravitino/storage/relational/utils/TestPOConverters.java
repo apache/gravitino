@@ -795,6 +795,28 @@ public class TestPOConverters {
   }
 
   @Test
+  public void testUpdateFilesetPOVersionWithNullLastVersion() throws Exception {
+    FilesetEntity filesetEntity =
+        createFileset(
+            1L,
+            "test",
+            NamespaceUtil.ofFileset("test_metalake", "test_catalog", "test_schema"),
+            "this is test",
+            "hdfs://localhost/test",
+            ImmutableMap.of("key", "value"));
+    FilesetPO.Builder builder =
+        FilesetPO.builder().withMetalakeId(1L).withCatalogId(1L).withSchemaId(1L);
+    FilesetPO initPO = POConverters.initializeFilesetPOWithVersion(filesetEntity, builder);
+
+    java.lang.reflect.Field lastVersionField = FilesetPO.class.getDeclaredField("lastVersion");
+    lastVersionField.setAccessible(true);
+    lastVersionField.set(initPO, null);
+
+    Assertions.assertDoesNotThrow(
+        () -> POConverters.updateFilesetPOWithVersion(initPO, filesetEntity, true));
+  }
+
+  @Test
   public void testFromPolicyPO() throws JsonProcessingException {
     ImmutableSet<MetadataObject.Type> supportedObjectTypes =
         ImmutableSet.of(MetadataObject.Type.TABLE, MetadataObject.Type.SCHEMA);
