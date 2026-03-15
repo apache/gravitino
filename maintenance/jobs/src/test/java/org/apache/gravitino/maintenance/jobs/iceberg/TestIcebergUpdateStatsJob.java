@@ -23,6 +23,8 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import java.util.Collections;
+import java.util.HashMap;
 import java.util.Map;
 import org.apache.gravitino.job.JobTemplateProvider;
 import org.apache.gravitino.job.SparkJobTemplate;
@@ -164,11 +166,10 @@ public class TestIcebergUpdateStatsJob {
 
   @Test
   public void testBuildOptimizerProperties() {
-    Map<String, String> options =
-        Map.of(
-            "gravitino_uri", "http://localhost:8090",
-            "metalake", "ml",
-            "gravitino.optimizer.jdbcMetrics.jdbcUrl", "jdbc:mysql://localhost:3306/metrics");
+    Map<String, String> options = new HashMap<>();
+    options.put("gravitino_uri", "http://localhost:8090");
+    options.put("metalake", "ml");
+    options.put("gravitino.optimizer.jdbcMetrics.jdbcUrl", "jdbc:mysql://localhost:3306/metrics");
     Map<String, String> optimizerProperties =
         IcebergUpdateStatsAndMetricsJob.buildOptimizerProperties(options);
 
@@ -181,16 +182,15 @@ public class TestIcebergUpdateStatsJob {
 
   @Test
   public void testRequireGravitinoConfig() {
-    Map<String, String> optimizerProperties =
-        Map.of(
-            OptimizerConfig.GRAVITINO_URI, "http://localhost:8090",
-            OptimizerConfig.GRAVITINO_METALAKE, "ml");
+    Map<String, String> optimizerProperties = new HashMap<>();
+    optimizerProperties.put(OptimizerConfig.GRAVITINO_URI, "http://localhost:8090");
+    optimizerProperties.put(OptimizerConfig.GRAVITINO_METALAKE, "ml");
     assertEquals(
         optimizerProperties,
         IcebergUpdateStatsAndMetricsJob.requireGravitinoConfig(optimizerProperties));
 
     assertThrows(
         IllegalArgumentException.class,
-        () -> IcebergUpdateStatsAndMetricsJob.requireGravitinoConfig(Map.of()));
+        () -> IcebergUpdateStatsAndMetricsJob.requireGravitinoConfig(Collections.emptyMap()));
   }
 }

@@ -50,7 +50,7 @@ public final class JdbcSqlScriptUtils {
     return Arrays.stream(executableSql.split(";"))
         .map(String::trim)
         .filter(s -> !s.isEmpty())
-        .toList();
+        .collect(Collectors.toList());
   }
 
   /**
