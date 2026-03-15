@@ -126,7 +126,8 @@ public class TestGravitinoServer {
     int joinIndex = source.indexOf("server.join();", hookStart);
 
     assertTrue(hookStart >= 0, "Main should register a shutdown hook");
-    assertTrue(joinIndex > hookStart, "Main should call server.join() after registering shutdown hook");
+    assertTrue(
+        joinIndex > hookStart, "Main should call server.join() after registering shutdown hook");
 
     String hookBlock = source.substring(hookStart, joinIndex);
     assertTrue(
