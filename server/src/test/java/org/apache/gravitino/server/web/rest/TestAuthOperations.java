@@ -76,7 +76,7 @@ public class TestAuthOperations extends BaseOperationsTest {
 
   @Test
   public void testGetAuthMe() {
-    Response resp = target("/auth/me").request().accept("application/vnd.gravitino.v1+json").get();
+    Response resp = target("/authn/me").request().accept("application/vnd.gravitino.v1+json").get();
 
     Assertions.assertEquals(Response.Status.OK.getStatusCode(), resp.getStatus());
 
