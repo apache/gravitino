@@ -102,8 +102,30 @@ export const logoutAction = createAsyncThunk('auth/logoutAction', async ({ route
     try {
       const provider = await oauthProviderFactory.getProvider()
       if (provider) {
+        // For OIDC providers, use signoutRedirect to end Keycloak session
+        if (provider.getUserManager) {
+          const userManager = provider.getUserManager()
+          if (userManager) {
+            await provider.clearAuthData()
+
+            // Clear legacy auth tokens before redirect
+            localStorage.removeItem('accessToken')
+            localStorage.removeItem('authParams')
+            localStorage.removeItem('expiredIn')
+            localStorage.removeItem('isIdle')
+            localStorage.removeItem('version')
+
+            dispatch(clearIntervalId())
+            dispatch(setAuthToken(''))
+
+            // Redirect to IdP logout endpoint — this will navigate away from the app
+            await userManager.signoutRedirect()
+
+            return { token: null }
+          }
+        }
+
         await provider.clearAuthData()
-        console.log('[Logout Action] Provider cleanup completed')
       }
     } catch (error) {
       console.warn('[Logout Action] Provider cleanup failed:', error)
