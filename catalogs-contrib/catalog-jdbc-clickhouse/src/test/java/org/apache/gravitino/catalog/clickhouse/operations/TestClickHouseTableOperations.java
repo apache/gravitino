@@ -1059,6 +1059,167 @@ public class TestClickHouseTableOperations extends TestClickHouse {
   }
 
   @Test
+  void testGenerateCreateTableSqlWithQuotedStringDefault() {
+    TestableClickHouseTableOperations ops = new TestableClickHouseTableOperations();
+    ops.initialize(
+        null,
+        new ClickHouseExceptionConverter(),
+        new ClickHouseTypeConverter(),
+        new ClickHouseColumnDefaultValueConverter(),
+        new HashMap<>());
+
+    JdbcColumn[] cols =
+        new JdbcColumn[] {
+          JdbcColumn.builder()
+              .withName("id")
+              .withType(Types.IntegerType.get())
+              .withNullable(false)
+              .build(),
+          JdbcColumn.builder()
+              .withName("status")
+              .withType(Types.StringType.get())
+              .withNullable(false)
+              .withComment("Status")
+              .withDefaultValue(Literals.stringLiteral("'active'"))
+              .build()
+        };
+
+    String sql =
+        ops.buildCreateSql(
+            "t_status",
+            cols,
+            null,
+            new HashMap<>(),
+            Transforms.EMPTY_TRANSFORM,
+            Distributions.NONE,
+            new Index[0],
+            ClickHouseUtils.getSortOrders("id"));
+
+    Assertions.assertTrue(sql.contains("`status` String  DEFAULT 'active' COMMENT 'Status'"));
+    Assertions.assertFalse(sql.contains("DEFAULT ''active''"));
+  }
+
+  @Test
+  void testGenerateCreateTableSqlEscapesStringDefaultQuotes() {
+    TestableClickHouseTableOperations ops = new TestableClickHouseTableOperations();
+    ops.initialize(
+        null,
+        new ClickHouseExceptionConverter(),
+        new ClickHouseTypeConverter(),
+        new ClickHouseColumnDefaultValueConverter(),
+        new HashMap<>());
+
+    JdbcColumn[] cols =
+        new JdbcColumn[] {
+          JdbcColumn.builder()
+              .withName("id")
+              .withType(Types.IntegerType.get())
+              .withNullable(false)
+              .build(),
+          JdbcColumn.builder()
+              .withName("status")
+              .withType(Types.StringType.get())
+              .withNullable(false)
+              .withDefaultValue(Literals.stringLiteral("o'reilly"))
+              .build()
+        };
+
+    String sql =
+        ops.buildCreateSql(
+            "t_status_quote",
+            cols,
+            null,
+            new HashMap<>(),
+            Transforms.EMPTY_TRANSFORM,
+            Distributions.NONE,
+            new Index[0],
+            ClickHouseUtils.getSortOrders("id"));
+
+    Assertions.assertTrue(sql.contains("DEFAULT 'o''reilly'"));
+  }
+
+  @Test
+  void testGenerateCreateTableSqlWithPreQuotedEscapedStringDefault() {
+    TestableClickHouseTableOperations ops = new TestableClickHouseTableOperations();
+    ops.initialize(
+        null,
+        new ClickHouseExceptionConverter(),
+        new ClickHouseTypeConverter(),
+        new ClickHouseColumnDefaultValueConverter(),
+        new HashMap<>());
+
+    JdbcColumn[] cols =
+        new JdbcColumn[] {
+          JdbcColumn.builder()
+              .withName("id")
+              .withType(Types.IntegerType.get())
+              .withNullable(false)
+              .build(),
+          JdbcColumn.builder()
+              .withName("status")
+              .withType(Types.StringType.get())
+              .withNullable(false)
+              .withDefaultValue(Literals.stringLiteral("'o''reilly'"))
+              .build()
+        };
+
+    String sql =
+        ops.buildCreateSql(
+            "t_status_prequoted",
+            cols,
+            null,
+            new HashMap<>(),
+            Transforms.EMPTY_TRANSFORM,
+            Distributions.NONE,
+            new Index[0],
+            ClickHouseUtils.getSortOrders("id"));
+
+    Assertions.assertTrue(sql.contains("DEFAULT 'o''reilly'"));
+    Assertions.assertFalse(sql.contains("DEFAULT 'o''''reilly'"));
+  }
+
+  @Test
+  void testGenerateCreateTableSqlWithNullStringDefaultThrows() {
+    TestableClickHouseTableOperations ops = new TestableClickHouseTableOperations();
+    ops.initialize(
+        null,
+        new ClickHouseExceptionConverter(),
+        new ClickHouseTypeConverter(),
+        new ClickHouseColumnDefaultValueConverter(),
+        new HashMap<>());
+
+    JdbcColumn[] cols =
+        new JdbcColumn[] {
+          JdbcColumn.builder()
+              .withName("id")
+              .withType(Types.IntegerType.get())
+              .withNullable(false)
+              .build(),
+          JdbcColumn.builder()
+              .withName("status")
+              .withType(Types.StringType.get())
+              .withNullable(false)
+              .withDefaultValue(Literals.of(null, Types.StringType.get()))
+              .build()
+        };
+
+    IllegalArgumentException exception =
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () ->
+                ops.buildCreateSql(
+                    "t_status_null_default",
+                    cols,
+                    null,
+                    new HashMap<>(),
+                    Transforms.EMPTY_TRANSFORM,
+                    Distributions.NONE,
+                    new Index[0],
+                    ClickHouseUtils.getSortOrders("id")));
+    Assertions.assertTrue(exception.getMessage().contains("Null default literal value"));
+  }
+
+  @Test
   void testParsePartitioningAndIndexExpressions() {
     TestableClickHouseTableOperations ops = new TestableClickHouseTableOperations();
 
