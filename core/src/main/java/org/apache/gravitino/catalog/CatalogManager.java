@@ -74,6 +74,12 @@ import org.apache.gravitino.EntityStore;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.StringIdentifier;
+import org.apache.gravitino.cache.invalidation.CacheDomain;
+import org.apache.gravitino.cache.invalidation.CacheInvalidationEvent;
+import org.apache.gravitino.cache.invalidation.CacheInvalidationOperation;
+import org.apache.gravitino.cache.invalidation.CacheInvalidationService;
+import org.apache.gravitino.cache.invalidation.CacheInvalidationServiceFactory;
+import org.apache.gravitino.cache.invalidation.CatalogCacheInvalidationKey;
 import org.apache.gravitino.connector.BaseCatalog;
 import org.apache.gravitino.connector.CatalogOperations;
 import org.apache.gravitino.connector.HasPropertyMetadata;
@@ -291,6 +297,8 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
 
   private final IdGenerator idGenerator;
   private final List<Consumer<NameIdentifier>> removalListeners = Lists.newArrayList();
+  private final CacheInvalidationService cacheInvalidationService;
+  private final String cacheInvalidationHandlerId;
 
   /**
    * Constructs a CatalogManager instance.
@@ -303,6 +311,8 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
     this.config = config;
     this.store = store;
     this.idGenerator = idGenerator;
+    this.cacheInvalidationService = CacheInvalidationServiceFactory.getOrCreate(config);
+    this.cacheInvalidationHandlerId = "catalog-manager-" + System.identityHashCode(this);
 
     long cacheEvictionIntervalInMs = config.get(Configs.CATALOG_CACHE_EVICTION_INTERVAL_MS);
     this.catalogCache =
@@ -327,6 +337,8 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
                             .setNameFormat("catalog-cleaner-%d")
                             .build())))
             .build();
+    this.cacheInvalidationService.registerHandler(
+        CacheDomain.CATALOG, cacheInvalidationHandlerId, this::handleCatalogInvalidationEvent);
   }
 
   /**
@@ -335,7 +347,8 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
    */
   @Override
   public void close() {
-    catalogCache.invalidateAll();
+    invalidateAllCatalogCache();
+    cacheInvalidationService.unregisterHandler(CacheDomain.CATALOG, cacheInvalidationHandlerId);
   }
 
   /**
@@ -493,7 +506,7 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
             throw e2;
 
           } catch (Exception e3) {
-            catalogCache.invalidate(ident);
+            invalidateCatalogCache(ident);
             LOG.error("Failed to create catalog {}", ident, e3);
             if (e3 instanceof RuntimeException) {
               throw (RuntimeException) e3;
@@ -611,7 +624,7 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
 
                   return newCatalogBuilder.build();
                 });
-            catalogCache.invalidate(ident);
+            invalidateCatalogCache(ident);
             return null;
           } catch (IOException e) {
             throw new RuntimeException(e);
@@ -651,7 +664,7 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
 
                   return newCatalogBuilder.build();
                 });
-            catalogCache.invalidate(ident);
+            invalidateCatalogCache(ident);
             return null;
           } catch (IOException e) {
             throw new RuntimeException(e);
@@ -715,7 +728,7 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
         nameIdentifierForLock,
         LockType.WRITE,
         () -> {
-          catalogCache.invalidate(ident);
+          invalidateCatalogCache(ident);
           try {
             CatalogEntity updatedCatalog =
                 store.update(
@@ -804,7 +817,7 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
             }
 
             // Finally, delete the catalog entity as well as all its sub-entities from the store.
-            catalogCache.invalidate(ident);
+            invalidateCatalogCache(ident);
             return store.delete(ident, EntityType.CATALOG, true);
 
           } catch (NoSuchMetalakeException | NoSuchCatalogException ignored) {
@@ -1295,7 +1308,7 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
 
             return newCatalogBuilder.build();
           });
-      catalogCache.invalidate(nameIdentifier);
+      invalidateCatalogCache(nameIdentifier);
 
     } catch (NoSuchCatalogException e) {
       LOG.error("Catalog {} does not exist", nameIdentifier, e);
@@ -1311,5 +1324,48 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
       LOG.error("Failed to update catalog {} property {}", nameIdentifier, propertyKey, ioe);
       throw new RuntimeException(ioe);
     }
+  }
+
+  private void invalidateCatalogCache(NameIdentifier nameIdentifier) {
+    if (!cacheInvalidationService.isEnabled()) {
+      catalogCache.invalidate(nameIdentifier);
+      return;
+    }
+
+    cacheInvalidationService.publish(
+        CacheInvalidationEvent.of(
+            CacheDomain.CATALOG,
+            CacheInvalidationOperation.INVALIDATE_KEY,
+            CatalogCacheInvalidationKey.of(nameIdentifier),
+            cacheInvalidationService.localNodeId()));
+  }
+
+  private void invalidateAllCatalogCache() {
+    if (!cacheInvalidationService.isEnabled()) {
+      catalogCache.invalidateAll();
+      return;
+    }
+
+    cacheInvalidationService.publish(
+        CacheInvalidationEvent.of(
+            CacheDomain.CATALOG,
+            CacheInvalidationOperation.INVALIDATE_ALL,
+            null,
+            cacheInvalidationService.localNodeId()));
+  }
+
+  private void handleCatalogInvalidationEvent(CacheInvalidationEvent event) {
+    if (event.operation() == CacheInvalidationOperation.INVALIDATE_ALL) {
+      catalogCache.invalidateAll();
+      return;
+    }
+
+    if (event.operation() != CacheInvalidationOperation.INVALIDATE_KEY
+        || !(event.key() instanceof CatalogCacheInvalidationKey)) {
+      return;
+    }
+
+    CatalogCacheInvalidationKey key = (CatalogCacheInvalidationKey) event.key();
+    catalogCache.invalidate(key.nameIdentifier());
   }
 }
