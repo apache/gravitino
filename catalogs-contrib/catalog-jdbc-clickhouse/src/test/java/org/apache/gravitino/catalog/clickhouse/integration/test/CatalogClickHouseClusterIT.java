@@ -33,9 +33,11 @@ import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.ResultSet;
 import java.sql.Statement;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Objects;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.Catalog;
 import org.apache.gravitino.NameIdentifier;
@@ -52,11 +54,15 @@ import org.apache.gravitino.integration.test.util.TestDatabaseName;
 import org.apache.gravitino.rel.Column;
 import org.apache.gravitino.rel.Table;
 import org.apache.gravitino.rel.TableCatalog;
+import org.apache.gravitino.rel.TableChange;
+import org.apache.gravitino.rel.expressions.NamedReference;
 import org.apache.gravitino.rel.expressions.distributions.Distribution;
 import org.apache.gravitino.rel.expressions.distributions.Distributions;
 import org.apache.gravitino.rel.expressions.literals.Literals;
 import org.apache.gravitino.rel.expressions.transforms.Transform;
 import org.apache.gravitino.rel.expressions.transforms.Transforms;
+import org.apache.gravitino.rel.indexes.Index;
+import org.apache.gravitino.rel.indexes.Indexes;
 import org.apache.gravitino.rel.types.Types;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.Assertions;
@@ -223,6 +229,10 @@ public class CatalogClickHouseClusterIT extends BaseIT {
         ENGINE.MERGETREE.getValue(), loadedLocalTable.properties().get(GRAVITINO_ENGINE_KEY));
     Assertions.assertEquals("false", loadedLocalTable.properties().get(ON_CLUSTER));
     Assertions.assertFalse(loadedLocalTable.properties().containsKey(CLUSTER_NAME));
+    Assertions.assertEquals(1, loadedLocalTable.sortOrder().length);
+    Assertions.assertTrue(loadedLocalTable.sortOrder()[0].expression() instanceof NamedReference);
+    Assertions.assertEquals(
+        "col_3", ((NamedReference) loadedLocalTable.sortOrder()[0].expression()).fieldName()[0]);
 
     Table distributedTable =
         tableCatalog.createTable(
@@ -263,6 +273,12 @@ public class CatalogClickHouseClusterIT extends BaseIT {
         ENGINE.MERGETREE.getValue(), loadedNonClusterTable.properties().get(GRAVITINO_ENGINE_KEY));
     Assertions.assertEquals("false", loadedNonClusterTable.properties().get(ON_CLUSTER));
     Assertions.assertFalse(loadedNonClusterTable.properties().containsKey(CLUSTER_NAME));
+    Assertions.assertEquals(1, loadedNonClusterTable.sortOrder().length);
+    Assertions.assertTrue(
+        loadedNonClusterTable.sortOrder()[0].expression() instanceof NamedReference);
+    Assertions.assertEquals(
+        "col_3",
+        ((NamedReference) loadedNonClusterTable.sortOrder()[0].expression()).fieldName()[0]);
 
     try (Connection connection =
             DriverManager.getConnection(
@@ -355,5 +371,156 @@ public class CatalogClickHouseClusterIT extends BaseIT {
         schemaName, sqlNonClusterDistributedTable.properties().get(REMOTE_DATABASE));
     Assertions.assertEquals(
         sqlNonClusterLocalTableName, sqlNonClusterDistributedTable.properties().get(REMOTE_TABLE));
+  }
+
+  @Test
+  public void testAlterTableBranchCoverageInCluster() {
+    String alterTableName = GravitinoITUtils.genRandomName("ck_cluster_alter");
+    NameIdentifier tableIdentifier = NameIdentifier.of(schemaName, alterTableName);
+    Column[] columns = createColumns();
+    Index[] indexes =
+        new Index[] {
+          Indexes.of(Index.IndexType.DATA_SKIPPING_MINMAX, "idx_col_2", new String[][] {{"col_2"}})
+        };
+    TableCatalog tableCatalog = catalog.asTableCatalog();
+    tableCatalog.createTable(
+        tableIdentifier,
+        columns,
+        tableComment,
+        clusterMergeTreeProperties(),
+        Transforms.EMPTY_TRANSFORM,
+        Distributions.NONE,
+        getSortOrders("col_3"),
+        indexes);
+
+    tableCatalog.alterTable(
+        tableIdentifier,
+        TableChange.addColumn(
+            new String[] {"col_4"},
+            Types.StringType.get(),
+            "new col",
+            TableChange.ColumnPosition.first()),
+        TableChange.updateColumnPosition(
+            new String[] {"col_2"}, TableChange.ColumnPosition.after("col_3")));
+    tableCatalog.alterTable(
+        tableIdentifier,
+        TableChange.updateColumnType(new String[] {"col_1"}, Types.LongType.get()));
+    tableCatalog.alterTable(
+        tableIdentifier,
+        TableChange.updateColumnComment(new String[] {"col_1"}, "col_1_new_comment"));
+    tableCatalog.alterTable(
+        tableIdentifier,
+        TableChange.updateColumnDefaultValue(
+            new String[] {"col_1"}, Literals.of("2", Types.LongType.get())));
+    tableCatalog.alterTable(
+        tableIdentifier, TableChange.updateColumnNullability(new String[] {"col_1"}, true));
+    tableCatalog.alterTable(tableIdentifier, TableChange.deleteIndex("idx_col_2", false));
+
+    Table alteredTable = tableCatalog.loadTable(tableIdentifier);
+    Assertions.assertEquals(4, alteredTable.columns().length);
+    Assertions.assertEquals("col_4", alteredTable.columns()[0].name());
+    int col2Position = -1;
+    int col3Position = -1;
+    for (int i = 0; i < alteredTable.columns().length; i++) {
+      if (Objects.equals("col_2", alteredTable.columns()[i].name())) {
+        col2Position = i;
+      }
+      if (Objects.equals("col_3", alteredTable.columns()[i].name())) {
+        col3Position = i;
+      }
+    }
+    Assertions.assertTrue(col2Position > col3Position, "col_2 should appear after col_3");
+    Column alteredCol1 =
+        Arrays.stream(alteredTable.columns())
+            .filter(column -> Objects.equals("col_1", column.name()))
+            .findFirst()
+            .orElseThrow(() -> new AssertionError("col_1 should exist"));
+    Assertions.assertTrue(alteredCol1.nullable());
+    Assertions.assertEquals(Types.LongType.get(), alteredCol1.dataType());
+    Assertions.assertEquals("col_1_new_comment", alteredCol1.comment());
+    Assertions.assertEquals(Literals.of("2", Types.LongType.get()), alteredCol1.defaultValue());
+    Assertions.assertFalse(
+        Arrays.stream(alteredTable.index())
+            .anyMatch(index -> Objects.equals(index.name(), "idx_col_2")));
+
+    Assertions.assertDoesNotThrow(
+        () ->
+            tableCatalog.alterTable(
+                tableIdentifier,
+                TableChange.deleteIndex("missing_idx", true),
+                TableChange.deleteColumn(new String[] {"missing_col"}, true)));
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () ->
+            tableCatalog.alterTable(
+                tableIdentifier, TableChange.deleteIndex("missing_idx", false)));
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () ->
+            tableCatalog.alterTable(
+                tableIdentifier, TableChange.deleteColumn(new String[] {"missing_col"}, false)));
+    Assertions.assertThrows(
+        UnsupportedOperationException.class,
+        () -> tableCatalog.alterTable(tableIdentifier, TableChange.setProperty("k", "v")));
+    Assertions.assertThrows(
+        UnsupportedOperationException.class,
+        () -> tableCatalog.alterTable(tableIdentifier, TableChange.removeProperty("k")));
+    Assertions.assertThrows(
+        UnsupportedOperationException.class,
+        () ->
+            tableCatalog.alterTable(
+                tableIdentifier,
+                TableChange.updateColumnAutoIncrement(new String[] {"col_1"}, true)));
+  }
+
+  @Test
+  public void testAlterAddIndexAndAutoIncrementInCluster() {
+    String tableName = GravitinoITUtils.genRandomName("ck_cluster_alter_idx");
+    NameIdentifier tableIdentifier = NameIdentifier.of(schemaName, tableName);
+    Column[] columns = createColumns();
+    TableCatalog tableCatalog = catalog.asTableCatalog();
+    tableCatalog.createTable(
+        tableIdentifier,
+        columns,
+        tableComment,
+        clusterMergeTreeProperties(),
+        Transforms.EMPTY_TRANSFORM,
+        Distributions.NONE,
+        getSortOrders("col_3"),
+        Indexes.EMPTY_INDEXES);
+
+    tableCatalog.alterTable(
+        tableIdentifier,
+        TableChange.addIndex(
+            Index.IndexType.DATA_SKIPPING_MINMAX, "idx_col_1_new", new String[][] {{"col_1"}}));
+    Table loaded = tableCatalog.loadTable(tableIdentifier);
+    Assertions.assertTrue(
+        Arrays.stream(loaded.index())
+            .anyMatch(index -> Objects.equals(index.name(), "idx_col_1_new")));
+    tableCatalog.alterTable(tableIdentifier, TableChange.deleteIndex("idx_col_1_new", false));
+    loaded = tableCatalog.loadTable(tableIdentifier);
+    Assertions.assertFalse(
+        Arrays.stream(loaded.index())
+            .anyMatch(index -> Objects.equals(index.name(), "idx_col_1_new")));
+
+    RuntimeException autoIncrementTrueException =
+        Assertions.assertThrows(
+            RuntimeException.class,
+            () ->
+                tableCatalog.alterTable(
+                    tableIdentifier,
+                    TableChange.updateColumnAutoIncrement(new String[] {"col_1"}, true)));
+    Assertions.assertTrue(
+        autoIncrementTrueException.getMessage().contains("auto increment is not supported"));
+
+    RuntimeException autoIncrementFalseException =
+        Assertions.assertThrows(
+            RuntimeException.class,
+            () ->
+                tableCatalog.alterTable(
+                    tableIdentifier,
+                    TableChange.updateColumnAutoIncrement(new String[] {"col_1"}, false)));
+    Assertions.assertTrue(
+        autoIncrementFalseException.getMessage().contains("auto increment is not supported"));
   }
 }

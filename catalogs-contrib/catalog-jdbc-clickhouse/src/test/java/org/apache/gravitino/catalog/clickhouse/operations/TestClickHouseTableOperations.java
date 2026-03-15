@@ -1059,6 +1059,43 @@ public class TestClickHouseTableOperations extends TestClickHouse {
   }
 
   @Test
+  void testGenerateCreateTableSqlWithAutoIncrementColumnUnsupported() {
+    TestableClickHouseTableOperations ops = new TestableClickHouseTableOperations();
+    ops.initialize(
+        null,
+        new ClickHouseExceptionConverter(),
+        new ClickHouseTypeConverter(),
+        new ClickHouseColumnDefaultValueConverter(),
+        new HashMap<>());
+
+    JdbcColumn[] cols =
+        new JdbcColumn[] {
+          JdbcColumn.builder()
+              .withName("id")
+              .withType(Types.IntegerType.get())
+              .withNullable(false)
+              .withAutoIncrement(true)
+              .withDefaultValue(DEFAULT_VALUE_NOT_SET)
+              .build()
+        };
+
+    UnsupportedOperationException exception =
+        Assertions.assertThrows(
+            UnsupportedOperationException.class,
+            () ->
+                ops.buildCreateSql(
+                    "t_auto_inc",
+                    cols,
+                    null,
+                    new HashMap<>(),
+                    Transforms.EMPTY_TRANSFORM,
+                    Distributions.NONE,
+                    Indexes.EMPTY_INDEXES,
+                    ClickHouseUtils.getSortOrders("id")));
+    Assertions.assertTrue(exception.getMessage().contains("auto increment"));
+  }
+
+  @Test
   void testParsePartitioningAndIndexExpressions() {
     TestableClickHouseTableOperations ops = new TestableClickHouseTableOperations();
 
@@ -1076,6 +1113,28 @@ public class TestClickHouseTableOperations extends TestClickHouse {
     Assertions.assertArrayEquals(new String[][] {{"c4"}}, bloomFields);
   }
 
+  @Test
+  void testParseSortOrdersFromMultilineShowCreateSql() {
+    TestableClickHouseTableOperations ops = new TestableClickHouseTableOperations();
+    String showCreateSql =
+        """
+        CREATE TABLE `t1`
+        (
+          `id` Int32,
+          `event_time` DateTime
+        )
+        ENGINE = MergeTree
+        ORDER BY
+          (`id`, toDate(`event_time`))
+        SETTINGS index_granularity = 8192
+        """;
+
+    SortOrder[] sortOrders = ops.parseSortOrders(showCreateSql);
+    Assertions.assertEquals(2, sortOrders.length);
+    Assertions.assertTrue(sortOrders[0].expression() instanceof NamedReference);
+    Assertions.assertEquals("id", ((NamedReference) sortOrders[0].expression()).fieldName()[0]);
+  }
+
   private static final class TestableClickHouseTableOperations extends ClickHouseTableOperations {
     String buildCreateSql(
         String tableName,
@@ -1088,6 +1147,10 @@ public class TestClickHouseTableOperations extends TestClickHouse {
         SortOrder[] sortOrders) {
       return generateCreateTableSql(
           tableName, columns, comment, properties, partitioning, distribution, indexes, sortOrders);
+    }
+
+    SortOrder[] parseSortOrders(String createSql) {
+      return parseSortOrdersFromCreateSql(createSql);
     }
   }
 
@@ -1121,6 +1184,8 @@ public class TestClickHouseTableOperations extends TestClickHouse {
           TableChange.updateColumnPosition(new String[] {"c1"}, TableChange.ColumnPosition.first()),
           TableChange.deleteColumn(new String[] {"c3"}, false),
           TableChange.updateColumnNullability(new String[] {"c2"}, false),
+          TableChange.addIndex(
+              Index.IndexType.DATA_SKIPPING_MINMAX, "idx2", new String[][] {{"c2"}}),
           TableChange.deleteIndex("idx1", false),
           TableChange.renameColumn(new String[] {"c2"}, "c2_new"),
           TableChange.updateComment("new_table_comment")
@@ -1135,6 +1200,7 @@ public class TestClickHouseTableOperations extends TestClickHouse {
     Assertions.assertTrue(sql.contains("COMMENT 'c1_comment'"));
     Assertions.assertTrue(sql.contains("FIRST"));
     Assertions.assertTrue(sql.contains("DROP COLUMN `c3`"));
+    Assertions.assertTrue(sql.contains("ADD INDEX `idx2` `c2` TYPE minmax GRANULARITY 1"));
     Assertions.assertTrue(sql.contains("DROP INDEX `idx1`"));
     Assertions.assertTrue(sql.contains("MODIFY COMMENT 'new_table_comment'"));
     Assertions.assertTrue(sql.startsWith("ALTER TABLE `tbl`"));
@@ -1180,6 +1246,61 @@ public class TestClickHouseTableOperations extends TestClickHouse {
         () ->
             ops.buildAlterSql(
                 "db", "tbl", new TableChange[] {TableChange.deleteIndex("missing", false)}));
+  }
+
+  @Test
+  public void testAlterTableAddIndexBranches() {
+    StubClickHouseTableOperations ops = new StubClickHouseTableOperations();
+    ops.initialize(
+        null,
+        new ClickHouseExceptionConverter(),
+        new ClickHouseTypeConverter(),
+        new ClickHouseColumnDefaultValueConverter(),
+        new HashMap<>());
+    ops.setTable(buildStubTable());
+
+    String minMaxSql =
+        ops.buildAlterSql(
+            "db",
+            "tbl",
+            new TableChange[] {
+              TableChange.addIndex(
+                  Index.IndexType.DATA_SKIPPING_MINMAX, "idx_new", new String[][] {{"c2"}})
+            });
+    Assertions.assertTrue(minMaxSql.contains("ADD INDEX `idx_new` `c2` TYPE minmax GRANULARITY 1"));
+
+    String bloomSql =
+        ops.buildAlterSql(
+            "db",
+            "tbl",
+            new TableChange[] {
+              TableChange.addIndex(
+                  Index.IndexType.DATA_SKIPPING_BLOOM_FILTER, "idx_bf", new String[][] {{"c2"}})
+            });
+    Assertions.assertTrue(
+        bloomSql.contains("ADD INDEX `idx_bf` `c2` TYPE bloom_filter GRANULARITY 3"));
+
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () ->
+            ops.buildAlterSql(
+                "db",
+                "tbl",
+                new TableChange[] {
+                  TableChange.addIndex(
+                      Index.IndexType.DATA_SKIPPING_MINMAX, "idx1", new String[][] {{"c2"}})
+                }));
+
+    Assertions.assertThrows(
+        UnsupportedOperationException.class,
+        () ->
+            ops.buildAlterSql(
+                "db",
+                "tbl",
+                new TableChange[] {
+                  TableChange.addIndex(
+                      Index.IndexType.PRIMARY_KEY, "pk_new", new String[][] {{"c1"}})
+                }));
   }
 
   @Test
