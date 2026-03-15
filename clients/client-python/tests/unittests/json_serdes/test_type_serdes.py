@@ -19,10 +19,23 @@ import random
 import unittest
 from itertools import combinations, product
 
+from gravitino.api.rel.expressions.expression import Expression
+from gravitino.api.rel.indexes.index import Index
+from gravitino.api.rel.indexes.indexes import Indexes
+from gravitino.api.rel.json_serdes.column_position_serdes import ColumnPositionSerdes
+from gravitino.api.rel.json_serdes.table_index_serdes import TableIndexSerdes
+from gravitino.api.rel.table_change import After, Default, First
 from gravitino.api.rel.types.json_serdes import TypeSerdes
 from gravitino.api.rel.types.json_serdes._helper.serdes_utils import SerdesUtils
 from gravitino.api.rel.types.type import PrimitiveType
 from gravitino.api.rel.types.types import Types
+from gravitino.dto.rel.expressions.field_reference_dto import FieldReferenceDTO
+from gravitino.dto.rel.expressions.func_expression_dto import FuncExpressionDTO
+from gravitino.dto.rel.expressions.json_serdes.column_default_value_serdes import (
+    ColumnDefaultValueSerdes,
+)
+from gravitino.dto.rel.expressions.literal_dto import LiteralDTO
+from gravitino.dto.rel.expressions.unparsed_expression_dto import UnparsedExpressionDTO
 from gravitino.exceptions.base import IllegalArgumentException
 
 
@@ -394,3 +407,233 @@ class TestTypeSerdes(unittest.TestCase):
         self.assertEqual(deserialized, timestamp_tz_without_precision)
         self.assertFalse(deserialized.has_precision_set())
         self.assertTrue(deserialized.has_time_zone())
+
+    def test_column_default_value_encoder_none(self) -> None:
+        self.assertIsNone(ColumnDefaultValueSerdes.serialize(None))
+        self.assertIsNone(
+            ColumnDefaultValueSerdes.serialize(Expression.EMPTY_EXPRESSION)
+        )
+
+    def test_column_default_value_encoder_with_literal(self) -> None:
+        literal = (
+            LiteralDTO.builder()
+            .with_data_type(Types.DateType.get())
+            .with_value("2023-04-01")
+            .build()
+        )
+
+        serialized = ColumnDefaultValueSerdes.serialize(literal)
+        expected = {
+            "type": "literal",
+            "dataType": "date",
+            "value": "2023-04-01",
+        }
+        self.assertEqual(expected, serialized)
+
+    def test_column_default_value_encoder_with_field(self) -> None:
+        field = (
+            FieldReferenceDTO.builder().with_field_name(["field1", "field2"]).build()
+        )
+
+        serialized = ColumnDefaultValueSerdes.serialize(field)
+        expected = {
+            "type": "field",
+            "fieldName": ["field1", "field2"],
+        }
+        self.assertEqual(expected, serialized)
+
+    def test_column_default_value_encoder_with_function(self) -> None:
+        arg1 = FieldReferenceDTO.builder().with_field_name(["dt"]).build()
+        arg2 = (
+            LiteralDTO.builder()
+            .with_data_type(Types.StringType.get())
+            .with_value("Asia/Shanghai")
+            .build()
+        )
+        to_date_func = (
+            FuncExpressionDTO.builder()
+            .with_function_name("toDate")
+            .with_function_args([arg1, arg2])
+            .build()
+        )
+
+        serialized = ColumnDefaultValueSerdes.serialize(to_date_func)
+        expected = {
+            "type": "function",
+            "funcName": "toDate",
+            "funcArgs": [
+                {
+                    "type": "field",
+                    "fieldName": ["dt"],
+                },
+                {
+                    "type": "literal",
+                    "dataType": "string",
+                    "value": "Asia/Shanghai",
+                },
+            ],
+        }
+        self.assertEqual(expected, serialized)
+
+    def test_column_default_value_encoder_with_unparsed(self) -> None:
+        unparsed = (
+            UnparsedExpressionDTO.builder().with_unparsed_expression("customer").build()
+        )
+        serialized = ColumnDefaultValueSerdes.serialize(unparsed)
+        expected = {
+            "type": "unparsed",
+            "unparsedExpression": "customer",
+        }
+        self.assertEqual(expected, serialized)
+
+    def test_column_default_value_decoder_with_none(self) -> None:
+        self.assertEqual(
+            Expression.EMPTY_EXPRESSION, ColumnDefaultValueSerdes.deserialize(None)
+        )
+
+    def test_column_default_value_decoder_with_literal(self) -> None:
+        json_str = {
+            "type": "literal",
+            "dataType": "string",
+            "value": "Asia/Shanghai",
+        }
+        expr: LiteralDTO = ColumnDefaultValueSerdes.deserialize(json_str)
+        self.assertEqual("Asia/Shanghai", expr.value())
+        self.assertEqual(expr.data_type(), Types.StringType.get())
+
+    def test_column_default_value_decoder_with_field(self) -> None:
+        json_str = {
+            "type": "field",
+            "fieldName": ["field1", "field2"],
+        }
+        expr: FieldReferenceDTO = ColumnDefaultValueSerdes.deserialize(json_str)
+        self.assertEqual(expr.field_name(), ["field1", "field2"])
+
+    def test_column_default_value_decoder_with_function(self) -> None:
+        json_str = {
+            "type": "function",
+            "funcName": "toDate",
+            "funcArgs": [
+                {
+                    "type": "field",
+                    "fieldName": ["dt"],
+                },
+                {
+                    "type": "literal",
+                    "dataType": "string",
+                    "value": "Asia/Shanghai",
+                },
+            ],
+        }
+
+        expr: FuncExpressionDTO = ColumnDefaultValueSerdes.deserialize(json_str)
+        self.assertEqual("toDate", expr.function_name())
+        self.assertEqual(2, len(expr.args()))
+
+    def test_column_default_value_decoder_with_unparsed(self) -> None:
+        json_str = {"type": "unparsed", "unparsedExpression": "unparsed expression"}
+
+        expr: UnparsedExpressionDTO = ColumnDefaultValueSerdes.deserialize(json_str)
+        self.assertEqual(expr.unparsed_expression(), "unparsed expression")
+
+    def test_column_position_serializer(self) -> None:
+        with self.assertRaises(ValueError):
+            ColumnPositionSerdes.serialize(None)
+
+        self.assertEqual(
+            ColumnPositionSerdes.serialize(First()),
+            "first",
+        )
+
+        self.assertEqual(
+            ColumnPositionSerdes.serialize(After("colA")),
+            {"after": "colA"},
+        )
+
+        self.assertEqual(
+            ColumnPositionSerdes.serialize(Default()),
+            "default",
+        )
+
+    def test_column_position_deserializer(self) -> None:
+        with self.assertRaises(ValueError):
+            ColumnPositionSerdes.deserialize(None)
+
+        self.assertIsInstance(
+            ColumnPositionSerdes.deserialize("first"),
+            First,
+        )
+
+        self.assertIsInstance(
+            ColumnPositionSerdes.deserialize("FIRST"),
+            First,
+        )
+
+        self.assertIsInstance(
+            ColumnPositionSerdes.deserialize({"after": "colA"}),
+            After,
+        )
+
+        self.assertEqual(
+            ColumnPositionSerdes.deserialize({"after": "colA"}).get_column(),
+            "colA",
+        )
+
+        self.assertIsInstance(
+            ColumnPositionSerdes.deserialize("default"),
+            Default,
+        )
+
+        self.assertIsInstance(
+            ColumnPositionSerdes.deserialize("DEFAULT"),
+            Default,
+        )
+
+    def test_table_index_serializer(self) -> None:
+        index_obj = Indexes.create_mysql_primary_key([["a", "b"]])
+        serialized = TableIndexSerdes.serialize(index_obj)
+        expected = {
+            "indexType": "PRIMARY_KEY",
+            "name": Indexes.DEFAULT_MYSQL_PRIMARY_KEY_NAME,
+            "fieldNames": [["a", "b"]],
+        }
+        self.assertEqual(serialized, expected)
+
+        index_obj = Indexes.of(Index.IndexType.PRIMARY_KEY, None, [["a", "b"]])
+        serialized = TableIndexSerdes.serialize(index_obj)
+        expected = {
+            "indexType": "PRIMARY_KEY",
+            "fieldNames": [["a", "b"]],
+        }
+        self.assertEqual(serialized, expected)
+
+        index_obj = Indexes.unique("uk_1", [["a", "b"]])
+        serialized = TableIndexSerdes.serialize(index_obj)
+        expected = {
+            "indexType": "UNIQUE_KEY",
+            "name": "uk_1",
+            "fieldNames": [["a", "b"]],
+        }
+        self.assertEqual(expected, serialized)
+
+    def test_table_index_deserialize(self) -> None:
+        data = {
+            "indexType": "PRIMARY_KEY",
+            "name": "idx_test",
+            "fieldNames": ["a", "b"],
+        }
+
+        result = TableIndexSerdes.deserialize(data)
+        self.assertEqual(result.name(), "idx_test")
+        self.assertEqual(result.type(), Index.IndexType.PRIMARY_KEY)
+        self.assertEqual(result.field_names(), ["a", "b"])
+
+        data = {
+            "indexType": "PRIMARY_KEY",
+            "fieldNames": ["a", "b"],
+        }
+
+        result = TableIndexSerdes.deserialize(data)
+        self.assertIsNone(result.name())
+        self.assertEqual(result.type(), Index.IndexType.PRIMARY_KEY)
+        self.assertEqual(result.field_names(), ["a", "b"])
