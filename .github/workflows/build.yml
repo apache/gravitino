@@ -84,7 +84,7 @@ jobs:
 
       - name: Build with Gradle
         run: |
-          ./gradlew release -x test
+          ./gradlew assemble
 
   # To check the spark-connector is compatible with scala2.13
   spark-connector-build:
@@ -194,9 +194,6 @@ jobs:
         run: |
           echo "Total coverage ${{ steps.coverage.outputs.coverage-overall }}"
           echo "Changed Files coverage ${{ steps.coverage.outputs.coverage-changed-files }}"
-
-      - name: Release with Gradle
-        run: ./gradlew clean && ./gradlew release -x test --rerun-tasks
 
       - name: Upload unit tests report
         uses: actions/upload-artifact@v4

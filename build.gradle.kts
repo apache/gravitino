@@ -24,6 +24,7 @@ import com.github.jk1.license.render.InventoryHtmlReportRenderer
 import com.github.jk1.license.render.ReportRenderer
 import com.github.vlsi.gradle.dsl.configureEach
 import net.ltgt.gradle.errorprone.errorprone
+import org.gradle.api.attributes.java.TargetJvmVersion
 import org.gradle.api.tasks.testing.logging.TestExceptionFormat
 import org.gradle.internal.hash.ChecksumService
 import org.gradle.internal.os.OperatingSystem
@@ -331,39 +332,24 @@ subprojects {
     mavenLocal()
   }
 
+  val jdk8CompatibleProjectNames = setOf("api", "common", "catalog-common", "hadoop-common")
+  val jdk8CompatibleProjectPrefixes = listOf(
+    ":maintenance:jobs",
+    ":maintenance:optimizer-api",
+    ":maintenance:gravitino-updaters",
+    ":clients",
+    ":bundles",
+    ":spark-connector",
+    ":flink-connector"
+  )
+  fun hasProjectPrefix(path: String, prefixes: List<String>): Boolean {
+    return prefixes.any { path.startsWith(it) }
+  }
+
   fun compatibleWithJDK8(project: Project): Boolean {
-    val name = project.name.lowercase()
     val path = project.path.lowercase()
-    if (path.startsWith(":maintenance:jobs") ||
-      path.startsWith(":maintenance:optimizer-api") ||
-      path.startsWith(":maintenance:gravitino-updaters") ||
-      path.startsWith(":clients:client-java") ||
-      name == "api" ||
-      name == "common" ||
-      name == "catalog-common" ||
-      name == "hadoop-common"
-    ) {
-      return true
-    }
-
-    val isReleaseRun = gradle.startParameter.taskNames.any {
-      it == "release" || it == "publish" || it == "publishToMavenLocal" || it.endsWith(":release") || it.endsWith(
-        ":publish"
-      ) || it.endsWith(":publishToMavenLocal")
-    }
-    if (!isReleaseRun) {
-      return false
-    }
-
-    if (path.startsWith(":client") ||
-      path.startsWith(":spark-connector") ||
-      path.startsWith(":flink-connector") ||
-      path.startsWith(":bundles")
-    ) {
-      return true
-    }
-
-    return false
+    val name = project.name.lowercase()
+    return name in jdk8CompatibleProjectNames || hasProjectPrefix(path, jdk8CompatibleProjectPrefixes)
   }
   extensions.extraProperties.set("excludePackagesForSparkConnector", ::excludePackagesForSparkConnector)
 
@@ -399,12 +385,6 @@ subprojects {
     }
   }
 
-  tasks.withType<JavaCompile>().configureEach {
-    if (compatibleWithJDK8(project)) {
-      options.release.set(8)
-    }
-  }
-
   java {
     toolchain {
       // Some JDK vendors like Homebrew installed OpenJDK 17 have problems in building trino-connector:
@@ -424,6 +404,22 @@ subprojects {
         languageVersion.set(JavaLanguageVersion.of(17))
       }
     }
+  }
+
+  if (compatibleWithJDK8(project)) {
+    tasks.named<JavaCompile>("compileJava") {
+      options.release.set(8)
+    }
+
+    tasks.named<JavaCompile>("compileTestJava") {
+      options.release.set(17)
+    }
+
+    val targetJvmVersionAttribute = TargetJvmVersion.TARGET_JVM_VERSION_ATTRIBUTE
+    configurations.matching { it.name in setOf("testCompileClasspath", "testRuntimeClasspath") }
+      .configureEach {
+        attributes.attribute(targetJvmVersionAttribute, 17)
+      }
   }
 
   gradle.projectsEvaluated {
@@ -450,6 +446,7 @@ subprojects {
   }
 
   tasks.withType<JavaCompile>().configureEach {
+    options.encoding = "UTF-8"
     options.errorprone.isEnabled.set(true)
     options.errorprone.disableWarningsInGeneratedCode.set(true)
     options.errorprone.disable(
@@ -1313,21 +1310,3 @@ fun checkOrbStackStatus() {
 }
 
 printDockerCheckInfo()
-
-tasks.register("release") {
-  group = "release"
-  description = "Builds and package a release version."
-  doFirst {
-    println("Releasing project...")
-  }
-
-  // Use 'assemble' instead of 'build' to skip tests during release
-  // Tests have JDK version conflicts (some need JDK 8, some need JDK 17)
-  // and should be run separately in CI/CD with appropriate JDK configurations
-  // Only include subprojects that apply the Java plugin (exclude client-python)
-  dependsOn(
-    subprojects
-      .filter { it.name != "client-python" }
-      .map { it.tasks.named("assemble") }
-  )
-}
