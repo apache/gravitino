@@ -31,6 +31,7 @@ jobs:
       - uses: dorny/paths-filter@de90cc6fb38fc0963ad72b210f1f284cd68cea36
         id: filter
         with:
+          list-files: json
           filters: |
             source_changes:
               - '.github/**'
@@ -64,10 +65,52 @@ jobs:
               - spark-connector/**
             mcp_server_changes:
               - mcp-server/**
+            maintenance_source_changes:
+              - 'maintenance/**'
+            maintenance_changes:
+              - '.github/**'
+              - 'maintenance/**'
+              - 'api/**'
+              - 'common/**'
+              - 'core/**'
+              - 'catalogs/catalog-common/**'
+              - 'clients/client-java/**'
+              - 'integration-test-common/**'
+              - 'server/**'
+              - 'server-common/**'
+              - 'build.gradle.kts'
+              - 'gradle.properties'
+              - 'gradlew'
+              - 'settings.gradle.kts'
+              - 'gradle/**'
+      - name: Determine maintenance-only source changes
+        id: maintenance_only
+        env:
+          SOURCE_CHANGE_FILES: ${{ steps.filter.outputs.source_changes_files }}
+        run: |
+          python3 - <<'PY'
+          import json
+          import os
+
+          source_files = json.loads(os.environ.get("SOURCE_CHANGE_FILES") or "[]")
+          maintenance_only = bool(source_files) and all(
+            path.startswith("maintenance/") for path in source_files
+          )
+
+          with open(os.environ["GITHUB_OUTPUT"], "a", encoding="utf-8") as output:
+            output.write(
+              "maintenance_only_source_changes="
+              + ("true" if maintenance_only else "false")
+              + "\n"
+            )
+          PY
     outputs:
       source_changes: ${{ steps.filter.outputs.source_changes }}
       spark_connector_changes: ${{ steps.filter.outputs.spark_connector_changes }}
       mcp_server_changes: ${{ steps.filter.outputs.mcp_server_changes }}
+      maintenance_source_changes: ${{ steps.filter.outputs.maintenance_source_changes }}
+      maintenance_changes: ${{ steps.filter.outputs.maintenance_changes }}
+      maintenance_only_source_changes: ${{ steps.maintenance_only.outputs.maintenance_only_source_changes }}
 
   compile-check:
     runs-on: ubuntu-latest
@@ -153,12 +196,54 @@ jobs:
           sudo dpkg -i libssl1.1_1.1.1f-1ubuntu2_amd64.deb  
 
       - name: Build with Gradle
-        if: needs.changes.outputs.mcp_server_changes == 'true'
-        run: ./gradlew build -PskipITs -PskipDockerTests=false -x :clients:client-python:build
+        run: |
+          if [ "${{ needs.changes.outputs.maintenance_only_source_changes }}" = "true" ]; then
+            ./gradlew \
+              :maintenance:optimizer-api:build \
+              :maintenance:gravitino-updaters:build \
+              :maintenance:optimizer:build \
+              :maintenance:jobs:build \
+              -PskipITs \
+              -PskipDockerTests=false
+            exit 0
+          fi
 
-      - name: Build with Gradle (skip mcp-server tests)
-        if: needs.changes.outputs.mcp_server_changes != 'true'
-        run: ./gradlew build -PskipITs -PskipDockerTests=false -x :clients:client-python:build -x :mcp-server:build -x :mcp-server:test -x :mcp-server:pylint -x :web-v2:web:build
+          gradle_args=(
+            build
+            -PskipITs
+            -PskipDockerTests=false
+            -x :clients:client-python:build
+            -x :maintenance:optimizer-api:test
+            -x :maintenance:gravitino-updaters:test
+            -x :maintenance:optimizer:test
+            -x :maintenance:jobs:test
+          )
+
+          if [ "${{ needs.changes.outputs.mcp_server_changes }}" != "true" ]; then
+            gradle_args+=(
+              -x :mcp-server:build
+              -x :mcp-server:test
+              -x :mcp-server:pylint
+              -x :web-v2:web:build
+            )
+          fi
+
+          printf './gradlew'
+          printf ' %q' "${gradle_args[@]}"
+          printf '\n'
+
+          ./gradlew "${gradle_args[@]}"
+
+      - name: Run maintenance unit tests
+        if: needs.changes.outputs.maintenance_changes == 'true' && needs.changes.outputs.maintenance_only_source_changes != 'true'
+        run: |
+          ./gradlew \
+            :maintenance:optimizer-api:test \
+            :maintenance:gravitino-updaters:test \
+            :maintenance:optimizer:test \
+            :maintenance:jobs:test \
+            -PskipITs \
+            -PskipDockerTests=false
 
       - name: Fetch base branch for coverage diff
         if: github.event_name == 'pull_request'
@@ -196,6 +281,7 @@ jobs:
           echo "Changed Files coverage ${{ steps.coverage.outputs.coverage-changed-files }}"
 
       - name: Release with Gradle
+        if: needs.changes.outputs.maintenance_only_source_changes != 'true'
         run: ./gradlew clean && ./gradlew release -x test --rerun-tasks
 
       - name: Upload unit tests report
