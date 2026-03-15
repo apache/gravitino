@@ -141,7 +141,7 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
   private Model getModel(String modelFilePath) {
     Model model = new Model();
     try (InputStream modelStream = JcasbinAuthorizer.class.getResourceAsStream(modelFilePath)) {
-      Preconditions.checkArgument(modelStream != null, "Jcasbin model file can not found.");
+      Preconditions.checkArgument(modelStream != null, "Jcasbin model file not found");
       String modelData = IOUtils.toString(modelStream, StandardCharsets.UTF_8);
       model.loadModelFromText(modelData);
     } catch (IOException e) {
@@ -228,7 +228,7 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
       metadataId = MetadataIdConverter.getID(metadataObject, metalake);
       result = Objects.equals(Optional.of(userId), ownerRel.getIfPresent(metadataId));
     } catch (Exception e) {
-      LOG.debug("Can not get entity id", e);
+      LOG.debug("Cannot get entity ID", e);
       result = false;
     }
     LOG.debug(
@@ -260,7 +260,7 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
       return GravitinoEnv.getInstance().accessControlDispatcher().getUser(metalake, currentUserName)
           != null;
     } catch (NoSuchUserException e) {
-      LOG.warn("Can not get user {} in metalake {}", currentUserName, metalake, e);
+      LOG.warn("Cannot get user {} in metalake {}", currentUserName, metalake, e);
       return false;
     }
   }
@@ -289,7 +289,7 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
         return entities.stream().anyMatch(roleEntity -> Objects.equals(roleEntity.id(), roleId));
 
       } catch (Exception e) {
-        LOG.warn("can not get user id or role id.", e);
+        LOG.warn("Cannot get user ID or role ID", e);
         return false;
       }
     }
@@ -453,7 +453,7 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
         userId = userEntity.id();
         metadataId = MetadataIdConverter.getID(metadataObject, metalake);
       } catch (Exception e) {
-        LOG.debug("Can not get entity id", e);
+        LOG.debug("Cannot get entity ID", e);
         return false;
       }
       loadRolePrivilege(metalake, username, userId, requestContext);
@@ -561,7 +561,7 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
         }
       }
     } catch (IOException e) {
-      LOG.warn("Can not load metadata owner", e);
+      LOG.warn("Cannot load metadata owner", e);
     }
   }
 

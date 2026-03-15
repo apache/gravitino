@@ -148,7 +148,7 @@ public class AuxiliaryServiceManager {
       LOG.error("Failed to register auxService: {}", auxServiceName, e);
       throw new RuntimeException(e);
     }
-    LOG.info("AuxService:{} registered successfully", auxServiceName);
+    LOG.info("AuxService {} registered successfully", auxServiceName);
   }
 
   private void registerAuxServices(Map<String, String> config) {
@@ -206,7 +206,7 @@ public class AuxiliaryServiceManager {
     try {
       auxiliaryService.serviceStop();
     } catch (Exception e) {
-      LOG.warn("AuxService:{} stop failed", auxServiceName, e);
+      LOG.warn("Failed to stop AuxService {}", auxServiceName, e);
       if (firstException == null) {
         firstException = e;
       }

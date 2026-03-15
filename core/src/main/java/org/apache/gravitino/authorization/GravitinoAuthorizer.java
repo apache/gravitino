@@ -149,7 +149,7 @@ public interface GravitinoAuthorizer extends Closeable {
                   RoleEntity.class);
       handleRolePrivilegeChange(entity.id());
     } catch (Exception e) {
-      throw new RuntimeException("Can not get Role Entity", e);
+      throw new RuntimeException("Cannot get role entity", e);
     }
   }
 

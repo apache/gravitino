@@ -183,20 +183,20 @@ public final class JettyServer {
       server.start();
     } catch (BindException e) {
       LOG.error(
-          "Failed to start {} web server on host {} port {}, which is already in use.",
+          "Failed to start {} web server on host {} port {}, which is already in use",
           serverName,
           serverConfig.getHost(),
           serverConfig.getHttpPort(),
           e);
-      throw new RuntimeException("Failed to start " + serverName + " web server.", e);
+      throw new RuntimeException("Failed to start " + serverName + " web server", e);
 
     } catch (Exception e) {
-      LOG.error("Failed to start {} web server.", serverName, e);
-      throw new RuntimeException("Failed to start " + serverName + " web server.", e);
+      LOG.error("Failed to start {} web server", serverName, e);
+      throw new RuntimeException("Failed to start " + serverName + " web server", e);
     }
 
     if (!serverConfig.isEnableHttps()) {
-      LOG.warn("Users would better use HTTPS to avoid token data leak.");
+      LOG.warn("Users should use HTTPS to avoid exposing tokens");
     }
 
     LOG.info(
@@ -207,7 +207,7 @@ public final class JettyServer {
     try {
       server.join();
     } catch (InterruptedException e) {
-      LOG.info("Interrupted while {} web server is joining.", serverName);
+      LOG.info("Interrupted while {} web server is joining", serverName);
       Thread.currentThread().interrupt();
     }
   }
@@ -234,7 +234,7 @@ public final class JettyServer {
             getPort());
       } catch (Exception e) {
         // Swallow the exception.
-        LOG.warn("Failed to stop {} web server.", serverName, e);
+        LOG.warn("Failed to stop {} web server", serverName, e);
       }
 
       server = null;

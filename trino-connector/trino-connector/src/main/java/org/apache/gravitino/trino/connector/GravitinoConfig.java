@@ -75,10 +75,10 @@ public class GravitinoConfig {
   // Gravitino config entity
   private static final ConfigEntry GRAVITINO_URI =
       new ConfigEntry(
-          "gravitino.uri", "The uri of the gravitino web server", "http://localhost:8090", false);
+          "gravitino.uri", "The URI of the Gravitino server", "http://localhost:8090", false);
 
   private static final ConfigEntry GRAVITINO_METALAKE =
-      new ConfigEntry("gravitino.metalake", "The metalake name for used", "", true);
+      new ConfigEntry("gravitino.metalake", "The name of the metalake (top-level namespace) to connect to", "", true);
 
   /**
    * @deprecated Please use {@code gravitino.use-single-metalake} instead.
@@ -88,7 +88,7 @@ public class GravitinoConfig {
   private static final ConfigEntry GRAVITINO_SIMPLIFY_CATALOG_NAMES =
       new ConfigEntry(
           "gravitino.simplify-catalog-names",
-          "Omit metalake prefix for catalog names, is deprecated, use gravitino.use-single-metalake instead",
+          "Deprecated: omits the metalake prefix from catalog names. Use gravitino.use-single-metalake instead.",
           "true",
           false);
 
@@ -103,22 +103,22 @@ public class GravitinoConfig {
   private static final ConfigEntry GRAVITINO_CLOUD_REGION_CODE =
       new ConfigEntry(
           "gravitino.cloud.region-code",
-          "The property to specify the region code of the cloud that the catalog is running on.",
+          "Cloud region code for filtering catalogs by region. Leave empty for on-premises deployments.",
           "",
           false);
 
   private static final ConfigEntry GRAVITINO_CATALOG_CONNECTOR_FACTORY_CLASS_NAME =
       new ConfigEntry(
           "gravitino.catalog.connector.factory.class.name",
-          "The class name for the custom CatalogConnectorFactory. The class must implement the CatalogConnectorFactory interface",
+          "Fully qualified class name of a custom CatalogConnectorFactory implementation. If omitted, the default factory is used.",
           "",
           false);
 
   private static final ConfigEntry TRINO_JDBC_USER =
-      new ConfigEntry("trino.jdbc.user", "The jdbc user name of Trino", "admin", false);
+      new ConfigEntry("trino.jdbc.user", "The JDBC username for connecting to Trino", "admin", false);
 
   private static final ConfigEntry TRINO_JDBC_PASSWORD =
-      new ConfigEntry("trino.jdbc.password", "The jdbc user password of Trino", "", false);
+      new ConfigEntry("trino.jdbc.password", "The JDBC password for connecting to Trino", "", false);
 
   private static final ConfigEntry GRAVITINO_METADATA_REFRESH_INTERVAL_SECOND =
       new ConfigEntry(
@@ -130,17 +130,17 @@ public class GravitinoConfig {
   private static final ConfigEntry GRAVITINO_TRINO_SKIP_VERSION_VALIDATION =
       new ConfigEntry(
           "gravitino.trino.skip-version-validation",
-          "The property to specify whether skip Trino version validation or not. Note there may be compatiablity problem if true.",
+          "When true, skips Trino version validation and logs a warning instead of throwing an error. Gravitino supports Trino versions 435-439; other versions are untested.",
           "false",
           false);
 
   private static final ConfigEntry GRAVITINO_CLIENT_CONFIG_PREFIX =
-      new ConfigEntry("gravitino.client.", "The config prefix for Grivitino client", "", false);
+      new ConfigEntry("gravitino.client.", "Prefix for Gravitino client properties. Any property beginning with this prefix is passed through to the Gravitino client (e.g., gravitino.client.auth.type=oauth2).", "", false);
 
   private static final ConfigEntry GRAVITINO_TRINO_SKIP_CATALOG_PATTERNS =
       new ConfigEntry(
           "gravitino.trino.skip-catalog-patterns",
-          "The property to specify a comma-separated list of catalog name regex patterns that should be excluded from loading.",
+          "Comma-separated list of regex patterns matching Gravitino catalog names to exclude from loading into Trino.",
           "",
           false);
 
@@ -194,7 +194,7 @@ public class GravitinoConfig {
   }
 
   /**
-   * Retrieves the config for Grivitino client.
+   * Retrieves the config for Gravitino client.
    *
    * @return the config properties map
    */
