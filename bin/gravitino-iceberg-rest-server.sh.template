@@ -150,7 +150,7 @@ JAVA_OPTS+=" -Dlog4j2.configurationFile=file://${GRAVITINO_CONF_DIR}/gravitino-i
 JAVA_OPTS+=" -Dgravitino.iceberg-rest-server.log.path=${GRAVITINO_LOG_DIR}"
 JAVA_OPTS+=" -Dgravitino.iceberg-rest-server.name=${GRAVITINO_SIMPLE_SERVER_NAME}"
 JAVA_OPTS+=" ${GRAVITINO_MEM}"
-if [ "$JVM_VERSION" -eq 17 ]; then
+if [ "$JVM_VERSION" -ge 17 ]; then
   JAVA_OPTS+=" -XX:+IgnoreUnrecognizedVMOptions"
   JAVA_OPTS+=" --add-opens java.base/java.io=ALL-UNNAMED"
   JAVA_OPTS+=" --add-opens java.base/java.lang.invoke=ALL-UNNAMED"
