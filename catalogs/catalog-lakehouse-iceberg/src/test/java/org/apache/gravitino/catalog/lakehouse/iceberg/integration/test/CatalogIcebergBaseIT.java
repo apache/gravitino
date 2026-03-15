@@ -54,7 +54,6 @@ import org.apache.gravitino.catalog.lakehouse.iceberg.IcebergTable;
 import org.apache.gravitino.catalog.lakehouse.iceberg.ops.IcebergCatalogWrapperHelper;
 import org.apache.gravitino.client.GravitinoMetalake;
 import org.apache.gravitino.exceptions.NoSuchSchemaException;
-import org.apache.gravitino.exceptions.NotFoundException;
 import org.apache.gravitino.exceptions.SchemaAlreadyExistsException;
 import org.apache.gravitino.exceptions.TableAlreadyExistsException;
 import org.apache.gravitino.iceberg.common.IcebergConfig;
@@ -345,7 +344,7 @@ public abstract class CatalogIcebergBaseIT extends BaseIT {
     // create failed check.
     NameIdentifier table = NameIdentifier.of(testSchemaName, "test_table");
     Assertions.assertThrows(
-        NotFoundException.class,
+        NoSuchSchemaException.class,
         () ->
             tableCatalog.createTable(
                 table,
