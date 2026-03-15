@@ -45,6 +45,8 @@ import org.apache.commons.cli.Options;
 import org.apache.gravitino.cli.commands.DeleteModel;
 import org.apache.gravitino.cli.commands.LinkModel;
 import org.apache.gravitino.cli.commands.ListModel;
+import org.apache.gravitino.cli.commands.ListModelProperties;
+import org.apache.gravitino.cli.commands.ListModelVersionProperties;
 import org.apache.gravitino.cli.commands.ModelAudit;
 import org.apache.gravitino.cli.commands.ModelDetails;
 import org.apache.gravitino.cli.commands.RegisterModel;
@@ -150,6 +152,120 @@ public class TestModelCommands {
             + ErrorMessages.MISSING_ENTITIES
             + joiner.join(Collections.singletonList(CommandEntities.SCHEMA)),
         output);
+  }
+
+  @Test
+  void testListModelPropertiesCommand() {
+    ListModelProperties mockList = mock(ListModelProperties.class);
+    when(mockCommandLine.hasOption(GravitinoOptions.METALAKE)).thenReturn(true);
+    when(mockCommandLine.getOptionValue(GravitinoOptions.METALAKE)).thenReturn("metalake_demo");
+    when(mockCommandLine.hasOption(GravitinoOptions.NAME)).thenReturn(true);
+    when(mockCommandLine.getOptionValue(GravitinoOptions.NAME)).thenReturn("catalog.schema.model");
+
+    GravitinoCommandLine commandLine =
+        spy(
+            new GravitinoCommandLine(
+                mockCommandLine, mockOptions, CommandEntities.MODEL, CommandActions.PROPERTIES));
+
+    doReturn(mockList)
+        .when(commandLine)
+        .newListModelProperties(
+            any(CommandContext.class),
+            eq("metalake_demo"),
+            eq("catalog"),
+            eq("schema"),
+            eq("model"));
+    doReturn(mockList).when(mockList).validate();
+    commandLine.handleCommandLine();
+    verify(mockList).handle();
+  }
+
+  @Test
+  void testListModelPropertiesCommandWithoutModel() {
+    Main.useExit = false;
+    when(mockCommandLine.hasOption(GravitinoOptions.METALAKE)).thenReturn(true);
+    when(mockCommandLine.getOptionValue(GravitinoOptions.METALAKE)).thenReturn("metalake_demo");
+    when(mockCommandLine.hasOption(GravitinoOptions.NAME)).thenReturn(true);
+    when(mockCommandLine.getOptionValue(GravitinoOptions.NAME)).thenReturn("catalog.schema");
+
+    GravitinoCommandLine commandLine =
+        spy(
+            new GravitinoCommandLine(
+                mockCommandLine, mockOptions, CommandEntities.MODEL, CommandActions.PROPERTIES));
+
+    assertThrows(RuntimeException.class, commandLine::handleCommandLine);
+
+    verify(commandLine, never())
+        .newListModelProperties(
+            any(CommandContext.class), eq("metalake_demo"), eq("catalog"), eq("schema"), isNull());
+    String output = new String(errContent.toByteArray(), StandardCharsets.UTF_8).trim();
+    assertEquals(
+        ErrorMessages.MALFORMED_NAME
+            + "\n"
+            + ErrorMessages.MISSING_ENTITIES
+            + joiner.join(Collections.singletonList(CommandEntities.MODEL)),
+        output);
+  }
+
+  @Test
+  void testListModelVersionPropertiesByVersion() {
+    ListModelVersionProperties mockList = mock(ListModelVersionProperties.class);
+    when(mockCommandLine.hasOption(GravitinoOptions.METALAKE)).thenReturn(true);
+    when(mockCommandLine.getOptionValue(GravitinoOptions.METALAKE)).thenReturn("metalake_demo");
+    when(mockCommandLine.hasOption(GravitinoOptions.NAME)).thenReturn(true);
+    when(mockCommandLine.getOptionValue(GravitinoOptions.NAME)).thenReturn("catalog.schema.model");
+    when(mockCommandLine.hasOption(GravitinoOptions.VERSION)).thenReturn(true);
+    when(mockCommandLine.getOptionValue(GravitinoOptions.VERSION)).thenReturn("1");
+
+    GravitinoCommandLine commandLine =
+        spy(
+            new GravitinoCommandLine(
+                mockCommandLine, mockOptions, CommandEntities.MODEL, CommandActions.PROPERTIES));
+
+    doReturn(mockList)
+        .when(commandLine)
+        .newListModelVersionProperties(
+            any(CommandContext.class),
+            eq("metalake_demo"),
+            eq("catalog"),
+            eq("schema"),
+            eq("model"),
+            eq(1),
+            isNull());
+    doReturn(mockList).when(mockList).validate();
+    commandLine.handleCommandLine();
+    verify(mockList).handle();
+  }
+
+  @Test
+  void testListModelVersionPropertiesByAlias() {
+    ListModelVersionProperties mockList = mock(ListModelVersionProperties.class);
+    when(mockCommandLine.hasOption(GravitinoOptions.METALAKE)).thenReturn(true);
+    when(mockCommandLine.getOptionValue(GravitinoOptions.METALAKE)).thenReturn("metalake_demo");
+    when(mockCommandLine.hasOption(GravitinoOptions.NAME)).thenReturn(true);
+    when(mockCommandLine.getOptionValue(GravitinoOptions.NAME)).thenReturn("catalog.schema.model");
+    when(mockCommandLine.hasOption(GravitinoOptions.ALIAS)).thenReturn(true);
+    when(mockCommandLine.getOptionValues(GravitinoOptions.ALIAS))
+        .thenReturn(new String[] {"aliasA"});
+
+    GravitinoCommandLine commandLine =
+        spy(
+            new GravitinoCommandLine(
+                mockCommandLine, mockOptions, CommandEntities.MODEL, CommandActions.PROPERTIES));
+
+    doReturn(mockList)
+        .when(commandLine)
+        .newListModelVersionProperties(
+            any(CommandContext.class),
+            eq("metalake_demo"),
+            eq("catalog"),
+            eq("schema"),
+            eq("model"),
+            isNull(),
+            eq("aliasA"));
+    doReturn(mockList).when(mockList).validate();
+    commandLine.handleCommandLine();
+    verify(mockList).handle();
   }
 
   @Test

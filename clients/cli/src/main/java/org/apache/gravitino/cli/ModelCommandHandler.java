@@ -123,6 +123,10 @@ public class ModelCommandHandler extends CommandHandler {
         handleRemoveCommand();
         return true;
 
+      case CommandActions.PROPERTIES:
+        handlePropertiesCommand();
+        return true;
+
       default:
         return false;
     }
@@ -305,6 +309,23 @@ public class ModelCommandHandler extends CommandHandler {
     } else {
       gravitinoCommandLine
           .newRemoveModelProperty(context, metalake, catalog, schema, model, property)
+          .validate()
+          .handle();
+    }
+  }
+
+  /** Handles the "PROPERTIES" command. */
+  private void handlePropertiesCommand() {
+    if (line.hasOption(GravitinoOptions.ALIAS) || line.hasOption(GravitinoOptions.VERSION)) {
+      Integer version = getVersionFromLine(line);
+      String alias = getAliasFromLine(line);
+      gravitinoCommandLine
+          .newListModelVersionProperties(context, metalake, catalog, schema, model, version, alias)
+          .validate()
+          .handle();
+    } else {
+      gravitinoCommandLine
+          .newListModelProperties(context, metalake, catalog, schema, model)
           .validate()
           .handle();
     }
