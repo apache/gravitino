@@ -36,7 +36,7 @@ import org.glassfish.jersey.test.TestProperties;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
-public class TestAuthOperations extends BaseOperationsTest {
+public class TestAuthnOperations extends BaseOperationsTest {
 
   private static final String TEST_PRINCIPAL = "test-user";
 
@@ -61,7 +61,7 @@ public class TestAuthOperations extends BaseOperationsTest {
     }
 
     ResourceConfig resourceConfig = new ResourceConfig();
-    resourceConfig.register(AuthOperations.class);
+    resourceConfig.register(AuthnOperations.class);
     resourceConfig.register(ObjectMapperProvider.class);
     resourceConfig.register(
         new AbstractBinder() {
@@ -75,7 +75,7 @@ public class TestAuthOperations extends BaseOperationsTest {
   }
 
   @Test
-  public void testGetAuthMe() {
+  public void testGetAuthnMe() {
     Response resp = target("/authn/me").request().accept("application/vnd.gravitino.v1+json").get();
 
     Assertions.assertEquals(Response.Status.OK.getStatusCode(), resp.getStatus());

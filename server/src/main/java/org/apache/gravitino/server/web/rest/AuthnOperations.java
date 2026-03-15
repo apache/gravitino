@@ -37,15 +37,15 @@ import org.apache.gravitino.utils.PrincipalUtils;
  * configured {@code principalFields} and {@code principalMapper}.
  */
 @Path("/authn")
-public class AuthOperations {
+public class AuthnOperations {
 
   @Context private HttpServletRequest httpRequest;
 
   @GET
   @Path("me")
   @Produces("application/vnd.gravitino.v1+json")
-  @Timed(name = "auth-me." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
-  @ResponseMetered(name = "auth-me", absolute = true)
+  @Timed(name = "authn-me." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
+  @ResponseMetered(name = "authn-me", absolute = true)
   public Response me() {
     try {
       return Utils.doAs(
