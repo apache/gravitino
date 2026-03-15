@@ -27,6 +27,7 @@ import { oauthProviderFactory } from '@/lib/auth/providers/factory'
 
 import { to } from '../utils'
 import { getAuthConfigs, setAuthToken, setAuthUser } from '../store/auth'
+import { getAuthMeApi } from '../api/auth'
 
 import { useIdle } from 'react-use'
 
@@ -121,7 +122,20 @@ const AuthProvider = ({ children }) => {
 
         if (tokenToUse) {
           dispatch(setAuthToken(tokenToUse))
-          user && dispatch(setAuthUser(user))
+
+          // Fetch server-resolved principal to ensure UI identity matches server-side
+          // identity derived from principalFields + principalMapper config
+          let authUser = user
+          try {
+            const [meErr, meRes] = await to(getAuthMeApi())
+            if (!meErr && meRes && meRes.principal) {
+              authUser = { ...user, name: meRes.principal }
+            }
+          } catch (e) {
+            // Fallback to OIDC profile if /api/auth/me is unavailable
+          }
+
+          authUser && dispatch(setAuthUser(authUser))
           dispatch(initialVersion())
           goToMetalakeListPage()
         } else {
