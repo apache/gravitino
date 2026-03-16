@@ -671,6 +671,43 @@ public class ClickHouseTableOperations extends JdbcTableOperations {
   }
 
   @Override
+  protected void dropTable(String databaseName, String tableName) {
+    LOG.info("Attempting to delete table {} from database {}", tableName, databaseName);
+    try (Connection connection = getConnection(databaseName)) {
+      Map<String, String> props = getTableProperties(connection, tableName);
+      JdbcConnectorUtils.executeUpdate(connection, generateDropTableSql(tableName, props));
+      LOG.info("Deleted table {} from database {}", tableName, databaseName);
+    } catch (final SQLException se) {
+      throw this.exceptionMapper.toGravitinoException(se);
+    }
+  }
+
+  /**
+   * Generates the SQL statement to drop a ClickHouse table. When the table was created with {@code
+   * ON CLUSTER}, the DROP statement includes {@code ON CLUSTER `clusterName` SYNC} so the operation
+   * is propagated to every cluster node synchronously.
+   *
+   * @param tableName The name of the table to drop.
+   * @param properties The table properties as returned by {@link #getTableProperties}; used to
+   *     determine whether the table is on a cluster.
+   * @return The DROP TABLE SQL statement.
+   */
+  @VisibleForTesting
+  String generateDropTableSql(String tableName, Map<String, String> properties) {
+    String clusterName = properties == null ? null : properties.get(ClusterConstants.CLUSTER_NAME);
+    boolean onCluster =
+        properties != null
+            && Boolean.parseBoolean(properties.getOrDefault(ClusterConstants.ON_CLUSTER, "false"));
+
+    if (onCluster && StringUtils.isNotBlank(clusterName)) {
+      return String.format(
+          "DROP TABLE %s ON CLUSTER %s SYNC",
+          quoteIdentifier(tableName), quoteIdentifier(clusterName));
+    }
+    return String.format("DROP TABLE %s", quoteIdentifier(tableName));
+  }
+
+  @Override
   protected String generatePurgeTableSql(String tableName) {
     throw new UnsupportedOperationException(
         "ClickHouse does not support purge table in Gravitino, please use drop table");

@@ -18,6 +18,7 @@
  */
 package org.apache.gravitino.catalog.clickhouse.operations;
 
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.ImmutableSet;
 import java.sql.Connection;
 import java.sql.ResultSet;
@@ -27,6 +28,8 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 import org.apache.commons.collections4.MapUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.StringIdentifier;
@@ -36,11 +39,11 @@ import org.apache.gravitino.catalog.jdbc.utils.JdbcConnectorUtils;
 
 public class ClickHouseDatabaseOperations extends JdbcDatabaseOperations {
 
+  private static final Pattern ON_CLUSTER_PATTERN =
+      Pattern.compile("(?i)\\bON\\s+CLUSTER\\s+`?([^`\\s(]+)`?");
+
   private static final Set<String> CLICK_HOUSE_SYSTEM_DATABASES =
       ImmutableSet.of("information_schema", "default", "system", "INFORMATION_SCHEMA");
-
-  // TODO: handle ClickHouse cluster properly when creating/dropping databases/tables
-  //  use https://github.com/apache/gravitino/issues/9820 to track it.
 
   @Override
   protected boolean supportSchemaComment() {
@@ -124,10 +127,63 @@ public class ClickHouseDatabaseOperations extends JdbcDatabaseOperations {
   protected void dropDatabase(String databaseName, boolean cascade) {
     try (final Connection connection = getConnection()) {
       connection.setCatalog(createSysDatabaseNameSet().iterator().next());
-      JdbcConnectorUtils.executeUpdate(connection, generateDropDatabaseSql(databaseName, cascade));
+      if (!cascade) {
+        try (Statement stmt = connection.createStatement();
+            ResultSet rs = stmt.executeQuery(String.format("SHOW TABLES IN `%s`", databaseName))) {
+          if (rs.next()) {
+            throw new IllegalStateException(
+                String.format(
+                    "Database %s is not empty, the value of cascade should be true.",
+                    databaseName));
+          }
+        }
+      }
+      String clusterName = getDatabaseClusterName(connection, databaseName);
+      JdbcConnectorUtils.executeUpdate(
+          connection, generateDropDatabaseSql(databaseName, clusterName));
     } catch (final SQLException se) {
       throw this.exceptionMapper.toGravitinoException(se);
     }
+  }
+
+  /**
+   * Generates the SQL statement to drop a ClickHouse database. If the database was created with ON
+   * CLUSTER, the DROP statement includes {@code ON CLUSTER `clusterName` SYNC} to propagate the
+   * operation across all cluster nodes synchronously.
+   *
+   * @param databaseName The name of the database to drop.
+   * @param clusterName The cluster name extracted from the database's CREATE SQL, or {@code null}
+   *     if the database is not on a cluster.
+   * @return The DROP DATABASE SQL statement.
+   */
+  @VisibleForTesting
+  String generateDropDatabaseSql(String databaseName, String clusterName) {
+    StringBuilder sql = new StringBuilder(String.format("DROP DATABASE `%s`", databaseName));
+    if (StringUtils.isNotBlank(clusterName)) {
+      sql.append(String.format(" ON CLUSTER `%s` SYNC", clusterName));
+    }
+    LOG.info("Generated drop database:{} sql: {}", databaseName, sql);
+    return sql.toString();
+  }
+
+  /**
+   * Extracts the cluster name from the {@code SHOW CREATE DATABASE} SQL of the given database.
+   * Returns {@code null} when the database was not created with {@code ON CLUSTER}.
+   */
+  private String getDatabaseClusterName(Connection connection, String databaseName)
+      throws SQLException {
+    try (Statement stmt = connection.createStatement();
+        ResultSet rs =
+            stmt.executeQuery(String.format("SHOW CREATE DATABASE `%s`", databaseName))) {
+      if (rs.next()) {
+        String createSql = rs.getString(1);
+        Matcher matcher = ON_CLUSTER_PATTERN.matcher(createSql);
+        if (matcher.find()) {
+          return matcher.group(1);
+        }
+      }
+    }
+    return null;
   }
 
   private boolean onCluster(Map<String, String> dbProperties) {

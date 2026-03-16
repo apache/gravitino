@@ -41,7 +41,6 @@ import org.apache.gravitino.catalog.clickhouse.converter.ClickHouseExceptionConv
 import org.apache.gravitino.catalog.clickhouse.converter.ClickHouseTypeConverter;
 import org.apache.gravitino.catalog.jdbc.JdbcColumn;
 import org.apache.gravitino.catalog.jdbc.JdbcTable;
-import org.apache.gravitino.exceptions.GravitinoRuntimeException;
 import org.apache.gravitino.rel.Column;
 import org.apache.gravitino.rel.TableChange;
 import org.apache.gravitino.rel.expressions.NamedReference;
@@ -205,11 +204,10 @@ public class TestClickHouseTableOperations extends TestClickHouse {
     Assertions.assertTrue(
         TABLE_OPERATIONS.drop(TEST_DB_NAME.toString(), newName), "table should be dropped");
 
-    GravitinoRuntimeException exception =
-        Assertions.assertThrows(
-            GravitinoRuntimeException.class,
-            () -> TABLE_OPERATIONS.drop(TEST_DB_NAME.toString(), newName));
-    Assertions.assertTrue(StringUtils.contains(exception.getMessage(), "does not exist"));
+    // Dropping a table that no longer exists should return false, not throw.
+    Assertions.assertFalse(
+        TABLE_OPERATIONS.drop(TEST_DB_NAME.toString(), newName),
+        "dropping non-existent table should return false");
   }
 
   @Test

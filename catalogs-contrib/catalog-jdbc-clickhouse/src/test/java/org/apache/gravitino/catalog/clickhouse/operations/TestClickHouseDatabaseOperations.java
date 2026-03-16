@@ -38,8 +38,8 @@ public class TestClickHouseDatabaseOperations {
       return generateCreateDatabaseSql(databaseName, comment, properties);
     }
 
-    String buildDropSql(String databaseName, boolean cascade) {
-      return generateDropDatabaseSql(databaseName, cascade);
+    String buildDropSql(String databaseName, String clusterName) {
+      return generateDropDatabaseSql(databaseName, clusterName);
     }
   }
 
@@ -96,8 +96,19 @@ public class TestClickHouseDatabaseOperations {
 
   @Test
   void testGenerateDropDatabaseSqlWithoutCluster() {
-    Map<String, String> conf = new HashMap<>();
-    String sql = newOps(conf).buildDropSql("db_name", true);
+    String sql = newOps(new HashMap<>()).buildDropSql("db_name", null);
     Assertions.assertEquals("DROP DATABASE `db_name`", sql);
+  }
+
+  @Test
+  void testGenerateDropDatabaseSqlWithBlankCluster() {
+    String sql = newOps(new HashMap<>()).buildDropSql("db_name", "");
+    Assertions.assertEquals("DROP DATABASE `db_name`", sql);
+  }
+
+  @Test
+  void testGenerateDropDatabaseSqlWithCluster() {
+    String sql = newOps(new HashMap<>()).buildDropSql("db_name", "ck_cluster");
+    Assertions.assertEquals("DROP DATABASE `db_name` ON CLUSTER `ck_cluster` SYNC", sql);
   }
 }

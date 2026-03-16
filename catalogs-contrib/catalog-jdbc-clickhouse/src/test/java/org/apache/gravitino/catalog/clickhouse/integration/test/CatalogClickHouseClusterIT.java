@@ -523,4 +523,79 @@ public class CatalogClickHouseClusterIT extends BaseIT {
     Assertions.assertTrue(
         autoIncrementFalseException.getMessage().contains("auto increment is not supported"));
   }
+
+  @Test
+  public void testDropTableOnCluster() {
+    String dropTableName = GravitinoITUtils.genRandomName("ck_cluster_drop_tbl");
+    NameIdentifier tableIdentifier = NameIdentifier.of(schemaName, dropTableName);
+    TableCatalog tableCatalog = catalog.asTableCatalog();
+
+    // Create a MergeTree table on the cluster
+    tableCatalog.createTable(
+        tableIdentifier,
+        createColumns(),
+        tableComment,
+        clusterMergeTreeProperties(),
+        Transforms.EMPTY_TRANSFORM,
+        Distributions.NONE,
+        getSortOrders("col_3"),
+        Indexes.EMPTY_INDEXES);
+
+    Assertions.assertNotNull(tableCatalog.loadTable(tableIdentifier));
+
+    // Drop the table — Gravitino should issue DROP TABLE ... ON CLUSTER ... SYNC
+    boolean dropped = tableCatalog.dropTable(tableIdentifier);
+    Assertions.assertTrue(dropped);
+
+    // Verify the table no longer exists via Gravitino
+    Assertions.assertFalse(
+        Arrays.stream(tableCatalog.listTables(Namespace.of(schemaName)))
+            .anyMatch(id -> id.name().equals(dropTableName)));
+  }
+
+  @Test
+  public void testDropNonClusterTableDoesNotUseOnCluster() {
+    String dropTableName = GravitinoITUtils.genRandomName("ck_no_cluster_drop_tbl");
+    NameIdentifier tableIdentifier = NameIdentifier.of(schemaName, dropTableName);
+    TableCatalog tableCatalog = catalog.asTableCatalog();
+
+    // Create a MergeTree table without ON CLUSTER
+    tableCatalog.createTable(
+        tableIdentifier,
+        createColumns(),
+        tableComment,
+        Collections.singletonMap(GRAVITINO_ENGINE_KEY, ENGINE.MERGETREE.getValue()),
+        Transforms.EMPTY_TRANSFORM,
+        Distributions.NONE,
+        getSortOrders("col_3"),
+        Indexes.EMPTY_INDEXES);
+
+    Assertions.assertNotNull(tableCatalog.loadTable(tableIdentifier));
+
+    boolean dropped = tableCatalog.dropTable(tableIdentifier);
+    Assertions.assertTrue(dropped);
+
+    Assertions.assertFalse(
+        Arrays.stream(tableCatalog.listTables(Namespace.of(schemaName)))
+            .anyMatch(id -> id.name().equals(dropTableName)));
+  }
+
+  @Test
+  public void testDropSchemaOnCluster() {
+    String dropSchemaName = GravitinoITUtils.genRandomName("ck_cluster_drop_schema");
+
+    // Create a schema on the cluster
+    Map<String, String> schemaProps = new HashMap<>();
+    schemaProps.put(CLUSTER_NAME, ClickHouseContainer.DEFAULT_CLUSTER_NAME);
+    schemaProps.put(ON_CLUSTER, String.valueOf(true));
+    catalog.asSchemas().createSchema(dropSchemaName, null, schemaProps);
+    Assertions.assertNotNull(catalog.asSchemas().loadSchema(dropSchemaName));
+
+    // Drop the schema — Gravitino should issue DROP DATABASE ... ON CLUSTER ... SYNC
+    boolean dropped = catalog.asSchemas().dropSchema(dropSchemaName, false);
+    Assertions.assertTrue(dropped);
+
+    Assertions.assertFalse(
+        Arrays.stream(catalog.asSchemas().listSchemas()).anyMatch(s -> s.equals(dropSchemaName)));
+  }
 }

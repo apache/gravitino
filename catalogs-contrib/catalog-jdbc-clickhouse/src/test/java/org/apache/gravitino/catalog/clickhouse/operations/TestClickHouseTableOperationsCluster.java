@@ -219,6 +219,41 @@ class TestClickHouseTableOperationsCluster {
         sql.contains("ENGINE = Distributed(`ck_cluster`,`remote_db`,`remote_table`,`user_id`)"));
   }
 
+  @Test
+  void testGenerateDropTableSqlWithoutCluster() {
+    Map<String, String> props = new HashMap<>();
+    props.put(ClusterConstants.ON_CLUSTER, "false");
+
+    String sql = ops.buildDropSql("orders", props);
+    Assertions.assertEquals("DROP TABLE `orders`", sql);
+  }
+
+  @Test
+  void testGenerateDropTableSqlWithNullProperties() {
+    String sql = ops.buildDropSql("orders", null);
+    Assertions.assertEquals("DROP TABLE `orders`", sql);
+  }
+
+  @Test
+  void testGenerateDropTableSqlWithCluster() {
+    Map<String, String> props = new HashMap<>();
+    props.put(ClusterConstants.ON_CLUSTER, "true");
+    props.put(ClusterConstants.CLUSTER_NAME, "ck_cluster");
+
+    String sql = ops.buildDropSql("orders", props);
+    Assertions.assertEquals("DROP TABLE `orders` ON CLUSTER `ck_cluster` SYNC", sql);
+  }
+
+  @Test
+  void testGenerateDropTableSqlOnClusterWithoutClusterName() {
+    // on-cluster=true but no cluster-name → fall back to plain DROP TABLE
+    Map<String, String> props = new HashMap<>();
+    props.put(ClusterConstants.ON_CLUSTER, "true");
+
+    String sql = ops.buildDropSql("orders", props);
+    Assertions.assertEquals("DROP TABLE `orders`", sql);
+  }
+
   private static class TestableClickHouseTableOperations extends ClickHouseTableOperations {
     String buildCreateSql(
         String tableName,
@@ -231,6 +266,10 @@ class TestClickHouseTableOperationsCluster {
         SortOrder[] sortOrders) {
       return generateCreateTableSql(
           tableName, columns, comment, properties, partitioning, distribution, indexes, sortOrders);
+    }
+
+    String buildDropSql(String tableName, Map<String, String> properties) {
+      return generateDropTableSql(tableName, properties);
     }
   }
 }
