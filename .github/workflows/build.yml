@@ -65,9 +65,14 @@ jobs:
               - spark-connector/**
             mcp_server_changes:
               - mcp-server/**
-            maintenance_source_changes:
+            # Direct changes under maintenance/. This is used to detect whether
+            # the PR itself touches maintenance sources.
+            maintenance_module_changes:
               - 'maintenance/**'
-            maintenance_changes:
+            # Changes that can affect maintenance validation, including
+            # maintenance itself, its upstream dependencies, and shared Gradle
+            # build configuration.
+            maintenance_related_changes:
               - '.github/**'
               - 'maintenance/**'
               - 'api/**'
@@ -92,6 +97,9 @@ jobs:
           import json
           import os
 
+          # This derived flag is narrower than maintenance_related_changes:
+          # it is true only when every source change in the PR is under
+          # maintenance/.
           source_files = json.loads(os.environ.get("SOURCE_CHANGE_FILES") or "[]")
           maintenance_only = bool(source_files) and all(
             path.startswith("maintenance/") for path in source_files
@@ -108,8 +116,8 @@ jobs:
       source_changes: ${{ steps.filter.outputs.source_changes }}
       spark_connector_changes: ${{ steps.filter.outputs.spark_connector_changes }}
       mcp_server_changes: ${{ steps.filter.outputs.mcp_server_changes }}
-      maintenance_source_changes: ${{ steps.filter.outputs.maintenance_source_changes }}
-      maintenance_changes: ${{ steps.filter.outputs.maintenance_changes }}
+      maintenance_module_changes: ${{ steps.filter.outputs.maintenance_module_changes }}
+      maintenance_related_changes: ${{ steps.filter.outputs.maintenance_related_changes }}
       maintenance_only_source_changes: ${{ steps.maintenance_only.outputs.maintenance_only_source_changes }}
 
   compile-check:
@@ -235,7 +243,7 @@ jobs:
           ./gradlew "${gradle_args[@]}"
 
       - name: Run maintenance unit tests
-        if: needs.changes.outputs.maintenance_changes == 'true' && needs.changes.outputs.maintenance_only_source_changes != 'true'
+        if: needs.changes.outputs.maintenance_related_changes == 'true' && needs.changes.outputs.maintenance_only_source_changes != 'true'
         run: |
           ./gradlew \
             :maintenance:optimizer-api:test \
