@@ -48,7 +48,7 @@ The output of this work should be:
 - Adding OAuth2 or Kerberos real-environment validation to the required test matrix for this delivery
 - Producing one universal jar that works across all Flink minors
 
-Note: Flink `2.0` support is explicitly out of scope for this delivery, but the module split and extension hooks introduced here should keep a clean path for a future Flink `2.0` compatibility lane.
+Note: Flink `2.0` support is explicitly out of scope for this delivery. It should be treated as a larger follow-up compatibility lane rather than a small extension of the `1.18` to `1.20` work, but the module split and extension hooks introduced here should keep a clean path for that future effort.
 
 ## Current Connector Model
 
@@ -182,6 +182,8 @@ Recommended rule set:
 - allow versioned `flink-1.18`, `flink-1.19`, `flink-1.20` modules to add small overlays for minor-specific APIs
 - keep runtime packaging and test execution version-specific
 
+This intentionally differs from the Spark connector approach that compiles the common layer against the latest Spark minor. For Flink `1.18` to `1.20`, the catalog/table API drift is mostly additive, so compiling `flink-common` against the lowest supported baseline is the safer default because it reduces accidental references to newer API only present in `1.19` or `1.20`.
+
 Important clarification: `compileOnly` avoids bundling dependencies, but it does not solve binary compatibility by itself. The bytecode in `flink-common` is still compiled against a concrete API surface. Therefore:
 
 - `flink-common` must only use API and provider methods that remain binary-compatible across `1.18`, `1.19`, and `1.20`
@@ -238,6 +240,22 @@ Add these projects in `settings.gradle.kts` under the existing Scala `2.12` guar
 - `:flink-connector:flink-1.20`
 - `:flink-connector:flink-runtime-1.20`
 
+Current-scope Scala note:
+
+- Flink `1.18`, `1.19`, and `1.20` in this delivery all use Scala `2.12` artifacts
+- the module layout and publication names should therefore consistently keep the `_2.12` suffix
+- supporting a different Scala suffix is out of scope for this change and should be treated as a separate compatibility question
+
+### Project migration rule
+
+After Phase 1:
+
+- `:flink-connector:flink` is replaced by `:flink-connector:flink-common` plus `:flink-connector:flink-1.18`
+- `:flink-connector:flink-runtime` is replaced by `:flink-connector:flink-runtime-1.18`
+- the old `:flink-connector:flink` and `:flink-connector:flink-runtime` entries should be removed from `settings.gradle.kts`
+- do not keep the old project names as Gradle aliases because that makes publication, workflow targeting, and review reasoning ambiguous
+- `settings.gradle.kts` should map the new project names to their explicit project directories
+
 ### Module responsibility split
 
 `flink-common` should contain the implementation that is expected to remain common across all supported Flink minors, for example:
@@ -255,6 +273,17 @@ Versioned `flink-*` modules should contain:
 - minor-specific factory/catalog overlay classes if needed
 - minor-specific SPI resource files if needed
 - minor-specific tests if needed
+
+### Provider placement matrix
+
+The initial provider split should be reviewed explicitly instead of relying only on a general rule.
+
+| Provider | Initial placement | Why | Required validation | Move trigger |
+| --- | --- | --- | --- | --- |
+| Hive | start in `flink-common` only if shared code uses constructors and helpers that remain ABI-compatible | current wrapper logic is mostly shared, but Hive connector drift is historically the most likely provider risk inside `1.18` to `1.20` | compile on all versioned classpaths, instantiate factory/wrapper, and run real-environment smoke | `NoSuchMethodError`, `ClassNotFoundException`, compile break, or provider-specific test failure |
+| Iceberg | start in `flink-common` with versioned runtime dependencies | the wrapper logic is thin, but `iceberg-flink-runtime-*` versions must be matched by Flink minor | compile on all versioned classpaths, instantiate factory/wrapper, and run Iceberg smoke | constructor/method drift or runtime linkage failure on versioned artifact |
+| JDBC | start in `flink-common` with versioned connector dependencies | the wrapper is thin, but JDBC connector artifacts already differ by Flink minor | compile on all versioned classpaths, instantiate factory/wrapper, and run JDBC smoke | constructor drift, artifact layout drift, or runtime linkage failure |
+| Paimon | start in `flink-common` with versioned runtime dependencies | Paimon `1.2.0` is available for `1.18` to `1.20`, so a shared wrapper is a reasonable first cut | compile on all versioned classpaths, instantiate factory/wrapper, and run Paimon smoke | factory API drift or runtime linkage failure |
 
 This gives:
 
@@ -607,6 +636,12 @@ Keep the existing naming pattern and extend it by Flink minor:
 
 This is already aligned with how the current `1.18` jar is named.
 
+Naming note:
+
+- the connector jar intentionally keeps the existing `gravitino-flink-*` pattern instead of adding an extra `connector` token
+- the runtime jar intentionally keeps the existing `gravitino-flink-connector-runtime-*` pattern
+- this avoids renaming existing published coordinates while still making the Flink minor explicit
+
 ## Detailed Implementation Plan
 
 ### Phase 1: Mechanical split without behavior change
@@ -617,12 +652,14 @@ This is already aligned with how the current `1.18` jar is named.
 4. Extract the extension hooks needed for future `1.20` catalog API support into `flink-common`.
 5. Make `:flink-connector:flink-1.18` depend on `:flink-connector:flink-common`.
 6. Keep `1.18` behavior unchanged.
+7. Remove the old `:flink-connector:flink` and `:flink-connector:flink-runtime` project entries once `flink-common`, `flink-1.18`, and `flink-runtime-1.18` are wired.
 
 Acceptance for Phase 1:
 
 - `:flink-connector:flink-common:test` passes
 - `:flink-connector:flink-1.18:test -PskipITs` passes
 - `:flink-connector:flink-runtime-1.18:test` passes
+- the old `:flink-connector:flink` and `:flink-connector:flink-runtime` projects are no longer present in `settings.gradle.kts`
 
 ### Phase 2: Add 1.19 with zero or near-zero Java divergence
 
@@ -631,11 +668,13 @@ Acceptance for Phase 1:
 3. Use `1.19` dependency aliases.
 4. Compile and run unit tests.
 5. Only add `v1.19/flink/src/main/java` overlay files if compilation proves they are needed.
+6. Run provider runtime linkage validation on the `1.19` dependency graph, not only common baseline tests.
 
 Expected outcome:
 
 - no provider behavior changes
 - probably no Java shim classes needed
+- any provider wrapper that fails runtime linkage moves into the `1.19` module instead of staying in `flink-common`
 
 ### Phase 3: Add 1.20 and handle dependency deltas first
 
@@ -646,6 +685,7 @@ Expected outcome:
 5. Set JDBC connector to `3.3.0-1.20` or another validated `1.20` variant.
 6. Compile against the common jar plus `1.20` deps.
 7. Only if compilation or runtime linking breaks appear, add minimal `v1.20` overlay classes.
+8. Run provider runtime linkage validation on the `1.20` dependency graph before declaring the shared provider wrappers safe.
 
 ### Phase 4: Keep SPI resources aligned
 
@@ -653,9 +693,15 @@ Ensure the service registration remains available for each versioned module:
 
 - `META-INF/services/org.apache.flink.table.factories.Factory`
 
-If all factory classes remain in `flink-common`, the service file can remain there.
+If all factory classes remain in `flink-common`, the service file can remain there and the versioned modules should not contribute a duplicate `Factory` service file.
 
-If a version-specific factory class is introduced, the service file must move to the relevant versioned module so ServiceLoader resolves the correct implementation.
+If a version-specific factory class is introduced, the versioned module's service file should replace the common effective service list for that variant.
+
+Required rule in that case:
+
+- the versioned module must re-list every factory class that should be visible for that variant, including common factories that still apply
+- do not rely on resource merge order between `flink-common` and the versioned module
+- do not ship duplicated factory entries for the same identifier in the final runtime artifact
 
 ### Phase 5: Update tests and workflows
 
@@ -701,6 +747,29 @@ Run for each variant:
 ./gradlew :flink-connector:flink-1.19:test -PskipITs -PskipDockerTests=false
 ./gradlew :flink-connector:flink-1.20:test -PskipITs -PskipDockerTests=false
 ```
+
+### `flink-common` baseline test scope
+
+`flink-common:test` runs only against the Flink `1.18` baseline dependency graph.
+
+This means:
+
+- it validates shared logic against the lowest supported API surface
+- it does not by itself prove binary compatibility on `1.19` or `1.20`
+- any regression test that depends on `1.19` or `1.20` linkage should live in the corresponding versioned module
+- versioned module test runs are required to validate the shared bytecode under `1.19` and `1.20` classpaths
+
+### Versioned provider runtime linkage validation
+
+Compilation alone is not enough for `1.19` and `1.20`.
+
+For each versioned module, validation should include at least one provider-level runtime linkage check that proves shared wrappers can be loaded and used on that minor's classpath.
+
+Minimum expectation:
+
+- load or instantiate the provider factory and wrapper path for Hive, Iceberg, JDBC, and Paimon on the versioned module classpath
+- fail the version lane if the run hits `NoSuchMethodError`, `NoClassDefFoundError`, `ClassNotFoundException`, or equivalent constructor/method linkage errors
+- treat real-environment smoke coverage as the stronger confirmation, but still keep a smaller versioned-module linkage check in the repository test lane where practical
 
 ### Runtime jar tests
 
@@ -954,6 +1023,22 @@ Review focus:
 - whether `flink-common` directly references constructors or methods whose signatures differ by minor
 - whether provider wrappers should stay in `flink-common` or move into versioned modules
 
+### Risk 6: Provider-level runtime ABI drift across `1.18` to `1.20`
+
+Even if the Flink SPI remains largely stable, the native provider connectors can still drift in ways that break shared wrappers at runtime.
+
+Concrete examples include:
+
+- `HiveCatalog` constructor or helper signature drift across Hive connector variants bundled with different Flink minors
+- `org.apache.iceberg.flink.FlinkCatalog` constructor or factory drift across `iceberg-flink-runtime-1.18`, `1.19`, and `1.20`
+- `JdbcCatalog` constructor drift across JDBC connector minors such as `3.2.0-1.18` and `3.3.0-1.20`
+
+Review focus:
+
+- whether shared provider wrappers only use methods and constructors proven stable across the supported minors
+- whether provider factories can be loaded and instantiated on each versioned classpath
+- whether a provider should be moved out of `flink-common` as soon as runtime linkage checks fail
+
 ## AI Guardrails
 
 If an AI agent implements this spec, it should follow these rules:
@@ -965,7 +1050,7 @@ If an AI agent implements this spec, it should follow these rules:
 5. Do not use reflection unless a compile-time version shim is impossible.
 6. Do not add version-specific Flink catalog classes unless compilation, tests, or runtime ABI checks require them.
 7. Do not rename factory identifiers or connector property keys.
-8. Keep the SPI service file content identical unless a version-specific factory class is introduced.
+8. Keep the SPI service file content identical unless a version-specific factory class is introduced, and if one is introduced the versioned module must own the full final service list for that variant.
 9. Update docs and workflows in the same change set as the code split.
 
 ## Expected Touched Areas
