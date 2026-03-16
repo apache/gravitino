@@ -22,7 +22,7 @@ package org.apache.gravitino.maintenance.optimizer.common.util;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
-import java.util.List;
+import java.util.Arrays;
 import org.apache.gravitino.maintenance.optimizer.api.common.PartitionPath;
 import org.apache.gravitino.maintenance.optimizer.common.PartitionEntryImpl;
 import org.junit.jupiter.api.Test;
@@ -33,7 +33,7 @@ public class TestPartitionPathSerdeUtils {
   public void testEncodeAndDecodePartitionPath() {
     PartitionPath path =
         PartitionPath.of(
-            List.of(
+            Arrays.asList(
                 new PartitionEntryImpl("dt", "2026-01-01"), new PartitionEntryImpl("hh", "08")));
 
     String encoded = PartitionPathSerdeUtils.encode(path);
