@@ -853,7 +853,7 @@ public class ClickHouseTableOperations extends JdbcTableOperations {
 
       default:
         throw new IllegalArgumentException(
-            "Gravitino Clickhouse doesn't support index : " + addIndex.getType());
+            "Gravitino ClickHouse doesn't support index : " + addIndex.getType());
     }
   }
 
