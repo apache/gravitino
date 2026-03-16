@@ -22,7 +22,6 @@ gravitino_dir="$(dirname "${BASH_SOURCE-$0}")"
 gravitino_dir="$(cd "${gravitino_dir}">/dev/null; pwd)"
 gravitino_home="$(cd "${gravitino_dir}/../../..">/dev/null; pwd)"
 gravitino_package_dir="${gravitino_dir}/packages/gravitino"
-gravitino_staging_dir="${gravitino_package_dir}/staging"
 gravitino_iceberg_rest_dir="${gravitino_package_dir}/iceberg-rest-server/libs/"
 
 # Function to download and distribute GCS connector
@@ -60,7 +59,6 @@ rm -rf "${gravitino_dir}/packages"
 mkdir -p "${gravitino_dir}/packages"
 
 cp -r "${gravitino_home}/distribution/package" "${gravitino_package_dir}"
-mkdir -p "${gravitino_staging_dir}"
 
 echo "Start to download the jar package"
 
@@ -87,7 +85,7 @@ find ${gravitino_home}/bundles/aws-bundle/build/libs/ -name 'gravitino-aws-bundl
 find ${gravitino_home}/bundles/gcp-bundle/build/libs/ -name 'gravitino-gcp-bundle-*.jar' ! -name '*-empty.jar' -exec cp -v {} "${fileset_lib_dir}" \;
 find ${gravitino_home}/bundles/azure-bundle/build/libs/ -name 'gravitino-azure-bundle-*.jar' ! -name '*-empty.jar' -exec cp -v {} "${fileset_lib_dir}" \;
 
-iceberg_bundle_dir="${gravitino_dir}/packages/gravitino/iceberg-bundles"
+iceberg_bundle_dir="${gravitino_package_dir}/iceberg-bundles"
 
 # Copy the Aliyun, AWS, GCP and Azure bundles to the Iceberg bundles directory
 mkdir -p "${iceberg_bundle_dir}"
