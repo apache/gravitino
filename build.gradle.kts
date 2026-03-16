@@ -1165,7 +1165,8 @@ tasks {
       ":catalogs:hive-metastore3-libs:copyLibs",
       ":catalogs:catalog-lakehouse-generic:copyLibAndConfig",
       ":catalogs-contrib:catalog-jdbc-oceanbase:copyLibAndConfig",
-      ":catalogs-contrib:catalog-jdbc-clickhouse:copyLibAndConfig"
+      ":catalogs-contrib:catalog-jdbc-clickhouse:copyLibAndConfig",
+      ":catalogs-contrib:catalog-jdbc-hologres:copyLibAndConfig"
     )
   }
 
