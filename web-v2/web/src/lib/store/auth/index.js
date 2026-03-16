@@ -102,11 +102,17 @@ export const logoutAction = createAsyncThunk('auth/logoutAction', async ({ route
     try {
       const provider = await oauthProviderFactory.getProvider()
       if (provider) {
-        // For OIDC providers, use signoutRedirect to end Keycloak session
+        // For OIDC providers, use signoutRedirect to end IdP session
         if (provider.getUserManager) {
           const userManager = provider.getUserManager()
           if (userManager) {
-            // Clear legacy auth tokens before redirect
+            // Read id_token before clearing — needed for id_token_hint
+            const user = await userManager.getUser()
+
+            // Clear OIDC user data from store
+            await provider.clearAuthData()
+
+            // Clear legacy auth tokens
             localStorage.removeItem('accessToken')
             localStorage.removeItem('authParams')
             localStorage.removeItem('expiredIn')
@@ -116,14 +122,8 @@ export const logoutAction = createAsyncThunk('auth/logoutAction', async ({ route
             dispatch(clearIntervalId())
             dispatch(setAuthToken(''))
 
-            // Redirect to IdP logout endpoint — this will navigate away from the app
-            // signoutRedirect() must be called before clearAuthData() because it needs
-            // the stored id_token for the id_token_hint parameter in RP-initiated logout
-            await userManager.signoutRedirect()
-
-            await provider.clearAuthData()
-
-            return { token: null }
+            // Redirect to IdP logout endpoint — browser navigates away, must be last
+            await userManager.signoutRedirect({ id_token_hint: user?.id_token })
           }
         }
 
