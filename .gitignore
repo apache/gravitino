@@ -29,8 +29,6 @@ replay_pid*
 !/.idea/icon.svg
 !.idea/vcs.xml
 **/.vscode
-**/.metals/
-**/.bloop/
 **/build
 gen
 **/.DS_Store
