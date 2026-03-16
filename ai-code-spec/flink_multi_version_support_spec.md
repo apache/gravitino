@@ -1,4 +1,32 @@
+<!--
+  Licensed to the Apache Software Foundation (ASF) under one
+  or more contributor license agreements.  See the NOTICE file
+  distributed with this work for additional information
+  regarding copyright ownership.  The ASF licenses this file
+  to you under the Apache License, Version 2.0 (the
+  "License"); you may not use this file except in compliance
+  with the License.  You may obtain a copy of the License at
+
+   http://www.apache.org/licenses/LICENSE-2.0
+
+  Unless required by applicable law or agreed to in writing,
+  software distributed under the License is distributed on an
+  "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+  KIND, either express or implied.  See the License for the
+  specific language governing permissions and limitations
+  under the License.
+-->
+
 # Gravitino Flink Connector Multi-Version Support Spec
+
+| Field | Value |
+| --- | --- |
+| Status | Proposal |
+| Owner | FANNG |
+| Created | 2026-03-16 |
+| Target Release | 1.3.0 |
+| Related Issue | [#9710](https://github.com/apache/gravitino/issues/9710) |
+| Related PR | N/A |
 
 ## Goal
 
@@ -17,6 +45,7 @@ The output of this work should be:
 - Changing connector behavior beyond what is required for multi-version compatibility
 - Adding new connector features such as materialized table support
 - Reworking provider semantics for Hive, Iceberg, JDBC, or Paimon
+- Adding OAuth2 or Kerberos real-environment validation to the required test matrix for this delivery
 - Producing one universal jar that works across all Flink minors
 
 Note: Flink `2.0` support is explicitly out of scope for this delivery, but the module split and extension hooks introduced here should keep a clean path for a future Flink `2.0` compatibility lane.
@@ -703,12 +732,20 @@ Minimum required coverage:
 
 Repository-local integration tests are necessary but not sufficient.
 
+For this delivery, the real-environment lane is a simple smoke-validation lane. In this document, `smoke` means a minimal real-distribution end-to-end check that proves the connector can load, bootstrap, and complete a basic documented catalog flow. It should prove that the versioned runtime jar can work in a real Flink distribution with the basic documented flow, but it does not need to cover the full authentication matrix.
+
 For every supported Flink minor, the connector must also be validated in a real Flink runtime environment to prove that:
 
 - the versioned runtime jar can be loaded by that Flink distribution
 - ServiceLoader-based factory discovery works with the real classloader layout
 - SQL examples from the public documentation actually work against that Flink version
 - Gravitino-managed catalogs can be used end-to-end from the real Flink client/session environment
+
+Current-scope rule:
+
+- require simple authentication mode only
+- do not require OAuth2 validation
+- do not require Kerberos validation
 
 This validation is required for:
 
@@ -718,7 +755,7 @@ This validation is required for:
 
 ### Real environment validation modes
 
-At minimum, each supported Flink minor should be validated in these modes:
+At minimum, each supported Flink minor should be validated with one simple real-distribution smoke path. The preferred options are:
 
 1. SQL/TableEnvironment mode
 
@@ -733,10 +770,9 @@ At minimum, each supported Flink minor should be validated in these modes:
 - configure `table.catalog-store.kind=gravitino`
 - execute representative SQL flows from the connector documentation
 
-3. Deployed cluster mode
+At least one of the two modes above must be automated per supported Flink minor in this delivery.
 
-- validate against a deployed runtime, not just in-process execution
-- this should match the intent of the current `embedded` and `deploy` integration test modes
+`Deployed cluster` validation is useful but optional for this delivery and can be added later as a stronger compatibility lane.
 
 ### Test content sources
 
@@ -749,7 +785,6 @@ The real-environment validation suite should be derived from two sources:
 2. Public Flink connector documentation under:
 
 - `docs/flink-connector/flink-connector.md`
-- `docs/flink-connector/flink-authentication-with-gravitino.md`
 - `docs/flink-connector/flink-catalog-hive.md`
 - `docs/flink-connector/flink-catalog-iceberg.md`
 - `docs/flink-connector/flink-catalog-jdbc.md`
@@ -757,9 +792,9 @@ The real-environment validation suite should be derived from two sources:
 
 The real-environment validation plan should not invent a separate product surface. It should prove that the documented usage and the current IT coverage both work on each supported Flink version.
 
-### Required real-environment validation scenarios
+### Required real-environment smoke scenarios
 
-For every supported Flink minor, validate the following scenario groups in a real Flink environment.
+For every supported Flink minor, validate the following minimum scenario groups in a real Flink environment.
 
 1. Catalog store bootstrap
 
@@ -771,8 +806,6 @@ For every supported Flink minor, validate the following scenario groups in a rea
 2. Authentication
 
 - simple mode
-- Kerberos mode if the environment is available
-- OAuth2 mode where practical, or at minimum a dedicated compatibility lane if it cannot be part of the default CI
 
 3. Hive catalog
 
@@ -827,22 +860,22 @@ At review time, it should be possible to answer:
 
 ### CI recommendation for real-environment validation
 
-The ideal target is a Flink-version matrix in CI.
+The near-term target is a lightweight Flink-version smoke matrix in CI.
 
 Recommended minimum:
 
 - run repository integration tests per Flink versioned module
-- add at least one real-distribution validation job per supported Flink minor
-- if full provider coverage is too expensive on every PR, keep a reduced PR lane and a fuller scheduled lane
+- add at least one simple real-distribution smoke validation job per supported Flink minor
+- keep OAuth2, Kerberos, and broader deployed-cluster validation out of the required PR lane for this delivery
 
 Recommended matrix dimensions:
 
 - Flink version: `1.18`, `1.19`, `1.20`
-- mode: `embedded`, `deploy`, `real-distribution`
+- mode: `embedded`, `deploy`, `real-distribution-smoke`
 
 ### Real-environment validation acceptance
 
-Support for a Flink minor should not be declared complete until the corresponding real Flink environment validation passes for that minor.
+Support for a Flink minor should not be declared complete until the corresponding simple real Flink environment smoke validation passes for that minor.
 
 ### What must be verified across all minors
 
@@ -864,7 +897,7 @@ The work is done when all of the following are true:
 4. Existing behavior for the current `1.18` connector is preserved.
 5. Unit tests pass for the common module and all supported Flink minors.
 6. Integration tests can be run against all supported Flink minors.
-7. Real Flink environment validation passes for all supported Flink minors.
+7. Simple real Flink environment smoke validation passes for all supported Flink minors.
 8. User docs no longer claim that only Flink `1.18` is supported.
 
 ## Risks and Review Focus
