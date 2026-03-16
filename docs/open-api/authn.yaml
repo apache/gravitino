@@ -35,7 +35,7 @@ paths:
           content:
             application/vnd.gravitino.v1+json:
               schema:
-                $ref: "#/components/responses/AuthMeResponse"
+                $ref: "#/components/schemas/AuthMeResponse"
               examples:
                 AuthMeResponse:
                   $ref: "#/components/examples/AuthMeResponse"
@@ -49,7 +49,7 @@ paths:
           $ref: "./openapi.yaml#/components/responses/ServerErrorResponse"
 
 components:
-  responses:
+  schemas:
     AuthMeResponse:
       type: object
       properties:

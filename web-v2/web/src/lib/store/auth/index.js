@@ -106,8 +106,6 @@ export const logoutAction = createAsyncThunk('auth/logoutAction', async ({ route
         if (provider.getUserManager) {
           const userManager = provider.getUserManager()
           if (userManager) {
-            await provider.clearAuthData()
-
             // Clear legacy auth tokens before redirect
             localStorage.removeItem('accessToken')
             localStorage.removeItem('authParams')
@@ -119,7 +117,11 @@ export const logoutAction = createAsyncThunk('auth/logoutAction', async ({ route
             dispatch(setAuthToken(''))
 
             // Redirect to IdP logout endpoint — this will navigate away from the app
+            // signoutRedirect() must be called before clearAuthData() because it needs
+            // the stored id_token for the id_token_hint parameter in RP-initiated logout
             await userManager.signoutRedirect()
+
+            await provider.clearAuthData()
 
             return { token: null }
           }

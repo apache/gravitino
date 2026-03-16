@@ -132,7 +132,7 @@ const AuthProvider = ({ children }) => {
               authUser = { ...user, name: meRes.principal }
             }
           } catch (e) {
-            // Fallback to OIDC profile if /api/auth/me is unavailable
+            // Fallback to OIDC profile if /api/authn/me is unavailable
           }
 
           authUser && dispatch(setAuthUser(authUser))
