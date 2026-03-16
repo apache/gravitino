@@ -37,6 +37,7 @@ if [ -d "${jdbc_driver_dir}" ]; then
   mkdir -p "${gravitino_dir}/catalogs/lakehouse-iceberg/libs"
   mkdir -p "${gravitino_dir}/iceberg-rest-server/libs"
   mkdir -p "${gravitino_dir}/libs"
+  mkdir -p "${gravitino_dir}/catalogs/jdbc-postgresql/libs"
   find "${jdbc_driver_dir}" -name "mysql-connector-java-*.jar" -exec ln -sfv {} "${gravitino_dir}/catalogs/jdbc-mysql/libs/" \;
   find "${jdbc_driver_dir}" -name "mysql-connector-java-*.jar" -exec ln -sfv {} "${gravitino_dir}/catalogs/jdbc-doris/libs/" \;
   find "${jdbc_driver_dir}" -name "mysql-connector-java-*.jar" -exec ln -sfv {} "${gravitino_dir}/catalogs/jdbc-starrocks/libs/" \;
