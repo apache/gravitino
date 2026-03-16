@@ -81,8 +81,23 @@ include(
 include("spark-connector:spark-common")
 if (scalaVersion == "2.12") {
   // flink only support scala 2.12
-  include("flink-connector:flink")
-  include("flink-connector:flink-runtime")
+  include("flink-connector:flink-common")
+  include(
+    "flink-connector:flink-1.18",
+    "flink-connector:flink-runtime-1.18",
+    "flink-connector:flink-1.19",
+    "flink-connector:flink-runtime-1.19",
+    "flink-connector:flink-1.20",
+    "flink-connector:flink-runtime-1.20")
+  project(":flink-connector:flink-1.18").projectDir = file("flink-connector/v1.18/flink")
+  project(":flink-connector:flink-runtime-1.18").projectDir =
+    file("flink-connector/v1.18/flink-runtime")
+  project(":flink-connector:flink-1.19").projectDir = file("flink-connector/v1.19/flink")
+  project(":flink-connector:flink-runtime-1.19").projectDir =
+    file("flink-connector/v1.19/flink-runtime")
+  project(":flink-connector:flink-1.20").projectDir = file("flink-connector/v1.20/flink")
+  project(":flink-connector:flink-runtime-1.20").projectDir =
+    file("flink-connector/v1.20/flink-runtime")
 }
 include("spark-connector:spark-3.3", "spark-connector:spark-runtime-3.3")
 project(":spark-connector:spark-3.3").projectDir = file("spark-connector/v3.3/spark")

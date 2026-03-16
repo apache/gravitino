@@ -18,15 +18,29 @@ This capability allows users to perform federation queries, accessing data from 
 4. Supports [Jdbc catalog](flink-catalog-jdbc.md)
 5. Supports most DDL and DML SQLs.
 
-## Requirement
+## Requirements
 
-* Flink 1.18
+* Flink 1.18.x, 1.19.x, or 1.20.x
 * Scala 2.12
 * JDK 8, 11 or 17
 
 ## How to use it
 
-1. [Build](../how-to-build.md) or [download](https://mvnrepository.com/artifact/org.apache.gravitino/gravitino-flink-connector-runtime-1.18) the Gravitino flink connector runtime jar, and place it to the classpath of Flink.
+1. Build or download the Gravitino Flink connector runtime jar that matches your Flink minor version, and place it in the Flink classpath.
+
+   | Flink version | Runtime module | Runtime jar |
+   |---------------|----------------|-------------|
+   | 1.18.x | `:flink-connector:flink-runtime-1.18` | `gravitino-flink-connector-runtime-1.18_2.12-${gravitino-version}.jar` |
+   | 1.19.x | `:flink-connector:flink-runtime-1.19` | `gravitino-flink-connector-runtime-1.19_2.12-${gravitino-version}.jar` |
+   | 1.20.x | `:flink-connector:flink-runtime-1.20` | `gravitino-flink-connector-runtime-1.20_2.12-${gravitino-version}.jar` |
+
+   If you build from source, use one of the following commands:
+
+   ```shell
+   ./gradlew :flink-connector:flink-runtime-1.18:shadowJar
+   ./gradlew :flink-connector:flink-runtime-1.19:shadowJar
+   ./gradlew :flink-connector:flink-runtime-1.20:shadowJar
+   ```
 
 2. Configure the Flink configuration to use the Gravitino flink connector.
 
@@ -63,9 +77,9 @@ EnvironmentSettings.Builder builder = EnvironmentSettings.newInstance().withConf
 TableEnvironment tableEnv = TableEnvironment.create(builder.inBatchMode().build());
 ```
 
-3. Add necessary jar files to Flink's classpath.
+3. Add the provider-specific jar files that match the same Flink minor version to Flink's classpath.
 
-To run Flink with Gravitino connector and then access the data source like Hive, you may need to put additional jars to Flink's classpath. You can refer to the [Flink document](https://nightlies.apache.org/flink/flink-docs-master/docs/connectors/table/hive/overview/#dependencies) for more information.
+To run Flink with the Gravitino connector and access a provider such as Hive, Iceberg, JDBC, or Paimon, you may need to add extra provider jars to Flink's classpath. Always use provider jars that match the same Flink minor version as the selected Gravitino runtime jar. See the provider-specific documents for concrete jar combinations and refer to the [Flink document](https://nightlies.apache.org/flink/flink-docs-master/docs/connectors/table/hive/overview/#dependencies) for more information.
 
 4. Execute the Flink SQL query.
 

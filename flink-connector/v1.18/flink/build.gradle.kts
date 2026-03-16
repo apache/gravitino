@@ -26,58 +26,24 @@ repositories {
   mavenCentral()
 }
 
-var paimonVersion: String = libs.versions.paimon.get()
-val flinkVersion: String = libs.versions.flink.get()
+val commonProject = project(":flink-connector:flink-common")
+val flinkVersion: String = libs.versions.flink18.get()
 val flinkMajorVersion: String = flinkVersion.substringBeforeLast(".")
-
-val icebergVersion: String = libs.versions.iceberg4connector.get()
-
-// The Flink only support scala 2.12, and all scala api will be removed in a future version.
-// You can find more detail at the following issues:
-// https://issues.apache.org/jira/browse/FLINK-23986,
-// https://issues.apache.org/jira/browse/FLINK-20845,
-// https://issues.apache.org/jira/browse/FLINK-13414.
+val icebergVersion: String = libs.versions.iceberg4flink18.get()
+val paimonVersion: String = libs.versions.paimon4flink18.get()
 val scalaVersion: String = "2.12"
 val artifactName = "${rootProject.name}-flink-${flinkMajorVersion}_$scalaVersion"
 
 dependencies {
-  implementation(project(":catalogs:catalog-common")) {
-    exclude("org.apache.logging.log4j")
-  }
-  implementation(libs.guava)
+  implementation(commonProject)
 
   compileOnly(project(":clients:client-java-runtime", configuration = "shadow"))
-
   compileOnly("org.apache.iceberg:iceberg-flink-runtime-$flinkMajorVersion:$icebergVersion")
   compileOnly("org.apache.flink:flink-connector-hive_$scalaVersion:$flinkVersion")
   compileOnly("org.apache.flink:flink-table-common:$flinkVersion")
   compileOnly("org.apache.flink:flink-table-api-java:$flinkVersion")
-  compileOnly("org.apache.paimon:paimon-flink-1.18:$paimonVersion")
-  compileOnly(libs.flinkjdbc)
-
-  compileOnly(libs.hive2.exec) {
-    artifact {
-      classifier = "core"
-    }
-    exclude("com.fasterxml.jackson.core")
-    exclude("com.google.code.findbugs", "jsr305")
-    exclude("com.google.protobuf")
-    exclude("org.apache.avro")
-    exclude("org.apache.calcite")
-    exclude("org.apache.calcite.avatica")
-    exclude("org.apache.curator")
-    exclude("org.apache.hadoop", "hadoop-yarn-server-resourcemanager")
-    exclude("org.apache.logging.log4j")
-    exclude("org.apache.zookeeper")
-    exclude("org.eclipse.jetty.aggregate", "jetty-all")
-    exclude("org.eclipse.jetty.orbit", "javax.servlet")
-    exclude("org.openjdk.jol")
-    exclude("org.pentaho")
-    exclude("org.slf4j")
-  }
-
-  testAnnotationProcessor(libs.lombok)
-  testCompileOnly(libs.lombok)
+  compileOnly("org.apache.paimon:paimon-flink-$flinkMajorVersion:$paimonVersion")
+  compileOnly(libs.flinkjdbc18)
 
   testImplementation(project(":api"))
   testImplementation(project(":clients:client-java"))
@@ -96,7 +62,7 @@ dependencies {
   testImplementation(libs.testcontainers.junit.jupiter)
   testImplementation(libs.testcontainers.mysql)
   testImplementation(libs.metrics.core)
-  testImplementation(libs.flinkjdbc)
+  testImplementation(libs.flinkjdbc18)
   testImplementation(libs.minikdc)
 
   testImplementation("org.apache.iceberg:iceberg-core:$icebergVersion")
@@ -182,7 +148,6 @@ dependencies {
 tasks.test {
   val skipITs = project.hasProperty("skipITs")
   if (skipITs) {
-    // Exclude integration tests
     exclude("**/integration/test/**")
   } else {
     dependsOn(tasks.jar)
@@ -200,4 +165,8 @@ publishing {
       artifactId = artifactName
     }
   }
+}
+
+tasks.named<Jar>("sourcesJar") {
+  duplicatesStrategy = DuplicatesStrategy.EXCLUDE
 }

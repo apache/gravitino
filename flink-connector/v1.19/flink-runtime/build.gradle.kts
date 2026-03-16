@@ -29,14 +29,8 @@ repositories {
   mavenCentral()
 }
 
-val flinkVersion: String = libs.versions.flink.get()
+val flinkVersion: String = libs.versions.flink19.get()
 val flinkMajorVersion: String = flinkVersion.substringBeforeLast(".")
-
-// The Flink only support scala 2.12, and all scala api will be removed in a future version.
-// You can find more detail at the following issues:
-// https://issues.apache.org/jira/browse/FLINK-23986,
-// https://issues.apache.org/jira/browse/FLINK-20845,
-// https://issues.apache.org/jira/browse/FLINK-13414.
 val scalaVersion: String = "2.12"
 val artifactName = "gravitino-${project.name}_$scalaVersion"
 val baseName = "${rootProject.name}-flink-connector-runtime-${flinkMajorVersion}_$scalaVersion"
@@ -51,7 +45,7 @@ configurations.all {
 
 dependencies {
   implementation(project(":clients:client-java-runtime", configuration = "shadow"))
-  implementation(project(":flink-connector:flink"))
+  implementation(project(":flink-connector:flink-1.19"))
 
   testImplementation(libs.junit.jupiter.api)
   testRuntimeOnly(libs.junit.jupiter.engine)
@@ -68,7 +62,6 @@ shadowJarTask.configure {
   exclude("org/slf4j/**")
   exclude("META-INF/maven/org.slf4j/**")
 
-  // Relocate dependencies to avoid conflicts
   relocate("com.google", "org.apache.gravitino.shaded.com.google")
   relocate("google", "org.apache.gravitino.shaded.google")
   relocate("org.apache.hc", "org.apache.gravitino.shaded.org.apache.hc")
@@ -78,10 +71,7 @@ tasks.test {
   useJUnitPlatform()
   dependsOn(shadowJarTask)
   doFirst {
-    systemProperty(
-      "shadowJarPath",
-      shadowJarTask.get().archiveFile.get().asFile.absolutePath
-    )
+    systemProperty("shadowJarPath", shadowJarTask.get().archiveFile.get().asFile.absolutePath)
   }
 }
 

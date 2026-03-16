@@ -102,7 +102,7 @@ public class GravitinoCatalogStore extends AbstractCatalogStore {
       Map<String, String> flinkCatalogProperties =
           catalogPropertiesConverter.toFlinkCatalogProperties(catalog.properties());
       CatalogDescriptor descriptor =
-          CatalogDescriptor.of(catalogName, Configuration.fromMap(flinkCatalogProperties));
+          newCatalogDescriptor(catalogName, Configuration.fromMap(flinkCatalogProperties));
       return Optional.of(descriptor);
     } catch (NoSuchCatalogException noSuchCatalogException) {
       return Optional.empty();
@@ -123,6 +123,11 @@ public class GravitinoCatalogStore extends AbstractCatalogStore {
   @Override
   public boolean contains(String catalogName) throws CatalogException {
     return gravitinoCatalogManager.contains(catalogName);
+  }
+
+  protected CatalogDescriptor newCatalogDescriptor(
+      String catalogName, Configuration configuration) {
+    return CatalogDescriptor.of(catalogName, configuration);
   }
 
   private BaseCatalogFactory getCatalogFactory(Map<String, String> configuration) {

@@ -570,7 +570,15 @@ public abstract class BaseCatalog extends AbstractCatalog {
         schemaAndTablePropertiesConverter.toFlinkTableProperties(
             catalogOptions, table.properties(), tablePath);
     List<String> partitionKeys = partitionConverter.toFlinkPartitionKeys(table.partitioning());
-    return CatalogTable.of(builder.build(), table.comment(), partitionKeys, flinkTableProperties);
+    return newCatalogTable(builder.build(), table.comment(), partitionKeys, flinkTableProperties);
+  }
+
+  protected CatalogTable newCatalogTable(
+      org.apache.flink.table.api.Schema schema,
+      String comment,
+      List<String> partitionKeys,
+      Map<String, String> options) {
+    return CatalogTable.of(schema, comment, partitionKeys, options);
   }
 
   private static Optional<List<String>> getFlinkPrimaryKey(Table table) {

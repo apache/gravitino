@@ -29,6 +29,7 @@ import javax.annotation.Nullable;
 import org.apache.flink.table.catalog.AbstractCatalog;
 import org.apache.flink.table.catalog.CatalogBaseTable;
 import org.apache.flink.table.catalog.CatalogPropertiesUtil;
+import org.apache.flink.table.catalog.CatalogTable;
 import org.apache.flink.table.catalog.ObjectPath;
 import org.apache.flink.table.catalog.ResolvedCatalogBaseTable;
 import org.apache.flink.table.catalog.ResolvedCatalogTable;
@@ -111,8 +112,7 @@ public class GravitinoHiveCatalog extends BaseCatalog {
 
     NameIdentifier identifier =
         NameIdentifier.of(tablePath.getDatabaseName(), tablePath.getObjectName());
-    Map<String, String> properties =
-        FlinkGenericTableUtil.toGravitinoGenericTableProperties(resolvedTable);
+    Map<String, String> properties = toGravitinoGenericTableProperties(resolvedTable);
 
     try {
       catalog()
@@ -146,7 +146,7 @@ public class GravitinoHiveCatalog extends BaseCatalog {
               .asTableCatalog()
               .loadTable(NameIdentifier.of(tablePath.getDatabaseName(), tablePath.getObjectName()));
       if (FlinkGenericTableUtil.isGenericTableWhenLoad(table.properties())) {
-        return FlinkGenericTableUtil.toFlinkGenericTable(table);
+        return toFlinkGenericTable(table);
       }
       return super.toFlinkTable(table, tablePath);
     } catch (NoSuchTableException e) {
@@ -218,8 +218,7 @@ public class GravitinoHiveCatalog extends BaseCatalog {
       throws TableNotExistException, CatalogException {
     NameIdentifier identifier =
         NameIdentifier.of(tablePath.getDatabaseName(), tablePath.getObjectName());
-    Map<String, String> updatedProperties =
-        FlinkGenericTableUtil.toGravitinoGenericTableProperties(newTable);
+    Map<String, String> updatedProperties = toGravitinoGenericTableProperties(newTable);
     Map<String, String> currentProperties =
         existingTable.properties() == null ? Collections.emptyMap() : existingTable.properties();
 
@@ -251,5 +250,14 @@ public class GravitinoHiveCatalog extends BaseCatalog {
     } catch (Exception e) {
       throw new CatalogException(e);
     }
+  }
+
+  protected Map<String, String> toGravitinoGenericTableProperties(
+      ResolvedCatalogTable resolvedTable) {
+    return FlinkGenericTableUtil.toGravitinoGenericTableProperties(resolvedTable);
+  }
+
+  protected CatalogTable toFlinkGenericTable(Table table) {
+    return FlinkGenericTableUtil.toFlinkGenericTable(table, this::newCatalogTable);
   }
 }
