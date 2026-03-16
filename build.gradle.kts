@@ -332,8 +332,11 @@ subprojects {
     mavenLocal()
   }
 
-  val jdk8CompatibleProjectNames = setOf("api", "common", "catalog-common", "hadoop-common")
-  val jdk8CompatibleProjectPrefixes = listOf(
+  val jdk8CompatibleProjectPathPrefixes = setOf(
+    ":api",
+    ":common",
+    ":catalogs:catalog-common",
+    ":catalogs:hadoop-common",
     ":maintenance:jobs",
     ":maintenance:optimizer-api",
     ":maintenance:updaters",
@@ -342,14 +345,10 @@ subprojects {
     ":spark-connector",
     ":flink-connector"
   )
-  fun hasProjectPrefix(path: String, prefixes: List<String>): Boolean {
-    return prefixes.any { path.startsWith(it) }
-  }
 
   fun compatibleWithJDK8(project: Project): Boolean {
     val path = project.path.lowercase()
-    val name = project.name.lowercase()
-    return name in jdk8CompatibleProjectNames || hasProjectPrefix(path, jdk8CompatibleProjectPrefixes)
+    return jdk8CompatibleProjectPathPrefixes.any { path.startsWith(it) }
   }
   extensions.extraProperties.set("excludePackagesForSparkConnector", ::excludePackagesForSparkConnector)
 
@@ -446,6 +445,7 @@ subprojects {
   }
 
   tasks.withType<JavaCompile>().configureEach {
+    // Keep Java compilation independent of the host's default charset.
     options.encoding = "UTF-8"
     options.errorprone.isEnabled.set(true)
     options.errorprone.disableWarningsInGeneratedCode.set(true)
