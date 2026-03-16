@@ -493,4 +493,105 @@ public class TestLancePartitionStatisticStorage {
     }
     return newData;
   }
+
+  @Test
+  public void testDropStatisticsWithQuoteInPartitionAndStatisticName() throws Exception {
+    PartitionStatisticStorageFactory factory = new LancePartitionStatisticStorageFactory();
+    String metalakeName = "metalake";
+    MetadataObject metadataObject =
+        MetadataObjects.of(
+            Lists.newArrayList("catalog", "schema", "table"), MetadataObject.Type.TABLE);
+
+    EntityStore entityStore = mock(EntityStore.class);
+    TableEntity tableEntity = mock(TableEntity.class);
+    when(entityStore.get(any(), any(), any())).thenReturn(tableEntity);
+    when(tableEntity.id()).thenReturn(1L);
+    FieldUtils.writeField(GravitinoEnv.getInstance(), "entityStore", entityStore, true);
+
+    String location = Files.createTempDirectory("lance_stats_test_quote").toString();
+    Map<String, String> properties = Maps.newHashMap();
+    properties.put("location", location);
+
+    LancePartitionStatisticStorage storage =
+        (LancePartitionStatisticStorage) factory.create(properties);
+    try {
+      String quotedPartition = "partition'01";
+      String quotedStatistic = "statistic'0";
+      String normalStatistic = "statistic1";
+
+      Map<String, StatisticValue<?>> stats = Maps.newHashMap();
+      stats.put(quotedStatistic, StatisticValues.stringValue("value0"));
+      stats.put(normalStatistic, StatisticValues.stringValue("value1"));
+
+      storage.updateStatistics(
+          metalakeName,
+          Lists.newArrayList(
+              MetadataObjectStatisticsUpdate.of(
+                  metadataObject,
+                  Lists.newArrayList(
+                      PartitionStatisticsModification.update(quotedPartition, stats)))));
+
+      List<PersistedPartitionStatistics> listedStats =
+          storage.listStatistics(
+              metalakeName,
+              metadataObject,
+              PartitionRange.between(
+                  quotedPartition,
+                  PartitionRange.BoundType.CLOSED,
+                  quotedPartition,
+                  PartitionRange.BoundType.CLOSED));
+
+      Assertions.assertEquals(1, listedStats.size());
+      Assertions.assertEquals(quotedPartition, listedStats.get(0).partitionName());
+      Assertions.assertEquals(2, listedStats.get(0).statistics().size());
+
+      storage.dropStatistics(
+          metalakeName,
+          Lists.newArrayList(
+              MetadataObjectStatisticsDrop.of(
+                  metadataObject,
+                  Lists.newArrayList(
+                      PartitionStatisticsModification.drop(
+                          quotedPartition, Lists.newArrayList(quotedStatistic))))));
+
+      listedStats =
+          storage.listStatistics(
+              metalakeName,
+              metadataObject,
+              PartitionRange.between(
+                  quotedPartition,
+                  PartitionRange.BoundType.CLOSED,
+                  quotedPartition,
+                  PartitionRange.BoundType.CLOSED));
+
+      Assertions.assertEquals(1, listedStats.size());
+      Assertions.assertEquals(quotedPartition, listedStats.get(0).partitionName());
+      Assertions.assertEquals(1, listedStats.get(0).statistics().size());
+      Assertions.assertEquals(normalStatistic, listedStats.get(0).statistics().get(0).name());
+
+      storage.dropStatistics(
+          metalakeName,
+          Lists.newArrayList(
+              MetadataObjectStatisticsDrop.of(
+                  metadataObject,
+                  Lists.newArrayList(
+                      PartitionStatisticsModification.drop(
+                          quotedPartition, Lists.newArrayList(normalStatistic))))));
+
+      listedStats =
+          storage.listStatistics(
+              metalakeName,
+              metadataObject,
+              PartitionRange.between(
+                  quotedPartition,
+                  PartitionRange.BoundType.CLOSED,
+                  quotedPartition,
+                  PartitionRange.BoundType.CLOSED));
+
+      Assertions.assertTrue(listedStats.isEmpty());
+    } finally {
+      FileUtils.deleteDirectory(new File(location + "/" + tableEntity.id() + ".lance"));
+      storage.close();
+    }
+  }
 }

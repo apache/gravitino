@@ -335,6 +335,9 @@ subprojects {
     val name = project.name.lowercase()
     val path = project.path.lowercase()
     if (path.startsWith(":maintenance:jobs") ||
+      path.startsWith(":maintenance:optimizer-api") ||
+      path.startsWith(":maintenance:gravitino-updaters") ||
+      path.startsWith(":clients:client-java") ||
       name == "api" ||
       name == "common" ||
       name == "catalog-common" ||
@@ -343,7 +346,11 @@ subprojects {
       return true
     }
 
-    val isReleaseRun = gradle.startParameter.taskNames.any { it == "release" || it == "publish" || it == "publishToMavenLocal" }
+    val isReleaseRun = gradle.startParameter.taskNames.any {
+      it == "release" || it == "publish" || it == "publishToMavenLocal" || it.endsWith(":release") || it.endsWith(
+        ":publish"
+      ) || it.endsWith(":publishToMavenLocal")
+    }
     if (!isReleaseRun) {
       return false
     }
@@ -389,6 +396,12 @@ subprojects {
               |==================================
         """.trimMargin()
       )
+    }
+  }
+
+  tasks.withType<JavaCompile>().configureEach {
+    if (compatibleWithJDK8(project)) {
+      options.release.set(8)
     }
   }
 
@@ -846,7 +859,7 @@ tasks {
           include(
             "${rootProject.name}-iceberg-rest-server.conf.template",
             "${rootProject.name}-env.sh.template",
-            "log4j2.properties.template"
+            "${rootProject.name}-iceberg-rest-log4j2.properties.template"
           )
           into("${rootProject.name}-iceberg-rest-server/conf")
         }
@@ -891,7 +904,7 @@ tasks {
           include(
             "${rootProject.name}-lance-rest-server.conf.template",
             "${rootProject.name}-env.sh.template",
-            "log4j2.properties.template"
+            "${rootProject.name}-lance-rest-log4j2.properties.template"
           )
           into("${rootProject.name}-lance-rest-server/conf")
         }
@@ -1073,10 +1086,13 @@ tasks {
         it.parent?.name != "maintenance" &&
         it.name != "mcp-server"
       ) {
-        from(it.configurations.runtimeClasspath)
+        from(it.configurations.runtimeClasspath) {
+          exclude("error_prone_annotations-*.jar")
+        }
         into("distribution/package/libs")
       }
     }
+    setDuplicatesStrategy(DuplicatesStrategy.EXCLUDE)
   }
 
   register("copyCliLib", Copy::class) {
@@ -1124,7 +1140,7 @@ tasks {
         dependsOn("${it.name}:build")
         from("${it.name}/build/libs") {
           include("*.jar")
-          exclude("*-jcstress.jar", "*-jmh.jar")
+          exclude("*-jcstress.jar", "*-jmh.jar", "error_prone_annotations-*.jar")
         }
         into("distribution/package/libs")
         setDuplicatesStrategy(DuplicatesStrategy.INCLUDE)

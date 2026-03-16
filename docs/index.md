@@ -66,8 +66,8 @@ You can use either to manage metadata. See
 
 Also, you can find the complete REST API definition in
 [Gravitino Open API](./api/rest/gravitino-rest-api),
-Java SDK definition in [Gravitino Java doc](pathname:///docs/1.2.0-SNAPSHOT/api/java/index.html),
-and Python SDK definition in [Gravitino Python doc](pathname:///docs/1.2.0-SNAPSHOT/api/python/index.html).
+Java SDK definition in [Gravitino Java doc](pathname:///docs/1.3.0-SNAPSHOT/api/java/index.html),
+and Python SDK definition in [Gravitino Python doc](pathname:///docs/1.3.0-SNAPSHOT/api/python/index.html).
 
 Gravitino also provides a web UI to manage the metadata. Visit the web UI in the browser via `http://<ip-address>:8090`.
 See [Gravitino web UI](./webui.md) for details.
@@ -79,6 +79,7 @@ Gravitino currently supports the following catalogs:
 **Relational catalogs:**
 
 * [**Doris catalog**](./jdbc-doris-catalog.md)
+* [**Hologres catalog**](./jdbc-hologres-catalog.md)
 * [**Hudi catalog**](./lakehouse-hudi-catalog.md)
 * [**Hive catalog**](./apache-hive-catalog.md)
 * [**Iceberg catalog**](./lakehouse-iceberg-catalog.md)
@@ -103,6 +104,9 @@ If you want to operate table and partition statistics, you can refer to the [doc
 **Model catalogs:**
 
 * [**Model catalog**](./model-catalog.md)
+
+If you want to automate table maintenance workflows, see [Table Maintenance Service (Optimizer)](./table-maintenance-service/optimizer.md).
+Start with Gravitino built-in policies and built-in job templates, and extend via optimizer interfaces when needed.
 
 Catalogs with an asterisk (\*) aren’t in the standard release tarball and Docker image since 1.2.0.  In 1.2.0, Gravitino introduces 
 folder `catalogs-contrib` to host the contributed catalogs, which aren’t in the standard release but can be built and used separately. See [how to build Gravitino](./how-to-build.md#quick-start) for details.
@@ -129,6 +133,7 @@ complete environment. To experience all the features, see
 Gravitino supports different catalogs to manage the metadata in different sources. Please see:
 
 * [Doris catalog](./jdbc-doris-catalog.md): a complete guide to using Gravitino to manage Doris data.
+* [Hologres catalog](./jdbc-hologres-catalog.md): a complete guide to using Gravitino to manage Hologres data.
 * [StarRocks catalog](./jdbc-starrocks-catalog.md): a complete guide to using Gravitino to manage StarRocks data.
 * [Fileset catalog](./fileset-catalog.md): a complete guide to using Gravitino to manage fileset
   using Hadoop Compatible File System (HCFS).
@@ -216,8 +221,8 @@ Gravitino MCP server provides the ability to manage Gravitino metadata for AI to
 ### Programming guides
 
 * [Gravitino Open API](./api/rest/gravitino-rest-api): provides the complete Open API definition of Gravitino.
-* [Gravitino Java doc](pathname:///docs/1.2.0-SNAPSHOT/api/java/index.html): provides the Javadoc for the Gravitino API.
-* [Gravitino Python doc](pathname:///docs/1.2.0-SNAPSHOT/api/python/index.html): provides the Python doc for the Gravitino API.
+* [Gravitino Java doc](pathname:///docs/1.3.0-SNAPSHOT/api/java/index.html): provides the Javadoc for the Gravitino API.
+* [Gravitino Python doc](pathname:///docs/1.3.0-SNAPSHOT/api/python/index.html): provides the Python doc for the Gravitino API.
 
 ### Development guides
 

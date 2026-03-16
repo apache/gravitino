@@ -53,6 +53,7 @@ import org.apache.gravitino.maintenance.optimizer.command.MonitorMetricsCommand;
 import org.apache.gravitino.maintenance.optimizer.command.OptimizerCommandContext;
 import org.apache.gravitino.maintenance.optimizer.command.OptimizerCommandExecutor;
 import org.apache.gravitino.maintenance.optimizer.command.SubmitStrategyJobsCommand;
+import org.apache.gravitino.maintenance.optimizer.command.SubmitUpdateStatsJobCommand;
 import org.apache.gravitino.maintenance.optimizer.command.UpdateStatisticsCommand;
 import org.apache.gravitino.maintenance.optimizer.command.rule.CommandRules;
 import org.apache.gravitino.maintenance.optimizer.common.OptimizerEnv;
@@ -114,7 +115,25 @@ public class OptimizerCmd {
               EnumSet.of(CliOption.IDENTIFIERS),
               EnumSet.noneOf(CliOption.class),
               "List stored job metrics.",
-              "./bin/gravitino-optimizer.sh --type list-job-metrics --identifiers c.db.job"));
+              "./bin/gravitino-optimizer.sh --type list-job-metrics --identifiers c.db.job"),
+          OptimizerCommandType.SUBMIT_UPDATE_STATS_JOB,
+          CommandOptionSpec.of(
+              EnumSet.of(CliOption.IDENTIFIERS),
+              EnumSet.of(
+                  CliOption.DRY_RUN,
+                  CliOption.UPDATE_MODE,
+                  CliOption.UPDATER_OPTIONS,
+                  CliOption.SPARK_CONF),
+              "Submit built-in Iceberg update stats/metrics Spark jobs for table identifiers.",
+              "./bin/gravitino-optimizer.sh --type submit-update-stats-job --identifiers "
+                  + "rest.ab.t1,rest.ab.t2 --update-mode all "
+                  + "--updater-options '{\"gravitino_uri\":\"http://localhost:8090\",\"metalake\":\"test\"}' "
+                  + "--spark-conf '{\"spark.sql.catalog.rest\":\"org.apache.iceberg.spark.SparkCatalog\","
+                  + "\"spark.sql.catalog.rest.type\":\"rest\","
+                  + "\"spark.sql.catalog.rest.uri\":\"http://localhost:9001/iceberg\","
+                  + "\"spark.sql.catalog.rest.warehouse\":\"/tmp/warehouse\","
+                  + "\"spark.sql.extensions\":\"org.apache.iceberg.spark.extensions.IcebergSparkSessionExtensions\"}'",
+              updateStatsJobInputRules()));
   private static final Map<OptimizerCommandType, OptimizerCommandExecutor> COMMAND_HANDLERS =
       Map.of(
           OptimizerCommandType.SUBMIT_STRATEGY_JOBS, new SubmitStrategyJobsCommand(),
@@ -122,7 +141,8 @@ public class OptimizerCmd {
           OptimizerCommandType.APPEND_METRICS, new AppendMetricsCommand(),
           OptimizerCommandType.MONITOR_METRICS, new MonitorMetricsCommand(),
           OptimizerCommandType.LIST_TABLE_METRICS, new ListTableMetricsCommand(),
-          OptimizerCommandType.LIST_JOB_METRICS, new ListJobMetricsCommand());
+          OptimizerCommandType.LIST_JOB_METRICS, new ListJobMetricsCommand(),
+          OptimizerCommandType.SUBMIT_UPDATE_STATS_JOB, new SubmitUpdateStatsJobCommand());
   private static final String LOCAL_STATS_CALCULATOR_NAME = "local-stats-calculator";
 
   static {
@@ -164,6 +184,11 @@ public class OptimizerCmd {
           cmd.getOptionValue(
               CliOption.RANGE_SECONDS.longOpt(), Long.toString(DEFAULT_RANGE_SECONDS));
       String partitionPathRaw = cmd.getOptionValue(CliOption.PARTITION_PATH.longOpt());
+      String updateMode = cmd.getOptionValue(CliOption.UPDATE_MODE.longOpt());
+      String updaterOptions = cmd.getOptionValue(CliOption.UPDATER_OPTIONS.longOpt());
+      String sparkConf = cmd.getOptionValue(CliOption.SPARK_CONF.longOpt());
+      OptimizerCommandContext.UpdateStatsJobOptions updateStatsJobOptions =
+          new OptimizerCommandContext.UpdateStatsJobOptions(updateMode, updaterOptions, sparkConf);
       String statisticsPayload = cmd.getOptionValue(CliOption.STATISTICS_PAYLOAD.longOpt());
       String filePath = cmd.getOptionValue(CliOption.FILE_PATH.longOpt());
       Optional<StatisticsInputContent> statisticsInputContent =
@@ -179,6 +204,7 @@ public class OptimizerCmd {
               actionTime,
               rangeSeconds,
               partitionPathRaw,
+              updateStatsJobOptions,
               statisticsInputContent,
               out);
       executeCommand(optimizerType, context);
@@ -300,13 +326,11 @@ public class OptimizerCmd {
             "Command '%s' with --calculator-name %s requires one of --statistics-payload "
                 + "or --file-path.",
             LOCAL_STATS_CALCULATOR_NAME)
-        .addForbidWhenOption(
-            CliOption.CALCULATOR_NAME.longOpt(),
-            value -> !LOCAL_STATS_CALCULATOR_NAME.equals(value),
-            List.of(CliOption.STATISTICS_PAYLOAD.longOpt(), CliOption.FILE_PATH.longOpt()),
-            "--statistics-payload and --file-path are only supported when --calculator-name is %s.",
-            LOCAL_STATS_CALCULATOR_NAME)
         .build();
+  }
+
+  private static CommandRules.ValidationPlan updateStatsJobInputRules() {
+    return CommandRules.emptyPlan();
   }
 
   private static void printGlobalHelp(Options options, PrintStream out) {
@@ -340,6 +364,27 @@ public class OptimizerCmd {
     out.printf("Required options: %s%n", joinOptions(spec.requiredOptions()));
     out.printf("Optional options: %s%n", joinOptions(spec.optionalOptions()));
     out.printf("Usage example: %s%n", spec.example());
+    if (optimizerType == OptimizerCommandType.SUBMIT_UPDATE_STATS_JOB) {
+      printSubmitUpdateStatsHelpNotes(out);
+    }
+  }
+
+  private static void printSubmitUpdateStatsHelpNotes(PrintStream out) {
+    out.println("Notes:");
+    out.println(
+        "  - --identifiers supports catalog.schema.table or schema.table "
+            + "(uses gravitino.optimizer.gravitinoDefaultCatalog).");
+    out.println("  - --update-mode default is all. Supported values: stats | metrics | all.");
+    out.println(
+        "  - --updater-options and --spark-conf must be flat JSON maps; CLI overrides config file.");
+    out.println("  - stats/all mode requires updater option keys: gravitino_uri and metalake.");
+    out.println(
+        "  - --spark-conf must include Iceberg catalog connection keys for each "
+            + "catalog in --identifiers:");
+    out.println("      spark.sql.catalog.<catalog>.type");
+    out.println("      spark.sql.catalog.<catalog>.uri (for rest/hive)");
+    out.println("      spark.sql.catalog.<catalog>.warehouse (for hadoop)");
+    out.println("  - spark.sql.catalog.<catalog> is auto-filled by CLI if absent.");
   }
 
   private static void validateCommandDefinitions() {
@@ -434,7 +479,11 @@ public class OptimizerCmd {
         null,
         "Show help. Combine with --type to show command help."),
     CONF_PATH("conf-path", CliOptionArgType.SINGLE, null, "Optimizer configuration path"),
-    IDENTIFIERS("identifiers", CliOptionArgType.MULTI, ',', "Comma separated identifier list"),
+    IDENTIFIERS(
+        "identifiers",
+        CliOptionArgType.MULTI,
+        ',',
+        "Comma separated table/job identifiers. Table format: catalog.schema.table or schema.table"),
     STRATEGY_NAME("strategy-name", CliOptionArgType.SINGLE, null, "Strategy name"),
     DRY_RUN("dry-run", CliOptionArgType.NONE, null, "Preview strategy jobs without submitting"),
     LIMIT("limit", CliOptionArgType.SINGLE, null, "Maximum number of strategy jobs to process"),
@@ -447,12 +496,12 @@ public class OptimizerCmd {
         "statistics-payload",
         CliOptionArgType.SINGLE,
         null,
-        "Inline statistics payload for local-stats-calculator"),
+        "Inline statistics payload for the selected calculator"),
     FILE_PATH(
         "file-path",
         CliOptionArgType.SINGLE,
         null,
-        "Path to statistics input file for local-stats-calculator"),
+        "Path to statistics input file for the selected calculator"),
     ACTION_TIME("action-time", CliOptionArgType.SINGLE, null, "Action time in epoch seconds"),
     RANGE_SECONDS(
         "range-seconds", CliOptionArgType.SINGLE, null, "Range seconds for monitor evaluation"),
@@ -461,7 +510,23 @@ public class OptimizerCmd {
         CliOptionArgType.SINGLE,
         null,
         "Partition path for monitor-metrics "
-            + "(JSON array, for example: [{\"p1\":\"v1\"},{\"p2\":\"v2\"}])");
+            + "(JSON array, for example: [{\"p1\":\"v1\"},{\"p2\":\"v2\"}])"),
+    UPDATE_MODE(
+        "update-mode",
+        CliOptionArgType.SINGLE,
+        null,
+        "Update mode for submit-update-stats-job: stats|metrics|all (default: all)"),
+    UPDATER_OPTIONS(
+        "updater-options",
+        CliOptionArgType.SINGLE,
+        null,
+        "Flat JSON map for updater options in submit-update-stats-job "
+            + "(for stats/all includes gravitino_uri and metalake)"),
+    SPARK_CONF(
+        "spark-conf",
+        CliOptionArgType.SINGLE,
+        null,
+        "Flat JSON map for Spark configs in submit-update-stats-job");
 
     private final String longOpt;
     private final CliOptionArgType argType;
@@ -509,7 +574,8 @@ public class OptimizerCmd {
     APPEND_METRICS,
     MONITOR_METRICS,
     LIST_TABLE_METRICS,
-    LIST_JOB_METRICS;
+    LIST_JOB_METRICS,
+    SUBMIT_UPDATE_STATS_JOB;
 
     public static String allValues() {
       return Arrays.stream(values())

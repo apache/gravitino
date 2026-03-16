@@ -271,7 +271,13 @@ public class IcebergAuthorizationIT extends BaseIT {
   }
 
   protected Set<String> listTableNames(String database) {
-    return convertToStringSet(sql("SHOW TABLES in %s", database), 1);
+    List<Object[]> objects = sql("SHOW TABLES in %s", database);
+    for (Object[] row : objects) {
+      if (row.length > 1) {
+        Assertions.assertEquals(database, String.valueOf(row[0]));
+      }
+    }
+    return convertToStringSet(objects, 1);
   }
 
   protected List<Object[]> sql2(String query) {

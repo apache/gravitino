@@ -435,7 +435,7 @@ class TestCompactionStrategyHandler {
 
       @Override
       public String strategyType() {
-        return "compaction";
+        return CompactionStrategyHandler.NAME;
       }
 
       @Override

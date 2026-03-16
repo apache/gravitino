@@ -272,7 +272,7 @@ Gravitino provides a comprehensive set of privileges organized by the type of op
 
 | Name          | Supports Securable Object | Operation                                                                                                     |
 |---------------|---------------------------|---------------------------------------------------------------------------------------------------------------|
-| MANAGE_GRANTS | Metalake                  | Manages roles granted to or revoked from the user or group, and privilege granted to or revoked from the role |
+| MANAGE_GRANTS | Metalake, Catalog, Schema, Table, View, Topic, Fileset, Model | Grants the ability to manage privileges on securable objects. When bound to a **Metalake**, also allows assigning and revoking roles for users and groups across the entire metalake. When bound to a **Catalog, Schema, Table, View, Topic, Fileset, or Model**, privilege management is scoped to that object and its descendants only. |
 
 ### Catalog privileges
 
@@ -1324,8 +1324,8 @@ The following table lists the required privileges for each API.
 | list roles                        | `MANAGE_GRANTS` on the metalake or the owner of the metalake can see all the roles. Others can see his granted roles or owned roles.                                                                                                          |
 | grant role                        | `MANAGE_GRANTS` on the metalake                                                                                                                                                                                                               |
 | revoke role                       | `MANAGE_GRANTS` on the metalake                                                                                                                                                                                                               |
-| grant privilege                   | `MANAGE_GRANTS` on the metalake or the owner of the securable object or the metalake                                                                                                                                                          |
-| revoke privilege                  | `MANAGE_GRANTS` on the metalake or the owner of the securable object or the metalake                                                                                                                                                          |
+| grant privilege                   | `MANAGE_GRANTS` on the securable object, or any ancestor of it (Schema, Catalog, Metalake), or the owner of the securable object or the metalake                                                                                              |
+| revoke privilege                  | `MANAGE_GRANTS` on the securable object, or any ancestor of it (Schema, Catalog, Metalake), or the owner of the securable object or the metalake                                                                                             |
 | override privilege                | `MANAGE_GRANTS` on the metalake or the owner of the metalake                                                                                                                                                                                  |
 | set owner                         | The owner of the securable object                                                                                                                                                                                                             |
 | list tags                         | The owner of the metalake can see all the tags, others can see the tags which they can load.                                                                                                                                                  |
