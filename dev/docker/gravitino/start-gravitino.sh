@@ -59,7 +59,7 @@ iceberg_rest_lib_dir="${gravitino_dir}/iceberg-rest-server/libs"
 if [ -d "${iceberg_bundle_dir}" ]; then
   mkdir -p "${lakehouse_iceberg_lib_dir}"
   mkdir -p "${iceberg_rest_lib_dir}"
-  find ${iceberg_bundle_dir} -name '*.jar' -exec ln -sv {} "${lakehouse_iceberg_lib_dir}" \; -exec ln -sv {} "${iceberg_rest_lib_dir}" \;
+  find ${iceberg_bundle_dir} -name '*.jar' -exec ln -sfv {} "${lakehouse_iceberg_lib_dir}" \; -exec ln -sfv {} "${iceberg_rest_lib_dir}" \;
 fi
 
 JAVA_OPTS+=" -XX:-UseContainerSupport"
