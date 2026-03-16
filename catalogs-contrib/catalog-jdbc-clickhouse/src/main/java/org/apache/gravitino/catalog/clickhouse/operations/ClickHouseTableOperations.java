@@ -439,7 +439,8 @@ public class ClickHouseTableOperations extends JdbcTableOperations {
     for (JdbcColumn column : columns) {
       if (column.autoIncrement()) {
         throw new UnsupportedOperationException(
-            "ClickHouse does not support auto increment column in CREATE TABLE");
+            "ClickHouse does not support auto increment column: '%s' in CREATE TABLE"
+                .formatted(column.name()));
       }
     }
   }
@@ -789,7 +790,6 @@ public class ClickHouseTableOperations extends JdbcTableOperations {
     return result;
   }
 
-  @VisibleForTesting
   private String addIndexDefinition(JdbcTable table, TableChange.AddIndex addIndex) {
     Preconditions.checkArgument(
         StringUtils.isNotBlank(addIndex.getName()), "Index name is required");
