@@ -23,7 +23,6 @@ import static org.apache.gravitino.dto.util.DTOConverters.fromDTOs;
 
 import com.codahale.metrics.annotation.ResponseMetered;
 import com.codahale.metrics.annotation.Timed;
-import com.google.common.collect.Lists;
 import javax.inject.Inject;
 import javax.servlet.http.HttpServletRequest;
 import javax.ws.rs.DELETE;
@@ -39,7 +38,6 @@ import javax.ws.rs.core.Context;
 import javax.ws.rs.core.Response;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.MetadataObject;
-import org.apache.gravitino.MetadataObjects;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.catalog.TableDispatcher;
@@ -58,7 +56,6 @@ import org.apache.gravitino.server.authorization.annotations.AuthorizationExpres
 import org.apache.gravitino.server.authorization.annotations.AuthorizationMetadata;
 import org.apache.gravitino.server.authorization.expression.AuthorizationExpressionConstants;
 import org.apache.gravitino.server.web.Utils;
-import org.apache.gravitino.utils.MetadataObjectUtil;
 import org.apache.gravitino.utils.NameIdentifierUtil;
 import org.apache.gravitino.utils.NamespaceUtil;
 import org.slf4j.Logger;
@@ -139,12 +136,6 @@ public class TableOperations {
             request.validate();
             NameIdentifier ident =
                 NameIdentifierUtil.ofTable(metalake, catalog, schema, request.getName());
-
-            // Make sure schema is imported, otherwise set owner for the table may fail.
-            MetadataObjectUtil.checkMetadataObject(
-                metalake,
-                MetadataObjects.of(
-                    Lists.newArrayList(catalog, schema), MetadataObject.Type.SCHEMA));
 
             Table table =
                 dispatcher.createTable(
