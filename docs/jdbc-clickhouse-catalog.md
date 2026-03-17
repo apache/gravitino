@@ -28,12 +28,8 @@ ClickHouse catalog is not included in the standard Gravitino server distribution
 | Scope             | One catalog maps to one ClickHouse instance                                                                                                                                                                   |
 | Metadata/DDL      | Supports JDBC-based metadata management and DDL                                                                                                                                                               |
 | Column defaults   | Supports column default values                                                                                                                                                                                |
-| Drivers           | Requires user-provided ClickHouse JDBC driver in `${GRAVITINO_HOME}/catalogs/jdbc-clickhouse/libs`. We recommend a shaded artifact (`classifier=all` or `clickhouse-jdbc-all`) from [ClickHouse JDBC docs](https://clickhouse.com/docs/en/integrations/language-clients/java/jdbc). |
+| Drivers           | Requires user-provided ClickHouse JDBC driver in `${GRAVITINO_HOME}/catalogs/jdbc-clickhouse/libs`, please download the jar from [link](https://repo1.maven.org/maven2/com/clickhouse/clickhouse-jdbc/0.7.1/) |
 | Supported version | All the codes are tested by ClickHouse `24.8.14`, newer versions like `25.x` may also work but we did not conduct thorough tests. Report to the community if something does not work as expected.             |                                                
-
-:::note
-Only verified supported combinations are listed in the matrix below.
-:::
 
 ### ClickHouse server and JDBC driver compatibility matrix
 
@@ -42,8 +38,7 @@ Only verified supported combinations are listed in the matrix below.
 | `24.8.x` (including `24.8.14`) | `0.7.1 ~ 0.8.4`                           |
 
 :::tip
-For production, pin exact server/driver versions and validate upgrades in a staging environment.
-For other ClickHouse versions, the required JDBC driver version may be different.
+For other ClickHouse versions (not 24.8.x), the required JDBC driver version may be different.
 Use your staging validation results and the official ClickHouse documentation as the final reference.
 :::
 
