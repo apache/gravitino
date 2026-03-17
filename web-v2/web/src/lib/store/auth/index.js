@@ -124,6 +124,8 @@ export const logoutAction = createAsyncThunk('auth/logoutAction', async ({ route
 
             // Redirect to IdP logout endpoint — browser navigates away, must be last
             await userManager.signoutRedirect({ id_token_hint: user?.id_token })
+
+            return { token: null } // unreachable — browser navigates away
           }
         }
 
