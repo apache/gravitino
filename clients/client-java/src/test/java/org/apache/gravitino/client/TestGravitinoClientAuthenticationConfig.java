@@ -45,7 +45,9 @@ public class TestGravitinoClientAuthenticationConfig {
   @Test
   public void testSimpleAuthenticationWithoutUser() {
     Map<String, String> config =
-        ImmutableMap.<String, String>builder().put("gravitino.client.authType", "simple").build();
+        ImmutableMap.<String, String>builder()
+            .put(GravitinoClientAuthenticationConfig.AUTH_TYPE_KEY, "simple")
+            .build();
 
     AuthDataProvider result =
         GravitinoClientAuthenticationConfig.createAuthDataProvider(config, SERVER_URI);
@@ -58,8 +60,8 @@ public class TestGravitinoClientAuthenticationConfig {
   public void testSimpleAuthenticationWithUser() {
     Map<String, String> config =
         ImmutableMap.<String, String>builder()
-            .put("gravitino.client.authType", "simple")
-            .put("gravitino.client.simpleAuthUser", "testuser")
+            .put(GravitinoClientAuthenticationConfig.AUTH_TYPE_KEY, "simple")
+            .put(GravitinoClientAuthenticationConfig.SIMPLE_AUTH_USER_KEY, "testuser")
             .build();
 
     AuthDataProvider result =
@@ -73,10 +75,13 @@ public class TestGravitinoClientAuthenticationConfig {
   public void testOAuthAuthenticationMissingScope() {
     Map<String, String> config =
         ImmutableMap.<String, String>builder()
-            .put("gravitino.client.authType", "oauth")
-            .put("gravitino.client.oauth.serverUri", "http://oauth-server:8080")
-            .put("gravitino.client.oauth.credential", "client_id:client_secret")
-            .put("gravitino.client.oauth.path", "oauth2/token")
+            .put(GravitinoClientAuthenticationConfig.AUTH_TYPE_KEY, "oauth")
+            .put(
+                GravitinoClientAuthenticationConfig.OAUTH_SERVER_URI_KEY,
+                "http://oauth-server:8080")
+            .put(
+                GravitinoClientAuthenticationConfig.OAUTH_CREDENTIAL_KEY, "client_id:client_secret")
+            .put(GravitinoClientAuthenticationConfig.OAUTH_PATH_KEY, "oauth2/token")
             .build();
 
     IllegalArgumentException exception =
@@ -91,9 +96,10 @@ public class TestGravitinoClientAuthenticationConfig {
   public void testOAuthAuthenticationMissingServerUri() {
     Map<String, String> config =
         ImmutableMap.<String, String>builder()
-            .put("gravitino.client.authType", "oauth")
-            .put("gravitino.client.oauth.credential", "client_id:client_secret")
-            .put("gravitino.client.oauth.path", "/oauth2/token")
+            .put(GravitinoClientAuthenticationConfig.AUTH_TYPE_KEY, "oauth")
+            .put(
+                GravitinoClientAuthenticationConfig.OAUTH_CREDENTIAL_KEY, "client_id:client_secret")
+            .put(GravitinoClientAuthenticationConfig.OAUTH_PATH_KEY, "/oauth2/token")
             .build();
 
     IllegalArgumentException exception =
@@ -108,9 +114,11 @@ public class TestGravitinoClientAuthenticationConfig {
   public void testOAuthAuthenticationMissingCredential() {
     Map<String, String> config =
         ImmutableMap.<String, String>builder()
-            .put("gravitino.client.authType", "oauth")
-            .put("gravitino.client.oauth.serverUri", "http://oauth-server:8080")
-            .put("gravitino.client.oauth.path", "/oauth2/token")
+            .put(GravitinoClientAuthenticationConfig.AUTH_TYPE_KEY, "oauth")
+            .put(
+                GravitinoClientAuthenticationConfig.OAUTH_SERVER_URI_KEY,
+                "http://oauth-server:8080")
+            .put(GravitinoClientAuthenticationConfig.OAUTH_PATH_KEY, "/oauth2/token")
             .build();
 
     IllegalArgumentException exception =
@@ -125,9 +133,12 @@ public class TestGravitinoClientAuthenticationConfig {
   public void testOAuthAuthenticationMissingPath() {
     Map<String, String> config =
         ImmutableMap.<String, String>builder()
-            .put("gravitino.client.authType", "oauth")
-            .put("gravitino.client.oauth.serverUri", "http://oauth-server:8080")
-            .put("gravitino.client.oauth.credential", "client_id:client_secret")
+            .put(GravitinoClientAuthenticationConfig.AUTH_TYPE_KEY, "oauth")
+            .put(
+                GravitinoClientAuthenticationConfig.OAUTH_SERVER_URI_KEY,
+                "http://oauth-server:8080")
+            .put(
+                GravitinoClientAuthenticationConfig.OAUTH_CREDENTIAL_KEY, "client_id:client_secret")
             .build();
 
     IllegalArgumentException exception =
@@ -145,9 +156,11 @@ public class TestGravitinoClientAuthenticationConfig {
 
     Map<String, String> config =
         ImmutableMap.<String, String>builder()
-            .put("gravitino.client.authType", "kerberos")
-            .put("gravitino.client.kerberos.principal", "user@REALM")
-            .put("gravitino.client.kerberos.keytabFilePath", keytabFile.getAbsolutePath())
+            .put(GravitinoClientAuthenticationConfig.AUTH_TYPE_KEY, "kerberos")
+            .put(GravitinoClientAuthenticationConfig.KERBEROS_PRINCIPAL_KEY, "user@REALM")
+            .put(
+                GravitinoClientAuthenticationConfig.KERBEROS_KEYTAB_FILE_PATH_KEY,
+                keytabFile.getAbsolutePath())
             .build();
 
     AuthDataProvider result =
@@ -161,8 +174,8 @@ public class TestGravitinoClientAuthenticationConfig {
   public void testKerberosAuthenticationWithoutKeytab() {
     Map<String, String> config =
         ImmutableMap.<String, String>builder()
-            .put("gravitino.client.authType", "kerberos")
-            .put("gravitino.client.kerberos.principal", "user@REALM")
+            .put(GravitinoClientAuthenticationConfig.AUTH_TYPE_KEY, "kerberos")
+            .put(GravitinoClientAuthenticationConfig.KERBEROS_PRINCIPAL_KEY, "user@REALM")
             .build();
 
     AuthDataProvider result =
@@ -175,7 +188,9 @@ public class TestGravitinoClientAuthenticationConfig {
   @Test
   public void testKerberosAuthenticationMissingPrincipal() {
     Map<String, String> config =
-        ImmutableMap.<String, String>builder().put("gravitino.client.authType", "kerberos").build();
+        ImmutableMap.<String, String>builder()
+            .put(GravitinoClientAuthenticationConfig.AUTH_TYPE_KEY, "kerberos")
+            .build();
 
     IllegalArgumentException exception =
         Assertions.assertThrows(
@@ -189,9 +204,11 @@ public class TestGravitinoClientAuthenticationConfig {
   public void testKerberosAuthenticationKeytabFileNotFound() {
     Map<String, String> config =
         ImmutableMap.<String, String>builder()
-            .put("gravitino.client.authType", "kerberos")
-            .put("gravitino.client.kerberos.principal", "user@REALM")
-            .put("gravitino.client.kerberos.keytabFilePath", "/nonexistent/path/test.keytab")
+            .put(GravitinoClientAuthenticationConfig.AUTH_TYPE_KEY, "kerberos")
+            .put(GravitinoClientAuthenticationConfig.KERBEROS_PRINCIPAL_KEY, "user@REALM")
+            .put(
+                GravitinoClientAuthenticationConfig.KERBEROS_KEYTAB_FILE_PATH_KEY,
+                "/nonexistent/path/test.keytab")
             .build();
 
     IllegalArgumentException exception =
@@ -206,7 +223,7 @@ public class TestGravitinoClientAuthenticationConfig {
   public void testInvalidAuthenticationType() {
     Map<String, String> config =
         ImmutableMap.<String, String>builder()
-            .put("gravitino.client.authType", "invalid_type")
+            .put(GravitinoClientAuthenticationConfig.AUTH_TYPE_KEY, "invalid_type")
             .build();
 
     IllegalArgumentException exception =
@@ -220,7 +237,9 @@ public class TestGravitinoClientAuthenticationConfig {
   @Test
   public void testNoneAuthenticationType() {
     Map<String, String> config =
-        ImmutableMap.<String, String>builder().put("gravitino.client.authType", "none").build();
+        ImmutableMap.<String, String>builder()
+            .put(GravitinoClientAuthenticationConfig.AUTH_TYPE_KEY, "none")
+            .build();
 
     AuthDataProvider result =
         GravitinoClientAuthenticationConfig.createAuthDataProvider(config, SERVER_URI);

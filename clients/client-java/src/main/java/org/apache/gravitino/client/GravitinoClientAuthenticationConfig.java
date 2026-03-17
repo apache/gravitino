@@ -21,6 +21,8 @@ package org.apache.gravitino.client;
 import static org.apache.gravitino.client.GravitinoClientConfiguration.GRAVITINO_CLIENT_CONFIG_PREFIX;
 
 import java.io.File;
+import java.net.URI;
+import java.net.URISyntaxException;
 import java.util.Locale;
 import java.util.Map;
 import org.apache.commons.lang3.StringUtils;
@@ -32,7 +34,7 @@ import org.apache.commons.lang3.StringUtils;
  * based on configuration maps. It supports multiple authentication types including Simple, OAuth,
  * and Kerberos.
  */
-public class GravitinoClientAuthenticationConfig {
+class GravitinoClientAuthenticationConfig {
 
   /** Authentication type configuration key. */
   public static final String AUTH_TYPE_KEY = GRAVITINO_CLIENT_CONFIG_PREFIX + "authType";
@@ -200,9 +202,9 @@ public class GravitinoClientAuthenticationConfig {
     // Set host from server URI if available
     if (StringUtils.isNotBlank(serverUri)) {
       try {
-        java.net.URI uri = new java.net.URI(serverUri);
+        URI uri = new URI(serverUri);
         provider.setHost(uri.getHost());
-      } catch (java.net.URISyntaxException e) {
+      } catch (URISyntaxException e) {
         throw new IllegalArgumentException("Invalid server URI: " + serverUri, e);
       }
     }
