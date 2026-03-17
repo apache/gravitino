@@ -131,7 +131,7 @@ public class AsyncQueueListener implements EventListenerPlugin {
         LOG.warn("{} event dispatcher thread is interrupted.", asyncQueueListenerName);
         break;
       } catch (Exception e) {
-        LOG.warn("{} throw a exception while processing event", asyncQueueListenerName, e);
+        LOG.warn("{} threw an exception while processing event", asyncQueueListenerName, e);
       }
     }
 
