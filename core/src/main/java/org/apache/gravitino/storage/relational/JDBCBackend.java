@@ -369,6 +369,7 @@ public class JDBCBackend implements RelationalBackend {
         for (NameIdentifier identifier : identifiers) {
           roles.add((E) RoleMetaService.getInstance().getRoleByIdentifier(identifier));
         }
+        return roles;
       case VIEW:
         List<E> views = Lists.newArrayList();
         for (NameIdentifier identifier : identifiers) {
