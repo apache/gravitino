@@ -2,25 +2,19 @@ name: Trino Multi-Version Integration Test
 
 on:
   workflow_dispatch:
-    inputs:
-      trino_versions_map:
-        description: 'Trino versions to test (space-separated version:module pairs)'
-        required: false
-        default: '478:trino-connector-473-478 473:trino-connector-473-478 469:trino-connector-469-472 452:trino-connector-452-468 446:trino-connector-446-451 440:trino-connector-440-445 435:trino-connector-435-439'
 
 jobs:
   TrinoMultiVersionIT:
     runs-on: ubuntu-latest
     timeout-minutes: 240
-    strategy:
-      matrix:
-        java-version: [ 17 ]
+    env:
+      CONNECTOR_DIR: ${{ github.workspace }}/trino-connector
     steps:
       - uses: actions/checkout@v4
 
       - uses: actions/setup-java@v4
         with:
-          java-version: ${{ matrix.java-version }}
+          java-version: 17
           distribution: 'temurin'
           cache: 'gradle'
 
@@ -28,29 +22,68 @@ jobs:
         uses: docker/setup-qemu-action@v3
 
       - name: Check required command
-        run: |
-          dev/ci/check_commands.sh
+        run: dev/ci/check_commands.sh
 
       - name: Build Gravitino
-        run: |
-          ./gradlew build -x test
+        run: ./gradlew build -x test
 
       - name: Free up disk space
-        run: |
-          dev/ci/util_free_space.sh
+        run: dev/ci/util_free_space.sh
 
-      - name: Run Multi-Version Trino Integration Tests
-        id: integrationTest
+      - name: Test Trino 478
+        id: test478
         run: |
-          trino-connector/integration-test/trino-test-tools/run_test_with_versions.sh \
-            --trino_versions_map="${{ github.event.inputs.trino_versions_map }}" \
-            --trino_test_args="--auto=all --auto_patch"
+          trino-connector/integration-test/trino-test-tools/trino_integration_test.sh \
+            --auto=all --auto_patch --trino_version=478 \
+            --trino_connector_dir=${{ env.CONNECTOR_DIR }}/trino-connector-473-478/build/libs
+
+      - name: Test Trino 473
+        id: test473
+        run: |
+          trino-connector/integration-test/trino-test-tools/trino_integration_test.sh \
+            --auto=all --auto_patch --trino_version=473 \
+            --trino_connector_dir=${{ env.CONNECTOR_DIR }}/trino-connector-473-478/build/libs
+
+      - name: Test Trino 469
+        id: test469
+        run: |
+          trino-connector/integration-test/trino-test-tools/trino_integration_test.sh \
+            --auto=all --auto_patch --trino_version=469 \
+            --trino_connector_dir=${{ env.CONNECTOR_DIR }}/trino-connector-469-472/build/libs
+
+      - name: Test Trino 452
+        id: test452
+        run: |
+          trino-connector/integration-test/trino-test-tools/trino_integration_test.sh \
+            --auto=all --auto_patch --trino_version=452 \
+            --trino_connector_dir=${{ env.CONNECTOR_DIR }}/trino-connector-452-468/build/libs
+
+      - name: Test Trino 446
+        id: test446
+        run: |
+          trino-connector/integration-test/trino-test-tools/trino_integration_test.sh \
+            --auto=all --auto_patch --trino_version=446 \
+            --trino_connector_dir=${{ env.CONNECTOR_DIR }}/trino-connector-446-451/build/libs
+
+      - name: Test Trino 440
+        id: test440
+        run: |
+          trino-connector/integration-test/trino-test-tools/trino_integration_test.sh \
+            --auto=all --auto_patch --trino_version=440 \
+            --trino_connector_dir=${{ env.CONNECTOR_DIR }}/trino-connector-440-445/build/libs
+
+      - name: Test Trino 435
+        id: test435
+        run: |
+          trino-connector/integration-test/trino-test-tools/trino_integration_test.sh \
+            --auto=all --auto_patch --trino_version=435 \
+            --trino_connector_dir=${{ env.CONNECTOR_DIR }}/trino-connector-435-439/build/libs
 
       - name: Upload test reports
         uses: actions/upload-artifact@v4
-        if: ${{ failure() && steps.integrationTest.outcome == 'failure' }}
+        if: failure()
         with:
-          name: trino-multi-version-test-reports-${{ matrix.java-version }}
+          name: trino-multi-version-test-reports
           path: |
             build/reports
             trino-connector/integration-test/build/*.log
