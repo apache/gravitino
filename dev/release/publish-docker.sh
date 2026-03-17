@@ -23,15 +23,14 @@
 #
 # Arguments:
 #   <tag>                     A Git tag, typically a release candidate (e.g., v1.2.0-rc5).
-#                             The tag must already exist locally or be fetched via:
-#                             git fetch --tags origin
+#                             The tag must already exist on the remote apache/gravitino repository.
 #   <branch>                  A Git branch name (e.g., main, branch-1.2). The workflow will
 #                             build from the latest commit on that branch.
 #   --docker-version <ver>    Docker image version tag to publish (e.g., 1.2.0-rc5). Required.
 #                             This is used as the image tag, independent of the Git tag/branch.
 #   --trino-version <ver>     Trino version used for the playground image (e.g., 478).
 #                             Defaults to 478. The playground image tag will be:
-#                             <ver>-gravitino-<docker-version>
+#                             trino-<ver>-gravitino-<docker-version>
 #   --dry-run                 Print the workflow commands that would be triggered without
 #                             actually running them. Useful for previewing before publishing.
 #
@@ -41,15 +40,16 @@
 #
 # Environment variables required (set in env file or shell profile):
 #   DOCKER_USERNAME       - Docker Hub username
-#   PUBLISH_DOCKER_TOKEN  - Docker Hub access token with push permission
+#   PUBLISH_DOCKER_TOKEN  - Workflow authorization token (compared against secrets.PUBLISH_DOCKER_TOKEN
+#                           in the workflow to authorize the dispatch; not used for Docker Hub login)
 #   GH_TOKEN              - GitHub personal access token with repo and workflow scopes
 #
 # This script triggers the docker-image.yml workflow for the following images:
 #   - apache/gravitino:<docker-version>
-#   - apache/gravitino-iceberg-rest-server:<docker-version>
-#   - apache/gravitino-lance-rest-server:<docker-version>
+#   - apache/gravitino-iceberg-rest:<docker-version>
+#   - apache/gravitino-lance-rest:<docker-version>
 #   - apache/gravitino-mcp-server:<docker-version>
-#   - apache/gravitino-playground:<trino-version>-gravitino-<docker-version>
+#   - apache/gravitino-playground:trino-<trino-version>-gravitino-<docker-version>
 #
 
 set -e
@@ -103,7 +103,7 @@ Arguments:
 
 Environment variables:
   DOCKER_USERNAME        Docker Hub username (required for actual run)
-  PUBLISH_DOCKER_TOKEN   Docker Hub access token (required for actual run)
+  PUBLISH_DOCKER_TOKEN   Workflow authorization token (required for actual run)
   GH_TOKEN               GitHub token with repo/workflow permissions
 
 Examples:
@@ -112,10 +112,10 @@ Examples:
 
 Images built:
   apache/gravitino:<docker-version>
-  apache/gravitino-iceberg-rest-server:<docker-version>
-  apache/gravitino-lance-rest-server:<docker-version>
+  apache/gravitino-iceberg-rest:<docker-version>
+  apache/gravitino-lance-rest:<docker-version>
   apache/gravitino-mcp-server:<docker-version>
-  apache/gravitino-playground:<trino-version>-gravitino-<docker-version>
+  apache/gravitino-playground:trino-<trino-version>-gravitino-<docker-version>
 
 EOF
       exit 0
