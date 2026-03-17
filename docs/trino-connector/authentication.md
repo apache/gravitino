@@ -9,6 +9,8 @@ license: "This software is licensed under the Apache License version 2."
 
 The Gravitino Trino connector supports authenticating to the Gravitino server using the same authentication mechanisms as the Gravitino Java client: Simple, OAuth, and Kerberos.
 
+If `gravitino.client.authType` is not set, the connector operates in no-authentication mode and connects to the Gravitino server without any credentials.
+
 ### Configuration
 
 Authentication is configured through the Trino connector properties file using the `gravitino.client.*` prefix. These properties are passed directly to the underlying Gravitino Java client.
@@ -31,10 +33,10 @@ gravitino.client.simpleAuthUser=admin
 
 **Configuration properties:**
 
-| Property                          | Description                                           | Default value | Required                               | Since version |
-|-----------------------------------|-------------------------------------------------------|---------------|----------------------------------------|---------------|
-| `gravitino.client.authType`       | Authentication type: `simple`, `oauth`, or `kerberos` | (none)        | No                                     | 1.2.0         |
-| `gravitino.client.simpleAuthUser` | Username for simple authentication                    | (none)        | No (uses system user if not specified) | 1.2.0         |
+| Property                          | Description                                                          | Default value    | Required                               | Since version |
+|-----------------------------------|----------------------------------------------------------------------|------------------|----------------------------------------|---------------|
+| `gravitino.client.authType`       | Authentication type: `simple`, `oauth`, or `kerberos`               | (none, no-auth)  | No                                     | 1.2.0         |
+| `gravitino.client.simpleAuthUser` | Username for simple authentication                                   | (none)           | No (uses system user if not specified) | 1.2.0         |
 
 ### OAuth Authentication
 

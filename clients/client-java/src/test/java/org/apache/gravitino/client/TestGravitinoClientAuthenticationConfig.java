@@ -37,9 +37,8 @@ public class TestGravitinoClientAuthenticationConfig {
     AuthDataProvider result =
         GravitinoClientAuthenticationConfig.createAuthDataProvider(config, SERVER_URI);
 
-    // When no auth type is specified, defaults to Simple authentication
-    Assertions.assertNotNull(result);
-    Assertions.assertTrue(result instanceof SimpleTokenProvider);
+    // When no auth type is specified, do not configure authentication
+    Assertions.assertNull(result);
   }
 
   @Test

@@ -84,9 +84,9 @@ class GravitinoClientAuthenticationConfig {
       Map<String, String> config, String serverUri) {
     String authTypeStr = config.get(AUTH_TYPE_KEY);
 
-    // Default to SIMPLE authentication if auth type is not specified
+    // If auth type is not specified, do not configure authentication
     if (StringUtils.isBlank(authTypeStr)) {
-      return createSimpleAuthProvider(config);
+      return null;
     }
 
     AuthType authType;
