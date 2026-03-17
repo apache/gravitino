@@ -1,5 +1,7 @@
 #!/usr/bin/env bash
 
+set -euo pipefail
+
 #
 # Licensed to the Apache Software Foundation (ASF) under one or more
 # contributor license agreements.  See the NOTICE file distributed with
@@ -20,22 +22,46 @@
 # Referred from Apache Spark's release script
 # dev/create-release/do-release.sh
 
-SELF=$(cd $(dirname $0) && pwd)
+RUNNING_IN_DOCKER=${RUNNING_IN_DOCKER:-0}
 
-while getopts ":b:n" opt; do
+SELF=$(cd "$(dirname "$0")" && pwd)
+
+while getopts ":b:s:p:t:r:nyh" opt; do
   case $opt in
     b) GIT_BRANCH=$OPTARG ;;
     n) DRY_RUN=1 ;;
+    s) RELEASE_STEP=$OPTARG ;;
+    p) GPG_PASSPHRASE=$OPTARG ;;
+    t) ASF_PASSWORD=$OPTARG ;;
+    r) RC_COUNT=$OPTARG ;;
+    y) FORCE=1 ;;
+    h)
+      echo "Usage: $0 [options]"
+      echo "Options:"
+      echo "  -b <branch>   Git branch to release (e.g., branch-1.2)"
+      echo "  -s <step>     Release step to execute: tag, build, docs, publish, finalize"
+      echo "  -r <num>      Release candidate number (e.g., 6 for rc6)"
+      echo "  -n            Dry run mode"
+      echo "  -p <pass>     GPG passphrase"
+      echo "  -t <pass>     ASF password"
+      echo "  -y            Force continue without confirmation"
+      echo "  -h            Show this help message"
+      exit 0
+      ;;
     \?) error "Invalid option: $OPTARG" ;;
   esac
 done
 
-DRY_RUN=${DRY_RUN:-0}
-export DRY_RUN
+export DRY_RUN=${DRY_RUN:-0}
+export FORCE=${FORCE:-0}
+export RC_COUNT=${RC_COUNT:-0}
+export RELEASE_STEP=${RELEASE_STEP:-}
+
+echo "DRY_RUN=$DRY_RUN FORCE=$FORCE RC_COUNT=$RC_COUNT RELEASE_STEP=$RELEASE_STEP"
 
 cmds=("git" "gpg" "svn" "twine" "shasum" "sha1sum" "jq" "make")
 for cmd in "${cmds[@]}"; do
-  if ! command -v $cmd &> /dev/null; then
+  if ! command -v "$cmd" &> /dev/null; then
     echo "$cmd is required to run this script."
     exit 1
   fi
@@ -67,8 +93,15 @@ if [ "$RUNNING_IN_DOCKER" = "1" ]; then
     export JAVA_HOME=/usr
   fi
 else
-  # Outside docker, need to ask for information about the release.
-  get_release_info
+  # Outside docker, need to ask for information about the release if required vars are missing.
+  # Set default values to avoid unbound variable errors with set -u
+  RELEASE_VERSION=${RELEASE_VERSION:-}
+  GIT_BRANCH=${GIT_BRANCH:-}
+  RC_COUNT=${RC_COUNT:-0}
+
+  if [ -z "$GIT_BRANCH" ] || [ -z "$RELEASE_VERSION" ] || [ -z "$RC_COUNT" ]; then
+    get_release_info
+  fi
 fi
 
 function should_build {
@@ -80,8 +113,12 @@ if should_build "tag" && [ $SKIP_TAG = 0 ]; then
   run_silent "Creating release tag $RELEASE_TAG..." "tag.log" \
     "$SELF/release-tag.sh"
   echo "It may take some time for the tag to be synchronized to github."
-  echo "Press enter when you've verified that the new tag ($RELEASE_TAG) is available."
-  read
+  if [ "$FORCE" = "1" ]; then
+    echo "Force mode: skipping wait."
+  else
+    echo "Press enter when you've verified that the new tag ($RELEASE_TAG) is available."
+    read
+  fi
 else
   echo "Skipping tag creation for $RELEASE_TAG."
 fi
@@ -107,7 +144,9 @@ else
   echo "Skipping publish step."
 fi
 
-if [ ! -z "$RELEASE_STEP" ] && [ "$RELEASE_STEP" = "finalize" ]; then
+if [ "$RELEASE_STEP" = "finalize" ]; then
   run_silent "Finalizing release" "finalize.log" \
     "$SELF/release-build.sh" finalize
 fi
+
+echo "Release build and publish completed"
