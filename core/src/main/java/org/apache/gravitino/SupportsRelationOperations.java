@@ -21,7 +21,6 @@ package org.apache.gravitino;
 import java.io.IOException;
 import java.util.List;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
-import org.apache.gravitino.storage.relational.helper.EntityRelation;
 
 /**
  * This is an extended interface. This is mainly used for strengthen the ability of querying
@@ -93,11 +92,33 @@ public interface SupportsRelationOperations {
       Type relType, NameIdentifier nameIdentifier, Entity.EntityType identType, boolean allFields)
       throws IOException;
 
-  <E extends Entity & HasIdentifier> List<EntityRelation<E>> batchListEntitiesByRelation(
-      Type relType,
-      List<NameIdentifier> nameIdentifiers,
-      Entity.EntityType identType,
-      boolean allFields)
+  /**
+   * Retrieves the relations for a batch of source entities in a single call.
+   *
+   * <p>This is the batch counterpart of {@link #listEntitiesByRelation}. Instead of issuing one
+   * query per source entity, callers can supply a list of identifiers and receive all matching
+   * {@link Relation} objects in one round-trip to the backend.
+   *
+   * <p>For example, to fetch the owners for a collection of tables in one call:
+   *
+   * <pre>
+   *   batchListEntitiesByRelation(OWNER_REL, tableIdentifiers, EntityType.TABLE);
+   * </pre>
+   *
+   * <p>Each returned {@link Relation} carries the source identifier, source entity type, target
+   * identifier, and target entity type, allowing callers to correlate results back to their inputs.
+   * Source identifiers that have no related entity will produce no {@link Relation} entry in the
+   * result; they will not cause an error.
+   *
+   * @param relType The type of relation to query.
+   * @param nameIdentifiers The list of source entity identifiers to look up relations for.
+   * @param identType The entity type that each element in {@code nameIdentifiers} represents.
+   * @return A list of {@link Relation} objects, one per (source, target) pair found. May be empty
+   *     but never null.
+   * @throws IOException If a storage-related error occurs during the batch query.
+   */
+  List<Relation> batchListEntitiesByRelation(
+      Type relType, List<NameIdentifier> nameIdentifiers, Entity.EntityType identType)
       throws IOException;
 
   /**

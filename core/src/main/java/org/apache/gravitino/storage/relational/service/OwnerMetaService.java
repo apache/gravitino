@@ -31,9 +31,11 @@ import java.util.Optional;
 import org.apache.commons.collections4.CollectionUtils;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.NameIdentifier;
+import org.apache.gravitino.Relation;
+import org.apache.gravitino.SupportsRelationOperations;
 import org.apache.gravitino.authorization.AuthorizationUtils;
+import org.apache.gravitino.meta.UserEntity;
 import org.apache.gravitino.metrics.Monitored;
-import org.apache.gravitino.storage.relational.helper.EntityRelation;
 import org.apache.gravitino.storage.relational.mapper.OwnerMetaMapper;
 import org.apache.gravitino.storage.relational.po.GroupPO;
 import org.apache.gravitino.storage.relational.po.OwnerRelPO;
@@ -91,12 +93,11 @@ public class OwnerMetaService {
   @Monitored(
       metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME,
       baseMetricName = "batchGetOwner")
-  public <E extends Entity> List<EntityRelation<E>> batchGetOwner(
-      List<NameIdentifier> identifiers, Entity.EntityType type) {
+  public List<Relation> batchGetOwner(List<NameIdentifier> identifiers, Entity.EntityType type) {
     if (CollectionUtils.isEmpty(identifiers)) {
       return new ArrayList<>();
     }
-    List<EntityRelation<E>> result = new ArrayList<>();
+    List<Relation> result = new ArrayList<>();
     Map<Long, NameIdentifier> nameIdentifierMap = new HashMap<>();
     List<Long> entityIds =
         identifiers.stream()
@@ -114,6 +115,8 @@ public class OwnerMetaService {
           Objects.equals(NameIdentifierUtil.getMetalake(identifier), metalake),
           "identifiers should in one metalake");
     }
+
+    // Get user owners
     List<UserOwnerRelPO> userPOList =
         SessionUtils.getWithoutCommit(
             OwnerMetaMapper.class,
@@ -122,13 +125,22 @@ public class OwnerMetaService {
     if (CollectionUtils.isNotEmpty(userPOList)) {
       userPOList.forEach(
           userPO -> {
-            EntityRelation<E> entityEntityRelation = new EntityRelation<>();
-            entityEntityRelation.setSourceNameIdentity(
-                nameIdentifierMap.get(userPO.getMetadataObjectId()));
-            entityEntityRelation.setRelationEntity((E) userPO);
-            result.add(entityEntityRelation);
+            UserEntity userEntity =
+                POConverters.fromUserPO(
+                    userPO, Collections.emptyList(), AuthorizationUtils.ofUserNamespace(metalake));
+            result.add(
+                new Relation(
+                    SupportsRelationOperations.Type.OWNER_REL,
+                    nameIdentifierMap.get(userPO.getMetadataObjectId()),
+                    type,
+                    userEntity.nameIdentifier(),
+                    Entity.EntityType.USER));
           });
     }
+
+    // TODO: Add batch support for group owners when GroupOwnerRelPO and batch method are available
+    // For now, we only handle user owners in batch mode
+
     return result;
   }
 

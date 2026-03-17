@@ -73,6 +73,20 @@ public class NoOpsCache extends BaseEntityCache {
 
   /** {@inheritDoc} */
   @Override
+  public <E extends Exception> void withBatchCacheLock(
+      List<EntityCacheKey> keys, ThrowingRunnable<E> action) throws E {
+    opLock.withBatchLockAndThrow(keys, action);
+  }
+
+  /** {@inheritDoc} */
+  @Override
+  public <T, E extends Exception> T withBatchCacheLock(
+      List<EntityCacheKey> keys, ThrowingSupplier<T, E> action) throws E {
+    return opLock.withBatchLockAndThrow(keys, action);
+  }
+
+  /** {@inheritDoc} */
+  @Override
   public <E extends Entity & HasIdentifier> Optional<E> getIfPresent(
       NameIdentifier ident, Entity.EntityType type) {
     return Optional.empty();

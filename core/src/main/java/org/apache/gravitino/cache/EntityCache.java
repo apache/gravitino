@@ -19,6 +19,7 @@
 
 package org.apache.gravitino.cache;
 
+import java.util.List;
 import org.apache.gravitino.Entity;
 
 /**
@@ -60,6 +61,32 @@ public interface EntityCache extends SupportsEntityStoreCache, SupportsRelationE
    */
   <T, E extends Exception> T withCacheLock(EntityCacheKey key, ThrowingSupplier<T, E> action)
       throws E;
+
+  /**
+   * Acquires locks for multiple cache keys and executes the action. Keys are locked in a consistent
+   * order to avoid deadlocks.
+   *
+   * @param keys The cache keys to lock
+   * @param action The action to execute while holding all locks
+   * @param <E> The type of exception that may be thrown
+   * @throws E if the action throws an exception of type E
+   */
+  <E extends Exception> void withBatchCacheLock(
+      List<EntityCacheKey> keys, ThrowingRunnable<E> action) throws E;
+
+  /**
+   * Acquires locks for multiple cache keys and executes the action, returning the result. Keys are
+   * locked in a consistent order to avoid deadlocks.
+   *
+   * @param keys The cache keys to lock
+   * @param action The action to execute while holding all locks
+   * @param <T> The type of the result
+   * @param <E> The type of exception that may be thrown
+   * @return The result of the action
+   * @throws E if the action throws an exception of type E
+   */
+  <T, E extends Exception> T withBatchCacheLock(
+      List<EntityCacheKey> keys, ThrowingSupplier<T, E> action) throws E;
 
   /**
    * A functional interface that represents a supplier that may throw an exception.

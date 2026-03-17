@@ -404,8 +404,7 @@ public class MetadataAuthzHelper {
           .batchListEntitiesByRelation(
               SupportsRelationOperations.Type.OWNER_REL,
               Arrays.stream(nameIdentifiers).toList(),
-              entityType,
-              true);
+              entityType);
     } catch (Exception e) {
       LOG.warn("Ignore preloadOwner error:{}", e.getMessage(), e);
     }

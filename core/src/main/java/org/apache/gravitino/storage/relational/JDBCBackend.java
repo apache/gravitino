@@ -38,6 +38,7 @@ import org.apache.gravitino.EntityAlreadyExistsException;
 import org.apache.gravitino.HasIdentifier;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
+import org.apache.gravitino.Relation;
 import org.apache.gravitino.SupportsRelationOperations;
 import org.apache.gravitino.UnsupportedEntityTypeException;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
@@ -61,7 +62,6 @@ import org.apache.gravitino.meta.TopicEntity;
 import org.apache.gravitino.meta.UserEntity;
 import org.apache.gravitino.storage.relational.converters.SQLExceptionConverterFactory;
 import org.apache.gravitino.storage.relational.database.H2Database;
-import org.apache.gravitino.storage.relational.helper.EntityRelation;
 import org.apache.gravitino.storage.relational.service.CatalogMetaService;
 import org.apache.gravitino.storage.relational.service.FilesetMetaService;
 import org.apache.gravitino.storage.relational.service.FunctionMetaService;
@@ -671,11 +671,8 @@ public class JDBCBackend implements RelationalBackend {
   }
 
   @Override
-  public <E extends Entity & HasIdentifier> List<EntityRelation<E>> batchListEntitiesByRelation(
-      Type relType,
-      List<NameIdentifier> nameIdentifiers,
-      Entity.EntityType identType,
-      boolean allFields)
+  public List<Relation> batchListEntitiesByRelation(
+      Type relType, List<NameIdentifier> nameIdentifiers, Entity.EntityType identType)
       throws IOException {
     switch (relType) {
       case OWNER_REL:

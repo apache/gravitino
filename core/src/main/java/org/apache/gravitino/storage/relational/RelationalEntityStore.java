@@ -21,16 +21,14 @@ package org.apache.gravitino.storage.relational;
 import static org.apache.gravitino.Configs.ENTITY_RELATIONAL_STORE;
 
 import com.google.common.annotations.VisibleForTesting;
-import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableMap;
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Objects;
 import java.util.Optional;
 import java.util.function.Function;
-import java.util.stream.Collectors;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.gravitino.Config;
 import org.apache.gravitino.Configs;
@@ -40,15 +38,17 @@ import org.apache.gravitino.EntityStore;
 import org.apache.gravitino.HasIdentifier;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
+import org.apache.gravitino.Relation;
 import org.apache.gravitino.SupportsRelationOperations;
 import org.apache.gravitino.cache.CacheFactory;
 import org.apache.gravitino.cache.CachedEntityIdResolver;
 import org.apache.gravitino.cache.EntityCache;
+import org.apache.gravitino.cache.EntityCacheKey;
 import org.apache.gravitino.cache.EntityCacheRelationKey;
 import org.apache.gravitino.cache.NoOpsCache;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
-import org.apache.gravitino.storage.relational.helper.EntityRelation;
 import org.apache.gravitino.storage.relational.service.EntityIdService;
+import org.apache.gravitino.utils.EntityClassMapper;
 import org.apache.gravitino.utils.Executable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -231,53 +231,43 @@ public class RelationalEntityStore implements EntityStore, SupportsRelationOpera
   }
 
   @Override
-  public <E extends Entity & HasIdentifier> List<EntityRelation<E>> batchListEntitiesByRelation(
-      Type relType,
-      List<NameIdentifier> nameIdentifiers,
-      Entity.EntityType identType,
-      boolean allFields)
+  public List<Relation> batchListEntitiesByRelation(
+      Type relType, List<NameIdentifier> nameIdentifiers, Entity.EntityType identType)
       throws IOException {
-    // TODO add lock
-    List<EntityRelation<E>> result = new ArrayList<>();
-    List<NameIdentifier> notInCache = new ArrayList<>();
-    for (NameIdentifier nameIdentifier : nameIdentifiers) {
-      Optional<List<E>> entities = cache.getIfPresent(relType, nameIdentifier, identType);
-      entities.ifPresentOrElse(
-          listInCache -> {
-            listInCache.forEach(
-                e -> {
-                  EntityRelation<E> entityEntityRelation = new EntityRelation<>();
-                  entityEntityRelation.setRelationEntity(e);
-                  entityEntityRelation.setSourceNameIdentity(nameIdentifier);
-                  result.add(entityEntityRelation);
-                });
-          },
-          () -> {
-            notInCache.add(nameIdentifier);
-          });
+    if (nameIdentifiers == null || nameIdentifiers.isEmpty()) {
+      return new ArrayList<>();
     }
-    if (Objects.requireNonNull(relType) == Type.OWNER_REL) {
-      List<EntityRelation<E>> entityRelations =
-          backend.batchListEntitiesByRelation(relType, notInCache, identType, allFields);
-      Preconditions.checkState(
-          entityRelations.size() == notInCache.size(),
-          "Owner list size not equal to nameIdentifiers size");
-      result.addAll(entityRelations);
-      Map<NameIdentifier, List<EntityRelation<E>>> grouped =
-          entityRelations.stream()
-              .collect(
-                  Collectors.groupingBy(
-                      EntityRelation::getSourceNameIdentity, Collectors.toList()));
-      grouped.forEach(
-          (name, entities) -> {
-            cache.put(
-                name,
-                identType,
-                relType,
-                entities.stream().map(EntityRelation::getRelationEntity).toList());
-          });
+
+    List<EntityCacheKey> lockKeys = new ArrayList<>();
+    for (NameIdentifier id : nameIdentifiers) {
+      lockKeys.add(EntityCacheRelationKey.of(id, identType, relType));
     }
-    return result;
+
+    return cache.withBatchCacheLock(
+        lockKeys,
+        () -> {
+          List<Relation> result = new ArrayList<>();
+          List<NameIdentifier> uncachedIdentifiers = new ArrayList<>();
+
+          for (NameIdentifier nameIdentifier : nameIdentifiers) {
+            List<Relation> cachedRelations = getCachedRelations(relType, nameIdentifier, identType);
+            if (cachedRelations != null) {
+              result.addAll(cachedRelations);
+            } else {
+              uncachedIdentifiers.add(nameIdentifier);
+            }
+          }
+
+          if (!uncachedIdentifiers.isEmpty()) {
+            List<Relation> backendRelations =
+                backend.batchListEntitiesByRelation(relType, uncachedIdentifiers, identType);
+            result.addAll(backendRelations);
+
+            batchPopulateRelationCache(relType, identType, uncachedIdentifiers, backendRelations);
+          }
+
+          return result;
+        });
   }
 
   @Override
@@ -372,5 +362,67 @@ public class RelationalEntityStore implements EntityStore, SupportsRelationOpera
   public <E extends Entity & HasIdentifier> void batchPut(List<E> entities, boolean overwritten)
       throws IOException, EntityAlreadyExistsException {
     backend.batchPut(entities, overwritten);
+  }
+
+  private <E extends Entity & HasIdentifier> List<Relation> getCachedRelations(
+      SupportsRelationOperations.Type relType,
+      NameIdentifier nameIdentifier,
+      Entity.EntityType identType) {
+    Optional<List<E>> entitiesOpt = cache.getIfPresent(relType, nameIdentifier, identType);
+    if (entitiesOpt.isPresent()) {
+      List<Relation> cachedRelations = new ArrayList<>();
+      for (E entity : entitiesOpt.get()) {
+        cachedRelations.add(
+            new Relation(
+                relType, nameIdentifier, identType, entity.nameIdentifier(), entity.type()));
+      }
+      return cachedRelations;
+    }
+    return null;
+  }
+
+  private <E extends Entity & HasIdentifier> void batchPopulateRelationCache(
+      SupportsRelationOperations.Type relType,
+      Entity.EntityType identType,
+      List<NameIdentifier> uncachedIdentifiers,
+      List<Relation> backendRelations) {
+    Map<NameIdentifier, List<Relation>> relationsBySource = new HashMap<>();
+    for (Relation relation : backendRelations) {
+      relationsBySource.computeIfAbsent(relation.source(), k -> new ArrayList<>()).add(relation);
+    }
+
+    Map<Entity.EntityType, List<NameIdentifier>> targetsByType = new HashMap<>();
+    for (Relation relation : backendRelations) {
+      if (relation.targetType() != null) {
+        targetsByType
+            .computeIfAbsent(relation.targetType(), k -> new ArrayList<>())
+            .add(relation.target());
+      }
+    }
+
+    Map<NameIdentifier, E> entitiesByIdent = new HashMap<>();
+    for (Map.Entry<Entity.EntityType, List<NameIdentifier>> entry : targetsByType.entrySet()) {
+      List<E> entities =
+          batchGet(
+              entry.getValue(), entry.getKey(), EntityClassMapper.getEntityClass(entry.getKey()));
+      for (E entity : entities) {
+        entitiesByIdent.put(entity.nameIdentifier(), entity);
+      }
+    }
+
+    for (NameIdentifier sourceId : uncachedIdentifiers) {
+      List<Relation> sourceRelations = relationsBySource.get(sourceId);
+      List<E> entityList = new ArrayList<>();
+      if (sourceRelations != null) {
+        for (Relation rel : sourceRelations) {
+          E entity = entitiesByIdent.get(rel.target());
+          if (entity != null) {
+            entityList.add(entity);
+          }
+        }
+      }
+
+      cache.put(sourceId, identType, relType, entityList);
+    }
   }
 }

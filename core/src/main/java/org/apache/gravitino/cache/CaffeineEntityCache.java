@@ -340,6 +340,26 @@ public class CaffeineEntityCache extends BaseEntityCache {
     return segmentedLock.withLockAndThrow(key, action);
   }
 
+  /** {@inheritDoc} */
+  @Override
+  public <E extends Exception> void withBatchCacheLock(
+      List<EntityCacheKey> keys, EntityCache.ThrowingRunnable<E> action) throws E {
+    Preconditions.checkArgument(keys != null, "Keys cannot be null");
+    Preconditions.checkArgument(action != null, "Action cannot be null");
+
+    segmentedLock.withBatchLockAndThrow(keys, action);
+  }
+
+  /** {@inheritDoc} */
+  @Override
+  public <T, E extends Exception> T withBatchCacheLock(
+      List<EntityCacheKey> keys, EntityCache.ThrowingSupplier<T, E> action) throws E {
+    Preconditions.checkArgument(keys != null, "Keys cannot be null");
+    Preconditions.checkArgument(action != null, "Action cannot be null");
+
+    return segmentedLock.withBatchLockAndThrow(keys, action);
+  }
+
   /**
    * Removes the expired entity from the cache. This method is a hook method for the Cache, when an
    * entry expires, it will call this method.
