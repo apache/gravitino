@@ -71,7 +71,7 @@ public interface EntityCache extends SupportsEntityStoreCache, SupportsRelationE
    * @param <E> The type of exception that may be thrown
    * @throws E if the action throws an exception of type E
    */
-  <E extends Exception> void withBatchCacheLock(
+  <E extends Exception> void withMultipleKeyCacheLock(
       List<EntityCacheKey> keys, ThrowingRunnable<E> action) throws E;
 
   /**
@@ -85,7 +85,7 @@ public interface EntityCache extends SupportsEntityStoreCache, SupportsRelationE
    * @return The result of the action
    * @throws E if the action throws an exception of type E
    */
-  <T, E extends Exception> T withBatchCacheLock(
+  <T, E extends Exception> T withMultipleKeyCacheLock(
       List<EntityCacheKey> keys, ThrowingSupplier<T, E> action) throws E;
 
   /**

@@ -73,16 +73,16 @@ public class NoOpsCache extends BaseEntityCache {
 
   /** {@inheritDoc} */
   @Override
-  public <E extends Exception> void withBatchCacheLock(
+  public <E extends Exception> void withMultipleKeyCacheLock(
       List<EntityCacheKey> keys, ThrowingRunnable<E> action) throws E {
-    opLock.withBatchLockAndThrow(keys, action);
+    opLock.withMultipleKeyLockAndThrow(keys, action);
   }
 
   /** {@inheritDoc} */
   @Override
-  public <T, E extends Exception> T withBatchCacheLock(
+  public <T, E extends Exception> T withMultipleKeyCacheLock(
       List<EntityCacheKey> keys, ThrowingSupplier<T, E> action) throws E {
-    return opLock.withBatchLockAndThrow(keys, action);
+    return opLock.withMultipleKeyLockAndThrow(keys, action);
   }
 
   /** {@inheritDoc} */

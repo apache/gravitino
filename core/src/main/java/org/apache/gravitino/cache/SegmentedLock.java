@@ -188,7 +188,7 @@ public class SegmentedLock {
    * @param <E> Exception type
    * @throws E Exception from the action
    */
-  public <E extends Exception> void withBatchLockAndThrow(
+  public <E extends Exception> void withMultipleKeyLockAndThrow(
       List<? extends Object> keys, EntityCache.ThrowingRunnable<E> action) throws E {
     waitForGlobalComplete();
     List<Lock> sortedLocks = getDistinctSortedLocks(keys);
@@ -211,7 +211,7 @@ public class SegmentedLock {
    * @return Action result
    * @throws E Exception from the action
    */
-  public <T, E extends Exception> T withBatchLockAndThrow(
+  public <T, E extends Exception> T withMultipleKeyLockAndThrow(
       List<? extends Object> keys, EntityCache.ThrowingSupplier<T, E> action) throws E {
     waitForGlobalComplete();
     List<Lock> sortedLocks = getDistinctSortedLocks(keys);

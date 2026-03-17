@@ -243,7 +243,7 @@ public class RelationalEntityStore implements EntityStore, SupportsRelationOpera
       lockKeys.add(EntityCacheRelationKey.of(id, identType, relType));
     }
 
-    return cache.withBatchCacheLock(
+    return cache.withMultipleKeyCacheLock(
         lockKeys,
         () -> {
           List<Relation> result = new ArrayList<>();
