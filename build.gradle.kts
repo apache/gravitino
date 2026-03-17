@@ -336,7 +336,7 @@ subprojects {
     val path = project.path.lowercase()
     if (path.startsWith(":maintenance:jobs") ||
       path.startsWith(":maintenance:optimizer-api") ||
-      path.startsWith(":maintenance:gravitino-updaters") ||
+      path.startsWith(":maintenance:updaters") ||
       path.startsWith(":clients:client-java") ||
       name == "api" ||
       name == "common" ||
