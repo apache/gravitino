@@ -1403,6 +1403,79 @@ public class CatalogClickHouseIT extends BaseIT {
   }
 
   @Test
+  void testCreateSameTableNameAcrossSchemas() {
+    String firstSchema = GravitinoITUtils.genRandomName("ck_db1").toLowerCase();
+    String secondSchema = GravitinoITUtils.genRandomName("ck_db2").toLowerCase();
+    String sharedTableName = GravitinoITUtils.genRandomName("ck_t").toLowerCase();
+    String firstTableComment = "first schema table";
+    String secondTableComment = "second schema table";
+
+    SupportsSchemas schemaSupport = catalog.asSchemas();
+    TableCatalog tableCatalog = catalog.asTableCatalog();
+    schemaSupport.createSchema(firstSchema, null, Collections.emptyMap());
+    schemaSupport.createSchema(secondSchema, null, Collections.emptyMap());
+
+    try {
+      Column[] firstSchemaColumns =
+          new Column[] {
+            Column.of("id", Types.IntegerType.get(), "id", false, false, DEFAULT_VALUE_NOT_SET),
+            Column.of(
+                "first_value", Types.StringType.get(), "value", true, false, DEFAULT_VALUE_NOT_SET)
+          };
+      Column[] secondSchemaColumns =
+          new Column[] {
+            Column.of("id", Types.IntegerType.get(), "id", false, false, DEFAULT_VALUE_NOT_SET),
+            Column.of(
+                "second_value", Types.LongType.get(), "value", true, false, DEFAULT_VALUE_NOT_SET)
+          };
+
+      NameIdentifier firstTableIdentifier = NameIdentifier.of(firstSchema, sharedTableName);
+      NameIdentifier secondTableIdentifier = NameIdentifier.of(secondSchema, sharedTableName);
+
+      tableCatalog.createTable(
+          firstTableIdentifier,
+          firstSchemaColumns,
+          firstTableComment,
+          createProperties(),
+          Transforms.EMPTY_TRANSFORM,
+          Distributions.NONE,
+          getSortOrders("id"));
+      Table firstTable = tableCatalog.loadTable(firstTableIdentifier);
+
+      tableCatalog.createTable(
+          secondTableIdentifier,
+          secondSchemaColumns,
+          secondTableComment,
+          createProperties(),
+          Transforms.EMPTY_TRANSFORM,
+          Distributions.NONE,
+          getSortOrders("id"));
+
+      Table secondTable = tableCatalog.loadTable(secondTableIdentifier);
+      Assertions.assertEquals(sharedTableName, firstTable.name());
+      Assertions.assertEquals(sharedTableName, secondTable.name());
+      Assertions.assertEquals(firstTableComment, firstTable.comment());
+      Assertions.assertEquals(secondTableComment, secondTable.comment());
+      Assertions.assertEquals("first_value", firstTable.columns()[1].name());
+      Assertions.assertEquals("second_value", secondTable.columns()[1].name());
+
+      Set<String> firstSchemaTables =
+          Arrays.stream(tableCatalog.listTables(Namespace.of(firstSchema)))
+              .map(NameIdentifier::name)
+              .collect(Collectors.toSet());
+      Set<String> secondSchemaTables =
+          Arrays.stream(tableCatalog.listTables(Namespace.of(secondSchema)))
+              .map(NameIdentifier::name)
+              .collect(Collectors.toSet());
+      Assertions.assertEquals(Collections.singleton(sharedTableName), firstSchemaTables);
+      Assertions.assertEquals(Collections.singleton(sharedTableName), secondSchemaTables);
+    } finally {
+      schemaSupport.dropSchema(firstSchema, true);
+      schemaSupport.dropSchema(secondSchema, true);
+    }
+  }
+
+  @Test
   public void testSchemaComment() {
     final String testSchemaName = GravitinoITUtils.genRandomName("test");
     Assertions.assertDoesNotThrow(
