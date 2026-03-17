@@ -351,6 +351,30 @@ public class JDBCBackend implements RelationalBackend {
       case JOB_TEMPLATE:
         return (List<E>)
             JobTemplateMetaService.getInstance().batchGetJobTemplateByIdentifier(identifiers);
+      case USER:
+        // TODO: I will add batch operations for users, groups and views
+        List<E> users = Lists.newArrayList();
+        for (NameIdentifier identifier : identifiers) {
+          users.add((E) UserMetaService.getInstance().getUserByIdentifier(identifier));
+        }
+        return users;
+      case GROUP:
+        List<E> groups = Lists.newArrayList();
+        for (NameIdentifier identifier : identifiers) {
+          groups.add((E) GroupMetaService.getInstance().getGroupByIdentifier(identifier));
+        }
+        return groups;
+      case ROLE:
+        List<E> roles = Lists.newArrayList();
+        for (NameIdentifier identifier : identifiers) {
+          roles.add((E) RoleMetaService.getInstance().getRoleByIdentifier(identifier));
+        }
+      case VIEW:
+        List<E> views = Lists.newArrayList();
+        for (NameIdentifier identifier : identifiers) {
+          views.add((E) ViewMetaService.getInstance().getViewByIdentifier(identifier));
+        }
+        return views;
       default:
         throw new UnsupportedEntityTypeException(
             "Unsupported entity type: %s for batch get operation", entityType);
