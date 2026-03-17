@@ -37,9 +37,9 @@ Only verified supported combinations are listed in the matrix below.
 
 ### ClickHouse server and JDBC driver compatibility matrix
 
-| ClickHouse version | Supported ClickHouse JDBC driver versions |
-|--------------------|-------------------------------------------|
-| `24.8.x` (including `24.8.14`) | `0.7.1` |
+| ClickHouse version             | Supported ClickHouse JDBC driver versions |
+|--------------------------------|-------------------------------------------|
+| `24.8.x` (including `24.8.14`) | `0.7.1 ~ 0.8.4`                           |
 
 :::tip
 For production, pin exact server/driver versions and validate upgrades in a staging environment.
