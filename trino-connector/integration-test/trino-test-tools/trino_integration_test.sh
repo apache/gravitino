@@ -33,7 +33,7 @@ auto_patch=false
 trino_version=""
 args=""
 for arg in "$@"; do
-    case $arg in
+    case "$arg" in
         --auto_patch)
             auto_patch=true
             ;;
@@ -57,18 +57,21 @@ TESTSETS_DIR="$GRAVITINO_ROOT_DIR/trino-connector/integration-test/src/test/reso
 #   version <= 446: also apply trino-452-446.patch
 apply_version_patches() {
     local version=$1
-    if [[ $version -le 473 ]]; then
-        echo "Applying patch: trino-478-473.patch"
-        git -C "$GRAVITINO_ROOT_DIR" apply "$TESTSETS_DIR/trino-478-473.patch"
-    fi
-    if [[ $version -le 452 ]]; then
-        echo "Applying patch: trino-473-452.patch"
-        git -C "$GRAVITINO_ROOT_DIR" apply "$TESTSETS_DIR/trino-473-452.patch"
-    fi
-    if [[ $version -le 446 ]]; then
-        echo "Applying patch: trino-452-446.patch"
-        git -C "$GRAVITINO_ROOT_DIR" apply "$TESTSETS_DIR/trino-452-446.patch"
-    fi
+    # Each entry is "max_version:patch_file"; patches are applied in order.
+    local patches=(
+        "473:trino-478-473.patch"
+        "452:trino-473-452.patch"
+        "446:trino-452-446.patch"
+    )
+    for entry in "${patches[@]}"; do
+        local max_ver="${entry%%:*}"
+        local patch="${entry##*:}"
+        if [[ $version -le $max_ver ]]; then
+            echo "Applying patch: $patch"
+            git -C "$GRAVITINO_ROOT_DIR" apply "$TESTSETS_DIR/$patch" \
+                || { echo "ERROR: Failed to apply $patch"; exit 1; }
+        fi
+    done
 }
 
 # Restore test resources to their original state by reverting any patch changes.
@@ -82,6 +85,15 @@ restore_test_files() {
 }
 
 if [ "$auto_patch" = true ]; then
+    # Abort if the testsets directory has uncommitted changes, to avoid
+    # patch conflicts or accidental loss of in-progress work.
+    TESTSETS_REL="trino-connector/integration-test/src/test/resources/trino-ci-testset/testsets"
+    if ! git -C "$GRAVITINO_ROOT_DIR" diff --quiet -- "$TESTSETS_REL" || \
+       ! git -C "$GRAVITINO_ROOT_DIR" diff --cached --quiet -- "$TESTSETS_REL"; then
+        echo "ERROR: Uncommitted changes detected in $TESTSETS_REL."
+        echo "Please commit or stash your changes before running with --auto_patch."
+        exit 1
+    fi
     # Register trap to ensure test files are always restored on exit,
     # even if the script is interrupted or exits abnormally.
     trap 'restore_test_files' EXIT

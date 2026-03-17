@@ -109,7 +109,6 @@ index 000000000..46ad6a38c
 +USE gt_iceberg.gt_db2;
 +
 +DROP SCHEMA gt_iceberg.gt_db2;
-\ No newline at end of file
 diff --git a/trino-connector/integration-test/src/test/resources/trino-ci-testset/testsets/lakehouse-iceberg/ignored/00011_table_statistics.sql b/trino-connector/integration-test/src/test/resources/trino-ci-testset/testsets/lakehouse-iceberg/ignored/00011_table_statistics.sql
 deleted file mode 100644
 index a3154a68e..000000000
