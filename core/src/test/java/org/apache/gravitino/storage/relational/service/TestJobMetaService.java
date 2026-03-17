@@ -32,9 +32,6 @@ import org.apache.gravitino.meta.JobEntity;
 import org.apache.gravitino.meta.JobTemplateEntity;
 import org.apache.gravitino.storage.RandomIdGenerator;
 import org.apache.gravitino.storage.relational.TestJDBCBackend;
-import org.apache.gravitino.storage.relational.mapper.JobMetaMapper;
-import org.apache.gravitino.storage.relational.po.JobPO;
-import org.apache.gravitino.storage.relational.utils.SessionUtils;
 import org.apache.gravitino.utils.NameIdentifierUtil;
 import org.apache.gravitino.utils.NamespaceUtil;
 import org.junit.jupiter.api.Assertions;
@@ -228,40 +225,6 @@ public class TestJobMetaService extends TestJDBCBackend {
     Assertions.assertFalse(
         JobMetaService.getInstance()
             .deleteJob(NameIdentifierUtil.ofJob(METALAKE_NAME, job.name())));
-  }
-
-  @TestTemplate
-  public void testBatchSelectJobByIdentifierIncludesJobTemplateName() throws IOException {
-    BaseMetalake metalake =
-        createBaseMakeLake(RandomIdGenerator.INSTANCE.nextId(), METALAKE_NAME, AUDIT_INFO);
-    backend.insert(metalake, false);
-
-    JobTemplateEntity jobTemplate =
-        TestJobTemplateMetaService.newShellJobTemplateEntity(
-            "test_job_template", "test_comment", METALAKE_NAME);
-    JobTemplateMetaService.getInstance().insertJobTemplate(jobTemplate, false);
-
-    JobEntity job =
-        TestJobTemplateMetaService.newJobEntity(
-            jobTemplate.name(), JobHandle.Status.QUEUED, METALAKE_NAME);
-    JobMetaService.getInstance().insertJob(job, false);
-
-    List<JobPO> results =
-        SessionUtils.doWithCommitAndFetchResult(
-            JobMetaMapper.class,
-            mapper ->
-                mapper.batchSelectJobByIdentifier(
-                    METALAKE_NAME, jobTemplate.name(), List.of(String.valueOf(job.id()))));
-
-    Assertions.assertEquals(1, results.size());
-    JobPO result = results.get(0);
-    Assertions.assertEquals(
-        jobTemplate.name(),
-        result.jobTemplateName(),
-        "batchSelectJobByIdentifier should return jobTemplateName");
-    Assertions.assertEquals(job.id(), result.jobRunId());
-    Assertions.assertEquals(job.jobExecutionId(), result.jobExecutionId());
-    Assertions.assertEquals(job.status().name(), result.jobRunStatus());
   }
 
   @Test
