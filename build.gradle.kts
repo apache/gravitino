@@ -406,10 +406,12 @@ subprojects {
   }
 
   if (compatibleWithJDK8(project)) {
+    // Keep published/main classes Java 8-compatible for the selected modules.
     tasks.named<JavaCompile>("compileJava") {
       options.release.set(8)
     }
 
+    // Tests still need Java 17 to compile against dependencies that only publish Java 17 variants.
     tasks.named<JavaCompile>("compileTestJava") {
       options.release.set(17)
     }
