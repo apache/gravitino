@@ -96,7 +96,7 @@ Usage: publish-docker.sh <tag|branch> --docker-version <version> [--trino-versio
 
 Arguments:
   <tag|branch>              Git tag (e.g., v1.2.0-rc5) or branch (e.g., main) to use as
-                            workflow source (--ref). Must exist locally or be fetched first.
+                            workflow source (--ref). Must exist on the remote apache/gravitino repository.
   --docker-version <ver>    Docker image version tag to publish (e.g., 1.2.0-rc5). Required.
   --trino-version <ver>     Trino version for the playground image (default: 478).
   --dry-run                 Preview mode, print commands without triggering workflows.
@@ -166,8 +166,9 @@ echo "Docker Version: ${DOCKER_VERSION}"
 echo "Trino Version: ${TRINO_VERSION}"
 
 if [[ "$DRY_RUN" == "false" ]]; then
-  if [[ -z "$GH_TOKEN" ]]; then
-    echo "ERROR: GH_TOKEN environment variable not set"
+  if [[ -z "$GH_TOKEN" ]] && ! gh auth status > /dev/null 2>&1; then
+    echo "ERROR: GH_TOKEN is not set and gh auth is not configured."
+    echo "Either export GH_TOKEN or run: gh auth login"
     exit 1
   fi
   if [[ -z "$DOCKER_USERNAME" ]]; then
