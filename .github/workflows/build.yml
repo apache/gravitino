@@ -248,7 +248,6 @@ jobs:
           echo "Changed Files coverage ${{ steps.coverage.outputs.coverage-changed-files }}"
 
       - name: Release with Gradle
-        if: needs.changes.outputs.maintenance_only_changes != 'true'
         run: ./gradlew clean && ./gradlew release -x test --rerun-tasks
 
       - name: Upload unit tests report
