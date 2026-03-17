@@ -250,9 +250,10 @@ public class RelationalEntityStore implements EntityStore, SupportsRelationOpera
           List<NameIdentifier> uncachedIdentifiers = new ArrayList<>();
 
           for (NameIdentifier nameIdentifier : nameIdentifiers) {
-            List<Relation> cachedRelations = getCachedRelations(relType, nameIdentifier, identType);
-            if (cachedRelations != null) {
-              result.addAll(cachedRelations);
+            Optional<List<Relation>> cachedRelations =
+                getCachedRelations(relType, nameIdentifier, identType);
+            if (cachedRelations.isPresent()) {
+              result.addAll(cachedRelations.get());
             } else {
               uncachedIdentifiers.add(nameIdentifier);
             }
@@ -364,7 +365,7 @@ public class RelationalEntityStore implements EntityStore, SupportsRelationOpera
     backend.batchPut(entities, overwritten);
   }
 
-  private <E extends Entity & HasIdentifier> List<Relation> getCachedRelations(
+  private <E extends Entity & HasIdentifier> Optional<List<Relation>> getCachedRelations(
       SupportsRelationOperations.Type relType,
       NameIdentifier nameIdentifier,
       Entity.EntityType identType) {
@@ -376,9 +377,9 @@ public class RelationalEntityStore implements EntityStore, SupportsRelationOpera
             new Relation(
                 relType, nameIdentifier, identType, entity.nameIdentifier(), entity.type()));
       }
-      return cachedRelations;
+      return Optional.of(cachedRelations);
     }
-    return null;
+    return Optional.empty();
   }
 
   private <E extends Entity & HasIdentifier> void batchPopulateRelationCache(
@@ -393,11 +394,9 @@ public class RelationalEntityStore implements EntityStore, SupportsRelationOpera
 
     Map<Entity.EntityType, List<NameIdentifier>> targetsByType = new HashMap<>();
     for (Relation relation : backendRelations) {
-      if (relation.targetType() != null) {
-        targetsByType
-            .computeIfAbsent(relation.targetType(), k -> new ArrayList<>())
-            .add(relation.target());
-      }
+      targetsByType
+          .computeIfAbsent(relation.targetType(), k -> new ArrayList<>())
+          .add(relation.target());
     }
 
     Map<NameIdentifier, E> entitiesByIdent = new HashMap<>();
