@@ -183,14 +183,21 @@ public class JobMetaBaseSQLProvider {
         + " WHERE deleted_at < #{legacyTimeline} AND deleted_at > 0 LIMIT #{limit}";
   }
 
+  // Note: this method is currently not called by the service layer. batchGetJobByIdentifier in
+  // JobMetaService uses batchSelectJobByRunIds instead, because jobs are identified by their
+  // numeric run ID rather than a name. This method is kept correct and consistent to avoid
+  // confusion if it is used in the future.
   public String batchSelectJobByIdentifier(
       @Param("metalakeName") String metalakeName,
       @Param("jobTemplateName") String jobTemplateName,
       @Param("jobNames") List<String> jobNames) {
     return "<script>"
-        + "SELECT jm.job_run_id, jm.metalake_id, jm.job_template_id,"
-        + " jm.job_execution_id, jm.job_run_status, jm.job_finished_at,"
-        + " jm.audit_info, jm.current_version, jm.last_version, jm.deleted_at"
+        + "SELECT jm.job_run_id AS jobRunId, jtm.job_template_name AS jobTemplateName,"
+        + " jm.metalake_id AS metalakeId, jm.job_execution_id AS jobExecutionId,"
+        + " jm.job_run_status AS jobRunStatus, jm.job_finished_at AS jobFinishedAt,"
+        + " jm.audit_info AS auditInfo,"
+        + " jm.current_version AS currentVersion, jm.last_version AS lastVersion,"
+        + " jm.deleted_at AS deletedAt"
         + " FROM "
         + JobMetaMapper.TABLE_NAME
         + " jm"
