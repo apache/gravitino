@@ -21,33 +21,35 @@ package org.apache.gravitino.flink.connector.iceberg;
 import java.util.Map;
 import java.util.Optional;
 import org.apache.flink.table.catalog.AbstractCatalog;
+import org.apache.flink.table.factories.CatalogFactory;
 import org.apache.flink.table.factories.Factory;
 import org.apache.gravitino.flink.connector.PartitionConverter;
 import org.apache.gravitino.flink.connector.SchemaAndTablePropertiesConverter;
 import org.apache.gravitino.flink.connector.catalog.BaseCatalog;
-import org.apache.iceberg.flink.FlinkCatalog;
-import org.apache.iceberg.flink.FlinkCatalogFactory;
+import org.apache.gravitino.flink.connector.utils.IcebergCatalogCompatUtils;
 
 /** Gravitino Iceberg Catalog. */
 public class GravitinoIcebergCatalog extends BaseCatalog {
 
-  private final FlinkCatalog icebergCatalog;
+  private final AbstractCatalog icebergCatalog;
 
   protected GravitinoIcebergCatalog(
       String catalogName,
       String defaultDatabase,
       SchemaAndTablePropertiesConverter schemaAndTablePropertiesConverter,
       PartitionConverter partitionConverter,
-      Map<String, String> flinkCatalogProperties) {
+      Map<String, String> catalogOptions,
+      Map<String, String> icebergCatalogProperties,
+      CatalogFactory.Context context) {
     super(
         catalogName,
-        flinkCatalogProperties,
+        catalogOptions,
         defaultDatabase,
         schemaAndTablePropertiesConverter,
         partitionConverter);
-    FlinkCatalogFactory flinkCatalogFactory = new FlinkCatalogFactory();
     this.icebergCatalog =
-        (FlinkCatalog) flinkCatalogFactory.createCatalog(catalogName, flinkCatalogProperties);
+        IcebergCatalogCompatUtils.createIcebergCatalog(
+            catalogName, icebergCatalogProperties, context);
   }
 
   @Override

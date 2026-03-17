@@ -24,6 +24,7 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.ServiceConfigurationError;
 import java.util.ServiceLoader;
 import java.util.Set;
 import java.util.function.Predicate;
@@ -154,7 +155,11 @@ public class GravitinoCatalogStore extends AbstractCatalogStore {
   }
 
   private BaseCatalogFactory discoverFactories(Predicate<Factory> predicate, String errorMessage) {
-    Iterator<Factory> serviceLoaderIterator = ServiceLoader.load(Factory.class).iterator();
+    return discoverFactories(ServiceLoader.load(Factory.class).iterator(), predicate, errorMessage);
+  }
+
+  BaseCatalogFactory discoverFactories(
+      Iterator<Factory> serviceLoaderIterator, Predicate<Factory> predicate, String errorMessage) {
     final List<Factory> factories = new ArrayList<>();
     while (true) {
       try {
@@ -165,8 +170,13 @@ public class GravitinoCatalogStore extends AbstractCatalogStore {
         if (catalogFactory instanceof BaseCatalogFactory && predicate.test(catalogFactory)) {
           factories.add(catalogFactory);
         }
+      } catch (ServiceConfigurationError e) {
+        LOG.debug(
+            "Skip a {} entry that cannot be initialized.", Factory.class.getCanonicalName(), e);
       } catch (NoClassDefFoundError e) {
         LOG.debug("NoClassDefFoundError when loading a {}.", Factory.class.getCanonicalName(), e);
+      } catch (LinkageError e) {
+        LOG.debug("LinkageError when loading a {}.", Factory.class.getCanonicalName(), e);
       } catch (Exception e) {
         throw new RuntimeException("Unexpected error when trying to load service provider.", e);
       }

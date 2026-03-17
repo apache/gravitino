@@ -18,10 +18,13 @@
  */
 package org.apache.gravitino.flink.connector.iceberg;
 
+import com.google.common.collect.Maps;
 import java.util.Collections;
+import java.util.Map;
 import java.util.Set;
 import org.apache.flink.configuration.ConfigOption;
 import org.apache.flink.table.catalog.Catalog;
+import org.apache.flink.table.catalog.CommonCatalogOptions;
 import org.apache.flink.table.factories.FactoryUtil;
 import org.apache.gravitino.flink.connector.CatalogPropertiesConverter;
 import org.apache.gravitino.flink.connector.DefaultPartitionConverter;
@@ -41,7 +44,9 @@ public class GravitinoIcebergCatalogFactory implements BaseCatalogFactory {
         helper.getOptions().get(GravitinoIcebergCatalogFactoryOptions.DEFAULT_DATABASE),
         schemaAndTablePropertiesConverter(),
         partitionConverter(),
-        context.getOptions());
+        context.getOptions(),
+        toIcebergCatalogOptions(context.getOptions()),
+        context);
   }
 
   @Override
@@ -92,5 +97,17 @@ public class GravitinoIcebergCatalogFactory implements BaseCatalogFactory {
   @Override
   public PartitionConverter partitionConverter() {
     return DefaultPartitionConverter.INSTANCE;
+  }
+
+  private Map<String, String> toIcebergCatalogOptions(Map<String, String> catalogOptions) {
+    Map<String, String> icebergCatalogOptions = Maps.newHashMap(catalogOptions);
+    String catalogBackend =
+        catalogOptions.get(IcebergPropertiesConstants.GRAVITINO_ICEBERG_CATALOG_BACKEND);
+    if (catalogBackend != null
+        && !icebergCatalogOptions.containsKey(IcebergPropertiesConstants.ICEBERG_CATALOG_TYPE)) {
+      icebergCatalogOptions.put(IcebergPropertiesConstants.ICEBERG_CATALOG_TYPE, catalogBackend);
+    }
+    icebergCatalogOptions.put(CommonCatalogOptions.CATALOG_TYPE.key(), "iceberg");
+    return icebergCatalogOptions;
   }
 }

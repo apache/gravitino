@@ -18,13 +18,19 @@
  */
 package org.apache.gravitino.flink.connector.store;
 
+import static org.junit.Assert.assertSame;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import java.util.Iterator;
+import java.util.ServiceConfigurationError;
+import java.util.function.Predicate;
 import org.apache.flink.table.catalog.exceptions.CatalogException;
+import org.apache.flink.table.factories.Factory;
+import org.apache.gravitino.flink.connector.catalog.BaseCatalogFactory;
 import org.apache.gravitino.flink.connector.catalog.GravitinoCatalogManager;
 import org.junit.Before;
 import org.junit.Test;
@@ -93,5 +99,36 @@ public class TestGravitinoCatalogStore {
       assertTrue("Expected cause to be RuntimeException", e.getCause() instanceof RuntimeException);
     }
     verify(gravitinoCatalogMockManager).dropCatalog(catalogName);
+  }
+
+  @Test
+  public void testDiscoverFactoriesSkipsServiceConfigurationError() {
+    BaseCatalogFactory expectedFactory = mock(BaseCatalogFactory.class);
+    Predicate<Factory> predicate = factory -> true;
+
+    BaseCatalogFactory actualFactory =
+        gravitinoCatalogStore.discoverFactories(
+            new Iterator<Factory>() {
+              private int index;
+
+              @Override
+              public boolean hasNext() {
+                return index < 2;
+              }
+
+              @Override
+              public Factory next() {
+                if (index++ == 0) {
+                  throw new ServiceConfigurationError(
+                      "Missing optional factory dependency",
+                      new NoClassDefFoundError("missing.optional.Factory"));
+                }
+                return expectedFactory;
+              }
+            },
+            predicate,
+            "Unexpected factory loading error.");
+
+    assertSame(expectedFactory, actualFactory);
   }
 }

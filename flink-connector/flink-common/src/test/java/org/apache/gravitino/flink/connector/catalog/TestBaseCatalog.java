@@ -29,12 +29,12 @@ import org.apache.flink.table.catalog.AbstractCatalog;
 import org.apache.flink.table.catalog.CatalogBaseTable;
 import org.apache.flink.table.catalog.CatalogDatabase;
 import org.apache.flink.table.catalog.CatalogDatabaseImpl;
-import org.apache.flink.table.catalog.CatalogTable;
 import org.apache.flink.table.catalog.Column;
 import org.apache.flink.table.catalog.TableChange;
 import org.apache.gravitino.SchemaChange;
 import org.apache.gravitino.flink.connector.PartitionConverter;
 import org.apache.gravitino.flink.connector.SchemaAndTablePropertiesConverter;
+import org.apache.gravitino.flink.connector.utils.FlinkCatalogCompatUtils;
 import org.apache.gravitino.rel.types.Types;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
@@ -110,10 +110,10 @@ public class TestBaseCatalog {
   public void testTableChangesWithoutColumnChange() {
     Schema schema = Schema.newBuilder().column("test", "INT").build();
     CatalogBaseTable table =
-        CatalogTable.of(
+        FlinkCatalogCompatUtils.createCatalogTable(
             schema, "test", ImmutableList.of(), ImmutableMap.of("key", "value", "key2", "value2"));
     CatalogBaseTable newTable =
-        CatalogTable.of(
+        FlinkCatalogCompatUtils.createCatalogTable(
             schema, "new comment", ImmutableList.of(), ImmutableMap.of("key", "new value"));
     org.apache.gravitino.rel.TableChange[] tableChanges =
         BaseCatalog.getGravitinoTableChanges(table, newTable);

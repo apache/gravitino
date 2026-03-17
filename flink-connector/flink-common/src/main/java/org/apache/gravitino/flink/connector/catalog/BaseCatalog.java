@@ -73,6 +73,7 @@ import org.apache.gravitino.exceptions.SchemaAlreadyExistsException;
 import org.apache.gravitino.exceptions.TableAlreadyExistsException;
 import org.apache.gravitino.flink.connector.PartitionConverter;
 import org.apache.gravitino.flink.connector.SchemaAndTablePropertiesConverter;
+import org.apache.gravitino.flink.connector.utils.FlinkCatalogCompatUtils;
 import org.apache.gravitino.flink.connector.utils.TableUtils;
 import org.apache.gravitino.flink.connector.utils.TypeUtils;
 import org.apache.gravitino.rel.Column;
@@ -578,7 +579,7 @@ public abstract class BaseCatalog extends AbstractCatalog {
       String comment,
       List<String> partitionKeys,
       Map<String, String> options) {
-    return CatalogTable.of(schema, comment, partitionKeys, options);
+    return FlinkCatalogCompatUtils.createCatalogTable(schema, comment, partitionKeys, options);
   }
 
   private static Optional<List<String>> getFlinkPrimaryKey(Table table) {
