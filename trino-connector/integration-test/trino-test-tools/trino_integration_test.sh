@@ -26,6 +26,68 @@ export HADOOP_USER_NAME=anonymous
 echo $GRAVITINO_ROOT_DIR
 cd $GRAVITINO_ROOT_DIR
 
-args="\"$@\""
+# Parse --auto_patch and --trino_version from arguments.
+# --auto_patch is consumed here and not forwarded to Gradle.
+# --trino_version is forwarded to Gradle and also used for patch selection.
+auto_patch=false
+trino_version=""
+args=""
+for arg in "$@"; do
+    case $arg in
+        --auto_patch)
+            auto_patch=true
+            ;;
+        --trino_version=*)
+            trino_version="${arg#*=}"
+            args="$args $arg"
+            ;;
+        *)
+            args="$args $arg"
+            ;;
+    esac
+done
+args="${args# }"
 
-./gradlew :trino-connector:integration-test:TrinoTest -PappArgs="$args"
+TESTSETS_DIR="$GRAVITINO_ROOT_DIR/trino-connector/integration-test/src/test/resources/trino-ci-testset/testsets"
+
+# Apply version-specific patches cumulatively based on the target Trino version.
+# Patches are applied in descending order (newest first):
+#   version <= 473: apply trino-478-473.patch
+#   version <= 452: also apply trino-473-452.patch
+#   version <= 446: also apply trino-452-446.patch
+apply_version_patches() {
+    local version=$1
+    if [[ $version -le 473 ]]; then
+        echo "Applying patch: trino-478-473.patch"
+        git -C "$GRAVITINO_ROOT_DIR" apply "$TESTSETS_DIR/trino-478-473.patch"
+    fi
+    if [[ $version -le 452 ]]; then
+        echo "Applying patch: trino-473-452.patch"
+        git -C "$GRAVITINO_ROOT_DIR" apply "$TESTSETS_DIR/trino-473-452.patch"
+    fi
+    if [[ $version -le 446 ]]; then
+        echo "Applying patch: trino-452-446.patch"
+        git -C "$GRAVITINO_ROOT_DIR" apply "$TESTSETS_DIR/trino-452-446.patch"
+    fi
+}
+
+# Restore test resources to their original state by reverting any patch changes.
+restore_test_files() {
+    echo "Restoring test files..."
+    git -C "$GRAVITINO_ROOT_DIR" checkout -- \
+        trino-connector/integration-test/src/test/resources/ \
+        integration-test-common/
+    git -C "$GRAVITINO_ROOT_DIR" clean -f \
+        trino-connector/integration-test/src/test/resources/trino-ci-testset/testsets/lakehouse-iceberg/
+}
+
+if [ "$auto_patch" = true ]; then
+    # Register trap to ensure test files are always restored on exit,
+    # even if the script is interrupted or exits abnormally.
+    trap 'restore_test_files' EXIT
+    if [ -n "$trino_version" ]; then
+        apply_version_patches "$trino_version"
+    fi
+fi
+
+./gradlew :trino-connector:integration-test:TrinoTest -PappArgs="\"$args\""
