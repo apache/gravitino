@@ -26,8 +26,35 @@ plugins {
 }
 
 dependencies {
-  implementation(libs.hadoop2.common)
-  implementation(libs.hive3.metastore)
+  implementation(libs.hadoop2.common) {
+    exclude(group = "org.slf4j")
+    exclude(group = "org.apache.logging.log4j")
+    exclude(group = "com.google.code.findbugs")
+    exclude(group = "org.eclipse.jetty.aggregate", module = "jetty-all")
+    exclude(group = "org.eclipse.jetty.orbit", module = "javax.servlet")
+  }
+  implementation(libs.hive3.metastore) {
+    exclude(group = "ant")
+    exclude(group = "co.cask.tephra")
+    exclude(group = "com.github.joshelser")
+    exclude(group = "com.google.code.findbugs")
+    exclude(group = "com.tdunning", module = "json")
+    exclude(group = "com.zaxxer", module = "HikariCP")
+    exclude(group = "io.dropwizard.metrics")
+    exclude(group = "javax.transaction", module = "transaction-api")
+    exclude(group = "junit")
+    exclude(group = "org.apache.ant")
+    exclude(group = "org.apache.avro")
+    exclude(group = "org.apache.hadoop", module = "hadoop-yarn-server-resourcemanager")
+    exclude(group = "org.apache.hbase")
+    exclude(group = "org.apache.logging.log4j")
+    exclude(group = "org.apache.parquet", module = "parquet-hadoop-bundle")
+    exclude(group = "org.datanucleus")
+    exclude(group = "org.eclipse.jetty.aggregate", module = "jetty-all")
+    exclude(group = "org.eclipse.jetty.orbit", module = "javax.servlet")
+    exclude(group = "org.openjdk.jol")
+    exclude(group = "org.slf4j")
+  }
 }
 
 tasks {
@@ -41,7 +68,28 @@ tasks {
 
   register("copyLibs", Copy::class) {
     dependsOn(copyDepends, "build")
-    from("build/libs")
+    from("build/libs") {
+      exclude("guava-*.jar")
+      exclude("log4j-*.jar")
+      exclude("slf4j-*.jar")
+      exclude("logback-*.jar")
+      exclude("error_prone_annotations-*.jar")
+      exclude("junit-*.jar")
+      exclude("hamcrest-*.jar")
+      exclude("*-tests.jar")
+      exclude("hbase-*.jar")
+      exclude("datanucleus-*.jar")
+      exclude("ant-*.jar")
+      exclude("avro-*.jar")
+      exclude("parquet-hadoop-bundle-*.jar")
+      exclude("tephra-*.jar")
+      exclude("twill-*.jar")
+      exclude("hadoop-yarn-server-*.jar")
+      exclude("jol-core-*.jar")
+      exclude("jsr305-*.jar")
+      exclude("spotbugs-annotations-*.jar")
+      exclude("findbugs-annotations-*.jar")
+    }
     into("$rootDir/distribution/package/catalogs/hive/libs/hive-metastore3-libs")
   }
 }
