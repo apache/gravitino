@@ -48,7 +48,7 @@ The output of this work should be:
 - Adding OAuth2 or Kerberos real-environment validation to the required test matrix for this delivery
 - Producing one universal jar that works across all Flink minors
 
-Note: Flink `2.0` support is explicitly out of scope for this delivery. It should be treated as a larger follow-up compatibility lane rather than a small extension of the `1.18` to `1.20` work, but the module split and extension hooks introduced here should keep a clean path for that future effort.
+Note: Flink `2.0` support is explicitly out of scope for this delivery. It should be treated as a larger follow-up compatibility lane rather than a small extension of the `1.18` to `1.20` work, but the module split and extension hooks introduced here should keep a clean path for that future effort. Follow-up implementation findings for that lane are recorded in [flink_2_0_adaptation_notes.md](flink_2_0_adaptation_notes.md).
 
 ## Current Connector Model
 
@@ -58,8 +58,8 @@ The current Flink connector is not a generic table runtime connector. It is prim
 
 1. Catalog store bootstrapping
 
-- `flink-connector/flink/src/main/java/org/apache/gravitino/flink/connector/store/GravitinoCatalogStoreFactory.java`
-- `flink-connector/flink/src/main/java/org/apache/gravitino/flink/connector/store/GravitinoCatalogStore.java`
+- `flink-connector/flink-common/src/main/java/org/apache/gravitino/flink/connector/store/GravitinoCatalogStoreFactory.java`
+- `flink-connector/flink-common/src/main/java/org/apache/gravitino/flink/connector/store/GravitinoCatalogStore.java`
 
 These classes integrate with:
 
@@ -71,8 +71,8 @@ These classes integrate with:
 
 2. Catalog SPI implementations
 
-- `flink-connector/flink/src/main/java/org/apache/gravitino/flink/connector/catalog/BaseCatalog.java`
-- `flink-connector/flink/src/main/java/org/apache/gravitino/flink/connector/catalog/BaseCatalogFactory.java`
+- `flink-connector/flink-common/src/main/java/org/apache/gravitino/flink/connector/catalog/BaseCatalog.java`
+- `flink-connector/flink-common/src/main/java/org/apache/gravitino/flink/connector/catalog/BaseCatalogFactory.java`
 
 These classes integrate with:
 
@@ -124,7 +124,7 @@ The connector depends much more on the Flink Table/Catalog SPI than on the DataS
 
 ### Flink SPI stability from 1.18 to 1.20
 
-Reviewing local Flink sources under `/Users/fanng/opensource/flink` shows that the APIs used by the current connector are mostly stable across `release-1.18`, `release-1.19`, and `origin/release-1.20`.
+Reviewing local Flink sources shows that the APIs used by the current connector are mostly stable across `release-1.18`, `release-1.19`, and `origin/release-1.20`.
 
 Observed changes are mostly additive:
 
@@ -504,52 +504,58 @@ Do later only when required by real Flink `1.20` API usage:
 
 ## Future Flink 2.0 Compatibility Lane
 
-Flink `2.0` should not be implemented in this change set.
+Flink `2.0` is still out of scope for this delivery, but later implementation and debugging work has already confirmed the shape of that compatibility lane. This section records those findings so the future follow-up does not need to rediscover the same breakpoints.
 
-However, this design should keep Flink `2.0` support possible without another repository-level reorganization.
+Detailed implementation notes for that follow-up are documented in [flink_2_0_adaptation_notes.md](flink_2_0_adaptation_notes.md).
 
-### Can this architecture support Flink `2.0`?
+### Confirmed architectural conclusion
 
-Yes, with one important caveat:
+Yes, this architecture can support Flink `2.0`, with one important caveat:
 
 - the overall `flink-common + versioned modules + versioned runtime modules` architecture is still valid
-- but Flink `2.0` should be treated as a new major compatibility lane, not as just another `1.x` minor
+- but Flink `2.0` must be treated as a new major compatibility lane, not as just another `1.x` minor
 
 In practice, this means:
 
 - add `:flink-connector:flink-2.0`
 - add `:flink-connector:flink-runtime-2.0`
-- expect a real `v2.0` shim layer
+- add a real `v2.0` shim layer at the version-sensitive Flink API boundaries
 - do not assume `flink-common` bytecode compiled against `1.18` will run unchanged on `2.0`
 
-### Why Flink `2.0` is materially different
+### Confirmed breakpoints from real implementation work
 
-Reviewing local Flink `release-2.0` sources under `/Users/fanng/opensource/flink` shows several changes relevant to the current connector:
+Later Flink `2.0` implementation and validation work confirmed that the following are real breakpoints, not just theoretical risks:
 
-- `CatalogTable.of(...)` is no longer the construction path; builder-based construction is used instead
-- `CatalogBaseTable.TableKind` gains `MATERIALIZED_TABLE`
-- `Catalog` gains model-related APIs and more modern catalog surface area
-- legacy compatibility APIs continue to shrink
-- `TableSchema` references move to legacy package locations
+- `CatalogTable.of(...)` is no longer available; `CatalogTable.newBuilder()` must be supported
+- `CatalogPropertiesUtil.serializeCatalogTable(...)` requires a newer compatibility path in the `2.0` lane
+- Iceberg's `FlinkCatalogFactory` changed from `createCatalog(String, Map<String, String>)` to `createCatalog(CatalogFactory.Context)`
+- Flink `2.0` JDBC artifacts and class packages changed, so direct `1.x` imports are not stable enough
+- real Flink `2.0.x` distributions expose stricter runtime behavior than repo-local tests, especially for Iceberg REST URI handling and JDBC driver/classloader visibility
 
-This is enough to require a `v2.0` adapter layer even if much of the business logic remains shared.
+This confirms that Flink `2.0` needs both:
 
-### Minimum code changes likely required for Flink `2.0`
+- versioned modules and dependencies
+- narrow compatibility helpers in shared code
 
-At minimum, future Flink `2.0` support should expect the following changes:
+### Minimum code changes required for a future Flink `2.0` follow-up
+
+At minimum, future Flink `2.0` support should include all of the following:
 
 1. Add versioned modules
 
 - `:flink-connector:flink-2.0`
 - `:flink-connector:flink-runtime-2.0`
 
-2. Add `v2.0` catalog/table construction shims
+2. Add shared compatibility helpers at the actual breakpoints
 
-Current code paths that will not directly carry over include:
+The later implementation work showed that these hooks are required:
 
 - shared `CatalogTable` construction in `BaseCatalog`
-- generic table reconstruction in `FlinkGenericTableUtil`
-- tests that directly use `CatalogTable.of(...)`
+- generic table serialization/deserialization in `FlinkGenericTableUtil`
+- Iceberg factory creation in `GravitinoIcebergCatalog` and `GravitinoIcebergCatalogFactory`
+- JDBC factory creation in `GravitinoJdbcCatalog`
+- `ServiceLoader` discovery hardening in `GravitinoCatalogStore`
+- tests that directly used `CatalogTable.of(...)`
 
 3. Add `v2.0` API adapters where new catalog surface should be supported
 
@@ -561,51 +567,56 @@ Examples:
 
 4. Re-evaluate provider wrappers independently
 
-Flink `2.0` provider dependencies should not be assumed compatible with the `1.18` to `1.20` wrappers.
+Flink `2.0` provider dependencies should not be assumed compatible with the `1.18` to `1.20` wrappers even when the core catalog SPI is bridged.
 
-### Provider compatibility expectations for Flink `2.0`
+### Provider status from current Flink `2.0` experiments
 
-As of `March 16, 2026`, the external ecosystem suggests the following:
+The later Flink `2.0` work produced a more concrete provider picture than this spec originally had:
 
-- Iceberg: `iceberg-flink-runtime-2.0` exists, but only from Iceberg `1.10.0`
-- Paimon: `paimon-flink-2.0` exists
-- JDBC: Flink `2.0` uses the newer JDBC artifact split such as `flink-connector-jdbc-core`, `flink-connector-jdbc-mysql`, and `flink-connector-jdbc-postgres`
-- Hive: a clear Flink `2.0` `flink-connector-hive_2.12` artifact was not found in Maven Central during this analysis
+| Area | Repo-level status | Real external `2.0.1` status | Notes |
+| --- | --- | --- | --- |
+| Core catalog lane | validated | indirectly validated through Paimon and Iceberg REST flows | the shared architecture and compat-helper approach work |
+| Paimon | validated | passed | a good candidate for the initial supported provider set |
+| Iceberg REST | validated | passed | URI shape and REST auxiliary service handling matter |
+| JDBC | validated in repo-level tests | not yet passed | real SQL client still hits driver/classloader issues such as `No suitable driver found` |
+| Hive | not enabled | not validated | keep out of the initial `2.0` support claim unless separate proof is added |
 
 Implication:
 
-- Iceberg and Paimon look feasible for a future `2.0` lane
-- JDBC likely needs provider-specific dependency and wrapper updates
-- Hive may be the highest-risk or blocked provider for a first `2.0` support cut
+- Iceberg REST and Paimon look feasible for a first `2.0` support cut
+- JDBC requires a follow-up focused on real-distribution SQL client driver loading
+- Hive remains the highest-risk provider and should not be promised without direct evidence
 
-### Recommended strategy for a future Flink `2.0` effort
+### Recommended staged strategy for a future Flink `2.0` effort
 
 Do Flink `2.0` in two stages instead of trying to carry every provider at once.
 
-Stage 1: core compatibility lane
+Stage 1: core compatibility lane plus the validated provider subset
 
 - create `flink-2.0` and `flink-runtime-2.0`
-- make common catalog-store bootstrapping work
-- adapt common table/catalog object construction
-- run unit tests and minimal integration coverage
+- keep common catalog-store bootstrapping working
+- adapt common table/catalog object construction through shared helpers
+- validate the core lane, Paimon, and Iceberg REST
+- add unit tests, runtime jar checks, and at least one real-distribution smoke path
 
-Stage 2: provider enablement
+Stage 2: provider completion and broader surface
 
-- validate Iceberg
-- validate Paimon
-- redesign JDBC provider dependency wiring for the new artifact layout
+- finish JDBC real-distribution validation and driver/classloader handling
 - validate whether Hive is possible, partial, or must stay unsupported
+- add any model/materialized-table handling only if the product scope actually requires it
+- extend CI once the supported provider matrix is explicit
 
 ### What this current implementation should do now for future Flink `2.0`
 
-Even though Flink `2.0` is out of scope now, this implementation should avoid choices that would block it later.
+Even though Flink `2.0` is out of scope for this delivery, this implementation should avoid choices that would block it later.
 
 Required now:
 
 - keep all version-sensitive Flink object construction behind hooks
 - avoid hard-coding `CatalogTable.of(...)` deep inside shared logic
-- avoid putting too much provider-specific construction logic into `flink-common`
+- keep provider construction behind thin helpers or movable wrappers
 - keep provider wrappers movable into version modules if `2.0` requires it
+- make `ServiceLoader`-based factory discovery tolerant of optional provider linkage failures
 
 Not required now:
 
@@ -619,9 +630,11 @@ Flink `2.0` should only be considered supported in a future task when all of the
 
 1. `:flink-connector:flink-2.0` and `:flink-connector:flink-runtime-2.0` build successfully.
 2. Shared common logic runs correctly through a `v2.0` shim layer.
-3. The supported provider matrix for `2.0` is explicitly documented.
-4. Docs do not imply that all `1.x` providers automatically carry over to `2.0`.
-5. CI has at least one dedicated Flink `2.0` validation path.
+3. The supported provider matrix for `2.0` is explicitly documented and does not overclaim Hive or JDBC.
+4. Repo-level tests pass for the declared `2.0` scope.
+5. At least one real-distribution `2.0` smoke lane passes for each declared supported provider.
+6. Docs do not imply that all `1.x` providers automatically carry over to `2.0`.
+7. CI has at least one dedicated Flink `2.0` validation path.
 
 ## Artifact Naming
 
@@ -849,7 +862,7 @@ The real-environment validation suite should be derived from two sources:
 
 1. Existing integration tests under:
 
-- `flink-connector/flink/src/test/java/org/apache/gravitino/flink/connector/integration/test`
+- `flink-connector/flink-common/src/test/java/org/apache/gravitino/flink/connector/integration/test`
 
 2. Public Flink connector documentation under:
 
