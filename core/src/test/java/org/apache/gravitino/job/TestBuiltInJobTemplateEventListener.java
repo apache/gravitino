@@ -486,6 +486,41 @@ public class TestBuiltInJobTemplateEventListener {
     listener.reconcileBuiltInJobTemplates(metalakeName, builtInTemplates);
   }
 
+  @Test
+  public void testReconcileBuiltInJobTemplatesUpdateUsesExistingIdentifier() throws IOException {
+    String metalakeName = "test_metalake";
+
+    JobTemplateEntity existingEntity = createJobTemplateEntity("builtin-existing", "v1");
+    entityStore.put(existingEntity, false);
+
+    ShellJobTemplate newTemplate =
+        ShellJobTemplate.builder()
+            .withName("builtin-existing")
+            .withComment("updated")
+            .withExecutable("/bin/echo")
+            .withCustomFields(Collections.singletonMap("version", "v2"))
+            .build();
+
+    Map<String, JobTemplate> builtInTemplates = new HashMap<>();
+    builtInTemplates.put(newTemplate.name(), newTemplate);
+
+    when(jobManager.listJobTemplates(metalakeName))
+        .thenReturn(Collections.singletonList(existingEntity));
+
+    Assertions.assertDoesNotThrow(
+        () -> listener.reconcileBuiltInJobTemplates(metalakeName, builtInTemplates));
+
+    JobTemplateEntity updated =
+        entityStore.get(
+            existingEntity.nameIdentifier(),
+            Entity.EntityType.JOB_TEMPLATE,
+            JobTemplateEntity.class);
+
+    Assertions.assertNotNull(updated);
+    Assertions.assertEquals("v2", updated.templateContent().customFields().get("version"));
+    Assertions.assertEquals("builtin-existing", updated.name());
+  }
+
   private void createMetalake(String name, boolean inUse) throws IOException {
     Map<String, String> props = new HashMap<>();
     props.put(PROPERTY_IN_USE, String.valueOf(inUse));

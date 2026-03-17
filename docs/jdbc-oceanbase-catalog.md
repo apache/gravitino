@@ -16,7 +16,8 @@ import TabItem from '@theme/TabItem';
 Apache Gravitino provides the ability to manage OceanBase metadata.
 
 :::caution
-Gravitino saves some system information in schema and table comment, like `(From Gravitino, DO NOT EDIT: gravitino.v1.uid1078334182909406185)`, please don't change or remove this message.
+1. Gravitino saves some system information in schema and table comment, like `(From Gravitino, DO NOT EDIT: gravitino.v1.uid1078334182909406185)`, please don't change or remove this message.
+2. Since 1.2.0, OceanBase catalog is not included in standard Gravitino distribution, but you can still build it from source if you need it. Check [build from source](./how-to-build.md) for more details.
 :::
 
 ## Catalog
@@ -190,8 +191,8 @@ Column[] cols = new Column[] {
     Column.of("name", Types.VarCharType.of(500), "Name of the user", true, false, null)
 };
 Index[] indexes = new Index[] {
-    Indexes.of(IndexType.PRIMARY_KEY, "PRIMARY", new String[][]{{"id"}})
-}
+    Indexes.of(IndexType.PRIMARY_KEY, "PRIMARY", new String[][]{{"id"}}, Map.of())
+};
 ```
 
 </TabItem>
@@ -227,9 +228,9 @@ Index[] indexes = new Index[] {
 
 ```java
 Index[] indexes = new Index[] {
-    Indexes.of(IndexType.PRIMARY_KEY, "PRIMARY", new String[][]{{"id"}}),
-    Indexes.of(IndexType.UNIQUE_KEY, "id_name_uk", new String[][]{{"id"} , {"name"}}),
-}
+    Indexes.of(IndexType.PRIMARY_KEY, "PRIMARY", new String[][]{{"id"}}, Map.of()),
+    Indexes.of(IndexType.UNIQUE_KEY, "id_name_uk", new String[][]{{"id"} , {"name"}}, Map.of()),
+};
 ```
 
 </TabItem>

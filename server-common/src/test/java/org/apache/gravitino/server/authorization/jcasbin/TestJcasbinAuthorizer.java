@@ -21,6 +21,7 @@ import static org.apache.gravitino.authorization.Privilege.Name.USE_CATALOG;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
@@ -444,6 +445,147 @@ public class TestJcasbinAuthorizer {
 
     assertNotNull(loadedRoles, "loadedRoles cache should be initialized");
     assertNotNull(ownerRel, "ownerRel cache should be initialized");
+  }
+
+  /** Tests {@link JcasbinAuthorizer#hasMetadataPrivilegePermission} hierarchy walk */
+  @Test
+  public void testHasMetadataPrivilegePermission() throws Exception {
+    makeCompletableFutureUseCurrentThread(jcasbinAuthorizer);
+    NameIdentifier userNameIdentifier = NameIdentifierUtil.ofUser(METALAKE, USERNAME);
+
+    // --- Case 1: no MANAGE_GRANTS anywhere → false ---
+    when(supportsRelationOperations.listEntitiesByRelation(
+            eq(SupportsRelationOperations.Type.ROLE_USER_REL),
+            eq(userNameIdentifier),
+            eq(Entity.EntityType.USER)))
+        .thenReturn(ImmutableList.of());
+    assertFalse(
+        jcasbinAuthorizer.hasMetadataPrivilegePermission(
+            METALAKE,
+            "TABLE",
+            "testCatalog.testSchema.testTable",
+            new AuthorizationRequestContext()),
+        "No MANAGE_GRANTS grants should return false");
+
+    // --- Case 2: METALAKE-level MANAGE_GRANTS covers a TABLE ---
+    Long metalakeGrantRoleId = 201L;
+    RoleEntity metalakeGrantRole =
+        getRoleEntity(
+            metalakeGrantRoleId,
+            "metalakeGrantRole",
+            ImmutableList.of(
+                buildManageGrantsSecurableObject(
+                    metalakeGrantRoleId, MetadataObject.Type.METALAKE, METALAKE)));
+    when(entityStore.get(
+            eq(NameIdentifierUtil.ofRole(METALAKE, metalakeGrantRole.name())),
+            eq(Entity.EntityType.ROLE),
+            eq(RoleEntity.class)))
+        .thenReturn(metalakeGrantRole);
+    when(supportsRelationOperations.listEntitiesByRelation(
+            eq(SupportsRelationOperations.Type.ROLE_USER_REL),
+            eq(userNameIdentifier),
+            eq(Entity.EntityType.USER)))
+        .thenReturn(ImmutableList.of(metalakeGrantRole));
+    assertTrue(
+        jcasbinAuthorizer.hasMetadataPrivilegePermission(
+            METALAKE,
+            "TABLE",
+            "testCatalog.testSchema.testTable",
+            new AuthorizationRequestContext()),
+        "METALAKE-level MANAGE_GRANTS should cover TABLE within it");
+
+    // --- Case 3: CATALOG-level MANAGE_GRANTS covers TABLE/SCHEMA ---
+    Long catalogGrantRoleId = 200L;
+    RoleEntity catalogGrantRole =
+        getRoleEntity(
+            catalogGrantRoleId,
+            "catalogGrantRole",
+            ImmutableList.of(
+                buildManageGrantsSecurableObject(
+                    catalogGrantRoleId, MetadataObject.Type.CATALOG, "testCatalog")));
+    when(entityStore.get(
+            eq(NameIdentifierUtil.ofRole(METALAKE, catalogGrantRole.name())),
+            eq(Entity.EntityType.ROLE),
+            eq(RoleEntity.class)))
+        .thenReturn(catalogGrantRole);
+    when(supportsRelationOperations.listEntitiesByRelation(
+            eq(SupportsRelationOperations.Type.ROLE_USER_REL),
+            eq(userNameIdentifier),
+            eq(Entity.EntityType.USER)))
+        .thenReturn(ImmutableList.of(catalogGrantRole));
+    assertTrue(
+        jcasbinAuthorizer.hasMetadataPrivilegePermission(
+            METALAKE,
+            "TABLE",
+            "testCatalog.testSchema.testTable",
+            new AuthorizationRequestContext()),
+        "CATALOG-level MANAGE_GRANTS should cover TABLE within it");
+    assertTrue(
+        jcasbinAuthorizer.hasMetadataPrivilegePermission(
+            METALAKE, "SCHEMA", "testCatalog.testSchema", new AuthorizationRequestContext()),
+        "CATALOG-level MANAGE_GRANTS should cover SCHEMA within it");
+
+    // --- Case 4: TABLE-level MANAGE_GRANTS covers the table itself ---
+    Long tableGrantRoleId = 202L;
+    RoleEntity tableGrantRole =
+        getRoleEntity(
+            tableGrantRoleId,
+            "tableGrantRole",
+            ImmutableList.of(
+                buildManageGrantsSecurableObject(
+                    tableGrantRoleId,
+                    MetadataObject.Type.TABLE,
+                    "testCatalog.testSchema.testTable")));
+    when(entityStore.get(
+            eq(NameIdentifierUtil.ofRole(METALAKE, tableGrantRole.name())),
+            eq(Entity.EntityType.ROLE),
+            eq(RoleEntity.class)))
+        .thenReturn(tableGrantRole);
+    when(supportsRelationOperations.listEntitiesByRelation(
+            eq(SupportsRelationOperations.Type.ROLE_USER_REL),
+            eq(userNameIdentifier),
+            eq(Entity.EntityType.USER)))
+        .thenReturn(ImmutableList.of(tableGrantRole));
+    assertTrue(
+        jcasbinAuthorizer.hasMetadataPrivilegePermission(
+            METALAKE,
+            "TABLE",
+            "testCatalog.testSchema.testTable",
+            new AuthorizationRequestContext()),
+        "TABLE-level MANAGE_GRANTS should cover itself");
+
+    // --- Case 5: invalid type string → IllegalArgumentException ---
+    assertThrows(
+        IllegalArgumentException.class,
+        () ->
+            jcasbinAuthorizer.hasMetadataPrivilegePermission(
+                METALAKE, "INVALID_TYPE", "testCatalog", new AuthorizationRequestContext()));
+  }
+
+  /**
+   * Builds a {@link SecurableObject} carrying an ALLOW {@code MANAGE_GRANTS} privilege bound to
+   * {@code type} with the shared test metadata ID ({@link #CATALOG_ID}).
+   */
+  private static SecurableObject buildManageGrantsSecurableObject(
+      Long roleId, MetadataObject.Type type, String objectName) {
+    try {
+      ImmutableList<String> privilegeNames = ImmutableList.of("MANAGE_GRANTS");
+      ImmutableList<String> conditions = ImmutableList.of("ALLOW");
+      SecurableObjectPO po =
+          SecurableObjectPO.builder()
+              .withType(String.valueOf(type))
+              .withMetadataObjectId(CATALOG_ID)
+              .withRoleId(roleId)
+              .withPrivilegeNames(objectMapper.writeValueAsString(privilegeNames))
+              .withPrivilegeConditions(objectMapper.writeValueAsString(conditions))
+              .withDeletedAt(0L)
+              .withCurrentVersion(1L)
+              .withLastVersion(1L)
+              .build();
+      return POConverters.fromSecurableObjectPO(objectName, po, type);
+    } catch (JsonProcessingException e) {
+      throw new RuntimeException(e);
+    }
   }
 
   @SuppressWarnings("unchecked")

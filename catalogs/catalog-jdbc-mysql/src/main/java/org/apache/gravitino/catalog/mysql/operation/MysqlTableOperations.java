@@ -138,8 +138,7 @@ public class MysqlTableOperations extends JdbcTableOperations {
       switch (index.type()) {
         case PRIMARY_KEY:
           if (null != index.name()
-              && !StringUtils.equalsIgnoreCase(
-                  index.name(), Indexes.DEFAULT_MYSQL_PRIMARY_KEY_NAME)) {
+              && !StringUtils.equalsIgnoreCase(index.name(), Indexes.DEFAULT_PRIMARY_KEY_NAME)) {
             throw new IllegalArgumentException("Primary key name must be PRIMARY in MySQL");
           }
           sqlBuilder.append("CONSTRAINT ").append("PRIMARY KEY (").append(fieldStr).append(")");
@@ -381,7 +380,7 @@ public class MysqlTableOperations extends JdbcTableOperations {
       case PRIMARY_KEY:
         if (null != addIndex.getName()
             && !StringUtils.equalsIgnoreCase(
-                addIndex.getName(), Indexes.DEFAULT_MYSQL_PRIMARY_KEY_NAME)) {
+                addIndex.getName(), Indexes.DEFAULT_PRIMARY_KEY_NAME)) {
           throw new IllegalArgumentException("Primary key name must be PRIMARY in MySQL");
         }
         sqlBuilder.append("PRIMARY KEY ");

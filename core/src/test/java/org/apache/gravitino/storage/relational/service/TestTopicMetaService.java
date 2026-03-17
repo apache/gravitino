@@ -19,14 +19,20 @@
 package org.apache.gravitino.storage.relational.service;
 
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.IOException;
+import java.lang.reflect.InvocationTargetException;
+import java.lang.reflect.Method;
 import java.time.Instant;
 import java.util.List;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.EntityAlreadyExistsException;
+import org.apache.gravitino.NameIdentifier;
+import org.apache.gravitino.Namespace;
+import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.meta.TopicEntity;
 import org.apache.gravitino.storage.RandomIdGenerator;
 import org.apache.gravitino.storage.relational.TestJDBCBackend;
@@ -144,5 +150,24 @@ public class TestTopicMetaService extends TestJDBCBackend {
                 Entity.EntityType.TOPIC,
                 e ->
                     createTopicEntity(topicCopy.id(), topicCopy.namespace(), "topic", AUDIT_INFO)));
+  }
+
+  @TestTemplate
+  public void testGetTopicByFullQualifiedNameMalformedNamespaceThrowsNoSuchEntityException()
+      throws Exception {
+    Method method =
+        TopicMetaService.class.getDeclaredMethod(
+            "getTopicPOByFullQualifiedName", NameIdentifier.class);
+    method.setAccessible(true);
+
+    NameIdentifier malformedIdentifier =
+        NameIdentifier.of(Namespace.of(metalakeName, catalogName), "topic");
+
+    InvocationTargetException invocationTargetException =
+        assertThrows(
+            InvocationTargetException.class,
+            () -> method.invoke(TopicMetaService.getInstance(), malformedIdentifier));
+
+    assertInstanceOf(NoSuchEntityException.class, invocationTargetException.getCause());
   }
 }

@@ -23,6 +23,7 @@ import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Lists;
 import java.io.IOException;
 import java.sql.SQLException;
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -911,6 +912,62 @@ public class TestModelVersionMetaService extends TestJDBCBackend {
                     NameIdentifierUtil.ofModelVersion(
                         METALAKE_NAME, CATALOG_NAME, SCHEMA_NAME, modelName, "non_exist_version"),
                     updatePropertiesUpdater));
+  }
+
+  @TestTemplate
+  void testUpdateModelVersionAliasesFromEmpty() throws IOException {
+    createParentEntities(METALAKE_NAME, CATALOG_NAME, SCHEMA_NAME, AUDIT_INFO);
+
+    Map<String, String> properties = ImmutableMap.of("k1", "v1");
+    String modelName = randomModelName();
+    List<String> updatedVersionAliases = ImmutableList.of("alias1", "alias2");
+
+    ModelEntity modelEntity =
+        createModelEntity(
+            RandomIdGenerator.INSTANCE.nextId(),
+            MODEL_NS,
+            modelName,
+            "model comment",
+            0,
+            properties,
+            AUDIT_INFO);
+
+    // Create model version with NO aliases
+    ModelVersionEntity modelVersionEntity =
+        createModelVersionEntity(
+            modelEntity.nameIdentifier(),
+            0,
+            ImmutableMap.of(ModelVersion.URI_NAME_UNKNOWN, "S3://test/path"),
+            Collections.emptyList(),
+            "version comment",
+            properties,
+            AUDIT_INFO);
+
+    ModelVersionEntity updatedModelVersionEntity =
+        createModelVersionEntity(
+            modelVersionEntity.modelIdentifier(),
+            modelVersionEntity.version(),
+            modelVersionEntity.uris(),
+            updatedVersionAliases,
+            modelVersionEntity.comment(),
+            modelVersionEntity.properties(),
+            modelVersionEntity.auditInfo());
+
+    Assertions.assertDoesNotThrow(
+        () -> ModelMetaService.getInstance().insertModel(modelEntity, false));
+    Assertions.assertDoesNotThrow(
+        () -> ModelVersionMetaService.getInstance().insertModelVersion(modelVersionEntity));
+
+    // Updating aliases on a version that had no aliases must not throw
+    Function<ModelVersionEntity, ModelVersionEntity> updater = old -> updatedModelVersionEntity;
+
+    ModelVersionEntity altered =
+        Assertions.assertDoesNotThrow(
+            () ->
+                ModelVersionMetaService.getInstance()
+                    .updateModelVersion(modelVersionEntity.nameIdentifier(), updater));
+
+    Assertions.assertEquals(updatedVersionAliases, altered.aliases());
   }
 
   private NameIdentifier getModelVersionIdent(NameIdentifier modelIdent, int version) {

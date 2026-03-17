@@ -102,6 +102,7 @@ public class JdbcCatalogOperations implements CatalogOperations, SupportsSchemas
   private final TableOperation tableOperation;
 
   private DataSource dataSource;
+  private String jdbcUrl;
 
   private final JdbcColumnDefaultValueConverter columnDefaultValueConverter;
 
@@ -170,6 +171,7 @@ public class JdbcCatalogOperations implements CatalogOperations, SupportsSchemas
     resultConf.putAll(gravitinoConfig);
 
     JdbcConfig jdbcConfig = new JdbcConfig(resultConf);
+    this.jdbcUrl = jdbcConfig.getJdbcUrl();
     this.dataSource = DataSourceUtils.createDataSource(jdbcConfig);
 
     checkJDBCDriverVersion();
@@ -199,6 +201,28 @@ public class JdbcCatalogOperations implements CatalogOperations, SupportsSchemas
       metricsSystem.unregister(catalogMetricsSource);
     }
     DataSourceUtils.closeDataSource(dataSource);
+    try {
+      Driver driver = getDriver();
+      if (driver != null) {
+        deregisterDriver(driver);
+      }
+    } catch (SQLException e) {
+      LOG.warn("Failed to deregister JDBC driver", e);
+    }
+  }
+
+  /**
+   * Gets the JDBC driver for the provided JDBC URL.
+   *
+   * @return The JDBC driver instance if the JDBC URL is not blank; null if the JDBC URL is blank.
+   * @throws SQLException if failing to get driver from JDBC URL.
+   */
+  protected Driver getDriver() throws SQLException {
+    if (StringUtils.isBlank(jdbcUrl)) {
+      return null;
+    }
+
+    return DriverManager.getDriver(jdbcUrl);
   }
 
   /**
@@ -371,6 +395,7 @@ public class JdbcCatalogOperations implements CatalogOperations, SupportsSchemas
         .withName(tableName)
         .withColumns(load.columns())
         .withAuditInfo(load.auditInfo())
+        .withSortOrders(load.sortOrder())
         .withComment(comment)
         .withProperties(properties)
         .withDistribution(load.distribution())
@@ -450,8 +475,13 @@ public class JdbcCatalogOperations implements CatalogOperations, SupportsSchemas
       SortOrder[] sortOrders,
       Index[] indexes)
       throws NoSuchSchemaException, TableAlreadyExistsException {
-    Preconditions.checkArgument(
-        null == sortOrders || sortOrders.length == 0, "jdbc-catalog does not support sort orders");
+    JdbcTableOperations jdbcTableOperations = (JdbcTableOperations) tableOperation;
+    if (!jdbcTableOperations.supportsTableSortOrder()) {
+      Preconditions.checkArgument(
+          null == sortOrders || sortOrders.length == 0,
+          "The current JDBC connector: %s does not support sort orders",
+          jdbcTableOperations.getClass().getName());
+    }
 
     StringIdentifier identifier = StringIdentifier.fromProperties(properties);
     Preconditions.checkArgument(identifier != null, GRAVITINO_ATTRIBUTE_DOES_NOT_EXIST_MSG);
@@ -483,7 +513,8 @@ public class JdbcCatalogOperations implements CatalogOperations, SupportsSchemas
         resultProperties,
         partitioning,
         distribution,
-        indexes);
+        indexes,
+        sortOrders);
 
     return JdbcTable.builder()
         .withAuditInfo(

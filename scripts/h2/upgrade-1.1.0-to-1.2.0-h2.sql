@@ -25,7 +25,6 @@ CREATE TABLE IF NOT EXISTS `function_meta` (
     `schema_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'schema id',
     `function_type` VARCHAR(64) NOT NULL COMMENT 'function type',
     `deterministic` TINYINT(1) DEFAULT 1 COMMENT 'whether the function result is deterministic',
-    `return_type` CLOB NOT NULL COMMENT 'function return type',
     `function_current_version` INT UNSIGNED DEFAULT 1 COMMENT 'function current version',
     `function_latest_version` INT UNSIGNED DEFAULT 1 COMMENT 'function latest version',
     `audit_info` CLOB NOT NULL COMMENT 'function audit info',
@@ -82,3 +81,30 @@ CREATE TABLE IF NOT EXISTS partition_statistic_meta (
 );
 
 CREATE INDEX IF NOT EXISTS idx_table_partition ON partition_statistic_meta(table_id, partition_name);
+
+-- Add optimizer metrics storage tables
+CREATE TABLE IF NOT EXISTS `table_metrics` (
+    `id` BIGINT(20) UNSIGNED NOT NULL AUTO_INCREMENT COMMENT 'auto increment id',
+    `table_identifier` VARCHAR(1024) NOT NULL COMMENT 'normalized table identifier',
+    `metric_name` VARCHAR(1024) NOT NULL COMMENT 'metric name',
+    `table_partition` VARCHAR(1024) DEFAULT NULL COMMENT 'normalized partition identifier',
+    `metric_ts` BIGINT(20) NOT NULL COMMENT 'metric timestamp in epoch seconds',
+    `metric_value` VARCHAR(1024) NOT NULL COMMENT 'metric value payload',
+    PRIMARY KEY (`id`)
+) ENGINE=InnoDB COMMENT='optimizer table metrics';
+
+CREATE TABLE IF NOT EXISTS `job_metrics` (
+    `id` BIGINT(20) UNSIGNED NOT NULL AUTO_INCREMENT COMMENT 'auto increment id',
+    `job_identifier` VARCHAR(1024) NOT NULL COMMENT 'normalized job identifier',
+    `metric_name` VARCHAR(1024) NOT NULL COMMENT 'metric name',
+    `metric_ts` BIGINT(20) NOT NULL COMMENT 'metric timestamp in epoch seconds',
+    `metric_value` VARCHAR(1024) NOT NULL COMMENT 'metric value payload',
+    PRIMARY KEY (`id`)
+) ENGINE=InnoDB COMMENT='optimizer job metrics';
+
+CREATE INDEX IF NOT EXISTS `idx_table_metrics_metric_ts` ON `table_metrics`(`metric_ts`);
+CREATE INDEX IF NOT EXISTS `idx_job_metrics_metric_ts` ON `job_metrics`(`metric_ts`);
+CREATE INDEX IF NOT EXISTS `idx_table_metrics_composite`
+  ON `table_metrics`(`table_identifier`, `table_partition`, `metric_ts`);
+CREATE INDEX IF NOT EXISTS `idx_job_metrics_identifier_metric_ts`
+  ON `job_metrics`(`job_identifier`, `metric_ts`);

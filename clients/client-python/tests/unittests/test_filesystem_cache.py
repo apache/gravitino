@@ -28,6 +28,7 @@ Test Coverage:
 - Cache expiration: TTL-based eviction and recreation
 - Cache key construction: Equality, inequality, process/thread isolation
 """
+
 import os
 import threading
 import time
@@ -324,16 +325,14 @@ class TestFileSystemCacheKey(unittest.TestCase):
             scheme="s3",
             authority="bucket1",
             credentials=None,
-            catalog_props={"prop1": "value1"},
-            options={"opt1": "val1"},
+            fileset_props={"prop1": "value1", "opt1": "val1"},
             extra_kwargs={"arg1": "val1"},
         )
         key2 = FileSystemCacheKey(
             scheme="s3",
             authority="bucket1",
             credentials=None,
-            catalog_props={"prop1": "value1"},
-            options={"opt1": "val1"},
+            fileset_props={"prop1": "value1", "opt1": "val1"},
             extra_kwargs={"arg1": "val1"},
         )
 
@@ -346,8 +345,7 @@ class TestFileSystemCacheKey(unittest.TestCase):
             scheme="s3",
             authority="bucket1",
             credentials=None,
-            catalog_props={"prop1": "value1"},
-            options={},
+            fileset_props={"prop1": "value1"},
             extra_kwargs={},
         )
 
@@ -356,8 +354,7 @@ class TestFileSystemCacheKey(unittest.TestCase):
             scheme="gs",
             authority="bucket1",
             credentials=None,
-            catalog_props={"prop1": "value1"},
-            options={},
+            fileset_props={"prop1": "value1"},
             extra_kwargs={},
         )
         self.assertNotEqual(base_key, key_diff_scheme)
@@ -367,31 +364,28 @@ class TestFileSystemCacheKey(unittest.TestCase):
             scheme="s3",
             authority="bucket2",
             credentials=None,
-            catalog_props={"prop1": "value1"},
-            options={},
+            fileset_props={"prop1": "value1"},
             extra_kwargs={},
         )
         self.assertNotEqual(base_key, key_diff_authority)
 
-        # Different catalog properties
+        # Different fileset properties
         key_diff_config = FileSystemCacheKey(
             scheme="s3",
             authority="bucket1",
             credentials=None,
-            catalog_props={"prop1": "value2"},  # Different value
-            options={},
+            fileset_props={"prop1": "value2"},  # Different value
             extra_kwargs={},
         )
         self.assertNotEqual(base_key, key_diff_config)
 
-        # Different options
+        # Different extra kwargs
         key_diff_options = FileSystemCacheKey(
             scheme="s3",
             authority="bucket1",
             credentials=None,
-            catalog_props={"prop1": "value1"},
-            options={"opt1": "val1"},  # Added option
-            extra_kwargs={},
+            fileset_props={"prop1": "value1"},
+            extra_kwargs={"opt1": "val1"},  # Added option
         )
         self.assertNotEqual(base_key, key_diff_options)
 
@@ -401,8 +395,7 @@ class TestFileSystemCacheKey(unittest.TestCase):
             scheme="s3",
             authority="bucket1",
             credentials=None,
-            catalog_props={},
-            options={},
+            fileset_props={},
             extra_kwargs={},
         )
 
@@ -415,8 +408,7 @@ class TestFileSystemCacheKey(unittest.TestCase):
             scheme="s3",
             authority="bucket1",
             credentials=None,
-            catalog_props={},
-            options={},
+            fileset_props={},
             extra_kwargs={},
         )
 
@@ -429,8 +421,7 @@ class TestFileSystemCacheKey(unittest.TestCase):
             scheme="s3",
             authority="my-bucket",
             credentials=None,
-            catalog_props={},
-            options={},
+            fileset_props={},
             extra_kwargs={},
         )
 

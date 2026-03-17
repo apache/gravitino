@@ -378,6 +378,87 @@ public class TestLancePartitionStatisticStorage {
     storage.close();
   }
 
+  @Test
+  public void testExceedMaxStatisticsPerUpdateLimit() throws Exception {
+    PartitionStatisticStorageFactory factory = new LancePartitionStatisticStorageFactory();
+
+    String metalakeName = "metalake";
+    String catalogName = "catalog";
+    String schemaName = "schema";
+    String tableName = "table";
+
+    MetadataObject metadataObject =
+        MetadataObjects.of(
+            Lists.newArrayList(catalogName, schemaName, tableName), MetadataObject.Type.TABLE);
+
+    EntityStore entityStore = mock(EntityStore.class);
+    TableEntity tableEntity = mock(TableEntity.class);
+    when(entityStore.get(any(), any(), any())).thenReturn(tableEntity);
+    when(tableEntity.id()).thenReturn(101L);
+    FieldUtils.writeField(GravitinoEnv.getInstance(), "entityStore", entityStore, true);
+
+    String location = Files.createTempDirectory("lance_stats_exceed_test").toString();
+    Map<String, String> properties = Maps.newHashMap();
+    properties.put("location", location);
+    // Default limit is 100, generate 101 statistics to exceed the limit
+
+    LancePartitionStatisticStorage storage =
+        (LancePartitionStatisticStorage) factory.create(properties);
+
+    try {
+      // Generate 101 statistics which exceeds the default limit of 100
+      int count = 101;
+      Map<MetadataObject, Map<String, Map<String, StatisticValue<?>>>> originData =
+          generateData(metadataObject, count, 1);
+      Map<MetadataObject, List<PartitionStatisticsUpdate>> statisticsToUpdate =
+          convertData(originData);
+
+      List<MetadataObjectStatisticsUpdate> objectUpdates = Lists.newArrayList();
+      for (Map.Entry<MetadataObject, List<PartitionStatisticsUpdate>> entry :
+          statisticsToUpdate.entrySet()) {
+        objectUpdates.add(MetadataObjectStatisticsUpdate.of(entry.getKey(), entry.getValue()));
+      }
+
+      IllegalArgumentException exception =
+          Assertions.assertThrows(
+              IllegalArgumentException.class,
+              () -> storage.updateStatistics(metalakeName, objectUpdates));
+      Assertions.assertTrue(exception.getMessage().contains("exceeds the maximum limit"));
+    } finally {
+      FileUtils.deleteDirectory(new File(location + "/" + tableEntity.id() + ".lance"));
+      storage.close();
+    }
+  }
+
+  @Test
+  public void testInvalidMaxStatisticsPerUpdateConfiguration() throws Exception {
+    String location = Files.createTempDirectory("lance_stats_invalid_config_test").toString();
+
+    try {
+      // Test that zero value throws an exception
+      Map<String, String> properties = Maps.newHashMap();
+      properties.put("location", location);
+      properties.put("maxStatisticsPerUpdate", "0");
+
+      IllegalArgumentException exception =
+          Assertions.assertThrows(
+              IllegalArgumentException.class, () -> new LancePartitionStatisticStorage(properties));
+      Assertions.assertTrue(
+          exception.getMessage().contains("maxStatisticsPerUpdate must be positive"));
+
+      // Test that negative value throws an exception
+      properties.put("maxStatisticsPerUpdate", "-1");
+
+      exception =
+          Assertions.assertThrows(
+              IllegalArgumentException.class, () -> new LancePartitionStatisticStorage(properties));
+      Assertions.assertTrue(
+          exception.getMessage().contains("maxStatisticsPerUpdate must be positive"));
+    } finally {
+      FileUtils.deleteDirectory(new File(location));
+    }
+  }
+
   private Map<MetadataObject, Map<String, Map<String, StatisticValue<?>>>> generateData(
       MetadataObject metadataObject, int count, int partitions) {
     Map<MetadataObject, Map<String, Map<String, StatisticValue<?>>>> statisticsToUpdate =
@@ -411,5 +492,106 @@ public class TestLancePartitionStatisticStorage {
       }
     }
     return newData;
+  }
+
+  @Test
+  public void testDropStatisticsWithQuoteInPartitionAndStatisticName() throws Exception {
+    PartitionStatisticStorageFactory factory = new LancePartitionStatisticStorageFactory();
+    String metalakeName = "metalake";
+    MetadataObject metadataObject =
+        MetadataObjects.of(
+            Lists.newArrayList("catalog", "schema", "table"), MetadataObject.Type.TABLE);
+
+    EntityStore entityStore = mock(EntityStore.class);
+    TableEntity tableEntity = mock(TableEntity.class);
+    when(entityStore.get(any(), any(), any())).thenReturn(tableEntity);
+    when(tableEntity.id()).thenReturn(1L);
+    FieldUtils.writeField(GravitinoEnv.getInstance(), "entityStore", entityStore, true);
+
+    String location = Files.createTempDirectory("lance_stats_test_quote").toString();
+    Map<String, String> properties = Maps.newHashMap();
+    properties.put("location", location);
+
+    LancePartitionStatisticStorage storage =
+        (LancePartitionStatisticStorage) factory.create(properties);
+    try {
+      String quotedPartition = "partition'01";
+      String quotedStatistic = "statistic'0";
+      String normalStatistic = "statistic1";
+
+      Map<String, StatisticValue<?>> stats = Maps.newHashMap();
+      stats.put(quotedStatistic, StatisticValues.stringValue("value0"));
+      stats.put(normalStatistic, StatisticValues.stringValue("value1"));
+
+      storage.updateStatistics(
+          metalakeName,
+          Lists.newArrayList(
+              MetadataObjectStatisticsUpdate.of(
+                  metadataObject,
+                  Lists.newArrayList(
+                      PartitionStatisticsModification.update(quotedPartition, stats)))));
+
+      List<PersistedPartitionStatistics> listedStats =
+          storage.listStatistics(
+              metalakeName,
+              metadataObject,
+              PartitionRange.between(
+                  quotedPartition,
+                  PartitionRange.BoundType.CLOSED,
+                  quotedPartition,
+                  PartitionRange.BoundType.CLOSED));
+
+      Assertions.assertEquals(1, listedStats.size());
+      Assertions.assertEquals(quotedPartition, listedStats.get(0).partitionName());
+      Assertions.assertEquals(2, listedStats.get(0).statistics().size());
+
+      storage.dropStatistics(
+          metalakeName,
+          Lists.newArrayList(
+              MetadataObjectStatisticsDrop.of(
+                  metadataObject,
+                  Lists.newArrayList(
+                      PartitionStatisticsModification.drop(
+                          quotedPartition, Lists.newArrayList(quotedStatistic))))));
+
+      listedStats =
+          storage.listStatistics(
+              metalakeName,
+              metadataObject,
+              PartitionRange.between(
+                  quotedPartition,
+                  PartitionRange.BoundType.CLOSED,
+                  quotedPartition,
+                  PartitionRange.BoundType.CLOSED));
+
+      Assertions.assertEquals(1, listedStats.size());
+      Assertions.assertEquals(quotedPartition, listedStats.get(0).partitionName());
+      Assertions.assertEquals(1, listedStats.get(0).statistics().size());
+      Assertions.assertEquals(normalStatistic, listedStats.get(0).statistics().get(0).name());
+
+      storage.dropStatistics(
+          metalakeName,
+          Lists.newArrayList(
+              MetadataObjectStatisticsDrop.of(
+                  metadataObject,
+                  Lists.newArrayList(
+                      PartitionStatisticsModification.drop(
+                          quotedPartition, Lists.newArrayList(normalStatistic))))));
+
+      listedStats =
+          storage.listStatistics(
+              metalakeName,
+              metadataObject,
+              PartitionRange.between(
+                  quotedPartition,
+                  PartitionRange.BoundType.CLOSED,
+                  quotedPartition,
+                  PartitionRange.BoundType.CLOSED));
+
+      Assertions.assertTrue(listedStats.isEmpty());
+    } finally {
+      FileUtils.deleteDirectory(new File(location + "/" + tableEntity.id() + ".lance"));
+      storage.close();
+    }
   }
 }

@@ -219,12 +219,25 @@ allprojects {
       param.systemProperty("gravitino.log.path", "build/${project.name}-integration-test.log")
       project.delete("build/${project.name}-integration-test.log")
       if (testMode == "deploy") {
-        param.environment("GRAVITINO_HOME", project.rootDir.path + "/distribution/package")
+        param.environment("GRAVITINO_HOME", project.rootDir.path + "/distribution/package-all")
+        val useWebV2 = System.getenv("GRAVITINO_USE_WEB_V2")?.toBoolean() == true
+        val webWarPath = if (useWebV2) {
+          project.rootDir.path + "/distribution/package/web-v2/gravitino-web-${project.version}.war"
+        } else {
+          project.rootDir.path + "/distribution/package/web/gravitino-web-${project.version}.war"
+        }
+        param.environment("GRAVITINO_WAR", webWarPath)
         param.systemProperty("testMode", "deploy")
       } else if (testMode == "embedded") {
         param.environment("GRAVITINO_HOME", project.rootDir.path)
         param.environment("GRAVITINO_TEST", "true")
-        param.environment("GRAVITINO_WAR", project.rootDir.path + "/web/web/dist/")
+        val useWebV2 = System.getenv("GRAVITINO_USE_WEB_V2")?.toBoolean() == true
+        val webWarPath = if (useWebV2) {
+          project.rootDir.path + "/web-v2/web/dist/"
+        } else {
+          project.rootDir.path + "/web/web/dist/"
+        }
+        param.environment("GRAVITINO_WAR", webWarPath)
         param.systemProperty("testMode", "embedded")
       } else {
         throw GradleException(
@@ -322,6 +335,9 @@ subprojects {
     val name = project.name.lowercase()
     val path = project.path.lowercase()
     if (path.startsWith(":maintenance:jobs") ||
+      path.startsWith(":maintenance:optimizer-api") ||
+      path.startsWith(":maintenance:gravitino-updaters") ||
+      path.startsWith(":clients:client-java") ||
       name == "api" ||
       name == "common" ||
       name == "catalog-common" ||
@@ -330,7 +346,11 @@ subprojects {
       return true
     }
 
-    val isReleaseRun = gradle.startParameter.taskNames.any { it == "release" || it == "publish" || it == "publishToMavenLocal" }
+    val isReleaseRun = gradle.startParameter.taskNames.any {
+      it == "release" || it == "publish" || it == "publishToMavenLocal" || it.endsWith(":release") || it.endsWith(
+        ":publish"
+      ) || it.endsWith(":publishToMavenLocal")
+    }
     if (!isReleaseRun) {
       return false
     }
@@ -376,6 +396,12 @@ subprojects {
               |==================================
         """.trimMargin()
       )
+    }
+  }
+
+  tasks.withType<JavaCompile>().configureEach {
+    if (compatibleWithJDK8(project)) {
+      options.release.set(8)
     }
   }
 
@@ -512,7 +538,7 @@ subprojects {
     }
   }
 
-  if (project.name in listOf("web", "docs")) {
+  if (project.name in listOf("web", "web-v2", "docs")) {
     plugins.apply(NodePlugin::class)
     configure<NodeExtension> {
       version.set("20.19.0")
@@ -583,6 +609,30 @@ subprojects {
     if (project.name != "server-common") {
       val initTest = project.extra.get("initTestParam") as (Test) -> Unit
       initTest(this)
+    }
+
+    val testTaskStartTimeMsKey = "testTaskStartTimeMs"
+    doFirst {
+      extensions.extraProperties[testTaskStartTimeMsKey] = System.currentTimeMillis()
+      logger.lifecycle(
+        "[TEST-TIMING] START module={} task={} at={}",
+        project.path,
+        path,
+        extensions.extraProperties[testTaskStartTimeMsKey]
+      )
+    }
+
+    doLast {
+      val endTimeMs = System.currentTimeMillis()
+      val startTimeMs = extensions.extraProperties[testTaskStartTimeMsKey] as? Long ?: endTimeMs
+      logger.lifecycle(
+        "[TEST-TIMING] END module={} task={} startMs={} endMs={} durationMs={}",
+        project.path,
+        path,
+        startTimeMs,
+        endTimeMs,
+        endTimeMs - startTimeMs
+      )
     }
 
     testLogging {
@@ -682,7 +732,18 @@ tasks.rat {
     "web/web/src/lib/icons/svg/**/*.svg",
     "web/web/src/lib/utils/axios/**/*",
     "web/web/src/types/axios.d.ts",
-    "web/web/yarn.lock"
+    "web/web/yarn.lock",
+    "web-v2/web/.**",
+    "web-v2/web/dist/**/*",
+    "web-v2/web/next-env.d.ts",
+    "web-v2/web/node_modules/**/*",
+    "web-v2/web/package-lock.json",
+    "web-v2/web/pnpm-lock.yaml",
+    "web-v2/web/src/lib/enums/httpEnum.js",
+    "web-v2/web/src/lib/icons/svg/**/*.svg",
+    "web-v2/web/src/lib/utils/axios/**/*",
+    "web-v2/web/src/types/axios.d.ts",
+    "web-v2/web/yarn.lock"
   )
 
   // Add .gitignore excludes to the Apache Rat exclusion list.
@@ -725,7 +786,8 @@ tasks {
       ":iceberg:iceberg-rest-server:copyLibAndConfigs",
       ":lance:lance-rest-server:copyLibAndConfigs",
       ":maintenance:optimizer:copyLibAndConfigs",
-      ":web:web:build"
+      ":web:web:build",
+      ":web-v2:web:build"
     )
 
     group = "gravitino distribution"
@@ -735,6 +797,7 @@ tasks {
         from(projectDir.dir("conf")) { into("package/conf") }
         from(projectDir.dir("bin")) { into("package/bin") }
         from(projectDir.dir("web/web/build/libs/${rootProject.name}-web-$version.war")) { into("package/web") }
+        from(projectDir.dir("web-v2/web/build/libs/${rootProject.name}-web-$version.war")) { into("package/web-v2") }
         from(projectDir.dir("scripts")) { into("package/scripts") }
         into(outputDir)
         rename { fileName ->
@@ -757,6 +820,9 @@ tasks {
         from(projectDir.dir("web/web/licenses")) { into("package/web/licenses") }
         from(projectDir.dir("web/web/LICENSE.bin")) { into("package/web") }
         from(projectDir.dir("web/web/NOTICE.bin")) { into("package/web") }
+        from(projectDir.dir("web-v2/web/licenses")) { into("package/web-v2/licenses") }
+        from(projectDir.dir("web-v2/web/LICENSE.bin")) { into("package/web-v2") }
+        from(projectDir.dir("web-v2/web/NOTICE.bin")) { into("package/web-v2") }
         into(outputDir)
         rename { fileName ->
           fileName.replace(".bin", "")
@@ -793,7 +859,7 @@ tasks {
           include(
             "${rootProject.name}-iceberg-rest-server.conf.template",
             "${rootProject.name}-env.sh.template",
-            "log4j2.properties.template"
+            "${rootProject.name}-iceberg-rest-log4j2.properties.template"
           )
           into("${rootProject.name}-iceberg-rest-server/conf")
         }
@@ -838,7 +904,7 @@ tasks {
           include(
             "${rootProject.name}-lance-rest-server.conf.template",
             "${rootProject.name}-env.sh.template",
-            "log4j2.properties.template"
+            "${rootProject.name}-lance-rest-log4j2.properties.template"
           )
           into("${rootProject.name}-lance-rest-server/conf")
         }
@@ -874,25 +940,21 @@ tasks {
   }
 
   val compileTrinoConnector by registering {
-    dependsOn("trino-connector:trino-connector:copyLibs")
+    dependsOn("trino-connector:trino-connector-473-478:copyLibs")
     group = "gravitino distribution"
-    outputs.dir(projectDir.dir("distribution/${rootProject.name}-trino-connector"))
-    doLast {
-      copy {
-        from(projectDir.dir("licenses")) { into("${rootProject.name}-trino-connector/licenses") }
-        from(projectDir.file("LICENSE.trino")) { into("${rootProject.name}-trino-connector") }
-        from(projectDir.file("NOTICE.trino")) { into("${rootProject.name}-trino-connector") }
-        from(projectDir.file("README.md")) { into("${rootProject.name}-trino-connector") }
-        into(outputDir)
-        rename { fileName ->
-          fileName.replace(".trino", "")
-        }
-      }
-    }
   }
 
   val assembleDistribution by registering(Tar::class) {
-    dependsOn("assembleTrinoConnector", "assembleIcebergRESTServer", "assembleLanceRESTServer", "assembleDistributionAll")
+    dependsOn(
+      ":trino-connector:trino-connector-435-439:assembleTrinoConnector",
+      ":trino-connector:trino-connector-440-445:assembleTrinoConnector",
+      ":trino-connector:trino-connector-446-451:assembleTrinoConnector",
+      ":trino-connector:trino-connector-452-468:assembleTrinoConnector",
+      ":trino-connector:trino-connector-469-472:assembleTrinoConnector",
+      ":trino-connector:trino-connector-473-478:assembleTrinoConnector",
+      "assembleIcebergRESTServer",
+      "assembleLanceRESTServer"
+    )
     group = "gravitino distribution"
     finalizedBy("checksumDistribution")
     into("${rootProject.name}-$version-bin")
@@ -927,17 +989,6 @@ tasks {
         serviceOf<ChecksumService>().sha256(archiveFile.get().asFile).toString()
       )
     }
-  }
-
-  val assembleTrinoConnector by registering(Tar::class) {
-    dependsOn("compileTrinoConnector")
-    group = "gravitino distribution"
-    finalizedBy("checksumTrinoConnector")
-    into("${rootProject.name}-trino-connector-$version")
-    from(compileTrinoConnector.map { it.outputs.files.single() })
-    compression = Compression.GZIP
-    archiveFileName.set("${rootProject.name}-trino-connector-$version.tar.gz")
-    destinationDirectory.set(projectDir.dir("distribution"))
   }
 
   val assembleLanceRESTServer by registering(Tar::class) {
@@ -996,24 +1047,8 @@ tasks {
 
   register("checksumDistribution") {
     group = "gravitino distribution"
-    dependsOn(assembleDistribution, "checksumTrinoConnector", "checksumIcebergRESTServerDistribution", "checksumLanceRESTServerDistribution")
+    dependsOn(assembleDistribution, "checksumIcebergRESTServerDistribution", "checksumLanceRESTServerDistribution")
     val archiveFile = assembleDistribution.flatMap { it.archiveFile }
-    val checksumFile = archiveFile.map { archive ->
-      archive.asFile.let { it.resolveSibling("${it.name}.sha256") }
-    }
-    inputs.file(archiveFile)
-    outputs.file(checksumFile)
-    doLast {
-      checksumFile.get().writeText(
-        serviceOf<ChecksumService>().sha256(archiveFile.get().asFile).toString()
-      )
-    }
-  }
-
-  register("checksumTrinoConnector") {
-    group = "gravitino distribution"
-    dependsOn(assembleTrinoConnector)
-    val archiveFile = assembleTrinoConnector.flatMap { it.archiveFile }
     val checksumFile = archiveFile.map { archive ->
       archive.asFile.let { it.resolveSibling("${it.name}.sha256") }
     }
@@ -1044,17 +1079,20 @@ tasks {
         !it.name.startsWith("optimizer") &&
         !it.name.startsWith("spark") &&
         !it.name.startsWith("hive-metastore") &&
+        !it.name.startsWith("trino-connector") &&
         it.name != "hadoop-common" &&
         it.name != "integration-test" &&
-        it.name != "trino-connector" &&
         it.parent?.name != "bundles" &&
         it.parent?.name != "maintenance" &&
         it.name != "mcp-server"
       ) {
-        from(it.configurations.runtimeClasspath)
+        from(it.configurations.runtimeClasspath) {
+          exclude("error_prone_annotations-*.jar")
+        }
         into("distribution/package/libs")
       }
     }
+    setDuplicatesStrategy(DuplicatesStrategy.EXCLUDE)
   }
 
   register("copyCliLib", Copy::class) {
@@ -1093,6 +1131,8 @@ tasks {
         it.name != "hive-metastore-common" &&
         it.name != "docs" &&
         it.name != "hadoop-common" &&
+        it.name != "web" &&
+        it.name != "web-v2" &&
         it.parent?.name != "bundles" &&
         it.parent?.name != "maintenance" &&
         it.name != "mcp-server"
@@ -1100,7 +1140,7 @@ tasks {
         dependsOn("${it.name}:build")
         from("${it.name}/build/libs") {
           include("*.jar")
-          exclude("*-jcstress.jar", "*-jmh.jar")
+          exclude("*-jcstress.jar", "*-jmh.jar", "error_prone_annotations-*.jar")
         }
         into("distribution/package/libs")
         setDuplicatesStrategy(DuplicatesStrategy.INCLUDE)
@@ -1124,6 +1164,7 @@ tasks {
       ":catalogs:hive-metastore2-libs:copyLibs",
       ":catalogs:hive-metastore3-libs:copyLibs",
       ":catalogs:catalog-lakehouse-generic:copyLibAndConfig",
+      ":catalogs-contrib:catalog-jdbc-hologres:copyLibAndConfig",
       ":catalogs-contrib:catalog-jdbc-oceanbase:copyLibAndConfig",
       ":catalogs-contrib:catalog-jdbc-clickhouse:copyLibAndConfig"
     )

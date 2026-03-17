@@ -29,6 +29,18 @@ import org.junit.jupiter.api.Test;
 public class TestIcebergPropertiesUtils {
 
   @Test
+  void testJdbcSchemaVersionPropertyIsMapped() {
+    Map<String, String> gravitinoProps =
+        ImmutableMap.of(IcebergConstants.GRAVITINO_JDBC_SCHEMA_VERSION, "V1");
+    Map<String, String> icebergProps =
+        IcebergPropertiesUtils.toIcebergCatalogProperties(gravitinoProps);
+    Assertions.assertEquals(
+        "V1",
+        icebergProps.get(IcebergConstants.ICEBERG_JDBC_SCHEMA_VERSION),
+        "jdbc-schema-version must be translated to jdbc.schema-version for Iceberg");
+  }
+
+  @Test
   void testGetCatalogBackendName() {
     Map<String, String> catalogProperties =
         ImmutableMap.of(

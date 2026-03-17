@@ -967,7 +967,9 @@ public class TestMysqlTableOperations extends TestMysql {
     };
 
     final Index[] primaryIndex =
-        new Index[] {Indexes.createMysqlPrimaryKey(new String[][] {{"col_1"}, {"col_4"}})};
+        new Index[] {
+          Indexes.createMysqlPrimaryKey(new String[][] {{"col_1"}, {"col_4"}}, Map.of())
+        };
     exception =
         Assertions.assertThrows(
             IllegalArgumentException.class,
@@ -1046,7 +1048,7 @@ public class TestMysqlTableOperations extends TestMysql {
     successIndex =
         new TableChange.AddIndex(
             Index.IndexType.PRIMARY_KEY,
-            Indexes.DEFAULT_MYSQL_PRIMARY_KEY_NAME,
+            Indexes.DEFAULT_PRIMARY_KEY_NAME,
             new String[][] {{"col_1"}, {"col_2"}});
     sql = MysqlTableOperations.addIndexDefinition(successIndex);
     Assertions.assertEquals("ADD PRIMARY KEY  (`col_1`, `col_2`)", sql);
@@ -1071,7 +1073,7 @@ public class TestMysqlTableOperations extends TestMysql {
     Map<String, String> properties = new HashMap<>();
     properties.put(MYSQL_AUTO_INCREMENT_OFFSET_KEY, "10");
 
-    Index[] indexes = new Index[] {Indexes.unique("uk_2", new String[][] {{"col_1"}})};
+    Index[] indexes = new Index[] {Indexes.unique("uk_2", new String[][] {{"col_1"}}, Map.of())};
     // create table
     TABLE_OPERATIONS.create(
         TEST_DB_NAME.toString(),

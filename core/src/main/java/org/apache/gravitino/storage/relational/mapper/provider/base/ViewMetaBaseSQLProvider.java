@@ -147,6 +147,7 @@ public class ViewMetaBaseSQLProvider {
     return "UPDATE "
         + TABLE_NAME
         + " SET view_name = #{newViewMeta.viewName}, "
+        + " schema_id = #{newViewMeta.schemaId}, "
         + " current_version = #{newViewMeta.currentVersion}, "
         + " last_version = #{newViewMeta.lastVersion}, "
         + " deleted_at = #{newViewMeta.deletedAt} "

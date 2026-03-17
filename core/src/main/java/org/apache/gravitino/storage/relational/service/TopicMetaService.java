@@ -166,6 +166,10 @@ public class TopicMetaService {
   }
 
   private List<TopicPO> listTopicPOsByFullQualifiedName(Namespace namespace) {
+    if (namespace == null || namespace.length() != 3) {
+      throw new NoSuchEntityException(
+          "Topic namespace must have 3 levels, the input namespace is %s", namespace);
+    }
     String[] namespaceLevels = namespace.levels();
     List<TopicPO> topicPOs =
         SessionUtils.getWithoutCommit(
@@ -190,6 +194,12 @@ public class TopicMetaService {
   }
 
   private TopicPO getTopicPOByFullQualifiedName(NameIdentifier identifier) {
+    if (identifier == null
+        || identifier.namespace() == null
+        || identifier.namespace().length() != 3) {
+      throw new NoSuchEntityException(
+          "Topic identifier must have a 3-level namespace, the input identifier is %s", identifier);
+    }
     String[] namespaceLevels = identifier.namespace().levels();
     TopicPO topicPO =
         SessionUtils.getWithoutCommit(
@@ -320,5 +330,27 @@ public class TopicMetaService {
           topicName);
     }
     return topicId;
+  }
+
+  @Monitored(
+      metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME,
+      baseMetricName = "batchGetTopicByIdentifier")
+  public List<TopicEntity> batchGetTopicByIdentifier(List<NameIdentifier> identifiers) {
+    NameIdentifier firstIdent = identifiers.get(0);
+    NameIdentifier schemaIdent = NameIdentifierUtil.getSchemaIdentifier(firstIdent);
+    List<String> topicNames =
+        identifiers.stream().map(NameIdentifier::name).collect(Collectors.toList());
+
+    return SessionUtils.doWithCommitAndFetchResult(
+        TopicMetaMapper.class,
+        mapper -> {
+          List<TopicPO> topicPOs =
+              mapper.batchSelectTopicByIdentifier(
+                  schemaIdent.namespace().level(0),
+                  schemaIdent.namespace().level(1),
+                  schemaIdent.name(),
+                  topicNames);
+          return POConverters.fromTopicPOs(topicPOs, firstIdent.namespace());
+        });
   }
 }

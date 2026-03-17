@@ -331,6 +331,7 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
           return hasCatalogUseCatalog || hasMetalakeUseCatalog;
         }
         if (tempType == MetadataObject.Type.TABLE
+            || tempType == MetadataObject.Type.VIEW
             || tempType == MetadataObject.Type.TOPIC
             || tempType == MetadataObject.Type.FILESET
             || tempType == MetadataObject.Type.MODEL) {
@@ -370,15 +371,32 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
   public boolean hasMetadataPrivilegePermission(
       String metalake, String type, String fullName, AuthorizationRequestContext requestContext) {
     Principal currentPrincipal = PrincipalUtils.getCurrentPrincipal();
-    MetadataObject metalakeMetadataObject =
-        MetadataObjects.of(ImmutableList.of(metalake), MetadataObject.Type.METALAKE);
-    return authorize(
-            currentPrincipal,
-            metalake,
-            metalakeMetadataObject,
-            Privilege.Name.MANAGE_GRANTS,
-            requestContext)
-        || hasSetOwnerPermission(metalake, type, fullName, requestContext);
+    // Check whether the principal holds MANAGE_GRANTS on the target object or any ancestor.
+    // A grant at a broader level (e.g. CATALOG or SCHEMA) implicitly covers all objects beneath it.
+    MetadataObject.Type metadataType;
+    try {
+      metadataType = MetadataObject.Type.valueOf(type.toUpperCase());
+    } catch (IllegalArgumentException e) {
+      throw new IllegalArgumentException("Unknown metadata object type: " + type, e);
+    }
+    // Build the full ancestor chain from the target object up to and including the metalake.
+    // MetadataObjects.parent(CATALOG) returns null (CATALOG is a root in the parent API), so the
+    // metalake is appended manually at the end.
+    List<MetadataObject> chain = new ArrayList<>();
+    for (MetadataObject obj = MetadataObjects.parse(fullName, metadataType);
+        obj != null;
+        obj = MetadataObjects.parent(obj)) {
+      chain.add(obj);
+    }
+    chain.add(MetadataObjects.of(ImmutableList.of(metalake), MetadataObject.Type.METALAKE));
+
+    for (MetadataObject obj : chain) {
+      if (authorize(
+          currentPrincipal, metalake, obj, Privilege.Name.MANAGE_GRANTS, requestContext)) {
+        return true;
+      }
+    }
+    return hasSetOwnerPermission(metalake, type, fullName, requestContext);
   }
 
   @Override

@@ -21,10 +21,41 @@ package org.apache.gravitino.catalog.clickhouse;
 
 public class ClickHouseConstants {
 
-  // Name of the clickhouse cluster
-  public static final String CLUSTER_NAME = "cluster-name";
-  // Whether to use 'ON CLUSTER' clause when creating tables
-  public static final String ON_CLUSTER = "on-cluster";
-  // Sharding key for the clickhouse cluster
-  public static final String CLUSTER_SHARDING_KEY = "cluster-sharding-key";
+  /** Constants for tables with the distributed engine. */
+  public static final class DistributedTableConstants {
+    private DistributedTableConstants() {}
+    // Sharding key for the clickhouse cluster
+    public static final String SHARDING_KEY = "cluster-sharding-key";
+    public static final String REMOTE_DATABASE = "cluster-remote-database";
+    public static final String REMOTE_TABLE = "cluster-remote-table";
+  }
+
+  /** Constants for cluster tables. */
+  public static final class ClusterConstants {
+    private ClusterConstants() {}
+
+    // Name of the clickhouse cluster
+    public static final String CLUSTER_NAME = "cluster-name";
+    // Whether to use 'ON CLUSTER' clause when creating tables
+    public static final String ON_CLUSTER = "on-cluster";
+  }
+
+  /** Table-scoped properties. */
+  public static final class TableConstants {
+    private TableConstants() {}
+
+    public static final String ENGINE = "engine";
+    public static final String ENGINE_UPPER = "ENGINE";
+    public static final String SETTINGS_PREFIX = "settings.";
+  }
+
+  public static final class IndexConstants {
+    private IndexConstants() {}
+
+    // The name of the data skipping index type for minmax index in clickhouse.
+    public static final String DATA_SKIPPING_MINMAX_VALUE = "minmax";
+
+    // The name of the data skipping index type for bloom filter index in clickhouse.
+    public static final String DATA_SKIPPING_BLOOM_FILTER = "bloom_filter";
+  }
 }

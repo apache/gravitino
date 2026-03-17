@@ -136,7 +136,6 @@ public class TestFunctionMetaService extends TestJDBCBackend {
             .withComment("updated comment")
             .withFunctionType(function.functionType())
             .withDeterministic(function.deterministic())
-            .withReturnType(function.returnType())
             .withDefinitions(function.definitions())
             .withAuditInfo(AUDIT_INFO)
             .build();
@@ -197,7 +196,6 @@ public class TestFunctionMetaService extends TestJDBCBackend {
             .withComment("updated comment")
             .withFunctionType(function.functionType())
             .withDeterministic(true)
-            .withReturnType(function.returnType())
             .withDefinitions(function.definitions())
             .withAuditInfo(AUDIT_INFO)
             .build();
@@ -263,7 +261,6 @@ public class TestFunctionMetaService extends TestJDBCBackend {
             .withComment("version 2 comment")
             .withFunctionType(function.functionType())
             .withDeterministic(function.deterministic())
-            .withReturnType(function.returnType())
             .withDefinitions(function.definitions())
             .withAuditInfo(AUDIT_INFO)
             .build();
@@ -300,7 +297,6 @@ public class TestFunctionMetaService extends TestJDBCBackend {
             .withComment("another function v2")
             .withFunctionType(anotherFunction.functionType())
             .withDeterministic(anotherFunction.deterministic())
-            .withReturnType(anotherFunction.returnType())
             .withDefinitions(anotherFunction.definitions())
             .withAuditInfo(AUDIT_INFO)
             .build();
@@ -314,7 +310,6 @@ public class TestFunctionMetaService extends TestJDBCBackend {
             .withComment("another function v3")
             .withFunctionType(anotherFunction.functionType())
             .withDeterministic(anotherFunction.deterministic())
-            .withReturnType(anotherFunction.returnType())
             .withDefinitions(anotherFunction.definitions())
             .withAuditInfo(AUDIT_INFO)
             .build();
@@ -352,20 +347,26 @@ public class TestFunctionMetaService extends TestJDBCBackend {
     }
     assertFalse(legacyRecordExistsInDB(function.id(), Entity.EntityType.FUNCTION));
     assertEquals(0, listFunctionVersions(function.id()).size());
-    assertEquals(3, listFunctionVersions(anotherFunction.id()).size());
+    Map<Integer, Long> anotherFunctionVersionsAfterHardDelete =
+        listFunctionVersions(anotherFunction.id());
+    assertTrue(anotherFunctionVersionsAfterHardDelete.containsKey(3));
+    assertEquals(0L, anotherFunctionVersionsAfterHardDelete.get(3));
 
     // Soft delete old versions
     for (Entity.EntityType entityType : Entity.EntityType.values()) {
       backend.deleteOldVersionData(entityType, 1);
     }
     Map<Integer, Long> versionDeletedMap = listFunctionVersions(anotherFunction.id());
-    assertEquals(3, versionDeletedMap.size());
+    assertTrue(versionDeletedMap.containsKey(3));
+    assertEquals(0L, versionDeletedMap.get(3));
     assertEquals(1, versionDeletedMap.values().stream().filter(value -> value == 0L).count());
-    assertEquals(2, versionDeletedMap.values().stream().filter(value -> value != 0L).count());
 
     // Hard delete old versions
     backend.hardDeleteLegacyData(Entity.EntityType.FUNCTION, Instant.now().toEpochMilli() + 1000);
-    assertEquals(1, listFunctionVersions(anotherFunction.id()).size());
+    Map<Integer, Long> finalFunctionVersions = listFunctionVersions(anotherFunction.id());
+    assertTrue(finalFunctionVersions.containsKey(3));
+    assertEquals(0L, finalFunctionVersions.get(3));
+    assertEquals(1, finalFunctionVersions.values().stream().filter(value -> value == 0L).count());
   }
 
   @TestTemplate
@@ -391,7 +392,6 @@ public class TestFunctionMetaService extends TestJDBCBackend {
               .withComment("version " + version)
               .withFunctionType(function.functionType())
               .withDeterministic(function.deterministic())
-              .withReturnType(function.returnType())
               .withDefinitions(function.definitions())
               .withAuditInfo(AUDIT_INFO)
               .build();
@@ -441,7 +441,6 @@ public class TestFunctionMetaService extends TestJDBCBackend {
             .withComment("overwritten comment")
             .withFunctionType(function.functionType())
             .withDeterministic(true)
-            .withReturnType(function.returnType())
             .withDefinitions(function.definitions())
             .withAuditInfo(AUDIT_INFO)
             .build();
@@ -461,7 +460,10 @@ public class TestFunctionMetaService extends TestJDBCBackend {
     FunctionParam param2 = FunctionParams.of("param2", Types.StringType.get());
     FunctionImpl impl = FunctionImpls.ofSql(FunctionImpl.RuntimeType.SPARK, "SELECT param1 + 1");
     FunctionDefinition definition =
-        FunctionDefinitions.of(new FunctionParam[] {param1, param2}, new FunctionImpl[] {impl});
+        FunctionDefinitions.of(
+            new FunctionParam[] {param1, param2},
+            Types.IntegerType.get(),
+            new FunctionImpl[] {impl});
 
     return FunctionEntity.builder()
         .withId(id)
@@ -470,7 +472,6 @@ public class TestFunctionMetaService extends TestJDBCBackend {
         .withComment("test function comment")
         .withFunctionType(FunctionType.SCALAR)
         .withDeterministic(false)
-        .withReturnType(Types.IntegerType.get())
         .withDefinitions(new FunctionDefinition[] {definition})
         .withAuditInfo(auditInfo)
         .build();

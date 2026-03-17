@@ -906,7 +906,9 @@ public class TestOceanBaseTableOperations extends TestOceanBase {
     };
 
     final Index[] primaryIndex =
-        new Index[] {Indexes.createMysqlPrimaryKey(new String[][] {{"col_1"}, {"col_4"}})};
+        new Index[] {
+          Indexes.createMysqlPrimaryKey(new String[][] {{"col_1"}, {"col_4"}}, Map.of())
+        };
     exception =
         Assertions.assertThrows(
             IllegalArgumentException.class,
@@ -985,7 +987,7 @@ public class TestOceanBaseTableOperations extends TestOceanBase {
     successIndex =
         new TableChange.AddIndex(
             Index.IndexType.PRIMARY_KEY,
-            Indexes.DEFAULT_MYSQL_PRIMARY_KEY_NAME,
+            Indexes.DEFAULT_PRIMARY_KEY_NAME,
             new String[][] {{"col_1"}, {"col_2"}});
     sql = OceanBaseTableOperations.addIndexDefinition(successIndex);
     Assertions.assertEquals("ADD PRIMARY KEY  (`col_1`, `col_2`)", sql);

@@ -55,6 +55,9 @@ public class PolicyDTO implements Policy {
     // add mappings for built-in types here
     // For example: @JsonSubTypes.Type(value = DataCompactionContent.class, name =
     // "system_data_compaction")
+    @JsonSubTypes.Type(
+        value = PolicyContentDTO.IcebergCompactionContentDTO.class,
+        name = "system_iceberg_compaction")
   })
   private PolicyContentDTO content;
 

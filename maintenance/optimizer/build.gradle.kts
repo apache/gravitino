@@ -24,8 +24,16 @@ plugins {
   id("idea")
 }
 
+val scalaVersion: String =
+  project.properties["scalaVersion"] as? String ?: extra["defaultScalaVersion"].toString()
+val sparkVersion: String = libs.versions.spark33.get()
+val sparkMajorVersion: String = sparkVersion.substringBeforeLast(".")
+val icebergVersion: String = libs.versions.iceberg4connector.get()
+
 dependencies {
   implementation(project(":api"))
+  implementation(project(":maintenance:optimizer-api"))
+  implementation(project(":maintenance:gravitino-updaters"))
   implementation(project(":catalogs:catalog-common"))
   implementation(project(":clients:client-java"))
   implementation(project(":core")) {
@@ -35,16 +43,57 @@ dependencies {
     exclude("*")
   }
   implementation(libs.bundles.log4j)
+  implementation(libs.commons.cli.new)
   implementation(libs.commons.lang3)
   implementation(libs.jackson.databind)
   implementation(libs.jackson.annotations)
   implementation(libs.guava)
+  implementation(libs.commons.dbcp2)
+  implementation(libs.ql.expression)
+  implementation(libs.h2db)
 
   annotationProcessor(libs.lombok)
   compileOnly(libs.lombok)
 
+  testImplementation(libs.awaitility)
   testImplementation(libs.junit.jupiter.api)
   testImplementation(libs.junit.jupiter.params)
+  testImplementation(libs.mockito.core)
+  testImplementation("org.slf4j:slf4j-api:1.7.36")
+  testRuntimeOnly("org.slf4j:slf4j-simple:1.7.36")
+  testRuntimeOnly(
+    "org.scala-lang.modules:scala-collection-compat_$scalaVersion:${libs.versions.scala.collection.compat.get()}"
+  )
+  testImplementation(
+    "org.apache.iceberg:iceberg-spark-runtime-${sparkMajorVersion}_$scalaVersion:$icebergVersion"
+  ) {
+    exclude(group = "org.slf4j", module = "slf4j-api")
+    exclude(group = "org.apache.logging.log4j", module = "log4j-slf4j-impl")
+    exclude(group = "org.slf4j", module = "slf4j-log4j12")
+  }
+  testImplementation("org.apache.spark:spark-catalyst_$scalaVersion:$sparkVersion") {
+    exclude(group = "org.slf4j", module = "slf4j-api")
+    exclude(group = "org.apache.logging.log4j", module = "log4j-slf4j-impl")
+    exclude(group = "org.slf4j", module = "slf4j-log4j12")
+  }
+  testImplementation("org.apache.spark:spark-core_$scalaVersion:$sparkVersion") {
+    exclude(group = "org.slf4j", module = "slf4j-api")
+    exclude(group = "org.apache.logging.log4j", module = "log4j-slf4j-impl")
+    exclude(group = "org.slf4j", module = "slf4j-log4j12")
+  }
+  testImplementation("org.apache.spark:spark-sql_$scalaVersion:$sparkVersion") {
+    exclude(group = "org.slf4j", module = "slf4j-api")
+    exclude(group = "org.apache.logging.log4j", module = "log4j-slf4j-impl")
+    exclude(group = "org.slf4j", module = "slf4j-log4j12")
+  }
+  testImplementation(libs.testcontainers)
+  testImplementation(libs.testcontainers.junit.jupiter)
+  testImplementation(libs.testcontainers.mysql)
+  testImplementation(libs.testcontainers.postgresql)
+  testImplementation(project(":integration-test-common", "testArtifacts"))
+  testImplementation(project(":server"))
+  testRuntimeOnly(libs.mysql.driver)
+  testRuntimeOnly(libs.postgresql.driver)
   testAnnotationProcessor(libs.lombok)
   testCompileOnly(libs.lombok)
 
@@ -66,24 +115,13 @@ tasks {
     into("$rootDir/distribution/package/optimizer/libs")
   }
 
-  register("copyConfigs", Copy::class) {
-    from("src/main/resources")
-    into("$rootDir/distribution/package/optimizer/conf")
-
-    rename { original ->
-      if (original.endsWith(".template")) {
-        original.replace(".template", "")
-      } else {
-        original
-      }
-    }
-
-    fileMode = 0b111101101
-  }
-
   register("copyLibAndConfigs", Copy::class) {
-    dependsOn("copyLibs", "copyConfigs")
+    dependsOn("copyLibs")
   }
+}
+
+configurations.testRuntimeClasspath {
+  exclude(group = "org.apache.logging.log4j", module = "log4j-slf4j2-impl")
 }
 
 tasks.test {

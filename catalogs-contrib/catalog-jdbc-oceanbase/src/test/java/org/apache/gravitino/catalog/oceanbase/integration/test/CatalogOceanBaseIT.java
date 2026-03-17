@@ -1622,7 +1622,7 @@ public class CatalogOceanBaseIT extends BaseIT {
         NameIdentifier.of(schemaName, tableName),
         TableChange.addIndex(
             Index.IndexType.PRIMARY_KEY,
-            Indexes.DEFAULT_MYSQL_PRIMARY_KEY_NAME,
+            Indexes.DEFAULT_PRIMARY_KEY_NAME,
             new String[][] {{"col_1"}}));
 
     Table table = tableCatalog.loadTable(NameIdentifier.of(schemaName, tableName));
@@ -1728,7 +1728,7 @@ public class CatalogOceanBaseIT extends BaseIT {
             true),
         TableChange.addIndex(
             Index.IndexType.PRIMARY_KEY,
-            Indexes.DEFAULT_MYSQL_PRIMARY_KEY_NAME,
+            Indexes.DEFAULT_PRIMARY_KEY_NAME,
             new String[][] {{"col_6"}}));
 
     Table table = tableCatalog.loadTable(tableIdentifier);

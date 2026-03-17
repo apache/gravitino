@@ -428,4 +428,26 @@ public class FilesetMetaService {
 
     return filesetPO;
   }
+
+  @Monitored(
+      metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME,
+      baseMetricName = "batchGetFilesetByIdentifier")
+  public List<FilesetEntity> batchGetFilesetByIdentifier(List<NameIdentifier> identifiers) {
+    NameIdentifier firstIdent = identifiers.get(0);
+    NameIdentifier schemaIdent = NameIdentifierUtil.getSchemaIdentifier(firstIdent);
+    List<String> filesetNames =
+        identifiers.stream().map(NameIdentifier::name).collect(Collectors.toList());
+
+    return SessionUtils.doWithCommitAndFetchResult(
+        FilesetMetaMapper.class,
+        mapper -> {
+          List<FilesetPO> filesetPOs =
+              mapper.batchSelectFilesetByIdentifier(
+                  schemaIdent.namespace().level(0),
+                  schemaIdent.namespace().level(1),
+                  schemaIdent.name(),
+                  filesetNames);
+          return POConverters.fromFilesetPOs(filesetPOs, firstIdent.namespace());
+        });
+  }
 }

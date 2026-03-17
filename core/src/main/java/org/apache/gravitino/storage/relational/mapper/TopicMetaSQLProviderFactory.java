@@ -123,4 +123,13 @@ public class TopicMetaSQLProviderFactory {
       @Param("legacyTimeline") Long legacyTimeline, @Param("limit") int limit) {
     return getProvider().deleteTopicMetasByLegacyTimeline(legacyTimeline, limit);
   }
+
+  public static String batchSelectTopicByIdentifier(
+      @Param("metalakeName") String metalakeName,
+      @Param("catalogName") String catalogName,
+      @Param("schemaName") String schemaName,
+      @Param("topicNames") List<String> topicNames) {
+    return getProvider()
+        .batchSelectTopicByIdentifier(metalakeName, catalogName, schemaName, topicNames);
+  }
 }

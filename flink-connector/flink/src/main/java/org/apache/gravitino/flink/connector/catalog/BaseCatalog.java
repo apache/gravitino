@@ -328,7 +328,7 @@ public abstract class BaseCatalog extends AbstractCatalog {
         primaryColumns.stream()
             .map(primaryColumn -> new String[] {primaryColumn})
             .toArray(String[][]::new);
-    Index primary = Indexes.primary("primary", primaryField);
+    Index primary = Indexes.primary("primary", primaryField, Collections.emptyMap());
     return new Index[] {primary};
   }
 

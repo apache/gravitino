@@ -19,8 +19,6 @@
 package org.apache.gravitino.dto.function;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
-import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
-import com.fasterxml.jackson.databind.annotation.JsonSerialize;
 import java.util.Arrays;
 import javax.annotation.Nullable;
 import lombok.AllArgsConstructor;
@@ -30,11 +28,8 @@ import lombok.NoArgsConstructor;
 import org.apache.gravitino.Audit;
 import org.apache.gravitino.dto.AuditDTO;
 import org.apache.gravitino.function.Function;
-import org.apache.gravitino.function.FunctionColumn;
 import org.apache.gravitino.function.FunctionDefinition;
 import org.apache.gravitino.function.FunctionType;
-import org.apache.gravitino.json.JsonUtils;
-import org.apache.gravitino.rel.types.Type;
 
 /** Represents a Function DTO (Data Transfer Object). */
 @NoArgsConstructor
@@ -55,15 +50,6 @@ public class FunctionDTO implements Function {
   @Nullable
   @JsonProperty("comment")
   private String comment;
-
-  @Nullable
-  @JsonProperty("returnType")
-  @JsonSerialize(using = JsonUtils.TypeSerializer.class)
-  @JsonDeserialize(using = JsonUtils.TypeDeserializer.class)
-  private Type returnType;
-
-  @JsonProperty("returnColumns")
-  private FunctionColumnDTO[] returnColumns;
 
   @JsonProperty("definitions")
   private FunctionDefinitionDTO[] definitions;
@@ -92,21 +78,6 @@ public class FunctionDTO implements Function {
   }
 
   @Override
-  public Type returnType() {
-    return returnType;
-  }
-
-  @Override
-  public FunctionColumn[] returnColumns() {
-    if (returnColumns == null) {
-      return new FunctionColumn[0];
-    }
-    return Arrays.stream(returnColumns)
-        .map(FunctionColumnDTO::toFunctionColumn)
-        .toArray(FunctionColumn[]::new);
-  }
-
-  @Override
   public FunctionDefinition[] definitions() {
     if (definitions == null) {
       return new FunctionDefinition[0];
@@ -132,10 +103,6 @@ public class FunctionDTO implements Function {
         + ", comment='"
         + comment
         + '\''
-        + ", returnType="
-        + returnType
-        + ", returnColumns="
-        + Arrays.toString(returnColumns)
         + ", definitions="
         + Arrays.toString(definitions)
         + ", audit="

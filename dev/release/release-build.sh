@@ -206,12 +206,16 @@ if [[ "$1" == "package" ]]; then
 
   rm -f gravitino-$GRAVITINO_VERSION-src/LICENSE.bin
   rm -f gravitino-$GRAVITINO_VERSION-src/NOTICE.bin
-  rm -f gravitino-$GRAVITINO_VERSION-src/LICENSE.rest
-  rm -f gravitino-$GRAVITINO_VERSION-src/NOTICE.rest
   rm -f gravitino-$GRAVITINO_VERSION-src/LICENSE.trino
   rm -f gravitino-$GRAVITINO_VERSION-src/NOTICE.trino
+  rm -f gravitino-$GRAVITINO_VERSION-src/LICENSE.iceberg
+  rm -f gravitino-$GRAVITINO_VERSION-src/NOTICE.iceberg
+  rm -f gravitino-$GRAVITINO_VERSION-src/LICENSE.lance
+  rm -f gravitino-$GRAVITINO_VERSION-src/NOTICE.lance
   rm -f gravitino-$GRAVITINO_VERSION-src/web/web/LICENSE.bin
   rm -f gravitino-$GRAVITINO_VERSION-src/web/web/NOTICE.bin
+  rm -f gravitino-$GRAVITINO_VERSION-src/web-v2/web/LICENSE.bin
+  rm -f gravitino-$GRAVITINO_VERSION-src/web-v2/web/NOTICE.bin
 
   rm -f *.asc
   tar cvzf gravitino-$GRAVITINO_VERSION-src.tar.gz --exclude gravitino-$GRAVITINO_VERSION-src/.git gravitino-$GRAVITINO_VERSION-src
@@ -254,12 +258,15 @@ if [[ "$1" == "package" ]]; then
       --detach-sig gravitino-lance-rest-server-$GRAVITINO_VERSION-bin.tar.gz
     shasum -a 512 gravitino-lance-rest-server-$GRAVITINO_VERSION-bin.tar.gz > gravitino-lance-rest-server-$GRAVITINO_VERSION-bin.tar.gz.sha512
 
-    echo "Copying and signing Gravitino Trino connector binary distribution"
-    cp gravitino-$GRAVITINO_VERSION-bin/distribution/gravitino-trino-connector-$GRAVITINO_VERSION.tar.gz .
-    echo $GPG_PASSPHRASE | $GPG --passphrase-fd 0 --armour \
-      --output gravitino-trino-connector-$GRAVITINO_VERSION.tar.gz.asc \
-      --detach-sig gravitino-trino-connector-$GRAVITINO_VERSION.tar.gz
-    shasum -a 512 gravitino-trino-connector-$GRAVITINO_VERSION.tar.gz > gravitino-trino-connector-$GRAVITINO_VERSION.tar.gz.sha512
+    echo "Copying and signing Gravitino Trino connector binary distributions"
+    for trino_tar in gravitino-$GRAVITINO_VERSION-bin/distribution/gravitino-trino-connector-*-$GRAVITINO_VERSION.tar.gz; do
+      trino_connector_name=$(basename "$trino_tar" .tar.gz)
+      cp "$trino_tar" .
+      echo $GPG_PASSPHRASE | $GPG --passphrase-fd 0 --armour \
+        --output ${trino_connector_name}.tar.gz.asc \
+        --detach-sig ${trino_connector_name}.tar.gz
+      shasum -a 512 ${trino_connector_name}.tar.gz > ${trino_connector_name}.tar.gz.sha512
+    done
 
     echo "Copying and signing Gravitino Python client binary distribution"
     cp gravitino-$GRAVITINO_VERSION-bin/clients/client-python/dist/apache_gravitino-$RC_PYGRAVITINO_VERSION.tar.gz .

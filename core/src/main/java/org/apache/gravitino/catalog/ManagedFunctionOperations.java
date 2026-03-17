@@ -27,7 +27,6 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
-import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Collectors;
 import org.apache.gravitino.Entity;
@@ -42,7 +41,6 @@ import org.apache.gravitino.exceptions.NoSuchSchemaException;
 import org.apache.gravitino.function.Function;
 import org.apache.gravitino.function.FunctionCatalog;
 import org.apache.gravitino.function.FunctionChange;
-import org.apache.gravitino.function.FunctionColumn;
 import org.apache.gravitino.function.FunctionDefinition;
 import org.apache.gravitino.function.FunctionDefinitions;
 import org.apache.gravitino.function.FunctionImpl;
@@ -52,7 +50,6 @@ import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.meta.FunctionEntity;
 import org.apache.gravitino.rel.Column;
 import org.apache.gravitino.rel.expressions.Expression;
-import org.apache.gravitino.rel.types.Type;
 import org.apache.gravitino.storage.IdGenerator;
 import org.apache.gravitino.utils.PrincipalUtils;
 
@@ -122,35 +119,9 @@ public class ManagedFunctionOperations implements FunctionCatalog {
       String comment,
       FunctionType functionType,
       boolean deterministic,
-      Type returnType,
       FunctionDefinition[] definitions)
       throws NoSuchSchemaException, FunctionAlreadyExistsException {
-    return doRegisterFunction(
-        ident,
-        comment,
-        functionType,
-        deterministic,
-        Optional.of(returnType),
-        Optional.empty(),
-        definitions);
-  }
-
-  @Override
-  public Function registerFunction(
-      NameIdentifier ident,
-      String comment,
-      boolean deterministic,
-      FunctionColumn[] returnColumns,
-      FunctionDefinition[] definitions)
-      throws NoSuchSchemaException, FunctionAlreadyExistsException {
-    return doRegisterFunction(
-        ident,
-        comment,
-        FunctionType.TABLE,
-        deterministic,
-        Optional.empty(),
-        Optional.of(returnColumns),
-        definitions);
+    return doRegisterFunction(ident, comment, functionType, deterministic, definitions);
   }
 
   @Override
@@ -188,13 +159,12 @@ public class ManagedFunctionOperations implements FunctionCatalog {
       String comment,
       FunctionType functionType,
       boolean deterministic,
-      Optional<Type> returnType,
-      Optional<FunctionColumn[]> returnColumns,
       FunctionDefinition[] definitions)
       throws NoSuchSchemaException, FunctionAlreadyExistsException {
     Preconditions.checkArgument(
         definitions != null && definitions.length > 0,
         "At least one function definition must be provided");
+    validateDefinitionsNoRuntimeDuplicate(definitions);
     validateDefinitionsNoArityOverlap(definitions);
 
     String currentUser = PrincipalUtils.getCurrentUserName();
@@ -209,8 +179,6 @@ public class ManagedFunctionOperations implements FunctionCatalog {
             .withComment(comment)
             .withFunctionType(functionType)
             .withDeterministic(deterministic)
-            .withReturnType(returnType.orElse(null))
-            .withReturnColumns(returnColumns.orElse(null))
             .withDefinitions(definitions)
             .withAuditInfo(auditInfo)
             .build();
@@ -255,6 +223,32 @@ public class ManagedFunctionOperations implements FunctionCatalog {
                   "Cannot register function: definitions at index %d and %d have overlapping "
                       + "arity '%s'. This would create ambiguous function invocations.",
                   existingIndex, i, arity));
+        }
+      }
+    }
+  }
+
+  /**
+   * Validates that no definition contains duplicate runtime types in its implementations. Each
+   * definition must have at most one implementation per runtime type.
+   *
+   * @param definitions The array of definitions to validate.
+   * @throws IllegalArgumentException If any definition has duplicate runtime types.
+   */
+  private void validateDefinitionsNoRuntimeDuplicate(FunctionDefinition[] definitions) {
+    for (int i = 0; i < definitions.length; i++) {
+      FunctionImpl[] impls = definitions[i].impls();
+      if (impls == null || impls.length <= 1) {
+        continue;
+      }
+      Set<FunctionImpl.RuntimeType> seenRuntimes = new HashSet<>();
+      for (FunctionImpl impl : impls) {
+        if (!seenRuntimes.add(impl.runtime())) {
+          throw new IllegalArgumentException(
+              String.format(
+                  "Cannot register function: definition at index %d has duplicate runtime '%s'. "
+                      + "Each definition must have at most one implementation per runtime.",
+                  i, impl.runtime()));
         }
       }
     }
@@ -321,8 +315,6 @@ public class ManagedFunctionOperations implements FunctionCatalog {
         .withComment(newComment)
         .withFunctionType(oldEntity.functionType())
         .withDeterministic(oldEntity.deterministic())
-        .withReturnType(oldEntity.returnType())
-        .withReturnColumns(oldEntity.returnColumns())
         .withDefinitions(newDefinitions.toArray(new FunctionDefinition[0]))
         .withAuditInfo(newAuditInfo)
         .build();
@@ -459,6 +451,19 @@ public class ManagedFunctionOperations implements FunctionCatalog {
     }
   }
 
+  private static String formatParams(FunctionParam[] params) {
+    if (params == null || params.length == 0) {
+      return "()";
+    }
+    StringBuilder sb = new StringBuilder("(");
+    for (int i = 0; i < params.length; i++) {
+      if (i > 0) sb.append(", ");
+      sb.append(params[i].name()).append(": ").append(params[i].dataType().simpleString());
+    }
+    sb.append(")");
+    return sb.toString();
+  }
+
   private boolean parametersMatch(FunctionParam[] params1, FunctionParam[] params2) {
     if (params1.length != params2.length) {
       return false;
@@ -492,15 +497,20 @@ public class ManagedFunctionOperations implements FunctionCatalog {
         }
         List<FunctionImpl> impls = new ArrayList<>(Arrays.asList(def.impls()));
         impls.add(implToAdd);
-        result.add(FunctionDefinitions.of(def.parameters(), impls.toArray(new FunctionImpl[0])));
+        result.add(rebuildDefinitionWithNewImpls(def, impls.toArray(new FunctionImpl[0])));
       } else {
         result.add(def);
       }
     }
 
     if (!found) {
+      List<String> availableSignatures =
+          definitions.stream().map(d -> formatParams(d.parameters())).collect(Collectors.toList());
       throw new IllegalArgumentException(
-          "Cannot add implementation: no definition found with the specified parameters");
+          String.format(
+              "Cannot add implementation: no definition found with the specified parameters %s. "
+                  + "Available parameter signatures: %s",
+              formatParams(targetParams), availableSignatures));
     }
 
     return result;
@@ -514,12 +524,14 @@ public class ManagedFunctionOperations implements FunctionCatalog {
     List<FunctionDefinition> result = new ArrayList<>();
     boolean definitionFound = false;
     boolean runtimeFound = false;
+    List<FunctionImpl.RuntimeType> availableRuntimes = new ArrayList<>();
 
     for (FunctionDefinition def : definitions) {
       if (parametersMatch(def.parameters(), targetParams)) {
         definitionFound = true;
         List<FunctionImpl> impls = new ArrayList<>();
         for (FunctionImpl impl : def.impls()) {
+          availableRuntimes.add(impl.runtime());
           if (impl.runtime() == runtime) {
             runtimeFound = true;
             impls.add(newImpl);
@@ -527,21 +539,28 @@ public class ManagedFunctionOperations implements FunctionCatalog {
             impls.add(impl);
           }
         }
-        result.add(FunctionDefinitions.of(def.parameters(), impls.toArray(new FunctionImpl[0])));
+        result.add(rebuildDefinitionWithNewImpls(def, impls.toArray(new FunctionImpl[0])));
       } else {
         result.add(def);
       }
     }
 
     if (!definitionFound) {
+      List<String> availableSignatures =
+          definitions.stream().map(d -> formatParams(d.parameters())).collect(Collectors.toList());
       throw new IllegalArgumentException(
-          "Cannot update implementation: no definition found with the specified parameters");
+          String.format(
+              "Cannot update implementation: no definition found with the specified parameters %s. "
+                  + "Available parameter signatures: %s",
+              formatParams(targetParams), availableSignatures));
     }
 
     if (!runtimeFound) {
       throw new IllegalArgumentException(
           String.format(
-              "Cannot update implementation: runtime '%s' not found in the definition", runtime));
+              "Cannot update implementation: runtime '%s' not found in the definition %s. "
+                  + "Available runtimes in that definition: %s",
+              runtime, formatParams(targetParams), availableRuntimes));
     }
 
     return result;
@@ -554,6 +573,7 @@ public class ManagedFunctionOperations implements FunctionCatalog {
     List<FunctionDefinition> result = new ArrayList<>();
     boolean definitionFound = false;
     boolean runtimeFound = false;
+    List<FunctionImpl.RuntimeType> availableRuntimes = new ArrayList<>();
 
     for (FunctionDefinition def : definitions) {
       if (parametersMatch(def.parameters(), targetParams)) {
@@ -569,29 +589,53 @@ public class ManagedFunctionOperations implements FunctionCatalog {
 
         List<FunctionImpl> impls = new ArrayList<>();
         for (FunctionImpl impl : def.impls()) {
+          availableRuntimes.add(impl.runtime());
           if (impl.runtime() == runtime) {
             runtimeFound = true;
           } else {
             impls.add(impl);
           }
         }
-        result.add(FunctionDefinitions.of(def.parameters(), impls.toArray(new FunctionImpl[0])));
+        result.add(rebuildDefinitionWithNewImpls(def, impls.toArray(new FunctionImpl[0])));
       } else {
         result.add(def);
       }
     }
 
     if (!definitionFound) {
+      List<String> availableSignatures =
+          definitions.stream().map(d -> formatParams(d.parameters())).collect(Collectors.toList());
       throw new IllegalArgumentException(
-          "Cannot remove implementation: no definition found with the specified parameters");
+          String.format(
+              "Cannot remove implementation: no definition found with the specified parameters %s. "
+                  + "Available parameter signatures: %s",
+              formatParams(targetParams), availableSignatures));
     }
 
     if (!runtimeFound) {
       throw new IllegalArgumentException(
           String.format(
-              "Cannot remove implementation: runtime '%s' not found in the definition", runtime));
+              "Cannot remove implementation: runtime '%s' not found in the definition %s. "
+                  + "Available runtimes in that definition: %s",
+              runtime, formatParams(targetParams), availableRuntimes));
     }
 
     return result;
+  }
+
+  /**
+   * Rebuilds a FunctionDefinition with new implementations while preserving
+   * returnType/returnColumns.
+   */
+  @SuppressWarnings("deprecation")
+  private FunctionDefinition rebuildDefinitionWithNewImpls(
+      FunctionDefinition original, FunctionImpl[] newImpls) {
+    if (original.returnType() != null) {
+      return FunctionDefinitions.of(original.parameters(), original.returnType(), newImpls);
+    } else if (original.returnColumns() != null && original.returnColumns().length > 0) {
+      return FunctionDefinitions.of(original.parameters(), original.returnColumns(), newImpls);
+    } else {
+      return FunctionDefinitions.of(original.parameters(), newImpls);
+    }
   }
 }

@@ -17,4 +17,25 @@
 
 package org.apache.gravitino.spark.connector.integration.test.authorization;
 
-public class SparkAuthorizationIT35 extends SparkAuthorizationIT {}
+import static org.junit.Assert.assertThrows;
+
+import org.apache.gravitino.exceptions.ForbiddenException;
+
+/**
+ * Spark 3.5+ specific authorization integration tests. Overrides assertion methods for
+ * functionality that behaves differently in Spark 3.5+, such as the loadTable method with
+ * TableWritePrivilege support.
+ */
+public class SparkAuthorizationIT35 extends SparkAuthorizationIT {
+
+  /**
+   * In Spark 3.5+, INSERT should throw ForbiddenException when user doesn't have MODIFY_TABLE
+   * privilege because Spark 3.5+ supports {@code loadTable(Identifier, Set<TableWritePrivilege>)}.
+   */
+  @Override
+  protected void assertInsertBehaviorWithoutModifyPrivilege(String tableName) {
+    assertThrows(
+        ForbiddenException.class,
+        () -> getSparkSession().sql(String.format("INSERT INTO %s VALUES (1, 'test')", tableName)));
+  }
+}

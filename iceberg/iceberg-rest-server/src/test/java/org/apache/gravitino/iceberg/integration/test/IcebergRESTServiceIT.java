@@ -117,6 +117,10 @@ public abstract class IcebergRESTServiceIT extends IcebergRESTServiceBaseIT {
     sql(String.format("DROP TABLE %s.%s PURGE", namespace, table));
   }
 
+  private void purgeView(String namespace, String view) {
+    sql(String.format("DROP VIEW %s.%s", namespace, view));
+  }
+
   private void purgeNamespace(String namespace) {
     if (!namespaceExists(namespace)) {
       return;
@@ -127,6 +131,15 @@ public abstract class IcebergRESTServiceIT extends IcebergRESTServiceBaseIT {
       List<Object[]> childNamespaces = sql(String.format("SHOW DATABASES IN %s ", namespace));
       Set<String> childNamespacesString = convertToStringSet(childNamespaces, 0);
       childNamespacesString.forEach(this::purgeNamespace);
+    }
+
+    // Drop views first (required by Iceberg 1.10.1+)
+    try {
+      List<Object[]> views = sql("SHOW VIEWS IN " + namespace);
+      Set<String> viewsString = convertToStringSet(views, 1);
+      viewsString.forEach(view -> purgeView(namespace, view));
+    } catch (Exception e) {
+      // Ignore if SHOW VIEWS is not supported
     }
 
     Set<String> tables = convertToStringSet(sql("SHOW TABLES IN " + namespace), 1);

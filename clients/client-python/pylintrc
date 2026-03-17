@@ -39,6 +39,7 @@ disable=missing-class-docstring,
         unnecessary-pass,               
         duplicate-code,                 #TODO-fix
         too-many-arguments,             #TODO-fix
+        too-many-positional-arguments,  #TODO-fix
 
 [LOGGING]
 
@@ -93,3 +94,8 @@ variable-naming-style=snake_case
 
 # Naming Style for Module
 module-naming-style=snake_case
+
+[DESIGN]
+
+# Maximum number of return / yield for a function / method body.
+max-returns=10

@@ -51,7 +51,6 @@ import org.apache.gravitino.dto.authorization.UserDTO;
 import org.apache.gravitino.dto.credential.CredentialDTO;
 import org.apache.gravitino.dto.file.FileInfoDTO;
 import org.apache.gravitino.dto.file.FilesetDTO;
-import org.apache.gravitino.dto.function.FunctionColumnDTO;
 import org.apache.gravitino.dto.function.FunctionDTO;
 import org.apache.gravitino.dto.function.FunctionDefinitionDTO;
 import org.apache.gravitino.dto.job.JobTemplateDTO;
@@ -98,6 +97,7 @@ import org.apache.gravitino.job.SparkJobTemplate;
 import org.apache.gravitino.messaging.Topic;
 import org.apache.gravitino.model.Model;
 import org.apache.gravitino.model.ModelVersion;
+import org.apache.gravitino.policy.IcebergDataCompactionContent;
 import org.apache.gravitino.policy.PolicyContent;
 import org.apache.gravitino.policy.PolicyContents;
 import org.apache.gravitino.rel.Column;
@@ -408,6 +408,7 @@ public class DTOConverters {
         .withIndexType(index.type())
         .withName(index.name())
         .withFieldNames(index.fieldNames())
+        .withProperties(index.properties())
         .build();
   }
 
@@ -564,6 +565,19 @@ public class DTOConverters {
           .build();
     }
 
+    if (policyContent instanceof IcebergDataCompactionContent) {
+      IcebergDataCompactionContent icebergCompactionContent =
+          (IcebergDataCompactionContent) policyContent;
+      return PolicyContentDTO.IcebergCompactionContentDTO.builder()
+          .withMinDataFileMse(icebergCompactionContent.minDataFileMse())
+          .withMinDeleteFileNumber(icebergCompactionContent.minDeleteFileNumber())
+          .withDataFileMseWeight(icebergCompactionContent.dataFileMseWeight())
+          .withDeleteFileNumberWeight(icebergCompactionContent.deleteFileNumberWeight())
+          .withMaxPartitionNum(icebergCompactionContent.maxPartitionNum())
+          .withRewriteOptions(icebergCompactionContent.rewriteOptions())
+          .build();
+    }
+
     throw new IllegalArgumentException("Unsupported policy content: " + policyContent);
   }
 
@@ -607,8 +621,10 @@ public class DTOConverters {
       if (Literals.NULL.equals(expression)) {
         return LiteralDTO.NULL;
       }
+
+      Object value = ((Literal) expression).value();
       return LiteralDTO.builder()
-          .withValue((((Literal) expression).value().toString()))
+          .withValue(value == null ? null : value.toString())
           .withDataType(((Literal) expression).dataType())
           .build();
     } else if (expression instanceof NamedReference.FieldReference) {
@@ -737,14 +753,6 @@ public class DTOConverters {
    * @return The function DTO.
    */
   public static FunctionDTO toDTO(Function function) {
-    FunctionColumnDTO[] returnColumnDTOs = null;
-    if (function.returnColumns() != null && function.returnColumns().length > 0) {
-      returnColumnDTOs =
-          Arrays.stream(function.returnColumns())
-              .map(FunctionColumnDTO::fromFunctionColumn)
-              .toArray(FunctionColumnDTO[]::new);
-    }
-
     FunctionDefinitionDTO[] definitionDTOs = null;
     if (function.definitions() != null) {
       definitionDTOs =
@@ -758,8 +766,6 @@ public class DTOConverters {
         .withFunctionType(function.functionType())
         .withDeterministic(function.deterministic())
         .withComment(function.comment())
-        .withReturnType(function.returnType())
-        .withReturnColumns(returnColumnDTOs)
         .withDefinitions(definitionDTOs)
         .withAudit(toDTO(function.auditInfo()))
         .build();
@@ -970,7 +976,8 @@ public class DTOConverters {
    * @return The index.
    */
   public static Index fromDTO(IndexDTO indexDTO) {
-    return Indexes.of(indexDTO.type(), indexDTO.name(), indexDTO.fieldNames());
+    return Indexes.of(
+        indexDTO.type(), indexDTO.name(), indexDTO.fieldNames(), indexDTO.properties());
   }
 
   /**
@@ -1302,6 +1309,18 @@ public class DTOConverters {
           customContentDTO.customRules(),
           customContentDTO.supportedObjectTypes(),
           customContentDTO.properties());
+    }
+
+    if (policyContentDTO instanceof PolicyContentDTO.IcebergCompactionContentDTO) {
+      PolicyContentDTO.IcebergCompactionContentDTO icebergCompactionContentDTO =
+          (PolicyContentDTO.IcebergCompactionContentDTO) policyContentDTO;
+      return PolicyContents.icebergDataCompaction(
+          icebergCompactionContentDTO.minDataFileMse(),
+          icebergCompactionContentDTO.minDeleteFileNumber(),
+          icebergCompactionContentDTO.dataFileMseWeight(),
+          icebergCompactionContentDTO.deleteFileNumberWeight(),
+          icebergCompactionContentDTO.maxPartitionNum(),
+          icebergCompactionContentDTO.rewriteOptions());
     }
 
     throw new IllegalArgumentException(

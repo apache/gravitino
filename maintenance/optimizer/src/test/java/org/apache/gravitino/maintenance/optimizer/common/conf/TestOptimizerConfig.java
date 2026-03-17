@@ -53,4 +53,20 @@ class TestOptimizerConfig {
         () -> config.get(OptimizerConfig.GRAVITINO_METALAKE_CONFIG));
     Assertions.assertNull(config.get(OptimizerConfig.GRAVITINO_DEFAULT_CATALOG_CONFIG));
   }
+
+  @Test
+  void testJobSubmitterConfigsWithPrefix() {
+    Map<String, String> properties =
+        Map.of(
+            OptimizerConfig.JOB_SUBMITTER_CONFIG_PREFIX + "spark.master",
+            "yarn",
+            OptimizerConfig.JOB_SUBMITTER_CONFIG_PREFIX + "queue",
+            "default",
+            OptimizerConfig.GRAVITINO_URI,
+            "http://example.com");
+    OptimizerConfig config = new OptimizerConfig(properties);
+
+    Assertions.assertEquals(
+        Map.of("spark.master", "yarn", "queue", "default"), config.jobSubmitterConfigs());
+  }
 }

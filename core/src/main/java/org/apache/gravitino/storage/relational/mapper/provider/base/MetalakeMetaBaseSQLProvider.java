@@ -168,4 +168,21 @@ public class MetalakeMetaBaseSQLProvider {
         + TABLE_NAME
         + " WHERE deleted_at > 0 AND deleted_at < #{legacyTimeline} LIMIT #{limit}";
   }
+
+  public String batchSelectMetalakeByName(@Param("metalakeNames") List<String> metalakeNames) {
+    return "<script>"
+        + "SELECT metalake_id as metalakeId, metalake_name as metalakeName,"
+        + " metalake_comment as metalakeComment, properties, audit_info as auditInfo,"
+        + " schema_version as schemaVersion, current_version as currentVersion,"
+        + " last_version as lastVersion, deleted_at as deletedAt"
+        + " FROM "
+        + TABLE_NAME
+        + " WHERE metalake_name IN ("
+        + "<foreach collection='metalakeNames' item='metalakeName' separator=','>"
+        + "#{metalakeName}"
+        + "</foreach>"
+        + " )"
+        + " AND deleted_at = 0"
+        + "</script>";
+  }
 }

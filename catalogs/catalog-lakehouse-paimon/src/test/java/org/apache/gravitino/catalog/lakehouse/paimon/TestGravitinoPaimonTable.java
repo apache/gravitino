@@ -288,7 +288,10 @@ public class TestGravitinoPaimonTable {
     String[] partitionKeys = new String[] {"col_1"};
     Index[] indexes =
         Collections.singletonList(
-                primary(PAIMON_PRIMARY_KEY_INDEX_NAME, new String[][] {new String[] {"col_2"}}))
+                primary(
+                    PAIMON_PRIMARY_KEY_INDEX_NAME,
+                    new String[][] {new String[] {"col_2"}},
+                    Map.of()))
             .toArray(new Index[0]);
 
     Table table =
@@ -429,7 +432,10 @@ public class TestGravitinoPaimonTable {
 
     Index[] indexes =
         Collections.singletonList(
-                primary(PAIMON_PRIMARY_KEY_INDEX_NAME, new String[][] {new String[] {"col_2"}}))
+                primary(
+                    PAIMON_PRIMARY_KEY_INDEX_NAME,
+                    new String[][] {new String[] {"col_2"}},
+                    Map.of()))
             .toArray(new Index[0]);
 
     IllegalArgumentException exception =
@@ -669,7 +675,8 @@ public class TestGravitinoPaimonTable {
         Collections.singletonList(
                 primary(
                     PAIMON_PRIMARY_KEY_INDEX_NAME,
-                    new String[][] {new String[] {columns[2].name()}}))
+                    new String[][] {new String[] {columns[2].name()}},
+                    Map.of()))
             .toArray(new Index[0]);
 
     GravitinoPaimonTable gravitinoPaimonTable =
