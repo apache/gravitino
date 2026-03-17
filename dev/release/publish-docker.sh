@@ -75,10 +75,18 @@ while [[ $# -gt 0 ]]; do
       shift
       ;;
     --docker-version)
+      if [[ -z "${2:-}" || "$2" == -* ]]; then
+        echo "ERROR: --docker-version requires a non-empty value." >&2
+        exit 1
+      fi
       DOCKER_VERSION="$2"
       shift 2
       ;;
     --trino-version)
+      if [[ -z "${2:-}" || "$2" == -* ]]; then
+        echo "ERROR: --trino-version requires a non-empty value." >&2
+        exit 1
+      fi
       TRINO_VER="$2"
       shift 2
       ;;
