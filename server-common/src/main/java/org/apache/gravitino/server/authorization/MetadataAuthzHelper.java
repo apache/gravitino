@@ -168,6 +168,7 @@ public class MetadataAuthzHelper {
       Entity.EntityType entityType,
       NameIdentifier[] nameIdentifiers) {
     preloadToCache(entityType, nameIdentifiers);
+    preloadOwner(entityType, nameIdentifiers);
     return filterByExpression(metalake, expression, entityType, nameIdentifiers, e -> e);
   }
 
