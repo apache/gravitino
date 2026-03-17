@@ -104,7 +104,7 @@ include(":lineage")
 include(":mcp-server")
 include(
   ":maintenance:optimizer-api",
-  ":maintenance:gravitino-updaters",
+  ":maintenance:updaters",
   ":maintenance:optimizer",
   ":maintenance:jobs"
 )
