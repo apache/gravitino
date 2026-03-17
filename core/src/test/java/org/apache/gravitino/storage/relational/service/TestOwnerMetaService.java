@@ -544,6 +544,7 @@ class TestOwnerMetaService extends TestJDBCBackend {
 
     List<Relation> relations =
         OwnerMetaService.getInstance().batchGetOwner(identifiers, Entity.EntityType.CATALOG);
+    Assertions.assertEquals(1, relations.size());
 
     // catalog is CATALOG type; schema/table/topic share the same owner but different types.
     // batchGetOwner queries by a single identType, so query per type.
