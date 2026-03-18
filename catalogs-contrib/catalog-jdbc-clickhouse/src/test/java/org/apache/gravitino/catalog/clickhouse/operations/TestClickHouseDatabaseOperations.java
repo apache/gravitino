@@ -29,7 +29,6 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
 import javax.sql.DataSource;
-import org.apache.gravitino.catalog.clickhouse.ClickHouseConfig;
 import org.apache.gravitino.catalog.clickhouse.ClickHouseConstants.ClusterConstants;
 import org.apache.gravitino.catalog.jdbc.converter.JdbcExceptionConverter;
 import org.junit.jupiter.api.Assertions;
@@ -72,9 +71,6 @@ public class TestClickHouseDatabaseOperations {
 
   @Test
   void testGenerateCreateDatabaseSqlWithClusterNameButDisabled() {
-    Map<String, String> conf = new HashMap<>();
-    conf.put(ClickHouseConfig.CK_CLUSTER_NAME.getKey(), "ck_cluster");
-
     String sql = newOps().buildCreateSql("db_name", "comment", Collections.emptyMap());
     Assertions.assertEquals("CREATE DATABASE `db_name` COMMENT 'comment'", sql);
   }
@@ -89,8 +85,7 @@ public class TestClickHouseDatabaseOperations {
     // Cluster metadata embedded in COMMENT; user comment is empty
     String expectedComment = CLUSTER_META_PREFIX + "ck_cluster";
     Assertions.assertEquals(
-        "CREATE DATABASE `db_name` ON CLUSTER `ck_cluster` COMMENT '" + expectedComment + "'",
-        sql);
+        "CREATE DATABASE `db_name` ON CLUSTER `ck_cluster` COMMENT '" + expectedComment + "'", sql);
   }
 
   @Test
@@ -103,8 +98,7 @@ public class TestClickHouseDatabaseOperations {
     // User comment preserved before the separator
     String expectedComment = "my comment" + CLUSTER_META_PREFIX + "ck_cluster";
     Assertions.assertEquals(
-        "CREATE DATABASE `db_name` ON CLUSTER `ck_cluster` COMMENT '" + expectedComment + "'",
-        sql);
+        "CREATE DATABASE `db_name` ON CLUSTER `ck_cluster` COMMENT '" + expectedComment + "'", sql);
   }
 
   // ---------------------------------------------------------------------------

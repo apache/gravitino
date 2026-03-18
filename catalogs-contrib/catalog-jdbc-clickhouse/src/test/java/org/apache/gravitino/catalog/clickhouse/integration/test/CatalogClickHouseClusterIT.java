@@ -607,8 +607,8 @@ public class CatalogClickHouseClusterIT extends BaseIT {
   // ---------------------------------------------------------------------------
 
   /**
-   * Gravitino embeds the cluster name in the database COMMENT field at CREATE time, because
-   * SHOW CREATE DATABASE does not include ON CLUSTER. This test verifies the metadata survives the
+   * Gravitino embeds the cluster name in the database COMMENT field at CREATE time, because SHOW
+   * CREATE DATABASE does not include ON CLUSTER. This test verifies the metadata survives the
    * round-trip: createSchema → loadSchema → cluster properties present.
    */
   @Test
@@ -622,10 +622,12 @@ public class CatalogClickHouseClusterIT extends BaseIT {
     try {
       Schema loaded = catalog.asSchemas().loadSchema(name);
       Assertions.assertEquals(
-          String.valueOf(true), loaded.properties().get(ON_CLUSTER),
+          String.valueOf(true),
+          loaded.properties().get(ON_CLUSTER),
           "loadSchema must return on-cluster=true for a Gravitino-created cluster schema");
       Assertions.assertEquals(
-          ClickHouseContainer.DEFAULT_CLUSTER_NAME, loaded.properties().get(CLUSTER_NAME),
+          ClickHouseContainer.DEFAULT_CLUSTER_NAME,
+          loaded.properties().get(CLUSTER_NAME),
           "loadSchema must return the cluster name embedded in COMMENT at create time");
     } finally {
       catalog.asSchemas().dropSchema(name, true);
@@ -656,10 +658,12 @@ public class CatalogClickHouseClusterIT extends BaseIT {
     try {
       Table loaded = tableCatalog.loadTable(tableIdent);
       Assertions.assertEquals(
-          String.valueOf(true), loaded.properties().get(ON_CLUSTER),
+          String.valueOf(true),
+          loaded.properties().get(ON_CLUSTER),
           "loadTable must return on-cluster=true for a Gravitino-created cluster table");
       Assertions.assertEquals(
-          ClickHouseContainer.DEFAULT_CLUSTER_NAME, loaded.properties().get(CLUSTER_NAME),
+          ClickHouseContainer.DEFAULT_CLUSTER_NAME,
+          loaded.properties().get(CLUSTER_NAME),
           "loadTable must return the cluster name embedded in COMMENT at create time");
     } finally {
       tableCatalog.dropTable(tableIdent);
@@ -668,8 +672,8 @@ public class CatalogClickHouseClusterIT extends BaseIT {
 
   /**
    * When a user updates the table comment via Gravitino, the cluster metadata embedded in the
-   * ClickHouse COMMENT field must be preserved. Without re-embedding, the next loadTable call
-   * would lose the cluster name.
+   * ClickHouse COMMENT field must be preserved. Without re-embedding, the next loadTable call would
+   * lose the cluster name.
    */
   @Test
   public void testUpdateTableCommentOnClusterPreservesClusterProperties() {
@@ -694,10 +698,12 @@ public class CatalogClickHouseClusterIT extends BaseIT {
       // Cluster properties must still be present after the comment update
       Table loaded = tableCatalog.loadTable(tableIdent);
       Assertions.assertEquals(
-          String.valueOf(true), loaded.properties().get(ON_CLUSTER),
+          String.valueOf(true),
+          loaded.properties().get(ON_CLUSTER),
           "on-cluster must be preserved after a comment update");
       Assertions.assertEquals(
-          ClickHouseContainer.DEFAULT_CLUSTER_NAME, loaded.properties().get(CLUSTER_NAME),
+          ClickHouseContainer.DEFAULT_CLUSTER_NAME,
+          loaded.properties().get(CLUSTER_NAME),
           "cluster-name must be preserved after a comment update");
     } finally {
       tableCatalog.dropTable(tableIdent);
@@ -705,9 +711,9 @@ public class CatalogClickHouseClusterIT extends BaseIT {
   }
 
   /**
-   * Tables created directly in ClickHouse (not through Gravitino) have no cluster metadata
-   * embedded in their COMMENT field. Gravitino must report on-cluster=false and omit cluster-name
-   * for such tables, and document this as a known limitation.
+   * Tables created directly in ClickHouse (not through Gravitino) have no cluster metadata embedded
+   * in their COMMENT field. Gravitino must report on-cluster=false and omit cluster-name for such
+   * tables, and document this as a known limitation.
    */
   @Test
   public void testNonGravitinoCreatedClusterTableHasNoClusterProperties() {
@@ -726,7 +732,8 @@ public class CatalogClickHouseClusterIT extends BaseIT {
       // Without Gravitino COMMENT metadata there is no way to recover cluster info —
       // this is the documented limitation.
       Assertions.assertEquals(
-          String.valueOf(false), loaded.properties().get(ON_CLUSTER),
+          String.valueOf(false),
+          loaded.properties().get(ON_CLUSTER),
           "on-cluster must be false for non-Gravitino-created tables (no embedded COMMENT metadata)");
       Assertions.assertFalse(
           loaded.properties().containsKey(CLUSTER_NAME),

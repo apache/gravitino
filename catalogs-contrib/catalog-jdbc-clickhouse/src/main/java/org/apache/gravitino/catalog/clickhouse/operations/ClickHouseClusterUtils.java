@@ -33,13 +33,12 @@ import org.apache.commons.lang3.StringUtils;
  *   <li>{@code SHOW CREATE DATABASE} omits the {@code ON CLUSTER} clause.
  *   <li>{@code SHOW CREATE TABLE} omits the {@code ON CLUSTER} clause (each node stores the local
  *       DDL without the distribution directive).
- *   <li>{@code system.databases.cluster} is only populated for {@code Replicated}-engine
- *       databases.
+ *   <li>{@code system.databases.cluster} is only populated for {@code Replicated}-engine databases.
  * </ul>
  *
- * <p>Gravitino therefore embeds the cluster name inside the object's COMMENT field at creation
- * time using a non-printable SOH separator ({@code \u0001}). The metadata is invisible to end
- * users because Gravitino strips it before surfacing the comment.
+ * <p>Gravitino therefore embeds the cluster name inside the object's COMMENT field at creation time
+ * using a non-printable SOH separator ({@code \u0001}). The metadata is invisible to end users
+ * because Gravitino strips it before surfacing the comment.
  *
  * <h3>Stored format</h3>
  *
@@ -47,11 +46,11 @@ import org.apache.commons.lang3.StringUtils;
  *
  * <h3>Limitation</h3>
  *
- * <p>This mechanism only works for databases and tables created through Gravitino. If a
- * database or table was created directly in ClickHouse (bypassing Gravitino), Gravitino has no way
- * to determine whether it was created {@code ON CLUSTER} or which cluster name was used. In that
- * case {@link #extractClusterFromComment} returns {@code null} and the {@code on-cluster} /
- * {@code cluster-name} properties reported by Gravitino will be absent or inaccurate.
+ * <p>This mechanism only works for databases and tables created through Gravitino. If a database or
+ * table was created directly in ClickHouse (bypassing Gravitino), Gravitino has no way to determine
+ * whether it was created {@code ON CLUSTER} or which cluster name was used. In that case {@link
+ * #extractClusterFromComment} returns {@code null} and the {@code on-cluster} / {@code
+ * cluster-name} properties reported by Gravitino will be absent or inaccurate.
  */
 public final class ClickHouseClusterUtils {
 
@@ -77,7 +76,7 @@ public final class ClickHouseClusterUtils {
    * @return The combined string: {@code comment\u0001ch.cluster=clusterName}.
    */
   public static String embedClusterInComment(String comment, String clusterName) {
-    return StringUtils.defaultString(comment, "") + CLUSTER_META_PREFIX + clusterName;
+    return StringUtils.defaultString(comment) + CLUSTER_META_PREFIX + clusterName;
   }
 
   /**
@@ -100,8 +99,8 @@ public final class ClickHouseClusterUtils {
   }
 
   /**
-   * Returns the user-visible portion of the stored comment, stripping any embedded cluster
-   * metadata suffix. Returns {@code null} if {@code storedComment} is {@code null}.
+   * Returns the user-visible portion of the stored comment, stripping any embedded cluster metadata
+   * suffix. Returns {@code null} if {@code storedComment} is {@code null}.
    *
    * @param storedComment The raw comment as stored in ClickHouse.
    * @return The comment without cluster metadata.

@@ -55,7 +55,6 @@ public class ClickHouseDatabaseOperations extends JdbcDatabaseOperations {
    * populated for {@code Replicated} engine databases. Gravitino therefore embeds the cluster name
    * in the COMMENT field (see {@link ClickHouseClusterUtils}) so it can be retrieved at DROP time.
    */
-
   @Override
   protected boolean supportSchemaComment() {
     return true;
@@ -108,11 +107,9 @@ public class ClickHouseDatabaseOperations extends JdbcDatabaseOperations {
       // Embed the cluster name into the COMMENT so it can be retrieved later (e.g., at DROP time).
       // ClickHouse does not persist ON CLUSTER info in SHOW CREATE DATABASE for Atomic databases.
       String storedComment = embedClusterInComment(originComment, clusterName);
-      createDatabaseSql.append(
-          String.format(" COMMENT '%s'", storedComment.replace("'", "''")));
+      createDatabaseSql.append(String.format(" COMMENT '%s'", storedComment.replace("'", "''")));
     } else if (StringUtils.isNotEmpty(originComment)) {
-      createDatabaseSql.append(
-          String.format(" COMMENT '%s'", originComment.replace("'", "''")));
+      createDatabaseSql.append(String.format(" COMMENT '%s'", originComment.replace("'", "''")));
     }
 
     LOG.info("Generated create database:{} sql: {}", databaseName, createDatabaseSql);
@@ -199,9 +196,9 @@ public class ClickHouseDatabaseOperations extends JdbcDatabaseOperations {
   }
 
   /**
-   * Generates the SQL statement to drop a ClickHouse database. If {@code clusterName} is
-   * non-blank, the DROP statement includes {@code ON CLUSTER `clusterName` SYNC} to propagate the
-   * operation across all cluster nodes synchronously.
+   * Generates the SQL statement to drop a ClickHouse database. If {@code clusterName} is non-blank,
+   * the DROP statement includes {@code ON CLUSTER `clusterName` SYNC} to propagate the operation
+   * across all cluster nodes synchronously.
    *
    * @param databaseName The name of the database to drop.
    * @param clusterName The cluster name read from the stored comment, or {@code null}/blank if not
@@ -225,8 +222,7 @@ public class ClickHouseDatabaseOperations extends JdbcDatabaseOperations {
    */
   private String readClusterName(Connection connection, String databaseName) throws SQLException {
     try (PreparedStatement stmt =
-        connection.prepareStatement(
-            "SELECT comment FROM system.databases WHERE name = ?")) {
+        connection.prepareStatement("SELECT comment FROM system.databases WHERE name = ?")) {
       stmt.setString(1, databaseName);
       try (ResultSet rs = stmt.executeQuery()) {
         if (rs.next()) {

@@ -1386,7 +1386,8 @@ public class CatalogClickHouseIT extends BaseIT {
     Throwable excep =
         Assertions.assertThrows(
             RuntimeException.class, () -> catalog.asSchemas().dropSchema(schemaName, false));
-    Assertions.assertTrue(excep.getMessage().contains("the value of cascade should be true."));
+    Assertions.assertTrue(
+        excep.getMessage().contains("Database %s is not empty".formatted(schemaName)));
 
     // Check the database still exists
     catalog.asSchemas().loadSchema(schemaName);

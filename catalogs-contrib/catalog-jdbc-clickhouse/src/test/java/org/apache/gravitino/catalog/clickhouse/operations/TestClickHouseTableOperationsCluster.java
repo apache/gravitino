@@ -31,9 +31,9 @@ import org.apache.gravitino.catalog.clickhouse.converter.ClickHouseColumnDefault
 import org.apache.gravitino.catalog.clickhouse.converter.ClickHouseExceptionConverter;
 import org.apache.gravitino.catalog.clickhouse.converter.ClickHouseTypeConverter;
 import org.apache.gravitino.catalog.jdbc.JdbcColumn;
+import org.apache.gravitino.rel.expressions.NamedReference;
 import org.apache.gravitino.rel.expressions.distributions.Distribution;
 import org.apache.gravitino.rel.expressions.distributions.Distributions;
-import org.apache.gravitino.rel.expressions.NamedReference;
 import org.apache.gravitino.rel.expressions.sorts.SortOrder;
 import org.apache.gravitino.rel.expressions.sorts.SortOrders;
 import org.apache.gravitino.rel.expressions.transforms.Transform;
@@ -292,9 +292,7 @@ class TestClickHouseTableOperationsCluster {
             null,
             Distributions.NONE,
             new Index[0],
-            new SortOrder[] {
-              SortOrders.ascending(NamedReference.field("id"))
-            });
+            new SortOrder[] {SortOrders.ascending(NamedReference.field("id"))});
 
     // CREATE TABLE clause must have ON CLUSTER
     Assertions.assertTrue(
@@ -337,16 +335,13 @@ class TestClickHouseTableOperationsCluster {
             null,
             Distributions.NONE,
             new Index[0],
-            new SortOrder[] {
-              SortOrders.ascending(NamedReference.field("id"))
-            });
+            new SortOrder[] {SortOrders.ascending(NamedReference.field("id"))});
 
     Assertions.assertFalse(
         sql.contains(String.valueOf(ClickHouseClusterUtils.CLUSTER_META_SEP)),
         "Non-cluster table must not embed cluster metadata; got: " + sql);
     Assertions.assertTrue(
-        sql.contains("plain comment"),
-        "User comment must be present unmodified; got: " + sql);
+        sql.contains("plain comment"), "User comment must be present unmodified; got: " + sql);
   }
 
   /** Cluster metadata round-trip: embed → extract → strip. */

@@ -190,10 +190,11 @@ public class ClickHouseTableOperations extends JdbcTableOperations {
 
     // Add table comment; embed cluster name so it can be recovered at DROP/ALTER time.
     // ClickHouse does not persist ON CLUSTER in SHOW CREATE TABLE (see ClickHouseClusterUtils).
-    String storedComment = onCluster
-        ? ClickHouseClusterUtils.embedClusterInComment(
-            comment, notNullProperties.get(ClusterConstants.CLUSTER_NAME))
-        : comment;
+    String storedComment =
+        onCluster
+            ? ClickHouseClusterUtils.embedClusterInComment(
+                comment, notNullProperties.get(ClusterConstants.CLUSTER_NAME))
+            : comment;
     if (StringUtils.isNotEmpty(storedComment)) {
       sqlBuilder.append(" COMMENT '%s'".formatted(storedComment.replace("'", "''")));
     }
