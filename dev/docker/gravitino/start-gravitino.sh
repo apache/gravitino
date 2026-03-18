@@ -30,25 +30,8 @@ python bin/rewrite_gravitino_server_config.py
 jdbc_driver_dir="${gravitino_dir}/jdbc-drivers"
 
 if [ -d "${jdbc_driver_dir}" ]; then
-  # Link MySQL driver to catalogs that need it
-  mkdir -p "${gravitino_dir}/catalogs/jdbc-mysql/libs"
-  mkdir -p "${gravitino_dir}/catalogs/jdbc-doris/libs"
-  mkdir -p "${gravitino_dir}/catalogs/jdbc-starrocks/libs"
-  mkdir -p "${gravitino_dir}/catalogs/lakehouse-iceberg/libs"
-  mkdir -p "${gravitino_dir}/iceberg-rest-server/libs"
   mkdir -p "${gravitino_dir}/libs"
-  mkdir -p "${gravitino_dir}/catalogs/jdbc-postgresql/libs"
-  find "${jdbc_driver_dir}" -name "mysql-connector-java-*.jar" -exec ln -sfv {} "${gravitino_dir}/catalogs/jdbc-mysql/libs/" \;
-  find "${jdbc_driver_dir}" -name "mysql-connector-java-*.jar" -exec ln -sfv {} "${gravitino_dir}/catalogs/jdbc-doris/libs/" \;
-  find "${jdbc_driver_dir}" -name "mysql-connector-java-*.jar" -exec ln -sfv {} "${gravitino_dir}/catalogs/jdbc-starrocks/libs/" \;
-  find "${jdbc_driver_dir}" -name "mysql-connector-java-*.jar" -exec ln -sfv {} "${gravitino_dir}/catalogs/lakehouse-iceberg/libs/" \;
-  find "${jdbc_driver_dir}" -name "mysql-connector-java-*.jar" -exec ln -sfv {} "${gravitino_dir}/iceberg-rest-server/libs/" \;
   find "${jdbc_driver_dir}" -name "mysql-connector-java-*.jar" -exec ln -sfv {} "${gravitino_dir}/libs/" \;
-
-  # Link PostgreSQL driver to catalogs that need it
-  find "${jdbc_driver_dir}" -name "postgresql-*.jar" -exec ln -sfv {} "${gravitino_dir}/catalogs/jdbc-postgresql/libs/" \;
-  find "${jdbc_driver_dir}" -name "postgresql-*.jar" -exec ln -sfv {} "${gravitino_dir}/catalogs/lakehouse-iceberg/libs/" \;
-  find "${jdbc_driver_dir}" -name "postgresql-*.jar" -exec ln -sfv {} "${gravitino_dir}/iceberg-rest-server/libs/" \;
   find "${jdbc_driver_dir}" -name "postgresql-*.jar" -exec ln -sfv {} "${gravitino_dir}/libs/" \;
 fi
 
