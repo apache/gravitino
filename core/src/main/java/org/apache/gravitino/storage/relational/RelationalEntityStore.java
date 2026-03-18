@@ -364,11 +364,10 @@ public class RelationalEntityStore implements EntityStore, SupportsRelationOpera
     backend.batchPut(entities, overwritten);
   }
 
-  private <E extends Entity & HasIdentifier> Optional<List<RelationalEntity<?>>>
-      getCachedRelations(
-          SupportsRelationOperations.Type relType,
-          NameIdentifier nameIdentifier,
-          Entity.EntityType identType) {
+  private <E extends Entity & HasIdentifier> Optional<List<RelationalEntity<?>>> getCachedRelations(
+      SupportsRelationOperations.Type relType,
+      NameIdentifier nameIdentifier,
+      Entity.EntityType identType) {
     Optional<List<E>> entitiesOpt = cache.getIfPresent(relType, nameIdentifier, identType);
     if (entitiesOpt.isPresent()) {
       List<RelationalEntity<?>> cachedRelations = new ArrayList<>();
@@ -397,7 +396,6 @@ public class RelationalEntityStore implements EntityStore, SupportsRelationOpera
         for (RelationalEntity<?> rel : sourceRelations) {
           @SuppressWarnings("unchecked")
           E entity = (E) rel.targetEntity();
-          cache.put(entity);
           entityList.add(entity);
         }
       }
