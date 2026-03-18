@@ -24,7 +24,7 @@ import org.apache.commons.lang3.StringUtils;
 /**
  * Utilities for embedding and extracting ClickHouse cluster metadata in object COMMENT fields.
  *
- * <h3>Why COMMENT?</h3>
+ * <p><b>Why COMMENT?</b>
  *
  * <p>ClickHouse does not persist {@code ON CLUSTER} information in any queryable system table for
  * non-Replicated objects:
@@ -40,17 +40,13 @@ import org.apache.commons.lang3.StringUtils;
  * using a non-printable SOH separator ({@code \u0001}). The metadata is invisible to end users
  * because Gravitino strips it before surfacing the comment.
  *
- * <h3>Stored format</h3>
+ * <p><b>Stored format:</b> {@code userComment\u0001ch.cluster=clusterName}
  *
- * <pre>userComment\u0001ch.cluster=clusterName</pre>
- *
- * <h3>Limitation</h3>
- *
- * <p>This mechanism only works for databases and tables created through Gravitino. If a database or
- * table was created directly in ClickHouse (bypassing Gravitino), Gravitino has no way to determine
- * whether it was created {@code ON CLUSTER} or which cluster name was used. In that case {@link
- * #extractClusterFromComment} returns {@code null} and the {@code on-cluster} / {@code
- * cluster-name} properties reported by Gravitino will be absent or inaccurate.
+ * <p><b>Limitation:</b> This mechanism only works for databases and tables created through
+ * Gravitino. If a database or table was created directly in ClickHouse (bypassing Gravitino),
+ * Gravitino has no way to determine whether it was created {@code ON CLUSTER} or which cluster name
+ * was used. In that case {@link #extractClusterFromComment} returns {@code null} and the {@code
+ * on-cluster} / {@code cluster-name} properties reported by Gravitino will be absent or inaccurate.
  */
 public final class ClickHouseClusterUtils {
 
