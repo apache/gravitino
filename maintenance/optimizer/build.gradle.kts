@@ -33,7 +33,7 @@ val icebergVersion: String = libs.versions.iceberg4connector.get()
 dependencies {
   implementation(project(":api"))
   implementation(project(":maintenance:optimizer-api"))
-  implementation(project(":maintenance:gravitino-updaters"))
+  implementation(project(":maintenance:updaters"))
   implementation(project(":catalogs:catalog-common"))
   implementation(project(":clients:client-java"))
   implementation(project(":core")) {
@@ -115,23 +115,8 @@ tasks {
     into("$rootDir/distribution/package/optimizer/libs")
   }
 
-  register("copyConfigs", Copy::class) {
-    from("src/main/resources")
-    into("$rootDir/distribution/package/optimizer/conf")
-
-    rename { original ->
-      if (original.endsWith(".template")) {
-        original.replace(".template", "")
-      } else {
-        original
-      }
-    }
-
-    fileMode = 0b111101101
-  }
-
   register("copyLibAndConfigs", Copy::class) {
-    dependsOn("copyLibs", "copyConfigs")
+    dependsOn("copyLibs")
   }
 }
 

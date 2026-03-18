@@ -317,7 +317,7 @@ public class CatalogClickHouseIT extends BaseIT {
     // create failed check.
     NameIdentifier table = NameIdentifier.of(testSchemaName, "test_table");
     Assertions.assertThrows(
-        NotFoundException.class,
+        NoSuchSchemaException.class,
         () ->
             tableCatalog.createTable(
                 table,

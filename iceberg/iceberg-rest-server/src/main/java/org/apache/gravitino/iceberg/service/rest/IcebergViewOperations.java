@@ -353,7 +353,7 @@ public class IcebergViewOperations {
     List<TableIdentifier> filteredIdentifiers = new ArrayList<>();
     for (NameIdentifier ident : idents) {
       filteredIdentifiers.add(
-          TableIdentifier.of(Namespace.of(ident.namespace().level(0)), ident.name()));
+          TableIdentifier.of(Namespace.of(ident.namespace().level(2)), ident.name()));
     }
     return ListTablesResponse.builder()
         .addAll(filteredIdentifiers)

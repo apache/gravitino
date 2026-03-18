@@ -133,6 +133,7 @@ tasks {
       exclude("guava-*.jar")
       exclude("log4j-*.jar")
       exclude("slf4j-*.jar")
+      exclude("error_prone_annotations-*.jar")
       // Exclude the following jars to avoid conflict with the jars in authorization-gcp
       exclude("protobuf-java-*.jar")
     }

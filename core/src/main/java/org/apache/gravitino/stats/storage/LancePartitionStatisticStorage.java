@@ -326,9 +326,11 @@ public class LancePartitionStatisticStorage implements PartitionStatisticStorage
             "table_id = "
                 + tableId
                 + " AND partition_name = '"
-                + partition
+                + escapeSqlLiteral(partition)
                 + "' AND statistic_name IN ("
-                + statistics.stream().map(str -> "'" + str + "'").collect(Collectors.joining(", "))
+                + statistics.stream()
+                    .map(str -> "'" + escapeSqlLiteral(str) + "'")
+                    .collect(Collectors.joining(", "))
                 + ")");
       }
 
@@ -449,7 +451,7 @@ public class LancePartitionStatisticStorage implements PartitionStatisticStorage
                                 "AND partition_name "
                                     + (type == PartitionRange.BoundType.CLOSED ? ">= " : "> ")
                                     + "'"
-                                    + name
+                                    + escapeSqlLiteral(name)
                                     + "'"))
             .orElse("");
     String toPartitionNameFilter =
@@ -464,11 +466,15 @@ public class LancePartitionStatisticStorage implements PartitionStatisticStorage
                                 "AND partition_name "
                                     + (type == PartitionRange.BoundType.CLOSED ? "<= " : "< ")
                                     + "'"
-                                    + name
+                                    + escapeSqlLiteral(name)
                                     + "'"))
             .orElse("");
 
     return fromPartitionNameFilter + toPartitionNameFilter;
+  }
+
+  private static String escapeSqlLiteral(String value) {
+    return value.replace("'", "''");
   }
 
   private List<PersistedPartitionStatistics> listStatisticsImpl(

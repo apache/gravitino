@@ -820,7 +820,7 @@ public class POConverters {
       return PolicyPO.builder()
           .withPolicyId(newPolicy.id())
           .withPolicyName(newPolicy.name())
-          .withPolicyType(newPolicy.policyType().name())
+          .withPolicyType(newPolicy.policyType().policyType())
           .withMetalakeId(oldPolicyPO.getMetalakeId())
           .withAuditInfo(JsonUtils.anyFieldMapper().writeValueAsString(newPolicy.auditInfo()))
           .withCurrentVersion(currentVersion)
@@ -1512,7 +1512,7 @@ public class POConverters {
       return builder
           .withPolicyId(policyEntity.id())
           .withPolicyName(policyEntity.name())
-          .withPolicyType(policyEntity.policyType().name())
+          .withPolicyType(policyEntity.policyType().policyType())
           .withAuditInfo(JsonUtils.anyFieldMapper().writeValueAsString(policyEntity.auditInfo()))
           .withCurrentVersion(INIT_VERSION)
           .withLastVersion(INIT_VERSION)

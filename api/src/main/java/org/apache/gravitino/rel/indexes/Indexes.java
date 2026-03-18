@@ -110,7 +110,7 @@ public class Indexes {
    * @return An {@link Index} instance with empty properties
    */
   public static Index of(IndexType indexType, String name, String[][] fieldNames) {
-    return of(indexType, name, fieldNames, Map.of());
+    return of(indexType, name, fieldNames, ImmutableMap.of());
   }
 
   /**
@@ -156,7 +156,7 @@ public class Indexes {
       this.indexType = indexType;
       this.name = name;
       this.fieldNames = fieldNames;
-      this.properties = properties == null ? Map.of() : properties;
+      this.properties = properties == null ? ImmutableMap.of() : properties;
     }
 
     /**
