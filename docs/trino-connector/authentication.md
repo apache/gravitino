@@ -35,8 +35,8 @@ gravitino.client.simpleAuthUser=admin
 
 | Property                          | Description                                                          | Default value    | Required                               | Since version |
 |-----------------------------------|----------------------------------------------------------------------|------------------|----------------------------------------|---------------|
-| `gravitino.client.authType`       | Authentication type: `simple`, `oauth`, or `kerberos`               | (none, no-auth)  | No                                     | 1.2.0         |
-| `gravitino.client.simpleAuthUser` | Username for simple authentication                                   | (none)           | No (uses system user if not specified) | 1.2.0         |
+| `gravitino.client.authType`       | Authentication type: `simple`, `oauth`, or `kerberos`               | (none, no-auth)  | No                                     | 1.3.0         |
+| `gravitino.client.simpleAuthUser` | Username for simple authentication                                   | (none)           | No (uses system user if not specified) | 1.3.0         |
 
 ### OAuth Authentication
 
@@ -61,11 +61,11 @@ gravitino.client.oauth.scope=gravitino
 
 | Property                            | Description                                           | Default value | Required                   | Since version |
 |-------------------------------------|-------------------------------------------------------|---------------|----------------------------|---------------|
-| `gravitino.client.authType`         | Authentication type                                   | (none)        | Yes                        | 1.2.0         |
-| `gravitino.client.oauth.serverUri`  | OAuth server URI                                      | (none)        | Yes if authType is `oauth` | 1.2.0         |
-| `gravitino.client.oauth.credential` | OAuth credentials in format `client_id:client_secret` | (none)        | Yes if authType is `oauth` | 1.2.0         |
-| `gravitino.client.oauth.path`       | OAuth token endpoint path                             | (none)        | Yes if authType is `oauth` | 1.2.0         |
-| `gravitino.client.oauth.scope`      | OAuth scope                                           | (none)        | Yes if authType is `oauth` | 1.2.0         |
+| `gravitino.client.authType`         | Authentication type                                   | (none)        | Yes                        | 1.3.0         |
+| `gravitino.client.oauth.serverUri`  | OAuth server URI                                      | (none)        | Yes if authType is `oauth` | 1.3.0         |
+| `gravitino.client.oauth.credential` | OAuth credentials in format `client_id:client_secret` | (none)        | Yes if authType is `oauth` | 1.3.0         |
+| `gravitino.client.oauth.path`       | OAuth token endpoint path                             | (none)        | Yes if authType is `oauth` | 1.3.0         |
+| `gravitino.client.oauth.scope`      | OAuth scope                                           | (none)        | Yes if authType is `oauth` | 1.3.0         |
 
 ### Kerberos Authentication
 
@@ -88,9 +88,9 @@ gravitino.client.kerberos.keytabFilePath=/path/to/user.keytab
 
 | Property                                   | Description         | Default value | Required                                | Since version |
 |--------------------------------------------|---------------------|---------------|-----------------------------------------|---------------|
-| `gravitino.client.authType`                | Authentication type | (none)        | Yes                                     | 1.2.0         |
-| `gravitino.client.kerberos.principal`      | Kerberos principal  | (none)        | Yes if authType is `kerberos`           | 1.2.0         |
-| `gravitino.client.kerberos.keytabFilePath` | Path to keytab file | (none)        | No (uses ticket cache if not specified) | 1.2.0         |
+| `gravitino.client.authType`                | Authentication type | (none)        | Yes                                     | 1.3.0         |
+| `gravitino.client.kerberos.principal`      | Kerberos principal  | (none)        | Yes if authType is `kerberos`           | 1.3.0         |
+| `gravitino.client.kerberos.keytabFilePath` | Path to keytab file | (none)        | No (uses ticket cache if not specified) | 1.3.0         |
 
 ### Example: Connecting to OAuth-protected Gravitino Server
 
