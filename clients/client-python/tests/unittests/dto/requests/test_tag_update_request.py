@@ -31,10 +31,12 @@ class TestTagUpdateRequest(unittest.TestCase):
 
     def test_tag_rename_tag_request_serde(self) -> None:
         request = TagUpdateRequest.RenameTagRequest(_new_name="new_name")
-        json_str = _json.dumps({
-            "@type": "rename",
-            "newName": "new_name",
-        })
+        json_str = _json.dumps(
+            {
+                "@type": "rename",
+                "newName": "new_name",
+            }
+        )
         self.assertEqual(json_str, request.to_json())
 
         deserialized_request = TagUpdateRequest.RenameTagRequest.from_json(json_str)
@@ -43,10 +45,12 @@ class TestTagUpdateRequest(unittest.TestCase):
 
     def test_update_tag_comment_request_serde(self) -> None:
         request = TagUpdateRequest.UpdateTagCommentRequest("new_comment")
-        json_str = _json.dumps({
-            "@type": "updateComment",
-            "newComment": "new_comment",
-        })
+        json_str = _json.dumps(
+            {
+                "@type": "updateComment",
+                "newComment": "new_comment",
+            }
+        )
         self.assertEqual(json_str, request.to_json())
 
         deserialized_request = TagUpdateRequest.UpdateTagCommentRequest.from_json(
@@ -72,11 +76,13 @@ class TestTagUpdateRequest(unittest.TestCase):
 
     def test_set_tag_property_request_serde(self) -> None:
         request = TagUpdateRequest.SetTagPropertyRequest("key", "value")
-        json_str = _json.dumps({
-            "@type": "setProperty",
-            "property": "key",
-            "value": "value",
-        })
+        json_str = _json.dumps(
+            {
+                "@type": "setProperty",
+                "property": "key",
+                "value": "value",
+            }
+        )
         self.assertEqual(json_str, request.to_json())
 
         deserialized_request = TagUpdateRequest.SetTagPropertyRequest.from_json(
@@ -93,10 +99,12 @@ class TestTagUpdateRequest(unittest.TestCase):
 
     def test_remove_tag_property_request_serde(self) -> None:
         request = TagUpdateRequest.RemoveTagPropertyRequest("key")
-        json_str = _json.dumps({
-            "@type": "removeProperty",
-            "property": "key",
-        })
+        json_str = _json.dumps(
+            {
+                "@type": "removeProperty",
+                "property": "key",
+            }
+        )
         self.assertEqual(json_str, request.to_json())
 
         deserialized_request = TagUpdateRequest.RemoveTagPropertyRequest.from_json(

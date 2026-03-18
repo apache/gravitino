@@ -66,8 +66,9 @@ class TagUpdateRequest:
             Raises:
                 ValueError: If the request is invalid, this exception is thrown.
             """
-            Precondition.check_argument(
-                self._new_name, '"newName" must not be blank'
+            Precondition.check_string_not_empty(
+                self._new_name,
+                '"newName" must not be blank',
             )
 
         @property
@@ -122,11 +123,14 @@ class TagUpdateRequest:
             Raises:
                 ValueError: If the request is invalid, this exception is thrown.
             """
-            if not self._property:
-                raise ValueError('"property" must not be blank')
-
-            if not self._value:
-                raise ValueError('"value" must not be blank')
+            Precondition.check_string_not_empty(
+                self._property,
+                '"property" must not be blank',
+            )
+            Precondition.check_string_not_empty(
+                self._value,
+                '"value" must not be blank',
+            )
 
         @property
         def prop(self) -> str:
@@ -156,8 +160,10 @@ class TagUpdateRequest:
             Raises:
                 ValueError: If the request is invalid, this exception is thrown.
             """
-            if not self._property:
-                raise ValueError('"property" must not be blank')
+            Precondition.check_string_not_empty(
+                self._property,
+                '"property" must not be blank',
+            )
 
         @property
         def prop(self) -> str:
