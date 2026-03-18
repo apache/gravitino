@@ -187,7 +187,7 @@ jobs:
           if [ "${{ needs.changes.outputs.maintenance_module_only_changes }}" = "true" ]; then
             ./gradlew \
               :maintenance:optimizer-api:build \
-              :maintenance:gravitino-updaters:build \
+              :maintenance:updaters:build \
               :maintenance:optimizer:build \
               :maintenance:jobs:build \
               -PskipITs \
