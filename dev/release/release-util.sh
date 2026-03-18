@@ -34,12 +34,12 @@ function error {
 function read_config {
   local PROMPT="$1"
   local DEFAULT="$2"
-  local VAR_NAME="$3"  # Optional: environment variable name to check first
+  local FORCE_ENV_VAR="$3"  # Optional: env var name to use in force/non-interactive mode
   local REPLY=
 
-  # If VAR_NAME is provided and the corresponding env var is set, use it
-  if [ -n "$VAR_NAME" ] && [ -n "${!VAR_NAME:-}" ] && [ "$FORCE" = "1" ]; then
-    echo "${!VAR_NAME}"
+  # If FORCE_ENV_VAR is provided and the corresponding env var is set, use it
+  if [ -n "$FORCE_ENV_VAR" ] && [ -n "${!FORCE_ENV_VAR:-}" ] && [ "$FORCE" = "1" ]; then
+    echo "${!FORCE_ENV_VAR}"
     return
   fi
 
@@ -72,13 +72,10 @@ function run_silent {
   echo "Command: $@"
   echo "Log file: $LOG_FILE"
 
-  "$@" 1>"$LOG_FILE" 2>&1
-
-  local EC=$?
-  if [ $EC != 0 ]; then
+  if ! "$@" 1>"$LOG_FILE" 2>&1; then
     echo "Command FAILED. Check full logs for details."
     tail "$LOG_FILE"
-    exit $EC
+    exit 1
   fi
 }
 
@@ -146,10 +143,11 @@ function get_release_info {
   export NEXT_VERSION
   export RELEASE_VERSION=$(read_config "Release" "$RELEASE_VERSION" RELEASE_VERSION)
 
-  if [ "$FORCE" = "1" ]; then
+  # If -r was explicitly provided (non-zero), override the auto-detected NRC_COUNT
+  if [ "${RC_COUNT:-0}" -gt 0 ]; then
     NRC_COUNT=$RC_COUNT
   fi
-  RC_COUNT=$(read_config "RC #" "$RC_COUNT" NRC_COUNT)
+  RC_COUNT=$(read_config "RC #" "$NRC_COUNT" NRC_COUNT)
   export RC_COUNT
 
   # Check if the RC already exists, and if re-creating the RC, skip tag creation.
@@ -182,11 +180,11 @@ function get_release_info {
   export GRAVITINO_PACKAGE_VERSION="$RELEASE_TAG"
 
   # Gather some user information.
-  if [ -z "$ASF_USERNAME" ]; then
+  if [ -z "${ASF_USERNAME:-}" ]; then
     export ASF_USERNAME=$(read_config "ASF user" "$LOGNAME" ASF_USERNAME)
   fi
 
-  if [ -z "$GIT_NAME" ]; then
+  if [ -z "${GIT_NAME:-}" ]; then
     GIT_NAME=$(git config user.name || echo "")
     export GIT_NAME=$(read_config "Full name" "$GIT_NAME" GIT_NAME)
   fi
@@ -220,14 +218,14 @@ EOF
   fi
 
   if ! is_dry_run; then
-    if [ -z "$ASF_PASSWORD" ]; then
+    if [ -z "${ASF_PASSWORD:-}" ]; then
       stty -echo && printf "ASF password: " && read ASF_PASSWORD && printf '\n' && stty echo
     fi
   else
     ASF_PASSWORD="***INVALID***"
   fi
 
-  if [ -z "$GPG_PASSPHRASE" ]; then
+  if [ -z "${GPG_PASSPHRASE:-}" ]; then
     stty -echo && printf "GPG passphrase: " && read GPG_PASSPHRASE && printf '\n' && stty echo
   fi
 
