@@ -29,6 +29,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.function.Function;
 import java.util.stream.Collectors;
+import org.apache.gravitino.Entity;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
@@ -591,6 +592,75 @@ public class TestTableColumnMetaService extends TestJDBCBackend {
         TableColumnMetaService.getInstance()
             .getColumnIdByTableIdAndName(retrievedTable.id(), newColumn.name());
     Assertions.assertEquals(newColumn.id(), selectedColumnId);
+  }
+
+  @TestTemplate
+  public void testUpdateTableWithSchemaAndColumnChangesUpdatesAllColumnSchemaIds()
+      throws IOException {
+    String catalogName = "catalog1";
+    String oldSchemaName = "schema1";
+    String newSchemaName = "schema2";
+    createParentEntities(METALAKE_NAME, catalogName, oldSchemaName, AUDIT_INFO);
+    createAndInsertSchema(METALAKE_NAME, catalogName, newSchemaName);
+
+    ColumnEntity existingColumn =
+        ColumnEntity.builder()
+            .withId(RandomIdGenerator.INSTANCE.nextId())
+            .withName("column1")
+            .withPosition(0)
+            .withComment("comment1")
+            .withDataType(Types.IntegerType.get())
+            .withNullable(true)
+            .withAutoIncrement(false)
+            .withDefaultValue(Literals.integerLiteral(1))
+            .withAuditInfo(AUDIT_INFO)
+            .build();
+
+    TableEntity createdTable =
+        TableEntity.builder()
+            .withId(RandomIdGenerator.INSTANCE.nextId())
+            .withName("table_move_schema")
+            .withNamespace(Namespace.of(METALAKE_NAME, catalogName, oldSchemaName))
+            .withColumns(Lists.newArrayList(existingColumn))
+            .withAuditInfo(AUDIT_INFO)
+            .build();
+    TableMetaService.getInstance().insertTable(createdTable, false);
+
+    ColumnEntity newColumn =
+        ColumnEntity.builder()
+            .withId(RandomIdGenerator.INSTANCE.nextId())
+            .withName("column2")
+            .withPosition(1)
+            .withComment("comment2")
+            .withDataType(Types.StringType.get())
+            .withNullable(true)
+            .withAutoIncrement(false)
+            .withDefaultValue(Literals.stringLiteral("v2"))
+            .withAuditInfo(AUDIT_INFO)
+            .build();
+
+    TableEntity movedAndUpdatedTable =
+        TableEntity.builder()
+            .withId(createdTable.id())
+            .withName(createdTable.name())
+            .withNamespace(Namespace.of(METALAKE_NAME, catalogName, newSchemaName))
+            .withColumns(Lists.newArrayList(existingColumn, newColumn))
+            .withAuditInfo(AUDIT_INFO)
+            .build();
+
+    TableMetaService.getInstance()
+        .updateTable(createdTable.nameIdentifier(), old -> movedAndUpdatedTable);
+
+    long newSchemaId =
+        EntityIdService.getEntityId(
+            NameIdentifier.of(METALAKE_NAME, catalogName, newSchemaName), Entity.EntityType.SCHEMA);
+    ColumnPO existingColumnPO =
+        TableColumnMetaService.getInstance().getColumnPOById(existingColumn.id());
+
+    Assertions.assertEquals(
+        newSchemaId,
+        existingColumnPO.getSchemaId(),
+        "Existing column schema id should be updated to new schema id");
   }
 
   private void compareTwoColumns(
