@@ -112,6 +112,15 @@ if [ "$RUNNING_IN_DOCKER" = "1" ]; then
     # JAVA_HOME for the openjdk package.
     export JAVA_HOME=/usr
   fi
+
+  # In docker mode get_release_info is not called; derive the release tag variables
+  # from env vars that the driver script is expected to have exported.
+  export RELEASE_TAG="${RELEASE_TAG:-v${RELEASE_VERSION}-rc${RC_COUNT}}"
+  export GRAVITINO_PACKAGE_VERSION="$RELEASE_TAG"
+  SKIP_TAG=0
+  if check_for_tag "$RELEASE_TAG"; then
+    SKIP_TAG=1
+  fi
 else
   # Outside docker, collect release information.
   # In force/non-interactive mode (-y), read_config uses env vars and skips prompts.
