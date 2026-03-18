@@ -31,7 +31,7 @@ import java.util.Optional;
 import org.apache.commons.collections4.CollectionUtils;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.NameIdentifier;
-import org.apache.gravitino.Relation;
+import org.apache.gravitino.RelationalEntity;
 import org.apache.gravitino.SupportsRelationOperations;
 import org.apache.gravitino.authorization.AuthorizationUtils;
 import org.apache.gravitino.meta.UserEntity;
@@ -93,11 +93,12 @@ public class OwnerMetaService {
   @Monitored(
       metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME,
       baseMetricName = "batchGetOwner")
-  public List<Relation> batchGetOwner(List<NameIdentifier> identifiers, Entity.EntityType type) {
+  public List<RelationalEntity<?>> batchGetOwner(
+      List<NameIdentifier> identifiers, Entity.EntityType type) {
     if (CollectionUtils.isEmpty(identifiers)) {
       return new ArrayList<>();
     }
-    List<Relation> result = new ArrayList<>();
+    List<RelationalEntity<?>> result = new ArrayList<>();
     Map<Long, NameIdentifier> nameIdentifierMap = new HashMap<>();
     List<Long> entityIds =
         identifiers.stream()
@@ -129,12 +130,11 @@ public class OwnerMetaService {
                 POConverters.fromUserPO(
                     userPO, Collections.emptyList(), AuthorizationUtils.ofUserNamespace(metalake));
             result.add(
-                new Relation(
+                new RelationalEntity<>(
                     SupportsRelationOperations.Type.OWNER_REL,
                     nameIdentifierMap.get(userPO.getMetadataObjectId()),
                     type,
-                    userEntity.nameIdentifier(),
-                    Entity.EntityType.USER));
+                    userEntity));
           });
     }
 

@@ -38,7 +38,7 @@ import org.apache.gravitino.EntityStore;
 import org.apache.gravitino.HasIdentifier;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
-import org.apache.gravitino.Relation;
+import org.apache.gravitino.RelationalEntity;
 import org.apache.gravitino.SupportsRelationOperations;
 import org.apache.gravitino.cache.CacheFactory;
 import org.apache.gravitino.cache.CachedEntityIdResolver;
@@ -48,7 +48,6 @@ import org.apache.gravitino.cache.EntityCacheRelationKey;
 import org.apache.gravitino.cache.NoOpsCache;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.storage.relational.service.EntityIdService;
-import org.apache.gravitino.utils.EntityClassMapper;
 import org.apache.gravitino.utils.Executable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -231,7 +230,7 @@ public class RelationalEntityStore implements EntityStore, SupportsRelationOpera
   }
 
   @Override
-  public List<Relation> batchListEntitiesByRelation(
+  public List<RelationalEntity<?>> batchListEntitiesByRelation(
       Type relType, List<NameIdentifier> nameIdentifiers, Entity.EntityType identType)
       throws IOException {
     if (nameIdentifiers == null || nameIdentifiers.isEmpty()) {
@@ -246,11 +245,11 @@ public class RelationalEntityStore implements EntityStore, SupportsRelationOpera
     return cache.withMultipleKeyCacheLock(
         lockKeys,
         () -> {
-          List<Relation> result = new ArrayList<>();
+          List<RelationalEntity<?>> result = new ArrayList<>();
           List<NameIdentifier> uncachedIdentifiers = new ArrayList<>();
 
           for (NameIdentifier nameIdentifier : nameIdentifiers) {
-            Optional<List<Relation>> cachedRelations =
+            Optional<List<RelationalEntity<?>>> cachedRelations =
                 getCachedRelations(relType, nameIdentifier, identType);
             if (cachedRelations.isPresent()) {
               result.addAll(cachedRelations.get());
@@ -260,7 +259,7 @@ public class RelationalEntityStore implements EntityStore, SupportsRelationOpera
           }
 
           if (!uncachedIdentifiers.isEmpty()) {
-            List<Relation> backendRelations =
+            List<RelationalEntity<?>> backendRelations =
                 backend.batchListEntitiesByRelation(relType, uncachedIdentifiers, identType);
             result.addAll(backendRelations);
 
@@ -365,17 +364,16 @@ public class RelationalEntityStore implements EntityStore, SupportsRelationOpera
     backend.batchPut(entities, overwritten);
   }
 
-  private <E extends Entity & HasIdentifier> Optional<List<Relation>> getCachedRelations(
-      SupportsRelationOperations.Type relType,
-      NameIdentifier nameIdentifier,
-      Entity.EntityType identType) {
+  private <E extends Entity & HasIdentifier> Optional<List<RelationalEntity<?>>>
+      getCachedRelations(
+          SupportsRelationOperations.Type relType,
+          NameIdentifier nameIdentifier,
+          Entity.EntityType identType) {
     Optional<List<E>> entitiesOpt = cache.getIfPresent(relType, nameIdentifier, identType);
     if (entitiesOpt.isPresent()) {
-      List<Relation> cachedRelations = new ArrayList<>();
+      List<RelationalEntity<?>> cachedRelations = new ArrayList<>();
       for (E entity : entitiesOpt.get()) {
-        cachedRelations.add(
-            new Relation(
-                relType, nameIdentifier, identType, entity.nameIdentifier(), entity.type()));
+        cachedRelations.add(new RelationalEntity<>(relType, nameIdentifier, identType, entity));
       }
       return Optional.of(cachedRelations);
     }
@@ -386,38 +384,21 @@ public class RelationalEntityStore implements EntityStore, SupportsRelationOpera
       SupportsRelationOperations.Type relType,
       Entity.EntityType identType,
       List<NameIdentifier> uncachedIdentifiers,
-      List<Relation> backendRelations) {
-    Map<NameIdentifier, List<Relation>> relationsBySource = new HashMap<>();
-    for (Relation relation : backendRelations) {
+      List<RelationalEntity<?>> backendRelations) {
+    Map<NameIdentifier, List<RelationalEntity<?>>> relationsBySource = new HashMap<>();
+    for (RelationalEntity<?> relation : backendRelations) {
       relationsBySource.computeIfAbsent(relation.source(), k -> new ArrayList<>()).add(relation);
     }
 
-    Map<Entity.EntityType, List<NameIdentifier>> targetsByType = new HashMap<>();
-    for (Relation relation : backendRelations) {
-      targetsByType
-          .computeIfAbsent(relation.targetType(), k -> new ArrayList<>())
-          .add(relation.target());
-    }
-
-    Map<NameIdentifier, E> entitiesByIdent = new HashMap<>();
-    for (Map.Entry<Entity.EntityType, List<NameIdentifier>> entry : targetsByType.entrySet()) {
-      List<E> entities =
-          batchGet(
-              entry.getValue(), entry.getKey(), EntityClassMapper.getEntityClass(entry.getKey()));
-      for (E entity : entities) {
-        entitiesByIdent.put(entity.nameIdentifier(), entity);
-      }
-    }
-
     for (NameIdentifier sourceId : uncachedIdentifiers) {
-      List<Relation> sourceRelations = relationsBySource.get(sourceId);
+      List<RelationalEntity<?>> sourceRelations = relationsBySource.get(sourceId);
       List<E> entityList = new ArrayList<>();
       if (sourceRelations != null) {
-        for (Relation rel : sourceRelations) {
-          E entity = entitiesByIdent.get(rel.target());
-          if (entity != null) {
-            entityList.add(entity);
-          }
+        for (RelationalEntity<?> rel : sourceRelations) {
+          @SuppressWarnings("unchecked")
+          E entity = (E) rel.targetEntity();
+          cache.put(entity);
+          entityList.add(entity);
         }
       }
 

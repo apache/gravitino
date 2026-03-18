@@ -30,7 +30,7 @@ import java.util.stream.Collectors;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
-import org.apache.gravitino.Relation;
+import org.apache.gravitino.RelationalEntity;
 import org.apache.gravitino.SupportsRelationOperations;
 import org.apache.gravitino.authorization.AuthorizationUtils;
 import org.apache.gravitino.meta.AuditInfo;
@@ -542,29 +542,29 @@ class TestOwnerMetaService extends TestJDBCBackend {
             table.nameIdentifier(),
             topic.nameIdentifier());
 
-    List<Relation> relations =
+    List<RelationalEntity<?>> relations =
         OwnerMetaService.getInstance().batchGetOwner(identifiers, Entity.EntityType.CATALOG);
     Assertions.assertEquals(1, relations.size());
 
     // catalog is CATALOG type; schema/table/topic share the same owner but different types.
     // batchGetOwner queries by a single identType, so query per type.
-    List<Relation> catalogRelations =
+    List<RelationalEntity<?>> catalogRelations =
         OwnerMetaService.getInstance()
             .batchGetOwner(List.of(catalog.nameIdentifier()), Entity.EntityType.CATALOG);
-    List<Relation> schemaRelations =
+    List<RelationalEntity<?>> schemaRelations =
         OwnerMetaService.getInstance()
             .batchGetOwner(List.of(schema.nameIdentifier()), Entity.EntityType.SCHEMA);
-    List<Relation> tableRelations =
+    List<RelationalEntity<?>> tableRelations =
         OwnerMetaService.getInstance()
             .batchGetOwner(List.of(table.nameIdentifier()), Entity.EntityType.TABLE);
-    List<Relation> topicRelations =
+    List<RelationalEntity<?>> topicRelations =
         OwnerMetaService.getInstance()
             .batchGetOwner(List.of(topic.nameIdentifier()), Entity.EntityType.TOPIC);
 
     Assertions.assertEquals(1, catalogRelations.size());
     Assertions.assertEquals(catalog.nameIdentifier(), catalogRelations.get(0).source());
     Assertions.assertEquals(Entity.EntityType.CATALOG, catalogRelations.get(0).sourceType());
-    Assertions.assertEquals(Entity.EntityType.USER, catalogRelations.get(0).targetType());
+    Assertions.assertEquals(Entity.EntityType.USER, catalogRelations.get(0).targetEntity().type());
     Assertions.assertEquals(
         SupportsRelationOperations.Type.OWNER_REL, catalogRelations.get(0).type());
 
@@ -578,14 +578,14 @@ class TestOwnerMetaService extends TestJDBCBackend {
     Assertions.assertEquals(topic.nameIdentifier(), topicRelations.get(0).source());
 
     // All targets should be the same user
-    List<Relation> allRelations =
+    List<RelationalEntity<?>> allRelations =
         List.of(
             catalogRelations.get(0),
             schemaRelations.get(0),
             tableRelations.get(0),
             topicRelations.get(0));
-    for (Relation rel : allRelations) {
-      Assertions.assertEquals(user.nameIdentifier(), rel.target());
+    for (RelationalEntity<?> rel : allRelations) {
+      Assertions.assertEquals(user.nameIdentifier(), rel.targetEntity().nameIdentifier());
     }
   }
 
@@ -618,7 +618,7 @@ class TestOwnerMetaService extends TestJDBCBackend {
     OwnerMetaService.getInstance()
         .setOwner(schema2.nameIdentifier(), schema2.type(), user2.nameIdentifier(), user2.type());
 
-    List<Relation> relations =
+    List<RelationalEntity<?>> relations =
         OwnerMetaService.getInstance()
             .batchGetOwner(
                 List.of(
@@ -628,24 +628,26 @@ class TestOwnerMetaService extends TestJDBCBackend {
     Assertions.assertEquals(2, relations.size());
 
     Map<NameIdentifier, NameIdentifier> sourceToTarget =
-        relations.stream().collect(Collectors.toMap(Relation::source, Relation::target));
+        relations.stream()
+            .collect(
+                Collectors.toMap(RelationalEntity::source, r -> r.targetEntity().nameIdentifier()));
 
     Assertions.assertEquals(user1.nameIdentifier(), sourceToTarget.get(schema1.nameIdentifier()));
     Assertions.assertEquals(user2.nameIdentifier(), sourceToTarget.get(schema2.nameIdentifier()));
     // schema3 has no owner — not present in results
     Assertions.assertFalse(sourceToTarget.containsKey(schema3.nameIdentifier()));
 
-    // Verify Relation metadata
-    for (Relation rel : relations) {
+    // Verify RelationalEntity metadata
+    for (RelationalEntity<?> rel : relations) {
       Assertions.assertEquals(SupportsRelationOperations.Type.OWNER_REL, rel.type());
       Assertions.assertEquals(Entity.EntityType.SCHEMA, rel.sourceType());
-      Assertions.assertEquals(Entity.EntityType.USER, rel.targetType());
+      Assertions.assertEquals(Entity.EntityType.USER, rel.targetEntity().type());
     }
   }
 
   @TestTemplate
   void testBatchGetOwnerWithEmptyInput() {
-    List<Relation> relations =
+    List<RelationalEntity<?>> relations =
         OwnerMetaService.getInstance()
             .batchGetOwner(Collections.emptyList(), Entity.EntityType.TABLE);
     Assertions.assertNotNull(relations);
@@ -659,7 +661,7 @@ class TestOwnerMetaService extends TestJDBCBackend {
     SchemaEntity schema1 = createAndInsertSchema(METALAKE_NAME, CATALOG_NAME, SCHEMA_NAME);
     SchemaEntity schema2 = createAndInsertSchema(METALAKE_NAME, CATALOG_NAME, SCHEMA_NAME + "_2");
 
-    List<Relation> relations =
+    List<RelationalEntity<?>> relations =
         OwnerMetaService.getInstance()
             .batchGetOwner(
                 List.of(schema1.nameIdentifier(), schema2.nameIdentifier()),

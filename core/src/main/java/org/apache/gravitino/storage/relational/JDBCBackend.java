@@ -38,7 +38,7 @@ import org.apache.gravitino.EntityAlreadyExistsException;
 import org.apache.gravitino.HasIdentifier;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
-import org.apache.gravitino.Relation;
+import org.apache.gravitino.RelationalEntity;
 import org.apache.gravitino.SupportsRelationOperations;
 import org.apache.gravitino.UnsupportedEntityTypeException;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
@@ -696,7 +696,7 @@ public class JDBCBackend implements RelationalBackend {
   }
 
   @Override
-  public List<Relation> batchListEntitiesByRelation(
+  public List<RelationalEntity<?>> batchListEntitiesByRelation(
       Type relType, List<NameIdentifier> nameIdentifiers, Entity.EntityType identType)
       throws IOException {
     switch (relType) {
