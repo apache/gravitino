@@ -123,6 +123,7 @@ public class JsonUtils {
   private static final String INDEX_TYPE = "indexType";
   private static final String INDEX_NAME = "name";
   private static final String INDEX_FIELD_NAMES = "fieldNames";
+  private static final String INDEX_PROPERTIES = "properties";
   private static final String NUMBER = "number";
   private static final String TYPE = "type";
   private static final String STRUCT = "struct";
@@ -636,10 +637,8 @@ public class JsonUtils {
     }
 
     JsonNode propertiesNode = node.get(property);
-    Iterator<Map.Entry<String, JsonNode>> fieldsIterator = propertiesNode.fields();
     Map<String, String> properties = Maps.newHashMap();
-    while (fieldsIterator.hasNext()) {
-      Map.Entry<String, JsonNode> field = fieldsIterator.next();
+    for (Map.Entry<String, JsonNode> field : propertiesNode.properties()) {
       properties.put(field.getKey(), field.getValue().asText());
     }
     return properties;
@@ -1392,8 +1391,8 @@ public class JsonUtils {
       ObjectNode objectNode = (ObjectNode) node;
       Map<String, StatisticValue<?>> map = Maps.newHashMap();
       objectNode
-          .fields()
-          .forEachRemaining(
+          .properties()
+          .forEach(
               entry -> {
                 try {
                   StatisticValue<?> value = getStatisticValue(entry.getValue());
@@ -1476,7 +1475,7 @@ public class JsonUtils {
       gen.writeFieldName(INDEX_FIELD_NAMES);
       gen.writeObject(value.fieldNames());
       Map<String, String> props = value.properties();
-      gen.writeFieldName("properties");
+      gen.writeFieldName(INDEX_PROPERTIES);
       Map<String, String> sortedProps = new TreeMap<>(props);
       gen.writeObject(sortedProps);
       gen.writeEndObject();
@@ -1509,13 +1508,13 @@ public class JsonUtils {
       builder.withFieldNames(fieldNames.toArray(new String[0][0]));
       Map<String, String> properties = ImmutableMap.of();
 
-      if (node.has("properties") && node.get("properties").isObject()) {
+      if (node.has(INDEX_PROPERTIES) && node.get(INDEX_PROPERTIES).isObject()) {
 
         Map<String, String> props = new HashMap<>();
 
-        node.get("properties")
-            .fields()
-            .forEachRemaining(entry -> props.put(entry.getKey(), entry.getValue().asText()));
+        node.get(INDEX_PROPERTIES)
+            .properties()
+            .forEach(entry -> props.put(entry.getKey(), entry.getValue().asText()));
 
         properties = props;
       }

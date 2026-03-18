@@ -42,8 +42,8 @@ public class SerializationUtils {
             jsonNode -> {
               Map<String, String> map = new HashMap<>();
               jsonNode
-                  .fields()
-                  .forEachRemaining(
+                  .properties()
+                  .forEach(
                       entry -> {
                         map.put(entry.getKey(), entry.getValue().asText());
                       });
