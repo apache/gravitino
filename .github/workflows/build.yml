@@ -31,7 +31,7 @@ jobs:
       - uses: dorny/paths-filter@de90cc6fb38fc0963ad72b210f1f284cd68cea36
         id: filter
         with:
-          list-files: json
+          list-files: shell
           filters: |
             source_changes:
               - '.github/**'
@@ -65,34 +65,39 @@ jobs:
               - spark-connector/**
             mcp_server_changes:
               - mcp-server/**
-      - name: Determine maintenance-only changes
-        id: maintenance_only
+      - name: Determine maintenance-module-only changes
+        id: maintenance_module_only
         env:
           SOURCE_CHANGE_FILES: ${{ steps.filter.outputs.source_changes_files }}
         run: |
-          python3 - <<'PY'
-          import json
-          import os
-          
           # Route to the maintenance-only build path only when every source
-          # change in the PR is under maintenance/.
-          source_files = json.loads(os.environ.get("SOURCE_CHANGE_FILES") or "[]")
-          maintenance_only = bool(source_files) and all(
-            path.startswith("maintenance/") for path in source_files
-          )
+          # change in the PR is under maintenance/. Non-source changes are
+          # already filtered out by source_changes_files.
+          source_files=()
+          if [ -n "${SOURCE_CHANGE_FILES}" ]; then
+            eval "source_files=(${SOURCE_CHANGE_FILES})"
+          fi
 
-          with open(os.environ["GITHUB_OUTPUT"], "a", encoding="utf-8") as output:
-            output.write(
-              "maintenance_only_changes="
-              + ("true" if maintenance_only else "false")
-              + "\n"
-            )
-          PY
+          maintenance_module_only=false
+          if [ "${#source_files[@]}" -gt 0 ]; then
+            maintenance_module_only=true
+            for path in "${source_files[@]}"; do
+              case "$path" in
+                maintenance/*) ;;
+                *)
+                  maintenance_module_only=false
+                  break
+                  ;;
+              esac
+            done
+          fi
+
+          echo "maintenance_module_only_changes=${maintenance_module_only}" >> "${GITHUB_OUTPUT}"
     outputs:
       source_changes: ${{ steps.filter.outputs.source_changes }}
       spark_connector_changes: ${{ steps.filter.outputs.spark_connector_changes }}
       mcp_server_changes: ${{ steps.filter.outputs.mcp_server_changes }}
-      maintenance_only_changes: ${{ steps.maintenance_only.outputs.maintenance_only_changes }}
+      maintenance_module_only_changes: ${{ steps.maintenance_module_only.outputs.maintenance_module_only_changes }}
 
   compile-check:
     runs-on: ubuntu-latest
@@ -179,7 +184,7 @@ jobs:
 
       - name: Build with Gradle
         run: |
-          if [ "${{ needs.changes.outputs.maintenance_only_changes }}" = "true" ]; then
+          if [ "${{ needs.changes.outputs.maintenance_module_only_changes }}" = "true" ]; then
             ./gradlew \
               :maintenance:optimizer-api:build \
               :maintenance:gravitino-updaters:build \
