@@ -22,8 +22,6 @@ from itertools import combinations, product
 from gravitino.api.rel.expressions.expression import Expression
 from gravitino.api.rel.indexes.index import Index
 from gravitino.api.rel.indexes.indexes import Indexes
-from gravitino.api.rel.json_serdes.column_position_serdes import ColumnPositionSerdes
-from gravitino.api.rel.json_serdes.table_index_serdes import TableIndexSerdes
 from gravitino.api.rel.table_change import After, Default, First
 from gravitino.api.rel.types.json_serdes import TypeSerdes
 from gravitino.api.rel.types.json_serdes._helper.serdes_utils import SerdesUtils
@@ -36,6 +34,8 @@ from gravitino.dto.rel.expressions.json_serdes.column_default_value_serdes impor
 )
 from gravitino.dto.rel.expressions.literal_dto import LiteralDTO
 from gravitino.dto.rel.expressions.unparsed_expression_dto import UnparsedExpressionDTO
+from gravitino.dto.rel.indexes.json_serdes.index_serdes import IndexSerdes
+from gravitino.dto.rel.json_serdes.column_position_serdes import ColumnPositionSerdes
 from gravitino.exceptions.base import IllegalArgumentException
 
 
@@ -591,7 +591,7 @@ class TestTypeSerdes(unittest.TestCase):
 
     def test_table_index_serializer(self) -> None:
         index_obj = Indexes.create_mysql_primary_key([["a", "b"]])
-        serialized = TableIndexSerdes.serialize(index_obj)
+        serialized = IndexSerdes.serialize(index_obj)
         expected = {
             "indexType": "PRIMARY_KEY",
             "name": Indexes.DEFAULT_MYSQL_PRIMARY_KEY_NAME,
@@ -600,7 +600,7 @@ class TestTypeSerdes(unittest.TestCase):
         self.assertEqual(serialized, expected)
 
         index_obj = Indexes.of(Index.IndexType.PRIMARY_KEY, None, [["a", "b"]])
-        serialized = TableIndexSerdes.serialize(index_obj)
+        serialized = IndexSerdes.serialize(index_obj)
         expected = {
             "indexType": "PRIMARY_KEY",
             "fieldNames": [["a", "b"]],
@@ -608,7 +608,7 @@ class TestTypeSerdes(unittest.TestCase):
         self.assertEqual(serialized, expected)
 
         index_obj = Indexes.unique("uk_1", [["a", "b"]])
-        serialized = TableIndexSerdes.serialize(index_obj)
+        serialized = IndexSerdes.serialize(index_obj)
         expected = {
             "indexType": "UNIQUE_KEY",
             "name": "uk_1",
@@ -623,7 +623,7 @@ class TestTypeSerdes(unittest.TestCase):
             "fieldNames": ["a", "b"],
         }
 
-        result = TableIndexSerdes.deserialize(data)
+        result = IndexSerdes.deserialize(data)
         self.assertEqual(result.name(), "idx_test")
         self.assertEqual(result.type(), Index.IndexType.PRIMARY_KEY)
         self.assertEqual(result.field_names(), ["a", "b"])
@@ -633,7 +633,7 @@ class TestTypeSerdes(unittest.TestCase):
             "fieldNames": ["a", "b"],
         }
 
-        result = TableIndexSerdes.deserialize(data)
+        result = IndexSerdes.deserialize(data)
         self.assertIsNone(result.name())
         self.assertEqual(result.type(), Index.IndexType.PRIMARY_KEY)
         self.assertEqual(result.field_names(), ["a", "b"])

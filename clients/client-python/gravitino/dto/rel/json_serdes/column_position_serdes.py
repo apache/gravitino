@@ -47,9 +47,10 @@ class ColumnPositionSerdes(JsonSerializable[TableChange.ColumnPosition]):
     @classmethod
     def deserialize(cls, data: Json) -> Union[First, After, Default]:
         if isinstance(data, str):
-            if data == cls._POSITION_FIRST or data == cls._POSITION_FIRST.upper():
+            data = data.lower()
+            if data == cls._POSITION_FIRST:
                 return TableChange.ColumnPosition.first()
-            if data == cls._POSITION_DEFAULT or data == cls._POSITION_DEFAULT.upper():
+            if data == cls._POSITION_DEFAULT:
                 return TableChange.ColumnPosition.default_pos()
 
         if isinstance(data, dict):

@@ -130,7 +130,7 @@ class TestTableUpdateRequest(unittest.TestCase):
             invalid_request.validate()
 
         invalid_request = TableUpdateRequest.AddTableColumnRequest(
-            ["", "column"],
+            [" ", "column"],
             Types.StringType.get(),
             "comment",
             TableChange.ColumnPosition.after("afterColumn"),
@@ -296,7 +296,7 @@ class TestTableUpdateRequest(unittest.TestCase):
             invalid_request.validate()
 
         invalid_request = TableUpdateRequest.UpdateTableColumnDefaultValueRequest(
-            ["", "key"],
+            [" ", "key"],
             LiteralDTO.builder()
             .with_data_type(Types.DateType.get())
             .with_value("2023-04-01")
@@ -340,7 +340,7 @@ class TestTableUpdateRequest(unittest.TestCase):
             [], "new comment"
         )
         invalid_request2 = TableUpdateRequest.UpdateTableColumnCommentRequest(
-            ["", "column2"], "new comment"
+            [" ", "column2"], "new comment"
         )
         invalid_request3 = TableUpdateRequest.UpdateTableColumnCommentRequest(
             ["column"], ""
@@ -375,7 +375,7 @@ class TestTableUpdateRequest(unittest.TestCase):
             [], True
         )
         invalid_request2 = TableUpdateRequest.UpdateTableColumnNullabilityRequest(
-            ["", "column2"], False
+            [" ", "column2"], False
         )
 
         with self.assertRaises(ValueError):
@@ -401,7 +401,7 @@ class TestTableUpdateRequest(unittest.TestCase):
 
     def test_delete_column_request_validate(self) -> None:
         invalid_request1 = TableUpdateRequest.DeleteTableColumnRequest([], False)
-        invalid_request2 = TableUpdateRequest.DeleteTableColumnRequest(["", ""], True)
+        invalid_request2 = TableUpdateRequest.DeleteTableColumnRequest([" ", " "], True)
 
         with self.assertRaises(ValueError):
             invalid_request1.validate()
@@ -492,7 +492,7 @@ class TestTableUpdateRequest(unittest.TestCase):
             invalid_request.validate()
 
         invalid_request = TableUpdateRequest.UpdateTableColumnPositionRequest(
-            ["column", ""], TableChange.ColumnPosition.first()
+            ["column", " "], TableChange.ColumnPosition.first()
         )
 
         with self.assertRaises(ValueError):
@@ -549,7 +549,7 @@ class TestTableUpdateRequest(unittest.TestCase):
     def test_update_column_auto_increment_request_validate(self) -> None:
         invalid_request1 = TableUpdateRequest.UpdateColumnAutoIncrementRequest([], True)
         invalid_request2 = TableUpdateRequest.UpdateColumnAutoIncrementRequest(
-            ["", "column2"], False
+            [" ", "column2"], False
         )
 
         with self.assertRaises(ValueError):
@@ -583,7 +583,7 @@ class TestTableUpdateRequest(unittest.TestCase):
             invalid_request.validate()
 
         invalid_request = TableUpdateRequest.UpdateTableColumnTypeRequest(
-            ["", "column"], Types.StringType.get()
+            [" ", "column"], Types.StringType.get()
         )
         with self.assertRaises(ValueError):
             invalid_request.validate()

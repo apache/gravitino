@@ -27,8 +27,6 @@ from dataclasses_json import config, dataclass_json
 from gravitino.api.rel.expressions.expression import Expression
 from gravitino.api.rel.indexes.index import Index
 from gravitino.api.rel.indexes.indexes import Indexes
-from gravitino.api.rel.json_serdes.column_position_serdes import ColumnPositionSerdes
-from gravitino.api.rel.json_serdes.table_index_serdes import TableIndexSerdes
 from gravitino.api.rel.table_change import (
     DeleteColumn,
     RenameColumn,
@@ -45,7 +43,10 @@ from gravitino.api.rel.types.type import Type
 from gravitino.dto.rel.expressions.json_serdes.column_default_value_serdes import (
     ColumnDefaultValueSerdes,
 )
+from gravitino.dto.rel.indexes.json_serdes.index_serdes import IndexSerdes
+from gravitino.dto.rel.json_serdes.column_position_serdes import ColumnPositionSerdes
 from gravitino.rest.rest_message import RESTRequest
+from gravitino.utils import StringUtils
 from gravitino.utils.precondition import Precondition
 
 
@@ -104,8 +105,8 @@ class TableUpdateRequest:
             Raises:
                 ValueError: If the request is invalid, this exception is thrown.
             """
-            Precondition.check_argument(
-                self._new_name is not None and self._new_name.strip() != "",
+            Precondition.check_string_not_empty(
+                self._new_name,
                 '"newName" field is required and cannot be empty',
             )
 
@@ -191,12 +192,13 @@ class TableUpdateRequest:
             Raises:
                 ValueError: If the request is invalid, this exception is thrown.
             """
-            Precondition.check_argument(
-                self._property is not None and self._property != "",
+            Precondition.check_string_not_empty(
+                self._property,
                 '"property" field is required',
             )
-            Precondition.check_argument(
-                self._value is not None and self._value != "",
+
+            Precondition.check_string_not_empty(
+                self._value,
                 '"value" field is required',
             )
 
@@ -240,8 +242,8 @@ class TableUpdateRequest:
             Raises:
                 ValueError: If the request is invalid, this exception is thrown.
             """
-            Precondition.check_argument(
-                self._property is not None and self._property != "",
+            Precondition.check_string_not_empty(
+                self._property,
                 '"property" field is required',
             )
 
@@ -329,11 +331,11 @@ class TableUpdateRequest:
                 ValueError: If the request is invalid, this exception is thrown.
             """
             Precondition.check_argument(
-                self._field_name is not None and len(self._field_name) > 0,
+                self._field_name,
                 "Field name must be specified",
             )
             Precondition.check_argument(
-                all(name for name in self._field_name),
+                all(StringUtils.is_not_blank(name) for name in self._field_name),
                 'elements in "field_name" cannot be empty',
             )
             Precondition.check_argument(
@@ -411,15 +413,15 @@ class TableUpdateRequest:
                 ValueError: If the request is invalid, this exception is thrown.
             """
             Precondition.check_argument(
-                self._old_field_name is not None and len(self._old_field_name) > 0,
+                self._old_field_name,
                 '"old_field_name" field is required and must contain at least one element',
             )
             Precondition.check_argument(
-                all(name for name in self._old_field_name),
+                all(StringUtils.is_not_blank(name) for name in self._old_field_name),
                 'elements in "old_field_name" cannot be empty',
             )
-            Precondition.check_argument(
-                self._new_field_name is not None and self._new_field_name != "",
+            Precondition.check_string_not_empty(
+                self._new_field_name,
                 '"newFieldName" field is required and cannot be empty',
             )
 
@@ -465,11 +467,11 @@ class TableUpdateRequest:
                 ValueError: If the request is invalid, this exception is thrown.
             """
             Precondition.check_argument(
-                self._field_name is not None and len(self._field_name) > 0,
+                self._field_name,
                 '"field_name" field is required and must contain at least one element',
             )
             Precondition.check_argument(
-                all(name for name in self._field_name),
+                all(StringUtils.is_not_blank(name) for name in self._field_name),
                 'elements in "field_name" cannot be empty',
             )
             Precondition.check_argument(
@@ -528,11 +530,11 @@ class TableUpdateRequest:
                 ValueError: If the request is invalid, this exception is thrown.
             """
             Precondition.check_argument(
-                self._field_name is not None and len(self._field_name) > 0,
+                self._field_name,
                 '"field_name" field is required and must contain at least one element',
             )
             Precondition.check_argument(
-                all(name for name in self._field_name),
+                all(StringUtils.is_not_blank(name) for name in self._field_name),
                 'elements in "field_name" cannot be empty',
             )
             Precondition.check_argument(
@@ -584,15 +586,15 @@ class TableUpdateRequest:
                 ValueError: If the request is invalid, this exception is thrown.
             """
             Precondition.check_argument(
-                self._field_name is not None and len(self._field_name) > 0,
+                self._field_name,
                 '"field_name" field is required and must contain at least one element',
             )
             Precondition.check_argument(
-                all(name for name in self._field_name),
+                all(StringUtils.is_not_blank(name) for name in self._field_name),
                 'elements in "field_name" cannot be empty',
             )
-            Precondition.check_argument(
-                self._new_comment is not None and self._new_comment != "",
+            Precondition.check_string_not_empty(
+                self._new_comment,
                 '"newComment" field is required and cannot be empty',
             )
 
@@ -650,11 +652,11 @@ class TableUpdateRequest:
                 ValueError: If the request is invalid, this exception is thrown.
             """
             Precondition.check_argument(
-                self._field_name is not None and len(self._field_name) > 0,
+                self._field_name,
                 '"field_name" field is required and must contain at least one element',
             )
             Precondition.check_argument(
-                all(name for name in self._field_name),
+                all(StringUtils.is_not_blank(name) for name in self._field_name),
                 'elements in "field_name" cannot be empty',
             )
             Precondition.check_argument(
@@ -708,11 +710,11 @@ class TableUpdateRequest:
                 ValueError: If the request is invalid, this exception is thrown.
             """
             Precondition.check_argument(
-                self._field_name is not None and len(self._field_name) > 0,
+                self._field_name,
                 '"field_name" field is required and must contain at least one element',
             )
             Precondition.check_argument(
-                all(name for name in self._field_name),
+                all(StringUtils.is_not_blank(name) for name in self._field_name),
                 'elements in "field_name" cannot be empty',
             )
 
@@ -762,11 +764,11 @@ class TableUpdateRequest:
                 ValueError: If the request is invalid, this exception is thrown.
             """
             Precondition.check_argument(
-                self._field_name is not None and len(self._field_name) > 0,
+                self._field_name,
                 '"field_name" field is required and must contain at least one element',
             )
             Precondition.check_argument(
-                all(name for name in self._field_name),
+                all(StringUtils.is_not_blank(name) for name in self._field_name),
                 'elements in "field_name" cannot be empty',
             )
 
@@ -791,8 +793,8 @@ class TableUpdateRequest:
         _index: Index = field(
             metadata=config(
                 field_name="index",
-                encoder=TableIndexSerdes.serialize,
-                decoder=TableIndexSerdes.deserialize,
+                encoder=IndexSerdes.serialize,
+                decoder=IndexSerdes.deserialize,
             )
         )
 
@@ -828,8 +830,8 @@ class TableUpdateRequest:
                 self._index.type() is not None,
                 "Index type cannot be null",
             )
-            Precondition.check_argument(
-                self._index.name() is not None and self._index.name() != "",
+            Precondition.check_string_not_empty(
+                self._index.name(),
                 '"name" field is required',
             )
             Precondition.check_argument(
@@ -879,8 +881,8 @@ class TableUpdateRequest:
             Raises:
                 ValueError: If the request is invalid, this exception is thrown.
             """
-            Precondition.check_argument(
-                self._name is not None and self._name != "",
+            Precondition.check_string_not_empty(
+                self._name,
                 '"name" field is required',
             )
 
@@ -928,11 +930,11 @@ class TableUpdateRequest:
                 ValueError: If the request is invalid, this exception is thrown.
             """
             Precondition.check_argument(
-                self._field_name is not None and len(self._field_name) > 0,
+                self._field_name,
                 '"field_name" field is required and must contain at least one element',
             )
             Precondition.check_argument(
-                all(name for name in self._field_name),
+                all(StringUtils.is_not_blank(name) for name in self._field_name),
                 'elements in "field_name" cannot be empty',
             )
 
