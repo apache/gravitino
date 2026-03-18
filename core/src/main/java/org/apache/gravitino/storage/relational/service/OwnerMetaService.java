@@ -28,6 +28,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.stream.Collectors;
 import org.apache.commons.collections4.CollectionUtils;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.NameIdentifier;
@@ -98,6 +99,12 @@ public class OwnerMetaService {
     if (CollectionUtils.isEmpty(identifiers)) {
       return new ArrayList<>();
     }
+    String metalake = NameIdentifierUtil.getMetalake(identifiers.get(0));
+    for (NameIdentifier identifier : identifiers) {
+      Preconditions.checkArgument(
+          Objects.equals(NameIdentifierUtil.getMetalake(identifier), metalake),
+          "identifiers should in one metalake");
+    }
     List<RelationalEntity<?>> result = new ArrayList<>();
     Map<Long, NameIdentifier> nameIdentifierMap = new HashMap<>();
     List<Long> entityIds =
@@ -108,14 +115,7 @@ public class OwnerMetaService {
                   nameIdentifierMap.put(entityId, identifier);
                   return entityId;
                 })
-            .toList();
-    NameIdentifier nameIdentifier = identifiers.get(0);
-    String metalake = NameIdentifierUtil.getMetalake(nameIdentifier);
-    for (NameIdentifier identifier : identifiers) {
-      Preconditions.checkArgument(
-          Objects.equals(NameIdentifierUtil.getMetalake(identifier), metalake),
-          "identifiers should in one metalake");
-    }
+            .collect(Collectors.toList());
 
     // Get user owners
     List<UserOwnerRelPO> userPOList =

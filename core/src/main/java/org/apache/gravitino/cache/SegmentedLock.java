@@ -23,18 +23,27 @@ import com.google.common.annotations.VisibleForTesting;
 import com.google.common.util.concurrent.Striped;
 import java.util.Comparator;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.concurrent.locks.Lock;
 import java.util.stream.Collectors;
+import java.util.stream.IntStream;
 
 /**
  * Segmented lock for improved concurrency. Divides locks into segments to reduce contention.
  * Supports global clearing operations that require exclusive access to all segments.
  */
 public class SegmentedLock {
-  private final Striped<Lock> stripedLocks;
   private static final Object NULL_KEY = new Object();
+
+  private final Striped<Lock> stripedLocks;
+
+  /**
+   * Stable index for each stripe lock, built once at construction. Used to sort locks in {@link
+   * #getDistinctSortedLocks} with a guaranteed total order (no hash-collision ties).
+   */
+  private final Map<Lock, Integer> lockIndices;
 
   /** CountDownLatch for global operations - null when no operation is in progress */
   private final AtomicReference<CountDownLatch> globalOperationLatch = new AtomicReference<>();
@@ -53,6 +62,10 @@ public class SegmentedLock {
     }
 
     this.stripedLocks = Striped.lock(numSegments);
+    this.lockIndices =
+        IntStream.range(0, this.stripedLocks.size())
+            .boxed()
+            .collect(Collectors.toMap(this.stripedLocks::getAt, i -> i));
   }
 
   /**
@@ -180,7 +193,7 @@ public class SegmentedLock {
   }
 
   /**
-   * Acquires locks for multiple keys in a consistent order (sorted by identity hash code) to avoid
+   * Acquires locks for multiple keys in a consistent order (sorted by stripe index) to avoid
    * deadlocks, then executes the action.
    *
    * @param keys The keys to lock
@@ -201,7 +214,7 @@ public class SegmentedLock {
   }
 
   /**
-   * Acquires locks for multiple keys in a consistent order (sorted by identity hash code) to avoid
+   * Acquires locks for multiple keys in a consistent order (sorted by stripe index) to avoid
    * deadlocks, then executes the action and returns the result.
    *
    * @param keys The keys to lock
@@ -227,7 +240,7 @@ public class SegmentedLock {
     return keys.stream()
         .map(this::getSegmentLock)
         .distinct()
-        .sorted(Comparator.comparingInt(System::identityHashCode))
+        .sorted(Comparator.comparingInt(lockIndices::get))
         .collect(Collectors.toList());
   }
 

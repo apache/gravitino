@@ -113,8 +113,8 @@ public interface SupportsRelationOperations {
    * @param relType The type of relation to query.
    * @param nameIdentifiers The list of source entity identifiers to look up relations for.
    * @param identType The entity type that each element in {@code nameIdentifiers} represents.
-   * @return A list of {@link RelationalEntity} objects, one per (source, target) pair found. May
-   *     be empty but never null.
+   * @return A list of {@link RelationalEntity} objects, one per (source, target) pair found. May be
+   *     empty but never null.
    * @throws IOException If a storage-related error occurs during the batch query.
    */
   List<RelationalEntity<?>> batchListEntitiesByRelation(
