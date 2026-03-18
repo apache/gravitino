@@ -67,8 +67,8 @@ public class Configs {
       "gravitino.entity.store.relational.maxWaitMillis";
 
   /**
-   * Local filesystem path for embedded H2 only. Not applicable to read-only / replica JDBC
-   * traffic (replica host and DB are in jdbcReadOnlyUrl).
+   * Local filesystem path for embedded H2 only. Not applicable to read-only / replica JDBC traffic
+   * (replica host and DB are in jdbcReadOnlyUrl).
    */
   public static final String ENTITY_RELATIONAL_JDBC_BACKEND_STORAGE_PATH_KEY =
       "gravitino.entity.store.relational.storagePath";
@@ -216,36 +216,40 @@ public class Configs {
           .createWithDefault("");
 
   /**
-   * Max connections for the read replica pool only. Value {@link #JDBC_READ_ONLY_POOL_INHERIT_MAX_CONNECTIONS}
-   * (-1) means use {@link #ENTITY_RELATIONAL_JDBC_BACKEND_MAX_CONNECTIONS} (backward compatible).
+   * Max connections for the read replica pool only. Value {@link
+   * #JDBC_READ_ONLY_POOL_INHERIT_MAX_CONNECTIONS} (-1) means use {@link
+   * #ENTITY_RELATIONAL_JDBC_BACKEND_MAX_CONNECTIONS} (backward compatible).
    */
-  public static final ConfigEntry<Integer> ENTITY_RELATIONAL_JDBC_BACKEND_READ_ONLY_MAX_CONNECTIONS =
-      new ConfigBuilder(ENTITY_RELATIONAL_JDBC_BACKEND_READ_ONLY_MAX_CONNECTIONS_KEY)
-          .doc(
-              "Maximum connections for the read-only JDBC pool. Set to -1 to use maxConnections"
-                  + " (write pool value). Any other value must be >= 1.")
-          .version(ConfigConstants.VERSION_0_9_0)
-          .intConf()
-          .checkValue(
-              v -> v == JDBC_READ_ONLY_POOL_INHERIT_MAX_CONNECTIONS || v >= 1,
-              "readOnlyMaxConnections must be -1 (inherit) or >= 1")
-          .createWithDefault(JDBC_READ_ONLY_POOL_INHERIT_MAX_CONNECTIONS);
+  public static final ConfigEntry<Integer>
+      ENTITY_RELATIONAL_JDBC_BACKEND_READ_ONLY_MAX_CONNECTIONS =
+          new ConfigBuilder(ENTITY_RELATIONAL_JDBC_BACKEND_READ_ONLY_MAX_CONNECTIONS_KEY)
+              .doc(
+                  "Maximum connections for the read-only JDBC pool. Set to -1 to use maxConnections"
+                      + " (write pool value). Any other value must be >= 1.")
+              .version(ConfigConstants.VERSION_0_9_0)
+              .intConf()
+              .checkValue(
+                  v -> v == JDBC_READ_ONLY_POOL_INHERIT_MAX_CONNECTIONS || v >= 1,
+                  "readOnlyMaxConnections must be -1 (inherit) or >= 1")
+              .createWithDefault(JDBC_READ_ONLY_POOL_INHERIT_MAX_CONNECTIONS);
 
   /**
-   * Max wait for the read replica pool only. Value {@link #JDBC_READ_ONLY_POOL_INHERIT_MAX_WAIT_MILLIS}
-   * (-1) means use {@link #ENTITY_RELATIONAL_JDBC_BACKEND_WAIT_MILLISECONDS} (backward compatible).
+   * Max wait for the read replica pool only. Value {@link
+   * #JDBC_READ_ONLY_POOL_INHERIT_MAX_WAIT_MILLIS} (-1) means use {@link
+   * #ENTITY_RELATIONAL_JDBC_BACKEND_WAIT_MILLISECONDS} (backward compatible).
    */
-  public static final ConfigEntry<Long> ENTITY_RELATIONAL_JDBC_BACKEND_READ_ONLY_MAX_WAIT_MILLISECONDS =
-      new ConfigBuilder(ENTITY_RELATIONAL_JDBC_BACKEND_READ_ONLY_MAX_WAIT_MILLIS_KEY)
-          .doc(
-              "Maximum wait milliseconds for the read-only JDBC pool. Set to -1 to use"
-                  + " maxWaitMillis (write pool value). Any other value must be >= 1.")
-          .version(ConfigConstants.VERSION_0_9_0)
-          .longConf()
-          .checkValue(
-              v -> v == JDBC_READ_ONLY_POOL_INHERIT_MAX_WAIT_MILLIS || v >= 1L,
-              "readOnlyMaxWaitMillis must be -1 (inherit) or >= 1")
-          .createWithDefault(JDBC_READ_ONLY_POOL_INHERIT_MAX_WAIT_MILLIS);
+  public static final ConfigEntry<Long>
+      ENTITY_RELATIONAL_JDBC_BACKEND_READ_ONLY_MAX_WAIT_MILLISECONDS =
+          new ConfigBuilder(ENTITY_RELATIONAL_JDBC_BACKEND_READ_ONLY_MAX_WAIT_MILLIS_KEY)
+              .doc(
+                  "Maximum wait milliseconds for the read-only JDBC pool. Set to -1 to use"
+                      + " maxWaitMillis (write pool value). Any other value must be >= 1.")
+              .version(ConfigConstants.VERSION_0_9_0)
+              .longConf()
+              .checkValue(
+                  v -> v == JDBC_READ_ONLY_POOL_INHERIT_MAX_WAIT_MILLIS || v >= 1L,
+                  "readOnlyMaxWaitMillis must be -1 (inherit) or >= 1")
+              .createWithDefault(JDBC_READ_ONLY_POOL_INHERIT_MAX_WAIT_MILLIS);
 
   public static final ConfigEntry<Integer> ENTITY_RELATIONAL_JDBC_BACKEND_MAX_CONNECTIONS =
       new ConfigBuilder(ENTITY_RELATIONAL_JDBC_BACKEND_MAX_CONNECTION_KEYS)

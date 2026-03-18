@@ -47,8 +47,8 @@ import org.slf4j.LoggerFactory;
 /**
  * SqlSessionFactoryHelper maintains MyBatis {@link SqlSessionFactory} instances for the entity
  * store: a primary (write) factory and optionally a separate read-only factory when any read-only
- * config is set (jdbcReadOnlyUrl, jdbcReadOnlyUser, jdbcReadOnlyPassword, readOnlyMaxConnections, or
- * readOnlyMaxWaitMillis). When none are set, a single factory is used for both reads and writes.
+ * config is set (jdbcReadOnlyUrl, jdbcReadOnlyUser, jdbcReadOnlyPassword, readOnlyMaxConnections,
+ * or readOnlyMaxWaitMillis). When none are set, a single factory is used for both reads and writes.
  */
 public class SqlSessionFactoryHelper {
   private static final Logger LOG = LoggerFactory.getLogger(SqlSessionFactoryHelper.class);
@@ -64,8 +64,8 @@ public class SqlSessionFactoryHelper {
 
   /**
    * Initialize SqlSessionFactory instances from config. When no read-only config is set, a single
-   * factory serves both reads and writes. When any read-only config is set, a separate read pool
-   * is created.
+   * factory serves both reads and writes. When any read-only config is set, a separate read pool is
+   * created.
    */
   @SuppressWarnings("deprecation")
   public void init(Config config) {
@@ -99,8 +99,10 @@ public class SqlSessionFactoryHelper {
             readType);
       }
 
-      Integer readOnlyMaxConn = config.get(Configs.ENTITY_RELATIONAL_JDBC_BACKEND_READ_ONLY_MAX_CONNECTIONS);
-      Long readOnlyMaxWait = config.get(Configs.ENTITY_RELATIONAL_JDBC_BACKEND_READ_ONLY_MAX_WAIT_MILLISECONDS);
+      Integer readOnlyMaxConn =
+          config.get(Configs.ENTITY_RELATIONAL_JDBC_BACKEND_READ_ONLY_MAX_CONNECTIONS);
+      Long readOnlyMaxWait =
+          config.get(Configs.ENTITY_RELATIONAL_JDBC_BACKEND_READ_ONLY_MAX_WAIT_MILLISECONDS);
       boolean anyReadOnlyConfigSet =
           readOnlyUrlSet
               || StringUtils.isNotBlank(
@@ -190,7 +192,8 @@ public class SqlSessionFactoryHelper {
             ? config.get(Configs.ENTITY_RELATIONAL_JDBC_BACKEND_MAX_CONNECTIONS)
             : readMax;
     dataSource.setMaxTotal(maxTotal);
-    Long readWait = config.get(Configs.ENTITY_RELATIONAL_JDBC_BACKEND_READ_ONLY_MAX_WAIT_MILLISECONDS);
+    Long readWait =
+        config.get(Configs.ENTITY_RELATIONAL_JDBC_BACKEND_READ_ONLY_MAX_WAIT_MILLISECONDS);
     long maxWait =
         (readWait == null || readWait == Configs.JDBC_READ_ONLY_POOL_INHERIT_MAX_WAIT_MILLIS)
             ? config.get(Configs.ENTITY_RELATIONAL_JDBC_BACKEND_WAIT_MILLISECONDS)
