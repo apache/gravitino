@@ -76,7 +76,14 @@ jobs:
 
       - name: Build Gravitino
         run: |
-          ./gradlew build -x test
+          ./gradlew build -x test \
+            -x :web:web:build -x :web:integration-test:build \
+            -x :web-v2:web:build -x :web-v2:integration-test:build \
+            -x :clients:client-python:build \
+            -x :flink-connector:flink:build \
+            -x :spark-connector:spark-common:build \
+            -x :spark-connector:spark-3.3:build -x :spark-connector:spark-3.4:build -x :spark-connector:spark-3.5:build \
+            -x :spark-connector:spark-runtime-3.3:build -x :spark-connector:spark-runtime-3.4:build -x :spark-connector:spark-runtime-3.5:build
 
       - name: Free up disk space
         run: |
