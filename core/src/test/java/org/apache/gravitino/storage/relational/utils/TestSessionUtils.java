@@ -34,7 +34,7 @@ public class TestSessionUtils {
     Object mapper = new Object();
 
     try (MockedStatic<SqlSessions> mockedSqlSessions = mockStatic(SqlSessions.class)) {
-      mockedSqlSessions.when(() -> SqlSessions.getMapper(Object.class)).thenReturn(mapper);
+      mockedSqlSessions.when(() -> SqlSessions.getWriteMapper(Object.class)).thenReturn(mapper);
 
       assertThrows(
           AssertionError.class,
@@ -55,7 +55,7 @@ public class TestSessionUtils {
     Object mapper = new Object();
 
     try (MockedStatic<SqlSessions> mockedSqlSessions = mockStatic(SqlSessions.class)) {
-      mockedSqlSessions.when(() -> SqlSessions.getMapper(Object.class)).thenReturn(mapper);
+      mockedSqlSessions.when(() -> SqlSessions.getWriteMapper(Object.class)).thenReturn(mapper);
 
       assertThrows(
           AssertionError.class,
@@ -82,7 +82,7 @@ public class TestSessionUtils {
                     throw new AssertionError("boom");
                   }));
 
-      mockedSqlSessions.verify(SqlSessions::getSqlSession);
+      mockedSqlSessions.verify(SqlSessions::getWriteSqlSession);
       mockedSqlSessions.verify(SqlSessions::rollbackAndCloseSqlSession);
       mockedSqlSessions.verify(() -> SqlSessions.commitAndCloseSqlSession(), never());
     }

@@ -48,6 +48,14 @@ gravitino.entity.store.relational = JDBCBackend
 
 # The JDBC URL for the entity store
 gravitino.entity.store.relational.jdbcUrl = jdbc:h2
+# Optional read-only JDBC URL (e.g. MySQL replica) for entity store reads. If unset, jdbcUrl is used.
+# gravitino.entity.store.relational.jdbcReadOnlyUrl =
+# Optional read-only user/password (if unset, jdbcUser/jdbcPassword are used).
+# gravitino.entity.store.relational.jdbcReadOnlyUser =
+# gravitino.entity.store.relational.jdbcReadOnlyPassword =
+# Read replica pool size / wait (-1 = same as maxConnections / maxWaitMillis below).
+# gravitino.entity.store.relational.readOnlyMaxConnections = -1
+# gravitino.entity.store.relational.readOnlyMaxWaitMillis = -1
 # The JDBC driver class name
 gravitino.entity.store.relational.jdbcDriver = org.h2.Driver
 # The JDBC user name

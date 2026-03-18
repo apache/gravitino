@@ -49,18 +49,36 @@ public class Configs {
   public static final String ENTITY_RELATIONAL_JDBC_BACKEND_PASSWORD_KEY =
       "gravitino.entity.store.relational.jdbcPassword";
 
+  public static final String ENTITY_RELATIONAL_JDBC_BACKEND_READ_ONLY_URL_KEY =
+      "gravitino.entity.store.relational.jdbcReadOnlyUrl";
+  public static final String ENTITY_RELATIONAL_JDBC_BACKEND_READ_ONLY_USER_KEY =
+      "gravitino.entity.store.relational.jdbcReadOnlyUser";
+  public static final String ENTITY_RELATIONAL_JDBC_BACKEND_READ_ONLY_PASSWORD_KEY =
+      "gravitino.entity.store.relational.jdbcReadOnlyPassword";
+  public static final String ENTITY_RELATIONAL_JDBC_BACKEND_READ_ONLY_MAX_CONNECTIONS_KEY =
+      "gravitino.entity.store.relational.readOnlyMaxConnections";
+  public static final String ENTITY_RELATIONAL_JDBC_BACKEND_READ_ONLY_MAX_WAIT_MILLIS_KEY =
+      "gravitino.entity.store.relational.readOnlyMaxWaitMillis";
+
   public static final String ENTITY_RELATIONAL_JDBC_BACKEND_MAX_CONNECTION_KEYS =
       "gravitino.entity.store.relational.maxConnections";
 
   public static final String ENTITY_RELATIONAL_JDBC_BACKEND_MAX_WAIT_MILLIS_CONNECTION_KEY =
       "gravitino.entity.store.relational.maxWaitMillis";
 
+  /**
+   * Local filesystem path for embedded H2 only. Not applicable to read-only / replica JDBC
+   * traffic (replica host and DB are in jdbcReadOnlyUrl).
+   */
   public static final String ENTITY_RELATIONAL_JDBC_BACKEND_STORAGE_PATH_KEY =
       "gravitino.entity.store.relational.storagePath";
 
   public static final Long DEFAULT_DELETE_AFTER_TIME = 604800000L; // 7 days
 
-  // Config for data keep time after soft deletion, in milliseconds.
+  /**
+   * Retention for soft-deleted entity rows (garbage collection on the primary). Not applicable to
+   * read-only traffic.
+   */
   public static final String STORE_DELETE_AFTER_TIME_KEY =
       "gravitino.entity.store.deleteAfterTimeMs";
   // using the fallback default value
@@ -96,6 +114,18 @@ public class Configs {
   public static final int DEFAULT_GRAVITINO_AUTHORIZATION_THREAD_POOL_SIZE = 100;
 
   public static final long DEFAULT_RELATIONAL_JDBC_BACKEND_MAX_WAIT_MILLISECONDS = 1000L;
+
+  /**
+   * Use with {@link #ENTITY_RELATIONAL_JDBC_BACKEND_READ_ONLY_MAX_CONNECTIONS}: inherit {@link
+   * #ENTITY_RELATIONAL_JDBC_BACKEND_MAX_CONNECTIONS} for the read replica pool.
+   */
+  public static final int JDBC_READ_ONLY_POOL_INHERIT_MAX_CONNECTIONS = -1;
+
+  /**
+   * Use with {@link #ENTITY_RELATIONAL_JDBC_BACKEND_READ_ONLY_MAX_WAIT_MILLISECONDS}: inherit
+   * {@link #ENTITY_RELATIONAL_JDBC_BACKEND_WAIT_MILLISECONDS} for the read replica pool.
+   */
+  public static final long JDBC_READ_ONLY_POOL_INHERIT_MAX_WAIT_MILLIS = -1L;
 
   public static final int GARBAGE_COLLECTOR_SINGLE_DELETION_LIMIT = 100;
   public static final long MAX_NODE_IN_MEMORY = 100000L;
@@ -150,9 +180,79 @@ public class Configs {
           .stringConf()
           .createWithDefault(DEFAULT_RELATIONAL_JDBC_BACKEND_PASSWORD);
 
+  /**
+   * Optional JDBC URL for read-only queries against the entity store (e.g. MySQL replica). When
+   * unset or blank, {@link #ENTITY_RELATIONAL_JDBC_BACKEND_URL} is used for all traffic.
+   */
+  public static final ConfigEntry<String> ENTITY_RELATIONAL_JDBC_BACKEND_READ_ONLY_URL =
+      new ConfigBuilder(ENTITY_RELATIONAL_JDBC_BACKEND_READ_ONLY_URL_KEY)
+          .doc(
+              "Read-only JDBC URL for JDBCBackend (e.g. replica). If unset, uses jdbcUrl for reads"
+                  + " and writes.")
+          .version(ConfigConstants.VERSION_0_9_0)
+          .stringConf()
+          .createWithDefault("");
+
+  /**
+   * Optional username for the read-only JDBC connection. When unset or blank, uses {@link
+   * #ENTITY_RELATIONAL_JDBC_BACKEND_USER}.
+   */
+  public static final ConfigEntry<String> ENTITY_RELATIONAL_JDBC_BACKEND_READ_ONLY_USER =
+      new ConfigBuilder(ENTITY_RELATIONAL_JDBC_BACKEND_READ_ONLY_USER_KEY)
+          .doc("Username for read-only JDBC connection. If unset, uses jdbcUser.")
+          .version(ConfigConstants.VERSION_0_9_0)
+          .stringConf()
+          .createWithDefault("");
+
+  /**
+   * Optional password for the read-only JDBC connection. When unset or blank, uses {@link
+   * #ENTITY_RELATIONAL_JDBC_BACKEND_PASSWORD}.
+   */
+  public static final ConfigEntry<String> ENTITY_RELATIONAL_JDBC_BACKEND_READ_ONLY_PASSWORD =
+      new ConfigBuilder(ENTITY_RELATIONAL_JDBC_BACKEND_READ_ONLY_PASSWORD_KEY)
+          .doc("Password for read-only JDBC connection. If unset, uses jdbcPassword.")
+          .version(ConfigConstants.VERSION_0_9_0)
+          .stringConf()
+          .createWithDefault("");
+
+  /**
+   * Max connections for the read replica pool only. Value {@link #JDBC_READ_ONLY_POOL_INHERIT_MAX_CONNECTIONS}
+   * (-1) means use {@link #ENTITY_RELATIONAL_JDBC_BACKEND_MAX_CONNECTIONS} (backward compatible).
+   */
+  public static final ConfigEntry<Integer> ENTITY_RELATIONAL_JDBC_BACKEND_READ_ONLY_MAX_CONNECTIONS =
+      new ConfigBuilder(ENTITY_RELATIONAL_JDBC_BACKEND_READ_ONLY_MAX_CONNECTIONS_KEY)
+          .doc(
+              "Maximum connections for the read-only JDBC pool. Set to -1 to use maxConnections"
+                  + " (write pool value). Any other value must be >= 1.")
+          .version(ConfigConstants.VERSION_0_9_0)
+          .intConf()
+          .checkValue(
+              v -> v == JDBC_READ_ONLY_POOL_INHERIT_MAX_CONNECTIONS || v >= 1,
+              "readOnlyMaxConnections must be -1 (inherit) or >= 1")
+          .createWithDefault(JDBC_READ_ONLY_POOL_INHERIT_MAX_CONNECTIONS);
+
+  /**
+   * Max wait for the read replica pool only. Value {@link #JDBC_READ_ONLY_POOL_INHERIT_MAX_WAIT_MILLIS}
+   * (-1) means use {@link #ENTITY_RELATIONAL_JDBC_BACKEND_WAIT_MILLISECONDS} (backward compatible).
+   */
+  public static final ConfigEntry<Long> ENTITY_RELATIONAL_JDBC_BACKEND_READ_ONLY_MAX_WAIT_MILLISECONDS =
+      new ConfigBuilder(ENTITY_RELATIONAL_JDBC_BACKEND_READ_ONLY_MAX_WAIT_MILLIS_KEY)
+          .doc(
+              "Maximum wait milliseconds for the read-only JDBC pool. Set to -1 to use"
+                  + " maxWaitMillis (write pool value). Any other value must be >= 1.")
+          .version(ConfigConstants.VERSION_0_9_0)
+          .longConf()
+          .checkValue(
+              v -> v == JDBC_READ_ONLY_POOL_INHERIT_MAX_WAIT_MILLIS || v >= 1L,
+              "readOnlyMaxWaitMillis must be -1 (inherit) or >= 1")
+          .createWithDefault(JDBC_READ_ONLY_POOL_INHERIT_MAX_WAIT_MILLIS);
+
   public static final ConfigEntry<Integer> ENTITY_RELATIONAL_JDBC_BACKEND_MAX_CONNECTIONS =
       new ConfigBuilder(ENTITY_RELATIONAL_JDBC_BACKEND_MAX_CONNECTION_KEYS)
-          .doc("The maximum number of connections for the JDBC Backend connection pool")
+          .doc(
+              "The maximum number of connections for the JDBC Backend write pool. The read replica"
+                  + " pool uses readOnlyMaxConnections, or the same value when readOnlyMaxConnections"
+                  + " is -1.")
           .version(ConfigConstants.VERSION_0_9_0)
           .intConf()
           .createWithDefault(DEFAULT_RELATIONAL_JDBC_BACKEND_MAX_CONNECTIONS);
@@ -160,7 +260,9 @@ public class Configs {
   public static final ConfigEntry<Long> ENTITY_RELATIONAL_JDBC_BACKEND_WAIT_MILLISECONDS =
       new ConfigBuilder(ENTITY_RELATIONAL_JDBC_BACKEND_MAX_WAIT_MILLIS_CONNECTION_KEY)
           .doc(
-              "The maximum wait time in milliseconds for a connection from the JDBC Backend connection pool")
+              "The maximum wait time in milliseconds for the JDBC Backend write pool. The read"
+                  + " replica pool uses readOnlyMaxWaitMillis, or the same value when"
+                  + " readOnlyMaxWaitMillis is -1.")
           .version(ConfigConstants.VERSION_0_9_0)
           .longConf()
           .createWithDefault(DEFAULT_RELATIONAL_JDBC_BACKEND_MAX_WAIT_MILLISECONDS);
@@ -168,10 +270,9 @@ public class Configs {
   public static final ConfigEntry<String> ENTITY_RELATIONAL_JDBC_BACKEND_PATH =
       new ConfigBuilder(ENTITY_RELATIONAL_JDBC_BACKEND_STORAGE_PATH_KEY)
           .doc(
-              "The storage path for JDBC storage implementation. It supports both absolute and"
-                  + " relative path, if the value is a relative path, the final path is "
-                  + "`${GRAVITINO_HOME}/${PATH_YOU_HAVA_SET}`, default value is "
-                  + "`${GRAVITINO_HOME}/data/jdbc`")
+              "The storage path for JDBC storage implementation (H2 embedded only). Not applicable"
+                  + " to read-only / replica traffic. Supports absolute and relative path; relative"
+                  + " paths resolve under GRAVITINO_HOME; default `${GRAVITINO_HOME}/data/jdbc`.")
           .version(ConfigConstants.VERSION_0_6_0)
           .stringConf()
           .createWithDefault(DEFAULT_RELATIONAL_JDBC_BACKEND_PATH);
@@ -226,9 +327,10 @@ public class Configs {
       new ConfigBuilder(STORE_DELETE_AFTER_TIME_KEY)
           .doc(
               String.format(
-                  "The maximum time in milliseconds that the deleted data and old version data is kept, "
-                      + "max delete time allow is %s ms(30 days), "
-                      + "min delete time allow is %s ms(10 minutes)",
+                  "The maximum time in milliseconds that the deleted data and old version data is"
+                      + " kept. Write/GC only; not applicable to read-only traffic. "
+                      + "Max delete time allow is %s ms (30 days), "
+                      + "min delete time allow is %s ms (10 minutes).",
                   MAX_DELETE_TIME_ALLOW, MIN_DELETE_TIME_ALLOW))
           .version(ConfigConstants.VERSION_0_5_0)
           .longConf()
