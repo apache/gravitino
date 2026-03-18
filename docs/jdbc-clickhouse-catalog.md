@@ -120,6 +120,10 @@ See [Manage Relational Metadata Using Gravitino](./manage-relational-metadata-us
 | `on-cluster`   | Use `ON CLUSTER` when creating the database                                        | `false`       | No       | No        | 1.2.0         |
 | `cluster-name` | Cluster name used with `ON CLUSTER` (must align with table-level cluster settings) | (none)        | No       | No        | 1.2.0         |
 
+:::warning
+**Cluster properties only reflect Gravitino-managed schemas.** Gravitino embeds the cluster name inside the schema's `COMMENT` field at creation time (because `SHOW CREATE DATABASE` does not include `ON CLUSTER` for standard Atomic databases). Schemas created outside Gravitino will not have this metadata, so `on-cluster` and `cluster-name` will be absent when loaded, and `DROP SCHEMA` will not propagate `ON CLUSTER` to other cluster nodes.
+:::
+
 ### Create a schema
 
 <Tabs groupId="language" queryString>
@@ -195,7 +199,17 @@ Other ClickHouse types are exposed as [External Type](./manage-relational-metada
 :::note
 - `settings.*` keys are passed to the ClickHouse `SETTINGS` clause verbatim.
 - The `engine` value is immutable after creation.
-- When loading table metadata, Gravitino cannot determine whether it is a cluster table or a local table, because properties such as `cluster-name` and `on-cluster` are not available from the JDBC metadata.
+:::
+
+:::warning
+**Cluster properties only reflect Gravitino-managed objects.**
+ClickHouse does not persist `ON CLUSTER` information in `SHOW CREATE TABLE` or `SHOW CREATE DATABASE` output for non-Replicated objects. Gravitino works around this by embedding the cluster name in the object's `COMMENT` field at creation time and reading it back on load/drop.
+
+This means:
+- **Gravitino-created databases and tables**: `on-cluster` and `cluster-name` properties are accurate.
+- **Databases or tables created outside Gravitino** (e.g., via ClickHouse client, migration scripts, or other tools): `on-cluster` will be `false` and `cluster-name` will be absent, regardless of whether the object was actually created `ON CLUSTER`. Subsequent `DROP DATABASE` / `DROP TABLE` operations performed through Gravitino will **not** include `ON CLUSTER`, which may leave orphan objects on non-coordinating cluster nodes.
+
+If you need Gravitino to manage an existing cluster database or table, recreate it through the Gravitino API so the cluster metadata is properly embedded.
 :::
 
 :::warning

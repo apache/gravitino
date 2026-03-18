@@ -86,8 +86,6 @@ public class ClickHouseTableOperations extends JdbcTableOperations {
   private static final Pattern PARTITION_BY_PATTERN =
       Pattern.compile(
           "(?is)\\bPARTITION\\s+BY\\s*(.+?)(?=\\bORDER\\s+BY\\b|\\bPRIMARY\\s+KEY\\b|\\bSAMPLE\\s+BY\\b|\\bTTL\\b|\\bSETTINGS\\b|\\bCOMMENT\\b|$)");
-  private static final Pattern ON_CLUSTER_PATTERN =
-      Pattern.compile("(?i)\\bON\\s+CLUSTER\\s+`?([^`\\s(]+)`?");
   private static final Pattern DISTRIBUTED_ENGINE_PATTERN =
       Pattern.compile(
           "(?i)^Distributed\\(([^,]+),\\s*([^,]+),\\s*([^,]+),\\s*(.+)\\)$", Pattern.DOTALL);
@@ -169,8 +167,8 @@ public class ClickHouseTableOperations extends JdbcTableOperations {
 
     validateNoAutoIncrementColumns(columns);
 
-    // Add Create table clause
-    appendCreateTableClause(notNullProperties, sqlBuilder, tableName);
+    // Add Create table clause; capture whether ON CLUSTER is in use
+    boolean onCluster = appendCreateTableClause(notNullProperties, sqlBuilder, tableName);
 
     // We still allow empty columns when the engine is distributed.
     if (columns.length > 0) {
@@ -190,10 +188,14 @@ public class ClickHouseTableOperations extends JdbcTableOperations {
 
     appendPartitionClause(partitioning, sqlBuilder, engine);
 
-    // Add table comment if specified
-    if (StringUtils.isNotEmpty(comment)) {
-      String escapedComment = comment.replace("'", "''");
-      sqlBuilder.append(" COMMENT '%s'".formatted(escapedComment));
+    // Add table comment; embed cluster name so it can be recovered at DROP/ALTER time.
+    // ClickHouse does not persist ON CLUSTER in SHOW CREATE TABLE (see ClickHouseClusterUtils).
+    String storedComment = onCluster
+        ? ClickHouseClusterUtils.embedClusterInComment(
+            comment, notNullProperties.get(ClusterConstants.CLUSTER_NAME))
+        : comment;
+    if (StringUtils.isNotEmpty(storedComment)) {
+      sqlBuilder.append(" COMMENT '%s'".formatted(storedComment.replace("'", "''")));
     }
 
     // Add setting clause if specified, clickhouse only supports predefine settings
@@ -549,14 +551,17 @@ public class ClickHouseTableOperations extends JdbcTableOperations {
             return Collections.unmodifiableMap(
                 new HashMap<String, String>() {
                   {
-                    put(COMMENT, resultSet.getString(COMMENT));
+                    // Extract cluster name embedded in the COMMENT at create time.
+                    // SHOW CREATE TABLE does not include ON CLUSTER (see ClickHouseClusterUtils).
+                    String storedComment = resultSet.getString(COMMENT);
+                    String clusterName =
+                        ClickHouseClusterUtils.extractClusterFromComment(storedComment);
+                    put(COMMENT, ClickHouseClusterUtils.stripClusterMetadata(storedComment));
                     String engine = resultSet.getString(CLICKHOUSE_ENGINE_KEY);
                     put(GRAVITINO_ENGINE_KEY, engine);
-                    String createSql = parseShowCreateTableSql(connection, tableName);
-                    Matcher onClusterMatcher = ON_CLUSTER_PATTERN.matcher(createSql);
-                    if (onClusterMatcher.find()) {
+                    if (StringUtils.isNotBlank(clusterName)) {
                       put(ClusterConstants.ON_CLUSTER, String.valueOf(true));
-                      put(ClusterConstants.CLUSTER_NAME, unquote(onClusterMatcher.group(1)));
+                      put(ClusterConstants.CLUSTER_NAME, clusterName);
                     } else {
                       put(ClusterConstants.ON_CLUSTER, String.valueOf(false));
                     }
@@ -798,14 +803,19 @@ public class ClickHouseTableOperations extends JdbcTableOperations {
       String newComment = updateComment.getNewComment();
       if (null == StringIdentifier.fromComment(newComment)) {
         // Detect and add Gravitino id.
-        JdbcTable jdbcTable = getOrCreateTable(databaseName, tableName, lazyLoadTable);
-        StringIdentifier identifier = StringIdentifier.fromComment(jdbcTable.comment());
+        lazyLoadTable = getOrCreateTable(databaseName, tableName, lazyLoadTable);
+        StringIdentifier identifier = StringIdentifier.fromComment(lazyLoadTable.comment());
         if (null != identifier) {
           newComment = StringIdentifier.addToComment(identifier, newComment);
         }
       }
-      String escapedComment = newComment.replace("'", "''");
-      alterSql.add(" MODIFY COMMENT '%s'".formatted(escapedComment));
+      // Re-embed cluster metadata so it is not lost when the comment is updated.
+      lazyLoadTable = getOrCreateTable(databaseName, tableName, lazyLoadTable);
+      String clusterName = lazyLoadTable.properties().get(ClusterConstants.CLUSTER_NAME);
+      if (StringUtils.isNotBlank(clusterName)) {
+        newComment = ClickHouseClusterUtils.embedClusterInComment(newComment, clusterName);
+      }
+      alterSql.add(" MODIFY COMMENT '%s'".formatted(newComment.replace("'", "''")));
     }
 
     if (!setProperties.isEmpty()) {

@@ -18,9 +18,15 @@
  */
 package org.apache.gravitino.catalog.clickhouse.operations;
 
+import static org.apache.gravitino.catalog.clickhouse.operations.ClickHouseClusterUtils.embedClusterInComment;
+import static org.apache.gravitino.catalog.clickhouse.operations.ClickHouseClusterUtils.extractClusterFromComment;
+import static org.apache.gravitino.catalog.clickhouse.operations.ClickHouseClusterUtils.stripClusterMetadata;
+
 import com.google.common.annotations.VisibleForTesting;
+import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
 import java.sql.Connection;
+import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
@@ -28,22 +34,27 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
 import org.apache.commons.collections4.MapUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.StringIdentifier;
 import org.apache.gravitino.catalog.clickhouse.ClickHouseConstants.ClusterConstants;
+import org.apache.gravitino.catalog.jdbc.JdbcSchema;
 import org.apache.gravitino.catalog.jdbc.operation.JdbcDatabaseOperations;
 import org.apache.gravitino.catalog.jdbc.utils.JdbcConnectorUtils;
+import org.apache.gravitino.exceptions.NoSuchSchemaException;
+import org.apache.gravitino.meta.AuditInfo;
 
 public class ClickHouseDatabaseOperations extends JdbcDatabaseOperations {
 
-  private static final Pattern ON_CLUSTER_PATTERN =
-      Pattern.compile("(?i)\\bON\\s+CLUSTER\\s+`?([^`\\s(]+)`?");
-
   private static final Set<String> CLICK_HOUSE_SYSTEM_DATABASES =
       ImmutableSet.of("information_schema", "default", "system", "INFORMATION_SCHEMA");
+
+  /**
+   * Background: ClickHouse's {@code SHOW CREATE DATABASE} does not include {@code ON CLUSTER} in
+   * its output for non-Replicated (Atomic) databases, and {@code system.databases.cluster} is only
+   * populated for {@code Replicated} engine databases. Gravitino therefore embeds the cluster name
+   * in the COMMENT field (see {@link ClickHouseClusterUtils}) so it can be retrieved at DROP time.
+   */
 
   @Override
   protected boolean supportSchemaComment() {
@@ -94,10 +105,14 @@ public class ClickHouseDatabaseOperations extends JdbcDatabaseOperations {
     if (onCluster(properties)) {
       String clusterName = properties.get(ClusterConstants.CLUSTER_NAME);
       createDatabaseSql.append(String.format(" ON CLUSTER `%s`", clusterName));
-    }
-
-    if (StringUtils.isNotEmpty(originComment)) {
-      createDatabaseSql.append(String.format(" COMMENT '%s'", originComment));
+      // Embed the cluster name into the COMMENT so it can be retrieved later (e.g., at DROP time).
+      // ClickHouse does not persist ON CLUSTER info in SHOW CREATE DATABASE for Atomic databases.
+      String storedComment = embedClusterInComment(originComment, clusterName);
+      createDatabaseSql.append(
+          String.format(" COMMENT '%s'", storedComment.replace("'", "''")));
+    } else if (StringUtils.isNotEmpty(originComment)) {
+      createDatabaseSql.append(
+          String.format(" COMMENT '%s'", originComment.replace("'", "''")));
     }
 
     LOG.info("Generated create database:{} sql: {}", databaseName, createDatabaseSql);
@@ -124,6 +139,41 @@ public class ClickHouseDatabaseOperations extends JdbcDatabaseOperations {
   }
 
   @Override
+  public JdbcSchema load(String databaseName) throws NoSuchSchemaException {
+    try (Connection connection = getConnection()) {
+      connection.setCatalog(createSysDatabaseNameSet().iterator().next());
+      try (PreparedStatement stmt =
+          connection.prepareStatement(
+              "SELECT name, comment FROM system.databases WHERE name = ?")) {
+        stmt.setString(1, databaseName);
+        try (ResultSet rs = stmt.executeQuery()) {
+          if (!rs.next()) {
+            throw new NoSuchSchemaException("Database %s could not be found", databaseName);
+          }
+          String storedComment = rs.getString("comment");
+          String clusterName = extractClusterFromComment(storedComment);
+          String userComment = stripClusterMetadata(storedComment);
+
+          ImmutableMap.Builder<String, String> propsBuilder = ImmutableMap.builder();
+          if (StringUtils.isNotBlank(clusterName)) {
+            propsBuilder.put(ClusterConstants.ON_CLUSTER, String.valueOf(true));
+            propsBuilder.put(ClusterConstants.CLUSTER_NAME, clusterName);
+          }
+
+          return JdbcSchema.builder()
+              .withName(databaseName)
+              .withComment(userComment)
+              .withProperties(propsBuilder.build())
+              .withAuditInfo(AuditInfo.EMPTY)
+              .build();
+        }
+      }
+    } catch (final SQLException se) {
+      throw this.exceptionMapper.toGravitinoException(se);
+    }
+  }
+
+  @Override
   protected void dropDatabase(String databaseName, boolean cascade) {
     try (final Connection connection = getConnection()) {
       connection.setCatalog(createSysDatabaseNameSet().iterator().next());
@@ -133,12 +183,14 @@ public class ClickHouseDatabaseOperations extends JdbcDatabaseOperations {
           if (rs.next()) {
             throw new IllegalStateException(
                 String.format(
-                    "Database %s is not empty, the value of cascade should be true.",
+                    "Database %s is not empty, you can drop it with CASCADE option.",
                     databaseName));
           }
         }
       }
-      String clusterName = getDatabaseClusterName(connection, databaseName);
+      // Read the cluster name stored in the COMMENT at CREATE time.
+      // SHOW CREATE DATABASE does not include ON CLUSTER info for non-Replicated databases.
+      String clusterName = readClusterName(connection, databaseName);
       JdbcConnectorUtils.executeUpdate(
           connection, generateDropDatabaseSql(databaseName, clusterName));
     } catch (final SQLException se) {
@@ -147,13 +199,13 @@ public class ClickHouseDatabaseOperations extends JdbcDatabaseOperations {
   }
 
   /**
-   * Generates the SQL statement to drop a ClickHouse database. If the database was created with ON
-   * CLUSTER, the DROP statement includes {@code ON CLUSTER `clusterName` SYNC} to propagate the
+   * Generates the SQL statement to drop a ClickHouse database. If {@code clusterName} is
+   * non-blank, the DROP statement includes {@code ON CLUSTER `clusterName` SYNC} to propagate the
    * operation across all cluster nodes synchronously.
    *
    * @param databaseName The name of the database to drop.
-   * @param clusterName The cluster name extracted from the database's CREATE SQL, or {@code null}
-   *     if the database is not on a cluster.
+   * @param clusterName The cluster name read from the stored comment, or {@code null}/blank if not
+   *     a cluster database.
    * @return The DROP DATABASE SQL statement.
    */
   @VisibleForTesting
@@ -167,19 +219,18 @@ public class ClickHouseDatabaseOperations extends JdbcDatabaseOperations {
   }
 
   /**
-   * Extracts the cluster name from the {@code SHOW CREATE DATABASE} SQL of the given database.
-   * Returns {@code null} when the database was not created with {@code ON CLUSTER}.
+   * Reads the cluster name from {@code system.databases.comment} for the given database. Returns
+   * {@code null} if the database has no embedded cluster metadata (i.e., it was created without
+   * {@code ON CLUSTER}).
    */
-  private String getDatabaseClusterName(Connection connection, String databaseName)
-      throws SQLException {
-    try (Statement stmt = connection.createStatement();
-        ResultSet rs =
-            stmt.executeQuery(String.format("SHOW CREATE DATABASE `%s`", databaseName))) {
-      if (rs.next()) {
-        String createSql = rs.getString(1);
-        Matcher matcher = ON_CLUSTER_PATTERN.matcher(createSql);
-        if (matcher.find()) {
-          return matcher.group(1);
+  private String readClusterName(Connection connection, String databaseName) throws SQLException {
+    try (PreparedStatement stmt =
+        connection.prepareStatement(
+            "SELECT comment FROM system.databases WHERE name = ?")) {
+      stmt.setString(1, databaseName);
+      try (ResultSet rs = stmt.executeQuery()) {
+        if (rs.next()) {
+          return extractClusterFromComment(rs.getString("comment"));
         }
       }
     }
