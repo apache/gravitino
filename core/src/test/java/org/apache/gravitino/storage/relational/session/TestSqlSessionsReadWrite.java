@@ -97,6 +97,7 @@ public class TestSqlSessionsReadWrite {
   }
 
   @Test
+  @SuppressWarnings("deprecation")
   public void testReadPoolInheritsWriteMaxConnectionsAndWaitWhenUnset() {
     BasicDataSource readDs =
         (BasicDataSource)
@@ -110,6 +111,7 @@ public class TestSqlSessionsReadWrite {
   }
 
   @Test
+  @SuppressWarnings("deprecation")
   public void testReadPoolUsesExplicitMaxConnectionsWhenConfigured() {
     SqlSessionFactoryHelper.getInstance().close();
     Mockito.when(config.get(ENTITY_RELATIONAL_JDBC_BACKEND_READ_ONLY_MAX_CONNECTIONS))

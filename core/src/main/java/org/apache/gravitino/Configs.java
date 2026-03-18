@@ -189,7 +189,7 @@ public class Configs {
           .doc(
               "Read-only JDBC URL for JDBCBackend (e.g. replica). If unset, uses jdbcUrl for reads"
                   + " and writes.")
-          .version(ConfigConstants.VERSION_0_9_0)
+          .version(ConfigConstants.VERSION_1_3_0)
           .stringConf()
           .createWithDefault("");
 
@@ -200,7 +200,7 @@ public class Configs {
   public static final ConfigEntry<String> ENTITY_RELATIONAL_JDBC_BACKEND_READ_ONLY_USER =
       new ConfigBuilder(ENTITY_RELATIONAL_JDBC_BACKEND_READ_ONLY_USER_KEY)
           .doc("Username for read-only JDBC connection. If unset, uses jdbcUser.")
-          .version(ConfigConstants.VERSION_0_9_0)
+          .version(ConfigConstants.VERSION_1_3_0)
           .stringConf()
           .createWithDefault("");
 
@@ -211,7 +211,7 @@ public class Configs {
   public static final ConfigEntry<String> ENTITY_RELATIONAL_JDBC_BACKEND_READ_ONLY_PASSWORD =
       new ConfigBuilder(ENTITY_RELATIONAL_JDBC_BACKEND_READ_ONLY_PASSWORD_KEY)
           .doc("Password for read-only JDBC connection. If unset, uses jdbcPassword.")
-          .version(ConfigConstants.VERSION_0_9_0)
+          .version(ConfigConstants.VERSION_1_3_0)
           .stringConf()
           .createWithDefault("");
 
@@ -226,7 +226,7 @@ public class Configs {
               .doc(
                   "Maximum connections for the read-only JDBC pool. Set to -1 to use maxConnections"
                       + " (write pool value). Any other value must be >= 1.")
-              .version(ConfigConstants.VERSION_0_9_0)
+              .version(ConfigConstants.VERSION_1_3_0)
               .intConf()
               .checkValue(
                   v -> v == JDBC_READ_ONLY_POOL_INHERIT_MAX_CONNECTIONS || v >= 1,
@@ -244,7 +244,7 @@ public class Configs {
               .doc(
                   "Maximum wait milliseconds for the read-only JDBC pool. Set to -1 to use"
                       + " maxWaitMillis (write pool value). Any other value must be >= 1.")
-              .version(ConfigConstants.VERSION_0_9_0)
+              .version(ConfigConstants.VERSION_1_3_0)
               .longConf()
               .checkValue(
                   v -> v == JDBC_READ_ONLY_POOL_INHERIT_MAX_WAIT_MILLIS || v >= 1L,

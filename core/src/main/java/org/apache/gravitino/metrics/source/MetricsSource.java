@@ -44,7 +44,7 @@ public abstract class MetricsSource {
   public static final String GRAVITINO_SERVER_METRIC_NAME = "gravitino-server";
   public static final String GRAVITINO_RELATIONAL_STORE_METRIC_NAME = "gravitino-relational-store";
   public static final String GRAVITINO_RELATIONAL_STORE_READ_METRIC_NAME =
-      "gravitino-relational-store-read";
+      "gravitino-relational-store-read-only";
   public static final String GRAVITINO_CATALOG_METRIC_PREFIX = "gravitino-catalog";
   public static final String JVM_METRIC_NAME = "jvm";
   private final MetricRegistry metricRegistry;
