@@ -35,15 +35,33 @@ while getopts ":b:s:p:t:r:nyh" opt; do
     y) FORCE=1 ;;
     h)
       echo "Usage: $0 [options]"
+      echo ""
       echo "Options:"
       echo "  -b <branch>   Git branch to release (e.g., branch-1.2)"
       echo "  -s <step>     Release step to execute: tag, build, docs, publish, finalize"
       echo "  -r <num>      Release candidate number (e.g., 6 for rc6)"
-      echo "  -n            Dry run mode"
+      echo "  -n            Dry run mode (skip publishing)"
       echo "  -p <pass>     GPG passphrase (insecure; prefer GPG_PASSPHRASE env var)"
       echo "  -t <pass>     ASF password (insecure; prefer ASF_PASSWORD env var)"
-      echo "  -y            Force continue without confirmation"
+      echo "  -y            Non-interactive mode: skip all confirmation prompts"
       echo "  -h            Show this help message"
+      echo ""
+      echo "Examples:"
+      echo "  # Interactive mode (prompted for all inputs):"
+      echo "  $0"
+      echo ""
+      echo "  # Non-interactive full release (use env vars for secrets):"
+      echo "  export GPG_PASSPHRASE='my-gpg-pass'"
+      echo "  export ASF_PASSWORD='my-asf-pass'"
+      echo "  export PYPI_API_TOKEN='my-pypi-token'"
+      echo "  export ASF_USERNAME='myuser'"
+      echo "  $0 -b branch-1.2 -r 1 -y"
+      echo ""
+      echo "  # Run a single step only (e.g., build):"
+      echo "  $0 -b branch-1.2 -r 1 -s build -y"
+      echo ""
+      echo "  # Dry run to test without publishing:"
+      echo "  $0 -n -b branch-1.2"
       exit 0
       ;;
     :) echo "Option -$OPTARG requires an argument." >&2; exit 1 ;;
@@ -95,10 +113,9 @@ if [ "$RUNNING_IN_DOCKER" = "1" ]; then
     export JAVA_HOME=/usr
   fi
 else
-  # Outside docker, need to ask for information about the release if required vars are missing.
-  if [ -z "$GIT_BRANCH" ] || [ -z "$RELEASE_VERSION" ] || [ "$RC_COUNT" -eq 0 ]; then
-    get_release_info
-  fi
+  # Outside docker, collect release information.
+  # In force/non-interactive mode (-y), read_config uses env vars and skips prompts.
+  get_release_info
 fi
 
 function should_build {
@@ -110,7 +127,7 @@ if should_build "tag" && [ $SKIP_TAG = 0 ]; then
   run_silent "Creating release tag $RELEASE_TAG..." "tag.log" \
     "$SELF/release-tag.sh"
   echo "It may take some time for the tag to be synchronized to github."
-  if [ "$FORCE" = "1" ]; then
+  if is_force; then
     echo "Force mode: skipping wait."
   else
     echo "Press enter when you've verified that the new tag ($RELEASE_TAG) is available."

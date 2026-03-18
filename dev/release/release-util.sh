@@ -34,19 +34,17 @@ function error {
 function read_config {
   local PROMPT="$1"
   local DEFAULT="$2"
-  local FORCE_ENV_VAR="$3"  # Optional: env var name to use in force/non-interactive mode
+  local ENV_VAR_NAME="$3"  # Optional: env var name to use in non-interactive (force) mode
   local REPLY=
 
-  # If FORCE_ENV_VAR is provided and the corresponding env var is set, use it
-  if [ -n "$FORCE_ENV_VAR" ] && [ -n "${!FORCE_ENV_VAR:-}" ] && [ "$FORCE" = "1" ]; then
-    echo "${!FORCE_ENV_VAR}"
+  # In force/non-interactive mode, use the env var value directly if available.
+  if [ -n "$ENV_VAR_NAME" ] && [ -n "${!ENV_VAR_NAME:-}" ] && is_force; then
+    echo "${!ENV_VAR_NAME}"
     return
   fi
 
-  # If DEFAULT is provided and not empty, show it as default
-  local DISPLAY_DEFAULT="$DEFAULT"
-  if [ -n "$DISPLAY_DEFAULT" ]; then
-    read -p "$PROMPT [$DISPLAY_DEFAULT]: " REPLY
+  if [ -n "$DEFAULT" ]; then
+    read -p "$PROMPT [$DEFAULT]: " REPLY
   else
     read -p "$PROMPT: " REPLY
   fi
@@ -72,10 +70,12 @@ function run_silent {
   echo "Command: $@"
   echo "Log file: $LOG_FILE"
 
-  if ! "$@" 1>"$LOG_FILE" 2>&1; then
+  local EC=0
+  "$@" 1>"$LOG_FILE" 2>&1 || EC=$?
+  if [ $EC != 0 ]; then
     echo "Command FAILED. Check full logs for details."
     tail "$LOG_FILE"
-    exit 1
+    exit $EC
   fi
 }
 
@@ -154,7 +154,7 @@ function get_release_info {
   RELEASE_TAG="v${RELEASE_VERSION}-rc${RC_COUNT}"
   SKIP_TAG=0
   if check_for_tag "$RELEASE_TAG"; then
-    if [ "$FORCE" = "1" ]; then
+    if is_force; then
       echo "$RELEASE_TAG already exists. Force continuing."
     else
       read -p "$RELEASE_TAG already exists. Continue anyway [y/n]? " ANSWER
@@ -207,7 +207,7 @@ E-MAIL:     $GIT_EMAIL
 ================
 EOF
 
-  if [ "$FORCE" = "1" ]; then
+  if is_force; then
     echo "Force mode: proceeding without confirmation."
   else
     read -p "Is this info correct [y/n]? " ANSWER
@@ -235,6 +235,10 @@ EOF
 
 function is_dry_run {
   [[ $DRY_RUN = 1 ]]
+}
+
+function is_force {
+  [[ $FORCE = 1 ]]
 }
 
 # Initializes JAVA_VERSION to the version of the JVM in use.
