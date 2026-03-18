@@ -174,3 +174,9 @@ gravitino.entity.store.relational.jdbcPassword = ${your_password}
 ### Step 5: Start the server
 
 Please see the above steps in the MySQL section.
+
+## Read replica (optional)
+
+You can direct standalone metadata reads to a read replica (e.g. MySQL replica) by setting
+`gravitino.entity.store.relational.jdbcReadOnlyUrl` and optionally read-only credentials and pool sizing.
+See [Gravitino server configuration](gravitino-server-config.md#read-replica-optional) for the full list of options and **caveats** (replica lag, consistency, and routing behavior).

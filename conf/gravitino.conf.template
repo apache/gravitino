@@ -49,6 +49,9 @@ gravitino.entity.store.relational = JDBCBackend
 # The JDBC URL for the entity store
 gravitino.entity.store.relational.jdbcUrl = jdbc:h2
 # Optional read-only JDBC URL (e.g. MySQL replica) for entity store reads. If unset, jdbcUrl is used.
+# When set, standalone metadata reads use this pool; writes and in-transaction reads use the primary.
+# Caveats: reads can see replica lag (eventual consistency); for read-your-writes use synchronous
+# replication on the DB. See docs/gravitino-server-config.md "Read replica (optional)" for details.
 # gravitino.entity.store.relational.jdbcReadOnlyUrl =
 # Optional read-only user/password (if unset, jdbcUser/jdbcPassword are used).
 # gravitino.entity.store.relational.jdbcReadOnlyUser =
