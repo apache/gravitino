@@ -80,6 +80,18 @@ export RELEASE_TAG=${RELEASE_TAG:-}
 export ASF_PASSWORD=${ASF_PASSWORD:-}
 export GPG_PASSPHRASE=${GPG_PASSPHRASE:-}
 
+if [[ "${RC_COUNT}" != "0" ]] && ! [[ "${RC_COUNT}" =~ ^[1-9][0-9]*$ ]]; then
+  echo "Error: RC number must be a positive integer, got: '${RC_COUNT}'" >&2
+  exit 1
+fi
+
+if [ -n "${RELEASE_STEP}" ]; then
+  case "${RELEASE_STEP}" in
+    tag|build|docs|publish|finalize) ;;
+    *) echo "Error: invalid release step '${RELEASE_STEP}'. Valid steps: tag, build, docs, publish, finalize" >&2; exit 1 ;;
+  esac
+fi
+
 cmds=("git" "gpg" "svn" "twine" "shasum" "sha1sum" "jq" "make")
 for cmd in "${cmds[@]}"; do
   if ! command -v "$cmd" &> /dev/null; then
@@ -104,7 +116,7 @@ fi
 
 if [ "$RUNNING_IN_DOCKER" = "1" ]; then
   # Inside docker, need to import the GPG key stored in the current directory.
-  echo "${GPG_PASSPHRASE:-}" | $GPG --passphrase-fd 0 --import "$SELF/gpg.key"
+  printf '%s\n' "${GPG_PASSPHRASE:-}" | $GPG --passphrase-fd 0 --import "$SELF/gpg.key"
 
   # We may need to adjust the path since JAVA_HOME may be overridden by the driver script.
   if [ -n "${JAVA_HOME:-}" ]; then

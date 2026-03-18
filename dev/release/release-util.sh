@@ -37,10 +37,14 @@ function read_config {
   local ENV_VAR_NAME="$3"  # Optional: env var name to use in non-interactive (force) mode
   local REPLY=
 
-  # In force/non-interactive mode, use the env var value directly if available.
-  if [ -n "$ENV_VAR_NAME" ] && [ -n "${!ENV_VAR_NAME:-}" ] && is_force; then
-    echo "${!ENV_VAR_NAME}"
-    return
+  # In force/non-interactive mode, the env var must be set; error if missing.
+  if is_force; then
+    if [ -n "$ENV_VAR_NAME" ] && [ -n "${!ENV_VAR_NAME:-}" ]; then
+      echo "${!ENV_VAR_NAME}"
+      return
+    else
+      error "Force mode requires '$PROMPT' to be set via environment variable ${ENV_VAR_NAME:-<none>}."
+    fi
   fi
 
   if [ -n "$DEFAULT" ]; then
