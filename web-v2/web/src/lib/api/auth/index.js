@@ -26,6 +26,12 @@ export const getAuthConfigsApi = () => {
   })
 }
 
+export const getAuthMeApi = () => {
+  return defHttp.get({
+    url: '/api/authn/me'
+  })
+}
+
 export const loginApi = (url, params) => {
   return defHttp.post(
     {
