@@ -54,6 +54,8 @@
 
 set -e
 
+SELF=$(cd "$(dirname "$0")" && pwd)
+
 # Check required commands
 for cmd in git gh; do
   if ! command -v "$cmd" > /dev/null 2>&1; then
@@ -153,6 +155,22 @@ fi
 
 echo "Verified: $INPUT_TAG exists"
 
+# ---------------------------------------------------------------------------
+# Stage state tracking: reuse the same .release-state/{TAG}/ convention as
+# do-release.sh so all stage markers live together.
+# ---------------------------------------------------------------------------
+DOCKER_STATE_DIR="${RELEASE_STATE_DIR:-$SELF/.release-state}/${INPUT_TAG}"
+DOCKER_STATE_FILE="${DOCKER_STATE_DIR}/docker.done"
+
+if [[ "$DRY_RUN" == "false" ]] && [[ -f "$DOCKER_STATE_FILE" ]]; then
+  echo ""
+  echo "=== Stage 'docker' is already complete ==="
+  cat "$DOCKER_STATE_FILE"
+  echo "To re-run, delete: $DOCKER_STATE_FILE"
+  echo ""
+  exit 0
+fi
+
 # Trino special version
 TRINO_VERSION="${TRINO_VER}-gravitino-${DOCKER_VERSION}"
 
@@ -232,4 +250,15 @@ if [[ "$DRY_RUN" == "true" ]]; then
 else
   echo "=== All workflows triggered ==="
   echo "View progress: https://github.com/apache/gravitino/actions/workflows/docker-image.yml"
+
+  # Mark docker stage as done
+  mkdir -p "$DOCKER_STATE_DIR"
+  {
+    echo "completed_at=$(date -u '+%Y-%m-%dT%H:%M:%SZ')"
+    echo "release=$INPUT_TAG"
+    echo "docker_version=$DOCKER_VERSION"
+    echo "trino_version=$TRINO_VERSION"
+    echo "info=All Docker image workflows dispatched to apache/gravitino"
+  } > "$DOCKER_STATE_FILE"
+  echo "Stage 'docker' marked as done. State file: $DOCKER_STATE_FILE"
 fi
