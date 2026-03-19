@@ -33,16 +33,16 @@ class ColumnPositionSerdes(JsonSerializable[TableChange.ColumnPosition]):
     @classmethod
     def serialize(
         cls,
-        data_type: TableChange.ColumnPosition,
+        value: TableChange.ColumnPosition,
     ) -> Union[str, dict[str, str]]:
-        if isinstance(data_type, First):
+        if isinstance(value, First):
             return cls._POSITION_FIRST
-        if isinstance(data_type, After):
-            return {cls._POSITION_AFTER: data_type.get_column()}
-        if isinstance(data_type, Default):
+        if isinstance(value, After):
+            return {cls._POSITION_AFTER: value.get_column()}
+        if isinstance(value, Default):
             return cls._POSITION_DEFAULT
 
-        raise ValueError(f"Unknown column position: {data_type}")
+        raise ValueError(f"Unknown column position: {value}")
 
     @classmethod
     def deserialize(cls, data: Json) -> Union[First, After, Default]:

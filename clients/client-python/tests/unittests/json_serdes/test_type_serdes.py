@@ -70,7 +70,7 @@ class TestTypeSerdes(unittest.TestCase):
 
     def test_serialize_primitive_and_none_type(self):
         for simple_string, type_ in self._primitive_and_none_types.items():
-            self.assertEqual(TypeSerdes.serialize(data_type=type_), simple_string)
+            self.assertEqual(TypeSerdes.serialize(type_), simple_string)
 
     def test_serialize_struct_type_of_primitive_and_none_types(self):
         types = self._primitive_and_none_types.values()
