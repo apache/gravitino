@@ -33,6 +33,10 @@ dependencies {
     exclude(group = "org.eclipse.jetty.aggregate", module = "jetty-all")
     exclude(group = "org.eclipse.jetty.orbit", module = "javax.servlet")
   }
+  implementation(libs.hadoop2.mapreduce.client.core) {
+    exclude(group = "org.slf4j")
+    exclude(group = "org.apache.logging.log4j")
+  }
   implementation(libs.hive2.metastore) {
     exclude(group = "ant")
     exclude(group = "co.cask.tephra")
