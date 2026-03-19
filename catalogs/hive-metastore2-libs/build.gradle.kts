@@ -30,24 +30,34 @@ plugins {
 dependencies {
   implementation(libs.hadoop2.common) {
     exclude(group = "ch.qos.logback")
-    exclude(group = "com.google.guava")
-    exclude(group = "org.slf4j")
-    exclude(group = "org.apache.logging.log4j")
+    exclude(group = "com.github.spotbugs")
     exclude(group = "com.google.code.findbugs")
+    exclude(group = "com.google.guava")
+    exclude(group = "log4j")
+    exclude(group = "org.apache.avro")
+    exclude(group = "org.apache.logging.log4j")
     exclude(group = "org.eclipse.jetty.aggregate", module = "jetty-all")
     exclude(group = "org.eclipse.jetty.orbit", module = "javax.servlet")
+    exclude(group = "org.slf4j")
   }
   implementation(libs.hadoop2.mapreduce.client.core) {
-    exclude(group = "org.slf4j")
+    exclude(group = "com.github.spotbugs")
+    exclude(group = "com.google.code.findbugs")
+    exclude(group = "com.google.guava")
+    exclude(group = "log4j")
+    exclude(group = "org.apache.avro")
     exclude(group = "org.apache.logging.log4j")
+    exclude(group = "org.slf4j")
   }
   implementation(libs.hive2.metastore) {
     exclude(group = "ant")
     exclude(group = "ch.qos.logback")
     exclude(group = "co.cask.tephra")
     exclude(group = "com.github.joshelser")
+    exclude(group = "com.github.spotbugs")
     exclude(group = "com.google.code.findbugs")
     exclude(group = "com.google.guava")
+    exclude(group = "log4j")
     exclude(group = "com.tdunning", module = "json")
     exclude(group = "com.zaxxer", module = "HikariCP")
     exclude(group = "io.dropwizard.metrics")
@@ -78,28 +88,7 @@ tasks {
 
   register("copyLibs", Copy::class) {
     dependsOn(copyDepends, "build")
-    from("build/libs") {
-      exclude("guava-*.jar")
-      exclude("log4j-*.jar")
-      exclude("slf4j-*.jar")
-      exclude("logback-*.jar")
-      exclude("error_prone_annotations-*.jar")
-      exclude("junit-*.jar")
-      exclude("hamcrest-*.jar")
-      exclude("*-tests.jar")
-      exclude("hbase-*.jar")
-      exclude("datanucleus-*.jar")
-      exclude("ant-*.jar")
-      exclude("avro-*.jar")
-      exclude("parquet-hadoop-bundle-*.jar")
-      exclude("tephra-*.jar")
-      exclude("twill-*.jar")
-      exclude("hadoop-yarn-server-*.jar")
-      exclude("jol-core-*.jar")
-      exclude("jsr305-*.jar")
-      exclude("spotbugs-annotations-*.jar")
-      exclude("findbugs-annotations-*.jar")
-    }
+    from("build/libs")
     into("$rootDir/distribution/package/catalogs/hive/libs/hive-metastore2-libs")
   }
 }
