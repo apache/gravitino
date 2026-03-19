@@ -77,7 +77,7 @@ public final class PartitionPathSerdeUtils {
       Preconditions.checkArgument(
           item != null && item.isObject() && item.size() == 1,
           "partition entry must contain one key/value pair");
-      Map.Entry<String, JsonNode> kv = item.fields().next();
+      Map.Entry<String, JsonNode> kv = item.properties().iterator().next();
       String name = kv.getKey();
       JsonNode valueNode = kv.getValue();
       String value = valueNode == null || valueNode.isNull() ? null : valueNode.asText();

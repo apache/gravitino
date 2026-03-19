@@ -106,6 +106,34 @@ allprojects {
     return@allprojects
   }
 
+  // Fix: Global dependency exclusions and forced safe versions.
+  // Placed in allprojects to cover all modules including hive-metastore2/3-libs.
+  // Trino connector modules are excluded because they must match Trino's own Jackson version.
+  if (!project.path.startsWith(":trino-connector")) {
+    configurations.all {
+      // Exclude dangerous transitive dependencies
+      exclude(group = "log4j", module = "log4j")
+      exclude(group = "org.slf4j", module = "slf4j-log4j12")
+      exclude(group = "ch.qos.logback", module = "logback-classic")
+      exclude(group = "ch.qos.logback", module = "logback-core")
+      exclude(group = "org.mortbay.jetty") // Old Jetty 6.x from Hadoop2
+
+      resolutionStrategy {
+        // Force safe versions for transitive dependencies
+        force("com.fasterxml.jackson:jackson-bom:2.18.6")
+        force("com.fasterxml.jackson.core:jackson-databind:2.18.6")
+        force("com.fasterxml.jackson.core:jackson-core:2.18.6")
+        force("com.fasterxml.jackson.core:jackson-annotations:2.18.6")
+        force("org.apache.avro:avro:1.12.0")
+        force("commons-beanutils:commons-beanutils:1.9.4")
+        force("org.eclipse.jetty:jetty-server:9.4.56.v20240826")
+        force("org.eclipse.jetty:jetty-http:9.4.56.v20240826")
+        force("org.eclipse.jetty:jetty-servlet:9.4.56.v20240826")
+        force("com.jamesmurty.utils:java-xmlbuilder:1.2")
+      }
+    }
+  }
+
   apply(plugin = "com.diffplug.spotless")
   repositories {
     mavenCentral()
@@ -329,6 +357,14 @@ subprojects {
   repositories {
     mavenCentral()
     mavenLocal()
+  }
+
+  // Exclude Java 21 multi-release classes from ShadowJar to avoid ASM compatibility
+  // issues with Shadow plugin (jackson-core 2.19.2 contains META-INF/versions/21/)
+  plugins.withId("com.github.johnrengelman.shadow") {
+    tasks.named("shadowJar") {
+      (this as Jar).exclude("META-INF/versions/21/**")
+    }
   }
 
   fun compatibleWithJDK8(project: Project): Boolean {

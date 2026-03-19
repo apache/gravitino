@@ -27,7 +27,6 @@ import com.google.common.collect.ImmutableList;
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.util.ArrayList;
-import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
@@ -600,9 +599,7 @@ abstract class AbstractStatisticsImporter implements StatisticsImporter {
     }
 
     List<PartitionEntry> entries = new ArrayList<>();
-    Iterator<Map.Entry<String, JsonNode>> iterator = partitionPathNode.fields();
-    while (iterator.hasNext()) {
-      Map.Entry<String, JsonNode> entry = iterator.next();
+    for (Map.Entry<String, JsonNode> entry : partitionPathNode.properties()) {
       JsonNode valueNode = entry.getValue();
       if (valueNode == null || valueNode.isNull() || !valueNode.isTextual()) {
         return Optional.empty();
