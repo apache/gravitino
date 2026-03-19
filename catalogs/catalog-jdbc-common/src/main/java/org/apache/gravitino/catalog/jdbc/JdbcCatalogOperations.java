@@ -75,7 +75,6 @@ import org.apache.gravitino.rel.expressions.distributions.Distribution;
 import org.apache.gravitino.rel.expressions.sorts.SortOrder;
 import org.apache.gravitino.rel.expressions.transforms.Transform;
 import org.apache.gravitino.rel.indexes.Index;
-import org.apache.gravitino.utils.IsolatedClassLoader;
 import org.apache.gravitino.utils.MapUtils;
 import org.apache.gravitino.utils.PrincipalUtils;
 import org.slf4j.Logger;
@@ -201,14 +200,6 @@ public class JdbcCatalogOperations implements CatalogOperations, SupportsSchemas
       metricsSystem.unregister(catalogMetricsSource);
     }
     DataSourceUtils.closeDataSource(dataSource);
-    try {
-      Driver driver = getDriver();
-      if (driver != null) {
-        deregisterDriver(driver);
-      }
-    } catch (SQLException e) {
-      LOG.warn("Failed to deregister JDBC driver", e);
-    }
   }
 
   /**
@@ -619,13 +610,5 @@ public class JdbcCatalogOperations implements CatalogOperations, SupportsSchemas
 
   private static String currentUser() {
     return PrincipalUtils.getCurrentUserName();
-  }
-
-  public void deregisterDriver(Driver driver) throws SQLException {
-    if (driver.getClass().getClassLoader().getClass()
-        == IsolatedClassLoader.CUSTOM_CLASS_LOADER_CLASS) {
-      DriverManager.deregisterDriver(driver);
-      LOG.info("Driver {} has been deregistered...", driver);
-    }
   }
 }
