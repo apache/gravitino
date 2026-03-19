@@ -138,6 +138,15 @@ public interface OAuthConfig {
           .toSequence()
           .createWithDefault(java.util.Arrays.asList("sub"));
 
+  ConfigEntry<List<String>> GROUP_FIELDS =
+      new ConfigBuilder(OAUTH_CONFIG_PREFIX + "groupsFields")
+          .doc(
+              "JWT claim field(s) to use as groups. Comma-separated list for fallback in order (e.g., 'groups,roles').")
+          .version(ConfigConstants.VERSION_1_2_0)
+          .stringConf()
+          .toSequence()
+          .createWithDefault(java.util.Arrays.asList("groups"));
+
   ConfigEntry<String> TOKEN_VALIDATOR_CLASS =
       new ConfigBuilder(OAUTH_CONFIG_PREFIX + "tokenValidatorClass")
           .doc("Fully qualified class name of the OAuth token validator implementation")

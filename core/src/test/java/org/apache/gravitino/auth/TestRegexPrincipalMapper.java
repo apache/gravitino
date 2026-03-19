@@ -132,6 +132,48 @@ public class TestRegexPrincipalMapper {
   }
 
   @Test
+  public void testExtractGroups() {
+    // pattern: username/groups
+    RegexPrincipalMapper mapper = new RegexPrincipalMapper("([^/]+)/(.*)");
+    Principal principal = mapper.map("john/group1,group2");
+
+    assertNotNull(principal);
+    assertEquals("john", principal.getName());
+    assertTrue(principal instanceof UserPrincipal);
+    UserPrincipal userPrincipal = (UserPrincipal) principal;
+    assertEquals(2, userPrincipal.getGroups().size());
+    assertTrue(userPrincipal.getGroups().contains("group1"));
+    assertTrue(userPrincipal.getGroups().contains("group2"));
+  }
+
+  @Test
+  public void testExtractGroupsWithEmptyGroups() {
+    // pattern: username/groups
+    RegexPrincipalMapper mapper = new RegexPrincipalMapper("([^/]+)/(.*)");
+    Principal principal = mapper.map("john/");
+
+    assertNotNull(principal);
+    assertEquals("john", principal.getName());
+    assertTrue(principal instanceof UserPrincipal);
+    UserPrincipal userPrincipal = (UserPrincipal) principal;
+    assertTrue(userPrincipal.getGroups().isEmpty());
+  }
+
+  @Test
+  public void testExtractGroupsWithSingleGroup() {
+    // pattern: username/groups
+    RegexPrincipalMapper mapper = new RegexPrincipalMapper("([^/]+)/(.*)");
+    Principal principal = mapper.map("john/group1");
+
+    assertNotNull(principal);
+    assertEquals("john", principal.getName());
+    assertTrue(principal instanceof UserPrincipal);
+    UserPrincipal userPrincipal = (UserPrincipal) principal;
+    assertEquals(1, userPrincipal.getGroups().size());
+    assertTrue(userPrincipal.getGroups().contains("group1"));
+  }
+
+  @Test
   public void testGetPatternString() {
     String pattern = "([^@]+)@.*";
     RegexPrincipalMapper mapper = new RegexPrincipalMapper(pattern);
