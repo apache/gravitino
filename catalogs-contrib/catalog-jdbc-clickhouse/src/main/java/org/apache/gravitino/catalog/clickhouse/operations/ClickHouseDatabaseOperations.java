@@ -19,6 +19,7 @@
 package org.apache.gravitino.catalog.clickhouse.operations;
 
 import static org.apache.gravitino.catalog.clickhouse.operations.ClickHouseClusterUtils.embedClusterInComment;
+import static org.apache.gravitino.catalog.clickhouse.operations.ClickHouseClusterUtils.escapeSingleQuotes;
 import static org.apache.gravitino.catalog.clickhouse.operations.ClickHouseClusterUtils.extractClusterFromComment;
 import static org.apache.gravitino.catalog.clickhouse.operations.ClickHouseClusterUtils.stripClusterMetadata;
 
@@ -107,9 +108,9 @@ public class ClickHouseDatabaseOperations extends JdbcDatabaseOperations {
       // Embed the cluster name into the COMMENT so it can be retrieved later (e.g., at DROP time).
       // ClickHouse does not persist ON CLUSTER info in SHOW CREATE DATABASE for Atomic databases.
       String storedComment = embedClusterInComment(originComment, clusterName);
-      createDatabaseSql.append(String.format(" COMMENT '%s'", storedComment.replace("'", "''")));
+      createDatabaseSql.append(String.format(" COMMENT '%s'", escapeSingleQuotes(storedComment)));
     } else if (StringUtils.isNotEmpty(originComment)) {
-      createDatabaseSql.append(String.format(" COMMENT '%s'", originComment.replace("'", "''")));
+      createDatabaseSql.append(String.format(" COMMENT '%s'", escapeSingleQuotes(originComment)));
     }
 
     LOG.info("Generated create database:{} sql: {}", databaseName, createDatabaseSql);
@@ -175,13 +176,18 @@ public class ClickHouseDatabaseOperations extends JdbcDatabaseOperations {
     try (final Connection connection = getConnection()) {
       connection.setCatalog(createSysDatabaseNameSet().iterator().next());
       if (!cascade) {
-        try (Statement stmt = connection.createStatement();
-            ResultSet rs = stmt.executeQuery(String.format("SHOW TABLES IN `%s`", databaseName))) {
-          if (rs.next()) {
-            throw new IllegalStateException(
-                String.format(
-                    "Database %s is not empty, you can drop it with CASCADE option.",
-                    databaseName));
+        // Query system.tables instead of SHOW TABLES IN so we get a proper parameterised query
+        // and avoid any edge cases with special characters in database names.
+        try (PreparedStatement checkStmt =
+            connection.prepareStatement("SELECT 1 FROM system.tables WHERE database = ? LIMIT 1")) {
+          checkStmt.setString(1, databaseName);
+          try (ResultSet rs = checkStmt.executeQuery()) {
+            if (rs.next()) {
+              throw new IllegalArgumentException(
+                  String.format(
+                      "Database %s is not empty, you can drop it with CASCADE option.",
+                      databaseName));
+            }
           }
         }
       }
@@ -209,7 +215,7 @@ public class ClickHouseDatabaseOperations extends JdbcDatabaseOperations {
   String generateDropDatabaseSql(String databaseName, String clusterName) {
     StringBuilder sql = new StringBuilder(String.format("DROP DATABASE `%s`", databaseName));
     if (StringUtils.isNotBlank(clusterName)) {
-      sql.append(String.format(" ON CLUSTER `%s` SYNC", clusterName));
+      sql.append(String.format(" ON CLUSTER `%s`", clusterName));
     }
     LOG.info("Generated drop database:{} sql: {}", databaseName, sql);
     return sql.toString();

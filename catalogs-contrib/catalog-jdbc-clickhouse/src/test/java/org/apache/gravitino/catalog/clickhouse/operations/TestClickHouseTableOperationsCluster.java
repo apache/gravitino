@@ -268,7 +268,7 @@ class TestClickHouseTableOperationsCluster {
    * COMMENT so it can be recovered at DROP/load time (SHOW CREATE TABLE omits ON CLUSTER).
    */
   @Test
-  void testCreateTableOnClusterEmbedsCluterNameInComment() {
+  void testCreateTableOnClusterEmbedsClusterNameInComment() {
     JdbcColumn[] columns =
         new JdbcColumn[] {
           JdbcColumn.builder()
@@ -338,7 +338,7 @@ class TestClickHouseTableOperationsCluster {
             new SortOrder[] {SortOrders.ascending(NamedReference.field("id"))});
 
     Assertions.assertFalse(
-        sql.contains(String.valueOf(ClickHouseClusterUtils.CLUSTER_META_SEP)),
+        sql.contains(ClickHouseClusterUtils.CLUSTER_META_PREFIX),
         "Non-cluster table must not embed cluster metadata; got: " + sql);
     Assertions.assertTrue(
         sql.contains("plain comment"), "User comment must be present unmodified; got: " + sql);

@@ -120,7 +120,7 @@ public class TestClickHouseDatabaseOperations {
   @Test
   void testGenerateDropDatabaseSqlWithCluster() {
     String sql = newOps().buildDropSql("db_name", "ck_cluster");
-    Assertions.assertEquals("DROP DATABASE `db_name` ON CLUSTER `ck_cluster` SYNC", sql);
+    Assertions.assertEquals("DROP DATABASE `db_name` ON CLUSTER `ck_cluster`", sql);
   }
 
   // ---------------------------------------------------------------------------

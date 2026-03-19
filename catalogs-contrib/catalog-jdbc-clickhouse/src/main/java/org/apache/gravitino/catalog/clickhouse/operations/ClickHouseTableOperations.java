@@ -23,6 +23,7 @@ import static org.apache.gravitino.catalog.clickhouse.ClickHouseConstants.IndexC
 import static org.apache.gravitino.catalog.clickhouse.ClickHouseTablePropertiesMetadata.CLICKHOUSE_ENGINE_KEY;
 import static org.apache.gravitino.catalog.clickhouse.ClickHouseTablePropertiesMetadata.ENGINE_PROPERTY_ENTRY;
 import static org.apache.gravitino.catalog.clickhouse.ClickHouseTablePropertiesMetadata.GRAVITINO_ENGINE_KEY;
+import static org.apache.gravitino.catalog.clickhouse.operations.ClickHouseClusterUtils.escapeSingleQuotes;
 import static org.apache.gravitino.rel.Column.DEFAULT_VALUE_NOT_SET;
 
 import com.google.common.annotations.VisibleForTesting;
@@ -196,7 +197,7 @@ public class ClickHouseTableOperations extends JdbcTableOperations {
                 comment, notNullProperties.get(ClusterConstants.CLUSTER_NAME))
             : comment;
     if (StringUtils.isNotEmpty(storedComment)) {
-      sqlBuilder.append(" COMMENT '%s'".formatted(storedComment.replace("'", "''")));
+      sqlBuilder.append(" COMMENT '%s'".formatted(escapeSingleQuotes(storedComment)));
     }
 
     // Add setting clause if specified, clickhouse only supports predefine settings
@@ -802,21 +803,23 @@ public class ClickHouseTableOperations extends JdbcTableOperations {
     // Last modified comment
     if (null != updateComment) {
       String newComment = updateComment.getNewComment();
+      // Load the existing table once. We need it for two purposes:
+      //   1. Preserve the Gravitino StringIdentifier embedded in the old comment, so Gravitino can
+      //      still identify the table after the comment is changed.
+      //   2. Re-embed the cluster name so it is not lost. ClickHouse does not persist ON CLUSTER
+      //      in SHOW CREATE TABLE, so the cluster name lives only in the stored comment.
+      lazyLoadTable = getOrCreateTable(databaseName, tableName, lazyLoadTable);
       if (null == StringIdentifier.fromComment(newComment)) {
-        // Detect and add Gravitino id.
-        lazyLoadTable = getOrCreateTable(databaseName, tableName, lazyLoadTable);
         StringIdentifier identifier = StringIdentifier.fromComment(lazyLoadTable.comment());
         if (null != identifier) {
           newComment = StringIdentifier.addToComment(identifier, newComment);
         }
       }
-      // Re-embed cluster metadata so it is not lost when the comment is updated.
-      lazyLoadTable = getOrCreateTable(databaseName, tableName, lazyLoadTable);
       String clusterName = lazyLoadTable.properties().get(ClusterConstants.CLUSTER_NAME);
       if (StringUtils.isNotBlank(clusterName)) {
         newComment = ClickHouseClusterUtils.embedClusterInComment(newComment, clusterName);
       }
-      alterSql.add(" MODIFY COMMENT '%s'".formatted(newComment.replace("'", "''")));
+      alterSql.add(" MODIFY COMMENT '%s'".formatted(escapeSingleQuotes(newComment)));
     }
 
     if (!setProperties.isEmpty()) {

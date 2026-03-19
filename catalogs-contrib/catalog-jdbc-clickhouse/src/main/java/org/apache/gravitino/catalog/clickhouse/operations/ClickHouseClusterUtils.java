@@ -36,11 +36,59 @@ import org.apache.commons.lang3.StringUtils;
  *   <li>{@code system.databases.cluster} is only populated for {@code Replicated}-engine databases.
  * </ul>
  *
- * <p>Gravitino therefore embeds the cluster name inside the object's COMMENT field at creation time
- * using a non-printable SOH separator ({@code \u0001}). The metadata is invisible to end users
- * because Gravitino strips it before surfacing the comment.
+ * <p>Gravitino therefore embeds the cluster name inside the object's COMMENT field at creation
+ * time, separated from the user comment by a newline. The metadata line is always stripped before
+ * surfacing the comment to callers.
  *
- * <p><b>Stored format:</b> {@code userComment\u0001ch.cluster=clusterName}
+ * <p><b>Stored format:</b>
+ *
+ * <pre>userComment
+ * ch.cluster=clusterName</pre>
+ *
+ * <p><b>Example — database created ON CLUSTER:</b>
+ *
+ * <pre>
+ * -- Gravitino issues:
+ * CREATE DATABASE `my_db` ON CLUSTER `ck_cluster` COMMENT 'my comment\nch.cluster=ck_cluster'
+ *
+ * -- ClickHouse SHOW CREATE DATABASE output (ON CLUSTER is omitted):
+ * CREATE DATABASE my_db
+ * ENGINE = Atomic
+ * COMMENT 'my comment
+ * ch.cluster=ck_cluster'
+ *
+ * -- Gravitino reads back from system.databases.comment:
+ * --   stored : 'my comment\nch.cluster=ck_cluster'
+ * --   cluster: 'ck_cluster'      (extracted by extractClusterFromComment)
+ * --   user   : 'my comment'      (stripped by stripClusterMetadata)
+ * </pre>
+ *
+ * <p><b>Example — table created ON CLUSTER:</b>
+ *
+ * <pre>
+ * -- Gravitino issues:
+ * CREATE TABLE `orders` ON CLUSTER `ck_cluster`
+ *   (`id` Int32, `amount` Decimal(10,2))
+ *   ENGINE = MergeTree()
+ *   ORDER BY `id`
+ *   COMMENT 'order records\nch.cluster=ck_cluster'
+ *
+ * -- ClickHouse SHOW CREATE TABLE output (ON CLUSTER is omitted):
+ * CREATE TABLE default.orders
+ * (
+ *   `id` Int32,
+ *   `amount` Decimal(10, 2)
+ * )
+ * ENGINE = MergeTree
+ * ORDER BY id
+ * COMMENT 'order records
+ * ch.cluster=ck_cluster'
+ *
+ * -- Gravitino reads back from system.tables.comment:
+ * --   stored : 'order records\nch.cluster=ck_cluster'
+ * --   cluster: 'ck_cluster'      (extracted by extractClusterFromComment)
+ * --   user   : 'order records'   (stripped by stripClusterMetadata)
+ * </pre>
  *
  * <p><b>Limitation:</b> This mechanism only works for databases and tables created through
  * Gravitino. If a database or table was created directly in ClickHouse (bypassing Gravitino),
@@ -51,14 +99,11 @@ import org.apache.commons.lang3.StringUtils;
 public final class ClickHouseClusterUtils {
 
   /**
-   * Separator character between the user comment and the cluster metadata token. SOH (U+0001) is a
-   * non-printable control character that will not appear in normal user-supplied comments.
+   * Prefix that marks the start of the embedded cluster metadata line. Using a newline as the
+   * leading character keeps the metadata on its own line when viewed directly in ClickHouse (e.g.
+   * via {@code SHOW CREATE TABLE}), making it human-readable.
    */
-  @VisibleForTesting public static final char CLUSTER_META_SEP = '\u0001';
-
-  /** Full prefix of the cluster metadata token appended after {@link #CLUSTER_META_SEP}. */
-  @VisibleForTesting
-  public static final String CLUSTER_META_PREFIX = CLUSTER_META_SEP + "ch.cluster=";
+  @VisibleForTesting public static final String CLUSTER_META_PREFIX = "\nch.cluster=";
 
   private ClickHouseClusterUtils() {}
 
@@ -69,7 +114,7 @@ public final class ClickHouseClusterUtils {
    * @param comment The user-visible comment (may be {@code null} or the Gravitino-encoded comment
    *     string).
    * @param clusterName The cluster name to embed.
-   * @return The combined string: {@code comment\u0001ch.cluster=clusterName}.
+   * @return The combined string: {@code comment\nch.cluster=clusterName}.
    */
   public static String embedClusterInComment(String comment, String clusterName) {
     return StringUtils.defaultString(comment) + CLUSTER_META_PREFIX + clusterName;
@@ -105,7 +150,18 @@ public final class ClickHouseClusterUtils {
     if (storedComment == null) {
       return null;
     }
-    int idx = storedComment.indexOf(CLUSTER_META_SEP);
+    int idx = storedComment.indexOf(CLUSTER_META_PREFIX);
     return idx < 0 ? storedComment : storedComment.substring(0, idx);
+  }
+
+  /**
+   * Escapes single-quote characters in {@code text} for use inside a ClickHouse SQL string literal
+   * delimited by single quotes (i.e. replaces each {@code '} with {@code ''}).
+   *
+   * @param text the raw string; must not be {@code null}.
+   * @return the escaped string.
+   */
+  public static String escapeSingleQuotes(String text) {
+    return text.replace("'", "''");
   }
 }
