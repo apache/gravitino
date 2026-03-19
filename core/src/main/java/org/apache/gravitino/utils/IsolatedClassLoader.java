@@ -145,6 +145,16 @@ public class IsolatedClassLoader implements Closeable {
         classPathContents, Collections.emptyList(), Collections.emptyList());
   }
 
+  /**
+   * Returns the internal URLClassLoader used by this IsolatedClassLoader. This is used by {@link
+   * ClassLoaderPool} for resource cleanup (e.g., JDBC driver deregistration, ThreadLocal cleanup).
+   *
+   * @return The internal URLClassLoader, or null if not yet initialized.
+   */
+  public URLClassLoader getInternalClassLoader() {
+    return classLoader;
+  }
+
   /** Closes the class loader. */
   @Override
   public void close() {
