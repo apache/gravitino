@@ -83,7 +83,10 @@ jobs:
             -x :flink-connector:flink:build \
             -x :spark-connector:spark-common:build \
             -x :spark-connector:spark-3.3:build -x :spark-connector:spark-3.4:build -x :spark-connector:spark-3.5:build \
-            -x :spark-connector:spark-runtime-3.3:build -x :spark-connector:spark-runtime-3.4:build -x :spark-connector:spark-runtime-3.5:build
+            -x :spark-connector:spark-runtime-3.3:build -x :spark-connector:spark-runtime-3.4:build -x :spark-connector:spark-runtime-3.5:build \
+            -x :mcp-server:build -x :lineage:build \
+            -x :maintenance:optimizer:build -x :maintenance:jobs:build \
+            -x :lance:lance-common:build -x :lance:lance-rest-server:build
 
       - name: Free up disk space
         run: |

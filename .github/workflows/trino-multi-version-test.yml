@@ -33,59 +33,36 @@ jobs:
             -x :flink-connector:flink:build \
             -x :spark-connector:spark-common:build \
             -x :spark-connector:spark-3.3:build -x :spark-connector:spark-3.4:build -x :spark-connector:spark-3.5:build \
-            -x :spark-connector:spark-runtime-3.3:build -x :spark-connector:spark-runtime-3.4:build -x :spark-connector:spark-runtime-3.5:build
+            -x :spark-connector:spark-runtime-3.3:build -x :spark-connector:spark-runtime-3.4:build -x :spark-connector:spark-runtime-3.5:build \
+            -x :mcp-server:build -x :lineage:build \
+            -x :maintenance:optimizer:build -x :maintenance:jobs:build \
+            -x :lance:lance-common:build -x :lance:lance-rest-server:build
 
       - name: Free up disk space
         run: dev/ci/util_free_space.sh
 
-      - name: Test Trino 478
-        id: test478
+      - name: Run Multi-Version Trino Tests
         run: |
-          trino-connector/integration-test/trino-test-tools/trino_integration_test.sh \
-            --auto=all --auto_patch --trino_version=478 \
-            --trino_connector_dir=${{ env.CONNECTOR_DIR }}/trino-connector-473-478/build/libs
-
-      - name: Test Trino 473
-        id: test473
-        run: |
-          trino-connector/integration-test/trino-test-tools/trino_integration_test.sh \
-            --auto=all --auto_patch --trino_version=473 \
-            --trino_connector_dir=${{ env.CONNECTOR_DIR }}/trino-connector-473-478/build/libs
-
-      - name: Test Trino 469
-        id: test469
-        run: |
-          trino-connector/integration-test/trino-test-tools/trino_integration_test.sh \
-            --auto=all --auto_patch --trino_version=469 \
-            --trino_connector_dir=${{ env.CONNECTOR_DIR }}/trino-connector-469-472/build/libs
-
-      - name: Test Trino 452
-        id: test452
-        run: |
-          trino-connector/integration-test/trino-test-tools/trino_integration_test.sh \
-            --auto=all --auto_patch --trino_version=452 \
-            --trino_connector_dir=${{ env.CONNECTOR_DIR }}/trino-connector-452-468/build/libs
-
-      - name: Test Trino 446
-        id: test446
-        run: |
-          trino-connector/integration-test/trino-test-tools/trino_integration_test.sh \
-            --auto=all --auto_patch --trino_version=446 \
-            --trino_connector_dir=${{ env.CONNECTOR_DIR }}/trino-connector-446-451/build/libs
-
-      - name: Test Trino 440
-        id: test440
-        run: |
-          trino-connector/integration-test/trino-test-tools/trino_integration_test.sh \
-            --auto=all --auto_patch --trino_version=440 \
-            --trino_connector_dir=${{ env.CONNECTOR_DIR }}/trino-connector-440-445/build/libs
-
-      - name: Test Trino 435
-        id: test435
-        run: |
-          trino-connector/integration-test/trino-test-tools/trino_integration_test.sh \
-            --auto=all --auto_patch --trino_version=435 \
-            --trino_connector_dir=${{ env.CONNECTOR_DIR }}/trino-connector-435-439/build/libs
+          # version:connector_dir pairs
+          VERSIONS=(
+            "478:trino-connector-473-478"
+            "473:trino-connector-473-478"
+            "469:trino-connector-469-472"
+            "452:trino-connector-452-468"
+            "446:trino-connector-446-451"
+            "440:trino-connector-440-445"
+            "435:trino-connector-435-439"
+          )
+          for entry in "${VERSIONS[@]}"; do
+            version="${entry%%:*}"
+            connector="${entry##*:}"
+            echo "========================================"
+            echo "Testing Trino version: ${version}"
+            echo "========================================"
+            trino-connector/integration-test/trino-test-tools/trino_integration_test.sh \
+              --auto=all --auto_patch --trino_version="${version}" \
+              --trino_connector_dir=${{ env.CONNECTOR_DIR }}/"${connector}"/build/libs
+          done
 
       - name: Upload test reports
         uses: actions/upload-artifact@v4
