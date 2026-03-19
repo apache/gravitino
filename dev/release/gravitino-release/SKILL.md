@@ -409,7 +409,7 @@ This cannot be undone. Type 'yes' to proceed:
      --label "${RELEASE_VERSION}" \
      --state all \
      --limit 500 \
-     --json number,title,author,labels,url
+     --json number,title,assignees,labels,url
    ```
 2. Asks the user to describe 3–5 key features/themes for the **Highlights** section before generating the draft.
 3. Generates a Markdown draft with the following sections in order:
@@ -420,7 +420,7 @@ This cannot be undone. Type 'yes' to proceed:
    - **Documentation** (`documentation`, `docs`)
    - **Build / CI** (`build`, `ci`)
    - **Other** (no matching label)
-   - **Credits** — deduplicated list of all issue authors sorted case-insensitively by GitHub login, formatted as `@login`
+   - **Credits** — deduplicated list of all issue assignees sorted case-insensitively by GitHub login, formatted as `@login`
 4. Displays the draft for review, then saves to:
    `$RELEASE_SCRIPTS_DIR/gravitino-{VERSION}-release-notes.md`
 
