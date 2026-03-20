@@ -31,6 +31,7 @@ import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.flink.connector.PartitionConverter;
 import org.apache.gravitino.flink.connector.SchemaAndTablePropertiesConverter;
 import org.apache.gravitino.flink.connector.catalog.BaseCatalog;
+import org.apache.gravitino.rel.Table;
 import org.apache.paimon.flink.FlinkCatalogFactory;
 import org.apache.paimon.flink.FlinkTableFactory;
 
@@ -74,29 +75,14 @@ public class GravitinoPaimonCatalog extends BaseCatalog {
     }
   }
 
-  /**
-   * Delegates getTable to the underlying Paimon FlinkCatalog so that the returned CatalogTable is a
-   * DataCatalogTable wrapping a FileStoreTable with a proper CatalogEnvironment (containing a
-   * non-null catalogLoader). Without this override, BaseCatalog.getTable() returns a plain
-   * CatalogTable via the Gravitino REST API, causing AbstractFlinkTableFactory.buildPaimonTable()
-   * to create a FileStoreTable with CatalogEnvironment.empty(), which makes partitionHandler()
-   * return null and prevents AddPartitionCommitCallback from being registered, resulting in Hive
-   * partition metadata never being updated after commits.
-   */
   @Override
-  public CatalogBaseTable getTable(ObjectPath tablePath)
-      throws TableNotExistException, CatalogException {
-    return paimonCatalog.getTable(tablePath);
-  }
-
-  /**
-   * Delegates tableExists to the underlying Paimon FlinkCatalog to stay consistent with {@link
-   * #getTable(ObjectPath)}, avoiding mismatches between the two when Gravitino and Paimon metadata
-   * are out of sync.
-   */
-  @Override
-  public boolean tableExists(ObjectPath tablePath) throws CatalogException {
-    return paimonCatalog.tableExists(tablePath);
+  protected CatalogBaseTable toFlinkTable(Table table, ObjectPath tablePath) {
+    try {
+      return paimonCatalog.getTable(tablePath);
+    } catch (TableNotExistException e) {
+      throw new CatalogException(
+          "Table " + tablePath + " exists in Gravitino but not in Paimon catalog", e);
+    }
   }
 
   @Override
