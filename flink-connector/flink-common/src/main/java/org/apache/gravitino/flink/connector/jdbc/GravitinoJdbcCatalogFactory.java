@@ -51,8 +51,17 @@ public abstract class GravitinoJdbcCatalogFactory implements BaseCatalogFactory 
     Preconditions.checkArgument(
         defaultDatabase != null,
         GravitinoJdbcCatalogFactoryOptions.DEFAULT_DATABASE.key() + " should not be null.");
-    return new GravitinoJdbcCatalog(
+    return newCatalog(
         context, defaultDatabase, schemaAndTablePropertiesConverter(), partitionConverter());
+  }
+
+  protected org.apache.flink.table.catalog.Catalog newCatalog(
+      Context context,
+      String defaultDatabase,
+      SchemaAndTablePropertiesConverter schemaAndTablePropertiesConverter,
+      PartitionConverter partitionConverter) {
+    return new GravitinoJdbcCatalog(
+        context, defaultDatabase, schemaAndTablePropertiesConverter, partitionConverter);
   }
 
   @Override

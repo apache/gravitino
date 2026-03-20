@@ -43,8 +43,17 @@ public class GravitinoPaimonCatalogFactory implements BaseCatalogFactory {
         FactoryUtils.createCatalogFactoryHelper(this, context);
     String defaultDatabase =
         helper.getOptions().get(GravitinoPaimonCatalogFactoryOptions.DEFAULT_DATABASE);
-    return new GravitinoPaimonCatalog(
+    return newCatalog(
         context, defaultDatabase, schemaAndTablePropertiesConverter(), partitionConverter());
+  }
+
+  protected Catalog newCatalog(
+      Context context,
+      String defaultDatabase,
+      SchemaAndTablePropertiesConverter schemaAndTablePropertiesConverter,
+      PartitionConverter partitionConverter) {
+    return new GravitinoPaimonCatalog(
+        context, defaultDatabase, schemaAndTablePropertiesConverter, partitionConverter);
   }
 
   @Override

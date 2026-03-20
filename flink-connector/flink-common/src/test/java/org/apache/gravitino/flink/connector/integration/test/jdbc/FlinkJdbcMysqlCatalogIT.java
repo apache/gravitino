@@ -36,7 +36,7 @@ import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 
 @Tag("gravitino-docker-test")
-public class FlinkJdbcMysqlCatalogIT extends FlinkCommonIT {
+public abstract class FlinkJdbcMysqlCatalogIT extends FlinkCommonIT {
 
   protected String mysqlUrl;
   protected String mysqlUsername;

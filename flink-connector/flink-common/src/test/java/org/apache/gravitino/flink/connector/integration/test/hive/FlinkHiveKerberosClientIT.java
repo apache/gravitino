@@ -59,7 +59,7 @@ import org.junit.jupiter.api.Test;
  * Kerberos-specific scenarios.
  */
 @Tag("gravitino-docker-test")
-public class FlinkHiveKerberosClientIT extends FlinkEnvIT {
+public abstract class FlinkHiveKerberosClientIT extends FlinkEnvIT {
 
   private static final KerberosSecurityTestcase kdc =
       new KerberosSecurityTestcase() {

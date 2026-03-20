@@ -25,7 +25,7 @@ import org.apache.gravitino.flink.connector.iceberg.IcebergPropertiesConstants;
 import org.junit.jupiter.api.Tag;
 
 @Tag("gravitino-docker-test")
-public class FlinkIcebergHiveCatalogIT extends FlinkIcebergCatalogIT {
+public abstract class FlinkIcebergHiveCatalogIT extends FlinkIcebergCatalogIT {
 
   @Override
   protected Map<String, String> getCatalogConfigs() {

@@ -16,6 +16,8 @@
  * specific language governing permissions and limitations
  * under the License.
  */
+import org.gradle.api.tasks.SourceSetContainer
+
 plugins {
   `maven-publish`
   id("java")
@@ -27,6 +29,8 @@ repositories {
 }
 
 val commonProject = project(":flink-connector:flink-common")
+val commonSourceSets = commonProject.extensions.getByType<SourceSetContainer>()
+val commonTestOutput = commonSourceSets.named("test").get().output
 val flinkVersion: String = libs.versions.flink18.get()
 val flinkMajorVersion: String = flinkVersion.substringBeforeLast(".")
 val icebergVersion: String = libs.versions.iceberg4flink18.get()
@@ -44,6 +48,10 @@ dependencies {
   compileOnly("org.apache.flink:flink-table-api-java:$flinkVersion")
   compileOnly("org.apache.paimon:paimon-flink-$flinkMajorVersion:$paimonVersion")
   compileOnly(libs.flinkjdbc18)
+  compileOnly(libs.hive2.common) {
+    exclude("org.eclipse.jetty.aggregate", "jetty-all")
+    exclude("org.eclipse.jetty.orbit", "javax.servlet")
+  }
 
   testImplementation(project(":api"))
   testImplementation(project(":clients:client-java"))
@@ -52,6 +60,7 @@ dependencies {
   testImplementation(project(":integration-test-common", "testArtifacts"))
   testImplementation(project(":server"))
   testImplementation(project(":server-common"))
+  testImplementation(project(":flink-connector:flink-common", "testArtifacts"))
   testImplementation(libs.awaitility)
   testImplementation(libs.junit.jupiter.api)
   testImplementation(libs.junit.jupiter.params)
@@ -146,6 +155,10 @@ dependencies {
 }
 
 tasks.test {
+  dependsOn(commonProject.tasks.named("testClasses"))
+  testClassesDirs = files(commonTestOutput.classesDirs, sourceSets["test"].output.classesDirs)
+  classpath = files(commonTestOutput, sourceSets["test"].runtimeClasspath)
+
   val skipITs = project.hasProperty("skipITs")
   if (skipITs) {
     exclude("**/integration/test/**")

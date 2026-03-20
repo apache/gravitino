@@ -86,7 +86,7 @@ import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 
 @Tag("gravitino-docker-test")
-public class FlinkHiveCatalogIT extends FlinkCommonIT {
+public abstract class FlinkHiveCatalogIT extends FlinkCommonIT {
   private static final String DEFAULT_HIVE_CATALOG = "test_flink_hive_schema_catalog";
   private static final String FLINK_USER_NAME = "gravitino";
   private static final String MYSQL_DATABASE = TestDatabaseName.FLINK_HIVE_CATALOG_IT.name();

@@ -24,7 +24,7 @@ import org.apache.gravitino.catalog.lakehouse.paimon.PaimonConstants;
 import org.junit.jupiter.api.Tag;
 
 @Tag("gravitino-docker-test")
-public class FlinkPaimonHiveBackendIT extends FlinkPaimonCatalogIT {
+public abstract class FlinkPaimonHiveBackendIT extends FlinkPaimonCatalogIT {
 
   private static final String DEFAULT_PAIMON_CATALOG = "test_flink_paimon_hive_catalog";
 

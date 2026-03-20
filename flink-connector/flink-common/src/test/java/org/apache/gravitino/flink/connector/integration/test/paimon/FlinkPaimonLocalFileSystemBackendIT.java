@@ -26,7 +26,7 @@ import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.io.TempDir;
 
 @Tag("gravitino-docker-test")
-public class FlinkPaimonLocalFileSystemBackendIT extends FlinkPaimonCatalogIT {
+public abstract class FlinkPaimonLocalFileSystemBackendIT extends FlinkPaimonCatalogIT {
 
   @TempDir private static Path warehouseDir;
 

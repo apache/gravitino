@@ -63,7 +63,7 @@ public class GravitinoHiveCatalogFactory implements BaseCatalogFactory {
     PropertyUtils.getHadoopAndHiveProperties(context.getOptions()).forEach(hiveConf::set);
     SchemaAndTablePropertiesConverter tablePropertiesConverter =
         new HiveSchemaAndTablePropertiesConverter(hiveConf);
-    return new GravitinoHiveCatalog(
+    return newCatalog(
         context.getName(),
         helper.getOptions().get(HiveCatalogFactoryOptions.DEFAULT_DATABASE),
         context.getOptions(),
@@ -71,6 +71,24 @@ public class GravitinoHiveCatalogFactory implements BaseCatalogFactory {
         partitionConverter(),
         hiveConf,
         helper.getOptions().get(HiveCatalogFactoryOptions.HIVE_VERSION));
+  }
+
+  protected Catalog newCatalog(
+      String catalogName,
+      String defaultDatabase,
+      java.util.Map<String, String> catalogOptions,
+      SchemaAndTablePropertiesConverter schemaAndTablePropertiesConverter,
+      PartitionConverter partitionConverter,
+      @javax.annotation.Nullable HiveConf hiveConf,
+      @javax.annotation.Nullable String hiveVersion) {
+    return new GravitinoHiveCatalog(
+        catalogName,
+        defaultDatabase,
+        catalogOptions,
+        schemaAndTablePropertiesConverter,
+        partitionConverter,
+        hiveConf,
+        hiveVersion);
   }
 
   @Override

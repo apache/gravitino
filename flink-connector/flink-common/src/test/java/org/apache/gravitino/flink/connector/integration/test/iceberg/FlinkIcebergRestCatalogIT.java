@@ -35,7 +35,7 @@ import org.junit.jupiter.api.condition.DisabledIf;
 // Flink connector use low Iceberg version, couldn't work with Iceberg REST server with high Iceberg
 // version in embedded mode.
 @DisabledIf("org.apache.gravitino.integration.test.util.ITUtils#isEmbedded")
-public class FlinkIcebergRestCatalogIT extends FlinkIcebergCatalogIT {
+public abstract class FlinkIcebergRestCatalogIT extends FlinkIcebergCatalogIT {
 
   @Override
   protected Map<String, String> getCatalogConfigs() {

@@ -28,7 +28,7 @@ import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.io.TempDir;
 
 @Tag("gravitino-docker-test")
-public class FlinkPaimonJdbcBackendIT extends FlinkPaimonCatalogIT {
+public abstract class FlinkPaimonJdbcBackendIT extends FlinkPaimonCatalogIT {
 
   private static final String DEFAULT_PAIMON_CATALOG = "test_flink_paimon_jdbc_catalog";
 
