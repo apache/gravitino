@@ -79,17 +79,17 @@ restore_test_files() {
     echo "Restoring test files..."
     git -C "$GRAVITINO_ROOT_DIR" checkout -- \
         trino-connector/integration-test/src/test/resources/ \
-        integration-test-common/
+        integration-test-common/docker-script/
     git -C "$GRAVITINO_ROOT_DIR" clean -fd \
         trino-connector/integration-test/src/test/resources/ \
-        integration-test-common/
+        integration-test-common/docker-script/
 }
 
 if [ "$auto_patch" = true ]; then
     # Abort if the testsets directory has uncommitted changes, to avoid
     # patch conflicts or accidental loss of in-progress work.
     TESTSETS_REL="trino-connector/integration-test/src/test/resources/trino-ci-testset/testsets"
-    INTEGRATION_TEST_COMMON_REL="integration-test-common"
+    INTEGRATION_TEST_COMMON_REL="integration-test-common/docker-script"
     for dir in "$TESTSETS_REL" "$INTEGRATION_TEST_COMMON_REL"; do
         if ! git -C "$GRAVITINO_ROOT_DIR" diff --quiet -- "$dir" || \
            ! git -C "$GRAVITINO_ROOT_DIR" diff --cached --quiet -- "$dir"; then
