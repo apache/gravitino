@@ -63,18 +63,6 @@ public interface EntityCache extends SupportsEntityStoreCache, SupportsRelationE
       throws E;
 
   /**
-   * Acquires locks for multiple cache keys and executes the action. Keys are locked in a consistent
-   * order to avoid deadlocks.
-   *
-   * @param keys The cache keys to lock
-   * @param action The action to execute while holding all locks
-   * @param <E> The type of exception that may be thrown
-   * @throws E if the action throws an exception of type E
-   */
-  <E extends Exception> void withMultipleKeyCacheLock(
-      List<EntityCacheKey> keys, ThrowingRunnable<E> action) throws E;
-
-  /**
    * Acquires locks for multiple cache keys and executes the action, returning the result. Keys are
    * locked in a consistent order to avoid deadlocks.
    *

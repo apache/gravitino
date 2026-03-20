@@ -236,34 +236,19 @@ public class SegmentedLock {
     }
   }
 
-  private List<Lock> getDistinctSortedLocks(List<? extends Object> keys) {
-    return keys.stream()
-        .map(this::getSegmentLock)
-        .distinct()
-        .sorted(Comparator.comparingInt(lockIndices::get))
-        .collect(Collectors.toList());
+  /** Checks if a global operation is currently in progress. */
+  @VisibleForTesting
+  public boolean isClearing() {
+    return globalOperationLatch.get() != null;
   }
 
-  private void acquireAllLocks(List<Lock> locks) {
-    int lockedCount = 0;
-    try {
-      for (Lock lock : locks) {
-        lock.lockInterruptibly();
-        lockedCount++;
-      }
-    } catch (InterruptedException e) {
-      for (int i = lockedCount - 1; i >= 0; i--) {
-        locks.get(i).unlock();
-      }
-      Thread.currentThread().interrupt();
-      throw new IllegalStateException("Thread was interrupted while acquiring batch lock", e);
-    }
-  }
-
-  private void releaseAllLocks(List<Lock> locks) {
-    for (int i = locks.size() - 1; i >= 0; i--) {
-      locks.get(i).unlock();
-    }
+  /**
+   * Returns number of lock segments.
+   *
+   * @return Number of segments
+   */
+  public int getNumSegments() {
+    return stripedLocks.size();
   }
 
   /**
@@ -292,6 +277,38 @@ public class SegmentedLock {
     }
   }
 
+  private List<Lock> getDistinctSortedLocks(List<? extends Object> keys) {
+    return keys.stream()
+        .map(this::getSegmentLock)
+        .distinct()
+        .sorted(Comparator.comparingInt(lockIndices::get))
+        .collect(Collectors.toList());
+  }
+
+  private void acquireAllLocks(List<Lock> locks) {
+    int lockedCount = 0;
+    try {
+      for (Lock lock : locks) {
+        lock.lockInterruptibly();
+        lockedCount++;
+      }
+    } catch (InterruptedException e) {
+      releaseLocks(locks, lockedCount);
+      Thread.currentThread().interrupt();
+      throw new IllegalStateException("Thread was interrupted while acquiring batch lock", e);
+    }
+  }
+
+  private static void releaseLocks(List<Lock> locks, int lockedCount) {
+    for (int i = lockedCount - 1; i >= 0; i--) {
+      locks.get(i).unlock();
+    }
+  }
+
+  private void releaseAllLocks(List<Lock> locks) {
+    releaseLocks(locks, locks.size());
+  }
+
   /**
    * Waits for any ongoing global operation to complete. This method is called by regular operations
    * to ensure they don't interfere with global operations.
@@ -307,20 +324,5 @@ public class SegmentedLock {
             "Thread was interrupted while waiting for global operation to complete", e);
       }
     }
-  }
-
-  /** Checks if a global operation is currently in progress. */
-  @VisibleForTesting
-  public boolean isClearing() {
-    return globalOperationLatch.get() != null;
-  }
-
-  /**
-   * Returns number of lock segments.
-   *
-   * @return Number of segments
-   */
-  public int getNumSegments() {
-    return stripedLocks.size();
   }
 }

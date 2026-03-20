@@ -342,16 +342,6 @@ public class CaffeineEntityCache extends BaseEntityCache {
 
   /** {@inheritDoc} */
   @Override
-  public <E extends Exception> void withMultipleKeyCacheLock(
-      List<EntityCacheKey> keys, EntityCache.ThrowingRunnable<E> action) throws E {
-    Preconditions.checkArgument(keys != null, "Keys cannot be null");
-    Preconditions.checkArgument(action != null, "Action cannot be null");
-
-    segmentedLock.withMultipleKeyLockAndThrow(keys, action);
-  }
-
-  /** {@inheritDoc} */
-  @Override
   public <T, E extends Exception> T withMultipleKeyCacheLock(
       List<EntityCacheKey> keys, EntityCache.ThrowingSupplier<T, E> action) throws E {
     Preconditions.checkArgument(keys != null, "Keys cannot be null");
