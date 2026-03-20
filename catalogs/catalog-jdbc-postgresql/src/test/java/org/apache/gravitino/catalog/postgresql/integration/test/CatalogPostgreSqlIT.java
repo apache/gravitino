@@ -50,7 +50,6 @@ import org.apache.gravitino.catalog.postgresql.integration.test.service.PostgreS
 import org.apache.gravitino.client.GravitinoMetalake;
 import org.apache.gravitino.exceptions.ConnectionFailedException;
 import org.apache.gravitino.exceptions.NoSuchSchemaException;
-import org.apache.gravitino.exceptions.NotFoundException;
 import org.apache.gravitino.exceptions.SchemaAlreadyExistsException;
 import org.apache.gravitino.integration.test.container.ContainerSuite;
 import org.apache.gravitino.integration.test.container.PGImageName;
@@ -424,7 +423,7 @@ public class CatalogPostgreSqlIT extends BaseIT {
     // create failed check.
     NameIdentifier table = NameIdentifier.of(testSchemaName, "test_table");
     Assertions.assertThrows(
-        NotFoundException.class,
+        NoSuchSchemaException.class,
         () ->
             tableCatalog.createTable(
                 table,

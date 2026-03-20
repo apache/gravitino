@@ -37,7 +37,7 @@ val sparkMajorVersion = "3.5"
 dependencies {
   implementation(project(":api"))
   implementation(project(":maintenance:optimizer-api"))
-  implementation(project(":maintenance:gravitino-updaters"))
+  implementation(project(":maintenance:updaters"))
 
   compileOnly(libs.slf4j.api)
   compileOnly(libs.jackson.databind)

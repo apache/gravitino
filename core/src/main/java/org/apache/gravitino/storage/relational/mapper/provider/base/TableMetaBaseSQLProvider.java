@@ -350,19 +350,30 @@ public class TableMetaBaseSQLProvider {
             tm.table_id AS tableId,
             tm.table_name AS tableName,
             tm.metalake_id AS metalakeId,
+            tm.catalog_id AS catalogId,
+            tm.schema_id AS schemaId,
             tm.audit_info AS auditInfo,
             tm.current_version AS currentVersion,
             tm.last_version AS lastVersion,
-            tm.deleted_at AS deletedAt
-            FROM %s tm
-            WHERE schema_id = #{schemaId}
-            AND table_name IN
+            tm.deleted_at AS deletedAt,
+            tv.format AS format,
+            tv.properties AS properties,
+            tv.partitioning AS partitions,
+            tv.sort_orders AS sortOrders,
+            tv.distribution AS distribution,
+            tv.indexes AS indexes,
+            tv.comment AS comment
+            FROM %s tm LEFT JOIN %s tv
+            ON tm.table_id = tv.table_id AND tm.current_version = tv.version
+            AND tv.deleted_at = 0
+            WHERE tm.schema_id = #{schemaId}
+            AND tm.table_name IN
             <foreach collection="tableNames" item="tableName" open="(" separator="," close=")">
             #{tableName}
             </foreach>
-             AND deleted_at = 0
+             AND tm.deleted_at = 0
              </script>
             """
-        .formatted(TABLE_NAME);
+        .formatted(TABLE_NAME, TableVersionMapper.TABLE_NAME);
   }
 }

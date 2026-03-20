@@ -59,19 +59,20 @@ class TestOptimizerCmd {
   }
 
   @Test
-  void testRejectStatisticsInputWhenCalculatorIsNotLocal() {
+  void testAllowStatisticsInputWhenCalculatorIsNotLocal() throws Exception {
+    Path confPath = createOptimizerConfForUpdater();
     String[] output =
         runCommand(
             "--type",
             "update-statistics",
             "--calculator-name",
-            "mock-calculator",
+            StatisticsCalculatorForTest.NAME,
             "--statistics-payload",
-            "{\"identifier\":\"c.db.t\"}");
-    Assertions.assertTrue(
-        output[1].contains(
-            "--statistics-payload and --file-path are only supported when --calculator-name "
-                + "is local-stats-calculator."));
+            "{\"identifier\":\"test.db.table\",\"stats-type\":\"table\",\"row_count\":100}",
+            "--conf-path",
+            confPath.toString());
+    Assertions.assertTrue(output[1].isEmpty(), "stderr=" + output[1] + ", stdout=" + output[0]);
+    Assertions.assertTrue(output[0].contains("SUMMARY: statistics"));
   }
 
   @Test

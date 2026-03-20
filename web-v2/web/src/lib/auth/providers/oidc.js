@@ -67,8 +67,8 @@ export class OidcOAuthProvider extends BaseOAuthProvider {
       let user = await this.userManager.getUser()
 
       if (user && !user.expired) {
-        // For JWKS validation, we need the ID token (JWT format), not the access token
-        return user.id_token || user.access_token
+        // Use access token for API requests per OAuth2 spec
+        return user.access_token || user.id_token
       }
 
       if (user && user.expired) {
@@ -76,8 +76,8 @@ export class OidcOAuthProvider extends BaseOAuthProvider {
           // Attempt silent refresh
           const refreshedUser = await this.userManager.signinSilent()
 
-          // Return ID token for JWKS validation
-          return refreshedUser.id_token || refreshedUser.access_token
+          // Use access token for API requests per OAuth2 spec
+          return refreshedUser.access_token || refreshedUser.id_token
         } catch (refreshError) {
           // Clear expired tokens
           await this.userManager.removeUser()

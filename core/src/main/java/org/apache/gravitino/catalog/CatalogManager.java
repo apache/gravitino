@@ -117,7 +117,7 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
   private static final Logger LOG = LoggerFactory.getLogger(CatalogManager.class);
 
   private static final Set<String> CONTRIB_CATALOGS_TYPES =
-      ImmutableSet.of("jdbc-oceanbase", "jdbc-clickhouse");
+      ImmutableSet.of("jdbc-oceanbase", "jdbc-clickhouse", "jdbc-hologres");
 
   /** Wrapper class for a catalog instance and its class loader. */
   public static class CatalogWrapper {
