@@ -262,6 +262,36 @@ public class TestMetalakeEvent {
   }
 
   @Test
+  void testEnableMetalakeFailureEvent() {
+    NameIdentifier identifier = NameIdentifier.of(metalake.name());
+    Assertions.assertThrowsExactly(
+        GravitinoRuntimeException.class, () -> failureDispatcher.enableMetalake(identifier));
+    Event event = dummyEventListener.popPostEvent();
+    Assertions.assertEquals(identifier, event.identifier());
+    Assertions.assertEquals(EnableMetalakeFailureEvent.class, event.getClass());
+    Assertions.assertEquals(
+        GravitinoRuntimeException.class,
+        ((EnableMetalakeFailureEvent) event).exception().getClass());
+    Assertions.assertEquals(OperationType.ENABLE_METALAKE, event.operationType());
+    Assertions.assertEquals(OperationStatus.FAILURE, event.operationStatus());
+  }
+
+  @Test
+  void testDisableMetalakeFailureEvent() {
+    NameIdentifier identifier = NameIdentifier.of(metalake.name());
+    Assertions.assertThrowsExactly(
+        GravitinoRuntimeException.class, () -> failureDispatcher.disableMetalake(identifier));
+    Event event = dummyEventListener.popPostEvent();
+    Assertions.assertEquals(identifier, event.identifier());
+    Assertions.assertEquals(DisableMetalakeFailureEvent.class, event.getClass());
+    Assertions.assertEquals(
+        GravitinoRuntimeException.class,
+        ((DisableMetalakeFailureEvent) event).exception().getClass());
+    Assertions.assertEquals(OperationType.DISABLE_METALAKE, event.operationType());
+    Assertions.assertEquals(OperationStatus.FAILURE, event.operationStatus());
+  }
+
+  @Test
   void testListMetalakeFailureEvent() {
     Assertions.assertThrowsExactly(
         GravitinoRuntimeException.class, () -> failureDispatcher.listMetalakes());

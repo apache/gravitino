@@ -289,6 +289,36 @@ public class TestCatalogEvent {
   }
 
   @Test
+  void testEnableCatalogFailureEvent() {
+    NameIdentifier identifier = NameIdentifier.of("metalake", catalog.name());
+    Assertions.assertThrowsExactly(
+        GravitinoRuntimeException.class, () -> failureDispatcher.enableCatalog(identifier));
+    Event event = dummyEventListener.popPostEvent();
+    Assertions.assertEquals(identifier, event.identifier());
+    Assertions.assertEquals(EnableCatalogFailureEvent.class, event.getClass());
+    Assertions.assertEquals(
+        GravitinoRuntimeException.class,
+        ((EnableCatalogFailureEvent) event).exception().getClass());
+    Assertions.assertEquals(OperationType.ENABLE_CATALOG, event.operationType());
+    Assertions.assertEquals(OperationStatus.FAILURE, event.operationStatus());
+  }
+
+  @Test
+  void testDisableCatalogFailureEvent() {
+    NameIdentifier identifier = NameIdentifier.of("metalake", catalog.name());
+    Assertions.assertThrowsExactly(
+        GravitinoRuntimeException.class, () -> failureDispatcher.disableCatalog(identifier));
+    Event event = dummyEventListener.popPostEvent();
+    Assertions.assertEquals(identifier, event.identifier());
+    Assertions.assertEquals(DisableCatalogFailureEvent.class, event.getClass());
+    Assertions.assertEquals(
+        GravitinoRuntimeException.class,
+        ((DisableCatalogFailureEvent) event).exception().getClass());
+    Assertions.assertEquals(OperationType.DISABLE_CATALOG, event.operationType());
+    Assertions.assertEquals(OperationStatus.FAILURE, event.operationStatus());
+  }
+
+  @Test
   void testListCatalogFailureEvent() {
     Namespace namespace = Namespace.of("metalake", "catalog");
     Assertions.assertThrowsExactly(
