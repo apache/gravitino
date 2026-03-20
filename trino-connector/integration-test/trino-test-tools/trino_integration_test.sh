@@ -89,12 +89,15 @@ if [ "$auto_patch" = true ]; then
     # Abort if the testsets directory has uncommitted changes, to avoid
     # patch conflicts or accidental loss of in-progress work.
     TESTSETS_REL="trino-connector/integration-test/src/test/resources/trino-ci-testset/testsets"
-    if ! git -C "$GRAVITINO_ROOT_DIR" diff --quiet -- "$TESTSETS_REL" || \
-       ! git -C "$GRAVITINO_ROOT_DIR" diff --cached --quiet -- "$TESTSETS_REL"; then
-        echo "ERROR: Uncommitted changes detected in $TESTSETS_REL."
-        echo "Please commit or stash your changes before running with --auto_patch."
-        exit 1
-    fi
+    INTEGRATION_TEST_COMMON_REL="integration-test-common"
+    for dir in "$TESTSETS_REL" "$INTEGRATION_TEST_COMMON_REL"; do
+        if ! git -C "$GRAVITINO_ROOT_DIR" diff --quiet -- "$dir" || \
+           ! git -C "$GRAVITINO_ROOT_DIR" diff --cached --quiet -- "$dir"; then
+            echo "ERROR: Uncommitted changes detected in $dir."
+            echo "Please commit or stash your changes before running with --auto_patch."
+            exit 1
+        fi
+    done
     # Register trap to ensure test files are always restored on exit,
     # even if the script is interrupted or exits abnormally.
     trap 'restore_test_files' EXIT
