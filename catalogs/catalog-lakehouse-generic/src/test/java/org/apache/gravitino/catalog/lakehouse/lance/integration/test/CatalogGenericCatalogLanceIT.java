@@ -154,6 +154,84 @@ public class CatalogGenericCatalogLanceIT extends BaseIT {
   }
 
   @Test
+  public void testPurgeTableWhenLocationMissing() throws IOException {
+    Column[] columns = createColumns();
+    String location = tempDirectory + "/" + GravitinoITUtils.genRandomName(TABLE_PREFIX) + "/";
+    NameIdentifier identifier =
+        NameIdentifier.of(schemaName, GravitinoITUtils.genRandomName(TABLE_PREFIX));
+    Map<String, String> properties = createProperties();
+    properties.put(Table.PROPERTY_TABLE_FORMAT, LANCE_TABLE_FORMAT);
+    properties.put(Table.PROPERTY_EXTERNAL, "true");
+    properties.put(Table.PROPERTY_LOCATION, location);
+
+    catalog
+        .asTableCatalog()
+        .createTable(
+            identifier, columns, TABLE_COMMENT, properties, Transforms.EMPTY_TRANSFORM, null, null);
+    Assertions.assertTrue(new File(location).exists());
+
+    // Simulate missing data before purge
+    FileUtils.deleteDirectory(new File(location));
+    Assertions.assertFalse(new File(location).exists());
+
+    Assertions.assertDoesNotThrow(() -> catalog.asTableCatalog().purgeTable(identifier));
+    Assertions.assertFalse(catalog.asTableCatalog().tableExists(identifier));
+  }
+
+  @Test
+  public void testPurgeTableWhenLocationNeverCreated() {
+    Column[] columns = createColumns();
+    String location = tempDirectory + "/" + GravitinoITUtils.genRandomName(TABLE_PREFIX) + "/";
+    NameIdentifier identifier =
+        NameIdentifier.of(schemaName, GravitinoITUtils.genRandomName(TABLE_PREFIX));
+    Map<String, String> properties = createProperties();
+    properties.put(Table.PROPERTY_TABLE_FORMAT, LANCE_TABLE_FORMAT);
+    properties.put(Table.PROPERTY_EXTERNAL, "true");
+    properties.put(Table.PROPERTY_LOCATION, location);
+
+    catalog
+        .asTableCatalog()
+        .createTable(
+            identifier, columns, TABLE_COMMENT, properties, Transforms.EMPTY_TRANSFORM, null, null);
+    // Normal case, the location should be created
+    Assertions.assertTrue(new File(location).exists());
+
+    Assertions.assertDoesNotThrow(() -> catalog.asTableCatalog().purgeTable(identifier));
+    Assertions.assertFalse(catalog.asTableCatalog().tableExists(identifier));
+  }
+
+  @Test
+  public void testPurgeManagedTableWithAutoLocation() {
+    Column[] columns = createColumns();
+    NameIdentifier identifier =
+        NameIdentifier.of(schemaName, GravitinoITUtils.genRandomName(TABLE_PREFIX));
+    String location = tempDirectory + "/" + GravitinoITUtils.genRandomName(TABLE_PREFIX) + "/";
+
+    Map<String, String> properties = createProperties();
+    properties.put(Table.PROPERTY_TABLE_FORMAT, LANCE_TABLE_FORMAT);
+    properties.put(Table.PROPERTY_EXTERNAL, "false");
+    properties.put(Table.PROPERTY_LOCATION, location);
+
+    Table table =
+        catalog
+            .asTableCatalog()
+            .createTable(
+                identifier,
+                columns,
+                TABLE_COMMENT,
+                properties,
+                Transforms.EMPTY_TRANSFORM,
+                null,
+                null);
+    String resolvedLocation = table.properties().get(Table.PROPERTY_LOCATION);
+    Assertions.assertNotNull(resolvedLocation);
+    Assertions.assertTrue(new File(resolvedLocation).exists());
+
+    Assertions.assertDoesNotThrow(() -> catalog.asTableCatalog().purgeTable(identifier));
+    Assertions.assertFalse(catalog.asTableCatalog().tableExists(identifier));
+  }
+
+  @Test
   public void testCrateEmptyTable() {
     String emptyTableName = GravitinoITUtils.genRandomName(TABLE_PREFIX);
     NameIdentifier nameIdentifier = NameIdentifier.of(schemaName, emptyTableName);
