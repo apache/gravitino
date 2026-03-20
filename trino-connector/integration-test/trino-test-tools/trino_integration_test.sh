@@ -80,7 +80,7 @@ restore_test_files() {
     git -C "$GRAVITINO_ROOT_DIR" checkout -- \
         trino-connector/integration-test/src/test/resources/ \
         integration-test-common/
-    git -C "$GRAVITINO_ROOT_DIR" clean -f \
+    git -C "$GRAVITINO_ROOT_DIR" clean -fd \
         trino-connector/integration-test/src/test/resources/trino-ci-testset/testsets/lakehouse-iceberg/
 }
 

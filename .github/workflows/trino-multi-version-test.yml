@@ -38,6 +38,9 @@ jobs:
       - name: Free up disk space
         run: dev/ci/util_free_space.sh
 
+      - name: List connector JARs
+        run: find trino-connector/trino-connector-*/build/libs -name "*.jar" | sort
+
       - name: Upload connector JARs
         uses: actions/upload-artifact@v4
         with:
