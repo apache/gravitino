@@ -33,9 +33,13 @@ import org.apache.gravitino.listener.api.event.AlterMetalakePreEvent;
 import org.apache.gravitino.listener.api.event.CreateMetalakeEvent;
 import org.apache.gravitino.listener.api.event.CreateMetalakeFailureEvent;
 import org.apache.gravitino.listener.api.event.CreateMetalakePreEvent;
+import org.apache.gravitino.listener.api.event.DisableMetalakeEvent;
+import org.apache.gravitino.listener.api.event.DisableMetalakePreEvent;
 import org.apache.gravitino.listener.api.event.DropMetalakeEvent;
 import org.apache.gravitino.listener.api.event.DropMetalakeFailureEvent;
 import org.apache.gravitino.listener.api.event.DropMetalakePreEvent;
+import org.apache.gravitino.listener.api.event.EnableMetalakeEvent;
+import org.apache.gravitino.listener.api.event.EnableMetalakePreEvent;
 import org.apache.gravitino.listener.api.event.ListMetalakeEvent;
 import org.apache.gravitino.listener.api.event.ListMetalakeFailureEvent;
 import org.apache.gravitino.listener.api.event.ListMetalakePreEvent;
@@ -45,6 +49,8 @@ import org.apache.gravitino.listener.api.event.LoadMetalakePreEvent;
 import org.apache.gravitino.listener.api.info.MetalakeInfo;
 import org.apache.gravitino.metalake.MetalakeDispatcher;
 import org.apache.gravitino.utils.PrincipalUtils;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * {@code MetalakeEventDispatcher} is a decorator for {@link MetalakeDispatcher} that not only
@@ -53,6 +59,8 @@ import org.apache.gravitino.utils.PrincipalUtils;
  * completed. This allows for event-driven workflows or monitoring of metalake operations.
  */
 public class MetalakeEventDispatcher implements MetalakeDispatcher {
+  private static final Logger LOG = LoggerFactory.getLogger(MetalakeEventDispatcher.class);
+
   private final EventBus eventBus;
   private final MetalakeDispatcher dispatcher;
 
@@ -161,13 +169,19 @@ public class MetalakeEventDispatcher implements MetalakeDispatcher {
 
   @Override
   public void enableMetalake(NameIdentifier ident) throws NoSuchMetalakeException {
-    // todo: support enable metalake event
+    LOG.info("Dispatching enableMetalake event for {}", ident);
+    eventBus.dispatchEvent(new EnableMetalakePreEvent(PrincipalUtils.getCurrentUserName(), ident));
     dispatcher.enableMetalake(ident);
+    eventBus.dispatchEvent(new EnableMetalakeEvent(PrincipalUtils.getCurrentUserName(), ident));
+    LOG.info("Dispatched enableMetalake post-event for {}", ident);
   }
 
   @Override
   public void disableMetalake(NameIdentifier ident) throws NoSuchMetalakeException {
-    // todo: support disable metalake event
+    LOG.info("Dispatching disableMetalake event for {}", ident);
+    eventBus.dispatchEvent(new DisableMetalakePreEvent(PrincipalUtils.getCurrentUserName(), ident));
     dispatcher.disableMetalake(ident);
+    eventBus.dispatchEvent(new DisableMetalakeEvent(PrincipalUtils.getCurrentUserName(), ident));
+    LOG.info("Dispatched disableMetalake post-event for {}", ident);
   }
 }

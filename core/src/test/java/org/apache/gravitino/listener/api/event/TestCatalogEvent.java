@@ -185,6 +185,40 @@ public class TestCatalogEvent {
   }
 
   @Test
+  void testEnableCatalogEvent() {
+    NameIdentifier identifier = NameIdentifier.of("metalake", catalog.name());
+    dispatcher.enableCatalog(identifier);
+    Event event = dummyEventListener.popPostEvent();
+    Assertions.assertEquals(identifier, event.identifier());
+    Assertions.assertEquals(EnableCatalogEvent.class, event.getClass());
+    Assertions.assertEquals(OperationType.ENABLE_CATALOG, event.operationType());
+    Assertions.assertEquals(OperationStatus.SUCCESS, event.operationStatus());
+
+    PreEvent preEvent = dummyEventListener.popPreEvent();
+    Assertions.assertEquals(identifier, preEvent.identifier());
+    Assertions.assertEquals(EnableCatalogPreEvent.class, preEvent.getClass());
+    Assertions.assertEquals(OperationType.ENABLE_CATALOG, preEvent.operationType());
+    Assertions.assertEquals(OperationStatus.UNPROCESSED, preEvent.operationStatus());
+  }
+
+  @Test
+  void testDisableCatalogEvent() {
+    NameIdentifier identifier = NameIdentifier.of("metalake", catalog.name());
+    dispatcher.disableCatalog(identifier);
+    Event event = dummyEventListener.popPostEvent();
+    Assertions.assertEquals(identifier, event.identifier());
+    Assertions.assertEquals(DisableCatalogEvent.class, event.getClass());
+    Assertions.assertEquals(OperationType.DISABLE_CATALOG, event.operationType());
+    Assertions.assertEquals(OperationStatus.SUCCESS, event.operationStatus());
+
+    PreEvent preEvent = dummyEventListener.popPreEvent();
+    Assertions.assertEquals(identifier, preEvent.identifier());
+    Assertions.assertEquals(DisableCatalogPreEvent.class, preEvent.getClass());
+    Assertions.assertEquals(OperationType.DISABLE_CATALOG, preEvent.operationType());
+    Assertions.assertEquals(OperationStatus.UNPROCESSED, preEvent.operationStatus());
+  }
+
+  @Test
   void testCreateCatalogFailureEvent() {
     NameIdentifier identifier = NameIdentifier.of("metalake", catalog.name());
     Assertions.assertThrowsExactly(
