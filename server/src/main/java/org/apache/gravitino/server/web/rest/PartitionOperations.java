@@ -162,7 +162,7 @@ public class PartitionOperations {
             return response;
           });
     } catch (Exception e) {
-      return ExceptionHandlers.handlePartitionException(OperationType.GET, "", table, e);
+      return ExceptionHandlers.handlePartitionException(OperationType.GET, partition, table, e);
     }
   }
 
