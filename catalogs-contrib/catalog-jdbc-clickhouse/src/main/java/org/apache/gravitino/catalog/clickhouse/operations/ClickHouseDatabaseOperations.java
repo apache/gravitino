@@ -178,6 +178,10 @@ public class ClickHouseDatabaseOperations extends JdbcDatabaseOperations {
       if (!cascade) {
         // Query system.tables instead of SHOW TABLES IN so we get a proper parameterised query
         // and avoid any edge cases with special characters in database names.
+
+        // Note that using system table will not resolve the problem: if the database does not exist
+        // in this host(e.g. in a cluster setup), the query will return empty result, and we will
+        // proceed to drop the database,
         try (PreparedStatement checkStmt =
             connection.prepareStatement("SELECT 1 FROM system.tables WHERE database = ? LIMIT 1")) {
           checkStmt.setString(1, databaseName);
