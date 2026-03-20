@@ -100,8 +100,8 @@ if [ "$auto_patch" = true ]; then
     done
     # Register trap to ensure test files are always restored on exit,
     # even if the script is interrupted or exits abnormally.
-    trap 'restore_test_files' EXIT
     if [ -n "$trino_version" ]; then
+        trap 'restore_test_files' EXIT
         apply_version_patches "$trino_version"
     fi
 fi
