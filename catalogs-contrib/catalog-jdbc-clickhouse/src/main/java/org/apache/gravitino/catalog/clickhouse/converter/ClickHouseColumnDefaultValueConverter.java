@@ -25,6 +25,7 @@ import com.google.common.base.Preconditions;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.gravitino.catalog.clickhouse.operations.ClickHouseClusterUtils;
 import org.apache.gravitino.catalog.jdbc.converter.JdbcColumnDefaultValueConverter;
 import org.apache.gravitino.catalog.jdbc.converter.JdbcTypeConverter;
 import org.apache.gravitino.rel.expressions.Expression;
@@ -68,9 +69,10 @@ public class ClickHouseColumnDefaultValueConverter extends JdbcColumnDefaultValu
             && str.endsWith("'")) {
           // The API caller may pass quoted string literals (e.g. "'active'"), but DDL generation
           // is responsible for adding the outer quotes.
-          value = str.substring(1, str.length() - 1).replace("''", "'");
+          value = ClickHouseClusterUtils.unescapeSingleQuotes(str.substring(1, str.length() - 1));
         }
-        return String.format("'%s'", value.toString().replace("'", "''"));
+
+        return String.format("'%s'", ClickHouseClusterUtils.escapeSingleQuotes(value.toString()));
       }
     }
 
