@@ -35,7 +35,6 @@ dependencies {
   implementation(project(":catalogs:catalog-common")) {
     exclude("*")
   }
-  implementation(project(":clients:client-java-runtime", configuration = "shadow"))
 
   implementation(libs.caffeine)
   implementation(libs.guava)
