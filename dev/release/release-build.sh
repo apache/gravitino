@@ -350,8 +350,8 @@ if [[ "$1" == "publish-release" ]]; then
   cd ..
 
   $GRADLE clean
-  $GRADLE release -x test -PdefaultScalaVersion=2.12
-  $GRADLE release -x test -PdefaultScalaVersion=2.13
+  $GRADLE assemble -PdefaultScalaVersion=2.12
+  $GRADLE assemble -PdefaultScalaVersion=2.13
 
   $GRADLE -Dmaven.repo.local=$tmp_repo publishToMavenLocal -PdefaultScalaVersion=2.12
   $GRADLE -Dmaven.repo.local=$tmp_repo publishToMavenLocal -PdefaultScalaVersion=2.13
