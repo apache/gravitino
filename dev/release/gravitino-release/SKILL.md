@@ -1,3 +1,20 @@
+<!--
+  Licensed to the Apache Software Foundation (ASF) under one or more
+  contributor license agreements.  See the NOTICE file distributed with
+  this work for additional information regarding copyright ownership.
+  The ASF licenses this file to You under the Apache License, Version 2.0
+  (the "License"); you may not use this file except in compliance with
+  the License.  You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+  Unless required by applicable law or agreed to in writing, software
+  distributed under the License is distributed on an "AS IS" BASIS,
+  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+  See the License for the specific language governing permissions and
+  limitations under the License.
+-->
+
 ---
 name: gravitino-release
 description: Apache Gravitino release manager — guides through the full staged release pipeline stage by stage
@@ -32,7 +49,8 @@ You are the Apache Gravitino release manager agent. Your role is to guide the us
 | 4 | **publish** | `publish` | `.release-state/{TAG}/publish.done` |
 | 5 | **docker** | _(separate script)_ | `.release-state/{TAG}/docker.done` |
 | 6 | **finalize** | `finalize` | `.release-state/{TAG}/finalize.done` |
-| 7 | **release-note** | _(agent-generated)_ | _(no state file — always re-runnable)_ |
+| 7 | **docker-final** | _(separate script)_ | `.release-state/{TAG}/docker-final.done` |
+| 8 | **release-note** | _(agent-generated)_ | _(no state file — always re-runnable)_ |
 
 > `{TAG}` is the release candidate tag, e.g. `v1.2.0-rc1`.
 
@@ -155,9 +173,25 @@ git checkout
 
 ---
 
-### Step 3 — Read current state
+### Step 3 — Select mode
 
-Check `$RELEASE_SCRIPTS_DIR/.release-state/v${RELEASE_VERSION}-rc${RC_COUNT}/` for `.done` files and show the user:
+Ask before reading state, because mock mode uses a different scripts directory and therefore a different state directory:
+
+```
+Mock mode? [y/N]
+Dry run mode? [y/N]
+```
+
+If the user selects mock mode, set `RELEASE_SCRIPTS_DIR` to the mock subdirectory **now**, before any state check:
+```bash
+RELEASE_SCRIPTS_DIR="$WORK_DIR/dev/release/mock"
+```
+
+---
+
+### Step 4 — Read current state
+
+Using the `RELEASE_SCRIPTS_DIR` set in Step 3, check `.release-state/v${RELEASE_VERSION}-rc${RC_COUNT}/` for `.done` files and show the user:
 
 ```
 Release state for v1.2.0-rc1:
@@ -166,8 +200,9 @@ Release state for v1.2.0-rc1:
   ○ docs         (pending)
   ○ publish      (pending)
   ○ docker       (pending)
-  ○ finalize     (pending)
-  ↻ release-note (always re-runnable — no state file)
+  ○ finalize      (pending)
+  ○ docker-final  (pending)
+  ↻ release-note  (always re-runnable — no state file)
 ```
 
 `release-note` has no `.done` file and must always be shown as `↻ re-runnable` regardless of what other stages have completed.
@@ -176,7 +211,7 @@ If no state directory exists: "No stages completed yet for v{VERSION}-rc{RC}."
 
 ---
 
-### Step 4 — Ask what to do
+### Step 5 — Ask what to do
 
 ```
 What would you like to do?
@@ -184,19 +219,11 @@ What would you like to do?
   2. Run a specific stage
   3. Run all remaining stages sequentially
   4. Show current state only
-
-Mock mode? [y/N]
-Dry run mode? [y/N]
-```
-
-If the user selects mock mode, point all script invocations at the mock subdirectory:
-```bash
-RELEASE_SCRIPTS_DIR="$WORK_DIR/dev/release/mock"
 ```
 
 ---
 
-### Step 5 — Collect secrets
+### Step 6 — Collect secrets
 
 Check each required environment variable before running any stage. If unset, ask the user for the value and `export` it. **Never display, log, or echo secret values.**
 
@@ -207,9 +234,9 @@ Check each required environment variable before running any stage. If unset, ask
 | `GPG_KEY` | package, publish | GPG key ID (typically `user@apache.org`) |
 | `GPG_PASSPHRASE` | package, publish | GPG key passphrase |
 | `PYPI_API_TOKEN` | tag, package, finalize | PyPI API token (starts with `pypi-`) |
-| `GH_TOKEN` | docker | GitHub token with `repo`+`workflow` scope |
-| `DOCKER_USERNAME` | docker | Docker Hub username |
-| `PUBLISH_DOCKER_TOKEN` | docker | Workflow authorization token (matched against repo secret) |
+| `GH_TOKEN` | docker, docker-final | GitHub token with `repo`+`workflow` scope |
+| `DOCKER_USERNAME` | docker, docker-final | Docker Hub username |
+| `PUBLISH_DOCKER_TOKEN` | docker, docker-final | Workflow authorization token (matched against repo secret) |
 
 Collect only what is needed for the stage(s) about to run. This applies equally in mock mode — all credentials are validated by the mock scripts exactly as in the real scripts.
 
@@ -262,6 +289,57 @@ Proceed to tag? [y/N]
 ---
 
 ## Stage Details
+
+### Execution model for long-running stages
+
+Stages **build**, **docs**, **publish**, and **finalize** typically take 30–90 minutes. Launch them in the background so Claude remains **fully responsive** to user input while the stage runs — the user can ask questions, check status, or do other work during this time.
+
+#### Launching
+
+```bash
+# Launch in background — stdout+stderr go to the stage log, PID saved to a file
+nohup "$RELEASE_SCRIPTS_DIR/do-release.sh" -s <stage> -y -b "$GIT_BRANCH" -r "$RC_COUNT" \
+  > "$RELEASE_SCRIPTS_DIR/<stage>.log" 2>&1 &
+echo $! > "$RELEASE_SCRIPTS_DIR/<stage>.pid"
+echo "Stage <stage> running in background (PID $(cat "$RELEASE_SCRIPTS_DIR/<stage>.pid")). You can keep chatting."
+```
+
+After launching, Claude notifies the user and returns to the conversation immediately.
+
+#### Checking status (on demand)
+
+Claude runs this whenever the user asks (e.g. "how's the build going?") or proactively after a natural pause:
+
+```bash
+STAGE_PID=$(cat "$RELEASE_SCRIPTS_DIR/<stage>.pid" 2>/dev/null)
+if kill -0 "$STAGE_PID" 2>/dev/null; then
+  echo "Still running. Recent log:"
+  tail -10 "$RELEASE_SCRIPTS_DIR/<stage>.log"
+elif [ -f "$STATE_DIR/<stage>.done" ]; then
+  echo "Completed successfully:"
+  cat "$STATE_DIR/<stage>.done"
+else
+  echo "Process exited but no .done file — FAILED. Last log:"
+  tail -30 "$RELEASE_SCRIPTS_DIR/<stage>.log"
+fi
+```
+
+#### Auto-polling (optional)
+
+Periodically ask the agent to check status (e.g. "any update on the build?") — it will run the status check above and report back. In **Claude Code** you can also use the built-in `/loop` skill to automate this:
+```
+/loop 10m check stage <stage> status
+```
+Use `1m` for mock mode (with `MOCK_STAGE_DELAY=180`), `10m` for real runs. `/loop` is Claude Code only and not available in other tools.
+
+**Mock mode tip:** Set `MOCK_STAGE_DELAY=<secs>` to simulate a long-running stage:
+```bash
+export MOCK_STAGE_DELAY=180   # stage sleeps 3 minutes before completing
+```
+
+**Short stages** (tag, docker, docker-final) complete in under 5 minutes and are run synchronously — no backgrounding needed.
+
+---
 
 ### Stage 1: tag
 
@@ -398,7 +476,37 @@ This cannot be undone. Type 'yes' to proceed:
 
 ---
 
-### Stage 7: release-note
+### Stage 7: docker-final
+
+**Command:**
+```bash
+RELEASE_STATE_DIR="$RELEASE_SCRIPTS_DIR/.release-state/$RELEASE_TAG" \
+"$RELEASE_SCRIPTS_DIR/publish-docker.sh" "v${RELEASE_VERSION}" \
+  --docker-version "${RELEASE_VERSION}" \
+  --trino-version "${TRINO_VERSION:-478}" \
+  --state-key "docker-final"
+```
+
+**Required env vars:** `GH_TOKEN` (or active `gh auth login`), `DOCKER_USERNAME`, `PUBLISH_DOCKER_TOKEN`
+
+**Optional env vars:** `TRINO_VERSION` — Trino version for the playground image (default: `478`). Ask the user before running if they want a different version.
+
+**What it does:** Triggers GitHub Actions `docker-image.yml` for each final (non-RC) image:
+- `apache/gravitino:{VERSION}`
+- `apache/gravitino-iceberg-rest:{VERSION}`
+- `apache/gravitino-lance-rest:{VERSION}`
+- `apache/gravitino-mcp-server:{VERSION}`
+- `apache/gravitino-playground:trino-{TRINO_VER}-gravitino-{VERSION}`
+
+The `--state-key docker-final` flag causes `publish-docker.sh` to write `docker-final.done` (distinct from the RC `docker.done` written in stage 5). `RELEASE_STATE_DIR` is set explicitly so both state files land in the same `.release-state/{RC_TAG}/` directory.
+
+**Always offer `--dry-run` first** before triggering any real workflow dispatches.
+
+**Monitor progress:** https://github.com/apache/gravitino/actions/workflows/docker-image.yml
+
+---
+
+### Stage 8: release-note
 
 **Required env vars:** _(none — read-only GitHub API calls via `gh`)_
 
