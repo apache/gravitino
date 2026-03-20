@@ -224,6 +224,9 @@ paths:
   /metalakes/{metalake}/jobs/runs/{jobId}:
     $ref: "./jobs.yaml#/paths/~1metalakes~1%7Bmetalake%7D~1jobs~1runs~1%7BjobId%7D"
 
+  /authn/me:
+    $ref: "./authn.yaml#/paths/~1authn~1me"
+
 components:
 
   schemas:
