@@ -38,6 +38,7 @@ import org.apache.gravitino.EntityAlreadyExistsException;
 import org.apache.gravitino.HasIdentifier;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
+import org.apache.gravitino.RelationalEntity;
 import org.apache.gravitino.SupportsRelationOperations;
 import org.apache.gravitino.UnsupportedEntityTypeException;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
@@ -350,6 +351,31 @@ public class JDBCBackend implements RelationalBackend {
       case JOB_TEMPLATE:
         return (List<E>)
             JobTemplateMetaService.getInstance().batchGetJobTemplateByIdentifier(identifiers);
+      case USER:
+        // TODO: I will add batch operations for users, groups and views
+        List<E> users = Lists.newArrayList();
+        for (NameIdentifier identifier : identifiers) {
+          users.add((E) UserMetaService.getInstance().getUserByIdentifier(identifier));
+        }
+        return users;
+      case GROUP:
+        List<E> groups = Lists.newArrayList();
+        for (NameIdentifier identifier : identifiers) {
+          groups.add((E) GroupMetaService.getInstance().getGroupByIdentifier(identifier));
+        }
+        return groups;
+      case ROLE:
+        List<E> roles = Lists.newArrayList();
+        for (NameIdentifier identifier : identifiers) {
+          roles.add((E) RoleMetaService.getInstance().getRoleByIdentifier(identifier));
+        }
+        return roles;
+      case VIEW:
+        List<E> views = Lists.newArrayList();
+        for (NameIdentifier identifier : identifiers) {
+          views.add((E) ViewMetaService.getInstance().getViewByIdentifier(identifier));
+        }
+        return views;
       default:
         throw new UnsupportedEntityTypeException(
             "Unsupported entity type: %s for batch get operation", entityType);
@@ -663,6 +689,19 @@ public class JDBCBackend implements RelationalBackend {
           return (List<E>)
               TagMetaService.getInstance().listTagsForMetadataObject(nameIdentifier, identType);
         }
+      default:
+        throw new IllegalArgumentException(
+            String.format("Doesn't support the relation type %s", relType));
+    }
+  }
+
+  @Override
+  public List<RelationalEntity<?>> batchListEntitiesByRelation(
+      Type relType, List<NameIdentifier> nameIdentifiers, Entity.EntityType identType)
+      throws IOException {
+    switch (relType) {
+      case OWNER_REL:
+        return OwnerMetaService.getInstance().batchGetOwner(nameIdentifiers, identType);
       default:
         throw new IllegalArgumentException(
             String.format("Doesn't support the relation type %s", relType));
