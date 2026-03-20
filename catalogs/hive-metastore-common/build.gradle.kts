@@ -31,14 +31,13 @@ dependencies {
   compileOnly(libs.hive2.metastore)
   compileOnly(libs.immutables.value)
   compileOnly(libs.lombok)
+  compileOnly(libs.caffeine)
+  compileOnly(libs.guava)
+  compileOnly(libs.slf4j.api)
 
   implementation(project(":catalogs:catalog-common")) {
     exclude("*")
   }
-
-  implementation(libs.caffeine)
-  implementation(libs.guava)
-  implementation(libs.slf4j.api)
 
   annotationProcessor(libs.immutables.value)
   annotationProcessor(libs.lombok)
