@@ -81,7 +81,8 @@ restore_test_files() {
         trino-connector/integration-test/src/test/resources/ \
         integration-test-common/
     git -C "$GRAVITINO_ROOT_DIR" clean -fd \
-        trino-connector/integration-test/src/test/resources/trino-ci-testset/testsets/lakehouse-iceberg/
+        trino-connector/integration-test/src/test/resources/ \
+        integration-test-common/
 }
 
 if [ "$auto_patch" = true ]; then
