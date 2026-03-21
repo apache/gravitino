@@ -24,6 +24,7 @@ import io.trino.spi.connector.SchemaTableName;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
+import javax.annotation.Nullable;
 import org.apache.commons.lang3.NotImplementedException;
 import org.apache.gravitino.Catalog;
 import org.apache.gravitino.NameIdentifier;
@@ -36,6 +37,8 @@ import org.apache.gravitino.exceptions.NoSuchSchemaException;
 import org.apache.gravitino.exceptions.NoSuchTableException;
 import org.apache.gravitino.exceptions.NonEmptySchemaException;
 import org.apache.gravitino.exceptions.TableAlreadyExistsException;
+import org.apache.gravitino.function.Function;
+import org.apache.gravitino.function.FunctionCatalog;
 import org.apache.gravitino.rel.Table;
 import org.apache.gravitino.rel.TableCatalog;
 import org.apache.gravitino.rel.TableChange;
@@ -44,9 +47,13 @@ import org.apache.gravitino.trino.connector.GravitinoErrorCode;
 import org.apache.gravitino.trino.connector.metadata.GravitinoColumn;
 import org.apache.gravitino.trino.connector.metadata.GravitinoSchema;
 import org.apache.gravitino.trino.connector.metadata.GravitinoTable;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /** This class implements Apache Gravitino metadata operators. */
 public class CatalogConnectorMetadata {
+
+  private static final Logger LOG = LoggerFactory.getLogger(CatalogConnectorMetadata.class);
 
   private static final String CATALOG_DOES_NOT_EXIST_MSG = "Catalog does not exist";
   private static final String SCHEMA_DOES_NOT_EXIST_MSG = "Schema does not exist";
@@ -54,6 +61,7 @@ public class CatalogConnectorMetadata {
   private final String catalogName;
   private final SupportsSchemas schemaCatalog;
   private final TableCatalog tableCatalog;
+  @Nullable private final FunctionCatalog functionCatalog;
 
   /**
    * Constructs a new CatalogConnectorMetadata.
@@ -68,6 +76,13 @@ public class CatalogConnectorMetadata {
       // Make sure the catalog support schema operations.
       this.schemaCatalog = catalog.asSchemas();
       this.tableCatalog = catalog.asTableCatalog();
+      FunctionCatalog fc = null;
+      try {
+        fc = catalog.asFunctionCatalog();
+      } catch (UnsupportedOperationException e) {
+        LOG.debug("Catalog {} does not support function operations", catalogName);
+      }
+      this.functionCatalog = fc;
     } catch (NoSuchCatalogException e) {
       throw new TrinoException(
           GravitinoErrorCode.GRAVITINO_CATALOG_NOT_EXISTS, CATALOG_DOES_NOT_EXIST_MSG, e);
@@ -395,5 +410,51 @@ public class CatalogConnectorMetadata {
   public void setColumnType(SchemaTableName schemaTableName, String columnName, Type type) {
     String[] columnNames = {columnName};
     applyAlter(schemaTableName, TableChange.updateColumnType(columnNames, type));
+  }
+
+  /**
+   * Checks whether the catalog supports function operations.
+   *
+   * @return true if the catalog supports function operations, false otherwise
+   */
+  public boolean supportsFunctions() {
+    return functionCatalog != null;
+  }
+
+  /**
+   * Lists all functions with details in the specified schema.
+   *
+   * @param schemaName the name of the schema
+   * @return an array of functions, or an empty array if functions are not supported
+   */
+  public Function[] listFunctionInfos(String schemaName) {
+    if (functionCatalog == null) {
+      return new Function[0];
+    }
+    try {
+      return functionCatalog.listFunctionInfos(Namespace.of(schemaName));
+    } catch (NoSuchSchemaException e) {
+      throw new TrinoException(
+          GravitinoErrorCode.GRAVITINO_SCHEMA_NOT_EXISTS, SCHEMA_DOES_NOT_EXIST_MSG, e);
+    }
+  }
+
+  /**
+   * Retrieves a function by its schema and function name.
+   *
+   * @param schemaName the name of the schema
+   * @param functionName the name of the function
+   * @return the function, or null if functions are not supported or the function does not exist
+   */
+  @Nullable
+  public Function getFunction(String schemaName, String functionName) {
+    if (functionCatalog == null) {
+      return null;
+    }
+    try {
+      return functionCatalog.getFunction(NameIdentifier.of(schemaName, functionName));
+    } catch (org.apache.gravitino.exceptions.NoSuchFunctionException e) {
+      return null;
+    }
   }
 }
