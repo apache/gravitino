@@ -31,6 +31,9 @@ public final class JdbcCatalogCompatUtils {
     "org.apache.flink.connector.jdbc.catalog.factory.JdbcCatalogFactory",
     "org.apache.flink.connector.jdbc.core.database.catalog.factory.JdbcCatalogFactory"
   };
+  private static final String[] JDBC_CORE_CATALOG_FACTORY_CLASS_NAMES = {
+    "org.apache.flink.connector.jdbc.core.database.catalog.factory.JdbcCatalogFactory"
+  };
   private static final String[] JDBC_DYNAMIC_TABLE_FACTORY_CLASS_NAMES = {
     "org.apache.flink.connector.jdbc.table.JdbcDynamicTableFactory",
     "org.apache.flink.connector.jdbc.core.table.JdbcDynamicTableFactory"
@@ -40,6 +43,17 @@ public final class JdbcCatalogCompatUtils {
 
   public static AbstractCatalog createJdbcCatalog(CatalogFactory.Context context) {
     Object jdbcCatalogFactory = instantiate(loadCompatibleClass(JDBC_CATALOG_FACTORY_CLASS_NAMES));
+    return createJdbcCatalog(context, jdbcCatalogFactory);
+  }
+
+  public static AbstractCatalog createCoreJdbcCatalog(CatalogFactory.Context context) {
+    Object jdbcCatalogFactory =
+        instantiate(loadCompatibleClass(JDBC_CORE_CATALOG_FACTORY_CLASS_NAMES));
+    return createJdbcCatalog(context, jdbcCatalogFactory);
+  }
+
+  private static AbstractCatalog createJdbcCatalog(
+      CatalogFactory.Context context, Object jdbcCatalogFactory) {
     Object jdbcCatalog =
         invoke(
             jdbcCatalogFactory,

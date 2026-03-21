@@ -22,6 +22,7 @@ package org.apache.gravitino.flink.connector.jdbc;
 import org.apache.flink.table.factories.CatalogFactory;
 import org.apache.gravitino.flink.connector.PartitionConverter;
 import org.apache.gravitino.flink.connector.SchemaAndTablePropertiesConverter;
+import org.apache.gravitino.flink.connector.utils.JdbcCatalogCompatUtils;
 
 public class GravitinoJdbcCatalogFlink120 extends GravitinoJdbcCatalog {
 
@@ -30,6 +31,11 @@ public class GravitinoJdbcCatalogFlink120 extends GravitinoJdbcCatalog {
       String defaultDatabase,
       SchemaAndTablePropertiesConverter schemaAndTablePropertiesConverter,
       PartitionConverter partitionConverter) {
-    super(context, defaultDatabase, schemaAndTablePropertiesConverter, partitionConverter);
+    super(
+        context,
+        defaultDatabase,
+        schemaAndTablePropertiesConverter,
+        partitionConverter,
+        JdbcCatalogCompatUtils.createCoreJdbcCatalog(context));
   }
 }

@@ -19,4 +19,27 @@
 
 package org.apache.gravitino.flink.connector.integration.test.jdbc;
 
-public class FlinkJdbcMysqlCatalogIT120 extends FlinkJdbcMysqlCatalogIT {}
+import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.Test;
+
+public class FlinkJdbcMysqlCatalogIT120 extends FlinkJdbcMysqlCatalogIT {
+
+  @Override
+  @Test
+  public void testCreateGravitinoJdbcCatalogUsingSQLMissingOptions() {
+    tableEnv.useCatalog(DEFAULT_CATALOG);
+    String catalogName = "gravitino_mysql_jdbc_catalog_missing_options";
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () ->
+            tableEnv.executeSql(
+                String.format(
+                    "create catalog %s with ("
+                        + "'type'='gravitino-jdbc-mysql', "
+                        + "'base-url'='%s',"
+                        + "'username'='%s',"
+                        + "'default-database'='%s'"
+                        + ")",
+                    catalogName, mysqlUrl, mysqlUsername, mysqlDefaultDatabase)));
+  }
+}
