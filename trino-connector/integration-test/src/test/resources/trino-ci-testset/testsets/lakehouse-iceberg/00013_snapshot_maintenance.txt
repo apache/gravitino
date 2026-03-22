@@ -1,0 +1,35 @@
+CREATE SCHEMA
+
+CREATE TABLE
+
+INSERT: 1 row
+
+INSERT: 1 row
+
+INSERT: 1 row
+
+"true"
+
+EXECUTE expire_snapshots
+
+"3"
+
+EXECUTE remove_orphan_files
+
+"3"
+
+INSERT: 1 row
+
+INSERT: 1 row
+
+EXECUTE optimize
+
+"5"
+
+EXECUTE rewrite_manifests
+
+"5"
+
+DROP TABLE
+
+DROP SCHEMA
