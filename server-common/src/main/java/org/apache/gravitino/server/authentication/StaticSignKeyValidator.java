@@ -38,10 +38,15 @@ import java.util.Base64;
 import java.util.List;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.Config;
+import org.apache.gravitino.UserPrincipal;
+import org.apache.gravitino.auth.GroupMapper;
+import org.apache.gravitino.auth.GroupMapperFactory;
 import org.apache.gravitino.auth.PrincipalMapper;
 import org.apache.gravitino.auth.PrincipalMapperFactory;
 import org.apache.gravitino.auth.SignatureAlgorithmFamilyType;
 import org.apache.gravitino.exceptions.UnauthorizedException;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * Static OAuth token validator that uses a pre-configured signing key for JWT validation.
@@ -51,10 +56,14 @@ import org.apache.gravitino.exceptions.UnauthorizedException;
  * signAlgorithmType} for validation.
  */
 public class StaticSignKeyValidator implements OAuthTokenValidator {
+  private static final Logger LOG = LoggerFactory.getLogger(StaticSignKeyValidator.class);
+
   private long allowSkewSeconds;
   private Key defaultSigningKey;
   private PrincipalMapper principalMapper;
   private List<String> principalFields;
+  private GroupMapper groupMapper;
+  private List<String> groupFields;
 
   @Override
   public void initialize(Config config) {
@@ -69,10 +78,17 @@ public class StaticSignKeyValidator implements OAuthTokenValidator {
     String algType = config.get(OAuthConfig.SIGNATURE_ALGORITHM_TYPE);
     this.defaultSigningKey = decodeSignKey(Base64.getDecoder().decode(configuredSignKey), algType);
     this.principalFields = config.get(OAuthConfig.PRINCIPAL_FIELDS);
+    this.groupFields = config.get(OAuthConfig.GROUP_FIELDS);
+
     // Create principal mapper based on configuration
     String mapperType = config.get(OAuthConfig.PRINCIPAL_MAPPER);
     String regexPattern = config.get(OAuthConfig.PRINCIPAL_MAPPER_REGEX_PATTERN);
     this.principalMapper = PrincipalMapperFactory.create(mapperType, regexPattern);
+
+    // Create group mapper based on configuration
+    String groupMapperType = config.get(OAuthConfig.GROUP_MAPPER);
+    String groupRegexPattern = config.get(OAuthConfig.GROUP_MAPPER_REGEX_PATTERN);
+    this.groupMapper = GroupMapperFactory.create(groupMapperType, groupRegexPattern);
   }
 
   @Override
@@ -110,7 +126,13 @@ public class StaticSignKeyValidator implements OAuthTokenValidator {
       String principal = extractPrincipal(jwt.getBody());
 
       // Use principal mapper to extract username
-      return principalMapper.map(principal);
+      Principal userPrincipal = principalMapper.map(principal);
+      List<String> groups = extractGroups(jwt.getBody());
+      if (groups != null && !groups.isEmpty()) {
+        List<String> mappedGroups = groupMapper.map(groups);
+        return new UserPrincipal(userPrincipal.getName(), mappedGroups);
+      }
+      return userPrincipal;
     } catch (ExpiredJwtException
         | UnsupportedJwtException
         | MalformedJwtException
@@ -136,6 +158,26 @@ public class StaticSignKeyValidator implements OAuthTokenValidator {
 
     throw new UnauthorizedException(
         "No valid principal found in token. Checked fields: %s", principalFields);
+  }
+
+  /** Extracts the groups from the validated JWT claims using configured field(s). */
+  private List<String> extractGroups(Claims claims) {
+    if (groupFields != null && !groupFields.isEmpty()) {
+      for (String field : groupFields) {
+        if (StringUtils.isNotBlank(field)) {
+          try {
+            Object groups = claims.get(field);
+            if (groups instanceof List) {
+              return (List<String>) groups;
+            }
+          } catch (Exception e) {
+            LOG.warn("Failed to parse groups from claim field: {}", field, e);
+          }
+        }
+      }
+    }
+
+    return null;
   }
 
   private static Key decodeSignKey(byte[] key, String algType) {

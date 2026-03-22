@@ -21,11 +21,16 @@ package org.apache.gravitino;
 
 import com.google.common.base.Preconditions;
 import java.security.Principal;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
+import java.util.Objects;
 
 /** A simple implementation of Principal that holds a username. */
 public class UserPrincipal implements Principal {
 
   private final String username;
+  private final List<String> groups;
 
   /**
    * Constructs a UserPrincipal with the given username.
@@ -33,8 +38,22 @@ public class UserPrincipal implements Principal {
    * @param username the username of the principal
    */
   public UserPrincipal(final String username) {
+    this(username, Collections.emptyList());
+  }
+
+  /**
+   * Constructs a UserPrincipal with the given username and groups.
+   *
+   * @param username the username of the principal
+   * @param groups the groups of the principal
+   */
+  public UserPrincipal(final String username, final List<String> groups) {
     Preconditions.checkArgument(username != null, "UserPrincipal must have the username");
     this.username = username;
+    this.groups =
+        groups != null
+            ? Collections.unmodifiableList(new ArrayList<>(groups))
+            : Collections.emptyList();
   }
 
   /**
@@ -47,9 +66,18 @@ public class UserPrincipal implements Principal {
     return username;
   }
 
+  /**
+   * Returns the groups of this principal.
+   *
+   * @return the groups
+   */
+  public List<String> getGroups() {
+    return groups;
+  }
+
   @Override
   public int hashCode() {
-    return username.hashCode();
+    return Objects.hash(username, groups);
   }
 
   @Override
@@ -57,15 +85,15 @@ public class UserPrincipal implements Principal {
     if (this == o) {
       return true;
     }
-    if (o instanceof UserPrincipal) {
-      UserPrincipal that = (UserPrincipal) o;
-      return this.username.equals(that.username);
+    if (!(o instanceof UserPrincipal)) {
+      return false;
     }
-    return false;
+    UserPrincipal that = (UserPrincipal) o;
+    return Objects.equals(username, that.username) && Objects.equals(groups, that.groups);
   }
 
   @Override
   public String toString() {
-    return "[principal: " + this.username + "]";
+    return "[principal: " + this.username + ", groups: " + this.groups + "]";
   }
 }

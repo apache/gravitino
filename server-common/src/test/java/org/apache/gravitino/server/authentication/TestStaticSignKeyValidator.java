@@ -485,4 +485,36 @@ public class TestStaticSignKeyValidator {
     assertNotNull(principal);
     assertEquals("john.doe", principal.getName()); // Mapper extracted local part
   }
+
+  @Test
+  public void testValidateTokenWithGroups() {
+    Map<String, String> config = createBaseConfig();
+    config.put("gravitino.authenticator.oauth.groupFields", "groups");
+    validator.initialize(createConfig(config));
+
+    // Create token with groups
+    String token =
+        Jwts.builder()
+            .setSubject("test-user")
+            .claim("groups", Arrays.asList("group1", "group2"))
+            .setAudience(serviceAudience)
+            .setIssuedAt(Date.from(Instant.now()))
+            .setExpiration(Date.from(Instant.now().plusSeconds(3600)))
+            .signWith(hmacKey, SignatureAlgorithm.HS256)
+            .compact();
+
+    Principal principal = validator.validateToken(token, serviceAudience);
+    assertNotNull(principal);
+    assertEquals("test-user", principal.getName());
+
+    // Check if principal is UserPrincipal and has groups
+    if (principal instanceof org.apache.gravitino.UserPrincipal) {
+      org.apache.gravitino.UserPrincipal userPrincipal =
+          (org.apache.gravitino.UserPrincipal) principal;
+      assertEquals(Arrays.asList("group1", "group2"), userPrincipal.getGroups());
+    } else {
+      // This fails if the principal is not UserPrincipal or groups are missing
+      throw new AssertionError("Principal should be UserPrincipal");
+    }
+  }
 }
