@@ -23,16 +23,19 @@ import static org.apache.gravitino.trino.connector.GravitinoErrorCode.GRAVITINO_
 
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
+import io.airlift.slice.Slice;
 import io.trino.spi.TrinoException;
 import io.trino.spi.connector.AggregateFunction;
 import io.trino.spi.connector.AggregationApplicationResult;
 import io.trino.spi.connector.Assignment;
+import io.trino.spi.connector.BeginTableExecuteResult;
 import io.trino.spi.connector.ColumnHandle;
 import io.trino.spi.connector.ColumnMetadata;
 import io.trino.spi.connector.ConnectorInsertTableHandle;
 import io.trino.spi.connector.ConnectorMetadata;
 import io.trino.spi.connector.ConnectorPartitioningHandle;
 import io.trino.spi.connector.ConnectorSession;
+import io.trino.spi.connector.ConnectorTableExecuteHandle;
 import io.trino.spi.connector.ConnectorTableHandle;
 import io.trino.spi.connector.ConnectorTableLayout;
 import io.trino.spi.connector.ConnectorTableMetadata;
@@ -57,6 +60,7 @@ import io.trino.spi.security.TrinoPrincipal;
 import io.trino.spi.statistics.ColumnStatistics;
 import io.trino.spi.statistics.TableStatistics;
 import io.trino.spi.type.Type;
+import java.util.Collection;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -658,6 +662,46 @@ public abstract class GravitinoMetadata implements ConnectorMetadata {
                         result.getPartitionColumns(),
                         result.supportsMultipleWritersPerPartition())
                     : new ConnectorTableLayout(result.getPartitionColumns()));
+  }
+
+  @Override
+  public Optional<ConnectorTableLayout> getLayoutForTableExecute(
+      ConnectorSession session, ConnectorTableExecuteHandle tableExecuteHandle) {
+    return internalMetadata
+        .getLayoutForTableExecute(session, tableExecuteHandle)
+        .map(
+            result ->
+                result.getPartitioning().isPresent()
+                    ? new ConnectorTableLayout(
+                        new GravitinoPartitioningHandle(result.getPartitioning().get()),
+                        result.getPartitionColumns(),
+                        result.supportsMultipleWritersPerPartition())
+                    : new ConnectorTableLayout(result.getPartitionColumns()));
+  }
+
+  @Override
+  public BeginTableExecuteResult<ConnectorTableExecuteHandle, ConnectorTableHandle>
+      beginTableExecute(
+          ConnectorSession session,
+          ConnectorTableExecuteHandle tableExecuteHandle,
+          ConnectorTableHandle updatedSourceTableHandle) {
+    BeginTableExecuteResult<ConnectorTableExecuteHandle, ConnectorTableHandle> result =
+        internalMetadata.beginTableExecute(
+            session, tableExecuteHandle, GravitinoHandle.unWrap(updatedSourceTableHandle));
+    SchemaTableName tableName = getTableName(updatedSourceTableHandle);
+    return new BeginTableExecuteResult<>(
+        result.getTableExecuteHandle(),
+        new GravitinoTableHandle(
+            tableName.getSchemaName(), tableName.getTableName(), result.getSourceHandle()));
+  }
+
+  @Override
+  public void finishTableExecute(
+      ConnectorSession session,
+      ConnectorTableExecuteHandle tableExecuteHandle,
+      Collection<Slice> fragments,
+      List<Object> tableExecuteState) {
+    internalMetadata.finishTableExecute(session, tableExecuteHandle, fragments, tableExecuteState);
   }
 
   protected SchemaTableName getTableName(ConnectorTableHandle tableHandle) {
