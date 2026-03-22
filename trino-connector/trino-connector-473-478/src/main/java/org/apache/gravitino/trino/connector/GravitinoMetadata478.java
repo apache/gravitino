@@ -22,10 +22,12 @@ import io.airlift.slice.Slice;
 import io.trino.spi.connector.ColumnHandle;
 import io.trino.spi.connector.ColumnMetadata;
 import io.trino.spi.connector.ColumnPosition;
+import io.trino.spi.connector.ConnectorAccessControl;
 import io.trino.spi.connector.ConnectorInsertTableHandle;
 import io.trino.spi.connector.ConnectorMergeTableHandle;
 import io.trino.spi.connector.ConnectorOutputMetadata;
 import io.trino.spi.connector.ConnectorSession;
+import io.trino.spi.connector.ConnectorTableExecuteHandle;
 import io.trino.spi.connector.ConnectorTableHandle;
 import io.trino.spi.connector.RetryMode;
 import io.trino.spi.connector.SchemaTableName;
@@ -64,6 +66,29 @@ public class GravitinoMetadata478 extends GravitinoMetadata {
     }
     GravitinoColumn gravitinoColumn = metadataAdapter.createColumn(column);
     catalogConnectorMetadata.addColumn(getTableName(tableHandle), gravitinoColumn, columnPosition);
+  }
+
+  @Override
+  public Optional<ConnectorTableExecuteHandle> getTableHandleForExecute(
+      ConnectorSession session,
+      ConnectorAccessControl accessControl,
+      ConnectorTableHandle tableHandle,
+      String procedureName,
+      Map<String, Object> executeProperties,
+      RetryMode retryMode) {
+    return internalMetadata.getTableHandleForExecute(
+        session,
+        accessControl,
+        GravitinoHandle.unWrap(tableHandle),
+        procedureName,
+        executeProperties,
+        retryMode);
+  }
+
+  @Override
+  public Map<String, Long> executeTableExecute(
+      ConnectorSession session, ConnectorTableExecuteHandle tableExecuteHandle) {
+    return internalMetadata.executeTableExecute(session, tableExecuteHandle);
   }
 
   @Override

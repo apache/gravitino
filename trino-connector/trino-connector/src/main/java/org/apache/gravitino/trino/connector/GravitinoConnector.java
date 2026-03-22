@@ -33,6 +33,8 @@ import io.trino.spi.connector.ConnectorRecordSetProvider;
 import io.trino.spi.connector.ConnectorSession;
 import io.trino.spi.connector.ConnectorSplitManager;
 import io.trino.spi.connector.ConnectorTransactionHandle;
+import io.trino.spi.connector.TableProcedureMetadata;
+import io.trino.spi.procedure.Procedure;
 import io.trino.spi.session.PropertyMetadata;
 import io.trino.spi.transaction.IsolationLevel;
 import java.util.List;
@@ -99,6 +101,18 @@ public class GravitinoConnector implements Connector {
       CatalogConnectorMetadataAdapter metadataAdapter,
       ConnectorMetadata internalMetadata) {
     throw new TrinoException(NOT_SUPPORTED, "Should be overridden in subclass");
+  }
+
+  @Override
+  public Set<Procedure> getProcedures() {
+    Connector internalConnector = catalogConnectorContext.getInternalConnector();
+    return internalConnector.getProcedures();
+  }
+
+  @Override
+  public Set<TableProcedureMetadata> getTableProcedures() {
+    Connector internalConnector = catalogConnectorContext.getInternalConnector();
+    return internalConnector.getTableProcedures();
   }
 
   @Override
