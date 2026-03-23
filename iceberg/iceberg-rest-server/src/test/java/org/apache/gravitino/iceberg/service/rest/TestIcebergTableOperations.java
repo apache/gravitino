@@ -751,4 +751,136 @@ public class TestIcebergTableOperations extends IcebergNamespaceTestBase {
         errorBody.contains("vended-credentials") && errorBody.contains("illegal"),
         "Error message should mention valid values: " + errorBody);
   }
+
+  @ParameterizedTest
+  @MethodSource("org.apache.gravitino.iceberg.service.rest.IcebergRestTestUtil#testNamespaces")
+  void testCreateTableReturnsETag(Namespace namespace) {
+    verifyCreateNamespaceSucc(namespace);
+    Response response = doCreateTable(namespace, "create_etag_foo1");
+    Assertions.assertEquals(Status.OK.getStatusCode(), response.getStatus());
+    String etag = response.getHeaderString("ETag");
+    Assertions.assertNotNull(etag, "ETag header should be present in create table response");
+    Assertions.assertFalse(etag.isEmpty(), "ETag header should not be empty");
+  }
+
+  @ParameterizedTest
+  @MethodSource("org.apache.gravitino.iceberg.service.rest.IcebergRestTestUtil#testNamespaces")
+  void testUpdateTableReturnsETag(Namespace namespace) {
+    verifyCreateNamespaceSucc(namespace);
+    verifyCreateTableSucc(namespace, "update_etag_foo1");
+    TableMetadata metadata = getTableMeta(namespace, "update_etag_foo1");
+    Response response = doUpdateTable(namespace, "update_etag_foo1", metadata);
+    Assertions.assertEquals(Status.OK.getStatusCode(), response.getStatus());
+    String etag = response.getHeaderString("ETag");
+    Assertions.assertNotNull(etag, "ETag header should be present in update table response");
+    Assertions.assertFalse(etag.isEmpty(), "ETag header should not be empty");
+  }
+
+  @ParameterizedTest
+  @MethodSource("org.apache.gravitino.iceberg.service.rest.IcebergRestTestUtil#testNamespaces")
+  void testLoadTableReturnsETag(Namespace namespace) {
+    verifyCreateNamespaceSucc(namespace);
+    verifyCreateTableSucc(namespace, "etag_foo1");
+
+    // Load the table and verify ETag header is present
+    Response response = doLoadTable(namespace, "etag_foo1");
+    Assertions.assertEquals(Status.OK.getStatusCode(), response.getStatus());
+    String etag = response.getHeaderString("ETag");
+    Assertions.assertNotNull(etag, "ETag header should be present in load table response");
+    Assertions.assertFalse(etag.isEmpty(), "ETag header should not be empty");
+  }
+
+  @ParameterizedTest
+  @MethodSource("org.apache.gravitino.iceberg.service.rest.IcebergRestTestUtil#testNamespaces")
+  void testLoadTableReturns304WhenETagMatches(Namespace namespace) {
+    verifyCreateNamespaceSucc(namespace);
+    verifyCreateTableSucc(namespace, "etag_304_foo1");
+
+    // First, load the table to get the ETag
+    Response firstResponse = doLoadTable(namespace, "etag_304_foo1");
+    Assertions.assertEquals(Status.OK.getStatusCode(), firstResponse.getStatus());
+    String etag = firstResponse.getHeaderString("ETag");
+    Assertions.assertNotNull(etag, "ETag header should be present");
+
+    // Second, load the table with If-None-Match header set to the ETag
+    Response secondResponse =
+        getTableClientBuilder(namespace, Optional.of("etag_304_foo1"))
+            .header(IcebergTableOperations.IF_NONE_MATCH, etag)
+            .get();
+    Assertions.assertEquals(
+        Status.NOT_MODIFIED.getStatusCode(),
+        secondResponse.getStatus(),
+        "Should return 304 when ETag matches");
+  }
+
+  @ParameterizedTest
+  @MethodSource("org.apache.gravitino.iceberg.service.rest.IcebergRestTestUtil#testNamespaces")
+  void testLoadTableReturns200WhenETagDoesNotMatch(Namespace namespace) {
+    verifyCreateNamespaceSucc(namespace);
+    verifyCreateTableSucc(namespace, "etag_mismatch_foo1");
+
+    // Load with a non-matching If-None-Match header
+    Response response =
+        getTableClientBuilder(namespace, Optional.of("etag_mismatch_foo1"))
+            .header(IcebergTableOperations.IF_NONE_MATCH, "\"non-matching-etag-value\"")
+            .get();
+    Assertions.assertEquals(
+        Status.OK.getStatusCode(),
+        response.getStatus(),
+        "Should return 200 when ETag does not match");
+    String etag = response.getHeaderString("ETag");
+    Assertions.assertNotNull(etag, "ETag header should be present");
+  }
+
+  @ParameterizedTest
+  @MethodSource("org.apache.gravitino.iceberg.service.rest.IcebergRestTestUtil#testNamespaces")
+  void testLoadTableETagChangesAfterUpdate(Namespace namespace) {
+    verifyCreateNamespaceSucc(namespace);
+    verifyCreateTableSucc(namespace, "etag_update_foo1");
+
+    // Load the table and get the initial ETag
+    Response firstResponse = doLoadTable(namespace, "etag_update_foo1");
+    Assertions.assertEquals(Status.OK.getStatusCode(), firstResponse.getStatus());
+    String firstEtag = firstResponse.getHeaderString("ETag");
+    Assertions.assertNotNull(firstEtag, "ETag header should be present");
+
+    // Update the table
+    TableMetadata metadata = getTableMeta(namespace, "etag_update_foo1");
+    verifyUpdateSucc(namespace, "etag_update_foo1", metadata);
+
+    // Load the table again and verify the ETag has changed
+    Response secondResponse = doLoadTable(namespace, "etag_update_foo1");
+    Assertions.assertEquals(Status.OK.getStatusCode(), secondResponse.getStatus());
+    String secondEtag = secondResponse.getHeaderString("ETag");
+    Assertions.assertNotNull(secondEtag, "ETag header should be present after update");
+    Assertions.assertNotEquals(
+        firstEtag, secondEtag, "ETag should change after table metadata is updated");
+
+    // Verify old ETag no longer returns 304
+    Response thirdResponse =
+        getTableClientBuilder(namespace, Optional.of("etag_update_foo1"))
+            .header(IcebergTableOperations.IF_NONE_MATCH, firstEtag)
+            .get();
+    Assertions.assertEquals(
+        Status.OK.getStatusCode(),
+        thirdResponse.getStatus(),
+        "Old ETag should not return 304 after table update");
+  }
+
+  @ParameterizedTest
+  @MethodSource("org.apache.gravitino.iceberg.service.rest.IcebergRestTestUtil#testNamespaces")
+  void testLoadTableETagConsistency(Namespace namespace) {
+    verifyCreateNamespaceSucc(namespace);
+    verifyCreateTableSucc(namespace, "etag_consistent_foo1");
+
+    // Load the table twice and verify the ETag is the same
+    Response firstResponse = doLoadTable(namespace, "etag_consistent_foo1");
+    String firstEtag = firstResponse.getHeaderString("ETag");
+
+    Response secondResponse = doLoadTable(namespace, "etag_consistent_foo1");
+    String secondEtag = secondResponse.getHeaderString("ETag");
+
+    Assertions.assertEquals(
+        firstEtag, secondEtag, "ETag should be consistent for the same table metadata");
+  }
 }
