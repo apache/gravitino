@@ -96,9 +96,6 @@ public class TestGravitinoPaimonCatalog {
     when(mockPaimonCatalog.getTable(tablePath))
         .thenThrow(new TableNotExistException("test-paimon-catalog", tablePath));
 
-    // TableNotExistException from Paimon must be wrapped in CatalogException because
-    // toFlinkTable() is called from BaseCatalog.getTable() after Gravitino already confirmed
-    // the table exists; reaching this point with a missing Paimon table is a metadata mismatch.
     Assertions.assertThrows(
         CatalogException.class, () -> catalog.toFlinkTable(Mockito.mock(Table.class), tablePath));
     Mockito.verify(mockPaimonCatalog, Mockito.times(1)).getTable(tablePath);
