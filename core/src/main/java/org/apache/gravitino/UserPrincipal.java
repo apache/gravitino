@@ -26,7 +26,7 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Objects;
 
-/** A simple implementation of Principal that holds a username. */
+/** A simple implementation of Principal that holds a username and group membership. */
 public class UserPrincipal implements Principal {
 
   private final String username;
