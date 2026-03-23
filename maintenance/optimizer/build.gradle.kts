@@ -33,7 +33,7 @@ val icebergVersion: String = libs.versions.iceberg4connector.get()
 dependencies {
   implementation(project(":api"))
   implementation(project(":maintenance:optimizer-api"))
-  implementation(project(":maintenance:gravitino-updaters"))
+  implementation(project(":maintenance:updaters"))
   implementation(project(":catalogs:catalog-common"))
   implementation(project(":clients:client-java"))
   implementation(project(":core")) {

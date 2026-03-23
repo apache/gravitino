@@ -1,0 +1,71 @@
+# Licensed to the Apache Software Foundation (ASF) under one
+# or more contributor license agreements.  See the NOTICE file
+# distributed with this work for additional information
+# regarding copyright ownership.  The ASF licenses this file
+# to you under the Apache License, Version 2.0 (the
+# "License"); you may not use this file except in compliance
+# with the License.  You may obtain a copy of the License at
+#
+#   http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing,
+# software distributed under the License is distributed on an
+# "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+# KIND, either express or implied.  See the License for the
+# specific language governing permissions and limitations
+# under the License.
+
+---
+
+paths:
+
+  /authn/me:
+    get:
+      tags:
+        - authentication
+      summary: Get the authenticated principal
+      operationId: getAuthenticatedPrincipal
+      description: >
+        Returns the server-resolved principal name for the current authenticated user.
+        The principal is derived from the JWT token using the configured `principalFields`
+        and `principalMapper`, ensuring consistency between server-side identity and UI display.
+      responses:
+        "200":
+          description: Returns the authenticated principal information
+          content:
+            application/vnd.gravitino.v1+json:
+              schema:
+                $ref: "#/components/schemas/AuthMeResponse"
+              examples:
+                AuthMeResponse:
+                  $ref: "#/components/examples/AuthMeResponse"
+        "401":
+          description: Unauthorized - Authentication credentials are missing or invalid
+          content:
+            application/vnd.gravitino.v1+json:
+              schema:
+                $ref: "./openapi.yaml#/components/schemas/ErrorModel"
+        "5xx":
+          $ref: "./openapi.yaml#/components/responses/ServerErrorResponse"
+
+components:
+  schemas:
+    AuthMeResponse:
+      type: object
+      properties:
+        code:
+          type: integer
+          format: int32
+          description: Status code of the response
+          enum:
+            - 0
+        principal:
+          type: string
+          description: The server-resolved principal name of the authenticated user
+
+  examples:
+    AuthMeResponse:
+      value: {
+        "code": 0,
+        "principal": "admin"
+      }
