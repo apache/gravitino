@@ -116,6 +116,7 @@ dependencies {
     exclude("org.slf4j")
   }
   testImplementation(libs.htrace.core4)
+  testImplementation(libs.caffeine)
   testImplementation(libs.junit.jupiter.api)
   testImplementation(libs.mockito.core)
   testImplementation(libs.testcontainers)
