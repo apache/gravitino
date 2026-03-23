@@ -40,7 +40,6 @@ jobs:
               - gradle/**
               - iceberg/**
               - integration-test-common/**
-              - maintenance/**
               - meta/**
               - scripts/**
               - server/**
