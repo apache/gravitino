@@ -24,7 +24,7 @@ JVM heap and metaspace are controlled by `GRAVITINO_MEM` (default `-Xms1024m -Xm
 Changelog
 
 - apache/gravitino:1.1.1
-  - Based on Gravitino 1.1.1, you can know more information from 1.1.1 [release notes](https://github.com/apache/gravitino/releases/tag/v1.1.1).
+  - Based on Gravitino 1.1.1. For more information, see the 1.1.1 [release notes](https://github.com/apache/gravitino/releases/tag/v1.1.1).
 
 - apache/gravitino:1.1.0
   - Based on Gravitino 1.1.0, you can know more information from 1.1.0 [release notes](https://github.com/apache/gravitino/releases/tag/v1.1.0).
@@ -87,7 +87,7 @@ Use `GRAVITINO_MEM` to size the JVM (default `-Xms1024m -Xmx1024m -XX:MaxMetaspa
 Changelog
 
 - apache/gravitino-iceberg-rest:1.1.1
-  - Based on Gravitino 1.1.1, you can know more information from 1.1.1 [release notes](https://github.com/apache/gravitino/releases/tag/v1.1.1).
+  - Based on Gravitino 1.1.1. For more information, see the 1.1.1 [release notes](https://github.com/apache/gravitino/releases/tag/v1.1.1).
 
 - apache/gravitino-iceberg-rest:1.1.0
   - Support scan planning endpoint
