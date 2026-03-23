@@ -21,7 +21,6 @@ jobs:
       - uses: dorny/paths-filter@de90cc6fb38fc0963ad72b210f1f284cd68cea36
         id: filter
         with:
-          list-files: shell
           filters: |
             source_changes:
               - .github/**
@@ -51,31 +50,6 @@ jobs:
               - gradle.properties
               - gradlew
               - settings.gradle.kts
-      - name: Determine maintenance-module-only changes
-        id: maintenance_module_only
-        env:
-          SOURCE_CHANGE_FILES: ${{ steps.filter.outputs.source_changes_files }}
-        run: |
-          source_files=()
-          if [ -n "${SOURCE_CHANGE_FILES}" ]; then
-            eval "source_files=(${SOURCE_CHANGE_FILES})"
-          fi
-
-          maintenance_module_only=false
-          if [ "${#source_files[@]}" -gt 0 ]; then
-            maintenance_module_only=true
-            for path in "${source_files[@]}"; do
-              case "$path" in
-                maintenance/*) ;;
-                *)
-                  maintenance_module_only=false
-                  break
-                  ;;
-              esac
-            done
-          fi
-
-          echo "maintenance_module_only_changes=${maintenance_module_only}" >> "${GITHUB_OUTPUT}"
       - name: Detect changed catalogs-contrib modules
         id: contrib
         run: |
@@ -107,7 +81,6 @@ jobs:
           echo "changed_catalogs_contrib_modules=$CHANGED_MODULES" >> "$GITHUB_OUTPUT"
     outputs:
       source_changes: ${{ steps.filter.outputs.source_changes }}
-      maintenance_module_only_changes: ${{ steps.maintenance_module_only.outputs.maintenance_module_only_changes }}
       changed_catalogs_contrib_modules: ${{ steps.contrib.outputs.changed_catalogs_contrib_modules }}
 
   BackendIT-on-push:
