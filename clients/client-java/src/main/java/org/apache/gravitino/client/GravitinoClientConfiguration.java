@@ -19,9 +19,7 @@
 
 package org.apache.gravitino.client;
 
-import com.google.common.collect.ImmutableSet;
 import java.util.Map;
-import java.util.Set;
 import java.util.function.Function;
 import org.apache.gravitino.utils.MapUtils;
 
@@ -39,10 +37,12 @@ public class GravitinoClientConfiguration {
   public static final int CLIENT_SOCKET_TIMEOUT_MS_DEFAULT = 180_000;
 
   /** An optional http connection timeout in milliseconds. */
-  public static final String CLIENT_CONNECTION_TIMEOUT_MS = "gravitino.client.connectionTimeoutMs";
+  public static final String CLIENT_CONNECTION_TIMEOUT_MS =
+      GRAVITINO_CLIENT_CONFIG_PREFIX + "connectionTimeoutMs";
 
   /** An optional http socket timeout in milliseconds. */
-  public static final String CLIENT_SOCKET_TIMEOUT_MS = "gravitino.client.socketTimeoutMs";
+  public static final String CLIENT_SOCKET_TIMEOUT_MS =
+      GRAVITINO_CLIENT_CONFIG_PREFIX + "socketTimeoutMs";
 
   /**
    * A default value for max total HTTP connections in the connection pool. This is the same as the
@@ -51,7 +51,8 @@ public class GravitinoClientConfiguration {
   public static final int CLIENT_MAX_CONNECTIONS_DEFAULT = 25;
 
   /** An optional max total HTTP connections. */
-  public static final String CLIENT_MAX_CONNECTIONS = "gravitino.client.maxConnections";
+  public static final String CLIENT_MAX_CONNECTIONS =
+      GRAVITINO_CLIENT_CONFIG_PREFIX + "maxConnections";
 
   /**
    * A default value for max HTTP connections per route. This is the same as the default value of
@@ -61,14 +62,7 @@ public class GravitinoClientConfiguration {
 
   /** An optional max HTTP connections per route. */
   public static final String CLIENT_MAX_CONNECTIONS_PER_ROUTE =
-      "gravitino.client.maxConnectionsPerRoute";
-
-  private static final Set<String> SUPPORT_CLIENT_CONFIG_KEYS =
-      ImmutableSet.of(
-          CLIENT_CONNECTION_TIMEOUT_MS,
-          CLIENT_SOCKET_TIMEOUT_MS,
-          CLIENT_MAX_CONNECTIONS,
-          CLIENT_MAX_CONNECTIONS_PER_ROUTE);
+      GRAVITINO_CLIENT_CONFIG_PREFIX + "maxConnectionsPerRoute";
 
   private Map<String, String> properties;
 
@@ -83,11 +77,6 @@ public class GravitinoClientConfiguration {
    * @return GravitinoClientConfiguration instance
    */
   public static GravitinoClientConfiguration buildFromProperties(Map<String, String> properties) {
-    for (String key : properties.keySet()) {
-      if (!SUPPORT_CLIENT_CONFIG_KEYS.contains(key)) {
-        throw new IllegalArgumentException(String.format("Invalid property for client: %s", key));
-      }
-    }
     GravitinoClientConfiguration config = new GravitinoClientConfiguration(properties);
     config.validateConnectionPoolSettings();
     return config;

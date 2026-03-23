@@ -1075,19 +1075,13 @@ public class TestGvfsBase extends GravitinoMockServerBase {
     Assertions.assertEquals(clientConfig.get(CLIENT_CONNECTION_TIMEOUT_MS), "8000");
     Assertions.assertEquals(clientConfig.get(CLIENT_SOCKET_TIMEOUT_MS), "4000");
 
-    // test invalid client property
+    // Unknown client properties are silently ignored (to allow auth-related properties
+    // like gravitino.client.authType to pass through without being rejected).
     configuration.set(FS_GRAVITINO_CLIENT_CONFIG_PREFIX + "xxxx", "2000");
-    Throwable throwable =
-        Assertions.assertThrows(
-            IllegalArgumentException.class,
-            () -> {
-              try (FileSystem fs = new Path("gvfs://fileset/").getFileSystem(configuration)) {
-                // Trigger lazy initialization by accessing a path
-                fs.exists(new Path("gvfs://fileset/catalog/schema/fileset/file.txt"));
-              }
-            });
-    Assertions.assertEquals(
-        "Invalid property for client: gravitino.client.xxxx", throwable.getMessage());
+    Map<String, String> clientConfigWithUnknown =
+        GravitinoVirtualFileSystemUtils.extractClientConfig(getConfigMap(configuration));
+    Assertions.assertEquals(clientConfigWithUnknown.get(CLIENT_CONNECTION_TIMEOUT_MS), "8000");
+    Assertions.assertEquals(clientConfigWithUnknown.get(CLIENT_SOCKET_TIMEOUT_MS), "4000");
   }
 
   @Test
