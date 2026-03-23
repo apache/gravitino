@@ -28,8 +28,8 @@ on:
       maintenance_only:
         required: false
         description: 'run only maintenance integration tests'
-        type: boolean
-        default: false
+        type: string
+        default: 'false'
 
 jobs:
   start-runner:
