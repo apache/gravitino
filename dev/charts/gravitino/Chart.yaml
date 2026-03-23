@@ -41,7 +41,7 @@ maintainers:
   - name: Gravitino
     email: dev@gravitino.apache.org
     url: https://gravitino.apache.org
-name: gravitino
+name: gravitino-helm
 sources:
   - https://github.com/apache/gravitino
 version: 1.3.0
