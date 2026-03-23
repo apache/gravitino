@@ -23,6 +23,7 @@ import static org.apache.gravitino.catalog.clickhouse.ClickHouseConstants.IndexC
 import static org.apache.gravitino.catalog.clickhouse.ClickHouseTablePropertiesMetadata.CLICKHOUSE_ENGINE_KEY;
 import static org.apache.gravitino.catalog.clickhouse.ClickHouseTablePropertiesMetadata.ENGINE_PROPERTY_ENTRY;
 import static org.apache.gravitino.catalog.clickhouse.ClickHouseTablePropertiesMetadata.GRAVITINO_ENGINE_KEY;
+import static org.apache.gravitino.catalog.clickhouse.operations.ClickHouseClusterUtils.escapeSingleQuotes;
 import static org.apache.gravitino.rel.Column.DEFAULT_VALUE_NOT_SET;
 
 import com.google.common.annotations.VisibleForTesting;
@@ -81,11 +82,11 @@ public class ClickHouseTableOperations extends JdbcTableOperations {
   private static final String CLICKHOUSE_NOT_SUPPORT_NESTED_COLUMN_MSG =
       "Clickhouse does not support nested column names.";
   private static final Pattern ORDER_BY_PATTERN =
-      Pattern.compile("ORDER\\s+BY\\s+([^\\n]+)", Pattern.CASE_INSENSITIVE);
+      Pattern.compile(
+          "(?is)\\bORDER\\s+BY\\s*(.+?)(?=\\bPARTITION\\s+BY\\b|\\bPRIMARY\\s+KEY\\b|\\bSAMPLE\\s+BY\\b|\\bTTL\\b|\\bSETTINGS\\b|\\bCOMMENT\\b|$)");
   private static final Pattern PARTITION_BY_PATTERN =
-      Pattern.compile("PARTITION\\s+BY\\s+([^\\n]+)", Pattern.CASE_INSENSITIVE);
-  private static final Pattern ON_CLUSTER_PATTERN =
-      Pattern.compile("(?i)\\bON\\s+CLUSTER\\s+`?([^`\\s(]+)`?");
+      Pattern.compile(
+          "(?is)\\bPARTITION\\s+BY\\s*(.+?)(?=\\bORDER\\s+BY\\b|\\bPRIMARY\\s+KEY\\b|\\bSAMPLE\\s+BY\\b|\\bTTL\\b|\\bSETTINGS\\b|\\bCOMMENT\\b|$)");
   private static final Pattern DISTRIBUTED_ENGINE_PATTERN =
       Pattern.compile(
           "(?i)^Distributed\\(([^,]+),\\s*([^,]+),\\s*([^,]+),\\s*(.+)\\)$", Pattern.DOTALL);
@@ -165,8 +166,10 @@ public class ClickHouseTableOperations extends JdbcTableOperations {
     Map<String, String> notNullProperties =
         MapUtils.isNotEmpty(properties) ? properties : Collections.emptyMap();
 
-    // Add Create table clause
-    appendCreateTableClause(notNullProperties, sqlBuilder, tableName);
+    validateNoAutoIncrementColumns(columns);
+
+    // Add Create table clause; capture whether ON CLUSTER is in use
+    boolean onCluster = appendCreateTableClause(notNullProperties, sqlBuilder, tableName);
 
     // We still allow empty columns when the engine is distributed.
     if (columns.length > 0) {
@@ -186,10 +189,15 @@ public class ClickHouseTableOperations extends JdbcTableOperations {
 
     appendPartitionClause(partitioning, sqlBuilder, engine);
 
-    // Add table comment if specified
-    if (StringUtils.isNotEmpty(comment)) {
-      String escapedComment = comment.replace("'", "''");
-      sqlBuilder.append(" COMMENT '%s'".formatted(escapedComment));
+    // Add table comment; embed cluster name so it can be recovered at DROP/ALTER time.
+    // ClickHouse does not persist ON CLUSTER in SHOW CREATE TABLE (see ClickHouseClusterUtils).
+    String storedComment =
+        onCluster
+            ? ClickHouseClusterUtils.embedClusterInComment(
+                comment, notNullProperties.get(ClusterConstants.CLUSTER_NAME))
+            : comment;
+    if (StringUtils.isNotEmpty(storedComment)) {
+      sqlBuilder.append(" COMMENT '%s'".formatted(escapeSingleQuotes(storedComment)));
     }
 
     // Add setting clause if specified, clickhouse only supports predefine settings
@@ -427,6 +435,20 @@ public class ClickHouseTableOperations extends JdbcTableOperations {
     return quoteIdentifier(fieldName);
   }
 
+  private void validateNoAutoIncrementColumns(JdbcColumn[] columns) {
+    if (ArrayUtils.isEmpty(columns)) {
+      return;
+    }
+
+    for (JdbcColumn column : columns) {
+      if (column.autoIncrement()) {
+        throw new UnsupportedOperationException(
+            "ClickHouse does not support auto increment column: '%s' in CREATE TABLE"
+                .formatted(column.name()));
+      }
+    }
+  }
+
   private void buildColumnsDefinition(JdbcColumn[] columns, StringBuilder sqlBuilder) {
     if (ArrayUtils.isEmpty(columns)) {
       return;
@@ -531,14 +553,17 @@ public class ClickHouseTableOperations extends JdbcTableOperations {
             return Collections.unmodifiableMap(
                 new HashMap<String, String>() {
                   {
-                    put(COMMENT, resultSet.getString(COMMENT));
+                    // Extract cluster name embedded in the COMMENT at create time.
+                    // SHOW CREATE TABLE does not include ON CLUSTER (see ClickHouseClusterUtils).
+                    String storedComment = resultSet.getString(COMMENT);
+                    String clusterName =
+                        ClickHouseClusterUtils.extractClusterFromComment(storedComment);
+                    put(COMMENT, ClickHouseClusterUtils.stripClusterMetadata(storedComment));
                     String engine = resultSet.getString(CLICKHOUSE_ENGINE_KEY);
                     put(GRAVITINO_ENGINE_KEY, engine);
-                    String createSql = parseShowCreateTableSql(connection, tableName);
-                    Matcher onClusterMatcher = ON_CLUSTER_PATTERN.matcher(createSql);
-                    if (onClusterMatcher.find()) {
+                    if (StringUtils.isNotBlank(clusterName)) {
                       put(ClusterConstants.ON_CLUSTER, String.valueOf(true));
-                      put(ClusterConstants.CLUSTER_NAME, unquote(onClusterMatcher.group(1)));
+                      put(ClusterConstants.CLUSTER_NAME, clusterName);
                     } else {
                       put(ClusterConstants.ON_CLUSTER, String.valueOf(false));
                     }
@@ -653,6 +678,43 @@ public class ClickHouseTableOperations extends JdbcTableOperations {
   }
 
   @Override
+  protected void dropTable(String databaseName, String tableName) {
+    LOG.info("Attempting to delete table {} from database {}", tableName, databaseName);
+    try (Connection connection = getConnection(databaseName)) {
+      Map<String, String> props = getTableProperties(connection, tableName);
+      JdbcConnectorUtils.executeUpdate(connection, generateDropTableSql(tableName, props));
+      LOG.info("Deleted table {} from database {}", tableName, databaseName);
+    } catch (final SQLException se) {
+      throw this.exceptionMapper.toGravitinoException(se);
+    }
+  }
+
+  /**
+   * Generates the SQL statement to drop a ClickHouse table. When the table was created with {@code
+   * ON CLUSTER}, the DROP statement includes {@code ON CLUSTER `clusterName` SYNC} so the operation
+   * is propagated to every cluster node synchronously.
+   *
+   * @param tableName The name of the table to drop.
+   * @param properties The table properties as returned by {@link #getTableProperties}; used to
+   *     determine whether the table is on a cluster.
+   * @return The DROP TABLE SQL statement.
+   */
+  @VisibleForTesting
+  String generateDropTableSql(String tableName, Map<String, String> properties) {
+    String clusterName = properties == null ? null : properties.get(ClusterConstants.CLUSTER_NAME);
+    boolean onCluster =
+        properties != null
+            && Boolean.parseBoolean(properties.getOrDefault(ClusterConstants.ON_CLUSTER, "false"));
+
+    if (onCluster && StringUtils.isNotBlank(clusterName)) {
+      return String.format(
+          "DROP TABLE %s ON CLUSTER %s SYNC",
+          quoteIdentifier(tableName), quoteIdentifier(clusterName));
+    }
+    return String.format("DROP TABLE %s", quoteIdentifier(tableName));
+  }
+
+  @Override
   protected String generatePurgeTableSql(String tableName) {
     throw new UnsupportedOperationException(
         "ClickHouse does not support purge table in Gravitino, please use drop table");
@@ -719,6 +781,10 @@ public class ClickHouseTableOperations extends JdbcTableOperations {
             updateColumnNullabilityDefinition(
                 (TableChange.UpdateColumnNullability) change, lazyLoadTable));
 
+      } else if (change instanceof TableChange.AddIndex addIndex) {
+        lazyLoadTable = getOrCreateTable(databaseName, tableName, lazyLoadTable);
+        alterSql.add(addIndexDefinition(lazyLoadTable, addIndex));
+
       } else if (change instanceof TableChange.DeleteIndex) {
         lazyLoadTable = getOrCreateTable(databaseName, tableName, lazyLoadTable);
         alterSql.add(deleteIndexDefinition(lazyLoadTable, (TableChange.DeleteIndex) change));
@@ -737,16 +803,23 @@ public class ClickHouseTableOperations extends JdbcTableOperations {
     // Last modified comment
     if (null != updateComment) {
       String newComment = updateComment.getNewComment();
+      // Load the existing table once. We need it for two purposes:
+      //   1. Preserve the Gravitino StringIdentifier embedded in the old comment, so Gravitino can
+      //      still identify the table after the comment is changed.
+      //   2. Re-embed the cluster name so it is not lost. ClickHouse does not persist ON CLUSTER
+      //      in SHOW CREATE TABLE, so the cluster name lives only in the stored comment.
+      lazyLoadTable = getOrCreateTable(databaseName, tableName, lazyLoadTable);
       if (null == StringIdentifier.fromComment(newComment)) {
-        // Detect and add Gravitino id.
-        JdbcTable jdbcTable = getOrCreateTable(databaseName, tableName, lazyLoadTable);
-        StringIdentifier identifier = StringIdentifier.fromComment(jdbcTable.comment());
+        StringIdentifier identifier = StringIdentifier.fromComment(lazyLoadTable.comment());
         if (null != identifier) {
           newComment = StringIdentifier.addToComment(identifier, newComment);
         }
       }
-      String escapedComment = newComment.replace("'", "''");
-      alterSql.add(" MODIFY COMMENT '%s'".formatted(escapedComment));
+      String clusterName = lazyLoadTable.properties().get(ClusterConstants.CLUSTER_NAME);
+      if (StringUtils.isNotBlank(clusterName)) {
+        newComment = ClickHouseClusterUtils.embedClusterInComment(newComment, clusterName);
+      }
+      alterSql.add(" MODIFY COMMENT '%s'".formatted(escapeSingleQuotes(newComment)));
     }
 
     if (!setProperties.isEmpty()) {
@@ -766,6 +839,36 @@ public class ClickHouseTableOperations extends JdbcTableOperations {
             .formatted(quoteIdentifier(tableName), String.join(",\n", nonEmptySQLs));
     LOG.info("Generated alter table:{} sql: {}", databaseName + "." + tableName, result);
     return result;
+  }
+
+  private String addIndexDefinition(JdbcTable table, TableChange.AddIndex addIndex) {
+    Preconditions.checkArgument(
+        StringUtils.isNotBlank(addIndex.getName()), "Index name is required");
+    Preconditions.checkArgument(
+        ArrayUtils.isNotEmpty(addIndex.getFieldNames()), "Index field names are required");
+
+    boolean indexExists =
+        Arrays.stream(table.index()).anyMatch(index -> index.name().equals(addIndex.getName()));
+    Preconditions.checkArgument(!indexExists, "Index '%s' already exists", addIndex.getName());
+
+    String fieldStr = getIndexFieldStr(addIndex.getFieldNames());
+    switch (addIndex.getType()) {
+      case DATA_SKIPPING_MINMAX:
+        return "ADD INDEX %s %s TYPE minmax GRANULARITY 1"
+            .formatted(quoteIdentifier(addIndex.getName()), fieldStr);
+
+      case DATA_SKIPPING_BLOOM_FILTER:
+        return "ADD INDEX %s %s TYPE bloom_filter GRANULARITY 3"
+            .formatted(quoteIdentifier(addIndex.getName()), fieldStr);
+
+      case PRIMARY_KEY:
+        throw new UnsupportedOperationException(
+            "ClickHouse does not support adding primary key via ALTER TABLE");
+
+      default:
+        throw new IllegalArgumentException(
+            "Gravitino ClickHouse doesn't support index : " + addIndex.getType());
+    }
   }
 
   @VisibleForTesting
@@ -1015,6 +1118,11 @@ public class ClickHouseTableOperations extends JdbcTableOperations {
     }
 
     return metadata;
+  }
+
+  @VisibleForTesting
+  SortOrder[] parseSortOrdersFromCreateSql(String createSql) {
+    return parseCreateStatement(createSql).sortOrders;
   }
 
   private ShowCreateTableMetadata parseShowCreateTable(Connection connection, String tableName)

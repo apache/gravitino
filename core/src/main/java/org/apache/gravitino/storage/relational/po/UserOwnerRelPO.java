@@ -6,9 +6,7 @@
  * to you under the Apache License, Version 2.0 (the
  * "License"); you may not use this file except in compliance
  * with the License.  You may obtain a copy of the License at
- *
  *  http://www.apache.org/licenses/LICENSE-2.0
- *
  * Unless required by applicable law or agreed to in writing,
  * software distributed under the License is distributed on an
  * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
@@ -17,30 +15,16 @@
  * under the License.
  */
 
-import { defHttp } from '@/lib/utils/axios'
-import { ContentTypeEnum } from '@/lib/enums/httpEnum'
+package org.apache.gravitino.storage.relational.po;
 
-export const getAuthConfigsApi = () => {
-  return defHttp.get({
-    url: '/configs'
-  })
-}
+import lombok.Data;
+import lombok.EqualsAndHashCode;
+import lombok.ToString;
 
-export const getAuthMeApi = () => {
-  return defHttp.get({
-    url: '/api/authn/me'
-  })
-}
+@Data
+@ToString(callSuper = true)
+@EqualsAndHashCode(callSuper = true)
+public class UserOwnerRelPO extends UserPO {
 
-export const loginApi = (url, params) => {
-  return defHttp.post(
-    {
-      url,
-      data: params,
-      headers: {
-        'Content-Type': ContentTypeEnum.FORM_URLENCODED
-      }
-    },
-    { withToken: false }
-  )
+  private Long metadataObjectId;
 }

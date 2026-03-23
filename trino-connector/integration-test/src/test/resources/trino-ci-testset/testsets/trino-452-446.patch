@@ -1,3 +1,16 @@
+diff --git a/integration-test-common/docker-script/init/trino/config/jvm.config b/integration-test-common/docker-script/init/trino/config/jvm.config
+index e1089ee4b..77a930a36 100644
+--- a/integration-test-common/docker-script/init/trino/config/jvm.config
++++ b/integration-test-common/docker-script/init/trino/config/jvm.config
+@@ -26,8 +26,5 @@
+ -XX:+ExplicitGCInvokesConcurrent
+ -XX:+HeapDumpOnOutOfMemoryError
+ 
+--XX:+UnlockDiagnosticVMOptions
+--XX:G1NumCollectionsKeepPinned=10000000
+-
+ -DHADOOP_USER_NAME=hive
+ -Dlog4j.configurationFile=/etc/trino/log4j2.properties
 diff --git a/trino-connector/integration-test/src/test/resources/trino-ci-testset/testsets/jdbc-mysql/00011_column_properties.txt b/trino-connector/integration-test/src/test/resources/trino-ci-testset/testsets/jdbc-mysql/00011_column_properties.txt
 index 117d2f1d4..c3e55683f 100644
 --- a/trino-connector/integration-test/src/test/resources/trino-ci-testset/testsets/jdbc-mysql/00011_column_properties.txt
