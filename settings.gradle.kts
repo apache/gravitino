@@ -22,8 +22,9 @@ plugins {
 
 rootProject.name = "gravitino"
 
-val scalaVersion: String = gradle.startParameter.projectProperties["scalaVersion"]?.toString()
-  ?: settings.extra["defaultScalaVersion"].toString()
+val scalaVersion: String =
+  gradle.startParameter.projectProperties["scalaVersion"]?.toString()
+    ?: settings.extra["defaultScalaVersion"].toString()
 
 include("api", "common", "core", "server", "server-common")
 include("catalogs:catalog-common")
@@ -68,7 +69,11 @@ include("iceberg:iceberg-common")
 include("iceberg:iceberg-rest-server")
 include("lance:lance-common")
 include("lance:lance-rest-server")
-include("authorizations:authorization-ranger", "authorizations:authorization-common", "authorizations:authorization-chain")
+include(
+  "authorizations:authorization-ranger",
+  "authorizations:authorization-common",
+  "authorizations:authorization-chain"
+)
 include(
   "trino-connector:trino-connector",
   "trino-connector:trino-connector-435-439",
@@ -82,17 +87,28 @@ include(
 include("spark-connector:spark-common")
 if (scalaVersion == "2.12") {
   // flink only support scala 2.12
-  include("flink-connector:flink")
-  include("flink-connector:flink-runtime")
+  include("flink-connector:flink-common")
+  include("flink-connector:flink-1.18", "flink-connector:flink-runtime-1.18")
+  project(":flink-connector:flink-1.18").projectDir = file("flink-connector/v1.18/flink")
+  project(":flink-connector:flink-runtime-1.18").projectDir =
+    file("flink-connector/v1.18/flink-runtime")
 }
 include("spark-connector:spark-3.3", "spark-connector:spark-runtime-3.3")
 project(":spark-connector:spark-3.3").projectDir = file("spark-connector/v3.3/spark")
-project(":spark-connector:spark-runtime-3.3").projectDir = file("spark-connector/v3.3/spark-runtime")
-include("spark-connector:spark-3.4", "spark-connector:spark-runtime-3.4", "spark-connector:spark-3.5", "spark-connector:spark-runtime-3.5")
+project(":spark-connector:spark-runtime-3.3").projectDir =
+  file("spark-connector/v3.3/spark-runtime")
+include(
+  "spark-connector:spark-3.4",
+  "spark-connector:spark-runtime-3.4",
+  "spark-connector:spark-3.5",
+  "spark-connector:spark-runtime-3.5"
+)
 project(":spark-connector:spark-3.4").projectDir = file("spark-connector/v3.4/spark")
-project(":spark-connector:spark-runtime-3.4").projectDir = file("spark-connector/v3.4/spark-runtime")
+project(":spark-connector:spark-runtime-3.4").projectDir =
+  file("spark-connector/v3.4/spark-runtime")
 project(":spark-connector:spark-3.5").projectDir = file("spark-connector/v3.5/spark")
-project(":spark-connector:spark-runtime-3.5").projectDir = file("spark-connector/v3.5/spark-runtime")
+project(":spark-connector:spark-runtime-3.5").projectDir =
+  file("spark-connector/v3.5/spark-runtime")
 include("web:web", "web:integration-test")
 include("web-v2:web", "web-v2:integration-test")
 include("docs")
