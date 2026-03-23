@@ -430,14 +430,18 @@ class TestTableUpdateRequest(unittest.TestCase):
 
     def test_add_table_index_request_validate(self) -> None:
         invalid_request1 = TableUpdateRequest.AddTableIndexRequest(
-            index_type=Index.IndexType.UNIQUE_KEY,
-            name="",
-            field_names=[["column1"]],
+            Indexes.of(
+                Index.IndexType.UNIQUE_KEY,
+                "",
+                [["column1"]],
+            )
         )
         invalid_request2 = TableUpdateRequest.AddTableIndexRequest(
-            index_type=Index.IndexType.UNIQUE_KEY,
-            name="index_name",
-            field_names=[],
+            Indexes.of(
+                Index.IndexType.UNIQUE_KEY,
+                "index_name",
+                [],
+            )
         )
 
         with self.assertRaises(ValueError):
@@ -448,9 +452,11 @@ class TestTableUpdateRequest(unittest.TestCase):
 
     def test_add_table_index_request_serialize(self) -> None:
         request = TableUpdateRequest.AddTableIndexRequest(
-            index_type=Index.IndexType.PRIMARY_KEY,
-            name=Indexes.DEFAULT_MYSQL_PRIMARY_KEY_NAME,
-            field_names=[["column1"]],
+            Indexes.of(
+                Index.IndexType.PRIMARY_KEY,
+                Indexes.DEFAULT_MYSQL_PRIMARY_KEY_NAME,
+                [["column1"]],
+            )
         )
         json_str = _json.dumps(
             {

@@ -31,12 +31,13 @@ class StringUtils:
 
     @classmethod
     def is_not_blank(cls, s: str) -> bool:
-        """Checks if a string is not blank (null, empty, or only whitespace).
+        """
+        Checks if a string is not blank (not null, not empty, and not only whitespace).
 
         Args:
-            s: The string to check.
+            s (str): The string to check.
 
         Returns:
-            True if the string is blank, False otherwise.
+            bool: True if the string is not blank, False otherwise.
         """
         return not cls.is_blank(s)
