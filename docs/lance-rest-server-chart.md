@@ -15,23 +15,28 @@ This Helm chart deploys Apache Gravitino Lance REST Server on Kubernetes with cu
 - Kubernetes 1.29+
 - Helm 3+
 
-## Update Chart Dependency
+## Installation
 
-The Gravitino Lance REST Server Helm chart has not yet been officially released.   
-To proceed, please clone the repository, navigate to the chart directory [charts](../dev/charts), and execute the Helm dependency update command.
+Pull the chart from Docker Hub OCI registry:
 
 ```console
-helm dependency update [CHART]
+helm pull oci://registry-1.docker.io/apache/gravitino-lance-rest-server-helm --version 1.3.0
 ```
 
-## View Chart values
+Or install directly:
+
+```console
+helm install gravitino-lance oci://registry-1.docker.io/apache/gravitino-lance-rest-server-helm --version 1.3.0 -n gravitino --create-namespace
+```
+
+## View Chart Values
 
 You can customize values.yaml parameters to override chart default settings. Additionally, Gravitino Lance REST Server configurations in [gravitino-lance-rest-server.conf](../dev/charts/gravitino-lance-rest-server/resources/gravitino-lance-rest-server.conf) can be modified through Helm values.yaml.
 
 To display the default values of the chart, run:
 
 ```console
-helm show values [CHART]
+helm show values oci://registry-1.docker.io/apache/gravitino-lance-rest-server-helm --version 1.3.0
 ```
 
 ## Install Helm Chart
@@ -42,13 +47,14 @@ helm install [RELEASE_NAME] [CHART] [flags]
 
 ### Deploy with Default Configuration
 
-Run the following command to deploy Gravitino Lance REST Server using the default settings, specifying the container image version using `--set image.tag=<version>` (replace `<version>` with the desired image tag):
+Run the following command to deploy Gravitino Lance REST Server using the default settings:
 
 ```console
-helm upgrade --install gravitino ./gravitino-lance-rest-server \
+helm install gravitino-lance oci://registry-1.docker.io/apache/gravitino-lance-rest-server-helm --version 1.3.0 \
   -n gravitino \
   --create-namespace \
-  --set image.tag=<version> \
+  --set lanceRest.gravitinoUri=http://gravitino:8090 \
+  --set lanceRest.gravitinoMetalake=your-metalake \
   --set replicas=2 \
   --set resources.requests.memory="4Gi" \
   --set resources.requests.cpu="2"
@@ -59,21 +65,20 @@ helm upgrade --install gravitino ./gravitino-lance-rest-server \
 To customize the deployment, use the --set flag to override specific values:
 
 ```console
-helm upgrade --install gravitino ./gravitino-lance-rest-server \
+helm install gravitino-lance oci://registry-1.docker.io/apache/gravitino-lance-rest-server-helm --version 1.3.0 \
   -n gravitino \
   --create-namespace \
   --set key1=val1,key2=val2,...
 ```
+
 Alternatively, you can provide a custom values.yaml file:
 
 ```console
-helm upgrade --install gravitino ./gravitino-lance-rest-server \
+helm install gravitino-lance oci://registry-1.docker.io/apache/gravitino-lance-rest-server-helm --version 1.3.0 \
   -n gravitino \
   --create-namespace \
   -f /path/to/values.yaml
 ```
-_Note: \
-The path '/path/to/values.yaml' refers to the actual path to the values.yaml file._
 
 ## Configuration Notes
 

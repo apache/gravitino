@@ -15,23 +15,28 @@ This Helm chart deploys Apache Gravitino Iceberg REST Catalog Server on Kubernet
 - Kubernetes 1.29+
 - Helm 3+
 
-## Update Chart Dependency
+## Installation
 
-The Gravitino Iceberg REST Catalog Server Helm chart has not yet been released to the helm registry.
-To proceed, please clone the repository, navigate to the chart directory [charts](../dev/charts), and execute the Helm dependency update command.
+Pull the chart from Docker Hub OCI registry:
 
 ```console
-helm dependency update [CHART]
+helm pull oci://registry-1.docker.io/apache/gravitino-iceberg-rest-server-helm --version 1.3.0
 ```
 
-## View Chart values
+Or install directly:
+
+```console
+helm install gravitino-iceberg oci://registry-1.docker.io/apache/gravitino-iceberg-rest-server-helm --version 1.3.0 -n gravitino --create-namespace
+```
+
+## View Chart Values
 
 You can customize values.yaml parameters to override chart default settings. Additionally, Gravitino Iceberg REST Catalog Server configurations in [gravitino-iceberg-rest-server.conf](../dev/charts/gravitino-iceberg-rest-server/resources/gravitino-iceberg-rest-server.conf) can be modified through Helm values.yaml.
 
-To display the default values of the Gravitino chart, run:
+To display the default values of the chart, run:
 
 ```console
-helm show values [CHART]
+helm show values oci://registry-1.docker.io/apache/gravitino-iceberg-rest-server-helm --version 1.3.0
 ```
 
 ## Install Helm Chart
@@ -42,13 +47,12 @@ helm install [RELEASE_NAME] [CHART] [flags]
 
 ### Deploy with Default Configuration
 
-Run the following command to deploy Gravitino Iceberg REST Catalog Server using the default settings, specify container image versions using --set image.tag=x.y.z (replace x, y, z with the expected version numbers):
+Run the following command to deploy Gravitino Iceberg REST Catalog Server using the default settings:
 
 ```console
-helm upgrade --install gravitino ./gravitino-iceberg-rest-server \
+helm install gravitino-iceberg oci://registry-1.docker.io/apache/gravitino-iceberg-rest-server-helm --version 1.3.0 \
   -n gravitino \
   --create-namespace \
-  --set image.tag=<x.y.z> \
   --set replicas=2 \
   --set resources.requests.memory="4Gi" \
   --set resources.requests.cpu="2"
@@ -59,21 +63,20 @@ helm upgrade --install gravitino ./gravitino-iceberg-rest-server \
 To customize the deployment, use the --set flag to override specific values:
 
 ```console
-helm upgrade --install gravitino ./gravitino-iceberg-rest-server
+helm install gravitino-iceberg oci://registry-1.docker.io/apache/gravitino-iceberg-rest-server-helm --version 1.3.0 \
   -n gravitino \
   --create-namespace \
   --set key1=val1,key2=val2,...
 ```
+
 Alternatively, you can provide a custom values.yaml file:
 
 ```console
-helm upgrade --install gravitino ./gravitino-iceberg-rest-server
+helm install gravitino-iceberg oci://registry-1.docker.io/apache/gravitino-iceberg-rest-server-helm --version 1.3.0 \
   -n gravitino \
   --create-namespace \
   -f /path/to/values.yaml
 ```
-_Note: \
-The path '/path/to/values.yaml' refers to the actual path to the values.yaml file._
 
 ## Uninstall Helm Chart
 
