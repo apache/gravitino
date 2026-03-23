@@ -21,7 +21,7 @@ package org.apache.gravitino.trino.connector.catalog;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
-import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
@@ -71,10 +71,10 @@ public class TestCatalogConnectorMetadataFunction {
   }
 
   @Test
-  public void testListFunctionInfosWhenUnsupported() {
+  public void testListFunctionInfosThrowsWhenUnsupported() {
     CatalogConnectorMetadata metadata = createMetadataWithFunctionCatalog(false);
-    Function[] functions = metadata.listFunctionInfos("test_schema");
-    assertEquals(0, functions.length);
+    assertThrows(
+        UnsupportedOperationException.class, () -> metadata.listFunctionInfos("test_schema"));
   }
 
   @Test
@@ -90,21 +90,21 @@ public class TestCatalogConnectorMetadataFunction {
   }
 
   @Test
-  public void testGetFunctionReturnsNullWhenNotFound() {
+  public void testGetFunctionThrowsWhenNotFound() {
     FunctionCatalog functionCatalog = mock(FunctionCatalog.class);
     when(functionCatalog.getFunction(any(NameIdentifier.class)))
         .thenThrow(new NoSuchFunctionException("Function does not exist"));
 
     CatalogConnectorMetadata metadata = createMetadataWithMockFunctionCatalog(functionCatalog);
-    Function function = metadata.getFunction("test_schema", "no_such_func");
-    assertNull(function);
+    assertThrows(
+        NoSuchFunctionException.class, () -> metadata.getFunction("test_schema", "no_such_func"));
   }
 
   @Test
-  public void testGetFunctionReturnsNullWhenUnsupported() {
+  public void testGetFunctionThrowsWhenUnsupported() {
     CatalogConnectorMetadata metadata = createMetadataWithFunctionCatalog(false);
-    Function function = metadata.getFunction("test_schema", "my_func");
-    assertNull(function);
+    assertThrows(
+        UnsupportedOperationException.class, () -> metadata.getFunction("test_schema", "my_func"));
   }
 
   private CatalogConnectorMetadata createMetadataWithFunctionCatalog(boolean supportsFunctions) {

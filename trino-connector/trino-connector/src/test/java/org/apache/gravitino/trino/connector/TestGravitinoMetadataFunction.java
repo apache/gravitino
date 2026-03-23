@@ -30,6 +30,7 @@ import io.trino.spi.function.SchemaFunctionName;
 import java.util.Collection;
 import java.util.List;
 import org.apache.gravitino.Audit;
+import org.apache.gravitino.exceptions.NoSuchFunctionException;
 import org.apache.gravitino.function.Function;
 import org.apache.gravitino.function.FunctionDefinition;
 import org.apache.gravitino.function.FunctionImpl;
@@ -118,7 +119,8 @@ public class TestGravitinoMetadataFunction {
   public void testGetLanguageFunctionsWhenFunctionNotFound() {
     CatalogConnectorMetadata catalogMetadata = mock(CatalogConnectorMetadata.class);
     when(catalogMetadata.supportsFunctions()).thenReturn(true);
-    when(catalogMetadata.getFunction("test_schema", "no_such_func")).thenReturn(null);
+    when(catalogMetadata.getFunction("test_schema", "no_such_func"))
+        .thenThrow(new NoSuchFunctionException("Function not found"));
 
     GravitinoMetadata metadata = createTestMetadata(catalogMetadata);
     ConnectorSession session = mock(ConnectorSession.class);
@@ -126,6 +128,19 @@ public class TestGravitinoMetadataFunction {
     Collection<LanguageFunction> functions =
         metadata.getLanguageFunctions(
             session, new SchemaFunctionName("test_schema", "no_such_func"));
+    assertTrue(functions.isEmpty());
+  }
+
+  @Test
+  public void testGetLanguageFunctionsWhenUnsupported() {
+    CatalogConnectorMetadata catalogMetadata = mock(CatalogConnectorMetadata.class);
+    when(catalogMetadata.supportsFunctions()).thenReturn(false);
+
+    GravitinoMetadata metadata = createTestMetadata(catalogMetadata);
+    ConnectorSession session = mock(ConnectorSession.class);
+
+    Collection<LanguageFunction> functions =
+        metadata.getLanguageFunctions(session, new SchemaFunctionName("test_schema", "my_func"));
     assertTrue(functions.isEmpty());
   }
 

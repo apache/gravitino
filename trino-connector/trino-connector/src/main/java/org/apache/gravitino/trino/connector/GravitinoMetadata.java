@@ -60,6 +60,7 @@ import io.trino.spi.statistics.ColumnStatistics;
 import io.trino.spi.statistics.TableStatistics;
 import io.trino.spi.type.Type;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collection;
 import java.util.List;
 import java.util.Locale;
@@ -69,6 +70,7 @@ import java.util.OptionalLong;
 import java.util.Set;
 import java.util.stream.Collectors;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.gravitino.exceptions.NoSuchFunctionException;
 import org.apache.gravitino.function.Function;
 import org.apache.gravitino.function.FunctionDefinition;
 import org.apache.gravitino.function.FunctionImpl;
@@ -700,13 +702,9 @@ public abstract class GravitinoMetadata implements ConnectorMetadata {
     if (!catalogConnectorMetadata.supportsFunctions()) {
       return List.of();
     }
-    Function[] functions = catalogConnectorMetadata.listFunctionInfos(schemaName);
-    List<LanguageFunction> result = new ArrayList<>();
-    for (Function function : functions) {
-      result.addAll(toLanguageFunctions(function));
-    }
-    LOG.debug("Listed {} language functions in schema {}", result.size(), schemaName);
-    return result;
+    return Arrays.stream(catalogConnectorMetadata.listFunctionInfos(schemaName))
+        .flatMap(function -> toLanguageFunctions(function).stream())
+        .toList();
   }
 
   @Override
@@ -715,12 +713,17 @@ public abstract class GravitinoMetadata implements ConnectorMetadata {
     if (!catalogConnectorMetadata.supportsFunctions()) {
       return List.of();
     }
-    Function function =
-        catalogConnectorMetadata.getFunction(name.getSchemaName(), name.getFunctionName());
-    if (function == null) {
+    try {
+      Function function =
+          catalogConnectorMetadata.getFunction(name.getSchemaName(), name.getFunctionName());
+      if (function == null) {
+        return List.of();
+      }
+      return toLanguageFunctions(function);
+    } catch (NoSuchFunctionException e) {
+      LOG.debug("Function {} not found in schema {}", name.getFunctionName(), name.getSchemaName());
       return List.of();
     }
-    return toLanguageFunctions(function);
   }
 
   /**
@@ -737,8 +740,12 @@ public abstract class GravitinoMetadata implements ConnectorMetadata {
           continue;
         }
         String sql = ((SQLImpl) impl).sql();
-        String signatureToken = buildSignatureToken(function.name(), definition.parameters());
-        result.add(new LanguageFunction(signatureToken, sql, List.of(), Optional.empty()));
+        try {
+          String signatureToken = buildSignatureToken(function.name(), definition.parameters());
+          result.add(new LanguageFunction(signatureToken, sql, List.of(), Optional.empty()));
+        } catch (TrinoException e) {
+          LOG.warn("Failed to build signature token for function {}", function.name(), e);
+        }
       }
     }
     return result;

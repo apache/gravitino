@@ -33,7 +33,6 @@ import org.apache.gravitino.Schema;
 import org.apache.gravitino.SupportsSchemas;
 import org.apache.gravitino.client.GravitinoMetalake;
 import org.apache.gravitino.exceptions.NoSuchCatalogException;
-import org.apache.gravitino.exceptions.NoSuchFunctionException;
 import org.apache.gravitino.exceptions.NoSuchSchemaException;
 import org.apache.gravitino.exceptions.NoSuchTableException;
 import org.apache.gravitino.exceptions.NonEmptySchemaException;
@@ -426,11 +425,12 @@ public class CatalogConnectorMetadata {
    * Lists all functions with details in the specified schema.
    *
    * @param schemaName the name of the schema
-   * @return an array of functions, or an empty array if functions are not supported
+   * @return an array of functions
+   * @throws UnsupportedOperationException if the catalog does not support functions
    */
   public Function[] listFunctionInfos(String schemaName) {
-    if (functionCatalog == null) {
-      return new Function[0];
+    if (!supportsFunctions()) {
+      throw new UnsupportedOperationException("Catalog does not support functions");
     }
     try {
       return functionCatalog.listFunctionInfos(Namespace.of(schemaName));
@@ -445,17 +445,13 @@ public class CatalogConnectorMetadata {
    *
    * @param schemaName the name of the schema
    * @param functionName the name of the function
-   * @return the function, or null if functions are not supported or the function does not exist
+   * @return the function
+   * @throws UnsupportedOperationException if the catalog does not support functions
    */
-  @Nullable
   public Function getFunction(String schemaName, String functionName) {
-    if (functionCatalog == null) {
-      return null;
+    if (!supportsFunctions()) {
+      throw new UnsupportedOperationException("Catalog does not support functions");
     }
-    try {
-      return functionCatalog.getFunction(NameIdentifier.of(schemaName, functionName));
-    } catch (NoSuchFunctionException e) {
-      return null;
-    }
+    return functionCatalog.getFunction(NameIdentifier.of(schemaName, functionName));
   }
 }
