@@ -69,16 +69,24 @@ public class RegexGroupMapper implements GroupMapper {
       if (group == null) {
         continue;
       }
-      Matcher matcher = pattern.matcher(group);
-      if (matcher.find() && matcher.groupCount() >= 1) {
-        String extracted = matcher.group(1);
-        if (extracted != null && !extracted.isEmpty()) {
-          mappedGroups.add(extracted);
+      try {
+        Matcher matcher = pattern.matcher(group);
+        if (matcher.find() && matcher.groupCount() >= 1) {
+          String extracted = matcher.group(1);
+          if (extracted != null && !extracted.isEmpty()) {
+            mappedGroups.add(extracted);
+          } else {
+            mappedGroups.add(group);
+          }
         } else {
           mappedGroups.add(group);
         }
-      } else {
-        mappedGroups.add(group);
+      } catch (Exception e) {
+        String message =
+            String.format(
+                "Error applying regex pattern '%s' to group '%s'", pattern.pattern(), group);
+        LOG.error("{}: {}", message, e.getMessage());
+        throw new IllegalArgumentException(message, e);
       }
     }
     return mappedGroups;
