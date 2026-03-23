@@ -20,6 +20,7 @@
 package org.apache.gravitino.server.authentication;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
@@ -36,6 +37,7 @@ import java.util.Date;
 import java.util.HashMap;
 import java.util.Map;
 import org.apache.gravitino.Config;
+import org.apache.gravitino.UserPrincipal;
 import org.apache.gravitino.exceptions.UnauthorizedException;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -508,13 +510,7 @@ public class TestStaticSignKeyValidator {
     assertEquals("test-user", principal.getName());
 
     // Check if principal is UserPrincipal and has groups
-    if (principal instanceof org.apache.gravitino.UserPrincipal) {
-      org.apache.gravitino.UserPrincipal userPrincipal =
-          (org.apache.gravitino.UserPrincipal) principal;
-      assertEquals(Arrays.asList("group1", "group2"), userPrincipal.getGroups());
-    } else {
-      // This fails if the principal is not UserPrincipal or groups are missing
-      throw new AssertionError("Principal should be UserPrincipal");
-    }
+    UserPrincipal userPrincipal = assertInstanceOf(UserPrincipal.class, principal);
+    assertEquals(Arrays.asList("group1", "group2"), userPrincipal.getGroups());
   }
 }
