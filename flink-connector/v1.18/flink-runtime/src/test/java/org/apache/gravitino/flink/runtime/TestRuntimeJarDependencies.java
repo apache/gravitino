@@ -24,6 +24,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.File;
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.jar.JarEntry;
 import java.util.jar.JarFile;
@@ -31,6 +32,8 @@ import java.util.stream.Collectors;
 import org.junit.jupiter.api.Test;
 
 class TestRuntimeJarDependencies {
+  private static final String FACTORY_SERVICE_ENTRY =
+      "META-INF/services/org.apache.flink.table.factories.Factory";
 
   @Test
   void shadowJarShouldNotBundleSlf4j() throws IOException {
@@ -49,6 +52,29 @@ class TestRuntimeJarDependencies {
           hasSlf4jClasses,
           "Flink connector runtime jar should rely on Flink provided slf4j instead of shading it");
       assertFalse(hasSlf4jMetadata, "SLF4J metadata should not be packaged in runtime jar");
+    }
+  }
+
+  @Test
+  void shadowJarShouldMergeFactoryServiceDescriptors() throws IOException {
+    String jarPath = System.getProperty("shadowJarPath");
+    assertNotNull(jarPath, "shadowJarPath system property should be provided by the build");
+
+    try (JarFile jarFile = new JarFile(new File(jarPath))) {
+      JarEntry factoryServiceEntry = jarFile.getJarEntry(FACTORY_SERVICE_ENTRY);
+      assertNotNull(factoryServiceEntry, "Factory service descriptor should exist in runtime jar");
+
+      String factoryServices =
+          new String(
+              jarFile.getInputStream(factoryServiceEntry).readAllBytes(), StandardCharsets.UTF_8);
+      assertTrue(
+          factoryServices.contains(
+              "org.apache.gravitino.flink.connector.store.GravitinoCatalogStoreFactory"),
+          "Runtime jar should include the shared catalog-store factory descriptor");
+      assertTrue(
+          factoryServices.contains(
+              "org.apache.gravitino.flink.connector.hive.GravitinoHiveCatalogFactoryFlink118"),
+          "Runtime jar should include the version-specific catalog factory descriptor");
     }
   }
 }

@@ -6,17 +6,7 @@ license: "This software is licensed under the Apache License version 2."
 ---
 
 The Apache Gravitino Flink connector can be used to read and write Iceberg tables, with the metadata managed by the Gravitino server.
-To enable the Flink connector, place the Iceberg Flink runtime JAR and the matching Gravitino Flink runtime JAR in the Flink classpath.
-
-## Prerequisites
-
-Use matching Iceberg and Gravitino runtime jars for the same Flink minor version.
-
-| Flink version | Iceberg runtime jar | Gravitino runtime jar |
-|---------------|---------------------|-----------------------|
-| 1.18.x | `iceberg-flink-runtime-1.18-1.9.2.jar` | `gravitino-flink-connector-runtime-1.18_2.12-${gravitino-version}.jar` |
-| 1.19.x | `iceberg-flink-runtime-1.19-1.9.2.jar` | `gravitino-flink-connector-runtime-1.19_2.12-${gravitino-version}.jar` |
-| 1.20.x | `iceberg-flink-runtime-1.20-1.9.2.jar` | `gravitino-flink-connector-runtime-1.20_2.12-${gravitino-version}.jar` |
+To enable the Flink connector, you must download the Iceberg Flink runtime JAR and place it in the Flink classpath.
 
 ## Capabilities
 

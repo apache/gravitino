@@ -26,17 +26,19 @@ fi
 
 readonly flink_version="$1"
 readonly test_mode="$2"
-readonly smoke_test="org.apache.gravitino.flink.connector.integration.test.catalog.GravitinoCatalogManagerIT"
 
 case "$flink_version" in
   1.18)
-    readonly test_task=":flink-connector:flink-common:test"
+    readonly test_task=":flink-connector:flink-1.18:test"
+    readonly smoke_test="org.apache.gravitino.flink.connector.integration.test.catalog.GravitinoCatalogManagerIT118"
     ;;
   1.19)
     readonly test_task=":flink-connector:flink-1.19:test"
+    readonly smoke_test="org.apache.gravitino.flink.connector.integration.test.catalog.GravitinoCatalogManagerIT119"
     ;;
   1.20)
     readonly test_task=":flink-connector:flink-1.20:test"
+    readonly smoke_test="org.apache.gravitino.flink.connector.integration.test.catalog.GravitinoCatalogManagerIT120"
     ;;
   *)
     echo "Unsupported Flink version: ${flink_version}" >&2

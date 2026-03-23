@@ -73,16 +73,6 @@ license: "This software is licensed under the Apache License version 2."
 
   This creates `gravitino-spark-connector-runtime-{sparkVersion}_{scalaVersion}-{version}.jar` under the `spark-connector/v3.4/spark-runtime/build/libs` directory. You could replace `3.4` with  `3.3` or `3.5` to specify different Spark versions and replace `2.12` with `2.13` for different Scala versions. The default Scala version is `2.12` if `-PscalaVersion` is not specified.
 
-  If you want to build a specific Flink connector runtime jar, use the matching Flink runtime module:
-
-   ```shell
-   ./gradlew :flink-connector:flink-runtime-1.18:shadowJar
-   ./gradlew :flink-connector:flink-runtime-1.19:shadowJar
-   ./gradlew :flink-connector:flink-runtime-1.20:shadowJar
-   ```
-
-  These commands create `gravitino-flink-connector-runtime-{flinkVersion}_2.12-{version}.jar` under the corresponding `flink-connector/v{flinkVersion}/flink-runtime/build/libs` directory.
-
   :::info
   Gravitino Spark connector doesn't support Scala 2.13 for Spark 3.3.
   :::

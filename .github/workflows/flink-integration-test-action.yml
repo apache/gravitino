@@ -47,8 +47,8 @@ jobs:
       - name: Flink Integration Test
         id: integrationTest
         run: |
-          ./gradlew -PskipTests -PtestMode=embedded -PskipDockerTests=false :flink-connector:flink-common:test --tests "org.apache.gravitino.flink.connector.integration.test.**"
-          ./gradlew -PskipTests -PtestMode=deploy -PskipDockerTests=false :flink-connector:flink-common:test --tests "org.apache.gravitino.flink.connector.integration.test.**"
+          ./gradlew -PskipTests -PtestMode=embedded -PskipDockerTests=false :flink-connector:flink-1.18:test --tests "org.apache.gravitino.flink.connector.integration.test.**"
+          ./gradlew -PskipTests -PtestMode=deploy -PskipDockerTests=false :flink-connector:flink-1.18:test --tests "org.apache.gravitino.flink.connector.integration.test.**"
           dev/ci/run_flink_connector_smoke.sh 1.19 embedded
           dev/ci/run_flink_connector_smoke.sh 1.19 deploy
           dev/ci/run_flink_connector_smoke.sh 1.20 embedded
@@ -61,8 +61,8 @@ jobs:
           name: flink-connector-integrate-test-reports-${{ inputs.java-version }}
           path: |
             build/reports
-            flink-connector/flink-common/build/*.log
-            flink-connector/flink-common/build/*.tar
+            flink-connector/v1.18/flink/build/*.log
+            flink-connector/v1.18/flink/build/*.tar
             flink-connector/v1.19/flink/build/*.log
             flink-connector/v1.19/flink/build/*.tar
             flink-connector/v1.20/flink/build/*.log

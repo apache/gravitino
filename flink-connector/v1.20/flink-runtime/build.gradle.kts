@@ -58,6 +58,7 @@ shadowJarTask.configure {
   configurations = listOf(project.configurations.runtimeClasspath.get())
   archiveFileName.set("$baseName-$version.jar")
   archiveClassifier.set("")
+  mergeServiceFiles()
 
   exclude("org/slf4j/**")
   exclude("META-INF/maven/org.slf4j/**")
