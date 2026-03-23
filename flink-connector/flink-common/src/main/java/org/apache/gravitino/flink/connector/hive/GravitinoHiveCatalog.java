@@ -254,10 +254,10 @@ public class GravitinoHiveCatalog extends BaseCatalog {
 
   protected Map<String, String> toGravitinoGenericTableProperties(
       ResolvedCatalogTable resolvedTable) {
-    return FlinkGenericTableUtil.toGravitinoGenericTableProperties(resolvedTable);
+    return FlinkGenericTableUtil.toGravitinoGenericTableProperties(resolvedTable, catalogCompat());
   }
 
   protected CatalogTable toFlinkGenericTable(Table table) {
-    return FlinkGenericTableUtil.toFlinkGenericTable(table, this::newCatalogTable);
+    return FlinkGenericTableUtil.toFlinkGenericTable(table, catalogCompat());
   }
 }

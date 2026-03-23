@@ -29,7 +29,7 @@ import org.apache.flink.table.catalog.Column;
 import org.apache.flink.table.catalog.ResolvedCatalogTable;
 import org.apache.flink.table.catalog.ResolvedSchema;
 import org.apache.flink.table.factories.ManagedTableFactory;
-import org.apache.gravitino.flink.connector.utils.FlinkCatalogCompatUtils;
+import org.apache.gravitino.flink.connector.utils.DefaultCatalogCompat;
 import org.apache.gravitino.rel.Table;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
@@ -72,7 +72,8 @@ class TestFlinkGenericTableUtil {
     ResolvedCatalogTable resolvedTable = createResolvedTable(Collections.emptyMap());
 
     Map<String, String> properties =
-        FlinkGenericTableUtil.toGravitinoGenericTableProperties(resolvedTable);
+        FlinkGenericTableUtil.toGravitinoGenericTableProperties(
+            resolvedTable, DefaultCatalogCompat.INSTANCE);
 
     Assertions.assertEquals("true", properties.get(CatalogPropertiesUtil.IS_GENERIC));
     Assertions.assertTrue(
@@ -85,7 +86,8 @@ class TestFlinkGenericTableUtil {
     ResolvedCatalogTable resolvedTable = createResolvedTable(Collections.emptyMap());
 
     Map<String, String> properties =
-        FlinkGenericTableUtil.toGravitinoGenericTableProperties(resolvedTable);
+        FlinkGenericTableUtil.toGravitinoGenericTableProperties(
+            resolvedTable, DefaultCatalogCompat.INSTANCE);
 
     Assertions.assertEquals(
         ManagedTableFactory.DEFAULT_IDENTIFIER,
@@ -96,7 +98,8 @@ class TestFlinkGenericTableUtil {
   void testToFlinkGenericTableRemoveDefaultConnector() {
     ResolvedCatalogTable resolvedTable = createResolvedTable(ImmutableMap.of("custom", "value"));
     Map<String, String> properties =
-        FlinkGenericTableUtil.toGravitinoGenericTableProperties(resolvedTable);
+        FlinkGenericTableUtil.toGravitinoGenericTableProperties(
+            resolvedTable, DefaultCatalogCompat.INSTANCE);
     Assertions.assertEquals("default", properties.get("flink.connector"));
 
     CatalogTable catalogTable =
@@ -121,7 +124,8 @@ class TestFlinkGenericTableUtil {
               public org.apache.gravitino.Audit auditInfo() {
                 return null;
               }
-            });
+            },
+            DefaultCatalogCompat.INSTANCE);
 
     Assertions.assertFalse(catalogTable.getOptions().containsKey("connector"));
     Assertions.assertEquals("value", catalogTable.getOptions().get("custom"));
@@ -130,7 +134,7 @@ class TestFlinkGenericTableUtil {
   private static ResolvedCatalogTable createResolvedTable(Map<String, String> options) {
     Schema schema = Schema.newBuilder().column("id", DataTypes.INT()).build();
     CatalogTable table =
-        FlinkCatalogCompatUtils.createCatalogTable(
+        DefaultCatalogCompat.INSTANCE.createCatalogTable(
             schema, "comment", Collections.emptyList(), options);
     ResolvedSchema resolvedSchema =
         new ResolvedSchema(

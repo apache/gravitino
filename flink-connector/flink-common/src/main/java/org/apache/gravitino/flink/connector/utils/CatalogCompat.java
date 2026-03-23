@@ -19,15 +19,16 @@
 
 package org.apache.gravitino.flink.connector.utils;
 
-import org.apache.flink.table.factories.Factory;
-import org.junit.jupiter.api.Assertions;
-import org.junit.jupiter.api.Test;
+import java.util.List;
+import java.util.Map;
+import org.apache.flink.table.api.Schema;
+import org.apache.flink.table.catalog.CatalogTable;
+import org.apache.flink.table.catalog.ResolvedCatalogTable;
 
-public class TestJdbcCatalogCompatUtils {
+public interface CatalogCompat {
 
-  @Test
-  public void testCreateJdbcDynamicTableFactory() {
-    Factory factory = JdbcCatalogCompatUtils.createJdbcDynamicTableFactory();
-    Assertions.assertNotNull(factory);
-  }
+  CatalogTable createCatalogTable(
+      Schema schema, String comment, List<String> partitionKeys, Map<String, String> options);
+
+  Map<String, String> serializeCatalogTable(ResolvedCatalogTable resolvedTable);
 }

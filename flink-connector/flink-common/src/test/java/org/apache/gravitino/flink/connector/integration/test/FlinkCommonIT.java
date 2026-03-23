@@ -48,7 +48,7 @@ import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Schema;
 import org.apache.gravitino.catalog.hive.HiveConstants;
 import org.apache.gravitino.flink.connector.integration.test.utils.TestUtils;
-import org.apache.gravitino.flink.connector.utils.FlinkCatalogCompatUtils;
+import org.apache.gravitino.flink.connector.utils.DefaultCatalogCompat;
 import org.apache.gravitino.rel.Column;
 import org.apache.gravitino.rel.Table;
 import org.apache.gravitino.rel.expressions.literals.Literals;
@@ -551,7 +551,7 @@ public abstract class FlinkCommonIT extends FlinkEnvIT {
                       .column("test", DataTypes.INT())
                       .build();
               CatalogTable newTable =
-                  FlinkCatalogCompatUtils.createCatalogTable(
+                  DefaultCatalogCompat.INSTANCE.createCatalogTable(
                       schema, "test comment", ImmutableList.of(), ImmutableMap.of());
               List<org.apache.flink.table.catalog.Column> columns = Lists.newArrayList();
               columns.add(org.apache.flink.table.catalog.Column.physical("test", DataTypes.INT()));
@@ -563,7 +563,7 @@ public abstract class FlinkCommonIT extends FlinkEnvIT {
               // alter table comment
               currentFlinkCatalog.alterTable(
                   currentTablePath,
-                  FlinkCatalogCompatUtils.createCatalogTable(
+                  DefaultCatalogCompat.INSTANCE.createCatalogTable(
                       table.getUnresolvedSchema(),
                       newComment,
                       table.getPartitionKeys(),

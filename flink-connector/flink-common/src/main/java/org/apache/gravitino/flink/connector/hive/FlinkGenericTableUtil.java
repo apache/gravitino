@@ -27,7 +27,8 @@ import org.apache.flink.table.catalog.CatalogPropertiesUtil;
 import org.apache.flink.table.catalog.CatalogTable;
 import org.apache.flink.table.catalog.ResolvedCatalogTable;
 import org.apache.flink.table.factories.FactoryUtil;
-import org.apache.gravitino.flink.connector.utils.FlinkCatalogCompatUtils;
+import org.apache.gravitino.flink.connector.utils.CatalogCompat;
+import org.apache.gravitino.flink.connector.utils.DefaultCatalogCompat;
 import org.apache.gravitino.rel.Table;
 
 final class FlinkGenericTableUtil {
@@ -64,7 +65,12 @@ final class FlinkGenericTableUtil {
   }
 
   static Map<String, String> toGravitinoGenericTableProperties(ResolvedCatalogTable resolvedTable) {
-    Map<String, String> properties = FlinkCatalogCompatUtils.serializeCatalogTable(resolvedTable);
+    return toGravitinoGenericTableProperties(resolvedTable, DefaultCatalogCompat.INSTANCE);
+  }
+
+  static Map<String, String> toGravitinoGenericTableProperties(
+      ResolvedCatalogTable resolvedTable, CatalogCompat catalogCompat) {
+    Map<String, String> properties = catalogCompat.serializeCatalogTable(resolvedTable);
     if (!properties.containsKey(CONNECTOR)) {
       properties.put(CONNECTOR, MANAGED_TABLE_IDENTIFIER);
     }
@@ -74,7 +80,11 @@ final class FlinkGenericTableUtil {
   }
 
   static CatalogTable toFlinkGenericTable(Table table) {
-    return toFlinkGenericTable(table, FlinkCatalogCompatUtils::createCatalogTable);
+    return toFlinkGenericTable(table, DefaultCatalogCompat.INSTANCE);
+  }
+
+  static CatalogTable toFlinkGenericTable(Table table, CatalogCompat catalogCompat) {
+    return toFlinkGenericTable(table, catalogCompat::createCatalogTable);
   }
 
   static CatalogTable toFlinkGenericTable(Table table, CatalogTableBuilder tableBuilder) {

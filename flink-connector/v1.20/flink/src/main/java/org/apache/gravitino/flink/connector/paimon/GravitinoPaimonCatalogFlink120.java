@@ -22,6 +22,8 @@ package org.apache.gravitino.flink.connector.paimon;
 import org.apache.flink.table.factories.CatalogFactory;
 import org.apache.gravitino.flink.connector.PartitionConverter;
 import org.apache.gravitino.flink.connector.SchemaAndTablePropertiesConverter;
+import org.apache.gravitino.flink.connector.utils.CatalogCompat;
+import org.apache.gravitino.flink.connector.utils.CatalogCompatFlink120;
 
 public class GravitinoPaimonCatalogFlink120 extends GravitinoPaimonCatalog {
 
@@ -31,5 +33,10 @@ public class GravitinoPaimonCatalogFlink120 extends GravitinoPaimonCatalog {
       SchemaAndTablePropertiesConverter schemaAndTablePropertiesConverter,
       PartitionConverter partitionConverter) {
     super(context, defaultDatabase, schemaAndTablePropertiesConverter, partitionConverter);
+  }
+
+  @Override
+  protected CatalogCompat catalogCompat() {
+    return CatalogCompatFlink120.INSTANCE;
   }
 }

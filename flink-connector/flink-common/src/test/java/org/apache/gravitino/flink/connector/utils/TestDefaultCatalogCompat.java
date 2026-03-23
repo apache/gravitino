@@ -30,12 +30,12 @@ import org.apache.flink.table.catalog.ResolvedSchema;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
-public class TestFlinkCatalogCompatUtils {
+public class TestDefaultCatalogCompat {
 
   @Test
   public void testCreateCatalogTable() {
     CatalogTable catalogTable =
-        FlinkCatalogCompatUtils.createCatalogTable(
+        DefaultCatalogCompat.INSTANCE.createCatalogTable(
             Schema.newBuilder().column("id", DataTypes.INT()).build(),
             "comment",
             Collections.singletonList("id"),
@@ -50,7 +50,7 @@ public class TestFlinkCatalogCompatUtils {
   @Test
   public void testSerializeCatalogTable() {
     CatalogTable catalogTable =
-        FlinkCatalogCompatUtils.createCatalogTable(
+        DefaultCatalogCompat.INSTANCE.createCatalogTable(
             Schema.newBuilder().column("id", DataTypes.INT()).build(),
             "comment",
             Collections.emptyList(),
@@ -64,7 +64,7 @@ public class TestFlinkCatalogCompatUtils {
                 null));
 
     Map<String, String> serialized =
-        FlinkCatalogCompatUtils.serializeCatalogTable(resolvedCatalogTable);
+        DefaultCatalogCompat.INSTANCE.serializeCatalogTable(resolvedCatalogTable);
 
     Assertions.assertEquals("id", serialized.get("schema.0.name"));
     Assertions.assertEquals("value", serialized.get("key"));

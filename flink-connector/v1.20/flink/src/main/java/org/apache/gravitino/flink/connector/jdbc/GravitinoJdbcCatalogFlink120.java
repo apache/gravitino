@@ -19,10 +19,16 @@
 
 package org.apache.gravitino.flink.connector.jdbc;
 
+import java.util.Optional;
+import org.apache.flink.connector.jdbc.core.database.catalog.factory.JdbcCatalogFactory;
+import org.apache.flink.connector.jdbc.core.table.JdbcDynamicTableFactory;
+import org.apache.flink.table.catalog.AbstractCatalog;
 import org.apache.flink.table.factories.CatalogFactory;
+import org.apache.flink.table.factories.Factory;
 import org.apache.gravitino.flink.connector.PartitionConverter;
 import org.apache.gravitino.flink.connector.SchemaAndTablePropertiesConverter;
-import org.apache.gravitino.flink.connector.utils.JdbcCatalogCompatUtils;
+import org.apache.gravitino.flink.connector.utils.CatalogCompat;
+import org.apache.gravitino.flink.connector.utils.CatalogCompatFlink120;
 
 public class GravitinoJdbcCatalogFlink120 extends GravitinoJdbcCatalog {
 
@@ -36,6 +42,20 @@ public class GravitinoJdbcCatalogFlink120 extends GravitinoJdbcCatalog {
         defaultDatabase,
         schemaAndTablePropertiesConverter,
         partitionConverter,
-        JdbcCatalogCompatUtils.createCoreJdbcCatalog(context));
+        createJdbcCatalog(context));
+  }
+
+  @Override
+  public Optional<Factory> getFactory() {
+    return Optional.of(new JdbcDynamicTableFactory());
+  }
+
+  @Override
+  protected CatalogCompat catalogCompat() {
+    return CatalogCompatFlink120.INSTANCE;
+  }
+
+  private static AbstractCatalog createJdbcCatalog(CatalogFactory.Context context) {
+    return (AbstractCatalog) new JdbcCatalogFactory().createCatalog(context);
   }
 }

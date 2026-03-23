@@ -23,6 +23,8 @@ import java.util.Map;
 import javax.annotation.Nullable;
 import org.apache.gravitino.flink.connector.PartitionConverter;
 import org.apache.gravitino.flink.connector.SchemaAndTablePropertiesConverter;
+import org.apache.gravitino.flink.connector.utils.CatalogCompat;
+import org.apache.gravitino.flink.connector.utils.CatalogCompatFlink120;
 import org.apache.hadoop.hive.conf.HiveConf;
 
 public class GravitinoHiveCatalogFlink120 extends GravitinoHiveCatalog {
@@ -43,5 +45,10 @@ public class GravitinoHiveCatalogFlink120 extends GravitinoHiveCatalog {
         partitionConverter,
         hiveConf,
         hiveVersion);
+  }
+
+  @Override
+  protected CatalogCompat catalogCompat() {
+    return CatalogCompatFlink120.INSTANCE;
   }
 }
