@@ -317,7 +317,8 @@ public abstract class BaseCatalog<T extends BaseCatalog>
     if (catalogCredentialManager == null) {
       synchronized (this) {
         if (catalogCredentialManager == null) {
-          this.catalogCredentialManager = new CatalogCredentialManager(name(), properties());
+          this.catalogCredentialManager =
+              new CatalogCredentialManager(name(), propertiesWithCredentialProviders());
         }
       }
     }
@@ -419,6 +420,16 @@ public abstract class BaseCatalog<T extends BaseCatalog>
       }
     }
     return properties;
+  }
+
+  /**
+   * Retrieves the properties of the catalog including credential providers. This method is used
+   * when we need to expose credential-related properties.
+   *
+   * @return A map of properties including credential providers.
+   */
+  public Map<String, String> propertiesWithCredentialProviders() {
+    return properties();
   }
 
   @Override

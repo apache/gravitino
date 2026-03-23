@@ -60,6 +60,9 @@ public enum TestDatabaseName {
   /** Represents the MySQL database used for testing the catalog integration with MySQL. */
   MYSQL_CATALOG_MYSQL_IT,
 
+  /** Represents the MySQL database used for testing catalog credential integration. */
+  MYSQL_CATALOG_CREDENTIAL_IT,
+
   PG_JDBC_BACKEND,
 
   /** Represents the PostgreSQL database for CatalogPostgreSqlIT. */
