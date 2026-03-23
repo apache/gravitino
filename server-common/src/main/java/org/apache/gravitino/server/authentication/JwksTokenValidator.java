@@ -58,7 +58,7 @@ public class JwksTokenValidator implements OAuthTokenValidator {
   private String jwksUri;
   private String expectedIssuer;
   private List<String> principalFields;
-  private List<String> groupFields;
+  private List<String> groupsFields;
   private long allowSkewSeconds;
   private PrincipalMapper principalMapper;
   private GroupMapper groupMapper;
@@ -68,7 +68,7 @@ public class JwksTokenValidator implements OAuthTokenValidator {
     this.jwksUri = config.get(OAuthConfig.JWKS_URI);
     this.expectedIssuer = config.get(OAuthConfig.AUTHORITY);
     this.principalFields = config.get(OAuthConfig.PRINCIPAL_FIELDS);
-    this.groupFields = config.get(OAuthConfig.GROUP_FIELDS);
+    this.groupsFields = config.get(OAuthConfig.GROUPS_FIELDS);
     this.allowSkewSeconds = config.get(OAuthConfig.ALLOW_SKEW_SECONDS);
 
     // Create principal mapper based on configuration
@@ -194,8 +194,8 @@ public class JwksTokenValidator implements OAuthTokenValidator {
 
   /** Extracts the groups from the validated JWT claims using configured field(s). */
   private List<String> extractGroups(JWTClaimsSet validatedClaims) {
-    if (groupFields != null && !groupFields.isEmpty()) {
-      for (String field : groupFields) {
+    if (groupsFields != null && !groupsFields.isEmpty()) {
+      for (String field : groupsFields) {
         if (StringUtils.isNotBlank(field)) {
           try {
             List<String> groups = validatedClaims.getStringListClaim(field);

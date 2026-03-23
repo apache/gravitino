@@ -138,7 +138,7 @@ public interface OAuthConfig {
           .toSequence()
           .createWithDefault(java.util.Arrays.asList("sub"));
 
-  ConfigEntry<List<String>> GROUP_FIELDS =
+  ConfigEntry<List<String>> GROUPS_FIELDS =
       new ConfigBuilder(OAUTH_CONFIG_PREFIX + "groupsFields")
           .doc(
               "JWT claim field(s) to use as groups. Comma-separated list for fallback in order (e.g., 'groups,roles').")

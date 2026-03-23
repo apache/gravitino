@@ -63,7 +63,7 @@ public class StaticSignKeyValidator implements OAuthTokenValidator {
   private PrincipalMapper principalMapper;
   private List<String> principalFields;
   private GroupMapper groupMapper;
-  private List<String> groupFields;
+  private List<String> groupsFields;
 
   @Override
   public void initialize(Config config) {
@@ -78,7 +78,7 @@ public class StaticSignKeyValidator implements OAuthTokenValidator {
     String algType = config.get(OAuthConfig.SIGNATURE_ALGORITHM_TYPE);
     this.defaultSigningKey = decodeSignKey(Base64.getDecoder().decode(configuredSignKey), algType);
     this.principalFields = config.get(OAuthConfig.PRINCIPAL_FIELDS);
-    this.groupFields = config.get(OAuthConfig.GROUP_FIELDS);
+    this.groupsFields = config.get(OAuthConfig.GROUPS_FIELDS);
 
     // Create principal mapper based on configuration
     String mapperType = config.get(OAuthConfig.PRINCIPAL_MAPPER);
@@ -162,8 +162,8 @@ public class StaticSignKeyValidator implements OAuthTokenValidator {
 
   /** Extracts the groups from the validated JWT claims using configured field(s). */
   private List<String> extractGroups(Claims claims) {
-    if (groupFields != null && !groupFields.isEmpty()) {
-      for (String field : groupFields) {
+    if (groupsFields != null && !groupsFields.isEmpty()) {
+      for (String field : groupsFields) {
         if (StringUtils.isNotBlank(field)) {
           try {
             Object groups = claims.get(field);

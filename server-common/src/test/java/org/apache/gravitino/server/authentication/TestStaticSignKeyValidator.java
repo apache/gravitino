@@ -489,7 +489,7 @@ public class TestStaticSignKeyValidator {
   @Test
   public void testValidateTokenWithGroups() {
     Map<String, String> config = createBaseConfig();
-    config.put("gravitino.authenticator.oauth.groupFields", "groups");
+    config.put("gravitino.authenticator.oauth.groupsFields", "groups");
     validator.initialize(createConfig(config));
 
     // Create token with groups
