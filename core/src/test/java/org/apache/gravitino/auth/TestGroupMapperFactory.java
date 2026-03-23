@@ -85,7 +85,7 @@ public class TestGroupMapperFactory {
             () -> {
               GroupMapperFactory.create("unknown.InvalidClass", null);
             });
-    assertTrue(exception.getMessage().contains("Failed to create GroupMapper"));
+    assertTrue(exception.getMessage().contains("Failed to load GroupMapper class"));
   }
 
   public static class TestCustomGroupMapper implements GroupMapper {

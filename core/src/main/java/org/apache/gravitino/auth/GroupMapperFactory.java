@@ -52,6 +52,9 @@ public class GroupMapperFactory {
             "Class " + mapperType + " does not implement GroupMapper");
       }
       return (GroupMapper) clazz.getDeclaredConstructor().newInstance();
+    } catch (ClassNotFoundException e) {
+      LOG.error("Failed to load GroupMapper class: {}", mapperType, e);
+      throw new IllegalArgumentException("Failed to load GroupMapper class: " + mapperType, e);
     } catch (Exception e) {
       LOG.error("Failed to create GroupMapper: {}", mapperType, e);
       throw new IllegalArgumentException("Failed to create GroupMapper: " + mapperType, e);
