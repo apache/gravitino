@@ -126,13 +126,12 @@ jobs:
             backend: 'postgresql'
           - test-mode: 'deploy'
             backend: 'h2'
-    uses: apache/gravitino/.github/workflows/backend-integration-test-action.yml@branch-backend-it-maintenance-routing-explicit
+    uses: ./.github/workflows/backend-integration-test-action.yml
     with:
       architecture: ${{ matrix.architecture }}
       java-version: ${{ matrix.java-version }}
       backend: ${{ matrix.backend }}
       test-mode: ${{ matrix.test-mode }}
-      maintenance_only: ${{ needs.changes.outputs.maintenance_module_only_changes }}
       changed-catalogs-contrib-modules: ${{ needs.changes.outputs.changed_catalogs_contrib_modules }}
 
   BackendIT-on-pr:
@@ -151,11 +150,10 @@ jobs:
             backend: 'postgresql'
           - test-mode: 'deploy'
             backend: 'h2'
-    uses: apache/gravitino/.github/workflows/backend-integration-test-action.yml@branch-backend-it-maintenance-routing-explicit
+    uses: ./.github/workflows/backend-integration-test-action.yml
     with:
       architecture: ${{ matrix.architecture }}
       java-version: ${{ matrix.java-version }}
       backend: ${{ matrix.backend }}
       test-mode: ${{ matrix.test-mode }}
-      maintenance_only: ${{ needs.changes.outputs.maintenance_module_only_changes }}
       changed-catalogs-contrib-modules: ${{ needs.changes.outputs.changed_catalogs_contrib_modules }}

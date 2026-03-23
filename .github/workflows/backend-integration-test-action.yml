@@ -25,11 +25,6 @@ on:
         description: 'space-separated changed catalogs-contrib module names, or __all__'
         type: string
         default: ''
-      maintenance_only:
-        required: false
-        description: 'run only maintenance integration tests'
-        type: string
-        default: 'false'
 
 jobs:
   start-runner:
@@ -78,44 +73,37 @@ jobs:
             -PskipDockerTests=false
           )
 
-          if [ "${{ inputs.maintenance_only }}" = "true" ]; then
-            gradle_args+=(
-              :maintenance:optimizer:test
-              :maintenance:jobs:test
-            )
-          else
-            ALL_CONTRIB_MODULES="$(find catalogs-contrib -mindepth 1 -maxdepth 1 -type d -name 'catalog-*' -exec basename {} \; | sort)"
-            CHANGED_CONTRIB_MODULES="${{ inputs.changed-catalogs-contrib-modules }}"
+          ALL_CONTRIB_MODULES="$(find catalogs-contrib -mindepth 1 -maxdepth 1 -type d -name 'catalog-*' -exec basename {} \; | sort)"
+          CHANGED_CONTRIB_MODULES="${{ inputs.changed-catalogs-contrib-modules }}"
 
-            gradle_args+=(
-              test
-              -x :web:web:test
-              -x :web:integration-test:test
-              -x :web-v2:web:test
-              -x :web-v2:integration-test:test
-              -x :clients:client-python:test
-              -x :flink-connector:flink:test
-              -x :spark-connector:spark-common:test
-              -x :spark-connector:spark-3.3:test
-              -x :spark-connector:spark-3.4:test
-              -x :spark-connector:spark-3.5:test
-              -x :spark-connector:spark-runtime-3.3:test
-              -x :spark-connector:spark-runtime-3.4:test
-              -x :spark-connector:spark-runtime-3.5:test
-              -x :trino-connector:integration-test:test
-              -x :trino-connector:trino-connector:test
-              -x :authorizations:authorization-chain:test
-              -x :authorizations:authorization-ranger:test
-              -x :clients:cli:test
-            )
+          gradle_args+=(
+            test
+            -x :web:web:test
+            -x :web:integration-test:test
+            -x :web-v2:web:test
+            -x :web-v2:integration-test:test
+            -x :clients:client-python:test
+            -x :flink-connector:flink:test
+            -x :spark-connector:spark-common:test
+            -x :spark-connector:spark-3.3:test
+            -x :spark-connector:spark-3.4:test
+            -x :spark-connector:spark-3.5:test
+            -x :spark-connector:spark-runtime-3.3:test
+            -x :spark-connector:spark-runtime-3.4:test
+            -x :spark-connector:spark-runtime-3.5:test
+            -x :trino-connector:integration-test:test
+            -x :trino-connector:trino-connector:test
+            -x :authorizations:authorization-chain:test
+            -x :authorizations:authorization-ranger:test
+            -x :clients:cli:test
+          )
 
-            if [ "$CHANGED_CONTRIB_MODULES" != "__all__" ]; then
-              for module in $ALL_CONTRIB_MODULES; do
-                if [[ " $CHANGED_CONTRIB_MODULES " != *" $module "* ]]; then
-                  gradle_args+=("-x" ":catalogs-contrib:$module:test")
-                fi
-              done
-            fi
+          if [ "$CHANGED_CONTRIB_MODULES" != "__all__" ]; then
+            for module in $ALL_CONTRIB_MODULES; do
+              if [[ " $CHANGED_CONTRIB_MODULES " != *" $module "* ]]; then
+                gradle_args+=("-x" ":catalogs-contrib:$module:test")
+              fi
+            done
           fi
 
           printf './gradlew'
