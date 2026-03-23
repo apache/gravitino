@@ -494,6 +494,17 @@ public class TestStaticSignKeyValidator {
     config.put("gravitino.authenticator.oauth.groupsFields", "groups");
     validator.initialize(createConfig(config));
 
+    // token json:
+    // {
+    //  "sub": "test-user",
+    //  "groups": [
+    //    "group1",
+    //    "group2"
+    //  ],
+    //  "aud": "test-service",
+    //  "iat": xxxxxxxxxx,
+    //  "exp": xxxxxxxxxx
+    //}
     // Create token with groups
     String token =
         Jwts.builder()
