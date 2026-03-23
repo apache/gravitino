@@ -24,6 +24,7 @@ import static org.apache.hadoop.minikdc.MiniKdc.MAX_TICKET_LIFETIME;
 
 import com.google.common.collect.Maps;
 import java.io.File;
+import java.net.URISyntaxException;
 import java.security.PrivilegedAction;
 import java.util.Arrays;
 import java.util.Map;
@@ -164,14 +165,15 @@ public abstract class FlinkHiveKerberosClientIT extends FlinkEnvIT {
 
     // Create a new catalog with Kerberos authentication using SQL
     String catalogName = "gravitino_hive_kerberos";
+    String hiveConfDir = getSharedHiveConfDir();
     tableEnv.executeSql(
         String.format(
             "CREATE CATALOG %s WITH ("
                 + "'type'='gravitino-hive', "
-                + "'hive-conf-dir'='src/test/resources/flink-tests',"
+                + "'hive-conf-dir'='%s',"
                 + "'hive.metastore.uris'='%s'"
                 + ")",
-            catalogName, hiveMetastoreUri));
+            catalogName, hiveConfDir, hiveMetastoreUri));
 
     // Verify catalog exists in Gravitino
     Assertions.assertTrue(metalake.catalogExists(catalogName));
@@ -194,7 +196,7 @@ public abstract class FlinkHiveKerberosClientIT extends FlinkEnvIT {
             .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
     Assertions.assertEquals(2, flinkProperties.size());
     Assertions.assertEquals(
-        "src/test/resources/flink-tests",
+        hiveConfDir,
         flinkProperties.get(flinkByPass(HiveCatalogFactoryOptions.HIVE_CONF_DIR.key())));
     Assertions.assertEquals(
         GravitinoHiveCatalogFactoryOptions.IDENTIFIER,
@@ -239,5 +241,18 @@ public abstract class FlinkHiveKerberosClientIT extends FlinkEnvIT {
 
   private static String removeRealm(String principal) {
     return principal.substring(0, principal.lastIndexOf("@"));
+  }
+
+  private static String getSharedHiveConfDir() {
+    try {
+      return java.nio.file.Paths.get(
+              org.apache.flink.util.Preconditions.checkNotNull(
+                      FlinkHiveKerberosClientIT.class.getResource("/flink-tests"),
+                      "Cannot locate shared hive test resources")
+                  .toURI())
+          .toString();
+    } catch (URISyntaxException e) {
+      throw new RuntimeException("Failed to resolve shared hive test resources", e);
+    }
   }
 }
