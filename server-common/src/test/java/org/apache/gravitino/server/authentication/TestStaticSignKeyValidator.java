@@ -20,8 +20,10 @@
 package org.apache.gravitino.server.authentication;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.SignatureAlgorithm;
@@ -36,6 +38,7 @@ import java.util.Date;
 import java.util.HashMap;
 import java.util.Map;
 import org.apache.gravitino.Config;
+import org.apache.gravitino.UserPrincipal;
 import org.apache.gravitino.exceptions.UnauthorizedException;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -484,5 +487,44 @@ public class TestStaticSignKeyValidator {
     Principal principal = validator.validateToken(token, serviceAudience);
     assertNotNull(principal);
     assertEquals("john.doe", principal.getName()); // Mapper extracted local part
+  }
+
+  @Test
+  public void testValidateTokenWithGroups() {
+    Map<String, String> config = createBaseConfig();
+    config.put("gravitino.authenticator.oauth.groupsFields", "groups");
+    validator.initialize(createConfig(config));
+
+    // token json:
+    // {
+    //  "sub": "test-user",
+    //  "groups": [
+    //    "group1",
+    //    "group2"
+    //  ],
+    //  "aud": "test-service",
+    //  "iat": xxxxxxxxxx,
+    //  "exp": xxxxxxxxxx
+    // }
+    // Create token with groups
+    String token =
+        Jwts.builder()
+            .setSubject("test-user")
+            .claim("groups", Arrays.asList("group1", "group2"))
+            .setAudience(serviceAudience)
+            .setIssuedAt(Date.from(Instant.now()))
+            .setExpiration(Date.from(Instant.now().plusSeconds(3600)))
+            .signWith(hmacKey, SignatureAlgorithm.HS256)
+            .compact();
+
+    Principal principal = validator.validateToken(token, serviceAudience);
+    assertNotNull(principal);
+    assertEquals("test-user", principal.getName());
+
+    // Check if principal is UserPrincipal and has groups
+    UserPrincipal userPrincipal = assertInstanceOf(UserPrincipal.class, principal);
+    assertEquals(2, userPrincipal.getGroups().size());
+    assertTrue(userPrincipal.getGroups().stream().anyMatch(g -> g.getGroupname().equals("group1")));
+    assertTrue(userPrincipal.getGroups().stream().anyMatch(g -> g.getGroupname().equals("group2")));
   }
 }
