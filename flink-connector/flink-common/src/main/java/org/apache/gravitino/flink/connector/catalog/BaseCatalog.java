@@ -584,6 +584,8 @@ public abstract class BaseCatalog extends AbstractCatalog {
   }
 
   protected CatalogCompat catalogCompat() {
+    // Versioned catalog entry classes override this hook when the Flink minor has a different
+    // catalog/table API path.
     return DefaultCatalogCompat.INSTANCE;
   }
 

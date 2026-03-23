@@ -25,6 +25,7 @@ import org.apache.flink.table.api.Schema;
 import org.apache.flink.table.catalog.CatalogTable;
 import org.apache.flink.table.catalog.ResolvedCatalogTable;
 
+/** Typed compatibility hook that is implemented per Flink minor version. */
 public interface CatalogCompat {
 
   CatalogTable createCatalogTable(

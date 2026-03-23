@@ -32,6 +32,7 @@ public enum CatalogCompatFlink120 implements CatalogCompat {
   @Override
   public CatalogTable createCatalogTable(
       Schema schema, String comment, List<String> partitionKeys, Map<String, String> options) {
+    // Flink 1.20 deprecates CatalogTable.of(...), so the versioned compat must use the builder.
     return CatalogTable.newBuilder()
         .schema(schema)
         .comment(comment)
