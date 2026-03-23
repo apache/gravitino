@@ -132,7 +132,7 @@ jobs:
       java-version: ${{ matrix.java-version }}
       backend: ${{ matrix.backend }}
       test-mode: ${{ matrix.test-mode }}
-      maintenance_only: ${{ needs.changes.outputs.maintenance_module_only_changes == 'true' }}
+      maintenance_only: ${{ needs.changes.outputs.maintenance_module_only_changes }}
       changed-catalogs-contrib-modules: ${{ needs.changes.outputs.changed_catalogs_contrib_modules }}
 
   BackendIT-on-pr:
@@ -157,5 +157,5 @@ jobs:
       java-version: ${{ matrix.java-version }}
       backend: ${{ matrix.backend }}
       test-mode: ${{ matrix.test-mode }}
-      maintenance_only: ${{ needs.changes.outputs.maintenance_module_only_changes == 'true' }}
+      maintenance_only: ${{ needs.changes.outputs.maintenance_module_only_changes }}
       changed-catalogs-contrib-modules: ${{ needs.changes.outputs.changed_catalogs_contrib_modules }}
