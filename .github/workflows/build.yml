@@ -68,7 +68,7 @@ jobs:
 
       - name: Build with Gradle
         run: |
-          ./gradlew release -x test
+          ./gradlew assemble
 
   # To check the spark-connector is compatible with scala2.13
   spark-connector-build:
@@ -143,9 +143,6 @@ jobs:
       - name: Build with Gradle (skip mcp-server tests)
         if: needs.changes.outputs.mcp_server_changes != 'true'
         run: ./gradlew build -PskipITs -PskipDockerTests=false -x :clients:client-python:build -x :mcp-server:build -x :mcp-server:test -x :mcp-server:pylint
-
-      - name: Release with Gradle
-        run: ./gradlew clean && ./gradlew release -x test --rerun-tasks
 
       - name: Upload unit tests report
         uses: actions/upload-artifact@v4
