@@ -25,6 +25,7 @@ import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Lists;
 import java.io.IOException;
+import java.net.URISyntaxException;
 import java.nio.charset.StandardCharsets;
 import java.security.PrivilegedAction;
 import java.sql.Connection;
@@ -198,6 +199,19 @@ public abstract class FlinkHiveCatalogIT extends FlinkCommonIT {
     }
   }
 
+  protected String getSharedHiveConfDir() {
+    try {
+      return java.nio.file.Paths.get(
+              Preconditions.checkNotNull(
+                      FlinkHiveCatalogIT.class.getResource("/flink-tests"),
+                      "Cannot locate shared hive test resources")
+                  .toURI())
+          .toString();
+    } catch (URISyntaxException e) {
+      throw new RuntimeException("Failed to resolve shared hive test resources", e);
+    }
+  }
+
   @Test
   public void testCreateGravitinoHiveCatalog() {
     tableEnv.useCatalog(DEFAULT_CATALOG);
@@ -210,7 +224,8 @@ public abstract class FlinkHiveCatalogIT extends FlinkCommonIT {
     Configuration configuration = new Configuration();
     configuration.set(
         CommonCatalogOptions.CATALOG_TYPE, GravitinoHiveCatalogFactoryOptions.IDENTIFIER);
-    configuration.set(HiveCatalogFactoryOptions.HIVE_CONF_DIR, "src/test/resources/flink-tests");
+    String hiveConfDir = getSharedHiveConfDir();
+    configuration.set(HiveCatalogFactoryOptions.HIVE_CONF_DIR, hiveConfDir);
     configuration.set(GravitinoHiveCatalogFactoryOptions.HIVE_METASTORE_URIS, hiveMetastoreUri);
     CatalogDescriptor catalogDescriptor = CatalogDescriptor.of(catalogName, configuration);
     tableEnv.createCatalog(catalogName, catalogDescriptor);
@@ -228,7 +243,7 @@ public abstract class FlinkHiveCatalogIT extends FlinkCommonIT {
             .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
     Assertions.assertEquals(2, flinkProperties.size());
     Assertions.assertEquals(
-        "src/test/resources/flink-tests",
+        hiveConfDir,
         flinkProperties.get(flinkByPass(HiveCatalogFactoryOptions.HIVE_CONF_DIR.key())));
     Assertions.assertEquals(
         GravitinoHiveCatalogFactoryOptions.IDENTIFIER,
@@ -273,15 +288,16 @@ public abstract class FlinkHiveCatalogIT extends FlinkCommonIT {
 
     // Create a new catalog.
     String catalogName = "gravitino_hive_sql";
+    String hiveConfDir = getSharedHiveConfDir();
     tableEnv.executeSql(
         String.format(
             "create catalog %s with ("
                 + "'type'='gravitino-hive', "
-                + "'hive-conf-dir'='src/test/resources/flink-tests',"
+                + "'hive-conf-dir'='%s',"
                 + "'hive.metastore.uris'='%s',"
                 + "'unknown.key'='unknown.value'"
                 + ")",
-            catalogName, hiveMetastoreUri));
+            catalogName, hiveConfDir, hiveMetastoreUri));
     Assertions.assertTrue(metalake.catalogExists(catalogName));
 
     // Check the properties of the created catalog.
@@ -294,7 +310,7 @@ public abstract class FlinkHiveCatalogIT extends FlinkCommonIT {
             .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
     Assertions.assertEquals(3, flinkProperties.size());
     Assertions.assertEquals(
-        "src/test/resources/flink-tests",
+        hiveConfDir,
         flinkProperties.get(flinkByPass(HiveCatalogFactoryOptions.HIVE_CONF_DIR.key())));
     Assertions.assertEquals(
         GravitinoHiveCatalogFactoryOptions.IDENTIFIER,
@@ -350,13 +366,14 @@ public abstract class FlinkHiveCatalogIT extends FlinkCommonIT {
     Assertions.assertThrows(
         ValidationException.class,
         () -> {
+          String hiveConfDir = getSharedHiveConfDir();
           tableEnv.executeSql(
               String.format(
                   "create catalog %s with ("
                       + "'type'='gravitino-hive', "
-                      + "'hive-conf-dir'='src/test/resources/flink-tests'"
+                      + "'hive-conf-dir'='%s'"
                       + ")",
-                  catalogName));
+                  catalogName, hiveConfDir));
         },
         "The hive.metastore.uris is required.");
 
@@ -414,7 +431,7 @@ public abstract class FlinkHiveCatalogIT extends FlinkCommonIT {
             null,
             ImmutableMap.of(
                 "flink.bypass.hive-conf-dir",
-                "src/test/resources/flink-tests",
+                getSharedHiveConfDir(),
                 "flink.bypass.hive.test",
                 "hive.config",
                 "metastore.uris",

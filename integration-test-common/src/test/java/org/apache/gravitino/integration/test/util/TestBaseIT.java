@@ -16,31 +16,25 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-
-package org.apache.gravitino.flink.connector.integration.test.hive;
+package org.apache.gravitino.integration.test.util;
 
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
-public class FlinkHiveCatalogIT120 extends FlinkHiveCatalogIT {
+public class TestBaseIT {
 
-  @Override
   @Test
-  public void testCreateGravitinoHiveCatalogRequireOptions() {
-    tableEnv.useCatalog(DEFAULT_CATALOG);
+  public void testAuxiliaryServiceNames() {
+    Assertions.assertEquals("", BaseIT.auxiliaryServiceNames(true, true));
+    Assertions.assertEquals("iceberg-rest", BaseIT.auxiliaryServiceNames(false, true));
+    Assertions.assertEquals("lance-rest", BaseIT.auxiliaryServiceNames(true, false));
+    Assertions.assertEquals("iceberg-rest,lance-rest", BaseIT.auxiliaryServiceNames(false, false));
+  }
 
-    String catalogName = "gravitino_hive_sql2";
-    Assertions.assertThrows(
-        IllegalArgumentException.class,
-        () ->
-            tableEnv.executeSql(
-                String.format(
-                    "create catalog %s with ("
-                        + "'type'='gravitino-hive', "
-                        + "'hive-conf-dir'='%s'"
-                        + ")",
-                    catalogName, getSharedHiveConfDir())));
-
-    Assertions.assertFalse(metalake.catalogExists(catalogName));
+  @Test
+  public void testNormalizeHostForLocalAccess() {
+    Assertions.assertEquals("127.0.0.1", BaseIT.normalizeHostForLocalAccess("0.0.0.0"));
+    Assertions.assertEquals("127.0.0.1", BaseIT.normalizeHostForLocalAccess("::"));
+    Assertions.assertEquals("localhost", BaseIT.normalizeHostForLocalAccess("localhost"));
   }
 }
