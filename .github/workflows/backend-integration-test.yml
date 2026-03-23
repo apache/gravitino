@@ -126,7 +126,7 @@ jobs:
             backend: 'postgresql'
           - test-mode: 'deploy'
             backend: 'h2'
-    uses: ./.github/workflows/backend-integration-test-action.yml
+    uses: apache/gravitino/.github/workflows/backend-integration-test-action.yml@branch-backend-it-maintenance-routing-explicit
     with:
       architecture: ${{ matrix.architecture }}
       java-version: ${{ matrix.java-version }}
@@ -151,7 +151,7 @@ jobs:
             backend: 'postgresql'
           - test-mode: 'deploy'
             backend: 'h2'
-    uses: ./.github/workflows/backend-integration-test-action.yml
+    uses: apache/gravitino/.github/workflows/backend-integration-test-action.yml@branch-backend-it-maintenance-routing-explicit
     with:
       architecture: ${{ matrix.architecture }}
       java-version: ${{ matrix.java-version }}
