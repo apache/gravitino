@@ -504,7 +504,7 @@ public class TestStaticSignKeyValidator {
     //  "aud": "test-service",
     //  "iat": xxxxxxxxxx,
     //  "exp": xxxxxxxxxx
-    //}
+    // }
     // Create token with groups
     String token =
         Jwts.builder()

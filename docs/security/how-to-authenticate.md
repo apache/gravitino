@@ -117,6 +117,24 @@ GravitinoClient client = GravitinoClient.builder(uri)
 
 Gravitino supports principal mapping to transform authenticated principals (from OAuth or Kerberos) into user identities for authorization. By default, Gravitino uses regex-based mapping.
 
+### Group mapping
+
+Gravitino supports group mapping to transform authenticated groups (from OAuth) into Gravitino groups for authorization. By default, Gravitino uses regex-based mapping.
+
+#### OAuth group mapping
+
+For OAuth authentication, groups are extracted from JWT claims (configured via `gravitino.authenticator.oauth.groupsFields`). You can customize how these groups are mapped:
+
+```text
+# Use default regex mapper that extracts everything (passes through unchanged)
+gravitino.authenticator.oauth.groupMapper = regex
+gravitino.authenticator.oauth.groupMapper.regex.pattern = ^(.*)$
+
+# Extract group from a complex string (e.g., /group -> group)
+gravitino.authenticator.oauth.groupMapper = regex
+gravitino.authenticator.oauth.groupMapper.regex.pattern = ^/(.*)
+```
+
 #### OAuth principal mapping
 
 For OAuth authentication, principals are extracted from JWT claims (configured via `gravitino.authenticator.oauth.principalFields`). You can customize how these principals are mapped:
@@ -208,9 +226,12 @@ Gravitino server and Gravitino Iceberg REST server share the same configuration 
 | `gravitino.authenticator.oauth.scope`               | OAuth scopes for Web UI authentication (space-separated).                                                                                                                                                                                                               | (none)                                                              | Yes if provider is `oidc`                                                                       | 1.0.0            |
 | `gravitino.authenticator.oauth.jwksUri`             | JWKS URI for server-side OAuth token validation. Required when using JWKS-based validation.                                                                                                                                                                             | (none)                                                              | Yes if `tokenValidatorClass` is `org.apache.gravitino.server.authentication.JwksTokenValidator` | 1.0.0            |
 | `gravitino.authenticator.oauth.principalFields`     | JWT claim field(s) to use as principal identity. Comma-separated list for fallback in order (e.g., 'preferred_username,email,sub').                                                                                                                                     | `sub`                                                               | No                                                                                              | 1.0.0            |
+| `gravitino.authenticator.oauth.groupsFields`        | JWT claim field(s) to use as group membership. Comma-separated list for fallback in order (e.g., 'groups,roles').                                                                                                                                                       | (none)                                                              | No                                                                                              | 1.2.0            |
 | `gravitino.authenticator.oauth.tokenValidatorClass` | Fully qualified class name of the OAuth token validator implementation. Use `org.apache.gravitino.server.authentication.JwksTokenValidator` for JWKS-based validation or `org.apache.gravitino.server.authentication.StaticSignKeyValidator` for static key validation. | `org.apache.gravitino.server.authentication.StaticSignKeyValidator` | No                                                                                              | 1.0.0            |
 | `gravitino.authenticator.oauth.principalMapper` | Principal mapper type for OAuth. Use 'regex' for regex-based mapping, or provide a fully qualified class name implementing `org.apache.gravitino.auth.PrincipalMapper`.                                                                                                 | `regex`                                                             | No                                                                                              | 1.2.0            |
 | `gravitino.authenticator.oauth.principalMapper.regex.pattern` | Regex pattern for OAuth principal mapping. First capture group becomes the mapped principal. Only used when principalMapper is 'regex'.                                                                                                                           | `^(.*)$`                                                            | No                                                                                              | 1.2.0            |
+| `gravitino.authenticator.oauth.groupMapper` | Group mapper type for OAuth. Use 'regex' for regex-based mapping, or provide a fully qualified class name implementing `org.apache.gravitino.auth.GroupMapper`.                                                                                                         | `regex`                                                             | No                                                                                              | 1.2.0            |
+| `gravitino.authenticator.oauth.groupMapper.regex.pattern` | Regex pattern for OAuth group mapping. First capture group becomes the mapped group. Only used when groupMapper is 'regex'.                                                                                                                                       | `^(.*)$`                                                            | No                                                                                              | 1.2.0            |
 | `gravitino.authenticator.kerberos.principal`        | Indicates the Kerberos principal to be used for HTTP endpoint. Principal should start with `HTTP/`.                                                                                                                                                                     | (none)                                                              | Yes if use `kerberos` as the authenticator                                                      | 0.4.0            |
 | `gravitino.authenticator.kerberos.keytab`           | Location of the keytab file with the credentials for the principal.                                                                                                                                                                                                     | (none)                                                              | Yes if use `kerberos` as the authenticator                                                      | 0.4.0            |
 | `gravitino.authenticator.kerberos.principalMapper` | Principal mapper type for Kerberos. Use 'regex' for regex-based mapping, or provide a fully qualified class name implementing `org.apache.gravitino.auth.PrincipalMapper`.                                                                                            | `regex`                                                             | No                                                                                              | 1.2.0            |
