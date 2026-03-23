@@ -1,0 +1,98 @@
+name: Trino Multi-Version Integration Test
+
+on:
+  workflow_dispatch:
+
+jobs:
+  TrinoMultiVersionIT:
+    runs-on: ubuntu-latest
+    timeout-minutes: 240
+    env:
+      CONNECTOR_DIR: ${{ github.workspace }}/trino-connector
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          java-version: 17
+          distribution: 'temurin'
+          cache: 'gradle'
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+
+      - name: Check required command
+        run: dev/ci/check_commands.sh
+
+      - name: Build Gravitino
+        run: |
+          ./gradlew build -x test \
+            -x :web:web:build -x :web:integration-test:build \
+            -x :web-v2:web:build -x :web-v2:integration-test:build \
+            -x :clients:client-python:build \
+            -x :flink-connector:flink:build \
+            -x :spark-connector:spark-common:build \
+            -x :spark-connector:spark-3.3:build -x :spark-connector:spark-3.4:build -x :spark-connector:spark-3.5:build \
+            -x :spark-connector:spark-runtime-3.3:build -x :spark-connector:spark-runtime-3.4:build -x :spark-connector:spark-runtime-3.5:build \
+            -x :mcp-server:build -x :lineage:build \
+            -x :maintenance:optimizer:build -x :maintenance:jobs:build \
+            -x :lance:lance-common:build -x :lance:lance-rest-server:build
+
+      - name: Free up disk space
+        run: dev/ci/util_free_space.sh
+
+      - name: Test Trino 478
+        run: |
+          trino-connector/integration-test/trino-test-tools/trino_integration_test.sh \
+            --auto=all --auto_patch --trino_version=478 \
+            --trino_connector_dir=${{ env.CONNECTOR_DIR }}/trino-connector-473-478/build/libs
+
+      - name: Test Trino 473
+        run: |
+          trino-connector/integration-test/trino-test-tools/trino_integration_test.sh \
+            --auto=all --auto_patch --trino_version=473 \
+            --trino_connector_dir=${{ env.CONNECTOR_DIR }}/trino-connector-473-478/build/libs
+
+      - name: Test Trino 469
+        run: |
+          trino-connector/integration-test/trino-test-tools/trino_integration_test.sh \
+            --auto=all --auto_patch --trino_version=469 \
+            --trino_connector_dir=${{ env.CONNECTOR_DIR }}/trino-connector-469-472/build/libs
+
+      - name: Test Trino 452
+        run: |
+          trino-connector/integration-test/trino-test-tools/trino_integration_test.sh \
+            --auto=all --auto_patch --trino_version=452 \
+            --trino_connector_dir=${{ env.CONNECTOR_DIR }}/trino-connector-452-468/build/libs
+
+      - name: Test Trino 446
+        run: |
+          trino-connector/integration-test/trino-test-tools/trino_integration_test.sh \
+            --auto=all --auto_patch --trino_version=446 \
+            --trino_connector_dir=${{ env.CONNECTOR_DIR }}/trino-connector-446-451/build/libs
+
+      - name: Test Trino 440
+        run: |
+          trino-connector/integration-test/trino-test-tools/trino_integration_test.sh \
+            --auto=all --auto_patch --trino_version=440 \
+            --trino_connector_dir=${{ env.CONNECTOR_DIR }}/trino-connector-440-445/build/libs
+
+      - name: Test Trino 435
+        run: |
+          trino-connector/integration-test/trino-test-tools/trino_integration_test.sh \
+            --auto=all --auto_patch --trino_version=435 \
+            --trino_connector_dir=${{ env.CONNECTOR_DIR }}/trino-connector-435-439/build/libs
+
+      - name: Upload test reports
+        uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: trino-multi-version-test-reports
+          path: |
+            build/reports
+            trino-connector/integration-test/build/*.log
+            trino-connector/integration-test/build/*.tar
+            integration-test-common/build/trino-ci-container-log
+            distribution/package/logs/gravitino-server.out
+            distribution/package/logs/gravitino-server.log
+            catalogs/**/*.log

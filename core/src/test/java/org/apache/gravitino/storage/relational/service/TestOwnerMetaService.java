@@ -23,8 +23,15 @@ import java.sql.Connection;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
+import java.util.Collections;
+import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
 import org.apache.gravitino.Entity;
+import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
+import org.apache.gravitino.RelationalEntity;
+import org.apache.gravitino.SupportsRelationOperations;
 import org.apache.gravitino.authorization.AuthorizationUtils;
 import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.meta.BaseMetalake;
@@ -489,6 +496,179 @@ class TestOwnerMetaService extends TestJDBCBackend {
     UserMetaService.getInstance().deleteUser(user.nameIdentifier());
     Assertions.assertEquals(24, countAllOwnerRel(user.id()));
     Assertions.assertEquals(0, countActiveOwnerRel(user.id()));
+  }
+
+  @TestTemplate
+  void testBatchGetOwnerWithUserOwners() throws IOException {
+    createAndInsertMakeLake(METALAKE_NAME);
+    CatalogEntity catalog = createAndInsertCatalog(METALAKE_NAME, CATALOG_NAME);
+    SchemaEntity schema = createAndInsertSchema(METALAKE_NAME, CATALOG_NAME, SCHEMA_NAME);
+    TableEntity table =
+        createTableEntity(
+            RandomIdGenerator.INSTANCE.nextId(),
+            Namespace.of(METALAKE_NAME, CATALOG_NAME, SCHEMA_NAME),
+            TABLE_NAME,
+            AUDIT_INFO);
+    backend.insert(table, false);
+    TopicEntity topic =
+        createTopicEntity(
+            RandomIdGenerator.INSTANCE.nextId(),
+            Namespace.of(METALAKE_NAME, CATALOG_NAME, SCHEMA_NAME),
+            TOPIC_NAME,
+            AUDIT_INFO);
+    backend.insert(topic, false);
+
+    UserEntity user =
+        createUserEntity(
+            RandomIdGenerator.INSTANCE.nextId(),
+            AuthorizationUtils.ofUserNamespace(METALAKE_NAME),
+            "user",
+            AUDIT_INFO);
+    backend.insert(user, false);
+
+    OwnerMetaService.getInstance()
+        .setOwner(catalog.nameIdentifier(), catalog.type(), user.nameIdentifier(), user.type());
+    OwnerMetaService.getInstance()
+        .setOwner(schema.nameIdentifier(), schema.type(), user.nameIdentifier(), user.type());
+    OwnerMetaService.getInstance()
+        .setOwner(table.nameIdentifier(), table.type(), user.nameIdentifier(), user.type());
+    OwnerMetaService.getInstance()
+        .setOwner(topic.nameIdentifier(), topic.type(), user.nameIdentifier(), user.type());
+
+    List<NameIdentifier> identifiers =
+        List.of(
+            catalog.nameIdentifier(),
+            schema.nameIdentifier(),
+            table.nameIdentifier(),
+            topic.nameIdentifier());
+
+    List<RelationalEntity<?>> relations =
+        OwnerMetaService.getInstance().batchGetOwner(identifiers, Entity.EntityType.CATALOG);
+    Assertions.assertEquals(1, relations.size());
+
+    // catalog is CATALOG type; schema/table/topic share the same owner but different types.
+    // batchGetOwner queries by a single identType, so query per type.
+    List<RelationalEntity<?>> catalogRelations =
+        OwnerMetaService.getInstance()
+            .batchGetOwner(List.of(catalog.nameIdentifier()), Entity.EntityType.CATALOG);
+    List<RelationalEntity<?>> schemaRelations =
+        OwnerMetaService.getInstance()
+            .batchGetOwner(List.of(schema.nameIdentifier()), Entity.EntityType.SCHEMA);
+    List<RelationalEntity<?>> tableRelations =
+        OwnerMetaService.getInstance()
+            .batchGetOwner(List.of(table.nameIdentifier()), Entity.EntityType.TABLE);
+    List<RelationalEntity<?>> topicRelations =
+        OwnerMetaService.getInstance()
+            .batchGetOwner(List.of(topic.nameIdentifier()), Entity.EntityType.TOPIC);
+
+    Assertions.assertEquals(1, catalogRelations.size());
+    Assertions.assertEquals(catalog.nameIdentifier(), catalogRelations.get(0).source());
+    Assertions.assertEquals(Entity.EntityType.CATALOG, catalogRelations.get(0).sourceType());
+    Assertions.assertEquals(Entity.EntityType.USER, catalogRelations.get(0).targetEntity().type());
+    Assertions.assertEquals(
+        SupportsRelationOperations.Type.OWNER_REL, catalogRelations.get(0).type());
+
+    Assertions.assertEquals(1, schemaRelations.size());
+    Assertions.assertEquals(schema.nameIdentifier(), schemaRelations.get(0).source());
+
+    Assertions.assertEquals(1, tableRelations.size());
+    Assertions.assertEquals(table.nameIdentifier(), tableRelations.get(0).source());
+
+    Assertions.assertEquals(1, topicRelations.size());
+    Assertions.assertEquals(topic.nameIdentifier(), topicRelations.get(0).source());
+
+    // All targets should be the same user
+    List<RelationalEntity<?>> allRelations =
+        List.of(
+            catalogRelations.get(0),
+            schemaRelations.get(0),
+            tableRelations.get(0),
+            topicRelations.get(0));
+    for (RelationalEntity<?> rel : allRelations) {
+      Assertions.assertEquals(user.nameIdentifier(), rel.targetEntity().nameIdentifier());
+    }
+  }
+
+  @TestTemplate
+  void testBatchGetOwnerWithMultipleEntitiesOfSameType() throws IOException {
+    createAndInsertMakeLake(METALAKE_NAME);
+    createAndInsertCatalog(METALAKE_NAME, CATALOG_NAME);
+    SchemaEntity schema1 = createAndInsertSchema(METALAKE_NAME, CATALOG_NAME, SCHEMA_NAME);
+    SchemaEntity schema2 = createAndInsertSchema(METALAKE_NAME, CATALOG_NAME, SCHEMA_NAME + "_2");
+    SchemaEntity schema3 = createAndInsertSchema(METALAKE_NAME, CATALOG_NAME, SCHEMA_NAME + "_3");
+
+    UserEntity user1 =
+        createUserEntity(
+            RandomIdGenerator.INSTANCE.nextId(),
+            AuthorizationUtils.ofUserNamespace(METALAKE_NAME),
+            "user1",
+            AUDIT_INFO);
+    backend.insert(user1, false);
+    UserEntity user2 =
+        createUserEntity(
+            RandomIdGenerator.INSTANCE.nextId(),
+            AuthorizationUtils.ofUserNamespace(METALAKE_NAME),
+            "user2",
+            AUDIT_INFO);
+    backend.insert(user2, false);
+
+    // schema1 -> user1, schema2 -> user2, schema3 has no owner
+    OwnerMetaService.getInstance()
+        .setOwner(schema1.nameIdentifier(), schema1.type(), user1.nameIdentifier(), user1.type());
+    OwnerMetaService.getInstance()
+        .setOwner(schema2.nameIdentifier(), schema2.type(), user2.nameIdentifier(), user2.type());
+
+    List<RelationalEntity<?>> relations =
+        OwnerMetaService.getInstance()
+            .batchGetOwner(
+                List.of(
+                    schema1.nameIdentifier(), schema2.nameIdentifier(), schema3.nameIdentifier()),
+                Entity.EntityType.SCHEMA);
+
+    Assertions.assertEquals(2, relations.size());
+
+    Map<NameIdentifier, NameIdentifier> sourceToTarget =
+        relations.stream()
+            .collect(
+                Collectors.toMap(RelationalEntity::source, r -> r.targetEntity().nameIdentifier()));
+
+    Assertions.assertEquals(user1.nameIdentifier(), sourceToTarget.get(schema1.nameIdentifier()));
+    Assertions.assertEquals(user2.nameIdentifier(), sourceToTarget.get(schema2.nameIdentifier()));
+    // schema3 has no owner — not present in results
+    Assertions.assertFalse(sourceToTarget.containsKey(schema3.nameIdentifier()));
+
+    // Verify RelationalEntity metadata
+    for (RelationalEntity<?> rel : relations) {
+      Assertions.assertEquals(SupportsRelationOperations.Type.OWNER_REL, rel.type());
+      Assertions.assertEquals(Entity.EntityType.SCHEMA, rel.sourceType());
+      Assertions.assertEquals(Entity.EntityType.USER, rel.targetEntity().type());
+    }
+  }
+
+  @TestTemplate
+  void testBatchGetOwnerWithEmptyInput() {
+    List<RelationalEntity<?>> relations =
+        OwnerMetaService.getInstance()
+            .batchGetOwner(Collections.emptyList(), Entity.EntityType.TABLE);
+    Assertions.assertNotNull(relations);
+    Assertions.assertTrue(relations.isEmpty());
+  }
+
+  @TestTemplate
+  void testBatchGetOwnerNoneHaveOwners() throws IOException {
+    createAndInsertMakeLake(METALAKE_NAME);
+    createAndInsertCatalog(METALAKE_NAME, CATALOG_NAME);
+    SchemaEntity schema1 = createAndInsertSchema(METALAKE_NAME, CATALOG_NAME, SCHEMA_NAME);
+    SchemaEntity schema2 = createAndInsertSchema(METALAKE_NAME, CATALOG_NAME, SCHEMA_NAME + "_2");
+
+    List<RelationalEntity<?>> relations =
+        OwnerMetaService.getInstance()
+            .batchGetOwner(
+                List.of(schema1.nameIdentifier(), schema2.nameIdentifier()),
+                Entity.EntityType.SCHEMA);
+
+    Assertions.assertNotNull(relations);
+    Assertions.assertTrue(relations.isEmpty());
   }
 
   private Integer countAllOwnerRel(Long ownerId) {
