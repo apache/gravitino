@@ -26,7 +26,11 @@ import org.apache.gravitino.metrics.MetricNames;
 public class RelationDatasourceMetricsSource extends MetricsSource {
 
   public RelationDatasourceMetricsSource(BasicDataSource dataSource) {
-    super(MetricsSource.GRAVITINO_RELATIONAL_STORE_METRIC_NAME);
+    this(dataSource, MetricsSource.GRAVITINO_RELATIONAL_STORE_METRIC_NAME);
+  }
+
+  public RelationDatasourceMetricsSource(BasicDataSource dataSource, String metricsSourceName) {
+    super(metricsSourceName);
     registerGauge(
         MetricNames.DATASOURCE_ACTIVE_CONNECTIONS, (Gauge<Integer>) dataSource::getNumActive);
     registerGauge(MetricNames.DATASOURCE_IDLE_CONNECTIONS, (Gauge<Integer>) dataSource::getNumIdle);

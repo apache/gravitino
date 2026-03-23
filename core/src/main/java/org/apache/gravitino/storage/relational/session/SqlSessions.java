@@ -27,89 +27,129 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- * SqlSessions is a utility class to maintain the MyBatis's {@link SqlSession} object. It is a
- * thread local class and should be used to get the {@link SqlSession} object. It also provides the
- * methods to commit, rollback and close the {@link SqlSession} object.
+ * Thread-local MyBatis {@link SqlSession} management for the entity store.
+ *
+ * <p>Write paths ({@link #getWriteSqlSession()}, {@link #getWriteMapper}) use the primary JDBC URL.
+ * Standalone reads ({@link #getReadMapper}) use the read-only JDBC URL when configured; if a write
+ * session is already active on the thread, reads use that session so nested calls and read-after
+ * write stay consistent.
  */
 public final class SqlSessions {
   private static final Logger LOG = LoggerFactory.getLogger(SqlSessions.class);
-  private static final ThreadLocal<SqlSession> sessions = new ThreadLocal<>();
-  private static final ThreadLocal<AtomicInteger> sessionCount =
-      ThreadLocal.withInitial(() -> new AtomicInteger(0));
+
+  private static final ThreadLocal<SqlSession> writeSessions = new ThreadLocal<>();
+  private static final ThreadLocal<AtomicInteger> writeSessionCount =
+      ThreadLocal.withInitial(AtomicInteger::new);
+
+  private static final ThreadLocal<SqlSession> readSessions = new ThreadLocal<>();
+  private static final ThreadLocal<AtomicInteger> readSessionCount =
+      ThreadLocal.withInitial(AtomicInteger::new);
 
   private SqlSessions() {}
 
   @VisibleForTesting
-  static ThreadLocal<SqlSession> getSessions() {
-    return sessions;
+  static ThreadLocal<SqlSession> getWriteSessions() {
+    return writeSessions;
+  }
+
+  @VisibleForTesting
+  static ThreadLocal<SqlSession> getReadSessions() {
+    return readSessions;
+  }
+
+  /** Returns true if a write transaction session is active on this thread. */
+  public static boolean isWriteSessionActive() {
+    return writeSessionCount.get().get() > 0;
   }
 
   @VisibleForTesting
   static Integer getSessionCount() {
-    return sessionCount.get().get();
+    return writeSessionCount.get().get();
   }
 
-  /**
-   * Get the SqlSession object. If the SqlSession object is not present in the thread local, then
-   * create a new SqlSession object and set it in the thread local. This method also increments the
-   * session count.
-   *
-   * @return SqlSession object from the thread local storage.
-   */
-  public static SqlSession getSqlSession() {
-    SqlSession sqlSession = sessions.get();
+  @VisibleForTesting
+  static Integer getReadSessionCount() {
+    return readSessionCount.get().get();
+  }
+
+  public static SqlSession getWriteSqlSession() {
+    SqlSession sqlSession = writeSessions.get();
     if (sqlSession == null) {
       sqlSession =
           SqlSessionFactoryHelper.getInstance()
-              .getSqlSessionFactory()
+              .getWriteSqlSessionFactory()
               .openSession(TransactionIsolationLevel.READ_COMMITTED);
-      sessions.set(sqlSession);
+      writeSessions.set(sqlSession);
     }
-    sessionCount.get().incrementAndGet();
+    writeSessionCount.get().incrementAndGet();
     return sqlSession;
   }
 
   /**
-   * Commit the SqlSession object and close it. It also removes the SqlSession object from the
-   * thread local storage.
+   * Opens or reuses a read-only SqlSession (auto-commit). Not used when nested under an active
+   * write session; use {@link #getReadMapper} instead.
    */
-  public static void commitAndCloseSqlSession() {
-    handleSessionClose(true /* commit */, false /* rollback */);
+  private static SqlSession getOrCreateReadSqlSession() {
+    SqlSession sqlSession = readSessions.get();
+    if (sqlSession == null) {
+      sqlSession =
+          SqlSessionFactoryHelper.getInstance().getReadSqlSessionFactory().openSession(true);
+      readSessions.set(sqlSession);
+    }
+    readSessionCount.get().incrementAndGet();
+    return sqlSession;
+  }
+
+  public static <T> T getWriteMapper(Class<T> className) {
+    return getWriteSqlSession().getMapper(className);
   }
 
   /**
-   * Rollback the SqlSession object and close it. It also removes the SqlSession object from the
-   * thread local storage.
+   * Mapper for read-only access. Uses the read replica when configured and no write transaction is
+   * active on this thread; otherwise uses the write session.
    */
-  public static void rollbackAndCloseSqlSession() {
-    handleSessionClose(false /* commit */, true /* rollback */);
+  public static <T> T getReadMapper(Class<T> className) {
+    if (writeSessionCount.get().get() > 0) {
+      writeSessionCount.get().incrementAndGet();
+      return writeSessions.get().getMapper(className);
+    }
+    return getOrCreateReadSqlSession().getMapper(className);
   }
 
-  /** Close the SqlSession object and remove it from the thread local storage. */
-  public static void closeSqlSession() {
-    handleSessionClose(false /* commit */, false /* rollback */);
+  /** Same as {@link #getWriteSqlSession()} for backward compatibility. */
+  public static SqlSession getSqlSession() {
+    return getWriteSqlSession();
   }
 
-  /**
-   * Get the Mapper object from the SqlSession object. This method will open a session if one is not
-   * already opened.
-   *
-   * @param <T> the type of the mapper interface.
-   * @param className the class name of the Mapper object.
-   * @return the Mapper object.
-   */
+  /** Prefer {@link #getWriteMapper(Class)}. */
   public static <T> T getMapper(Class<T> className) {
-    // getSqlSession() is called to ensure a session exists and increment the count.
-    return getSqlSession().getMapper(className);
+    return getWriteMapper(className);
   }
 
-  private static void handleSessionClose(boolean commit, boolean rollback) {
-    SqlSession sqlSession = sessions.get();
+  public static void commitAndCloseSqlSession() {
+    handleWriteSessionClose(true, false);
+  }
+
+  public static void rollbackAndCloseSqlSession() {
+    handleWriteSessionClose(false, true);
+  }
+
+  /** Decrements the write-session ref count; closes when the outermost scope ends. */
+  public static void closeSqlSession() {
+    handleWriteSessionClose(false, false);
+  }
+
+  /** Decrements the read-session ref count; closes when the outermost read scope ends. */
+  public static void closeReadSqlSession() {
+    handleReadSessionClose();
+  }
+
+  private static void handleWriteSessionClose(boolean commit, boolean rollback) {
+    SqlSession sqlSession = writeSessions.get();
     if (sqlSession == null) {
       return;
     }
-
-    int count = sessionCount.get().decrementAndGet();
+    int count = writeSessionCount.get().decrementAndGet();
     if (count == 0) {
       try {
         if (commit) {
@@ -119,21 +159,36 @@ public final class SqlSessions {
         }
       } finally {
         try {
-          // Ensure the session is always closed
           sqlSession.close();
         } finally {
-          // Ensure ThreadLocal is always cleaned up
-          sessions.remove();
-          sessionCount.remove();
+          writeSessions.remove();
+          writeSessionCount.remove();
         }
       }
     } else if (count < 0) {
-      // This should not happen if the session management is correct.
-      // Reset the count and remove the session to avoid further issues.
-      LOG.warn(
-          "Session count is negative: {}. Resetting session count and removing session.", count);
-      sessions.remove();
-      sessionCount.remove();
+      LOG.warn("Write session count is negative: {}. Resetting write session.", count);
+      writeSessions.remove();
+      writeSessionCount.remove();
+    }
+  }
+
+  private static void handleReadSessionClose() {
+    SqlSession sqlSession = readSessions.get();
+    if (sqlSession == null) {
+      return;
+    }
+    int count = readSessionCount.get().decrementAndGet();
+    if (count == 0) {
+      try {
+        sqlSession.close();
+      } finally {
+        readSessions.remove();
+        readSessionCount.remove();
+      }
+    } else if (count < 0) {
+      LOG.warn("Read session count is negative: {}. Resetting read session.", count);
+      readSessions.remove();
+      readSessionCount.remove();
     }
   }
 }
