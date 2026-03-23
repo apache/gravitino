@@ -102,8 +102,11 @@ import org.apache.gravitino.rel.Table;
 import org.apache.gravitino.rel.TableCatalog;
 import org.apache.gravitino.rel.ViewCatalog;
 import org.apache.gravitino.storage.IdGenerator;
+import org.apache.gravitino.utils.ClassLoaderKey;
+import org.apache.gravitino.utils.ClassLoaderPool;
 import org.apache.gravitino.utils.IsolatedClassLoader;
 import org.apache.gravitino.utils.NamespaceUtil;
+import org.apache.gravitino.utils.PooledClassLoaderEntry;
 import org.apache.gravitino.utils.PrincipalUtils;
 import org.apache.gravitino.utils.ThrowableFunction;
 import org.slf4j.Logger;
@@ -119,15 +122,33 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
   private static final Set<String> CONTRIB_CATALOGS_TYPES =
       ImmutableSet.of("jdbc-oceanbase", "jdbc-clickhouse", "jdbc-hologres");
 
+  private static final String AUTH_TYPE_KEY = "authentication.type";
+  private static final String KERBEROS_PRINCIPAL_KEY = "authentication.kerberos.principal";
+  private static final String KERBEROS_KEYTAB_KEY = "authentication.kerberos.keytab-uri";
+  private static final String AUTH_TYPE_KERBEROS = "kerberos";
+
   /** Wrapper class for a catalog instance and its class loader. */
   public static class CatalogWrapper {
 
     private BaseCatalog catalog;
     private IsolatedClassLoader classLoader;
+    private ClassLoaderPool pool;
+    private PooledClassLoaderEntry poolEntry;
 
     public CatalogWrapper(BaseCatalog catalog, IsolatedClassLoader classLoader) {
       this.catalog = catalog;
       this.classLoader = classLoader;
+    }
+
+    public CatalogWrapper(
+        BaseCatalog catalog,
+        IsolatedClassLoader classLoader,
+        ClassLoaderPool pool,
+        PooledClassLoaderEntry poolEntry) {
+      this.catalog = catalog;
+      this.classLoader = classLoader;
+      this.pool = pool;
+      this.poolEntry = poolEntry;
     }
 
     public BaseCatalog catalog() {
@@ -237,7 +258,7 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
       return classLoader.withClassLoader(cl -> catalog.capability());
     }
 
-    public void close() {
+    public synchronized void close() {
       try {
         classLoader.withClassLoader(
             cl -> {
@@ -251,7 +272,22 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
         LOG.warn("Failed to close catalog", e);
       }
 
-      classLoader.close();
+      if ((pool == null) != (poolEntry == null)) {
+        // This state should never occur. Prefer leaking one ClassLoader over destroying a
+        // ClassLoader that may still be shared by other catalogs through the pool.
+        LOG.warn(
+            "Inconsistent state: pool={}, poolEntry={}. Skipping cleanup to avoid corruption.",
+            pool,
+            poolEntry);
+        return;
+      }
+
+      if (pool != null && poolEntry != null) {
+        pool.release(poolEntry);
+        poolEntry = null;
+      } else {
+        classLoader.close();
+      }
     }
 
     private SupportsSchemas asSchemas() {
@@ -284,6 +320,8 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
   }
 
   private final Config config;
+
+  private final ClassLoaderPool classLoaderPool = new ClassLoaderPool();
 
   @Getter private final Cache<NameIdentifier, CatalogWrapper> catalogCache;
 
@@ -336,6 +374,7 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
   @Override
   public void close() {
     catalogCache.invalidateAll();
+    classLoaderPool.close();
   }
 
   /**
@@ -562,11 +601,15 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
               .build();
 
       CatalogWrapper wrapper = createCatalogWrapper(dummyEntity, mergedConfig);
-      wrapper.doWithCatalogOps(
-          c -> {
-            c.testConnection(ident, type, provider, comment, mergedConfig);
-            return null;
-          });
+      try {
+        wrapper.doWithCatalogOps(
+            c -> {
+              c.testConnection(ident, type, provider, comment, mergedConfig);
+              return null;
+            });
+      } finally {
+        wrapper.close();
+      }
     } catch (GravitinoRuntimeException e) {
       throw e;
     } catch (Exception e) {
@@ -986,27 +1029,36 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
     Map<String, String> conf = entity.getProperties();
     String provider = entity.getProvider();
 
-    IsolatedClassLoader classLoader = createClassLoader(provider, conf);
-    BaseCatalog<?> catalog = createBaseCatalog(classLoader, entity);
+    ClassLoaderKey key = buildClassLoaderKey(provider, conf);
+    PooledClassLoaderEntry poolEntry =
+        classLoaderPool.acquire(key, () -> createClassLoader(provider, conf));
+    try {
+      IsolatedClassLoader classLoader = poolEntry.classLoader();
+      BaseCatalog<?> catalog = createBaseCatalog(classLoader, entity);
 
-    CatalogWrapper wrapper = new CatalogWrapper(catalog, classLoader);
-    // Validate catalog properties and initialize the config
-    classLoader.withClassLoader(
-        cl -> {
-          validatePropertyForCreate(catalog.catalogPropertiesMetadata(), propsToValidate);
+      CatalogWrapper wrapper = new CatalogWrapper(catalog, classLoader, classLoaderPool, poolEntry);
+      // Validate catalog properties and initialize the config
+      classLoader.withClassLoader(
+          cl -> {
+            validatePropertyForCreate(catalog.catalogPropertiesMetadata(), propsToValidate);
 
-          // Call wrapper.catalog.properties() to make BaseCatalog#properties in IsolatedClassLoader
-          // not null. Why do we do this? Because wrapper.catalog.properties() needs to be called in
-          // the IsolatedClassLoader, as it needs to load the specific catalog class
-          // such as HiveCatalog or similar. To simplify, we will preload the value of properties
-          // so that AppClassLoader can get the value of properties.
-          wrapper.catalog.properties();
-          wrapper.catalog.capability();
-          return null;
-        },
-        IllegalArgumentException.class);
+            // Call wrapper.catalog.properties() to make BaseCatalog#properties in
+            // IsolatedClassLoader not null. Why do we do this? Because
+            // wrapper.catalog.properties() needs to be called in the IsolatedClassLoader, as it
+            // needs to load the specific catalog class such as HiveCatalog or similar. To simplify,
+            // we will preload the value of properties so that AppClassLoader can get the value of
+            // properties.
+            wrapper.catalog.properties();
+            wrapper.catalog.capability();
+            return null;
+          },
+          IllegalArgumentException.class);
 
-    return wrapper;
+      return wrapper;
+    } catch (Exception e) {
+      classLoaderPool.release(poolEntry);
+      throw e;
+    }
   }
 
   /**
@@ -1020,9 +1072,15 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
     Map<String, String> conf = entity.getProperties();
     String provider = entity.getProvider();
 
-    try (IsolatedClassLoader classLoader = createClassLoader(provider, conf)) {
+    ClassLoaderKey key = buildClassLoaderKey(provider, conf);
+    PooledClassLoaderEntry poolEntry =
+        classLoaderPool.acquire(key, () -> createClassLoader(provider, conf));
+    try {
+      IsolatedClassLoader classLoader = poolEntry.classLoader();
       BaseCatalog<?> catalog = createBaseCatalog(classLoader, entity);
       return classLoader.withClassLoader(cl -> catalog.properties(), RuntimeException.class);
+    } finally {
+      classLoaderPool.release(poolEntry);
     }
   }
 
@@ -1032,6 +1090,26 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
     catalog.withCatalogConf(entity.getProperties()).withCatalogEntity(entity);
     catalog.initAuthorizationPluginInstance(classLoader);
     return catalog;
+  }
+
+  private ClassLoaderKey buildClassLoaderKey(String provider, Map<String, String> conf) {
+    String packageProperty = conf != null ? conf.get(Catalog.PROPERTY_PACKAGE) : null;
+    String authPkgPath =
+        BaseAuthorization.buildAuthorizationPkgPath(conf != null ? conf : Collections.emptyMap())
+            .orElse(null);
+
+    // Include Kerberos identity in the key because Hadoop's UserGroupInformation and other
+    // static state are scoped to the ClassLoader. Catalogs with different Kerberos principals
+    // must use separate ClassLoaders to avoid authentication state corruption.
+    String kerberosPrincipal = null;
+    String kerberosKeytab = null;
+    if (conf != null && AUTH_TYPE_KERBEROS.equalsIgnoreCase(conf.get(AUTH_TYPE_KEY))) {
+      kerberosPrincipal = conf.get(KERBEROS_PRINCIPAL_KEY);
+      kerberosKeytab = conf.get(KERBEROS_KEYTAB_KEY);
+    }
+
+    return new ClassLoaderKey(
+        provider, packageProperty, authPkgPath, kerberosPrincipal, kerberosKeytab);
   }
 
   private IsolatedClassLoader createClassLoader(String provider, Map<String, String> conf) {
