@@ -21,6 +21,7 @@ package org.apache.gravitino.flink.connector.paimon;
 
 import java.util.Optional;
 import org.apache.flink.table.catalog.AbstractCatalog;
+import org.apache.flink.table.catalog.CatalogBaseTable;
 import org.apache.flink.table.catalog.ObjectPath;
 import org.apache.flink.table.catalog.exceptions.CatalogException;
 import org.apache.flink.table.catalog.exceptions.TableNotExistException;
@@ -30,6 +31,7 @@ import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.flink.connector.PartitionConverter;
 import org.apache.gravitino.flink.connector.SchemaAndTablePropertiesConverter;
 import org.apache.gravitino.flink.connector.catalog.BaseCatalog;
+import org.apache.gravitino.rel.Table;
 import org.apache.paimon.flink.FlinkCatalogFactory;
 import org.apache.paimon.flink.FlinkTableFactory;
 
@@ -70,6 +72,16 @@ public class GravitinoPaimonCatalog extends BaseCatalog {
             .purgeTable(NameIdentifier.of(tablePath.getDatabaseName(), tablePath.getObjectName()));
     if (!dropped && !ignoreIfNotExists) {
       throw new TableNotExistException(catalogName(), tablePath);
+    }
+  }
+
+  @Override
+  protected CatalogBaseTable toFlinkTable(Table table, ObjectPath tablePath) {
+    try {
+      return paimonCatalog.getTable(tablePath);
+    } catch (TableNotExistException e) {
+      throw new CatalogException(
+          "Table " + tablePath + " exists in Gravitino but not in Paimon catalog", e);
     }
   }
 
