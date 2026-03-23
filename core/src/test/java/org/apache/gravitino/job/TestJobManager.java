@@ -913,4 +913,20 @@ public class TestJobManager {
     Assertions.assertThrows(
         RuntimeException.class, () -> JobManager.fetchFileFromUri(uri, stagingDir, 1000));
   }
+
+  @Test
+  public void testCloseShouldShutdownExecutorsWhenJobExecutorCloseFails() throws IOException {
+    JobExecutor failingJobExecutor = Mockito.mock(JobExecutor.class);
+    doThrow(new IOException("close failed")).when(failingJobExecutor).close();
+
+    JobManager manager = new JobManager(config, entityStore, idGenerator, failingJobExecutor);
+    try {
+      Assertions.assertThrows(IOException.class, manager::close);
+      Assertions.assertTrue(manager.statusPullExecutor.isShutdown());
+      Assertions.assertTrue(manager.cleanUpExecutor.isShutdown());
+    } finally {
+      manager.statusPullExecutor.shutdownNow();
+      manager.cleanUpExecutor.shutdownNow();
+    }
+  }
 }
