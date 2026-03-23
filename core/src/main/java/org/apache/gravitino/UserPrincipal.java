@@ -30,7 +30,7 @@ import java.util.Objects;
 public class UserPrincipal implements Principal {
 
   private final String username;
-  private final List<String> groups;
+  private final List<UserGroup> groups;
 
   /**
    * Constructs a UserPrincipal with the given username.
@@ -47,7 +47,7 @@ public class UserPrincipal implements Principal {
    * @param username the username of the principal
    * @param groups the groups of the principal
    */
-  public UserPrincipal(final String username, final List<String> groups) {
+  public UserPrincipal(final String username, final List<UserGroup> groups) {
     Preconditions.checkArgument(username != null, "UserPrincipal must have the username");
     this.username = username;
     this.groups =
@@ -71,7 +71,7 @@ public class UserPrincipal implements Principal {
    *
    * @return the groups
    */
-  public List<String> getGroups() {
+  public List<UserGroup> getGroups() {
     return groups;
   }
 

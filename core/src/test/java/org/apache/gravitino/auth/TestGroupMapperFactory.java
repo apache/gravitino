@@ -28,6 +28,7 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 import java.util.stream.Collectors;
+import org.apache.gravitino.UserGroup;
 import org.junit.jupiter.api.Test;
 
 public class TestGroupMapperFactory {
@@ -39,12 +40,14 @@ public class TestGroupMapperFactory {
     assertNotNull(mapper);
     assertTrue(mapper instanceof RegexGroupMapper);
 
-    List<String> groups = Arrays.asList("group-admin", "group-user");
-    List<String> mappedGroups = mapper.map(groups);
+    List<Object> groups = Arrays.asList("group-admin", "group-user");
+    List<UserGroup> mappedGroups = mapper.map(groups);
 
     assertEquals(2, mappedGroups.size());
-    assertTrue(mappedGroups.contains("admin"));
-    assertTrue(mappedGroups.contains("user"));
+    List<String> groupNames =
+        mappedGroups.stream().map(UserGroup::getGroupname).collect(Collectors.toList());
+    assertTrue(groupNames.contains("admin"));
+    assertTrue(groupNames.contains("user"));
   }
 
   @Test
@@ -54,12 +57,14 @@ public class TestGroupMapperFactory {
     assertNotNull(mapper);
     assertTrue(mapper instanceof RegexGroupMapper);
 
-    List<String> groups = Arrays.asList("admin", "user");
-    List<String> mappedGroups = mapper.map(groups);
+    List<Object> groups = Arrays.asList("admin", "user");
+    List<UserGroup> mappedGroups = mapper.map(groups);
 
     assertEquals(2, mappedGroups.size());
-    assertTrue(mappedGroups.contains("admin"));
-    assertTrue(mappedGroups.contains("user"));
+    List<String> groupNames =
+        mappedGroups.stream().map(UserGroup::getGroupname).collect(Collectors.toList());
+    assertTrue(groupNames.contains("admin"));
+    assertTrue(groupNames.contains("user"));
   }
 
   @Test
@@ -69,12 +74,14 @@ public class TestGroupMapperFactory {
     assertNotNull(mapper);
     assertTrue(mapper instanceof RegexGroupMapper);
 
-    List<String> groups = Arrays.asList("/admin", "/user");
-    List<String> mappedGroups = mapper.map(groups);
+    List<Object> groups = Arrays.asList("/admin", "/user");
+    List<UserGroup> mappedGroups = mapper.map(groups);
 
     assertEquals(2, mappedGroups.size());
-    assertTrue(mappedGroups.contains("admin"));
-    assertTrue(mappedGroups.contains("user"));
+    List<String> groupNames =
+        mappedGroups.stream().map(UserGroup::getGroupname).collect(Collectors.toList());
+    assertTrue(groupNames.contains("admin"));
+    assertTrue(groupNames.contains("user"));
   }
 
   @Test
@@ -90,11 +97,13 @@ public class TestGroupMapperFactory {
 
   public static class TestCustomGroupMapper implements GroupMapper {
     @Override
-    public List<String> map(List<String> groups) {
+    public List<UserGroup> map(List<Object> groups) {
       if (groups == null) {
         return Collections.emptyList();
       }
-      return groups.stream().map(g -> "custom:" + g).collect(Collectors.toList());
+      return groups.stream()
+          .map(g -> new UserGroup(null, "custom:" + g.toString()))
+          .collect(Collectors.toList());
     }
   }
 
@@ -106,10 +115,10 @@ public class TestGroupMapperFactory {
     assertNotNull(mapper);
     assertTrue(mapper instanceof TestCustomGroupMapper);
 
-    List<String> groups = Collections.singletonList("foo");
-    List<String> mappedGroups = mapper.map(groups);
+    List<Object> groups = Collections.singletonList("foo");
+    List<UserGroup> mappedGroups = mapper.map(groups);
 
     assertEquals(1, mappedGroups.size());
-    assertEquals("custom:foo", mappedGroups.get(0));
+    assertEquals("custom:foo", mappedGroups.get(0).getGroupname());
   }
 }

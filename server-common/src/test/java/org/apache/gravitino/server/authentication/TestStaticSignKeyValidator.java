@@ -23,6 +23,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.SignatureAlgorithm;
@@ -522,6 +523,8 @@ public class TestStaticSignKeyValidator {
 
     // Check if principal is UserPrincipal and has groups
     UserPrincipal userPrincipal = assertInstanceOf(UserPrincipal.class, principal);
-    assertEquals(Arrays.asList("group1", "group2"), userPrincipal.getGroups());
+    assertEquals(2, userPrincipal.getGroups().size());
+    assertTrue(userPrincipal.getGroups().stream().anyMatch(g -> g.getGroupname().equals("group1")));
+    assertTrue(userPrincipal.getGroups().stream().anyMatch(g -> g.getGroupname().equals("group2")));
   }
 }

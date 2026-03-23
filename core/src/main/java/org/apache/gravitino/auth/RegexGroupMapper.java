@@ -23,6 +23,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import org.apache.gravitino.UserGroup;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -59,27 +60,28 @@ public class RegexGroupMapper implements GroupMapper {
    * @return a list of mapped group strings
    */
   @Override
-  public List<String> map(List<String> groups) {
+  public List<UserGroup> map(List<Object> groups) {
     if (groups == null || groups.isEmpty()) {
       return new ArrayList<>();
     }
 
-    List<String> mappedGroups = new ArrayList<>();
-    for (String group : groups) {
-      if (group == null) {
+    List<UserGroup> mappedGroups = new ArrayList<>();
+    for (Object groupObj : groups) {
+      if (groupObj == null) {
         continue;
       }
+      String group = groupObj.toString();
       try {
         Matcher matcher = pattern.matcher(group);
         if (matcher.find() && matcher.groupCount() >= 1) {
           String extracted = matcher.group(1);
           if (extracted != null && !extracted.isEmpty()) {
-            mappedGroups.add(extracted);
+            mappedGroups.add(new UserGroup(null, extracted));
           } else {
-            mappedGroups.add(group);
+            mappedGroups.add(new UserGroup(null, group));
           }
         } else {
-          mappedGroups.add(group);
+          mappedGroups.add(new UserGroup(null, group));
         }
       } catch (Exception e) {
         String message =

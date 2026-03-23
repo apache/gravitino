@@ -38,6 +38,7 @@ import java.util.Base64;
 import java.util.List;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.Config;
+import org.apache.gravitino.UserGroup;
 import org.apache.gravitino.UserPrincipal;
 import org.apache.gravitino.auth.GroupMapper;
 import org.apache.gravitino.auth.GroupMapperFactory;
@@ -127,9 +128,9 @@ public class StaticSignKeyValidator implements OAuthTokenValidator {
 
       // Use principal mapper to extract username
       Principal userPrincipal = principalMapper.map(principal);
-      List<String> groups = extractGroups(jwt.getBody());
+      List<Object> groups = extractGroups(jwt.getBody());
       if (groups != null && !groups.isEmpty()) {
-        List<String> mappedGroups = groupMapper.map(groups);
+        List<UserGroup> mappedGroups = groupMapper.map(groups);
         return new UserPrincipal(userPrincipal.getName(), mappedGroups);
       }
       return userPrincipal;
@@ -161,18 +162,14 @@ public class StaticSignKeyValidator implements OAuthTokenValidator {
   }
 
   /** Extracts the groups from the validated JWT claims using configured field(s). */
-  private List<String> extractGroups(Claims claims) {
+  private List<Object> extractGroups(Claims claims) {
     if (groupsFields != null && !groupsFields.isEmpty()) {
       for (String field : groupsFields) {
         if (StringUtils.isNotBlank(field)) {
           try {
             Object groupsObj = claims.get(field);
             if (groupsObj instanceof List) {
-              List<?> list = (List<?>) groupsObj;
-              return list.stream()
-                  .filter(java.util.Objects::nonNull)
-                  .map(Object::toString)
-                  .collect(java.util.stream.Collectors.toList());
+              return (List<Object>) groupsObj;
             }
           } catch (Exception e) {
             LOG.warn("Failed to parse groups from claim field: {}", field, e);

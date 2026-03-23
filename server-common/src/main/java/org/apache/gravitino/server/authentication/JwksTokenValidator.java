@@ -36,6 +36,7 @@ import java.util.List;
 import java.util.Set;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.Config;
+import org.apache.gravitino.UserGroup;
 import org.apache.gravitino.UserPrincipal;
 import org.apache.gravitino.auth.GroupMapper;
 import org.apache.gravitino.auth.GroupMapperFactory;
@@ -152,9 +153,9 @@ public class JwksTokenValidator implements OAuthTokenValidator {
 
       // Use principal mapper to extract username
       Principal userPrincipal = principalMapper.map(principal);
-      List<String> groups = extractGroups(validatedClaims);
+      List<Object> groups = extractGroups(validatedClaims);
       if (groups != null && !groups.isEmpty()) {
-        List<String> mappedGroups = groupMapper.map(groups);
+        List<UserGroup> mappedGroups = groupMapper.map(groups);
         return new UserPrincipal(userPrincipal.getName(), mappedGroups);
       }
       return userPrincipal;
@@ -193,16 +194,16 @@ public class JwksTokenValidator implements OAuthTokenValidator {
   }
 
   /** Extracts the groups from the validated JWT claims using configured field(s). */
-  private List<String> extractGroups(JWTClaimsSet validatedClaims) {
+  private List<Object> extractGroups(JWTClaimsSet validatedClaims) {
     if (groupsFields != null && !groupsFields.isEmpty()) {
       for (String field : groupsFields) {
         if (StringUtils.isNotBlank(field)) {
           try {
-            List<String> groups = validatedClaims.getStringListClaim(field);
-            if (groups != null) {
-              return groups;
+            Object groupsObj = validatedClaims.getClaim(field);
+            if (groupsObj instanceof List) {
+              return (List<Object>) groupsObj;
             }
-          } catch (java.text.ParseException e) {
+          } catch (Exception e) {
             LOG.warn("Failed to parse groups from claim field: {}", field, e);
           }
         }

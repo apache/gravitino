@@ -20,6 +20,7 @@
 package org.apache.gravitino.auth;
 
 import java.util.List;
+import org.apache.gravitino.UserGroup;
 
 /**
  * Interface for mapping authenticated groups.
@@ -35,5 +36,5 @@ public interface GroupMapper {
    * @param groups the list of group strings to map
    * @return a list of mapped group strings
    */
-  List<String> map(List<String> groups);
+  List<UserGroup> map(List<Object> groups);
 }
