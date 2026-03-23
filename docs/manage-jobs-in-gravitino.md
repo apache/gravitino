@@ -160,6 +160,47 @@ Note that:
 4. The `className` is required for the Java and Scala Spark job template, it is the main class of
    the Spark application to be executed. For PySpark job template, this field can be `null` instead.
 
+### Optional arguments
+
+Arguments in the `arguments` list can be marked as **optional** by prefixing them with `?`.
+An optional argument is silently dropped at job-run time if its effective value is considered
+empty — that is, when the value is `null`, an empty string, whitespace-only, or a placeholder
+whose key is absent from the job configuration.
+
+There are two supported patterns:
+
+**Flag/value pair** — a literal optional flag followed by an optional placeholder value:
+
+```text
+"?--strategy", "?{{strategy}}"
+```
+
+When `strategy` is absent from the job configuration, both `--strategy` and the placeholder
+are dropped together. When `strategy` is supplied (e.g. `"strategy": "binpack"`), both are
+included as `--strategy binpack`.
+
+**Independent optional placeholder** — each `?{{key}}` is evaluated on its own:
+
+```text
+"?{{opt1}}", "?{{opt2}}"
+```
+
+The presence or absence of `opt1` has no effect on `opt2`, and vice versa.
+
+#### Example
+
+Template arguments:
+
+```json
+["{{table}}", "?--strategy", "?{{strategy}}", "?--where", "?{{where}}"]
+```
+
+| Job configuration | Effective arguments |
+| --- | --- |
+| `{"table": "db.t"}` | `["db.t"]` |
+| `{"table": "db.t", "strategy": "binpack"}` | `["db.t", "--strategy", "binpack"]` |
+| `{"table": "db.t", "strategy": "binpack", "where": "ts > '2024-01-01'"}` | `["db.t", "--strategy", "binpack", "--where", "ts > '2024-01-01'"]` |
+
 To register a job template, you can use REST API or the Java and Python SDKs. Here is the
 example to register a shell job template:
 
