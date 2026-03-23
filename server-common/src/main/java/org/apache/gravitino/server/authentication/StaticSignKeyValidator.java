@@ -166,9 +166,13 @@ public class StaticSignKeyValidator implements OAuthTokenValidator {
       for (String field : groupsFields) {
         if (StringUtils.isNotBlank(field)) {
           try {
-            Object groups = claims.get(field);
-            if (groups instanceof List) {
-              return (List<String>) groups;
+            Object groupsObj = claims.get(field);
+            if (groupsObj instanceof List) {
+              List<?> list = (List<?>) groupsObj;
+              return list.stream()
+                  .filter(java.util.Objects::nonNull)
+                  .map(Object::toString)
+                  .collect(java.util.stream.Collectors.toList());
             }
           } catch (Exception e) {
             LOG.warn("Failed to parse groups from claim field: {}", field, e);
