@@ -372,6 +372,35 @@ public class TestStatisticOperations extends JerseyTest {
   }
 
   @Test
+  public void testUpdateTableStatisticsWithNullRequestBody() {
+    when(tableDispatcher.tableExists(any())).thenReturn(true);
+
+    MetadataObject tableObject =
+        MetadataObjects.parse(
+            String.format("%s.%s.%s", catalog, schema, table), MetadataObject.Type.TABLE);
+
+    Response resp =
+        target(
+                "/metalakes/"
+                    + metalake
+                    + "/objects/"
+                    + tableObject.type()
+                    + "/"
+                    + tableObject.fullName()
+                    + "/statistics")
+            .request(MediaType.APPLICATION_JSON_TYPE)
+            .accept("application/vnd.gravitino.v1+json")
+            .put(entity("null", MediaType.APPLICATION_JSON_TYPE));
+
+    Assertions.assertEquals(Response.Status.BAD_REQUEST.getStatusCode(), resp.getStatus());
+    Assertions.assertEquals(MediaType.APPLICATION_JSON_TYPE, resp.getMediaType());
+
+    ErrorResponse errorResp = resp.readEntity(ErrorResponse.class);
+    Assertions.assertEquals(ErrorConstants.ILLEGAL_ARGUMENTS_CODE, errorResp.getCode());
+    Assertions.assertEquals(IllegalArgumentException.class.getSimpleName(), errorResp.getType());
+  }
+
+  @Test
   public void testDropTableStatistics() {
     StatisticsDropRequest req = new StatisticsDropRequest(new String[] {"test1", "test2"});
     when(manager.dropStatistics(any(), any(), any())).thenReturn(true);
