@@ -102,8 +102,34 @@ export const logoutAction = createAsyncThunk('auth/logoutAction', async ({ route
     try {
       const provider = await oauthProviderFactory.getProvider()
       if (provider) {
+        // For OIDC providers, use signoutRedirect to end IdP session
+        if (provider.getUserManager) {
+          const userManager = provider.getUserManager()
+          if (userManager) {
+            // Read id_token before clearing — needed for id_token_hint
+            const user = await userManager.getUser()
+
+            // Clear OIDC user data from store
+            await provider.clearAuthData()
+
+            // Clear legacy auth tokens
+            localStorage.removeItem('accessToken')
+            localStorage.removeItem('authParams')
+            localStorage.removeItem('expiredIn')
+            localStorage.removeItem('isIdle')
+            localStorage.removeItem('version')
+
+            dispatch(clearIntervalId())
+            dispatch(setAuthToken(''))
+
+            // Redirect to IdP logout endpoint — browser navigates away, must be last
+            await userManager.signoutRedirect({ id_token_hint: user?.id_token })
+
+            return { token: null } // unreachable — browser navigates away
+          }
+        }
+
         await provider.clearAuthData()
-        console.log('[Logout Action] Provider cleanup completed')
       }
     } catch (error) {
       console.warn('[Logout Action] Provider cleanup failed:', error)
