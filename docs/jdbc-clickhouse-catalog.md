@@ -31,8 +31,15 @@ ClickHouse catalog is not included in the standard Gravitino server distribution
 | Drivers           | Requires user-provided ClickHouse JDBC driver in `${GRAVITINO_HOME}/catalogs/jdbc-clickhouse/libs`, please download the jar from [link](https://repo1.maven.org/maven2/com/clickhouse/clickhouse-jdbc/0.7.1/) |
 | Supported version | All the codes are tested by ClickHouse `24.8.14`, newer versions like `25.x` may also work but we did not conduct thorough tests. Report to the community if something does not work as expected.             |                                                
 
-:::note
-ClickHouse Driver 0.7.1 is recommended for better compatibility. Some older versions of the ClickHouse JDBC driver have issues such as incorrect metadata reporting that may cause problems with Gravitino's metadata management. If you encounter issues, please check the driver version and consider upgrading to 0.7.1 or later. If the problem still persists, please report it to the Gravitino community for further investigation.
+### ClickHouse server and JDBC driver compatibility matrix
+
+| ClickHouse version             | Supported ClickHouse JDBC driver versions |
+|--------------------------------|-------------------------------------------|
+| `24.8.x` (including `24.8.14`) | `0.7.1 ~ 0.8.4`                           |
+
+:::tip
+For other ClickHouse versions (not 24.8.x), the required JDBC driver version may be different.
+Use your staging validation results and the official ClickHouse documentation as the final reference.
 :::
 
 ### Catalog properties
@@ -120,6 +127,10 @@ See [Manage Relational Metadata Using Gravitino](./manage-relational-metadata-us
 | `on-cluster`   | Use `ON CLUSTER` when creating the database                                        | `false`       | No       | No        | 1.2.0         |
 | `cluster-name` | Cluster name used with `ON CLUSTER` (must align with table-level cluster settings) | (none)        | No       | No        | 1.2.0         |
 
+:::warning
+**Cluster properties only reflect Gravitino-managed schemas.** Gravitino embeds the cluster name inside the schema's `COMMENT` field at creation time (because `SHOW CREATE DATABASE` does not include `ON CLUSTER` for standard Atomic databases). Schemas created outside Gravitino will not have this metadata, so `on-cluster` and `cluster-name` will be absent when loaded, and `DROP SCHEMA` will not propagate `ON CLUSTER` to other cluster nodes.
+:::
+
 ### Create a schema
 
 <Tabs groupId="language" queryString>
@@ -156,15 +167,15 @@ See [Manage Relational Metadata Using Gravitino](./manage-relational-metadata-us
 
 ### Table capabilities
 
-| Area                | Details                                                                                                                                                                                                                                                                                                                                                                  |
-|---------------------|--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| Mapping             | Gravitino table maps to a ClickHouse table                                                                                                                                                                                                                                                                                                                               |
-| Engines             | Local engines: MergeTree family (`MergeTree` default, `ReplacingMergeTree`, `SummingMergeTree`, `AggregatingMergeTree`, `CollapsingMergeTree`, `VersionedCollapsingMergeTree`, `GraphiteMergeTree`), Tiny/Stripe/Log, Memory, File, Null, Set, Join, View, Buffer, KeeperMap, etc. Distributed engine supports cluster mode with remote database/table and sharding key. |
-| Ordering/Partition  | MergeTree-family requires exactly one `ORDER BY` column; only single-column identity `PARTITION BY` is supported on MergeTree engines. Other engines reject `ORDER BY`/`PARTITION BY`.                                                                                                                                                                                   |
-| Indexes             | Primary key; data-skipping indexes `DATA_SKIPPING_MINMAX` and `DATA_SKIPPING_BLOOM_FILTER` (fixed granularities).                                                                                                                                                                                                                                                        |
-| Distribution        | Gravitino enforces `Distributions.NONE`; no custom distribution strategies.                                                                                                                                                                                                                                                                                              |
-| Column defaults     | Supported.                                                                                                                                                                                                                                                                                                                                                               |
-| Unsupported         | Engine change after creation; removing table properties; auto-increment columns.                                                                                                                                                                                                                                                                                         |
+| Area                | Details                                                                                                                                                                                                                                                                                                                                                                                                                                                                   |
+|---------------------|---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| Mapping             | Gravitino table maps to a ClickHouse table                                                                                                                                                                                                                                                                                                                                                                                                                                |
+| Engines             | **MergeTree family** (`MergeTree` default, `ReplacingMergeTree`, `SummingMergeTree`, `AggregatingMergeTree`, `CollapsingMergeTree`, `VersionedCollapsingMergeTree`, `GraphiteMergeTree`): fully supported, data persists across restarts. **Log family** (`TinyLog`, `StripeLog`, `Log`): supported, data and table definition persist across restarts. **`Null`**: supported, table persists, data is always discarded by design. **`Set`**: supported, table definition persists. **`Memory`**: ⚠️ table definition persists but data is lost on ClickHouse restart (volatile). **Distributed**: cluster mode with remote database/table and sharding key. **Not directly creatable via Gravitino** (`Join`, `Buffer`, `View`, `KeeperMap`, `File`): require parameterized ENGINE clauses or external dependencies not supported by the CREATE TABLE API. |
+| Ordering/Partition  | MergeTree-family requires exactly one `ORDER BY` column; only single-column identity `PARTITION BY` is supported on MergeTree engines. Other engines reject `ORDER BY`/`PARTITION BY`.                                                                                                                                                                                                                                                                                    |
+| Indexes             | Primary key; data-skipping indexes `DATA_SKIPPING_MINMAX` and `DATA_SKIPPING_BLOOM_FILTER` (fixed granularities).                                                                                                                                                                                                                                                                                                                                                         |
+| Distribution        | Gravitino enforces `Distributions.NONE`; no custom distribution strategies.                                                                                                                                                                                                                                                                                                                                                                                               |
+| Column defaults     | Supported.                                                                                                                                                                                                                                                                                                                                                                                                                                                                |
+| Unsupported         | Engine change after creation; removing table properties; auto-increment columns.                                                                                                                                                                                                                                                                                                                                                                                          |
 
 ### Table column types
 
@@ -193,9 +204,23 @@ Other ClickHouse types are exposed as [External Type](./manage-relational-metada
 ### Table properties
 
 :::note
-- `settings.*` keys are passed to the ClickHouse `SETTINGS` clause verbatim.  
+- `settings.*` keys are passed to the ClickHouse `SETTINGS` clause verbatim.
 - The `engine` value is immutable after creation.
-- When loading table metadata, Gravitino cannot determine whether it is a cluster table or a local table, because properties such as `cluster-name` and `on-cluster` are not available from the JDBC metadata.
+:::
+
+:::warning
+**Cluster properties only reflect Gravitino-managed objects.**
+ClickHouse does not persist `ON CLUSTER` information in `SHOW CREATE TABLE` or `SHOW CREATE DATABASE` output for non-Replicated objects. Gravitino works around this by embedding the cluster name in the object's `COMMENT` field at creation time and reading it back on load/drop.
+
+This means:
+- **Gravitino-created databases and tables**: `on-cluster` and `cluster-name` properties are accurate.
+- **Databases or tables created outside Gravitino** (e.g., via ClickHouse client, migration scripts, or other tools): `on-cluster` will be `false` and `cluster-name` will be absent, regardless of whether the object was actually created `ON CLUSTER`. Subsequent `DROP DATABASE` / `DROP TABLE` operations performed through Gravitino will **not** include `ON CLUSTER`, which may leave orphan objects on non-coordinating cluster nodes.
+
+If you need Gravitino to manage an existing cluster database or table, recreate it through the Gravitino API so the cluster metadata is properly embedded.
+:::
+
+:::warning
+**Memory engine data volatility**: Tables created with `engine=Memory` store data in RAM only. After a ClickHouse server restart the table definition persists (Gravitino's `loadTable` succeeds), but all data is permanently lost. Gravitino metadata and ClickHouse remain consistent at the schema level, but users are responsible for repopulating data after restarts. Consider using `TinyLog`, `StripeLog`, or a MergeTree-family engine if data durability is required.
 :::
 
 | Property Name              | Description                                                                                              | Default Value | Required | Reserved | Immutable | Since version |
@@ -322,7 +347,7 @@ Supported:
 - Rename column.
 - Update column type/comment/default/position/nullability.
 - Delete columns (with `IF EXISTS` support).
-- Add primary or data-skipping indexes; drop data-skipping indexes.
+- Add data-skipping indexes; drop data-skipping indexes. Adding/dropping primary key is not supported.
 - Update table comment.
 
 Unsupported:
