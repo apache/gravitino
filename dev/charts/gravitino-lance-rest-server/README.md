@@ -6,13 +6,13 @@ This Helm chart deploys Apache Gravitino Lance REST Server on Kubernetes with cu
 
 ```bash
 # Install from OCI registry
-helm install gravitino-lance oci://registry-1.docker.io/apache/gravitino-lance-rest-server-helm --version 1.3.0 \
+helm install gravitino-lance oci://registry-1.docker.io/apache/gravitino-lance-rest-server-helm --version <VERSION> \
   -n gravitino --create-namespace \
   --set lanceRest.gravitinoUri=http://gravitino:8090 \
   --set lanceRest.gravitinoMetalake=your-metalake
 
 # Or pull the chart first
-helm pull oci://registry-1.docker.io/apache/gravitino-lance-rest-server-helm --version 1.3.0
+helm pull oci://registry-1.docker.io/apache/gravitino-lance-rest-server-helm --version <VERSION>
 ```
 
 ## Documentation

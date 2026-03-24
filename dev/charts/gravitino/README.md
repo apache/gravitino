@@ -6,10 +6,10 @@ This Helm chart deploys Apache Gravitino on Kubernetes with customizable configu
 
 ```bash
 # Install from OCI registry
-helm install gravitino oci://registry-1.docker.io/apache/gravitino-helm --version 1.3.0 -n gravitino --create-namespace
+helm install gravitino oci://registry-1.docker.io/apache/gravitino-helm --version <VERSION> -n gravitino --create-namespace
 
 # Or pull the chart first
-helm pull oci://registry-1.docker.io/apache/gravitino-helm --version 1.3.0
+helm pull oci://registry-1.docker.io/apache/gravitino-helm --version <VERSION>
 ```
 
 ## Documentation
