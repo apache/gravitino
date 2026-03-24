@@ -190,6 +190,19 @@ public class Configs {
           .booleanConf()
           .createWithDefault(true);
 
+  public static final ConfigEntry<List<String>> CATALOG_CLASSLOADER_ISOLATION_EXTRA_PROPERTIES =
+      new ConfigBuilder("gravitino.catalog.classloader.isolation.extra-properties")
+          .doc(
+              "Additional catalog property keys used to determine ClassLoader isolation. "
+                  + "Catalogs that differ in any of these properties will use separate "
+                  + "ClassLoaders. This supplements the built-in default isolation properties "
+                  + "(package, authorization-provider, Kerberos identity, metastore.uris, "
+                  + "jdbc-url, fs.defaultFS) and cannot be used to remove them.")
+          .version(ConfigConstants.VERSION_1_2_0)
+          .stringConf()
+          .toSequence()
+          .createWithDefault(Collections.emptyList());
+
   public static final ConfigEntry<String> AUTHENTICATOR =
       new ConfigBuilder("gravitino.authenticator")
           .doc(

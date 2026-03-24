@@ -122,10 +122,28 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
   private static final Set<String> CONTRIB_CATALOGS_TYPES =
       ImmutableSet.of("jdbc-oceanbase", "jdbc-clickhouse", "jdbc-hologres");
 
-  private static final String AUTH_TYPE_KEY = "authentication.type";
-  private static final String KERBEROS_PRINCIPAL_KEY = "authentication.kerberos.principal";
-  private static final String KERBEROS_KEYTAB_KEY = "authentication.kerberos.keytab-uri";
-  private static final String AUTH_TYPE_KERBEROS = "kerberos";
+  // Built-in default isolation property keys. These are always included in the ClassLoaderKey
+  // and cannot be removed by configuration. They cover the catalog property dimensions that
+  // determine the classpath or anchor per-ClassLoader static state.
+  //
+  // Classpath dimensions:
+  //   - package: determines which JARs are loaded
+  //   - authorization-provider: determines which authorization plugin JARs are loaded
+  // Static-state dimensions:
+  //   - authentication.type/kerberos.principal/kerberos.keytab-uri: Hadoop UGI is per-ClassLoader
+  //   - metastore.uris: HiveConf static configuration space
+  //   - jdbc-url: JDBC DriverManager global registry per ClassLoader
+  //   - fs.defaultFS: Hadoop FileSystem.CACHE per ClassLoader
+  static final Set<String> DEFAULT_ISOLATION_PROPERTY_KEYS =
+      ImmutableSet.of(
+          Catalog.PROPERTY_PACKAGE,
+          Catalog.AUTHORIZATION_PROVIDER,
+          "authentication.type",
+          "authentication.kerberos.principal",
+          "authentication.kerberos.keytab-uri",
+          "metastore.uris",
+          "jdbc-url",
+          "fs.defaultFS");
 
   /** Wrapper class for a catalog instance and its class loader. */
   public static class CatalogWrapper {
@@ -323,6 +341,10 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
 
   private final ClassLoaderPool classLoaderPool = new ClassLoaderPool();
 
+  // The effective set of catalog property keys used for ClassLoader isolation.
+  // Union of DEFAULT_ISOLATION_PROPERTY_KEYS and any extra keys from server config.
+  private final Set<String> isolationPropertyKeys;
+
   @Getter private final Cache<NameIdentifier, CatalogWrapper> catalogCache;
 
   private final EntityStore store;
@@ -341,6 +363,13 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
     this.config = config;
     this.store = store;
     this.idGenerator = idGenerator;
+
+    List<String> extraKeys = config.get(Configs.CATALOG_CLASSLOADER_ISOLATION_EXTRA_PROPERTIES);
+    this.isolationPropertyKeys =
+        ImmutableSet.<String>builder()
+            .addAll(DEFAULT_ISOLATION_PROPERTY_KEYS)
+            .addAll(extraKeys)
+            .build();
 
     long cacheEvictionIntervalInMs = config.get(Configs.CATALOG_CACHE_EVICTION_INTERVAL_MS);
     this.catalogCache =
@@ -1093,23 +1122,16 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
   }
 
   private ClassLoaderKey buildClassLoaderKey(String provider, Map<String, String> conf) {
-    String packageProperty = conf != null ? conf.get(Catalog.PROPERTY_PACKAGE) : null;
-    String authPkgPath =
-        BaseAuthorization.buildAuthorizationPkgPath(conf != null ? conf : Collections.emptyMap())
-            .orElse(null);
-
-    // Include Kerberos identity in the key because Hadoop's UserGroupInformation and other
-    // static state are scoped to the ClassLoader. Catalogs with different Kerberos principals
-    // must use separate ClassLoaders to avoid authentication state corruption.
-    String kerberosPrincipal = null;
-    String kerberosKeytab = null;
-    if (conf != null && AUTH_TYPE_KERBEROS.equalsIgnoreCase(conf.get(AUTH_TYPE_KEY))) {
-      kerberosPrincipal = conf.get(KERBEROS_PRINCIPAL_KEY);
-      kerberosKeytab = conf.get(KERBEROS_KEYTAB_KEY);
+    Map<String, String> isolationProps = new HashMap<>();
+    if (conf != null) {
+      for (String key : isolationPropertyKeys) {
+        String value = conf.get(key);
+        if (value != null) {
+          isolationProps.put(key, value);
+        }
+      }
     }
-
-    return new ClassLoaderKey(
-        provider, packageProperty, authPkgPath, kerberosPrincipal, kerberosKeytab);
+    return new ClassLoaderKey(provider, isolationProps.isEmpty() ? null : isolationProps);
   }
 
   private IsolatedClassLoader createClassLoader(String provider, Map<String, String> conf) {

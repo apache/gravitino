@@ -18,46 +18,41 @@
  */
 package org.apache.gravitino.utils;
 
+import java.util.Collections;
+import java.util.Map;
 import java.util.Objects;
+import java.util.TreeMap;
 import javax.annotation.Nullable;
 
 /**
- * Key used to identify a shared ClassLoader in the {@link ClassLoaderPool}. ClassLoaders are shared
- * among catalogs that have the same provider, package property, authorization plugin path, and
- * Kerberos identity.
+ * Key used to identify a shared ClassLoader in the {@link ClassLoaderPool}. Stores isolation
+ * properties as a generic {@code Map<String, String>}, decoupled from any specific property names.
+ * This makes the pool infrastructure key-agnostic — only the logic that builds the key (in {@code
+ * CatalogManager}) needs to know which properties matter.
  *
- * <p>Kerberos principal and keytab are included because Hadoop's {@code UserGroupInformation} and
- * other static state are scoped to the ClassLoader. Catalogs with different Kerberos identities
- * must use separate ClassLoaders to avoid authentication state corruption.
+ * <p>The set of isolation-relevant properties is determined by a combination of built-in defaults
+ * and an optional server configuration ({@code
+ * gravitino.catalog.classloader.isolation.extra-properties}) that allows operators to add
+ * additional isolation criteria without code changes. The built-in defaults cannot be removed.
  */
 public class ClassLoaderKey {
 
   private final String provider;
-  @Nullable private final String packageProperty;
-  @Nullable private final String authorizationPkgPath;
-  @Nullable private final String kerberosPrincipal;
-  @Nullable private final String kerberosKeytab;
+  private final Map<String, String> properties;
 
   /**
    * Constructs a ClassLoaderKey.
    *
    * @param provider The catalog provider name (e.g., "hive", "lakehouse-iceberg").
-   * @param packageProperty The catalog package property, or null if not set.
-   * @param authorizationPkgPath The authorization plugin package path, or null if not set.
-   * @param kerberosPrincipal The Kerberos principal, or null if not using Kerberos.
-   * @param kerberosKeytab The Kerberos keytab URI, or null if not using Kerberos.
+   * @param properties The isolation-relevant properties extracted from the catalog configuration,
+   *     or null if none.
    */
-  public ClassLoaderKey(
-      String provider,
-      @Nullable String packageProperty,
-      @Nullable String authorizationPkgPath,
-      @Nullable String kerberosPrincipal,
-      @Nullable String kerberosKeytab) {
+  public ClassLoaderKey(String provider, @Nullable Map<String, String> properties) {
     this.provider = Objects.requireNonNull(provider, "provider must not be null");
-    this.packageProperty = packageProperty;
-    this.authorizationPkgPath = authorizationPkgPath;
-    this.kerberosPrincipal = kerberosPrincipal;
-    this.kerberosKeytab = kerberosKeytab;
+    this.properties =
+        properties == null
+            ? Collections.emptyMap()
+            : Collections.unmodifiableMap(new TreeMap<>(properties));
   }
 
   @Override
@@ -65,37 +60,16 @@ public class ClassLoaderKey {
     if (this == o) return true;
     if (!(o instanceof ClassLoaderKey)) return false;
     ClassLoaderKey that = (ClassLoaderKey) o;
-    return Objects.equals(provider, that.provider)
-        && Objects.equals(packageProperty, that.packageProperty)
-        && Objects.equals(authorizationPkgPath, that.authorizationPkgPath)
-        && Objects.equals(kerberosPrincipal, that.kerberosPrincipal)
-        && Objects.equals(kerberosKeytab, that.kerberosKeytab);
+    return Objects.equals(provider, that.provider) && Objects.equals(properties, that.properties);
   }
 
   @Override
   public int hashCode() {
-    return Objects.hash(
-        provider, packageProperty, authorizationPkgPath, kerberosPrincipal, kerberosKeytab);
+    return Objects.hash(provider, properties);
   }
 
   @Override
   public String toString() {
-    return "ClassLoaderKey{"
-        + "provider='"
-        + provider
-        + '\''
-        + ", packageProperty='"
-        + packageProperty
-        + '\''
-        + ", authorizationPkgPath='"
-        + authorizationPkgPath
-        + '\''
-        + ", kerberosPrincipal='"
-        + kerberosPrincipal
-        + '\''
-        + ", kerberosKeytab='"
-        + kerberosKeytab
-        + '\''
-        + '}';
+    return "ClassLoaderKey{" + "provider='" + provider + '\'' + ", properties=" + properties + '}';
   }
 }
