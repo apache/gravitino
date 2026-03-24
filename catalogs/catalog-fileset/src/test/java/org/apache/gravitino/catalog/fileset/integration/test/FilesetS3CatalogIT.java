@@ -68,7 +68,7 @@ public class FilesetS3CatalogIT extends FilesetCatalogIT {
     gravitinoLocalStackContainer = containerSuite.getLocalStackContainer();
 
     Awaitility.await()
-        .atMost(60, TimeUnit.SECONDS)
+        .atMost(180, TimeUnit.SECONDS)
         .pollInterval(1, TimeUnit.SECONDS)
         .until(
             () -> {
