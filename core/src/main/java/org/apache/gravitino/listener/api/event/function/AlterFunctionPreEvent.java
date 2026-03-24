@@ -19,6 +19,7 @@
 
 package org.apache.gravitino.listener.api.event.function;
 
+import java.util.Arrays;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.annotation.DeveloperApi;
 import org.apache.gravitino.function.FunctionChange;
@@ -32,7 +33,7 @@ public class AlterFunctionPreEvent extends FunctionPreEvent {
   public AlterFunctionPreEvent(
       String user, NameIdentifier identifier, FunctionChange[] functionChanges) {
     super(user, identifier);
-    this.functionChanges = functionChanges;
+    this.functionChanges = Arrays.copyOf(functionChanges, functionChanges.length);
   }
 
   /**
@@ -42,7 +43,7 @@ public class AlterFunctionPreEvent extends FunctionPreEvent {
    *     function.
    */
   public FunctionChange[] functionChanges() {
-    return functionChanges;
+    return Arrays.copyOf(functionChanges, functionChanges.length);
   }
 
   @Override

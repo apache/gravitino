@@ -19,6 +19,7 @@
 
 package org.apache.gravitino.listener.api.event.function;
 
+import java.util.Arrays;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.annotation.DeveloperApi;
 import org.apache.gravitino.function.FunctionChange;
@@ -46,7 +47,7 @@ public final class AlterFunctionEvent extends FunctionEvent {
       FunctionChange[] functionChanges,
       FunctionInfo updatedFunctionInfo) {
     super(user, identifier);
-    this.functionChanges = functionChanges.clone();
+    this.functionChanges = Arrays.copyOf(functionChanges, functionChanges.length);
     this.updatedFunctionInfo = updatedFunctionInfo;
   }
 
@@ -66,7 +67,7 @@ public final class AlterFunctionEvent extends FunctionEvent {
    *     function.
    */
   public FunctionChange[] functionChanges() {
-    return functionChanges;
+    return Arrays.copyOf(functionChanges, functionChanges.length);
   }
 
   @Override

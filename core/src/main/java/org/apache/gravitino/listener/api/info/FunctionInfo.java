@@ -126,7 +126,7 @@ public final class FunctionInfo {
    * @return Array of function definitions.
    */
   public FunctionDefinition[] definitions() {
-    return definitions;
+    return Arrays.copyOf(definitions, definitions.length);
   }
 
   /**

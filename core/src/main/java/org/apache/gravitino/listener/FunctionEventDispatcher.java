@@ -73,50 +73,44 @@ public class FunctionEventDispatcher implements FunctionDispatcher {
 
   @Override
   public NameIdentifier[] listFunctions(Namespace namespace) throws NoSuchSchemaException {
-    eventBus.dispatchEvent(
-        new ListFunctionPreEvent(PrincipalUtils.getCurrentUserName(), namespace));
+    String user = PrincipalUtils.getCurrentUserName();
+    eventBus.dispatchEvent(new ListFunctionPreEvent(user, namespace));
     try {
       NameIdentifier[] nameIdentifiers = dispatcher.listFunctions(namespace);
-      eventBus.dispatchEvent(new ListFunctionEvent(PrincipalUtils.getCurrentUserName(), namespace));
+      eventBus.dispatchEvent(new ListFunctionEvent(user, namespace));
       return nameIdentifiers;
     } catch (Exception e) {
-      eventBus.dispatchEvent(
-          new ListFunctionFailureEvent(PrincipalUtils.getCurrentUserName(), namespace, e));
+      eventBus.dispatchEvent(new ListFunctionFailureEvent(user, namespace, e));
       throw e;
     }
   }
 
   @Override
   public Function[] listFunctionInfos(Namespace namespace) throws NoSuchSchemaException {
-    eventBus.dispatchEvent(
-        new ListFunctionPreEvent(PrincipalUtils.getCurrentUserName(), namespace));
+    String user = PrincipalUtils.getCurrentUserName();
+    eventBus.dispatchEvent(new ListFunctionPreEvent(user, namespace));
     try {
       Function[] functions = dispatcher.listFunctionInfos(namespace);
       FunctionInfo[] functionInfos =
           Arrays.stream(functions).map(FunctionInfo::new).toArray(FunctionInfo[]::new);
-      eventBus.dispatchEvent(
-          new ListFunctionInfosEvent(
-              PrincipalUtils.getCurrentUserName(), namespace, functionInfos));
+      eventBus.dispatchEvent(new ListFunctionInfosEvent(user, namespace, functionInfos));
       return functions;
     } catch (Exception e) {
-      eventBus.dispatchEvent(
-          new ListFunctionFailureEvent(PrincipalUtils.getCurrentUserName(), namespace, e));
+      eventBus.dispatchEvent(new ListFunctionFailureEvent(user, namespace, e));
       throw e;
     }
   }
 
   @Override
   public Function getFunction(NameIdentifier ident) throws NoSuchFunctionException {
-    eventBus.dispatchEvent(new GetFunctionPreEvent(PrincipalUtils.getCurrentUserName(), ident));
+    String user = PrincipalUtils.getCurrentUserName();
+    eventBus.dispatchEvent(new GetFunctionPreEvent(user, ident));
     try {
       Function function = dispatcher.getFunction(ident);
-      eventBus.dispatchEvent(
-          new GetFunctionEvent(
-              PrincipalUtils.getCurrentUserName(), ident, new FunctionInfo(function)));
+      eventBus.dispatchEvent(new GetFunctionEvent(user, ident, new FunctionInfo(function)));
       return function;
     } catch (Exception e) {
-      eventBus.dispatchEvent(
-          new GetFunctionFailureEvent(PrincipalUtils.getCurrentUserName(), ident, e));
+      eventBus.dispatchEvent(new GetFunctionFailureEvent(user, ident, e));
       throw e;
     }
   }
@@ -129,22 +123,18 @@ public class FunctionEventDispatcher implements FunctionDispatcher {
       boolean deterministic,
       FunctionDefinition[] definitions)
       throws NoSuchSchemaException, FunctionAlreadyExistsException {
+    String user = PrincipalUtils.getCurrentUserName();
     FunctionInfo registerFunctionRequest =
         new FunctionInfo(ident.name(), functionType, deterministic, comment, definitions, null);
-    eventBus.dispatchEvent(
-        new RegisterFunctionPreEvent(
-            PrincipalUtils.getCurrentUserName(), ident, registerFunctionRequest));
+    eventBus.dispatchEvent(new RegisterFunctionPreEvent(user, ident, registerFunctionRequest));
     try {
       Function function =
           dispatcher.registerFunction(ident, comment, functionType, deterministic, definitions);
-      eventBus.dispatchEvent(
-          new RegisterFunctionEvent(
-              PrincipalUtils.getCurrentUserName(), ident, new FunctionInfo(function)));
+      eventBus.dispatchEvent(new RegisterFunctionEvent(user, ident, new FunctionInfo(function)));
       return function;
     } catch (Exception e) {
       eventBus.dispatchEvent(
-          new RegisterFunctionFailureEvent(
-              PrincipalUtils.getCurrentUserName(), ident, e, registerFunctionRequest));
+          new RegisterFunctionFailureEvent(user, ident, e, registerFunctionRequest));
       throw e;
     }
   }
@@ -152,32 +142,29 @@ public class FunctionEventDispatcher implements FunctionDispatcher {
   @Override
   public Function alterFunction(NameIdentifier ident, FunctionChange... changes)
       throws NoSuchFunctionException, IllegalArgumentException {
-    eventBus.dispatchEvent(
-        new AlterFunctionPreEvent(PrincipalUtils.getCurrentUserName(), ident, changes));
+    String user = PrincipalUtils.getCurrentUserName();
+    eventBus.dispatchEvent(new AlterFunctionPreEvent(user, ident, changes));
     try {
       Function function = dispatcher.alterFunction(ident, changes);
       eventBus.dispatchEvent(
-          new AlterFunctionEvent(
-              PrincipalUtils.getCurrentUserName(), ident, changes, new FunctionInfo(function)));
+          new AlterFunctionEvent(user, ident, changes, new FunctionInfo(function)));
       return function;
     } catch (Exception e) {
-      eventBus.dispatchEvent(
-          new AlterFunctionFailureEvent(PrincipalUtils.getCurrentUserName(), ident, e, changes));
+      eventBus.dispatchEvent(new AlterFunctionFailureEvent(user, ident, e, changes));
       throw e;
     }
   }
 
   @Override
   public boolean dropFunction(NameIdentifier ident) {
-    eventBus.dispatchEvent(new DropFunctionPreEvent(PrincipalUtils.getCurrentUserName(), ident));
+    String user = PrincipalUtils.getCurrentUserName();
+    eventBus.dispatchEvent(new DropFunctionPreEvent(user, ident));
     try {
       boolean isExists = dispatcher.dropFunction(ident);
-      eventBus.dispatchEvent(
-          new DropFunctionEvent(PrincipalUtils.getCurrentUserName(), ident, isExists));
+      eventBus.dispatchEvent(new DropFunctionEvent(user, ident, isExists));
       return isExists;
     } catch (Exception e) {
-      eventBus.dispatchEvent(
-          new DropFunctionFailureEvent(PrincipalUtils.getCurrentUserName(), ident, e));
+      eventBus.dispatchEvent(new DropFunctionFailureEvent(user, ident, e));
       throw e;
     }
   }
