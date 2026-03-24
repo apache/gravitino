@@ -16,15 +16,15 @@ helm pull oci://registry-1.docker.io/apache/gravitino-iceberg-rest-server-helm -
 
 For detailed installation instructions, configuration options, and usage examples, please refer to:
 
-📖 [Complete Iceberg REST Catalog Server Documentation](../../../docs/iceberg-rest-catalog-chart.md)
+📖 [Complete Iceberg REST Catalog Server Documentation](https://github.com/apache/gravitino/blob/main/docs/iceberg-rest-catalog-chart.md)
 
 ## Quick Links
 
-- [Prerequisites](../../../docs/iceberg-rest-catalog-chart.md#prerequisites)
-- [Installation Methods](../../../docs/iceberg-rest-catalog-chart.md#installation-methods)
-- [Configuration](../../../docs/iceberg-rest-catalog-chart.md#view-chart-values)
-- [Deploy with Custom Configuration](../../../docs/iceberg-rest-catalog-chart.md#deploy-with-custom-configuration)
-- [Uninstall](../../../docs/iceberg-rest-catalog-chart.md#uninstall-helm-chart)
+- [Prerequisites](https://github.com/apache/gravitino/blob/main/docs/iceberg-rest-catalog-chart.md#prerequisites)
+- [Installation](https://github.com/apache/gravitino/blob/main/docs/iceberg-rest-catalog-chart.md#installation)
+- [Configuration](https://github.com/apache/gravitino/blob/main/docs/iceberg-rest-catalog-chart.md#view-chart-values)
+- [Deploy with Custom Configuration](https://github.com/apache/gravitino/blob/main/docs/iceberg-rest-catalog-chart.md#deploy-with-custom-configuration)
+- [Uninstall](https://github.com/apache/gravitino/blob/main/docs/iceberg-rest-catalog-chart.md#uninstall-helm-chart)
 
 ## Support
 

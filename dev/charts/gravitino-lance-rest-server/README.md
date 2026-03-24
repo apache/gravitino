@@ -19,15 +19,15 @@ helm pull oci://registry-1.docker.io/apache/gravitino-lance-rest-server-helm --v
 
 For detailed installation instructions, configuration options, and usage examples, please refer to:
 
-📖 [Complete Lance REST Server Documentation](../../../docs/lance-rest-server-chart.md)
+📖 [Complete Lance REST Server Documentation](https://github.com/apache/gravitino/blob/main/docs/lance-rest-server-chart.md)
 
 ## Quick Links
 
-- [Prerequisites](../../../docs/lance-rest-server-chart.md#prerequisites)
-- [Installation Methods](../../../docs/lance-rest-server-chart.md#installation-methods)
-- [Configuration](../../../docs/lance-rest-server-chart.md#view-chart-values)
-- [Gravitino Backend Configuration](../../../docs/lance-rest-server-chart.md#configuration-notes)
-- [Uninstall](../../../docs/lance-rest-server-chart.md#uninstall-helm-chart)
+- [Prerequisites](https://github.com/apache/gravitino/blob/main/docs/lance-rest-server-chart.md#prerequisites)
+- [Installation](https://github.com/apache/gravitino/blob/main/docs/lance-rest-server-chart.md#installation)
+- [Configuration](https://github.com/apache/gravitino/blob/main/docs/lance-rest-server-chart.md#view-chart-values)
+- [Gravitino Backend Configuration](https://github.com/apache/gravitino/blob/main/docs/lance-rest-server-chart.md#configuration-notes)
+- [Uninstall](https://github.com/apache/gravitino/blob/main/docs/lance-rest-server-chart.md#uninstall-helm-chart)
 
 ## Important Notes
 

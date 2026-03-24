@@ -16,15 +16,15 @@ helm pull oci://registry-1.docker.io/apache/gravitino-helm --version 1.3.0
 
 For detailed installation instructions, configuration options, and usage examples, please refer to:
 
-📖 [Complete Helm Chart Documentation](../../../docs/chart.md)
+📖 [Complete Helm Chart Documentation](https://github.com/apache/gravitino/blob/main/docs/chart.md)
 
 ## Quick Links
 
-- [Prerequisites](../../../docs/chart.md#prerequisites)
-- [Installation Methods](../../../docs/chart.md#installation-methods)
-- [Configuration](../../../docs/chart.md#view-chart-values)
-- [Deploy with MySQL](../../../docs/chart.md#deploying-gravitino-with-mysql-as-the-storage-backend)
-- [Uninstall](../../../docs/chart.md#uninstall-helm-chart)
+- [Prerequisites](https://github.com/apache/gravitino/blob/main/docs/chart.md#prerequisites)
+- [Installation](https://github.com/apache/gravitino/blob/main/docs/chart.md#installation)
+- [Configuration](https://github.com/apache/gravitino/blob/main/docs/chart.md#view-chart-values)
+- [Deploy with MySQL](https://github.com/apache/gravitino/blob/main/docs/chart.md#deploying-gravitino-with-mysql-as-the-storage-backend)
+- [Uninstall](https://github.com/apache/gravitino/blob/main/docs/chart.md#uninstall-helm-chart)
 
 ## Support
 
