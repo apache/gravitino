@@ -22,6 +22,7 @@ package org.apache.gravitino.auth;
 import com.google.common.base.Preconditions;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import org.apache.gravitino.UserGroup;
@@ -81,12 +82,12 @@ public class RegexGroupMapper implements GroupMapper {
         if (matcher.find() && matcher.groupCount() >= 1) {
           String extracted = matcher.group(1);
           if (extracted != null && !extracted.isEmpty()) {
-            mappedGroups.add(new UserGroup(null, extracted));
+            mappedGroups.add(new UserGroup(Optional.empty(), extracted));
           } else {
-            mappedGroups.add(new UserGroup(null, group));
+            mappedGroups.add(new UserGroup(Optional.empty(), group));
           }
         } else {
-          mappedGroups.add(new UserGroup(null, group));
+          mappedGroups.add(new UserGroup(Optional.empty(), group));
         }
       } catch (Exception e) {
         String message =
