@@ -15,6 +15,8 @@
 # specific language governing permissions and limitations
 # under the License.
 
+from __future__ import annotations
+
 from functools import reduce
 from typing import ClassVar, List, Optional, Dict
 
