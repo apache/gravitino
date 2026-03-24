@@ -53,6 +53,23 @@ public class TestConfigServlet {
   }
 
   @Test
+  public void testConfigServletWithAuthEnabledAndServiceAdmins() throws Exception {
+    ServerConfig serverConfig = new ServerConfig();
+    serverConfig.set(Configs.ENABLE_AUTHORIZATION, true);
+    serverConfig.set(Configs.SERVICE_ADMINS, Lists.newArrayList("admin1", "admin2"));
+    ConfigServlet configServlet = new ConfigServlet(serverConfig);
+    configServlet.init();
+    HttpServletResponse res = mock(HttpServletResponse.class);
+    PrintWriter writer = mock(PrintWriter.class);
+    when(res.getWriter()).thenReturn(writer);
+    configServlet.doGet(null, res);
+    verify(writer)
+        .write(
+            "{\"gravitino.authorization.serviceAdmins\":[\"admin1\",\"admin2\"],\"gravitino.authorization.enable\":true,\"gravitino.authenticators\":[\"simple\"]}");
+    configServlet.destroy();
+  }
+
+  @Test
   public void testConfigServletWithVisibleConfigs() throws Exception {
     ServerConfig serverConfig = new ServerConfig();
 
