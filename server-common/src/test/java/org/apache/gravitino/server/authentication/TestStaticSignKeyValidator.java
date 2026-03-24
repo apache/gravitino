@@ -495,17 +495,6 @@ public class TestStaticSignKeyValidator {
     config.put("gravitino.authenticator.oauth.groupsFields", "groups");
     validator.initialize(createConfig(config));
 
-    // token json:
-    // {
-    //  "sub": "test-user",
-    //  "groups": [
-    //    "group1",
-    //    "group2"
-    //  ],
-    //  "aud": "test-service",
-    //  "iat": xxxxxxxxxx,
-    //  "exp": xxxxxxxxxx
-    // }
     // Create token with groups
     String token =
         Jwts.builder()
@@ -513,7 +502,7 @@ public class TestStaticSignKeyValidator {
             .claim("groups", Arrays.asList("group1", "group2"))
             .setAudience(serviceAudience)
             .setIssuedAt(Date.from(Instant.now()))
-            .setExpiration(Date.from(Instant.now().plusSeconds(3600)))
+            .setExpiration(Date.from(Instant.now().plusSeconds(315360000)))
             .signWith(hmacKey, SignatureAlgorithm.HS256)
             .compact();
 
@@ -526,5 +515,51 @@ public class TestStaticSignKeyValidator {
     assertEquals(2, userPrincipal.getGroups().size());
     assertTrue(userPrincipal.getGroups().stream().anyMatch(g -> g.getGroupname().equals("group1")));
     assertTrue(userPrincipal.getGroups().stream().anyMatch(g -> g.getGroupname().equals("group2")));
+  }
+
+  @Test
+  public void testValidateRealKeycloakTokenWithGroups() {
+    Map<String, String> config = new HashMap<String, String>();
+    config.put("gravitino.authenticator.oauth.groupsFields", "groups");
+    config.put("gravitino.authenticator.oauth.groupMapper.regex.pattern", "^/(.*)");
+    config.put("gravitino.authenticator.oauth.principalFields", "preferred_username");
+    config.put("gravitino.authenticator.oauth.allowSkewSecs", "315360000");
+    config.put(
+        "gravitino.authenticator.oauth.defaultSignKey",
+        "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEA0J4W"
+            + "fjgnb/nyrkOuVefHoGu17pIpiUm/TaTeVKoZcYxphcL8HAg2jKTQYov4SvlWZ4wXHZ1FayPm5+e74W5vSGOgZzjyzMZKithGkYa"
+            + "gbRuXbUeo4sw6f7t4BsAmgpAUgyBYE/1fdEghHtKHia1Er1grQVsvGVAAbYoFjh+OfcnRLYFAel+ADvX83RmsK16laxXpY+LeFk"
+            + "jugOsCaD5mnGfgqQC96t9H4/QlsqJacg+9YImZWxUHtqN/itrV/VCdGVfywih6Dk9F2jxt4rL9++3xVdG/OrvFDtNW98xhKqgqF"
+            + "iXLsjKPT5WmqzbGCaQi/29Cdu9QOmd/IxmVeRy0+wIDAQAB");
+    config.put("gravitino.authenticator.oauth.serverUri", "http://localhost:8080");
+    config.put(
+        "gravitino.authenticator.oauth.tokenPath",
+        "/realms/gravitinorealm/protocol/openid-connect/token");
+    config.put("gravitino.authenticator.oauth.signAlgorithmType", "RS256");
+
+    validator.initialize(createConfig(config));
+    String token =
+        "eyJhbGciOiJSUzI1NiIsInR5cCIgOiAiSldUIiwia2lkIiA6ICIySHlKQVZ6STJvQlVqUXdZUWZEbEh5SW1Ec3dWUGh1akJmLUZfbjZIUm"
+            + "s4In0.eyJleHAiOjE3NzQyODA0NzAsImlhdCI6MTc3NDI4MDE3MCwianRpIjoiYmRjNzcxY2EtYjE4Ni00OWE5LWEzY2QtOWYx"
+            + "NmY1ZTZmOTZhIiwiaXNzIjoiaHR0cDovL2xvY2FsaG9zdDo4MDgwL3JlYWxtcy9ncmF2aXRpbm9yZWFsbSIsImF1ZCI6ImdyYX"
+            + "ZpdGluby1jbGllbnQiLCJzdWIiOiI5ZGI0NTU4Mi1hMDhjLTQ3MjEtYmUxMi02ZTU5MDVkMzczMTciLCJ0eXAiOiJJRCIsImF6"
+            + "cCI6ImdyYXZpdGluby1jbGllbnQiLCJzaWQiOiIxNzEwYTIwNy03MmQ2LTQyZjgtYjVjNy0yZDJiNWZhOGU1MmEiLCJhdF9oYX"
+            + "NoIjoiV01sb1VmZHJqMUVaZHJ6M0xoZW1QQSIsImFjciI6IjEiLCJlbWFpbF92ZXJpZmllZCI6ZmFsc2UsIm5hbWUiOiJhIGIi"
+            + "LCJncm91cHMiOlsiL2dyb3VwYSIsIi9ncm91cGIiXSwicHJlZmVycmVkX3VzZXJuYW1lIjoidXNlcmIiLCJnaXZlbl9uYW1lIj"
+            + "oiYSIsImZhbWlseV9uYW1lIjoiYiIsImVtYWlsIjoic2FpQGRhdGFzdHJhdG8uY29tIn0.ZNYmcK1gFTONojvp5aWekp9eK89y"
+            + "j7I1PszY4aK9y_dFF2Dp_Ec1K71LygCccem_mnopua2Ys92BwthgHrc4p1LoZ9nC98PIXrlhNw6BPazBELUgIol6HPzMQ18HvN"
+            + "DO_K4pRzMK1khIcpTDgt5ikpw8-8i9KFAPyvO3ezKhIv5h4TQPdMV9RaAplP539hkuxSi4VhIlz6qYPuyoTW4QPmnqKbn7E0IE"
+            + "EgVnpvQ7Y-xxoCstpFNhN_IikGDz7G7xQwBbYo4zvo4brixzRWOW-wWe9nLDTI9veYxs8Hs_ZG_JkhiCvecHNY811o_fgQ0Bz2"
+            + "mWizL5ukKRnxXfL0oPVg";
+
+    Principal principal = validator.validateToken(token, "gravitino-client");
+    assertNotNull(principal);
+    assertEquals("userb", principal.getName());
+
+    // Check if principal is UserPrincipal and has groups
+    UserPrincipal userPrincipal = assertInstanceOf(UserPrincipal.class, principal);
+    assertEquals(2, userPrincipal.getGroups().size());
+    assertTrue(userPrincipal.getGroups().stream().anyMatch(g -> g.getGroupname().equals("groupa")));
+    assertTrue(userPrincipal.getGroups().stream().anyMatch(g -> g.getGroupname().equals("groupb")));
   }
 }
