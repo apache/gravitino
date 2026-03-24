@@ -538,6 +538,30 @@ public class TestStaticSignKeyValidator {
     config.put("gravitino.authenticator.oauth.signAlgorithmType", "RS256");
 
     validator.initialize(createConfig(config));
+
+    // {
+    //  "exp": 1774280470,
+    //  "iat": 1774280170,
+    //  "jti": "bdc771ca-b186-49a9-a3cd-9f16f5e6f96a",
+    //  "iss": "http://localhost:8080/realms/gravitinorealm",
+    //  "aud": "gravitino-client",
+    //  "sub": "9db45582-a08c-4721-be12-6e5905d37317",
+    //  "typ": "ID",
+    //  "azp": "gravitino-client",
+    //  "sid": "1710a207-72d6-42f8-b5c7-2d2b5fa8e52a",
+    //  "at_hash": "WMloUfdrj1EZdrz3LhemPA",
+    //  "acr": "1",
+    //  "email_verified": false,
+    //  "name": "a b",
+    //  "groups": [
+    //    "/groupa",
+    //    "/groupb"
+    //  ],
+    //  "preferred_username": "userb",
+    //  "given_name": "a",
+    //  "family_name": "b",
+    //  "email": "sai@datastrato.com"
+    //  }
     String token =
         "eyJhbGciOiJSUzI1NiIsInR5cCIgOiAiSldUIiwia2lkIiA6ICIySHlKQVZ6STJvQlVqUXdZUWZEbEh5SW1Ec3dWUGh1akJmLUZfbjZIUm"
             + "s4In0.eyJleHAiOjE3NzQyODA0NzAsImlhdCI6MTc3NDI4MDE3MCwianRpIjoiYmRjNzcxY2EtYjE4Ni00OWE5LWEzY2QtOWYx"
