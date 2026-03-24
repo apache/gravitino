@@ -608,10 +608,6 @@ public class IcebergTableOperations {
     if (ifNoneMatch == null || ifNoneMatch.isEmpty()) {
       return false;
     }
-    // Handle wildcard
-    if ("*".equals(ifNoneMatch.trim())) {
-      return true;
-    }
     // Strip quotes if present to compare the raw value
     String clientEtag = ifNoneMatch.trim();
     if (clientEtag.startsWith("\"") && clientEtag.endsWith("\"")) {
