@@ -93,6 +93,35 @@ public interface SupportsRelationOperations {
       throws IOException;
 
   /**
+   * Retrieves the relations for a batch of source entities in a single call.
+   *
+   * <p>This is the batch counterpart of {@link #listEntitiesByRelation}. Instead of issuing one
+   * query per source entity, callers can supply a list of identifiers and receive all matching
+   * {@link RelationalEntity} objects in one round-trip to the backend.
+   *
+   * <p>For example, to fetch the owners for a collection of tables in one call:
+   *
+   * <pre>
+   *   batchListEntitiesByRelation(OWNER_REL, tableIdentifiers, EntityType.TABLE);
+   * </pre>
+   *
+   * <p>Each returned {@link RelationalEntity} carries the source identifier, source entity type,
+   * and the resolved target entity, allowing callers to correlate results back to their inputs.
+   * Source identifiers that have no related entity will produce no {@link RelationalEntity} entry
+   * in the result; they will not cause an error.
+   *
+   * @param relType The type of relation to query.
+   * @param nameIdentifiers The list of source entity identifiers to look up relations for.
+   * @param identType The entity type that each element in {@code nameIdentifiers} represents.
+   * @return A list of {@link RelationalEntity} objects, one per (source, target) pair found. May be
+   *     empty but never null.
+   * @throws IOException If a storage-related error occurs during the batch query.
+   */
+  List<RelationalEntity<?>> batchListEntitiesByRelation(
+      Type relType, List<NameIdentifier> nameIdentifiers, Entity.EntityType identType)
+      throws IOException;
+
+  /**
    * Get a specific entity that is related to a given source entity.
    *
    * <p>For example, this can be used to get a specific policy that is directly associated with a

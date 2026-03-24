@@ -24,6 +24,7 @@ import com.github.jk1.license.render.InventoryHtmlReportRenderer
 import com.github.jk1.license.render.ReportRenderer
 import com.github.vlsi.gradle.dsl.configureEach
 import net.ltgt.gradle.errorprone.errorprone
+import org.gradle.api.attributes.java.TargetJvmVersion
 import org.gradle.api.tasks.testing.logging.TestExceptionFormat
 import org.gradle.internal.hash.ChecksumService
 import org.gradle.internal.os.OperatingSystem
@@ -192,7 +193,7 @@ allprojects {
       param.environment("GRAVITINO_CI_TRINO_DOCKER_IMAGE", "apache/gravitino-ci:trino-0.1.6")
       param.environment("GRAVITINO_CI_RANGER_DOCKER_IMAGE", "apache/gravitino-ci:ranger-0.1.2")
       param.environment("GRAVITINO_CI_KAFKA_DOCKER_IMAGE", "apache/kafka:3.7.0")
-      param.environment("GRAVITINO_CI_LOCALSTACK_DOCKER_IMAGE", "localstack/localstack:latest")
+      param.environment("GRAVITINO_CI_LOCALSTACK_DOCKER_IMAGE", "localstack/localstack:4.14.0")
 
       // Disable Ryuk for integration tests
       // Ryuk need privileged mode, if we want to rootless or run non-privileged mode, we need to disable it.
@@ -331,39 +332,23 @@ subprojects {
     mavenLocal()
   }
 
+  val jdk8CompatibleProjectPathPrefixes = setOf(
+    ":api",
+    ":common",
+    ":catalogs:catalog-common",
+    ":catalogs:hadoop-common",
+    ":maintenance:jobs",
+    ":maintenance:optimizer-api",
+    ":maintenance:updaters",
+    ":clients",
+    ":bundles",
+    ":spark-connector",
+    ":flink-connector"
+  )
+
   fun compatibleWithJDK8(project: Project): Boolean {
-    val name = project.name.lowercase()
     val path = project.path.lowercase()
-    if (path.startsWith(":maintenance:jobs") ||
-      path.startsWith(":maintenance:optimizer-api") ||
-      path.startsWith(":maintenance:gravitino-updaters") ||
-      path.startsWith(":clients:client-java") ||
-      name == "api" ||
-      name == "common" ||
-      name == "catalog-common" ||
-      name == "hadoop-common"
-    ) {
-      return true
-    }
-
-    val isReleaseRun = gradle.startParameter.taskNames.any {
-      it == "release" || it == "publish" || it == "publishToMavenLocal" || it.endsWith(":release") || it.endsWith(
-        ":publish"
-      ) || it.endsWith(":publishToMavenLocal")
-    }
-    if (!isReleaseRun) {
-      return false
-    }
-
-    if (path.startsWith(":client") ||
-      path.startsWith(":spark-connector") ||
-      path.startsWith(":flink-connector") ||
-      path.startsWith(":bundles")
-    ) {
-      return true
-    }
-
-    return false
+    return jdk8CompatibleProjectPathPrefixes.any { path.startsWith(it) }
   }
   extensions.extraProperties.set("excludePackagesForSparkConnector", ::excludePackagesForSparkConnector)
 
@@ -399,12 +384,6 @@ subprojects {
     }
   }
 
-  tasks.withType<JavaCompile>().configureEach {
-    if (compatibleWithJDK8(project)) {
-      options.release.set(8)
-    }
-  }
-
   java {
     toolchain {
       // Some JDK vendors like Homebrew installed OpenJDK 17 have problems in building trino-connector:
@@ -424,6 +403,24 @@ subprojects {
         languageVersion.set(JavaLanguageVersion.of(17))
       }
     }
+  }
+
+  if (compatibleWithJDK8(project)) {
+    // Keep published/main classes Java 8-compatible for the selected modules.
+    tasks.named<JavaCompile>("compileJava") {
+      options.release.set(8)
+    }
+
+    // Tests still need Java 17 to compile against dependencies that only publish Java 17 variants.
+    tasks.named<JavaCompile>("compileTestJava") {
+      options.release.set(17)
+    }
+
+    val targetJvmVersionAttribute = TargetJvmVersion.TARGET_JVM_VERSION_ATTRIBUTE
+    configurations.matching { it.name in setOf("testCompileClasspath", "testRuntimeClasspath") }
+      .configureEach {
+        attributes.attribute(targetJvmVersionAttribute, 17)
+      }
   }
 
   gradle.projectsEvaluated {
@@ -450,6 +447,8 @@ subprojects {
   }
 
   tasks.withType<JavaCompile>().configureEach {
+    // Keep Java compilation independent of the host's default charset.
+    options.encoding = "UTF-8"
     options.errorprone.isEnabled.set(true)
     options.errorprone.disableWarningsInGeneratedCode.set(true)
     options.errorprone.disable(
@@ -1313,21 +1312,3 @@ fun checkOrbStackStatus() {
 }
 
 printDockerCheckInfo()
-
-tasks.register("release") {
-  group = "release"
-  description = "Builds and package a release version."
-  doFirst {
-    println("Releasing project...")
-  }
-
-  // Use 'assemble' instead of 'build' to skip tests during release
-  // Tests have JDK version conflicts (some need JDK 8, some need JDK 17)
-  // and should be run separately in CI/CD with appropriate JDK configurations
-  // Only include subprojects that apply the Java plugin (exclude client-python)
-  dependsOn(
-    subprojects
-      .filter { it.name != "client-python" }
-      .map { it.tasks.named("assemble") }
-  )
-}

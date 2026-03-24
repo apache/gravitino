@@ -515,6 +515,8 @@ public class JdbcCatalogOperations implements CatalogOperations, SupportsSchemas
         .withComment(comment)
         .withProperties(jdbcTablePropertiesMetadata.convertFromJdbcProperties(resultProperties))
         .withPartitioning(partitioning)
+        .withSortOrders(sortOrders)
+        .withDistribution(distribution)
         .withIndexes(indexes)
         .withDatabaseName(databaseName)
         .withTableOperation(tableOperation)
