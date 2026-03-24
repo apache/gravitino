@@ -58,7 +58,7 @@ public class CatalogHiveS3IT extends CatalogHive3IT {
     gravitinoLocalStackContainer = containerSuite.getLocalStackContainer();
 
     Awaitility.await()
-        .atMost(60, TimeUnit.SECONDS)
+        .atMost(180, TimeUnit.SECONDS)
         .pollInterval(1, TimeUnit.SECONDS)
         .until(
             () -> {
