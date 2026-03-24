@@ -133,6 +133,42 @@ gravitino.authenticator.oauth.groupMapper.regex.pattern = ^(.*)$
 # Extract group from a complex string (e.g., /group -> group)
 gravitino.authenticator.oauth.groupMapper = regex
 gravitino.authenticator.oauth.groupMapper.regex.pattern = ^/(.*)
+
+
+# Use custom group mapper implementation
+gravitino.authenticator.oauth.groupMapper = com.example.MyCustomGroupMapper
+```
+
+#### Custom group mapper
+
+For advanced use cases, implement the `GroupMapper` interface:
+
+```java
+package com.example;
+
+import org.apache.gravitino.UserGroup;
+import org.apache.gravitino.auth.GroupMapper;
+import java.util.Collections;
+import java.util.List;
+import java.util.stream.Collectors;
+
+public class MyCustomGroupMapper implements GroupMapper {
+  @Override
+  public List<UserGroup> map(List<Object> groups) {
+    if (groups == null) {
+      return Collections.emptyList();
+    }
+    return groups.stream()
+        .map(g -> new UserGroup(null, "mapped_" + g.toString()))
+        .collect(Collectors.toList());
+  }
+}
+```
+
+Configure Gravitino to use your custom mapper:
+
+```text
+gravitino.authenticator.oauth.groupMapper = com.example.MyCustomGroupMapper
 ```
 
 #### OAuth principal mapping
@@ -152,6 +188,30 @@ gravitino.authenticator.oauth.principalMapper.regex.pattern = ([^@]+)@.*
 gravitino.authenticator.oauth.principalMapper = com.example.MyCustomMapper
 ```
 
+#### Custom principal mapper
+
+For advanced use cases, implement the `PrincipalMapper` interface:
+
+```java
+package com.example;
+
+import org.apache.gravitino.auth.PrincipalMapper;
+import java.security.Principal;
+
+public class MyCustomPrincipalMapper implements PrincipalMapper {
+  @Override
+  public Principal map(String principal) {
+    return () -> "mapped_" + principal;
+  }
+}
+```
+
+Configure Gravitino to use your custom mapper:
+
+```text
+gravitino.authenticator.oauth.principalMapper = com.example.MyCustomPrincipalMapper
+```
+
 #### Kerberos principal mapping
 
 For Kerberos authentication, principals follow the format `primary[/instance][@REALM]`. The default mapper extracts the primary component (username before `@`):
@@ -166,7 +226,7 @@ gravitino.authenticator.kerberos.principalMapper = regex
 gravitino.authenticator.kerberos.principalMapper.regex.pattern = ([^/@]+).*
 ```
 
-#### Custom principal mapper
+#### Custom Kerberos principal mapper
 
 For advanced use cases, implement the `PrincipalMapper` interface:
 

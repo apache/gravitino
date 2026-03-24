@@ -21,12 +21,12 @@ package org.apache.gravitino;
 
 import com.google.common.base.Preconditions;
 import java.util.Objects;
-import javax.annotation.Nullable;
+import java.util.Optional;
 
 /** A class representing a user group with external UID and name. */
 public class UserGroup {
 
-  @Nullable private final String groupExternalUID;
+  private final Optional<String> groupExternalUID;
   private final String groupname;
 
   /**
@@ -35,7 +35,7 @@ public class UserGroup {
    * @param groupExternalUID The external UID of the group.
    * @param groupname The name of the group.
    */
-  public UserGroup(@Nullable String groupExternalUID, String groupname) {
+  public UserGroup(Optional<String> groupExternalUID, String groupname) {
     Preconditions.checkArgument(groupname != null, "groupname cannot be null");
     this.groupExternalUID = groupExternalUID;
     this.groupname = groupname;
@@ -46,8 +46,7 @@ public class UserGroup {
    *
    * @return The group external UID.
    */
-  @Nullable
-  public String getGroupExternalUID() {
+  public Optional<String> getGroupExternalUID() {
     return groupExternalUID;
   }
 
@@ -81,9 +80,8 @@ public class UserGroup {
   @Override
   public String toString() {
     return "UserGroup{"
-        + "groupExternalUID='"
+        + "groupExternalUID="
         + groupExternalUID
-        + '\''
         + ", groupname='"
         + groupname
         + '\''

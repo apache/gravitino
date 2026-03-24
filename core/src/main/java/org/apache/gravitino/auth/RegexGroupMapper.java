@@ -19,6 +19,7 @@
 
 package org.apache.gravitino.auth;
 
+import com.google.common.base.Preconditions;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.regex.Matcher;
@@ -65,12 +66,16 @@ public class RegexGroupMapper implements GroupMapper {
       return new ArrayList<>();
     }
 
+    groups.forEach(
+        g ->
+            Preconditions.checkArgument(
+                g == null || g instanceof String, "Group must be a string"));
     List<UserGroup> mappedGroups = new ArrayList<>();
     for (Object groupObj : groups) {
       if (groupObj == null) {
         continue;
       }
-      String group = groupObj.toString();
+      String group = (String) groupObj;
       try {
         Matcher matcher = pattern.matcher(group);
         if (matcher.find() && matcher.groupCount() >= 1) {
