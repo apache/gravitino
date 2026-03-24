@@ -59,8 +59,8 @@ public class ConfigServlet extends HttpServlet {
     }
 
     if (serverConfig.get(Configs.ENABLE_AUTHORIZATION)) {
-      // Expose serviceAdmins when authorization is enabled so the web UI can determine whether the logged-in user has
-      // service-admin privileges (e.g. to show the "Create Metalake" button).
+      // Expose serviceAdmins when authorization is enabled so the web UI can determine whether the
+      // logged-in user has service-admin privileges (e.g. to show the "Create Metalake" button).
       String serviceAdminsRaw = serverConfig.getRawString(Configs.SERVICE_ADMINS.getKey());
       if (serviceAdminsRaw != null) {
         configs.put(Configs.SERVICE_ADMINS.getKey(), serverConfig.get(Configs.SERVICE_ADMINS));

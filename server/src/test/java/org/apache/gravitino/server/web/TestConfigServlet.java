@@ -53,6 +53,24 @@ public class TestConfigServlet {
   }
 
   @Test
+  public void testConfigServletWithAuthEnabledButNoServiceAdmins() throws Exception {
+    // When authorization is enabled but serviceAdmins is not configured, the key should be
+    // absent from the response (no crash) rather than null or empty.
+    ServerConfig serverConfig = new ServerConfig();
+    serverConfig.set(Configs.ENABLE_AUTHORIZATION, true);
+    ConfigServlet configServlet = new ConfigServlet(serverConfig);
+    configServlet.init();
+    HttpServletResponse res = mock(HttpServletResponse.class);
+    PrintWriter writer = mock(PrintWriter.class);
+    when(res.getWriter()).thenReturn(writer);
+    configServlet.doGet(null, res);
+    verify(writer)
+        .write(
+            "{\"gravitino.authorization.enable\":true,\"gravitino.authenticators\":[\"simple\"]}");
+    configServlet.destroy();
+  }
+
+  @Test
   public void testConfigServletWithAuthEnabledAndServiceAdmins() throws Exception {
     ServerConfig serverConfig = new ServerConfig();
     serverConfig.set(Configs.ENABLE_AUTHORIZATION, true);
@@ -65,7 +83,7 @@ public class TestConfigServlet {
     configServlet.doGet(null, res);
     verify(writer)
         .write(
-            "{\"gravitino.authorization.serviceAdmins\":[\"admin1\",\"admin2\"],\"gravitino.authorization.enable\":true,\"gravitino.authenticators\":[\"simple\"]}");
+            "{\"gravitino.authorization.enable\":true,\"gravitino.authenticators\":[\"simple\"],\"gravitino.authorization.serviceAdmins\":[\"admin1\",\"admin2\"]}");
     configServlet.destroy();
   }
 
