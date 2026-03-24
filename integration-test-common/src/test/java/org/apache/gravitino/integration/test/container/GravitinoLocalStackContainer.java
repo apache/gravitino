@@ -22,13 +22,13 @@ import com.google.common.collect.ImmutableSet;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
+import org.apache.gravitino.rest.RESTUtils;
 import org.testcontainers.containers.Network;
 
 public class GravitinoLocalStackContainer extends BaseContainer {
 
   public static final String DEFAULT_IMAGE = System.getenv("GRAVITINO_CI_LOCALSTACK_DOCKER_IMAGE");
   public static final String HOST_NAME = "gravitino-ci-localstack";
-  public static final int PORT = 4566;
 
   public GravitinoLocalStackContainer(
       String image,
@@ -57,7 +57,12 @@ public class GravitinoLocalStackContainer extends BaseContainer {
       super();
       this.image = DEFAULT_IMAGE;
       this.hostName = HOST_NAME;
-      this.exposePorts = ImmutableSet.of(PORT);
+      try {
+        int randomPort = RESTUtils.findAvailablePort(4566, 4666);
+        this.exposePorts = ImmutableSet.of(randomPort);
+      } catch (Exception e) {
+        throw new RuntimeException("Failed to find an available port for LocalStack container", e);
+      }
     }
 
     @Override
