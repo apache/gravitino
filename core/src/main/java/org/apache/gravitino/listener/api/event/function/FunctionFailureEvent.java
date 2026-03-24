@@ -17,10 +17,11 @@
  * under the License.
  */
 
-package org.apache.gravitino.listener.api.event;
+package org.apache.gravitino.listener.api.event.function;
 
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.annotation.DeveloperApi;
+import org.apache.gravitino.listener.api.event.FailureEvent;
 
 /**
  * An abstract class representing events that are triggered when a function operation fails due to

@@ -190,6 +190,7 @@ public enum OperationType {
   ALTER_FUNCTION,
   DROP_FUNCTION,
   LIST_FUNCTION,
+  LIST_FUNCTION_INFOS,
 
   UNKNOWN,
 }

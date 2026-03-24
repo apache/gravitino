@@ -17,11 +17,12 @@
  * under the License.
  */
 
-package org.apache.gravitino.listener.api.event;
+package org.apache.gravitino.listener.api.event.function;
 
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.annotation.DeveloperApi;
 import org.apache.gravitino.function.FunctionChange;
+import org.apache.gravitino.listener.api.event.OperationType;
 import org.apache.gravitino.listener.api.info.FunctionInfo;
 
 /** Represents an event fired when a function is successfully altered. */

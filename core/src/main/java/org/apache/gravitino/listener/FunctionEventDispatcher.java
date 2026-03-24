@@ -19,6 +19,7 @@
 
 package org.apache.gravitino.listener;
 
+import java.util.Arrays;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.catalog.FunctionDispatcher;
@@ -29,21 +30,22 @@ import org.apache.gravitino.function.Function;
 import org.apache.gravitino.function.FunctionChange;
 import org.apache.gravitino.function.FunctionDefinition;
 import org.apache.gravitino.function.FunctionType;
-import org.apache.gravitino.listener.api.event.AlterFunctionEvent;
-import org.apache.gravitino.listener.api.event.AlterFunctionFailureEvent;
-import org.apache.gravitino.listener.api.event.AlterFunctionPreEvent;
-import org.apache.gravitino.listener.api.event.DropFunctionEvent;
-import org.apache.gravitino.listener.api.event.DropFunctionFailureEvent;
-import org.apache.gravitino.listener.api.event.DropFunctionPreEvent;
-import org.apache.gravitino.listener.api.event.GetFunctionEvent;
-import org.apache.gravitino.listener.api.event.GetFunctionFailureEvent;
-import org.apache.gravitino.listener.api.event.GetFunctionPreEvent;
-import org.apache.gravitino.listener.api.event.ListFunctionEvent;
-import org.apache.gravitino.listener.api.event.ListFunctionFailureEvent;
-import org.apache.gravitino.listener.api.event.ListFunctionPreEvent;
-import org.apache.gravitino.listener.api.event.RegisterFunctionEvent;
-import org.apache.gravitino.listener.api.event.RegisterFunctionFailureEvent;
-import org.apache.gravitino.listener.api.event.RegisterFunctionPreEvent;
+import org.apache.gravitino.listener.api.event.function.AlterFunctionEvent;
+import org.apache.gravitino.listener.api.event.function.AlterFunctionFailureEvent;
+import org.apache.gravitino.listener.api.event.function.AlterFunctionPreEvent;
+import org.apache.gravitino.listener.api.event.function.DropFunctionEvent;
+import org.apache.gravitino.listener.api.event.function.DropFunctionFailureEvent;
+import org.apache.gravitino.listener.api.event.function.DropFunctionPreEvent;
+import org.apache.gravitino.listener.api.event.function.GetFunctionEvent;
+import org.apache.gravitino.listener.api.event.function.GetFunctionFailureEvent;
+import org.apache.gravitino.listener.api.event.function.GetFunctionPreEvent;
+import org.apache.gravitino.listener.api.event.function.ListFunctionEvent;
+import org.apache.gravitino.listener.api.event.function.ListFunctionFailureEvent;
+import org.apache.gravitino.listener.api.event.function.ListFunctionInfosEvent;
+import org.apache.gravitino.listener.api.event.function.ListFunctionPreEvent;
+import org.apache.gravitino.listener.api.event.function.RegisterFunctionEvent;
+import org.apache.gravitino.listener.api.event.function.RegisterFunctionFailureEvent;
+import org.apache.gravitino.listener.api.event.function.RegisterFunctionPreEvent;
 import org.apache.gravitino.listener.api.info.FunctionInfo;
 import org.apache.gravitino.utils.PrincipalUtils;
 
@@ -90,7 +92,11 @@ public class FunctionEventDispatcher implements FunctionDispatcher {
         new ListFunctionPreEvent(PrincipalUtils.getCurrentUserName(), namespace));
     try {
       Function[] functions = dispatcher.listFunctionInfos(namespace);
-      eventBus.dispatchEvent(new ListFunctionEvent(PrincipalUtils.getCurrentUserName(), namespace));
+      FunctionInfo[] functionInfos =
+          Arrays.stream(functions).map(FunctionInfo::new).toArray(FunctionInfo[]::new);
+      eventBus.dispatchEvent(
+          new ListFunctionInfosEvent(
+              PrincipalUtils.getCurrentUserName(), namespace, functionInfos));
       return functions;
     } catch (Exception e) {
       eventBus.dispatchEvent(

@@ -17,27 +17,34 @@
  * under the License.
  */
 
-package org.apache.gravitino.listener.api.event;
+package org.apache.gravitino.listener.api.event.function;
 
 import org.apache.gravitino.NameIdentifier;
+import org.apache.gravitino.Namespace;
 import org.apache.gravitino.annotation.DeveloperApi;
+import org.apache.gravitino.listener.api.event.OperationType;
 
-/** Represents an event that occurs when an attempt to get a function fails due to an exception. */
+/** Represents an event that is triggered before listing functions within a namespace. */
 @DeveloperApi
-public final class GetFunctionFailureEvent extends FunctionFailureEvent {
+public class ListFunctionPreEvent extends FunctionPreEvent {
+  private final Namespace namespace;
+
+  public ListFunctionPreEvent(String user, Namespace namespace) {
+    super(user, NameIdentifier.of(namespace.levels()));
+    this.namespace = namespace;
+  }
+
   /**
-   * Constructs a {@code GetFunctionFailureEvent} instance.
+   * Provides the namespace associated with this event.
    *
-   * @param user The user who initiated the function retrieval operation.
-   * @param identifier The identifier of the function that the retrieval attempt was made for.
-   * @param exception The exception that was thrown during the function retrieval operation.
+   * @return A {@link Namespace} instance from which functions were listed.
    */
-  public GetFunctionFailureEvent(String user, NameIdentifier identifier, Exception exception) {
-    super(user, identifier, exception);
+  public Namespace namespace() {
+    return namespace;
   }
 
   @Override
   public OperationType operationType() {
-    return OperationType.GET_FUNCTION;
+    return OperationType.LIST_FUNCTION;
   }
 }

@@ -17,42 +17,42 @@
  * under the License.
  */
 
-package org.apache.gravitino.listener.api.event;
+package org.apache.gravitino.listener.api.event.function;
 
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.annotation.DeveloperApi;
+import org.apache.gravitino.listener.api.event.OperationType;
 import org.apache.gravitino.listener.api.info.FunctionInfo;
 
-/** Represents an event triggered upon the successful registration of a function. */
+/** Represents an event triggered upon the successful retrieval of a function. */
 @DeveloperApi
-public final class RegisterFunctionEvent extends FunctionEvent {
-  private final FunctionInfo registeredFunctionInfo;
+public final class GetFunctionEvent extends FunctionEvent {
+  private final FunctionInfo functionInfo;
 
   /**
-   * Constructs an instance of {@code RegisterFunctionEvent}.
+   * Constructs an instance of {@code GetFunctionEvent}.
    *
-   * @param user The username of the individual who initiated the function registration.
-   * @param identifier The unique identifier of the function that was registered.
-   * @param registeredFunctionInfo The final state of the function post-registration.
+   * @param user The username of the individual who initiated the function retrieval.
+   * @param identifier The unique identifier of the function that was retrieved.
+   * @param functionInfo The state of the function post-retrieval.
    */
-  public RegisterFunctionEvent(
-      String user, NameIdentifier identifier, FunctionInfo registeredFunctionInfo) {
+  public GetFunctionEvent(String user, NameIdentifier identifier, FunctionInfo functionInfo) {
     super(user, identifier);
-    this.registeredFunctionInfo = registeredFunctionInfo;
+    this.functionInfo = functionInfo;
   }
 
   /**
-   * Retrieves the final state of the function after successful registration.
+   * Retrieves the state of the function as it was made available to the user after successful
+   * retrieval.
    *
-   * @return A {@link FunctionInfo} instance encapsulating the details of the newly registered
-   *     function.
+   * @return A {@link FunctionInfo} instance encapsulating the details of the function as retrieved.
    */
-  public FunctionInfo registeredFunctionInfo() {
-    return registeredFunctionInfo;
+  public FunctionInfo functionInfo() {
+    return functionInfo;
   }
 
   @Override
   public OperationType operationType() {
-    return OperationType.REGISTER_FUNCTION;
+    return OperationType.GET_FUNCTION;
   }
 }

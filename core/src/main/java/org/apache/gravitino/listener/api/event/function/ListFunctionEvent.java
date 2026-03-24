@@ -17,36 +17,36 @@
  * under the License.
  */
 
-package org.apache.gravitino.listener.api.event;
+package org.apache.gravitino.listener.api.event.function;
 
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.annotation.DeveloperApi;
+import org.apache.gravitino.listener.api.event.OperationType;
 
 /**
- * Represents an event that is triggered when an attempt to list functions within a namespace fails
- * due to an exception.
+ * Represents an event that is triggered upon the successful listing of functions within a
+ * namespace.
  */
 @DeveloperApi
-public final class ListFunctionFailureEvent extends FunctionFailureEvent {
+public final class ListFunctionEvent extends FunctionEvent {
   private final Namespace namespace;
 
   /**
-   * Constructs a {@code ListFunctionFailureEvent} instance.
+   * Constructs an instance of {@code ListFunctionEvent}.
    *
-   * @param user The username of the individual who initiated the operation to list functions.
-   * @param namespace The namespace for which the function listing was attempted.
-   * @param exception The exception encountered during the attempt to list functions.
+   * @param user The username of the individual who initiated the function listing.
+   * @param namespace The namespace from which functions were listed.
    */
-  public ListFunctionFailureEvent(String user, Namespace namespace, Exception exception) {
-    super(user, NameIdentifier.of(namespace.levels()), exception);
+  public ListFunctionEvent(String user, Namespace namespace) {
+    super(user, NameIdentifier.of(namespace.levels()));
     this.namespace = namespace;
   }
 
   /**
-   * Retrieves the namespace associated with this failure event.
+   * Provides the namespace associated with this event.
    *
-   * @return A {@link Namespace} instance for which the function listing was attempted.
+   * @return A {@link Namespace} instance from which functions were listed.
    */
   public Namespace namespace() {
     return namespace;

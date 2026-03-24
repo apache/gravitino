@@ -17,43 +17,29 @@
  * under the License.
  */
 
-package org.apache.gravitino.listener.api.event;
+package org.apache.gravitino.listener.api.event.function;
 
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.annotation.DeveloperApi;
+import org.apache.gravitino.listener.api.event.OperationType;
 import org.apache.gravitino.listener.api.info.FunctionInfo;
 
-/**
- * Represents an event that is generated when an attempt to register a function fails due to an
- * exception.
- */
+/** Represents an event triggered before registering a function. */
 @DeveloperApi
-public final class RegisterFunctionFailureEvent extends FunctionFailureEvent {
+public class RegisterFunctionPreEvent extends FunctionPreEvent {
   private final FunctionInfo registerFunctionRequest;
 
-  /**
-   * Constructs a {@code RegisterFunctionFailureEvent} instance.
-   *
-   * @param user The user who initiated the function registration operation.
-   * @param identifier The identifier of the function that was attempted to be registered.
-   * @param exception The exception that was thrown during the function registration operation.
-   * @param registerFunctionRequest The original request information used to attempt to register the
-   *     function.
-   */
-  public RegisterFunctionFailureEvent(
-      String user,
-      NameIdentifier identifier,
-      Exception exception,
-      FunctionInfo registerFunctionRequest) {
-    super(user, identifier, exception);
+  public RegisterFunctionPreEvent(
+      String user, NameIdentifier identifier, FunctionInfo registerFunctionRequest) {
+    super(user, identifier);
     this.registerFunctionRequest = registerFunctionRequest;
   }
 
   /**
-   * Retrieves the original request information for the attempted function registration.
+   * Retrieves the register function request.
    *
-   * @return The {@link FunctionInfo} instance representing the request information for the failed
-   *     function registration attempt.
+   * @return A {@link FunctionInfo} instance encapsulating the details of the register function
+   *     request.
    */
   public FunctionInfo registerFunctionRequest() {
     return registerFunctionRequest;

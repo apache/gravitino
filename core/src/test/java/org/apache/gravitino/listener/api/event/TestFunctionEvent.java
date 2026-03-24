@@ -35,6 +35,22 @@ import org.apache.gravitino.function.FunctionType;
 import org.apache.gravitino.listener.DummyEventListener;
 import org.apache.gravitino.listener.EventBus;
 import org.apache.gravitino.listener.FunctionEventDispatcher;
+import org.apache.gravitino.listener.api.event.function.AlterFunctionEvent;
+import org.apache.gravitino.listener.api.event.function.AlterFunctionFailureEvent;
+import org.apache.gravitino.listener.api.event.function.AlterFunctionPreEvent;
+import org.apache.gravitino.listener.api.event.function.DropFunctionEvent;
+import org.apache.gravitino.listener.api.event.function.DropFunctionFailureEvent;
+import org.apache.gravitino.listener.api.event.function.DropFunctionPreEvent;
+import org.apache.gravitino.listener.api.event.function.GetFunctionEvent;
+import org.apache.gravitino.listener.api.event.function.GetFunctionFailureEvent;
+import org.apache.gravitino.listener.api.event.function.GetFunctionPreEvent;
+import org.apache.gravitino.listener.api.event.function.ListFunctionEvent;
+import org.apache.gravitino.listener.api.event.function.ListFunctionFailureEvent;
+import org.apache.gravitino.listener.api.event.function.ListFunctionInfosEvent;
+import org.apache.gravitino.listener.api.event.function.ListFunctionPreEvent;
+import org.apache.gravitino.listener.api.event.function.RegisterFunctionEvent;
+import org.apache.gravitino.listener.api.event.function.RegisterFunctionFailureEvent;
+import org.apache.gravitino.listener.api.event.function.RegisterFunctionPreEvent;
 import org.apache.gravitino.listener.api.info.FunctionInfo;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
@@ -173,6 +189,29 @@ public class TestFunctionEvent {
   }
 
   @Test
+  void testListFunctionInfosEvent() {
+    Namespace namespace = Namespace.of("metalake", "catalog", "schema");
+    dispatcher.listFunctionInfos(namespace);
+
+    Event event = dummyEventListener.popPostEvent();
+    Assertions.assertEquals(namespace.toString(), event.identifier().toString());
+    Assertions.assertEquals(ListFunctionInfosEvent.class, event.getClass());
+    Assertions.assertEquals(namespace, ((ListFunctionInfosEvent) event).namespace());
+    FunctionInfo[] functionInfos = ((ListFunctionInfosEvent) event).functionInfos();
+    Assertions.assertEquals(1, functionInfos.length);
+    checkFunctionInfo(functionInfos[0], function);
+    Assertions.assertEquals(OperationType.LIST_FUNCTION_INFOS, event.operationType());
+    Assertions.assertEquals(OperationStatus.SUCCESS, event.operationStatus());
+
+    PreEvent preEvent = dummyEventListener.popPreEvent();
+    Assertions.assertEquals(namespace.toString(), preEvent.identifier().toString());
+    Assertions.assertEquals(ListFunctionPreEvent.class, preEvent.getClass());
+    Assertions.assertEquals(namespace, ((ListFunctionPreEvent) preEvent).namespace());
+    Assertions.assertEquals(OperationType.LIST_FUNCTION, preEvent.operationType());
+    Assertions.assertEquals(OperationStatus.UNPROCESSED, preEvent.operationStatus());
+  }
+
+  @Test
   void testRegisterFunctionFailureEvent() {
     NameIdentifier identifier = NameIdentifier.of("metalake", "catalog", "schema", "func");
     Assertions.assertThrowsExactly(
@@ -256,6 +295,21 @@ public class TestFunctionEvent {
     Assertions.assertEquals(OperationStatus.FAILURE, event.operationStatus());
   }
 
+  @Test
+  void testListFunctionInfosFailureEvent() {
+    Namespace namespace = Namespace.of("metalake", "catalog", "schema");
+    Assertions.assertThrowsExactly(
+        GravitinoRuntimeException.class, () -> failureDispatcher.listFunctionInfos(namespace));
+    Event event = dummyEventListener.popPostEvent();
+    Assertions.assertEquals(namespace.toString(), event.identifier().toString());
+    Assertions.assertEquals(ListFunctionFailureEvent.class, event.getClass());
+    Assertions.assertEquals(
+        GravitinoRuntimeException.class, ((ListFunctionFailureEvent) event).exception().getClass());
+    Assertions.assertEquals(namespace, ((ListFunctionFailureEvent) event).namespace());
+    Assertions.assertEquals(OperationType.LIST_FUNCTION, event.operationType());
+    Assertions.assertEquals(OperationStatus.FAILURE, event.operationStatus());
+  }
+
   private void checkFunctionInfo(FunctionInfo functionInfo, Function func) {
     Assertions.assertEquals(func.name(), functionInfo.name());
     Assertions.assertEquals(func.functionType(), functionInfo.functionType());
@@ -288,6 +342,7 @@ public class TestFunctionEvent {
     when(dispatcher.getFunction(any(NameIdentifier.class))).thenReturn(function);
     when(dispatcher.dropFunction(any(NameIdentifier.class))).thenReturn(true);
     when(dispatcher.listFunctions(any(Namespace.class))).thenReturn(null);
+    when(dispatcher.listFunctionInfos(any(Namespace.class))).thenReturn(new Function[] {function});
     when(dispatcher.alterFunction(any(NameIdentifier.class), any(FunctionChange.class)))
         .thenReturn(function);
     return dispatcher;

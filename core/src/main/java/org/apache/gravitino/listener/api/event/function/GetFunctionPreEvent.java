@@ -17,37 +17,17 @@
  * under the License.
  */
 
-package org.apache.gravitino.listener.api.event;
+package org.apache.gravitino.listener.api.event.function;
 
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.annotation.DeveloperApi;
-import org.apache.gravitino.listener.api.info.FunctionInfo;
+import org.apache.gravitino.listener.api.event.OperationType;
 
-/** Represents an event triggered upon the successful retrieval of a function. */
+/** Represents an event triggered before getting a function. */
 @DeveloperApi
-public final class GetFunctionEvent extends FunctionEvent {
-  private final FunctionInfo functionInfo;
-
-  /**
-   * Constructs an instance of {@code GetFunctionEvent}.
-   *
-   * @param user The username of the individual who initiated the function retrieval.
-   * @param identifier The unique identifier of the function that was retrieved.
-   * @param functionInfo The state of the function post-retrieval.
-   */
-  public GetFunctionEvent(String user, NameIdentifier identifier, FunctionInfo functionInfo) {
+public class GetFunctionPreEvent extends FunctionPreEvent {
+  public GetFunctionPreEvent(String user, NameIdentifier identifier) {
     super(user, identifier);
-    this.functionInfo = functionInfo;
-  }
-
-  /**
-   * Retrieves the state of the function as it was made available to the user after successful
-   * retrieval.
-   *
-   * @return A {@link FunctionInfo} instance encapsulating the details of the function as retrieved.
-   */
-  public FunctionInfo functionInfo() {
-    return functionInfo;
   }
 
   @Override

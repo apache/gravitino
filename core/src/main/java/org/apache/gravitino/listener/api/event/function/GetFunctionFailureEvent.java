@@ -17,30 +17,28 @@
  * under the License.
  */
 
-package org.apache.gravitino.listener.api.event;
+package org.apache.gravitino.listener.api.event.function;
 
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.annotation.DeveloperApi;
+import org.apache.gravitino.listener.api.event.OperationType;
 
-/**
- * Represents an abstract base class for events related to function operations. This class extends
- * {@link Event} to provide a more specific context involving operations on functions, such as
- * registration, deletion, or modification.
- */
+/** Represents an event that occurs when an attempt to get a function fails due to an exception. */
 @DeveloperApi
-public abstract class FunctionEvent extends Event {
+public final class GetFunctionFailureEvent extends FunctionFailureEvent {
   /**
-   * Constructs a new {@code FunctionEvent} with the specified user and function identifier.
+   * Constructs a {@code GetFunctionFailureEvent} instance.
    *
-   * @param user The user responsible for triggering the function operation.
-   * @param identifier The identifier of the function involved in the operation.
+   * @param user The user who initiated the function retrieval operation.
+   * @param identifier The identifier of the function that the retrieval attempt was made for.
+   * @param exception The exception that was thrown during the function retrieval operation.
    */
-  protected FunctionEvent(String user, NameIdentifier identifier) {
-    super(user, identifier);
+  public GetFunctionFailureEvent(String user, NameIdentifier identifier, Exception exception) {
+    super(user, identifier, exception);
   }
 
   @Override
-  public OperationStatus operationStatus() {
-    return OperationStatus.SUCCESS;
+  public OperationType operationType() {
+    return OperationType.GET_FUNCTION;
   }
 }

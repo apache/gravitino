@@ -17,42 +17,36 @@
  * under the License.
  */
 
-package org.apache.gravitino.listener.api.event;
+package org.apache.gravitino.listener.api.event.function;
 
 import org.apache.gravitino.NameIdentifier;
-import org.apache.gravitino.Namespace;
 import org.apache.gravitino.annotation.DeveloperApi;
+import org.apache.gravitino.function.FunctionChange;
+import org.apache.gravitino.listener.api.event.OperationType;
 
-/**
- * Represents an event that is triggered upon the successful listing of functions within a
- * namespace.
- */
+/** Represents an event triggered before altering a function. */
 @DeveloperApi
-public final class ListFunctionEvent extends FunctionEvent {
-  private final Namespace namespace;
+public class AlterFunctionPreEvent extends FunctionPreEvent {
+  private final FunctionChange[] functionChanges;
 
-  /**
-   * Constructs an instance of {@code ListFunctionEvent}.
-   *
-   * @param user The username of the individual who initiated the function listing.
-   * @param namespace The namespace from which functions were listed.
-   */
-  public ListFunctionEvent(String user, Namespace namespace) {
-    super(user, NameIdentifier.of(namespace.levels()));
-    this.namespace = namespace;
+  public AlterFunctionPreEvent(
+      String user, NameIdentifier identifier, FunctionChange[] functionChanges) {
+    super(user, identifier);
+    this.functionChanges = functionChanges;
   }
 
   /**
-   * Provides the namespace associated with this event.
+   * Retrieves the specific changes that were made to the function during the alteration process.
    *
-   * @return A {@link Namespace} instance from which functions were listed.
+   * @return An array of {@link FunctionChange} objects detailing each modification applied to the
+   *     function.
    */
-  public Namespace namespace() {
-    return namespace;
+  public FunctionChange[] functionChanges() {
+    return functionChanges;
   }
 
   @Override
   public OperationType operationType() {
-    return OperationType.LIST_FUNCTION;
+    return OperationType.ALTER_FUNCTION;
   }
 }

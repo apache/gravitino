@@ -17,33 +17,32 @@
  * under the License.
  */
 
-package org.apache.gravitino.listener.api.event;
+package org.apache.gravitino.listener.api.event.function;
 
 import org.apache.gravitino.NameIdentifier;
-import org.apache.gravitino.Namespace;
 import org.apache.gravitino.annotation.DeveloperApi;
+import org.apache.gravitino.listener.api.event.Event;
+import org.apache.gravitino.listener.api.event.OperationStatus;
 
-/** Represents an event that is triggered before listing functions within a namespace. */
+/**
+ * Represents an abstract base class for events related to function operations. This class extends
+ * {@link Event} to provide a more specific context involving operations on functions, such as
+ * registration, deletion, or modification.
+ */
 @DeveloperApi
-public class ListFunctionPreEvent extends FunctionPreEvent {
-  private final Namespace namespace;
-
-  public ListFunctionPreEvent(String user, Namespace namespace) {
-    super(user, NameIdentifier.of(namespace.levels()));
-    this.namespace = namespace;
-  }
-
+public abstract class FunctionEvent extends Event {
   /**
-   * Provides the namespace associated with this event.
+   * Constructs a new {@code FunctionEvent} with the specified user and function identifier.
    *
-   * @return A {@link Namespace} instance from which functions were listed.
+   * @param user The user responsible for triggering the function operation.
+   * @param identifier The identifier of the function involved in the operation.
    */
-  public Namespace namespace() {
-    return namespace;
+  protected FunctionEvent(String user, NameIdentifier identifier) {
+    super(user, identifier);
   }
 
   @Override
-  public OperationType operationType() {
-    return OperationType.LIST_FUNCTION;
+  public OperationStatus operationStatus() {
+    return OperationStatus.SUCCESS;
   }
 }

@@ -17,15 +17,31 @@
  * under the License.
  */
 
-package org.apache.gravitino.listener.api.event;
+package org.apache.gravitino.listener.api.event.function;
 
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.annotation.DeveloperApi;
+import org.apache.gravitino.listener.api.event.OperationType;
 
-/** Represents a pre-event for function operations. */
+/**
+ * Represents an event that is generated when an attempt to drop a function fails due to an
+ * exception.
+ */
 @DeveloperApi
-public abstract class FunctionPreEvent extends PreEvent {
-  protected FunctionPreEvent(String user, NameIdentifier identifier) {
-    super(user, identifier);
+public final class DropFunctionFailureEvent extends FunctionFailureEvent {
+  /**
+   * Constructs a new {@code DropFunctionFailureEvent} instance.
+   *
+   * @param user The user who initiated the drop function operation.
+   * @param identifier The identifier of the function that the operation attempted to drop.
+   * @param exception The exception that was thrown during the drop function operation.
+   */
+  public DropFunctionFailureEvent(String user, NameIdentifier identifier, Exception exception) {
+    super(user, identifier, exception);
+  }
+
+  @Override
+  public OperationType operationType() {
+    return OperationType.DROP_FUNCTION;
   }
 }

@@ -17,20 +17,16 @@
  * under the License.
  */
 
-package org.apache.gravitino.listener.api.event;
+package org.apache.gravitino.listener.api.event.function;
 
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.annotation.DeveloperApi;
+import org.apache.gravitino.listener.api.event.PreEvent;
 
-/** Represents an event triggered before getting a function. */
+/** Represents a pre-event for function operations. */
 @DeveloperApi
-public class GetFunctionPreEvent extends FunctionPreEvent {
-  public GetFunctionPreEvent(String user, NameIdentifier identifier) {
+public abstract class FunctionPreEvent extends PreEvent {
+  protected FunctionPreEvent(String user, NameIdentifier identifier) {
     super(user, identifier);
-  }
-
-  @Override
-  public OperationType operationType() {
-    return OperationType.GET_FUNCTION;
   }
 }
