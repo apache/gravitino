@@ -150,6 +150,7 @@ import org.apache.gravitino.UserGroup;
 import org.apache.gravitino.auth.GroupMapper;
 import java.util.Collections;
 import java.util.List;
+import java.util.Optional;
 import java.util.stream.Collectors;
 
 public class MyCustomGroupMapper implements GroupMapper {
@@ -159,7 +160,7 @@ public class MyCustomGroupMapper implements GroupMapper {
       return Collections.emptyList();
     }
     return groups.stream()
-        .map(g -> new UserGroup(null, "mapped_" + g.toString()))
+        .map(g -> new UserGroup(Optional.empty(), "mapped_" + g.toString()))
         .collect(Collectors.toList());
   }
 }
