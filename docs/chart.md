@@ -11,7 +11,7 @@ This Helm chart deploys Apache Gravitino on Kubernetes with customizable configu
 
 ## Prerequisites
 
-- Kubernetes 1.28+
+- Kubernetes 1.29+
 - Helm 3+
 
 ## Installation
@@ -19,13 +19,13 @@ This Helm chart deploys Apache Gravitino on Kubernetes with customizable configu
 Pull the chart from Docker Hub OCI registry:
 
 ```console
-helm pull oci://registry-1.docker.io/apache/gravitino-helm --version 1.3.0
+helm pull oci://registry-1.docker.io/apache/gravitino-helm --version <VERSION>
 ```
 
 Or install directly:
 
 ```console
-helm install gravitino oci://registry-1.docker.io/apache/gravitino-helm --version 1.3.0 -n gravitino --create-namespace
+helm upgrade --install gravitino oci://registry-1.docker.io/apache/gravitino-helm --version <VERSION> -n gravitino --create-namespace
 ```
 
 ## View Chart Values
@@ -35,13 +35,13 @@ You can customize values.yaml parameters to override chart default settings. Add
 To display the default values of the Gravitino chart, run:
 
 ```console
-helm show values oci://registry-1.docker.io/apache/gravitino-helm --version 1.3.0
+helm show values oci://registry-1.docker.io/apache/gravitino-helm --version <VERSION>
 ```
 
 ## Install Helm Chart
 
 ```console
-helm install [RELEASE_NAME] [CHART] [flags]
+helm upgrade --install [RELEASE_NAME] oci://registry-1.docker.io/apache/gravitino-helm --version <VERSION> [flags]
 ```
 
 ### Deploy with Default Configuration
@@ -49,7 +49,7 @@ helm install [RELEASE_NAME] [CHART] [flags]
 Run the following command to deploy Gravitino using the default settings:
 
 ```console
-helm install gravitino oci://registry-1.docker.io/apache/gravitino-helm --version 1.3.0 -n gravitino --create-namespace
+helm upgrade --install gravitino oci://registry-1.docker.io/apache/gravitino-helm --version <VERSION> -n gravitino --create-namespace
 ```
 
 ### Deploy with Custom Configuration
@@ -57,7 +57,7 @@ helm install gravitino oci://registry-1.docker.io/apache/gravitino-helm --versio
 To customize the deployment, use the --set flag to override specific values:
 
 ```console
-helm install gravitino oci://registry-1.docker.io/apache/gravitino-helm --version 1.3.0 \
+helm upgrade --install gravitino oci://registry-1.docker.io/apache/gravitino-helm --version <VERSION> \
   -n gravitino --create-namespace \
   --set key1=val1,key2=val2,...
 ```
@@ -65,7 +65,7 @@ helm install gravitino oci://registry-1.docker.io/apache/gravitino-helm --versio
 Alternatively, you can provide a custom values.yaml file:
 
 ```console
-helm install gravitino oci://registry-1.docker.io/apache/gravitino-helm --version 1.3.0 \
+helm upgrade --install gravitino oci://registry-1.docker.io/apache/gravitino-helm --version <VERSION> \
   -n gravitino --create-namespace \
   -f /path/to/values.yaml
 ```
@@ -75,7 +75,7 @@ helm install gravitino oci://registry-1.docker.io/apache/gravitino-helm --versio
 To deploy both Gravitino and MySQL, where MySQL is used as the storage backend, enable the built-in MySQL instance:
 
 ```console
-helm install gravitino oci://registry-1.docker.io/apache/gravitino-helm --version 1.3.0 \
+helm upgrade --install gravitino oci://registry-1.docker.io/apache/gravitino-helm --version <VERSION> \
   -n gravitino --create-namespace \
   --set mysql.enabled=true
 ```
@@ -85,7 +85,7 @@ helm install gravitino oci://registry-1.docker.io/apache/gravitino-helm --versio
 By default, the MySQL PersistentVolumeClaim(PVC) storage class is local-path. To disable dynamic provisioning, set the storage class to "-":
 
 ```console
-helm install gravitino oci://registry-1.docker.io/apache/gravitino-helm --version 1.3.0 \
+helm upgrade --install gravitino oci://registry-1.docker.io/apache/gravitino-helm --version <VERSION> \
   -n gravitino --create-namespace \
   --set mysql.enabled=true \
   --set global.defaultStorageClass="-"
@@ -106,7 +106,7 @@ mysql -h database-1.***.***.rds.amazonaws.com -P 3306 -u <YOUR-USERNAME> -p <YOU
 Use Helm to install or upgrade Gravitino, specifying the MySQL connection details.
 
 ```console
-helm install gravitino oci://registry-1.docker.io/apache/gravitino-helm --version 1.3.0 \
+helm upgrade --install gravitino oci://registry-1.docker.io/apache/gravitino-helm --version <VERSION> \
   -n gravitino --create-namespace \
   --set entity.jdbcUrl="jdbc:mysql://database-1.***.***.rds.amazonaws.com:3306/gravitino" \
   --set entity.jdbcDriver="com.mysql.cj.jdbc.Driver" \

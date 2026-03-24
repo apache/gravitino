@@ -20,13 +20,13 @@ This Helm chart deploys Apache Gravitino Iceberg REST Catalog Server on Kubernet
 Pull the chart from Docker Hub OCI registry:
 
 ```console
-helm pull oci://registry-1.docker.io/apache/gravitino-iceberg-rest-server-helm --version 1.3.0
+helm pull oci://registry-1.docker.io/apache/gravitino-iceberg-rest-server-helm --version <VERSION>
 ```
 
 Or install directly:
 
 ```console
-helm install gravitino-iceberg oci://registry-1.docker.io/apache/gravitino-iceberg-rest-server-helm --version 1.3.0 -n gravitino --create-namespace
+helm upgrade --install gravitino-iceberg oci://registry-1.docker.io/apache/gravitino-iceberg-rest-server-helm --version <VERSION> -n gravitino --create-namespace
 ```
 
 ## View Chart Values
@@ -36,13 +36,13 @@ You can customize values.yaml parameters to override chart default settings. Add
 To display the default values of the chart, run:
 
 ```console
-helm show values oci://registry-1.docker.io/apache/gravitino-iceberg-rest-server-helm --version 1.3.0
+helm show values oci://registry-1.docker.io/apache/gravitino-iceberg-rest-server-helm --version <VERSION>
 ```
 
 ## Install Helm Chart
 
 ```console
-helm install [RELEASE_NAME] [CHART] [flags]
+helm upgrade --install [RELEASE_NAME] oci://registry-1.docker.io/apache/gravitino-iceberg-rest-server-helm --version <VERSION> [flags]
 ```
 
 ### Deploy with Default Configuration
@@ -50,7 +50,7 @@ helm install [RELEASE_NAME] [CHART] [flags]
 Run the following command to deploy Gravitino Iceberg REST Catalog Server using the default settings:
 
 ```console
-helm install gravitino-iceberg oci://registry-1.docker.io/apache/gravitino-iceberg-rest-server-helm --version 1.3.0 \
+helm upgrade --install gravitino-iceberg oci://registry-1.docker.io/apache/gravitino-iceberg-rest-server-helm --version <VERSION> \
   -n gravitino \
   --create-namespace \
   --set replicas=2 \
@@ -63,7 +63,7 @@ helm install gravitino-iceberg oci://registry-1.docker.io/apache/gravitino-icebe
 To customize the deployment, use the --set flag to override specific values:
 
 ```console
-helm install gravitino-iceberg oci://registry-1.docker.io/apache/gravitino-iceberg-rest-server-helm --version 1.3.0 \
+helm upgrade --install gravitino-iceberg oci://registry-1.docker.io/apache/gravitino-iceberg-rest-server-helm --version <VERSION> \
   -n gravitino \
   --create-namespace \
   --set key1=val1,key2=val2,...
@@ -72,7 +72,7 @@ helm install gravitino-iceberg oci://registry-1.docker.io/apache/gravitino-icebe
 Alternatively, you can provide a custom values.yaml file:
 
 ```console
-helm install gravitino-iceberg oci://registry-1.docker.io/apache/gravitino-iceberg-rest-server-helm --version 1.3.0 \
+helm upgrade --install gravitino-iceberg oci://registry-1.docker.io/apache/gravitino-iceberg-rest-server-helm --version <VERSION> \
   -n gravitino \
   --create-namespace \
   -f /path/to/values.yaml
