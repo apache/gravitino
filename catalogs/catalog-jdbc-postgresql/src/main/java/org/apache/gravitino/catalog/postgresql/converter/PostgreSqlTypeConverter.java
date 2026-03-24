@@ -76,7 +76,23 @@ public class PostgreSqlTypeConverter extends JdbcTypeConverter {
             .map(Types.TimestampType::withTimeZone)
             .orElseGet(Types.TimestampType::withTimeZone);
       case NUMERIC:
-        return Types.DecimalType.of(typeBean.getColumnSize(), typeBean.getScale());
+        Integer columnSize = typeBean.getColumnSize();
+        Integer scale = typeBean.getScale();
+        // Unconstrained NUMERIC (no precision/scale) — PostgreSQL JDBC returns columnSize=0.
+        // Use ExternalType to preserve arbitrary-precision semantics (backed by BigDecimal).
+        if (columnSize == null || columnSize == 0) {
+          return Types.ExternalType.of(NUMERIC);
+        }
+        int effectiveScale = scale != null ? scale : 0;
+        // NUMERIC(P, 0) with small P can be represented as integer types for better performance.
+        if (effectiveScale == 0) {
+          if (columnSize < 10) {
+            return Types.IntegerType.get();
+          } else if (columnSize < 19) {
+            return Types.LongType.get();
+          }
+        }
+        return Types.DecimalType.of(columnSize, effectiveScale);
       case VARCHAR:
         return typeBean.getColumnSize() == null
             ? Types.StringType.get()
