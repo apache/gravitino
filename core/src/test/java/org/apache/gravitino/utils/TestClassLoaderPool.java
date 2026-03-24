@@ -18,9 +18,11 @@
  */
 package org.apache.gravitino.utils;
 
+import com.google.common.collect.ImmutableMap;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.CyclicBarrier;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -36,10 +38,14 @@ public class TestClassLoaderPool {
         Collections.emptyList(), Collections.emptyList(), Collections.emptyList());
   }
 
+  private ClassLoaderKey simpleKey(String provider) {
+    return new ClassLoaderKey(provider, null);
+  }
+
   @Test
   public void testAcquireFirstTimeCreatesNewEntry() {
     try (ClassLoaderPool pool = new ClassLoaderPool()) {
-      ClassLoaderKey key = new ClassLoaderKey("iceberg", null, null, null, null);
+      ClassLoaderKey key = simpleKey("iceberg");
       PooledClassLoaderEntry entry = pool.acquire(key, this::createDummyClassLoader);
 
       Assertions.assertNotNull(entry);
@@ -52,7 +58,7 @@ public class TestClassLoaderPool {
   @Test
   public void testAcquireSameKeyReusesEntry() {
     try (ClassLoaderPool pool = new ClassLoaderPool()) {
-      ClassLoaderKey key = new ClassLoaderKey("iceberg", null, null, null, null);
+      ClassLoaderKey key = simpleKey("iceberg");
       PooledClassLoaderEntry entry1 = pool.acquire(key, this::createDummyClassLoader);
       PooledClassLoaderEntry entry2 = pool.acquire(key, this::createDummyClassLoader);
 
@@ -65,8 +71,8 @@ public class TestClassLoaderPool {
   @Test
   public void testDifferentKeysCreateDifferentEntries() {
     try (ClassLoaderPool pool = new ClassLoaderPool()) {
-      ClassLoaderKey key1 = new ClassLoaderKey("iceberg", null, null, null, null);
-      ClassLoaderKey key2 = new ClassLoaderKey("hive", null, null, null, null);
+      ClassLoaderKey key1 = simpleKey("iceberg");
+      ClassLoaderKey key2 = simpleKey("hive");
 
       PooledClassLoaderEntry entry1 = pool.acquire(key1, this::createDummyClassLoader);
       PooledClassLoaderEntry entry2 = pool.acquire(key2, this::createDummyClassLoader);
@@ -81,7 +87,7 @@ public class TestClassLoaderPool {
   @Test
   public void testReleaseDecrementsRefCount() {
     try (ClassLoaderPool pool = new ClassLoaderPool()) {
-      ClassLoaderKey key = new ClassLoaderKey("iceberg", null, null, null, null);
+      ClassLoaderKey key = simpleKey("iceberg");
       PooledClassLoaderEntry entry = pool.acquire(key, this::createDummyClassLoader);
       pool.acquire(key, this::createDummyClassLoader);
       Assertions.assertEquals(2, entry.refCount());
@@ -95,7 +101,7 @@ public class TestClassLoaderPool {
   @Test
   public void testReleaseToZeroRemovesEntry() {
     try (ClassLoaderPool pool = new ClassLoaderPool()) {
-      ClassLoaderKey key = new ClassLoaderKey("iceberg", null, null, null, null);
+      ClassLoaderKey key = simpleKey("iceberg");
       PooledClassLoaderEntry entry = pool.acquire(key, this::createDummyClassLoader);
       Assertions.assertEquals(1, pool.size());
 
@@ -107,7 +113,7 @@ public class TestClassLoaderPool {
   @Test
   public void testDoubleReleaseIsHandledGracefully() {
     try (ClassLoaderPool pool = new ClassLoaderPool()) {
-      ClassLoaderKey key = new ClassLoaderKey("iceberg", null, null, null, null);
+      ClassLoaderKey key = simpleKey("iceberg");
       PooledClassLoaderEntry entry = pool.acquire(key, this::createDummyClassLoader);
 
       pool.release(entry); // refCount 1 -> 0, entry removed
@@ -129,7 +135,7 @@ public class TestClassLoaderPool {
   @Test
   public void testReleaseOneDoesNotAffectOtherSameType() {
     try (ClassLoaderPool pool = new ClassLoaderPool()) {
-      ClassLoaderKey key = new ClassLoaderKey("iceberg", null, null, null, null);
+      ClassLoaderKey key = simpleKey("iceberg");
       PooledClassLoaderEntry entryA = pool.acquire(key, this::createDummyClassLoader);
       pool.acquire(key, this::createDummyClassLoader); // entryB shares same entry
       Assertions.assertEquals(2, entryA.refCount());
@@ -143,7 +149,7 @@ public class TestClassLoaderPool {
   @Test
   public void testConcurrentAcquireAndRelease() throws Exception {
     ClassLoaderPool pool = new ClassLoaderPool();
-    ClassLoaderKey key = new ClassLoaderKey("iceberg", null, null, null, null);
+    ClassLoaderKey key = simpleKey("iceberg");
     int threadCount = 20;
     CyclicBarrier barrier = new CyclicBarrier(threadCount);
     ExecutorService executor = Executors.newFixedThreadPool(threadCount);
@@ -197,8 +203,8 @@ public class TestClassLoaderPool {
   @Test
   public void testCloseCleanupAllEntries() {
     ClassLoaderPool pool = new ClassLoaderPool();
-    ClassLoaderKey key1 = new ClassLoaderKey("iceberg", null, null, null, null);
-    ClassLoaderKey key2 = new ClassLoaderKey("hive", null, null, null, null);
+    ClassLoaderKey key1 = simpleKey("iceberg");
+    ClassLoaderKey key2 = simpleKey("hive");
     pool.acquire(key1, this::createDummyClassLoader);
     pool.acquire(key2, this::createDummyClassLoader);
     Assertions.assertEquals(2, pool.size());
@@ -210,8 +216,8 @@ public class TestClassLoaderPool {
   @Test
   public void testKeyWithPackageProperty() {
     try (ClassLoaderPool pool = new ClassLoaderPool()) {
-      ClassLoaderKey key1 = new ClassLoaderKey("iceberg", "/path/a", null, null, null);
-      ClassLoaderKey key2 = new ClassLoaderKey("iceberg", "/path/b", null, null, null);
+      ClassLoaderKey key1 = new ClassLoaderKey("iceberg", ImmutableMap.of("package", "/path/a"));
+      ClassLoaderKey key2 = new ClassLoaderKey("iceberg", ImmutableMap.of("package", "/path/b"));
 
       PooledClassLoaderEntry entry1 = pool.acquire(key1, this::createDummyClassLoader);
       PooledClassLoaderEntry entry2 = pool.acquire(key2, this::createDummyClassLoader);
@@ -222,10 +228,11 @@ public class TestClassLoaderPool {
   }
 
   @Test
-  public void testKeyWithAuthorizationPath() {
+  public void testKeyWithAuthorizationProvider() {
     try (ClassLoaderPool pool = new ClassLoaderPool()) {
-      ClassLoaderKey key1 = new ClassLoaderKey("iceberg", null, "/auth/ranger", null, null);
-      ClassLoaderKey key2 = new ClassLoaderKey("iceberg", null, null, null, null);
+      ClassLoaderKey key1 =
+          new ClassLoaderKey("iceberg", ImmutableMap.of("authorization-provider", "ranger"));
+      ClassLoaderKey key2 = simpleKey("iceberg");
 
       PooledClassLoaderEntry entry1 = pool.acquire(key1, this::createDummyClassLoader);
       PooledClassLoaderEntry entry2 = pool.acquire(key2, this::createDummyClassLoader);
@@ -238,11 +245,20 @@ public class TestClassLoaderPool {
   @Test
   public void testDifferentKerberosPrincipalsCreateDifferentEntries() {
     try (ClassLoaderPool pool = new ClassLoaderPool()) {
-      ClassLoaderKey key1 =
-          new ClassLoaderKey("iceberg", null, null, "user-A@REALM", "/keytabs/a.keytab");
-      ClassLoaderKey key2 =
-          new ClassLoaderKey("iceberg", null, null, "user-B@REALM", "/keytabs/b.keytab");
-      ClassLoaderKey key3 = new ClassLoaderKey("iceberg", null, null, null, null);
+      Map<String, String> props1 =
+          ImmutableMap.of(
+              "authentication.type", "kerberos",
+              "authentication.kerberos.principal", "user-A@REALM",
+              "authentication.kerberos.keytab-uri", "/keytabs/a.keytab");
+      Map<String, String> props2 =
+          ImmutableMap.of(
+              "authentication.type", "kerberos",
+              "authentication.kerberos.principal", "user-B@REALM",
+              "authentication.kerberos.keytab-uri", "/keytabs/b.keytab");
+
+      ClassLoaderKey key1 = new ClassLoaderKey("iceberg", props1);
+      ClassLoaderKey key2 = new ClassLoaderKey("iceberg", props2);
+      ClassLoaderKey key3 = simpleKey("iceberg");
 
       PooledClassLoaderEntry entry1 = pool.acquire(key1, this::createDummyClassLoader);
       PooledClassLoaderEntry entry2 = pool.acquire(key2, this::createDummyClassLoader);
@@ -256,15 +272,112 @@ public class TestClassLoaderPool {
   }
 
   @Test
+  public void testSameKerberosPrincipalSharesEntry() {
+    try (ClassLoaderPool pool = new ClassLoaderPool()) {
+      Map<String, String> props =
+          ImmutableMap.of(
+              "authentication.type", "kerberos",
+              "authentication.kerberos.principal", "user-A@REALM",
+              "authentication.kerberos.keytab-uri", "/keytabs/a.keytab");
+
+      ClassLoaderKey key1 = new ClassLoaderKey("iceberg", props);
+      ClassLoaderKey key2 = new ClassLoaderKey("iceberg", props);
+
+      PooledClassLoaderEntry entry1 = pool.acquire(key1, this::createDummyClassLoader);
+      PooledClassLoaderEntry entry2 = pool.acquire(key2, this::createDummyClassLoader);
+
+      Assertions.assertSame(entry1, entry2);
+      Assertions.assertEquals(2, entry1.refCount());
+      Assertions.assertEquals(1, pool.size());
+    }
+  }
+
+  @Test
+  public void testDifferentMetastoreUrisCreateDifferentEntries() {
+    try (ClassLoaderPool pool = new ClassLoaderPool()) {
+      ClassLoaderKey key1 =
+          new ClassLoaderKey(
+              "lakehouse-iceberg", ImmutableMap.of("metastore.uris", "thrift://hms-A:9083"));
+      ClassLoaderKey key2 =
+          new ClassLoaderKey(
+              "lakehouse-iceberg", ImmutableMap.of("metastore.uris", "thrift://hms-B:9083"));
+
+      PooledClassLoaderEntry entry1 = pool.acquire(key1, this::createDummyClassLoader);
+      PooledClassLoaderEntry entry2 = pool.acquire(key2, this::createDummyClassLoader);
+
+      Assertions.assertNotSame(entry1, entry2);
+      Assertions.assertEquals(2, pool.size());
+    }
+  }
+
+  @Test
+  public void testSameMetastoreUrisShareEntry() {
+    try (ClassLoaderPool pool = new ClassLoaderPool()) {
+      ClassLoaderKey key1 =
+          new ClassLoaderKey(
+              "lakehouse-iceberg", ImmutableMap.of("metastore.uris", "thrift://hms-A:9083"));
+      ClassLoaderKey key2 =
+          new ClassLoaderKey(
+              "lakehouse-iceberg", ImmutableMap.of("metastore.uris", "thrift://hms-A:9083"));
+
+      PooledClassLoaderEntry entry1 = pool.acquire(key1, this::createDummyClassLoader);
+      PooledClassLoaderEntry entry2 = pool.acquire(key2, this::createDummyClassLoader);
+
+      Assertions.assertSame(entry1, entry2);
+      Assertions.assertEquals(2, entry1.refCount());
+      Assertions.assertEquals(1, pool.size());
+    }
+  }
+
+  @Test
+  public void testDifferentJdbcUrlsCreateDifferentEntries() {
+    try (ClassLoaderPool pool = new ClassLoaderPool()) {
+      ClassLoaderKey key1 =
+          new ClassLoaderKey(
+              "jdbc-mysql", ImmutableMap.of("jdbc-url", "jdbc:mysql://host-A:3306/db"));
+      ClassLoaderKey key2 =
+          new ClassLoaderKey(
+              "jdbc-mysql", ImmutableMap.of("jdbc-url", "jdbc:mysql://host-B:3306/db"));
+
+      PooledClassLoaderEntry entry1 = pool.acquire(key1, this::createDummyClassLoader);
+      PooledClassLoaderEntry entry2 = pool.acquire(key2, this::createDummyClassLoader);
+
+      Assertions.assertNotSame(entry1, entry2);
+      Assertions.assertEquals(2, pool.size());
+    }
+  }
+
+  @Test
+  public void testDifferentDefaultFsCreateDifferentEntries() {
+    try (ClassLoaderPool pool = new ClassLoaderPool()) {
+      ClassLoaderKey key1 =
+          new ClassLoaderKey(
+              "lakehouse-iceberg",
+              ImmutableMap.of(
+                  "metastore.uris", "thrift://hms:9083",
+                  "fs.defaultFS", "hdfs://cluster-A:8020"));
+      ClassLoaderKey key2 =
+          new ClassLoaderKey(
+              "lakehouse-iceberg",
+              ImmutableMap.of(
+                  "metastore.uris", "thrift://hms:9083",
+                  "fs.defaultFS", "hdfs://cluster-B:8020"));
+
+      PooledClassLoaderEntry entry1 = pool.acquire(key1, this::createDummyClassLoader);
+      PooledClassLoaderEntry entry2 = pool.acquire(key2, this::createDummyClassLoader);
+
+      Assertions.assertNotSame(entry1, entry2);
+      Assertions.assertEquals(2, pool.size());
+    }
+  }
+
+  @Test
   public void testAcquireAfterCloseThrows() {
     ClassLoaderPool pool = new ClassLoaderPool();
     pool.close();
     Assertions.assertThrows(
         IllegalStateException.class,
-        () ->
-            pool.acquire(
-                new ClassLoaderKey("iceberg", null, null, null, null),
-                this::createDummyClassLoader));
+        () -> pool.acquire(simpleKey("iceberg"), this::createDummyClassLoader));
   }
 
   @Test
@@ -275,7 +388,7 @@ public class TestClassLoaderPool {
 
     // Pre-populate the pool with entries that have active refCounts > 0
     // to exercise the force-cleanup path in close()
-    ClassLoaderKey heldKey = new ClassLoaderKey("held", null, null, null, null);
+    ClassLoaderKey heldKey = simpleKey("held");
     pool.acquire(heldKey, this::createDummyClassLoader); // refCount=1, never released
 
     // Race: some threads try to acquire while another thread closes
@@ -287,7 +400,7 @@ public class TestClassLoaderPool {
           executor.submit(
               () -> {
                 barrier.await();
-                ClassLoaderKey k = new ClassLoaderKey("type-" + idx, null, null, null, null);
+                ClassLoaderKey k = simpleKey("type-" + idx);
                 try {
                   PooledClassLoaderEntry e = pool.acquire(k, this::createDummyClassLoader);
                   // If acquire succeeded, release it
@@ -311,22 +424,5 @@ public class TestClassLoaderPool {
     // After close + all threads done, pool must be empty
     Assertions.assertEquals(0, pool.size());
     executor.shutdown();
-  }
-
-  @Test
-  public void testSameKerberosPrincipalSharesEntry() {
-    try (ClassLoaderPool pool = new ClassLoaderPool()) {
-      ClassLoaderKey key1 =
-          new ClassLoaderKey("iceberg", null, null, "user-A@REALM", "/keytabs/a.keytab");
-      ClassLoaderKey key2 =
-          new ClassLoaderKey("iceberg", null, null, "user-A@REALM", "/keytabs/a.keytab");
-
-      PooledClassLoaderEntry entry1 = pool.acquire(key1, this::createDummyClassLoader);
-      PooledClassLoaderEntry entry2 = pool.acquire(key2, this::createDummyClassLoader);
-
-      Assertions.assertSame(entry1, entry2);
-      Assertions.assertEquals(2, entry1.refCount());
-      Assertions.assertEquals(1, pool.size());
-    }
   }
 }

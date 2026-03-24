@@ -30,9 +30,11 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- * A pool that manages shared {@link IsolatedClassLoader} instances across catalogs of the same
- * type. Catalogs with identical provider, package properties, authorization plugin paths, and
- * Kerberos identity share the same ClassLoader, significantly reducing Metaspace memory usage.
+ * A pool that manages shared {@link IsolatedClassLoader} instances across catalogs with identical
+ * isolation-relevant properties. The set of isolation properties is determined by built-in defaults
+ * (package, authorization provider, Kerberos identity, metastore URIs, JDBC URL, default
+ * filesystem) plus any operator-configured extra properties. Sharing ClassLoaders across
+ * same-configuration catalogs significantly reduces Metaspace memory usage.
  *
  * <p>Thread safety is guaranteed through {@link ConcurrentHashMap#compute} for all acquire/release
  * operations.
