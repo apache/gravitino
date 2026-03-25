@@ -112,14 +112,18 @@ Gravitino already defines standardized AWS/S3 properties in `S3Properties.java`:
 | `s3-role-arn` / `s3-external-id` | Iceberg, Hive (STS AssumeRole) |
 | `s3-endpoint` | Iceberg, Hive (custom S3 endpoint) |
 
-We **reuse `s3-region` as the AWS region** (Glue and S3 are always co-located) and **reuse `s3-access-key-id` / `s3-secret-access-key` for authentication**. Only two new Glue-specific properties:
+We **reuse `s3-region` as the AWS region** (Glue and S3 are always co-located) and **reuse `s3-access-key-id` / `s3-secret-access-key` for authentication**. These properties already exist in `S3Properties.java` and are already handled by both the Hive and Iceberg catalogs — no new code is required for credential plumbing.
 
-| New Property | Required | Description |
-|---|---|---|
-| `aws-glue-catalog-id` | No | Glue catalog ID (defaults to caller's AWS account). For cross-account access. |
-| `aws-glue-endpoint` | No | Custom Glue endpoint (for VPC endpoints or testing). |
+Only two new Glue-specific properties are needed (prefixed with `aws-glue-` to clearly indicate they are AWS Glue Data Catalog settings, distinct from the generic `s3-` storage properties):
 
-**Authentication priority**: Static credentials → STS AssumeRole (`s3-role-arn`) → Default credential chain (environment variables, instance profile).
+| New Property | Required | Default | Description |
+|---|---|---|---|
+| `aws-glue-catalog-id` | No | Caller's AWS account ID | Glue catalog ID. For cross-account access. |
+| `aws-glue-endpoint` | No | AWS default regional endpoint | Custom Glue endpoint URL (for VPC endpoints or LocalStack testing). |
+
+No other Glue-specific properties are needed — all authentication and region settings are covered by existing `s3-*` properties.
+
+**Authentication priority** (existing implementation in `S3Properties`, reused as-is): Static credentials (`s3-access-key-id` + `s3-secret-access-key`) → STS AssumeRole (`s3-role-arn`) → Default credential chain (environment variables, instance profile). The mapping from `s3-*` properties to AWS SDK / Glue SDK credentials is done in the property conversion layer (Section 4.2 and 4.3).
 
 ### 4.2 Iceberg Catalog + Glue Backend
 
@@ -143,9 +147,26 @@ User: catalog-backend=glue, warehouse=s3://..., s3-region=us-east-1
 
 #### Engine Integration
 
-**Trino** — `IcebergCatalogPropertyConverter.java`: Add `case "glue":` → `iceberg.catalog.type=glue` + AWS region/catalog-id.
+**Trino** — Add `case "glue":` in `IcebergCatalogPropertyConverter.gravitinoToEngineProperties()`:
 
-**Spark** — No code change needed. The existing generic `all.put(ICEBERG_CATALOG_TYPE, catalogBackend)` already handles `"glue"`.
+```java
+// In IcebergCatalogPropertyConverter.java:
+case "glue":
+  icebergProperties.put("iceberg.catalog.type", "glue");
+  // Map Gravitino s3-region → Trino glue.region
+  String region = properties.get("s3-region");
+  if (region != null) {
+    icebergProperties.put("hive.metastore.glue.region", region);
+  }
+  // Map aws-glue-catalog-id → Trino glue.catalog-id
+  String catalogId = properties.get("aws-glue-catalog-id");
+  if (catalogId != null) {
+    icebergProperties.put("hive.metastore.glue.catalogid", catalogId);
+  }
+  break;
+```
+
+**Spark** — No code change needed. The existing `IcebergPropertiesConverter` does a generic passthrough: `all.put(ICEBERG_CATALOG_TYPE, catalogBackend)` already passes `"glue"` to Spark's Iceberg catalog, which natively supports `GlueCatalog`.
 
 ### 4.3 Hive Catalog + Glue Backend
 
@@ -170,28 +191,39 @@ User: metastore-type=glue, s3-region=us-east-1
   → All existing HiveCatalogOperations methods work unchanged
 ```
 
-#### GlueShim and Hive2/Hive3 Compatibility
+#### Hive Version Resolution
 
-**Problem**: `HiveClientFactory.createHiveClient()` probes the remote HMS to detect Hive2 vs Hive3 (tries `getCatalogs()`, falls back on error). This detection is irrelevant for Glue — there is no remote HMS to probe.
+**Problem**: `HiveClientFactory.createHiveClientWithBackend()` currently probes the remote HMS to detect Hive2 vs Hive3 at runtime — it calls `getCatalogs()` and falls back to Hive2 if the RPC fails. This probe-and-fallback approach has two issues for Glue: (1) there is no remote HMS to probe, and (2) the version is already known from the catalog configuration.
 
-**Solution**: When `metastore.type=glue`, skip version detection and always use Hive3 classloader:
+**Solution**: Extract a `resolveHiveVersion(Properties)` method that determines the Hive version from catalog configuration, avoiding runtime probing when possible:
 
 ```java
-// In HiveClientFactory.createHiveClient():
-public HiveClient createHiveClient() {
+// In HiveClientFactory:
+
+/**
+ * Determines the Hive classloader version based on catalog configuration.
+ * For Glue metastore: always HIVE3 (no probe needed).
+ * For HMS: probes the remote server (existing behavior).
+ */
+private HiveVersion resolveHiveVersion(Properties properties) {
   String metastoreType = properties.getProperty("metastore.type", "hive");
   if ("glue".equalsIgnoreCase(metastoreType)) {
-    return createGlueClient();  // Always Hive3, no probe
+    // Glue is an AWS-managed service with a single API version.
+    // Always use Hive3 — the aws-glue-datacatalog-hive3-client JAR
+    // is in hive-metastore3-libs/ and implements the Hive3 IMetaStoreClient.
+    return HiveVersion.HIVE3;
   }
-  // ... existing hive2/hive3 detection logic unchanged ...
+  // For HMS: probe the server to detect version (existing logic)
+  return probeHmsVersion();
 }
 
-private HiveClient createGlueClient() {
+public HiveClient createHiveClient() {
+  HiveVersion version = resolveHiveVersion(properties);
   if (backendClassLoader == null) {
     synchronized (classLoaderLock) {
       if (backendClassLoader == null) {
         backendClassLoader = HiveClientClassLoader.createLoader(
-            HIVE3, Thread.currentThread().getContextClassLoader());
+            version, Thread.currentThread().getContextClassLoader());
       }
     }
   }
@@ -199,30 +231,35 @@ private HiveClient createGlueClient() {
 }
 ```
 
-**Why Hive3 classloader?**
+This design:
+- **Eliminates hardcoding**: version resolution is centralized in one method, driven by catalog configuration.
+- **Is extensible**: future backends (e.g., Hive2 Glue client) can add new branches to `resolveHiveVersion()` without modifying `createHiveClient()`.
+- **Preserves existing behavior**: for HMS metastore (`metastore.type=hive` or unset), the existing probe-and-fallback logic is unchanged — just extracted into `probeHmsVersion()`.
 
-1. **JAR loading path**: `HiveClientClassLoader.getJarDirectory()` maps `HIVE3` → `hive-metastore3-libs/`. The Glue client JAR is placed in this directory (see Section 4.4).
-2. **API compatibility**: AWS provides `aws-glue-datacatalog-hive2-client` and `aws-glue-datacatalog-hive3-client`. The `IMetaStoreClient` interfaces differ between versions (Hive3 adds catalog-aware methods). The JAR must match the Hive version in the same directory. We choose Hive3 as the actively maintained variant.
-
-**Future extension**: For Hive2 environments, add `aws-glue-datacatalog-hive2-client` to `hive-metastore2-libs` and select classloader by configuration.
+**Why Hive3 for Glue?** AWS Glue Data Catalog is a managed service with a single API version — there is no concept of Hive2 vs Hive3 on the server side. We choose the Hive3 classloader because:
+1. **JAR location**: `HiveClientClassLoader.getJarDirectory()` maps `HIVE3` → `hive-metastore3-libs/`, where the Glue client JAR is placed (see Section 4.4).
+2. **Active maintenance**: AWS's `aws-glue-datacatalog-hive3-client` is the actively maintained variant. The Hive2 client is legacy.
+3. **API compatibility**: The `IMetaStoreClient` interface differs between Hive2 and Hive3 (Hive3 adds catalog-aware methods). The Glue client JAR must match the Hive version of the classloader it is loaded into.
 
 #### GlueShim Design
 
-`GlueShim` extends `HiveShimV2` and overrides only `createMetaStoreClient()`:
+`GlueShim` extends `HiveShimV3` and overrides only `createMetaStoreClient()`:
 
-| Shim | `createMetaStoreClient()` Implementation |
-|---|---|
-| `HiveShimV2` | `RetryingMetaStoreClient.getProxy(hiveConf)` → Thrift to HMS |
-| `HiveShimV3` | Same as V2 (V3 only adds catalog-aware method overrides) |
-| `GlueShim` | `AWSGlueDataCatalogHiveClientFactory.create(hiveConf)` → Glue SDK |
+| Shim | Parent | `createMetaStoreClient()` | Calling Convention |
+|---|---|---|---|
+| `HiveShimV2` | `HiveShim` | `RetryingMetaStoreClient.getProxy(hiveConf)` → Thrift HMS | 2-arg: `getDatabase(db)` |
+| `HiveShimV3` | `HiveShimV2` | Same as V2 | 3-arg: `getDatabase(catalog, db)` — catalog-aware |
+| `GlueShim` | `HiveShimV3` | `AWSGlueDataCatalogHiveClientFactory.create(hiveConf)` → Glue SDK | Inherits HiveShimV3's 3-arg convention |
 
-All three return `IMetaStoreClient`. `HiveClientImpl` selects the shim:
+**Why extend `HiveShimV3`?** GlueShim uses the Hive3 classloader and `aws-glue-datacatalog-hive3-client`, which implements the Hive3 version of `IMetaStoreClient`. `HiveShimV3` provides the correct 3-arg calling convention (catalog-aware method signatures) that matches this interface. Extending `HiveShimV2` would use the 2-arg convention, which would not match the Hive3 `IMetaStoreClient` loaded by the Hive3 classloader.
+
+All three return `IMetaStoreClient`. `HiveClientImpl` selects the shim based on `metastore.type`:
 
 ```java
 // In HiveClientImpl constructor:
 String metastoreType = properties.getProperty("metastore.type", "hive");
 if ("glue".equalsIgnoreCase(metastoreType)) {
-  shim = new GlueShim(properties);
+  shim = new GlueShim(properties);   // extends HiveShimV3
 } else {
   switch (hiveVersion) {
     case HIVE2: shim = new HiveShimV2(properties); break;
@@ -246,12 +283,46 @@ org.apache.hadoop.hive.metastore.IMetaStoreClient    ← Hive standard interface
 
 #### Engine Integration
 
-**Trino** — `HiveConnectorAdapter.java`:
-- When `metastore-type=glue`: set `hive.metastore=glue` + `hive.metastore.glue.region` + `hive.metastore.glue.catalogid`.
-- When `hive` (default): existing `hive.metastore.uri` path unchanged.
+**Trino** — Add Glue branch in `HiveConnectorAdapter.buildInternalConnectorConfig()`:
 
-**Spark** — `HivePropertiesConverter.java`:
-- When `metastore-type=glue`: set `spark.hadoop.hive.metastore.client.factory.class = com.amazonaws.glue.catalog.metastore.AWSGlueDataCatalogHiveClientFactory`.
+```java
+// In HiveConnectorAdapter.java:
+String metastoreType = catalog.getProperty("metastore-type", "hive");
+if ("glue".equalsIgnoreCase(metastoreType)) {
+  // Use Trino's native Glue metastore support
+  config.put("hive.metastore", "glue");
+  String region = catalog.getProperty("s3-region");
+  if (region != null) {
+    config.put("hive.metastore.glue.region", region);
+  }
+  String catalogId = catalog.getProperty("aws-glue-catalog-id");
+  if (catalogId != null) {
+    config.put("hive.metastore.glue.catalogid", catalogId);
+  }
+} else {
+  // Existing HMS path — unchanged
+  config.put("hive.metastore.uri", catalog.getRequiredProperty("metastore.uris"));
+}
+```
+
+**Spark** — Add Glue branch in `HivePropertiesConverter.toSparkCatalogProperties()`:
+
+```java
+// In HivePropertiesConverter.java:
+String metastoreType = properties.get("metastore-type");
+if ("glue".equalsIgnoreCase(metastoreType)) {
+  // Use AWS Glue Data Catalog as Hive metastore for Spark
+  sparkProperties.put("spark.hadoop.hive.metastore.client.factory.class",
+      "com.amazonaws.glue.catalog.metastore.AWSGlueDataCatalogHiveClientFactory");
+  String region = properties.get("s3-region");
+  if (region != null) {
+    sparkProperties.put("spark.hadoop.aws.region", region);
+  }
+} else {
+  // Existing HMS path — unchanged
+  sparkProperties.put(SPARK_HIVE_METASTORE_URI, properties.get(GRAVITINO_HIVE_METASTORE_URI));
+}
+```
 
 ### 4.4 Dependency Management
 
@@ -322,7 +393,7 @@ No changes to `gradle/libs.versions.toml` required.
 
 **GlueShim** — new `TestGlueShim` (in `hive-metastore-common/src/test/`):
 - `testCreateMetaStoreClient()`: mock factory, verify correct invocation
-- `testGlueShimExtendsHiveShimV2()`: verify inheritance
+- `testGlueShimExtendsHiveShimV3()`: verify inheritance
 - `testGluePropertiesPassedToHiveConf()`: verify property propagation
 
 ### 5.2 Integration Tests — Reuse Existing Test Framework
@@ -333,13 +404,13 @@ The project has well-established integration test inheritance hierarchies. Glue 
 
 | New Test Class | Extends | Override |
 |---|---|---|
-| `CatalogHiveGlueIT` | `CatalogHive2IT` (23 tests) | `startNecessaryContainer()` → LocalStack; `createCatalogProperties()` → `metastore-type=glue` |
+| `CatalogHiveGlueIT` | `CatalogHive3IT` (23 tests) | `startNecessaryContainer()` → LocalStack; `createCatalogProperties()` → `metastore-type=glue` |
 | `CatalogIcebergGlueIT` | `CatalogIcebergBaseIT` (15 tests) | `initIcebergCatalogProperties()` → `catalog-backend=glue` |
 
 Example:
 ```java
 @Tag("gravitino-docker-test")
-public class CatalogHiveGlueIT extends CatalogHive2IT {
+public class CatalogHiveGlueIT extends CatalogHive3IT {
   @Override
   protected void startNecessaryContainer() {
     containerSuite.startLocalStackContainer();
@@ -357,7 +428,7 @@ public class CatalogHiveGlueIT extends CatalogHive2IT {
 
 All parent tests (`testCreateHiveTable`, `testAlterTable`, `testListPartitions`, etc.) automatically run against the Glue backend — no rewriting needed.
 
-**Hive + Glue supported operations** (all covered by inherited `CatalogHive2IT` tests):
+**Hive + Glue supported operations** (all covered by inherited `CatalogHive3IT` tests):
 
 - Schema: `createDatabase`, `getDatabase`, `getAllDatabases`, `alterDatabase`, `dropDatabase(cascade)`
 - Table: `createTable`, `getTable`, `getAllTables`, `alterTable`, `dropTable(deleteData)`, `purgeTable`, `getTableObjectsByName`
@@ -365,7 +436,43 @@ All parent tests (`testCreateHiveTable`, `testAlterTable`, `testListPartitions`,
 
 These are all directly supported by `AWSCatalogMetastoreClient` (`IMetaStoreClient`). GlueShim only creates the client instance — upstream `HiveShim` methods work automatically.
 
-**Trino E2E**: Add Glue catalog configuration in `TrinoQueryITBase`, reuse existing SQL test scripts.
+**Trino E2E**: Add new Glue catalog SQL files in the existing testset directories — no Java code changes needed:
+
+```
+trino-ci-testset/testsets/
+  hive/
+    catalog_hive_glue_prepare.sql      ← NEW: create Glue-backed Hive catalog
+    catalog_hive_glue_cleanup.sql      ← NEW: drop Glue-backed Hive catalog
+    (existing *.sql test scripts reused automatically)
+  lakehouse-iceberg/
+    catalog_iceberg_glue_prepare.sql   ← NEW: create Glue-backed Iceberg catalog
+    catalog_iceberg_glue_cleanup.sql   ← NEW: drop Glue-backed Iceberg catalog
+    (existing *.sql test scripts reused automatically)
+```
+
+Example `catalog_hive_glue_prepare.sql`:
+```sql
+call gravitino.system.create_catalog(
+    'gt_hive_glue', 'hive',
+    map(
+        array['metastore-type', 's3-region', 'aws-glue-endpoint'],
+        array['glue', 'us-east-1', '${glue_endpoint}']
+    )
+);
+```
+
+Example `catalog_iceberg_glue_prepare.sql`:
+```sql
+call gravitino.system.create_catalog(
+    'gt_iceberg_glue', 'lakehouse-iceberg',
+    map(
+        array['catalog-backend', 'warehouse', 's3-region', 'aws-glue-endpoint'],
+        array['glue', '${s3_warehouse}', 'us-east-1', '${glue_endpoint}']
+    )
+);
+```
+
+The existing SQL test scripts in each testset directory are automatically reused against the new Glue-backed catalogs.
 
 **Spark E2E**:
 
@@ -379,10 +486,27 @@ All `SparkCommonIT` tests (31 DDL/DML/query tests) are automatically inherited.
 ### 5.3 Build Verification
 
 ```bash
-./gradlew build -x test                # Compile
-./build.sh sp                          # Spotless formatting
-./gradlew test -PskipITs               # Unit tests
-./gradlew test -PskipTests -PskipDockerTests=false  # Integration tests (Docker + LocalStack)
+# Compile all modified modules
+./gradlew :iceberg:iceberg-common:build -x test
+./gradlew :catalogs:catalog-hive:build -x test
+./gradlew :catalogs:hive-metastore-common:build -x test
+./gradlew :catalogs:hive-metastore3-libs:build -x test
+./gradlew :trino-connector:trino-connector:build -x test
+./gradlew :spark-connector:spark-common:build -x test
+
+# Spotless formatting
+./build.sh sp
+
+# Unit tests for modified modules
+./gradlew :iceberg:iceberg-common:test -PskipITs
+./gradlew :catalogs:hive-metastore-common:test -PskipITs
+./gradlew :trino-connector:trino-connector:test -PskipITs
+
+# Integration tests (Docker + LocalStack)
+./gradlew :catalogs:catalog-hive:test -PskipTests -PskipDockerTests=false \
+  --tests "*.CatalogHiveGlueIT"
+./gradlew :catalogs:catalog-lakehouse-iceberg:test -PskipTests -PskipDockerTests=false \
+  --tests "*.CatalogIcebergGlueIT"
 ```
 
 ## 6. Implementation Plan
@@ -421,9 +545,9 @@ This work item creates a thin routing layer (`GlueShim` — one method override)
 | 2.1 | Add Hive constants | `HiveConstants.java` | `METASTORE_TYPE`, `METASTORE_TYPE_GLUE`, `AWS_GLUE_CATALOG_ID`, `AWS_GLUE_ENDPOINT` |
 | 2.2 | Declare property metadata | `HiveCatalogPropertiesMetadata.java` | Register `metastore-type` + Glue properties; make `metastore.uris` conditionally required |
 | 2.3 | Property mapping | `HiveCatalogOperations.java` | Add Glue properties to `GRAVITINO_CONFIG_TO_HIVE`; add Glue branch in `initialize()` |
-| 2.4 | Modify HiveClientFactory | `HiveClientFactory.java` | Skip hive2/3 detection when `metastore.type=glue`, use Hive3 classloader |
+| 2.4 | Add `resolveHiveVersion()` | `HiveClientFactory.java` | Extract version resolution from catalog config; Glue → HIVE3 without probing |
 | 2.5 | Modify HiveClientImpl | `HiveClientImpl.java` | Select `GlueShim` when `metastore.type=glue` |
-| 2.6 | Create GlueShim | `GlueShim.java` (new) | Extends `HiveShimV2`, overrides `createMetaStoreClient()` to use `AWSGlueDataCatalogHiveClientFactory` |
+| 2.6 | Create GlueShim | `GlueShim.java` (new) | Extends `HiveShimV3`, overrides `createMetaStoreClient()` to use `AWSGlueDataCatalogHiveClientFactory` |
 | 2.7 | Add dependency | `hive-metastore3-libs/build.gradle.kts` | `implementation("com.amazonaws:aws-glue-datacatalog-hive3-client:...")` |
 | 2.8 | Unit tests | `TestHiveClientImpl.java` (new), `TestGlueShim.java` (new) | Routing, GlueShim |
 
@@ -432,7 +556,7 @@ This work item creates a thin routing layer (`GlueShim` — one method override)
 | # | Work Item | Files Involved | Description |
 |---|---|---|---|
 | 3.1 | LocalStack container support | `ContainerSuite.java` | Add `startLocalStackContainer()` |
-| 3.2 | Hive + Glue integration test | `CatalogHiveGlueIT.java` (new) | Extends `CatalogHive2IT`, LocalStack |
+| 3.2 | Hive + Glue integration test | `CatalogHiveGlueIT.java` (new) | Extends `CatalogHive3IT`, LocalStack |
 | 3.3 | Iceberg + Glue integration test | `CatalogIcebergGlueIT.java` (new) | Extends `CatalogIcebergBaseIT` |
 
 #### WI-4: Trino and Spark Connector Support
@@ -443,7 +567,7 @@ This work item creates a thin routing layer (`GlueShim` — one method override)
 | 4.2 | Hive — Trino property conversion | `HiveConnectorAdapter.java` | `metastore-type=glue` → `hive.metastore=glue` |
 | 4.3 | Hive — Spark property conversion | `HivePropertiesConverter.java` | Set `hive.metastore.client.factory.class` |
 | 4.4 | Unit tests | `TestIcebergCatalogPropertyConverter.java`, `TestHiveConnectorAdapter.java` | Trino Glue config tests |
-| 4.5 | Trino + Glue E2E | `TrinoQueryITBase.java` + SQL files | Glue catalog config, reuse existing SQL tests |
+| 4.5 | Trino + Glue E2E | `trino-ci-testset/testsets/hive/catalog_hive_glue_*.sql`, `trino-ci-testset/testsets/lakehouse-iceberg/catalog_iceberg_glue_*.sql` | Add Glue catalog prepare/cleanup SQL in testsets directories |
 | 4.6 | Spark + Hive + Glue E2E | `SparkHiveGlueCatalogIT.java` (new) | Extends `SparkHiveCatalogIT` |
 | 4.7 | Spark + Iceberg + Glue E2E | `SparkIcebergGlueCatalogIT.java` (new) | Extends `SparkIcebergCatalogIT` |
 
