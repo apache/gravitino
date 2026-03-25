@@ -54,6 +54,9 @@ dependencies {
   }
 
   testImplementation(project(":api"))
+  testImplementation(project(":catalogs:catalog-jdbc-common")) {
+    exclude("org.apache.logging.log4j")
+  }
   testImplementation(project(":clients:client-java"))
   testImplementation(project(":core"))
   testImplementation(project(":common"))
@@ -165,11 +168,16 @@ tasks.test {
   } else {
     dependsOn(tasks.jar)
     dependsOn(":catalogs:catalog-hive:jar")
+    dependsOn(":catalogs:catalog-hive:runtimeJars")
     dependsOn(":catalogs:catalog-lakehouse-iceberg:jar")
+    dependsOn(":catalogs:catalog-lakehouse-iceberg:runtimeJars")
     dependsOn(":iceberg:iceberg-rest-server:jar")
     dependsOn(":catalogs:catalog-lakehouse-paimon:jar")
+    dependsOn(":catalogs:catalog-lakehouse-paimon:runtimeJars")
     dependsOn(":catalogs:catalog-jdbc-mysql:jar")
+    dependsOn(":catalogs:catalog-jdbc-mysql:runtimeJars")
     dependsOn(":catalogs:catalog-jdbc-postgresql:jar")
+    dependsOn(":catalogs:catalog-jdbc-postgresql:runtimeJars")
   }
 }
 
