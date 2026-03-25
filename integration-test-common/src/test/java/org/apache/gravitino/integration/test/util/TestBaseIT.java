@@ -34,7 +34,7 @@ public class TestBaseIT {
   @Test
   public void testNormalizeHostForLocalAccess() {
     Assertions.assertEquals("127.0.0.1", BaseIT.normalizeHostForLocalAccess("0.0.0.0"));
-    Assertions.assertEquals("127.0.0.1", BaseIT.normalizeHostForLocalAccess("::"));
+    Assertions.assertEquals("::1", BaseIT.normalizeHostForLocalAccess("::"));
     Assertions.assertEquals("localhost", BaseIT.normalizeHostForLocalAccess("localhost"));
   }
 }

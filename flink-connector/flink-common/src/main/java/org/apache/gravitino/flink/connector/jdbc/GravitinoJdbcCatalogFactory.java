@@ -23,9 +23,9 @@ import com.google.common.collect.ImmutableSet;
 import java.util.Collections;
 import java.util.Set;
 import org.apache.flink.configuration.ConfigOption;
+import org.apache.flink.table.catalog.Catalog;
 import org.apache.flink.table.factories.FactoryUtil;
 import org.apache.flink.util.Preconditions;
-import org.apache.gravitino.Catalog;
 import org.apache.gravitino.flink.connector.PartitionConverter;
 import org.apache.gravitino.flink.connector.SchemaAndTablePropertiesConverter;
 import org.apache.gravitino.flink.connector.UnsupportPartitionConverter;
@@ -41,7 +41,7 @@ public abstract class GravitinoJdbcCatalogFactory implements BaseCatalogFactory 
   protected abstract SchemaAndTablePropertiesConverter schemaAndTablePropertiesConverter();
 
   @Override
-  public org.apache.flink.table.catalog.Catalog createCatalog(Context context) {
+  public Catalog createCatalog(Context context) {
     // FlinkJdbcCatalog does not support 'driver' as an option, but Gravitino JdbcCatalog requires
     // it.
     context.getOptions().remove(JdbcPropertiesConstants.FLINK_DRIVER);
@@ -57,7 +57,7 @@ public abstract class GravitinoJdbcCatalogFactory implements BaseCatalogFactory 
         context, defaultDatabase, schemaAndTablePropertiesConverter(), partitionConverter());
   }
 
-  protected org.apache.flink.table.catalog.Catalog newCatalog(
+  protected Catalog newCatalog(
       Context context,
       String defaultDatabase,
       SchemaAndTablePropertiesConverter schemaAndTablePropertiesConverter,
@@ -67,8 +67,8 @@ public abstract class GravitinoJdbcCatalogFactory implements BaseCatalogFactory 
   }
 
   @Override
-  public Catalog.Type gravitinoCatalogType() {
-    return Catalog.Type.RELATIONAL;
+  public org.apache.gravitino.Catalog.Type gravitinoCatalogType() {
+    return org.apache.gravitino.Catalog.Type.RELATIONAL;
   }
 
   @Override

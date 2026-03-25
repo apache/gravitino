@@ -27,6 +27,7 @@ import com.google.common.collect.Lists;
 import java.io.IOException;
 import java.net.URISyntaxException;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Paths;
 import java.security.PrivilegedAction;
 import java.sql.Connection;
 import java.sql.DriverManager;
@@ -201,7 +202,7 @@ public abstract class FlinkHiveCatalogIT extends FlinkCommonIT {
 
   protected String getSharedHiveConfDir() {
     try {
-      return java.nio.file.Paths.get(
+      return Paths.get(
               Preconditions.checkNotNull(
                       FlinkHiveCatalogIT.class.getResource("/flink-tests"),
                       "Cannot locate shared hive test resources")

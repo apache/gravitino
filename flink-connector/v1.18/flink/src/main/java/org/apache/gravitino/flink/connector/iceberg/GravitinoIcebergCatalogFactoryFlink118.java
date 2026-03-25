@@ -42,7 +42,6 @@ public class GravitinoIcebergCatalogFactoryFlink118 extends GravitinoIcebergCata
         schemaAndTablePropertiesConverter,
         partitionConverter,
         catalogOptions,
-        icebergCatalogProperties,
-        context);
+        icebergCatalogProperties);
   }
 }

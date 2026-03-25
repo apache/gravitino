@@ -21,7 +21,6 @@ package org.apache.gravitino.flink.connector.iceberg;
 
 import java.util.Map;
 import org.apache.flink.table.catalog.AbstractCatalog;
-import org.apache.flink.table.factories.CatalogFactory;
 import org.apache.gravitino.flink.connector.PartitionConverter;
 import org.apache.gravitino.flink.connector.SchemaAndTablePropertiesConverter;
 import org.apache.gravitino.flink.connector.utils.CatalogCompat;
@@ -36,8 +35,7 @@ public class GravitinoIcebergCatalogFlink118 extends GravitinoIcebergCatalog {
       SchemaAndTablePropertiesConverter schemaAndTablePropertiesConverter,
       PartitionConverter partitionConverter,
       Map<String, String> catalogOptions,
-      Map<String, String> icebergCatalogProperties,
-      CatalogFactory.Context context) {
+      Map<String, String> icebergCatalogProperties) {
     super(
         catalogName,
         defaultDatabase,

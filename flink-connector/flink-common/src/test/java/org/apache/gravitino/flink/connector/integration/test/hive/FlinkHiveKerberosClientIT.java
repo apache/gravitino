@@ -25,6 +25,7 @@ import static org.apache.hadoop.minikdc.MiniKdc.MAX_TICKET_LIFETIME;
 import com.google.common.collect.Maps;
 import java.io.File;
 import java.net.URISyntaxException;
+import java.nio.file.Paths;
 import java.security.PrivilegedAction;
 import java.util.Arrays;
 import java.util.Map;
@@ -245,7 +246,7 @@ public abstract class FlinkHiveKerberosClientIT extends FlinkEnvIT {
 
   private static String getSharedHiveConfDir() {
     try {
-      return java.nio.file.Paths.get(
+      return Paths.get(
               org.apache.flink.util.Preconditions.checkNotNull(
                       FlinkHiveKerberosClientIT.class.getResource("/flink-tests"),
                       "Cannot locate shared hive test resources")

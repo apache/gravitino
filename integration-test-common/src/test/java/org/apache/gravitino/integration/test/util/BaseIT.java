@@ -91,7 +91,8 @@ public class BaseIT {
 
   private static final Logger LOG = LoggerFactory.getLogger(BaseIT.class);
   private static final Splitter COMMA = Splitter.on(",").omitEmptyStrings().trimResults();
-  private static final String LOOPBACK_HOST = "127.0.0.1";
+  private static final String IPV4_LOOPBACK_HOST = "127.0.0.1";
+  private static final String IPV6_LOOPBACK_HOST = "::1";
   private static final String ICEBERG_REST_CONFIG_PREFIX = "gravitino.iceberg-rest.";
   private static final String ICEBERG_REST_SERVICE_NAME = "iceberg-rest";
   private static final String LANCE_REST_SERVICE_NAME = "lance-rest";
@@ -160,8 +161,11 @@ public class BaseIT {
   }
 
   static String normalizeHostForLocalAccess(String host) {
-    if ("0.0.0.0".equals(host) || "::".equals(host)) {
-      return LOOPBACK_HOST;
+    if ("0.0.0.0".equals(host)) {
+      return IPV4_LOOPBACK_HOST;
+    }
+    if ("::".equals(host)) {
+      return IPV6_LOOPBACK_HOST;
     }
     return host;
   }

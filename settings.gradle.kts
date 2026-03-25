@@ -22,9 +22,8 @@ plugins {
 
 rootProject.name = "gravitino"
 
-val scalaVersion: String =
-  gradle.startParameter.projectProperties["scalaVersion"]?.toString()
-    ?: settings.extra["defaultScalaVersion"].toString()
+val scalaVersion: String = gradle.startParameter.projectProperties["scalaVersion"]?.toString()
+  ?: settings.extra["defaultScalaVersion"].toString()
 
 include("api", "common", "core", "server", "server-common")
 include("catalogs:catalog-common")
@@ -69,11 +68,7 @@ include("iceberg:iceberg-common")
 include("iceberg:iceberg-rest-server")
 include("lance:lance-common")
 include("lance:lance-rest-server")
-include(
-  "authorizations:authorization-ranger",
-  "authorizations:authorization-common",
-  "authorizations:authorization-chain"
-)
+include("authorizations:authorization-ranger", "authorizations:authorization-common", "authorizations:authorization-chain")
 include(
   "trino-connector:trino-connector",
   "trino-connector:trino-connector-435-439",

@@ -28,8 +28,23 @@ import org.apache.flink.table.catalog.ResolvedCatalogTable;
 /** Typed compatibility hook that is implemented per Flink minor version. */
 public interface CatalogCompat {
 
+  /**
+   * Create a {@link CatalogTable} using the Flink minor version's constructor and behavior.
+   *
+   * @param schema table schema
+   * @param comment table comment
+   * @param partitionKeys partition column names
+   * @param options table options
+   * @return a version-compatible catalog table
+   */
   CatalogTable createCatalogTable(
       Schema schema, String comment, List<String> partitionKeys, Map<String, String> options);
 
+  /**
+   * Serialize a resolved catalog table using the Flink minor version's helper implementation.
+   *
+   * @param resolvedTable resolved catalog table
+   * @return serialized table properties
+   */
   Map<String, String> serializeCatalogTable(ResolvedCatalogTable resolvedTable);
 }

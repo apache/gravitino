@@ -22,7 +22,9 @@ package org.apache.gravitino.flink.connector.hive;
 import static org.apache.gravitino.flink.connector.hive.GravitinoHiveCatalogFactoryOptions.IDENTIFIER;
 
 import com.google.common.collect.ImmutableSet;
+import java.util.Map;
 import java.util.Set;
+import javax.annotation.Nullable;
 import org.apache.flink.configuration.ConfigOption;
 import org.apache.flink.table.catalog.Catalog;
 import org.apache.flink.table.catalog.hive.HiveCatalog;
@@ -76,11 +78,11 @@ public class GravitinoHiveCatalogFactory implements BaseCatalogFactory {
   protected Catalog newCatalog(
       String catalogName,
       String defaultDatabase,
-      java.util.Map<String, String> catalogOptions,
+      Map<String, String> catalogOptions,
       SchemaAndTablePropertiesConverter schemaAndTablePropertiesConverter,
       PartitionConverter partitionConverter,
-      @javax.annotation.Nullable HiveConf hiveConf,
-      @javax.annotation.Nullable String hiveVersion) {
+      @Nullable HiveConf hiveConf,
+      @Nullable String hiveVersion) {
     return new GravitinoHiveCatalog(
         catalogName,
         defaultDatabase,
