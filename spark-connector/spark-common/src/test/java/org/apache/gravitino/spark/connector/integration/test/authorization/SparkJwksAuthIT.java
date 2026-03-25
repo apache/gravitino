@@ -1,0 +1,261 @@
+/*
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ *
+ *  http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing,
+ * software distributed under the License is distributed on an
+ * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+ * KIND, either express or implied.  See the License for the
+ * specific language governing permissions and limitations
+ * under the License.
+ */
+package org.apache.gravitino.spark.connector.integration.test.authorization;
+
+import com.google.common.collect.Maps;
+import com.nimbusds.jose.JWSAlgorithm;
+import com.nimbusds.jose.JWSHeader;
+import com.nimbusds.jose.crypto.RSASSASigner;
+import com.nimbusds.jose.jwk.JWKSet;
+import com.nimbusds.jose.jwk.RSAKey;
+import com.nimbusds.jose.jwk.gen.RSAKeyGenerator;
+import com.nimbusds.jwt.JWTClaimsSet;
+import com.nimbusds.jwt.SignedJWT;
+import com.sun.net.httpserver.HttpServer;
+import java.io.IOException;
+import java.net.InetSocketAddress;
+import java.nio.charset.StandardCharsets;
+import java.time.Instant;
+import java.util.Date;
+import java.util.List;
+import java.util.Map;
+import org.apache.gravitino.Configs;
+import org.apache.gravitino.auth.AuthProperties;
+import org.apache.gravitino.auth.AuthenticatorType;
+import org.apache.gravitino.integration.test.util.BaseIT;
+import org.apache.gravitino.integration.test.util.OAuthMockDataProvider;
+import org.apache.gravitino.server.authentication.OAuthConfig;
+import org.apache.gravitino.spark.connector.GravitinoSparkConfig;
+import org.apache.spark.SparkConf;
+import org.apache.spark.sql.Row;
+import org.apache.spark.sql.SparkSession;
+import org.junit.jupiter.api.AfterAll;
+import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.Test;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+/**
+ * End-to-end integration test for Spark OAuth2 user authentication via JWKS token validation.
+ *
+ * <p>Verifies that the Spark connector ({@code GravitinoSparkPlugin}) can authenticate against
+ * Gravitino using the OAuth2 {@code client_credentials} flow:
+ *
+ * <ol>
+ *   <li>An in-process JDK {@link HttpServer} serves two endpoints on a random port:
+ *       <ul>
+ *         <li>{@code /jwks} – JWKS public-key document consumed by Gravitino's {@code
+ *             JwksTokenValidator} to verify JWT signatures.
+ *         <li>{@code /token} – Mock OAuth2 {@code client_credentials} endpoint; returns a
+ *             pre-minted RS256 JWT when Spark's {@code DefaultOAuth2TokenProvider} posts its {@code
+ *             client_id:secret}.
+ *       </ul>
+ *   <li>The embedded Gravitino server is configured with {@code JwksTokenValidator} and the JWKS
+ *       URI pointing to the in-process server above.
+ *   <li>A Spark session is started with {@code GravitinoSparkPlugin} and OAuth2 auth config ({@code
+ *       spark.sql.gravitino.authType=oauth2}, URI, path, credential, scope) all pointing to the
+ *       mock token endpoint.
+ *   <li>Real Spark SQL ({@code SHOW CATALOGS}) is executed so the complete request path — Spark
+ *       plugin → {@code client_credentials} POST → JWT fetch → Gravitino REST API → JWKS signature
+ *       validation — is exercised without any external services or Docker.
+ * </ol>
+ *
+ * <p>JWT validation negative tests (expired token, wrong key, wrong audience) are covered by the
+ * non-Spark {@code JwksTokenValidatorIT} in the {@code client-java} module.
+ */
+public class SparkJwksAuthIT extends BaseIT {
+
+  private static final Logger LOG = LoggerFactory.getLogger(SparkJwksAuthIT.class);
+
+  private static final String SERVICE_AUDIENCE = "service1";
+  private static final String METALAKE = "jwks_test_metalake";
+  private static final String KEY_ID = "test-kid";
+
+  private static HttpServer embeddedServer;
+  private static RSAKey rsaKey;
+  /** The JWT served by the mock {@code /token} endpoint. */
+  private static volatile String currentToken;
+
+  private static String validToken;
+  private static SparkSession sparkSession;
+
+  // ---------------------------------------------------------------------------
+  // Lifecycle
+  // ---------------------------------------------------------------------------
+
+  @BeforeAll
+  @Override
+  public void startIntegrationTest() throws Exception {
+    // 1. Generate RSA key pair.
+    rsaKey = new RSAKeyGenerator(2048).keyID(KEY_ID).generate();
+    validToken = mintToken(rsaKey, SERVICE_AUDIENCE, Instant.now().plusSeconds(1_000_000));
+    currentToken = validToken;
+
+    // 2. Launch the embedded HTTP server (random free port).
+    String jwksJson = new JWKSet(rsaKey.toPublicJWK()).toString();
+    embeddedServer = HttpServer.create(new InetSocketAddress(0), 0);
+
+    // /jwks  – serves the JWKS document (public key only) consumed by Gravitino
+    embeddedServer.createContext(
+        "/jwks",
+        exchange -> {
+          byte[] body = jwksJson.getBytes(StandardCharsets.UTF_8);
+          exchange.getResponseHeaders().set("Content-Type", "application/json");
+          exchange.sendResponseHeaders(200, body.length);
+          exchange.getResponseBody().write(body);
+          exchange.getResponseBody().close();
+        });
+
+    // /token – mock OAuth2 client-credentials endpoint consumed by Spark's
+    // DefaultOAuth2TokenProvider; always returns the pre-minted JWT.
+    embeddedServer.createContext(
+        "/token",
+        exchange -> {
+          // Drain the POST body so the connection is fully consumed.
+          exchange.getRequestBody().readAllBytes();
+          String json = buildTokenResponse(currentToken);
+          byte[] body = json.getBytes(StandardCharsets.UTF_8);
+          exchange.getResponseHeaders().set("Content-Type", "application/json");
+          exchange.sendResponseHeaders(200, body.length);
+          exchange.getResponseBody().write(body);
+          exchange.getResponseBody().close();
+        });
+
+    embeddedServer.start();
+    int serverPort = embeddedServer.getAddress().getPort();
+    LOG.info("Embedded JWKS+token server started on port {}", serverPort);
+
+    // 3. Configure the embedded Gravitino server to use JwksTokenValidator.
+    Map<String, String> configs = Maps.newHashMap();
+    configs.put(Configs.AUTHENTICATORS.getKey(), AuthenticatorType.OAUTH.name().toLowerCase());
+    configs.put(OAuthConfig.SERVICE_AUDIENCE.getKey(), SERVICE_AUDIENCE);
+    configs.put(
+        OAuthConfig.TOKEN_VALIDATOR_CLASS.getKey(),
+        "org.apache.gravitino.server.authentication.JwksTokenValidator");
+    configs.put(OAuthConfig.JWKS_URI.getKey(), "http://localhost:" + serverPort + "/jwks");
+    configs.put(OAuthConfig.PRINCIPAL_FIELDS.getKey(), "sub");
+    configs.put(OAuthConfig.ALLOW_SKEW_SECONDS.getKey(), "6");
+    registerCustomConfigs(configs);
+
+    // 4. Prime OAuthMockDataProvider so that BaseIT can build its internal `client` successfully.
+    OAuthMockDataProvider.getInstance().setTokenData(validToken.getBytes(StandardCharsets.UTF_8));
+
+    // 5. Start Gravitino (BaseIT wires up `client` via OAuthMockDataProvider automatically).
+    super.startIntegrationTest();
+
+    // 6. Create a metalake so Spark has something to discover.
+    client.createMetalake(METALAKE, "JWKS auth test metalake", Maps.newHashMap());
+
+    // 7. Start the Spark session using GravitinoSparkPlugin + OAuth2 → mock /token endpoint.
+    SparkConf sparkConf =
+        new SparkConf()
+            .set(
+                "spark.plugins", "org.apache.gravitino.spark.connector.plugin.GravitinoSparkPlugin")
+            .set(GravitinoSparkConfig.GRAVITINO_URI, serverUri)
+            .set(GravitinoSparkConfig.GRAVITINO_METALAKE, METALAKE)
+            // OAuth2 auth – Spark's DefaultOAuth2TokenProvider fetches the JWT from the mock
+            // /token endpoint and sends it as a Bearer token to the Gravitino REST server.
+            .set(GravitinoSparkConfig.GRAVITINO_AUTH_TYPE, AuthProperties.OAUTH2_AUTH_TYPE)
+            .set(GravitinoSparkConfig.GRAVITINO_OAUTH2_URI, "http://localhost:" + serverPort)
+            .set(GravitinoSparkConfig.GRAVITINO_OAUTH2_PATH, "token")
+            // credential / scope are syntactically required by DefaultOAuth2TokenProvider;
+            // the mock /token endpoint intentionally ignores them.
+            .set(GravitinoSparkConfig.GRAVITINO_OAUTH2_CREDENTIAL, "test-client:test-secret")
+            .set(GravitinoSparkConfig.GRAVITINO_OAUTH2_SCOPE, "openid");
+
+    sparkSession =
+        SparkSession.builder()
+            .master("local[1]")
+            .appName("SparkJwksAuthIT")
+            .config(sparkConf)
+            .getOrCreate();
+
+    LOG.info("Spark session started. Gravitino URI: {}", serverUri);
+  }
+
+  @AfterAll
+  @Override
+  public void stopIntegrationTest() throws IOException, InterruptedException {
+    if (sparkSession != null) {
+      sparkSession.close();
+    }
+    if (embeddedServer != null) {
+      embeddedServer.stop(0);
+    }
+    super.stopIntegrationTest();
+  }
+
+  // ---------------------------------------------------------------------------
+  // Tests
+  // ---------------------------------------------------------------------------
+
+  /**
+   * Verifies the full Spark OAuth2 authentication path end-to-end: Spark plugin → {@code
+   * client_credentials} POST → JWT fetch from mock {@code /token} → Gravitino REST API → JWKS
+   * signature validation → Spark SQL response.
+   *
+   * <p>If this test passes, the Spark connector correctly uses the configured OAuth2 {@code
+   * client_id:secret} to obtain a JWT and send it as a Bearer token to Gravitino.
+   */
+  @Test
+  public void testSparkConnectsWithJwksAuth() {
+    // SHOW CATALOGS drives a real Gravitino REST call through the Spark plugin.
+    // The plugin fetches a JWT from the mock /token endpoint (using client_id:secret)
+    // and presents it as a Bearer token; Gravitino validates the signature via /jwks.
+    List<Row> catalogs = sparkSession.sql("SHOW CATALOGS").collectAsList();
+    Assertions.assertNotNull(catalogs);
+    LOG.info("SHOW CATALOGS returned {} rows", catalogs.size());
+  }
+
+  // ---------------------------------------------------------------------------
+  // Helpers
+  // ---------------------------------------------------------------------------
+
+  /**
+   * Mints a compact RS256-signed JWT.
+   *
+   * @param key RSA key (private component required for signing)
+   * @param audience {@code aud} claim value
+   * @param expiry token expiration
+   * @return serialized compact JWT string
+   */
+  @SuppressWarnings("JavaUtilDate")
+  private static String mintToken(RSAKey key, String audience, Instant expiry) throws Exception {
+    JWTClaimsSet claims =
+        new JWTClaimsSet.Builder()
+            .subject("gravitino")
+            .audience(audience)
+            .issueTime(Date.from(Instant.now()))
+            .expirationTime(Date.from(expiry))
+            .build();
+    SignedJWT jwt =
+        new SignedJWT(
+            new JWSHeader.Builder(JWSAlgorithm.RS256).keyID(key.getKeyID()).build(), claims);
+    jwt.sign(new RSASSASigner(key));
+    return jwt.serialize();
+  }
+
+  /** Builds the JSON body returned by the mock {@code /token} endpoint. */
+  private static String buildTokenResponse(String accessToken) {
+    return "{\"access_token\":\""
+        + accessToken
+        + "\",\"token_type\":\"bearer\",\"expires_in\":86400}";
+  }
+}
