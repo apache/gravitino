@@ -91,11 +91,6 @@ public class BaseIT {
 
   private static final Logger LOG = LoggerFactory.getLogger(BaseIT.class);
   private static final Splitter COMMA = Splitter.on(",").omitEmptyStrings().trimResults();
-  private static final String IPV4_LOOPBACK_HOST = "127.0.0.1";
-  private static final String IPV6_LOOPBACK_HOST = "::1";
-  private static final String ICEBERG_REST_CONFIG_PREFIX = "gravitino.iceberg-rest.";
-  private static final String ICEBERG_REST_SERVICE_NAME = "iceberg-rest";
-  private static final String LANCE_REST_SERVICE_NAME = "lance-rest";
 
   protected GravitinoAdminClient client;
 
@@ -146,28 +141,6 @@ public class BaseIT {
 
   public void registerCustomConfigs(Map<String, String> configs) {
     customConfigs.putAll(configs);
-  }
-
-  static String auxiliaryServiceNames(
-      boolean ignoreIcebergAuxRestService, boolean ignoreLanceAuxRestService) {
-    List<String> enabledServices = new ArrayList<>();
-    if (!ignoreIcebergAuxRestService) {
-      enabledServices.add(ICEBERG_REST_SERVICE_NAME);
-    }
-    if (!ignoreLanceAuxRestService) {
-      enabledServices.add(LANCE_REST_SERVICE_NAME);
-    }
-    return String.join(",", enabledServices);
-  }
-
-  static String normalizeHostForLocalAccess(String host) {
-    if ("0.0.0.0".equals(host)) {
-      return IPV4_LOOPBACK_HOST;
-    }
-    if ("::".equals(host)) {
-      return IPV6_LOOPBACK_HOST;
-    }
-    return host;
   }
 
   /**
@@ -395,10 +368,12 @@ public class BaseIT {
 
     serverConfig = new ServerConfig();
     customConfigs.put(ENTITY_RELATIONAL_JDBC_BACKEND_PATH.getKey(), file.getAbsolutePath());
-    customConfigs.put(
-        AuxiliaryServiceManager.GRAVITINO_AUX_SERVICE_PREFIX
-            + AuxiliaryServiceManager.AUX_SERVICE_NAMES,
-        auxiliaryServiceNames(ignoreIcebergAuxRestService, ignoreLanceAuxRestService));
+    if (ignoreLanceAuxRestService && ignoreIcebergAuxRestService) {
+      customConfigs.put(
+          AuxiliaryServiceManager.GRAVITINO_AUX_SERVICE_PREFIX
+              + AuxiliaryServiceManager.AUX_SERVICE_NAMES,
+          "");
+    }
     if (!ignoreLanceAuxRestService) {
       customConfigs.put(
           LANCE_CONFIG_PREFIX + METALAKE_NAME.getKey(),
@@ -676,10 +651,9 @@ public class BaseIT {
 
   protected String getIcebergRestServiceUri() {
     JettyServerConfig jettyServerConfig =
-        JettyServerConfig.fromConfig(serverConfig, ICEBERG_REST_CONFIG_PREFIX);
+        JettyServerConfig.fromConfig(serverConfig, String.format("gravitino.iceberg-rest."));
     return String.format(
-        "http://%s:%d/iceberg/",
-        normalizeHostForLocalAccess(jettyServerConfig.getHost()), jettyServerConfig.getHttpPort());
+        "http://%s:%d/iceberg/", jettyServerConfig.getHost(), jettyServerConfig.getHttpPort());
   }
 
   protected String getJDBCBackend() {

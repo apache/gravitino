@@ -90,20 +90,12 @@ if (scalaVersion == "2.12") {
 }
 include("spark-connector:spark-3.3", "spark-connector:spark-runtime-3.3")
 project(":spark-connector:spark-3.3").projectDir = file("spark-connector/v3.3/spark")
-project(":spark-connector:spark-runtime-3.3").projectDir =
-  file("spark-connector/v3.3/spark-runtime")
-include(
-  "spark-connector:spark-3.4",
-  "spark-connector:spark-runtime-3.4",
-  "spark-connector:spark-3.5",
-  "spark-connector:spark-runtime-3.5"
-)
+project(":spark-connector:spark-runtime-3.3").projectDir = file("spark-connector/v3.3/spark-runtime")
+include("spark-connector:spark-3.4", "spark-connector:spark-runtime-3.4", "spark-connector:spark-3.5", "spark-connector:spark-runtime-3.5")
 project(":spark-connector:spark-3.4").projectDir = file("spark-connector/v3.4/spark")
-project(":spark-connector:spark-runtime-3.4").projectDir =
-  file("spark-connector/v3.4/spark-runtime")
+project(":spark-connector:spark-runtime-3.4").projectDir = file("spark-connector/v3.4/spark-runtime")
 project(":spark-connector:spark-3.5").projectDir = file("spark-connector/v3.5/spark")
-project(":spark-connector:spark-runtime-3.5").projectDir =
-  file("spark-connector/v3.5/spark-runtime")
+project(":spark-connector:spark-runtime-3.5").projectDir = file("spark-connector/v3.5/spark-runtime")
 include("web:web", "web:integration-test")
 include("web-v2:web", "web-v2:integration-test")
 include("docs")
