@@ -548,4 +548,124 @@ public class TestJwksTokenValidator {
       assertEquals("plainuser", result.getName());
     }
   }
+
+  @Test
+  public void testGroupsClaimPresent() throws Exception {
+    // Generate a test RSA key pair
+    RSAKey rsaKey =
+        new RSAKeyGenerator(2048).keyID("test-key-id").algorithm(JWSAlgorithm.RS256).generate();
+
+    // Create a signed JWT token with groups claim
+    JWTClaimsSet claimsSet =
+        new JWTClaimsSet.Builder()
+            .subject("test-subject")
+            .claim("groups", Arrays.asList("group1", "group2"))
+            .audience("test-service")
+            .issuer("https://test-issuer.com")
+            .expirationTime(Date.from(Instant.now().plusSeconds(3600)))
+            .issueTime(Date.from(Instant.now()))
+            .build();
+
+    SignedJWT signedJWT =
+        new SignedJWT(
+            new JWSHeader.Builder(JWSAlgorithm.RS256).keyID("test-key-id").build(), claimsSet);
+
+    JWSSigner signer = new RSASSASigner(rsaKey);
+    signedJWT.sign(signer);
+
+    String tokenString = signedJWT.serialize();
+
+    // Mock the JWKSourceBuilder to return our test key
+    try (MockedStatic<JWKSourceBuilder> mockedBuilder = mockStatic(JWKSourceBuilder.class)) {
+      @SuppressWarnings("unchecked")
+      JWKSource<SecurityContext> mockJwkSource = mock(JWKSource.class);
+      @SuppressWarnings("unchecked")
+      JWKSourceBuilder<SecurityContext> mockBuilder = mock(JWKSourceBuilder.class);
+
+      mockedBuilder.when(() -> JWKSourceBuilder.create(any(URL.class))).thenReturn(mockBuilder);
+      when(mockBuilder.build()).thenReturn(mockJwkSource);
+
+      // Configure the mock to return our test key
+      when(mockJwkSource.get(any(), any())).thenReturn(Arrays.asList(rsaKey));
+
+      // Initialize validator with groups field configured
+      Map<String, String> config = new HashMap<>();
+      config.put(
+          "gravitino.authenticator.oauth.jwksUri", "https://test-jwks.com/.well-known/jwks.json");
+      config.put("gravitino.authenticator.oauth.authority", "https://test-issuer.com");
+      config.put("gravitino.authenticator.oauth.groupsFields", "groups");
+      config.put("gravitino.authenticator.oauth.allowSkewSecs", "120");
+
+      validator.initialize(createConfig(config));
+      Principal result = validator.validateToken(tokenString, "test-service");
+
+      assertNotNull(result);
+      assertTrue(result instanceof UserPrincipal);
+      UserPrincipal userPrincipal = (UserPrincipal) result;
+      assertEquals("test-subject", userPrincipal.getName());
+      assertEquals(2, userPrincipal.getGroups().size());
+      assertTrue(
+          userPrincipal.getGroups().stream().anyMatch(g -> g.getGroupname().equals("group1")));
+      assertTrue(
+          userPrincipal.getGroups().stream().anyMatch(g -> g.getGroupname().equals("group2")));
+    }
+  }
+
+  @Test
+  public void testGroupsClaimMissing() throws Exception {
+    // Generate a test RSA key pair
+    RSAKey rsaKey =
+        new RSAKeyGenerator(2048).keyID("test-key-id").algorithm(JWSAlgorithm.RS256).generate();
+
+    // Create a signed JWT token without groups claim
+    JWTClaimsSet claimsSet =
+        new JWTClaimsSet.Builder()
+            .subject("test-subject")
+            .audience("test-service")
+            .issuer("https://test-issuer.com")
+            .expirationTime(Date.from(Instant.now().plusSeconds(3600)))
+            .issueTime(Date.from(Instant.now()))
+            .build();
+
+    SignedJWT signedJWT =
+        new SignedJWT(
+            new JWSHeader.Builder(JWSAlgorithm.RS256).keyID("test-key-id").build(), claimsSet);
+
+    JWSSigner signer = new RSASSASigner(rsaKey);
+    signedJWT.sign(signer);
+
+    String tokenString = signedJWT.serialize();
+
+    // Mock the JWKSourceBuilder to return our test key
+    try (MockedStatic<JWKSourceBuilder> mockedBuilder = mockStatic(JWKSourceBuilder.class)) {
+      @SuppressWarnings("unchecked")
+      JWKSource<SecurityContext> mockJwkSource = mock(JWKSource.class);
+      @SuppressWarnings("unchecked")
+      JWKSourceBuilder<SecurityContext> mockBuilder = mock(JWKSourceBuilder.class);
+
+      mockedBuilder.when(() -> JWKSourceBuilder.create(any(URL.class))).thenReturn(mockBuilder);
+      when(mockBuilder.build()).thenReturn(mockJwkSource);
+
+      // Configure the mock to return our test key
+      when(mockJwkSource.get(any(), any())).thenReturn(Arrays.asList(rsaKey));
+
+      // Initialize validator with groups field configured
+      Map<String, String> config = new HashMap<>();
+      config.put(
+          "gravitino.authenticator.oauth.jwksUri", "https://test-jwks.com/.well-known/jwks.json");
+      config.put("gravitino.authenticator.oauth.authority", "https://test-issuer.com");
+      config.put("gravitino.authenticator.oauth.groupsFields", "groups");
+      config.put("gravitino.authenticator.oauth.allowSkewSecs", "120");
+
+      validator.initialize(createConfig(config));
+      Principal result = validator.validateToken(tokenString, "test-service");
+
+      assertNotNull(result);
+      assertTrue(result instanceof UserPrincipal);
+      UserPrincipal userPrincipal = (UserPrincipal) result;
+      assertEquals("test-subject", userPrincipal.getName());
+      // Expect no groups if claim is missing
+      assertTrue(userPrincipal.getGroups().isEmpty());
+    }
+  }
 }
