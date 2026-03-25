@@ -165,6 +165,11 @@ tasks.test {
   } else {
     dependsOn(tasks.jar)
     dependsOn(":catalogs:catalog-hive:jar")
+    dependsOn(":catalogs:catalog-lakehouse-iceberg:jar")
+    dependsOn(":iceberg:iceberg-rest-server:jar")
+    dependsOn(":catalogs:catalog-lakehouse-paimon:jar")
+    dependsOn(":catalogs:catalog-jdbc-mysql:jar")
+    dependsOn(":catalogs:catalog-jdbc-postgresql:jar")
   }
 }
 
