@@ -25,7 +25,7 @@ import java.util.Map;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.client.DefaultOAuth2TokenProvider;
 import org.apache.gravitino.client.GravitinoAdminClient;
-import org.apache.gravitino.client.GravitinoClientAuthenticationConfig;
+import org.apache.gravitino.client.GravitinoClientConfiguration;
 import org.apache.gravitino.client.KerberosTokenProvider;
 import org.apache.gravitino.trino.connector.GravitinoConfig;
 import org.slf4j.Logger;
@@ -39,6 +39,46 @@ class GravitinoAuthProvider {
 
   private static final Logger LOG = LoggerFactory.getLogger(GravitinoAuthProvider.class);
 
+  /** Authentication type configuration key. */
+  static final String AUTH_TYPE_KEY =
+      GravitinoClientConfiguration.GRAVITINO_CLIENT_CONFIG_PREFIX + "authType";
+
+  /** Simple authentication user configuration key. */
+  static final String SIMPLE_AUTH_USER_KEY =
+      GravitinoClientConfiguration.GRAVITINO_CLIENT_CONFIG_PREFIX + "simpleAuthUser";
+
+  /** OAuth server URI configuration key. */
+  static final String OAUTH_SERVER_URI_KEY =
+      GravitinoClientConfiguration.GRAVITINO_CLIENT_CONFIG_PREFIX + "oauth.serverUri";
+
+  /** OAuth credential configuration key. */
+  static final String OAUTH_CREDENTIAL_KEY =
+      GravitinoClientConfiguration.GRAVITINO_CLIENT_CONFIG_PREFIX + "oauth.credential";
+
+  /** OAuth path configuration key. */
+  static final String OAUTH_PATH_KEY =
+      GravitinoClientConfiguration.GRAVITINO_CLIENT_CONFIG_PREFIX + "oauth.path";
+
+  /** OAuth scope configuration key. */
+  static final String OAUTH_SCOPE_KEY =
+      GravitinoClientConfiguration.GRAVITINO_CLIENT_CONFIG_PREFIX + "oauth.scope";
+
+  /** Kerberos principal configuration key. */
+  static final String KERBEROS_PRINCIPAL_KEY =
+      GravitinoClientConfiguration.GRAVITINO_CLIENT_CONFIG_PREFIX + "kerberos.principal";
+
+  /** Kerberos keytab file path configuration key. */
+  static final String KERBEROS_KEYTAB_FILE_PATH_KEY =
+      GravitinoClientConfiguration.GRAVITINO_CLIENT_CONFIG_PREFIX + "kerberos.keytabFilePath";
+
+  /** Authentication types supported by the Trino connector. */
+  enum AuthType {
+    SIMPLE,
+    OAUTH,
+    KERBEROS,
+    NONE
+  }
+
   private GravitinoAuthProvider() {}
 
   /**
@@ -51,16 +91,14 @@ class GravitinoAuthProvider {
   public static GravitinoAdminClient buildClient(GravitinoConfig config) {
     Map<String, String> clientConfig = new HashMap<>(config.getClientConfig());
     String uri = config.getURI();
-    String authTypeStr = clientConfig.get(GravitinoClientAuthenticationConfig.AUTH_TYPE_KEY);
+    String authTypeStr = clientConfig.get(AUTH_TYPE_KEY);
 
     GravitinoAdminClient.AdminClientBuilder builder = GravitinoAdminClient.builder(uri);
 
     if (StringUtils.isNotBlank(authTypeStr)) {
-      GravitinoClientAuthenticationConfig.AuthType authType;
+      AuthType authType;
       try {
-        authType =
-            GravitinoClientAuthenticationConfig.AuthType.valueOf(
-                authTypeStr.toUpperCase(Locale.ROOT));
+        authType = AuthType.valueOf(authTypeStr.toUpperCase(Locale.ROOT));
       } catch (IllegalArgumentException e) {
         throw new IllegalArgumentException(
             String.format(
@@ -86,14 +124,14 @@ class GravitinoAuthProvider {
     }
 
     // Remove auth-specific keys before passing to withClientConfig
-    clientConfig.remove(GravitinoClientAuthenticationConfig.AUTH_TYPE_KEY);
-    clientConfig.remove(GravitinoClientAuthenticationConfig.SIMPLE_AUTH_USER_KEY);
-    clientConfig.remove(GravitinoClientAuthenticationConfig.OAUTH_SERVER_URI_KEY);
-    clientConfig.remove(GravitinoClientAuthenticationConfig.OAUTH_CREDENTIAL_KEY);
-    clientConfig.remove(GravitinoClientAuthenticationConfig.OAUTH_PATH_KEY);
-    clientConfig.remove(GravitinoClientAuthenticationConfig.OAUTH_SCOPE_KEY);
-    clientConfig.remove(GravitinoClientAuthenticationConfig.KERBEROS_PRINCIPAL_KEY);
-    clientConfig.remove(GravitinoClientAuthenticationConfig.KERBEROS_KEYTAB_FILE_PATH_KEY);
+    clientConfig.remove(AUTH_TYPE_KEY);
+    clientConfig.remove(SIMPLE_AUTH_USER_KEY);
+    clientConfig.remove(OAUTH_SERVER_URI_KEY);
+    clientConfig.remove(OAUTH_CREDENTIAL_KEY);
+    clientConfig.remove(OAUTH_PATH_KEY);
+    clientConfig.remove(OAUTH_SCOPE_KEY);
+    clientConfig.remove(KERBEROS_PRINCIPAL_KEY);
+    clientConfig.remove(KERBEROS_KEYTAB_FILE_PATH_KEY);
 
     builder.withClientConfig(clientConfig);
     return builder.build();
@@ -101,7 +139,7 @@ class GravitinoAuthProvider {
 
   private static void buildSimpleAuth(
       GravitinoAdminClient.AdminClientBuilder builder, Map<String, String> clientConfig) {
-    String simpleUser = clientConfig.get(GravitinoClientAuthenticationConfig.SIMPLE_AUTH_USER_KEY);
+    String simpleUser = clientConfig.get(SIMPLE_AUTH_USER_KEY);
     if (StringUtils.isNotBlank(simpleUser)) {
       builder.withSimpleAuth(simpleUser);
     } else {
@@ -110,34 +148,26 @@ class GravitinoAuthProvider {
   }
 
   private static DefaultOAuth2TokenProvider buildOAuthProvider(Map<String, String> config) {
-    String serverUri = config.get(GravitinoClientAuthenticationConfig.OAUTH_SERVER_URI_KEY);
-    String credential = config.get(GravitinoClientAuthenticationConfig.OAUTH_CREDENTIAL_KEY);
-    String path = config.get(GravitinoClientAuthenticationConfig.OAUTH_PATH_KEY);
-    String scope = config.get(GravitinoClientAuthenticationConfig.OAUTH_SCOPE_KEY);
+    String serverUri = config.get(OAUTH_SERVER_URI_KEY);
+    String credential = config.get(OAUTH_CREDENTIAL_KEY);
+    String path = config.get(OAUTH_PATH_KEY);
+    String scope = config.get(OAUTH_SCOPE_KEY);
 
     if (StringUtils.isBlank(serverUri)) {
       throw new IllegalArgumentException(
-          String.format(
-              "OAuth server URI is required. Please set %s",
-              GravitinoClientAuthenticationConfig.OAUTH_SERVER_URI_KEY));
+          String.format("OAuth server URI is required. Please set %s", OAUTH_SERVER_URI_KEY));
     }
     if (StringUtils.isBlank(credential)) {
       throw new IllegalArgumentException(
-          String.format(
-              "OAuth credential is required. Please set %s",
-              GravitinoClientAuthenticationConfig.OAUTH_CREDENTIAL_KEY));
+          String.format("OAuth credential is required. Please set %s", OAUTH_CREDENTIAL_KEY));
     }
     if (StringUtils.isBlank(path)) {
       throw new IllegalArgumentException(
-          String.format(
-              "OAuth path is required. Please set %s",
-              GravitinoClientAuthenticationConfig.OAUTH_PATH_KEY));
+          String.format("OAuth path is required. Please set %s", OAUTH_PATH_KEY));
     }
     if (StringUtils.isBlank(scope)) {
       throw new IllegalArgumentException(
-          String.format(
-              "OAuth scope is required. Please set %s",
-              GravitinoClientAuthenticationConfig.OAUTH_SCOPE_KEY));
+          String.format("OAuth scope is required. Please set %s", OAUTH_SCOPE_KEY));
     }
 
     // Remove leading slash from path if present
@@ -162,15 +192,12 @@ class GravitinoAuthProvider {
   }
 
   private static KerberosTokenProvider buildKerberosProvider(Map<String, String> config) {
-    String principal = config.get(GravitinoClientAuthenticationConfig.KERBEROS_PRINCIPAL_KEY);
-    String keytabFilePath =
-        config.get(GravitinoClientAuthenticationConfig.KERBEROS_KEYTAB_FILE_PATH_KEY);
+    String principal = config.get(KERBEROS_PRINCIPAL_KEY);
+    String keytabFilePath = config.get(KERBEROS_KEYTAB_FILE_PATH_KEY);
 
     if (StringUtils.isBlank(principal)) {
       throw new IllegalArgumentException(
-          String.format(
-              "Kerberos principal is required. Please set %s",
-              GravitinoClientAuthenticationConfig.KERBEROS_PRINCIPAL_KEY));
+          String.format("Kerberos principal is required. Please set %s", KERBEROS_PRINCIPAL_KEY));
     }
 
     KerberosTokenProvider.Builder kerberosBuilder =
@@ -188,7 +215,7 @@ class GravitinoAuthProvider {
           "No keytab file configured for Kerberos authentication ({}). "
               + "Authentication will fail at runtime unless Kerberos credentials are already "
               + "present in the current security context.",
-          GravitinoClientAuthenticationConfig.KERBEROS_KEYTAB_FILE_PATH_KEY);
+          KERBEROS_KEYTAB_FILE_PATH_KEY);
     }
 
     // host is set by GravitinoAdminClient.Builder.withKerberosAuth() from the server URI

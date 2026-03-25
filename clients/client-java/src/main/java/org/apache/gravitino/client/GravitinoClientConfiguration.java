@@ -19,7 +19,9 @@
 
 package org.apache.gravitino.client;
 
+import com.google.common.collect.ImmutableSet;
 import java.util.Map;
+import java.util.Set;
 import java.util.function.Function;
 import org.apache.gravitino.utils.MapUtils;
 
@@ -64,6 +66,13 @@ public class GravitinoClientConfiguration {
   public static final String CLIENT_MAX_CONNECTIONS_PER_ROUTE =
       GRAVITINO_CLIENT_CONFIG_PREFIX + "maxConnectionsPerRoute";
 
+  private static final Set<String> SUPPORT_CLIENT_CONFIG_KEYS =
+      ImmutableSet.of(
+          CLIENT_CONNECTION_TIMEOUT_MS,
+          CLIENT_SOCKET_TIMEOUT_MS,
+          CLIENT_MAX_CONNECTIONS,
+          CLIENT_MAX_CONNECTIONS_PER_ROUTE);
+
   private Map<String, String> properties;
 
   private GravitinoClientConfiguration(Map<String, String> properties) {
@@ -77,6 +86,11 @@ public class GravitinoClientConfiguration {
    * @return GravitinoClientConfiguration instance
    */
   public static GravitinoClientConfiguration buildFromProperties(Map<String, String> properties) {
+    for (String key : properties.keySet()) {
+      if (!SUPPORT_CLIENT_CONFIG_KEYS.contains(key)) {
+        throw new IllegalArgumentException(String.format("Invalid property for client: %s", key));
+      }
+    }
     GravitinoClientConfiguration config = new GravitinoClientConfiguration(properties);
     config.validateConnectionPoolSettings();
     return config;

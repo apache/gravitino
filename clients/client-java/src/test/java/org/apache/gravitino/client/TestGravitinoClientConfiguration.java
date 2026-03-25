@@ -37,17 +37,18 @@ public class TestGravitinoClientConfiguration {
   }
 
   @Test
-  void testUnknownConfigKeyIsAccepted() {
-    // Unknown keys (e.g. auth-related properties) are silently ignored by
-    // GravitinoClientConfiguration so that gravitino.client.authType and friends
-    // are not rejected at this layer.
+  void testInValidConfig() {
+
     Map<String, String> properties =
         ImmutableMap.of(
             "gravitino.client.xxxx", String.valueOf(10),
             "gravitino.client.socketTimeoutMs", String.valueOf(20));
-    GravitinoClientConfiguration clientConfiguration =
-        GravitinoClientConfiguration.buildFromProperties(properties);
-    Assertions.assertEquals(20, clientConfiguration.getClientSocketTimeoutMs());
+    Throwable throwable =
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () -> GravitinoClientConfiguration.buildFromProperties(properties));
+    Assertions.assertEquals(
+        "Invalid property for client: gravitino.client.xxxx", throwable.getMessage());
   }
 
   @Test

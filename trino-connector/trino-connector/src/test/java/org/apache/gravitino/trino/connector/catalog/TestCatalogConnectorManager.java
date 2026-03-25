@@ -34,10 +34,10 @@ import java.io.File;
 import java.io.IOException;
 import java.nio.file.Files;
 import org.apache.gravitino.client.GravitinoAdminClient;
-import org.apache.gravitino.client.GravitinoClientAuthenticationConfig;
 import org.apache.gravitino.trino.connector.GravitinoConfig;
 import org.apache.gravitino.trino.connector.GravitinoErrorCode;
 import org.apache.gravitino.trino.connector.metadata.GravitinoCatalog;
+import org.junit.jupiter.api.Assumptions;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
@@ -157,9 +157,7 @@ public class TestCatalogConnectorManager {
     assertDoesNotThrow(
         () ->
             manager.config(
-                buildConfig(
-                    ImmutableMap.of(GravitinoClientAuthenticationConfig.AUTH_TYPE_KEY, "none")),
-                null));
+                buildConfig(ImmutableMap.of(GravitinoAuthProvider.AUTH_TYPE_KEY, "none")), null));
   }
 
   @Test
@@ -170,8 +168,8 @@ public class TestCatalogConnectorManager {
             manager.config(
                 buildConfig(
                     ImmutableMap.of(
-                        GravitinoClientAuthenticationConfig.AUTH_TYPE_KEY, "simple",
-                        GravitinoClientAuthenticationConfig.SIMPLE_AUTH_USER_KEY, "alice")),
+                        GravitinoAuthProvider.AUTH_TYPE_KEY, "simple",
+                        GravitinoAuthProvider.SIMPLE_AUTH_USER_KEY, "alice")),
                 null));
   }
 
@@ -181,9 +179,7 @@ public class TestCatalogConnectorManager {
     assertDoesNotThrow(
         () ->
             manager.config(
-                buildConfig(
-                    ImmutableMap.of(GravitinoClientAuthenticationConfig.AUTH_TYPE_KEY, "simple")),
-                null));
+                buildConfig(ImmutableMap.of(GravitinoAuthProvider.AUTH_TYPE_KEY, "simple")), null));
   }
 
   @Test
@@ -193,9 +189,7 @@ public class TestCatalogConnectorManager {
         TrinoException.class,
         () ->
             manager.config(
-                buildConfig(
-                    ImmutableMap.of(
-                        GravitinoClientAuthenticationConfig.AUTH_TYPE_KEY, "invalid_type")),
+                buildConfig(ImmutableMap.of(GravitinoAuthProvider.AUTH_TYPE_KEY, "invalid_type")),
                 null));
   }
 
@@ -208,10 +202,10 @@ public class TestCatalogConnectorManager {
             manager.config(
                 buildConfig(
                     ImmutableMap.of(
-                        GravitinoClientAuthenticationConfig.AUTH_TYPE_KEY, "oauth",
-                        GravitinoClientAuthenticationConfig.OAUTH_CREDENTIAL_KEY, "cred",
-                        GravitinoClientAuthenticationConfig.OAUTH_PATH_KEY, "oauth2/token",
-                        GravitinoClientAuthenticationConfig.OAUTH_SCOPE_KEY, "scope")),
+                        GravitinoAuthProvider.AUTH_TYPE_KEY, "oauth",
+                        GravitinoAuthProvider.OAUTH_CREDENTIAL_KEY, "cred",
+                        GravitinoAuthProvider.OAUTH_PATH_KEY, "oauth2/token",
+                        GravitinoAuthProvider.OAUTH_SCOPE_KEY, "scope")),
                 null));
   }
 
@@ -224,11 +218,10 @@ public class TestCatalogConnectorManager {
             manager.config(
                 buildConfig(
                     ImmutableMap.of(
-                        GravitinoClientAuthenticationConfig.AUTH_TYPE_KEY, "oauth",
-                        GravitinoClientAuthenticationConfig.OAUTH_SERVER_URI_KEY,
-                            "http://auth.example.com",
-                        GravitinoClientAuthenticationConfig.OAUTH_PATH_KEY, "oauth2/token",
-                        GravitinoClientAuthenticationConfig.OAUTH_SCOPE_KEY, "scope")),
+                        GravitinoAuthProvider.AUTH_TYPE_KEY, "oauth",
+                        GravitinoAuthProvider.OAUTH_SERVER_URI_KEY, "http://auth.example.com",
+                        GravitinoAuthProvider.OAUTH_PATH_KEY, "oauth2/token",
+                        GravitinoAuthProvider.OAUTH_SCOPE_KEY, "scope")),
                 null));
   }
 
@@ -239,8 +232,7 @@ public class TestCatalogConnectorManager {
         TrinoException.class,
         () ->
             manager.config(
-                buildConfig(
-                    ImmutableMap.of(GravitinoClientAuthenticationConfig.AUTH_TYPE_KEY, "kerberos")),
+                buildConfig(ImmutableMap.of(GravitinoAuthProvider.AUTH_TYPE_KEY, "kerberos")),
                 null));
   }
 
@@ -253,10 +245,9 @@ public class TestCatalogConnectorManager {
             manager.config(
                 buildConfig(
                     ImmutableMap.of(
-                        GravitinoClientAuthenticationConfig.AUTH_TYPE_KEY, "kerberos",
-                        GravitinoClientAuthenticationConfig.KERBEROS_PRINCIPAL_KEY,
-                            "user@REALM.COM",
-                        GravitinoClientAuthenticationConfig.KERBEROS_KEYTAB_FILE_PATH_KEY,
+                        GravitinoAuthProvider.AUTH_TYPE_KEY, "kerberos",
+                        GravitinoAuthProvider.KERBEROS_PRINCIPAL_KEY, "user@REALM.COM",
+                        GravitinoAuthProvider.KERBEROS_KEYTAB_FILE_PATH_KEY,
                             tempDir.resolve("missing.keytab").toString())),
                 null));
   }
@@ -264,6 +255,9 @@ public class TestCatalogConnectorManager {
   @Test
   public void testBuildGravitinoClientKerberosWithKeytab(@TempDir java.nio.file.Path tempDir)
       throws IOException {
+    // KerberosTokenProvider.build() calls Subject.getSubject(AccessController.getContext())
+    // which throws UnsupportedOperationException on JVM 17+.
+    Assumptions.assumeTrue(Runtime.version().feature() < 17, "Kerberos test skipped on JVM 17+");
     File keytabFile = tempDir.resolve("user.keytab").toFile();
     Files.write(keytabFile.toPath(), new byte[0]);
     CatalogConnectorManager manager = createManagerWithNullClient(ImmutableMap.of());
@@ -272,10 +266,9 @@ public class TestCatalogConnectorManager {
             manager.config(
                 buildConfig(
                     ImmutableMap.of(
-                        GravitinoClientAuthenticationConfig.AUTH_TYPE_KEY, "kerberos",
-                        GravitinoClientAuthenticationConfig.KERBEROS_PRINCIPAL_KEY,
-                            "user@REALM.COM",
-                        GravitinoClientAuthenticationConfig.KERBEROS_KEYTAB_FILE_PATH_KEY,
+                        GravitinoAuthProvider.AUTH_TYPE_KEY, "kerberos",
+                        GravitinoAuthProvider.KERBEROS_PRINCIPAL_KEY, "user@REALM.COM",
+                        GravitinoAuthProvider.KERBEROS_KEYTAB_FILE_PATH_KEY,
                             keytabFile.getAbsolutePath())),
                 null));
   }
