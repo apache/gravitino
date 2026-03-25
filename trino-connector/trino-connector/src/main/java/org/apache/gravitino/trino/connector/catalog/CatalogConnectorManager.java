@@ -116,10 +116,16 @@ public class CatalogConnectorManager {
     Preconditions.checkArgument(config != null, "config is not null");
     this.config = config;
     if (client == null) {
-      this.gravitinoClient =
-          GravitinoAdminClient.builder(config.getURI())
-              .withClientConfig(config.getClientConfig())
-              .build();
+      String authType = config.getClientConfig().getOrDefault("gravitino.client.authType", "none");
+      LOG.info("Building Gravitino client with authType: {}", authType);
+      try {
+        this.gravitinoClient = GravitinoAuthProvider.buildClient(config);
+      } catch (Exception e) {
+        throw new TrinoException(
+            GravitinoErrorCode.GRAVITINO_MISSING_CONFIG,
+            "Failed to build Gravitino client with authType '" + authType + "': " + e.getMessage(),
+            e);
+      }
     } else {
       this.gravitinoClient = client;
     }

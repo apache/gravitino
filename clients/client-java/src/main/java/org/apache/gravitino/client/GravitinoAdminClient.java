@@ -258,7 +258,6 @@ public class GravitinoAdminClient extends GravitinoClientBase implements Support
     public GravitinoAdminClient build() {
       Preconditions.checkArgument(
           uri != null && !uri.isEmpty(), "The argument 'uri' must be a valid URI");
-      configureAuthentication();
       return new GravitinoAdminClient(
           uri, authDataProvider, isVersionCheckEnabled(), headers, properties);
     }

@@ -711,7 +711,6 @@ public class GravitinoClient extends GravitinoClientBase
           metalakeName != null && !metalakeName.isEmpty(),
           "The argument 'metalakeName' must be a valid name");
 
-      configureAuthentication();
       return new GravitinoClient(
           uri, metalakeName, authDataProvider, isVersionCheckEnabled(), headers, properties);
     }

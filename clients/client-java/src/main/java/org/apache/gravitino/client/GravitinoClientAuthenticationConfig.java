@@ -34,7 +34,7 @@ import org.apache.commons.lang3.StringUtils;
  * based on configuration maps. It supports multiple authentication types including Simple, OAuth,
  * and Kerberos.
  */
-class GravitinoClientAuthenticationConfig {
+public class GravitinoClientAuthenticationConfig {
 
   /** Authentication type configuration key. */
   public static final String AUTH_TYPE_KEY = GRAVITINO_CLIENT_CONFIG_PREFIX + "authType";
