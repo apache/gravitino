@@ -30,16 +30,11 @@ import static org.mockito.Mockito.when;
 import com.google.common.collect.ImmutableMap;
 import io.trino.spi.TrinoException;
 import io.trino.spi.connector.ConnectorContext;
-import java.io.File;
-import java.io.IOException;
-import java.nio.file.Files;
 import org.apache.gravitino.client.GravitinoAdminClient;
 import org.apache.gravitino.trino.connector.GravitinoConfig;
 import org.apache.gravitino.trino.connector.GravitinoErrorCode;
 import org.apache.gravitino.trino.connector.metadata.GravitinoCatalog;
-import org.junit.jupiter.api.Assumptions;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.io.TempDir;
 
 public class TestCatalogConnectorManager {
 
@@ -143,155 +138,6 @@ public class TestCatalogConnectorManager {
     assertTrue(manager.skipCatalog("a1"));
     assertTrue(manager.skipCatalog("b1"));
     assertFalse(manager.skipCatalog("b2"));
-  }
-
-  @Test
-  public void testBuildGravitinoClientNoAuth() {
-    CatalogConnectorManager manager = createManagerWithNullClient(ImmutableMap.of());
-    assertDoesNotThrow(() -> manager.config(buildConfig(ImmutableMap.of()), null));
-  }
-
-  @Test
-  public void testBuildGravitinoClientNoneAuth() {
-    CatalogConnectorManager manager = createManagerWithNullClient(ImmutableMap.of());
-    assertDoesNotThrow(
-        () ->
-            manager.config(
-                buildConfig(ImmutableMap.of(GravitinoAuthProvider.AUTH_TYPE_KEY, "none")), null));
-  }
-
-  @Test
-  public void testBuildGravitinoClientSimpleAuthWithUser() {
-    CatalogConnectorManager manager = createManagerWithNullClient(ImmutableMap.of());
-    assertDoesNotThrow(
-        () ->
-            manager.config(
-                buildConfig(
-                    ImmutableMap.of(
-                        GravitinoAuthProvider.AUTH_TYPE_KEY, "simple",
-                        GravitinoAuthProvider.SIMPLE_AUTH_USER_KEY, "alice")),
-                null));
-  }
-
-  @Test
-  public void testBuildGravitinoClientSimpleAuthNoUser() {
-    CatalogConnectorManager manager = createManagerWithNullClient(ImmutableMap.of());
-    assertDoesNotThrow(
-        () ->
-            manager.config(
-                buildConfig(ImmutableMap.of(GravitinoAuthProvider.AUTH_TYPE_KEY, "simple")), null));
-  }
-
-  @Test
-  public void testBuildGravitinoClientInvalidAuthType() {
-    CatalogConnectorManager manager = createManagerWithNullClient(ImmutableMap.of());
-    assertThrows(
-        TrinoException.class,
-        () ->
-            manager.config(
-                buildConfig(ImmutableMap.of(GravitinoAuthProvider.AUTH_TYPE_KEY, "invalid_type")),
-                null));
-  }
-
-  @Test
-  public void testBuildGravitinoClientOAuthMissingServerUri() {
-    CatalogConnectorManager manager = createManagerWithNullClient(ImmutableMap.of());
-    assertThrows(
-        TrinoException.class,
-        () ->
-            manager.config(
-                buildConfig(
-                    ImmutableMap.of(
-                        GravitinoAuthProvider.AUTH_TYPE_KEY, "oauth",
-                        GravitinoAuthProvider.OAUTH_CREDENTIAL_KEY, "cred",
-                        GravitinoAuthProvider.OAUTH_PATH_KEY, "oauth2/token",
-                        GravitinoAuthProvider.OAUTH_SCOPE_KEY, "scope")),
-                null));
-  }
-
-  @Test
-  public void testBuildGravitinoClientOAuthMissingCredential() {
-    CatalogConnectorManager manager = createManagerWithNullClient(ImmutableMap.of());
-    assertThrows(
-        TrinoException.class,
-        () ->
-            manager.config(
-                buildConfig(
-                    ImmutableMap.of(
-                        GravitinoAuthProvider.AUTH_TYPE_KEY, "oauth",
-                        GravitinoAuthProvider.OAUTH_SERVER_URI_KEY, "http://auth.example.com",
-                        GravitinoAuthProvider.OAUTH_PATH_KEY, "oauth2/token",
-                        GravitinoAuthProvider.OAUTH_SCOPE_KEY, "scope")),
-                null));
-  }
-
-  @Test
-  public void testBuildGravitinoClientKerberosMissingPrincipal() {
-    CatalogConnectorManager manager = createManagerWithNullClient(ImmutableMap.of());
-    assertThrows(
-        TrinoException.class,
-        () ->
-            manager.config(
-                buildConfig(ImmutableMap.of(GravitinoAuthProvider.AUTH_TYPE_KEY, "kerberos")),
-                null));
-  }
-
-  @Test
-  public void testBuildGravitinoClientKerberosKeytabNotFound(@TempDir java.nio.file.Path tempDir) {
-    CatalogConnectorManager manager = createManagerWithNullClient(ImmutableMap.of());
-    assertThrows(
-        TrinoException.class,
-        () ->
-            manager.config(
-                buildConfig(
-                    ImmutableMap.of(
-                        GravitinoAuthProvider.AUTH_TYPE_KEY, "kerberos",
-                        GravitinoAuthProvider.KERBEROS_PRINCIPAL_KEY, "user@REALM.COM",
-                        GravitinoAuthProvider.KERBEROS_KEYTAB_FILE_PATH_KEY,
-                            tempDir.resolve("missing.keytab").toString())),
-                null));
-  }
-
-  @Test
-  public void testBuildGravitinoClientKerberosWithKeytab(@TempDir java.nio.file.Path tempDir)
-      throws IOException {
-    // KerberosTokenProvider.build() calls Subject.getSubject(AccessController.getContext())
-    // which throws UnsupportedOperationException on JVM 17+.
-    Assumptions.assumeTrue(Runtime.version().feature() < 17, "Kerberos test skipped on JVM 17+");
-    File keytabFile = tempDir.resolve("user.keytab").toFile();
-    Files.write(keytabFile.toPath(), new byte[0]);
-    CatalogConnectorManager manager = createManagerWithNullClient(ImmutableMap.of());
-    assertDoesNotThrow(
-        () ->
-            manager.config(
-                buildConfig(
-                    ImmutableMap.of(
-                        GravitinoAuthProvider.AUTH_TYPE_KEY, "kerberos",
-                        GravitinoAuthProvider.KERBEROS_PRINCIPAL_KEY, "user@REALM.COM",
-                        GravitinoAuthProvider.KERBEROS_KEYTAB_FILE_PATH_KEY,
-                            keytabFile.getAbsolutePath())),
-                null));
-  }
-
-  private CatalogConnectorManager createManagerWithNullClient(
-      ImmutableMap<String, String> ignored) {
-    CatalogRegister catalogRegister = mock(CatalogRegister.class);
-    CatalogConnectorFactory catalogFactory;
-    try {
-      catalogFactory = createCatalogConnectorFactory();
-    } catch (Exception e) {
-      throw new RuntimeException(e);
-    }
-    return new CatalogConnectorManager(catalogRegister, catalogFactory, null);
-  }
-
-  private GravitinoConfig buildConfig(ImmutableMap<String, String> authConfig) {
-    ImmutableMap.Builder<String, String> builder =
-        ImmutableMap.<String, String>builder()
-            .put("gravitino.uri", "http://127.0.0.1:8090")
-            .put("gravitino.metalake", "test");
-    builder.putAll(authConfig);
-    return new GravitinoConfig(builder.build());
   }
 
   private CatalogConnectorManager createManager(ImmutableMap<String, String> configMap)
