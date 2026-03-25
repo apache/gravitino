@@ -89,6 +89,10 @@ public class SecurableObjectSQLProviderFactory {
     return getProvider().listSecurableObjectsByRoleId(roleId);
   }
 
+  public static String listSecurableObjectsByRoleIds(@Param("roleIds") List<Long> roleIds) {
+    return getProvider().listSecurableObjectsByRoleIds(roleIds);
+  }
+
   public static String deleteSecurableObjectsByLegacyTimeline(
       @Param("legacyTimeline") Long legacyTimeline, @Param("limit") int limit) {
     return getProvider().deleteSecurableObjectsByLegacyTimeline(legacyTimeline, limit);

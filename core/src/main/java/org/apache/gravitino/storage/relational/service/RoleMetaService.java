@@ -21,6 +21,7 @@ package org.apache.gravitino.storage.relational.service;
 import static org.apache.gravitino.metrics.source.MetricsSource.GRAVITINO_RELATIONAL_STORE_METRIC_NAME;
 
 import com.google.common.base.Preconditions;
+import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Sets;
 import java.io.IOException;
@@ -338,6 +339,37 @@ public class RoleMetaService {
         SecurableObjectMapper.class, mapper -> mapper.listSecurableObjectsByRoleId(roleId));
   }
 
+  /**
+   * Batch-loads securable objects for multiple roles in a single SQL query and returns a map from
+   * role ID to the resolved {@link SecurableObject} list. This eliminates the N+1 query pattern
+   * that occurs when loading securable objects for each role individually.
+   *
+   * @param roleIds the list of role IDs to load
+   * @return a map from role ID to its list of resolved securable objects
+   */
+  @Monitored(
+      metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME,
+      baseMetricName = "batchListSecurableObjectsForRoles")
+  public static Map<Long, List<SecurableObject>> batchListSecurableObjectsForRoles(
+      List<Long> roleIds) {
+    if (roleIds.isEmpty()) {
+      return ImmutableMap.of();
+    }
+    List<SecurableObjectPO> allPOs =
+        SessionUtils.getWithoutCommit(
+            SecurableObjectMapper.class, mapper -> mapper.listSecurableObjectsByRoleIds(roleIds));
+
+    Map<Long, List<SecurableObjectPO>> byRoleId =
+        allPOs.stream().collect(Collectors.groupingBy(SecurableObjectPO::getRoleId));
+
+    ImmutableMap.Builder<Long, List<SecurableObject>> builder = ImmutableMap.builder();
+    for (Long roleId : roleIds) {
+      List<SecurableObjectPO> pos = byRoleId.getOrDefault(roleId, Collections.emptyList());
+      builder.put(roleId, buildSecurableObjectsFromPOs(pos));
+    }
+    return builder.build();
+  }
+
   @Monitored(
       metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME,
       baseMetricName = "listRolesByNamespace")
@@ -398,6 +430,11 @@ public class RoleMetaService {
 
   private static List<SecurableObject> listSecurableObjects(RolePO po) {
     List<SecurableObjectPO> securableObjectPOs = listSecurableObjectsByRoleId(po.getRoleId());
+    return buildSecurableObjectsFromPOs(securableObjectPOs);
+  }
+
+  private static List<SecurableObject> buildSecurableObjectsFromPOs(
+      List<SecurableObjectPO> securableObjectPOs) {
     List<SecurableObject> securableObjects = Lists.newArrayList();
 
     securableObjectPOs.stream()

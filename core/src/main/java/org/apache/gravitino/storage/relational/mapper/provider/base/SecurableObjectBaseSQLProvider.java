@@ -191,6 +191,22 @@ public class SecurableObjectBaseSQLProvider {
         + " WHERE role_id = #{roleId} AND deleted_at = 0";
   }
 
+  public String listSecurableObjectsByRoleIds(@Param("roleIds") List<Long> roleIds) {
+    return "<script>"
+        + "SELECT role_id as roleId, metadata_object_id as metadataObjectId,"
+        + " type as type, privilege_names as privilegeNames,"
+        + " privilege_conditions as privilegeConditions, current_version as currentVersion,"
+        + " last_version as lastVersion, deleted_at as deletedAt"
+        + " FROM "
+        + SECURABLE_OBJECT_TABLE_NAME
+        + " WHERE role_id IN "
+        + "<foreach collection='roleIds' item='item' open='(' separator=',' close=')'>"
+        + "#{item}"
+        + "</foreach>"
+        + " AND deleted_at = 0"
+        + "</script>";
+  }
+
   public String deleteSecurableObjectsByLegacyTimeline(
       @Param("legacyTimeline") Long legacyTimeline, @Param("limit") int limit) {
     return "DELETE FROM "

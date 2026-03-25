@@ -38,7 +38,9 @@ import java.io.IOException;
 import java.lang.reflect.Field;
 import java.security.Principal;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.Executor;
 import java.util.stream.Collectors;
@@ -64,6 +66,7 @@ import org.apache.gravitino.server.ServerConfig;
 import org.apache.gravitino.server.authorization.MetadataIdConverter;
 import org.apache.gravitino.storage.relational.po.SecurableObjectPO;
 import org.apache.gravitino.storage.relational.service.OwnerMetaService;
+import org.apache.gravitino.storage.relational.service.RoleMetaService;
 import org.apache.gravitino.storage.relational.utils.POConverters;
 import org.apache.gravitino.utils.NameIdentifierUtil;
 import org.apache.gravitino.utils.NamespaceUtil;
@@ -98,6 +101,12 @@ public class TestJcasbinAuthorizer {
   private static SupportsRelationOperations supportsRelationOperations =
       mock(SupportsRelationOperations.class);
 
+  /**
+   * Shared map from role ID to securable objects, consulted by the {@link RoleMetaService} mock.
+   * Test methods must populate this map before exercising code paths that load new roles.
+   */
+  private static final Map<Long, List<SecurableObject>> roleSecurableObjectsMap = new HashMap<>();
+
   private static MockedStatic<PrincipalUtils> principalUtilsMockedStatic;
 
   private static MockedStatic<GravitinoEnv> gravitinoEnvMockedStatic;
@@ -106,12 +115,33 @@ public class TestJcasbinAuthorizer {
 
   private static MockedStatic<OwnerMetaService> ownerMetaServiceMockedStatic;
 
+  private static MockedStatic<RoleMetaService> roleMetaServiceMockedStatic;
+
   private static JcasbinAuthorizer jcasbinAuthorizer;
 
   private static ObjectMapper objectMapper = new ObjectMapper();
 
   @BeforeAll
   public static void setup() throws IOException {
+    // Pre-populate known constant roles so tests don't need to set them up individually.
+    roleSecurableObjectsMap.put(ALLOW_ROLE_ID, ImmutableList.of(getAllowSecurableObject()));
+    roleSecurableObjectsMap.put(DENY_ROLE_ID, ImmutableList.of(getDenySecurableObject()));
+
+    // Mock RoleMetaService.batchListSecurableObjectsForRoles to avoid real DB access.
+    roleMetaServiceMockedStatic = mockStatic(RoleMetaService.class);
+    roleMetaServiceMockedStatic
+        .when(() -> RoleMetaService.batchListSecurableObjectsForRoles(any()))
+        .thenAnswer(
+            inv -> {
+              List<Long> ids = inv.getArgument(0);
+              com.google.common.collect.ImmutableMap.Builder<Long, List<SecurableObject>> result =
+                  com.google.common.collect.ImmutableMap.builder();
+              for (Long id : ids) {
+                result.put(id, roleSecurableObjectsMap.getOrDefault(id, ImmutableList.of()));
+              }
+              return result.build();
+            });
+
     OwnerMetaService ownerMetaService = mock(OwnerMetaService.class);
     ownerMetaServiceMockedStatic = mockStatic(OwnerMetaService.class);
     ownerMetaServiceMockedStatic.when(OwnerMetaService::getInstance).thenReturn(ownerMetaService);
@@ -163,6 +193,9 @@ public class TestJcasbinAuthorizer {
     }
     if (gravitinoEnvMockedStatic != null) {
       gravitinoEnvMockedStatic.close();
+    }
+    if (roleMetaServiceMockedStatic != null) {
+      roleMetaServiceMockedStatic.close();
     }
   }
 
@@ -476,11 +509,7 @@ public class TestJcasbinAuthorizer {
             ImmutableList.of(
                 buildManageGrantsSecurableObject(
                     metalakeGrantRoleId, MetadataObject.Type.METALAKE, METALAKE)));
-    when(entityStore.get(
-            eq(NameIdentifierUtil.ofRole(METALAKE, metalakeGrantRole.name())),
-            eq(Entity.EntityType.ROLE),
-            eq(RoleEntity.class)))
-        .thenReturn(metalakeGrantRole);
+    roleSecurableObjectsMap.put(metalakeGrantRoleId, metalakeGrantRole.securableObjects());
     when(supportsRelationOperations.listEntitiesByRelation(
             eq(SupportsRelationOperations.Type.ROLE_USER_REL),
             eq(userNameIdentifier),
@@ -503,11 +532,7 @@ public class TestJcasbinAuthorizer {
             ImmutableList.of(
                 buildManageGrantsSecurableObject(
                     catalogGrantRoleId, MetadataObject.Type.CATALOG, "testCatalog")));
-    when(entityStore.get(
-            eq(NameIdentifierUtil.ofRole(METALAKE, catalogGrantRole.name())),
-            eq(Entity.EntityType.ROLE),
-            eq(RoleEntity.class)))
-        .thenReturn(catalogGrantRole);
+    roleSecurableObjectsMap.put(catalogGrantRoleId, catalogGrantRole.securableObjects());
     when(supportsRelationOperations.listEntitiesByRelation(
             eq(SupportsRelationOperations.Type.ROLE_USER_REL),
             eq(userNameIdentifier),
@@ -536,11 +561,7 @@ public class TestJcasbinAuthorizer {
                     tableGrantRoleId,
                     MetadataObject.Type.TABLE,
                     "testCatalog.testSchema.testTable")));
-    when(entityStore.get(
-            eq(NameIdentifierUtil.ofRole(METALAKE, tableGrantRole.name())),
-            eq(Entity.EntityType.ROLE),
-            eq(RoleEntity.class)))
-        .thenReturn(tableGrantRole);
+    roleSecurableObjectsMap.put(tableGrantRoleId, tableGrantRole.securableObjects());
     when(supportsRelationOperations.listEntitiesByRelation(
             eq(SupportsRelationOperations.Type.ROLE_USER_REL),
             eq(userNameIdentifier),

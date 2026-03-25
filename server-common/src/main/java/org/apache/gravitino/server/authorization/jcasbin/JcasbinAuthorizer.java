@@ -27,14 +27,16 @@ import java.nio.charset.StandardCharsets;
 import java.security.Principal;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
-import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Executor;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
+import java.util.stream.Collectors;
 import org.apache.commons.io.IOUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.Configs;
@@ -55,6 +57,7 @@ import org.apache.gravitino.exceptions.NoSuchUserException;
 import org.apache.gravitino.meta.RoleEntity;
 import org.apache.gravitino.meta.UserEntity;
 import org.apache.gravitino.server.authorization.MetadataIdConverter;
+import org.apache.gravitino.storage.relational.service.RoleMetaService;
 import org.apache.gravitino.utils.MetadataObjectUtil;
 import org.apache.gravitino.utils.NameIdentifierUtil;
 import org.apache.gravitino.utils.PrincipalUtils;
@@ -490,47 +493,55 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
         () -> {
           EntityStore entityStore = GravitinoEnv.getInstance().entityStore();
           NameIdentifier userNameIdentifier = NameIdentifierUtil.ofUser(metalake, username);
-          List<RoleEntity> entities;
+          List<RoleEntity> roleStubs;
           try {
-            entities =
+            roleStubs =
                 entityStore
                     .relationOperations()
                     .listEntitiesByRelation(
                         SupportsRelationOperations.Type.ROLE_USER_REL,
                         userNameIdentifier,
                         Entity.EntityType.USER);
-            List<CompletableFuture<Void>> loadRoleFutures = new ArrayList<>();
-            for (RoleEntity role : entities) {
-              Long roleId = role.id();
-              allowEnforcer.addRoleForUser(String.valueOf(userId), String.valueOf(roleId));
-              denyEnforcer.addRoleForUser(String.valueOf(userId), String.valueOf(roleId));
-              if (loadedRoles.getIfPresent(roleId) != null) {
-                continue;
-              }
-              CompletableFuture<Void> loadRoleFuture =
-                  CompletableFuture.supplyAsync(
-                          () -> {
-                            try {
-                              return entityStore.get(
-                                  NameIdentifierUtil.ofRole(metalake, role.name()),
-                                  Entity.EntityType.ROLE,
-                                  RoleEntity.class);
-                            } catch (Exception e) {
-                              throw new RuntimeException("Failed to load role: " + role.name(), e);
-                            }
-                          },
-                          executor)
-                      .thenAcceptAsync(
-                          roleEntity -> {
-                            loadPolicyByRoleEntity(roleEntity);
-                            loadedRoles.put(roleId, true);
-                          },
-                          executor);
-              loadRoleFutures.add(loadRoleFuture);
-            }
-            CompletableFuture.allOf(loadRoleFutures.toArray(new CompletableFuture[0])).join();
           } catch (IOException e) {
             throw new RuntimeException(e);
+          }
+
+          // Register user-role associations in enforcers for all roles.
+          for (RoleEntity role : roleStubs) {
+            allowEnforcer.addRoleForUser(String.valueOf(userId), String.valueOf(role.id()));
+            denyEnforcer.addRoleForUser(String.valueOf(userId), String.valueOf(role.id()));
+          }
+
+          // Collect stubs for roles whose policies have not yet been loaded into the enforcer.
+          List<RoleEntity> unloadedRoleStubs =
+              roleStubs.stream()
+                  .filter(role -> loadedRoles.getIfPresent(role.id()) == null)
+                  .collect(Collectors.toList());
+          if (unloadedRoleStubs.isEmpty()) {
+            return;
+          }
+
+          // Batch-fetch securable objects for all unloaded roles in a single query,
+          // eliminating the N+1 pattern of per-role entityStore.get() calls.
+          List<Long> unloadedRoleIds =
+              unloadedRoleStubs.stream().map(RoleEntity::id).collect(Collectors.toList());
+          Map<Long, List<SecurableObject>> secObjsByRoleId =
+              RoleMetaService.batchListSecurableObjectsForRoles(unloadedRoleIds);
+
+          for (RoleEntity stub : unloadedRoleStubs) {
+            List<SecurableObject> securableObjects =
+                secObjsByRoleId.getOrDefault(stub.id(), Collections.emptyList());
+            RoleEntity fullRole =
+                RoleEntity.builder()
+                    .withId(stub.id())
+                    .withName(stub.name())
+                    .withNamespace(stub.namespace())
+                    .withProperties(stub.properties())
+                    .withAuditInfo(stub.auditInfo())
+                    .withSecurableObjects(securableObjects)
+                    .build();
+            loadPolicyByRoleEntity(fullRole);
+            loadedRoles.put(stub.id(), true);
           }
         });
   }
