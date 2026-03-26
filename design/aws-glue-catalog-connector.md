@@ -587,9 +587,6 @@ Iceberg — Spark requires no code change (generic passthrough).
 | # | Work Item | Description | Priority |
 |---|---|---|---|
 | P2-1 | **Cross-account Glue access** | Support `aws-glue-catalog-id` + STS AssumeRole (`s3-role-arn`) for cross-account access | High |
-| P2-2 | **Hive2 Glue client support** | Add `aws-glue-datacatalog-hive2-client` to `hive-metastore2-libs` for Hive2 environments | Medium |
-| P2-3 | **Glue Table Filter** | Filter Iceberg tables from Hive catalog (`Parameters["table_type"]="ICEBERG"` hidden) to avoid confusion | Medium |
-| P2-4 | **VPC Endpoint support** | Validate `aws-glue-endpoint` for VPC private link scenarios, add integration tests | Medium |
-| P2-5 | **Paimon / Hudi on Glue** | Extend Glue support to Paimon, Hudi, and other lakehouse formats | Low |
-| P2-6 | **Unified Catalog experience** | Investigate single Gravitino catalog exposing both Hive and Iceberg tables (requires routing layer in Trino/Spark connectors) | Low |
-| P2-7 | **AWS Lake Formation integration** | Integrate Lake Formation fine-grained access control into Gravitino's authorization module | Low |
+| P2-2 | **Glue Table Filter** | Filter Iceberg tables from Hive catalog (`Parameters["table_type"]="ICEBERG"` hidden) to avoid confusion | Medium |
+| P2-3 | **VPC Endpoint support** | Validate `aws-glue-endpoint` for VPC private link scenarios, add integration tests | Medium |
+| P2-4 | **Paimon / Hudi on Glue** | Extend Glue support to Paimon, Hudi, and other lakehouse formats | Low |
