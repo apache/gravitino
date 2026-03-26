@@ -1300,41 +1300,58 @@ public class ClickHouseTableOperations extends JdbcTableOperations {
   private int getGranularity(
       Map<String, String> indexProperties, Index.IndexType indexType, String indexName) {
     int defaultGranularity = getDefaultGranularity(indexType);
-    if (MapUtils.isEmpty(indexProperties)) {
+    if (shouldReturnDefaultGranularity(indexProperties)) {
       return defaultGranularity;
     }
 
-    for (String propertyKey : indexProperties.keySet()) {
-      if (StringUtils.equalsIgnoreCase(propertyKey, GRANULARITY)
-          && !StringUtils.equals(propertyKey, GRANULARITY)) {
-        throw new IllegalArgumentException(
-            "Index '%s' has unsupported property key '%s'. Use lowercase '%s'."
-                .formatted(indexName, propertyKey, GRANULARITY));
+    validateGranularityKeyCase(indexProperties, indexName);
+    return parsePositiveGranularity(indexProperties.get(GRANULARITY), indexName);
+  }
+
+  private boolean shouldReturnDefaultGranularity(Map<String, String> indexProperties) {
+    if (MapUtils.isEmpty(indexProperties)) {
+      return true;
+    }
+
+    for (String key : indexProperties.keySet()) {
+      if (StringUtils.equalsIgnoreCase(key, GRANULARITY)) {
+        return false;
       }
     }
+    return true;
+  }
 
-    String granularityValue = indexProperties.get(GRANULARITY);
+  private void validateGranularityKeyCase(Map<String, String> indexProperties, String indexName) {
+    for (String key : indexProperties.keySet()) {
+      if (StringUtils.equalsIgnoreCase(key, GRANULARITY) && !StringUtils.equals(key, GRANULARITY)) {
+        throw new IllegalArgumentException(
+            "Index '%s' has unsupported property key '%s'. Use lowercase '%s'."
+                .formatted(indexName, key, GRANULARITY));
+      }
+    }
+  }
+
+  private int parsePositiveGranularity(String granularityValue, String indexName) {
+    String message =
+        "Invalid %s value '%s' for index '%s'. It must be a positive integer."
+            .formatted(GRANULARITY, granularityValue, indexName);
+
     if (StringUtils.isBlank(granularityValue)) {
-      return defaultGranularity;
+      throw new IllegalArgumentException(message);
     }
 
-    int parsedGranularity;
+    final int parsed;
     try {
-      parsedGranularity = Integer.parseInt(granularityValue.trim());
+      parsed = Integer.parseInt(granularityValue.trim());
     } catch (NumberFormatException e) {
-      throw new IllegalArgumentException(
-          "Invalid %s value '%s' for index '%s'. It must be a positive integer."
-              .formatted(GRANULARITY, granularityValue, indexName),
-          e);
+      throw new IllegalArgumentException(message, e);
     }
 
-    Preconditions.checkArgument(
-        parsedGranularity > 0,
-        "Invalid %s value '%s' for index '%s'. It must be a positive integer.",
-        GRANULARITY,
-        granularityValue,
-        indexName);
-    return parsedGranularity;
+    if (parsed <= 0) {
+      throw new IllegalArgumentException(message);
+    }
+
+    return parsed;
   }
 
   private int getDefaultGranularity(Index.IndexType indexType) {
