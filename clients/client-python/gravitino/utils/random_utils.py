@@ -15,14 +15,24 @@
 # specific language governing permissions and limitations
 # under the License.
 
-from gravitino.utils.http_client import HTTPClient, Response, unpack
-from gravitino.utils.random_utils import RandomStringUtils
-from gravitino.utils.string_utils import StringUtils
 
-__all__ = [
-    "Response",
-    "HTTPClient",
-    "unpack",
-    "StringUtils",
-    "RandomStringUtils",
-]
+from __future__ import annotations
+
+import random
+import string
+
+
+class RandomStringUtils:
+    @staticmethod
+    def random_string(length: int = 8) -> str:
+        """
+        Generate a random string of specified length.
+
+        Args:
+            length (int, optional): The length of string. Defaults to 8.
+
+        Returns:
+            str: The random string.
+        """
+        chars = string.ascii_letters + string.digits
+        return "".join(random.choices(chars, k=length))

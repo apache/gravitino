@@ -15,6 +15,10 @@
 # specific language governing permissions and limitations
 # under the License.
 
+from __future__ import annotations
+
+import typing as tp
+
 from gravitino.api.catalog import Catalog
 from gravitino.api.catalog_change import CatalogChange
 from gravitino.api.job.job_template import JobTemplate, JobType
@@ -30,6 +34,7 @@ from gravitino.api.job.job_template_change import (
 from gravitino.api.job.shell_job_template import ShellJobTemplate
 from gravitino.api.job.spark_job_template import SparkJobTemplate
 from gravitino.api.metalake_change import MetalakeChange
+from gravitino.api.tag.tag_change import TagChange
 from gravitino.client.fileset_catalog import FilesetCatalog
 from gravitino.client.generic_model_catalog import GenericModelCatalog
 from gravitino.client.relational_catalog import RelationalCatalog
@@ -48,6 +53,7 @@ from gravitino.dto.requests.job_template_update_request import (
     UpdateJobTemplateContentRequest,
 )
 from gravitino.dto.requests.metalake_update_request import MetalakeUpdateRequest
+from gravitino.dto.requests.tag_update_request import TagUpdateRequest
 from gravitino.namespace import Namespace
 from gravitino.utils import HTTPClient
 
@@ -285,3 +291,44 @@ class DTOConverters:
             return UpdateJobTemplateContentRequest(template_update_dto)
 
         raise ValueError(f"Unknown change type: {type(change).__name__}")
+
+    @staticmethod
+    def to_tag_update_request(
+        change: TagChange,
+    ) -> tp.Union[
+        TagUpdateRequest.RenameTagRequest,
+        TagUpdateRequest.UpdateTagCommentRequest,
+        TagUpdateRequest.SetTagPropertyRequest,
+        TagUpdateRequest.RemoveTagPropertyRequest,
+    ]:
+        """
+        Convert the tag change to the corresponding tag update request.
+
+        Args:
+            change (TagChange): The tag change.
+
+        Raises:
+            ValueError: if the change type is not supported.
+
+        Returns:
+            tp.Union[ TagUpdateRequest.RenameTagRequest,
+            TagUpdateRequest.UpdateTagCommentRequest,
+            TagUpdateRequest.SetTagPropertyRequest,
+            TagUpdateRequest.RemoveTagPropertyRequest,
+            ]:  The tag update request.
+        """
+        if isinstance(change, TagChange.RenameTag):
+            return TagUpdateRequest.RenameTagRequest(change.new_name)
+
+        if isinstance(change, TagChange.UpdateTagComment):
+            return TagUpdateRequest.UpdateTagCommentRequest(change.new_comment)
+
+        if isinstance(change, TagChange.SetProperty):
+            return TagUpdateRequest.SetTagPropertyRequest(
+                change.name,
+                change.value,
+            )
+        if isinstance(change, TagChange.RemoveProperty):
+            return TagUpdateRequest.RemoveTagPropertyRequest(change.removed_property)
+
+        raise ValueError(f"Unknown change type: {type(change)}")
