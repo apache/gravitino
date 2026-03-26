@@ -63,8 +63,6 @@ dependencies {
     exclude(group = "org.apache.parquet", module = "parquet-hadoop-bundle")
     exclude(group = "org.datanucleus")
     exclude(group = "org.eclipse.jetty")
-    exclude(group = "org.eclipse.jetty.aggregate", module = "jetty-all")
-    exclude(group = "org.eclipse.jetty.orbit", module = "javax.servlet")
     exclude(group = "org.openjdk.jol")
     exclude(group = "org.slf4j")
   }
