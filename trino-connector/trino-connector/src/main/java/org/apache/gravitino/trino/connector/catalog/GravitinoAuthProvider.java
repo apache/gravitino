@@ -44,24 +44,23 @@ class GravitinoAuthProvider {
       GravitinoClientConfiguration.GRAVITINO_CLIENT_CONFIG_PREFIX + "authType";
 
   /** Simple authentication user configuration key. */
-  static final String SIMPLE_AUTH_USER_KEY =
-      GravitinoClientConfiguration.GRAVITINO_CLIENT_CONFIG_PREFIX + "simpleAuthUser";
+  static final String SIMPLE_AUTH_USER_KEY = "gravitino.user";
 
-  /** OAuth server URI configuration key. */
+  /** OAuth2 server URI configuration key. */
   static final String OAUTH_SERVER_URI_KEY =
-      GravitinoClientConfiguration.GRAVITINO_CLIENT_CONFIG_PREFIX + "oauth.serverUri";
+      GravitinoClientConfiguration.GRAVITINO_CLIENT_CONFIG_PREFIX + "oauth2.serverUri";
 
-  /** OAuth credential configuration key. */
+  /** OAuth2 credential configuration key. */
   static final String OAUTH_CREDENTIAL_KEY =
-      GravitinoClientConfiguration.GRAVITINO_CLIENT_CONFIG_PREFIX + "oauth.credential";
+      GravitinoClientConfiguration.GRAVITINO_CLIENT_CONFIG_PREFIX + "oauth2.credential";
 
-  /** OAuth path configuration key. */
+  /** OAuth2 path configuration key. */
   static final String OAUTH_PATH_KEY =
-      GravitinoClientConfiguration.GRAVITINO_CLIENT_CONFIG_PREFIX + "oauth.path";
+      GravitinoClientConfiguration.GRAVITINO_CLIENT_CONFIG_PREFIX + "oauth2.path";
 
-  /** OAuth scope configuration key. */
+  /** OAuth2 scope configuration key. */
   static final String OAUTH_SCOPE_KEY =
-      GravitinoClientConfiguration.GRAVITINO_CLIENT_CONFIG_PREFIX + "oauth.scope";
+      GravitinoClientConfiguration.GRAVITINO_CLIENT_CONFIG_PREFIX + "oauth2.scope";
 
   /** Kerberos principal configuration key. */
   static final String KERBEROS_PRINCIPAL_KEY =
@@ -74,7 +73,7 @@ class GravitinoAuthProvider {
   /** Authentication types supported by the Trino connector. */
   enum AuthType {
     SIMPLE,
-    OAUTH,
+    OAUTH2,
     KERBEROS,
     NONE
   }
@@ -102,16 +101,16 @@ class GravitinoAuthProvider {
       } catch (IllegalArgumentException e) {
         throw new IllegalArgumentException(
             String.format(
-                "Invalid authentication type: %s. Valid values are: simple, oauth, kerberos, none",
+                "Invalid authentication type: %s. Valid values are: simple, oauth2, kerberos, none",
                 authTypeStr),
             e);
       }
 
       switch (authType) {
         case SIMPLE:
-          buildSimpleAuth(builder, clientConfig);
+          buildSimpleAuth(builder, config.getUser());
           break;
-        case OAUTH:
+        case OAUTH2:
           builder.withOAuth(buildOAuthProvider(clientConfig));
           break;
         case KERBEROS:
@@ -125,7 +124,6 @@ class GravitinoAuthProvider {
 
     // Remove auth-specific keys before passing to withClientConfig
     clientConfig.remove(AUTH_TYPE_KEY);
-    clientConfig.remove(SIMPLE_AUTH_USER_KEY);
     clientConfig.remove(OAUTH_SERVER_URI_KEY);
     clientConfig.remove(OAUTH_CREDENTIAL_KEY);
     clientConfig.remove(OAUTH_PATH_KEY);
@@ -138,8 +136,7 @@ class GravitinoAuthProvider {
   }
 
   private static void buildSimpleAuth(
-      GravitinoAdminClient.AdminClientBuilder builder, Map<String, String> clientConfig) {
-    String simpleUser = clientConfig.get(SIMPLE_AUTH_USER_KEY);
+      GravitinoAdminClient.AdminClientBuilder builder, String simpleUser) {
     if (StringUtils.isNotBlank(simpleUser)) {
       builder.withSimpleAuth(simpleUser);
     } else {
@@ -174,21 +171,12 @@ class GravitinoAuthProvider {
     String normalizedPath = path.startsWith("/") ? path.substring(1) : path;
 
     LOG.info("Initializing OAuth2 token provider with server URI: {}", serverUri);
-    try {
-      return DefaultOAuth2TokenProvider.builder()
-          .withUri(serverUri)
-          .withCredential(credential)
-          .withPath(normalizedPath)
-          .withScope(scope)
-          .build();
-    } catch (Exception e) {
-      throw new IllegalStateException(
-          String.format(
-              "Failed to initialize OAuth2 token provider for server URI '%s'. "
-                  + "Check that the server is reachable and credentials are correct.",
-              serverUri),
-          e);
-    }
+    return DefaultOAuth2TokenProvider.builder()
+        .withUri(serverUri)
+        .withCredential(credential)
+        .withPath(normalizedPath)
+        .withScope(scope)
+        .build();
   }
 
   private static KerberosTokenProvider buildKerberosProvider(Map<String, String> config) {
@@ -207,7 +195,21 @@ class GravitinoAuthProvider {
       File keytabFile = new File(keytabFilePath);
       if (!keytabFile.exists()) {
         throw new IllegalArgumentException(
-            String.format("Keytab file not found: %s", keytabFilePath));
+            String.format(
+                "Keytab file configured via %s does not exist: %s",
+                KERBEROS_KEYTAB_FILE_PATH_KEY, keytabFilePath));
+      }
+      if (!keytabFile.isFile()) {
+        throw new IllegalArgumentException(
+            String.format(
+                "Keytab path configured via %s is not a file: %s",
+                KERBEROS_KEYTAB_FILE_PATH_KEY, keytabFilePath));
+      }
+      if (!keytabFile.canRead()) {
+        throw new IllegalArgumentException(
+            String.format(
+                "Keytab file configured via %s is not readable: %s",
+                KERBEROS_KEYTAB_FILE_PATH_KEY, keytabFilePath));
       }
       kerberosBuilder.withKeyTabFile(keytabFile);
     } else {

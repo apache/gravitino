@@ -26,7 +26,6 @@ import java.io.File;
 import java.io.IOException;
 import java.nio.file.Files;
 import org.apache.gravitino.trino.connector.GravitinoConfig;
-import org.junit.jupiter.api.Assumptions;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
@@ -81,7 +80,7 @@ public class TestGravitinoAuthProvider {
             GravitinoAuthProvider.buildClient(
                 buildConfig(
                     ImmutableMap.of(
-                        GravitinoAuthProvider.AUTH_TYPE_KEY, "oauth",
+                        GravitinoAuthProvider.AUTH_TYPE_KEY, "oauth2",
                         GravitinoAuthProvider.OAUTH_CREDENTIAL_KEY, "cred",
                         GravitinoAuthProvider.OAUTH_PATH_KEY, "oauth2/token",
                         GravitinoAuthProvider.OAUTH_SCOPE_KEY, "scope"))));
@@ -95,7 +94,7 @@ public class TestGravitinoAuthProvider {
             GravitinoAuthProvider.buildClient(
                 buildConfig(
                     ImmutableMap.of(
-                        GravitinoAuthProvider.AUTH_TYPE_KEY, "oauth",
+                        GravitinoAuthProvider.AUTH_TYPE_KEY, "oauth2",
                         GravitinoAuthProvider.OAUTH_SERVER_URI_KEY, "http://auth.example.com",
                         GravitinoAuthProvider.OAUTH_PATH_KEY, "oauth2/token",
                         GravitinoAuthProvider.OAUTH_SCOPE_KEY, "scope"))));
@@ -127,9 +126,6 @@ public class TestGravitinoAuthProvider {
   @Test
   public void testBuildClientKerberosWithKeytab(@TempDir java.nio.file.Path tempDir)
       throws IOException {
-    // KerberosTokenProvider.build() calls Subject.getSubject(AccessController.getContext())
-    // which throws UnsupportedOperationException on JVM 17+.
-    Assumptions.assumeTrue(Runtime.version().feature() < 17, "Kerberos test skipped on JVM 17+");
     File keytabFile = tempDir.resolve("user.keytab").toFile();
     Files.write(keytabFile.toPath(), new byte[0]);
     assertDoesNotThrow(

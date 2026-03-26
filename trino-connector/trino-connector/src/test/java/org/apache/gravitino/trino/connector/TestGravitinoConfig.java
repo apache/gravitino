@@ -159,13 +159,13 @@ public class TestGravitinoConfig {
             metalake,
             "gravitino.client.authType",
             "simple",
-            "gravitino.client.simpleAuthUser",
+            "gravitino.user",
             "admin");
     GravitinoConfig config = new GravitinoConfig(configMap);
 
     String catalogConfig = config.toCatalogConfig();
     assertTrue(catalogConfig.contains("\"gravitino.client.authType\"='simple'"));
-    assertTrue(catalogConfig.contains("\"gravitino.client.simpleAuthUser\"='admin'"));
+    assertTrue(catalogConfig.contains("\"gravitino.user\"='admin'"));
   }
 
   private static boolean skipCatalog(String catalogName, GravitinoConfig config) {
