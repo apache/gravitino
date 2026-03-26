@@ -35,7 +35,10 @@ This capability allows users to perform federation queries, accessing data from 
 | table.catalog-store.kind                         | string | generic_in_memory | The Catalog Store name, it should set to `gravitino`.                | Yes      | 0.6.0-incubating |
 | table.catalog-store.gravitino.gravitino.metalake | string | (none)            | The metalake name that flink connector used to request to Gravitino. | Yes      | 0.6.0-incubating |
 | table.catalog-store.gravitino.gravitino.uri      | string | (none)            | The uri of Gravitino server address.                                 | Yes      | 0.6.0-incubating |
+| table.catalog-store.gravitino.gravitino.allow.third-party-connector.list | string | (none) | List of allowed third-party connectors, separated by commas. | No | 1.3.0            |
 | table.catalog-store.gravitino.gravitino.client.  | string | (none)            | The configuration key prefix for the Gravitino client config.        | No       | 1.0.0            |
+
+The `table.catalog-store.gravitino.gravitino.allow.third-party-connector.list` configuration allows you to specify a comma-separated list of catalog types. Catalogs created with these types will be stored in Flink's in-memory catalog store and will not be managed by Gravitino. This is useful for using standard Flink connectors (like `jdbc`, `hive`) that you do not wish to be governed by Gravitino.
 
 To configure the Gravitino client, use properties prefixed with `table.catalog-store.gravitino.gravitino.client.`. These properties will be passed to the Gravitino client after removing the `table.catalog-store.gravitino.` prefix.
 
@@ -48,6 +51,7 @@ Set the flink configuration in flink-conf.yaml.
 table.catalog-store.kind: gravitino
 table.catalog-store.gravitino.gravitino.metalake: metalake_demo
 table.catalog-store.gravitino.gravitino.uri: http://localhost:8090
+table.catalog-store.gravitino.gravitino.allow.third-party-connector.list: hive,jdbc
 table.catalog-store.gravitino.gravitino.client.socketTimeoutMs: 60000
 table.catalog-store.gravitino.gravitino.client.connectionTimeoutMs: 60000
 ```
@@ -57,6 +61,7 @@ final Configuration configuration = new Configuration();
 configuration.setString("table.catalog-store.kind", "gravitino");
 configuration.setString("table.catalog-store.gravitino.gravitino.metalake", "metalake_demo");
 configuration.setString("table.catalog-store.gravitino.gravitino.uri", "http://localhost:8090");
+configuration.setString("table.catalog-store.gravitino.gravitino.allow.third-party-connector.list", "hive,jdbc");
 configuration.setString("table.catalog-store.gravitino.gravitino.client.socketTimeoutMs", "60000");
 configuration.setString("table.catalog-store.gravitino.gravitino.client.connectionTimeoutMs", "60000");
 EnvironmentSettings.Builder builder = EnvironmentSettings.newInstance().withConfiguration(configuration);
