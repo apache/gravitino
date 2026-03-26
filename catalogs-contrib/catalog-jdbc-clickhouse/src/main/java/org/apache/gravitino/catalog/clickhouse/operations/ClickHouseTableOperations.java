@@ -31,6 +31,7 @@ import static org.apache.gravitino.rel.Column.DEFAULT_VALUE_NOT_SET;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
+import com.google.common.collect.ImmutableMap;
 import java.sql.Connection;
 import java.sql.DatabaseMetaData;
 import java.sql.PreparedStatement;
@@ -1276,9 +1277,9 @@ public class ClickHouseTableOperations extends JdbcTableOperations {
             if (ArrayUtils.isEmpty(fields)) {
               continue;
             }
-            Map<String, String> indexProperties = new HashMap<>();
+            Map<String, String> indexProperties = ImmutableMap.of();
             if (StringUtils.isNotBlank(granularity)) {
-              indexProperties.put(GRANULARITY, granularity);
+              indexProperties = ImmutableMap.of(GRANULARITY, granularity);
             }
             secondaryIndexes.add(
                 Indexes.of(getClickHouseIndexType(type), name, fields, indexProperties));
