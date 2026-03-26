@@ -15,12 +15,29 @@
 # specific language governing permissions and limitations
 # under the License.
 
-from gravitino.dto.rel.json_serdes.column_position_serdes import ColumnPositionSerdes
-from gravitino.dto.rel.json_serdes.distribution_serdes import DistributionSerDes
-from gravitino.dto.rel.json_serdes.sort_order_serdes import SortOrderSerdes
 
-__all__ = [
-    "ColumnPositionSerdes",
-    "DistributionSerDes",
-    "SortOrderSerdes",
-]
+class StringUtils:
+    @classmethod
+    def is_blank(cls, s: str) -> bool:
+        """Checks if a string is blank (null, empty, or only whitespace).
+
+        Args:
+            s: The string to check.
+
+        Returns:
+            True if the string is blank, False otherwise.
+        """
+        return s is None or s.strip() == ""
+
+    @classmethod
+    def is_not_blank(cls, s: str) -> bool:
+        """
+        Checks if a string is not blank (not null, not empty, and not only whitespace).
+
+        Args:
+            s (str): The string to check.
+
+        Returns:
+            bool: True if the string is not blank, False otherwise.
+        """
+        return not cls.is_blank(s)

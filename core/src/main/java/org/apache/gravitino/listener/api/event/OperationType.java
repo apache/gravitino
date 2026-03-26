@@ -69,6 +69,8 @@ public enum OperationType {
   ALTER_CATALOG,
   LOAD_CATALOG,
   LIST_CATALOG,
+  ENABLE_CATALOG,
+  DISABLE_CATALOG,
 
   // Partition event
   ADD_PARTITION,
@@ -92,6 +94,8 @@ public enum OperationType {
   LIST_METALAKE,
   DROP_METALAKE,
   LOAD_METALAKE,
+  ENABLE_METALAKE,
+  DISABLE_METALAKE,
 
   // View event
   CREATE_VIEW,
