@@ -24,6 +24,11 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import java.util.Arrays;
+import org.apache.flink.configuration.Configuration;
+import org.apache.flink.table.catalog.CatalogDescriptor;
+import org.apache.flink.table.catalog.CommonCatalogOptions;
+import org.apache.flink.table.catalog.GenericInMemoryCatalogStore;
 import org.apache.flink.table.catalog.exceptions.CatalogException;
 import org.apache.gravitino.flink.connector.catalog.GravitinoCatalogManager;
 import org.junit.Before;
@@ -31,12 +36,17 @@ import org.junit.Test;
 
 public class TestGravitinoCatalogStore {
   private GravitinoCatalogManager gravitinoCatalogMockManager;
+  private GenericInMemoryCatalogStore memoryCatalogStore;
   private GravitinoCatalogStore gravitinoCatalogStore;
 
   @Before
   public void setupCatalogStore() {
     gravitinoCatalogMockManager = mock(GravitinoCatalogManager.class);
-    gravitinoCatalogStore = new GravitinoCatalogStore(gravitinoCatalogMockManager);
+    memoryCatalogStore = new GenericInMemoryCatalogStore();
+    memoryCatalogStore.open();
+    gravitinoCatalogStore =
+        new GravitinoCatalogStore(
+            gravitinoCatalogMockManager, memoryCatalogStore, Arrays.asList("filesystem", "jdbc"));
   }
 
   @Test
@@ -93,5 +103,36 @@ public class TestGravitinoCatalogStore {
       assertTrue("Expected cause to be RuntimeException", e.getCause() instanceof RuntimeException);
     }
     verify(gravitinoCatalogMockManager).dropCatalog(catalogName);
+  }
+
+  @Test
+  public void testStoreJdbcCatalog() {
+    String catalogName = "testJdbcCatalog";
+    Configuration conf = new Configuration();
+    conf.set(CommonCatalogOptions.CATALOG_TYPE, "jdbc");
+    conf.setString("url", "jdbc:mysql://localhost:3306/test");
+    conf.setString("username", "test");
+    conf.setString("password", "test");
+    CatalogDescriptor descriptor = CatalogDescriptor.of(catalogName, conf);
+
+    gravitinoCatalogStore.storeCatalog(catalogName, descriptor);
+    assertTrue(gravitinoCatalogStore.contains(catalogName));
+    assertTrue(memoryCatalogStore.contains(catalogName));
+  }
+
+  @Test
+  public void testStoreHiveCatalogWithException() {
+    String catalogName = "testHiveCatalog";
+    Configuration conf = new Configuration();
+    conf.set(CommonCatalogOptions.CATALOG_TYPE, "hive");
+    conf.setString("hive-conf-dir", "/tmp");
+    CatalogDescriptor descriptor = CatalogDescriptor.of(catalogName, conf);
+
+    try {
+      gravitinoCatalogStore.storeCatalog(catalogName, descriptor);
+      fail("Should throw RuntimeException");
+    } catch (RuntimeException e) {
+      assertTrue(e.getMessage().contains("Failed to correctly match the Flink catalog factory."));
+    }
   }
 }

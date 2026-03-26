@@ -40,7 +40,11 @@ public class GravitinoCatalogStoreFactoryOptions {
           .stringType()
           .noDefaultValue()
           .withDescription("The name of Gravitino metalake");
-
+  public static final ConfigOption<String> GRAVITINO_ALLOW_THIRD_PARTY_CONNECTOR_LIST_CONFIG =
+      ConfigOptions.key("gravitino.allow.third-party-connector.list")
+          .stringType()
+          .noDefaultValue()
+          .withDescription("List of allow third-party connector of Gravitino, separated by commas");
   public static final ConfigOption<Map<String, String>> GRAVITINO_CLIENT_CONFIG =
       ConfigOptions.key("gravitino.client")
           .mapType()

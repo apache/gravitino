@@ -21,6 +21,7 @@ package org.apache.gravitino.flink.connector.store;
 
 import static org.apache.flink.table.factories.FactoryUtil.createCatalogStoreFactoryHelper;
 import static org.apache.gravitino.flink.connector.store.GravitinoCatalogStoreFactoryOptions.GRAVITINO;
+import static org.apache.gravitino.flink.connector.store.GravitinoCatalogStoreFactoryOptions.GRAVITINO_ALLOW_THIRD_PARTY_CONNECTOR_LIST_CONFIG;
 import static org.apache.gravitino.flink.connector.store.GravitinoCatalogStoreFactoryOptions.GRAVITINO_CLIENT_CONFIG;
 import static org.apache.gravitino.flink.connector.store.GravitinoCatalogStoreFactoryOptions.GRAVITINO_METALAKE;
 import static org.apache.gravitino.flink.connector.store.GravitinoCatalogStoreFactoryOptions.GRAVITINO_URI;
@@ -28,29 +29,40 @@ import static org.apache.gravitino.flink.connector.store.GravitinoCatalogStoreFa
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableSet;
+import java.util.Arrays;
+import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Collectors;
 import org.apache.flink.configuration.ConfigOption;
 import org.apache.flink.configuration.ReadableConfig;
 import org.apache.flink.table.catalog.CatalogStore;
+import org.apache.flink.table.catalog.GenericInMemoryCatalogStore;
 import org.apache.flink.table.catalog.exceptions.CatalogException;
 import org.apache.flink.table.factories.CatalogStoreFactory;
 import org.apache.flink.table.factories.FactoryUtil;
 import org.apache.gravitino.client.GravitinoClientConfiguration;
 import org.apache.gravitino.flink.connector.catalog.GravitinoCatalogManager;
+import org.apache.gravitino.flink.connector.utils.FactoryUtils;
 
 /** The Factory for creating {@link GravitinoCatalogStore}. */
 public class GravitinoCatalogStoreFactory implements CatalogStoreFactory {
+
   private GravitinoCatalogManager catalogManager;
+  private GenericInMemoryCatalogStore memoryCatalogStore;
+  private List<String> allowThirdPartyConnectors;
 
   @Override
   public CatalogStore createCatalogStore() {
-    return new GravitinoCatalogStore(catalogManager);
+    return new GravitinoCatalogStore(catalogManager, memoryCatalogStore, allowThirdPartyConnectors);
   }
 
   @Override
   public void open(Context context) throws CatalogException {
+    this.memoryCatalogStore = new GenericInMemoryCatalogStore();
+    this.memoryCatalogStore.open();
+
     FactoryUtil.FactoryHelper<CatalogStoreFactory> factoryHelper =
         createCatalogStoreFactoryHelper(this, context);
     factoryHelper.validate();
@@ -64,6 +76,21 @@ public class GravitinoCatalogStoreFactory implements CatalogStoreFactory {
         "Both %s and %s must be set",
         GRAVITINO_URI.key(),
         GRAVITINO_METALAKE.key());
+    allowThirdPartyConnectors =
+        Arrays.asList(
+                Optional.ofNullable(options.get(GRAVITINO_ALLOW_THIRD_PARTY_CONNECTOR_LIST_CONFIG))
+                    .map(s -> s.split(","))
+                    .orElse(new String[] {}))
+            .stream()
+            .map(String::trim)
+            .filter(s -> !s.isEmpty())
+            .collect(Collectors.toList());
+
+    Preconditions.checkArgument(
+        allowThirdPartyConnectors.stream().noneMatch(FactoryUtils.gravitinoFactoryList::contains),
+        "The allowed third party connectors %s should not contain Gravitino connectors %s.",
+        allowThirdPartyConnectors,
+        FactoryUtils.gravitinoFactoryList);
 
     this.catalogManager =
         GravitinoCatalogManager.create(gravitinoUri, gravitinoName, extractClientConfig(options));
@@ -71,6 +98,9 @@ public class GravitinoCatalogStoreFactory implements CatalogStoreFactory {
 
   @Override
   public void close() throws CatalogException {
+    if (memoryCatalogStore != null) {
+      memoryCatalogStore.close();
+    }
     if (catalogManager != null) {
       catalogManager.close();
     }
@@ -88,7 +118,8 @@ public class GravitinoCatalogStoreFactory implements CatalogStoreFactory {
 
   @Override
   public Set<ConfigOption<?>> optionalOptions() {
-    return ImmutableSet.of(GRAVITINO_CLIENT_CONFIG);
+    return ImmutableSet.of(
+        GRAVITINO_CLIENT_CONFIG, GRAVITINO_ALLOW_THIRD_PARTY_CONNECTOR_LIST_CONFIG);
   }
 
   @VisibleForTesting

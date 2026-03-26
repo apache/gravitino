@@ -21,12 +21,17 @@ package org.apache.gravitino.flink.connector.utils;
 import static org.apache.flink.table.factories.FactoryUtil.validateFactoryOptions;
 import static org.apache.flink.table.factories.FactoryUtil.validateWatermarkOptions;
 
+import com.google.common.collect.ImmutableList;
 import java.util.HashSet;
 import java.util.Set;
 import java.util.stream.Collectors;
 import org.apache.flink.table.factories.CatalogFactory;
 import org.apache.flink.table.factories.Factory;
 import org.apache.flink.table.factories.FactoryUtil;
+import org.apache.gravitino.flink.connector.hive.GravitinoHiveCatalogFactoryOptions;
+import org.apache.gravitino.flink.connector.iceberg.GravitinoIcebergCatalogFactoryOptions;
+import org.apache.gravitino.flink.connector.jdbc.GravitinoJdbcCatalogFactoryOptions;
+import org.apache.gravitino.flink.connector.paimon.GravitinoPaimonCatalogFactoryOptions;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -35,6 +40,16 @@ public class FactoryUtils {
   private FactoryUtils() {}
 
   private static final Logger LOG = LoggerFactory.getLogger(FactoryUtils.class);
+
+  /** The list of Gravitino catalog factory identifiers. */
+  public static final ImmutableList<String> gravitinoFactoryList =
+      ImmutableList.<String>builder()
+          .add(GravitinoHiveCatalogFactoryOptions.IDENTIFIER)
+          .add(GravitinoIcebergCatalogFactoryOptions.IDENTIFIER)
+          .add(GravitinoJdbcCatalogFactoryOptions.MYSQL_IDENTIFIER)
+          .add(GravitinoJdbcCatalogFactoryOptions.POSTGRESQL_IDENTIFIER)
+          .add(GravitinoPaimonCatalogFactoryOptions.IDENTIFIER)
+          .build();
 
   /**
    * Utility for working with {@link Factory}s. The {@link GravitinoCatalogFactoryHelper} override
