@@ -21,7 +21,6 @@ package org.apache.gravitino.trino.connector;
 import static io.trino.spi.StandardErrorCode.NOT_SUPPORTED;
 
 import com.google.common.base.Splitter;
-import com.google.common.collect.ImmutableSet;
 import io.trino.spi.TrinoException;
 import java.io.FileInputStream;
 import java.io.IOException;
@@ -31,7 +30,6 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Properties;
-import java.util.Set;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 import org.apache.commons.lang3.StringUtils;
@@ -145,14 +143,6 @@ public class GravitinoConfig {
 
   private static final ConfigEntry GRAVITINO_CLIENT_CONFIG_PREFIX =
       new ConfigEntry("gravitino.client.", "The config prefix for Grivitino client", "", false);
-
-  /**
-   * Sensitive client config keys that should be excluded from the catalog config string to avoid
-   * leaking secrets into Trino catalog metadata and logs.
-   */
-  private static final Set<String> SENSITIVE_CLIENT_CONFIG_KEYS =
-      ImmutableSet.of(
-          "gravitino.client.oauth2.credential", "gravitino.client.kerberos.keytabFilePath");
 
   private static final ConfigEntry GRAVITINO_TRINO_SKIP_CATALOG_PATTERNS =
       new ConfigEntry(
@@ -349,11 +339,9 @@ public class GravitinoConfig {
         stringList.add(String.format("\"%s\"='%s'", entry.getKey(), value));
       }
     }
-    // copy the configuration by the prefix of GRAVITINO_CLIENT_CONFIG_PREFIX,
-    // excluding sensitive keys that should not appear in catalog metadata or logs
+    // copy the configuration by the prefix of GRAVITINO_CLIENT_CONFIG_PREFIX
     config.entrySet().stream()
         .filter(entry -> entry.getKey().startsWith(GRAVITINO_CLIENT_CONFIG_PREFIX.key))
-        .filter(entry -> !SENSITIVE_CLIENT_CONFIG_KEYS.contains(entry.getKey()))
         .forEach(
             entry ->
                 stringList.add(String.format("\"%s\"='%s'", entry.getKey(), entry.getValue())));
