@@ -177,6 +177,8 @@ public abstract class FlinkCommonIT extends FlinkEnvIT {
           String schema = "test_list_schema";
           String schema2 = "test_list_schema2";
           String schema3 = "test_list_schema3";
+          String[] initialSchemas = catalog.asSchemas().listSchemas();
+          Arrays.sort(initialSchemas);
 
           try {
             TestUtils.assertTableResult(
@@ -204,7 +206,9 @@ public abstract class FlinkCommonIT extends FlinkEnvIT {
             catalog.asSchemas().dropSchema(schema, supportDropCascade());
             catalog.asSchemas().dropSchema(schema2, supportDropCascade());
             catalog.asSchemas().dropSchema(schema3, supportDropCascade());
-            Assertions.assertEquals(1, catalog.asSchemas().listSchemas().length);
+            String[] remainingSchemas = catalog.asSchemas().listSchemas();
+            Arrays.sort(remainingSchemas);
+            Assertions.assertArrayEquals(initialSchemas, remainingSchemas);
           }
         });
   }
