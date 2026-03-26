@@ -37,11 +37,11 @@ After this feature is implemented:
    ```bash
    # Hive-format tables
    gcli catalog create --name hive_on_glue --provider hive \
-     --properties metastore-type=glue,s3-region=us-east-1
+     --properties metastore-type=glue,aws-region=us-east-1
 
    # Iceberg-format tables
    gcli catalog create --name iceberg_on_glue --provider lakehouse-iceberg \
-     --properties catalog-backend=glue,warehouse=s3://bucket/iceberg,s3-region=us-east-1
+     --properties catalog-backend=glue,warehouse=s3://bucket/iceberg,aws-region=us-east-1
    ```
 
 2. **Standard Gravitino API works against Glue catalogs**:
@@ -62,6 +62,7 @@ After this feature is implemented:
 AWS Glue Data Catalog is a managed metadata repository storing:
 - **Databases** — logical groupings, equivalent to Gravitino schemas.
 - **Tables** — metadata records containing column definitions, storage descriptors, partition keys, and user-defined parameters.
+- **Views** — virtual tables defined by SQL queries. Under Alternative B, view support is inherited from the existing Hive and Iceberg catalog implementations — no Glue-specific view handling is needed.
 
 Tables come in two formats:
 
@@ -122,27 +123,17 @@ Extend the existing Hive and Iceberg catalogs with Glue as a backend option.
 
 ### 4.1 Configuration Properties
 
-Gravitino already defines standardized AWS/S3 properties in `S3Properties.java`:
+Glue is a separate AWS service from S3, and in practice the Glue region and credentials may differ from S3 storage credentials. Therefore, Glue properties use their own `aws-` namespace rather than reusing `s3-*` properties:
 
-| Existing Property | Used By |
-|---|---|
-| `s3-access-key-id` / `s3-secret-access-key` | Iceberg, Hive (S3 storage + Glue auth) |
-| `s3-region` | Iceberg, Hive (S3 storage + Glue region) |
-| `s3-role-arn` / `s3-external-id` | Iceberg, Hive (STS AssumeRole) |
-| `s3-endpoint` | Iceberg, Hive (custom S3 endpoint) |
-
-We **reuse `s3-region` as the default AWS region for both Glue and S3** and **reuse `s3-access-key-id` / `s3-secret-access-key` for authentication**. These properties already exist in `S3Properties.java` and are already handled by both the Hive and Iceberg catalogs — no new code is required for credential plumbing.
-
-Only two new Glue-specific properties are needed (prefixed with `aws-glue-` to clearly indicate they are AWS Glue Data Catalog settings, distinct from the generic `s3-` storage properties):
-
-| New Property | Required | Default | Description |
+| Property | Required | Default | Description |
 |---|---|---|---|
-| `aws-glue-catalog-id` | No | Caller's AWS account ID | Glue catalog ID. For cross-account access. |
+| `aws-region` | Yes | — | AWS region for the Glue Data Catalog |
+| `aws-access-key-id` | No | Default credential chain | AWS access key for Glue API authentication |
+| `aws-secret-access-key` | No | Default credential chain | AWS secret key for Glue API authentication |
+| `aws-glue-catalog-id` | Yes | — | Glue catalog ID. Required because an AWS account can have multiple Glue catalogs (e.g., default catalog and federated S3 Tables catalog). |
 | `aws-glue-endpoint` | No | AWS default regional endpoint | Custom Glue endpoint URL (for VPC endpoints or LocalStack testing). |
 
-No other Glue-specific properties are needed — all authentication and region settings are covered by existing `s3-*` properties.
-
-**Authentication priority** (existing implementation in `S3Properties`, reused as-is): Static credentials (`s3-access-key-id` + `s3-secret-access-key`) → STS AssumeRole (`s3-role-arn`) → Default credential chain (environment variables, instance profile). The mapping from `s3-*` properties to AWS SDK / Glue SDK credentials is done in the property conversion layer (Section 4.2 and 4.3).
+**Authentication priority**: Static credentials (`aws-access-key-id` + `aws-secret-access-key`) → Default credential chain (environment variables, instance profile, container credentials). STS AssumeRole (`aws-role-arn`) is a future enhancement — static credentials are sufficient for the initial release, including cross-account access.
 
 ### 4.2 Iceberg Catalog + Glue Backend
 
@@ -151,7 +142,7 @@ Add `GLUE` as a new `IcebergCatalogBackend` enum value. Use Iceberg's built-in `
 #### Data Flow
 
 ```
-User: catalog-backend=glue, warehouse=s3://..., s3-region=us-east-1
+User: catalog-backend=glue, warehouse=s3://..., aws-region=us-east-1
   → IcebergCatalogOperations.initialize()
     → IcebergCatalogUtil.loadCatalogBackend(GLUE, config)
       → loadGlueCatalog(config)
@@ -172,8 +163,8 @@ User: catalog-backend=glue, warehouse=s3://..., s3-region=us-east-1
 // In IcebergCatalogPropertyConverter.java:
 case "glue":
   icebergProperties.put("iceberg.catalog.type", "glue");
-  // Map Gravitino s3-region → Trino glue.region
-  String region = properties.get("s3-region");
+  // Map Gravitino aws-region → Trino glue.region
+  String region = properties.get("aws-region");
   if (region != null) {
     icebergProperties.put("hive.metastore.glue.region", region);
   }
@@ -194,7 +185,7 @@ Add `metastore-type=glue` property (Gravitino user-facing key). During `HiveCata
 #### Data Flow
 
 ```
-User: metastore-type=glue, s3-region=us-east-1
+User: metastore-type=glue, aws-region=us-east-1
   → HiveCatalogOperations.initialize()
     → mergeProperties(conf) — maps Glue properties
     → CachedClientPool(properties)
@@ -294,7 +285,7 @@ String metastoreType = catalog.getProperty("metastore-type", "hive");
 if ("glue".equalsIgnoreCase(metastoreType)) {
   // Use Trino's native Glue metastore support
   config.put("hive.metastore", "glue");
-  String region = catalog.getProperty("s3-region");
+  String region = catalog.getProperty("aws-region");
   if (region != null) {
     config.put("hive.metastore.glue.region", region);
   }
@@ -317,7 +308,7 @@ if ("glue".equalsIgnoreCase(metastoreType)) {
   // Use AWS Glue Data Catalog as Hive metastore for Spark
   sparkProperties.put("spark.hadoop.hive.metastore.client.factory.class",
       "com.amazonaws.glue.catalog.metastore.AWSGlueDataCatalogHiveClientFactory");
-  String region = properties.get("s3-region");
+  String region = properties.get("aws-region");
   if (region != null) {
     sparkProperties.put("spark.hadoop.aws.region", region);
   }
@@ -423,7 +414,7 @@ public class CatalogHiveGlueIT extends CatalogHive3IT {
   protected Map<String, String> createCatalogProperties() {
     return ImmutableMap.of(
         "metastore-type", "glue",
-        "s3-region", "us-east-1",
+        "aws-region", "us-east-1",
         "aws-glue-endpoint", localStackEndpoint);
   }
 }
@@ -458,7 +449,7 @@ Example `catalog_hive_glue_prepare.sql`:
 call gravitino.system.create_catalog(
     'gt_hive_glue', 'hive',
     map(
-        array['metastore-type', 's3-region', 'aws-glue-endpoint'],
+        array['metastore-type', 'aws-region', 'aws-glue-endpoint'],
         array['glue', 'us-east-1', '${glue_endpoint}']
     )
 );
@@ -469,7 +460,7 @@ Example `catalog_iceberg_glue_prepare.sql`:
 call gravitino.system.create_catalog(
     'gt_iceberg_glue', 'lakehouse-iceberg',
     map(
-        array['catalog-backend', 'warehouse', 's3-region', 'aws-glue-endpoint'],
+        array['catalog-backend', 'warehouse', 'aws-region', 'aws-glue-endpoint'],
         array['glue', '${s3_warehouse}', 'us-east-1', '${glue_endpoint}']
     )
 );
@@ -523,7 +514,7 @@ No new interface implementation is required. Apache Iceberg's `GlueCatalog` (fro
 |---|---|---|---|
 | 1.1 | Add `GLUE` enum value | `IcebergCatalogBackend.java` | Add `GLUE` to the enum |
 | 1.2 | Add Glue property constants | `IcebergConstants.java` | `GLUE_CATALOG_ID`, `GLUE_ENDPOINT` |
-| 1.3 | Add property mapping | `IcebergPropertiesUtils.java` | `s3-region` → `client.region`, `aws-glue-catalog-id` → `glue.catalog-id`, etc. |
+| 1.3 | Add property mapping | `IcebergPropertiesUtils.java` | `aws-region` → `client.region`, `aws-glue-catalog-id` → `glue.catalog-id`, etc. |
 | 1.4 | Declare property metadata | `IcebergCatalogPropertiesMetadata.java` | Register `aws-glue-catalog-id`, `aws-glue-endpoint` |
 | 1.5 | Add ConfigEntry | `IcebergConfig.java` | Glue-related configuration entries |
 | 1.6 | Implement `loadGlueCatalog()` | `IcebergCatalogUtil.java` | `case GLUE:` branch, instantiate and initialize `GlueCatalog` |
@@ -586,7 +577,7 @@ Iceberg — Spark requires no code change (generic passthrough).
 
 | # | Work Item | Description | Priority |
 |---|---|---|---|
-| P2-1 | **Cross-account Glue access** | Support `aws-glue-catalog-id` + STS AssumeRole (`s3-role-arn`) for cross-account access | High |
+| P2-1 | **STS AssumeRole** | Support `aws-role-arn` for role-based authentication. Static credentials (`aws-access-key-id` + `aws-secret-access-key`) already handle cross-account access in Phase 1. | Medium |
 | P2-2 | **Glue Table Filter** | Filter Iceberg tables from Hive catalog (`Parameters["table_type"]="ICEBERG"` hidden) to avoid confusion | Medium |
 | P2-3 | **VPC Endpoint support** | Validate `aws-glue-endpoint` for VPC private link scenarios, add integration tests | Medium |
 | P2-4 | **Paimon / Hudi on Glue** | Extend Glue support to Paimon, Hudi, and other lakehouse formats | Low |
