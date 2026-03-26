@@ -94,6 +94,11 @@ public class GlueCatalogOperations implements CatalogOperations, SupportsSchemas
     String accessKeyId = conf.get(AWS_ACCESS_KEY_ID);
     String secretAccessKey = conf.get(AWS_SECRET_ACCESS_KEY);
 
+    if (region == null || region.isBlank()) {
+      throw new IllegalArgumentException(
+              "Missing required property: " + AWS_REGION);
+    }
+
     software.amazon.awssdk.services.glue.GlueClientBuilder builder =
         GlueClient.builder().region(Region.of(region));
 
@@ -147,10 +152,13 @@ public class GlueCatalogOperations implements CatalogOperations, SupportsSchemas
               .database();
 
       return new GlueSchema(
-          ident.name(),
-          db.description(),
-          Collections.emptyMap(),
-          AuditInfo.builder().withCreator("glue").withCreateTime(Instant.now()).build());
+              ident.name(),
+              db.description(),
+              db.parameters() != null ? db.parameters() : Collections.emptyMap(),
+              AuditInfo.builder()
+                      .withCreator("glue")
+                      .withCreateTime(db.createTime() != null ? db.createTime() : Instant.now())
+                      .build());
 
     } catch (EntityNotFoundException e) {
       throw new NoSuchSchemaException("Schema %s does not exist in Glue", ident.name());
