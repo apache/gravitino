@@ -1,3 +1,22 @@
+<!--
+  Licensed to the Apache Software Foundation (ASF) under one
+  or more contributor license agreements.  See the NOTICE file
+  distributed with this work for additional information
+  regarding copyright ownership.  The ASF licenses this file
+  to you under the Apache License, Version 2.0 (the
+  "License"); you may not use this file except in compliance
+  with the License.  You may obtain a copy of the License at
+
+   http://www.apache.org/licenses/LICENSE-2.0
+
+  Unless required by applicable law or agreed to in writing,
+  software distributed under the License is distributed on an
+  "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+  KIND, either express or implied.  See the License for the
+  specific language governing permissions and limitations
+  under the License.
+-->
+
 # Design: AWS Glue Data Catalog Support for Apache Gravitino
 
 ## 1. Problem Statement and Goals
@@ -112,7 +131,7 @@ Gravitino already defines standardized AWS/S3 properties in `S3Properties.java`:
 | `s3-role-arn` / `s3-external-id` | Iceberg, Hive (STS AssumeRole) |
 | `s3-endpoint` | Iceberg, Hive (custom S3 endpoint) |
 
-We **reuse `s3-region` as the AWS region** (Glue and S3 are always co-located) and **reuse `s3-access-key-id` / `s3-secret-access-key` for authentication**. These properties already exist in `S3Properties.java` and are already handled by both the Hive and Iceberg catalogs — no new code is required for credential plumbing.
+We **reuse `s3-region` as the default AWS region for both Glue and S3** and **reuse `s3-access-key-id` / `s3-secret-access-key` for authentication**. These properties already exist in `S3Properties.java` and are already handled by both the Hive and Iceberg catalogs — no new code is required for credential plumbing.
 
 Only two new Glue-specific properties are needed (prefixed with `aws-glue-` to clearly indicate they are AWS Glue Data Catalog settings, distinct from the generic `s3-` storage properties):
 
@@ -170,7 +189,7 @@ case "glue":
 
 ### 4.3 Hive Catalog + Glue Backend
 
-Add `metastore-type=glue` property. Use AWS's `aws-glue-datacatalog-hive3-client` library which provides an `IMetaStoreClient` implementation backed by the Glue SDK.
+Add `metastore-type=glue` property (Gravitino user-facing key). During `HiveCatalogOperations.initialize()`, this is mapped to the Hive-internal property `metastore.type=glue` via the `GRAVITINO_CONFIG_TO_HIVE` mapping. All Java code snippets below use the Hive-internal key `metastore.type`. Use AWS's `aws-glue-datacatalog-hive3-client` library which provides an `IMetaStoreClient` implementation backed by the Glue SDK.
 
 #### Data Flow
 
@@ -330,7 +349,7 @@ if ("glue".equalsIgnoreCase(metastoreType)) {
 
 | Dependency | Target Module | Scope |
 |---|---|---|
-| `org.apache.iceberg:iceberg-aws` — Contains `GlueCatalog` implementation. Transitively depends on `software.amazon.awssdk:glue`. Already in version catalog as `libs.iceberg.aws`. | `iceberg/iceberg-common/build.gradle.kts` | `compileOnly` (provided at runtime by `bundles/bundle-aws`) |
+| `org.apache.iceberg:iceberg-aws` — Contains `GlueCatalog` implementation. Transitively depends on `software.amazon.awssdk:glue`. Already in version catalog as `libs.iceberg.aws`. | `iceberg/iceberg-common/build.gradle.kts` | `compileOnly` (provided at runtime by `bundles/iceberg-aws-bundle`) |
 
 No changes to `gradle/libs.versions.toml` required.
 
@@ -493,9 +512,6 @@ All `SparkCommonIT` tests (31 DDL/DML/query tests) are automatically inherited.
 ./gradlew :catalogs:hive-metastore3-libs:build -x test
 ./gradlew :trino-connector:trino-connector:build -x test
 ./gradlew :spark-connector:spark-common:build -x test
-
-# Spotless formatting
-./build.sh sp
 
 # Unit tests for modified modules
 ./gradlew :iceberg:iceberg-common:test -PskipITs
