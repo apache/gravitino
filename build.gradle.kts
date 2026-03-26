@@ -784,7 +784,7 @@ tasks {
           include(
             "${rootProject.name}-iceberg-rest-server.conf.template",
             "${rootProject.name}-env.sh.template",
-            "log4j2.properties.template"
+            "${rootProject.name}-iceberg-rest-log4j2.properties.template"
           )
           into("${rootProject.name}-iceberg-rest-server/conf")
         }
@@ -829,7 +829,7 @@ tasks {
           include(
             "${rootProject.name}-lance-rest-server.conf.template",
             "${rootProject.name}-env.sh.template",
-            "log4j2.properties.template"
+            "${rootProject.name}-lance-rest-log4j2.properties.template"
           )
           into("${rootProject.name}-lance-rest-server/conf")
         }
