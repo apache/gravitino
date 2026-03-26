@@ -85,6 +85,7 @@ dependencies {
     exclude("commons-codec")
     exclude("commons-cli")
     exclude("tomcat")
+    exclude("org.apache.tomcat.embed")
     exclude("org.apache.avro")
     exclude("net.sf.opencsv")
     exclude("javolution")
