@@ -296,9 +296,10 @@ public final class KerberosTokenProvider implements AuthDataProvider {
     public KerberosTokenProvider build() {
       KerberosTokenProvider provider = new KerberosTokenProvider();
 
-      // Check if the framework (e.g., Flink) has already established Kerberos credentials
-      java.security.AccessControlContext context = java.security.AccessController.getContext();
-      Subject subject = Subject.getSubject(context);
+      // Check if the framework (e.g., Flink) has already established Kerberos credentials.
+      // Use Subject.current() on JDK 18+ (where Subject.getSubject(AccessControlContext)
+      // was removed), and fall back to the deprecated API on JDK 17 and below.
+      Subject subject = getCurrentSubject();
 
       // If credentials exist (KerberosKey or KerberosTicket), reuse them
       // This avoids redundant logins when Flink has already authenticated with Kerberos
@@ -348,6 +349,40 @@ public final class KerberosTokenProvider implements AuthDataProvider {
               .findFirst()
               .map(Object::toString)
               .orElse(null);
+    }
+
+    /**
+     * Returns the current {@link Subject} in a JDK-version-neutral way.
+     *
+     * <ul>
+     *   <li>JDK 18+: uses {@code Subject.current()} via reflection, which is the designated
+     *       replacement for the removed {@code Subject.getSubject(AccessControlContext)}
+     *   <li>JDK 17 and below: uses the deprecated {@code Subject.getSubject(AccessControlContext)}
+     * </ul>
+     *
+     * @return the current Subject, or {@code null} if none is established
+     */
+    @SuppressWarnings("removal")
+    private static Subject getCurrentSubject() {
+      // Use reflection to call Subject.current() (JDK 18+) because this project compiles on
+      // JDK 17, where Subject.current() does not exist as a compile-time API.
+      // Fall back to the deprecated Subject.getSubject(AccessControlContext) on JDK 17 and below.
+      try {
+        java.lang.reflect.Method currentMethod = Subject.class.getMethod("current");
+        return (Subject) currentMethod.invoke(null);
+      } catch (NoSuchMethodException e) {
+        // JDK 17 and below: Subject.current() does not exist, use the legacy API.
+        // AccessController.getContext() may also throw UnsupportedOperationException on JDK 17
+        // when the Security Manager is explicitly disabled; treat that as no existing subject.
+        try {
+          java.security.AccessControlContext context = java.security.AccessController.getContext();
+          return Subject.getSubject(context);
+        } catch (UnsupportedOperationException ignored) {
+          return null;
+        }
+      } catch (ReflectiveOperationException e) {
+        return null;
+      }
     }
   }
 }
