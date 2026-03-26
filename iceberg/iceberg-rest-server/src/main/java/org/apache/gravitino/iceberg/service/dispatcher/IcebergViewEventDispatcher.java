@@ -90,16 +90,22 @@ public class IcebergViewEventDispatcher implements IcebergViewOperationDispatche
     try {
       loadViewResponse =
           icebergViewOperationDispatcher.createView(
-              context, namespace, transformedCreateEvent.createViewRequest());
+              context, namespace, (CreateViewRequest) transformedCreateEvent.createViewRequest());
     } catch (Exception e) {
       eventBus.dispatchEvent(
           new IcebergCreateViewFailureEvent(
-              context, nameIdentifier, transformedCreateEvent.createViewRequest(), e));
+              context,
+              nameIdentifier,
+              toSerializablePayload(transformedCreateEvent.createViewRequest()),
+              e));
       throw e;
     }
     eventBus.dispatchEvent(
         new IcebergCreateViewEvent(
-            context, nameIdentifier, transformedCreateEvent.createViewRequest(), loadViewResponse));
+            context,
+            nameIdentifier,
+            toSerializablePayload(transformedCreateEvent.createViewRequest()),
+            toSerializablePayload(loadViewResponse)));
     return loadViewResponse;
   }
 
@@ -120,19 +126,24 @@ public class IcebergViewEventDispatcher implements IcebergViewOperationDispatche
     try {
       loadViewResponse =
           icebergViewOperationDispatcher.replaceView(
-              context, viewIdentifier, transformedReplaceEvent.replaceViewRequest());
+              context,
+              viewIdentifier,
+              (UpdateTableRequest) transformedReplaceEvent.replaceViewRequest());
     } catch (Exception e) {
       eventBus.dispatchEvent(
           new IcebergReplaceViewFailureEvent(
-              context, gravitinoNameIdentifier, transformedReplaceEvent.replaceViewRequest(), e));
+              context,
+              gravitinoNameIdentifier,
+              toSerializablePayload(transformedReplaceEvent.replaceViewRequest()),
+              e));
       throw e;
     }
     eventBus.dispatchEvent(
         new IcebergReplaceViewEvent(
             context,
             gravitinoNameIdentifier,
-            transformedReplaceEvent.replaceViewRequest(),
-            loadViewResponse));
+            toSerializablePayload(transformedReplaceEvent.replaceViewRequest()),
+            toSerializablePayload(loadViewResponse)));
     return loadViewResponse;
   }
 
@@ -165,7 +176,8 @@ public class IcebergViewEventDispatcher implements IcebergViewOperationDispatche
       throw e;
     }
     eventBus.dispatchEvent(
-        new IcebergLoadViewEvent(context, gravitinoNameIdentifier, loadViewResponse));
+        new IcebergLoadViewEvent(
+            context, gravitinoNameIdentifier, toSerializablePayload(loadViewResponse)));
     return loadViewResponse;
   }
 
@@ -216,10 +228,15 @@ public class IcebergViewEventDispatcher implements IcebergViewOperationDispatche
     } catch (Exception e) {
       eventBus.dispatchEvent(
           new IcebergRenameViewFailureEvent(
-              context, gravitinoNameIdentifier, renameViewRequest, e));
+              context, gravitinoNameIdentifier, toSerializablePayload(renameViewRequest), e));
       throw e;
     }
     eventBus.dispatchEvent(
-        new IcebergRenameViewEvent(context, gravitinoNameIdentifier, renameViewRequest));
+        new IcebergRenameViewEvent(
+            context, gravitinoNameIdentifier, toSerializablePayload(renameViewRequest)));
+  }
+
+  private Object toSerializablePayload(Object payload) {
+    return IcebergRESTUtils.toSerializableMap(payload);
   }
 }

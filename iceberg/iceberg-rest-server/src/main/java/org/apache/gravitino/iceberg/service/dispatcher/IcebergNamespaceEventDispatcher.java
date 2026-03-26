@@ -94,11 +94,14 @@ public class IcebergNamespaceEventDispatcher implements IcebergNamespaceOperatio
     try {
       createResponse =
           operationDispatcher.createNamespace(
-              context, transformedCreateEvent.createNamespaceRequest());
+              context, (CreateNamespaceRequest) transformedCreateEvent.createNamespaceRequest());
     } catch (Exception e) {
       eventBus.dispatchEvent(
           new IcebergCreateNamespaceFailureEvent(
-              context, nameIdentifier, transformedCreateEvent.createNamespaceRequest(), e));
+              context,
+              nameIdentifier,
+              toSerializablePayload(transformedCreateEvent.createNamespaceRequest()),
+              e));
       throw e;
     }
 
@@ -106,8 +109,8 @@ public class IcebergNamespaceEventDispatcher implements IcebergNamespaceOperatio
         new IcebergCreateNamespaceEvent(
             context,
             nameIdentifier,
-            transformedCreateEvent.createNamespaceRequest(),
-            createResponse));
+            toSerializablePayload(transformedCreateEvent.createNamespaceRequest()),
+            toSerializablePayload(createResponse)));
     return createResponse;
   }
 
@@ -129,13 +132,16 @@ public class IcebergNamespaceEventDispatcher implements IcebergNamespaceOperatio
     try {
       updateResponse =
           operationDispatcher.updateNamespace(
-              context, namespace, transformedUpdateEvent.updateNamespacePropertiesRequest());
+              context,
+              namespace,
+              (UpdateNamespacePropertiesRequest)
+                  transformedUpdateEvent.updateNamespacePropertiesRequest());
     } catch (Exception e) {
       eventBus.dispatchEvent(
           new IcebergUpdateNamespaceFailureEvent(
               context,
               nameIdentifier,
-              transformedUpdateEvent.updateNamespacePropertiesRequest(),
+              toSerializablePayload(transformedUpdateEvent.updateNamespacePropertiesRequest()),
               e));
       throw e;
     }
@@ -144,8 +150,8 @@ public class IcebergNamespaceEventDispatcher implements IcebergNamespaceOperatio
         new IcebergUpdateNamespaceEvent(
             context,
             nameIdentifier,
-            transformedUpdateEvent.updateNamespacePropertiesRequest(),
-            updateResponse));
+            toSerializablePayload(transformedUpdateEvent.updateNamespacePropertiesRequest()),
+            toSerializablePayload(updateResponse)));
     return updateResponse;
   }
 
@@ -179,7 +185,8 @@ public class IcebergNamespaceEventDispatcher implements IcebergNamespaceOperatio
       throw e;
     }
 
-    eventBus.dispatchEvent(new IcebergLoadNamespaceEvent(context, nameIdentifier, getResponse));
+    eventBus.dispatchEvent(
+        new IcebergLoadNamespaceEvent(context, nameIdentifier, toSerializablePayload(getResponse)));
     return getResponse;
   }
 
@@ -240,13 +247,21 @@ public class IcebergNamespaceEventDispatcher implements IcebergNamespaceOperatio
           operationDispatcher.registerTable(context, namespace, registerTableRequest);
     } catch (Exception e) {
       eventBus.dispatchEvent(
-          new IcebergRegisterTableFailureEvent(context, nameIdentifier, registerTableRequest, e));
+          new IcebergRegisterTableFailureEvent(
+              context, nameIdentifier, toSerializablePayload(registerTableRequest), e));
       throw e;
     }
 
     eventBus.dispatchEvent(
         new IcebergRegisterTableEvent(
-            context, nameIdentifier, registerTableRequest, loadTableResponse));
+            context,
+            nameIdentifier,
+            toSerializablePayload(registerTableRequest),
+            toSerializablePayload(loadTableResponse)));
     return loadTableResponse;
+  }
+
+  private Object toSerializablePayload(Object payload) {
+    return IcebergRESTUtils.toSerializableMap(payload);
   }
 }
