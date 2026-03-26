@@ -19,29 +19,26 @@
 
 package org.apache.gravitino.listener.api.event;
 
+import java.util.Map;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.annotation.DeveloperApi;
 import org.apache.gravitino.iceberg.service.IcebergRESTUtils;
-import org.apache.iceberg.rest.requests.CreateTableRequest;
-import org.apache.iceberg.rest.responses.LoadTableResponse;
 
 /** Represent an event after creating Iceberg table successfully. */
 @DeveloperApi
 public class IcebergCreateTableEvent extends IcebergTableEvent {
 
-  private final CreateTableRequest createTableRequest;
-  private final LoadTableResponse loadTableResponse;
+  private final Map<String, Object> createTableRequest;
+  private final Map<String, Object> loadTableResponse;
 
   public IcebergCreateTableEvent(
       IcebergRequestContext icebergRequestContext,
       NameIdentifier resourceIdentifier,
-      CreateTableRequest createTableRequest,
-      LoadTableResponse loadTableResponse) {
+      Object createTableRequest,
+      Object loadTableResponse) {
     super(icebergRequestContext, resourceIdentifier);
-    this.createTableRequest =
-        IcebergRESTUtils.cloneIcebergRESTObject(createTableRequest, CreateTableRequest.class);
-    this.loadTableResponse =
-        IcebergRESTUtils.cloneIcebergRESTObject(loadTableResponse, LoadTableResponse.class);
+    this.createTableRequest = IcebergRESTUtils.toSerializableMap(createTableRequest);
+    this.loadTableResponse = IcebergRESTUtils.toSerializableMap(loadTableResponse);
   }
 
   @Override
@@ -49,11 +46,11 @@ public class IcebergCreateTableEvent extends IcebergTableEvent {
     return OperationType.CREATE_TABLE;
   }
 
-  public CreateTableRequest createTableRequest() {
+  public Map<String, Object> createTableRequest() {
     return createTableRequest;
   }
 
-  public LoadTableResponse loadTableResponse() {
+  public Map<String, Object> loadTableResponse() {
     return loadTableResponse;
   }
 }

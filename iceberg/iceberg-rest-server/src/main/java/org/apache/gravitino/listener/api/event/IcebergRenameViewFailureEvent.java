@@ -21,23 +21,22 @@ package org.apache.gravitino.listener.api.event;
 
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.annotation.DeveloperApi;
-import org.apache.iceberg.rest.requests.RenameTableRequest;
 
 /** Represent an event when rename Iceberg view failed. */
 @DeveloperApi
 public class IcebergRenameViewFailureEvent extends IcebergViewFailureEvent {
-  private final RenameTableRequest renameViewRequest;
+  private final Object renameViewRequest;
 
   public IcebergRenameViewFailureEvent(
       IcebergRequestContext icebergRequestContext,
       NameIdentifier viewIdentifier,
-      RenameTableRequest renameViewRequest,
+      Object renameViewRequest,
       Exception e) {
     super(icebergRequestContext, viewIdentifier, e);
     this.renameViewRequest = renameViewRequest;
   }
 
-  public RenameTableRequest renameViewRequest() {
+  public Object renameViewRequest() {
     return renameViewRequest;
   }
 

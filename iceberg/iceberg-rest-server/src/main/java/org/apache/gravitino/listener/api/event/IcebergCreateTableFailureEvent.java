@@ -19,24 +19,23 @@
 
 package org.apache.gravitino.listener.api.event;
 
+import java.util.Map;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.annotation.DeveloperApi;
 import org.apache.gravitino.iceberg.service.IcebergRESTUtils;
-import org.apache.iceberg.rest.requests.CreateTableRequest;
 
 /** Represent a failure event when creating Iceberg table failed. */
 @DeveloperApi
 public class IcebergCreateTableFailureEvent extends IcebergTableFailureEvent {
-  private final CreateTableRequest createTableRequest;
+  private final Map<String, Object> createTableRequest;
 
   public IcebergCreateTableFailureEvent(
       IcebergRequestContext icebergRequestContext,
       NameIdentifier nameIdentifier,
-      CreateTableRequest createTableRequest,
+      Object createTableRequest,
       Exception e) {
     super(icebergRequestContext, nameIdentifier, e);
-    this.createTableRequest =
-        IcebergRESTUtils.cloneIcebergRESTObject(createTableRequest, CreateTableRequest.class);
+    this.createTableRequest = IcebergRESTUtils.toSerializableMap(createTableRequest);
   }
 
   @Override
@@ -44,7 +43,7 @@ public class IcebergCreateTableFailureEvent extends IcebergTableFailureEvent {
     return OperationType.CREATE_TABLE;
   }
 
-  public CreateTableRequest createTableRequest() {
+  public Map<String, Object> createTableRequest() {
     return createTableRequest;
   }
 }

@@ -19,36 +19,33 @@
 
 package org.apache.gravitino.listener.api.event;
 
+import java.util.Map;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.annotation.DeveloperApi;
 import org.apache.gravitino.iceberg.service.IcebergRESTUtils;
-import org.apache.iceberg.rest.requests.UpdateTableRequest;
-import org.apache.iceberg.rest.responses.LoadTableResponse;
 
 /** Represent an event after updating Iceberg table successfully. */
 @DeveloperApi
 public class IcebergUpdateTableEvent extends IcebergTableEvent {
 
-  private final UpdateTableRequest updateTableRequest;
-  private final LoadTableResponse loadTableResponse;
+  private final Map<String, Object> updateTableRequest;
+  private final Map<String, Object> loadTableResponse;
 
   public IcebergUpdateTableEvent(
       IcebergRequestContext icebergRequestContext,
       NameIdentifier resourceIdentifier,
-      UpdateTableRequest updateTableRequest,
-      LoadTableResponse loadTableResponse) {
+      Object updateTableRequest,
+      Object loadTableResponse) {
     super(icebergRequestContext, resourceIdentifier);
-    this.updateTableRequest =
-        IcebergRESTUtils.cloneIcebergRESTObject(updateTableRequest, UpdateTableRequest.class);
-    this.loadTableResponse =
-        IcebergRESTUtils.cloneIcebergRESTObject(loadTableResponse, LoadTableResponse.class);
+    this.updateTableRequest = IcebergRESTUtils.toSerializableMap(updateTableRequest);
+    this.loadTableResponse = IcebergRESTUtils.toSerializableMap(loadTableResponse);
   }
 
-  public UpdateTableRequest createTableRequest() {
+  public Map<String, Object> createTableRequest() {
     return updateTableRequest;
   }
 
-  public LoadTableResponse loadTableResponse() {
+  public Map<String, Object> loadTableResponse() {
     return loadTableResponse;
   }
 

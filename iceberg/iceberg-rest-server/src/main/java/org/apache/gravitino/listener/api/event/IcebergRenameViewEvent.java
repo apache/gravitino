@@ -19,26 +19,25 @@
 
 package org.apache.gravitino.listener.api.event;
 
+import java.util.Map;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.annotation.DeveloperApi;
 import org.apache.gravitino.iceberg.service.IcebergRESTUtils;
-import org.apache.iceberg.rest.requests.RenameTableRequest;
 
 /** Represent an event after rename Iceberg view successfully. */
 @DeveloperApi
 public class IcebergRenameViewEvent extends IcebergViewEvent {
-  private final RenameTableRequest renameViewRequest;
+  private final Map<String, Object> renameViewRequest;
 
   public IcebergRenameViewEvent(
       IcebergRequestContext icebergRequestContext,
       NameIdentifier viewIdentifier,
-      RenameTableRequest renameViewRequest) {
+      Object renameViewRequest) {
     super(icebergRequestContext, viewIdentifier);
-    this.renameViewRequest =
-        IcebergRESTUtils.cloneIcebergRESTObject(renameViewRequest, RenameTableRequest.class);
+    this.renameViewRequest = IcebergRESTUtils.toSerializableMap(renameViewRequest);
   }
 
-  public RenameTableRequest renameViewRequest() {
+  public Map<String, Object> renameViewRequest() {
     return renameViewRequest;
   }
 

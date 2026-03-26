@@ -19,27 +19,26 @@
 
 package org.apache.gravitino.listener.api.event;
 
+import java.util.Map;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.annotation.DeveloperApi;
 import org.apache.gravitino.iceberg.service.IcebergRESTUtils;
-import org.apache.iceberg.rest.requests.UpdateTableRequest;
 
 /** Represent a failure event when updating Iceberg view failed. */
 @DeveloperApi
 public class IcebergReplaceViewFailureEvent extends IcebergViewFailureEvent {
-  private final UpdateTableRequest replaceViewRequest;
+  private final Map<String, Object> replaceViewRequest;
 
   public IcebergReplaceViewFailureEvent(
       IcebergRequestContext icebergRequestContext,
       NameIdentifier viewIdentifier,
-      UpdateTableRequest replaceViewRequest,
+      Object replaceViewRequest,
       Exception e) {
     super(icebergRequestContext, viewIdentifier, e);
-    this.replaceViewRequest =
-        IcebergRESTUtils.cloneIcebergRESTObject(replaceViewRequest, UpdateTableRequest.class);
+    this.replaceViewRequest = IcebergRESTUtils.toSerializableMap(replaceViewRequest);
   }
 
-  public UpdateTableRequest replaceViewRequest() {
+  public Map<String, Object> replaceViewRequest() {
     return replaceViewRequest;
   }
 

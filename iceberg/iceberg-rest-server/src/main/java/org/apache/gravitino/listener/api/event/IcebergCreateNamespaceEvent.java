@@ -19,38 +19,33 @@
 
 package org.apache.gravitino.listener.api.event;
 
+import java.util.Map;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.annotation.DeveloperApi;
 import org.apache.gravitino.iceberg.service.IcebergRESTUtils;
-import org.apache.iceberg.rest.requests.CreateNamespaceRequest;
-import org.apache.iceberg.rest.responses.CreateNamespaceResponse;
 
 /** Represent an event after creating Iceberg namespace successfully. */
 @DeveloperApi
 public class IcebergCreateNamespaceEvent extends IcebergNamespaceEvent {
 
-  private final CreateNamespaceRequest createNamespaceRequest;
-  private final CreateNamespaceResponse createNamespaceResponse;
+  private final Map<String, Object> createNamespaceRequest;
+  private final Map<String, Object> createNamespaceResponse;
 
   public IcebergCreateNamespaceEvent(
       IcebergRequestContext icebergRequestContext,
       NameIdentifier nameIdentifier,
-      CreateNamespaceRequest createNamespaceRequest,
-      CreateNamespaceResponse createNamespaceResponse) {
+      Object createNamespaceRequest,
+      Object createNamespaceResponse) {
     super(icebergRequestContext, nameIdentifier);
-    this.createNamespaceRequest =
-        IcebergRESTUtils.cloneIcebergRESTObject(
-            createNamespaceRequest, CreateNamespaceRequest.class);
-    this.createNamespaceResponse =
-        IcebergRESTUtils.cloneIcebergRESTObject(
-            createNamespaceResponse, CreateNamespaceResponse.class);
+    this.createNamespaceRequest = IcebergRESTUtils.toSerializableMap(createNamespaceRequest);
+    this.createNamespaceResponse = IcebergRESTUtils.toSerializableMap(createNamespaceResponse);
   }
 
-  public CreateNamespaceRequest createNamespaceRequest() {
+  public Map<String, Object> createNamespaceRequest() {
     return createNamespaceRequest;
   }
 
-  public CreateNamespaceResponse createNamespaceResponse() {
+  public Map<String, Object> createNamespaceResponse() {
     return createNamespaceResponse;
   }
 

@@ -19,28 +19,27 @@
 
 package org.apache.gravitino.listener.api.event;
 
+import java.util.Map;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.annotation.DeveloperApi;
 import org.apache.gravitino.iceberg.service.IcebergRESTUtils;
-import org.apache.iceberg.rest.requests.UpdateNamespacePropertiesRequest;
 
 /** Represent a failure event when updating Iceberg namespace failed. */
 @DeveloperApi
 public class IcebergUpdateNamespaceFailureEvent extends IcebergNamespaceFailureEvent {
-  private final UpdateNamespacePropertiesRequest updateNamespacePropertiesRequest;
+  private final Map<String, Object> updateNamespacePropertiesRequest;
 
   public IcebergUpdateNamespaceFailureEvent(
       IcebergRequestContext icebergRequestContext,
       NameIdentifier nameIdentifier,
-      UpdateNamespacePropertiesRequest updateNamespacePropertiesRequest,
+      Object updateNamespacePropertiesRequest,
       Exception e) {
     super(icebergRequestContext, nameIdentifier, e);
     this.updateNamespacePropertiesRequest =
-        IcebergRESTUtils.cloneIcebergRESTObject(
-            updateNamespacePropertiesRequest, UpdateNamespacePropertiesRequest.class);
+        IcebergRESTUtils.toSerializableMap(updateNamespacePropertiesRequest);
   }
 
-  public UpdateNamespacePropertiesRequest updateNamespacePropertiesRequest() {
+  public Map<String, Object> updateNamespacePropertiesRequest() {
     return updateNamespacePropertiesRequest;
   }
 

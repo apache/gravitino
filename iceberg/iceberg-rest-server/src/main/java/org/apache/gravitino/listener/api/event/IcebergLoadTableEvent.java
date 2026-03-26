@@ -19,23 +19,22 @@
 
 package org.apache.gravitino.listener.api.event;
 
+import java.util.Map;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.annotation.DeveloperApi;
 import org.apache.gravitino.iceberg.service.IcebergRESTUtils;
-import org.apache.iceberg.rest.responses.LoadTableResponse;
 
 /** Represent an event after loading Iceberg table successfully. */
 @DeveloperApi
 public class IcebergLoadTableEvent extends IcebergTableEvent {
-  private final LoadTableResponse loadTableResponse;
+  private final Map<String, Object> loadTableResponse;
 
   public IcebergLoadTableEvent(
       IcebergRequestContext icebergRequestContext,
       NameIdentifier resourceIdentifier,
-      LoadTableResponse loadTableResponse) {
+      Object loadTableResponse) {
     super(icebergRequestContext, resourceIdentifier);
-    this.loadTableResponse =
-        IcebergRESTUtils.cloneIcebergRESTObject(loadTableResponse, LoadTableResponse.class);
+    this.loadTableResponse = IcebergRESTUtils.toSerializableMap(loadTableResponse);
   }
 
   @Override
@@ -43,7 +42,7 @@ public class IcebergLoadTableEvent extends IcebergTableEvent {
     return OperationType.LOAD_TABLE;
   }
 
-  public LoadTableResponse loadTableResponse() {
+  public Map<String, Object> loadTableResponse() {
     return loadTableResponse;
   }
 }

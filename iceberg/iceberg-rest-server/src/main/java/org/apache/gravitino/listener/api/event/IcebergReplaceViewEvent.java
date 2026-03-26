@@ -19,36 +19,33 @@
 
 package org.apache.gravitino.listener.api.event;
 
+import java.util.Map;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.annotation.DeveloperApi;
 import org.apache.gravitino.iceberg.service.IcebergRESTUtils;
-import org.apache.iceberg.rest.requests.UpdateTableRequest;
-import org.apache.iceberg.rest.responses.LoadViewResponse;
 
 /** Represent an event after updating Iceberg view successfully. */
 @DeveloperApi
 public class IcebergReplaceViewEvent extends IcebergViewEvent {
 
-  private final UpdateTableRequest replaceViewRequest;
-  private final LoadViewResponse loadViewResponse;
+  private final Map<String, Object> replaceViewRequest;
+  private final Map<String, Object> loadViewResponse;
 
   public IcebergReplaceViewEvent(
       IcebergRequestContext icebergRequestContext,
       NameIdentifier viewIdentifier,
-      UpdateTableRequest replaceViewRequest,
-      LoadViewResponse loadViewResponse) {
+      Object replaceViewRequest,
+      Object loadViewResponse) {
     super(icebergRequestContext, viewIdentifier);
-    this.replaceViewRequest =
-        IcebergRESTUtils.cloneIcebergRESTObject(replaceViewRequest, UpdateTableRequest.class);
-    this.loadViewResponse =
-        IcebergRESTUtils.cloneIcebergRESTObject(loadViewResponse, LoadViewResponse.class);
+    this.replaceViewRequest = IcebergRESTUtils.toSerializableMap(replaceViewRequest);
+    this.loadViewResponse = IcebergRESTUtils.toSerializableMap(loadViewResponse);
   }
 
-  public UpdateTableRequest renameViewRequest() {
+  public Map<String, Object> renameViewRequest() {
     return replaceViewRequest;
   }
 
-  public LoadViewResponse loadViewResponse() {
+  public Map<String, Object> loadViewResponse() {
     return loadViewResponse;
   }
 

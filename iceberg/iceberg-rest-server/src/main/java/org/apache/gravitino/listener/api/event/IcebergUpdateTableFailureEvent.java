@@ -19,27 +19,26 @@
 
 package org.apache.gravitino.listener.api.event;
 
+import java.util.Map;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.annotation.DeveloperApi;
 import org.apache.gravitino.iceberg.service.IcebergRESTUtils;
-import org.apache.iceberg.rest.requests.UpdateTableRequest;
 
 /** Represent a failure event when updating Iceberg table failed. */
 @DeveloperApi
 public class IcebergUpdateTableFailureEvent extends IcebergTableFailureEvent {
-  private final UpdateTableRequest updateTableRequest;
+  private final Map<String, Object> updateTableRequest;
 
   public IcebergUpdateTableFailureEvent(
       IcebergRequestContext icebergRequestContext,
       NameIdentifier nameIdentifier,
-      UpdateTableRequest updateTableRequest,
+      Object updateTableRequest,
       Exception e) {
     super(icebergRequestContext, nameIdentifier, e);
-    this.updateTableRequest =
-        IcebergRESTUtils.cloneIcebergRESTObject(updateTableRequest, UpdateTableRequest.class);
+    this.updateTableRequest = IcebergRESTUtils.toSerializableMap(updateTableRequest);
   }
 
-  public UpdateTableRequest updateTableRequest() {
+  public Map<String, Object> updateTableRequest() {
     return updateTableRequest;
   }
 

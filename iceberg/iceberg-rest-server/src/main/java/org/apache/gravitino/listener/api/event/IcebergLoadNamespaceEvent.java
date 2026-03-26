@@ -19,26 +19,25 @@
 
 package org.apache.gravitino.listener.api.event;
 
+import java.util.Map;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.annotation.DeveloperApi;
 import org.apache.gravitino.iceberg.service.IcebergRESTUtils;
-import org.apache.iceberg.rest.responses.GetNamespaceResponse;
 
 /** Represent an event after loading Iceberg namespace successfully. */
 @DeveloperApi
 public class IcebergLoadNamespaceEvent extends IcebergNamespaceEvent {
-  private final GetNamespaceResponse getNamespaceResponse;
+  private final Map<String, Object> getNamespaceResponse;
 
   public IcebergLoadNamespaceEvent(
       IcebergRequestContext icebergRequestContext,
       NameIdentifier nameIdentifier,
-      GetNamespaceResponse getNamespaceResponse) {
+      Object getNamespaceResponse) {
     super(icebergRequestContext, nameIdentifier);
-    this.getNamespaceResponse =
-        IcebergRESTUtils.cloneIcebergRESTObject(getNamespaceResponse, GetNamespaceResponse.class);
+    this.getNamespaceResponse = IcebergRESTUtils.toSerializableMap(getNamespaceResponse);
   }
 
-  public GetNamespaceResponse getNamespaceResponse() {
+  public Map<String, Object> getNamespaceResponse() {
     return getNamespaceResponse;
   }
 

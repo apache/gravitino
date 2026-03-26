@@ -19,36 +19,33 @@
 
 package org.apache.gravitino.listener.api.event;
 
+import java.util.Map;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.annotation.DeveloperApi;
 import org.apache.gravitino.iceberg.service.IcebergRESTUtils;
-import org.apache.iceberg.rest.requests.CreateViewRequest;
-import org.apache.iceberg.rest.responses.LoadViewResponse;
 
 /** Represent an event after creating Iceberg view successfully. */
 @DeveloperApi
 public class IcebergCreateViewEvent extends IcebergViewEvent {
 
-  private final CreateViewRequest createViewRequest;
-  private final LoadViewResponse loadViewResponse;
+  private final Map<String, Object> createViewRequest;
+  private final Map<String, Object> loadViewResponse;
 
   public IcebergCreateViewEvent(
       IcebergRequestContext icebergRequestContext,
       NameIdentifier viewIdentifier,
-      CreateViewRequest createViewRequest,
-      LoadViewResponse loadViewResponse) {
+      Object createViewRequest,
+      Object loadViewResponse) {
     super(icebergRequestContext, viewIdentifier);
-    this.createViewRequest =
-        IcebergRESTUtils.cloneIcebergRESTObject(createViewRequest, CreateViewRequest.class);
-    this.loadViewResponse =
-        IcebergRESTUtils.cloneIcebergRESTObject(loadViewResponse, LoadViewResponse.class);
+    this.createViewRequest = IcebergRESTUtils.toSerializableMap(createViewRequest);
+    this.loadViewResponse = IcebergRESTUtils.toSerializableMap(loadViewResponse);
   }
 
-  public CreateViewRequest createViewRequest() {
+  public Map<String, Object> createViewRequest() {
     return createViewRequest;
   }
 
-  public LoadViewResponse loadViewResponse() {
+  public Map<String, Object> loadViewResponse() {
     return loadViewResponse;
   }
 

@@ -115,6 +115,16 @@ public class IcebergRESTUtils {
     }
   }
 
+  public static Map<String, Object> toSerializableMap(Object message) {
+    ObjectMapper icebergObjectMapper = IcebergObjectMapper.getInstance();
+    try {
+      byte[] values = icebergObjectMapper.writeValueAsBytes(message);
+      return icebergObjectMapper.readValue(values, Map.class);
+    } catch (IOException e) {
+      throw new RuntimeException(e);
+    }
+  }
+
   public static NameIdentifier getGravitinoNameIdentifier(
       String metalakeName, String catalogName, Namespace namespace) {
     Stream<String> catalogNS =

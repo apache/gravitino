@@ -19,27 +19,26 @@
 
 package org.apache.gravitino.listener.api.event;
 
+import java.util.Map;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.annotation.DeveloperApi;
 import org.apache.gravitino.iceberg.service.IcebergRESTUtils;
-import org.apache.iceberg.rest.requests.CreateViewRequest;
 
 /** Represent a failure event when creating Iceberg view failed. */
 @DeveloperApi
 public class IcebergCreateViewFailureEvent extends IcebergViewFailureEvent {
-  private final CreateViewRequest createViewRequest;
+  private final Map<String, Object> createViewRequest;
 
   public IcebergCreateViewFailureEvent(
       IcebergRequestContext icebergRequestContext,
       NameIdentifier viewIdentifier,
-      CreateViewRequest createViewRequest,
+      Object createViewRequest,
       Exception e) {
     super(icebergRequestContext, viewIdentifier, e);
-    this.createViewRequest =
-        IcebergRESTUtils.cloneIcebergRESTObject(createViewRequest, CreateViewRequest.class);
+    this.createViewRequest = IcebergRESTUtils.toSerializableMap(createViewRequest);
   }
 
-  public CreateViewRequest createViewRequest() {
+  public Map<String, Object> createViewRequest() {
     return createViewRequest;
   }
 

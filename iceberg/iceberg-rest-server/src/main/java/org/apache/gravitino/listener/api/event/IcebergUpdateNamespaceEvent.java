@@ -19,38 +19,35 @@
 
 package org.apache.gravitino.listener.api.event;
 
+import java.util.Map;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.annotation.DeveloperApi;
 import org.apache.gravitino.iceberg.service.IcebergRESTUtils;
-import org.apache.iceberg.rest.requests.UpdateNamespacePropertiesRequest;
-import org.apache.iceberg.rest.responses.UpdateNamespacePropertiesResponse;
 
 /** Represent an event after updating Iceberg namespace successfully. */
 @DeveloperApi
 public class IcebergUpdateNamespaceEvent extends IcebergNamespaceEvent {
 
-  private final UpdateNamespacePropertiesRequest updateNamespacePropertiesRequest;
-  private final UpdateNamespacePropertiesResponse updateNamespacePropertiesResponse;
+  private final Map<String, Object> updateNamespacePropertiesRequest;
+  private final Map<String, Object> updateNamespacePropertiesResponse;
 
   public IcebergUpdateNamespaceEvent(
       IcebergRequestContext icebergRequestContext,
       NameIdentifier nameIdentifier,
-      UpdateNamespacePropertiesRequest updateNamespacePropertiesRequest,
-      UpdateNamespacePropertiesResponse updateNamespacePropertiesResponse) {
+      Object updateNamespacePropertiesRequest,
+      Object updateNamespacePropertiesResponse) {
     super(icebergRequestContext, nameIdentifier);
     this.updateNamespacePropertiesRequest =
-        IcebergRESTUtils.cloneIcebergRESTObject(
-            updateNamespacePropertiesRequest, UpdateNamespacePropertiesRequest.class);
+        IcebergRESTUtils.toSerializableMap(updateNamespacePropertiesRequest);
     this.updateNamespacePropertiesResponse =
-        IcebergRESTUtils.cloneIcebergRESTObject(
-            updateNamespacePropertiesResponse, UpdateNamespacePropertiesResponse.class);
+        IcebergRESTUtils.toSerializableMap(updateNamespacePropertiesResponse);
   }
 
-  public UpdateNamespacePropertiesRequest updateNamespacePropertiesRequest() {
+  public Map<String, Object> updateNamespacePropertiesRequest() {
     return updateNamespacePropertiesRequest;
   }
 
-  public UpdateNamespacePropertiesResponse updateNamespacePropertiesResponse() {
+  public Map<String, Object> updateNamespacePropertiesResponse() {
     return updateNamespacePropertiesResponse;
   }
 
