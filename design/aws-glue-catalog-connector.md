@@ -220,35 +220,19 @@ User: metastore-type=glue, s3-region=us-east-1
 // In HiveClientFactory:
 
 /**
- * Determines the Hive classloader version based on catalog configuration.
- * For Glue metastore: always HIVE3 (no probe needed).
- * For HMS: probes the remote server (existing behavior).
+ * Resolves Hive version from catalog configuration.
+ * Returns UNKNOWN when version cannot be determined statically (HMS mode).
  */
 private HiveVersion resolveHiveVersion(Properties properties) {
   String metastoreType = properties.getProperty("metastore.type", "hive");
   if ("glue".equalsIgnoreCase(metastoreType)) {
-    // Glue is an AWS-managed service with a single API version.
-    // Always use Hive3 — the aws-glue-datacatalog-hive3-client JAR
-    // is in hive-metastore3-libs/ and implements the Hive3 IMetaStoreClient.
-    return HiveVersion.HIVE3;
+    return HiveVersion.HIVE3;  // Glue always uses Hive3
   }
-  // For HMS: probe the server to detect version (existing logic)
-  return probeHmsVersion();
-}
-
-public HiveClient createHiveClient() {
-  HiveVersion version = resolveHiveVersion(properties);
-  if (backendClassLoader == null) {
-    synchronized (classLoaderLock) {
-      if (backendClassLoader == null) {
-        backendClassLoader = HiveClientClassLoader.createLoader(
-            version, Thread.currentThread().getContextClassLoader());
-      }
-    }
-  }
-  return createHiveClientInternal(backendClassLoader);
+  return HiveVersion.UNKNOWN;  // HMS: let createHiveClient() probe at runtime
 }
 ```
+
+When `resolveHiveVersion()` returns `UNKNOWN`, `createHiveClient()` falls into the existing probe-and-fallback path (`createHiveClientWithBackend()`). When it returns a concrete version (`HIVE3`), the probe is skipped entirely.
 
 This design:
 - **Eliminates hardcoding**: version resolution is centralized in one method, driven by catalog configuration.
