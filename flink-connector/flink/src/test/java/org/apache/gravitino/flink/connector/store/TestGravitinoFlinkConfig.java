@@ -98,7 +98,7 @@ public class TestGravitinoFlinkConfig {
   }
 
   @Test
-  void testGravitinoCatalogStoreFactoryWithAllowedType() {
+  void testGravitinoCatalogStoreFactoryWithAllowedTypeAndUnsupportedAuthType() {
     final Configuration configuration = new Configuration();
     configuration.setString(
         "table.catalog-store.kind", GravitinoCatalogStoreFactoryOptions.GRAVITINO);
@@ -116,5 +116,25 @@ public class TestGravitinoFlinkConfig {
     // But it should pass the validation.
     Exception e = Assertions.assertThrows(Exception.class, () -> factory.open(context));
     Assertions.assertFalse(e.getMessage().contains("The allowed third party connectors"));
+  }
+
+  @Test
+  void testGravitinoCatalogStoreFactoryWithUnsupportedAuthType() {
+    final Configuration configuration = new Configuration();
+    configuration.setString(
+        "table.catalog-store.kind", GravitinoCatalogStoreFactoryOptions.GRAVITINO);
+    configuration.setString("table.catalog-store.gravitino.gravitino.metalake", "flink");
+    configuration.setString("table.catalog-store.gravitino.gravitino.uri", "http://127.0.0.1:8090");
+    configuration.setString(
+        "table.catalog-store.gravitino.gravitino.client.auth.type", "unsupported");
+
+    CatalogStoreFactory.Context context =
+        TableFactoryUtil.buildCatalogStoreFactoryContext(
+            configuration, this.getClass().getClassLoader());
+    GravitinoCatalogStoreFactory factory = new GravitinoCatalogStoreFactory();
+
+    IllegalArgumentException e =
+        Assertions.assertThrows(IllegalArgumentException.class, () -> factory.open(context));
+    Assertions.assertTrue(e.getMessage().contains("Unsupported auth type 'unsupported'"));
   }
 }
