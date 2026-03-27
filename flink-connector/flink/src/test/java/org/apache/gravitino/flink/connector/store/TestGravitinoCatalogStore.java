@@ -19,15 +19,20 @@
 package org.apache.gravitino.flink.connector.store;
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Optional;
+import java.util.Set;
 import org.apache.flink.configuration.Configuration;
 import org.apache.flink.table.catalog.CatalogDescriptor;
 import org.apache.flink.table.catalog.CommonCatalogOptions;
@@ -119,12 +124,7 @@ public class TestGravitinoCatalogStore {
   @Test
   public void testStoreJdbcCatalog() {
     String catalogName = "testJdbcCatalog";
-    Configuration conf = new Configuration();
-    conf.set(CommonCatalogOptions.CATALOG_TYPE, "jdbc");
-    conf.setString("url", "jdbc:mysql://localhost:3306/test");
-    conf.setString("username", "test");
-    conf.setString("password", "test");
-    CatalogDescriptor descriptor = CatalogDescriptor.of(catalogName, conf);
+    CatalogDescriptor descriptor = createJdbcCatalogDescriptor(catalogName);
 
     gravitinoCatalogStore.storeCatalog(catalogName, descriptor);
     assertTrue(gravitinoCatalogStore.contains(catalogName));
@@ -186,15 +186,59 @@ public class TestGravitinoCatalogStore {
     connectors.clear();
 
     String catalogName = "testJdbcCatalogWithDefensiveCopy";
+    CatalogDescriptor descriptor = createJdbcCatalogDescriptor(catalogName);
+
+    catalogStore.storeCatalog(catalogName, descriptor);
+    assertTrue(catalogStore.contains(catalogName));
+    assertTrue(memoryCatalogStore.contains(catalogName));
+  }
+
+  @Test
+  public void testRemoveCatalogWhenMemoryCatalogExistsShouldRemoveFromMemory() {
+    String catalogName = "testMemoryJdbcCatalog";
+    CatalogDescriptor descriptor = createJdbcCatalogDescriptor(catalogName);
+    gravitinoCatalogStore.storeCatalog(catalogName, descriptor);
+
+    gravitinoCatalogStore.removeCatalog(catalogName, false);
+
+    assertFalse(memoryCatalogStore.contains(catalogName));
+    verifyNoInteractions(gravitinoCatalogMockManager);
+  }
+
+  @Test
+  public void testGetCatalogWhenMemoryCatalogExistsShouldReturnMemoryDescriptor() {
+    String catalogName = "testMemoryJdbcCatalog";
+    CatalogDescriptor descriptor = createJdbcCatalogDescriptor(catalogName);
+    gravitinoCatalogStore.storeCatalog(catalogName, descriptor);
+
+    Optional<CatalogDescriptor> actualCatalog = gravitinoCatalogStore.getCatalog(catalogName);
+
+    assertTrue(actualCatalog.isPresent());
+    assertEquals(
+        descriptor.getConfiguration().toMap(), actualCatalog.get().getConfiguration().toMap());
+    verifyNoInteractions(gravitinoCatalogMockManager);
+  }
+
+  @Test
+  public void testListCatalogsShouldMergeMemoryAndGravitinoCatalogs() {
+    String memoryCatalogName = "testMemoryJdbcCatalog";
+    CatalogDescriptor descriptor = createJdbcCatalogDescriptor(memoryCatalogName);
+    gravitinoCatalogStore.storeCatalog(memoryCatalogName, descriptor);
+    when(gravitinoCatalogMockManager.listCatalogs())
+        .thenReturn(new HashSet<>(Arrays.asList(memoryCatalogName, "testHiveCatalog")));
+
+    Set<String> catalogs = gravitinoCatalogStore.listCatalogs();
+
+    assertEquals(new HashSet<>(Arrays.asList(memoryCatalogName, "testHiveCatalog")), catalogs);
+    verify(gravitinoCatalogMockManager).listCatalogs();
+  }
+
+  private CatalogDescriptor createJdbcCatalogDescriptor(String catalogName) {
     Configuration conf = new Configuration();
     conf.set(CommonCatalogOptions.CATALOG_TYPE, "jdbc");
     conf.setString("url", "jdbc:mysql://localhost:3306/test");
     conf.setString("username", "test");
     conf.setString("password", "test");
-    CatalogDescriptor descriptor = CatalogDescriptor.of(catalogName, conf);
-
-    catalogStore.storeCatalog(catalogName, descriptor);
-    assertTrue(catalogStore.contains(catalogName));
-    assertTrue(memoryCatalogStore.contains(catalogName));
+    return CatalogDescriptor.of(catalogName, conf);
   }
 }
