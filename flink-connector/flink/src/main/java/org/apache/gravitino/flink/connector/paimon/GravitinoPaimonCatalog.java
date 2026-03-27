@@ -19,11 +19,15 @@
 
 package org.apache.gravitino.flink.connector.paimon;
 
+import java.util.List;
 import java.util.Optional;
 import org.apache.flink.table.catalog.AbstractCatalog;
 import org.apache.flink.table.catalog.CatalogBaseTable;
 import org.apache.flink.table.catalog.ObjectPath;
+import org.apache.flink.table.catalog.TableChange;
 import org.apache.flink.table.catalog.exceptions.CatalogException;
+import org.apache.flink.table.catalog.exceptions.DatabaseNotExistException;
+import org.apache.flink.table.catalog.exceptions.TableAlreadyExistException;
 import org.apache.flink.table.catalog.exceptions.TableNotExistException;
 import org.apache.flink.table.factories.CatalogFactory;
 import org.apache.flink.table.factories.Factory;
@@ -31,7 +35,6 @@ import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.flink.connector.PartitionConverter;
 import org.apache.gravitino.flink.connector.SchemaAndTablePropertiesConverter;
 import org.apache.gravitino.flink.connector.catalog.BaseCatalog;
-import org.apache.gravitino.rel.Table;
 import org.apache.paimon.flink.FlinkCatalogFactory;
 import org.apache.paimon.flink.FlinkTableFactory;
 
@@ -73,15 +76,71 @@ public class GravitinoPaimonCatalog extends BaseCatalog {
     if (!dropped && !ignoreIfNotExists) {
       throw new TableNotExistException(catalogName(), tablePath);
     }
+
+    if (dropped) {
+      try {
+        paimonCatalog.dropTable(tablePath, true);
+      } catch (Exception e) {
+        throw new CatalogException(
+            "Gravitino metadata dropped, but failed to sync Paimon/Hive metastore"
+                + " for table: "
+                + tablePath,
+            e);
+      }
+    }
   }
 
   @Override
-  protected CatalogBaseTable toFlinkTable(Table table, ObjectPath tablePath) {
+  public void createTable(ObjectPath tablePath, CatalogBaseTable table, boolean ignoreIfExists)
+      throws TableAlreadyExistException, DatabaseNotExistException, CatalogException {
+    super.createTable(tablePath, table, ignoreIfExists);
     try {
-      return paimonCatalog.getTable(tablePath);
-    } catch (TableNotExistException e) {
+      if (!paimonCatalog.tableExists(tablePath)) {
+        paimonCatalog.createTable(tablePath, table, ignoreIfExists);
+      }
+    } catch (Exception e) {
       throw new CatalogException(
-          "Table " + tablePath + " exists in Gravitino but not in Paimon catalog", e);
+          "Gravitino metadata written, but failed to sync Paimon/Hive metastore for table "
+              + tablePath,
+          e);
+    }
+  }
+
+  @Override
+  public void alterTable(ObjectPath tablePath, CatalogBaseTable newTable, boolean ignoreIfNotExists)
+      throws TableNotExistException, CatalogException {
+    super.alterTable(tablePath, newTable, ignoreIfNotExists);
+
+    try {
+      if (paimonCatalog.tableExists(tablePath)) {
+        paimonCatalog.alterTable(tablePath, newTable, ignoreIfNotExists);
+      }
+    } catch (Exception e) {
+      throw new CatalogException(
+          "Gravitino metadata updated, but failed to sync Paimon/Hive metastore for table "
+              + tablePath,
+          e);
+    }
+  }
+
+  @Override
+  public void alterTable(
+      ObjectPath tablePath,
+      CatalogBaseTable newTable,
+      List<TableChange> tableChanges,
+      boolean ignoreIfNotExists)
+      throws TableNotExistException, CatalogException {
+    super.alterTable(tablePath, newTable, tableChanges, ignoreIfNotExists);
+
+    try {
+      if (paimonCatalog.tableExists(tablePath)) {
+        paimonCatalog.alterTable(tablePath, newTable, tableChanges, ignoreIfNotExists);
+      }
+    } catch (Exception e) {
+      throw new CatalogException(
+          "Gravitino metadata updated, but failed to sync Paimon/Hive metastore for table "
+              + tablePath,
+          e);
     }
   }
 
