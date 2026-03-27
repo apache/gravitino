@@ -69,8 +69,6 @@ initScript: |
   echo "Override config."
   cp /tmp/conf/* ${GRAVITINO_HOME}/conf
   echo "Start the Gravitino Lance Rest Server"
-  # Skip config rewrite since we already have config from ConfigMap
-  export SKIP_CONFIG_REWRITE=true
   /bin/bash ${GRAVITINO_HOME}/bin/start-lance-rest-server.sh
 
 ## Optional volumes for logs
@@ -87,6 +85,8 @@ env:
     value: /root/gravitino-lance-rest-server
   - name: GRAVITINO_MEM
     value: "-Xms1024m -Xmx1024m -XX:MaxMetaspaceSize=512m"
+  - name: SKIP_CONFIG_REWRITE
+    value: "true"
 
 envFrom: []
 

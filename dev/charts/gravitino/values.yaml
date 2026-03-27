@@ -427,8 +427,6 @@ additionalLog4j2Properties:
 initScript: |
   cp /tmp/conf/* ${GRAVITINO_HOME}/conf
   echo "Start the Gravitino Server"
-  # Skip config rewrite since we already have config from ConfigMap
-  export SKIP_CONFIG_REWRITE=true
   /bin/bash ${GRAVITINO_HOME}/bin/start-gravitino.sh
 
 ## Expose the gravitino service to be accessed from outside the cluster (LoadBalancer service).
@@ -516,6 +514,8 @@ env:
     value: /root/gravitino
   - name: GRAVITINO_MEM
     value: "-Xms1024m -Xmx1024m -XX:MaxMetaspaceSize=512m"
+  - name: SKIP_CONFIG_REWRITE
+    value: "true"
 
 ## The envWithTpl array below has the same usage as "env", but is using the tpl function to support templatable string.
 ## This can be useful when you want to pass dynamic values to the Chart using the helm argument "--set <variable>=<value>"
