@@ -44,7 +44,8 @@ public class GravitinoCatalogStoreFactoryOptions {
       ConfigOptions.key("gravitino.allow.third-party-connector.list")
           .stringType()
           .noDefaultValue()
-          .withDescription("List of allow third-party connector of Gravitino, separated by commas");
+          .withDescription(
+              "Comma-separated list of allowed third-party catalog types (handled by Flink's in-memory catalog store)");
   public static final ConfigOption<Map<String, String>> GRAVITINO_CLIENT_CONFIG =
       ConfigOptions.key("gravitino.client")
           .mapType()
