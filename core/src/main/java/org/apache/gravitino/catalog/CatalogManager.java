@@ -290,22 +290,14 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
         LOG.warn("Failed to close catalog", e);
       }
 
-      if ((pool == null) != (poolEntry == null)) {
-        // This state should never occur. Prefer leaking one ClassLoader over destroying a
-        // ClassLoader that may still be shared by other catalogs through the pool.
-        LOG.warn(
-            "Inconsistent state: pool={}, poolEntry={}. Skipping cleanup to avoid corruption.",
-            pool,
-            poolEntry);
-        return;
-      }
-
-      if (pool != null && poolEntry != null) {
+      if (poolEntry != null) {
         pool.release(poolEntry);
         poolEntry = null;
-      } else {
+      } else if (pool == null) {
+        // Non-pooled path (e.g., CATALOG_LOAD_ISOLATED=false): close the ClassLoader directly
         classLoader.close();
       }
+      // If pool != null but poolEntry == null, this is a repeated close — skip silently
     }
 
     private SupportsSchemas asSchemas() {
