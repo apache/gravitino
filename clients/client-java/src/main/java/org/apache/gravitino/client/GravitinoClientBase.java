@@ -357,6 +357,23 @@ public abstract class GravitinoClientBase implements Closeable {
     }
 
     /**
+     * Configures authentication based on the properties map. This method is called automatically in
+     * build() before creating the client instance.
+     */
+    protected void configureAuthentication() {
+      if (this.authDataProvider != null) {
+        // Authentication already configured, skip
+        return;
+      }
+
+      AuthDataProvider provider =
+          GravitinoClientAuthenticationConfig.createAuthDataProvider(this.properties, this.uri);
+      if (provider != null) {
+        this.authDataProvider = provider;
+      }
+    }
+
+    /**
      * Builds a new instance. Subclasses should overwrite this method.
      *
      * @return A new instance of Gravitino Client.
