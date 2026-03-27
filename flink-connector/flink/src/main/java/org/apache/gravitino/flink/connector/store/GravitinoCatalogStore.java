@@ -19,6 +19,7 @@
 
 package org.apache.gravitino.flink.connector.store;
 
+import com.google.common.collect.ImmutableList;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.Iterator;
@@ -49,15 +50,20 @@ public class GravitinoCatalogStore extends AbstractCatalogStore {
   private static final Logger LOG = LoggerFactory.getLogger(GravitinoCatalogStore.class);
   private final GenericInMemoryCatalogStore memoryCatalogStore;
   private final GravitinoCatalogManager gravitinoCatalogManager;
-  private List<String> allowThirdPartyConnectors;
+  private final ImmutableList<String> allowThirdPartyConnectors;
 
   public GravitinoCatalogStore(
       GravitinoCatalogManager catalogManager,
       GenericInMemoryCatalogStore memoryCatalogStore,
       List<String> allowThirdPartyConnectors) {
-    this.gravitinoCatalogManager = catalogManager;
-    this.memoryCatalogStore = memoryCatalogStore;
-    this.allowThirdPartyConnectors = allowThirdPartyConnectors;
+    this.gravitinoCatalogManager =
+        Preconditions.checkNotNull(catalogManager, "CatalogManager cannot be null");
+    this.memoryCatalogStore =
+        Preconditions.checkNotNull(memoryCatalogStore, "MemoryCatalogStore cannot be null");
+    this.allowThirdPartyConnectors =
+        ImmutableList.copyOf(
+            Preconditions.checkNotNull(
+                allowThirdPartyConnectors, "AllowThirdPartyConnectors cannot be null"));
   }
 
   @Override
