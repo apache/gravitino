@@ -35,9 +35,18 @@ components:
           enum:
             - "primary_key"
             - "unique_key"
+            - "data_skipping_minmax"
+            - "data_skipping_bloom_filter"
         name:
           type: string
           description: The name of the index
           nullable: true
         fieldNames:
           $ref: "./tables.yaml#/components/schemas/FieldNames"
+        properties:
+          type: object
+          description: A map of index properties.
+          nullable: true
+          default: { }
+          additionalProperties:
+            type: string

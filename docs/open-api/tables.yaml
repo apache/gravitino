@@ -402,6 +402,8 @@ components:
         - $ref: "#/components/schemas/UpdateTableColumnNullabilityRequest"
         - $ref: "#/components/schemas/UpdateTableColumnDefaultValueRequest"
         - $ref: "#/components/schemas/DeleteTableColumnRequest"
+        - $ref: "#/components/schemas/AddTableIndexRequest"
+        - $ref: "#/components/schemas/DeleteTableIndexRequest"
       discriminator:
         propertyName: "@type"
         mapping:
@@ -417,6 +419,8 @@ components:
           updateColumnNullability: "#/components/schemas/UpdateTableColumnNullabilityRequest"
           updateColumnDefaultValue: "#/components/schemas/UpdateTableColumnDefaultValueRequest"
           deleteColumn: "#/components/schemas/DeleteTableColumnRequest"
+          addTableIndex: "#/components/schemas/AddTableIndexRequest"
+          deleteTableIndex: "#/components/schemas/DeleteTableIndexRequest"
 
     RenameTableRequest:
       type: object
@@ -716,6 +720,55 @@ components:
       example: {
         "@type": "deleteColumn",
         "fieldName": [ "no_existing_column" ],
+        "ifExists": true
+      }
+
+    AddTableIndexRequest:
+      type: object
+      required:
+        - "@type"
+        - index
+      properties:
+        "@type":
+          type: string
+          enum:
+            - "addTableIndex"
+        index:
+          $ref: "./indexes.yaml#/components/schemas/IndexSpec"
+          description: The index to add
+      example: {
+        "@type": "addTableIndex",
+        "index": {
+          "indexType": "data_skipping_bloom_filter",
+          "name": "idx_note_bf",
+          "fieldNames": [["note"]],
+          "properties": {
+            "granularity": "7"
+          }
+        }
+      }
+
+    DeleteTableIndexRequest:
+      type: object
+      required:
+        - "@type"
+        - name
+      properties:
+        "@type":
+          type: string
+          enum:
+            - "deleteTableIndex"
+        name:
+          type: string
+          description: The index name to delete
+        ifExists:
+          type: boolean
+          description: If true, the request will not fail if the index does not exist
+          nullable: true
+          default: false
+      example: {
+        "@type": "deleteTableIndex",
+        "name": "idx_note_bf",
         "ifExists": true
       }
 
