@@ -28,9 +28,11 @@ import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Lists;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import org.apache.flink.table.api.DataTypes;
 import org.apache.flink.table.api.ResultKind;
 import org.apache.flink.table.api.TableResult;
@@ -179,6 +181,10 @@ public abstract class FlinkCommonIT extends FlinkEnvIT {
           String schema3 = "test_list_schema3";
           String[] initialSchemas = catalog.asSchemas().listSchemas();
           Arrays.sort(initialSchemas);
+          Set<String> expectedSchemas = new HashSet<>(Arrays.asList(initialSchemas));
+          expectedSchemas.add(schema);
+          expectedSchemas.add(schema2);
+          expectedSchemas.add(schema3);
 
           try {
             TestUtils.assertTableResult(
@@ -197,11 +203,11 @@ public abstract class FlinkCommonIT extends FlinkEnvIT {
 
             String[] schemas = catalog.asSchemas().listSchemas();
             Arrays.sort(schemas);
-            Assertions.assertEquals(4, schemas.length);
-            Assertions.assertEquals(defaultDatabaseName(), schemas[0]);
-            Assertions.assertEquals(schema, schemas[1]);
-            Assertions.assertEquals(schema2, schemas[2]);
-            Assertions.assertEquals(schema3, schemas[3]);
+            Assertions.assertEquals(expectedSchemas.size(), schemas.length);
+            Assertions.assertTrue(
+                Arrays.asList(schemas).containsAll(expectedSchemas),
+                String.format(
+                    "Expected schemas %s but got %s", expectedSchemas, Arrays.asList(schemas)));
           } finally {
             catalog.asSchemas().dropSchema(schema, supportDropCascade());
             catalog.asSchemas().dropSchema(schema2, supportDropCascade());
