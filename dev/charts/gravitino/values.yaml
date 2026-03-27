@@ -427,6 +427,8 @@ additionalLog4j2Properties:
 initScript: |
   cp /tmp/conf/* ${GRAVITINO_HOME}/conf
   echo "Start the Gravitino Server"
+  # Skip config rewrite since we already have config from ConfigMap
+  export SKIP_CONFIG_REWRITE=true
   /bin/bash ${GRAVITINO_HOME}/bin/start-gravitino.sh
 
 ## Expose the gravitino service to be accessed from outside the cluster (LoadBalancer service).
