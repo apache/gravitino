@@ -59,6 +59,7 @@ plugins {
   alias(libs.plugins.dependencyLicenseReport)
   alias(libs.plugins.tasktree)
   alias(libs.plugins.errorprone)
+  alias(libs.plugins.owasp.dependencycheck)
 }
 
 val scalaVersion: String = project.properties["scalaVersion"] as? String ?: extra["defaultScalaVersion"].toString()
@@ -101,6 +102,37 @@ licenseReport {
   renderers = arrayOf<ReportRenderer>(InventoryHtmlReportRenderer("report.html", "Backend"))
   filters = arrayOf<DependencyFilter>(LicenseBundleNormalizer())
 }
+
+dependencyCheck {
+  // Scan runtime dependencies only (compileClasspath may contain
+  // transitive deps that get resolved to newer versions at runtime)
+  scanConfigurations = listOf("runtimeClasspath")
+
+  // HTML + JSON reports
+  formats = listOf("HTML", "JSON")
+  outputDirectory.set(layout.buildDirectory.dir("reports/dependency-check"))
+
+  // Suppression file for false positives and accepted risks
+  suppressionFile = "$rootDir/config/owasp/suppressions.xml"
+
+  // Fail the build on CVSS >= 7 (High and Critical)
+  failBuildOnCVSS = 7.0f
+
+  // NVD API key (set via environment variable or gradle property for faster updates)
+  nvd {
+    apiKey = providers.environmentVariable("NVD_API_KEY")
+      .orElse(providers.gradleProperty("nvdApiKey"))
+      .getOrElse("")
+    // Lower page size and increase delay/retries to avoid NVD API rate-limiting
+    resultsPerPage = 500
+    delay = 5000
+    maxRetryCount = 20
+  }
+
+  // Skip projects that don't produce JVM artifacts
+  skipProjects = listOf(":clients:client-python", ":web:web", ":web-v2:web", ":docs")
+}
+
 repositories { mavenCentral() }
 
 allprojects {

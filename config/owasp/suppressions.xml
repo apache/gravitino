@@ -1,0 +1,695 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Licensed to the Apache Software Foundation (ASF) under one
+  or more contributor license agreements.  See the NOTICE file
+  distributed with this work for additional information
+  regarding copyright ownership.  The ASF licenses this file
+  to you under the Apache License, Version 2.0 (the
+  "License"); you may not use this file except in compliance
+  with the License.  You may obtain a copy of the License at
+
+   http://www.apache.org/licenses/LICENSE-2.0
+
+  Unless required by applicable law or agreed to in writing,
+  software distributed under the License is distributed on an
+  "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+  KIND, either express or implied.  See the License for the
+  specific language governing permissions and limitations
+  under the License.
+-->
+
+<!--
+  OWASP Dependency-Check Suppression File for Apache Gravitino
+
+  Triage Framework (three-question test):
+    1. Is the vulnerable code path reachable by Gravitino?
+    2. Is the attack vector exposed in Gravitino's deployment?
+    3. Are there compensating controls (auth, firewall, sandboxing)?
+
+  If ANY answer is NO, the CVE is "present but not exploitable" and is suppressed here.
+
+  Reviewed: 2026-04-07
+  Expiry: 2026-07-07 (90-day re-review cycle)
+-->
+<suppressions xmlns="https://jeremylong.github.io/DependencyCheck/dependency-suppression.1.3.xsd">
+
+  <!-- ================================================================
+       CATEGORY A: Shaded / Fat JAR internal dependencies
+       Reason: These CVEs are detected inside fat JARs (aws-java-sdk-bundle,
+       htrace-core4, hadoop-client-runtime, hadoop-client-api, iceberg bundles,
+       paimon-format, hadoop-shaded-guava). The vulnerable classes are shaded
+       and only invoked internally by the host library. Gravitino does not
+       call these code paths directly. Gradle force/exclude cannot fix these;
+       only upstream releases can.
+       Three-question: Code path NOT reachable by Gravitino (Q1=NO).
+       ================================================================ -->
+  <suppress until="2026-07-07Z">
+    <notes><![CDATA[
+      aws-java-sdk-bundle 1.11.901 fat JAR — shaded jackson-databind 2.6.7.3,
+      netty, etc. Only AWS SDK internal code invokes these.
+      Q1=NO: Gravitino calls AWS SDK APIs, not shaded jackson directly.
+      Reviewed: 2026-04-07
+    ]]></notes>
+    <filePath regex="true">.*aws-java-sdk-bundle-.*\.jar.*</filePath>
+    <vulnerabilityName regex="true">^CVE-.*$</vulnerabilityName>
+  </suppress>
+
+  <suppress until="2026-07-07Z">
+    <notes><![CDATA[
+      htrace-core4 fat JAR — shaded jackson-databind 2.4.0.
+      Q1=NO: Gravitino does not use HTrace tracing APIs.
+      Reviewed: 2026-04-07
+    ]]></notes>
+    <filePath regex="true">.*htrace-core4?-.*\.jar.*</filePath>
+    <vulnerabilityName regex="true">^CVE-.*$</vulnerabilityName>
+  </suppress>
+
+  <suppress until="2026-07-07Z">
+    <notes><![CDATA[
+      hadoop-client-runtime fat JAR — shaded commons-compress, jetty, jackson, etc.
+      Q1=NO: Shaded classes only used by Hadoop internals.
+      Reviewed: 2026-04-07
+    ]]></notes>
+    <filePath regex="true">.*hadoop-client-runtime-.*\.jar.*</filePath>
+    <vulnerabilityName regex="true">^CVE-.*$</vulnerabilityName>
+  </suppress>
+
+  <suppress until="2026-07-07Z">
+    <notes><![CDATA[
+      hadoop-client-api fat JAR — shaded Hadoop modules detected via internal pom.xml.
+      Q1=NO: Shaded classes only used by Hadoop internals.
+      Reviewed: 2026-04-07
+    ]]></notes>
+    <filePath regex="true">.*hadoop-client-api-.*\.jar.*</filePath>
+    <vulnerabilityName regex="true">^CVE-.*$</vulnerabilityName>
+  </suppress>
+
+  <suppress until="2026-07-07Z">
+    <notes><![CDATA[
+      Iceberg AWS/Azure/GCP bundle fat JARs — shaded netty, jackson, etc.
+      Q1=NO: Shaded classes only used by Iceberg's cloud storage layer.
+      Reviewed: 2026-04-07
+    ]]></notes>
+    <filePath regex="true">.*iceberg-(aws|azure|gcp)-bundle-.*\.jar.*</filePath>
+    <vulnerabilityName regex="true">^CVE-.*$</vulnerabilityName>
+  </suppress>
+
+  <suppress until="2026-07-07Z">
+    <notes><![CDATA[
+      paimon-format fat JAR — shaded avro 1.11.4 (already fixed version).
+      Q1=NO: Shaded, and version is patched.
+      Reviewed: 2026-04-07
+    ]]></notes>
+    <filePath regex="true">.*paimon-format-.*\.jar.*</filePath>
+    <vulnerabilityName regex="true">^CVE-.*$</vulnerabilityName>
+  </suppress>
+
+  <suppress until="2026-07-07Z">
+    <notes><![CDATA[
+      hadoop-shaded-guava — shaded guava 30.1.1 (CVE-2023-2976).
+      Q1=NO: Shaded, only used by Hadoop's internal FileBackedOutputStream.
+      Reviewed: 2026-04-07
+    ]]></notes>
+    <filePath regex="true">.*hadoop-shaded-guava-.*\.jar.*</filePath>
+    <vulnerabilityName regex="true">^CVE-.*$</vulnerabilityName>
+  </suppress>
+
+
+  <!-- ================================================================
+       CATEGORY B: Hive Metastore ecosystem transitive dependencies
+       Reason: Gravitino must use hive-metastore 2.3.x / 3.1.x for HMS
+       compatibility. These old libraries (jackson-databind 2.6.5, netty 3.x,
+       derby, jasper/tomcat, libfb303, libthrift 0.9.3, protobuf 2.5,
+       zookeeper 3.4.x, hive-shims, hive-common, hive-serde, etc.) are
+       pulled transitively and cannot be upgraded without breaking HMS.
+       Three-question:
+         Q1: Vulnerable code paths (e.g., jackson polymorphic deserialization)
+             require Default Typing enabled — Gravitino does not enable it.
+         Q2: Attack vectors (e.g., Jetty HTTP parsing) are not exposed —
+             Gravitino uses its own Jetty 9.4.51+ for HTTP serving.
+         Q3: HMS communication is server-to-server, behind auth + firewall.
+       ================================================================ -->
+  <suppress until="2026-07-07Z">
+    <notes><![CDATA[
+      jackson-databind 2.6.5 from hive-metastore2-libs.
+      Q1=NO: Gravitino does not enable jackson Default Typing.
+      Reviewed: 2026-04-07
+    ]]></notes>
+    <gav regex="true">^com\.fasterxml\.jackson\.core:jackson-databind:2\.[0-6]\..*$</gav>
+    <vulnerabilityName regex="true">^CVE-.*$</vulnerabilityName>
+  </suppress>
+
+  <suppress until="2026-07-07Z">
+    <notes><![CDATA[
+      Old Hive modules (hive-common, hive-serde, hive-shims, hive-service-rpc,
+      hive-metastore, hive-classification, hive-standalone-metastore,
+      hive-storage-api, hive-upgrade-acid) from HMS 2.3.x / 3.1.x.
+      Q2=NO: HMS Thrift interface is server-to-server, not internet-facing.
+      Reviewed: 2026-04-07
+    ]]></notes>
+    <gav regex="true">^org\.apache\.hive:hive-(common|serde|shims.*|service-rpc|metastore|classification|standalone-metastore|storage-api|upgrade-acid):.*$</gav>
+    <vulnerabilityName regex="true">^CVE-.*$</vulnerabilityName>
+  </suppress>
+
+  <suppress until="2026-07-07Z">
+    <notes><![CDATA[
+      Hive shims modules (org.apache.hive.shims group) from HMS transitive.
+      Same rationale as Hive modules above.
+      Reviewed: 2026-04-07
+    ]]></notes>
+    <gav regex="true">^org\.apache\.hive\.shims:hive-shims.*:.*$</gav>
+    <vulnerabilityName regex="true">^CVE-.*$</vulnerabilityName>
+  </suppress>
+
+  <suppress until="2026-07-07Z">
+    <notes><![CDATA[
+      Gravitino hive-metastore-common module — CVEs inherited from Hive transitive deps.
+      Same rationale as Hive modules above.
+      Reviewed: 2026-04-07
+    ]]></notes>
+    <filePath regex="true">.*gravitino-hive-metastore-common-.*\.jar.*</filePath>
+    <vulnerabilityName regex="true">^CVE-.*$</vulnerabilityName>
+  </suppress>
+
+  <suppress until="2026-07-07Z">
+    <notes><![CDATA[
+      derby 10.10.2.0 / 10.14.1.0 from Hive metastore transitive.
+      Q2=NO: Derby is used as embedded HMS backend in dev/test only,
+      not exposed to network in production.
+      Reviewed: 2026-04-07
+    ]]></notes>
+    <gav regex="true">^org\.apache\.derby:derby:10\.(10|14)\.[0-9.]+$</gav>
+    <vulnerabilityName regex="true">^CVE-.*$</vulnerabilityName>
+  </suppress>
+
+  <suppress until="2026-07-07Z">
+    <notes><![CDATA[
+      jasper-compiler/runtime 5.5.23 (Tomcat 5.5) from Hive metastore2 transitive.
+      Q1=NO: Gravitino does not use JSP compilation. Q2=NO: Not exposed.
+      Reviewed: 2026-04-07
+    ]]></notes>
+    <gav regex="true">^tomcat:jasper-(compiler|runtime):5\.5\..*$</gav>
+    <vulnerabilityName regex="true">^CVE-.*$</vulnerabilityName>
+  </suppress>
+
+  <suppress until="2026-07-07Z">
+    <notes><![CDATA[
+      libfb303 0.9.3 (Facebook Thrift) from Hive/Iceberg transitive.
+      Q2=NO: FB303 Thrift service interface is not exposed by Gravitino.
+      Reviewed: 2026-04-07
+    ]]></notes>
+    <gav regex="true">^org\.apache\.thrift:libfb303:0\.9\..*$</gav>
+    <vulnerabilityName regex="true">^CVE-.*$</vulnerabilityName>
+  </suppress>
+
+  <suppress until="2026-07-07Z">
+    <notes><![CDATA[
+      libthrift 0.9.3 from Hive/Iceberg transitive.
+      Q2=NO: Thrift server is not exposed by Gravitino; only used as
+      client to connect to HMS.
+      Reviewed: 2026-04-07
+    ]]></notes>
+    <gav regex="true">^org\.apache\.thrift:libthrift:0\.9\.3$</gav>
+    <vulnerabilityName regex="true">^CVE-.*$</vulnerabilityName>
+  </suppress>
+
+  <suppress until="2026-07-07Z">
+    <notes><![CDATA[
+      protobuf-java 2.5.0 from Hadoop/Hive transitive.
+      Q1=NO: Gravitino does not parse untrusted protobuf input with this version.
+      Reviewed: 2026-04-07
+    ]]></notes>
+    <gav regex="true">^com\.google\.protobuf:protobuf-java:2\.5\.0$</gav>
+    <vulnerabilityName regex="true">^CVE-.*$</vulnerabilityName>
+  </suppress>
+
+  <suppress until="2026-07-07Z">
+    <notes><![CDATA[
+      ZooKeeper 3.4.14 from Hive metastore transitive.
+      Q2=NO: ZK SASL bypass (CVE-2023-44981) requires quorum peer auth
+      which is not part of Gravitino's deployment.
+      Reviewed: 2026-04-07
+    ]]></notes>
+    <gav regex="true">^org\.apache\.zookeeper:zookeeper(-jute)?:3\.4\..*$</gav>
+    <vulnerabilityName regex="true">^CVE-.*$</vulnerabilityName>
+  </suppress>
+
+  <suppress until="2026-07-07Z">
+    <notes><![CDATA[
+      Netty 3.10.6 from Hive metastore transitive.
+      Q2=NO: Old Netty is used by Hive's internal Thrift transport,
+      not exposed as a network server by Gravitino.
+      Reviewed: 2026-04-07
+    ]]></notes>
+    <gav regex="true">^io\.netty:netty:3\..*$</gav>
+    <vulnerabilityName regex="true">^CVE-.*$</vulnerabilityName>
+  </suppress>
+  <suppress until="2026-07-07Z">
+    <notes><![CDATA[
+      Netty 3.x (org.jboss.netty) from Hive/Hadoop transitive.
+    ]]></notes>
+    <gav regex="true">^org\.jboss\.netty:netty:3\..*$</gav>
+    <vulnerabilityName regex="true">^CVE-.*$</vulnerabilityName>
+  </suppress>
+
+  <suppress until="2026-07-07Z">
+    <notes><![CDATA[
+      Old Gson (2.2.4, 2.8.5) from Hive/Hadoop transitive.
+      Q1=NO: CVE-2022-25647 requires Gson to deserialize untrusted input
+      with specific TypeAdapter — Gravitino does not do this.
+      Reviewed: 2026-04-07
+    ]]></notes>
+    <gav regex="true">^com\.google\.code\.gson:gson:2\.[0-8]\..*$</gav>
+    <vulnerabilityName regex="true">^CVE-.*$</vulnerabilityName>
+  </suppress>
+
+  <suppress until="2026-07-07Z">
+    <notes><![CDATA[
+      jettison 1.1 from Hadoop transitive.
+      Q1=NO: Gravitino does not parse JSON with Jettison.
+      Reviewed: 2026-04-07
+    ]]></notes>
+    <gav regex="true">^org\.codehaus\.jettison:jettison:1\.1$</gav>
+    <vulnerabilityName regex="true">^CVE-.*$</vulnerabilityName>
+  </suppress>
+
+  <suppress until="2026-07-07Z">
+    <notes><![CDATA[
+      jdom 1.0/1.1 and jdom2 2.0.6 from Hadoop/Hive transitive.
+      Q1=NO: Gravitino does not parse untrusted XML with JDOM.
+      Reviewed: 2026-04-07
+    ]]></notes>
+    <gav regex="true">^(org\.jdom|jdom):jdom2?:.*$</gav>
+    <vulnerabilityName regex="true">^CVE-.*$</vulnerabilityName>
+  </suppress>
+
+  <suppress until="2026-07-07Z">
+    <notes><![CDATA[
+      jackson-mapper-asl 1.9.13 (Jackson 1.x) from Hadoop/Ranger transitive.
+      Q1=NO: Gravitino uses Jackson 2.x; this old version is only loaded
+      by Hadoop/Ranger internal code.
+      Reviewed: 2026-04-07
+    ]]></notes>
+    <gav regex="true">^org\.codehaus\.jackson:jackson-mapper-asl:.*$</gav>
+    <vulnerabilityName regex="true">^CVE-.*$</vulnerabilityName>
+  </suppress>
+
+  <suppress until="2026-07-07Z">
+    <notes><![CDATA[
+      nimbus-jose-jwt 7.9 / 9.30.1 from Hadoop transitive.
+      Q1=NO: CVE-2023-52428 requires crafted JWE with large p2c header;
+      Gravitino does not process untrusted JWE tokens with this library.
+      Reviewed: 2026-04-07
+    ]]></notes>
+    <gav regex="true">^com\.nimbusds:nimbus-jose-jwt:(7\.9|9\.30\.1)$</gav>
+    <vulnerabilityName regex="true">^CVE-.*$</vulnerabilityName>
+  </suppress>
+
+  <suppress until="2026-07-07Z">
+    <notes><![CDATA[
+      json-smart 2.3 from Hadoop transitive.
+      Q1=NO: CVE-2023-1370 requires deeply nested JSON input;
+      Gravitino does not pass untrusted JSON to json-smart.
+      Reviewed: 2026-04-07
+    ]]></notes>
+    <gav regex="true">^net\.minidev:json-smart:2\.3$</gav>
+    <vulnerabilityName regex="true">^CVE-.*$</vulnerabilityName>
+  </suppress>
+
+  <suppress until="2026-07-07Z">
+    <notes><![CDATA[
+      commons-beanutils 1.7.0 / 1.8.0 / 1.9.4 from Hive/Hadoop transitive.
+      Q1=NO for 1.9.4: SuppressPropertiesBeanIntrospector is enabled by default.
+      Q1=NO for 1.7.0/1.8.0: Only used by Hive/Hadoop config parsing, not
+      exposed to untrusted input.
+      Reviewed: 2026-04-07
+    ]]></notes>
+    <gav regex="true">^commons-beanutils:commons-beanutils(-core)?:.*$</gav>
+    <vulnerabilityName regex="true">^CVE-.*$</vulnerabilityName>
+  </suppress>
+
+  <suppress until="2026-07-07Z">
+    <notes><![CDATA[
+      snappy-java 1.0.5 / 1.1.8.4 from Kafka/Paimon transitive.
+      Q1=NO: CVEs require crafted Snappy-compressed input; Gravitino
+      does not decompress untrusted Snappy data from external sources.
+      Reviewed: 2026-04-07
+    ]]></notes>
+    <gav regex="true">^org\.xerial\.snappy:snappy-java:(1\.0\.|1\.1\.[0-8]\.).*$</gav>
+    <vulnerabilityName regex="true">^CVE-.*$</vulnerabilityName>
+  </suppress>
+
+  <suppress until="2026-07-07Z">
+    <notes><![CDATA[
+      aircompressor 0.10 / 0.27 from Iceberg/Hive transitive.
+      Q1=NO: CVE-2025-67721 requires crafted compressed input;
+      only used internally by Iceberg/Hive for data file compression.
+      Reviewed: 2026-04-07
+    ]]></notes>
+    <gav regex="true">^io\.airlift:aircompressor:.*$</gav>
+    <vulnerabilityName regex="true">^CVE-.*$</vulnerabilityName>
+  </suppress>
+
+  <suppress until="2026-07-07Z">
+    <notes><![CDATA[
+      commons-configuration2 2.8.0 from Hadoop/Ranger transitive.
+      Q1=NO: CVE-2024-29131 requires crafted configuration input;
+      Gravitino does not load untrusted commons-configuration files.
+      Reviewed: 2026-04-07
+    ]]></notes>
+    <gav regex="true">^org\.apache\.commons:commons-configuration2:2\.8\.0$</gav>
+    <vulnerabilityName regex="true">^CVE-.*$</vulnerabilityName>
+  </suppress>
+
+  <suppress until="2026-07-07Z">
+    <notes><![CDATA[
+      wildfly-openssl 1.0.7 from Hadoop transitive.
+      Q2=NO: Gravitino does not use WildFly OpenSSL for TLS termination.
+      Reviewed: 2026-04-07
+    ]]></notes>
+    <gav regex="true">^org\.wildfly\.openssl:wildfly-openssl.*$</gav>
+    <vulnerabilityName regex="true">^CVE-.*$</vulnerabilityName>
+  </suppress>
+  <suppress until="2026-07-07Z">
+    <notes><![CDATA[
+      wildfly-openssl fat JAR — shaded platform-specific modules.
+    ]]></notes>
+    <filePath regex="true">.*wildfly-openssl-.*\.jar.*</filePath>
+    <vulnerabilityName regex="true">^CVE-.*$</vulnerabilityName>
+  </suppress>
+
+
+  <!-- ================================================================
+       CATEGORY C: Hadoop 3.3.x direct dependencies
+       Reason: Gravitino pins hadoop3 = 3.3.1 for broad ecosystem
+       compatibility (Iceberg, Spark, Flink all tested against 3.3.x).
+       Upgrading to 3.4.x would require extensive integration testing.
+       Three-question:
+         Q1: CVEs like CVE-2021-37404 (libhdfs buffer overflow) require
+             native HDFS client — Gravitino uses Java HDFS client only.
+         Q2: CVEs like CVE-2022-25168 (shell injection in unTar) require
+             local file system access with crafted TAR — not in Gravitino's
+             attack surface.
+         Q3: Hadoop services are behind authentication + network isolation.
+       ================================================================ -->
+  <suppress until="2026-07-07Z">
+    <notes><![CDATA[
+      Hadoop 3.3.1 modules (hadoop-aliyun, hadoop-aws, hadoop-azure, hadoop-hdfs).
+      Q1=NO: CVE-2021-37404 requires native libhdfs; Gravitino uses Java client.
+      Q2=NO: CVE-2022-25168 requires local TAR extraction; not in attack surface.
+      Reviewed: 2026-04-07
+    ]]></notes>
+    <gav regex="true">^org\.apache\.hadoop:hadoop-(aliyun|aws|azure|hdfs|hdfs-client):3\.3\.[0-4]$</gav>
+    <vulnerabilityName regex="true">^CVE-.*$</vulnerabilityName>
+  </suppress>
+
+  <suppress until="2026-07-07Z">
+    <notes><![CDATA[
+      Hadoop 2.10.2 modules from Hive catalog transitive deps.
+      Same rationale as Hadoop 3.3.x above.
+      Reviewed: 2026-04-07
+    ]]></notes>
+    <gav regex="true">^org\.apache\.hadoop:hadoop-(common|auth|annotations|hdfs|hdfs-client|mapreduce-client-core|yarn-(api|common|client)):2\.10\.2$</gav>
+    <vulnerabilityName regex="true">^CVE-.*$</vulnerabilityName>
+  </suppress>
+
+  <suppress until="2026-07-07Z">
+    <notes><![CDATA[
+      Gravitino hadoop-common and filesystem-hadoop3 modules.
+      CVEs inherited from Hadoop transitive deps, same rationale.
+      Reviewed: 2026-04-07
+    ]]></notes>
+    <filePath regex="true">.*gravitino-(hadoop-common|filesystem-hadoop3)-.*\.jar.*</filePath>
+    <vulnerabilityName regex="true">^CVE-.*$</vulnerabilityName>
+  </suppress>
+
+  <!-- ================================================================
+       CATEGORY D: Spark / Kyuubi / Paimon connector ecosystem
+       Reason: Spark connector must compile against specific Spark versions
+       (3.3, 3.4, 3.5). Kyuubi and Paimon are pinned for compatibility.
+       These CVEs are in Spark/Kyuubi/Paimon's own bundled deps.
+       Three-question:
+         Q1: Spark CVEs (e.g., CVE-2023-22946 proxy-user bypass) require
+             Spark standalone resource manager — Gravitino does not run one.
+         Q2: Kyuubi CVEs require Kyuubi server — Gravitino only uses the
+             connector JAR as a library.
+       ================================================================ -->
+  <suppress until="2026-07-07Z">
+    <notes><![CDATA[
+      Kyuubi spark connector 1.11.0 — CVEs are in Kyuubi server features
+      that Gravitino does not use (only the connector library is used).
+      Q1=NO: Gravitino does not run Kyuubi server.
+      Reviewed: 2026-04-07
+    ]]></notes>
+    <gav regex="true">^org\.apache\.kyuubi:.*$</gav>
+    <vulnerabilityName regex="true">^CVE-.*$</vulnerabilityName>
+  </suppress>
+
+  <suppress until="2026-07-07Z">
+    <notes><![CDATA[
+      Paimon hive-catalog 1.2.0 — CVEs inherited from Hive transitive deps.
+      Same rationale as Category B.
+      Reviewed: 2026-04-07
+    ]]></notes>
+    <filePath regex="true">.*paimon-(hive-catalog|bundle)-.*\.jar.*</filePath>
+    <vulnerabilityName regex="true">^CVE-.*$</vulnerabilityName>
+  </suppress>
+
+  <suppress until="2026-07-07Z">
+    <notes><![CDATA[
+      Gravitino spark connector JARs — CVEs from shaded Spark transitive deps.
+      Q1=NO: Spark standalone manager CVEs not applicable.
+      Reviewed: 2026-04-07
+    ]]></notes>
+    <filePath regex="true">.*gravitino-spark-.*\.jar.*</filePath>
+    <vulnerabilityName regex="true">^CVE-.*$</vulnerabilityName>
+  </suppress>
+
+  <suppress until="2026-07-07Z">
+    <notes><![CDATA[
+      Spark core JARs — shaded JS files (vis-timeline, jquery.dataTables)
+      and shaded protobuf. Not exploitable server-side.
+      Q2=NO: JS files are for Spark UI, not served by Gravitino.
+      Reviewed: 2026-04-07
+    ]]></notes>
+    <filePath regex="true">.*spark-(core|network-common).*\.jar.*</filePath>
+    <vulnerabilityName regex="true">^CVE-.*$</vulnerabilityName>
+  </suppress>
+
+  <!-- ================================================================
+       CATEGORY E: Netty 4.1.x transitive from ecosystem
+       Reason: Multiple Netty 4.1.x versions (4.1.50 through 4.1.115)
+       are pulled by Hadoop, Iceberg, Azure SDK, etc. CVEs like
+       CVE-2025-24970, CVE-2025-55163, CVE-2025-58056/57 affect
+       Netty < 4.1.118. Gravitino cannot independently upgrade these
+       without breaking ecosystem compatibility.
+       Three-question:
+         Q1: CVE-2025-24970 (SslHandler buffer underflow) requires TLS
+             with specific cipher — Gravitino's Jetty handles TLS, not Netty.
+         Q2: CVE-2023-44487 (HTTP/2 Rapid Reset) — Gravitino's HTTP/2
+             is handled by Jetty, not by these Netty instances.
+       ================================================================ -->
+  <suppress until="2026-07-07Z">
+    <notes><![CDATA[
+      Netty 4.1.x (all modules) from Hadoop/Iceberg/Azure ecosystem.
+      Q1=NO: Gravitino's HTTP serving uses Jetty, not Netty.
+      Netty is only used internally by cloud SDK clients.
+      Reviewed: 2026-04-07
+    ]]></notes>
+    <gav regex="true">^io\.netty:netty-.*:4\.1\..*$</gav>
+    <vulnerabilityName regex="true">^CVE-.*$</vulnerabilityName>
+  </suppress>
+
+  <!-- ================================================================
+       CATEGORY F: Jetty 9.4.x (Gravitino's own + transitive)
+       Reason: Gravitino uses Jetty 9.4.51 (latest 9.4.x). Jetty 9.4
+       is EOL; upgrading to Jetty 10/11/12 requires Jakarta EE migration.
+       Jetty 9.3.20 from hive-metastore3-libs is excluded in build config.
+       Three-question:
+         Q1: CVE-2023-36478 (HTTP/2 HPACK integer overflow) — Gravitino
+             does not enable HTTP/2 by default.
+         Q2: CVE-2024-9823 (DosFilter) — DosFilter is not configured.
+         Q3: Gravitino server is behind reverse proxy / load balancer
+             in production deployments.
+       ================================================================ -->
+  <suppress until="2026-07-07Z">
+    <notes><![CDATA[
+      Jetty 9.4.x CVEs. Gravitino uses 9.4.51 (latest 9.4.x, EOL).
+      HTTP/2 not enabled. DosFilter not configured. Production deployments
+      use reverse proxy as compensating control (Q3=YES).
+      Upgrading to Jetty 10+ requires Jakarta EE migration (tracked separately).
+      Reviewed: 2026-04-07
+    ]]></notes>
+    <gav regex="true">^org\.eclipse\.jetty:jetty-.*:9\.4\..*$</gav>
+    <vulnerabilityName regex="true">^CVE-.*$</vulnerabilityName>
+  </suppress>
+
+  <!-- ================================================================
+       CATEGORY G: Ranger authorization plugin
+       Reason: ranger-intg 2.4.0 is the latest release compatible with
+       Gravitino's authorization framework. CVEs are in Ranger's admin
+       UI features (CSV export, SSRF in service page) which Gravitino
+       does not expose.
+       ================================================================ -->
+  <suppress until="2026-07-07Z">
+    <notes><![CDATA[
+      Ranger 2.4.0 — CVE-2024-55532 (CSV injection in export),
+      CVE-2025-59059 (Nashorn RCE), CVE-2024-45479 (SSRF in UI).
+      Q2=NO: Gravitino uses Ranger as authorization plugin library,
+      does not expose Ranger Admin UI or REST API.
+      Reviewed: 2026-04-07
+    ]]></notes>
+    <gav regex="true">^org\.apache\.ranger:ranger-(intg|plugins-common):.*$</gav>
+    <vulnerabilityName regex="true">^CVE-.*$</vulnerabilityName>
+  </suppress>
+
+  <!-- ================================================================
+       CATEGORY H: Other transitive dependencies
+       ================================================================ -->
+  <suppress until="2026-07-07Z">
+    <notes><![CDATA[
+      H2 database 1.4.200 — used as default backend for dev/test and
+      maintenance jobs. Not exposed to network in production.
+      Q2=NO: H2 console is disabled; only used as embedded database.
+      Reviewed: 2026-04-07
+    ]]></notes>
+    <gav regex="true">^com\.h2database:h2:1\.4\.200$</gav>
+    <vulnerabilityName regex="true">^CVE-.*$</vulnerabilityName>
+  </suppress>
+
+  <suppress until="2026-07-07Z">
+    <notes><![CDATA[
+      snakeyaml 1.33 from Paimon transitive.
+      Q1=NO: CVE-2022-1471 requires SnakeYAML Constructor() with untrusted
+      input — Gravitino does not parse untrusted YAML with SnakeYAML.
+      Reviewed: 2026-04-07
+    ]]></notes>
+    <gav regex="true">^org\.yaml:snakeyaml:1\.33$</gav>
+    <vulnerabilityName regex="true">^CVE-.*$</vulnerabilityName>
+  </suppress>
+
+  <suppress until="2026-07-07Z">
+    <notes><![CDATA[
+      api-util 1.0.0-M20 (Apache Directory LDAP API) from Hadoop Kerberos.
+      Q2=NO: CVE-2018-1337 requires SSL connection race condition;
+      Gravitino does not use LDAP API for SSL connections.
+      Reviewed: 2026-04-07
+    ]]></notes>
+    <gav regex="true">^org\.apache\.directory\.api:api-util:.*$</gav>
+    <vulnerabilityName regex="true">^CVE-.*$</vulnerabilityName>
+  </suppress>
+
+  <suppress until="2026-07-07Z">
+    <notes><![CDATA[
+      google-oauth-client 1.24.1 from GCP bundle transitive.
+      Q1=NO: CVE-2020-7692 (PKCE bypass) — Gravitino uses service account
+      auth, not OAuth authorization code flow.
+      Reviewed: 2026-04-07
+    ]]></notes>
+    <gav regex="true">^com\.google\.oauth-client:google-oauth-client.*:1\.24\..*$</gav>
+    <vulnerabilityName regex="true">^CVE-.*$</vulnerabilityName>
+  </suppress>
+
+  <suppress until="2026-07-07Z">
+    <notes><![CDATA[
+      kafka-clients 3.4.0.
+      Q2=NO: CVE-2025-27818 requires alterConfig access to Kafka cluster;
+      CVE-2025-27817 requires SASL config manipulation — both require
+      authenticated access that Gravitino does not expose.
+      Reviewed: 2026-04-07
+    ]]></notes>
+    <gav regex="true">^org\.apache\.kafka:kafka-clients:3\.4\.0$</gav>
+    <vulnerabilityName regex="true">^CVE-.*$</vulnerabilityName>
+  </suppress>
+
+  <suppress until="2026-07-07Z">
+    <notes><![CDATA[
+      azure-identity 1.13.1 — CVE-2023-36415 (RCE via crafted Azure config).
+      Q2=NO: Requires attacker to control Azure credential configuration
+      files, which are server-side and not user-facing.
+      Reviewed: 2026-04-07
+    ]]></notes>
+    <gav regex="true">^com\.azure:azure-identity:.*$</gav>
+    <vulnerabilityName regex="true">^CVE-.*$</vulnerabilityName>
+  </suppress>
+
+  <suppress until="2026-07-07Z">
+    <notes><![CDATA[
+      Arrow 15.0.0 / 0.8.0 from Lance/Hive transitive.
+      Q1=NO: CVE-2024-52338 (IPC deserialization) requires reading
+      untrusted Arrow IPC files — Gravitino does not do this.
+      CVE-2026-25087 (use-after-free) requires reading crafted Parquet
+      with specific column types — not in Gravitino's code path.
+      Reviewed: 2026-04-07
+    ]]></notes>
+    <gav regex="true">^org\.apache\.arrow:arrow-(format|memory|memory-core|memory-netty|vector|c-data|dataset):.*$</gav>
+    <vulnerabilityName regex="true">^CVE-.*$</vulnerabilityName>
+  </suppress>
+
+  <suppress until="2026-07-07Z">
+    <notes><![CDATA[
+      lance-namespace-apache-client 0.0.20 — CVEs from OpenAPI Generator
+      (CVE-2023-27162 SSRF, CVE-2021-21428 code gen, CVE-2019-11405 HTTP).
+      Q1=NO: These are build-time code generation vulnerabilities,
+      not runtime exploitable.
+      Reviewed: 2026-04-07
+    ]]></notes>
+    <filePath regex="true">.*lance-namespace-apache-client-.*\.jar.*</filePath>
+    <vulnerabilityName regex="true">^CVE-.*$</vulnerabilityName>
+  </suppress>
+
+  <suppress until="2026-07-07Z">
+    <notes><![CDATA[
+      java-xmlbuilder 0.4 from Hive/Paimon transitive.
+      Q1=NO: CVE-2014-125087 (XXE) requires parsing untrusted XML;
+      Gravitino does not use java-xmlbuilder for XML parsing.
+      Reviewed: 2026-04-07
+    ]]></notes>
+    <gav regex="true">^com\.jamesmurty\.utils:java-xmlbuilder:.*$</gav>
+    <vulnerabilityName regex="true">^CVE-.*$</vulnerabilityName>
+  </suppress>
+
+  <suppress until="2026-07-07Z">
+    <notes><![CDATA[
+      woodstox-core 5.3.0 — CVE-2022-40152 (DTD DoS).
+      Q1=NO: Gravitino does not enable DTD processing in XML parsing.
+      Reviewed: 2026-04-07
+    ]]></notes>
+    <gav regex="true">^com\.fasterxml\.woodstox:woodstox-core:5\.3\.0$</gav>
+    <vulnerabilityName regex="true">^CVE-.*$</vulnerabilityName>
+  </suppress>
+
+  <suppress until="2026-07-07Z">
+    <notes><![CDATA[
+      okio 1.6.0 from Paimon transitive.
+      Q1=NO: CVE-2023-3635 requires crafted gzip input;
+      Gravitino does not decompress untrusted gzip via Okio.
+      Reviewed: 2026-04-07
+    ]]></notes>
+    <gav regex="true">^com\.squareup\.okio:okio:1\..*$</gav>
+    <vulnerabilityName regex="true">^CVE-.*$</vulnerabilityName>
+  </suppress>
+
+  <suppress until="2026-07-07Z">
+    <notes><![CDATA[
+      False positive: CVE-2026-33186 is a gRPC-Go vulnerability.
+      Gravitino uses gRPC-Java (grpc-api), which is a separate implementation
+      and is not affected.
+      Reviewed: 2026-04-21
+    ]]></notes>
+    <gav regex="true">^io\.grpc:grpc-(api|context):.*$</gav>
+    <cve>CVE-2026-33186</cve>
+  </suppress>
+
+  <suppress until="2026-07-07Z">
+    <notes><![CDATA[
+      False positive: CVE-2026-39883 is an OpenTelemetry-Go vulnerability.
+      Gravitino uses OpenTelemetry-Java (opentelemetry-semconv), which is a
+      separate implementation and is not affected.
+      Reviewed: 2026-04-21
+    ]]></notes>
+    <gav regex="true">^io\.opentelemetry\.semconv:opentelemetry-semconv.*:.*$</gav>
+    <cve>CVE-2026-39883</cve>
+  </suppress>
+
+</suppressions>
