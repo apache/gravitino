@@ -87,10 +87,10 @@ public class GravitinoCatalogStoreFactory implements CatalogStoreFactory {
             .collect(Collectors.toList());
 
     Preconditions.checkArgument(
-        allowThirdPartyConnectors.stream().noneMatch(FactoryUtils.gravitinoFactoryList::contains),
+        allowThirdPartyConnectors.stream().noneMatch(FactoryUtils.GRAVITINO_FACTORY_LIST::contains),
         "The allowed third party connectors %s should not contain Gravitino connectors %s.",
         allowThirdPartyConnectors,
-        FactoryUtils.gravitinoFactoryList);
+        FactoryUtils.GRAVITINO_FACTORY_LIST);
 
     this.catalogManager =
         GravitinoCatalogManager.create(gravitinoUri, gravitinoName, extractClientConfig(options));

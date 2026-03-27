@@ -42,7 +42,7 @@ public class FactoryUtils {
   private static final Logger LOG = LoggerFactory.getLogger(FactoryUtils.class);
 
   /** The list of Gravitino catalog factory identifiers. */
-  public static final ImmutableList<String> gravitinoFactoryList =
+  public static final ImmutableList<String> GRAVITINO_FACTORY_LIST =
       ImmutableList.<String>builder()
           .add(GravitinoHiveCatalogFactoryOptions.IDENTIFIER)
           .add(GravitinoIcebergCatalogFactoryOptions.IDENTIFIER)
