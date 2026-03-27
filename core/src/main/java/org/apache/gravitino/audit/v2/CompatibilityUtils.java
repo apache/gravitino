@@ -35,6 +35,8 @@ public class CompatibilityUtils {
           .put(OperationType.DROP_METALAKE, Operation.DROP_METALAKE)
           .put(OperationType.LOAD_METALAKE, Operation.LOAD_METALAKE)
           .put(OperationType.LIST_METALAKE, Operation.LIST_METALAKE)
+          .put(OperationType.ENABLE_METALAKE, Operation.ENABLE_METALAKE)
+          .put(OperationType.DISABLE_METALAKE, Operation.DISABLE_METALAKE)
 
           // Catalog operation
           .put(OperationType.CREATE_CATALOG, Operation.CREATE_CATALOG)
@@ -42,6 +44,8 @@ public class CompatibilityUtils {
           .put(OperationType.DROP_CATALOG, Operation.DROP_CATALOG)
           .put(OperationType.LOAD_CATALOG, Operation.LOAD_CATALOG)
           .put(OperationType.LIST_CATALOG, Operation.LIST_CATALOG)
+          .put(OperationType.ENABLE_CATALOG, Operation.ENABLE_CATALOG)
+          .put(OperationType.DISABLE_CATALOG, Operation.DISABLE_CATALOG)
 
           // Schema operation
           .put(OperationType.CREATE_SCHEMA, Operation.CREATE_SCHEMA)
