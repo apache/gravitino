@@ -69,7 +69,7 @@ initScript: |
   echo "Override config."
   cp /tmp/conf/* ${GRAVITINO_HOME}/conf
   echo "Start the Gravitino Lance Rest Server"
-  /bin/bash ${GRAVITINO_HOME}/bin/gravitino-lance-rest-server.sh run
+  /bin/bash ${GRAVITINO_HOME}/bin/start-lance-rest-server.sh
 
 ## Optional volumes for logs
 volumes:
