@@ -340,6 +340,16 @@ public class CaffeineEntityCache extends BaseEntityCache {
     return segmentedLock.withLockAndThrow(key, action);
   }
 
+  /** {@inheritDoc} */
+  @Override
+  public <T, E extends Exception> T withMultipleKeyCacheLock(
+      List<EntityCacheKey> keys, EntityCache.ThrowingSupplier<T, E> action) throws E {
+    Preconditions.checkArgument(keys != null, "Keys cannot be null");
+    Preconditions.checkArgument(action != null, "Action cannot be null");
+
+    return segmentedLock.withMultipleKeyLockAndThrow(keys, action);
+  }
+
   /**
    * Removes the expired entity from the cache. This method is a hook method for the Cache, when an
    * entry expires, it will call this method.

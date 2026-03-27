@@ -128,21 +128,9 @@ describe('OidcOAuthProvider', () => {
       expect(token).toBeNull()
     })
 
-    it('should return id_token for valid user', async () => {
+    it('should return access_token for valid user', async () => {
       const mockUser = {
         id_token: 'test-id-token',
-        access_token: 'test-access-token',
-        expired: false
-      }
-      mockUserManager.getUser.mockResolvedValue(mockUser)
-
-      const token = await provider.getAccessToken()
-
-      expect(token).toBe('test-id-token')
-    })
-
-    it('should return access_token when id_token is not available', async () => {
-      const mockUser = {
         access_token: 'test-access-token',
         expired: false
       }
@@ -153,10 +141,23 @@ describe('OidcOAuthProvider', () => {
       expect(token).toBe('test-access-token')
     })
 
+    it('should return id_token when access_token is not available', async () => {
+      const mockUser = {
+        id_token: 'test-id-token',
+        expired: false
+      }
+      mockUserManager.getUser.mockResolvedValue(mockUser)
+
+      const token = await provider.getAccessToken()
+
+      expect(token).toBe('test-id-token')
+    })
+
     it('should attempt silent refresh for expired user', async () => {
       const expiredUser = { expired: true }
 
       const refreshedUser = {
+        access_token: 'new-access-token',
         id_token: 'new-id-token',
         expired: false
       }
@@ -167,7 +168,7 @@ describe('OidcOAuthProvider', () => {
       const token = await provider.getAccessToken()
 
       expect(mockUserManager.signinSilent).toHaveBeenCalled()
-      expect(token).toBe('new-id-token')
+      expect(token).toBe('new-access-token')
     })
 
     it('should handle silent refresh failure', async () => {
