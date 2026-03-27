@@ -41,6 +41,8 @@ export default function UserSetting() {
   const [showLogoutButton, setShowLogoutButton] = useState(false)
   const auth = useAppSelector(state => state.auth)
   const { serviceAdmins, authUser, anthEnable } = auth
+  const admins = Array.isArray(serviceAdmins) ? serviceAdmins : (serviceAdmins || '').split(',')
+  const isServiceAdmin = admins.includes(authUser?.name)
   const [session, setSession] = useState({})
   const router = useRouter()
   const pathname = usePathname()
@@ -85,7 +87,7 @@ export default function UserSetting() {
         label: (
           <div className='flex w-[208px] justify-between'>
             <span>Metalakes</span>
-            {[...(serviceAdmins || '').split(',')].includes(authUser?.name) && (
+            {isServiceAdmin && (
               <Tooltip title='Create Metalake'>
                 <PlusOutlined className='cursor-pointer text-black' onClick={handleCreateMetalake} />
               </Tooltip>

@@ -33,9 +33,15 @@ import org.apache.gravitino.listener.api.event.AlterMetalakePreEvent;
 import org.apache.gravitino.listener.api.event.CreateMetalakeEvent;
 import org.apache.gravitino.listener.api.event.CreateMetalakeFailureEvent;
 import org.apache.gravitino.listener.api.event.CreateMetalakePreEvent;
+import org.apache.gravitino.listener.api.event.DisableMetalakeEvent;
+import org.apache.gravitino.listener.api.event.DisableMetalakeFailureEvent;
+import org.apache.gravitino.listener.api.event.DisableMetalakePreEvent;
 import org.apache.gravitino.listener.api.event.DropMetalakeEvent;
 import org.apache.gravitino.listener.api.event.DropMetalakeFailureEvent;
 import org.apache.gravitino.listener.api.event.DropMetalakePreEvent;
+import org.apache.gravitino.listener.api.event.EnableMetalakeEvent;
+import org.apache.gravitino.listener.api.event.EnableMetalakeFailureEvent;
+import org.apache.gravitino.listener.api.event.EnableMetalakePreEvent;
 import org.apache.gravitino.listener.api.event.ListMetalakeEvent;
 import org.apache.gravitino.listener.api.event.ListMetalakeFailureEvent;
 import org.apache.gravitino.listener.api.event.ListMetalakePreEvent;
@@ -161,13 +167,27 @@ public class MetalakeEventDispatcher implements MetalakeDispatcher {
 
   @Override
   public void enableMetalake(NameIdentifier ident) throws NoSuchMetalakeException {
-    // todo: support enable metalake event
-    dispatcher.enableMetalake(ident);
+    eventBus.dispatchEvent(new EnableMetalakePreEvent(PrincipalUtils.getCurrentUserName(), ident));
+    try {
+      dispatcher.enableMetalake(ident);
+      eventBus.dispatchEvent(new EnableMetalakeEvent(PrincipalUtils.getCurrentUserName(), ident));
+    } catch (Exception e) {
+      eventBus.dispatchEvent(
+          new EnableMetalakeFailureEvent(PrincipalUtils.getCurrentUserName(), ident, e));
+      throw e;
+    }
   }
 
   @Override
   public void disableMetalake(NameIdentifier ident) throws NoSuchMetalakeException {
-    // todo: support disable metalake event
-    dispatcher.disableMetalake(ident);
+    eventBus.dispatchEvent(new DisableMetalakePreEvent(PrincipalUtils.getCurrentUserName(), ident));
+    try {
+      dispatcher.disableMetalake(ident);
+      eventBus.dispatchEvent(new DisableMetalakeEvent(PrincipalUtils.getCurrentUserName(), ident));
+    } catch (Exception e) {
+      eventBus.dispatchEvent(
+          new DisableMetalakeFailureEvent(PrincipalUtils.getCurrentUserName(), ident, e));
+      throw e;
+    }
   }
 }
