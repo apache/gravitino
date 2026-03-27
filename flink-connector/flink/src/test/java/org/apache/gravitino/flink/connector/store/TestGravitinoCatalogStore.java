@@ -31,6 +31,7 @@ import org.apache.flink.table.catalog.CommonCatalogOptions;
 import org.apache.flink.table.catalog.GenericInMemoryCatalogStore;
 import org.apache.flink.table.catalog.exceptions.CatalogException;
 import org.apache.gravitino.flink.connector.catalog.GravitinoCatalogManager;
+import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
 
@@ -47,6 +48,13 @@ public class TestGravitinoCatalogStore {
     gravitinoCatalogStore =
         new GravitinoCatalogStore(
             gravitinoCatalogMockManager, memoryCatalogStore, Arrays.asList("filesystem", "jdbc"));
+  }
+
+  @After
+  public void closeCatalogStore() {
+    if (memoryCatalogStore != null) {
+      memoryCatalogStore.close();
+    }
   }
 
   @Test
