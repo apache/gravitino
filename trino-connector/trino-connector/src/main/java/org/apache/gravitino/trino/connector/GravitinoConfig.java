@@ -327,9 +327,8 @@ public class GravitinoConfig {
     config.entrySet().stream()
         .filter(entry -> entry.getKey().startsWith(GRAVITINO_CLIENT_CONFIG_PREFIX.key))
         .forEach(
-            entry -> {
-              stringList.add(String.format("\"%s\"='%s'", entry.getKey(), entry.getValue()));
-            });
+            entry ->
+                stringList.add(String.format("\"%s\"='%s'", entry.getKey(), entry.getValue())));
     return StringUtils.join(stringList, ',');
   }
 
