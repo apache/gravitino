@@ -37,8 +37,6 @@ dependencies {
     exclude(group = "org.apache.avro")
     exclude(group = "org.apache.logging.log4j")
     exclude(group = "org.eclipse.jetty")
-    exclude(group = "org.eclipse.jetty.aggregate", module = "jetty-all")
-    exclude(group = "org.eclipse.jetty.orbit", module = "javax.servlet")
     exclude(group = "org.slf4j")
   }
   implementation(libs.hive3.metastore) {
