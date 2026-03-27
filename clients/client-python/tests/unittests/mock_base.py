@@ -238,7 +238,7 @@ class MockTagRepo:
                 del self.tag_store[tag_name]
                 tag_name = change.new_name
 
-            elif isinstance(change, TagChange.ChangeComment):
+            elif isinstance(change, TagChange.UpdateTagComment):
                 self.tag_store[tag_name] = build_tag_dto(
                     current_tag_obj.name(),
                     change.new_comment,

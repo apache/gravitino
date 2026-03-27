@@ -550,7 +550,7 @@ class GravitinoMetalake(
         Raises:
             NoSuchMetalakeException: If the metalake does not exist.
         """
-        url = self.API_METALAKES_TAGS_PATH.format(encode_string(self.name))
+        url = self.API_METALAKES_TAGS_PATH.format(encode_string(self.name()))
 
         response = self.rest_client.get(url, error_handler=TAG_ERROR_HANDLER)
         list_info_resp = TagListResponse.from_json(response.body, infer_missing=True)
