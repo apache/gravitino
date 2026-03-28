@@ -19,6 +19,7 @@ import unittest
 from http.client import HTTPResponse
 from unittest.mock import Mock, patch
 
+from gravitino.api.rel.table_change import TableChange
 from gravitino.client.relational_catalog import RelationalCatalog
 from gravitino.dto.audit_dto import AuditDTO
 from gravitino.dto.rel.distribution_dto import DistributionDTO
@@ -299,3 +300,128 @@ class TestRelationalCatalog(unittest.TestCase):
         ):
             is_dropped = self.catalog.purge_table(self.table_identifier)
             self.assertTrue(is_dropped)
+
+    def test_alter_table(self):
+        resp_body = TableResponse(0, self.table_dto)
+        mock_resp = self._get_mock_http_resp(resp_body.to_json())
+
+        with patch(
+            "gravitino.utils.http_client.HTTPClient.put",
+            return_value=mock_resp,
+        ):
+            table = self.catalog.alter_table(
+                self.table_identifier,
+                TableChange.update_comment("Updated comment"),
+            )
+            self.assertEqual(table.name(), self.table_dto.name())
+
+    def test_alter_table_not_exists(self):
+        with (
+            patch(
+                "gravitino.utils.http_client.HTTPClient.put",
+                side_effect=NoSuchTableException("Table not found"),
+            ),
+            self.assertRaises(NoSuchTableException),
+        ):
+            self.catalog.alter_table(
+                self.table_identifier,
+                TableChange.update_comment("Updated comment"),
+            )
+
+    def test_alter_table_set_property(self):
+        resp_body = TableResponse(0, self.table_dto)
+        mock_resp = self._get_mock_http_resp(resp_body.to_json())
+
+        with patch(
+            "gravitino.utils.http_client.HTTPClient.put",
+            return_value=mock_resp,
+        ):
+            table = self.catalog.alter_table(
+                self.table_identifier,
+                TableChange.set_property("key", "value"),
+            )
+            self.assertEqual(table.name(), self.table_dto.name())
+
+    def test_alter_table_rename(self):
+        resp_body = TableResponse(0, self.table_dto)
+        mock_resp = self._get_mock_http_resp(resp_body.to_json())
+
+        with patch(
+            "gravitino.utils.http_client.HTTPClient.put",
+            return_value=mock_resp,
+        ):
+            table = self.catalog.alter_table(
+                self.table_identifier,
+                TableChange.rename("new_table_name"),
+            )
+            self.assertEqual(table.name(), self.table_dto.name())
+
+    def test_alter_table_remove_property(self):
+        resp_body = TableResponse(0, self.table_dto)
+        mock_resp = self._get_mock_http_resp(resp_body.to_json())
+
+        with patch(
+            "gravitino.utils.http_client.HTTPClient.put",
+            return_value=mock_resp,
+        ):
+            table = self.catalog.alter_table(
+                self.table_identifier,
+                TableChange.remove_property("key"),
+            )
+            self.assertEqual(table.name(), self.table_dto.name())
+
+    def test_alter_table_rename_column(self):
+        resp_body = TableResponse(0, self.table_dto)
+        mock_resp = self._get_mock_http_resp(resp_body.to_json())
+
+        with patch(
+            "gravitino.utils.http_client.HTTPClient.put",
+            return_value=mock_resp,
+        ):
+            table = self.catalog.alter_table(
+                self.table_identifier,
+                TableChange.rename_column(["id"], "new_id"),
+            )
+            self.assertEqual(table.name(), self.table_dto.name())
+
+    def test_alter_table_update_column_comment(self):
+        resp_body = TableResponse(0, self.table_dto)
+        mock_resp = self._get_mock_http_resp(resp_body.to_json())
+
+        with patch(
+            "gravitino.utils.http_client.HTTPClient.put",
+            return_value=mock_resp,
+        ):
+            table = self.catalog.alter_table(
+                self.table_identifier,
+                TableChange.update_column_comment(["id"], "new comment"),
+            )
+            self.assertEqual(table.name(), self.table_dto.name())
+
+    def test_alter_table_delete_column(self):
+        resp_body = TableResponse(0, self.table_dto)
+        mock_resp = self._get_mock_http_resp(resp_body.to_json())
+
+        with patch(
+            "gravitino.utils.http_client.HTTPClient.put",
+            return_value=mock_resp,
+        ):
+            table = self.catalog.alter_table(
+                self.table_identifier,
+                TableChange.delete_column(["id"], if_exists=True),
+            )
+            self.assertEqual(table.name(), self.table_dto.name())
+
+    def test_alter_table_update_column_nullability(self):
+        resp_body = TableResponse(0, self.table_dto)
+        mock_resp = self._get_mock_http_resp(resp_body.to_json())
+
+        with patch(
+            "gravitino.utils.http_client.HTTPClient.put",
+            return_value=mock_resp,
+        ):
+            table = self.catalog.alter_table(
+                self.table_identifier,
+                TableChange.update_column_nullability(["id"], nullable=True),
+            )
+            self.assertEqual(table.name(), self.table_dto.name())
