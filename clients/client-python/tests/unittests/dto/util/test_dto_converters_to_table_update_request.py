@@ -20,6 +20,7 @@ from typing import cast
 
 from gravitino.api.rel.column import Column
 from gravitino.api.rel.expressions.literals.literals import Literals
+from gravitino.api.rel.indexes.index import Index
 from gravitino.api.rel.table_change import TableChange
 from gravitino.api.rel.types.types import Types
 from gravitino.dto.rel.expressions.literal_dto import LiteralDTO
@@ -223,3 +224,81 @@ class TestDTOConvertersToTableUpdateRequest(unittest.TestCase):
             )
             self.assertListEqual(update_request.field_name, ["col"])
             self.assertEqual(update_request.auto_increment, auto_increment)
+
+    def test_to_table_update_request_rename_table(self):
+        """Tests the conversion of a rename table change to a TableUpdateRequest."""
+        rename_table = TableChange.rename("new_table_name")
+        result = DTOConverters.to_table_update_request(rename_table)
+        self.assertIsInstance(result, TableUpdateRequest.RenameTableRequest)
+        rename_request = cast(TableUpdateRequest.RenameTableRequest, result)
+        self.assertEqual(rename_request.new_name, "new_table_name")
+        self.assertIsNone(rename_request.new_schema_name)
+
+    def test_to_table_update_request_update_comment(self):
+        """Tests the conversion of an update comment change to a TableUpdateRequest."""
+        update_comment = TableChange.update_comment("new comment")
+        result = DTOConverters.to_table_update_request(update_comment)
+        self.assertIsInstance(result, TableUpdateRequest.UpdateTableCommentRequest)
+        comment_request = cast(TableUpdateRequest.UpdateTableCommentRequest, result)
+        self.assertEqual(comment_request.new_comment, "new comment")
+
+    def test_to_table_update_request_set_property(self):
+        """Tests the conversion of a set property change to a TableUpdateRequest."""
+        set_property = TableChange.set_property("key", "value")
+        result = DTOConverters.to_table_update_request(set_property)
+        self.assertIsInstance(result, TableUpdateRequest.SetTablePropertyRequest)
+        property_request = cast(TableUpdateRequest.SetTablePropertyRequest, result)
+        self.assertEqual(property_request.prop, "key")
+        self.assertEqual(property_request.prop_value, "value")
+
+    def test_to_table_update_request_remove_property(self):
+        """Tests the conversion of a remove property change to a TableUpdateRequest."""
+        remove_property = TableChange.remove_property("key")
+        result = DTOConverters.to_table_update_request(remove_property)
+        self.assertIsInstance(result, TableUpdateRequest.RemoveTablePropertyRequest)
+        property_request = cast(TableUpdateRequest.RemoveTablePropertyRequest, result)
+        self.assertEqual(property_request.property, "key")
+
+    def test_to_table_update_request_add_column(self):
+        """Tests the conversion of an add column change to a TableUpdateRequest."""
+        add_column = TableChange.add_column(
+            field_name=["new_col"],
+            data_type=Types.StringType.get(),
+        )
+        result = DTOConverters.to_table_update_request(add_column)
+        self.assertIsInstance(result, TableUpdateRequest.AddTableColumnRequest)
+        add_request = cast(TableUpdateRequest.AddTableColumnRequest, result)
+        self.assertListEqual(add_request.field_name, ["new_col"])
+        self.assertEqual(add_request.data_type, Types.StringType.get())
+
+    def test_to_table_update_request_delete_column(self):
+        """Tests the conversion of a delete column change to a TableUpdateRequest."""
+        delete_column = TableChange.delete_column(["col"], if_exists=True)
+        result = DTOConverters.to_table_update_request(delete_column)
+        self.assertIsInstance(result, TableUpdateRequest.DeleteTableColumnRequest)
+        delete_request = cast(TableUpdateRequest.DeleteTableColumnRequest, result)
+        self.assertListEqual(delete_request.field_name, ["col"])
+        self.assertTrue(delete_request.if_exists)
+
+    def test_to_table_update_request_add_index(self):
+        """Tests the conversion of an add index change to a TableUpdateRequest."""
+
+        add_index = TableChange.add_index(
+            index_type=Index.IndexType.PRIMARY_KEY,
+            name="pk_index",
+            field_names=[["id"]],
+        )
+        result = DTOConverters.to_table_update_request(add_index)
+        self.assertIsInstance(result, TableUpdateRequest.AddTableIndexRequest)
+        index_request = cast(TableUpdateRequest.AddTableIndexRequest, result)
+        self.assertEqual(index_request.index.type(), Index.IndexType.PRIMARY_KEY)
+        self.assertEqual(index_request.index.name(), "pk_index")
+
+    def test_to_table_update_request_delete_index(self):
+        """Tests the conversion of a delete index change to a TableUpdateRequest."""
+        delete_index = TableChange.delete_index("idx_name", if_exists=False)
+        result = DTOConverters.to_table_update_request(delete_index)
+        self.assertIsInstance(result, TableUpdateRequest.DeleteTableIndexRequest)
+        index_request = cast(TableUpdateRequest.DeleteTableIndexRequest, result)
+        self.assertEqual(index_request.name, "idx_name")
+        self.assertFalse(index_request.if_exists)
