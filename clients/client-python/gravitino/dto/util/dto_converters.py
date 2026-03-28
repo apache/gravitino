@@ -46,6 +46,7 @@ from gravitino.api.rel.table_change import (
     AddColumn,
     DeleteColumn,
     RenameColumn,
+    TableChange,
     UpdateColumnAutoIncrement,
     UpdateColumnComment,
     UpdateColumnDefaultValue,
@@ -749,4 +750,55 @@ class DTOConverters:
         return TableUpdateRequest.UpdateColumnAutoIncrementRequest(
             _field_name=change.field_name(),
             _auto_increment=change.is_auto_increment(),
+        )
+
+    @staticmethod
+    def to_table_update_request(change) -> TableUpdateRequestBase:
+        if isinstance(change, TableChange.RenameTable):
+            rename_table = cast(TableChange.RenameTable, change)
+            return TableUpdateRequest.RenameTableRequest(
+                _new_name=rename_table.get_new_name(),
+                _new_schema_name=rename_table.get_new_schema_name(),
+            )
+
+        if isinstance(change, TableChange.UpdateComment):
+            return TableUpdateRequest.UpdateTableCommentRequest(
+                _new_comment=cast(TableChange.UpdateComment, change).get_new_comment()
+            )
+
+        if isinstance(change, TableChange.SetProperty):
+            set_property = cast(TableChange.SetProperty, change)
+            return TableUpdateRequest.SetTablePropertyRequest(
+                _prop=set_property.get_property(),
+                _prop_value=set_property.get_value(),
+            )
+
+        if isinstance(change, TableChange.RemoveProperty):
+            remove_property = cast(TableChange.RemoveProperty, change)
+            return TableUpdateRequest.RemoveTablePropertyRequest(
+                _property=remove_property.get_property()
+            )
+
+        if isinstance(change, TableChange.ColumnChange):
+            return DTOConverters._to_column_update_request(change)
+
+        if isinstance(change, TableChange.AddIndex):
+            add_index = cast(TableChange.AddIndex, change)
+            return TableUpdateRequest.AddTableIndexRequest(
+                Indexes.of(
+                    add_index.get_type(),
+                    add_index.get_name(),
+                    add_index.get_field_names(),
+                ),
+            )
+
+        if isinstance(change, TableChange.DeleteIndex):
+            delete_index = cast(TableChange.DeleteIndex, change)
+            return TableUpdateRequest.DeleteTableIndexRequest(
+                _name=delete_index.get_name(),
+                _if_exists=delete_index.is_if_exists(),
+            )
+
+        raise IllegalArgumentException(
+            f"Unknown change type: {change.__class__.__name__}"
         )
