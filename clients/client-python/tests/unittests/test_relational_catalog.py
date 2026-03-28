@@ -19,6 +19,7 @@ import unittest
 from http.client import HTTPResponse
 from unittest.mock import Mock, patch
 
+from gravitino.api.authorization.privileges import Privilege
 from gravitino.api.rel.table_change import TableChange
 from gravitino.client.relational_catalog import RelationalCatalog
 from gravitino.dto.audit_dto import AuditDTO
@@ -229,6 +230,23 @@ class TestRelationalCatalog(unittest.TestCase):
         ):
             table = self.catalog.load_table(self.table_identifier)
             self.assertEqual(table.name(), self.table_dto.name())
+
+    def test_load_table_with_required_privilege_names(self):
+        resp_body = TableResponse(0, self.table_dto)
+        mock_resp = self._get_mock_http_resp(resp_body.to_json())
+
+        with patch(
+            "gravitino.utils.http_client.HTTPClient.get",
+            return_value=mock_resp,
+        ) as mock_get:
+            privileges = {Privilege.Name.SELECT_TABLE, Privilege.Name.MODIFY_TABLE}
+            table = self.catalog.load_table(
+                self.table_identifier, required_privilege_names=privileges
+            )
+            self.assertEqual(table.name(), self.table_dto.name())
+            mock_get.assert_called_once()
+            call_args = mock_get.call_args
+            self.assertIn("privileges", call_args.kwargs["params"])
 
     def test_list_tables(self):
         resp_body = EntityListResponse(
