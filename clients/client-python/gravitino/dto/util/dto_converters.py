@@ -42,6 +42,17 @@ from gravitino.api.rel.partitions.list_partition import ListPartition
 from gravitino.api.rel.partitions.partition import Partition
 from gravitino.api.rel.partitions.range_partition import RangePartition
 from gravitino.api.rel.table import Table
+from gravitino.api.rel.table_change import (
+    AddColumn,
+    DeleteColumn,
+    RenameColumn,
+    UpdateColumnAutoIncrement,
+    UpdateColumnComment,
+    UpdateColumnDefaultValue,
+    UpdateColumnNullability,
+    UpdateColumnPosition,
+    UpdateColumnType,
+)
 from gravitino.api.rel.types.types import Types
 from gravitino.dto.rel.column_dto import ColumnDTO
 from gravitino.dto.rel.distribution_dto import DistributionDTO
@@ -77,6 +88,10 @@ from gravitino.dto.rel.partitions.partition_dto import PartitionDTO
 from gravitino.dto.rel.partitions.range_partition_dto import RangePartitionDTO
 from gravitino.dto.rel.sort_order_dto import SortOrderDTO
 from gravitino.dto.rel.table_dto import TableDTO
+from gravitino.dto.requests.table_update_request import (
+    TableUpdateRequest,
+    TableUpdateRequestBase,
+)
 from gravitino.exceptions.base import IllegalArgumentException
 
 
@@ -643,3 +658,93 @@ class DTOConverters:
         if not dtos:
             return []
         return [DTOConverters.to_dto(dto) for dto in dtos]
+
+    @singledispatchmethod
+    @staticmethod
+    def _to_column_update_request(change) -> TableUpdateRequestBase:
+        raise IllegalArgumentException(f"Unknown column change type: {type(change)}")
+
+    @_to_column_update_request.register
+    @staticmethod
+    def _(change: AddColumn) -> TableUpdateRequestBase:
+        default_value = (
+            Column.DEFAULT_VALUE_NOT_SET
+            if change.get_default_value() is None
+            or change.get_default_value() == Column.DEFAULT_VALUE_NOT_SET
+            else DTOConverters.to_function_arg(change.get_default_value())
+        )
+        return TableUpdateRequest.AddTableColumnRequest(
+            _field_name=change.field_name(),
+            _data_type=change.get_data_type(),
+            _comment=change.get_comment(),
+            _position=change.get_position(),
+            _nullable=change.is_nullable(),
+            _auto_increment=change.is_auto_increment(),
+            _default_value=default_value,
+        )
+
+    @_to_column_update_request.register
+    @staticmethod
+    def _(change: RenameColumn) -> TableUpdateRequestBase:
+        return TableUpdateRequest.RenameTableColumnRequest(
+            _old_field_name=change.field_name(),
+            _new_field_name=change.get_new_name(),
+        )
+
+    @_to_column_update_request.register
+    @staticmethod
+    def _(change: UpdateColumnDefaultValue) -> TableUpdateRequestBase:
+        return TableUpdateRequest.UpdateTableColumnDefaultValueRequest(
+            _field_name=change.field_name(),
+            _new_default_value=DTOConverters.to_function_arg(
+                change.get_new_default_value()
+            ),
+        )
+
+    @_to_column_update_request.register
+    @staticmethod
+    def _(change: UpdateColumnType) -> TableUpdateRequestBase:
+        return TableUpdateRequest.UpdateTableColumnTypeRequest(
+            _field_name=change.field_name(),
+            _new_type=change.get_new_data_type(),
+        )
+
+    @_to_column_update_request.register
+    @staticmethod
+    def _(change: UpdateColumnComment) -> TableUpdateRequestBase:
+        return TableUpdateRequest.UpdateTableColumnCommentRequest(
+            _field_name=change.field_name(),
+            _new_comment=change.get_new_comment(),
+        )
+
+    @_to_column_update_request.register
+    @staticmethod
+    def _(change: UpdateColumnPosition) -> TableUpdateRequestBase:
+        return TableUpdateRequest.UpdateTableColumnPositionRequest(
+            _field_name=change.field_name(),
+            _new_position=change.get_position(),
+        )
+
+    @_to_column_update_request.register
+    @staticmethod
+    def _(change: DeleteColumn) -> TableUpdateRequestBase:
+        return TableUpdateRequest.DeleteTableColumnRequest(
+            _field_name=change.field_name(),
+            _if_exists=change.get_if_exists(),
+        )
+
+    @_to_column_update_request.register
+    @staticmethod
+    def _(change: UpdateColumnNullability) -> TableUpdateRequestBase:
+        return TableUpdateRequest.UpdateTableColumnNullabilityRequest(
+            _field_name=change.field_name(),
+            _nullable=change.get_nullable(),
+        )
+
+    @_to_column_update_request.register
+    @staticmethod
+    def _(change: UpdateColumnAutoIncrement) -> TableUpdateRequestBase:
+        return TableUpdateRequest.UpdateColumnAutoIncrementRequest(
+            _field_name=change.field_name(),
+            _auto_increment=change.is_auto_increment(),
+        )
