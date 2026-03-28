@@ -15,8 +15,9 @@
 # specific language governing permissions and limitations
 # under the License.
 
-from typing import Optional
+from typing import Final, Optional, overload
 
+from gravitino.api.authorization.privileges import Privilege
 from gravitino.api.catalog import Catalog
 from gravitino.api.rel.column import Column
 from gravitino.api.rel.expressions.distributions.distribution import Distribution
@@ -42,13 +43,17 @@ from gravitino.rest.rest_utils import encode_string
 from gravitino.utils import HTTPClient
 
 
-class RelationalCatalog(BaseSchemaCatalog, TableCatalog):  # pylint: disable=too-many-ancestors
+class RelationalCatalog(
+    BaseSchemaCatalog, TableCatalog
+):  # pylint: disable=too-many-ancestors
     """Relational catalog is a catalog implementation
 
     The `RelationalCatalog` supports relational database like metadata operations,
     for example, schemas and tables list, creation, update and deletion. A Relational
     catalog is under the metalake.
     """
+
+    PRIVILEGES: Final[str] = "privileges"
 
     def __init__(
         self,
@@ -188,12 +193,35 @@ class RelationalCatalog(BaseSchemaCatalog, TableCatalog):  # pylint: disable=too
             for ident in entity_list_resp.identifiers()
         ]
 
-    def load_table(self, identifier: NameIdentifier) -> Table:
+    @overload
+    def load_table(self, identifier: NameIdentifier) -> Table: ...
+
+    @overload
+    def load_table(  # pylint: disable=arguments-differ
+        self, identifier: NameIdentifier, required_privilege_names: set[Privilege.Name]
+    ) -> Table: ...
+
+    def load_table(
+        self,
+        identifier: NameIdentifier,
+        required_privilege_names: Optional[set[Privilege.Name]] = None,
+    ) -> Table:
         self._check_table_name_identifier(identifier)
         full_namespace = self._get_table_full_namespace(identifier.namespace())
+        query_params = (
+            {
+                RelationalCatalog.PRIVILEGES: ",".join(
+                    priv.name for priv in required_privilege_names
+                )
+            }
+            if required_privilege_names is not None
+            else None
+        )
+
         resp = self.rest_client.get(
             f"{self._format_table_request_path(full_namespace)}"
             f"/{encode_string(identifier.name())}",
+            params=query_params,
             error_handler=TABLE_ERROR_HANDLER,
         )
         table_resp = TableResponse.from_json(resp.body, infer_missing=True)
