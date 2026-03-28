@@ -662,7 +662,9 @@ class DTOConverters:
     @singledispatchmethod
     @staticmethod
     def _to_column_update_request(change) -> TableUpdateRequestBase:
-        raise IllegalArgumentException(f"Unknown column change type: {type(change)}")
+        raise IllegalArgumentException(
+            f"Unknown column change type: {change.__class__.__name__}"
+        )
 
     @_to_column_update_request.register
     @staticmethod
