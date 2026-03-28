@@ -30,7 +30,7 @@ from gravitino.exceptions.base import IllegalArgumentException
 
 
 class TestDTOConvertersToTableUpdateRequest(unittest.TestCase):
-    def test_to_column_update_request_add_column_with_default_value(self):
+    def test_to_table_update_request_add_column_with_default_value(self):
         """Tests the conversion of an add column change with a default value to a TableUpdateRequest."""
         add_column = TableChange.add_column(
             field_name=["new_col"],
@@ -42,7 +42,7 @@ class TestDTOConvertersToTableUpdateRequest(unittest.TestCase):
         )
         result = cast(
             TableUpdateRequest.AddTableColumnRequest,
-            DTOConverters._to_column_update_request(add_column),
+            DTOConverters.to_table_update_request(add_column),
         )
         self.assertIsInstance(result, TableUpdateRequest.AddTableColumnRequest)
         add_column_request = cast(TableUpdateRequest.AddTableColumnRequest, result)
@@ -53,13 +53,13 @@ class TestDTOConvertersToTableUpdateRequest(unittest.TestCase):
         self.assertFalse(add_column_request.is_nullable)
         self.assertTrue(add_column_request.is_auto_increment)
 
-    def test_to_column_update_request_add_column_without_default_value(self):
+    def test_to_table_update_request_add_column_without_default_value(self):
         """Tests the conversion of an add column change without a default value to a TableUpdateRequest."""
         add_column = TableChange.add_column(
             field_name=["new_col"],
             data_type=Types.StringType.get(),
         )
-        result = DTOConverters._to_column_update_request(add_column)
+        result = DTOConverters.to_table_update_request(add_column)
         self.assertIsInstance(result, TableUpdateRequest.AddTableColumnRequest)
         add_column_request = cast(TableUpdateRequest.AddTableColumnRequest, result)
         self.assertEqual(
@@ -67,26 +67,30 @@ class TestDTOConvertersToTableUpdateRequest(unittest.TestCase):
             Column.DEFAULT_VALUE_NOT_SET,
         )
 
-    def test_to_column_update_request_unsupported_change(self):
+    def test_to_table_update_request_unsupported_change(self):
         """Tests that an unsupported table change raises an IllegalArgumentException."""
-        with self.assertRaisesRegex(
-            IllegalArgumentException, "Unknown column change type"
-        ):
-            DTOConverters._to_column_update_request("invalid_change")
+        with self.assertRaisesRegex(IllegalArgumentException, "Unknown change type"):
+            DTOConverters.to_table_update_request("invalid_change")
 
-    def test_to_column_update_request_rename_column(self):
+    def test_to_table_update_request_rename_column(self):
         """Tests the conversion of a rename column change to a TableUpdateRequest."""
         rename_column = TableChange.rename_column(
             field_name=["old_col"],
             new_name="new_col",
         )
-        result = DTOConverters._to_column_update_request(rename_column)
+        result = DTOConverters.to_table_update_request(rename_column)
         self.assertIsInstance(result, TableUpdateRequest.RenameTableColumnRequest)
         rename_request = cast(TableUpdateRequest.RenameTableColumnRequest, result)
-        self.assertListEqual(rename_request._old_field_name, ["old_col"])
-        self.assertEqual(rename_request._new_field_name, "new_col")
+        self.assertListEqual(
+            rename_request._old_field_name,  # pylint: disable=protected-access
+            ["old_col"],
+        )
+        self.assertEqual(
+            rename_request._new_field_name,  # pylint: disable=protected-access
+            "new_col",
+        )
 
-    def test_to_column_update_request_update_column_default_value_full(self):
+    def test_to_table_update_request_update_column_default_value_full(self):
         """Tests the conversion of an update column default value change to a TableUpdateRequest."""
         literals = [
             Literals.integer_literal(42),
@@ -99,7 +103,7 @@ class TestDTOConvertersToTableUpdateRequest(unittest.TestCase):
                 field_name=["col"],
                 new_default_value=literal,
             )
-            result = DTOConverters._to_column_update_request(update_default)
+            result = DTOConverters.to_table_update_request(update_default)
             self.assertIsInstance(
                 result, TableUpdateRequest.UpdateTableColumnDefaultValueRequest
             )
@@ -115,7 +119,7 @@ class TestDTOConvertersToTableUpdateRequest(unittest.TestCase):
                 "NULL" if literal.value() is None else str(literal.value()),
             )
 
-    def test_to_column_update_request_update_column_type(self):
+    def test_to_table_update_request_update_column_type(self):
         """Tests the conversion of an update column type change to a TableUpdateRequest."""
         column_types = [
             Types.IntegerType.get(),
@@ -129,7 +133,7 @@ class TestDTOConvertersToTableUpdateRequest(unittest.TestCase):
                 field_name=["col"],
                 new_data_type=new_column_type,
             )
-            result = DTOConverters._to_column_update_request(update_type)
+            result = DTOConverters.to_table_update_request(update_type)
             self.assertIsInstance(
                 result, TableUpdateRequest.UpdateTableColumnTypeRequest
             )
@@ -139,13 +143,13 @@ class TestDTOConvertersToTableUpdateRequest(unittest.TestCase):
             self.assertListEqual(update_request.field_name, ["col"])
             self.assertEqual(update_request.new_type, new_column_type)
 
-    def test_to_column_update_request_update_column_comment(self):
+    def test_to_table_update_request_update_column_comment(self):
         """Tests the conversion of an update column comment change to a TableUpdateRequest."""
         update_comment = TableChange.update_column_comment(
             field_name=["col"],
             new_comment="new comment",
         )
-        result = DTOConverters._to_column_update_request(update_comment)
+        result = DTOConverters.to_table_update_request(update_comment)
         self.assertIsInstance(
             result, TableUpdateRequest.UpdateTableColumnCommentRequest
         )
@@ -155,7 +159,7 @@ class TestDTOConvertersToTableUpdateRequest(unittest.TestCase):
         self.assertListEqual(update_request.field_name, ["col"])
         self.assertEqual(update_request.new_comment, "new comment")
 
-    def test_to_column_update_request_update_column_position(self):
+    def test_to_table_update_request_update_column_position(self):
         """Tests the conversion of an update column position change with a ColumnPosition."""
         positions = [
             TableChange.ColumnPosition.first(),
@@ -167,7 +171,7 @@ class TestDTOConvertersToTableUpdateRequest(unittest.TestCase):
                 field_name=["col"],
                 new_position=position,
             )
-            result = DTOConverters._to_column_update_request(update_position)
+            result = DTOConverters.to_table_update_request(update_position)
             self.assertIsInstance(
                 result, TableUpdateRequest.UpdateTableColumnPositionRequest
             )
@@ -177,7 +181,7 @@ class TestDTOConvertersToTableUpdateRequest(unittest.TestCase):
             self.assertListEqual(update_request.field_name, ["col"])
             self.assertEqual(str(update_request.new_position), str(position))
 
-    def test_to_column_update_request_delete_column(self):
+    def test_to_table_update_request_delete_column(self):
         """Tests the conversion of a delete column change to a TableUpdateRequest."""
 
         for exists in (True, False):
@@ -185,20 +189,20 @@ class TestDTOConvertersToTableUpdateRequest(unittest.TestCase):
                 field_name=["col"],
                 if_exists=exists,
             )
-            result = DTOConverters._to_column_update_request(delete_column)
+            result = DTOConverters.to_table_update_request(delete_column)
             self.assertIsInstance(result, TableUpdateRequest.DeleteTableColumnRequest)
             delete_request = cast(TableUpdateRequest.DeleteTableColumnRequest, result)
             self.assertListEqual(delete_request.field_name, ["col"])
             self.assertEqual(delete_request.if_exists, exists)
 
-    def test_to_column_update_request_update_column_nullability(self):
+    def test_to_table_update_request_update_column_nullability(self):
         """Tests the conversion of an update column nullability change to a TableUpdateRequest."""
         for nullable in (True, False):
             update_nullability = TableChange.update_column_nullability(
                 field_name=["col"],
                 nullable=nullable,
             )
-            result = DTOConverters._to_column_update_request(update_nullability)
+            result = DTOConverters.to_table_update_request(update_nullability)
             self.assertIsInstance(
                 result, TableUpdateRequest.UpdateTableColumnNullabilityRequest
             )
@@ -208,14 +212,14 @@ class TestDTOConvertersToTableUpdateRequest(unittest.TestCase):
             self.assertListEqual(update_request.field_name, ["col"])
             self.assertEqual(update_request.nullable, nullable)
 
-    def test_to_column_update_request_update_column_auto_increment(self):
+    def test_to_table_update_request_update_column_auto_increment(self):
         """Tests the conversion of an update column auto increment change to a TableUpdateRequest."""
         for auto_increment in (True, False):
             update_auto_increment = TableChange.update_column_auto_increment(
                 field_name=["col"],
                 auto_increment=auto_increment,
             )
-            result = DTOConverters._to_column_update_request(update_auto_increment)
+            result = DTOConverters.to_table_update_request(update_auto_increment)
             self.assertIsInstance(
                 result, TableUpdateRequest.UpdateColumnAutoIncrementRequest
             )
@@ -258,27 +262,6 @@ class TestDTOConvertersToTableUpdateRequest(unittest.TestCase):
         self.assertIsInstance(result, TableUpdateRequest.RemoveTablePropertyRequest)
         property_request = cast(TableUpdateRequest.RemoveTablePropertyRequest, result)
         self.assertEqual(property_request.property, "key")
-
-    def test_to_table_update_request_add_column(self):
-        """Tests the conversion of an add column change to a TableUpdateRequest."""
-        add_column = TableChange.add_column(
-            field_name=["new_col"],
-            data_type=Types.StringType.get(),
-        )
-        result = DTOConverters.to_table_update_request(add_column)
-        self.assertIsInstance(result, TableUpdateRequest.AddTableColumnRequest)
-        add_request = cast(TableUpdateRequest.AddTableColumnRequest, result)
-        self.assertListEqual(add_request.field_name, ["new_col"])
-        self.assertEqual(add_request.data_type, Types.StringType.get())
-
-    def test_to_table_update_request_delete_column(self):
-        """Tests the conversion of a delete column change to a TableUpdateRequest."""
-        delete_column = TableChange.delete_column(["col"], if_exists=True)
-        result = DTOConverters.to_table_update_request(delete_column)
-        self.assertIsInstance(result, TableUpdateRequest.DeleteTableColumnRequest)
-        delete_request = cast(TableUpdateRequest.DeleteTableColumnRequest, result)
-        self.assertListEqual(delete_request.field_name, ["col"])
-        self.assertTrue(delete_request.if_exists)
 
     def test_to_table_update_request_add_index(self):
         """Tests the conversion of an add index change to a TableUpdateRequest."""
