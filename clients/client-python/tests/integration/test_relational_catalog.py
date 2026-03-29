@@ -213,3 +213,21 @@ class TestRelationalCatalog(IntegrationTestEnv):
 
         with self.assertRaises(NoSuchTableException):
             relational_catalog.load_table(identifier=non_existent_table)
+
+    def test_relational_catalog_table_exists(self):
+        """Test checking if a table exists."""
+        relational_catalog = self.catalog.as_table_catalog()
+
+        self.assertFalse(
+            relational_catalog.table_exists(
+                identifier=TestRelationalCatalog.TABLE_IDENT
+            )
+        )
+
+        self._create_test_table()
+
+        self.assertTrue(
+            relational_catalog.table_exists(
+                identifier=TestRelationalCatalog.TABLE_IDENT
+            )
+        )
