@@ -30,7 +30,11 @@ from gravitino.api.rel.expressions.transforms.transforms import Transforms
 from gravitino.api.rel.indexes.indexes import Indexes
 from gravitino.api.rel.table import Table
 from gravitino.api.rel.types.types import Types
-from gravitino.exceptions.base import TableAlreadyExistsException
+from gravitino.exceptions.base import (
+    NoSuchSchemaException,
+    TableAlreadyExistsException,
+)
+from gravitino.namespace import Namespace
 from tests.integration.containers.hdfs_container import HDFSContainer
 from tests.integration.integration_test_env import IntegrationTestEnv
 
@@ -164,3 +168,24 @@ class TestRelationalCatalog(IntegrationTestEnv):
                 comment="Duplicate table",
                 properties={},
             )
+
+    def test_relational_catalog_list_tables(self):
+        """Test listing tables in the relational catalog."""
+        self._create_test_table()
+        relational_catalog = TestRelationalCatalog.catalog.as_table_catalog()
+
+        table_identifiers = relational_catalog.list_tables(
+            Namespace.of(TestRelationalCatalog.SCHEMA_NAME)
+        )
+        self.assertEqual(len(table_identifiers), 1)
+        self.assertEqual(table_identifiers[0], TestRelationalCatalog.TABLE_IDENT)
+
+    def test_relational_catalog_list_tables_invalid_namespace(self):
+        """Test listing tables with invalid namespace."""
+        relational_catalog = self.catalog.as_table_catalog()
+        invalid_namespace = NameIdentifier.of(
+            "non_existent_schema", "dummy"
+        ).namespace()
+
+        with self.assertRaises(NoSuchSchemaException):
+            relational_catalog.list_tables(namespace=invalid_namespace)
