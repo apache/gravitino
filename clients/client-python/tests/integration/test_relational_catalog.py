@@ -30,8 +30,10 @@ from gravitino.api.rel.expressions.transforms.transforms import Transforms
 from gravitino.api.rel.indexes.indexes import Indexes
 from gravitino.api.rel.table import Table
 from gravitino.api.rel.types.types import Types
+from gravitino.client.relational_table import RelationalTable
 from gravitino.exceptions.base import (
     NoSuchSchemaException,
+    NoSuchTableException,
     TableAlreadyExistsException,
 )
 from gravitino.namespace import Namespace
@@ -189,3 +191,25 @@ class TestRelationalCatalog(IntegrationTestEnv):
 
         with self.assertRaises(NoSuchSchemaException):
             relational_catalog.list_tables(namespace=invalid_namespace)
+
+    def test_relational_catalog_load_table(self):
+        """Test loading a table from the relational catalog."""
+        self._create_test_table()
+        relational_catalog = TestRelationalCatalog.catalog.as_table_catalog()
+
+        relational_table = relational_catalog.load_table(
+            identifier=TestRelationalCatalog.TABLE_IDENT
+        )
+        self.assertIsInstance(relational_table, RelationalTable)
+        self.assertEqual(relational_table.name(), TestRelationalCatalog.TABLE_NAME)
+
+    def test_relational_catalog_load_table_not_exists(self):
+        """Test loading a table that doesn't exist should raise exception."""
+        relational_catalog = self.catalog.as_table_catalog()
+
+        non_existent_table = NameIdentifier.of(
+            TestRelationalCatalog.SCHEMA_NAME, "non_existent_table"
+        )
+
+        with self.assertRaises(NoSuchTableException):
+            relational_catalog.load_table(identifier=non_existent_table)
