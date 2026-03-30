@@ -42,7 +42,7 @@ When `table.catalog-store.gravitino.gravitino.support.session.catalog` is set to
 
 When session catalog support is enabled, the following behaviors apply:
 
-- **CREATE CATALOG**: Gravitino-managed catalog are persisted to the Gravitino server; non-Gravitino catalog are stored in the in-memory store only.
+- **CREATE CATALOG**: Gravitino-managed catalogs are persisted to the Gravitino server; non-Gravitino catalogs are stored in the in-memory store only.
 - **GET / USE CATALOG**: The in-memory store is checked first. If the catalog is not found there, it is retrieved from the Gravitino server.
 - **DROP CATALOG**: The in-memory store is checked first. If the catalog exists there it is removed from memory; otherwise it is removed from the Gravitino server.
 - **SHOW / LIST CATALOGS**: Returns the combined set of catalogs from both the in-memory store and the Gravitino server.
