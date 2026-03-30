@@ -118,7 +118,7 @@ public class TestIcebergCatalogUtil {
   @Test
   void testMergeRestCatalogAuthForUserPrincipalAddsAuthType() {
     Map<String, String> in = new HashMap<>();
-    in.put(IcebergConstants.GRAVITINO_ICEBERG_REST_FORWARD_USER_ACCESS_TOKEN, "true");
+    in.put(IcebergConstants.REST_FORWARD_USER_ACCESS_TOKEN, "true");
     in.put("uri", "http://localhost:9001");
 
     Map<String, String> out = IcebergCatalogUtil.mergeRestCatalogAuthForUserPrincipal(in);
@@ -129,7 +129,7 @@ public class TestIcebergCatalogUtil {
   @Test
   void testMergeRestCatalogAuthForUserPrincipalRespectsExistingAuthType() {
     Map<String, String> in = new HashMap<>();
-    in.put(IcebergConstants.GRAVITINO_ICEBERG_REST_FORWARD_USER_ACCESS_TOKEN, "true");
+    in.put(IcebergConstants.REST_FORWARD_USER_ACCESS_TOKEN, "true");
     in.put(AuthProperties.AUTH_TYPE, "oauth2");
 
     Map<String, String> out = IcebergCatalogUtil.mergeRestCatalogAuthForUserPrincipal(in);

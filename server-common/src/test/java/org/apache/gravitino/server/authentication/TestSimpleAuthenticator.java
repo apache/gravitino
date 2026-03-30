@@ -21,8 +21,8 @@ package org.apache.gravitino.server.authentication;
 import java.nio.charset.StandardCharsets;
 import java.util.Base64;
 import org.apache.gravitino.Config;
-import org.apache.gravitino.auth.AuthConstants;
 import org.apache.gravitino.UserPrincipal;
+import org.apache.gravitino.auth.AuthConstants;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 

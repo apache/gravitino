@@ -31,6 +31,11 @@ public class IcebergConstants {
   public static final String ICEBERG_JDBC_PASSWORD = "jdbc.password";
   public static final String ICEBERG_JDBC_INITIALIZE = "jdbc-initialize";
 
+  /** Iceberg REST catalog client property controlling data access mechanism. */
+  public static final String DATA_ACCESS = "data-access";
+
+  public static final String ICEBERG_ACCESS_DELEGATION = "header.X-Iceberg-Access-Delegation";
+
   public static final String GRAVITINO_JDBC_SCHEMA_VERSION = "jdbc-schema-version";
   public static final String ICEBERG_JDBC_SCHEMA_VERSION = "jdbc.schema-version";
 
@@ -100,8 +105,7 @@ public class IcebergConstants {
    * caller's Bearer access token (stored on the authenticated principal) is sent to the remote
    * Iceberg REST service.
    */
-  public static final String GRAVITINO_ICEBERG_REST_FORWARD_USER_ACCESS_TOKEN =
-      GRAVITINO_PREFIX + "iceberg-rest-catalog.forward-user-access-token";
+  public static final String REST_FORWARD_USER_ACCESS_TOKEN = "rest.forward-user-access-token";
 
   public static final String ICEBERG_REST_DEFAULT_METALAKE = "gravitino";
   public static final String ICEBERG_REST_DEFAULT_CATALOG = "default_catalog";

@@ -18,11 +18,6 @@
  */
 package org.apache.gravitino.catalog.lakehouse.iceberg;
 
-import static org.apache.gravitino.connector.PropertyEntry.enumImmutablePropertyEntry;
-import static org.apache.gravitino.connector.PropertyEntry.integerOptionalPropertyEntry;
-import static org.apache.gravitino.connector.PropertyEntry.stringOptionalPropertyEntry;
-import static org.apache.gravitino.connector.PropertyEntry.stringRequiredPropertyEntry;
-
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Maps;
@@ -140,7 +135,16 @@ public class IcebergCatalogPropertiesMetadata extends BaseCatalogPropertiesMetad
                 "Table metadata cache TTL in minutes",
                 false /* immutable */,
                 60 /* defaultValue */,
-                false /* hidden */));
+                false /* hidden */),
+            stringOptionalPropertyEntry(IcebergConstants.DATA_ACCESS, "", false, null, false),
+            booleanPropertyEntry(
+                IcebergConstants.REST_FORWARD_USER_ACCESS_TOKEN,
+                "",
+                false,
+                false,
+                true,
+                false,
+                false));
     HashMap<String, PropertyEntry<?>> result = Maps.newHashMap();
     result.putAll(Maps.uniqueIndex(propertyEntries, PropertyEntry::getName));
     result.putAll(KerberosConfig.KERBEROS_PROPERTY_ENTRIES);

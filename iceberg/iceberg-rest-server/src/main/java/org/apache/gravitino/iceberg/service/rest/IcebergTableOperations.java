@@ -516,15 +516,15 @@ public class IcebergTableOperations {
       return true;
     }
     if ("remote-signing".equalsIgnoreCase(accessDelegation)) {
-      throw new UnsupportedOperationException(
-          "Gravitino IcebergRESTServer doesn't support remote signing");
+      // Remote signing implies no credential vending from this REST server.
+      return false;
     } else {
       throw new IllegalArgumentException(
           X_ICEBERG_ACCESS_DELEGATION
               + ": "
               + accessDelegation
               + " is illegal, Iceberg REST spec supports: [vended-credentials,remote-signing], "
-              + "Gravitino Iceberg REST server supports: vended-credentials");
+              + "Gravitino Iceberg REST server supports: [vended-credentials,remote-signing]");
     }
   }
 

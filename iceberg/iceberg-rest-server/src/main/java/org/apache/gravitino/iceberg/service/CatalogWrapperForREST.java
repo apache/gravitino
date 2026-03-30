@@ -63,9 +63,9 @@ import org.apache.iceberg.catalog.Catalog;
 import org.apache.iceberg.catalog.Namespace;
 import org.apache.iceberg.catalog.TableIdentifier;
 import org.apache.iceberg.exceptions.ServiceUnavailableException;
-import org.apache.iceberg.rest.RESTCatalog;
 import org.apache.iceberg.io.CloseableIterable;
 import org.apache.iceberg.rest.PlanStatus;
+import org.apache.iceberg.rest.RESTCatalog;
 import org.apache.iceberg.rest.requests.CreateTableRequest;
 import org.apache.iceberg.rest.requests.PlanTableScanRequest;
 import org.apache.iceberg.rest.responses.ImmutableLoadCredentialsResponse;
@@ -88,7 +88,8 @@ public class CatalogWrapperForREST extends IcebergCatalogWrapper {
           IcebergConstants.AWS_S3_REGION,
           IcebergConstants.ICEBERG_S3_ENDPOINT,
           IcebergConstants.ICEBERG_OSS_ENDPOINT,
-          IcebergConstants.ICEBERG_S3_PATH_STYLE_ACCESS);
+          IcebergConstants.ICEBERG_S3_PATH_STYLE_ACCESS,
+          IcebergConstants.DATA_ACCESS);
 
   @SuppressWarnings("deprecation")
   private static Map<String, String> deprecatedProperties =
@@ -203,15 +204,15 @@ public class CatalogWrapperForREST extends IcebergCatalogWrapper {
     }
 
     Map<String, String> filtered =
-        MapUtils.getFilteredMap(
-            sourceProps, key -> catalogPropertiesToClientKeys.contains(key));
-    if (catalog instanceof RESTCatalog) {
-      Map<String, String> withRestExtras = new HashMap<>(filtered);
-      putIfValuePresent(sourceProps, withRestExtras, IcebergConstants.URI);
-      putIfValuePresent(sourceProps, withRestExtras, IcebergConstants.WAREHOUSE);
-      return Collections.unmodifiableMap(withRestExtras);
+        MapUtils.getFilteredMap(sourceProps, key -> catalogPropertiesToClientKeys.contains(key));
+    if (!filtered.containsKey(IcebergConstants.DATA_ACCESS)) {
+      filtered = new HashMap<>(filtered);
+      // Default to vended-credentials: the Gravitino Iceberg REST server supports credential
+      // vending by default. (Clients may still request remote-signing, which disables vending.)
+      filtered.put(IcebergConstants.DATA_ACCESS, "vended-credentials");
     }
-    return filtered;
+
+    return Collections.unmodifiableMap(filtered);
   }
 
   private static void putIfValuePresent(
@@ -280,6 +281,12 @@ public class CatalogWrapperForREST extends IcebergCatalogWrapper {
     if (!requestCredential) {
       return false;
     }
+
+    // RESTCatalog will fetch credential from the remote catalog instead of generating credential
+    if (getCatalog() instanceof RESTCatalog) {
+      return false;
+    }
+
     validateCredentialLocation(loadTableResponse.tableMetadata().location());
     return !isLocalOrHdfsTable(loadTableResponse.tableMetadata());
   }

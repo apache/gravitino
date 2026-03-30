@@ -29,11 +29,11 @@ import java.util.Locale;
 import java.util.Map;
 import org.apache.gravitino.catalog.lakehouse.iceberg.IcebergCatalogBackend;
 import org.apache.gravitino.catalog.lakehouse.iceberg.IcebergConstants;
-import org.apache.gravitino.iceberg.common.rest.auth.UserPrincipalForwardingAuthManager;
 import org.apache.gravitino.exceptions.ConnectionFailedException;
 import org.apache.gravitino.iceberg.common.ClosableHiveCatalog;
 import org.apache.gravitino.iceberg.common.IcebergConfig;
 import org.apache.gravitino.iceberg.common.authentication.AuthenticationConfig;
+import org.apache.gravitino.iceberg.common.rest.auth.UserPrincipalForwardingAuthManager;
 import org.apache.hadoop.hdfs.HdfsConfiguration;
 import org.apache.iceberg.CatalogProperties;
 import org.apache.iceberg.CatalogUtil;
@@ -135,15 +135,14 @@ public class IcebergCatalogUtil {
   }
 
   /**
-   * When {@link IcebergConstants#GRAVITINO_ICEBERG_REST_FORWARD_USER_ACCESS_TOKEN} is enabled and
-   * {@link AuthProperties#AUTH_TYPE} is not already set, configures the Iceberg REST client to use
-   * {@link UserPrincipalForwardingAuthManager}.
+   * When {@link IcebergConstants#REST_FORWARD_USER_ACCESS_TOKEN} is enabled and {@link
+   * AuthProperties#AUTH_TYPE} is not already set, configures the Iceberg REST client to use {@link
+   * UserPrincipalForwardingAuthManager}.
    */
   @VisibleForTesting
   static Map<String, String> mergeRestCatalogAuthForUserPrincipal(Map<String, String> properties) {
     if (!Boolean.parseBoolean(
-        properties.getOrDefault(
-            IcebergConstants.GRAVITINO_ICEBERG_REST_FORWARD_USER_ACCESS_TOKEN, "false"))) {
+        properties.getOrDefault(IcebergConstants.REST_FORWARD_USER_ACCESS_TOKEN, "false"))) {
       return properties;
     }
     if (properties.containsKey(AuthProperties.AUTH_TYPE)) {

@@ -154,8 +154,7 @@ public class TestOAuth2TokenAuthenticator {
             .compact();
     Principal principal =
         auth2TokenAuthenticator.authenticateToken(
-            (AuthConstants.AUTHORIZATION_BEARER_HEADER + token5)
-                .getBytes(StandardCharsets.UTF_8));
+            (AuthConstants.AUTHORIZATION_BEARER_HEADER + token5).getBytes(StandardCharsets.UTF_8));
     assertEquals("gravitino", principal.getName());
     assertTrue(principal instanceof UserPrincipal);
     assertEquals(
@@ -268,8 +267,7 @@ public class TestOAuth2TokenAuthenticator {
     assertNotNull(principal);
     assertEquals("test-user", principal.getName());
     assertTrue(principal instanceof UserPrincipal);
-    assertEquals(
-        bearerToken, ((UserPrincipal) principal).getAccessToken().get());
+    assertEquals(bearerToken, ((UserPrincipal) principal).getAccessToken().get());
   }
 
   @Test

@@ -48,17 +48,14 @@ public class TestUserPrincipalForwardingAuthManager {
 
     HTTPRequest authenticated =
         PrincipalUtils.doAs(
-            new UserPrincipal(
-                "alice", AuthConstants.AUTHORIZATION_BEARER_HEADER + "jwt-token-abc"),
+            new UserPrincipal("alice", AuthConstants.AUTHORIZATION_BEARER_HEADER + "jwt-token-abc"),
             () -> session.authenticate(request));
 
     Assertions.assertTrue(
         authenticated.headers().contains("Authorization"),
         "Expected Authorization header on outgoing Iceberg REST request");
-    String authValue =
-        authenticated.headers().entries("Authorization").iterator().next().value();
-    Assertions.assertEquals(
-        AuthConstants.AUTHORIZATION_BEARER_HEADER + "jwt-token-abc", authValue);
+    String authValue = authenticated.headers().entries("Authorization").iterator().next().value();
+    Assertions.assertEquals(AuthConstants.AUTHORIZATION_BEARER_HEADER + "jwt-token-abc", authValue);
     manager.close();
   }
 
@@ -76,10 +73,7 @@ public class TestUserPrincipalForwardingAuthManager {
 
     Assertions.assertThrows(
         IllegalStateException.class,
-        () ->
-            PrincipalUtils.doAs(
-                new UserPrincipal("bob"),
-                () -> session.authenticate(request)));
+        () -> PrincipalUtils.doAs(new UserPrincipal("bob"), () -> session.authenticate(request)));
     manager.close();
   }
 
@@ -101,12 +95,10 @@ public class TestUserPrincipalForwardingAuthManager {
 
     HTTPRequest authenticated =
         PrincipalUtils.doAs(
-            new UserPrincipal(
-                "alice", AuthConstants.AUTHORIZATION_BEARER_HEADER + "jwt-token-abc"),
+            new UserPrincipal("alice", AuthConstants.AUTHORIZATION_BEARER_HEADER + "jwt-token-abc"),
             () -> session.authenticate(request));
 
-    String authValue =
-        authenticated.headers().entries("Authorization").iterator().next().value();
+    String authValue = authenticated.headers().entries("Authorization").iterator().next().value();
     Assertions.assertEquals("Bearer existing", authValue);
     manager.close();
   }

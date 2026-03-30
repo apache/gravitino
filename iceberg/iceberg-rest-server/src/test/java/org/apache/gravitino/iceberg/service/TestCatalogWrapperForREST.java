@@ -102,6 +102,8 @@ public class TestCatalogWrapperForREST {
                 "org.apache.iceberg.aws.s3.S3FileIO",
                 IcebergConstants.ICEBERG_S3_ENDPOINT,
                 "http://localhost:9000",
+                IcebergConstants.DATA_ACCESS,
+                "vended-credentials",
                 IcebergConstants.WAREHOUSE,
                 "/remote/warehouse"));
 
@@ -113,6 +115,8 @@ public class TestCatalogWrapperForREST {
         "org.apache.iceberg.aws.s3.S3FileIO", configToClients.get(IcebergConstants.IO_IMPL));
     Assertions.assertEquals(
         "http://localhost:9000", configToClients.get(IcebergConstants.ICEBERG_S3_ENDPOINT));
+    Assertions.assertEquals(
+        "vended-credentials", configToClients.get(IcebergConstants.DATA_ACCESS));
     Assertions.assertEquals("/remote/warehouse", configToClients.get(IcebergConstants.WAREHOUSE));
   }
 
@@ -133,5 +137,7 @@ public class TestCatalogWrapperForREST {
     Assertions.assertFalse(configToClients.containsKey(IcebergConstants.URI));
     Assertions.assertEquals(
         "org.apache.iceberg.aws.s3.S3FileIO", configToClients.get(IcebergConstants.IO_IMPL));
+    Assertions.assertEquals(
+        "vended-credentials", configToClients.get(IcebergConstants.DATA_ACCESS));
   }
 }

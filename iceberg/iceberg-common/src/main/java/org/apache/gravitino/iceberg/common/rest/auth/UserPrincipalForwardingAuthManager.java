@@ -25,22 +25,24 @@ import org.apache.gravitino.utils.PrincipalUtils;
 import org.apache.iceberg.rest.HTTPHeaders;
 import org.apache.iceberg.rest.HTTPRequest;
 import org.apache.iceberg.rest.ImmutableHTTPRequest;
+import org.apache.iceberg.rest.RESTClient;
 import org.apache.iceberg.rest.auth.AuthManager;
 import org.apache.iceberg.rest.auth.AuthSession;
-import org.apache.iceberg.rest.RESTClient;
 
 /**
  * Iceberg REST catalog {@link AuthManager} that adds an {@code Authorization} header on each
  * outgoing request using the access token from the current {@link UserPrincipal}.
  *
- * <p>Enable by setting {@link org.apache.iceberg.rest.auth.AuthProperties#AUTH_TYPE} to this
- * class name, or set catalog property {@code gravitino.iceberg-rest-catalog.forward-user-access-token}
- * to {@code true} for REST catalog backend (see {@link
+ * <p>Enable by setting {@link org.apache.iceberg.rest.auth.AuthProperties#AUTH_TYPE} to this class
+ * name, or set catalog property {@code gravitino.iceberg-rest-catalog.forward-user-access-token} to
+ * {@code true} for REST catalog backend (see {@link
  * org.apache.gravitino.iceberg.common.utils.IcebergCatalogUtil#mergeRestCatalogAuthForUserPrincipal}).
  */
 public class UserPrincipalForwardingAuthManager implements AuthManager {
 
-  /** @param name catalog name passed by Iceberg when loading this auth manager */
+  /**
+   * @param name catalog name passed by Iceberg when loading this auth manager
+   */
   @SuppressWarnings("unused")
   public UserPrincipalForwardingAuthManager(String name) {}
 
@@ -67,12 +69,11 @@ public class UserPrincipalForwardingAuthManager implements AuthManager {
               .getAccessToken()
               .orElseThrow(
                   () ->
-                      new IllegalStateException(
-                          "UserPrincipal has no authorization header value"));
+                      new IllegalStateException("UserPrincipal has no authorization header value"));
       HTTPHeaders newHeaders =
-          request.headers()
-              .putIfAbsent(
-                  HTTPHeaders.of(Map.of("Authorization", authorizationHeaderValue)));
+          request
+              .headers()
+              .putIfAbsent(HTTPHeaders.of(Map.of("Authorization", authorizationHeaderValue)));
       return newHeaders.equals(request.headers())
           ? request
           : ImmutableHTTPRequest.builder().from(request).headers(newHeaders).build();
