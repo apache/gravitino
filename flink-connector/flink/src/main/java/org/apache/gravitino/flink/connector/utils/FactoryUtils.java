@@ -51,6 +51,10 @@ public class FactoryUtils {
           .add(GravitinoPaimonCatalogFactoryOptions.IDENTIFIER)
           .build();
 
+  public static boolean isBuiltInCatalog(String type) {
+    return GRAVITINO_FACTORY_LIST.contains(type);
+  }
+
   /**
    * Utility for working with {@link Factory}s. The {@link GravitinoCatalogFactoryHelper} override
    * the {@link FactoryUtil.CatalogFactoryHelper#validate()} method to validate the options. For the

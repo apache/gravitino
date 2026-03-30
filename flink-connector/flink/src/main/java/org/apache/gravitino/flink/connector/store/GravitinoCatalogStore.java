@@ -19,9 +19,7 @@
 
 package org.apache.gravitino.flink.connector.store;
 
-import com.google.common.collect.ImmutableList;
 import java.util.ArrayList;
-import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
@@ -33,7 +31,6 @@ import org.apache.flink.configuration.Configuration;
 import org.apache.flink.table.catalog.AbstractCatalogStore;
 import org.apache.flink.table.catalog.CatalogDescriptor;
 import org.apache.flink.table.catalog.CommonCatalogOptions;
-import org.apache.flink.table.catalog.GenericInMemoryCatalogStore;
 import org.apache.flink.table.catalog.exceptions.CatalogException;
 import org.apache.flink.table.factories.Factory;
 import org.apache.flink.util.Preconditions;
@@ -48,43 +45,26 @@ import org.slf4j.LoggerFactory;
 /** GravitinoCatalogStore is used to store catalog information to Apache Gravitino server. */
 public class GravitinoCatalogStore extends AbstractCatalogStore {
   private static final Logger LOG = LoggerFactory.getLogger(GravitinoCatalogStore.class);
-  private final GenericInMemoryCatalogStore memoryCatalogStore;
   private final GravitinoCatalogManager gravitinoCatalogManager;
-  private final ImmutableList<String> allowThirdPartyConnectors;
 
-  public GravitinoCatalogStore(
-      GravitinoCatalogManager catalogManager,
-      GenericInMemoryCatalogStore memoryCatalogStore,
-      List<String> allowThirdPartyConnectors) {
-    this.gravitinoCatalogManager =
-        Preconditions.checkNotNull(catalogManager, "CatalogManager cannot be null");
-    this.memoryCatalogStore =
-        Preconditions.checkNotNull(memoryCatalogStore, "MemoryCatalogStore cannot be null");
-    this.allowThirdPartyConnectors =
-        ImmutableList.copyOf(
-            Preconditions.checkNotNull(
-                allowThirdPartyConnectors, "AllowThirdPartyConnectors cannot be null"));
+  public GravitinoCatalogStore(GravitinoCatalogManager catalogManager) {
+    this.gravitinoCatalogManager = catalogManager;
   }
 
   @Override
   public void storeCatalog(String catalogName, CatalogDescriptor descriptor)
       throws CatalogException {
-    String catalogType = descriptor.getConfiguration().get(CommonCatalogOptions.CATALOG_TYPE);
-    if (isAllowThirdPartyConnector(catalogType)) {
-      memoryCatalogStore.storeCatalog(catalogName, descriptor);
-    } else {
-      Configuration configuration = descriptor.getConfiguration();
-      Map<String, String> gravitino = configuration.toMap();
-      BaseCatalogFactory catalogFactory = getCatalogFactory(gravitino);
-      Map<String, String> gravitinoProperties =
-          catalogFactory.catalogPropertiesConverter().toGravitinoCatalogProperties(configuration);
-      gravitinoCatalogManager.createCatalog(
-          catalogName,
-          catalogFactory.gravitinoCatalogType(),
-          null,
-          catalogFactory.gravitinoCatalogProvider(),
-          gravitinoProperties);
-    }
+    Configuration configuration = descriptor.getConfiguration();
+    Map<String, String> gravitino = configuration.toMap();
+    BaseCatalogFactory catalogFactory = getCatalogFactory(gravitino);
+    Map<String, String> gravitinoProperties =
+        catalogFactory.catalogPropertiesConverter().toGravitinoCatalogProperties(configuration);
+    gravitinoCatalogManager.createCatalog(
+        catalogName,
+        catalogFactory.gravitinoCatalogType(),
+        null,
+        catalogFactory.gravitinoCatalogProvider(),
+        gravitinoProperties);
   }
   /**
    * Removes the specified catalog.
@@ -95,19 +75,13 @@ public class GravitinoCatalogStore extends AbstractCatalogStore {
    */
   @Override
   public void removeCatalog(String catalogName, boolean ignoreIfNotExists) throws CatalogException {
-    if (memoryCatalogStore.contains(catalogName)) {
-      memoryCatalogStore.removeCatalog(catalogName, ignoreIfNotExists);
-    } else {
-      try {
-        boolean isDropped = gravitinoCatalogManager.dropCatalog(catalogName);
-        if (!ignoreIfNotExists && !isDropped) {
-          throw new CatalogException(
-              String.format("Failed to remove the catalog: %s", catalogName));
-        }
-      } catch (Exception e) {
-        throw new CatalogException(
-            String.format("Failed to remove the catalog: %s", catalogName), e);
+    try {
+      boolean isDropped = gravitinoCatalogManager.dropCatalog(catalogName);
+      if (!ignoreIfNotExists && !isDropped) {
+        throw new CatalogException(String.format("Failed to remove the catalog: %s", catalogName));
       }
+    } catch (Exception e) {
+      throw new CatalogException(String.format("Failed to remove the catalog: %s", catalogName), e);
     }
   }
 
@@ -120,12 +94,6 @@ public class GravitinoCatalogStore extends AbstractCatalogStore {
    */
   @Override
   public Optional<CatalogDescriptor> getCatalog(String catalogName) throws CatalogException {
-    if (memoryCatalogStore.contains(catalogName)) {
-      Optional<CatalogDescriptor> descriptor = memoryCatalogStore.getCatalog(catalogName);
-      if (descriptor.isPresent()) {
-        return descriptor;
-      }
-    }
     try {
       Catalog catalog = gravitinoCatalogManager.getGravitinoCatalogInfo(catalogName);
       BaseCatalogFactory catalogFactory = getCatalogFactory(catalog.provider());
@@ -145,20 +113,16 @@ public class GravitinoCatalogStore extends AbstractCatalogStore {
 
   @Override
   public Set<String> listCatalogs() throws CatalogException {
-    Set<String> catalogs = new HashSet<>();
-    catalogs.addAll(memoryCatalogStore.listCatalogs());
     try {
-      catalogs.addAll(gravitinoCatalogManager.listCatalogs());
+      return gravitinoCatalogManager.listCatalogs();
     } catch (Exception e) {
       throw new CatalogException("Failed to list catalog.", e);
     }
-    return catalogs;
   }
 
   @Override
   public boolean contains(String catalogName) throws CatalogException {
-    return memoryCatalogStore.contains(catalogName)
-        || gravitinoCatalogManager.contains(catalogName);
+    return gravitinoCatalogManager.contains(catalogName);
   }
 
   private BaseCatalogFactory getCatalogFactory(Map<String, String> configuration) {
@@ -211,9 +175,5 @@ public class GravitinoCatalogStore extends AbstractCatalogStore {
       throw new RuntimeException(errorMessage);
     }
     return (BaseCatalogFactory) factories.get(0);
-  }
-
-  private boolean isAllowThirdPartyConnector(String type) {
-    return allowThirdPartyConnectors.contains(type);
   }
 }

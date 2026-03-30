@@ -40,12 +40,12 @@ public class GravitinoCatalogStoreFactoryOptions {
           .stringType()
           .noDefaultValue()
           .withDescription("The name of Gravitino metalake");
-  public static final ConfigOption<String> GRAVITINO_ALLOW_THIRD_PARTY_CONNECTOR_LIST_CONFIG =
-      ConfigOptions.key("gravitino.allow.third-party-connector.list")
-          .stringType()
-          .noDefaultValue()
+  public static final ConfigOption<Boolean> GRAVITINO_SUPPORT_SESSION_CATALOG =
+      ConfigOptions.key("gravitino.support.session.catalog")
+          .booleanType()
+          .defaultValue(false)
           .withDescription(
-              "Comma-separated list of allowed third-party catalog types (handled by Flink's in-memory catalog store)");
+              "Whether to enable support for Flink's session catalog in the Gravitino catalog store");
   public static final ConfigOption<Map<String, String>> GRAVITINO_CLIENT_CONFIG =
       ConfigOptions.key("gravitino.client")
           .mapType()

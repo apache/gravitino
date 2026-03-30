@@ -18,51 +18,25 @@
  */
 package org.apache.gravitino.flink.connector.store;
 
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Optional;
-import java.util.Set;
-import org.apache.flink.configuration.Configuration;
-import org.apache.flink.table.catalog.CatalogDescriptor;
-import org.apache.flink.table.catalog.CommonCatalogOptions;
-import org.apache.flink.table.catalog.GenericInMemoryCatalogStore;
 import org.apache.flink.table.catalog.exceptions.CatalogException;
 import org.apache.gravitino.flink.connector.catalog.GravitinoCatalogManager;
-import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
 
 public class TestGravitinoCatalogStore {
   private GravitinoCatalogManager gravitinoCatalogMockManager;
-  private GenericInMemoryCatalogStore memoryCatalogStore;
   private GravitinoCatalogStore gravitinoCatalogStore;
 
   @Before
   public void setupCatalogStore() {
     gravitinoCatalogMockManager = mock(GravitinoCatalogManager.class);
-    memoryCatalogStore = new GenericInMemoryCatalogStore();
-    memoryCatalogStore.open();
-    gravitinoCatalogStore =
-        new GravitinoCatalogStore(
-            gravitinoCatalogMockManager, memoryCatalogStore, Arrays.asList("filesystem", "jdbc"));
-  }
-
-  @After
-  public void closeCatalogStore() {
-    if (memoryCatalogStore != null) {
-      memoryCatalogStore.close();
-    }
+    gravitinoCatalogStore = new GravitinoCatalogStore(gravitinoCatalogMockManager);
   }
 
   @Test
@@ -119,126 +93,5 @@ public class TestGravitinoCatalogStore {
       assertTrue("Expected cause to be RuntimeException", e.getCause() instanceof RuntimeException);
     }
     verify(gravitinoCatalogMockManager).dropCatalog(catalogName);
-  }
-
-  @Test
-  public void testStoreJdbcCatalog() {
-    String catalogName = "testJdbcCatalog";
-    CatalogDescriptor descriptor = createJdbcCatalogDescriptor(catalogName);
-
-    gravitinoCatalogStore.storeCatalog(catalogName, descriptor);
-    assertTrue(gravitinoCatalogStore.contains(catalogName));
-    assertTrue(memoryCatalogStore.contains(catalogName));
-  }
-
-  @Test
-  public void testStoreHiveCatalogWithException() {
-    String catalogName = "testHiveCatalog";
-    Configuration conf = new Configuration();
-    conf.set(CommonCatalogOptions.CATALOG_TYPE, "hive");
-    conf.setString("hive-conf-dir", "/tmp");
-    CatalogDescriptor descriptor = CatalogDescriptor.of(catalogName, conf);
-
-    try {
-      gravitinoCatalogStore.storeCatalog(catalogName, descriptor);
-      fail("Should throw RuntimeException");
-    } catch (RuntimeException e) {
-      assertTrue(e.getMessage().contains("Failed to correctly match the Flink catalog factory."));
-    }
-  }
-
-  @Test
-  public void testConstructorWithNullCatalogManagerShouldThrow() {
-    try {
-      new GravitinoCatalogStore(null, memoryCatalogStore, Arrays.asList("filesystem", "jdbc"));
-      fail("Expected NullPointerException to be thrown");
-    } catch (NullPointerException e) {
-      assertEquals("CatalogManager cannot be null", e.getMessage());
-    }
-  }
-
-  @Test
-  public void testConstructorWithNullMemoryCatalogStoreShouldThrow() {
-    try {
-      new GravitinoCatalogStore(
-          gravitinoCatalogMockManager, null, Arrays.asList("filesystem", "jdbc"));
-      fail("Expected NullPointerException to be thrown");
-    } catch (NullPointerException e) {
-      assertEquals("MemoryCatalogStore cannot be null", e.getMessage());
-    }
-  }
-
-  @Test
-  public void testConstructorWithNullAllowThirdPartyConnectorsShouldThrow() {
-    try {
-      new GravitinoCatalogStore(gravitinoCatalogMockManager, memoryCatalogStore, null);
-      fail("Expected NullPointerException to be thrown");
-    } catch (NullPointerException e) {
-      assertEquals("AllowThirdPartyConnectors cannot be null", e.getMessage());
-    }
-  }
-
-  @Test
-  public void testStoreCatalogShouldUseDefensiveCopyOfAllowedConnectors() {
-    List<String> connectors = new ArrayList<>(Arrays.asList("filesystem", "jdbc"));
-    GravitinoCatalogStore catalogStore =
-        new GravitinoCatalogStore(gravitinoCatalogMockManager, memoryCatalogStore, connectors);
-    connectors.clear();
-
-    String catalogName = "testJdbcCatalogWithDefensiveCopy";
-    CatalogDescriptor descriptor = createJdbcCatalogDescriptor(catalogName);
-
-    catalogStore.storeCatalog(catalogName, descriptor);
-    assertTrue(catalogStore.contains(catalogName));
-    assertTrue(memoryCatalogStore.contains(catalogName));
-  }
-
-  @Test
-  public void testRemoveCatalogWhenMemoryCatalogExistsShouldRemoveFromMemory() {
-    String catalogName = "testMemoryJdbcCatalog";
-    CatalogDescriptor descriptor = createJdbcCatalogDescriptor(catalogName);
-    gravitinoCatalogStore.storeCatalog(catalogName, descriptor);
-
-    gravitinoCatalogStore.removeCatalog(catalogName, false);
-
-    assertFalse(memoryCatalogStore.contains(catalogName));
-    verifyNoInteractions(gravitinoCatalogMockManager);
-  }
-
-  @Test
-  public void testGetCatalogWhenMemoryCatalogExistsShouldReturnMemoryDescriptor() {
-    String catalogName = "testMemoryJdbcCatalog";
-    CatalogDescriptor descriptor = createJdbcCatalogDescriptor(catalogName);
-    gravitinoCatalogStore.storeCatalog(catalogName, descriptor);
-
-    Optional<CatalogDescriptor> actualCatalog = gravitinoCatalogStore.getCatalog(catalogName);
-
-    assertTrue(actualCatalog.isPresent());
-    assertEquals(
-        descriptor.getConfiguration().toMap(), actualCatalog.get().getConfiguration().toMap());
-    verifyNoInteractions(gravitinoCatalogMockManager);
-  }
-
-  @Test
-  public void testListCatalogsShouldMergeMemoryAndGravitinoCatalogs() {
-    String memoryCatalogName = "testMemoryJdbcCatalog";
-    CatalogDescriptor descriptor = createJdbcCatalogDescriptor(memoryCatalogName);
-    gravitinoCatalogStore.storeCatalog(memoryCatalogName, descriptor);
-    when(gravitinoCatalogMockManager.listCatalogs())
-        .thenReturn(new HashSet<>(Arrays.asList(memoryCatalogName, "testHiveCatalog")));
-
-    Set<String> catalogs = gravitinoCatalogStore.listCatalogs();
-
-    assertEquals(new HashSet<>(Arrays.asList(memoryCatalogName, "testHiveCatalog")), catalogs);
-    verify(gravitinoCatalogMockManager).listCatalogs();
-  }
-
-  private CatalogDescriptor createJdbcCatalogDescriptor(String catalogName) {
-    Configuration conf = new Configuration();
-    conf.set(CommonCatalogOptions.CATALOG_TYPE, "jdbc");
-    conf.setString("url", "jdbc:mysql://localhost:3306/test");
-    conf.setString("username", "test");
-    conf.setString("password", "test");
-    return CatalogDescriptor.of(catalogName, conf);
   }
 }
