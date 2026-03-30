@@ -23,8 +23,6 @@ import static org.apache.gravitino.lance.common.config.LanceConfig.NAMESPACE_BAC
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
-import com.lancedb.lance.namespace.LanceNamespaceException;
-import com.lancedb.lance.namespace.util.CommonUtil;
 import java.util.HashMap;
 import java.util.Map;
 import org.apache.commons.lang3.StringUtils;
@@ -35,6 +33,7 @@ import org.apache.gravitino.lance.common.config.LanceConfig;
 import org.apache.gravitino.lance.common.ops.LanceNamespaceOperations;
 import org.apache.gravitino.lance.common.ops.LanceTableOperations;
 import org.apache.gravitino.lance.common.ops.NamespaceWrapper;
+import org.lance.namespace.errors.NamespaceNotFoundException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -125,18 +124,14 @@ public class GravitinoLanceNamespaceWrapper extends NamespaceWrapper {
     try {
       catalog = client.loadCatalog(catalogName);
     } catch (NoSuchCatalogException e) {
-      throw LanceNamespaceException.notFound(
-          "Catalog not found: " + catalogName,
-          NoSuchCatalogException.class.getSimpleName(),
-          catalogName,
-          CommonUtil.formatCurrentStackTrace());
+      throw new NamespaceNotFoundException(
+          "Catalog not found: " + catalogName, CommonUtil.formatCurrentStackTrace(), catalogName);
     }
     if (!isLakehouseCatalog(catalog)) {
-      throw LanceNamespaceException.notFound(
+      throw new NamespaceNotFoundException(
           "Catalog is not a lakehouse catalog: " + catalogName,
-          NoSuchCatalogException.class.getSimpleName(),
-          catalogName,
-          CommonUtil.formatCurrentStackTrace());
+          CommonUtil.formatCurrentStackTrace(),
+          catalogName);
     }
     return catalog;
   }

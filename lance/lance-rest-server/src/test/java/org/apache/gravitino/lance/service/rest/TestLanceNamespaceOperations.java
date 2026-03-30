@@ -29,29 +29,6 @@ import static org.mockito.Mockito.when;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Sets;
-import com.lancedb.lance.namespace.LanceNamespaceException;
-import com.lancedb.lance.namespace.model.AlterTableAlterColumnsRequest;
-import com.lancedb.lance.namespace.model.AlterTableAlterColumnsResponse;
-import com.lancedb.lance.namespace.model.AlterTableDropColumnsRequest;
-import com.lancedb.lance.namespace.model.AlterTableDropColumnsResponse;
-import com.lancedb.lance.namespace.model.ColumnAlteration;
-import com.lancedb.lance.namespace.model.CreateEmptyTableRequest;
-import com.lancedb.lance.namespace.model.CreateEmptyTableResponse;
-import com.lancedb.lance.namespace.model.CreateNamespaceRequest;
-import com.lancedb.lance.namespace.model.CreateNamespaceResponse;
-import com.lancedb.lance.namespace.model.CreateTableResponse;
-import com.lancedb.lance.namespace.model.DeregisterTableRequest;
-import com.lancedb.lance.namespace.model.DeregisterTableResponse;
-import com.lancedb.lance.namespace.model.DescribeNamespaceResponse;
-import com.lancedb.lance.namespace.model.DescribeTableRequest;
-import com.lancedb.lance.namespace.model.DescribeTableResponse;
-import com.lancedb.lance.namespace.model.DropNamespaceRequest;
-import com.lancedb.lance.namespace.model.DropNamespaceResponse;
-import com.lancedb.lance.namespace.model.DropTableResponse;
-import com.lancedb.lance.namespace.model.ErrorResponse;
-import com.lancedb.lance.namespace.model.ListNamespacesResponse;
-import com.lancedb.lance.namespace.model.RegisterTableRequest;
-import com.lancedb.lance.namespace.model.RegisterTableResponse;
 import java.io.IOException;
 import java.util.List;
 import java.util.regex.Pattern;
@@ -72,8 +49,31 @@ import org.glassfish.jersey.test.TestProperties;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
+import org.lance.namespace.model.AlterColumnsEntry;
+import org.lance.namespace.model.AlterTableAlterColumnsRequest;
+import org.lance.namespace.model.AlterTableAlterColumnsResponse;
+import org.lance.namespace.model.AlterTableDropColumnsRequest;
+import org.lance.namespace.model.AlterTableDropColumnsResponse;
+import org.lance.namespace.model.CreateEmptyTableRequest;
+import org.lance.namespace.model.CreateEmptyTableResponse;
+import org.lance.namespace.model.CreateNamespaceRequest;
+import org.lance.namespace.model.CreateNamespaceResponse;
+import org.lance.namespace.model.CreateTableResponse;
+import org.lance.namespace.model.DeregisterTableRequest;
+import org.lance.namespace.model.DeregisterTableResponse;
+import org.lance.namespace.model.DescribeNamespaceResponse;
+import org.lance.namespace.model.DescribeTableRequest;
+import org.lance.namespace.model.DescribeTableResponse;
+import org.lance.namespace.model.DropNamespaceRequest;
+import org.lance.namespace.model.DropNamespaceResponse;
+import org.lance.namespace.model.DropTableResponse;
+import org.lance.namespace.model.ErrorResponse;
+import org.lance.namespace.model.ListNamespacesResponse;
+import org.lance.namespace.model.RegisterTableRequest;
+import org.lance.namespace.model.RegisterTableResponse;
 import org.mockito.Mockito;
 
+@SuppressWarnings("deprecation")
 public class TestLanceNamespaceOperations extends JerseyTest {
   private static class MockServletRequestFactory extends ServletRequestFactoryBase {
     @Override
@@ -172,9 +172,8 @@ public class TestLanceNamespaceOperations extends JerseyTest {
     Assertions.assertEquals(MediaType.APPLICATION_JSON_TYPE, resp.getMediaType());
 
     ErrorResponse errorResp = resp.readEntity(ErrorResponse.class);
-    Assertions.assertEquals(500, errorResp.getCode());
+    Assertions.assertEquals(18, errorResp.getCode());
     Assertions.assertEquals("Test exception", errorResp.getError());
-    Assertions.assertEquals(RuntimeException.class.getSimpleName(), errorResp.getType());
     Assertions.assertEquals("ns1.ns2", errorResp.getInstance());
     Assertions.assertNotNull(errorResp.getDetail());
     Assertions.assertTrue(errorResp.getDetail().contains("Test exception"));
@@ -216,9 +215,8 @@ public class TestLanceNamespaceOperations extends JerseyTest {
     Assertions.assertEquals(MediaType.APPLICATION_JSON_TYPE, resp.getMediaType());
 
     ErrorResponse errorResp = resp.readEntity(ErrorResponse.class);
-    Assertions.assertEquals(500, errorResp.getCode());
+    Assertions.assertEquals(18, errorResp.getCode());
     Assertions.assertEquals("Test exception", errorResp.getError());
-    Assertions.assertEquals(RuntimeException.class.getSimpleName(), errorResp.getType());
   }
 
   @Test
@@ -243,7 +241,7 @@ public class TestLanceNamespaceOperations extends JerseyTest {
         .createNamespace(
             eq(namespaceId),
             eq(Pattern.quote(delimiter)),
-            eq(CreateNamespaceRequest.ModeEnum.CREATE),
+            eq("create"),
             eq(createNamespaceReq.getProperties()));
     Assertions.assertEquals(Response.Status.OK.getStatusCode(), resp.getStatus());
     Assertions.assertEquals(MediaType.APPLICATION_JSON_TYPE, resp.getMediaType());
@@ -265,9 +263,8 @@ public class TestLanceNamespaceOperations extends JerseyTest {
     Assertions.assertEquals(MediaType.APPLICATION_JSON_TYPE, resp.getMediaType());
 
     ErrorResponse errorResp = resp.readEntity(ErrorResponse.class);
-    Assertions.assertEquals(500, errorResp.getCode());
+    Assertions.assertEquals(18, errorResp.getCode());
     Assertions.assertEquals("Test exception", errorResp.getError());
-    Assertions.assertEquals(RuntimeException.class.getSimpleName(), errorResp.getType());
   }
 
   @Test
@@ -300,9 +297,8 @@ public class TestLanceNamespaceOperations extends JerseyTest {
     Assertions.assertEquals(MediaType.APPLICATION_JSON_TYPE, resp.getMediaType());
 
     ErrorResponse errorResp = resp.readEntity(ErrorResponse.class);
-    Assertions.assertEquals(404, errorResp.getCode());
+    Assertions.assertEquals(1, errorResp.getCode());
     Assertions.assertEquals("Not found", errorResp.getError());
-    Assertions.assertEquals(NoSuchCatalogException.class.getSimpleName(), errorResp.getType());
   }
 
   @Test
@@ -321,11 +317,7 @@ public class TestLanceNamespaceOperations extends JerseyTest {
             .post(Entity.entity(dropNamespaceReq, MediaType.APPLICATION_JSON_TYPE));
 
     Mockito.verify(namespaceOps)
-        .dropNamespace(
-            eq(namespaceId),
-            eq(Pattern.quote(delimiter)),
-            eq(DropNamespaceRequest.ModeEnum.FAIL),
-            eq(DropNamespaceRequest.BehaviorEnum.RESTRICT));
+        .dropNamespace(eq(namespaceId), eq(Pattern.quote(delimiter)), eq("fail"), eq("restrict"));
     Assertions.assertEquals(Response.Status.OK.getStatusCode(), resp.getStatus());
     Assertions.assertEquals(MediaType.APPLICATION_JSON_TYPE, resp.getMediaType());
 
@@ -343,9 +335,8 @@ public class TestLanceNamespaceOperations extends JerseyTest {
     Assertions.assertEquals(MediaType.APPLICATION_JSON_TYPE, resp.getMediaType());
 
     ErrorResponse errorResp = resp.readEntity(ErrorResponse.class);
-    Assertions.assertEquals(500, errorResp.getCode());
+    Assertions.assertEquals(18, errorResp.getCode());
     Assertions.assertEquals("Test exception", errorResp.getError());
-    Assertions.assertEquals(RuntimeException.class.getSimpleName(), errorResp.getType());
   }
 
   @Test
@@ -395,7 +386,6 @@ public class TestLanceNamespaceOperations extends JerseyTest {
     Assertions.assertEquals(MediaType.APPLICATION_JSON_TYPE, resp.getMediaType());
     ErrorResponse errorResp = resp.readEntity(ErrorResponse.class);
     Assertions.assertEquals("Runtime exception", errorResp.getError());
-    Assertions.assertEquals(RuntimeException.class.getSimpleName(), errorResp.getType());
   }
 
   @Test
@@ -406,7 +396,7 @@ public class TestLanceNamespaceOperations extends JerseyTest {
     // Test normal
     CreateEmptyTableResponse createTableResponse = new CreateEmptyTableResponse();
     createTableResponse.setLocation("/path/to/table");
-    createTableResponse.setProperties(ImmutableMap.of("key", "value"));
+    createTableResponse.setStorageOptions(ImmutableMap.of("key", "value"));
     when(tableOps.createEmptyTable(any(), any(), any(), any())).thenReturn(createTableResponse);
 
     CreateEmptyTableRequest tableRequest = new CreateEmptyTableRequest();
@@ -422,7 +412,7 @@ public class TestLanceNamespaceOperations extends JerseyTest {
     Assertions.assertEquals(MediaType.APPLICATION_JSON_TYPE, resp.getMediaType());
     CreateEmptyTableResponse response = resp.readEntity(CreateEmptyTableResponse.class);
     Assertions.assertEquals(createTableResponse.getLocation(), response.getLocation());
-    Assertions.assertEquals(createTableResponse.getProperties(), response.getProperties());
+    Assertions.assertEquals(createTableResponse.getStorageOptions(), response.getStorageOptions());
 
     Mockito.reset(tableOps);
     // Test illegal argument
@@ -452,7 +442,6 @@ public class TestLanceNamespaceOperations extends JerseyTest {
     Assertions.assertEquals(MediaType.APPLICATION_JSON_TYPE, resp.getMediaType());
     ErrorResponse errorResp = resp.readEntity(ErrorResponse.class);
     Assertions.assertEquals("Runtime exception", errorResp.getError());
-    Assertions.assertEquals(RuntimeException.class.getSimpleName(), errorResp.getType());
   }
 
   @Test
@@ -468,7 +457,7 @@ public class TestLanceNamespaceOperations extends JerseyTest {
 
     RegisterTableRequest tableRequest = new RegisterTableRequest();
     tableRequest.setLocation("/path/to/registered_table");
-    tableRequest.setMode(RegisterTableRequest.ModeEnum.CREATE);
+    tableRequest.setMode("create");
 
     Response resp =
         target(String.format("/v1/table/%s/register", tableIds))
@@ -509,7 +498,6 @@ public class TestLanceNamespaceOperations extends JerseyTest {
     Assertions.assertEquals(MediaType.APPLICATION_JSON_TYPE, resp.getMediaType());
     ErrorResponse errorResp = resp.readEntity(ErrorResponse.class);
     Assertions.assertEquals("Runtime exception", errorResp.getError());
-    Assertions.assertEquals(RuntimeException.class.getSimpleName(), errorResp.getType());
   }
 
   @Test
@@ -529,7 +517,7 @@ public class TestLanceNamespaceOperations extends JerseyTest {
 
     RegisterTableRequest tableRequest = new RegisterTableRequest();
     tableRequest.setLocation("/path/to/registered_table");
-    tableRequest.setMode(RegisterTableRequest.ModeEnum.CREATE);
+    tableRequest.setMode("create");
     tableRequest.setProperties(ImmutableMap.of("custom-key", "custom-value"));
 
     Response resp =
@@ -544,7 +532,7 @@ public class TestLanceNamespaceOperations extends JerseyTest {
     Mockito.verify(tableOps)
         .registerTable(
             eq(tableIds),
-            eq(RegisterTableRequest.ModeEnum.CREATE),
+            eq("create"),
             eq(delimiter),
             Mockito.argThat(
                 props ->
@@ -595,8 +583,7 @@ public class TestLanceNamespaceOperations extends JerseyTest {
     Mockito.reset(tableOps);
     when(tableOps.deregisterTable(any(), any()))
         .thenThrow(
-            LanceNamespaceException.notFound(
-                "Table not found", "NoSuchTableException", tableIds, ""));
+            new org.lance.namespace.errors.TableNotFoundException("Table not found", "", tableIds));
     resp =
         target(String.format("/v1/table/%s/deregister", tableIds))
             .queryParam("delimiter", delimiter)
@@ -619,7 +606,6 @@ public class TestLanceNamespaceOperations extends JerseyTest {
     Assertions.assertEquals(MediaType.APPLICATION_JSON_TYPE, resp.getMediaType());
     ErrorResponse errorResp = resp.readEntity(ErrorResponse.class);
     Assertions.assertEquals("Runtime exception", errorResp.getError());
-    Assertions.assertEquals(RuntimeException.class.getSimpleName(), errorResp.getType());
   }
 
   @Test
@@ -630,7 +616,7 @@ public class TestLanceNamespaceOperations extends JerseyTest {
     // Test normal
     DescribeTableResponse createTableResponse = new DescribeTableResponse();
     createTableResponse.setLocation("/path/to/describe_table");
-    createTableResponse.setProperties(ImmutableMap.of("key", "value"));
+    createTableResponse.setMetadata(ImmutableMap.of("key", "value"));
     when(tableOps.describeTable(any(), any(), any())).thenReturn(createTableResponse);
 
     DescribeTableRequest tableRequest = new DescribeTableRequest();
@@ -644,14 +630,13 @@ public class TestLanceNamespaceOperations extends JerseyTest {
     Assertions.assertEquals(MediaType.APPLICATION_JSON_TYPE, resp.getMediaType());
     DescribeTableResponse response = resp.readEntity(DescribeTableResponse.class);
     Assertions.assertEquals(createTableResponse.getLocation(), response.getLocation());
-    Assertions.assertEquals(createTableResponse.getProperties(), response.getProperties());
+    Assertions.assertEquals(createTableResponse.getMetadata(), response.getMetadata());
 
     // Test not found exception
     Mockito.reset(tableOps);
     when(tableOps.describeTable(any(), any(), any()))
         .thenThrow(
-            LanceNamespaceException.notFound(
-                "Table not found", "NoSuchTableException", tableIds, ""));
+            new org.lance.namespace.errors.TableNotFoundException("Table not found", "", tableIds));
     resp =
         target(String.format("/v1/table/%s/describe", tableIds))
             .queryParam("delimiter", delimiter)
@@ -674,7 +659,6 @@ public class TestLanceNamespaceOperations extends JerseyTest {
     Assertions.assertEquals(MediaType.APPLICATION_JSON_TYPE, resp.getMediaType());
     ErrorResponse errorResp = resp.readEntity(ErrorResponse.class);
     Assertions.assertEquals("Runtime exception", errorResp.getError());
-    Assertions.assertEquals(RuntimeException.class.getSimpleName(), errorResp.getType());
   }
 
   @Test
@@ -693,9 +677,7 @@ public class TestLanceNamespaceOperations extends JerseyTest {
     Assertions.assertEquals(Response.Status.OK.getStatusCode(), resp.getStatus());
 
     // test throw exception
-    doThrow(
-            LanceNamespaceException.notFound(
-                "Table not found", "NoSuchTableException", tableIds, ""))
+    doThrow(new org.lance.namespace.errors.TableNotFoundException("Table not found", "", tableIds))
         .when(tableOps)
         .tableExists(any(), any());
     resp =
@@ -708,9 +690,8 @@ public class TestLanceNamespaceOperations extends JerseyTest {
     Assertions.assertEquals(MediaType.APPLICATION_JSON_TYPE, resp.getMediaType());
 
     ErrorResponse errorResp = resp.readEntity(ErrorResponse.class);
-    Assertions.assertEquals(404, errorResp.getCode());
+    Assertions.assertEquals(4, errorResp.getCode());
     Assertions.assertEquals("Table not found", errorResp.getError());
-    Assertions.assertEquals("NoSuchTableException", errorResp.getType());
 
     // Test runtime exception
     Mockito.reset(tableOps);
@@ -749,9 +730,7 @@ public class TestLanceNamespaceOperations extends JerseyTest {
     Assertions.assertEquals(dropTableResponse.getLocation(), response.getLocation());
 
     // test throw exception
-    doThrow(
-            LanceNamespaceException.notFound(
-                "Table not found", "NoSuchTableException", tableIds, ""))
+    doThrow(new org.lance.namespace.errors.TableNotFoundException("Table not found", "", tableIds))
         .when(tableOps)
         .dropTable(any(), any());
     resp =
@@ -764,9 +743,8 @@ public class TestLanceNamespaceOperations extends JerseyTest {
     Assertions.assertEquals(MediaType.APPLICATION_JSON_TYPE, resp.getMediaType());
 
     ErrorResponse errorResp = resp.readEntity(ErrorResponse.class);
-    Assertions.assertEquals(404, errorResp.getCode());
+    Assertions.assertEquals(4, errorResp.getCode());
     Assertions.assertEquals("Table not found", errorResp.getError());
-    Assertions.assertEquals("NoSuchTableException", errorResp.getType());
 
     // Test runtime exception
     Mockito.reset(tableOps);
@@ -817,7 +795,6 @@ public class TestLanceNamespaceOperations extends JerseyTest {
     Assertions.assertEquals(MediaType.APPLICATION_JSON_TYPE, resp.getMediaType());
     ErrorResponse errorResp = resp.readEntity(ErrorResponse.class);
     Assertions.assertEquals("Columns to drop cannot be empty.", errorResp.getError());
-    Assertions.assertEquals(IllegalArgumentException.class.getSimpleName(), errorResp.getType());
 
     // Test blank column names validation
     AlterTableDropColumnsRequest blankColumnRequest = new AlterTableDropColumnsRequest();
@@ -831,7 +808,6 @@ public class TestLanceNamespaceOperations extends JerseyTest {
     Assertions.assertEquals(MediaType.APPLICATION_JSON_TYPE, resp.getMediaType());
     errorResp = resp.readEntity(ErrorResponse.class);
     Assertions.assertEquals("Columns to drop cannot be blank.", errorResp.getError());
-    Assertions.assertEquals(IllegalArgumentException.class.getSimpleName(), errorResp.getType());
 
     // Test runtime exception
     Mockito.reset(tableOps);
@@ -850,8 +826,7 @@ public class TestLanceNamespaceOperations extends JerseyTest {
     Mockito.reset(tableOps);
     when(tableOps.alterTable(any(), any(), any(AlterTableDropColumnsRequest.class)))
         .thenThrow(
-            LanceNamespaceException.notFound(
-                "Table not found", "NoSuchTableException", tableIds, ""));
+            new org.lance.namespace.errors.TableNotFoundException("Table not found", "", tableIds));
     resp =
         target(String.format("/v1/table/%s/drop_columns", tableIds))
             .queryParam("delimiter", delimiter)
@@ -870,8 +845,8 @@ public class TestLanceNamespaceOperations extends JerseyTest {
 
     AlterTableAlterColumnsRequest alterColumnsRequest = new AlterTableAlterColumnsRequest();
     alterColumnsRequest.setId(List.of("catalog", "scheme", "alter_table_alter_columns"));
-    ColumnAlteration columnAlteration = new ColumnAlteration();
-    columnAlteration.setColumn("col1");
+    AlterColumnsEntry columnAlteration = new AlterColumnsEntry();
+    columnAlteration.setPath("col1");
     columnAlteration.setRename("col1_new");
     alterColumnsRequest.setAlterations(List.of(columnAlteration));
 
@@ -903,8 +878,7 @@ public class TestLanceNamespaceOperations extends JerseyTest {
     Mockito.reset(tableOps);
     when(tableOps.alterTable(any(), any(), any(AlterTableAlterColumnsRequest.class)))
         .thenThrow(
-            LanceNamespaceException.notFound(
-                "Table not found", "NoSuchTableException", tableIds, ""));
+            new org.lance.namespace.errors.TableNotFoundException("Table not found", "", tableIds));
     resp =
         target(String.format("/v1/table/%s/alter_columns", tableIds))
             .queryParam("delimiter", delimiter)

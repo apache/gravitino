@@ -21,11 +21,6 @@ package org.apache.gravitino.lance.service.rest;
 
 import static org.apache.gravitino.lance.common.utils.LanceConstants.LANCE_TABLE_VERSION;
 
-import com.lancedb.lance.namespace.model.AlterTableAlterColumnsRequest;
-import com.lancedb.lance.namespace.model.AlterTableAlterColumnsResponse;
-import com.lancedb.lance.namespace.model.AlterTableDropColumnsRequest;
-import com.lancedb.lance.namespace.model.AlterTableDropColumnsResponse;
-import com.lancedb.lance.namespace.model.ColumnAlteration;
 import java.util.List;
 import java.util.Map;
 import org.apache.gravitino.lance.common.ops.gravitino.GravitinoLanceTableAlterHandler.AlterColumnsGravitinoLance;
@@ -34,6 +29,11 @@ import org.apache.gravitino.rel.Table;
 import org.apache.gravitino.rel.TableChange;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
+import org.lance.namespace.model.AlterColumnsEntry;
+import org.lance.namespace.model.AlterTableAlterColumnsRequest;
+import org.lance.namespace.model.AlterTableAlterColumnsResponse;
+import org.lance.namespace.model.AlterTableDropColumnsRequest;
+import org.lance.namespace.model.AlterTableDropColumnsResponse;
 import org.mockito.Mockito;
 
 class TestGravitinoLanceTableOperations {
@@ -58,8 +58,8 @@ class TestGravitinoLanceTableOperations {
   @Test
   void testAlterColumnsHandlerBuildsChangesAndSetsVersion() {
     AlterTableAlterColumnsRequest request = new AlterTableAlterColumnsRequest();
-    ColumnAlteration alteration = new ColumnAlteration();
-    alteration.setColumn("c1");
+    AlterColumnsEntry alteration = new AlterColumnsEntry();
+    alteration.setPath("c1");
     alteration.setRename("c1_new");
     request.setAlterations(List.of(alteration));
 

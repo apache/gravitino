@@ -22,43 +22,6 @@ import com.google.common.base.Joiner;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Maps;
 import com.google.common.collect.Sets;
-import com.lancedb.lance.namespace.LanceNamespace;
-import com.lancedb.lance.namespace.LanceNamespaceException;
-import com.lancedb.lance.namespace.LanceNamespaces;
-import com.lancedb.lance.namespace.client.apache.ApiException;
-import com.lancedb.lance.namespace.client.apache.api.TableApi;
-import com.lancedb.lance.namespace.model.AlterTableAlterColumnsRequest;
-import com.lancedb.lance.namespace.model.AlterTableAlterColumnsResponse;
-import com.lancedb.lance.namespace.model.AlterTableDropColumnsRequest;
-import com.lancedb.lance.namespace.model.AlterTableDropColumnsResponse;
-import com.lancedb.lance.namespace.model.ColumnAlteration;
-import com.lancedb.lance.namespace.model.CreateEmptyTableRequest;
-import com.lancedb.lance.namespace.model.CreateEmptyTableResponse;
-import com.lancedb.lance.namespace.model.CreateNamespaceRequest;
-import com.lancedb.lance.namespace.model.CreateNamespaceResponse;
-import com.lancedb.lance.namespace.model.CreateTableRequest;
-import com.lancedb.lance.namespace.model.CreateTableResponse;
-import com.lancedb.lance.namespace.model.DeregisterTableRequest;
-import com.lancedb.lance.namespace.model.DeregisterTableResponse;
-import com.lancedb.lance.namespace.model.DescribeNamespaceRequest;
-import com.lancedb.lance.namespace.model.DescribeNamespaceResponse;
-import com.lancedb.lance.namespace.model.DescribeTableRequest;
-import com.lancedb.lance.namespace.model.DescribeTableResponse;
-import com.lancedb.lance.namespace.model.DropNamespaceRequest;
-import com.lancedb.lance.namespace.model.DropNamespaceResponse;
-import com.lancedb.lance.namespace.model.DropTableRequest;
-import com.lancedb.lance.namespace.model.ErrorResponse;
-import com.lancedb.lance.namespace.model.JsonArrowField;
-import com.lancedb.lance.namespace.model.ListNamespacesRequest;
-import com.lancedb.lance.namespace.model.ListNamespacesResponse;
-import com.lancedb.lance.namespace.model.ListTablesRequest;
-import com.lancedb.lance.namespace.model.NamespaceExistsRequest;
-import com.lancedb.lance.namespace.model.RegisterTableRequest;
-import com.lancedb.lance.namespace.model.RegisterTableRequest.ModeEnum;
-import com.lancedb.lance.namespace.model.RegisterTableResponse;
-import com.lancedb.lance.namespace.model.TableExistsRequest;
-import com.lancedb.lance.namespace.rest.RestNamespace;
-import com.lancedb.lance.namespace.rest.RestNamespaceConfig;
 import java.io.File;
 import java.io.IOException;
 import java.nio.charset.Charset;
@@ -69,21 +32,19 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
-import java.util.Optional;
 import java.util.Set;
 import org.apache.arrow.memory.BufferAllocator;
 import org.apache.arrow.memory.RootAllocator;
 import org.apache.arrow.vector.types.pojo.ArrowType;
 import org.apache.arrow.vector.types.pojo.Field;
 import org.apache.commons.io.FileUtils;
-import org.apache.commons.lang3.reflect.FieldUtils;
 import org.apache.gravitino.Catalog;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Schema;
 import org.apache.gravitino.client.GravitinoMetalake;
-import org.apache.gravitino.exceptions.NoSuchTableException;
 import org.apache.gravitino.integration.test.util.BaseIT;
 import org.apache.gravitino.integration.test.util.GravitinoITUtils;
+import org.apache.gravitino.json.JsonUtils;
 import org.apache.gravitino.lance.common.utils.ArrowUtils;
 import org.apache.gravitino.lance.common.utils.LanceConstants;
 import org.apache.gravitino.rel.Table;
@@ -92,10 +53,46 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
+import org.lance.namespace.LanceNamespace;
+import org.lance.namespace.client.apache.ApiClient;
+import org.lance.namespace.client.apache.ApiException;
+import org.lance.namespace.client.apache.api.TableApi;
+import org.lance.namespace.errors.ErrorCode;
+import org.lance.namespace.errors.LanceNamespaceException;
+import org.lance.namespace.model.AlterColumnsEntry;
+import org.lance.namespace.model.AlterTableAlterColumnsRequest;
+import org.lance.namespace.model.AlterTableAlterColumnsResponse;
+import org.lance.namespace.model.AlterTableDropColumnsRequest;
+import org.lance.namespace.model.AlterTableDropColumnsResponse;
+import org.lance.namespace.model.CreateEmptyTableRequest;
+import org.lance.namespace.model.CreateEmptyTableResponse;
+import org.lance.namespace.model.CreateNamespaceRequest;
+import org.lance.namespace.model.CreateNamespaceResponse;
+import org.lance.namespace.model.CreateTableResponse;
+import org.lance.namespace.model.DeregisterTableRequest;
+import org.lance.namespace.model.DeregisterTableResponse;
+import org.lance.namespace.model.DescribeNamespaceRequest;
+import org.lance.namespace.model.DescribeNamespaceResponse;
+import org.lance.namespace.model.DescribeTableRequest;
+import org.lance.namespace.model.DescribeTableResponse;
+import org.lance.namespace.model.DropNamespaceRequest;
+import org.lance.namespace.model.DropNamespaceResponse;
+import org.lance.namespace.model.DropTableRequest;
+import org.lance.namespace.model.ErrorResponse;
+import org.lance.namespace.model.JsonArrowField;
+import org.lance.namespace.model.ListNamespacesRequest;
+import org.lance.namespace.model.ListNamespacesResponse;
+import org.lance.namespace.model.ListTablesRequest;
+import org.lance.namespace.model.NamespaceExistsRequest;
+import org.lance.namespace.model.RegisterTableRequest;
+import org.lance.namespace.model.RegisterTableResponse;
+import org.lance.namespace.model.TableExistsRequest;
 
+@SuppressWarnings("deprecation")
 public class LanceRESTServiceIT extends BaseIT {
   private static final String CATALOG_NAME = GravitinoITUtils.genRandomName("lance_rest_catalog");
   private static final String SCHEMA_NAME = GravitinoITUtils.genRandomName("lance_rest_schema");
+  private static final String DELIMITER = ".";
 
   private GravitinoMetalake metalake;
   private Catalog catalog;
@@ -116,9 +113,9 @@ public class LanceRESTServiceIT extends BaseIT {
     this.metalake = createMetalake(getLanceRESTServerMetalakeName());
 
     HashMap<String, String> props = Maps.newHashMap();
-    props.put(RestNamespaceConfig.URI, getLanceRestServiceUrl());
-    props.put(RestNamespaceConfig.DELIMITER, RestNamespaceConfig.DELIMITER_DEFAULT);
-    this.ns = LanceNamespaces.connect("rest", props, null, allocator);
+    props.put("uri", getLanceRestServiceUrl());
+    props.put("delimiter", DELIMITER);
+    this.ns = LanceNamespace.connect("rest", props, allocator);
 
     this.tempDir = Files.createTempDirectory("test_lance_rest_service_it_");
   }
@@ -183,29 +180,20 @@ public class LanceRESTServiceIT extends BaseIT {
 
     // test describe the root namespace
     DescribeNamespaceRequest rootDescNamespaceReq = new DescribeNamespaceRequest();
-    LanceNamespaceException exception =
+    RuntimeException exception =
         Assertions.assertThrows(
-            LanceNamespaceException.class, () -> ns.describeNamespace(rootDescNamespaceReq));
-
-    Assertions.assertEquals(400, exception.getCode());
-    Assertions.assertTrue(exception.getErrorResponse().isPresent());
+            RuntimeException.class, () -> ns.describeNamespace(rootDescNamespaceReq));
+    Assertions.assertTrue(exception.getMessage().contains("\"code\":13"));
     Assertions.assertTrue(
-        exception
-            .getErrorResponse()
-            .get()
-            .getError()
-            .contains("Expected at most 2-level and at least 1-level namespace"));
-    Assertions.assertEquals(
-        IllegalArgumentException.class.getSimpleName(),
-        exception.getErrorResponse().get().getType());
+        exception.getMessage().contains("Expected at most 2-level and at least 1-level namespace"));
 
     // test describe a non-existent catalog namespace
     DescribeNamespaceRequest nonExistentCatalogReq = new DescribeNamespaceRequest();
     nonExistentCatalogReq.addIdItem("non_existent_catalog");
     exception =
         Assertions.assertThrows(
-            LanceNamespaceException.class, () -> ns.describeNamespace(nonExistentCatalogReq));
-    Assertions.assertEquals(404, exception.getCode());
+            RuntimeException.class, () -> ns.describeNamespace(nonExistentCatalogReq));
+    Assertions.assertTrue(exception.getMessage().contains("\"code\":1"));
 
     // test describe a non-existent schema namespace
     DescribeNamespaceRequest nonExistentSchemaReq = new DescribeNamespaceRequest();
@@ -213,8 +201,8 @@ public class LanceRESTServiceIT extends BaseIT {
     nonExistentSchemaReq.addIdItem("non_existent_schema");
     exception =
         Assertions.assertThrows(
-            LanceNamespaceException.class, () -> ns.describeNamespace(nonExistentSchemaReq));
-    Assertions.assertEquals(404, exception.getCode());
+            RuntimeException.class, () -> ns.describeNamespace(nonExistentSchemaReq));
+    Assertions.assertTrue(exception.getMessage().contains("\"code\":1"));
   }
 
   @Test
@@ -237,13 +225,13 @@ public class LanceRESTServiceIT extends BaseIT {
     Assertions.assertEquals(catalog.properties(), createNamespaceResp.getProperties());
 
     // create catalog again with default mode (create) should fail
-    LanceNamespaceException exception =
+    RuntimeException exception =
         Assertions.assertThrows(
-            LanceNamespaceException.class, () -> ns.createNamespace(createNamespaceReq));
-    Assertions.assertEquals(409, exception.getCode());
+            RuntimeException.class, () -> ns.createNamespace(createNamespaceReq));
+    Assertions.assertTrue(exception.getMessage().contains("\"code\":2"));
 
     // create catalog again with exist_ok mode should succeed
-    createNamespaceReq.setMode(CreateNamespaceRequest.ModeEnum.EXIST_OK);
+    createNamespaceReq.setMode("exist_ok");
     createNamespaceResp = ns.createNamespace(createNamespaceReq);
     Assertions.assertEquals(catalog.properties(), createNamespaceResp.getProperties());
 
@@ -254,7 +242,7 @@ public class LanceRESTServiceIT extends BaseIT {
             put("catalog_key2", "catalog_value2");
           }
         };
-    createNamespaceReq.setMode(CreateNamespaceRequest.ModeEnum.OVERWRITE);
+    createNamespaceReq.setMode("overwrite");
     createNamespaceReq.setProperties(newProps);
     createNamespaceResp = ns.createNamespace(createNamespaceReq);
 
@@ -281,12 +269,11 @@ public class LanceRESTServiceIT extends BaseIT {
 
     // create schema again with default mode (create) should fail
     exception =
-        Assertions.assertThrows(
-            LanceNamespaceException.class, () -> ns.createNamespace(createSchemaReq));
-    Assertions.assertEquals(409, exception.getCode());
+        Assertions.assertThrows(RuntimeException.class, () -> ns.createNamespace(createSchemaReq));
+    Assertions.assertTrue(exception.getMessage().contains("\"code\":2"));
 
     // create schema again with exist_ok mode should succeed
-    createSchemaReq.setMode(CreateNamespaceRequest.ModeEnum.EXIST_OK);
+    createSchemaReq.setMode("exist_ok");
     createNamespaceResp = ns.createNamespace(createSchemaReq);
     Assertions.assertEquals(schema.properties(), createNamespaceResp.getProperties());
 
@@ -297,7 +284,7 @@ public class LanceRESTServiceIT extends BaseIT {
             put("schema_key2", "schema_value2");
           }
         };
-    createSchemaReq.setMode(CreateNamespaceRequest.ModeEnum.OVERWRITE);
+    createSchemaReq.setMode("overwrite");
     createSchemaReq.setProperties(newSchemaProps);
     createNamespaceResp = ns.createNamespace(createSchemaReq);
 
@@ -313,13 +300,12 @@ public class LanceRESTServiceIT extends BaseIT {
     // test drop a non-existent namespace (catalog) with default mode (FAIL) should fail
     DropNamespaceRequest dropNamespaceReq = new DropNamespaceRequest();
     dropNamespaceReq.addIdItem("non_existent_catalog");
-    LanceNamespaceException exception =
-        Assertions.assertThrows(
-            LanceNamespaceException.class, () -> ns.dropNamespace(dropNamespaceReq));
-    Assertions.assertEquals(404, exception.getCode());
+    RuntimeException exception =
+        Assertions.assertThrows(RuntimeException.class, () -> ns.dropNamespace(dropNamespaceReq));
+    Assertions.assertTrue(exception.getMessage().contains("\"code\":1"));
 
     // test drop a non-existent namespace (catalog) with SKIP mode should succeed
-    dropNamespaceReq.setMode(DropNamespaceRequest.ModeEnum.SKIP);
+    dropNamespaceReq.setMode("skip");
     DropNamespaceResponse dropNamespaceResp = ns.dropNamespace(dropNamespaceReq);
     Assertions.assertTrue(dropNamespaceResp.getTransactionId().isEmpty());
 
@@ -328,12 +314,11 @@ public class LanceRESTServiceIT extends BaseIT {
     dropSchemaReq.addIdItem(catalog.name());
     dropSchemaReq.addIdItem("non_existent_schema");
     exception =
-        Assertions.assertThrows(
-            LanceNamespaceException.class, () -> ns.dropNamespace(dropSchemaReq));
-    Assertions.assertEquals(404, exception.getCode());
+        Assertions.assertThrows(RuntimeException.class, () -> ns.dropNamespace(dropSchemaReq));
+    Assertions.assertTrue(exception.getMessage().contains("\"code\":1"));
 
     // test drop a non-existent namespace (schema) with SKIP mode should succeed
-    dropSchemaReq.setMode(DropNamespaceRequest.ModeEnum.SKIP);
+    dropSchemaReq.setMode("skip");
     dropNamespaceResp = ns.dropNamespace(dropSchemaReq);
     Assertions.assertTrue(dropNamespaceResp.getTransactionId().isEmpty());
 
@@ -342,11 +327,11 @@ public class LanceRESTServiceIT extends BaseIT {
     dropNonEmptyCatalogReq.addIdItem(catalog.name());
     exception =
         Assertions.assertThrows(
-            LanceNamespaceException.class, () -> ns.dropNamespace(dropNonEmptyCatalogReq));
-    Assertions.assertEquals(400, exception.getCode());
+            RuntimeException.class, () -> ns.dropNamespace(dropNonEmptyCatalogReq));
+    Assertions.assertTrue(exception.getMessage().contains("\"code\":13"));
 
     // test drop a non-empty namespace (catalog) with CASCADE behavior should succeed
-    dropNonEmptyCatalogReq.setBehavior(DropNamespaceRequest.BehaviorEnum.CASCADE);
+    dropNonEmptyCatalogReq.setBehavior("cascade");
     dropNamespaceResp = ns.dropNamespace(dropNonEmptyCatalogReq);
     Assertions.assertTrue(dropNamespaceResp.getTransactionId().isEmpty());
     Assertions.assertFalse(metalake.catalogExists(catalog.name()));
@@ -370,12 +355,12 @@ public class LanceRESTServiceIT extends BaseIT {
     dropNonEmptySchemaReq.addIdItem(schema.name());
     exception =
         Assertions.assertThrows(
-            LanceNamespaceException.class, () -> ns.dropNamespace(dropNonEmptySchemaReq));
-    Assertions.assertEquals(400, exception.getCode());
+            RuntimeException.class, () -> ns.dropNamespace(dropNonEmptySchemaReq));
+    Assertions.assertTrue(exception.getMessage().contains("\"code\":13"));
     Assertions.assertTrue(catalog.asSchemas().schemaExists(schema.name()));
 
     // test drop a non-empty namespace (schema) with CASCADE behavior should succeed
-    dropNonEmptySchemaReq.setBehavior(DropNamespaceRequest.BehaviorEnum.CASCADE);
+    dropNonEmptySchemaReq.setBehavior("cascade");
     dropNamespaceResp = ns.dropNamespace(dropNonEmptySchemaReq);
     Assertions.assertTrue(dropNamespaceResp.getTransactionId().isEmpty());
     Assertions.assertFalse(catalog.asSchemas().schemaExists(schema.name()));
@@ -394,10 +379,10 @@ public class LanceRESTServiceIT extends BaseIT {
     // test non-existing catalog
     NamespaceExistsRequest nonExistentCatalogReq = new NamespaceExistsRequest();
     nonExistentCatalogReq.addIdItem("non_existent_catalog");
-    LanceNamespaceException exception =
+    RuntimeException exception =
         Assertions.assertThrows(
-            LanceNamespaceException.class, () -> ns.namespaceExists(nonExistentCatalogReq));
-    Assertions.assertEquals(404, exception.getCode());
+            RuntimeException.class, () -> ns.namespaceExists(nonExistentCatalogReq));
+    Assertions.assertTrue(exception.getMessage().contains("\"code\":1"));
 
     // test existing schema
     NamespaceExistsRequest schemaExistsReq = new NamespaceExistsRequest();
@@ -411,8 +396,8 @@ public class LanceRESTServiceIT extends BaseIT {
     nonExistentSchemaReq.addIdItem("non_existent_schema");
     exception =
         Assertions.assertThrows(
-            LanceNamespaceException.class, () -> ns.namespaceExists(nonExistentSchemaReq));
-    Assertions.assertEquals(404, exception.getCode());
+            RuntimeException.class, () -> ns.namespaceExists(nonExistentSchemaReq));
+    Assertions.assertTrue(exception.getMessage().contains("\"code\":1"));
   }
 
   @Test
@@ -423,19 +408,11 @@ public class LanceRESTServiceIT extends BaseIT {
     CreateEmptyTableRequest request = new CreateEmptyTableRequest();
     String location = tempDir + "/" + "empty_table/";
     request.setLocation(location);
-    request.setProperties(
-        ImmutableMap.of(
-            "key1", "v1",
-            "lance.storage.a", "value_a",
-            "lance.storage.b", "value_b"));
     request.setId(List.of(CATALOG_NAME, SCHEMA_NAME, "empty_table"));
 
     CreateEmptyTableResponse response = ns.createEmptyTable(request);
     Assertions.assertNotNull(response);
     Assertions.assertEquals(location, response.getLocation());
-    Assertions.assertEquals("v1", response.getProperties().get("key1"));
-    Assertions.assertEquals("value_a", response.getStorageOptions().get("a"));
-    Assertions.assertEquals("value_b", response.getStorageOptions().get("b"));
 
     DescribeTableRequest describeTableRequest = new DescribeTableRequest();
     describeTableRequest.setId(List.of(CATALOG_NAME, SCHEMA_NAME, "empty_table"));
@@ -444,17 +421,17 @@ public class LanceRESTServiceIT extends BaseIT {
     Assertions.assertNotNull(loadTable);
     Assertions.assertEquals(location, loadTable.getLocation());
     Assertions.assertEquals(
-        "true", loadTable.getProperties().get(LanceConstants.LANCE_TABLE_CREATE_EMPTY));
-    Assertions.assertEquals("true", loadTable.getProperties().get(Table.PROPERTY_EXTERNAL));
+        "true", loadTable.getMetadata().get(LanceConstants.LANCE_TABLE_CREATE_EMPTY));
+    Assertions.assertEquals("true", loadTable.getMetadata().get(Table.PROPERTY_EXTERNAL));
 
     // Try to create the same table again should fail
-    LanceNamespaceException exception =
+    RuntimeException exception =
         Assertions.assertThrows(
-            LanceNamespaceException.class,
+            RuntimeException.class,
             () -> {
               ns.createEmptyTable(request);
             });
-    Assertions.assertEquals(409, exception.getCode());
+    Assertions.assertTrue(exception.getMessage().contains("\"code\":5"));
 
     // Create an empty table with non-existent location should succeed
     // since storage is not touched
@@ -480,7 +457,7 @@ public class LanceRESTServiceIT extends BaseIT {
   }
 
   @Test
-  void testCreateTable() throws IOException, ApiException, IllegalAccessException {
+  void testCreateTable() throws IOException {
     catalog = createCatalog(CATALOG_NAME);
     createSchema();
 
@@ -493,19 +470,15 @@ public class LanceRESTServiceIT extends BaseIT {
                 Field.nullable("value", new ArrowType.Utf8())));
     byte[] body = ArrowUtils.generateIpcStream(schema);
 
-    CreateTableRequest request = new CreateTableRequest();
-    request.setId(ids);
-    request.setLocation(location);
-    request.setProperties(
+    Map<String, String> createTableProperties =
         ImmutableMap.of(
             "key1", "v1",
             "lance.storage.a", "value_a",
-            "lance.storage.b", "value_b"));
-
-    CreateTableResponse response = ns.createTable(request, body);
+            "lance.storage.b", "value_b");
+    CreateTableResponse response =
+        createTable(ids, location, createTableProperties, body, /* mode= */ null);
     Assertions.assertNotNull(response);
     Assertions.assertEquals(location, response.getLocation());
-    Assertions.assertEquals("v1", response.getProperties().get("key1"));
     Assertions.assertEquals("value_a", response.getStorageOptions().get("a"));
     Assertions.assertEquals("value_b", response.getStorageOptions().get("b"));
     Assertions.assertNotNull(response.getVersion());
@@ -531,74 +504,87 @@ public class LanceRESTServiceIT extends BaseIT {
     }
     // Check the location exists
     Assertions.assertTrue(new File(location).exists());
-    Assertions.assertEquals("v1", loadTable.getProperties().get("key1"));
+    Assertions.assertEquals("v1", loadTable.getMetadata().get("key1"));
     Assertions.assertEquals("value_a", loadTable.getStorageOptions().get("a"));
     Assertions.assertEquals("value_b", loadTable.getStorageOptions().get("b"));
 
     // Check overwrite mode
     String newLocation = tempDir + "/" + "table_new/";
-    request.setLocation(newLocation);
-    request.setMode(CreateTableRequest.ModeEnum.OVERWRITE);
-    request.setProperties(
+    Map<String, String> overwriteTableProperties =
         ImmutableMap.of(
             "key1", "v2",
             "lance.storage.a", "value_va",
-            "lance.storage.b", "value_vb"));
+            "lance.storage.b", "value_vb");
 
-    response = Assertions.assertDoesNotThrow(() -> ns.createTable(request, body));
+    response =
+        Assertions.assertDoesNotThrow(
+            () -> createTable(ids, newLocation, overwriteTableProperties, body, "overwrite"));
 
     Assertions.assertNotNull(response);
     Assertions.assertEquals(newLocation, response.getLocation());
-    Assertions.assertTrue(response.getProperties().get("key1").equals("v2"));
     Assertions.assertEquals("value_va", response.getStorageOptions().get("a"));
     Assertions.assertEquals("value_vb", response.getStorageOptions().get("b"));
     Assertions.assertTrue(new File(newLocation).exists());
     Assertions.assertFalse(new File(location).exists());
 
     // Check exist_ok mode
-    request.setMode(CreateTableRequest.ModeEnum.EXIST_OK);
-    response = Assertions.assertDoesNotThrow(() -> ns.createTable(request, body));
+    response =
+        Assertions.assertDoesNotThrow(
+            () -> createTable(ids, newLocation, overwriteTableProperties, body, "exist_ok"));
 
     Assertions.assertNotNull(response);
-    Assertions.assertEquals("v2", response.getProperties().get("key1"));
     Assertions.assertEquals("value_va", response.getStorageOptions().get("a"));
     Assertions.assertEquals("value_vb", response.getStorageOptions().get("b"));
     Assertions.assertEquals(newLocation, response.getLocation());
     Assertions.assertTrue(new File(newLocation).exists());
 
     // Create table again without overwrite or exist_ok should fail
-    request.setMode(CreateTableRequest.ModeEnum.CREATE);
     LanceNamespaceException exception =
-        Assertions.assertThrows(LanceNamespaceException.class, () -> ns.createTable(request, body));
+        Assertions.assertThrows(
+            LanceNamespaceException.class,
+            () -> createTable(ids, newLocation, overwriteTableProperties, body, "create"));
     Assertions.assertTrue(exception.getMessage().contains("already exists"));
-    Assertions.assertEquals(409, exception.getCode());
+    Assertions.assertEquals(5, exception.getCode());
 
     // Create a table without location should fail
-    CreateTableRequest noLocationRequest = new CreateTableRequest();
-    noLocationRequest.setId(List.of(CATALOG_NAME, SCHEMA_NAME, "no_location_table"));
     Assertions.assertThrows(
-        LanceNamespaceException.class, () -> ns.createTable(noLocationRequest, body));
+        LanceNamespaceException.class,
+        () ->
+            createTable(
+                List.of(CATALOG_NAME, SCHEMA_NAME, "no_location_table"),
+                /* location= */ null,
+                ImmutableMap.of(),
+                body,
+                /* mode= */ null));
 
     // Create table with invalid schema should fail
     byte[] invalidBody = "".getBytes(Charset.defaultCharset());
-    CreateTableRequest invalidRequest = new CreateTableRequest();
-    invalidRequest.setId(List.of(CATALOG_NAME, SCHEMA_NAME, "invalid_table"));
-    invalidRequest.setLocation(tempDir + "/" + "invalid_table/");
     LanceNamespaceException apiException =
         Assertions.assertThrows(
-            LanceNamespaceException.class, () -> ns.createTable(invalidRequest, invalidBody));
+            LanceNamespaceException.class,
+            () ->
+                createTable(
+                    List.of(CATALOG_NAME, SCHEMA_NAME, "invalid_table"),
+                    tempDir + "/" + "invalid_table/",
+                    ImmutableMap.of(),
+                    invalidBody,
+                    /* mode= */ null));
     Assertions.assertTrue(apiException.getMessage().contains("Failed to parse Arrow IPC stream"));
-    Assertions.assertEquals(400, apiException.getCode());
+    Assertions.assertEquals(13, apiException.getCode());
 
     // Create table with wrong ids should fail
-    CreateTableRequest wrongIdRequest = new CreateTableRequest();
-    wrongIdRequest.setId(List.of(CATALOG_NAME, "wrong_schema")); // This is a schema NOT a table.
-    wrongIdRequest.setLocation(tempDir + "/" + "wrong_id_table/");
     LanceNamespaceException wrongIdException =
         Assertions.assertThrows(
-            LanceNamespaceException.class, () -> ns.createTable(wrongIdRequest, body));
+            LanceNamespaceException.class,
+            () ->
+                createTable(
+                    List.of(CATALOG_NAME, "wrong_schema"),
+                    tempDir + "/" + "wrong_id_table/",
+                    ImmutableMap.of(),
+                    body,
+                    /* mode= */ null));
     Assertions.assertTrue(wrongIdException.getMessage().contains("Expected at 3-level namespace"));
-    Assertions.assertEquals(400, wrongIdException.getCode());
+    Assertions.assertEquals(13, wrongIdException.getCode());
 
     // Now test list tables
     ListTablesRequest listRequest = new ListTablesRequest();
@@ -613,10 +599,8 @@ public class LanceRESTServiceIT extends BaseIT {
     dropColumnsRequest.setId(List.of(CATALOG_NAME, SCHEMA_NAME, "table"));
     dropColumnsRequest.setColumns(List.of("value"));
 
-    // No alterTableDropColumns in Namespace interface, so we need to get TableApi via reflection
-    RestNamespace restNamespace = (RestNamespace) ns;
-    TableApi tableApi = (TableApi) FieldUtils.readField(restNamespace, "tableApi", true);
-    String delimiter = RestNamespaceConfig.DELIMITER_DEFAULT;
+    TableApi tableApi = createTableApi();
+    String delimiter = DELIMITER;
 
     AlterTableDropColumnsResponse alterTableDropColumnsResponse =
         Assertions.assertDoesNotThrow(
@@ -667,20 +651,15 @@ public class LanceRESTServiceIT extends BaseIT {
                 Field.nullable("value", new ArrowType.Utf8())));
     byte[] body = ArrowUtils.generateIpcStream(schema);
 
-    CreateTableRequest request = new CreateTableRequest();
-    request.setId(ids);
-    request.setLocation(location);
-    request.setProperties(ImmutableMap.of("key1", "v1"));
-    ns.createTable(request, body);
+    createTable(ids, location, ImmutableMap.of("key1", "v1"), body, /* mode= */ null);
 
-    RestNamespace restNamespace = (RestNamespace) ns;
-    TableApi tableApi = (TableApi) FieldUtils.readField(restNamespace, "tableApi", true);
-    String delimiter = RestNamespaceConfig.DELIMITER_DEFAULT;
+    TableApi tableApi = createTableApi();
+    String delimiter = DELIMITER;
 
     AlterTableAlterColumnsRequest alterRequest = new AlterTableAlterColumnsRequest();
     alterRequest.setId(ids);
-    ColumnAlteration columnAlteration = new ColumnAlteration();
-    columnAlteration.setColumn("value");
+    AlterColumnsEntry columnAlteration = new AlterColumnsEntry();
+    columnAlteration.setPath("value");
     columnAlteration.setRename("value_new");
     alterRequest.setAlterations(List.of(columnAlteration));
 
@@ -712,7 +691,7 @@ public class LanceRESTServiceIT extends BaseIT {
     List<String> ids = List.of(CATALOG_NAME, SCHEMA_NAME, "table_register");
     RegisterTableRequest registerTableRequest = new RegisterTableRequest();
     registerTableRequest.setLocation(location);
-    registerTableRequest.setMode(ModeEnum.CREATE);
+    registerTableRequest.setMode("create");
     registerTableRequest.setId(ids);
     registerTableRequest.setProperties(ImmutableMap.of("key1", "value1"));
 
@@ -727,11 +706,11 @@ public class LanceRESTServiceIT extends BaseIT {
     DescribeTableResponse loadTable = ns.describeTable(describeTableRequest);
     Assertions.assertNotNull(loadTable);
     Assertions.assertEquals(location, loadTable.getLocation());
-    Assertions.assertTrue(loadTable.getProperties().containsKey("key1"));
+    Assertions.assertTrue(loadTable.getMetadata().containsKey("key1"));
 
     // Test register again with OVERWRITE mode
     String newLocation = tempDir + "/" + "register_new/";
-    registerTableRequest.setMode(ModeEnum.OVERWRITE);
+    registerTableRequest.setMode("overwrite");
     registerTableRequest.setLocation(newLocation);
     response = Assertions.assertDoesNotThrow(() -> ns.registerTable(registerTableRequest));
     Assertions.assertNotNull(response);
@@ -743,7 +722,7 @@ public class LanceRESTServiceIT extends BaseIT {
     String existingLocation = tempDir + "/" + "existing_location/";
     new File(existingLocation).mkdirs();
     Assertions.assertTrue(new File(existingLocation).exists());
-    registerTableRequest.setMode(ModeEnum.CREATE);
+    registerTableRequest.setMode("create");
     registerTableRequest.setLocation(existingLocation);
     registerTableRequest.setId(List.of(CATALOG_NAME, SCHEMA_NAME, "table_with_existing_location"));
     RegisterTableResponse existingLocationResponse =
@@ -775,7 +754,7 @@ public class LanceRESTServiceIT extends BaseIT {
 
     // Test Overwrite again after deregister
     String nonExistingLocation = tempDir + "/" + "non_existing_location/";
-    registerTableRequest.setMode(ModeEnum.OVERWRITE);
+    registerTableRequest.setMode("overwrite");
     registerTableRequest.setId(ids);
     registerTableRequest.setLocation(nonExistingLocation);
     response = Assertions.assertDoesNotThrow(() -> ns.registerTable(registerTableRequest));
@@ -802,22 +781,16 @@ public class LanceRESTServiceIT extends BaseIT {
     DeregisterTableRequest deregisterTableRequest = new DeregisterTableRequest();
     deregisterTableRequest.setId(ids);
 
-    LanceNamespaceException exception =
+    RuntimeException exception =
         Assertions.assertThrows(
-            LanceNamespaceException.class, () -> ns.deregisterTable(deregisterTableRequest));
-    Assertions.assertEquals(404, exception.getCode());
-    Assertions.assertTrue(exception.getMessage().contains("does not exist"));
-    Optional<ErrorResponse> responseOptional = exception.getErrorResponse();
-    Assertions.assertTrue(responseOptional.isPresent());
-    Assertions.assertEquals(
-        NoSuchTableException.class.getSimpleName(), responseOptional.get().getType());
-
+            RuntimeException.class, () -> ns.deregisterTable(deregisterTableRequest));
+    Assertions.assertTrue(exception.getMessage().contains("\"code\":4"));
+    Assertions.assertTrue(exception.getMessage().contains("Table not found"));
     // Try to create a table and then deregister table
     CreateEmptyTableRequest createEmptyTableRequest = new CreateEmptyTableRequest();
     String location = tempDir + "/" + "to_be_deregistered_table/";
     ids = List.of(CATALOG_NAME, SCHEMA_NAME, "to_be_deregistered_table");
     createEmptyTableRequest.setLocation(location);
-    createEmptyTableRequest.setProperties(ImmutableMap.of());
     createEmptyTableRequest.setId(ids);
     CreateEmptyTableResponse response =
         Assertions.assertDoesNotThrow(() -> ns.createEmptyTable(createEmptyTableRequest));
@@ -837,16 +810,19 @@ public class LanceRESTServiceIT extends BaseIT {
     // Now try to describe the table, should fail
     DescribeTableRequest describeTableRequest = new DescribeTableRequest();
     describeTableRequest.setId(ids);
-    LanceNamespaceException lanceNamespaceException =
+    RuntimeException describeException =
         Assertions.assertThrows(
-            LanceNamespaceException.class, () -> ns.describeTable(describeTableRequest));
-    Assertions.assertEquals(404, lanceNamespaceException.getCode());
+            RuntimeException.class, () -> ns.describeTable(describeTableRequest));
+    Assertions.assertTrue(describeException.getMessage().contains("\"code\":4"));
 
     describeTableRequest.setVersion(1L);
-    lanceNamespaceException =
+    RuntimeException versionException =
         Assertions.assertThrows(
-            LanceNamespaceException.class, () -> ns.describeTable(describeTableRequest));
-    Assertions.assertEquals(406, lanceNamespaceException.getCode());
+            RuntimeException.class, () -> ns.describeTable(describeTableRequest));
+    Assertions.assertTrue(
+        versionException
+            .getMessage()
+            .contains("Describing specific table version is not supported"));
   }
 
   @Test
@@ -858,7 +834,6 @@ public class LanceRESTServiceIT extends BaseIT {
     CreateEmptyTableRequest createEmptyTableRequest = new CreateEmptyTableRequest();
     String location = tempDir + "/" + "table_exists/";
     createEmptyTableRequest.setLocation(location);
-    createEmptyTableRequest.setProperties(ImmutableMap.of());
     createEmptyTableRequest.setId(ids);
     CreateEmptyTableResponse response =
         Assertions.assertDoesNotThrow(() -> ns.createEmptyTable(createEmptyTableRequest));
@@ -873,10 +848,9 @@ public class LanceRESTServiceIT extends BaseIT {
     // Test non-existing table
     List<String> nonExistingIds = List.of(CATALOG_NAME, SCHEMA_NAME, "non_existing_table");
     tableExistsReq.setId(nonExistingIds);
-    LanceNamespaceException exception =
-        Assertions.assertThrows(
-            LanceNamespaceException.class, () -> ns.tableExists(tableExistsReq));
-    Assertions.assertEquals(404, exception.getCode());
+    RuntimeException exception =
+        Assertions.assertThrows(RuntimeException.class, () -> ns.tableExists(tableExistsReq));
+    Assertions.assertTrue(exception.getMessage().contains("\"code\":4"));
     Assertions.assertTrue(exception.getMessage().contains("Not Found"));
   }
 
@@ -889,7 +863,6 @@ public class LanceRESTServiceIT extends BaseIT {
     CreateEmptyTableRequest createEmptyTableRequest = new CreateEmptyTableRequest();
     String location = tempDir + "/" + "table_to_drop/";
     createEmptyTableRequest.setLocation(location);
-    createEmptyTableRequest.setProperties(ImmutableMap.of());
     createEmptyTableRequest.setId(ids);
     CreateEmptyTableResponse response =
         Assertions.assertDoesNotThrow(() -> ns.createEmptyTable(createEmptyTableRequest));
@@ -904,17 +877,76 @@ public class LanceRESTServiceIT extends BaseIT {
     // Describe the dropped table should fail
     DescribeTableRequest describeTableRequest = new DescribeTableRequest();
     describeTableRequest.setId(ids);
-    LanceNamespaceException exception =
+    RuntimeException exception =
         Assertions.assertThrows(
-            LanceNamespaceException.class, () -> ns.describeTable(describeTableRequest));
-    Assertions.assertEquals(404, exception.getCode());
+            RuntimeException.class, () -> ns.describeTable(describeTableRequest));
+    Assertions.assertTrue(exception.getMessage().contains("\"code\":4"));
 
     // Drop a non-existing table should fail
     dropTableRequest.setId(ids);
     exception =
-        Assertions.assertThrows(
-            LanceNamespaceException.class, () -> ns.dropTable(dropTableRequest));
-    Assertions.assertEquals(404, exception.getCode());
+        Assertions.assertThrows(RuntimeException.class, () -> ns.dropTable(dropTableRequest));
+    Assertions.assertTrue(exception.getMessage().contains("\"code\":4"));
+  }
+
+  private CreateTableResponse createTable(
+      List<String> ids,
+      String location,
+      Map<String, String> tableProperties,
+      byte[] body,
+      String mode) {
+    Map<String, String> additionalHeaders = Maps.newHashMap();
+    if (location != null) {
+      additionalHeaders.put(LanceConstants.LANCE_TABLE_LOCATION_HEADER, location);
+    }
+    if (tableProperties != null && !tableProperties.isEmpty()) {
+      additionalHeaders.put(
+          LanceConstants.LANCE_TABLE_PROPERTIES_PREFIX_HEADER,
+          serializeTableProperties(tableProperties));
+    }
+
+    try {
+      return createTableApi()
+          .createTable(String.join(DELIMITER, ids), body, DELIMITER, mode, additionalHeaders);
+    } catch (ApiException e) {
+      throw toLanceNamespaceException(e);
+    }
+  }
+
+  private static String serializeTableProperties(Map<String, String> tableProperties) {
+    try {
+      return JsonUtils.anyFieldMapper().writeValueAsString(tableProperties);
+    } catch (IOException e) {
+      throw new IllegalStateException("Failed to serialize table properties", e);
+    }
+  }
+
+  private static LanceNamespaceException toLanceNamespaceException(ApiException e) {
+    if (e.getResponseBody() != null) {
+      try {
+        ErrorResponse errorResponse =
+            JsonUtils.anyFieldMapper().readValue(e.getResponseBody(), ErrorResponse.class);
+        ErrorCode errorCode =
+            errorResponse.getCode() == null
+                ? ErrorCode.INTERNAL
+                : ErrorCode.fromCode(errorResponse.getCode());
+        return new LanceNamespaceException(
+            errorCode,
+            errorResponse.getError(),
+            errorResponse.getDetail(),
+            errorResponse.getInstance(),
+            e);
+      } catch (IOException ignored) {
+        // Fall through to a generic internal error.
+      }
+    }
+
+    return new LanceNamespaceException(ErrorCode.INTERNAL, e.getMessage(), e);
+  }
+
+  private TableApi createTableApi() {
+    ApiClient apiClient = new ApiClient().setBasePath(getLanceRestServiceUrl());
+    return new TableApi(apiClient);
   }
 
   private GravitinoMetalake createMetalake(String metalakeName) {

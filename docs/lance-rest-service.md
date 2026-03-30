@@ -273,7 +273,7 @@ curl -X POST http://localhost:9101/lance/v1/table/lance_catalog%24schema%24table
   -d '{
     "id": ["lance_catalog", "schema", "table01"],
     "location": "/tmp/lance_catalog/schema/table01",
-    "mode": "CREATE"
+    "mode": "create"
   }'
 
 # Create a new empty table
@@ -298,7 +298,7 @@ curl -X POST \
 <TabItem value="java" label="Java">
 
 ```java
-// Add dependency: implementation("com.lancedb:lance-namespace-core:0.0.20")
+// Add dependency: implementation("org.lance:lance-namespace-core:0.4.5")
 
 import org.apache.arrow.memory.BufferAllocator;
 import org.apache.arrow.memory.RootAllocator;
@@ -312,26 +312,26 @@ Map<String, String> props = new HashMap<>();
 props.put(RestNamespaceConfig.URI, "http://localhost:9101/lance");
 props.put(RestNamespaceConfig.DELIMITER, RestNamespaceConfig.DELIMITER_DEFAULT);
 
-LanceNamespace ns = LanceNamespaces.connect("rest", props, null, allocator);
+LanceNamespace ns = LanceNamespace.connect("rest", props, allocator);
 
 // Create catalog namespace
 CreateNamespaceRequest createCatalogNsRequest = new CreateNamespaceRequest();
 createCatalogNsRequest.addIdItem("lance_catalog");
-createCatalogNsRequest.setMode(CreateNamespaceRequest.ModeEnum.CREATE);
+createCatalogNsRequest.setMode("create");
 ns.createNamespace(createCatalogNsRequest);
 
 // Create schema namespace
 CreateNamespaceRequest createSchemaNsRequest = new CreateNamespaceRequest();
 createSchemaNsRequest.addIdItem("lance_catalog");
 createSchemaNsRequest.addIdItem("schema");
-createSchemaNsRequest.setMode(CreateNamespaceRequest.ModeEnum.CREATE);
+createSchemaNsRequest.setMode("create");
 ns.createNamespace(createSchemaNsRequest);
 
 // Register a table
 RegisterTableRequest registerTableRequest = new RegisterTableRequest();
 registerTableRequest.setLocation("/tmp/lance_catalog/schema/table01");
 registerTableRequest.setId(Lists.newArrayList("lance_catalog", "schema", "table01"));
-registerTableRequest.setMode(RegisterTableRequest.ModeEnum.CREATE);
+registerTableRequest.setMode("create");
 ns.registerTable(registerTableRequest);
 
 // Create an empty table
@@ -342,8 +342,8 @@ ns.createEmptyTable(createEmptyTableRequest);
 
 // Create a table with schema inferred from Arrow IPC file
 CreateTableRequest createTableRequest = new CreateTableRequest();
-createTableRequest.setIds(Lists.newArrayList("lance_catalog", "schema", "table03"));
-createTableRequest.setLocation("/tmp/lance_catalog/schema/table03");
+createTableRequest.setId(Lists.newArrayList("lance_catalog", "schema", "table03"));
+createTableRequest.setMode("create");
 org.apache.arrow.vector.types.pojo.Schema schema =
         new org.apache.arrow.vector.types.pojo.Schema(
                 Arrays.asList(
@@ -358,7 +358,7 @@ ns.createTable(createTableRequest, body);
 <TabItem value="python" label="Python">
 
 ```python
-# Install: pip install lance-namespace==0.0.20
+# Install: pip install lance-namespace==0.4.5
 
 import lance_namespace as ln
 
@@ -389,7 +389,7 @@ create_empty_table_request = ln.CreateEmptyTableRequest(
 # Create a table with schema inferred from Arrow IPC file
 create_table_request = ln.CreateTableRequest(
     id=['lance_catalog', 'schema', 'table03'],
-    location='/tmp/lance_catalog/schema/table03'
+    mode='create'
 )
 with open('schema.ipc', 'rb') as f:
     body = f.read()

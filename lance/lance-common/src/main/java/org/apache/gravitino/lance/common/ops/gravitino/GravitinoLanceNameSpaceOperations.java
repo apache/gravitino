@@ -24,20 +24,10 @@ import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
 import com.google.common.collect.Sets;
-import com.lancedb.lance.namespace.LanceNamespaceException;
-import com.lancedb.lance.namespace.ObjectIdentifier;
-import com.lancedb.lance.namespace.model.CreateNamespaceRequest;
-import com.lancedb.lance.namespace.model.CreateNamespaceResponse;
-import com.lancedb.lance.namespace.model.DescribeNamespaceResponse;
-import com.lancedb.lance.namespace.model.DropNamespaceRequest;
-import com.lancedb.lance.namespace.model.DropNamespaceResponse;
-import com.lancedb.lance.namespace.model.ListNamespacesResponse;
-import com.lancedb.lance.namespace.model.ListTablesResponse;
-import com.lancedb.lance.namespace.util.CommonUtil;
-import com.lancedb.lance.namespace.util.PageUtil;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
 import java.util.function.BiFunction;
@@ -52,19 +42,42 @@ import org.apache.gravitino.Namespace;
 import org.apache.gravitino.Schema;
 import org.apache.gravitino.SchemaChange;
 import org.apache.gravitino.client.GravitinoClient;
-import org.apache.gravitino.exceptions.CatalogAlreadyExistsException;
 import org.apache.gravitino.exceptions.CatalogInUseException;
 import org.apache.gravitino.exceptions.NoSuchCatalogException;
 import org.apache.gravitino.exceptions.NoSuchSchemaException;
 import org.apache.gravitino.exceptions.NonEmptyCatalogException;
 import org.apache.gravitino.exceptions.NonEmptySchemaException;
-import org.apache.gravitino.exceptions.SchemaAlreadyExistsException;
 import org.apache.gravitino.lance.common.ops.LanceNamespaceOperations;
+import org.lance.namespace.errors.InvalidInputException;
+import org.lance.namespace.errors.LanceNamespaceException;
+import org.lance.namespace.errors.NamespaceAlreadyExistsException;
+import org.lance.namespace.errors.NamespaceNotFoundException;
+import org.lance.namespace.model.CreateNamespaceResponse;
+import org.lance.namespace.model.DescribeNamespaceResponse;
+import org.lance.namespace.model.DropNamespaceResponse;
+import org.lance.namespace.model.ListNamespacesResponse;
+import org.lance.namespace.model.ListTablesResponse;
 
 public class GravitinoLanceNameSpaceOperations implements LanceNamespaceOperations {
 
   private final GravitinoLanceNamespaceWrapper namespaceWrapper;
   private final GravitinoClient client;
+
+  private enum CreateMode {
+    CREATE,
+    EXIST_OK,
+    OVERWRITE
+  }
+
+  private enum DropMode {
+    FAIL,
+    SKIP
+  }
+
+  private enum DropBehavior {
+    RESTRICT,
+    CASCADE
+  }
 
   public GravitinoLanceNameSpaceOperations(GravitinoLanceNamespaceWrapper namespaceWrapper) {
     this.namespaceWrapper = namespaceWrapper;
@@ -143,10 +156,7 @@ public class GravitinoLanceNameSpaceOperations implements LanceNamespaceOperatio
 
   @Override
   public CreateNamespaceResponse createNamespace(
-      String namespaceId,
-      String delimiter,
-      CreateNamespaceRequest.ModeEnum mode,
-      Map<String, String> properties) {
+      String namespaceId, String delimiter, String mode, Map<String, String> properties) {
     ObjectIdentifier nsId = ObjectIdentifier.of(namespaceId, delimiter);
     Preconditions.checkArgument(
         nsId.levels() <= 2 && nsId.levels() > 0,
@@ -155,10 +165,14 @@ public class GravitinoLanceNameSpaceOperations implements LanceNamespaceOperatio
 
     switch (nsId.levels()) {
       case 1:
-        return createOrUpdateCatalog(nsId.levelAtListPos(0), mode, properties);
+        return createOrUpdateCatalog(
+            nsId.levelAtListPos(0), parseCreateMode(namespaceId, mode), properties);
       case 2:
         return createOrUpdateSchema(
-            nsId.levelAtListPos(0), nsId.levelAtListPos(1), mode, properties);
+            nsId.levelAtListPos(0),
+            nsId.levelAtListPos(1),
+            parseCreateMode(namespaceId, mode),
+            properties);
       default:
         throw new IllegalArgumentException(
             "Expected at most 2-level and at least 1-level namespace but got: " + namespaceId);
@@ -167,10 +181,7 @@ public class GravitinoLanceNameSpaceOperations implements LanceNamespaceOperatio
 
   @Override
   public DropNamespaceResponse dropNamespace(
-      String namespaceId,
-      String delimiter,
-      DropNamespaceRequest.ModeEnum mode,
-      DropNamespaceRequest.BehaviorEnum behavior) {
+      String namespaceId, String delimiter, String mode, String behavior) {
     ObjectIdentifier nsId = ObjectIdentifier.of(namespaceId, delimiter);
     Preconditions.checkArgument(
         nsId.levels() <= 2 && nsId.levels() > 0,
@@ -179,9 +190,16 @@ public class GravitinoLanceNameSpaceOperations implements LanceNamespaceOperatio
 
     switch (nsId.levels()) {
       case 1:
-        return dropCatalog(nsId.levelAtListPos(0), mode, behavior);
+        return dropCatalog(
+            nsId.levelAtListPos(0),
+            parseDropMode(namespaceId, mode),
+            parseDropBehavior(namespaceId, behavior));
       case 2:
-        return dropSchema(nsId.levelAtListPos(0), nsId.levelAtListPos(1), mode, behavior);
+        return dropSchema(
+            nsId.levelAtListPos(0),
+            nsId.levelAtListPos(1),
+            parseDropMode(namespaceId, mode),
+            parseDropBehavior(namespaceId, behavior));
       default:
         throw new IllegalArgumentException(
             "Expected at most 2-level and at least 1-level namespace but got: " + namespaceId);
@@ -200,17 +218,14 @@ public class GravitinoLanceNameSpaceOperations implements LanceNamespaceOperatio
     if (nsId.levels() == 2) {
       String schemaName = nsId.levelAtListPos(1);
       if (!catalog.asSchemas().schemaExists(schemaName)) {
-        throw LanceNamespaceException.notFound(
-            "Schema not found: " + schemaName,
-            NoSuchSchemaException.class.getSimpleName(),
-            schemaName,
-            CommonUtil.formatCurrentStackTrace());
+        throw new NamespaceNotFoundException(
+            "Schema not found: " + schemaName, CommonUtil.formatCurrentStackTrace(), schemaName);
       }
     }
   }
 
   private CreateNamespaceResponse createOrUpdateCatalog(
-      String catalogName, CreateNamespaceRequest.ModeEnum mode, Map<String, String> properties) {
+      String catalogName, CreateMode mode, Map<String, String> properties) {
     CreateNamespaceResponse response = new CreateNamespaceResponse();
 
     Catalog catalog;
@@ -232,11 +247,10 @@ public class GravitinoLanceNameSpaceOperations implements LanceNamespaceOperatio
 
     // Catalog exists, validate type
     if (!namespaceWrapper.isLakehouseCatalog(catalog)) {
-      throw LanceNamespaceException.conflict(
+      throw new NamespaceAlreadyExistsException(
           "Catalog already exists but is not a lakehouse catalog: " + catalogName,
-          CatalogAlreadyExistsException.class.getSimpleName(),
-          catalogName,
-          CommonUtil.formatCurrentStackTrace());
+          CommonUtil.formatCurrentStackTrace(),
+          catalogName);
     }
 
     // Catalog exists, handle based on mode
@@ -246,11 +260,10 @@ public class GravitinoLanceNameSpaceOperations implements LanceNamespaceOperatio
             Optional.ofNullable(catalog.properties()).orElse(Collections.emptyMap()));
         return response;
       case CREATE:
-        throw LanceNamespaceException.conflict(
+        throw new NamespaceAlreadyExistsException(
             "Catalog already exists: " + catalogName,
-            CatalogAlreadyExistsException.class.getSimpleName(),
-            catalogName,
-            CommonUtil.formatCurrentStackTrace());
+            CommonUtil.formatCurrentStackTrace(),
+            catalogName);
       case OVERWRITE:
         CatalogChange[] changes =
             buildChanges(
@@ -274,10 +287,7 @@ public class GravitinoLanceNameSpaceOperations implements LanceNamespaceOperatio
   }
 
   private CreateNamespaceResponse createOrUpdateSchema(
-      String catalogName,
-      String schemaName,
-      CreateNamespaceRequest.ModeEnum mode,
-      Map<String, String> properties) {
+      String catalogName, String schemaName, CreateMode mode, Map<String, String> properties) {
     CreateNamespaceResponse response = new CreateNamespaceResponse();
     Catalog loadedCatalog = namespaceWrapper.loadAndValidateLakehouseCatalog(catalogName);
 
@@ -299,11 +309,10 @@ public class GravitinoLanceNameSpaceOperations implements LanceNamespaceOperatio
             Optional.ofNullable(schema.properties()).orElse(Collections.emptyMap()));
         return response;
       case CREATE:
-        throw LanceNamespaceException.conflict(
+        throw new NamespaceAlreadyExistsException(
             "Schema already exists: " + schemaName,
-            SchemaAlreadyExistsException.class.getSimpleName(),
-            schemaName,
-            CommonUtil.formatCurrentStackTrace());
+            CommonUtil.formatCurrentStackTrace(),
+            schemaName);
       case OVERWRITE:
         SchemaChange[] changes =
             buildChanges(
@@ -321,76 +330,60 @@ public class GravitinoLanceNameSpaceOperations implements LanceNamespaceOperatio
   }
 
   private DropNamespaceResponse dropCatalog(
-      String catalogName,
-      DropNamespaceRequest.ModeEnum mode,
-      DropNamespaceRequest.BehaviorEnum behavior) {
+      String catalogName, DropMode mode, DropBehavior behavior) {
     try {
-      boolean dropped =
-          client.dropCatalog(catalogName, behavior == DropNamespaceRequest.BehaviorEnum.CASCADE);
+      boolean dropped = client.dropCatalog(catalogName, behavior == DropBehavior.CASCADE);
       if (dropped) {
         return new DropNamespaceResponse();
       } else {
         // Catalog did not exist
-        if (mode == DropNamespaceRequest.ModeEnum.FAIL) {
-          throw LanceNamespaceException.notFound(
+        if (mode == DropMode.FAIL) {
+          throw new NamespaceNotFoundException(
               "Catalog not found: " + catalogName,
-              NoSuchCatalogException.class.getSimpleName(),
-              catalogName,
-              CommonUtil.formatCurrentStackTrace());
+              CommonUtil.formatCurrentStackTrace(),
+              catalogName);
         }
         return new DropNamespaceResponse(); // SKIP mode
       }
     } catch (NonEmptyCatalogException e) {
-      throw LanceNamespaceException.badRequest(
+      throw new InvalidInputException(
           String.format("Catalog %s is not empty", catalogName),
-          NonEmptyCatalogException.class.getSimpleName(),
-          catalogName,
-          CommonUtil.formatCurrentStackTrace());
+          CommonUtil.formatCurrentStackTrace(),
+          catalogName);
     } catch (CatalogInUseException e) {
-      throw LanceNamespaceException.badRequest(
+      throw new InvalidInputException(
           String.format("Catalog %s is in use", catalogName),
-          CatalogInUseException.class.getSimpleName(),
-          catalogName,
-          CommonUtil.formatCurrentStackTrace());
+          CommonUtil.formatCurrentStackTrace(),
+          catalogName);
     }
   }
 
   private DropNamespaceResponse dropSchema(
-      String catalogName,
-      String schemaName,
-      DropNamespaceRequest.ModeEnum mode,
-      DropNamespaceRequest.BehaviorEnum behavior) {
+      String catalogName, String schemaName, DropMode mode, DropBehavior behavior) {
     try {
       boolean dropped =
           client
               .loadCatalog(catalogName)
               .asSchemas()
-              .dropSchema(schemaName, behavior == DropNamespaceRequest.BehaviorEnum.CASCADE);
+              .dropSchema(schemaName, behavior == DropBehavior.CASCADE);
       if (dropped) {
         return new DropNamespaceResponse();
       } else {
         // Schema did not exist
-        if (mode == DropNamespaceRequest.ModeEnum.FAIL) {
-          throw LanceNamespaceException.notFound(
-              "Schema not found: " + schemaName,
-              NoSuchSchemaException.class.getSimpleName(),
-              schemaName,
-              CommonUtil.formatCurrentStackTrace());
+        if (mode == DropMode.FAIL) {
+          throw new NamespaceNotFoundException(
+              "Schema not found: " + schemaName, CommonUtil.formatCurrentStackTrace(), schemaName);
         }
         return new DropNamespaceResponse(); // SKIP mode
       }
     } catch (NoSuchCatalogException e) {
-      throw LanceNamespaceException.notFound(
-          "Catalog not found: " + catalogName,
-          NoSuchCatalogException.class.getSimpleName(),
-          catalogName,
-          CommonUtil.formatCurrentStackTrace());
+      throw new NamespaceNotFoundException(
+          "Catalog not found: " + catalogName, CommonUtil.formatCurrentStackTrace(), catalogName);
     } catch (NonEmptySchemaException e) {
-      throw LanceNamespaceException.badRequest(
+      throw new InvalidInputException(
           String.format("Schema %s is not empty.", schemaName),
-          NonEmptySchemaException.class.getSimpleName(),
-          schemaName,
-          CommonUtil.formatCurrentStackTrace());
+          CommonUtil.formatCurrentStackTrace(),
+          schemaName);
     }
   }
 
@@ -412,6 +405,60 @@ public class GravitinoLanceNameSpaceOperations implements LanceNamespaceOperatio
                 .map(removePropertyFunc);
 
     return Stream.concat(setPropertiesStream, removePropertiesStream).toArray(arrayCreator);
+  }
+
+  private static CreateMode parseCreateMode(String instance, String mode) {
+    if (mode == null) {
+      return CreateMode.CREATE;
+    }
+    String normalized = normalizeToken(mode);
+    if ("CREATE".equals(normalized)) {
+      return CreateMode.CREATE;
+    }
+    if ("EXISTOK".equals(normalized)) {
+      return CreateMode.EXIST_OK;
+    }
+    if ("OVERWRITE".equals(normalized)) {
+      return CreateMode.OVERWRITE;
+    }
+    throw new InvalidInputException(
+        "Unknown create namespace mode: " + mode, CommonUtil.formatCurrentStackTrace(), instance);
+  }
+
+  private static DropMode parseDropMode(String instance, String mode) {
+    if (mode == null) {
+      return DropMode.FAIL;
+    }
+    String normalized = normalizeToken(mode);
+    if ("FAIL".equals(normalized)) {
+      return DropMode.FAIL;
+    }
+    if ("SKIP".equals(normalized)) {
+      return DropMode.SKIP;
+    }
+    throw new InvalidInputException(
+        "Unknown drop namespace mode: " + mode, CommonUtil.formatCurrentStackTrace(), instance);
+  }
+
+  private static DropBehavior parseDropBehavior(String instance, String behavior) {
+    if (behavior == null) {
+      return DropBehavior.RESTRICT;
+    }
+    String normalized = normalizeToken(behavior);
+    if ("RESTRICT".equals(normalized)) {
+      return DropBehavior.RESTRICT;
+    }
+    if ("CASCADE".equals(normalized)) {
+      return DropBehavior.CASCADE;
+    }
+    throw new InvalidInputException(
+        "Unknown drop namespace behavior: " + behavior,
+        CommonUtil.formatCurrentStackTrace(),
+        instance);
+  }
+
+  private static String normalizeToken(String value) {
+    return value.replaceAll("[^A-Za-z0-9]", "").toUpperCase(Locale.ROOT);
   }
 
   @Override

@@ -22,13 +22,6 @@ import static org.apache.gravitino.lance.common.ops.NamespaceWrapper.NAMESPACE_D
 
 import com.codahale.metrics.annotation.ResponseMetered;
 import com.codahale.metrics.annotation.Timed;
-import com.lancedb.lance.namespace.model.CreateNamespaceRequest;
-import com.lancedb.lance.namespace.model.CreateNamespaceResponse;
-import com.lancedb.lance.namespace.model.DescribeNamespaceResponse;
-import com.lancedb.lance.namespace.model.DropNamespaceRequest;
-import com.lancedb.lance.namespace.model.DropNamespaceResponse;
-import com.lancedb.lance.namespace.model.ListNamespacesResponse;
-import com.lancedb.lance.namespace.model.ListTablesResponse;
 import java.util.regex.Pattern;
 import javax.inject.Inject;
 import javax.ws.rs.Consumes;
@@ -44,6 +37,13 @@ import javax.ws.rs.core.Response;
 import org.apache.gravitino.lance.common.ops.NamespaceWrapper;
 import org.apache.gravitino.lance.service.LanceExceptionMapper;
 import org.apache.gravitino.metrics.MetricNames;
+import org.lance.namespace.model.CreateNamespaceRequest;
+import org.lance.namespace.model.CreateNamespaceResponse;
+import org.lance.namespace.model.DescribeNamespaceResponse;
+import org.lance.namespace.model.DropNamespaceRequest;
+import org.lance.namespace.model.DropNamespaceResponse;
+import org.lance.namespace.model.ListNamespacesResponse;
+import org.lance.namespace.model.ListTablesResponse;
 
 @Path("/v1/namespace")
 @Consumes(MediaType.APPLICATION_JSON)
@@ -66,6 +66,22 @@ public class LanceNamespaceOperations {
       @DefaultValue(NAMESPACE_DELIMITER_DEFAULT) @QueryParam("delimiter") String delimiter,
       @QueryParam("page_token") String pageToken,
       @QueryParam("limit") Integer limit) {
+    return listNamespacesInternal(namespaceId, delimiter, pageToken, limit);
+  }
+
+  @GET
+  @Path("/list")
+  @Timed(name = "list-namespaces-root." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
+  @ResponseMetered(name = "list-namespaces-root", absolute = true)
+  public Response listNamespacesOnRoot(
+      @DefaultValue(NAMESPACE_DELIMITER_DEFAULT) @QueryParam("delimiter") String delimiter,
+      @QueryParam("page_token") String pageToken,
+      @QueryParam("limit") Integer limit) {
+    return listNamespacesInternal(delimiter, delimiter, pageToken, limit);
+  }
+
+  private Response listNamespacesInternal(
+      String namespaceId, String delimiter, String pageToken, Integer limit) {
     try {
       ListNamespacesResponse response =
           lanceNamespace
@@ -84,6 +100,19 @@ public class LanceNamespaceOperations {
   public Response describeNamespace(
       @PathParam("id") String namespaceId,
       @DefaultValue(NAMESPACE_DELIMITER_DEFAULT) @QueryParam("delimiter") String delimiter) {
+    return describeNamespaceInternal(namespaceId, delimiter);
+  }
+
+  @POST
+  @Path("/describe")
+  @Timed(name = "describe-namespaces-root." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
+  @ResponseMetered(name = "describe-namespaces-root", absolute = true)
+  public Response describeNamespaceOnRoot(
+      @DefaultValue(NAMESPACE_DELIMITER_DEFAULT) @QueryParam("delimiter") String delimiter) {
+    return describeNamespaceInternal(delimiter, delimiter);
+  }
+
+  private Response describeNamespaceInternal(String namespaceId, String delimiter) {
     try {
       DescribeNamespaceResponse response =
           lanceNamespace.asNamespaceOps().describeNamespace(namespaceId, Pattern.quote(delimiter));
@@ -108,9 +137,7 @@ public class LanceNamespaceOperations {
               .createNamespace(
                   namespaceId,
                   Pattern.quote(delimiter),
-                  request.getMode() == null
-                      ? CreateNamespaceRequest.ModeEnum.CREATE
-                      : request.getMode(),
+                  request.getMode() == null ? "create" : request.getMode(),
                   request.getProperties());
       return Response.ok(response).build();
     } catch (Exception e) {
@@ -133,12 +160,8 @@ public class LanceNamespaceOperations {
               .dropNamespace(
                   namespaceId,
                   Pattern.quote(delimiter),
-                  request.getMode() == null
-                      ? DropNamespaceRequest.ModeEnum.FAIL
-                      : request.getMode(),
-                  request.getBehavior() == null
-                      ? DropNamespaceRequest.BehaviorEnum.RESTRICT
-                      : request.getBehavior());
+                  request.getMode() == null ? "fail" : request.getMode(),
+                  request.getBehavior() == null ? "restrict" : request.getBehavior());
       return Response.ok(response).build();
     } catch (Exception e) {
       return LanceExceptionMapper.toRESTResponse(namespaceId, e);

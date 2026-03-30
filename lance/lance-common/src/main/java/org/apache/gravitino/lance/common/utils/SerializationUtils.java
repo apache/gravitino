@@ -19,11 +19,11 @@
  */
 package org.apache.gravitino.lance.common.utils;
 
-import com.google.common.collect.ImmutableMap;
-import com.lancedb.lance.namespace.util.JsonUtil;
+import com.fasterxml.jackson.core.type.TypeReference;
 import java.util.HashMap;
 import java.util.Map;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.gravitino.json.JsonUtils;
 
 public class SerializationUtils {
 
@@ -35,19 +35,19 @@ public class SerializationUtils {
   // see https://github.com/lancedb/lance-namespace/blob/2033b2fca126e87e56ba0d5ec19c5ec010c7a98f/
   // java/lance-namespace-core/src/main/java/com/lancedb/lance/namespace/rest/RestNamespace.java#L207-L208
   public static Map<String, String> deserializeProperties(String serializedProperties) {
-    return StringUtils.isBlank(serializedProperties)
-        ? ImmutableMap.of()
-        : JsonUtil.parse(
-            serializedProperties,
-            jsonNode -> {
-              Map<String, String> map = new HashMap<>();
-              jsonNode
-                  .fields()
-                  .forEachRemaining(
-                      entry -> {
-                        map.put(entry.getKey(), entry.getValue().asText());
-                      });
-              return map;
-            });
+    if (StringUtils.isBlank(serializedProperties)) {
+      return new HashMap<>();
+    }
+
+    try {
+      Map<String, Object> rawProperties =
+          JsonUtils.anyFieldMapper()
+              .readValue(serializedProperties, new TypeReference<Map<String, Object>>() {});
+      Map<String, String> deserializedProperties = new HashMap<>();
+      rawProperties.forEach((k, v) -> deserializedProperties.put(k, String.valueOf(v)));
+      return deserializedProperties;
+    } catch (Exception e) {
+      throw new IllegalArgumentException("Failed to deserialize table properties JSON", e);
+    }
   }
 }

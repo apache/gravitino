@@ -45,7 +45,7 @@ dependencies {
   implementation(libs.bundles.prometheus)
   implementation(libs.commons.lang3)
   implementation(libs.lance.namespace.core) {
-    exclude(group = "com.lancedb", module = "lance-core")
+    exclude(group = "org.lance", module = "lance-core")
     exclude(group = "com.google.guava", module = "guava") // provided by gravitino
     exclude(group = "com.fasterxml.jackson.core", module = "*") // provided by gravitino
     exclude(group = "com.fasterxml.jackson.datatype", module = "*") // provided by gravitino
@@ -65,6 +65,7 @@ dependencies {
   testImplementation(project(":clients:client-java"))
   testImplementation(project(":server"))
   testImplementation(project(":integration-test-common", "testArtifacts"))
+  testImplementation(libs.lance)
 
   testImplementation(libs.awaitility)
   testImplementation(libs.commons.io)
