@@ -46,7 +46,7 @@ When session catalog support is enabled, the following behaviors apply:
 - **GET / USE CATALOG**: The in-memory store is checked first. If the catalog is not found there, it is retrieved from the Gravitino server.
 - **DROP CATALOG**: The in-memory store is checked first. If the catalog exists there it is removed from memory; otherwise it is removed from the Gravitino server.
 - **SHOW / LIST CATALOGS**: Returns the combined set of catalogs from both the in-memory store and the Gravitino server.
-- **Session scope**: Catalogs stored only in memory are session-scoped and will not survive when Flink restart.
+- **Session scope**: Catalogs stored only in memory are session-scoped and will not survive when Flink restarts.
 - **Name conflict**: If a catalog with the same name exists in both stores, the in-memory entry takes precedence.
 
 To configure the Gravitino client, use properties prefixed with `table.catalog-store.gravitino.gravitino.client.`. These properties will be passed to the Gravitino client after removing the `table.catalog-store.gravitino.` prefix.
