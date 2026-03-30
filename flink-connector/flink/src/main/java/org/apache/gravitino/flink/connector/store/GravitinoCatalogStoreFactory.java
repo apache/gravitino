@@ -46,7 +46,7 @@ import org.apache.gravitino.flink.connector.catalog.GravitinoCatalogManager;
 public class GravitinoCatalogStoreFactory implements CatalogStoreFactory {
   private GravitinoCatalogManager catalogManager;
   private boolean supportSessionCatalog;
-  GenericInMemoryCatalogStore memoryCatalogStore;
+  private GenericInMemoryCatalogStore memoryCatalogStore;
 
   @Override
   public CatalogStore createCatalogStore() {
