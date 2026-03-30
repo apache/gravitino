@@ -20,6 +20,7 @@ package org.apache.gravitino.iceberg.service.dispatcher;
 
 import java.io.IOException;
 import java.time.Instant;
+import java.util.Optional;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.EntityStore;
 import org.apache.gravitino.GravitinoEnv;
@@ -177,6 +178,12 @@ public class IcebergTableHookDispatcher implements IcebergTableOperationDispatch
       TableIdentifier tableIdentifier,
       PlanTableScanRequest scanRequest) {
     return dispatcher.planTableScan(context, tableIdentifier, scanRequest);
+  }
+
+  @Override
+  public Optional<String> getTableMetadataLocation(
+      IcebergRequestContext context, TableIdentifier tableIdentifier) {
+    return dispatcher.getTableMetadataLocation(context, tableIdentifier);
   }
 
   private void importTable(String catalogName, Namespace namespace, String tableName) {

@@ -21,6 +21,7 @@ package org.apache.gravitino.iceberg.service.dispatcher;
 
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Optional;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.auth.AuthConstants;
@@ -185,5 +186,13 @@ public class IcebergTableOperationExecutor implements IcebergTableOperationDispa
     return icebergCatalogWrapperManager
         .getCatalogWrapper(context.catalogName())
         .planTableScan(tableIdentifier, scanRequest);
+  }
+
+  @Override
+  public Optional<String> getTableMetadataLocation(
+      IcebergRequestContext context, TableIdentifier tableIdentifier) {
+    return icebergCatalogWrapperManager
+        .getCatalogWrapper(context.catalogName())
+        .getTableMetadataLocation(tableIdentifier);
   }
 }
