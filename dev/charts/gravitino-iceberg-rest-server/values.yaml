@@ -259,12 +259,8 @@ securityContext:
 ## Container Environment
 ##
 env:
-  - name: GRAVITINO_HOME
-    value: /root/gravitino-iceberg-rest-server
   - name: GRAVITINO_MEM
     value: "-Xms1024m -Xmx1024m -XX:MaxMetaspaceSize=512m"
-  - name: SKIP_CONFIG_REWRITE
-    value: "true"
 
 # foo2: bar2
 envFrom: []

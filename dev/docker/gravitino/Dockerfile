@@ -30,5 +30,6 @@ EXPOSE 8090
 EXPOSE 9001
 
 RUN chmod +x /root/gravitino/bin/start-gravitino.sh
+RUN wget https://repo1.maven.org/maven2/com/clickhouse/clickhouse-jdbc/0.7.1/clickhouse-jdbc-0.7.1-all.jar -O /root/gravitino/catalogs/jdbc-clickhouse/libs/clickhouse-jdbc-0.7.1-all.jar
 
 ENTRYPOINT ["/bin/bash", "/root/gravitino/bin/start-gravitino.sh"]

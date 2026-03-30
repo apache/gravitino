@@ -510,12 +510,8 @@ containerSecurityContext:
 ## Container Environment
 ##
 env:
-  - name: GRAVITINO_HOME
-    value: /root/gravitino
   - name: GRAVITINO_MEM
     value: "-Xms1024m -Xmx1024m -XX:MaxMetaspaceSize=512m"
-  - name: SKIP_CONFIG_REWRITE
-    value: "true"
 
 ## The envWithTpl array below has the same usage as "env", but is using the tpl function to support templatable string.
 ## This can be useful when you want to pass dynamic values to the Chart using the helm argument "--set <variable>=<value>"

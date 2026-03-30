@@ -81,12 +81,8 @@ volumeMounts:
     mountPath: /root/gravitino-lance-rest-server/logs
 
 env:
-  - name: GRAVITINO_HOME
-    value: /root/gravitino-lance-rest-server
   - name: GRAVITINO_MEM
     value: "-Xms1024m -Xmx1024m -XX:MaxMetaspaceSize=512m"
-  - name: SKIP_CONFIG_REWRITE
-    value: "true"
 
 envFrom: []
 

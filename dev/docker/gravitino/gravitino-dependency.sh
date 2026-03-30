@@ -48,7 +48,7 @@ download_gcs_connector() {
 }
 
 # Build the Gravitino project
-${gravitino_home}/gradlew clean build -x test
+${gravitino_home}/gradlew clean build -x test -x rat
 
 rm -rf ${gravitino_home}/distribution
 # Prepare compile Gravitino packages
@@ -58,7 +58,7 @@ ${gravitino_home}/gradlew compileDistribution -x test
 rm -rf "${gravitino_dir}/packages"
 mkdir -p "${gravitino_dir}/packages"
 
-cp -r "${gravitino_home}/distribution/package" "${gravitino_package_dir}"
+cp -r "${gravitino_home}/distribution/package-all" "${gravitino_package_dir}"
 
 echo "Start to download the jar package"
 
