@@ -95,7 +95,19 @@ awaitility = "4.2.1"
 servlet = "3.1.0"
 jodd = "3.5.2"
 flink = "1.18.0"
+flink18 = "1.18.0"
+flink19 = "1.19.0"
+flink20 = "1.20.0"
 flinkjdbc = "3.2.0-1.18"
+flinkjdbc18 = "3.2.0-1.18"
+flinkjdbc19 = "3.3.0-1.19"
+flinkjdbc20 = "3.3.0-1.20"
+iceberg4flink18 = "1.9.2"
+iceberg4flink19 = "1.9.2"
+iceberg4flink20 = "1.9.2"
+paimon4flink18 = "1.2.0"
+paimon4flink19 = "1.2.0"
+paimon4flink20 = "1.2.0"
 # cglib upgraded from 2. to 3.3.0 for Java 17 compatibility.
 # Explicit ASM dependency (9.8) is required due to cglib's internal use and Java 17 module system.
 cglib = "3.3.0"
@@ -319,6 +331,9 @@ google-auth-credentials = { group = "com.google.auth", name = "google-auth-libra
 aliyun-credentials-sdk = { group='com.aliyun', name='credentials-java', version.ref='aliyun-credentials' }
 aliyun-sdk-oss = { module = "com.aliyun.oss:aliyun-sdk-oss", version.ref = "aliyun-sdk-oss" }
 flinkjdbc = {group='org.apache.flink',name='flink-connector-jdbc', version.ref='flinkjdbc'}
+flinkjdbc18 = {group='org.apache.flink',name='flink-connector-jdbc', version.ref='flinkjdbc18'}
+flinkjdbc19 = {group='org.apache.flink',name='flink-connector-jdbc', version.ref='flinkjdbc19'}
+flinkjdbc20 = {group='org.apache.flink',name='flink-connector-jdbc', version.ref='flinkjdbc20'}
 concurrent-trees = { group = "com.googlecode.concurrent-trees", name = "concurrent-trees", version.ref = "concurrent-trees" }
 jcasbin = { group='org.casbin', name='jcasbin', version.ref="jcasbin" }
 openlineage-java= { group = "io.openlineage", name = "openlineage-java", version.ref = "openlineage" }

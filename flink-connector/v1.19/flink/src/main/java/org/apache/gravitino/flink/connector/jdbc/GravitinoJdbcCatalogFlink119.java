@@ -1,0 +1,61 @@
+/*
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ *
+ *  http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing,
+ * software distributed under the License is distributed on an
+ * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+ * KIND, either express or implied.  See the License for the
+ * specific language governing permissions and limitations
+ * under the License.
+ */
+
+package org.apache.gravitino.flink.connector.jdbc;
+
+import java.util.Optional;
+import org.apache.flink.connector.jdbc.core.database.catalog.factory.JdbcCatalogFactory;
+import org.apache.flink.connector.jdbc.core.table.JdbcDynamicTableFactory;
+import org.apache.flink.table.catalog.AbstractCatalog;
+import org.apache.flink.table.factories.CatalogFactory;
+import org.apache.flink.table.factories.Factory;
+import org.apache.gravitino.flink.connector.PartitionConverter;
+import org.apache.gravitino.flink.connector.SchemaAndTablePropertiesConverter;
+import org.apache.gravitino.flink.connector.utils.CatalogCompat;
+import org.apache.gravitino.flink.connector.utils.CatalogCompatFlink119;
+
+public class GravitinoJdbcCatalogFlink119 extends GravitinoJdbcCatalog {
+
+  public GravitinoJdbcCatalogFlink119(
+      CatalogFactory.Context context,
+      String defaultDatabase,
+      SchemaAndTablePropertiesConverter schemaAndTablePropertiesConverter,
+      PartitionConverter partitionConverter) {
+    super(
+        context,
+        defaultDatabase,
+        schemaAndTablePropertiesConverter,
+        partitionConverter,
+        createJdbcCatalog(context));
+  }
+
+  @Override
+  public Optional<Factory> getFactory() {
+    return Optional.of(new JdbcDynamicTableFactory());
+  }
+
+  @Override
+  protected CatalogCompat catalogCompat() {
+    return CatalogCompatFlink119.INSTANCE;
+  }
+
+  private static AbstractCatalog createJdbcCatalog(CatalogFactory.Context context) {
+    return (AbstractCatalog) new JdbcCatalogFactory().createCatalog(context);
+  }
+}
