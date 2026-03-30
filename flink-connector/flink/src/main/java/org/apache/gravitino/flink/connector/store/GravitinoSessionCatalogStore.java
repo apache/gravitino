@@ -32,16 +32,16 @@ import org.apache.flink.table.catalog.exceptions.CatalogException;
 import org.apache.flink.util.Preconditions;
 
 /**
- * A catalog store that combines a session-scoped in-memory
- * {@link GenericInMemoryCatalogStore} with a persistent {@link GravitinoCatalogStore}.
+ * A catalog store that combines a session-scoped in-memory {@link GenericInMemoryCatalogStore} with
+ * a persistent {@link GravitinoCatalogStore}.
  *
- * <p>Catalogs for built-in catalog types are stored only in the in-memory store, while all
- * other catalogs are stored in the Gravitino-backed store. When retrieving, listing, or
- * removing catalogs, entries in the in-memory store take precedence over entries in the
- * Gravitino-backed store.
+ * <p>Catalogs for built-in catalog types are stored only in the in-memory store, while all other
+ * catalogs are stored in the Gravitino-backed store. When retrieving, listing, or removing
+ * catalogs, entries in the in-memory store take precedence over entries in the Gravitino-backed
+ * store.
  *
- * <p>This store is intended to be used per Flink session, keeping transient catalogs in
- * memory while delegating persistent catalogs to Apache Gravitino.
+ * <p>This store is intended to be used per Flink session, keeping transient catalogs in memory
+ * while delegating persistent catalogs to Apache Gravitino.
  */
 public class GravitinoSessionCatalogStore extends AbstractCatalogStore {
   private final GenericInMemoryCatalogStore memoryCatalogStore;
