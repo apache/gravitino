@@ -23,7 +23,10 @@ import com.google.common.base.Preconditions;
 import com.google.common.base.Splitter;
 import java.io.File;
 import java.io.IOException;
+import java.lang.reflect.Method;
 import java.nio.charset.StandardCharsets;
+import java.security.AccessControlContext;
+import java.security.AccessController;
 import java.time.Instant;
 import java.util.Base64;
 import java.util.List;
@@ -299,7 +302,15 @@ public final class KerberosTokenProvider implements AuthDataProvider {
       // Check if the framework (e.g., Flink) has already established Kerberos credentials.
       // Use Subject.current() on JDK 18+ (where Subject.getSubject(AccessControlContext)
       // was removed), and fall back to the deprecated API on JDK 17 and below.
-      Subject subject = getCurrentSubject();
+      Subject subject;
+      try {
+        subject = getCurrentSubject();
+      } catch (UnsupportedOperationException e) {
+        throw new IllegalArgumentException(
+            "Cannot detect current Kerberos subject on JDK 17 with Security Manager disabled. "
+                + "Please configure keyTabFile and clientPrincipal explicitly.",
+            e);
+      }
 
       // If credentials exist (KerberosKey or KerberosTicket), reuse them
       // This avoids redundant logins when Flink has already authenticated with Kerberos
@@ -361,6 +372,9 @@ public final class KerberosTokenProvider implements AuthDataProvider {
      * </ul>
      *
      * @return the current Subject, or {@code null} if none is established
+     * @throws UnsupportedOperationException if the Security Manager is explicitly disabled on JDK
+     *     17
+     * @throws RuntimeException if reflection fails unexpectedly
      */
     @SuppressWarnings("removal")
     private static Subject getCurrentSubject() {
@@ -368,20 +382,16 @@ public final class KerberosTokenProvider implements AuthDataProvider {
       // JDK 17, where Subject.current() does not exist as a compile-time API.
       // Fall back to the deprecated Subject.getSubject(AccessControlContext) on JDK 17 and below.
       try {
-        java.lang.reflect.Method currentMethod = Subject.class.getMethod("current");
+        Method currentMethod = Subject.class.getMethod("current");
         return (Subject) currentMethod.invoke(null);
       } catch (NoSuchMethodException e) {
         // JDK 17 and below: Subject.current() does not exist, use the legacy API.
-        // AccessController.getContext() may also throw UnsupportedOperationException on JDK 17
-        // when the Security Manager is explicitly disabled; treat that as no existing subject.
-        try {
-          java.security.AccessControlContext context = java.security.AccessController.getContext();
-          return Subject.getSubject(context);
-        } catch (UnsupportedOperationException ignored) {
-          return null;
-        }
+        // AccessController.getContext() may throw UnsupportedOperationException when the
+        // Security Manager is explicitly disabled — propagate so the caller can decide.
+        AccessControlContext context = AccessController.getContext();
+        return Subject.getSubject(context);
       } catch (ReflectiveOperationException e) {
-        return null;
+        throw new RuntimeException("Failed to invoke Subject.current() via reflection", e);
       }
     }
   }
