@@ -19,6 +19,7 @@
 
 package org.apache.gravitino.iceberg.service.dispatcher;
 
+import java.util.Optional;
 import org.apache.gravitino.listener.api.event.IcebergRequestContext;
 import org.apache.iceberg.catalog.Namespace;
 import org.apache.iceberg.catalog.TableIdentifier;
@@ -133,4 +134,16 @@ public interface IcebergTableOperationDispatcher {
       IcebergRequestContext context,
       TableIdentifier tableIdentifier,
       PlanTableScanRequest scanRequest);
+
+  /**
+   * Retrieves the metadata file location for a table without loading full table metadata. This is
+   * an optional fast path for catalogs that support cheap metadata location retrieval.
+   *
+   * @param context Iceberg REST request context information.
+   * @param tableIdentifier The Iceberg table identifier.
+   * @return an Optional containing the metadata file location, or empty if the catalog doesn't
+   *     support this operation
+   */
+  Optional<String> getTableMetadataLocation(
+      IcebergRequestContext context, TableIdentifier tableIdentifier);
 }
