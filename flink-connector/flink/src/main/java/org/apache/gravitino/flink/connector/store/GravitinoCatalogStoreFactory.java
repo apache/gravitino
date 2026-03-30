@@ -78,9 +78,6 @@ public class GravitinoCatalogStoreFactory implements CatalogStoreFactory {
     this.catalogManager =
         GravitinoCatalogManager.create(gravitinoUri, gravitinoName, extractClientConfig(options));
     this.supportSessionCatalog = options.get(GRAVITINO_SUPPORT_SESSION_CATALOG);
-    if (supportSessionCatalog) {
-
-    }
   }
 
   @Override
