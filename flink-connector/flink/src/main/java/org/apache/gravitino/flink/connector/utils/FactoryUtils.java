@@ -21,7 +21,7 @@ package org.apache.gravitino.flink.connector.utils;
 import static org.apache.flink.table.factories.FactoryUtil.validateFactoryOptions;
 import static org.apache.flink.table.factories.FactoryUtil.validateWatermarkOptions;
 
-import com.google.common.collect.ImmutableList;
+import com.google.common.collect.ImmutableSet;
 import java.util.HashSet;
 import java.util.Set;
 import java.util.stream.Collectors;
@@ -41,18 +41,17 @@ public class FactoryUtils {
 
   private static final Logger LOG = LoggerFactory.getLogger(FactoryUtils.class);
 
-  /** The list of Gravitino catalog factory identifiers. */
-  public static final ImmutableList<String> GRAVITINO_FACTORY_LIST =
-      ImmutableList.<String>builder()
-          .add(GravitinoHiveCatalogFactoryOptions.IDENTIFIER)
-          .add(GravitinoIcebergCatalogFactoryOptions.IDENTIFIER)
-          .add(GravitinoJdbcCatalogFactoryOptions.MYSQL_IDENTIFIER)
-          .add(GravitinoJdbcCatalogFactoryOptions.POSTGRESQL_IDENTIFIER)
-          .add(GravitinoPaimonCatalogFactoryOptions.IDENTIFIER)
-          .build();
+  /** The set of catalog type identifiers managed by Gravitino. */
+  public static final ImmutableSet<String> GRAVITINO_CATALOG_TYPES =
+      ImmutableSet.of(
+          GravitinoHiveCatalogFactoryOptions.IDENTIFIER,
+          GravitinoIcebergCatalogFactoryOptions.IDENTIFIER,
+          GravitinoJdbcCatalogFactoryOptions.MYSQL_IDENTIFIER,
+          GravitinoJdbcCatalogFactoryOptions.POSTGRESQL_IDENTIFIER,
+          GravitinoPaimonCatalogFactoryOptions.IDENTIFIER);
 
   public static boolean isBuiltInCatalog(String type) {
-    return GRAVITINO_FACTORY_LIST.contains(type);
+    return GRAVITINO_CATALOG_TYPES.contains(type);
   }
 
   /**
