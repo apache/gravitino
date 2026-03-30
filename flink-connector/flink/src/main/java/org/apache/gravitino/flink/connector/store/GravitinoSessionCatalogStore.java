@@ -105,7 +105,9 @@ public class GravitinoSessionCatalogStore extends AbstractCatalogStore {
     catalogs.addAll(memoryCatalogStore.listCatalogs());
     try {
       catalogs.addAll(gravitinoCatalogStore.listCatalogs());
-    } catch (Exception e) {
+    } catch (CatalogException e) {
+      throw new CatalogException("Failed to list catalog.", e);
+    } catch (RuntimeException e) {
       throw new CatalogException("Failed to list catalog.", e);
     }
     return catalogs;
