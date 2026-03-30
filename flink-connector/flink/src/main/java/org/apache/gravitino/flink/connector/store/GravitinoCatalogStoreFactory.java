@@ -52,8 +52,10 @@ public class GravitinoCatalogStoreFactory implements CatalogStoreFactory {
   public CatalogStore createCatalogStore() {
     GravitinoCatalogStore gravitinoCatalogStore = new GravitinoCatalogStore(catalogManager);
     if (supportSessionCatalog) {
-      memoryCatalogStore = new GenericInMemoryCatalogStore();
-      memoryCatalogStore.open();
+      if (memoryCatalogStore == null) {
+        memoryCatalogStore = new GenericInMemoryCatalogStore();
+        memoryCatalogStore.open();
+      }
       return new GravitinoSessionCatalogStore(gravitinoCatalogStore, memoryCatalogStore);
     }
     return gravitinoCatalogStore;
