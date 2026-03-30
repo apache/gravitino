@@ -29,6 +29,7 @@ import java.util.Locale;
 import java.util.Map;
 import org.apache.gravitino.catalog.lakehouse.iceberg.IcebergCatalogBackend;
 import org.apache.gravitino.catalog.lakehouse.iceberg.IcebergConstants;
+import org.apache.gravitino.iceberg.common.rest.auth.UserPrincipalForwardingAuthManager;
 import org.apache.gravitino.exceptions.ConnectionFailedException;
 import org.apache.gravitino.iceberg.common.ClosableHiveCatalog;
 import org.apache.gravitino.iceberg.common.IcebergConfig;
@@ -45,6 +46,7 @@ import org.apache.iceberg.jdbc.JdbcCatalogWithMetadataLocationSupport;
 import org.apache.iceberg.jdbc.UncheckedSQLException;
 import org.apache.iceberg.memory.MemoryCatalogWithMetadataLocationSupport;
 import org.apache.iceberg.rest.RESTCatalog;
+import org.apache.iceberg.rest.auth.AuthProperties;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -124,11 +126,32 @@ public class IcebergCatalogUtil {
     String icebergCatalogName = icebergConfig.getCatalogBackendName();
     RESTCatalog restCatalog = new RESTCatalog();
     HdfsConfiguration hdfsConfiguration = new HdfsConfiguration();
-    Map<String, String> properties = icebergConfig.getIcebergCatalogProperties();
+    Map<String, String> properties =
+        mergeRestCatalogAuthForUserPrincipal(icebergConfig.getIcebergCatalogProperties());
     properties.forEach(hdfsConfiguration::set);
     restCatalog.setConf(hdfsConfiguration);
     restCatalog.initialize(icebergCatalogName, properties);
     return restCatalog;
+  }
+
+  /**
+   * When {@link IcebergConstants#GRAVITINO_ICEBERG_REST_FORWARD_USER_ACCESS_TOKEN} is enabled and
+   * {@link AuthProperties#AUTH_TYPE} is not already set, configures the Iceberg REST client to use
+   * {@link UserPrincipalForwardingAuthManager}.
+   */
+  @VisibleForTesting
+  static Map<String, String> mergeRestCatalogAuthForUserPrincipal(Map<String, String> properties) {
+    if (!Boolean.parseBoolean(
+        properties.getOrDefault(
+            IcebergConstants.GRAVITINO_ICEBERG_REST_FORWARD_USER_ACCESS_TOKEN, "false"))) {
+      return properties;
+    }
+    if (properties.containsKey(AuthProperties.AUTH_TYPE)) {
+      return properties;
+    }
+    Map<String, String> merged = new HashMap<>(properties);
+    merged.put(AuthProperties.AUTH_TYPE, UserPrincipalForwardingAuthManager.class.getName());
+    return merged;
   }
 
   private static Catalog loadCustomCatalog(IcebergConfig icebergConfig) {

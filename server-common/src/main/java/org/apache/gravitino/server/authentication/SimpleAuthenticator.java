@@ -62,7 +62,8 @@ class SimpleAuthenticator implements Authenticator {
       if (userInformation.length < 1 || userInformation[0].isEmpty()) {
         return ANONYMOUS_PRINCIPAL;
       }
-      return new UserPrincipal(userInformation[0]);
+      // Keep the raw Authorization header value so downstream services can reuse it.
+      return new UserPrincipal(userInformation[0], authData);
     } catch (IllegalArgumentException ie) {
       return ANONYMOUS_PRINCIPAL;
     }

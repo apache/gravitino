@@ -21,11 +21,17 @@ package org.apache.gravitino;
 
 import com.google.common.base.Preconditions;
 import java.security.Principal;
+import java.util.Optional;
+import javax.annotation.Nullable;
 
-/** A simple implementation of Principal that holds a username. */
+/**
+ * A simple implementation of Principal that holds a username and optionally the raw
+ * {@code Authorization} header value (for forwarding to downstream Iceberg REST catalogs).
+ */
 public class UserPrincipal implements Principal {
 
   private final String username;
+  @Nullable private final String accessToken;
 
   /**
    * Constructs a UserPrincipal with the given username.
@@ -33,8 +39,20 @@ public class UserPrincipal implements Principal {
    * @param username the username of the principal
    */
   public UserPrincipal(final String username) {
+    this(username, null);
+  }
+
+  /**
+   * Constructs a UserPrincipal with the given username and optional raw {@code Authorization}
+   * header value.
+   *
+   * @param accessToken authorization header value (for example, {@code Bearer <jwt>} or
+   *     {@code Basic <base64>})
+   */
+  public UserPrincipal(final String username, @Nullable final String accessToken) {
     Preconditions.checkArgument(username != null, "UserPrincipal must have the username");
     this.username = username;
+    this.accessToken = accessToken;
   }
 
   /**
@@ -45,6 +63,11 @@ public class UserPrincipal implements Principal {
   @Override
   public String getName() {
     return username;
+  }
+
+  /** Returns the raw {@code Authorization} header value when the authenticator recorded it. */
+  public Optional<String> getAccessToken() {
+    return Optional.ofNullable(accessToken);
   }
 
   @Override
@@ -66,6 +89,6 @@ public class UserPrincipal implements Principal {
 
   @Override
   public String toString() {
-    return "[principal: " + this.username + "]";
+    return "[principal: " + this.username + (accessToken != null ? ", token=***" : "") + "]";
   }
 }

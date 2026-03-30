@@ -22,6 +22,7 @@ import java.nio.charset.StandardCharsets;
 import java.util.Base64;
 import org.apache.gravitino.Config;
 import org.apache.gravitino.auth.AuthConstants;
+import org.apache.gravitino.UserPrincipal;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
@@ -51,11 +52,11 @@ public class TestSimpleAuthenticator {
     String basicToken =
         AuthConstants.AUTHORIZATION_BASIC_HEADER
             + Base64.getEncoder().encodeToString(fullCredentials.getBytes(StandardCharsets.UTF_8));
-    Assertions.assertEquals(
-        fullCredentials.split(":")[0],
-        simpleAuthenticator
-            .authenticateToken(basicToken.getBytes(StandardCharsets.UTF_8))
-            .getName());
+    UserPrincipal principal =
+        (UserPrincipal)
+            simpleAuthenticator.authenticateToken(basicToken.getBytes(StandardCharsets.UTF_8));
+    Assertions.assertEquals(fullCredentials.split(":")[0], principal.getName());
+    Assertions.assertEquals(basicToken, principal.getAccessToken().get());
     String credentialsOnlyHaveUsername = "test-user:";
     basicToken =
         AuthConstants.AUTHORIZATION_BASIC_HEADER
