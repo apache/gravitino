@@ -16,8 +16,6 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-import com.github.jengelman.gradle.plugins.shadow.tasks.ShadowJar
-
 plugins {
   `maven-publish`
   id("java")
@@ -28,12 +26,19 @@ dependencies {
   implementation(libs.google.auth.credentials)
   implementation(libs.google.auth.http)
   implementation(libs.iceberg.gcp.bundle)
+  implementation(libs.guava)
 }
 
-tasks.withType(ShadowJar::class.java) {
+tasks.named<com.github.jengelman.gradle.plugins.shadow.tasks.ShadowJar>("shadowJar") {
   isZip64 = true
   configurations = listOf(project.configurations.runtimeClasspath.get())
   archiveClassifier.set("")
+
+  // Relocate Guava to avoid version conflicts, but exclude already-shaded classes from iceberg
+  relocate("com.google.common", "org.apache.gravitino.shaded.com.google.common") {
+    // Don't transform iceberg's already-shaded Guava
+    exclude("org.apache.iceberg.gcp.shaded.com.google.common.**")
+  }
 
   dependencies {
     exclude(dependency("org.slf4j:slf4j-api"))
