@@ -45,6 +45,10 @@ import org.apache.gravitino.listener.api.event.CreateTableEvent;
 import org.apache.gravitino.listener.api.event.CreateTableFailureEvent;
 import org.apache.gravitino.listener.api.event.CreateTopicEvent;
 import org.apache.gravitino.listener.api.event.CreateTopicFailureEvent;
+import org.apache.gravitino.listener.api.event.DisableCatalogEvent;
+import org.apache.gravitino.listener.api.event.DisableCatalogFailureEvent;
+import org.apache.gravitino.listener.api.event.DisableMetalakeEvent;
+import org.apache.gravitino.listener.api.event.DisableMetalakeFailureEvent;
 import org.apache.gravitino.listener.api.event.DropCatalogEvent;
 import org.apache.gravitino.listener.api.event.DropCatalogFailureEvent;
 import org.apache.gravitino.listener.api.event.DropFilesetEvent;
@@ -57,6 +61,10 @@ import org.apache.gravitino.listener.api.event.DropTableEvent;
 import org.apache.gravitino.listener.api.event.DropTableFailureEvent;
 import org.apache.gravitino.listener.api.event.DropTopicEvent;
 import org.apache.gravitino.listener.api.event.DropTopicFailureEvent;
+import org.apache.gravitino.listener.api.event.EnableCatalogEvent;
+import org.apache.gravitino.listener.api.event.EnableCatalogFailureEvent;
+import org.apache.gravitino.listener.api.event.EnableMetalakeEvent;
+import org.apache.gravitino.listener.api.event.EnableMetalakeFailureEvent;
 import org.apache.gravitino.listener.api.event.Event;
 import org.apache.gravitino.listener.api.event.EventSource;
 import org.apache.gravitino.listener.api.event.GetFileLocationEvent;
@@ -201,6 +209,10 @@ public interface AuditLog {
 
     LIST_METALAKE,
 
+    ENABLE_METALAKE,
+
+    DISABLE_METALAKE,
+
     CREATE_CATALOG,
 
     LOAD_CATALOG,
@@ -210,6 +222,10 @@ public interface AuditLog {
     DROP_CATALOG,
 
     LIST_CATALOG,
+
+    ENABLE_CATALOG,
+
+    DISABLE_CATALOG,
 
     CREATE_SCHEMA,
 
@@ -277,6 +293,12 @@ public interface AuditLog {
         return LOAD_METALAKE;
       } else if (event instanceof ListMetalakeEvent || event instanceof ListMetalakeFailureEvent) {
         return LIST_METALAKE;
+      } else if (event instanceof EnableMetalakeEvent
+          || event instanceof EnableMetalakeFailureEvent) {
+        return ENABLE_METALAKE;
+      } else if (event instanceof DisableMetalakeEvent
+          || event instanceof DisableMetalakeFailureEvent) {
+        return DISABLE_METALAKE;
       } else if (event instanceof CreateCatalogEvent
           || event instanceof CreateCatalogFailureEvent) {
         return CREATE_CATALOG;
@@ -288,6 +310,12 @@ public interface AuditLog {
         return LOAD_CATALOG;
       } else if (event instanceof ListCatalogEvent || event instanceof ListCatalogFailureEvent) {
         return LIST_CATALOG;
+      } else if (event instanceof EnableCatalogEvent
+          || event instanceof EnableCatalogFailureEvent) {
+        return ENABLE_CATALOG;
+      } else if (event instanceof DisableCatalogEvent
+          || event instanceof DisableCatalogFailureEvent) {
+        return DISABLE_CATALOG;
       } else if (event instanceof CreateSchemaEvent || event instanceof CreateSchemaFailureEvent) {
         return CREATE_SCHEMA;
       } else if (event instanceof AlterSchemaEvent || event instanceof AlterSchemaFailureEvent) {
