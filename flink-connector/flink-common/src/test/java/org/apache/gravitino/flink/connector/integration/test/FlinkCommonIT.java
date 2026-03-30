@@ -33,6 +33,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
+import java.util.stream.Collectors;
 import org.apache.flink.table.api.DataTypes;
 import org.apache.flink.table.api.ResultKind;
 import org.apache.flink.table.api.TableResult;
@@ -193,13 +194,16 @@ public abstract class FlinkCommonIT extends FlinkEnvIT {
                 sql("CREATE DATABASE IF NOT EXISTS %s", schema2), ResultKind.SUCCESS);
             TestUtils.assertTableResult(
                 sql("CREATE DATABASE IF NOT EXISTS %s", schema3), ResultKind.SUCCESS);
-            TestUtils.assertTableResult(
-                sql("SHOW DATABASES"),
-                ResultKind.SUCCESS_WITH_CONTENT,
-                Row.of(defaultDatabaseName()),
-                Row.of(schema),
-                Row.of(schema2),
-                Row.of(schema3));
+            TestUtils.assertTableResult(sql("SHOW DATABASES"), ResultKind.SUCCESS_WITH_CONTENT);
+            List<String> shownSchemas =
+                Lists.newArrayList(sql("SHOW DATABASES").collect()).stream()
+                    .map(row -> row.getField(0).toString())
+                    .collect(Collectors.toList());
+            Assertions.assertEquals(expectedSchemas.size(), shownSchemas.size());
+            Assertions.assertTrue(
+                shownSchemas.containsAll(expectedSchemas),
+                String.format(
+                    "Expected shown schemas %s but got %s", expectedSchemas, shownSchemas));
 
             String[] schemas = catalog.asSchemas().listSchemas();
             Arrays.sort(schemas);
