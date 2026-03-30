@@ -110,6 +110,27 @@ public class TestGravitinoCatalogStoreFactory {
   }
 
   /**
+   * Calling {@link GravitinoCatalogStoreFactory#createCatalogStore()} more than once must reuse the
+   * same in-memory catalog store instance rather than creating a new one each time (which would
+   * leak the previous instance and lose its state).
+   */
+  @Test
+  void testCreateCatalogStore_calledTwice_reusesMemoryCatalogStoreInstance() throws Exception {
+    GravitinoCatalogStoreFactory factory = factoryWith(true);
+
+    factory.createCatalogStore();
+    CatalogStore firstMemoryStore = getField(factory, "memoryCatalogStore");
+
+    factory.createCatalogStore();
+    CatalogStore secondMemoryStore = getField(factory, "memoryCatalogStore");
+
+    Assertions.assertSame(
+        firstMemoryStore,
+        secondMemoryStore,
+        "memoryCatalogStore must be the same instance across multiple createCatalogStore() calls");
+  }
+
+  /**
    * Parses the value of {@code gravitino.support.session.catalog} from the given configuration
    * using the real Flink factory-helper path (same approach as {@link TestGravitinoFlinkConfig}).
    */
@@ -138,5 +159,12 @@ public class TestGravitinoCatalogStoreFactory {
     Field field = target.getClass().getDeclaredField(fieldName);
     field.setAccessible(true);
     field.set(target, value);
+  }
+
+  @SuppressWarnings("unchecked")
+  private static <T> T getField(Object target, String fieldName) throws Exception {
+    Field field = target.getClass().getDeclaredField(fieldName);
+    field.setAccessible(true);
+    return (T) field.get(target);
   }
 }
