@@ -28,6 +28,7 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
@@ -90,6 +91,8 @@ public class CatalogWrapperForREST extends IcebergCatalogWrapper {
           IcebergConstants.ICEBERG_OSS_ENDPOINT,
           IcebergConstants.ICEBERG_S3_PATH_STYLE_ACCESS,
           IcebergConstants.DATA_ACCESS);
+  private static final String DATA_ACCESS_VENDED_CREDENTIALS = "vended-credentials";
+  private static final String DATA_ACCESS_REMOTE_SIGNING = "remote-signing";
 
   @SuppressWarnings("deprecation")
   private static Map<String, String> deprecatedProperties =
@@ -205,14 +208,36 @@ public class CatalogWrapperForREST extends IcebergCatalogWrapper {
 
     Map<String, String> filtered =
         MapUtils.getFilteredMap(sourceProps, key -> catalogPropertiesToClientKeys.contains(key));
-    if (!filtered.containsKey(IcebergConstants.DATA_ACCESS)) {
-      filtered = new HashMap<>(filtered);
-      // Default to vended-credentials: the Gravitino Iceberg REST server supports credential
-      // vending by default. (Clients may still request remote-signing, which disables vending.)
-      filtered.put(IcebergConstants.DATA_ACCESS, "vended-credentials");
-    }
+    filtered = new HashMap<>(filtered);
+    validateAndNormalizeDataAccessProperty(filtered);
 
     return Collections.unmodifiableMap(filtered);
+  }
+
+  @VisibleForTesting
+  static void validateAndNormalizeDataAccessProperty(Map<String, String> properties) {
+    String dataAccess = properties.get(IcebergConstants.DATA_ACCESS);
+    if (StringUtils.isBlank(dataAccess)) {
+      properties.remove(IcebergConstants.DATA_ACCESS);
+      return;
+    }
+
+    String normalizedDataAccess = dataAccess.toLowerCase(Locale.ROOT);
+    if (!DATA_ACCESS_VENDED_CREDENTIALS.equals(normalizedDataAccess)
+        && !DATA_ACCESS_REMOTE_SIGNING.equals(normalizedDataAccess)) {
+      throw new IllegalArgumentException(
+          "Invalid catalog property '"
+              + IcebergConstants.DATA_ACCESS
+              + "': "
+              + dataAccess
+              + ", supported values are ["
+              + DATA_ACCESS_VENDED_CREDENTIALS
+              + ","
+              + DATA_ACCESS_REMOTE_SIGNING
+              + "]");
+    }
+
+    properties.put(IcebergConstants.DATA_ACCESS, normalizedDataAccess);
   }
 
   private static void putIfValuePresent(

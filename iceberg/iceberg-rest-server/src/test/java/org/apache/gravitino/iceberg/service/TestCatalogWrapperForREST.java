@@ -137,7 +137,22 @@ public class TestCatalogWrapperForREST {
     Assertions.assertFalse(configToClients.containsKey(IcebergConstants.URI));
     Assertions.assertEquals(
         "org.apache.iceberg.aws.s3.S3FileIO", configToClients.get(IcebergConstants.IO_IMPL));
-    Assertions.assertEquals(
-        "vended-credentials", configToClients.get(IcebergConstants.DATA_ACCESS));
+    Assertions.assertFalse(configToClients.containsKey(IcebergConstants.DATA_ACCESS));
+  }
+
+  @Test
+  void testCatalogConfigToClientsRejectsInvalidDataAccessValue() {
+    Catalog catalog = mock(Catalog.class);
+    IcebergConfig config =
+        new IcebergConfig(
+            ImmutableMap.of(
+                IcebergConstants.CATALOG_BACKEND,
+                "hive",
+                IcebergConstants.DATA_ACCESS,
+                "invalid-mode"));
+
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () -> CatalogWrapperForREST.buildCatalogConfigToClients(config, catalog));
   }
 }
