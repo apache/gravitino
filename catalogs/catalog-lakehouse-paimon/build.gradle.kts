@@ -108,6 +108,7 @@ dependencies {
     exclude("com.sun.jersey")
     exclude("javax.servlet")
     exclude("org.apache.avro")
+    exclude(group = "net.java.dev.jets3t")
     exclude("org.apache.curator")
     exclude("org.apache.zookeeper")
     exclude("org.mortbay.jetty")
