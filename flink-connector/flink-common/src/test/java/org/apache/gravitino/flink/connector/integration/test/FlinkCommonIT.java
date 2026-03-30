@@ -194,9 +194,11 @@ public abstract class FlinkCommonIT extends FlinkEnvIT {
                 sql("CREATE DATABASE IF NOT EXISTS %s", schema2), ResultKind.SUCCESS);
             TestUtils.assertTableResult(
                 sql("CREATE DATABASE IF NOT EXISTS %s", schema3), ResultKind.SUCCESS);
-            TestUtils.assertTableResult(sql("SHOW DATABASES"), ResultKind.SUCCESS_WITH_CONTENT);
+            TableResult showDatabasesResult = sql("SHOW DATABASES");
+            Assertions.assertEquals(
+                ResultKind.SUCCESS_WITH_CONTENT, showDatabasesResult.getResultKind());
             List<String> shownSchemas =
-                Lists.newArrayList(sql("SHOW DATABASES").collect()).stream()
+                Lists.newArrayList(showDatabasesResult.collect()).stream()
                     .map(row -> row.getField(0).toString())
                     .collect(Collectors.toList());
             Assertions.assertEquals(expectedSchemas.size(), shownSchemas.size());
