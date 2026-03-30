@@ -59,9 +59,11 @@ import org.apache.iceberg.Table;
 import org.apache.iceberg.TableMetadata;
 import org.apache.iceberg.TableProperties;
 import org.apache.iceberg.TableScan;
+import org.apache.iceberg.catalog.Catalog;
 import org.apache.iceberg.catalog.Namespace;
 import org.apache.iceberg.catalog.TableIdentifier;
 import org.apache.iceberg.exceptions.ServiceUnavailableException;
+import org.apache.iceberg.rest.RESTCatalog;
 import org.apache.iceberg.io.CloseableIterable;
 import org.apache.iceberg.rest.PlanStatus;
 import org.apache.iceberg.rest.requests.CreateTableRequest;
@@ -98,10 +100,7 @@ public class CatalogWrapperForREST extends IcebergCatalogWrapper {
 
   public CatalogWrapperForREST(String catalogName, IcebergConfig config) {
     super(config);
-    this.catalogConfigToClients =
-        MapUtils.getFilteredMap(
-            config.getIcebergCatalogProperties(),
-            key -> catalogPropertiesToClientKeys.contains(key));
+    this.catalogConfigToClients = buildCatalogConfigToClients(config, getCatalog());
     // To be compatible with old properties
     Map<String, String> catalogProperties =
         checkForCompatibility(config.getAllConfig(), deprecatedProperties);
@@ -184,6 +183,43 @@ public class CatalogWrapperForREST extends IcebergCatalogWrapper {
 
   public Map<String, String> getCatalogConfigToClient() {
     return catalogConfigToClients;
+  }
+
+  /**
+   * Builds properties exposed to Iceberg clients via the IRC {@code /v1/config} defaults.
+   *
+   * <p>For {@link RESTCatalog}, uses {@link RESTCatalog#properties()} so defaults reflect the
+   * remote catalog's config response merged with client properties (after REST handshake), not only
+   * static Gravitino catalog configuration.
+   */
+  @VisibleForTesting
+  static Map<String, String> buildCatalogConfigToClients(IcebergConfig config, Catalog catalog) {
+    Map<String, String> sourceProps;
+    if (catalog instanceof RESTCatalog) {
+      Map<String, String> merged = ((RESTCatalog) catalog).properties();
+      sourceProps = merged != null ? new HashMap<>(merged) : new HashMap<>();
+    } else {
+      sourceProps = new HashMap<>(config.getIcebergCatalogProperties());
+    }
+
+    Map<String, String> filtered =
+        MapUtils.getFilteredMap(
+            sourceProps, key -> catalogPropertiesToClientKeys.contains(key));
+    if (catalog instanceof RESTCatalog) {
+      Map<String, String> withRestExtras = new HashMap<>(filtered);
+      putIfValuePresent(sourceProps, withRestExtras, IcebergConstants.URI);
+      putIfValuePresent(sourceProps, withRestExtras, IcebergConstants.WAREHOUSE);
+      return Collections.unmodifiableMap(withRestExtras);
+    }
+    return filtered;
+  }
+
+  private static void putIfValuePresent(
+      Map<String, String> source, Map<String, String> target, String key) {
+    String value = source.get(key);
+    if (StringUtils.isNotBlank(value)) {
+      target.put(key, value);
+    }
   }
 
   @Override

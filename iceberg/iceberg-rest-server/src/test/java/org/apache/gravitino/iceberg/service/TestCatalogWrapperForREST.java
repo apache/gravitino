@@ -19,8 +19,15 @@
 
 package org.apache.gravitino.iceberg.service;
 
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
+
 import com.google.common.collect.ImmutableMap;
 import java.util.Map;
+import org.apache.gravitino.catalog.lakehouse.iceberg.IcebergConstants;
+import org.apache.gravitino.iceberg.common.IcebergConfig;
+import org.apache.iceberg.catalog.Catalog;
+import org.apache.iceberg.rest.RESTCatalog;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
@@ -73,5 +80,58 @@ public class TestCatalogWrapperForREST {
     Assertions.assertThrowsExactly(
         IllegalArgumentException.class,
         () -> CatalogWrapperForREST.validateCredentialLocation("   "));
+  }
+
+  @Test
+  void testCatalogConfigToClientsForRestBackendUsesMergedRemoteProperties() {
+    IcebergConfig config =
+        new IcebergConfig(
+            ImmutableMap.of(
+                IcebergConstants.CATALOG_BACKEND,
+                "rest",
+                IcebergConstants.URI,
+                "http://client-config-only:8181"));
+
+    RESTCatalog restCatalog = mock(RESTCatalog.class);
+    when(restCatalog.properties())
+        .thenReturn(
+            ImmutableMap.of(
+                IcebergConstants.URI,
+                "http://merged-from-remote-config:9999",
+                IcebergConstants.IO_IMPL,
+                "org.apache.iceberg.aws.s3.S3FileIO",
+                IcebergConstants.ICEBERG_S3_ENDPOINT,
+                "http://localhost:9000",
+                IcebergConstants.WAREHOUSE,
+                "/remote/warehouse"));
+
+    Map<String, String> configToClients =
+        CatalogWrapperForREST.buildCatalogConfigToClients(config, restCatalog);
+    Assertions.assertEquals(
+        "http://merged-from-remote-config:9999", configToClients.get(IcebergConstants.URI));
+    Assertions.assertEquals(
+        "org.apache.iceberg.aws.s3.S3FileIO", configToClients.get(IcebergConstants.IO_IMPL));
+    Assertions.assertEquals(
+        "http://localhost:9000", configToClients.get(IcebergConstants.ICEBERG_S3_ENDPOINT));
+    Assertions.assertEquals("/remote/warehouse", configToClients.get(IcebergConstants.WAREHOUSE));
+  }
+
+  @Test
+  void testCatalogConfigToClientsForNonRestBackend() {
+    Catalog catalog = mock(Catalog.class);
+    IcebergConfig config =
+        new IcebergConfig(
+            ImmutableMap.of(
+                IcebergConstants.CATALOG_BACKEND,
+                "hive",
+                IcebergConstants.URI,
+                "thrift://hive-metastore:9083",
+                IcebergConstants.IO_IMPL,
+                "org.apache.iceberg.aws.s3.S3FileIO"));
+    Map<String, String> configToClients =
+        CatalogWrapperForREST.buildCatalogConfigToClients(config, catalog);
+    Assertions.assertFalse(configToClients.containsKey(IcebergConstants.URI));
+    Assertions.assertEquals(
+        "org.apache.iceberg.aws.s3.S3FileIO", configToClients.get(IcebergConstants.IO_IMPL));
   }
 }
