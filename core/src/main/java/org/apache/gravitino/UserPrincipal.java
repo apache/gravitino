@@ -25,8 +25,8 @@ import java.util.Optional;
 import javax.annotation.Nullable;
 
 /**
- * A simple implementation of Principal that holds a username and optionally the raw
- * {@code Authorization} header value (for forwarding to downstream Iceberg REST catalogs).
+ * A simple implementation of Principal that holds a username and optionally the raw {@code
+ * Authorization} header value (for forwarding to downstream Iceberg REST catalogs).
  */
 public class UserPrincipal implements Principal {
 
@@ -46,8 +46,8 @@ public class UserPrincipal implements Principal {
    * Constructs a UserPrincipal with the given username and optional raw {@code Authorization}
    * header value.
    *
-   * @param accessToken authorization header value (for example, {@code Bearer <jwt>} or
-   *     {@code Basic <base64>})
+   * @param accessToken authorization header value (for example, {@code Bearer <jwt>} or {@code
+   *     Basic <base64>})
    */
   public UserPrincipal(final String username, @Nullable final String accessToken) {
     Preconditions.checkArgument(username != null, "UserPrincipal must have the username");

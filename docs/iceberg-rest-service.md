@@ -135,6 +135,7 @@ Use the REST backend to proxy another Iceberg REST catalog server (IRC2). The Gr
 | `gravitino.iceberg-rest.catalog-backend` | The Catalog backend of the Gravitino Iceberg REST catalog service. Use the value **`rest`** for the REST catalog backend.     | `memory`      | Yes      | 0.2.0         |
 | `gravitino.iceberg-rest.uri`             | The Iceberg REST catalog URI (IRC2), such as `http://127.0.0.1:9001/iceberg`.                                                 | (none)        | Yes      | 0.2.0         |
 | `gravitino.iceberg-rest.warehouse`       | The catalog name in the Iceberg REST spec. Set to a specific catalog name, or leave empty to use the default catalog on IRC2. | (none)        | No       | 0.2.0         |
+| `gravitino.iceberg-rest.data-access`     | Data access mode exposed to Iceberg REST clients via `/v1/config`. Supported values: `vended-credentials`, `remote-signing`.  | `vended-credentials` | No       | 1.2.0         |
 
 IRC1 configuration example if IRC2 using HDFS storage:
 
@@ -156,6 +157,11 @@ gravitino.iceberg-rest.header.X-Iceberg-Access-Delegation = vended-credentials
 ```
 
 IRC1 must also configure S3 configurations if the client side requests credential vending.
+
+`data-access` is returned in `/v1/config` defaults for REST clients:
+
+- `vended-credentials`: clients should request credential vending (`X-Iceberg-Access-Delegation: vended-credentials`).
+- `remote-signing`: clients should use remote-signing mode and not request credential vending.
 
 #### Custom backend configuration
 

@@ -18,6 +18,12 @@
  */
 package org.apache.gravitino.catalog.lakehouse.iceberg;
 
+import static org.apache.gravitino.connector.PropertyEntry.booleanPropertyEntry;
+import static org.apache.gravitino.connector.PropertyEntry.enumImmutablePropertyEntry;
+import static org.apache.gravitino.connector.PropertyEntry.integerOptionalPropertyEntry;
+import static org.apache.gravitino.connector.PropertyEntry.stringOptionalPropertyEntry;
+import static org.apache.gravitino.connector.PropertyEntry.stringRequiredPropertyEntry;
+
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Maps;
