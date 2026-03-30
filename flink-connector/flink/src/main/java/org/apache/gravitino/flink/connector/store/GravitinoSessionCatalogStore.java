@@ -59,7 +59,7 @@ public class GravitinoSessionCatalogStore extends AbstractCatalogStore {
   public void storeCatalog(String catalogName, CatalogDescriptor descriptor)
       throws CatalogException {
     String catalogType = descriptor.getConfiguration().get(CommonCatalogOptions.CATALOG_TYPE);
-    if (isBuiltInCatalog(catalogType)) {
+    if (!isBuiltInCatalog(catalogType)) {
       memoryCatalogStore.storeCatalog(catalogName, descriptor);
     } else {
       gravitinoCatalogStore.storeCatalog(catalogName, descriptor);
