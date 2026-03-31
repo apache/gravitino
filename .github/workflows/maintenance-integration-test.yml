@@ -24,7 +24,7 @@ jobs:
               - .github/**
               - api/**
               - bin/**
-              - catalogs/**
+              - catalogs/catalog-common/**
               - clients/client-java/**
               - clients/client-java-runtime/**
               - common/**
@@ -32,7 +32,6 @@ jobs:
               - core/**
               - dev/**
               - gradle/**
-              - iceberg/**
               - integration-test-common/**
               - maintenance/**
               - meta/**
