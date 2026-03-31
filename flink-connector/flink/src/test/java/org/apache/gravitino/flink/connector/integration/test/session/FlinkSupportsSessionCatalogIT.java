@@ -48,7 +48,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- * Integration tests verifying that the {@code gravitino.supportsSessionCatalog} option correctly
+ * Integration tests verifying that the {@code gravitino.supportSessionCatalog} option correctly
  * routes catalog operations to the appropriate store:
  *
  * <ul>
@@ -63,9 +63,9 @@ import org.slf4j.LoggerFactory;
  * <p>Requires a running Hive Docker container for the Gravitino-managed catalog tests.
  */
 @Tag("gravitino-docker-test")
-public class FlinkSupportsSessionCatalogIT extends FlinkEnvIT {
+public class FlinkSupportSessionCatalogIT extends FlinkEnvIT {
 
-  private static final Logger LOG = LoggerFactory.getLogger(FlinkSupportsSessionCatalogIT.class);
+  private static final Logger LOG = LoggerFactory.getLogger(FlinkSupportSessionCatalogIT.class);
 
   private static String hiveConfDir;
   private static Path hiveConfDirPath;
@@ -76,9 +76,9 @@ public class FlinkSupportsSessionCatalogIT extends FlinkEnvIT {
   }
 
   /**
-   * Overrides the default Flink environment to enable {@code
-   * gravitino.supportsSessionCatalog=true}, which wires a {@link
-   * org.apache.gravitino.flink.connector.store.GravitinoSessionCatalogStore} as the catalog store.
+   * Overrides the default Flink environment to enable {@code gravitino.supportSessionCatalog=true},
+   * which wires a {@link org.apache.gravitino.flink.connector.store.GravitinoSessionCatalogStore}
+   * as the catalog store.
    */
   @Override
   protected void initFlinkEnv() {
@@ -88,26 +88,25 @@ public class FlinkSupportsSessionCatalogIT extends FlinkEnvIT {
         "table.catalog-store.kind", GravitinoCatalogStoreFactoryOptions.GRAVITINO);
     configuration.setString("table.catalog-store.gravitino.gravitino.metalake", GRAVITINO_METALAKE);
     configuration.setString("table.catalog-store.gravitino.gravitino.uri", gravitinoUri);
-    configuration.setBoolean(
-        "table.catalog-store.gravitino.gravitino.supportsSessionCatalog", true);
+    configuration.setBoolean("table.catalog-store.gravitino.gravitino.supportSessionCatalog", true);
     EnvironmentSettings settings =
         EnvironmentSettings.newInstance().withConfiguration(configuration).inBatchMode().build();
     tableEnv = TableEnvironment.create(settings);
     LOG.info(
-        "Flink env with supportsSessionCatalog=true initialized, Gravitino uri: {}.", gravitinoUri);
+        "Flink env with supportSessionCatalog=true initialized, Gravitino uri: {}.", gravitinoUri);
   }
 
   @BeforeAll
   void sessionCatalogStartUp() {
     Preconditions.checkArgument(metalake != null, "metalake should not be null");
-    LOG.info("FlinkSupportsSessionCatalogIT startup complete.");
+    LOG.info("FlinkSupportSessionCatalogIT startup complete.");
   }
 
   @AfterAll
   static void sessionCatalogStop() {
     Preconditions.checkArgument(metalake != null, "metalake should not be null");
     deleteHiveConfDir();
-    LOG.info("FlinkSupportsSessionCatalogIT teardown complete.");
+    LOG.info("FlinkSupportSessionCatalogIT teardown complete.");
   }
 
   /**
@@ -211,7 +210,7 @@ public class FlinkSupportsSessionCatalogIT extends FlinkEnvIT {
 
   /**
    * {@code SHOW CATALOGS} must return catalogs from both the Gravitino-backed store and the
-   * in-memory store when {@code supportsSessionCatalog=true}.
+   * in-memory store when {@code supportSessionCatalog=true}.
    */
   @Test
   public void testListCatalogsReturnsBothStores() {
