@@ -296,7 +296,7 @@ def mock_tag_methods():
 def mock_http_response(json_str: str) -> Response:
     mock_http_resp = Mock(HTTPResponse)
     mock_http_resp.getcode.return_value = 200
-    mock_http_resp.read.return_value = json_str
+    mock_http_resp.read.return_value = json_str.encode("utf-8")
     mock_http_resp.info.return_value = None
     mock_http_resp.url = None
     mock_resp = Response(mock_http_resp)

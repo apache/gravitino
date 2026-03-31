@@ -16,7 +16,6 @@
 # under the License.
 
 from gravitino.utils.http_client import HTTPClient, Response, unpack
-from gravitino.utils.random_utils import RandomStringUtils
 from gravitino.utils.string_utils import StringUtils
 
 __all__ = [
@@ -24,5 +23,4 @@ __all__ = [
     "HTTPClient",
     "unpack",
     "StringUtils",
-    "RandomStringUtils",
 ]

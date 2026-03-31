@@ -562,7 +562,7 @@ class GravitinoMetalake(
 
         return [
             GenericTag(
-                self.name,
+                self.name(),
                 tag_dto,
                 self.rest_client,
             )
@@ -648,6 +648,10 @@ class GravitinoMetalake(
         Precondition.check_argument(
             StringUtils.is_not_blank(tag_name),
             "tag name must not be null or empty",
+        )
+        Precondition.check_argument(
+            changes is not None and len(changes) > 0,
+            "at least one change is required",
         )
         updates = [DTOConverters.to_tag_update_request(change) for change in changes]
         update_req = TagUpdatesRequest(updates)

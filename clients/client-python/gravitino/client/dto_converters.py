@@ -299,20 +299,16 @@ class DTOConverters:
         change: TagChange,
     ) -> TagUpdateRequestBase:
         """
-        Convert the tag change to the corresponding tag update request.
+        Converts a TagChange to a TagUpdateRequestBase.
 
         Args:
-            change (TagChange): The tag change.
+            change (TagChange): the TagChange to convert.
 
         Raises:
-            ValueError: if the change type is not supported.
+            IllegalArgumentException: if the change is not a valid TagChange.
 
         Returns:
-            tp.Union[ TagUpdateRequest.RenameTagRequest,
-            TagUpdateRequest.UpdateTagCommentRequest,
-            TagUpdateRequest.SetTagPropertyRequest,
-            TagUpdateRequest.RemoveTagPropertyRequest,
-            ]:  The tag update request.
+            TagUpdateRequestBase: the TagUpdateRequestBase corresponding to the change.
         """
         if isinstance(change, TagChange.RenameTag):
             return TagUpdateRequest.RenameTagRequest(change.new_name)
