@@ -350,7 +350,19 @@ public class LancePartitionStatisticStorage implements PartitionStatisticStorage
 
   @Override
   public void close() throws IOException {
-    datasetCache.ifPresent(Cache::invalidateAll);
+    datasetCache.ifPresent(
+        cache -> {
+          cache
+              .asMap()
+              .values()
+              .forEach(
+                  dataset -> {
+                    if (dataset != null) {
+                      dataset.close();
+                    }
+                  });
+          cache.invalidateAll();
+        });
 
     if (allocator != null) {
       allocator.close();
