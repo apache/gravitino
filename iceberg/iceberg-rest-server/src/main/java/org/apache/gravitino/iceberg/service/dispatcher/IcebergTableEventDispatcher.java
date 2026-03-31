@@ -300,4 +300,10 @@ public class IcebergTableEventDispatcher implements IcebergTableOperationDispatc
     eventBus.dispatchEvent(new IcebergPlanTableScanEvent(context, gravitinoNameIdentifier));
     return planTableScanResponse;
   }
+
+  @Override
+  public Optional<String> getTableMetadataLocation(
+      IcebergRequestContext context, TableIdentifier tableIdentifier) {
+    return icebergTableOperationDispatcher.getTableMetadataLocation(context, tableIdentifier);
+  }
 }

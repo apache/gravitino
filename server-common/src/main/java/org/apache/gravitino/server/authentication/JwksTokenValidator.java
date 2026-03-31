@@ -36,6 +36,10 @@ import java.util.List;
 import java.util.Set;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.Config;
+import org.apache.gravitino.UserGroup;
+import org.apache.gravitino.UserPrincipal;
+import org.apache.gravitino.auth.GroupMapper;
+import org.apache.gravitino.auth.GroupMapperFactory;
 import org.apache.gravitino.auth.PrincipalMapper;
 import org.apache.gravitino.auth.PrincipalMapperFactory;
 import org.apache.gravitino.exceptions.UnauthorizedException;
@@ -55,20 +59,28 @@ public class JwksTokenValidator implements OAuthTokenValidator {
   private String jwksUri;
   private String expectedIssuer;
   private List<String> principalFields;
+  private List<String> groupsFields;
   private long allowSkewSeconds;
   private PrincipalMapper principalMapper;
+  private GroupMapper groupMapper;
 
   @Override
   public void initialize(Config config) {
     this.jwksUri = config.get(OAuthConfig.JWKS_URI);
     this.expectedIssuer = config.get(OAuthConfig.AUTHORITY);
     this.principalFields = config.get(OAuthConfig.PRINCIPAL_FIELDS);
+    this.groupsFields = config.get(OAuthConfig.GROUPS_FIELDS);
     this.allowSkewSeconds = config.get(OAuthConfig.ALLOW_SKEW_SECONDS);
 
     // Create principal mapper based on configuration
     String mapperType = config.get(OAuthConfig.PRINCIPAL_MAPPER);
     String regexPattern = config.get(OAuthConfig.PRINCIPAL_MAPPER_REGEX_PATTERN);
     this.principalMapper = PrincipalMapperFactory.create(mapperType, regexPattern);
+
+    // Create group mapper based on configuration
+    String groupMapperType = config.get(OAuthConfig.GROUP_MAPPER);
+    String groupRegexPattern = config.get(OAuthConfig.GROUP_MAPPER_REGEX_PATTERN);
+    this.groupMapper = GroupMapperFactory.create(groupMapperType, groupRegexPattern);
 
     LOG.info("Initializing JWKS token validator");
 
@@ -140,7 +152,13 @@ public class JwksTokenValidator implements OAuthTokenValidator {
       }
 
       // Use principal mapper to extract username
-      return principalMapper.map(principal);
+      Principal userPrincipal = principalMapper.map(principal);
+      List<Object> groups = extractGroups(validatedClaims);
+      if (groups != null && !groups.isEmpty()) {
+        List<UserGroup> mappedGroups = groupMapper.map(groups);
+        return new UserPrincipal(userPrincipal.getName(), mappedGroups);
+      }
+      return userPrincipal;
 
     } catch (Exception e) {
       LOG.error("JWKS JWT validation error: {}", e.getMessage());
@@ -164,9 +182,29 @@ public class JwksTokenValidator implements OAuthTokenValidator {
     if (principalFields != null && !principalFields.isEmpty()) {
       for (String field : principalFields) {
         if (StringUtils.isNotBlank(field)) {
-          String principal = (String) validatedClaims.getClaim(field);
+          Object principal = validatedClaims.getClaim(field);
           if (principal != null) {
-            return principal;
+            return principal.toString();
+          }
+        }
+      }
+    }
+
+    return null;
+  }
+
+  /** Extracts the groups from the validated JWT claims using configured field(s). */
+  private List<Object> extractGroups(JWTClaimsSet validatedClaims) {
+    if (groupsFields != null && !groupsFields.isEmpty()) {
+      for (String field : groupsFields) {
+        if (StringUtils.isNotBlank(field)) {
+          try {
+            Object groupsObj = validatedClaims.getClaim(field);
+            if (groupsObj instanceof List) {
+              return (List<Object>) groupsObj;
+            }
+          } catch (Exception e) {
+            LOG.warn("Failed to parse groups from claim field: {}", field, e);
           }
         }
       }

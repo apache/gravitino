@@ -21,16 +21,22 @@ package org.apache.gravitino;
 
 import com.google.common.base.Preconditions;
 import java.security.Principal;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
+import java.util.Objects;
 import java.util.Optional;
 import javax.annotation.Nullable;
 
 /**
- * A simple implementation of Principal that holds a username and optionally the raw {@code
- * Authorization} header value (for forwarding to downstream Iceberg REST catalogs).
+ * A simple implementation of Principal that holds a username, optional group membership, and
+ * optionally the raw {@code Authorization} header value for forwarding to downstream Iceberg REST
+ * catalogs.
  */
 public class UserPrincipal implements Principal {
 
   private final String username;
+  private final List<UserGroup> groups;
   @Nullable private final String accessToken;
 
   /**
@@ -52,7 +58,24 @@ public class UserPrincipal implements Principal {
   public UserPrincipal(final String username, @Nullable final String accessToken) {
     Preconditions.checkArgument(username != null, "UserPrincipal must have the username");
     this.username = username;
+    this.groups = Collections.emptyList();
     this.accessToken = accessToken;
+  }
+
+  /**
+   * Constructs a UserPrincipal with the given username and groups.
+   *
+   * @param username the username of the principal
+   * @param groups the groups of the principal
+   */
+  public UserPrincipal(final String username, final List<UserGroup> groups) {
+    Preconditions.checkArgument(username != null, "UserPrincipal must have the username");
+    this.username = username;
+    this.groups =
+        groups != null
+            ? Collections.unmodifiableList(new ArrayList<>(groups))
+            : Collections.emptyList();
+    this.accessToken = null;
   }
 
   /**
@@ -70,9 +93,18 @@ public class UserPrincipal implements Principal {
     return Optional.ofNullable(accessToken);
   }
 
+  /**
+   * Returns the groups of this principal.
+   *
+   * @return the groups
+   */
+  public List<UserGroup> getGroups() {
+    return groups;
+  }
+
   @Override
   public int hashCode() {
-    return username.hashCode();
+    return Objects.hash(username, groups, accessToken);
   }
 
   @Override
@@ -80,15 +112,22 @@ public class UserPrincipal implements Principal {
     if (this == o) {
       return true;
     }
-    if (o instanceof UserPrincipal) {
-      UserPrincipal that = (UserPrincipal) o;
-      return this.username.equals(that.username);
+    if (!(o instanceof UserPrincipal)) {
+      return false;
     }
-    return false;
+    UserPrincipal that = (UserPrincipal) o;
+    return Objects.equals(username, that.username)
+        && Objects.equals(groups, that.groups)
+        && Objects.equals(accessToken, that.accessToken);
   }
 
   @Override
   public String toString() {
-    return "[principal: " + this.username + (accessToken != null ? ", token=***" : "") + "]";
+    return "[principal: "
+        + this.username
+        + ", groups: "
+        + this.groups
+        + (accessToken != null ? ", token=***" : "")
+        + "]";
   }
 }
