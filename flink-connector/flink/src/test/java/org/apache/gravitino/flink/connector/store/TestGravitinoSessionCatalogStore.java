@@ -154,19 +154,6 @@ public class TestGravitinoSessionCatalogStore {
     verify(gravitinoCatalogStore).getCatalog("gravitino-hive");
   }
 
-  @Test
-  void testGetCatalog_catalogInMemoryButEmpty_fallbackToGravitino() throws CatalogException {
-    CatalogDescriptor expected = descriptorWithType(GRAVITINO_CATALOG_TYPE);
-    when(memoryCatalogStore.getCatalog("gravitino-hive")).thenReturn(Optional.empty());
-    when(gravitinoCatalogStore.getCatalog("gravitino-hive")).thenReturn(Optional.of(expected));
-
-    Optional<CatalogDescriptor> result = sessionCatalogStore.getCatalog("gravitino-hive");
-
-    Assertions.assertTrue(result.isPresent());
-    Assertions.assertEquals(expected, result.get());
-    verify(gravitinoCatalogStore).getCatalog("gravitino-hive");
-  }
-
   // -------------------------------------------------------------------------
   // listCatalogs
   // -------------------------------------------------------------------------
