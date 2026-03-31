@@ -470,6 +470,10 @@ ingress:
 ##
 annotations: {}
 
+## Service account name for the Gravitino pod
+##
+serviceAccountName: default
+
 ## Deployment replicas
 ##
 replicas: 1
