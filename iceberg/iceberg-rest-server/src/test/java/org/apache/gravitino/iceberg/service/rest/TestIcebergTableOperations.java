@@ -66,6 +66,7 @@ import org.apache.gravitino.server.authorization.GravitinoAuthorizerProvider;
 import org.apache.iceberg.MetadataUpdate;
 import org.apache.iceberg.Schema;
 import org.apache.iceberg.Snapshot;
+import org.apache.iceberg.SnapshotRef;
 import org.apache.iceberg.TableMetadata;
 import org.apache.iceberg.UpdateRequirement;
 import org.apache.iceberg.UpdateRequirements;
@@ -980,5 +981,69 @@ public class TestIcebergTableOperations extends IcebergNamespaceTestBase {
     String allEtag2 = allResponse2.getHeaderString("ETag");
     Assertions.assertEquals(
         allEtag, allEtag2, "ETag should be consistent for the same snapshots value");
+  }
+
+  @ParameterizedTest
+  @MethodSource("org.apache.gravitino.iceberg.service.rest.IcebergRestTestUtil#testNamespaces")
+  void testLoadTableSnapshotsRefsFiltering(Namespace namespace) {
+    verifyCreateNamespaceSucc(namespace);
+    // Create table with data; generatePlanData=true produces two snapshots (create + append),
+    // but only the latest snapshot is referenced by the "main" branch.
+    verifyCreateTableSucc(namespace, "snapshots_refs_foo1", true);
+
+    // Load with snapshots=all: should return all snapshots
+    Response allResponse = doLoadTableWithSnapshots(namespace, "snapshots_refs_foo1", "all");
+    Assertions.assertEquals(Status.OK.getStatusCode(), allResponse.getStatus());
+    LoadTableResponse allTableResponse = allResponse.readEntity(LoadTableResponse.class);
+    List<Snapshot> allSnapshots = allTableResponse.tableMetadata().snapshots();
+    Assertions.assertTrue(
+        allSnapshots.size() >= 2,
+        "Table with data should have at least 2 snapshots, got " + allSnapshots.size());
+
+    // Collect snapshot IDs referenced by refs
+    Map<String, SnapshotRef> refs = allTableResponse.tableMetadata().refs();
+    Set<Long> referencedSnapshotIds =
+        refs.values().stream().map(SnapshotRef::snapshotId).collect(Collectors.toSet());
+
+    // Load with snapshots=refs: should return only ref-referenced snapshots
+    Response refsResponse = doLoadTableWithSnapshots(namespace, "snapshots_refs_foo1", "refs");
+    Assertions.assertEquals(Status.OK.getStatusCode(), refsResponse.getStatus());
+    LoadTableResponse refsTableResponse = refsResponse.readEntity(LoadTableResponse.class);
+    List<Snapshot> refsSnapshots = refsTableResponse.tableMetadata().snapshots();
+
+    // The returned snapshots should be exactly the ref-referenced snapshots
+    Assertions.assertEquals(
+        referencedSnapshotIds,
+        refsSnapshots.stream().map(Snapshot::snapshotId).collect(Collectors.toSet()),
+        "snapshots=refs should return exactly the ref-referenced snapshots");
+
+    // Refs should be preserved in the filtered response
+    Assertions.assertEquals(
+        refs.keySet(),
+        refsTableResponse.tableMetadata().refs().keySet(),
+        "Refs should be preserved in filtered response");
+  }
+
+  @ParameterizedTest
+  @MethodSource("org.apache.gravitino.iceberg.service.rest.IcebergRestTestUtil#testNamespaces")
+  void testLoadTableSnapshotsAllReturnsAllSnapshots(Namespace namespace) {
+    verifyCreateNamespaceSucc(namespace);
+    verifyCreateTableSucc(namespace, "snapshots_all_foo1", true);
+
+    // Load with default snapshots=all
+    Response defaultResponse = doLoadTable(namespace, "snapshots_all_foo1");
+    Assertions.assertEquals(Status.OK.getStatusCode(), defaultResponse.getStatus());
+    LoadTableResponse defaultTableResponse = defaultResponse.readEntity(LoadTableResponse.class);
+
+    // Load with explicit snapshots=all
+    Response allResponse = doLoadTableWithSnapshots(namespace, "snapshots_all_foo1", "all");
+    Assertions.assertEquals(Status.OK.getStatusCode(), allResponse.getStatus());
+    LoadTableResponse allTableResponse = allResponse.readEntity(LoadTableResponse.class);
+
+    // Both should return the same number of snapshots
+    Assertions.assertEquals(
+        defaultTableResponse.tableMetadata().snapshots().size(),
+        allTableResponse.tableMetadata().snapshots().size(),
+        "Default load and snapshots=all should return the same number of snapshots");
   }
 }
