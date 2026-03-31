@@ -22,8 +22,8 @@ package org.apache.gravitino.flink.connector.store;
 import static org.apache.flink.table.factories.FactoryUtil.createCatalogStoreFactoryHelper;
 import static org.apache.gravitino.flink.connector.store.GravitinoCatalogStoreFactoryOptions.GRAVITINO;
 import static org.apache.gravitino.flink.connector.store.GravitinoCatalogStoreFactoryOptions.GRAVITINO_CLIENT_CONFIG;
+import static org.apache.gravitino.flink.connector.store.GravitinoCatalogStoreFactoryOptions.GRAVITINO_ENABLE_SESSION_CATALOG_SUPPORT;
 import static org.apache.gravitino.flink.connector.store.GravitinoCatalogStoreFactoryOptions.GRAVITINO_METALAKE;
-import static org.apache.gravitino.flink.connector.store.GravitinoCatalogStoreFactoryOptions.GRAVITINO_SUPPORT_SESSION_CATALOG;
 import static org.apache.gravitino.flink.connector.store.GravitinoCatalogStoreFactoryOptions.GRAVITINO_URI;
 
 import com.google.common.annotations.VisibleForTesting;
@@ -45,13 +45,13 @@ import org.apache.gravitino.flink.connector.catalog.GravitinoCatalogManager;
 /** The Factory for creating {@link GravitinoCatalogStore}. */
 public class GravitinoCatalogStoreFactory implements CatalogStoreFactory {
   private GravitinoCatalogManager catalogManager;
-  private boolean supportSessionCatalog;
+  private boolean enableSessionCatalogSupport;
   private GenericInMemoryCatalogStore memoryCatalogStore;
 
   @Override
   public CatalogStore createCatalogStore() {
     GravitinoCatalogStore gravitinoCatalogStore = new GravitinoCatalogStore(catalogManager);
-    if (supportSessionCatalog) {
+    if (enableSessionCatalogSupport) {
       if (memoryCatalogStore == null) {
         memoryCatalogStore = new GenericInMemoryCatalogStore();
         memoryCatalogStore.open();
@@ -79,7 +79,7 @@ public class GravitinoCatalogStoreFactory implements CatalogStoreFactory {
 
     this.catalogManager =
         GravitinoCatalogManager.create(gravitinoUri, gravitinoName, extractClientConfig(options));
-    this.supportSessionCatalog = options.get(GRAVITINO_SUPPORT_SESSION_CATALOG);
+    this.enableSessionCatalogSupport = options.get(GRAVITINO_ENABLE_SESSION_CATALOG_SUPPORT);
   }
 
   @Override
@@ -104,7 +104,7 @@ public class GravitinoCatalogStoreFactory implements CatalogStoreFactory {
 
   @Override
   public Set<ConfigOption<?>> optionalOptions() {
-    return ImmutableSet.of(GRAVITINO_CLIENT_CONFIG, GRAVITINO_SUPPORT_SESSION_CATALOG);
+    return ImmutableSet.of(GRAVITINO_CLIENT_CONFIG, GRAVITINO_ENABLE_SESSION_CATALOG_SUPPORT);
   }
 
   @VisibleForTesting

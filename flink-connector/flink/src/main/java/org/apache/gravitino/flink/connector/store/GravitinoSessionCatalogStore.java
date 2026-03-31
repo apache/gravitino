@@ -35,10 +35,18 @@ import org.apache.flink.util.Preconditions;
  * A catalog store that combines a session-scoped in-memory {@link GenericInMemoryCatalogStore} with
  * a persistent {@link GravitinoCatalogStore}.
  *
- * <p>Catalogs for built-in catalog types are stored only in the in-memory store, while all other
- * catalogs are stored in the Gravitino-backed store. When retrieving, listing, or removing
- * catalogs, entries in the in-memory store take precedence over entries in the Gravitino-backed
- * store.
+ * <p>Routing is based on the catalog type declared in the {@link CatalogDescriptor}:
+ *
+ * <ul>
+ *   <li><b>Gravitino-managed catalog types</b> (e.g. {@code gravitino-hive}, {@code
+ *       gravitino-iceberg}) are persisted to the Gravitino-backed store and are visible across all
+ *       Flink sessions and Gravitino clients that share the same metalake.
+ *   <li><b>All other catalog types</b> (e.g. {@code generic_in_memory}, third-party connectors) are
+ *       stored in the session-scoped in-memory store only and are not persisted to Gravitino.
+ * </ul>
+ *
+ * <p>When retrieving, listing, or removing catalogs, entries in the in-memory store take precedence
+ * over entries in the Gravitino-backed store.
  *
  * <p>This store is intended to be used per Flink session, keeping transient catalogs in memory
  * while delegating persistent catalogs to Apache Gravitino.

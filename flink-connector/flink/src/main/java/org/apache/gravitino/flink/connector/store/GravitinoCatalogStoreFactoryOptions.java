@@ -40,8 +40,8 @@ public class GravitinoCatalogStoreFactoryOptions {
           .stringType()
           .noDefaultValue()
           .withDescription("The name of Gravitino metalake");
-  public static final ConfigOption<Boolean> GRAVITINO_SUPPORT_SESSION_CATALOG =
-      ConfigOptions.key("gravitino.supportSessionCatalog")
+  public static final ConfigOption<Boolean> GRAVITINO_ENABLE_SESSION_CATALOG_SUPPORT =
+      ConfigOptions.key("gravitino.enableSessionCatalogSupport")
           .booleanType()
           .defaultValue(false)
           .withDescription(
