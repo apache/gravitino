@@ -220,17 +220,17 @@ public class FilesetMetaService {
         // deleted_at`, it means that no other transaction has been inserted (if a uniqueness
         // conflict occurs, the transaction will be rolled back), then we can consider that the
         // fileset meta update is successful
+        int[] updateResultRef = new int[1];
         SessionUtils.doMultipleWithCommit(
             () ->
                 SessionUtils.doWithoutCommit(
                     FilesetVersionMapper.class,
                     mapper -> mapper.insertFilesetVersions(newFilesetPO.getFilesetVersionPOs())),
             () ->
-                SessionUtils.doWithoutCommit(
+                updateResultRef[0] = SessionUtils.getWithoutCommit(
                     FilesetMetaMapper.class,
                     mapper -> mapper.updateFilesetMeta(newFilesetPO, oldFilesetPO)));
-        // we set the updateResult to 1 to indicate that the update is successful
-        updateResult = 1;
+        updateResult = updateResultRef[0];
       } else {
         updateResult =
             SessionUtils.doWithCommitAndFetchResult(
