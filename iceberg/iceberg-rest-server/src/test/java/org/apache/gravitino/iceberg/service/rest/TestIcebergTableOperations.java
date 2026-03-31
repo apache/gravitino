@@ -773,6 +773,65 @@ public class TestIcebergTableOperations extends IcebergNamespaceTestBase {
 
   @ParameterizedTest
   @MethodSource("org.apache.gravitino.iceberg.service.rest.IcebergRestTestUtil#testNamespaces")
+  void testCreateTableETagMatchesLoadTableETag(Namespace namespace) {
+    verifyCreateNamespaceSucc(namespace);
+    Response createResponse = doCreateTable(namespace, "create_load_etag_foo1");
+    Assertions.assertEquals(Status.OK.getStatusCode(), createResponse.getStatus());
+    String createEtag = createResponse.getHeaderString("ETag");
+    Assertions.assertNotNull(createEtag, "ETag should be present in create response");
+
+    // Load the same table with default snapshots — ETag should match
+    Response loadResponse = doLoadTable(namespace, "create_load_etag_foo1");
+    Assertions.assertEquals(Status.OK.getStatusCode(), loadResponse.getStatus());
+    String loadEtag = loadResponse.getHeaderString("ETag");
+    Assertions.assertNotNull(loadEtag, "ETag should be present in load response");
+
+    Assertions.assertEquals(
+        createEtag, loadEtag, "ETag from createTable should match ETag from default loadTable");
+
+    // The create ETag should be reusable for If-None-Match on a subsequent loadTable
+    Response conditionalResponse =
+        getTableClientBuilder(namespace, Optional.of("create_load_etag_foo1"))
+            .header(IcebergTableOperations.IF_NONE_MATCH, createEtag)
+            .get();
+    Assertions.assertEquals(
+        Status.NOT_MODIFIED.getStatusCode(),
+        conditionalResponse.getStatus(),
+        "Create ETag should produce 304 on subsequent unchanged loadTable");
+  }
+
+  @ParameterizedTest
+  @MethodSource("org.apache.gravitino.iceberg.service.rest.IcebergRestTestUtil#testNamespaces")
+  void testUpdateTableETagMatchesLoadTableETag(Namespace namespace) {
+    verifyCreateNamespaceSucc(namespace);
+    verifyCreateTableSucc(namespace, "update_load_etag_foo1");
+    TableMetadata metadata = getTableMeta(namespace, "update_load_etag_foo1");
+    Response updateResponse = doUpdateTable(namespace, "update_load_etag_foo1", metadata);
+    Assertions.assertEquals(Status.OK.getStatusCode(), updateResponse.getStatus());
+    String updateEtag = updateResponse.getHeaderString("ETag");
+    Assertions.assertNotNull(updateEtag, "ETag should be present in update response");
+
+    // Load the same table — ETag should match
+    Response loadResponse = doLoadTable(namespace, "update_load_etag_foo1");
+    Assertions.assertEquals(Status.OK.getStatusCode(), loadResponse.getStatus());
+    String loadEtag = loadResponse.getHeaderString("ETag");
+
+    Assertions.assertEquals(
+        updateEtag, loadEtag, "ETag from updateTable should match ETag from default loadTable");
+
+    // The update ETag should be reusable for If-None-Match
+    Response conditionalResponse =
+        getTableClientBuilder(namespace, Optional.of("update_load_etag_foo1"))
+            .header(IcebergTableOperations.IF_NONE_MATCH, updateEtag)
+            .get();
+    Assertions.assertEquals(
+        Status.NOT_MODIFIED.getStatusCode(),
+        conditionalResponse.getStatus(),
+        "Update ETag should produce 304 on subsequent unchanged loadTable");
+  }
+
+  @ParameterizedTest
+  @MethodSource("org.apache.gravitino.iceberg.service.rest.IcebergRestTestUtil#testNamespaces")
   void testUpdateTableReturnsETag(Namespace namespace) {
     verifyCreateNamespaceSucc(namespace);
     verifyCreateTableSucc(namespace, "update_etag_foo1");

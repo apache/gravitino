@@ -36,8 +36,7 @@ dependencies {
     exclude(group = "log4j")
     exclude(group = "org.apache.avro")
     exclude(group = "org.apache.logging.log4j")
-    exclude(group = "org.eclipse.jetty.aggregate", module = "jetty-all")
-    exclude(group = "org.eclipse.jetty.orbit", module = "javax.servlet")
+    exclude(group = "org.eclipse.jetty")
     exclude(group = "org.slf4j")
   }
   implementation(libs.hive3.metastore) {
@@ -61,8 +60,7 @@ dependencies {
     exclude(group = "org.apache.logging.log4j")
     exclude(group = "org.apache.parquet", module = "parquet-hadoop-bundle")
     exclude(group = "org.datanucleus")
-    exclude(group = "org.eclipse.jetty.aggregate", module = "jetty-all")
-    exclude(group = "org.eclipse.jetty.orbit", module = "javax.servlet")
+    exclude(group = "org.eclipse.jetty")
     exclude(group = "org.openjdk.jol")
     exclude(group = "org.slf4j")
   }
