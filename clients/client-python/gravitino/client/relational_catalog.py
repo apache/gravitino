@@ -43,9 +43,7 @@ from gravitino.rest.rest_utils import encode_string
 from gravitino.utils import HTTPClient
 
 
-class RelationalCatalog(
-    BaseSchemaCatalog, TableCatalog
-):  # pylint: disable=too-many-ancestors
+class RelationalCatalog(BaseSchemaCatalog, TableCatalog):  # pylint: disable=too-many-ancestors
     """Relational catalog is a catalog implementation
 
     The `RelationalCatalog` supports relational database like metadata operations,
@@ -211,10 +209,10 @@ class RelationalCatalog(
         query_params = (
             {
                 RelationalCatalog.PRIVILEGES: ",".join(
-                    priv.name for priv in required_privilege_names
+                    sorted(priv.name for priv in required_privilege_names)
                 )
             }
-            if required_privilege_names is not None
+            if required_privilege_names
             else None
         )
 

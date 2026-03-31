@@ -671,7 +671,7 @@ class DTOConverters:
     @staticmethod
     def _(change: AddColumn) -> TableUpdateRequestBase:
         default_value = (
-            Column.DEFAULT_VALUE_NOT_SET
+            None
             if change.get_default_value() is None
             or change.get_default_value() == Column.DEFAULT_VALUE_NOT_SET
             else DTOConverters.to_function_arg(change.get_default_value())
