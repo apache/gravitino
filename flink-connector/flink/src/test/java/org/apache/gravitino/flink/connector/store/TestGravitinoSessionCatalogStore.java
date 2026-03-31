@@ -19,9 +19,6 @@
 package org.apache.gravitino.flink.connector.store;
 
 import static org.apache.gravitino.flink.connector.utils.FactoryUtils.isGravitinoManagedCatalogType;
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertFalse;
-import static org.junit.Assert.assertTrue;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -35,8 +32,9 @@ import org.apache.flink.table.catalog.CatalogDescriptor;
 import org.apache.flink.table.catalog.CommonCatalogOptions;
 import org.apache.flink.table.catalog.GenericInMemoryCatalogStore;
 import org.apache.flink.table.catalog.exceptions.CatalogException;
-import org.junit.Before;
-import org.junit.Test;
+import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
 
 public class TestGravitinoSessionCatalogStore {
 
@@ -57,14 +55,14 @@ public class TestGravitinoSessionCatalogStore {
   private GenericInMemoryCatalogStore memoryCatalogStore;
   private GravitinoSessionCatalogStore sessionCatalogStore;
 
-  @Before
-  public void setUp() {
-    assertTrue(
-        "GRAVITINO_CATALOG_TYPE must be recognised by isGravitinoManagedCatalogType()",
-        isGravitinoManagedCatalogType(GRAVITINO_CATALOG_TYPE));
-    assertFalse(
-        "SESSION_CATALOG_TYPE must NOT be recognised by isGravitinoManagedCatalogType()",
-        isGravitinoManagedCatalogType(SESSION_CATALOG_TYPE));
+  @BeforeEach
+  void setUp() {
+    Assertions.assertTrue(
+        isGravitinoManagedCatalogType(GRAVITINO_CATALOG_TYPE),
+        "GRAVITINO_CATALOG_TYPE must be recognised by isGravitinoManagedCatalogType()");
+    Assertions.assertFalse(
+        isGravitinoManagedCatalogType(SESSION_CATALOG_TYPE),
+        "SESSION_CATALOG_TYPE must NOT be recognised by isGravitinoManagedCatalogType()");
     gravitinoCatalogStore = mock(GravitinoCatalogStore.class);
     memoryCatalogStore = mock(GenericInMemoryCatalogStore.class);
     sessionCatalogStore =
@@ -76,7 +74,7 @@ public class TestGravitinoSessionCatalogStore {
   // -------------------------------------------------------------------------
 
   @Test
-  public void testStoreCatalog_gravitinoCatalog_storesInGravitino() throws CatalogException {
+  void testStoreCatalog_gravitinoCatalog_storesInGravitino() throws CatalogException {
     CatalogDescriptor descriptor = descriptorWithType(GRAVITINO_CATALOG_TYPE);
 
     sessionCatalogStore.storeCatalog("gravitino-hive", descriptor);
@@ -86,7 +84,7 @@ public class TestGravitinoSessionCatalogStore {
   }
 
   @Test
-  public void testStoreCatalog_sessionCatalog_storesInMemory() throws CatalogException {
+  void testStoreCatalog_sessionCatalog_storesInMemory() throws CatalogException {
     CatalogDescriptor descriptor = descriptorWithType(SESSION_CATALOG_TYPE);
 
     sessionCatalogStore.storeCatalog("hive", descriptor);
@@ -95,11 +93,12 @@ public class TestGravitinoSessionCatalogStore {
     verify(gravitinoCatalogStore, never()).storeCatalog("hive", descriptor);
   }
 
-  @Test(expected = CatalogException.class)
-  public void testStoreCatalog_missingCatalogType_throwsCatalogException() throws CatalogException {
+  @Test
+  void testStoreCatalog_missingCatalogType_throwsCatalogException() {
     CatalogDescriptor descriptor = CatalogDescriptor.of("unknown", new Configuration());
 
-    sessionCatalogStore.storeCatalog("unknown", descriptor);
+    Assertions.assertThrows(
+        CatalogException.class, () -> sessionCatalogStore.storeCatalog("unknown", descriptor));
   }
 
   // -------------------------------------------------------------------------
@@ -107,7 +106,7 @@ public class TestGravitinoSessionCatalogStore {
   // -------------------------------------------------------------------------
 
   @Test
-  public void testRemoveCatalog_catalogInMemory_removesFromMemory() throws CatalogException {
+  void testRemoveCatalog_catalogInMemory_removesFromMemory() throws CatalogException {
     when(memoryCatalogStore.contains("hive")).thenReturn(true);
 
     sessionCatalogStore.removeCatalog("hive", false);
@@ -117,7 +116,7 @@ public class TestGravitinoSessionCatalogStore {
   }
 
   @Test
-  public void testRemoveCatalog_catalogNotInMemory_removesFromGravitino() throws CatalogException {
+  void testRemoveCatalog_catalogNotInMemory_removesFromGravitino() throws CatalogException {
     when(memoryCatalogStore.contains("gravitino-hive")).thenReturn(false);
 
     sessionCatalogStore.removeCatalog("gravitino-hive", false);
@@ -131,40 +130,40 @@ public class TestGravitinoSessionCatalogStore {
   // -------------------------------------------------------------------------
 
   @Test
-  public void testGetCatalog_catalogInMemory_returnsFromMemory() throws CatalogException {
+  void testGetCatalog_catalogInMemory_returnsFromMemory() throws CatalogException {
     CatalogDescriptor expected = descriptorWithType(SESSION_CATALOG_TYPE);
     when(memoryCatalogStore.getCatalog("hive")).thenReturn(Optional.of(expected));
 
     Optional<CatalogDescriptor> result = sessionCatalogStore.getCatalog("hive");
 
-    assertTrue(result.isPresent());
-    assertEquals(expected, result.get());
+    Assertions.assertTrue(result.isPresent());
+    Assertions.assertEquals(expected, result.get());
     verify(gravitinoCatalogStore, never()).getCatalog("hive");
   }
 
   @Test
-  public void testGetCatalog_catalogNotInMemory_returnsFromGravitino() throws CatalogException {
+  void testGetCatalog_catalogNotInMemory_returnsFromGravitino() throws CatalogException {
     CatalogDescriptor expected = descriptorWithType(GRAVITINO_CATALOG_TYPE);
     when(memoryCatalogStore.getCatalog("gravitino-hive")).thenReturn(Optional.empty());
     when(gravitinoCatalogStore.getCatalog("gravitino-hive")).thenReturn(Optional.of(expected));
 
     Optional<CatalogDescriptor> result = sessionCatalogStore.getCatalog("gravitino-hive");
 
-    assertTrue(result.isPresent());
-    assertEquals(expected, result.get());
+    Assertions.assertTrue(result.isPresent());
+    Assertions.assertEquals(expected, result.get());
     verify(gravitinoCatalogStore).getCatalog("gravitino-hive");
   }
 
   @Test
-  public void testGetCatalog_catalogInMemoryButEmpty_fallbackToGravitino() throws CatalogException {
+  void testGetCatalog_catalogInMemoryButEmpty_fallbackToGravitino() throws CatalogException {
     CatalogDescriptor expected = descriptorWithType(GRAVITINO_CATALOG_TYPE);
     when(memoryCatalogStore.getCatalog("gravitino-hive")).thenReturn(Optional.empty());
     when(gravitinoCatalogStore.getCatalog("gravitino-hive")).thenReturn(Optional.of(expected));
 
     Optional<CatalogDescriptor> result = sessionCatalogStore.getCatalog("gravitino-hive");
 
-    assertTrue(result.isPresent());
-    assertEquals(expected, result.get());
+    Assertions.assertTrue(result.isPresent());
+    Assertions.assertEquals(expected, result.get());
     verify(gravitinoCatalogStore).getCatalog("gravitino-hive");
   }
 
@@ -173,22 +172,22 @@ public class TestGravitinoSessionCatalogStore {
   // -------------------------------------------------------------------------
 
   @Test
-  public void testListCatalogs_returnsCombinedSet() throws CatalogException {
+  void testListCatalogs_returnsCombinedSet() throws CatalogException {
     when(memoryCatalogStore.listCatalogs()).thenReturn(ImmutableSet.of("hive"));
     when(gravitinoCatalogStore.listCatalogs()).thenReturn(ImmutableSet.of("gravitino-hive"));
 
     Set<String> result = sessionCatalogStore.listCatalogs();
 
-    assertEquals(ImmutableSet.of("hive", "gravitino-hive"), result);
+    Assertions.assertEquals(ImmutableSet.of("hive", "gravitino-hive"), result);
   }
 
-  @Test(expected = CatalogException.class)
-  public void testListCatalogs_gravitinoThrows_wrapsCatalogException() throws CatalogException {
+  @Test
+  void testListCatalogs_gravitinoThrows_wrapsCatalogException() {
     when(memoryCatalogStore.listCatalogs()).thenReturn(ImmutableSet.of("hive"));
     when(gravitinoCatalogStore.listCatalogs())
         .thenThrow(new RuntimeException("Gravitino unavailable"));
 
-    sessionCatalogStore.listCatalogs();
+    Assertions.assertThrows(CatalogException.class, () -> sessionCatalogStore.listCatalogs());
   }
 
   // -------------------------------------------------------------------------
@@ -196,26 +195,26 @@ public class TestGravitinoSessionCatalogStore {
   // -------------------------------------------------------------------------
 
   @Test
-  public void testContains_catalogInMemory_returnsTrue() {
+  void testContains_catalogInMemory_returnsTrue() {
     when(memoryCatalogStore.contains("hive")).thenReturn(true);
 
-    assertTrue(sessionCatalogStore.contains("hive"));
+    Assertions.assertTrue(sessionCatalogStore.contains("hive"));
   }
 
   @Test
-  public void testContains_catalogInGravitino_returnsTrue() {
+  void testContains_catalogInGravitino_returnsTrue() {
     when(memoryCatalogStore.contains("gravitino-hive")).thenReturn(false);
     when(gravitinoCatalogStore.contains("gravitino-hive")).thenReturn(true);
 
-    assertTrue(sessionCatalogStore.contains("gravitino-hive"));
+    Assertions.assertTrue(sessionCatalogStore.contains("gravitino-hive"));
   }
 
   @Test
-  public void testContains_catalogInNeither_returnsFalse() {
+  void testContains_catalogInNeither_returnsFalse() {
     when(memoryCatalogStore.contains("hive")).thenReturn(false);
     when(gravitinoCatalogStore.contains("hive")).thenReturn(false);
 
-    assertFalse(sessionCatalogStore.contains("hive"));
+    Assertions.assertFalse(sessionCatalogStore.contains("hive"));
   }
 
   // -------------------------------------------------------------------------
