@@ -33,12 +33,12 @@ import org.junit.jupiter.api.Test;
 
 /**
  * Unit tests verifying that {@link GravitinoCatalogStoreFactory} wires the correct {@link
- * CatalogStore} implementation based on the {@code gravitino.support.session.catalog} option.
+ * CatalogStore} implementation based on the {@code gravitino.supportsSessionCatalog} option.
  */
 public class TestGravitinoCatalogStoreFactory {
 
   /**
-   * When {@code gravitino.support.session.catalog=true} the factory must return a {@link
+   * When {@code gravitino.supportsSessionCatalog=true} the factory must return a {@link
    * GravitinoSessionCatalogStore}.
    */
   @Test
@@ -52,7 +52,7 @@ public class TestGravitinoCatalogStoreFactory {
   }
 
   /**
-   * When {@code gravitino.support.session.catalog=false} (the default) the factory must return a
+   * When {@code gravitino.supportsSessionCatalog=false} (the default) the factory must return a
    * plain {@link GravitinoCatalogStore}, not a session store.
    */
   @Test
@@ -67,14 +67,14 @@ public class TestGravitinoCatalogStoreFactory {
   }
 
   /**
-   * Verifies that {@code gravitino.support.session.catalog=true} is correctly parsed from the Flink
+   * Verifies that {@code gravitino.supportsSessionCatalog=true} is correctly parsed from the Flink
    * configuration by the factory's option helper.
    */
   @Test
   void testOptionParsing_supportSessionCatalogTrue_isReadFromConfig() {
     Configuration configuration = baseConfiguration();
     configuration.setBoolean(
-        "table.catalog-store.gravitino.gravitino.support.session.catalog", true);
+        "table.catalog-store.gravitino.gravitino.supportsSessionCatalog", true);
 
     boolean parsed = parseSupportSessionCatalog(configuration);
 
@@ -82,7 +82,7 @@ public class TestGravitinoCatalogStoreFactory {
   }
 
   /**
-   * Verifies that {@code gravitino.support.session.catalog} defaults to {@code false} when absent
+   * Verifies that {@code gravitino.supportsSessionCatalog} defaults to {@code false} when absent
    * from the configuration.
    */
   @Test
@@ -131,8 +131,8 @@ public class TestGravitinoCatalogStoreFactory {
   }
 
   /**
-   * Parses the value of {@code gravitino.support.session.catalog} from the given configuration
-   * using the real Flink factory-helper path (same approach as {@link TestGravitinoFlinkConfig}).
+   * Parses the value of {@code gravitino.supportsSessionCatalog} from the given configuration using
+   * the real Flink factory-helper path (same approach as {@link TestGravitinoFlinkConfig}).
    */
   private static boolean parseSupportSessionCatalog(Configuration configuration) {
     CatalogStoreFactory.Context context =
