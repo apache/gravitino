@@ -54,6 +54,8 @@ import org.apache.gravitino.rel.expressions.sorts.SortOrder;
 import org.apache.gravitino.rel.expressions.transforms.Transform;
 import org.apache.gravitino.rel.indexes.Index;
 import org.apache.gravitino.utils.PrincipalUtils;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * {@code TableEventDispatcher} is a decorator for {@link TableDispatcher} that not only delegates
@@ -62,6 +64,8 @@ import org.apache.gravitino.utils.PrincipalUtils;
  * for event-driven workflows or monitoring of table operations.
  */
 public class TableEventDispatcher implements TableDispatcher {
+
+  private static final Logger LOG = LoggerFactory.getLogger(TableEventDispatcher.class);
 
   private final EventBus eventBus;
   private final TableDispatcher dispatcher;
@@ -139,9 +143,13 @@ public class TableEventDispatcher implements TableDispatcher {
           new CreateTableEvent(PrincipalUtils.getCurrentUserName(), ident, new TableInfo(table)));
       return table;
     } catch (Exception e) {
-      eventBus.dispatchEvent(
-          new CreateTableFailureEvent(
-              PrincipalUtils.getCurrentUserName(), ident, e, createTableRequest));
+      try {
+        eventBus.dispatchEvent(
+            new CreateTableFailureEvent(
+                PrincipalUtils.getCurrentUserName(), ident, e, createTableRequest));
+      } catch (Exception ex) {
+        LOG.warn("Failed to dispatch CreateTableFailureEvent", ex);
+      }
       throw e;
     }
   }
