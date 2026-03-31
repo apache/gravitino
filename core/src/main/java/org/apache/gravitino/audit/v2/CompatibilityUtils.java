@@ -27,7 +27,7 @@ import org.apache.gravitino.listener.api.event.OperationType;
 
 public class CompatibilityUtils {
 
-  private static final ImmutableMap<OperationType, Operation> operationTypeMap =
+  private static final ImmutableMap<OperationType, Operation> OPERATION_TYPE_MAP =
       ImmutableMap.<OperationType, Operation>builder()
           .put(OperationType.CREATE_METALAKE, Operation.CREATE_METALAKE)
           .put(OperationType.ALTER_METALAKE, Operation.ALTER_METALAKE)
@@ -182,7 +182,7 @@ public class CompatibilityUtils {
       return Operation.UNKNOWN_OPERATION;
     }
 
-    return operationTypeMap.getOrDefault(operationType, Operation.UNKNOWN_OPERATION);
+    return OPERATION_TYPE_MAP.getOrDefault(operationType, Operation.UNKNOWN_OPERATION);
   }
 
   static Status toAuditLogStatus(OperationStatus operationStatus) {
