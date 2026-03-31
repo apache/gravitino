@@ -174,6 +174,12 @@ public class CompatibilityUtils {
           .put(
               OperationType.GET_POLICY_FOR_METADATA_OBJECT,
               Operation.GET_POLICY_FOR_METADATA_OBJECT)
+          .put(OperationType.REGISTER_FUNCTION, Operation.REGISTER_FUNCTION)
+          .put(OperationType.GET_FUNCTION, Operation.GET_FUNCTION)
+          .put(OperationType.ALTER_FUNCTION, Operation.ALTER_FUNCTION)
+          .put(OperationType.DROP_FUNCTION, Operation.DROP_FUNCTION)
+          .put(OperationType.LIST_FUNCTION, Operation.LIST_FUNCTION)
+          .put(OperationType.LIST_FUNCTION_INFOS, Operation.LIST_FUNCTION_INFOS)
           .put(OperationType.UNKNOWN, Operation.UNKNOWN_OPERATION)
           .build();
 

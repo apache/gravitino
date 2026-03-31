@@ -178,6 +178,12 @@ public class TestCompatibilityUtils {
         Operation.ASSOCIATE_POLICIES_FOR_METADATA_OBJECT
       },
       {OperationType.GET_POLICY_FOR_METADATA_OBJECT, Operation.GET_POLICY_FOR_METADATA_OBJECT},
+      {OperationType.REGISTER_FUNCTION, Operation.REGISTER_FUNCTION},
+      {OperationType.GET_FUNCTION, Operation.GET_FUNCTION},
+      {OperationType.ALTER_FUNCTION, Operation.ALTER_FUNCTION},
+      {OperationType.DROP_FUNCTION, Operation.DROP_FUNCTION},
+      {OperationType.LIST_FUNCTION, Operation.LIST_FUNCTION},
+      {OperationType.LIST_FUNCTION_INFOS, Operation.LIST_FUNCTION_INFOS},
       {OperationType.UNKNOWN, Operation.UNKNOWN_OPERATION},
       {null, Operation.UNKNOWN_OPERATION}
     };

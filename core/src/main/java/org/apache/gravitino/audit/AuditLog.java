@@ -459,6 +459,18 @@ public interface AuditLog {
 
     GET_POLICY_FOR_METADATA_OBJECT,
 
+    REGISTER_FUNCTION,
+
+    GET_FUNCTION,
+
+    ALTER_FUNCTION,
+
+    DROP_FUNCTION,
+
+    LIST_FUNCTION,
+
+    LIST_FUNCTION_INFOS,
+
     UNKNOWN_OPERATION;
 
     public static Operation fromEvent(Event event) {
