@@ -35,7 +35,19 @@ This capability allows users to perform federation queries, accessing data from 
 | table.catalog-store.kind                         | string | generic_in_memory | The Catalog Store name, it should set to `gravitino`.                | Yes      | 0.6.0-incubating |
 | table.catalog-store.gravitino.gravitino.metalake | string | (none)            | The metalake name that flink connector used to request to Gravitino. | Yes      | 0.6.0-incubating |
 | table.catalog-store.gravitino.gravitino.uri      | string | (none)            | The uri of Gravitino server address.                                 | Yes      | 0.6.0-incubating |
+| table.catalog-store.gravitino.gravitino.enableSessionCatalogSupport | boolean | false | Whether to enable support for Flink's session catalog in the Gravitino catalog store. | No | 1.3.0 |
 | table.catalog-store.gravitino.gravitino.client.  | string | (none)            | The configuration key prefix for the Gravitino client config.        | No       | 1.0.0            |
+
+When `table.catalog-store.gravitino.gravitino.enableSessionCatalogSupport` is set to `true`, Gravitino uses `GravitinoSessionCatalogStore`, which combines a `GravitinoCatalogStore` (backed by the Gravitino server) with an in-memory store to support Flink's session catalog. When `false` (the default), only `GravitinoCatalogStore` is used.
+
+When session catalog support is enabled, the following behaviors apply:
+
+- **CREATE CATALOG**: Gravitino-managed catalogs (e.g. `gravitino-hive`, `gravitino-iceberg`) are persisted to the Gravitino server; non-Gravitino-managed catalogs (e.g. `hive`, `jdbc`, or any custom connector type) are stored in the in-memory store only.
+- **GET / USE CATALOG**: The in-memory store is checked first. If the catalog is not found there, it is retrieved from the Gravitino server.
+- **DROP CATALOG**: The in-memory store is checked first. If the catalog exists there it is removed from memory; otherwise it is removed from the Gravitino server.
+- **SHOW / LIST CATALOGS**: Returns the combined set of catalogs from both the in-memory store and the Gravitino server.
+- **Session scope**: Catalogs stored only in memory are session-scoped and will not survive when Flink restarts.
+- **Name conflict**: If a catalog with the same name exists in both stores, the in-memory entry takes precedence.
 
 To configure the Gravitino client, use properties prefixed with `table.catalog-store.gravitino.gravitino.client.`. These properties will be passed to the Gravitino client after removing the `table.catalog-store.gravitino.` prefix.
 
@@ -48,6 +60,7 @@ Set the flink configuration in flink-conf.yaml.
 table.catalog-store.kind: gravitino
 table.catalog-store.gravitino.gravitino.metalake: metalake_demo
 table.catalog-store.gravitino.gravitino.uri: http://localhost:8090
+table.catalog-store.gravitino.gravitino.enableSessionCatalogSupport: true
 table.catalog-store.gravitino.gravitino.client.socketTimeoutMs: 60000
 table.catalog-store.gravitino.gravitino.client.connectionTimeoutMs: 60000
 ```
@@ -57,6 +70,7 @@ final Configuration configuration = new Configuration();
 configuration.setString("table.catalog-store.kind", "gravitino");
 configuration.setString("table.catalog-store.gravitino.gravitino.metalake", "metalake_demo");
 configuration.setString("table.catalog-store.gravitino.gravitino.uri", "http://localhost:8090");
+configuration.setBoolean("table.catalog-store.gravitino.gravitino.enableSessionCatalogSupport", true);
 configuration.setString("table.catalog-store.gravitino.gravitino.client.socketTimeoutMs", "60000");
 configuration.setString("table.catalog-store.gravitino.gravitino.client.connectionTimeoutMs", "60000");
 EnvironmentSettings.Builder builder = EnvironmentSettings.newInstance().withConfiguration(configuration);
