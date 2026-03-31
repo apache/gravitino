@@ -80,6 +80,7 @@ public class GravitinoSessionCatalogStore extends AbstractCatalogStore {
       memoryCatalogStore.storeCatalog(catalogName, descriptor);
     }
   }
+
   /**
    * Removes the specified catalog.
    *
