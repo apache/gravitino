@@ -593,5 +593,56 @@ public class TestLancePartitionStatisticStorage {
       FileUtils.deleteDirectory(new File(location + "/" + tableEntity.id() + ".lance"));
       storage.close();
     }
+  @Test
+  public void testUpdateStatisticsWithLargeTableId() throws Exception {
+    PartitionStatisticStorageFactory factory = new LancePartitionStatisticStorageFactory();
+    String metalakeName = "metalake";
+    MetadataObject metadataObject =
+        MetadataObjects.of(
+            Lists.newArrayList("catalog", "schema", "table"), MetadataObject.Type.TABLE);
+
+    EntityStore entityStore = mock(EntityStore.class);
+    TableEntity tableEntity = mock(TableEntity.class);
+    when(entityStore.get(any(), any(), any())).thenReturn(tableEntity);
+    when(tableEntity.id()).thenReturn(256L);
+    FieldUtils.writeField(GravitinoEnv.getInstance(), "entityStore", entityStore, true);
+
+    String location = Files.createTempDirectory("lance_stats_large_table_id").toString();
+    Map<String, String> properties = Maps.newHashMap();
+    properties.put("location", location);
+
+    LancePartitionStatisticStorage storage =
+        (LancePartitionStatisticStorage) factory.create(properties);
+    try {
+      Map<String, StatisticValue<?>> statistics = Maps.newHashMap();
+      statistics.put("statistic0", StatisticValues.stringValue("value0"));
+
+      storage.updateStatistics(
+          metalakeName,
+          Lists.newArrayList(
+              MetadataObjectStatisticsUpdate.of(
+                  metadataObject,
+                  Lists.newArrayList(
+                      PartitionStatisticsModification.update("partition0", statistics)))));
+
+      List<PersistedPartitionStatistics> listedStats =
+          storage.listStatistics(
+              metalakeName,
+              metadataObject,
+              PartitionRange.between(
+                  "partition0",
+                  PartitionRange.BoundType.CLOSED,
+                  "partition0",
+                  PartitionRange.BoundType.CLOSED));
+
+      Assertions.assertEquals(1, listedStats.size());
+      Assertions.assertEquals("partition0", listedStats.get(0).partitionName());
+      Assertions.assertEquals(1, listedStats.get(0).statistics().size());
+      Assertions.assertEquals("statistic0", listedStats.get(0).statistics().get(0).name());
+      Assertions.assertEquals("value0", listedStats.get(0).statistics().get(0).value().value());
+    } finally {
+      FileUtils.deleteDirectory(new File(location + "/" + tableEntity.id() + ".lance"));
+      storage.close();
+    }
   }
 }
