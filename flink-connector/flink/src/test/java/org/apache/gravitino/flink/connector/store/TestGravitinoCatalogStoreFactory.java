@@ -92,6 +92,41 @@ public class TestGravitinoCatalogStoreFactory {
     Assertions.assertFalse(parsed);
   }
 
+  /**
+   * End-to-end: option parsed as {@code true} from {@link Configuration} must wire through to
+   * {@link GravitinoSessionCatalogStore} being returned by {@link
+   * GravitinoCatalogStoreFactory#createCatalogStore()}.
+   */
+  @Test
+  void testEndToEnd_sessionCatalogEnabled_returnsGravitinoSessionCatalogStore() throws Exception {
+    Configuration configuration = baseConfiguration();
+    configuration.setBoolean(
+        "table.catalog-store.gravitino.gravitino.supportsSessionCatalog", true);
+
+    boolean supportSessionCatalog = parseSupportSessionCatalog(configuration);
+    GravitinoCatalogStoreFactory factory = factoryWith(supportSessionCatalog);
+
+    CatalogStore store = factory.createCatalogStore();
+
+    Assertions.assertInstanceOf(GravitinoSessionCatalogStore.class, store);
+  }
+
+  /**
+   * End-to-end: option absent from {@link Configuration} (defaults to {@code false}) must wire
+   * through to a plain {@link GravitinoCatalogStore} being returned by {@link
+   * GravitinoCatalogStoreFactory#createCatalogStore()}.
+   */
+  @Test
+  void testEndToEnd_sessionCatalogAbsent_returnsPlainGravitinoCatalogStore() throws Exception {
+    boolean supportSessionCatalog = parseSupportSessionCatalog(baseConfiguration());
+    GravitinoCatalogStoreFactory factory = factoryWith(supportSessionCatalog);
+
+    CatalogStore store = factory.createCatalogStore();
+
+    Assertions.assertInstanceOf(GravitinoCatalogStore.class, store);
+    Assertions.assertFalse(store instanceof GravitinoSessionCatalogStore);
+  }
+
   // -------------------------------------------------------------------------
   // helpers
   // -------------------------------------------------------------------------
