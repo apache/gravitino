@@ -524,7 +524,7 @@ public class IcebergTableOperations {
               + ": "
               + accessDelegation
               + " is illegal, Iceberg REST spec supports: [vended-credentials,remote-signing], "
-              + "Gravitino Iceberg REST server supports: [vended-credentials,remote-signing]");
+              + "Gravitino Iceberg REST server supports: vended-credentials");
     }
   }
 
