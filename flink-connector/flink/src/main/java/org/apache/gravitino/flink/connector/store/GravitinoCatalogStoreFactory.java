@@ -46,19 +46,13 @@ import org.apache.gravitino.flink.connector.catalog.GravitinoCatalogManager;
 public class GravitinoCatalogStoreFactory implements CatalogStoreFactory {
   private GravitinoCatalogManager catalogManager;
   private boolean enableSessionCatalogSupport;
+  private GravitinoCatalogStore gravitinoCatalogStore;
   private GenericInMemoryCatalogStore memoryCatalogStore;
+  private CatalogStore catalogStore;
 
   @Override
   public CatalogStore createCatalogStore() {
-    GravitinoCatalogStore gravitinoCatalogStore = new GravitinoCatalogStore(catalogManager);
-    if (enableSessionCatalogSupport) {
-      if (memoryCatalogStore == null) {
-        memoryCatalogStore = new GenericInMemoryCatalogStore();
-        memoryCatalogStore.open();
-      }
-      return new GravitinoSessionCatalogStore(gravitinoCatalogStore, memoryCatalogStore);
-    }
-    return gravitinoCatalogStore;
+    return catalogStore;
   }
 
   @Override
@@ -80,6 +74,15 @@ public class GravitinoCatalogStoreFactory implements CatalogStoreFactory {
     this.catalogManager =
         GravitinoCatalogManager.create(gravitinoUri, gravitinoName, extractClientConfig(options));
     this.enableSessionCatalogSupport = options.get(GRAVITINO_ENABLE_SESSION_CATALOG_SUPPORT);
+    this.gravitinoCatalogStore = new GravitinoCatalogStore(catalogManager);
+    if (enableSessionCatalogSupport) {
+      this.memoryCatalogStore = new GenericInMemoryCatalogStore();
+      this.memoryCatalogStore.open();
+      this.catalogStore =
+          new GravitinoSessionCatalogStore(gravitinoCatalogStore, memoryCatalogStore);
+    } else {
+      this.catalogStore = gravitinoCatalogStore;
+    }
   }
 
   @Override

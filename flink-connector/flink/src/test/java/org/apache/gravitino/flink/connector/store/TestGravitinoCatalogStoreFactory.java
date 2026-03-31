@@ -24,6 +24,7 @@ import static org.mockito.Mockito.mock;
 import java.lang.reflect.Field;
 import org.apache.flink.configuration.Configuration;
 import org.apache.flink.table.catalog.CatalogStore;
+import org.apache.flink.table.catalog.GenericInMemoryCatalogStore;
 import org.apache.flink.table.factories.CatalogStoreFactory;
 import org.apache.flink.table.factories.FactoryUtil;
 import org.apache.flink.table.factories.TableFactoryUtil;
@@ -139,30 +140,36 @@ public class TestGravitinoCatalogStoreFactory {
   private static GravitinoCatalogStoreFactory factoryWith(boolean enableSessionCatalogSupport)
       throws Exception {
     GravitinoCatalogStoreFactory factory = new GravitinoCatalogStoreFactory();
-    setField(factory, "catalogManager", mock(GravitinoCatalogManager.class));
+    GravitinoCatalogManager mockCatalogManager = mock(GravitinoCatalogManager.class);
+    setField(factory, "catalogManager", mockCatalogManager);
     setField(factory, "enableSessionCatalogSupport", enableSessionCatalogSupport);
+    GravitinoCatalogStore gravitinoStore = new GravitinoCatalogStore(mockCatalogManager);
+    setField(factory, "gravitinoCatalogStore", gravitinoStore);
+    if (enableSessionCatalogSupport) {
+      GenericInMemoryCatalogStore memoryStore = new GenericInMemoryCatalogStore();
+      memoryStore.open();
+      setField(factory, "memoryCatalogStore", memoryStore);
+      setField(
+          factory, "catalogStore", new GravitinoSessionCatalogStore(gravitinoStore, memoryStore));
+    } else {
+      setField(factory, "catalogStore", gravitinoStore);
+    }
     return factory;
   }
 
   /**
    * Calling {@link GravitinoCatalogStoreFactory#createCatalogStore()} more than once must reuse the
-   * same in-memory catalog store instance rather than creating a new one each time (which would
-   * leak the previous instance and lose its state).
+   * same store instances rather than creating new ones each time.
    */
   @Test
-  void testCreateCatalogStore_calledTwice_reusesMemoryCatalogStoreInstance() throws Exception {
+  void testCreateCatalogStore_calledTwice_reusesStoreInstances() throws Exception {
     GravitinoCatalogStoreFactory factory = factoryWith(true);
 
-    factory.createCatalogStore();
-    CatalogStore firstMemoryStore = getField(factory, "memoryCatalogStore");
-
-    factory.createCatalogStore();
-    CatalogStore secondMemoryStore = getField(factory, "memoryCatalogStore");
+    CatalogStore first = factory.createCatalogStore();
+    CatalogStore second = factory.createCatalogStore();
 
     Assertions.assertSame(
-        firstMemoryStore,
-        secondMemoryStore,
-        "memoryCatalogStore must be the same instance across multiple createCatalogStore() calls");
+        first, second, "createCatalogStore() must return the same instance on repeated calls");
   }
 
   /**
@@ -194,12 +201,5 @@ public class TestGravitinoCatalogStoreFactory {
     Field field = target.getClass().getDeclaredField(fieldName);
     field.setAccessible(true);
     field.set(target, value);
-  }
-
-  @SuppressWarnings("unchecked")
-  private static <T> T getField(Object target, String fieldName) throws Exception {
-    Field field = target.getClass().getDeclaredField(fieldName);
-    field.setAccessible(true);
-    return (T) field.get(target);
   }
 }
