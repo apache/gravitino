@@ -304,9 +304,12 @@ class TestRelationalCatalog(unittest.TestCase):
         with patch(
             "gravitino.utils.http_client.HTTPClient.delete",
             return_value=mock_resp,
-        ):
+        ) as mock_delete:
             is_dropped = self.catalog.drop_table(self.table_identifier)
             self.assertTrue(is_dropped)
+            mock_delete.assert_called_once()
+            call_args = mock_delete.call_args
+            self.assertIsNone(call_args.kwargs.get("params"))
 
     def test_purge_table(self):
         resp_body = DropResponse(0, True)
@@ -315,9 +318,13 @@ class TestRelationalCatalog(unittest.TestCase):
         with patch(
             "gravitino.utils.http_client.HTTPClient.delete",
             return_value=mock_resp,
-        ):
+        ) as mock_delete:
             is_dropped = self.catalog.purge_table(self.table_identifier)
             self.assertTrue(is_dropped)
+            mock_delete.assert_called_once()
+            call_args = mock_delete.call_args
+            self.assertIn("params", call_args.kwargs)
+            self.assertEqual(call_args.kwargs["params"], {"purge": "true"})
 
     def test_alter_table(self):
         resp_body = TableResponse(0, self.table_dto)

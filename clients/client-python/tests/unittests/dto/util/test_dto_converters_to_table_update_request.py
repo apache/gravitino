@@ -18,7 +18,6 @@
 import unittest
 from typing import cast
 
-from gravitino.api.rel.column import Column
 from gravitino.api.rel.expressions.literals.literals import Literals
 from gravitino.api.rel.indexes.index import Index
 from gravitino.api.rel.table_change import TableChange
@@ -62,10 +61,7 @@ class TestDTOConvertersToTableUpdateRequest(unittest.TestCase):
         result = DTOConverters.to_table_update_request(add_column)
         self.assertIsInstance(result, TableUpdateRequest.AddTableColumnRequest)
         add_column_request = cast(TableUpdateRequest.AddTableColumnRequest, result)
-        self.assertEqual(
-            add_column_request.default_value,
-            Column.DEFAULT_VALUE_NOT_SET,
-        )
+        self.assertIsNone(add_column_request.default_value)
 
     def test_to_table_update_request_unsupported_change(self):
         """Tests that an unsupported table change raises an IllegalArgumentException."""
