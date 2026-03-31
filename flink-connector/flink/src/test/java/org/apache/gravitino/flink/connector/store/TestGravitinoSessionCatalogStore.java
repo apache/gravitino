@@ -95,6 +95,13 @@ public class TestGravitinoSessionCatalogStore {
     verify(gravitinoCatalogStore, never()).storeCatalog("hive", descriptor);
   }
 
+  @Test(expected = CatalogException.class)
+  public void testStoreCatalog_missingCatalogType_throwsCatalogException() throws CatalogException {
+    CatalogDescriptor descriptor = CatalogDescriptor.of("unknown", new Configuration());
+
+    sessionCatalogStore.storeCatalog("unknown", descriptor);
+  }
+
   // -------------------------------------------------------------------------
   // removeCatalog
   // -------------------------------------------------------------------------

@@ -59,6 +59,13 @@ public class GravitinoSessionCatalogStore extends AbstractCatalogStore {
   public void storeCatalog(String catalogName, CatalogDescriptor descriptor)
       throws CatalogException {
     String catalogType = descriptor.getConfiguration().get(CommonCatalogOptions.CATALOG_TYPE);
+    if (catalogType == null) {
+      throw new CatalogException(
+          String.format(
+              "Cannot store catalog '%s': '%s' is not set in the catalog descriptor. "
+                  + "Please specify a catalog type.",
+              catalogName, CommonCatalogOptions.CATALOG_TYPE.key()));
+    }
     if (isBuiltInCatalog(catalogType)) {
       gravitinoCatalogStore.storeCatalog(catalogName, descriptor);
     } else {
