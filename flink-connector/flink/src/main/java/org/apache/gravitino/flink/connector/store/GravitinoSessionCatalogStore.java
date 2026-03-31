@@ -97,13 +97,8 @@ public class GravitinoSessionCatalogStore extends AbstractCatalogStore {
    */
   @Override
   public Optional<CatalogDescriptor> getCatalog(String catalogName) throws CatalogException {
-    if (memoryCatalogStore.contains(catalogName)) {
-      Optional<CatalogDescriptor> descriptor = memoryCatalogStore.getCatalog(catalogName);
-      if (descriptor.isPresent()) {
-        return descriptor;
-      }
-    }
-    return gravitinoCatalogStore.getCatalog(catalogName);
+    Optional<CatalogDescriptor> descriptor = memoryCatalogStore.getCatalog(catalogName);
+    return descriptor.isPresent() ? descriptor : gravitinoCatalogStore.getCatalog(catalogName);
   }
 
   @Override

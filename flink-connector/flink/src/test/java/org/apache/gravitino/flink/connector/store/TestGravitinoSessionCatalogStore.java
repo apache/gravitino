@@ -133,7 +133,6 @@ public class TestGravitinoSessionCatalogStore {
   @Test
   public void testGetCatalog_catalogInMemory_returnsFromMemory() throws CatalogException {
     CatalogDescriptor expected = descriptorWithType(SESSION_CATALOG_TYPE);
-    when(memoryCatalogStore.contains("hive")).thenReturn(true);
     when(memoryCatalogStore.getCatalog("hive")).thenReturn(Optional.of(expected));
 
     Optional<CatalogDescriptor> result = sessionCatalogStore.getCatalog("hive");
@@ -146,7 +145,7 @@ public class TestGravitinoSessionCatalogStore {
   @Test
   public void testGetCatalog_catalogNotInMemory_returnsFromGravitino() throws CatalogException {
     CatalogDescriptor expected = descriptorWithType(GRAVITINO_CATALOG_TYPE);
-    when(memoryCatalogStore.contains("gravitino-hive")).thenReturn(false);
+    when(memoryCatalogStore.getCatalog("gravitino-hive")).thenReturn(Optional.empty());
     when(gravitinoCatalogStore.getCatalog("gravitino-hive")).thenReturn(Optional.of(expected));
 
     Optional<CatalogDescriptor> result = sessionCatalogStore.getCatalog("gravitino-hive");
@@ -159,7 +158,6 @@ public class TestGravitinoSessionCatalogStore {
   @Test
   public void testGetCatalog_catalogInMemoryButEmpty_fallbackToGravitino() throws CatalogException {
     CatalogDescriptor expected = descriptorWithType(GRAVITINO_CATALOG_TYPE);
-    when(memoryCatalogStore.contains("gravitino-hive")).thenReturn(true);
     when(memoryCatalogStore.getCatalog("gravitino-hive")).thenReturn(Optional.empty());
     when(gravitinoCatalogStore.getCatalog("gravitino-hive")).thenReturn(Optional.of(expected));
 
