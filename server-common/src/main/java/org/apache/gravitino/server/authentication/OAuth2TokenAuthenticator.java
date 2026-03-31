@@ -76,7 +76,7 @@ class OAuth2TokenAuthenticator implements Authenticator {
       if (validated instanceof UserPrincipal) {
         UserPrincipal userPrincipal = (UserPrincipal) validated;
         // Keep the raw Authorization header value so downstream services can reuse it.
-        return new UserPrincipal(userPrincipal.getName(), authData);
+        return new UserPrincipal(userPrincipal.getName(), userPrincipal.getGroups(), authData);
       }
       return validated;
     } catch (UnauthorizedException e) {

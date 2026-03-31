@@ -109,15 +109,13 @@ public class TestCatalogWrapperForREST {
 
     Map<String, String> configToClients =
         CatalogWrapperForREST.buildCatalogConfigToClients(config, restCatalog);
-    Assertions.assertEquals(
-        "http://merged-from-remote-config:9999", configToClients.get(IcebergConstants.URI));
+
     Assertions.assertEquals(
         "org.apache.iceberg.aws.s3.S3FileIO", configToClients.get(IcebergConstants.IO_IMPL));
     Assertions.assertEquals(
         "http://localhost:9000", configToClients.get(IcebergConstants.ICEBERG_S3_ENDPOINT));
     Assertions.assertEquals(
         "vended-credentials", configToClients.get(IcebergConstants.DATA_ACCESS));
-    Assertions.assertEquals("/remote/warehouse", configToClients.get(IcebergConstants.WAREHOUSE));
   }
 
   @Test

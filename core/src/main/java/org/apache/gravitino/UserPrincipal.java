@@ -45,7 +45,7 @@ public class UserPrincipal implements Principal {
    * @param username the username of the principal
    */
   public UserPrincipal(final String username) {
-    this(username, null);
+    this(username, Collections.emptyList(), null);
   }
 
   /**
@@ -56,10 +56,7 @@ public class UserPrincipal implements Principal {
    *     Basic <base64>})
    */
   public UserPrincipal(final String username, @Nullable final String accessToken) {
-    Preconditions.checkArgument(username != null, "UserPrincipal must have the username");
-    this.username = username;
-    this.groups = Collections.emptyList();
-    this.accessToken = accessToken;
+    this(username, Collections.emptyList(), accessToken);
   }
 
   /**
@@ -69,13 +66,27 @@ public class UserPrincipal implements Principal {
    * @param groups the groups of the principal
    */
   public UserPrincipal(final String username, final List<UserGroup> groups) {
+    this(username, groups, null);
+  }
+
+  /**
+   * Constructs a UserPrincipal with the given username, groups and optional raw {@code
+   * Authorization} header value.
+   *
+   * @param username the username of the principal
+   * @param groups the groups of the principal
+   * @param accessToken authorization header value (for example, {@code Bearer <jwt>} or {@code
+   *     Basic <base64>})
+   */
+  public UserPrincipal(
+      final String username, final List<UserGroup> groups, @Nullable final String accessToken) {
     Preconditions.checkArgument(username != null, "UserPrincipal must have the username");
     this.username = username;
     this.groups =
         groups != null
             ? Collections.unmodifiableList(new ArrayList<>(groups))
             : Collections.emptyList();
-    this.accessToken = null;
+    this.accessToken = accessToken;
   }
 
   /**

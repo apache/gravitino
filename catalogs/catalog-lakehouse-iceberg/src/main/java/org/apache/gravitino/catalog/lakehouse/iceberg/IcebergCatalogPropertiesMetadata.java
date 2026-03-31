@@ -142,10 +142,17 @@ public class IcebergCatalogPropertiesMetadata extends BaseCatalogPropertiesMetad
                 false /* immutable */,
                 60 /* defaultValue */,
                 false /* hidden */),
-            stringOptionalPropertyEntry(IcebergConstants.DATA_ACCESS, "", false, null, false),
+            stringOptionalPropertyEntry(
+                IcebergConstants.DATA_ACCESS,
+                "Iceberg REST data access mode. Supported values are vended-credentials and"
+                    + " remote-signing.",
+                false,
+                null,
+                false),
             booleanPropertyEntry(
                 IcebergConstants.REST_FORWARD_USER_ACCESS_TOKEN,
-                "",
+                "Whether to forward the caller's access token to the downstream Iceberg REST"
+                    + " catalog when using the REST backend.",
                 false,
                 false,
                 true,

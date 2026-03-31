@@ -135,6 +135,11 @@ public class KerberosAuthenticator implements Authenticator {
             public Principal run() throws Exception {
               Principal principal = retrievePrincipalFromToken(serverPrincipal, clientToken);
               // Keep the raw Authorization header value so downstream services can reuse it.
+              if (principal instanceof UserPrincipal) {
+                UserPrincipal userPrincipal = (UserPrincipal) principal;
+                return new UserPrincipal(
+                    userPrincipal.getName(), userPrincipal.getGroups(), authHeaderValue);
+              }
               return new UserPrincipal(principal.getName(), authHeaderValue);
             }
           });
