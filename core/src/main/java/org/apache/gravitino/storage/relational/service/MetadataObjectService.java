@@ -23,6 +23,7 @@ import static org.apache.gravitino.metrics.source.MetricsSource.GRAVITINO_RELATI
 import com.google.common.base.Joiner;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Lists;
+import com.google.common.collect.Maps;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -94,7 +95,7 @@ public class MetadataObjectService {
 
   private static Map<Long, String> getPolicyObjectsFullName(List<Long> policyIds) {
     if (policyIds == null || policyIds.isEmpty()) {
-      return Map.of();
+      return Maps.newHashMap();
     }
 
     List<PolicyPO> policyPOs =
@@ -102,7 +103,7 @@ public class MetadataObjectService {
             PolicyMetaMapper.class, mapper -> mapper.listPolicyPOsByPolicyIds(policyIds));
 
     if (policyPOs == null || policyPOs.isEmpty()) {
-      return Map.of();
+      return Maps.newHashMap();
     }
 
     HashMap<Long, String> policyIdAndNameMap = new HashMap<>();
@@ -115,7 +116,7 @@ public class MetadataObjectService {
 
   private static Map<Long, String> getJobObjectsFullName(List<Long> jobIds) {
     if (jobIds == null || jobIds.isEmpty()) {
-      return Map.of();
+      return Maps.newHashMap();
     }
 
     return jobIds.stream()
@@ -124,7 +125,7 @@ public class MetadataObjectService {
 
   private static Map<Long, String> getJobTemplateObjectsFullName(List<Long> jobTemplateIds) {
     if (jobTemplateIds == null || jobTemplateIds.isEmpty()) {
-      return Map.of();
+      return Maps.newHashMap();
     }
 
     List<JobTemplatePO> jobTemplatePOs =
@@ -133,7 +134,7 @@ public class MetadataObjectService {
             mapper -> mapper.listJobTemplatePOsByJobTemplateIds(jobTemplateIds));
 
     if (jobTemplatePOs == null || jobTemplatePOs.isEmpty()) {
-      return Map.of();
+      return Maps.newHashMap();
     }
 
     HashMap<Long, String> jobTemplateIdAndNameMap = new HashMap<>();
@@ -148,7 +149,7 @@ public class MetadataObjectService {
 
   private static Map<Long, String> getTagObjectsFullName(List<Long> tagIds) {
     if (tagIds == null || tagIds.isEmpty()) {
-      return Map.of();
+      return Maps.newHashMap();
     }
 
     List<TagPO> tagPOs =
@@ -156,7 +157,7 @@ public class MetadataObjectService {
             TagMetaMapper.class, mapper -> mapper.listTagPOsByTagIds(tagIds));
 
     if (tagPOs == null || tagPOs.isEmpty()) {
-      return Map.of();
+      return Maps.newHashMap();
     }
 
     HashMap<Long, String> tagIdAndNameMap = new HashMap<>();
@@ -338,7 +339,7 @@ public class MetadataObjectService {
       baseMetricName = "getTableObjectsFullName")
   public static Map<Long, String> getTableObjectsFullName(List<Long> tableIds) {
     if (tableIds == null || tableIds.isEmpty()) {
-      return Map.of();
+      return Maps.newHashMap();
     }
 
     List<TablePO> tablePOs =
@@ -346,7 +347,7 @@ public class MetadataObjectService {
             TableMetaMapper.class, mapper -> mapper.listTablePOsByTableIds(tableIds));
 
     if (tablePOs == null || tablePOs.isEmpty()) {
-      return Map.of();
+      return Maps.newHashMap();
     }
 
     List<Long> schemaIds = tablePOs.stream().map(TablePO::getSchemaId).collect(Collectors.toList());
