@@ -57,10 +57,10 @@ public class GravitinoSessionCatalogStore extends AbstractCatalogStore {
 
   public GravitinoSessionCatalogStore(
       GravitinoCatalogStore gravitinoCatalogStore, GenericInMemoryCatalogStore memoryCatalogStore) {
-    this.gravitinoCatalogStore =
-        Preconditions.checkNotNull(gravitinoCatalogStore, "CatalogStore cannot be null");
-    this.memoryCatalogStore =
-        Preconditions.checkNotNull(memoryCatalogStore, "MemoryCatalogStore cannot be null");
+    Preconditions.checkArgument(gravitinoCatalogStore != null, "CatalogStore cannot be null");
+    Preconditions.checkArgument(memoryCatalogStore != null, "MemoryCatalogStore cannot be null");
+    this.gravitinoCatalogStore = gravitinoCatalogStore;
+    this.memoryCatalogStore = memoryCatalogStore;
   }
 
   @Override
