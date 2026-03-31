@@ -1,0 +1,71 @@
+name: Maintenance Integration Test
+
+# Controls when the workflow will run
+on:
+  push:
+    branches: [ "main", "branch-*" ]
+  pull_request:
+    branches: [ "main", "branch-*" ]
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  changes:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dorny/paths-filter@de90cc6fb38fc0963ad72b210f1f284cd68cea36
+        id: filter
+        with:
+          filters: |
+            source_changes:
+              - .github/**
+              - api/**
+              - bin/**
+              - catalogs/**
+              - clients/client-java/**
+              - clients/client-java-runtime/**
+              - common/**
+              - conf/**
+              - core/**
+              - dev/**
+              - gradle/**
+              - iceberg/**
+              - integration-test-common/**
+              - maintenance/**
+              - meta/**
+              - scripts/**
+              - server/**
+              - server-common/**
+              - build.gradle.kts
+              - gradle.properties
+              - gradlew
+              - settings.gradle.kts
+    outputs:
+      source_changes: ${{ steps.filter.outputs.source_changes }}
+
+  MaintenanceIT-on-push:
+    needs: changes
+    if: (github.event_name == 'push' && needs.changes.outputs.source_changes == 'true')
+    strategy:
+      matrix:
+        architecture: [linux/amd64]
+        java-version: [ 17 ]
+    uses: ./.github/workflows/maintenance-integration-test-action.yml
+    with:
+      architecture: ${{ matrix.architecture }}
+      java-version: ${{ matrix.java-version }}
+
+  MaintenanceIT-on-pr:
+    needs: changes
+    if: (github.event_name == 'pull_request' && needs.changes.outputs.source_changes == 'true')
+    strategy:
+      matrix:
+        architecture: [linux/amd64]
+        java-version: [ 17 ]
+    uses: ./.github/workflows/maintenance-integration-test-action.yml
+    with:
+      architecture: ${{ matrix.architecture }}
+      java-version: ${{ matrix.java-version }}
