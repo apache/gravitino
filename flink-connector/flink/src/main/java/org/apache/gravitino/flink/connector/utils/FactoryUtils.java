@@ -50,7 +50,7 @@ public class FactoryUtils {
           GravitinoJdbcCatalogFactoryOptions.POSTGRESQL_IDENTIFIER,
           GravitinoPaimonCatalogFactoryOptions.IDENTIFIER);
 
-  public static boolean isBuiltInCatalog(String type) {
+  public static boolean isGravitinoManagedCatalogType(String type) {
     return GRAVITINO_CATALOG_TYPES.contains(type);
   }
 

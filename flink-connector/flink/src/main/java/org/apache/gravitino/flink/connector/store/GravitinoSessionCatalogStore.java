@@ -19,7 +19,7 @@
 
 package org.apache.gravitino.flink.connector.store;
 
-import static org.apache.gravitino.flink.connector.utils.FactoryUtils.isBuiltInCatalog;
+import static org.apache.gravitino.flink.connector.utils.FactoryUtils.isGravitinoManagedCatalogType;
 
 import java.util.HashSet;
 import java.util.Optional;
@@ -66,7 +66,7 @@ public class GravitinoSessionCatalogStore extends AbstractCatalogStore {
                   + "Please specify a catalog type.",
               catalogName, CommonCatalogOptions.CATALOG_TYPE.key()));
     }
-    if (isBuiltInCatalog(catalogType)) {
+    if (isGravitinoManagedCatalogType(catalogType)) {
       gravitinoCatalogStore.storeCatalog(catalogName, descriptor);
     } else {
       memoryCatalogStore.storeCatalog(catalogName, descriptor);

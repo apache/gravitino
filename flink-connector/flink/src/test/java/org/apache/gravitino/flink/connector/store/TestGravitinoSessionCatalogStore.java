@@ -18,7 +18,7 @@
  */
 package org.apache.gravitino.flink.connector.store;
 
-import static org.apache.gravitino.flink.connector.utils.FactoryUtils.isBuiltInCatalog;
+import static org.apache.gravitino.flink.connector.utils.FactoryUtils.isGravitinoManagedCatalogType;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
@@ -42,8 +42,8 @@ public class TestGravitinoSessionCatalogStore {
 
   /**
    * A Gravitino-managed (built-in) catalog type — verified by {@link
-   * org.apache.gravitino.flink.connector.utils.FactoryUtils#isBuiltInCatalog}. Catalogs of this
-   * type are routed to the Gravitino-backed store.
+   * org.apache.gravitino.flink.connector.utils.FactoryUtils#isGravitinoManagedCatalogType}.
+   * Catalogs of this type are routed to the Gravitino-backed store.
    */
   private static final String GRAVITINO_CATALOG_TYPE = "gravitino-hive";
 
@@ -60,11 +60,11 @@ public class TestGravitinoSessionCatalogStore {
   @Before
   public void setUp() {
     assertTrue(
-        "GRAVITINO_CATALOG_TYPE must be recognised by isBuiltInCatalog()",
-        isBuiltInCatalog(GRAVITINO_CATALOG_TYPE));
+        "GRAVITINO_CATALOG_TYPE must be recognised by isGravitinoManagedCatalogType()",
+        isGravitinoManagedCatalogType(GRAVITINO_CATALOG_TYPE));
     assertFalse(
-        "SESSION_CATALOG_TYPE must NOT be recognised by isBuiltInCatalog()",
-        isBuiltInCatalog(SESSION_CATALOG_TYPE));
+        "SESSION_CATALOG_TYPE must NOT be recognised by isGravitinoManagedCatalogType()",
+        isGravitinoManagedCatalogType(SESSION_CATALOG_TYPE));
     gravitinoCatalogStore = mock(GravitinoCatalogStore.class);
     memoryCatalogStore = mock(GenericInMemoryCatalogStore.class);
     sessionCatalogStore =
