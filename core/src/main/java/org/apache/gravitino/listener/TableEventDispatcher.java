@@ -148,6 +148,7 @@ public class TableEventDispatcher implements TableDispatcher {
             new CreateTableFailureEvent(
                 PrincipalUtils.getCurrentUserName(), ident, e, createTableRequest));
       } catch (Exception ex) {
+        e.addSuppressed(ex);
         LOG.warn("Failed to dispatch CreateTableFailureEvent", ex);
       }
       throw e;
