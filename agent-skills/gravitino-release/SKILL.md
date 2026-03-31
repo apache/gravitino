@@ -605,22 +605,22 @@ Everything else — credential collection, preflight checks, state reading — i
 ## Installation
 
 Claude Code, GitHub Copilot CLI, and OpenClaw all manage skills as directories containing a `SKILL.md` file.
-The skill is packaged as `dev/release/gravitino-release/` in the Gravitino repo — copy the whole directory to install.
+The skill is packaged as `agent-skills/gravitino-release/` in the Gravitino repo — copy the whole directory to install.
 
 > Claude Code and GitHub Copilot CLI share the same `.claude/` directory.
 
 ```bash
 # Claude Code / GitHub Copilot CLI — global (available in all projects)
-cp -r dev/release/gravitino-release ~/.claude/skills/
+cp -r agent-skills/gravitino-release ~/.claude/skills/
 
 # Claude Code / GitHub Copilot CLI — project-local (available only inside this repo)
-cp -r dev/release/gravitino-release .claude/skills/
+cp -r agent-skills/gravitino-release .claude/skills/
 
 # OpenClaw — global
-cp -r dev/release/gravitino-release ~/.openclaw/workspace/skills/
+cp -r agent-skills/gravitino-release ~/.openclaw/workspace/skills/
 
 # OpenClaw — project-local
-cp -r dev/release/gravitino-release .openclaw/workspace/skills/
+cp -r agent-skills/gravitino-release .openclaw/workspace/skills/
 ```
 
 Invoke with `/gravitino-release`. No local clone of the Gravitino repository is needed — the skill downloads the release scripts automatically via `gh`.
