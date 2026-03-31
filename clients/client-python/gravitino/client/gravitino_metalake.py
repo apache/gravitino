@@ -552,7 +552,11 @@ class GravitinoMetalake(
         """
         url = self.API_METALAKES_TAGS_PATH.format(encode_string(self.name()))
 
-        response = self.rest_client.get(url, error_handler=TAG_ERROR_HANDLER)
+        response = self.rest_client.get(
+            url,
+            params={"details": "true"},
+            error_handler=TAG_ERROR_HANDLER,
+        )
         list_info_resp = TagListResponse.from_json(response.body, infer_missing=True)
         list_info_resp.validate()
 
@@ -658,7 +662,6 @@ class GravitinoMetalake(
             error_handler=TAG_ERROR_HANDLER,
         )
         tag_resp: TagResponse = TagResponse.from_json(response.body, infer_missing=True)
-        tag_resp.validate()
 
         tag_resp.validate()
         return GenericTag(

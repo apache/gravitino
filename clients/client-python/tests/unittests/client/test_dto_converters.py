@@ -22,6 +22,7 @@ import unittest
 from gravitino.api.tag.tag_change import TagChange
 from gravitino.client.dto_converters import DTOConverters
 from gravitino.dto.requests.tag_update_request import TagUpdateRequest
+from gravitino.exceptions.base import IllegalArgumentException
 
 
 class TestDtoConverters(unittest.TestCase):
@@ -95,5 +96,5 @@ class TestDtoConverters(unittest.TestCase):
         self.assertEqual(json_str, remove_property_request.to_json())
 
     def test_to_tag_update_request_with_unsupport_type(self) -> None:
-        with self.assertRaises(ValueError):
+        with self.assertRaises(IllegalArgumentException):
             DTOConverters.to_tag_update_request(None)

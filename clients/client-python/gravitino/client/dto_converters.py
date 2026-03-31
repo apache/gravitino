@@ -17,8 +17,6 @@
 
 from __future__ import annotations
 
-import typing as tp
-
 from gravitino.api.catalog import Catalog
 from gravitino.api.catalog_change import CatalogChange
 from gravitino.api.job.job_template import JobTemplate, JobType
@@ -53,7 +51,11 @@ from gravitino.dto.requests.job_template_update_request import (
     UpdateJobTemplateContentRequest,
 )
 from gravitino.dto.requests.metalake_update_request import MetalakeUpdateRequest
-from gravitino.dto.requests.tag_update_request import TagUpdateRequest
+from gravitino.dto.requests.tag_update_request import (
+    TagUpdateRequest,
+    TagUpdateRequestBase,
+)
+from gravitino.exceptions.base import IllegalArgumentException
 from gravitino.namespace import Namespace
 from gravitino.utils import HTTPClient
 
@@ -295,12 +297,7 @@ class DTOConverters:
     @staticmethod
     def to_tag_update_request(
         change: TagChange,
-    ) -> tp.Union[
-        TagUpdateRequest.RenameTagRequest,
-        TagUpdateRequest.UpdateTagCommentRequest,
-        TagUpdateRequest.SetTagPropertyRequest,
-        TagUpdateRequest.RemoveTagPropertyRequest,
-    ]:
+    ) -> TagUpdateRequestBase:
         """
         Convert the tag change to the corresponding tag update request.
 
@@ -331,4 +328,4 @@ class DTOConverters:
         if isinstance(change, TagChange.RemoveProperty):
             return TagUpdateRequest.RemoveTagPropertyRequest(change.removed_property)
 
-        raise ValueError(f"Unknown change type: {type(change)}")
+        raise IllegalArgumentException(f"Unknown change type: {type(change)}")
