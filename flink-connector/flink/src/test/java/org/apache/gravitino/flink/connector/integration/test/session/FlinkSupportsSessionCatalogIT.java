@@ -19,10 +19,15 @@
 package org.apache.gravitino.flink.connector.integration.test.session;
 
 import com.google.common.base.Preconditions;
+import java.io.File;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.Arrays;
+import java.util.Comparator;
 import java.util.Optional;
+import java.util.stream.Stream;
 import org.apache.flink.configuration.Configuration;
 import org.apache.flink.table.api.EnvironmentSettings;
 import org.apache.flink.table.api.TableEnvironment;
@@ -63,6 +68,7 @@ public class FlinkSupportsSessionCatalogIT extends FlinkEnvIT {
   private static final Logger LOG = LoggerFactory.getLogger(FlinkSupportsSessionCatalogIT.class);
 
   private static String hiveConfDir;
+  private static Path hiveConfDirPath;
 
   @Override
   protected String getProvider() {
@@ -100,6 +106,7 @@ public class FlinkSupportsSessionCatalogIT extends FlinkEnvIT {
   @AfterAll
   static void sessionCatalogStop() {
     Preconditions.checkArgument(metalake != null, "metalake should not be null");
+    deleteHiveConfDir();
     LOG.info("FlinkSupportsSessionCatalogIT teardown complete.");
   }
 
@@ -301,8 +308,8 @@ public class FlinkSupportsSessionCatalogIT extends FlinkEnvIT {
       return;
     }
     try {
-      java.nio.file.Path dir = java.nio.file.Files.createTempDirectory("flink-session-hive-conf");
-      java.nio.file.Path hiveSite = dir.resolve("hive-site.xml");
+      hiveConfDirPath = Files.createTempDirectory("flink-session-hive-conf");
+      Path hiveSite = hiveConfDirPath.resolve("hive-site.xml");
       String hiveSiteXml =
           "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n"
               + "<?xml-stylesheet type=\"text/xsl\" href=\"configuration.xsl\"?>\n"
@@ -328,10 +335,24 @@ public class FlinkSupportsSessionCatalogIT extends FlinkEnvIT {
               + "</value>\n"
               + "  </property>\n"
               + "</configuration>\n";
-      java.nio.file.Files.write(hiveSite, hiveSiteXml.getBytes(StandardCharsets.UTF_8));
-      hiveConfDir = dir.toAbsolutePath().toString();
+      Files.write(hiveSite, hiveSiteXml.getBytes(StandardCharsets.UTF_8));
+      hiveConfDir = hiveConfDirPath.toAbsolutePath().toString();
     } catch (IOException e) {
       throw new RuntimeException("Failed to prepare hive conf dir for ITs", e);
+    }
+  }
+
+  private static void deleteHiveConfDir() {
+    if (hiveConfDirPath == null) {
+      return;
+    }
+    try (Stream<Path> walk = Files.walk(hiveConfDirPath)) {
+      walk.sorted(Comparator.reverseOrder()).map(Path::toFile).forEach(File::delete);
+    } catch (IOException e) {
+      LOG.warn("Failed to delete temp hive conf dir: {}", hiveConfDirPath, e);
+    } finally {
+      hiveConfDirPath = null;
+      hiveConfDir = null;
     }
   }
 }
