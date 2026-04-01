@@ -143,10 +143,10 @@ public abstract class SparkJwksAuthorizationIT extends BaseIT {
   /** GravitinoAdminClient authenticated as bob ({@code client_id=bob}). */
   private static GravitinoAdminClient bobClient;
 
-  protected String mysqlUrl;
-  protected String mysqlUsername;
-  protected String mysqlPassword;
-  protected String mysqlDriver;
+  private String mysqlUrl;
+  private String mysqlUsername;
+  private String mysqlPassword;
+  private String mysqlDriver;
 
   // ---------------------------------------------------------------------------
   // Lifecycle

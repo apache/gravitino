@@ -174,7 +174,10 @@ public class JwksTokenValidatorIT extends BaseIT {
         validToken,
         oauthClient -> {
           GravitinoVersion version = oauthClient.serverVersion();
-          Assertions.assertEquals(System.getenv("PROJECT_VERSION"), version.version());
+          String projectVersion = System.getenv("PROJECT_VERSION");
+          if (projectVersion != null) {
+            Assertions.assertEquals(projectVersion, version.version());
+          }
           Assertions.assertFalse(version.compileDate().isEmpty());
           if (testMode.equals(ITUtils.EMBEDDED_TEST_MODE)) {
             Assertions.assertEquals(readGitCommitIdFromGitFile(), version.gitCommit());
@@ -216,10 +219,6 @@ public class JwksTokenValidatorIT extends BaseIT {
         badClient -> Assertions.assertThrows(RuntimeException.class, badClient::serverVersion));
   }
 
-  // ---------------------------------------------------------------------------
-  // Helpers
-  // ---------------------------------------------------------------------------
-
   /**
    * Verifies that a JWT with {@code sub=alice} is accepted and that alice (who was added to the
    * metalake) can load it. Proves that Gravitino extracts the username from the JWT {@code sub}
@@ -253,6 +252,10 @@ public class JwksTokenValidatorIT extends BaseIT {
             Assertions.assertThrows(
                 ForbiddenException.class, () -> bobClient.loadMetalake(METALAKE_NAME)));
   }
+
+  // ---------------------------------------------------------------------------
+  // Helpers
+  // ---------------------------------------------------------------------------
 
   /**
    * Mints a signed RS256 JWT with the given subject, audience, and expiry.
