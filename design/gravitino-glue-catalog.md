@@ -141,6 +141,7 @@ Glue is a separate AWS service from S3. The Glue region and credentials may diff
 | `aws-glue-catalog-id` | Yes | — | Glue catalog ID. Required because an AWS account can have multiple Glue catalogs (e.g., default catalog and federated S3 Tables catalog). |
 | `aws-glue-endpoint` | No | AWS default regional endpoint | Custom Glue endpoint URL (for VPC endpoints or LocalStack testing). |
 | `default-table-format` | No | `iceberg` | Default format for tables created via Gravitino's `createTable()` API. Accepted values: `iceberg`, `hive`. |
+| `table-type-filter` | No | `all` | Comma-separated list of table types exposed by `listTables()` and `loadTable()`. Accepted values: `all`, `hive`, `iceberg`, `delta`, `parquet`. Use to restrict visible table types for backwards compatibility with existing systems that cannot handle mixed-format catalogs. |
 
 **Authentication priority**: Static credentials (`aws-access-key-id` + `aws-secret-access-key`) → Default credential chain (environment variables, instance profile, container credentials). STS AssumeRole (`aws-role-arn`) is a future enhancement — static credentials are sufficient for the initial release, including cross-account access.
 
@@ -247,9 +248,9 @@ public class GlueClientProvider {
 
 ### 5.5 Table Operations
 
-**Key design principle: present ALL table types, no filtering.**
+**Key design principle: present all table types by default, with opt-in filtering.**
 
-Unlike `HiveCatalogOperations` (which filters out Iceberg/Paimon/Hudi tables), `GlueCatalogOperations` returns every table in a Glue database regardless of `table_type`. This is the correct behavior for a unified Glue catalog.
+Unlike `HiveCatalogOperations` (which filters out Iceberg/Paimon/Hudi tables), `GlueCatalogOperations` returns every table in a Glue database by default. The `table-type-filter` catalog property allows restricting the visible table types for backwards compatibility with existing systems or older query engine versions that cannot handle mixed-format catalogs.
 
 #### Table Listing
 
@@ -442,7 +443,7 @@ Trino's Hive connector supports [table redirection](https://trino.io/docs/curren
 - Approach 3 requires Gravitino to manage the lifecycle of hidden internal catalogs, adding complexity that outweighs the benefit of supporting older Trino versions.
 - A single `GlueConnectorAdapter` (~30 lines) is all that is needed in Gravitino — all mixed-format routing complexity is delegated to Trino.
 
-**For users on Trino < 477**: Phase 1 behavior applies — Gravitino's metadata API exposes all table types correctly, but Trino query execution is limited to Hive-format tables. Mixed-format query support requires upgrading to Trino ≥ 477.
+**For users on Trino < 477**: Trino's Hive connector can only execute queries against Hive-format tables. Set `table-type-filter=hive` on the Gravitino `catalog-glue` catalog so that only Hive-format tables are exposed — Trino then operates correctly without encountering Iceberg or Delta tables it cannot handle. Mixed-format query support requires upgrading to Trino ≥ 477 and removing the filter.
 
 ---
 
