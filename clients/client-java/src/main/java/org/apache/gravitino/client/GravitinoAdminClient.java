@@ -54,6 +54,7 @@ public class GravitinoAdminClient extends GravitinoClientBase implements Support
    *
    * @param uri The base URI for the Gravitino API.
    * @param authDataProvider The provider of the data which is used for authentication.
+   * @param extraHeadersProvider The provider of per-request extra headers, may be {@code null}.
    * @param checkVersion Whether to check the version of the Gravitino server. Gravitino does not
    *     support the case that the client-side version is higher than the server-side version.
    * @param headers The base header for Gravitino API.
@@ -62,10 +63,11 @@ public class GravitinoAdminClient extends GravitinoClientBase implements Support
   private GravitinoAdminClient(
       String uri,
       AuthDataProvider authDataProvider,
+      ExtraHeadersProvider extraHeadersProvider,
       boolean checkVersion,
       Map<String, String> headers,
       Map<String, String> properties) {
-    super(uri, authDataProvider, checkVersion, headers, properties);
+    super(uri, authDataProvider, extraHeadersProvider, checkVersion, headers, properties);
   }
 
   /**
@@ -259,7 +261,12 @@ public class GravitinoAdminClient extends GravitinoClientBase implements Support
       Preconditions.checkArgument(
           uri != null && !uri.isEmpty(), "The argument 'uri' must be a valid URI");
       return new GravitinoAdminClient(
-          uri, authDataProvider, isVersionCheckEnabled(), headers, properties);
+          uri,
+          authDataProvider,
+          extraHeadersProvider,
+          isVersionCheckEnabled(),
+          headers,
+          properties);
     }
   }
 }

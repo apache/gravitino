@@ -90,8 +90,11 @@ public class GravitinoConnector implements Connector {
     ConnectorMetadata internalMetadata =
         internalConnector.getMetadata(session, gravitinoTransactionHandle.getInternalHandle());
     Preconditions.checkArgument(internalMetadata != null, "Internal metadata must not be null");
-    return createGravitinoMetadata(
-        connectorMetadata, catalogConnectorContext.getMetadataAdapter(), internalMetadata);
+    GravitinoMetadata metadata =
+        createGravitinoMetadata(
+            connectorMetadata, catalogConnectorContext.getMetadataAdapter(), internalMetadata);
+    metadata.setSessionContext(catalogConnectorContext.getSessionContext());
+    return metadata;
   }
 
   protected GravitinoMetadata createGravitinoMetadata(

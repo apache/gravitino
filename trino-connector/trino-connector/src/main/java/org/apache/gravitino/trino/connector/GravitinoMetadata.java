@@ -63,9 +63,11 @@ import java.util.Optional;
 import java.util.OptionalLong;
 import java.util.Set;
 import java.util.stream.Collectors;
+import javax.annotation.Nullable;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.trino.connector.catalog.CatalogConnectorMetadata;
 import org.apache.gravitino.trino.connector.catalog.CatalogConnectorMetadataAdapter;
+import org.apache.gravitino.trino.connector.catalog.TrinoSessionContext;
 import org.apache.gravitino.trino.connector.metadata.GravitinoSchema;
 import org.apache.gravitino.trino.connector.metadata.GravitinoTable;
 
@@ -87,6 +89,8 @@ public abstract class GravitinoMetadata implements ConnectorMetadata {
 
   protected final ConnectorMetadata internalMetadata;
 
+  @Nullable private TrinoSessionContext sessionContext;
+
   /**
    * Constructs a new GravitinoMetadata instance.
    *
@@ -102,6 +106,16 @@ public abstract class GravitinoMetadata implements ConnectorMetadata {
     this.catalogConnectorMetadata = catalogConnectorMetadata;
     this.metadataAdapter = metadataAdapter;
     this.internalMetadata = internalMetadata;
+  }
+
+  /**
+   * Injects the session context used to forward Trino session credentials to Gravitino. Called by
+   * {@link org.apache.gravitino.trino.connector.GravitinoConnector#getMetadata} after construction.
+   *
+   * @param sessionContext the session context, or {@code null} when forwarding is not configured
+   */
+  public void setSessionContext(@Nullable TrinoSessionContext sessionContext) {
+    this.sessionContext = sessionContext;
   }
 
   @Override
@@ -226,11 +240,17 @@ public abstract class GravitinoMetadata implements ConnectorMetadata {
 
   @Override
   public void beginQuery(ConnectorSession session) {
+    if (sessionContext != null) {
+      sessionContext.applySession(session);
+    }
     internalMetadata.beginQuery(session);
   }
 
   @Override
   public void cleanupQuery(ConnectorSession session) {
+    if (sessionContext != null) {
+      sessionContext.clearSession();
+    }
     internalMetadata.cleanupQuery(session);
   }
 

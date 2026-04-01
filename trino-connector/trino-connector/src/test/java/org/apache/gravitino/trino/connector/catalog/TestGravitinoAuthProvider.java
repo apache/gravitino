@@ -19,6 +19,8 @@
 package org.apache.gravitino.trino.connector.catalog;
 
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import com.google.common.collect.ImmutableMap;
@@ -29,6 +31,7 @@ import org.apache.gravitino.trino.connector.GravitinoConfig;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
+@SuppressWarnings("deprecation")
 public class TestGravitinoAuthProvider {
 
   @Test
@@ -137,6 +140,56 @@ public class TestGravitinoAuthProvider {
                         GravitinoAuthProvider.KERBEROS_PRINCIPAL_KEY, "user@REALM.COM",
                         GravitinoAuthProvider.KERBEROS_KEYTAB_FILE_PATH_KEY,
                             keytabFile.getAbsolutePath()))));
+  }
+
+  @Test
+  public void testBuildNoAuthReturnsNullSessionContext() {
+    GravitinoAuthProvider.BuildResult result =
+        GravitinoAuthProvider.build(buildConfig(ImmutableMap.of()));
+    assertNotNull(result.client);
+    assertNull(result.sessionContext);
+  }
+
+  @Test
+  public void testBuildOAuth2TokenMissingCredentialKey() {
+    assertThrows(
+        IllegalArgumentException.class,
+        () ->
+            GravitinoAuthProvider.build(
+                buildConfig(ImmutableMap.of(GravitinoAuthProvider.AUTH_TYPE_KEY, "oauth2_token"))));
+  }
+
+  @Test
+  public void testBuildOAuth2TokenReturnsSessionContext() {
+    GravitinoAuthProvider.BuildResult result =
+        GravitinoAuthProvider.build(
+            buildConfig(
+                ImmutableMap.of(
+                    GravitinoAuthProvider.AUTH_TYPE_KEY, "oauth2_token",
+                    GravitinoAuthProvider.OAUTH2_TOKEN_CREDENTIAL_KEY, "my-token-key")));
+    assertNotNull(result.client);
+    assertNotNull(result.sessionContext);
+  }
+
+  @Test
+  public void testBuildSimpleWithForwardUserReturnsSessionContext() {
+    GravitinoAuthProvider.BuildResult result =
+        GravitinoAuthProvider.build(
+            buildConfig(
+                ImmutableMap.of(
+                    GravitinoAuthProvider.AUTH_TYPE_KEY, "simple",
+                    GravitinoAuthProvider.FORWARD_SESSION_USER_KEY, "true")));
+    assertNotNull(result.client);
+    assertNotNull(result.sessionContext);
+  }
+
+  @Test
+  public void testBuildNoneWithForwardUserReturnsSessionContext() {
+    GravitinoAuthProvider.BuildResult result =
+        GravitinoAuthProvider.build(
+            buildConfig(ImmutableMap.of(GravitinoAuthProvider.FORWARD_SESSION_USER_KEY, "true")));
+    assertNotNull(result.client);
+    assertNotNull(result.sessionContext);
   }
 
   private GravitinoConfig buildConfig(ImmutableMap<String, String> authConfig) {

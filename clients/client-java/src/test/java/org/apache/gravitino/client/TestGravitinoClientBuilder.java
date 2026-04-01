@@ -101,7 +101,7 @@ class MockGravitinoClient extends GravitinoClientBase {
       AuthDataProvider authDataProvider,
       Map<String, String> headers,
       Map<String, String> properties) {
-    super(uri, authDataProvider, false, headers, properties);
+    super(uri, authDataProvider, null, false, headers, properties);
     this.headers = headers;
     this.authDataProvider = authDataProvider;
     this.properties = properties;

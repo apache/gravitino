@@ -80,6 +80,7 @@ public class HTTPClient implements RESTClient {
   private final CloseableHttpClient httpClient;
   private final ObjectMapper mapper;
   private final AuthDataProvider authDataProvider;
+  private final ExtraHeadersProvider extraHeadersProvider;
 
   // Handler to be executed before connecting to the server.
   private final Runnable beforeConnectHandler;
@@ -103,6 +104,7 @@ public class HTTPClient implements RESTClient {
    * @param baseHeaders A map of base headers to be included in all HTTP requests.
    * @param objectMapper The ObjectMapper used for JSON serialization and deserialization.
    * @param authDataProvider The provider of authentication data.
+   * @param extraHeadersProvider The provider of per-request extra headers, may be {@code null}.
    * @param beforeConnectHandler The function to be executed before connecting to the server.
    * @param properties A map of properties (key-value pairs) used to configure the HTTP client.
    */
@@ -111,6 +113,7 @@ public class HTTPClient implements RESTClient {
       Map<String, String> baseHeaders,
       ObjectMapper objectMapper,
       AuthDataProvider authDataProvider,
+      ExtraHeadersProvider extraHeadersProvider,
       Runnable beforeConnectHandler,
       Map<String, String> properties) {
     this.uri = uri;
@@ -130,6 +133,7 @@ public class HTTPClient implements RESTClient {
 
     this.httpClient = clientBuilder.build();
     this.authDataProvider = authDataProvider;
+    this.extraHeadersProvider = extraHeadersProvider;
 
     if (beforeConnectHandler == null) {
       handlerStatus = HandlerStatus.Finished;
@@ -360,10 +364,15 @@ public class HTTPClient implements RESTClient {
     } else {
       addRequestHeaders(request, headers, ContentType.APPLICATION_JSON.getMimeType());
     }
-    if (authDataProvider != null) {
-      request.setHeader(
-          AuthConstants.HTTP_HEADER_AUTHORIZATION,
-          new String(authDataProvider.getTokenData(), StandardCharsets.UTF_8));
+    if (authDataProvider != null && authDataProvider.hasTokenData()) {
+      byte[] tokenData = authDataProvider.getTokenData();
+      if (tokenData != null) {
+        request.setHeader(
+            AuthConstants.HTTP_HEADER_AUTHORIZATION, new String(tokenData, StandardCharsets.UTF_8));
+      }
+    }
+    if (extraHeadersProvider != null) {
+      extraHeadersProvider.getHeaders().forEach(request::setHeader);
     }
 
     try (CloseableHttpResponse response = httpClient.execute(request)) {
@@ -705,6 +714,9 @@ public class HTTPClient implements RESTClient {
     if (authDataProvider != null) {
       authDataProvider.close();
     }
+    if (extraHeadersProvider != null) {
+      extraHeadersProvider.close();
+    }
     httpClient.close(CloseMode.GRACEFUL);
   }
 
@@ -758,6 +770,7 @@ public class HTTPClient implements RESTClient {
     private String uri;
     private ObjectMapper mapper = ObjectMapperProvider.objectMapper();
     private AuthDataProvider authDataProvider;
+    private ExtraHeadersProvider extraHeadersProvider;
     private Runnable beforeConnectHandler;
 
     private Builder(Map<String, String> properties) {
@@ -834,6 +847,19 @@ public class HTTPClient implements RESTClient {
     }
 
     /**
+     * Sets the ExtraHeadersProvider for the HTTP client. The provider's {@link
+     * ExtraHeadersProvider#getHeaders()} is called on every outgoing request to append additional
+     * headers (e.g. a forwarded user-identity header).
+     *
+     * @param extraHeadersProvider the provider, or {@code null} to disable extra headers
+     * @return This Builder instance for method chaining.
+     */
+    public Builder withExtraHeadersProvider(ExtraHeadersProvider extraHeadersProvider) {
+      this.extraHeadersProvider = extraHeadersProvider;
+      return this;
+    }
+
+    /**
      * Builds and returns an instance of the HTTPClient with the configured options.
      *
      * @return An instance of HTTPClient with the configured options.
@@ -841,7 +867,13 @@ public class HTTPClient implements RESTClient {
     public HTTPClient build() {
 
       return new HTTPClient(
-          uri, baseHeaders, mapper, authDataProvider, beforeConnectHandler, properties);
+          uri,
+          baseHeaders,
+          mapper,
+          authDataProvider,
+          extraHeadersProvider,
+          beforeConnectHandler,
+          properties);
     }
   }
 

@@ -43,13 +43,25 @@ public class TestVersionCheck extends TestBase {
 
   private static class TestClient extends GravitinoClientBase {
     protected TestClient(String uri, AuthDataProvider authDataProvider, boolean checkVersion) {
-      super(uri, authDataProvider, checkVersion, Collections.emptyMap(), Collections.emptyMap());
+      super(
+          uri,
+          authDataProvider,
+          null,
+          checkVersion,
+          Collections.emptyMap(),
+          Collections.emptyMap());
     }
   }
 
   private static class TestAdminClient extends GravitinoClientBase {
     protected TestAdminClient(String uri, AuthDataProvider authDataProvider, boolean checkVersion) {
-      super(uri, authDataProvider, checkVersion, Collections.emptyMap(), Collections.emptyMap());
+      super(
+          uri,
+          authDataProvider,
+          null,
+          checkVersion,
+          Collections.emptyMap(),
+          Collections.emptyMap());
     }
 
     private int listMetalakesCount() {

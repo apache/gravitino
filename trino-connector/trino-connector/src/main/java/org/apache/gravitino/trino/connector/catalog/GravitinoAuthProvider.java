@@ -22,6 +22,7 @@ import java.io.File;
 import java.util.HashMap;
 import java.util.Locale;
 import java.util.Map;
+import javax.annotation.Nullable;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.client.DefaultOAuth2TokenProvider;
 import org.apache.gravitino.client.GravitinoAdminClient;
@@ -33,7 +34,8 @@ import org.slf4j.LoggerFactory;
 
 /**
  * Builds a {@link GravitinoAdminClient} with the appropriate authentication provider based on the
- * Gravitino config.
+ * Gravitino config, and produces an optional {@link TrinoSessionContext} for per-query credential
+ * forwarding.
  */
 class GravitinoAuthProvider {
 
@@ -62,6 +64,13 @@ class GravitinoAuthProvider {
   static final String OAUTH_SCOPE_KEY =
       GravitinoClientConfiguration.GRAVITINO_CLIENT_CONFIG_PREFIX + "oauth2.scope";
 
+  /**
+   * Extra-credentials key whose value is forwarded as a Bearer token to Gravitino. Only used when
+   * {@code authType=oauth2_token}.
+   */
+  static final String OAUTH2_TOKEN_CREDENTIAL_KEY =
+      GravitinoClientConfiguration.GRAVITINO_CLIENT_CONFIG_PREFIX + "oauth2.token.credentialKey";
+
   /** Kerberos principal configuration key. */
   static final String KERBEROS_PRINCIPAL_KEY =
       GravitinoClientConfiguration.GRAVITINO_CLIENT_CONFIG_PREFIX + "kerberos.principal";
@@ -70,29 +79,60 @@ class GravitinoAuthProvider {
   static final String KERBEROS_KEYTAB_FILE_PATH_KEY =
       GravitinoClientConfiguration.GRAVITINO_CLIENT_CONFIG_PREFIX + "kerberos.keytabFilePath";
 
+  /**
+   * When set to {@code true}, the Trino session user name is forwarded to Gravitino via the {@code
+   * X-Gravitino-User} HTTP header on every request, regardless of the configured auth type. For
+   * {@code simple} auth the session user also replaces the static {@code gravitino.user}.
+   */
+  static final String FORWARD_SESSION_USER_KEY =
+      GravitinoClientConfiguration.GRAVITINO_CLIENT_CONFIG_PREFIX + "session.forwardUser";
+
   /** Authentication types supported by the Trino connector. */
   enum AuthType {
     SIMPLE,
     OAUTH2,
     KERBEROS,
+    OAUTH2_TOKEN,
     NONE
   }
 
   private GravitinoAuthProvider() {}
 
   /**
-   * Builds a GravitinoAdminClient from the given config, applying authentication settings found in
-   * the client config.
+   * The result of {@link #build(GravitinoConfig)}.
+   *
+   * <p>{@link #sessionContext} is non-null when session-forwarding is configured; callers must
+   * propagate it to {@link CatalogConnectorContext} so that {@link
+   * org.apache.gravitino.trino.connector.GravitinoMetadata} can apply / clear it around each query.
+   */
+  static final class BuildResult {
+    final GravitinoAdminClient client;
+    @Nullable final TrinoSessionContext sessionContext;
+
+    BuildResult(GravitinoAdminClient client, @Nullable TrinoSessionContext sessionContext) {
+      this.client = client;
+      this.sessionContext = sessionContext;
+    }
+  }
+
+  /**
+   * Builds a {@link GravitinoAdminClient} from the given config, applying authentication settings
+   * found in the client config.
    *
    * @param config the Gravitino configuration containing server URI and client properties
-   * @return a configured GravitinoAdminClient
+   * @return a {@link BuildResult} containing the configured client and an optional session context
    */
-  public static GravitinoAdminClient buildClient(GravitinoConfig config) {
+  static BuildResult build(GravitinoConfig config) {
     Map<String, String> clientConfig = new HashMap<>(config.getClientConfig());
     String uri = config.getURI();
     String authTypeStr = clientConfig.get(AUTH_TYPE_KEY);
+    boolean forwardUser =
+        Boolean.parseBoolean(clientConfig.getOrDefault(FORWARD_SESSION_USER_KEY, "false"));
 
     GravitinoAdminClient.AdminClientBuilder builder = GravitinoAdminClient.builder(uri);
+
+    TrinoSessionAuthProvider authProvider = null;
+    TrinoUserHeaderProvider headerProvider = forwardUser ? new TrinoUserHeaderProvider() : null;
 
     if (StringUtils.isNotBlank(authTypeStr)) {
       AuthType authType;
@@ -101,14 +141,21 @@ class GravitinoAuthProvider {
       } catch (IllegalArgumentException e) {
         throw new IllegalArgumentException(
             String.format(
-                "Invalid authentication type: %s. Valid values are: simple, oauth2, kerberos, none",
+                "Invalid authentication type: %s. Valid values are: simple, oauth2, kerberos,"
+                    + " oauth2_token, none",
                 authTypeStr),
             e);
       }
 
       switch (authType) {
         case SIMPLE:
-          buildSimpleAuth(builder, config.getUser());
+          if (forwardUser) {
+            // Use the Trino session user dynamically instead of the static configured user.
+            authProvider = new TrinoSessionAuthProvider();
+            builder.withCustomTokenAuth(authProvider);
+          } else {
+            buildSimpleAuth(builder, config.getUser());
+          }
           break;
         case OAUTH2:
           builder.withOAuth(buildOAuthProvider(clientConfig));
@@ -116,13 +163,33 @@ class GravitinoAuthProvider {
         case KERBEROS:
           builder.withKerberosAuth(buildKerberosProvider(clientConfig));
           break;
+        case OAUTH2_TOKEN:
+          String credentialKey = clientConfig.get(OAUTH2_TOKEN_CREDENTIAL_KEY);
+          if (StringUtils.isBlank(credentialKey)) {
+            throw new IllegalArgumentException(
+                String.format(
+                    "oauth2_token auth requires a credential key. Please set %s",
+                    OAUTH2_TOKEN_CREDENTIAL_KEY));
+          }
+          authProvider = new TrinoSessionAuthProvider(credentialKey);
+          builder.withCustomTokenAuth(authProvider);
+          // Always forward the user header for oauth2_token
+          if (headerProvider == null) {
+            headerProvider = new TrinoUserHeaderProvider();
+          }
+          break;
         case NONE:
         default:
           break;
       }
     }
 
-    // Remove auth-specific keys before passing to withClientConfig
+    if (headerProvider != null) {
+      builder.withExtraHeaders(headerProvider);
+    }
+
+    // Remove all auth-specific and session-forwarding keys before passing remaining config to
+    // withClientConfig so that GravitinoClientConfiguration does not reject unknown keys.
     clientConfig.remove(AUTH_TYPE_KEY);
     clientConfig.remove(OAUTH_SERVER_URI_KEY);
     clientConfig.remove(OAUTH_CREDENTIAL_KEY);
@@ -130,9 +197,29 @@ class GravitinoAuthProvider {
     clientConfig.remove(OAUTH_SCOPE_KEY);
     clientConfig.remove(KERBEROS_PRINCIPAL_KEY);
     clientConfig.remove(KERBEROS_KEYTAB_FILE_PATH_KEY);
+    clientConfig.remove(OAUTH2_TOKEN_CREDENTIAL_KEY);
+    clientConfig.remove(FORWARD_SESSION_USER_KEY);
 
     builder.withClientConfig(clientConfig);
-    return builder.build();
+
+    TrinoSessionContext sessionContext =
+        (authProvider != null || headerProvider != null)
+            ? new TrinoSessionContext(authProvider, headerProvider)
+            : null;
+
+    return new BuildResult(builder.build(), sessionContext);
+  }
+
+  /**
+   * Convenience wrapper kept for callers that only need the {@link GravitinoAdminClient} and do not
+   * require session-forwarding (e.g. tests that inject a pre-built client).
+   *
+   * @deprecated Use {@link #build(GravitinoConfig)} instead.
+   */
+  @Deprecated
+  @SuppressWarnings("InlineMeSuggester")
+  static GravitinoAdminClient buildClient(GravitinoConfig config) {
+    return build(config).client;
   }
 
   private static void buildSimpleAuth(
