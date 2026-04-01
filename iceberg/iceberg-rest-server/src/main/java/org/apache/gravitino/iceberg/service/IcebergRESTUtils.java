@@ -21,6 +21,9 @@ package org.apache.gravitino.iceberg.service;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.common.base.Preconditions;
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
 import java.time.Instant;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
@@ -30,6 +33,7 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.stream.Stream;
 import javax.servlet.http.HttpServletRequest;
+import javax.ws.rs.core.EntityTag;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 import javax.ws.rs.core.Response.Status;
@@ -39,13 +43,98 @@ import org.apache.gravitino.iceberg.service.authorization.IcebergRESTServerConte
 import org.apache.iceberg.catalog.Namespace;
 import org.apache.iceberg.catalog.TableIdentifier;
 import org.apache.iceberg.rest.responses.ErrorResponse;
+import org.apache.iceberg.rest.responses.LoadTableResponse;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 public class IcebergRESTUtils {
+
+  private static final Logger LOG = LoggerFactory.getLogger(IcebergRESTUtils.class);
+
+  private static final String DEFAULT_SNAPSHOTS = "all";
 
   private IcebergRESTUtils() {}
 
   public static <T> Response ok(T t) {
     return Response.status(Response.Status.OK).entity(t).type(MediaType.APPLICATION_JSON).build();
+  }
+
+  /**
+   * Builds an OK response with the ETag header derived from the table metadata location. Uses the
+   * default snapshots value to ensure ETags from create/update/register are consistent with the
+   * default loadTable endpoint.
+   *
+   * @param loadTableResponse the table response to include in the body
+   * @return a Response with ETag header set
+   */
+  public static Response buildResponseWithETag(LoadTableResponse loadTableResponse) {
+    EntityTag etag =
+        generateETag(loadTableResponse.tableMetadata().metadataFileLocation(), DEFAULT_SNAPSHOTS);
+    return buildResponseWithETag(loadTableResponse, etag);
+  }
+
+  /**
+   * Builds an OK response with the given ETag header.
+   *
+   * @param loadTableResponse the table response to include in the body
+   * @param etag the pre-computed ETag, may be null
+   * @return a Response with ETag header set if etag is non-null
+   */
+  public static Response buildResponseWithETag(
+      LoadTableResponse loadTableResponse, EntityTag etag) {
+    Response.ResponseBuilder responseBuilder =
+        Response.ok(loadTableResponse, MediaType.APPLICATION_JSON_TYPE);
+    if (etag != null) {
+      responseBuilder.tag(etag);
+    }
+    return responseBuilder.build();
+  }
+
+  /**
+   * Generates an ETag based on the table metadata file location. The ETag is a SHA-256 hash of the
+   * metadata location, which changes whenever the table metadata is updated.
+   *
+   * @param metadataLocation the metadata file location
+   * @return the generated ETag, or null if generation fails
+   */
+  public static EntityTag generateETag(String metadataLocation) {
+    return generateETag(metadataLocation, null);
+  }
+
+  /**
+   * Generates an ETag based on the table metadata file location and snapshot mode. The ETag is a
+   * SHA-256 hash that incorporates both the metadata location and the snapshots parameter, ensuring
+   * distinct ETags for different representations of the same table version (e.g., snapshots=all vs
+   * snapshots=refs).
+   *
+   * @param metadataLocation the metadata file location
+   * @param snapshots the snapshots query parameter value (e.g., "all", "refs"), may be null
+   * @return the generated ETag, or null if generation fails
+   */
+  public static EntityTag generateETag(String metadataLocation, String snapshots) {
+    if (metadataLocation == null) {
+      return null;
+    }
+    try {
+      MessageDigest digest = MessageDigest.getInstance("SHA-256");
+      digest.update(metadataLocation.getBytes(StandardCharsets.UTF_8));
+      if (snapshots != null) {
+        digest.update(snapshots.getBytes(StandardCharsets.UTF_8));
+      }
+      byte[] hash = digest.digest();
+      StringBuilder hexString = new StringBuilder();
+      for (byte b : hash) {
+        String hex = Integer.toHexString(0xff & b);
+        if (hex.length() == 1) {
+          hexString.append('0');
+        }
+        hexString.append(hex);
+      }
+      return new EntityTag(hexString.toString());
+    } catch (NoSuchAlgorithmException e) {
+      LOG.warn("Failed to generate ETag for metadata location: {}", metadataLocation, e);
+      return null;
+    }
   }
 
   public static Response okWithoutContent() {

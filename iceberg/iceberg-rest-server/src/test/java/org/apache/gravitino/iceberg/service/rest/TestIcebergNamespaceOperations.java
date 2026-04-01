@@ -22,7 +22,9 @@ import java.util.Arrays;
 import java.util.Optional;
 import javax.servlet.http.HttpServletRequest;
 import javax.ws.rs.core.Application;
+import javax.ws.rs.core.EntityTag;
 import javax.ws.rs.core.Response;
+import org.apache.gravitino.iceberg.service.IcebergRESTUtils;
 import org.apache.gravitino.listener.api.event.Event;
 import org.apache.gravitino.listener.api.event.IcebergCreateNamespaceEvent;
 import org.apache.gravitino.listener.api.event.IcebergCreateNamespaceFailureEvent;
@@ -198,6 +200,14 @@ public class TestIcebergNamespaceOperations extends IcebergNamespaceTestBase {
     String etag = response.getHeaderString("ETag");
     Assertions.assertNotNull(etag, "ETag header should be present in register table response");
     Assertions.assertFalse(etag.isEmpty(), "ETag header should not be empty");
+
+    // Verify the ETag value matches the expected SHA-256 hash of the known mock metadata location
+    EntityTag expectedETag =
+        IcebergRESTUtils.generateETag("/mock/metadata/v1.metadata.json", "all");
+    Assertions.assertEquals(
+        "\"" + expectedETag.getValue() + "\"",
+        etag,
+        "ETag should match SHA-256 hash of mock metadata location with default snapshots");
   }
 
   @ParameterizedTest
