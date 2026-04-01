@@ -39,19 +39,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Supplier;
 import javax.annotation.Nullable;
 
-/**
- * In-process JWKS + OAuth2 token mock server for integration tests.
- *
- * <p>Provides two HTTP endpoints on a single random port:
- *
- * <ul>
- *   <li>{@code /jwks} – serves the JWKS public key document for Gravitino's {@code
- *       JwksTokenValidator}.
- *   <li>{@code /token} – mock OAuth2 {@code client_credentials} endpoint. In single-token mode it
- *       always returns the same JWT; in multi-user mode it parses {@code client_id} from the
- *       URL-encoded POST body and returns the corresponding pre-minted JWT.
- * </ul>
- */
+/** In-process JWKS + OAuth2 token mock server for integration tests. */
 public class JwksMockServerHelper implements Closeable {
 
   private static final String DEFAULT_KEY_ID = "test-kid";
@@ -60,19 +48,8 @@ public class JwksMockServerHelper implements Closeable {
   private final RSAKey rsaKey;
   private final int port;
 
-  /**
-   * Token supplier for single-token mode. When set, the {@code /token} handler returns whatever
-   * this supplier provides (allowing runtime swaps).
-   */
   @Nullable private volatile Supplier<String> tokenSupplier;
-
-  /**
-   * Per-user token map for multi-user mode. When {@link #tokenSupplier} is null, the handler looks
-   * up {@code client_id} in this map.
-   */
   private final Map<String, String> userTokens = new ConcurrentHashMap<>();
-
-  /** Fallback token when a client_id is not found in {@link #userTokens}. */
   @Nullable private volatile String fallbackToken;
 
   private JwksMockServerHelper(HttpServer httpServer, RSAKey rsaKey, int port) {
@@ -81,7 +58,7 @@ public class JwksMockServerHelper implements Closeable {
     this.port = port;
   }
 
-  /** Returns the RSA key pair (public + private) used for signing JWTs. */
+  /** Returns the RSA key pair used for signing JWTs. */
   public RSAKey rsaKey() {
     return rsaKey;
   }
@@ -101,29 +78,17 @@ public class JwksMockServerHelper implements Closeable {
     return baseUri() + "/jwks";
   }
 
-  /**
-   * Configures single-token mode: every {@code /token} request returns the token from the given
-   * supplier. This supports runtime token swapping (e.g., for negative test cases).
-   */
+  /** Configures single-token mode: every {@code /token} request returns the supplier's token. */
   public void setTokenSupplier(Supplier<String> supplier) {
     this.tokenSupplier = supplier;
   }
 
-  /**
-   * Configures multi-user mode by registering a pre-minted JWT for a specific {@code client_id}.
-   * The {@code /token} handler parses {@code client_id} from the POST body and returns the matching
-   * JWT.
-   *
-   * @param clientId the client_id value
-   * @param token the JWT to return for this client
-   */
+  /** Registers a pre-minted JWT for a specific {@code client_id} (multi-user mode). */
   public void registerUserToken(String clientId, String token) {
     userTokens.put(clientId, token);
   }
 
-  /**
-   * Sets the fallback token returned when the {@code client_id} is not found in the user token map.
-   */
+  /** Sets the fallback token when {@code client_id} is not found in the user token map. */
   public void setFallbackToken(String token) {
     this.fallbackToken = token;
   }
@@ -134,27 +99,12 @@ public class JwksMockServerHelper implements Closeable {
     httpServer.stop(0);
   }
 
-  /**
-   * Mints a compact RS256-signed JWT using this helper's RSA key.
-   *
-   * @param subject JWT {@code sub} claim — becomes the Gravitino principal
-   * @param audience JWT {@code aud} claim
-   * @param expiry expiration instant
-   * @return serialized compact JWT string
-   */
+  /** Mints a compact RS256-signed JWT using this helper's RSA key. */
   public String mintToken(String subject, String audience, Instant expiry) throws Exception {
     return mintToken(rsaKey, subject, audience, expiry);
   }
 
-  /**
-   * Mints a compact RS256-signed JWT using the specified RSA key.
-   *
-   * @param key RSA key (private component required for signing)
-   * @param subject JWT {@code sub} claim — becomes the Gravitino principal
-   * @param audience JWT {@code aud} claim
-   * @param expiry expiration instant
-   * @return serialized compact JWT string
-   */
+  /** Mints a compact RS256-signed JWT using the specified RSA key. */
   @SuppressWarnings("JavaUtilDate")
   public static String mintToken(RSAKey key, String subject, String audience, Instant expiry)
       throws Exception {
@@ -179,10 +129,7 @@ public class JwksMockServerHelper implements Closeable {
         + "\",\"token_type\":\"bearer\",\"expires_in\":86400}";
   }
 
-  /**
-   * Parses a single parameter from a URL-encoded form body (e.g., the {@code client_credentials}
-   * POST body sent by {@code DefaultOAuth2TokenProvider}).
-   */
+  /** Parses a single parameter from a URL-encoded form body. */
   static String parseFormParam(String body, String key) {
     for (String pair : body.split("&")) {
       String[] kv = pair.split("=", 2);
@@ -193,21 +140,7 @@ public class JwksMockServerHelper implements Closeable {
     return null;
   }
 
-  /**
-   * Creates and starts a new mock server with a freshly generated RSA key pair on a random port.
-   *
-   * @return a started {@link JwksMockServerHelper}
-   */
-  public static JwksMockServerHelper create() throws Exception {
-    return create(DEFAULT_KEY_ID);
-  }
-
-  /**
-   * Creates and starts a new mock server with a freshly generated RSA key pair on a random port.
-   *
-   * @param keyId the key ID to use in the generated RSA key
-   * @return a started {@link JwksMockServerHelper}
-   */
+  /** Creates and starts a new mock server with a freshly generated RSA key pair on a random port. */
   public static JwksMockServerHelper create(String keyId) throws Exception {
     RSAKey rsaKey = new RSAKeyGenerator(2048).keyID(keyId).generate();
     String jwksJson = new JWKSet(rsaKey.toPublicJWK()).toString();

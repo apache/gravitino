@@ -67,25 +67,8 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- * End-to-end Docker integration test for Spark OAuth2 authentication AND authorization via JWKS
- * token validation.
- *
- * <p>Verifies the complete scenario: user identity is derived solely from the JWT {@code sub} claim
- * (i.e., the OAuth2 credential drives authorization, not environment variables or simple auth). The
- * test lifecycle is:
- *
- * <ol>
- *   <li><b>Alice</b> authenticates via OAuth2 ({@code client_id=alice}) — Gravitino validates the
- *       JWT from the in-process JWKS server. Alice creates a table via Spark SQL.
- *   <li><b>Bob</b> (OAuth2, {@code client_id=bob}) has no catalog privileges — his {@link
- *       GravitinoAdminClient} gets {@link ForbiddenException} on {@code loadCatalog}.
- *   <li><b>Admin</b> grants Bob {@code SELECT_TABLE} access via the Gravitino API.
- *   <li><b>Bob's client</b> can now load the catalog and see the table Alice created.
- * </ol>
- *
- * <p>All user identity is JWT-based: the in-process mock {@code /token} endpoint parses {@code
- * client_id} from the {@code client_credentials} POST body and returns the corresponding pre-minted
- * RS256 JWT. No {@code SPARK_USER} / {@code HADOOP_USER_NAME} environment variables are set.
+ * End-to-end Docker integration test for Spark OAuth2 authentication and authorization via JWKS.
+ * User identity is derived solely from the JWT {@code sub} claim.
  */
 @Tag("gravitino-docker-test")
 @TestMethodOrder(MethodOrderer.OrderAnnotation.class)
@@ -93,13 +76,10 @@ public abstract class SparkJwksAuthorizationIT extends BaseIT {
 
   private static final Logger LOG = LoggerFactory.getLogger(SparkJwksAuthorizationIT.class);
 
-  // These become the JWT sub claims and therefore the Gravitino principal names.
   private static final String GRAVITINO_ADMIN = "gravitino";
   private static final String ALICE = "alice";
   private static final String BOB = "bob";
 
-  // Credential format understood by DefaultOAuth2TokenProvider: clientId:clientSecret.
-  // The mock /token endpoint only cares about clientId (the part before ':').
   private static final String ALICE_CREDENTIAL = ALICE + ":alice-secret";
   private static final String BOB_CREDENTIAL = BOB + ":bob-secret";
 
@@ -118,10 +98,7 @@ public abstract class SparkJwksAuthorizationIT extends BaseIT {
 
   private static String gravitinoUri;
 
-  /** Spark session authenticated as alice ({@code client_id=alice}). */
   private static SparkSession aliceSparkSession;
-
-  /** GravitinoAdminClient authenticated as bob ({@code client_id=bob}). */
   private static GravitinoAdminClient bobClient;
 
   private String mysqlUrl;
@@ -129,30 +106,22 @@ public abstract class SparkJwksAuthorizationIT extends BaseIT {
   private String mysqlPassword;
   private String mysqlDriver;
 
-  // ---------------------------------------------------------------------------
-  // Lifecycle
-  // ---------------------------------------------------------------------------
-
   @BeforeAll
   @Override
   public void startIntegrationTest() throws Exception {
-    // 1. Create the mock JWKS+token server (generates RSA key pair, random port).
     mockServerHelper = JwksMockServerHelper.create(KEY_ID);
 
-    // 2. Pre-mint long-lived tokens for each principal.
     Instant farFuture = Instant.now().plusSeconds(1_000_000);
     String adminToken = mockServerHelper.mintToken(GRAVITINO_ADMIN, SERVICE_AUDIENCE, farFuture);
     String aliceToken = mockServerHelper.mintToken(ALICE, SERVICE_AUDIENCE, farFuture);
     String bobToken = mockServerHelper.mintToken(BOB, SERVICE_AUDIENCE, farFuture);
 
-    // Multi-user mode: /token handler returns the JWT matching the client_id.
     mockServerHelper.registerUserToken(GRAVITINO_ADMIN, adminToken);
     mockServerHelper.registerUserToken(ALICE, aliceToken);
     mockServerHelper.registerUserToken(BOB, bobToken);
     mockServerHelper.setFallbackToken(adminToken);
     LOG.info("Mock JWKS+token server started on port {}", mockServerHelper.port());
 
-    // 3. Configure embedded Gravitino server: JwksTokenValidator + authorization.
     Map<String, String> configs = Maps.newHashMap();
     configs.put(Configs.AUTHENTICATORS.getKey(), AuthenticatorType.OAUTH.name().toLowerCase());
     configs.put(OAuthConfig.SERVICE_AUDIENCE.getKey(), SERVICE_AUDIENCE);
@@ -164,25 +133,18 @@ public abstract class SparkJwksAuthorizationIT extends BaseIT {
     configs.put(OAuthConfig.ALLOW_SKEW_SECONDS.getKey(), "6");
     configs.put(Configs.ENABLE_AUTHORIZATION.getKey(), "true");
     configs.put(Configs.SERVICE_ADMINS.getKey(), GRAVITINO_ADMIN);
-    // Disable cache so privilege changes from tests are reflected immediately.
     configs.put(Configs.CACHE_ENABLED.getKey(), "false");
     registerCustomConfigs(configs);
 
-    // 4. Prime OAuthMockDataProvider — BaseIT requires this to build its internal `client`.
     OAuthMockDataProvider.getInstance().setTokenData(adminToken.getBytes(StandardCharsets.UTF_8));
 
-    // 5. Start MySQL container (must happen before super.startIntegrationTest) and Gravitino.
     initMysqlContainer();
     super.startIntegrationTest();
     gravitinoUri = String.format("http://127.0.0.1:%d", getGravitinoServerPort());
 
-    // 6. Bootstrap metadata: metalake, catalog, schema, users, alice's role.
     initMetadata();
 
-    // 7. Start alice's Spark session — OAuth2 with client_id=alice.
     aliceSparkSession = buildSparkSession(ALICE_CREDENTIAL);
-
-    // 8. Build bob's GravitinoAdminClient — OAuth2 with client_id=bob.
     bobClient = buildGravitinoClient(BOB_CREDENTIAL);
   }
 
@@ -218,7 +180,6 @@ public abstract class SparkJwksAuthorizationIT extends BaseIT {
     metalake.addUser(ALICE);
     metalake.addUser(BOB);
 
-    // Create JDBC catalog and schema as the admin.
     Map<String, String> props = Maps.newHashMap();
     props.put(JdbcPropertiesConstants.GRAVITINO_JDBC_URL, mysqlUrl);
     props.put(JdbcPropertiesConstants.GRAVITINO_JDBC_USER, mysqlUsername);
@@ -228,7 +189,6 @@ public abstract class SparkJwksAuthorizationIT extends BaseIT {
         metalake.createCatalog(CATALOG, Catalog.Type.RELATIONAL, "jdbc-mysql", "", props);
     catalog.asSchemas().createSchema(SCHEMA, "", new HashMap<>());
 
-    // Grant alice full access to the catalog so she can create and read tables.
     SecurableObject catalogAccess =
         SecurableObjects.ofCatalog(
             CATALOG,
@@ -241,14 +201,6 @@ public abstract class SparkJwksAuthorizationIT extends BaseIT {
     metalake.grantRolesToUser(ImmutableList.of(ALICE_ROLE), ALICE);
   }
 
-  // ---------------------------------------------------------------------------
-  // Tests
-  // ---------------------------------------------------------------------------
-
-  /**
-   * Verifies that Alice can create a table via Spark SQL using her OAuth2 JWT. Gravitino resolves
-   * Alice's identity from the JWT {@code sub=alice} claim and enforces her catalog privileges.
-   */
   @Test
   @Order(1)
   public void testAliceCreatesTableViaSparkOAuth() {
@@ -260,7 +212,6 @@ public abstract class SparkJwksAuthorizationIT extends BaseIT {
         tables.stream().anyMatch(r -> ALICE_TABLE.equalsIgnoreCase(r.getString(1))),
         "Alice's Spark session should see the table she created");
 
-    // Verify that Gravitino recorded Alice (JWT sub=alice) as the table owner.
     GravitinoMetalake adminMetalake = client.loadMetalake(METALAKE);
     Optional<Owner> tableOwner =
         adminMetalake.getOwner(
@@ -270,14 +221,10 @@ public abstract class SparkJwksAuthorizationIT extends BaseIT {
     Assertions.assertEquals(
         ALICE,
         tableOwner.get().name(),
-        "Table owner should be Alice (resolved from JWT sub=alice)");
+        "Table owner should be Alice");
     LOG.info("Alice created '{}' via Spark OAuth2 (sub=alice)", ALICE_TABLE);
   }
 
-  /**
-   * Verifies that Bob cannot load the catalog before any privileges are granted. Bob's JWT has
-   * {@code sub=bob}; Gravitino resolves his identity and enforces the absence of catalog access.
-   */
   @Test
   @Order(2)
   public void testBobCannotAccessCatalogBeforeGrant() {
@@ -289,15 +236,9 @@ public abstract class SparkJwksAuthorizationIT extends BaseIT {
     LOG.info("Bob correctly received ForbiddenException before grant (sub=bob)");
   }
 
-  /**
-   * Grants Bob read access to the catalog (via the admin client), then verifies that Bob's
-   * JWT-authenticated client can load the catalog and see the table Alice created. Proves the full
-   * loop: grant → privilege change propagates → JWT-identified user gains access.
-   */
   @Test
   @Order(3)
   public void testBobAccessCatalogAfterGrant() {
-    // Admin grants bob USE_CATALOG + USE_SCHEMA + SELECT_TABLE.
     GravitinoMetalake adminMetalake = client.loadMetalake(METALAKE);
     SecurableObject bobCatalogAccess =
         SecurableObjects.ofCatalog(
@@ -309,7 +250,6 @@ public abstract class SparkJwksAuthorizationIT extends BaseIT {
     adminMetalake.createRole(BOB_ROLE, new HashMap<>(), ImmutableList.of(bobCatalogAccess));
     adminMetalake.grantRolesToUser(ImmutableList.of(BOB_ROLE), BOB);
 
-    // Bob's JWT-authenticated client should now be able to load the catalog and see alice's table.
     GravitinoMetalake bobMetalake = bobClient.loadMetalake(METALAKE);
     Catalog catalog = bobMetalake.loadCatalog(CATALOG);
     Assertions.assertNotNull(catalog);
@@ -320,10 +260,6 @@ public abstract class SparkJwksAuthorizationIT extends BaseIT {
         tableExists, "Bob should see the table Alice created after being granted access");
     LOG.info("Bob's JWT-authenticated client sees '{}' after grant (sub=bob)", ALICE_TABLE);
   }
-
-  // ---------------------------------------------------------------------------
-  // Private helpers
-  // ---------------------------------------------------------------------------
 
   private SparkSession buildSparkSession(String credential) {
     SparkConf conf =

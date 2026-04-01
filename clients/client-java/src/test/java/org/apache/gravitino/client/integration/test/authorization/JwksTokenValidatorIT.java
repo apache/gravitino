@@ -44,19 +44,7 @@ import org.junit.jupiter.api.Test;
 
 /**
  * Integration test for {@link org.apache.gravitino.server.authentication.JwksTokenValidator}.
- *
- * <p>Runs two in-process HTTP endpoints on a single random port (zero additional dependencies):
- *
- * <ul>
- *   <li>{@code /jwks} – serves the JWKS public key consumed by Gravitino's {@code
- *       JwksTokenValidator}.
- *   <li>{@code /token} – mock OAuth2 client-credentials endpoint; always returns {@code
- *       currentToken}, so swapping that field changes what the next {@link
- *       DefaultOAuth2TokenProvider} fetch will return.
- * </ul>
- *
- * <p>All test assertions (positive and negative) go through the full {@code client_credentials →
- * /token fetch → Bearer → Gravitino JWKS validation} path via {@link DefaultOAuth2TokenProvider}.
+ * Exercises the full {@code client_credentials → /token → Bearer → JWKS validation} path.
  */
 public class JwksTokenValidatorIT extends BaseIT {
 
@@ -69,7 +57,6 @@ public class JwksTokenValidatorIT extends BaseIT {
 
   private static JwksMockServerHelper mockServerHelper;
   private static RSAKey rsaKey;
-  /** What the {@code /token} endpoint returns; swap this to inject a different JWT. */
   private static volatile String currentToken;
 
   private static String validToken;
@@ -83,7 +70,6 @@ public class JwksTokenValidatorIT extends BaseIT {
         JwksMockServerHelper.mintToken(
             rsaKey, SUBJECT, SERVICE_AUDIENCE, Instant.now().plusSeconds(1_000_000));
     currentToken = validToken;
-    // Single-token mode: every /token request returns currentToken (swappable at runtime).
     mockServerHelper.setTokenSupplier(() -> currentToken);
 
     Map<String, String> configs = Maps.newHashMap();
@@ -95,18 +81,13 @@ public class JwksTokenValidatorIT extends BaseIT {
     configs.put(OAuthConfig.JWKS_URI.getKey(), mockServerHelper.jwksUri());
     configs.put(OAuthConfig.PRINCIPAL_FIELDS.getKey(), "sub");
     configs.put(OAuthConfig.ALLOW_SKEW_SECONDS.getKey(), "6");
-    // Enable authorization so that user identity (extracted from JWT sub) is enforced.
     configs.put(Configs.ENABLE_AUTHORIZATION.getKey(), "true");
-    // SUBJECT ("gravitino") is the service admin: the BaseIT internal client runs as this user.
     configs.put(Configs.SERVICE_ADMINS.getKey(), SUBJECT);
     registerCustomConfigs(configs);
 
-    // Prime OAuthMockDataProvider so that BaseIT can build its internal `client` successfully.
     OAuthMockDataProvider.getInstance().setTokenData(validToken.getBytes(StandardCharsets.UTF_8));
     super.startIntegrationTest();
 
-    // Create a metalake and add alice so authorization tests have something to verify.
-    // bob is intentionally NOT added — his token should be rejected with ForbiddenException.
     client.createMetalake(METALAKE_NAME, "JWKS auth test metalake", Maps.newHashMap());
     client.loadMetalake(METALAKE_NAME).addUser(ALICE);
   }
@@ -120,15 +101,6 @@ public class JwksTokenValidatorIT extends BaseIT {
     super.stopIntegrationTest();
   }
 
-  // ---------------------------------------------------------------------------
-  // Tests
-  // ---------------------------------------------------------------------------
-
-  /**
-   * Full happy path: {@code DefaultOAuth2TokenProvider} posts {@code client_id:secret} to {@code
-   * /token}, receives a valid RS256 JWT, then sends it as a Bearer token to Gravitino, which
-   * validates the signature against {@code /jwks}.
-   */
   @Test
   public void testValidTokenAuthentication() throws Exception {
     withToken(
@@ -146,7 +118,6 @@ public class JwksTokenValidatorIT extends BaseIT {
         });
   }
 
-  /** The mock {@code /token} returns an already-expired JWT; Gravitino must reject it. */
   @Test
   public void testExpiredTokenFails() throws Exception {
     String expiredToken =
@@ -157,7 +128,6 @@ public class JwksTokenValidatorIT extends BaseIT {
         badClient -> Assertions.assertThrows(RuntimeException.class, badClient::serverVersion));
   }
 
-  /** The mock {@code /token} returns a JWT with the wrong audience; Gravitino must reject it. */
   @Test
   public void testWrongAudienceFails() throws Exception {
     String wrongAudToken =
@@ -168,10 +138,6 @@ public class JwksTokenValidatorIT extends BaseIT {
         badClient -> Assertions.assertThrows(RuntimeException.class, badClient::serverVersion));
   }
 
-  /**
-   * The mock {@code /token} returns a JWT signed by a different RSA key whose public key is NOT in
-   * the JWKS endpoint; Gravitino must reject the signature.
-   */
   @Test
   public void testTokenSignedWithDifferentKeyFails() throws Exception {
     RSAKey differentKey = new RSAKeyGenerator(2048).keyID("other-kid").generate();
@@ -183,11 +149,6 @@ public class JwksTokenValidatorIT extends BaseIT {
         badClient -> Assertions.assertThrows(RuntimeException.class, badClient::serverVersion));
   }
 
-  /**
-   * Verifies that a JWT with {@code sub=alice} is accepted and that alice (who was added to the
-   * metalake) can load it. Proves that Gravitino extracts the username from the JWT {@code sub}
-   * claim and enforces authorization based on it.
-   */
   @Test
   public void testPrivilegedUserCanAccessMetalake() throws Exception {
     String aliceToken =
@@ -202,11 +163,6 @@ public class JwksTokenValidatorIT extends BaseIT {
         });
   }
 
-  /**
-   * Verifies that a JWT with {@code sub=bob} is cryptographically valid but bob has no access to
-   * the metalake — Gravitino must throw {@link ForbiddenException}. Proves that authorization is
-   * enforced per-user based on the JWT {@code sub} claim.
-   */
   @Test
   public void testUnprivilegedUserForbidden() throws Exception {
     String bobToken =
@@ -219,17 +175,8 @@ public class JwksTokenValidatorIT extends BaseIT {
                 ForbiddenException.class, () -> bobClient.loadMetalake(METALAKE_NAME)));
   }
 
-  // ---------------------------------------------------------------------------
-  // Helpers
-  // ---------------------------------------------------------------------------
-
   /**
-   * Sets {@code currentToken} so that the next {@code /token} request returns {@code token}, builds
-   * a fresh {@link DefaultOAuth2TokenProvider} (which fetches immediately on construction), wraps
-   * it in a {@link GravitinoAdminClient}, runs {@code action}, then restores the previous token.
-   *
-   * <p>Each call creates an independent provider with no cached state, so the bad token is
-   * guaranteed to be fetched fresh from the mock server.
+   * Swaps {@code currentToken}, builds a fresh provider+client, runs {@code action}, restores.
    */
   private void withToken(String token, ClientConsumer action) throws Exception {
     String previous = currentToken;
