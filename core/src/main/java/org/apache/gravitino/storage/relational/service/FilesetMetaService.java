@@ -240,7 +240,7 @@ public class FilesetMetaService {
           if (metaUpdateCountRef[0] == 0) {
             // The meta update matched no rows; the transaction was rolled back,
             // including the version insert above.
-            updateResult = 0;
+            throw new IOException("Failed to update the entity: " + identifier);
           } else {
             ExceptionUtils.checkSQLException(
                 re, Entity.EntityType.FILESET, newEntity.nameIdentifier().toString());
