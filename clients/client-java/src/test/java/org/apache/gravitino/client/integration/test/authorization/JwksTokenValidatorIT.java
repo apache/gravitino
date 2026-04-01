@@ -175,9 +175,7 @@ public class JwksTokenValidatorIT extends BaseIT {
                 ForbiddenException.class, () -> bobClient.loadMetalake(METALAKE_NAME)));
   }
 
-  /**
-   * Swaps {@code currentToken}, builds a fresh provider+client, runs {@code action}, restores.
-   */
+  /** Swaps {@code currentToken}, builds a fresh provider+client, runs {@code action}, restores. */
   private void withToken(String token, ClientConsumer action) throws Exception {
     String previous = currentToken;
     currentToken = token;

@@ -218,10 +218,7 @@ public abstract class SparkJwksAuthorizationIT extends BaseIT {
             MetadataObjects.of(
                 ImmutableList.of(CATALOG, SCHEMA, ALICE_TABLE), MetadataObject.Type.TABLE));
     Assertions.assertTrue(tableOwner.isPresent(), "Table should have an owner recorded");
-    Assertions.assertEquals(
-        ALICE,
-        tableOwner.get().name(),
-        "Table owner should be Alice");
+    Assertions.assertEquals(ALICE, tableOwner.get().name(), "Table owner should be Alice");
     LOG.info("Alice created '{}' via Spark OAuth2 (sub=alice)", ALICE_TABLE);
   }
 
