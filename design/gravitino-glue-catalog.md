@@ -436,7 +436,13 @@ Trino's Hive connector supports [table redirection](https://trino.io/docs/curren
 
 #### Decision
 
-**Use Approach 2 (Lakehouse connector).** It maps exactly to the unified-catalog model of Alternative A, requires the least code in Gravitino, and delegates all format complexity to Trino. For users on Trino < 477, the Phase 1 behavior applies — Gravitino's metadata API shows all table types, but Trino query execution is limited to Hive-format tables until upgrading to Trino ≥ 477. Approach 3 is not recommended because hidden-catalog lifecycle management outweighs the benefit of supporting older Trino versions. Approach 1 is not recommended because it duplicates functionality already in Trino's Lakehouse connector.
+**Use Approach 2 (Lakehouse connector)** for the following reasons:
+
+- Trino's Lakehouse connector already solves exactly this problem natively. Approach 1 would duplicate that work inside Gravitino with significantly higher implementation cost and ongoing maintenance burden.
+- Approach 3 requires Gravitino to manage the lifecycle of hidden internal catalogs, adding complexity that outweighs the benefit of supporting older Trino versions.
+- A single `GlueConnectorAdapter` (~30 lines) is all that is needed in Gravitino — all mixed-format routing complexity is delegated to Trino.
+
+**For users on Trino < 477**: Phase 1 behavior applies — Gravitino's metadata API exposes all table types correctly, but Trino query execution is limited to Hive-format tables. Mixed-format query support requires upgrading to Trino ≥ 477.
 
 ---
 
