@@ -20,8 +20,11 @@ package org.apache.gravitino.iceberg.common.ops;
 
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableSet;
+import com.google.common.collect.Maps;
 import java.sql.Driver;
 import java.sql.DriverManager;
+import java.time.OffsetDateTime;
+import java.time.ZoneOffset;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
@@ -42,19 +45,16 @@ import org.apache.gravitino.utils.IsolatedClassLoader;
 import org.apache.gravitino.utils.MapUtils;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.security.UserGroupInformation;
-import org.apache.iceberg.BaseMetadataTable;
-import org.apache.iceberg.BaseTable;
-import org.apache.iceberg.Table;
-import org.apache.iceberg.TableMetadata;
-import org.apache.iceberg.Transaction;
 import org.apache.iceberg.catalog.Catalog;
 import org.apache.iceberg.catalog.Namespace;
 import org.apache.iceberg.catalog.SupportsNamespaces;
 import org.apache.iceberg.catalog.TableIdentifier;
 import org.apache.iceberg.catalog.ViewCatalog;
+import org.apache.iceberg.exceptions.AlreadyExistsException;
 import org.apache.iceberg.exceptions.NoSuchTableException;
 import org.apache.iceberg.jdbc.JdbcCatalogWithMetadataLocationSupport;
 import org.apache.iceberg.rest.CatalogHandlers;
+import org.apache.iceberg.rest.RESTCatalog;
 import org.apache.iceberg.rest.requests.CreateNamespaceRequest;
 import org.apache.iceberg.rest.requests.CreateTableRequest;
 import org.apache.iceberg.rest.requests.CreateViewRequest;
@@ -188,10 +188,10 @@ public class IcebergCatalogWrapper implements AutoCloseable {
   public LoadTableResponse createTable(Namespace namespace, CreateTableRequest request) {
     request.validate();
     if (request.stageCreate()) {
-      return CatalogHandlers.stageTableCreate(catalog, namespace, request);
+      return stageTableCreateInternal(namespace, request);
     }
-    LoadTableResponse loadTableResponse = CatalogHandlers.createTable(catalog, namespace, request);
-    if (loadTableResponse != null) {
+    LoadTableResponse loadTableResponse = createTableInternal(namespace, request);
+    if (loadTableResponse != null && !(catalog instanceof RESTCatalog)) {
       TableIdentifier tableIdentifier = TableIdentifier.of(namespace, request.name());
       metadataCache.updateTableMetadata(tableIdentifier, loadTableResponse.tableMetadata());
     }
@@ -215,7 +215,7 @@ public class IcebergCatalogWrapper implements AutoCloseable {
     }
 
     LoadTableResponse loadTableResponse = loadTableInternal(tableIdentifier);
-    if (loadTableResponse != null) {
+    if (loadTableResponse != null && !(catalog instanceof RESTCatalog)) {
       metadataCache.updateTableMetadata(tableIdentifier, loadTableResponse.tableMetadata());
     }
     return loadTableResponse;
@@ -454,5 +454,80 @@ public class IcebergCatalogWrapper implements AutoCloseable {
     }
 
     throw new IllegalStateException("Cannot wrap catalog that does not produce BaseTable");
+  }
+
+  private LoadTableResponse createTableInternal(Namespace namespace, CreateTableRequest request) {
+    request.validate();
+
+    TableIdentifier ident = TableIdentifier.of(namespace, request.name());
+    Table table =
+        catalog
+            .buildTable(ident, request.schema())
+            .withLocation(request.location())
+            .withPartitionSpec(request.spec())
+            .withSortOrder(request.writeOrder())
+            .withProperties(request.properties())
+            .create();
+
+    if (table instanceof BaseTable) {
+      Map<String, String> properties = table.io().properties();
+      return LoadTableResponse.builder()
+          .withTableMetadata(((BaseTable) table).operations().current())
+          .addAllConfig(
+              MapUtils.getFilteredMap(
+                  properties, key -> catalogPropertiesToClientKeys.contains(key)))
+          // Keep only credential fields from FileIO properties before returning them to the client.
+          .addAllConfig(CredentialPropertyUtils.filterCredentialProperties(properties))
+          .build();
+    }
+
+    throw new IllegalStateException("Cannot wrap catalog that does not produce BaseTable");
+  }
+
+  public LoadTableResponse stageTableCreateInternal(
+      Namespace namespace, CreateTableRequest request) {
+    request.validate();
+
+    TableIdentifier ident = TableIdentifier.of(namespace, request.name());
+    if (catalog.tableExists(ident)) {
+      throw new AlreadyExistsException("Table already exists: %s", ident);
+    }
+
+    Map<String, String> properties = Maps.newHashMap();
+    properties.put("created-at", OffsetDateTime.now(ZoneOffset.UTC).toString());
+    properties.putAll(request.properties());
+
+    Map<String, String> config = Maps.newHashMap();
+    String location;
+    if (request.location() != null) {
+      location = request.location();
+    } else {
+      Table table =
+          catalog
+              .buildTable(ident, request.schema())
+              .withPartitionSpec(request.spec())
+              .withSortOrder(request.writeOrder())
+              .withProperties(properties)
+              .createTransaction()
+              .table();
+      config.putAll(
+          MapUtils.getFilteredMap(properties, key -> catalogPropertiesToClientKeys.contains(key)));
+      config.putAll(CredentialPropertyUtils.filterCredentialProperties(properties));
+      location = table.location();
+    }
+
+    TableMetadata metadata =
+        TableMetadata.newTableMetadata(
+            request.schema(),
+            request.spec() != null ? request.spec() : PartitionSpec.unpartitioned(),
+            request.writeOrder() != null ? request.writeOrder() : SortOrder.unsorted(),
+            location,
+            properties);
+
+    if (config.isEmpty()) {
+      return LoadTableResponse.builder().withTableMetadata(metadata).build();
+    } else {
+      return LoadTableResponse.builder().withTableMetadata(metadata).addAllConfig(config).build();
+    }
   }
 }
