@@ -42,8 +42,6 @@ import javax.annotation.Nullable;
 /** In-process JWKS + OAuth2 token mock server for integration tests. */
 public class JwksMockServerHelper implements Closeable {
 
-  private static final String DEFAULT_KEY_ID = "test-kid";
-
   private final HttpServer httpServer;
   private final RSAKey rsaKey;
   private final int port;
