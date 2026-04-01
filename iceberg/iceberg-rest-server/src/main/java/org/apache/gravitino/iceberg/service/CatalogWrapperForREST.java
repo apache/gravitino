@@ -31,7 +31,6 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
-import java.util.Set;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import org.apache.commons.lang3.StringUtils;
@@ -83,14 +82,6 @@ public class CatalogWrapperForREST extends IcebergCatalogWrapper {
 
   private final ScanPlanCache scanPlanCache;
 
-  private static final Set<String> catalogPropertiesToClientKeys =
-      ImmutableSet.of(
-          IcebergConstants.IO_IMPL,
-          IcebergConstants.AWS_S3_REGION,
-          IcebergConstants.ICEBERG_S3_ENDPOINT,
-          IcebergConstants.ICEBERG_OSS_ENDPOINT,
-          IcebergConstants.ICEBERG_S3_PATH_STYLE_ACCESS,
-          IcebergConstants.DATA_ACCESS);
   private static final String DATA_ACCESS_VENDED_CREDENTIALS = "vended-credentials";
   private static final String DATA_ACCESS_REMOTE_SIGNING = "remote-signing";
 
@@ -154,6 +145,7 @@ public class CatalogWrapperForREST extends IcebergCatalogWrapper {
 
             @Override
             public Map<String, String> config() {
+              // Convert Gravitino credentials to the Iceberg REST credential payload format.
               return CredentialPropertyUtils.toIcebergProperties(credential);
             }
 
@@ -264,6 +256,7 @@ public class CatalogWrapperForREST extends IcebergCatalogWrapper {
         credential.credentialType(),
         tableIdentifier);
 
+    // Merge temporary credential fields as Iceberg client config entries in the load-table response.
     Map<String, String> credentialConfig = CredentialPropertyUtils.toIcebergProperties(credential);
     return LoadTableResponse.builder()
         .withTableMetadata(loadTableResponse.tableMetadata())

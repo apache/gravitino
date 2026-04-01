@@ -37,17 +37,38 @@ public class TestSimpleAuthenticator {
     Assertions.assertEquals(
         AuthConstants.ANONYMOUS_USER, simpleAuthenticator.authenticateToken(null).getName());
     Assertions.assertEquals(
+        AuthConstants.AUTHORIZATION_BASIC_HEADER,
+        ((UserPrincipal) simpleAuthenticator.authenticateToken(null)).getAccessToken().get());
+    Assertions.assertEquals(
         AuthConstants.ANONYMOUS_USER,
         simpleAuthenticator.authenticateToken("".getBytes(StandardCharsets.UTF_8)).getName());
     Assertions.assertEquals(
+        AuthConstants.AUTHORIZATION_BASIC_HEADER,
+        ((UserPrincipal) simpleAuthenticator.authenticateToken("".getBytes(StandardCharsets.UTF_8)))
+            .getAccessToken()
+            .get());
+    Assertions.assertEquals(
         AuthConstants.ANONYMOUS_USER,
         simpleAuthenticator.authenticateToken("abc".getBytes(StandardCharsets.UTF_8)).getName());
+    Assertions.assertEquals(
+        AuthConstants.AUTHORIZATION_BASIC_HEADER,
+        ((UserPrincipal)
+                simpleAuthenticator.authenticateToken("abc".getBytes(StandardCharsets.UTF_8)))
+            .getAccessToken()
+            .get());
     Assertions.assertEquals(
         AuthConstants.ANONYMOUS_USER,
         simpleAuthenticator
             .authenticateToken(
                 AuthConstants.AUTHORIZATION_BASIC_HEADER.getBytes(StandardCharsets.UTF_8))
             .getName());
+    Assertions.assertEquals(
+        AuthConstants.AUTHORIZATION_BASIC_HEADER,
+        ((UserPrincipal)
+                simpleAuthenticator.authenticateToken(
+                    AuthConstants.AUTHORIZATION_BASIC_HEADER.getBytes(StandardCharsets.UTF_8)))
+            .getAccessToken()
+            .get());
     String fullCredentials = "test-user:123";
     String basicToken =
         AuthConstants.AUTHORIZATION_BASIC_HEADER
@@ -77,6 +98,12 @@ public class TestSimpleAuthenticator {
         simpleAuthenticator
             .authenticateToken(basicToken.getBytes(StandardCharsets.UTF_8))
             .getName());
+    Assertions.assertEquals(
+        AuthConstants.AUTHORIZATION_BASIC_HEADER,
+        ((UserPrincipal)
+                simpleAuthenticator.authenticateToken(basicToken.getBytes(StandardCharsets.UTF_8)))
+            .getAccessToken()
+            .get());
     Assertions.assertEquals(
         "gravitino",
         simpleAuthenticator

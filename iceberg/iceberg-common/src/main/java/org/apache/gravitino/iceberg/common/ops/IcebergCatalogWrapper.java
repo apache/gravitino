@@ -19,24 +19,32 @@
 package org.apache.gravitino.iceberg.common.ops;
 
 import com.google.common.base.Preconditions;
+import com.google.common.collect.ImmutableSet;
 import java.sql.Driver;
 import java.sql.DriverManager;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import lombok.Getter;
 import lombok.Setter;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.catalog.hadoop.fs.FileSystemUtils;
 import org.apache.gravitino.catalog.lakehouse.iceberg.IcebergCatalogBackend;
+import org.apache.gravitino.catalog.lakehouse.iceberg.IcebergConstants;
+import org.apache.gravitino.credential.CredentialPropertyUtils;
 import org.apache.gravitino.iceberg.common.IcebergConfig;
 import org.apache.gravitino.iceberg.common.cache.SupportsMetadataLocation;
 import org.apache.gravitino.iceberg.common.cache.TableMetadataCache;
 import org.apache.gravitino.iceberg.common.utils.IcebergCatalogUtil;
 import org.apache.gravitino.utils.ClassUtils;
 import org.apache.gravitino.utils.IsolatedClassLoader;
+import org.apache.gravitino.utils.MapUtils;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.security.UserGroupInformation;
+import org.apache.iceberg.BaseMetadataTable;
+import org.apache.iceberg.BaseTable;
+import org.apache.iceberg.Table;
 import org.apache.iceberg.TableMetadata;
 import org.apache.iceberg.Transaction;
 import org.apache.iceberg.catalog.Catalog;
@@ -44,6 +52,7 @@ import org.apache.iceberg.catalog.Namespace;
 import org.apache.iceberg.catalog.SupportsNamespaces;
 import org.apache.iceberg.catalog.TableIdentifier;
 import org.apache.iceberg.catalog.ViewCatalog;
+import org.apache.iceberg.exceptions.NoSuchTableException;
 import org.apache.iceberg.jdbc.JdbcCatalogWithMetadataLocationSupport;
 import org.apache.iceberg.rest.CatalogHandlers;
 import org.apache.iceberg.rest.requests.CreateNamespaceRequest;
@@ -70,6 +79,14 @@ import org.slf4j.LoggerFactory;
 public class IcebergCatalogWrapper implements AutoCloseable {
 
   public static final Logger LOG = LoggerFactory.getLogger(IcebergCatalogWrapper.class);
+  protected static final Set<String> catalogPropertiesToClientKeys =
+      ImmutableSet.of(
+          IcebergConstants.IO_IMPL,
+          IcebergConstants.AWS_S3_REGION,
+          IcebergConstants.ICEBERG_S3_ENDPOINT,
+          IcebergConstants.ICEBERG_OSS_ENDPOINT,
+          IcebergConstants.ICEBERG_S3_PATH_STYLE_ACCESS,
+          IcebergConstants.DATA_ACCESS);
 
   @Getter protected Catalog catalog;
   private SupportsNamespaces asNamespaceCatalog;
@@ -197,7 +214,7 @@ public class IcebergCatalogWrapper implements AutoCloseable {
       return LoadTableResponse.builder().withTableMetadata(tableMetadataOptional.get()).build();
     }
 
-    LoadTableResponse loadTableResponse = CatalogHandlers.loadTable(catalog, tableIdentifier);
+    LoadTableResponse loadTableResponse = loadTableInternal(tableIdentifier);
     if (loadTableResponse != null) {
       metadataCache.updateTableMetadata(tableIdentifier, loadTableResponse.tableMetadata());
     }
@@ -413,5 +430,29 @@ public class IcebergCatalogWrapper implements AutoCloseable {
         capacity,
         expireMinutes);
     return cache;
+  }
+
+  private LoadTableResponse loadTableInternal(TableIdentifier ident) {
+    Table table = catalog.loadTable(ident);
+    for (Map.Entry<String, String> entry : table.io().properties().entrySet()) {
+      LOG.warn("table property {}: {}", entry.getKey(), entry.getValue());
+    }
+
+    if (table instanceof BaseTable) {
+      Map<String, String> properties = table.io().properties();
+      return LoadTableResponse.builder()
+          .withTableMetadata(((BaseTable) table).operations().current())
+          .addAllConfig(
+              MapUtils.getFilteredMap(
+                  properties, key -> catalogPropertiesToClientKeys.contains(key)))
+          // Keep only credential fields from FileIO properties before returning them to the client.
+          .addAllConfig(CredentialPropertyUtils.filterCredentialProperties(properties))
+          .build();
+    } else if (table instanceof BaseMetadataTable) {
+      // metadata tables are loaded on the client side, return NoSuchTableException for now
+      throw new NoSuchTableException("Table does not exist: %s", ident.toString());
+    }
+
+    throw new IllegalStateException("Cannot wrap catalog that does not produce BaseTable");
   }
 }
