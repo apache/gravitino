@@ -668,4 +668,57 @@ public class TestJwksTokenValidator {
       assertTrue(userPrincipal.getGroups().isEmpty());
     }
   }
+
+  @Test
+  public void testExtractPrincipalForLogging_nullToken() {
+    Map<String, String> config = new HashMap<>();
+    config.put("gravitino.authenticator.oauth.jwksUri", validJwksUri);
+    validator.initialize(createConfig(config));
+
+    assertEquals("unknown", validator.extractPrincipalForLogging(null));
+  }
+
+  @Test
+  public void testExtractPrincipalForLogging_withSubClaim() throws Exception {
+    Map<String, String> config = new HashMap<>();
+    config.put("gravitino.authenticator.oauth.jwksUri", validJwksUri);
+    config.put("gravitino.authenticator.oauth.principalFields", "sub");
+    validator.initialize(createConfig(config));
+
+    RSAKey rsaKey =
+        new RSAKeyGenerator(2048).keyID("test-key-id").algorithm(JWSAlgorithm.RS256).generate();
+    JWTClaimsSet claims =
+        new JWTClaimsSet.Builder()
+            .subject("alice")
+            .expirationTime(Date.from(Instant.now().plusSeconds(3600)))
+            .build();
+    SignedJWT jwt =
+        new SignedJWT(
+            new JWSHeader.Builder(JWSAlgorithm.RS256).keyID("test-key-id").build(), claims);
+    jwt.sign(new RSASSASigner(rsaKey));
+
+    assertEquals("alice", validator.extractPrincipalForLogging(jwt));
+  }
+
+  @Test
+  public void testExtractPrincipalForLogging_missingPrincipalField() throws Exception {
+    Map<String, String> config = new HashMap<>();
+    config.put("gravitino.authenticator.oauth.jwksUri", validJwksUri);
+    config.put("gravitino.authenticator.oauth.principalFields", "preferred_username");
+    validator.initialize(createConfig(config));
+
+    RSAKey rsaKey =
+        new RSAKeyGenerator(2048).keyID("test-key-id").algorithm(JWSAlgorithm.RS256).generate();
+    JWTClaimsSet claims =
+        new JWTClaimsSet.Builder()
+            .subject("alice") // only sub, no preferred_username
+            .expirationTime(Date.from(Instant.now().plusSeconds(3600)))
+            .build();
+    SignedJWT jwt =
+        new SignedJWT(
+            new JWSHeader.Builder(JWSAlgorithm.RS256).keyID("test-key-id").build(), claims);
+    jwt.sign(new RSASSASigner(rsaKey));
+
+    assertEquals("unknown", validator.extractPrincipalForLogging(jwt));
+  }
 }
