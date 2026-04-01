@@ -634,6 +634,54 @@ public class TestJobManager {
   }
 
   @Test
+  public void testCleanUpStagingDirsDeletesDirectoryBeforeEntity() throws IOException {
+    JobEntity finishedJob = newJobEntity("shell_job", JobHandle.Status.SUCCEEDED);
+    BaseMetalake mockMetalakeEntity =
+        BaseMetalake.builder()
+            .withName(metalake)
+            .withId(idGenerator.nextId())
+            .withVersion(SchemaVersion.V_0_1)
+            .withAuditInfo(AuditInfo.EMPTY)
+            .build();
+    when(entityStore.list(Namespace.empty(), BaseMetalake.class, Entity.EntityType.METALAKE))
+        .thenReturn(ImmutableList.of(mockMetalakeEntity));
+    mockedMetalake
+        .when(() -> MetalakeManager.listInUseMetalakes(entityStore))
+        .thenReturn(ImmutableList.of(metalake));
+    when(jobManager.listJobs(metalake, Optional.empty())).thenReturn(ImmutableList.of(finishedJob));
+
+    // Create the staging directory so FileUtils.deleteDirectory is actually invoked
+    String jobStagingPath =
+        testStagingDir
+            + File.separator
+            + metalake
+            + File.separator
+            + finishedJob.jobTemplateName()
+            + File.separator
+            + JobHandle.JOB_ID_PREFIX
+            + finishedJob.id();
+    File jobStagingDir = new File(jobStagingPath);
+    Assertions.assertTrue(jobStagingDir.mkdirs());
+
+    // Simulate IOException when deleting the staging directory
+    try (MockedStatic<org.apache.commons.io.FileUtils> mockedFileUtils =
+        mockStatic(org.apache.commons.io.FileUtils.class)) {
+      mockedFileUtils
+          .when(() -> org.apache.commons.io.FileUtils.deleteDirectory(any(File.class)))
+          .thenThrow(new IOException("Simulated IO failure"));
+
+      Awaitility.await()
+          .atMost(3, TimeUnit.SECONDS)
+          .untilAsserted(
+              () -> {
+                jobManager.cleanUpStagingDirs();
+                // Entity should NOT be deleted because directory deletion failed
+                verify(entityStore, never()).delete(any(), any());
+              });
+    }
+  }
+
+  @Test
   public void testUpdateShellJobTemplateEntity() {
     String jobTemplateName = "old_shell_job";
     String jobTemplateComment = "An old shell job template";

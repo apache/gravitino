@@ -645,17 +645,17 @@ public class JobManager implements JobOperationDispatcher {
       finishedJobs.forEach(
           job -> {
             try {
-              entityStore.delete(
-                  NameIdentifierUtil.ofJob(metalake, job.name()), Entity.EntityType.JOB);
-
               String jobStagingPath =
                   stagingDir.getAbsolutePath()
                       + String.format(JOB_STAGING_DIR, metalake, job.jobTemplateName(), job.id());
               File jobStagingDir = new File(jobStagingPath);
               if (jobStagingDir.exists()) {
                 FileUtils.deleteDirectory(jobStagingDir);
-                LOG.info("Deleted job staging directory {} for job {}", jobStagingPath, job.name());
               }
+
+              entityStore.delete(
+                  NameIdentifierUtil.ofJob(metalake, job.name()), Entity.EntityType.JOB);
+              LOG.info("Deleted job staging directory {} for job {}", jobStagingPath, job.name());
             } catch (IOException e) {
               LOG.error("Failed to delete job and staging directory for job {}", job.name(), e);
             }
