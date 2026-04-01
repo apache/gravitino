@@ -579,7 +579,7 @@ public class IcebergTableOperations {
    * @param loadTableResponse the table response to include in the body
    * @return a Response with ETag header set
    */
-  private static Response buildResponseWithETag(LoadTableResponse loadTableResponse) {
+  static Response buildResponseWithETag(LoadTableResponse loadTableResponse) {
     EntityTag etag =
         generateETag(loadTableResponse.tableMetadata().metadataFileLocation(), DEFAULT_SNAPSHOTS);
     return buildResponseWithETag(loadTableResponse, etag);

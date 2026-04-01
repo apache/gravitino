@@ -317,7 +317,7 @@ public class IcebergNamespaceOperations {
             LoadTableResponse loadTableResponse =
                 namespaceOperationDispatcher.registerTable(
                     context, icebergNS, registerTableRequest);
-            return IcebergRESTUtils.ok(loadTableResponse);
+            return IcebergTableOperations.buildResponseWithETag(loadTableResponse);
           });
     } catch (Exception e) {
       return IcebergExceptionMapper.toRESTResponse(e);

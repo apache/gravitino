@@ -22,6 +22,7 @@ import java.util.Arrays;
 import java.util.Optional;
 import javax.servlet.http.HttpServletRequest;
 import javax.ws.rs.core.Application;
+import javax.ws.rs.core.Response;
 import org.apache.gravitino.listener.api.event.Event;
 import org.apache.gravitino.listener.api.event.IcebergCreateNamespaceEvent;
 import org.apache.gravitino.listener.api.event.IcebergCreateNamespaceFailureEvent;
@@ -187,6 +188,16 @@ public class TestIcebergNamespaceOperations extends IcebergNamespaceTestBase {
         dummyEventListener.popPostEvent() instanceof IcebergRegisterTableFailureEvent);
 
     verifyRegisterTableSucc("register_foo2", Namespace.of("register_ns_2", "a"));
+  }
+
+  @Test
+  void testRegisterTableReturnsETag() {
+    Namespace ns = Namespace.of("register_etag_ns");
+    Response response = doRegisterTable("register_etag_foo1", ns);
+    Assertions.assertEquals(Response.Status.OK.getStatusCode(), response.getStatus());
+    String etag = response.getHeaderString("ETag");
+    Assertions.assertNotNull(etag, "ETag header should be present in register table response");
+    Assertions.assertFalse(etag.isEmpty(), "ETag header should not be empty");
   }
 
   @ParameterizedTest
