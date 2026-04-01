@@ -28,6 +28,7 @@ import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
 import javax.inject.Inject;
 import javax.servlet.http.HttpServletRequest;
 import javax.ws.rs.Consumes;
@@ -91,6 +92,8 @@ public class IcebergTableOperations {
   public static final String X_ICEBERG_ACCESS_DELEGATION = "X-Iceberg-Access-Delegation";
 
   @VisibleForTesting public static final String IF_NONE_MATCH = "If-None-Match";
+
+  @VisibleForTesting static final String DEFAULT_SNAPSHOTS = "all";
 
   private IcebergMetricsManager icebergMetricsManager;
 
@@ -288,7 +291,7 @@ public class IcebergTableOperations {
           String namespace,
       @IcebergAuthorizationMetadata(type = RequestType.LOAD_TABLE) @Encoded() @PathParam("table")
           String table,
-      @DefaultValue("all") @QueryParam("snapshots") String snapshots,
+      @DefaultValue(DEFAULT_SNAPSHOTS) @QueryParam("snapshots") String snapshots,
       @HeaderParam(X_ICEBERG_ACCESS_DELEGATION) String accessDelegation,
       @HeaderParam(IF_NONE_MATCH) String ifNoneMatch) {
     String catalogName = IcebergRESTUtils.getCatalogName(prefix);
@@ -311,6 +314,19 @@ public class IcebergTableOperations {
             TableIdentifier tableIdentifier = TableIdentifier.of(icebergNS, tableName);
             IcebergRequestContext context =
                 new IcebergRequestContext(httpServletRequest(), catalogName, isCredentialVending);
+
+            // Fast path: if client sent If-None-Match, try to resolve ETag without full table load
+            if (StringUtils.isNotBlank(ifNoneMatch)) {
+              Optional<String> metadataLocation =
+                  tableOperationDispatcher.getTableMetadataLocation(context, tableIdentifier);
+              if (metadataLocation.isPresent()) {
+                EntityTag etag = generateETag(metadataLocation.get(), snapshots);
+                if (etag != null && etagMatches(ifNoneMatch, etag)) {
+                  return Response.notModified(etag).build();
+                }
+              }
+            }
+
             LoadTableResponse loadTableResponse =
                 tableOperationDispatcher.loadTable(context, tableIdentifier);
             EntityTag etag =
@@ -521,13 +537,16 @@ public class IcebergTableOperations {
   }
 
   /**
-   * Builds an OK response with the ETag header derived from the table metadata location.
+   * Builds an OK response with the ETag header derived from the table metadata location. Uses the
+   * default snapshots value to ensure ETags from create/update are consistent with the default
+   * loadTable endpoint.
    *
    * @param loadTableResponse the table response to include in the body
    * @return a Response with ETag header set
    */
   private static Response buildResponseWithETag(LoadTableResponse loadTableResponse) {
-    EntityTag etag = generateETag(loadTableResponse.tableMetadata().metadataFileLocation());
+    EntityTag etag =
+        generateETag(loadTableResponse.tableMetadata().metadataFileLocation(), DEFAULT_SNAPSHOTS);
     return buildResponseWithETag(loadTableResponse, etag);
   }
 
@@ -605,7 +624,7 @@ public class IcebergTableOperations {
    * @return true if the ETag matches (table unchanged), false otherwise
    */
   private static boolean etagMatches(String ifNoneMatch, EntityTag etag) {
-    if (ifNoneMatch == null || ifNoneMatch.isEmpty()) {
+    if (StringUtils.isBlank(ifNoneMatch)) {
       return false;
     }
     // Strip quotes if present to compare the raw value

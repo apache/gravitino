@@ -22,9 +22,11 @@
 ## General Coding Standards
 - **Language**: Use English for all code, comments, and documentation.
 - **Style**: Follow rigid Google Java Style. Run `./gradlew spotlessApply` to format.
-- **Imports**: prioritizing standard imports over Fully Qualified Class Names (FQN).
+- **Imports**: Always use normal `import` statements instead of Fully Qualified Class Names (FQN) in Java code whenever possible.
   - **Bad**: `org.apache.gravitino.rel.Table table = ...;`
   - **Good**: `Table table = ...;` (with `import org.apache.gravitino.rel.Table;`)
+  - Do not write inline types like `java.nio.file.Paths` or `org.apache.xxx.Table` unless there is a real class name conflict that cannot be resolved cleanly.
+  - If two classes share the same simple name, prefer imports plus small refactors over keeping FQNs throughout the code.
 - **Safety**: Use `@Nullable` annotations. Handle resources with try-with-resources.
 - **Logging**: Use SLF4J. No `System.out.println`.
 - **Testing**:
@@ -65,4 +67,3 @@
 - When hitting a problem, search memory first for known solutions before debugging from scratch.
 - After completing a task, save key findings and solutions to claude-mem for future reference.
 - Use multiple keyword combinations when searching (e.g., module name + issue type, class name + error).
-
