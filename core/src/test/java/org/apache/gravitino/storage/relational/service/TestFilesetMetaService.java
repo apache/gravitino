@@ -375,6 +375,8 @@ public class TestFilesetMetaService extends TestJDBCBackend {
         .withProperties(null)
         .withAuditInfo(auditInfo)
         .build();
+  }
+
   @TestTemplate
   public void testUpdateFilesetReturnsSuccessWhenVersionedMetaUpdateAffectsNoRows()
       throws IOException {
@@ -411,25 +413,36 @@ public class TestFilesetMetaService extends TestJDBCBackend {
                     .build())
             .build();
 
-    Exception exception = Assertions.assertThrows(
-        IOException.class,
-        () -> FilesetMetaService.getInstance()
-            .updateFileset(
-                filesetIdent,
-                e -> {
-                  // Simulate an optimistic locking conflict
-                  try {
-                    backend.update(filesetIdent, Entity.EntityType.FILESET, entity -> {
-                       FilesetEntity cloned = createFilesetEntity(entity.id(), entity.namespace(), entity.name(), conflictingAuditInfo, "/tmp");
-                       return cloned;
-                    });
-                  } catch (Exception ex) {
-                    throw new RuntimeException(ex);
-                  }
-                  return updatedFilesetEntity;
-                })
-    );
-    Assertions.assertTrue(exception.getMessage().contains("Failed to update the entity: " + filesetIdent));
+    Exception exception =
+        Assertions.assertThrows(
+            IOException.class,
+            () ->
+                FilesetMetaService.getInstance()
+                    .updateFileset(
+                        filesetIdent,
+                        e -> {
+                          // Simulate an optimistic locking conflict
+                          try {
+                            backend.update(
+                                filesetIdent,
+                                Entity.EntityType.FILESET,
+                                entity -> {
+                                  FilesetEntity cloned =
+                                      createFilesetEntity(
+                                          entity.id(),
+                                          entity.namespace(),
+                                          entity.name(),
+                                          conflictingAuditInfo,
+                                          "/tmp");
+                                  return cloned;
+                                });
+                          } catch (Exception ex) {
+                            throw new RuntimeException(ex);
+                          }
+                          return updatedFilesetEntity;
+                        }));
+    Assertions.assertTrue(
+        exception.getMessage().contains("Failed to update the entity: " + filesetIdent));
 
     FilesetEntity persistedEntity =
         FilesetMetaService.getInstance().getFilesetByIdentifier(filesetIdent);

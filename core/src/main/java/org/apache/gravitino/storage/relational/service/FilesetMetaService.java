@@ -215,22 +215,38 @@ public class FilesetMetaService {
       FilesetPO newFilesetPO =
           POConverters.updateFilesetPOWithVersion(oldFilesetPO, newEntity, checkNeedUpdateVersion);
       if (checkNeedUpdateVersion) {
-        // These operations are guaranteed to be atomic by the transaction. If version info is
-        // inserted successfully and the uniqueness is guaranteed by `fileset_id + version +
-        // deleted_at`, it means that no other transaction has been inserted (if a uniqueness
-        // conflict occurs, the transaction will be rolled back), then we can consider that the
-        // fileset meta update is successful
-        int[] updateResultRef = new int[1];
-        SessionUtils.doMultipleWithCommit(
-            () ->
-                SessionUtils.doWithoutCommit(
-                    FilesetVersionMapper.class,
-                    mapper -> mapper.insertFilesetVersions(newFilesetPO.getFilesetVersionPOs())),
-            () ->
-                updateResultRef[0] = SessionUtils.getWithoutCommit(
-                    FilesetMetaMapper.class,
-                    mapper -> mapper.updateFilesetMeta(newFilesetPO, oldFilesetPO)));
-        updateResult = updateResultRef[0];
+        // These operations are performed atomically within a single transaction. The version
+        // insert is protected by a unique constraint on `fileset_id + version + deleted_at`. If
+        // the meta update affects 0 rows (concurrent modification), the transaction is rolled
+        // back — including the version insert — and the update is treated as a conflict.
+        int[] metaUpdateCountRef = new int[1];
+        try {
+          SessionUtils.doMultipleWithCommit(
+              () ->
+                  SessionUtils.doWithoutCommit(
+                      FilesetVersionMapper.class,
+                      mapper -> mapper.insertFilesetVersions(newFilesetPO.getFilesetVersionPOs())),
+              () -> {
+                metaUpdateCountRef[0] =
+                    SessionUtils.getWithoutCommit(
+                        FilesetMetaMapper.class,
+                        mapper -> mapper.updateFilesetMeta(newFilesetPO, oldFilesetPO));
+                if (metaUpdateCountRef[0] == 0) {
+                  throw new RuntimeException("Failed to update the entity: " + identifier);
+                }
+              });
+          updateResult = 1;
+        } catch (RuntimeException re) {
+          if (metaUpdateCountRef[0] == 0) {
+            // The meta update matched no rows; the transaction was rolled back,
+            // including the version insert above.
+            updateResult = 0;
+          } else {
+            ExceptionUtils.checkSQLException(
+                re, Entity.EntityType.FILESET, newEntity.nameIdentifier().toString());
+            throw re;
+          }
+        }
       } else {
         updateResult =
             SessionUtils.doWithCommitAndFetchResult(
