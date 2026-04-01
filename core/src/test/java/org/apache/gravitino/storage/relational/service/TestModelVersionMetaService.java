@@ -22,13 +22,18 @@ import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Lists;
 import java.io.IOException;
+import java.sql.Connection;
+import java.sql.ResultSet;
 import java.sql.SQLException;
+import java.sql.Statement;
+import java.time.Instant;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import java.util.function.Function;
 import java.util.stream.Collectors;
+import org.apache.gravitino.Entity;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.exceptions.IllegalNamespaceException;
@@ -40,7 +45,9 @@ import org.apache.gravitino.meta.ModelVersionEntity;
 import org.apache.gravitino.model.ModelVersion;
 import org.apache.gravitino.storage.RandomIdGenerator;
 import org.apache.gravitino.storage.relational.TestJDBCBackend;
+import org.apache.gravitino.storage.relational.session.SqlSessionFactoryHelper;
 import org.apache.gravitino.utils.NameIdentifierUtil;
+import org.apache.ibatis.session.SqlSession;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.TestTemplate;
 
@@ -970,6 +977,110 @@ public class TestModelVersionMetaService extends TestJDBCBackend {
     Assertions.assertEquals(updatedVersionAliases, altered.aliases());
   }
 
+  @TestTemplate
+  void testDeleteModelVersionsByLegacyTimeline() throws IOException {
+    createParentEntities(METALAKE_NAME, CATALOG_NAME, SCHEMA_NAME, AUDIT_INFO);
+
+    // Create a model entity
+    ModelEntity modelEntity =
+        createModelEntity(
+            RandomIdGenerator.INSTANCE.nextId(),
+            MODEL_NS,
+            "model1",
+            "model1 comment",
+            0,
+            properties,
+            AUDIT_INFO);
+
+    Assertions.assertDoesNotThrow(
+        () -> ModelMetaService.getInstance().insertModel(modelEntity, false));
+
+    // Create model version entities with aliases
+    ModelVersionEntity modelVersionEntity0 =
+        createModelVersionEntity(
+            modelEntity.nameIdentifier(),
+            0,
+            ImmutableMap.of(ModelVersion.URI_NAME_UNKNOWN, "model_path_0"),
+            aliases,
+            "version 0 comment",
+            properties,
+            AUDIT_INFO);
+
+    ModelVersionEntity modelVersionEntity1 =
+        createModelVersionEntity(
+            modelEntity.nameIdentifier(),
+            1,
+            ImmutableMap.of(ModelVersion.URI_NAME_UNKNOWN, "model_path_1"),
+            ImmutableList.of("alias3"),
+            "version 1 comment",
+            properties,
+            AUDIT_INFO);
+
+    Assertions.assertDoesNotThrow(
+        () -> ModelVersionMetaService.getInstance().insertModelVersion(modelVersionEntity0));
+    Assertions.assertDoesNotThrow(
+        () -> ModelVersionMetaService.getInstance().insertModelVersion(modelVersionEntity1));
+
+    // Verify model versions exist
+    Assertions.assertEquals(
+        modelVersionEntity0,
+        ModelVersionMetaService.getInstance()
+            .getModelVersionByIdentifier(getModelVersionIdent(modelEntity.nameIdentifier(), 0)));
+    Assertions.assertEquals(
+        modelVersionEntity1,
+        ModelVersionMetaService.getInstance()
+            .getModelVersionByIdentifier(getModelVersionIdent(modelEntity.nameIdentifier(), 1)));
+
+    // Soft delete the model (cascade deletes model versions)
+    Assertions.assertTrue(ModelMetaService.getInstance().deleteModel(modelEntity.nameIdentifier()));
+
+    // Verify model versions are soft deleted (cannot be retrieved)
+    Assertions.assertThrows(
+        NoSuchEntityException.class,
+        () ->
+            ModelVersionMetaService.getInstance()
+                .getModelVersionByIdentifier(
+                    getModelVersionIdent(modelEntity.nameIdentifier(), 0)));
+    Assertions.assertThrows(
+        NoSuchEntityException.class,
+        () ->
+            ModelVersionMetaService.getInstance()
+                .getModelVersionByIdentifier(
+                    getModelVersionIdent(modelEntity.nameIdentifier(), 1)));
+
+    // Verify legacy records exist in database after soft delete
+    Assertions.assertTrue(
+        legacyModelVersionRecordExistsInDB(modelEntity.id(), 0),
+        "Model version 0 legacy record should exist");
+    Assertions.assertTrue(
+        legacyModelVersionRecordExistsInDB(modelEntity.id(), 1),
+        "Model version 1 legacy record should exist");
+    Assertions.assertTrue(
+        legacyModelVersionAliasRecordsExistInDB(modelEntity.id(), 0),
+        "Model version 0 alias legacy records should exist");
+    Assertions.assertTrue(
+        legacyModelVersionAliasRecordsExistInDB(modelEntity.id(), 1),
+        "Model version 1 alias legacy records should exist");
+
+    // Hard delete legacy data for MODEL_VERSION entity type
+    backend.hardDeleteLegacyData(
+        Entity.EntityType.MODEL_VERSION, Instant.now().toEpochMilli() + 1000);
+
+    // Verify legacy records are removed from database
+    Assertions.assertFalse(
+        legacyModelVersionRecordExistsInDB(modelEntity.id(), 0),
+        "Model version 0 legacy record should be deleted");
+    Assertions.assertFalse(
+        legacyModelVersionRecordExistsInDB(modelEntity.id(), 1),
+        "Model version 1 legacy record should be deleted");
+    Assertions.assertFalse(
+        legacyModelVersionAliasRecordsExistInDB(modelEntity.id(), 0),
+        "Model version 0 alias legacy records should be deleted");
+    Assertions.assertFalse(
+        legacyModelVersionAliasRecordsExistInDB(modelEntity.id(), 1),
+        "Model version 1 alias legacy records should be deleted");
+  }
+
   private NameIdentifier getModelVersionIdent(NameIdentifier modelIdent, int version) {
     List<String> parts = Lists.newArrayList(modelIdent.namespace().levels());
     parts.add(modelIdent.name());
@@ -1019,5 +1130,51 @@ public class TestModelVersionMetaService extends TestJDBCBackend {
         .withProperties(properties)
         .withAuditInfo(auditInfo)
         .build();
+  }
+
+  /**
+   * Helper method to check if a model version legacy record exists in the database.
+   *
+   * @param modelId The model ID
+   * @param version The model version
+   * @return true if legacy record exists (deleted_at != 0), false otherwise
+   */
+  private boolean legacyModelVersionRecordExistsInDB(Long modelId, Integer version) {
+    try (SqlSession sqlSession =
+            SqlSessionFactoryHelper.getInstance().getSqlSessionFactory().openSession(true);
+        Connection connection = sqlSession.getConnection();
+        Statement statement = connection.createStatement();
+        ResultSet rs =
+            statement.executeQuery(
+                String.format(
+                    "SELECT * FROM model_version_info WHERE model_id = %d AND version = %d AND deleted_at != 0",
+                    modelId, version))) {
+      return rs.next();
+    } catch (SQLException e) {
+      throw new RuntimeException("SQL execution failed", e);
+    }
+  }
+
+  /**
+   * Helper method to check if model version alias legacy records exist in the database.
+   *
+   * @param modelId The model ID
+   * @param version The model version
+   * @return true if any alias legacy records exist (deleted_at != 0), false otherwise
+   */
+  private boolean legacyModelVersionAliasRecordsExistInDB(Long modelId, Integer version) {
+    try (SqlSession sqlSession =
+            SqlSessionFactoryHelper.getInstance().getSqlSessionFactory().openSession(true);
+        Connection connection = sqlSession.getConnection();
+        Statement statement = connection.createStatement();
+        ResultSet rs =
+            statement.executeQuery(
+                String.format(
+                    "SELECT * FROM model_version_alias_rel WHERE model_id = %d AND model_version = %d AND deleted_at != 0",
+                    modelId, version))) {
+      return rs.next();
+    } catch (SQLException e) {
+      throw new RuntimeException("SQL execution failed", e);
+    }
   }
 }
