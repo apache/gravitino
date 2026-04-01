@@ -17,7 +17,7 @@
 
 
 # the tools to publish the python client to Pypi
-requests==2.32.5
+requests==2.33.1
 dataclasses-json==0.6.7
 readerwriterlock==1.0.9
 fsspec==2026.2.0
