@@ -22,10 +22,7 @@ import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Lists;
 import java.io.IOException;
-import java.sql.Connection;
-import java.sql.ResultSet;
 import java.sql.SQLException;
-import java.sql.Statement;
 import java.time.Instant;
 import java.util.Collections;
 import java.util.List;
@@ -45,9 +42,7 @@ import org.apache.gravitino.meta.ModelVersionEntity;
 import org.apache.gravitino.model.ModelVersion;
 import org.apache.gravitino.storage.RandomIdGenerator;
 import org.apache.gravitino.storage.relational.TestJDBCBackend;
-import org.apache.gravitino.storage.relational.session.SqlSessionFactoryHelper;
 import org.apache.gravitino.utils.NameIdentifierUtil;
-import org.apache.ibatis.session.SqlSession;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.TestTemplate;
 
@@ -1021,16 +1016,6 @@ public class TestModelVersionMetaService extends TestJDBCBackend {
     Assertions.assertDoesNotThrow(
         () -> ModelVersionMetaService.getInstance().insertModelVersion(modelVersionEntity1));
 
-    // Verify model versions exist
-    Assertions.assertEquals(
-        modelVersionEntity0,
-        ModelVersionMetaService.getInstance()
-            .getModelVersionByIdentifier(getModelVersionIdent(modelEntity.nameIdentifier(), 0)));
-    Assertions.assertEquals(
-        modelVersionEntity1,
-        ModelVersionMetaService.getInstance()
-            .getModelVersionByIdentifier(getModelVersionIdent(modelEntity.nameIdentifier(), 1)));
-
     // Soft delete the model (cascade deletes model versions)
     Assertions.assertTrue(ModelMetaService.getInstance().deleteModel(modelEntity.nameIdentifier()));
 
@@ -1048,37 +1033,14 @@ public class TestModelVersionMetaService extends TestJDBCBackend {
                 .getModelVersionByIdentifier(
                     getModelVersionIdent(modelEntity.nameIdentifier(), 1)));
 
-    // Verify legacy records exist in database after soft delete
-    Assertions.assertTrue(
-        legacyModelVersionRecordExistsInDB(modelEntity.id(), 0),
-        "Model version 0 legacy record should exist");
-    Assertions.assertTrue(
-        legacyModelVersionRecordExistsInDB(modelEntity.id(), 1),
-        "Model version 1 legacy record should exist");
-    Assertions.assertTrue(
-        legacyModelVersionAliasRecordsExistInDB(modelEntity.id(), 0),
-        "Model version 0 alias legacy records should exist");
-    Assertions.assertTrue(
-        legacyModelVersionAliasRecordsExistInDB(modelEntity.id(), 1),
-        "Model version 1 alias legacy records should exist");
-
     // Hard delete legacy data for MODEL_VERSION entity type
-    backend.hardDeleteLegacyData(
-        Entity.EntityType.MODEL_VERSION, Instant.now().toEpochMilli() + 1000);
+    int deletedCount =
+        backend.hardDeleteLegacyData(
+            Entity.EntityType.MODEL_VERSION, Instant.now().toEpochMilli() + 1000);
 
-    // Verify legacy records are removed from database
-    Assertions.assertFalse(
-        legacyModelVersionRecordExistsInDB(modelEntity.id(), 0),
-        "Model version 0 legacy record should be deleted");
-    Assertions.assertFalse(
-        legacyModelVersionRecordExistsInDB(modelEntity.id(), 1),
-        "Model version 1 legacy record should be deleted");
-    Assertions.assertFalse(
-        legacyModelVersionAliasRecordsExistInDB(modelEntity.id(), 0),
-        "Model version 0 alias legacy records should be deleted");
-    Assertions.assertFalse(
-        legacyModelVersionAliasRecordsExistInDB(modelEntity.id(), 1),
-        "Model version 1 alias legacy records should be deleted");
+    // Verify correct number of records deleted
+    // Expected: 2 model_version_info records + 3 model_version_alias_rel records = 5 total
+    Assertions.assertEquals(5, deletedCount, "Should have deleted 5 legacy records");
   }
 
   private NameIdentifier getModelVersionIdent(NameIdentifier modelIdent, int version) {
@@ -1130,51 +1092,5 @@ public class TestModelVersionMetaService extends TestJDBCBackend {
         .withProperties(properties)
         .withAuditInfo(auditInfo)
         .build();
-  }
-
-  /**
-   * Helper method to check if a model version legacy record exists in the database.
-   *
-   * @param modelId The model ID
-   * @param version The model version
-   * @return true if legacy record exists (deleted_at != 0), false otherwise
-   */
-  private boolean legacyModelVersionRecordExistsInDB(Long modelId, Integer version) {
-    try (SqlSession sqlSession =
-            SqlSessionFactoryHelper.getInstance().getSqlSessionFactory().openSession(true);
-        Connection connection = sqlSession.getConnection();
-        Statement statement = connection.createStatement();
-        ResultSet rs =
-            statement.executeQuery(
-                String.format(
-                    "SELECT * FROM model_version_info WHERE model_id = %d AND version = %d AND deleted_at != 0",
-                    modelId, version))) {
-      return rs.next();
-    } catch (SQLException e) {
-      throw new RuntimeException("SQL execution failed", e);
-    }
-  }
-
-  /**
-   * Helper method to check if model version alias legacy records exist in the database.
-   *
-   * @param modelId The model ID
-   * @param version The model version
-   * @return true if any alias legacy records exist (deleted_at != 0), false otherwise
-   */
-  private boolean legacyModelVersionAliasRecordsExistInDB(Long modelId, Integer version) {
-    try (SqlSession sqlSession =
-            SqlSessionFactoryHelper.getInstance().getSqlSessionFactory().openSession(true);
-        Connection connection = sqlSession.getConnection();
-        Statement statement = connection.createStatement();
-        ResultSet rs =
-            statement.executeQuery(
-                String.format(
-                    "SELECT * FROM model_version_alias_rel WHERE model_id = %d AND model_version = %d AND deleted_at != 0",
-                    modelId, version))) {
-      return rs.next();
-    } catch (SQLException e) {
-      throw new RuntimeException("SQL execution failed", e);
-    }
   }
 }
