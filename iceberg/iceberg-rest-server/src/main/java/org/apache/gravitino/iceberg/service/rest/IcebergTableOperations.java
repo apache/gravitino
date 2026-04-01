@@ -28,7 +28,10 @@ import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
+import java.util.stream.Collectors;
 import javax.inject.Inject;
 import javax.servlet.http.HttpServletRequest;
 import javax.ws.rs.Consumes;
@@ -67,6 +70,8 @@ import org.apache.gravitino.server.authorization.annotations.IcebergAuthorizatio
 import org.apache.gravitino.server.authorization.annotations.IcebergAuthorizationMetadata.RequestType;
 import org.apache.gravitino.server.authorization.expression.AuthorizationExpressionConstants;
 import org.apache.gravitino.server.web.Utils;
+import org.apache.iceberg.SnapshotRef;
+import org.apache.iceberg.TableMetadata;
 import org.apache.iceberg.catalog.Namespace;
 import org.apache.iceberg.catalog.TableIdentifier;
 import org.apache.iceberg.rest.RESTUtil;
@@ -94,6 +99,7 @@ public class IcebergTableOperations {
   @VisibleForTesting public static final String IF_NONE_MATCH = "If-None-Match";
 
   @VisibleForTesting static final String DEFAULT_SNAPSHOTS = "all";
+  @VisibleForTesting static final String SNAPSHOTS_REFS = "refs";
 
   private IcebergMetricsManager icebergMetricsManager;
 
@@ -306,7 +312,6 @@ public class IcebergTableOperations {
         tableName,
         accessDelegation,
         isCredentialVending);
-    // todo support snapshots
     try {
       return Utils.doAs(
           httpRequest,
@@ -333,6 +338,9 @@ public class IcebergTableOperations {
                 generateETag(loadTableResponse.tableMetadata().metadataFileLocation(), snapshots);
             if (etag != null && etagMatches(ifNoneMatch, etag)) {
               return Response.notModified(etag).build();
+            }
+            if (SNAPSHOTS_REFS.equals(snapshots)) {
+              loadTableResponse = filterSnapshotsByRefs(loadTableResponse);
             }
             return buildResponseWithETag(loadTableResponse, etag);
           });
@@ -534,6 +542,33 @@ public class IcebergTableOperations {
       LOG.error("Failed to plan table scan: {}", e.getMessage(), e);
       return IcebergExceptionMapper.toRESTResponse(e);
     }
+  }
+
+  /**
+   * Filters the {@link LoadTableResponse} to include only snapshots that are directly referenced by
+   * the table's refs (branches and tags). This implements the {@code snapshots=refs} query
+   * parameter behavior per the Iceberg REST specification.
+   *
+   * @param loadTableResponse the original response containing all snapshots
+   * @return a new response with only ref-referenced snapshots
+   */
+  @VisibleForTesting
+  static LoadTableResponse filterSnapshotsByRefs(LoadTableResponse loadTableResponse) {
+    TableMetadata metadata = loadTableResponse.tableMetadata();
+    Map<String, SnapshotRef> refs = metadata.refs();
+    Set<Long> referencedSnapshotIds =
+        refs.values().stream().map(SnapshotRef::snapshotId).collect(Collectors.toSet());
+    // If all snapshots are already referenced by refs, return the original response
+    if (metadata.snapshots().stream()
+        .allMatch(s -> referencedSnapshotIds.contains(s.snapshotId()))) {
+      return loadTableResponse;
+    }
+    TableMetadata filteredMetadata =
+        TableMetadata.buildFrom(metadata).suppressHistoricalSnapshots().build();
+    return LoadTableResponse.builder()
+        .withTableMetadata(filteredMetadata)
+        .addAllConfig(loadTableResponse.config())
+        .build();
   }
 
   /**
