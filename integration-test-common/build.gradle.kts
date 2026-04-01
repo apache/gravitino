@@ -39,6 +39,7 @@ dependencies {
   testImplementation(libs.bundles.jetty)
   testImplementation(libs.bundles.jersey)
   testImplementation(libs.bundles.jwt)
+  testImplementation(libs.nimbus.jose.jwt)
   testImplementation(libs.bundles.log4j)
   testImplementation(libs.commons.cli)
   testImplementation(libs.commons.lang3)
