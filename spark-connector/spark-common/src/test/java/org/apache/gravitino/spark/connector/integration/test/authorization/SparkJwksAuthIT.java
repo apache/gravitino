@@ -22,11 +22,13 @@ import com.google.common.collect.Maps;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.time.Instant;
-import java.util.List;
 import java.util.Map;
 import org.apache.gravitino.Configs;
 import org.apache.gravitino.auth.AuthProperties;
 import org.apache.gravitino.auth.AuthenticatorType;
+import org.apache.gravitino.client.DefaultOAuth2TokenProvider;
+import org.apache.gravitino.client.GravitinoAdminClient;
+import org.apache.gravitino.client.GravitinoMetalake;
 import org.apache.gravitino.integration.test.util.BaseIT;
 import org.apache.gravitino.integration.test.util.JwksMockServerHelper;
 import org.apache.gravitino.integration.test.util.OAuthMockDataProvider;
@@ -34,7 +36,6 @@ import org.apache.gravitino.server.authentication.OAuthConfig;
 import org.apache.gravitino.spark.connector.GravitinoSparkConfig;
 import org.apache.gravitino.spark.connector.plugin.GravitinoSparkPlugin;
 import org.apache.spark.SparkConf;
-import org.apache.spark.sql.Row;
 import org.apache.spark.sql.SparkSession;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.Assertions;
@@ -121,9 +122,26 @@ public class SparkJwksAuthIT extends BaseIT {
   }
 
   @Test
-  public void testSparkConnectsWithJwksAuth() {
-    List<Row> catalogs = sparkSession.sql("SHOW CATALOGS").collectAsList();
-    Assertions.assertFalse(catalogs.isEmpty(), "SHOW CATALOGS should return at least one catalog");
-    LOG.info("SHOW CATALOGS returned {} rows", catalogs.size());
+  public void testSparkConnectsWithJwksAuth() throws Exception {
+    // Verify the Spark plugin initialized successfully by executing a query.
+    // SHOW CATALOGS may be empty if no Gravitino catalog is defined; the real signal is
+    // that no exception is thrown and the OAuth token fetch + JWKS validation succeeded.
+    Assertions.assertDoesNotThrow(() -> sparkSession.sql("SHOW CATALOGS").collect());
+
+    // Verify the same OAuth token flow works end-to-end via a direct Gravitino client.
+    DefaultOAuth2TokenProvider oauthProvider =
+        DefaultOAuth2TokenProvider.builder()
+            .withUri(mockServerHelper.baseUri())
+            .withPath("token")
+            .withCredential("test-client:test-secret")
+            .withScope("openid")
+            .build();
+    try (GravitinoAdminClient oauthClient =
+        GravitinoAdminClient.builder(serverUri).withOAuth(oauthProvider).build()) {
+      GravitinoMetalake metalake = oauthClient.loadMetalake(METALAKE);
+      Assertions.assertNotNull(metalake);
+      Assertions.assertEquals(METALAKE, metalake.name());
+      LOG.info("JWKS-authenticated Gravitino client loaded metalake '{}'", metalake.name());
+    }
   }
 }
