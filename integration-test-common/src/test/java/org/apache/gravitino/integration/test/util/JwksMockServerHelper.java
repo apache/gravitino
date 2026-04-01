@@ -138,7 +138,9 @@ public class JwksMockServerHelper implements Closeable {
     return null;
   }
 
-  /** Creates and starts a new mock server with a freshly generated RSA key pair on a random port. */
+  /**
+   * Creates and starts a new mock server with a freshly generated RSA key pair on a random port.
+   */
   public static JwksMockServerHelper create(String keyId) throws Exception {
     RSAKey rsaKey = new RSAKeyGenerator(2048).keyID(keyId).generate();
     String jwksJson = new JWKSet(rsaKey.toPublicJWK()).toString();
