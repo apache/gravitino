@@ -346,6 +346,54 @@ public class TestJwksTokenValidator {
   }
 
   @Test
+  public void testValidateTokenRejectedForUnknownIssuer() throws Exception {
+    // Generate a test RSA key pair
+    RSAKey rsaKey =
+        new RSAKeyGenerator(2048).keyID("test-key-id").algorithm(JWSAlgorithm.RS256).generate();
+
+    // Mock the JWKSourceBuilder to return our test key
+    try (MockedStatic<JWKSourceBuilder> mockedBuilder = mockStatic(JWKSourceBuilder.class)) {
+      @SuppressWarnings("unchecked")
+      JWKSource<SecurityContext> mockJwkSource = mock(JWKSource.class);
+      @SuppressWarnings("unchecked")
+      JWKSourceBuilder<SecurityContext> mockBuilder = mock(JWKSourceBuilder.class);
+
+      mockedBuilder.when(() -> JWKSourceBuilder.create(any(URL.class))).thenReturn(mockBuilder);
+      when(mockBuilder.build()).thenReturn(mockJwkSource);
+      when(mockJwkSource.get(any(), any())).thenReturn(Arrays.asList(rsaKey));
+
+      // Initialize validator with authority=https://test-issuer.com
+      Map<String, String> config = new HashMap<>();
+      config.put(
+          "gravitino.authenticator.oauth.jwksUri", "https://test-jwks.com/.well-known/jwks.json");
+      config.put("gravitino.authenticator.oauth.authority", "https://test-issuer.com");
+      config.put("gravitino.authenticator.oauth.principalFields", "sub");
+      config.put("gravitino.authenticator.oauth.allowSkewSecs", "60");
+
+      validator.initialize(createConfig(config));
+
+      // Token with a different issuer — should be rejected
+      JWTClaimsSet unknownIssuerClaims =
+          new JWTClaimsSet.Builder()
+              .subject("test-user")
+              .audience("test-service")
+              .issuer("https://unknown-issuer.com")
+              .expirationTime(Date.from(Instant.now().plusSeconds(3600)))
+              .issueTime(Date.from(Instant.now()))
+              .build();
+      SignedJWT unknownToken =
+          new SignedJWT(
+              new JWSHeader.Builder(JWSAlgorithm.RS256).keyID("test-key-id").build(),
+              unknownIssuerClaims);
+      unknownToken.sign(new RSASSASigner(rsaKey));
+
+      assertThrows(
+          UnauthorizedException.class,
+          () -> validator.validateToken(unknownToken.serialize(), "test-service"));
+    }
+  }
+
+  @Test
   public void testValidateTokenWithInvalidToken() {
     Map<String, String> config = new HashMap<>();
     config.put("gravitino.authenticator.oauth.jwksUri", validJwksUri);
@@ -546,6 +594,109 @@ public class TestJwksTokenValidator {
 
       assertNotNull(result);
       assertEquals("plainuser", result.getName());
+    }
+  }
+
+  @Test
+  public void testIndexedMultiJwksEntriesRoutedByIssuer() throws Exception {
+    // Two independent RSA key pairs — one per JWKS entry.
+    RSAKey rsaKey0 =
+        new RSAKeyGenerator(2048).keyID("key-issuer0").algorithm(JWSAlgorithm.RS256).generate();
+    RSAKey rsaKey1 =
+        new RSAKeyGenerator(2048).keyID("key-issuer1").algorithm(JWSAlgorithm.RS256).generate();
+
+    try (MockedStatic<JWKSourceBuilder> mockedBuilder = mockStatic(JWKSourceBuilder.class)) {
+      @SuppressWarnings("unchecked")
+      JWKSource<SecurityContext> mockSource0 = mock(JWKSource.class);
+      @SuppressWarnings("unchecked")
+      JWKSource<SecurityContext> mockSource1 = mock(JWKSource.class);
+      @SuppressWarnings("unchecked")
+      JWKSourceBuilder<SecurityContext> mockBuilderInst0 = mock(JWKSourceBuilder.class);
+      @SuppressWarnings("unchecked")
+      JWKSourceBuilder<SecurityContext> mockBuilderInst1 = mock(JWKSourceBuilder.class);
+
+      // Route by URL string so each entry gets its own source.
+      mockedBuilder
+          .when(() -> JWKSourceBuilder.create(any(URL.class)))
+          .thenAnswer(
+              inv -> {
+                String url = inv.getArgument(0, URL.class).toString();
+                if (url.contains("issuer0")) return mockBuilderInst0;
+                if (url.contains("issuer1")) return mockBuilderInst1;
+                throw new IllegalArgumentException("Unexpected URL: " + url);
+              });
+      when(mockBuilderInst0.build()).thenReturn(mockSource0);
+      when(mockBuilderInst1.build()).thenReturn(mockSource1);
+      when(mockSource0.get(any(), any())).thenReturn(Arrays.asList(rsaKey0));
+      when(mockSource1.get(any(), any())).thenReturn(Arrays.asList(rsaKey1));
+
+      // Indexed multi-JWKS config.
+      Map<String, String> config = new HashMap<>();
+      config.put("gravitino.authenticator.oauth.jwks.0.uri", "https://issuer0.com/jwks.json");
+      config.put("gravitino.authenticator.oauth.jwks.0.issuer", "https://issuer0.com");
+      config.put("gravitino.authenticator.oauth.jwks.0.audience", "audience-0");
+      config.put("gravitino.authenticator.oauth.jwks.0.principalFields", "sub");
+      config.put("gravitino.authenticator.oauth.jwks.1.uri", "https://issuer1.com/jwks.json");
+      config.put("gravitino.authenticator.oauth.jwks.1.issuer", "https://issuer1.com");
+      config.put("gravitino.authenticator.oauth.jwks.1.audience", "audience-1");
+      config.put("gravitino.authenticator.oauth.jwks.1.principalFields", "sub");
+
+      validator.initialize(createConfig(config));
+
+      // Token from issuer0, signed with key0 — should validate via entry 0.
+      JWTClaimsSet claims0 =
+          new JWTClaimsSet.Builder()
+              .subject("user-from-issuer0")
+              .audience("audience-0")
+              .issuer("https://issuer0.com")
+              .expirationTime(Date.from(Instant.now().plusSeconds(3600)))
+              .issueTime(Date.from(Instant.now()))
+              .build();
+      SignedJWT token0 =
+          new SignedJWT(
+              new JWSHeader.Builder(JWSAlgorithm.RS256).keyID("key-issuer0").build(), claims0);
+      token0.sign(new RSASSASigner(rsaKey0));
+
+      Principal principal0 = validator.validateToken(token0.serialize(), "unused");
+      assertNotNull(principal0);
+      assertEquals("user-from-issuer0", principal0.getName());
+
+      // Token from issuer1, signed with key1 — should validate via entry 1.
+      JWTClaimsSet claims1 =
+          new JWTClaimsSet.Builder()
+              .subject("user-from-issuer1")
+              .audience("audience-1")
+              .issuer("https://issuer1.com")
+              .expirationTime(Date.from(Instant.now().plusSeconds(3600)))
+              .issueTime(Date.from(Instant.now()))
+              .build();
+      SignedJWT token1 =
+          new SignedJWT(
+              new JWSHeader.Builder(JWSAlgorithm.RS256).keyID("key-issuer1").build(), claims1);
+      token1.sign(new RSASSASigner(rsaKey1));
+
+      Principal principal1 = validator.validateToken(token1.serialize(), "unused");
+      assertNotNull(principal1);
+      assertEquals("user-from-issuer1", principal1.getName());
+
+      // Token with an issuer not in config — should be rejected.
+      JWTClaimsSet unknownClaims =
+          new JWTClaimsSet.Builder()
+              .subject("attacker")
+              .audience("audience-0")
+              .issuer("https://unknown-issuer.com")
+              .expirationTime(Date.from(Instant.now().plusSeconds(3600)))
+              .issueTime(Date.from(Instant.now()))
+              .build();
+      SignedJWT unknownToken =
+          new SignedJWT(
+              new JWSHeader.Builder(JWSAlgorithm.RS256).keyID("key-issuer0").build(),
+              unknownClaims);
+      unknownToken.sign(new RSASSASigner(rsaKey0));
+
+      assertThrows(
+          UnauthorizedException.class,
+          () -> validator.validateToken(unknownToken.serialize(), "unused"));
     }
   }
 
