@@ -593,6 +593,8 @@ public class TestLancePartitionStatisticStorage {
       FileUtils.deleteDirectory(new File(location + "/" + tableEntity.id() + ".lance"));
       storage.close();
     }
+  }
+
   @Test
   public void testUpdateStatisticsWithLargeTableId() throws Exception {
     PartitionStatisticStorageFactory factory = new LancePartitionStatisticStorageFactory();

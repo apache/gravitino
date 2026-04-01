@@ -52,9 +52,9 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.stream.Collectors;
 import org.apache.arrow.memory.BufferAllocator;
 import org.apache.arrow.memory.RootAllocator;
-import org.apache.arrow.vector.BigIntVector;
 import org.apache.arrow.vector.FieldVector;
 import org.apache.arrow.vector.LargeVarCharVector;
+import org.apache.arrow.vector.UInt8Vector;
 import org.apache.arrow.vector.VarCharVector;
 import org.apache.arrow.vector.VectorSchemaRoot;
 import org.apache.arrow.vector.ipc.ArrowReader;
@@ -385,7 +385,7 @@ public class LancePartitionStatisticStorage implements PartitionStatisticStorage
       root.allocateNew();
       int index = 0;
 
-      BigIntVector tableIdVector = (BigIntVector) root.getVector(TABLE_ID_COLUMN);
+      UInt8Vector tableIdVector = (UInt8Vector) root.getVector(TABLE_ID_COLUMN);
       VarCharVector partitionNameVector = (VarCharVector) root.getVector(PARTITION_NAME_COLUMN);
       VarCharVector statisticNameVector = (VarCharVector) root.getVector(STATISTIC_NAME_COLUMN);
       LargeVarCharVector statisticValueVector =
