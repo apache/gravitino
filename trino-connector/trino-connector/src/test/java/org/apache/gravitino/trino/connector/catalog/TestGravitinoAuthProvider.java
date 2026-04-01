@@ -171,27 +171,6 @@ public class TestGravitinoAuthProvider {
     assertNotNull(result.sessionContext);
   }
 
-  @Test
-  public void testBuildSimpleWithForwardUserReturnsSessionContext() {
-    GravitinoAuthProvider.BuildResult result =
-        GravitinoAuthProvider.build(
-            buildConfig(
-                ImmutableMap.of(
-                    GravitinoAuthProvider.AUTH_TYPE_KEY, "simple",
-                    GravitinoAuthProvider.FORWARD_SESSION_USER_KEY, "true")));
-    assertNotNull(result.client);
-    assertNotNull(result.sessionContext);
-  }
-
-  @Test
-  public void testBuildNoneWithForwardUserReturnsSessionContext() {
-    GravitinoAuthProvider.BuildResult result =
-        GravitinoAuthProvider.build(
-            buildConfig(ImmutableMap.of(GravitinoAuthProvider.FORWARD_SESSION_USER_KEY, "true")));
-    assertNotNull(result.client);
-    assertNotNull(result.sessionContext);
-  }
-
   private GravitinoConfig buildConfig(ImmutableMap<String, String> authConfig) {
     ImmutableMap.Builder<String, String> builder =
         ImmutableMap.<String, String>builder()

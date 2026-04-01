@@ -121,36 +121,6 @@ SHOW SCHEMAS IN my_catalog;
 | `gravitino.client.authType`                   | Authentication type: `oauth2_token`                                                   | (none)        | Yes (to enable token forwarding)     | 1.9.0         |
 | `gravitino.client.oauth2.token.credentialKey` | Key name in Trino extra credentials that holds the Bearer token                       | (none)        | Yes if authType is `oauth2_token`    | 1.9.0         |
 
-### Session User Forwarding
-
-All authentication types support forwarding the Trino session user name to the Gravitino server via the `X-Gravitino-User` HTTP header. This is useful when the Gravitino server is configured with user-level access control and needs to know the identity of the originating Trino user.
-
-**Configuration in `etc/catalog/gravitino.properties`:**
-
-```properties
-connector.name=gravitino
-gravitino.metalake=metalake
-gravitino.uri=http://localhost:8090
-
-# Optionally set an auth type (or omit for no-auth)
-gravitino.client.authType=oauth2
-gravitino.client.oauth2.serverUri=http://oauth-server:8080
-gravitino.client.oauth2.credential=client_id:client_secret
-gravitino.client.oauth2.path=oauth2/token
-gravitino.client.oauth2.scope=gravitino
-
-# Forward Trino session user to Gravitino on every request
-gravitino.client.session.forwardUser=true
-```
-
-When `forwardUser=true` is set alongside `authType=simple`, the static `gravitino.user` is ignored and the Trino session user name is used dynamically as the identity for each query.
-
-**Configuration properties:**
-
-| Property                               | Description                                                                                     | Default value | Required | Since version |
-|----------------------------------------|-------------------------------------------------------------------------------------------------|---------------|----------|---------------|
-| `gravitino.client.session.forwardUser` | When `true`, forwards the Trino session user name via the `X-Gravitino-User` header             | `false`       | No       | 1.9.0         |
-
 ### Example: Connecting to OAuth-protected Gravitino Server
 
 This example shows how to configure the Trino connector to connect to a Gravitino server protected by OAuth authentication.

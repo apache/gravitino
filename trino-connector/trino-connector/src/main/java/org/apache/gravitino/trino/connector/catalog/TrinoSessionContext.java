@@ -19,7 +19,6 @@
 package org.apache.gravitino.trino.connector.catalog;
 
 import io.trino.spi.connector.ConnectorSession;
-import javax.annotation.Nullable;
 
 /**
  * Facade that aggregates all session-forwarding providers for a single Gravitino connector
@@ -33,41 +32,27 @@ import javax.annotation.Nullable;
  */
 public class TrinoSessionContext {
 
-  @Nullable private final TrinoSessionAuthProvider authProvider;
-  @Nullable private final TrinoUserHeaderProvider headerProvider;
+  private final TrinoSessionAuthProvider authProvider;
 
-  TrinoSessionContext(
-      @Nullable TrinoSessionAuthProvider authProvider,
-      @Nullable TrinoUserHeaderProvider headerProvider) {
+  TrinoSessionContext(TrinoSessionAuthProvider authProvider) {
     this.authProvider = authProvider;
-    this.headerProvider = headerProvider;
   }
 
   /**
-   * Populates per-thread credentials / user identity from the current session. Called once per
-   * query before any Gravitino API request is made.
+   * Populates per-thread credentials from the current session. Called once per query before any
+   * Gravitino API request is made.
    *
    * @param session the current Trino connector session
    */
   public void applySession(ConnectorSession session) {
-    if (authProvider != null) {
-      authProvider.applySession(session);
-    }
-    if (headerProvider != null) {
-      headerProvider.applySession(session);
-    }
+    authProvider.applySession(session);
   }
 
   /**
-   * Clears the per-thread credentials / user identity. Must be called at the end of every query to
-   * prevent context leaking to subsequent queries running on the same thread.
+   * Clears the per-thread credentials. Must be called at the end of every query to prevent context
+   * leaking to subsequent queries running on the same thread.
    */
   public void clearSession() {
-    if (authProvider != null) {
-      authProvider.clearSession();
-    }
-    if (headerProvider != null) {
-      headerProvider.clearSession();
-    }
+    authProvider.clearSession();
   }
 }
