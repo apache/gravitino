@@ -17,7 +17,7 @@ jobs:
     steps:
       - name: Download Coverage Report
         id: download
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: coverage-report
           run-id: ${{ github.event.workflow_run.id }}
