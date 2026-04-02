@@ -95,7 +95,7 @@ public class IcebergCatalogWrapper implements AutoCloseable {
           IcebergConstants.ICEBERG_S3_ENDPOINT,
           IcebergConstants.ICEBERG_OSS_ENDPOINT,
           IcebergConstants.ICEBERG_S3_PATH_STYLE_ACCESS,
-          IcebergConstants.DATA_ACCESS);
+          IcebergConstants.ICEBERG_ACCESS_DELEGATION);
 
   @Getter protected Catalog catalog;
   private SupportsNamespaces asNamespaceCatalog;

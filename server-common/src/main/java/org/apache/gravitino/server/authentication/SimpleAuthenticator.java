@@ -34,7 +34,12 @@ import org.apache.gravitino.auth.AuthConstants;
 class SimpleAuthenticator implements Authenticator {
 
   private final Principal ANONYMOUS_PRINCIPAL =
-      new UserPrincipal(AuthConstants.ANONYMOUS_USER, AuthConstants.AUTHORIZATION_BASIC_HEADER);
+      new UserPrincipal(
+          AuthConstants.ANONYMOUS_USER,
+          AuthConstants.AUTHORIZATION_BASIC_HEADER
+              + " "
+              + Base64.getEncoder()
+                  .encodeToString(AuthConstants.ANONYMOUS_USER.getBytes(StandardCharsets.UTF_8)));
 
   @Override
   public boolean isDataFromToken() {
