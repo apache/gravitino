@@ -51,7 +51,7 @@ public class IcebergRESTUtils {
 
   private static final Logger LOG = LoggerFactory.getLogger(IcebergRESTUtils.class);
 
-  private static final String DEFAULT_SNAPSHOTS = "all";
+  public static final String DEFAULT_SNAPSHOTS = "all";
 
   private IcebergRESTUtils() {}
 

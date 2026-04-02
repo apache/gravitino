@@ -95,7 +95,6 @@ public class IcebergTableOperations {
 
   @VisibleForTesting public static final String IF_NONE_MATCH = "If-None-Match";
 
-  @VisibleForTesting static final String DEFAULT_SNAPSHOTS = "all";
   @VisibleForTesting static final String SNAPSHOTS_REFS = "refs";
 
   private IcebergMetricsManager icebergMetricsManager;
@@ -294,7 +293,7 @@ public class IcebergTableOperations {
           String namespace,
       @IcebergAuthorizationMetadata(type = RequestType.LOAD_TABLE) @Encoded() @PathParam("table")
           String table,
-      @DefaultValue(DEFAULT_SNAPSHOTS) @QueryParam("snapshots") String snapshots,
+      @DefaultValue(IcebergRESTUtils.DEFAULT_SNAPSHOTS) @QueryParam("snapshots") String snapshots,
       @HeaderParam(X_ICEBERG_ACCESS_DELEGATION) String accessDelegation,
       @HeaderParam(IF_NONE_MATCH) String ifNoneMatch) {
     String catalogName = IcebergRESTUtils.getCatalogName(prefix);
