@@ -59,6 +59,8 @@ import org.apache.iceberg.catalog.TableIdentifier;
 import org.apache.iceberg.catalog.ViewCatalog;
 import org.apache.iceberg.exceptions.AlreadyExistsException;
 import org.apache.iceberg.exceptions.NoSuchTableException;
+import org.apache.iceberg.inmemory.InMemoryFileIO;
+import org.apache.iceberg.io.FileIO;
 import org.apache.iceberg.jdbc.JdbcCatalogWithMetadataLocationSupport;
 import org.apache.iceberg.rest.CatalogHandlers;
 import org.apache.iceberg.rest.RESTCatalog;
@@ -441,12 +443,9 @@ public class IcebergCatalogWrapper implements AutoCloseable {
 
   private LoadTableResponse loadTableInternal(TableIdentifier ident) {
     Table table = catalog.loadTable(ident);
-    for (Map.Entry<String, String> entry : table.io().properties().entrySet()) {
-      LOG.warn("table property {}: {}", entry.getKey(), entry.getValue());
-    }
 
     if (table instanceof BaseTable) {
-      Map<String, String> properties = table.io().properties();
+      Map<String, String> properties = retrieveFileIOProperties(table.io());
       return LoadTableResponse.builder()
           .withTableMetadata(((BaseTable) table).operations().current())
           .addAllConfig(
@@ -477,7 +476,7 @@ public class IcebergCatalogWrapper implements AutoCloseable {
             .create();
 
     if (table instanceof BaseTable) {
-      Map<String, String> properties = table.io().properties();
+      Map<String, String> properties = retrieveFileIOProperties(table.io());
       return LoadTableResponse.builder()
           .withTableMetadata(((BaseTable) table).operations().current())
           .addAllConfig(
@@ -517,9 +516,11 @@ public class IcebergCatalogWrapper implements AutoCloseable {
               .withProperties(properties)
               .createTransaction()
               .table();
+      Map<String, String> tableProperties = retrieveFileIOProperties(table.io());
       config.putAll(
-          MapUtils.getFilteredMap(properties, key -> catalogPropertiesToClientKeys.contains(key)));
-      config.putAll(CredentialPropertyUtils.filterCredentialProperties(properties));
+          MapUtils.getFilteredMap(
+              tableProperties, key -> catalogPropertiesToClientKeys.contains(key)));
+      config.putAll(CredentialPropertyUtils.filterCredentialProperties(tableProperties));
       location = table.location();
     }
 
@@ -531,10 +532,10 @@ public class IcebergCatalogWrapper implements AutoCloseable {
             location,
             properties);
 
-    if (config.isEmpty()) {
-      return LoadTableResponse.builder().withTableMetadata(metadata).build();
-    } else {
-      return LoadTableResponse.builder().withTableMetadata(metadata).addAllConfig(config).build();
-    }
+    return LoadTableResponse.builder().withTableMetadata(metadata).addAllConfig(config).build();
+  }
+
+  private static Map<String, String> retrieveFileIOProperties(FileIO fileIO) {
+    return fileIO instanceof InMemoryFileIO ? Maps.newHashMap() : fileIO.properties();
   }
 }
