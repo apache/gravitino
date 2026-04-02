@@ -21,6 +21,7 @@ package org.apache.gravitino.iceberg.common.rest.auth;
 import java.security.Principal;
 import java.util.Map;
 import org.apache.gravitino.UserPrincipal;
+import org.apache.gravitino.auth.AuthConstants;
 import org.apache.gravitino.utils.PrincipalUtils;
 import org.apache.iceberg.rest.HTTPHeaders;
 import org.apache.iceberg.rest.HTTPRequest;
@@ -35,8 +36,7 @@ import org.apache.iceberg.rest.auth.AuthSession;
  *
  * <p>Enable by setting {@link org.apache.iceberg.rest.auth.AuthProperties#AUTH_TYPE} to this class
  * name, or set catalog property {@code gravitino.iceberg-rest-catalog.forward-user-access-token} to
- * {@code true} for REST catalog backend (see {@link
- * org.apache.gravitino.iceberg.common.utils.IcebergCatalogUtil#mergeRestCatalogAuthForUserPrincipal}).
+ * {@code true} for REST catalog backend
  */
 public class UserPrincipalForwardingAuthManager implements AuthManager {
 
@@ -73,7 +73,9 @@ public class UserPrincipalForwardingAuthManager implements AuthManager {
       HTTPHeaders newHeaders =
           request
               .headers()
-              .putIfAbsent(HTTPHeaders.of(Map.of("Authorization", authorizationHeaderValue)));
+              .putIfAbsent(
+                  HTTPHeaders.of(
+                      Map.of(AuthConstants.HTTP_HEADER_AUTHORIZATION, authorizationHeaderValue)));
       return newHeaders.equals(request.headers())
           ? request
           : ImmutableHTTPRequest.builder().from(request).headers(newHeaders).build();

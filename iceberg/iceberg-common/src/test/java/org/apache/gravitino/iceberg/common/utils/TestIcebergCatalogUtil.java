@@ -24,13 +24,11 @@ import java.util.Map;
 import org.apache.gravitino.catalog.lakehouse.iceberg.IcebergCatalogBackend;
 import org.apache.gravitino.catalog.lakehouse.iceberg.IcebergConstants;
 import org.apache.gravitino.iceberg.common.IcebergConfig;
-import org.apache.gravitino.iceberg.common.rest.auth.UserPrincipalForwardingAuthManager;
 import org.apache.iceberg.CatalogProperties;
 import org.apache.iceberg.catalog.Catalog;
 import org.apache.iceberg.hive.HiveCatalog;
 import org.apache.iceberg.inmemory.InMemoryCatalog;
 import org.apache.iceberg.jdbc.JdbcCatalog;
-import org.apache.iceberg.rest.auth.AuthProperties;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
@@ -113,35 +111,5 @@ public class TestIcebergCatalogUtil {
                         put("catalog-backend-impl", "org.apache.");
                       }
                     })));
-  }
-
-  @Test
-  void testMergeRestCatalogAuthForUserPrincipalAddsAuthType() {
-    Map<String, String> in = new HashMap<>();
-    in.put(IcebergConstants.REST_FORWARD_USER_ACCESS_TOKEN, "true");
-    in.put("uri", "http://localhost:9001");
-
-    Map<String, String> out = IcebergCatalogUtil.mergeRestCatalogAuthForUserPrincipal(in);
-    Assertions.assertEquals(
-        UserPrincipalForwardingAuthManager.class.getName(), out.get(AuthProperties.AUTH_TYPE));
-  }
-
-  @Test
-  void testMergeRestCatalogAuthForUserPrincipalRespectsExistingAuthType() {
-    Map<String, String> in = new HashMap<>();
-    in.put(IcebergConstants.REST_FORWARD_USER_ACCESS_TOKEN, "true");
-    in.put(AuthProperties.AUTH_TYPE, "oauth2");
-
-    Map<String, String> out = IcebergCatalogUtil.mergeRestCatalogAuthForUserPrincipal(in);
-    Assertions.assertEquals("oauth2", out.get(AuthProperties.AUTH_TYPE));
-  }
-
-  @Test
-  void testMergeRestCatalogAuthForUserPrincipalNoOpWhenDisabled() {
-    Map<String, String> in = new HashMap<>();
-    in.put("uri", "http://localhost:9001");
-
-    Map<String, String> out = IcebergCatalogUtil.mergeRestCatalogAuthForUserPrincipal(in);
-    Assertions.assertSame(in, out);
   }
 }

@@ -22,6 +22,7 @@ import static org.apache.hadoop.fs.CommonConfigurationKeysPublic.HADOOP_SECURITY
 import static org.apache.hadoop.fs.CommonConfigurationKeysPublic.HADOOP_SECURITY_AUTHORIZATION;
 
 import com.google.common.annotations.VisibleForTesting;
+import com.google.common.collect.Maps;
 import java.sql.SQLException;
 import java.util.Collections;
 import java.util.HashMap;
@@ -126,31 +127,15 @@ public class IcebergCatalogUtil {
     String icebergCatalogName = icebergConfig.getCatalogBackendName();
     RESTCatalog restCatalog = new RESTCatalog();
     HdfsConfiguration hdfsConfiguration = new HdfsConfiguration();
-    Map<String, String> properties =
-        mergeRestCatalogAuthForUserPrincipal(icebergConfig.getIcebergCatalogProperties());
+    Map<String, String> properties = Maps.newHashMap();
+
+    // REST catalog must use forward access token from the user request
+    properties.put(AuthProperties.AUTH_TYPE, UserPrincipalForwardingAuthManager.class.getName());
+
     properties.forEach(hdfsConfiguration::set);
     restCatalog.setConf(hdfsConfiguration);
     restCatalog.initialize(icebergCatalogName, properties);
     return restCatalog;
-  }
-
-  /**
-   * When {@link IcebergConstants#REST_FORWARD_USER_ACCESS_TOKEN} is enabled and {@link
-   * AuthProperties#AUTH_TYPE} is not already set, configures the Iceberg REST client to use {@link
-   * UserPrincipalForwardingAuthManager}.
-   */
-  @VisibleForTesting
-  static Map<String, String> mergeRestCatalogAuthForUserPrincipal(Map<String, String> properties) {
-    if (!Boolean.parseBoolean(
-        properties.getOrDefault(IcebergConstants.REST_FORWARD_USER_ACCESS_TOKEN, "false"))) {
-      return properties;
-    }
-    if (properties.containsKey(AuthProperties.AUTH_TYPE)) {
-      return properties;
-    }
-    Map<String, String> merged = new HashMap<>(properties);
-    merged.put(AuthProperties.AUTH_TYPE, UserPrincipalForwardingAuthManager.class.getName());
-    return merged;
   }
 
   private static Catalog loadCustomCatalog(IcebergConfig icebergConfig) {
