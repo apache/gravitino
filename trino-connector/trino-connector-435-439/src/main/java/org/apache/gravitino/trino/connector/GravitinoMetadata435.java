@@ -30,14 +30,14 @@ import io.trino.spi.connector.SchemaTableName;
 import io.trino.spi.statistics.ComputedStatistics;
 import java.util.Collection;
 import java.util.Optional;
-import org.apache.gravitino.trino.connector.catalog.CatalogConnectorMetadata;
 import org.apache.gravitino.trino.connector.catalog.CatalogConnectorMetadataAdapter;
+import org.apache.gravitino.trino.connector.catalog.SessionAwareCatalogMetadata;
 import org.apache.gravitino.trino.connector.metadata.GravitinoColumn;
 
 public class GravitinoMetadata435 extends GravitinoMetadata {
 
   public GravitinoMetadata435(
-      CatalogConnectorMetadata catalogConnectorMetadata,
+      SessionAwareCatalogMetadata catalogConnectorMetadata,
       CatalogConnectorMetadataAdapter metadataAdapter,
       io.trino.spi.connector.ConnectorMetadata internalMetadata) {
     super(catalogConnectorMetadata, metadataAdapter, internalMetadata);
@@ -47,7 +47,7 @@ public class GravitinoMetadata435 extends GravitinoMetadata {
   public void addColumn(
       ConnectorSession session, ConnectorTableHandle tableHandle, ColumnMetadata column) {
     GravitinoColumn gravitinoColumn = metadataAdapter.createColumn(column);
-    catalogConnectorMetadata.addColumn(getTableName(tableHandle), gravitinoColumn);
+    catalogConnectorMetadata.addColumn(session, getTableName(tableHandle), gravitinoColumn);
   }
 
   @Override

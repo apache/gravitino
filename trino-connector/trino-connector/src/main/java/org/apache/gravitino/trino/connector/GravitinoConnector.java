@@ -41,6 +41,7 @@ import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.trino.connector.catalog.CatalogConnectorContext;
 import org.apache.gravitino.trino.connector.catalog.CatalogConnectorMetadata;
 import org.apache.gravitino.trino.connector.catalog.CatalogConnectorMetadataAdapter;
+import org.apache.gravitino.trino.connector.catalog.SessionAwareCatalogMetadata;
 
 /**
  * GravitinoConnector serves as the entry point for operations on the connector managed by Trino and
@@ -51,7 +52,7 @@ public class GravitinoConnector implements Connector {
 
   private final NameIdentifier catalogIdentifier;
   protected final CatalogConnectorContext catalogConnectorContext;
-  private final CatalogConnectorMetadata connectorMetadata;
+  private final SessionAwareCatalogMetadata connectorMetadata;
 
   /**
    * Constructs a new GravitinoConnector with the specified catalog identifier and catalog connector
@@ -63,7 +64,10 @@ public class GravitinoConnector implements Connector {
     this.catalogIdentifier = catalogConnectorContext.getCatalog().geNameIdentifier();
     this.catalogConnectorContext = catalogConnectorContext;
     this.connectorMetadata =
-        new CatalogConnectorMetadata(catalogConnectorContext.getMetalake(), this.catalogIdentifier);
+        new SessionAwareCatalogMetadata(
+            new CatalogConnectorMetadata(
+                catalogConnectorContext.getMetalake(), this.catalogIdentifier),
+            catalogConnectorContext.getSessionContext());
   }
 
   @Override
@@ -93,12 +97,11 @@ public class GravitinoConnector implements Connector {
     GravitinoMetadata metadata =
         createGravitinoMetadata(
             connectorMetadata, catalogConnectorContext.getMetadataAdapter(), internalMetadata);
-    metadata.setSessionContext(catalogConnectorContext.getSessionContext());
     return metadata;
   }
 
   protected GravitinoMetadata createGravitinoMetadata(
-      CatalogConnectorMetadata catalogConnectorMetadata,
+      SessionAwareCatalogMetadata catalogConnectorMetadata,
       CatalogConnectorMetadataAdapter metadataAdapter,
       ConnectorMetadata internalMetadata) {
     throw new TrinoException(NOT_SUPPORTED, "Should be overridden in subclass");

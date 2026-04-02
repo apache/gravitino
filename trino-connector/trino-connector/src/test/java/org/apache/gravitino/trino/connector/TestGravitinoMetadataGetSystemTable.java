@@ -31,15 +31,15 @@ import io.trino.spi.connector.ConnectorSession;
 import io.trino.spi.connector.SchemaTableName;
 import io.trino.spi.connector.SystemTable;
 import java.util.Optional;
-import org.apache.gravitino.trino.connector.catalog.CatalogConnectorMetadata;
 import org.apache.gravitino.trino.connector.catalog.CatalogConnectorMetadataAdapter;
+import org.apache.gravitino.trino.connector.catalog.SessionAwareCatalogMetadata;
 import org.junit.jupiter.api.Test;
 
 public class TestGravitinoMetadataGetSystemTable {
 
   @Test
   public void testGetSystemTableDelegatesToInternalMetadata() {
-    CatalogConnectorMetadata catalogConnectorMetadata = mock(CatalogConnectorMetadata.class);
+    SessionAwareCatalogMetadata catalogConnectorMetadata = mock(SessionAwareCatalogMetadata.class);
     CatalogConnectorMetadataAdapter metadataAdapter = mock(CatalogConnectorMetadataAdapter.class);
     ConnectorMetadata internalMetadata = mock(ConnectorMetadata.class);
     ConnectorSession session = mock(ConnectorSession.class);
@@ -62,7 +62,7 @@ public class TestGravitinoMetadataGetSystemTable {
 
   @Test
   public void testGetSystemTableReturnsEmptyWhenInternalReturnsEmpty() {
-    CatalogConnectorMetadata catalogConnectorMetadata = mock(CatalogConnectorMetadata.class);
+    SessionAwareCatalogMetadata catalogConnectorMetadata = mock(SessionAwareCatalogMetadata.class);
     CatalogConnectorMetadataAdapter metadataAdapter = mock(CatalogConnectorMetadataAdapter.class);
     ConnectorMetadata internalMetadata = mock(ConnectorMetadata.class);
     ConnectorSession session = mock(ConnectorSession.class);
@@ -83,7 +83,7 @@ public class TestGravitinoMetadataGetSystemTable {
 
   private static final class TestGravitinoMetadata extends GravitinoMetadata {
     private TestGravitinoMetadata(
-        CatalogConnectorMetadata catalogConnectorMetadata,
+        SessionAwareCatalogMetadata catalogConnectorMetadata,
         CatalogConnectorMetadataAdapter metadataAdapter,
         ConnectorMetadata internalMetadata) {
       super(catalogConnectorMetadata, metadataAdapter, internalMetadata);
