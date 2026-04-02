@@ -50,7 +50,7 @@ public class GroupRoleRelPostgreSQLProvider extends GroupRoleRelBaseSQLProvider 
   }
 
   @Override
-  public String softDeleteGroupRoleRelByMetalakeId(Long metalakeId) {
+  public String softDeleteGroupRoleRelByMetalakeId(@Param("metalakeId") Long metalakeId) {
     return "UPDATE "
         + GROUP_ROLE_RELATION_TABLE_NAME
         + " SET deleted_at = CAST(EXTRACT(EPOCH FROM CURRENT_TIMESTAMP) * 1000 AS BIGINT)"
@@ -61,7 +61,7 @@ public class GroupRoleRelPostgreSQLProvider extends GroupRoleRelBaseSQLProvider 
   }
 
   @Override
-  public String softDeleteGroupRoleRelByRoleId(Long roleId) {
+  public String softDeleteGroupRoleRelByRoleId(@Param("roleId") Long roleId) {
     return "UPDATE "
         + GROUP_ROLE_RELATION_TABLE_NAME
         + " SET deleted_at = CAST(EXTRACT(EPOCH FROM CURRENT_TIMESTAMP) * 1000 AS BIGINT)"
