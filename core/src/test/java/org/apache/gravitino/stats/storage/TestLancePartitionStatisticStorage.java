@@ -142,7 +142,8 @@ public class TestLancePartitionStatisticStorage {
                     PartitionStatisticsModification.drop(
                         targetPartitionName, Lists.newArrayList("statistic0")))));
 
-    storage.dropStatistics(metalakeName, tableStatisticsToDrop);
+    int droppedCount = storage.dropStatistics(metalakeName, tableStatisticsToDrop);
+    Assertions.assertEquals(1, droppedCount);
 
     listedStats =
         storage.listStatistics(
@@ -183,7 +184,8 @@ public class TestLancePartitionStatisticStorage {
                           "partition01", Lists.newArrayList("statistic1")),
                       PartitionStatisticsModification.drop(
                           "partition02", Lists.newArrayList("statistic2")))));
-      storage.dropStatistics(metalakeName, tableStatisticsToDrop);
+      droppedCount = storage.dropStatistics(metalakeName, tableStatisticsToDrop);
+      Assertions.assertEquals(2, droppedCount);
 
       listedStats =
           storage.listStatistics(
@@ -212,6 +214,17 @@ public class TestLancePartitionStatisticStorage {
         }
       }
     }
+
+    // Drop non-existent statistics should return 0
+    List<MetadataObjectStatisticsDrop> nonExistentDrop =
+        Lists.newArrayList(
+            MetadataObjectStatisticsDrop.of(
+                metadataObject,
+                Lists.newArrayList(
+                    PartitionStatisticsModification.drop(
+                        "non_existent_partition", Lists.newArrayList("non_existent_statistic")))));
+    int nonExistentDropCount = storage.dropStatistics(metalakeName, nonExistentDrop);
+    Assertions.assertEquals(0, nonExistentDropCount);
 
     FileUtils.deleteDirectory(new File(location + "/" + tableEntity.id() + ".lance"));
     storage.close();

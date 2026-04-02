@@ -233,17 +233,17 @@ public class LancePartitionStatisticStorage implements PartitionStatisticStorage
   public int dropStatistics(
       String metalake, List<MetadataObjectStatisticsDrop> partitionStatisticsToDrop)
       throws IOException {
+    int totalDropped = 0;
     for (MetadataObjectStatisticsDrop objectDrop : partitionStatisticsToDrop) {
       NameIdentifier identifier =
           MetadataObjectUtil.toEntityIdent(metalake, objectDrop.metadataObject());
       Entity.EntityType type = MetadataObjectUtil.toEntityType(objectDrop.metadataObject());
 
       Long tableId = entityStore.get(identifier, type, TableEntity.class).id();
-      dropStatisticsImpl(tableId, objectDrop.drops());
+      totalDropped += dropStatisticsImpl(tableId, objectDrop.drops());
     }
 
-    // Lance storage can't get the number of dropped statistics, so we return 1 as a placeholder.
-    return 1;
+    return totalDropped;
   }
 
   @Override
@@ -319,7 +319,7 @@ public class LancePartitionStatisticStorage implements PartitionStatisticStorage
     }
   }
 
-  private void dropStatisticsImpl(Long tableId, List<PartitionStatisticsDrop> drops) {
+  private int dropStatisticsImpl(Long tableId, List<PartitionStatisticsDrop> drops) {
     Dataset dataset = getDataset(tableId);
     try {
       List<String> partitionSQLs = Lists.newArrayList();
@@ -338,17 +338,45 @@ public class LancePartitionStatisticStorage implements PartitionStatisticStorage
                 + ")");
       }
 
-      if (partitionSQLs.size() == 1) {
-        dataset.delete(partitionSQLs.get(0));
-      } else if (partitionSQLs.size() > 1) {
-        String filterSQL =
-            partitionSQLs.stream().map(str -> "(" + str + ")").collect(Collectors.joining(" OR "));
+      if (partitionSQLs.isEmpty()) {
+        return 0;
+      }
+
+      String filterSQL =
+          partitionSQLs.size() == 1
+              ? partitionSQLs.get(0)
+              : partitionSQLs.stream()
+                  .map(str -> "(" + str + ")")
+                  .collect(Collectors.joining(" OR "));
+
+      int rowCount = countMatchingRows(dataset, filterSQL);
+      if (rowCount > 0) {
         dataset.delete(filterSQL);
       }
+      return rowCount;
     } finally {
       if (!datasetCache.isPresent() && dataset != null) {
         dataset.close();
       }
+    }
+  }
+
+  private int countMatchingRows(Dataset dataset, String filter) {
+    try (LanceScanner scanner =
+        dataset.newScan(
+            new ScanOptions.Builder()
+                .columns(Collections.singletonList(TABLE_ID_COLUMN))
+                .filter(filter)
+                .build())) {
+      int count = 0;
+      try (ArrowReader reader = scanner.scanBatches()) {
+        while (reader.loadNextBatch()) {
+          count += reader.getVectorSchemaRoot().getRowCount();
+        }
+      }
+      return count;
+    } catch (Exception e) {
+      throw new RuntimeException(e);
     }
   }
 
