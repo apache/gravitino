@@ -117,7 +117,7 @@ public class TestIcebergConfig extends IcebergTestBase {
   void testIcebergRestInvalidPrefix(String prefix) {
     String path = injectPrefixToPath(IcebergRestTestUtil.CONFIG_PATH, prefix);
     Response response = getIcebergClientBuilder(path, Optional.empty()).get();
-    Assertions.assertEquals(500, response.getStatus());
+    Assertions.assertEquals(404, response.getStatus());
   }
 
   @ParameterizedTest

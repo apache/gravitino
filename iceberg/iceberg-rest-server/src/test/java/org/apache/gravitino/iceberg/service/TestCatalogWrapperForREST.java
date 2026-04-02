@@ -102,7 +102,7 @@ public class TestCatalogWrapperForREST {
                 "org.apache.iceberg.aws.s3.S3FileIO",
                 IcebergConstants.ICEBERG_S3_ENDPOINT,
                 "http://localhost:9000",
-                IcebergConstants.DATA_ACCESS,
+                IcebergConstants.ICEBERG_ACCESS_DELEGATION,
                 "vended-credentials",
                 IcebergConstants.WAREHOUSE,
                 "/remote/warehouse"));
@@ -115,7 +115,7 @@ public class TestCatalogWrapperForREST {
     Assertions.assertEquals(
         "http://localhost:9000", configToClients.get(IcebergConstants.ICEBERG_S3_ENDPOINT));
     Assertions.assertEquals(
-        "vended-credentials", configToClients.get(IcebergConstants.DATA_ACCESS));
+        "vended-credentials", configToClients.get(IcebergConstants.ICEBERG_ACCESS_DELEGATION));
   }
 
   @Test
@@ -146,7 +146,7 @@ public class TestCatalogWrapperForREST {
             ImmutableMap.of(
                 IcebergConstants.CATALOG_BACKEND,
                 "hive",
-                IcebergConstants.DATA_ACCESS,
+                IcebergConstants.ICEBERG_ACCESS_DELEGATION,
                 "invalid-mode"));
 
     Assertions.assertThrows(

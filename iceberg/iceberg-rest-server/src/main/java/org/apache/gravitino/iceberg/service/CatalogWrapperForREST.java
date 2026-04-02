@@ -208,9 +208,8 @@ public class CatalogWrapperForREST extends IcebergCatalogWrapper {
 
   @VisibleForTesting
   static void validateAndNormalizeDataAccessProperty(Map<String, String> properties) {
-    String dataAccess = properties.get(IcebergConstants.DATA_ACCESS);
+    String dataAccess = properties.get(IcebergConstants.ICEBERG_ACCESS_DELEGATION);
     if (StringUtils.isBlank(dataAccess)) {
-      properties.remove(IcebergConstants.DATA_ACCESS);
       return;
     }
 
