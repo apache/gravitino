@@ -24,7 +24,10 @@ gravitino_dir="$(cd "${bin_dir}/../">/dev/null; pwd)"
 
 cd ${gravitino_dir}
 
-python bin/rewrite_gravitino_server_config.py
+# Skip config rewrite if SKIP_CONFIG_REWRITE is set (e.g., in Kubernetes)
+if [ "${SKIP_CONFIG_REWRITE}" != "true" ]; then
+  python bin/rewrite_gravitino_server_config.py
+fi
 
 JAVA_OPTS+=" -XX:-UseContainerSupport"
 export JAVA_OPTS
