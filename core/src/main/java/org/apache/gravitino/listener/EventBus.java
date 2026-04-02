@@ -107,7 +107,7 @@ public class EventBus {
       return dispatchEvent(baseEvent);
     } catch (Exception e) {
       LOG.error(
-          "Failed to dispatch event: {}",
+          "Failed to dispatch event: {}, ignoring exception and continuing",
           baseEvent == null ? "null" : baseEvent.getClass().getSimpleName(),
           e);
       return Optional.empty();
