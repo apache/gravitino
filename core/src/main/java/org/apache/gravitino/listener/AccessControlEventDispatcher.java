@@ -140,7 +140,7 @@ public class AccessControlEventDispatcher implements AccessControlDispatcher {
 
       return userObject;
     } catch (Exception e) {
-      eventBus.dispatchEvent(new AddUserFailureEvent(initiator, metalake, e, user));
+      eventBus.dispatchEventSafe(new AddUserFailureEvent(initiator, metalake, e, user));
       throw e;
     }
   }
@@ -157,7 +157,7 @@ public class AccessControlEventDispatcher implements AccessControlDispatcher {
 
       return isExists;
     } catch (Exception e) {
-      eventBus.dispatchEvent(new RemoveUserFailureEvent(initiator, metalake, e, user));
+      eventBus.dispatchEventSafe(new RemoveUserFailureEvent(initiator, metalake, e, user));
       throw e;
     }
   }
@@ -175,7 +175,7 @@ public class AccessControlEventDispatcher implements AccessControlDispatcher {
 
       return userObject;
     } catch (Exception e) {
-      eventBus.dispatchEvent(new GetUserFailureEvent(initiator, metalake, e, user));
+      eventBus.dispatchEventSafe(new GetUserFailureEvent(initiator, metalake, e, user));
       throw e;
     }
   }
@@ -192,7 +192,7 @@ public class AccessControlEventDispatcher implements AccessControlDispatcher {
 
       return users;
     } catch (Exception e) {
-      eventBus.dispatchEvent(new ListUsersFailureEvent(initiator, metalake, e));
+      eventBus.dispatchEventSafe(new ListUsersFailureEvent(initiator, metalake, e));
       throw e;
     }
   }
@@ -209,7 +209,7 @@ public class AccessControlEventDispatcher implements AccessControlDispatcher {
 
       return userNames;
     } catch (Exception e) {
-      eventBus.dispatchEvent(new ListUserNamesFailureEvent(initiator, metalake, e));
+      eventBus.dispatchEventSafe(new ListUserNamesFailureEvent(initiator, metalake, e));
       throw e;
     }
   }
@@ -227,7 +227,7 @@ public class AccessControlEventDispatcher implements AccessControlDispatcher {
 
       return groupObject;
     } catch (Exception e) {
-      eventBus.dispatchEvent(new AddGroupFailureEvent(initiator, metalake, e, group));
+      eventBus.dispatchEventSafe(new AddGroupFailureEvent(initiator, metalake, e, group));
       throw e;
     }
   }
@@ -244,7 +244,7 @@ public class AccessControlEventDispatcher implements AccessControlDispatcher {
 
       return isExists;
     } catch (Exception e) {
-      eventBus.dispatchEvent(new RemoveGroupFailureEvent(initiator, metalake, e, group));
+      eventBus.dispatchEventSafe(new RemoveGroupFailureEvent(initiator, metalake, e, group));
       throw e;
     }
   }
@@ -262,7 +262,7 @@ public class AccessControlEventDispatcher implements AccessControlDispatcher {
 
       return groupObject;
     } catch (Exception e) {
-      eventBus.dispatchEvent(new GetGroupFailureEvent(initiator, metalake, e, group));
+      eventBus.dispatchEventSafe(new GetGroupFailureEvent(initiator, metalake, e, group));
       throw e;
     }
   }
@@ -279,7 +279,7 @@ public class AccessControlEventDispatcher implements AccessControlDispatcher {
 
       return groups;
     } catch (Exception e) {
-      eventBus.dispatchEvent(new ListGroupsFailureEvent(initiator, metalake, e));
+      eventBus.dispatchEventSafe(new ListGroupsFailureEvent(initiator, metalake, e));
       throw e;
     }
   }
@@ -296,7 +296,7 @@ public class AccessControlEventDispatcher implements AccessControlDispatcher {
 
       return groupNames;
     } catch (Exception e) {
-      eventBus.dispatchEvent(new ListGroupNamesFailureEvent(initiator, metalake, e));
+      eventBus.dispatchEventSafe(new ListGroupNamesFailureEvent(initiator, metalake, e));
       throw e;
     }
   }
@@ -315,7 +315,8 @@ public class AccessControlEventDispatcher implements AccessControlDispatcher {
 
       return userObject;
     } catch (Exception e) {
-      eventBus.dispatchEvent(new GrantUserRolesFailureEvent(initiator, metalake, e, user, roles));
+      eventBus.dispatchEventSafe(
+          new GrantUserRolesFailureEvent(initiator, metalake, e, user, roles));
       throw e;
     }
   }
@@ -334,7 +335,8 @@ public class AccessControlEventDispatcher implements AccessControlDispatcher {
 
       return groupObject;
     } catch (Exception e) {
-      eventBus.dispatchEvent(new GrantGroupRolesFailureEvent(initiator, metalake, e, group, roles));
+      eventBus.dispatchEventSafe(
+          new GrantGroupRolesFailureEvent(initiator, metalake, e, group, roles));
       throw e;
     }
   }
@@ -373,7 +375,8 @@ public class AccessControlEventDispatcher implements AccessControlDispatcher {
 
       return userObject;
     } catch (Exception e) {
-      eventBus.dispatchEvent(new RevokeUserRolesFailureEvent(initiator, metalake, e, user, roles));
+      eventBus.dispatchEventSafe(
+          new RevokeUserRolesFailureEvent(initiator, metalake, e, user, roles));
       throw e;
     }
   }
@@ -422,7 +425,7 @@ public class AccessControlEventDispatcher implements AccessControlDispatcher {
 
       return roleObject;
     } catch (Exception e) {
-      eventBus.dispatchEvent(new GetRoleFailureEvent(initiator, metalake, e, role));
+      eventBus.dispatchEventSafe(new GetRoleFailureEvent(initiator, metalake, e, role));
       throw e;
     }
   }
@@ -439,7 +442,7 @@ public class AccessControlEventDispatcher implements AccessControlDispatcher {
 
       return isExists;
     } catch (Exception e) {
-      eventBus.dispatchEvent(new DeleteRoleFailureEvent(initiator, metalake, e, role));
+      eventBus.dispatchEventSafe(new DeleteRoleFailureEvent(initiator, metalake, e, role));
       throw e;
     }
   }
@@ -456,7 +459,7 @@ public class AccessControlEventDispatcher implements AccessControlDispatcher {
 
       return roleNames;
     } catch (Exception e) {
-      eventBus.dispatchEvent(new ListRoleNamesFailureEvent(initiator, metalake, e));
+      eventBus.dispatchEventSafe(new ListRoleNamesFailureEvent(initiator, metalake, e));
       throw e;
     }
   }
@@ -474,7 +477,7 @@ public class AccessControlEventDispatcher implements AccessControlDispatcher {
 
       return roleNames;
     } catch (Exception e) {
-      eventBus.dispatchEvent(new ListRoleNamesFailureEvent(initiator, metalake, e, object));
+      eventBus.dispatchEventSafe(new ListRoleNamesFailureEvent(initiator, metalake, e, object));
       throw e;
     }
   }

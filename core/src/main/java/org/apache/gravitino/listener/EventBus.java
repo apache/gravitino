@@ -30,6 +30,8 @@ import org.apache.gravitino.listener.api.event.BaseEvent;
 import org.apache.gravitino.listener.api.event.Event;
 import org.apache.gravitino.listener.api.event.PreEvent;
 import org.apache.gravitino.listener.api.event.SupportsChangingPreEvent;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * The {@code EventBus} class serves as a mechanism to dispatch events to registered listeners. It
@@ -37,6 +39,8 @@ import org.apache.gravitino.listener.api.event.SupportsChangingPreEvent;
  * within its internal management.
  */
 public class EventBus {
+  private static final Logger LOG = LoggerFactory.getLogger(EventBus.class);
+
   /**
    * Holds all instances of {@link EventListenerPlugin}. These instances can either be {@link
    * EventListenerPluginWrapper} which are used for synchronous event process, or {@link
@@ -82,6 +86,31 @@ public class EventBus {
       return Optional.empty();
     } else {
       throw new RuntimeException("Unknown event type:" + baseEvent.getClass().getSimpleName());
+    }
+  }
+
+  /**
+   * Safely dispatches an event to all registered listeners without propagating exceptions.
+   *
+   * <p>This method wraps {@link #dispatchEvent(BaseEvent)} with exception handling. If any
+   * exception occurs during dispatch (including listener errors or unknown event types), it is
+   * caught and logged without being propagated to the caller. This is particularly useful when
+   * dispatching failure events to prevent secondary exceptions from masking the original error.
+   *
+   * @param baseEvent the event to dispatch
+   * @return an Optional containing the transformed pre-event if it implements {@link
+   *     SupportsChangingPreEvent}, otherwise {@link Optional#empty() empty}. Returns empty if an
+   *     exception occurs.
+   */
+  public Optional<BaseEvent> dispatchEventSafe(BaseEvent baseEvent) {
+    try {
+      return dispatchEvent(baseEvent);
+    } catch (Exception e) {
+      LOG.error(
+          "Failed to dispatch event: {}",
+          baseEvent == null ? "null" : baseEvent.getClass().getSimpleName(),
+          e);
+      return Optional.empty();
     }
   }
 

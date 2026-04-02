@@ -26,6 +26,7 @@ import com.google.common.collect.ImmutableList;
 import java.util.Collections;
 import java.util.List;
 import org.apache.gravitino.NameIdentifier;
+import org.apache.gravitino.authorization.AccessControlDispatcher;
 import org.apache.gravitino.authorization.Group;
 import org.apache.gravitino.exceptions.GravitinoRuntimeException;
 import org.apache.gravitino.exceptions.NoSuchGroupException;
@@ -33,6 +34,7 @@ import org.apache.gravitino.exceptions.NoSuchMetalakeException;
 import org.apache.gravitino.listener.AccessControlEventDispatcher;
 import org.apache.gravitino.listener.DummyEventListener;
 import org.apache.gravitino.listener.EventBus;
+import org.apache.gravitino.listener.api.EventListenerPlugin;
 import org.apache.gravitino.listener.api.info.GroupInfo;
 import org.apache.gravitino.utils.NameIdentifierUtil;
 import org.junit.jupiter.api.Assertions;
@@ -360,6 +362,62 @@ public class TestGroupEvent {
     Assertions.assertEquals(
         NameIdentifierUtil.ofGroup(METALAKE, groupName), removeGroupFailureEvent.identifier());
     Assertions.assertEquals(groupName, removeGroupFailureEvent.groupName());
+  }
+
+  @Test
+  void testRemoveGroupFailureEventDoesNotMaskOriginalException() {
+    GravitinoRuntimeException originalException =
+        new GravitinoRuntimeException("Original remove group failure");
+    GravitinoRuntimeException listenerException =
+        new GravitinoRuntimeException("Listener failed while handling failure event");
+
+    AccessControlDispatcher exceptionDispatcher = mock(AccessControlDispatcher.class);
+    when(exceptionDispatcher.removeGroup(METALAKE, groupName)).thenThrow(originalException);
+
+    // Create a listener that throws when handling failure events
+    AccessControlEventDispatcher dispatcherWithThrowingListener =
+        createExceptionEventDispatcher(listenerException, exceptionDispatcher);
+
+    // The original exception should be propagated, not the listener's exception
+    GravitinoRuntimeException thrownException =
+        Assertions.assertThrows(
+            GravitinoRuntimeException.class,
+            () -> dispatcherWithThrowingListener.removeGroup(METALAKE, groupName));
+
+    // Verify it's the original exception, not the listener's exception
+    Assertions.assertSame(originalException, thrownException);
+  }
+
+  private static AccessControlEventDispatcher createExceptionEventDispatcher(
+      GravitinoRuntimeException listenerException, AccessControlDispatcher exceptionDispatcher) {
+    EventListenerPlugin throwingListener =
+        new EventListenerPlugin() {
+          @Override
+          public void init(java.util.Map<String, String> properties) {}
+
+          @Override
+          public void start() {}
+
+          @Override
+          public void stop() {}
+
+          @Override
+          public void onPostEvent(Event event) {
+            if (event instanceof RemoveGroupFailureEvent) {
+              throw listenerException;
+            }
+          }
+
+          @Override
+          public void onPreEvent(PreEvent preEvent) {}
+        };
+
+    // Create dispatcher with throwing listener
+    EventBus eventBusWithThrowingListener =
+        new EventBus(Collections.singletonList(throwingListener));
+    AccessControlEventDispatcher exceptionEventDispatcher =
+        new AccessControlEventDispatcher(eventBusWithThrowingListener, exceptionDispatcher);
+    return exceptionEventDispatcher;
   }
 
   @Test
