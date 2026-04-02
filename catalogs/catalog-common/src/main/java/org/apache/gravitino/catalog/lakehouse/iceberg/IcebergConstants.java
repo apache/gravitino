@@ -31,7 +31,6 @@ public class IcebergConstants {
   public static final String ICEBERG_JDBC_PASSWORD = "jdbc.password";
   public static final String ICEBERG_JDBC_INITIALIZE = "jdbc-initialize";
 
-  /** Iceberg REST catalog client property controlling data access mechanism. */
   public static final String DATA_ACCESS = "data-access";
 
   public static final String ICEBERG_ACCESS_DELEGATION = "header.X-Iceberg-Access-Delegation";
@@ -98,14 +97,6 @@ public class IcebergConstants {
   public static final String GRAVITINO_OAUTH2_CREDENTIAL = GRAVITINO_PREFIX + "oauth2.credential";
   public static final String GRAVITINO_OAUTH2_TOKEN_PATH = GRAVITINO_PREFIX + "oauth2.token-path";
   public static final String GRAVITINO_OAUTH2_SCOPE = GRAVITINO_PREFIX + "oauth2.scope";
-
-  /**
-   * When {@code true} on a lakehouse-iceberg catalog with {@code catalog-backend=rest}, sets the
-   * Iceberg REST client {@code rest.auth.type} to {@code UserPrincipalForwardingAuthManager} so the
-   * caller's Bearer access token (stored on the authenticated principal) is sent to the remote
-   * Iceberg REST service.
-   */
-  public static final String REST_FORWARD_USER_ACCESS_TOKEN = "rest.forward-user-access-token";
 
   public static final String ICEBERG_REST_DEFAULT_METALAKE = "gravitino";
   public static final String ICEBERG_REST_DEFAULT_CATALOG = "default_catalog";
