@@ -31,6 +31,7 @@ import java.util.Arrays;
 import java.util.Enumeration;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Optional;
 import java.util.stream.Stream;
 import javax.servlet.http.HttpServletRequest;
 import javax.ws.rs.core.EntityTag;
@@ -53,6 +54,8 @@ public class IcebergRESTUtils {
 
   public static final String DEFAULT_SNAPSHOTS = "all";
 
+  public static final String SNAPSHOTS_REFS = "refs";
+
   private IcebergRESTUtils() {}
 
   public static <T> Response ok(T t) {
@@ -68,7 +71,7 @@ public class IcebergRESTUtils {
    * @return a Response with ETag header set
    */
   public static Response buildResponseWithETag(LoadTableResponse loadTableResponse) {
-    EntityTag etag =
+    Optional<EntityTag> etag =
         generateETag(loadTableResponse.tableMetadata().metadataFileLocation(), DEFAULT_SNAPSHOTS);
     return buildResponseWithETag(loadTableResponse, etag);
   }
@@ -77,28 +80,27 @@ public class IcebergRESTUtils {
    * Builds an OK response with the given ETag header.
    *
    * @param loadTableResponse the table response to include in the body
-   * @param etag the pre-computed ETag, may be null
-   * @return a Response with ETag header set if etag is non-null
+   * @param etag the pre-computed ETag
+   * @return a Response with ETag header set if etag is present
    */
   public static Response buildResponseWithETag(
-      LoadTableResponse loadTableResponse, EntityTag etag) {
+      LoadTableResponse loadTableResponse, Optional<EntityTag> etag) {
     Response.ResponseBuilder responseBuilder =
         Response.ok(loadTableResponse, MediaType.APPLICATION_JSON_TYPE);
-    if (etag != null) {
-      responseBuilder.tag(etag);
-    }
+    etag.ifPresent(responseBuilder::tag);
     return responseBuilder.build();
   }
 
   /**
    * Generates an ETag based on the table metadata file location. The ETag is a SHA-256 hash of the
-   * metadata location, which changes whenever the table metadata is updated.
+   * metadata location, which changes whenever the table metadata is updated. Uses the default
+   * snapshots value to ensure consistency.
    *
    * @param metadataLocation the metadata file location
-   * @return the generated ETag, or null if generation fails
+   * @return the generated ETag
    */
-  public static EntityTag generateETag(String metadataLocation) {
-    return generateETag(metadataLocation, null);
+  public static Optional<EntityTag> generateETag(String metadataLocation) {
+    return generateETag(metadataLocation, DEFAULT_SNAPSHOTS);
   }
 
   /**
@@ -108,19 +110,17 @@ public class IcebergRESTUtils {
    * snapshots=refs).
    *
    * @param metadataLocation the metadata file location
-   * @param snapshots the snapshots query parameter value (e.g., "all", "refs"), may be null
-   * @return the generated ETag, or null if generation fails
+   * @param snapshots the snapshots query parameter value (e.g., "all", "refs")
+   * @return the generated ETag
    */
-  public static EntityTag generateETag(String metadataLocation, String snapshots) {
+  public static Optional<EntityTag> generateETag(String metadataLocation, String snapshots) {
     if (metadataLocation == null) {
-      return null;
+      return Optional.empty();
     }
     try {
       MessageDigest digest = MessageDigest.getInstance("SHA-256");
       digest.update(metadataLocation.getBytes(StandardCharsets.UTF_8));
-      if (snapshots != null) {
-        digest.update(snapshots.getBytes(StandardCharsets.UTF_8));
-      }
+      digest.update(snapshots.getBytes(StandardCharsets.UTF_8));
       byte[] hash = digest.digest();
       StringBuilder hexString = new StringBuilder();
       for (byte b : hash) {
@@ -130,10 +130,10 @@ public class IcebergRESTUtils {
         }
         hexString.append(hex);
       }
-      return new EntityTag(hexString.toString());
+      return Optional.of(new EntityTag(hexString.toString()));
     } catch (NoSuchAlgorithmException e) {
       LOG.warn("Failed to generate ETag for metadata location: {}", metadataLocation, e);
-      return null;
+      return Optional.empty();
     }
   }
 

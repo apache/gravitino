@@ -95,8 +95,6 @@ public class IcebergTableOperations {
 
   @VisibleForTesting public static final String IF_NONE_MATCH = "If-None-Match";
 
-  @VisibleForTesting static final String SNAPSHOTS_REFS = "refs";
-
   private IcebergMetricsManager icebergMetricsManager;
 
   private ObjectMapper icebergObjectMapper;
@@ -321,21 +319,21 @@ public class IcebergTableOperations {
               Optional<String> metadataLocation =
                   tableOperationDispatcher.getTableMetadataLocation(context, tableIdentifier);
               if (metadataLocation.isPresent()) {
-                EntityTag etag = generateETag(metadataLocation.get(), snapshots);
-                if (etag != null && etagMatches(ifNoneMatch, etag)) {
-                  return Response.notModified(etag).build();
+                Optional<EntityTag> etag = generateETag(metadataLocation.get(), snapshots);
+                if (etag.isPresent() && etagMatches(ifNoneMatch, etag.get())) {
+                  return Response.notModified(etag.get()).build();
                 }
               }
             }
 
             LoadTableResponse loadTableResponse =
                 tableOperationDispatcher.loadTable(context, tableIdentifier);
-            EntityTag etag =
+            Optional<EntityTag> etag =
                 generateETag(loadTableResponse.tableMetadata().metadataFileLocation(), snapshots);
-            if (etag != null && etagMatches(ifNoneMatch, etag)) {
-              return Response.notModified(etag).build();
+            if (etag.isPresent() && etagMatches(ifNoneMatch, etag.get())) {
+              return Response.notModified(etag.get()).build();
             }
-            if (SNAPSHOTS_REFS.equals(snapshots)) {
+            if (IcebergRESTUtils.SNAPSHOTS_REFS.equals(snapshots)) {
               loadTableResponse = filterSnapshotsByRefs(loadTableResponse);
             }
             return buildResponseWithETag(loadTableResponse, etag);
@@ -572,17 +570,17 @@ public class IcebergTableOperations {
   }
 
   private static Response buildResponseWithETag(
-      LoadTableResponse loadTableResponse, EntityTag etag) {
+      LoadTableResponse loadTableResponse, Optional<EntityTag> etag) {
     return IcebergRESTUtils.buildResponseWithETag(loadTableResponse, etag);
   }
 
   @VisibleForTesting
-  static EntityTag generateETag(String metadataLocation) {
+  static Optional<EntityTag> generateETag(String metadataLocation) {
     return IcebergRESTUtils.generateETag(metadataLocation);
   }
 
   @VisibleForTesting
-  static EntityTag generateETag(String metadataLocation, String snapshots) {
+  static Optional<EntityTag> generateETag(String metadataLocation, String snapshots) {
     return IcebergRESTUtils.generateETag(metadataLocation, snapshots);
   }
 
