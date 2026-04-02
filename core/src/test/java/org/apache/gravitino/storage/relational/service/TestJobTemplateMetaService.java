@@ -24,8 +24,6 @@ import java.util.List;
 import org.apache.gravitino.EntityAlreadyExistsException;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.job.JobHandle;
-import org.apache.gravitino.job.ShellJobTemplate;
-import org.apache.gravitino.job.SparkJobTemplate;
 import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.meta.BaseMetalake;
 import org.apache.gravitino.meta.JobEntity;
@@ -276,41 +274,6 @@ public class TestJobTemplateMetaService extends TestJDBCBackend {
         () ->
             jobTemplateMetaService.updateJobTemplate(
                 updatedJobTemplateEntity.nameIdentifier(), e -> duplicateNameJobTemplateEntity));
-  }
-
-  static JobTemplateEntity newShellJobTemplateEntity(String name, String comment, String metalake) {
-    ShellJobTemplate shellJobTemplate =
-        ShellJobTemplate.builder()
-            .withName(name)
-            .withComment(comment)
-            .withExecutable("/bin/echo")
-            .build();
-
-    return JobTemplateEntity.builder()
-        .withId(RandomIdGenerator.INSTANCE.nextId())
-        .withName(name)
-        .withNamespace(NamespaceUtil.ofJobTemplate(metalake))
-        .withTemplateContent(JobTemplateEntity.TemplateContent.fromJobTemplate(shellJobTemplate))
-        .withAuditInfo(AUDIT_INFO)
-        .build();
-  }
-
-  static JobTemplateEntity newSparkJobTemplateEntity(String name, String comment, String metalake) {
-    SparkJobTemplate sparkJobTemplate =
-        SparkJobTemplate.builder()
-            .withName(name)
-            .withComment(comment)
-            .withClassName("org.apache.spark.examples.SparkPi")
-            .withExecutable("file:/path/to/spark-examples.jar")
-            .build();
-
-    return JobTemplateEntity.builder()
-        .withId(RandomIdGenerator.INSTANCE.nextId())
-        .withName(name)
-        .withNamespace(NamespaceUtil.ofJobTemplate(metalake))
-        .withTemplateContent(JobTemplateEntity.TemplateContent.fromJobTemplate(sparkJobTemplate))
-        .withAuditInfo(AUDIT_INFO)
-        .build();
   }
 
   static JobEntity newJobEntity(String templateName, JobHandle.Status status, String metalake) {

@@ -100,6 +100,10 @@ public class PolicyMetaSQLProviderFactory {
     return getProvider().selectPolicyByPolicyId(policyId);
   }
 
+  public static String listPolicyPOsByPolicyIds(@Param("policyIds") List<Long> policyIds) {
+    return getProvider().listPolicyPOsByPolicyIds(policyIds);
+  }
+
   public static String batchSelectPolicyByIdentifier(
       @Param("metalakeName") String metalakeName, @Param("policyNames") List<String> policyNames) {
     return getProvider().batchSelectPolicyByIdentifier(metalakeName, policyNames);
