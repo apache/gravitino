@@ -29,11 +29,6 @@ import javax.annotation.Nullable;
  * properties as a generic {@code Map<String, String>}, decoupled from any specific property names.
  * This makes the pool infrastructure key-agnostic — only the logic that builds the key (in {@code
  * CatalogManager}) needs to know which properties matter.
- *
- * <p>The set of isolation-relevant properties is determined by a combination of built-in defaults
- * and an optional server configuration ({@code
- * gravitino.catalog.classloader.isolation.extra-properties}) that allows operators to add
- * additional isolation criteria without code changes. The built-in defaults cannot be removed.
  */
 public class ClassLoaderKey {
 

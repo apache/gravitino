@@ -127,9 +127,8 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
   private static final Set<String> CONTRIB_CATALOGS_TYPES =
       ImmutableSet.of("jdbc-oceanbase", "jdbc-clickhouse", "jdbc-hologres");
 
-  // Built-in default isolation property keys. These are always included in the ClassLoaderKey
-  // and cannot be removed by configuration. They cover the catalog property dimensions that
-  // determine the classpath or anchor per-ClassLoader static state.
+  // Isolation property keys included in the ClassLoaderKey. They cover the catalog property
+  // dimensions that determine the classpath or anchor per-ClassLoader static state.
   //
   // Classpath dimensions:
   //   - package: determines which JARs are loaded
@@ -337,10 +336,6 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
 
   private final boolean classLoaderSharingEnabled;
 
-  // The effective set of catalog property keys used for ClassLoader isolation.
-  // Union of DEFAULT_ISOLATION_PROPERTY_KEYS and any extra keys from server config.
-  private final Set<String> isolationPropertyKeys;
-
   @Getter private final Cache<NameIdentifier, CatalogWrapper> catalogCache;
 
   private final EntityStore store;
@@ -369,13 +364,6 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
     this.store = store;
     this.idGenerator = idGenerator;
     this.classLoaderSharingEnabled = config.get(Configs.CATALOG_CLASSLOADER_SHARING_ENABLED);
-
-    List<String> extraKeys = config.get(Configs.CATALOG_CLASSLOADER_ISOLATION_EXTRA_PROPERTIES);
-    this.isolationPropertyKeys =
-        ImmutableSet.<String>builder()
-            .addAll(DEFAULT_ISOLATION_PROPERTY_KEYS)
-            .addAll(extraKeys)
-            .build();
 
     long cacheEvictionIntervalInMs = config.get(Configs.CATALOG_CACHE_EVICTION_INTERVAL_MS);
     this.catalogCache =
@@ -1285,7 +1273,7 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
   private ClassLoaderKey buildClassLoaderKey(String provider, Map<String, String> conf) {
     Map<String, String> isolationProps = new HashMap<>();
     if (conf != null) {
-      for (String key : isolationPropertyKeys) {
+      for (String key : DEFAULT_ISOLATION_PROPERTY_KEYS) {
         String value = conf.get(key);
         if (value != null) {
           isolationProps.put(key, value);
