@@ -265,7 +265,7 @@ public class IcebergCatalogWrapper implements AutoCloseable {
     metadataCache.invalidate(tableIdentifier);
     LoadTableResponse loadTableResponse =
         CatalogHandlers.updateTable(catalog, tableIdentifier, updateTableRequest);
-    if (loadTableResponse != null) {
+    if (loadTableResponse != null && !(catalog instanceof RESTCatalog)) {
       metadataCache.updateTableMetadata(tableIdentifier, loadTableResponse.tableMetadata());
     }
     return loadTableResponse;
