@@ -169,6 +169,94 @@ public class TestClassLoaderPoolIntegration {
   }
 
   @Test
+  public void testSharingDisabledEachCatalogGetsOwnClassLoader() throws IllegalAccessException {
+    Config noSharingConfig = new Config(false) {};
+    noSharingConfig.set(Configs.CATALOG_LOAD_ISOLATED, false);
+    noSharingConfig.set(Configs.CATALOG_CLASSLOADER_SHARING_ENABLED, false);
+
+    CatalogManager noSharingManager =
+        new CatalogManager(noSharingConfig, entityStore, new RandomIdGenerator());
+    try {
+      Map<String, String> props =
+          ImmutableMap.of("key1", "value1", "key2", "value2", "key5-1", "value3");
+
+      noSharingManager.createCatalog(
+          NameIdentifier.of(METALAKE, "catalog1"),
+          Catalog.Type.RELATIONAL,
+          PROVIDER,
+          "test catalog 1",
+          props);
+      noSharingManager.createCatalog(
+          NameIdentifier.of(METALAKE, "catalog2"),
+          Catalog.Type.RELATIONAL,
+          PROVIDER,
+          "test catalog 2",
+          props);
+
+      CatalogManager.CatalogWrapper wrapper1 =
+          noSharingManager.getCatalogCache().getIfPresent(NameIdentifier.of(METALAKE, "catalog1"));
+      CatalogManager.CatalogWrapper wrapper2 =
+          noSharingManager.getCatalogCache().getIfPresent(NameIdentifier.of(METALAKE, "catalog2"));
+
+      Assertions.assertNotNull(wrapper1);
+      Assertions.assertNotNull(wrapper2);
+
+      // With sharing disabled, each catalog should have its own ClassLoader instance
+      Object classLoader1 = FieldUtils.readField(wrapper1, "classLoader", true);
+      Object classLoader2 = FieldUtils.readField(wrapper2, "classLoader", true);
+      Assertions.assertNotSame(
+          classLoader1,
+          classLoader2,
+          "With sharing disabled, catalogs should NOT share a ClassLoader");
+
+      // Non-pooled wrappers should not hold a pool reference
+      Object pool1 = FieldUtils.readField(wrapper1, "pool", true);
+      Assertions.assertNull(pool1, "Non-pooled wrapper should not reference the pool");
+    } finally {
+      noSharingManager.close();
+    }
+  }
+
+  @Test
+  public void testSharingDisabledDropOneCatalogDoesNotAffectOther() {
+    Config noSharingConfig = new Config(false) {};
+    noSharingConfig.set(Configs.CATALOG_LOAD_ISOLATED, false);
+    noSharingConfig.set(Configs.CATALOG_CLASSLOADER_SHARING_ENABLED, false);
+
+    CatalogManager noSharingManager =
+        new CatalogManager(noSharingConfig, entityStore, new RandomIdGenerator());
+    try {
+      Map<String, String> props =
+          ImmutableMap.of("key1", "value1", "key2", "value2", "key5-1", "value3");
+
+      noSharingManager.createCatalog(
+          NameIdentifier.of(METALAKE, "catalog1"),
+          Catalog.Type.RELATIONAL,
+          PROVIDER,
+          "test catalog 1",
+          props);
+      noSharingManager.createCatalog(
+          NameIdentifier.of(METALAKE, "catalog2"),
+          Catalog.Type.RELATIONAL,
+          PROVIDER,
+          "test catalog 2",
+          props);
+
+      // Drop catalog1
+      noSharingManager.disableCatalog(NameIdentifier.of(METALAKE, "catalog1"));
+      noSharingManager.dropCatalog(NameIdentifier.of(METALAKE, "catalog1"));
+
+      // catalog2 should still be loadable
+      Catalog loaded =
+          Assertions.assertDoesNotThrow(
+              () -> noSharingManager.loadCatalog(NameIdentifier.of(METALAKE, "catalog2")));
+      Assertions.assertNotNull(loaded);
+    } finally {
+      noSharingManager.close();
+    }
+  }
+
+  @Test
   public void testClassLoaderPoolCleanupOnManagerClose() throws IllegalAccessException {
     Map<String, String> props =
         ImmutableMap.of("key1", "value1", "key2", "value2", "key5-1", "value3");

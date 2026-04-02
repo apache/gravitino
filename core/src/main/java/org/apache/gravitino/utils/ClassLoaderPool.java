@@ -162,19 +162,28 @@ public class ClassLoaderPool implements Closeable {
       return;
     }
 
-    IsolatedClassLoader isolatedClassLoader = entry.classLoader();
+    cleanupClassLoader(entry.classLoader());
+    LOG.info("ClassLoader for key {} has been fully cleaned up.", entry.key());
+  }
+
+  /**
+   * Performs full resource cleanup for an {@link IsolatedClassLoader}: deregisters JDBC drivers,
+   * cleans up ClassLoader-scoped resources (ThreadLocals, Hadoop FileSystem, etc.), and closes the
+   * ClassLoader.
+   *
+   * @param classLoader The IsolatedClassLoader to clean up.
+   */
+  public static void cleanupClassLoader(IsolatedClassLoader classLoader) {
     try {
-      URLClassLoader internalCl = isolatedClassLoader.getInternalClassLoader();
+      URLClassLoader internalCl = classLoader.getInternalClassLoader();
       if (internalCl != null) {
         deregisterAllDrivers(internalCl);
         ClassLoaderResourceCleanerUtils.closeClassLoaderResource(internalCl);
       }
     } catch (Exception e) {
-      LOG.warn("Error during ClassLoader resource cleanup for key {}", entry.key(), e);
+      LOG.warn("Error during ClassLoader resource cleanup", e);
     }
-
-    isolatedClassLoader.close();
-    LOG.info("ClassLoader for key {} has been fully cleaned up.", entry.key());
+    classLoader.close();
   }
 
   /**
@@ -182,7 +191,7 @@ public class ClassLoaderPool implements Closeable {
    *
    * @param classLoader The ClassLoader whose drivers should be deregistered.
    */
-  private void deregisterAllDrivers(ClassLoader classLoader) {
+  private static void deregisterAllDrivers(ClassLoader classLoader) {
     // DriverManager.getDrivers() returns a snapshot in JDK 9+, so iterating while
     // calling deregisterDriver() is safe.
     Enumeration<Driver> drivers = DriverManager.getDrivers();

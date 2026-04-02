@@ -153,17 +153,14 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
     private ClassLoaderPool pool;
     private PooledClassLoaderEntry poolEntry;
 
-    public CatalogWrapper(BaseCatalog catalog, IsolatedClassLoader classLoader) {
-      this.catalog = catalog;
+    /** Non-pooled constructor: each catalog owns its ClassLoader exclusively. */
+    CatalogWrapper(IsolatedClassLoader classLoader) {
       this.classLoader = classLoader;
     }
 
-    public CatalogWrapper(
-        BaseCatalog catalog,
-        IsolatedClassLoader classLoader,
-        ClassLoaderPool pool,
-        PooledClassLoaderEntry poolEntry) {
-      this.catalog = catalog;
+    /** Pooled constructor: ClassLoader is managed by the pool with reference counting. */
+    CatalogWrapper(
+        IsolatedClassLoader classLoader, ClassLoaderPool pool, PooledClassLoaderEntry poolEntry) {
       this.classLoader = classLoader;
       this.pool = pool;
       this.poolEntry = poolEntry;
@@ -294,8 +291,8 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
         pool.release(poolEntry);
         poolEntry = null;
       } else if (pool == null) {
-        // Non-pooled path (e.g., CATALOG_LOAD_ISOLATED=false): close the ClassLoader directly
-        classLoader.close();
+        // Non-pooled path (e.g., sharing disabled or CATALOG_LOAD_ISOLATED=false)
+        ClassLoaderPool.cleanupClassLoader(classLoader);
       }
       // If pool != null but poolEntry == null, this is a repeated close — skip silently
     }
@@ -333,6 +330,8 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
 
   private final ClassLoaderPool classLoaderPool = new ClassLoaderPool();
 
+  private final boolean classLoaderSharingEnabled;
+
   // The effective set of catalog property keys used for ClassLoader isolation.
   // Union of DEFAULT_ISOLATION_PROPERTY_KEYS and any extra keys from server config.
   private final Set<String> isolationPropertyKeys;
@@ -355,6 +354,7 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
     this.config = config;
     this.store = store;
     this.idGenerator = idGenerator;
+    this.classLoaderSharingEnabled = config.get(Configs.CATALOG_CLASSLOADER_SHARING_ENABLED);
 
     List<String> extraKeys = config.get(Configs.CATALOG_CLASSLOADER_ISOLATION_EXTRA_PROPERTIES);
     this.isolationPropertyKeys =
@@ -1050,36 +1050,59 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
     Map<String, String> conf = entity.getProperties();
     String provider = entity.getProvider();
 
+    if (!classLoaderSharingEnabled) {
+      return createNonPooledCatalogWrapper(provider, conf, entity, propsToValidate);
+    }
+
     ClassLoaderKey key = buildClassLoaderKey(provider, conf);
     PooledClassLoaderEntry poolEntry =
         classLoaderPool.acquire(key, () -> createClassLoader(provider, conf));
     try {
-      IsolatedClassLoader classLoader = poolEntry.classLoader();
-      BaseCatalog<?> catalog = createBaseCatalog(classLoader, entity);
-
-      CatalogWrapper wrapper = new CatalogWrapper(catalog, classLoader, classLoaderPool, poolEntry);
-      // Validate catalog properties and initialize the config
-      classLoader.withClassLoader(
-          cl -> {
-            validatePropertyForCreate(catalog.catalogPropertiesMetadata(), propsToValidate);
-
-            // Call wrapper.catalog.properties() to make BaseCatalog#properties in
-            // IsolatedClassLoader not null. Why do we do this? Because
-            // wrapper.catalog.properties() needs to be called in the IsolatedClassLoader, as it
-            // needs to load the specific catalog class such as HiveCatalog or similar. To simplify,
-            // we will preload the value of properties so that AppClassLoader can get the value of
-            // properties.
-            wrapper.catalog.properties();
-            wrapper.catalog.capability();
-            return null;
-          },
-          IllegalArgumentException.class);
-
+      CatalogWrapper wrapper =
+          initCatalogWrapper(
+              new CatalogWrapper(poolEntry.classLoader(), classLoaderPool, poolEntry),
+              entity,
+              propsToValidate);
       return wrapper;
     } catch (Exception e) {
       classLoaderPool.release(poolEntry);
       throw e;
     }
+  }
+
+  private CatalogWrapper createNonPooledCatalogWrapper(
+      String provider,
+      Map<String, String> conf,
+      CatalogEntity entity,
+      @Nullable Map<String, String> propsToValidate) {
+    IsolatedClassLoader classLoader = createClassLoader(provider, conf);
+    try {
+      return initCatalogWrapper(new CatalogWrapper(classLoader), entity, propsToValidate);
+    } catch (Exception e) {
+      ClassLoaderPool.cleanupClassLoader(classLoader);
+      throw e;
+    }
+  }
+
+  /**
+   * Creates the catalog instance, validates properties, and preloads property/capability values
+   * into the given wrapper.
+   */
+  private CatalogWrapper initCatalogWrapper(
+      CatalogWrapper wrapper, CatalogEntity entity, @Nullable Map<String, String> propsToValidate) {
+    BaseCatalog<?> catalog = createBaseCatalog(wrapper.classLoader, entity);
+    wrapper.catalog = catalog;
+    wrapper.classLoader.withClassLoader(
+        cl -> {
+          validatePropertyForCreate(catalog.catalogPropertiesMetadata(), propsToValidate);
+          // Preload properties() and capability() inside the IsolatedClassLoader so that
+          // AppClassLoader can read them later without needing the isolated context.
+          catalog.properties();
+          catalog.capability();
+          return null;
+        },
+        IllegalArgumentException.class);
+    return wrapper;
   }
 
   /**
@@ -1092,6 +1115,16 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
   private Map<String, String> getResolvedProperties(CatalogEntity entity) {
     Map<String, String> conf = entity.getProperties();
     String provider = entity.getProvider();
+
+    if (!classLoaderSharingEnabled) {
+      IsolatedClassLoader classLoader = createClassLoader(provider, conf);
+      try {
+        BaseCatalog<?> catalog = createBaseCatalog(classLoader, entity);
+        return classLoader.withClassLoader(cl -> catalog.properties(), RuntimeException.class);
+      } finally {
+        ClassLoaderPool.cleanupClassLoader(classLoader);
+      }
+    }
 
     ClassLoaderKey key = buildClassLoaderKey(provider, conf);
     PooledClassLoaderEntry poolEntry =
