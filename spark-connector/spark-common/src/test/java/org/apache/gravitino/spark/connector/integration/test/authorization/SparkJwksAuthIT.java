@@ -41,16 +41,12 @@ import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 /**
  * End-to-end integration test for Spark OAuth2 authentication via JWKS. Exercises the full path:
  * Spark plugin → {@code client_credentials} → JWT fetch → Gravitino REST → JWKS validation.
  */
 public class SparkJwksAuthIT extends BaseIT {
-
-  private static final Logger LOG = LoggerFactory.getLogger(SparkJwksAuthIT.class);
 
   private static final String SERVICE_AUDIENCE = "service1";
   private static final String METALAKE = "jwks_test_metalake";
@@ -69,7 +65,6 @@ public class SparkJwksAuthIT extends BaseIT {
         mockServerHelper.mintToken(
             "gravitino", SERVICE_AUDIENCE, Instant.now().plusSeconds(1_000_000));
     mockServerHelper.setTokenSupplier(() -> validToken);
-    LOG.info("Embedded JWKS+token server started on port {}", mockServerHelper.port());
 
     Map<String, String> configs = Maps.newHashMap();
     configs.put(Configs.AUTHENTICATORS.getKey(), AuthenticatorType.OAUTH.name().toLowerCase());
@@ -87,7 +82,6 @@ public class SparkJwksAuthIT extends BaseIT {
 
     client.createMetalake(METALAKE, "JWKS auth test metalake", Maps.newHashMap());
 
-    // Start the Spark session with OAuth2 pointing to the mock /token endpoint.
     SparkConf sparkConf =
         new SparkConf()
             .set("spark.plugins", GravitinoSparkPlugin.class.getName())
@@ -105,8 +99,6 @@ public class SparkJwksAuthIT extends BaseIT {
             .appName("SparkJwksAuthIT")
             .config(sparkConf)
             .getOrCreate();
-
-    LOG.info("Spark session started. Gravitino URI: {}", serverUri);
   }
 
   @AfterAll
@@ -123,12 +115,10 @@ public class SparkJwksAuthIT extends BaseIT {
 
   @Test
   public void testSparkConnectsWithJwksAuth() throws Exception {
-    // Verify the Spark plugin initialized successfully by executing a query.
-    // SHOW CATALOGS may be empty if no Gravitino catalog is defined; the real signal is
-    // that no exception is thrown and the OAuth token fetch + JWKS validation succeeded.
+    // Trigger the Spark plugin's OAuth handshake with Gravitino on the first SQL call.
     Assertions.assertDoesNotThrow(() -> sparkSession.sql("SHOW CATALOGS").collect());
 
-    // Verify the same OAuth token flow works end-to-end via a direct Gravitino client.
+    // Verify the full client_credentials → JWKS validation path via a direct Gravitino client.
     DefaultOAuth2TokenProvider oauthProvider =
         DefaultOAuth2TokenProvider.builder()
             .withUri(mockServerHelper.baseUri())
@@ -139,9 +129,7 @@ public class SparkJwksAuthIT extends BaseIT {
     try (GravitinoAdminClient oauthClient =
         GravitinoAdminClient.builder(serverUri).withOAuth(oauthProvider).build()) {
       GravitinoMetalake metalake = oauthClient.loadMetalake(METALAKE);
-      Assertions.assertNotNull(metalake);
       Assertions.assertEquals(METALAKE, metalake.name());
-      LOG.info("JWKS-authenticated Gravitino client loaded metalake '{}'", metalake.name());
     }
   }
 }
