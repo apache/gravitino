@@ -48,6 +48,13 @@ class GravitinoAuthProvider {
   /** Simple authentication user configuration key. */
   static final String SIMPLE_AUTH_USER_KEY = "gravitino.user";
 
+  /**
+   * When set to {@code true} with {@code simple} auth, the Trino session user is forwarded to
+   * Gravitino per-request instead of the static {@code gravitino.user}.
+   */
+  static final String FORWARD_SESSION_USER_KEY =
+      GravitinoClientConfiguration.GRAVITINO_CLIENT_CONFIG_PREFIX + "session.forwardUser";
+
   /** OAuth2 server URI configuration key. */
   static final String OAUTH_SERVER_URI_KEY =
       GravitinoClientConfiguration.GRAVITINO_CLIENT_CONFIG_PREFIX + "oauth2.serverUri";
@@ -118,6 +125,8 @@ class GravitinoAuthProvider {
     Map<String, String> clientConfig = new HashMap<>(config.getClientConfig());
     String uri = config.getURI();
     String authTypeStr = clientConfig.get(AUTH_TYPE_KEY);
+    boolean forwardUser =
+        Boolean.parseBoolean(clientConfig.getOrDefault(FORWARD_SESSION_USER_KEY, "false"));
 
     GravitinoAdminClient.AdminClientBuilder builder = GravitinoAdminClient.builder(uri);
 
@@ -138,7 +147,14 @@ class GravitinoAuthProvider {
 
       switch (authType) {
         case SIMPLE:
-          buildSimpleAuth(builder, config.getUser());
+          if (forwardUser) {
+            LOG.info(
+                "Enabling SIMPLE_SESSION mode: Trino session user will be forwarded per query");
+            authProvider = new TrinoSessionAuthProvider();
+            builder.withCustomTokenAuth(authProvider);
+          } else {
+            buildSimpleAuth(builder, config.getUser());
+          }
           break;
         case OAUTH2:
           builder.withOAuth(buildOAuthProvider(clientConfig));
@@ -173,6 +189,7 @@ class GravitinoAuthProvider {
     clientConfig.remove(KERBEROS_PRINCIPAL_KEY);
     clientConfig.remove(KERBEROS_KEYTAB_FILE_PATH_KEY);
     clientConfig.remove(OAUTH2_TOKEN_CREDENTIAL_KEY);
+    clientConfig.remove(FORWARD_SESSION_USER_KEY);
 
     builder.withClientConfig(clientConfig);
 

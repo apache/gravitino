@@ -21,15 +21,27 @@ package org.apache.gravitino.trino.connector.catalog;
 import io.trino.spi.connector.ConnectorSession;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
+import java.util.Base64;
+import java.util.concurrent.ConcurrentHashMap;
+import javax.annotation.Nullable;
 import org.apache.gravitino.auth.AuthConstants;
 import org.apache.gravitino.client.CustomTokenProvider;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
- * A {@link CustomTokenProvider} that forwards the Trino session's per-query OAuth2 Bearer token to
- * Gravitino on every request by storing it in a {@link ThreadLocal}.
+ * A {@link CustomTokenProvider} that forwards the Trino session user's credentials to Gravitino on
+ * every request by storing them in a {@link ThreadLocal}.
  *
- * <p>The token is read from the Trino session's extra credentials using a configured key and
- * forwarded as {@code Authorization: Bearer <token>}.
+ * <p>There are two operating modes, selected at construction time:
+ *
+ * <ul>
+ *   <li><b>OAUTH2_TOKEN</b> – reads a Bearer token from the Trino session's extra credentials using
+ *       a configured key, and forwards it as {@code Authorization: Bearer <token>}.
+ *   <li><b>SIMPLE_SESSION</b> – encodes the Trino session username using the same Basic-auth format
+ *       as {@code SimpleTokenProvider}, so the Gravitino server sees the actual Trino user rather
+ *       than a shared service account.
+ * </ul>
  *
  * <p>When no session has been applied (e.g. during connector start-up), {@link #hasTokenData()}
  * returns {@code false} so that the request is sent without an {@code Authorization} header.
@@ -38,41 +50,88 @@ import org.apache.gravitino.client.CustomTokenProvider;
  */
 public class TrinoSessionAuthProvider extends CustomTokenProvider {
 
+  private static final Logger LOG = LoggerFactory.getLogger(TrinoSessionAuthProvider.class);
+
+  /** Distinguishes between the two operating modes. */
+  enum Mode {
+    OAUTH2_TOKEN,
+    SIMPLE_SESSION
+  }
+
   private static final ThreadLocal<byte[]> TOKEN_HOLDER = new ThreadLocal<>();
 
-  /** The key to look up in Trino extra credentials that holds the Bearer token. */
-  private final String credentialKey;
+  /** Cache of encoded tokens per username to avoid repeated Base64 encoding. */
+  private static final ConcurrentHashMap<String, byte[]> TOKEN_CACHE = new ConcurrentHashMap<>();
+
+  private final Mode mode;
+
+  /** The key to look up in Trino extra credentials (only used in OAUTH2_TOKEN mode). */
+  @Nullable private final String credentialKey;
 
   /**
-   * Creates a provider that reads a Bearer token from the Trino session's extra credentials using
-   * the given key.
+   * Creates a provider in OAUTH2_TOKEN mode.
    *
    * @param credentialKey the key whose value in the Trino session's extra credentials is the Bearer
    *     token
    */
   TrinoSessionAuthProvider(String credentialKey) {
+    this.mode = Mode.OAUTH2_TOKEN;
     this.credentialKey = credentialKey;
     this.schemeName = "Bearer"; // required by parent abstract; not used because we override
   }
 
   /**
-   * Reads the Bearer token from the current session's extra credentials and stores it in the
-   * per-thread holder.
+   * Creates a provider in SIMPLE_SESSION mode. The Trino session user name is encoded using the
+   * same Basic-auth format as {@code SimpleTokenProvider}.
+   */
+  TrinoSessionAuthProvider() {
+    this.mode = Mode.SIMPLE_SESSION;
+    this.credentialKey = null;
+    this.schemeName = "Basic"; // required by parent abstract; not used because we override
+  }
+
+  /**
+   * Reads credentials from the current session and stores them in the per-thread holder.
    *
    * @param session the current Trino connector session
    */
   void applySession(ConnectorSession session) {
-    String bearerToken = session.getIdentity().getExtraCredentials().get(credentialKey);
-    if (bearerToken != null) {
-      TOKEN_HOLDER.set(
-          (AuthConstants.AUTHORIZATION_BEARER_HEADER + bearerToken)
-              .getBytes(StandardCharsets.UTF_8));
-    } else {
-      TOKEN_HOLDER.remove();
+    // Check if token is already set for this thread to avoid redundant operations
+    if (TOKEN_HOLDER.get() != null) {
+      return;
     }
+
+    byte[] token;
+    if (mode == Mode.OAUTH2_TOKEN) {
+      String bearerToken = session.getIdentity().getExtraCredentials().get(credentialKey);
+      if (bearerToken == null) {
+        LOG.error(
+            "OAuth2 token not found in Trino session credentials for user: {}. "
+                + "Expected credential key: '{}'. Available keys: {}. "
+                + "Requests to Gravitino will fail with authentication errors.",
+            session.getUser(),
+            credentialKey,
+            session.getIdentity().getExtraCredentials().keySet());
+        TOKEN_HOLDER.remove();
+        return;
+      }
+      token =
+          (AuthConstants.AUTHORIZATION_BEARER_HEADER + bearerToken)
+              .getBytes(StandardCharsets.UTF_8);
+    } else {
+      String username = session.getUser();
+      if (username == null || username.isEmpty()) {
+        LOG.error("Cannot forward empty username to Gravitino in SIMPLE_SESSION mode");
+        TOKEN_HOLDER.remove();
+        return;
+      }
+      token = encodeSimpleToken(username);
+    }
+
+    TOKEN_HOLDER.set(token);
   }
 
-  /** Removes the per-thread token. Must be called at the end of each query. */
+  /** Removes the per-thread credentials. Must be called at the end of each query. */
   void clearSession() {
     TOKEN_HOLDER.remove();
   }
@@ -100,5 +159,18 @@ public class TrinoSessionAuthProvider extends CustomTokenProvider {
   @Override
   public void close() throws IOException {
     TOKEN_HOLDER.remove();
+  }
+
+  private static byte[] encodeSimpleToken(String user) {
+    return TOKEN_CACHE.computeIfAbsent(
+        user,
+        u -> {
+          String userInformation = u + ":dummy";
+          return (AuthConstants.AUTHORIZATION_BASIC_HEADER
+                  + new String(
+                      Base64.getEncoder().encode(userInformation.getBytes(StandardCharsets.UTF_8)),
+                      StandardCharsets.UTF_8))
+              .getBytes(StandardCharsets.UTF_8);
+        });
   }
 }

@@ -156,6 +156,28 @@ gravitino.client.oauth2.scope=test
 SHOW CATALOGS;
 ```
 
+### Session User Forwarding
+
+When `authType=simple` is configured, by default the static `gravitino.user` is used as the identity for all requests. Setting `gravitino.client.session.forwardUser=true` overrides this: the Trino session user name is encoded as a `Basic` credential and forwarded to the Gravitino server on every query, so each Trino user is visible in the Gravitino audit log.
+
+**Configuration:**
+
+```properties
+connector.name=gravitino
+gravitino.metalake=metalake
+gravitino.uri=http://localhost:8090
+
+# Forward the Trino session user to Gravitino per-request
+gravitino.client.authType=simple
+gravitino.client.session.forwardUser=true
+```
+
+**Configuration properties:**
+
+| Property                                       | Description                                                                                  | Default value | Required | Since version |
+|------------------------------------------------|----------------------------------------------------------------------------------------------|---------------|----------|---------------|
+| `gravitino.client.session.forwardUser`         | When `true` with `authType=simple`, the Trino session user is forwarded per-request instead of the static `gravitino.user` | `false` | No | 1.9.0 |
+
 ### Notes
 
 - The Gravitino server must be configured with the corresponding authentication mechanism enabled.
