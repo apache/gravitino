@@ -575,7 +575,6 @@ public class ModelOperations {
         schema,
         model,
         version);
-    request.validate();
 
     try {
       NameIdentifier modelId = NameIdentifierUtil.ofModel(metalake, catalog, schema, model);
@@ -630,7 +629,6 @@ public class ModelOperations {
         schema,
         model,
         alias);
-    request.validate();
 
     try {
       NameIdentifier modelId = NameIdentifierUtil.ofModel(metalake, catalog, schema, model);
