@@ -52,9 +52,21 @@ public class IcebergRESTUtils {
 
   private static final Logger LOG = LoggerFactory.getLogger(IcebergRESTUtils.class);
 
-  public static final String DEFAULT_SNAPSHOTS = "all";
+  /** Snapshot modes for the Iceberg loadTable endpoint. */
+  public enum SnapshotMode {
+    ALL("all"),
+    REFS("refs");
 
-  public static final String SNAPSHOTS_REFS = "refs";
+    private final String value;
+
+    SnapshotMode(String value) {
+      this.value = value;
+    }
+
+    public String getValue() {
+      return value;
+    }
+  }
 
   private IcebergRESTUtils() {}
 
@@ -72,7 +84,8 @@ public class IcebergRESTUtils {
    */
   public static Response buildResponseWithETag(LoadTableResponse loadTableResponse) {
     Optional<EntityTag> etag =
-        generateETag(loadTableResponse.tableMetadata().metadataFileLocation(), DEFAULT_SNAPSHOTS);
+        generateETag(
+            loadTableResponse.tableMetadata().metadataFileLocation(), SnapshotMode.ALL.getValue());
     return buildResponseWithETag(loadTableResponse, etag);
   }
 
@@ -100,7 +113,7 @@ public class IcebergRESTUtils {
    * @return the generated ETag
    */
   public static Optional<EntityTag> generateETag(String metadataLocation) {
-    return generateETag(metadataLocation, DEFAULT_SNAPSHOTS);
+    return generateETag(metadataLocation, SnapshotMode.ALL.getValue());
   }
 
   /**
@@ -114,7 +127,7 @@ public class IcebergRESTUtils {
    * @return the generated ETag
    */
   public static Optional<EntityTag> generateETag(String metadataLocation, String snapshots) {
-    if (metadataLocation == null) {
+    if (StringUtils.isBlank(metadataLocation)) {
       return Optional.empty();
     }
     try {

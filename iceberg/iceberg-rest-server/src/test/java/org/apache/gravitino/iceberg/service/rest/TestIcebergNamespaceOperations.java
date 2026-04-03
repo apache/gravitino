@@ -203,7 +203,8 @@ public class TestIcebergNamespaceOperations extends IcebergNamespaceTestBase {
 
     // Verify the ETag value matches the expected SHA-256 hash of the known mock metadata location
     Optional<EntityTag> expectedETag =
-        IcebergRESTUtils.generateETag("/mock/metadata/v1.metadata.json", "all");
+        IcebergRESTUtils.generateETag(
+            "/mock/metadata/v1.metadata.json", IcebergRESTUtils.SnapshotMode.ALL.getValue());
     Assertions.assertTrue(expectedETag.isPresent(), "Expected ETag should be generated");
     Assertions.assertEquals(
         "\"" + expectedETag.get().getValue() + "\"",

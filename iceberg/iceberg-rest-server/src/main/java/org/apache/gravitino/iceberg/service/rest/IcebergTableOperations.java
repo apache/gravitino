@@ -291,7 +291,7 @@ public class IcebergTableOperations {
           String namespace,
       @IcebergAuthorizationMetadata(type = RequestType.LOAD_TABLE) @Encoded() @PathParam("table")
           String table,
-      @DefaultValue(IcebergRESTUtils.DEFAULT_SNAPSHOTS) @QueryParam("snapshots") String snapshots,
+      @DefaultValue("all") @QueryParam("snapshots") String snapshots,
       @HeaderParam(X_ICEBERG_ACCESS_DELEGATION) String accessDelegation,
       @HeaderParam(IF_NONE_MATCH) String ifNoneMatch) {
     String catalogName = IcebergRESTUtils.getCatalogName(prefix);
@@ -333,7 +333,7 @@ public class IcebergTableOperations {
             if (etag.isPresent() && etagMatches(ifNoneMatch, etag.get())) {
               return Response.notModified(etag.get()).build();
             }
-            if (IcebergRESTUtils.SNAPSHOTS_REFS.equals(snapshots)) {
+            if (IcebergRESTUtils.SnapshotMode.REFS.getValue().equals(snapshots)) {
               loadTableResponse = filterSnapshotsByRefs(loadTableResponse);
             }
             return buildResponseWithETag(loadTableResponse, etag);
