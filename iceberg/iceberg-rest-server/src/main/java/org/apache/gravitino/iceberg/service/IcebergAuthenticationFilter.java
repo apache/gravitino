@@ -23,23 +23,21 @@ import com.google.common.collect.ImmutableMap;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.util.Map;
-import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
+import org.apache.gravitino.server.authentication.AuthenticationFilter;
 import org.apache.iceberg.rest.responses.ErrorResponse;
 import org.eclipse.jetty.http.HttpStatus;
-import org.eclipse.jetty.server.Request;
-import org.eclipse.jetty.server.handler.ErrorHandler;
 
 /**
- * Custom Jetty {@link ErrorHandler} for the Iceberg REST server that produces JSON error responses
- * conforming to the Iceberg REST API specification.
+ * An {@link AuthenticationFilter} subclass for the Iceberg REST server that produces JSON error
+ * responses conforming to the Iceberg REST API specification.
  *
- * <p>By default, Jetty's {@link ErrorHandler} returns HTML error pages. This is problematic for
- * Iceberg REST clients (e.g., the Java {@code RESTCatalog}) which expect all error responses to be
- * JSON {@code ErrorResponse} bodies. This handler ensures that pre-JAX-RS errors (such as
- * authentication failures from the {@code AuthenticationFilter}) are returned as proper JSON.
+ * <p>When authentication fails, the default {@link AuthenticationFilter} calls {@code
+ * resp.sendError()} which produces HTML error pages via Jetty's default error handler. This
+ * subclass overrides the error response to write a proper Iceberg {@link ErrorResponse} JSON body,
+ * which Iceberg REST clients (e.g., the Java {@code RESTCatalog}) expect.
  */
-public class IcebergJsonErrorHandler extends ErrorHandler {
+public class IcebergAuthenticationFilter extends AuthenticationFilter {
 
   private static final ObjectMapper MAPPER = IcebergObjectMapper.getInstance();
 
@@ -60,21 +58,18 @@ public class IcebergJsonErrorHandler extends ErrorHandler {
           .build();
 
   @Override
-  public void handle(
-      String target, Request baseRequest, HttpServletRequest request, HttpServletResponse response)
+  protected void sendAuthErrorResponse(HttpServletResponse response, int status, String message)
       throws IOException {
-    int code = response.getStatus();
-    String message = (String) request.getAttribute("javax.servlet.error.message");
     if (message == null || message.isEmpty()) {
-      message = HttpStatus.getMessage(code);
+      message = HttpStatus.getMessage(status);
     }
 
-    String type = ERROR_TYPE_NAMES.getOrDefault(code, HttpStatus.getMessage(code));
-    ErrorResponse errorResponse = IcebergRESTUtils.errorResponse(code, type, message);
+    String type = ERROR_TYPE_NAMES.getOrDefault(status, HttpStatus.getMessage(status));
+    ErrorResponse errorResponse = IcebergRESTUtils.errorResponse(status, type, message);
 
+    response.setStatus(status);
     response.setContentType("application/json");
     response.setCharacterEncoding(StandardCharsets.UTF_8.name());
     MAPPER.writeValue(response.getWriter(), errorResponse);
-    baseRequest.setHandled(true);
   }
 }

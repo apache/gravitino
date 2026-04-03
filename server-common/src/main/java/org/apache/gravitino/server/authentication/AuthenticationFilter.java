@@ -99,11 +99,24 @@ public class AuthenticationFilter implements Filter {
           resp.setHeader(AuthConstants.HTTP_CHALLENGE_HEADER, challenge);
         }
       }
-      resp.sendError(HttpServletResponse.SC_UNAUTHORIZED, ue.getMessage());
+      sendAuthErrorResponse(resp, HttpServletResponse.SC_UNAUTHORIZED, ue.getMessage());
     } catch (Exception e) {
       HttpServletResponse resp = (HttpServletResponse) response;
-      resp.sendError(HttpServletResponse.SC_UNAUTHORIZED, e.getMessage());
+      sendAuthErrorResponse(resp, HttpServletResponse.SC_UNAUTHORIZED, e.getMessage());
     }
+  }
+
+  /**
+   * Sends an error response when authentication fails. Subclasses can override this to customize
+   * the error response format (e.g., Iceberg REST server returns JSON error bodies).
+   *
+   * @param response the HTTP servlet response
+   * @param status the HTTP status code
+   * @param message the error message
+   */
+  protected void sendAuthErrorResponse(HttpServletResponse response, int status, String message)
+      throws IOException {
+    response.sendError(status, message);
   }
 
   @Override

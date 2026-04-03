@@ -25,38 +25,30 @@ import static org.mockito.Mockito.when;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.io.PrintWriter;
 import java.io.StringWriter;
-import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 import org.apache.iceberg.rest.responses.ErrorResponse;
-import org.eclipse.jetty.server.Request;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
-public class TestIcebergJsonErrorHandler {
+public class TestIcebergAuthenticationFilter {
 
   private static final ObjectMapper MAPPER = IcebergObjectMapper.getInstance();
 
   @Test
   public void testUnauthorizedErrorReturnsJson() throws Exception {
-    IcebergJsonErrorHandler handler = new IcebergJsonErrorHandler();
+    IcebergAuthenticationFilter filter = new IcebergAuthenticationFilter();
 
-    Request baseRequest = mock(Request.class);
-    HttpServletRequest request = mock(HttpServletRequest.class);
     HttpServletResponse response = mock(HttpServletResponse.class);
-
     StringWriter stringWriter = new StringWriter();
     PrintWriter printWriter = new PrintWriter(stringWriter);
-
-    when(response.getStatus()).thenReturn(HttpServletResponse.SC_UNAUTHORIZED);
-    when(request.getAttribute("javax.servlet.error.message"))
-        .thenReturn("The provided credentials did not support");
     when(response.getWriter()).thenReturn(printWriter);
 
-    handler.handle("/test", baseRequest, request, response);
+    filter.sendAuthErrorResponse(
+        response, HttpServletResponse.SC_UNAUTHORIZED, "The provided credentials did not support");
 
+    verify(response).setStatus(HttpServletResponse.SC_UNAUTHORIZED);
     verify(response).setContentType("application/json");
     verify(response).setCharacterEncoding("UTF-8");
-    verify(baseRequest).setHandled(true);
 
     printWriter.flush();
     String json = stringWriter.toString();
@@ -68,20 +60,17 @@ public class TestIcebergJsonErrorHandler {
 
   @Test
   public void testInternalServerErrorReturnsJson() throws Exception {
-    IcebergJsonErrorHandler handler = new IcebergJsonErrorHandler();
+    IcebergAuthenticationFilter filter = new IcebergAuthenticationFilter();
 
-    Request baseRequest = mock(Request.class);
-    HttpServletRequest request = mock(HttpServletRequest.class);
     HttpServletResponse response = mock(HttpServletResponse.class);
-
     StringWriter stringWriter = new StringWriter();
     PrintWriter printWriter = new PrintWriter(stringWriter);
-
-    when(response.getStatus()).thenReturn(HttpServletResponse.SC_INTERNAL_SERVER_ERROR);
-    when(request.getAttribute("javax.servlet.error.message")).thenReturn("Something went wrong");
     when(response.getWriter()).thenReturn(printWriter);
 
-    handler.handle("/test", baseRequest, request, response);
+    filter.sendAuthErrorResponse(
+        response, HttpServletResponse.SC_INTERNAL_SERVER_ERROR, "Something went wrong");
+
+    verify(response).setStatus(HttpServletResponse.SC_INTERNAL_SERVER_ERROR);
 
     printWriter.flush();
     String json = stringWriter.toString();
@@ -93,20 +82,14 @@ public class TestIcebergJsonErrorHandler {
 
   @Test
   public void testNullMessageUsesDefaultStatusMessage() throws Exception {
-    IcebergJsonErrorHandler handler = new IcebergJsonErrorHandler();
+    IcebergAuthenticationFilter filter = new IcebergAuthenticationFilter();
 
-    Request baseRequest = mock(Request.class);
-    HttpServletRequest request = mock(HttpServletRequest.class);
     HttpServletResponse response = mock(HttpServletResponse.class);
-
     StringWriter stringWriter = new StringWriter();
     PrintWriter printWriter = new PrintWriter(stringWriter);
-
-    when(response.getStatus()).thenReturn(HttpServletResponse.SC_FORBIDDEN);
-    when(request.getAttribute("javax.servlet.error.message")).thenReturn(null);
     when(response.getWriter()).thenReturn(printWriter);
 
-    handler.handle("/test", baseRequest, request, response);
+    filter.sendAuthErrorResponse(response, HttpServletResponse.SC_FORBIDDEN, null);
 
     printWriter.flush();
     String json = stringWriter.toString();
@@ -118,20 +101,14 @@ public class TestIcebergJsonErrorHandler {
 
   @Test
   public void testEmptyMessageUsesDefaultStatusMessage() throws Exception {
-    IcebergJsonErrorHandler handler = new IcebergJsonErrorHandler();
+    IcebergAuthenticationFilter filter = new IcebergAuthenticationFilter();
 
-    Request baseRequest = mock(Request.class);
-    HttpServletRequest request = mock(HttpServletRequest.class);
     HttpServletResponse response = mock(HttpServletResponse.class);
-
     StringWriter stringWriter = new StringWriter();
     PrintWriter printWriter = new PrintWriter(stringWriter);
-
-    when(response.getStatus()).thenReturn(HttpServletResponse.SC_NOT_FOUND);
-    when(request.getAttribute("javax.servlet.error.message")).thenReturn("");
     when(response.getWriter()).thenReturn(printWriter);
 
-    handler.handle("/test", baseRequest, request, response);
+    filter.sendAuthErrorResponse(response, HttpServletResponse.SC_NOT_FOUND, "");
 
     printWriter.flush();
     String json = stringWriter.toString();

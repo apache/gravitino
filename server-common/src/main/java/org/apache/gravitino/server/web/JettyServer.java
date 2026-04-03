@@ -241,15 +241,6 @@ public final class JettyServer {
     }
   }
 
-  public void setErrorHandler(ErrorHandler handler) {
-    ErrorHandler existing = server.getBean(ErrorHandler.class);
-    if (existing != null) {
-      server.removeBean(existing);
-    }
-    handler.setServer(server);
-    server.addBean(handler);
-  }
-
   public void addServlet(Servlet servlet, String pathSpec) {
     servletContextHandler.addServlet(new ServletHolder(servlet), pathSpec);
   }
@@ -475,10 +466,14 @@ public final class JettyServer {
   }
 
   public void addSystemFilters(String pathSpec) {
+    addSystemFilters(pathSpec, new AuthenticationFilter());
+  }
+
+  public void addSystemFilters(String pathSpec, Filter authFilter) {
     if (serverConfig.isEnableCorsFilter()) {
       servletContextHandler.addFilter(
           CorsFilterHolder.create(serverConfig), pathSpec, EnumSet.allOf(DispatcherType.class));
     }
-    addFilter(new AuthenticationFilter(), pathSpec);
+    addFilter(authFilter, pathSpec);
   }
 }
