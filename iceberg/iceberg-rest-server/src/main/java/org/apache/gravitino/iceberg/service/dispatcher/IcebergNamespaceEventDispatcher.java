@@ -20,6 +20,7 @@
 package org.apache.gravitino.iceberg.service.dispatcher;
 
 import java.util.Optional;
+import javax.annotation.Nullable;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.iceberg.service.IcebergRESTUtils;
 import org.apache.gravitino.listener.EventBus;
@@ -185,7 +186,10 @@ public class IcebergNamespaceEventDispatcher implements IcebergNamespaceOperatio
 
   @Override
   public ListNamespacesResponse listNamespaces(
-      IcebergRequestContext context, Namespace parentNamespace) {
+      IcebergRequestContext context,
+      Namespace parentNamespace,
+      @Nullable String pageToken,
+      @Nullable Integer pageSize) {
     NameIdentifier nameIdentifier =
         IcebergRESTUtils.getGravitinoNameIdentifier(
             metalakeName, context.catalogName(), parentNamespace);
@@ -193,7 +197,8 @@ public class IcebergNamespaceEventDispatcher implements IcebergNamespaceOperatio
 
     ListNamespacesResponse listResponse;
     try {
-      listResponse = operationDispatcher.listNamespaces(context, parentNamespace);
+      listResponse =
+          operationDispatcher.listNamespaces(context, parentNamespace, pageToken, pageSize);
     } catch (Exception e) {
       eventBus.dispatchEvent(new IcebergListNamespacesFailureEvent(context, nameIdentifier, e));
       throw e;

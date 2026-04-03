@@ -21,9 +21,11 @@ package org.apache.gravitino.iceberg.common.ops;
 import com.google.common.base.Preconditions;
 import java.sql.Driver;
 import java.sql.DriverManager;
+import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
+import javax.annotation.Nullable;
 import lombok.Getter;
 import lombok.Setter;
 import org.apache.commons.lang3.StringUtils;
@@ -146,6 +148,12 @@ public class IcebergCatalogWrapper implements AutoCloseable {
     return CatalogHandlers.listNamespaces(asNamespaceCatalog, parent);
   }
 
+  public ListNamespacesResponse listNamespace(
+      Namespace parent, @Nullable String pageToken, @Nullable Integer pageSize) {
+    ListNamespacesResponse fullResponse = listNamespace(parent);
+    return paginateNamespaces(fullResponse, pageToken, pageSize);
+  }
+
   public UpdateNamespacePropertiesResponse updateNamespaceProperties(
       Namespace namespace, UpdateNamespacePropertiesRequest updateNamespacePropertiesRequest) {
     validateNamespace(Optional.of(namespace));
@@ -229,6 +237,12 @@ public class IcebergCatalogWrapper implements AutoCloseable {
     return CatalogHandlers.listTables(catalog, namespace);
   }
 
+  public ListTablesResponse listTable(
+      Namespace namespace, @Nullable String pageToken, @Nullable Integer pageSize) {
+    ListTablesResponse fullResponse = listTable(namespace);
+    return paginateTables(fullResponse, pageToken, pageSize);
+  }
+
   public void renameTable(RenameTableRequest renameTableRequest) {
     metadataCache.invalidate(renameTableRequest.source());
     CatalogHandlers.renameTable(catalog, renameTableRequest);
@@ -280,6 +294,12 @@ public class IcebergCatalogWrapper implements AutoCloseable {
 
   public ListTablesResponse listView(Namespace namespace) {
     return CatalogHandlers.listViews(getViewCatalog(), namespace);
+  }
+
+  public ListTablesResponse listView(
+      Namespace namespace, @Nullable String pageToken, @Nullable Integer pageSize) {
+    ListTablesResponse fullResponse = listView(namespace);
+    return paginateTables(fullResponse, pageToken, pageSize);
   }
 
   public boolean supportsViewOperations() {
@@ -386,6 +406,61 @@ public class IcebergCatalogWrapper implements AutoCloseable {
       this.tableIdentifier = tableIdentifier;
       this.transaction = transaction;
     }
+  }
+
+  private int parsePageToken(@Nullable String pageToken) {
+    if (pageToken == null || pageToken.isEmpty()) {
+      return 0;
+    }
+    try {
+      int offset = Integer.parseInt(pageToken);
+      Preconditions.checkArgument(offset >= 0, "pageToken must be non-negative, got: %s", offset);
+      return offset;
+    } catch (NumberFormatException e) {
+      throw new IllegalArgumentException("Invalid pageToken: " + pageToken, e);
+    }
+  }
+
+  private ListNamespacesResponse paginateNamespaces(
+      ListNamespacesResponse response, @Nullable String pageToken, @Nullable Integer pageSize) {
+    if (pageSize == null && (pageToken == null || pageToken.isEmpty())) {
+      return response;
+    }
+    List<Namespace> all = response.namespaces();
+    int offset = parsePageToken(pageToken);
+    if (offset >= all.size()) {
+      return ListNamespacesResponse.builder().build();
+    }
+    int limit = pageSize != null ? pageSize : all.size();
+    Preconditions.checkArgument(limit > 0, "pageSize must be positive, got: %s", limit);
+    int end = Math.min(offset + limit, all.size());
+    List<Namespace> page = all.subList(offset, end);
+    ListNamespacesResponse.Builder builder = ListNamespacesResponse.builder().addAll(page);
+    if (end < all.size()) {
+      builder.nextPageToken(String.valueOf(end));
+    }
+    return builder.build();
+  }
+
+  private ListTablesResponse paginateTables(
+      ListTablesResponse response, @Nullable String pageToken, @Nullable Integer pageSize) {
+    if (pageSize == null && (pageToken == null || pageToken.isEmpty())) {
+      return response;
+    }
+    List<TableIdentifier> all = response.identifiers();
+    int offset = parsePageToken(pageToken);
+    if (offset >= all.size()) {
+      return ListTablesResponse.builder().build();
+    }
+    int limit = pageSize != null ? pageSize : all.size();
+    Preconditions.checkArgument(limit > 0, "pageSize must be positive, got: %s", limit);
+    int end = Math.min(offset + limit, all.size());
+    List<TableIdentifier> page = all.subList(offset, end);
+    ListTablesResponse.Builder builder = ListTablesResponse.builder().addAll(page);
+    if (end < all.size()) {
+      builder.nextPageToken(String.valueOf(end));
+    }
+    return builder.build();
   }
 
   private TableMetadataCache loadTableMetadataCache(IcebergConfig config, Catalog catalog) {

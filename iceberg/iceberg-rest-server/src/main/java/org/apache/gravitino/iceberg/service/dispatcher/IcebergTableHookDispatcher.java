@@ -21,6 +21,7 @@ package org.apache.gravitino.iceberg.service.dispatcher;
 import java.io.IOException;
 import java.time.Instant;
 import java.util.Optional;
+import javax.annotation.Nullable;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.EntityStore;
 import org.apache.gravitino.GravitinoEnv;
@@ -105,8 +106,12 @@ public class IcebergTableHookDispatcher implements IcebergTableOperationDispatch
   }
 
   @Override
-  public ListTablesResponse listTable(IcebergRequestContext context, Namespace namespace) {
-    return dispatcher.listTable(context, namespace);
+  public ListTablesResponse listTable(
+      IcebergRequestContext context,
+      Namespace namespace,
+      @Nullable String pageToken,
+      @Nullable Integer pageSize) {
+    return dispatcher.listTable(context, namespace, pageToken, pageSize);
   }
 
   @Override

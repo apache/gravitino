@@ -19,6 +19,7 @@
 package org.apache.gravitino.iceberg.service.dispatcher;
 
 import java.io.IOException;
+import javax.annotation.Nullable;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.EntityStore;
 import org.apache.gravitino.GravitinoEnv;
@@ -106,8 +107,11 @@ public class IcebergNamespaceHookDispatcher implements IcebergNamespaceOperation
 
   @Override
   public ListNamespacesResponse listNamespaces(
-      IcebergRequestContext context, Namespace parentNamespace) {
-    return dispatcher.listNamespaces(context, parentNamespace);
+      IcebergRequestContext context,
+      Namespace parentNamespace,
+      @Nullable String pageToken,
+      @Nullable Integer pageSize) {
+    return dispatcher.listNamespaces(context, parentNamespace, pageToken, pageSize);
   }
 
   @Override

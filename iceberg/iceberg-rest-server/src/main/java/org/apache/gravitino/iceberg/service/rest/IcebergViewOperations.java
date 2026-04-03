@@ -36,6 +36,7 @@ import javax.ws.rs.POST;
 import javax.ws.rs.Path;
 import javax.ws.rs.PathParam;
 import javax.ws.rs.Produces;
+import javax.ws.rs.QueryParam;
 import javax.ws.rs.core.Context;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
@@ -93,7 +94,9 @@ public class IcebergViewOperations {
   public Response listView(
       @AuthorizationMetadata(type = Entity.EntityType.CATALOG) @PathParam("prefix") String prefix,
       @AuthorizationMetadata(type = EntityType.SCHEMA) @Encoded() @PathParam("namespace")
-          String namespace) {
+          String namespace,
+      @QueryParam("pageToken") String pageToken,
+      @QueryParam("pageSize") Integer pageSize) {
     String catalogName = IcebergRESTUtils.getCatalogName(prefix);
     Namespace icebergNS = RESTUtil.decodeNamespace(namespace);
     LOG.info("List Iceberg views, catalog: {}, namespace: {}", catalogName, icebergNS);
@@ -104,7 +107,7 @@ public class IcebergViewOperations {
             IcebergRequestContext context =
                 new IcebergRequestContext(httpServletRequest(), catalogName);
             ListTablesResponse listTablesResponse =
-                viewOperationDispatcher.listView(context, icebergNS);
+                viewOperationDispatcher.listView(context, icebergNS, pageToken, pageSize);
 
             IcebergRESTServerContext authContext = IcebergRESTServerContext.getInstance();
             if (authContext.isAuthorizationEnabled()) {

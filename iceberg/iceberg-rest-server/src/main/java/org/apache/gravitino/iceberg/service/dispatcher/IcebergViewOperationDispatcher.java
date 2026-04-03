@@ -19,6 +19,7 @@
 
 package org.apache.gravitino.iceberg.service.dispatcher;
 
+import javax.annotation.Nullable;
 import org.apache.gravitino.listener.api.event.IcebergRequestContext;
 import org.apache.iceberg.catalog.Namespace;
 import org.apache.iceberg.catalog.TableIdentifier;
@@ -80,9 +81,15 @@ public interface IcebergViewOperationDispatcher {
    *
    * @param context Iceberg REST request context information.
    * @param namespace The Iceberg namespace.
+   * @param pageToken An optional page token for pagination.
+   * @param pageSize An optional page size for pagination.
    * @return A {@link ListTablesResponse} object containing the list of view identifiers.
    */
-  ListTablesResponse listView(IcebergRequestContext context, Namespace namespace);
+  ListTablesResponse listView(
+      IcebergRequestContext context,
+      Namespace namespace,
+      @Nullable String pageToken,
+      @Nullable Integer pageSize);
 
   /**
    * Check whether an Iceberg view exists.

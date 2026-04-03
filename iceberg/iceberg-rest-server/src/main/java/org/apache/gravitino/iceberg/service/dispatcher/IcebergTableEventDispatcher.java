@@ -20,6 +20,7 @@
 package org.apache.gravitino.iceberg.service.dispatcher;
 
 import java.util.Optional;
+import javax.annotation.Nullable;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.iceberg.service.IcebergRESTUtils;
 import org.apache.gravitino.listener.EventBus;
@@ -187,13 +188,18 @@ public class IcebergTableEventDispatcher implements IcebergTableOperationDispatc
   }
 
   @Override
-  public ListTablesResponse listTable(IcebergRequestContext context, Namespace namespace) {
+  public ListTablesResponse listTable(
+      IcebergRequestContext context,
+      Namespace namespace,
+      @Nullable String pageToken,
+      @Nullable Integer pageSize) {
     NameIdentifier gravitinoNameIdentifier =
         IcebergRESTUtils.getGravitinoNameIdentifier(metalakeName, context.catalogName(), namespace);
     eventBus.dispatchEvent(new IcebergListTablePreEvent(context, gravitinoNameIdentifier));
     ListTablesResponse listTablesResponse;
     try {
-      listTablesResponse = icebergTableOperationDispatcher.listTable(context, namespace);
+      listTablesResponse =
+          icebergTableOperationDispatcher.listTable(context, namespace, pageToken, pageSize);
     } catch (Exception e) {
       eventBus.dispatchEvent(new IcebergListTableFailureEvent(context, gravitinoNameIdentifier, e));
       throw e;

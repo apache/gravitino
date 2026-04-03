@@ -21,6 +21,7 @@ package org.apache.gravitino.iceberg.service.dispatcher;
 
 import java.util.HashMap;
 import java.util.Map;
+import javax.annotation.Nullable;
 import org.apache.gravitino.auth.AuthConstants;
 import org.apache.gravitino.catalog.lakehouse.iceberg.IcebergConstants;
 import org.apache.gravitino.iceberg.service.IcebergCatalogWrapperManager;
@@ -103,10 +104,13 @@ public class IcebergNamespaceOperationExecutor implements IcebergNamespaceOperat
 
   @Override
   public ListNamespacesResponse listNamespaces(
-      IcebergRequestContext context, Namespace parentNamespace) {
+      IcebergRequestContext context,
+      Namespace parentNamespace,
+      @Nullable String pageToken,
+      @Nullable Integer pageSize) {
     return icebergCatalogWrapperManager
         .getCatalogWrapper(context.catalogName())
-        .listNamespace(parentNamespace);
+        .listNamespace(parentNamespace, pageToken, pageSize);
   }
 
   @Override

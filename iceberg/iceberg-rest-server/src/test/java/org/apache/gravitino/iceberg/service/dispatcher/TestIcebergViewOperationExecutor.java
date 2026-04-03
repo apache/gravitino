@@ -93,12 +93,12 @@ public class TestIcebergViewOperationExecutor {
   public void testListView() {
     Namespace namespace = Namespace.of("test_ns");
     ListTablesResponse mockResponse = mock(ListTablesResponse.class);
-    when(mockCatalogWrapper.listView(namespace)).thenReturn(mockResponse);
+    when(mockCatalogWrapper.listView(namespace, null, null)).thenReturn(mockResponse);
 
-    ListTablesResponse result = executor.listView(mockContext, namespace);
+    ListTablesResponse result = executor.listView(mockContext, namespace, null, null);
 
     Assertions.assertEquals(mockResponse, result);
-    verify(mockCatalogWrapper).listView(namespace);
+    verify(mockCatalogWrapper).listView(namespace, null, null);
   }
 
   @Test

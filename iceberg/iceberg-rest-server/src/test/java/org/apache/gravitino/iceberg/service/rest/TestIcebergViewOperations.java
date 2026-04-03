@@ -19,6 +19,7 @@
 
 package org.apache.gravitino.iceberg.service.rest;
 
+import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
 import java.util.Arrays;
 import java.util.Optional;
@@ -125,6 +126,49 @@ public class TestIcebergViewOperations extends IcebergNamespaceTestBase {
     verifyLisViewSucc(namespace, ImmutableSet.of("list_foo1", "list_foo2"));
     Assertions.assertTrue(dummyEventListener.popPreEvent() instanceof IcebergListViewPreEvent);
     Assertions.assertTrue(dummyEventListener.popPostEvent() instanceof IcebergListViewEvent);
+  }
+
+  @ParameterizedTest
+  @MethodSource(
+      "org.apache.gravitino.iceberg.service.rest.IcebergRestTestUtil#testPrefixesAndNamespaces")
+  void testListViewsWithPagination(String prefix, Namespace namespace) {
+    setUrlPathWithPrefix(prefix);
+    verifyCreateNamespaceSucc(namespace);
+    verifyCreateViewSucc(namespace, "page_v1");
+    verifyCreateViewSucc(namespace, "page_v2");
+    verifyCreateViewSucc(namespace, "page_v3");
+
+    dummyEventListener.clearEvent();
+
+    // First page: pageSize=2
+    String viewPath =
+        IcebergRestTestUtil.NAMESPACE_PATH + "/" + RESTUtil.encodeNamespace(namespace) + "/views";
+    Response firstPageResponse =
+        getIcebergClientBuilder(viewPath, Optional.of(ImmutableMap.of("pageSize", "2"))).get();
+    Assertions.assertEquals(Response.Status.OK.getStatusCode(), firstPageResponse.getStatus());
+    ListTablesResponse firstPage = firstPageResponse.readEntity(ListTablesResponse.class);
+    Assertions.assertEquals(2, firstPage.identifiers().size());
+    Assertions.assertNotNull(firstPage.nextPageToken());
+
+    // Second page using nextPageToken
+    Response secondPageResponse =
+        getIcebergClientBuilder(
+                viewPath,
+                Optional.of(
+                    ImmutableMap.of("pageToken", firstPage.nextPageToken(), "pageSize", "2")))
+            .get();
+    Assertions.assertEquals(Response.Status.OK.getStatusCode(), secondPageResponse.getStatus());
+    ListTablesResponse secondPage = secondPageResponse.readEntity(ListTablesResponse.class);
+    Assertions.assertEquals(1, secondPage.identifiers().size());
+    Assertions.assertNull(secondPage.nextPageToken());
+
+    // Verify combined results
+    Set<String> paginatedNames =
+        java.util.stream.Stream.concat(
+                firstPage.identifiers().stream(), secondPage.identifiers().stream())
+            .map(id -> id.name())
+            .collect(Collectors.toSet());
+    Assertions.assertEquals(ImmutableSet.of("page_v1", "page_v2", "page_v3"), paginatedNames);
   }
 
   @ParameterizedTest
