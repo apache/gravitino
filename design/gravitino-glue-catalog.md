@@ -118,15 +118,6 @@ Extend existing Hive and Iceberg catalogs with `metastore-type=glue` / `catalog-
 
 **Why rejected**: Industry standard (Dremio, Athena, AWS console) is one connection = all table types. Requiring two catalogs confuses users and diverges from the expected experience.
 
-| Dimension | Alternative A | Alternative B |
-|---|---|---|
-| Catalogs to register | **1** per Glue Data Catalog | 2+ (one for Hive, one for Iceberg) |
-| Table visibility | **All formats in one view** | Filtered per catalog type |
-| User experience | Matches Dremio, Athena, AWS console | Diverges from industry standard |
-| Implementation scope | New module (~10 new files) | Modify existing files (~15 modifications) |
-| Metadata passthrough | **Explicit design goal** | Not addressed |
-| Long-term extensibility | Clean foundation for mixed-type routing | Requires two separate engine catalogs permanently |
-
 ---
 
 ## 4. Configuration Properties
@@ -136,8 +127,8 @@ Glue is a separate AWS service from S3. The Glue region and credentials may diff
 | Property | Required | Default | Description |
 |---|---|---|---|
 | `aws-region` | Yes | — | AWS region for the Glue Data Catalog |
-| `aws-access-key-id` | No | Default credential chain | AWS access key for Glue API authentication |
-| `aws-secret-access-key` | No | Default credential chain | AWS secret key for Glue API authentication |
+| `aws-access-key-id` | No | Default credential chain | AWS access key for Glue API authentication. **Sensitive**: not visible to catalog readers via Gravitino API. |
+| `aws-secret-access-key` | No | Default credential chain | AWS secret key for Glue API authentication. **Sensitive**: not visible to catalog readers via Gravitino API. |
 | `aws-glue-catalog-id` | Yes | — | Glue catalog ID. Required because an AWS account can have multiple Glue catalogs (e.g., default catalog and federated S3 Tables catalog). |
 | `aws-glue-endpoint` | No | AWS default regional endpoint | Custom Glue endpoint URL (for VPC endpoints or LocalStack testing). |
 | `default-table-format` | No | `iceberg` | Default format for tables created via Gravitino's `createTable()` API. Accepted values: `iceberg`, `hive`. |
@@ -425,7 +416,7 @@ Gravitino catalog (provider=glue)
 
 **Pros**: Minimal Gravitino code (one new `GlueConnectorAdapter`, ~30 lines); no routing logic, no transaction coordination, no property conflicts. Single Gravitino catalog = single Trino catalog. Future table format additions are automatically supported as Trino extends the Lakehouse connector.
 
-**Cons**: Requires **Trino ≥ 477**. Gravitino currently supports Trino 435–478; versions 435–476 cannot use this approach.
+**Cons**: Requires **Trino ≥ 477**. This feature is only supported in Trino version 477 and above.
 
 #### Approach 3: Hive Connector Table Redirection
 
@@ -526,6 +517,8 @@ Roles, users, and groups are managed through Gravitino's standard access control
 ### 7.3 AWS IAM Minimum Permissions
 
 **Key point**: the `aws-access-key-id` configured in `catalog-glue` serves a dual role — Gravitino uses it to call the Glue API for metadata operations, and the same credential is passed through to Trino and Spark (via the property mappings in Sections 6.1 and 6.2) for both Glue metadata access and S3 data read/write. A single IAM policy must therefore cover both planes.
+
+**Note**: Static credentials have security limitations (transfer on wire, shared privileges between Gravitino and query engines). Future enhancement: credential vending (https://github.com/apache/gravitino/issues/10415) will provide dynamic, scoped credentials for better security isolation.
 
 This policy should be attached to the IAM user or role that owns the `aws-access-key-id`. When using the default credential chain (instance profile, container credentials, etc.), attach it to the corresponding IAM role instead.
 
@@ -645,9 +638,10 @@ Test coverage:
 | 1.5 | `GlueTable` | `GlueTable.java` | Gravitino Table backed by Glue Table; full `parameters()` passthrough |
 | 1.6 | Schema CRUD | `GlueCatalogOperations.java` (schema methods) | `listSchemas`, `createSchema`, `loadSchema`, `alterSchema`, `dropSchema` |
 | 1.7 | Table CRUD | `GlueCatalogOperations.java` (table methods) | `listTables`, `loadTable`, `createTable`, `alterTable`, `dropTable` — all types, no filtering |
-| 1.8 | `GlueCatalog` + wiring | `GlueCatalog.java`, `GlueCatalogCapability.java`, `build.gradle.kts`, `META-INF/services/` | Plugin registration, `shortName()="glue"` |
-| 1.9 | Unit tests | `TestGlue*.java` | Mock-based tests for all components |
-| 1.10 | Integration tests | `CatalogGlueIT.java` | LocalStack-backed end-to-end tests |
+| 1.8 | Partition support | `GlueCatalogOperations.java` | `SupportsPartitions` for Hive-format partitioned tables |
+| 1.9 | `GlueCatalog` + wiring | `GlueCatalog.java`, `GlueCatalogCapability.java`, `build.gradle.kts`, `META-INF/services/` | Plugin registration, `shortName()="glue"` |
+| 1.10 | Unit tests | `TestGlue*.java` | Mock-based tests for all components |
+| 1.11 | Integration tests | `CatalogGlueIT.java` | LocalStack-backed end-to-end tests |
 
 ### Phase 2: Query Engine Integration
 
@@ -655,6 +649,5 @@ Test coverage:
 |---|---|---|---|
 | 2.1 | Trino Lakehouse adapter | `GlueConnectorAdapter.java` in `trino-connector/` | Maps `provider=glue` → `connector.name=lakehouse` + `hive.metastore=glue`; requires Trino ≥ 477 |
 | 2.2 | Spark mixed-type routing | `GravitinoHiveCatalog.createSparkTable()` | Intercept on `table_type=ICEBERG`; delegate to lazily initialized Iceberg `SparkCatalog` |
-| 2.3 | Partition support | `GlueCatalogOperations.java` | `SupportsPartitions` for Hive-format partitioned tables |
-| 2.4 | View CRUD | `GlueCatalogOperations.java` | Full `ViewCatalog` interface implementation (pending Gravitino View API) |
-| 2.5 | STS AssumeRole | `GlueClientProvider.java` | `aws-role-arn` property for cross-account access via STS |
+| 2.3 | View CRUD | `GlueCatalogOperations.java` | Full `ViewCatalog` interface implementation (pending Gravitino View API) |
+| 2.4 | STS AssumeRole | `GlueClientProvider.java` | `aws-role-arn` property for cross-account access via STS |
