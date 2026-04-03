@@ -19,8 +19,10 @@
 package org.apache.gravitino.iceberg.service;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.google.common.collect.ImmutableMap;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
+import java.util.Map;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 import org.apache.iceberg.rest.responses.ErrorResponse;
@@ -41,6 +43,22 @@ public class IcebergJsonErrorHandler extends ErrorHandler {
 
   private static final ObjectMapper MAPPER = IcebergObjectMapper.getInstance();
 
+  // Error type names matching the Iceberg REST API specification examples.
+  // See https://github.com/apache/iceberg/blob/main/open-api/rest-catalog-open-api.yaml
+  private static final Map<Integer, String> ERROR_TYPE_NAMES =
+      ImmutableMap.<Integer, String>builder()
+          .put(HttpServletResponse.SC_BAD_REQUEST, "BadRequestException")
+          .put(HttpServletResponse.SC_UNAUTHORIZED, "NotAuthorizedException")
+          .put(HttpServletResponse.SC_FORBIDDEN, "NotAuthorizedException")
+          .put(HttpServletResponse.SC_NOT_FOUND, "NoSuchResourceException")
+          .put(HttpServletResponse.SC_CONFLICT, "AlreadyExistsException")
+          .put(HttpServletResponse.SC_NOT_ACCEPTABLE, "UnsupportedOperationException")
+          .put(422, "UnprocessableEntityException")
+          .put(419, "AuthenticationTimeoutException")
+          .put(HttpServletResponse.SC_SERVICE_UNAVAILABLE, "SlowDownException")
+          .put(HttpServletResponse.SC_INTERNAL_SERVER_ERROR, "InternalServerError")
+          .build();
+
   @Override
   public void handle(
       String target, Request baseRequest, HttpServletRequest request, HttpServletResponse response)
@@ -51,12 +69,10 @@ public class IcebergJsonErrorHandler extends ErrorHandler {
       message = HttpStatus.getMessage(code);
     }
 
+    String type = ERROR_TYPE_NAMES.getOrDefault(code, HttpStatus.getMessage(code));
+
     ErrorResponse errorResponse =
-        ErrorResponse.builder()
-            .responseCode(code)
-            .withType(HttpStatus.getMessage(code))
-            .withMessage(message)
-            .build();
+        ErrorResponse.builder().responseCode(code).withType(type).withMessage(message).build();
 
     response.setContentType("application/json");
     response.setCharacterEncoding(StandardCharsets.UTF_8.name());

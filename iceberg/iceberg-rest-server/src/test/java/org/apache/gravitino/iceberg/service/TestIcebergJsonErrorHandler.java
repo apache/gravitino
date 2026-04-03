@@ -62,7 +62,7 @@ public class TestIcebergJsonErrorHandler {
     String json = stringWriter.toString();
     ErrorResponse errorResponse = MAPPER.readValue(json, ErrorResponse.class);
     Assertions.assertEquals(401, errorResponse.code());
-    Assertions.assertEquals("Unauthorized", errorResponse.type());
+    Assertions.assertEquals("NotAuthorizedException", errorResponse.type());
     Assertions.assertEquals("The provided credentials did not support", errorResponse.message());
   }
 
@@ -87,7 +87,7 @@ public class TestIcebergJsonErrorHandler {
     String json = stringWriter.toString();
     ErrorResponse errorResponse = MAPPER.readValue(json, ErrorResponse.class);
     Assertions.assertEquals(500, errorResponse.code());
-    Assertions.assertEquals("Server Error", errorResponse.type());
+    Assertions.assertEquals("InternalServerError", errorResponse.type());
     Assertions.assertEquals("Something went wrong", errorResponse.message());
   }
 
@@ -112,7 +112,7 @@ public class TestIcebergJsonErrorHandler {
     String json = stringWriter.toString();
     ErrorResponse errorResponse = MAPPER.readValue(json, ErrorResponse.class);
     Assertions.assertEquals(403, errorResponse.code());
-    Assertions.assertEquals("Forbidden", errorResponse.type());
+    Assertions.assertEquals("NotAuthorizedException", errorResponse.type());
     Assertions.assertEquals("Forbidden", errorResponse.message());
   }
 
@@ -137,7 +137,7 @@ public class TestIcebergJsonErrorHandler {
     String json = stringWriter.toString();
     ErrorResponse errorResponse = MAPPER.readValue(json, ErrorResponse.class);
     Assertions.assertEquals(404, errorResponse.code());
-    Assertions.assertEquals("Not Found", errorResponse.type());
+    Assertions.assertEquals("NoSuchResourceException", errorResponse.type());
     Assertions.assertEquals("Not Found", errorResponse.message());
   }
 }
