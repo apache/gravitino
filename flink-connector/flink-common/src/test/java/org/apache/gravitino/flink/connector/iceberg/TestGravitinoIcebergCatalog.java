@@ -19,27 +19,28 @@
 
 package org.apache.gravitino.flink.connector.iceberg;
 
-import java.util.Map;
+import static org.junit.jupiter.api.Assertions.assertSame;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.mockito.Mockito.mock;
+
+import org.apache.flink.table.catalog.AbstractCatalog;
 import org.apache.flink.table.catalog.Catalog;
-import org.apache.gravitino.flink.connector.PartitionConverter;
-import org.apache.gravitino.flink.connector.SchemaAndTablePropertiesConverter;
+import org.junit.jupiter.api.Test;
 
-public class GravitinoIcebergCatalogFactoryFlink118 extends GravitinoIcebergCatalogFactory {
+class TestGravitinoIcebergCatalog {
 
-  @Override
-  protected Catalog newCatalog(
-      String catalogName,
-      String defaultDatabase,
-      SchemaAndTablePropertiesConverter schemaAndTablePropertiesConverter,
-      PartitionConverter partitionConverter,
-      Map<String, String> catalogOptions,
-      Map<String, String> icebergCatalogProperties) {
-    return new GravitinoIcebergCatalogFlink118(
-        catalogName,
-        defaultDatabase,
-        schemaAndTablePropertiesConverter,
-        partitionConverter,
-        catalogOptions,
-        icebergCatalogProperties);
+  @Test
+  void testRequireAbstractCatalogAcceptsAbstractCatalog() {
+    AbstractCatalog catalog = mock(AbstractCatalog.class);
+
+    assertSame(catalog, GravitinoIcebergCatalog.requireAbstractCatalog(catalog));
+  }
+
+  @Test
+  void testRequireAbstractCatalogRejectsNonAbstractCatalog() {
+    Catalog catalog = mock(Catalog.class);
+
+    assertThrows(
+        IllegalStateException.class, () -> GravitinoIcebergCatalog.requireAbstractCatalog(catalog));
   }
 }

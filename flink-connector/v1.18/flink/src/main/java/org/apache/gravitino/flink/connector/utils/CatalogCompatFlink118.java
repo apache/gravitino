@@ -22,7 +22,6 @@ package org.apache.gravitino.flink.connector.utils;
 import java.util.List;
 import java.util.Map;
 import org.apache.flink.table.api.Schema;
-import org.apache.flink.table.catalog.CatalogPropertiesUtil;
 import org.apache.flink.table.catalog.CatalogTable;
 import org.apache.flink.table.catalog.ResolvedCatalogTable;
 
@@ -32,11 +31,12 @@ public enum CatalogCompatFlink118 implements CatalogCompat {
   @Override
   public CatalogTable createCatalogTable(
       Schema schema, String comment, List<String> partitionKeys, Map<String, String> options) {
-    return CatalogTable.of(schema, comment, partitionKeys, options);
+    return DefaultCatalogCompat.INSTANCE.createCatalogTable(
+        schema, comment, partitionKeys, options);
   }
 
   @Override
   public Map<String, String> serializeCatalogTable(ResolvedCatalogTable resolvedTable) {
-    return CatalogPropertiesUtil.serializeCatalogTable(resolvedTable);
+    return DefaultCatalogCompat.INSTANCE.serializeCatalogTable(resolvedTable);
   }
 }

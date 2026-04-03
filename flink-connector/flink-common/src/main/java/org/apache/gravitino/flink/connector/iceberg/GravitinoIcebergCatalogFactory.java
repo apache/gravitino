@@ -25,7 +25,6 @@ import java.util.Set;
 import org.apache.flink.configuration.ConfigOption;
 import org.apache.flink.table.catalog.Catalog;
 import org.apache.flink.table.catalog.CommonCatalogOptions;
-import org.apache.flink.table.factories.CatalogFactory;
 import org.apache.flink.table.factories.FactoryUtil;
 import org.apache.gravitino.flink.connector.CatalogPropertiesConverter;
 import org.apache.gravitino.flink.connector.DefaultPartitionConverter;
@@ -46,8 +45,7 @@ public class GravitinoIcebergCatalogFactory implements BaseCatalogFactory {
         schemaAndTablePropertiesConverter(),
         partitionConverter(),
         context.getOptions(),
-        toIcebergCatalogOptions(context.getOptions()),
-        context);
+        toIcebergCatalogOptions(context.getOptions()));
   }
 
   protected Catalog newCatalog(
@@ -56,16 +54,14 @@ public class GravitinoIcebergCatalogFactory implements BaseCatalogFactory {
       SchemaAndTablePropertiesConverter schemaAndTablePropertiesConverter,
       PartitionConverter partitionConverter,
       Map<String, String> catalogOptions,
-      Map<String, String> icebergCatalogProperties,
-      CatalogFactory.Context context) {
+      Map<String, String> icebergCatalogProperties) {
     return new GravitinoIcebergCatalog(
         catalogName,
         defaultDatabase,
         schemaAndTablePropertiesConverter,
         partitionConverter,
         catalogOptions,
-        icebergCatalogProperties,
-        context);
+        icebergCatalogProperties);
   }
 
   @Override
@@ -126,6 +122,8 @@ public class GravitinoIcebergCatalogFactory implements BaseCatalogFactory {
         && !icebergCatalogOptions.containsKey(IcebergPropertiesConstants.ICEBERG_CATALOG_TYPE)) {
       icebergCatalogOptions.put(IcebergPropertiesConstants.ICEBERG_CATALOG_TYPE, catalogBackend);
     }
+    // The outer Flink factory is `gravitino-iceberg`, but the nested Iceberg factory still expects
+    // `catalog-type=iceberg` when building the native Iceberg catalog instance.
     icebergCatalogOptions.put(CommonCatalogOptions.CATALOG_TYPE.key(), "iceberg");
     return icebergCatalogOptions;
   }

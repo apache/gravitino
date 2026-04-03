@@ -126,6 +126,13 @@ public class GravitinoCatalogStore extends AbstractCatalogStore {
     return gravitinoCatalogManager.contains(catalogName);
   }
 
+  /**
+   * Build a Flink {@link CatalogDescriptor} for the loaded Gravitino catalog.
+   *
+   * @param catalogName catalog name
+   * @param configuration translated Flink catalog configuration
+   * @return descriptor used by the active Flink minor
+   */
   protected CatalogDescriptor newCatalogDescriptor(
       String catalogName, Configuration configuration) {
     return CatalogDescriptor.of(catalogName, configuration);
@@ -158,6 +165,14 @@ public class GravitinoCatalogStore extends AbstractCatalogStore {
     return discoverFactories(ServiceLoader.load(Factory.class).iterator(), predicate, errorMessage);
   }
 
+  /**
+   * Discover a single {@link BaseCatalogFactory} from the provided iterator.
+   *
+   * @param serviceLoaderIterator service loader iterator for Flink factories
+   * @param predicate predicate used to match the expected factory
+   * @param errorMessage error message used when multiple matches are found
+   * @return the matched catalog factory
+   */
   BaseCatalogFactory discoverFactories(
       Iterator<Factory> serviceLoaderIterator, Predicate<Factory> predicate, String errorMessage) {
     final List<Factory> factories = new ArrayList<>();

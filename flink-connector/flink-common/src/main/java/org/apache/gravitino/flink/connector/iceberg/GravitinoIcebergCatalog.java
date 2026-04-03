@@ -21,8 +21,9 @@ package org.apache.gravitino.flink.connector.iceberg;
 import java.util.Map;
 import java.util.Optional;
 import org.apache.flink.table.catalog.AbstractCatalog;
-import org.apache.flink.table.factories.CatalogFactory;
+import org.apache.flink.table.catalog.Catalog;
 import org.apache.flink.table.factories.Factory;
+import org.apache.flink.util.Preconditions;
 import org.apache.gravitino.flink.connector.PartitionConverter;
 import org.apache.gravitino.flink.connector.SchemaAndTablePropertiesConverter;
 import org.apache.gravitino.flink.connector.catalog.BaseCatalog;
@@ -39,8 +40,7 @@ public class GravitinoIcebergCatalog extends BaseCatalog {
       SchemaAndTablePropertiesConverter schemaAndTablePropertiesConverter,
       PartitionConverter partitionConverter,
       Map<String, String> catalogOptions,
-      Map<String, String> icebergCatalogProperties,
-      CatalogFactory.Context context) {
+      Map<String, String> icebergCatalogProperties) {
     super(
         catalogName,
         catalogOptions,
@@ -48,8 +48,8 @@ public class GravitinoIcebergCatalog extends BaseCatalog {
         schemaAndTablePropertiesConverter,
         partitionConverter);
     this.icebergCatalog =
-        (AbstractCatalog)
-            new FlinkCatalogFactory().createCatalog(catalogName, icebergCatalogProperties);
+        requireAbstractCatalog(
+            new FlinkCatalogFactory().createCatalog(catalogName, icebergCatalogProperties));
   }
 
   protected GravitinoIcebergCatalog(
@@ -76,5 +76,13 @@ public class GravitinoIcebergCatalog extends BaseCatalog {
   @Override
   protected AbstractCatalog realCatalog() {
     return icebergCatalog;
+  }
+
+  protected static AbstractCatalog requireAbstractCatalog(Catalog catalog) {
+    Preconditions.checkState(
+        catalog instanceof AbstractCatalog,
+        "Expected AbstractCatalog from FlinkCatalogFactory but got %s.",
+        catalog.getClass().getName());
+    return (AbstractCatalog) catalog;
   }
 }

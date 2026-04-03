@@ -20,7 +20,6 @@ package org.apache.gravitino.flink.connector.hive;
 
 import java.util.Collections;
 import java.util.HashMap;
-import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
 import org.apache.flink.table.catalog.CatalogPropertiesUtil;
@@ -84,10 +83,6 @@ final class FlinkGenericTableUtil {
   }
 
   static CatalogTable toFlinkGenericTable(Table table, CatalogCompat catalogCompat) {
-    return toFlinkGenericTable(table, catalogCompat::createCatalogTable);
-  }
-
-  static CatalogTable toFlinkGenericTable(Table table, CatalogTableBuilder tableBuilder) {
     Map<String, String> flinkProperties = unmaskFlinkProperties(table.properties());
     CatalogTable catalogTable = CatalogPropertiesUtil.deserializeCatalogTable(flinkProperties);
     if (catalogTable.getUnresolvedSchema().getColumns().isEmpty()) {
@@ -98,20 +93,11 @@ final class FlinkGenericTableUtil {
     if (MANAGED_TABLE_IDENTIFIER.equalsIgnoreCase(options.get(CONNECTOR))) {
       options.remove(CONNECTOR);
     }
-    return tableBuilder.create(
+    return catalogCompat.createCatalogTable(
         catalogTable.getUnresolvedSchema(),
         catalogTable.getComment(),
         catalogTable.getPartitionKeys(),
         options);
-  }
-
-  @FunctionalInterface
-  interface CatalogTableBuilder {
-    CatalogTable create(
-        org.apache.flink.table.api.Schema schema,
-        String comment,
-        List<String> partitionKeys,
-        Map<String, String> options);
   }
 
   private static String getConnectorFromProperties(Map<String, String> properties) {
