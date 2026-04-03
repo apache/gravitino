@@ -442,6 +442,10 @@ public class IcebergCatalogWrapper implements AutoCloseable {
   }
 
   private LoadTableResponse loadTableInternal(TableIdentifier ident) {
+    if (!(catalog instanceof RESTCatalog)) {
+      return CatalogHandlers.loadTable(catalog, ident);
+    }
+
     Table table = catalog.loadTable(ident);
 
     if (table instanceof BaseTable) {
@@ -463,6 +467,10 @@ public class IcebergCatalogWrapper implements AutoCloseable {
   }
 
   private LoadTableResponse createTableInternal(Namespace namespace, CreateTableRequest request) {
+    if (!(catalog instanceof RESTCatalog)) {
+      CatalogHandlers.createTable(catalog, namespace, request);
+    }
+
     request.validate();
 
     TableIdentifier ident = TableIdentifier.of(namespace, request.name());
@@ -492,6 +500,10 @@ public class IcebergCatalogWrapper implements AutoCloseable {
 
   public LoadTableResponse stageTableCreateInternal(
       Namespace namespace, CreateTableRequest request) {
+    if (!(catalog instanceof RESTCatalog)) {
+      return CatalogHandlers.stageTableCreate(catalog, namespace, request);
+    }
+
     request.validate();
 
     TableIdentifier ident = TableIdentifier.of(namespace, request.name());

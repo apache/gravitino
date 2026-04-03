@@ -115,7 +115,7 @@ public class UserPrincipal implements Principal {
 
   @Override
   public int hashCode() {
-    return Objects.hash(username, groups, accessToken);
+    return Objects.hash(username, groups);
   }
 
   @Override
@@ -127,9 +127,7 @@ public class UserPrincipal implements Principal {
       return false;
     }
     UserPrincipal that = (UserPrincipal) o;
-    return Objects.equals(username, that.username)
-        && Objects.equals(groups, that.groups)
-        && Objects.equals(accessToken, that.accessToken);
+    return Objects.equals(username, that.username) && Objects.equals(groups, that.groups);
   }
 
   @Override
