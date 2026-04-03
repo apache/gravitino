@@ -46,6 +46,7 @@ import org.apache.iceberg.catalog.TableIdentifier;
 import org.apache.iceberg.catalog.ViewCatalog;
 import org.apache.iceberg.jdbc.JdbcCatalogWithMetadataLocationSupport;
 import org.apache.iceberg.rest.CatalogHandlers;
+import org.apache.iceberg.rest.requests.CommitTransactionRequest;
 import org.apache.iceberg.rest.requests.CreateNamespaceRequest;
 import org.apache.iceberg.rest.requests.CreateTableRequest;
 import org.apache.iceberg.rest.requests.CreateViewRequest;
@@ -249,6 +250,20 @@ public class IcebergCatalogWrapper implements AutoCloseable {
     Transaction transaction = icebergTableChange.getTransaction();
     transaction.commitTransaction();
     return loadTable(icebergTableChange.getTableIdentifier());
+  }
+
+  /**
+   * Commits multiple table updates atomically as a single transaction. Each {@link
+   * UpdateTableRequest} in the request must include a {@link TableIdentifier} specifying which
+   * table to update.
+   *
+   * @param commitTransactionRequest The request containing all table changes to apply.
+   */
+  public void commitTransaction(CommitTransactionRequest commitTransactionRequest) {
+    commitTransactionRequest.validate();
+    for (UpdateTableRequest tableChange : commitTransactionRequest.tableChanges()) {
+      updateTable(tableChange.identifier(), tableChange);
+    }
   }
 
   public LoadViewResponse createView(Namespace namespace, CreateViewRequest request) {

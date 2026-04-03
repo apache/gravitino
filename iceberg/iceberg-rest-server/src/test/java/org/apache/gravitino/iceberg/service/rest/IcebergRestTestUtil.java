@@ -43,6 +43,9 @@ import org.apache.gravitino.iceberg.service.dispatcher.IcebergNamespaceOperation
 import org.apache.gravitino.iceberg.service.dispatcher.IcebergTableEventDispatcher;
 import org.apache.gravitino.iceberg.service.dispatcher.IcebergTableOperationDispatcher;
 import org.apache.gravitino.iceberg.service.dispatcher.IcebergTableOperationExecutor;
+import org.apache.gravitino.iceberg.service.dispatcher.IcebergTransactionEventDispatcher;
+import org.apache.gravitino.iceberg.service.dispatcher.IcebergTransactionOperationDispatcher;
+import org.apache.gravitino.iceberg.service.dispatcher.IcebergTransactionOperationExecutor;
 import org.apache.gravitino.iceberg.service.dispatcher.IcebergViewEventDispatcher;
 import org.apache.gravitino.iceberg.service.dispatcher.IcebergViewOperationDispatcher;
 import org.apache.gravitino.iceberg.service.dispatcher.IcebergViewOperationExecutor;
@@ -78,6 +81,7 @@ public class IcebergRestTestUtil {
   public static final String RENAME_TABLE_PATH = V_1 + "/tables/rename";
 
   public static final String RENAME_VIEW_PATH = V_1 + "/views/rename";
+  public static final String COMMIT_TRANSACTION_PATH = V_1 + "/transactions/commit";
   public static final String REPORT_METRICS_POSTFIX = "metrics";
 
   public static final boolean DEBUG_SERVER_LOG_ENABLED = true;
@@ -155,6 +159,12 @@ public class IcebergRestTestUtil {
           new IcebergNamespaceEventDispatcher(
               icebergNamespaceOperationExecutor, eventBus, configProvider.getMetalakeName());
 
+      IcebergTransactionOperationExecutor icebergTransactionOperationExecutor =
+          new IcebergTransactionOperationExecutor(icebergCatalogWrapperManager);
+      IcebergTransactionEventDispatcher icebergTransactionEventDispatcher =
+          new IcebergTransactionEventDispatcher(
+              icebergTransactionOperationExecutor, eventBus, configProvider.getMetalakeName());
+
       IcebergMetricsManager icebergMetricsManager = new IcebergMetricsManager(new IcebergConfig());
       resourceConfig.register(
           new AbstractBinder() {
@@ -166,6 +176,9 @@ public class IcebergRestTestUtil {
               bind(icebergViewEventDispatcher).to(IcebergViewOperationDispatcher.class).ranked(2);
               bind(icebergNamespaceEventDispatcher)
                   .to(IcebergNamespaceOperationDispatcher.class)
+                  .ranked(2);
+              bind(icebergTransactionEventDispatcher)
+                  .to(IcebergTransactionOperationDispatcher.class)
                   .ranked(2);
             }
           });
