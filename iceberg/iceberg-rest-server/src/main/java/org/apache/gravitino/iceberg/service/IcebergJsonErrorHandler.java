@@ -45,7 +45,7 @@ public class IcebergJsonErrorHandler extends ErrorHandler {
 
   // Error type names matching the Iceberg REST API specification examples.
   // See https://github.com/apache/iceberg/blob/main/open-api/rest-catalog-open-api.yaml
-  private static final Map<Integer, String> ERROR_TYPE_NAMES =
+  static final Map<Integer, String> ERROR_TYPE_NAMES =
       ImmutableMap.<Integer, String>builder()
           .put(HttpServletResponse.SC_BAD_REQUEST, "BadRequestException")
           .put(HttpServletResponse.SC_UNAUTHORIZED, "NotAuthorizedException")
@@ -70,9 +70,7 @@ public class IcebergJsonErrorHandler extends ErrorHandler {
     }
 
     String type = ERROR_TYPE_NAMES.getOrDefault(code, HttpStatus.getMessage(code));
-
-    ErrorResponse errorResponse =
-        ErrorResponse.builder().responseCode(code).withType(type).withMessage(message).build();
+    ErrorResponse errorResponse = IcebergRESTUtils.errorResponse(code, type, message);
 
     response.setContentType("application/json");
     response.setCharacterEncoding(StandardCharsets.UTF_8.name());

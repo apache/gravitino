@@ -74,6 +74,18 @@ public class IcebergRESTUtils {
         .build();
   }
 
+  /**
+   * Build an Iceberg {@link ErrorResponse} for a given HTTP status code and message, without an
+   * exception. Used by the Jetty error handler for pre-JAX-RS errors.
+   */
+  public static ErrorResponse errorResponse(int httpStatus, String type, String message) {
+    return ErrorResponse.builder()
+        .responseCode(httpStatus)
+        .withType(type)
+        .withMessage(message)
+        .build();
+  }
+
   public static Instant calculateNewTimestamp(Instant currentTimestamp, int hours) {
     LocalDateTime currentDateTime =
         LocalDateTime.ofInstant(currentTimestamp, ZoneId.systemDefault());
