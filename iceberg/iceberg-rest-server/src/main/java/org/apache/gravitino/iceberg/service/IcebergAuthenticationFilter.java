@@ -19,11 +19,10 @@
 package org.apache.gravitino.iceberg.service;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.google.common.collect.ImmutableMap;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
-import java.util.Map;
 import javax.servlet.http.HttpServletResponse;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.server.authentication.AuthenticationFilter;
 import org.apache.iceberg.rest.responses.ErrorResponse;
 import org.eclipse.jetty.http.HttpStatus;
@@ -41,30 +40,15 @@ public class IcebergAuthenticationFilter extends AuthenticationFilter {
 
   private static final ObjectMapper MAPPER = IcebergObjectMapper.getInstance();
 
-  // Error type names matching the Iceberg REST API specification examples.
-  // See https://github.com/apache/iceberg/blob/main/open-api/rest-catalog-open-api.yaml
-  static final Map<Integer, String> ERROR_TYPE_NAMES =
-      ImmutableMap.<Integer, String>builder()
-          .put(HttpServletResponse.SC_BAD_REQUEST, "BadRequestException")
-          .put(HttpServletResponse.SC_UNAUTHORIZED, "NotAuthorizedException")
-          .put(HttpServletResponse.SC_FORBIDDEN, "NotAuthorizedException")
-          .put(HttpServletResponse.SC_NOT_FOUND, "NoSuchResourceException")
-          .put(HttpServletResponse.SC_CONFLICT, "AlreadyExistsException")
-          .put(HttpServletResponse.SC_NOT_ACCEPTABLE, "UnsupportedOperationException")
-          .put(422, "UnprocessableEntityException")
-          .put(419, "AuthenticationTimeoutException")
-          .put(HttpServletResponse.SC_SERVICE_UNAVAILABLE, "SlowDownException")
-          .put(HttpServletResponse.SC_INTERNAL_SERVER_ERROR, "InternalServerError")
-          .build();
-
   @Override
   protected void sendAuthErrorResponse(HttpServletResponse response, int status, String message)
       throws IOException {
-    if (message == null || message.isEmpty()) {
+    if (StringUtils.isBlank(message)) {
       message = HttpStatus.getMessage(status);
     }
 
-    String type = ERROR_TYPE_NAMES.getOrDefault(status, HttpStatus.getMessage(status));
+    String type =
+        IcebergRESTUtils.ERROR_TYPE_NAMES.getOrDefault(status, HttpStatus.getMessage(status));
     ErrorResponse errorResponse = IcebergRESTUtils.errorResponse(status, type, message);
 
     response.setStatus(status);

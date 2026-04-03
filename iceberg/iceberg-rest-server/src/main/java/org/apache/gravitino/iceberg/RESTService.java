@@ -80,7 +80,13 @@ public class RESTService implements GravitinoAuxiliaryService {
 
   private void initServer(IcebergConfig icebergConfig) {
     JettyServerConfig serverConfig = JettyServerConfig.fromConfig(icebergConfig);
-    server = new JettyServer();
+    server =
+        new JettyServer() {
+          @Override
+          protected javax.servlet.Filter createAuthenticationFilter() {
+            return new IcebergAuthenticationFilter();
+          }
+        };
     MetricsSystem metricsSystem = GravitinoEnv.getInstance().metricsSystem();
     server.initialize(serverConfig, SERVICE_NAME, false /* shouldEnableUI */);
 
@@ -154,7 +160,7 @@ public class RESTService implements GravitinoAuxiliaryService {
     Servlet servlet = new ServletContainer(config);
     server.addServlet(servlet, ICEBERG_SPEC);
     server.addCustomFilters(ICEBERG_SPEC);
-    server.addSystemFilters(ICEBERG_SPEC, new IcebergAuthenticationFilter());
+    server.addSystemFilters(ICEBERG_SPEC);
   }
 
   @Override

@@ -110,6 +110,9 @@ public class AuthenticationFilter implements Filter {
    * Sends an error response when authentication fails. Subclasses can override this to customize
    * the error response format (e.g., Iceberg REST server returns JSON error bodies).
    *
+   * <p>TODO: Gravitino server should override this method to return a correct JSON response
+   * following the Gravitino error response spec.
+   *
    * @param response the HTTP servlet response
    * @param status the HTTP status code
    * @param message the error message
