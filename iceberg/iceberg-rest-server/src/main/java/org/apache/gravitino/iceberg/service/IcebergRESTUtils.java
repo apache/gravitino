@@ -52,10 +52,14 @@ public class IcebergRESTUtils {
 
   private static final Logger LOG = LoggerFactory.getLogger(IcebergRESTUtils.class);
 
+  public static final String SNAPSHOT_ALL = "all";
+
+  public static final String SNAPSHOT_REFS = "refs";
+
   /** Snapshot modes for the Iceberg loadTable endpoint. */
   public enum SnapshotMode {
-    ALL("all"),
-    REFS("refs");
+    ALL(SNAPSHOT_ALL),
+    REFS(SNAPSHOT_REFS);
 
     private final String value;
 
