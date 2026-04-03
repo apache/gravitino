@@ -246,7 +246,9 @@ class TestRelationalCatalog(unittest.TestCase):
             self.assertEqual(table.name(), self.table_dto.name())
             mock_get.assert_called_once()
             call_args = mock_get.call_args
-            self.assertIn("privileges", call_args.kwargs["params"])
+            self.assertEqual(
+                call_args.kwargs["params"]["privileges"], "MODIFY_TABLE,SELECT_TABLE"
+            )
 
     def test_list_tables(self):
         resp_body = EntityListResponse(

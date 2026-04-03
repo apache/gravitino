@@ -51,6 +51,11 @@ class TestDTOConvertersToTableUpdateRequest(unittest.TestCase):
         self.assertIsNone(add_column_request.position)
         self.assertFalse(add_column_request.is_nullable)
         self.assertTrue(add_column_request.is_auto_increment)
+        self.assertIsNotNone(add_column_request.default_value)
+        self.assertIsInstance(add_column_request.default_value, LiteralDTO)
+        default_value_dto = cast(LiteralDTO, add_column_request.default_value)
+        self.assertEqual(default_value_dto.data_type(), Types.IntegerType.get())
+        self.assertEqual(default_value_dto.value(), "10")
 
     def test_to_table_update_request_add_column_without_default_value(self):
         """Tests the conversion of an add column change without a default value to a TableUpdateRequest."""
