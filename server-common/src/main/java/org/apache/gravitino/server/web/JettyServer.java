@@ -241,6 +241,15 @@ public final class JettyServer {
     }
   }
 
+  public void setErrorHandler(ErrorHandler handler) {
+    ErrorHandler existing = server.getBean(ErrorHandler.class);
+    if (existing != null) {
+      server.removeBean(existing);
+    }
+    handler.setServer(server);
+    server.addBean(handler);
+  }
+
   public void addServlet(Servlet servlet, String pathSpec) {
     servletContextHandler.addServlet(new ServletHolder(servlet), pathSpec);
   }

@@ -29,6 +29,7 @@ import org.apache.gravitino.auxiliary.GravitinoAuxiliaryService;
 import org.apache.gravitino.iceberg.common.IcebergConfig;
 import org.apache.gravitino.iceberg.service.IcebergCatalogWrapperManager;
 import org.apache.gravitino.iceberg.service.IcebergExceptionMapper;
+import org.apache.gravitino.iceberg.service.IcebergJsonErrorHandler;
 import org.apache.gravitino.iceberg.service.IcebergObjectMapperProvider;
 import org.apache.gravitino.iceberg.service.authorization.IcebergRESTServerContext;
 import org.apache.gravitino.iceberg.service.dispatcher.IcebergNamespaceEventDispatcher;
@@ -82,6 +83,7 @@ public class RESTService implements GravitinoAuxiliaryService {
     server = new JettyServer();
     MetricsSystem metricsSystem = GravitinoEnv.getInstance().metricsSystem();
     server.initialize(serverConfig, SERVICE_NAME, false /* shouldEnableUI */);
+    server.setErrorHandler(new IcebergJsonErrorHandler());
 
     ResourceConfig config = new ResourceConfig();
     config.packages(getIcebergRESTPackages(icebergConfig));
