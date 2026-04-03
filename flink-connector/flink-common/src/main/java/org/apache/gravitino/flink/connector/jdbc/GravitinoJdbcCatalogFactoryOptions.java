@@ -30,20 +30,8 @@ public class GravitinoJdbcCatalogFactoryOptions {
   /** Identifier for the {@link GravitinoJdbcCatalog}. */
   public static final String POSTGRESQL_IDENTIFIER = "gravitino-jdbc-postgresql";
 
-  public static final ConfigOption<String> BASE_URL =
-      ConfigOptions.key(JdbcPropertiesConstants.FLINK_JDBC_URL).stringType().noDefaultValue();
-
-  public static final ConfigOption<String> USERNAME =
-      ConfigOptions.key(JdbcPropertiesConstants.FLINK_JDBC_USER).stringType().noDefaultValue();
-
-  public static final ConfigOption<String> PASSWORD =
-      ConfigOptions.key(JdbcPropertiesConstants.FLINK_JDBC_PASSWORD).stringType().noDefaultValue();
-
   public static final ConfigOption<String> DEFAULT_DATABASE =
       ConfigOptions.key(JdbcPropertiesConstants.FLINK_JDBC_DEFAULT_DATABASE)
           .stringType()
           .noDefaultValue();
-
-  public static final ConfigOption<String> DRIVER =
-      ConfigOptions.key(JdbcPropertiesConstants.FLINK_DRIVER).stringType().noDefaultValue();
 }

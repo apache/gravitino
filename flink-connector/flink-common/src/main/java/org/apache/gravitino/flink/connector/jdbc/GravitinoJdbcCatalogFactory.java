@@ -19,7 +19,6 @@
 
 package org.apache.gravitino.flink.connector.jdbc;
 
-import com.google.common.collect.ImmutableSet;
 import java.util.Collections;
 import java.util.Set;
 import org.apache.flink.configuration.ConfigOption;
@@ -47,7 +46,6 @@ public abstract class GravitinoJdbcCatalogFactory implements BaseCatalogFactory 
     context.getOptions().remove(JdbcPropertiesConstants.FLINK_DRIVER);
     final FactoryUtil.CatalogFactoryHelper helper =
         FactoryUtils.createCatalogFactoryHelper(this, context);
-    helper.validate();
     String defaultDatabase =
         helper.getOptions().get(GravitinoJdbcCatalogFactoryOptions.DEFAULT_DATABASE);
     Preconditions.checkArgument(
@@ -78,15 +76,11 @@ public abstract class GravitinoJdbcCatalogFactory implements BaseCatalogFactory 
 
   @Override
   public Set<ConfigOption<?>> requiredOptions() {
-    return ImmutableSet.of(
-        GravitinoJdbcCatalogFactoryOptions.BASE_URL,
-        GravitinoJdbcCatalogFactoryOptions.USERNAME,
-        GravitinoJdbcCatalogFactoryOptions.PASSWORD,
-        GravitinoJdbcCatalogFactoryOptions.DEFAULT_DATABASE);
+    return Collections.emptySet();
   }
 
   @Override
   public Set<ConfigOption<?>> optionalOptions() {
-    return Collections.singleton(GravitinoJdbcCatalogFactoryOptions.DRIVER);
+    return Collections.emptySet();
   }
 }
