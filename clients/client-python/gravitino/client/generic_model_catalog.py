@@ -15,7 +15,7 @@
 # specific language governing permissions and limitations
 # under the License.
 
-from typing import Dict, List
+from typing import Dict, List, Self
 
 from gravitino.api.catalog import Catalog
 from gravitino.api.model.model import Model
@@ -53,7 +53,7 @@ from gravitino.rest.rest_utils import encode_string
 from gravitino.utils import HTTPClient
 
 
-class GenericModelCatalog(BaseSchemaCatalog):
+class GenericModelCatalog(BaseSchemaCatalog):  # pylint: disable=R0901
     """
     The generic model catalog is a catalog that supports model and model version operations,
     for example, model register, model version link, model and model version list, etc.
@@ -82,7 +82,7 @@ class GenericModelCatalog(BaseSchemaCatalog):
             rest_client,
         )
 
-    def as_model_catalog(self):
+    def as_model_catalog(self) -> Self:
         return self
 
     def list_models(self, namespace: Namespace) -> List[NameIdentifier]:

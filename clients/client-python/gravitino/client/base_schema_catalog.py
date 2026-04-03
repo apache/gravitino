@@ -19,20 +19,23 @@ import logging
 from typing import Dict, List, Optional
 
 from gravitino.api.catalog import Catalog
-from gravitino.api.metadata_object import MetadataObject
-from gravitino.api.metadata_objects import MetadataObjects
 from gravitino.api.function.function import Function
 from gravitino.api.function.function_catalog import FunctionCatalog
 from gravitino.api.function.function_change import FunctionChange
 from gravitino.api.function.function_definition import FunctionDefinition
 from gravitino.api.function.function_type import FunctionType
+from gravitino.api.metadata_object import MetadataObject
+from gravitino.api.metadata_objects import MetadataObjects
 from gravitino.api.schema import Schema
 from gravitino.api.schema_change import SchemaChange
 from gravitino.api.supports_schemas import SupportsSchemas
+from gravitino.api.tag.supports_tags import SupportsTags
+from gravitino.api.tag.tag import Tag
 from gravitino.client.function_catalog_operations import FunctionCatalogOperations
 from gravitino.client.metadata_object_credential_operations import (
     MetadataObjectCredentialOperations,
 )
+from gravitino.client.metadata_object_tag_operations import MetadataObjectTagOperations
 from gravitino.dto.audit_dto import AuditDTO
 from gravitino.dto.catalog_dto import CatalogDTO
 from gravitino.dto.requests.schema_create_request import SchemaCreateRequest
@@ -51,7 +54,12 @@ from gravitino.utils import HTTPClient
 logger = logging.getLogger(__name__)
 
 
-class BaseSchemaCatalog(CatalogDTO, SupportsSchemas, FunctionCatalog):
+class BaseSchemaCatalog(
+    CatalogDTO,
+    SupportsSchemas,
+    FunctionCatalog,
+    SupportsTags,
+):
     """
     BaseSchemaCatalog is the base abstract class for all the catalog with schema. It provides the
     common methods for managing schemas in a catalog. With BaseSchemaCatalog, users can list,
@@ -97,6 +105,9 @@ class BaseSchemaCatalog(CatalogDTO, SupportsSchemas, FunctionCatalog):
         )
         self._function_operations = FunctionCatalogOperations(
             rest_client, catalog_namespace, self.name()
+        )
+        self._object_tag_operations = MetadataObjectTagOperations(
+            catalog_namespace.level(0), metadata_object, rest_client
         )
 
         self.validate()
@@ -310,3 +321,17 @@ class BaseSchemaCatalog(CatalogDTO, SupportsSchemas, FunctionCatalog):
             raise IllegalArgumentException("provider must not be blank")
         if self.audit_info() is None:
             raise IllegalArgumentException("audit must not be None")
+
+    def list_tags(self) -> List[str]:
+        return self._object_tag_operations.list_tags()
+
+    def list_tags_info(self) -> List[Tag]:
+        return self._object_tag_operations.list_tags_info()
+
+    def get_tag(self, name: str) -> Tag:
+        return self._object_tag_operations.get_tag(name)
+
+    def associate_tags(
+        self, tags_to_add: List[str], tags_to_remove: List[str]
+    ) -> List[str]:
+        return self._object_tag_operations.associate_tags(tags_to_add, tags_to_remove)
