@@ -15,7 +15,7 @@
 # specific language governing permissions and limitations
 # under the License.
 
-from typing import Dict, List, Self
+from typing import Dict, List
 
 from gravitino.api.catalog import Catalog
 from gravitino.api.model.model import Model
@@ -82,7 +82,7 @@ class GenericModelCatalog(BaseSchemaCatalog):  # pylint: disable=R0901
             rest_client,
         )
 
-    def as_model_catalog(self) -> Self:
+    def as_model_catalog(self):
         return self
 
     def list_models(self, namespace: Namespace) -> List[NameIdentifier]:
