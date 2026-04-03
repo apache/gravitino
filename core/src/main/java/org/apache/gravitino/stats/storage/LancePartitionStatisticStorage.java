@@ -349,11 +349,11 @@ public class LancePartitionStatisticStorage implements PartitionStatisticStorage
                   .map(str -> "(" + str + ")")
                   .collect(Collectors.joining(" OR "));
 
-      int rowCount = countMatchingRows(dataset, filterSQL);
+      long rowCount = dataset.countRows(filterSQL);
       if (rowCount > 0) {
         dataset.delete(filterSQL);
       }
-      return rowCount;
+      return (int) rowCount;
     } finally {
       if (!datasetCache.isPresent() && dataset != null) {
         dataset.close();
@@ -361,24 +361,6 @@ public class LancePartitionStatisticStorage implements PartitionStatisticStorage
     }
   }
 
-  private int countMatchingRows(Dataset dataset, String filter) {
-    try (LanceScanner scanner =
-        dataset.newScan(
-            new ScanOptions.Builder()
-                .columns(Collections.singletonList(TABLE_ID_COLUMN))
-                .filter(filter)
-                .build())) {
-      int count = 0;
-      try (ArrowReader reader = scanner.scanBatches()) {
-        while (reader.loadNextBatch()) {
-          count += reader.getVectorSchemaRoot().getRowCount();
-        }
-      }
-      return count;
-    } catch (Exception e) {
-      throw new RuntimeException(e);
-    }
-  }
 
   @Override
   public void close() throws IOException {
