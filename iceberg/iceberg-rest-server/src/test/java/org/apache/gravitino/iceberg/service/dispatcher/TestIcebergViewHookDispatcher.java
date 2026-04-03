@@ -342,11 +342,11 @@ public class TestIcebergViewHookDispatcher {
     Namespace namespace = Namespace.of(SCHEMA_NAME);
     ListTablesResponse mockResponse = mock(ListTablesResponse.class);
 
-    when(mockExecutor.listView(mockContext, namespace)).thenReturn(mockResponse);
+    when(mockExecutor.listView(mockContext, namespace, null, null)).thenReturn(mockResponse);
 
-    ListTablesResponse response = hookDispatcher.listView(mockContext, namespace);
+    ListTablesResponse response = hookDispatcher.listView(mockContext, namespace, null, null);
 
-    verify(mockExecutor, times(1)).listView(mockContext, namespace);
+    verify(mockExecutor, times(1)).listView(mockContext, namespace, null, null);
     assertEquals(mockResponse, response);
   }
 

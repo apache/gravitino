@@ -22,6 +22,7 @@ package org.apache.gravitino.iceberg.service.dispatcher;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Optional;
+import javax.annotation.Nullable;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.auth.AuthConstants;
@@ -134,10 +135,14 @@ public class IcebergTableOperationExecutor implements IcebergTableOperationDispa
   }
 
   @Override
-  public ListTablesResponse listTable(IcebergRequestContext context, Namespace namespace) {
+  public ListTablesResponse listTable(
+      IcebergRequestContext context,
+      Namespace namespace,
+      @Nullable String pageToken,
+      @Nullable Integer pageSize) {
     return icebergCatalogWrapperManager
         .getCatalogWrapper(context.catalogName())
-        .listTable(namespace);
+        .listTable(namespace, pageToken, pageSize);
   }
 
   @Override

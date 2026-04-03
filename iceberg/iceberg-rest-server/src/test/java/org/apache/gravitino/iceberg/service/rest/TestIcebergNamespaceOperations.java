@@ -18,10 +18,15 @@
  */
 package org.apache.gravitino.iceberg.service.rest;
 
+import com.google.common.collect.ImmutableMap;
 import java.util.Arrays;
+import java.util.List;
 import java.util.Optional;
+import java.util.stream.Collectors;
 import javax.servlet.http.HttpServletRequest;
 import javax.ws.rs.core.Application;
+import javax.ws.rs.core.Response;
+import javax.ws.rs.core.Response.Status;
 import org.apache.gravitino.listener.api.event.Event;
 import org.apache.gravitino.listener.api.event.IcebergCreateNamespaceEvent;
 import org.apache.gravitino.listener.api.event.IcebergCreateNamespaceFailureEvent;
@@ -41,6 +46,7 @@ import org.apache.gravitino.listener.api.event.IcebergUpdateNamespaceEvent;
 import org.apache.gravitino.listener.api.event.IcebergUpdateNamespaceFailureEvent;
 import org.apache.gravitino.listener.api.event.IcebergUpdateNamespacePreEvent;
 import org.apache.iceberg.catalog.Namespace;
+import org.apache.iceberg.rest.responses.ListNamespacesResponse;
 import org.glassfish.jersey.internal.inject.AbstractBinder;
 import org.glassfish.jersey.server.ResourceConfig;
 import org.junit.jupiter.api.Assertions;
@@ -213,6 +219,56 @@ public class TestIcebergNamespaceOperations extends IcebergNamespaceTestBase {
     verifyListNamespaceFail(Optional.of(Namespace.of("list_fooxx")), 404);
     verifyListNamespaceFail(Optional.of(Namespace.of("list_foo3", "c")), 404);
     verifyListNamespaceFail(Optional.of(Namespace.of("list_foo3", "a", "x")), 404);
+  }
+
+  @ParameterizedTest
+  @ValueSource(strings = {"", IcebergRestTestUtil.PREFIX})
+  void testListNamespaceWithPagination(String prefix) {
+    setUrlPathWithPrefix(prefix);
+    dropAllExistingNamespace();
+
+    doCreateNamespace(Namespace.of("page_ns1"));
+    doCreateNamespace(Namespace.of("page_ns2"));
+    doCreateNamespace(Namespace.of("page_ns3"));
+
+    // First page: pageSize=2, no pageToken
+    Response firstPageResponse =
+        getNamespaceClientBuilder(
+                Optional.empty(), Optional.empty(), Optional.of(ImmutableMap.of("pageSize", "2")))
+            .get();
+    Assertions.assertEquals(Status.OK.getStatusCode(), firstPageResponse.getStatus());
+    ListNamespacesResponse firstPage = firstPageResponse.readEntity(ListNamespacesResponse.class);
+    Assertions.assertEquals(2, firstPage.namespaces().size());
+    Assertions.assertNotNull(firstPage.nextPageToken());
+
+    // Second page using the nextPageToken
+    Response secondPageResponse =
+        getNamespaceClientBuilder(
+                Optional.empty(),
+                Optional.empty(),
+                Optional.of(
+                    ImmutableMap.of("pageToken", firstPage.nextPageToken(), "pageSize", "2")))
+            .get();
+    Assertions.assertEquals(Status.OK.getStatusCode(), secondPageResponse.getStatus());
+    ListNamespacesResponse secondPage = secondPageResponse.readEntity(ListNamespacesResponse.class);
+    Assertions.assertEquals(1, secondPage.namespaces().size());
+    Assertions.assertNull(secondPage.nextPageToken());
+
+    // All results without pagination
+    Response allResponse = getNamespaceClientBuilder().get();
+    Assertions.assertEquals(Status.OK.getStatusCode(), allResponse.getStatus());
+    ListNamespacesResponse allPage = allResponse.readEntity(ListNamespacesResponse.class);
+    Assertions.assertEquals(3, allPage.namespaces().size());
+
+    // Collect all paginated results and verify they match the unpaginated results
+    List<String> paginatedNames =
+        java.util.stream.Stream.concat(
+                firstPage.namespaces().stream(), secondPage.namespaces().stream())
+            .map(Namespace::toString)
+            .collect(Collectors.toList());
+    List<String> allNames =
+        allPage.namespaces().stream().map(Namespace::toString).collect(Collectors.toList());
+    Assertions.assertEquals(allNames, paginatedNames);
   }
 
   @Test

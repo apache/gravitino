@@ -19,6 +19,7 @@
 
 package org.apache.gravitino.iceberg.service.dispatcher;
 
+import javax.annotation.Nullable;
 import org.apache.gravitino.iceberg.service.IcebergCatalogWrapperManager;
 import org.apache.gravitino.listener.api.event.IcebergRequestContext;
 import org.apache.iceberg.catalog.Namespace;
@@ -68,10 +69,14 @@ public class IcebergViewOperationExecutor implements IcebergViewOperationDispatc
   }
 
   @Override
-  public ListTablesResponse listView(IcebergRequestContext context, Namespace namespace) {
+  public ListTablesResponse listView(
+      IcebergRequestContext context,
+      Namespace namespace,
+      @Nullable String pageToken,
+      @Nullable Integer pageSize) {
     return icebergCatalogWrapperManager
         .getCatalogWrapper(context.catalogName())
-        .listView(namespace);
+        .listView(namespace, pageToken, pageSize);
   }
 
   @Override

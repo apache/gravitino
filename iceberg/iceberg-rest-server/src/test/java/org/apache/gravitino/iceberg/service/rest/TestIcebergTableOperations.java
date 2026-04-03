@@ -299,6 +299,49 @@ public class TestIcebergTableOperations extends IcebergNamespaceTestBase {
   }
 
   @ParameterizedTest
+  @MethodSource(
+      "org.apache.gravitino.iceberg.service.rest.IcebergRestTestUtil#testPrefixesAndNamespaces")
+  void testListTablesWithPagination(String prefix, Namespace namespace) {
+    setUrlPathWithPrefix(prefix);
+    verifyCreateNamespaceSucc(namespace);
+    verifyCreateTableSucc(namespace, "page_t1");
+    verifyCreateTableSucc(namespace, "page_t2");
+    verifyCreateTableSucc(namespace, "page_t3");
+
+    dummyEventListener.clearEvent();
+
+    // First page: pageSize=2
+    String tablePath =
+        IcebergRestTestUtil.NAMESPACE_PATH + "/" + RESTUtil.encodeNamespace(namespace) + "/tables";
+    Response firstPageResponse =
+        getIcebergClientBuilder(tablePath, Optional.of(ImmutableMap.of("pageSize", "2"))).get();
+    Assertions.assertEquals(Status.OK.getStatusCode(), firstPageResponse.getStatus());
+    ListTablesResponse firstPage = firstPageResponse.readEntity(ListTablesResponse.class);
+    Assertions.assertEquals(2, firstPage.identifiers().size());
+    Assertions.assertNotNull(firstPage.nextPageToken());
+
+    // Second page using nextPageToken
+    Response secondPageResponse =
+        getIcebergClientBuilder(
+                tablePath,
+                Optional.of(
+                    ImmutableMap.of("pageToken", firstPage.nextPageToken(), "pageSize", "2")))
+            .get();
+    Assertions.assertEquals(Status.OK.getStatusCode(), secondPageResponse.getStatus());
+    ListTablesResponse secondPage = secondPageResponse.readEntity(ListTablesResponse.class);
+    Assertions.assertEquals(1, secondPage.identifiers().size());
+    Assertions.assertNull(secondPage.nextPageToken());
+
+    // Verify combined results
+    Set<String> paginatedNames =
+        java.util.stream.Stream.concat(
+                firstPage.identifiers().stream(), secondPage.identifiers().stream())
+            .map(id -> id.name())
+            .collect(Collectors.toSet());
+    Assertions.assertEquals(ImmutableSet.of("page_t1", "page_t2", "page_t3"), paginatedNames);
+  }
+
+  @ParameterizedTest
   @MethodSource("org.apache.gravitino.iceberg.service.rest.IcebergRestTestUtil#testNamespaces")
   void testTableExits(Namespace namespace) {
     verifyTableExistsStatusCode(namespace, "exists_foo2", 404);

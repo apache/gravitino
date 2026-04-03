@@ -19,6 +19,7 @@
 
 package org.apache.gravitino.iceberg.service.dispatcher;
 
+import javax.annotation.Nullable;
 import org.apache.gravitino.listener.api.event.IcebergRequestContext;
 import org.apache.iceberg.catalog.Namespace;
 import org.apache.iceberg.rest.requests.CreateNamespaceRequest;
@@ -84,9 +85,15 @@ public interface IcebergNamespaceOperationDispatcher {
    *
    * @param context Iceberg REST request context information.
    * @param parentNamespace The Iceberg namespace.
+   * @param pageToken An optional page token for pagination.
+   * @param pageSize An optional page size for pagination.
    * @return A {@link ListNamespacesResponse} object containing the list of namespaces.
    */
-  ListNamespacesResponse listNamespaces(IcebergRequestContext context, Namespace parentNamespace);
+  ListNamespacesResponse listNamespaces(
+      IcebergRequestContext context,
+      Namespace parentNamespace,
+      @Nullable String pageToken,
+      @Nullable Integer pageSize);
 
   /**
    * Check whether an Iceberg namespace exists.
