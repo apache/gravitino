@@ -82,10 +82,11 @@ public class IcebergRESTUtils {
   }
 
   public static Response errorResponse(Throwable ex, int httpStatus) {
+    String type = ERROR_TYPE_NAMES.getOrDefault(httpStatus, ex.getClass().getSimpleName());
     ErrorResponse errorResponse =
         ErrorResponse.builder()
             .responseCode(httpStatus)
-            .withType(ex.getClass().getSimpleName())
+            .withType(type)
             .withMessage(ex.getMessage())
             .withStackTrace(ex)
             .build();
