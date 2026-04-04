@@ -41,6 +41,7 @@ import java.io.IOException;
 import java.time.Instant;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.UUID;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.reflect.FieldUtils;
@@ -390,5 +391,17 @@ public class TestStatisticManager {
       Assertions.assertEquals(
           value, statistic.value().get(), "Statistic value type mismatch: " + statistic.name());
     }
+  }
+
+  @Test
+  public void testCustomStatisticWithNullValue() {
+    AuditInfo audit = AuditInfo.builder().withCreator("test").withCreateTime(Instant.now()).build();
+    StatisticManager.CustomStatistic stat =
+        new StatisticManager.CustomStatistic("null-value-stat", null, audit);
+
+    Assertions.assertEquals("null-value-stat", stat.name());
+    Assertions.assertDoesNotThrow(() -> stat.value());
+    Assertions.assertEquals(Optional.empty(), stat.value());
+    Assertions.assertEquals(audit, stat.auditInfo());
   }
 }

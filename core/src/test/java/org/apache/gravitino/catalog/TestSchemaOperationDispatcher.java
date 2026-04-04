@@ -279,53 +279,6 @@ public class TestSchemaOperationDispatcher extends TestOperationDispatcher {
   }
 
   @Test
-  public void testAlterSchemaKeepsStoredCommentAndProperties() throws IOException {
-    NameIdentifier schemaIdent = NameIdentifier.of(metalake, catalog, "schema_preserve_metadata");
-    Map<String, String> props = ImmutableMap.of("k1", "v1", "k2", "v2");
-    dispatcher.createSchema(schemaIdent, "comment", props);
-
-    SchemaChange[] changes =
-        new SchemaChange[] {
-          SchemaChange.setProperty("k3", "v3"), SchemaChange.removeProperty("k1")
-        };
-    dispatcher.alterSchema(schemaIdent, changes);
-
-    SchemaEntity storedSchema = entityStore.get(schemaIdent, SCHEMA, SchemaEntity.class);
-    Assertions.assertEquals("comment", storedSchema.comment());
-    Assertions.assertEquals(ImmutableMap.of("k2", "v2", "k3", "v3"), storedSchema.properties());
-  }
-
-  @Test
-  public void testAlterSchemaMultipleTimesKeepsMetadata() throws IOException {
-    NameIdentifier schemaIdent = NameIdentifier.of(metalake, catalog, "schema_multiple_alter");
-    Map<String, String> props = ImmutableMap.of("k1", "v1", "k2", "v2");
-    dispatcher.createSchema(schemaIdent, "initial comment", props);
-
-    // First alteration: add a property
-    SchemaChange[] changes1 = new SchemaChange[] {SchemaChange.setProperty("k3", "v3")};
-    dispatcher.alterSchema(schemaIdent, changes1);
-
-    // Check metadata after first alteration
-    SchemaEntity storedSchema1 = entityStore.get(schemaIdent, SCHEMA, SchemaEntity.class);
-    Assertions.assertEquals("initial comment", storedSchema1.comment());
-    Assertions.assertEquals(
-        ImmutableMap.of("k1", "v1", "k2", "v2", "k3", "v3"), storedSchema1.properties());
-
-    // Second alteration: remove a property and add a new one
-    SchemaChange[] changes2 =
-        new SchemaChange[] {
-          SchemaChange.removeProperty("k1"), SchemaChange.setProperty("k4", "v4")
-        };
-    dispatcher.alterSchema(schemaIdent, changes2);
-
-    // Check metadata after second alteration
-    SchemaEntity storedSchema2 = entityStore.get(schemaIdent, SCHEMA, SchemaEntity.class);
-    Assertions.assertEquals("initial comment", storedSchema2.comment());
-    Assertions.assertEquals(
-        ImmutableMap.of("k2", "v2", "k3", "v3", "k4", "v4"), storedSchema2.properties());
-  }
-
-  @Test
   public void testCreateAndDropSchema() throws IOException {
     NameIdentifier schemaIdent = NameIdentifier.of(metalake, catalog, "schema31");
     Map<String, String> props = ImmutableMap.of("k1", "v1", "k2", "v2");

@@ -167,6 +167,19 @@ public interface PolicyMetaMapper {
     @Result(property = "auditInfo", column = "audit_info"),
     @Result(property = "currentVersion", column = "current_version"),
     @Result(property = "lastVersion", column = "last_version"),
+    @Result(property = "deletedAt", column = "deleted_at")
+  })
+  @SelectProvider(type = PolicyMetaSQLProviderFactory.class, method = "listPolicyPOsByPolicyIds")
+  List<PolicyPO> listPolicyPOsByPolicyIds(@Param("policyIds") List<Long> policyIds);
+
+  @Results({
+    @Result(property = "policyId", column = "policy_id"),
+    @Result(property = "policyName", column = "policy_name"),
+    @Result(property = "policyType", column = "policy_type"),
+    @Result(property = "metalakeId", column = "metalake_id"),
+    @Result(property = "auditInfo", column = "audit_info"),
+    @Result(property = "currentVersion", column = "current_version"),
+    @Result(property = "lastVersion", column = "last_version"),
     @Result(property = "deletedAt", column = "deleted_at"),
     @Result(property = "policyVersionPO.id", column = "id"),
     @Result(property = "policyVersionPO.metalakeId", column = "version_metalake_id"),

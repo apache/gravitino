@@ -50,10 +50,13 @@ import org.apache.gravitino.storage.relational.mapper.ViewMetaMapper;
 import org.apache.gravitino.storage.relational.po.CatalogPO;
 import org.apache.gravitino.storage.relational.po.ColumnPO;
 import org.apache.gravitino.storage.relational.po.FilesetPO;
+import org.apache.gravitino.storage.relational.po.JobTemplatePO;
 import org.apache.gravitino.storage.relational.po.MetalakePO;
 import org.apache.gravitino.storage.relational.po.ModelPO;
+import org.apache.gravitino.storage.relational.po.PolicyPO;
 import org.apache.gravitino.storage.relational.po.SchemaPO;
 import org.apache.gravitino.storage.relational.po.TablePO;
+import org.apache.gravitino.storage.relational.po.TagPO;
 import org.apache.gravitino.storage.relational.po.TopicPO;
 import org.apache.gravitino.storage.relational.po.ViewPO;
 import org.apache.gravitino.storage.relational.utils.SessionUtils;
@@ -92,17 +95,23 @@ public class MetadataObjectService {
 
   private static Map<Long, String> getPolicyObjectsFullName(List<Long> policyIds) {
     if (policyIds == null || policyIds.isEmpty()) {
-      return Map.of();
+      return Maps.newHashMap();
     }
-    return policyIds.stream()
-        .collect(
-            Collectors.toMap(
-                policyId -> policyId,
-                policyId ->
-                    SessionUtils.getWithoutCommit(
-                        PolicyMetaMapper.class,
-                        policyMetaMapper ->
-                            policyMetaMapper.selectPolicyByPolicyId(policyId).getPolicyName())));
+
+    List<PolicyPO> policyPOs =
+        SessionUtils.getWithoutCommit(
+            PolicyMetaMapper.class, mapper -> mapper.listPolicyPOsByPolicyIds(policyIds));
+
+    if (policyPOs == null || policyPOs.isEmpty()) {
+      return Maps.newHashMap();
+    }
+
+    HashMap<Long, String> policyIdAndNameMap = new HashMap<>();
+
+    policyPOs.forEach(
+        policyPO -> policyIdAndNameMap.put(policyPO.getPolicyId(), policyPO.getPolicyName()));
+
+    return policyIdAndNameMap;
   }
 
   private static Map<Long, String> getJobObjectsFullName(List<Long> jobIds) {
@@ -119,31 +128,43 @@ public class MetadataObjectService {
       return Maps.newHashMap();
     }
 
-    return jobTemplateIds.stream()
-        .collect(
-            Collectors.toMap(
-                jobTemplateId -> jobTemplateId,
-                jobTemplateId ->
-                    SessionUtils.getWithoutCommit(
-                        JobTemplateMetaMapper.class,
-                        jobTemplateMetaMapper ->
-                            jobTemplateMetaMapper
-                                .selectJobTemplateById(jobTemplateId)
-                                .jobTemplateName())));
+    List<JobTemplatePO> jobTemplatePOs =
+        SessionUtils.getWithoutCommit(
+            JobTemplateMetaMapper.class,
+            mapper -> mapper.listJobTemplatePOsByJobTemplateIds(jobTemplateIds));
+
+    if (jobTemplatePOs == null || jobTemplatePOs.isEmpty()) {
+      return Maps.newHashMap();
+    }
+
+    HashMap<Long, String> jobTemplateIdAndNameMap = new HashMap<>();
+
+    jobTemplatePOs.forEach(
+        jobTemplatePO ->
+            jobTemplateIdAndNameMap.put(
+                jobTemplatePO.jobTemplateId(), jobTemplatePO.jobTemplateName()));
+
+    return jobTemplateIdAndNameMap;
   }
 
   private static Map<Long, String> getTagObjectsFullName(List<Long> tagIds) {
     if (tagIds == null || tagIds.isEmpty()) {
-      return Map.of();
+      return Maps.newHashMap();
     }
-    return tagIds.stream()
-        .collect(
-            Collectors.toMap(
-                tagId -> tagId,
-                tagId ->
-                    SessionUtils.getWithoutCommit(
-                        TagMetaMapper.class,
-                        tagMetaMapper -> tagMetaMapper.selectTagByTagId(tagId).getTagName())));
+
+    List<TagPO> tagPOs =
+        SessionUtils.getWithoutCommit(
+            TagMetaMapper.class, mapper -> mapper.listTagPOsByTagIds(tagIds));
+
+    if (tagPOs == null || tagPOs.isEmpty()) {
+      return Maps.newHashMap();
+    }
+
+    HashMap<Long, String> tagIdAndNameMap = new HashMap<>();
+
+    tagPOs.forEach(tagPO -> tagIdAndNameMap.put(tagPO.getTagId(), tagPO.getTagName()));
+
+    return tagIdAndNameMap;
   }
 
   private MetadataObjectService() {}
@@ -317,12 +338,16 @@ public class MetadataObjectService {
       metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME,
       baseMetricName = "getTableObjectsFullName")
   public static Map<Long, String> getTableObjectsFullName(List<Long> tableIds) {
+    if (tableIds == null || tableIds.isEmpty()) {
+      return Maps.newHashMap();
+    }
+
     List<TablePO> tablePOs =
         SessionUtils.getWithoutCommit(
             TableMetaMapper.class, mapper -> mapper.listTablePOsByTableIds(tableIds));
 
     if (tablePOs == null || tablePOs.isEmpty()) {
-      return new HashMap<>();
+      return Maps.newHashMap();
     }
 
     List<Long> schemaIds = tablePOs.stream().map(TablePO::getSchemaId).collect(Collectors.toList());

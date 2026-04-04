@@ -80,6 +80,9 @@ public interface TagMetaMapper {
   @SelectProvider(type = TagMetaSQLProviderFactory.class, method = "selectTagByTagId")
   TagPO selectTagByTagId(@Param("tagId") Long tagId);
 
+  @SelectProvider(type = TagMetaSQLProviderFactory.class, method = "listTagPOsByTagIds")
+  List<TagPO> listTagPOsByTagIds(@Param("tagIds") List<Long> tagIds);
+
   @SelectProvider(type = TagMetaSQLProviderFactory.class, method = "batchSelectTagByIdentifier")
   List<TagPO> batchSelectTagByIdentifier(
       @Param("metalakeName") String metalakeName, @Param("tagNames") List<String> tagNames);

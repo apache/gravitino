@@ -183,15 +183,17 @@ spec:
             {{- toYaml .Values.resources | nindent 12 }}
           securityContext:
             {{- toYaml .Values.containerSecurityContext | nindent 12 }}
-          {{- if or .Values.env .Values.envWithTpl }}
           env:
+            - name: GRAVITINO_HOME
+              value: /root/gravitino
+            - name: SKIP_CONFIG_REWRITE
+              value: "true"
           {{- with .Values.env }}
             {{- toYaml . | nindent 12 }}
           {{- end }}
           {{- range $item := .Values.envWithTpl }}
             - name: {{ $item.name }}
               value: {{ tpl $item.value $ | quote }}
-          {{- end }}
           {{- end }}
           {{- if .Values.envFrom }}
           envFrom:
