@@ -34,6 +34,8 @@ import org.apache.gravitino.StringIdentifier;
 import org.apache.gravitino.connector.HasPropertyMetadata;
 import org.apache.gravitino.connector.PropertiesMetadata;
 import org.apache.gravitino.connector.capability.Capability;
+import org.apache.gravitino.exceptions.GravitinoRuntimeException;
+import org.apache.gravitino.exceptions.NoSuchCatalogException;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.file.FilesetChange;
 import org.apache.gravitino.messaging.TopicChange;
@@ -126,6 +128,42 @@ public abstract class OperationDispatcher {
       }
 
       throw new RuntimeException(exception);
+    }
+  }
+
+  /**
+   * Attempts to rollback entity creation in the underlying catalog.
+   *
+   * <p>This method is used when entity metadata fails to persist to the Gravitino store after
+   * successful creation in the underlying catalog. It attempts to rollback the creation to maintain
+   * consistency between the catalog and Gravitino's metadata store.
+   *
+   * @param catalogIdent The identifier of the catalog.
+   * @param entityIdent The identifier of the entity to rollback.
+   * @param entityType The type of entity (e.g., "schema", "table", "topic") for logging purposes.
+   * @param rollbackOperation The operation to perform rollback. This should be a function that
+   *     takes a CatalogWrapper and performs the necessary deletion operation (e.g., dropSchema,
+   *     dropTable, etc.).
+   * @param <R> The return type of the rollback operation (usually Boolean for drop operations).
+   * @throws GravitinoRuntimeException If rollback fails. The exception will contain details about
+   *     the rollback failure.
+   */
+  protected <R> void rollbackEntityCreation(
+      NameIdentifier catalogIdent,
+      NameIdentifier entityIdent,
+      String entityType,
+      ThrowableFunction<CatalogManager.CatalogWrapper, R> rollbackOperation) {
+    try {
+      LOG.warn(
+          "Failed to persist {} metadata to Gravitino store for: {}. "
+              + "Attempting to rollback {} creation in underlying catalog to maintain consistency.",
+          entityType,
+          entityIdent,
+          entityType);
+      doWithCatalog(catalogIdent, rollbackOperation, NoSuchCatalogException.class);
+      LOG.info("Successfully rolled back {} creation for: {}", entityType, entityIdent);
+    } catch (Exception ex) {
+      throw ex;
     }
   }
 
@@ -289,5 +327,17 @@ public abstract class OperationDispatcher {
             + "identifier in the property {}, this is unexpected if this object is created by "
             + "Gravitino. This might be due to some operations that are not performed through Gravitino. "
             + "With this situation the returned object will not contain the metadata from Gravitino";
+
+    static final String ENTITY_PERSIST_FAILURE_WITH_ROLLBACK_FAILURE =
+        "Failed to persist schema metadata to Gravitino store for: %s. "
+            + "Additionally, rollback of schema creation in underlying catalog failed. "
+            + "The schema may exist in the underlying catalog but is not tracked by Gravitino.";
+
+    static final String ENTITY_PERSIST_FAILURE_WITH_ROLLBACK_SUCCESS =
+        "Failed to persist schema metadata to Gravitino store for: %s. "
+            + "Schema creation in underlying catalog has been rolled back.";
+
+    static final String ENTITY_SCHEMA_ROLLBACK_FAILED =
+        "Failed to rollback schema creation in underlying catalog for: {}.";
   }
 }
