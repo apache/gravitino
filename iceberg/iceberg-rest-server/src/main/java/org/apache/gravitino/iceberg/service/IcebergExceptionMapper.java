@@ -26,6 +26,7 @@ import javax.ws.rs.ext.ExceptionMapper;
 import javax.ws.rs.ext.Provider;
 import org.apache.gravitino.exceptions.IllegalNameIdentifierException;
 import org.apache.gravitino.exceptions.NoSuchCatalogException;
+import org.apache.gravitino.exceptions.UnauthorizedException;
 import org.apache.iceberg.exceptions.AlreadyExistsException;
 import org.apache.iceberg.exceptions.CommitFailedException;
 import org.apache.iceberg.exceptions.CommitStateUnknownException;
@@ -56,6 +57,7 @@ public class IcebergExceptionMapper implements ExceptionMapper<Exception> {
           .put(IllegalNameIdentifierException.class, 400)
           .put(NamespaceNotEmptyException.class, 400)
           .put(NotAuthorizedException.class, 401)
+          .put(UnauthorizedException.class, 401)
           .put(org.apache.gravitino.exceptions.ForbiddenException.class, 403)
           .put(ForbiddenException.class, 403)
           .put(NoSuchNamespaceException.class, 404)
@@ -70,6 +72,17 @@ public class IcebergExceptionMapper implements ExceptionMapper<Exception> {
           .put(CommitStateUnknownException.class, 500)
           .put(ServiceUnavailableException.class, 503)
           .build();
+
+  /**
+   * Returns the HTTP status code for the given exception based on the Iceberg REST spec.
+   *
+   * @param ex the exception
+   * @return the HTTP status code, defaulting to 500 for unmapped exceptions
+   */
+  public static int getErrorCode(Exception ex) {
+    return EXCEPTION_ERROR_CODES.getOrDefault(
+        ex.getClass(), Status.INTERNAL_SERVER_ERROR.getStatusCode());
+  }
 
   @Override
   public Response toResponse(Exception ex) {

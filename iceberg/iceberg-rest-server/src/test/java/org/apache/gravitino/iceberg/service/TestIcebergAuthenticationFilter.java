@@ -26,6 +26,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import java.io.PrintWriter;
 import java.io.StringWriter;
 import javax.servlet.http.HttpServletResponse;
+import org.apache.gravitino.exceptions.UnauthorizedException;
 import org.apache.iceberg.rest.responses.ErrorResponse;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
@@ -44,7 +45,7 @@ public class TestIcebergAuthenticationFilter {
     when(response.getWriter()).thenReturn(printWriter);
 
     filter.sendAuthErrorResponse(
-        response, HttpServletResponse.SC_UNAUTHORIZED, "The provided credentials did not support");
+        response, new UnauthorizedException("The provided credentials did not support"));
 
     verify(response).setStatus(HttpServletResponse.SC_UNAUTHORIZED);
     verify(response).setContentType("application/json");
@@ -67,8 +68,7 @@ public class TestIcebergAuthenticationFilter {
     PrintWriter printWriter = new PrintWriter(stringWriter);
     when(response.getWriter()).thenReturn(printWriter);
 
-    filter.sendAuthErrorResponse(
-        response, HttpServletResponse.SC_INTERNAL_SERVER_ERROR, "Something went wrong");
+    filter.sendAuthErrorResponse(response, new RuntimeException("Something went wrong"));
 
     verify(response).setStatus(HttpServletResponse.SC_INTERNAL_SERVER_ERROR);
 
@@ -81,6 +81,28 @@ public class TestIcebergAuthenticationFilter {
   }
 
   @Test
+  public void testForbiddenExceptionReturnsJson() throws Exception {
+    IcebergAuthenticationFilter filter = new IcebergAuthenticationFilter();
+
+    HttpServletResponse response = mock(HttpServletResponse.class);
+    StringWriter stringWriter = new StringWriter();
+    PrintWriter printWriter = new PrintWriter(stringWriter);
+    when(response.getWriter()).thenReturn(printWriter);
+
+    filter.sendAuthErrorResponse(
+        response, new org.apache.gravitino.exceptions.ForbiddenException("Access denied"));
+
+    verify(response).setStatus(HttpServletResponse.SC_FORBIDDEN);
+
+    printWriter.flush();
+    String json = stringWriter.toString();
+    ErrorResponse errorResponse = MAPPER.readValue(json, ErrorResponse.class);
+    Assertions.assertEquals(403, errorResponse.code());
+    Assertions.assertEquals("NotAuthorizedException", errorResponse.type());
+    Assertions.assertEquals("Access denied", errorResponse.message());
+  }
+
+  @Test
   public void testNullMessageUsesDefaultStatusMessage() throws Exception {
     IcebergAuthenticationFilter filter = new IcebergAuthenticationFilter();
 
@@ -89,32 +111,13 @@ public class TestIcebergAuthenticationFilter {
     PrintWriter printWriter = new PrintWriter(stringWriter);
     when(response.getWriter()).thenReturn(printWriter);
 
-    filter.sendAuthErrorResponse(response, HttpServletResponse.SC_FORBIDDEN, null);
+    filter.sendAuthErrorResponse(response, new RuntimeException((String) null));
 
     printWriter.flush();
     String json = stringWriter.toString();
     ErrorResponse errorResponse = MAPPER.readValue(json, ErrorResponse.class);
-    Assertions.assertEquals(403, errorResponse.code());
-    Assertions.assertEquals("NotAuthorizedException", errorResponse.type());
-    Assertions.assertEquals("Forbidden", errorResponse.message());
-  }
-
-  @Test
-  public void testEmptyMessageUsesDefaultStatusMessage() throws Exception {
-    IcebergAuthenticationFilter filter = new IcebergAuthenticationFilter();
-
-    HttpServletResponse response = mock(HttpServletResponse.class);
-    StringWriter stringWriter = new StringWriter();
-    PrintWriter printWriter = new PrintWriter(stringWriter);
-    when(response.getWriter()).thenReturn(printWriter);
-
-    filter.sendAuthErrorResponse(response, HttpServletResponse.SC_NOT_FOUND, "");
-
-    printWriter.flush();
-    String json = stringWriter.toString();
-    ErrorResponse errorResponse = MAPPER.readValue(json, ErrorResponse.class);
-    Assertions.assertEquals(404, errorResponse.code());
-    Assertions.assertEquals("NoSuchResourceException", errorResponse.type());
-    Assertions.assertEquals("Not Found", errorResponse.message());
+    Assertions.assertEquals(500, errorResponse.code());
+    Assertions.assertEquals("InternalServerError", errorResponse.type());
+    Assertions.assertEquals("Server Error", errorResponse.message());
   }
 }

@@ -99,10 +99,10 @@ public class AuthenticationFilter implements Filter {
           resp.setHeader(AuthConstants.HTTP_CHALLENGE_HEADER, challenge);
         }
       }
-      sendAuthErrorResponse(resp, HttpServletResponse.SC_UNAUTHORIZED, ue.getMessage());
+      sendAuthErrorResponse(resp, ue);
     } catch (Exception e) {
       HttpServletResponse resp = (HttpServletResponse) response;
-      sendAuthErrorResponse(resp, HttpServletResponse.SC_UNAUTHORIZED, e.getMessage());
+      sendAuthErrorResponse(resp, e);
     }
   }
 
@@ -114,12 +114,15 @@ public class AuthenticationFilter implements Filter {
    * following the Gravitino error response spec.
    *
    * @param response the HTTP servlet response
-   * @param status the HTTP status code
-   * @param message the error message
+   * @param exception the authentication exception
    */
-  protected void sendAuthErrorResponse(HttpServletResponse response, int status, String message)
+  protected void sendAuthErrorResponse(HttpServletResponse response, Exception exception)
       throws IOException {
-    response.sendError(status, message);
+    int status =
+        exception instanceof UnauthorizedException
+            ? HttpServletResponse.SC_UNAUTHORIZED
+            : HttpServletResponse.SC_INTERNAL_SERVER_ERROR;
+    response.sendError(status, exception.getMessage());
   }
 
   @Override
