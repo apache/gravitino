@@ -37,6 +37,7 @@ import org.apache.iceberg.exceptions.NoSuchNamespaceException;
 import org.apache.iceberg.exceptions.NoSuchTableException;
 import org.apache.iceberg.exceptions.NoSuchViewException;
 import org.apache.iceberg.exceptions.NotAuthorizedException;
+import org.apache.iceberg.exceptions.ServiceFailureException;
 import org.apache.iceberg.exceptions.ServiceUnavailableException;
 import org.apache.iceberg.exceptions.UnprocessableEntityException;
 import org.apache.iceberg.exceptions.ValidationException;
@@ -70,6 +71,7 @@ public class IcebergExceptionMapper implements ExceptionMapper<Exception> {
           .put(CommitFailedException.class, 409)
           .put(UnprocessableEntityException.class, 422)
           .put(CommitStateUnknownException.class, 500)
+          .put(ServiceFailureException.class, 500)
           .put(ServiceUnavailableException.class, 503)
           .build();
 
@@ -82,6 +84,26 @@ public class IcebergExceptionMapper implements ExceptionMapper<Exception> {
   public static int getErrorCode(Exception ex) {
     return EXCEPTION_ERROR_CODES.getOrDefault(
         ex.getClass(), Status.INTERNAL_SERVER_ERROR.getStatusCode());
+  }
+
+  /**
+   * Converts a Gravitino or generic exception to the corresponding Iceberg REST spec exception.
+   *
+   * @param e the original exception
+   * @return the equivalent Iceberg exception, or the original if already an Iceberg exception
+   */
+  public static Exception convertToIcebergException(Exception e) {
+    String message = e.getMessage() != null ? e.getMessage() : "";
+    if (e instanceof UnauthorizedException) {
+      return new NotAuthorizedException("%s", message);
+    }
+    if (e instanceof org.apache.gravitino.exceptions.ForbiddenException) {
+      return new ForbiddenException("%s", message);
+    }
+    if (EXCEPTION_ERROR_CODES.containsKey(e.getClass())) {
+      return e;
+    }
+    return new ServiceFailureException("%s", message);
   }
 
   @Override

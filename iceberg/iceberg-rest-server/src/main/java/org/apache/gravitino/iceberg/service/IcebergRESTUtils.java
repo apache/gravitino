@@ -53,7 +53,7 @@ public class IcebergRESTUtils {
       ImmutableMap.<Integer, String>builder()
           .put(HttpServletResponse.SC_BAD_REQUEST, "BadRequestException")
           .put(HttpServletResponse.SC_UNAUTHORIZED, "NotAuthorizedException")
-          .put(HttpServletResponse.SC_FORBIDDEN, "NotAuthorizedException")
+          .put(HttpServletResponse.SC_FORBIDDEN, "ForbiddenException")
           .put(HttpServletResponse.SC_NOT_FOUND, "NoSuchResourceException")
           .put(HttpServletResponse.SC_CONFLICT, "AlreadyExistsException")
           .put(HttpServletResponse.SC_NOT_ACCEPTABLE, "UnsupportedOperationException")

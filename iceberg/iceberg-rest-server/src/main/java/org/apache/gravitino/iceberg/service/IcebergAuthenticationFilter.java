@@ -43,15 +43,14 @@ public class IcebergAuthenticationFilter extends AuthenticationFilter {
   @Override
   protected void sendAuthErrorResponse(HttpServletResponse response, Exception exception)
       throws IOException {
-    int status = IcebergExceptionMapper.getErrorCode(exception);
-    String message = exception.getMessage();
+    Exception icebergException = IcebergExceptionMapper.convertToIcebergException(exception);
+    int status = IcebergExceptionMapper.getErrorCode(icebergException);
+    String message = icebergException.getMessage();
     if (StringUtils.isBlank(message)) {
       message = HttpStatus.getMessage(status);
     }
 
-    String type =
-        IcebergRESTUtils.ERROR_TYPE_NAMES.getOrDefault(
-            status, exception.getClass().getSimpleName());
+    String type = icebergException.getClass().getSimpleName();
     ErrorResponse errorResponse = IcebergRESTUtils.errorResponse(status, type, message);
 
     response.setStatus(status);

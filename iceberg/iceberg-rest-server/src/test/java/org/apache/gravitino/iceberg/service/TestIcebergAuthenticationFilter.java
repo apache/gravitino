@@ -76,7 +76,7 @@ public class TestIcebergAuthenticationFilter {
     String json = stringWriter.toString();
     ErrorResponse errorResponse = MAPPER.readValue(json, ErrorResponse.class);
     Assertions.assertEquals(500, errorResponse.code());
-    Assertions.assertEquals("InternalServerError", errorResponse.type());
+    Assertions.assertEquals("ServiceFailureException", errorResponse.type());
     Assertions.assertEquals("Something went wrong", errorResponse.message());
   }
 
@@ -98,7 +98,7 @@ public class TestIcebergAuthenticationFilter {
     String json = stringWriter.toString();
     ErrorResponse errorResponse = MAPPER.readValue(json, ErrorResponse.class);
     Assertions.assertEquals(403, errorResponse.code());
-    Assertions.assertEquals("NotAuthorizedException", errorResponse.type());
+    Assertions.assertEquals("ForbiddenException", errorResponse.type());
     Assertions.assertEquals("Access denied", errorResponse.message());
   }
 
@@ -117,7 +117,7 @@ public class TestIcebergAuthenticationFilter {
     String json = stringWriter.toString();
     ErrorResponse errorResponse = MAPPER.readValue(json, ErrorResponse.class);
     Assertions.assertEquals(500, errorResponse.code());
-    Assertions.assertEquals("InternalServerError", errorResponse.type());
+    Assertions.assertEquals("ServiceFailureException", errorResponse.type());
     Assertions.assertEquals("Server Error", errorResponse.message());
   }
 }
