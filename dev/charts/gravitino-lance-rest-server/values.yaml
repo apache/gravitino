@@ -78,7 +78,7 @@ volumes:
 
 volumeMounts:
   - name: gravitino-rest-catalog-server-log
-    mountPath: /root/gravitino-lance-rest-server/logs
+    mountPath: /opt/gravitino-lance-rest-server/logs
 
 env:
   - name: GRAVITINO_MEM
@@ -103,13 +103,13 @@ podLabels: {}
 podSecurityContext: {}
   # fsGroup: 2000
 
-securityContext: {}
+securityContext:
+  runAsNonRoot: true
+  runAsUser: 1000
   # capabilities:
   #   drop:
   #   - ALL
   # readOnlyRootFilesystem: true
-  # runAsNonRoot: true
-  # runAsUser: 1000
 
 service:
   name: gravitino-lance-rest-server

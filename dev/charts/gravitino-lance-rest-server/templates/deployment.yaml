@@ -62,7 +62,7 @@ spec:
           # Environment variables
           env:
             - name: GRAVITINO_HOME
-              value: /root/gravitino-lance-rest-server
+              value: /opt/gravitino-lance-rest-server
             - name: SKIP_CONFIG_REWRITE
               value: "true"
           {{- with .Values.env }}
