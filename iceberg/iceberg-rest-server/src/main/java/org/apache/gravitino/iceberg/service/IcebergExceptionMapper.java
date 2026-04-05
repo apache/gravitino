@@ -28,6 +28,7 @@ import org.apache.gravitino.exceptions.IllegalNameIdentifierException;
 import org.apache.gravitino.exceptions.NoSuchCatalogException;
 import org.apache.gravitino.exceptions.UnauthorizedException;
 import org.apache.iceberg.exceptions.AlreadyExistsException;
+import org.apache.iceberg.exceptions.BadRequestException;
 import org.apache.iceberg.exceptions.CommitFailedException;
 import org.apache.iceberg.exceptions.CommitStateUnknownException;
 import org.apache.iceberg.exceptions.ForbiddenException;
@@ -99,6 +100,12 @@ public class IcebergExceptionMapper implements ExceptionMapper<Exception> {
     }
     if (e instanceof org.apache.gravitino.exceptions.ForbiddenException) {
       return new ForbiddenException("%s", message);
+    }
+    if (e instanceof IllegalArgumentException
+        || e instanceof IllegalNameIdentifierException
+        || e instanceof ValidationException
+        || e instanceof NamespaceNotEmptyException) {
+      return new BadRequestException("%s", message);
     }
     if (EXCEPTION_ERROR_CODES.containsKey(e.getClass())) {
       return e;

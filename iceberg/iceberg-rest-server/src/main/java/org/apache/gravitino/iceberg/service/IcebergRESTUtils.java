@@ -20,7 +20,6 @@ package org.apache.gravitino.iceberg.service;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.common.base.Preconditions;
-import com.google.common.collect.ImmutableMap;
 import java.io.IOException;
 import java.time.Instant;
 import java.time.LocalDateTime;
@@ -31,7 +30,6 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.stream.Stream;
 import javax.servlet.http.HttpServletRequest;
-import javax.servlet.http.HttpServletResponse;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 import javax.ws.rs.core.Response.Status;
@@ -43,25 +41,6 @@ import org.apache.iceberg.catalog.TableIdentifier;
 import org.apache.iceberg.rest.responses.ErrorResponse;
 
 public class IcebergRESTUtils {
-
-  /**
-   * Error type names matching the Iceberg REST API specification examples. See <a
-   * href="https://github.com/apache/iceberg/blob/main/open-api/rest-catalog-open-api.yaml">Iceberg
-   * REST API spec</a>.
-   */
-  public static final Map<Integer, String> ERROR_TYPE_NAMES =
-      ImmutableMap.<Integer, String>builder()
-          .put(HttpServletResponse.SC_BAD_REQUEST, "BadRequestException")
-          .put(HttpServletResponse.SC_UNAUTHORIZED, "NotAuthorizedException")
-          .put(HttpServletResponse.SC_FORBIDDEN, "ForbiddenException")
-          .put(HttpServletResponse.SC_NOT_FOUND, "NoSuchResourceException")
-          .put(HttpServletResponse.SC_CONFLICT, "AlreadyExistsException")
-          .put(HttpServletResponse.SC_NOT_ACCEPTABLE, "UnsupportedOperationException")
-          .put(422, "UnprocessableEntityException")
-          .put(419, "AuthenticationTimeoutException")
-          .put(HttpServletResponse.SC_SERVICE_UNAVAILABLE, "SlowDownException")
-          .put(HttpServletResponse.SC_INTERNAL_SERVER_ERROR, "InternalServerError")
-          .build();
 
   private IcebergRESTUtils() {}
 
@@ -82,11 +61,10 @@ public class IcebergRESTUtils {
   }
 
   public static Response errorResponse(Throwable ex, int httpStatus) {
-    String type = ERROR_TYPE_NAMES.getOrDefault(httpStatus, ex.getClass().getSimpleName());
     ErrorResponse errorResponse =
         ErrorResponse.builder()
             .responseCode(httpStatus)
-            .withType(type)
+            .withType(ex.getClass().getSimpleName())
             .withMessage(ex.getMessage())
             .withStackTrace(ex)
             .build();
