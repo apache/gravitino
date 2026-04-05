@@ -640,10 +640,7 @@ public class TableOperationDispatcher extends OperationDispatcher implements Tab
       store.put(tableEntity, true /* overwrite */);
     } catch (Exception e) {
       LOG.error(FormattedErrorMessages.STORE_OP_FAILURE, "put", ident, e);
-      return EntityCombinedTable.of(table)
-          .withHiddenProperties(
-              getHiddenPropertyNames(
-                  catalogIdent, HasPropertyMetadata::tablePropertiesMetadata, table.properties()));
+      throw new RuntimeException("Failed to persist table entity to the store.", e);
     }
 
     // Merge both the metadata from catalog operation and the metadata from entity store.

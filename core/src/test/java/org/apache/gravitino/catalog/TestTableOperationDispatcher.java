@@ -159,22 +159,13 @@ public class TestTableOperationDispatcher extends TestOperationDispatcher {
     // Test when the entity store failed to put the table entity
     doThrow(new IOException()).when(entityStore).put(any(), anyBoolean());
     NameIdentifier tableIdent2 = NameIdentifier.of(tableNs, "table2");
-    Table table2 =
-        tableOperationDispatcher.createTable(
-            tableIdent2, columns, "comment", props, new Transform[0]);
-
-    // Check if the created Schema's field values are correct
-    Assertions.assertEquals("table2", table2.name());
-    Assertions.assertEquals("comment", table2.comment());
-    testProperties(props, table2.properties());
-
-    // Check if the Table entity is stored in the EntityStore
-    Assertions.assertFalse(entityStore.exists(tableIdent2, TABLE));
-    Assertions.assertThrows(
-        NoSuchEntityException.class, () -> entityStore.get(tableIdent2, TABLE, TableEntity.class));
-
-    // Audit info is gotten from the catalog, not from the entity store
-    Assertions.assertEquals("test", table2.auditInfo().creator());
+    RuntimeException exception =
+        Assertions.assertThrows(
+            RuntimeException.class,
+            () ->
+                tableOperationDispatcher.createTable(
+                    tableIdent2, columns, "comment", props, new Transform[0]));
+    Assertions.assertTrue(exception.getMessage().contains("Failed to persist table entity"));
   }
 
   @Test
