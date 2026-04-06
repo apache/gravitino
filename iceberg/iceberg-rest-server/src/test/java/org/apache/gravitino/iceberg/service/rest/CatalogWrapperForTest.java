@@ -66,13 +66,17 @@ public class CatalogWrapperForTest extends CatalogWrapperForREST {
       throw new AlreadyExistsException("Already exits exception for test");
     }
 
+    // Use metadataLocation for cloud URIs (e.g. s3://) to enable credential vending tests,
+    // otherwise default to /mock for backward compatibility with existing tests.
+    String location =
+        request.metadataLocation().contains("://") ? request.metadataLocation() : "/mock";
     Schema mockSchema = new Schema(NestedField.of(1, false, "foo_string", StringType.get()));
     TableMetadata baseMetadata =
         TableMetadata.newTableMetadata(
-            mockSchema, PartitionSpec.unpartitioned(), "/mock", ImmutableMap.of());
+            mockSchema, PartitionSpec.unpartitioned(), location, ImmutableMap.of());
     String json = TableMetadataParser.toJson(baseMetadata);
     TableMetadata tableMetadata =
-        TableMetadataParser.fromJson("/mock/metadata/v1.metadata.json", json);
+        TableMetadataParser.fromJson(location + "/metadata/v1.metadata.json", json);
     LoadTableResponse loadTableResponse =
         LoadTableResponse.builder()
             .withTableMetadata(tableMetadata)
