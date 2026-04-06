@@ -428,6 +428,8 @@ class TestModelEvent {
     Assertions.assertEquals(OperationStatus.FAILURE, event.operationStatus());
 
     ListModelFailureEvent listModelFailureEvent = (ListModelFailureEvent) event;
+    Assertions.assertEquals("__list_models__", listModelFailureEvent.identifier().name());
+    Assertions.assertEquals(namespace, listModelFailureEvent.identifier().namespace());
     checkArray(namespace.levels(), listModelFailureEvent.namespace().levels());
   }
 

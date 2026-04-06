@@ -34,6 +34,7 @@ dependencies {
     exclude(group = "com.google.code.findbugs")
     exclude(group = "com.google.guava")
     exclude(group = "log4j")
+    exclude(group = "net.java.dev.jets3t")
     exclude(group = "org.apache.avro")
     exclude(group = "org.apache.logging.log4j")
     exclude(group = "org.eclipse.jetty")

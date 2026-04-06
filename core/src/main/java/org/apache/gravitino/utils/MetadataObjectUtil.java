@@ -110,7 +110,7 @@ public class MetadataObjectUtil {
 
     switch (metadataObject.type()) {
       case METALAKE:
-        return NameIdentifierUtil.ofMetalake(metalakeName);
+        return NameIdentifierUtil.ofMetalake(metadataObject.name());
       case ROLE:
         return AuthorizationUtils.ofRole(metalakeName, metadataObject.name());
       case TAG:

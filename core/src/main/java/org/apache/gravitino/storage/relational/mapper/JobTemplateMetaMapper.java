@@ -82,6 +82,12 @@ public interface JobTemplateMetaMapper {
 
   @SelectProvider(
       type = JobTemplateMetaSQLProviderFactory.class,
+      method = "listJobTemplatePOsByJobTemplateIds")
+  List<JobTemplatePO> listJobTemplatePOsByJobTemplateIds(
+      @Param("jobTemplateIds") List<Long> jobTemplateIds);
+
+  @SelectProvider(
+      type = JobTemplateMetaSQLProviderFactory.class,
       method = "batchSelectJobTemplateByIdentifier")
   List<JobTemplatePO> batchSelectJobTemplateByIdentifier(
       @Param("metalakeName") String metalakeName,

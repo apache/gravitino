@@ -15,8 +15,9 @@
 # specific language governing permissions and limitations
 # under the License.
 
-from typing import Optional
+from typing import Final, Optional, overload
 
+from gravitino.api.authorization.privileges import Privilege
 from gravitino.api.catalog import Catalog
 from gravitino.api.rel.column import Column
 from gravitino.api.rel.expressions.distributions.distribution import Distribution
@@ -30,6 +31,8 @@ from gravitino.client.relational_table import RelationalTable
 from gravitino.dto.audit_dto import AuditDTO
 from gravitino.dto.rel.distribution_dto import DistributionDTO
 from gravitino.dto.requests.table_create_request import TableCreateRequest
+from gravitino.dto.requests.table_updates_request import TableUpdatesRequest
+from gravitino.dto.responses.drop_response import DropResponse
 from gravitino.dto.responses.entity_list_response import EntityListResponse
 from gravitino.dto.responses.table_response import TableResponse
 from gravitino.dto.util.dto_converters import DTOConverters
@@ -40,15 +43,15 @@ from gravitino.rest.rest_utils import encode_string
 from gravitino.utils import HTTPClient
 
 
-class RelationalCatalog(
-    BaseSchemaCatalog, TableCatalog
-):  # pylint: disable=too-many-ancestors
+class RelationalCatalog(BaseSchemaCatalog, TableCatalog):  # pylint: disable=too-many-ancestors
     """Relational catalog is a catalog implementation
 
     The `RelationalCatalog` supports relational database like metadata operations,
     for example, schemas and tables list, creation, update and deletion. A Relational
     catalog is under the metalake.
     """
+
+    PRIVILEGES: Final[str] = "privileges"
 
     def __init__(
         self,
@@ -188,24 +191,96 @@ class RelationalCatalog(
             for ident in entity_list_resp.identifiers()
         ]
 
-    def load_table(self, identifier: NameIdentifier) -> Table:
+    @overload
+    def load_table(self, identifier: NameIdentifier) -> Table: ...
+
+    @overload
+    def load_table(  # pylint: disable=arguments-differ
+        self, identifier: NameIdentifier, required_privilege_names: set[Privilege.Name]
+    ) -> Table: ...
+
+    def load_table(
+        self,
+        identifier: NameIdentifier,
+        required_privilege_names: Optional[set[Privilege.Name]] = None,
+    ) -> Table:
         self._check_table_name_identifier(identifier)
         full_namespace = self._get_table_full_namespace(identifier.namespace())
+        query_params = (
+            {
+                RelationalCatalog.PRIVILEGES: ",".join(
+                    sorted(priv.name for priv in required_privilege_names)
+                )
+            }
+            if required_privilege_names
+            else None
+        )
+
         resp = self.rest_client.get(
             f"{self._format_table_request_path(full_namespace)}"
             f"/{encode_string(identifier.name())}",
+            params=query_params,
             error_handler=TABLE_ERROR_HANDLER,
         )
         table_resp = TableResponse.from_json(resp.body, infer_missing=True)
         table_resp.validate()
         return RelationalTable(full_namespace, table_resp.table(), self.rest_client)
 
-    # TODO: We shall implement the following methods after integration tests for relational table
     def drop_table(self, identifier: NameIdentifier) -> bool:
-        raise NotImplementedError("Drop table is not implemented yet.")
+        """Drop the table with specified identifier.
+
+        Args:
+            identifier (NameIdentifier):
+                The identifier of the table, which should be "schema.table" format.
+
+        Returns:
+            bool:
+                `True` if the table is dropped successfully, `False` if the table does not exist.
+        """
+
+        return self._drop_table(identifier, purge=False)
 
     def alter_table(self, identifier: NameIdentifier, *changes) -> Table:
-        raise NotImplementedError("Alter table is not implemented yet.")
+        self._check_table_name_identifier(identifier)
+        full_namespace = self._get_table_full_namespace(identifier.namespace())
+        updates_request = TableUpdatesRequest(
+            updates=[
+                DTOConverters.to_table_update_request(change) for change in changes
+            ]
+        )
+        updates_request.validate()
+        resp = self.rest_client.put(
+            f"{self._format_table_request_path(full_namespace)}"
+            f"/{encode_string(identifier.name())}",
+            json=updates_request,
+            error_handler=TABLE_ERROR_HANDLER,
+        )
+        table_resp = TableResponse.from_json(resp.body, infer_missing=True)
+        table_resp.validate()
+        return RelationalTable(full_namespace, table_resp.table(), self.rest_client)
 
     def purge_table(self, identifier: NameIdentifier) -> bool:
-        raise NotImplementedError("Purge table is not implemented yet.")
+        """Purge the table with specified identifier.
+
+        Args:
+            identifier (NameIdentifier):
+                The identifier of the table, which should be "schema.table" format.
+
+        Returns:
+            bool:
+                `True` if the table is purged successfully, `False` if the table does not exist.
+        """
+        return self._drop_table(identifier, purge=True)
+
+    def _drop_table(self, identifier: NameIdentifier, purge: bool) -> bool:
+        self._check_table_name_identifier(identifier)
+        full_namespace = self._get_table_full_namespace(identifier.namespace())
+        resp = self.rest_client.delete(
+            f"{self._format_table_request_path(full_namespace)}"
+            f"/{encode_string(identifier.name())}",
+            error_handler=TABLE_ERROR_HANDLER,
+            params={"purge": "true"} if purge else None,
+        )
+        drop_resp = DropResponse.from_json(resp.body, infer_missing=True)
+        drop_resp.validate()
+        return drop_resp.dropped()

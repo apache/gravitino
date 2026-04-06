@@ -99,11 +99,30 @@ public class AuthenticationFilter implements Filter {
           resp.setHeader(AuthConstants.HTTP_CHALLENGE_HEADER, challenge);
         }
       }
-      resp.sendError(HttpServletResponse.SC_UNAUTHORIZED, ue.getMessage());
+      sendAuthErrorResponse(resp, ue);
     } catch (Exception e) {
       HttpServletResponse resp = (HttpServletResponse) response;
-      resp.sendError(HttpServletResponse.SC_UNAUTHORIZED, e.getMessage());
+      sendAuthErrorResponse(resp, e);
     }
+  }
+
+  /**
+   * Sends an error response when authentication fails. Subclasses can override this to customize
+   * the error response format (e.g., Iceberg REST server returns JSON error bodies).
+   *
+   * <p>TODO: Gravitino server should override this method to return a correct JSON response
+   * following the Gravitino error response spec.
+   *
+   * @param response the HTTP servlet response
+   * @param exception the authentication exception
+   */
+  protected void sendAuthErrorResponse(HttpServletResponse response, Exception exception)
+      throws IOException {
+    int status =
+        exception instanceof UnauthorizedException
+            ? HttpServletResponse.SC_UNAUTHORIZED
+            : HttpServletResponse.SC_INTERNAL_SERVER_ERROR;
+    response.sendError(status, exception.getMessage());
   }
 
   @Override
