@@ -29,6 +29,7 @@ from gravitino.api.rel.expressions.distributions.distributions import Distributi
 from gravitino.api.rel.expressions.transforms.transforms import Transforms
 from gravitino.api.rel.indexes.indexes import Indexes
 from gravitino.api.rel.table import Table
+from gravitino.api.rel.table_change import TableChange
 from gravitino.api.rel.types.types import Types
 from gravitino.client.relational_table import RelationalTable
 from gravitino.exceptions.base import (
@@ -273,3 +274,38 @@ class TestRelationalCatalog(IntegrationTestEnv):
                 identifier=TestRelationalCatalog.TABLE_IDENT
             )
         )
+
+    def test_relational_catalog_alter_table_not_exists(self):
+        """Test altering a table that doesn't exist should raise NoSuchTableException."""
+        relational_catalog = self.catalog.as_table_catalog()
+        ident = NameIdentifier.of(TestRelationalCatalog.SCHEMA_NAME, "invalid_table")
+
+        with self.assertRaises(NoSuchTableException):
+            relational_catalog.alter_table(
+                ident, TableChange.update_comment("new comment")
+            )
+
+    def test_relational_catalog_alter_table(self):
+        """Test altering a table from the relational catalog."""
+        self._create_test_table()
+        relational_catalog = self.catalog.as_table_catalog()
+
+        new_comment = f"{TestRelationalCatalog.TABLE_COMMENT} updated"
+        new_property_value = "new_property_value"
+
+        changes = [
+            TableChange.update_comment(new_comment),
+            TableChange.set_property("property1", new_property_value),
+            TableChange.remove_property("property2"),
+        ]
+
+        altered_table = relational_catalog.alter_table(
+            TestRelationalCatalog.TABLE_IDENT, *changes
+        )
+
+        self.assertEqual(altered_table.comment(), new_comment)
+        self.assertEqual(
+            altered_table.properties().get("property1"),
+            new_property_value,
+        )
+        self.assertNotIn("property2", altered_table.properties())
