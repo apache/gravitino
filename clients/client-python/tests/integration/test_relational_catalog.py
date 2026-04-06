@@ -231,3 +231,19 @@ class TestRelationalCatalog(IntegrationTestEnv):
                 identifier=TestRelationalCatalog.TABLE_IDENT
             )
         )
+
+    def test_relational_catalog_drop_table_not_exists(self):
+        """Test dropping a table that doesn't exist should return False."""
+        relational_catalog = TestRelationalCatalog.catalog.as_table_catalog()
+
+        ident = NameIdentifier.of(TestRelationalCatalog.SCHEMA_NAME, "invalid_table")
+        is_dropped = relational_catalog.drop_table(ident)
+        self.assertFalse(is_dropped)
+
+    def test_relational_catalog_drop_table(self):
+        """Test dropping a table from the relational catalog."""
+        self._create_test_table()
+        relational_catalog = TestRelationalCatalog.catalog.as_table_catalog()
+
+        is_dropped = relational_catalog.drop_table(TestRelationalCatalog.TABLE_IDENT)
+        self.assertTrue(is_dropped)
