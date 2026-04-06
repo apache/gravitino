@@ -603,7 +603,7 @@ public class IcebergTableOperations {
     return etag.getValue().equals(clientEtag);
   }
 
-  private boolean isCredentialVending(String accessDelegation) {
+  static boolean isCredentialVending(String accessDelegation) {
     if (StringUtils.isBlank(accessDelegation)) {
       return false;
     }

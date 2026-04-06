@@ -66,6 +66,7 @@ import org.apache.iceberg.io.CloseableIterable;
 import org.apache.iceberg.rest.PlanStatus;
 import org.apache.iceberg.rest.requests.CreateTableRequest;
 import org.apache.iceberg.rest.requests.PlanTableScanRequest;
+import org.apache.iceberg.rest.requests.RegisterTableRequest;
 import org.apache.iceberg.rest.responses.ImmutableLoadCredentialsResponse;
 import org.apache.iceberg.rest.responses.LoadCredentialsResponse;
 import org.apache.iceberg.rest.responses.LoadTableResponse;
@@ -126,6 +127,18 @@ public class CatalogWrapperForREST extends IcebergCatalogWrapper {
     LoadTableResponse loadTableResponse = super.loadTable(identifier);
     if (shouldGenerateCredential(loadTableResponse, requestCredential)) {
       return injectCredentialConfig(identifier, loadTableResponse, privilege);
+    }
+    return loadTableResponse;
+  }
+
+  public LoadTableResponse registerTable(
+      Namespace namespace, RegisterTableRequest request, boolean requestCredential) {
+    LoadTableResponse loadTableResponse = registerTable(namespace, request);
+    if (shouldGenerateCredential(loadTableResponse, requestCredential)) {
+      return injectCredentialConfig(
+          TableIdentifier.of(namespace, request.name()),
+          loadTableResponse,
+          CredentialPrivilege.WRITE);
     }
     return loadTableResponse;
   }

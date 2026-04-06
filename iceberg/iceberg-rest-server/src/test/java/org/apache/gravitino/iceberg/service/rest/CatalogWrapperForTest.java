@@ -66,13 +66,14 @@ public class CatalogWrapperForTest extends CatalogWrapperForREST {
       throw new AlreadyExistsException("Already exits exception for test");
     }
 
+    String location = request.metadataLocation();
     Schema mockSchema = new Schema(NestedField.of(1, false, "foo_string", StringType.get()));
     TableMetadata baseMetadata =
         TableMetadata.newTableMetadata(
-            mockSchema, PartitionSpec.unpartitioned(), "/mock", ImmutableMap.of());
+            mockSchema, PartitionSpec.unpartitioned(), location, ImmutableMap.of());
     String json = TableMetadataParser.toJson(baseMetadata);
     TableMetadata tableMetadata =
-        TableMetadataParser.fromJson("/mock/metadata/v1.metadata.json", json);
+        TableMetadataParser.fromJson(location + "/metadata/v1.metadata.json", json);
     LoadTableResponse loadTableResponse =
         LoadTableResponse.builder()
             .withTableMetadata(tableMetadata)
