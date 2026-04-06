@@ -247,3 +247,29 @@ class TestRelationalCatalog(IntegrationTestEnv):
 
         is_dropped = relational_catalog.drop_table(TestRelationalCatalog.TABLE_IDENT)
         self.assertTrue(is_dropped)
+
+    def test_relational_catalog_purge_table_not_exists(self):
+        """Test purging a table that doesn't exist should return False."""
+        relational_catalog = TestRelationalCatalog.catalog.as_table_catalog()
+
+        ident = NameIdentifier.of(TestRelationalCatalog.SCHEMA_NAME, "invalid_table")
+        self.assertFalse(relational_catalog.table_exists(ident))
+        is_dropped = relational_catalog.purge_table(ident)
+        self.assertFalse(is_dropped)
+
+    def test_relational_catalog_purge_table(self):
+        """Test purging a table from the relational catalog."""
+        self._create_test_table()
+        relational_catalog = TestRelationalCatalog.catalog.as_table_catalog()
+        self.assertTrue(
+            relational_catalog.table_exists(
+                identifier=TestRelationalCatalog.TABLE_IDENT
+            )
+        )
+        is_dropped = relational_catalog.purge_table(TestRelationalCatalog.TABLE_IDENT)
+        self.assertTrue(is_dropped)
+        self.assertFalse(
+            relational_catalog.table_exists(
+                identifier=TestRelationalCatalog.TABLE_IDENT
+            )
+        )
