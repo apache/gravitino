@@ -78,7 +78,7 @@ For the REST catalog backend, `warehouse` identifies the catalog in the Iceberg 
 | `data-access`  | Data access mode for REST catalog backend. Supported values are `vended-credentials` and `remote-signing`.              | (none)        | No       | 1.3.0         |
 
 - `vended-credentials`: request credential vending from the Iceberg REST server.
-- `remote-signing`: Gravitino doesn't support now.
+- `remote-signing`: Gravitino doesn't support this mode yet.
 
 Example: create an Iceberg catalog with the REST backend. This targets the default catalog and uses a REST path like `http://127.0.0.1:9001/iceberg/v1/namespaces/db/tables/table`.
 

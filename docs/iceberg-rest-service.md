@@ -161,7 +161,7 @@ IRC1 must also configure S3 configurations if the client side requests credentia
 `data-access` is returned in `/v1/config` defaults for REST clients:
 
 - `vended-credentials`: clients should request credential vending (`X-Iceberg-Access-Delegation: vended-credentials`).
-- `remote-signing`: Gravitino doesn't support now.
+- `remote-signing`: Gravitino doesn't support this mode yet.
 
 #### Custom backend configuration
 
