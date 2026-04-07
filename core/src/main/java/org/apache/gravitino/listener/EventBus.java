@@ -137,7 +137,7 @@ public class EventBus {
    * (including {@link RuntimeException}, {@link Error}, etc.) to ensure the original exception can
    * be properly thrown to the caller.
    *
-   * @param failureEvent the failure failureEvent to dispatch
+   * @param failureEvent the failure event to dispatch
    */
   private void dispatchFailureEvent(Event failureEvent) {
     try {
@@ -145,7 +145,7 @@ public class EventBus {
     } catch (Exception e) {
       // Swallow ALL listener exceptions to prevent masking the original error
       LOG.error(
-          "Failed to dispatch failure failureEvent: {}, ignoring exception to preserve original error",
+          "Failed to dispatch failure event: {}, ignoring exception to preserve original error",
           failureEvent.getClass().getSimpleName(),
           e);
     }
