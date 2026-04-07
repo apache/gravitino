@@ -45,7 +45,7 @@ logger = logging.getLogger(__name__)
 
 
 class TestRelationalCatalog(IntegrationTestEnv):
-    METALAKE_NAME: str = "TestRelationalTable_metalake" + str(randint(1, 10000))
+    METALAKE_NAME: str = "TestRelationalCatalog_metalake" + str(randint(1, 10000))
     CATALOG_NAME: str = "relational_catalog"
     CATALOG_PROVIDER: str = "hive"
     SCHEMA_NAME: str = "test_schema"
@@ -56,6 +56,7 @@ class TestRelationalCatalog(IntegrationTestEnv):
 
     @classmethod
     def setUpClass(cls):
+        super().setUpClass()
         cls.hdfs_container: HDFSContainer = HDFSContainer()
         hive_metastore_uri = f"thrift://{cls.hdfs_container.get_ip()}:9083"
         logger.info("Started Hive container with metastore URI: %s", hive_metastore_uri)
@@ -90,6 +91,7 @@ class TestRelationalCatalog(IntegrationTestEnv):
                 cls.hdfs_container.close()
             except Exception as e:  # pylint: disable=broad-exception-caught
                 logger.warning("Failed to clean up HDFS container: %s", e)
+        super().tearDownClass()
 
     def setUp(self):
         # Create schema for each test
