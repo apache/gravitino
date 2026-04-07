@@ -21,8 +21,11 @@ package org.apache.gravitino.credential;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.ImmutableMap;
+import com.google.common.collect.Maps;
+import com.google.common.collect.Sets;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Set;
 
 /**
  * Helper class to generate specific credential properties for different table format and engine.
@@ -45,6 +48,8 @@ public class CredentialPropertyUtils {
 
   @VisibleForTesting
   static final String ICEBERG_ADLS_ACCOUNT_KEY = "adls.auth.shared-key.account.key";
+
+  private static final String GCS_OAUTH_2_TOKEN_EXPIRES_AT = "gcs.oauth2.token-expires-at";
 
   private static Map<String, String> icebergCredentialPropertyMap =
       ImmutableMap.<String, String>builder()
@@ -90,7 +95,7 @@ public class CredentialPropertyUtils {
       Map<String, String> icebergGCSCredentialProperties =
           transformProperties(credential.credentialInfo(), icebergCredentialPropertyMap);
       icebergGCSCredentialProperties.put(
-          "gcs.oauth2.token-expires-at", String.valueOf(credential.expireTimeInMs()));
+          GCS_OAUTH_2_TOKEN_EXPIRES_AT, String.valueOf(credential.expireTimeInMs()));
       return icebergGCSCredentialProperties;
     }
 
@@ -107,6 +112,29 @@ public class CredentialPropertyUtils {
     }
 
     return credential.toProperties();
+  }
+
+  /**
+   * Filters a property map down to only Iceberg credential-related keys.
+   *
+   * <p>This is used when an Iceberg table load response contains many table and catalog properties,
+   * but the caller only needs the temporary credential properties that should be forwarded to the
+   * Iceberg client.
+   *
+   * @param properties the source properties to filter
+   * @return a map containing only credential properties recognized by Iceberg
+   */
+  public static Map<String, String> filterCredentialProperties(Map<String, String> properties) {
+    Set<String> credentialPropertyKeys = Sets.newHashSet(icebergCredentialPropertyMap.values());
+    credentialPropertyKeys.add(GCS_OAUTH_2_TOKEN_EXPIRES_AT);
+    Map<String, String> filteredProperties = Maps.newHashMap(properties);
+    filteredProperties
+        .entrySet()
+        .removeIf(
+            entry ->
+                !credentialPropertyKeys.contains(entry.getKey())
+                    && !entry.getKey().startsWith(ICEBERG_ADLS_TOKEN));
+    return filteredProperties;
   }
 
   private static Map<String, String> transformProperties(
