@@ -30,9 +30,8 @@ import org.slf4j.LoggerFactory;
 
 /**
  * Utility class to clean up resources related to a specific class loader to prevent memory leaks.
- * Gravitino will create a new class loader for each catalog and release it when there exist any
- * changes to the catalog. So, it's important to clean up resources related to the class loader to
- * prevent memory leaks.
+ * Gravitino uses isolated class loaders for catalog implementations, and these class loaders must
+ * be properly cleaned up when no longer needed to prevent Metaspace leaks.
  */
 public class ClassLoaderResourceCleanerUtils {
 
@@ -41,7 +40,14 @@ public class ClassLoaderResourceCleanerUtils {
   private ClassLoaderResourceCleanerUtils() {}
 
   /**
-   * Close all resources related to the given class loader to prevent memory leaks.
+   * Close all resources related to the given class loader to prevent memory leaks. This includes
+   * stopping threads, clearing ThreadLocals, shutting down MySQL's
+   * AbandonedConnectionCleanupThread, and releasing various logging and cloud SDK resources.
+   *
+   * <p><b>Warning:</b> This method performs destructive cleanup that affects all code sharing the
+   * ClassLoader. It must only be called when the ClassLoader is about to be destroyed and no
+   * catalogs are still using it. In the ClassLoaderPool lifecycle, this is called from {@code
+   * doFinalCleanup()} when the reference count reaches zero.
    *
    * @param classLoader the classloader to be closed
    */
@@ -56,12 +62,9 @@ public class ClassLoaderResourceCleanerUtils {
     executeAndCatch(
         ClassLoaderResourceCleanerUtils::closeStatsDataClearerInFileSystem, classLoader);
 
-    // Stop all threads with the current class loader and clear their threadLocal variables for
-    // jetty threads that are loaded by the current class loader.
-    // For example, thread local `threadData` in FileSystem#StatisticsDataCleaner is created
-    // within jetty thread with the current class loader. However, there are clear by
-    // `catalog.close` in ForkJoinPool in CaffeineCache, in this case, the thread local variable
-    // will not be cleared, so we need to clear them manually here.
+    // Stop all threads using the target class loader and clear their ThreadLocal variables.
+    // ThreadLocals can be created on any thread (e.g., Jetty webserver, Caffeine ForkJoinPool,
+    // catalog-cleaner) and may hold references to the ClassLoader, preventing GC.
     executeAndCatch(
         ClassLoaderResourceCleanerUtils::stopThreadsAndClearThreadLocalVariables, classLoader);
 
@@ -76,6 +79,10 @@ public class ClassLoaderResourceCleanerUtils {
     executeAndCatch(ClassLoaderResourceCleanerUtils::closeResourceInAzure, classLoader);
 
     executeAndCatch(ClassLoaderResourceCleanerUtils::clearShutdownHooks, classLoader);
+
+    executeAndCatch(
+        ClassLoaderResourceCleanerUtils::shutdownMySQLAbandonedConnectionCleanupThread,
+        classLoader);
   }
 
   /**
@@ -124,7 +131,7 @@ public class ClassLoaderResourceCleanerUtils {
     for (Thread thread : threads) {
       // First clear thread local variables
       clearThreadLocalMap(thread, classLoader);
-      // Close all threads that are using the FilesetCatalogOperations class loader
+      // Stop all threads that are using the target class loader
       if (runningWithClassLoader(thread, classLoader)) {
         LOG.debug("Interrupting thread: {}", thread.getName());
         thread.setContextClassLoader(null);
@@ -157,7 +164,23 @@ public class ClassLoaderResourceCleanerUtils {
   }
 
   private static void clearThreadLocalMap(Thread thread, ClassLoader targetClassLoader) {
-    if (thread == null || !thread.getName().startsWith("Gravitino-webserver-")) {
+    if (thread == null) {
+      return;
+    }
+
+    // We process all application threads (not just Gravitino-webserver-* as before) because
+    // ThreadLocals referencing the target ClassLoader can exist on any thread — e.g., Caffeine
+    // ForkJoinPool threads, catalog-cleaner threads, or Hadoop daemon threads. This broader scope
+    // is safe because the downstream check (value.getClass().getClassLoader() == targetClassLoader)
+    // ensures only entries loaded by the target ClassLoader are cleared; ThreadLocals belonging to
+    // other ClassLoaders are left untouched.
+    //
+    // Skip JVM internal threads (Reference Handler, Finalizer, Signal Dispatcher, etc.)
+    // — they should not hold catalog ClassLoader references, and reflectively accessing
+    // their ThreadLocals could cause unexpected issues. Using the thread group name is
+    // more robust than matching individual thread names.
+    ThreadGroup group = thread.getThreadGroup();
+    if (group != null && "system".equals(group.getName())) {
       return;
     }
 
@@ -234,7 +257,7 @@ public class ClassLoaderResourceCleanerUtils {
       LOG.debug("HTrace is not used, skipping release of HTrace LogFactory...");
     }
 
-    // Release the LogFactory for the FilesetCatalogOperations class loader
+    // Release the LogFactory for the target class loader
     Class<?> logFactoryClass =
         Class.forName("org.apache.commons.logging.LogFactory", true, currentClassLoader);
     MethodUtils.invokeStaticMethod(logFactoryClass, "release", currentClassLoader);
@@ -299,6 +322,24 @@ public class ClassLoaderResourceCleanerUtils {
             true,
             classLoader);
     MethodUtils.invokeStaticMethod(relocatedLogFactory, "release", classLoader);
+  }
+
+  /**
+   * Shutdown MySQL's AbandonedConnectionCleanupThread to prevent it from holding a reference to the
+   * ClassLoader. Unlike simple thread interruption, {@code uncheckedShutdown()} cleans up the
+   * tracked connections map, releasing references to classes loaded by the target ClassLoader.
+   *
+   * @param classLoader the classloader where the MySQL driver is loaded
+   */
+  private static void shutdownMySQLAbandonedConnectionCleanupThread(ClassLoader classLoader)
+      throws Exception {
+    // Use initialize=false because the class was already loaded and initialized when the MySQL
+    // driver was first used. Re-initialization is unnecessary and could have side effects during
+    // ClassLoader teardown.
+    Class<?> clazz =
+        Class.forName("com.mysql.cj.jdbc.AbandonedConnectionCleanupThread", false, classLoader);
+    MethodUtils.invokeStaticMethod(clazz, "uncheckedShutdown");
+    LOG.info("AbandonedConnectionCleanupThread has been shutdown.");
   }
 
   @FunctionalInterface
