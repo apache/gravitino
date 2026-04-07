@@ -30,12 +30,16 @@ import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.authorization.AuthorizationRequestContext;
 import org.apache.gravitino.authorization.AuthorizationUtils;
+import org.apache.gravitino.iceberg.common.ops.IcebergCatalogWrapper;
+import org.apache.gravitino.iceberg.service.IcebergCatalogWrapperManager;
 import org.apache.gravitino.iceberg.service.IcebergExceptionMapper;
+import org.apache.gravitino.iceberg.service.authorization.IcebergRESTServerContext;
 import org.apache.gravitino.server.authorization.annotations.AuthorizationExpression;
 import org.apache.gravitino.server.authorization.expression.AuthorizationExpressionEvaluator;
 import org.apache.gravitino.server.web.Utils;
 import org.apache.gravitino.utils.PrincipalUtils;
 import org.apache.iceberg.exceptions.ForbiddenException;
+import org.apache.iceberg.rest.RESTCatalog;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -124,6 +128,10 @@ public abstract class BaseMetadataAuthorizationMethodInterceptor implements Meth
         Map<Entity.EntityType, NameIdentifier> nameIdentifierMap =
             extractNameIdentifierFromParameters(parameters, args);
 
+        if (skipAuthorizationForRestCatalog(nameIdentifierMap)) {
+          return methodInvocation.proceed();
+        }
+
         // Check if current user exists in the metalake.
         NameIdentifier metalakeIdent = nameIdentifierMap.get(Entity.EntityType.METALAKE);
 
@@ -204,5 +212,22 @@ public abstract class BaseMetadataAuthorizationMethodInterceptor implements Meth
     } catch (Throwable e) {
       return IcebergExceptionMapper.toRESTResponse(e);
     }
+  }
+
+  private boolean skipAuthorizationForRestCatalog(
+      Map<Entity.EntityType, NameIdentifier> nameIdentifierMap) {
+    NameIdentifier catalogId = nameIdentifierMap.get(Entity.EntityType.CATALOG);
+    if (catalogId == null) {
+      return false;
+    }
+
+    IcebergCatalogWrapperManager wrapperManager =
+        IcebergRESTServerContext.getInstance().catalogWrapperManager();
+    if (wrapperManager == null) {
+      return false;
+    }
+
+    IcebergCatalogWrapper catalogWrapper = wrapperManager.getCatalogWrapper(catalogId.name());
+    return catalogWrapper != null && catalogWrapper.getCatalog() instanceof RESTCatalog;
   }
 }
