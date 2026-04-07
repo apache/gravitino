@@ -504,6 +504,12 @@ livenessProbe:
   initialDelaySeconds: 20
   timeoutSeconds: 5
 
+## Pod-level security context configuration
+## ref: https://kubernetes.io/docs/tasks/configure-pod-container/security-context/
+##
+podSecurityContext: {}
+  # fsGroup: 1000
+
 ## Container-specific security context configuration
 ## ref: https://kubernetes.io/docs/tasks/configure-pod-container/security-context/
 ##
