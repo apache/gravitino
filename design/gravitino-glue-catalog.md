@@ -484,6 +484,38 @@ When initializing the backing `SparkCatalog`, `GravitinoHiveCatalog` maps the Gr
 
 ---
 
+### 6.3 Flink
+
+In Gravitino's Flink connector, Hive-format and Iceberg tables require different processing paths. The chosen approach mirrors the Spark design: `GravitinoGlueCatalog` (a new subclass of `GravitinoHiveCatalog`) holds an internal lazily-initialized Iceberg `FlinkCatalog` instance (backed by Iceberg's `GlueCatalog`, using the same AWS credentials and catalog ID). When `getTable()` detects `table_type=ICEBERG` in the Gravitino table properties, it delegates to this internal catalog to produce a properly typed `CatalogTable` with full schema and Iceberg execution semantics. Hive-format tables continue through the existing Kyuubi-backed path unchanged:
+
+```
+GravitinoGlueCatalog.getTable(objectPath)
+  │
+  ├── table_type = "ICEBERG"
+  │     └── icebergFlinkCatalog.getTable(objectPath)   ← Iceberg native FlinkCatalog
+  │
+  └── everything else
+        └── super.getTable() → existing HiveDynamicTableFactory path (unchanged)
+```
+
+When initializing the backing `FlinkCatalog`, `GravitinoGlueCatalog` maps the Gravitino catalog properties as follows:
+
+| Gravitino Property | Iceberg FlinkCatalog Property | Notes |
+|---|---|---|
+| _(fixed)_ | `catalog-impl` = `org.apache.iceberg.aws.glue.GlueCatalog` | Selects Iceberg's Glue backend |
+| `aws-region` | `client.region` | AWS region for the Glue API client |
+| `aws-glue-catalog-id` | `glue.id` | 12-digit AWS account / catalog ID |
+| `aws-glue-endpoint` | `glue.endpoint` | Omitted if not set; used for VPC endpoints or LocalStack |
+| `aws-access-key-id` + `aws-secret-access-key` | `client.credentials-provider` → `StaticCredentialsProvider` | Omitted when using default credential chain |
+
+**Pros**: Clean encapsulation — credentials are held within the internal catalog instance, never appearing in table options or `SHOW CREATE TABLE` output; schema is resolved natively by the Iceberg catalog from the metadata file; consistent with the Spark approach. The backing catalog is initialized lazily (double-checked locking) only on first Iceberg table encounter.
+
+**Cons**: Requires `iceberg-flink-runtime` as a `compileOnly` dependency (same pattern as Spark's `iceberg-spark-runtime`).
+
+**For `catalog-hive` with mixed-format HMS** (Phase 3): the same `GravitinoHiveCatalog.getTable()` override applies with an HMS-backed Iceberg `FlinkCatalog` — no additional design required once the Glue implementation is in place.
+
+---
+
 ## 7. Security
 
 ### 7.1 Two-Layer Security Model
@@ -649,8 +681,9 @@ Test coverage:
 |---|---|---|---|
 | 2.1 | Trino Lakehouse adapter | `GlueConnectorAdapter.java` in `trino-connector/` | Maps `provider=glue` → `connector.name=lakehouse` + `hive.metastore=glue`; requires Trino ≥ 477 |
 | 2.2 | Spark mixed-type routing | `GravitinoHiveCatalog.createSparkTable()` | Intercept on `table_type=ICEBERG`; delegate to lazily initialized Iceberg `SparkCatalog` |
-| 2.3 | View CRUD | `GlueCatalogOperations.java` | Full `ViewCatalog` interface implementation (pending Gravitino View API) |
-| 2.4 | STS AssumeRole | `GlueClientProvider.java` | `aws-role-arn` property for cross-account access via STS |
+| 2.3 | Flink mixed-type routing | `GravitinoGlueCatalog.java` in `flink-connector/` | New subclass of `GravitinoHiveCatalog`; `getTable()` delegates to lazily initialized Iceberg `FlinkCatalog` (GlueCatalog backend) for Iceberg tables |
+| 2.6 | View CRUD | `GlueCatalogOperations.java` | Full `ViewCatalog` interface implementation (pending Gravitino View API) |
+| 2.7 | STS AssumeRole | `GlueClientProvider.java` | `aws-role-arn` property for cross-account access via STS |
 
 ### Phase 3: Extending Mixed-Format Support to Hive Catalog
 
