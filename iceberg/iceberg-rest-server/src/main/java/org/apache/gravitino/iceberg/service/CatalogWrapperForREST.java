@@ -664,8 +664,6 @@ public class CatalogWrapperForREST extends IcebergCatalogWrapper {
 
   private LoadTableResponse stageTableCreateInternal(
       Namespace namespace, CreateTableRequest request) {
-    request.validate();
-
     TableIdentifier ident = TableIdentifier.of(namespace, request.name());
     if (catalog.tableExists(ident)) {
       throw new AlreadyExistsException("Table already exists: %s", ident);
