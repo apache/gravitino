@@ -50,6 +50,8 @@ import org.lance.namespace.model.ListTablesResponse;
 @Produces(MediaType.APPLICATION_JSON)
 public class LanceNamespaceOperations {
 
+  private static final String ROOT_NAMESPACE_ID = "";
+
   private final NamespaceWrapper lanceNamespace;
 
   @Inject
@@ -77,7 +79,7 @@ public class LanceNamespaceOperations {
       @DefaultValue(NAMESPACE_DELIMITER_DEFAULT) @QueryParam("delimiter") String delimiter,
       @QueryParam("page_token") String pageToken,
       @QueryParam("limit") Integer limit) {
-    return listNamespacesInternal(delimiter, delimiter, pageToken, limit);
+    return listNamespacesInternal(ROOT_NAMESPACE_ID, delimiter, pageToken, limit);
   }
 
   private Response listNamespacesInternal(
@@ -109,7 +111,7 @@ public class LanceNamespaceOperations {
   @ResponseMetered(name = "describe-namespaces-root", absolute = true)
   public Response describeNamespaceOnRoot(
       @DefaultValue(NAMESPACE_DELIMITER_DEFAULT) @QueryParam("delimiter") String delimiter) {
-    return describeNamespaceInternal(delimiter, delimiter);
+    return describeNamespaceInternal(ROOT_NAMESPACE_ID, delimiter);
   }
 
   private Response describeNamespaceInternal(String namespaceId, String delimiter) {

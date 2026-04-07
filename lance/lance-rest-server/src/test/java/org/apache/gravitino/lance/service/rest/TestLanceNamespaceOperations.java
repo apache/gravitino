@@ -19,6 +19,7 @@
 package org.apache.gravitino.lance.service.rest;
 
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doNothing;
 import static org.mockito.Mockito.doReturn;
@@ -31,6 +32,7 @@ import com.google.common.collect.Lists;
 import com.google.common.collect.Sets;
 import java.io.IOException;
 import java.util.List;
+import java.util.Map;
 import java.util.regex.Pattern;
 import javax.servlet.http.HttpServletRequest;
 import javax.ws.rs.client.Entity;
@@ -49,6 +51,7 @@ import org.glassfish.jersey.test.TestProperties;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
+import org.lance.namespace.errors.TableNotFoundException;
 import org.lance.namespace.model.AlterColumnsEntry;
 import org.lance.namespace.model.AlterTableAlterColumnsRequest;
 import org.lance.namespace.model.AlterTableAlterColumnsResponse;
@@ -158,6 +161,20 @@ public class TestLanceNamespaceOperations extends JerseyTest {
     Assertions.assertEquals(listNamespacesResp.getNamespaces(), respEntity.getNamespaces());
     Assertions.assertEquals(listNamespacesResp.getPageToken(), respEntity.getPageToken());
 
+    // list namespaces via root endpoint
+    resp =
+        target("/v1/namespace/list")
+            .queryParam("delimiter", delimiter)
+            .request(MediaType.APPLICATION_JSON_TYPE)
+            .get();
+
+    Mockito.verify(namespaceOps).listNamespaces(eq(""), eq(Pattern.quote(delimiter)), any(), any());
+    Assertions.assertEquals(Response.Status.OK.getStatusCode(), resp.getStatus());
+    Assertions.assertEquals(MediaType.APPLICATION_JSON_TYPE, resp.getMediaType());
+    respEntity = resp.readEntity(ListNamespacesResponse.class);
+    Assertions.assertEquals(listNamespacesResp.getNamespaces(), respEntity.getNamespaces());
+    Assertions.assertEquals(listNamespacesResp.getPageToken(), respEntity.getPageToken());
+
     // test throw exception
     when(namespaceOps.listNamespaces(any(), any(), any(), any()))
         .thenThrow(new RuntimeException("Test exception"));
@@ -177,6 +194,17 @@ public class TestLanceNamespaceOperations extends JerseyTest {
     Assertions.assertEquals("ns1.ns2", errorResp.getInstance());
     Assertions.assertNotNull(errorResp.getDetail());
     Assertions.assertTrue(errorResp.getDetail().contains("Test exception"));
+
+    // root endpoint should use explicit root identifier instead of delimiter in error instance
+    resp =
+        target("/v1/namespace/list")
+            .queryParam("delimiter", delimiter)
+            .request(MediaType.APPLICATION_JSON_TYPE)
+            .get();
+    Assertions.assertEquals(
+        Response.Status.INTERNAL_SERVER_ERROR.getStatusCode(), resp.getStatus());
+    errorResp = resp.readEntity(ErrorResponse.class);
+    Assertions.assertEquals("", errorResp.getInstance());
   }
 
   @Test
@@ -201,6 +229,20 @@ public class TestLanceNamespaceOperations extends JerseyTest {
     DescribeNamespaceResponse respEntity = resp.readEntity(DescribeNamespaceResponse.class);
     Assertions.assertEquals(describeNamespaceResp.getProperties(), respEntity.getProperties());
 
+    // describe namespace via root endpoint
+    resp =
+        target("/v1/namespace/describe")
+            .queryParam("delimiter", delimiter)
+            .request(MediaType.APPLICATION_JSON_TYPE)
+            .post(null);
+
+    Mockito.verify(namespaceOps).describeNamespace(eq(""), eq(Pattern.quote(delimiter)));
+    Assertions.assertEquals(Response.Status.OK.getStatusCode(), resp.getStatus());
+    Assertions.assertEquals(MediaType.APPLICATION_JSON_TYPE, resp.getMediaType());
+
+    respEntity = resp.readEntity(DescribeNamespaceResponse.class);
+    Assertions.assertEquals(describeNamespaceResp.getProperties(), respEntity.getProperties());
+
     // test throw exception
     when(namespaceOps.describeNamespace(any(), any()))
         .thenThrow(new RuntimeException("Test exception"));
@@ -217,6 +259,17 @@ public class TestLanceNamespaceOperations extends JerseyTest {
     ErrorResponse errorResp = resp.readEntity(ErrorResponse.class);
     Assertions.assertEquals(18, errorResp.getCode());
     Assertions.assertEquals("Test exception", errorResp.getError());
+
+    // root endpoint should use explicit root identifier instead of delimiter in error instance
+    resp =
+        target("/v1/namespace/describe")
+            .queryParam("delimiter", delimiter)
+            .request(MediaType.APPLICATION_JSON_TYPE)
+            .post(null);
+    Assertions.assertEquals(
+        Response.Status.INTERNAL_SERVER_ERROR.getStatusCode(), resp.getStatus());
+    errorResp = resp.readEntity(ErrorResponse.class);
+    Assertions.assertEquals("", errorResp.getInstance());
   }
 
   @Test
@@ -414,6 +467,65 @@ public class TestLanceNamespaceOperations extends JerseyTest {
     Assertions.assertEquals(createTableResponse.getLocation(), response.getLocation());
     Assertions.assertEquals(createTableResponse.getStorageOptions(), response.getStorageOptions());
 
+    Mockito.verify(tableOps)
+        .createEmptyTable(eq(tableIds), eq(delimiter), eq("/path/to/table"), eq(Map.of()));
+
+    // Backward compatibility: request-body properties should still be accepted.
+    Mockito.reset(tableOps);
+    when(tableOps.createEmptyTable(any(), any(), any(), any())).thenReturn(createTableResponse);
+    String bodyWithProperties =
+        "{"
+            + "\"id\":[\"catalog\",\"scheme\",\"create_empty_table\"],"
+            + "\"location\":\"/path/to/table\","
+            + "\"properties\":{\"k1\":\"v1\",\"k2\":2}"
+            + "}";
+    resp =
+        target(String.format("/v1/table/%s/create-empty", tableIds))
+            .queryParam("delimiter", delimiter)
+            .request(MediaType.APPLICATION_JSON_TYPE)
+            .post(Entity.entity(bodyWithProperties, MediaType.APPLICATION_JSON_TYPE));
+    Assertions.assertEquals(Response.Status.OK.getStatusCode(), resp.getStatus());
+    Mockito.verify(tableOps)
+        .createEmptyTable(
+            eq(tableIds),
+            eq(delimiter),
+            eq("/path/to/table"),
+            argThat(
+                (Map<String, String> props) ->
+                    "v1".equals(props.get("k1"))
+                        && "2".equals(props.get("k2"))
+                        && props.size() == 2));
+
+    // Header properties should override body properties on key conflicts.
+    Mockito.reset(tableOps);
+    when(tableOps.createEmptyTable(any(), any(), any(), any())).thenReturn(createTableResponse);
+    String bodyWithOverlappedProperties =
+        "{"
+            + "\"id\":[\"catalog\",\"scheme\",\"create_empty_table\"],"
+            + "\"location\":\"/path/to/table\","
+            + "\"properties\":{\"k1\":\"body\",\"k2\":\"body2\"}"
+            + "}";
+    resp =
+        target(String.format("/v1/table/%s/create-empty", tableIds))
+            .queryParam("delimiter", delimiter)
+            .request(MediaType.APPLICATION_JSON_TYPE)
+            .header(
+                LanceConstants.LANCE_TABLE_PROPERTIES_PREFIX_HEADER,
+                "{\"k1\":\"header\",\"k3\":\"v3\"}")
+            .post(Entity.entity(bodyWithOverlappedProperties, MediaType.APPLICATION_JSON_TYPE));
+    Assertions.assertEquals(Response.Status.OK.getStatusCode(), resp.getStatus());
+    Mockito.verify(tableOps)
+        .createEmptyTable(
+            eq(tableIds),
+            eq(delimiter),
+            eq("/path/to/table"),
+            argThat(
+                (Map<String, String> props) ->
+                    "header".equals(props.get("k1"))
+                        && "body2".equals(props.get("k2"))
+                        && "v3".equals(props.get("k3"))
+                        && props.size() == 3));
+
     Mockito.reset(tableOps);
     // Test illegal argument
     when(tableOps.createEmptyTable(any(), any(), any(), any()))
@@ -582,8 +694,7 @@ public class TestLanceNamespaceOperations extends JerseyTest {
     // Test not found exception
     Mockito.reset(tableOps);
     when(tableOps.deregisterTable(any(), any()))
-        .thenThrow(
-            new org.lance.namespace.errors.TableNotFoundException("Table not found", "", tableIds));
+        .thenThrow(new TableNotFoundException("Table not found", "", tableIds));
     resp =
         target(String.format("/v1/table/%s/deregister", tableIds))
             .queryParam("delimiter", delimiter)
@@ -635,8 +746,7 @@ public class TestLanceNamespaceOperations extends JerseyTest {
     // Test not found exception
     Mockito.reset(tableOps);
     when(tableOps.describeTable(any(), any(), any()))
-        .thenThrow(
-            new org.lance.namespace.errors.TableNotFoundException("Table not found", "", tableIds));
+        .thenThrow(new TableNotFoundException("Table not found", "", tableIds));
     resp =
         target(String.format("/v1/table/%s/describe", tableIds))
             .queryParam("delimiter", delimiter)
@@ -677,7 +787,7 @@ public class TestLanceNamespaceOperations extends JerseyTest {
     Assertions.assertEquals(Response.Status.OK.getStatusCode(), resp.getStatus());
 
     // test throw exception
-    doThrow(new org.lance.namespace.errors.TableNotFoundException("Table not found", "", tableIds))
+    doThrow(new TableNotFoundException("Table not found", "", tableIds))
         .when(tableOps)
         .tableExists(any(), any());
     resp =
@@ -730,7 +840,7 @@ public class TestLanceNamespaceOperations extends JerseyTest {
     Assertions.assertEquals(dropTableResponse.getLocation(), response.getLocation());
 
     // test throw exception
-    doThrow(new org.lance.namespace.errors.TableNotFoundException("Table not found", "", tableIds))
+    doThrow(new TableNotFoundException("Table not found", "", tableIds))
         .when(tableOps)
         .dropTable(any(), any());
     resp =
@@ -825,8 +935,7 @@ public class TestLanceNamespaceOperations extends JerseyTest {
     // Test No such table exception
     Mockito.reset(tableOps);
     when(tableOps.alterTable(any(), any(), any(AlterTableDropColumnsRequest.class)))
-        .thenThrow(
-            new org.lance.namespace.errors.TableNotFoundException("Table not found", "", tableIds));
+        .thenThrow(new TableNotFoundException("Table not found", "", tableIds));
     resp =
         target(String.format("/v1/table/%s/drop_columns", tableIds))
             .queryParam("delimiter", delimiter)
@@ -863,6 +972,39 @@ public class TestLanceNamespaceOperations extends JerseyTest {
     AlterTableAlterColumnsResponse response = resp.readEntity(AlterTableAlterColumnsResponse.class);
     Assertions.assertEquals(alterColumnsResponse.getVersion(), response.getVersion());
 
+    // Missing rename should return a clear validation message.
+    AlterTableAlterColumnsRequest missingRenameRequest = new AlterTableAlterColumnsRequest();
+    missingRenameRequest.setId(List.of("catalog", "scheme", "alter_table_alter_columns"));
+    AlterColumnsEntry missingRenameAlteration = new AlterColumnsEntry();
+    missingRenameAlteration.setPath("col1");
+    missingRenameAlteration.setRename("  ");
+    missingRenameRequest.setAlterations(List.of(missingRenameAlteration));
+    resp =
+        target(String.format("/v1/table/%s/alter_columns", tableIds))
+            .queryParam("delimiter", delimiter)
+            .request(MediaType.APPLICATION_JSON_TYPE)
+            .post(Entity.entity(missingRenameRequest, MediaType.APPLICATION_JSON_TYPE));
+    Assertions.assertEquals(Response.Status.BAD_REQUEST.getStatusCode(), resp.getStatus());
+    ErrorResponse errorResp = resp.readEntity(ErrorResponse.class);
+    Assertions.assertEquals("Rename field must be specified.", errorResp.getError());
+
+    // Non-rename alteration fields should still be rejected separately.
+    AlterTableAlterColumnsRequest withUnsupportedFieldRequest = new AlterTableAlterColumnsRequest();
+    withUnsupportedFieldRequest.setId(List.of("catalog", "scheme", "alter_table_alter_columns"));
+    AlterColumnsEntry withUnsupportedFieldAlteration = new AlterColumnsEntry();
+    withUnsupportedFieldAlteration.setPath("col1");
+    withUnsupportedFieldAlteration.setRename("col1_new");
+    withUnsupportedFieldAlteration.setNullable(Boolean.TRUE);
+    withUnsupportedFieldRequest.setAlterations(List.of(withUnsupportedFieldAlteration));
+    resp =
+        target(String.format("/v1/table/%s/alter_columns", tableIds))
+            .queryParam("delimiter", delimiter)
+            .request(MediaType.APPLICATION_JSON_TYPE)
+            .post(Entity.entity(withUnsupportedFieldRequest, MediaType.APPLICATION_JSON_TYPE));
+    Assertions.assertEquals(Response.Status.BAD_REQUEST.getStatusCode(), resp.getStatus());
+    errorResp = resp.readEntity(ErrorResponse.class);
+    Assertions.assertEquals("Only RENAME alteration is supported currently.", errorResp.getError());
+
     Mockito.reset(tableOps);
     when(tableOps.alterTable(any(), any(), any(AlterTableAlterColumnsRequest.class)))
         .thenThrow(new RuntimeException("Runtime exception"));
@@ -877,8 +1019,7 @@ public class TestLanceNamespaceOperations extends JerseyTest {
 
     Mockito.reset(tableOps);
     when(tableOps.alterTable(any(), any(), any(AlterTableAlterColumnsRequest.class)))
-        .thenThrow(
-            new org.lance.namespace.errors.TableNotFoundException("Table not found", "", tableIds));
+        .thenThrow(new TableNotFoundException("Table not found", "", tableIds));
     resp =
         target(String.format("/v1/table/%s/alter_columns", tableIds))
             .queryParam("delimiter", delimiter)

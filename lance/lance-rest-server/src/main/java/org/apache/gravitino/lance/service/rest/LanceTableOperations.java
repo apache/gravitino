@@ -54,7 +54,6 @@ import org.lance.namespace.model.AlterTableAlterColumnsRequest;
 import org.lance.namespace.model.AlterTableAlterColumnsResponse;
 import org.lance.namespace.model.AlterTableDropColumnsRequest;
 import org.lance.namespace.model.AlterTableDropColumnsResponse;
-import org.lance.namespace.model.CreateEmptyTableRequest;
 import org.lance.namespace.model.CreateEmptyTableResponse;
 import org.lance.namespace.model.CreateTableResponse;
 import org.lance.namespace.model.DeregisterTableRequest;
@@ -146,15 +145,22 @@ public class LanceTableOperations {
   public Response createEmptyTable(
       @PathParam("id") String tableId,
       @QueryParam("delimiter") @DefaultValue(NAMESPACE_DELIMITER_DEFAULT) String delimiter,
-      CreateEmptyTableRequest request,
+      Map<String, Object> requestBody,
       @Context HttpHeaders headers) {
     try {
-      validateCreateEmptyTableRequest(request);
-
-      String tableLocation = request.getLocation();
+      validateCreateEmptyTableRequest(requestBody);
+      String tableLocation =
+          Optional.ofNullable(requestBody)
+              .map(body -> body.get(LANCE_LOCATION))
+              .map(String::valueOf)
+              .orElse(null);
+      Map<String, String> props = extractPropertiesFromBody(requestBody);
       MultivaluedMap<String, String> headersMap = headers.getRequestHeaders();
       String tableProperties = headersMap.getFirst(LANCE_TABLE_PROPERTIES_PREFIX_HEADER);
-      Map<String, String> props = SerializationUtils.deserializeProperties(tableProperties);
+      Map<String, String> headerProps = SerializationUtils.deserializeProperties(tableProperties);
+      // Keep backward compatibility: accept body properties and let header override on key
+      // conflict.
+      props.putAll(headerProps);
 
       CreateEmptyTableResponse response =
           lanceNamespace.asTableOps().createEmptyTable(tableId, delimiter, tableLocation, props);
@@ -298,8 +304,24 @@ public class LanceTableOperations {
   }
 
   @SuppressWarnings({"unused", "deprecation"})
-  private void validateCreateEmptyTableRequest(CreateEmptyTableRequest request) {
+  private void validateCreateEmptyTableRequest(Map<String, Object> requestBody) {
     // No specific fields to validate for now
+  }
+
+  private static Map<String, String> extractPropertiesFromBody(Map<String, Object> requestBody) {
+    if (requestBody == null) {
+      return Maps.newHashMap();
+    }
+
+    Object propertiesObject = requestBody.get("properties");
+    if (!(propertiesObject instanceof Map<?, ?>)) {
+      return Maps.newHashMap();
+    }
+
+    Map<String, String> properties = Maps.newHashMap();
+    ((Map<?, ?>) propertiesObject)
+        .forEach((key, value) -> properties.put(String.valueOf(key), String.valueOf(value)));
+    return properties;
   }
 
   private void validateRegisterTableRequest(
@@ -345,8 +367,7 @@ public class LanceTableOperations {
       Preconditions.checkArgument(
           StringUtils.isNotBlank(alteration.getPath()), "Column path to alter cannot be empty.");
       Preconditions.checkArgument(
-          StringUtils.isNotBlank(alteration.getRename()),
-          "Only RENAME alteration is supported currently.");
+          StringUtils.isNotBlank(alteration.getRename()), "Rename field must be specified.");
       Preconditions.checkArgument(
           alteration.getDataType() == null
               && alteration.getNullable() == null

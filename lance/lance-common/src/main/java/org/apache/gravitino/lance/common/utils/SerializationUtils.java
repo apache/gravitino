@@ -19,6 +19,7 @@
  */
 package org.apache.gravitino.lance.common.utils;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.type.TypeReference;
 import java.util.HashMap;
 import java.util.Map;
@@ -46,7 +47,7 @@ public class SerializationUtils {
       Map<String, String> deserializedProperties = new HashMap<>();
       rawProperties.forEach((k, v) -> deserializedProperties.put(k, String.valueOf(v)));
       return deserializedProperties;
-    } catch (Exception e) {
+    } catch (JsonProcessingException e) {
       throw new IllegalArgumentException("Failed to deserialize table properties JSON", e);
     }
   }

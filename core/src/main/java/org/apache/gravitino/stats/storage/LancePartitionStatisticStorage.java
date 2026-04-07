@@ -67,8 +67,6 @@ import org.apache.gravitino.stats.PartitionStatisticsUpdate;
 import org.apache.gravitino.stats.StatisticValue;
 import org.apache.gravitino.utils.MetadataObjectUtil;
 import org.apache.gravitino.utils.PrincipalUtils;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import org.lance.Dataset;
 import org.lance.Fragment;
 import org.lance.FragmentMetadata;
@@ -78,6 +76,8 @@ import org.lance.WriteParams;
 import org.lance.ipc.LanceScanner;
 import org.lance.ipc.ScanOptions;
 import org.lance.operation.Append;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /** LancePartitionStatisticStorage is based on Lance format files. */
 public class LancePartitionStatisticStorage implements PartitionStatisticStorage {
