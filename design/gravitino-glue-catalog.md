@@ -17,7 +17,7 @@
   under the License.
 -->
 
-# Design: AWS Glue Data Catalog Support for Apache Gravitino (Alternative A — Unified Catalog)
+# Design: AWS Glue Data Catalog Support for Apache Gravitino
 
 ## 1. Problem Statement and Goals
 
@@ -567,7 +567,7 @@ When the Glue catalog belongs to a different AWS account, the `aws-glue-catalog-
 
 ## 8. Testing Strategy
 
-### 7.1 Unit Tests
+### 8.1 Unit Tests
 
 | Test Class | Location | Coverage |
 |---|---|---|
@@ -577,7 +577,7 @@ When the Glue catalog belongs to a different AWS account, the `aws-glue-catalog-
 | `TestGlueTableTypeDetection` | same | Hive, Iceberg, Delta, Parquet, view table type mapping |
 | `TestGlueTableMapping` | same | `StorageDescriptor` → `Column[]` conversion, property passthrough |
 
-### 7.2 Integration Tests (LocalStack)
+### 8.2 Integration Tests (LocalStack)
 
 LocalStack provides a local AWS Glue API endpoint, enabling integration tests without a real AWS account.
 
@@ -651,3 +651,17 @@ Test coverage:
 | 2.2 | Spark mixed-type routing | `GravitinoHiveCatalog.createSparkTable()` | Intercept on `table_type=ICEBERG`; delegate to lazily initialized Iceberg `SparkCatalog` |
 | 2.3 | View CRUD | `GlueCatalogOperations.java` | Full `ViewCatalog` interface implementation (pending Gravitino View API) |
 | 2.4 | STS AssumeRole | `GlueClientProvider.java` | `aws-role-arn` property for cross-account access via STS |
+
+### Phase 3: Extending Mixed-Format Support to Hive Catalog
+
+The mixed-format routing built for `catalog-glue` in Phase 2 is not Glue-specific. The same problem exists for `catalog-hive` when the underlying Hive Metastore contains both Hive-format and Iceberg tables in the same database — a common pattern when Iceberg tables are created directly by Spark or Trino on top of an existing HMS.
+
+Once the routing mechanism is proven in `catalog-glue`, the same approach can be applied to `catalog-hive`:
+
+| Component | Change |
+|---|---|
+| Trino connector | `HiveConnectorAdapter` maps `provider=hive` → Trino Lakehouse connector when `list-all-tables=true`, enabling mixed-format query execution without a separate Iceberg catalog |
+| Spark connector | `GravitinoHiveCatalog.createSparkTable()` intercept (already planned for Phase 2) applies equally to `catalog-hive` — no additional changes required once the Glue implementation is in place |
+| Server-side | `HiveCatalogOperations` can adopt `table-type-filter` semantics to expose Iceberg/Delta tables alongside Hive tables when `list-all-tables=true` |
+
+This phase depends on Phase 2 completion and can reuse its implementation directly, making the incremental cost low.
