@@ -157,7 +157,7 @@ public class TagManager implements TagDispatcher {
   }
 
   public Tag alterTag(String metalake, String name, TagChange... changes)
-      throws NoSuchTagException, IllegalArgumentException {
+      throws NoSuchTagException, IllegalArgumentException, TagAlreadyExistsException {
     checkMetalake(NameIdentifier.of(metalake), entityStore);
     return TreeLockUtils.doWithTreeLock(
         NameIdentifierUtil.ofTag(metalake, name),

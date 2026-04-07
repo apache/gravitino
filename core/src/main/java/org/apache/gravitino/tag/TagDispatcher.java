@@ -21,6 +21,7 @@ package org.apache.gravitino.tag;
 import java.util.Map;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.exceptions.NoSuchTagException;
+import org.apache.gravitino.exceptions.TagAlreadyExistsException;
 
 /**
  * {@code TagDispatcher} interface provides functionalities for managing tags within a metalake. It
@@ -72,8 +73,11 @@ public interface TagDispatcher {
    * @param name The name of the tag.
    * @param changes The changes to apply to the tag.
    * @return The updated tag.
+   * @throws IllegalArgumentException If the changes cannot be applied to the tag.
+   * @throws TagAlreadyExistsException If a tag with the new name already exists.
    */
-  Tag alterTag(String metalake, String name, TagChange... changes);
+  Tag alterTag(String metalake, String name, TagChange... changes)
+      throws IllegalArgumentException, TagAlreadyExistsException;
 
   /**
    * delete an existing tag in the specified metalake
