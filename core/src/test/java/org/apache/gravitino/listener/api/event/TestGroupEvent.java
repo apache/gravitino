@@ -25,6 +25,7 @@ import static org.mockito.Mockito.when;
 import com.google.common.collect.ImmutableList;
 import java.util.Collections;
 import java.util.List;
+import java.util.Map;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.authorization.AccessControlDispatcher;
 import org.apache.gravitino.authorization.Group;
@@ -393,7 +394,7 @@ public class TestGroupEvent {
     EventListenerPlugin throwingListener =
         new EventListenerPlugin() {
           @Override
-          public void init(java.util.Map<String, String> properties) {}
+          public void init(Map<String, String> properties) {}
 
           @Override
           public void start() {}
