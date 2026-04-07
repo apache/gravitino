@@ -129,6 +129,7 @@ If you are using multiple JDBC catalog backends, setting `jdbc-initialize` to tr
 #### REST backend configuration
 
 Use the REST backend to proxy another Iceberg REST catalog server (IRC2). The Gravitino Iceberg REST service acts as IRC1 and forwards catalog operations to IRC2.
+Assuming IRC2 will be the Gravitino server, too. for this scenario, the IRC would not perform authorization and would only act as a proxy. IRC2 will perform authorization
 
 | Configuration item                       | Description                                                                                                                   | Default value | Required | Since Version |
 |------------------------------------------|-------------------------------------------------------------------------------------------------------------------------------|---------------|----------|---------------|

@@ -214,6 +214,8 @@ public abstract class BaseMetadataAuthorizationMethodInterceptor implements Meth
     }
   }
 
+  // Assuming all REST catalog instances are Gravitino servers, for this scenario, the Gravitino
+  // server would not perform authorization and would only act as a proxy.
   private boolean skipAuthorizationForRestCatalog(
       Map<Entity.EntityType, NameIdentifier> nameIdentifierMap) {
     NameIdentifier catalogId = nameIdentifierMap.get(Entity.EntityType.CATALOG);
