@@ -46,10 +46,10 @@ Gravitino maintains three distinct caching layers for the authorization path:
 
 The Layer 2 caches exist solely to manage JCasbin's policy loading lifecycle:
 
-| Cache | Role |
-|-------|------|
-| `loadedRoles: Cache<Long, Boolean>` | Tracks which roles are already loaded into JCasbin — prevents repeated [C2]+[C3] queries on every auth request |
-| `ownerRel: Cache<Long, Optional<Long>>` | Caches owner lookups for OWNER-privilege checks — prevents [D1] on every ownership check |
+| Cache                                   | Role                                                                                                           |
+|-----------------------------------------|----------------------------------------------------------------------------------------------------------------|
+| `loadedRoles: Cache<Long, Boolean>`     | Tracks which roles are already loaded into JCasbin — prevents repeated [C2]+[C3] queries on every auth request |
+| `ownerRel: Cache<Long, Optional<Long>>` | Caches owner lookups for OWNER-privilege checks — prevents [D1] on every ownership check                       |
 
 Without `loadedRoles`, every auth request would re-execute N DB queries to reload all of a
 user's role policies into JCasbin. These two caches are the reason the auth path is fast on
@@ -108,11 +108,11 @@ With it, [C2]+[C3] only run on first load per role. **This is the most critical 
 
 **What these caches do NOT protect** (hit DB on every auth request without entity cache):
 
-| Call | Description | Protected by |
-|------|-------------|-------------|
-| [A] `getUserEntity()` | Fetch User entity → get integer userId | Entity cache only |
-| [B] `MetadataIdConverter.getID()` target | Resolve target resource name → integer ID | Entity cache only |
-| [C1] `listEntitiesByRelation(ROLE_USER_REL)` | Get user's role list | Entity cache only |
+| Call                                         | Description                               | Protected by      |
+|----------------------------------------------|-------------------------------------------|-------------------|
+| [A] `getUserEntity()`                        | Fetch User entity → get integer userId    | Entity cache only |
+| [B] `MetadataIdConverter.getID()` target     | Resolve target resource name → integer ID | Entity cache only |
+| [C1] `listEntitiesByRelation(ROLE_USER_REL)` | Get user's role list                      | Entity cache only |
 
 ---
 
@@ -121,14 +121,14 @@ With it, [C2]+[C3] only run on first load per role. **This is the most critical 
 Layer 2 sits **on top of** Layer 1. When Layer 1 is disabled (NoOpsCache), calls [A], [B],
 [C1] hit DB on every auth request.
 
-| Call | With entity cache | Without entity cache |
-|------|------------------|----------------------|
-| [A] `getUserEntity()` | Cache hit after first request | **DB query every auth request** |
-| [B] `MetadataIdConverter.getID()` target | Cache hit after first request | **DB query every auth request** |
-| [C1] `listEntitiesByRelation(ROLE_USER_REL)` | Cache hit after first request | **DB query every auth request** |
-| [C2] `entityStore.get(RoleEntity)` | Protected by `loadedRoles` | DB only on cold role load |
-| [C3] `MetadataIdConverter.getID()` per privilege | Protected by `loadedRoles` | DB only on cold role load |
-| [D1] `listEntitiesByRelation(OWNER_REL)` | Protected by `ownerRel` | DB only on first owner check |
+| Call                                             | With entity cache             | Without entity cache            |
+|--------------------------------------------------|-------------------------------|---------------------------------|
+| [A] `getUserEntity()`                            | Cache hit after first request | **DB query every auth request** |
+| [B] `MetadataIdConverter.getID()` target         | Cache hit after first request | **DB query every auth request** |
+| [C1] `listEntitiesByRelation(ROLE_USER_REL)`     | Cache hit after first request | **DB query every auth request** |
+| [C2] `entityStore.get(RoleEntity)`               | Protected by `loadedRoles`    | DB only on cold role load       |
+| [C3] `MetadataIdConverter.getID()` per privilege | Protected by `loadedRoles`    | DB only on cold role load       |
+| [D1] `listEntitiesByRelation(OWNER_REL)`         | Protected by `ownerRel`       | DB only on first owner check    |
 
 ---
 
@@ -181,14 +181,14 @@ JCasbin policy tuples use **integer entity IDs** throughout. Consequences:
 
 ### 1.7 Correctness Under Rename and Drop
 
-| Scenario | Analysis |
-|----------|----------|
-| **User / Group rename** | `userRoleCache` key = `metalakeName:userName`. New name → cache miss → Step 1 queries DB and returns correct result. Old key has no traffic and expires via TTL. **Safe.** |
-| **User / Group drop** | Step 1 returns zero rows → auth denied. Old cache entry expires harmlessly. **Safe.** |
-| **User / Group drop + same-name recreate** | New entity gets a new auto-increment `user_id`, `role_grants_version = 1`. Cached entry has old `user_id` and a different version → **version mismatch forces cache refresh.** ✅ |
-| **SecurableObject rename** | JCasbin stores integer `metadataId`. Rename does not change ID. Step 2 resolves new name to same ID via DB. `enforce()` matches existing policy. **No action needed.** ✅ |
-| **SecurableObject drop** | Step 2 returns "not found" → auth denied. Orphan JCasbin policies remain in memory but can never be matched. **Safe.** |
-| **SecurableObject drop + same-name recreate** | New object gets new `metadataId`. No JCasbin policy covers it → DENY until a new grant bumps `securable_objects_version` and triggers a policy reload. **Correct.** |
+| Scenario                                      | Analysis                                                                                                                                                                         |
+|-----------------------------------------------|----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| **User / Group rename**                       | `userRoleCache` key = `metalakeName:userName`. New name → cache miss → Step 1 queries DB and returns correct result. Old key has no traffic and expires via TTL. **Safe.**       |
+| **User / Group drop**                         | Step 1 returns zero rows → auth denied. Old cache entry expires harmlessly. **Safe.**                                                                                            |
+| **User / Group drop + same-name recreate**    | New entity gets a new auto-increment `user_id`, `role_grants_version = 1`. Cached entry has old `user_id` and a different version → **version mismatch forces cache refresh.** ✅ |
+| **SecurableObject rename**                    | JCasbin stores integer `metadataId`. Rename does not change ID. Step 2 resolves new name to same ID via DB. `enforce()` matches existing policy. **No action needed.** ✅         |
+| **SecurableObject drop**                      | Step 2 returns "not found" → auth denied. Orphan JCasbin policies remain in memory but can never be matched. **Safe.**                                                           |
+| **SecurableObject drop + same-name recreate** | New object gets new `metadataId`. No JCasbin policy covers it → DENY until a new grant bumps `securable_objects_version` and triggers a policy reload. **Correct.**              |
 
 ---
 
