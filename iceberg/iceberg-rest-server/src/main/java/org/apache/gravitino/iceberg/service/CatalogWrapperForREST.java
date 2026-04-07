@@ -80,6 +80,7 @@ import org.apache.iceberg.rest.PlanStatus;
 import org.apache.iceberg.rest.RESTCatalog;
 import org.apache.iceberg.rest.requests.CreateTableRequest;
 import org.apache.iceberg.rest.requests.PlanTableScanRequest;
+import org.apache.iceberg.rest.requests.UpdateTableRequest;
 import org.apache.iceberg.rest.responses.ImmutableLoadCredentialsResponse;
 import org.apache.iceberg.rest.responses.LoadCredentialsResponse;
 import org.apache.iceberg.rest.responses.LoadTableResponse;
@@ -97,15 +98,7 @@ public class CatalogWrapperForREST extends IcebergCatalogWrapper {
   private static final String DATA_ACCESS_VENDED_CREDENTIALS = "vended-credentials";
   private static final String DATA_ACCESS_REMOTE_SIGNING = "remote-signing";
 
-  @SuppressWarnings("deprecation")
-  private static Map<String, String> deprecatedProperties =
-      ImmutableMap.of(
-          CredentialConstants.CREDENTIAL_PROVIDER_TYPE,
-          CredentialConstants.CREDENTIAL_PROVIDERS,
-          "gcs-credential-file-path",
-          GCSProperties.GRAVITINO_GCS_SERVICE_ACCOUNT_FILE);
-
-  protected static final Set<String> catalogPropertiesToClientKeys =
+  private static final Set<String> catalogPropertiesToClientKeys =
       ImmutableSet.of(
           IcebergConstants.IO_IMPL,
           IcebergConstants.AWS_S3_REGION,
@@ -113,6 +106,14 @@ public class CatalogWrapperForREST extends IcebergCatalogWrapper {
           IcebergConstants.ICEBERG_OSS_ENDPOINT,
           IcebergConstants.ICEBERG_S3_PATH_STYLE_ACCESS,
           IcebergConstants.ICEBERG_ACCESS_DELEGATION);
+
+  @SuppressWarnings("deprecation")
+  private static Map<String, String> deprecatedProperties =
+      ImmutableMap.of(
+          CredentialConstants.CREDENTIAL_PROVIDER_TYPE,
+          CredentialConstants.CREDENTIAL_PROVIDERS,
+          "gcs-credential-file-path",
+          GCSProperties.GRAVITINO_GCS_SERVICE_ACCOUNT_FILE);
 
   public CatalogWrapperForREST(String catalogName, IcebergConfig config) {
     super(config);
@@ -153,6 +154,16 @@ public class CatalogWrapperForREST extends IcebergCatalogWrapper {
       return injectCredentialConfig(identifier, loadTableResponse, privilege);
     }
     return loadTableResponse;
+  }
+
+  @Override
+  public LoadTableResponse updateTable(
+      TableIdentifier tableIdentifier, UpdateTableRequest updateTableRequest) {
+    if (catalog instanceof RESTCatalog) {
+      return CatalogHandlers.updateTable(catalog, tableIdentifier, updateTableRequest);
+    } else {
+      return super.updateTable(tableIdentifier, updateTableRequest);
+    }
   }
 
   /**
@@ -653,10 +664,6 @@ public class CatalogWrapperForREST extends IcebergCatalogWrapper {
 
   private LoadTableResponse stageTableCreateInternal(
       Namespace namespace, CreateTableRequest request) {
-    if (!(catalog instanceof RESTCatalog)) {
-      return CatalogHandlers.stageTableCreate(catalog, namespace, request);
-    }
-
     request.validate();
 
     TableIdentifier ident = TableIdentifier.of(namespace, request.name());
