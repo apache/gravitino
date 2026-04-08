@@ -515,7 +515,6 @@ podSecurityContext: {}
 ##
 containerSecurityContext:
   runAsNonRoot: true
-  runAsUser: 1000
 
 ## Container Environment
 ##

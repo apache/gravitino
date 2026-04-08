@@ -22,7 +22,7 @@ LABEL maintainer="dev@gravitino.apache.org"
 RUN apt-get update && apt-get install -y \
     python-is-python3
 
-RUN groupadd -g 1000 gravitino && useradd -u 1000 -g gravitino -m gravitino
+RUN groupadd -r gravitino && useradd -r -g gravitino gravitino
 
 WORKDIR /opt/gravitino
 
