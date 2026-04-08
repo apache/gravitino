@@ -95,7 +95,8 @@ public class JwksTokenValidator implements OAuthTokenValidator {
       this.jwkSource = JWKSourceBuilder.create(new URL(jwksUri)).build();
     } catch (Exception e) {
       LOG.error("Failed to create JWKS source from URI: {}", jwksUri, e);
-      throw new IllegalArgumentException("Invalid JWKS URI or failed to create JWKS source: " + jwksUri, e);
+      throw new IllegalArgumentException(
+          "Invalid JWKS URI or failed to create JWKS source: " + jwksUri, e);
     }
   }
 
@@ -185,7 +186,6 @@ public class JwksTokenValidator implements OAuthTokenValidator {
       return "unknown";
     }
   }
-
 
   /** Extracts the principal from the validated JWT claims using configured field(s). */
   private String extractPrincipal(JWTClaimsSet validatedClaims) {
