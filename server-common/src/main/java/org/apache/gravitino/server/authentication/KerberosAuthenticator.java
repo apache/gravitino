@@ -22,6 +22,7 @@ import javax.security.auth.kerberos.KerberosPrincipal;
 import javax.security.auth.kerberos.KeyTab;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.Config;
+import org.apache.gravitino.UserPrincipal;
 import org.apache.gravitino.auth.AuthConstants;
 import org.apache.gravitino.auth.KerberosUtils;
 import org.apache.gravitino.auth.PrincipalMapper;
@@ -126,12 +127,20 @@ public class KerberosAuthenticator implements Authenticator {
         throw new IllegalArgumentException("Principal must start with `HTTP/`");
       }
 
+      final String authHeaderValue = authData;
       return Subject.doAs(
           serverSubject,
           new PrivilegedExceptionAction<Principal>() {
             @Override
             public Principal run() throws Exception {
-              return retrievePrincipalFromToken(serverPrincipal, clientToken);
+              Principal principal = retrievePrincipalFromToken(serverPrincipal, clientToken);
+              // Keep the raw Authorization header value so downstream services can reuse it.
+              if (principal instanceof UserPrincipal) {
+                UserPrincipal userPrincipal = (UserPrincipal) principal;
+                return new UserPrincipal(
+                    userPrincipal.getName(), userPrincipal.getGroups(), authHeaderValue);
+              }
+              return new UserPrincipal(principal.getName(), authHeaderValue);
             }
           });
     } catch (Exception e) {

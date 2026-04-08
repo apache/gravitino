@@ -19,6 +19,8 @@
 
 package org.apache.gravitino.server.authentication;
 
+import static org.apache.gravitino.utils.PrincipalUtils.ANONYMOUS_PRINCIPAL;
+
 import java.nio.charset.StandardCharsets;
 import java.security.Principal;
 import java.util.Base64;
@@ -32,8 +34,6 @@ import org.apache.gravitino.auth.AuthConstants;
  * the identifier provided by the user without any validation.
  */
 class SimpleAuthenticator implements Authenticator {
-
-  private final Principal ANONYMOUS_PRINCIPAL = new UserPrincipal(AuthConstants.ANONYMOUS_USER);
 
   @Override
   public boolean isDataFromToken() {
@@ -62,7 +62,8 @@ class SimpleAuthenticator implements Authenticator {
       if (userInformation.length < 1 || userInformation[0].isEmpty()) {
         return ANONYMOUS_PRINCIPAL;
       }
-      return new UserPrincipal(userInformation[0]);
+      // Keep the raw Authorization header value so downstream services can reuse it.
+      return new UserPrincipal(userInformation[0], authData);
     } catch (IllegalArgumentException ie) {
       return ANONYMOUS_PRINCIPAL;
     }

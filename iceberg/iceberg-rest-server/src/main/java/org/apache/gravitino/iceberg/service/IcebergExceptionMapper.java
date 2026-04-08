@@ -20,6 +20,7 @@ package org.apache.gravitino.iceberg.service;
 
 import com.google.common.collect.ImmutableMap;
 import java.util.Map;
+import javax.ws.rs.NotFoundException;
 import javax.ws.rs.core.Response;
 import javax.ws.rs.core.Response.Status;
 import javax.ws.rs.ext.ExceptionMapper;
@@ -62,6 +63,7 @@ public class IcebergExceptionMapper implements ExceptionMapper<Exception> {
           .put(UnauthorizedException.class, 401)
           .put(org.apache.gravitino.exceptions.ForbiddenException.class, 403)
           .put(ForbiddenException.class, 403)
+          .put(NotFoundException.class, 404)
           .put(NoSuchNamespaceException.class, 404)
           .put(NoSuchTableException.class, 404)
           .put(NoSuchIcebergTableException.class, 404)

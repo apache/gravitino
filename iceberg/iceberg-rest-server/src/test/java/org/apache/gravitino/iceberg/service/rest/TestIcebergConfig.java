@@ -103,9 +103,7 @@ public class TestIcebergConfig extends IcebergTestBase {
     // Per the Iceberg REST spec, the config endpoint does not accept a prefix.
     String path = injectPrefixToPath(IcebergRestTestUtil.CONFIG_PATH, IcebergRestTestUtil.PREFIX);
     Response response = getIcebergClientBuilder(path, Optional.empty()).get();
-    // Jersey returns 500 (not 404) for unmatched routes because the
-    // IcebergExceptionMapper converts the NotFoundException into an internal error response.
-    Assertions.assertEquals(500, response.getStatus());
+    Assertions.assertEquals(404, response.getStatus());
   }
 
   @Test
