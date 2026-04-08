@@ -19,11 +19,46 @@
 package org.apache.gravitino.catalog.glue;
 
 import org.apache.gravitino.connector.capability.Capability;
+import org.apache.gravitino.connector.capability.CapabilityResult;
 
 /**
  * Capability declarations for the AWS Glue Data Catalog connector.
  *
- * <p>TODO PR-02: declare actual capabilities (case sensitivity, NOT NULL support, etc.) based on
- * Glue's known constraints.
+ * <p>AWS Glue constraints that deviate from Gravitino defaults:
+ *
+ * <ul>
+ *   <li>Names (database, table, column) are case-insensitive — Glue normalises them to lowercase.
+ *   <li>Column NOT NULL constraints are not enforced by Glue.
+ *   <li>Column DEFAULT values are not supported by Glue.
+ * </ul>
  */
-public class GlueCatalogCapability implements Capability {}
+public class GlueCatalogCapability implements Capability {
+
+  @Override
+  public CapabilityResult columnNotNull() {
+    return CapabilityResult.unsupported(
+        "AWS Glue Data Catalog does not enforce NOT NULL constraints on columns.");
+  }
+
+  @Override
+  public CapabilityResult columnDefaultValue() {
+    return CapabilityResult.unsupported(
+        "AWS Glue Data Catalog does not support DEFAULT values on columns.");
+  }
+
+  @Override
+  public CapabilityResult caseSensitiveOnName(Scope scope) {
+    switch (scope) {
+      case SCHEMA:
+      case TABLE:
+      case COLUMN:
+        // Glue normalises database/table/column names to lowercase.
+        return CapabilityResult.unsupported(
+            "AWS Glue Data Catalog is case-insensitive for "
+                + scope.name().toLowerCase()
+                + " names.");
+      default:
+        return CapabilityResult.SUPPORTED;
+    }
+  }
+}
