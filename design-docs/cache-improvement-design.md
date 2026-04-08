@@ -58,6 +58,56 @@ the warm path. Layer 1 (entity cache) additionally accelerates the name→ID res
 
 ---
 
+#### 1.2.1 Problems with the Current Entity Cache
+
+**The entity cache (Layer 1) has accumulated significant complexity and is not well-suited to
+serve as a general-purpose or auth-dedicated caching layer.**
+
+##### Mixed responsibilities make it hard to maintain
+
+`CaffeineEntityCache` uses a single `Cache<EntityCacheRelationKey, List<Entity>>` to store
+three semantically different kinds of data:
+
+| Stored data             | Key form                                         | Example relation types                                    |
+|-------------------------|--------------------------------------------------|-----------------------------------------------------------|
+| Direct entity           | `(nameIdentifier, entityType, null)`             | any entity: catalog, schema, table, user, role, ...       |
+| Relation result set     | `(nameIdentifier, entityType, relType)`          | `ROLE_USER_REL`, `TAG_METADATA_OBJECT_REL`, ...           |
+| Reverse index entries   | `ReverseIndexCache` (separate radix tree)        | entity → list of cache keys that reference it             |
+
+On top of this, a `cacheIndex` (radix tree) keeps a prefix-indexed view of all keys to
+support cascading invalidation. The resulting invalidation logic (`invalidateEntities`) is a
+BFS traversal that walks both the forward index and the reverse index, making it difficult to
+reason about correctness and hard to extend safely.
+
+The five relation types currently tracked (`METADATA_OBJECT_ROLE_REL`, `ROLE_USER_REL`,
+`ROLE_GROUP_REL`, `POLICY_METADATA_OBJECT_REL`, `TAG_METADATA_OBJECT_REL`) are all
+auth-related, which reflects the original design intent: **the entity cache was built
+primarily to serve the auth path.** Over time it accumulated relation types and reverse-index
+logic without a clear ownership model, making it harder to maintain and evolve.
+
+##### Limited benefit for non-auth interfaces
+
+For general metadata API calls (list catalogs, list schemas, list tables), the entity cache
+provides minimal benefit:
+
+| Operation                          | Goes through cache? | Notes                                             |
+|------------------------------------|---------------------|---------------------------------------------------|
+| `list(namespace, type)`            | **No**              | Bypasses cache entirely; always hits DB           |
+| `get(ident, type)` (single entity) | Yes                 | Cache helps on repeated reads of the same entity  |
+| `update(ident, type)`              | Invalidate only     | Invalidates entry, write always goes to DB        |
+| `listEntitiesByRelation(...)`      | Yes                 | Only for the five auth-centric relation types     |
+
+In practice, the most common metadata browsing operations (`LIST` endpoints) are not cached
+at the entity store level. The cache's real workload is the auth path, where the same user
+entity, role assignments, and resource IDs are resolved on every single authorization check.
+
+**Conclusion:** The entity cache is a de-facto auth cache dressed up as a general-purpose
+cache. Its complexity is unjustified for the non-auth use case, and its TTL-based consistency
+model is insufficient for the auth use case (see §1.8). A purpose-built auth cache layer —
+separate from the entity store — is the cleaner path forward.
+
+---
+
 ### 1.3 JCasbin Authorization — Deep Dive
 
 #### 1.3.1 Call Graph for a Single `authorize()` Check
@@ -149,13 +199,13 @@ immediately, not after TTL expiry.
 
 **[A] — userId — is handled for free by the [C1] cache.**
 
-The user version check query (§4.1.3 Step 1) already returns `user_id`. After the first
-auth request, userId is cached as part of `CachedUserRoles`. No separate userId cache needed.
+The user lookup query (discussed in §4.1.3) is designed to return `user_id` alongside the
+role list in a single query. No separate userId cache is needed.
 
-**metalakeName → metalakeId — handled by a JOIN in the Step 1 query.**
+**metalakeName → metalakeId — handled by an inline JOIN.**
 
-`metalake_meta` is tiny (few rows per deployment); an inline JOIN resolves it without a
-separate lookup or cache.
+`metalake_meta` is tiny (few rows per deployment); an inline JOIN in the user lookup query
+(§4.1.3) resolves it without a separate lookup or cache.
 
 ---
 
@@ -179,22 +229,10 @@ JCasbin policy tuples use **integer entity IDs** throughout. Consequences:
 
 ---
 
-### 1.7 Correctness Under Rename and Drop
+### 1.7 Auth N+1 Problem
 
-| Scenario                                      | Analysis                                                                                                                                                                         |
-|-----------------------------------------------|----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| **User / Group rename**                       | `userRoleCache` key = `metalakeName:userName`. New name → cache miss → Step 1 queries DB and returns correct result. Old key has no traffic and expires via TTL. **Safe.**       |
-| **User / Group drop**                         | Step 1 returns zero rows → auth denied. Old cache entry expires harmlessly. **Safe.**                                                                                            |
-| **User / Group drop + same-name recreate**    | New entity gets a new auto-increment `user_id`, `role_grants_version = 1`. Cached entry has old `user_id` and a different version → **version mismatch forces cache refresh.** ✅ |
-| **SecurableObject rename**                    | JCasbin stores integer `metadataId`. Rename does not change ID. Step 2 resolves new name to same ID via DB. `enforce()` matches existing policy. **No action needed.** ✅         |
-| **SecurableObject drop**                      | Step 2 returns "not found" → auth denied. Orphan JCasbin policies remain in memory but can never be matched. **Safe.**                                                           |
-| **SecurableObject drop + same-name recreate** | New object gets new `metadataId`. No JCasbin policy covers it → DENY until a new grant bumps `securable_objects_version` and triggers a policy reload. **Correct.**              |
-
----
-
-### 1.8 Auth N+1 Problem
-
-`loadRolePrivilege()` executes [C2] per role not in `loadedRoles`. Before the batch fix:
+`loadRolePrivilege()` executes [C2] per role not in `loadedRoles`. Before the batch fix
+(Phase 1 §5, step 1.1):
 
 ```
 [C1]: 1 query (list roles for user)
@@ -202,11 +240,12 @@ JCasbin policy tuples use **integer entity IDs** throughout. Consequences:
 [C3]: 2 queries per role (securable objects)       ← 2N queries
 ```
 
-After `batchListSecurableObjectsByRoleIds()`: `3 + T` total on cold cache.
+After introducing `batchListSecurableObjectsByRoleIds()` (Phase 1): `3 + T` total on cold
+cache, where T is the number of distinct securable-object types across all roles.
 
 ---
 
-### 1.9 HA Consistency Gap
+### 1.8 HA Consistency Gap
 
 ```
 Node A: REVOKE privilege P from role R  →  DB updated; Node A loadedRoles evicted ✅
@@ -444,6 +483,17 @@ authorize(metalakeName, username, resource, operation)
 | Background threads       | **None**                                                                 |
 | Failure mode             | DB unavailable → auth blocked (same as today)                            |
 | HA correctness           | **Fixed** — every node checks DB version on every request                |
+
+#### 4.1.5 Correctness Under Rename and Drop
+
+| Scenario                                      | Analysis                                                                                                                                                                                                                        |
+|-----------------------------------------------|---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| **User / Group rename**                       | `userRoleCache` is keyed on `metalakeName:userName`. A rename produces a cache miss → Step 1 queries DB and returns the correct result. The old key has no traffic and expires via TTL. **Safe.**                               |
+| **User / Group drop**                         | Step 1 returns zero rows → auth denied. The old cache entry expires harmlessly. **Safe.**                                                                                                                                       |
+| **User / Group drop + same-name recreate**    | The new entity gets a new auto-increment `user_id` and `role_grants_version = 1`. The cached entry holds the old `user_id` and an older version → **version mismatch on the next Step 1 forces a cache refresh.** ✅            |
+| **SecurableObject rename**                    | JCasbin stores integer `metadataId`. Rename does not change the ID. Step 2 resolves the new name to the same ID via DB. `enforce()` matches the existing policy. **No action needed.** ✅                                       |
+| **SecurableObject drop**                      | Step 2 returns "not found" → auth denied. Orphan JCasbin policies remain in memory but can never be matched (no ID resolves to the dropped object). **Safe.**                                                                   |
+| **SecurableObject drop + same-name recreate** | The new object gets a new `metadataId`. No JCasbin policy covers it → DENY until a new privilege grant bumps `securable_objects_version` in the same transaction and Step 3 detects the version change to reload policies. **Correct.** |
 
 ---
 
