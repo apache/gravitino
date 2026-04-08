@@ -26,6 +26,7 @@ import java.io.IOException;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import org.apache.commons.io.FileUtils;
+import org.apache.gravitino.Configs;
 import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.auxiliary.AuxiliaryServiceManager;
 import org.apache.gravitino.rest.RESTUtils;
@@ -97,6 +98,25 @@ public class TestGravitinoServer {
     gravitinoServer.initialize();
     gravitinoServer.start();
     gravitinoServer.stop();
+  }
+
+  @Test
+  public void testStartAndStopWithWebUiDisabled() throws Exception {
+    ServerConfig config = new ServerConfig();
+    config.loadFromMap(
+        ImmutableMap.of(
+            GravitinoServer.WEBSERVER_CONF_PREFIX + JettyServerConfig.WEBSERVER_HTTP_PORT.getKey(),
+            String.valueOf(RESTUtils.findAvailablePort(5000, 6000)),
+            Configs.SERVER_UI_ENABLED.getKey(),
+            "false",
+            AuxiliaryServiceManager.GRAVITINO_AUX_SERVICE_PREFIX
+                + AuxiliaryServiceManager.AUX_SERVICE_NAMES,
+            ""),
+        t -> true);
+    GravitinoServer localServer = new GravitinoServer(config, GravitinoEnv.getInstance());
+    localServer.initialize();
+    localServer.start();
+    localServer.stop();
   }
 
   @Test

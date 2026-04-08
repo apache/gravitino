@@ -66,6 +66,8 @@ if (scalaVersion !in listOf("2.12", "2.13")) {
   throw GradleException("Scala version $scalaVersion is not supported.")
 }
 
+val skipWebWar: Boolean = (project.findProperty("skipWebWar") as? String)?.toBoolean() ?: false
+
 project.extra["extraJvmArgs"] =
   listOf(
     "-XX:+IgnoreUnrecognizedVMOptions",
@@ -775,19 +777,23 @@ tasks {
   val outputDir = projectDir.dir("distribution")
 
   val compileDistribution by registering {
-    dependsOn(
-      "copyCatalogLibAndConfigs",
-      "copySubprojectDependencies",
-      "copySubprojectLib",
-      "copyCliLib",
-      "copyJobsLib",
-      ":authorizations:copyLibAndConfig",
-      ":iceberg:iceberg-rest-server:copyLibAndConfigs",
-      ":lance:lance-rest-server:copyLibAndConfigs",
-      ":maintenance:optimizer:copyLibAndConfigs",
-      ":web:web:build",
-      ":web-v2:web:build"
-    )
+    val dependencies =
+      mutableListOf(
+        "copyCatalogLibAndConfigs",
+        "copySubprojectDependencies",
+        "copySubprojectLib",
+        "copyCliLib",
+        "copyJobsLib",
+        ":authorizations:copyLibAndConfig",
+        ":iceberg:iceberg-rest-server:copyLibAndConfigs",
+        ":lance:lance-rest-server:copyLibAndConfigs",
+        ":maintenance:optimizer:copyLibAndConfigs"
+      )
+    if (!skipWebWar) {
+      dependencies.add(":web:web:build")
+      dependencies.add(":web-v2:web:build")
+    }
+    dependsOn(dependencies)
 
     group = "gravitino distribution"
     outputs.dir(projectDir.dir("distribution/package"))
@@ -795,8 +801,10 @@ tasks {
       copy {
         from(projectDir.dir("conf")) { into("package/conf") }
         from(projectDir.dir("bin")) { into("package/bin") }
-        from(projectDir.dir("web/web/build/libs/${rootProject.name}-web-$version.war")) { into("package/web") }
-        from(projectDir.dir("web-v2/web/build/libs/${rootProject.name}-web-$version.war")) { into("package/web-v2") }
+        if (!skipWebWar) {
+          from(projectDir.dir("web/web/build/libs/${rootProject.name}-web-$version.war")) { into("package/web") }
+          from(projectDir.dir("web-v2/web/build/libs/${rootProject.name}-web-$version.war")) { into("package/web-v2") }
+        }
         from(projectDir.dir("scripts")) { into("package/scripts") }
         into(outputDir)
         rename { fileName ->
@@ -810,6 +818,19 @@ tasks {
           }
         }
         fileMode = 0b111101101
+      }
+      if (skipWebWar) {
+        val confFile = projectDir.file("distribution/package/conf/gravitino.conf").asFile
+        if (confFile.exists()) {
+          confFile.writeText(
+            confFile
+              .readText()
+              .replace(
+                "gravitino.server.webui.enable = true",
+                "gravitino.server.webui.enable = false"
+              )
+          )
+        }
       }
       copy {
         from(projectDir.dir("licenses")) { into("package/licenses") }

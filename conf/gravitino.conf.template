@@ -39,6 +39,8 @@ gravitino.server.webserver.threadPoolWorkQueueSize = 100
 gravitino.server.webserver.requestHeaderSize = 131072
 # The response header size of the built-in web server
 gravitino.server.webserver.responseHeaderSize = 131072
+# Whether to enable Gravitino Web UI
+gravitino.server.webui.enable = true
 
 # THE CONFIGURATION FOR Gravitino ENTITY STORE
 # The entity store to use, we only supports relational

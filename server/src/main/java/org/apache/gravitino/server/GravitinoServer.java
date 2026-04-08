@@ -56,7 +56,6 @@ import org.apache.gravitino.server.web.filter.GravitinoInterceptionService;
 import org.apache.gravitino.server.web.mapper.JsonMappingExceptionMapper;
 import org.apache.gravitino.server.web.mapper.JsonParseExceptionMapper;
 import org.apache.gravitino.server.web.mapper.JsonProcessingExceptionMapper;
-import org.apache.gravitino.server.web.ui.WebUIFilter;
 import org.apache.gravitino.stats.StatisticDispatcher;
 import org.apache.gravitino.tag.TagDispatcher;
 import org.glassfish.hk2.api.InterceptionService;
@@ -100,7 +99,8 @@ public class GravitinoServer extends ResourceConfig {
 
     JettyServerConfig jettyServerConfig =
         JettyServerConfig.fromConfig(serverConfig, WEBSERVER_CONF_PREFIX);
-    server.initialize(jettyServerConfig, SERVER_NAME, true /* shouldEnableUI */);
+    boolean enableWebUI = serverConfig.get(Configs.SERVER_UI_ENABLED);
+    server.initialize(jettyServerConfig, SERVER_NAME, enableWebUI);
 
     ServerAuthenticator.getInstance().initialize(serverConfig);
 
@@ -175,9 +175,6 @@ public class GravitinoServer extends ResourceConfig {
     server.addCustomFilters(API_ANY_PATH);
     server.addFilter(new VersioningFilter(), API_ANY_PATH);
     server.addSystemFilters(API_ANY_PATH);
-
-    server.addFilter(new WebUIFilter(), "/"); // Redirect to the /ui/index html page.
-    server.addFilter(new WebUIFilter(), "/ui/*"); // Redirect to the static html file.
   }
 
   public void start() throws Exception {

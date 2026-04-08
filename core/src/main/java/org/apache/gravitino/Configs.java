@@ -357,6 +357,13 @@ public class Configs {
           .toSequence()
           .createWithDefault(Collections.emptyList());
 
+  public static final ConfigEntry<Boolean> SERVER_UI_ENABLED =
+      new ConfigBuilder("gravitino.server.webui.enable")
+          .doc("Whether to enable the web UI.")
+          .version(ConfigConstants.VERSION_1_2_0)
+          .booleanConf()
+          .createWithDefault(true);
+
   public static final String AUDIT_LOG_WRITER_CONFIG_PREFIX = "gravitino.audit.writer.";
 
   public static final ConfigEntry<Boolean> AUDIT_LOG_ENABLED_CONF =
