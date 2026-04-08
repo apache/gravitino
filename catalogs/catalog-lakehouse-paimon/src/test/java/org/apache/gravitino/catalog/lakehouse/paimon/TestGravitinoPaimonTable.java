@@ -383,7 +383,8 @@ public class TestGravitinoPaimonTable {
     Map<String, String> options = Maps.newHashMap();
     options.put(PaimonTablePropertiesMetadata.BUCKET_KEY, "col_1");
 
-    Distribution distribution = GravitinoPaimonTable.getDistribution(options);
+    Distribution distribution =
+        GravitinoPaimonTable.getDistribution(options, Collections.emptyList());
     Assertions.assertEquals(HASH, distribution.strategy());
     Assertions.assertEquals(Distributions.AUTO, distribution.number());
     Assertions.assertEquals(
@@ -396,7 +397,8 @@ public class TestGravitinoPaimonTable {
     options.put(PaimonTablePropertiesMetadata.BUCKET_KEY, "col_1,col_2");
     options.put(PaimonTablePropertiesMetadata.BUCKET_NUM, "4");
 
-    Distribution distribution = GravitinoPaimonTable.getDistribution(options);
+    Distribution distribution =
+        GravitinoPaimonTable.getDistribution(options, Collections.emptyList());
     Assertions.assertEquals(HASH, distribution.strategy());
     Assertions.assertEquals(4, distribution.number());
     Assertions.assertEquals(2, distribution.expressions().length);
@@ -414,7 +416,8 @@ public class TestGravitinoPaimonTable {
 
     IllegalArgumentException exception =
         Assertions.assertThrows(
-            IllegalArgumentException.class, () -> GravitinoPaimonTable.getDistribution(options));
+            IllegalArgumentException.class,
+            () -> GravitinoPaimonTable.getDistribution(options, Collections.emptyList()));
     Assertions.assertTrue(
         exception.getMessage().contains("Paimon bucket number must be a valid integer"));
   }
