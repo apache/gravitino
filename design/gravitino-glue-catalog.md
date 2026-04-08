@@ -249,7 +249,7 @@ Unlike `HiveCatalogOperations` (which filters out Iceberg/Paimon/Hudi tables), `
 @Override
 public NameIdentifier[] listTables(Namespace namespace) throws NoSuchSchemaException {
   String databaseName = namespace.level(namespace.length() - 1);
-  // Paginate through all tables — no type filter
+  // Paginate through all tables; table-type-filter is applied after listing (omitted here for brevity)
   List<Table> glueTables = new ArrayList<>();
   String nextToken = null;
   do {
@@ -486,7 +486,7 @@ When initializing the backing `SparkCatalog`, `GravitinoHiveCatalog` maps the Gr
 
 ### 6.3 Flink
 
-In Gravitino's Flink connector, Hive-format and Iceberg tables require different processing paths. The chosen approach mirrors the Spark design: `GravitinoGlueCatalog` (a new subclass of `GravitinoHiveCatalog`) holds an internal lazily-initialized Iceberg `FlinkCatalog` instance (backed by Iceberg's `GlueCatalog`, using the same AWS credentials and catalog ID). When `getTable()` detects `table_type=ICEBERG` in the Gravitino table properties, it delegates to this internal catalog to produce a properly typed `CatalogTable` with full schema and Iceberg execution semantics. Hive-format tables continue through the existing Kyuubi-backed path unchanged:
+In Gravitino's Flink connector, Hive-format and Iceberg tables require different processing paths. The chosen approach mirrors the Spark design: `GravitinoGlueCatalog` (a new subclass of `GravitinoHiveCatalog`) holds an internal lazily-initialized Iceberg `FlinkCatalog` instance (backed by Iceberg's `GlueCatalog`, using the same AWS credentials and catalog ID). When `getTable()` detects `table_type=ICEBERG` in the Gravitino table properties, it delegates to this internal catalog to produce a properly typed `CatalogTable` with full schema and Iceberg execution semantics. Hive-format tables continue through the existing Flink `HiveCatalog` path unchanged:
 
 ```
 GravitinoGlueCatalog.getTable(objectPath)
@@ -548,7 +548,7 @@ Roles, users, and groups are managed through Gravitino's standard access control
 
 ### 7.3 AWS IAM Minimum Permissions
 
-**Key point**: the `aws-access-key-id` configured in `catalog-glue` serves a dual role — Gravitino uses it to call the Glue API for metadata operations, and the same credential is passed through to Trino and Spark (via the property mappings in Sections 6.1 and 6.2) for both Glue metadata access and S3 data read/write. A single IAM policy must therefore cover both planes.
+**Key point**: the `aws-access-key-id` configured in `catalog-glue` serves a dual role — Gravitino uses it to call the Glue API for metadata operations, and the same credential is passed through to Trino, Spark, and Flink (via the property mappings in Sections 6.1, 6.2, and 6.3) for both Glue metadata access and S3 data read/write. A single IAM policy must therefore cover both planes.
 
 **Note**: Static credentials have security limitations (transfer on wire, shared privileges between Gravitino and query engines). Future enhancement: credential vending (https://github.com/apache/gravitino/issues/10415) will provide dynamic, scoped credentials for better security isolation.
 
@@ -641,7 +641,7 @@ Test coverage:
 - Metadata passthrough: Verify `table_type` and `metadata_location` survive `loadTable()`
 - Property validation: Missing `aws-region` or `aws-glue-catalog-id` → informative error
 
-### 7.3 Build Verification
+### 8.3 Build Verification
 
 ```bash
 # Compile
@@ -682,8 +682,8 @@ Test coverage:
 | 2.1 | Trino Lakehouse adapter | `GlueConnectorAdapter.java` in `trino-connector/` | Maps `provider=glue` → `connector.name=lakehouse` + `hive.metastore=glue`; requires Trino ≥ 477 |
 | 2.2 | Spark mixed-type routing | `GravitinoHiveCatalog.createSparkTable()` | Intercept on `table_type=ICEBERG`; delegate to lazily initialized Iceberg `SparkCatalog` |
 | 2.3 | Flink mixed-type routing | `GravitinoGlueCatalog.java` in `flink-connector/` | New subclass of `GravitinoHiveCatalog`; `getTable()` delegates to lazily initialized Iceberg `FlinkCatalog` (GlueCatalog backend) for Iceberg tables |
-| 2.6 | View CRUD | `GlueCatalogOperations.java` | Full `ViewCatalog` interface implementation (pending Gravitino View API) |
-| 2.7 | STS AssumeRole | `GlueClientProvider.java` | `aws-role-arn` property for cross-account access via STS |
+| 2.4 | View CRUD | `GlueCatalogOperations.java` | Full `ViewCatalog` interface implementation (pending Gravitino View API) |
+| 2.5 | STS AssumeRole | `GlueClientProvider.java` | `aws-role-arn` property for cross-account access via STS |
 
 ### Phase 3: Extending Mixed-Format Support to Hive Catalog
 
@@ -693,8 +693,8 @@ Once the routing mechanism is proven in `catalog-glue`, the same approach can be
 
 | Component | Change |
 |---|---|
-| Trino connector | `HiveConnectorAdapter` maps `provider=hive` → Trino Lakehouse connector when `list-all-tables=true`, enabling mixed-format query execution without a separate Iceberg catalog |
+| Trino connector | `HiveConnectorAdapter` maps `provider=hive` → Trino Lakehouse connector when `table-type-filter=all`, enabling mixed-format query execution without a separate Iceberg catalog |
 | Spark connector | `GravitinoHiveCatalog.createSparkTable()` intercept (already planned for Phase 2) applies equally to `catalog-hive` — no additional changes required once the Glue implementation is in place |
-| Server-side | `HiveCatalogOperations` can adopt `table-type-filter` semantics to expose Iceberg/Delta tables alongside Hive tables when `list-all-tables=true` |
+| Server-side | `HiveCatalogOperations` can adopt `table-type-filter` semantics to expose Iceberg/Delta tables alongside Hive tables when `table-type-filter=all` |
 
 This phase depends on Phase 2 completion and can reuse its implementation directly, making the incremental cost low.
