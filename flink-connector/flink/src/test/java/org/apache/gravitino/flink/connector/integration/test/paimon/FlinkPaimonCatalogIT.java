@@ -19,9 +19,17 @@
 package org.apache.gravitino.flink.connector.integration.test.paimon;
 
 import com.google.common.base.Preconditions;
+import com.google.common.collect.Lists;
+import java.util.List;
 import java.util.Map;
+import org.apache.flink.table.api.TableResult;
+import org.apache.flink.types.Row;
 import org.apache.gravitino.Catalog;
+import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.flink.connector.integration.test.FlinkCommonIT;
+import org.apache.gravitino.rel.Table;
+import org.apache.gravitino.rel.expressions.distributions.Distributions;
+import org.apache.gravitino.rel.expressions.distributions.Strategy;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
@@ -79,6 +87,75 @@ public abstract class FlinkPaimonCatalogIT extends FlinkCommonIT {
   }
 
   protected abstract String getWarehouse();
+
+  @Test
+  public void testBucketDistributionRoundTrip() {
+    String databaseName = "test_bucket_distribution_db";
+    String tableName = "test_bucket_table";
+
+    doWithSchema(
+        currentCatalog(),
+        databaseName,
+        catalog -> {
+          sql(
+              "CREATE TABLE %s (id BIGINT, name STRING) "
+                  + "WITH ('bucket' = '4', 'bucket-key' = 'id')",
+              tableName);
+
+          Table table =
+              catalog.asTableCatalog().loadTable(NameIdentifier.of(databaseName, tableName));
+          Assertions.assertEquals(Strategy.HASH, table.distribution().strategy());
+          Assertions.assertEquals(4, table.distribution().number());
+          Assertions.assertEquals(1, table.distribution().expressions().length);
+          Assertions.assertEquals("id", table.distribution().expressions()[0].toString());
+
+          TableResult showResult = sql("SHOW CREATE TABLE %s", tableName);
+          List<Row> rows = Lists.newArrayList(showResult.collect());
+          Assertions.assertEquals(1, rows.size());
+          String createTableDDL = rows.get(0).getField(0).toString();
+          Assertions.assertTrue(
+              createTableDDL.contains("'bucket' = '4'"),
+              "SHOW CREATE TABLE should contain bucket number, but was: " + createTableDDL);
+          Assertions.assertTrue(
+              createTableDDL.contains("'bucket-key' = 'id'"),
+              "SHOW CREATE TABLE should contain bucket-key, but was: " + createTableDDL);
+        },
+        true,
+        supportDropCascade());
+  }
+
+  @Test
+  public void testDynamicBucketDistributionRoundTrip() {
+    String databaseName = "test_dynamic_bucket_db";
+    String tableName = "test_dynamic_bucket_table";
+
+    doWithSchema(
+        currentCatalog(),
+        databaseName,
+        catalog -> {
+          sql(
+              "CREATE TABLE %s (id BIGINT, name STRING, PRIMARY KEY (id) NOT ENFORCED) "
+                  + "WITH ('bucket' = '-1')",
+              tableName);
+
+          Table table =
+              catalog.asTableCatalog().loadTable(NameIdentifier.of(databaseName, tableName));
+          Assertions.assertEquals(Strategy.HASH, table.distribution().strategy());
+          Assertions.assertEquals(Distributions.AUTO, table.distribution().number());
+          Assertions.assertEquals(1, table.distribution().expressions().length);
+          Assertions.assertEquals("id", table.distribution().expressions()[0].toString());
+
+          TableResult showResult = sql("SHOW CREATE TABLE %s", tableName);
+          List<Row> rows = Lists.newArrayList(showResult.collect());
+          Assertions.assertEquals(1, rows.size());
+          String createTableDDL = rows.get(0).getField(0).toString();
+          Assertions.assertTrue(
+              createTableDDL.contains("'bucket' = '-1'"),
+              "SHOW CREATE TABLE should contain bucket=-1, but was: " + createTableDDL);
+        },
+        true,
+        supportDropCascade());
+  }
 
   @Test
   public void testCreateGravitinoPaimonCatalogUsingSQL() {

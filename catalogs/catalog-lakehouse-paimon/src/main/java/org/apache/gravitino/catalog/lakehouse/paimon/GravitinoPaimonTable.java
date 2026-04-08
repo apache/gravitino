@@ -116,7 +116,7 @@ public class GravitinoPaimonTable extends BaseTable {
             GravitinoPaimonColumn.fromPaimonRowType(table.rowType())
                 .toArray(new GravitinoPaimonColumn[0]))
         .withPartitioning(toGravitinoPartitioning(table.partitionKeys()))
-        .withDistribution(getDistribution(table.options()))
+        .withDistribution(getDistribution(table.options(), table.primaryKeys()))
         .withComment(table.comment().orElse(null))
         .withProperties(table.options())
         .withIndexes(constructIndexesFromPrimaryKeys(table))
@@ -204,12 +204,17 @@ public class GravitinoPaimonTable extends BaseTable {
       return;
     }
 
-    List<String> bucketKeys = getBucketKeys(distribution);
-    if (!bucketKeys.isEmpty()) {
-      properties.put(BUCKET_KEY, String.join(",", bucketKeys));
+    int number = distribution.number();
+    // Paimon does not allow 'bucket-key' with bucket=-1 (dynamic mode).
+    // In dynamic mode, Paimon uses the primary key as the bucket key automatically.
+    if (number != Distributions.AUTO) {
+      List<String> bucketKeys = getBucketKeys(distribution);
+      if (!bucketKeys.isEmpty()) {
+        properties.put(BUCKET_KEY, String.join(",", bucketKeys));
+      }
     }
 
-    properties.put(BUCKET_NUM, String.valueOf(distribution.number()));
+    properties.put(BUCKET_NUM, String.valueOf(number == Distributions.AUTO ? -1 : number));
   }
 
   private static List<String> getBucketKeys(Distribution distribution) {
@@ -228,31 +233,50 @@ public class GravitinoPaimonTable extends BaseTable {
         .collect(Collectors.toList());
   }
 
-  static Distribution getDistribution(Map<String, String> properties) {
+  static Distribution getDistribution(Map<String, String> properties, List<String> primaryKeys) {
     if (properties == null) {
       return Distributions.NONE;
     }
+
+    // Resolve bucket key columns: explicit bucket-key, else fall back to PK
     String bucketKeys = properties.get(BUCKET_KEY);
-    if (StringUtils.isBlank(bucketKeys)) {
-      return Distributions.NONE;
+    List<String> bucketKeyList;
+    if (StringUtils.isNotBlank(bucketKeys)) {
+      bucketKeyList =
+          Arrays.stream(bucketKeys.split(","))
+              .map(String::trim)
+              .filter(StringUtils::isNotBlank)
+              .collect(Collectors.toList());
+    } else {
+      bucketKeyList = (primaryKeys != null) ? primaryKeys : Collections.emptyList();
     }
-    List<String> bucketKeyList =
-        Arrays.stream(bucketKeys.split(","))
-            .map(String::trim)
-            .filter(StringUtils::isNotBlank)
-            .collect(Collectors.toList());
+
+    String bucketValue = properties.get(BUCKET_NUM);
+
     if (bucketKeyList.isEmpty()) {
       return Distributions.NONE;
     }
+
     Expression[] expressions =
         bucketKeyList.stream().map(NamedReference::field).toArray(Expression[]::new);
-    String bucketValue = properties.get(BUCKET_NUM);
+
     if (StringUtils.isBlank(bucketValue)) {
       return Distributions.auto(Strategy.HASH, expressions);
     }
+
     String trimmedBucketValue = bucketValue.trim();
     try {
-      return Distributions.hash(Integer.parseInt(trimmedBucketValue), expressions);
+      int parsedBucket = Integer.parseInt(trimmedBucketValue);
+      if (parsedBucket == -1) {
+        return Distributions.auto(Strategy.HASH, expressions);
+      }
+      if (parsedBucket <= 0) {
+        throw new IllegalArgumentException(
+            String.format(
+                "Paimon bucket number must be a positive integer or -1 (dynamic mode), but was '%s'.",
+                bucketValue));
+      }
+      return Distributions.hash(parsedBucket, expressions);
     } catch (NumberFormatException e) {
       throw new IllegalArgumentException(
           String.format("Paimon bucket number must be a valid integer, but was '%s'.", bucketValue),
