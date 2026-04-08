@@ -55,7 +55,6 @@ dependencies {
   implementation(libs.hadoop2.common) {
     exclude("*")
   }
-  implementation(libs.htrace.core4)
   implementation(libs.slf4j.api)
   implementation(libs.woodstox.core)
 

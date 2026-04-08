@@ -52,7 +52,6 @@ dependencies {
   implementation(libs.hadoop2.common) {
     exclude("*")
   }
-  implementation(libs.htrace.core4)
   implementation(libs.slf4j.api)
   implementation(libs.woodstox.core)
 
@@ -116,7 +115,6 @@ dependencies {
   testImplementation(libs.hadoop2.mapreduce.client.core) {
     exclude("*")
   }
-  testImplementation(libs.htrace.core4)
   testImplementation(libs.junit.jupiter.api)
   testImplementation(libs.mysql.driver)
   testImplementation(libs.postgresql.driver)
