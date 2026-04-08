@@ -506,9 +506,18 @@ livenessProbe:
 
 ## Pod-level security context configuration
 ## ref: https://kubernetes.io/docs/tasks/configure-pod-container/security-context/
+## When using persistent volumes (persistence.enabled=true), set fsGroup to match
+## the gravitino user's GID so mounted volumes are writable by the container.
 ##
 podSecurityContext: {}
-  # fsGroup: 1000
+  # fsGroup: 65534  # set to the GID of the gravitino system user if using PVCs
+
+## Init container security context configuration
+## Applied to all initContainers (sqlfile, init-mysql, init-postgresql).
+## Required on clusters enforcing the Kubernetes Pod Security Standard "restricted" policy.
+##
+initContainerSecurityContext:
+  runAsNonRoot: true
 
 ## Container-specific security context configuration
 ## ref: https://kubernetes.io/docs/tasks/configure-pod-container/security-context/
