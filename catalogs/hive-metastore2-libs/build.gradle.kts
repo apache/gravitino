@@ -78,6 +78,8 @@ dependencies {
     exclude(group = "org.eclipse.jetty.orbit", module = "javax.servlet")
     exclude(group = "org.openjdk.jol")
     exclude(group = "org.slf4j")
+    exclude(group = "tomcat", module = "jasper-compiler")
+    exclude(group = "tomcat", module = "jasper-runtime")
   }
 }
 
