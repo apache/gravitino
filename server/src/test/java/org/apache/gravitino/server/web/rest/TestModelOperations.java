@@ -1396,6 +1396,46 @@ public class TestModelOperations extends BaseOperationsTest {
   }
 
   @Test
+  void testAlterModelVersionWithNullUpdates() {
+    ModelVersionUpdatesRequest req = new ModelVersionUpdatesRequest(null);
+
+    Response resp =
+        target(modelPath())
+            .path("model1")
+            .path("versions")
+            .path("0")
+            .request(MediaType.APPLICATION_JSON_TYPE)
+            .accept("application/vnd.gravitino.v1+json")
+            .put(Entity.entity(req, MediaType.APPLICATION_JSON_TYPE));
+
+    Assertions.assertEquals(Response.Status.BAD_REQUEST.getStatusCode(), resp.getStatus());
+
+    ErrorResponse errorResp = resp.readEntity(ErrorResponse.class);
+    Assertions.assertEquals(ErrorConstants.ILLEGAL_ARGUMENTS_CODE, errorResp.getCode());
+    Assertions.assertEquals(IllegalArgumentException.class.getSimpleName(), errorResp.getType());
+  }
+
+  @Test
+  void testAlterModelVersionByAliasWithNullUpdates() {
+    ModelVersionUpdatesRequest req = new ModelVersionUpdatesRequest(null);
+
+    Response resp =
+        target(modelPath())
+            .path("model1")
+            .path("aliases")
+            .path("alias1")
+            .request(MediaType.APPLICATION_JSON_TYPE)
+            .accept("application/vnd.gravitino.v1+json")
+            .put(Entity.entity(req, MediaType.APPLICATION_JSON_TYPE));
+
+    Assertions.assertEquals(Response.Status.BAD_REQUEST.getStatusCode(), resp.getStatus());
+
+    ErrorResponse errorResp = resp.readEntity(ErrorResponse.class);
+    Assertions.assertEquals(ErrorConstants.ILLEGAL_ARGUMENTS_CODE, errorResp.getCode());
+    Assertions.assertEquals(IllegalArgumentException.class.getSimpleName(), errorResp.getType());
+  }
+
+  @Test
   public void testGetModelVersionUri() {
     NameIdentifier modelIdent = NameIdentifierUtil.ofModel(metalake, catalog, schema, "model1");
     when(modelDispatcher.getModelVersionUri(modelIdent, 0, "n1")).thenReturn("u1");
