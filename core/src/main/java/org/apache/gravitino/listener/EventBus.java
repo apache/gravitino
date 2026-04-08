@@ -28,8 +28,11 @@ import org.apache.gravitino.exceptions.ForbiddenException;
 import org.apache.gravitino.listener.api.EventListenerPlugin;
 import org.apache.gravitino.listener.api.event.BaseEvent;
 import org.apache.gravitino.listener.api.event.Event;
+import org.apache.gravitino.listener.api.event.FailureEvent;
 import org.apache.gravitino.listener.api.event.PreEvent;
 import org.apache.gravitino.listener.api.event.SupportsChangingPreEvent;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * The {@code EventBus} class serves as a mechanism to dispatch events to registered listeners. It
@@ -37,6 +40,8 @@ import org.apache.gravitino.listener.api.event.SupportsChangingPreEvent;
  * within its internal management.
  */
 public class EventBus {
+  private static final Logger LOG = LoggerFactory.getLogger(EventBus.class);
+
   /**
    * Holds all instances of {@link EventListenerPlugin}. These instances can either be {@link
    * EventListenerPluginWrapper} which are used for synchronous event process, or {@link
@@ -69,14 +74,32 @@ public class EventBus {
    * Dispatches an event to all registered listeners. Each listener processes the event based on its
    * implementation, which could be either synchronous or asynchronous.
    *
-   * @param baseEvent The event to be dispatched to all registered listeners.
-   * @return an Optional containing the transformed pre-event if it implements {@link
-   *     SupportsChangingPreEvent}, otherwise {@link Optional#empty() empty}
+   * <p>This method applies different exception-handling semantics depending on the event type:
+   *
+   * <ul>
+   *   <li>{@link PreEvent}: May throw {@link ForbiddenException} to prevent the operation (e.g.,
+   *       for authorization or validation failures).
+   *   <li>{@link FailureEvent}: All listener exceptions are caught, logged, and swallowed to avoid
+   *       masking the original failure.
+   *   <li>{@link Event} (success events): Listener exceptions are propagated to the caller.
+   * </ul>
+   *
+   * @param baseEvent the event to dispatch to all registered listeners; must not be null
+   * @return an {@link Optional} containing the transformed pre-event if it implements {@link
+   *     SupportsChangingPreEvent}, otherwise {@link Optional#empty()}
+   * @throws ForbiddenException if a synchronous pre-event listener blocks the operation
+   * @throws RuntimeException if an unknown event type is encountered or a listener throws an
+   *     exception for non-failure events
    */
   public Optional<BaseEvent> dispatchEvent(BaseEvent baseEvent) {
     Preconditions.checkNotNull(baseEvent, "baseEvent cannot be null");
     if (baseEvent instanceof PreEvent) {
       return dispatchAndTransformPreEvent((PreEvent) baseEvent);
+    } else if (baseEvent instanceof FailureEvent) {
+      // FailureEvents get special "safe" handling - swallow all exceptions to prevent
+      // masking the original error that triggered this failure event
+      dispatchFailureEvent((Event) baseEvent);
+      return Optional.empty();
     } else if (baseEvent instanceof Event) {
       dispatchPostEvent((Event) baseEvent);
       return Optional.empty();
@@ -103,6 +126,29 @@ public class EventBus {
 
   private void dispatchPostEvent(Event postEvent) {
     eventListeners.forEach(eventListener -> eventListener.onPostEvent(postEvent));
+  }
+
+  /**
+   * Dispatches a failure failureEvent to listeners, swallowing all exceptions to preserve the
+   * original error.
+   *
+   * <p>When the primary operation fails, we want to notify listeners, but listener exceptions must
+   * NOT propagate and mask the original failure. This method catches and logs all exceptions
+   * (including {@link RuntimeException}, {@link Error}, etc.) to ensure the original exception can
+   * be properly thrown to the caller.
+   *
+   * @param failureEvent the failure event to dispatch
+   */
+  private void dispatchFailureEvent(Event failureEvent) {
+    try {
+      eventListeners.forEach(eventListener -> eventListener.onPostEvent(failureEvent));
+    } catch (Exception e) {
+      // Swallow ALL listener exceptions to prevent masking the original error
+      LOG.error(
+          "Failed to dispatch failure event: {}, ignoring exception to preserve original error",
+          failureEvent.getClass().getSimpleName(),
+          e);
+    }
   }
 
   private Optional<BaseEvent> dispatchAndTransformPreEvent(PreEvent originalEvent)
