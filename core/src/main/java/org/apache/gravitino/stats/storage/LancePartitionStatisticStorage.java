@@ -361,7 +361,6 @@ public class LancePartitionStatisticStorage implements PartitionStatisticStorage
     }
   }
 
-
   @Override
   public void close() throws IOException {
     if (datasetCache.isPresent()) {
