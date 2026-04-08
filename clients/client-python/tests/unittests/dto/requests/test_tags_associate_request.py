@@ -46,7 +46,7 @@ class TestTagsAssociateRequest(unittest.TestCase):
             ["tag_to_remove_1", "tag_to_remove_2"], deserialized_request.tags_to_remove
         )
 
-    def test_associaate_request_validate(self) -> None:
+    def test_associate_request_validate(self) -> None:
         invalid_request1 = TagsAssociateRequest(
             None, None
         )  # pyright: ignore[reportArgumentType]

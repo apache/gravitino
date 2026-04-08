@@ -45,7 +45,7 @@ class GenericColumn(Column, SupportsTags):
             [catalog, schema, table, column.name()],
             MetadataObject.Type.COLUMN,
         )
-        self.object_tag_operations = MetadataObjectTagOperations(
+        self._object_tag_operations = MetadataObjectTagOperations(
             metalake,
             column_object,
             rest_client,
@@ -82,15 +82,15 @@ class GenericColumn(Column, SupportsTags):
         return self
 
     def list_tags(self) -> list[str]:
-        return self.object_tag_operations.list_tags()
+        return self._object_tag_operations.list_tags()
 
     def list_tags_info(self) -> list[Tag]:
-        return self.object_tag_operations.list_tags_info()
+        return self._object_tag_operations.list_tags_info()
 
     def get_tag(self, name: str) -> Tag:
-        return self.object_tag_operations.get_tag(name)
+        return self._object_tag_operations.get_tag(name)
 
     def associate_tags(
         self, tags_to_add: list[str], tags_to_remove: list[str]
     ) -> list[str]:
-        return self.object_tag_operations.associate_tags(tags_to_add, tags_to_remove)
+        return self._object_tag_operations.associate_tags(tags_to_add, tags_to_remove)

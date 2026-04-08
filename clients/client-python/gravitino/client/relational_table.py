@@ -62,11 +62,16 @@ class RelationalTable(
         self._table = cast(Table, DTOConverters.from_dto(table_dto))
         self._rest_client = rest_client
         table_object = MetadataObjects.parse(
-            self.table_full_name(namespace, table_dto.name()), MetadataObject.Type.TABLE
+            RelationalTable.table_full_name(namespace, table_dto.name()),
+            MetadataObject.Type.TABLE,
         )
         self._object_tag_operations = MetadataObjectTagOperations(
             namespace.level(0), table_object, rest_client
         )
+
+    @staticmethod
+    def table_full_name(table_ns: Namespace, table_name: str) -> str:
+        return f"{table_ns.level(1)}.{table_ns.level(2)}.{table_name}"
 
     def name(self) -> str:
         return self._table.name()
@@ -241,6 +246,3 @@ class RelationalTable(
         self, tags_to_add: list[str], tags_to_remove: list[str]
     ) -> list[str]:
         return self._object_tag_operations.associate_tags(tags_to_add, tags_to_remove)
-
-    def table_full_name(self, table_ns: Namespace, table_name: str) -> str:
-        return f"{table_ns.level(1)}.{table_ns.level(2)}.{table_name}"

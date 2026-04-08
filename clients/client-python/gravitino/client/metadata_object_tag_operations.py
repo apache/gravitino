@@ -30,12 +30,15 @@ from gravitino.dto.responses.tag_response import (
 from gravitino.exceptions.handlers.tag_error_handler import TAG_ERROR_HANDLER
 from gravitino.rest.rest_utils import encode_string
 from gravitino.utils.http_client import HTTPClient
+from gravitino.utils.precondition import Precondition
+from gravitino.utils.string_utils import StringUtils
 
 
 class MetadataObjectTagOperations(SupportsTags):
     """
-    The implementation of SupportsTags. This interface will be composited into catalog, schema,
-    table, fileset and topic to provide tag operations for these metadata objects
+    The implementation of SupportsTags. This helper is composed into metadata objects,
+    including catalog, schema, table, column, fileset, and topic, to provide tag
+    operations for these objects.
     """
 
     TAG_REQUEST_PATH = "api/metalakes/{}/objects/{}/{}/tags"
@@ -88,7 +91,11 @@ class MetadataObjectTagOperations(SupportsTags):
             for tag_dto in list_info_resp.tags()
         ]
 
-    def get_tag(self, name) -> Tag:
+    def get_tag(self, name: str) -> Tag:
+        Precondition.check_argument(
+            StringUtils.is_not_blank(name), "Tag name must not be null or empty"
+        )
+
         response = self.rest_client.get(
             f"{self.tag_request_path}/{encode_string(name)}",
             params={},
@@ -107,12 +114,12 @@ class MetadataObjectTagOperations(SupportsTags):
     def associate_tags(
         self, tags_to_add: list[str], tags_to_remove: list[str]
     ) -> list[str]:
-        associate_resp = TagsAssociateRequest(tags_to_add, tags_to_remove)
-        associate_resp.validate()
+        associate_request = TagsAssociateRequest(tags_to_add, tags_to_remove)
+        associate_request.validate()
 
         response = self.rest_client.post(
             self.tag_request_path,
-            json=associate_resp,
+            json=associate_request.to_json(),
             error_handler=TAG_ERROR_HANDLER,
         )
 

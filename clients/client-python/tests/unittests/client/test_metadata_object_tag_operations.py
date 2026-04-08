@@ -178,7 +178,7 @@ class TestMetadataObjectTagOperations(unittest.TestCase):
 
             mock_post.assert_called_once_with(
                 "api/metalakes/demo_metalake/objects/table/catalog.schema.table/tags",
-                json=param,
+                json=param.to_json(),
                 error_handler=TAG_ERROR_HANDLER,
             )
 
