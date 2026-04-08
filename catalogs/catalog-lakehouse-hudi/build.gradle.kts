@@ -42,7 +42,9 @@ dependencies {
   implementation(project(":catalogs:hive-metastore-common"))
 
   implementation(libs.commons.collections3)
-  implementation(libs.commons.configuration1)
+  implementation(libs.commons.configuration1) {
+    exclude(group = "commons-beanutils")
+  }
   implementation(libs.commons.io)
   implementation(libs.commons.lang3)
   implementation(libs.guava)
@@ -103,7 +105,9 @@ dependencies {
   testImplementation(libs.bundles.jersey)
   testImplementation(libs.bundles.jetty)
   testImplementation(libs.commons.collections3)
-  testImplementation(libs.commons.configuration1)
+  testImplementation(libs.commons.configuration1) {
+    exclude(group = "commons-beanutils")
+  }
   testImplementation(libs.datanucleus.api.jdo)
   testImplementation(libs.datanucleus.core)
   testImplementation(libs.datanucleus.jdo)
