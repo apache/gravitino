@@ -57,7 +57,7 @@ public final class GlueClientProvider {
   public static GlueClient buildClient(Map<String, String> config) {
     String region = config.get(GlueConstants.AWS_REGION);
     Preconditions.checkArgument(
-        !Strings.isNullOrEmpty(region) && !region.isBlank(),
+        !Strings.isNullOrEmpty(region),
         "Property '%s' is required to create a Glue client",
         GlueConstants.AWS_REGION);
 
@@ -67,15 +67,15 @@ public final class GlueClientProvider {
     // Both keys must be provided together — a partial pair is always a misconfiguration.
     String accessKey = config.get(GlueConstants.AWS_ACCESS_KEY_ID);
     String secretKey = config.get(GlueConstants.AWS_SECRET_ACCESS_KEY);
-    boolean hasAccessKey = !Strings.isNullOrEmpty(accessKey) && !accessKey.isBlank();
-    boolean hasSecretKey = !Strings.isNullOrEmpty(secretKey) && !secretKey.isBlank();
+    boolean hasAccessKey = !Strings.isNullOrEmpty(accessKey);
+    boolean hasSecretKey = !Strings.isNullOrEmpty(secretKey);
     Preconditions.checkArgument(
         hasAccessKey == hasSecretKey,
-        "Incomplete static credentials: '%s' requires '%s'. "
+        "Both '%s' and '%s' must be set together. "
             + "Either provide both keys for static authentication, "
             + "or omit both to use the default credential chain.",
-        hasAccessKey ? GlueConstants.AWS_ACCESS_KEY_ID : GlueConstants.AWS_SECRET_ACCESS_KEY,
-        hasAccessKey ? GlueConstants.AWS_SECRET_ACCESS_KEY : GlueConstants.AWS_ACCESS_KEY_ID);
+        GlueConstants.AWS_ACCESS_KEY_ID,
+        GlueConstants.AWS_SECRET_ACCESS_KEY);
 
     if (hasAccessKey) {
       builder.credentialsProvider(
@@ -86,7 +86,7 @@ public final class GlueClientProvider {
 
     // Optional custom endpoint override for VPC endpoints or LocalStack testing.
     String endpoint = config.get(GlueConstants.AWS_GLUE_ENDPOINT);
-    if (!Strings.isNullOrEmpty(endpoint) && !endpoint.isBlank()) {
+    if (!Strings.isNullOrEmpty(endpoint)) {
       try {
         builder.endpointOverride(URI.create(endpoint));
       } catch (IllegalArgumentException e) {
