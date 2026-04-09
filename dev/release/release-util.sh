@@ -34,12 +34,28 @@ function error {
 function read_config {
   local PROMPT="$1"
   local DEFAULT="$2"
+  local ENV_VAR_NAME="$3"  # Optional: env var name to use in non-interactive (force) mode
   local REPLY=
 
-  read -p "$PROMPT [$DEFAULT]: " REPLY
+  # In force/non-interactive mode, the env var must be set; error if missing.
+  if is_force; then
+    if [ -n "$ENV_VAR_NAME" ] && [ -n "${!ENV_VAR_NAME:-}" ]; then
+      echo "${!ENV_VAR_NAME}"
+      return
+    else
+      error "Force mode requires '$PROMPT' to be set via environment variable ${ENV_VAR_NAME:-<none>}."
+    fi
+  fi
+
+  if [ -n "$DEFAULT" ]; then
+    read -p "$PROMPT [$DEFAULT]: " REPLY
+  else
+    read -p "$PROMPT: " REPLY
+  fi
+
   local RETVAL="${REPLY:-$DEFAULT}"
   if [ -z "$RETVAL" ]; then
-    error "$PROMPT is must be provided."
+    error "$PROMPT must be provided."
   fi
   echo "$RETVAL"
 }
@@ -58,9 +74,8 @@ function run_silent {
   echo "Command: $@"
   echo "Log file: $LOG_FILE"
 
-  "$@" 1>"$LOG_FILE" 2>&1
-
-  local EC=$?
+  local EC=0
+  "$@" 1>"$LOG_FILE" 2>&1 || EC=$?
   if [ $EC != 0 ]; then
     echo "Command FAILED. Check full logs for details."
     tail "$LOG_FILE"
@@ -81,7 +96,7 @@ function check_for_tag {
 
 function get_release_info {
   if [ -z "$GIT_BRANCH" ]; then
-    # If no branch is specified, found out the latest branch from the repo.
+    # If no branch is specified, find out the latest branch from the repo.
     GIT_BRANCH=$(git ls-remote --heads "$ASF_REPO" |
       grep -e "refs/heads/branch-.*" |
       awk '{print $2}' |
@@ -90,7 +105,7 @@ function get_release_info {
       cut -d/ -f3)
   fi
 
-  export GIT_BRANCH=$(read_config "Branch" "$GIT_BRANCH")
+  export GIT_BRANCH=$(read_config "Branch" "$GIT_BRANCH" GIT_BRANCH)
 
   # Find the current version for the branch.
   local VERSION=$(curl -s "$ASF_REPO_WEBUI/$GIT_BRANCH/gradle.properties" |
@@ -115,33 +130,41 @@ function get_release_info {
     local PREV_REL_REV=$((REV - 1))
     local PREV_REL_TAG="v${SHORT_VERSION}.${PREV_REL_REV}"
     if check_for_tag "$PREV_REL_TAG"; then
-      RC_COUNT=1
+      NRC_COUNT=1
       REV=$((REV + 1))
       NEXT_VERSION="${SHORT_VERSION}.${REV}-SNAPSHOT"
     else
       RELEASE_VERSION="${SHORT_VERSION}.${PREV_REL_REV}"
-      RC_COUNT=$(git ls-remote --tags "$ASF_REPO" "v${RELEASE_VERSION}-rc*" | wc -l)
-      RC_COUNT=$((RC_COUNT + 1))
+      NRC_COUNT=$(git ls-remote --tags "$ASF_REPO" "v${RELEASE_VERSION}-rc*" | wc -l)
+      NRC_COUNT=$((NRC_COUNT + 1))
     fi
   else
     REV=$((REV + 1))
     NEXT_VERSION="${SHORT_VERSION}.${REV}-SNAPSHOT"
-    RC_COUNT=1
+    NRC_COUNT=1
   fi
 
   export NEXT_VERSION
-  export RELEASE_VERSION=$(read_config "Release" "$RELEASE_VERSION")
+  export RELEASE_VERSION=$(read_config "Release" "$RELEASE_VERSION" RELEASE_VERSION)
 
-  RC_COUNT=$(read_config "RC #" "$RC_COUNT")
+  # If -r was explicitly provided (non-zero), override the auto-detected NRC_COUNT
+  if [ "${RC_COUNT:-0}" -gt 0 ]; then
+    NRC_COUNT=$RC_COUNT
+  fi
+  RC_COUNT=$(read_config "RC #" "$NRC_COUNT" NRC_COUNT)
   export RC_COUNT
 
   # Check if the RC already exists, and if re-creating the RC, skip tag creation.
   RELEASE_TAG="v${RELEASE_VERSION}-rc${RC_COUNT}"
   SKIP_TAG=0
   if check_for_tag "$RELEASE_TAG"; then
-    read -p "$RELEASE_TAG already exists. Continue anyway [y/n]? " ANSWER
-    if [ "$ANSWER" != "y" ]; then
-      error "Exiting."
+    if is_force; then
+      echo "$RELEASE_TAG already exists. Force continuing."
+    else
+      read -p "$RELEASE_TAG already exists. Continue anyway [y/n]? " ANSWER
+      if [ "$ANSWER" != "y" ]; then
+        error "Exiting."
+      fi
     fi
     SKIP_TAG=1
   fi
@@ -155,23 +178,23 @@ function get_release_info {
     if [[ $SKIP_TAG = 0 ]]; then
       GIT_REF="$GIT_BRANCH"
     fi
-    GIT_REF=$(read_config "Ref" "$GIT_REF")
+    GIT_REF=$(read_config "Ref" "$GIT_REF" GIT_REF)
   fi
   export GIT_REF
   export GRAVITINO_PACKAGE_VERSION="$RELEASE_TAG"
 
   # Gather some user information.
-  if [ -z "$ASF_USERNAME" ]; then
-    export ASF_USERNAME=$(read_config "ASF user" "$LOGNAME")
+  if [ -z "${ASF_USERNAME:-}" ]; then
+    export ASF_USERNAME=$(read_config "ASF user" "$LOGNAME" ASF_USERNAME)
   fi
 
-  if [ -z "$GIT_NAME" ]; then
+  if [ -z "${GIT_NAME:-}" ]; then
     GIT_NAME=$(git config user.name || echo "")
-    export GIT_NAME=$(read_config "Full name" "$GIT_NAME")
+    export GIT_NAME=$(read_config "Full name" "$GIT_NAME" GIT_NAME)
   fi
 
   export GIT_EMAIL="$ASF_USERNAME@apache.org"
-  export GPG_KEY=$(read_config "GPG key" "$GIT_EMAIL")
+  export GPG_KEY=$(read_config "GPG key" "$GIT_EMAIL" GPG_KEY)
 
   cat <<EOF
 ================
@@ -188,21 +211,25 @@ E-MAIL:     $GIT_EMAIL
 ================
 EOF
 
-  read -p "Is this info correct [y/n]? " ANSWER
-  if [ "$ANSWER" != "y" ]; then
-    echo "Exiting."
-    exit 1
+  if is_force; then
+    echo "Force mode: proceeding without confirmation."
+  else
+    read -p "Is this info correct [y/n]? " ANSWER
+    if [ "$ANSWER" != "y" ]; then
+      echo "Exiting."
+      exit 1
+    fi
   fi
 
   if ! is_dry_run; then
-    if [ -z "$ASF_PASSWORD" ]; then
+    if [ -z "${ASF_PASSWORD:-}" ]; then
       stty -echo && printf "ASF password: " && read ASF_PASSWORD && printf '\n' && stty echo
     fi
   else
     ASF_PASSWORD="***INVALID***"
   fi
 
-  if [ -z "$GPG_PASSPHRASE" ]; then
+  if [ -z "${GPG_PASSPHRASE:-}" ]; then
     stty -echo && printf "GPG passphrase: " && read GPG_PASSPHRASE && printf '\n' && stty echo
   fi
 
@@ -212,6 +239,10 @@ EOF
 
 function is_dry_run {
   [[ $DRY_RUN = 1 ]]
+}
+
+function is_force {
+  [[ $FORCE = 1 ]]
 }
 
 # Initializes JAVA_VERSION to the version of the JVM in use.
@@ -226,7 +257,6 @@ function init_java {
   else
       error "javac not found in ${JAVA_HOME}/bin, please ensure you have a JDK installed."
   fi
-  JAVA_VERSION=$("${JAVA_HOME}"/bin/javac -version 2>&1 | cut -d " " -f 2)
   export JAVA_VERSION
   echo "Java version is $JAVA_VERSION"
 }

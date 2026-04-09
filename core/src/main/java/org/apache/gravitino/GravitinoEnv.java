@@ -75,6 +75,7 @@ import org.apache.gravitino.listener.CatalogEventDispatcher;
 import org.apache.gravitino.listener.EventBus;
 import org.apache.gravitino.listener.EventListenerManager;
 import org.apache.gravitino.listener.FilesetEventDispatcher;
+import org.apache.gravitino.listener.FunctionEventDispatcher;
 import org.apache.gravitino.listener.JobEventDispatcher;
 import org.apache.gravitino.listener.MetalakeEventDispatcher;
 import org.apache.gravitino.listener.ModelEventDispatcher;
@@ -456,7 +457,7 @@ public class GravitinoEnv {
   }
 
   public boolean cacheEnabled() {
-    return config.get(Configs.CACHE_ENABLED);
+    return config == null || config.get(Configs.CACHE_ENABLED);
   }
 
   public void start() {
@@ -612,15 +613,15 @@ public class GravitinoEnv {
         new ModelNormalizeDispatcher(modelHookDispatcher, catalogManager);
     this.modelDispatcher = new ModelEventDispatcher(eventBus, modelNormalizeDispatcher);
 
-    // TODO: Add FunctionHookDispatcher and FunctionEventDispatcher when needed
-    // The operation chain should be:
-    // FunctionEventDispatcher -> FunctionNormalizeDispatcher -> FunctionHookDispatcher ->
-    // FunctionOperationDispatcher
+    // TODO: Add FunctionHookDispatcher when needed
+    // The operation chain is:
+    // FunctionEventDispatcher -> FunctionNormalizeDispatcher -> FunctionOperationDispatcher
     FunctionOperationDispatcher functionOperationDispatcher =
         new FunctionOperationDispatcher(
             catalogManager, schemaOperationDispatcher, entityStore, idGenerator);
-    this.functionDispatcher =
+    FunctionNormalizeDispatcher functionNormalizeDispatcher =
         new FunctionNormalizeDispatcher(functionOperationDispatcher, catalogManager);
+    this.functionDispatcher = new FunctionEventDispatcher(eventBus, functionNormalizeDispatcher);
 
     // TODO: Add ViewHookDispatcher and ViewEventDispatcher when needed for view-specific hooks
     //  and event handling.

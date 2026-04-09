@@ -43,24 +43,30 @@ import org.apache.gravitino.authorization.SecurableObjects;
 import org.apache.gravitino.file.Fileset;
 import org.apache.gravitino.integration.test.util.CloseContainerExtension;
 import org.apache.gravitino.integration.test.util.PrintFuncNameExtension;
+import org.apache.gravitino.job.ShellJobTemplate;
+import org.apache.gravitino.job.SparkJobTemplate;
 import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.meta.BaseMetalake;
 import org.apache.gravitino.meta.CatalogEntity;
 import org.apache.gravitino.meta.FilesetEntity;
 import org.apache.gravitino.meta.GenericEntity;
 import org.apache.gravitino.meta.GroupEntity;
+import org.apache.gravitino.meta.JobTemplateEntity;
 import org.apache.gravitino.meta.ModelEntity;
 import org.apache.gravitino.meta.PolicyEntity;
 import org.apache.gravitino.meta.RoleEntity;
 import org.apache.gravitino.meta.SchemaEntity;
 import org.apache.gravitino.meta.SchemaVersion;
 import org.apache.gravitino.meta.TableEntity;
+import org.apache.gravitino.meta.TagEntity;
 import org.apache.gravitino.meta.TopicEntity;
 import org.apache.gravitino.meta.UserEntity;
 import org.apache.gravitino.policy.Policy;
+import org.apache.gravitino.policy.PolicyContent;
 import org.apache.gravitino.policy.PolicyContents;
 import org.apache.gravitino.storage.RandomIdGenerator;
 import org.apache.gravitino.storage.relational.session.SqlSessionFactoryHelper;
+import org.apache.gravitino.utils.NamespaceUtil;
 import org.apache.ibatis.session.SqlSession;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.TestInstance;
@@ -402,6 +408,14 @@ public abstract class TestJDBCBackend {
         .build();
   }
 
+  protected TableEntity createAndInsertTableEntity(Namespace namespace, String name)
+      throws IOException {
+    TableEntity tableEntity =
+        createTableEntity(RandomIdGenerator.INSTANCE.nextId(), namespace, name, AUDIT_INFO);
+    backend.insert(tableEntity, false);
+    return tableEntity;
+  }
+
   protected FilesetEntity createFilesetEntity(
       Long id, Namespace namespace, String name, AuditInfo auditInfo) {
     return FilesetEntity.builder()
@@ -540,5 +554,87 @@ public abstract class TestJDBCBackend {
     createAndInsertMakeLake(metalakeName);
     createAndInsertCatalog(metalakeName, catalogName);
     createAndInsertSchema(metalakeName, catalogName, schemaName);
+  }
+
+  protected static JobTemplateEntity newShellJobTemplateEntity(
+      String name, String comment, String metalake) {
+    ShellJobTemplate shellJobTemplate =
+        ShellJobTemplate.builder()
+            .withName(name)
+            .withComment(comment)
+            .withExecutable("/bin/echo")
+            .build();
+
+    return JobTemplateEntity.builder()
+        .withId(RandomIdGenerator.INSTANCE.nextId())
+        .withName(name)
+        .withNamespace(NamespaceUtil.ofJobTemplate(metalake))
+        .withTemplateContent(JobTemplateEntity.TemplateContent.fromJobTemplate(shellJobTemplate))
+        .withAuditInfo(AUDIT_INFO)
+        .build();
+  }
+
+  protected static JobTemplateEntity newSparkJobTemplateEntity(
+      String name, String comment, String metalake) {
+    SparkJobTemplate sparkJobTemplate =
+        SparkJobTemplate.builder()
+            .withName(name)
+            .withComment(comment)
+            .withClassName("org.apache.spark.examples.SparkPi")
+            .withExecutable("file:/path/to/spark-examples.jar")
+            .build();
+
+    return JobTemplateEntity.builder()
+        .withId(RandomIdGenerator.INSTANCE.nextId())
+        .withName(name)
+        .withNamespace(NamespaceUtil.ofJobTemplate(metalake))
+        .withTemplateContent(JobTemplateEntity.TemplateContent.fromJobTemplate(sparkJobTemplate))
+        .withAuditInfo(AUDIT_INFO)
+        .build();
+  }
+
+  protected JobTemplateEntity createAndInsertShellJobTemplateEntity(
+      String name, String comment, String metalake) throws IOException {
+    JobTemplateEntity jobTemplateEntity = newShellJobTemplateEntity(name, comment, metalake);
+    backend.insert(jobTemplateEntity, false);
+    return jobTemplateEntity;
+  }
+
+  protected JobTemplateEntity createAndInsertSparkJobTemplateEntity(
+      String name, String comment, String metalake) throws IOException {
+    JobTemplateEntity jobTemplateEntity = newSparkJobTemplateEntity(name, comment, metalake);
+    backend.insert(jobTemplateEntity, false);
+    return jobTemplateEntity;
+  }
+
+  protected TagEntity createAndInsertTagEntity(String name, String comment, String metalake)
+      throws IOException {
+    TagEntity tagEntity =
+        TagEntity.builder()
+            .withId(RandomIdGenerator.INSTANCE.nextId())
+            .withName(name)
+            .withNamespace(NamespaceUtil.ofTag(metalake))
+            .withComment(comment)
+            .withAuditInfo(AUDIT_INFO)
+            .build();
+    backend.insert(tagEntity, false);
+    return tagEntity;
+  }
+
+  protected PolicyEntity createAndInsertPolicyEntity(
+      String policyName, String comment, PolicyContent policyContent, String metalake)
+      throws IOException {
+    PolicyEntity policyEntity =
+        PolicyEntity.builder()
+            .withId(RandomIdGenerator.INSTANCE.nextId())
+            .withName(policyName)
+            .withNamespace(NamespaceUtil.ofPolicy(metalake))
+            .withComment(comment)
+            .withPolicyType(Policy.BuiltInType.CUSTOM)
+            .withContent(policyContent)
+            .withAuditInfo(AUDIT_INFO)
+            .build();
+    backend.insert(policyEntity, false);
+    return policyEntity;
   }
 }

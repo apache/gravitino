@@ -104,6 +104,11 @@ public class JobTemplateMetaSQLProviderFactory {
     return getProvider().selectJobTemplateById(jobTemplateId);
   }
 
+  public static String listJobTemplatePOsByJobTemplateIds(
+      @Param("jobTemplateIds") List<Long> jobTemplateIds) {
+    return getProvider().listJobTemplatePOsByJobTemplateIds(jobTemplateIds);
+  }
+
   public static String batchSelectJobTemplateByIdentifier(
       @Param("metalakeName") String metalakeName,
       @Param("jobTemplateNames") List<String> jobTemplateNames) {

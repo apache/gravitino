@@ -19,15 +19,23 @@
 package org.apache.gravitino.stats.storage;
 
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.doAnswer;
+import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.spy;
 import static org.mockito.Mockito.when;
 
+import com.github.benmanes.caffeine.cache.Cache;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
+import com.lancedb.lance.Dataset;
 import java.io.File;
 import java.nio.file.Files;
 import java.util.List;
 import java.util.Map;
+import org.apache.arrow.memory.BufferAllocator;
+import org.apache.arrow.memory.RootAllocator;
+import org.apache.arrow.vector.VarCharVector;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.reflect.FieldUtils;
 import org.apache.gravitino.EntityStore;
@@ -42,6 +50,7 @@ import org.apache.gravitino.stats.StatisticValue;
 import org.apache.gravitino.stats.StatisticValues;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
+import org.mockito.InOrder;
 
 public class TestLancePartitionStatisticStorage {
 
@@ -492,5 +501,155 @@ public class TestLancePartitionStatisticStorage {
       }
     }
     return newData;
+  }
+
+  @Test
+  public void testDropStatisticsWithQuoteInPartitionAndStatisticName() throws Exception {
+    PartitionStatisticStorageFactory factory = new LancePartitionStatisticStorageFactory();
+    String metalakeName = "metalake";
+    MetadataObject metadataObject =
+        MetadataObjects.of(
+            Lists.newArrayList("catalog", "schema", "table"), MetadataObject.Type.TABLE);
+
+    EntityStore entityStore = mock(EntityStore.class);
+    TableEntity tableEntity = mock(TableEntity.class);
+    when(entityStore.get(any(), any(), any())).thenReturn(tableEntity);
+    when(tableEntity.id()).thenReturn(1L);
+    FieldUtils.writeField(GravitinoEnv.getInstance(), "entityStore", entityStore, true);
+
+    String location = Files.createTempDirectory("lance_stats_test_quote").toString();
+    Map<String, String> properties = Maps.newHashMap();
+    properties.put("location", location);
+
+    LancePartitionStatisticStorage storage =
+        (LancePartitionStatisticStorage) factory.create(properties);
+    try {
+      String quotedPartition = "partition'01";
+      String quotedStatistic = "statistic'0";
+      String normalStatistic = "statistic1";
+
+      Map<String, StatisticValue<?>> stats = Maps.newHashMap();
+      stats.put(quotedStatistic, StatisticValues.stringValue("value0"));
+      stats.put(normalStatistic, StatisticValues.stringValue("value1"));
+
+      storage.updateStatistics(
+          metalakeName,
+          Lists.newArrayList(
+              MetadataObjectStatisticsUpdate.of(
+                  metadataObject,
+                  Lists.newArrayList(
+                      PartitionStatisticsModification.update(quotedPartition, stats)))));
+
+      List<PersistedPartitionStatistics> listedStats =
+          storage.listStatistics(
+              metalakeName,
+              metadataObject,
+              PartitionRange.between(
+                  quotedPartition,
+                  PartitionRange.BoundType.CLOSED,
+                  quotedPartition,
+                  PartitionRange.BoundType.CLOSED));
+
+      Assertions.assertEquals(1, listedStats.size());
+      Assertions.assertEquals(quotedPartition, listedStats.get(0).partitionName());
+      Assertions.assertEquals(2, listedStats.get(0).statistics().size());
+
+      storage.dropStatistics(
+          metalakeName,
+          Lists.newArrayList(
+              MetadataObjectStatisticsDrop.of(
+                  metadataObject,
+                  Lists.newArrayList(
+                      PartitionStatisticsModification.drop(
+                          quotedPartition, Lists.newArrayList(quotedStatistic))))));
+
+      listedStats =
+          storage.listStatistics(
+              metalakeName,
+              metadataObject,
+              PartitionRange.between(
+                  quotedPartition,
+                  PartitionRange.BoundType.CLOSED,
+                  quotedPartition,
+                  PartitionRange.BoundType.CLOSED));
+
+      Assertions.assertEquals(1, listedStats.size());
+      Assertions.assertEquals(quotedPartition, listedStats.get(0).partitionName());
+      Assertions.assertEquals(1, listedStats.get(0).statistics().size());
+      Assertions.assertEquals(normalStatistic, listedStats.get(0).statistics().get(0).name());
+
+      storage.dropStatistics(
+          metalakeName,
+          Lists.newArrayList(
+              MetadataObjectStatisticsDrop.of(
+                  metadataObject,
+                  Lists.newArrayList(
+                      PartitionStatisticsModification.drop(
+                          quotedPartition, Lists.newArrayList(normalStatistic))))));
+
+      listedStats =
+          storage.listStatistics(
+              metalakeName,
+              metadataObject,
+              PartitionRange.between(
+                  quotedPartition,
+                  PartitionRange.BoundType.CLOSED,
+                  quotedPartition,
+                  PartitionRange.BoundType.CLOSED));
+
+      Assertions.assertTrue(listedStats.isEmpty());
+    } finally {
+      FileUtils.deleteDirectory(new File(location + "/" + tableEntity.id() + ".lance"));
+      storage.close();
+    }
+  }
+
+  @Test
+  public void testCloseReleasesCachedDatasetBeforeAllocator() throws Exception {
+    String location = Files.createTempDirectory("lance_stats_close_cache").toString();
+    Map<String, String> properties = Maps.newHashMap();
+    properties.put("location", location);
+    properties.put("datasetCacheSize", "10");
+
+    EntityStore entityStore = org.mockito.Mockito.mock(EntityStore.class);
+    TableEntity tableEntity = org.mockito.Mockito.mock(TableEntity.class);
+    when(entityStore.get(any(), any(), any())).thenReturn(tableEntity);
+    when(tableEntity.id()).thenReturn(1L);
+    FieldUtils.writeField(GravitinoEnv.getInstance(), "entityStore", entityStore, true);
+
+    LancePartitionStatisticStorage storage = new LancePartitionStatisticStorage(properties);
+
+    try {
+      BufferAllocator allocator = spy(new RootAllocator(Long.MAX_VALUE));
+      FieldUtils.writeField(storage, "allocator", allocator, true);
+
+      Cache<Long, Dataset> datasetCache = storage.getDatasetCache();
+      Assertions.assertNotNull(datasetCache);
+
+      Dataset dataset = mock(Dataset.class);
+      VarCharVector buffer = new VarCharVector("test", allocator);
+      buffer.allocateNew(1024);
+
+      doAnswer(
+              invocation -> {
+                buffer.close();
+                return null;
+              })
+          .when(dataset)
+          .close();
+
+      datasetCache.put(1L, dataset);
+
+      storage.close();
+
+      Assertions.assertEquals(0, allocator.getAllocatedMemory());
+
+      InOrder inOrder = inOrder(dataset, allocator);
+      inOrder.verify(dataset).close();
+      inOrder.verify(allocator).close();
+
+    } finally {
+      FileUtils.deleteDirectory(new File(location));
+    }
   }
 }

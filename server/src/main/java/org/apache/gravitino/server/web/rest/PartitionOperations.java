@@ -162,7 +162,7 @@ public class PartitionOperations {
             return response;
           });
     } catch (Exception e) {
-      return ExceptionHandlers.handlePartitionException(OperationType.GET, "", table, e);
+      return ExceptionHandlers.handlePartitionException(OperationType.GET, partition, table, e);
     }
   }
 
@@ -181,24 +181,24 @@ public class PartitionOperations {
       @PathParam("table") @AuthorizationMetadata(type = Entity.EntityType.TABLE) String table,
       AddPartitionsRequest request) {
     try {
-      if (request == null || request.getPartitions() == null) {
-        throw new IllegalArgumentException("partitions must not be null");
-      }
-      LOG.info(
-          "Received add {} partition(s) request for table {}.{}.{}.{} ",
-          request.getPartitions().length,
-          metalake,
-          catalog,
-          schema,
-          table);
-      Preconditions.checkArgument(
-          request.getPartitions().length == 1, "Only one partition is supported");
-
-      request.validate();
-
       return Utils.doAs(
           httpRequest,
           () -> {
+            if (request == null || request.getPartitions() == null) {
+              throw new IllegalArgumentException("partitions must not be null");
+            }
+            LOG.info(
+                "Received add {} partition(s) request for table {}.{}.{}.{} ",
+                request.getPartitions().length,
+                metalake,
+                catalog,
+                schema,
+                table);
+            Preconditions.checkArgument(
+                request.getPartitions().length == 1, "Only one partition is supported");
+
+            request.validate();
+
             NameIdentifier tableIdent = NameIdentifier.of(metalake, catalog, schema, table);
             Partition p = dispatcher.addPartition(tableIdent, fromDTO(request.getPartitions()[0]));
             Response response =

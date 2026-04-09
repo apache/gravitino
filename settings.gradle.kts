@@ -27,6 +27,7 @@ val scalaVersion: String = gradle.startParameter.projectProperties["scalaVersion
 
 include("api", "common", "core", "server", "server-common")
 include("catalogs:catalog-common")
+include("catalogs:catalog-glue")
 include("catalogs:catalog-hive")
 include("catalogs:hive-metastore-common")
 include("catalogs:hive-metastore2-libs", "catalogs:hive-metastore3-libs")
@@ -103,4 +104,9 @@ include(":bundles:azure", ":bundles:azure-bundle", ":bundles:iceberg-azure-bundl
 include(":catalogs:hadoop-common")
 include(":lineage")
 include(":mcp-server")
-include(":maintenance:optimizer", ":maintenance:jobs")
+include(
+  ":maintenance:optimizer-api",
+  ":maintenance:updaters",
+  ":maintenance:optimizer",
+  ":maintenance:jobs"
+)

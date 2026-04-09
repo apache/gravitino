@@ -1,11 +1,11 @@
 <!--
 1. Title: [#<issue>] <type>(<scope>): <subject>
    Examples:
-     - "[#123] feat(operator): support xxx"
-     - "[#233] fix: check null before access result in xxx"
-     - "[MINOR] refactor: fix typo in variable name"
-     - "[MINOR] docs: fix typo in README"
-     - "[#255] test: fix flaky test NameOfTheTest"
+     - "[#123] feat(operator): Support xxx"
+     - "[#233] fix: Check null before access result in xxx"
+     - "[MINOR] refactor: Fix typo in variable name"
+     - "[MINOR] docs: Fix typo in README"
+     - "[#255] test: Fix flaky test NameOfTheTest"
    Reference: https://www.conventionalcommits.org/en/v1.0.0/
 2. If the PR is unfinished, please mark this PR as draft.
 -->

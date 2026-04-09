@@ -163,6 +163,26 @@ public class JobTemplateMetaBaseSQLProvider {
         + " AND jtm.deleted_at = 0";
   }
 
+  public String listJobTemplatePOsByJobTemplateIds(
+      @Param("jobTemplateIds") List<Long> jobTemplateIds) {
+    return "<script>"
+        + "SELECT jtm.job_template_id AS jobTemplateId, jtm.job_template_name AS jobTemplateName,"
+        + " jtm.metalake_id AS metalakeId, jtm.job_template_comment AS jobTemplateComment,"
+        + " jtm.job_template_content AS jobTemplateContent, jtm.audit_info AS auditInfo,"
+        + " jtm.current_version AS currentVersion, jtm.last_version AS lastVersion,"
+        + " jtm.deleted_at AS deletedAt"
+        + " FROM "
+        + JobTemplateMetaMapper.TABLE_NAME
+        + " jtm"
+        + " WHERE jtm.deleted_at = 0"
+        + " AND jtm.job_template_id IN ("
+        + "<foreach collection='jobTemplateIds' item='jobTemplateId' separator=','>"
+        + "#{jobTemplateId}"
+        + "</foreach>"
+        + ")"
+        + "</script>";
+  }
+
   public String batchSelectJobTemplateByIdentifier(
       @Param("metalakeName") String metalakeName,
       @Param("jobTemplateNames") List<String> jobTemplateNames) {

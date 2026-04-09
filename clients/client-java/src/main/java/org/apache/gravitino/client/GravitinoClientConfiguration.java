@@ -32,18 +32,6 @@ public class GravitinoClientConfiguration {
   /** The configuration key prefix for the Gravitino client config. */
   public static final String GRAVITINO_CLIENT_CONFIG_PREFIX = "gravitino.client.";
 
-  /** A default value for http connection timeout in milliseconds. */
-  public static final long CLIENT_CONNECTION_TIMEOUT_MS_DEFAULT = 180_000L;
-
-  /** A default value for http socket timeout in milliseconds. */
-  public static final int CLIENT_SOCKET_TIMEOUT_MS_DEFAULT = 180_000;
-
-  /** An optional http connection timeout in milliseconds. */
-  public static final String CLIENT_CONNECTION_TIMEOUT_MS = "gravitino.client.connectionTimeoutMs";
-
-  /** An optional http socket timeout in milliseconds. */
-  public static final String CLIENT_SOCKET_TIMEOUT_MS = "gravitino.client.socketTimeoutMs";
-
   /**
    * A default value for max total HTTP connections in the connection pool. This is the same as the
    * default value of Apache HttpClient 5.x
@@ -51,7 +39,8 @@ public class GravitinoClientConfiguration {
   public static final int CLIENT_MAX_CONNECTIONS_DEFAULT = 25;
 
   /** An optional max total HTTP connections. */
-  public static final String CLIENT_MAX_CONNECTIONS = "gravitino.client.maxConnections";
+  public static final String CLIENT_MAX_CONNECTIONS =
+      GRAVITINO_CLIENT_CONFIG_PREFIX + "maxConnections";
 
   /**
    * A default value for max HTTP connections per route. This is the same as the default value of
@@ -61,7 +50,21 @@ public class GravitinoClientConfiguration {
 
   /** An optional max HTTP connections per route. */
   public static final String CLIENT_MAX_CONNECTIONS_PER_ROUTE =
-      "gravitino.client.maxConnectionsPerRoute";
+      GRAVITINO_CLIENT_CONFIG_PREFIX + "maxConnectionsPerRoute";
+
+  /** A default value for http connection timeout in milliseconds. */
+  public static final long CLIENT_CONNECTION_TIMEOUT_MS_DEFAULT = 180_000L;
+
+  /** A default value for http socket timeout in milliseconds. */
+  public static final int CLIENT_SOCKET_TIMEOUT_MS_DEFAULT = 180_000;
+
+  /** An optional http connection timeout in milliseconds. */
+  public static final String CLIENT_CONNECTION_TIMEOUT_MS =
+      GRAVITINO_CLIENT_CONFIG_PREFIX + "connectionTimeoutMs";
+
+  /** An optional http socket timeout in milliseconds. */
+  public static final String CLIENT_SOCKET_TIMEOUT_MS =
+      GRAVITINO_CLIENT_CONFIG_PREFIX + "socketTimeoutMs";
 
   private static final Set<String> SUPPORT_CLIENT_CONFIG_KEYS =
       ImmutableSet.of(

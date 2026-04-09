@@ -97,6 +97,7 @@ import org.apache.gravitino.job.SparkJobTemplate;
 import org.apache.gravitino.messaging.Topic;
 import org.apache.gravitino.model.Model;
 import org.apache.gravitino.model.ModelVersion;
+import org.apache.gravitino.policy.IcebergDataCompactionContent;
 import org.apache.gravitino.policy.PolicyContent;
 import org.apache.gravitino.policy.PolicyContents;
 import org.apache.gravitino.rel.Column;
@@ -561,6 +562,19 @@ public class DTOConverters {
           .withCustomRules(customContent.customRules())
           .withSupportedObjectTypes(customContent.supportedObjectTypes())
           .withProperties(customContent.properties())
+          .build();
+    }
+
+    if (policyContent instanceof IcebergDataCompactionContent) {
+      IcebergDataCompactionContent icebergCompactionContent =
+          (IcebergDataCompactionContent) policyContent;
+      return PolicyContentDTO.IcebergCompactionContentDTO.builder()
+          .withMinDataFileMse(icebergCompactionContent.minDataFileMse())
+          .withMinDeleteFileNumber(icebergCompactionContent.minDeleteFileNumber())
+          .withDataFileMseWeight(icebergCompactionContent.dataFileMseWeight())
+          .withDeleteFileNumberWeight(icebergCompactionContent.deleteFileNumberWeight())
+          .withMaxPartitionNum(icebergCompactionContent.maxPartitionNum())
+          .withRewriteOptions(icebergCompactionContent.rewriteOptions())
           .build();
     }
 
@@ -1295,6 +1309,18 @@ public class DTOConverters {
           customContentDTO.customRules(),
           customContentDTO.supportedObjectTypes(),
           customContentDTO.properties());
+    }
+
+    if (policyContentDTO instanceof PolicyContentDTO.IcebergCompactionContentDTO) {
+      PolicyContentDTO.IcebergCompactionContentDTO icebergCompactionContentDTO =
+          (PolicyContentDTO.IcebergCompactionContentDTO) policyContentDTO;
+      return PolicyContents.icebergDataCompaction(
+          icebergCompactionContentDTO.minDataFileMse(),
+          icebergCompactionContentDTO.minDeleteFileNumber(),
+          icebergCompactionContentDTO.dataFileMseWeight(),
+          icebergCompactionContentDTO.deleteFileNumberWeight(),
+          icebergCompactionContentDTO.maxPartitionNum(),
+          icebergCompactionContentDTO.rewriteOptions());
     }
 
     throw new IllegalArgumentException(

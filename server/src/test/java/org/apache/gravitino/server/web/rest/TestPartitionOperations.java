@@ -250,6 +250,25 @@ public class TestPartitionOperations extends JerseyTest {
   }
 
   @Test
+  public void testGetPartitionExceptionMessageContainsPartitionName() {
+    doThrow(new NoSuchPartitionException("missing partition"))
+        .when(dispatcher)
+        .getPartition(any(), any());
+
+    Response resp =
+        target(partitionPath(metalake, catalog, schema, table) + "p3")
+            .request(MediaType.APPLICATION_JSON_TYPE)
+            .accept("application/vnd.gravitino.v1+json")
+            .get();
+
+    Assertions.assertEquals(Response.Status.NOT_FOUND.getStatusCode(), resp.getStatus());
+
+    ErrorResponse errorResponse = resp.readEntity(ErrorResponse.class);
+    Assertions.assertEquals(ErrorConstants.NOT_FOUND_CODE, errorResponse.getCode());
+    Assertions.assertTrue(errorResponse.getMessage().contains("[p3]"));
+  }
+
+  @Test
   public void testAddPartition() {
     when(dispatcher.addPartition(any(), any())).thenReturn(partition1);
 

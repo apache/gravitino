@@ -41,7 +41,7 @@ class JsonSerializable(ABC, Generic[_GravitinoTypeT]):
 
     @classmethod
     @abstractmethod
-    def serialize(cls, data_type: _GravitinoTypeT) -> Json:
+    def serialize(cls, value: _GravitinoTypeT) -> Json:
         """To serialize the given `data`.
 
         Args:

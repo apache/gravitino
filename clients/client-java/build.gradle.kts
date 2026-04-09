@@ -70,6 +70,12 @@ tasks.build {
 }
 
 tasks.test {
+  javaLauncher.set(
+    javaToolchains.launcherFor {
+      languageVersion.set(JavaLanguageVersion.of(17))
+    }
+  )
+
   val skipITs = project.hasProperty("skipITs")
   if (skipITs) {
     exclude("**/integration/test/**")

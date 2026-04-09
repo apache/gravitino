@@ -63,3 +63,4 @@ web/.next
 
 .venv/
 .worktrees/
+.claude

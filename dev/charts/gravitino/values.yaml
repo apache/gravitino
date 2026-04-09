@@ -31,7 +31,7 @@ global:
 image:
   registry: docker.io
   repository: apache/gravitino
-  tag: 1.2.0-SNAPSHOT
+  tag: 1.3.0-SNAPSHOT
   pullPolicy: IfNotPresent
 
 ## MySQL chart configuration
@@ -427,7 +427,7 @@ additionalLog4j2Properties:
 initScript: |
   cp /tmp/conf/* ${GRAVITINO_HOME}/conf
   echo "Start the Gravitino Server"
-  /bin/bash ${GRAVITINO_HOME}/bin/gravitino.sh run
+  /bin/bash ${GRAVITINO_HOME}/bin/start-gravitino.sh
 
 ## Expose the gravitino service to be accessed from outside the cluster (LoadBalancer service).
 ## or access it from within the cluster (ClusterIP service). Set the service type and the port to serve it.
@@ -470,6 +470,10 @@ ingress:
 ##
 annotations: {}
 
+## Service account name for the Gravitino pod
+##
+serviceAccountName: default
+
 ## Deployment replicas
 ##
 replicas: 1
@@ -510,8 +514,6 @@ containerSecurityContext:
 ## Container Environment
 ##
 env:
-  - name: GRAVITINO_HOME
-    value: /root/gravitino
   - name: GRAVITINO_MEM
     value: "-Xms1024m -Xmx1024m -XX:MaxMetaspaceSize=512m"
 
