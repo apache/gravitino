@@ -24,6 +24,7 @@ import static org.apache.gravitino.catalog.glue.GlueConstants.AWS_REGION;
 import static org.apache.gravitino.catalog.glue.GlueConstants.AWS_SECRET_ACCESS_KEY;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.util.HashMap;
 import java.util.Map;
@@ -39,9 +40,9 @@ class TestGlueClientProvider {
     config.put(AWS_ACCESS_KEY_ID, "AKIAIOSFODNN7EXAMPLE");
     config.put(AWS_SECRET_ACCESS_KEY, "wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY");
 
-    GlueClient client = GlueClientProvider.buildClient(config);
-    assertNotNull(client);
-    client.close();
+    try (GlueClient client = GlueClientProvider.buildClient(config)) {
+      assertNotNull(client);
+    }
   }
 
   @Test
@@ -50,9 +51,9 @@ class TestGlueClientProvider {
     Map<String, String> config = new HashMap<>();
     config.put(AWS_REGION, "eu-west-1");
 
-    GlueClient client = GlueClientProvider.buildClient(config);
-    assertNotNull(client);
-    client.close();
+    try (GlueClient client = GlueClientProvider.buildClient(config)) {
+      assertNotNull(client);
+    }
   }
 
   @Test
@@ -63,15 +64,14 @@ class TestGlueClientProvider {
     config.put(AWS_SECRET_ACCESS_KEY, "test");
     config.put(AWS_GLUE_ENDPOINT, "http://localhost:4566");
 
-    GlueClient client = GlueClientProvider.buildClient(config);
-    assertNotNull(client);
-    client.close();
+    try (GlueClient client = GlueClientProvider.buildClient(config)) {
+      assertNotNull(client);
+    }
   }
 
   @Test
   void testBuildClientMissingRegionThrows() {
     Map<String, String> config = new HashMap<>();
-    // No AWS_REGION set.
 
     assertThrows(IllegalArgumentException.class, () -> GlueClientProvider.buildClient(config));
   }
@@ -85,16 +85,39 @@ class TestGlueClientProvider {
   }
 
   @Test
-  void testBuildClientOnlyAccessKeyFallsBackToDefaultChain() {
-    // Only one of the key pair provided → both must be present to use static creds.
-    // Falls back to default chain, which just builds without error.
+  void testBuildClientOnlyAccessKeyThrows() {
+    // Providing only one of the credential pair is always a misconfiguration — must fail fast.
     Map<String, String> config = new HashMap<>();
     config.put(AWS_REGION, "ap-southeast-1");
     config.put(AWS_ACCESS_KEY_ID, "AKIAIOSFODNN7EXAMPLE");
-    // No AWS_SECRET_ACCESS_KEY → default chain is used instead.
+    // No AWS_SECRET_ACCESS_KEY.
 
-    GlueClient client = GlueClientProvider.buildClient(config);
-    assertNotNull(client);
-    client.close();
+    IllegalArgumentException ex =
+        assertThrows(IllegalArgumentException.class, () -> GlueClientProvider.buildClient(config));
+    assertTrue(ex.getMessage().contains(AWS_SECRET_ACCESS_KEY));
+  }
+
+  @Test
+  void testBuildClientOnlySecretKeyThrows() {
+    // Providing only the secret without the access key is also a misconfiguration.
+    Map<String, String> config = new HashMap<>();
+    config.put(AWS_REGION, "ap-southeast-1");
+    config.put(AWS_SECRET_ACCESS_KEY, "wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY");
+    // No AWS_ACCESS_KEY_ID.
+
+    IllegalArgumentException ex =
+        assertThrows(IllegalArgumentException.class, () -> GlueClientProvider.buildClient(config));
+    assertTrue(ex.getMessage().contains(AWS_ACCESS_KEY_ID));
+  }
+
+  @Test
+  void testBuildClientInvalidEndpointThrows() {
+    Map<String, String> config = new HashMap<>();
+    config.put(AWS_REGION, "us-east-1");
+    config.put(AWS_GLUE_ENDPOINT, "not a valid uri ://");
+
+    IllegalArgumentException ex =
+        assertThrows(IllegalArgumentException.class, () -> GlueClientProvider.buildClient(config));
+    assertTrue(ex.getMessage().contains(AWS_GLUE_ENDPOINT));
   }
 }

@@ -36,7 +36,7 @@ import org.apache.gravitino.connector.PropertyEntry;
  * operations layer and are not validated here.
  *
  * <p>Note: storage location ({@code StorageDescriptor.location}) varies by table format and is
- * handled per-format in the Table CRUD layer (PR-05), not declared here.
+ * handled per-format in the Table CRUD layer, not declared here.
  */
 public class GlueTablePropertiesMetadata extends BasePropertiesMetadata {
 

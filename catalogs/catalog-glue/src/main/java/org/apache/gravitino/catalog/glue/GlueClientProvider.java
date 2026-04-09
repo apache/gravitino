@@ -51,7 +51,8 @@ public final class GlueClientProvider {
    *
    * @param config Catalog configuration properties.
    * @return A configured and ready-to-use {@link GlueClient}.
-   * @throws IllegalArgumentException if {@code aws-region} is missing or blank.
+   * @throws IllegalArgumentException if {@code aws-region} is missing or blank, if only one of the
+   *     credential keys is provided, or if {@code aws-glue-endpoint} is not a valid URI.
    */
   public static GlueClient buildClient(Map<String, String> config) {
     String region = config.get(GlueConstants.AWS_REGION);
@@ -63,12 +64,20 @@ public final class GlueClientProvider {
     GlueClientBuilder builder = GlueClient.builder().region(Region.of(region));
 
     // Static credentials take priority over the default credential chain.
+    // Both keys must be provided together — a partial pair is always a misconfiguration.
     String accessKey = config.get(GlueConstants.AWS_ACCESS_KEY_ID);
     String secretKey = config.get(GlueConstants.AWS_SECRET_ACCESS_KEY);
-    if (!Strings.isNullOrEmpty(accessKey)
-        && !accessKey.isBlank()
-        && !Strings.isNullOrEmpty(secretKey)
-        && !secretKey.isBlank()) {
+    boolean hasAccessKey = !Strings.isNullOrEmpty(accessKey) && !accessKey.isBlank();
+    boolean hasSecretKey = !Strings.isNullOrEmpty(secretKey) && !secretKey.isBlank();
+    Preconditions.checkArgument(
+        hasAccessKey == hasSecretKey,
+        "Incomplete static credentials: '%s' requires '%s'. "
+            + "Either provide both keys for static authentication, "
+            + "or omit both to use the default credential chain.",
+        hasAccessKey ? GlueConstants.AWS_ACCESS_KEY_ID : GlueConstants.AWS_SECRET_ACCESS_KEY,
+        hasAccessKey ? GlueConstants.AWS_SECRET_ACCESS_KEY : GlueConstants.AWS_ACCESS_KEY_ID);
+
+    if (hasAccessKey) {
       builder.credentialsProvider(
           StaticCredentialsProvider.create(AwsBasicCredentials.create(accessKey, secretKey)));
     } else {
@@ -78,7 +87,16 @@ public final class GlueClientProvider {
     // Optional custom endpoint override for VPC endpoints or LocalStack testing.
     String endpoint = config.get(GlueConstants.AWS_GLUE_ENDPOINT);
     if (!Strings.isNullOrEmpty(endpoint) && !endpoint.isBlank()) {
-      builder.endpointOverride(URI.create(endpoint));
+      try {
+        builder.endpointOverride(URI.create(endpoint));
+      } catch (IllegalArgumentException e) {
+        throw new IllegalArgumentException(
+            String.format(
+                "Property '%s' contains an invalid URI: '%s'. "
+                    + "Expected a valid URL, e.g. 'http://localhost:4566'. Cause: %s",
+                GlueConstants.AWS_GLUE_ENDPOINT, endpoint, e.getMessage()),
+            e);
+      }
     }
 
     return builder.build();

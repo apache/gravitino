@@ -45,11 +45,11 @@ public final class GlueConstants {
 
   /**
    * Default table format used when creating tables via Gravitino's {@code createTable()} API
-   * (optional). Accepted values: {@code iceberg}, {@code hive}. Defaults to {@code iceberg}.
+   * (optional). Accepted values: {@code iceberg}, {@code hive}. Defaults to {@code hive}.
    */
   public static final String DEFAULT_TABLE_FORMAT = "default-table-format";
 
-  /** Default value for {@link #DEFAULT_TABLE_FORMAT}. */
+  /** Default value for {@link #DEFAULT_TABLE_FORMAT}: {@code "hive"}. */
   public static final String DEFAULT_TABLE_FORMAT_VALUE = "hive";
 
   /**
