@@ -182,78 +182,6 @@ Layer 2 sits **on top of** Layer 1. When Layer 1 is disabled (NoOpsCache), calls
 
 ---
 
-### 1.5 What Needs Caching and What Does Not
-
-**[B] — target resource name→ID — does NOT need a new cache.**
-
-JCasbin stores entity **integer IDs** in policies (see §1.6). Entity rename does not change
-the ID — DB lookup always returns the correct integer ID. Adding a `metadataIdCache`
-(name→ID) would require invalidation on every entity rename or drop across all entity types
-(catalog, schema, table, etc.) — a massive, fragile write-path change with no benefit.
-A single indexed DB lookup (~1 ms) is simpler and always correct.
-
-**[C1] — user's role list — DOES need a cache, with version validation.**
-
-Expensive JOIN query, hard consistency requirement: role revocation must take effect
-immediately, not after TTL expiry.
-
-**[A] — userId — is handled for free by the [C1] cache.**
-
-The user lookup query (discussed in §4.1.3) is designed to return `user_id` alongside the
-role list in a single query. No separate userId cache is needed.
-
-**metalakeName → metalakeId — handled by an inline JOIN.**
-
-`metalake_meta` is tiny (few rows per deployment); an inline JOIN in the user lookup query
-(§4.1.3) resolves it without a separate lookup or cache.
-
----
-
-### 1.6 Key Finding: JCasbin Stores Entity IDs, Not Names
-
-```java
-// JcasbinAuthorizer.loadPolicyByRoleEntity()
-allowEnforcer.addPolicy(
-    String.valueOf(roleEntity.id()),
-    securableObject.type().name(),
-    String.valueOf(MetadataIdConverter.getID(securableObject, metalake)),  // integer ID
-    privilege.name().toUpperCase(),
-    condition.name().toLowerCase());
-```
-
-JCasbin policy tuples use **integer entity IDs** throughout. Consequences:
-- Entity renames do not affect loaded policies (ID is stable under rename).
-- Auth cache staleness is caused **only** by: privilege grant/revoke, role assignment /
-  revocation, ownership change. DDL (rename, drop) requires no auth cache update.
-- Name→ID resolution at auth time ([B]) always goes to DB — correct and required.
-
----
-
-### 1.7 Auth N+1 Problem
-
-`loadRolePrivilege()` executes [C2] per role not in `loadedRoles`. Before the batch fix
-(Phase 1 §5, step 1.1):
-
-```
-[C1]: 1 query (list roles for user)
-[C2]: 1 query per role (get RoleEntity)            ← N queries
-[C3]: 2 queries per role (securable objects)       ← 2N queries
-```
-
-After introducing `batchListSecurableObjectsByRoleIds()` (Phase 1): `3 + T` total on cold
-cache, where T is the number of distinct securable-object types across all roles.
-
----
-
-### 1.8 HA Consistency Gap
-
-```
-Node A: REVOKE privilege P from role R  →  DB updated; Node A loadedRoles evicted ✅
-Node B: authorize(user U, resource X)   →  role R still in loadedRoles ← stale ❌
-                                            U retains revoked access for up to 1 hour
-```
-
----
 
 ## 2. Goals
 
@@ -263,7 +191,7 @@ Node B: authorize(user U, resource X)   →  role R still in loadedRoles ← sta
 request. The new auth cache layer must protect these without relying on entity store cache.
 ([B] also hits DB, but this is correct and acceptable — see §1.5.)
 
-**Problem 2 — Consistency:** `loadedRoles` is TTL-bounded (1 hour staleness). Permission
+**Problem 2 — Consistency:** `loadedRoles` is TTL-bounded (1 hour staleness) and updated by hook with in a instance. Permission
 changes must take effect at the next auth request, not after TTL expiry.
 
 Both problems are solved by the same mechanism: a version-validated cache for the user's role
@@ -278,15 +206,6 @@ list (userId comes for free from the same query).
 | Auth performance                | Hot path: ≤ 3 lightweight DB queries (Approach A) or ≤ 1 (Approach B)                                        |
 | No new mandatory infrastructure | Solution requires only the existing DB                                                                       |
 | Incremental delivery            | Phase 1 independently shippable                                                                              |
-
-### 2.3 Staleness Tolerance
-
-| Data Type                | Effect When Stale               | Approach A           | Approach B           |
-|--------------------------|---------------------------------|----------------------|----------------------|
-| Role privileges          | Revoked access still granted    | **0**                | ≤ poll interval      |
-| User role assignments    | Revoked roles still active      | **0**                | ≤ poll interval      |
-| Ownership                | Transfer not reflected          | **0** (direct query) | **0** (direct query) |
-| Table / schema existence | Object visibility inconsistency | ≤ 2 s                | ≤ 2 s                |
 
 ---
 
