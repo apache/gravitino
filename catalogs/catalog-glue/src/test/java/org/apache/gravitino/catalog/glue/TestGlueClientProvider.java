@@ -116,6 +116,8 @@ class TestGlueClientProvider {
     config.put(AWS_REGION, "us-east-1");
     config.put(AWS_GLUE_ENDPOINT, "not a valid uri ://");
 
-    assertThrows(IllegalArgumentException.class, () -> GlueClientProvider.buildClient(config));
+    IllegalArgumentException ex =
+        assertThrows(IllegalArgumentException.class, () -> GlueClientProvider.buildClient(config));
+    assertTrue(ex.getMessage().contains(AWS_GLUE_ENDPOINT));
   }
 }
