@@ -50,7 +50,7 @@ public final class GlueConstants {
   public static final String DEFAULT_TABLE_FORMAT = "default-table-format";
 
   /** Default value for {@link #DEFAULT_TABLE_FORMAT}. */
-  public static final String DEFAULT_TABLE_FORMAT_VALUE = "iceberg";
+  public static final String DEFAULT_TABLE_FORMAT_VALUE = "hive";
 
   /**
    * Comma-separated list of table types exposed by {@code listTables()} and {@code loadTable()}
@@ -67,16 +67,13 @@ public final class GlueConstants {
   // -------------------------------------------------------------------------
 
   /**
-   * Glue table type parameter key. Common values: {@code ICEBERG}, {@code HIVE}, {@code DELTA},
-   * {@code PARQUET}, {@code VIRTUAL_VIEW}.
+   * Glue table format type parameter key stored in {@code Table.parameters()}. Common values:
+   * {@code ICEBERG}, {@code HIVE}, {@code DELTA}, {@code PARQUET}, {@code VIRTUAL_VIEW}.
    */
-  public static final String TABLE_TYPE = "table_type";
+  public static final String TABLE_FORMAT_TYPE = "table_format_type";
 
   /** Iceberg table metadata location stored in Glue {@code Table.parameters()}. */
   public static final String METADATA_LOCATION = "metadata_location";
-
-  /** Storage location for the table data. */
-  public static final String LOCATION = "location";
 
   private GlueConstants() {}
 }
