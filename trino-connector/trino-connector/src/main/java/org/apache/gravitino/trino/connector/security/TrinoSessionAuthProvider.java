@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.gravitino.trino.connector.catalog;
+package org.apache.gravitino.trino.connector.security;
 
 import io.trino.spi.connector.ConnectorSession;
 import java.io.IOException;
@@ -36,11 +36,13 @@ import org.slf4j.LoggerFactory;
  * <p>There are two operating modes, selected at construction time:
  *
  * <ul>
- *   <li><b>OAUTH2_TOKEN</b> – reads a Bearer token from the Trino session's extra credentials using
- *       a configured key, and forwards it as {@code Authorization: Bearer <token>}.
+ *   <li><b>BEARER_TOKEN</b> – reads a Bearer token from the Trino session's extra credentials using
+ *       a configured key, and forwards it as {@code Authorization: Bearer <token>}. Used when
+ *       {@code authType=oauth2} and {@code forwardUser=true}.
  *   <li><b>SIMPLE_SESSION</b> – encodes the Trino session username using the same Basic-auth format
  *       as {@code SimpleTokenProvider}, so the Gravitino server sees the actual Trino user rather
- *       than a shared service account.
+ *       than a shared service account. Used when {@code authType=simple} and {@code
+ *       forwardUser=true}.
  * </ul>
  *
  * <p>When no session has been applied (e.g. during connector start-up), {@link #hasTokenData()}
@@ -54,7 +56,7 @@ public class TrinoSessionAuthProvider extends CustomTokenProvider {
 
   /** Distinguishes between the two operating modes. */
   enum Mode {
-    OAUTH2_TOKEN,
+    BEARER_TOKEN,
     SIMPLE_SESSION
   }
 
@@ -69,13 +71,13 @@ public class TrinoSessionAuthProvider extends CustomTokenProvider {
   @Nullable private final String credentialKey;
 
   /**
-   * Creates a provider in OAUTH2_TOKEN mode.
+   * Creates a provider in BEARER_TOKEN mode.
    *
    * @param credentialKey the key whose value in the Trino session's extra credentials is the Bearer
    *     token
    */
   TrinoSessionAuthProvider(String credentialKey) {
-    this.mode = Mode.OAUTH2_TOKEN;
+    this.mode = Mode.BEARER_TOKEN;
     this.credentialKey = credentialKey;
     this.schemeName = "Bearer"; // required by parent abstract; not used because we override
   }
@@ -102,7 +104,7 @@ public class TrinoSessionAuthProvider extends CustomTokenProvider {
     }
 
     byte[] token;
-    if (mode == Mode.OAUTH2_TOKEN) {
+    if (mode == Mode.BEARER_TOKEN) {
       String bearerToken = session.getIdentity().getExtraCredentials().get(credentialKey);
       if (bearerToken == null) {
         LOG.error(

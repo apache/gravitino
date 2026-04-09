@@ -42,6 +42,8 @@ import org.apache.gravitino.exceptions.NoSuchMetalakeException;
 import org.apache.gravitino.trino.connector.GravitinoConfig;
 import org.apache.gravitino.trino.connector.GravitinoErrorCode;
 import org.apache.gravitino.trino.connector.metadata.GravitinoCatalog;
+import org.apache.gravitino.trino.connector.security.GravitinoAuthProvider;
+import org.apache.gravitino.trino.connector.security.TrinoSessionContext;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 

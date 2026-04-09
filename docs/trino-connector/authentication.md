@@ -7,7 +7,7 @@ license: "This software is licensed under the Apache License version 2."
 
 ## Authentication
 
-The Gravitino Trino connector supports authenticating to the Gravitino server using the same authentication mechanisms as the Gravitino Java client: Simple, OAuth2, Kerberos, and OAuth2 Token forwarding. Authentication is configured through the Trino connector properties file using the `gravitino.client.*` prefix.
+The Gravitino Trino connector supports authenticating to the Gravitino server using the same authentication mechanisms as the Gravitino Java client: Simple, OAuth2, and Kerberos. Authentication is configured through the Trino connector properties file using the `gravitino.client.*` prefix.
 
 If `gravitino.client.authType` is not set, the connector operates in no-authentication mode and connects to the Gravitino server without any credentials.
 
@@ -31,7 +31,7 @@ gravitino.user=admin
 
 | Property                          | Description                                                          | Default value    | Required                               | Since version |
 |-----------------------------------|----------------------------------------------------------------------|------------------|----------------------------------------|---------------|
-| `gravitino.client.authType`       | Authentication type: `simple`, `oauth2`, `kerberos`, or `oauth2_token` | (none)        | No                                     | 1.3.0         |
+| `gravitino.client.authType`       | Authentication type: `simple`, `oauth2`, or `kerberos`                 | (none)        | No                                     | 1.3.0         |
 | `gravitino.user`                  | Username for simple authentication                                   | (none)           | No (uses system user if not specified) | 1.3.0         |
 
 ### OAuth2 Authentication
@@ -57,7 +57,7 @@ gravitino.client.oauth2.scope=gravitino
 
 | Property                             | Description                                            | Default value | Required                    | Since version |
 |--------------------------------------|--------------------------------------------------------|---------------|-----------------------------|---------------|
-| `gravitino.client.authType`          | Authentication type: `simple`, `oauth2`, or `kerberos` | (none)        | Yes (to enable OAuth2)      | 1.3.0         |
+| `gravitino.client.authType`          | Authentication type: `simple`, `oauth2`, or `kerberos` | (none)        | Yes (to enable OAuth2)           | 1.3.0         |
 | `gravitino.client.oauth2.serverUri`  | OAuth2 server URI                                      | (none)        | Yes if authType is `oauth2` | 1.3.0         |
 | `gravitino.client.oauth2.credential` | OAuth2 credentials in format `client_id:client_secret` | (none)        | Yes if authType is `oauth2` | 1.3.0         |
 | `gravitino.client.oauth2.path`       | OAuth2 token endpoint path                             | (none)        | Yes if authType is `oauth2` | 1.3.0         |
@@ -88,38 +88,6 @@ gravitino.client.kerberos.keytabFilePath=/path/to/user.keytab
 | `gravitino.client.kerberos.principal`      | Kerberos principal  | (none)        | Yes if authType is `kerberos`           | 1.3.0         |
 | `gravitino.client.kerberos.keytabFilePath` | Path to keytab file | (none)        | No (uses ticket cache if not specified) | 1.3.0         |
 
-### OAuth2 Token Forwarding
-
-`oauth2_token` authentication forwards the Trino session's per-query OAuth2 Bearer token to the Gravitino server on every request. The token is read from the Trino session's extra credentials using a configured key.
-
-This enables per-query, per-user authorization: each query carries its own access token, so different users can have different permissions on the Gravitino metadata.
-
-**Configuration in `etc/catalog/gravitino.properties`:**
-
-```properties
-connector.name=gravitino
-gravitino.metalake=metalake
-gravitino.uri=http://localhost:8090
-
-# Forward per-query OAuth2 token from Trino session extra credentials
-gravitino.client.authType=oauth2_token
-gravitino.client.oauth2.token.credentialKey=gravitino.token
-```
-
-**Query execution with token:**
-
-```sql
--- Pass an OAuth2 token through Trino extra credentials
-SET SESSION gravitino.extra_credentials = 'gravitino.token=<your-oauth2-token>';
-SHOW SCHEMAS IN my_catalog;
-```
-
-**Configuration properties:**
-
-| Property                                      | Description                                                                           | Default value | Required                             | Since version |
-|-----------------------------------------------|---------------------------------------------------------------------------------------|---------------|--------------------------------------|---------------|
-| `gravitino.client.authType`                   | Authentication type: `oauth2_token`                                                   | (none)        | Yes (to enable token forwarding)     | 1.9.0         |
-| `gravitino.client.oauth2.token.credentialKey` | Key name in Trino extra credentials that holds the Bearer token                       | (none)        | Yes if authType is `oauth2_token`    | 1.9.0         |
 
 ### Example: Connecting to OAuth-protected Gravitino Server
 
@@ -156,27 +124,50 @@ gravitino.client.oauth2.scope=test
 SHOW CATALOGS;
 ```
 
-### Session User Forwarding
+### Session Credential Forwarding
 
-When `authType=simple` is configured, by default the static `gravitino.user` is used as the identity for all requests. Setting `gravitino.client.session.forwardUser=true` overrides this: the Trino session user name is encoded as a `Basic` credential and forwarded to the Gravitino server on every query, so each Trino user is visible in the Gravitino audit log.
+Setting `gravitino.client.session.forwardUser=true` enables per-query credential forwarding from Trino to Gravitino. The behavior depends on the configured `authType`:
 
-**Configuration:**
+- **`authType=simple`**: The Trino session username is encoded as a `Basic` credential and forwarded per-request, so each Trino user is visible in the Gravitino audit log instead of the shared `gravitino.user`.
+- **`authType=oauth2`**: The Bearer token from Trino session extra credentials is forwarded per-request to Gravitino, enabling per-user OAuth2 authorization.
+
+**Configuration for simple auth (forward session user):**
 
 ```properties
 connector.name=gravitino
 gravitino.metalake=metalake
 gravitino.uri=http://localhost:8090
 
-# Forward the Trino session user to Gravitino per-request
 gravitino.client.authType=simple
 gravitino.client.session.forwardUser=true
 ```
 
+**Configuration for OAuth2 (forward session Bearer token):**
+
+```properties
+connector.name=gravitino
+gravitino.metalake=metalake
+gravitino.uri=http://localhost:8090
+
+gravitino.client.authType=oauth2
+gravitino.client.session.forwardUser=true
+gravitino.client.oauth2.token.credentialKey=gravitino.token
+```
+
+**Query execution with OAuth2 token:**
+
+```sql
+-- Pass an OAuth2 token through Trino extra credentials
+SET SESSION gravitino.extra_credentials = 'gravitino.token=<your-oauth2-token>';
+SHOW SCHEMAS IN my_catalog;
+```
+
 **Configuration properties:**
 
-| Property                                       | Description                                                                                  | Default value | Required | Since version |
-|------------------------------------------------|----------------------------------------------------------------------------------------------|---------------|----------|---------------|
-| `gravitino.client.session.forwardUser`         | When `true` with `authType=simple`, the Trino session user is forwarded per-request instead of the static `gravitino.user` | `false` | No | 1.9.0 |
+| Property                                        | Description                                                                                                                              | Default value | Required                                                 | Since version |
+|-------------------------------------------------|------------------------------------------------------------------------------------------------------------------------------------------|---------------|----------------------------------------------------------|---------------|
+| `gravitino.client.session.forwardUser`          | When `true`, forwards the Trino session user (`simple`) or Bearer token (`oauth2`) to Gravitino per-request                              | `false`       | No                                                       | 1.9.0         |
+| `gravitino.client.oauth2.token.credentialKey`   | Key name in Trino extra credentials that holds the Bearer token. Only used when `authType=oauth2` and `forwardUser=true`                  | (none)        | Yes if `authType=oauth2` and `forwardUser=true`          | 1.9.0         |
 
 ### Notes
 

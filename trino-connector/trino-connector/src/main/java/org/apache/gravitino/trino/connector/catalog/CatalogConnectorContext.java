@@ -29,6 +29,7 @@ import org.apache.gravitino.client.GravitinoMetalake;
 import org.apache.gravitino.trino.connector.GravitinoConnector;
 import org.apache.gravitino.trino.connector.GravitinoConnectorPluginManager;
 import org.apache.gravitino.trino.connector.metadata.GravitinoCatalog;
+import org.apache.gravitino.trino.connector.security.TrinoSessionContext;
 
 /**
  * The CatalogConnector serves as a communication bridge between the Apache Gravitino connector and

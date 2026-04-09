@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.gravitino.trino.connector.catalog;
+package org.apache.gravitino.trino.connector.security;
 
 import java.io.File;
 import java.util.HashMap;
@@ -37,7 +37,7 @@ import org.slf4j.LoggerFactory;
  * Gravitino config, and produces an optional {@link TrinoSessionContext} for per-query credential
  * forwarding.
  */
-class GravitinoAuthProvider {
+public class GravitinoAuthProvider {
 
   private static final Logger LOG = LoggerFactory.getLogger(GravitinoAuthProvider.class);
 
@@ -87,11 +87,10 @@ class GravitinoAuthProvider {
       GravitinoClientConfiguration.GRAVITINO_CLIENT_CONFIG_PREFIX + "kerberos.keytabFilePath";
 
   /** Authentication types supported by the Trino connector. */
-  enum AuthType {
+  public enum AuthType {
     SIMPLE,
     OAUTH2,
     KERBEROS,
-    OAUTH2_TOKEN,
     NONE
   }
 
@@ -104,11 +103,11 @@ class GravitinoAuthProvider {
    * propagate it to {@link CatalogConnectorContext} so that {@link
    * org.apache.gravitino.trino.connector.GravitinoMetadata} can apply / clear it around each query.
    */
-  static final class BuildResult {
-    final GravitinoAdminClient client;
-    @Nullable final TrinoSessionContext sessionContext;
+  public static final class BuildResult {
+    public final GravitinoAdminClient client;
+    @Nullable public final TrinoSessionContext sessionContext;
 
-    BuildResult(GravitinoAdminClient client, @Nullable TrinoSessionContext sessionContext) {
+    public BuildResult(GravitinoAdminClient client, @Nullable TrinoSessionContext sessionContext) {
       this.client = client;
       this.sessionContext = sessionContext;
     }
@@ -121,7 +120,7 @@ class GravitinoAuthProvider {
    * @param config the Gravitino configuration containing server URI and client properties
    * @return a {@link BuildResult} containing the configured client and an optional session context
    */
-  static BuildResult build(GravitinoConfig config) {
+  public static BuildResult build(GravitinoConfig config) {
     Map<String, String> clientConfig = new HashMap<>(config.getClientConfig());
     String uri = config.getURI();
     String authTypeStr = clientConfig.get(AUTH_TYPE_KEY);
@@ -139,8 +138,7 @@ class GravitinoAuthProvider {
       } catch (IllegalArgumentException e) {
         throw new IllegalArgumentException(
             String.format(
-                "Invalid authentication type: %s. Valid values are: simple, oauth2, kerberos,"
-                    + " oauth2_token, none",
+                "Invalid authentication type: %s. Valid values are: simple, oauth2, kerberos, none",
                 authTypeStr),
             e);
       }
@@ -157,21 +155,24 @@ class GravitinoAuthProvider {
           }
           break;
         case OAUTH2:
-          builder.withOAuth(buildOAuthProvider(clientConfig));
+          if (forwardUser) {
+            String credentialKey = clientConfig.get(OAUTH2_TOKEN_CREDENTIAL_KEY);
+            if (StringUtils.isBlank(credentialKey)) {
+              throw new IllegalArgumentException(
+                  String.format(
+                      "oauth2 with forwardUser requires a credential key. Please set %s",
+                      OAUTH2_TOKEN_CREDENTIAL_KEY));
+            }
+            LOG.info(
+                "Enabling OAUTH2_SESSION mode: Trino session Bearer token will be forwarded per query");
+            authProvider = new TrinoSessionAuthProvider(credentialKey);
+            builder.withCustomTokenAuth(authProvider);
+          } else {
+            builder.withOAuth(buildOAuthProvider(clientConfig));
+          }
           break;
         case KERBEROS:
           builder.withKerberosAuth(buildKerberosProvider(clientConfig));
-          break;
-        case OAUTH2_TOKEN:
-          String credentialKey = clientConfig.get(OAUTH2_TOKEN_CREDENTIAL_KEY);
-          if (StringUtils.isBlank(credentialKey)) {
-            throw new IllegalArgumentException(
-                String.format(
-                    "oauth2_token auth requires a credential key. Please set %s",
-                    OAUTH2_TOKEN_CREDENTIAL_KEY));
-          }
-          authProvider = new TrinoSessionAuthProvider(credentialKey);
-          builder.withCustomTokenAuth(authProvider);
           break;
         case NONE:
         default:
@@ -207,7 +208,7 @@ class GravitinoAuthProvider {
    */
   @Deprecated
   @SuppressWarnings("InlineMeSuggester")
-  static GravitinoAdminClient buildClient(GravitinoConfig config) {
+  public static GravitinoAdminClient buildClient(GravitinoConfig config) {
     return build(config).client;
   }
 

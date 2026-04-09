@@ -29,6 +29,7 @@ import org.apache.gravitino.rel.types.Type;
 import org.apache.gravitino.trino.connector.metadata.GravitinoColumn;
 import org.apache.gravitino.trino.connector.metadata.GravitinoSchema;
 import org.apache.gravitino.trino.connector.metadata.GravitinoTable;
+import org.apache.gravitino.trino.connector.security.TrinoSessionContext;
 
 /**
  * A session-aware facade over {@link CatalogConnectorMetadata} that automatically applies and

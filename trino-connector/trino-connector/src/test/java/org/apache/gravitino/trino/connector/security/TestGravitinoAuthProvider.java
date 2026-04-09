@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.gravitino.trino.connector.catalog;
+package org.apache.gravitino.trino.connector.security;
 
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
@@ -172,21 +172,25 @@ public class TestGravitinoAuthProvider {
   }
 
   @Test
-  public void testBuildOAuth2TokenMissingCredentialKey() {
+  public void testBuildOAuth2WithForwardUserMissingCredentialKey() {
     assertThrows(
         IllegalArgumentException.class,
         () ->
             GravitinoAuthProvider.build(
-                buildConfig(ImmutableMap.of(GravitinoAuthProvider.AUTH_TYPE_KEY, "oauth2_token"))));
+                buildConfig(
+                    ImmutableMap.of(
+                        GravitinoAuthProvider.AUTH_TYPE_KEY, "oauth2",
+                        GravitinoAuthProvider.FORWARD_SESSION_USER_KEY, "true"))));
   }
 
   @Test
-  public void testBuildOAuth2TokenReturnsSessionContext() {
+  public void testBuildOAuth2WithForwardUserReturnsSessionContext() {
     GravitinoAuthProvider.BuildResult result =
         GravitinoAuthProvider.build(
             buildConfig(
                 ImmutableMap.of(
-                    GravitinoAuthProvider.AUTH_TYPE_KEY, "oauth2_token",
+                    GravitinoAuthProvider.AUTH_TYPE_KEY, "oauth2",
+                    GravitinoAuthProvider.FORWARD_SESSION_USER_KEY, "true",
                     GravitinoAuthProvider.OAUTH2_TOKEN_CREDENTIAL_KEY, "my-token-key")));
     assertNotNull(result.client);
     assertNotNull(result.sessionContext);
