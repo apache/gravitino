@@ -18,6 +18,7 @@
  */
 package org.apache.gravitino.catalog.glue;
 
+import java.util.Locale;
 import org.apache.gravitino.connector.capability.Capability;
 import org.apache.gravitino.connector.capability.CapabilityResult;
 
@@ -69,7 +70,7 @@ public class GlueCatalogCapability implements Capability {
         // See https://docs.aws.amazon.com/glue/latest/dg/aws-glue-api-catalog-tables.html
         return CapabilityResult.unsupported(
             "AWS Glue Data Catalog is case-insensitive for "
-                + scope.name().toLowerCase(java.util.Locale.ROOT)
+                + scope.name().toLowerCase(Locale.ROOT)
                 + " names.");
       default:
         return CapabilityResult.SUPPORTED;
