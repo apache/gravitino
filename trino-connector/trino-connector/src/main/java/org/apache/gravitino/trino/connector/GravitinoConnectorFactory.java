@@ -155,17 +155,22 @@ public class GravitinoConnectorFactory implements ConnectorFactory {
     return "\"" + metalakeName + "." + catalogName + "\"";
   }
 
-  private void checkTrinoSpiVersion(ConnectorContext context, GravitinoConfig config) {
+  @VisibleForTesting
+  void checkTrinoSpiVersion(ConnectorContext context, GravitinoConfig config) {
     String spiVersion = context.getSpiVersion();
     trinoVersion = Integer.parseInt(spiVersion);
 
-    // check catalog name with metalake are supported in this trino version
+    // Catalog names that include the metalake (e.g. "metalake.catalog") may have
+    // limitations on this Trino version. This was originally relaxed from an error to a
+    // warning in #7256 so users could opt in; the split refactor in #9735 inadvertently
+    // re-introduced the hard error (#10717), so we keep it as a warning here.
     if (!config.singleMetalakeMode() && !supportCatalogNameWithMetalake()) {
-      String errmsg =
-          String.format(
-              "The trino-connector-%s-%s does not support catalog name with metalake.",
-              getMinSupportTrinoSpiVersion(), getMaxSupportTrinoSpiVersion());
-      throw new TrinoException(GravitinoErrorCode.GRAVITINO_UNSUPPORTED_TRINO_VERSION, errmsg);
+      LOG.warn(
+          "The trino-connector-{}-{} may not fully support catalog names that include "
+              + "the metalake. Some errors may occur when using USE <CATALOG>.<SCHEMA> "
+              + "statements in Trino.",
+          getMinSupportTrinoSpiVersion(),
+          getMaxSupportTrinoSpiVersion());
     }
 
     // skip version validation
