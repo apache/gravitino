@@ -17,6 +17,8 @@ This Helm chart deploys Apache Gravitino Iceberg REST Catalog Server on Kubernet
 
 ## Installation
 
+### Install from OCI Registry (Recommended for Released Versions)
+
 Pull the chart from Docker Hub OCI registry:
 
 ```console
@@ -27,6 +29,27 @@ Or install directly:
 
 ```console
 helm upgrade --install gravitino-iceberg oci://registry-1.docker.io/apache/gravitino-iceberg-rest-server-helm --version <VERSION> -n gravitino --create-namespace
+```
+
+### Install from Local Repository (For Development or Unreleased Versions)
+
+Clone the repository and navigate to the chart directory:
+
+```console
+git clone https://github.com/apache/gravitino.git
+cd gravitino/dev/charts
+```
+
+Update chart dependencies:
+
+```console
+helm dependency update gravitino-iceberg-rest-server
+```
+
+Install the chart:
+
+```console
+helm upgrade --install gravitino-iceberg ./gravitino-iceberg-rest-server -n gravitino --create-namespace
 ```
 
 ## View Chart Values
