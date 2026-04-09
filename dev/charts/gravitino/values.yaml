@@ -510,7 +510,7 @@ livenessProbe:
 ## the gravitino user's GID so mounted volumes are writable by the container.
 ##
 podSecurityContext: {}
-  # fsGroup: 65534  # set to the GID of the gravitino system user if using PVCs
+  # fsGroup: 1000  # set when using PVCs so mounted volumes are writable by UID 1000
 
 ## Init container security context configuration
 ## Applied to all initContainers (sqlfile, init-mysql, init-postgresql).
@@ -518,12 +518,14 @@ podSecurityContext: {}
 ##
 initContainerSecurityContext:
   runAsNonRoot: true
+  runAsUser: 1000
 
 ## Container-specific security context configuration
 ## ref: https://kubernetes.io/docs/tasks/configure-pod-container/security-context/
 ##
 containerSecurityContext:
   runAsNonRoot: true
+  runAsUser: 1000
 
 ## Container Environment
 ##

@@ -105,7 +105,7 @@ podSecurityContext: {}
 
 securityContext:
   runAsNonRoot: true
-  # capabilities:
+  runAsUser: 1000
   #   drop:
   #   - ALL
   # readOnlyRootFilesystem: true

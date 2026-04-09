@@ -22,18 +22,16 @@ LABEL maintainer="dev@gravitino.apache.org"
 RUN apt-get update && apt-get install -y \
     python-is-python3
 
-RUN groupadd -r gravitino && useradd -r -g gravitino gravitino
-
 WORKDIR /opt/gravitino
 
 COPY packages/gravitino /opt/gravitino
 
-RUN chown -R gravitino:gravitino /opt/gravitino \
+RUN chmod -R g+rwX /opt/gravitino \
     && chmod +x /opt/gravitino/bin/start-gravitino.sh
 
 EXPOSE 8090
 EXPOSE 9001
 
-USER gravitino
+USER 1000
 
 ENTRYPOINT ["/bin/bash", "/opt/gravitino/bin/start-gravitino.sh"]
