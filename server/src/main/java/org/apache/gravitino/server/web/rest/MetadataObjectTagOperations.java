@@ -40,6 +40,8 @@ import javax.ws.rs.Produces;
 import javax.ws.rs.QueryParam;
 import javax.ws.rs.core.Context;
 import javax.ws.rs.core.Response;
+
+import dev.langchain4j.agent.tool.Tool;
 import org.apache.commons.lang3.ArrayUtils;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.MetadataObject;
@@ -159,6 +161,7 @@ public class MetadataObjectTagOperations {
   @Timed(name = "list-object-tags." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
   @ResponseMetered(name = "list-object-tags", absolute = true)
   @AuthorizationExpression(expression = CAN_ACCESS_METADATA)
+  @Tool
   public Response listTagsForMetadataObject(
       @PathParam("metalake") @AuthorizationMetadata(type = Entity.EntityType.METALAKE)
           String metalake,
