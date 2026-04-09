@@ -64,9 +64,9 @@ public class GlueCatalogCapability implements Capability {
     switch (scope) {
       case SCHEMA:
       case TABLE:
-      case COLUMN:
         // Glue folds database/table names to lowercase on storage.
         // See https://docs.aws.amazon.com/glue/latest/dg/aws-glue-api-catalog-databases.html
+        // See https://docs.aws.amazon.com/glue/latest/dg/aws-glue-api-catalog-tables.html
         return CapabilityResult.unsupported(
             "AWS Glue Data Catalog is case-insensitive for "
                 + scope.name().toLowerCase(java.util.Locale.ROOT)
