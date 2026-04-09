@@ -199,13 +199,13 @@ list (userId comes for free from the same query).
 
 ### 2.2 Requirements
 
-| Goal                            | Requirement                                                                                                  |
-|---------------------------------|--------------------------------------------------------------------------------------------------------------|
-| HA auth consistency             | Privilege revocations visible on all nodes at the next auth request (or within poll interval for Approach B) |
-| Auth self-sufficiency           | [A] and [C1] protected without relying on entity store cache                                                 |
-| Auth performance                | Hot path: ≤ 3 lightweight DB queries (Approach A) or ≤ 1 (Approach B)                                        |
-| No new mandatory infrastructure | Solution requires only the existing DB                                                                       |
-| Incremental delivery            | Phase 1 independently shippable                                                                              |
+| Goal                            | Requirement                                                                                                   |
+|---------------------------------|---------------------------------------------------------------------------------------------------------------|
+| HA auth consistency             | Privilege revocations visible on all nodes at the next auth request                                           |
+| Auth self-sufficiency           | [A] and [C1] protected without relying on entity store cache                                                  |
+| Auth performance                | Hot path: ≤ 3 lightweight DB queries                                                                          |
+| No new mandatory infrastructure | Solution requires only the existing DB                                                                        |
+| Incremental delivery            | Phase 1 independently shippable                                                                               |
 
 ---
 
@@ -223,7 +223,7 @@ Polaris achieves strong consistency by embedding two version counters on every e
 | Cache miss              | Not in cache          | **1** — full load                     |
 
 `loadEntitiesChangeTracking(ids)` issues one lightweight query returning only integer version
-columns for a batch of IDs — the same pattern used in Approach A's Step 3 below.
+columns for a batch of IDs — the same pattern used in §4.1 Step 3 below.
 
 **Key difference from Gravitino:** Polaris bundles entity + grants in one cached object, so
 one batch query validates both dimensions. Gravitino separates user→role from role→privilege,
@@ -237,20 +237,14 @@ requiring 2 version-check queries on a warm hit. Both achieve strong consistency
 Recommended future direction if Gravitino needs stronger delivery guarantees.
 
 **DB version polling** — monotonic counters incremented in write transaction; a background
-thread polls for version changes and proactively invalidates caches. Directly applicable as
-Approach B below.
+thread polls for version changes and proactively invalidates caches. Considered but not
+adopted; per-request validation (§4.1) achieves strong consistency without background threads.
 
 ---
 
-## 4. Design Approaches
+## 4. Design
 
-Both approaches share the same schema changes and cache data structures. They differ only
-in **when** version validation is performed: inline on every auth request (Approach A) or
-proactively by a background thread (Approach B).
-
----
-
-### 4.1 Approach A — Per-Request Version Check (Polaris Style)
+### 4.1 Per-Request Version Check (Polaris Style)
 
 Every auth request executes two lightweight version-check queries before serving from cache.
 If any version has advanced, only the stale portion is reloaded. Staleness window: **zero**.
@@ -283,6 +277,12 @@ Write paths that must bump the version **in the same DB transaction**:
 | Assign / revoke role for group G   | `group_meta.role_grants_version WHERE group_id = G`     | `GroupMetaService` |
 
 Version comparison uses `!=` (not `<`) to safely handle theoretical INT wrap-around.
+
+**Ownership transfers** do not require a version column. The `ownerRel` cache is removed;
+Step 2.5 queries `owner_meta` directly on every `OWNER`-privilege check, providing strong
+consistency without caching. The soft-delete pattern of `owner_meta` (old row deleted, new
+row inserted with `current_version = 1`) makes version-based cache validation unreliable
+for this table. Direct query is simpler and always correct. See §7.2.
 
 #### 4.1.2 Cache Data Structures (Changes in JcasbinAuthorizer)
 
@@ -363,6 +363,12 @@ authorize(metalakeName, username, resource, operation)
 │   metadataId = MetadataIdConverter.getID(resource, metalake)  ← 1 indexed DB query
 │   Always correct: rename does not change ID; drop+recreate returns the new ID.
 │
+│   TODO: A strong-consistency name→id cache could eliminate this DB query on the warm
+│   path. Version-based validation does not apply here (checking the version requires
+│   the same query that returns the ID). A viable approach would require an
+│   entity_mutation_log for cross-node invalidation plus write-path eviction on the
+│   local node. Not implemented in this phase.
+│
 ├─ [Only when privilege == OWNER] STEP 2.5 — Query ownership directly (no cache):
 │
 │   SELECT owner_id, owner_type FROM owner_meta
@@ -414,240 +420,59 @@ authorize(metalakeName, username, resource, operation)
 | **SecurableObject drop**                      | Step 2 returns "not found" → auth denied. Orphan JCasbin policies remain in memory but can never be matched (no ID resolves to the dropped object). **Safe.**                                                                   |
 | **SecurableObject drop + same-name recreate** | The new object gets a new `metadataId`. No JCasbin policy covers it → DENY until a new privilege grant bumps `securable_objects_version` in the same transaction and Step 3 detects the version change to reload policies. **Correct.** |
 
----
+#### 4.1.6 Concurrent Mutation During Auth (TOCTOU)
 
-### 4.2 Approach B — Background Poll + Proactive Invalidation
+The version check in Step 1 and the policy reload in Step 3 are not atomic with the
+`enforce()` call in Step 4. A concurrent write on another thread or node can advance a
+version counter between these steps. This section analyses the bounded impact.
 
-A background thread on each node periodically detects auth mutations and proactively
-invalidates stale cache entries before any auth request arrives. The hot path never issues
-version-check queries. Staleness window: **≤ poll interval** (configurable).
-
-The critical difference from Approach A: Approach A needs fine-grained per-entity versions
-to know **exactly what changed** (this specific user? this specific role?) so it can reload
-only the stale part inline. Approach B only needs to know **whether anything changed**, then
-proactively invalidates before the next request. This means the schema can be much simpler.
-
-#### 4.2.1 Schema Changes — Two Options
-
-**Option B-Global: one new table, no changes to existing tables**
-
-```sql
-CREATE TABLE `auth_global_version` (
-    `metalake_id`  BIGINT UNSIGNED NOT NULL COMMENT 'metalake this version tracks',
-    `version`      BIGINT UNSIGNED NOT NULL DEFAULT 1
-                   COMMENT 'monotonically increasing; bumped by any auth mutation in this metalake',
-    PRIMARY KEY (`metalake_id`)
-);
-```
-
-Write path — **every** auth mutation (grant/revoke privilege, assign/revoke role, transfer
-ownership) adds one UPDATE in the same transaction:
-
-```sql
--- in the same transaction as the actual grant/revoke/assign
-UPDATE auth_global_version SET version = version + 1 WHERE metalake_id = #{metalakeId}
-```
-
-Background poll:
-```sql
-SELECT version FROM auth_global_version WHERE metalake_id = ?
-```
-→ If version advanced → invalidate **all** auth cache entries for this metalake (coarse).
-
-**Trade-off:** Any single auth mutation invalidates all users' and all roles' cache entries
-for the metalake. The next batch of auth requests all experience cache misses simultaneously
-(cache stampede). For most deployments where auth mutations are rare, this is acceptable.
-For high-churn environments, Option B-Fine below is better.
-
----
-
-**Option B-Fine: same per-table versions as Approach A (fine-grained)**
-
-Identical schema changes as §4.1.1 (three `ALTER TABLE` statements). The background poll
-batch-checks `role_grants_version` and `securable_objects_version` and invalidates only the
-specific users and roles that changed — no cache stampede.
-
-```sql
--- Poll query 1: batch check all cached users
-SELECT user_id, role_grants_version FROM user_meta
-WHERE user_id IN (...all cached user IDs...) AND deleted_at = 0
-
--- Poll query 2: batch check all cached roles
-SELECT role_id, securable_objects_version FROM role_meta
-WHERE role_id IN (...all cached role IDs...) AND deleted_at = 0
-```
-
-**Trade-off:** Requires 3 schema changes (same as Approach A). Targeted invalidation —
-only stale users and roles are evicted, all other cache entries remain valid.
-
-#### 4.2.2 Cache Data Structures
-
-**Identical to Approach A** — `userRoleCache`, `groupRoleCache`, `loadedRoles` (Boolean→
-Integer), `ownerRel` removed. The cache structures are the same; only the invalidation
-mechanism differs.
-
-#### 4.2.3 Background Poll Thread
-
-```java
-// Runs every poll_interval seconds (configurable, default 5 s)
-class AuthCachePollThread implements Runnable {
-
-    @Override
-    public void run() {
-        if (useGlobalVersion) {
-            pollGlobalVersion();    // Option B-Global
-        } else {
-            pollFineGrainedVersions();  // Option B-Fine
-        }
-    }
-
-    // ── Option B-Global ──────────────────────────────────────────────────
-    private void pollGlobalVersion() {
-        long cachedVersion = lastSeenGlobalVersion.get(metalakeId);
-        // SELECT version FROM auth_global_version WHERE metalake_id = ?
-        long dbVersion = authGlobalVersionMapper.getVersion(metalakeId);
-        if (dbVersion != cachedVersion) {
-            invalidateAllForMetalake(metalakeName);  // coarse: evict everything
-            lastSeenGlobalVersion.put(metalakeId, dbVersion);
-        }
-    }
-
-    private void invalidateAllForMetalake(String metalakeName) {
-        // 1. Evict all userRoleCache entries whose key starts with metalakeName + ":"
-        userRoleCache.invalidateIf(key -> key.startsWith(metalakeName + ":"));
-        groupRoleCache.invalidateIf(key -> key.startsWith(metalakeName + ":"));
-
-        // 2. Evict all loadedRoles entries for roles in this metalake, clear JCasbin
-        Set<Long> metalakeRoleIds = metalakeToRoleIds.getOrDefault(metalakeId, Set.of());
-        for (long roleId : metalakeRoleIds) {
-            loadedRoles.invalidate(roleId);
-            allowEnforcer.deleteRole(String.valueOf(roleId));
-            denyEnforcer.deleteRole(String.valueOf(roleId));
-        }
-        metalakeToRoleIds.remove(metalakeId);  // clear the auxiliary index
-    }
-
-    // ── Option B-Fine ────────────────────────────────────────────────────
-    private void pollFineGrainedVersions() {
-        // Batch check all cached users
-        Map<Long, String>  userIdToKey  = collectCachedUserIds();
-        Map<Long, Integer> userVersions = userMetaMapper.batchGetRoleGrantsVersions(userIdToKey.keySet());
-        for (var entry : cachedUserEntries()) {
-            int dbVer = userVersions.getOrDefault(entry.getValue().userId(), -1);
-            if (dbVer == -1 || dbVer != entry.getValue().roleGrantsVersion()) {
-                userRoleCache.invalidate(entry.getKey());
-            }
-        }
-
-        // Batch check all cached roles
-        Set<Long>          cachedRoles  = loadedRoles.asMap().keySet();
-        Map<Long, Integer> roleVersions = roleMetaMapper.batchGetSecurableObjectsVersions(cachedRoles);
-        for (long roleId : cachedRoles) {
-            int dbVer = roleVersions.getOrDefault(roleId, -1);
-            if (dbVer == -1 || !Objects.equals(dbVer, loadedRoles.getIfPresent(roleId).orElse(null))) {
-                loadedRoles.invalidate(roleId);
-                allowEnforcer.deleteRole(String.valueOf(roleId));
-                denyEnforcer.deleteRole(String.valueOf(roleId));
-            }
-        }
-    }
-}
-```
-
-`metalakeToRoleIds: Map<Long, Set<Long>>` is an auxiliary in-memory index maintained in
-`JcasbinAuthorizer`: when a role is loaded into `loadedRoles`, add it to the metalake's set;
-when evicted, remove it. Required only for Option B-Global to identify which roles to clear.
-
-Thread lifecycle: started in `JcasbinAuthorizer.init()`, shut down in `close()`.
-Uses a single-thread `ScheduledExecutorService` with fixed delay (not fixed rate, to avoid
-overlapping polls if one takes longer than the interval).
-
-#### 4.2.4 Auth Check Flow
-
-Same for both B-Global and B-Fine — no version queries in the request path:
+**Scenario A — Role revoked between Step 1 read and Step 3 policy check**
 
 ```
-authorize(metalakeName, username, resource, operation)
-│
-├─ STEP 1 — Check userRoleCache (no version query — poll thread keeps it current):
-│
-│   userRoleCache HIT → use cached userId and roleIds    [A] and [C1] from cache
-│
-│   MISS (first request, or evicted by poll thread):
-│     → SELECT um.user_id, um.role_grants_version
-│         FROM user_meta um JOIN metalake_meta mm ON ... WHERE ...  ← same as Approach A Step 1
-│     → SELECT role_id FROM user_role_rel WHERE user_id = ? AND deleted_at = 0
-│     → userRoleCache.put(key, new CachedUserRoles(userId, version, roleIds))
-│
-├─ STEP 2 — Resolve target resource ID (always DB, no cache):
-│   metadataId = MetadataIdConverter.getID(resource, metalake)  ← 1 indexed DB query
-│
-├─ [Only when privilege == OWNER] STEP 2.5 — Query ownership directly (no cache):
-│   SELECT owner_id, owner_type FROM owner_meta WHERE metadata_object_id = ? AND deleted_at = 0
-│
-├─ STEP 3 — Check loadedRoles (no version query — poll thread keeps it current):
-│   loadedRoles HIT → [C2][C3] avoided
-│   MISS → reload securable objects for this role from DB
-│
-└─ STEP 4 — enforce() (in-memory, O(1))
+Thread A  Step 1: reads role_grants_version = 5 → matches cache → roleIds = [R1, R2]
+Thread B  commits: revokes R2 from user → role_grants_version bumped to 6
+Thread A  Step 3: checks R1, R2 versions → both current (policies loaded) → skips reload
+Thread A  Step 4: enforce() sees R2 policy → may ALLOW using revoked role
 ```
 
-**Note on entity storage cache dependency:** After poll-based invalidation, the reload path
-(Step 1 on cache miss, securable objects reload on loadedRoles miss) goes directly to DB
-through MyBatis mappers — **no entity storage cache involved**. Phase 2 auth caches rebuild
-themselves from DB in the same way as cold start. The entity cache (Layer 1) is fully
-disabled in Phase 2 and is not part of any reload path.
+Thread A's check reflects the DB state at the moment of Step 1. The revoke is visible
+on Thread A's **next** request (Step 1 reads version 6 → mismatch → reloads role list →
+R2 absent → JCasbin user-role mapping updated → DENY). The inconsistency window is
+bounded to **the duration of one auth request** (typically single-digit milliseconds).
 
-#### 4.2.5 Properties
+Strictly eliminating this window would require serializable isolation across the entire
+auth flow, which is impractical at auth-request frequency. The window is acceptable.
 
-| Dimension                | B-Global (new version table)                                 | B-Fine (per-table versions)                |
-|--------------------------|--------------------------------------------------------------|--------------------------------------------|
-| Staleness window         | **≤ poll interval**                                          | **≤ poll interval**                        |
-| Schema changes           | **1 new table**, 0 existing table changes                    | 3 columns on existing tables               |
-| Hot path DB queries      | **1** (Step 2 only)                                          | **1** (Step 2 only)                        |
-| Invalidation granularity | Coarse — entire metalake                                     | Fine — only changed user/role              |
-| Cache stampede risk      | **Yes** — all users cold miss after any mutation             | **No** — only stale entries evicted        |
-| Write path contention    | One row per metalake (may be hot under concurrent mutations) | One row per role/user                      |
-| Background threads       | 1 per node                                                   | 1 per node                                 |
-| Failure mode             | Poll failure → stale reads until next poll                   | Poll failure → stale reads until next poll |
+**Scenario B — Privilege revoked during policy reload (Step 3)**
 
----
+```
+Thread A  Step 3: detects R1 stale (version N → N+1) → calls deleteRole(R1), reloads
+Thread B  commits: another revoke on R1 → version bumped to N+2
+Thread A  reads R1 securable objects from DB → may get version-N+1 snapshot
+Thread A  stores loadedRoles(R1) = N+1
+Next req  Step 3: db version = N+2, cache = N+1 → mismatch → reload again ✅
+```
 
-### 4.3 Comparison and Recommendation
+Thread A might serve one request using N+1 policies (missing the N+2 revoke). The
+**next** request detects the mismatch and reloads. Bounded to one request window.
 
-| Dimension                | Approach A                   | Approach B-Global                           | Approach B-Fine                  |
-|--------------------------|------------------------------|---------------------------------------------|----------------------------------|
-| Staleness window         | **0**                        | ≤ poll interval                             | ≤ poll interval                  |
-| Hot path DB queries      | **3**                        | **1**                                       | **1**                            |
-| OWNER hot path queries   | **4**                        | **2**                                       | **2**                            |
-| Schema changes           | 3 columns on existing tables | **1 new table**                             | 3 columns on existing tables     |
-| Invalidation on mutation | Targeted (per-user/role)     | Coarse (whole metalake)                     | Targeted (per-user/role)         |
-| Cache stampede risk      | None                         | **Yes** (all users cold after any mutation) | None                             |
-| Write path               | +1 UPDATE in existing tx     | +1 UPDATE in existing tx                    | +1 UPDATE in existing tx         |
-| Background threads       | **None**                     | 1 per node                                  | 1 per node                       |
-| Failure mode             | DB down → auth blocked       | Poll failure → stale reads                  | Poll failure → stale reads       |
-| Best for                 | Zero-staleness requirement   | Simple schema, low-mutation rate            | High-QPS + targeted invalidation |
+**Scenario C — Concurrent reload of the same role by two threads**
 
-**Recommendation:**
+Both threads call `deleteRole(R1)` then reload. `SyncedEnforcer` serialises JCasbin
+mutations; the second reload overwrites the first with the same (or newer) DB data.
+Final state is correct. No correctness issue.
 
-1. **Default choice: Approach A** — zero staleness, no background thread, simpler failure
-   semantics. The +2 lightweight queries per request are the only cost.
+**Summary**
 
-2. **If QPS is high and a few seconds' staleness is acceptable:** Approach B-Global is the
-   simplest implementation — only 1 new table, no changes to existing tables. Acceptable
-   when auth mutations are rare (which is typical: role/privilege changes happen on admin
-   actions, not on every query).
+| Race                                       | Worst-case window                   | Acceptability                        |
+|--------------------------------------------|-------------------------------------|--------------------------------------|
+| Revoke committed after Step 1 version read | Duration of 1 auth request          | Acceptable — next request is correct |
+| Revoke committed during Step 3 reload      | Duration of 1 auth request          | Acceptable — next request is correct |
+| Concurrent reload of same role             | None (serialised by SyncedEnforcer) | No issue                             |
 
-3. **If B-Global's cache stampede is a concern:** Approach B-Fine gives targeted invalidation
-   at the cost of the same schema changes as Approach A.
-
-4. **Combined:** Approach B for the common case, Approach A version-check as a fallback on
-   cache miss or before the first poll has run after startup.
-
-**Note on entity storage cache:** After invalidation in either Approach B variant, the reload
-path uses direct DB queries through MyBatis mappers — identical to cold start. Entity cache
-(Layer 1) is fully disabled in Phase 2 and is not part of any reload path. There is no
-entity storage cache dependency in Phase 2.
+The TOCTOU window is an inherent property of non-serializable reads in distributed systems.
+It applies only during concurrent admin mutations (which are rare in practice), not on
+the steady-state auth path.
 
 ---
 
@@ -667,61 +492,26 @@ as a stepping stone — Phase 2 closes this). Consistency still TTL-bounded.
 
 ---
 
-### Phase 2A — Approach A Implementation
+### Phase 2 — Version-Validated Auth Cache Implementation
 
 | Step  | Change                                                                      | Module                                 |
 |-------|-----------------------------------------------------------------------------|----------------------------------------|
-| 2A.1  | `ADD COLUMN securable_objects_version` on `role_meta`                       | `schema-x.y.z-*.sql`                   |
-| 2A.2  | `ADD COLUMN role_grants_version` on `user_meta`                             | `schema-x.y.z-*.sql`                   |
-| 2A.3  | `ADD COLUMN role_grants_version` on `group_meta`                            | `schema-x.y.z-*.sql`                   |
-| 2A.4  | Bump `securable_objects_version` in privilege grant/revoke transaction      | `RoleMetaService`                      |
-| 2A.5  | Bump `role_grants_version` in role assign/revoke transaction (user + group) | `UserMetaService`, `GroupMetaService`  |
-| 2A.6  | Add `userRoleCache: GravitinoCache<String, CachedUserRoles>`                | `JcasbinAuthorizer`                    |
-| 2A.7  | Add `groupRoleCache: GravitinoCache<String, CachedGroupRoles>`              | `JcasbinAuthorizer`                    |
-| 2A.8  | Change `loadedRoles` type: `Boolean` → `Integer` (stores version)           | `JcasbinAuthorizer`                    |
-| 2A.9  | Rewrite `loadRolePrivilege()` + `authorize()` with 4-step flow (§4.1.3)     | `JcasbinAuthorizer`                    |
-| 2A.10 | Add mapper methods (see §6.1)                                               | mapper + SQL                           |
-| 2A.11 | Remove `ownerRel`; add `selectOwnerByMetadataObjectId` for OWNER checks     | `JcasbinAuthorizer`, `OwnerMetaMapper` |
+| 2.1   | `ADD COLUMN securable_objects_version` on `role_meta`                       | `schema-x.y.z-*.sql`                   |
+| 2.2   | `ADD COLUMN role_grants_version` on `user_meta`                             | `schema-x.y.z-*.sql`                   |
+| 2.3   | `ADD COLUMN role_grants_version` on `group_meta`                            | `schema-x.y.z-*.sql`                   |
+| 2.4   | Bump `securable_objects_version` in privilege grant/revoke transaction      | `RoleMetaService`                      |
+| 2.5   | Bump `role_grants_version` in role assign/revoke transaction (user + group) | `UserMetaService`, `GroupMetaService`  |
+| 2.6   | Add `userRoleCache: GravitinoCache<String, CachedUserRoles>`                | `JcasbinAuthorizer`                    |
+| 2.7   | Add `groupRoleCache: GravitinoCache<String, CachedGroupRoles>`              | `JcasbinAuthorizer`                    |
+| 2.8   | Change `loadedRoles` type: `Boolean` → `Integer` (stores version)           | `JcasbinAuthorizer`                    |
+| 2.9   | Rewrite `loadRolePrivilege()` + `authorize()` with 4-step flow (§4.1.3)     | `JcasbinAuthorizer`                    |
+| 2.10  | Add mapper methods (see §6.1)                                               | mapper + SQL                           |
+| 2.11  | Remove `ownerRel`; add `selectOwnerByMetadataObjectId` for OWNER checks     | `JcasbinAuthorizer`, `OwnerMetaMapper` |
 
 **Outcome:** Zero staleness. Hot path: 3 lightweight DB queries (2 version checks + 1 ID lookup).
 
 ---
 
-### Phase 2B — Approach B Implementation (alternative to 2A)
-
-Cache data structure changes are **identical to 2A** (steps 2A.6–2A.9, 2A.11). The difference
-is in schema and the poll mechanism. Two sub-options:
-
-**Phase 2B-Global (simpler schema — recommended starting point for Approach B):**
-
-| Step   | Change                                                                                     | Module                                                   |
-|--------|--------------------------------------------------------------------------------------------|----------------------------------------------------------|
-| 2B-G.1 | Create `auth_global_version` table (1 row per metalake)                                    | `schema-x.y.z-*.sql`                                     |
-| 2B-G.2 | Bump `auth_global_version.version` in every auth mutation transaction                      | `RoleMetaService`, `UserMetaService`, `GroupMetaService` |
-| 2B-G.3 | Add `AuthGlobalVersionMapper.getVersion(metalakeId)`                                       | mapper + SQL                                             |
-| 2B-G.4 | Add `AuthCachePollThread` (B-Global variant); maintain `metalakeToRoleIds` auxiliary index | `JcasbinAuthorizer`                                      |
-| 2B-G.5 | Add config `gravitino.authorization.poll.interval.secs` (default: 5)                       | `Configs.java`                                           |
-| 2B-G.6 | Simplify `authorize()`: remove version queries from Steps 1 and 3                          | `JcasbinAuthorizer`                                      |
-
-**Outcome:** 1 new table, 0 changes to existing tables. Staleness ≤ poll interval. Hot path: 1 DB query.
-Cache stampede possible after mutations (all users for metalake invalidated simultaneously).
-
----
-
-**Phase 2B-Fine (same schema as Approach A — targeted invalidation):**
-
-| Step     | Change                                                                     | Module                                                   |
-|----------|----------------------------------------------------------------------------|----------------------------------------------------------|
-| 2B-F.1–3 | `ADD COLUMN` on `role_meta`, `user_meta`, `group_meta` — same as 2A.1–2A.3 | `schema-x.y.z-*.sql`                                     |
-| 2B-F.4–5 | Bump versions in mutation transactions — same as 2A.4–2A.5                 | `RoleMetaService`, `UserMetaService`, `GroupMetaService` |
-| 2B-F.6   | Add `AuthCachePollThread` (B-Fine variant) with batch version poll queries | `JcasbinAuthorizer`                                      |
-| 2B-F.7   | Add config `gravitino.authorization.poll.interval.secs` (default: 5)       | `Configs.java`                                           |
-| 2B-F.8   | Simplify `authorize()`: remove version queries from Steps 1 and 3          | `JcasbinAuthorizer`                                      |
-
-**Outcome:** 3 schema changes (same as Approach A). Staleness ≤ poll interval. Hot path: 1 DB query.
-Targeted invalidation — no cache stampede.
-
----
 
 ## 6. Implementation Details
 
@@ -826,15 +616,29 @@ only if there is pressure to disable entity cache before the version infrastruct
 
 ### 7.2 `ownerRel` — Why Removed Instead of Version-Validated
 
-`owner_meta` uses soft-delete for ownership transfers (delete old row + insert new row).
-The new row's `current_version` always starts at 1, making `current_version` useless for
-detecting ownership staleness. Adding `owner_version` to every owned entity type (catalog,
-schema, table, fileset, topic, view, ...) is invasive.
+**Why version-based caching does not apply to `owner_meta`:**
 
-**Resolution:** Remove `ownerRel` cache. Since `ownerRel` is only consulted for
-`privilege == OWNER` (regular privilege checks never touch it), and `metadataId` is already
-resolved in Step 2, one additional indexed query on `owner_meta` (Step 2.5) provides strong
-consistency for OWNER checks at the cost of +1 query only on OWNER evaluations.
+`owner_meta` uses a soft-delete pattern for ownership transfers: the old ownership row is
+soft-deleted and a new row is inserted. The new row's version counter always starts at 1,
+so a version field on `owner_meta` cannot distinguish "freshly cached" from "ownership just
+transferred" — any new row looks identical to the cache.
+
+Adding an `owner_version` counter to every owned entity type (`catalog_meta`, `schema_meta`,
+`table_meta`, `fileset_meta`, `topic_meta`, `view_meta`, `model_meta`, ...) is invasive and
+couples the entity schema to the auth cache.
+
+**Resolution:** Remove the `ownerRel` cache entirely. `OWNER`-privilege checks are rare
+(only triggered by `privilege == OWNER`, not by regular SELECT / CREATE / ALTER checks).
+Since `metadataId` is already resolved in Step 2, one additional indexed query on
+`owner_meta` (Step 2.5) provides **strong consistency** for OWNER checks at the cost of
++1 query per OWNER evaluation.
+
+**Cross-node consistency:** Because ownership is never cached, ownership transfers are
+immediately visible on all nodes — no version propagation needed.
+
+**Future consideration:** If OWNER-check volume grows and caching becomes necessary, an
+explicit `owner_grants_version` column on `metalake_meta` (bumped on any ownership change
+within the metalake) would be the cleanest version signal. Not planned for this phase.
 
 ### 7.3 Group Role Assignments
 
@@ -858,25 +662,25 @@ With entity cache **enabled** and all in-process caches warm, the current system
 from pure in-process Caffeine with **0 DB queries**. Phase 2 exchanges this for a small,
 bounded query count plus strong HA consistency.
 
-| Scenario                 | Entity cache ON (current)    | Phase 1                   | Phase 2A              | Phase 2B (either variant)      |
-|--------------------------|------------------------------|---------------------------|-----------------------|--------------------------------|
-| Hot path — all current   | **0** (fully in-memory)      | 3+ heavy full-row queries | **3 lightweight**     | **1**                          |
-| OWNER privilege hot path | 0 (ownerRel warm)            | 1 heavy JOIN              | **4**                 | **2**                          |
-| After mutation (stale)   | 0 (**stale — TTL hides it**) | 3+ heavy                  | **4 on next request** | Evicted by poll; next req: 3–5 |
-| Cold start               | ~3+T                         | ~3+T heavy                | **4–5 lightweight**   | **3–5 lightweight**            |
-| HA staleness             | Up to 1 hour                 | Up to 1 hour              | **0**                 | **≤ poll interval**            |
+| Scenario                 | Entity cache ON (current)    | Phase 1                   | Phase 2                 |
+|--------------------------|------------------------------|---------------------------|-------------------------|
+| Hot path — all current   | **0** (fully in-memory)      | 3+ heavy full-row queries | **3 lightweight**       |
+| OWNER privilege hot path | 0 (ownerRel warm)            | 1 heavy JOIN              | **4**                   |
+| After mutation (stale)   | 0 (**stale — TTL hides it**) | 3+ heavy                  | **4 on next request**   |
+| Cold start               | ~3+T                         | ~3+T heavy                | **4–5 lightweight**     |
+| HA staleness             | Up to 1 hour                 | Up to 1 hour              | **0**                   |
 
 ### 8.2 Change Surface
 
-| Dimension                  | Phase 1      | Phase 2A                               | Phase 2B-Global                       | Phase 2B-Fine            |
-|----------------------------|--------------|----------------------------------------|---------------------------------------|--------------------------|
-| Entity cache               | **Disabled** | Disabled                               | Disabled                              | Disabled                 |
-| Schema — existing tables   | None         | **+3 columns** (role/user/group_meta)  | **None**                              | +3 columns (same as 2A)  |
-| Schema — new tables        | None         | None                                   | **1 new table** (auth_global_version) | None                     |
-| New caches                 | None         | **2** (userRoleCache + groupRoleCache) | **2** (same)                          | **2** (same)             |
-| Cache type changes         | None         | **1** (loadedRoles Boolean→Integer)    | **1** (same)                          | **1** (same)             |
-| Removed caches             | None         | **1** (ownerRel)                       | **1** (ownerRel)                      | **1** (ownerRel)         |
-| Background threads         | None         | **None**                               | 1 per node                            | 1 per node               |
-| Invalidation granularity   | —            | Targeted (per request)                 | Coarse (whole metalake)               | Targeted (per-user/role) |
-| Cache stampede on mutation | —            | None                                   | **Possible**                          | None                     |
-| External dependencies      | None         | None                                   | None                                  | None                     |
+| Dimension                  | Phase 1      | Phase 2                                |
+|----------------------------|--------------|----------------------------------------|
+| Entity cache               | **Disabled** | Disabled                               |
+| Schema — existing tables   | None         | **+3 columns** (role/user/group_meta)  |
+| Schema — new tables        | None         | None                                   |
+| New caches                 | None         | **2** (userRoleCache + groupRoleCache) |
+| Cache type changes         | None         | **1** (loadedRoles Boolean→Integer)    |
+| Removed caches             | None         | **1** (ownerRel)                       |
+| Background threads         | None         | **None**                               |
+| Invalidation granularity   | —            | Targeted (per request)                 |
+| Cache stampede on mutation | —            | None                                   |
+| External dependencies      | None         | None                                   |
