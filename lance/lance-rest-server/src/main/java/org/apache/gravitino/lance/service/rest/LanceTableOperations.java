@@ -56,6 +56,8 @@ import org.lance.namespace.model.AlterTableDropColumnsRequest;
 import org.lance.namespace.model.AlterTableDropColumnsResponse;
 import org.lance.namespace.model.CreateEmptyTableResponse;
 import org.lance.namespace.model.CreateTableResponse;
+import org.lance.namespace.model.DeclareTableRequest;
+import org.lance.namespace.model.DeclareTableResponse;
 import org.lance.namespace.model.DeregisterTableRequest;
 import org.lance.namespace.model.DeregisterTableResponse;
 import org.lance.namespace.model.DescribeTableRequest;
@@ -164,6 +166,32 @@ public class LanceTableOperations {
 
       CreateEmptyTableResponse response =
           lanceNamespace.asTableOps().createEmptyTable(tableId, delimiter, tableLocation, props);
+      return Response.ok(response).build();
+    } catch (Exception e) {
+      return LanceExceptionMapper.toRESTResponse(tableId, e);
+    }
+  }
+
+  @POST
+  @Path("/declare")
+  @Produces("application/json")
+  @Timed(name = "declare-table." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
+  @ResponseMetered(name = "declare-table", absolute = true)
+  public Response declareTable(
+      @PathParam("id") String tableId,
+      @QueryParam("delimiter") @DefaultValue(NAMESPACE_DELIMITER_DEFAULT) String delimiter,
+      DeclareTableRequest declareTableRequest,
+      @Context HttpHeaders headers) {
+    try {
+      validateDeclareTableRequest(declareTableRequest);
+      String tableLocation =
+          declareTableRequest.getLocation() != null ? declareTableRequest.getLocation() : null;
+      MultivaluedMap<String, String> headersMap = headers.getRequestHeaders();
+      String tableProperties = headersMap.getFirst(LANCE_TABLE_PROPERTIES_PREFIX_HEADER);
+      Map<String, String> props = SerializationUtils.deserializeProperties(tableProperties);
+
+      DeclareTableResponse response =
+          lanceNamespace.asTableOps().declareTable(tableId, delimiter, tableLocation, props);
       return Response.ok(response).build();
     } catch (Exception e) {
       return LanceExceptionMapper.toRESTResponse(tableId, e);
@@ -305,6 +333,11 @@ public class LanceTableOperations {
 
   @SuppressWarnings({"unused", "deprecation"})
   private void validateCreateEmptyTableRequest(Map<String, Object> requestBody) {
+    // No specific fields to validate for now
+  }
+
+  private void validateDeclareTableRequest(
+      @SuppressWarnings("unused") DeclareTableRequest request) {
     // No specific fields to validate for now
   }
 

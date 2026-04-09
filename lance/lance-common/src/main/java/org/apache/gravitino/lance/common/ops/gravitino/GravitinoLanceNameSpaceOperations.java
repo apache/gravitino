@@ -27,7 +27,6 @@ import com.google.common.collect.Sets;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
-import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
 import java.util.function.BiFunction;
@@ -63,6 +62,8 @@ public class GravitinoLanceNameSpaceOperations implements LanceNamespaceOperatio
   private final GravitinoLanceNamespaceWrapper namespaceWrapper;
   private final GravitinoClient client;
 
+  // lance-namespace 0.4.5 switched mode/behavior fields to plain strings in request models.
+  // Keep local enums as normalized internal states for type-safe branching.
   private enum CreateMode {
     CREATE,
     EXIST_OK,
@@ -411,7 +412,7 @@ public class GravitinoLanceNameSpaceOperations implements LanceNamespaceOperatio
     if (mode == null) {
       return CreateMode.CREATE;
     }
-    String normalized = normalizeToken(mode);
+    String normalized = CommonUtil.normalizeToken(mode);
     if ("CREATE".equals(normalized)) {
       return CreateMode.CREATE;
     }
@@ -429,7 +430,7 @@ public class GravitinoLanceNameSpaceOperations implements LanceNamespaceOperatio
     if (mode == null) {
       return DropMode.FAIL;
     }
-    String normalized = normalizeToken(mode);
+    String normalized = CommonUtil.normalizeToken(mode);
     if ("FAIL".equals(normalized)) {
       return DropMode.FAIL;
     }
@@ -444,7 +445,7 @@ public class GravitinoLanceNameSpaceOperations implements LanceNamespaceOperatio
     if (behavior == null) {
       return DropBehavior.RESTRICT;
     }
-    String normalized = normalizeToken(behavior);
+    String normalized = CommonUtil.normalizeToken(behavior);
     if ("RESTRICT".equals(normalized)) {
       return DropBehavior.RESTRICT;
     }
@@ -455,10 +456,6 @@ public class GravitinoLanceNameSpaceOperations implements LanceNamespaceOperatio
         "Unknown drop namespace behavior: " + behavior,
         CommonUtil.formatCurrentStackTrace(),
         instance);
-  }
-
-  private static String normalizeToken(String value) {
-    return value.replaceAll("[^A-Za-z0-9]", "").toUpperCase(Locale.ROOT);
   }
 
   @Override

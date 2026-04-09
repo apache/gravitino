@@ -18,8 +18,8 @@
  */
 package org.apache.gravitino.lance.common.ops.gravitino;
 
-import java.io.PrintWriter;
-import java.io.StringWriter;
+import com.google.common.base.Throwables;
+import java.util.Locale;
 
 /** Utility methods used by Gravitino Lance namespace operations. */
 class CommonUtil {
@@ -27,10 +27,10 @@ class CommonUtil {
   private CommonUtil() {}
 
   static String formatCurrentStackTrace() {
-    StringWriter stringWriter = new StringWriter();
-    PrintWriter printWriter = new PrintWriter(stringWriter);
-    new RuntimeException("Captured stacktrace").printStackTrace(printWriter);
-    printWriter.flush();
-    return stringWriter.toString();
+    return Throwables.getStackTraceAsString(new RuntimeException("Captured stacktrace"));
+  }
+
+  static String normalizeToken(String value) {
+    return value == null ? "" : value.replaceAll("[^A-Za-z0-9]", "").toUpperCase(Locale.ROOT);
   }
 }

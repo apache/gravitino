@@ -69,6 +69,8 @@ import org.lance.namespace.model.CreateEmptyTableResponse;
 import org.lance.namespace.model.CreateNamespaceRequest;
 import org.lance.namespace.model.CreateNamespaceResponse;
 import org.lance.namespace.model.CreateTableResponse;
+import org.lance.namespace.model.DeclareTableRequest;
+import org.lance.namespace.model.DeclareTableResponse;
 import org.lance.namespace.model.DeregisterTableRequest;
 import org.lance.namespace.model.DeregisterTableResponse;
 import org.lance.namespace.model.DescribeNamespaceRequest;
@@ -887,6 +889,53 @@ public class LanceRESTServiceIT extends BaseIT {
     exception =
         Assertions.assertThrows(RuntimeException.class, () -> ns.dropTable(dropTableRequest));
     Assertions.assertTrue(exception.getMessage().contains("\"code\":4"));
+  }
+
+  @Test
+  void testDeclareTable() {
+    catalog = createCatalog(CATALOG_NAME);
+    createSchema();
+
+    DeclareTableRequest request = new DeclareTableRequest();
+    String location = tempDir + "/" + "declared_table/";
+    request.setLocation(location);
+    request.setId(List.of(CATALOG_NAME, SCHEMA_NAME, "declared_table"));
+
+    DeclareTableResponse response = ns.declareTable(request);
+    Assertions.assertNotNull(response);
+    Assertions.assertEquals(location, response.getLocation());
+
+    DescribeTableRequest describeTableRequest = new DescribeTableRequest();
+    describeTableRequest.setId(List.of(CATALOG_NAME, SCHEMA_NAME, "declared_table"));
+
+    DescribeTableResponse loadTable = ns.describeTable(describeTableRequest);
+    Assertions.assertNotNull(loadTable);
+    Assertions.assertEquals(location, loadTable.getLocation());
+    Assertions.assertEquals(
+        "true", loadTable.getMetadata().get(LanceConstants.LANCE_TABLE_CREATE_EMPTY));
+    Assertions.assertEquals("true", loadTable.getMetadata().get(Table.PROPERTY_EXTERNAL));
+
+    // Try to declare the same table again should fail
+    RuntimeException declareException =
+        Assertions.assertThrows(
+            RuntimeException.class,
+            () -> {
+              ns.declareTable(request);
+            });
+    Assertions.assertTrue(declareException.getMessage().contains("\"code\":5"));
+
+    // Declare a table with non-existent location should succeed
+    // since storage is not touched
+    DeclareTableRequest anotherRequest = new DeclareTableRequest();
+    anotherRequest.setId(List.of(CATALOG_NAME, SCHEMA_NAME, "another_declared_table"));
+    String anotherLocation = tempDir + "/" + "another_declared_location/";
+    Assertions.assertFalse(new File(anotherLocation).exists());
+    anotherRequest.setLocation(anotherLocation);
+    DeclareTableResponse anotherResponse = ns.declareTable(anotherRequest);
+    Assertions.assertNotNull(anotherResponse);
+    Assertions.assertEquals(anotherLocation, anotherResponse.getLocation());
+    // Will not touch storage, so the path should not be created.
+    Assertions.assertFalse(new File(anotherLocation).exists());
   }
 
   private CreateTableResponse createTable(

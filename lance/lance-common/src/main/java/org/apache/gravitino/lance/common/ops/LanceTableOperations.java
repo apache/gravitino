@@ -22,6 +22,7 @@ import java.util.Map;
 import java.util.Optional;
 import org.lance.namespace.model.CreateEmptyTableResponse;
 import org.lance.namespace.model.CreateTableResponse;
+import org.lance.namespace.model.DeclareTableResponse;
 import org.lance.namespace.model.DeregisterTableResponse;
 import org.lance.namespace.model.DescribeTableResponse;
 import org.lance.namespace.model.DropTableResponse;
@@ -59,14 +60,29 @@ public interface LanceTableOperations {
       byte[] arrowStreamBody);
 
   /**
-   * Create an new table without schema.
+   * Declare a table without touching storage. This is the preferred API for creating metadata-only
+   * table entries, replacing the deprecated {@link #createEmptyTable} method.
+   *
+   * @param tableId table ids are in the format of "{namespace}{delimiter}{table_name}"
+   * @param delimiter the delimiter used in the namespace
+   * @param tableLocation the location where the table data will be stored
+   * @param tableProperties the properties of the table
+   * @return the response of the declare table operation
+   */
+  DeclareTableResponse declareTable(
+      String tableId, String delimiter, String tableLocation, Map<String, String> tableProperties);
+
+  /**
+   * Create a new table without schema.
    *
    * @param tableId table ids are in the format of "{namespace}{delimiter}{table_name}"
    * @param delimiter the delimiter used in the namespace
    * @param tableLocation the location where the table data will be stored
    * @param tableProperties the properties of the table
    * @return the response of the create table operation
+   * @deprecated Use {@link #declareTable} instead.
    */
+  @Deprecated
   @SuppressWarnings("deprecation")
   CreateEmptyTableResponse createEmptyTable(
       String tableId, String delimiter, String tableLocation, Map<String, String> tableProperties);

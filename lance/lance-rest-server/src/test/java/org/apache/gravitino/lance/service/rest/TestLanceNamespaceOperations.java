@@ -62,6 +62,8 @@ import org.lance.namespace.model.CreateEmptyTableResponse;
 import org.lance.namespace.model.CreateNamespaceRequest;
 import org.lance.namespace.model.CreateNamespaceResponse;
 import org.lance.namespace.model.CreateTableResponse;
+import org.lance.namespace.model.DeclareTableRequest;
+import org.lance.namespace.model.DeclareTableResponse;
 import org.lance.namespace.model.DeregisterTableRequest;
 import org.lance.namespace.model.DeregisterTableResponse;
 import org.lance.namespace.model.DescribeNamespaceResponse;
@@ -1026,5 +1028,64 @@ public class TestLanceNamespaceOperations extends JerseyTest {
             .request(MediaType.APPLICATION_JSON_TYPE)
             .post(Entity.entity(alterColumnsRequest, MediaType.APPLICATION_JSON_TYPE));
     Assertions.assertEquals(Response.Status.NOT_FOUND.getStatusCode(), resp.getStatus());
+  }
+
+  @Test
+  void testDeclareTable() {
+    String tableIds = "catalog.scheme.declare_table";
+    String delimiter = ".";
+
+    // Test normal
+    DeclareTableResponse declareTableResponse = new DeclareTableResponse();
+    declareTableResponse.setLocation("/path/to/table");
+    declareTableResponse.setStorageOptions(ImmutableMap.of("key", "value"));
+    when(tableOps.declareTable(any(), any(), any(), any())).thenReturn(declareTableResponse);
+
+    DeclareTableRequest tableRequest = new DeclareTableRequest();
+    tableRequest.setLocation("/path/to/table");
+
+    Response resp =
+        target(String.format("/v1/table/%s/declare", tableIds))
+            .queryParam("delimiter", delimiter)
+            .request(MediaType.APPLICATION_JSON_TYPE)
+            .post(Entity.entity(tableRequest, MediaType.APPLICATION_JSON_TYPE));
+
+    Assertions.assertEquals(Response.Status.OK.getStatusCode(), resp.getStatus());
+    Assertions.assertEquals(MediaType.APPLICATION_JSON_TYPE, resp.getMediaType());
+    DeclareTableResponse response = resp.readEntity(DeclareTableResponse.class);
+    Assertions.assertEquals(declareTableResponse.getLocation(), response.getLocation());
+    Assertions.assertEquals(declareTableResponse.getStorageOptions(), response.getStorageOptions());
+
+    Mockito.verify(tableOps)
+        .declareTable(eq(tableIds), eq(delimiter), eq("/path/to/table"), eq(Map.of()));
+
+    // Test illegal argument
+    Mockito.reset(tableOps);
+    when(tableOps.declareTable(any(), any(), any(), any()))
+        .thenThrow(new IllegalArgumentException("Illegal argument"));
+
+    resp =
+        target(String.format("/v1/table/%s/declare", tableIds))
+            .queryParam("delimiter", delimiter)
+            .request(MediaType.APPLICATION_JSON_TYPE)
+            .post(Entity.entity(tableRequest, MediaType.APPLICATION_JSON_TYPE));
+    Assertions.assertEquals(Response.Status.BAD_REQUEST.getStatusCode(), resp.getStatus());
+    Assertions.assertEquals(MediaType.APPLICATION_JSON_TYPE, resp.getMediaType());
+
+    // Test runtime exception
+    Mockito.reset(tableOps);
+    when(tableOps.declareTable(any(), any(), any(), any()))
+        .thenThrow(new RuntimeException("Runtime exception"));
+    resp =
+        target(String.format("/v1/table/%s/declare", tableIds))
+            .queryParam("delimiter", delimiter)
+            .request(MediaType.APPLICATION_JSON_TYPE)
+            .post(Entity.entity(tableRequest, MediaType.APPLICATION_JSON_TYPE));
+
+    Assertions.assertEquals(
+        Response.Status.INTERNAL_SERVER_ERROR.getStatusCode(), resp.getStatus());
+    Assertions.assertEquals(MediaType.APPLICATION_JSON_TYPE, resp.getMediaType());
+    ErrorResponse errorResp = resp.readEntity(ErrorResponse.class);
+    Assertions.assertEquals("Runtime exception", errorResp.getError());
   }
 }

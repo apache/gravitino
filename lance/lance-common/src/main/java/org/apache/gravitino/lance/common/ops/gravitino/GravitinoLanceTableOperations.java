@@ -34,7 +34,6 @@ import com.google.common.collect.Maps;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
-import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
 import java.util.regex.Pattern;
@@ -57,6 +56,7 @@ import org.lance.namespace.model.AlterTableAlterColumnsRequest;
 import org.lance.namespace.model.AlterTableDropColumnsRequest;
 import org.lance.namespace.model.CreateEmptyTableResponse;
 import org.lance.namespace.model.CreateTableResponse;
+import org.lance.namespace.model.DeclareTableResponse;
 import org.lance.namespace.model.DeregisterTableResponse;
 import org.lance.namespace.model.DescribeTableResponse;
 import org.lance.namespace.model.DropTableResponse;
@@ -170,6 +170,24 @@ public class GravitinoLanceTableOperations implements LanceTableOperations {
         Optional.ofNullable(properties.get(LANCE_TABLE_VERSION)).map(Long::valueOf).orElse(null));
     response.setLocation(properties.get(LANCE_LOCATION));
     return response;
+  }
+
+  @Override
+  public DeclareTableResponse declareTable(
+      String tableId, String delimiter, String tableLocation, Map<String, String> tableProperties) {
+    ImmutableMap<String, String> props =
+        ImmutableMap.<String, String>builder()
+            .putAll(tableProperties)
+            .put(LANCE_TABLE_CREATE_EMPTY, "true")
+            .put(Table.PROPERTY_EXTERNAL, "true")
+            .build();
+
+    CreateTableResponse response =
+        createTable(tableId, "create", delimiter, tableLocation, props, null);
+    DeclareTableResponse declareTableResponse = new DeclareTableResponse();
+    declareTableResponse.setLocation(response.getLocation());
+    declareTableResponse.setStorageOptions(response.getStorageOptions());
+    return declareTableResponse;
   }
 
   @Override
@@ -364,7 +382,7 @@ public class GravitinoLanceTableOperations implements LanceTableOperations {
     if (mode == null) {
       return "CREATE";
     }
-    String normalized = mode.replaceAll("[^A-Za-z0-9]", "").toUpperCase(Locale.ROOT);
+    String normalized = CommonUtil.normalizeToken(mode);
     if ("CREATE".equals(normalized)) {
       return "CREATE";
     }
@@ -382,7 +400,7 @@ public class GravitinoLanceTableOperations implements LanceTableOperations {
     if (mode == null) {
       return "CREATE";
     }
-    String normalized = mode.replaceAll("[^A-Za-z0-9]", "").toUpperCase(Locale.ROOT);
+    String normalized = CommonUtil.normalizeToken(mode);
     if ("CREATE".equals(normalized) || "REGISTER".equals(normalized)) {
       return "CREATE";
     }
