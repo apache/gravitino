@@ -37,8 +37,8 @@ class TestGlueClientProvider {
   void testBuildClientWithStaticCredentials() {
     Map<String, String> config = new HashMap<>();
     config.put(AWS_REGION, "us-east-1");
-    config.put(AWS_ACCESS_KEY_ID, "AKIAIOSFODNN7EXAMPLE");
-    config.put(AWS_SECRET_ACCESS_KEY, "wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY");
+    config.put(AWS_ACCESS_KEY_ID, "test-access-key");
+    config.put(AWS_SECRET_ACCESS_KEY, "test-secret-key");
 
     try (GlueClient client = GlueClientProvider.buildClient(config)) {
       assertNotNull(client);
@@ -102,7 +102,7 @@ class TestGlueClientProvider {
     // Providing only the secret without the access key is also a misconfiguration.
     Map<String, String> config = new HashMap<>();
     config.put(AWS_REGION, "ap-southeast-1");
-    config.put(AWS_SECRET_ACCESS_KEY, "wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY");
+    config.put(AWS_SECRET_ACCESS_KEY, "test-secret-key");
     // No AWS_ACCESS_KEY_ID.
 
     IllegalArgumentException ex =

@@ -68,7 +68,7 @@ public final class GlueConstants {
 
   /**
    * Glue table format type parameter key stored in {@code Table.parameters()}. Common values:
-   * {@code ICEBERG}, {@code HIVE}, {@code DELTA}, {@code PARQUET}, {@code VIRTUAL_VIEW}.
+   * {@code ICEBERG}, {@code HIVE}, {@code DELTA}, {@code PARQUET}.
    */
   public static final String TABLE_FORMAT_TYPE = "table_format_type";
 
