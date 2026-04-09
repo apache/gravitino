@@ -28,8 +28,8 @@ Gravitino maintains three distinct caching layers for the authorization path:
 │  Scope: one HTTP request; prevents duplicate auth calls   │
 ├──────────────────────────────────────────────────────┤
 │  Layer 2: Auth policy caches (JcasbinAuthorizer)          │
-│  loadedRoles  Cache<Long, Boolean>        TTL 1 hour      │
-│  ownerRel     Cache<Long, Optional<Long>> TTL 1 hour      │
+│  loadedRoles  Cache<Long, Boolean>   hook update/TTL      │
+│  ownerRel     Cache<Long, Optional<Long>> hook update/TTL │
 ├──────────────────────────────────────────────────────┤
 │  Layer 1: Entity store cache (RelationalEntityStore)      │
 │  CaffeineEntityCache — or NoOpsCache when disabled        │
