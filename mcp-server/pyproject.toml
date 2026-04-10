@@ -28,6 +28,10 @@ dependencies = [
     "parameterized>=0.9.0",
     "pytest>=8.4.1",
     "pylint>=2.20.0",
+    # pydocket (a transitive dep of fastmcp>=2.14.0) requires fakeredis>=2.32.1, but fakeredis
+    # 2.35.0 removed FakeConnection from fakeredis.aioredis which pydocket still uses. Pin to
+    # <2.35.0 until pydocket is updated.
+    "fakeredis<2.35.0",
 ]
 
 [tool.isort]
