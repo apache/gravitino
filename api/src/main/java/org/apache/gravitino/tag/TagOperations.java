@@ -81,7 +81,7 @@ public interface TagOperations {
    * @throws TagAlreadyExistsException If a tag with the new name already exists.
    */
   Tag alterTag(String name, TagChange... changes)
-      throws NoSuchTagException, IllegalArgumentException, TagAlreadyExistsException;
+      throws NoSuchTagException, IllegalArgumentException;
 
   /**
    * Delete a tag under a metalake.
