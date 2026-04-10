@@ -61,7 +61,6 @@ public abstract class GravitinoClientBase implements Closeable {
    *
    * @param uri The base URI for the Gravitino API.
    * @param authDataProvider The provider of the data which is used for authentication.
-   * @param extraHeadersProvider The provider of per-request extra headers, may be {@code null}.
    * @param checkVersion Whether to check the version of the Gravitino server.
    * @param headers The base header of the Gravitino API.
    * @param properties A map of properties (key-value pairs) used to configure the Gravitino client.
@@ -69,7 +68,6 @@ public abstract class GravitinoClientBase implements Closeable {
   protected GravitinoClientBase(
       String uri,
       AuthDataProvider authDataProvider,
-      ExtraHeadersProvider extraHeadersProvider,
       boolean checkVersion,
       Map<String, String> headers,
       Map<String, String> properties) {
@@ -80,7 +78,6 @@ public abstract class GravitinoClientBase implements Closeable {
           HTTPClient.builder(properties)
               .uri(uri)
               .withAuthDataProvider(authDataProvider)
-              .withExtraHeadersProvider(extraHeadersProvider)
               .withObjectMapper(mapper)
               .withPreConnectHandler(this::checkVersion)
               .withHeaders(headers)
@@ -91,7 +88,6 @@ public abstract class GravitinoClientBase implements Closeable {
           HTTPClient.builder(properties)
               .uri(uri)
               .withAuthDataProvider(authDataProvider)
-              .withExtraHeadersProvider(extraHeadersProvider)
               .withObjectMapper(mapper)
               .withHeaders(headers)
               .build();
@@ -212,8 +208,6 @@ public abstract class GravitinoClientBase implements Closeable {
     protected String uri;
     /** The authentication provider. */
     protected AuthDataProvider authDataProvider;
-    /** The provider of per-request extra headers (e.g. forwarded user identity). */
-    protected ExtraHeadersProvider extraHeadersProvider;
     /** The check version flag. */
     protected boolean checkVersion = true;
     /** The request base header for the Gravitino API. */
@@ -332,19 +326,6 @@ public abstract class GravitinoClientBase implements Closeable {
      */
     public Builder<T> withCustomTokenAuth(CustomTokenProvider dataProvider) {
       this.authDataProvider = dataProvider;
-      return this;
-    }
-
-    /**
-     * Sets an {@link ExtraHeadersProvider} that appends per-request headers to every outgoing HTTP
-     * call. A common use-case is forwarding the originating user identity (e.g. the Trino session
-     * user) alongside the service-level authentication credentials.
-     *
-     * @param provider the provider, or {@code null} to disable extra-header forwarding
-     * @return This Builder instance for method chaining.
-     */
-    public Builder<T> withExtraHeaders(ExtraHeadersProvider provider) {
-      this.extraHeadersProvider = provider;
       return this;
     }
 

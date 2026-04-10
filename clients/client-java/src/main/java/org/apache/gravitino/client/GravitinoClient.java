@@ -99,11 +99,10 @@ public class GravitinoClient extends GravitinoClientBase
       String uri,
       String metalakeName,
       AuthDataProvider authDataProvider,
-      ExtraHeadersProvider extraHeadersProvider,
       boolean checkVersion,
       Map<String, String> headers,
       Map<String, String> properties) {
-    super(uri, authDataProvider, extraHeadersProvider, checkVersion, headers, properties);
+    super(uri, authDataProvider, checkVersion, headers, properties);
     this.metalake = loadMetalake(metalakeName);
   }
 
@@ -713,13 +712,7 @@ public class GravitinoClient extends GravitinoClientBase
           "The argument 'metalakeName' must be a valid name");
 
       return new GravitinoClient(
-          uri,
-          metalakeName,
-          authDataProvider,
-          extraHeadersProvider,
-          isVersionCheckEnabled(),
-          headers,
-          properties);
+          uri, metalakeName, authDataProvider, isVersionCheckEnabled(), headers, properties);
     }
   }
 }

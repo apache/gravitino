@@ -166,8 +166,8 @@ SHOW SCHEMAS IN my_catalog;
 
 | Property                                        | Description                                                                                                                              | Default value | Required                                                 | Since version |
 |-------------------------------------------------|------------------------------------------------------------------------------------------------------------------------------------------|---------------|----------------------------------------------------------|---------------|
-| `gravitino.client.session.forwardUser`          | When `true`, forwards the Trino session user (`simple`) or Bearer token (`oauth2`) to Gravitino per-request                              | `false`       | No                                                       | 1.9.0         |
-| `gravitino.client.oauth2.token.credentialKey`   | Key name in Trino extra credentials that holds the Bearer token. Only used when `authType=oauth2` and `forwardUser=true`                  | (none)        | Yes if `authType=oauth2` and `forwardUser=true`          | 1.9.0         |
+| `gravitino.client.session.forwardUser`          | When `true`, forwards the Trino session user (`simple`) or Bearer token (`oauth2`) to Gravitino per-request                              | `false`       | No                                                       | 1.3.0         |
+| `gravitino.client.oauth2.token.credentialKey`   | Key name in Trino extra credentials that holds the Bearer token. Only used when `authType=oauth2` and `forwardUser=true`                  | (none)        | Yes if `authType=oauth2` and `forwardUser=true`          | 1.3.0         |
 
 ### Notes
 
