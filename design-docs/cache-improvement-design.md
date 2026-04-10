@@ -213,21 +213,84 @@ list (userId comes for free from the same query).
 
 ### 3.1 Apache Polaris — Per-Entity Version Tracking
 
-Polaris achieves strong consistency by embedding two version counters on every entity
-(`entityVersion` and `grantRecordsVersion`) and validating them on each cache access:
+#### Schema
 
-| Path                    | Condition             | DB queries                            |
-|-------------------------|-----------------------|---------------------------------------|
-| Cache hit               | Both versions current | **0**                                 |
-| Stale, targeted refresh | Either version behind | **1** — returns only the changed part |
-| Cache miss              | Not in cache          | **1** — full load                     |
+All entity types (catalogs, namespaces, tables, roles, principals) share a single `ENTITIES`
+table (single-table inheritance). The two version columns are the key fields for caching:
 
-`loadEntitiesChangeTracking(ids)` issues one lightweight query returning only integer version
-columns for a batch of IDs — the same pattern used in §4.1 Step 3 below.
+```sql
+ENTITIES (
+  id                     BIGINT,   -- Unique entity ID
+  catalog_id             BIGINT,   -- Owning catalog (0 for top-level entities)
+  parent_id              BIGINT,   -- Parent entity ID, forms the hierarchy tree
+  type_code              INT,      -- Entity type enum (see hierarchy below)
+  name                   VARCHAR,
+  entity_version         INT,      -- Bumped on rename / property update / drop  ← key
+  sub_type_code          INT,      -- Subtype (ICEBERG_TABLE, ICEBERG_VIEW, etc.)
+  properties             JSON,     -- User-visible properties (location, format, etc.)
+  internal_properties    JSON,     -- Internal properties (credentials, storage config, etc.)
+  grant_records_version  INT,      -- Bumped on every GRANT or REVOKE               ← key
+)
 
-**Key difference from Gravitino:** Polaris bundles entity + grants in one cached object, so
-one batch query validates both dimensions. Gravitino separates user→role from role→privilege,
-requiring 2 version-check queries on a warm hit. Both achieve strong consistency.
+GRANT_RECORDS (
+  securable_catalog_id  BIGINT,
+  securable_id          BIGINT,   -- The resource being secured (table/namespace/catalog)
+  grantee_catalog_id    BIGINT,
+  grantee_id            BIGINT,   -- The principal or role receiving the grant
+  privilege_code        INT       -- One of 102 defined privileges
+)
+```
+
+`GRANT_RECORDS` has no version column of its own. The version fingerprint is stored in
+`ENTITIES.grant_records_version` — detecting staleness requires no scan of `GRANT_RECORDS`.
+
+#### Entity Type Hierarchy
+
+```
+ROOT
+  ├── PRINCIPAL          (user account,      isGrantee)
+  ├── PRINCIPAL_ROLE     (user-level role,   isGrantee)
+  └── CATALOG
+        ├── CATALOG_ROLE (catalog-level role, isGrantee)
+        ├── NAMESPACE
+        │     └── TABLE_LIKE / POLICY / FILE
+        └── TASK
+```
+
+Only `PRINCIPAL`, `PRINCIPAL_ROLE`, and `CATALOG_ROLE` are **grantees** (can receive grants).
+All others are **securables** (privileges are set on them).
+
+#### How `grantRecordsVersion` Is Maintained
+
+Every `grantPrivilege` / `revokePrivilege` call performs three writes in **one DB transaction**:
+
+1. Insert or delete the `GRANT_RECORDS` row.
+2. Increment `grant_records_version` on the **grantee** entity row.
+3. Increment `grant_records_version` on the **securable** entity row.
+
+Both sides are bumped atomically — no separate changelog table is needed.
+
+#### Version-Validated Cache
+
+The cache unit is `ResolvedPolarisEntity` = entity metadata + grant records in both directions.
+On every request, `bulkValidate()` issues one batch query for all path entities:
+
+```sql
+SELECT * FROM ENTITIES WHERE (catalog_id, id) IN ((?, ?), ...)
+```
+
+| Path                    | Condition              | Action                                 |
+|-------------------------|------------------------|----------------------------------------|
+| Cache hit               | Both versions current  | Serve from cache — **0 extra queries** |
+| Stale, targeted refresh | Either version behind  | Reload only the changed dimension      |
+| Cache miss              | Not in cache           | Full load                              |
+
+The DB is the single source of truth; no broadcast is needed for correctness.
+
+**Key difference from Gravitino:** Polaris bundles entity + grants in one cached object, so one
+batch query covers both dimensions. Gravitino separates user→role from role→privilege, requiring
+2 version-check queries on a warm hit (see §4.1 Step 1 and Step 3). Both achieve strong
+consistency.
 
 ### 3.2 Other References
 
@@ -646,7 +709,46 @@ within the metalake) would be the cleanest version signal. Not planned for this 
 version-validation coverage as users. `ALTER TABLE group_meta ADD COLUMN role_grants_version`
 is in §4.1.1, and `groupRoleCache` ships in Phase 2 alongside `userRoleCache`.
 
-### 7.4 Possible Future Direction: Auth Decision Cache
+### 7.4 Alternative Considered: JcasbinAuthorizer as Distributed Cache
+
+During design review, the question was raised: since auth ultimately loads policies into the
+`SyncedEnforcer` on each node, could we treat each `JcasbinAuthorizer` instance as a
+distributed cache and maintain cross-node consistency by propagating policy changes?
+
+**What this means in practice:** JCasbin provides a `Watcher` extension interface for exactly
+this purpose. When one node calls `addPolicy()` / `removePolicy()`, the watcher broadcasts
+the change; peer nodes receive the notification and call `loadPolicy()` to refresh their local
+enforcer. Mature implementations exist (`casbin-redis-watcher`, `casbin-kafka-watcher`, etc.).
+
+**Why it was not adopted:**
+
+| Dimension                        | JCasbin Watcher                                        | Per-Request Version Check (chosen)           |
+|----------------------------------|--------------------------------------------------------|----------------------------------------------|
+| Consistency                      | **Eventual** — broadcast can fail or be lost           | **Strong** — DB validated on every request   |
+| Infrastructure                   | Requires Redis / Kafka / etc.                          | Existing DB only                             |
+| Cold start / node restart        | Must reload full policy from DB regardless             | Handled naturally; load on first access      |
+| Write-path cost                  | Each write triggers full `loadPolicy()` on all peers   | No cross-node cost; each node updates lazily |
+| Broadcast failure window         | Unbounded until TTL expiry                             | Not applicable — no broadcast                |
+| `UpdatableWatcher` (incremental) | Reduces reload cost but adds implementation complexity | N/A                                          |
+
+**Core problem with the push model:** JCasbin's default `loadPolicy()` is a full reload — every
+privilege change causes every peer node to re-fetch all policies from the DB. At scale
+(many roles × many securable objects) this is prohibitively expensive. `UpdatableWatcher`
+supports incremental updates but its implementation complexity converges toward reinventing
+per-request version check while still requiring an external message broker.
+
+**Key insight:** The current design already treats `SyncedEnforcer` as a local cache. The
+`loadedRoles`, `userRoleCache`, and `groupRoleCache` caches manage its policy-loading
+lifecycle; version numbers decide when to invalidate. The difference from the Watcher approach
+is **push vs. pull** — and pull against the existing DB achieves strong consistency without
+any additional infrastructure.
+
+**Potential future hybrid:** If the 3 per-request DB queries become a bottleneck, a Watcher
+could be added as an **optimistic hint** layer (early notification → skip the version-check
+queries on likely-clean requests). The per-request version check must be retained as the
+correctness guarantee. This is out of scope for the current phases.
+
+### 7.5 Possible Future Direction: Auth Decision Cache
 
 Not on the current roadmap. Once Phase 2 is stable, caching the final auth decision
 `(userId, objectType, metadataId, privilege) → ALLOW|DENY` would reduce the hot path to
