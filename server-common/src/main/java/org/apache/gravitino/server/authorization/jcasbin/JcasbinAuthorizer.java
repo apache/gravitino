@@ -32,9 +32,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
-import java.util.concurrent.Executor;
-import java.util.concurrent.Executors;
-import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 import org.apache.commons.io.IOUtils;
@@ -92,8 +89,6 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
 
   private Cache<Long, Optional<Long>> ownerRel;
 
-  private Executor executor = null;
-
   @Override
   public void initialize() {
     long cacheExpirationSecs =
@@ -129,16 +124,6 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
             .expireAfterAccess(cacheExpirationSecs, TimeUnit.SECONDS)
             .maximumSize(ownerCacheSize)
             .build();
-    executor =
-        Executors.newFixedThreadPool(
-            GravitinoEnv.getInstance()
-                .config()
-                .get(Configs.GRAVITINO_AUTHORIZATION_THREAD_POOL_SIZE),
-            runnable -> {
-              Thread thread = new Thread(runnable);
-              thread.setName("GravitinoAuthorizer-ThreadPool-" + thread.getId());
-              return thread;
-            });
   }
 
   private Model getModel(String modelFilePath) {
@@ -416,14 +401,7 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
   }
 
   @Override
-  public void close() throws IOException {
-    if (executor != null) {
-      if (executor instanceof ThreadPoolExecutor) {
-        ThreadPoolExecutor threadPoolExecutor = (ThreadPoolExecutor) executor;
-        threadPoolExecutor.shutdown();
-      }
-    }
-  }
+  public void close() throws IOException {}
 
   private class InternalAuthorizer {
 
@@ -525,8 +503,19 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
           // eliminating the N+1 pattern of per-role entityStore.get() calls.
           List<Long> unloadedRoleIds =
               unloadedRoleStubs.stream().map(RoleEntity::id).collect(Collectors.toList());
-          Map<Long, List<SecurableObject>> secObjsByRoleId =
-              RoleMetaService.batchListSecurableObjectsForRoles(unloadedRoleIds);
+          Map<Long, List<SecurableObject>> secObjsByRoleId;
+          try {
+            secObjsByRoleId = RoleMetaService.batchListSecurableObjectsForRoles(unloadedRoleIds);
+          } catch (RuntimeException e) {
+            throw new RuntimeException(
+                "Failed to batch-load securable objects for roles "
+                    + unloadedRoleIds
+                    + " of metalake "
+                    + metalake
+                    + ", userId "
+                    + userId,
+                e);
+          }
 
           for (RoleEntity stub : unloadedRoleStubs) {
             List<SecurableObject> securableObjects =

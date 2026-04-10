@@ -287,6 +287,67 @@ class TestRoleMetaService extends TestJDBCBackend {
   }
 
   @TestTemplate
+  void testBatchListSecurableObjectsForRoles() throws IOException {
+    createAndInsertMakeLake(METALAKE_NAME);
+    String catalogName1 = "catalog1";
+    String catalogName2 = "catalog2";
+    createAndInsertCatalog(METALAKE_NAME, catalogName1);
+    createAndInsertCatalog(METALAKE_NAME, catalogName2);
+
+    RoleMetaService roleMetaService = RoleMetaService.getInstance();
+
+    // Create role1 with a securable object on catalog1
+    RoleEntity role1 =
+        createRoleEntity(
+            RandomIdGenerator.INSTANCE.nextId(),
+            AuthorizationUtils.ofRoleNamespace(METALAKE_NAME),
+            "role1",
+            AUDIT_INFO,
+            SecurableObjects.ofCatalog(
+                catalogName1, Lists.newArrayList(Privileges.UseCatalog.allow())),
+            ImmutableMap.of());
+    roleMetaService.insertRole(role1, false);
+
+    // Create role2 with a securable object on catalog2
+    RoleEntity role2 =
+        createRoleEntity(
+            RandomIdGenerator.INSTANCE.nextId(),
+            AuthorizationUtils.ofRoleNamespace(METALAKE_NAME),
+            "role2",
+            AUDIT_INFO,
+            SecurableObjects.ofCatalog(
+                catalogName2, Lists.newArrayList(Privileges.UseCatalog.allow())),
+            ImmutableMap.of());
+    roleMetaService.insertRole(role2, false);
+
+    // Batch-load securable objects for both roles
+    Map<Long, List<SecurableObject>> result =
+        RoleMetaService.batchListSecurableObjectsForRoles(
+            Lists.newArrayList(role1.id(), role2.id()));
+
+    assertEquals(2, result.size());
+
+    List<SecurableObject> role1SecObjs = result.get(role1.id());
+    Assertions.assertNotNull(role1SecObjs);
+    assertEquals(1, role1SecObjs.size());
+    assertEquals(catalogName1, role1SecObjs.get(0).name());
+
+    List<SecurableObject> role2SecObjs = result.get(role2.id());
+    Assertions.assertNotNull(role2SecObjs);
+    assertEquals(1, role2SecObjs.size());
+    assertEquals(catalogName2, role2SecObjs.get(0).name());
+
+    // A role ID that does not exist should return an empty list
+    long nonExistentRoleId = -9999L;
+    Map<Long, List<SecurableObject>> resultWithMissing =
+        RoleMetaService.batchListSecurableObjectsForRoles(
+            Lists.newArrayList(role1.id(), nonExistentRoleId));
+    assertEquals(2, resultWithMissing.size());
+    assertEquals(1, resultWithMissing.get(role1.id()).size());
+    assertEquals(0, resultWithMissing.get(nonExistentRoleId).size());
+  }
+
+  @TestTemplate
   void testInsertRole() throws IOException {
     createAndInsertMakeLake(METALAKE_NAME);
     String catalogName = "catalog";

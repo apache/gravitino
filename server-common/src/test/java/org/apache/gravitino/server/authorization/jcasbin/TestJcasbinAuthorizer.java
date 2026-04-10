@@ -34,6 +34,7 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.github.benmanes.caffeine.cache.Cache;
 import com.google.common.collect.ImmutableList;
+import com.google.common.collect.ImmutableMap;
 import java.io.IOException;
 import java.lang.reflect.Field;
 import java.security.Principal;
@@ -42,9 +43,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
-import java.util.concurrent.Executor;
 import java.util.stream.Collectors;
-import org.apache.commons.lang3.reflect.FieldUtils;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.EntityStore;
 import org.apache.gravitino.GravitinoEnv;
@@ -134,8 +133,7 @@ public class TestJcasbinAuthorizer {
         .thenAnswer(
             inv -> {
               List<Long> ids = inv.getArgument(0);
-              com.google.common.collect.ImmutableMap.Builder<Long, List<SecurableObject>> result =
-                  com.google.common.collect.ImmutableMap.builder();
+              ImmutableMap.Builder<Long, List<SecurableObject>> result = ImmutableMap.builder();
               for (Long id : ids) {
                 result.put(id, roleSecurableObjectsMap.getOrDefault(id, ImmutableList.of()));
               }
@@ -201,7 +199,6 @@ public class TestJcasbinAuthorizer {
 
   @Test
   public void testAuthorize() throws Exception {
-    makeCompletableFutureUseCurrentThread(jcasbinAuthorizer);
     Principal currentPrincipal = PrincipalUtils.getCurrentPrincipal();
     assertFalse(doAuthorize(currentPrincipal));
     RoleEntity allowRole =
@@ -380,21 +377,8 @@ public class TestJcasbinAuthorizer {
         "testCatalog2", getDenySecurableObjectPO(), MetadataObject.Type.CATALOG);
   }
 
-  private static void makeCompletableFutureUseCurrentThread(JcasbinAuthorizer jcasbinAuthorizer) {
-    try {
-      Executor currentThread = Runnable::run;
-      Class<JcasbinAuthorizer> jcasbinAuthorizerClass = JcasbinAuthorizer.class;
-      Field field = jcasbinAuthorizerClass.getDeclaredField("executor");
-      field.setAccessible(true);
-      FieldUtils.writeField(field, jcasbinAuthorizer, currentThread);
-    } catch (Exception e) {
-      throw new RuntimeException(e);
-    }
-  }
-
   @Test
   public void testRoleCacheInvalidation() throws Exception {
-    makeCompletableFutureUseCurrentThread(jcasbinAuthorizer);
 
     // Get the loadedRoles cache via reflection
     Cache<Long, Boolean> loadedRoles = getLoadedRolesCache(jcasbinAuthorizer);
@@ -437,7 +421,6 @@ public class TestJcasbinAuthorizer {
 
   @Test
   public void testRoleCacheSynchronousRemovalListenerDeletesPolicy() throws Exception {
-    makeCompletableFutureUseCurrentThread(jcasbinAuthorizer);
 
     // Get the enforcers via reflection
     Enforcer allowEnforcer = getAllowEnforcer(jcasbinAuthorizer);
@@ -462,7 +445,6 @@ public class TestJcasbinAuthorizer {
     assertTrue(denyEnforcer.hasPolicy(roleIdStr, "CATALOG", "999", "USE_CATALOG", "allow"));
 
     // Invalidate the cache entry - this triggers the synchronous removal listener
-    // (using executor(Runnable::run) to ensure synchronous execution)
     loadedRoles.invalidate(testRoleId);
 
     // Verify the role's policies have been deleted from enforcers (synchronous, no need to wait)
@@ -483,7 +465,6 @@ public class TestJcasbinAuthorizer {
   /** Tests {@link JcasbinAuthorizer#hasMetadataPrivilegePermission} hierarchy walk */
   @Test
   public void testHasMetadataPrivilegePermission() throws Exception {
-    makeCompletableFutureUseCurrentThread(jcasbinAuthorizer);
     NameIdentifier userNameIdentifier = NameIdentifierUtil.ofUser(METALAKE, USERNAME);
 
     // --- Case 1: no MANAGE_GRANTS anywhere → false ---
