@@ -610,7 +610,8 @@ public class TestCatalogManager {
     Mockito.doReturn(catalogImported).when(importedCatalogWrapper).catalog();
     Mockito.doReturn(importedCapability).when(importedCatalogWrapper).capabilities();
     Mockito.doReturn(unsupportedResult).when(importedCapability).managedStorage(any());
-    Mockito.doReturn(new NameIdentifier[] {NameIdentifier.of("metalake", "test41", "imported_schema")})
+    Mockito.doReturn(
+            new NameIdentifier[] {NameIdentifier.of("metalake", "test41", "imported_schema")})
         .doReturn(importedSchema)
         .when(importedCatalogWrapper)
         .doWithSchemaOps(any());

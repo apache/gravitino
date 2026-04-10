@@ -890,7 +890,8 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
               Map<String, String> entityProps = e.properties();
               if (entityProps != null
                   && "true"
-                      .equals(entityProps.get(SchemaOperationDispatcher.SCHEMA_CREATED_BY_GRAVITINO))) {
+                      .equals(
+                          entityProps.get(SchemaOperationDispatcher.SCHEMA_CREATED_BY_GRAVITINO))) {
                 return true;
               }
 
