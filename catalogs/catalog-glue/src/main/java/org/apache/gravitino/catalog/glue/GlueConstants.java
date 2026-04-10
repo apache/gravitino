@@ -28,7 +28,10 @@ public final class GlueConstants {
   /** AWS region for the Glue Data Catalog (required). */
   public static final String AWS_REGION = "aws-region";
 
-  /** Glue catalog ID — the 12-digit AWS account ID (required). */
+  /**
+   * Glue catalog ID — the 12-digit AWS account ID (optional). When omitted, defaults to the
+   * caller's AWS account ID.
+   */
   public static final String AWS_GLUE_CATALOG_ID = "aws-glue-catalog-id";
 
   /** AWS access key ID for static credential authentication (optional, sensitive). */
@@ -68,7 +71,9 @@ public final class GlueConstants {
 
   /**
    * Glue table format type parameter key stored in {@code Table.parameters()}. Common values:
-   * {@code ICEBERG}, {@code HIVE}, {@code DELTA}, {@code PARQUET}.
+   * {@code ICEBERG}, {@code HIVE}, {@code DELTA}, {@code PARQUET} (uppercase, as stored by Glue).
+   * Note: these differ from the Gravitino-side filter values in {@link #TABLE_TYPE_FILTER}, which
+   * use lowercase (e.g. {@code iceberg}, {@code hive}).
    */
   public static final String TABLE_FORMAT_TYPE = "table_format_type";
 
