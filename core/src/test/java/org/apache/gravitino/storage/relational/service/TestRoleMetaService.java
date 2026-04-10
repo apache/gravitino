@@ -38,8 +38,10 @@ import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
 import java.util.function.Function;
+import java.util.stream.Collectors;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.EntityAlreadyExistsException;
+import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.authorization.AuthorizationUtils;
 import org.apache.gravitino.authorization.Privileges;
@@ -345,6 +347,103 @@ class TestRoleMetaService extends TestJDBCBackend {
     assertEquals(2, resultWithMissing.size());
     assertEquals(1, resultWithMissing.get(role1.id()).size());
     assertEquals(0, resultWithMissing.get(nonExistentRoleId).size());
+  }
+
+  @TestTemplate
+  void testBatchListSecurableObjectsForRolesEmptyInput() {
+    // Empty role ID list must return an empty map without hitting the DB.
+    Map<Long, List<SecurableObject>> result =
+        RoleMetaService.batchListSecurableObjectsForRoles(Collections.emptyList());
+    assertTrue(result.isEmpty());
+  }
+
+  @TestTemplate
+  void testBatchListSecurableObjectsForRolesMultipleObjectsPerRole() throws IOException {
+    createAndInsertMakeLake(METALAKE_NAME);
+    String catalogName = "catalogForBatch";
+    String schemaName = "schemaForBatch";
+    createAndInsertCatalog(METALAKE_NAME, catalogName);
+    createAndInsertSchema(METALAKE_NAME, catalogName, schemaName);
+
+    RoleMetaService roleMetaService = RoleMetaService.getInstance();
+
+    // A role that carries securable objects of three different types:
+    // metalake-level, catalog-level, and schema-level.
+    SecurableObject metalakeObj =
+        SecurableObjects.ofMetalake(
+            METALAKE_NAME, Lists.newArrayList(Privileges.CreateCatalog.allow()));
+    SecurableObject catalogObj =
+        SecurableObjects.ofCatalog(catalogName, Lists.newArrayList(Privileges.UseCatalog.allow()));
+    SecurableObject schemaObj =
+        SecurableObjects.ofSchema(
+            catalogObj, schemaName, Lists.newArrayList(Privileges.UseSchema.allow()));
+
+    RoleEntity richRole =
+        createRoleEntity(
+            RandomIdGenerator.INSTANCE.nextId(),
+            AuthorizationUtils.ofRoleNamespace(METALAKE_NAME),
+            "richRole",
+            AUDIT_INFO,
+            Lists.newArrayList(metalakeObj, catalogObj, schemaObj),
+            ImmutableMap.of());
+    roleMetaService.insertRole(richRole, false);
+
+    Map<Long, List<SecurableObject>> result =
+        RoleMetaService.batchListSecurableObjectsForRoles(Lists.newArrayList(richRole.id()));
+
+    assertEquals(1, result.size());
+    List<SecurableObject> objects = result.get(richRole.id());
+    Assertions.assertNotNull(objects);
+    assertEquals(3, objects.size());
+
+    // Verify that all three expected full-names are present.
+    List<String> fullNames =
+        objects.stream().map(SecurableObject::fullName).collect(Collectors.toList());
+    assertTrue(fullNames.contains(METALAKE_NAME));
+    assertTrue(fullNames.contains(catalogName));
+    assertTrue(fullNames.contains(catalogName + "." + schemaName));
+  }
+
+  @TestTemplate
+  void testBatchListSecurableObjectsForRolesDroppedEntity() throws IOException {
+    createAndInsertMakeLake(METALAKE_NAME);
+    String catalogName = "catalogForDrop";
+    String catalogNameDropped = "catalogDropped";
+    createAndInsertCatalog(METALAKE_NAME, catalogName);
+    createAndInsertCatalog(METALAKE_NAME, catalogNameDropped);
+
+    RoleMetaService roleMetaService = RoleMetaService.getInstance();
+
+    SecurableObject survivingObj =
+        SecurableObjects.ofCatalog(catalogName, Lists.newArrayList(Privileges.UseCatalog.allow()));
+    SecurableObject droppedObj =
+        SecurableObjects.ofCatalog(
+            catalogNameDropped, Lists.newArrayList(Privileges.UseCatalog.allow()));
+
+    RoleEntity role =
+        createRoleEntity(
+            RandomIdGenerator.INSTANCE.nextId(),
+            AuthorizationUtils.ofRoleNamespace(METALAKE_NAME),
+            "roleWithDroppedObj",
+            AUDIT_INFO,
+            Lists.newArrayList(survivingObj, droppedObj),
+            ImmutableMap.of());
+    roleMetaService.insertRole(role, false);
+
+    // Soft-delete the catalog that backs droppedObj; its securable object rows remain
+    // (soft-deleted at the securable_object level when the catalog is deleted).
+    CatalogMetaService.getInstance()
+        .deleteCatalog(NameIdentifier.of(METALAKE_NAME, catalogNameDropped), false);
+
+    // The method must return only the surviving object — dropped entity is silently skipped.
+    Map<Long, List<SecurableObject>> result =
+        RoleMetaService.batchListSecurableObjectsForRoles(Lists.newArrayList(role.id()));
+
+    assertEquals(1, result.size());
+    List<SecurableObject> objects = result.get(role.id());
+    Assertions.assertNotNull(objects);
+    assertEquals(1, objects.size());
+    assertEquals(catalogName, objects.get(0).name());
   }
 
   @TestTemplate
