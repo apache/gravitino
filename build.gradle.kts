@@ -66,7 +66,9 @@ if (scalaVersion !in listOf("2.12", "2.13")) {
   throw GradleException("Scala version $scalaVersion is not supported.")
 }
 
+val skipWeb: Boolean = (project.findProperty("skipWeb") as? String)?.toBoolean() ?: false
 val skipWebWar: Boolean = (project.findProperty("skipWebWar") as? String)?.toBoolean() ?: false
+val skipFrontend: Boolean = skipWeb || skipWebWar
 
 project.extra["extraJvmArgs"] =
   listOf(
@@ -266,6 +268,17 @@ allprojects {
   }
 
   extra["initTestParam"] = setTestEnvironment
+}
+
+if (skipWeb) {
+  gradle.projectsEvaluated {
+    listOf(":web:web", ":web-v2:web", ":web:integration-test", ":web-v2:integration-test")
+      .forEach { projectPath ->
+        project(projectPath).tasks.configureEach {
+          enabled = false
+        }
+      }
+  }
 }
 
 nexusPublishing {
@@ -789,7 +802,7 @@ tasks {
         ":lance:lance-rest-server:copyLibAndConfigs",
         ":maintenance:optimizer:copyLibAndConfigs"
       )
-    if (!skipWebWar) {
+    if (!skipFrontend) {
       dependencies.add(":web:web:build")
       dependencies.add(":web-v2:web:build")
     }
@@ -801,10 +814,8 @@ tasks {
       copy {
         from(projectDir.dir("conf")) { into("package/conf") }
         from(projectDir.dir("bin")) { into("package/bin") }
-        if (!skipWebWar) {
-          from(projectDir.dir("web/web/build/libs/${rootProject.name}-web-$version.war")) { into("package/web") }
-          from(projectDir.dir("web-v2/web/build/libs/${rootProject.name}-web-$version.war")) { into("package/web-v2") }
-        }
+        from(projectDir.dir("web/web/build/libs/${rootProject.name}-web-$version.war")) { into("package/web") }
+        from(projectDir.dir("web-v2/web/build/libs/${rootProject.name}-web-$version.war")) { into("package/web-v2") }
         from(projectDir.dir("scripts")) { into("package/scripts") }
         into(outputDir)
         rename { fileName ->
@@ -819,7 +830,7 @@ tasks {
         }
         fileMode = 0b111101101
       }
-      if (skipWebWar) {
+      if (skipFrontend) {
         val confFile = projectDir.file("distribution/package/conf/gravitino.conf").asFile
         if (confFile.exists()) {
           confFile.writeText(

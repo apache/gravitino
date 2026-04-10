@@ -38,7 +38,7 @@ jobs:
 
       - name: Package Gravitino
         run: |
-          ./gradlew compileDistribution -PskipWebWar=true -x test 
+          ./gradlew compileDistribution -PskipWeb=true -x test 
 
       - name: Free up disk space
         run: |

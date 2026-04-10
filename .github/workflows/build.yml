@@ -114,7 +114,7 @@ jobs:
 
       - name: Build with Gradle
         run: |
-          ./gradlew assemble -PskipWebWar=true
+          ./gradlew assemble -PskipWeb=true
 
   # To check the spark-connector is compatible with scala2.13
   spark-connector-build:
@@ -137,9 +137,9 @@ jobs:
 
       - name: Build with Scala2.13
         run: |
-          ./gradlew :spark-connector:spark-3.3:build -PscalaVersion=2.13 -PskipITs -PskipDockerTests=false -PskipWebWar=true
-          ./gradlew :spark-connector:spark-3.4:build -PscalaVersion=2.13 -PskipITs -PskipDockerTests=false -PskipWebWar=true
-          ./gradlew :spark-connector:spark-3.5:build -PscalaVersion=2.13 -PskipITs -PskipDockerTests=false -PskipWebWar=true
+          ./gradlew :spark-connector:spark-3.3:build -PscalaVersion=2.13 -PskipITs -PskipDockerTests=false -PskipWeb=true
+          ./gradlew :spark-connector:spark-3.4:build -PscalaVersion=2.13 -PskipITs -PskipDockerTests=false -PskipWeb=true
+          ./gradlew :spark-connector:spark-3.5:build -PscalaVersion=2.13 -PskipITs -PskipDockerTests=false -PskipWeb=true
 
       - name: Upload unit tests report
         uses: actions/upload-artifact@v7
@@ -171,7 +171,7 @@ jobs:
           cache: 'gradle'
 
       - name: Test publish to local
-        run: ./gradlew publishToMavenLocal -PskipWebWar=true -x test
+        run: ./gradlew publishToMavenLocal -PskipWeb=true -x test
 
       - name: Free up disk space
         run: |
@@ -190,7 +190,7 @@ jobs:
               :maintenance:updaters:build \
               :maintenance:optimizer:build \
               :maintenance:jobs:build \
-              -PskipWebWar=true \
+              -PskipWeb=true \
               -PskipITs \
               -PskipDockerTests=false
             exit 0
@@ -198,7 +198,7 @@ jobs:
 
           gradle_args=(
             build
-            -PskipWebWar=true
+            -PskipWeb=true
             -PskipITs
             -PskipDockerTests=false
             -x :clients:client-python:build

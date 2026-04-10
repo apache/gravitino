@@ -26,7 +26,7 @@ jobs:
 
       - name: Build Gravitino
         run: |
-          ./gradlew build -PskipWebWar=true -x test \
+          ./gradlew build -PskipWeb=true -x test \
             -x :web:web:build -x :web:integration-test:build \
             -x :web-v2:web:build -x :web-v2:integration-test:build \
             -x :clients:client-python:build \

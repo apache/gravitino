@@ -75,7 +75,7 @@ jobs:
       - name: Python Client Integration Test
         id: integrationTest
         run: |
-          ./gradlew compileDistribution -PskipWebWar=true -x test 
+          ./gradlew compileDistribution -PskipWeb=true -x test 
 
           for pythonVersion in "3.10" "3.11" "3.12"
           do
