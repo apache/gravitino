@@ -23,6 +23,7 @@ import static org.apache.gravitino.catalog.OperationDispatcher.FormattedErrorMes
 import static org.apache.gravitino.catalog.PropertiesMetadataHelpers.validatePropertyForCreate;
 import static org.apache.gravitino.utils.NameIdentifierUtil.getCatalogIdentifier;
 
+import com.google.common.collect.ImmutableMap;
 import java.time.Instant;
 import java.util.Map;
 import org.apache.gravitino.EntityAlreadyExistsException;
@@ -50,6 +51,8 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 public class SchemaOperationDispatcher extends OperationDispatcher implements SchemaDispatcher {
+
+  static final String SCHEMA_CREATED_BY_GRAVITINO = "gravitino.created";
 
   private static final Logger LOG = LoggerFactory.getLogger(SchemaOperationDispatcher.class);
 
@@ -148,6 +151,7 @@ public class SchemaOperationDispatcher extends OperationDispatcher implements Sc
                   .withId(uid)
                   .withName(ident.name())
                   .withNamespace(ident.namespace())
+                  .withProperties(ImmutableMap.of(SCHEMA_CREATED_BY_GRAVITINO, "true"))
                   .withAuditInfo(
                       AuditInfo.builder()
                           .withCreator(PrincipalUtils.getCurrentPrincipal().getName())

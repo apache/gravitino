@@ -73,6 +73,7 @@ import org.apache.gravitino.EntityAlreadyExistsException;
 import org.apache.gravitino.EntityStore;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
+import org.apache.gravitino.Schema;
 import org.apache.gravitino.StringIdentifier;
 import org.apache.gravitino.connector.BaseCatalog;
 import org.apache.gravitino.connector.CatalogOperations;
@@ -87,6 +88,7 @@ import org.apache.gravitino.exceptions.GravitinoRuntimeException;
 import org.apache.gravitino.exceptions.NoSuchCatalogException;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.exceptions.NoSuchMetalakeException;
+import org.apache.gravitino.exceptions.NoSuchSchemaException;
 import org.apache.gravitino.exceptions.NonEmptyCatalogException;
 import org.apache.gravitino.exceptions.NonEmptyEntityException;
 import org.apache.gravitino.file.FilesetCatalog;
@@ -877,9 +879,39 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
     Set<String> availableSchemaNames =
         Arrays.stream(allSchemas).map(NameIdentifier::name).collect(Collectors.toSet());
 
-    // some schemas are dropped externally, but still exist in the entity store, those schemas are
-    // invalid
-    return schemaEntities.stream().map(SchemaEntity::name).anyMatch(availableSchemaNames::contains);
+    // Some schemas are dropped externally, but still exist in the entity store — those are invalid.
+    // Among schemas that still exist in the underlying catalog, only count those created via
+    // Gravitino. New schemas carry an entity-store marker; older schemas fall back to the embedded
+    // StringIdentifier in external catalog metadata.
+    return schemaEntities.stream()
+        .filter(e -> availableSchemaNames.contains(e.name()))
+        .anyMatch(
+            e -> {
+              Map<String, String> entityProps = e.properties();
+              if (entityProps != null
+                  && "true"
+                      .equals(entityProps.get(SchemaOperationDispatcher.SCHEMA_CREATED_BY_GRAVITINO))) {
+                return true;
+              }
+
+              try {
+                Schema schema =
+                    catalogWrapper.doWithSchemaOps(ops -> ops.loadSchema(e.nameIdentifier()));
+                return StringIdentifier.fromProperties(schema.properties()) != null;
+              } catch (NoSuchSchemaException ex) {
+                LOG.warn(
+                    "Schema {} no longer exists while checking whether it is user-created",
+                    e.nameIdentifier(),
+                    ex);
+                return false;
+              } catch (Exception ex) {
+                throw new RuntimeException(
+                    String.format(
+                        "Failed to determine whether schema %s is user-created",
+                        e.nameIdentifier()),
+                    ex);
+              }
+            });
   }
 
   /**
