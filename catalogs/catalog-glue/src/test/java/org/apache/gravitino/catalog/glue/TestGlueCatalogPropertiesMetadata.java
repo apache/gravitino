@@ -49,8 +49,8 @@ class TestGlueCatalogPropertiesMetadata {
   }
 
   @Test
-  void testAwsGlueCatalogIdIsRequired() {
-    assertTrue(metadata.isRequiredProperty(AWS_GLUE_CATALOG_ID));
+  void testAwsGlueCatalogIdIsOptional() {
+    assertFalse(metadata.isRequiredProperty(AWS_GLUE_CATALOG_ID));
   }
 
   @Test

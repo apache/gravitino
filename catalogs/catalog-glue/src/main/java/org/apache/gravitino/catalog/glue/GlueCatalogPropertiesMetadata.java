@@ -49,10 +49,12 @@ public class GlueCatalogPropertiesMetadata extends BaseCatalogPropertiesMetadata
                   false /* hidden */))
           .put(
               AWS_GLUE_CATALOG_ID,
-              stringRequiredPropertyEntry(
+              stringOptionalPropertyEntry(
                   AWS_GLUE_CATALOG_ID,
-                  "The 12-digit AWS account ID that owns the Glue catalog",
+                  "The 12-digit AWS account ID that owns the Glue catalog."
+                      + " When omitted, defaults to the caller's AWS account ID.",
                   true /* immutable */,
+                  null /* defaultValue */,
                   false /* hidden */))
           .put(
               AWS_ACCESS_KEY_ID,
@@ -85,7 +87,8 @@ public class GlueCatalogPropertiesMetadata extends BaseCatalogPropertiesMetadata
               DEFAULT_TABLE_FORMAT,
               stringOptionalPropertyEntry(
                   DEFAULT_TABLE_FORMAT,
-                  "Default format for tables created via createTable(). Accepted: iceberg, hive.",
+                  "Default format for tables created via createTable(). Accepted: iceberg, hive."
+                      + " Unrecognised values are rejected at createTable() time.",
                   false /* immutable */,
                   DEFAULT_TABLE_FORMAT_VALUE,
                   false /* hidden */))
@@ -94,7 +97,8 @@ public class GlueCatalogPropertiesMetadata extends BaseCatalogPropertiesMetadata
               stringOptionalPropertyEntry(
                   TABLE_TYPE_FILTER,
                   "Comma-separated table types exposed by listTables() and loadTable()."
-                      + " Accepted: all, hive, iceberg, delta, parquet.",
+                      + " Accepted: all, hive, iceberg, delta, parquet."
+                      + " Unrecognised values are rejected at listTables() time.",
                   false /* immutable */,
                   TABLE_TYPE_FILTER_ALL,
                   false /* hidden */))

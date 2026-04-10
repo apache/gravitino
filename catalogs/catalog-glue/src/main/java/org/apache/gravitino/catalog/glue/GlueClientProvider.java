@@ -19,9 +19,9 @@
 package org.apache.gravitino.catalog.glue;
 
 import com.google.common.base.Preconditions;
-import com.google.common.base.Strings;
 import java.net.URI;
 import java.util.Map;
+import org.apache.commons.lang3.StringUtils;
 import software.amazon.awssdk.auth.credentials.AwsBasicCredentials;
 import software.amazon.awssdk.auth.credentials.DefaultCredentialsProvider;
 import software.amazon.awssdk.auth.credentials.StaticCredentialsProvider;
@@ -57,7 +57,7 @@ public final class GlueClientProvider {
   public static GlueClient buildClient(Map<String, String> config) {
     String region = config.get(GlueConstants.AWS_REGION);
     Preconditions.checkArgument(
-        !Strings.isNullOrEmpty(region),
+        StringUtils.isNotBlank(region),
         "Property '%s' is required to create a Glue client",
         GlueConstants.AWS_REGION);
 
@@ -67,8 +67,8 @@ public final class GlueClientProvider {
     // Both keys must be provided together — a partial pair is always a misconfiguration.
     String accessKey = config.get(GlueConstants.AWS_ACCESS_KEY_ID);
     String secretKey = config.get(GlueConstants.AWS_SECRET_ACCESS_KEY);
-    boolean hasAccessKey = !Strings.isNullOrEmpty(accessKey);
-    boolean hasSecretKey = !Strings.isNullOrEmpty(secretKey);
+    boolean hasAccessKey = StringUtils.isNotBlank(accessKey);
+    boolean hasSecretKey = StringUtils.isNotBlank(secretKey);
     Preconditions.checkArgument(
         hasAccessKey == hasSecretKey,
         "Both '%s' and '%s' must be set together. "
@@ -86,7 +86,7 @@ public final class GlueClientProvider {
 
     // Optional custom endpoint override for VPC endpoints or LocalStack testing.
     String endpoint = config.get(GlueConstants.AWS_GLUE_ENDPOINT);
-    if (!Strings.isNullOrEmpty(endpoint)) {
+    if (StringUtils.isNotBlank(endpoint)) {
       try {
         builder.endpointOverride(URI.create(endpoint));
       } catch (IllegalArgumentException e) {
