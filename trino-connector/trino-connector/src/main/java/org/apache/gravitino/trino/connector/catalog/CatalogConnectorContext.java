@@ -185,24 +185,30 @@ public class CatalogConnectorContext {
     }
 
     /**
-     * Constructs a new Builder with the specified connector adapter and catalog.
+     * Constructs a new Builder with the specified connector adapter, catalog, and config. Used
+     * internally by {@link #clone(GravitinoCatalog)} to propagate all builder state.
      *
      * @param connectorAdapter the connector adapter to use
      * @param catalog the catalog to use
+     * @param config the Gravitino config to propagate
      */
-    private Builder(CatalogConnectorAdapter connectorAdapter, GravitinoCatalog catalog) {
+    private Builder(
+        CatalogConnectorAdapter connectorAdapter,
+        GravitinoCatalog catalog,
+        GravitinoConfig config) {
       this.connectorAdapter = connectorAdapter;
       this.catalog = catalog;
+      this.config = config;
     }
 
     /**
-     * Clones the builder with a new catalog.
+     * Clones the builder with a new catalog, preserving all other state including config.
      *
      * @param catalog the new catalog to use
      * @return a new builder with the specified catalog
      */
     public Builder clone(GravitinoCatalog catalog) {
-      return new Builder(connectorAdapter, catalog);
+      return new Builder(connectorAdapter, catalog, this.config);
     }
 
     /**
@@ -248,6 +254,7 @@ public class CatalogConnectorContext {
       Preconditions.checkArgument(metalake != null, "metalake is not null");
       Preconditions.checkArgument(catalog != null, "catalog is not null");
       Preconditions.checkArgument(context != null, "context is not null");
+      Preconditions.checkArgument(config != null, "config is not null");
       Map<String, String> connectorConfig = connectorAdapter.buildInternalConnectorConfig(catalog);
       String internalConnectorName = connectorAdapter.internalConnectorName();
 

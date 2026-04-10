@@ -28,9 +28,6 @@ import java.util.Map;
  * thread-safe because {@link #getHeaders()} is called once per HTTP request and may be invoked
  * concurrently from multiple threads.
  *
- * <p>A typical use-case is forwarding per-request context (e.g. the originating user identity) that
- * is stored in a {@link ThreadLocal} and populated before each request is dispatched.
- *
  * @since 1.3.0
  */
 public interface ExtraHeadersProvider extends Closeable {

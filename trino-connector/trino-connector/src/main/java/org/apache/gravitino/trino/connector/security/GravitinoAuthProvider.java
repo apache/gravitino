@@ -139,10 +139,9 @@ public class GravitinoAuthProvider {
   }
 
   /**
-   * Convenience wrapper kept for callers that only need the {@link GravitinoAdminClient} and do not
-   * require session-forwarding (e.g. tests that inject a pre-built client).
+   * Alias for {@link #build(GravitinoConfig)}, kept for backward compatibility with existing tests.
    *
-   * @deprecated Use {@link #build(GravitinoConfig)} instead.
+   * @deprecated Use {@link #build(GravitinoConfig)} directly.
    */
   @Deprecated
   @SuppressWarnings("InlineMeSuggester")

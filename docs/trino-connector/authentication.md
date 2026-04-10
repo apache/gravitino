@@ -128,8 +128,8 @@ SHOW CATALOGS;
 
 Setting `gravitino.client.session.forwardUser=true` enables per-query credential forwarding from Trino to Gravitino. The behavior depends on the configured `authType`:
 
-- **`authType=simple`**: The Trino session username is encoded as a `Basic` credential and forwarded per-request, so each Trino user is visible in the Gravitino audit log instead of the shared `gravitino.user`.
-- **`authType=oauth2`**: The Bearer token from Trino session extra credentials is forwarded per-request to Gravitino, enabling per-user OAuth2 authorization.
+- **`authType=simple`**: A dedicated Gravitino client is created per Trino session user, so each user is visible in the Gravitino audit log instead of the shared `gravitino.user`.
+- **`authType=oauth2`**: A dedicated Gravitino client is created per Bearer token from the Trino session extra credentials, enabling per-user OAuth2 authorization.
 
 **Configuration for simple auth (forward session user):**
 
