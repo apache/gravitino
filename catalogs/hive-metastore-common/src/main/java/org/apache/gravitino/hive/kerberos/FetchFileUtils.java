@@ -19,9 +19,11 @@
 package org.apache.gravitino.hive.kerberos;
 
 import java.io.File;
+import java.io.IOException;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.nio.file.Files;
+import java.util.Optional;
 import org.apache.commons.io.FileUtils;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileSystem;
@@ -32,10 +34,10 @@ public class FetchFileUtils {
   private FetchFileUtils() {}
 
   public static void fetchFileFromUri(
-      String fileUri, File destFile, int timeout, Configuration conf) throws java.io.IOException {
+      String fileUri, File destFile, int timeout, Configuration conf) throws IOException {
     try {
       URI uri = new URI(fileUri);
-      String scheme = java.util.Optional.ofNullable(uri.getScheme()).orElse("file");
+      String scheme = Optional.ofNullable(uri.getScheme()).orElse("file");
 
       switch (scheme) {
         case "http":
@@ -45,7 +47,12 @@ public class FetchFileUtils {
           break;
 
         case "file":
-          Files.createSymbolicLink(destFile.toPath(), new File(uri.getPath()).toPath());
+          // Synchronize on the canonical dest path to prevent concurrent threads from
+          // racing between deleteIfExists and createSymbolicLink for the same keytab file.
+          synchronized (destFile.getAbsolutePath().intern()) {
+            Files.deleteIfExists(destFile.toPath());
+            Files.createSymbolicLink(destFile.toPath(), new File(uri.getPath()).toPath());
+          }
           break;
 
         case "hdfs":
