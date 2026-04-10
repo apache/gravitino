@@ -87,7 +87,8 @@ public class GlueCatalogPropertiesMetadata extends BaseCatalogPropertiesMetadata
               DEFAULT_TABLE_FORMAT,
               stringOptionalPropertyEntry(
                   DEFAULT_TABLE_FORMAT,
-                  "Default format for tables created via createTable(). Accepted: iceberg, hive.",
+                  "Default format for tables created via createTable(). Accepted: iceberg, hive."
+                      + " Unrecognised values are rejected at createTable() time.",
                   false /* immutable */,
                   DEFAULT_TABLE_FORMAT_VALUE,
                   false /* hidden */))
