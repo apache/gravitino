@@ -40,6 +40,12 @@ public class GravitinoCatalogStoreFactoryOptions {
           .stringType()
           .noDefaultValue()
           .withDescription("The name of Gravitino metalake");
+  public static final ConfigOption<Boolean> GRAVITINO_ENABLE_SESSION_CATALOG_SUPPORT =
+      ConfigOptions.key("gravitino.enableSessionCatalogSupport")
+          .booleanType()
+          .defaultValue(false)
+          .withDescription(
+              "Whether to enable support for Flink's session catalog in the Gravitino catalog store");
 
   public static final ConfigOption<Map<String, String>> GRAVITINO_CLIENT_CONFIG =
       ConfigOptions.key("gravitino.client")

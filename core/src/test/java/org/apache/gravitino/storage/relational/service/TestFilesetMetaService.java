@@ -376,4 +376,80 @@ public class TestFilesetMetaService extends TestJDBCBackend {
         .withAuditInfo(auditInfo)
         .build();
   }
+
+  @TestTemplate
+  public void testUpdateFilesetReturnsSuccessWhenVersionedMetaUpdateAffectsNoRows()
+      throws IOException {
+    String filesetName = GravitinoITUtils.genRandomName("tst_fs_conflict");
+    NameIdentifier filesetIdent =
+        NameIdentifier.of(metalakeName, catalogName, schemaName, filesetName);
+    FilesetEntity filesetEntity =
+        createFilesetEntity(
+            RandomIdGenerator.INSTANCE.nextId(),
+            NamespaceUtil.ofFileset(metalakeName, catalogName, schemaName),
+            filesetName,
+            AUDIT_INFO,
+            "/tmp");
+    FilesetMetaService.getInstance().insertFileset(filesetEntity, true);
+
+    AuditInfo conflictingAuditInfo =
+        AuditInfo.builder()
+            .withCreator("conflicting-updater")
+            .withCreateTime(Instant.now())
+            .build();
+    FilesetEntity updatedFilesetEntity =
+        FilesetEntity.builder()
+            .withId(filesetEntity.id())
+            .withName(filesetEntity.name())
+            .withNamespace(filesetEntity.namespace())
+            .withFilesetType(filesetEntity.filesetType())
+            .withStorageLocations(ImmutableMap.of(LOCATION_NAME_UNKNOWN, "/tmp-v2"))
+            .withComment("comment-v2")
+            .withProperties(ImmutableMap.of("version", "2"))
+            .withAuditInfo(
+                AuditInfo.builder()
+                    .withCreator("expected-updater")
+                    .withCreateTime(Instant.now())
+                    .build())
+            .build();
+
+    Exception exception =
+        Assertions.assertThrows(
+            IOException.class,
+            () ->
+                FilesetMetaService.getInstance()
+                    .updateFileset(
+                        filesetIdent,
+                        e -> {
+                          // Simulate an optimistic locking conflict
+                          try {
+                            backend.update(
+                                filesetIdent,
+                                Entity.EntityType.FILESET,
+                                entity -> {
+                                  FilesetEntity cloned =
+                                      createFilesetEntity(
+                                          entity.id(),
+                                          entity.namespace(),
+                                          entity.name(),
+                                          conflictingAuditInfo,
+                                          "/tmp");
+                                  return cloned;
+                                });
+                          } catch (Exception ex) {
+                            throw new RuntimeException(ex);
+                          }
+                          return updatedFilesetEntity;
+                        }));
+    Assertions.assertTrue(
+        exception.getMessage().contains("Failed to update the entity: " + filesetIdent));
+
+    FilesetEntity persistedEntity =
+        FilesetMetaService.getInstance().getFilesetByIdentifier(filesetIdent);
+    Assertions.assertEquals(conflictingAuditInfo, persistedEntity.auditInfo());
+    Assertions.assertEquals("", persistedEntity.comment());
+    Assertions.assertNull(persistedEntity.properties());
+    Assertions.assertEquals("/tmp", persistedEntity.storageLocations().get(LOCATION_NAME_UNKNOWN));
+    Assertions.assertNotEquals(updatedFilesetEntity, persistedEntity);
+  }
 }

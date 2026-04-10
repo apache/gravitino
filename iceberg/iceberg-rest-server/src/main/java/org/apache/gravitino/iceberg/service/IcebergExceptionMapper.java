@@ -20,13 +20,16 @@ package org.apache.gravitino.iceberg.service;
 
 import com.google.common.collect.ImmutableMap;
 import java.util.Map;
+import javax.ws.rs.NotFoundException;
 import javax.ws.rs.core.Response;
 import javax.ws.rs.core.Response.Status;
 import javax.ws.rs.ext.ExceptionMapper;
 import javax.ws.rs.ext.Provider;
 import org.apache.gravitino.exceptions.IllegalNameIdentifierException;
 import org.apache.gravitino.exceptions.NoSuchCatalogException;
+import org.apache.gravitino.exceptions.UnauthorizedException;
 import org.apache.iceberg.exceptions.AlreadyExistsException;
+import org.apache.iceberg.exceptions.BadRequestException;
 import org.apache.iceberg.exceptions.CommitFailedException;
 import org.apache.iceberg.exceptions.CommitStateUnknownException;
 import org.apache.iceberg.exceptions.ForbiddenException;
@@ -36,6 +39,7 @@ import org.apache.iceberg.exceptions.NoSuchNamespaceException;
 import org.apache.iceberg.exceptions.NoSuchTableException;
 import org.apache.iceberg.exceptions.NoSuchViewException;
 import org.apache.iceberg.exceptions.NotAuthorizedException;
+import org.apache.iceberg.exceptions.ServiceFailureException;
 import org.apache.iceberg.exceptions.ServiceUnavailableException;
 import org.apache.iceberg.exceptions.UnprocessableEntityException;
 import org.apache.iceberg.exceptions.ValidationException;
@@ -56,8 +60,10 @@ public class IcebergExceptionMapper implements ExceptionMapper<Exception> {
           .put(IllegalNameIdentifierException.class, 400)
           .put(NamespaceNotEmptyException.class, 400)
           .put(NotAuthorizedException.class, 401)
+          .put(UnauthorizedException.class, 401)
           .put(org.apache.gravitino.exceptions.ForbiddenException.class, 403)
           .put(ForbiddenException.class, 403)
+          .put(NotFoundException.class, 404)
           .put(NoSuchNamespaceException.class, 404)
           .put(NoSuchTableException.class, 404)
           .put(NoSuchIcebergTableException.class, 404)
@@ -68,8 +74,46 @@ public class IcebergExceptionMapper implements ExceptionMapper<Exception> {
           .put(CommitFailedException.class, 409)
           .put(UnprocessableEntityException.class, 422)
           .put(CommitStateUnknownException.class, 500)
+          .put(ServiceFailureException.class, 500)
           .put(ServiceUnavailableException.class, 503)
           .build();
+
+  /**
+   * Returns the HTTP status code for the given exception based on the Iceberg REST spec.
+   *
+   * @param ex the exception
+   * @return the HTTP status code, defaulting to 500 for unmapped exceptions
+   */
+  public static int getErrorCode(Exception ex) {
+    return EXCEPTION_ERROR_CODES.getOrDefault(
+        ex.getClass(), Status.INTERNAL_SERVER_ERROR.getStatusCode());
+  }
+
+  /**
+   * Converts a Gravitino or generic exception to the corresponding Iceberg REST spec exception.
+   *
+   * @param e the original exception
+   * @return the equivalent Iceberg exception, or the original if already an Iceberg exception
+   */
+  public static Exception convertToIcebergException(Exception e) {
+    String message = e.getMessage() != null ? e.getMessage() : "";
+    if (e instanceof UnauthorizedException) {
+      return new NotAuthorizedException("%s", message);
+    }
+    if (e instanceof org.apache.gravitino.exceptions.ForbiddenException) {
+      return new ForbiddenException("%s", message);
+    }
+    if (e instanceof IllegalArgumentException
+        || e instanceof IllegalNameIdentifierException
+        || e instanceof ValidationException
+        || e instanceof NamespaceNotEmptyException) {
+      return new BadRequestException("%s", message);
+    }
+    if (EXCEPTION_ERROR_CODES.containsKey(e.getClass())) {
+      return e;
+    }
+    return new ServiceFailureException("%s", message);
+  }
 
   @Override
   public Response toResponse(Exception ex) {

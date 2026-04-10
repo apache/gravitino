@@ -64,7 +64,7 @@ import org.eclipse.jetty.webapp.WebAppContext;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-public final class JettyServer {
+public class JettyServer {
 
   private static final Logger LOG = LoggerFactory.getLogger(JettyServer.class);
 
@@ -470,6 +470,14 @@ public final class JettyServer {
       servletContextHandler.addFilter(
           CorsFilterHolder.create(serverConfig), pathSpec, EnumSet.allOf(DispatcherType.class));
     }
-    addFilter(new AuthenticationFilter(), pathSpec);
+    addFilter(createAuthenticationFilter(), pathSpec);
+  }
+
+  /**
+   * Creates the authentication filter for this server. Subclasses can override this to provide a
+   * custom authentication filter (e.g., one that returns Iceberg-spec JSON error responses).
+   */
+  protected Filter createAuthenticationFilter() {
+    return new AuthenticationFilter();
   }
 }

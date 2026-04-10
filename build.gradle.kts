@@ -1150,6 +1150,7 @@ tasks {
   register("copyCatalogLibAndConfigs", Copy::class) {
     dependsOn(
       ":catalogs:catalog-fileset:copyLibAndConfig",
+      ":catalogs:catalog-glue:copyLibAndConfig",
       ":catalogs:catalog-hive:copyLibAndConfig",
       ":catalogs:catalog-jdbc-doris:copyLibAndConfig",
       ":catalogs:catalog-jdbc-mysql:copyLibAndConfig",

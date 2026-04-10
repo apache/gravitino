@@ -226,6 +226,27 @@ public class TagMetaBaseSQLProvider {
         + " WHERE tag_id = #{tagId} and deleted_at = 0";
   }
 
+  public String listTagPOsByTagIds(@Param("tagIds") List<Long> tagIds) {
+    return "<script>"
+        + "SELECT tag_id as tagId, tag_name as tagName,"
+        + " metalake_id as metalakeId,"
+        + " tag_comment as comment,"
+        + " properties as properties,"
+        + " audit_info as auditInfo,"
+        + " current_version as currentVersion,"
+        + " last_version as lastVersion,"
+        + " deleted_at as deletedAt"
+        + " FROM "
+        + TAG_TABLE_NAME
+        + " WHERE deleted_at = 0"
+        + " AND tag_id IN ("
+        + "<foreach collection='tagIds' item='tagId' separator=','>"
+        + "#{tagId}"
+        + "</foreach>"
+        + ")"
+        + "</script>";
+  }
+
   public String batchSelectTagByIdentifier(
       @Param("metalakeName") String metalakeName, @Param("tagNames") List<String> tagNames) {
     return "<script>"
