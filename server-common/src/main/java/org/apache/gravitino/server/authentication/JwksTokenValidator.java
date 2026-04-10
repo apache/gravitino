@@ -90,7 +90,11 @@ public class JwksTokenValidator implements OAuthTokenValidator {
           "JWKS URI must be configured when using JWKS-based OAuth providers");
     }
 
-    // Validate JWKS URI format and create cached JWK source
+    // Create the JWK source once at initialization. JWKSourceBuilder.create(url).build() enables
+    // rate-limiting (min 30 s between URL fetches) and caching with refresh-ahead by default:
+    //   - Cache TTL: 5 minutes (DEFAULT_CACHE_TIME_TO_LIVE)
+    //   - Refresh-ahead: 30 seconds before expiration on a background thread
+    // The Nimbus library handles key rotation transparently within these defaults.
     try {
       this.jwkSource = JWKSourceBuilder.create(new URL(jwksUri)).build();
     } catch (Exception e) {
