@@ -24,12 +24,11 @@ import io.trino.spi.connector.ConnectorContext;
 import io.trino.spi.session.PropertyMetadata;
 import java.util.List;
 import java.util.Map;
-import javax.annotation.Nullable;
 import org.apache.gravitino.client.GravitinoMetalake;
+import org.apache.gravitino.trino.connector.GravitinoConfig;
 import org.apache.gravitino.trino.connector.GravitinoConnector;
 import org.apache.gravitino.trino.connector.GravitinoConnectorPluginManager;
 import org.apache.gravitino.trino.connector.metadata.GravitinoCatalog;
-import org.apache.gravitino.trino.connector.security.TrinoSessionContext;
 
 /**
  * The CatalogConnector serves as a communication bridge between the Apache Gravitino connector and
@@ -49,7 +48,7 @@ public class CatalogConnectorContext {
 
   private final CatalogConnectorAdapter adapter;
 
-  @Nullable private final TrinoSessionContext sessionContext;
+  private final GravitinoConfig config;
 
   /**
    * Constructs a new CatalogConnectorContext.
@@ -58,19 +57,19 @@ public class CatalogConnectorContext {
    * @param metalake the Gravitino metalake
    * @param internalConnector the internal connector
    * @param adapter the catalog connector adapter
-   * @param sessionContext the optional session context for per-query credential forwarding
+   * @param config the Gravitino connector configuration
    */
   public CatalogConnectorContext(
       GravitinoCatalog catalog,
       GravitinoMetalake metalake,
       Connector internalConnector,
       CatalogConnectorAdapter adapter,
-      @Nullable TrinoSessionContext sessionContext) {
+      GravitinoConfig config) {
     this.catalog = catalog;
     this.metalake = metalake;
     this.internalConnector = internalConnector;
     this.adapter = adapter;
-    this.sessionContext = sessionContext;
+    this.config = config;
   }
 
   /**
@@ -146,14 +145,12 @@ public class CatalogConnectorContext {
   }
 
   /**
-   * Returns the optional session context for per-query credential forwarding, or {@code null} when
-   * session forwarding is not configured.
+   * Returns the Gravitino connector configuration.
    *
-   * @return the session context, or {@code null}
+   * @return the Gravitino config
    */
-  @Nullable
-  public TrinoSessionContext getSessionContext() {
-    return sessionContext;
+  public GravitinoConfig getConfig() {
+    return config;
   }
 
   /** Closes the internal connector associated with this context. */
@@ -176,7 +173,7 @@ public class CatalogConnectorContext {
     private GravitinoCatalog catalog;
     private GravitinoMetalake metalake;
     private ConnectorContext context;
-    @Nullable private TrinoSessionContext sessionContext;
+    private GravitinoConfig config;
 
     /**
      * Constructs a new Builder with the specified connector adapter.
@@ -231,13 +228,13 @@ public class CatalogConnectorContext {
     }
 
     /**
-     * Sets the optional session context for per-query credential forwarding.
+     * Sets the Gravitino connector configuration.
      *
-     * @param sessionContext the session context, or {@code null} to disable forwarding
+     * @param config the Gravitino config
      * @return the builder
      */
-    public Builder withSessionContext(@Nullable TrinoSessionContext sessionContext) {
-      this.sessionContext = sessionContext;
+    public Builder withConfig(GravitinoConfig config) {
+      this.config = config;
       return this;
     }
 
@@ -257,8 +254,7 @@ public class CatalogConnectorContext {
       Connector connector =
           GravitinoConnectorPluginManager.instance(context.getClass().getClassLoader())
               .createConnector(internalConnectorName, connectorConfig, context);
-      return new CatalogConnectorContext(
-          catalog, metalake, connector, connectorAdapter, sessionContext);
+      return new CatalogConnectorContext(catalog, metalake, connector, connectorAdapter, config);
     }
   }
 }

@@ -64,8 +64,8 @@ import java.util.OptionalLong;
 import java.util.Set;
 import java.util.stream.Collectors;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.gravitino.trino.connector.catalog.CatalogConnectorMetadata;
 import org.apache.gravitino.trino.connector.catalog.CatalogConnectorMetadataAdapter;
-import org.apache.gravitino.trino.connector.catalog.SessionAwareCatalogMetadata;
 import org.apache.gravitino.trino.connector.metadata.GravitinoSchema;
 import org.apache.gravitino.trino.connector.metadata.GravitinoTable;
 
@@ -80,7 +80,7 @@ public abstract class GravitinoMetadata implements ConnectorMetadata {
   public static final String MERGE_ROW_ID = "$row_id";
 
   // Handling metadata operations on gravitino server
-  protected final SessionAwareCatalogMetadata catalogConnectorMetadata;
+  protected final CatalogConnectorMetadata catalogConnectorMetadata;
 
   // Transform different metadata format
   protected final CatalogConnectorMetadataAdapter metadataAdapter;
@@ -90,14 +90,13 @@ public abstract class GravitinoMetadata implements ConnectorMetadata {
   /**
    * Constructs a new GravitinoMetadata instance.
    *
-   * @param catalogConnectorMetadata the session-aware metadata handler for operations on the
-   *     Gravitino server
+   * @param catalogConnectorMetadata the metadata handler for operations on the Gravitino server
    * @param metadataAdapter the adapter for transforming metadata between Trino and Gravitino
    *     formats
    * @param internalMetadata the internal connector metadata for data access
    */
   public GravitinoMetadata(
-      SessionAwareCatalogMetadata catalogConnectorMetadata,
+      CatalogConnectorMetadata catalogConnectorMetadata,
       CatalogConnectorMetadataAdapter metadataAdapter,
       ConnectorMetadata internalMetadata) {
     this.catalogConnectorMetadata = catalogConnectorMetadata;
@@ -107,12 +106,12 @@ public abstract class GravitinoMetadata implements ConnectorMetadata {
 
   @Override
   public List<String> listSchemaNames(ConnectorSession session) {
-    return catalogConnectorMetadata.listSchemaNames(session);
+    return catalogConnectorMetadata.listSchemaNames();
   }
 
   @Override
   public Map<String, Object> getSchemaProperties(ConnectorSession session, String schemaName) {
-    GravitinoSchema schema = catalogConnectorMetadata.getSchema(session, schemaName);
+    GravitinoSchema schema = catalogConnectorMetadata.getSchema(schemaName);
     return metadataAdapter.getSchemaProperties(schema);
   }
 
@@ -123,8 +122,7 @@ public abstract class GravitinoMetadata implements ConnectorMetadata {
       Optional<ConnectorTableVersion> startVersion,
       Optional<ConnectorTableVersion> endVersion) {
     boolean tableExists =
-        catalogConnectorMetadata.tableExists(
-            session, tableName.getSchemaName(), tableName.getTableName());
+        catalogConnectorMetadata.tableExists(tableName.getSchemaName(), tableName.getTableName());
     if (!tableExists) return null;
 
     ConnectorTableHandle internalTableHandle =
@@ -145,7 +143,7 @@ public abstract class GravitinoMetadata implements ConnectorMetadata {
     GravitinoTableHandle gravitinoTableHandle = (GravitinoTableHandle) tableHandle;
     GravitinoTable table =
         catalogConnectorMetadata.getTable(
-            session, gravitinoTableHandle.getSchemaName(), gravitinoTableHandle.getTableName());
+            gravitinoTableHandle.getSchemaName(), gravitinoTableHandle.getTableName());
     return metadataAdapter.getTableMetadata(table);
     // TODO Add support for retrieving hidden columns from the table; they are used for query
     // optimization.
@@ -171,7 +169,7 @@ public abstract class GravitinoMetadata implements ConnectorMetadata {
 
     ImmutableList.Builder<SchemaTableName> builder = ImmutableList.builder();
     for (String schemaName : schemaNames) {
-      List<String> tableNames = catalogConnectorMetadata.listTables(session, schemaName);
+      List<String> tableNames = catalogConnectorMetadata.listTables(schemaName);
       for (String tableName : tableNames) {
         builder.add(new SchemaTableName(schemaName, tableName));
       }
@@ -203,7 +201,7 @@ public abstract class GravitinoMetadata implements ConnectorMetadata {
       ConnectorSession session, ConnectorTableMetadata tableMetadata, SaveMode saveMode) {
     GravitinoTable table = metadataAdapter.createTable(tableMetadata);
     // saveMode = SaveMode.IGNORE is used to ignore the table creation if it already exists
-    catalogConnectorMetadata.createTable(session, table, saveMode == SaveMode.IGNORE);
+    catalogConnectorMetadata.createTable(table, saveMode == SaveMode.IGNORE);
   }
 
   @Override
@@ -213,17 +211,17 @@ public abstract class GravitinoMetadata implements ConnectorMetadata {
       Map<String, Object> properties,
       TrinoPrincipal owner) {
     GravitinoSchema schema = metadataAdapter.createSchema(schemaName, properties);
-    catalogConnectorMetadata.createSchema(session, schema);
+    catalogConnectorMetadata.createSchema(schema);
   }
 
   @Override
   public void dropSchema(ConnectorSession session, String schemaName, boolean cascade) {
-    catalogConnectorMetadata.dropSchema(session, schemaName, cascade);
+    catalogConnectorMetadata.dropSchema(schemaName, cascade);
   }
 
   @Override
   public void dropTable(ConnectorSession session, ConnectorTableHandle tableHandle) {
-    catalogConnectorMetadata.dropTable(session, getTableName(tableHandle));
+    catalogConnectorMetadata.dropTable(getTableName(tableHandle));
   }
 
   @Override
@@ -253,20 +251,19 @@ public abstract class GravitinoMetadata implements ConnectorMetadata {
 
   @Override
   public void renameSchema(ConnectorSession session, String source, String target) {
-    catalogConnectorMetadata.renameSchema(session, source, target);
+    catalogConnectorMetadata.renameSchema(source, target);
   }
 
   @Override
   public void renameTable(
       ConnectorSession session, ConnectorTableHandle tableHandle, SchemaTableName newTableName) {
-    catalogConnectorMetadata.renameTable(session, getTableName(tableHandle), newTableName);
+    catalogConnectorMetadata.renameTable(getTableName(tableHandle), newTableName);
   }
 
   @Override
   public void setTableComment(
       ConnectorSession session, ConnectorTableHandle tableHandle, Optional<String> comment) {
-    catalogConnectorMetadata.setTableComment(
-        session, getTableName(tableHandle), comment.orElse(""));
+    catalogConnectorMetadata.setTableComment(getTableName(tableHandle), comment.orElse(""));
   }
 
   @Override
@@ -279,14 +276,14 @@ public abstract class GravitinoMetadata implements ConnectorMetadata {
             .filter(e -> e.getValue().isPresent())
             .collect(Collectors.toMap(Map.Entry::getKey, e -> e.getValue().get()));
     Map<String, String> allProps = metadataAdapter.toGravitinoTableProperties(resultMap);
-    catalogConnectorMetadata.setTableProperties(session, getTableName(tableHandle), allProps);
+    catalogConnectorMetadata.setTableProperties(getTableName(tableHandle), allProps);
   }
 
   @Override
   public void dropColumn(
       ConnectorSession session, ConnectorTableHandle tableHandle, ColumnHandle column) {
     String columnName = getColumnName(column);
-    catalogConnectorMetadata.dropColumn(session, getTableName(tableHandle), columnName);
+    catalogConnectorMetadata.dropColumn(getTableName(tableHandle), columnName);
   }
 
   @Override
@@ -296,7 +293,7 @@ public abstract class GravitinoMetadata implements ConnectorMetadata {
       ColumnHandle source,
       String target) {
     String columnName = getColumnName(source);
-    catalogConnectorMetadata.renameColumn(session, getTableName(tableHandle), columnName, target);
+    catalogConnectorMetadata.renameColumn(getTableName(tableHandle), columnName, target);
   }
 
   @Override
@@ -304,7 +301,6 @@ public abstract class GravitinoMetadata implements ConnectorMetadata {
       ConnectorSession session, ConnectorTableHandle tableHandle, ColumnHandle column, Type type) {
     String columnName = getColumnName(column);
     catalogConnectorMetadata.setColumnType(
-        session,
         getTableName(tableHandle),
         columnName,
         metadataAdapter.getDataTypeTransformer().getGravitinoType(type));
@@ -318,8 +314,7 @@ public abstract class GravitinoMetadata implements ConnectorMetadata {
       Optional<String> comment) {
     String columnName = getColumnName(column);
     String commentString = comment.filter(c -> !StringUtils.isBlank(c)).orElse("");
-    catalogConnectorMetadata.setColumnComment(
-        session, getTableName(tableHandle), columnName, commentString);
+    catalogConnectorMetadata.setColumnComment(getTableName(tableHandle), columnName, commentString);
   }
 
   @Override

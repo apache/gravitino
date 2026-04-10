@@ -43,7 +43,6 @@ import org.apache.gravitino.trino.connector.GravitinoConfig;
 import org.apache.gravitino.trino.connector.GravitinoErrorCode;
 import org.apache.gravitino.trino.connector.metadata.GravitinoCatalog;
 import org.apache.gravitino.trino.connector.security.GravitinoAuthProvider;
-import org.apache.gravitino.trino.connector.security.TrinoSessionContext;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -76,7 +75,6 @@ public class CatalogConnectorManager {
   private final Map<String, GravitinoMetalake> metalakes = new ConcurrentHashMap<>();
 
   private GravitinoAdminClient gravitinoClient;
-  private TrinoSessionContext sessionContext;
   private GravitinoConfig config;
   private TrinoCatalogNameHandler trinoCatalogNameHandler;
 
@@ -122,9 +120,7 @@ public class CatalogConnectorManager {
       String authType = config.getClientConfig().getOrDefault("gravitino.client.authType", "none");
       LOG.info("Building Gravitino client with authType: {}", authType);
       try {
-        GravitinoAuthProvider.BuildResult result = GravitinoAuthProvider.build(config);
-        this.gravitinoClient = result.client;
-        this.sessionContext = result.sessionContext;
+        this.gravitinoClient = GravitinoAuthProvider.build(config);
       } catch (IllegalArgumentException e) {
         throw new TrinoException(
             GravitinoErrorCode.GRAVITINO_ILLEGAL_ARGUMENT,
@@ -420,7 +416,7 @@ public class CatalogConnectorManager {
       builder
           .withMetalake(metalakes.computeIfAbsent(catalog.getMetalake(), this::retrieveMetalake))
           .withContext(context)
-          .withSessionContext(sessionContext);
+          .withConfig(this.config);
 
       CatalogConnectorContext connectorContext = builder.build();
       String fullCatalogName = getTrinoCatalogName(catalog);

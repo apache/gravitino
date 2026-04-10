@@ -21,6 +21,10 @@ package org.apache.gravitino.trino.connector;
 import static io.trino.spi.StandardErrorCode.NOT_SUPPORTED;
 
 import com.google.common.base.Preconditions;
+import com.google.common.cache.Cache;
+import com.google.common.cache.CacheBuilder;
+import com.google.common.cache.RemovalListener;
+import com.google.common.cache.RemovalNotification;
 import io.trino.spi.TrinoException;
 import io.trino.spi.connector.Connector;
 import io.trino.spi.connector.ConnectorAccessControl;
@@ -36,12 +40,17 @@ import io.trino.spi.connector.ConnectorTransactionHandle;
 import io.trino.spi.session.PropertyMetadata;
 import io.trino.spi.transaction.IsolationLevel;
 import java.util.List;
+import java.util.Locale;
+import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.TimeUnit;
 import org.apache.gravitino.NameIdentifier;
+import org.apache.gravitino.client.GravitinoAdminClient;
+import org.apache.gravitino.client.GravitinoMetalake;
 import org.apache.gravitino.trino.connector.catalog.CatalogConnectorContext;
 import org.apache.gravitino.trino.connector.catalog.CatalogConnectorMetadata;
 import org.apache.gravitino.trino.connector.catalog.CatalogConnectorMetadataAdapter;
-import org.apache.gravitino.trino.connector.catalog.SessionAwareCatalogMetadata;
+import org.apache.gravitino.trino.connector.security.GravitinoAuthProvider;
 
 /**
  * GravitinoConnector serves as the entry point for operations on the connector managed by Trino and
@@ -52,7 +61,11 @@ public class GravitinoConnector implements Connector {
 
   private final NameIdentifier catalogIdentifier;
   protected final CatalogConnectorContext catalogConnectorContext;
-  private final SessionAwareCatalogMetadata connectorMetadata;
+  private final CatalogConnectorMetadata connectorMetadata;
+  private final boolean forwardUser;
+  private final String authType;
+  private final String oauth2CredentialKey;
+  private final Cache<String, UserSession> perUserSessionCache;
 
   /**
    * Constructs a new GravitinoConnector with the specified catalog identifier and catalog connector
@@ -64,10 +77,33 @@ public class GravitinoConnector implements Connector {
     this.catalogIdentifier = catalogConnectorContext.getCatalog().geNameIdentifier();
     this.catalogConnectorContext = catalogConnectorContext;
     this.connectorMetadata =
-        new SessionAwareCatalogMetadata(
-            new CatalogConnectorMetadata(
-                catalogConnectorContext.getMetalake(), this.catalogIdentifier),
-            catalogConnectorContext.getSessionContext());
+        new CatalogConnectorMetadata(catalogConnectorContext.getMetalake(), this.catalogIdentifier);
+
+    GravitinoConfig config = catalogConnectorContext.getConfig();
+    Map<String, String> clientConfig = config.getClientConfig();
+    this.forwardUser =
+        Boolean.parseBoolean(
+            clientConfig.getOrDefault(GravitinoAuthProvider.FORWARD_SESSION_USER_KEY, "false"));
+    this.authType =
+        clientConfig.getOrDefault(GravitinoAuthProvider.AUTH_TYPE_KEY, "").toUpperCase(Locale.ROOT);
+    this.oauth2CredentialKey = clientConfig.get(GravitinoAuthProvider.OAUTH2_TOKEN_CREDENTIAL_KEY);
+
+    if (forwardUser) {
+      this.perUserSessionCache =
+          CacheBuilder.newBuilder()
+              .maximumSize(500)
+              .expireAfterAccess(1, TimeUnit.HOURS)
+              .removalListener(
+                  new RemovalListener<String, UserSession>() {
+                    @Override
+                    public void onRemoval(RemovalNotification<String, UserSession> notification) {
+                      notification.getValue().close();
+                    }
+                  })
+              .build();
+    } else {
+      this.perUserSessionCache = null;
+    }
   }
 
   @Override
@@ -94,14 +130,37 @@ public class GravitinoConnector implements Connector {
     ConnectorMetadata internalMetadata =
         internalConnector.getMetadata(session, gravitinoTransactionHandle.getInternalHandle());
     Preconditions.checkArgument(internalMetadata != null, "Internal metadata must not be null");
-    GravitinoMetadata metadata =
-        createGravitinoMetadata(
-            connectorMetadata, catalogConnectorContext.getMetadataAdapter(), internalMetadata);
-    return metadata;
+
+    if (forwardUser) {
+      String credKey =
+          authType.equals("OAUTH2")
+              ? "oauth2:"
+                  + session
+                      .getIdentity()
+                      .getExtraCredentials()
+                      .getOrDefault(oauth2CredentialKey, "")
+              : "simple:" + session.getUser();
+      UserSession userSession = perUserSessionCache.getIfPresent(credKey);
+      if (userSession == null) {
+        GravitinoAdminClient userClient =
+            GravitinoAuthProvider.buildForSession(catalogConnectorContext.getConfig(), session);
+        GravitinoMetalake userMetalake =
+            userClient.loadMetalake(catalogConnectorContext.getMetalake().name());
+        CatalogConnectorMetadata userMetadata =
+            new CatalogConnectorMetadata(userMetalake, catalogIdentifier);
+        userSession = new UserSession(userClient, userMetadata);
+        perUserSessionCache.put(credKey, userSession);
+      }
+      return createGravitinoMetadata(
+          userSession.metadata, catalogConnectorContext.getMetadataAdapter(), internalMetadata);
+    }
+
+    return createGravitinoMetadata(
+        connectorMetadata, catalogConnectorContext.getMetadataAdapter(), internalMetadata);
   }
 
   protected GravitinoMetadata createGravitinoMetadata(
-      SessionAwareCatalogMetadata catalogConnectorMetadata,
+      CatalogConnectorMetadata catalogConnectorMetadata,
       CatalogConnectorMetadataAdapter metadataAdapter,
       ConnectorMetadata internalMetadata) {
     throw new TrinoException(NOT_SUPPORTED, "Should be overridden in subclass");
@@ -185,8 +244,30 @@ public class GravitinoConnector implements Connector {
   }
 
   public void shutdown() {
+    if (forwardUser) {
+      perUserSessionCache.invalidateAll();
+    }
     Connector internalConnector = catalogConnectorContext.getInternalConnector();
     internalConnector.shutdown();
     catalogConnectorContext.close();
+  }
+
+  /** Holds a per-user {@link GravitinoAdminClient} together with its derived metadata. */
+  private static final class UserSession {
+    final GravitinoAdminClient client;
+    final CatalogConnectorMetadata metadata;
+
+    UserSession(GravitinoAdminClient client, CatalogConnectorMetadata metadata) {
+      this.client = client;
+      this.metadata = metadata;
+    }
+
+    void close() {
+      try {
+        client.close();
+      } catch (Exception e) {
+        throw new RuntimeException("Failed to close GravitinoAdminClient", e);
+      }
+    }
   }
 }

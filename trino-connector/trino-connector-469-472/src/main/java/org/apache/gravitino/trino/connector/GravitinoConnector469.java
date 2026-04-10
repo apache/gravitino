@@ -24,8 +24,8 @@ import io.trino.spi.connector.ConnectorNodePartitioningProvider;
 import io.trino.spi.connector.ConnectorPageSourceProviderFactory;
 import io.trino.spi.connector.ConnectorSplitManager;
 import org.apache.gravitino.trino.connector.catalog.CatalogConnectorContext;
+import org.apache.gravitino.trino.connector.catalog.CatalogConnectorMetadata;
 import org.apache.gravitino.trino.connector.catalog.CatalogConnectorMetadataAdapter;
-import org.apache.gravitino.trino.connector.catalog.SessionAwareCatalogMetadata;
 
 public class GravitinoConnector469 extends GravitinoConnector {
 
@@ -35,7 +35,7 @@ public class GravitinoConnector469 extends GravitinoConnector {
 
   @Override
   protected GravitinoMetadata createGravitinoMetadata(
-      SessionAwareCatalogMetadata catalogConnectorMetadata,
+      CatalogConnectorMetadata catalogConnectorMetadata,
       CatalogConnectorMetadataAdapter metadataAdapter,
       ConnectorMetadata internalMetadata) {
     return new GravitinoMetadata469(catalogConnectorMetadata, metadataAdapter, internalMetadata);
