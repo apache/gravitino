@@ -47,7 +47,6 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Objects;
 import java.util.Optional;
 import java.util.Properties;
 import java.util.ServiceLoader;
@@ -717,7 +716,6 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
         nameIdentifierForLock,
         LockType.WRITE,
         () -> {
-          catalogCache.invalidate(ident);
           try {
             CatalogEntity updatedCatalog =
                 store.update(
@@ -736,15 +734,20 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
 
                       return newCatalogBuilder.build();
                     });
+            // Invalidate after store.update() so that any background thread that tries to reload
+            // the old catalog identifier from the store (after the invalidate) will get
+            // NoSuchCatalogException instead of stale data. Invalidating before the update creates
+            // a window where the background thread repopulates the cache with the old entity.
+            catalogCache.invalidate(ident);
             // The old fileset catalog's provider is "hadoop", whereas the new fileset catalog's
             // provider is "fileset", still using "hadoop" will lead to catalog loading issue. So
             // after reading the catalog entity, we convert it to the new fileset catalog entity.
             CatalogEntity convertedCatalog = convertFilesetCatalogEntity(updatedCatalog);
-            return Objects.requireNonNull(
-                    catalogCache.get(
-                        convertedCatalog.nameIdentifier(),
-                        id -> createCatalogWrapper(convertedCatalog, null)))
-                .catalog;
+            // Use put() instead of get() to force the updated wrapper into the cache, preventing
+            // a background thread from overwriting it with stale data between invalidate and put.
+            CatalogWrapper newWrapper = createCatalogWrapper(convertedCatalog, null);
+            catalogCache.put(convertedCatalog.nameIdentifier(), newWrapper);
+            return newWrapper.catalog;
 
           } catch (NoSuchEntityException ne) {
             LOG.warn("Catalog {} does not exist", ident, ne);
@@ -806,8 +809,11 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
             }
 
             // Finally, delete the catalog entity as well as all its sub-entities from the store.
+            // Invalidate after store.delete() to prevent a background thread from repopulating
+            // the cache with stale data between invalidate and delete.
+            boolean deleted = store.delete(ident, EntityType.CATALOG, true);
             catalogCache.invalidate(ident);
-            return store.delete(ident, EntityType.CATALOG, true);
+            return deleted;
 
           } catch (NoSuchMetalakeException | NoSuchCatalogException ignored) {
             return false;
