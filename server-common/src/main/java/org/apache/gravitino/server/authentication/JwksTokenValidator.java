@@ -63,6 +63,7 @@ public class JwksTokenValidator implements OAuthTokenValidator {
   private long allowSkewSeconds;
   private PrincipalMapper principalMapper;
   private GroupMapper groupMapper;
+  private JWKSource<SecurityContext> jwkSource;
 
   @Override
   public void initialize(Config config) {
@@ -89,12 +90,17 @@ public class JwksTokenValidator implements OAuthTokenValidator {
           "JWKS URI must be configured when using JWKS-based OAuth providers");
     }
 
-    // Validate JWKS URI format
+    // Create the JWK source once at initialization. JWKSourceBuilder.create(url).build() enables
+    // rate-limiting (min 30 s between URL fetches) and caching with refresh-ahead by default:
+    //   - Cache TTL: 5 minutes (DEFAULT_CACHE_TIME_TO_LIVE)
+    //   - Refresh-ahead: 30 seconds before expiration on a background thread
+    // The Nimbus library handles key rotation transparently within these defaults.
     try {
-      new URL(jwksUri);
+      this.jwkSource = JWKSourceBuilder.create(new URL(jwksUri)).build();
     } catch (Exception e) {
-      LOG.error("Invalid JWKS URI format: {}", jwksUri);
-      throw new IllegalArgumentException("Invalid JWKS URI format: " + jwksUri, e);
+      LOG.error("Failed to create JWKS source from URI: {}", jwksUri, e);
+      throw new IllegalArgumentException(
+          "Invalid JWKS URI or failed to create JWKS source: " + jwksUri, e);
     }
   }
 
@@ -115,7 +121,6 @@ public class JwksTokenValidator implements OAuthTokenValidator {
       signedJWT = SignedJWT.parse(token);
 
       // Set up JWKS source and processor
-      JWKSource<SecurityContext> jwkSource = createJwkSource();
       JWSAlgorithm algorithm = JWSAlgorithm.parse(signedJWT.getHeader().getAlgorithm().getName());
       JWSKeySelector<SecurityContext> keySelector =
           new JWSVerificationKeySelector<>(algorithm, jwkSource);
@@ -162,8 +167,8 @@ public class JwksTokenValidator implements OAuthTokenValidator {
       return userPrincipal;
 
     } catch (Exception e) {
-      LOG.error(
-          "JWKS JWT validation error for principal [{}]: {}",
+      LOG.warn(
+          "JWKS JWT validation failed for principal [{}]: {}",
           extractPrincipalForLogging(signedJWT),
           e.getMessage());
       throw new UnauthorizedException(e, "JWKS JWT validation error");
@@ -183,16 +188,6 @@ public class JwksTokenValidator implements OAuthTokenValidator {
       return principal != null ? principal : "unknown";
     } catch (Exception ex) {
       return "unknown";
-    }
-  }
-
-  /** Creates a JWK source from the configured JWKS URI. */
-  private JWKSource<SecurityContext> createJwkSource() throws Exception {
-    try {
-      return JWKSourceBuilder.create(new URL(jwksUri)).build();
-    } catch (Exception e) {
-      LOG.error("Failed to create JWKS source from URI: {}", jwksUri, e);
-      throw new Exception("Failed to create JWKS source: " + e.getMessage(), e);
     }
   }
 
