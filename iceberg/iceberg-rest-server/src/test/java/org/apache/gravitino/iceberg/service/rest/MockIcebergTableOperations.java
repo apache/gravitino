@@ -21,6 +21,7 @@ package org.apache.gravitino.iceberg.service.rest;
 
 import javax.inject.Inject;
 import javax.servlet.http.HttpServletRequest;
+import org.apache.gravitino.iceberg.service.IcebergIdempotencyManager;
 import org.apache.gravitino.iceberg.service.dispatcher.IcebergTableOperationDispatcher;
 import org.apache.gravitino.iceberg.service.metrics.IcebergMetricsManager;
 
@@ -29,8 +30,9 @@ public class MockIcebergTableOperations extends IcebergTableOperations {
   @Inject
   public MockIcebergTableOperations(
       IcebergMetricsManager icebergMetricsManager,
-      IcebergTableOperationDispatcher tableOperationDispatcher) {
-    super(icebergMetricsManager, tableOperationDispatcher);
+      IcebergTableOperationDispatcher tableOperationDispatcher,
+      IcebergIdempotencyManager idempotencyManager) {
+    super(icebergMetricsManager, tableOperationDispatcher, idempotencyManager);
   }
 
   // HTTP request is null in Jersey test, create a mock request

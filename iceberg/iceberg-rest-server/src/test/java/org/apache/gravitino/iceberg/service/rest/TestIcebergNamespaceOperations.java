@@ -28,6 +28,7 @@ import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 import javax.ws.rs.core.Response.Status;
 import org.apache.gravitino.credential.Credential;
+import org.apache.gravitino.iceberg.service.IcebergIdempotencyManager;
 import org.apache.gravitino.iceberg.service.IcebergRESTUtils;
 import org.apache.gravitino.iceberg.service.extension.DummyCredentialProvider;
 import org.apache.gravitino.listener.api.event.Event;
@@ -234,6 +235,25 @@ public class TestIcebergNamespaceOperations extends IcebergNamespaceTestBase {
   }
 
   @Test
+  void testRegisterTableWithIdempotencyKey() {
+    Namespace namespace = Namespace.of("register_idempotent_ns");
+    String tableName = "register_idempotent_tbl";
+    String idempotencyKey = "018f4f74-7e58-7cc2-a2f0-6f53123abcde";
+
+    dummyEventListener.clearEvent();
+    Response first = doRegisterTableWithIdempotencyKey(tableName, namespace, idempotencyKey);
+    Assertions.assertEquals(Response.Status.OK.getStatusCode(), first.getStatus());
+
+    Response second = doRegisterTableWithIdempotencyKey(tableName, namespace, idempotencyKey);
+    Assertions.assertEquals(Response.Status.OK.getStatusCode(), second.getStatus());
+
+    Assertions.assertTrue(dummyEventListener.popPreEvent() instanceof IcebergRegisterTablePreEvent);
+    Assertions.assertTrue(dummyEventListener.popPostEvent() instanceof IcebergRegisterTableEvent);
+    Assertions.assertThrows(AssertionError.class, () -> dummyEventListener.popPreEvent());
+    Assertions.assertThrows(AssertionError.class, () -> dummyEventListener.popPostEvent());
+  }
+
+  @Test
   void testRegisterTableReturnsETag() {
     Namespace ns = Namespace.of("register_etag_ns");
     Response response = doRegisterTable("register_etag_foo1", ns);
@@ -361,5 +381,14 @@ public class TestIcebergNamespaceOperations extends IcebergNamespaceTestBase {
             .header(IcebergTableOperations.X_ICEBERG_ACCESS_DELEGATION, "invalid-value")
             .post(Entity.entity(request, MediaType.APPLICATION_JSON_TYPE));
     Assertions.assertEquals(400, response.getStatus());
+  }
+
+  private Response doRegisterTableWithIdempotencyKey(
+      String tableName, Namespace ns, String idempotencyKey) {
+    RegisterTableRequest request =
+        ImmutableRegisterTableRequest.builder().name(tableName).metadataLocation("mock").build();
+    return getNamespaceClientBuilder(Optional.of(ns), Optional.of("register"), Optional.empty())
+        .header(IcebergIdempotencyManager.IDEMPOTENCY_KEY_HEADER, idempotencyKey)
+        .post(Entity.entity(request, MediaType.APPLICATION_JSON_TYPE));
   }
 }
