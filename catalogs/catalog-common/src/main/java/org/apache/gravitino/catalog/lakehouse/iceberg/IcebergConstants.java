@@ -110,4 +110,6 @@ public class IcebergConstants {
   public static final String SCAN_PLAN_CACHE_IMPL = "scan-plan-cache-impl";
   public static final String SCAN_PLAN_CACHE_CAPACITY = "scan-plan-cache-capacity";
   public static final String SCAN_PLAN_CACHE_EXPIRE_MINUTES = "scan-plan-cache-expire-minutes";
+
+  public static final String IDEMPOTENCY_KEY_LIFETIME_MINUTES = "idempotency-key-lifetime-minutes";
 }

@@ -41,6 +41,7 @@ import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.catalog.lakehouse.iceberg.IcebergConstants;
 import org.apache.gravitino.iceberg.service.CatalogWrapperForREST;
 import org.apache.gravitino.iceberg.service.IcebergCatalogWrapperManager;
+import org.apache.gravitino.iceberg.service.IcebergIdempotencyManager;
 import org.apache.gravitino.iceberg.service.IcebergRESTUtils;
 import org.apache.gravitino.metrics.MetricNames;
 import org.apache.iceberg.rest.Endpoint;
@@ -56,6 +57,7 @@ public class IcebergConfigOperations {
   private HttpServletRequest httpRequest;
 
   private final IcebergCatalogWrapperManager catalogWrapperManager;
+  private final IcebergIdempotencyManager idempotencyManager;
 
   private static final List<Endpoint> DEFAULT_ENDPOINTS =
       ImmutableList.<Endpoint>builder()
@@ -90,8 +92,11 @@ public class IcebergConfigOperations {
           .build();
 
   @Inject
-  public IcebergConfigOperations(IcebergCatalogWrapperManager catalogWrapperManager) {
+  public IcebergConfigOperations(
+      IcebergCatalogWrapperManager catalogWrapperManager,
+      IcebergIdempotencyManager idempotencyManager) {
     this.catalogWrapperManager = catalogWrapperManager;
+    this.idempotencyManager = idempotencyManager;
   }
 
   @GET
@@ -121,6 +126,9 @@ public class IcebergConfigOperations {
     Map<String, String> configs = new HashMap<>();
     CatalogWrapperForREST catalogWrapper = getCatalogWrapper(catalogName);
     configs.putAll(catalogWrapper.getCatalogConfigToClient());
+    configs.put(
+        IcebergIdempotencyManager.IDEMPOTENCY_KEY_LIFETIME,
+        idempotencyManager.getIdempotencyKeyLifetime());
     return configs;
   }
 

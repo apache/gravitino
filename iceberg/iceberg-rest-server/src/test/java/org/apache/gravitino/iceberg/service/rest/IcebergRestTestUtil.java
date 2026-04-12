@@ -35,6 +35,7 @@ import org.apache.gravitino.credential.CredentialConstants;
 import org.apache.gravitino.iceberg.common.IcebergConfig;
 import org.apache.gravitino.iceberg.service.IcebergCatalogWrapperManager;
 import org.apache.gravitino.iceberg.service.IcebergExceptionMapper;
+import org.apache.gravitino.iceberg.service.IcebergIdempotencyManager;
 import org.apache.gravitino.iceberg.service.IcebergObjectMapperProvider;
 import org.apache.gravitino.iceberg.service.authorization.IcebergRESTServerContext;
 import org.apache.gravitino.iceberg.service.dispatcher.IcebergNamespaceEventDispatcher;
@@ -156,12 +157,15 @@ public class IcebergRestTestUtil {
               icebergNamespaceOperationExecutor, eventBus, configProvider.getMetalakeName());
 
       IcebergMetricsManager icebergMetricsManager = new IcebergMetricsManager(new IcebergConfig());
+      IcebergIdempotencyManager icebergIdempotencyManager =
+          new IcebergIdempotencyManager(new IcebergConfig(catalogConf));
       resourceConfig.register(
           new AbstractBinder() {
             @Override
             protected void configure() {
               bind(icebergCatalogWrapperManager).to(IcebergCatalogWrapperManager.class).ranked(2);
               bind(icebergMetricsManager).to(IcebergMetricsManager.class).ranked(2);
+              bind(icebergIdempotencyManager).to(IcebergIdempotencyManager.class).ranked(2);
               bind(icebergTableEventDispatcher).to(IcebergTableOperationDispatcher.class).ranked(2);
               bind(icebergViewEventDispatcher).to(IcebergViewOperationDispatcher.class).ranked(2);
               bind(icebergNamespaceEventDispatcher)
