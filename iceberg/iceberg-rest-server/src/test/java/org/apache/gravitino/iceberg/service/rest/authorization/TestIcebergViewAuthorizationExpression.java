@@ -46,7 +46,7 @@ public class TestIcebergViewAuthorizationExpression {
   public void testCreateView() throws NoSuchMethodException, OgnlException {
     Method method =
         IcebergViewOperations.class.getMethod(
-            "createView", String.class, String.class, CreateViewRequest.class);
+            "createView", String.class, String.class, CreateViewRequest.class, String.class);
     AuthorizationExpression annotation = method.getAnnotation(AuthorizationExpression.class);
     String expression = annotation.expression();
     MockAuthorizationExpressionEvaluator mockEvaluator =
@@ -253,7 +253,12 @@ public class TestIcebergViewAuthorizationExpression {
   public void testReplaceView() throws NoSuchMethodException, OgnlException {
     Method method =
         IcebergViewOperations.class.getMethod(
-            "replaceView", String.class, String.class, String.class, UpdateTableRequest.class);
+            "replaceView",
+            String.class,
+            String.class,
+            String.class,
+            UpdateTableRequest.class,
+            String.class);
     AuthorizationExpression annotation = method.getAnnotation(AuthorizationExpression.class);
     String expression = annotation.expression();
     MockAuthorizationExpressionEvaluator mockEvaluator =
@@ -300,7 +305,8 @@ public class TestIcebergViewAuthorizationExpression {
   @Test
   public void testDropView() throws NoSuchMethodException, OgnlException {
     Method method =
-        IcebergViewOperations.class.getMethod("dropView", String.class, String.class, String.class);
+        IcebergViewOperations.class.getMethod(
+            "dropView", String.class, String.class, String.class, String.class);
     AuthorizationExpression annotation = method.getAnnotation(AuthorizationExpression.class);
     String expression = annotation.expression();
     MockAuthorizationExpressionEvaluator mockEvaluator =
