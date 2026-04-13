@@ -95,8 +95,7 @@ public class GlueCatalogPropertiesMetadata extends BaseCatalogPropertiesMetadata
               TABLE_TYPE_FILTER,
               stringOptionalPropertyEntry(
                   TABLE_TYPE_FILTER,
-                  "Comma-separated table types exposed by listTables() and loadTable()."
-                      + " Accepted: all, hive, iceberg.",
+                  "Comma-separated table types exposed by listTables() and loadTable().",
                   false /* immutable */,
                   DEFAULT_TABLE_TYPE_FILTER,
                   false /* hidden */))
