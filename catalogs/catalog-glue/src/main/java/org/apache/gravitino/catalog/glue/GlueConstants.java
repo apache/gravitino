@@ -73,7 +73,7 @@ public final class GlueConstants {
    * ICEBERG}, {@code HIVE}, {@code DELTA}, {@code PARQUET} (uppercase, as stored by Glue). Used
    * internally to determine the table format when reading Glue tables.
    */
-  public static final String TABLE_FORMAT = "table_format";
+  public static final String TABLE_FORMAT = "table-format";
 
   /** Iceberg table metadata location stored in Glue {@code Table.parameters()}. */
   public static final String METADATA_LOCATION = "metadata_location";
