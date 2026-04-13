@@ -49,7 +49,7 @@ The Layer 2 caches exist solely to manage JCasbin's policy loading lifecycle:
 | Cache                                   | Role                                                                                                           |
 |-----------------------------------------|----------------------------------------------------------------------------------------------------------------|
 | `loadedRoles: Cache<Long, Boolean>`     | Tracks which roles are already loaded into JCasbin — prevents repeated [C2]+[C3] queries on every auth request |
-| `ownerRel: Cache<Long, Optional<Long>>` | Caches owner lookups for OWNER-privilege checks — prevents [D1] on every ownership check                       |
+| `ownerRel: Cache<Long, Optional<Long>>` | Caches owner lookups — **prevents [D1] on every auth request** (2–4 `isOwner()` calls per request, see §1.3.2) |
 
 Without `loadedRoles`, every auth request would re-execute N DB queries to reload all of a
 user's role policies into JCasbin. These two caches are the reason the auth path is fast on
@@ -139,8 +139,11 @@ JcasbinAuthorizer.authorize(principal, metalake, metadataObject, privilege)
 │
 │   loadedRoles.put(roleId, true)   ← mark role as loaded
 │
-├─ [D] loadOwnerPolicy(...)        ← only called when privilege == OWNER
-│   ├─ Check ownerRel cache → if HIT, return
+├─ [D] isOwner() / loadOwnerPolicy(...)   ← called on EVERY auth request (not only OWNER
+│   │   privilege checks). Nearly all auth expressions contain ANY(OWNER, METALAKE, CATALOG),
+│   │   which expands to METALAKE::OWNER || CATALOG::OWNER || … and calls isOwner() directly
+│   │   via OGNL, independently of the authorize() path. Typical call count: 2–4 per request.
+│   ├─ Check ownerRel cache → if HIT, return (most non-owner users get Optional.empty())
 │   └─ [D1] entityStore.listEntitiesByRelation(OWNER_REL, ...)
 │             ownerRel.put(metadataId, Optional.of(ownerId))
 │
@@ -153,8 +156,18 @@ JcasbinAuthorizer.authorize(principal, metalake, metadataObject, privilege)
 Without it, every request re-executes [C2]+[C3] for all roles the user has (N+1 queries).
 With it, [C2]+[C3] only run on first load per role. **This is the most critical cache.**
 
-`ownerRel: Cache<Long, Optional<Long>>` — caches [D1] results. Only consulted when
-`privilege == OWNER`; regular privilege checks (SELECT, CREATE, ALTER, ...) never touch it.
+`ownerRel: Cache<Long, Optional<Long>>` — caches ownership lookups for OWNER-privilege
+checks. **Contrary to initial analysis, `ownerRel` is consulted on virtually every auth
+request**, not only when `privilege == OWNER`. The reason is that nearly every authorization
+expression in `AuthorizationExpressionConstants` includes `ANY(OWNER, METALAKE, CATALOG)`
+or similar clauses (e.g. `LOAD_TABLE_AUTHORIZATION_EXPRESSION`,
+`FILTER_TABLE_AUTHORIZATION_EXPRESSION`, `LOAD_CATALOG_AUTHORIZATION_EXPRESSION`). The
+`ANY(OWNER, …)` macro expands to `METALAKE::OWNER || CATALOG::OWNER || …`, and each
+`X::OWNER` term calls `isOwner()` directly — a code path that is **independent of
+`authorize()`**. As a result, every auth request triggers 2–4 `isOwner()` calls (one per
+ancestor level), each consulting `ownerRel`. For most non-owner users, `ownerRel` caches
+`Optional.empty()`, which lets the ownership sub-check fail quickly without a DB query.
+Without `ownerRel`, every auth request would add 2–4 extra DB queries against `owner_meta`.
 
 **What these caches do NOT protect** (hit DB on every auth request without entity cache):
 
@@ -178,7 +191,7 @@ Layer 2 sits **on top of** Layer 1. When Layer 1 is disabled (NoOpsCache), calls
 | [C1] `listEntitiesByRelation(ROLE_USER_REL)`     | Cache hit after first request | **DB query every auth request** |
 | [C2] `entityStore.get(RoleEntity)`               | Protected by `loadedRoles`    | DB only on cold role load       |
 | [C3] `MetadataIdConverter.getID()` per privilege | Protected by `loadedRoles`    | DB only on cold role load       |
-| [D1] `listEntitiesByRelation(OWNER_REL)`         | Protected by `ownerRel`       | DB only on first owner check    |
+| [D1] `listEntitiesByRelation(OWNER_REL)`         | Protected by `ownerRel`       | **DB query 2–4x per request**   |
 
 ---
 
@@ -341,11 +354,9 @@ Write paths that must bump the version **in the same DB transaction**:
 
 Version comparison uses `!=` (not `<`) to safely handle theoretical INT wrap-around.
 
-**Ownership transfers** do not require a version column. The `ownerRel` cache is removed;
-Step 2.5 queries `owner_meta` directly on every `OWNER`-privilege check, providing strong
-consistency without caching. The soft-delete pattern of `owner_meta` (old row deleted, new
-row inserted with `current_version = 1`) makes version-based cache validation unreliable
-for this table. Direct query is simpler and always correct. See §7.2.
+**Ownership transfers** require no schema change and no cache. The `ownerRel` cache is
+**removed** (see §7.2). Step 2.5 queries `owner_meta` directly with a single batch query on
+every auth request — strongly consistent, no versioning complexity needed.
 
 #### 4.1.2 Cache Data Structures (Changes in JcasbinAuthorizer)
 
@@ -384,7 +395,9 @@ private GravitinoCache<Long, Integer>  loadedRoles;
 // roleId → securable_objects_version at the time JCasbin policies were loaded
 
 // REMOVED: ownerRel cache eliminated (see §7.2).
-// OWNER privilege checks query owner_meta directly (Step 2.5 below).
+// isOwner() is called 2–4 times per request, but version-validated caching offers no
+// query savings: the version check query already returns the owner_id, so there is nothing
+// expensive to avoid. Step 2.5 queries owner_meta directly via one batch query per request.
 // private Cache<Long, Optional<Long>> ownerRel;
 ```
 
@@ -394,11 +407,13 @@ recreate across all entity types. Since JCasbin uses integer IDs (not names), th
 for [B] is always correct (~1 ms indexed). Simpler and more correct to hit DB every request.
 
 **Why `ownerRel` is removed:**
-`ownerRel` has the same HA staleness problem as `loadedRoles` but cannot be easily
-version-validated (`owner_meta` uses soft-delete; new rows always start at version 1).
-`ownerRel` is only consulted for `privilege == OWNER`. Since Step 2 already resolves
-`metadataId`, one direct indexed query on `owner_meta` (Step 2.5) gives strong consistency
-for OWNER checks at the cost of 1 extra query, only on OWNER checks. See §7.2.
+`isOwner()` is called 2–4 times per auth request (once per ancestor in the OGNL expression
+chain). A version-validated cache would still query `owner_meta` on every request to check
+versions — and that same query already returns the `owner_id`. There is no expensive
+downstream work to avoid (unlike roles, where skipping securable-object loading saves
+significant work). Caching adds complexity with zero query savings. Step 2.5 issues one
+batch query per request directly against `owner_meta`, achieving strong consistency with
+no extra infrastructure. See §7.2.
 
 #### 4.1.3 Auth Check Flow
 
@@ -432,13 +447,17 @@ authorize(metalakeName, username, resource, operation)
 │   entity_mutation_log for cross-node invalidation plus write-path eviction on the
 │   local node. Not implemented in this phase.
 │
-├─ [Only when privilege == OWNER] STEP 2.5 — Query ownership directly (no cache):
+├─ STEP 2.5 — Direct ownership batch query (called for EVERY auth request, no cache):
+│   (Triggered by ANY(OWNER, …) in the OGNL expression — 2–4 isOwner() calls per request)
 │
-│   SELECT owner_id, owner_type FROM owner_meta
-│   WHERE metadata_object_id = ? AND deleted_at = 0
-│   (metadataId already known from Step 2; indexed on metadata_object_id)
-│   → Compare owner_id with userId; return ALLOW/DENY immediately.
-│   Non-OWNER privilege checks skip Step 2.5 entirely.
+│   Collect all ancestor metadataIds from the OGNL expression (metalakeId, catalogId, …).
+│
+│   SELECT metadata_object_id, owner_id FROM owner_meta
+│   WHERE metadata_object_id IN (?, ?, …) AND deleted_at = 0
+│   ↑ 1 indexed batch query covers all ancestors simultaneously
+│
+│   For each ancestor: compare owner_id with userId → ALLOW if match, continue if not.
+│   No cache read or write — always strongly consistent.
 │
 ├─ STEP 3 — Role batch version check (1 query):
 │
@@ -462,25 +481,26 @@ authorize(metalakeName, username, resource, operation)
 
 #### 4.1.4 Properties
 
-| Dimension                | Value                                                                    |
-|--------------------------|--------------------------------------------------------------------------|
-| Staleness window         | **0** — every request validates against DB                               |
-| Hot path DB queries      | **3** (Step 1 + Step 2 + Step 3; Steps 1 and 3 return integer cols only) |
-| OWNER privilege hot path | **4** (+ Step 2.5 indexed owner_meta query)                              |
-| Cold/stale path          | **4–5** queries                                                          |
-| Background threads       | **None**                                                                 |
-| Failure mode             | DB unavailable → auth blocked (same as today)                            |
-| HA correctness           | **Fixed** — every node checks DB version on every request                |
+| Dimension           | Value                                                                          |
+|---------------------|--------------------------------------------------------------------------------|
+| Staleness window    | **0** — every request validates against DB                                     |
+| Hot path DB queries | **4** (Step 1 + Step 2 + Step 2.5 owner batch + Step 3 role batch)             |
+| Owner check         | Always 1 batch query; no cache, always strongly consistent                     |
+| Cold/stale path     | **5–6** queries                                                                |
+| Background threads  | **None**                                                                       |
+| Failure mode        | DB unavailable → auth blocked (same as today)                                  |
+| HA correctness      | **Fixed** — DB queried directly on every request for ownership; role versions  |
+|                     | validated via `role_meta.securable_objects_version` in Step 3                  |
 
 #### 4.1.5 Correctness Under Rename and Drop
 
-| Scenario                                      | Analysis                                                                                                                                                                                                                        |
-|-----------------------------------------------|---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| **User / Group rename**                       | `userRoleCache` is keyed on `metalakeName:userName`. A rename produces a cache miss → Step 1 queries DB and returns the correct result. The old key has no traffic and expires via TTL. **Safe.**                               |
-| **User / Group drop**                         | Step 1 returns zero rows → auth denied. The old cache entry expires harmlessly. **Safe.**                                                                                                                                       |
-| **User / Group drop + same-name recreate**    | The new entity gets a new auto-increment `user_id` and `role_grants_version = 1`. The cached entry holds the old `user_id` and an older version → **version mismatch on the next Step 1 forces a cache refresh.** ✅            |
-| **SecurableObject rename**                    | JCasbin stores integer `metadataId`. Rename does not change the ID. Step 2 resolves the new name to the same ID via DB. `enforce()` matches the existing policy. **No action needed.** ✅                                       |
-| **SecurableObject drop**                      | Step 2 returns "not found" → auth denied. Orphan JCasbin policies remain in memory but can never be matched (no ID resolves to the dropped object). **Safe.**                                                                   |
+| Scenario                                      | Analysis                                                                                                                                                                                                                                |
+|-----------------------------------------------|-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| **User / Group rename**                       | `userRoleCache` is keyed on `metalakeName:userName`. A rename produces a cache miss → Step 1 queries DB and returns the correct result. The old key has no traffic and expires via TTL. **Safe.**                                       |
+| **User / Group drop**                         | Step 1 returns zero rows → auth denied. The old cache entry expires harmlessly. **Safe.**                                                                                                                                               |
+| **User / Group drop + same-name recreate**    | The new entity gets a new auto-increment `user_id` and `role_grants_version = 1`. The cached entry holds the old `user_id` and an older version → **version mismatch on the next Step 1 forces a cache refresh.** ✅                     |
+| **SecurableObject rename**                    | JCasbin stores integer `metadataId`. Rename does not change the ID. Step 2 resolves the new name to the same ID via DB. `enforce()` matches the existing policy. **No action needed.** ✅                                                |
+| **SecurableObject drop**                      | Step 2 returns "not found" → auth denied. Orphan JCasbin policies remain in memory but can never be matched (no ID resolves to the dropped object). **Safe.**                                                                           |
 | **SecurableObject drop + same-name recreate** | The new object gets a new `metadataId`. No JCasbin policy covers it → DENY until a new privilege grant bumps `securable_objects_version` in the same transaction and Step 3 detects the version change to reload policies. **Correct.** |
 
 #### 4.1.6 Concurrent Mutation During Auth (TOCTOU)
@@ -557,19 +577,19 @@ as a stepping stone — Phase 2 closes this). Consistency still TTL-bounded.
 
 ### Phase 2 — Version-Validated Auth Cache Implementation
 
-| Step  | Change                                                                      | Module                                 |
-|-------|-----------------------------------------------------------------------------|----------------------------------------|
-| 2.1   | `ADD COLUMN securable_objects_version` on `role_meta`                       | `schema-x.y.z-*.sql`                   |
-| 2.2   | `ADD COLUMN role_grants_version` on `user_meta`                             | `schema-x.y.z-*.sql`                   |
-| 2.3   | `ADD COLUMN role_grants_version` on `group_meta`                            | `schema-x.y.z-*.sql`                   |
-| 2.4   | Bump `securable_objects_version` in privilege grant/revoke transaction      | `RoleMetaService`                      |
-| 2.5   | Bump `role_grants_version` in role assign/revoke transaction (user + group) | `UserMetaService`, `GroupMetaService`  |
-| 2.6   | Add `userRoleCache: GravitinoCache<String, CachedUserRoles>`                | `JcasbinAuthorizer`                    |
-| 2.7   | Add `groupRoleCache: GravitinoCache<String, CachedGroupRoles>`              | `JcasbinAuthorizer`                    |
-| 2.8   | Change `loadedRoles` type: `Boolean` → `Integer` (stores version)           | `JcasbinAuthorizer`                    |
-| 2.9   | Rewrite `loadRolePrivilege()` + `authorize()` with 4-step flow (§4.1.3)     | `JcasbinAuthorizer`                    |
-| 2.10  | Add mapper methods (see §6.1)                                               | mapper + SQL                           |
-| 2.11  | Remove `ownerRel`; add `selectOwnerByMetadataObjectId` for OWNER checks     | `JcasbinAuthorizer`, `OwnerMetaMapper` |
+| Step  | Change                                                                                                                          | Module                                 |
+|-------|---------------------------------------------------------------------------------------------------------------------------------|----------------------------------------|
+| 2.1   | `ADD COLUMN securable_objects_version` on `role_meta`                                                                           | `schema-x.y.z-*.sql`                   |
+| 2.2   | `ADD COLUMN role_grants_version` on `user_meta`                                                                                 | `schema-x.y.z-*.sql`                   |
+| 2.3   | `ADD COLUMN role_grants_version` on `group_meta`                                                                                | `schema-x.y.z-*.sql`                   |
+| 2.4   | Bump `securable_objects_version` in privilege grant/revoke transaction                                                          | `RoleMetaService`                      |
+| 2.5   | Bump `role_grants_version` in role assign/revoke transaction (user + group)                                                     | `UserMetaService`, `GroupMetaService`  |
+| 2.6   | Add `userRoleCache: GravitinoCache<String, CachedUserRoles>`                                                                    | `JcasbinAuthorizer`                    |
+| 2.7   | Add `groupRoleCache: GravitinoCache<String, CachedGroupRoles>`                                                                  | `JcasbinAuthorizer`                    |
+| 2.8   | Change `loadedRoles` type: `Boolean` → `Integer` (stores version)                                                               | `JcasbinAuthorizer`                    |
+| 2.9   | Rewrite `loadRolePrivilege()` + `authorize()` with 4-step flow (§4.1.3)                                                         | `JcasbinAuthorizer`                    |
+| 2.10  | Add mapper methods (see §6.1)                                                                                                   | mapper + SQL                           |
+| 2.11  | Remove `ownerRel` cache; add `selectOwnersByMetadataObjectIds` batch mapper; Step 2.5 queries `owner_meta` directly per request | `JcasbinAuthorizer`, `OwnerMetaMapper` |
 
 **Outcome:** Zero staleness. Hot path: 3 lightweight DB queries (2 version checks + 1 ID lookup).
 
@@ -595,9 +615,9 @@ void                bumpRoleGrantsVersionForGroup(@Param("groupId") long groupId
 Map<String, Object> getGroupVersionInfo(
     @Param("metalakeName") String metalakeName, @Param("groupName") String groupName);
 
-// OwnerMetaMapper.java (for Step 2.5)
-Map<String, Object> selectOwnerByMetadataObjectId(
-    @Param("metadataObjectId") long metadataObjectId);
+// OwnerMetaMapper.java (for Step 2.5 direct batch query, no version needed)
+List<Map<String, Object>> selectOwnersByMetadataObjectIds(
+    @Param("metadataObjectIds") List<Long> metadataObjectIds);
 ```
 
 ```xml
@@ -608,6 +628,14 @@ Map<String, Object> selectOwnerByMetadataObjectId(
   JOIN metalake_meta mm ON um.metalake_id = mm.metalake_id AND mm.deleted_at = 0
   WHERE mm.metalake_name = #{metalakeName} AND um.user_name = #{userName}
   AND um.deleted_at = 0
+</select>
+
+<!-- Step 2.5 query: batch ownership lookup, always correct, no version column needed -->
+<select id="selectOwnersByMetadataObjectIds" resultType="map">
+  SELECT metadata_object_id, owner_id, owner_type FROM owner_meta
+  WHERE metadata_object_id IN
+  <foreach item="id" collection="metadataObjectIds" open="(" separator="," close=")">#{id}</foreach>
+  AND deleted_at = 0
 </select>
 
 <!-- Step 3 / poll query: batch version check for roles -->
@@ -650,6 +678,11 @@ SessionUtils.doMultipleWithCommit(
 );
 ```
 
+**`OwnerMetaService` — ownership transfer:** no write-path changes needed.
+`owner_meta` continues to soft-delete the old row and insert a new one unchanged.
+Step 2.5 always queries `owner_meta` directly, so there is no cache to invalidate and no
+version column to maintain.
+
 The version bump is in the **same transaction** as the data change. If the transaction rolls
 back, the version is not incremented — no spurious cache invalidations.
 
@@ -677,31 +710,59 @@ public interface GravitinoCache<K, V> extends Closeable {
 Yes. If the team has capacity, Phase 1 and Phase 2 can ship together. The separation exists
 only if there is pressure to disable entity cache before the version infrastructure is ready.
 
-### 7.2 `ownerRel` — Why Removed Instead of Version-Validated
+### 7.2 `ownerRel` — Correct Analysis and Design Decision
 
-**Why version-based caching does not apply to `owner_meta`:**
+#### Corrected Access-Frequency Analysis
 
-`owner_meta` uses a soft-delete pattern for ownership transfers: the old ownership row is
-soft-deleted and a new row is inserted. The new row's version counter always starts at 1,
-so a version field on `owner_meta` cannot distinguish "freshly cached" from "ownership just
-transferred" — any new row looks identical to the cache.
+The original framing — "only consulted when `privilege == OWNER`" — was **incorrect**.
+Nearly all authorization expressions in `AuthorizationExpressionConstants` include
+`ANY(OWNER, METALAKE, CATALOG)` or `ANY(OWNER, METALAKE, CATALOG, SCHEMA, ...)`, which
+expand to a chain of `METALAKE::OWNER || CATALOG::OWNER || ...` checks. Each term calls
+`isOwner()` directly via OGNL evaluation, independently of the `authorize()` code path.
 
-Adding an `owner_version` counter to every owned entity type (`catalog_meta`, `schema_meta`,
-`table_meta`, `fileset_meta`, `topic_meta`, `view_meta`, `model_meta`, ...) is invasive and
-couples the entity schema to the auth cache.
+Consequence: every auth request triggers **2–4 `isOwner()` calls**, one per ancestor level
+(e.g. METALAKE + CATALOG for a catalog-level check; METALAKE + CATALOG + SCHEMA + TABLE for
+a table-level check). Removing `ownerRel` without replacement would therefore add **2–4
+extra DB queries per auth request**, not +1 as originally stated in §4.1.4. This materially
+changes the cost analysis.
 
-**Resolution:** Remove the `ownerRel` cache entirely. `OWNER`-privilege checks are rare
-(only triggered by `privilege == OWNER`, not by regular SELECT / CREATE / ALTER checks).
-Since `metadataId` is already resolved in Step 2, one additional indexed query on
-`owner_meta` (Step 2.5) provides **strong consistency** for OWNER checks at the cost of
-+1 query per OWNER evaluation.
+#### Why Version-Validated Caching Offers No Benefit for `ownerRel`
 
-**Cross-node consistency:** Because ownership is never cached, ownership transfers are
-immediately visible on all nodes — no version propagation needed.
+The key insight is that `loadedRoles` and `ownerRel` serve fundamentally different purposes:
 
-**Future consideration:** If OWNER-check volume grows and caching becomes necessary, an
-explicit `owner_grants_version` column on `metalake_meta` (bumped on any ownership change
-within the metalake) would be the cleanest version signal. Not planned for this phase.
+| Cache | What the version check returns | What it saves |
+|-------|-------------------------------|---------------|
+| `loadedRoles` | `(role_id, securable_objects_version)` — 2 integers | Skips reloading all securable objects + JCasbin `addPolicy` calls — **expensive** |
+| `ownerRel` (hypothetical) | `(metadata_object_id, owner_id, owner_version)` | Nothing — the version check **already returns `owner_id`**, which is the only thing the cache would have stored |
+
+For `ownerRel`, the version check query IS the data query. There is no downstream expensive
+operation to avoid. A version-validated cache would add complexity (schema change, cache
+reads/writes, invalidation logic) while saving exactly zero DB queries.
+
+#### Decision: Remove `ownerRel`, Query `owner_meta` Directly
+
+Step 2.5 issues one batch query per request against `owner_meta` with no caching:
+
+```sql
+SELECT metadata_object_id, owner_id FROM owner_meta
+WHERE metadata_object_id IN (metalakeId, catalogId, ...)  -- all ancestors at once
+AND deleted_at = 0
+```
+
+This is:
+- **1 query** regardless of how many ancestor levels are in the expression (vs. 2–4 separate queries with the old per-call pattern)
+- **Always strongly consistent** — no staleness, no version columns, no invalidation logic
+- **No schema change** — `owner_meta` is untouched
+
+**Cross-node consistency:** Guaranteed by always reading from DB. Ownership transfers are
+immediately visible on all nodes with no propagation needed.
+
+**Hot-path query count for Phase 2:**
+
+| Path      | Count                                                              |
+|-----------|--------------------------------------------------------------------|
+| Hot path  | **4** (Step 1 + Step 2 + Step 2.5 owner batch + Step 3 role batch) |
+| All paths | Step 2.5 is always 1 query, never more                             |
 
 ### 7.3 Group Role Assignments
 
