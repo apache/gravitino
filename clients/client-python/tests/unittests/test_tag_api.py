@@ -418,9 +418,9 @@ class TestTagAPI(unittest.TestCase):
         )
 
         with patch(
-            "gravitino.utils.http_client.HTTPClient.post",
+            "gravitino.utils.http_client.HTTPClient.put",
             return_value=mock_resp,
-        ):
+        ) as mock_put:
             rename_change = TagChange.rename("tagB")
             update_comment_change = TagChange.update_comment("mock tag B")
             update_properties_change = TagChange.set_property("key2", "value2")
@@ -440,6 +440,7 @@ class TestTagAPI(unittest.TestCase):
                 },
                 updated_tag.properties(),
             )
+            mock_put.assert_called_once()
 
     def test_gravitino_metalake_alter_tag_api_with_empty_tag_name(
         self, *mock_args
