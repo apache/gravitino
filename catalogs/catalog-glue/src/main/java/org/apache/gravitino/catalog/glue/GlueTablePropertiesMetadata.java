@@ -19,7 +19,6 @@
 package org.apache.gravitino.catalog.glue;
 
 import static org.apache.gravitino.catalog.glue.GlueConstants.METADATA_LOCATION;
-import static org.apache.gravitino.catalog.glue.GlueConstants.TABLE_FORMAT_TYPE;
 import static org.apache.gravitino.connector.PropertyEntry.stringOptionalPropertyEntry;
 
 import com.google.common.collect.ImmutableMap;
@@ -42,15 +41,6 @@ public class GlueTablePropertiesMetadata extends BasePropertiesMetadata {
 
   private static final Map<String, PropertyEntry<?>> PROPERTIES_METADATA =
       ImmutableMap.<String, PropertyEntry<?>>builder()
-          .put(
-              TABLE_FORMAT_TYPE,
-              stringOptionalPropertyEntry(
-                  TABLE_FORMAT_TYPE,
-                  "Glue table format type stored in Table.parameters(). Common values:"
-                      + " iceberg, hive.",
-                  false /* immutable */,
-                  null /* defaultValue */,
-                  false /* hidden */))
           .put(
               METADATA_LOCATION,
               stringOptionalPropertyEntry(

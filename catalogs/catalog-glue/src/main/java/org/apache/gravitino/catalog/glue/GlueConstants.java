@@ -69,12 +69,11 @@ public final class GlueConstants {
   // -------------------------------------------------------------------------
 
   /**
-   * Glue table format type parameter key stored in {@code Table.parameters()}. Common values:
-   * {@code ICEBERG}, {@code HIVE}, {@code DELTA}, {@code PARQUET} (uppercase, as stored by Glue).
-   * Note: these differ from the Gravitino-side filter values in {@link #TABLE_FORMAT_FILTER}, which
-   * use lowercase (e.g. {@code iceberg}, {@code hive}).
+   * Glue table format parameter key stored in {@code Table.parameters()}. Common values: {@code
+   * ICEBERG}, {@code HIVE}, {@code DELTA}, {@code PARQUET} (uppercase, as stored by Glue). Used
+   * internally to determine the table format when reading Glue tables.
    */
-  public static final String TABLE_FORMAT_TYPE = "table_format_type";
+  public static final String TABLE_FORMAT = "table_format";
 
   /** Iceberg table metadata location stored in Glue {@code Table.parameters()}. */
   public static final String METADATA_LOCATION = "metadata_location";
