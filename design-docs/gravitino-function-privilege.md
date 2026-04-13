@@ -26,7 +26,7 @@ The existing Gravitino access control framework covers catalogs, schemas, tables
 
 ## Non-Goals
 
-1. **DEFINER/INVOKER Security Mode**: Gravitino's function metadata model does not currently include a `securityType` field (unlike views). Adding security mode support to functions is a separate metadata model concern and is outside the scope of this privilege design.
+1. **DEFINER/INVOKER Security Mode**: Gravitino's function metadata model does not currently include a `securityType` field. Adding security mode support to functions is a separate metadata model concern and is outside the scope of this privilege design.
 
 2. **New Function Management Capabilities**: This design adds privilege control on top of the existing function management API. No new CRUD operations or metadata model changes are introduced.
 
@@ -83,6 +83,26 @@ This is consistent with tables, filesets, and other schema-scoped objects. Funct
 | Function | — | ✅ | ✅ |
 
 > `REGISTER_FUNCTION` is not applicable at the function level because creation happens at the schema level (a function must be created within a schema).
+
+---
+
+### Visibility Control
+
+Function visibility follows the "can't see what you can't execute" pattern observed across all surveyed systems:
+
+1. **`listFunctions`** — Returns only functions the user has at least one privilege on (`EXECUTE_FUNCTION`, `MODIFY_FUNCTION`, or ownership). `REGISTER_FUNCTION` alone does not grant visibility. This is implemented via a filter expression applied to the result set, consistent with table and fileset listing.
+
+2. **`getFunction`** — Requires `EXECUTE_FUNCTION`, `MODIFY_FUNCTION`, or ownership. If the user lacks privileges, the authorization framework denies access.
+
+3. **Function definition protection** — Function definitions (implementations, source code) are part of the function metadata returned by `getFunction`. Since `getFunction` requires privilege, function definitions are protected by default.
+
+---
+
+### Authorization Pushdown — Not Applicable
+
+Unlike tables, which are delegated to underlying data sources (Hive, MySQL, Iceberg, etc.) that have their own privilege systems, **function management is fully managed by Gravitino** — all function metadata is stored in Gravitino's own database via `ManagedFunctionOperations`. There is no delegation to external catalogs.
+
+Therefore, **authorization pushdown is not needed for functions**. Gravitino's own authorization layer is the single enforcement point for all function privilege checks. This is simpler than the table model and eliminates the complexity of privilege mapping to heterogeneous data source privilege systems.
 
 ---
 
@@ -147,26 +167,6 @@ ANY_USE_CATALOG && ANY_USE_SCHEMA && FUNCTION::OWNER
 
 - Only function owners (and metalake/catalog/schema owners) can drop functions.
 - This follows the same pattern as `DROP_TABLE` and `DROP_FILESET`, where only the object owner can perform the drop — `MODIFY_FUNCTION` alone is not sufficient for drop.
-
----
-
-### Visibility Control
-
-Function visibility follows the "can't see what you can't execute" pattern observed across all surveyed systems:
-
-1. **`listFunctions`** — Returns only functions the user has at least one privilege on (`EXECUTE_FUNCTION`, `MODIFY_FUNCTION`, or ownership). `REGISTER_FUNCTION` alone does not grant visibility. This is implemented via a filter expression applied to the result set, consistent with table and fileset listing.
-
-2. **`getFunction`** — Requires `EXECUTE_FUNCTION`, `MODIFY_FUNCTION`, or ownership. If the user lacks privileges, the authorization framework denies access.
-
-3. **Function definition protection** — Function definitions (implementations, source code) are part of the function metadata returned by `getFunction`. Since `getFunction` requires privilege, function definitions are protected by default.
-
----
-
-### Authorization Pushdown — Not Applicable
-
-Unlike tables, which are delegated to underlying data sources (Hive, MySQL, Iceberg, etc.) that have their own privilege systems, **function management is fully managed by Gravitino** — all function metadata is stored in Gravitino's own database via `ManagedFunctionOperations`. There is no delegation to external catalogs.
-
-Therefore, **authorization pushdown is not needed for functions**. Gravitino's own authorization layer is the single enforcement point for all function privilege checks. This is simpler than the table model and eliminates the complexity of privilege mapping to heterogeneous data source privilege systems.
 
 ---
 
