@@ -33,13 +33,20 @@ if [ "$1" = "--stop" ]; then
     GRADLE_PID=$(cat "$PID_FILE")
     if kill -0 "$GRADLE_PID" 2>/dev/null; then
       PGID=$(ps -o pgid= -p "$GRADLE_PID" 2>/dev/null | tr -d ' ')
-      echo "Stopping environment (PGID: $PGID)..."
-      kill -TERM -- "-$PGID" 2>/dev/null
-      for i in $(seq 1 60); do
-        kill -0 "$GRADLE_PID" 2>/dev/null || break
-        sleep 1
-      done
+      if [[ -n "$PGID" && "$PGID" =~ ^[0-9]+$ ]]; then
+        echo "Stopping environment (PGID: $PGID)..."
+        kill -TERM -- "-$PGID" 2>/dev/null
+        for i in $(seq 1 60); do
+          kill -0 "$GRADLE_PID" 2>/dev/null || break
+          sleep 1
+        done
+      else
+        echo "Could not determine process group for PID $GRADLE_PID, stopping containers directly..."
+      fi
+    else
+      echo "Environment process ($GRADLE_PID) is no longer running, stopping containers directly..."
     fi
+    "$GRAVITINO_ROOT_DIR/integration-test-common/docker-script/shutdown.sh"
     rm -f "$PID_FILE"
   else
     echo "No running environment found, stopping containers directly..."
