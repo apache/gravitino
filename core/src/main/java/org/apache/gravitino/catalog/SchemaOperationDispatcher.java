@@ -53,6 +53,7 @@ import org.slf4j.LoggerFactory;
 public class SchemaOperationDispatcher extends OperationDispatcher implements SchemaDispatcher {
 
   static final String SCHEMA_CREATED_BY_GRAVITINO = "gravitino.created";
+  static final String SCHEMA_CREATED_BY_GRAVITINO_VALUE = "true";
 
   private static final Logger LOG = LoggerFactory.getLogger(SchemaOperationDispatcher.class);
 
@@ -151,7 +152,9 @@ public class SchemaOperationDispatcher extends OperationDispatcher implements Sc
                   .withId(uid)
                   .withName(ident.name())
                   .withNamespace(ident.namespace())
-                  .withProperties(ImmutableMap.of(SCHEMA_CREATED_BY_GRAVITINO, "true"))
+                  .withProperties(
+                      ImmutableMap.of(
+                          SCHEMA_CREATED_BY_GRAVITINO, SCHEMA_CREATED_BY_GRAVITINO_VALUE))
                   .withAuditInfo(
                       AuditInfo.builder()
                           .withCreator(PrincipalUtils.getCurrentPrincipal().getName())
