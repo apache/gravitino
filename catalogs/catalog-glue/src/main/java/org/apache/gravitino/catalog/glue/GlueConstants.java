@@ -63,7 +63,7 @@ public final class GlueConstants {
   public static final String TABLE_TYPE_FILTER = "table-type-filter";
 
   /** Default value for {@link #TABLE_TYPE_FILTER}: expose all table types. */
-  public static final String TABLE_TYPE_FILTER_ALL = "all";
+  public static final String DEFAULT_TABLE_TYPE_FILTER = "all";
 
   // -------------------------------------------------------------------------
   // Glue Table.parameters() keys (passthrough properties)

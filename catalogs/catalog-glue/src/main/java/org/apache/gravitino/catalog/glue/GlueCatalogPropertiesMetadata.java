@@ -25,8 +25,8 @@ import static org.apache.gravitino.catalog.glue.GlueConstants.AWS_REGION;
 import static org.apache.gravitino.catalog.glue.GlueConstants.AWS_SECRET_ACCESS_KEY;
 import static org.apache.gravitino.catalog.glue.GlueConstants.DEFAULT_TABLE_FORMAT;
 import static org.apache.gravitino.catalog.glue.GlueConstants.DEFAULT_TABLE_FORMAT_VALUE;
+import static org.apache.gravitino.catalog.glue.GlueConstants.DEFAULT_TABLE_TYPE_FILTER;
 import static org.apache.gravitino.catalog.glue.GlueConstants.TABLE_TYPE_FILTER;
-import static org.apache.gravitino.catalog.glue.GlueConstants.TABLE_TYPE_FILTER_ALL;
 import static org.apache.gravitino.connector.PropertyEntry.stringOptionalPropertyEntry;
 import static org.apache.gravitino.connector.PropertyEntry.stringRequiredPropertyEntry;
 
@@ -87,8 +87,7 @@ public class GlueCatalogPropertiesMetadata extends BaseCatalogPropertiesMetadata
               DEFAULT_TABLE_FORMAT,
               stringOptionalPropertyEntry(
                   DEFAULT_TABLE_FORMAT,
-                  "Default format for tables created via createTable(). Accepted: iceberg, hive."
-                      + " Unrecognised values are rejected at createTable() time.",
+                  "Default format for tables created via createTable(). Accepted: iceberg, hive.",
                   false /* immutable */,
                   DEFAULT_TABLE_FORMAT_VALUE,
                   false /* hidden */))
@@ -97,10 +96,9 @@ public class GlueCatalogPropertiesMetadata extends BaseCatalogPropertiesMetadata
               stringOptionalPropertyEntry(
                   TABLE_TYPE_FILTER,
                   "Comma-separated table types exposed by listTables() and loadTable()."
-                      + " Accepted: all, hive, iceberg, delta, parquet."
-                      + " Unrecognised values are rejected at listTables() time.",
+                      + " Accepted: all, hive, iceberg.",
                   false /* immutable */,
-                  TABLE_TYPE_FILTER_ALL,
+                  DEFAULT_TABLE_TYPE_FILTER,
                   false /* hidden */))
           .build();
 

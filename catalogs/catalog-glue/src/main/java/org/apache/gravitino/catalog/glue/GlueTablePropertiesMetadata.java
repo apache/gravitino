@@ -47,7 +47,7 @@ public class GlueTablePropertiesMetadata extends BasePropertiesMetadata {
               stringOptionalPropertyEntry(
                   TABLE_FORMAT_TYPE,
                   "Glue table format type stored in Table.parameters(). Common values:"
-                      + " ICEBERG, HIVE, DELTA, PARQUET.",
+                      + " iceberg, hive.",
                   false /* immutable */,
                   null /* defaultValue */,
                   false /* hidden */))
