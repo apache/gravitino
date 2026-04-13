@@ -24,9 +24,9 @@ import static org.apache.gravitino.catalog.glue.GlueConstants.AWS_GLUE_ENDPOINT;
 import static org.apache.gravitino.catalog.glue.GlueConstants.AWS_REGION;
 import static org.apache.gravitino.catalog.glue.GlueConstants.AWS_SECRET_ACCESS_KEY;
 import static org.apache.gravitino.catalog.glue.GlueConstants.DEFAULT_TABLE_FORMAT;
+import static org.apache.gravitino.catalog.glue.GlueConstants.DEFAULT_TABLE_FORMAT_FILTER;
 import static org.apache.gravitino.catalog.glue.GlueConstants.DEFAULT_TABLE_FORMAT_VALUE;
-import static org.apache.gravitino.catalog.glue.GlueConstants.DEFAULT_TABLE_TYPE_FILTER;
-import static org.apache.gravitino.catalog.glue.GlueConstants.TABLE_TYPE_FILTER;
+import static org.apache.gravitino.catalog.glue.GlueConstants.TABLE_FORMAT_FILTER;
 import static org.apache.gravitino.connector.PropertyEntry.stringOptionalPropertyEntry;
 import static org.apache.gravitino.connector.PropertyEntry.stringRequiredPropertyEntry;
 
@@ -92,12 +92,12 @@ public class GlueCatalogPropertiesMetadata extends BaseCatalogPropertiesMetadata
                   DEFAULT_TABLE_FORMAT_VALUE,
                   false /* hidden */))
           .put(
-              TABLE_TYPE_FILTER,
+              TABLE_FORMAT_FILTER,
               stringOptionalPropertyEntry(
-                  TABLE_TYPE_FILTER,
-                  "Comma-separated table types exposed by listTables() and loadTable().",
+                  TABLE_FORMAT_FILTER,
+                  "Comma-separated table formats exposed by listTables() and loadTable().",
                   false /* immutable */,
-                  DEFAULT_TABLE_TYPE_FILTER,
+                  DEFAULT_TABLE_FORMAT_FILTER,
                   false /* hidden */))
           .build();
 
