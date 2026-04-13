@@ -40,7 +40,6 @@ import io.trino.spi.connector.ConnectorTransactionHandle;
 import io.trino.spi.session.PropertyMetadata;
 import io.trino.spi.transaction.IsolationLevel;
 import java.util.List;
-import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ExecutionException;
@@ -69,7 +68,7 @@ public class GravitinoConnector implements Connector {
   protected final CatalogConnectorContext catalogConnectorContext;
   private final CatalogConnectorMetadata connectorMetadata;
   private final boolean forwardUser;
-  private final String authType;
+  private final GravitinoAuthProvider.AuthType authType;
   private final String oauth2CredentialKey;
   private final Cache<String, UserSession> perUserSessionCache;
 
@@ -90,11 +89,11 @@ public class GravitinoConnector implements Connector {
     this.forwardUser =
         Boolean.parseBoolean(
             clientConfig.getOrDefault(GravitinoAuthProvider.FORWARD_SESSION_USER_KEY, "false"));
-    this.authType =
-        clientConfig.getOrDefault(GravitinoAuthProvider.AUTH_TYPE_KEY, "").toUpperCase(Locale.ROOT);
+    String authTypeStr = clientConfig.getOrDefault(GravitinoAuthProvider.AUTH_TYPE_KEY, "none");
+    this.authType = GravitinoAuthProvider.parseAuthType(authTypeStr);
     this.oauth2CredentialKey = clientConfig.get(GravitinoAuthProvider.OAUTH2_TOKEN_CREDENTIAL_KEY);
 
-    if (forwardUser && authType.equals("OAUTH2")) {
+    if (forwardUser && authType == GravitinoAuthProvider.AuthType.OAUTH2) {
       Preconditions.checkArgument(
           StringUtils.isNotBlank(oauth2CredentialKey),
           "oauth2 with forwardUser=true requires '%s' to be set",
@@ -146,7 +145,7 @@ public class GravitinoConnector implements Connector {
 
     if (forwardUser) {
       String credKey =
-          authType.equals("OAUTH2")
+          authType == GravitinoAuthProvider.AuthType.OAUTH2
               ? "oauth2:" + session.getIdentity().getExtraCredentials().get(oauth2CredentialKey)
               : "simple:" + session.getUser();
       UserSession userSession;

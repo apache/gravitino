@@ -251,10 +251,10 @@ public class CatalogConnectorContext {
      * @throws Exception if the metalake, catalog, or context is not set
      */
     public CatalogConnectorContext build() throws Exception {
-      Preconditions.checkArgument(metalake != null, "metalake is not null");
-      Preconditions.checkArgument(catalog != null, "catalog is not null");
-      Preconditions.checkArgument(context != null, "context is not null");
-      Preconditions.checkArgument(config != null, "config is not null");
+      Preconditions.checkArgument(metalake != null, "metalake must not be null");
+      Preconditions.checkArgument(catalog != null, "catalog must not be null");
+      Preconditions.checkArgument(context != null, "context must not be null");
+      Preconditions.checkArgument(config != null, "config must not be null");
       Map<String, String> connectorConfig = connectorAdapter.buildInternalConnectorConfig(catalog);
       String internalConnectorName = connectorAdapter.internalConnectorName();
 

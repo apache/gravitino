@@ -114,10 +114,11 @@ public class CatalogConnectorManager {
    * @param client the Gravitino admin client
    */
   public void config(GravitinoConfig config, GravitinoAdminClient client) {
-    Preconditions.checkArgument(config != null, "config is not null");
+    Preconditions.checkArgument(config != null, "config must not be null");
     this.config = config;
     if (client == null) {
-      String authType = config.getClientConfig().getOrDefault("gravitino.client.authType", "none");
+      String authType =
+          config.getClientConfig().getOrDefault(GravitinoAuthProvider.AUTH_TYPE_KEY, "none");
       LOG.info("Building Gravitino client with authType: {}", authType);
       try {
         this.gravitinoClient = GravitinoAuthProvider.build(config);

@@ -21,11 +21,9 @@ package org.apache.gravitino.trino.connector.security;
 import io.trino.spi.connector.ConnectorSession;
 import java.io.File;
 import java.io.IOException;
-import java.nio.charset.StandardCharsets;
 import java.util.Locale;
 import java.util.Map;
 import org.apache.commons.lang3.StringUtils;
-import org.apache.gravitino.auth.AuthConstants;
 import org.apache.gravitino.client.CustomTokenProvider;
 import org.apache.gravitino.client.DefaultOAuth2TokenProvider;
 import org.apache.gravitino.client.GravitinoAdminClient;
@@ -222,7 +220,7 @@ public class GravitinoAuthProvider {
     return builder.build();
   }
 
-  private static AuthType parseAuthType(String authTypeStr) {
+  public static AuthType parseAuthType(String authTypeStr) {
     try {
       return AuthType.valueOf(authTypeStr.toUpperCase(Locale.ROOT));
     } catch (IllegalArgumentException e) {
@@ -350,11 +348,6 @@ public class GravitinoAuthProvider {
     @Override
     public boolean hasTokenData() {
       return true;
-    }
-
-    @Override
-    public byte[] getTokenData() {
-      return (AuthConstants.AUTHORIZATION_BEARER_HEADER + token).getBytes(StandardCharsets.UTF_8);
     }
 
     @Override
