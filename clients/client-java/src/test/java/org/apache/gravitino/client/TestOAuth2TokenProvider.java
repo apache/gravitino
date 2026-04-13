@@ -30,11 +30,14 @@ import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.security.KeyPair;
 import java.util.Date;
+import java.util.HashMap;
+import java.util.Map;
 import org.apache.gravitino.auth.AuthConstants;
 import org.apache.gravitino.dto.responses.OAuth2ErrorResponse;
 import org.apache.gravitino.dto.responses.OAuth2TokenResponse;
 import org.apache.gravitino.exceptions.BadRequestException;
 import org.apache.gravitino.exceptions.UnauthorizedException;
+import org.apache.gravitino.rest.RESTUtils;
 import org.apache.hc.core5.http.HttpStatus;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.Assertions;
@@ -42,6 +45,7 @@ import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.mockserver.integration.ClientAndServer;
 import org.mockserver.matchers.Times;
+import org.mockserver.model.HttpRequest;
 import org.mockserver.model.HttpResponse;
 
 @SuppressWarnings("JavaUtilDate")
@@ -152,6 +156,41 @@ public class TestOAuth2TokenProvider {
     Assertions.assertEquals(
         AuthConstants.AUTHORIZATION_BEARER_HEADER + accessToken,
         new String(provider.getTokenData(), StandardCharsets.UTF_8));
+  }
+
+  @Test
+  public void testAuthenticationPasswordGrant() throws Exception {
+    String expectedAccessToken = "access-token";
+    ObjectMapper objectMapper = ObjectMapperProvider.objectMapper();
+    HttpResponse mockResponse = HttpResponse.response().withStatusCode(HttpStatus.SC_OK);
+    OAuth2TokenResponse response =
+        new OAuth2TokenResponse(expectedAccessToken, "2", "bearer", 1, "openid", null);
+    String respJson = objectMapper.writeValueAsString(response);
+    mockResponse = mockResponse.withBody(respJson);
+
+    Map<String, String> bodyMap = new HashMap<>();
+    bodyMap.put("grant_type", "password");
+    bodyMap.put("client_id", "yy");
+    bodyMap.put("client_secret", "xx");
+    bodyMap.put("username", "usera");
+    bodyMap.put("password", "Admin@123");
+    bodyMap.put("scope", "openid");
+
+    mockServer
+        .when(
+            HttpRequest.request().withPath("/oauth/token").withBody(RESTUtils.encodeFormData(bodyMap)),
+            Times.exactly(1))
+        .respond(mockResponse);
+
+    OAuth2TokenProvider provider =
+        DefaultOAuth2TokenProvider.builder()
+            .withUri(String.format("http://127.0.0.1:%d", PORT))
+            .withCredential("yy:xx:usera:Admin@123")
+            .withPath("oauth/token")
+            .withScope("openid")
+            .build();
+
+    Assertions.assertEquals(expectedAccessToken, provider.getAccessToken());
   }
 
   @Test
