@@ -623,8 +623,34 @@ class GravitinoMetalake(
             NoSuchTagException: If the tag does not exist.
             NoSuchMetalakeException: If the metalake does not exist.
         """
-        # TODO implement alter_tag
-        raise NotImplementedError()
+        Precondition.check_argument(
+            StringUtils.is_not_blank(tag_name),
+            "tag name must not be null or empty",
+        )
+        Precondition.check_argument(
+            changes is not None and len(changes) > 0,
+            "at least one change is required",
+        )
+        updates = [DTOConverters.to_tag_update_request(change) for change in changes]
+        update_req = TagUpdatesRequest(updates)
+        update_req.validate()
+
+        url = self.API_METALAKES_TAG_PATH.format(
+            encode_string(self.name()), encode_string(tag_name)
+        )
+        response = self.rest_client.put(
+            url,
+            json=update_req,
+            error_handler=TAG_ERROR_HANDLER,
+        )
+        tag_resp: TagResponse = TagResponse.from_json(response.body, infer_missing=True)
+
+        tag_resp.validate()
+        return GenericTag(
+            self.name(),
+            tag_resp.tag(),
+            self.rest_client,
+        )
 
     def delete_tag(self, tag_name) -> bool:
         """
