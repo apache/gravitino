@@ -420,21 +420,37 @@ no extra infrastructure. See §7.2.
 ```
 authorize(metalakeName, username, resource, operation)
 │
-├─ STEP 1 — User version check (1 query, metalake resolved via JOIN):
+├─ STEP 1 — User + Group version check (2 queries, metalake resolved via JOIN):
 │
+│   [1a] User query:
 │   SELECT um.user_id, um.role_grants_version
 │   FROM user_meta um
 │   JOIN metalake_meta mm ON um.metalake_id = mm.metalake_id AND mm.deleted_at = 0
 │   WHERE mm.metalake_name = ? AND um.user_name = ? AND um.deleted_at = 0
-│   ↑ returns only 2 integer columns — no JSON, no audit fields
 │
 │   userRoleCache HIT and role_grants_version matches:
 │     → use cached userId and roleIds               [A] and [C1] avoided
-│
 │   MISS or version mismatch:
 │     → SELECT role_id FROM user_role_rel WHERE user_id = ? AND deleted_at = 0
-│     → re-associate userId ↔ roleIds in JCasbin enforcers
-│     → userRoleCache.put(key, new CachedUserRoles(userId, version, roleIds))
+│     → re-associate userId ↔ roleIds in JCasbin allow/deny enforcers
+│     → userRoleCache.put(key, CachedUserRoles(userId, version, roleIds))
+│
+│   [1b] Group query (user may belong to groups that also hold roles):
+│   SELECT gm.group_id, gm.role_grants_version
+│   FROM group_meta gm
+│   JOIN group_user_rel gu ON gm.group_id = gu.group_id AND gu.deleted_at = 0
+│   WHERE gu.user_id = ? AND gm.deleted_at = 0
+│
+│   For each group:
+│     groupRoleCache HIT and role_grants_version matches:
+│       → use cached groupId and roleIds            [group C1] avoided
+│     MISS or version mismatch:
+│       → SELECT role_id FROM group_role_rel WHERE group_id = ? AND deleted_at = 0
+│       → addRoleForUser(userId, roleId) in JCasbin enforcers
+│       → groupRoleCache.put(groupKey, CachedGroupRoles(groupId, version, roleIds))
+│
+│   Note: current code only loads user-direct roles (ROLE_USER_REL). Loading group roles
+│   via [1b] is a NEW capability introduced in Phase 2 alongside groupRoleCache.
 │
 ├─ STEP 2 — Resolve target resource ID (always DB, no cache):
 │
@@ -447,17 +463,24 @@ authorize(metalakeName, username, resource, operation)
 │   entity_mutation_log for cross-node invalidation plus write-path eviction on the
 │   local node. Not implemented in this phase.
 │
-├─ STEP 2.5 — Direct ownership batch query (called for EVERY auth request, no cache):
-│   (Triggered by ANY(OWNER, …) in the OGNL expression — 2–4 isOwner() calls per request)
+├─ STEP 2.5 — Ownership check per isOwner() call (request-level dedup via context cache):
+│   (Triggered by ANY(OWNER, …) in the OGNL expression — 2–4 calls per request.
+│    Note: OGNL evaluates lazily with short-circuit; ancestor IDs are not pre-collected.)
 │
-│   Collect all ancestor metadataIds from the OGNL expression (metalakeId, catalogId, …).
+│   Each isOwner(principal, metalake, metadataObject) call:
+│     requestContext.ownerCache HIT for metadataId → return cached result immediately
+│     MISS:
+│       SELECT owner_id FROM owner_meta
+│       WHERE metadata_object_id = ? AND deleted_at = 0   ← 1 indexed query
+│       requestContext.ownerCache.put(metadataId, ownerId)
+│       compare ownerId with userId → return result
 │
-│   SELECT metadata_object_id, owner_id FROM owner_meta
-│   WHERE metadata_object_id IN (?, ?, …) AND deleted_at = 0
-│   ↑ 1 indexed batch query covers all ancestors simultaneously
+│   requestContext.ownerCache is a Map<Long, Optional<Long>> scoped to this HTTP request.
+│   Within one request the same metadataId is never queried twice.
+│   Across requests: always queries DB → always strongly consistent.
 │
-│   For each ancestor: compare owner_id with userId → ALLOW if match, continue if not.
-│   No cache read or write — always strongly consistent.
+│   Also fixes existing bug: isOwner() currently calls MetadataIdConverter.getID() twice
+│   for the same object (JcasbinAuthorizer lines 224, 228). Phase 2 consolidates to 1 call.
 │
 ├─ STEP 3 — Role batch version check (1 query):
 │
@@ -481,16 +504,16 @@ authorize(metalakeName, username, resource, operation)
 
 #### 4.1.4 Properties
 
-| Dimension           | Value                                                                          |
-|---------------------|--------------------------------------------------------------------------------|
-| Staleness window    | **0** — every request validates against DB                                     |
-| Hot path DB queries | **4** (Step 1 + Step 2 + Step 2.5 owner batch + Step 3 role batch)             |
-| Owner check         | Always 1 batch query; no cache, always strongly consistent                     |
-| Cold/stale path     | **5–6** queries                                                                |
-| Background threads  | **None**                                                                       |
-| Failure mode        | DB unavailable → auth blocked (same as today)                                  |
-| HA correctness      | **Fixed** — DB queried directly on every request for ownership; role versions  |
-|                     | validated via `role_meta.securable_objects_version` in Step 3                  |
+| Dimension                | Value                                                                                                 |
+|--------------------------|-------------------------------------------------------------------------------------------------------|
+| Staleness window         | **0** — every request validates against DB                                                            |
+| Hot path DB queries      | **4** (Step 1a user + Step 1b groups + Step 2 metadataId + Step 3 role versions)                      |
+| Owner check warm         | **+0** — requestContext.ownerCache deduplicates within one request                                    |
+| Owner check cold         | **+1 per unique ancestor metadataId** on first access within the request                              |
+| Cold/stale path          | **5–6** queries                                                                                       |
+| Background threads       | **None** — executor removed (N+1 fix uses batch query instead of parallel futures)                    |
+| Failure mode             | DB unavailable → auth blocked (same as today)                                                         |
+| HA correctness           | **Fixed** — Step 1 validates role versions; Step 2.5 always reads from DB                             |
 
 #### 4.1.5 Correctness Under Rename and Drop
 
@@ -577,21 +600,22 @@ as a stepping stone — Phase 2 closes this). Consistency still TTL-bounded.
 
 ### Phase 2 — Version-Validated Auth Cache Implementation
 
-| Step  | Change                                                                                                                          | Module                                 |
-|-------|---------------------------------------------------------------------------------------------------------------------------------|----------------------------------------|
-| 2.1   | `ADD COLUMN securable_objects_version` on `role_meta`                                                                           | `schema-x.y.z-*.sql`                   |
-| 2.2   | `ADD COLUMN role_grants_version` on `user_meta`                                                                                 | `schema-x.y.z-*.sql`                   |
-| 2.3   | `ADD COLUMN role_grants_version` on `group_meta`                                                                                | `schema-x.y.z-*.sql`                   |
-| 2.4   | Bump `securable_objects_version` in privilege grant/revoke transaction                                                          | `RoleMetaService`                      |
-| 2.5   | Bump `role_grants_version` in role assign/revoke transaction (user + group)                                                     | `UserMetaService`, `GroupMetaService`  |
-| 2.6   | Add `userRoleCache: GravitinoCache<String, CachedUserRoles>`                                                                    | `JcasbinAuthorizer`                    |
-| 2.7   | Add `groupRoleCache: GravitinoCache<String, CachedGroupRoles>`                                                                  | `JcasbinAuthorizer`                    |
-| 2.8   | Change `loadedRoles` type: `Boolean` → `Integer` (stores version)                                                               | `JcasbinAuthorizer`                    |
-| 2.9   | Rewrite `loadRolePrivilege()` + `authorize()` with 4-step flow (§4.1.3)                                                         | `JcasbinAuthorizer`                    |
-| 2.10  | Add mapper methods (see §6.1)                                                                                                   | mapper + SQL                           |
-| 2.11  | Remove `ownerRel` cache; add `selectOwnersByMetadataObjectIds` batch mapper; Step 2.5 queries `owner_meta` directly per request | `JcasbinAuthorizer`, `OwnerMetaMapper` |
+| Step  | Change                                                                                                                          | Module                                                  |
+|-------|---------------------------------------------------------------------------------------------------------------------------------|---------------------------------------------------------|
+| 2.1   | `ADD COLUMN securable_objects_version` on `role_meta`                                                                           | `schema-x.y.z-*.sql`                                    |
+| 2.2   | `ADD COLUMN role_grants_version` on `user_meta`                                                                                 | `schema-x.y.z-*.sql`                                    |
+| 2.3   | `ADD COLUMN role_grants_version` on `group_meta`                                                                                | `schema-x.y.z-*.sql`                                    |
+| 2.4   | Bump `securable_objects_version` in privilege grant/revoke transaction                                                          | `RoleMetaService`                                       |
+| 2.5   | Bump `role_grants_version` in role assign/revoke transaction (user + group)                                                     | `UserMetaService`, `GroupMetaService`                   |
+| 2.6   | Add `userRoleCache: GravitinoCache<String, CachedUserRoles>`                                                                    | `JcasbinAuthorizer`                                     |
+| 2.7   | Add `groupRoleCache: GravitinoCache<String, CachedGroupRoles>`; implement group role loading in `loadRolePrivilege()` (currently missing entirely) | `JcasbinAuthorizer`               |
+| 2.8   | Change `loadedRoles` type: `Boolean` → `Integer` (stores version)                                                               | `JcasbinAuthorizer`                                     |
+| 2.9   | Rewrite `loadRolePrivilege()` + `authorize()` with 4-step flow (§4.1.3); remove `executor` thread pool (replaced by batch query) | `JcasbinAuthorizer`                                    |
+| 2.10  | Add mapper methods (see §6.1)                                                                                                   | mapper + SQL                                            |
+| 2.11  | Remove `ownerRel`; add `ownerCache: Map<Long, Optional<Long>>` to `AuthorizationRequestContext` for per-request dedup; fix double `getID()` call in `isOwner()` | `JcasbinAuthorizer`, `AuthorizationRequestContext` |
+| 2.12  | Extend `AuthorizationRequestContext.loadRole()` guard to cover both user and group role loading in one pass                     | `AuthorizationRequestContext`                           |
 
-**Outcome:** Zero staleness. Hot path: 3 lightweight DB queries (2 version checks + 1 ID lookup).
+**Outcome:** Zero staleness. Hot path: 4 DB queries (Step 1a user + Step 1b groups + Step 2 metadataId + Step 3 role versions). `isOwner()` deduped within request via context cache; always consistent.
 
 ---
 
@@ -610,18 +634,18 @@ void                bumpRoleGrantsVersion(@Param("userId") long userId);
 Map<String, Object> getUserVersionInfo(
     @Param("metalakeName") String metalakeName, @Param("userName") String userName);
 
-// GroupMetaMapper.java (same pattern as UserMetaMapper)
-void                bumpRoleGrantsVersionForGroup(@Param("groupId") long groupId);
-Map<String, Object> getGroupVersionInfo(
-    @Param("metalakeName") String metalakeName, @Param("groupName") String groupName);
+// GroupMetaMapper.java
+void                bumpRoleGrantsVersion(@Param("groupId") long groupId);
+// NEW: returns group_id + role_grants_version for all groups the user belongs to
+List<Map<String, Object>> getGroupVersionInfoByUserId(@Param("userId") long userId);
 
-// OwnerMetaMapper.java (for Step 2.5 direct batch query, no version needed)
-List<Map<String, Object>> selectOwnersByMetadataObjectIds(
-    @Param("metadataObjectIds") List<Long> metadataObjectIds);
+// OwnerMetaMapper.java (for Step 2.5 per-call single query, deduped by requestContext)
+Map<String, Object> selectOwnerByMetadataObjectId(
+    @Param("metadataObjectId") long metadataObjectId);
 ```
 
 ```xml
-<!-- Step 1 query: resolves metalake name inline, returns userId + version -->
+<!-- Step 1a: user version check, resolves metalake inline -->
 <select id="getUserVersionInfo" resultType="map">
   SELECT um.user_id, um.role_grants_version
   FROM user_meta um
@@ -630,15 +654,21 @@ List<Map<String, Object>> selectOwnersByMetadataObjectIds(
   AND um.deleted_at = 0
 </select>
 
-<!-- Step 2.5 query: batch ownership lookup, always correct, no version column needed -->
-<select id="selectOwnersByMetadataObjectIds" resultType="map">
-  SELECT metadata_object_id, owner_id, owner_type FROM owner_meta
-  WHERE metadata_object_id IN
-  <foreach item="id" collection="metadataObjectIds" open="(" separator="," close=")">#{id}</foreach>
-  AND deleted_at = 0
+<!-- Step 1b: group version check, returns all groups the user belongs to -->
+<select id="getGroupVersionInfoByUserId" resultType="map">
+  SELECT gm.group_id, gm.role_grants_version
+  FROM group_meta gm
+  JOIN group_user_rel gu ON gm.group_id = gu.group_id AND gu.deleted_at = 0
+  WHERE gu.user_id = #{userId} AND gm.deleted_at = 0
 </select>
 
-<!-- Step 3 / poll query: batch version check for roles -->
+<!-- Step 2.5: single ownership query, called per isOwner(); deduped by requestContext cache -->
+<select id="selectOwnerByMetadataObjectId" resultType="map">
+  SELECT owner_id, owner_type FROM owner_meta
+  WHERE metadata_object_id = #{metadataObjectId} AND deleted_at = 0
+</select>
+
+<!-- Step 3: batch version check for roles -->
 <select id="batchGetSecurableObjectsVersions" resultType="map">
   SELECT role_id, securable_objects_version FROM role_meta
   WHERE role_id IN
@@ -650,12 +680,6 @@ List<Map<String, Object>> selectOwnersByMetadataObjectIds(
   UPDATE role_meta SET securable_objects_version = securable_objects_version + 1
   WHERE role_id = #{roleId}
 </update>
-
-<!-- Step 2.5: direct ownership query, no cache -->
-<select id="selectOwnerByMetadataObjectId" resultType="map">
-  SELECT owner_id, owner_type FROM owner_meta
-  WHERE metadata_object_id = #{metadataObjectId} AND deleted_at = 0
-</select>
 ```
 
 ### 6.2 Write Path Changes
