@@ -57,8 +57,7 @@ public final class GlueConstants {
 
   /**
    * Comma-separated list of table types exposed by {@code listTables()} and {@code loadTable()}
-   * (optional). Accepted values: {@code all}, {@code hive}, {@code iceberg}, {@code delta}, {@code
-   * parquet}. Defaults to {@code all}.
+   * (optional). Defaults to {@code all}.
    */
   public static final String TABLE_TYPE_FILTER = "table-type-filter";
 
