@@ -23,13 +23,22 @@ import java.io.IOException;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.nio.file.Files;
+import java.nio.file.StandardCopyOption;
 import java.util.Optional;
+import java.util.concurrent.ConcurrentHashMap;
 import org.apache.commons.io.FileUtils;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 
 public class FetchFileUtils {
+
+  /**
+   * Per-destination lock map used to serialize concurrent symlink creation for the same keytab
+   * file. Keyed by the normalized absolute destination path string to avoid races caused by
+   * different path spellings referring to the same file.
+   */
+  private static final ConcurrentHashMap<String, Object> SYMLINK_LOCKS = new ConcurrentHashMap<>();
 
   private FetchFileUtils() {}
 
@@ -47,11 +56,21 @@ public class FetchFileUtils {
           break;
 
         case "file":
-          // Synchronize on the canonical dest path to prevent concurrent threads from
-          // racing between deleteIfExists and createSymbolicLink for the same keytab file.
-          synchronized (destFile.getAbsolutePath().intern()) {
-            Files.deleteIfExists(destFile.toPath());
-            Files.createSymbolicLink(destFile.toPath(), new File(uri.getPath()).toPath());
+          var srcPath = new File(uri.getPath()).toPath().normalize();
+          var destPath = destFile.toPath().toAbsolutePath().normalize();
+          Object lock = SYMLINK_LOCKS.computeIfAbsent(destPath.toString(), k -> new Object());
+          synchronized (lock) {
+            // Skip if the symlink already points to the correct target.
+            if (Files.isSymbolicLink(destPath)
+                && Files.readSymbolicLink(destPath).normalize().equals(srcPath)) {
+              break;
+            }
+            // Atomically replace via a temporary symlink + rename to avoid a window
+            // where the keytab path is absent (which could cause loginUserFromKeytab to fail).
+            var tmpPath = destPath.resolveSibling(destPath.getFileName() + ".symlink.tmp");
+            Files.deleteIfExists(tmpPath);
+            Files.createSymbolicLink(tmpPath, srcPath);
+            Files.move(tmpPath, destPath, StandardCopyOption.REPLACE_EXISTING);
           }
           break;
 
