@@ -74,7 +74,7 @@ gravitino.authorization.impl = org.apache.gravitino.server.authorization.PassThr
 - Authorization must be enabled
 - Users must be granted appropriate privileges
 - See [API Required Conditions](#api-required-conditions) for privilege requirements for each REST API
-  :::
+:::
 
 #### Authorization Pushdown
 
@@ -107,6 +107,9 @@ A role is a named collection of privileges on securable objects. Roles simplify 
 - The creator of a role is automatically the owner
 - Owners have full control over the role, including the ability to drop it
 - Only the owner can modify the role's permissions
+
+**Examples:**
+- `ROLE`: "role1" (under a metalake)
 
 ### Privilege
 
@@ -163,6 +166,9 @@ A user represents an individual identity in Gravitino. Users can be:
 - Given different operating privileges based on their assigned roles
 - Made owners of securable objects
 
+**Examples:**
+- `USER`: "user1" (under a metalake)
+
 ### Group
 
 A group is a collection of users that simplifies permission management by allowing you to:
@@ -175,6 +181,9 @@ All users in a group inherit the roles and privileges granted to that group.
 :::info
 Groups can be granted roles and privileges, but they cannot be owners of securable objects. Only users can be owners.
 :::
+
+**Examples:**
+- `GROUP`: "group1" (under a metalake)
 
 ### Metadata Objects
 
@@ -272,7 +281,7 @@ Gravitino provides a comprehensive set of privileges organized by the type of op
 
 | Name          | Supports Securable Object | Operation                                                                                                     |
 |---------------|---------------------------|---------------------------------------------------------------------------------------------------------------|
-| MANAGE_GRANTS | Metalake                  | Manages roles granted to or revoked from the user or group, and privilege granted to or revoked from the role |
+| MANAGE_GRANTS | Metalake, Catalog, Schema, Table, View, Topic, Fileset, Model | Grants the ability to manage privileges on securable objects. When bound to a **Metalake**, also allows assigning and revoking roles for users and groups across the entire metalake. When bound to a **Catalog, Schema, Table, View, Topic, Fileset, or Model**, privilege management is scoped to that object and its descendants only. |
 
 ### Catalog privileges
 
@@ -283,7 +292,7 @@ Gravitino provides a comprehensive set of privileges organized by the type of op
 
 :::info
 
-`USE_CATALOG` is needed for a user to interact with any object within the catalog.
+`USE_CATALOG` is needed for a user to interact with any object within the catalog. 
 
 For example, to select data from a table, users need to have the `SELECT_TABLE` privilege on that table and
 `USE_CATALOG` privileges on its parent catalog as well as `USE_SCHEMA` privileges on its parent schema.
@@ -299,7 +308,7 @@ For example, to select data from a table, users need to have the `SELECT_TABLE` 
 
 :::info
 
-`USE_SCHEMA`is needed for a user to interact with any object within the schema.
+`USE_SCHEMA`is needed for a user to interact with any object within the schema. 
 
 For example, to select data from a table, users need to have the `SELECT_TABLE` privilege on that table
 and `USE_SCHEMA` privileges on its parent schema.
@@ -315,7 +324,7 @@ and `USE_SCHEMA` privileges on its parent schema.
 | SELECT_TABLE | Metalake, Catalog, Schema, Table  | Select data from a table                                                  |
 
 DENY `MODIFY_TABLE` won't deny the `SELECT_TABLE` operation if the user has the privilege to `ALLOW SELECT_TABLE` on the table.
-DENY `SELECT_TABLE` won't deny the `MODIFY_TABLE` operation if the user has the privilege `ALLOW MODIFY_TABLE` on the table.
+DENY `SELECT_TABLE` won't deny the `MODIFY_TABLE` operation if the user has the privilege `ALLOW MODIFY_TABLE` on the table. 
 
 ### View privileges
 
@@ -469,7 +478,7 @@ When role privileges or ownership are changed through the Gravitino API, the cor
 1. **Add users first**: Users must be added to a metalake before creating metadata objects
 2. **Default user**: If no user is specified, operations use the `anonymous` user
 3. **Automatic membership**: When creating a metalake with authorization enabled, the creator is automatically added to that metalake
-   :::
+:::
 
 **Example Configuration:**
 
@@ -551,7 +560,7 @@ Restart the Gravitino server for the configuration changes to take effect.
 **Important Migration Notes:**
 - Set owners for **all** existing metalakes before removing the `gravitino.authorization.impl` configuration
 - Without assigned owners, operations on these metalakes will fail after full authorization is enabled
-  :::
+:::
 
 ## Operations
 
@@ -570,7 +579,7 @@ Add a user to your metalake before using authorization features.
 curl -X POST -H "Accept: application/vnd.gravitino.v1+json" \
 -H "Content-Type: application/json" -d '{
   "name": "user1"
-}' http://localhost:8090/api/metalakes/${metalake}/users
+}' http://localhost:8090/api/metalakes/test/users
 ```
 
 </TabItem>
@@ -594,10 +603,10 @@ List all users in a metalake. Use `details=true` to get full user objects instea
 
 ```shell
 curl -X GET -H "Accept: application/vnd.gravitino.v1+json" \
--H "Content-Type: application/json" http://localhost:8090/api/metalakes/${metalake}/users/
+-H "Content-Type: application/json" http://localhost:8090/api/metalakes/test/users/
 
 curl -X GET -H "Accept: application/vnd.gravitino.v1+json" \
--H "Content-Type: application/json" http://localhost:8090/api/metalakes/${metalake}/users/?details=true
+-H "Content-Type: application/json" http://localhost:8090/api/metalakes/test/users/?details=true
 ```
 
 </TabItem>
@@ -622,7 +631,7 @@ You can get a user by its name.
 
 ```shell
 curl -X GET -H "Accept: application/vnd.gravitino.v1+json" \
--H "Content-Type: application/json" http://localhost:8090/api/metalakes/${metalake}/users/${user}
+-H "Content-Type: application/json" http://localhost:8090/api/metalakes/test/users/user1
 ```
 
 </TabItem>
@@ -646,7 +655,7 @@ You can remove a user by its name.
 
 ```shell
 curl -X DELETE -H "Accept: application/vnd.gravitino.v1+json" \
--H "Content-Type: application/json" http://localhost:8090/api/metalakes/${metalake}/users/${user}
+-H "Content-Type: application/json" http://localhost:8090/api/metalakes/test/users/user1
 ```
 
 </TabItem>
@@ -674,7 +683,7 @@ You should add the group to your metalake before you use the authorization.
 curl -X POST -H "Accept: application/vnd.gravitino.v1+json" \
 -H "Content-Type: application/json" -d '{
   "name": "group1"
-}' http://localhost:8090/api/metalakes/${metalake}/groups
+}' http://localhost:8090/api/metalakes/test/groups
 ```
 
 </TabItem>
@@ -699,10 +708,10 @@ Returns the list of groups if details is true, otherwise returns the list of gro
 
 ```shell
 curl -X GET -H "Accept: application/vnd.gravitino.v1+json" \
--H "Content-Type: application/json" http://localhost:8090/api/metalakes/${metalake}/groups/
+-H "Content-Type: application/json" http://localhost:8090/api/metalakes/test/groups/
 
 curl -X GET -H "Accept: application/vnd.gravitino.v1+json" \
--H "Content-Type: application/json" http://localhost:8090/api/metalakes/${metalake}/groups/?details=true
+-H "Content-Type: application/json" http://localhost:8090/api/metalakes/test/groups/?details=true
 ```
 
 </TabItem>
@@ -710,9 +719,9 @@ curl -X GET -H "Accept: application/vnd.gravitino.v1+json" \
 
 ```java
 GravitinoClient client = ...
-String[] usernames = client.listGroupNames();
+String[] groupNames = client.listGroupNames();
 
-User[] users = client.listGroups();
+Group[] groups = client.listGroups();
 ```
 
 </TabItem>
@@ -727,7 +736,7 @@ You can get a group by its name.
 
 ```shell
 curl -X GET -H "Accept: application/vnd.gravitino.v1+json" \
--H "Content-Type: application/json" http://localhost:8090/api/metalakes/${metalake}/groups/group1
+-H "Content-Type: application/json" http://localhost:8090/api/metalakes/test/groups/group1
 ```
 
 </TabItem>
@@ -751,7 +760,7 @@ You can remove a group by its name.
 
 ```shell
 curl -X DELETE -H "Accept: application/vnd.gravitino.v1+json" \
--H "Content-Type: application/json" http://localhost:8090/api/metalakes/${metalake}/groups/group1
+-H "Content-Type: application/json" http://localhost:8090/api/metalakes/test/groups/group1
 ```
 
 </TabItem>
@@ -792,7 +801,7 @@ curl -X POST -H "Accept: application/vnd.gravitino.v1+json" \
              ]    
           }
    ]
-}' http://localhost:8090/api/metalakes/${metalake}/roles
+}' http://localhost:8090/api/metalakes/test/roles
 ```
 
 </TabItem>
@@ -826,7 +835,7 @@ You can list the created roles in a metalake.
 
 ```shell
 curl -X GET -H "Accept: application/vnd.gravitino.v1+json" \
--H "Content-Type: application/json" http://localhost:8090/api/metalakes/${metalake}/roles/
+-H "Content-Type: application/json" http://localhost:8090/api/metalakes/test/roles/
 ```
 
 </TabItem>
@@ -834,7 +843,7 @@ curl -X GET -H "Accept: application/vnd.gravitino.v1+json" \
 
 ```java
 GravitinoClient client = ...
-String[] usernames = client.listRoleNames();
+String[] roleNames = client.listRoleNames();
 ```
 
 </TabItem>
@@ -844,17 +853,17 @@ String[] usernames = client.listRoleNames();
 
 You can list the binding roles for a metadata object in a metalake.
 
-The request path for REST API is `/api/metalakes/${metalake}/objects/${metadataObjectType}/${metadataObjectName}/roles`.
+The request path for REST API is `/api/metalakes/{metalake}/objects/{metadataObjectType}/{metadataObjectName}/roles`.
 
 <Tabs groupId='language' queryString>
 <TabItem value="shell" label="Shell">
 
 ```shell
 curl -X GET -H "Accept: application/vnd.gravitino.v1+json" \
-http://localhost:8090/api/metalakes/${metalake}/objects/catalog/catalog1/roles
+http://localhost:8090/api/metalakes/test/objects/catalog/catalog1/roles
 
 curl -X GET -H "Accept: application/vnd.gravitino.v1+json" \
-http://localhost:8090/api/metalakes/${metalake}/objects/schema/catalog1.schema1/roles
+http://localhost:8090/api/metalakes/test/objects/schema/catalog1.schema1/roles
 ```
 
 </TabItem>
@@ -880,7 +889,7 @@ You can get a role by its name.
 
 ```shell
 curl -X GET -H "Accept: application/vnd.gravitino.v1+json" \
--H "Content-Type: application/json"  http://localhost:8090/api/metalakes/${metalake}/roles/${role}
+-H "Content-Type: application/json"  http://localhost:8090/api/metalakes/test/roles/role1
 ```
 
 </TabItem>
@@ -904,7 +913,7 @@ You can delete a role by its name.
 
 ```shell
 curl -X DELETE -H "Accept: application/vnd.gravitino.v1+json" \
--H "Content-Type: application/json" http://localhost:8090/api/metalakes/${metalake}/roles/${role}
+-H "Content-Type: application/json" http://localhost:8090/api/metalakes/test/roles/role1
 ```
 
 </TabItem>
@@ -924,7 +933,7 @@ boolean deleted =
 ### Grant privileges to a role
 
 You can grant specific privileges to a role.
-The request path for REST API is `/api/metalakes/${metalake}/permissions/roles/${role}/${metadataObjectType}/${metadataObjectName}/grant`.
+The request path for REST API is `/api/metalakes/{metalake}/permissions/roles/{role}/{metadataObjectType}/{metadataObjectName}/grant`.
 
 <Tabs groupId='language' queryString>
 <TabItem value="shell" label="Shell">
@@ -937,7 +946,7 @@ curl -X PUT -H "Accept: application/vnd.gravitino.v1+json" \
       "name": "SELECT_TABLE",
       "condition": "ALLOW"
       }]
-}' http://localhost:8090/api/metalakes/${metalake}/permissions/roles/${role}/schema/${catalog1.schema1}/grant
+}' http://localhost:8090/api/metalakes/test/permissions/roles/role1/schema/catalog1.schema1/grant
 
 curl -X PUT -H "Accept: application/vnd.gravitino.v1+json" \
 -H "Content-Type: application/json" -d '{
@@ -946,7 +955,7 @@ curl -X PUT -H "Accept: application/vnd.gravitino.v1+json" \
       "name": "SELECT_TABLE",
       "condition": "ALLOW"
       }]
-}' http://localhost:8090/api/metalakes/${metalake}/permissions/roles/${role}/table/${catalog1.schema1.table1}/grant
+}' http://localhost:8090/api/metalakes/test/permissions/roles/role1/table/catalog1.schema1.table1/grant
 ```
 
 </TabItem>
@@ -955,11 +964,11 @@ curl -X PUT -H "Accept: application/vnd.gravitino.v1+json" \
 ```java
 GravitinoClient client = ...
 
-// Grant the privilege allowing `SELEC_TABLE` for the `schema` to `role1`        
+// Grant the privilege allowing `SELECT_TABLE` for the `schema` to `role1`
 MetadataObject schema = ...
-Role role = client.grantPrivilegesToRole("role1", schema, Lists.newArrayList(Privileges.SelectTable.allow()));        
+Role role = client.grantPrivilegesToRole("role1", schema, Lists.newArrayList(Privileges.SelectTable.allow()));
 
-// Grant the privilege allowing `SELEC_TABLE` for the `table` to `role1`        
+// Grant the privilege allowing `SELECT_TABLE` for the `table` to `role1`
 MetadataObject table = ...
 Role role = client.grantPrivilegesToRole("role1", table, Lists.newArrayList(Privileges.SelectTable.allow()));
 ```
@@ -969,7 +978,7 @@ Role role = client.grantPrivilegesToRole("role1", table, Lists.newArrayList(Priv
 ### Revoke privileges from a role
 
 You can revoke specific privileges from a role.
-The request path for REST API is `/api/metalakes/${metalake}/permissions/roles/{role}/{metadataObjectType}/{metadataObjectName}/revoke`.
+The request path for REST API is `/api/metalakes/{metalake}/permissions/roles/{role}/{metadataObjectType}/{metadataObjectName}/revoke`.
 
 <Tabs groupId='language' queryString>
 <TabItem value="shell" label="Shell">
@@ -982,7 +991,7 @@ curl -X PUT -H "Accept: application/vnd.gravitino.v1+json" \
       "name": "SELECT_TABLE",
       "condition": "ALLOW"
       }]
-}' http://localhost:8090/api/metalakes/${metalake}/permissions/roles/${role}/schema/${catalog1.schema1}/revoke
+}' http://localhost:8090/api/metalakes/test/permissions/roles/role1/schema/catalog1.schema1/revoke
 
 curl -X PUT -H "Accept: application/vnd.gravitino.v1+json" \
 -H "Content-Type: application/json" -d '{
@@ -991,7 +1000,7 @@ curl -X PUT -H "Accept: application/vnd.gravitino.v1+json" \
       "name": "SELECT_TABLE",
       "condition": "ALLOW"
       }]
-}' http://localhost:8090/api/metalakes/${metalake}/permissions/roles/${role}/table/catalog1.schema1.table1/revoke
+}' http://localhost:8090/api/metalakes/test/permissions/roles/role1/table/catalog1.schema1.table1/revoke
 ```
 
 </TabItem>
@@ -1000,11 +1009,11 @@ curl -X PUT -H "Accept: application/vnd.gravitino.v1+json" \
 ```java
 GravitinoClient client = ...
 
-// Revoke the privilege allowing `SELEC_TABLE` for the `schema` from `role1`         
+// Revoke the privilege allowing `SELECT_TABLE` for the `schema` from `role1`
 MetadataObject schema = ...
 Role role = client.revokePrivilegesFromRole("role1", schema, Lists.newArrayList(Privileges.SelectTable.allow()));
 
-// Revoke the privilege allowing `SELEC_TABLE` for the `table` from `role1`         
+// Revoke the privilege allowing `SELECT_TABLE` for the `table` from `role1`
 MetadataObject table = ...
 Role role = client.revokePrivilegesFromRole("role1", table, Lists.newArrayList(Privileges.SelectTable.allow()));
 
@@ -1016,7 +1025,7 @@ Role role = client.revokePrivilegesFromRole("role1", table, Lists.newArrayList(P
 
 You can override all privileges in a role with a new set of securable objects and their privileges. This operation completely replaces the role's entire privilege configuration - any securable objects not included in the request will be removed from the role.
 
-The request path for REST API is `/api/metalakes/${metalake}/permissions/roles/${role}/`.
+The request path for REST API is `/api/metalakes/{metalake}/permissions/roles/{role}/`.
 
 ```shell
 curl -X PUT -H "Accept: application/vnd.gravitino.v1+json" \
@@ -1043,7 +1052,7 @@ curl -X PUT -H "Accept: application/vnd.gravitino.v1+json" \
         ]
       }
     ]
-}' http://localhost:8090/api/metalakes/${metalake}/permissions/roles/${role}/
+}' http://localhost:8090/api/metalakes/test/permissions/roles/role1/
 ```
 
 :::warning
@@ -1068,7 +1077,7 @@ You can grant specific roles to a user.
 curl -X PUT -H "Accept: application/vnd.gravitino.v1+json" \
 -H "Content-Type: application/json" -d '{
     "roleNames": ["role1"]
-}' http://localhost:8090/api/metalakes/${metalake}/permissions/users/${user}/grant
+}' http://localhost:8090/api/metalakes/test/permissions/users/user1/grant
 ```
 
 </TabItem>
@@ -1093,7 +1102,7 @@ You can revoke specific roles from a user.
 curl -X PUT -H "Accept: application/vnd.gravitino.v1+json" \
 -H "Content-Type: application/json" -d '{
     "roleNames": ["role1"]
-}' http://localhost:8090/api/metalakes/${metalake}/permissions/users/${user}/revoke
+}' http://localhost:8090/api/metalakes/test/permissions/users/user1/revoke
 ```
 
 </TabItem>
@@ -1119,7 +1128,7 @@ You can grant specific roles to a group.
 curl -X PUT -H "Accept: application/vnd.gravitino.v1+json" \
 -H "Content-Type: application/json" -d '{
     "roleNames": ["role1"]
-}' http://localhost:8090/api/metalakes/${metalake}/permissions/groups/${group}/grant
+}' http://localhost:8090/api/metalakes/test/permissions/groups/group1/grant
 ```
 
 </TabItem>
@@ -1144,7 +1153,7 @@ You can revoke specific roles from a group.
 curl -X PUT -H "Accept: application/vnd.gravitino.v1+json" \
 -H "Content-Type: application/json" -d '{
     "roleNames": ["role1"]
-}' http://localhost:8090/api/metalakes/${metalake}/permissions/groups/${group}/revoke
+}' http://localhost:8090/api/metalakes/test/permissions/groups/group1/revoke
 ```
 
 </TabItem>
@@ -1169,7 +1178,7 @@ You can get the owner of a metadata object.
 
 ```shell
 curl -X GET -H "Accept: application/vnd.gravitino.v1+json" \
--H "Content-Type: application/json" http://localhost:8090/api/metalakes/${metalake}/owners/table/${metadataObjectName}
+-H "Content-Type: application/json" http://localhost:8090/api/metalakes/test/owners/table/catalog1.schema1.table1
 ```
 
 </TabItem>
@@ -1197,9 +1206,9 @@ You can set the owner of a metadata object.
 ```shell
 curl -X PUT -H "Accept: application/vnd.gravitino.v1+json" \
 -H "Content-Type: application/json" -d '{
-    "name": "${user}",
+    "name": "user1",
     "type": "USER"
-}' http://localhost:8090/api/metalakes/${metalake}/owners/table/${metadataObjectName}
+}' http://localhost:8090/api/metalakes/test/owners/table/catalog1.schema1.table1
 ```
 
 </TabItem>
@@ -1324,8 +1333,8 @@ The following table lists the required privileges for each API.
 | list roles                        | `MANAGE_GRANTS` on the metalake or the owner of the metalake can see all the roles. Others can see his granted roles or owned roles.                                                                                                          |
 | grant role                        | `MANAGE_GRANTS` on the metalake                                                                                                                                                                                                               |
 | revoke role                       | `MANAGE_GRANTS` on the metalake                                                                                                                                                                                                               |
-| grant privilege                   | `MANAGE_GRANTS` on the metalake or the owner of the securable object or the metalake                                                                                                                                                          |
-| revoke privilege                  | `MANAGE_GRANTS` on the metalake or the owner of the securable object or the metalake                                                                                                                                                          |
+| grant privilege                   | `MANAGE_GRANTS` on the securable object, or any ancestor of it (Schema, Catalog, Metalake), or the owner of the securable object or the metalake                                                                                              |
+| revoke privilege                  | `MANAGE_GRANTS` on the securable object, or any ancestor of it (Schema, Catalog, Metalake), or the owner of the securable object or the metalake                                                                                             |
 | override privilege                | `MANAGE_GRANTS` on the metalake or the owner of the metalake                                                                                                                                                                                  |
 | set owner                         | The owner of the securable object                                                                                                                                                                                                             |
 | list tags                         | The owner of the metalake can see all the tags, others can see the tags which they can load.                                                                                                                                                  |
