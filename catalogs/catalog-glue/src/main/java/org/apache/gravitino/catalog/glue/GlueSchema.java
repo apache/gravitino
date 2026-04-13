@@ -18,8 +18,6 @@
  */
 package org.apache.gravitino.catalog.glue;
 
-import java.util.Collections;
-import java.util.Map;
 import lombok.ToString;
 import org.apache.gravitino.connector.BaseSchema;
 import org.apache.gravitino.meta.AuditInfo;
@@ -49,13 +47,10 @@ public class GlueSchema extends BaseSchema {
   public static GlueSchema fromGlueDatabase(Database database) {
     AuditInfo auditInfo = AuditInfo.builder().withCreateTime(database.createTime()).build();
 
-    Map<String, String> props =
-        database.parameters() != null ? database.parameters() : Collections.emptyMap();
-
     return GlueSchema.builder()
         .withName(database.name())
         .withComment(database.description())
-        .withProperties(props)
+        .withProperties(database.parameters())
         .withAuditInfo(auditInfo)
         .build();
   }

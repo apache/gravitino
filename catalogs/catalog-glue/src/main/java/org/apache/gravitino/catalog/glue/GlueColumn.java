@@ -42,13 +42,12 @@ public class GlueColumn extends BaseColumn {
    * </ul>
    *
    * @param glueColumn the Glue Column returned by the AWS SDK
-   * @param typeConverter the type converter to use for column type mapping
    * @return a populated {@link GlueColumn}
    */
-  public static GlueColumn fromGlueColumn(Column glueColumn, GlueTypeConverter typeConverter) {
+  public static GlueColumn fromGlueColumn(Column glueColumn) {
     return GlueColumn.builder()
         .withName(glueColumn.name())
-        .withType(typeConverter.toGravitino(glueColumn.type()))
+        .withType(GlueTypeConverter.toGravitino(glueColumn.type()))
         .withComment(glueColumn.comment())
         .withNullable(true)
         .build();

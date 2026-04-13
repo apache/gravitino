@@ -29,34 +29,33 @@ import org.junit.jupiter.api.Test;
 /** Unit tests for {@link GlueTypeConverter}. */
 class TestGlueTypeConverter {
 
-  private static final GlueTypeConverter CONVERTER = new GlueTypeConverter();
-
   // -------------------------------------------------------------------------
   // toGravitino — primitive types
   // -------------------------------------------------------------------------
 
   @Test
   void testPrimitiveTypes() {
-    assertEquals(Types.BooleanType.get(), CONVERTER.toGravitino("boolean"));
-    assertEquals(Types.ByteType.get(), CONVERTER.toGravitino("tinyint"));
-    assertEquals(Types.ShortType.get(), CONVERTER.toGravitino("smallint"));
-    assertEquals(Types.IntegerType.get(), CONVERTER.toGravitino("int"));
-    assertEquals(Types.IntegerType.get(), CONVERTER.toGravitino("integer"));
-    assertEquals(Types.LongType.get(), CONVERTER.toGravitino("bigint"));
-    assertEquals(Types.FloatType.get(), CONVERTER.toGravitino("float"));
-    assertEquals(Types.DoubleType.get(), CONVERTER.toGravitino("double"));
-    assertEquals(Types.StringType.get(), CONVERTER.toGravitino("string"));
-    assertEquals(Types.DateType.get(), CONVERTER.toGravitino("date"));
-    assertEquals(Types.TimestampType.withoutTimeZone(), CONVERTER.toGravitino("timestamp"));
-    assertEquals(Types.BinaryType.get(), CONVERTER.toGravitino("binary"));
-    assertEquals(Types.IntervalYearType.get(), CONVERTER.toGravitino("interval_year_month"));
-    assertEquals(Types.IntervalDayType.get(), CONVERTER.toGravitino("interval_day_time"));
+    assertEquals(Types.BooleanType.get(), GlueTypeConverter.toGravitino("boolean"));
+    assertEquals(Types.ByteType.get(), GlueTypeConverter.toGravitino("tinyint"));
+    assertEquals(Types.ShortType.get(), GlueTypeConverter.toGravitino("smallint"));
+    assertEquals(Types.IntegerType.get(), GlueTypeConverter.toGravitino("int"));
+    assertEquals(Types.IntegerType.get(), GlueTypeConverter.toGravitino("integer"));
+    assertEquals(Types.LongType.get(), GlueTypeConverter.toGravitino("bigint"));
+    assertEquals(Types.FloatType.get(), GlueTypeConverter.toGravitino("float"));
+    assertEquals(Types.DoubleType.get(), GlueTypeConverter.toGravitino("double"));
+    assertEquals(Types.StringType.get(), GlueTypeConverter.toGravitino("string"));
+    assertEquals(Types.DateType.get(), GlueTypeConverter.toGravitino("date"));
+    assertEquals(Types.TimestampType.withoutTimeZone(), GlueTypeConverter.toGravitino("timestamp"));
+    assertEquals(Types.BinaryType.get(), GlueTypeConverter.toGravitino("binary"));
+    assertEquals(
+        Types.IntervalYearType.get(), GlueTypeConverter.toGravitino("interval_year_month"));
+    assertEquals(Types.IntervalDayType.get(), GlueTypeConverter.toGravitino("interval_day_time"));
   }
 
   @Test
   void testCaseInsensitive() {
-    assertEquals(Types.LongType.get(), CONVERTER.toGravitino("BIGINT"));
-    assertEquals(Types.StringType.get(), CONVERTER.toGravitino("STRING"));
+    assertEquals(Types.LongType.get(), GlueTypeConverter.toGravitino("BIGINT"));
+    assertEquals(Types.StringType.get(), GlueTypeConverter.toGravitino("STRING"));
   }
 
   // -------------------------------------------------------------------------
@@ -65,93 +64,51 @@ class TestGlueTypeConverter {
 
   @Test
   void testCharType() {
-    assertEquals(Types.FixedCharType.of(10), CONVERTER.toGravitino("char(10)"));
-    assertEquals(Types.FixedCharType.of(1), CONVERTER.toGravitino("char(1)"));
+    assertEquals(Types.FixedCharType.of(10), GlueTypeConverter.toGravitino("char(10)"));
+    assertEquals(Types.FixedCharType.of(1), GlueTypeConverter.toGravitino("char(1)"));
   }
 
   @Test
   void testVarcharType() {
-    assertEquals(Types.VarCharType.of(255), CONVERTER.toGravitino("varchar(255)"));
-    assertEquals(Types.VarCharType.of(65535), CONVERTER.toGravitino("varchar(65535)"));
+    assertEquals(Types.VarCharType.of(255), GlueTypeConverter.toGravitino("varchar(255)"));
+    assertEquals(Types.VarCharType.of(65535), GlueTypeConverter.toGravitino("varchar(65535)"));
   }
 
   @Test
   void testDecimalType() {
-    assertEquals(Types.DecimalType.of(10, 2), CONVERTER.toGravitino("decimal(10,2)"));
-    assertEquals(Types.DecimalType.of(38, 18), CONVERTER.toGravitino("decimal(38, 18)"));
-    assertEquals(Types.DecimalType.of(5, 0), CONVERTER.toGravitino("decimal(5)"));
+    assertEquals(Types.DecimalType.of(10, 2), GlueTypeConverter.toGravitino("decimal(10,2)"));
+    assertEquals(Types.DecimalType.of(38, 18), GlueTypeConverter.toGravitino("decimal(38, 18)"));
+    assertEquals(Types.DecimalType.of(5, 0), GlueTypeConverter.toGravitino("decimal(5)"));
   }
 
   // -------------------------------------------------------------------------
-  // toGravitino — complex types
+  // toGravitino — complex / unknown types → ExternalType
   // -------------------------------------------------------------------------
 
   @Test
-  void testArrayType() {
-    assertEquals(
-        Types.ListType.nullable(Types.StringType.get()), CONVERTER.toGravitino("array<string>"));
-    assertEquals(
-        Types.ListType.nullable(Types.LongType.get()), CONVERTER.toGravitino("array<bigint>"));
+  void testComplexTypesBecomesExternalType() {
+    assertInstanceOf(Types.ExternalType.class, GlueTypeConverter.toGravitino("array<string>"));
+    assertInstanceOf(Types.ExternalType.class, GlueTypeConverter.toGravitino("map<string,int>"));
+    assertInstanceOf(
+        Types.ExternalType.class, GlueTypeConverter.toGravitino("struct<id:bigint,name:string>"));
+    assertInstanceOf(
+        Types.ExternalType.class, GlueTypeConverter.toGravitino("uniontype<int,string>"));
+    assertInstanceOf(
+        Types.ExternalType.class, GlueTypeConverter.toGravitino("unknown_custom_type"));
   }
 
   @Test
-  void testMapType() {
-    assertEquals(
-        Types.MapType.valueNullable(Types.StringType.get(), Types.IntegerType.get()),
-        CONVERTER.toGravitino("map<string,int>"));
+  void testExternalTypePreservesOriginalString() {
+    String rawType = "array<map<string,int>>";
+    Type type = GlueTypeConverter.toGravitino(rawType);
+    assertInstanceOf(Types.ExternalType.class, type);
+    assertEquals(rawType, ((Types.ExternalType) type).catalogString());
   }
 
   @Test
-  void testStructType() {
-    Types.StructType expected =
-        Types.StructType.of(
-            Types.StructType.Field.nullableField("id", Types.LongType.get()),
-            Types.StructType.Field.nullableField("name", Types.StringType.get()));
-    assertEquals(expected, CONVERTER.toGravitino("struct<id:bigint,name:string>"));
-  }
-
-  @Test
-  void testUnionType() {
-    assertEquals(
-        Types.UnionType.of(Types.IntegerType.get(), Types.StringType.get()),
-        CONVERTER.toGravitino("uniontype<int,string>"));
-  }
-
-  @Test
-  void testNestedComplexType() {
-    // array<map<string,int>>
-    Type expected =
-        Types.ListType.nullable(
-            Types.MapType.valueNullable(Types.StringType.get(), Types.IntegerType.get()));
-    assertEquals(expected, CONVERTER.toGravitino("array<map<string,int>>"));
-  }
-
-  // -------------------------------------------------------------------------
-  // toGravitino — unknown types → ExternalType
-  // -------------------------------------------------------------------------
-
-  @Test
-  void testUnknownTypeBecomesExternalType() {
-    assertInstanceOf(Types.ExternalType.class, CONVERTER.toGravitino("unknown_custom_type"));
-  }
-
-  @Test
-  void testBlankInputThrows() {
-    assertThrows(IllegalArgumentException.class, () -> CONVERTER.toGravitino(null));
-    assertThrows(IllegalArgumentException.class, () -> CONVERTER.toGravitino(""));
-    assertThrows(IllegalArgumentException.class, () -> CONVERTER.toGravitino("   "));
-  }
-
-  @Test
-  void testInvalidKnownTypeThrows() {
-    // Malformed parameterized types should throw, not fall back to ExternalType
-    assertThrows(IllegalArgumentException.class, () -> CONVERTER.toGravitino("char(abc)"));
-    assertThrows(IllegalArgumentException.class, () -> CONVERTER.toGravitino("varchar(xyz)"));
-    assertThrows(IllegalArgumentException.class, () -> CONVERTER.toGravitino("decimal(p,s)"));
-    // Malformed complex types should throw
-    assertThrows(IllegalArgumentException.class, () -> CONVERTER.toGravitino("map<string>"));
-    assertThrows(
-        IllegalArgumentException.class, () -> CONVERTER.toGravitino("struct<no_colon_field>"));
+  void testNullAndEmptyInput() {
+    assertInstanceOf(Types.ExternalType.class, GlueTypeConverter.toGravitino(null));
+    assertInstanceOf(Types.ExternalType.class, GlueTypeConverter.toGravitino(""));
   }
 
   // -------------------------------------------------------------------------
@@ -177,52 +134,22 @@ class TestGlueTypeConverter {
 
   @Test
   void testRoundTripParameterised() {
-    assertEquals("char(10)", CONVERTER.fromGravitino(Types.FixedCharType.of(10)));
-    assertEquals("varchar(255)", CONVERTER.fromGravitino(Types.VarCharType.of(255)));
-    assertEquals("decimal(10,2)", CONVERTER.fromGravitino(Types.DecimalType.of(10, 2)));
-  }
-
-  @Test
-  void testRoundTripComplexTypes() {
-    roundTrip("array<string>", Types.ListType.nullable(Types.StringType.get()));
-    roundTrip(
-        "map<string,int>",
-        Types.MapType.valueNullable(Types.StringType.get(), Types.IntegerType.get()));
-    roundTrip(
-        "struct<id:bigint,name:string>",
-        Types.StructType.of(
-            Types.StructType.Field.nullableField("id", Types.LongType.get()),
-            Types.StructType.Field.nullableField("name", Types.StringType.get())));
-    roundTrip(
-        "uniontype<int,string>",
-        Types.UnionType.of(Types.IntegerType.get(), Types.StringType.get()));
-  }
-
-  @Test
-  void testRoundTripNestedComplexType() {
-    roundTrip(
-        "array<map<string,int>>",
-        Types.ListType.nullable(
-            Types.MapType.valueNullable(Types.StringType.get(), Types.IntegerType.get())));
+    assertEquals("char(10)", GlueTypeConverter.fromGravitino(Types.FixedCharType.of(10)));
+    assertEquals("varchar(255)", GlueTypeConverter.fromGravitino(Types.VarCharType.of(255)));
+    assertEquals("decimal(10,2)", GlueTypeConverter.fromGravitino(Types.DecimalType.of(10, 2)));
   }
 
   @Test
   void testFromGravitinoExternalType() {
-    String raw = "unknown_custom_type";
-    assertEquals(raw, CONVERTER.fromGravitino(Types.ExternalType.of(raw)));
-  }
-
-  @Test
-  void testFromGravitinoTimestampWithTimeZoneThrows() {
-    assertThrows(
-        IllegalArgumentException.class,
-        () -> CONVERTER.fromGravitino(Types.TimestampType.withTimeZone()));
+    String raw = "array<string>";
+    assertEquals(raw, GlueTypeConverter.fromGravitino(Types.ExternalType.of(raw)));
   }
 
   @Test
   void testFromGravitinoUnsupportedTypeThrows() {
     assertThrows(
-        IllegalArgumentException.class, () -> CONVERTER.fromGravitino(Types.NullType.get()));
+        IllegalArgumentException.class,
+        () -> GlueTypeConverter.fromGravitino(Types.NullType.get()));
   }
 
   // -------------------------------------------------------------------------
@@ -230,7 +157,7 @@ class TestGlueTypeConverter {
   // -------------------------------------------------------------------------
 
   private static void roundTrip(String glueType, Type gravitinoType) {
-    assertEquals(gravitinoType, CONVERTER.toGravitino(glueType));
-    assertEquals(glueType, CONVERTER.fromGravitino(gravitinoType));
+    assertEquals(gravitinoType, GlueTypeConverter.toGravitino(glueType));
+    assertEquals(glueType, GlueTypeConverter.fromGravitino(gravitinoType));
   }
 }

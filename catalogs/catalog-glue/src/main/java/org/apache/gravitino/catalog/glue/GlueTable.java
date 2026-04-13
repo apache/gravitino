@@ -62,6 +62,7 @@ public class GlueTable extends BaseTable {
 
   @Override
   protected TableOperations newOps() {
+    // Partition operations are deferred to PR-06.
     throw new UnsupportedOperationException(
         "Partition operations are not yet supported for GlueTable");
   }
@@ -81,23 +82,22 @@ public class GlueTable extends BaseTable {
    * table.parameters()} and passes through as-is.
    *
    * @param glueTable the Glue Table returned by the AWS SDK
-   * @param typeConverter the type converter to use for column type mapping
    * @return a populated {@link GlueTable}
    */
-  public static GlueTable fromGlueTable(Table glueTable, GlueTypeConverter typeConverter) {
+  public static GlueTable fromGlueTable(Table glueTable) {
     StorageDescriptor sd = glueTable.storageDescriptor();
 
     // --- Columns ---
     List<Column> columns = new ArrayList<>();
     if (sd != null && sd.hasColumns()) {
       for (software.amazon.awssdk.services.glue.model.Column c : sd.columns()) {
-        columns.add(GlueColumn.fromGlueColumn(c, typeConverter));
+        columns.add(GlueColumn.fromGlueColumn(c));
       }
     }
     List<String> partitionColNames = new ArrayList<>();
     if (glueTable.hasPartitionKeys()) {
       for (software.amazon.awssdk.services.glue.model.Column pk : glueTable.partitionKeys()) {
-        columns.add(GlueColumn.fromGlueColumn(pk, typeConverter));
+        columns.add(GlueColumn.fromGlueColumn(pk));
         partitionColNames.add(pk.name());
       }
     }
@@ -108,11 +108,10 @@ public class GlueTable extends BaseTable {
 
     // --- Distribution (bucket) ---
     Distribution distribution = Distributions.NONE;
-    Integer numBuckets = sd != null ? sd.numberOfBuckets() : null;
-    if (sd != null && sd.hasBucketColumns() && numBuckets != null && numBuckets > 0) {
+    if (sd != null && sd.hasBucketColumns() && sd.numberOfBuckets() > 0) {
       distribution =
           Distributions.hash(
-              numBuckets,
+              sd.numberOfBuckets(),
               sd.bucketColumns().stream()
                   .map(NamedReference::field)
                   .toArray(org.apache.gravitino.rel.expressions.Expression[]::new));
@@ -124,14 +123,10 @@ public class GlueTable extends BaseTable {
       sortOrders =
           sd.sortColumns().stream()
               .map(
-                  o -> {
-                    Integer sortOrder = o.sortOrder();
-                    return SortOrders.of(
-                        NamedReference.field(o.column()),
-                        sortOrder != null && sortOrder == 1
-                            ? SortDirection.ASCENDING
-                            : SortDirection.DESCENDING);
-                  })
+                  o ->
+                      SortOrders.of(
+                          NamedReference.field(o.column()),
+                          o.sortOrder() == 1 ? SortDirection.ASCENDING : SortDirection.DESCENDING))
               .toArray(SortOrder[]::new);
     }
 
