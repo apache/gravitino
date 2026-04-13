@@ -61,14 +61,7 @@ public class IcebergTableHookDispatcher implements IcebergTableOperationDispatch
     // Skip import and ownership for staged creates (credential vending).
     // The table will be imported when the staged table is committed via updateTable.
     if (!createTableRequest.stageCreate()) {
-      importTable(context.catalogName(), namespace, createTableRequest.name());
-      IcebergOwnershipUtils.setTableOwner(
-          metalake,
-          context.catalogName(),
-          namespace,
-          createTableRequest.name(),
-          context.userName(),
-          GravitinoEnv.getInstance().ownerDispatcher());
+      importTableAndSetOwner(context, namespace, createTableRequest.name());
     }
 
     return response;
@@ -89,14 +82,7 @@ public class IcebergTableHookDispatcher implements IcebergTableOperationDispatch
           IcebergIdentifierUtils.toGravitinoTableIdentifier(
               metalake, context.catalogName(), tableIdentifier);
       if (store != null && !store.exists(gravitinoTableId, Entity.EntityType.TABLE)) {
-        importTable(context.catalogName(), tableIdentifier.namespace(), tableIdentifier.name());
-        IcebergOwnershipUtils.setTableOwner(
-            metalake,
-            context.catalogName(),
-            tableIdentifier.namespace(),
-            tableIdentifier.name(),
-            context.userName(),
-            GravitinoEnv.getInstance().ownerDispatcher());
+        importTableAndSetOwner(context, tableIdentifier.namespace(), tableIdentifier.name());
       }
     } catch (IOException ioe) {
       throw new RuntimeException("io exception when checking table entity existence", ioe);
@@ -212,12 +198,20 @@ public class IcebergTableHookDispatcher implements IcebergTableOperationDispatch
     return dispatcher.getTableMetadataLocation(context, tableIdentifier);
   }
 
-  private void importTable(String catalogName, Namespace namespace, String tableName) {
+  private void importTableAndSetOwner(
+      IcebergRequestContext context, Namespace namespace, String tableName) {
     TableDispatcher tableDispatcher = GravitinoEnv.getInstance().tableDispatcher();
     if (tableDispatcher != null) {
       tableDispatcher.loadTable(
           IcebergIdentifierUtils.toGravitinoTableIdentifier(
-              metalake, catalogName, TableIdentifier.of(namespace, tableName)));
+              metalake, context.catalogName(), TableIdentifier.of(namespace, tableName)));
     }
+    IcebergOwnershipUtils.setTableOwner(
+        metalake,
+        context.catalogName(),
+        namespace,
+        tableName,
+        context.userName(),
+        GravitinoEnv.getInstance().ownerDispatcher());
   }
 }
