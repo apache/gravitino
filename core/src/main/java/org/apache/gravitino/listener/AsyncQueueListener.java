@@ -54,8 +54,7 @@ public class AsyncQueueListener implements EventListenerPlugin {
   private final AtomicBoolean stopped = new AtomicBoolean(false);
   private final AtomicLong dropEventCounters = new AtomicLong(0);
   private final AtomicLong lastDropEventCounters = new AtomicLong(0);
-  private final AtomicReference<Instant> lastRecordDropEventTime =
-      new AtomicReference<>(Instant.EPOCH);
+  private final AtomicReference<Instant> lastRecordDropEventTime = new AtomicReference<>(Instant.EPOCH);
   private final String asyncQueueListenerName;
   private final int highWatermarkThreshold;
 
