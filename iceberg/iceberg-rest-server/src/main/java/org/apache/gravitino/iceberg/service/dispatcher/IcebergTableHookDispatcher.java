@@ -58,14 +58,18 @@ public class IcebergTableHookDispatcher implements IcebergTableOperationDispatch
   public LoadTableResponse createTable(
       IcebergRequestContext context, Namespace namespace, CreateTableRequest createTableRequest) {
     LoadTableResponse response = dispatcher.createTable(context, namespace, createTableRequest);
-    importTable(context.catalogName(), namespace, createTableRequest.name());
-    IcebergOwnershipUtils.setTableOwner(
-        metalake,
-        context.catalogName(),
-        namespace,
-        createTableRequest.name(),
-        context.userName(),
-        GravitinoEnv.getInstance().ownerDispatcher());
+    // Skip import and ownership for staged creates (credential vending).
+    // The table will be imported when the staged table is committed via updateTable.
+    if (!createTableRequest.stageCreate()) {
+      importTable(context.catalogName(), namespace, createTableRequest.name());
+      IcebergOwnershipUtils.setTableOwner(
+          metalake,
+          context.catalogName(),
+          namespace,
+          createTableRequest.name(),
+          context.userName(),
+          GravitinoEnv.getInstance().ownerDispatcher());
+    }
 
     return response;
   }
@@ -75,7 +79,29 @@ public class IcebergTableHookDispatcher implements IcebergTableOperationDispatch
       IcebergRequestContext context,
       TableIdentifier tableIdentifier,
       UpdateTableRequest updateTableRequest) {
-    return dispatcher.updateTable(context, tableIdentifier, updateTableRequest);
+    LoadTableResponse response =
+        dispatcher.updateTable(context, tableIdentifier, updateTableRequest);
+    // Import the table and set ownership if the entity does not yet exist,
+    // e.g. when committing a staged table create.
+    try {
+      EntityStore store = GravitinoEnv.getInstance().entityStore();
+      NameIdentifier gravitinoTableId =
+          IcebergIdentifierUtils.toGravitinoTableIdentifier(
+              metalake, context.catalogName(), tableIdentifier);
+      if (store != null && !store.exists(gravitinoTableId, Entity.EntityType.TABLE)) {
+        importTable(context.catalogName(), tableIdentifier.namespace(), tableIdentifier.name());
+        IcebergOwnershipUtils.setTableOwner(
+            metalake,
+            context.catalogName(),
+            tableIdentifier.namespace(),
+            tableIdentifier.name(),
+            context.userName(),
+            GravitinoEnv.getInstance().ownerDispatcher());
+      }
+    } catch (IOException ioe) {
+      throw new RuntimeException("io exception when checking table entity existence", ioe);
+    }
+    return response;
   }
 
   @Override

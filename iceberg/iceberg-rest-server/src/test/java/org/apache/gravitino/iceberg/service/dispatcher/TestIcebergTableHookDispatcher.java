@@ -22,6 +22,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -251,16 +252,103 @@ public class TestIcebergTableHookDispatcher {
   }
 
   @Test
-  public void testUpdateTablePassesThrough() {
+  public void testCreateTableSkipsImportAndOwnershipForStageCreate() {
+    Namespace namespace = Namespace.of("test_schema");
+    CreateTableRequest request =
+        CreateTableRequest.builder()
+            .withName("test_table")
+            .withSchema(TABLE_SCHEMA)
+            .stageCreate()
+            .build();
+
+    LoadTableResponse mockResponse = mock(LoadTableResponse.class);
+    when(mockDispatcher.createTable(mockContext, namespace, request)).thenReturn(mockResponse);
+
+    LoadTableResponse result = hookDispatcher.createTable(mockContext, namespace, request);
+
+    Assertions.assertEquals(mockResponse, result);
+    verify(mockDispatcher).createTable(mockContext, namespace, request);
+
+    // Verify table import was NOT called for staged create
+    verify(mockTableDispatcher, never()).loadTable(any());
+
+    // Verify ownership was NOT set for staged create
+    verify(mockOwnerDispatcher, never()).setOwner(any(), any(), any(), any());
+  }
+
+  @Test
+  public void testUpdateTableImportsAndSetsOwnershipForStagedCommit() throws IOException {
     TableIdentifier tableId = TableIdentifier.of("test_schema", "test_table");
     UpdateTableRequest request = mock(UpdateTableRequest.class);
     LoadTableResponse mockResponse = mock(LoadTableResponse.class);
 
     when(mockDispatcher.updateTable(mockContext, tableId, request)).thenReturn(mockResponse);
 
+    // Entity does not exist yet (staged table being committed)
+    NameIdentifier gravitinoTableId =
+        IcebergIdentifierUtils.toGravitinoTableIdentifier(TEST_METALAKE, TEST_CATALOG, tableId);
+    when(mockEntityStore.exists(gravitinoTableId, Entity.EntityType.TABLE)).thenReturn(false);
+
     LoadTableResponse result = hookDispatcher.updateTable(mockContext, tableId, request);
 
     Assertions.assertEquals(mockResponse, result);
+    verify(mockDispatcher).updateTable(mockContext, tableId, request);
+
+    // Verify table import was called
+    verify(mockTableDispatcher).loadTable(gravitinoTableId);
+
+    // Verify ownership was set
+    ArgumentCaptor<String> userCaptor = ArgumentCaptor.forClass(String.class);
+    verify(mockOwnerDispatcher)
+        .setOwner(eq(TEST_METALAKE), any(), userCaptor.capture(), eq(Owner.Type.USER));
+    Assertions.assertEquals(TEST_USER, userCaptor.getValue());
+  }
+
+  @Test
+  public void testUpdateTablePassesThrough() throws IOException {
+    TableIdentifier tableId = TableIdentifier.of("test_schema", "test_table");
+    UpdateTableRequest request = mock(UpdateTableRequest.class);
+    LoadTableResponse mockResponse = mock(LoadTableResponse.class);
+
+    when(mockDispatcher.updateTable(mockContext, tableId, request)).thenReturn(mockResponse);
+
+    // Entity already exists (regular update, not a staged commit)
+    NameIdentifier gravitinoTableId =
+        IcebergIdentifierUtils.toGravitinoTableIdentifier(TEST_METALAKE, TEST_CATALOG, tableId);
+    when(mockEntityStore.exists(gravitinoTableId, Entity.EntityType.TABLE)).thenReturn(true);
+
+    LoadTableResponse result = hookDispatcher.updateTable(mockContext, tableId, request);
+
+    Assertions.assertEquals(mockResponse, result);
+    verify(mockDispatcher).updateTable(mockContext, tableId, request);
+
+    // Verify table import was NOT called for existing entity
+    verify(mockTableDispatcher, never()).loadTable(any());
+
+    // Verify ownership was NOT set for existing entity
+    verify(mockOwnerDispatcher, never()).setOwner(any(), any(), any(), any());
+  }
+
+  @Test
+  public void testUpdateTableThrowsRuntimeExceptionOnIOException() throws IOException {
+    TableIdentifier tableId = TableIdentifier.of("test_schema", "test_table");
+    UpdateTableRequest request = mock(UpdateTableRequest.class);
+    LoadTableResponse mockResponse = mock(LoadTableResponse.class);
+
+    when(mockDispatcher.updateTable(mockContext, tableId, request)).thenReturn(mockResponse);
+
+    NameIdentifier gravitinoTableId =
+        IcebergIdentifierUtils.toGravitinoTableIdentifier(TEST_METALAKE, TEST_CATALOG, tableId);
+    when(mockEntityStore.exists(gravitinoTableId, Entity.EntityType.TABLE))
+        .thenThrow(new IOException("IO error"));
+
+    RuntimeException exception =
+        Assertions.assertThrows(
+            RuntimeException.class,
+            () -> hookDispatcher.updateTable(mockContext, tableId, request));
+
+    Assertions.assertTrue(
+        exception.getMessage().contains("io exception when checking table entity existence"));
     verify(mockDispatcher).updateTable(mockContext, tableId, request);
   }
 
