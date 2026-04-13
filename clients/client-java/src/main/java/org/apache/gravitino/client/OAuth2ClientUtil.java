@@ -80,10 +80,7 @@ class OAuth2ClientUtil {
     private final String password;
 
     private ParsedCredential(
-        String clientId,
-        String clientSecret,
-        String username,
-        String password) {
+        String clientId, String clientSecret, String username, String password) {
       this.clientId = clientId;
       this.clientSecret = clientSecret;
       this.username = username;
@@ -99,7 +96,7 @@ class OAuth2ClientUtil {
         // client ID, client secret, username, and password (client ID can be empty)
         return new ParsedCredential(parts.get(0), parts.get(1), parts.get(2), parts.get(3));
       case 3:
-            // client ID, client secret, username, and password (client ID can be empty)
+        // client ID, client secret, username, and password (client ID can be empty)
         return new ParsedCredential(null, parts.get(0), parts.get(1), parts.get(2));
       case 2:
         // client ID and client secret

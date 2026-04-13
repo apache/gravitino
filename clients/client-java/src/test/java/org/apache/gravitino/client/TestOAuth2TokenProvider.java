@@ -178,7 +178,9 @@ public class TestOAuth2TokenProvider {
 
     mockServer
         .when(
-            HttpRequest.request().withPath("/oauth/token").withBody(RESTUtils.encodeFormData(bodyMap)),
+            HttpRequest.request()
+                .withPath("/oauth/token")
+                .withBody(RESTUtils.encodeFormData(bodyMap)),
             Times.exactly(1))
         .respond(mockResponse);
 
