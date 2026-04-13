@@ -94,16 +94,7 @@ public final class GlueClientProvider {
     // Optional custom endpoint override for VPC endpoints or LocalStack testing.
     String endpoint = config.get(GlueConstants.AWS_GLUE_ENDPOINT);
     if (StringUtils.isNotBlank(endpoint)) {
-      try {
-        builder.endpointOverride(URI.create(endpoint));
-      } catch (IllegalArgumentException e) {
-        throw new IllegalArgumentException(
-            String.format(
-                "Property '%s' contains an invalid URI: '%s'. "
-                    + "Expected a valid URL, e.g. 'http://localhost:4566'. Cause: %s",
-                GlueConstants.AWS_GLUE_ENDPOINT, endpoint, e.getMessage()),
-            e);
-      }
+      builder.endpointOverride(URI.create(endpoint));
     }
 
     return builder.build();
