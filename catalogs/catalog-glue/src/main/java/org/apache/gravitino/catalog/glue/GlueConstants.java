@@ -56,13 +56,13 @@ public final class GlueConstants {
   public static final String DEFAULT_TABLE_FORMAT_VALUE = "hive";
 
   /**
-   * Comma-separated list of table types exposed by {@code listTables()} and {@code loadTable()}
+   * Comma-separated list of table formats exposed by {@code listTables()} and {@code loadTable()}
    * (optional). Defaults to {@code all}.
    */
-  public static final String TABLE_TYPE_FILTER = "table-type-filter";
+  public static final String TABLE_FORMAT_FILTER = "table-format-filter";
 
-  /** Default value for {@link #TABLE_TYPE_FILTER}: expose all table types. */
-  public static final String DEFAULT_TABLE_TYPE_FILTER = "all";
+  /** Default value for {@link #TABLE_FORMAT_FILTER}: expose all table formats. */
+  public static final String DEFAULT_TABLE_FORMAT_FILTER = "all";
 
   // -------------------------------------------------------------------------
   // Glue Table.parameters() keys (passthrough properties)
@@ -71,7 +71,7 @@ public final class GlueConstants {
   /**
    * Glue table format type parameter key stored in {@code Table.parameters()}. Common values:
    * {@code ICEBERG}, {@code HIVE}, {@code DELTA}, {@code PARQUET} (uppercase, as stored by Glue).
-   * Note: these differ from the Gravitino-side filter values in {@link #TABLE_TYPE_FILTER}, which
+   * Note: these differ from the Gravitino-side filter values in {@link #TABLE_FORMAT_FILTER}, which
    * use lowercase (e.g. {@code iceberg}, {@code hive}).
    */
   public static final String TABLE_FORMAT_TYPE = "table_format_type";

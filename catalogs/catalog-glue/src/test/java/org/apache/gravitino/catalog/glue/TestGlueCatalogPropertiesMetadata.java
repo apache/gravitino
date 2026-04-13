@@ -24,9 +24,9 @@ import static org.apache.gravitino.catalog.glue.GlueConstants.AWS_GLUE_ENDPOINT;
 import static org.apache.gravitino.catalog.glue.GlueConstants.AWS_REGION;
 import static org.apache.gravitino.catalog.glue.GlueConstants.AWS_SECRET_ACCESS_KEY;
 import static org.apache.gravitino.catalog.glue.GlueConstants.DEFAULT_TABLE_FORMAT;
+import static org.apache.gravitino.catalog.glue.GlueConstants.DEFAULT_TABLE_FORMAT_FILTER;
 import static org.apache.gravitino.catalog.glue.GlueConstants.DEFAULT_TABLE_FORMAT_VALUE;
-import static org.apache.gravitino.catalog.glue.GlueConstants.DEFAULT_TABLE_TYPE_FILTER;
-import static org.apache.gravitino.catalog.glue.GlueConstants.TABLE_TYPE_FILTER;
+import static org.apache.gravitino.catalog.glue.GlueConstants.TABLE_FORMAT_FILTER;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -90,10 +90,10 @@ class TestGlueCatalogPropertiesMetadata {
   }
 
   @Test
-  void testTableTypeFilterDefaultValue() {
+  void testTableFormatFilterDefaultValue() {
     assertEquals(
-        DEFAULT_TABLE_TYPE_FILTER,
-        metadata.getDefaultValue(TABLE_TYPE_FILTER),
-        "Default table type filter should be 'all'");
+        DEFAULT_TABLE_FORMAT_FILTER,
+        metadata.getDefaultValue(TABLE_FORMAT_FILTER),
+        "Default table format filter should be 'all'");
   }
 }
