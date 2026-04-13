@@ -582,13 +582,37 @@ public class TestCatalogManager {
     boolean dropped = catalogManager.dropCatalog(ident);
     Assertions.assertTrue(dropped);
 
-    Catalog catalogImported =
+    // Test drop non-existed catalog
+    NameIdentifier ident1 = NameIdentifier.of("metalake", "test42");
+    boolean dropped1 = catalogManager.dropCatalog(ident1);
+    Assertions.assertFalse(dropped1);
+
+    // Drop operation will update the cache
+    Assertions.assertNull(catalogManager.getCatalogCache().getIfPresent(ident));
+  }
+
+  @Test
+  public void testDropCatalogSkipsImportedSchemas() throws Exception {
+    NameIdentifier ident = NameIdentifier.of("metalake", "test41");
+    Map<String, String> props =
+        ImmutableMap.of(
+            "provider",
+            "test",
+            PROPERTY_KEY1,
+            "value1",
+            PROPERTY_KEY2,
+            "value2",
+            PROPERTY_KEY5_PREFIX + "1",
+            "value3");
+    String comment = "comment";
+
+    Catalog catalog =
         catalogManager.createCatalog(ident, Catalog.Type.RELATIONAL, provider, comment, props);
     Mockito.doCallRealMethod().when(catalogManager).loadCatalogAndWrap(ident);
     Assertions.assertDoesNotThrow(() -> catalogManager.disableCatalog(ident));
-    CatalogEntity importedCatalogEntity =
-        entityStore.get(ident, EntityType.CATALOG, CatalogEntity.class);
-    FieldUtils.writeField(catalogImported, "entity", importedCatalogEntity, true);
+    CatalogEntity catalogEntity = entityStore.get(ident, EntityType.CATALOG, CatalogEntity.class);
+    FieldUtils.writeField(catalog, "entity", catalogEntity, true);
+
     SchemaEntity importedSchemaEntity =
         SchemaEntity.builder()
             .withId(RandomIdGenerator.INSTANCE.nextId())
@@ -601,47 +625,86 @@ public class TestCatalogManager {
                     .build())
             .build();
     entityStore.put(importedSchemaEntity);
+
     Schema importedSchema = Mockito.mock(Schema.class);
     Mockito.doReturn(ImmutableMap.of()).when(importedSchema).properties();
-    CatalogManager.CatalogWrapper importedCatalogWrapper =
-        Mockito.mock(CatalogManager.CatalogWrapper.class);
-    Capability importedCapability = Mockito.mock(Capability.class);
-    Mockito.doReturn(importedCatalogWrapper).when(catalogManager).loadCatalogAndWrap(ident);
-    Mockito.doReturn(catalogImported).when(importedCatalogWrapper).catalog();
-    Mockito.doReturn(importedCapability).when(importedCatalogWrapper).capabilities();
-    Mockito.doReturn(unsupportedResult).when(importedCapability).managedStorage(any());
+    CatalogManager.CatalogWrapper wrapper = Mockito.mock(CatalogManager.CatalogWrapper.class);
+    Capability capability = Mockito.mock(Capability.class);
+    CapabilityResult unsupportedResult = CapabilityResult.unsupported("Not managed");
+    Mockito.doReturn(wrapper).when(catalogManager).loadCatalogAndWrap(ident);
+    Mockito.doReturn(catalog).when(wrapper).catalog();
+    Mockito.doReturn(capability).when(wrapper).capabilities();
+    Mockito.doReturn(unsupportedResult).when(capability).managedStorage(any());
     Mockito.doReturn(
             new NameIdentifier[] {NameIdentifier.of("metalake", "test41", "imported_schema")})
         .doReturn(importedSchema)
-        .when(importedCatalogWrapper)
+        .when(wrapper)
         .doWithSchemaOps(any());
-    Assertions.assertTrue(catalogManager.dropCatalog(ident));
 
-    Catalog catalog2 =
+    // Imported schema (no StringIdentifier, no gravitino.created marker) should not block drop.
+    Assertions.assertTrue(catalogManager.dropCatalog(ident));
+  }
+
+  @Test
+  public void testDropCatalogIgnoresMissingSchema() throws Exception {
+    NameIdentifier ident = NameIdentifier.of("metalake", "test41");
+    Map<String, String> props =
+        ImmutableMap.of(
+            "provider",
+            "test",
+            PROPERTY_KEY1,
+            "value1",
+            PROPERTY_KEY2,
+            "value2",
+            PROPERTY_KEY5_PREFIX + "1",
+            "value3");
+    String comment = "comment";
+
+    Catalog catalog =
         catalogManager.createCatalog(ident, Catalog.Type.RELATIONAL, provider, comment, props);
     Mockito.doCallRealMethod().when(catalogManager).loadCatalogAndWrap(ident);
     Assertions.assertDoesNotThrow(() -> catalogManager.disableCatalog(ident));
-    CatalogEntity oldEntity2 = entityStore.get(ident, EntityType.CATALOG, CatalogEntity.class);
-    FieldUtils.writeField(catalog2, "entity", oldEntity2, true);
-    CatalogManager.CatalogWrapper missingSchemaCatalogWrapper =
-        Mockito.mock(CatalogManager.CatalogWrapper.class);
-    Capability missingSchemaCapability = Mockito.mock(Capability.class);
-    Mockito.doReturn(missingSchemaCatalogWrapper).when(catalogManager).loadCatalogAndWrap(ident);
-    Mockito.doReturn(catalog2).when(missingSchemaCatalogWrapper).catalog();
-    Mockito.doReturn(missingSchemaCapability).when(missingSchemaCatalogWrapper).capabilities();
-    Mockito.doReturn(unsupportedResult).when(missingSchemaCapability).managedStorage(any());
+    CatalogEntity catalogEntity = entityStore.get(ident, EntityType.CATALOG, CatalogEntity.class);
+    FieldUtils.writeField(catalog, "entity", catalogEntity, true);
+
+    CatalogManager.CatalogWrapper wrapper = Mockito.mock(CatalogManager.CatalogWrapper.class);
+    Capability capability = Mockito.mock(Capability.class);
+    CapabilityResult unsupportedResult = CapabilityResult.unsupported("Not managed");
+    Mockito.doReturn(wrapper).when(catalogManager).loadCatalogAndWrap(ident);
+    Mockito.doReturn(catalog).when(wrapper).catalog();
+    Mockito.doReturn(capability).when(wrapper).capabilities();
+    Mockito.doReturn(unsupportedResult).when(capability).managedStorage(any());
     Mockito.doReturn(new NameIdentifier[] {NameIdentifier.of("metalake", "test41", "default")})
         .doThrow(new NoSuchSchemaException("Schema not found"))
-        .when(missingSchemaCatalogWrapper)
+        .when(wrapper)
         .doWithSchemaOps(any());
-    Assertions.assertTrue(catalogManager.dropCatalog(ident));
 
-    Catalog catalog3 =
+    // Schema disappearing between listSchemas and loadSchema should not block drop.
+    Assertions.assertTrue(catalogManager.dropCatalog(ident));
+  }
+
+  @Test
+  public void testDropCatalogFailsOnSchemaClassificationError() throws Exception {
+    NameIdentifier ident = NameIdentifier.of("metalake", "test41");
+    Map<String, String> props =
+        ImmutableMap.of(
+            "provider",
+            "test",
+            PROPERTY_KEY1,
+            "value1",
+            PROPERTY_KEY2,
+            "value2",
+            PROPERTY_KEY5_PREFIX + "1",
+            "value3");
+    String comment = "comment";
+
+    Catalog catalog =
         catalogManager.createCatalog(ident, Catalog.Type.RELATIONAL, provider, comment, props);
     Mockito.doCallRealMethod().when(catalogManager).loadCatalogAndWrap(ident);
     Assertions.assertDoesNotThrow(() -> catalogManager.disableCatalog(ident));
-    CatalogEntity oldEntity3 = entityStore.get(ident, EntityType.CATALOG, CatalogEntity.class);
-    FieldUtils.writeField(catalog3, "entity", oldEntity3, true);
+    CatalogEntity catalogEntity = entityStore.get(ident, EntityType.CATALOG, CatalogEntity.class);
+    FieldUtils.writeField(catalog, "entity", catalogEntity, true);
+
     SchemaEntity schemaEntity =
         SchemaEntity.builder()
             .withId(RandomIdGenerator.INSTANCE.nextId())
@@ -654,32 +717,23 @@ public class TestCatalogManager {
                     .build())
             .build();
     entityStore.put(schemaEntity);
-    CatalogManager.CatalogWrapper runtimeErrorCatalogWrapper =
-        Mockito.mock(CatalogManager.CatalogWrapper.class);
-    Capability runtimeErrorCapability = Mockito.mock(Capability.class);
-    Mockito.doReturn(runtimeErrorCatalogWrapper).when(catalogManager).loadCatalogAndWrap(ident);
-    Mockito.doReturn(catalog3).when(runtimeErrorCatalogWrapper).catalog();
-    Mockito.doReturn(runtimeErrorCapability).when(runtimeErrorCatalogWrapper).capabilities();
-    Mockito.doReturn(unsupportedResult).when(runtimeErrorCapability).managedStorage(any());
+
+    CatalogManager.CatalogWrapper wrapper = Mockito.mock(CatalogManager.CatalogWrapper.class);
+    Capability capability = Mockito.mock(Capability.class);
+    CapabilityResult unsupportedResult = CapabilityResult.unsupported("Not managed");
+    Mockito.doReturn(wrapper).when(catalogManager).loadCatalogAndWrap(ident);
+    Mockito.doReturn(catalog).when(wrapper).catalog();
+    Mockito.doReturn(capability).when(wrapper).capabilities();
+    Mockito.doReturn(unsupportedResult).when(capability).managedStorage(any());
     Mockito.doReturn(new NameIdentifier[] {NameIdentifier.of("metalake", "test41", "test_schema1")})
         .doThrow(new RuntimeException("Failed connect"))
-        .when(runtimeErrorCatalogWrapper)
+        .when(wrapper)
         .doWithSchemaOps(any());
-    RuntimeException runtimeException =
+
+    // Unexpected errors during schema classification should propagate (fail-closed).
+    RuntimeException ex =
         Assertions.assertThrows(RuntimeException.class, () -> catalogManager.dropCatalog(ident));
-    Assertions.assertTrue(
-        runtimeException
-            .getMessage()
-            .contains(
-                "Failed to determine whether schema metalake.test41.test_schema1 is user-created"));
-
-    // Test drop non-existed catalog
-    NameIdentifier ident1 = NameIdentifier.of("metalake", "test42");
-    boolean dropped1 = catalogManager.dropCatalog(ident1);
-    Assertions.assertFalse(dropped1);
-
-    // Drop operation will update the cache
-    Assertions.assertNull(catalogManager.getCatalogCache().getIfPresent(ident));
+    Assertions.assertTrue(ex.getCause().getMessage().contains("Failed connect"));
   }
 
   @Test
