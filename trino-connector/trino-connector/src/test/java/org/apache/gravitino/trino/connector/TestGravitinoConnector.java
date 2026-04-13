@@ -141,6 +141,59 @@ public abstract class TestGravitinoConnector extends AbstractGravitinoConnectorT
   }
 
   @Test
+  public void testCreateTableAsSelect() throws Exception {
+    String sourceTable = "\"memory\".db_01.tb_src";
+    String ctasTable = "\"memory\".db_01.tb_ctas";
+
+    createTestTable(sourceTable);
+
+    // Prepare source data
+    assertUpdate(
+        String.format(
+            "insert into %s (a, b) values ('Alice', 1), ('Bob', 2), ('Charlie', 3)", sourceTable),
+        3);
+
+    // Create table as select (CTAS)
+    assertUpdate(String.format("create table %s as select * from %s", ctasTable, sourceTable), 3);
+
+    // Verify the CTAS table contains the expected data
+    MaterializedResult result = computeActual("select * from " + ctasTable);
+    assertEquals(result.getRowCount(), 3);
+
+    // Verify schema matches
+    assertThat((String) computeScalar("show create table " + ctasTable))
+        .contains("a varchar")
+        .contains("b integer");
+
+    // Cleanup
+    dropTestTable(ctasTable);
+    dropTestTable(sourceTable);
+  }
+
+  @Test
+  public void testCreateTableAsSelectEmpty() throws Exception {
+    String sourceTable = "\"memory\".db_01.tb_src_empty";
+    String ctasTable = "\"memory\".db_01.tb_ctas_empty";
+
+    createTestTable(sourceTable);
+
+    // Create table as select from an empty source table
+    assertUpdate(String.format("create table %s as select * from %s", ctasTable, sourceTable), 0);
+
+    // Verify the CTAS table is empty but exists with the correct schema
+    MaterializedResult result = computeActual("select * from " + ctasTable);
+    assertEquals(result.getRowCount(), 0);
+
+    assertThat((String) computeScalar("show create table " + ctasTable))
+        .contains("a varchar")
+        .contains("b integer");
+
+    // Cleanup
+    dropTestTable(ctasTable);
+    dropTestTable(sourceTable);
+  }
+
+  @Test
   public void testAlterTable() throws Exception {
     String fullTableName1 = "\"memory\".db_01.tb_01";
     String fullTableName2 = "\"memory\".db_01.tb_02";

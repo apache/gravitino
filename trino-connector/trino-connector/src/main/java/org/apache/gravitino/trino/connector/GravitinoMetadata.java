@@ -31,6 +31,7 @@ import io.trino.spi.connector.ColumnHandle;
 import io.trino.spi.connector.ColumnMetadata;
 import io.trino.spi.connector.ConnectorInsertTableHandle;
 import io.trino.spi.connector.ConnectorMetadata;
+import io.trino.spi.connector.ConnectorOutputTableHandle;
 import io.trino.spi.connector.ConnectorPartitioningHandle;
 import io.trino.spi.connector.ConnectorSession;
 import io.trino.spi.connector.ConnectorTableHandle;
@@ -218,6 +219,46 @@ public abstract class GravitinoMetadata implements ConnectorMetadata {
     GravitinoTable table = metadataAdapter.createTable(tableMetadata);
     // saveMode = SaveMode.IGNORE is used to ignore the table creation if it already exists
     catalogConnectorMetadata.createTable(table, saveMode == SaveMode.IGNORE);
+  }
+
+  @Override
+  public ConnectorOutputTableHandle beginCreateTable(
+      ConnectorSession session,
+      ConnectorTableMetadata tableMetadata,
+      Optional<ConnectorTableLayout> layout,
+      RetryMode retryMode,
+      boolean noExistingData) {
+    // First, create the table in the Gravitino catalog
+    GravitinoTable table = metadataAdapter.createTable(tableMetadata);
+    catalogConnectorMetadata.createTable(table, false);
+
+    // Get the table handle from the internal connector for the newly created table
+    SchemaTableName tableName = tableMetadata.getTable();
+    ConnectorTableHandle internalTableHandle =
+        internalMetadata.getTableHandle(session, tableName, Optional.empty(), Optional.empty());
+
+    // Delegate to the internal connector's insert path to write data,
+    // avoiding double table creation in the original connector
+    List<ColumnHandle> columns =
+        new ArrayList<>(internalMetadata.getColumnHandles(session, internalTableHandle).values());
+    ConnectorInsertTableHandle insertTableHandle =
+        internalMetadata.beginInsert(session, internalTableHandle, columns, retryMode);
+    return new GravitinoOutputTableHandle(insertTableHandle, tableName);
+  }
+
+  @Override
+  public Optional<ConnectorTableLayout> getNewTableLayout(
+      ConnectorSession session, ConnectorTableMetadata tableMetadata) {
+    return internalMetadata
+        .getNewTableLayout(session, tableMetadata)
+        .map(
+            result ->
+                result.getPartitioning().isPresent()
+                    ? new ConnectorTableLayout(
+                        new GravitinoPartitioningHandle(result.getPartitioning().get()),
+                        result.getPartitionColumns(),
+                        result.supportsMultipleWritersPerPartition())
+                    : new ConnectorTableLayout(result.getPartitionColumns()));
   }
 
   @Override
