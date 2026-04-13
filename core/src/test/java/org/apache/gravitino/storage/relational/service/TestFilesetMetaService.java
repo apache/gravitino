@@ -335,12 +335,16 @@ public class TestFilesetMetaService extends TestJDBCBackend {
                   auditInfo1,
                   "/tmp1");
             });
+    Map<Integer, Long> versionDeletedMap = listFilesetVersions(filesetEntity.id());
+    assertEquals(2, versionDeletedMap.size());
+    assertVersionActive(versionDeletedMap, 1);
+    assertVersionActive(versionDeletedMap, 2);
+
     FilesetMetaService.getInstance().deleteFilesetVersionsByRetentionCount(1L, 100);
-    List<Pair<Integer, String>> versionInfos = listFilesetInvalidVersions(filesetEntity.id());
-    // version 1 should be softly deleted
-    Assertions.assertEquals(1, versionInfos.size());
-    Assertions.assertEquals(1, versionInfos.get(0).getLeft());
-    Assertions.assertEquals(LOCATION_NAME_UNKNOWN, versionInfos.get(0).getRight());
+    versionDeletedMap = listFilesetVersions(filesetEntity.id());
+    assertEquals(2, versionDeletedMap.size());
+    assertVersionSoftDeleted(versionDeletedMap, 1);
+    assertVersionActive(versionDeletedMap, 2);
   }
 
   private List<Pair<Integer, String>> listFilesetInvalidVersions(Long filesetId) {
@@ -361,6 +365,16 @@ public class TestFilesetMetaService extends TestJDBCBackend {
       throw new RuntimeException("SQL execution failed", e);
     }
     return deletedVersions;
+  }
+
+  private void assertVersionActive(Map<Integer, Long> versionDeletedMap, int version) {
+    assertTrue(versionDeletedMap.containsKey(version));
+    assertEquals(0L, versionDeletedMap.get(version));
+  }
+
+  private void assertVersionSoftDeleted(Map<Integer, Long> versionDeletedMap, int version) {
+    assertTrue(versionDeletedMap.containsKey(version));
+    assertTrue(versionDeletedMap.get(version) > 0L);
   }
 
   private FilesetEntity createFilesetEntity(
