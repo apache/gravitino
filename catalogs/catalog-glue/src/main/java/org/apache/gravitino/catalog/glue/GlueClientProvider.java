@@ -65,6 +65,13 @@ public final class GlueClientProvider {
 
     // Static credentials take priority over the default credential chain.
     // Both keys must be provided together — a partial pair is always a misconfiguration.
+    // Default credential chain order (when both keys are omitted):
+    //   1. Java system properties (aws.accessKeyId / aws.secretAccessKey)
+    //   2. Environment variables (AWS_ACCESS_KEY_ID / AWS_SECRET_ACCESS_KEY)
+    //   3. Web identity token (EKS / Kubernetes)
+    //   4. ~/.aws/credentials profile file
+    //   5. ECS container task role
+    //   6. EC2 instance profile (IMDSv2)
     String accessKey = config.get(GlueConstants.AWS_ACCESS_KEY_ID);
     String secretKey = config.get(GlueConstants.AWS_SECRET_ACCESS_KEY);
     boolean hasAccessKey = StringUtils.isNotBlank(accessKey);
@@ -87,16 +94,7 @@ public final class GlueClientProvider {
     // Optional custom endpoint override for VPC endpoints or LocalStack testing.
     String endpoint = config.get(GlueConstants.AWS_GLUE_ENDPOINT);
     if (StringUtils.isNotBlank(endpoint)) {
-      try {
-        builder.endpointOverride(URI.create(endpoint));
-      } catch (IllegalArgumentException e) {
-        throw new IllegalArgumentException(
-            String.format(
-                "Property '%s' contains an invalid URI: '%s'. "
-                    + "Expected a valid URL, e.g. 'http://localhost:4566'. Cause: %s",
-                GlueConstants.AWS_GLUE_ENDPOINT, endpoint, e.getMessage()),
-            e);
-      }
+      builder.endpointOverride(URI.create(endpoint));
     }
 
     return builder.build();
