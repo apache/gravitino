@@ -19,7 +19,6 @@
 package org.apache.gravitino.catalog;
 
 import static org.apache.gravitino.Entity.EntityType.SCHEMA;
-import static org.apache.gravitino.catalog.OperationDispatcher.FormattedErrorMessages;
 import static org.apache.gravitino.catalog.PropertiesMetadataHelpers.validatePropertyForCreate;
 import static org.apache.gravitino.utils.NameIdentifierUtil.getCatalogIdentifier;
 
@@ -34,7 +33,6 @@ import org.apache.gravitino.SchemaChange;
 import org.apache.gravitino.StringIdentifier;
 import org.apache.gravitino.connector.HasPropertyMetadata;
 import org.apache.gravitino.connector.capability.Capability;
-import org.apache.gravitino.exceptions.GravitinoRuntimeException;
 import org.apache.gravitino.exceptions.NoSuchCatalogException;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.exceptions.NoSuchSchemaException;
@@ -159,26 +157,12 @@ public class SchemaOperationDispatcher extends OperationDispatcher implements Sc
             store.put(schemaEntity, true /* overwrite */);
           } catch (Exception e) {
             LOG.error(FormattedErrorMessages.STORE_OP_FAILURE, "put", ident, e);
-
-            // Attempt to rollback the schema creation in the underlying catalog
-            try {
-              rollbackEntityCreation(
-                  catalogIdent,
-                  ident,
-                  "schema",
-                  catalogWrapper ->
-                      catalogWrapper.doWithSchemaOps(
-                          schemas -> schemas.dropSchema(ident, true /* cascade */)));
-            } catch (GravitinoRuntimeException ex) {
-              // Rollback failed - combine original exception with rollback failure
-              LOG.error(FormattedErrorMessages.ENTITY_SCHEMA_ROLLBACK_FAILED, ident, ex);
-              throw new GravitinoRuntimeException(
-                  e, FormattedErrorMessages.ENTITY_PERSIST_FAILURE_WITH_ROLLBACK_FAILURE, ident);
-            }
-
-            // Rollback succeeded - throw original exception with rollback success context
-            throw new GravitinoRuntimeException(
-                e, FormattedErrorMessages.ENTITY_PERSIST_FAILURE_WITH_ROLLBACK_SUCCESS, ident);
+            return EntityCombinedSchema.of(schema)
+                .withHiddenProperties(
+                    getHiddenPropertyNames(
+                        catalogIdent,
+                        HasPropertyMetadata::schemaPropertiesMetadata,
+                        schema.properties()));
           }
 
           // Merge both the metadata from catalog operation and the metadata from entity store.
