@@ -81,21 +81,33 @@ public final class GlueTypeConverter {
 
     // char(N)
     if (lower.startsWith("char(") && lower.endsWith(")")) {
-      int length = Integer.parseInt(lower.substring(5, lower.length() - 1).trim());
-      return Types.FixedCharType.of(length);
+      try {
+        int length = Integer.parseInt(lower.substring(5, lower.length() - 1).trim());
+        return Types.FixedCharType.of(length);
+      } catch (NumberFormatException e) {
+        return Types.ExternalType.of(glueType);
+      }
     }
     // varchar(N)
     if (lower.startsWith("varchar(") && lower.endsWith(")")) {
-      int length = Integer.parseInt(lower.substring(8, lower.length() - 1).trim());
-      return Types.VarCharType.of(length);
+      try {
+        int length = Integer.parseInt(lower.substring(8, lower.length() - 1).trim());
+        return Types.VarCharType.of(length);
+      } catch (NumberFormatException e) {
+        return Types.ExternalType.of(glueType);
+      }
     }
     // decimal(P,S) or decimal(P, S)
     if (lower.startsWith("decimal(") && lower.endsWith(")")) {
-      String inner = lower.substring(8, lower.length() - 1);
-      String[] parts = inner.split(",", 2);
-      int precision = Integer.parseInt(parts[0].trim());
-      int scale = parts.length > 1 ? Integer.parseInt(parts[1].trim()) : 0;
-      return Types.DecimalType.of(precision, scale);
+      try {
+        String inner = lower.substring(8, lower.length() - 1);
+        String[] parts = inner.split(",", 2);
+        int precision = Integer.parseInt(parts[0].trim());
+        int scale = parts.length > 1 ? Integer.parseInt(parts[1].trim()) : 0;
+        return Types.DecimalType.of(precision, scale);
+      } catch (NumberFormatException e) {
+        return Types.ExternalType.of(glueType);
+      }
     }
 
     // Complex types (array<...>, map<...>, struct<...>, uniontype<...>) and anything unknown

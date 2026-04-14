@@ -20,6 +20,7 @@ package org.apache.gravitino.catalog.glue;
 
 import java.util.HashMap;
 import java.util.Map;
+import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Tag;
 import software.amazon.awssdk.services.glue.GlueClient;
@@ -28,6 +29,7 @@ import software.amazon.awssdk.services.glue.model.Database;
 import software.amazon.awssdk.services.glue.model.DatabaseInput;
 import software.amazon.awssdk.services.glue.model.DeleteDatabaseRequest;
 import software.amazon.awssdk.services.glue.model.GetDatabaseRequest;
+import software.amazon.awssdk.services.glue.model.GlueException;
 
 /**
  * Runs {@link AbstractGlueSchemaTest} scenarios against a real AWS Glue endpoint.
@@ -47,7 +49,7 @@ import software.amazon.awssdk.services.glue.model.GetDatabaseRequest;
  * deleted in {@link #cleanup} regardless of test outcome.
  */
 @Tag("gravitino-aws-test")
-class AwsGlueSchemaIT extends AbstractGlueSchemaTest {
+class TestAwsGlueSchema extends AbstractGlueSchemaTest {
 
   private static GlueClient glueClient;
   private static String catalogId;
@@ -97,8 +99,15 @@ class AwsGlueSchemaIT extends AbstractGlueSchemaTest {
         req.catalogId(catalogId);
       }
       glueClient.deleteDatabase(req.build());
-    } catch (Exception ignored) {
-      // Best-effort cleanup
+    } catch (GlueException ignored) {
+      // Best-effort cleanup - ignore any AWS errors
+    }
+  }
+
+  @AfterAll
+  static void closeClient() {
+    if (glueClient != null) {
+      glueClient.close();
     }
   }
 }

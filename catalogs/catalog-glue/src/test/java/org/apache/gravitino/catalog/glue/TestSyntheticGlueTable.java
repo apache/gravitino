@@ -30,7 +30,7 @@ import software.amazon.awssdk.services.glue.model.Table;
  * Runs {@link AbstractGlueTableTest} scenarios using AWS SDK builders — no network or credentials
  * required.
  */
-class SyntheticGlueTableTest extends AbstractGlueTableTest {
+class TestSyntheticGlueTable extends AbstractGlueTableTest {
 
   private static final String INPUT_FMT = "org.apache.hadoop.mapred.TextInputFormat";
   private static final String OUTPUT_FMT =

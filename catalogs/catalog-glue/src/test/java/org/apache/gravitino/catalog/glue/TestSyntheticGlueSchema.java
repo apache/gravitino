@@ -29,7 +29,7 @@ import software.amazon.awssdk.services.glue.model.Database;
  * <p>This verifies that the {@link GlueSchema#fromGlueDatabase} conversion logic works correctly
  * for typical Glue API response shapes.
  */
-class SyntheticGlueSchemaTest extends AbstractGlueSchemaTest {
+class TestSyntheticGlueSchema extends AbstractGlueSchemaTest {
 
   @Override
   protected Database provideDatabase(String name, String description, Map<String, String> params) {

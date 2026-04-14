@@ -30,6 +30,7 @@ import software.amazon.awssdk.services.glue.model.CreateTableRequest;
 import software.amazon.awssdk.services.glue.model.DeleteDatabaseRequest;
 import software.amazon.awssdk.services.glue.model.DeleteTableRequest;
 import software.amazon.awssdk.services.glue.model.GetTableRequest;
+import software.amazon.awssdk.services.glue.model.GlueException;
 import software.amazon.awssdk.services.glue.model.Order;
 import software.amazon.awssdk.services.glue.model.SerDeInfo;
 import software.amazon.awssdk.services.glue.model.StorageDescriptor;
@@ -54,7 +55,7 @@ import software.amazon.awssdk.services.glue.model.TableInput;
  * deleted in {@link #cleanup} regardless of test outcome.
  */
 @Tag("gravitino-aws-test")
-class AwsGlueTableIT extends AbstractGlueTableTest {
+class TestAwsGlueTable extends AbstractGlueTableTest {
 
   private static GlueClient glueClient;
   private static String catalogId;
@@ -87,7 +88,7 @@ class AwsGlueTableIT extends AbstractGlueTableTest {
             .databaseInput(
                 software.amazon.awssdk.services.glue.model.DatabaseInput.builder()
                     .name(testSchemaName)
-                    .description("schema for AwsGlueTableIT")
+                    .description("schema for TestAwsGlueTable")
                     .build());
     if (catalogId != null) {
       dbReq.catalogId(catalogId);
@@ -184,8 +185,8 @@ class AwsGlueTableIT extends AbstractGlueTableTest {
         req.catalogId(catalogId);
       }
       glueClient.deleteTable(req.build());
-    } catch (Exception ignored) {
-      // Best-effort cleanup
+    } catch (GlueException ignored) {
+      // Best-effort cleanup - ignore any AWS errors
     }
   }
 
@@ -197,8 +198,15 @@ class AwsGlueTableIT extends AbstractGlueTableTest {
         dbReq.catalogId(catalogId);
       }
       glueClient.deleteDatabase(dbReq.build());
-    } catch (Exception ignored) {
-      // Best-effort cleanup
+    } catch (GlueException ignored) {
+      // Best-effort cleanup - ignore any AWS errors
+    }
+  }
+
+  @AfterAll
+  static void closeClient() {
+    if (glueClient != null) {
+      glueClient.close();
     }
   }
 }
