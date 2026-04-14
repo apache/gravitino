@@ -99,6 +99,7 @@ public interface OwnerMetaMapper {
 
   @SelectProvider(
       type = OwnerMetaSQLProviderFactory.class,
-      method = "selectOwnerByMetadataObjectId")
-  OwnerRelInfoPO selectOwnerByMetadataObjectId(@Param("metadataObjectId") long metadataObjectId);
+      method = "selectOwnersByMetadataObjectId")
+  List<OwnerRelInfoPO> selectOwnersByMetadataObjectId(
+      @Param("metadataObjectId") long metadataObjectId);
 }

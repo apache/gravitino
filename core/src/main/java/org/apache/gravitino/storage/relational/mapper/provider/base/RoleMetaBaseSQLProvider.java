@@ -206,9 +206,15 @@ public class RoleMetaBaseSQLProvider {
         + "SELECT role_id as roleId, securable_objects_version as securableObjectsVersion"
         + " FROM "
         + ROLE_TABLE_NAME
-        + " WHERE role_id IN "
+        + " WHERE "
+        + "<choose>"
+        + "<when test='roleIds != null and roleIds.size() > 0'>"
+        + "role_id IN "
         + "<foreach item='id' collection='roleIds' open='(' separator=',' close=')'>#{id}</foreach>"
         + " AND deleted_at = 0"
+        + "</when>"
+        + "<otherwise>1 = 0</otherwise>"
+        + "</choose>"
         + "</script>";
   }
 }

@@ -20,13 +20,13 @@
 -- Add version columns for Phase 2 version-validated auth cache
 
 ALTER TABLE `role_meta`
-    ADD COLUMN `securable_objects_version` INT UNSIGNED NOT NULL DEFAULT 1
+    ADD COLUMN `securable_objects_version` BIGINT UNSIGNED NOT NULL DEFAULT 0
     COMMENT 'Incremented atomically with any privilege grant/revoke for this role';
 
 ALTER TABLE `user_meta`
-    ADD COLUMN `role_grants_version` INT UNSIGNED NOT NULL DEFAULT 1
+    ADD COLUMN `role_grants_version` BIGINT UNSIGNED NOT NULL DEFAULT 0
     COMMENT 'Incremented atomically with any role assignment/revocation for this user';
 
 ALTER TABLE `group_meta`
-    ADD COLUMN `role_grants_version` INT UNSIGNED NOT NULL DEFAULT 1
+    ADD COLUMN `role_grants_version` BIGINT UNSIGNED NOT NULL DEFAULT 0
     COMMENT 'Incremented atomically with any role assignment/revocation for this group';

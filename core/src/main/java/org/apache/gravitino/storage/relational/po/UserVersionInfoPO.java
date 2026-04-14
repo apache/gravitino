@@ -22,7 +22,7 @@ package org.apache.gravitino.storage.relational.po;
 public class UserVersionInfoPO {
 
   private Long userId;
-  private Integer roleGrantsVersion;
+  private Long roleGrantsVersion;
 
   public Long getUserId() {
     return userId;
@@ -32,11 +32,11 @@ public class UserVersionInfoPO {
     this.userId = userId;
   }
 
-  public Integer getRoleGrantsVersion() {
+  public Long getRoleGrantsVersion() {
     return roleGrantsVersion;
   }
 
-  public void setRoleGrantsVersion(Integer roleGrantsVersion) {
+  public void setRoleGrantsVersion(Long roleGrantsVersion) {
     this.roleGrantsVersion = roleGrantsVersion;
   }
 }

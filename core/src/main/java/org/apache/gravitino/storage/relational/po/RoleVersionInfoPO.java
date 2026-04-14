@@ -22,7 +22,7 @@ package org.apache.gravitino.storage.relational.po;
 public class RoleVersionInfoPO {
 
   private Long roleId;
-  private Integer securableObjectsVersion;
+  private Long securableObjectsVersion;
 
   public Long getRoleId() {
     return roleId;
@@ -32,11 +32,11 @@ public class RoleVersionInfoPO {
     this.roleId = roleId;
   }
 
-  public Integer getSecurableObjectsVersion() {
+  public Long getSecurableObjectsVersion() {
     return securableObjectsVersion;
   }
 
-  public void setSecurableObjectsVersion(Integer securableObjectsVersion) {
+  public void setSecurableObjectsVersion(Long securableObjectsVersion) {
     this.securableObjectsVersion = securableObjectsVersion;
   }
 }

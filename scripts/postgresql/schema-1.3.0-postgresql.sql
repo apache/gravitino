@@ -290,7 +290,7 @@ CREATE TABLE IF NOT EXISTS user_meta (
     current_version INT NOT NULL DEFAULT 1,
     last_version INT NOT NULL DEFAULT 1,
     deleted_at BIGINT NOT NULL DEFAULT 0,
-    role_grants_version INT NOT NULL DEFAULT 1,
+    role_grants_version BIGINT NOT NULL DEFAULT 0,
     PRIMARY KEY (user_id),
     UNIQUE (metalake_id, user_name, deleted_at)
 );
@@ -314,7 +314,7 @@ CREATE TABLE IF NOT EXISTS role_meta (
     current_version INT NOT NULL DEFAULT 1,
     last_version INT NOT NULL DEFAULT 1,
     deleted_at BIGINT NOT NULL DEFAULT 0,
-    securable_objects_version INT NOT NULL DEFAULT 1,
+    securable_objects_version BIGINT NOT NULL DEFAULT 0,
     PRIMARY KEY (role_id),
     UNIQUE (metalake_id, role_name, deleted_at)
 );
@@ -391,7 +391,7 @@ CREATE TABLE IF NOT EXISTS group_meta (
     current_version INT NOT NULL DEFAULT 1,
     last_version INT NOT NULL DEFAULT 1,
     deleted_at BIGINT NOT NULL DEFAULT 0,
-    role_grants_version INT NOT NULL DEFAULT 1,
+    role_grants_version BIGINT NOT NULL DEFAULT 0,
     PRIMARY KEY (group_id),
     UNIQUE (metalake_id, group_name, deleted_at)
 );

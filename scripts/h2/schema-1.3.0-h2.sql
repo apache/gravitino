@@ -175,7 +175,7 @@ CREATE TABLE IF NOT EXISTS `user_meta` (
     `current_version` INT UNSIGNED NOT NULL DEFAULT 1 COMMENT 'user current version',
     `last_version` INT UNSIGNED NOT NULL DEFAULT 1 COMMENT 'user last version',
     `deleted_at` BIGINT(20) UNSIGNED NOT NULL DEFAULT 0 COMMENT 'user deleted at',
-    `role_grants_version` INT UNSIGNED NOT NULL DEFAULT 1 COMMENT 'version bumped on any role assignment change for this user',
+    `role_grants_version` BIGINT UNSIGNED NOT NULL DEFAULT 0 COMMENT 'version bumped on any role assignment change for this user',
     PRIMARY KEY (`user_id`),
     CONSTRAINT `uk_mid_us_del` UNIQUE (`metalake_id`, `user_name`, `deleted_at`)
 ) ENGINE=InnoDB;
@@ -189,7 +189,7 @@ CREATE TABLE IF NOT EXISTS `role_meta` (
     `current_version` INT UNSIGNED NOT NULL DEFAULT 1 COMMENT 'role current version',
     `last_version` INT UNSIGNED NOT NULL DEFAULT 1 COMMENT 'role last version',
     `deleted_at` BIGINT(20) UNSIGNED NOT NULL DEFAULT 0 COMMENT 'role deleted at',
-    `securable_objects_version` INT UNSIGNED NOT NULL DEFAULT 1 COMMENT 'version bumped on any privilege change for this role',
+    `securable_objects_version` BIGINT UNSIGNED NOT NULL DEFAULT 0 COMMENT 'version bumped on any privilege change for this role',
     PRIMARY KEY (`role_id`),
     CONSTRAINT `uk_mid_rn_del` UNIQUE (`metalake_id`, `role_name`, `deleted_at`)
 ) ENGINE=InnoDB;
@@ -230,7 +230,7 @@ CREATE TABLE IF NOT EXISTS `group_meta` (
     `current_version` INT UNSIGNED NOT NULL DEFAULT 1 COMMENT 'group current version',
     `last_version` INT UNSIGNED NOT NULL DEFAULT 1 COMMENT 'group last version',
     `deleted_at` BIGINT(20) UNSIGNED NOT NULL DEFAULT 0 COMMENT 'group deleted at',
-    `role_grants_version` INT UNSIGNED NOT NULL DEFAULT 1 COMMENT 'version bumped on any role assignment change for this group',
+    `role_grants_version` BIGINT UNSIGNED NOT NULL DEFAULT 0 COMMENT 'version bumped on any role assignment change for this group',
     PRIMARY KEY (`group_id`),
     CONSTRAINT `uk_mid_gr_del` UNIQUE (`metalake_id`, `group_name`, `deleted_at`)
 ) ENGINE=InnoDB;
