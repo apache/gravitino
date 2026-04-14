@@ -558,6 +558,7 @@ public class TestCatalogWrapperForREST {
                 .put(IcebergConstants.WAREHOUSE, "s3://remote/warehouse")
                 .put(IcebergConstants.ICEBERG_REST_CLIENT_CONNECTION_TIMEOUT_MS, "10000")
                 .put(IcebergConstants.ICEBERG_REST_CLIENT_SOCKET_TIMEOUT_MS, "60000")
+                .put(IcebergConstants.ICEBERG_S3_PROXY_ENDPOINT, "http://proxy:8080")
                 .build());
 
     // FederatedCatalogWrapper sources the client config from the remote RESTCatalog's properties().
@@ -574,6 +575,8 @@ public class TestCatalogWrapperForREST {
         configToClients.containsKey(IcebergConstants.ICEBERG_REST_CLIENT_CONNECTION_TIMEOUT_MS));
     Assertions.assertFalse(
         configToClients.containsKey(IcebergConstants.ICEBERG_REST_CLIENT_SOCKET_TIMEOUT_MS));
+    Assertions.assertEquals(
+        "http://proxy:8080", configToClients.get(IcebergConstants.ICEBERG_S3_PROXY_ENDPOINT));
   }
 
   @Test
