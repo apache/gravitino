@@ -18,6 +18,8 @@
  */
 package org.apache.gravitino.catalog.glue;
 
+import static java.util.Locale.ROOT;
+
 import org.apache.gravitino.rel.types.Type;
 import org.apache.gravitino.rel.types.Types;
 
@@ -43,7 +45,7 @@ public final class GlueTypeConverter {
     if (glueType == null || glueType.isEmpty()) {
       return Types.ExternalType.of("");
     }
-    String lower = glueType.trim().toLowerCase(java.util.Locale.ROOT);
+    String lower = glueType.trim().toLowerCase(ROOT);
 
     switch (lower) {
       case "boolean":
