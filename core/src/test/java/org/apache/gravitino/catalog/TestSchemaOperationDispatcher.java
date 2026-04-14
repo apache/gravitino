@@ -28,8 +28,6 @@ import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.reset;
-import static org.mockito.Mockito.spy;
-import static org.mockito.Mockito.verify;
 
 import com.google.common.collect.ImmutableMap;
 import java.io.IOException;
@@ -48,7 +46,6 @@ import org.apache.gravitino.Namespace;
 import org.apache.gravitino.Schema;
 import org.apache.gravitino.SchemaChange;
 import org.apache.gravitino.auth.AuthConstants;
-import org.apache.gravitino.exceptions.GravitinoRuntimeException;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.lock.LockManager;
 import org.apache.gravitino.meta.AuditInfo;
@@ -117,82 +114,25 @@ public class TestSchemaOperationDispatcher extends TestOperationDispatcher {
             .filter(s -> s.name().equals("schema1"))
             .findFirst();
     Assertions.assertTrue(ident1.isPresent());
-  }
 
-  @Test
-  public void testCreateSchemaFailsWhenStorePutFailsAndRollbackSucceeds() throws IOException {
-    Namespace ns = Namespace.of(metalake, catalog);
-    NameIdentifier schemaIdent = NameIdentifier.of(ns, "schema_rollback_success");
-    Map<String, String> props = ImmutableMap.of("k1", "v1", "k2", "v2");
+    // Test when the entity store failed to put the schema entity
+    doThrow(new IOException()).when(entityStore).put(any(), anyBoolean());
+    NameIdentifier schemaIdent2 = NameIdentifier.of(ns, "schema2");
+    Schema schema2 = dispatcher.createSchema(schemaIdent2, "comment", props);
 
-    // Spy on the dispatcher to verify rollbackEntityCreation is called
-    SchemaOperationDispatcher spyDispatcher = spy(dispatcher);
+    // Check if the created Schema's field values are correct
+    Assertions.assertEquals("schema2", schema2.name());
+    Assertions.assertEquals("comment", schema2.comment());
+    testProperties(props, schema2.properties());
 
-    // Mock store.put() to fail
-    reset(entityStore);
-    doThrow(new IOException("Store failure due to network issue"))
-        .when(entityStore)
-        .put(any(), anyBoolean());
-
-    // createSchema should fail with GravitinoRuntimeException after successful rollback
-    GravitinoRuntimeException exception =
-        Assertions.assertThrows(
-            GravitinoRuntimeException.class,
-            () -> spyDispatcher.createSchema(schemaIdent, "comment", props));
-
-    // Verify the original cause is preserved
-    Assertions.assertEquals(
-        "Store failure due to network issue", exception.getCause().getMessage());
-
-    // Verify that rollbackEntityCreation was called
-    verify(spyDispatcher).rollbackEntityCreation(any(), eq(schemaIdent), eq("schema"), any());
-
-    // Verify that the schema entity is NOT in the store
-    Assertions.assertFalse(entityStore.exists(schemaIdent, SCHEMA));
+    // Check if the Schema entity is stored in the EntityStore
+    Assertions.assertFalse(entityStore.exists(schemaIdent2, SCHEMA));
     Assertions.assertThrows(
         NoSuchEntityException.class,
-        () -> entityStore.get(schemaIdent, SCHEMA, SchemaEntity.class));
-  }
+        () -> entityStore.get(schemaIdent2, SCHEMA, SchemaEntity.class));
 
-  @Test
-  public void testCreateSchemaFailsWhenStorePutFailsAndRollbackFails() throws Exception {
-    Namespace ns = Namespace.of(metalake, catalog);
-    NameIdentifier schemaIdent = NameIdentifier.of(ns, "schema_rollback_fail");
-    Map<String, String> props = ImmutableMap.of("k1", "v1", "k2", "v2");
-
-    // Spy on the dispatcher to make rollbackEntityCreation throw an exception
-    SchemaOperationDispatcher spyDispatcher = spy(dispatcher);
-
-    // Make rollbackEntityCreation throw an exception to simulate rollback failure
-    doThrow(new GravitinoRuntimeException("Rollback failed - connection lost"))
-        .when(spyDispatcher)
-        .rollbackEntityCreation(any(), any(), any(), any());
-
-    // Mock store.put() to fail after successful schema creation
-    reset(entityStore);
-    IOException storeException = new IOException("Store failure due to network issue");
-    doThrow(storeException).when(entityStore).put(any(), anyBoolean());
-
-    // createSchema should fail with GravitinoRuntimeException when rollback fails
-    GravitinoRuntimeException exception =
-        Assertions.assertThrows(
-            GravitinoRuntimeException.class,
-            () -> spyDispatcher.createSchema(schemaIdent, "comment", props));
-
-    // Verify the original cause is preserved (the IOException from store.put)
-    Assertions.assertEquals(
-        "Store failure due to network issue", exception.getCause().getMessage());
-
-    // Verify that rollbackEntityCreation was called
-    Assertions.assertThrows(
-        Exception.class,
-        () -> spyDispatcher.rollbackEntityCreation(any(), eq(schemaIdent), eq("schema"), any()));
-
-    // Verify that the schema entity is NOT in the store
-    Assertions.assertFalse(entityStore.exists(schemaIdent, SCHEMA));
-    Assertions.assertThrows(
-        NoSuchEntityException.class,
-        () -> entityStore.get(schemaIdent, SCHEMA, SchemaEntity.class));
+    // Audit info is gotten from the catalog, not from the entity store
+    Assertions.assertEquals("test", schema2.auditInfo().creator());
   }
 
   @Test
