@@ -108,9 +108,6 @@ A role is a named collection of privileges on securable objects. Roles simplify 
 - Owners have full control over the role, including the ability to drop it
 - Only the owner can modify the role's permissions
 
-**Examples:**
-- `ROLE`: "role1" (under a metalake)
-
 ### Privilege
 
 Privilege is a specific operation method for securable object, if you need to control fine-grained privileges on a securable object in the system,
@@ -166,9 +163,6 @@ A user represents an individual identity in Gravitino. Users can be:
 - Given different operating privileges based on their assigned roles
 - Made owners of securable objects
 
-**Examples:**
-- `USER`: "user1" (under a metalake)
-
 ### Group
 
 A group is a collection of users that simplifies permission management by allowing you to:
@@ -181,9 +175,6 @@ All users in a group inherit the roles and privileges granted to that group.
 :::info
 Groups can be granted roles and privileges, but they cannot be owners of securable objects. Only users can be owners.
 :::
-
-**Examples:**
-- `GROUP`: "group1" (under a metalake)
 
 ### Metadata Objects
 
@@ -719,9 +710,9 @@ curl -X GET -H "Accept: application/vnd.gravitino.v1+json" \
 
 ```java
 GravitinoClient client = ...
-String[] groupNames = client.listGroupNames();
+String[] usernames = client.listGroupNames();
 
-Group[] groups = client.listGroups();
+User[] users = client.listGroups();
 ```
 
 </TabItem>
@@ -843,7 +834,7 @@ curl -X GET -H "Accept: application/vnd.gravitino.v1+json" \
 
 ```java
 GravitinoClient client = ...
-String[] roleNames = client.listRoleNames();
+String[] usernames = client.listRoleNames();
 ```
 
 </TabItem>
@@ -964,11 +955,11 @@ curl -X PUT -H "Accept: application/vnd.gravitino.v1+json" \
 ```java
 GravitinoClient client = ...
 
-// Grant the privilege allowing `SELECT_TABLE` for the `schema` to `role1`
+// Grant the privilege allowing `SELECT_TABLE` for the `schema` to `role1`        
 MetadataObject schema = ...
-Role role = client.grantPrivilegesToRole("role1", schema, Lists.newArrayList(Privileges.SelectTable.allow()));
+Role role = client.grantPrivilegesToRole("role1", schema, Lists.newArrayList(Privileges.SelectTable.allow()));        
 
-// Grant the privilege allowing `SELECT_TABLE` for the `table` to `role1`
+// Grant the privilege allowing `SELECT_TABLE` for the `table` to `role1`        
 MetadataObject table = ...
 Role role = client.grantPrivilegesToRole("role1", table, Lists.newArrayList(Privileges.SelectTable.allow()));
 ```
@@ -1009,11 +1000,11 @@ curl -X PUT -H "Accept: application/vnd.gravitino.v1+json" \
 ```java
 GravitinoClient client = ...
 
-// Revoke the privilege allowing `SELECT_TABLE` for the `schema` from `role1`
+// Revoke the privilege allowing `SELEC_TABLE` for the `schema` from `role1`         
 MetadataObject schema = ...
 Role role = client.revokePrivilegesFromRole("role1", schema, Lists.newArrayList(Privileges.SelectTable.allow()));
 
-// Revoke the privilege allowing `SELECT_TABLE` for the `table` from `role1`
+// Revoke the privilege allowing `SELEC_TABLE` for the `table` from `role1`         
 MetadataObject table = ...
 Role role = client.revokePrivilegesFromRole("role1", table, Lists.newArrayList(Privileges.SelectTable.allow()));
 
@@ -1199,6 +1190,8 @@ Owner owner = client.getOwner(table);
 ### set the owner
 
 You can set the owner of a metadata object.
+
+The request path for REST API is `/api/metalakes/{metalake}/owners/{metadataObjectType}/{metadataObjectName}`.
 
 <Tabs groupId='language' queryString>
 <TabItem value="shell" label="Shell">
