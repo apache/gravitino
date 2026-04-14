@@ -39,6 +39,7 @@ import java.util.HashMap;
 import java.util.Map;
 import org.apache.gravitino.Config;
 import org.apache.gravitino.UserPrincipal;
+import org.apache.gravitino.exceptions.TokenExpiredException;
 import org.apache.gravitino.exceptions.UnauthorizedException;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -188,7 +189,7 @@ public class TestStaticSignKeyValidator {
             .compact();
 
     assertThrows(
-        UnauthorizedException.class, () -> validator.validateToken(token, serviceAudience));
+        TokenExpiredException.class, () -> validator.validateToken(token, serviceAudience));
   }
 
   @Test
