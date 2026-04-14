@@ -17,16 +17,26 @@
 
 from __future__ import annotations
 
-from gravitino.api.authorization.group import Group
-from gravitino.api.authorization.privileges import Privileges
-from gravitino.api.authorization.role import Role
-from gravitino.api.authorization.securable_objects import SecurableObjects
-from gravitino.api.authorization.user import User
+from dataclasses import dataclass, field
 
-__all__ = [
-    "Group",
-    "Role",
-    "SecurableObjects",
-    "Privileges",
-    "User",
-]
+from dataclasses_json import config, dataclass_json
+
+from gravitino.dto.authorization.privilege_dto import PrivilegeDTO
+from gravitino.rest.rest_message import RESTRequest
+from gravitino.utils.precondition import Precondition
+
+
+@dataclass_json
+@dataclass
+class PrivilegeRevokeRequest(RESTRequest):
+    """Represents a request to revoke privileges from a role."""
+
+    _privileges: list[PrivilegeDTO] = field(
+        default_factory=list, metadata=config(field_name="privileges")
+    )
+
+    def validate(self) -> None:
+        Precondition.check_argument(
+            self._privileges is not None and len(self._privileges) > 0,
+            "privileges must not be null or empty",
+        )

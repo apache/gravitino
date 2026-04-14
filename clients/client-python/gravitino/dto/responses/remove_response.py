@@ -17,16 +17,31 @@
 
 from __future__ import annotations
 
-from gravitino.api.authorization.group import Group
-from gravitino.api.authorization.privileges import Privileges
-from gravitino.api.authorization.role import Role
-from gravitino.api.authorization.securable_objects import SecurableObjects
-from gravitino.api.authorization.user import User
+from dataclasses import dataclass, field
 
-__all__ = [
-    "Group",
-    "Role",
-    "SecurableObjects",
-    "Privileges",
-    "User",
-]
+from dataclasses_json import config, dataclass_json
+
+from gravitino.dto.responses.base_response import BaseResponse
+from gravitino.utils.precondition import Precondition
+
+
+@dataclass_json
+@dataclass
+class RemoveResponse(BaseResponse):
+    """Represents a response for a remove operation."""
+
+    _removed: bool = field(metadata=config(field_name="removed"))
+
+    def removed(self) -> bool:
+        return self._removed
+
+    def validate(self) -> None:
+        """Validates the response.
+
+        Raises:
+            IllegalArgumentException: If the removed field is not set.
+        """
+        Precondition.check_argument(
+            self._removed is not None,
+            "Remove response must contain 'removed' field",
+        )

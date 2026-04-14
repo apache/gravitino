@@ -27,6 +27,9 @@ from gravitino.client.fileset_catalog import FilesetCatalog
 from gravitino.client.generic_fileset import GenericFileset
 from gravitino.client.generic_model_catalog import GenericModelCatalog
 from gravitino.dto.audit_dto import AuditDTO
+from gravitino.dto.authorization.group_dto import GroupDTO
+from gravitino.dto.authorization.role_dto import RoleDTO
+from gravitino.dto.authorization.user_dto import UserDTO
 from gravitino.dto.fileset_dto import FilesetDTO
 from gravitino.dto.metalake_dto import MetalakeDTO
 from gravitino.dto.schema_dto import SchemaDTO
@@ -301,3 +304,217 @@ def mock_http_response(json_str: str) -> Response:
     mock_http_resp.url = None
     mock_resp = Response(mock_http_resp)
     return mock_resp
+
+
+def _build_user_dto(name: str, roles: tp.Optional[list[str]] = None) -> UserDTO:
+    return (
+        UserDTO.builder()
+        .with_name(name)
+        .with_roles(roles or [])
+        .with_audit(build_audit_info())
+        .build()
+    )
+
+
+def _build_group_dto(name: str, roles: tp.Optional[list[str]] = None) -> GroupDTO:
+    return (
+        GroupDTO.builder()
+        .with_name(name)
+        .with_roles(roles or [])
+        .with_audit(build_audit_info())
+        .build()
+    )
+
+
+def _build_role_dto(
+    name: str,
+    properties: tp.Optional[dict[str, str]] = None,
+) -> RoleDTO:
+    return (
+        RoleDTO.builder()
+        .with_name(name)
+        .with_properties(properties)
+        .with_audit(build_audit_info())
+        .build()
+    )
+
+
+class MockAuthorizationRepo:
+    """In-memory mock store for authorization entities (users, groups, roles)."""
+
+    def __init__(self) -> None:
+        self.users: dict[str, "UserDTO"] = {
+            "userA": _build_user_dto("userA"),
+            "userB": _build_user_dto("userB", ["roleA"]),
+        }
+        self.groups: dict[str, "GroupDTO"] = {
+            "groupA": _build_group_dto("groupA"),
+        }
+        self.roles: dict[str, "RoleDTO"] = {
+            "roleA": _build_role_dto("roleA", {"purpose": "test"}),
+        }
+
+    # ---- User ----
+
+    def mock_add_user(self, user: str) -> "UserDTO":
+        if user in self.users:
+            raise ValueError(f"User {user} already exists")
+        dto = _build_user_dto(user)
+        self.users[user] = dto
+        return dto
+
+    def mock_get_user(self, user: str) -> "UserDTO":
+        if user not in self.users:
+            raise ValueError(f"User {user} does not exist")
+        return self.users[user]
+
+    def mock_remove_user(self, user: str) -> bool:
+        if user not in self.users:
+            return False
+        del self.users[user]
+        return True
+
+    def mock_list_users(self) -> list["UserDTO"]:
+        return list(self.users.values())
+
+    def mock_list_user_names(self) -> list[str]:
+        return list(self.users.keys())
+
+    # ---- Group ----
+
+    def mock_add_group(self, group: str) -> "GroupDTO":
+        if group in self.groups:
+            raise ValueError(f"Group {group} already exists")
+        dto = _build_group_dto(group)
+        self.groups[group] = dto
+        return dto
+
+    def mock_get_group(self, group: str) -> "GroupDTO":
+        if group not in self.groups:
+            raise ValueError(f"Group {group} does not exist")
+        return self.groups[group]
+
+    def mock_remove_group(self, group: str) -> bool:
+        if group not in self.groups:
+            return False
+        del self.groups[group]
+        return True
+
+    def mock_list_groups(self) -> list["GroupDTO"]:
+        return list(self.groups.values())
+
+    def mock_list_group_names(self) -> list[str]:
+        return list(self.groups.keys())
+
+    # ---- Role ----
+
+    def mock_create_role(self, role: str, properties=None, securable_objects=None):
+        if role in self.roles:
+            raise ValueError(f"Role {role} already exists")
+        dto = _build_role_dto(role, properties)
+        self.roles[role] = dto
+        return dto
+
+    def mock_get_role(self, role: str) -> "RoleDTO":
+        if role not in self.roles:
+            raise ValueError(f"Role {role} does not exist")
+        return self.roles[role]
+
+    def mock_delete_role(self, role: str) -> bool:
+        if role not in self.roles:
+            return False
+        del self.roles[role]
+        return True
+
+    def mock_list_role_names(self) -> list[str]:
+        return list(self.roles.keys())
+
+    # ---- Grant / Revoke ----
+
+    def mock_grant_roles_to_user(self, roles: list[str], user: str) -> "UserDTO":
+        if user not in self.users:
+            raise ValueError(f"User {user} does not exist")
+        dto = self.users[user]
+        current_roles = list(dto.roles())
+        for r in roles:
+            if r not in current_roles:
+                current_roles.append(r)
+        new_dto = _build_user_dto(user, current_roles)
+        self.users[user] = new_dto
+        return new_dto
+
+    def mock_revoke_roles_from_user(self, roles: list[str], user: str) -> "UserDTO":
+        if user not in self.users:
+            raise ValueError(f"User {user} does not exist")
+        dto = self.users[user]
+        current_roles = [r for r in dto.roles() if r not in roles]
+        new_dto = _build_user_dto(user, current_roles)
+        self.users[user] = new_dto
+        return new_dto
+
+    def mock_grant_roles_to_group(self, roles: list[str], group: str) -> "GroupDTO":
+        if group not in self.groups:
+            raise ValueError(f"Group {group} does not exist")
+        dto = self.groups[group]
+        current_roles = list(dto.roles())
+        for r in roles:
+            if r not in current_roles:
+                current_roles.append(r)
+        new_dto = _build_group_dto(group, current_roles)
+        self.groups[group] = new_dto
+        return new_dto
+
+    def mock_revoke_roles_from_group(self, roles: list[str], group: str) -> "GroupDTO":
+        if group not in self.groups:
+            raise ValueError(f"Group {group} does not exist")
+        dto = self.groups[group]
+        current_roles = [r for r in dto.roles() if r not in roles]
+        new_dto = _build_group_dto(group, current_roles)
+        self.groups[group] = new_dto
+        return new_dto
+
+    def mock_grant_privileges_to_role(self, role, obj, privileges):
+        if role not in self.roles:
+            raise ValueError(f"Role {role} does not exist")
+        return self.roles[role]
+
+    def mock_revoke_privileges_from_role(self, role, obj, privileges):
+        if role not in self.roles:
+            raise ValueError(f"Role {role} does not exist")
+        return self.roles[role]
+
+
+@contextmanager
+def mock_authorization_methods():
+    repo = MockAuthorizationRepo()
+
+    with patch.multiple(
+        GravitinoMetalake,
+        add_user=MagicMock(side_effect=repo.mock_add_user),
+        get_user=MagicMock(side_effect=repo.mock_get_user),
+        remove_user=MagicMock(side_effect=repo.mock_remove_user),
+        list_users=MagicMock(side_effect=repo.mock_list_users),
+        list_user_names=MagicMock(side_effect=repo.mock_list_user_names),
+        add_group=MagicMock(side_effect=repo.mock_add_group),
+        get_group=MagicMock(side_effect=repo.mock_get_group),
+        remove_group=MagicMock(side_effect=repo.mock_remove_group),
+        list_groups=MagicMock(side_effect=repo.mock_list_groups),
+        list_group_names=MagicMock(side_effect=repo.mock_list_group_names),
+        create_role=MagicMock(side_effect=repo.mock_create_role),
+        get_role=MagicMock(side_effect=repo.mock_get_role),
+        delete_role=MagicMock(side_effect=repo.mock_delete_role),
+        list_role_names=MagicMock(side_effect=repo.mock_list_role_names),
+        grant_roles_to_user=MagicMock(side_effect=repo.mock_grant_roles_to_user),
+        revoke_roles_from_user=MagicMock(side_effect=repo.mock_revoke_roles_from_user),
+        grant_roles_to_group=MagicMock(side_effect=repo.mock_grant_roles_to_group),
+        revoke_roles_from_group=MagicMock(
+            side_effect=repo.mock_revoke_roles_from_group
+        ),
+        grant_privileges_to_role=MagicMock(
+            side_effect=repo.mock_grant_privileges_to_role
+        ),
+        revoke_privileges_from_role=MagicMock(
+            side_effect=repo.mock_revoke_privileges_from_role
+        ),
+    ) as mocks:
+        yield mocks, repo

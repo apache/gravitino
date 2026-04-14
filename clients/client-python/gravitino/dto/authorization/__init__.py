@@ -14,19 +14,3 @@
 # KIND, either express or implied.  See the License for the
 # specific language governing permissions and limitations
 # under the License.
-
-from __future__ import annotations
-
-from gravitino.api.authorization.group import Group
-from gravitino.api.authorization.privileges import Privileges
-from gravitino.api.authorization.role import Role
-from gravitino.api.authorization.securable_objects import SecurableObjects
-from gravitino.api.authorization.user import User
-
-__all__ = [
-    "Group",
-    "Role",
-    "SecurableObjects",
-    "Privileges",
-    "User",
-]

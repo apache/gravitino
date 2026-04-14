@@ -19,12 +19,18 @@ from __future__ import annotations
 
 from typing import Dict, List, Optional
 
+from gravitino.api.authorization.group import Group
+from gravitino.api.authorization.privileges import Privilege
+from gravitino.api.authorization.role import Role
+from gravitino.api.authorization.securable_objects import SecurableObject
+from gravitino.api.authorization.user import User
 from gravitino.api.catalog import Catalog
 from gravitino.api.catalog_change import CatalogChange
 from gravitino.api.job.job_handle import JobHandle
 from gravitino.api.job.job_template import JobTemplate
 from gravitino.api.job.job_template_change import JobTemplateChange
 from gravitino.api.job.supports_jobs import SupportsJobs
+from gravitino.api.metadata_object import MetadataObject
 from gravitino.api.tag.tag_operations import TagOperations
 from gravitino.auth.auth_data_provider import AuthDataProvider
 from gravitino.client.gravitino_client_base import GravitinoClientBase
@@ -330,3 +336,79 @@ class GravitinoClient(GravitinoClientBase, SupportsJobs, TagOperations):
             NoSuchMetalakeException: If the metalake does not exist.
         """
         return self.get_metalake().delete_tag(tag_name)
+
+    # Authorization operations
+
+    def add_user(self, user: str) -> User:
+        return self.get_metalake().add_user(user)
+
+    def remove_user(self, user: str) -> bool:
+        return self.get_metalake().remove_user(user)
+
+    def get_user(self, user: str) -> User:
+        return self.get_metalake().get_user(user)
+
+    def list_users(self) -> list[User]:
+        return self.get_metalake().list_users()
+
+    def list_user_names(self) -> list[str]:
+        return self.get_metalake().list_user_names()
+
+    def add_group(self, group: str) -> Group:
+        return self.get_metalake().add_group(group)
+
+    def remove_group(self, group: str) -> bool:
+        return self.get_metalake().remove_group(group)
+
+    def get_group(self, group: str) -> Group:
+        return self.get_metalake().get_group(group)
+
+    def list_groups(self) -> list[Group]:
+        return self.get_metalake().list_groups()
+
+    def list_group_names(self) -> list[str]:
+        return self.get_metalake().list_group_names()
+
+    def create_role(
+        self,
+        role: str,
+        properties: dict[str, str],
+        securable_objects: list[SecurableObject],
+    ) -> Role:
+        return self.get_metalake().create_role(role, properties, securable_objects)
+
+    def delete_role(self, role: str) -> bool:
+        return self.get_metalake().delete_role(role)
+
+    def get_role(self, role: str) -> Role:
+        return self.get_metalake().get_role(role)
+
+    def list_role_names(self) -> list[str]:
+        return self.get_metalake().list_role_names()
+
+    def grant_roles_to_user(self, roles: list[str], user: str) -> User:
+        return self.get_metalake().grant_roles_to_user(roles, user)
+
+    def revoke_roles_from_user(self, roles: list[str], user: str) -> User:
+        return self.get_metalake().revoke_roles_from_user(roles, user)
+
+    def grant_roles_to_group(self, roles: list[str], group: str) -> Group:
+        return self.get_metalake().grant_roles_to_group(roles, group)
+
+    def revoke_roles_from_group(self, roles: list[str], group: str) -> Group:
+        return self.get_metalake().revoke_roles_from_group(roles, group)
+
+    def grant_privileges_to_role(
+        self, role: str, obj: MetadataObject, privileges: list[Privilege]
+    ) -> Role:
+        return self.get_metalake().grant_privileges_to_role(role, obj, privileges)
+
+    def revoke_privileges_from_role(
+        self, role: str, obj: MetadataObject, privileges: list[Privilege]
+    ) -> Role:
+        return self.get_metalake().revoke_privileges_from_role(role, obj, privileges)
+
+    def list_binding_role_names(
+        self, type_: MetadataObject.Type, full_name: str
+    ) -> list[str]:
+        return self.get_metalake().list_binding_role_names(type_, full_name)

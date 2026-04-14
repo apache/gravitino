@@ -219,5 +219,59 @@ class Privilege(ABC):
 
 
 class Privileges:
-    # TODO Implement the Privileges class.
-    pass
+    """The helper class for Privilege. Provides factory methods to create privilege instances."""
+
+    @staticmethod
+    def allow(name: Privilege.Name) -> Privilege:
+        """Create a Privilege with ALLOW condition.
+
+        Args:
+            name: The name of the privilege.
+
+        Returns:
+            Privilege: A privilege instance with ALLOW condition.
+        """
+        return _GenericPrivilege(Privilege.Condition.ALLOW, name)
+
+    @staticmethod
+    def deny(name: Privilege.Name) -> Privilege:
+        """Create a Privilege with DENY condition.
+
+        Args:
+            name: The name of the privilege.
+
+        Returns:
+            Privilege: A privilege instance with DENY condition.
+        """
+        return _GenericPrivilege(Privilege.Condition.DENY, name)
+
+
+class _GenericPrivilege(Privilege):
+    """Generic implementation of Privilege that works with any Privilege.Name."""
+
+    def __init__(self, condition: Privilege.Condition, name: Privilege.Name):
+        self._condition = condition
+        self._name = name
+
+    def name(self) -> Privilege.Name:
+        return self._name
+
+    def simple_string(self) -> str:
+        return f"{self._condition.value} {self._name.name.lower().replace('_', ' ')}"
+
+    def condition(self) -> Privilege.Condition:
+        return self._condition
+
+    def can_bind_to(self, obj_type: MetadataObject.Type) -> bool:
+        return True
+
+    def __eq__(self, other: object) -> bool:
+        if not isinstance(other, Privilege):
+            return False
+        return self._condition == other.condition() and self._name == other.name()
+
+    def __hash__(self) -> int:
+        return hash((self._condition, self._name))
+
+    def __repr__(self) -> str:
+        return f"Privileges.{self._condition.value.lower()}(Privilege.Name.{self._name.name})"

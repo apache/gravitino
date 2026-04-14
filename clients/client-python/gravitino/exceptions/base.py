@@ -227,3 +227,27 @@ class NoSuchFunctionException(NotFoundException):
 
 class FunctionAlreadyExistsException(AlreadyExistsException):
     """An exception thrown when a function already exists."""
+
+
+class NoSuchUserException(NotFoundException):
+    """An exception thrown when a user is not found."""
+
+
+class NoSuchGroupException(NotFoundException):
+    """An exception thrown when a group is not found."""
+
+
+class NoSuchRoleException(NotFoundException):
+    """An exception thrown when a role is not found."""
+
+
+class UserAlreadyExistsException(AlreadyExistsException):
+    """An exception thrown when a user already exists."""
+
+
+class GroupAlreadyExistsException(AlreadyExistsException):
+    """An exception thrown when a group already exists."""
+
+
+class RoleAlreadyExistsException(AlreadyExistsException):
+    """An exception thrown when a role already exists."""

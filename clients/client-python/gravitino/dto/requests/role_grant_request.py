@@ -17,16 +17,23 @@
 
 from __future__ import annotations
 
-from gravitino.api.authorization.group import Group
-from gravitino.api.authorization.privileges import Privileges
-from gravitino.api.authorization.role import Role
-from gravitino.api.authorization.securable_objects import SecurableObjects
-from gravitino.api.authorization.user import User
+from dataclasses import dataclass, field
 
-__all__ = [
-    "Group",
-    "Role",
-    "SecurableObjects",
-    "Privileges",
-    "User",
-]
+from dataclasses_json import config, dataclass_json
+
+from gravitino.rest.rest_message import RESTRequest
+from gravitino.utils.precondition import Precondition
+
+
+@dataclass_json
+@dataclass
+class RoleGrantRequest(RESTRequest):
+    """Represents a request to grant roles to a user or group."""
+
+    _role_names: list[str] = field(metadata=config(field_name="roleNames"))
+
+    def validate(self) -> None:
+        Precondition.check_argument(
+            self._role_names is not None and len(self._role_names) > 0,
+            "roleNames must not be null or empty",
+        )
