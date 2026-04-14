@@ -47,6 +47,8 @@ dependencies {
   testImplementation(project(":common"))
   testImplementation(project(":core"))
 
+  testImplementation(libs.aws.glue)
+
   testImplementation(libs.junit.jupiter.api)
   testImplementation(libs.mockito.core)
   testImplementation(libs.slf4j.api)

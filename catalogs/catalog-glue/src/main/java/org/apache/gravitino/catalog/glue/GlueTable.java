@@ -108,10 +108,11 @@ public class GlueTable extends BaseTable {
 
     // --- Distribution (bucket) ---
     Distribution distribution = Distributions.NONE;
-    if (sd != null && sd.hasBucketColumns() && sd.numberOfBuckets() > 0) {
+    Integer numBuckets = sd != null ? sd.numberOfBuckets() : null;
+    if (sd != null && sd.hasBucketColumns() && numBuckets != null && numBuckets > 0) {
       distribution =
           Distributions.hash(
-              sd.numberOfBuckets(),
+              numBuckets,
               sd.bucketColumns().stream()
                   .map(NamedReference::field)
                   .toArray(org.apache.gravitino.rel.expressions.Expression[]::new));
@@ -123,10 +124,14 @@ public class GlueTable extends BaseTable {
       sortOrders =
           sd.sortColumns().stream()
               .map(
-                  o ->
-                      SortOrders.of(
-                          NamedReference.field(o.column()),
-                          o.sortOrder() == 1 ? SortDirection.ASCENDING : SortDirection.DESCENDING))
+                  o -> {
+                    Integer sortOrder = o.sortOrder();
+                    return SortOrders.of(
+                        NamedReference.field(o.column()),
+                        sortOrder != null && sortOrder == 1
+                            ? SortDirection.ASCENDING
+                            : SortDirection.DESCENDING);
+                  })
               .toArray(SortOrder[]::new);
     }
 
