@@ -95,17 +95,14 @@ public class TestCatalogWrapperForREST {
     RESTCatalog restCatalog = mock(RESTCatalog.class);
     when(restCatalog.properties())
         .thenReturn(
-            ImmutableMap.of(
-                IcebergConstants.URI,
-                "http://merged-from-remote-config:9999",
-                IcebergConstants.IO_IMPL,
-                "org.apache.iceberg.aws.s3.S3FileIO",
-                IcebergConstants.ICEBERG_S3_ENDPOINT,
-                "http://localhost:9000",
-                IcebergConstants.ICEBERG_ACCESS_DELEGATION,
-                "vended-credentials",
-                IcebergConstants.WAREHOUSE,
-                "/remote/warehouse"));
+            ImmutableMap.<String, String>builder()
+                .put(IcebergConstants.URI, "http://merged-from-remote-config:9999")
+                .put(IcebergConstants.IO_IMPL, "org.apache.iceberg.aws.s3.S3FileIO")
+                .put(IcebergConstants.ICEBERG_S3_ENDPOINT, "http://localhost:9000")
+                .put(IcebergConstants.ICEBERG_ACCESS_DELEGATION, "vended-credentials")
+                .put(IcebergConstants.ICEBERG_S3_PROXY_ENDPOINT, "http://proxy:8080")
+                .put(IcebergConstants.WAREHOUSE, "/remote/warehouse")
+                .build());
 
     Map<String, String> configToClients =
         CatalogWrapperForREST.buildCatalogConfigToClients(config, restCatalog);
@@ -116,6 +113,8 @@ public class TestCatalogWrapperForREST {
         "http://localhost:9000", configToClients.get(IcebergConstants.ICEBERG_S3_ENDPOINT));
     Assertions.assertEquals(
         "vended-credentials", configToClients.get(IcebergConstants.ICEBERG_ACCESS_DELEGATION));
+    Assertions.assertEquals(
+        "http://proxy:8080", configToClients.get(IcebergConstants.ICEBERG_S3_PROXY_ENDPOINT));
   }
 
   @Test
