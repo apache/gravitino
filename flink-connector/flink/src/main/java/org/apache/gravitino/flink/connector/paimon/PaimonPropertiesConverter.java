@@ -19,6 +19,9 @@
 
 package org.apache.gravitino.flink.connector.paimon;
 
+import java.util.HashMap;
+import java.util.Map;
+import org.apache.flink.table.catalog.ObjectPath;
 import org.apache.gravitino.catalog.lakehouse.paimon.PaimonConstants;
 import org.apache.gravitino.catalog.lakehouse.paimon.PaimonPropertiesUtils;
 import org.apache.gravitino.flink.connector.CatalogPropertiesConverter;
@@ -45,6 +48,44 @@ public class PaimonPropertiesConverter
       return PaimonConstants.METASTORE;
     }
     return PaimonPropertiesUtils.GRAVITINO_CONFIG_TO_PAIMON.get(configKey);
+  }
+
+  /**
+   * Merges translated catalog-level properties (e.g. {@code metastore=hive}, {@code uri}, {@code
+   * warehouse}) into the table properties so that {@link org.apache.paimon.flink.FlinkTableFactory}
+   * can construct the correct {@code MetastoreClient} (e.g. {@code HiveMetastoreClient}) during
+   * data-write commits. Without this merge, partition metadata is never synced to Hive metastore
+   * when writing to partitioned Paimon tables.
+   *
+   * <p>The catalog options may arrive in two forms depending on how the catalog was constructed:
+   *
+   * <ul>
+   *   <li><b>Gravitino-side keys</b> (e.g. {@code catalog-backend=hive}) — translated to Paimon
+   *       keys via {@link #transformPropertyToFlinkCatalog}.
+   *   <li><b>Paimon-native keys</b> (e.g. {@code metastore=hive}) — detected by a reverse lookup
+   *       via {@link #transformPropertyToGravitinoCatalog} and kept as-is.
+   * </ul>
+   *
+   * <p>Table-level properties take precedence over catalog-level properties.
+   */
+  @Override
+  public Map<String, String> toFlinkTableProperties(
+      Map<String, String> flinkCatalogProperties,
+      Map<String, String> gravitinoTableProperties,
+      ObjectPath tablePath) {
+    Map<String, String> result = new HashMap<>(gravitinoTableProperties);
+    for (Map.Entry<String, String> entry : flinkCatalogProperties.entrySet()) {
+      String paimonKey = transformPropertyToFlinkCatalog(entry.getKey());
+      if (paimonKey == null && transformPropertyToGravitinoCatalog(entry.getKey()) != null) {
+        // The key is already in Paimon-native format (e.g. "metastore", "uri", "warehouse").
+        paimonKey = entry.getKey();
+      }
+      if (paimonKey != null) {
+        // Table-level properties win; catalog options fill in only if not already set.
+        result.putIfAbsent(paimonKey, entry.getValue());
+      }
+    }
+    return result;
   }
 
   @Override
