@@ -22,6 +22,7 @@ import static org.apache.gravitino.storage.relational.mapper.RoleMetaMapper.GROU
 import static org.apache.gravitino.storage.relational.mapper.RoleMetaMapper.ROLE_TABLE_NAME;
 import static org.apache.gravitino.storage.relational.mapper.RoleMetaMapper.USER_ROLE_RELATION_TABLE_NAME;
 
+import java.util.List;
 import org.apache.gravitino.storage.relational.mapper.MetalakeMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.SecurableObjectMapper;
 import org.apache.gravitino.storage.relational.po.RolePO;
@@ -191,5 +192,23 @@ public class RoleMetaBaseSQLProvider {
     return "DELETE FROM "
         + ROLE_TABLE_NAME
         + " WHERE deleted_at > 0 AND deleted_at < #{legacyTimeline} LIMIT #{limit}";
+  }
+
+  public String bumpSecurableObjectsVersion(@Param("roleId") long roleId) {
+    return "UPDATE "
+        + ROLE_TABLE_NAME
+        + " SET securable_objects_version = securable_objects_version + 1"
+        + " WHERE role_id = #{roleId} AND deleted_at = 0";
+  }
+
+  public String batchGetSecurableObjectsVersions(@Param("roleIds") List<Long> roleIds) {
+    return "<script>"
+        + "SELECT role_id as roleId, securable_objects_version as securableObjectsVersion"
+        + " FROM "
+        + ROLE_TABLE_NAME
+        + " WHERE role_id IN "
+        + "<foreach item='id' collection='roleIds' open='(' separator=',' close=')'>#{id}</foreach>"
+        + " AND deleted_at = 0"
+        + "</script>";
   }
 }

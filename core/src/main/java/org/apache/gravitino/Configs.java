@@ -329,6 +329,15 @@ public class Configs {
           .longConf()
           .createWithDefault(DEFAULT_GRAVITINO_AUTHORIZATION_OWNER_CACHE_SIZE);
 
+  public static final long DEFAULT_GRAVITINO_AUTHORIZATION_USER_ROLE_CACHE_SIZE = 50000L;
+
+  public static final ConfigEntry<Long> GRAVITINO_AUTHORIZATION_USER_ROLE_CACHE_SIZE =
+      new ConfigBuilder("gravitino.authorization.jcasbin.userRoleCacheSize")
+          .doc("The maximum number of user→(roleIds, version) entries in the auth cache")
+          .version(ConfigConstants.VERSION_1_3_0)
+          .longConf()
+          .createWithDefault(DEFAULT_GRAVITINO_AUTHORIZATION_USER_ROLE_CACHE_SIZE);
+
   public static final ConfigEntry<List<String>> SERVICE_ADMINS =
       new ConfigBuilder("gravitino.authorization.serviceAdmins")
           .doc("The admins of Gravitino service")

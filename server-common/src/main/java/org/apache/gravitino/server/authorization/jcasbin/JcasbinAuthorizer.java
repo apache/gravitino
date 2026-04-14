@@ -17,8 +17,7 @@
 
 package org.apache.gravitino.server.authorization.jcasbin;
 
-import com.github.benmanes.caffeine.cache.Cache;
-import com.github.benmanes.caffeine.cache.Caffeine;
+import com.fasterxml.jackson.core.JsonProcessingException;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableList;
 import java.io.IOException;
@@ -27,19 +26,17 @@ import java.nio.charset.StandardCharsets;
 import java.security.Principal;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Locale;
+import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
-import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.Executor;
-import java.util.concurrent.Executors;
-import java.util.concurrent.ThreadPoolExecutor;
-import java.util.concurrent.TimeUnit;
+import java.util.stream.Collectors;
 import org.apache.commons.io.IOUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.Configs;
 import org.apache.gravitino.Entity;
-import org.apache.gravitino.EntityStore;
 import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.MetadataObjects;
@@ -50,12 +47,22 @@ import org.apache.gravitino.authorization.AuthorizationRequestContext;
 import org.apache.gravitino.authorization.AuthorizationUtils;
 import org.apache.gravitino.authorization.GravitinoAuthorizer;
 import org.apache.gravitino.authorization.Privilege;
-import org.apache.gravitino.authorization.SecurableObject;
+import org.apache.gravitino.cache.CaffeineGravitinoCache;
+import org.apache.gravitino.cache.GravitinoCache;
 import org.apache.gravitino.exceptions.NoSuchUserException;
+import org.apache.gravitino.json.JsonUtils;
 import org.apache.gravitino.meta.RoleEntity;
-import org.apache.gravitino.meta.UserEntity;
 import org.apache.gravitino.server.authorization.MetadataIdConverter;
-import org.apache.gravitino.utils.MetadataObjectUtil;
+import org.apache.gravitino.storage.relational.mapper.OwnerMetaMapper;
+import org.apache.gravitino.storage.relational.mapper.RoleMetaMapper;
+import org.apache.gravitino.storage.relational.mapper.UserMetaMapper;
+import org.apache.gravitino.storage.relational.po.OwnerRelInfoPO;
+import org.apache.gravitino.storage.relational.po.RolePO;
+import org.apache.gravitino.storage.relational.po.RoleVersionInfoPO;
+import org.apache.gravitino.storage.relational.po.SecurableObjectPO;
+import org.apache.gravitino.storage.relational.po.UserVersionInfoPO;
+import org.apache.gravitino.storage.relational.service.RoleMetaService;
+import org.apache.gravitino.storage.relational.utils.SessionUtils;
 import org.apache.gravitino.utils.NameIdentifierUtil;
 import org.apache.gravitino.utils.PrincipalUtils;
 import org.casbin.jcasbin.main.Enforcer;
@@ -82,14 +89,30 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
   private InternalAuthorizer denyInternalAuthorizer;
 
   /**
-   * loadedRoles is used to cache roles that have loaded permissions. When the permissions of a role
-   * are updated, they should be removed from it.
+   * Per-role policy version cache. Maps roleId → securableObjectsVersion. When the version in the
+   * DB differs from the cached value, the role's policies are reloaded. The removal listener clears
+   * stale policies from both enforcers on eviction.
    */
-  private Cache<Long, Boolean> loadedRoles;
+  private GravitinoCache<Long, Integer> loadedRoles;
 
-  private Cache<Long, Optional<Long>> ownerRel;
+  /**
+   * Per-user role cache. Maps "metalake:username" → CachedUserRoles (userId, roleGrantsVersion,
+   * roleIds). Validated against the DB version on every request before use.
+   */
+  private GravitinoCache<String, CachedUserRoles> userRoleCache;
 
-  private Executor executor = null;
+  /** Holds a snapshot of user role assignments for a single request lifetime. */
+  private static final class CachedUserRoles {
+    final long userId;
+    final int roleGrantsVersion;
+    final List<Long> roleIds;
+
+    CachedUserRoles(long userId, int roleGrantsVersion, List<Long> roleIds) {
+      this.userId = userId;
+      this.roleGrantsVersion = roleGrantsVersion;
+      this.roleIds = roleIds;
+    }
+  }
 
   @Override
   public void initialize() {
@@ -99,8 +122,10 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
             .get(Configs.GRAVITINO_AUTHORIZATION_CACHE_EXPIRATION_SECS);
     long roleCacheSize =
         GravitinoEnv.getInstance().config().get(Configs.GRAVITINO_AUTHORIZATION_ROLE_CACHE_SIZE);
-    long ownerCacheSize =
-        GravitinoEnv.getInstance().config().get(Configs.GRAVITINO_AUTHORIZATION_OWNER_CACHE_SIZE);
+    long userRoleCacheSize =
+        GravitinoEnv.getInstance()
+            .config()
+            .get(Configs.GRAVITINO_AUTHORIZATION_USER_ROLE_CACHE_SIZE);
 
     // Initialize enforcers before the caches that reference them in removal listeners
     allowEnforcer = new SyncedEnforcer(getModel("/jcasbin_model.conf"), new GravitinoAdapter());
@@ -109,33 +134,17 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
     denyInternalAuthorizer = new InternalAuthorizer(denyEnforcer);
 
     loadedRoles =
-        Caffeine.newBuilder()
-            .expireAfterAccess(cacheExpirationSecs, TimeUnit.SECONDS)
-            .maximumSize(roleCacheSize)
-            .executor(Runnable::run)
-            .removalListener(
-                (roleId, value, cause) -> {
-                  if (roleId != null) {
-                    allowEnforcer.deleteRole(String.valueOf(roleId));
-                    denyEnforcer.deleteRole(String.valueOf(roleId));
-                  }
-                })
-            .build();
-    ownerRel =
-        Caffeine.newBuilder()
-            .expireAfterAccess(cacheExpirationSecs, TimeUnit.SECONDS)
-            .maximumSize(ownerCacheSize)
-            .build();
-    executor =
-        Executors.newFixedThreadPool(
-            GravitinoEnv.getInstance()
-                .config()
-                .get(Configs.GRAVITINO_AUTHORIZATION_THREAD_POOL_SIZE),
-            runnable -> {
-              Thread thread = new Thread(runnable);
-              thread.setName("GravitinoAuthorizer-ThreadPool-" + thread.getId());
-              return thread;
+        new CaffeineGravitinoCache<>(
+            roleCacheSize,
+            cacheExpirationSecs,
+            (roleId, version, cause) -> {
+              if (roleId != null) {
+                allowEnforcer.deleteRole(String.valueOf(roleId));
+                denyEnforcer.deleteRole(String.valueOf(roleId));
+              }
             });
+
+    userRoleCache = new CaffeineGravitinoCache<>(userRoleCacheSize, cacheExpirationSecs);
   }
 
   private Model getModel(String modelFilePath) {
@@ -218,17 +227,43 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
       String metalake,
       MetadataObject metadataObject,
       AuthorizationRequestContext requestContext) {
-    Long userId;
     boolean result;
     try {
       Long metadataId = MetadataIdConverter.getID(metadataObject, metalake);
-      loadOwnerPolicy(metalake, metadataObject, metadataId);
-      UserEntity userEntity = getUserEntity(principal.getName(), metalake);
-      userId = userEntity.id();
-      metadataId = MetadataIdConverter.getID(metadataObject, metalake);
-      result = Objects.equals(Optional.of(userId), ownerRel.getIfPresent(metadataId));
+
+      // Resolve userId — use cached value if this request already resolved it
+      Long userId = requestContext.getResolvedUserId();
+      if (userId == null) {
+        UserVersionInfoPO versionInfo =
+            SessionUtils.getWithoutCommit(
+                UserMetaMapper.class,
+                mapper -> mapper.getUserVersionInfo(metalake, principal.getName()));
+        if (versionInfo == null) {
+          return false;
+        }
+        userId = versionInfo.getUserId();
+        requestContext.setResolvedUserId(userId);
+      }
+
+      // Resolve owner — use per-request cache to deduplicate DB lookups across ancestor chain
+      Optional<Long> ownerOpt;
+      if (requestContext.isOwnerCached(metadataId)) {
+        ownerOpt = requestContext.getCachedOwner(metadataId);
+      } else {
+        OwnerRelInfoPO ownerRow =
+            SessionUtils.getWithoutCommit(
+                OwnerMetaMapper.class, mapper -> mapper.selectOwnerByMetadataObjectId(metadataId));
+        if (ownerRow == null || !"USER".equals(ownerRow.getOwnerType())) {
+          ownerOpt = Optional.empty();
+        } else {
+          ownerOpt = Optional.of(ownerRow.getOwnerId());
+        }
+        requestContext.cacheOwner(metadataId, ownerOpt);
+      }
+
+      result = ownerOpt.isPresent() && Objects.equals(userId, ownerOpt.get());
     } catch (Exception e) {
-      LOG.debug("Can not get entity id", e);
+      LOG.debug("Can not get entity id for owner check", e);
       result = false;
     }
     LOG.debug(
@@ -276,18 +311,15 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
         Long roleId =
             MetadataIdConverter.getID(
                 NameIdentifierUtil.toMetadataObject(nameIdentifier, type), metalake);
-        EntityStore entityStore = GravitinoEnv.getInstance().entityStore();
-        NameIdentifier userNameIdentifier =
-            NameIdentifierUtil.ofUser(metalake, PrincipalUtils.getCurrentUserName());
         List<RoleEntity> entities =
-            entityStore
+            GravitinoEnv.getInstance()
+                .entityStore()
                 .relationOperations()
                 .listEntitiesByRelation(
                     SupportsRelationOperations.Type.ROLE_USER_REL,
-                    userNameIdentifier,
+                    NameIdentifierUtil.ofUser(metalake, PrincipalUtils.getCurrentUserName()),
                     Entity.EntityType.USER);
         return entities.stream().anyMatch(roleEntity -> Objects.equals(roleEntity.id(), roleId));
-
       } catch (Exception e) {
         LOG.warn("can not get user id or role id.", e);
         return false;
@@ -372,16 +404,12 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
       String metalake, String type, String fullName, AuthorizationRequestContext requestContext) {
     Principal currentPrincipal = PrincipalUtils.getCurrentPrincipal();
     // Check whether the principal holds MANAGE_GRANTS on the target object or any ancestor.
-    // A grant at a broader level (e.g. CATALOG or SCHEMA) implicitly covers all objects beneath it.
     MetadataObject.Type metadataType;
     try {
       metadataType = MetadataObject.Type.valueOf(type.toUpperCase());
     } catch (IllegalArgumentException e) {
       throw new IllegalArgumentException("Unknown metadata object type: " + type, e);
     }
-    // Build the full ancestor chain from the target object up to and including the metalake.
-    // MetadataObjects.parent(CATALOG) returns null (CATALOG is a root in the parent API), so the
-    // metalake is appended manually at the end.
     List<MetadataObject> chain = new ArrayList<>();
     for (MetadataObject obj = MetadataObjects.parse(fullName, metadataType);
         obj != null;
@@ -404,21 +432,23 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
     loadedRoles.invalidate(roleId);
   }
 
+  /**
+   * No-op: owner lookups are now done per-request via the DB, without a long-lived owner cache.
+   * This hook is kept for interface compatibility.
+   */
   @Override
   public void handleMetadataOwnerChange(
       String metalake, Long oldOwnerId, NameIdentifier nameIdentifier, Entity.EntityType type) {
-    MetadataObject metadataObject = NameIdentifierUtil.toMetadataObject(nameIdentifier, type);
-    Long metadataId = MetadataIdConverter.getID(metadataObject, metalake);
-    ownerRel.invalidate(metadataId);
+    // No persistent owner cache to invalidate — owner is resolved fresh per-request.
   }
 
   @Override
   public void close() throws IOException {
-    if (executor != null) {
-      if (executor instanceof ThreadPoolExecutor) {
-        ThreadPoolExecutor threadPoolExecutor = (ThreadPoolExecutor) executor;
-        threadPoolExecutor.shutdown();
-      }
+    if (loadedRoles != null) {
+      loadedRoles.close();
+    }
+    if (userRoleCache != null) {
+      userRoleCache.close();
     }
   }
 
@@ -447,24 +477,29 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
         String privilege,
         AuthorizationRequestContext requestContext) {
       Long metadataId;
-      Long userId;
       try {
-        UserEntity userEntity = getUserEntity(username, metalake);
-        userId = userEntity.id();
         metadataId = MetadataIdConverter.getID(metadataObject, metalake);
       } catch (Exception e) {
-        LOG.debug("Can not get entity id", e);
+        LOG.debug("Can not get metadata id", e);
         return false;
       }
-      loadRolePrivilege(metalake, username, userId, requestContext);
-      return authorizeByJcasbin(userId, metadataObject, metadataId, privilege);
+      loadRolePrivilege(metalake, username, requestContext);
+      Long userId = requestContext.getResolvedUserId();
+      if (userId == null) {
+        return false;
+      }
+      return authorizeByJcasbin(userId, metadataObject, metadataId, privilege, requestContext);
     }
 
     private boolean authorizeByJcasbin(
-        Long userId, MetadataObject metadataObject, Long metadataId, String privilege) {
+        Long userId,
+        MetadataObject metadataObject,
+        Long metadataId,
+        String privilege,
+        AuthorizationRequestContext requestContext) {
       if (AuthConstants.OWNER.equals(privilege)) {
-        Optional<Long> owner = ownerRel.getIfPresent(metadataId);
-        return Objects.equals(Optional.of(userId), owner);
+        Optional<Long> ownerOpt = requestContext.getCachedOwner(metadataId);
+        return ownerOpt != null && ownerOpt.isPresent() && Objects.equals(userId, ownerOpt.get());
       }
       return enforcer.enforce(
           String.valueOf(userId),
@@ -474,130 +509,149 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
     }
   }
 
-  private static UserEntity getUserEntity(String username, String metalake) throws IOException {
-    EntityStore entityStore = GravitinoEnv.getInstance().entityStore();
-    UserEntity userEntity =
-        entityStore.get(
-            NameIdentifierUtil.ofUser(metalake, username),
-            Entity.EntityType.USER,
-            UserEntity.class);
-    return userEntity;
-  }
-
+  /**
+   * Version-validated role loading. Runs at most once per request (guarded by
+   * requestContext.loadRole). On each execution:
+   *
+   * <ol>
+   *   <li>Fetches userId and roleGrantsVersion from DB.
+   *   <li>Compares DB version with userRoleCache; reloads role IDs if stale.
+   *   <li>For each role, compares DB securableObjectsVersion with loadedRoles; reloads policies if
+   *       stale.
+   *   <li>Wires user→role relationships in both JCasbin enforcers.
+   * </ol>
+   */
   private void loadRolePrivilege(
-      String metalake, String username, Long userId, AuthorizationRequestContext requestContext) {
+      String metalake, String username, AuthorizationRequestContext requestContext) {
     requestContext.loadRole(
         () -> {
-          EntityStore entityStore = GravitinoEnv.getInstance().entityStore();
-          NameIdentifier userNameIdentifier = NameIdentifierUtil.ofUser(metalake, username);
-          List<RoleEntity> entities;
-          try {
-            entities =
-                entityStore
-                    .relationOperations()
-                    .listEntitiesByRelation(
-                        SupportsRelationOperations.Type.ROLE_USER_REL,
-                        userNameIdentifier,
-                        Entity.EntityType.USER);
-            List<CompletableFuture<Void>> loadRoleFutures = new ArrayList<>();
-            for (RoleEntity role : entities) {
-              Long roleId = role.id();
-              allowEnforcer.addRoleForUser(String.valueOf(userId), String.valueOf(roleId));
-              denyEnforcer.addRoleForUser(String.valueOf(userId), String.valueOf(roleId));
-              if (loadedRoles.getIfPresent(roleId) != null) {
-                continue;
-              }
-              CompletableFuture<Void> loadRoleFuture =
-                  CompletableFuture.supplyAsync(
-                          () -> {
-                            try {
-                              return entityStore.get(
-                                  NameIdentifierUtil.ofRole(metalake, role.name()),
-                                  Entity.EntityType.ROLE,
-                                  RoleEntity.class);
-                            } catch (Exception e) {
-                              throw new RuntimeException("Failed to load role: " + role.name(), e);
-                            }
-                          },
-                          executor)
-                      .thenAcceptAsync(
-                          roleEntity -> {
-                            loadPolicyByRoleEntity(roleEntity);
-                            loadedRoles.put(roleId, true);
-                          },
-                          executor);
-              loadRoleFutures.add(loadRoleFuture);
+          // Step 1: Fetch userId + roleGrantsVersion from DB
+          UserVersionInfoPO versionInfo =
+              SessionUtils.getWithoutCommit(
+                  UserMetaMapper.class, mapper -> mapper.getUserVersionInfo(metalake, username));
+          if (versionInfo == null) {
+            LOG.debug("User {} not found in metalake {}", username, metalake);
+            return;
+          }
+          long userId = versionInfo.getUserId();
+          int dbRoleGrantsVersion = versionInfo.getRoleGrantsVersion();
+          requestContext.setResolvedUserId(userId);
+
+          // Step 2: Check/update userRoleCache
+          String cacheKey = metalake + ":" + username;
+          CachedUserRoles cached = userRoleCache.getIfPresent(cacheKey).orElse(null);
+
+          List<Long> roleIds;
+          boolean roleListStale = cached == null || cached.roleGrantsVersion != dbRoleGrantsVersion;
+          if (!roleListStale) {
+            roleIds = cached.roleIds;
+          } else {
+            List<RolePO> rolePOs =
+                SessionUtils.getWithoutCommit(
+                    RoleMetaMapper.class, mapper -> mapper.listRolesByUserId(userId));
+            roleIds = rolePOs.stream().map(RolePO::getRoleId).collect(Collectors.toList());
+            userRoleCache.put(cacheKey, new CachedUserRoles(userId, dbRoleGrantsVersion, roleIds));
+            // Clear stale user→role links in JCasbin before re-wiring
+            allowEnforcer.deleteRolesForUser(String.valueOf(userId));
+            denyEnforcer.deleteRolesForUser(String.valueOf(userId));
+          }
+
+          if (roleIds.isEmpty()) {
+            return;
+          }
+
+          // Step 3: Check per-role policy versions, reload stale roles
+          Map<Long, Integer> dbRoleVersions = fetchRoleVersionsFromDB(roleIds);
+          for (Long roleId : roleIds) {
+            Integer dbVersion = dbRoleVersions.get(roleId);
+            if (dbVersion == null) {
+              // Role may have been deleted; skip
+              continue;
             }
-            CompletableFuture.allOf(loadRoleFutures.toArray(new CompletableFuture[0])).join();
-          } catch (IOException e) {
-            throw new RuntimeException(e);
+            Optional<Integer> cachedVersion = loadedRoles.getIfPresent(roleId);
+            if (cachedVersion.isPresent() && cachedVersion.get().intValue() == dbVersion) {
+              // Policies for this role are up-to-date
+              continue;
+            }
+            // Invalidate first: triggers the removal listener which deletes stale policies from
+            // JCasbin. Then re-add fresh policies. Calling put() directly would also trigger the
+            // listener on REPLACED, wiping the newly loaded policies.
+            loadedRoles.invalidate(roleId);
+            List<SecurableObjectPO> pos = RoleMetaService.listSecurableObjectsByRoleId(roleId);
+            loadPoliciesFromPOs(roleId, pos);
+            loadedRoles.put(roleId, dbVersion);
+          }
+
+          // Step 4: Wire user → roles in JCasbin
+          for (Long roleId : roleIds) {
+            allowEnforcer.addRoleForUser(String.valueOf(userId), String.valueOf(roleId));
+            denyEnforcer.addRoleForUser(String.valueOf(userId), String.valueOf(roleId));
           }
         });
   }
 
-  private void loadOwnerPolicy(String metalake, MetadataObject metadataObject, Long metadataId) {
-    if (ownerRel.getIfPresent(metadataId) != null) {
-      LOG.debug("Metadata {} OWNER has been loaded.", metadataId);
-      return;
+  private Map<Long, Integer> fetchRoleVersionsFromDB(List<Long> roleIds) {
+    List<RoleVersionInfoPO> rows =
+        SessionUtils.getWithoutCommit(
+            RoleMetaMapper.class, mapper -> mapper.batchGetSecurableObjectsVersions(roleIds));
+    Map<Long, Integer> result = new HashMap<>();
+    for (RoleVersionInfoPO row : rows) {
+      result.put(row.getRoleId(), row.getSecurableObjectsVersion());
     }
-    try {
-      NameIdentifier entityIdent = MetadataObjectUtil.toEntityIdent(metalake, metadataObject);
-      EntityStore entityStore = GravitinoEnv.getInstance().entityStore();
-      List<? extends Entity> owners =
-          entityStore
-              .relationOperations()
-              .listEntitiesByRelation(
-                  SupportsRelationOperations.Type.OWNER_REL,
-                  entityIdent,
-                  Entity.EntityType.valueOf(metadataObject.type().name()));
-      if (owners.isEmpty()) {
-        ownerRel.put(metadataId, Optional.empty());
-      } else {
-        for (Entity ownerEntity : owners) {
-          if (ownerEntity instanceof UserEntity) {
-            UserEntity user = (UserEntity) ownerEntity;
-            ownerRel.put(metadataId, Optional.of(user.id()));
-          }
-        }
-      }
-    } catch (IOException e) {
-      LOG.warn("Can not load metadata owner", e);
-    }
+    return result;
   }
 
-  private void loadPolicyByRoleEntity(RoleEntity roleEntity) {
-    String metalake = NameIdentifierUtil.getMetalake(roleEntity.nameIdentifier());
-    List<SecurableObject> securableObjects = roleEntity.securableObjects();
+  /**
+   * Loads privilege policies for a role directly from {@link SecurableObjectPO} records, avoiding
+   * the need to resolve integer metadata IDs through {@link MetadataIdConverter}.
+   *
+   * <p>DENY-condition privileges are added to the denyEnforcer with "allow" effect, and also to
+   * allowEnforcer with "deny" effect so that concurrent allow+deny grants on the same object return
+   * false.
+   */
+  @SuppressWarnings("unchecked")
+  private void loadPoliciesFromPOs(long roleId, List<SecurableObjectPO> pos) {
+    String roleIdStr = String.valueOf(roleId);
+    for (SecurableObjectPO po : pos) {
+      List<String> privilegeNames;
+      List<String> privilegeConditions;
+      try {
+        privilegeNames = JsonUtils.anyFieldMapper().readValue(po.getPrivilegeNames(), List.class);
+        privilegeConditions =
+            JsonUtils.anyFieldMapper().readValue(po.getPrivilegeConditions(), List.class);
+      } catch (JsonProcessingException e) {
+        LOG.warn(
+            "Failed to parse privilege JSON for role {} securable object {}: {}",
+            roleId,
+            po.getMetadataObjectId(),
+            e.getMessage());
+        continue;
+      }
 
-    for (SecurableObject securableObject : securableObjects) {
-      for (Privilege privilege : securableObject.privileges()) {
-        Privilege.Condition condition = privilege.condition();
-        if (AuthConstants.DENY.equalsIgnoreCase(condition.name())) {
-          denyEnforcer.addPolicy(
-              String.valueOf(roleEntity.id()),
-              securableObject.type().name(),
-              String.valueOf(MetadataIdConverter.getID(securableObject, metalake)),
-              AuthorizationUtils.replaceLegacyPrivilegeName(privilege.name())
-                  .name()
-                  .toUpperCase(java.util.Locale.ROOT),
-              AuthConstants.ALLOW);
-        }
-        // Since different roles of a user may simultaneously hold both "allow" and "deny"
-        // permissions
-        // for the same privilege on a given MetadataObject, the allowEnforcer must also incorporate
-        // the "deny" privilege to ensure that the authorize method correctly returns false in such
-        // cases. For example, if role1 has an "allow" privilege for SELECT_TABLE on table1, while
-        // role2 has a "deny" privilege for the same action on table1, then a user assigned both
-        // roles should receive a false result when calling the authorize method.
+      String objectType = po.getType();
+      String objectIdStr = String.valueOf(po.getMetadataObjectId());
 
-        allowEnforcer.addPolicy(
-            String.valueOf(roleEntity.id()),
-            securableObject.type().name(),
-            String.valueOf(MetadataIdConverter.getID(securableObject, metalake)),
-            AuthorizationUtils.replaceLegacyPrivilegeName(privilege.name())
+      for (int i = 0; i < privilegeNames.size(); i++) {
+        String rawPrivName = privilegeNames.get(i);
+        String condition = privilegeConditions.get(i);
+
+        String normalizedPrivName =
+            AuthorizationUtils.replaceLegacyPrivilegeName(
+                    Privilege.Name.valueOf(rawPrivName.toUpperCase(Locale.ROOT)))
                 .name()
-                .toUpperCase(java.util.Locale.ROOT),
-            condition.name().toLowerCase(java.util.Locale.ROOT));
+                .toUpperCase(Locale.ROOT);
+
+        if (AuthConstants.DENY.equalsIgnoreCase(condition)) {
+          denyEnforcer.addPolicy(
+              roleIdStr, objectType, objectIdStr, normalizedPrivName, AuthConstants.ALLOW);
+        }
+        // allowEnforcer carries both ALLOW and DENY effects so that deny overrides allow
+        allowEnforcer.addPolicy(
+            roleIdStr,
+            objectType,
+            objectIdStr,
+            normalizedPrivName,
+            condition.toLowerCase(Locale.ROOT));
       }
     }
   }

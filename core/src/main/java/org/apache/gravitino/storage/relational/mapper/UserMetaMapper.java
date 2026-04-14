@@ -22,6 +22,7 @@ package org.apache.gravitino.storage.relational.mapper;
 import java.util.List;
 import org.apache.gravitino.storage.relational.po.ExtendedUserPO;
 import org.apache.gravitino.storage.relational.po.UserPO;
+import org.apache.gravitino.storage.relational.po.UserVersionInfoPO;
 import org.apache.ibatis.annotations.DeleteProvider;
 import org.apache.ibatis.annotations.InsertProvider;
 import org.apache.ibatis.annotations.Param;
@@ -88,4 +89,11 @@ public interface UserMetaMapper {
       method = "deleteUserMetasByLegacyTimeline")
   Integer deleteUserMetasByLegacyTimeline(
       @Param("legacyTimeline") Long legacyTimeline, @Param("limit") int limit);
+
+  @UpdateProvider(type = UserMetaSQLProviderFactory.class, method = "bumpRoleGrantsVersion")
+  void bumpRoleGrantsVersion(@Param("userId") long userId);
+
+  @SelectProvider(type = UserMetaSQLProviderFactory.class, method = "getUserVersionInfo")
+  UserVersionInfoPO getUserVersionInfo(
+      @Param("metalakeName") String metalakeName, @Param("userName") String userName);
 }

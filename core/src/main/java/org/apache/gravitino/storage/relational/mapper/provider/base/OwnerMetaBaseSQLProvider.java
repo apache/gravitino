@@ -225,4 +225,11 @@ public class OwnerMetaBaseSQLProvider {
         + OWNER_TABLE_NAME
         + " WHERE deleted_at > 0 AND deleted_at < #{legacyTimeline} LIMIT #{limit}";
   }
+
+  public String selectOwnerByMetadataObjectId(@Param("metadataObjectId") long metadataObjectId) {
+    return "SELECT owner_id as ownerId, owner_type as ownerType"
+        + " FROM "
+        + OWNER_TABLE_NAME
+        + " WHERE metadata_object_id = #{metadataObjectId} AND deleted_at = 0";
+  }
 }

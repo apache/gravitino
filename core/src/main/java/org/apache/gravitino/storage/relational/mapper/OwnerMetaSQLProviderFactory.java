@@ -104,4 +104,9 @@ public class OwnerMetaSQLProviderFactory {
     return getProvider()
         .batchSelectUserOwnerMetaByMetadataObjectIdAndType(metadataObjectIds, metadataObjectType);
   }
+
+  public static String selectOwnerByMetadataObjectId(
+      @Param("metadataObjectId") long metadataObjectId) {
+    return getProvider().selectOwnerByMetadataObjectId(metadataObjectId);
+  }
 }

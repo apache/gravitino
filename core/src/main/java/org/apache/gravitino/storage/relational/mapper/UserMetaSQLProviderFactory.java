@@ -97,4 +97,13 @@ public class UserMetaSQLProviderFactory {
       @Param("legacyTimeline") Long legacyTimeline, @Param("limit") int limit) {
     return getProvider().deleteUserMetasByLegacyTimeline(legacyTimeline, limit);
   }
+
+  public static String bumpRoleGrantsVersion(@Param("userId") long userId) {
+    return getProvider().bumpRoleGrantsVersion(userId);
+  }
+
+  public static String getUserVersionInfo(
+      @Param("metalakeName") String metalakeName, @Param("userName") String userName) {
+    return getProvider().getUserVersionInfo(metalakeName, userName);
+  }
 }

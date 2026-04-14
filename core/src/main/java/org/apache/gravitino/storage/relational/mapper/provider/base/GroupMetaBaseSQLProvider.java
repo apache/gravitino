@@ -182,4 +182,11 @@ public class GroupMetaBaseSQLProvider {
         + GROUP_TABLE_NAME
         + " WHERE deleted_at > 0 AND deleted_at < #{legacyTimeline} LIMIT #{limit}";
   }
+
+  public String bumpRoleGrantsVersion(@Param("groupId") long groupId) {
+    return "UPDATE "
+        + GROUP_TABLE_NAME
+        + " SET role_grants_version = role_grants_version + 1"
+        + " WHERE group_id = #{groupId} AND deleted_at = 0";
+  }
 }
