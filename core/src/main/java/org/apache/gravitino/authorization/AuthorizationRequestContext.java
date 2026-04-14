@@ -18,8 +18,10 @@
 package org.apache.gravitino.authorization;
 
 import java.security.Principal;
+import java.util.HashMap;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Function;
@@ -35,6 +37,15 @@ public class AuthorizationRequestContext {
 
   /** Used to determine whether the role has already been loaded. */
   private final AtomicBoolean hasLoadRole = new AtomicBoolean();
+
+  /**
+   * Per-request cache of metadata-object-id → owner user id. Maps to Optional.empty() when the
+   * object has no user owner. {@code null} means "not yet cached".
+   */
+  private final Map<Long, Optional<Long>> ownerCache = new HashMap<>();
+
+  /** The resolved user ID for the current request principal, cached after first resolution. */
+  private volatile Long resolvedUserId;
 
   private volatile String originalAuthorizationExpression;
 
@@ -101,6 +112,46 @@ public class AuthorizationRequestContext {
 
   public void setOriginalAuthorizationExpression(String originalAuthorizationExpression) {
     this.originalAuthorizationExpression = originalAuthorizationExpression;
+  }
+
+  public Long getResolvedUserId() {
+    return resolvedUserId;
+  }
+
+  public void setResolvedUserId(Long resolvedUserId) {
+    this.resolvedUserId = resolvedUserId;
+  }
+
+  /**
+   * Returns true if the owner entry for {@code metadataId} is present in the per-request cache.
+   *
+   * @param metadataId the metadata object ID
+   * @return true if cached
+   */
+  public boolean isOwnerCached(Long metadataId) {
+    return ownerCache.containsKey(metadataId);
+  }
+
+  /**
+   * Returns the cached owner for the given metadata object ID.
+   *
+   * <p>Call {@link #isOwnerCached(Long)} first to distinguish "not cached" from "no owner".
+   *
+   * @param metadataId the metadata object ID
+   * @return Optional.of(userId) if there is a user owner, Optional.empty() if no user owner
+   */
+  public Optional<Long> getCachedOwner(Long metadataId) {
+    return ownerCache.get(metadataId);
+  }
+
+  /**
+   * Stores the resolved owner (or "no owner") for the given metadata object ID.
+   *
+   * @param metadataId the metadata object ID
+   * @param owner Optional.of(userId) or Optional.empty()
+   */
+  public void cacheOwner(Long metadataId, Optional<Long> owner) {
+    ownerCache.put(metadataId, owner);
   }
 
   public static class AuthorizationKey {
