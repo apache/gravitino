@@ -99,6 +99,12 @@ public class IcebergCatalogPropertiesMetadata extends BaseCatalogPropertiesMetad
                 null /* defaultValue */,
                 true /* hidden */),
             stringOptionalPropertyEntry(
+                S3Properties.GRAVITINO_S3_PROXY_ENDPOINT,
+                "The proxy endpoint for S3 requests",
+                false /* immutable */,
+                null /* defaultValue */,
+                false /* hidden */),
+            stringOptionalPropertyEntry(
                 IcebergConstants.TABLE_METADATA_CACHE_IMPL,
                 "Table metadata cache implementation. Set to empty string(\"\") if "
                     + "catalog-backend is rest catalog, or custom catalog without the "

@@ -43,5 +43,8 @@ public class S3Properties {
   // The S3 path style access flag.
   public static final String GRAVITINO_S3_PATH_STYLE_ACCESS = "s3-path-style-access";
 
+  // The proxy endpoint for S3 requests.
+  public static final String GRAVITINO_S3_PROXY_ENDPOINT = "s3-proxy-endpoint";
+
   private S3Properties() {}
 }
