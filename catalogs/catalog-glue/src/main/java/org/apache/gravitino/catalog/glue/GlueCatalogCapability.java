@@ -18,12 +18,62 @@
  */
 package org.apache.gravitino.catalog.glue;
 
+import java.util.Locale;
 import org.apache.gravitino.connector.capability.Capability;
+import org.apache.gravitino.connector.capability.CapabilityResult;
 
 /**
  * Capability declarations for the AWS Glue Data Catalog connector.
  *
- * <p>TODO PR-02: declare actual capabilities (case sensitivity, NOT NULL support, etc.) based on
- * Glue's known constraints.
+ * <p>AWS Glue constraints that deviate from Gravitino defaults:
+ *
+ * <ul>
+ *   <li><b>Case-insensitive names</b>: Glue folds database and table names to lowercase on storage.
+ *       See <a
+ *       href="https://docs.aws.amazon.com/glue/latest/dg/aws-glue-api-catalog-databases.html">Database
+ *       API</a> and <a
+ *       href="https://docs.aws.amazon.com/glue/latest/dg/aws-glue-api-catalog-tables.html">Table
+ *       API</a>: <i>"folded to lowercase when it is stored"</i>.
+ *   <li><b>No NOT NULL constraints</b>: The Glue {@code Column} structure has no nullable /
+ *       constraint field. See <a
+ *       href="https://docs.aws.amazon.com/glue/latest/webapi/API_Column.html">Column API</a>.
+ *   <li><b>No DEFAULT values</b>: The Glue {@code Column} structure has no {@code defaultValue}
+ *       field. See <a href="https://docs.aws.amazon.com/glue/latest/webapi/API_Column.html">Column
+ *       API</a>.
+ * </ul>
  */
-public class GlueCatalogCapability implements Capability {}
+public class GlueCatalogCapability implements Capability {
+
+  @Override
+  public CapabilityResult columnNotNull() {
+    // Glue Column structure has no nullable/constraint field — NOT NULL cannot be expressed.
+    // See https://docs.aws.amazon.com/glue/latest/webapi/API_Column.html
+    return CapabilityResult.unsupported(
+        "AWS Glue Data Catalog does not support NOT NULL constraints on columns.");
+  }
+
+  @Override
+  public CapabilityResult columnDefaultValue() {
+    // Glue Column structure has no defaultValue field — DEFAULT cannot be expressed.
+    // See https://docs.aws.amazon.com/glue/latest/webapi/API_Column.html
+    return CapabilityResult.unsupported(
+        "AWS Glue Data Catalog does not support DEFAULT values on columns.");
+  }
+
+  @Override
+  public CapabilityResult caseSensitiveOnName(Scope scope) {
+    switch (scope) {
+      case SCHEMA:
+      case TABLE:
+        // Glue folds database/table names to lowercase on storage.
+        // See https://docs.aws.amazon.com/glue/latest/dg/aws-glue-api-catalog-databases.html
+        // See https://docs.aws.amazon.com/glue/latest/dg/aws-glue-api-catalog-tables.html
+        return CapabilityResult.unsupported(
+            "AWS Glue Data Catalog is case-insensitive for "
+                + scope.name().toLowerCase(Locale.ROOT)
+                + " names.");
+      default:
+        return CapabilityResult.SUPPORTED;
+    }
+  }
+}
