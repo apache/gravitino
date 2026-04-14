@@ -30,6 +30,11 @@ References:
 
 ### Option A: Add a new metadata object `SubNamespace`
 
+Use a new metadata object `SubNamespace` to replace schema
+
+Catalog -> SubNamespace a -> SubNamespace a.b -> Table a.b.c
+                          -> SubNamespace a.c -> SubNamespace a.c.d -> Table a.c.d.e
+
 Pros:
 
 - Clearer concept modeling.
@@ -70,6 +75,14 @@ Examples:
   - `metalake.catalog.'A.B'.table1`
   - `metalake.catalog.'A.B.C'.table2`
 - In UI display, show schema as `A.B` (human readable), but keep quoted form for parser-safe serialization.
+
+According to URL encoding rules (RFC 3986), single quotes have no reserved purpose 
+and must be percent-encoded if they appear in a URL component. The encoded form for a single quote is %27.
+
+Example:
+Invalid: https://example.com/path/to'O'reilly
+Valid (encoded): https://example.com/path/to%27O%27reilly
+
 
 ### Iceberg REST Side Behavior
 
