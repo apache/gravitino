@@ -30,6 +30,7 @@ import java.io.IOException;
 import java.time.Instant;
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.List;
 import org.apache.commons.lang3.reflect.FieldUtils;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.EntityStore;
@@ -46,6 +47,7 @@ import org.apache.gravitino.listener.api.event.IcebergRequestContext;
 import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.meta.TableEntity;
 import org.apache.iceberg.Schema;
+import org.apache.iceberg.UpdateRequirement;
 import org.apache.iceberg.catalog.Namespace;
 import org.apache.iceberg.catalog.TableIdentifier;
 import org.apache.iceberg.rest.requests.CreateTableRequest;
@@ -279,7 +281,10 @@ public class TestIcebergTableHookDispatcher {
   @Test
   public void testUpdateTableImportsAndSetsOwnershipForStagedCommit() throws IOException {
     TableIdentifier tableId = TableIdentifier.of("test_schema", "test_table");
-    UpdateTableRequest request = mock(UpdateTableRequest.class);
+    // A staged create commit carries AssertTableDoesNotExist as its requirement.
+    UpdateTableRequest request =
+        new UpdateTableRequest(
+            List.of(new UpdateRequirement.AssertTableDoesNotExist()), Collections.emptyList());
     LoadTableResponse mockResponse = mock(LoadTableResponse.class);
 
     when(mockDispatcher.updateTable(mockContext, tableId, request)).thenReturn(mockResponse);
@@ -305,14 +310,18 @@ public class TestIcebergTableHookDispatcher {
   }
 
   @Test
-  public void testUpdateTablePassesThrough() throws IOException {
+  public void testUpdateTableSkipsImportForStagedCommitWhenEntityAlreadyExists()
+      throws IOException {
     TableIdentifier tableId = TableIdentifier.of("test_schema", "test_table");
-    UpdateTableRequest request = mock(UpdateTableRequest.class);
+    // A staged create commit carries AssertTableDoesNotExist, but the entity already exists
+    // (e.g. idempotent retry). Import and ownership should be skipped.
+    UpdateTableRequest request =
+        new UpdateTableRequest(
+            List.of(new UpdateRequirement.AssertTableDoesNotExist()), Collections.emptyList());
     LoadTableResponse mockResponse = mock(LoadTableResponse.class);
 
     when(mockDispatcher.updateTable(mockContext, tableId, request)).thenReturn(mockResponse);
 
-    // Entity already exists (regular update, not a staged commit)
     NameIdentifier gravitinoTableId =
         IcebergIdentifierUtils.toGravitinoTableIdentifier(TEST_METALAKE, TEST_CATALOG, tableId);
     when(mockEntityStore.exists(gravitinoTableId, Entity.EntityType.TABLE)).thenReturn(true);
@@ -322,20 +331,73 @@ public class TestIcebergTableHookDispatcher {
     Assertions.assertEquals(mockResponse, result);
     verify(mockDispatcher).updateTable(mockContext, tableId, request);
 
-    // Verify table import was NOT called for existing entity
+    // Verify table import was NOT called since entity already exists
     verify(mockTableDispatcher, never()).loadTable(any());
 
-    // Verify ownership was NOT set for existing entity
+    // Verify ownership was NOT set since entity already exists
+    verify(mockOwnerDispatcher, never()).setOwner(any(), any(), any(), any());
+  }
+
+  @Test
+  public void testUpdateTableSkipsImportForRegularUpdateWhenEntityMissing() throws IOException {
+    TableIdentifier tableId = TableIdentifier.of("test_schema", "test_table");
+    // Regular table update (e.g. property change): no AssertTableDoesNotExist requirement.
+    UpdateTableRequest request =
+        new UpdateTableRequest(Collections.emptyList(), Collections.emptyList());
+    LoadTableResponse mockResponse = mock(LoadTableResponse.class);
+
+    when(mockDispatcher.updateTable(mockContext, tableId, request)).thenReturn(mockResponse);
+
+    // Entity does not exist (e.g. table pre-dates Gravitino tracking), but this is NOT a staged
+    // create commit, so we must NOT import or set ownership.
+    NameIdentifier gravitinoTableId =
+        IcebergIdentifierUtils.toGravitinoTableIdentifier(TEST_METALAKE, TEST_CATALOG, tableId);
+    when(mockEntityStore.exists(gravitinoTableId, Entity.EntityType.TABLE)).thenReturn(false);
+
+    LoadTableResponse result = hookDispatcher.updateTable(mockContext, tableId, request);
+
+    Assertions.assertEquals(mockResponse, result);
+    verify(mockDispatcher).updateTable(mockContext, tableId, request);
+
+    // Verify table import was NOT called for a plain property update
+    verify(mockTableDispatcher, never()).loadTable(any());
+
+    // Verify ownership was NOT set
+    verify(mockOwnerDispatcher, never()).setOwner(any(), any(), any(), any());
+  }
+
+  @Test
+  public void testUpdateTablePassesThrough() throws IOException {
+    TableIdentifier tableId = TableIdentifier.of("test_schema", "test_table");
+    // Regular update without AssertTableDoesNotExist — entity exists.
+    UpdateTableRequest request =
+        new UpdateTableRequest(Collections.emptyList(), Collections.emptyList());
+    LoadTableResponse mockResponse = mock(LoadTableResponse.class);
+
+    when(mockDispatcher.updateTable(mockContext, tableId, request)).thenReturn(mockResponse);
+
+    LoadTableResponse result = hookDispatcher.updateTable(mockContext, tableId, request);
+
+    Assertions.assertEquals(mockResponse, result);
+    verify(mockDispatcher).updateTable(mockContext, tableId, request);
+
+    // Verify table import was NOT called
+    verify(mockTableDispatcher, never()).loadTable(any());
+
+    // Verify ownership was NOT set
     verify(mockOwnerDispatcher, never()).setOwner(any(), any(), any(), any());
   }
 
   @Test
   public void testUpdateTableThrowsRuntimeExceptionOnIOException() throws IOException {
     TableIdentifier tableId = TableIdentifier.of("test_schema", "test_table");
-    UpdateTableRequest request = mock(UpdateTableRequest.class);
-    LoadTableResponse mockResponse = mock(LoadTableResponse.class);
+    // Use AssertTableDoesNotExist so the code path reaches store.exists().
+    UpdateTableRequest request =
+        new UpdateTableRequest(
+            List.of(new UpdateRequirement.AssertTableDoesNotExist()), Collections.emptyList());
 
-    when(mockDispatcher.updateTable(mockContext, tableId, request)).thenReturn(mockResponse);
+    when(mockDispatcher.updateTable(mockContext, tableId, request))
+        .thenReturn(mock(LoadTableResponse.class));
 
     NameIdentifier gravitinoTableId =
         IcebergIdentifierUtils.toGravitinoTableIdentifier(TEST_METALAKE, TEST_CATALOG, tableId);

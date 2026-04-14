@@ -33,6 +33,7 @@ import org.apache.gravitino.listener.api.event.IcebergRequestContext;
 import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.meta.TableEntity;
 import org.apache.gravitino.utils.PrincipalUtils;
+import org.apache.iceberg.UpdateRequirement;
 import org.apache.iceberg.catalog.Namespace;
 import org.apache.iceberg.catalog.TableIdentifier;
 import org.apache.iceberg.rest.requests.CreateTableRequest;
@@ -74,18 +75,26 @@ public class IcebergTableHookDispatcher implements IcebergTableOperationDispatch
       UpdateTableRequest updateTableRequest) {
     LoadTableResponse response =
         dispatcher.updateTable(context, tableIdentifier, updateTableRequest);
-    // Import the table and set ownership if the entity does not yet exist,
-    // e.g. when committing a staged table create.
-    try {
-      EntityStore store = GravitinoEnv.getInstance().entityStore();
-      NameIdentifier gravitinoTableId =
-          IcebergIdentifierUtils.toGravitinoTableIdentifier(
-              metalake, context.catalogName(), tableIdentifier);
-      if (store != null && !store.exists(gravitinoTableId, Entity.EntityType.TABLE)) {
-        importTableAndSetOwner(context, tableIdentifier.namespace(), tableIdentifier.name());
+    // Import the table and set ownership only when committing a staged table create.
+    // A staged create commit is identified by the AssertTableDoesNotExist requirement,
+    // which is set by UpdateRequirements.forCreateTable(). Regular updates (e.g. property
+    // changes) do not carry this requirement, so we must not set ownership for them even
+    // if the entity does not yet exist in the store.
+    boolean isStagedCreateCommit =
+        updateTableRequest.requirements().stream()
+            .anyMatch(UpdateRequirement.AssertTableDoesNotExist.class::isInstance);
+    if (isStagedCreateCommit) {
+      try {
+        EntityStore store = GravitinoEnv.getInstance().entityStore();
+        NameIdentifier gravitinoTableId =
+            IcebergIdentifierUtils.toGravitinoTableIdentifier(
+                metalake, context.catalogName(), tableIdentifier);
+        if (store != null && !store.exists(gravitinoTableId, Entity.EntityType.TABLE)) {
+          importTableAndSetOwner(context, tableIdentifier.namespace(), tableIdentifier.name());
+        }
+      } catch (IOException ioe) {
+        throw new RuntimeException("io exception when checking table entity existence", ioe);
       }
-    } catch (IOException ioe) {
-      throw new RuntimeException("io exception when checking table entity existence", ioe);
     }
     return response;
   }
