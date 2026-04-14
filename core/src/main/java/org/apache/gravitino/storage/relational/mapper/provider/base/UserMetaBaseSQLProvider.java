@@ -187,4 +187,23 @@ public class UserMetaBaseSQLProvider {
         + USER_TABLE_NAME
         + " WHERE deleted_at > 0 AND deleted_at < #{legacyTimeline} LIMIT #{limit}";
   }
+
+  public String bumpRoleGrantsVersion(@Param("userId") long userId) {
+    return "UPDATE "
+        + USER_TABLE_NAME
+        + " SET role_grants_version = role_grants_version + 1"
+        + " WHERE user_id = #{userId} AND deleted_at = 0";
+  }
+
+  public String getUserVersionInfo(
+      @Param("metalakeName") String metalakeName, @Param("userName") String userName) {
+    return "SELECT um.user_id as userId, um.role_grants_version as roleGrantsVersion"
+        + " FROM "
+        + USER_TABLE_NAME
+        + " um JOIN "
+        + MetalakeMetaMapper.TABLE_NAME
+        + " mm ON um.metalake_id = mm.metalake_id"
+        + " WHERE mm.metalake_name = #{metalakeName} AND um.user_name = #{userName}"
+        + " AND um.deleted_at = 0 AND mm.deleted_at = 0";
+  }
 }

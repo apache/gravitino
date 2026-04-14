@@ -88,4 +88,7 @@ public interface GroupMetaMapper {
       method = "deleteGroupMetasByLegacyTimeline")
   Integer deleteGroupMetasByLegacyTimeline(
       @Param("legacyTimeline") Long legacyTimeline, @Param("limit") int limit);
+
+  @UpdateProvider(type = GroupMetaSQLProviderFactory.class, method = "bumpRoleGrantsVersion")
+  void bumpRoleGrantsVersion(@Param("groupId") long groupId);
 }
