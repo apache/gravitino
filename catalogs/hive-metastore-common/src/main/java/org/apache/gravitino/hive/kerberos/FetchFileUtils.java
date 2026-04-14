@@ -36,11 +36,22 @@ public class FetchFileUtils {
   /**
    * Per-destination lock map used to serialize concurrent symlink creation for the same keytab
    * file. Keyed by the normalized absolute destination path string to avoid races caused by
-   * different path spellings referring to the same file.
+   * different path spellings referring to the same file. Entries are removed when the corresponding
+   * {@link KerberosClient} is closed, so the map size is bounded by the number of live catalogs.
    */
   private static final ConcurrentHashMap<String, Object> SYMLINK_LOCKS = new ConcurrentHashMap<>();
 
   private FetchFileUtils() {}
+
+  /**
+   * Removes the per-destination lock entry for the given file. Should be called when the keytab
+   * file is deleted (e.g., on {@link KerberosClient#close()}) to prevent unbounded map growth.
+   *
+   * @param destFile the keytab destination file whose lock entry should be removed
+   */
+  static void removeLock(File destFile) {
+    SYMLINK_LOCKS.remove(destFile.toPath().toAbsolutePath().normalize().toString());
+  }
 
   public static void fetchFileFromUri(
       String fileUri, File destFile, int timeout, Configuration conf) throws IOException {
@@ -65,8 +76,10 @@ public class FetchFileUtils {
                 && Files.readSymbolicLink(destPath).normalize().equals(srcPath)) {
               break;
             }
-            // Atomically replace via a temporary symlink + rename to avoid a window
-            // where the keytab path is absent (which could cause loginUserFromKeytab to fail).
+            // Replace via a temporary symlink + rename to minimize the window where the
+            // keytab path is absent (which could cause loginUserFromKeytab to fail).
+            // REPLACE_EXISTING is used here; on common local filesystems (ext4, xfs, APFS)
+            // a same-directory rename is effectively atomic at the OS level.
             var tmpPath = destPath.resolveSibling(destPath.getFileName() + ".symlink.tmp");
             Files.deleteIfExists(tmpPath);
             Files.createSymbolicLink(tmpPath, srcPath);

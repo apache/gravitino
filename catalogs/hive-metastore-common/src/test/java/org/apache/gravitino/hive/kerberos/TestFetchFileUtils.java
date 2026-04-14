@@ -26,6 +26,7 @@ import java.util.concurrent.CyclicBarrier;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
 import org.apache.hadoop.conf.Configuration;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
@@ -62,7 +63,7 @@ public class TestFetchFileUtils {
             executor.submit(
                 () -> {
                   try {
-                    barrier.await();
+                    barrier.await(30, TimeUnit.SECONDS);
                     FetchFileUtils.fetchFileFromUri(
                         srcFile.toURI().toString(), destFile, 10, new Configuration());
                   } catch (Exception e) {
@@ -71,7 +72,7 @@ public class TestFetchFileUtils {
                 }));
       }
       for (Future<?> future : futures) {
-        future.get();
+        future.get(30, TimeUnit.SECONDS);
       }
     } finally {
       executor.shutdownNow();
