@@ -67,8 +67,6 @@ if (scalaVersion !in listOf("2.12", "2.13")) {
 }
 
 val skipWeb: Boolean = (project.findProperty("skipWeb") as? String)?.toBoolean() ?: false
-val skipWebWar: Boolean = (project.findProperty("skipWebWar") as? String)?.toBoolean() ?: false
-val skipFrontend: Boolean = skipWeb || skipWebWar
 
 project.extra["extraJvmArgs"] =
   listOf(
@@ -268,17 +266,6 @@ allprojects {
   }
 
   extra["initTestParam"] = setTestEnvironment
-}
-
-if (skipWeb) {
-  gradle.projectsEvaluated {
-    listOf(":web:web", ":web-v2:web", ":web:integration-test", ":web-v2:integration-test")
-      .forEach { projectPath ->
-        project(projectPath).tasks.configureEach {
-          enabled = false
-        }
-      }
-  }
 }
 
 nexusPublishing {
@@ -804,7 +791,7 @@ tasks {
         ":lance:lance-rest-server:copyLibAndConfigs",
         ":maintenance:optimizer:copyLibAndConfigs"
       )
-    if (!skipWebBuild) {
+    if (!skipWeb) {
       dependencies.add(":web:web:build")
       dependencies.add(":web-v2:web:build")
     }
@@ -835,19 +822,6 @@ tasks {
           }
         }
         fileMode = 0b111101101
-      }
-      if (skipFrontend) {
-        val confFile = projectDir.file("distribution/package/conf/gravitino.conf").asFile
-        if (confFile.exists()) {
-          confFile.writeText(
-            confFile
-              .readText()
-              .replace(
-                "gravitino.server.webui.enable = true",
-                "gravitino.server.webui.enable = false"
-              )
-          )
-        }
       }
       copy {
         from(projectDir.dir("licenses")) { into("package/licenses") }

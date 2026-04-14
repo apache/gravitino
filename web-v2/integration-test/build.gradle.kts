@@ -54,8 +54,6 @@ dependencies {
 
 tasks.test {
   val skipWeb = (rootProject.findProperty("skipWeb") as? String)?.toBoolean() ?: false
-  val skipWebWar = (rootProject.findProperty("skipWebWar") as? String)?.toBoolean() ?: false
-  val skipFrontend = skipWeb || skipWebWar
   val skipITs = project.hasProperty("skipITs")
   if (skipITs) {
     exclude("*")
@@ -70,7 +68,7 @@ tasks.test {
     dependsOn(":catalogs:catalog-kafka:jar", ":catalogs:catalog-kafka:runtimeJars")
 
     // Frontend tests depend on the web page, so we need to build the web module first.
-    if (!skipFrontend) {
+    if (!skipWeb) {
       dependsOn(":web-v2:web:build")
     }
   }

@@ -79,7 +79,13 @@ public class JettyServer {
 
   private String serverName;
 
+  private boolean webUiEnabled;
+
   public JettyServer() {}
+
+  public synchronized void initialize(JettyServerConfig serverConfig, String serverName) {
+    initialize(serverConfig, serverName, true);
+  }
 
   public synchronized void initialize(
       JettyServerConfig serverConfig, String serverName, boolean shouldEnableUI) {
@@ -154,11 +160,12 @@ public class JettyServer {
       server.addConnector(httpConnector);
     }
 
-    // Initialize ServletContextHandler or WebAppContext
+    // Initialize ServletContextHandler or WebAppContext.
     if (shouldEnableUI) {
-      initializeWebAppServletContextHandler();
+      webUiEnabled = initializeServletContextHandler();
     } else {
       initializeBasicServletContextHandler();
+      webUiEnabled = false;
     }
 
     MetricsSystem metricsSystem = GravitinoEnv.getInstance().metricsSystem();
@@ -250,33 +257,84 @@ public class JettyServer {
         new FilterHolder(filter), pathSpec, EnumSet.allOf(DispatcherType.class));
   }
 
+  public boolean isWebUiEnabled() {
+    return webUiEnabled;
+  }
+
   private void initializeBasicServletContextHandler() {
     servletContextHandler = new ServletContextHandler();
     servletContextHandler.setContextPath("/");
     servletContextHandler.addServlet(DefaultServlet.class, "/");
   }
 
-  private void initializeWebAppServletContextHandler() {
-    boolean isUnitTest = System.getenv("GRAVITINO_TEST") != null;
-
-    // If in development/test mode, you can set `war` file or `web/dist` directory in the
-    // `GRAVITINO_WAR` environment variable.
-    String warPath = System.getenv("GRAVITINO_WAR") != null ? System.getenv("GRAVITINO_WAR") : "";
-    if (warPath.isEmpty()) {
-      warPath = findDefaultWarPath(System.getenv("GRAVITINO_HOME"));
-      if (warPath.isEmpty()) {
-        initializeBasicServletContextHandler();
-        LOG.info("No Gravitino web WAR found, start server without Web UI.");
-        return;
-      }
+  private boolean initializeServletContextHandler() {
+    Optional<String> warPath = resolveWebUiWarPath();
+    if (warPath.isPresent()) {
+      initializeWebAppServletContextHandler(warPath.get());
+      return true;
     }
+
+    LOG.info("Web UI WAR is not found, start server without Web UI.");
+    initializeBasicServletContextHandler();
+    return false;
+  }
+
+  private Optional<String> resolveWebUiWarPath() {
+    String warPathFromEnv = System.getenv("GRAVITINO_WAR");
+    if (StringUtils.isNotBlank(warPathFromEnv)) {
+      File warFile = new File(warPathFromEnv);
+      if (warFile.exists()) {
+        return Optional.of(warPathFromEnv);
+      }
+
+      LOG.warn("GRAVITINO_WAR path {} does not exist, Web UI is disabled.", warPathFromEnv);
+      return Optional.empty();
+    }
+
+    String gravitinoHome = System.getenv("GRAVITINO_HOME");
+    if (StringUtils.isBlank(gravitinoHome)) {
+      LOG.warn("GRAVITINO_HOME is not set, Web UI is disabled.");
+      return Optional.empty();
+    }
+
+    Optional<String> webWarPath =
+        findSingleWarInDirectory(String.join(File.separator, gravitinoHome, "web"));
+    if (webWarPath.isPresent()) {
+      return webWarPath;
+    }
+
+    return findSingleWarInDirectory(String.join(File.separator, gravitinoHome, "web-v2"));
+  }
+
+  private Optional<String> findSingleWarInDirectory(String webPath) {
+    int warCount = 0;
+    String warPath = null;
+    try (DirectoryStream<Path> paths =
+        Files.newDirectoryStream(Paths.get(webPath), "gravitino-web-*.war")) {
+      for (Path path : paths) {
+        warPath = path.toString();
+        warCount++;
+      }
+    } catch (IOException e) {
+      LOG.debug("Failed to read web path {}, ignore and disable Web UI.", webPath, e);
+      return Optional.empty();
+    }
+
+    if (warCount == 1) {
+      return Optional.of(warPath);
+    }
+
+    if (warCount > 1) {
+      LOG.warn("Found multiple war files in {}, Web UI is disabled.", webPath);
+    }
+    return Optional.empty();
+  }
+
+  private void initializeWebAppServletContextHandler(String warPath) {
+    servletContextHandler = new WebAppContext();
 
     File warFile = new File(warPath);
     if (!warFile.exists()) {
-      if (isUnitTest) {
-        initializeBasicServletContextHandler();
-        return;
-      }
       throw new RuntimeException("Gravitino web path not found in " + warPath);
     }
 
@@ -297,41 +355,6 @@ public class JettyServer {
         throw new RuntimeException(e);
       }
     }
-  }
-
-  private String findDefaultWarPath(String gravitinoHome) {
-    if (StringUtils.isBlank(gravitinoHome)) {
-      return "";
-    }
-
-    String[] webDirs = {"web", "web-v2"};
-    for (String webDir : webDirs) {
-      String webPath = String.join(File.separator, gravitinoHome, webDir);
-      Path webPathDir = Paths.get(webPath);
-      if (!Files.isDirectory(webPathDir)) {
-        continue;
-      }
-
-      try (DirectoryStream<Path> paths =
-          Files.newDirectoryStream(webPathDir, "gravitino-web-*.war")) {
-        int warCount = 0;
-        String foundWarPath = "";
-        for (Path path : paths) {
-          foundWarPath = path.toString();
-          warCount++;
-        }
-        if (warCount > 1) {
-          throw new RuntimeException("Found multiple war files in the web path : " + webPath);
-        }
-        if (warCount == 1) {
-          return foundWarPath;
-        }
-      } catch (IOException e) {
-        throw new RuntimeException("Failed to find war file in the web path : " + webPath, e);
-      }
-    }
-
-    return "";
   }
 
   private ServerConnector createHttpServerConnector(
