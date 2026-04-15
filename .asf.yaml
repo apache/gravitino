@@ -60,6 +60,7 @@ github:
     - tsungchih
     - beinan
     - laserninja
+    - geyanggang
 
 notifications:
   commits: commits@gravitino.apache.org
