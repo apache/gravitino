@@ -17,7 +17,7 @@
 
 
 from abc import ABC, abstractmethod
-from typing import Optional
+from typing import Final
 
 from gravitino.api.auditable import Auditable
 from gravitino.api.stats.statistic_value import StatisticValue
@@ -30,7 +30,7 @@ class Statistic(Auditable, ABC):
     statistics, fileset statistics, etc.
     """
 
-    CUSTOM_PREFIX: str = "custom-"
+    CUSTOM_PREFIX: Final[str] = "custom-"
     """The prefix for custom statistics. Custom statistics are user-defined statistics."""
 
     @abstractmethod
@@ -42,7 +42,7 @@ class Statistic(Auditable, ABC):
         """
 
     @abstractmethod
-    def value(self) -> Optional[StatisticValue]:
+    def value(self) -> StatisticValue | None:
         """Get the value of the statistic.
 
         he value is optional. If the statistic is not set, the value will be empty.
