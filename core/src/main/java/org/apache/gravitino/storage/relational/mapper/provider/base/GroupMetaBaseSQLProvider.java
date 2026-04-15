@@ -182,4 +182,17 @@ public class GroupMetaBaseSQLProvider {
         + GROUP_TABLE_NAME
         + " WHERE deleted_at > 0 AND deleted_at < #{legacyTimeline} LIMIT #{limit}";
   }
+
+  public String touchGroupUpdatedAt(@Param("groupId") long groupId, @Param("now") long now) {
+    return "UPDATE " + GROUP_TABLE_NAME + " SET updated_at = #{now} WHERE group_id = #{groupId}";
+  }
+
+  public String getGroupInfoByUserId(@Param("userId") long userId) {
+    return "SELECT gm.group_id as groupId, gm.updated_at as updatedAt"
+        + " FROM "
+        + GROUP_TABLE_NAME
+        + " gm"
+        + " JOIN group_user_rel gu ON gm.group_id = gu.group_id AND gu.deleted_at = 0"
+        + " WHERE gu.user_id = #{userId} AND gm.deleted_at = 0";
+  }
 }

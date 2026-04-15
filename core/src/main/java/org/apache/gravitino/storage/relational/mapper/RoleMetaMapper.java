@@ -21,6 +21,7 @@ package org.apache.gravitino.storage.relational.mapper;
 
 import java.util.List;
 import org.apache.gravitino.storage.relational.po.RolePO;
+import org.apache.gravitino.storage.relational.po.auth.RoleUpdatedAt;
 import org.apache.ibatis.annotations.DeleteProvider;
 import org.apache.ibatis.annotations.InsertProvider;
 import org.apache.ibatis.annotations.Param;
@@ -93,4 +94,10 @@ public interface RoleMetaMapper {
       method = "deleteRoleMetasByLegacyTimeline")
   Integer deleteRoleMetasByLegacyTimeline(
       @Param("legacyTimeline") Long legacyTimeline, @Param("limit") int limit);
+
+  @UpdateProvider(type = RoleMetaSQLProviderFactory.class, method = "touchRoleUpdatedAt")
+  void touchUpdatedAt(@Param("roleId") long roleId, @Param("now") long now);
+
+  @SelectProvider(type = RoleMetaSQLProviderFactory.class, method = "batchGetRoleUpdatedAt")
+  List<RoleUpdatedAt> batchGetUpdatedAt(@Param("roleIds") List<Long> roleIds);
 }
