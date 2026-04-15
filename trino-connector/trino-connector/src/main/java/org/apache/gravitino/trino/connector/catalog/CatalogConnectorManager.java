@@ -417,7 +417,7 @@ public class CatalogConnectorManager {
       builder
           .withMetalake(metalakes.computeIfAbsent(catalog.getMetalake(), this::retrieveMetalake))
           .withContext(context)
-          .withConfig(this.config);
+          .withConfig(config);
 
       CatalogConnectorContext connectorContext = builder.build();
       String fullCatalogName = getTrinoCatalogName(catalog);

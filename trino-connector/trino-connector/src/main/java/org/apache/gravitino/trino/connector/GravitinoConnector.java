@@ -44,6 +44,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.client.GravitinoAdminClient;
 import org.apache.gravitino.client.GravitinoMetalake;
@@ -88,6 +89,19 @@ public class GravitinoConnector implements Connector {
             clientConfig.getOrDefault(GravitinoAuthProvider.FORWARD_SESSION_USER_KEY, "false"));
 
     if (forwardUser) {
+      String authTypeStr = clientConfig.get(GravitinoAuthProvider.AUTH_TYPE_KEY);
+      if (StringUtils.isBlank(authTypeStr)) {
+        throw new TrinoException(
+            GravitinoErrorCode.GRAVITINO_ILLEGAL_ARGUMENT,
+            "gravitino.client.session.forwardUser=true requires gravitino.client.authType to be set");
+      }
+      GravitinoAuthProvider.AuthType authType = GravitinoAuthProvider.parseAuthType(authTypeStr);
+      if (authType != GravitinoAuthProvider.AuthType.SIMPLE) {
+        throw new TrinoException(
+            GravitinoErrorCode.GRAVITINO_ILLEGAL_ARGUMENT,
+            "gravitino.client.session.forwardUser=true only supports authType=simple, got: "
+                + authTypeStr);
+      }
       this.perUserSessionCache =
           CacheBuilder.newBuilder()
               .maximumSize(500)

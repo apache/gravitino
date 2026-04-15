@@ -186,6 +186,21 @@ public class TestGravitinoAuthProvider {
         () -> GravitinoAuthProvider.buildForSession(config, session));
   }
 
+  @Test
+  public void testBuildForSessionThrowsForNonSimpleAuthType() {
+    GravitinoConfig config =
+        buildConfig(
+            ImmutableMap.of(
+                GravitinoAuthProvider.AUTH_TYPE_KEY, "kerberos",
+                GravitinoAuthProvider.FORWARD_SESSION_USER_KEY, "true"));
+    ConnectorSession session = mock(ConnectorSession.class);
+    when(session.getUser()).thenReturn("alice");
+
+    assertThrows(
+        UnsupportedOperationException.class,
+        () -> GravitinoAuthProvider.buildForSession(config, session));
+  }
+
   private GravitinoConfig buildConfig(ImmutableMap<String, String> authConfig) {
     ImmutableMap.Builder<String, String> builder =
         ImmutableMap.<String, String>builder()

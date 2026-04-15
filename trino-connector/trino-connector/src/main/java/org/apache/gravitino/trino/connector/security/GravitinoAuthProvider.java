@@ -149,8 +149,8 @@ public class GravitinoAuthProvider {
    * @param config the Gravitino connector configuration
    * @param session the current Trino connector session
    * @return a new {@link GravitinoAdminClient} authenticated for the session user
-   * @throws IllegalArgumentException if forwarding is not configured or auth type does not support
-   *     it
+   * @throws IllegalArgumentException if forwarding is not configured or authType is missing
+   * @throws UnsupportedOperationException if the authType does not support session forwarding
    */
   public static GravitinoAdminClient buildForSession(
       GravitinoConfig config, ConnectorSession session) {
@@ -175,7 +175,7 @@ public class GravitinoAuthProvider {
     GravitinoAdminClient.AdminClientBuilder builder = GravitinoAdminClient.builder(uri);
 
     if (authType != AuthType.SIMPLE) {
-      throw new IllegalArgumentException(
+      throw new UnsupportedOperationException(
           "Auth type "
               + authType
               + " does not support session forwarding. Only simple is supported.");
