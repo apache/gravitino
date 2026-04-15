@@ -20,11 +20,9 @@ package org.apache.gravitino.trino.connector.security;
 
 import io.trino.spi.connector.ConnectorSession;
 import java.io.File;
-import java.io.IOException;
 import java.util.Locale;
 import java.util.Map;
 import org.apache.commons.lang3.StringUtils;
-import org.apache.gravitino.client.CustomTokenProvider;
 import org.apache.gravitino.client.DefaultOAuth2TokenProvider;
 import org.apache.gravitino.client.GravitinoAdminClient;
 import org.apache.gravitino.client.GravitinoClientConfiguration;
@@ -71,13 +69,6 @@ public class GravitinoAuthProvider {
   /** OAuth2 scope configuration key. */
   public static final String OAUTH_SCOPE_KEY =
       GravitinoClientConfiguration.GRAVITINO_CLIENT_CONFIG_PREFIX + "oauth2.scope";
-
-  /**
-   * Extra-credentials key whose value is forwarded as a Bearer token to Gravitino. Only used when
-   * {@code authType=oauth2} and {@code forwardUser=true}.
-   */
-  public static final String OAUTH2_TOKEN_CREDENTIAL_KEY =
-      GravitinoClientConfiguration.GRAVITINO_CLIENT_CONFIG_PREFIX + "oauth2.token.credentialKey";
 
   /** Kerberos principal configuration key. */
   public static final String KERBEROS_PRINCIPAL_KEY =
@@ -152,13 +143,8 @@ public class GravitinoAuthProvider {
    * connector session. This is the entry point for the per-user client cache when {@code
    * forwardUser=true}.
    *
-   * <p>Supported combinations:
-   *
-   * <ul>
-   *   <li>{@code authType=simple + forwardUser=true}: uses the Trino session user name
-   *   <li>{@code authType=oauth2 + forwardUser=true}: reads a Bearer token from the session's extra
-   *       credentials using the key configured via {@link #OAUTH2_TOKEN_CREDENTIAL_KEY}
-   * </ul>
+   * <p>Currently only {@code authType=simple} is supported: the Trino session username is used as
+   * the Gravitino simple-auth identity.
    *
    * @param config the Gravitino connector configuration
    * @param session the current Trino connector session
@@ -188,32 +174,13 @@ public class GravitinoAuthProvider {
 
     GravitinoAdminClient.AdminClientBuilder builder = GravitinoAdminClient.builder(uri);
 
-    switch (authType) {
-      case SIMPLE:
-        builder.withSimpleAuth(session.getUser());
-        break;
-      case OAUTH2:
-        String credentialKey = clientConfig.get(OAUTH2_TOKEN_CREDENTIAL_KEY);
-        if (StringUtils.isBlank(credentialKey)) {
-          throw new IllegalArgumentException(
-              String.format(
-                  "oauth2 with forwardUser requires a credential key. Please set %s",
-                  OAUTH2_TOKEN_CREDENTIAL_KEY));
-        }
-        String bearerToken = session.getIdentity().getExtraCredentials().get(credentialKey);
-        if (StringUtils.isBlank(bearerToken)) {
-          throw new IllegalArgumentException(
-              String.format(
-                  "OAuth2 token not found in Trino session credentials for user: %s. "
-                      + "Expected credential key: '%s'",
-                  session.getUser(), credentialKey));
-        }
-        builder.withCustomTokenAuth(new StaticTokenProvider(bearerToken));
-        break;
-      default:
-        throw new IllegalArgumentException(
-            "Auth type " + authType + " does not support session forwarding");
+    if (authType != AuthType.SIMPLE) {
+      throw new IllegalArgumentException(
+          "Auth type "
+              + authType
+              + " does not support session forwarding. Only simple is supported.");
     }
+    builder.withSimpleAuth(session.getUser());
 
     removeAuthSpecificKeys(clientConfig);
     builder.withClientConfig(clientConfig);
@@ -240,7 +207,6 @@ public class GravitinoAuthProvider {
     clientConfig.remove(OAUTH_SCOPE_KEY);
     clientConfig.remove(KERBEROS_PRINCIPAL_KEY);
     clientConfig.remove(KERBEROS_KEYTAB_FILE_PATH_KEY);
-    clientConfig.remove(OAUTH2_TOKEN_CREDENTIAL_KEY);
     clientConfig.remove(FORWARD_SESSION_USER_KEY);
   }
 
@@ -330,32 +296,5 @@ public class GravitinoAuthProvider {
     }
 
     return kerberosBuilder.build();
-  }
-
-  /**
-   * A {@link CustomTokenProvider} that holds a static Bearer token baked in at construction time.
-   * Used when building a per-user {@link GravitinoAdminClient} for OAuth2 session forwarding.
-   */
-  private static final class StaticTokenProvider extends CustomTokenProvider {
-
-    private final String token;
-
-    StaticTokenProvider(String token) {
-      this.token = token;
-      this.schemeName = "Bearer";
-    }
-
-    @Override
-    public boolean hasTokenData() {
-      return true;
-    }
-
-    @Override
-    protected String getCustomTokenInfo() {
-      return token;
-    }
-
-    @Override
-    public void close() throws IOException {}
   }
 }

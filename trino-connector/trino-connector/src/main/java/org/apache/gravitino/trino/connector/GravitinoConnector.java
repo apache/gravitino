@@ -44,7 +44,6 @@ import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
-import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.client.GravitinoAdminClient;
 import org.apache.gravitino.client.GravitinoMetalake;
@@ -68,8 +67,6 @@ public class GravitinoConnector implements Connector {
   protected final CatalogConnectorContext catalogConnectorContext;
   private final CatalogConnectorMetadata connectorMetadata;
   private final boolean forwardUser;
-  private final GravitinoAuthProvider.AuthType authType;
-  private final String oauth2CredentialKey;
   private final Cache<String, UserSession> perUserSessionCache;
 
   /**
@@ -89,16 +86,6 @@ public class GravitinoConnector implements Connector {
     this.forwardUser =
         Boolean.parseBoolean(
             clientConfig.getOrDefault(GravitinoAuthProvider.FORWARD_SESSION_USER_KEY, "false"));
-    String authTypeStr = clientConfig.getOrDefault(GravitinoAuthProvider.AUTH_TYPE_KEY, "none");
-    this.authType = GravitinoAuthProvider.parseAuthType(authTypeStr);
-    this.oauth2CredentialKey = clientConfig.get(GravitinoAuthProvider.OAUTH2_TOKEN_CREDENTIAL_KEY);
-
-    if (forwardUser && authType == GravitinoAuthProvider.AuthType.OAUTH2) {
-      Preconditions.checkArgument(
-          StringUtils.isNotBlank(oauth2CredentialKey),
-          "oauth2 with forwardUser=true requires '%s' to be set",
-          GravitinoAuthProvider.OAUTH2_TOKEN_CREDENTIAL_KEY);
-    }
 
     if (forwardUser) {
       this.perUserSessionCache =
@@ -144,10 +131,7 @@ public class GravitinoConnector implements Connector {
     Preconditions.checkArgument(internalMetadata != null, "Internal metadata must not be null");
 
     if (forwardUser) {
-      String credKey =
-          authType == GravitinoAuthProvider.AuthType.OAUTH2
-              ? "oauth2:" + session.getIdentity().getExtraCredentials().get(oauth2CredentialKey)
-              : "simple:" + session.getUser();
+      String credKey = "simple:" + session.getUser();
       UserSession userSession;
       try {
         userSession =

@@ -26,7 +26,6 @@ import static org.mockito.Mockito.when;
 
 import com.google.common.collect.ImmutableMap;
 import io.trino.spi.connector.ConnectorSession;
-import io.trino.spi.security.ConnectorIdentity;
 import java.io.File;
 import java.io.IOException;
 import java.nio.file.Files;
@@ -176,51 +175,11 @@ public class TestGravitinoAuthProvider {
   }
 
   @Test
-  public void testBuildForSessionOAuth2() {
-    String credentialKey = "my-token-key";
-    GravitinoConfig config =
-        buildConfig(
-            ImmutableMap.of(
-                GravitinoAuthProvider.AUTH_TYPE_KEY, "oauth2",
-                GravitinoAuthProvider.FORWARD_SESSION_USER_KEY, "true",
-                GravitinoAuthProvider.OAUTH2_TOKEN_CREDENTIAL_KEY, credentialKey));
-
-    ConnectorSession session = mock(ConnectorSession.class);
-    ConnectorIdentity identity = mock(ConnectorIdentity.class);
-    when(session.getUser()).thenReturn("alice");
-    when(session.getIdentity()).thenReturn(identity);
-    when(identity.getExtraCredentials())
-        .thenReturn(ImmutableMap.of(credentialKey, "test-bearer-token"));
-
-    GravitinoAdminClient client = GravitinoAuthProvider.buildForSession(config, session);
-    assertNotNull(client);
-  }
-
-  @Test
   public void testBuildForSessionThrowsWhenForwardUserDisabled() {
     GravitinoConfig config =
         buildConfig(ImmutableMap.of(GravitinoAuthProvider.AUTH_TYPE_KEY, "simple"));
     ConnectorSession session = mock(ConnectorSession.class);
     when(session.getUser()).thenReturn("alice");
-
-    assertThrows(
-        IllegalArgumentException.class,
-        () -> GravitinoAuthProvider.buildForSession(config, session));
-  }
-
-  @Test
-  public void testBuildForSessionOAuth2MissingCredentialKey() {
-    GravitinoConfig config =
-        buildConfig(
-            ImmutableMap.of(
-                GravitinoAuthProvider.AUTH_TYPE_KEY, "oauth2",
-                GravitinoAuthProvider.FORWARD_SESSION_USER_KEY, "true"));
-
-    ConnectorSession session = mock(ConnectorSession.class);
-    when(session.getUser()).thenReturn("alice");
-    ConnectorIdentity identity = mock(ConnectorIdentity.class);
-    when(session.getIdentity()).thenReturn(identity);
-    when(identity.getExtraCredentials()).thenReturn(ImmutableMap.of());
 
     assertThrows(
         IllegalArgumentException.class,
