@@ -103,7 +103,7 @@ public class GravitinoServer extends ResourceConfig {
 
     JettyServerConfig jettyServerConfig =
         JettyServerConfig.fromConfig(serverConfig, WEBSERVER_CONF_PREFIX);
-    server.initialize(jettyServerConfig, SERVER_NAME, true /* shouldEnableUI */);
+    server.initialize(jettyServerConfig, SERVER_NAME);
 
     ServerAuthenticator.getInstance().initialize(serverConfig);
 
@@ -179,8 +179,10 @@ public class GravitinoServer extends ResourceConfig {
     server.addFilter(new VersioningFilter(), API_ANY_PATH);
     server.addSystemFilters(API_ANY_PATH);
 
-    server.addFilter(new WebUIFilter(), "/"); // Redirect to the /ui/index html page.
-    server.addFilter(new WebUIFilter(), "/ui/*"); // Redirect to the static html file.
+    if (server.isWebUiEnabled()) {
+      server.addFilter(new WebUIFilter(), "/"); // Redirect to the /ui/index html page.
+      server.addFilter(new WebUIFilter(), "/ui/*"); // Redirect to the static html file.
+    }
   }
 
   public void start() throws Exception {

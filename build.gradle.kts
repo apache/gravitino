@@ -66,6 +66,8 @@ if (scalaVersion !in listOf("2.12", "2.13")) {
   throw GradleException("Scala version $scalaVersion is not supported.")
 }
 
+val skipWeb: Boolean = (project.findProperty("skipWeb") as? String)?.toBoolean() ?: false
+
 project.extra["extraJvmArgs"] =
   listOf(
     "-XX:+IgnoreUnrecognizedVMOptions",
@@ -784,10 +786,11 @@ tasks {
       ":authorizations:copyLibAndConfig",
       ":iceberg:iceberg-rest-server:copyLibAndConfigs",
       ":lance:lance-rest-server:copyLibAndConfigs",
-      ":maintenance:optimizer:copyLibAndConfigs",
-      ":web:web:build",
-      ":web-v2:web:build"
+      ":maintenance:optimizer:copyLibAndConfigs"
     )
+    if (!skipWeb) {
+      dependsOn(":web:web:build", ":web-v2:web:build")
+    }
 
     group = "gravitino distribution"
     outputs.dir(projectDir.dir("distribution/package"))
@@ -795,8 +798,14 @@ tasks {
       copy {
         from(projectDir.dir("conf")) { into("package/conf") }
         from(projectDir.dir("bin")) { into("package/bin") }
-        from(projectDir.dir("web/web/build/libs/${rootProject.name}-web-$version.war")) { into("package/web") }
-        from(projectDir.dir("web-v2/web/build/libs/${rootProject.name}-web-$version.war")) { into("package/web-v2") }
+        if (!skipWeb) {
+          from(projectDir.dir("web/web/build/libs/${rootProject.name}-web-$version.war")) {
+            into("package/web")
+          }
+          from(projectDir.dir("web-v2/web/build/libs/${rootProject.name}-web-$version.war")) {
+            into("package/web-v2")
+          }
+        }
         from(projectDir.dir("scripts")) { into("package/scripts") }
         into(outputDir)
         rename { fileName ->
@@ -816,16 +825,22 @@ tasks {
         from(projectDir.file("LICENSE.bin")) { into("package") }
         from(projectDir.file("NOTICE.bin")) { into("package") }
         from(projectDir.file("README.md")) { into("package") }
-        from(projectDir.dir("web/web/licenses")) { into("package/web/licenses") }
-        from(projectDir.dir("web/web/LICENSE.bin")) { into("package/web") }
-        from(projectDir.dir("web/web/NOTICE.bin")) { into("package/web") }
-        from(projectDir.dir("web-v2/web/licenses")) { into("package/web-v2/licenses") }
-        from(projectDir.dir("web-v2/web/LICENSE.bin")) { into("package/web-v2") }
-        from(projectDir.dir("web-v2/web/NOTICE.bin")) { into("package/web-v2") }
+        if (!skipWeb) {
+          from(projectDir.dir("web/web/licenses")) { into("package/web/licenses") }
+          from(projectDir.dir("web/web/LICENSE.bin")) { into("package/web") }
+          from(projectDir.dir("web/web/NOTICE.bin")) { into("package/web") }
+          from(projectDir.dir("web-v2/web/licenses")) { into("package/web-v2/licenses") }
+          from(projectDir.dir("web-v2/web/LICENSE.bin")) { into("package/web-v2") }
+          from(projectDir.dir("web-v2/web/NOTICE.bin")) { into("package/web-v2") }
+        }
         into(outputDir)
         rename { fileName ->
           fileName.replace(".bin", "")
         }
+      }
+
+      if (skipWeb) {
+        delete(projectDir.dir("distribution/package/web"), projectDir.dir("distribution/package/web-v2"))
       }
 
       // Create the directory 'data' for storage.
