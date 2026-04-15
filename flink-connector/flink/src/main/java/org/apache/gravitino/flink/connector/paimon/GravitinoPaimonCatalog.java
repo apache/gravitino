@@ -61,42 +61,6 @@ public class GravitinoPaimonCatalog extends BaseCatalog {
     this.paimonCatalog = flinkCatalogFactory.createCatalog(toPaimonContext(context));
   }
 
-  /**
-   * Translates Gravitino catalog property names to their Paimon/Flink equivalents so that the
-   * underlying {@code FlinkCatalog} can be initialised correctly (e.g., {@code catalog-backend}
-   * becomes {@code metastore}).
-   */
-  private static CatalogFactory.Context toPaimonContext(CatalogFactory.Context context) {
-    Map<String, String> translatedOptions = new HashMap<>();
-    for (Map.Entry<String, String> entry : context.getOptions().entrySet()) {
-      String mappedKey =
-          PaimonPropertiesConverter.INSTANCE.transformPropertyToFlinkCatalog(entry.getKey());
-      // Fall back to the original key when no mapping exists so Paimon-native properties are not
-      // silently dropped.
-      translatedOptions.put(mappedKey != null ? mappedKey : entry.getKey(), entry.getValue());
-    }
-    return new CatalogFactory.Context() {
-      @Override
-      public String getName() {
-        return context.getName();
-      }
-
-      @Override
-      public Map<String, String> getOptions() {
-        return translatedOptions;
-      }
-
-      @Override
-      public ReadableConfig getConfiguration() {
-        return context.getConfiguration();
-      }
-
-      @Override
-      public ClassLoader getClassLoader() {
-        return context.getClassLoader();
-      }
-    };
-  }
 
   @Override
   protected AbstractCatalog realCatalog() {
@@ -108,25 +72,6 @@ public class GravitinoPaimonCatalog extends BaseCatalog {
     return Optional.of(new FlinkTableFactory());
   }
 
-  /**
-   * Returns the Paimon-native {@code DataCatalogTable} instead of the plain Flink {@code
-   * CatalogTable} that {@link BaseCatalog#toFlinkTable} would produce from Gravitino metadata.
-   *
-   * <p><b>Why this matters for partition metadata:</b> Paimon's {@code
-   * AbstractFlinkTableFactory.buildPaimonTable()} inspects the incoming {@code CatalogBaseTable}.
-   * When it receives a plain {@code CatalogTable} (not a {@code DataCatalogTable}), it creates a
-   * {@code FileStoreTable} with {@code CatalogEnvironment.empty()} — a null {@code catalogLoader}.
-   * A null loader causes {@code FileStoreTable.partitionHandler()} to return {@code null}, so
-   * {@code AddPartitionCommitCallback} is never registered. As a result, Hive partition metadata is
-   * never updated when a Flink job commits, and the new partition does not appear in {@code SHOW
-   * PARTITIONS} even though the data files exist.
-   *
-   * <p><b>Why this is safe:</b> Gravitino authorization has already been enforced by {@link
-   * BaseCatalog#getTable(ObjectPath)}, which calls {@code catalog().asTableCatalog().loadTable()}
-   * before this method is invoked. DDL operations ({@code CREATE / ALTER / DROP TABLE}) continue
-   * to flow through the Gravitino REST API → Gravitino server → Paimon catalog, keeping Gravitino
-   * as the single source of truth.
-   */
   @Override
   protected CatalogBaseTable toFlinkTable(Table table, ObjectPath tablePath) {
     try {
