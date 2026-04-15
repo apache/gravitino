@@ -97,4 +97,4 @@ ds.show(limit=1)
 - [Iceberg REST catalog service](../iceberg-rest-service.md)
 - [Connect PyIceberg via Iceberg REST](./pyiceberg.md)
 - [Connect Spark via Iceberg REST](./spark.md)
-- 
+
