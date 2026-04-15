@@ -120,10 +120,11 @@ The storage strategy is driven by what users actually care about, rather than ex
 2. **Multi-engine** — Can my views be used by Spark, Trino, and Flink simultaneously?
 3. **Interoperability** — Can I see pre-existing views in the underlying catalog? Can views created via Gravitino be seen by other tools that access the underlying catalog directly?
 
-Rather than exposing catalog differences to users via a storage mode configuration, Gravitino automatically selects the optimal strategy based on each catalog's native view capability. Catalogs fall into three tiers:
+Rather than exposing catalog differences to users via a storage mode configuration, Gravitino automatically selects the optimal strategy based on each catalog's native view capability. Catalogs fall into the following tiers:
 
 - **Full view support** (Iceberg, Paimon) — Natively support multi-dialect view storage and CRUD operations.
-- **Single-dialect view support** (HMS) — Can store views, but each engine uses its own private format. Gravitino provides format-aware delegation to normalize these differences.
+- **Single-dialect view support** (HMS) — Can store views, but each engine uses its own private format within the same `VIRTUAL_VIEW` storage. Gravitino provides format-aware delegation to normalize these differences.
+- **Native multi-dialect + legacy single-dialect** (Glue) — Glue natively supports multi-dialect views through its Data Catalog view API (available since Glue 5.0) with ATHENA/REDSHIFT/SPARK dialects; it also contains legacy `VIRTUAL_VIEW` entries created by engines through the HMS-compatible path. Gravitino handles both. See [Glue View Considerations](#glue-view-considerations) for details.
 - **Read-only view support** (JDBC catalogs) — Can store views, but engine dialect mismatch makes write operations impractical. Gravitino provides read-only discovery in v1.
 - **No view support** (Hudi, Generic/Delta/Lance, etc.) — Do not support view operations at all.
 
@@ -133,7 +134,8 @@ The table below maps each tier to the corresponding storage strategy:
 |-------------|----------|-------------|
 | **Iceberg** | Complete delegation | All CRUD delegated to Iceberg catalog (native multi-dialect support) |
 | **Paimon** | Complete delegation | All CRUD delegated to Paimon catalog (native multi-dialect support, Hive/REST backends) |
-| **HMS** | Format-aware delegation | Gravitino detects engine-specific formats, normalizes view definitions, and writes new views in Gravitino standard format (see [HMS View Behavior](#hms-view-behavior) for details) |
+| **HMS** | Format-aware delegation | Gravitino detects engine-specific formats, normalizes view definitions, and writes new views in engine-native format (see [HMS View Behavior](#hms-view-behavior)) |
+| **Glue** | Format-aware delegation | Glue has two view storage mechanisms: native Data Catalog view (`ViewDefinition` API, multi-dialect) and legacy `VIRTUAL_VIEW` (Hive-compatible, single-dialect). Gravitino detects the storage mechanism first, then applies engine dialect detection within each (see [Glue View Considerations](#glue-view-considerations)) |
 | **JDBC** (MySQL, PostgreSQL, Doris, StarRocks, etc.) | Read-only discovery (v1) | Pre-existing database views are auto-discovered and exposed through Gravitino; CREATE VIEW not supported in v1 (future enhancement) |
 | **Catalogs without native view support** (Hudi, Generic/Delta/Lance, etc.) | Fully Gravitino-managed | All view metadata stored in Gravitino DB |
 
@@ -143,7 +145,10 @@ For **complete delegation** catalogs (Iceberg, Paimon), all operations are deleg
 
 For **fully Gravitino-managed** catalogs (Hudi, Generic/Delta/Lance, etc.), all operations are handled by Gravitino DB.
 
-For **format-aware delegation** catalogs (HMS), behavior is described in detail in the [HMS View Behavior](#hms-view-behavior) section below.
+For **format-aware delegation** catalogs:
+
+- **HMS** — All views are stored as `VIRTUAL_VIEW`; Gravitino detects the creating engine and normalizes the view definition. See [HMS View Behavior](#hms-view-behavior) for details.
+- **Glue** — Two view storage mechanisms coexist: native Data Catalog view (multi-dialect) and legacy `VIRTUAL_VIEW` (Hive-compatible). Gravitino detects the mechanism on load and selects the appropriate one on create. See [Glue View Considerations](#glue-view-considerations) for details. Note: Glue view support is not in v1 scope.
 
 For **read-only discovery** catalogs (JDBC), behavior is as follows:
 
@@ -259,7 +264,7 @@ sequenceDiagram
 
 ### View Metadata Storage
 
-View metadata is stored in Gravitino's relational database. Depending on the catalog type, the DB may store full view metadata (catalogs without native view support). For complete delegation catalogs (Iceberg, Paimon), Gravitino DB is not used. For HMS catalogs (format-aware delegation), views are stored in HMS only — Gravitino DB is not used in v1. For JDBC catalogs (read-only discovery in v1), Gravitino DB is not used.
+View metadata is stored in Gravitino's relational database. Depending on the catalog type, the DB may store full view metadata (catalogs without native view support). For complete delegation catalogs (Iceberg, Paimon) and format-aware delegation catalogs (HMS, Glue), the underlying metastore is the source of truth for view definitions. Gravitino DB still maintains view metadata references for access control and audit purposes. For JDBC catalogs (read-only discovery in v1), the underlying database is the source of truth.
 
 #### view_meta table
 
@@ -353,6 +358,8 @@ When a view is created through Gravitino (e.g., Trino user runs `CREATE VIEW` vi
 **Implementation note:** The Gravitino engine connector must pass sufficient metadata (beyond just SQL text and columns) for the HMS catalog provider to reconstruct the engine-native format. For example, the Trino connector needs to pass the `ConnectorViewDefinition` fields (`catalog`, `schema`, `owner`, `runAsInvoker`) as view properties, which the HMS provider uses to build the Base64 JSON blob.
 
 **v1 limitation:** Each HMS view stores exactly one dialect — the dialect of the creating engine. Multi-dialect views in HMS are not supported in v1. For multi-dialect view support, use IRC-backed catalogs.
+
+> **Note on format-level detection:** In HMS, the view storage format is always `VIRTUAL_VIEW` — the only variable is which engine created it (Trino, Spark, Hive, Flink). Therefore, engine detection alone is sufficient. This is different from Glue, where two distinct view storage mechanisms coexist (Data Catalog view and legacy `VIRTUAL_VIEW`), requiring an additional format-level detection step before engine detection. See [Glue View Considerations](#glue-view-considerations).
 
 #### Sequence Diagrams
 
@@ -463,7 +470,52 @@ sequenceDiagram
 |-------|-------|
 | **v1** | LoadView (format-aware delegation for Trino, Spark, Hive views) + CreateView (engine-native format for Trino, Spark, Hive) + DropView + ListViews |
 | **v1.1** | Flink view format reader/writer; AlterView for Gravitino-created views |
+| **v2** | Glue view support: Data Catalog view read/write for ATHENA/REDSHIFT/SPARK dialects + legacy `VIRTUAL_VIEW` handling (pending Glue catalog `ViewCatalog` interface) |
 | **Future** | Multi-dialect extension model |
+
+---
+
+### Glue View Considerations
+
+AWS Glue Data Catalog is a multi-format catalog (Hive, Iceberg, Delta, Parquet tables coexist) that supports two distinct view storage mechanisms. This section describes how Gravitino will handle views in Glue when the Glue catalog `ViewCatalog` interface is implemented (v2 scope).
+
+#### Two View Storage Mechanisms
+
+1. **Data Catalog view** (Glue 5.0+, also known as Multi-Dialect View):
+   - Stored via `Table.ViewDefinition` with a `Representations[]` array, where each representation contains a `Dialect` (ATHENA / REDSHIFT / SPARK), `DialectVersion`, `ViewOriginalText`, and `ViewExpandedText`.
+   - Identified by `Table.IsMultiDialectView = true`.
+   - Enforces DEFINER security semantics via AWS Lake Formation — only `PROTECTED` views are supported.
+   - Natively multi-dialect: a single view can store SQL representations for multiple supported dialects.
+   - Limitations: cannot reference other views; cannot reference cross-account tables; max 10 representations for input; only 3 dialects supported (ATHENA, REDSHIFT, SPARK).
+
+2. **Legacy `VIRTUAL_VIEW`** (Hive-compatible):
+   - Identical to HMS view storage: `TableType = VIRTUAL_VIEW` with `ViewOriginalText` / `ViewExpandedText` fields and engine-specific properties.
+   - Created by engines that interact with Glue through the HMS-compatible Thrift endpoint or engines that write Hive-format metadata via the Glue SDK directly (e.g., Trino's `GlueHiveMetastore`).
+   - Each view stores exactly one dialect in the creating engine's private format.
+
+#### How Engines Create Views in Glue
+
+Different engines use different mechanisms depending on their integration path with Glue:
+
+| Engine / Context | View Storage Mechanism | Dialect | Integration Path |
+|---|---|---|---|
+| Athena (Data Catalog view syntax) | Data Catalog view | `ATHENA` | Glue SDK (native) |
+| Athena (legacy `CREATE VIEW` syntax) | Legacy `VIRTUAL_VIEW` | N/A (Presto format) | Glue SDK (HMS-compatible) |
+| Redshift | Data Catalog view | `REDSHIFT` | Glue SDK (native) |
+| Spark on Glue 5.0 / EMR Serverless (Data Catalog view syntax) | Data Catalog view | `SPARK` | Glue SDK (native) |
+| Spark on EMR / standalone (regular `CREATE VIEW`) | Legacy `VIRTUAL_VIEW` | N/A (Spark format) | HMS-compatible Thrift |
+| Trino (`hive.metastore=glue`) | Legacy `VIRTUAL_VIEW` | N/A (Presto/Trino format) | Glue SDK (HMS-compatible) |
+
+#### Planned CRUD Behavior
+
+| Operation | Behavior |
+|-----------|----------|
+| **LoadView** | Read Glue table → check `IsMultiDialectView` flag → if `true`: parse `ViewDefinition.Representations[]` and map to Gravitino view representations; if `false`: apply the same engine detection chain as [HMS View Behavior](#hms-view-behavior) |
+| **ListViews** | List all Glue tables where `TableType = VIRTUAL_VIEW` or `IsMultiDialectView = true` → classify each → return with dialect info |
+| **CreateView** | For dialects supported by Data Catalog view (ATHENA/REDSHIFT/SPARK): write via `ViewDefinition` API as a Data Catalog view. For other dialects (e.g., Trino, Hive): write as legacy `VIRTUAL_VIEW` in engine-native format (same logic as HMS) |
+| **DropView** | Delegate to Glue — delete the Glue table entry |
+
+> **Open question:** CreateView with Data Catalog view API requires Lake Formation integration (DEFINER + PROTECTED). If the target Glue catalog does not have Lake Formation configured, should Gravitino fall back to legacy `VIRTUAL_VIEW` for all dialects, or return an error for ATHENA/REDSHIFT/SPARK dialects?
 
 ---
 
