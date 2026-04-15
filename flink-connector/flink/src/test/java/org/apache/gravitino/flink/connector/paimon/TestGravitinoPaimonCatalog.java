@@ -42,6 +42,7 @@ import org.apache.gravitino.exceptions.NoSuchTableException;
 import org.apache.gravitino.flink.connector.PartitionConverter;
 import org.apache.gravitino.flink.connector.SchemaAndTablePropertiesConverter;
 import org.apache.gravitino.flink.connector.catalog.GravitinoCatalogManager;
+import org.apache.gravitino.rel.Table;
 import org.apache.gravitino.rel.TableCatalog;
 import org.apache.paimon.flink.FlinkCatalog;
 import org.apache.paimon.flink.FlinkCatalogFactory;
@@ -417,5 +418,80 @@ public class TestGravitinoPaimonCatalog {
     Assertions.assertTrue(catalog.getFactory().isPresent());
     Assertions.assertInstanceOf(
         org.apache.paimon.flink.FlinkTableFactory.class, catalog.getFactory().get());
+  }
+
+  // -----------------------------------------------------------------------
+  // getTable — must enforce Gravitino authorization then return Paimon-native table
+  //
+  // Root-cause context: BaseCatalog.getTable() returns a plain CatalogTable
+  // built from Gravitino metadata, which causes
+  // AbstractFlinkTableFactory.buildPaimonTable() to create a FileStoreTable
+  // with CatalogEnvironment.empty() (catalogLoader = null).  This makes
+  // partitionHandler() return null so AddPartitionCommitCallback is never
+  // registered, and Hive partition metadata is never updated after commits.
+  //
+  // Fix: (1) call Gravitino loadTable for authorization, then (2) return
+  // paimonCatalog.getTable() which is a DataCatalogTable with proper
+  // CatalogEnvironment.
+  // -----------------------------------------------------------------------
+
+  @Test
+  public void testGetTableEnforcesGravitinoAuthAndReturnsPaimonTable()
+      throws TableNotExistException, CatalogException {
+    ObjectPath tablePath = new ObjectPath(TEST_DB, TEST_TABLE);
+    NameIdentifier identifier = NameIdentifier.of(TEST_DB, TEST_TABLE);
+    Catalog mockGravitinoCatalog = Mockito.mock(Catalog.class);
+    CatalogBaseTable paimonTable = Mockito.mock(CatalogBaseTable.class);
+
+    try (MockedStatic<GravitinoCatalogManager> mgrStatic =
+        Mockito.mockStatic(GravitinoCatalogManager.class)) {
+      TableCatalog mockTableCatalog = setupGravitinoCatalogMock(mgrStatic, mockGravitinoCatalog);
+      when(mockTableCatalog.loadTable(identifier)).thenReturn(Mockito.mock(Table.class));
+      when(mockPaimonCatalog.getTable(tablePath)).thenReturn(paimonTable);
+
+      CatalogBaseTable result = catalog.getTable(tablePath);
+
+      // Gravitino authorization must be enforced first.
+      verify(mockTableCatalog).loadTable(identifier);
+      // The returned object is the Paimon-native DataCatalogTable (with proper CatalogEnvironment).
+      Assertions.assertSame(paimonTable, result);
+      Mockito.verify(mockPaimonCatalog, Mockito.times(1)).getTable(tablePath);
+    }
+  }
+
+  @Test
+  public void testGetTablePropagatesNoSuchTableExceptionFromGravitino() {
+    ObjectPath tablePath = new ObjectPath(TEST_DB, "nonExistingTable");
+    NameIdentifier identifier = NameIdentifier.of(TEST_DB, "nonExistingTable");
+    Catalog mockGravitinoCatalog = Mockito.mock(Catalog.class);
+
+    try (MockedStatic<GravitinoCatalogManager> mgrStatic =
+        Mockito.mockStatic(GravitinoCatalogManager.class)) {
+      TableCatalog mockTableCatalog = setupGravitinoCatalogMock(mgrStatic, mockGravitinoCatalog);
+      when(mockTableCatalog.loadTable(identifier))
+          .thenThrow(new NoSuchTableException("table not found"));
+
+      Assertions.assertThrows(TableNotExistException.class, () -> catalog.getTable(tablePath));
+      // Paimon must NOT be called when Gravitino says the table does not exist.
+      Mockito.verify(mockPaimonCatalog, never()).getTable(any());
+    }
+  }
+
+  @Test
+  public void testGetTablePaimonNotCalledWhenGravitinoThrows() {
+    ObjectPath tablePath = new ObjectPath(TEST_DB, TEST_TABLE);
+    NameIdentifier identifier = NameIdentifier.of(TEST_DB, TEST_TABLE);
+    Catalog mockGravitinoCatalog = Mockito.mock(Catalog.class);
+
+    try (MockedStatic<GravitinoCatalogManager> mgrStatic =
+        Mockito.mockStatic(GravitinoCatalogManager.class)) {
+      TableCatalog mockTableCatalog = setupGravitinoCatalogMock(mgrStatic, mockGravitinoCatalog);
+      when(mockTableCatalog.loadTable(identifier))
+          .thenThrow(new RuntimeException("authorization error"));
+
+      Assertions.assertThrows(CatalogException.class, () -> catalog.getTable(tablePath));
+      // Paimon must NOT be called when Gravitino authorization fails.
+      Mockito.verify(mockPaimonCatalog, never()).getTable(any());
+    }
   }
 }

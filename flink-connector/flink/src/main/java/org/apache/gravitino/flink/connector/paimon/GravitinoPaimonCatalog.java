@@ -16,6 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
+
 package org.apache.gravitino.flink.connector.paimon;
 
 import java.util.HashMap;
@@ -40,6 +41,7 @@ import org.apache.flink.table.catalog.exceptions.TableNotPartitionedException;
 import org.apache.flink.table.factories.CatalogFactory;
 import org.apache.flink.table.factories.Factory;
 import org.apache.gravitino.NameIdentifier;
+import org.apache.gravitino.exceptions.NoSuchTableException;
 import org.apache.gravitino.flink.connector.PartitionConverter;
 import org.apache.gravitino.flink.connector.SchemaAndTablePropertiesConverter;
 import org.apache.gravitino.flink.connector.catalog.BaseCatalog;
@@ -113,6 +115,24 @@ public class GravitinoPaimonCatalog extends BaseCatalog {
   @Override
   public Optional<Factory> getFactory() {
     return Optional.of(new FlinkTableFactory());
+  }
+
+  @Override
+  public CatalogBaseTable getTable(ObjectPath tablePath)
+      throws TableNotExistException, CatalogException {
+    // Step 1: enforce Gravitino authorization (same path as BaseCatalog.getTable).
+    try {
+      catalog()
+          .asTableCatalog()
+          .loadTable(NameIdentifier.of(tablePath.getDatabaseName(), tablePath.getObjectName()));
+    } catch (NoSuchTableException e) {
+      throw new TableNotExistException(catalogName(), tablePath, e);
+    } catch (Exception e) {
+      throw new CatalogException(e);
+    }
+    // Step 2: return the Paimon-native DataCatalogTable (with proper CatalogEnvironment)
+    // so that AddPartitionCommitCallback is registered during write.
+    return paimonCatalog.getTable(tablePath);
   }
 
   // ---------------------------------------------------------------------------
@@ -201,7 +221,6 @@ public class GravitinoPaimonCatalog extends BaseCatalog {
 
   /**
    * Syncs the table change to Paimon/Hive metastore first, then persists the change in Gravitino.
-   * Paimon must be synced before Gravitino.
    *
    * <p>If the table is absent from Paimon the method returns early (without updating Gravitino) to
    * prevent the two stores from diverging. Gravitino authorization is enforced by the {@code
@@ -221,8 +240,7 @@ public class GravitinoPaimonCatalog extends BaseCatalog {
 
   /**
    * Same contract as {@link #alterTable(ObjectPath, CatalogBaseTable, boolean)} but accepts an
-   * explicit list of {@link TableChange} so callers that already computed the diff can pass it
-   * directly.
+   * explicit list of {@link TableChange}.
    */
   @Override
   public void alterTable(
@@ -241,32 +259,24 @@ public class GravitinoPaimonCatalog extends BaseCatalog {
   }
 
   /**
-   * Executes {@code paimonOp} against the Paimon catalog and returns {@code true} when the caller
-   * should proceed with the Gravitino update, or {@code false} when it should return early.
+   * Executes {@code paimonOp} and returns {@code true} when the caller should proceed with the
+   * Gravitino update, or {@code false} when it should return early.
    *
-   * <p>Returns {@code false} (early exit, skip Gravitino update) when:
-   *
-   * <ul>
-   *   <li>The table does not exist in Paimon and {@code ignoreIfNotExists=true} — proceeding to
-   *       Gravitino alone would diverge the two stores.
-   * </ul>
+   * <p>Returns {@code false} when the table does not exist in Paimon and {@code
+   * ignoreIfNotExists=true} — proceeding to Gravitino alone would diverge the two stores.
    */
   private boolean syncAlterToPaimon(
       ObjectPath tablePath, boolean ignoreIfNotExists, PaimonAlterOp paimonOp)
       throws TableNotExistException, CatalogException {
-    // Check existence outside the try block to avoid the thrown TableNotExistException
-    // being re-caught by the TOCTOU handler below.
     if (!paimonCatalog.tableExists(tablePath)) {
       if (!ignoreIfNotExists) {
         throw new TableNotExistException(catalogName(), tablePath);
       }
-      // ignoreIfNotExists=true: return early without touching Gravitino.
       return false;
     }
     try {
       paimonOp.run();
     } catch (TableNotExistException e) {
-      // TOCTOU: table dropped between the tableExists() check and paimonOp.run().
       if (!ignoreIfNotExists) {
         throw new CatalogException(
             "Failed to sync Paimon/Hive metastore for table: " + tablePath, e);
@@ -288,8 +298,6 @@ public class GravitinoPaimonCatalog extends BaseCatalog {
   @Override
   public void dropTable(ObjectPath tablePath, boolean ignoreIfNotExists)
       throws TableNotExistException, CatalogException {
-    // catalog().asTableCatalog().purgeTable() enforces Gravitino authorization and
-    // deletes both the metadata and the underlying data files.
     boolean dropped =
         catalog()
             .asTableCatalog()
@@ -298,10 +306,6 @@ public class GravitinoPaimonCatalog extends BaseCatalog {
       throw new TableNotExistException(catalogName(), tablePath);
     }
     if (dropped) {
-      // Sync the deletion to Paimon/Hive metastore so the entry does not become stale
-      // and prevent a subsequent CREATE TABLE with the same name from failing.
-      // NOTE: If this step fails the table is already gone from Gravitino; operators must
-      // manually remove the stale entry from Hive metastore.
       try {
         paimonCatalog.dropTable(tablePath, true);
       } catch (Exception e) {
