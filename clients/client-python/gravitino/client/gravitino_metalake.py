@@ -622,6 +622,8 @@ class GravitinoMetalake(
         Raises:
             NoSuchTagException: If the tag does not exist.
             NoSuchMetalakeException: If the metalake does not exist.
+            IllegalArgumentException: If the changes cannot be applied to the tag.
+            TagAlreadyExistsException: If a tag with the new name already exists.
         """
         # TODO implement alter_tag
         raise NotImplementedError()
