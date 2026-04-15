@@ -132,15 +132,14 @@ Use the REST backend to proxy another Iceberg REST catalog server (IRC2). The Gr
 
 By default, when the backend catalog is a REST catalog, IRC1 skips authorization and behaves as a proxy. IRC2 handles authorization. If you want IRC1 to keep authorization checks, set `gravitino.iceberg-rest.skip-authorization-for-rest-backend=false`.
 
-This is a server-level configuration in `gravitino-iceberg-rest-server.conf` (or `gravitino.conf` in auxiliary mode), not a per-catalog property.
 
-| Configuration item                                                  | Description                                                                                                                                                         | Default value | Required | Since Version |
-|---------------------------------------------------------------------|---------------------------------------------------------------------------------------------------------------------------------------------------------------------|---------------|----------|---------------|
-| `gravitino.iceberg-rest.catalog-backend`                            | The Catalog backend of the Gravitino Iceberg REST catalog service. Use the value **`rest`** for the REST catalog backend.                                        | `memory`      | Yes      | 0.2.0         |
-| `gravitino.iceberg-rest.uri`                                        | The Iceberg REST catalog URI (IRC2), such as `http://127.0.0.1:9001/iceberg`.                                                                                     | (none)        | Yes      | 0.2.0         |
-| `gravitino.iceberg-rest.warehouse`                                  | The catalog name in the Iceberg REST spec. Set to a specific catalog name, or leave empty to use the default catalog on IRC2.                                    | (none)        | No       | 0.2.0         |
-| `gravitino.iceberg-rest.data-access`                                | Data access mode exposed to Iceberg REST clients via `/v1/config`. Supported values: `vended-credentials`, `remote-signing`.                                     | (none)        | No       | 1.3.0         |
-| `gravitino.iceberg-rest.skip-authorization-for-rest-backend`        | Whether IRC1 skips authorization when the target backend catalog is a REST catalog. Set to `false` if you want IRC1 to enforce authorization before proxying.         | `true`        | No       | 1.4.0         |
+| Configuration item                                                  | Description                                                                                                                                                    | Default value | Required | Since Version |
+|---------------------------------------------------------------------|----------------------------------------------------------------------------------------------------------------------------------------------------------------|---------------|----------|---------------|
+| `gravitino.iceberg-rest.catalog-backend`                            | The Catalog backend of the Gravitino Iceberg REST catalog service. Use the value **`rest`** for the REST catalog backend.                                      | `memory`      | Yes      | 0.2.0         |
+| `gravitino.iceberg-rest.uri`                                        | The Iceberg REST catalog URI (IRC2), such as `http://127.0.0.1:9001/iceberg`.                                                                                  | (none)        | Yes      | 0.2.0         |
+| `gravitino.iceberg-rest.warehouse`                                  | The catalog name in the Iceberg REST spec. Set to a specific catalog name, or leave empty to use the default catalog on IRC2.                                  | (none)        | No       | 0.2.0         |
+| `gravitino.iceberg-rest.data-access`                                | Data access mode exposed to Iceberg REST clients via `/v1/config`. Supported values: `vended-credentials`, `remote-signing`.                                   | (none)        | No       | 1.3.0         |
+| `gravitino.iceberg-rest.skip-authorization-for-rest-backend`        | Whether IRC1 skips authorization when the target backend catalog is a REST catalog. Set to `false` if you want IRC1 to enforce authorization before proxying.  | `true`        | No       | 1.3.0         |
 
 IRC1 configuration example if IRC2 using HDFS storage:
 
@@ -477,7 +476,7 @@ View operations are supported when using the JDBC catalog backend with schema ve
 
 | Configuration item                           | Description                                                                                | Default value | Required | Since Version |
 |----------------------------------------------|--------------------------------------------------------------------------------------------|---------------|----------|---------------|
-| `gravitino.iceberg-rest.jdbc-schema-version` | The schema version of the JDBC catalog backend. Set to `V1` to enable view operations.    | `V0`          | No       | 1.2.0         |
+| `gravitino.iceberg-rest.jdbc-schema-version` | The schema version of the JDBC catalog backend. Set to `V1` to enable view operations.     | `V0`          | No       | 1.2.0         |
 
 ### Other Apache Iceberg catalog properties
 
