@@ -212,8 +212,8 @@ INSERT INTO gravitino_irc.<namespace>.new_table VALUES (1, 'example', current_ti
 
 ## Gravitino connector vs Iceberg REST
 
-| | Gravitino Engine Connector | Iceberg REST |
-|---|---|---|
+| Feature | Gravitino Engine Connector | Iceberg REST |
+|:---|:---|:---|
 | Engine plugin required | Yes | No |
 | Gravitino access control | Yes | Yes |
 | Supported engines | Trino, Spark, Flink, Daft | Any Iceberg-compatible engine |
