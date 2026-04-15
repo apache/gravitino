@@ -103,7 +103,7 @@ dependencies {
   }
   implementation(libs.commons.lang3)
   implementation(libs.guava)
-  implementation(libs.hadoop2.common) {
+  implementation(libs.hadoop3.common) {
     exclude("com.github.spotbugs")
     exclude("com.sun.jersey")
     exclude("javax.servlet")
@@ -113,16 +113,16 @@ dependencies {
     exclude("org.apache.zookeeper")
     exclude("org.mortbay.jetty")
   }
-  implementation(libs.hadoop2.hdfs) {
+  implementation(libs.hadoop3.hdfs) {
     exclude("*")
   }
-  implementation(libs.hadoop2.hdfs.client) {
+  implementation(libs.hadoop3.hdfs.client) {
     exclude("com.sun.jersey")
     exclude("javax.servlet")
     exclude("org.fusesource.leveldbjni")
     exclude("org.mortbay.jetty")
   }
-  implementation(libs.hadoop2.mapreduce.client.core) {
+  implementation(libs.hadoop3.mapreduce.client.core) {
     exclude("*")
   }
 

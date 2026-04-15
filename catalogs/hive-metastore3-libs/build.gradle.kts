@@ -29,7 +29,7 @@ plugins {
 // Guava and Logback are excluded because they are provided by the Gravitino runtime classpath.
 
 dependencies {
-  implementation(libs.hadoop2.common) {
+  implementation(libs.hadoop3.common) {
     exclude(group = "ch.qos.logback")
     exclude(group = "com.fasterxml.jackson.core")
     exclude(group = "com.github.spotbugs")

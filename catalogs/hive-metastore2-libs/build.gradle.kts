@@ -29,7 +29,7 @@ plugins {
 // Guava and Logback are excluded because they are provided by the Gravitino runtime classpath.
 
 dependencies {
-  implementation(libs.hadoop2.common) {
+  implementation(libs.hadoop3.common) {
     exclude(group = "ch.qos.logback")
     exclude(group = "com.fasterxml.jackson.core")
     exclude(group = "com.github.spotbugs")
@@ -43,7 +43,7 @@ dependencies {
     exclude(group = "org.eclipse.jetty.orbit", module = "javax.servlet")
     exclude(group = "org.slf4j")
   }
-  implementation(libs.hadoop2.mapreduce.client.core) {
+  implementation(libs.hadoop3.mapreduce.client.core) {
     exclude(group = "com.github.spotbugs")
     exclude(group = "com.google.code.findbugs")
     exclude(group = "com.google.guava")

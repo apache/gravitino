@@ -129,10 +129,10 @@ dependencies {
     exclude("org.slf4j")
   }
 
-  testImplementation(libs.hadoop2.common) {
+  testImplementation(libs.hadoop3.common) {
     exclude("*")
   }
-  testImplementation(libs.hadoop2.hdfs) {
+  testImplementation(libs.hadoop3.hdfs) {
     exclude("com.sun.jersey")
     exclude("commons-cli", "commons-cli")
     exclude("commons-io", "commons-io")
@@ -141,9 +141,14 @@ dependencies {
     exclude("javax.servlet", "servlet-api")
     exclude("org.mortbay.jetty")
   }
-  testImplementation(libs.hadoop2.mapreduce.client.core) {
+  testImplementation(libs.hadoop3.mapreduce.client.core) {
     exclude("*")
   }
+  // Hadoop 3.x runtime requirements (stripped by exclude("*") above)
+  testImplementation(libs.hadoop3.shaded.guava)
+  testImplementation(libs.hadoop3.shaded.protobuf)
+  testImplementation("org.apache.commons:commons-configuration2:2.8.0")
+  testImplementation(libs.re2j)
   testImplementation(libs.hive2.common) {
     exclude("org.eclipse.jetty.aggregate", "jetty-all")
     exclude("org.eclipse.jetty.orbit", "javax.servlet")
