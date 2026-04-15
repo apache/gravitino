@@ -34,7 +34,7 @@ Apache Gravitino, as a unified metadata management system, is well-positioned to
 
 ## Non-Goals
 
-1. **Materialized Views**: This design focuses on logical views only. Materialized views with physical storage are out of scope. IRC-based materialized views are a planned follow-on that builds on the logical view infrastructure established here; they represent a meaningful product differentiator that no other open metadata catalog currently offers.
+1. **Materialized Views**: This design focuses on logical views only. Materialized views with physical storage are out of scope. We are aware of the ongoing Iceberg Materialized View effort and will take it into consideration for future work. The logical view infrastructure established here (multi-dialect representations, unified metadata model, catalog capability detection) is designed to serve as the foundation for future materialized view support.
 
 2. **Temporary Views**: Session-scoped temporary views are managed by engines themselves and don't require persistent management.
 
@@ -82,8 +82,7 @@ View
 │           ├── sql: string                   # The view definition SQL
 │           ├── defaultCatalog: string        # Default catalog for unqualified refs
 │           └── defaultSchema: string         # Default schema for unqualified refs
-├── securityConfig: SecurityConfig
-│   └── securityMode: enum                # DEFINER | INVOKER
+├── securityMode: enum                    # DEFINER | INVOKER
 ├── properties: map<string, string>       # Extensible key-value properties
 └── auditInfo: AuditInfo                  # Creation/modification timestamps and users
 ```
@@ -108,7 +107,7 @@ View
   - Used by engines to resolve unqualified table references (e.g., `FROM orders` → `FROM defaultCatalog.defaultSchema.orders`).
   - View SQL may contain cross-catalog references (e.g., `catalog_a.schema.table JOIN catalog_b.schema.table`). The SQL is stored as-is; neither Gravitino, the IRC, nor the HMS validates, rewrites, or transforms view SQL at any point. The compute engine is responsible for resolving and executing cross-catalog queries at runtime.
 
-- **securityConfig**: Declares the security execution model of the view. This is a metadata property stored by Gravitino and **passed through to the compute engine** — Gravitino does not enforce it. Whether it takes effect depends on the engine's capability (e.g., MySQL natively supports DEFINER/INVOKER; Iceberg and Hive do not).
+- **securityMode**: Declares the security execution model of the view. This is a metadata property stored by Gravitino and **passed through to the compute engine** — Gravitino does not enforce it. Whether it takes effect depends on the engine's capability (e.g., MySQL natively supports DEFINER/INVOKER; Iceberg and Hive do not).
   - `DEFINER`: the engine should execute the view query with the view owner's privileges.
   - `INVOKER`: the engine should execute the view query with the querying user's privileges.
 
@@ -554,9 +553,7 @@ POST /api/metalakes/{metalake}/catalogs/{catalog}/schemas/{schema}/views
       "defaultSchema": "sales"
     }
   ],
-  "securityConfig": {
-    "securityMode": "DEFINER"
-  },
+  "securityMode": "DEFINER",
   "properties": {
     "description": "Customer order summary for analytics"
   }
@@ -579,7 +576,7 @@ GET /api/metalakes/{metalake}/catalogs/{catalog}/schemas/{schema}/views/{view}
   "comment": "Aggregated customer data view",
   "columns": [...],
   "representations": [...],
-  "securityConfig": {...},
+  "securityMode": "...",
   "properties": {...},
   "auditInfo": {
     "creator": "admin",
@@ -707,10 +704,7 @@ View view = viewCatalog.createView(
                 .withDefaultCatalog("iceberg_prod")
                 .withDefaultSchema("sales")
                 .build())
-        .withSecurityConfig(
-            SecurityConfig.builder()
-                .withSecurityMode(SecurityMode.DEFINER)
-                .build())
+        .withSecurityMode(SecurityMode.DEFINER)
         .withProperty("description", "Customer order summary for analytics")
         .build());
 
@@ -746,7 +740,7 @@ boolean dropped = viewCatalog.dropView(NameIdentifier.of("analytics_schema", "cu
 
 ```python
 from gravitino import NameIdentifier, Namespace
-from gravitino.api.view import SQLRepresentation, SecurityConfig, SecurityMode
+from gravitino.api.view import SQLRepresentation, SecurityMode
 
 # Get ViewCatalog interface
 view_catalog = catalog.as_view_catalog()
@@ -774,9 +768,7 @@ view = view_catalog.create_view(
             default_schema="sales"
         ),
     ],
-    security_config=SecurityConfig(
-        security_mode=SecurityMode.DEFINER
-    ),
+    security_mode=SecurityMode.DEFINER,
     properties={"description": "Customer order summary for analytics"}
 )
 
@@ -833,7 +825,7 @@ Gravitino defines the following privileges for view management, integrated with 
 
 > **Note:** These privileges control access to view **metadata** in Gravitino. Access to the **underlying data** when executing view queries is controlled by the compute engine and underlying catalog's permission system.
 
-> **Relationship with `securityConfig`**: The `securityConfig.securityMode` field (DEFINER/INVOKER) is a metadata property stored by Gravitino but enforced by the compute engine at query execution time. Whether it takes effect depends on engine capability — for example, MySQL natively supports DEFINER/INVOKER semantics, while Iceberg and Hive do not. For engines without native support, the field serves as a metadata annotation only. In summary: View Privileges govern *who can manage view metadata through Gravitino*, while `securityConfig` governs *how the engine accesses underlying data when executing the view* (subject to engine support).
+> **Relationship with `securityMode`**: The `securityMode` field (DEFINER/INVOKER) is a metadata property stored by Gravitino but enforced by the compute engine at query execution time. Whether it takes effect depends on engine capability — for example, MySQL natively supports DEFINER/INVOKER semantics, while Iceberg and Hive do not. For engines without native support, the field serves as a metadata annotation only. In summary: View Privileges govern *who can manage view metadata through Gravitino*, while `securityMode` governs *how the engine accesses underlying data when executing the view* (subject to engine support).
 
 ---
 
@@ -862,12 +854,9 @@ public class GravitinoConnectorMetadata implements ConnectorMetadata {
                     .withDefaultCatalog(definition.getCatalog().orElse(null))
                     .withDefaultSchema(definition.getSchema().orElse(null))
                     .build())
-            .withSecurityConfig(
-                SecurityConfig.builder()
-                    .withSecurityMode(definition.isRunAsInvoker() 
+            .withSecurityMode(definition.isRunAsInvoker() 
                         ? SecurityMode.INVOKER 
-                        : SecurityMode.DEFINER)
-                    .build());
+                        : SecurityMode.DEFINER);
         
         // Add columns
         for (ViewColumn col : definition.getColumns()) {
@@ -897,7 +886,7 @@ public class GravitinoConnectorMetadata implements ConnectorMetadata {
             convertColumns(view.getColumns()),
             Optional.ofNullable(view.getComment()),
             Optional.empty(), // owner managed via Gravitino's owner_meta
-            view.getSecurityConfig().getSecurityMode() == SecurityMode.INVOKER
+            view.getSecurityMode() == SecurityMode.INVOKER
         ));
     }
     
