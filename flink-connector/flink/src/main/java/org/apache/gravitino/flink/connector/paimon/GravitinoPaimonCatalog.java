@@ -99,4 +99,9 @@ public class GravitinoPaimonCatalog extends BaseCatalog {
       throw new TableNotExistException(catalogName(), tablePath);
     }
   }
+  
+  @Override
+  public Optional<Factory> getFactory() {
+    return Optional.of(new FlinkTableFactory());
+  }
 }
