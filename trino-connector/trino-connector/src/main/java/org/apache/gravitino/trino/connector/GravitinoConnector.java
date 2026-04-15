@@ -87,36 +87,7 @@ public class GravitinoConnector implements Connector {
     this.forwardUser =
         Boolean.parseBoolean(
             clientConfig.getOrDefault(GravitinoAuthProvider.FORWARD_SESSION_USER_KEY, "false"));
-
-    if (forwardUser) {
-      String authTypeStr = clientConfig.get(GravitinoAuthProvider.AUTH_TYPE_KEY);
-      if (StringUtils.isBlank(authTypeStr)) {
-        throw new TrinoException(
-            GravitinoErrorCode.GRAVITINO_ILLEGAL_ARGUMENT,
-            "gravitino.client.session.forwardUser=true requires gravitino.client.authType to be set");
-      }
-      GravitinoAuthProvider.AuthType authType = GravitinoAuthProvider.parseAuthType(authTypeStr);
-      if (authType != GravitinoAuthProvider.AuthType.SIMPLE) {
-        throw new TrinoException(
-            GravitinoErrorCode.GRAVITINO_ILLEGAL_ARGUMENT,
-            "gravitino.client.session.forwardUser=true only supports authType=simple, got: "
-                + authTypeStr);
-      }
-      this.perUserSessionCache =
-          CacheBuilder.newBuilder()
-              .maximumSize(500)
-              .expireAfterAccess(1, TimeUnit.HOURS)
-              .removalListener(
-                  (RemovalNotification<String, UserSession> notification) -> {
-                    UserSession session = notification.getValue();
-                    if (session != null) {
-                      session.close();
-                    }
-                  })
-              .build();
-    } else {
-      this.perUserSessionCache = null;
-    }
+    this.perUserSessionCache = forwardUser ? buildSessionCache(clientConfig) : null;
   }
 
   @Override
@@ -274,6 +245,49 @@ public class GravitinoConnector implements Connector {
     Connector internalConnector = catalogConnectorContext.getInternalConnector();
     internalConnector.shutdown();
     catalogConnectorContext.close();
+  }
+
+  /**
+   * Validates the auth config for forwardUser mode and builds the per-user session cache.
+   *
+   * @param clientConfig the client config map
+   * @return the per-user session cache
+   * @throws TrinoException if authType is missing or does not support session forwarding
+   */
+  private Cache<String, UserSession> buildSessionCache(Map<String, String> clientConfig) {
+    String authTypeStr = clientConfig.get(GravitinoAuthProvider.AUTH_TYPE_KEY);
+    if (StringUtils.isBlank(authTypeStr)) {
+      throw new TrinoException(
+          GravitinoErrorCode.GRAVITINO_ILLEGAL_ARGUMENT,
+          "gravitino.client.session.forwardUser=true requires gravitino.client.authType to be set");
+    }
+    GravitinoAuthProvider.AuthType authType = GravitinoAuthProvider.parseAuthType(authTypeStr);
+    if (authType != GravitinoAuthProvider.AuthType.SIMPLE) {
+      throw new TrinoException(
+          GravitinoErrorCode.GRAVITINO_ILLEGAL_ARGUMENT,
+          "gravitino.client.session.forwardUser=true only supports authType=simple, got: "
+              + authTypeStr);
+    }
+
+    long maxSize =
+        Long.parseLong(
+            clientConfig.getOrDefault(GravitinoAuthProvider.SESSION_CACHE_MAX_SIZE_KEY, "500"));
+    long expireAfterAccessSeconds =
+        Long.parseLong(
+            clientConfig.getOrDefault(
+                GravitinoAuthProvider.SESSION_CACHE_EXPIRE_AFTER_ACCESS_SECONDS_KEY, "3600"));
+
+    return CacheBuilder.newBuilder()
+        .maximumSize(maxSize)
+        .expireAfterAccess(expireAfterAccessSeconds, TimeUnit.SECONDS)
+        .removalListener(
+            (RemovalNotification<String, UserSession> notification) -> {
+              UserSession session = notification.getValue();
+              if (session != null) {
+                session.close();
+              }
+            })
+        .build();
   }
 
   /** Holds a per-user {@link GravitinoAdminClient} together with its derived metadata. */

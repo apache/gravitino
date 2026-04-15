@@ -141,9 +141,11 @@ gravitino.client.session.forwardUser=true
 
 **Configuration properties:**
 
-| Property                                       | Description                                                                                    | Default value | Required | Since version |
-|------------------------------------------------|------------------------------------------------------------------------------------------------|---------------|----------|---------------|
-| `gravitino.client.session.forwardUser`         | When `true` with `authType=simple`, forwards the Trino session user to Gravitino per-query     | `false`       | No       | 1.3.0         |
+| Property                                                   | Description                                                                                | Default value | Required | Since version |
+|------------------------------------------------------------|--------------------------------------------------------------------------------------------|---------------|----------|---------------|
+| `gravitino.client.session.forwardUser`                     | When `true` with `authType=simple`, forwards the Trino session user to Gravitino per-query | `false`       | No       | 1.3.0         |
+| `gravitino.client.session.cache.maxSize`                   | Maximum number of per-user sessions to keep in the cache                                   | `500`         | No       | 1.3.0         |
+| `gravitino.client.session.cache.expireAfterAccessSeconds`  | Seconds before an idle per-user session is evicted from the cache                          | `3600`        | No       | 1.3.0         |
 
 ### Notes
 
