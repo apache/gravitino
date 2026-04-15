@@ -208,6 +208,8 @@ public class GravitinoAuthProvider {
     clientConfig.remove(KERBEROS_PRINCIPAL_KEY);
     clientConfig.remove(KERBEROS_KEYTAB_FILE_PATH_KEY);
     clientConfig.remove(FORWARD_SESSION_USER_KEY);
+    clientConfig.remove(GravitinoConfig.SESSION_CACHE_MAX_SIZE_KEY);
+    clientConfig.remove(GravitinoConfig.SESSION_CACHE_EXPIRE_AFTER_ACCESS_SECONDS_KEY);
   }
 
   private static void buildSimpleAuth(

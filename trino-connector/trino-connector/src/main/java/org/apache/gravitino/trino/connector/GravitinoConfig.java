@@ -153,11 +153,11 @@ public class GravitinoConfig {
           false);
 
   /** Config key for the per-user session cache maximum size. */
-  public static final String SESSION_CACHE_MAX_SIZE_KEY = "gravitino.trino.session-cache.max-size";
+  public static final String SESSION_CACHE_MAX_SIZE_KEY = "gravitino.client.session.cache.maxSize";
 
   /** Config key for the per-user session cache expiry in seconds. */
   public static final String SESSION_CACHE_EXPIRE_AFTER_ACCESS_SECONDS_KEY =
-      "gravitino.trino.session-cache.expire-after-access-seconds";
+      "gravitino.client.session.cache.expireAfterAccessSeconds";
 
   private static final ConfigEntry GRAVITINO_SESSION_CACHE_MAX_SIZE =
       new ConfigEntry(
