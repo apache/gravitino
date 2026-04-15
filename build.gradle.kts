@@ -801,7 +801,9 @@ tasks {
         from(projectDir.dir("conf")) { into("package/conf") }
         from(projectDir.dir("bin")) { into("package/bin") }
         if (!skipWeb) {
-          from(projectDir.dir("web/web/build/libs/${rootProject.name}-web-$version.war")) { into("package/web") }
+          from(projectDir.dir("web/web/build/libs/${rootProject.name}-web-$version.war")) {
+            into("package/web")
+          }
           from(projectDir.dir("web-v2/web/build/libs/${rootProject.name}-web-$version.war")) {
             into("package/web-v2")
           }
