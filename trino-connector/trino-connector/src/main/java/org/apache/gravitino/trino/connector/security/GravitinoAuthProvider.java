@@ -207,9 +207,9 @@ public class GravitinoAuthProvider {
     clientConfig.remove(OAUTH_SCOPE_KEY);
     clientConfig.remove(KERBEROS_PRINCIPAL_KEY);
     clientConfig.remove(KERBEROS_KEYTAB_FILE_PATH_KEY);
-    // Remove all session-forwarding config keys (connector-level, not passed to the HTTP client)
-    String sessionPrefix = GravitinoClientConfiguration.GRAVITINO_CLIENT_CONFIG_PREFIX + "session.";
-    clientConfig.entrySet().removeIf(e -> e.getKey().startsWith(sessionPrefix));
+    clientConfig.remove(FORWARD_SESSION_USER_KEY);
+    clientConfig.remove(GravitinoConfig.SESSION_CACHE_MAX_SIZE_KEY);
+    clientConfig.remove(GravitinoConfig.SESSION_CACHE_EXPIRE_AFTER_ACCESS_SECONDS_KEY);
   }
 
   private static void buildSimpleAuth(

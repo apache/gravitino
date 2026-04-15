@@ -151,6 +151,27 @@ public class GravitinoConfig {
           "",
           false);
 
+  /** Config key for the per-user session cache maximum size. */
+  public static final String SESSION_CACHE_MAX_SIZE_KEY = "gravitino.client.session.cache.maxSize";
+
+  /** Config key for the per-user session cache expiry in seconds. */
+  public static final String SESSION_CACHE_EXPIRE_AFTER_ACCESS_SECONDS_KEY =
+      "gravitino.client.session.cache.expireAfterAccessSeconds";
+
+  private static final ConfigEntry GRAVITINO_SESSION_CACHE_MAX_SIZE =
+      new ConfigEntry(
+          SESSION_CACHE_MAX_SIZE_KEY,
+          "Maximum number of per-user sessions to keep in the cache when session.forwardUser=true",
+          "500",
+          false);
+
+  private static final ConfigEntry GRAVITINO_SESSION_CACHE_EXPIRE_AFTER_ACCESS_SECONDS =
+      new ConfigEntry(
+          SESSION_CACHE_EXPIRE_AFTER_ACCESS_SECONDS_KEY,
+          "Seconds before an idle per-user session is evicted from the cache when session.forwardUser=true",
+          "3600",
+          false);
+
   /**
    * Constructs a new GravitinoConfig with the specified configuration.
    *
@@ -387,6 +408,36 @@ public class GravitinoConfig {
         .splitToStream(skipCatalogConfig)
         .map(Pattern::compile)
         .collect(Collectors.toList());
+  }
+
+  /**
+   * Retrieves the maximum number of per-user sessions to keep in the cache.
+   *
+   * @return the session cache maximum size
+   */
+  public long getSessionCacheMaxSize() {
+    return parseLongConfigEntry(GRAVITINO_SESSION_CACHE_MAX_SIZE);
+  }
+
+  /**
+   * Retrieves the expiry (in seconds) for idle per-user sessions in the cache.
+   *
+   * @return the session cache expiry in seconds
+   */
+  public long getSessionCacheExpireAfterAccessSeconds() {
+    return parseLongConfigEntry(GRAVITINO_SESSION_CACHE_EXPIRE_AFTER_ACCESS_SECONDS);
+  }
+
+  private long parseLongConfigEntry(ConfigEntry entry) {
+    String value = config.getOrDefault(entry.key, entry.defaultValue);
+    try {
+      return Long.parseLong(value);
+    } catch (NumberFormatException e) {
+      throw new TrinoException(
+          GravitinoErrorCode.GRAVITINO_ILLEGAL_ARGUMENT,
+          "Invalid value for config '" + entry.key + "': expected a number, got: " + value,
+          e);
+    }
   }
 
   /**
