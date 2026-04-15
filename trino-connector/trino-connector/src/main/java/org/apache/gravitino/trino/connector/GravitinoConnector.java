@@ -47,6 +47,7 @@ import java.util.concurrent.TimeUnit;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.client.GravitinoAdminClient;
+import org.apache.gravitino.client.GravitinoClientConfiguration;
 import org.apache.gravitino.client.GravitinoMetalake;
 import org.apache.gravitino.trino.connector.catalog.CatalogConnectorContext;
 import org.apache.gravitino.trino.connector.catalog.CatalogConnectorMetadata;
@@ -63,6 +64,12 @@ import org.slf4j.LoggerFactory;
 public class GravitinoConnector implements Connector {
 
   private static final Logger LOG = LoggerFactory.getLogger(GravitinoConnector.class);
+
+  private static final String SESSION_CACHE_MAX_SIZE_KEY =
+      GravitinoClientConfiguration.GRAVITINO_CLIENT_CONFIG_PREFIX + "session.cache.maxSize";
+  private static final String SESSION_CACHE_EXPIRE_AFTER_ACCESS_SECONDS_KEY =
+      GravitinoClientConfiguration.GRAVITINO_CLIENT_CONFIG_PREFIX
+          + "session.cache.expireAfterAccessSeconds";
 
   private final NameIdentifier catalogIdentifier;
   protected final CatalogConnectorContext catalogConnectorContext;
@@ -247,13 +254,6 @@ public class GravitinoConnector implements Connector {
     catalogConnectorContext.close();
   }
 
-  /**
-   * Validates the auth config for forwardUser mode and builds the per-user session cache.
-   *
-   * @param clientConfig the client config map
-   * @return the per-user session cache
-   * @throws TrinoException if authType is missing or does not support session forwarding
-   */
   private Cache<String, UserSession> buildSessionCache(Map<String, String> clientConfig) {
     String authTypeStr = clientConfig.get(GravitinoAuthProvider.AUTH_TYPE_KEY);
     if (StringUtils.isBlank(authTypeStr)) {
@@ -269,13 +269,9 @@ public class GravitinoConnector implements Connector {
               + authTypeStr);
     }
 
-    long maxSize =
-        Long.parseLong(
-            clientConfig.getOrDefault(GravitinoAuthProvider.SESSION_CACHE_MAX_SIZE_KEY, "500"));
+    long maxSize = parseLongConfig(clientConfig, SESSION_CACHE_MAX_SIZE_KEY, 500);
     long expireAfterAccessSeconds =
-        Long.parseLong(
-            clientConfig.getOrDefault(
-                GravitinoAuthProvider.SESSION_CACHE_EXPIRE_AFTER_ACCESS_SECONDS_KEY, "3600"));
+        parseLongConfig(clientConfig, SESSION_CACHE_EXPIRE_AFTER_ACCESS_SECONDS_KEY, 3600);
 
     return CacheBuilder.newBuilder()
         .maximumSize(maxSize)
@@ -290,10 +286,26 @@ public class GravitinoConnector implements Connector {
         .build();
   }
 
+  private static long parseLongConfig(Map<String, String> config, String key, long defaultValue) {
+    String value = config.get(key);
+    if (value == null) {
+      return defaultValue;
+    }
+    try {
+      return Long.parseLong(value);
+    } catch (NumberFormatException e) {
+      throw new TrinoException(
+          GravitinoErrorCode.GRAVITINO_ILLEGAL_ARGUMENT,
+          "Invalid value for config '" + key + "': expected a number, got: " + value,
+          e);
+    }
+  }
+
   /** Holds a per-user {@link GravitinoAdminClient} together with its derived metadata. */
   private static final class UserSession {
     final GravitinoAdminClient client;
     final CatalogConnectorMetadata metadata;
+    private volatile boolean closed = false;
 
     UserSession(GravitinoAdminClient client, CatalogConnectorMetadata metadata) {
       this.client = client;
@@ -301,6 +313,10 @@ public class GravitinoConnector implements Connector {
     }
 
     void close() {
+      if (closed) {
+        return;
+      }
+      closed = true;
       try {
         client.close();
       } catch (Exception e) {

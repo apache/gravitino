@@ -54,21 +54,6 @@ public class GravitinoAuthProvider {
   public static final String FORWARD_SESSION_USER_KEY =
       GravitinoClientConfiguration.GRAVITINO_CLIENT_CONFIG_PREFIX + "session.forwardUser";
 
-  /**
-   * Maximum number of per-user sessions to keep in the cache when {@code forwardUser=true}.
-   * Defaults to {@code 500}.
-   */
-  public static final String SESSION_CACHE_MAX_SIZE_KEY =
-      GravitinoClientConfiguration.GRAVITINO_CLIENT_CONFIG_PREFIX + "session.cache.maxSize";
-
-  /**
-   * How long (in seconds) an idle per-user session is kept in the cache when {@code
-   * forwardUser=true}. Defaults to {@code 3600} (1 hour).
-   */
-  public static final String SESSION_CACHE_EXPIRE_AFTER_ACCESS_SECONDS_KEY =
-      GravitinoClientConfiguration.GRAVITINO_CLIENT_CONFIG_PREFIX
-          + "session.cache.expireAfterAccessSeconds";
-
   /** OAuth2 server URI configuration key. */
   public static final String OAUTH_SERVER_URI_KEY =
       GravitinoClientConfiguration.GRAVITINO_CLIENT_CONFIG_PREFIX + "oauth2.serverUri";
@@ -222,9 +207,9 @@ public class GravitinoAuthProvider {
     clientConfig.remove(OAUTH_SCOPE_KEY);
     clientConfig.remove(KERBEROS_PRINCIPAL_KEY);
     clientConfig.remove(KERBEROS_KEYTAB_FILE_PATH_KEY);
-    clientConfig.remove(FORWARD_SESSION_USER_KEY);
-    clientConfig.remove(SESSION_CACHE_MAX_SIZE_KEY);
-    clientConfig.remove(SESSION_CACHE_EXPIRE_AFTER_ACCESS_SECONDS_KEY);
+    // Remove all session-forwarding config keys (connector-level, not passed to the HTTP client)
+    String sessionPrefix = GravitinoClientConfiguration.GRAVITINO_CLIENT_CONFIG_PREFIX + "session.";
+    clientConfig.entrySet().removeIf(e -> e.getKey().startsWith(sessionPrefix));
   }
 
   private static void buildSimpleAuth(
