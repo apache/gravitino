@@ -341,6 +341,24 @@ required — the existing DB is the single source of truth for both tiers.
 
 ---
 
+### 4.1.1 Current-vs-Target Gap (Code-Aligned)
+
+The design below intentionally closes concrete gaps in the current implementation:
+
+| Area                                 | Current behavior (main branch)                                            | Target behavior (this design)                                                               |
+|--------------------------------------|---------------------------------------------------------------------------|---------------------------------------------------------------------------------------------|
+| Role loading                         | `JcasbinAuthorizer.loadRolePrivilege()` loads only `ROLE_USER_REL`        | Load both user direct roles and group-derived roles (`group_role_rel`)                      |
+| Owner check path                     | `isOwner()` calls `MetadataIdConverter.getID()` twice for the same object | Resolve metadata ID once per call path and reuse                                            |
+| Role cache coherence                 | `loadedRoles: Cache<Long, Boolean>` is TTL-driven                         | `loadedRoles: roleId -> updated_at` with per-request version validation                     |
+| Cross-node entity/owner invalidation | In-process hook/TTL only, no durable HA invalidation stream               | DB-backed pollers (`owner_meta.updated_at`, `entity_change_log`) with targeted invalidation |
+| Request-scope dedup                  | `AuthorizationRequestContext` has allow/deny result cache + `hasLoadRole` | Add request-scope owner/id dedup maps with strict request-thread scope                      |
+
+This section is used as implementation acceptance criteria and should stay synchronized with code
+changes in `server-common/.../JcasbinAuthorizer.java`,
+`server-common/.../MetadataIdConverter.java`, and `core/.../AuthorizationRequestContext.java`.
+
+---
+
 ### 4.2 Strong Consistency: User, Group, and Role Caches
 
 #### Why Strong Consistency Is Required
@@ -388,6 +406,33 @@ ALTER TABLE `group_meta`
              JcasbinAuthorizer compares db.updated_at vs cached updated_at per request
              to decide whether to reload the group-role mapping.';
 ```
+
+#### Index and Backfill Notes
+
+To keep Step 1 and Step 3 checks predictable under load, add/verify covering indexes for
+high-frequency predicates:
+
+```sql
+-- Suggested read-path indexes for version checks
+CREATE INDEX idx_user_meta_name_del_upd
+    ON user_meta (metalake_id, user_name, deleted_at, updated_at);
+CREATE INDEX idx_group_meta_del_upd
+    ON group_meta (group_id, deleted_at, updated_at);
+CREATE INDEX idx_role_meta_del_upd
+    ON role_meta (role_id, deleted_at, updated_at);
+CREATE INDEX idx_owner_meta_obj_del_upd
+    ON owner_meta (metadata_object_id, deleted_at, updated_at);
+```
+
+Backfill strategy for the newly added `updated_at` columns:
+
+1. DDL adds columns with default `0`.
+2. One-time backfill sets `updated_at = create_time` (or `last_modified_time` if available)
+   for existing active rows.
+3. New write-path hooks become the long-term source of truth.
+
+Using explicit backfill avoids a long-lived "all zero" window that would force unnecessary cold
+reloads at rollout time.
 
 ---
 
@@ -857,6 +902,26 @@ Final state is correct. No correctness issue.
 The TOCTOU window is an inherent property of non-serializable reads in distributed systems.
 It applies only during concurrent admin mutations (which are rare in practice), not on
 the steady-state auth path.
+
+---
+
+### 4.11 Minimal Acceptance Test Matrix
+
+Before merge, validate the following scenarios (single-node + HA two-node setup):
+
+| Case                      | Setup                                   | Expected result                                                     |
+|---------------------------|-----------------------------------------|---------------------------------------------------------------------|
+| Revoke user role          | User has role R, then R revoked         | Next auth request denied on all nodes (no TTL wait)                 |
+| Revoke role privilege     | Role R loses privilege P                | Next auth request for P denied on all nodes                         |
+| Group role grant/revoke   | User inherits role only via group       | Auth reflects group mutation on next request                        |
+| Owner transfer            | owner1 -> owner2                        | Local node immediate switch; HA peer converges within poll interval |
+| Entity rename             | table old -> new                        | Old name denied after invalidation; new name resolves same ID       |
+| Entity drop               | object dropped                          | Auth denied after invalidation (documented bounded HA window)       |
+| Drop + recreate same name | drop old, create new                    | New ID used; stale policy does not authorize new entity             |
+| Poller transient failure  | pause DB access for poller then recover | No privilege escalation; convergence resumes after recovery         |
+
+Tests should include both functional assertions and query-count assertions on warm path
+(target: Step 1 + Step 3 lightweight checks, caches hot for Step 2/2.5).
 
 ---
 
