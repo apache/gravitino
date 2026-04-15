@@ -775,9 +775,6 @@ jacoco {
 tasks {
   val projectDir = layout.projectDirectory
   val outputDir = projectDir.dir("distribution")
-  val skipWebBuild =
-    skipFrontend || providers.gradleProperty("skipWebBuild").map { it.toBoolean() }.orElse(false).get()
-
   val compileDistribution by registering {
     val dependencies =
       mutableListOf(
@@ -803,7 +800,7 @@ tasks {
       copy {
         from(projectDir.dir("conf")) { into("package/conf") }
         from(projectDir.dir("bin")) { into("package/bin") }
-        if (!skipWebBuild) {
+        if (!skipWeb) {
           from(projectDir.dir("web/web/build/libs/${rootProject.name}-web-$version.war")) { into("package/web") }
           from(projectDir.dir("web-v2/web/build/libs/${rootProject.name}-web-$version.war")) {
             into("package/web-v2")
@@ -828,7 +825,7 @@ tasks {
         from(projectDir.file("LICENSE.bin")) { into("package") }
         from(projectDir.file("NOTICE.bin")) { into("package") }
         from(projectDir.file("README.md")) { into("package") }
-        if (!skipWebBuild) {
+        if (!skipWeb) {
           from(projectDir.dir("web/web/licenses")) { into("package/web/licenses") }
           from(projectDir.dir("web/web/LICENSE.bin")) { into("package/web") }
           from(projectDir.dir("web/web/NOTICE.bin")) { into("package/web") }
@@ -842,7 +839,7 @@ tasks {
         }
       }
 
-      if (skipWebBuild) {
+      if (skipWeb) {
         delete(projectDir.dir("distribution/package/web"), projectDir.dir("distribution/package/web-v2"))
       }
 
