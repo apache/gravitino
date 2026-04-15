@@ -83,10 +83,7 @@ public class GravitinoConnector implements Connector {
         new CatalogConnectorMetadata(catalogConnectorContext.getMetalake(), this.catalogIdentifier);
 
     GravitinoConfig config = catalogConnectorContext.getConfig();
-    Map<String, String> clientConfig = config.getClientConfig();
-    this.forwardUser =
-        Boolean.parseBoolean(
-            clientConfig.getOrDefault(GravitinoAuthProvider.FORWARD_SESSION_USER_KEY, "false"));
+    this.forwardUser = config.isForwardUser();
     this.perUserSessionCache = forwardUser ? buildSessionCache(config) : null;
   }
 
@@ -115,43 +112,10 @@ public class GravitinoConnector implements Connector {
         internalConnector.getMetadata(session, gravitinoTransactionHandle.getInternalHandle());
     Preconditions.checkArgument(internalMetadata != null, "Internal metadata must not be null");
 
-    if (forwardUser) {
-      String credKey = "simple:" + session.getUser();
-      UserSession userSession;
-      try {
-        userSession =
-            perUserSessionCache.get(
-                credKey,
-                () -> {
-                  GravitinoAdminClient userClient =
-                      GravitinoAuthProvider.buildForSession(
-                          catalogConnectorContext.getConfig(), session);
-                  GravitinoMetalake userMetalake =
-                      userClient.loadMetalake(catalogConnectorContext.getMetalake().name());
-                  CatalogConnectorMetadata userMetadata =
-                      new CatalogConnectorMetadata(userMetalake, catalogIdentifier);
-                  return new UserSession(userClient, userMetadata);
-                });
-      } catch (ExecutionException e) {
-        Throwable cause = e.getCause();
-        LOG.warn(
-            "Failed to create per-user Gravitino client for user '{}': {}",
-            session.getUser(),
-            cause.getMessage());
-        throw new TrinoException(
-            PERMISSION_DENIED,
-            "Failed to authenticate user '"
-                + session.getUser()
-                + "' with Gravitino: "
-                + cause.getMessage(),
-            cause);
-      }
-      return createGravitinoMetadata(
-          userSession.metadata, catalogConnectorContext.getMetadataAdapter(), internalMetadata);
-    }
-
+    CatalogConnectorMetadata metadata =
+        forwardUser ? resolveSessionMetadata(session) : connectorMetadata;
     return createGravitinoMetadata(
-        connectorMetadata, catalogConnectorContext.getMetadataAdapter(), internalMetadata);
+        metadata, catalogConnectorContext.getMetadataAdapter(), internalMetadata);
   }
 
   protected GravitinoMetadata createGravitinoMetadata(
@@ -245,6 +209,37 @@ public class GravitinoConnector implements Connector {
     Connector internalConnector = catalogConnectorContext.getInternalConnector();
     internalConnector.shutdown();
     catalogConnectorContext.close();
+  }
+
+  private CatalogConnectorMetadata resolveSessionMetadata(ConnectorSession session) {
+    String credKey = "simple:" + session.getUser();
+    try {
+      return perUserSessionCache.get(
+              credKey,
+              () -> {
+                GravitinoAdminClient userClient =
+                    GravitinoAuthProvider.buildForSession(
+                        catalogConnectorContext.getConfig(), session);
+                GravitinoMetalake userMetalake =
+                    userClient.loadMetalake(catalogConnectorContext.getMetalake().name());
+                return new UserSession(
+                    userClient, new CatalogConnectorMetadata(userMetalake, catalogIdentifier));
+              })
+          .metadata;
+    } catch (ExecutionException e) {
+      Throwable cause = e.getCause();
+      LOG.warn(
+          "Failed to create per-user Gravitino client for user '{}': {}",
+          session.getUser(),
+          cause.getMessage());
+      throw new TrinoException(
+          PERMISSION_DENIED,
+          "Failed to authenticate user '"
+              + session.getUser()
+              + "' with Gravitino: "
+              + cause.getMessage(),
+          cause);
+    }
   }
 
   private Cache<String, UserSession> buildSessionCache(GravitinoConfig config) {

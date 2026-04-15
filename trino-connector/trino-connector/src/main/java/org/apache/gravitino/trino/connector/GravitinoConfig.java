@@ -33,6 +33,7 @@ import java.util.Properties;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.gravitino.trino.connector.security.GravitinoAuthProvider;
 
 /** Gravitino config. */
 public class GravitinoConfig {
@@ -152,11 +153,11 @@ public class GravitinoConfig {
           false);
 
   /** Config key for the per-user session cache maximum size. */
-  public static final String SESSION_CACHE_MAX_SIZE_KEY = "gravitino.client.session.cache.maxSize";
+  public static final String SESSION_CACHE_MAX_SIZE_KEY = "gravitino.trino.session-cache.max-size";
 
   /** Config key for the per-user session cache expiry in seconds. */
   public static final String SESSION_CACHE_EXPIRE_AFTER_ACCESS_SECONDS_KEY =
-      "gravitino.client.session.cache.expireAfterAccessSeconds";
+      "gravitino.trino.session-cache.expire-after-access-seconds";
 
   private static final ConfigEntry GRAVITINO_SESSION_CACHE_MAX_SIZE =
       new ConfigEntry(
@@ -408,6 +409,16 @@ public class GravitinoConfig {
         .splitToStream(skipCatalogConfig)
         .map(Pattern::compile)
         .collect(Collectors.toList());
+  }
+
+  /**
+   * Returns whether Trino session user forwarding is enabled.
+   *
+   * @return true if forwardUser is set to true
+   */
+  public boolean isForwardUser() {
+    return Boolean.parseBoolean(
+        config.getOrDefault(GravitinoAuthProvider.FORWARD_SESSION_USER_KEY, "false"));
   }
 
   /**
