@@ -200,7 +200,7 @@ public class TestClickHouseTableOperationsGranularity {
     Mockito.when(preparedStatement.executeQuery()).thenReturn(resultSet);
 
     // Case 1: valid minmax index with explicit granularity.
-    // Case 2: valid bloom_filter index with blank granularity (no properties key).
+    // Case 2: valid bloom_filter index with explicit granularity.
     // Case 3: invalid expression, should be skipped.
     // Case 4: unsupported index type, should be skipped.
     Mockito.when(resultSet.next()).thenReturn(true, true, true, true, false);
@@ -210,7 +210,7 @@ public class TestClickHouseTableOperationsGranularity {
         .thenReturn("minmax", "bloom_filter", "minmax", "unknown_type");
     Mockito.when(resultSet.getString("expr"))
         .thenReturn("`amount`", "`note`", "amount + 1", "`note`");
-    Mockito.when(resultSet.getString("granularity")).thenReturn("9", "", "7", "5");
+    Mockito.when(resultSet.getString("granularity")).thenReturn("9", "1", "7", "5");
 
     List<Index> indexes = ops.invokeGetSecondaryIndexes(connection, "db", "tbl");
 
@@ -222,10 +222,10 @@ public class TestClickHouseTableOperationsGranularity {
     Assertions.assertEquals(Index.IndexType.DATA_SKIPPING_MINMAX, indexes.get(0).type());
     Assertions.assertEquals("9", indexes.get(0).properties().get(GRANULARITY));
 
-    // Case 2 verification: blank granularity does not create a granularity property.
+    // Case 2 verification: granularity is loaded into index properties.
     Assertions.assertEquals("idx_valid_bf", indexes.get(1).name());
     Assertions.assertEquals(Index.IndexType.DATA_SKIPPING_BLOOM_FILTER, indexes.get(1).type());
-    Assertions.assertFalse(indexes.get(1).properties().containsKey(GRANULARITY));
+    Assertions.assertEquals("1", indexes.get(1).properties().get(GRANULARITY));
   }
 
   private void assertCreateGranularityInvalid(
