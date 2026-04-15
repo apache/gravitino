@@ -1280,6 +1280,15 @@ public class ClickHouseTableOperations extends JdbcTableOperations {
             Map<String, String> indexProperties = ImmutableMap.of();
             if (StringUtils.isNotBlank(granularity)) {
               indexProperties = ImmutableMap.of(GRANULARITY, granularity);
+            } else {
+              LOG.warn(
+                  "Found blank {} for data skipping index {} (type {}) on {}.{}, skip loading {} property.",
+                  GRANULARITY,
+                  name,
+                  type,
+                  databaseName,
+                  tableName,
+                  GRANULARITY);
             }
             secondaryIndexes.add(
                 Indexes.of(getClickHouseIndexType(type), name, fields, indexProperties));
