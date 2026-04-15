@@ -19,7 +19,7 @@ from __future__ import annotations
 
 from gravitino.api.authorization.supports_roles import SupportsRoles
 from gravitino.api.metadata_object import MetadataObject
-from gravitino.dto.responses.role_response import RoleNamesListResponse
+from gravitino.dto.responses.name_list_response import NameListResponse
 from gravitino.exceptions.handlers.role_error_handler import (
     ROLE_ERROR_HANDLER,
 )
@@ -44,18 +44,21 @@ class MetadataObjectRoleOperations(SupportsRoles):
         self.metalake_name = metalake_name
         self.metadata_object = metadata_object
         self.rest_client = rest_client
-        self.role_request_path = MetadataObjectRoleOperations.ROLE_REQUEST_PATH.format(
-            encode_string(metalake_name),
-            metadata_object.type().name.lower(),
-            encode_string(metadata_object.full_name()),
+        self.role_request_path = (
+            "api/metalakes"
+            + f"/{encode_string(metalake_name)}/"
+            + "objects"
+            + f"/{metadata_object.type().name.lower()}"
+            + f"/{encode_string(metadata_object.full_name())}"
+            + "/roles"
         )
 
     def list_binding_role_names(self) -> list[str]:
         response = self.rest_client.get(
             self.role_request_path, params={}, error_handler=ROLE_ERROR_HANDLER
         )
-        role_names_list_resp = RoleNamesListResponse.from_json(
+        role_names_list_resp = NameListResponse.from_json(
             response.body, infer_missing=True
         )
         role_names_list_resp.validate()
-        return role_names_list_resp.role_names()
+        return role_names_list_resp.names

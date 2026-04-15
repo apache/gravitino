@@ -24,7 +24,7 @@ from gravitino.client.metadata_object_role_operations import (
     MetadataObjectRoleOperations,
 )
 from gravitino.dto.responses.error_response import ErrorResponse
-from gravitino.dto.responses.role_response import RoleNamesListResponse
+from gravitino.dto.responses.name_list_response import NameListResponse
 from gravitino.exceptions.base import (
     IllegalMetadataObjectException,
     IllegalPrivilegeException,
@@ -67,7 +67,7 @@ class TestMetadataObjectRoleOperations(unittest.TestCase):
             metadata_object,
             TestMetadataObjectRoleOperations.REST_CLIENT,
         )
-        role_names_list_resp = RoleNamesListResponse(
+        role_names_list_resp = NameListResponse(
             0,
             expected_role_names_lst,
         )

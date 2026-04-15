@@ -15,7 +15,6 @@
 # specific language governing permissions and limitations
 # under the License.
 
-
 from __future__ import annotations
 
 from dataclasses import dataclass, field
@@ -28,15 +27,16 @@ from gravitino.utils.precondition import Precondition
 
 @dataclass_json
 @dataclass
-class RoleNamesListResponse(BaseResponse):
-    """Represents a response for a Role Names List request."""
+class NameListResponse(BaseResponse):
+    """Represents a response for a list of entity names."""
 
     _names: list[str] = field(default_factory=list, metadata=config(field_name="names"))
 
-    def role_names(self) -> list[str]:
+    @property
+    def names(self) -> list[str]:
         return self._names
 
-    def validate(self) -> None:
+    def validate(self):
         Precondition.check_argument(self._names is not None, '"names" must not be null')
 
         for role_name in self._names:
