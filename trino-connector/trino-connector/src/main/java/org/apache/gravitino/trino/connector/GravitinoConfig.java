@@ -152,23 +152,16 @@ public class GravitinoConfig {
           "",
           false);
 
-  /** Config key for the per-user session cache maximum size. */
-  public static final String SESSION_CACHE_MAX_SIZE_KEY = "gravitino.client.session.cache.maxSize";
-
-  /** Config key for the per-user session cache expiry in seconds. */
-  public static final String SESSION_CACHE_EXPIRE_AFTER_ACCESS_SECONDS_KEY =
-      "gravitino.client.session.cache.expireAfterAccessSeconds";
-
   private static final ConfigEntry GRAVITINO_SESSION_CACHE_MAX_SIZE =
       new ConfigEntry(
-          SESSION_CACHE_MAX_SIZE_KEY,
+          GravitinoAuthProvider.SESSION_CACHE_MAX_SIZE_KEY,
           "Maximum number of per-user sessions to keep in the cache when session.forwardUser=true",
           "500",
           false);
 
   private static final ConfigEntry GRAVITINO_SESSION_CACHE_EXPIRE_AFTER_ACCESS_SECONDS =
       new ConfigEntry(
-          SESSION_CACHE_EXPIRE_AFTER_ACCESS_SECONDS_KEY,
+          GravitinoAuthProvider.SESSION_CACHE_EXPIRE_AFTER_ACCESS_SECONDS_KEY,
           "Seconds before an idle per-user session is evicted from the cache when session.forwardUser=true",
           "3600",
           false);

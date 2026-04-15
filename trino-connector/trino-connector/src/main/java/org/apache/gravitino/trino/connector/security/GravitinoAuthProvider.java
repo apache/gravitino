@@ -78,6 +78,15 @@ public class GravitinoAuthProvider {
   public static final String KERBEROS_KEYTAB_FILE_PATH_KEY =
       GravitinoClientConfiguration.GRAVITINO_CLIENT_CONFIG_PREFIX + "kerberos.keytabFilePath";
 
+  /** Session cache maximum size configuration key. */
+  public static final String SESSION_CACHE_MAX_SIZE_KEY =
+      GravitinoClientConfiguration.GRAVITINO_CLIENT_CONFIG_PREFIX + "session.cache.maxSize";
+
+  /** Session cache expiry (seconds) configuration key. */
+  public static final String SESSION_CACHE_EXPIRE_AFTER_ACCESS_SECONDS_KEY =
+      GravitinoClientConfiguration.GRAVITINO_CLIENT_CONFIG_PREFIX
+          + "session.cache.expireAfterAccessSeconds";
+
   /** Authentication types supported by the Trino connector. */
   public enum AuthType {
     SIMPLE,
@@ -208,8 +217,8 @@ public class GravitinoAuthProvider {
     clientConfig.remove(KERBEROS_PRINCIPAL_KEY);
     clientConfig.remove(KERBEROS_KEYTAB_FILE_PATH_KEY);
     clientConfig.remove(FORWARD_SESSION_USER_KEY);
-    clientConfig.remove(GravitinoConfig.SESSION_CACHE_MAX_SIZE_KEY);
-    clientConfig.remove(GravitinoConfig.SESSION_CACHE_EXPIRE_AFTER_ACCESS_SECONDS_KEY);
+    clientConfig.remove(SESSION_CACHE_MAX_SIZE_KEY);
+    clientConfig.remove(SESSION_CACHE_EXPIRE_AFTER_ACCESS_SECONDS_KEY);
   }
 
   private static void buildSimpleAuth(
