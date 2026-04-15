@@ -184,6 +184,23 @@ public class PolicyMetaBaseSQLProvider {
         + " AND pm.deleted_at = 0 ";
   }
 
+  public String listPolicyPOsByPolicyIds(@Param("policyIds") List<Long> policyIds) {
+    return "<script>"
+        + "SELECT pm.policy_id, pm.policy_name, pm.policy_type, pm.metalake_id,"
+        + " pm.audit_info, pm.current_version, pm.last_version,"
+        + " pm.deleted_at"
+        + " FROM "
+        + POLICY_META_TABLE_NAME
+        + " pm"
+        + " WHERE pm.deleted_at = 0"
+        + " AND pm.policy_id IN ("
+        + "<foreach collection='policyIds' item='policyId' separator=','>"
+        + "#{policyId}"
+        + "</foreach>"
+        + ")"
+        + "</script>";
+  }
+
   public String selectPolicyMetaByMetalakeIdAndName(
       @Param("metalakeId") Long metalakeId, @Param("policyName") String policyName) {
     return "SELECT pm.policy_id, pm.policy_name, pm.policy_type, pm.metalake_id,"
@@ -196,5 +213,31 @@ public class PolicyMetaBaseSQLProvider {
         + " pm.metalake_id = #{metalakeId}"
         + " AND pm.policy_name = #{policyName}"
         + " AND pm.deleted_at = 0 ";
+  }
+
+  public String batchSelectPolicyByIdentifier(
+      @Param("metalakeName") String metalakeName, @Param("policyNames") List<String> policyNames) {
+    return "<script>"
+        + "SELECT pm.policy_id, pm.policy_name, pm.policy_type, pm.metalake_id,"
+        + " pm.audit_info, pm.current_version, pm.last_version, pm.deleted_at,"
+        + " pv.id, pv.metalake_id as version_metalake_id, pv.policy_id as version_policy_id,"
+        + " pv.version, pv.policy_comment, pv.enabled, pv.content, pv.deleted_at as version_deleted_at"
+        + " FROM "
+        + POLICY_META_TABLE_NAME
+        + " pm"
+        + " INNER JOIN "
+        + POLICY_VERSION_TABLE_NAME
+        + " pv ON pm.policy_id = pv.policy_id AND pm.current_version = pv.version"
+        + " JOIN "
+        + MetalakeMetaMapper.TABLE_NAME
+        + " mm ON pm.metalake_id = mm.metalake_id"
+        + " WHERE mm.metalake_name = #{metalakeName}"
+        + " AND pm.policy_name IN ("
+        + "<foreach collection='policyNames' item='policyName' separator=','>"
+        + "#{policyName}"
+        + "</foreach>"
+        + " )"
+        + " AND pm.deleted_at = 0 AND pv.deleted_at = 0 AND mm.deleted_at = 0"
+        + "</script>";
   }
 }

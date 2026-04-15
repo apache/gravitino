@@ -23,7 +23,6 @@ import static org.apache.gravitino.dto.util.DTOConverters.fromDTO;
 import com.codahale.metrics.annotation.ResponseMetered;
 import com.codahale.metrics.annotation.Timed;
 import java.util.Arrays;
-import java.util.Locale;
 import java.util.Optional;
 import javax.inject.Inject;
 import javax.servlet.http.HttpServletRequest;
@@ -107,7 +106,7 @@ public class PolicyOperations {
               policyDTOs =
                   MetadataAuthzHelper.filterByExpression(
                       metalake,
-                      AuthorizationExpressionConstants.loadPolicyAuthorizationExpression,
+                      AuthorizationExpressionConstants.LOAD_POLICY_AUTHORIZATION_EXPRESSION,
                       Entity.EntityType.POLICY,
                       policyDTOs,
                       (policyDTO -> NameIdentifierUtil.ofPolicy(metalake, policyDTO.name())));
@@ -120,7 +119,7 @@ public class PolicyOperations {
               policyNames =
                   MetadataAuthzHelper.filterByExpression(
                       metalake,
-                      AuthorizationExpressionConstants.loadPolicyAuthorizationExpression,
+                      AuthorizationExpressionConstants.LOAD_POLICY_AUTHORIZATION_EXPRESSION,
                       Entity.EntityType.POLICY,
                       policyNames,
                       (policyName -> NameIdentifierUtil.ofPolicy(metalake, policyName)));
@@ -149,6 +148,7 @@ public class PolicyOperations {
           httpRequest,
           () -> {
             request.validate();
+            validateCreatePolicyType(request.getPolicyType());
             PolicyEntity policy =
                 policyDispatcher.createPolicy(
                     metalake,
@@ -173,7 +173,7 @@ public class PolicyOperations {
   @Timed(name = "get-policy." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
   @ResponseMetered(name = "get-policy", absolute = true)
   @AuthorizationExpression(
-      expression = AuthorizationExpressionConstants.loadPolicyAuthorizationExpression)
+      expression = AuthorizationExpressionConstants.LOAD_POLICY_AUTHORIZATION_EXPRESSION)
   public Response getPolicy(
       @PathParam("metalake") @AuthorizationMetadata(type = Entity.EntityType.METALAKE)
           String metalake,
@@ -300,7 +300,7 @@ public class PolicyOperations {
   @Timed(name = "list-objects-for-policy." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
   @ResponseMetered(name = "list-objects-for-policy", absolute = true)
   @AuthorizationExpression(
-      expression = AuthorizationExpressionConstants.loadPolicyAuthorizationExpression)
+      expression = AuthorizationExpressionConstants.LOAD_POLICY_AUTHORIZATION_EXPRESSION)
   public Response listMetadataObjectsForPolicy(
       @PathParam("metalake") @AuthorizationMetadata(type = Entity.EntityType.METALAKE)
           String metalake,
@@ -334,17 +334,28 @@ public class PolicyOperations {
   }
 
   static PolicyDTO toDTO(PolicyEntity policy, Optional<Boolean> inherited) {
+    String policyType = policy.policyType().policyType();
     PolicyDTO.Builder builder =
         PolicyDTO.builder()
             .withName(policy.name())
             .withComment(policy.comment())
-            .withPolicyType(policy.policyType().name().toLowerCase(Locale.ROOT))
+            .withPolicyType(policyType)
             .withEnabled(policy.enabled())
             .withContent(DTOConverters.toDTO(policy.content()))
             .withInherited(inherited)
-            .withAudit(DTOConverters.toDTO(policy.auditInfo()))
-            .withInherited(inherited);
+            .withAudit(DTOConverters.toDTO(policy.auditInfo()));
 
     return builder.build();
+  }
+
+  private static void validateCreatePolicyType(String policyType) {
+    Policy.BuiltInType builtInType = Policy.BuiltInType.fromPolicyType(policyType);
+    if (builtInType != Policy.BuiltInType.CUSTOM
+        && !builtInType.policyType().equalsIgnoreCase(policyType)) {
+      throw new IllegalArgumentException(
+          String.format(
+              "Built-in policy type must use prefixed value '%s', but got: %s",
+              builtInType.policyType(), policyType));
+    }
   }
 }

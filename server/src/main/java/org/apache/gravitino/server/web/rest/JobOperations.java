@@ -112,7 +112,7 @@ public class JobOperations {
                 Lists.newArrayList(
                     MetadataAuthzHelper.filterByExpression(
                         metalake,
-                        AuthorizationExpressionConstants.loadJobTemplateAuthorizationExpression,
+                        AuthorizationExpressionConstants.LOAD_JOB_TEMPLATE_AUTHORIZATION_EXPRESSION,
                         Entity.EntityType.JOB_TEMPLATE,
                         jobOperationDispatcher
                             .listJobTemplates(metalake)
@@ -183,7 +183,7 @@ public class JobOperations {
   @Timed(name = "get-job-template." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
   @ResponseMetered(name = "get-job-template", absolute = true)
   @AuthorizationExpression(
-      expression = AuthorizationExpressionConstants.loadJobTemplateAuthorizationExpression)
+      expression = AuthorizationExpressionConstants.LOAD_JOB_TEMPLATE_AUTHORIZATION_EXPRESSION)
   public Response getJobTemplate(
       @PathParam("metalake") @AuthorizationMetadata(type = Entity.EntityType.METALAKE)
           String metalake,
@@ -299,7 +299,7 @@ public class JobOperations {
                 Lists.newArrayList(
                     MetadataAuthzHelper.filterByExpression(
                         metalake,
-                        AuthorizationExpressionConstants.loadJobAuthorizationExpression,
+                        AuthorizationExpressionConstants.LOAD_JOB_AUTHORIZATION_EXPRESSION,
                         Entity.EntityType.JOB,
                         jobOperationDispatcher
                             .listJobs(metalake, Optional.ofNullable(jobTemplateName))
@@ -322,7 +322,7 @@ public class JobOperations {
   @Timed(name = "get-job." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
   @ResponseMetered(name = "get-job", absolute = true)
   @AuthorizationExpression(
-      expression = AuthorizationExpressionConstants.loadJobAuthorizationExpression)
+      expression = AuthorizationExpressionConstants.LOAD_JOB_AUTHORIZATION_EXPRESSION)
   public Response getJob(
       @PathParam("metalake") @AuthorizationMetadata(type = Entity.EntityType.METALAKE)
           String metalake,

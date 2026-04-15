@@ -45,12 +45,12 @@ import org.apache.gravitino.exceptions.ForbiddenException;
 import org.apache.gravitino.exceptions.NoSuchMetalakeException;
 import org.apache.gravitino.server.authorization.annotations.AuthorizationExpression;
 import org.apache.gravitino.server.authorization.annotations.AuthorizationRequest;
-import org.apache.gravitino.server.authorization.expression.AuthorizationExpressionEvaluator;
 import org.apache.gravitino.server.web.Utils;
 import org.apache.gravitino.server.web.filter.authorization.AuthorizationExecutor;
 import org.apache.gravitino.server.web.filter.authorization.AuthorizeExecutorFactory;
 import org.apache.gravitino.server.web.rest.CatalogOperations;
 import org.apache.gravitino.server.web.rest.FilesetOperations;
+import org.apache.gravitino.server.web.rest.FunctionOperations;
 import org.apache.gravitino.server.web.rest.GroupOperations;
 import org.apache.gravitino.server.web.rest.JobOperations;
 import org.apache.gravitino.server.web.rest.MetadataObjectCredentialOperations;
@@ -92,6 +92,7 @@ public class GravitinoInterceptionService implements InterceptionService {
             SchemaOperations.class.getName(),
             TableOperations.class.getName(),
             ModelOperations.class.getName(),
+            FunctionOperations.class.getName(),
             TopicOperations.class.getName(),
             FilesetOperations.class.getName(),
             UserOperations.class.getName(),
@@ -182,20 +183,22 @@ public class GravitinoInterceptionService implements InterceptionService {
 
           // If expression is empty, skip authorization check (method handles its own filtering)
           if (StringUtils.isNotBlank(expression)) {
-            AuthorizationExpressionEvaluator authorizationExpressionEvaluator =
-                new AuthorizationExpressionEvaluator(expression);
             AuthorizationRequest.RequestType requestType =
                 extractAuthorizationRequestTypeFromParameters(parameters);
+            String secondaryExpression = expressionAnnotation.secondaryExpression();
+            String secondaryExpressionCondition =
+                expressionAnnotation.secondaryExpressionCondition();
             executor =
                 AuthorizeExecutorFactory.create(
                     expression,
                     requestType,
                     metadataContext,
-                    authorizationExpressionEvaluator,
                     pathParams,
                     entityType,
                     parameters,
-                    args);
+                    args,
+                    secondaryExpression,
+                    secondaryExpressionCondition);
             boolean authorizeResult = executor.execute();
             if (!authorizeResult) {
               return buildNoAuthResponse(expressionAnnotation, metadataContext, method, expression);

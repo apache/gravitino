@@ -24,6 +24,7 @@ import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Collectors;
@@ -65,6 +66,7 @@ import org.apache.gravitino.server.authorization.GravitinoAuthorizerProvider;
 import org.apache.iceberg.MetadataUpdate;
 import org.apache.iceberg.Schema;
 import org.apache.iceberg.Snapshot;
+import org.apache.iceberg.SnapshotRef;
 import org.apache.iceberg.TableMetadata;
 import org.apache.iceberg.UpdateRequirement;
 import org.apache.iceberg.UpdateRequirements;
@@ -74,6 +76,7 @@ import org.apache.iceberg.metrics.CommitReport;
 import org.apache.iceberg.metrics.ImmutableCommitMetricsResult;
 import org.apache.iceberg.metrics.ImmutableCommitReport;
 import org.apache.iceberg.rest.PlanStatus;
+import org.apache.iceberg.rest.RESTUtil;
 import org.apache.iceberg.rest.requests.CreateTableRequest;
 import org.apache.iceberg.rest.requests.PlanTableScanRequest;
 import org.apache.iceberg.rest.requests.RenameTableRequest;
@@ -176,8 +179,7 @@ public class TestIcebergTableOperations extends IcebergNamespaceTestBase {
         metadata.currentSnapshot() == null ? null : metadata.currentSnapshot().snapshotId();
     JsonNode planResponse = verifyPlanTableScanSucc(namespace, "plan_scan_table", snapshotId);
 
-    Assertions.assertEquals(
-        PlanStatus.COMPLETED.status(), planResponse.get("plan-status").asText());
+    Assertions.assertEquals(PlanStatus.COMPLETED.status(), planResponse.get("status").asText());
     Assertions.assertTrue(planResponse.has("plan-tasks"));
     Assertions.assertTrue(planResponse.get("plan-tasks").isArray());
     Assertions.assertTrue(planResponse.get("plan-tasks").size() > 0);
@@ -223,8 +225,7 @@ public class TestIcebergTableOperations extends IcebergNamespaceTestBase {
     JsonNode planResponse =
         verifyPlanTableScanSuccWithRange(
             namespace, "incremental_scan_valid_table", startSnapshotId, endSnapshotId);
-    Assertions.assertEquals(
-        PlanStatus.COMPLETED.status(), planResponse.get("plan-status").asText());
+    Assertions.assertEquals(PlanStatus.COMPLETED.status(), planResponse.get("status").asText());
     Assertions.assertTrue(planResponse.has("plan-tasks"));
     Assertions.assertTrue(planResponse.get("plan-tasks").isArray());
 
@@ -388,12 +389,20 @@ public class TestIcebergTableOperations extends IcebergNamespaceTestBase {
 
     // create the table with credential vending
     String tableName = "create_with_credential_vending";
-    response = doCreateTableWithCredentialVending(namespace, tableName);
+    String localLocation = "file:///tmp/" + tableName;
+    response = doCreateTableWithCredentialVending(namespace, tableName, localLocation);
     Assertions.assertEquals(Status.OK.getStatusCode(), response.getStatus());
     loadTableResponse = response.readEntity(LoadTableResponse.class);
+    Assertions.assertTrue(!loadTableResponse.config().containsKey(Credential.CREDENTIAL_TYPE));
+
+    String s3TableName = "create_with_credential_vending_s3";
+    String s3Location = "s3://dummy-bucket/" + s3TableName;
+    response = doCreateTableWithCredentialVending(namespace, s3TableName, s3Location);
+    Assertions.assertEquals(Status.OK.getStatusCode(), response.getStatus());
+    LoadTableResponse s3LoadTableResponse = response.readEntity(LoadTableResponse.class);
     Assertions.assertEquals(
         DummyCredentialProvider.DUMMY_CREDENTIAL_TYPE,
-        loadTableResponse.config().get(Credential.CREDENTIAL_TYPE));
+        s3LoadTableResponse.config().get(Credential.CREDENTIAL_TYPE));
 
     // load the table without credential vending
     response = doLoadTable(namespace, tableName);
@@ -405,14 +414,23 @@ public class TestIcebergTableOperations extends IcebergNamespaceTestBase {
     response = doLoadTableWithCredentialVending(namespace, tableName);
     Assertions.assertEquals(Status.OK.getStatusCode(), response.getStatus());
     loadTableResponse = response.readEntity(LoadTableResponse.class);
+    Assertions.assertTrue(!loadTableResponse.config().containsKey(Credential.CREDENTIAL_TYPE));
+
+    response = doLoadTableWithCredentialVending(namespace, s3TableName);
+    Assertions.assertEquals(Status.OK.getStatusCode(), response.getStatus());
+    loadTableResponse = response.readEntity(LoadTableResponse.class);
     Assertions.assertEquals(
         DummyCredentialProvider.DUMMY_CREDENTIAL_TYPE,
         loadTableResponse.config().get(Credential.CREDENTIAL_TYPE));
   }
 
-  private Response doCreateTableWithCredentialVending(Namespace ns, String name) {
+  private Response doCreateTableWithCredentialVending(Namespace ns, String name, String location) {
     CreateTableRequest createTableRequest =
-        CreateTableRequest.builder().withName(name).withSchema(tableSchema).build();
+        CreateTableRequest.builder()
+            .withName(name)
+            .withSchema(tableSchema)
+            .withLocation(location)
+            .build();
     return getTableClientBuilder(ns, Optional.empty())
         .header(IcebergTableOperations.X_ICEBERG_ACCESS_DELEGATION, "vended-credentials")
         .post(Entity.entity(createTableRequest, MediaType.APPLICATION_JSON_TYPE));
@@ -466,6 +484,13 @@ public class TestIcebergTableOperations extends IcebergNamespaceTestBase {
 
   private Response doLoadTable(Namespace ns, String name) {
     return getTableClientBuilder(ns, Optional.of(name)).get();
+  }
+
+  private Response doLoadTableWithSnapshots(Namespace ns, String name, String snapshots) {
+    String path =
+        IcebergRestTestUtil.NAMESPACE_PATH + "/" + RESTUtil.encodeNamespace(ns) + "/tables/" + name;
+    Map<String, String> queryParams = ImmutableMap.of("snapshots", snapshots);
+    return getIcebergClientBuilder(path, Optional.of(queryParams)).get();
   }
 
   private Response doPlanTableScan(Namespace ns, String tableName, PlanTableScanRequest request) {
@@ -556,7 +581,7 @@ public class TestIcebergTableOperations extends IcebergNamespaceTestBase {
   }
 
   private PlanTableScanRequest buildPlanTableScanRequest(Long snapshotId) {
-    PlanTableScanRequest.Builder builder = new PlanTableScanRequest.Builder();
+    PlanTableScanRequest.Builder builder = PlanTableScanRequest.builder();
     if (snapshotId != null) {
       builder = builder.withSnapshotId(snapshotId);
     } else {
@@ -567,7 +592,7 @@ public class TestIcebergTableOperations extends IcebergNamespaceTestBase {
 
   private PlanTableScanRequest buildPlanTableScanRequestWithRange(
       Long startSnapshotId, Long endSnapshotId) {
-    PlanTableScanRequest.Builder builder = new PlanTableScanRequest.Builder();
+    PlanTableScanRequest.Builder builder = PlanTableScanRequest.builder();
     if (startSnapshotId != null) {
       builder = builder.withStartSnapshotId(startSnapshotId);
     }
@@ -679,6 +704,40 @@ public class TestIcebergTableOperations extends IcebergNamespaceTestBase {
 
   @ParameterizedTest
   @MethodSource("org.apache.gravitino.iceberg.service.rest.IcebergRestTestUtil#testNamespaces")
+  void testTableOperationsWithEncodedName(Namespace namespace) {
+    // Table names with special characters that require percent-encoding in URL paths.
+    // RESTUtil.encodeString encodes them for the URL, and the server should decode
+    // them back via RESTUtil.decodeString thanks to @Encoded on the path parameter.
+    String[] specialNames = {"table.with.dots", "table@special"};
+
+    verifyCreateNamespaceSucc(namespace);
+
+    for (String originalName : specialNames) {
+      String encodedName = RESTUtil.encodeString(originalName);
+
+      // Create uses the original name in the request body, not in the URL path
+      verifyCreateTableSucc(namespace, originalName);
+
+      // Load, exists use the encoded name in the URL path
+      verifyLoadTableSucc(namespace, encodedName);
+      verifyTableExistsStatusCode(namespace, encodedName, 204);
+
+      // Update: load metadata with encoded path, then update with encoded path
+      TableMetadata metadata = getTableMeta(namespace, encodedName);
+      verifyUpdateSucc(namespace, encodedName, metadata);
+    }
+
+    // Verify list returns the original (decoded) table names
+    verifyListTableSucc(namespace, ImmutableSet.copyOf(specialNames));
+
+    for (String originalName : specialNames) {
+      verifyDropTableSucc(namespace, RESTUtil.encodeString(originalName));
+    }
+    verifyDropNamespaceSucc(namespace);
+  }
+
+  @ParameterizedTest
+  @MethodSource("org.apache.gravitino.iceberg.service.rest.IcebergRestTestUtil#testNamespaces")
   void testInvalidAccessDelegation(Namespace namespace) {
     verifyCreateNamespaceSucc(namespace);
 
@@ -700,5 +759,291 @@ public class TestIcebergTableOperations extends IcebergNamespaceTestBase {
     Assertions.assertTrue(
         errorBody.contains("vended-credentials") && errorBody.contains("illegal"),
         "Error message should mention valid values: " + errorBody);
+  }
+
+  @ParameterizedTest
+  @MethodSource("org.apache.gravitino.iceberg.service.rest.IcebergRestTestUtil#testNamespaces")
+  void testCreateTableReturnsETag(Namespace namespace) {
+    verifyCreateNamespaceSucc(namespace);
+    Response response = doCreateTable(namespace, "create_etag_foo1");
+    Assertions.assertEquals(Status.OK.getStatusCode(), response.getStatus());
+    String etag = response.getHeaderString("ETag");
+    Assertions.assertNotNull(etag, "ETag header should be present in create table response");
+    Assertions.assertFalse(etag.isEmpty(), "ETag header should not be empty");
+  }
+
+  @ParameterizedTest
+  @MethodSource("org.apache.gravitino.iceberg.service.rest.IcebergRestTestUtil#testNamespaces")
+  void testCreateTableETagMatchesLoadTableETag(Namespace namespace) {
+    verifyCreateNamespaceSucc(namespace);
+    Response createResponse = doCreateTable(namespace, "create_load_etag_foo1");
+    Assertions.assertEquals(Status.OK.getStatusCode(), createResponse.getStatus());
+    String createEtag = createResponse.getHeaderString("ETag");
+    Assertions.assertNotNull(createEtag, "ETag should be present in create response");
+
+    // Load the same table with default snapshots — ETag should match
+    Response loadResponse = doLoadTable(namespace, "create_load_etag_foo1");
+    Assertions.assertEquals(Status.OK.getStatusCode(), loadResponse.getStatus());
+    String loadEtag = loadResponse.getHeaderString("ETag");
+    Assertions.assertNotNull(loadEtag, "ETag should be present in load response");
+
+    Assertions.assertEquals(
+        createEtag, loadEtag, "ETag from createTable should match ETag from default loadTable");
+
+    // The create ETag should be reusable for If-None-Match on a subsequent loadTable
+    Response conditionalResponse =
+        getTableClientBuilder(namespace, Optional.of("create_load_etag_foo1"))
+            .header(IcebergTableOperations.IF_NONE_MATCH, createEtag)
+            .get();
+    Assertions.assertEquals(
+        Status.NOT_MODIFIED.getStatusCode(),
+        conditionalResponse.getStatus(),
+        "Create ETag should produce 304 on subsequent unchanged loadTable");
+  }
+
+  @ParameterizedTest
+  @MethodSource("org.apache.gravitino.iceberg.service.rest.IcebergRestTestUtil#testNamespaces")
+  void testUpdateTableETagMatchesLoadTableETag(Namespace namespace) {
+    verifyCreateNamespaceSucc(namespace);
+    verifyCreateTableSucc(namespace, "update_load_etag_foo1");
+    TableMetadata metadata = getTableMeta(namespace, "update_load_etag_foo1");
+    Response updateResponse = doUpdateTable(namespace, "update_load_etag_foo1", metadata);
+    Assertions.assertEquals(Status.OK.getStatusCode(), updateResponse.getStatus());
+    String updateEtag = updateResponse.getHeaderString("ETag");
+    Assertions.assertNotNull(updateEtag, "ETag should be present in update response");
+
+    // Load the same table — ETag should match
+    Response loadResponse = doLoadTable(namespace, "update_load_etag_foo1");
+    Assertions.assertEquals(Status.OK.getStatusCode(), loadResponse.getStatus());
+    String loadEtag = loadResponse.getHeaderString("ETag");
+
+    Assertions.assertEquals(
+        updateEtag, loadEtag, "ETag from updateTable should match ETag from default loadTable");
+
+    // The update ETag should be reusable for If-None-Match
+    Response conditionalResponse =
+        getTableClientBuilder(namespace, Optional.of("update_load_etag_foo1"))
+            .header(IcebergTableOperations.IF_NONE_MATCH, updateEtag)
+            .get();
+    Assertions.assertEquals(
+        Status.NOT_MODIFIED.getStatusCode(),
+        conditionalResponse.getStatus(),
+        "Update ETag should produce 304 on subsequent unchanged loadTable");
+  }
+
+  @ParameterizedTest
+  @MethodSource("org.apache.gravitino.iceberg.service.rest.IcebergRestTestUtil#testNamespaces")
+  void testUpdateTableReturnsETag(Namespace namespace) {
+    verifyCreateNamespaceSucc(namespace);
+    verifyCreateTableSucc(namespace, "update_etag_foo1");
+    TableMetadata metadata = getTableMeta(namespace, "update_etag_foo1");
+    Response response = doUpdateTable(namespace, "update_etag_foo1", metadata);
+    Assertions.assertEquals(Status.OK.getStatusCode(), response.getStatus());
+    String etag = response.getHeaderString("ETag");
+    Assertions.assertNotNull(etag, "ETag header should be present in update table response");
+    Assertions.assertFalse(etag.isEmpty(), "ETag header should not be empty");
+  }
+
+  @ParameterizedTest
+  @MethodSource("org.apache.gravitino.iceberg.service.rest.IcebergRestTestUtil#testNamespaces")
+  void testLoadTableReturnsETag(Namespace namespace) {
+    verifyCreateNamespaceSucc(namespace);
+    verifyCreateTableSucc(namespace, "etag_foo1");
+
+    // Load the table and verify ETag header is present
+    Response response = doLoadTable(namespace, "etag_foo1");
+    Assertions.assertEquals(Status.OK.getStatusCode(), response.getStatus());
+    String etag = response.getHeaderString("ETag");
+    Assertions.assertNotNull(etag, "ETag header should be present in load table response");
+    Assertions.assertFalse(etag.isEmpty(), "ETag header should not be empty");
+  }
+
+  @ParameterizedTest
+  @MethodSource("org.apache.gravitino.iceberg.service.rest.IcebergRestTestUtil#testNamespaces")
+  void testLoadTableReturns304WhenETagMatches(Namespace namespace) {
+    verifyCreateNamespaceSucc(namespace);
+    verifyCreateTableSucc(namespace, "etag_304_foo1");
+
+    // First, load the table to get the ETag
+    Response firstResponse = doLoadTable(namespace, "etag_304_foo1");
+    Assertions.assertEquals(Status.OK.getStatusCode(), firstResponse.getStatus());
+    String etag = firstResponse.getHeaderString("ETag");
+    Assertions.assertNotNull(etag, "ETag header should be present");
+
+    // Second, load the table with If-None-Match header set to the ETag
+    Response secondResponse =
+        getTableClientBuilder(namespace, Optional.of("etag_304_foo1"))
+            .header(IcebergTableOperations.IF_NONE_MATCH, etag)
+            .get();
+    Assertions.assertEquals(
+        Status.NOT_MODIFIED.getStatusCode(),
+        secondResponse.getStatus(),
+        "Should return 304 when ETag matches");
+  }
+
+  @ParameterizedTest
+  @MethodSource("org.apache.gravitino.iceberg.service.rest.IcebergRestTestUtil#testNamespaces")
+  void testLoadTableReturns200WhenETagDoesNotMatch(Namespace namespace) {
+    verifyCreateNamespaceSucc(namespace);
+    verifyCreateTableSucc(namespace, "etag_mismatch_foo1");
+
+    // Load with a non-matching If-None-Match header
+    Response response =
+        getTableClientBuilder(namespace, Optional.of("etag_mismatch_foo1"))
+            .header(IcebergTableOperations.IF_NONE_MATCH, "\"non-matching-etag-value\"")
+            .get();
+    Assertions.assertEquals(
+        Status.OK.getStatusCode(),
+        response.getStatus(),
+        "Should return 200 when ETag does not match");
+    String etag = response.getHeaderString("ETag");
+    Assertions.assertNotNull(etag, "ETag header should be present");
+  }
+
+  @ParameterizedTest
+  @MethodSource("org.apache.gravitino.iceberg.service.rest.IcebergRestTestUtil#testNamespaces")
+  void testLoadTableETagChangesAfterUpdate(Namespace namespace) {
+    verifyCreateNamespaceSucc(namespace);
+    verifyCreateTableSucc(namespace, "etag_update_foo1");
+
+    // Load the table and get the initial ETag
+    Response firstResponse = doLoadTable(namespace, "etag_update_foo1");
+    Assertions.assertEquals(Status.OK.getStatusCode(), firstResponse.getStatus());
+    String firstEtag = firstResponse.getHeaderString("ETag");
+    Assertions.assertNotNull(firstEtag, "ETag header should be present");
+
+    // Update the table
+    TableMetadata metadata = getTableMeta(namespace, "etag_update_foo1");
+    verifyUpdateSucc(namespace, "etag_update_foo1", metadata);
+
+    // Load the table again and verify the ETag has changed
+    Response secondResponse = doLoadTable(namespace, "etag_update_foo1");
+    Assertions.assertEquals(Status.OK.getStatusCode(), secondResponse.getStatus());
+    String secondEtag = secondResponse.getHeaderString("ETag");
+    Assertions.assertNotNull(secondEtag, "ETag header should be present after update");
+    Assertions.assertNotEquals(
+        firstEtag, secondEtag, "ETag should change after table metadata is updated");
+
+    // Verify old ETag no longer returns 304
+    Response thirdResponse =
+        getTableClientBuilder(namespace, Optional.of("etag_update_foo1"))
+            .header(IcebergTableOperations.IF_NONE_MATCH, firstEtag)
+            .get();
+    Assertions.assertEquals(
+        Status.OK.getStatusCode(),
+        thirdResponse.getStatus(),
+        "Old ETag should not return 304 after table update");
+  }
+
+  @ParameterizedTest
+  @MethodSource("org.apache.gravitino.iceberg.service.rest.IcebergRestTestUtil#testNamespaces")
+  void testLoadTableETagConsistency(Namespace namespace) {
+    verifyCreateNamespaceSucc(namespace);
+    verifyCreateTableSucc(namespace, "etag_consistent_foo1");
+
+    // Load the table twice and verify the ETag is the same
+    Response firstResponse = doLoadTable(namespace, "etag_consistent_foo1");
+    String firstEtag = firstResponse.getHeaderString("ETag");
+
+    Response secondResponse = doLoadTable(namespace, "etag_consistent_foo1");
+    String secondEtag = secondResponse.getHeaderString("ETag");
+
+    Assertions.assertEquals(
+        firstEtag, secondEtag, "ETag should be consistent for the same table metadata");
+  }
+
+  @ParameterizedTest
+  @MethodSource("org.apache.gravitino.iceberg.service.rest.IcebergRestTestUtil#testNamespaces")
+  void testLoadTableETagDiffersForSnapshotsParam(Namespace namespace) {
+    verifyCreateNamespaceSucc(namespace);
+    verifyCreateTableSucc(namespace, "etag_snapshots_foo1");
+
+    // Load with snapshots=all (default)
+    Response allResponse = doLoadTableWithSnapshots(namespace, "etag_snapshots_foo1", "all");
+    Assertions.assertEquals(Status.OK.getStatusCode(), allResponse.getStatus());
+    String allEtag = allResponse.getHeaderString("ETag");
+    Assertions.assertNotNull(allEtag, "ETag header should be present for snapshots=all");
+
+    // Load with snapshots=refs
+    Response refsResponse = doLoadTableWithSnapshots(namespace, "etag_snapshots_foo1", "refs");
+    Assertions.assertEquals(Status.OK.getStatusCode(), refsResponse.getStatus());
+    String refsEtag = refsResponse.getHeaderString("ETag");
+    Assertions.assertNotNull(refsEtag, "ETag header should be present for snapshots=refs");
+
+    // ETags should differ for different snapshots values
+    Assertions.assertNotEquals(
+        allEtag,
+        refsEtag,
+        "ETags should be distinct for different snapshots query parameter values");
+
+    // Loading with the same snapshots value should produce the same ETag
+    Response allResponse2 = doLoadTableWithSnapshots(namespace, "etag_snapshots_foo1", "all");
+    String allEtag2 = allResponse2.getHeaderString("ETag");
+    Assertions.assertEquals(
+        allEtag, allEtag2, "ETag should be consistent for the same snapshots value");
+  }
+
+  @ParameterizedTest
+  @MethodSource("org.apache.gravitino.iceberg.service.rest.IcebergRestTestUtil#testNamespaces")
+  void testLoadTableSnapshotsRefsFiltering(Namespace namespace) {
+    verifyCreateNamespaceSucc(namespace);
+    // Create table with data; generatePlanData=true produces two snapshots (create + append),
+    // but only the latest snapshot is referenced by the "main" branch.
+    verifyCreateTableSucc(namespace, "snapshots_refs_foo1", true);
+
+    // Load with snapshots=all: should return all snapshots
+    Response allResponse = doLoadTableWithSnapshots(namespace, "snapshots_refs_foo1", "all");
+    Assertions.assertEquals(Status.OK.getStatusCode(), allResponse.getStatus());
+    LoadTableResponse allTableResponse = allResponse.readEntity(LoadTableResponse.class);
+    List<Snapshot> allSnapshots = allTableResponse.tableMetadata().snapshots();
+    Assertions.assertTrue(
+        allSnapshots.size() >= 2,
+        "Table with data should have at least 2 snapshots, got " + allSnapshots.size());
+
+    // Collect snapshot IDs referenced by refs
+    Map<String, SnapshotRef> refs = allTableResponse.tableMetadata().refs();
+    Set<Long> referencedSnapshotIds =
+        refs.values().stream().map(SnapshotRef::snapshotId).collect(Collectors.toSet());
+
+    // Load with snapshots=refs: should return only ref-referenced snapshots
+    Response refsResponse = doLoadTableWithSnapshots(namespace, "snapshots_refs_foo1", "refs");
+    Assertions.assertEquals(Status.OK.getStatusCode(), refsResponse.getStatus());
+    LoadTableResponse refsTableResponse = refsResponse.readEntity(LoadTableResponse.class);
+    List<Snapshot> refsSnapshots = refsTableResponse.tableMetadata().snapshots();
+
+    // The returned snapshots should be exactly the ref-referenced snapshots
+    Assertions.assertEquals(
+        referencedSnapshotIds,
+        refsSnapshots.stream().map(Snapshot::snapshotId).collect(Collectors.toSet()),
+        "snapshots=refs should return exactly the ref-referenced snapshots");
+
+    // Refs should be preserved in the filtered response
+    Assertions.assertEquals(
+        refs.keySet(),
+        refsTableResponse.tableMetadata().refs().keySet(),
+        "Refs should be preserved in filtered response");
+  }
+
+  @ParameterizedTest
+  @MethodSource("org.apache.gravitino.iceberg.service.rest.IcebergRestTestUtil#testNamespaces")
+  void testLoadTableSnapshotsAllReturnsAllSnapshots(Namespace namespace) {
+    verifyCreateNamespaceSucc(namespace);
+    verifyCreateTableSucc(namespace, "snapshots_all_foo1", true);
+
+    // Load with default snapshots=all
+    Response defaultResponse = doLoadTable(namespace, "snapshots_all_foo1");
+    Assertions.assertEquals(Status.OK.getStatusCode(), defaultResponse.getStatus());
+    LoadTableResponse defaultTableResponse = defaultResponse.readEntity(LoadTableResponse.class);
+
+    // Load with explicit snapshots=all
+    Response allResponse = doLoadTableWithSnapshots(namespace, "snapshots_all_foo1", "all");
+    Assertions.assertEquals(Status.OK.getStatusCode(), allResponse.getStatus());
+    LoadTableResponse allTableResponse = allResponse.readEntity(LoadTableResponse.class);
+
+    // Both should return the same number of snapshots
+    Assertions.assertEquals(
+        defaultTableResponse.tableMetadata().snapshots().size(),
+        allTableResponse.tableMetadata().snapshots().size(),
+        "Default load and snapshots=all should return the same number of snapshots");
   }
 }

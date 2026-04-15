@@ -287,12 +287,6 @@ public class CaffeineEntityCache extends BaseEntityCache {
     segmentedLock.withLock(
         entityCacheKey,
         () -> {
-          // Return directly if entities are empty. No need to put an empty list to cache, we will
-          // use another PR to resolve the performance problem.
-          if (entities.isEmpty()) {
-            return;
-          }
-
           syncEntitiesToCache(
               entityCacheKey, entities.stream().map(e -> (Entity) e).collect(Collectors.toList()));
         });
@@ -344,6 +338,16 @@ public class CaffeineEntityCache extends BaseEntityCache {
     Preconditions.checkArgument(action != null, "Action cannot be null");
 
     return segmentedLock.withLockAndThrow(key, action);
+  }
+
+  /** {@inheritDoc} */
+  @Override
+  public <T, E extends Exception> T withMultipleKeyCacheLock(
+      List<EntityCacheKey> keys, EntityCache.ThrowingSupplier<T, E> action) throws E {
+    Preconditions.checkArgument(keys != null, "Keys cannot be null");
+    Preconditions.checkArgument(action != null, "Action cannot be null");
+
+    return segmentedLock.withMultipleKeyLockAndThrow(keys, action);
   }
 
   /**
@@ -409,7 +413,7 @@ public class CaffeineEntityCache extends BaseEntityCache {
     }
 
     if (cacheConfig.get(Configs.CACHE_EXPIRATION_TIME) > 0) {
-      builder.expireAfterWrite(
+      builder.expireAfterAccess(
           cacheConfig.get(Configs.CACHE_EXPIRATION_TIME), TimeUnit.MILLISECONDS);
     }
 

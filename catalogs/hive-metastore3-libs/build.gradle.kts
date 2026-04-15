@@ -25,9 +25,49 @@ plugins {
   id("idea")
 }
 
+// Note: exclusion lists here are intentionally kept in sync with hive-metastore2-libs/build.gradle.kts.
+// Guava and Logback are excluded because they are provided by the Gravitino runtime classpath.
+
 dependencies {
-  implementation(libs.hive3.metastore)
-  implementation(libs.hadoop2.common)
+  implementation(libs.hadoop2.common) {
+    exclude(group = "ch.qos.logback")
+    exclude(group = "com.fasterxml.jackson.core")
+    exclude(group = "com.github.spotbugs")
+    exclude(group = "com.google.code.findbugs")
+    exclude(group = "com.google.guava")
+    exclude(group = "log4j")
+    exclude(group = "net.java.dev.jets3t")
+    exclude(group = "org.apache.avro")
+    exclude(group = "org.apache.logging.log4j")
+    exclude(group = "org.eclipse.jetty")
+    exclude(group = "org.slf4j")
+  }
+  implementation(libs.hive3.metastore) {
+    exclude(group = "ant")
+    exclude(group = "ch.qos.logback")
+    exclude(group = "co.cask.tephra")
+    exclude(group = "com.fasterxml.jackson.core")
+    exclude(group = "com.github.joshelser")
+    exclude(group = "com.github.spotbugs")
+    exclude(group = "com.google.code.findbugs")
+    exclude(group = "com.google.guava")
+    exclude(group = "log4j")
+    exclude(group = "com.tdunning", module = "json")
+    exclude(group = "com.zaxxer", module = "HikariCP")
+    exclude(group = "io.dropwizard.metrics")
+    exclude(group = "javax.transaction", module = "transaction-api")
+    exclude(group = "junit")
+    exclude(group = "org.apache.ant")
+    exclude(group = "org.apache.avro")
+    exclude(group = "org.apache.hadoop", module = "hadoop-yarn-server-resourcemanager")
+    exclude(group = "org.apache.hbase")
+    exclude(group = "org.apache.logging.log4j")
+    exclude(group = "org.apache.parquet", module = "parquet-hadoop-bundle")
+    exclude(group = "org.datanucleus")
+    exclude(group = "org.eclipse.jetty")
+    exclude(group = "org.openjdk.jol")
+    exclude(group = "org.slf4j")
+  }
 }
 
 tasks {

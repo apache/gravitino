@@ -283,6 +283,30 @@ public class IcebergConfig extends Config implements OverwriteDefaultConfig {
           .intConf()
           .createWithDefault(60);
 
+  public static final ConfigEntry<String> SCAN_PLAN_CACHE_IMPL =
+      new ConfigBuilder(IcebergConstants.SCAN_PLAN_CACHE_IMPL)
+          .doc("The implementation of the scan plan cache")
+          .version(ConfigConstants.VERSION_1_2_0)
+          .stringConf()
+          .create();
+
+  public static final ConfigEntry<Integer> SCAN_PLAN_CACHE_CAPACITY =
+      new ConfigBuilder(IcebergConstants.SCAN_PLAN_CACHE_CAPACITY)
+          .doc("Maximum number of scan plan results to cache.")
+          .version(ConfigConstants.VERSION_1_2_0)
+          .intConf()
+          .checkValue(value -> value > 0, ConfigConstants.POSITIVE_NUMBER_ERROR_MSG)
+          .createWithDefault(200);
+
+  public static final ConfigEntry<Integer> SCAN_PLAN_CACHE_EXPIRE_MINUTES =
+      new ConfigBuilder(IcebergConstants.SCAN_PLAN_CACHE_EXPIRE_MINUTES)
+          .doc(
+              "Time in minutes after which cached scan plans expire if not accessed. Cached entries are automatically removed after this period of inactivity.")
+          .version(ConfigConstants.VERSION_1_2_0)
+          .intConf()
+          .checkValue(value -> value > 0, ConfigConstants.POSITIVE_NUMBER_ERROR_MSG)
+          .createWithDefault(60);
+
   public String getJdbcDriver() {
     return get(JDBC_DRIVER);
   }

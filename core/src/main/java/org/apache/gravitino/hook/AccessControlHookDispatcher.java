@@ -224,6 +224,16 @@ public class AccessControlHookDispatcher implements AccessControlDispatcher {
     return revokedRole;
   }
 
+  @Override
+  public Role overridePrivilegesInRole(
+      String metalake, String role, List<SecurableObject> securableObjectsToOverride)
+      throws NoSuchRoleException, NoSuchMetalakeException {
+    Role overriddenRole =
+        dispatcher.overridePrivilegesInRole(metalake, role, securableObjectsToOverride);
+    notifyRoleUserRelChange(metalake, role);
+    return overriddenRole;
+  }
+
   private static void notifyRoleUserRelChange(String metalake, List<String> roles) {
     GravitinoAuthorizer gravitinoAuthorizer = GravitinoEnv.getInstance().gravitinoAuthorizer();
     if (gravitinoAuthorizer != null) {

@@ -18,6 +18,9 @@
  */
 package org.apache.gravitino.authorization;
 
+import static org.apache.gravitino.Configs.TREE_LOCK_CLEAN_INTERVAL;
+import static org.apache.gravitino.Configs.TREE_LOCK_MAX_NODE_IN_MEMORY;
+import static org.apache.gravitino.Configs.TREE_LOCK_MIN_NODE_IN_MEMORY;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.reset;
 import static org.mockito.Mockito.verify;
@@ -43,9 +46,9 @@ import org.apache.gravitino.connector.BaseCatalog;
 import org.apache.gravitino.connector.authorization.AuthorizationPlugin;
 import org.apache.gravitino.exceptions.IllegalRoleException;
 import org.apache.gravitino.exceptions.NoSuchGroupException;
-import org.apache.gravitino.exceptions.NoSuchMetalakeException;
 import org.apache.gravitino.exceptions.NoSuchRoleException;
 import org.apache.gravitino.exceptions.NoSuchUserException;
+import org.apache.gravitino.lock.LockManager;
 import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.meta.BaseMetalake;
 import org.apache.gravitino.meta.GroupEntity;
@@ -72,6 +75,7 @@ public class TestAccessControlManagerForPermissions {
 
   private static String METALAKE = "metalake";
   private static String CATALOG = "catalog";
+  private static String SCHEMA = "schema";
 
   private static String USER = "user";
 
@@ -177,6 +181,11 @@ public class TestAccessControlManagerForPermissions {
         .thenReturn(new NameIdentifier[] {NameIdentifier.of("metalake", "catalog")});
     authorizationPlugin = Mockito.mock(AuthorizationPlugin.class);
     Mockito.when(catalog.getAuthorizationPlugin()).thenReturn(authorizationPlugin);
+
+    config.set(TREE_LOCK_MAX_NODE_IN_MEMORY, 100000L);
+    config.set(TREE_LOCK_MIN_NODE_IN_MEMORY, 1000L);
+    config.set(TREE_LOCK_CLEAN_INTERVAL, 36000L);
+    FieldUtils.writeField(GravitinoEnv.getInstance(), "lockManager", new LockManager(config), true);
   }
 
   @AfterAll
@@ -211,11 +220,6 @@ public class TestAccessControlManagerForPermissions {
     user = accessControlManager.grantRolesToUser(METALAKE, ROLE, USER);
     Assertions.assertEquals(1, user.roles().size());
 
-    // Throw NoSuchMetalakeException
-    Assertions.assertThrows(
-        NoSuchMetalakeException.class,
-        () -> accessControlManager.grantRolesToUser(notExist, ROLE, USER));
-
     // Throw IllegalRoleException
     Assertions.assertThrows(
         IllegalRoleException.class,
@@ -244,11 +248,6 @@ public class TestAccessControlManagerForPermissions {
 
     // Test authorization plugin
     Mockito.verify(authorizationPlugin).onRevokedRolesFromUser(any(), any());
-
-    // Throw NoSuchMetalakeException
-    Assertions.assertThrows(
-        NoSuchMetalakeException.class,
-        () -> accessControlManager.revokeRolesFromUser(notExist, ROLE, USER));
 
     // Throw IllegalRoleException
     Assertions.assertThrows(
@@ -289,11 +288,6 @@ public class TestAccessControlManagerForPermissions {
     group = accessControlManager.grantRolesToGroup(METALAKE, ROLE, GROUP);
     Assertions.assertEquals(1, group.roles().size());
 
-    // Throw NoSuchMetalakeException
-    Assertions.assertThrows(
-        NoSuchMetalakeException.class,
-        () -> accessControlManager.grantRolesToGroup(notExist, ROLE, GROUP));
-
     // Throw IllegalRoleException
     Assertions.assertThrows(
         IllegalRoleException.class,
@@ -323,11 +317,6 @@ public class TestAccessControlManagerForPermissions {
 
     // Test authorization plugin
     verify(authorizationPlugin).onRevokedRolesFromGroup(any(), any());
-
-    // Throw NoSuchMetalakeException
-    Assertions.assertThrows(
-        NoSuchMetalakeException.class,
-        () -> accessControlManager.revokeRolesFromGroup(notExist, ROLE, GROUP));
 
     // Throw IllegalRoleException
     Assertions.assertThrows(
@@ -425,5 +414,54 @@ public class TestAccessControlManagerForPermissions {
                 notExist,
                 MetadataObjects.of(null, METALAKE, MetadataObject.Type.METALAKE),
                 Sets.newHashSet(Privileges.CreateTable.allow())));
+  }
+
+  @Test
+  public void testOverridePrivileges() throws Exception {
+    String testRole = "role";
+    SecurableObject catalog =
+        SecurableObjects.ofCatalog(
+            CATALOG,
+            Lists.newArrayList(Privileges.UseCatalog.allow(), Privileges.CreateTable.allow()));
+
+    SecurableObject schema =
+        SecurableObjects.ofSchema(
+            catalog, SCHEMA, Lists.newArrayList(Privileges.CreateTable.allow()));
+
+    // Add two securable objects
+    Role role =
+        accessControlManager.overridePrivilegesInRole(
+            METALAKE, testRole, Lists.newArrayList(catalog, schema));
+
+    List<SecurableObject> objects = role.securableObjects();
+
+    Assertions.assertEquals(2, objects.size());
+
+    // Remove one securable object
+    role =
+        accessControlManager.overridePrivilegesInRole(
+            METALAKE, testRole, Lists.newArrayList(catalog));
+    objects = role.securableObjects();
+    Assertions.assertEquals(1, objects.size());
+    Assertions.assertEquals(catalog, objects.get(0));
+
+    // Update one securable object
+    SecurableObject catalogAnother =
+        SecurableObjects.ofCatalog(CATALOG, Lists.newArrayList(Privileges.UseCatalog.allow()));
+    role =
+        accessControlManager.overridePrivilegesInRole(
+            METALAKE, testRole, Lists.newArrayList(catalogAnother));
+
+    objects = role.securableObjects();
+    Assertions.assertEquals(1, objects.size());
+    Assertions.assertEquals(catalogAnother, objects.get(0));
+
+    // Throw IllegalRoleException
+    String notExist = "not-exist";
+    Assertions.assertThrows(
+        NoSuchRoleException.class,
+        () ->
+            accessControlManager.overridePrivilegesInRole(
+                METALAKE, notExist, Lists.newArrayList()));
   }
 }

@@ -117,11 +117,14 @@ public class JobAuthorizationIT extends BaseRestApiAuthorizationIT {
     // Normal user can see job templates they own (test_1, test_2)
     List<JobTemplate> normalUserTemplates =
         normalUserClient.loadMetalake(METALAKE).listJobTemplates();
-    Assertions.assertEquals(2, normalUserTemplates.size());
+    Assertions.assertTrue(normalUserTemplates.stream().anyMatch(s -> s.name().equals("test_1")));
+    Assertions.assertTrue(normalUserTemplates.stream().anyMatch(s -> s.name().equals("test_2")));
 
     // Admin can see all job templates (test_1, test_2, test_3)
     List<JobTemplate> adminTemplates = client.loadMetalake(METALAKE).listJobTemplates();
-    Assertions.assertEquals(3, adminTemplates.size());
+    Assertions.assertTrue(adminTemplates.stream().anyMatch(s -> s.name().equals("test_1")));
+    Assertions.assertTrue(adminTemplates.stream().anyMatch(s -> s.name().equals("test_2")));
+    Assertions.assertTrue(adminTemplates.stream().anyMatch(s -> s.name().equals("test_3")));
   }
 
   @Test

@@ -24,75 +24,46 @@ plugins {
 }
 
 dependencies {
-  implementation(project(":api")) {
-    exclude("*")
-  }
-
-  implementation(project(":catalogs:catalog-common")) {
-    exclude("*")
-  }
-  implementation(project(":common")) {
-    exclude("*")
-  }
-  implementation(project(":core")) {
-    exclude("*")
-  }
-  implementation(project(":clients:client-java-runtime", configuration = "shadow"))
-
-  implementation(libs.caffeine)
-  implementation(libs.guava)
-  implementation(libs.slf4j.api)
+  compileOnly(project(":api"))
+  compileOnly(project(":common"))
+  compileOnly(project(":core"))
 
   compileOnly(libs.hive2.metastore)
   compileOnly(libs.immutables.value)
   compileOnly(libs.lombok)
+  compileOnly(libs.caffeine)
+  compileOnly(libs.guava)
+  compileOnly(libs.slf4j.api)
+
+  implementation(project(":catalogs:catalog-common")) {
+    exclude("*")
+  }
 
   annotationProcessor(libs.immutables.value)
   annotationProcessor(libs.lombok)
 
+  testImplementation(project(":api"))
+  testImplementation(project(":common"))
+  testImplementation(project(":core"))
+  testImplementation(project(":integration-test-common", "testArtifacts"))
+
   testImplementation(libs.bundles.log4j)
   testImplementation(libs.commons.collections3)
   testImplementation(libs.commons.configuration1)
-  testImplementation(libs.datanucleus.core)
   testImplementation(libs.datanucleus.api.jdo)
-  testImplementation(libs.datanucleus.rdbms)
+  testImplementation(libs.datanucleus.core)
   testImplementation(libs.datanucleus.jdo)
+  testImplementation(libs.datanucleus.rdbms)
   testImplementation(libs.derby)
-  testImplementation(libs.hive2.metastore) {
-    exclude("ant")
-    exclude("co.cask.tephra")
-    exclude("com.github.joshelser")
-    exclude("com.google.code.findbugs", "jsr305")
-    exclude("com.google.code.findbugs", "sr305")
-    exclude("com.tdunning", "json")
-    exclude("com.zaxxer", "HikariCP")
-    exclude("io.dropwizard.metrics")
-    exclude("javax.transaction", "transaction-api")
-    exclude("org.apache.ant")
-    exclude("org.apache.avro")
-    exclude("org.apache.curator")
-    exclude("org.apache.derby")
-    exclude("org.apache.hadoop", "hadoop-yarn-server-resourcemanager")
-    exclude("org.apache.hbase")
-    exclude("org.apache.logging.log4j")
-    exclude("org.apache.parquet", "parquet-hadoop-bundle")
-    exclude("org.apache.zookeeper")
-    exclude("org.datanucleus")
-    exclude("org.eclipse.jetty.aggregate", "jetty-all")
-    exclude("org.eclipse.jetty.orbit", "javax.servlet")
-    exclude("org.openjdk.jol")
-    exclude("org.slf4j")
-  }
-  testImplementation(libs.hadoop2.common) {
+  testImplementation(libs.hadoop2.auth) {
     exclude("*")
   }
-  testImplementation(libs.hadoop2.auth) {
+  testImplementation(libs.hadoop2.common) {
     exclude("*")
   }
   testImplementation(libs.hadoop2.mapreduce.client.core) {
     exclude("*")
   }
-  testImplementation(libs.htrace.core4)
   testImplementation(libs.hive2.exec) {
     artifact {
       classifier = "core"
@@ -119,10 +90,37 @@ dependencies {
     exclude("org.pentaho")
     exclude("org.slf4j")
   }
+  testImplementation(libs.hive2.metastore) {
+    exclude("ant")
+    exclude("co.cask.tephra")
+    exclude("com.github.joshelser")
+    exclude("com.google.code.findbugs", "jsr305")
+    exclude("com.google.code.findbugs", "sr305")
+    exclude("com.tdunning", "json")
+    exclude("com.zaxxer", "HikariCP")
+    exclude("io.dropwizard.metrics")
+    exclude("javax.transaction", "transaction-api")
+    exclude("org.apache.ant")
+    exclude("org.apache.avro")
+    exclude("org.apache.curator")
+    exclude("org.apache.derby")
+    exclude("org.apache.hadoop", "hadoop-yarn-server-resourcemanager")
+    exclude("org.apache.hbase")
+    exclude("org.apache.logging.log4j")
+    exclude("org.apache.parquet", "parquet-hadoop-bundle")
+    exclude("org.apache.zookeeper")
+    exclude("org.datanucleus")
+    exclude("org.eclipse.jetty.aggregate", "jetty-all")
+    exclude("org.eclipse.jetty.orbit", "javax.servlet")
+    exclude("org.openjdk.jol")
+    exclude("org.slf4j")
+  }
+  testImplementation(libs.htrace.core4)
+  testImplementation(libs.caffeine)
   testImplementation(libs.junit.jupiter.api)
-  testImplementation(libs.woodstox.core)
+  testImplementation(libs.mockito.core)
   testImplementation(libs.testcontainers)
-  testImplementation(project(":integration-test-common", "testArtifacts"))
+  testImplementation(libs.woodstox.core)
 
   testRuntimeOnly(libs.junit.jupiter.engine)
 }

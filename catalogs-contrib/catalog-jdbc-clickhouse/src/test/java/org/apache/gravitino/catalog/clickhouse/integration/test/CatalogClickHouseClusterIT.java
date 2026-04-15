@@ -1,0 +1,748 @@
+/*
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+package org.apache.gravitino.catalog.clickhouse.integration.test;
+
+import static org.apache.gravitino.catalog.clickhouse.ClickHouseConstants.ClusterConstants.CLUSTER_NAME;
+import static org.apache.gravitino.catalog.clickhouse.ClickHouseConstants.ClusterConstants.ON_CLUSTER;
+import static org.apache.gravitino.catalog.clickhouse.ClickHouseConstants.DistributedTableConstants.REMOTE_DATABASE;
+import static org.apache.gravitino.catalog.clickhouse.ClickHouseConstants.DistributedTableConstants.REMOTE_TABLE;
+import static org.apache.gravitino.catalog.clickhouse.ClickHouseConstants.DistributedTableConstants.SHARDING_KEY;
+import static org.apache.gravitino.catalog.clickhouse.ClickHouseTablePropertiesMetadata.ENGINE;
+import static org.apache.gravitino.catalog.clickhouse.ClickHouseTablePropertiesMetadata.GRAVITINO_ENGINE_KEY;
+import static org.apache.gravitino.catalog.clickhouse.ClickHouseUtils.getSortOrders;
+import static org.apache.gravitino.rel.Column.DEFAULT_VALUE_NOT_SET;
+
+import com.google.common.collect.Maps;
+import java.nio.file.Paths;
+import java.sql.Connection;
+import java.sql.DriverManager;
+import java.sql.ResultSet;
+import java.sql.Statement;
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.Map;
+import java.util.Objects;
+import org.apache.commons.lang3.StringUtils;
+import org.apache.gravitino.Catalog;
+import org.apache.gravitino.NameIdentifier;
+import org.apache.gravitino.Namespace;
+import org.apache.gravitino.Schema;
+import org.apache.gravitino.catalog.clickhouse.integration.test.service.ClickHouseService;
+import org.apache.gravitino.catalog.jdbc.config.JdbcConfig;
+import org.apache.gravitino.client.GravitinoMetalake;
+import org.apache.gravitino.integration.test.container.ClickHouseContainer;
+import org.apache.gravitino.integration.test.container.ContainerSuite;
+import org.apache.gravitino.integration.test.util.BaseIT;
+import org.apache.gravitino.integration.test.util.GravitinoITUtils;
+import org.apache.gravitino.integration.test.util.TestDatabaseName;
+import org.apache.gravitino.rel.Column;
+import org.apache.gravitino.rel.Table;
+import org.apache.gravitino.rel.TableCatalog;
+import org.apache.gravitino.rel.TableChange;
+import org.apache.gravitino.rel.expressions.NamedReference;
+import org.apache.gravitino.rel.expressions.distributions.Distribution;
+import org.apache.gravitino.rel.expressions.distributions.Distributions;
+import org.apache.gravitino.rel.expressions.literals.Literals;
+import org.apache.gravitino.rel.expressions.transforms.Transform;
+import org.apache.gravitino.rel.expressions.transforms.Transforms;
+import org.apache.gravitino.rel.indexes.Index;
+import org.apache.gravitino.rel.indexes.Indexes;
+import org.apache.gravitino.rel.types.Types;
+import org.junit.jupiter.api.AfterAll;
+import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.Tag;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.TestInstance;
+import org.junit.jupiter.api.TestInstance.Lifecycle;
+
+@Tag("gravitino-docker-test")
+@TestInstance(Lifecycle.PER_CLASS)
+public class CatalogClickHouseClusterIT extends BaseIT {
+  private static final ContainerSuite containerSuite = ContainerSuite.getInstance();
+  private static final String provider = "jdbc-clickhouse";
+
+  private final String metalakeName = GravitinoITUtils.genRandomName("ck_cluster_metalake");
+  private final String catalogName = GravitinoITUtils.genRandomName("ck_cluster_catalog");
+  private final String schemaName = GravitinoITUtils.genRandomName("ck_cluster_schema");
+  private final String localTableName = GravitinoITUtils.genRandomName("ck_cluster_local");
+  private final String distributedTableName = GravitinoITUtils.genRandomName("ck_cluster_dist");
+  private final String nonClusterTableName = GravitinoITUtils.genRandomName("ck_non_cluster_local");
+  private final String sqlClusterLocalTableName =
+      GravitinoITUtils.genRandomName("ck_sql_cluster_local");
+  private final String sqlClusterDistributedTableName =
+      GravitinoITUtils.genRandomName("ck_sql_cluster_dist");
+  private final String sqlNonClusterLocalTableName =
+      GravitinoITUtils.genRandomName("ck_sql_non_cluster_local");
+  private final String sqlNonClusterDistributedTableName =
+      GravitinoITUtils.genRandomName("ck_sql_non_cluster_dist");
+  private final String tableComment = "cluster_table_comment";
+
+  private GravitinoMetalake metalake;
+  private Catalog catalog;
+  private ClickHouseService clickHouseService;
+  private ClickHouseContainer clickHouseClusterContainer;
+  private final TestDatabaseName TEST_DB_NAME = TestDatabaseName.CLICKHOUSE_CLUSTER_CLICKHOUSE_IT;
+
+  @BeforeAll
+  public void startup() {
+    String remoteServersConfig =
+        Paths.get("src", "test", "resources", "remote_servers.xml").toAbsolutePath().toString();
+    containerSuite.startClickHouseClusterContainer(TEST_DB_NAME, remoteServersConfig);
+    clickHouseClusterContainer = containerSuite.getClickHouseClusterContainer();
+
+    clickHouseService = new ClickHouseService(clickHouseClusterContainer, TEST_DB_NAME);
+    createMetalake();
+    createCatalog();
+    createSchema();
+  }
+
+  @AfterAll
+  public void stop() {
+    clearTableAndSchema();
+    metalake.disableCatalog(catalogName);
+    metalake.dropCatalog(catalogName, true);
+    client.disableMetalake(metalakeName);
+    client.dropMetalake(metalakeName, true);
+    clickHouseService.close();
+  }
+
+  private void clearTableAndSchema() {
+    NameIdentifier[] nameIdentifiers =
+        catalog.asTableCatalog().listTables(Namespace.of(schemaName));
+    for (NameIdentifier nameIdentifier : nameIdentifiers) {
+      catalog.asTableCatalog().dropTable(nameIdentifier);
+    }
+    catalog.asSchemas().dropSchema(schemaName, false);
+  }
+
+  private void createMetalake() {
+    client.createMetalake(metalakeName, "cluster metalake", Collections.emptyMap());
+    metalake = client.loadMetalake(metalakeName);
+  }
+
+  private void createCatalog() {
+    Map<String, String> catalogProperties = Maps.newHashMap();
+
+    catalogProperties.put(
+        JdbcConfig.JDBC_URL.getKey(),
+        StringUtils.substring(
+            clickHouseClusterContainer.getJdbcUrl(TEST_DB_NAME),
+            0,
+            clickHouseClusterContainer.getJdbcUrl(TEST_DB_NAME).lastIndexOf("/")));
+    try {
+      catalogProperties.put(
+          JdbcConfig.JDBC_DRIVER.getKey(),
+          clickHouseClusterContainer.getDriverClassName(TEST_DB_NAME));
+    } catch (Exception e) {
+      throw new RuntimeException(e);
+    }
+    catalogProperties.put(JdbcConfig.USERNAME.getKey(), clickHouseClusterContainer.getUsername());
+    catalogProperties.put(JdbcConfig.PASSWORD.getKey(), clickHouseClusterContainer.getPassword());
+
+    catalog =
+        metalake.createCatalog(
+            catalogName, Catalog.Type.RELATIONAL, provider, "cluster catalog", catalogProperties);
+  }
+
+  private void createSchema() {
+    Schema createdSchema =
+        catalog.asSchemas().createSchema(schemaName, null, Collections.emptyMap());
+    Schema loadSchema = catalog.asSchemas().loadSchema(schemaName);
+    Assertions.assertEquals(createdSchema.name(), loadSchema.name());
+  }
+
+  private Column[] createColumns() {
+    // TODO( check hash field)
+    Column col1 =
+        Column.of(
+            "col_1",
+            Types.IntegerType.get(),
+            "col_1_comment",
+            false,
+            false,
+            Literals.integerLiteral(0));
+    Column col2 = Column.of("col_2", Types.DateType.get(), "col_2_comment");
+    Column col3 =
+        Column.of(
+            "col_3", Types.StringType.get(), "col_3_comment", false, false, DEFAULT_VALUE_NOT_SET);
+    return new Column[] {col1, col2, col3};
+  }
+
+  private Map<String, String> clusterMergeTreeProperties() {
+    Map<String, String> properties = new HashMap<>();
+    properties.put(GRAVITINO_ENGINE_KEY, ENGINE.MERGETREE.getValue());
+    properties.put(CLUSTER_NAME, ClickHouseContainer.DEFAULT_CLUSTER_NAME);
+    properties.put(ON_CLUSTER, String.valueOf(true));
+    return properties;
+  }
+
+  private Map<String, String> distributedProperties(String remoteTable) {
+    Map<String, String> properties = new HashMap<>();
+    properties.put(GRAVITINO_ENGINE_KEY, ENGINE.DISTRIBUTED.getValue());
+    properties.put(CLUSTER_NAME, ClickHouseContainer.DEFAULT_CLUSTER_NAME);
+    properties.put(ON_CLUSTER, String.valueOf(true));
+    properties.put(REMOTE_DATABASE, schemaName);
+    properties.put(REMOTE_TABLE, remoteTable);
+    properties.put(SHARDING_KEY, "cityHash64(col_1)");
+    return properties;
+  }
+
+  @Test
+  public void testCreateDistributedTableOnCluster() throws Exception {
+    Column[] columns = createColumns();
+    NameIdentifier localTableIdent = NameIdentifier.of(schemaName, localTableName);
+    NameIdentifier distributedTableIdent = NameIdentifier.of(schemaName, distributedTableName);
+    Distribution distribution = Distributions.NONE;
+    Transform[] partitioning = Transforms.EMPTY_TRANSFORM;
+    TableCatalog tableCatalog = catalog.asTableCatalog();
+
+    Table localTable =
+        tableCatalog.createTable(
+            localTableIdent,
+            columns,
+            tableComment,
+            clusterMergeTreeProperties(),
+            partitioning,
+            distribution,
+            getSortOrders("col_3"));
+
+    Assertions.assertTrue(localTable != null && localTable.name().equals(localTableName));
+    Table loadedLocalTable = tableCatalog.loadTable(localTableIdent);
+    Assertions.assertEquals(
+        ENGINE.MERGETREE.getValue(), loadedLocalTable.properties().get(GRAVITINO_ENGINE_KEY));
+    // Cluster metadata is now embedded in COMMENT at create time and recovered on load.
+    Assertions.assertEquals("true", loadedLocalTable.properties().get(ON_CLUSTER));
+    Assertions.assertEquals(
+        ClickHouseContainer.DEFAULT_CLUSTER_NAME, loadedLocalTable.properties().get(CLUSTER_NAME));
+    Assertions.assertEquals(1, loadedLocalTable.sortOrder().length);
+    Assertions.assertTrue(loadedLocalTable.sortOrder()[0].expression() instanceof NamedReference);
+    Assertions.assertEquals(
+        "col_3", ((NamedReference) loadedLocalTable.sortOrder()[0].expression()).fieldName()[0]);
+
+    Table distributedTable =
+        tableCatalog.createTable(
+            distributedTableIdent,
+            new Column[] {},
+            tableComment,
+            distributedProperties(localTableName),
+            partitioning,
+            distribution,
+            null);
+    Assertions.assertTrue(
+        distributedTable != null && distributedTable.name().equals(distributedTableName));
+    Table loadedDistributedTable = tableCatalog.loadTable(distributedTableIdent);
+    Assertions.assertEquals(
+        ENGINE.DISTRIBUTED.getValue(),
+        loadedDistributedTable.properties().get(GRAVITINO_ENGINE_KEY));
+    // Cluster metadata embedded in COMMENT at create time; ON_CLUSTER is now recoverable.
+    Assertions.assertEquals("true", loadedDistributedTable.properties().get(ON_CLUSTER));
+    Assertions.assertEquals(
+        ClickHouseContainer.DEFAULT_CLUSTER_NAME,
+        loadedDistributedTable.properties().get(CLUSTER_NAME));
+    Assertions.assertEquals(schemaName, loadedDistributedTable.properties().get(REMOTE_DATABASE));
+    Assertions.assertEquals(localTableName, loadedDistributedTable.properties().get(REMOTE_TABLE));
+
+    NameIdentifier nonClusterTableIdent = NameIdentifier.of(schemaName, nonClusterTableName);
+    Table nonClusterTable =
+        tableCatalog.createTable(
+            nonClusterTableIdent,
+            columns,
+            tableComment,
+            Collections.singletonMap(GRAVITINO_ENGINE_KEY, ENGINE.MERGETREE.getValue()),
+            partitioning,
+            distribution,
+            getSortOrders("col_3"));
+    Assertions.assertTrue(
+        nonClusterTable != null && nonClusterTable.name().equals(nonClusterTableName));
+    Table loadedNonClusterTable = tableCatalog.loadTable(nonClusterTableIdent);
+    Assertions.assertEquals(
+        ENGINE.MERGETREE.getValue(), loadedNonClusterTable.properties().get(GRAVITINO_ENGINE_KEY));
+    Assertions.assertEquals("false", loadedNonClusterTable.properties().get(ON_CLUSTER));
+    Assertions.assertFalse(loadedNonClusterTable.properties().containsKey(CLUSTER_NAME));
+    Assertions.assertEquals(1, loadedNonClusterTable.sortOrder().length);
+    Assertions.assertTrue(
+        loadedNonClusterTable.sortOrder()[0].expression() instanceof NamedReference);
+    Assertions.assertEquals(
+        "col_3",
+        ((NamedReference) loadedNonClusterTable.sortOrder()[0].expression()).fieldName()[0]);
+
+    try (Connection connection =
+            DriverManager.getConnection(
+                clickHouseClusterContainer.getJdbcUrl(TEST_DB_NAME),
+                clickHouseClusterContainer.getUsername(),
+                clickHouseClusterContainer.getPassword());
+        Statement statement = connection.createStatement()) {
+      statement.execute(
+          String.format(
+              "INSERT INTO `%s`.`%s` VALUES (1, toDate('2020-01-01'), 'inserted')",
+              schemaName, localTableName));
+      try (ResultSet resultSet =
+          statement.executeQuery(
+              String.format("SELECT count() FROM `%s`.`%s`", schemaName, distributedTableName))) {
+        Assertions.assertTrue(resultSet.next());
+        Assertions.assertEquals(1L, resultSet.getLong(1));
+      }
+    }
+  }
+
+  @Test
+  public void testLoadSqlCreatedLocalAndDistributedTableProperties() {
+    clickHouseService.executeQuery(
+        String.format(
+            "CREATE TABLE `%s`.`%s` ON CLUSTER `%s` ("
+                + "col_1 Int32, col_2 Date, col_3 String) "
+                + "ENGINE = MergeTree ORDER BY col_1",
+            schemaName, sqlClusterLocalTableName, ClickHouseContainer.DEFAULT_CLUSTER_NAME));
+
+    clickHouseService.executeQuery(
+        String.format(
+            "CREATE TABLE `%s`.`%s` ON CLUSTER `%s` AS `%s`.`%s` "
+                + "ENGINE = Distributed('%s', '%s', '%s', cityHash64(col_1))",
+            schemaName,
+            sqlClusterDistributedTableName,
+            ClickHouseContainer.DEFAULT_CLUSTER_NAME,
+            schemaName,
+            sqlClusterLocalTableName,
+            ClickHouseContainer.DEFAULT_CLUSTER_NAME,
+            schemaName,
+            sqlClusterLocalTableName));
+
+    clickHouseService.executeQuery(
+        String.format(
+            "CREATE TABLE `%s`.`%s` (col_1 Int32, col_2 Date, col_3 String) "
+                + "ENGINE = MergeTree ORDER BY col_1",
+            schemaName, sqlNonClusterLocalTableName));
+
+    clickHouseService.executeQuery(
+        String.format(
+            "CREATE TABLE `%s`.`%s` AS `%s`.`%s` "
+                + "ENGINE = Distributed('%s', '%s', '%s', cityHash64(col_1))",
+            schemaName,
+            sqlNonClusterDistributedTableName,
+            schemaName,
+            sqlNonClusterLocalTableName,
+            ClickHouseContainer.DEFAULT_CLUSTER_NAME,
+            schemaName,
+            sqlNonClusterLocalTableName));
+
+    TableCatalog tableCatalog = catalog.asTableCatalog();
+    Table sqlLocalTable =
+        tableCatalog.loadTable(NameIdentifier.of(schemaName, sqlClusterLocalTableName));
+    Assertions.assertEquals(
+        ENGINE.MERGETREE.getValue(), sqlLocalTable.properties().get(GRAVITINO_ENGINE_KEY));
+    Assertions.assertEquals("false", sqlLocalTable.properties().get(ON_CLUSTER));
+
+    Table sqlDistributedTable =
+        tableCatalog.loadTable(NameIdentifier.of(schemaName, sqlClusterDistributedTableName));
+    Assertions.assertEquals(
+        ENGINE.DISTRIBUTED.getValue(), sqlDistributedTable.properties().get(GRAVITINO_ENGINE_KEY));
+    Assertions.assertEquals("false", sqlDistributedTable.properties().get(ON_CLUSTER));
+    Assertions.assertEquals(
+        ClickHouseContainer.DEFAULT_CLUSTER_NAME,
+        sqlDistributedTable.properties().get(CLUSTER_NAME));
+    Assertions.assertEquals(schemaName, sqlDistributedTable.properties().get(REMOTE_DATABASE));
+    Assertions.assertEquals(
+        sqlClusterLocalTableName, sqlDistributedTable.properties().get(REMOTE_TABLE));
+
+    Table sqlNonClusterDistributedTable =
+        tableCatalog.loadTable(NameIdentifier.of(schemaName, sqlNonClusterDistributedTableName));
+    Assertions.assertEquals(
+        ENGINE.DISTRIBUTED.getValue(),
+        sqlNonClusterDistributedTable.properties().get(GRAVITINO_ENGINE_KEY));
+    Assertions.assertEquals("false", sqlNonClusterDistributedTable.properties().get(ON_CLUSTER));
+    Assertions.assertEquals(
+        ClickHouseContainer.DEFAULT_CLUSTER_NAME,
+        sqlNonClusterDistributedTable.properties().get(CLUSTER_NAME));
+    Assertions.assertEquals(
+        schemaName, sqlNonClusterDistributedTable.properties().get(REMOTE_DATABASE));
+    Assertions.assertEquals(
+        sqlNonClusterLocalTableName, sqlNonClusterDistributedTable.properties().get(REMOTE_TABLE));
+  }
+
+  @Test
+  public void testAlterTableBranchCoverageInCluster() {
+    String alterTableName = GravitinoITUtils.genRandomName("ck_cluster_alter");
+    NameIdentifier tableIdentifier = NameIdentifier.of(schemaName, alterTableName);
+    Column[] columns = createColumns();
+    Index[] indexes =
+        new Index[] {
+          Indexes.of(Index.IndexType.DATA_SKIPPING_MINMAX, "idx_col_2", new String[][] {{"col_2"}})
+        };
+    TableCatalog tableCatalog = catalog.asTableCatalog();
+    tableCatalog.createTable(
+        tableIdentifier,
+        columns,
+        tableComment,
+        clusterMergeTreeProperties(),
+        Transforms.EMPTY_TRANSFORM,
+        Distributions.NONE,
+        getSortOrders("col_3"),
+        indexes);
+
+    tableCatalog.alterTable(
+        tableIdentifier,
+        TableChange.addColumn(
+            new String[] {"col_4"},
+            Types.StringType.get(),
+            "new col",
+            TableChange.ColumnPosition.first()),
+        TableChange.updateColumnPosition(
+            new String[] {"col_2"}, TableChange.ColumnPosition.after("col_3")));
+    tableCatalog.alterTable(
+        tableIdentifier,
+        TableChange.updateColumnType(new String[] {"col_1"}, Types.LongType.get()));
+    tableCatalog.alterTable(
+        tableIdentifier,
+        TableChange.updateColumnComment(new String[] {"col_1"}, "col_1_new_comment"));
+    tableCatalog.alterTable(
+        tableIdentifier,
+        TableChange.updateColumnDefaultValue(
+            new String[] {"col_1"}, Literals.of("2", Types.LongType.get())));
+    tableCatalog.alterTable(
+        tableIdentifier, TableChange.updateColumnNullability(new String[] {"col_1"}, true));
+    tableCatalog.alterTable(tableIdentifier, TableChange.deleteIndex("idx_col_2", false));
+
+    Table alteredTable = tableCatalog.loadTable(tableIdentifier);
+    Assertions.assertEquals(4, alteredTable.columns().length);
+    Assertions.assertEquals("col_4", alteredTable.columns()[0].name());
+    int col2Position = -1;
+    int col3Position = -1;
+    for (int i = 0; i < alteredTable.columns().length; i++) {
+      if (Objects.equals("col_2", alteredTable.columns()[i].name())) {
+        col2Position = i;
+      }
+      if (Objects.equals("col_3", alteredTable.columns()[i].name())) {
+        col3Position = i;
+      }
+    }
+    Assertions.assertTrue(col2Position > col3Position, "col_2 should appear after col_3");
+    Column alteredCol1 =
+        Arrays.stream(alteredTable.columns())
+            .filter(column -> Objects.equals("col_1", column.name()))
+            .findFirst()
+            .orElseThrow(() -> new AssertionError("col_1 should exist"));
+    Assertions.assertTrue(alteredCol1.nullable());
+    Assertions.assertEquals(Types.LongType.get(), alteredCol1.dataType());
+    Assertions.assertEquals("col_1_new_comment", alteredCol1.comment());
+    Assertions.assertEquals(Literals.of("2", Types.LongType.get()), alteredCol1.defaultValue());
+    Assertions.assertFalse(
+        Arrays.stream(alteredTable.index())
+            .anyMatch(index -> Objects.equals(index.name(), "idx_col_2")));
+
+    Assertions.assertDoesNotThrow(
+        () ->
+            tableCatalog.alterTable(
+                tableIdentifier,
+                TableChange.deleteIndex("missing_idx", true),
+                TableChange.deleteColumn(new String[] {"missing_col"}, true)));
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () ->
+            tableCatalog.alterTable(
+                tableIdentifier, TableChange.deleteIndex("missing_idx", false)));
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () ->
+            tableCatalog.alterTable(
+                tableIdentifier, TableChange.deleteColumn(new String[] {"missing_col"}, false)));
+    Assertions.assertThrows(
+        UnsupportedOperationException.class,
+        () -> tableCatalog.alterTable(tableIdentifier, TableChange.setProperty("k", "v")));
+    Assertions.assertThrows(
+        UnsupportedOperationException.class,
+        () -> tableCatalog.alterTable(tableIdentifier, TableChange.removeProperty("k")));
+    Assertions.assertThrows(
+        UnsupportedOperationException.class,
+        () ->
+            tableCatalog.alterTable(
+                tableIdentifier,
+                TableChange.updateColumnAutoIncrement(new String[] {"col_1"}, true)));
+  }
+
+  @Test
+  public void testAlterAddIndexAndAutoIncrementInCluster() {
+    String tableName = GravitinoITUtils.genRandomName("ck_cluster_alter_idx");
+    NameIdentifier tableIdentifier = NameIdentifier.of(schemaName, tableName);
+    Column[] columns = createColumns();
+    TableCatalog tableCatalog = catalog.asTableCatalog();
+    tableCatalog.createTable(
+        tableIdentifier,
+        columns,
+        tableComment,
+        clusterMergeTreeProperties(),
+        Transforms.EMPTY_TRANSFORM,
+        Distributions.NONE,
+        getSortOrders("col_3"),
+        Indexes.EMPTY_INDEXES);
+
+    tableCatalog.alterTable(
+        tableIdentifier,
+        TableChange.addIndex(
+            Index.IndexType.DATA_SKIPPING_MINMAX, "idx_col_1_new", new String[][] {{"col_1"}}));
+    Table loaded = tableCatalog.loadTable(tableIdentifier);
+    Assertions.assertTrue(
+        Arrays.stream(loaded.index())
+            .anyMatch(index -> Objects.equals(index.name(), "idx_col_1_new")));
+    tableCatalog.alterTable(tableIdentifier, TableChange.deleteIndex("idx_col_1_new", false));
+    loaded = tableCatalog.loadTable(tableIdentifier);
+    Assertions.assertFalse(
+        Arrays.stream(loaded.index())
+            .anyMatch(index -> Objects.equals(index.name(), "idx_col_1_new")));
+
+    RuntimeException autoIncrementTrueException =
+        Assertions.assertThrows(
+            RuntimeException.class,
+            () ->
+                tableCatalog.alterTable(
+                    tableIdentifier,
+                    TableChange.updateColumnAutoIncrement(new String[] {"col_1"}, true)));
+    Assertions.assertTrue(
+        autoIncrementTrueException.getMessage().contains("auto increment is not supported"));
+
+    RuntimeException autoIncrementFalseException =
+        Assertions.assertThrows(
+            RuntimeException.class,
+            () ->
+                tableCatalog.alterTable(
+                    tableIdentifier,
+                    TableChange.updateColumnAutoIncrement(new String[] {"col_1"}, false)));
+    Assertions.assertTrue(
+        autoIncrementFalseException.getMessage().contains("auto increment is not supported"));
+  }
+
+  @Test
+  public void testDropTableOnCluster() {
+    String dropTableName = GravitinoITUtils.genRandomName("ck_cluster_drop_tbl");
+    NameIdentifier tableIdentifier = NameIdentifier.of(schemaName, dropTableName);
+    TableCatalog tableCatalog = catalog.asTableCatalog();
+
+    // Create a MergeTree table on the cluster
+    tableCatalog.createTable(
+        tableIdentifier,
+        createColumns(),
+        tableComment,
+        clusterMergeTreeProperties(),
+        Transforms.EMPTY_TRANSFORM,
+        Distributions.NONE,
+        getSortOrders("col_3"),
+        Indexes.EMPTY_INDEXES);
+
+    Assertions.assertNotNull(tableCatalog.loadTable(tableIdentifier));
+
+    // Drop the table — Gravitino should issue DROP TABLE ... ON CLUSTER ... SYNC
+    boolean dropped = tableCatalog.dropTable(tableIdentifier);
+    Assertions.assertTrue(dropped);
+
+    // Verify the table no longer exists via Gravitino
+    Assertions.assertFalse(
+        Arrays.stream(tableCatalog.listTables(Namespace.of(schemaName)))
+            .anyMatch(id -> id.name().equals(dropTableName)));
+  }
+
+  @Test
+  public void testDropNonClusterTableDoesNotUseOnCluster() {
+    String dropTableName = GravitinoITUtils.genRandomName("ck_no_cluster_drop_tbl");
+    NameIdentifier tableIdentifier = NameIdentifier.of(schemaName, dropTableName);
+    TableCatalog tableCatalog = catalog.asTableCatalog();
+
+    // Create a MergeTree table without ON CLUSTER
+    tableCatalog.createTable(
+        tableIdentifier,
+        createColumns(),
+        tableComment,
+        Collections.singletonMap(GRAVITINO_ENGINE_KEY, ENGINE.MERGETREE.getValue()),
+        Transforms.EMPTY_TRANSFORM,
+        Distributions.NONE,
+        getSortOrders("col_3"),
+        Indexes.EMPTY_INDEXES);
+
+    Assertions.assertNotNull(tableCatalog.loadTable(tableIdentifier));
+
+    boolean dropped = tableCatalog.dropTable(tableIdentifier);
+    Assertions.assertTrue(dropped);
+
+    Assertions.assertFalse(
+        Arrays.stream(tableCatalog.listTables(Namespace.of(schemaName)))
+            .anyMatch(id -> id.name().equals(dropTableName)));
+  }
+
+  @Test
+  public void testDropSchemaOnCluster() {
+    String dropSchemaName = GravitinoITUtils.genRandomName("ck_cluster_drop_schema");
+
+    // Create a schema on the cluster
+    Map<String, String> schemaProps = new HashMap<>();
+    schemaProps.put(CLUSTER_NAME, ClickHouseContainer.DEFAULT_CLUSTER_NAME);
+    schemaProps.put(ON_CLUSTER, String.valueOf(true));
+    catalog.asSchemas().createSchema(dropSchemaName, null, schemaProps);
+    Assertions.assertNotNull(catalog.asSchemas().loadSchema(dropSchemaName));
+
+    // Drop the schema — Gravitino should issue DROP DATABASE ... ON CLUSTER ... SYNC
+    boolean dropped = catalog.asSchemas().dropSchema(dropSchemaName, false);
+    Assertions.assertTrue(dropped);
+
+    Assertions.assertFalse(
+        Arrays.stream(catalog.asSchemas().listSchemas()).anyMatch(s -> s.equals(dropSchemaName)));
+  }
+
+  // ---------------------------------------------------------------------------
+  // Cluster metadata round-trip via COMMENT embedding
+  // ---------------------------------------------------------------------------
+
+  /**
+   * Gravitino embeds the cluster name in the database COMMENT field at CREATE time, because SHOW
+   * CREATE DATABASE does not include ON CLUSTER. This test verifies the metadata survives the
+   * round-trip: createSchema → loadSchema → cluster properties present.
+   */
+  @Test
+  public void testLoadGravitinoCreatedSchemaOnClusterReturnsClusterProperties() {
+    String name = GravitinoITUtils.genRandomName("ck_cluster_schema_props");
+    Map<String, String> props = new HashMap<>();
+    props.put(CLUSTER_NAME, ClickHouseContainer.DEFAULT_CLUSTER_NAME);
+    props.put(ON_CLUSTER, String.valueOf(true));
+
+    catalog.asSchemas().createSchema(name, "schema comment", props);
+    try {
+      Schema loaded = catalog.asSchemas().loadSchema(name);
+      Assertions.assertEquals(
+          String.valueOf(true),
+          loaded.properties().get(ON_CLUSTER),
+          "loadSchema must return on-cluster=true for a Gravitino-created cluster schema");
+      Assertions.assertEquals(
+          ClickHouseContainer.DEFAULT_CLUSTER_NAME,
+          loaded.properties().get(CLUSTER_NAME),
+          "loadSchema must return the cluster name embedded in COMMENT at create time");
+    } finally {
+      catalog.asSchemas().dropSchema(name, true);
+    }
+  }
+
+  /**
+   * Verifies that a table created ON CLUSTER via Gravitino reports the correct cluster properties
+   * when loaded. SHOW CREATE TABLE does not include ON CLUSTER; Gravitino recovers the cluster name
+   * from the embedded COMMENT metadata.
+   */
+  @Test
+  public void testLoadGravitinoCreatedTableOnClusterReturnsClusterProperties() {
+    String name = GravitinoITUtils.genRandomName("ck_cluster_tbl_props");
+    NameIdentifier tableIdent = NameIdentifier.of(schemaName, name);
+    TableCatalog tableCatalog = catalog.asTableCatalog();
+
+    tableCatalog.createTable(
+        tableIdent,
+        createColumns(),
+        "table comment",
+        clusterMergeTreeProperties(),
+        Transforms.EMPTY_TRANSFORM,
+        Distributions.NONE,
+        getSortOrders("col_3"),
+        Indexes.EMPTY_INDEXES);
+
+    try {
+      Table loaded = tableCatalog.loadTable(tableIdent);
+      Assertions.assertEquals(
+          String.valueOf(true),
+          loaded.properties().get(ON_CLUSTER),
+          "loadTable must return on-cluster=true for a Gravitino-created cluster table");
+      Assertions.assertEquals(
+          ClickHouseContainer.DEFAULT_CLUSTER_NAME,
+          loaded.properties().get(CLUSTER_NAME),
+          "loadTable must return the cluster name embedded in COMMENT at create time");
+    } finally {
+      tableCatalog.dropTable(tableIdent);
+    }
+  }
+
+  /**
+   * When a user updates the table comment via Gravitino, the cluster metadata embedded in the
+   * ClickHouse COMMENT field must be preserved. Without re-embedding, the next loadTable call would
+   * lose the cluster name.
+   */
+  @Test
+  public void testUpdateTableCommentOnClusterPreservesClusterProperties() {
+    String name = GravitinoITUtils.genRandomName("ck_cluster_tbl_upd_cmt");
+    NameIdentifier tableIdent = NameIdentifier.of(schemaName, name);
+    TableCatalog tableCatalog = catalog.asTableCatalog();
+
+    tableCatalog.createTable(
+        tableIdent,
+        createColumns(),
+        "original comment",
+        clusterMergeTreeProperties(),
+        Transforms.EMPTY_TRANSFORM,
+        Distributions.NONE,
+        getSortOrders("col_3"),
+        Indexes.EMPTY_INDEXES);
+
+    try {
+      // Update the table comment
+      tableCatalog.alterTable(tableIdent, TableChange.updateComment("updated comment"));
+
+      // Cluster properties must still be present after the comment update
+      Table loaded = tableCatalog.loadTable(tableIdent);
+      Assertions.assertEquals(
+          String.valueOf(true),
+          loaded.properties().get(ON_CLUSTER),
+          "on-cluster must be preserved after a comment update");
+      Assertions.assertEquals(
+          ClickHouseContainer.DEFAULT_CLUSTER_NAME,
+          loaded.properties().get(CLUSTER_NAME),
+          "cluster-name must be preserved after a comment update");
+    } finally {
+      tableCatalog.dropTable(tableIdent);
+    }
+  }
+
+  /**
+   * Tables created directly in ClickHouse (not through Gravitino) have no cluster metadata embedded
+   * in their COMMENT field. Gravitino must report on-cluster=false and omit cluster-name for such
+   * tables, and document this as a known limitation.
+   */
+  @Test
+  public void testNonGravitinoCreatedClusterTableHasNoClusterProperties() {
+    String name = GravitinoITUtils.genRandomName("ck_sql_direct_cluster");
+
+    // Create directly in ClickHouse — no Gravitino cluster metadata in COMMENT
+    clickHouseService.executeQuery(
+        String.format(
+            "CREATE TABLE `%s`.`%s` ON CLUSTER `%s` "
+                + "(col_1 Int32, col_2 Date, col_3 String) "
+                + "ENGINE = MergeTree ORDER BY col_1",
+            schemaName, name, ClickHouseContainer.DEFAULT_CLUSTER_NAME));
+
+    try {
+      Table loaded = catalog.asTableCatalog().loadTable(NameIdentifier.of(schemaName, name));
+      // Without Gravitino COMMENT metadata there is no way to recover cluster info —
+      // this is the documented limitation.
+      Assertions.assertEquals(
+          String.valueOf(false),
+          loaded.properties().get(ON_CLUSTER),
+          "on-cluster must be false for non-Gravitino-created tables (no embedded COMMENT metadata)");
+      Assertions.assertFalse(
+          loaded.properties().containsKey(CLUSTER_NAME),
+          "cluster-name must be absent for non-Gravitino-created tables");
+    } finally {
+      clickHouseService.executeQuery(
+          String.format(
+              "DROP TABLE `%s`.`%s` ON CLUSTER `%s` SYNC",
+              schemaName, name, ClickHouseContainer.DEFAULT_CLUSTER_NAME));
+    }
+  }
+}

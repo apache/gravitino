@@ -17,18 +17,19 @@
 
 package org.apache.gravitino.server.authorization.expression;
 
-import static org.apache.gravitino.server.authorization.expression.AuthorizationExpressionConstants.loadCatalogAuthorizationExpression;
-import static org.apache.gravitino.server.authorization.expression.AuthorizationExpressionConstants.loadFilesetAuthorizationExpression;
-import static org.apache.gravitino.server.authorization.expression.AuthorizationExpressionConstants.loadJobAuthorizationExpression;
-import static org.apache.gravitino.server.authorization.expression.AuthorizationExpressionConstants.loadJobTemplateAuthorizationExpression;
-import static org.apache.gravitino.server.authorization.expression.AuthorizationExpressionConstants.loadMetalakeAuthorizationExpression;
-import static org.apache.gravitino.server.authorization.expression.AuthorizationExpressionConstants.loadModelAuthorizationExpression;
-import static org.apache.gravitino.server.authorization.expression.AuthorizationExpressionConstants.loadPolicyAuthorizationExpression;
-import static org.apache.gravitino.server.authorization.expression.AuthorizationExpressionConstants.loadRoleAuthorizationExpression;
-import static org.apache.gravitino.server.authorization.expression.AuthorizationExpressionConstants.loadSchemaAuthorizationExpression;
-import static org.apache.gravitino.server.authorization.expression.AuthorizationExpressionConstants.loadTableAuthorizationExpression;
-import static org.apache.gravitino.server.authorization.expression.AuthorizationExpressionConstants.loadTagAuthorizationExpression;
-import static org.apache.gravitino.server.authorization.expression.AuthorizationExpressionConstants.loadTopicsAuthorizationExpression;
+import static org.apache.gravitino.server.authorization.expression.AuthorizationExpressionConstants.LOAD_CATALOG_AUTHORIZATION_EXPRESSION;
+import static org.apache.gravitino.server.authorization.expression.AuthorizationExpressionConstants.LOAD_FILESET_AUTHORIZATION_EXPRESSION;
+import static org.apache.gravitino.server.authorization.expression.AuthorizationExpressionConstants.LOAD_JOB_AUTHORIZATION_EXPRESSION;
+import static org.apache.gravitino.server.authorization.expression.AuthorizationExpressionConstants.LOAD_JOB_TEMPLATE_AUTHORIZATION_EXPRESSION;
+import static org.apache.gravitino.server.authorization.expression.AuthorizationExpressionConstants.LOAD_METALAKE_AUTHORIZATION_EXPRESSION;
+import static org.apache.gravitino.server.authorization.expression.AuthorizationExpressionConstants.LOAD_MODEL_AUTHORIZATION_EXPRESSION;
+import static org.apache.gravitino.server.authorization.expression.AuthorizationExpressionConstants.LOAD_POLICY_AUTHORIZATION_EXPRESSION;
+import static org.apache.gravitino.server.authorization.expression.AuthorizationExpressionConstants.LOAD_ROLE_AUTHORIZATION_EXPRESSION;
+import static org.apache.gravitino.server.authorization.expression.AuthorizationExpressionConstants.LOAD_SCHEMA_AUTHORIZATION_EXPRESSION;
+import static org.apache.gravitino.server.authorization.expression.AuthorizationExpressionConstants.LOAD_TABLE_AUTHORIZATION_EXPRESSION;
+import static org.apache.gravitino.server.authorization.expression.AuthorizationExpressionConstants.LOAD_TAG_AUTHORIZATION_EXPRESSION;
+import static org.apache.gravitino.server.authorization.expression.AuthorizationExpressionConstants.LOAD_TOPICS_AUTHORIZATION_EXPRESSION;
+import static org.apache.gravitino.server.authorization.expression.AuthorizationExpressionConstants.LOAD_VIEW_AUTHORIZATION_EXPRESSION;
 
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
@@ -171,6 +172,7 @@ public class AuthorizationExpressionConverter {
               ( entityType == 'CATALOG' && (%s)) ||
               ( entityType == 'SCHEMA' && (%s)) ||
               ( entityType == 'TABLE' && (%s)) ||
+              ( entityType == 'VIEW' && (%s)) ||
               ( entityType == 'MODEL' && (%s)) ||
               ( entityType == 'FILESET' && (%s)) ||
               ( entityType == 'TOPIC' && (%s)) ||
@@ -183,19 +185,20 @@ public class AuthorizationExpressionConverter {
               ( entityType == 'COLUMN' && (%s))
               """
             .formatted(
-                loadCatalogAuthorizationExpression,
-                loadSchemaAuthorizationExpression,
-                loadTableAuthorizationExpression,
-                loadModelAuthorizationExpression,
-                loadFilesetAuthorizationExpression,
-                loadTopicsAuthorizationExpression,
-                loadRoleAuthorizationExpression,
-                loadMetalakeAuthorizationExpression,
-                loadPolicyAuthorizationExpression,
-                loadTagAuthorizationExpression,
-                loadJobAuthorizationExpression,
-                loadJobTemplateAuthorizationExpression,
-                loadTableAuthorizationExpression));
+                LOAD_CATALOG_AUTHORIZATION_EXPRESSION,
+                LOAD_SCHEMA_AUTHORIZATION_EXPRESSION,
+                LOAD_TABLE_AUTHORIZATION_EXPRESSION,
+                LOAD_VIEW_AUTHORIZATION_EXPRESSION,
+                LOAD_MODEL_AUTHORIZATION_EXPRESSION,
+                LOAD_FILESET_AUTHORIZATION_EXPRESSION,
+                LOAD_TOPICS_AUTHORIZATION_EXPRESSION,
+                LOAD_ROLE_AUTHORIZATION_EXPRESSION,
+                LOAD_METALAKE_AUTHORIZATION_EXPRESSION,
+                LOAD_POLICY_AUTHORIZATION_EXPRESSION,
+                LOAD_TAG_AUTHORIZATION_EXPRESSION,
+                LOAD_JOB_AUTHORIZATION_EXPRESSION,
+                LOAD_JOB_TEMPLATE_AUTHORIZATION_EXPRESSION,
+                LOAD_TABLE_AUTHORIZATION_EXPRESSION));
   }
 
   /**
@@ -252,6 +255,16 @@ public class AuthorizationExpressionConverter {
             "ANY_CREATE_TABLE",
             "((ANY(CREATE_TABLE, METALAKE, CATALOG, SCHEMA, TABLE)) "
                 + "&& !(ANY(DENY_CREATE_TABLE, METALAKE, CATALOG, SCHEMA, TABLE)))");
+    expression =
+        expression.replaceAll(
+            "ANY_SELECT_VIEW",
+            "((ANY(SELECT_VIEW, METALAKE, CATALOG, SCHEMA, VIEW)) "
+                + "&& !(ANY(DENY_SELECT_VIEW, METALAKE, CATALOG, SCHEMA, VIEW)))");
+    expression =
+        expression.replaceAll(
+            "ANY_CREATE_VIEW",
+            "((ANY(CREATE_VIEW, METALAKE, CATALOG, SCHEMA)) "
+                + "&& !(ANY(DENY_CREATE_VIEW, METALAKE, CATALOG, SCHEMA)))");
     expression =
         expression.replaceAll(
             "ANY_CREATE_FILESET",

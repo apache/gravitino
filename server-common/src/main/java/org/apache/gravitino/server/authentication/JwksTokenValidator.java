@@ -29,12 +29,21 @@ import com.nimbusds.jwt.JWTClaimsSet;
 import com.nimbusds.jwt.SignedJWT;
 import com.nimbusds.jwt.proc.DefaultJWTClaimsVerifier;
 import com.nimbusds.jwt.proc.DefaultJWTProcessor;
+import com.nimbusds.jwt.proc.ExpiredJWTException;
 import java.net.URL;
 import java.security.Principal;
+import java.util.Collections;
 import java.util.List;
+import java.util.Set;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.Config;
+import org.apache.gravitino.UserGroup;
 import org.apache.gravitino.UserPrincipal;
+import org.apache.gravitino.auth.GroupMapper;
+import org.apache.gravitino.auth.GroupMapperFactory;
+import org.apache.gravitino.auth.PrincipalMapper;
+import org.apache.gravitino.auth.PrincipalMapperFactory;
+import org.apache.gravitino.exceptions.TokenExpiredException;
 import org.apache.gravitino.exceptions.UnauthorizedException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -52,14 +61,29 @@ public class JwksTokenValidator implements OAuthTokenValidator {
   private String jwksUri;
   private String expectedIssuer;
   private List<String> principalFields;
+  private List<String> groupsFields;
   private long allowSkewSeconds;
+  private PrincipalMapper principalMapper;
+  private GroupMapper groupMapper;
+  private JWKSource<SecurityContext> jwkSource;
 
   @Override
   public void initialize(Config config) {
     this.jwksUri = config.get(OAuthConfig.JWKS_URI);
     this.expectedIssuer = config.get(OAuthConfig.AUTHORITY);
     this.principalFields = config.get(OAuthConfig.PRINCIPAL_FIELDS);
+    this.groupsFields = config.get(OAuthConfig.GROUPS_FIELDS);
     this.allowSkewSeconds = config.get(OAuthConfig.ALLOW_SKEW_SECONDS);
+
+    // Create principal mapper based on configuration
+    String mapperType = config.get(OAuthConfig.PRINCIPAL_MAPPER);
+    String regexPattern = config.get(OAuthConfig.PRINCIPAL_MAPPER_REGEX_PATTERN);
+    this.principalMapper = PrincipalMapperFactory.create(mapperType, regexPattern);
+
+    // Create group mapper based on configuration
+    String groupMapperType = config.get(OAuthConfig.GROUP_MAPPER);
+    String groupRegexPattern = config.get(OAuthConfig.GROUP_MAPPER_REGEX_PATTERN);
+    this.groupMapper = GroupMapperFactory.create(groupMapperType, groupRegexPattern);
 
     LOG.info("Initializing JWKS token validator");
 
@@ -68,12 +92,17 @@ public class JwksTokenValidator implements OAuthTokenValidator {
           "JWKS URI must be configured when using JWKS-based OAuth providers");
     }
 
-    // Validate JWKS URI format
+    // Create the JWK source once at initialization. JWKSourceBuilder.create(url).build() enables
+    // rate-limiting (min 30 s between URL fetches) and caching with refresh-ahead by default:
+    //   - Cache TTL: 5 minutes (DEFAULT_CACHE_TIME_TO_LIVE)
+    //   - Refresh-ahead: 30 seconds before expiration on a background thread
+    // The Nimbus library handles key rotation transparently within these defaults.
     try {
-      new URL(jwksUri);
+      this.jwkSource = JWKSourceBuilder.create(new URL(jwksUri)).build();
     } catch (Exception e) {
-      LOG.error("Invalid JWKS URI format: {}", jwksUri);
-      throw new IllegalArgumentException("Invalid JWKS URI format: " + jwksUri, e);
+      LOG.error("Failed to create JWKS source from URI: {}", jwksUri, e);
+      throw new IllegalArgumentException(
+          "Invalid JWKS URI or failed to create JWKS source: " + jwksUri, e);
     }
   }
 
@@ -89,11 +118,11 @@ public class JwksTokenValidator implements OAuthTokenValidator {
       throw new UnauthorizedException("Service audience cannot be null or empty");
     }
 
+    SignedJWT signedJWT = null;
     try {
-      SignedJWT signedJWT = SignedJWT.parse(token);
+      signedJWT = SignedJWT.parse(token);
 
       // Set up JWKS source and processor
-      JWKSource<SecurityContext> jwkSource = createJwkSource();
       JWSAlgorithm algorithm = JWSAlgorithm.parse(signedJWT.getHeader().getAlgorithm().getName());
       JWSKeySelector<SecurityContext> keySelector =
           new JWSVerificationKeySelector<>(algorithm, jwkSource);
@@ -101,27 +130,27 @@ public class JwksTokenValidator implements OAuthTokenValidator {
       DefaultJWTProcessor<SecurityContext> jwtProcessor = new DefaultJWTProcessor<>();
       jwtProcessor.setJWSKeySelector(keySelector);
 
-      // Configure claims verification
-      JWTClaimsSet.Builder expectedClaimsBuilder = new JWTClaimsSet.Builder();
-
-      // Set expected issuer if configured
-      if (StringUtils.isNotBlank(expectedIssuer)) {
-        expectedClaimsBuilder.issuer(expectedIssuer);
-      }
-
-      // Set expected audience if provided
+      // Audience validation per RFC 7519 (at-least-one match)
+      Set<String> acceptedAudiences = null;
       if (StringUtils.isNotBlank(serviceAudience)) {
-        expectedClaimsBuilder.audience(serviceAudience);
+        acceptedAudiences = Collections.singleton(serviceAudience);
       }
+
+      // Build exact match claims for issuer validation
+      JWTClaimsSet.Builder exactMatchBuilder = new JWTClaimsSet.Builder();
+      if (StringUtils.isNotBlank(expectedIssuer)) {
+        exactMatchBuilder.issuer(expectedIssuer);
+      }
+      JWTClaimsSet exactMatchClaims = exactMatchBuilder.build();
 
       DefaultJWTClaimsVerifier<SecurityContext> claimsVerifier =
-          new DefaultJWTClaimsVerifier<SecurityContext>(expectedClaimsBuilder.build(), null);
+          new DefaultJWTClaimsVerifier<>(acceptedAudiences, exactMatchClaims, null, null);
 
       // Set clock skew tolerance
       claimsVerifier.setMaxClockSkew((int) allowSkewSeconds);
       jwtProcessor.setJWTClaimsSetVerifier(claimsVerifier);
 
-      // Process and validate the token
+      // Validate token signature and claims
       JWTClaimsSet validatedClaims = jwtProcessor.process(signedJWT, null);
 
       String principal = extractPrincipal(validatedClaims);
@@ -130,21 +159,39 @@ public class JwksTokenValidator implements OAuthTokenValidator {
         throw new UnauthorizedException("No valid principal found in token");
       }
 
-      return new UserPrincipal(principal);
+      // Use principal mapper to extract username
+      Principal userPrincipal = principalMapper.map(principal);
+      List<Object> groups = extractGroups(validatedClaims);
+      if (groups != null && !groups.isEmpty()) {
+        List<UserGroup> mappedGroups = groupMapper.map(groups);
+        return new UserPrincipal(userPrincipal.getName(), mappedGroups);
+      }
+      return userPrincipal;
 
+    } catch (ExpiredJWTException e) {
+      throw new TokenExpiredException(e, "Authentication token is expired");
     } catch (Exception e) {
-      LOG.error("JWKS JWT validation error: {}", e.getMessage());
+      LOG.warn(
+          "JWKS JWT validation failed for principal [{}]: {}",
+          extractPrincipalForLogging(signedJWT),
+          e.getMessage());
       throw new UnauthorizedException(e, "JWKS JWT validation error");
     }
   }
 
-  /** Creates a JWK source from the configured JWKS URI. */
-  private JWKSource<SecurityContext> createJwkSource() throws Exception {
+  /**
+   * Extracts the principal from a parsed (but not yet verified) JWT for diagnostic logging. Safe to
+   * call with a null or invalid JWT.
+   */
+  String extractPrincipalForLogging(SignedJWT signedJWT) {
+    if (signedJWT == null) {
+      return "unknown";
+    }
     try {
-      return JWKSourceBuilder.create(new URL(jwksUri)).build();
-    } catch (Exception e) {
-      LOG.error("Failed to create JWKS source from URI: {}", jwksUri, e);
-      throw new Exception("Failed to create JWKS source: " + e.getMessage(), e);
+      String principal = extractPrincipal(signedJWT.getJWTClaimsSet());
+      return principal != null ? principal : "unknown";
+    } catch (Exception ex) {
+      return "unknown";
     }
   }
 
@@ -154,9 +201,29 @@ public class JwksTokenValidator implements OAuthTokenValidator {
     if (principalFields != null && !principalFields.isEmpty()) {
       for (String field : principalFields) {
         if (StringUtils.isNotBlank(field)) {
-          String principal = (String) validatedClaims.getClaim(field);
+          Object principal = validatedClaims.getClaim(field);
           if (principal != null) {
-            return principal;
+            return principal.toString();
+          }
+        }
+      }
+    }
+
+    return null;
+  }
+
+  /** Extracts the groups from the validated JWT claims using configured field(s). */
+  private List<Object> extractGroups(JWTClaimsSet validatedClaims) {
+    if (groupsFields != null && !groupsFields.isEmpty()) {
+      for (String field : groupsFields) {
+        if (StringUtils.isNotBlank(field)) {
+          try {
+            Object groupsObj = validatedClaims.getClaim(field);
+            if (groupsObj instanceof List) {
+              return (List<Object>) groupsObj;
+            }
+          } catch (Exception e) {
+            LOG.warn("Failed to parse groups from claim field: {}", field, e);
           }
         }
       }

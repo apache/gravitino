@@ -29,7 +29,6 @@ import org.apache.gravitino.Entity;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.authorization.AuthorizationRequestContext;
 import org.apache.gravitino.dto.requests.PoliciesAssociateRequest;
-import org.apache.gravitino.server.authorization.expression.AuthorizationExpressionEvaluator;
 
 /**
  * Metadata object authorization for {@link
@@ -47,10 +46,9 @@ public class AssociatePolicyAuthorizationExecutor extends CommonAuthorizerExecut
       Parameter[] parameters,
       Object[] args,
       Map<Entity.EntityType, NameIdentifier> metadataContext,
-      AuthorizationExpressionEvaluator authorizationExpressionEvaluator,
       Map<String, Object> pathParams,
       Optional<String> entityType) {
-    super(expression, metadataContext, authorizationExpressionEvaluator, pathParams, entityType);
+    super(expression, metadataContext, pathParams, entityType);
     this.parameters = parameters;
     this.args = args;
   }

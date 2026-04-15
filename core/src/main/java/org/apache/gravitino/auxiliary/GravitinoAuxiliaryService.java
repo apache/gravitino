@@ -38,8 +38,10 @@ public interface GravitinoAuxiliaryService {
   /**
    * @param config GravitinoServer will pass the config with prefix
    *     `gravitino.auxService.{shortName}.` to aux server
+   * @param auxMode whether the service is running as an auxiliary service (true) or standalone
+   *     (false)
    */
-  void serviceInit(Map<String, String> config);
+  void serviceInit(Map<String, String> config, boolean auxMode);
 
   /** Start aux service */
   void serviceStart();

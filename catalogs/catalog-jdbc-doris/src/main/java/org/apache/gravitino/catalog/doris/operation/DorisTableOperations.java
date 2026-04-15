@@ -24,6 +24,7 @@ import static org.apache.gravitino.catalog.doris.DorisTablePropertiesMetadata.RE
 import static org.apache.gravitino.catalog.doris.utils.DorisUtils.generatePartitionSqlFragment;
 import static org.apache.gravitino.rel.Column.DEFAULT_VALUE_NOT_SET;
 
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableList;
 import java.sql.Connection;
@@ -148,7 +149,8 @@ public class DorisTableOperations extends JdbcTableOperations {
     return result;
   }
 
-  private Map<String, String> appendNecessaryProperties(Map<String, String> properties) {
+  @VisibleForTesting
+  Map<String, String> appendNecessaryProperties(Map<String, String> properties) {
     Map<String, String> resultMap;
     if (properties == null) {
       resultMap = new HashMap<>();
@@ -749,12 +751,7 @@ public class DorisTableOperations extends JdbcTableOperations {
     }
 
     // Add DEFAULT value if specified
-    if (!DEFAULT_VALUE_NOT_SET.equals(column.defaultValue())) {
-      sqlBuilder
-          .append("DEFAULT ")
-          .append(columnDefaultValueConverter.fromGravitino(column.defaultValue()))
-          .append(SPACE);
-    }
+    appendDefaultValue(column, sqlBuilder);
 
     // Add column auto_increment if specified
     if (column.autoIncrement()) {

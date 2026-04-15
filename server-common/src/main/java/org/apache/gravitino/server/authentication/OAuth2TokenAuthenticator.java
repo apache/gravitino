@@ -23,6 +23,7 @@ import java.nio.charset.StandardCharsets;
 import java.security.Principal;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.Config;
+import org.apache.gravitino.UserPrincipal;
 import org.apache.gravitino.auth.AuthConstants;
 import org.apache.gravitino.exceptions.UnauthorizedException;
 
@@ -49,14 +50,6 @@ class OAuth2TokenAuthenticator implements Authenticator {
         StringUtils.isNotBlank(serviceAudience),
         "Service audience cannot be blank for OAuth authentication");
 
-    Preconditions.checkArgument(
-        StringUtils.isNotBlank(config.get(OAuthConfig.DEFAULT_TOKEN_PATH)),
-        "The path for token of the default OAuth server can't be blank");
-    Preconditions.checkArgument(
-        StringUtils.isNotBlank(config.get(OAuthConfig.DEFAULT_SERVER_URI)),
-        "The uri of the default OAuth server can't be blank");
-
-    // Create the appropriate token validator based on configuration
     this.tokenValidator = OAuthTokenValidatorFactory.createValidator(config);
   }
 
@@ -79,7 +72,13 @@ class OAuth2TokenAuthenticator implements Authenticator {
     // TODO: If we support multiple OAuth 2.0 servers, we should use multiple
     // signing keys.
     try {
-      return tokenValidator.validateToken(token, serviceAudience);
+      Principal validated = tokenValidator.validateToken(token, serviceAudience);
+      if (validated instanceof UserPrincipal) {
+        UserPrincipal userPrincipal = (UserPrincipal) validated;
+        // Keep the raw Authorization header value so downstream services can reuse it.
+        return new UserPrincipal(userPrincipal.getName(), userPrincipal.getGroups(), authData);
+      }
+      return validated;
     } catch (UnauthorizedException e) {
       // Re-throw validation errors (audience, subject, etc.) without wrapping
       throw e;

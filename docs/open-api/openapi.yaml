@@ -22,7 +22,7 @@ info:
   license:
     name: Apache 2.0
     url: https://www.apache.org/licenses/LICENSE-2.0.html
-  version: 1.2.0-SNAPSHOT
+  version: 1.3.0-SNAPSHOT
   description: |
     Defines the specification for the first version of the Gravitino REST API.
 
@@ -140,6 +140,12 @@ paths:
   /metalakes/{metalake}/catalogs/{catalog}/schemas/{schema}/topics/{topic}:
     $ref: "./topics.yaml#/paths/~1metalakes~1%7Bmetalake%7D~1catalogs~1%7Bcatalog%7D~1schemas~1%7Bschema%7D~1topics~1%7Btopic%7D"
 
+  /metalakes/{metalake}/catalogs/{catalog}/schemas/{schema}/functions:
+    $ref: "./functions.yaml#/paths/~1metalakes~1%7Bmetalake%7D~1catalogs~1%7Bcatalog%7D~1schemas~1%7Bschema%7D~1functions"
+
+  /metalakes/{metalake}/catalogs/{catalog}/schemas/{schema}/functions/{function}:
+    $ref: "./functions.yaml#/paths/~1metalakes~1%7Bmetalake%7D~1catalogs~1%7Bcatalog%7D~1schemas~1%7Bschema%7D~1functions~1%7Bfunction%7D"
+
   /metalakes/{metalake}/catalogs/{catalog}/schemas/{schema}/models:
     $ref: "./models.yaml#/paths/~1metalakes~1%7Bmetalake%7D~1catalogs~1%7Bcatalog%7D~1schemas~1%7Bschema%7D~1models"
 
@@ -200,6 +206,9 @@ paths:
   /metalakes/{metalake}/permissions/roles/{role}/{metadataObjectType}/{metadataObjectFullName}/revoke:
     $ref: "./permissions.yaml#/paths/~1metalakes~1%7Bmetalake%7D~1permissions~1roles~1%7Brole%7D~1%7BmetadataObjectType%7D~1%7BmetadataObjectFullName%7D~1revoke"
 
+  /metalakes/{metalake}/permissions/roles/{role}:
+    $ref: "./permissions.yaml#/paths/~1metalakes~1%7Bmetalake%7D~1permissions~1roles~1%7Brole%7D"
+
   /lineage:
     $ref: "./lineage.yaml#/paths/~1lineage"
 
@@ -214,6 +223,9 @@ paths:
 
   /metalakes/{metalake}/jobs/runs/{jobId}:
     $ref: "./jobs.yaml#/paths/~1metalakes~1%7Bmetalake%7D~1jobs~1runs~1%7BjobId%7D"
+
+  /authn/me:
+    $ref: "./authn.yaml#/paths/~1authn~1me"
 
 components:
 
@@ -496,6 +508,14 @@ components:
       name: model
       in: path
       description: The name of the model
+      required: true
+      schema:
+        type: string
+
+    function:
+      name: function
+      in: path
+      description: The name of the function
       required: true
       schema:
         type: string

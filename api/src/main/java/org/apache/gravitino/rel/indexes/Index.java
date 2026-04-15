@@ -19,6 +19,8 @@
 
 package org.apache.gravitino.rel.indexes;
 
+import com.google.common.collect.ImmutableMap;
+import java.util.Map;
 import org.apache.gravitino.annotation.Evolving;
 
 /**
@@ -43,6 +45,13 @@ public interface Index {
    *     "a.b.c" for nested column, but normally it could only be "a".
    */
   String[][] fieldNames();
+
+  /**
+   * @return Extra properties for index configuration
+   */
+  default Map<String, String> properties() {
+    return ImmutableMap.of();
+  }
 
   /**
    * The enum IndexType defines the type of the index. Currently, PRIMARY_KEY and UNIQUE_KEY are
@@ -111,6 +120,14 @@ public interface Index {
     /** IVF_HNSW_FLAT */
     IVF_HNSW_SQ,
     /** IVF_HNSW_PQ */
-    IVF_HNSW_PQ;
+    IVF_HNSW_PQ,
+
+    // The following index types are data skipping indexes in ClickHouse, ngrambf_v1 and tokenbf_v1
+    // Will be supported later.
+    /** minmax data skipping index */
+    DATA_SKIPPING_MINMAX,
+
+    /** Bloom filter data skipping index */
+    DATA_SKIPPING_BLOOM_FILTER,
   }
 }

@@ -50,8 +50,8 @@ public class IcebergPropertyMeta implements HasPropertyMeta {
   /** Property key for table format version configuration. */
   public static final String ICEBERG_FORMAT_VERSION_PROPERTY = "format_version";
 
-  private static final String DEFAULT_ICEBERG_FORMAT = "PARQUET";
-  private static final String DEFAULT_ICEBERG_FORMAT_VERSION = "2";
+  public static final String DEFAULT_ICEBERG_FORMAT = "PARQUET";
+  public static final String DEFAULT_ICEBERG_FORMAT_VERSION = "2";
 
   // Value is whether this property is reserved and cannot be used by users
   // TODO (yuqi) add more properties

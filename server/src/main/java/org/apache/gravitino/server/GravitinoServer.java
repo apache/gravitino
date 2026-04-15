@@ -22,12 +22,14 @@ import java.io.File;
 import java.io.IOException;
 import java.util.HashSet;
 import java.util.Properties;
+import java.util.concurrent.atomic.AtomicBoolean;
 import javax.inject.Singleton;
 import javax.servlet.Servlet;
 import org.apache.gravitino.Configs;
 import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.catalog.CatalogDispatcher;
 import org.apache.gravitino.catalog.FilesetDispatcher;
+import org.apache.gravitino.catalog.FunctionDispatcher;
 import org.apache.gravitino.catalog.ModelDispatcher;
 import org.apache.gravitino.catalog.PartitionDispatcher;
 import org.apache.gravitino.catalog.SchemaDispatcher;
@@ -86,6 +88,8 @@ public class GravitinoServer extends ResourceConfig {
   private final GravitinoEnv gravitinoEnv;
 
   private final LineageService lineageService;
+
+  private final AtomicBoolean isStopped = new AtomicBoolean(false);
 
   public GravitinoServer(ServerConfig config, GravitinoEnv gravitinoEnv) {
     this.serverConfig = config;
@@ -146,6 +150,7 @@ public class GravitinoServer extends ResourceConfig {
                 .to(CredentialOperationDispatcher.class)
                 .ranked(1);
             bind(gravitinoEnv.modelDispatcher()).to(ModelDispatcher.class).ranked(1);
+            bind(gravitinoEnv.functionDispatcher()).to(FunctionDispatcher.class).ranked(1);
             bind(lineageService).to(LineageDispatcher.class).ranked(1);
             bind(gravitinoEnv.jobOperationDispatcher()).to(JobOperationDispatcher.class).ranked(1);
             bind(gravitinoEnv.statisticDispatcher()).to(StatisticDispatcher.class).ranked(1);
@@ -196,6 +201,13 @@ public class GravitinoServer extends ResourceConfig {
     }
   }
 
+  void gracefulStop() throws IOException {
+    if (!isStopped.compareAndSet(false, true)) {
+      return;
+    }
+    stop();
+  }
+
   public static void main(String[] args) {
     LOG.info("Starting Gravitino Server");
     String confPath = System.getenv("GRAVITINO_TEST") == null ? "" : args[0];
@@ -217,8 +229,8 @@ public class GravitinoServer extends ResourceConfig {
             new Thread(
                 () -> {
                   try {
-                    // Register some clean-up tasks that need to be done before shutting down
                     Thread.sleep(server.serverConfig.get(ServerConfig.SERVER_SHUTDOWN_TIMEOUT));
+                    server.gracefulStop();
                   } catch (InterruptedException e) {
                     Thread.currentThread().interrupt();
                     LOG.error("Interrupted exception:", e);
@@ -231,7 +243,7 @@ public class GravitinoServer extends ResourceConfig {
 
     LOG.info("Shutting down Gravitino Server ... ");
     try {
-      server.stop();
+      server.gracefulStop();
       LOG.info("Gravitino Server has shut down.");
     } catch (Exception e) {
       LOG.error("Error while stopping Gravitino Server", e);

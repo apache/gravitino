@@ -27,6 +27,7 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.ScheduledThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
+import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.exceptions.NoSuchCatalogException;
 import org.apache.gravitino.iceberg.common.IcebergConfig;
 import org.apache.gravitino.iceberg.common.authentication.AuthenticationConfig;
@@ -43,16 +44,19 @@ public class IcebergCatalogWrapperManager implements AutoCloseable {
 
   public static final Logger LOG = LoggerFactory.getLogger(IcebergCatalogWrapperManager.class);
 
-  private final Cache<String, CatalogWrapperForREST> icebergCatalogWrapperCache;
+  private final Cache<String, CatalogWrapperForREST> catalogWrapperCache;
 
   private final IcebergConfigProvider configProvider;
 
   public IcebergCatalogWrapperManager(
-      Map<String, String> properties, IcebergConfigProvider configProvider) {
+      Map<String, String> properties,
+      IcebergConfigProvider configProvider,
+      boolean auxMode,
+      String metalakeName) {
     this.configProvider = configProvider;
-    this.icebergCatalogWrapperCache =
+    this.catalogWrapperCache =
         Caffeine.newBuilder()
-            .expireAfterWrite(
+            .expireAfterAccess(
                 (new IcebergConfig(properties))
                     .get(IcebergConfig.ICEBERG_REST_CATALOG_CACHE_EVICTION_INTERVAL),
                 TimeUnit.MILLISECONDS)
@@ -71,6 +75,16 @@ public class IcebergCatalogWrapperManager implements AutoCloseable {
                             .setNameFormat("iceberg-catalog-wrapper-cleaner-%d")
                             .build())))
             .build();
+    if (auxMode) {
+      GravitinoEnv.getInstance()
+          .catalogManager()
+          .addCatalogCacheRemoveListener(
+              ident -> {
+                if (ident.namespace().level(0).equals(metalakeName)) {
+                  catalogWrapperCache.invalidate(ident.name());
+                }
+              });
+    }
   }
 
   /**
@@ -85,7 +99,7 @@ public class IcebergCatalogWrapperManager implements AutoCloseable {
 
   public CatalogWrapperForREST getCatalogWrapper(String catalogName) {
     CatalogWrapperForREST catalogWrapperForREST =
-        icebergCatalogWrapperCache.get(catalogName, k -> createCatalogWrapper(catalogName));
+        catalogWrapperCache.get(catalogName, k -> createCatalogWrapper(catalogName));
     // Reload conf to reset UserGroupInformation or icebergTableOps will always use
     // Simple auth.
     catalogWrapperForREST.reloadHadoopConf();
@@ -134,6 +148,6 @@ public class IcebergCatalogWrapperManager implements AutoCloseable {
 
   @Override
   public void close() throws Exception {
-    icebergCatalogWrapperCache.invalidateAll();
+    catalogWrapperCache.invalidateAll();
   }
 }

@@ -24,6 +24,9 @@ For more details, please refer to the related doc.
 - [**Apache Doris**](./jdbc-doris-catalog.md)
 - [**StarRocks**](./jdbc-starrocks-catalog.md)
 - [**OceanBase**](./jdbc-oceanbase-catalog.md)
+- [**Hologres**](./jdbc-hologres-catalog.md)
+- [**ClickHouse**](./jdbc-clickhouse-catalog.md)
+- [**Hologres**](./jdbc-hologres-catalog.md)
 - [**Apache Iceberg**](./lakehouse-iceberg-catalog.md)
 - [**Apache Paimon**](./lakehouse-paimon-catalog.md)
 - [**Apache Hudi**](./lakehouse-hudi-catalog.md)
@@ -43,6 +46,11 @@ Assuming:
 :::caution
 It is not recommended to use one data source to create multiple catalogs, 
 as multiple catalogs operating on the same source may result in unpredictable behavior.
+:::
+
+:::caution
+If you plan to use the [Flink connector](./flink-connector/flink-connector.md), the catalog name **cannot start with a number**.
+This is a Flink limitation. For example, `catalog_hive` is valid, but `1_catalog` is not.
 :::
 
 :::tip
@@ -122,7 +130,10 @@ Currently, Gravitino supports the following catalog providers:
 | `jdbc-postgresql`   | [PostgreSQL catalog property](./jdbc-postgresql-catalog.md#catalog-properties)          |
 | `jdbc-doris`        | [Doris catalog property](./jdbc-doris-catalog.md#catalog-properties)                    |
 | `jdbc-oceanbase`    | [OceanBase catalog property](./jdbc-oceanbase-catalog.md#catalog-properties)            |
+| `jdbc-hologres`     | [Hologres catalog property](./jdbc-hologres-catalog.md#catalog-properties)              |
 | `jdbc-starrocks`    | [StarRocks catalog property](./jdbc-starrocks-catalog.md#catalog-properties)            |
+| `jdbc-clickhouse`   | [ClickHouse catalog property](./jdbc-clickhouse-catalog.md#catalog-properties)          |
+| `jdbc-hologres`     | [Hologres catalog property](./jdbc-hologres-catalog.md#catalog-properties)              |
 | `lakehouse-generic` | [Lakehouse generic catalog property](./lakehouse-generic-catalog.md#catalog-properties) |
 
 ### Load a catalog
@@ -497,17 +508,20 @@ catalog.as_schemas().create_schema(name="schema",
 
 Currently, Gravitino supports the following schema property:
 
-| Catalog provider    | Schema property                                                              |
-|---------------------|------------------------------------------------------------------------------|
-| `hive`              | [Hive schema property](./apache-hive-catalog.md#schema-properties)           |
-| `lakehouse-iceberg` | [Iceberg scheme property](./lakehouse-iceberg-catalog.md#schema-properties)  |
-| `lakehouse-paimon`  | [Paimon scheme property](./lakehouse-paimon-catalog.md#schema-properties)    |
-| `lakehouse-hudi`    | [Hudi scheme property](./lakehouse-hudi-catalog.md#schema-properties)        |
-| `jdbc-mysql`        | [MySQL schema property](./jdbc-mysql-catalog.md#schema-properties)           |
-| `jdbc-postgresql`   | [PostgreSQL schema property](./jdbc-postgresql-catalog.md#schema-properties) |
-| `jdbc-doris`        | [Doris schema property](./jdbc-doris-catalog.md#schema-properties)           |
-| `jdbc-oceanbase`    | [OceanBase schema property](./jdbc-oceanbase-catalog.md#schema-properties)   |
-| `jdbc-starrocks`    | [StarRocks schema property](./jdbc-starrocks-catalog.md#schema-properties)   |
+| Catalog provider    | Schema property                                                                       |
+|---------------------|---------------------------------------------------------------------------------------|
+| `hive`              | [Hive schema property](./apache-hive-catalog.md#schema-properties)                    |
+| `lakehouse-iceberg` | [Iceberg scheme property](./lakehouse-iceberg-catalog.md#schema-properties)           |
+| `lakehouse-paimon`  | [Paimon scheme property](./lakehouse-paimon-catalog.md#schema-properties)             |
+| `lakehouse-hudi`    | [Hudi scheme property](./lakehouse-hudi-catalog.md#schema-properties)                 |
+| `jdbc-mysql`        | [MySQL schema property](./jdbc-mysql-catalog.md#schema-properties)                    |
+| `jdbc-postgresql`   | [PostgreSQL schema property](./jdbc-postgresql-catalog.md#schema-properties)          |
+| `jdbc-doris`        | [Doris schema property](./jdbc-doris-catalog.md#schema-properties)                    |
+| `jdbc-oceanbase`    | [OceanBase schema property](./jdbc-oceanbase-catalog.md#schema-properties)            |
+| `jdbc-hologres`     | [Hologres schema property](./jdbc-hologres-catalog.md#schema-properties)              |
+| `jdbc-starrocks`    | [StarRocks schema property](./jdbc-starrocks-catalog.md#schema-properties)            |
+| `jdbc-clickhouse`   | [ClickHouse schema property](./jdbc-clickhouse-catalog.md#schema-properties)          |
+| `jdbc-hologres`     | [Hologres schema property](./jdbc-hologres-catalog.md#schema-properties)              |
 | `lakehouse-generic` | [Lakehouse generic schema property](./lakehouse-generic-catalog.md#schema-properties) |
 
 ### Load a schema
@@ -716,12 +730,7 @@ curl -X POST -H "Accept: application/vnd.gravitino.v1+json" \
       "type": "integer",
       "comment": "id column comment",
       "nullable": false,
-      "autoIncrement": true,
-      "defaultValue": {
-        "type": "literal",
-        "dataType": "integer",
-        "value": "-1"
-      }
+      "autoIncrement": true
     },
     {
       "name": "name",
@@ -849,7 +858,7 @@ Map<String, String> tablePropertiesMap = ImmutableMap.<String, String>builder()
 tableCatalog.createTable(
   NameIdentifier.of("schema", "example_table"),
   new Column[] {
-    Column.of("id", Types.IntegerType.get(), "id column comment", false, true, Literals.integerLiteral(-1)),
+    Column.of("id", Types.IntegerType.get(), "id column comment", false, true, Column.DEFAULT_VALUE_NOT_SET),
     Column.of("name", Types.VarCharType.of(500), "name column comment", true, false, Literals.NULL),
     Column.of("StartingDate", Types.TimestampType.withoutTimeZone(), "StartingDate column comment", false, false, Column.DEFAULT_VALUE_OF_CURRENT_TIMESTAMP),
     Column.of("info", Types.StructType.of(
@@ -864,7 +873,7 @@ tableCatalog.createTable(
   new Transform[] {Transforms.identity("id")},
   Distributions.of(Strategy.HASH, 32, NamedReference.field("id")),
   new SortOrder[] {SortOrders.ascending(NamedReference.field("name"))},
-  new Index[] {Indexes.of(IndexType.PRIMARY_KEY, "PRIMARY", new String[][]{{"id"}})}
+  new Index[] {Indexes.of(IndexType.PRIMARY_KEY, "PRIMARY", new String[][]{{"id"}}, Map.of())}
 );
 ```
 
@@ -917,7 +926,7 @@ The following types that Gravitino supports:
 | Union                     | `Types.UnionType.of([type1, type2, ...])`                                | `{"type": "union", "types": [type JSON, ...]}`                                                                                       | Union type, indicates a union of types                                                                                                                                     |
 | UUID                      | `Types.UUIDType.get()`                                                   | `uuid`                                                                                                                               | UUID type, indicates a universally unique identifier                                                                                                                       |
 
-The related java doc is [here](pathname:///docs/1.2.0-SNAPSHOT/api/java/org/apache/gravitino/rel/types/Type.html).
+The related java doc is [here](pathname:///docs/1.3.0-SNAPSHOT/api/java/org/apache/gravitino/rel/types/Type.html).
 
 ##### External type
 
@@ -982,18 +991,21 @@ When defining a table column, you can specify a [literal](./expression.md#litera
 
 The following is a table of the column default value that Gravitino supports for different catalogs:
 
-| Catalog provider    | Supported default value |
-|---------------------|-------------------------|
-| `hive`              | &#10008;                |
-| `lakehouse-iceberg` | &#10008;                |
-| `lakehouse-paimon`  | &#10008;                |
-| `lakehouse-hudi`    | &#10008;                |
-| `jdbc-mysql`        | &#10004;                |
-| `jdbc-postgresql`   | &#10004;                |
-| `jdbc-doris`        | &#10004;                |
-| `jdbc-oceanbase`    | &#10004;                |
-| `jdbc-starrocks`    | &#10004;                |
-| `lakehouse-generic` | &#10008;                |
+| Catalog provider     | Supported default value |
+|----------------------|-------------------------|
+| `hive`               | &#10008;                |
+| `lakehouse-iceberg`  | &#10008;                |
+| `lakehouse-paimon`   | &#10008;                |
+| `lakehouse-hudi`     | &#10008;                |
+| `jdbc-mysql`         | &#10004;                |
+| `jdbc-postgresql`    | &#10004;                |
+| `jdbc-doris`         | &#10004;                |
+| `jdbc-oceanbase`     | &#10004;                |
+| `jdbc-hologres`      | &#10004;                |
+| `jdbc-starrocks`     | &#10004;                |
+| `jdbc-clickhouse`    | &#10004;                |
+| `jdbc-hologres`      | &#10004;                |
+| `lakehouse-generic`  | &#10008;                |
 
 #### Table column auto-increment
 
@@ -1010,25 +1022,31 @@ The following table shows the column auto-increment that Gravitino supports for 
 | `jdbc-postgresql`   | &#10004;                                                                         |
 | `jdbc-doris`        | &#10008;                                                                         |
 | `jdbc-oceanbase`    | &#10004;([limitations](./jdbc-oceanbase-catalog.md#table-column-auto-increment)) |
+| `jdbc-hologres`     | &#10008;                                                                         |
 | `jdbc-starrocks`    | &#10004;                                                                         |
-| `lakehouse-generic` | &#10008;                                                                        |
+| `jdbc-clickhouse`   | &#10008;                                                                         |
+| `jdbc-hologres`     | &#10008;                                                                         |
+| `lakehouse-generic` | &#10008;                                                                         |
 
 #### Table property and type mapping
 
 The following is the table property that Gravitino supports:
 
-| Catalog provider    | Table property                                                                                                                                                                                                            | Type mapping                                                                                                                                                |
-|---------------------|---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|-------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| `hive`              | [Hive table property](./apache-hive-catalog.md#table-properties)                                                                                                                                                          | [Hive type mapping](./apache-hive-catalog.md#table-column-types)                                                                                            |
-| `lakehouse-iceberg` | [Iceberg table property](./lakehouse-iceberg-catalog.md#table-properties)                                                                                                                                                 | [Iceberg type mapping](./lakehouse-iceberg-catalog.md#table-column-types)                                                                                   |
-| `lakehouse-paimon`  | [Paimon table property](./lakehouse-paimon-catalog.md#table-properties)                                                                                                                                                   | [Paimon type mapping](./lakehouse-paimon-catalog.md#table-column-types)                                                                                     |
-| `lakehouse-hudi`    | [Hudi table property](./lakehouse-hudi-catalog.md#table-properties)                                                                                                                                                       | [Hudi type mapping](./lakehouse-hudi-catalog.md#table-column-types)                                                                                         |
-| `jdbc-mysql`        | [MySQL table property](./jdbc-mysql-catalog.md#table-properties)                                                                                                                                                          | [MySQL type mapping](./jdbc-mysql-catalog.md#table-column-types)                                                                                            |
-| `jdbc-postgresql`   | [PostgreSQL table property](./jdbc-postgresql-catalog.md#table-properties)                                                                                                                                                | [PostgreSQL type mapping](./jdbc-postgresql-catalog.md#table-column-types)                                                                                  |
-| `jdbc-doris`        | [Doris table property](./jdbc-doris-catalog.md#table-properties)                                                                                                                                                          | [Doris type mapping](./jdbc-doris-catalog.md#table-column-types)                                                                                            |
-| `jdbc-oceanbase`    | [OceanBase table property](./jdbc-oceanbase-catalog.md#table-properties)                                                                                                                                                  | [OceanBase type mapping](./jdbc-oceanbase-catalog.md#table-column-types)                                                                                    |
-| `jdbc-starrocks`    | [StarRocks table property](./jdbc-starrocks-catalog.md#table-properties)                                                                                                                                                  | [StarRocks type mapping](./jdbc-starrocks-catalog.md#table-column-types)                                                                                    |
-| `lakehouse-generic` | Lakehouse generic table property depends on specific table implementation, for Lance table, please refer to [doc](./lakehouse-generic-lance-table.md#table-properties), other table format, please refer to related docs. | Lakehouse generic type mapping. Similar to table properties, for Lance table, please refer to [docs](./lakehouse-generic-lance-table.md#data-type-mappings) |
+| Catalog provider    | Table property                                                                                                                                                                                                             | Type mapping                                                                                                                                                |
+|---------------------|----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|-------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| `hive`              | [Hive table property](./apache-hive-catalog.md#table-properties)                                                                                                                                                           | [Hive type mapping](./apache-hive-catalog.md#table-column-types)                                                                                            |
+| `lakehouse-iceberg` | [Iceberg table property](./lakehouse-iceberg-catalog.md#table-properties)                                                                                                                                                  | [Iceberg type mapping](./lakehouse-iceberg-catalog.md#table-column-types)                                                                                   |
+| `lakehouse-paimon`  | [Paimon table property](./lakehouse-paimon-catalog.md#table-properties)                                                                                                                                                    | [Paimon type mapping](./lakehouse-paimon-catalog.md#table-column-types)                                                                                     |
+| `lakehouse-hudi`    | [Hudi table property](./lakehouse-hudi-catalog.md#table-properties)                                                                                                                                                        | [Hudi type mapping](./lakehouse-hudi-catalog.md#table-column-types)                                                                                         |
+| `jdbc-mysql`        | [MySQL table property](./jdbc-mysql-catalog.md#table-properties)                                                                                                                                                           | [MySQL type mapping](./jdbc-mysql-catalog.md#table-column-types)                                                                                            |
+| `jdbc-postgresql`   | [PostgreSQL table property](./jdbc-postgresql-catalog.md#table-properties)                                                                                                                                                 | [PostgreSQL type mapping](./jdbc-postgresql-catalog.md#table-column-types)                                                                                  |
+| `jdbc-doris`        | [Doris table property](./jdbc-doris-catalog.md#table-properties)                                                                                                                                                           | [Doris type mapping](./jdbc-doris-catalog.md#table-column-types)                                                                                            |
+| `jdbc-oceanbase`    | [OceanBase table property](./jdbc-oceanbase-catalog.md#table-properties)                                                                                                                                                   | [OceanBase type mapping](./jdbc-oceanbase-catalog.md#table-column-types)                                                                                    |
+| `jdbc-hologres`     | [Hologres table property](./jdbc-hologres-catalog.md#table-properties)                                                                                                                                                     | [Hologres type mapping](./jdbc-hologres-catalog.md#table-column-types)                                                                                      |
+| `jdbc-starrocks`    | [StarRocks table property](./jdbc-starrocks-catalog.md#table-properties)                                                                                                                                                   | [StarRocks type mapping](./jdbc-starrocks-catalog.md#table-column-types)                                                                                    |
+| `jdbc-clickhouse`   | [ClickHouse table property](./jdbc-clickhouse-catalog.md#table-properties)                                                                                                                                                 | [ClickHouse type mapping](./jdbc-clickhouse-catalog.md#table-column-types)                                                                                  |
+| `jdbc-hologres`     | [Hologres table property](./jdbc-hologres-catalog.md#table-properties)                                                                                                                                                     | [Hologres type mapping](./jdbc-hologres-catalog.md#table-column-types)                                                                                      |
+| `lakehouse-generic` | Lakehouse generic table property depends on specific table implementation, for Lance table, please refer to [doc](./lakehouse-generic-lance-table.md#table-properties), other table format, please refer to related docs.  | Lakehouse generic type mapping. Similar to table properties, for Lance table, please refer to [docs](./lakehouse-generic-lance-table.md#data-type-mappings) |
 
 #### Table partitioning, distribution, sort ordering and indexes
 
@@ -1036,10 +1054,10 @@ In addition to the basic settings, Gravitino supports the following features:
 
 | Feature             | Description                                                                                                                                                                                                                                                                                    | Java doc                                                                                                                                  |
 |---------------------|------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|-------------------------------------------------------------------------------------------------------------------------------------------|
-| Table partitioning  | Equal to `PARTITION BY` in Apache Hive, It is a partitioning strategy that is used to split a table into parts based on partition keys. Some table engine may not support this feature                                                                                                         | [Partition](pathname:///docs/1.2.0-SNAPSHOT/api/java/org/apache/gravitino/dto/rel/partitioning/Partitioning.html)             |
-| Table distribution  | Equal to `CLUSTERED BY` in Apache Hive, distribution a.k.a (Clustering) is a technique to split the data into more manageable files/parts, (By specifying the number of buckets to create). The value of the distribution column will be hashed by a user-defined number into buckets.         | [Distribution](pathname:///docs/1.2.0-SNAPSHOT/api/java/org/apache/gravitino/rel/expressions/distributions/Distribution.html) |
-| Table sort ordering | Equal to `SORTED BY` in Apache Hive, sort ordering is a method to sort the data in specific ways such as by a column or a function, and then store table data. it will highly improve the query performance under certain scenarios.                                                           | [SortOrder](pathname:///docs/1.2.0-SNAPSHOT/api/java/org/apache/gravitino/rel/expressions/sorts/SortOrder.html)               |
-| Table indexes       | Equal to `KEY/INDEX` in MySQL , unique key enforces uniqueness of values in one or more columns within a table. It ensures that no two rows have identical values in specified columns, thereby facilitating data integrity and enabling efficient data retrieval and manipulation operations. | [Index](pathname:///docs/1.2.0-SNAPSHOT/api/java/org/apache/gravitino/rel/indexes/Index.html)                                 |
+| Table partitioning  | Equal to `PARTITION BY` in Apache Hive, It is a partitioning strategy that is used to split a table into parts based on partition keys. Some table engine may not support this feature                                                                                                         | [Partition](pathname:///docs/1.3.0-SNAPSHOT/api/java/org/apache/gravitino/dto/rel/partitioning/Partitioning.html)             |
+| Table distribution  | Equal to `CLUSTERED BY` in Apache Hive, distribution a.k.a (Clustering) is a technique to split the data into more manageable files/parts, (By specifying the number of buckets to create). The value of the distribution column will be hashed by a user-defined number into buckets.         | [Distribution](pathname:///docs/1.3.0-SNAPSHOT/api/java/org/apache/gravitino/rel/expressions/distributions/Distribution.html) |
+| Table sort ordering | Equal to `SORTED BY` in Apache Hive, sort ordering is a method to sort the data in specific ways such as by a column or a function, and then store table data. it will highly improve the query performance under certain scenarios.                                                           | [SortOrder](pathname:///docs/1.3.0-SNAPSHOT/api/java/org/apache/gravitino/rel/expressions/sorts/SortOrder.html)               |
+| Table indexes       | Equal to `KEY/INDEX` in MySQL , unique key enforces uniqueness of values in one or more columns within a table. It ensures that no two rows have identical values in specified columns, thereby facilitating data integrity and enabling efficient data retrieval and manipulation operations. | [Index](pathname:///docs/1.3.0-SNAPSHOT/api/java/org/apache/gravitino/rel/indexes/Index.html)                                 |
 
 For more information, please see the related document on [partitioning, bucketing, sorting, and indexes](table-partitioning-bucketing-sort-order-indexes.md).
 

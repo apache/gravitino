@@ -17,9 +17,11 @@
 
 package org.apache.gravitino.server.authorization;
 
+import com.google.common.base.Preconditions;
 import java.lang.reflect.Array;
 import java.security.Principal;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -31,15 +33,19 @@ import java.util.function.Function;
 import org.apache.gravitino.Config;
 import org.apache.gravitino.Configs;
 import org.apache.gravitino.Entity;
+import org.apache.gravitino.EntityStore;
 import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.Metalake;
 import org.apache.gravitino.NameIdentifier;
+import org.apache.gravitino.Namespace;
+import org.apache.gravitino.SupportsRelationOperations;
 import org.apache.gravitino.authorization.AuthorizationRequestContext;
 import org.apache.gravitino.authorization.GravitinoAuthorizer;
 import org.apache.gravitino.dto.tag.MetadataObjectDTO;
 import org.apache.gravitino.server.authorization.expression.AuthorizationExpressionConstants;
 import org.apache.gravitino.server.authorization.expression.AuthorizationExpressionEvaluator;
+import org.apache.gravitino.utils.EntityClassMapper;
 import org.apache.gravitino.utils.MetadataObjectUtil;
 import org.apache.gravitino.utils.NameIdentifierUtil;
 import org.apache.gravitino.utils.PrincipalUtils;
@@ -55,6 +61,31 @@ public class MetadataAuthzHelper {
 
   private static final Logger LOG = LoggerFactory.getLogger(MetadataAuthzHelper.class);
   private static volatile Executor executor = null;
+
+  /**
+   * Entity types that support batch get operations for cache preloading. These types have
+   * implemented the batchGetByIdentifier method in their respective MetaService classes.
+   */
+  private static final List<Entity.EntityType> SUPPORTED_PRELOAD_ENTITY_TYPES =
+      Arrays.asList(
+          Entity.EntityType.METALAKE,
+          Entity.EntityType.CATALOG,
+          Entity.EntityType.SCHEMA,
+          Entity.EntityType.TABLE,
+          Entity.EntityType.FILESET,
+          Entity.EntityType.TOPIC,
+          Entity.EntityType.MODEL,
+          Entity.EntityType.TAG,
+          Entity.EntityType.POLICY,
+          Entity.EntityType.JOB,
+          Entity.EntityType.JOB_TEMPLATE);
+
+  /**
+   * Topic and Table may be from the external system and the schema may not exist in Gravitino, so
+   * we need to import the schema first
+   */
+  private static final List<Entity.EntityType> REQUIRE_SCHEMA_EXISTS =
+      Arrays.asList(Entity.EntityType.TABLE, Entity.EntityType.TOPIC);
 
   private MetadataAuthzHelper() {}
 
@@ -136,6 +167,8 @@ public class MetadataAuthzHelper {
       String expression,
       Entity.EntityType entityType,
       NameIdentifier[] nameIdentifiers) {
+    preloadToCache(entityType, nameIdentifiers);
+    preloadOwner(entityType, nameIdentifiers);
     return filterByExpression(metalake, expression, entityType, nameIdentifiers, e -> e);
   }
 
@@ -291,7 +324,12 @@ public class MetadataAuthzHelper {
     return futures.stream()
         .map(CompletableFuture::join)
         .filter(Objects::nonNull)
-        .toArray(size -> (E[]) Array.newInstance(entities.getClass().getComponentType(), size));
+        .toArray(size -> createArray(entities.getClass().getComponentType(), size));
+  }
+
+  @SuppressWarnings("unchecked")
+  private static <E> E[] createArray(Class<?> componentType, int size) {
+    return (E[]) Array.newInstance(componentType, size);
   }
 
   private static boolean enableAuthorization() {
@@ -316,6 +354,60 @@ public class MetadataAuthzHelper {
                   });
         }
       }
+    }
+  }
+
+  private static void preloadToCache(
+      Entity.EntityType entityType, NameIdentifier[] nameIdentifiers) {
+    // If cache is not enabled or access control dispatcher is not set, skip preloading to cache
+    if (!GravitinoEnv.getInstance().cacheEnabled()
+        || GravitinoEnv.getInstance().accessControlDispatcher() == null
+        || nameIdentifiers.length == 0) {
+      return;
+    }
+
+    // Only preload entity types that support batch get operations
+    if (!SUPPORTED_PRELOAD_ENTITY_TYPES.contains(entityType)) {
+      return;
+    }
+
+    if (REQUIRE_SCHEMA_EXISTS.contains(entityType)) {
+      // For entity types that require schema existence, check if the schema exists before
+      // preloading to cache
+      Namespace firstNamespace = nameIdentifiers[0].namespace();
+      Preconditions.checkArgument(
+          Arrays.stream(nameIdentifiers).allMatch(id -> id.namespace().equals(firstNamespace)),
+          "All identifiers must have the same schema");
+
+      if (!GravitinoEnv.getInstance()
+          .schemaDispatcher()
+          .schemaExists(NameIdentifier.parse(firstNamespace.toString()))) {
+        return;
+      }
+    }
+
+    GravitinoEnv.getInstance()
+        .entityStore()
+        .batchGet(
+            Arrays.asList(nameIdentifiers),
+            entityType,
+            EntityClassMapper.getEntityClass(entityType));
+  }
+
+  private static void preloadOwner(Entity.EntityType entityType, NameIdentifier[] nameIdentifiers) {
+    if (!GravitinoEnv.getInstance().cacheEnabled()) {
+      return;
+    }
+    EntityStore entityStore = GravitinoEnv.getInstance().entityStore();
+    try {
+      entityStore
+          .relationOperations()
+          .batchListEntitiesByRelation(
+              SupportsRelationOperations.Type.OWNER_REL,
+              Arrays.stream(nameIdentifiers).toList(),
+              entityType);
+    } catch (Exception e) {
+      LOG.warn("Ignore preloadOwner error:{}", e.getMessage(), e);
     }
   }
 }

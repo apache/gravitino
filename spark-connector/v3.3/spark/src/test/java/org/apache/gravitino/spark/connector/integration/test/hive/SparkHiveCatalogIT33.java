@@ -32,4 +32,10 @@ public class SparkHiveCatalogIT33 extends SparkHiveCatalogIT {
             .getConfString("spark.sql.catalog." + getCatalogName());
     Assertions.assertEquals(GravitinoHiveCatalogSpark33.class.getName(), catalogClass);
   }
+
+  @Override
+  protected boolean supportsFunction() {
+    // Spark 3.3 does not support function operations
+    return false;
+  }
 }

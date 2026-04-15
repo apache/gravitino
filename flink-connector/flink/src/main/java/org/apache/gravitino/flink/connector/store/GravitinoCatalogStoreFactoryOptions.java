@@ -40,10 +40,25 @@ public class GravitinoCatalogStoreFactoryOptions {
           .stringType()
           .noDefaultValue()
           .withDescription("The name of Gravitino metalake");
+  public static final ConfigOption<Boolean> GRAVITINO_ENABLE_SESSION_CATALOG_SUPPORT =
+      ConfigOptions.key("gravitino.enableSessionCatalogSupport")
+          .booleanType()
+          .defaultValue(false)
+          .withDescription(
+              "Whether to enable support for Flink's session catalog in the Gravitino catalog store");
 
   public static final ConfigOption<Map<String, String>> GRAVITINO_CLIENT_CONFIG =
       ConfigOptions.key("gravitino.client")
           .mapType()
           .defaultValue(ImmutableMap.of())
           .withDescription("The config of Gravitino client");
+
+  public static final String AUTH_TYPE = "gravitino.client.auth.type";
+  public static final String OAUTH2 = "oauth2";
+
+  // OAuth2 config keys
+  public static final String OAUTH2_SERVER_URI = "gravitino.client.oauth2.serverUri";
+  public static final String OAUTH2_CREDENTIAL = "gravitino.client.oauth2.credential";
+  public static final String OAUTH2_TOKEN_PATH = "gravitino.client.oauth2.tokenPath";
+  public static final String OAUTH2_SCOPE = "gravitino.client.oauth2.scope";
 }

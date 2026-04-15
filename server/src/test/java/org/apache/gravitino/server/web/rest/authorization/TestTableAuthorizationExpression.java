@@ -84,7 +84,8 @@ public class TestTableAuthorizationExpression {
   @Test
   public void testListTable() throws IllegalAccessException, OgnlException, NoSuchFieldException {
     Field loadTableAuthorizationExpressionField =
-        AuthorizationExpressionConstants.class.getDeclaredField("loadTableAuthorizationExpression");
+        AuthorizationExpressionConstants.class.getDeclaredField(
+            "LOAD_TABLE_AUTHORIZATION_EXPRESSION");
     loadTableAuthorizationExpressionField.setAccessible(true);
     String loadTableAuthExpression = (String) loadTableAuthorizationExpressionField.get(null);
     MockAuthorizationExpressionEvaluator mockEvaluator =
@@ -128,7 +129,7 @@ public class TestTableAuthorizationExpression {
   public void testLoadTable() throws NoSuchMethodException, OgnlException {
     Method method =
         TableOperations.class.getMethod(
-            "loadTable", String.class, String.class, String.class, String.class);
+            "loadTable", String.class, String.class, String.class, String.class, String.class);
     AuthorizationExpression authorizationExpressionAnnotation =
         method.getAnnotation(AuthorizationExpression.class);
     String expression = authorizationExpressionAnnotation.expression();

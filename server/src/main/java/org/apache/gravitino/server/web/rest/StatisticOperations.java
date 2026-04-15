@@ -81,6 +81,9 @@ public class StatisticOperations {
 
   private static final Logger LOG = LoggerFactory.getLogger(StatisticOperations.class);
 
+  private static final String NULL_STATS_UPDATE_REQUEST_BODY_ERROR =
+      "Statistics update request body cannot be null";
+
   @Context private HttpServletRequest httpRequest;
 
   private final StatisticDispatcher statisticDispatcher;
@@ -160,6 +163,9 @@ public class StatisticOperations {
       return Utils.doAs(
           httpRequest,
           () -> {
+            if (request == null) {
+              throw new IllegalArgumentException(NULL_STATS_UPDATE_REQUEST_BODY_ERROR);
+            }
             request.validate();
             MetadataObject object =
                 MetadataObjects.parse(
@@ -188,7 +194,7 @@ public class StatisticOperations {
           });
     } catch (Exception e) {
       return ExceptionHandlers.handleStatisticException(
-          OperationType.UPDATE, StringUtils.join(request.getUpdates().keySet(), ","), fullName, e);
+          OperationType.UPDATE, getStatisticNames(request), fullName, e);
     }
   }
 
@@ -398,12 +404,7 @@ public class StatisticOperations {
           fullName,
           metalake,
           e);
-      String partitions =
-          StringUtils.joinWith(
-              ",",
-              request.getUpdates().stream()
-                  .map(PartitionStatisticsUpdateDTO::partitionName)
-                  .collect(Collectors.toList()));
+      String partitions = getPartitionNames(request);
       return ExceptionHandlers.handlePartitionStatsException(
           OperationType.UPDATE, partitions, fullName, e);
     }
@@ -460,12 +461,7 @@ public class StatisticOperations {
           fullName,
           metalake,
           e);
-      String partitions =
-          StringUtils.joinWith(
-              ",",
-              request.getDrops().stream()
-                  .map(PartitionStatisticsDropDTO::partitionName)
-                  .collect(Collectors.toList()));
+      String partitions = getDropPartitionNames(request);
       return ExceptionHandlers.handlePartitionStatsException(
           OperationType.DROP, partitions, fullName, e);
     }
@@ -499,5 +495,37 @@ public class StatisticOperations {
         return toPartitionName + ")";
       }
     }
+  }
+
+  private static String getStatisticNames(StatisticsUpdateRequest request) {
+    if (request == null || request.getUpdates() == null) {
+      return "";
+    }
+
+    return StringUtils.join(request.getUpdates().keySet(), ",");
+  }
+
+  private static String getPartitionNames(PartitionStatisticsUpdateRequest request) {
+    if (request == null || request.getUpdates() == null) {
+      return "";
+    }
+
+    return StringUtils.joinWith(
+        ",",
+        request.getUpdates().stream()
+            .map(PartitionStatisticsUpdateDTO::partitionName)
+            .collect(Collectors.toList()));
+  }
+
+  private static String getDropPartitionNames(PartitionStatisticsDropRequest request) {
+    if (request == null || request.getDrops() == null) {
+      return "";
+    }
+
+    return StringUtils.joinWith(
+        ",",
+        request.getDrops().stream()
+            .map(PartitionStatisticsDropDTO::partitionName)
+            .collect(Collectors.toList()));
   }
 }

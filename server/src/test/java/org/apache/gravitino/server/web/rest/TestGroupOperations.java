@@ -38,11 +38,13 @@ import javax.ws.rs.core.Response;
 import javax.ws.rs.core.Response.Status;
 import org.apache.commons.lang3.reflect.FieldUtils;
 import org.apache.gravitino.Config;
+import org.apache.gravitino.EntityStore;
 import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.authorization.AccessControlManager;
 import org.apache.gravitino.authorization.Group;
 import org.apache.gravitino.authorization.Owner;
 import org.apache.gravitino.authorization.OwnerDispatcher;
+import org.apache.gravitino.connector.PropertiesMetadata;
 import org.apache.gravitino.dto.authorization.GroupDTO;
 import org.apache.gravitino.dto.requests.GroupAddRequest;
 import org.apache.gravitino.dto.responses.ErrorConstants;
@@ -52,10 +54,12 @@ import org.apache.gravitino.dto.responses.GroupResponse;
 import org.apache.gravitino.dto.responses.NameListResponse;
 import org.apache.gravitino.dto.responses.RemoveResponse;
 import org.apache.gravitino.exceptions.GroupAlreadyExistsException;
+import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.exceptions.NoSuchGroupException;
 import org.apache.gravitino.exceptions.NoSuchMetalakeException;
 import org.apache.gravitino.lock.LockManager;
 import org.apache.gravitino.meta.AuditInfo;
+import org.apache.gravitino.meta.BaseMetalake;
 import org.apache.gravitino.meta.GroupEntity;
 import org.apache.gravitino.rest.RESTUtils;
 import org.glassfish.hk2.utilities.binding.AbstractBinder;
@@ -70,6 +74,7 @@ public class TestGroupOperations extends BaseOperationsTest {
 
   private static final AccessControlManager manager = mock(AccessControlManager.class);
   private static final OwnerDispatcher ownerDispatcher = mock(OwnerDispatcher.class);
+  private static final EntityStore entityStore = mock(EntityStore.class);
 
   private static class MockServletRequestFactory extends ServletRequestFactoryBase {
     @Override
@@ -89,6 +94,7 @@ public class TestGroupOperations extends BaseOperationsTest {
     FieldUtils.writeField(GravitinoEnv.getInstance(), "lockManager", new LockManager(config), true);
     FieldUtils.writeField(GravitinoEnv.getInstance(), "accessControlDispatcher", manager, true);
     FieldUtils.writeField(GravitinoEnv.getInstance(), "ownerDispatcher", ownerDispatcher, true);
+    FieldUtils.writeField(GravitinoEnv.getInstance(), "entityStore", entityStore, true);
   }
 
   @Override
@@ -114,11 +120,18 @@ public class TestGroupOperations extends BaseOperationsTest {
   }
 
   @Test
-  public void testAddGroup() {
+  public void testAddGroup() throws IOException {
     GroupAddRequest req = new GroupAddRequest("group1");
     Group group = buildGroup("group1");
 
     when(manager.addGroup(any(), any())).thenReturn(group);
+
+    // Mock metalake with in-use property
+    BaseMetalake metalake = mock(BaseMetalake.class);
+    PropertiesMetadata propertiesMetadata = mock(PropertiesMetadata.class);
+    when(propertiesMetadata.getOrDefault(any(), any())).thenReturn(true);
+    when(metalake.propertiesMetadata()).thenReturn(propertiesMetadata);
+    when(entityStore.get(any(), any(), any())).thenReturn(metalake);
 
     // test with IllegalRequest
     GroupAddRequest illegalReq = new GroupAddRequest("");
@@ -147,7 +160,7 @@ public class TestGroupOperations extends BaseOperationsTest {
     Assertions.assertTrue(groupDTO.roles().isEmpty());
 
     // Test to throw NoSuchMetalakeException
-    doThrow(new NoSuchMetalakeException("mock error")).when(manager).addGroup(any(), any());
+    doThrow(new NoSuchEntityException("mock error")).when(entityStore).get(any(), any(), any());
     Response resp1 =
         target("/metalakes/metalake1/groups")
             .request(MediaType.APPLICATION_JSON_TYPE)
@@ -162,6 +175,12 @@ public class TestGroupOperations extends BaseOperationsTest {
     Assertions.assertEquals(NoSuchMetalakeException.class.getSimpleName(), errorResponse.getType());
 
     // Test to throw GroupAlreadyExistsException
+    Mockito.reset(entityStore);
+    BaseMetalake metalake1 = mock(BaseMetalake.class);
+    PropertiesMetadata propertiesMetadata1 = mock(PropertiesMetadata.class);
+    when(propertiesMetadata1.getOrDefault(any(), any())).thenReturn(true);
+    when(metalake1.propertiesMetadata()).thenReturn(propertiesMetadata1);
+    when(entityStore.get(any(), any(), any())).thenReturn(metalake1);
     doThrow(new GroupAlreadyExistsException("mock error")).when(manager).addGroup(any(), any());
     Response resp2 =
         target("/metalakes/metalake1/groups")
@@ -192,10 +211,17 @@ public class TestGroupOperations extends BaseOperationsTest {
   }
 
   @Test
-  public void testGetGroup() {
+  public void testGetGroup() throws IOException {
     Group group = buildGroup("group1");
 
     when(manager.getGroup(any(), any())).thenReturn(group);
+
+    // Mock metalake with in-use property
+    BaseMetalake metalake = mock(BaseMetalake.class);
+    PropertiesMetadata propertiesMetadata = mock(PropertiesMetadata.class);
+    when(propertiesMetadata.getOrDefault(any(), any())).thenReturn(true);
+    when(metalake.propertiesMetadata()).thenReturn(propertiesMetadata);
+    when(entityStore.get(any(), any(), any())).thenReturn(metalake);
 
     Response resp =
         target("/metalakes/metalake1/groups/group1")
@@ -213,7 +239,7 @@ public class TestGroupOperations extends BaseOperationsTest {
     Assertions.assertTrue(groupDTO.roles().isEmpty());
 
     // Test to throw NoSuchMetalakeException
-    doThrow(new NoSuchMetalakeException("mock error")).when(manager).getGroup(any(), any());
+    doThrow(new NoSuchEntityException("mock error")).when(entityStore).get(any(), any(), any());
     Response resp1 =
         target("/metalakes/metalake1/groups/group1")
             .request(MediaType.APPLICATION_JSON_TYPE)
@@ -227,6 +253,12 @@ public class TestGroupOperations extends BaseOperationsTest {
     Assertions.assertEquals(NoSuchMetalakeException.class.getSimpleName(), errorResponse.getType());
 
     // Test to throw NoSuchGroupException
+    Mockito.reset(entityStore);
+    BaseMetalake metalake1 = mock(BaseMetalake.class);
+    PropertiesMetadata propertiesMetadata1 = mock(PropertiesMetadata.class);
+    when(propertiesMetadata1.getOrDefault(any(), any())).thenReturn(true);
+    when(metalake1.propertiesMetadata()).thenReturn(propertiesMetadata1);
+    when(entityStore.get(any(), any(), any())).thenReturn(metalake1);
     doThrow(new NoSuchGroupException("mock error")).when(manager).getGroup(any(), any());
     Response resp2 =
         target("/metalakes/metalake1/groups/group1")
@@ -257,8 +289,15 @@ public class TestGroupOperations extends BaseOperationsTest {
   }
 
   @Test
-  public void testListGroupNames() {
+  public void testListGroupNames() throws IOException {
     when(manager.listGroupNames(any())).thenReturn(new String[] {"group"});
+
+    // Mock metalake with in-use property
+    BaseMetalake metalake = mock(BaseMetalake.class);
+    PropertiesMetadata propertiesMetadata = mock(PropertiesMetadata.class);
+    when(propertiesMetadata.getOrDefault(any(), any())).thenReturn(true);
+    when(metalake.propertiesMetadata()).thenReturn(propertiesMetadata);
+    when(entityStore.get(any(), any(), any())).thenReturn(metalake);
 
     Response resp =
         target("/metalakes/metalake1/groups/")
@@ -274,7 +313,7 @@ public class TestGroupOperations extends BaseOperationsTest {
     Assertions.assertEquals("group", listResponse.getNames()[0]);
 
     // Test to throw NoSuchMetalakeException
-    doThrow(new NoSuchMetalakeException("mock error")).when(manager).listGroupNames(any());
+    doThrow(new NoSuchEntityException("mock error")).when(entityStore).get(any(), any(), any());
     Response resp1 =
         target("/metalakes/metalake1/groups/")
             .request(MediaType.APPLICATION_JSON_TYPE)
@@ -288,6 +327,12 @@ public class TestGroupOperations extends BaseOperationsTest {
     Assertions.assertEquals(NoSuchMetalakeException.class.getSimpleName(), errorResponse.getType());
 
     // Test to throw internal RuntimeException
+    Mockito.reset(entityStore);
+    BaseMetalake metalake1 = mock(BaseMetalake.class);
+    PropertiesMetadata propertiesMetadata1 = mock(PropertiesMetadata.class);
+    when(propertiesMetadata1.getOrDefault(any(), any())).thenReturn(true);
+    when(metalake1.propertiesMetadata()).thenReturn(propertiesMetadata1);
+    when(entityStore.get(any(), any(), any())).thenReturn(metalake1);
     doThrow(new RuntimeException("mock error")).when(manager).listGroupNames(any());
     Response resp3 =
         target("/metalakes/metalake1/groups")
@@ -304,9 +349,16 @@ public class TestGroupOperations extends BaseOperationsTest {
   }
 
   @Test
-  public void testListGroups() {
+  public void testListGroups() throws IOException {
     Group group = buildGroup("group");
     when(manager.listGroups(any())).thenReturn(new Group[] {group});
+
+    // Mock metalake with in-use property
+    BaseMetalake metalake = mock(BaseMetalake.class);
+    PropertiesMetadata propertiesMetadata = mock(PropertiesMetadata.class);
+    when(propertiesMetadata.getOrDefault(any(), any())).thenReturn(true);
+    when(metalake.propertiesMetadata()).thenReturn(propertiesMetadata);
+    when(entityStore.get(any(), any(), any())).thenReturn(metalake);
 
     Response resp =
         target("/metalakes/metalake1/groups/")
@@ -324,7 +376,7 @@ public class TestGroupOperations extends BaseOperationsTest {
     Assertions.assertEquals(group.roles(), listResponse.getGroups()[0].roles());
 
     // Test to throw NoSuchMetalakeException
-    doThrow(new NoSuchMetalakeException("mock error")).when(manager).listGroups(any());
+    doThrow(new NoSuchEntityException("mock error")).when(entityStore).get(any(), any(), any());
     Response resp1 =
         target("/metalakes/metalake1/groups/")
             .queryParam("details", "true")
@@ -339,6 +391,12 @@ public class TestGroupOperations extends BaseOperationsTest {
     Assertions.assertEquals(NoSuchMetalakeException.class.getSimpleName(), errorResponse.getType());
 
     // Test to throw internal RuntimeException
+    Mockito.reset(entityStore);
+    BaseMetalake metalake1 = mock(BaseMetalake.class);
+    PropertiesMetadata propertiesMetadata1 = mock(PropertiesMetadata.class);
+    when(propertiesMetadata1.getOrDefault(any(), any())).thenReturn(true);
+    when(metalake1.propertiesMetadata()).thenReturn(propertiesMetadata1);
+    when(entityStore.get(any(), any(), any())).thenReturn(metalake1);
     doThrow(new RuntimeException("mock error")).when(manager).listGroups(any());
     Response resp3 =
         target("/metalakes/metalake1/groups")
@@ -356,7 +414,14 @@ public class TestGroupOperations extends BaseOperationsTest {
   }
 
   @Test
-  public void testRemoveGroup() {
+  public void testRemoveGroup() throws IOException {
+    // Mock metalake with in-use property
+    BaseMetalake metalake = mock(BaseMetalake.class);
+    PropertiesMetadata propertiesMetadata = mock(PropertiesMetadata.class);
+    when(propertiesMetadata.getOrDefault(any(), any())).thenReturn(true);
+    when(metalake.propertiesMetadata()).thenReturn(propertiesMetadata);
+    when(entityStore.get(any(), any(), any())).thenReturn(metalake);
+
     // Delete the metalake owner
     when(manager.removeGroup(any(), any())).thenReturn(true);
     Owner owner = mock(Owner.class);

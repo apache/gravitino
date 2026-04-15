@@ -59,6 +59,7 @@ public class MetadataObjectUtil {
           .put(MetadataObject.Type.POLICY, Entity.EntityType.POLICY)
           .put(MetadataObject.Type.JOB_TEMPLATE, Entity.EntityType.JOB_TEMPLATE)
           .put(MetadataObject.Type.JOB, Entity.EntityType.JOB)
+          .put(MetadataObject.Type.VIEW, Entity.EntityType.VIEW)
           .build();
 
   private MetadataObjectUtil() {}
@@ -109,7 +110,7 @@ public class MetadataObjectUtil {
 
     switch (metadataObject.type()) {
       case METALAKE:
-        return NameIdentifierUtil.ofMetalake(metalakeName);
+        return NameIdentifierUtil.ofMetalake(metadataObject.name());
       case ROLE:
         return AuthorizationUtils.ofRole(metalakeName, metadataObject.name());
       case TAG:
@@ -120,6 +121,7 @@ public class MetadataObjectUtil {
         return NameIdentifierUtil.ofJob(metalakeName, metadataObject.name());
       case JOB_TEMPLATE:
         return NameIdentifierUtil.ofJobTemplate(metalakeName, metadataObject.name());
+      case VIEW:
       case CATALOG:
       case SCHEMA:
       case TABLE:
@@ -197,6 +199,11 @@ public class MetadataObjectUtil {
       case MODEL:
         NameIdentifierUtil.checkModel(identifier);
         check(env.modelDispatcher().modelExists(identifier), exceptionToThrowSupplier);
+        break;
+
+      case VIEW:
+        NameIdentifierUtil.checkView(identifier);
+        check(env.viewDispatcher().viewExists(identifier), exceptionToThrowSupplier);
         break;
 
       case ROLE:

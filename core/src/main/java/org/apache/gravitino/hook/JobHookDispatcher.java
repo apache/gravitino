@@ -24,7 +24,6 @@ import java.util.Map;
 import java.util.Optional;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.GravitinoEnv;
-import org.apache.gravitino.authorization.AuthorizationUtils;
 import org.apache.gravitino.authorization.Owner;
 import org.apache.gravitino.authorization.OwnerDispatcher;
 import org.apache.gravitino.exceptions.InUseException;
@@ -53,9 +52,6 @@ public class JobHookDispatcher implements JobOperationDispatcher {
   @Override
   public void registerJobTemplate(String metalake, JobTemplateEntity jobTemplateEntity)
       throws JobTemplateAlreadyExistsException {
-    // Check whether the current user exists or not
-    AuthorizationUtils.checkCurrentUser(metalake, PrincipalUtils.getCurrentUserName());
-
     jobOperationDispatcher.registerJobTemplate(metalake, jobTemplateEntity);
 
     // Set the creator as the owner of the job template.
@@ -102,9 +98,6 @@ public class JobHookDispatcher implements JobOperationDispatcher {
   @Override
   public JobEntity runJob(String metalake, String jobTemplateName, Map<String, String> jobConf)
       throws NoSuchJobTemplateException {
-    // Check whether the current user exists or not
-    AuthorizationUtils.checkCurrentUser(metalake, PrincipalUtils.getCurrentUserName());
-
     JobEntity jobEntity = jobOperationDispatcher.runJob(metalake, jobTemplateName, jobConf);
 
     // Set the creator as the owner of the job.

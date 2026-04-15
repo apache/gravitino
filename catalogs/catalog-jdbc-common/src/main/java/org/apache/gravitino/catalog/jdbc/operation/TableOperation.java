@@ -32,6 +32,7 @@ import org.apache.gravitino.exceptions.NoSuchTableException;
 import org.apache.gravitino.exceptions.TableAlreadyExistsException;
 import org.apache.gravitino.rel.TableChange;
 import org.apache.gravitino.rel.expressions.distributions.Distribution;
+import org.apache.gravitino.rel.expressions.sorts.SortOrder;
 import org.apache.gravitino.rel.expressions.transforms.Transform;
 import org.apache.gravitino.rel.indexes.Index;
 
@@ -72,6 +73,32 @@ public interface TableOperation {
       Transform[] partitioning,
       Distribution distribution,
       Index[] indexes)
+      throws TableAlreadyExistsException;
+
+  /**
+   * Create a table with sort orders.
+   *
+   * @param databaseName database name of the table
+   * @param tableName name of the table
+   * @param columns columns of the table
+   * @param comment comment of the table
+   * @param properties properties of the table
+   * @param partitioning partitioning of the table
+   * @param distribution distribution information of the table
+   * @param indexes indexes of the table
+   * @param sortOrders sort orders of the table
+   * @throws TableAlreadyExistsException if the table already exists
+   */
+  void create(
+      String databaseName,
+      String tableName,
+      JdbcColumn[] columns,
+      String comment,
+      Map<String, String> properties,
+      Transform[] partitioning,
+      Distribution distribution,
+      Index[] indexes,
+      SortOrder[] sortOrders)
       throws TableAlreadyExistsException;
 
   /**

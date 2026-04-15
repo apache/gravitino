@@ -18,7 +18,7 @@
  */
 package org.apache.gravitino.catalog.lakehouse.generic;
 
-import java.util.Objects;
+import com.google.common.base.Preconditions;
 import org.apache.gravitino.connector.capability.Capability;
 import org.apache.gravitino.connector.capability.CapabilityResult;
 
@@ -26,8 +26,8 @@ public class GenericCatalogCapability implements Capability {
 
   @Override
   public CapabilityResult managedStorage(Scope scope) {
-    if (Objects.requireNonNull(scope) == Scope.TABLE
-        || Objects.requireNonNull(scope) == Scope.SCHEMA) {
+    Preconditions.checkArgument(scope != null, "Scope cannot be null.");
+    if (scope == Scope.TABLE || scope == Scope.SCHEMA) {
       return CapabilityResult.SUPPORTED;
     }
 

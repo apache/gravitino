@@ -27,6 +27,7 @@ import java.util.Optional;
 import lombok.Getter;
 import lombok.Setter;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.gravitino.catalog.hadoop.fs.FileSystemUtils;
 import org.apache.gravitino.catalog.lakehouse.iceberg.IcebergCatalogBackend;
 import org.apache.gravitino.iceberg.common.IcebergConfig;
 import org.apache.gravitino.iceberg.common.cache.SupportsMetadataLocation;
@@ -77,6 +78,7 @@ public class IcebergCatalogWrapper implements AutoCloseable {
   private String catalogUri = null;
   private Map<String, String> catalogPropertiesMap;
   private TableMetadataCache metadataCache;
+  private Configuration configuration;
 
   public IcebergCatalogWrapper(IcebergConfig icebergConfig) {
     this.icebergConfig = icebergConfig;
@@ -100,6 +102,7 @@ public class IcebergCatalogWrapper implements AutoCloseable {
 
     this.metadataCache = loadTableMetadataCache(icebergConfig, catalog);
     this.catalogPropertiesMap = icebergConfig.getIcebergCatalogProperties();
+    this.configuration = FileSystemUtils.createConfiguration(null, catalogPropertiesMap);
   }
 
   private void validateNamespace(Optional<Namespace> namespace) {
@@ -162,8 +165,6 @@ public class IcebergCatalogWrapper implements AutoCloseable {
    * reinitialize it again.
    */
   public void reloadHadoopConf() {
-    Configuration configuration = new Configuration();
-    this.catalogPropertiesMap.forEach(configuration::set);
     UserGroupInformation.setConfiguration(configuration);
   }
 
@@ -201,6 +202,23 @@ public class IcebergCatalogWrapper implements AutoCloseable {
       metadataCache.updateTableMetadata(tableIdentifier, loadTableResponse.tableMetadata());
     }
     return loadTableResponse;
+  }
+
+  /**
+   * Retrieves the metadata file location for the specified table without loading full table
+   * metadata. This is an optional fast path for catalogs that implement {@link
+   * SupportsMetadataLocation}.
+   *
+   * @param tableIdentifier the table identifier
+   * @return an Optional containing the metadata file location, or empty if the catalog doesn't
+   *     support this operation
+   */
+  public Optional<String> getTableMetadataLocation(TableIdentifier tableIdentifier) {
+    if (catalog instanceof SupportsMetadataLocation) {
+      return Optional.ofNullable(
+          ((SupportsMetadataLocation) catalog).metadataLocation(tableIdentifier));
+    }
+    return Optional.empty();
   }
 
   public boolean tableExists(TableIdentifier tableIdentifier) {

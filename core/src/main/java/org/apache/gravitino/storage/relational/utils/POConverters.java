@@ -20,6 +20,7 @@
 package org.apache.gravitino.storage.relational.utils;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
+import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
 import java.time.Instant;
@@ -820,7 +821,7 @@ public class POConverters {
       return PolicyPO.builder()
           .withPolicyId(newPolicy.id())
           .withPolicyName(newPolicy.name())
-          .withPolicyType(newPolicy.policyType().name())
+          .withPolicyType(newPolicy.policyType().policyType())
           .withMetalakeId(oldPolicyPO.getMetalakeId())
           .withAuditInfo(JsonUtils.anyFieldMapper().writeValueAsString(newPolicy.auditInfo()))
           .withCurrentVersion(currentVersion)
@@ -1305,6 +1306,11 @@ public class POConverters {
               .readValue(securableObjectPO.getPrivilegeConditions(), List.class);
 
       List<Privilege> privileges = Lists.newArrayList();
+      Preconditions.checkArgument(
+          privilegeNames.size() == privilegeConditions.size(),
+          "Privilege names and conditions must have the same size, but got %s names and %s conditions",
+          privilegeNames.size(),
+          privilegeConditions.size());
       for (int index = 0; index < privilegeNames.size(); index++) {
         if (Privilege.Condition.ALLOW.name().equals(privilegeConditions.get(index))) {
           privileges.add(Privileges.allow(privilegeNames.get(index)));
@@ -1404,6 +1410,10 @@ public class POConverters {
     }
   }
 
+  public static List<TagEntity> fromTagPOs(List<TagPO> tagPOs, Namespace namespace) {
+    return tagPOs.stream().map(po -> fromTagPO(po, namespace)).collect(Collectors.toList());
+  }
+
   public static TagPO initializeTagPOWithVersion(TagEntity tagEntity, TagPO.Builder builder) {
     try {
       return builder
@@ -1487,6 +1497,10 @@ public class POConverters {
     }
   }
 
+  public static List<PolicyEntity> fromPolicyPOs(List<PolicyPO> policyPOs, Namespace namespace) {
+    return policyPOs.stream().map(po -> fromPolicyPO(po, namespace)).collect(Collectors.toList());
+  }
+
   public static PolicyPO initializePolicyPOWithVersion(
       PolicyEntity policyEntity, PolicyPO.Builder builder) {
     try {
@@ -1504,7 +1518,7 @@ public class POConverters {
       return builder
           .withPolicyId(policyEntity.id())
           .withPolicyName(policyEntity.name())
-          .withPolicyType(policyEntity.policyType().name())
+          .withPolicyType(policyEntity.policyType().policyType())
           .withAuditInfo(JsonUtils.anyFieldMapper().writeValueAsString(policyEntity.auditInfo()))
           .withCurrentVersion(INIT_VERSION)
           .withLastVersion(INIT_VERSION)
@@ -1583,6 +1597,10 @@ public class POConverters {
     } catch (JsonProcessingException e) {
       throw new RuntimeException("Failed to deserialize json object:", e);
     }
+  }
+
+  public static List<ModelEntity> fromModelPOs(List<ModelPO> modelPOs, Namespace namespace) {
+    return modelPOs.stream().map(po -> fromModelPO(po, namespace)).collect(Collectors.toList());
   }
 
   public static ModelPO initializeModelPO(ModelEntity modelEntity, ModelPO.Builder builder) {
@@ -1696,23 +1714,32 @@ public class POConverters {
   }
 
   /**
-   * Construct a new ModelVersionAliasRelPO object with the given alias.
+   * Construct a list of new {@link ModelVersionAliasRelPO} objects for the updated model version,
+   * one entry per alias in the new model version.
    *
-   * @param oldModelVersionAliasRelPOs The old ModelVersionAliasRelPOs object
+   * @param oldModelVersionAliasRelPOs The old ModelVersionAliasRelPOs list
    * @param newModelVersion The new {@link ModelVersionEntity} object
-   * @return The new ModelVersionAliasRelPO object
+   * @param modelId The DB ID of the model entity
+   * @return A list of new {@link ModelVersionAliasRelPO} objects, one per alias
    */
   public static List<ModelVersionAliasRelPO> updateModelVersionAliasRelPO(
-      List<ModelVersionAliasRelPO> oldModelVersionAliasRelPOs, ModelVersionEntity newModelVersion) {
+      List<ModelVersionAliasRelPO> oldModelVersionAliasRelPOs,
+      ModelVersionEntity newModelVersion,
+      Long modelId) {
 
     if (!oldModelVersionAliasRelPOs.isEmpty()) {
       ModelVersionAliasRelPO oldModelVersionAliasRelPO = oldModelVersionAliasRelPOs.get(0);
       return newModelVersion.aliases().stream()
-          .map(alias -> createAliasRelPO(oldModelVersionAliasRelPO, alias))
+          .map(
+              alias ->
+                  createAliasRelPO(
+                      oldModelVersionAliasRelPO.getModelId(),
+                      oldModelVersionAliasRelPO.getModelVersion(),
+                      alias))
           .collect(Collectors.toList());
     } else {
       return newModelVersion.aliases().stream()
-          .map(alias -> createAliasRelPO(newModelVersion, alias))
+          .map(alias -> createAliasRelPO(modelId, newModelVersion.version(), alias))
           .collect(Collectors.toList());
     }
   }
@@ -1763,21 +1790,11 @@ public class POConverters {
         .collect(Collectors.toList());
   }
 
-  private static ModelVersionAliasRelPO createAliasRelPO(
-      ModelVersionAliasRelPO oldModelVersionAliasRelPO, String alias) {
+  private static ModelVersionAliasRelPO createAliasRelPO(Long modelId, int version, String alias) {
     return ModelVersionAliasRelPO.builder()
-        .withModelVersion(oldModelVersionAliasRelPO.getModelVersion())
+        .withModelVersion(version)
         .withModelVersionAlias(alias)
-        .withModelId(oldModelVersionAliasRelPO.getModelId())
-        .withDeletedAt(DEFAULT_DELETED_AT)
-        .build();
-  }
-
-  private static ModelVersionAliasRelPO createAliasRelPO(ModelVersionEntity entity, String alias) {
-    return ModelVersionAliasRelPO.builder()
-        .withModelVersion(entity.version())
-        .withModelVersionAlias(alias)
-        .withModelId(entity.id())
+        .withModelId(modelId)
         .withDeletedAt(DEFAULT_DELETED_AT)
         .build();
   }

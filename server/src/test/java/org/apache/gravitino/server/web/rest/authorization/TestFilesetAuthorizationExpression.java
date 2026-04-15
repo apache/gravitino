@@ -83,7 +83,7 @@ public class TestFilesetAuthorizationExpression {
   public void testLoadFileset() throws OgnlException, NoSuchFieldException, IllegalAccessException {
     Field loadFilesetAuthorizationExpressionField =
         AuthorizationExpressionConstants.class.getDeclaredField(
-            "loadFilesetAuthorizationExpression");
+            "LOAD_FILESET_AUTHORIZATION_EXPRESSION");
     loadFilesetAuthorizationExpressionField.setAccessible(true);
     String loadFilesetAuthorizationExpression =
         (String) loadFilesetAuthorizationExpressionField.get(null);

@@ -47,6 +47,7 @@ dependencies {
   testImplementation(project(":server"))
   testImplementation(project(":server-common"))
 
+  testImplementation(libs.awaitility)
   testImplementation(libs.bundles.jersey)
   testImplementation(libs.bundles.jwt)
   testImplementation(libs.commons.lang3)
@@ -69,6 +70,12 @@ tasks.build {
 }
 
 tasks.test {
+  javaLauncher.set(
+    javaToolchains.launcherFor {
+      languageVersion.set(JavaLanguageVersion.of(17))
+    }
+  )
+
   val skipITs = project.hasProperty("skipITs")
   if (skipITs) {
     exclude("**/integration/test/**")
@@ -89,7 +96,7 @@ tasks.javadoc {
 
   classpath = configurations["compileClasspath"] +
     project(":api").configurations["runtimeClasspath"] +
-    project(":common").configurations["runtimeClasspath"]
+    project(":common").configurations["compileClasspath"]
 }
 
 tasks.clean {

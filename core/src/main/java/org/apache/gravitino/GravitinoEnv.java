@@ -19,7 +19,6 @@
 package org.apache.gravitino;
 
 import com.google.common.base.Preconditions;
-import java.lang.reflect.Proxy;
 import org.apache.gravitino.audit.AuditLogManager;
 import org.apache.gravitino.authorization.AccessControlDispatcher;
 import org.apache.gravitino.authorization.AccessControlManager;
@@ -35,10 +34,12 @@ import org.apache.gravitino.catalog.CatalogNormalizeDispatcher;
 import org.apache.gravitino.catalog.FilesetDispatcher;
 import org.apache.gravitino.catalog.FilesetNormalizeDispatcher;
 import org.apache.gravitino.catalog.FilesetOperationDispatcher;
+import org.apache.gravitino.catalog.FunctionDispatcher;
+import org.apache.gravitino.catalog.FunctionNormalizeDispatcher;
+import org.apache.gravitino.catalog.FunctionOperationDispatcher;
 import org.apache.gravitino.catalog.ModelDispatcher;
 import org.apache.gravitino.catalog.ModelNormalizeDispatcher;
 import org.apache.gravitino.catalog.ModelOperationDispatcher;
-import org.apache.gravitino.catalog.OperationDispatcherInterceptor;
 import org.apache.gravitino.catalog.PartitionDispatcher;
 import org.apache.gravitino.catalog.PartitionNormalizeDispatcher;
 import org.apache.gravitino.catalog.PartitionOperationDispatcher;
@@ -51,6 +52,8 @@ import org.apache.gravitino.catalog.TableOperationDispatcher;
 import org.apache.gravitino.catalog.TopicDispatcher;
 import org.apache.gravitino.catalog.TopicNormalizeDispatcher;
 import org.apache.gravitino.catalog.TopicOperationDispatcher;
+import org.apache.gravitino.catalog.ViewDispatcher;
+import org.apache.gravitino.catalog.ViewOperationDispatcher;
 import org.apache.gravitino.credential.CredentialOperationDispatcher;
 import org.apache.gravitino.hook.AccessControlHookDispatcher;
 import org.apache.gravitino.hook.CatalogHookDispatcher;
@@ -63,13 +66,16 @@ import org.apache.gravitino.hook.SchemaHookDispatcher;
 import org.apache.gravitino.hook.TableHookDispatcher;
 import org.apache.gravitino.hook.TagHookDispatcher;
 import org.apache.gravitino.hook.TopicHookDispatcher;
+import org.apache.gravitino.job.BuiltInJobTemplateEventListener;
 import org.apache.gravitino.job.JobManager;
 import org.apache.gravitino.job.JobOperationDispatcher;
+import org.apache.gravitino.job.JobTemplateValidationDispatcher;
 import org.apache.gravitino.listener.AccessControlEventDispatcher;
 import org.apache.gravitino.listener.CatalogEventDispatcher;
 import org.apache.gravitino.listener.EventBus;
 import org.apache.gravitino.listener.EventListenerManager;
 import org.apache.gravitino.listener.FilesetEventDispatcher;
+import org.apache.gravitino.listener.FunctionEventDispatcher;
 import org.apache.gravitino.listener.JobEventDispatcher;
 import org.apache.gravitino.listener.MetalakeEventDispatcher;
 import org.apache.gravitino.listener.ModelEventDispatcher;
@@ -127,6 +133,10 @@ public class GravitinoEnv {
   private TopicDispatcher topicDispatcher;
 
   private ModelDispatcher modelDispatcher;
+
+  private FunctionDispatcher functionDispatcher;
+
+  private ViewDispatcher viewDispatcher;
 
   private MetalakeDispatcher metalakeDispatcher;
 
@@ -256,7 +266,25 @@ public class GravitinoEnv {
   }
 
   /**
-   * Get the PartitionDispatcher associated with the Gravitino environment.
+   * Get the FunctionDispatcher associated with the Gravitino environment.
+   *
+   * @return The FunctionDispatcher instance.
+   */
+  public FunctionDispatcher functionDispatcher() {
+    return functionDispatcher;
+  }
+
+  /**
+   * Get the ViewDispatcher associated with the Gravitino environment.
+   *
+   * @return The ViewDispatcher instance.
+   */
+  public ViewDispatcher viewDispatcher() {
+    return viewDispatcher;
+  }
+
+  /**
+   * * Get the PartitionDispatcher associated with the Gravitino environment.
    *
    * @return The PartitionDispatcher instance.
    */
@@ -428,6 +456,10 @@ public class GravitinoEnv {
     return statisticDispatcher;
   }
 
+  public boolean cacheEnabled() {
+    return config == null || config.get(Configs.CACHE_ENABLED);
+  }
+
   public void start() {
     metricsSystem.start();
     eventListenerManager.start();
@@ -539,28 +571,14 @@ public class GravitinoEnv {
 
     SchemaOperationDispatcher schemaOperationDispatcher =
         new SchemaOperationDispatcher(catalogManager, entityStore, idGenerator);
-    SchemaDispatcher schemaDispatcherProxy =
-        (SchemaDispatcher)
-            Proxy.newProxyInstance(
-                SchemaDispatcher.class.getClassLoader(),
-                new Class[] {SchemaDispatcher.class},
-                new OperationDispatcherInterceptor(
-                    schemaOperationDispatcher, catalogManager, entityStore));
-    SchemaHookDispatcher schemaHookDispatcher = new SchemaHookDispatcher(schemaDispatcherProxy);
+    SchemaHookDispatcher schemaHookDispatcher = new SchemaHookDispatcher(schemaOperationDispatcher);
     SchemaNormalizeDispatcher schemaNormalizeDispatcher =
         new SchemaNormalizeDispatcher(schemaHookDispatcher, catalogManager);
     this.schemaDispatcher = new SchemaEventDispatcher(eventBus, schemaNormalizeDispatcher);
 
     TableOperationDispatcher tableOperationDispatcher =
         new TableOperationDispatcher(catalogManager, entityStore, idGenerator);
-    TableDispatcher tableDispatcherProxy =
-        (TableDispatcher)
-            Proxy.newProxyInstance(
-                TableDispatcher.class.getClassLoader(),
-                new Class[] {TableDispatcher.class},
-                new OperationDispatcherInterceptor(
-                    tableOperationDispatcher, catalogManager, entityStore));
-    TableHookDispatcher tableHookDispatcher = new TableHookDispatcher(tableDispatcherProxy);
+    TableHookDispatcher tableHookDispatcher = new TableHookDispatcher(tableOperationDispatcher);
     TableNormalizeDispatcher tableNormalizeDispatcher =
         new TableNormalizeDispatcher(tableHookDispatcher, catalogManager);
     this.tableDispatcher = new TableEventDispatcher(eventBus, tableNormalizeDispatcher);
@@ -569,58 +587,48 @@ public class GravitinoEnv {
     //  partition doesn't have ownership, so we don't need it now.
     PartitionOperationDispatcher partitionOperationDispatcher =
         new PartitionOperationDispatcher(catalogManager, entityStore, idGenerator);
-    PartitionDispatcher partitionDispatcherProxy =
-        (PartitionDispatcher)
-            Proxy.newProxyInstance(
-                PartitionDispatcher.class.getClassLoader(),
-                new Class[] {PartitionDispatcher.class},
-                new OperationDispatcherInterceptor(
-                    partitionOperationDispatcher, catalogManager, entityStore));
     PartitionNormalizeDispatcher partitionNormalizeDispatcher =
-        new PartitionNormalizeDispatcher(partitionDispatcherProxy, catalogManager);
+        new PartitionNormalizeDispatcher(partitionOperationDispatcher, catalogManager);
     this.partitionDispatcher = new PartitionEventDispatcher(eventBus, partitionNormalizeDispatcher);
 
     FilesetOperationDispatcher filesetOperationDispatcher =
         new FilesetOperationDispatcher(catalogManager, entityStore, idGenerator);
-    FilesetDispatcher filesetDispatcherProxy =
-        (FilesetDispatcher)
-            Proxy.newProxyInstance(
-                FilesetDispatcher.class.getClassLoader(),
-                new Class[] {FilesetDispatcher.class},
-                new OperationDispatcherInterceptor(
-                    filesetOperationDispatcher, catalogManager, entityStore));
-    FilesetHookDispatcher filesetHookDispatcher = new FilesetHookDispatcher(filesetDispatcherProxy);
+    FilesetHookDispatcher filesetHookDispatcher =
+        new FilesetHookDispatcher(filesetOperationDispatcher);
     FilesetNormalizeDispatcher filesetNormalizeDispatcher =
         new FilesetNormalizeDispatcher(filesetHookDispatcher, catalogManager);
     this.filesetDispatcher = new FilesetEventDispatcher(eventBus, filesetNormalizeDispatcher);
 
     TopicOperationDispatcher topicOperationDispatcher =
         new TopicOperationDispatcher(catalogManager, entityStore, idGenerator);
-    TopicDispatcher topicDispatcherProxy =
-        (TopicDispatcher)
-            Proxy.newProxyInstance(
-                TopicDispatcher.class.getClassLoader(),
-                new Class[] {TopicDispatcher.class},
-                new OperationDispatcherInterceptor(
-                    topicOperationDispatcher, catalogManager, entityStore));
-    TopicHookDispatcher topicHookDispatcher = new TopicHookDispatcher(topicDispatcherProxy);
+    TopicHookDispatcher topicHookDispatcher = new TopicHookDispatcher(topicOperationDispatcher);
     TopicNormalizeDispatcher topicNormalizeDispatcher =
         new TopicNormalizeDispatcher(topicHookDispatcher, catalogManager);
     this.topicDispatcher = new TopicEventDispatcher(eventBus, topicNormalizeDispatcher);
 
     ModelOperationDispatcher modelOperationDispatcher =
         new ModelOperationDispatcher(catalogManager, entityStore, idGenerator);
-    ModelDispatcher modelDispatcherProxy =
-        (ModelDispatcher)
-            Proxy.newProxyInstance(
-                ModelDispatcher.class.getClassLoader(),
-                new Class[] {ModelDispatcher.class},
-                new OperationDispatcherInterceptor(
-                    modelOperationDispatcher, catalogManager, entityStore));
-    ModelHookDispatcher modelHookDispatcher = new ModelHookDispatcher(modelDispatcherProxy);
+    ModelHookDispatcher modelHookDispatcher = new ModelHookDispatcher(modelOperationDispatcher);
     ModelNormalizeDispatcher modelNormalizeDispatcher =
         new ModelNormalizeDispatcher(modelHookDispatcher, catalogManager);
     this.modelDispatcher = new ModelEventDispatcher(eventBus, modelNormalizeDispatcher);
+
+    // TODO: Add FunctionHookDispatcher when needed
+    // The operation chain is:
+    // FunctionEventDispatcher -> FunctionNormalizeDispatcher -> FunctionOperationDispatcher
+    FunctionOperationDispatcher functionOperationDispatcher =
+        new FunctionOperationDispatcher(
+            catalogManager, schemaOperationDispatcher, entityStore, idGenerator);
+    FunctionNormalizeDispatcher functionNormalizeDispatcher =
+        new FunctionNormalizeDispatcher(functionOperationDispatcher, catalogManager);
+    this.functionDispatcher = new FunctionEventDispatcher(eventBus, functionNormalizeDispatcher);
+
+    // TODO: Add ViewHookDispatcher and ViewEventDispatcher when needed for view-specific hooks
+    //  and event handling.
+    ViewOperationDispatcher viewOperationDispatcher =
+        new ViewOperationDispatcher(catalogManager, entityStore, idGenerator);
+    this.viewDispatcher = viewOperationDispatcher;
+
     this.statisticDispatcher =
         new StatisticEventDispatcher(
             eventBus, new StatisticManager(entityStore, idGenerator, config));
@@ -655,8 +663,16 @@ public class GravitinoEnv {
         new PolicyEventDispatcher(eventBus, new PolicyManager(idGenerator, entityStore));
     this.policyDispatcher = new PolicyHookDispatcher(policyEventDispatcher);
 
+    JobManager jobManager = new JobManager(config, entityStore, idGenerator);
+    JobTemplateValidationDispatcher validationDispatcher =
+        new JobTemplateValidationDispatcher(jobManager);
     this.jobOperationDispatcher =
-        new JobEventDispatcher(
-            eventBus, new JobHookDispatcher(new JobManager(config, entityStore, idGenerator)));
+        new JobEventDispatcher(eventBus, new JobHookDispatcher(validationDispatcher));
+
+    // Register built-in job template event listener to automatically register templates
+    // when metalakes are created
+    BuiltInJobTemplateEventListener builtInJobTemplateListener =
+        new BuiltInJobTemplateEventListener(jobManager, entityStore, idGenerator);
+    eventListenerManager.addEventListener("builtin-job-template", builtInJobTemplateListener);
   }
 }

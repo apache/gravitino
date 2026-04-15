@@ -17,7 +17,7 @@ jobs:
   start-runner:
     name: JDK${{ inputs.java-version }}
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 60
     env:
       PLATFORM: ${{ inputs.architecture }}
     steps:
@@ -30,7 +30,7 @@ jobs:
           cache: 'gradle'
 
       - name: Set up QEMU
-        uses: docker/setup-qemu-action@v3
+        uses: docker/setup-qemu-action@ce360397dd3f832beb865e1373c09c0e9f86d70a # v4.0.0
 
       - name: Check required command
         run: |
@@ -52,7 +52,7 @@ jobs:
           ./gradlew -PskipTests -PtestMode=deploy -PskipDockerTests=false :flink-connector:flink:test --tests "org.apache.gravitino.flink.connector.integration.test.**"
 
       - name: Upload integrate tests reports
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         if: ${{ (failure() && steps.integrationTest.outcome == 'failure') || contains(github.event.pull_request.labels.*.name, 'upload log') }}
         with:
           name: flink-connector-integrate-test-reports-${{ inputs.java-version }}

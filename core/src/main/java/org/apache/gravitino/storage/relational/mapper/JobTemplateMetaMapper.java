@@ -78,5 +78,18 @@ public interface JobTemplateMetaMapper {
       @Param("metalakeId") long metalakeId, @Param("jobTemplateName") String jobTemplateName);
 
   @SelectProvider(type = JobTemplateMetaSQLProviderFactory.class, method = "selectJobTemplateById")
-  JobTemplatePO selectJobTemplateById(Long jobTemplateId);
+  JobTemplatePO selectJobTemplateById(@Param("jobTemplateId") Long jobTemplateId);
+
+  @SelectProvider(
+      type = JobTemplateMetaSQLProviderFactory.class,
+      method = "listJobTemplatePOsByJobTemplateIds")
+  List<JobTemplatePO> listJobTemplatePOsByJobTemplateIds(
+      @Param("jobTemplateIds") List<Long> jobTemplateIds);
+
+  @SelectProvider(
+      type = JobTemplateMetaSQLProviderFactory.class,
+      method = "batchSelectJobTemplateByIdentifier")
+  List<JobTemplatePO> batchSelectJobTemplateByIdentifier(
+      @Param("metalakeName") String metalakeName,
+      @Param("jobTemplateNames") List<String> jobTemplateNames);
 }

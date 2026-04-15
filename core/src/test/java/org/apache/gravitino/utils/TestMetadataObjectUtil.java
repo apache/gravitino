@@ -73,6 +73,11 @@ public class TestMetadataObjectUtil {
         Entity.EntityType.MODEL,
         MetadataObjectUtil.toEntityType(
             MetadataObjects.of("catalog.schema", "model", MetadataObject.Type.MODEL)));
+
+    Assertions.assertEquals(
+        Entity.EntityType.VIEW,
+        MetadataObjectUtil.toEntityType(
+            MetadataObjects.of("catalog.schema", "view", MetadataObject.Type.VIEW)));
   }
 
   @Test
@@ -91,6 +96,13 @@ public class TestMetadataObjectUtil {
         NameIdentifier.of("metalake"),
         MetadataObjectUtil.toEntityIdent(
             "metalake", MetadataObjects.of(null, "metalake", MetadataObject.Type.METALAKE)));
+
+    // Verify that toEntityIdent uses the metadata object's name, not the context metalakeName
+    Assertions.assertEquals(
+        NameIdentifier.of("target_metalake"),
+        MetadataObjectUtil.toEntityIdent(
+            "request_metalake",
+            MetadataObjects.of(null, "target_metalake", MetadataObject.Type.METALAKE)));
 
     Assertions.assertEquals(
         NameIdentifier.of("metalake", "catalog"),
@@ -128,5 +140,10 @@ public class TestMetadataObjectUtil {
         MetadataObjectUtil.toEntityIdent(
             "metalake",
             MetadataObjects.of("catalog.schema.table", "column", MetadataObject.Type.COLUMN)));
+
+    Assertions.assertEquals(
+        NameIdentifier.of("metalake", "catalog", "schema", "view"),
+        MetadataObjectUtil.toEntityIdent(
+            "metalake", MetadataObjects.of("catalog.schema", "view", MetadataObject.Type.VIEW)));
   }
 }

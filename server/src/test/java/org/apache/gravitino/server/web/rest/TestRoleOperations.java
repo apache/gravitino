@@ -41,6 +41,7 @@ import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 import org.apache.commons.lang3.reflect.FieldUtils;
 import org.apache.gravitino.Config;
+import org.apache.gravitino.EntityStore;
 import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.authorization.AccessControlManager;
@@ -53,6 +54,7 @@ import org.apache.gravitino.catalog.FilesetDispatcher;
 import org.apache.gravitino.catalog.SchemaDispatcher;
 import org.apache.gravitino.catalog.TableDispatcher;
 import org.apache.gravitino.catalog.TopicDispatcher;
+import org.apache.gravitino.connector.PropertiesMetadata;
 import org.apache.gravitino.dto.authorization.PrivilegeDTO;
 import org.apache.gravitino.dto.authorization.RoleDTO;
 import org.apache.gravitino.dto.authorization.SecurableObjectDTO;
@@ -66,12 +68,14 @@ import org.apache.gravitino.dto.util.DTOConverters;
 import org.apache.gravitino.exceptions.IllegalNamespaceException;
 import org.apache.gravitino.exceptions.IllegalPrivilegeException;
 import org.apache.gravitino.exceptions.NoSuchCatalogException;
+import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.exceptions.NoSuchMetadataObjectException;
 import org.apache.gravitino.exceptions.NoSuchMetalakeException;
 import org.apache.gravitino.exceptions.NoSuchRoleException;
 import org.apache.gravitino.exceptions.RoleAlreadyExistsException;
 import org.apache.gravitino.lock.LockManager;
 import org.apache.gravitino.meta.AuditInfo;
+import org.apache.gravitino.meta.BaseMetalake;
 import org.apache.gravitino.meta.RoleEntity;
 import org.apache.gravitino.metalake.MetalakeDispatcher;
 import org.apache.gravitino.rest.RESTUtils;
@@ -93,6 +97,7 @@ public class TestRoleOperations extends BaseOperationsTest {
   private static final TableDispatcher tableDispatcher = mock(TableDispatcher.class);
   private static final TopicDispatcher topicDispatcher = mock(TopicDispatcher.class);
   private static final FilesetDispatcher filesetDispatcher = mock(FilesetDispatcher.class);
+  private static final EntityStore entityStore = mock(EntityStore.class);
 
   private static class MockServletRequestFactory extends ServletRequestFactoryBase {
     @Override
@@ -118,6 +123,7 @@ public class TestRoleOperations extends BaseOperationsTest {
     FieldUtils.writeField(GravitinoEnv.getInstance(), "tableDispatcher", tableDispatcher, true);
     FieldUtils.writeField(GravitinoEnv.getInstance(), "topicDispatcher", topicDispatcher, true);
     FieldUtils.writeField(GravitinoEnv.getInstance(), "filesetDispatcher", filesetDispatcher, true);
+    FieldUtils.writeField(GravitinoEnv.getInstance(), "entityStore", entityStore, true);
   }
 
   @Override
@@ -143,7 +149,7 @@ public class TestRoleOperations extends BaseOperationsTest {
   }
 
   @Test
-  public void testCreateRole() throws IllegalAccessException, NoSuchFieldException {
+  public void testCreateRole() throws IllegalAccessException, NoSuchFieldException, IOException {
     SecurableObject securableObject =
         SecurableObjects.ofCatalog("catalog", Lists.newArrayList(Privileges.UseCatalog.allow()));
     SecurableObject anotherSecurableObject =
@@ -161,6 +167,13 @@ public class TestRoleOperations extends BaseOperationsTest {
 
     when(manager.createRole(any(), any(), any(), any())).thenReturn(role);
     when(catalogDispatcher.catalogExists(any())).thenReturn(true);
+
+    // Mock metalake with in-use property
+    BaseMetalake metalake = mock(BaseMetalake.class);
+    PropertiesMetadata propertiesMetadata = mock(PropertiesMetadata.class);
+    when(propertiesMetadata.getOrDefault(any(), any())).thenReturn(true);
+    when(metalake.propertiesMetadata()).thenReturn(propertiesMetadata);
+    when(entityStore.get(any(), any(), any())).thenReturn(metalake);
 
     // Test with IllegalRequest
     RoleCreateRequest illegalRequest = new RoleCreateRequest("role", Collections.emptyMap(), null);
@@ -265,9 +278,7 @@ public class TestRoleOperations extends BaseOperationsTest {
 
     // Test to throw NoSuchMetalakeException
     when(catalogDispatcher.catalogExists(any())).thenReturn(true);
-    doThrow(new NoSuchMetalakeException("mock error"))
-        .when(manager)
-        .createRole(any(), any(), any(), any());
+    doThrow(new NoSuchEntityException("mock error")).when(entityStore).get(any(), any(), any());
     Response resp1 =
         target("/metalakes/metalake1/roles")
             .request(MediaType.APPLICATION_JSON_TYPE)
@@ -282,6 +293,12 @@ public class TestRoleOperations extends BaseOperationsTest {
     Assertions.assertEquals(NoSuchMetalakeException.class.getSimpleName(), errorResponse.getType());
 
     // Test to throw RoleAlreadyExistsException
+    Mockito.reset(entityStore);
+    BaseMetalake metalake1 = mock(BaseMetalake.class);
+    PropertiesMetadata propertiesMetadata1 = mock(PropertiesMetadata.class);
+    when(propertiesMetadata1.getOrDefault(any(), any())).thenReturn(true);
+    when(metalake1.propertiesMetadata()).thenReturn(propertiesMetadata1);
+    when(entityStore.get(any(), any(), any())).thenReturn(metalake1);
     doThrow(new RoleAlreadyExistsException("mock error"))
         .when(manager)
         .createRole(any(), any(), any(), any());
@@ -369,10 +386,17 @@ public class TestRoleOperations extends BaseOperationsTest {
   }
 
   @Test
-  public void testGetRole() {
+  public void testGetRole() throws IOException {
     Role role = buildRole("role1");
 
     when(manager.getRole(any(), any())).thenReturn(role);
+
+    // Mock metalake with in-use property
+    BaseMetalake metalake = mock(BaseMetalake.class);
+    PropertiesMetadata propertiesMetadata = mock(PropertiesMetadata.class);
+    when(propertiesMetadata.getOrDefault(any(), any())).thenReturn(true);
+    when(metalake.propertiesMetadata()).thenReturn(propertiesMetadata);
+    when(entityStore.get(any(), any(), any())).thenReturn(metalake);
 
     Response resp =
         target("/metalakes/metalake1/roles/role1")
@@ -400,7 +424,7 @@ public class TestRoleOperations extends BaseOperationsTest {
         roleDTO.securableObjects().get(0).privileges().get(0).condition());
 
     // Test to throw NoSuchMetalakeException
-    doThrow(new NoSuchMetalakeException("mock error")).when(manager).getRole(any(), any());
+    doThrow(new NoSuchEntityException("mock error")).when(entityStore).get(any(), any(), any());
     Response resp1 =
         target("/metalakes/metalake1/roles/role1")
             .request(MediaType.APPLICATION_JSON_TYPE)
@@ -414,6 +438,12 @@ public class TestRoleOperations extends BaseOperationsTest {
     Assertions.assertEquals(NoSuchMetalakeException.class.getSimpleName(), errorResponse.getType());
 
     // Test to throw NoSuchRoleException
+    Mockito.reset(entityStore);
+    BaseMetalake metalake1 = mock(BaseMetalake.class);
+    PropertiesMetadata propertiesMetadata1 = mock(PropertiesMetadata.class);
+    when(propertiesMetadata1.getOrDefault(any(), any())).thenReturn(true);
+    when(metalake1.propertiesMetadata()).thenReturn(propertiesMetadata1);
+    when(entityStore.get(any(), any(), any())).thenReturn(metalake1);
     doThrow(new NoSuchRoleException("mock error")).when(manager).getRole(any(), any());
     Response resp2 =
         target("/metalakes/metalake1/roles/role1")
@@ -444,8 +474,15 @@ public class TestRoleOperations extends BaseOperationsTest {
   }
 
   @Test
-  public void testDeleteRole() {
+  public void testDeleteRole() throws IOException {
     when(manager.deleteRole(any(), any())).thenReturn(true);
+
+    // Mock metalake with in-use property
+    BaseMetalake metalake = mock(BaseMetalake.class);
+    PropertiesMetadata propertiesMetadata = mock(PropertiesMetadata.class);
+    when(propertiesMetadata.getOrDefault(any(), any())).thenReturn(true);
+    when(metalake.propertiesMetadata()).thenReturn(propertiesMetadata);
+    when(entityStore.get(any(), any(), any())).thenReturn(metalake);
 
     Response resp =
         target("/metalakes/metalake1/roles/role1")
@@ -608,8 +645,15 @@ public class TestRoleOperations extends BaseOperationsTest {
   }
 
   @Test
-  public void testListRoleNames() {
+  public void testListRoleNames() throws IOException {
     when(manager.listRoleNames(any())).thenReturn(new String[] {"role"});
+
+    // Mock metalake with in-use property
+    BaseMetalake metalake = mock(BaseMetalake.class);
+    PropertiesMetadata propertiesMetadata = mock(PropertiesMetadata.class);
+    when(propertiesMetadata.getOrDefault(any(), any())).thenReturn(true);
+    when(metalake.propertiesMetadata()).thenReturn(propertiesMetadata);
+    when(entityStore.get(any(), any(), any())).thenReturn(metalake);
 
     Response resp =
         target("/metalakes/metalake1/roles/")
@@ -625,7 +669,7 @@ public class TestRoleOperations extends BaseOperationsTest {
     Assertions.assertEquals("role", listResponse.getNames()[0]);
 
     // Test to throw NoSuchMetalakeException
-    doThrow(new NoSuchMetalakeException("mock error")).when(manager).listRoleNames(any());
+    doThrow(new NoSuchEntityException("mock error")).when(entityStore).get(any(), any(), any());
     Response resp1 =
         target("/metalakes/metalake1/roles/")
             .request(MediaType.APPLICATION_JSON_TYPE)
@@ -639,6 +683,12 @@ public class TestRoleOperations extends BaseOperationsTest {
     Assertions.assertEquals(NoSuchMetalakeException.class.getSimpleName(), errorResponse.getType());
 
     // Test to throw internal RuntimeException
+    Mockito.reset(entityStore);
+    BaseMetalake metalake1 = mock(BaseMetalake.class);
+    PropertiesMetadata propertiesMetadata1 = mock(PropertiesMetadata.class);
+    when(propertiesMetadata1.getOrDefault(any(), any())).thenReturn(true);
+    when(metalake1.propertiesMetadata()).thenReturn(propertiesMetadata1);
+    when(entityStore.get(any(), any(), any())).thenReturn(metalake1);
     doThrow(new RuntimeException("mock error")).when(manager).listRoleNames(any());
     Response resp3 =
         target("/metalakes/metalake1/roles")

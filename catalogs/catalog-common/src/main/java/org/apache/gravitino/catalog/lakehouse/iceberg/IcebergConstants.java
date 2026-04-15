@@ -31,6 +31,13 @@ public class IcebergConstants {
   public static final String ICEBERG_JDBC_PASSWORD = "jdbc.password";
   public static final String ICEBERG_JDBC_INITIALIZE = "jdbc-initialize";
 
+  public static final String DATA_ACCESS = "data-access";
+
+  public static final String ICEBERG_ACCESS_DELEGATION = "header.X-Iceberg-Access-Delegation";
+
+  public static final String GRAVITINO_JDBC_SCHEMA_VERSION = "jdbc-schema-version";
+  public static final String ICEBERG_JDBC_SCHEMA_VERSION = "jdbc.schema-version";
+
   public static final String GRAVITINO_JDBC_DRIVER = "jdbc-driver";
   public static final String WAREHOUSE = "warehouse";
   public static final String URI = "uri";
@@ -99,4 +106,8 @@ public class IcebergConstants {
   public static final String TABLE_METADATA_CACHE_CAPACITY = "table-metadata-cache-capacity";
   public static final String TABLE_METADATA_CACHE_EXPIRE_MINUTES =
       "table-metadata-cache-expire-minutes";
+
+  public static final String SCAN_PLAN_CACHE_IMPL = "scan-plan-cache-impl";
+  public static final String SCAN_PLAN_CACHE_CAPACITY = "scan-plan-cache-capacity";
+  public static final String SCAN_PLAN_CACHE_EXPIRE_MINUTES = "scan-plan-cache-expire-minutes";
 }

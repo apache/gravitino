@@ -174,11 +174,23 @@ class NoSuchTagException(NotFoundException):
 
 
 class TagAlreadyExistsException(AlreadyExistsException):
-    """An exception thrown when a tag with specified name already associated to a metadata object."""
+    """An exception thrown when a tag with specified name already exists."""
+
+
+class TagAlreadyAssociatedException(AlreadyExistsException):
+    """Exception thrown when a tag with specified name already associated to a metadata object."""
 
 
 class JobTemplateAlreadyExistsException(AlreadyExistsException):
     """An exception thrown when a job template with specified name already exists."""
+
+
+class IllegalJobTemplateOperationException(IllegalArgumentException):
+    """An exception thrown when an illegal operation is attempted on a job template.
+
+    This exception is raised when attempting to modify or delete a built-in job template,
+    or when trying to create a user template with a reserved name (e.g., starting with 'builtin-').
+    """
 
 
 class NoSuchJobTemplateException(NotFoundException):
@@ -215,3 +227,11 @@ class PartitionAlreadyExistsException(AlreadyExistsException):
 
 class TableAlreadyExistsException(AlreadyExistsException):
     """An exception thrown when a table already exists."""
+
+
+class NoSuchFunctionException(NotFoundException):
+    """An exception thrown when a function with specified name is not found."""
+
+
+class FunctionAlreadyExistsException(AlreadyExistsException):
+    """An exception thrown when a function already exists."""

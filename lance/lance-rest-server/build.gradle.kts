@@ -66,6 +66,7 @@ dependencies {
   testImplementation(project(":server"))
   testImplementation(project(":integration-test-common", "testArtifacts"))
 
+  testImplementation(libs.awaitility)
   testImplementation(libs.commons.io)
   testImplementation(libs.jersey.test.framework.core) {
     exclude(group = "org.junit.jupiter")

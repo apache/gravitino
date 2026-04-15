@@ -107,4 +107,10 @@ public interface CatalogMetaMapper {
       method = "selectCatalogIdByMetalakeNameAndCatalogName")
   CatalogIds selectCatalogIdByMetalakeNameAndCatalogName(
       @Param("metalakeName") String metalakeName, @Param("catalogName") String catalogName);
+
+  @SelectProvider(
+      type = CatalogMetaSQLProviderFactory.class,
+      method = "batchSelectCatalogByIdentifier")
+  List<CatalogPO> batchSelectCatalogByIdentifier(
+      @Param("metalakeName") String metalakeName, @Param("catalogNames") List<String> catalogNames);
 }

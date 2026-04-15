@@ -20,18 +20,27 @@
 package org.apache.gravitino.iceberg.service.authorization;
 
 import com.google.common.base.Preconditions;
+import org.apache.gravitino.iceberg.service.IcebergCatalogWrapperManager;
 import org.apache.gravitino.iceberg.service.provider.IcebergConfigProvider;
 
 public class IcebergRESTServerContext {
   private boolean isAuthorizationEnabled;
+  private boolean auxMode;
   private String metalakeName;
   private String defaultCatalogName;
+  private IcebergCatalogWrapperManager catalogWrapperManager;
 
   private IcebergRESTServerContext(
-      Boolean isAuthorizationEnabled, String metalakeName, String defaultCatalogName) {
+      Boolean isAuthorizationEnabled,
+      Boolean auxMode,
+      String metalakeName,
+      String defaultCatalogName,
+      IcebergCatalogWrapperManager catalogWrapperManager) {
     this.isAuthorizationEnabled = isAuthorizationEnabled;
+    this.auxMode = auxMode;
     this.metalakeName = metalakeName;
     this.defaultCatalogName = defaultCatalogName;
+    this.catalogWrapperManager = catalogWrapperManager;
   }
 
   private static class InstanceHolder {
@@ -39,10 +48,17 @@ public class IcebergRESTServerContext {
   }
 
   public static IcebergRESTServerContext create(
-      IcebergConfigProvider configProvider, Boolean enableAuth) {
+      IcebergConfigProvider configProvider,
+      Boolean enableAuth,
+      Boolean auxMode,
+      IcebergCatalogWrapperManager catalogWrapperManager) {
     InstanceHolder.INSTANCE =
         new IcebergRESTServerContext(
-            enableAuth, configProvider.getMetalakeName(), configProvider.getDefaultCatalogName());
+            enableAuth,
+            auxMode,
+            configProvider.getMetalakeName(),
+            configProvider.getDefaultCatalogName(),
+            catalogWrapperManager);
     return InstanceHolder.INSTANCE;
   }
 
@@ -55,11 +71,19 @@ public class IcebergRESTServerContext {
     return isAuthorizationEnabled;
   }
 
+  public boolean isAuxMode() {
+    return auxMode;
+  }
+
   public String metalakeName() {
     return metalakeName;
   }
 
   public String defaultCatalogName() {
     return defaultCatalogName;
+  }
+
+  public IcebergCatalogWrapperManager catalogWrapperManager() {
+    return catalogWrapperManager;
   }
 }

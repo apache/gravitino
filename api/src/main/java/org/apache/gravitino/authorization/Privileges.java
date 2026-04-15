@@ -57,6 +57,30 @@ public class Privileges {
           MetadataObject.Type.SCHEMA,
           MetadataObject.Type.FILESET);
 
+  private static final Set<MetadataObject.Type> VIEW_SUPPORTED_TYPES =
+      Sets.immutableEnumSet(
+          MetadataObject.Type.METALAKE,
+          MetadataObject.Type.CATALOG,
+          MetadataObject.Type.SCHEMA,
+          MetadataObject.Type.VIEW);
+
+  /**
+   * Object types that {@link ManageGrants} can be bound to.
+   *
+   * <p>Binding at a parent level implicitly covers all children — for example, a grant on a SCHEMA
+   * lets the holder manage privileges on every TABLE, VIEW, TOPIC, FILESET, and MODEL inside it.
+   */
+  private static final Set<MetadataObject.Type> MANAGE_GRANTS_SUPPORTED_TYPES =
+      Sets.immutableEnumSet(
+          MetadataObject.Type.METALAKE,
+          MetadataObject.Type.CATALOG,
+          MetadataObject.Type.SCHEMA,
+          MetadataObject.Type.TABLE,
+          MetadataObject.Type.VIEW,
+          MetadataObject.Type.TOPIC,
+          MetadataObject.Type.FILESET,
+          MetadataObject.Type.MODEL);
+
   /**
    * Returns the Privilege with allow condition from the string representation.
    *
@@ -159,6 +183,12 @@ public class Privileges {
         // Job
       case RUN_JOB:
         return RunJob.allow();
+
+        // View
+      case CREATE_VIEW:
+        return CreateView.allow();
+      case SELECT_VIEW:
+        return SelectView.allow();
 
       default:
         throw new IllegalArgumentException("Doesn't support the privilege: " + name);
@@ -267,6 +297,13 @@ public class Privileges {
         // Job
       case RUN_JOB:
         return RunJob.deny();
+
+        // View
+      case CREATE_VIEW:
+        return CreateView.deny();
+      case SELECT_VIEW:
+        return SelectView.deny();
+
       default:
         throw new IllegalArgumentException("Doesn't support the privilege: " + name);
     }
@@ -816,7 +853,14 @@ public class Privileges {
     }
   }
 
-  /** The privilege to grant or revoke a role for the user or the group. */
+  /**
+   * The privilege to grant or revoke privileges on securable objects. If bound on the metalake, we
+   * can grant or revoke the role for users or groups.
+   *
+   * <p>Unlike most privileges, this can be bound at any level of the object hierarchy — METALAKE,
+   * CATALOG, SCHEMA, TABLE, VIEW, TOPIC, FILESET, or MODEL. A grant at a parent level implicitly
+   * covers all descendants within it.
+   */
   public static class ManageGrants extends GenericPrivilege<ManageGrants> {
     private static final ManageGrants ALLOW_INSTANCE =
         new ManageGrants(Condition.ALLOW, Name.MANAGE_GRANTS);
@@ -843,7 +887,7 @@ public class Privileges {
 
     @Override
     public boolean canBindTo(MetadataObject.Type type) {
-      return type == MetadataObject.Type.METALAKE;
+      return MANAGE_GRANTS_SUPPORTED_TYPES.contains(type);
     }
   }
 
@@ -1235,6 +1279,68 @@ public class Privileges {
     @Override
     public boolean canBindTo(MetadataObject.Type type) {
       return type == MetadataObject.Type.METALAKE || type == MetadataObject.Type.JOB_TEMPLATE;
+    }
+  }
+
+  /** The privilege to create a view. */
+  public static class CreateView extends GenericPrivilege<CreateView> {
+    private static final CreateView ALLOW_INSTANCE =
+        new CreateView(Condition.ALLOW, Name.CREATE_VIEW);
+    private static final CreateView DENY_INSTANCE =
+        new CreateView(Condition.DENY, Name.CREATE_VIEW);
+
+    private CreateView(Condition condition, Name name) {
+      super(condition, name);
+    }
+
+    /**
+     * @return The instance with allow condition of the privilege.
+     */
+    public static CreateView allow() {
+      return ALLOW_INSTANCE;
+    }
+
+    /**
+     * @return The instance with deny condition of the privilege.
+     */
+    public static CreateView deny() {
+      return DENY_INSTANCE;
+    }
+
+    @Override
+    public boolean canBindTo(MetadataObject.Type type) {
+      return SCHEMA_SUPPORTED_TYPES.contains(type);
+    }
+  }
+
+  /** The privilege to select data from a view. */
+  public static class SelectView extends GenericPrivilege<SelectView> {
+    private static final SelectView ALLOW_INSTANCE =
+        new SelectView(Condition.ALLOW, Name.SELECT_VIEW);
+    private static final SelectView DENY_INSTANCE =
+        new SelectView(Condition.DENY, Name.SELECT_VIEW);
+
+    private SelectView(Condition condition, Name name) {
+      super(condition, name);
+    }
+
+    /**
+     * @return The instance with allow condition of the privilege.
+     */
+    public static SelectView allow() {
+      return ALLOW_INSTANCE;
+    }
+
+    /**
+     * @return The instance with deny condition of the privilege.
+     */
+    public static SelectView deny() {
+      return DENY_INSTANCE;
+    }
+
+    @Override
+    public boolean canBindTo(MetadataObject.Type type) {
+      return VIEW_SUPPORTED_TYPES.contains(type);
     }
   }
 }

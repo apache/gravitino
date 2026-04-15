@@ -30,12 +30,15 @@ Apart from configurations mentioned in [fileset-catalog-catalog-configuration](.
 
 | Configuration item            | Description                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            | Default value   | Required | Since version    |
 |-------------------------------|------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|-----------------|----------|------------------|
-| `filesystem-providers`        | The file system providers to add. Set it to `abs` if it's a Azure Blob Storage fileset, or a comma separated string that contains `abs` like `oss,abs,s3` to support multiple kinds of fileset including `abs`.                                                                                                                                                                                                                                                                                                                                                        | (none)          | Yes      | 0.8.0-incubating |
-| `default-filesystem-provider` | The name default filesystem providers of this Fileset catalog if users do not specify the scheme in the URI. Default value is `builtin-local`, for Azure Blob Storage, if we set this value, we can omit the prefix 'abfss://' in the location.                                                                                                                                                                                                                                                                                                                        | `builtin-local` | No       | 0.8.0-incubating |
+| `filesystem-providers`        | (deprecated) The file system providers to add. Set it to `abs` if it's a Azure Blob Storage fileset, or a comma separated string that contains `abs` like `oss,abs,s3` to support multiple kinds of fileset including `abs`.                                                                                                                                                                                                                                                                                                                                            | (none)          | Yes      | 0.8.0-incubating |
+| `default-filesystem-provider` | (deprecated) The name default filesystem providers of this Fileset catalog if users do not specify the scheme in the URI. Default value is `builtin-local`, for Azure Blob Storage, if we set this value, we can omit the prefix 'abfss://' in the location.                                                                                                                                                                                                                                                                                                            | `builtin-local` | No       | 0.8.0-incubating |
 | `azure-storage-account-name ` | The account name of Azure Blob Storage.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                | (none)          | Yes      | 0.8.0-incubating |
 | `azure-storage-account-key`   | The account key of Azure Blob Storage.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 | (none)          | Yes      | 0.8.0-incubating |
 | `credential-providers`        | The credential provider types, separated by comma, possible value can be `adls-token`, `azure-account-key`. As the default authentication type is using account name and account key as the above, this configuration can enable credential vending provided by Gravitino server and client will no longer need to provide authentication information like account_name/account_key to access ADLS by GVFS. Once it's set, more configuration items are needed to make it works, please see [adls-credential-vending](security/credential-vending.md#adls-credentials) | (none)          | No       | 0.8.0-incubating |
 
+:::note
+`default-filesystem-provider` and `filesystem-providers` are deprecated since 1.2.0. The fileset catalog automatically loads filesystem providers on the classpath, including buildin filesystem provider and cloud providers when the corresponding bundle jar is present (for example, `gravitino-azure-bundle`).
+:::
 
 ### Configurations for a schema
 
@@ -65,8 +68,7 @@ curl -X POST -H "Accept: application/vnd.gravitino.v1+json" \
   "properties": {
     "location": "abfss://container@account-name.dfs.core.windows.net/path",
     "azure-storage-account-name": "The account name of the Azure Blob Storage",
-    "azure-storage-account-key": "The account key of the Azure Blob Storage",
-    "filesystem-providers": "abs"
+    "azure-storage-account-key": "The account key of the Azure Blob Storage"
   }
 }' http://localhost:8090/api/metalakes/metalake/catalogs
 ```
@@ -84,7 +86,6 @@ Map<String, String> adlsProperties = ImmutableMap.<String, String>builder()
     .put("location", "abfss://container@account-name.dfs.core.windows.net/path")
     .put("azure-storage-account-name", "azure storage account name")
     .put("azure-storage-account-key", "azure storage account key")
-    .put("filesystem-providers", "abs")
     .build();
 
 Catalog adlsCatalog = gravitinoClient.createCatalog("example_catalog",
@@ -103,8 +104,7 @@ gravitino_client: GravitinoClient = GravitinoClient(uri="http://localhost:8090",
 adls_properties = {
     "location": "abfss://container@account-name.dfs.core.windows.net/path",
     "azure-storage-account-name": "azure storage account name",
-    "azure-storage-account-key": "azure storage account key",
-    "filesystem-providers": "abs"
+    "azure-storage-account-key": "azure storage account key"
 }
 
 adls_properties = gravitino_client.create_catalog(name="example_catalog",
@@ -506,7 +506,6 @@ curl -X POST -H "Accept: application/vnd.gravitino.v1+json" \
     "location": "abfss://container@account-name.dfs.core.windows.net/path",
     "azure-storage-account-name": "The account name of the Azure Blob Storage",
     "azure-storage-account-key": "The account key of the Azure Blob Storage",
-    "filesystem-providers": "abs",
     "credential-providers": "adls-token",
     "azure-tenant-id":"The Azure tenant id",
     "azure-client-id":"The Azure client id",

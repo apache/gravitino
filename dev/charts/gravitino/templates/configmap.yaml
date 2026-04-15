@@ -27,7 +27,7 @@ metadata:
 data:
   init.sh: |-
     {{- tpl .Values.initScript . | nindent 4 }}
-  gravitino.conf: |
+  gravitino.conf: |-
     {{- tpl (.Files.Get "resources/config/gravitino.conf") . | nindent 4 }}
   log4j2.properties: |-
     {{- tpl (.Files.Get "resources/config/log4j2.properties") . | nindent 4 }}

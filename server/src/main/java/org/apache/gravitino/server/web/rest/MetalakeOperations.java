@@ -93,7 +93,7 @@ public class MetalakeOperations {
             metalakes =
                 MetadataAuthzHelper.filterMetalakes(
                     metalakes,
-                    AuthorizationExpressionConstants.loadMetalakeAuthorizationExpression);
+                    AuthorizationExpressionConstants.LOAD_METALAKE_AUTHORIZATION_EXPRESSION);
             MetalakeDTO[] metalakeDTOs =
                 Arrays.stream(metalakes).map(DTOConverters::toDTO).toArray(MetalakeDTO[]::new);
             Response response = Utils.ok(new MetalakeListResponse(metalakeDTOs));
@@ -117,6 +117,12 @@ public class MetalakeOperations {
           "Only service admins can create metalakes, current user can't create the metalake,"
               + "  you should configure it in the server configuration first")
   public Response createMetalake(MetalakeCreateRequest request) {
+    if (request == null) {
+      LOG.warn("Received create metalake request with null request body");
+      return ExceptionHandlers.handleMetalakeException(
+          OperationType.CREATE, "", new IllegalArgumentException("Request body cannot be null"));
+    }
+
     LOG.info("Received create metalake request for {}", request.getName());
     try {
       return Utils.doAs(
@@ -133,7 +139,8 @@ public class MetalakeOperations {
           });
 
     } catch (Exception e) {
-      return ExceptionHandlers.handleMetalakeException(OperationType.CREATE, request.getName(), e);
+      String metalakeName = request != null ? request.getName() : "";
+      return ExceptionHandlers.handleMetalakeException(OperationType.CREATE, metalakeName, e);
     }
   }
 
@@ -143,7 +150,7 @@ public class MetalakeOperations {
   @Timed(name = "load-metalake." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
   @ResponseMetered(name = "load-metalake", absolute = true)
   @AuthorizationExpression(
-      expression = AuthorizationExpressionConstants.loadMetalakeAuthorizationExpression)
+      expression = AuthorizationExpressionConstants.LOAD_METALAKE_AUTHORIZATION_EXPRESSION)
   public Response loadMetalake(
       @PathParam("name") @AuthorizationMetadata(type = Entity.EntityType.METALAKE)
           String metalakeName) {
