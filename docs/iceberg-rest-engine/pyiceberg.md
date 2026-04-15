@@ -98,8 +98,8 @@ catalog.create_table("db.new_table", schema=schema)
 
 ## Gravitino connector vs Iceberg REST
 
-| | Gravitino Engine Connector | Iceberg REST |
-|---|---|---|
+| Feature | Gravitino Engine Connector | Iceberg REST |
+|:---|:---|:---|
 | Engine plugin required | Yes | No |
 | Gravitino access control | Yes | Yes |
 | Supported engines | Trino, Spark, Flink, Daft | Any Iceberg-compatible engine |
