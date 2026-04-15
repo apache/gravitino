@@ -45,6 +45,7 @@ import org.apache.gravitino.auth.GroupMapperFactory;
 import org.apache.gravitino.auth.PrincipalMapper;
 import org.apache.gravitino.auth.PrincipalMapperFactory;
 import org.apache.gravitino.auth.SignatureAlgorithmFamilyType;
+import org.apache.gravitino.exceptions.TokenExpiredException;
 import org.apache.gravitino.exceptions.UnauthorizedException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -134,8 +135,9 @@ public class StaticSignKeyValidator implements OAuthTokenValidator {
         return new UserPrincipal(userPrincipal.getName(), mappedGroups);
       }
       return userPrincipal;
-    } catch (ExpiredJwtException
-        | UnsupportedJwtException
+    } catch (ExpiredJwtException e) {
+      throw new TokenExpiredException(e, "Authentication token is expired");
+    } catch (UnsupportedJwtException
         | MalformedJwtException
         | SignatureException
         | IllegalArgumentException e) {

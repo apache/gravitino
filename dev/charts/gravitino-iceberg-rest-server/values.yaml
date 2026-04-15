@@ -247,14 +247,12 @@ podSecurityContext: {}
 ## ref: https://kubernetes.io/docs/tasks/configure-pod-container/security-context/
 ##
 securityContext:
-  runAsNonRoot: false
-  runAsUser: 0
+  runAsNonRoot: true
+  runAsUser: 1000
   # capabilities:
   #   drop:
   #   - ALL
   # readOnlyRootFilesystem: true
-  # runAsNonRoot: true
-  # runAsUser: 1000
 
 ## Container Environment
 ##
@@ -321,7 +319,7 @@ extraVolumes:
 ##
 extraVolumeMounts:
   - name: gravitino-rest-catalog-server-log
-    mountPath: /root/gravitino-iceberg-rest-server/logs
+    mountPath: /opt/gravitino-iceberg-rest-server/logs
 
 ingress:
   enabled: false

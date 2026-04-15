@@ -85,7 +85,7 @@ spec:
           # Environment variables
           env:
             - name: GRAVITINO_HOME
-              value: /root/gravitino-iceberg-rest-server
+              value: /opt/gravitino-iceberg-rest-server
             - name: SKIP_CONFIG_REWRITE
               value: "true"
           {{- with .Values.env }}

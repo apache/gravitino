@@ -48,6 +48,10 @@ spec:
           {{- end }}
     spec:
       serviceAccountName: {{ .Values.serviceAccountName }}
+      {{- with .Values.podSecurityContext }}
+      securityContext:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
       {{- with .Values.global.imagePullSecrets }}
       imagePullSecrets:
         {{- toYaml . | nindent 8 }}
@@ -60,11 +64,13 @@ spec:
             - /bin/bash
             - -c
             - |
-              cp -r /root/gravitino/scripts/*  /tmp/scripts/
-              VERSION=$(ls /root/gravitino/libs/gravitino-server-* | grep -oP '[0-9]+\.[0-9]+\.[0-9]+'|head -1)
+              cp -r /opt/gravitino/scripts/*  /tmp/scripts/
+              VERSION=$(ls /opt/gravitino/libs/gravitino-server-* | grep -oP '[0-9]+\.[0-9]+\.[0-9]+'|head -1)
               echo $VERSION > /tmp/scripts/version.txt
           resources:
             {{- toYaml .Values.initResources | nindent 12 }}
+          securityContext:
+            {{- toYaml .Values.initContainerSecurityContext | nindent 12 }}
           volumeMounts:
             - mountPath: /tmp/scripts/
               name: scripts-emptydir
@@ -105,6 +111,8 @@ spec:
               mysql -h {{ .Release.Name }}-mysql -u root -D $GRAVITINO_DB <$schema_file
           resources:
             {{- toYaml .Values.initResources | nindent 12 }}
+          securityContext:
+            {{- toYaml .Values.initContainerSecurityContext | nindent 12 }}
           env:
             - name: MYSQL_PWD
               valueFrom:
@@ -154,6 +162,8 @@ spec:
               PGPASSWORD=$POSTGRES_PASSWORD psql -h {{ .Release.Name }}-postgresql -U $POSTGRES_USER -d $GRAVITINO_DB -f "$schema_file"
           resources:
             {{- toYaml .Values.initResources | nindent 12 }}
+          securityContext:
+            {{- toYaml .Values.initContainerSecurityContext | nindent 12 }}
           env:
             - name: POSTGRES_USER
               value: {{ .Values.postgresql.auth.username }}
@@ -185,7 +195,7 @@ spec:
             {{- toYaml .Values.containerSecurityContext | nindent 12 }}
           env:
             - name: GRAVITINO_HOME
-              value: /root/gravitino
+              value: /opt/gravitino
             - name: SKIP_CONFIG_REWRITE
               value: "true"
           {{- with .Values.env }}

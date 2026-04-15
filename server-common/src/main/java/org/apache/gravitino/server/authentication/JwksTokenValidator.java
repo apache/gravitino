@@ -29,6 +29,7 @@ import com.nimbusds.jwt.JWTClaimsSet;
 import com.nimbusds.jwt.SignedJWT;
 import com.nimbusds.jwt.proc.DefaultJWTClaimsVerifier;
 import com.nimbusds.jwt.proc.DefaultJWTProcessor;
+import com.nimbusds.jwt.proc.ExpiredJWTException;
 import java.net.URL;
 import java.security.Principal;
 import java.util.Collections;
@@ -42,6 +43,7 @@ import org.apache.gravitino.auth.GroupMapper;
 import org.apache.gravitino.auth.GroupMapperFactory;
 import org.apache.gravitino.auth.PrincipalMapper;
 import org.apache.gravitino.auth.PrincipalMapperFactory;
+import org.apache.gravitino.exceptions.TokenExpiredException;
 import org.apache.gravitino.exceptions.UnauthorizedException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -166,6 +168,8 @@ public class JwksTokenValidator implements OAuthTokenValidator {
       }
       return userPrincipal;
 
+    } catch (ExpiredJWTException e) {
+      throw new TokenExpiredException(e, "Authentication token is expired");
     } catch (Exception e) {
       LOG.warn(
           "JWKS JWT validation failed for principal [{}]: {}",
