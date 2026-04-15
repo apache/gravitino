@@ -61,7 +61,6 @@ public class GravitinoPaimonCatalog extends BaseCatalog {
     this.paimonCatalog = flinkCatalogFactory.createCatalog(toPaimonContext(context));
   }
 
-
   @Override
   protected AbstractCatalog realCatalog() {
     return paimonCatalog;
@@ -99,7 +98,7 @@ public class GravitinoPaimonCatalog extends BaseCatalog {
       throw new TableNotExistException(catalogName(), tablePath);
     }
   }
-  
+
   @Override
   public Optional<Factory> getFactory() {
     return Optional.of(new FlinkTableFactory());
