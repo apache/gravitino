@@ -307,7 +307,6 @@ class TestGVFSCredentialCache(unittest.TestCase):
         for result in results:
             self.assertIsNotNone(result)
             self.assertEqual(len(result), 1)
-            # 显式类型缩小：在访问索引之前确保 result 不为 None
             assert result is not None  # type: ignore[unreachable]
             self.assertEqual(result[0].access_key_id(), "access_id")
 
