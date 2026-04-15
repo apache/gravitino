@@ -279,7 +279,7 @@ public class TestIcebergTableHookDispatcher {
   }
 
   @Test
-  public void testUpdateTableImportsAndSetsOwnershipForStagedCommit() throws IOException {
+  public void testUpdateTableImportsAndSetsOwnershipForStagedCommit() {
     TableIdentifier tableId = TableIdentifier.of("test_schema", "test_table");
     // A staged create commit carries AssertTableDoesNotExist as its requirement.
     UpdateTableRequest request =
@@ -289,17 +289,14 @@ public class TestIcebergTableHookDispatcher {
 
     when(mockDispatcher.updateTable(mockContext, tableId, request)).thenReturn(mockResponse);
 
-    // Entity does not exist yet (staged table being committed)
-    NameIdentifier gravitinoTableId =
-        IcebergIdentifierUtils.toGravitinoTableIdentifier(TEST_METALAKE, TEST_CATALOG, tableId);
-    when(mockEntityStore.exists(gravitinoTableId, Entity.EntityType.TABLE)).thenReturn(false);
-
     LoadTableResponse result = hookDispatcher.updateTable(mockContext, tableId, request);
 
     Assertions.assertEquals(mockResponse, result);
     verify(mockDispatcher).updateTable(mockContext, tableId, request);
 
     // Verify table import was called
+    NameIdentifier gravitinoTableId =
+        IcebergIdentifierUtils.toGravitinoTableIdentifier(TEST_METALAKE, TEST_CATALOG, tableId);
     verify(mockTableDispatcher).loadTable(gravitinoTableId);
 
     // Verify ownership was set
@@ -310,66 +307,10 @@ public class TestIcebergTableHookDispatcher {
   }
 
   @Test
-  public void testUpdateTableSkipsImportForStagedCommitWhenEntityAlreadyExists()
-      throws IOException {
-    TableIdentifier tableId = TableIdentifier.of("test_schema", "test_table");
-    // A staged create commit carries AssertTableDoesNotExist, but the entity already exists
-    // (e.g. idempotent retry). Import and ownership should be skipped.
-    UpdateTableRequest request =
-        new UpdateTableRequest(
-            List.of(new UpdateRequirement.AssertTableDoesNotExist()), Collections.emptyList());
-    LoadTableResponse mockResponse = mock(LoadTableResponse.class);
-
-    when(mockDispatcher.updateTable(mockContext, tableId, request)).thenReturn(mockResponse);
-
-    NameIdentifier gravitinoTableId =
-        IcebergIdentifierUtils.toGravitinoTableIdentifier(TEST_METALAKE, TEST_CATALOG, tableId);
-    when(mockEntityStore.exists(gravitinoTableId, Entity.EntityType.TABLE)).thenReturn(true);
-
-    LoadTableResponse result = hookDispatcher.updateTable(mockContext, tableId, request);
-
-    Assertions.assertEquals(mockResponse, result);
-    verify(mockDispatcher).updateTable(mockContext, tableId, request);
-
-    // Verify table import was NOT called since entity already exists
-    verify(mockTableDispatcher, never()).loadTable(any());
-
-    // Verify ownership was NOT set since entity already exists
-    verify(mockOwnerDispatcher, never()).setOwner(any(), any(), any(), any());
-  }
-
-  @Test
-  public void testUpdateTableSkipsImportForRegularUpdateWhenEntityMissing() throws IOException {
+  public void testUpdateTableSkipsImportForRegularUpdate() {
     TableIdentifier tableId = TableIdentifier.of("test_schema", "test_table");
     // Regular table update (e.g. property change): no AssertTableDoesNotExist requirement.
-    UpdateTableRequest request =
-        new UpdateTableRequest(Collections.emptyList(), Collections.emptyList());
-    LoadTableResponse mockResponse = mock(LoadTableResponse.class);
-
-    when(mockDispatcher.updateTable(mockContext, tableId, request)).thenReturn(mockResponse);
-
-    // Entity does not exist (e.g. table pre-dates Gravitino tracking), but this is NOT a staged
-    // create commit, so we must NOT import or set ownership.
-    NameIdentifier gravitinoTableId =
-        IcebergIdentifierUtils.toGravitinoTableIdentifier(TEST_METALAKE, TEST_CATALOG, tableId);
-    when(mockEntityStore.exists(gravitinoTableId, Entity.EntityType.TABLE)).thenReturn(false);
-
-    LoadTableResponse result = hookDispatcher.updateTable(mockContext, tableId, request);
-
-    Assertions.assertEquals(mockResponse, result);
-    verify(mockDispatcher).updateTable(mockContext, tableId, request);
-
-    // Verify table import was NOT called for a plain property update
-    verify(mockTableDispatcher, never()).loadTable(any());
-
-    // Verify ownership was NOT set
-    verify(mockOwnerDispatcher, never()).setOwner(any(), any(), any(), any());
-  }
-
-  @Test
-  public void testUpdateTablePassesThrough() throws IOException {
-    TableIdentifier tableId = TableIdentifier.of("test_schema", "test_table");
-    // Regular update without AssertTableDoesNotExist — entity exists.
+    // Import and ownership must NOT be triggered regardless of entity store state.
     UpdateTableRequest request =
         new UpdateTableRequest(Collections.emptyList(), Collections.emptyList());
     LoadTableResponse mockResponse = mock(LoadTableResponse.class);
@@ -381,37 +322,11 @@ public class TestIcebergTableHookDispatcher {
     Assertions.assertEquals(mockResponse, result);
     verify(mockDispatcher).updateTable(mockContext, tableId, request);
 
-    // Verify table import was NOT called
+    // Verify table import was NOT called for a regular update
     verify(mockTableDispatcher, never()).loadTable(any());
 
     // Verify ownership was NOT set
     verify(mockOwnerDispatcher, never()).setOwner(any(), any(), any(), any());
-  }
-
-  @Test
-  public void testUpdateTableThrowsRuntimeExceptionOnIOException() throws IOException {
-    TableIdentifier tableId = TableIdentifier.of("test_schema", "test_table");
-    // Use AssertTableDoesNotExist so the code path reaches store.exists().
-    UpdateTableRequest request =
-        new UpdateTableRequest(
-            List.of(new UpdateRequirement.AssertTableDoesNotExist()), Collections.emptyList());
-
-    when(mockDispatcher.updateTable(mockContext, tableId, request))
-        .thenReturn(mock(LoadTableResponse.class));
-
-    NameIdentifier gravitinoTableId =
-        IcebergIdentifierUtils.toGravitinoTableIdentifier(TEST_METALAKE, TEST_CATALOG, tableId);
-    when(mockEntityStore.exists(gravitinoTableId, Entity.EntityType.TABLE))
-        .thenThrow(new IOException("IO error"));
-
-    RuntimeException exception =
-        Assertions.assertThrows(
-            RuntimeException.class,
-            () -> hookDispatcher.updateTable(mockContext, tableId, request));
-
-    Assertions.assertTrue(
-        exception.getMessage().contains("io exception when checking table entity existence"));
-    verify(mockDispatcher).updateTable(mockContext, tableId, request);
   }
 
   @Test

@@ -77,24 +77,12 @@ public class IcebergTableHookDispatcher implements IcebergTableOperationDispatch
         dispatcher.updateTable(context, tableIdentifier, updateTableRequest);
     // Import the table and set ownership only when committing a staged table create.
     // A staged create commit is identified by the AssertTableDoesNotExist requirement,
-    // which is set by UpdateRequirements.forCreateTable(). Regular updates (e.g. property
-    // changes) do not carry this requirement, so we must not set ownership for them even
-    // if the entity does not yet exist in the store.
+    // which is set by UpdateRequirements.forCreateTable().
     boolean isStagedCreateCommit =
         updateTableRequest.requirements().stream()
             .anyMatch(UpdateRequirement.AssertTableDoesNotExist.class::isInstance);
     if (isStagedCreateCommit) {
-      try {
-        EntityStore store = GravitinoEnv.getInstance().entityStore();
-        NameIdentifier gravitinoTableId =
-            IcebergIdentifierUtils.toGravitinoTableIdentifier(
-                metalake, context.catalogName(), tableIdentifier);
-        if (store != null && !store.exists(gravitinoTableId, Entity.EntityType.TABLE)) {
-          importTableAndSetOwner(context, tableIdentifier.namespace(), tableIdentifier.name());
-        }
-      } catch (IOException ioe) {
-        throw new RuntimeException("io exception when checking table entity existence", ioe);
-      }
+      importTableAndSetOwner(context, tableIdentifier.namespace(), tableIdentifier.name());
     }
     return response;
   }
