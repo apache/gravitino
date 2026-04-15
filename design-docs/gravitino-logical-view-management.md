@@ -510,11 +510,11 @@ Different engines use different mechanisms depending on their integration path w
 | Operation | Behavior |
 |-----------|----------|
 | **LoadView** | Read Glue table → check `IsMultiDialectView` flag → if `true`: parse `ViewDefinition.Representations[]` and map to Gravitino view representations; if `false`: apply the same engine detection chain as [HMS View Behavior](#hms-view-behavior) |
-| **ListViews** | List all Glue tables where `TableType = VIRTUAL_VIEW` or `IsMultiDialectView = true` → classify each → return with dialect info |
+| **ListViews** | List all Glue tables where `TableType = VIRTUAL_VIEW` or `IsMultiDialectView = true` → return the name of the views |
 | **CreateView** | For dialects supported by Data Catalog view (ATHENA/REDSHIFT/SPARK): write via `ViewDefinition` API as a Data Catalog view. For other dialects (e.g., Trino, Hive): write as legacy `VIRTUAL_VIEW` in engine-native format (same logic as HMS) |
 | **DropView** | Delegate to Glue — delete the Glue table entry |
 
-> **Open question:** CreateView with Data Catalog view API requires Lake Formation integration (DEFINER + PROTECTED). If the target Glue catalog does not have Lake Formation configured, should Gravitino fall back to legacy `VIRTUAL_VIEW` for all dialects, or return an error for ATHENA/REDSHIFT/SPARK dialects?
+> **Note:** CreateView with Data Catalog view API requires Lake Formation integration (DEFINER + PROTECTED). If the target Glue catalog does not have Lake Formation configured, eturn an error for ATHENA/REDSHIFT/SPARK dialects.
 
 ---
 
