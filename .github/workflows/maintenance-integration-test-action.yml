@@ -48,8 +48,8 @@ jobs:
         id: integrationTest
         # run embedded mode and deploy mode integration tests
         run: |
-          ./gradlew -PskipTests -PtestMode=embedded -PskipDockerTests=false :maintenance:optimizer:test --tests "org.apache.gravitino.maintenance.optimizer.integration.test.**"
-          ./gradlew -PskipTests -PtestMode=deploy -PskipDockerTests=false :maintenance:optimizer:test --tests "org.apache.gravitino.maintenance.optimizer.integration.test.**"
+          ./gradlew -PskipTests -PtestMode=embedded -PskipDockerTests=false -PskipWeb=true :maintenance:optimizer:test --tests "org.apache.gravitino.maintenance.optimizer.integration.test.**"
+          ./gradlew -PskipTests -PtestMode=deploy -PskipDockerTests=false -PskipWeb=true :maintenance:optimizer:test --tests "org.apache.gravitino.maintenance.optimizer.integration.test.**"
 
       - name: Upload integrate tests reports
         uses: actions/upload-artifact@v7
