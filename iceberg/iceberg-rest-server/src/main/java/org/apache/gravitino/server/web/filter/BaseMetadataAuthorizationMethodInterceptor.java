@@ -30,16 +30,12 @@ import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.authorization.AuthorizationRequestContext;
 import org.apache.gravitino.authorization.AuthorizationUtils;
-import org.apache.gravitino.iceberg.common.ops.IcebergCatalogWrapper;
-import org.apache.gravitino.iceberg.service.IcebergCatalogWrapperManager;
 import org.apache.gravitino.iceberg.service.IcebergExceptionMapper;
-import org.apache.gravitino.iceberg.service.authorization.IcebergRESTServerContext;
 import org.apache.gravitino.server.authorization.annotations.AuthorizationExpression;
 import org.apache.gravitino.server.authorization.expression.AuthorizationExpressionEvaluator;
 import org.apache.gravitino.server.web.Utils;
 import org.apache.gravitino.utils.PrincipalUtils;
 import org.apache.iceberg.exceptions.ForbiddenException;
-import org.apache.iceberg.rest.RESTCatalog;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -108,6 +104,15 @@ public abstract class BaseMetadataAuthorizationMethodInterceptor implements Meth
   }
 
   /**
+   * Hook for subclasses to skip standard authorization before user validation and expression
+   * evaluation.
+   */
+  protected boolean shouldSkipAuthorization(
+      Map<Entity.EntityType, NameIdentifier> nameIdentifierMap) {
+    return false;
+  }
+
+  /**
    * Determine whether authorization is required and the rules via the authorization annotation ,
    * and obtain the metadata ID that requires authorization via the authorization annotation.
    *
@@ -128,7 +133,7 @@ public abstract class BaseMetadataAuthorizationMethodInterceptor implements Meth
         Map<Entity.EntityType, NameIdentifier> nameIdentifierMap =
             extractNameIdentifierFromParameters(parameters, args);
 
-        if (skipAuthorizationForRestCatalog(nameIdentifierMap)) {
+        if (shouldSkipAuthorization(nameIdentifierMap)) {
           return methodInvocation.proceed();
         }
 
@@ -212,24 +217,5 @@ public abstract class BaseMetadataAuthorizationMethodInterceptor implements Meth
     } catch (Throwable e) {
       return IcebergExceptionMapper.toRESTResponse(e);
     }
-  }
-
-  // Assuming all REST catalog instances are Gravitino servers, for this scenario, the Gravitino
-  // server would not perform authorization and would only act as a proxy.
-  private boolean skipAuthorizationForRestCatalog(
-      Map<Entity.EntityType, NameIdentifier> nameIdentifierMap) {
-    NameIdentifier catalogId = nameIdentifierMap.get(Entity.EntityType.CATALOG);
-    if (catalogId == null) {
-      return false;
-    }
-
-    IcebergCatalogWrapperManager wrapperManager =
-        IcebergRESTServerContext.getInstance().catalogWrapperManager();
-    if (wrapperManager == null) {
-      return false;
-    }
-
-    IcebergCatalogWrapper catalogWrapper = wrapperManager.getCatalogWrapper(catalogId.name());
-    return catalogWrapper != null && catalogWrapper.getCatalog() instanceof RESTCatalog;
   }
 }

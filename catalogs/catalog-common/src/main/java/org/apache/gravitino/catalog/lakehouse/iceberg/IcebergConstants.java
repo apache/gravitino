@@ -101,6 +101,8 @@ public class IcebergConstants {
   public static final String ICEBERG_REST_DEFAULT_METALAKE = "gravitino";
   public static final String ICEBERG_REST_DEFAULT_CATALOG = "default_catalog";
   public static final String ICEBERG_REST_DEFAULT_DYNAMIC_CATALOG_NAME = "default-catalog-name";
+  public static final String ICEBERG_REST_SKIP_AUTHORIZATION_FOR_REST_BACKEND =
+      "skip-authorization-for-rest-backend";
 
   public static final String TABLE_METADATA_CACHE_IMPL = "table-metadata-cache-impl";
   public static final String TABLE_METADATA_CACHE_CAPACITY = "table-metadata-cache-capacity";

@@ -61,7 +61,7 @@ public class TestIcebergMetadataAuthorizationMethodInterceptor {
     IcebergConfigProvider mockConfigProvider = Mockito.mock(IcebergConfigProvider.class);
     Mockito.when(mockConfigProvider.getMetalakeName()).thenReturn(TEST_METALAKE);
     Mockito.when(mockConfigProvider.getDefaultCatalogName()).thenReturn(TEST_CATALOG);
-    IcebergRESTServerContext.create(mockConfigProvider, false, false, null);
+    IcebergRESTServerContext.create(mockConfigProvider, false, false, true, null);
   }
 
   @Test
@@ -180,7 +180,7 @@ public class TestIcebergMetadataAuthorizationMethodInterceptor {
     RESTCatalog restCatalog = Mockito.mock(RESTCatalog.class);
     Mockito.when(wrapperManager.getCatalogWrapper(TEST_CATALOG)).thenReturn(wrapper);
     Mockito.when(wrapper.getCatalog()).thenReturn(restCatalog);
-    resetContext(wrapperManager);
+    resetContext(wrapperManager, true);
 
     Method method =
         TestOperations.class.getMethod(
@@ -215,7 +215,7 @@ public class TestIcebergMetadataAuthorizationMethodInterceptor {
     Catalog nonRestCatalog = Mockito.mock(Catalog.class);
     Mockito.when(wrapperManager.getCatalogWrapper(TEST_CATALOG)).thenReturn(wrapper);
     Mockito.when(wrapper.getCatalog()).thenReturn(nonRestCatalog);
-    resetContext(wrapperManager);
+    resetContext(wrapperManager, true);
 
     Method method =
         TestOperations.class.getMethod(
@@ -243,10 +243,50 @@ public class TestIcebergMetadataAuthorizationMethodInterceptor {
   }
 
   private void resetContext(IcebergCatalogWrapperManager wrapperManager) {
+    resetContext(wrapperManager, true);
+  }
+
+  private void resetContext(
+      IcebergCatalogWrapperManager wrapperManager, boolean skipAuthorizationForRestBackend) {
     IcebergConfigProvider mockConfigProvider = Mockito.mock(IcebergConfigProvider.class);
     Mockito.when(mockConfigProvider.getMetalakeName()).thenReturn(TEST_METALAKE);
     Mockito.when(mockConfigProvider.getDefaultCatalogName()).thenReturn(TEST_CATALOG);
-    IcebergRESTServerContext.create(mockConfigProvider, false, false, wrapperManager);
+    IcebergRESTServerContext.create(
+        mockConfigProvider, false, false, skipAuthorizationForRestBackend, wrapperManager);
+  }
+
+  @Test
+  public void testInvokeDoesNotSkipAuthorizationForRestCatalogWhenFlagDisabled() throws Throwable {
+    IcebergCatalogWrapperManager wrapperManager = Mockito.mock(IcebergCatalogWrapperManager.class);
+    CatalogWrapperForREST wrapper = Mockito.mock(CatalogWrapperForREST.class);
+    RESTCatalog restCatalog = Mockito.mock(RESTCatalog.class);
+    Mockito.when(wrapperManager.getCatalogWrapper(TEST_CATALOG)).thenReturn(wrapper);
+    Mockito.when(wrapper.getCatalog()).thenReturn(restCatalog);
+    resetContext(wrapperManager, false);
+
+    Method method =
+        TestOperations.class.getMethod(
+            "testTableOperationWithAuthorizationExpression",
+            String.class,
+            String.class,
+            String.class);
+    MethodInvocation invocation = Mockito.mock(MethodInvocation.class);
+    Mockito.when(invocation.getMethod()).thenReturn(method);
+    Mockito.when(invocation.getArguments())
+        .thenReturn(new Object[] {TEST_CATALOG + "/", TEST_SCHEMA, "tbl"});
+    Mockito.when(invocation.proceed()).thenReturn("PROCEEDED");
+
+    IcebergMetadataAuthorizationMethodInterceptor interceptor =
+        new IcebergMetadataAuthorizationMethodInterceptor() {
+          @Override
+          protected Optional<AuthorizationHandler> createAuthorizationHandler(
+              Parameter[] parameters, Object[] args) {
+            throw new RuntimeException("test");
+          }
+        };
+    Object result = interceptor.invoke(invocation);
+
+    assertNotEquals("PROCEEDED", result);
   }
 
   /** Test operations class to provide method annotations for testing. */

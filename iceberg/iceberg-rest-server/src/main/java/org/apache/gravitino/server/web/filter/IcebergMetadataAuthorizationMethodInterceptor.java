@@ -26,6 +26,8 @@ import java.util.Optional;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.Entity.EntityType;
 import org.apache.gravitino.NameIdentifier;
+import org.apache.gravitino.iceberg.common.ops.IcebergCatalogWrapper;
+import org.apache.gravitino.iceberg.service.IcebergCatalogWrapperManager;
 import org.apache.gravitino.iceberg.service.IcebergRESTUtils;
 import org.apache.gravitino.iceberg.service.authorization.IcebergRESTServerContext;
 import org.apache.gravitino.server.authorization.annotations.AuthorizationMetadata;
@@ -33,6 +35,7 @@ import org.apache.gravitino.server.authorization.annotations.IcebergAuthorizatio
 import org.apache.gravitino.server.authorization.annotations.IcebergAuthorizationMetadata.RequestType;
 import org.apache.gravitino.utils.NameIdentifierUtil;
 import org.apache.iceberg.catalog.Namespace;
+import org.apache.iceberg.rest.RESTCatalog;
 import org.apache.iceberg.rest.RESTUtil;
 
 /**
@@ -130,5 +133,28 @@ public class IcebergMetadataAuthorizationMethodInterceptor
   @Override
   protected boolean isExceptionPropagate(Exception e) {
     return e.getClass().getName().startsWith("org.apache.iceberg.exceptions");
+  }
+
+  @Override
+  protected boolean shouldSkipAuthorization(Map<EntityType, NameIdentifier> nameIdentifierMap) {
+    if (!IcebergRESTServerContext.getInstance().skipAuthorizationForRestBackend()) {
+      return false;
+    }
+
+    NameIdentifier catalogId = nameIdentifierMap.get(EntityType.CATALOG);
+    if (catalogId == null) {
+      return false;
+    }
+
+    IcebergCatalogWrapperManager wrapperManager =
+        IcebergRESTServerContext.getInstance().catalogWrapperManager();
+    if (wrapperManager == null) {
+      return false;
+    }
+
+    IcebergCatalogWrapper catalogWrapper = wrapperManager.getCatalogWrapper(catalogId.name());
+    // When IRC2 is another Gravitino server, IRC1 acts as a proxy and does not perform
+    // authorization. IRC2 handles authorization.
+    return catalogWrapper != null && catalogWrapper.getCatalog() instanceof RESTCatalog;
   }
 }

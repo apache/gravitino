@@ -71,7 +71,7 @@ Schema properties supply or set metadata for the underlying Hive database.
 The following table lists predefined schema properties for the Hive database. Additionally, you can define your own key-value pair properties and transmit them to the underlying Hive database.
 
 | Property name | Description                                                              | Default value                                                                           | Required | Since Version |
-|---------------|--------------------------------------------------------------------------|-----------------------------------------------------------------------------------------|----------|---------------|
+|---------------|------------------------------------------------------------------------ -|-----------------------------------------------------------------------------------------|----------|---------------|
 | `location`    | The directory for Hive database storage, such as `/user/hive/warehouse`. | HMS uses the value of `hive.metastore.warehouse.dir` in the `hive-site.xml` by default. | No       | 0.1.0         |
 
 ### Schema operations

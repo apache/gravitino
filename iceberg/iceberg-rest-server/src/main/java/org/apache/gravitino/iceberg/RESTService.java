@@ -103,6 +103,8 @@ public class RESTService implements GravitinoAuxiliaryService {
     this.configProvider = IcebergConfigProviderFactory.create(configProperties);
     configProvider.initialize(configProperties);
     String metalakeName = configProvider.getMetalakeName();
+    boolean skipAuthorizationForRestBackend =
+        icebergConfig.get(IcebergConfig.ICEBERG_REST_SKIP_AUTHORIZATION_FOR_REST_BACKEND);
 
     Boolean enableAuth = GravitinoEnv.getInstance().config().get(Configs.ENABLE_AUTHORIZATION);
     EventBus eventBus = GravitinoEnv.getInstance().eventBus();
@@ -110,7 +112,11 @@ public class RESTService implements GravitinoAuxiliaryService {
         new IcebergCatalogWrapperManager(configProperties, configProvider, auxMode, metalakeName);
     IcebergRESTServerContext authorizationContext =
         IcebergRESTServerContext.create(
-            configProvider, enableAuth, auxMode, icebergCatalogWrapperManager);
+            configProvider,
+            enableAuth,
+            auxMode,
+            skipAuthorizationForRestBackend,
+            icebergCatalogWrapperManager);
     this.icebergMetricsManager = new IcebergMetricsManager(icebergConfig);
     IcebergTableOperationDispatcher icebergTableOperationDispatcher =
         new IcebergTableOperationExecutor(icebergCatalogWrapperManager);
