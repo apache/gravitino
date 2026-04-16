@@ -74,7 +74,7 @@ scala-java-compat = "1.0.2"
 sqlite-jdbc = "3.42.0.0"
 testcontainers = "1.21.4"
 jwt = "0.11.1"
-nimbus-jose-jwt = "9.37.3"
+nimbus-jose-jwt = "10.9"
 jline = "3.21.0"
 okhttp3 = "4.11.0"
 opencsv = "2.3"
@@ -141,6 +141,7 @@ ql-expression = "4.0.3"
 
 [libraries]
 aspectj-aspectjrt = { group = "org.aspectj", name = "aspectjrt", version.ref = "aspectj" }
+aws-glue = { group = "software.amazon.awssdk", name = "glue", version.ref = "awssdk" }
 aws-iam = { group = "software.amazon.awssdk", name = "iam", version.ref = "awssdk" }
 aws-policy = { group = "software.amazon.awssdk", name = "iam-policy-builder", version.ref = "awssdk" }
 aws-s3 = { group = "software.amazon.awssdk", name = "s3", version.ref = "awssdk" }

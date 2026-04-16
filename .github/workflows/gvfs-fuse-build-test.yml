@@ -78,8 +78,8 @@ jobs:
 
       - name: Integration test
         run: |
-          ./gradlew build -x :clients:client-python:build -x test -x web 
-          ./gradlew compileDistribution -x :clients:client-python:build -x test -x web 
+          ./gradlew build -PskipWeb=true -x :clients:client-python:build -x test -x web
+          ./gradlew compileDistribution -PskipWeb=true -x :clients:client-python:build -x test -x web
           cd clients/filesystem-fuse
           make test-s3
           make test-fuse-it
@@ -97,4 +97,3 @@ jobs:
             clients/filesystem-fuse/target/debug/fuse.log
             distribution/package/logs/gravitino-server.out
             distribution/package/logs/gravitino-server.log
-

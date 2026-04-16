@@ -955,11 +955,11 @@ curl -X PUT -H "Accept: application/vnd.gravitino.v1+json" \
 ```java
 GravitinoClient client = ...
 
-// Grant the privilege allowing `SELEC_TABLE` for the `schema` to `role1`        
+// Grant the privilege allowing `SELECT_TABLE` for the `schema` to `role1`        
 MetadataObject schema = ...
 Role role = client.grantPrivilegesToRole("role1", schema, Lists.newArrayList(Privileges.SelectTable.allow()));        
 
-// Grant the privilege allowing `SELEC_TABLE` for the `table` to `role1`        
+// Grant the privilege allowing `SELECT_TABLE` for the `table` to `role1`        
 MetadataObject table = ...
 Role role = client.grantPrivilegesToRole("role1", table, Lists.newArrayList(Privileges.SelectTable.allow()));
 ```
@@ -1190,6 +1190,8 @@ Owner owner = client.getOwner(table);
 ### set the owner
 
 You can set the owner of a metadata object.
+
+The request path for REST API is `/api/metalakes/{metalake}/owners/{metadataObjectType}/{metadataObjectName}`.
 
 <Tabs groupId='language' queryString>
 <TabItem value="shell" label="Shell">

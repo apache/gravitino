@@ -22,6 +22,9 @@ import java.util.Arrays;
 import java.util.Optional;
 import javax.servlet.http.HttpServletRequest;
 import javax.ws.rs.core.Application;
+import javax.ws.rs.core.EntityTag;
+import javax.ws.rs.core.Response;
+import org.apache.gravitino.iceberg.service.IcebergRESTUtils;
 import org.apache.gravitino.listener.api.event.Event;
 import org.apache.gravitino.listener.api.event.IcebergCreateNamespaceEvent;
 import org.apache.gravitino.listener.api.event.IcebergCreateNamespaceFailureEvent;
@@ -187,6 +190,26 @@ public class TestIcebergNamespaceOperations extends IcebergNamespaceTestBase {
         dummyEventListener.popPostEvent() instanceof IcebergRegisterTableFailureEvent);
 
     verifyRegisterTableSucc("register_foo2", Namespace.of("register_ns_2", "a"));
+  }
+
+  @Test
+  void testRegisterTableReturnsETag() {
+    Namespace ns = Namespace.of("register_etag_ns");
+    Response response = doRegisterTable("register_etag_foo1", ns);
+    Assertions.assertEquals(Response.Status.OK.getStatusCode(), response.getStatus());
+    String etag = response.getHeaderString("ETag");
+    Assertions.assertNotNull(etag, "ETag header should be present in register table response");
+    Assertions.assertFalse(etag.isEmpty(), "ETag header should not be empty");
+
+    // Verify the ETag value matches the expected SHA-256 hash of the known mock metadata location
+    Optional<EntityTag> expectedETag =
+        IcebergRESTUtils.generateETag(
+            "/mock/metadata/v1.metadata.json", IcebergRESTUtils.SnapshotMode.ALL.getValue());
+    Assertions.assertTrue(expectedETag.isPresent(), "Expected ETag should be generated");
+    Assertions.assertEquals(
+        "\"" + expectedETag.get().getValue() + "\"",
+        etag,
+        "ETag should match SHA-256 hash of mock metadata location with default snapshots");
   }
 
   @ParameterizedTest
