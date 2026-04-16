@@ -141,6 +141,7 @@ dependencies {
     exclude("javax.servlet", "servlet-api")
     exclude("org.mortbay.jetty")
   }
+  testImplementation(libs.hadoop3.hdfs.client)
   testImplementation(libs.hadoop3.mapreduce.client.core) {
     exclude("*")
   }
