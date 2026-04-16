@@ -374,6 +374,20 @@ for (String scope : HierarchicalSchemaUtil.parentScopes("A:B:C")) {
 - No metadata model migration required.
 - Existing non-nested namespace behavior remains unchanged.
 - Limiting quoted identifier parsing to `schema` reduces regression risk for catalog/table/view/function identifier parsing.
+- Internal representation in Gravitino may use `:` for hierarchical schema semantics.
+- Spark/Flink/Trino connector-facing namespace representation must stay consistent with Iceberg
+  conventions and should not require users to input Gravitino-internal `:` format directly.
+- Connector layer is responsible for translation between Iceberg-style namespace representation and
+  Gravitino internal hierarchical schema representation.
+
+Rationale:
+
+- Keep connector-facing behavior aligned with Iceberg to preserve existing engine user experience
+  and avoid introducing a Gravitino-specific namespace syntax into Spark/Flink/Trino SQL or APIs.
+- Reduce migration cost and compatibility risk for current Iceberg workloads, scripts, and
+  operational tooling that already assume Iceberg namespace conventions.
+- Isolate internal representation changes inside Gravitino/connector translation boundaries, so
+  future internal evolution does not force external breaking changes for engine integrations.
 
 ## Test Plan
 
