@@ -641,7 +641,7 @@ public class TestCatalogManager {
         .when(wrapper)
         .doWithSchemaOps(any());
 
-    // Imported schema (no StringIdentifier, no gravitino.created marker) should not block drop.
+    // Imported schema (no StringIdentifier in external catalog properties) should not block drop.
     Assertions.assertTrue(catalogManager.dropCatalog(ident));
   }
 
@@ -666,6 +666,19 @@ public class TestCatalogManager {
     Assertions.assertDoesNotThrow(() -> catalogManager.disableCatalog(ident));
     CatalogEntity catalogEntity = entityStore.get(ident, EntityType.CATALOG, CatalogEntity.class);
     FieldUtils.writeField(catalog, "entity", catalogEntity, true);
+
+    SchemaEntity schemaEntity =
+        SchemaEntity.builder()
+            .withId(RandomIdGenerator.INSTANCE.nextId())
+            .withName("default")
+            .withNamespace(Namespace.of("metalake", "test41"))
+            .withAuditInfo(
+                AuditInfo.builder()
+                    .withCreator(PrincipalUtils.getCurrentPrincipal().getName())
+                    .withCreateTime(Instant.now())
+                    .build())
+            .build();
+    entityStore.put(schemaEntity);
 
     CatalogManager.CatalogWrapper wrapper = Mockito.mock(CatalogManager.CatalogWrapper.class);
     Capability capability = Mockito.mock(Capability.class);

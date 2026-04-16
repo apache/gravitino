@@ -879,20 +879,12 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
     Set<String> availableSchemaNames =
         Arrays.stream(allSchemas).map(NameIdentifier::name).collect(Collectors.toSet());
 
-    // Some schemas are dropped externally, but still exist in the entity store — those are invalid.
-    // Among schemas that still exist in the underlying catalog, only count those created via
-    // Gravitino. New schemas carry an entity-store marker; older schemas fall back to the embedded
-    // StringIdentifier in external catalog metadata.
+    // Some schemas are dropped externally but still exist in the entity store — those are invalid.
+    // Among schemas that exist in the underlying catalog, only those created via Gravitino carry a
+    // StringIdentifier in their external properties; imported schemas do not.
     for (SchemaEntity schemaEntity : schemaEntities) {
       if (!availableSchemaNames.contains(schemaEntity.name())) {
         continue;
-      }
-
-      Map<String, String> entityProps = schemaEntity.properties();
-      if (entityProps != null
-          && SchemaOperationDispatcher.SCHEMA_CREATED_BY_GRAVITINO_VALUE.equals(
-              entityProps.get(SchemaOperationDispatcher.SCHEMA_CREATED_BY_GRAVITINO))) {
-        return true;
       }
 
       try {
