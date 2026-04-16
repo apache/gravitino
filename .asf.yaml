@@ -58,8 +58,9 @@ github:
     - sunxiaojian
     - danhuawang
     - tsungchih
-    - beinan
     - laserninja
+    - geyanggang
+    - markhoerth
 
 notifications:
   commits: commits@gravitino.apache.org
