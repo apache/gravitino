@@ -10,11 +10,11 @@ INSERT: 1 row
 
 "true"
 
-EXECUTE expire_snapshots
+ALTER TABLE EXECUTE
 
 "3"
 
-EXECUTE remove_orphan_files
+ALTER TABLE EXECUTE
 
 "3"
 
@@ -22,11 +22,11 @@ INSERT: 1 row
 
 INSERT: 1 row
 
-EXECUTE optimize
+ALTER TABLE EXECUTE
 
 "5"
 
-EXECUTE rewrite_manifests
+ALTER TABLE EXECUTE
 
 "5"
 
