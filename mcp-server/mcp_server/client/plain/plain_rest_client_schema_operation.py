@@ -31,6 +31,7 @@ class PlainRESTClientSchemaOperation(SchemaOperation):
 
     async def get_list_of_schemas(self, catalog_name: str) -> str:
         response = await self.rest_client.get(
-            f"/api/metalakes/{encode_path_segment(self.metalake_name)}/catalogs/{encode_path_segment(catalog_name)}/schemas"
+            f"/api/metalakes/{encode_path_segment(self.metalake_name)}"
+            f"/catalogs/{encode_path_segment(catalog_name)}/schemas"
         )
         return extract_content_from_response(response, "identifiers", [])

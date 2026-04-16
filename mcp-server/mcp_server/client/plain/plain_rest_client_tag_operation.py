@@ -80,7 +80,9 @@ class PlainRESTClientTagOperation(TagOperation):
         tags_to_disassociate: list,
     ) -> str:
         response = await self.rest_client.post(
-            f"/api/metalakes/{encode_path_segment(self.metalake_name)}/objects/{encode_path_segment(metadata_type)}/{encode_path_segment(metadata_full_name)}/tags",
+            f"/api/metalakes/{encode_path_segment(self.metalake_name)}"
+            f"/objects/{encode_path_segment(metadata_type)}"
+            f"/{encode_path_segment(metadata_full_name)}/tags",
             json={
                 "tagsToAdd": tags_to_associate,
                 "tagsToRemove": tags_to_disassociate,
@@ -92,7 +94,9 @@ class PlainRESTClientTagOperation(TagOperation):
         self, metadata_full_name: str, metadata_type: str
     ) -> str:
         response = await self.rest_client.get(
-            f"/api/metalakes/{encode_path_segment(self.metalake_name)}/objects/{encode_path_segment(metadata_type)}/{encode_path_segment(metadata_full_name)}/tags?details=true"
+            f"/api/metalakes/{encode_path_segment(self.metalake_name)}"
+            f"/objects/{encode_path_segment(metadata_type)}"
+            f"/{encode_path_segment(metadata_full_name)}/tags?details=true"
         )
         return extract_content_from_response(response, "names", [])
 

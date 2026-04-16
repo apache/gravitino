@@ -30,7 +30,9 @@ class PlainRESTClientTopicOperation(TopicOperation):
 
     async def list_of_topics(self, catalog_name: str, schema_name: str) -> str:
         response = await self.rest_client.get(
-            f"/api/metalakes/{encode_path_segment(self.metalake_name)}/catalogs/{encode_path_segment(catalog_name)}/schemas/{encode_path_segment(schema_name)}/topics"
+            f"/api/metalakes/{encode_path_segment(self.metalake_name)}"
+            f"/catalogs/{encode_path_segment(catalog_name)}"
+            f"/schemas/{encode_path_segment(schema_name)}/topics"
         )
         return response.json().get("identifiers", [])
 
@@ -38,6 +40,9 @@ class PlainRESTClientTopicOperation(TopicOperation):
         self, catalog_name: str, schema_name: str, topic_name: str
     ) -> str:
         response = await self.rest_client.get(
-            f"/api/metalakes/{encode_path_segment(self.metalake_name)}/catalogs/{encode_path_segment(catalog_name)}/schemas/{encode_path_segment(schema_name)}/topics/{encode_path_segment(topic_name)}"
+            f"/api/metalakes/{encode_path_segment(self.metalake_name)}"
+            f"/catalogs/{encode_path_segment(catalog_name)}"
+            f"/schemas/{encode_path_segment(schema_name)}"
+            f"/topics/{encode_path_segment(topic_name)}"
         )
         return response.json().get("topic", {})

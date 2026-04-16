@@ -31,7 +31,9 @@ class PlainRESTClientStatisticOperation(StatisticOperation):
         self, metalake_name: str, metadata_type: str, metadata_fullname: str
     ) -> str:
         response = await self.rest_client.get(
-            f"/api/metalakes/{encode_path_segment(metalake_name)}/objects/{encode_path_segment(metadata_type)}/{encode_path_segment(metadata_fullname)}/statistics"
+            f"/api/metalakes/{encode_path_segment(metalake_name)}"
+            f"/objects/{encode_path_segment(metadata_type)}"
+            f"/{encode_path_segment(metadata_fullname)}/statistics"
         )
         return extract_content_from_response(response, "statistics", [])
 
@@ -47,7 +49,9 @@ class PlainRESTClientStatisticOperation(StatisticOperation):
         to_inclusive: bool = False,
     ) -> str:
         response = await self.rest_client.get(
-            f"/api/metalakes/{encode_path_segment(metalake_name)}/objects/{encode_path_segment(metadata_type)}/{encode_path_segment(metadata_fullname)}/statistics/partitions",
+            f"/api/metalakes/{encode_path_segment(metalake_name)}"
+            f"/objects/{encode_path_segment(metadata_type)}"
+            f"/{encode_path_segment(metadata_fullname)}/statistics/partitions",
             params={
                 "from": from_partition_name,
                 "to": to_partition_name,

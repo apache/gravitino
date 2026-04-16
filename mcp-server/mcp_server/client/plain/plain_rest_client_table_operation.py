@@ -34,7 +34,9 @@ class PlainRESTClientTableOperation(TableOperation):
         self, catalog_name: str, schema_name: str
     ) -> str:
         response = await self.rest_client.get(
-            f"/api/metalakes/{encode_path_segment(self.metalake_name)}/catalogs/{encode_path_segment(catalog_name)}/schemas/{encode_path_segment(schema_name)}/tables"
+            f"/api/metalakes/{encode_path_segment(self.metalake_name)}"
+            f"/catalogs/{encode_path_segment(catalog_name)}"
+            f"/schemas/{encode_path_segment(schema_name)}/tables"
         )
         return extract_content_from_response(response, "identifiers", [])
 
@@ -42,6 +44,9 @@ class PlainRESTClientTableOperation(TableOperation):
         self, catalog_name: str, schema_name: str, table_name: str
     ) -> str:
         response = await self.rest_client.get(
-            f"/api/metalakes/{encode_path_segment(self.metalake_name)}/catalogs/{encode_path_segment(catalog_name)}/schemas/{encode_path_segment(schema_name)}/tables/{encode_path_segment(table_name)}"
+            f"/api/metalakes/{encode_path_segment(self.metalake_name)}"
+            f"/catalogs/{encode_path_segment(catalog_name)}"
+            f"/schemas/{encode_path_segment(schema_name)}"
+            f"/tables/{encode_path_segment(table_name)}"
         )
         return extract_content_from_response(response, "table", {})

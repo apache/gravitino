@@ -30,7 +30,9 @@ class PlainRESTClientModelOperation(ModelOperation):
 
     async def list_of_models(self, catalog_name: str, schema_name: str) -> str:
         response = await self.rest_client.get(
-            f"/api/metalakes/{encode_path_segment(self.metalake_name)}/catalogs/{encode_path_segment(catalog_name)}/schemas/{encode_path_segment(schema_name)}/models"
+            f"/api/metalakes/{encode_path_segment(self.metalake_name)}"
+            f"/catalogs/{encode_path_segment(catalog_name)}"
+            f"/schemas/{encode_path_segment(schema_name)}/models"
         )
         return response.json().get("identifiers", [])
 
@@ -38,7 +40,10 @@ class PlainRESTClientModelOperation(ModelOperation):
         self, catalog_name: str, schema_name: str, model_name: str
     ) -> str:
         response = await self.rest_client.get(
-            f"/api/metalakes/{encode_path_segment(self.metalake_name)}/catalogs/{encode_path_segment(catalog_name)}/schemas/{encode_path_segment(schema_name)}/models/{encode_path_segment(model_name)}"
+            f"/api/metalakes/{encode_path_segment(self.metalake_name)}"
+            f"/catalogs/{encode_path_segment(catalog_name)}"
+            f"/schemas/{encode_path_segment(schema_name)}"
+            f"/models/{encode_path_segment(model_name)}"
         )
         return response.json().get("model", {})
 
@@ -46,8 +51,10 @@ class PlainRESTClientModelOperation(ModelOperation):
         self, catalog_name: str, schema_name: str, model_name: str
     ) -> str:
         response = await self.rest_client.get(
-            f"/api/metalakes/{encode_path_segment(self.metalake_name)}/catalogs/{encode_path_segment(catalog_name)}/schemas/{encode_path_segment(schema_name)}/models/{encode_path_segment(model_name)}"
-            f"/versions?details=true"
+            f"/api/metalakes/{encode_path_segment(self.metalake_name)}"
+            f"/catalogs/{encode_path_segment(catalog_name)}"
+            f"/schemas/{encode_path_segment(schema_name)}"
+            f"/models/{encode_path_segment(model_name)}/versions?details=true"
         )
         return response.json().get("infos", [])
 
@@ -55,7 +62,10 @@ class PlainRESTClientModelOperation(ModelOperation):
         self, catalog_name: str, schema_name: str, model_name: str, version: int
     ) -> str:
         response = await self.rest_client.get(
-            f"/api/metalakes/{encode_path_segment(self.metalake_name)}/catalogs/{encode_path_segment(catalog_name)}/schemas/{encode_path_segment(schema_name)}/models/{encode_path_segment(model_name)}"
+            f"/api/metalakes/{encode_path_segment(self.metalake_name)}"
+            f"/catalogs/{encode_path_segment(catalog_name)}"
+            f"/schemas/{encode_path_segment(schema_name)}"
+            f"/models/{encode_path_segment(model_name)}"
             f"/versions/{encode_path_segment(version)}"
         )
         return response.json().get("modelVersion", {})
@@ -64,7 +74,10 @@ class PlainRESTClientModelOperation(ModelOperation):
         self, catalog_name: str, schema_name: str, model_name: str, alias: str
     ) -> str:
         response = await self.rest_client.get(
-            f"/api/metalakes/{encode_path_segment(self.metalake_name)}/catalogs/{encode_path_segment(catalog_name)}/schemas/{encode_path_segment(schema_name)}/models/{encode_path_segment(model_name)}/"
-            f"aliases/{encode_path_segment(alias)}"
+            f"/api/metalakes/{encode_path_segment(self.metalake_name)}"
+            f"/catalogs/{encode_path_segment(catalog_name)}"
+            f"/schemas/{encode_path_segment(schema_name)}"
+            f"/models/{encode_path_segment(model_name)}"
+            f"/aliases/{encode_path_segment(alias)}"
         )
         return response.json().get("modelVersion", {})

@@ -28,7 +28,9 @@ class PlainRESTClientFilesetOperation(FilesetOperation):
         self, catalog_name: str, schema_name: str
     ) -> str:
         response = await self.rest_client.get(
-            f"/api/metalakes/{encode_path_segment(self.metalake_name)}/catalogs/{encode_path_segment(catalog_name)}/schemas/{encode_path_segment(schema_name)}/filesets"
+            f"/api/metalakes/{encode_path_segment(self.metalake_name)}"
+            f"/catalogs/{encode_path_segment(catalog_name)}"
+            f"/schemas/{encode_path_segment(schema_name)}/filesets"
         )
         return response.json().get("identifiers", [])
 
@@ -36,7 +38,10 @@ class PlainRESTClientFilesetOperation(FilesetOperation):
         self, catalog_name: str, schema_name: str, fileset_name: str
     ) -> str:
         response = await self.rest_client.get(
-            f"/api/metalakes/{encode_path_segment(self.metalake_name)}/catalogs/{encode_path_segment(catalog_name)}/schemas/{encode_path_segment(schema_name)}/filesets/{encode_path_segment(fileset_name)}"
+            f"/api/metalakes/{encode_path_segment(self.metalake_name)}"
+            f"/catalogs/{encode_path_segment(catalog_name)}"
+            f"/schemas/{encode_path_segment(schema_name)}"
+            f"/filesets/{encode_path_segment(fileset_name)}"
         )
         return response.json().get("fileset", {})
 
@@ -50,7 +55,9 @@ class PlainRESTClientFilesetOperation(FilesetOperation):
         sub_path: str = "/",
     ) -> str:
         response = await self.rest_client.get(
-            f"/api/metalakes/{encode_path_segment(self.metalake_name)}/catalogs/{encode_path_segment(catalog_name)}/schemas/{encode_path_segment(schema_name)}"
+            f"/api/metalakes/{encode_path_segment(self.metalake_name)}"
+            f"/catalogs/{encode_path_segment(catalog_name)}"
+            f"/schemas/{encode_path_segment(schema_name)}"
             f"/filesets/{encode_path_segment(fileset_name)}/files",
             params={"sub_path": sub_path, "location_name": location_name},
         )
