@@ -61,6 +61,7 @@ github:
     - beinan
     - laserninja
     - geyanggang
+    - markhoerth
 
 notifications:
   commits: commits@gravitino.apache.org
