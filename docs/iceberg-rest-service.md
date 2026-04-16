@@ -132,7 +132,6 @@ Use the REST backend to proxy another Iceberg REST catalog server (IRC2). The Gr
 
 By default, when the backend catalog is a REST catalog, IRC1 skips authorization and behaves as a proxy. IRC2 handles authorization. If you want IRC1 to keep authorization checks, set `gravitino.iceberg-rest.skip-authorization-for-rest-backend=false`.
 
-
 | Configuration item                                                  | Description                                                                                                                                                    | Default value | Required | Since Version |
 |---------------------------------------------------------------------|----------------------------------------------------------------------------------------------------------------------------------------------------------------|---------------|----------|---------------|
 | `gravitino.iceberg-rest.catalog-backend`                            | The Catalog backend of the Gravitino Iceberg REST catalog service. Use the value **`rest`** for the REST catalog backend.                                      | `memory`      | Yes      | 0.2.0         |
