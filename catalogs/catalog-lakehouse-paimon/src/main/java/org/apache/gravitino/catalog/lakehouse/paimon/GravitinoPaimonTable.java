@@ -251,7 +251,7 @@ public class GravitinoPaimonTable extends BaseTable {
       bucketKeyList = (primaryKeys != null) ? primaryKeys : Collections.emptyList();
     }
 
-    String bucketValue = properties.get(BUCKET_NUM);
+    String bucketNum = properties.get(BUCKET_NUM);
 
     if (bucketKeyList.isEmpty()) {
       return Distributions.NONE;
@@ -260,13 +260,12 @@ public class GravitinoPaimonTable extends BaseTable {
     Expression[] expressions =
         bucketKeyList.stream().map(NamedReference::field).toArray(Expression[]::new);
 
-    if (StringUtils.isBlank(bucketValue)) {
+    if (StringUtils.isBlank(bucketNum)) {
       return Distributions.auto(Strategy.HASH, expressions);
     }
 
-    String trimmedBucketValue = bucketValue.trim();
     try {
-      int parsedBucket = Integer.parseInt(trimmedBucketValue);
+      int parsedBucket = Integer.parseInt(bucketNum.trim());
       if (parsedBucket == -1) {
         return Distributions.auto(Strategy.HASH, expressions);
       }
@@ -274,12 +273,12 @@ public class GravitinoPaimonTable extends BaseTable {
         throw new IllegalArgumentException(
             String.format(
                 "Paimon bucket number must be a positive integer or -1 (dynamic mode), but was '%s'.",
-                bucketValue));
+                bucketNum));
       }
       return Distributions.hash(parsedBucket, expressions);
     } catch (NumberFormatException e) {
       throw new IllegalArgumentException(
-          String.format("Paimon bucket number must be a valid integer, but was '%s'.", bucketValue),
+          String.format("Paimon bucket number must be a valid integer, but was '%s'.", bucketNum),
           e);
     }
   }
