@@ -354,6 +354,7 @@ public class TestAuthMappers {
             .withCurrentVersion(1L)
             .withLastVersion(0L)
             .withDeleteAt(0L)
+            .withUpdatedAt(0L)
             .build();
     ownerMetaMapper.insertOwnerRel(ownerRelPO);
 
@@ -380,6 +381,7 @@ public class TestAuthMappers {
             .withCurrentVersion(1L)
             .withLastVersion(0L)
             .withDeleteAt(0L)
+            .withUpdatedAt(0L)
             .build();
     ownerMetaMapper.insertOwnerRel(ownerRelPO);
 

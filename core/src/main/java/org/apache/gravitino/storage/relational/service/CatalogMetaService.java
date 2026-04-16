@@ -24,6 +24,7 @@ import com.google.common.base.Preconditions;
 import java.io.IOException;
 import java.util.List;
 import java.util.Objects;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 import org.apache.gravitino.Entity;
@@ -38,6 +39,7 @@ import org.apache.gravitino.meta.SchemaEntity;
 import org.apache.gravitino.metrics.Monitored;
 import org.apache.gravitino.storage.relational.helper.CatalogIds;
 import org.apache.gravitino.storage.relational.mapper.CatalogMetaMapper;
+import org.apache.gravitino.storage.relational.mapper.EntityChangeLogMapper;
 import org.apache.gravitino.storage.relational.mapper.FilesetMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.FilesetVersionMapper;
 import org.apache.gravitino.storage.relational.mapper.FunctionMetaMapper;
@@ -219,23 +221,44 @@ public class CatalogMetaService {
         newEntity.id(),
         oldCatalogEntity.id());
 
-    Integer updateResult;
+    String metalakeName = identifier.namespace().level(0);
+    String oldFullName = oldCatalogEntity.name();
+    String newFullName = newEntity.name();
+    boolean isRenamed = !Objects.equals(oldFullName, newFullName);
+
+    AtomicInteger updateResult = new AtomicInteger(0);
     try {
-      updateResult =
-          SessionUtils.doWithCommitAndFetchResult(
-              CatalogMetaMapper.class,
-              mapper ->
-                  mapper.updateCatalogMeta(
-                      POConverters.updateCatalogPOWithVersion(
-                          oldCatalogPO, newEntity, oldCatalogPO.getMetalakeId()),
-                      oldCatalogPO));
+      SessionUtils.doMultipleWithCommit(
+          () ->
+              updateResult.set(
+                  SessionUtils.getWithoutCommit(
+                      CatalogMetaMapper.class,
+                      mapper ->
+                          mapper.updateCatalogMeta(
+                              POConverters.updateCatalogPOWithVersion(
+                                  oldCatalogPO, newEntity, oldCatalogPO.getMetalakeId()),
+                              oldCatalogPO))),
+          () -> {
+            if (isRenamed && updateResult.get() > 0) {
+              long now = System.currentTimeMillis();
+              SessionUtils.doWithoutCommit(
+                  EntityChangeLogMapper.class,
+                  mapper ->
+                      mapper.insertChange(
+                          metalakeName,
+                          Entity.EntityType.CATALOG.name(),
+                          oldFullName,
+                          "ALTER",
+                          now));
+            }
+          });
     } catch (RuntimeException re) {
       ExceptionUtils.checkSQLException(
           re, Entity.EntityType.CATALOG, newEntity.nameIdentifier().toString());
       throw re;
     }
 
-    if (updateResult > 0) {
+    if (updateResult.get() > 0) {
       return newEntity;
     } else {
       throw new IOException("Failed to update the entity: " + identifier);
@@ -250,6 +273,7 @@ public class CatalogMetaService {
 
     String catalogName = identifier.name();
     long catalogId = EntityIdService.getEntityId(identifier, Entity.EntityType.CATALOG);
+    String metalakeName = identifier.namespace().level(0);
 
     if (cascade) {
       SessionUtils.doMultipleWithCommit(
@@ -322,8 +346,15 @@ public class CatalogMetaService {
                   mapper -> mapper.softDeleteStatisticsByCatalogId(catalogId)),
           () ->
               SessionUtils.doWithoutCommit(
-                  ViewMetaMapper.class,
-                  mapper -> mapper.softDeleteViewMetasByCatalogId(catalogId)));
+                  ViewMetaMapper.class, mapper -> mapper.softDeleteViewMetasByCatalogId(catalogId)),
+          () -> {
+            long now = System.currentTimeMillis();
+            SessionUtils.doWithoutCommit(
+                EntityChangeLogMapper.class,
+                mapper ->
+                    mapper.insertChange(
+                        metalakeName, Entity.EntityType.CATALOG.name(), catalogName, "DROP", now));
+          });
     } else {
       List<SchemaEntity> schemaEntities =
           SchemaMetaService.getInstance()
@@ -365,7 +396,15 @@ public class CatalogMetaService {
                   PolicyMetadataObjectRelMapper.class,
                   mapper ->
                       mapper.softDeletePolicyMetadataObjectRelsByMetadataObject(
-                          catalogId, MetadataObject.Type.CATALOG.name())));
+                          catalogId, MetadataObject.Type.CATALOG.name())),
+          () -> {
+            long now = System.currentTimeMillis();
+            SessionUtils.doWithoutCommit(
+                EntityChangeLogMapper.class,
+                mapper ->
+                    mapper.insertChange(
+                        metalakeName, Entity.EntityType.CATALOG.name(), catalogName, "DROP", now));
+          });
     }
 
     return true;

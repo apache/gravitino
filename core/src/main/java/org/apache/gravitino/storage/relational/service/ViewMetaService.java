@@ -22,6 +22,7 @@ import static org.apache.gravitino.metrics.source.MetricsSource.GRAVITINO_RELATI
 
 import java.io.IOException;
 import java.util.List;
+import java.util.Objects;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Function;
 import java.util.stream.Collectors;
@@ -36,6 +37,7 @@ import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.meta.GenericEntity;
 import org.apache.gravitino.meta.NamespacedEntityId;
 import org.apache.gravitino.metrics.Monitored;
+import org.apache.gravitino.storage.relational.mapper.EntityChangeLogMapper;
 import org.apache.gravitino.storage.relational.mapper.OwnerMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.SecurableObjectMapper;
 import org.apache.gravitino.storage.relational.mapper.TagMetadataObjectRelMapper;
@@ -222,7 +224,13 @@ public class ViewMetaService {
             .withCurrentVersion(oldViewPO.getCurrentVersion())
             .build();
 
-    updateView(oldViewPO, newViewPO);
+    String metalakeName = ident.namespace().level(0);
+    String catalogName = ident.namespace().level(1);
+    String schemaName = ident.namespace().level(2);
+    String oldFullName = catalogName + "." + schemaName + "." + oldViewPO.getViewName();
+    boolean isRenamed = !Objects.equals(oldViewPO.getViewName(), newViewPO.getViewName());
+
+    updateView(oldViewPO, newViewPO, metalakeName, oldFullName, isRenamed);
 
     return newEntity;
   }
@@ -240,7 +248,11 @@ public class ViewMetaService {
     NameIdentifierUtil.checkView(ident);
 
     ViewPO viewPO = viewPOFetcher().apply(ident);
-    return deleteView(viewPO.getViewId());
+    String metalakeName = ident.namespace().level(0);
+    String catalogName = ident.namespace().level(1);
+    String schemaName = ident.namespace().level(2);
+    String viewFullName = catalogName + "." + schemaName + "." + viewPO.getViewName();
+    return deleteView(viewPO.getViewId(), metalakeName, viewFullName);
   }
 
   private ViewPO getViewPOBySchemaIdAndName(Long schemaId, String viewName) {
@@ -258,7 +270,7 @@ public class ViewMetaService {
     return viewPO;
   }
 
-  private boolean deleteView(Long viewId) {
+  private boolean deleteView(Long viewId, String metalakeName, String viewFullName) {
     AtomicInteger deleteResult = new AtomicInteger(0);
     SessionUtils.doMultipleWithCommit(
         () ->
@@ -282,17 +294,42 @@ public class ViewMetaService {
                 mapper ->
                     mapper.softDeleteTagMetadataObjectRelsByMetadataObject(
                         viewId, MetadataObject.Type.VIEW.name()));
+            long now = System.currentTimeMillis();
+            SessionUtils.doWithoutCommit(
+                EntityChangeLogMapper.class,
+                mapper ->
+                    mapper.insertChange(
+                        metalakeName, Entity.EntityType.VIEW.name(), viewFullName, "DROP", now));
           }
         });
     return deleteResult.get() > 0;
   }
 
-  private void updateView(ViewPO oldViewPO, ViewPO newViewPO) throws IOException {
+  private void updateView(
+      ViewPO oldViewPO,
+      ViewPO newViewPO,
+      String metalakeName,
+      String oldFullName,
+      boolean isRenamed)
+      throws IOException {
+    AtomicInteger updateResult = new AtomicInteger(0);
     try {
-      Integer updateResult =
-          SessionUtils.doWithCommitAndFetchResult(
-              ViewMetaMapper.class, mapper -> mapper.updateViewMeta(newViewPO, oldViewPO));
-      if (updateResult == 0) {
+      SessionUtils.doMultipleWithCommit(
+          () ->
+              updateResult.set(
+                  SessionUtils.getWithoutCommit(
+                      ViewMetaMapper.class, mapper -> mapper.updateViewMeta(newViewPO, oldViewPO))),
+          () -> {
+            if (isRenamed && updateResult.get() > 0) {
+              long now = System.currentTimeMillis();
+              SessionUtils.doWithoutCommit(
+                  EntityChangeLogMapper.class,
+                  mapper ->
+                      mapper.insertChange(
+                          metalakeName, Entity.EntityType.VIEW.name(), oldFullName, "ALTER", now));
+            }
+          });
+      if (updateResult.get() == 0) {
         throw new IOException("Failed to update the view: " + oldViewPO.getViewName());
       }
     } catch (RuntimeException re) {

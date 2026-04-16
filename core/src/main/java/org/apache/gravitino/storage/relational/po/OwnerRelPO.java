@@ -35,6 +35,7 @@ public class OwnerRelPO {
   private Long currentVersion;
   private Long lastVersion;
   private Long deletedAt;
+  private Long updatedAt;
 
   private OwnerRelPO() {}
 
@@ -91,6 +92,11 @@ public class OwnerRelPO {
 
     public Builder withDeleteAt(Long deleteAt) {
       ownerRelPO.deletedAt = deleteAt;
+      return this;
+    }
+
+    public Builder withUpdatedAt(Long updatedAt) {
+      ownerRelPO.updatedAt = updatedAt;
       return this;
     }
 

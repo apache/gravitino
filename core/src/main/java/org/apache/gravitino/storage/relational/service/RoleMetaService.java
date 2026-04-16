@@ -259,6 +259,11 @@ public class RoleMetaService {
             SessionUtils.doWithoutCommit(
                 SecurableObjectMapper.class,
                 mapper -> mapper.batchInsertSecurableObjects(insertSecurableObjectPOs));
+          },
+          () -> {
+            long now = System.currentTimeMillis();
+            SessionUtils.doWithoutCommit(
+                RoleMetaMapper.class, mapper -> mapper.touchUpdatedAt(rolePO.getRoleId(), now));
           });
 
       return newRoleEntity;

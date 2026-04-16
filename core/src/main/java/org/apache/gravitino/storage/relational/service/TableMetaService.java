@@ -40,6 +40,7 @@ import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.meta.NamespacedEntityId;
 import org.apache.gravitino.meta.TableEntity;
 import org.apache.gravitino.metrics.Monitored;
+import org.apache.gravitino.storage.relational.mapper.EntityChangeLogMapper;
 import org.apache.gravitino.storage.relational.mapper.OwnerMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.PolicyMetadataObjectRelMapper;
 import org.apache.gravitino.storage.relational.mapper.SecurableObjectMapper;
@@ -186,6 +187,12 @@ public class TableMetaService {
     TablePO newTablePO =
         POConverters.updateTablePOWithVersionAndSchemaId(oldTablePO, newTableEntity, newSchemaId);
 
+    String metalakeName = identifier.namespace().level(0);
+    String catalogName = identifier.namespace().level(1);
+    String schemaName = identifier.namespace().level(2);
+    String oldFullName = catalogName + "." + schemaName + "." + oldTableEntity.name();
+    boolean isRenamed = !Objects.equals(oldTableEntity.name(), newTableEntity.name());
+
     final AtomicInteger updateResult = new AtomicInteger(0);
     try {
       SessionUtils.doMultipleWithCommit(
@@ -207,6 +214,16 @@ public class TableMetaService {
               TableColumnMetaService.getInstance()
                   .updateColumnPOsFromTableDiff(oldTableEntity, newTableEntity, newTablePO);
             }
+          },
+          () -> {
+            if (isRenamed && updateResult.get() > 0) {
+              long now = System.currentTimeMillis();
+              SessionUtils.doWithoutCommit(
+                  EntityChangeLogMapper.class,
+                  mapper ->
+                      mapper.insertChange(
+                          metalakeName, Entity.EntityType.TABLE.name(), oldFullName, "ALTER", now));
+            }
           });
 
     } catch (RuntimeException re) {
@@ -225,6 +242,11 @@ public class TableMetaService {
   @Monitored(metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME, baseMetricName = "deleteTable")
   public boolean deleteTable(NameIdentifier identifier) {
     TablePO tablePO = getTablePOByIdentifier(identifier);
+
+    String metalakeName = identifier.namespace().level(0);
+    String catalogName = identifier.namespace().level(1);
+    String schemaName = identifier.namespace().level(2);
+    String tableFullName = catalogName + "." + schemaName + "." + identifier.name();
 
     AtomicInteger deleteResult = new AtomicInteger(0);
     SessionUtils.doMultipleWithCommit(
@@ -266,6 +288,16 @@ public class TableMetaService {
                 mapper ->
                     mapper.softDeleteTableVersionByTableIdAndVersion(
                         tablePO.getTableId(), tablePO.getCurrentVersion()));
+          }
+        },
+        () -> {
+          if (deleteResult.get() > 0) {
+            long now = System.currentTimeMillis();
+            SessionUtils.doWithoutCommit(
+                EntityChangeLogMapper.class,
+                mapper ->
+                    mapper.insertChange(
+                        metalakeName, Entity.EntityType.TABLE.name(), tableFullName, "DROP", now));
           }
         });
 
