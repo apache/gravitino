@@ -18,50 +18,126 @@
  */
 package org.apache.gravitino.iceberg.common.ops;
 
-import java.lang.reflect.Field;
-import java.util.Collections;
+import java.io.IOException;
+import java.lang.reflect.Method;
+import java.nio.file.Path;
+import java.util.HashMap;
+import java.util.Map;
+import java.util.Optional;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicInteger;
+import org.apache.gravitino.catalog.lakehouse.iceberg.IcebergConstants;
 import org.apache.gravitino.iceberg.common.IcebergConfig;
-import org.apache.iceberg.catalog.Catalog;
-import org.apache.iceberg.catalog.Namespace;
+import org.apache.gravitino.iceberg.common.cache.SupportsMetadataLocation;
+import org.apache.gravitino.iceberg.common.cache.TableMetadataCache;
+import org.apache.iceberg.TableMetadata;
+import org.apache.iceberg.catalog.TableIdentifier;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 
 public class TestIcebergCatalogWrapper {
 
   @Test
-  public void testCatalogAndNamespaceShouldBeLazyLoaded() throws Exception {
+  public void testCatalogShouldBeLazyLoaded() {
     IcebergCatalogWrapper wrapper =
-        new IcebergCatalogWrapper(new IcebergConfig(Collections.emptyMap()));
+        new IcebergCatalogWrapper(new IcebergConfig(unreachableConfig()));
 
-    Assertions.assertNull(getFieldValue(wrapper, "catalog"));
-    Assertions.assertNull(getFieldValue(wrapper, "asNamespaceCatalog"));
-    Assertions.assertNull(getFieldValue(wrapper, "metadataCache"));
-
-    Catalog loadedCatalog = wrapper.getCatalog();
-    Assertions.assertNotNull(loadedCatalog);
-    Assertions.assertSame(loadedCatalog, getFieldValue(wrapper, "catalog"));
-    Assertions.assertNull(getFieldValue(wrapper, "asNamespaceCatalog"));
-    Assertions.assertNull(getFieldValue(wrapper, "metadataCache"));
-
-    wrapper.namespaceExists(Namespace.of("test_db"));
-    Assertions.assertNotNull(getFieldValue(wrapper, "asNamespaceCatalog"));
+    Assertions.assertThrows(Throwable.class, wrapper::getCatalog);
   }
 
   @Test
-  public void testCloseShouldNotInitializeCatalog() throws Exception {
+  public void testCloseShouldNotInitializeCatalog() {
     IcebergCatalogWrapper wrapper =
-        new IcebergCatalogWrapper(new IcebergConfig(Collections.emptyMap()));
+        new IcebergCatalogWrapper(new IcebergConfig(unreachableConfig()));
+
+    Assertions.assertDoesNotThrow(
+        () -> {
+          wrapper.close();
+        });
+  }
+
+  @Test
+  public void testMetadataCacheShouldInitializeOnFirstAccessAndClose(@TempDir Path warehouseDir)
+      throws Exception {
+    TrackingTableMetadataCache.reset();
+    IcebergCatalogWrapper wrapper =
+        new IcebergCatalogWrapper(new IcebergConfig(metadataConfig(warehouseDir)));
+
+    Assertions.assertEquals(0, TrackingTableMetadataCache.INITIALIZE_COUNT.get());
+
+    TableMetadataCache cache = invokeGetMetadataCache(wrapper);
+    Assertions.assertNotNull(cache);
+    Assertions.assertEquals(1, TrackingTableMetadataCache.INITIALIZE_COUNT.get());
+    Assertions.assertFalse(TrackingTableMetadataCache.CLOSED.get());
 
     wrapper.close();
 
-    Assertions.assertNull(getFieldValue(wrapper, "catalog"));
-    Assertions.assertNull(getFieldValue(wrapper, "asNamespaceCatalog"));
-    Assertions.assertNull(getFieldValue(wrapper, "metadataCache"));
+    Assertions.assertEquals(1, TrackingTableMetadataCache.INITIALIZE_COUNT.get());
+    Assertions.assertTrue(TrackingTableMetadataCache.CLOSED.get());
   }
 
-  private static Object getFieldValue(Object target, String fieldName) throws Exception {
-    Field field = target.getClass().getDeclaredField(fieldName);
-    field.setAccessible(true);
-    return field.get(target);
+  private static TableMetadataCache invokeGetMetadataCache(IcebergCatalogWrapper wrapper)
+      throws Exception {
+    Method method = IcebergCatalogWrapper.class.getDeclaredMethod("getMetadataCache");
+    method.setAccessible(true);
+    return (TableMetadataCache) method.invoke(wrapper);
+  }
+
+  private static Map<String, String> unreachableConfig() {
+    Map<String, String> config = new HashMap<>();
+    config.put(IcebergConstants.CATALOG_BACKEND, "jdbc");
+    config.put(IcebergConstants.URI, "jdbc:invalid://unreachable");
+    config.put(IcebergConstants.WAREHOUSE, "unused");
+    return config;
+  }
+
+  private static Map<String, String> metadataConfig(Path warehouseDir) {
+    Map<String, String> config = new HashMap<>();
+    config.put(IcebergConstants.CATALOG_BACKEND, "jdbc");
+    config.put(IcebergConstants.URI, "jdbc:sqlite::memory:");
+    config.put(IcebergConstants.WAREHOUSE, warehouseDir.toString());
+    config.put(IcebergConstants.GRAVITINO_JDBC_DRIVER, "org.sqlite.JDBC");
+    config.put(IcebergConstants.ICEBERG_JDBC_USER, "test");
+    config.put(IcebergConstants.ICEBERG_JDBC_PASSWORD, "test");
+    config.put(IcebergConstants.ICEBERG_JDBC_INITIALIZE, "false");
+    config.put(
+        IcebergConstants.TABLE_METADATA_CACHE_IMPL, TrackingTableMetadataCache.class.getName());
+    return config;
+  }
+
+  public static class TrackingTableMetadataCache implements TableMetadataCache {
+    private static final AtomicInteger INITIALIZE_COUNT = new AtomicInteger();
+    private static final AtomicBoolean CLOSED = new AtomicBoolean();
+
+    static void reset() {
+      INITIALIZE_COUNT.set(0);
+      CLOSED.set(false);
+    }
+
+    @Override
+    public void initialize(
+        int capacity,
+        int expireMinutes,
+        Map<String, String> catalogProperties,
+        SupportsMetadataLocation supportsMetadataLocation) {
+      INITIALIZE_COUNT.incrementAndGet();
+    }
+
+    @Override
+    public void invalidate(TableIdentifier tableIdentifier) {}
+
+    @Override
+    public Optional<TableMetadata> getTableMetadata(TableIdentifier tableIdentifier) {
+      return Optional.empty();
+    }
+
+    @Override
+    public void updateTableMetadata(TableIdentifier tableIdentifier, TableMetadata tableMetadata) {}
+
+    @Override
+    public void close() throws IOException {
+      CLOSED.set(true);
+    }
   }
 }
