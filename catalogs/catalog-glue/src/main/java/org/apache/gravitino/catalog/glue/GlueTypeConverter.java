@@ -132,7 +132,18 @@ public final class GlueTypeConverter {
     if (type instanceof Types.DoubleType) return "double";
     if (type instanceof Types.StringType) return "string";
     if (type instanceof Types.DateType) return "date";
-    if (type instanceof Types.TimestampType) return "timestamp";
+    if (type instanceof Types.TimestampType) {
+      // Glue/Hive timestamps are timezoneless; see:
+      // https://cwiki.apache.org/confluence/display/hive/languagemanual+types
+      Types.TimestampType tsType = (Types.TimestampType) type;
+      if (tsType.hasTimeZone()) {
+        throw new IllegalArgumentException(
+            "Unsupported Gravitino type for Glue: "
+                + type
+                + ". Glue/Hive does not support TIMESTAMP WITH TIME ZONE.");
+      }
+      return "timestamp";
+    }
     if (type instanceof Types.BinaryType) return "binary";
     if (type instanceof Types.IntervalYearType) return "interval_year_month";
     if (type instanceof Types.IntervalDayType) return "interval_day_time";

@@ -146,6 +146,13 @@ class TestGlueTypeConverter {
   }
 
   @Test
+  void testFromGravitinoTimestampWithTimeZoneThrows() {
+    assertThrows(
+        IllegalArgumentException.class,
+        () -> GlueTypeConverter.fromGravitino(Types.TimestampType.withTimeZone()));
+  }
+
+  @Test
   void testFromGravitinoUnsupportedTypeThrows() {
     assertThrows(
         IllegalArgumentException.class,
