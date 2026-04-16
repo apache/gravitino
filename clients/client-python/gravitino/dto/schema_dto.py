@@ -16,9 +16,9 @@
 # under the License.
 
 from dataclasses import dataclass, field
-from typing import Optional, Dict
+from typing import Dict, Optional
 
-from dataclasses_json import config
+from dataclasses_json import DataClassJsonMixin, config
 
 from gravitino.api.audit import Audit
 from gravitino.api.schema import Schema
@@ -26,7 +26,7 @@ from gravitino.dto.audit_dto import AuditDTO
 
 
 @dataclass
-class SchemaDTO(Schema):
+class SchemaDTO(Schema, DataClassJsonMixin):
     """Represents a Schema DTO (Data Transfer Object)."""
 
     _name: str = field(metadata=config(field_name="name"))
@@ -42,6 +42,30 @@ class SchemaDTO(Schema):
 
     _audit: AuditDTO = field(metadata=config(field_name="audit"))
     """The audit information of the Metalake DTO."""
+
+    def __eq__(self, value: object) -> bool:
+        if not isinstance(value, SchemaDTO):
+            return False
+
+        return (
+            self._name == value.name()
+            and self._comment == value.comment()
+            and self._properties == value.properties()
+            and self._audit == value.audit_info()
+        )
+
+    def __hash__(self) -> int:
+        properties_tuple = (
+            () if self._properties is None else tuple(sorted(self._properties.items()))
+        )
+        return hash(
+            (
+                self._name,
+                self._comment,
+                properties_tuple,
+                self._audit,
+            )
+        )
 
     def name(self) -> str:
         return self._name

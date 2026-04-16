@@ -32,6 +32,7 @@ from gravitino.api.supports_schemas import SupportsSchemas
 from gravitino.api.tag.supports_tags import SupportsTags
 from gravitino.api.tag.tag import Tag
 from gravitino.client.function_catalog_operations import FunctionCatalogOperations
+from gravitino.client.generic_schema import GenericSchema
 from gravitino.client.metadata_object_credential_operations import (
     MetadataObjectCredentialOperations,
 )
@@ -169,7 +170,12 @@ class BaseSchemaCatalog(
         schema_response = SchemaResponse.from_json(resp.body, infer_missing=True)
         schema_response.validate()
 
-        return schema_response.schema()
+        return GenericSchema(
+            schema_response.schema(),
+            self.rest_client,
+            self._catalog_namespace.level(0),
+            self._name,
+        )
 
     def load_schema(self, schema_name: str) -> Schema:
         """Load the schema with specified identifier.
@@ -192,7 +198,12 @@ class BaseSchemaCatalog(
         schema_response = SchemaResponse.from_json(resp.body, infer_missing=True)
         schema_response.validate()
 
-        return schema_response.schema()
+        return GenericSchema(
+            schema_response.schema(),
+            self.rest_client,
+            self._catalog_namespace.level(0),
+            self._name,
+        )
 
     def alter_schema(self, schema_name: str, *changes: SchemaChange) -> Schema:
         """Alter the schema with specified identifier by applying the changes.
@@ -221,7 +232,13 @@ class BaseSchemaCatalog(
         )
         schema_response = SchemaResponse.from_json(resp.body, infer_missing=True)
         schema_response.validate()
-        return schema_response.schema()
+
+        return GenericSchema(
+            schema_response.schema(),
+            self.rest_client,
+            self._catalog_namespace.level(0),
+            self._name,
+        )
 
     def drop_schema(self, schema_name: str, cascade: bool) -> bool:
         """Drop the schema with specified identifier.
