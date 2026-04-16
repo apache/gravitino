@@ -33,8 +33,10 @@ import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Executor;
 import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicLong;
 import org.apache.commons.io.IOUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.Configs;
@@ -51,10 +53,17 @@ import org.apache.gravitino.authorization.AuthorizationUtils;
 import org.apache.gravitino.authorization.GravitinoAuthorizer;
 import org.apache.gravitino.authorization.Privilege;
 import org.apache.gravitino.authorization.SecurableObject;
+import org.apache.gravitino.cache.CaffeineGravitinoCache;
+import org.apache.gravitino.cache.GravitinoCache;
 import org.apache.gravitino.exceptions.NoSuchUserException;
 import org.apache.gravitino.meta.RoleEntity;
 import org.apache.gravitino.meta.UserEntity;
 import org.apache.gravitino.server.authorization.MetadataIdConverter;
+import org.apache.gravitino.storage.relational.mapper.EntityChangeLogMapper;
+import org.apache.gravitino.storage.relational.mapper.OwnerMetaMapper;
+import org.apache.gravitino.storage.relational.po.auth.ChangedOwnerInfo;
+import org.apache.gravitino.storage.relational.po.auth.EntityChangeRecord;
+import org.apache.gravitino.storage.relational.utils.SessionUtils;
 import org.apache.gravitino.utils.MetadataObjectUtil;
 import org.apache.gravitino.utils.NameIdentifierUtil;
 import org.apache.gravitino.utils.PrincipalUtils;
@@ -91,6 +100,33 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
 
   private Executor executor = null;
 
+  /** Caches metalakeName:userName -&gt; cached user roles (userId, updatedAt, roleIds). */
+  private GravitinoCache<String, CachedUserRoles> userRoleCache;
+
+  /** Caches metalakeName:groupName -&gt; cached group roles (groupId, updatedAt, roleIds). */
+  private GravitinoCache<String, CachedGroupRoles> groupRoleCache;
+
+  /** Caches name -&gt; integer id for MetadataObjects referenced in OGNL expressions. */
+  private GravitinoCache<String, Long> metadataIdCache;
+
+  /** Replaces ownerRel — persistent cache with hook + poller invalidation. */
+  private GravitinoCache<Long, Optional<Long>> ownerRelCache;
+
+  /** Max updated_at seen across all owner_meta rows so far (for poller). */
+  private final AtomicLong maxOwnerUpdatedAt = new AtomicLong(0L);
+
+  /** Max created_at seen across all entity_change_log rows so far (for poller). */
+  private final AtomicLong maxEntityCreatedAt = new AtomicLong(0L);
+
+  /** Single-thread scheduled executor for the two targeted poll tasks. */
+  private ScheduledExecutorService changePoller;
+
+  /** Inner record: cached user role membership with version sentinel. */
+  record CachedUserRoles(long userId, long updatedAt, List<Long> roleIds) {}
+
+  /** Inner record: cached group role membership with version sentinel. */
+  record CachedGroupRoles(long groupId, long updatedAt, List<Long> roleIds) {}
+
   @Override
   public void initialize() {
     long cacheExpirationSecs =
@@ -126,6 +162,19 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
             .expireAfterAccess(cacheExpirationSecs, TimeUnit.SECONDS)
             .maximumSize(ownerCacheSize)
             .build();
+
+    long userGroupCacheSize =
+        GravitinoEnv.getInstance()
+            .config()
+            .get(Configs.GRAVITINO_AUTHORIZATION_ROLE_CACHE_SIZE);
+    userRoleCache = new CaffeineGravitinoCache<>(userGroupCacheSize, cacheExpirationSecs);
+    groupRoleCache = new CaffeineGravitinoCache<>(userGroupCacheSize, cacheExpirationSecs);
+    metadataIdCache = new CaffeineGravitinoCache<>(userGroupCacheSize * 10, cacheExpirationSecs);
+    ownerRelCache = new CaffeineGravitinoCache<>(ownerCacheSize, cacheExpirationSecs);
+
+    long pollerIntervalMs = 5_000L;
+    startChangePoller(pollerIntervalMs);
+
     executor =
         Executors.newFixedThreadPool(
             GravitinoEnv.getInstance()
@@ -410,16 +459,112 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
     MetadataObject metadataObject = NameIdentifierUtil.toMetadataObject(nameIdentifier, type);
     Long metadataId = MetadataIdConverter.getID(metadataObject, metalake);
     ownerRel.invalidate(metadataId);
+    ownerRelCache.invalidate(metadataId);
+  }
+
+  @Override
+  public void handleEntityStructuralChange(
+      String metalake, NameIdentifier nameIdent, Entity.EntityType type) {
+    String cacheKey = buildCacheKey(metalake, type, nameIdent.name());
+    metadataIdCache.invalidateByPrefix(cacheKey);
   }
 
   @Override
   public void close() throws IOException {
+    if (changePoller != null) {
+      changePoller.shutdownNow();
+    }
     if (executor != null) {
       if (executor instanceof ThreadPoolExecutor) {
         ThreadPoolExecutor threadPoolExecutor = (ThreadPoolExecutor) executor;
         threadPoolExecutor.shutdown();
       }
     }
+    if (userRoleCache != null) {
+      userRoleCache.close();
+    }
+    if (groupRoleCache != null) {
+      groupRoleCache.close();
+    }
+    if (metadataIdCache != null) {
+      metadataIdCache.close();
+    }
+    if (ownerRelCache != null) {
+      ownerRelCache.close();
+    }
+  }
+
+  private void startChangePoller(long intervalMs) {
+    changePoller =
+        Executors.newSingleThreadScheduledExecutor(
+            r -> new Thread(r, "gravitino-change-poller"));
+    changePoller.scheduleAtFixedRate(
+        this::pollChanges, intervalMs, intervalMs, TimeUnit.MILLISECONDS);
+  }
+
+  private void pollChanges() {
+    pollOwnerChanges();
+    pollEntityChanges();
+  }
+
+  private void pollOwnerChanges() {
+    try {
+      long since = maxOwnerUpdatedAt.get();
+      List<ChangedOwnerInfo> rows =
+          SessionUtils.getWithoutCommit(
+              OwnerMetaMapper.class, mapper -> mapper.selectChangedOwners(since));
+      long maxAt = since;
+      for (ChangedOwnerInfo row : rows) {
+        ownerRelCache.invalidate(row.metadataObjectId());
+        if (row.updatedAt() > maxAt) {
+          maxAt = row.updatedAt();
+        }
+      }
+      maxOwnerUpdatedAt.set(maxAt);
+    } catch (Exception e) {
+      LOG.warn("Owner change poller failed, will retry", e);
+    }
+  }
+
+  private void pollEntityChanges() {
+    try {
+      long since = maxEntityCreatedAt.get();
+      List<EntityChangeRecord> rows =
+          SessionUtils.getWithoutCommit(
+              EntityChangeLogMapper.class,
+              mapper -> mapper.selectChanges(since, 1000));
+      long maxAt = since;
+      for (EntityChangeRecord row : rows) {
+        Entity.EntityType type = Entity.EntityType.valueOf(row.entityType());
+        String cacheKey = buildCacheKey(row.metalakeName(), type, row.fullName());
+        metadataIdCache.invalidateByPrefix(cacheKey);
+        if (row.createdAt() > maxAt) {
+          maxAt = row.createdAt();
+        }
+      }
+      maxEntityCreatedAt.set(maxAt);
+    } catch (Exception e) {
+      LOG.warn("Entity change poller failed, will retry", e);
+    }
+  }
+
+  static String buildCacheKey(String metalake, Entity.EntityType type, String fullName) {
+    StringBuilder sb = new StringBuilder(metalake);
+    for (String part : fullName.split("\\.")) {
+      sb.append("::").append(part);
+    }
+    if (isNonLeaf(type)) {
+      sb.append("::");
+    } else {
+      sb.append("::").append(type.name());
+    }
+    return sb.toString();
+  }
+
+  private static boolean isNonLeaf(Entity.EntityType type) {
+    return type == Entity.EntityType.METALAKE
+        || type == Entity.EntityType.CATALOG
+        || type == Entity.EntityType.SCHEMA;
   }
 
   private class InternalAuthorizer {

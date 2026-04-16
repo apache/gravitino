@@ -164,4 +164,18 @@ public interface GravitinoAuthorizer extends Closeable {
    */
   void handleMetadataOwnerChange(
       String metalake, Long oldOwnerId, NameIdentifier nameIdentifier, Entity.EntityType type);
+
+  /**
+   * Notifies the authorizer that an entity structural change (create, alter, drop) has occurred.
+   * Implementations should invalidate any cached name-to-id mappings for the affected entity.
+   *
+   * <p>This default no-op implementation exists to maintain backward compatibility with
+   * implementations that do not cache name-to-id mappings.
+   *
+   * @param metalake the metalake the entity belongs to
+   * @param nameIdent the name identifier of the affected entity
+   * @param type the entity type
+   */
+  default void handleEntityStructuralChange(
+      String metalake, NameIdentifier nameIdent, Entity.EntityType type) {}
 }
