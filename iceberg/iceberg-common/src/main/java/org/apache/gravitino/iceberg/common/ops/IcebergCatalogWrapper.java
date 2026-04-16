@@ -160,7 +160,8 @@ public class IcebergCatalogWrapper implements AutoCloseable {
   private ViewCatalog getViewCatalog() {
     Catalog loadedCatalog = getCatalog();
     if (!(loadedCatalog instanceof ViewCatalog)) {
-      throw new UnsupportedOperationException(loadedCatalog.name() + " is not support view");
+      throw new UnsupportedOperationException(
+          "The underlying catalog '" + loadedCatalog.name() + "' does not support view operations");
     }
     return (ViewCatalog) loadedCatalog;
   }
