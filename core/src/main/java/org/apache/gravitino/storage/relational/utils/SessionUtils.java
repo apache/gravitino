@@ -37,7 +37,7 @@ public class SessionUtils {
    */
   public static <T> void doWithCommit(Class<T> mapperClazz, Consumer<T> consumer) {
     try {
-      T mapper = SqlSessions.getMapper(mapperClazz);
+      T mapper = SqlSessions.getWriteMapper(mapperClazz);
       consumer.accept(mapper);
       SqlSessions.commitAndCloseSqlSession();
     } catch (Throwable t) {
@@ -52,7 +52,7 @@ public class SessionUtils {
    */
   public static <T, R> R doWithCommitAndFetchResult(Class<T> mapperClazz, Function<T, R> func) {
     try {
-      T mapper = SqlSessions.getMapper(mapperClazz);
+      T mapper = SqlSessions.getWriteMapper(mapperClazz);
       R result = func.apply(mapper);
       SqlSessions.commitAndCloseSqlSession();
       return result;
@@ -67,12 +67,19 @@ public class SessionUtils {
    * within other transactions.
    */
   public static <T, R> R getWithoutCommit(Class<T> mapperClazz, Function<T, R> func) {
+    boolean useWriteSession = SqlSessions.isWriteSessionActive();
     try {
-      T mapper = SqlSessions.getMapper(mapperClazz);
+      T mapper =
+          useWriteSession
+              ? SqlSessions.getWriteMapper(mapperClazz)
+              : SqlSessions.getReadMapper(mapperClazz);
       return func.apply(mapper);
     } finally {
-      // This will decrement the counter, the session is closed only when the counter is 0.
-      SqlSessions.closeSqlSession();
+      if (useWriteSession) {
+        SqlSessions.closeSqlSession();
+      } else {
+        SqlSessions.closeReadSqlSession();
+      }
     }
   }
 
@@ -82,10 +89,9 @@ public class SessionUtils {
    */
   public static <T> void doWithoutCommit(Class<T> mapperClazz, Consumer<T> consumer) {
     try {
-      T mapper = SqlSessions.getMapper(mapperClazz);
+      T mapper = SqlSessions.getWriteMapper(mapperClazz);
       consumer.accept(mapper);
     } finally {
-      // This will decrement the counter, the session is closed only when the counter is 0.
       SqlSessions.closeSqlSession();
     }
   }
@@ -95,9 +101,7 @@ public class SessionUtils {
    * lifecycle.
    */
   public static void doMultipleWithCommit(Runnable... operations) {
-    // This method acts as the outermost transaction boundary.
-    // It increments the session count once.
-    SqlSessions.getSqlSession();
+    SqlSessions.getWriteSqlSession();
     try {
       Arrays.stream(operations).forEach(Runnable::run);
       SqlSessions.commitAndCloseSqlSession();
@@ -108,7 +112,7 @@ public class SessionUtils {
   }
 
   public static void beginTransaction() {
-    SqlSessions.getSqlSession();
+    SqlSessions.getWriteSqlSession();
   }
 
   public static void commitTransaction() {
