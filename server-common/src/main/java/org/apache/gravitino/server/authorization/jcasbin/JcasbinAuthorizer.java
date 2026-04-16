@@ -91,10 +91,11 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
   private InternalAuthorizer denyInternalAuthorizer;
 
   /**
-   * loadedRoles is used to cache roles that have loaded permissions. When the permissions of a role
-   * are updated, they should be removed from it.
+   * loadedRoles caches roles that have loaded permissions, storing the updated_at version sentinel.
+   * When the permissions of a role are updated, they should be removed from it. The stored value is
+   * the {@code updated_at} timestamp from role_meta, used for version-validated strong consistency.
    */
-  private Cache<Long, Boolean> loadedRoles;
+  private GravitinoCache<Long, Long> loadedRoles;
 
   private Cache<Long, Optional<Long>> ownerRel;
 
@@ -144,19 +145,7 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
     denyEnforcer = new SyncedEnforcer(getModel("/jcasbin_model.conf"), new GravitinoAdapter());
     denyInternalAuthorizer = new InternalAuthorizer(denyEnforcer);
 
-    loadedRoles =
-        Caffeine.newBuilder()
-            .expireAfterAccess(cacheExpirationSecs, TimeUnit.SECONDS)
-            .maximumSize(roleCacheSize)
-            .executor(Runnable::run)
-            .removalListener(
-                (roleId, value, cause) -> {
-                  if (roleId != null) {
-                    allowEnforcer.deleteRole(String.valueOf(roleId));
-                    denyEnforcer.deleteRole(String.valueOf(roleId));
-                  }
-                })
-            .build();
+    loadedRoles = new CaffeineGravitinoCache<>(roleCacheSize, cacheExpirationSecs);
     ownerRel =
         Caffeine.newBuilder()
             .expireAfterAccess(cacheExpirationSecs, TimeUnit.SECONDS)
@@ -274,8 +263,12 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
       loadOwnerPolicy(metalake, metadataObject, metadataId);
       UserEntity userEntity = getUserEntity(principal.getName(), metalake);
       userId = userEntity.id();
-      metadataId = MetadataIdConverter.getID(metadataObject, metalake);
-      result = Objects.equals(Optional.of(userId), ownerRel.getIfPresent(metadataId));
+      // Prefer ownerRelCache; fall back to the legacy ownerRel TTL cache
+      Optional<Long> cachedOwner = ownerRelCache.getIfPresent(metadataId);
+      if (cachedOwner == null) {
+        cachedOwner = ownerRel.getIfPresent(metadataId);
+      }
+      result = Objects.equals(Optional.of(userId), cachedOwner);
     } catch (Exception e) {
       LOG.debug("Can not get entity id", e);
       result = false;
@@ -451,6 +444,8 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
   @Override
   public void handleRolePrivilegeChange(Long roleId) {
     loadedRoles.invalidate(roleId);
+    allowEnforcer.deleteRole(String.valueOf(roleId));
+    denyEnforcer.deleteRole(String.valueOf(roleId));
   }
 
   @Override
@@ -479,6 +474,9 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
         ThreadPoolExecutor threadPoolExecutor = (ThreadPoolExecutor) executor;
         threadPoolExecutor.shutdown();
       }
+    }
+    if (loadedRoles != null) {
+      loadedRoles.close();
     }
     if (userRoleCache != null) {
       userRoleCache.close();
@@ -668,7 +666,7 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
                       .thenAcceptAsync(
                           roleEntity -> {
                             loadPolicyByRoleEntity(roleEntity);
-                            loadedRoles.put(roleId, true);
+                            loadedRoles.put(roleId, System.currentTimeMillis());
                           },
                           executor);
               loadRoleFutures.add(loadRoleFuture);
@@ -681,7 +679,8 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
   }
 
   private void loadOwnerPolicy(String metalake, MetadataObject metadataObject, Long metadataId) {
-    if (ownerRel.getIfPresent(metadataId) != null) {
+    if (ownerRel.getIfPresent(metadataId) != null
+        || ownerRelCache.getIfPresent(metadataId) != null) {
       LOG.debug("Metadata {} OWNER has been loaded.", metadataId);
       return;
     }
@@ -697,11 +696,13 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
                   Entity.EntityType.valueOf(metadataObject.type().name()));
       if (owners.isEmpty()) {
         ownerRel.put(metadataId, Optional.empty());
+        ownerRelCache.put(metadataId, Optional.empty());
       } else {
         for (Entity ownerEntity : owners) {
           if (ownerEntity instanceof UserEntity) {
             UserEntity user = (UserEntity) ownerEntity;
             ownerRel.put(metadataId, Optional.of(user.id()));
+            ownerRelCache.put(metadataId, Optional.of(user.id()));
           }
         }
       }

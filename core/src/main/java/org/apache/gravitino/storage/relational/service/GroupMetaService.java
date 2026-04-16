@@ -230,6 +230,7 @@ public class GroupMetaService {
     if (insertRoleIds.isEmpty() && deleteRoleIds.isEmpty()) {
       return newEntity;
     }
+    long now = System.currentTimeMillis();
     try {
       SessionUtils.doMultipleWithCommit(
           () ->
@@ -259,7 +260,11 @@ public class GroupMetaService {
                 mapper ->
                     mapper.softDeleteGroupRoleRelByGroupAndRoles(
                         newEntity.id(), Lists.newArrayList(deleteRoleIds)));
-          });
+          },
+          () ->
+              SessionUtils.doWithoutCommit(
+                  GroupMetaMapper.class,
+                  mapper -> mapper.touchUpdatedAt(newEntity.id(), now)));
     } catch (RuntimeException re) {
       ExceptionUtils.checkSQLException(
           re, Entity.EntityType.GROUP, newEntity.nameIdentifier().toString());

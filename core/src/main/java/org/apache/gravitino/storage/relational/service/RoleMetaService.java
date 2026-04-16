@@ -235,6 +235,7 @@ public class RoleMetaService {
       List<SecurableObjectPO> insertSecurableObjectPOs =
           toSecurableObjectPOs(insertObjects, oldRoleEntity, metalake);
 
+      long now = System.currentTimeMillis();
       SessionUtils.doMultipleWithCommit(
           () ->
               SessionUtils.doWithoutCommit(
@@ -259,7 +260,11 @@ public class RoleMetaService {
             SessionUtils.doWithoutCommit(
                 SecurableObjectMapper.class,
                 mapper -> mapper.batchInsertSecurableObjects(insertSecurableObjectPOs));
-          });
+          },
+          () ->
+              SessionUtils.doWithoutCommit(
+                  RoleMetaMapper.class,
+                  mapper -> mapper.touchUpdatedAt(newRoleEntity.id(), now)));
 
       return newRoleEntity;
     } catch (RuntimeException re) {
