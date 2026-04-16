@@ -34,33 +34,13 @@ INSERT INTO gt_snapshot_test.maintenance_table VALUES (3, 'charlie');
 -- Verify we have multiple snapshots
 SELECT count(*) >= 3 FROM "gt_snapshot_test"."maintenance_table$snapshots";
 
--- Test expire_snapshots procedure
+-- Test expire_snapshots procedure (delegation to inner Iceberg connector).
+-- Note: remove_orphan_files, optimize, and rewrite_manifests procedures
+-- return non-deterministic statistics rows (file counts vary by run), so
+-- they are covered by Java unit tests instead of this SQL integration test.
 ALTER TABLE gt_snapshot_test.maintenance_table EXECUTE expire_snapshots;
 
 -- Verify table data is still intact after expire_snapshots
-SELECT count(*) FROM gt_snapshot_test.maintenance_table;
-
--- Test remove_orphan_files procedure
-ALTER TABLE gt_snapshot_test.maintenance_table EXECUTE remove_orphan_files;
-
--- Verify table data is still intact after remove_orphan_files
-SELECT count(*) FROM gt_snapshot_test.maintenance_table;
-
--- Insert more data to create small files for optimize (rewrite_data_files)
-INSERT INTO gt_snapshot_test.maintenance_table VALUES (4, 'dave');
-
-INSERT INTO gt_snapshot_test.maintenance_table VALUES (5, 'eve');
-
--- Test optimize (rewrite_data_files) table procedure
-ALTER TABLE gt_snapshot_test.maintenance_table EXECUTE optimize;
-
--- Verify all data is still accessible after optimize
-SELECT count(*) FROM gt_snapshot_test.maintenance_table;
-
--- Test rewrite_manifests procedure
-ALTER TABLE gt_snapshot_test.maintenance_table EXECUTE rewrite_manifests;
-
--- Verify all data is still accessible after rewrite_manifests
 SELECT count(*) FROM gt_snapshot_test.maintenance_table;
 
 -- Cleanup
