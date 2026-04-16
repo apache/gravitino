@@ -188,6 +188,10 @@ Mitigations:
 
 - Authorization follows nested namespace scope by logical `HierarchicalSchema` path and mapped schema name.
 - Namespace privileges follow inheritance: privilege on parent namespace applies to child namespace.
+- For operations requiring `USE_SCHEMA`, authorization succeeds if any ancestor scope
+  (including the current schema scope) has `USE_SCHEMA`; it is not required on every level.
+- Effective rule for `A:B:C`: check `A:B:C` -> `A:B` -> `A`, and pass on the first scope that has
+  `USE_SCHEMA`.
 - UI privilege granting is one usage scenario of this overall nested namespace solution.
 
 ### Option P1 (Recommended): Extend `create_schema` semantics
@@ -345,6 +349,8 @@ for (String scope : HierarchicalSchemaUtil.parentScopes("A:B:C")) {
 - In interceptor and handlers, stop treating the last namespace level as the only schema segment.
 - Build schema identity from the full namespace path through conversion rules.
 - Evaluate parent-scope inheritance using hierarchical logical scopes (`A`, `A:B`, `A:B:C`) before or during expression evaluation.
+- For `USE_SCHEMA` checks, short-circuit on the nearest scope that has permission; do not require
+  `USE_SCHEMA` on each intermediate level.
 
 ### 3) Namespace operation behavior
 
