@@ -19,12 +19,6 @@ References:
 - Support privilege granting for different nested namespace scopes (including UI workflow).
 - Keep metadata model stable and avoid heavy refactor.
 
-## Non-Goal
-
-- Create nested namespace by Gravitino REST API directly.
-- Delete nested namespace by Gravitino REST API directly.
-- Modify nested namespace by Gravitino REST API directly (for example, rename or alter properties).
-- Introduce a new metadata object (for example `NestedNamespace`) in this phase.
 
 ## Solution Options
 
@@ -154,28 +148,81 @@ Examples:
 - **Create nested namespace**:
   - Creating `A.B.C` will create (or ensure existence of) three schemas in Gravitino: `A`, `A.B`, and `A.B.C`.
   - Set the created namespace owner as current user.
+- **Update nested namespace**:
+  - Support updating namespace properties through mapped schema operations.
+  - Property update is applied to the mapped target namespace scope.
 - **Drop nested namespace**: drop corresponding schema in Gravitino.
 - **Rename nested namespace**: not needed because Iceberg REST does not support namespace rename.
 
 ### Gravitino Side Behavior
 
-- `list schema` stays flat instead of nested.
-- Gravitino does not provide a dedicated `list sub-schema` API.
-- `list schema` returns all schemas in a flat result set, including nested schemas.
-- Example: if schemas are `A`, `B`, `A.B`, `A.B.C`, the `list schema` result includes all four.
-- Gravitino side does not support creating nested namespace directly.
-- Gravitino side does not support deleting nested namespace directly.
-- Gravitino side does not support modifying nested namespace directly (for example, renaming or altering properties).
+- `list schema` should express nested hierarchy semantics for users.
+- `list schema` REST API (GET `/metalakes/{metalake}/catalogs/{catalog}/schemas`) should support an
+  optional query parameter `parentHierarchicalSchema`.
+  - When `parentHierarchicalSchema` is not provided, return only top-level schemas (first layer).
+  - When `parentHierarchicalSchema` is provided, return only the direct child schemas under the
+    given parent (next layer), instead of the full subtree.
+  - `parentHierarchicalSchema` value follows the same logical `HierarchicalSchema` encoding
+    rules as described in `Identifier Rules` (segment percent-encoding, and then RFC 3986
+    percent-encoding for transport in a query component).
+- Gravitino does not provide a dedicated `list sub-schema` API; hierarchy is expressed via
+  `list schema`/`list namespaces` results.
+- Example: for schemas `A`, `B`, `A.B`, `A.B.C`, hierarchy view is `A -> A.B -> A.B.C` and `B`;
+  root listing returns `A` and `B`, and querying parent `A` returns `A.B`.
+- To make nested semantics explicit, `list namespaces` should express parent-child relationships
+  (hierarchical view) even when underlying storage is flat.
+- Example hierarchical view from flat schemas: `A` -> `A.B` -> `A.B.C`, and `B` as another root.
+- This list-level hierarchical expression is the primary semantic model for users, reducing
+  ambiguity caused by one request creating multiple physical schema objects.
+- Gravitino server REST supports namespace create/update/drop operations for nested namespace
+  workflows, aligned with Iceberg REST behavior.
 - Existing schema/table APIs remain compatible with non-nested cases.
 
 ## Privileges and Authorization
 
-- No new privilege type is introduced.
 - Authorization follows nested namespace scope by logical `HierarchicalSchema` path and mapped schema name.
 - Namespace privileges follow inheritance: privilege on parent namespace applies to child namespace.
-- `create_schema` privilege is sufficient to create namespace.
-- We cannot bind `create_schema` privilege under a namespace node.
 - UI privilege granting is one usage scenario of this overall nested namespace solution.
+
+### Option P1 (Recommended): Extend `create_schema` semantics
+
+- Keep current privilege model and do not add a new privilege type.
+- Clarify `create_schema` as container-scoped capability: permission on parent namespace allows
+  creating direct child namespace under that scope.
+- Example: `create_schema` on `A` allows creating `A:B`, and `create_schema` on `A:B` allows
+  creating `A:B:C`.
+
+Pros:
+
+- Lowest implementation and migration cost.
+- Reuses existing authorization model and UI privilege workflow.
+- Keeps backward compatibility for current grants.
+
+Cons:
+
+- Semantics are less explicit because `create_schema` now covers both normal schema creation and
+  nested namespace creation.
+
+### Option P2: Introduce a dedicated nested-namespace privilege
+
+- Add a new privilege (for example `create_nested_namespace`) for creating child namespaces.
+- Keep `create_schema` semantics unchanged for existing schema creation behavior.
+- Evaluate both privileges independently in authorization expression where needed.
+
+Pros:
+
+- Clearer and more explicit permission model.
+- Better long-term extensibility for fine-grained namespace governance.
+
+Cons:
+
+- Requires privilege model/API/UI updates and migration planning.
+- Increases operational complexity for users and administrators.
+
+### Selection Guidance
+
+- Phase-1 recommends Option P1 for faster delivery and lower risk.
+- Option P2 can be considered in a later phase if stronger permission separation is required.
 
 Examples:
 
@@ -222,7 +269,7 @@ public static String toPhysicalSchemaName(String hierarchicalPath) {
 ```java
 // Example in IcebergMetadataAuthorizationMethodInterceptor
 Namespace rawNamespace = RESTUtil.decodeNamespace(value);
-String hierarchicalPath = HierarchicalSchemaUtil.serializeHierarchicalPath(rawNamespace.levels());
+String hierarchicalPath = HierarchicalSchemaUtil.toPath(rawNamespace, ":");
 String schema = HierarchicalSchemaUtil.toPhysicalSchemaName(hierarchicalPath);
 
 nameIdentifierMap.put(
@@ -295,8 +342,13 @@ for (String scope : HierarchicalSchemaUtil.parentScopes("A:B:C")) {
 ### 3) Namespace operation behavior
 
 - `createNamespace` should ensure parent schemas exist for each hierarchical level.
+- `updateNamespace` should support property updates for mapped namespace scope.
 - `dropNamespace` should target mapped physical schema and preserve existing non-nested behavior.
-- `listNamespaces` should be compatible with the logical hierarchy while keeping current flat storage model.
+- `listSchemas` should accept an optional query parameter `parentHierarchicalSchema`.
+  - When absent, return only top-level schemas (first layer).
+  - When present, return only direct children under the given parent (next layer).
+- `listNamespaces` should return hierarchy-aware semantics (or equivalent parent-child expression)
+  while keeping current flat storage model.
 
 ### 4) Identifier compatibility
 
@@ -319,7 +371,7 @@ for (String scope : HierarchicalSchemaUtil.parentScopes("A:B:C")) {
 ## Test Plan
 
 - Unit tests for schema name parse/quote handling when name contains `.`.
-- Unit/integration tests for Iceberg REST create/drop nested namespace mapping.
+- Unit/integration tests for Iceberg REST create/update/drop nested namespace mapping.
 - Authorization tests for nested scope behavior (`A`, `A.B`, `A.B.C`).
 - Regression tests for non-nested namespace authorization behavior.
 
