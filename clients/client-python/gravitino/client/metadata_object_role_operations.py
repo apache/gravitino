@@ -32,8 +32,6 @@ class MetadataObjectRoleOperations(SupportsRoles):
     Represents a response for a list of entity names.
     """
 
-    ROLE_REQUEST_PATH = "api/metalakes/{}/objects/{}/{}/roles"
-
     def __init__(
         self,
         metalake_name: str,

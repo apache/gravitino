@@ -34,7 +34,6 @@ from gravitino.exceptions.base import (
     RoleAlreadyExistsException,
 )
 from gravitino.exceptions.handlers.role_error_handler import ROLE_ERROR_HANDLER
-from gravitino.rest.rest_utils import encode_string
 from gravitino.utils import HTTPClient
 from tests.unittests import mock_base
 
@@ -42,20 +41,6 @@ from tests.unittests import mock_base
 class TestMetadataObjectRoleOperations(unittest.TestCase):
     REST_CLIENT = HTTPClient("http://localhost:8090")
     METALAKE_NAME = "demo_metalake"
-
-    def test_request_api_path(self) -> None:
-        metadata_object = MetadataObjects.of(
-            ["catalog", "schema", "table"], MetadataObject.Type.TABLE
-        )
-        table_role_request_path = MetadataObjectRoleOperations.ROLE_REQUEST_PATH.format(
-            encode_string(TestMetadataObjectRoleOperations.METALAKE_NAME),
-            metadata_object.type().name.lower(),
-            encode_string(metadata_object.full_name()),
-        )
-        self.assertEqual(
-            "api/metalakes/demo_metalake/objects/table/catalog.schema.table/roles",
-            table_role_request_path,
-        )
 
     def test_list_binding_role_names(self) -> None:
         expected_role_names_lst = ["role1", "role2"]
