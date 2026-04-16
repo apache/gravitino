@@ -890,7 +890,13 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
       try {
         Schema schema =
             catalogWrapper.doWithSchemaOps(ops -> ops.loadSchema(schemaEntity.nameIdentifier()));
-        if (StringIdentifier.fromProperties(schema.properties()) != null) {
+        Map<String, String> props = schema.properties();
+        // If the backend cannot store a StringIdentifier (null properties, e.g. MySQL schema),
+        // we cannot tell whether the schema was created by Gravitino or imported. Be conservative
+        // and treat it as user-created to avoid accidental data loss.
+        // Only skip a schema when properties are non-null and contain no StringIdentifier,
+        // which is the reliable signal that the schema was imported from an external catalog.
+        if (props == null || StringIdentifier.fromProperties(props) != null) {
           return true;
         }
       } catch (NoSuchSchemaException ex) {
