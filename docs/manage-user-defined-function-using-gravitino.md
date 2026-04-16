@@ -697,6 +697,8 @@ implementation based on the runtime.
 | Engine | Runtime             | Documentation                                                                      |
 |--------|---------------------|------------------------------------------------------------------------------------|
 | Spark  | `RuntimeType.SPARK` | [Spark connector - User-defined functions](spark-connector/spark-connector-udf.md) |
+| Ray    | `RuntimeType.RAY`   | [AI engine integration](ai-engine-udf-integration.md)                              |
+| Dask   | `RuntimeType.DASK`  | [AI engine integration](ai-engine-udf-integration.md)                              |
 
 :::note
 Support for additional engines (e.g. Trino, Flink) will be documented as they become available.
