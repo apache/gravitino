@@ -127,10 +127,10 @@ Cons:
   - Serialize: encode each segment first, then join with `:`.
   - Parse: split by `:`, then decode each segment.
 - Decode is applied exactly once to avoid double-decoding issues.
-- Add quote around schema names when needed to avoid parse ambiguity.
 - Keep flat storage model and convert `HierarchicalSchema` path to physical schema name by mapping rules.
-- `NameIdentifier` should support quoted `schema` names.
-- In this phase, quoted identifier support is limited to `schema` only; other identifier parts keep existing parsing rules.
+- Identifier rendering rule:
+  - Use encoded `HierarchicalSchema` path directly in schema position.
+  - Do not rely on single-quote wrapping for schema disambiguation in this phase.
 
 Examples:
 
@@ -139,17 +139,14 @@ Examples:
 - Logical `HierarchicalSchema` path is then converted to physical schema name through mapping rules.
 - Namespace levels `["team:core", "sales"]` are serialized as `team%3Acore:sales`.
 - Parsing `team%3Acore:sales` returns `["team:core", "sales"]`.
-- For parsing ambiguity, use quoted schema name in identifier rendering, for example:
-  - `metalake.catalog.'A.B'.table1`
-  - `metalake.catalog.'A.B.C'.table2`
-- In UI display, show logical path (for example `A:B:C`) for readability, but keep quoted form for parser-safe serialization.
-
-According to URL encoding rules (RFC 3986), single quotes have no reserved purpose 
-and must be percent-encoded if they appear in a URL component. The encoded form for a single quote is %27.
-
-Example:
-Invalid: https://example.com/path/to'O'reilly
-Valid (encoded): https://example.com/path/to%27O%27reilly
+- Identifier rendering example:
+  - `metalake.catalog.A:B.table1`
+  - `metalake.catalog.team%3Acore:sales.table2`
+- In UI display, show logical path (for example `A:B:C`) for readability.
+- HTTP transport rule:
+  - Namespace values in URL/query/body must follow RFC 3986 percent-encoding when needed.
+  - Example: namespace path `team%3Acore:sales` should be URL-encoded as
+    `team%253Acore%3Asales` when put into a URL query component.
 
 
 ### Iceberg REST Side Behavior
@@ -193,15 +190,29 @@ The following snippets are design-level examples to clarify how `HierarchicalSch
 ### Snippet 1: Convert Iceberg namespace to logical path and physical schema
 
 ```java
-// Example utility methods in IcebergRESTUtils (or a dedicated NamespacePathMapper)
-public static String toHierarchicalSchemaPath(Namespace namespace, String separator) {
-  // namespace.levels() = ["A", "B", "C"] -> "A:B:C"
-  return String.join(separator, namespace.levels());
+// Example utility methods in IcebergRESTUtils (or a dedicated HierarchicalSchemaUtil)
+private static String encodeSegment(String raw) {
+  // Encode % first, then separator-related characters.
+  return raw.replace("%", "%25").replace(":", "%3A");
+}
+
+private static String decodeSegment(String encoded) {
+  // Decode exactly once; reject malformed escape sequences in real implementation.
+  return encoded.replace("%3A", ":").replace("%25", "%");
+}
+
+public static String serializeHierarchicalPath(String[] levels) {
+  // ["team:core", "sales"] -> "team%3Acore:sales"
+  return Arrays.stream(levels).map(HierarchicalSchemaUtil::encodeSegment).collect(Collectors.joining(":"));
+}
+
+public static String[] parseHierarchicalPath(String path) {
+  // "team%3Acore:sales" -> ["team:core", "sales"]
+  return Arrays.stream(path.split(":", -1)).map(HierarchicalSchemaUtil::decodeSegment).toArray(String[]::new);
 }
 
 public static String toPhysicalSchemaName(String hierarchicalPath) {
-  // Phase-1 compatible mapping: keep storage as flattened schema
-  // "A:B:C" -> "A.B.C"
+  // Phase-1 mapping keeps flat schema storage: "A:B:C" -> "A.B.C"
   return hierarchicalPath.replace(":", ".");
 }
 ```
@@ -211,7 +222,7 @@ public static String toPhysicalSchemaName(String hierarchicalPath) {
 ```java
 // Example in IcebergMetadataAuthorizationMethodInterceptor
 Namespace rawNamespace = RESTUtil.decodeNamespace(value);
-String hierarchicalPath = HierarchicalSchemaUtil.toPath(rawNamespace, ":");
+String hierarchicalPath = HierarchicalSchemaUtil.serializeHierarchicalPath(rawNamespace.levels());
 String schema = HierarchicalSchemaUtil.toPhysicalSchemaName(hierarchicalPath);
 
 nameIdentifierMap.put(
@@ -223,7 +234,7 @@ nameIdentifierMap.put(
 
 ```java
 // Example path inheritance for A:B:C
-List<String> authzScopes = HierarchicalSchemaUtil.parentScopes("A:B:C", ":");
+List<String> authzScopes = HierarchicalSchemaUtil.parentScopes("A:B:C");
 // Result: ["A", "A:B", "A:B:C"]
 // Authorization passes if user has required privilege on any allowed parent scope by policy.
 ```
@@ -232,7 +243,7 @@ List<String> authzScopes = HierarchicalSchemaUtil.parentScopes("A:B:C", ":");
 
 ```java
 // For create namespace A:B:C, ensure parent schemas exist in physical model
-for (String scope : HierarchicalSchemaUtil.parentScopes("A:B:C", ":")) {
+for (String scope : HierarchicalSchemaUtil.parentScopes("A:B:C")) {
   String schemaName = HierarchicalSchemaUtil.toPhysicalSchemaName(scope); // A, A.B, A.B.C
   // create schema if not exists
 }
