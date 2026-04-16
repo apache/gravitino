@@ -97,7 +97,13 @@ Cons:
 - Introduce logical identifier concept: `HierarchicalSchema`.
 - `HierarchicalSchema` uses fixed separator `:` in logic layer.
 - `:` is mandatory in this design, not configurable.
-- Schema name can still contain `.` in physical storage to keep model stable.
+- For Gravitino REST create/update schema APIs, `request.getName()` keeps the logical schema name
+  and may contain `:` (for example `A:B` or `A:B:C`).
+- This phase does not pre-convert `request.getName()` from `:` to `.` before capability name
+  validation; capability naming rules must explicitly allow `:` for schema scope.
+- Schema name uses `:`-separated hierarchical representation in this design; `.` is not used as
+  schema separator.
+- `.` remains an Iceberg namespace hierarchy notation in external semantics only.
 - When `:` is used as separator, segment values containing `:` must be percent-encoded.
 - `%` must also be encoded as `%25` to avoid decode ambiguity.
 - Encoding/decoding order:
@@ -160,6 +166,23 @@ Examples:
 - Gravitino server REST supports namespace create/update/drop operations for nested namespace
   workflows, aligned with Iceberg REST behavior.
 - Existing schema/table APIs remain compatible with non-nested cases.
+
+### Performance Considerations
+
+- Current `EntityStore` does not support prefix matching on schema names.
+- As a result, `list schema` with `parentHierarchicalSchema` cannot be implemented as an
+  efficient prefix query at storage layer. The server must list all schemas in the catalog and
+  then compute the top-level / direct-children view in memory.
+- This may introduce higher-than-expected latency and load for catalogs with a large number of
+  schemas.
+
+Mitigations:
+
+- Cache computed hierarchy results per catalog with a short TTL and invalidate on schema
+  create/update/drop.
+- Enforce reasonable limits (pagination / maximum returned items) for list operations.
+- Add performance/regression tests with large schema counts to validate behavior.
+- Consider enhancing `EntityStore` to support prefix/index queries as a follow-up optimization.
 
 ## Privileges and Authorization
 
@@ -314,7 +337,8 @@ for (String scope : HierarchicalSchemaUtil.parentScopes("A:B:C")) {
 - Add a dedicated conversion utility for `HierarchicalSchema` path:
   - Iceberg namespace levels -> logical path (preferred `:`).
   - Logical path -> physical schema name (phase-1 uses `.` flattened mapping).
-- Add validation rules to reject ambiguous names (for example, raw schema names containing `:` when `:` is separator).
+- Override `Capability.specificationOnName(SCHEMA, name)` naming rules for related catalogs so
+  schema names containing `:` are accepted in this phase.
 
 ### 2) Authorization behavior
 
