@@ -22,6 +22,8 @@ import com.codahale.metrics.annotation.ResponseMetered;
 import com.codahale.metrics.annotation.Timed;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.node.ArrayNode;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.google.common.annotations.VisibleForTesting;
 import java.util.ArrayList;
 import java.util.List;
@@ -52,6 +54,8 @@ import org.apache.gravitino.Entity;
 import org.apache.gravitino.Entity.EntityType;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.NameIdentifier;
+import org.apache.gravitino.credential.CredentialPrivilege;
+import org.apache.gravitino.iceberg.service.IcebergCatalogWrapperManager;
 import org.apache.gravitino.iceberg.service.IcebergExceptionMapper;
 import org.apache.gravitino.iceberg.service.IcebergObjectMapper;
 import org.apache.gravitino.iceberg.service.IcebergRESTUtils;
@@ -72,6 +76,7 @@ import org.apache.iceberg.TableMetadata;
 import org.apache.iceberg.catalog.Namespace;
 import org.apache.iceberg.catalog.TableIdentifier;
 import org.apache.iceberg.rest.RESTUtil;
+import org.apache.iceberg.rest.credentials.Credential;
 import org.apache.iceberg.rest.requests.CreateTableRequest;
 import org.apache.iceberg.rest.requests.PlanTableScanRequest;
 import org.apache.iceberg.rest.requests.ReportMetricsRequest;
@@ -99,15 +104,18 @@ public class IcebergTableOperations {
 
   private ObjectMapper icebergObjectMapper;
   private IcebergTableOperationDispatcher tableOperationDispatcher;
+  private IcebergCatalogWrapperManager icebergCatalogWrapperManager;
 
   @Context private HttpServletRequest httpRequest;
 
   @Inject
   public IcebergTableOperations(
       IcebergMetricsManager icebergMetricsManager,
-      IcebergTableOperationDispatcher tableOperationDispatcher) {
+      IcebergTableOperationDispatcher tableOperationDispatcher,
+      IcebergCatalogWrapperManager icebergCatalogWrapperManager) {
     this.icebergMetricsManager = icebergMetricsManager;
     this.tableOperationDispatcher = tableOperationDispatcher;
+    this.icebergCatalogWrapperManager = icebergCatalogWrapperManager;
     this.icebergObjectMapper = IcebergObjectMapper.getInstance();
   }
 
@@ -509,15 +517,20 @@ public class IcebergTableOperations {
       @Encoded() @PathParam("namespace") @AuthorizationMetadata(type = EntityType.SCHEMA)
           String namespace,
       @Encoded() @PathParam("table") @AuthorizationMetadata(type = EntityType.TABLE) String table,
-      PlanTableScanRequest scanRequest) {
+      PlanTableScanRequest scanRequest,
+      @HeaderParam(X_ICEBERG_ACCESS_DELEGATION) String accessDelegation) {
+    boolean isCredentialVending = isCredentialVending(accessDelegation);
     String catalogName = IcebergRESTUtils.getCatalogName(prefix);
     Namespace icebergNS = RESTUtil.decodeNamespace(namespace);
     String tableName = RESTUtil.decodeString(table);
     LOG.info(
-        "Plan table scan, catalog: {}, namespace: {}, table: {}",
+        "Plan table scan, catalog: {}, namespace: {}, table: {}, "
+            + "accessDelegation: {}, isCredentialVending: {}",
         catalogName,
         icebergNS,
-        tableName);
+        tableName,
+        accessDelegation,
+        isCredentialVending);
 
     try {
       return Utils.doAs(
@@ -525,10 +538,28 @@ public class IcebergTableOperations {
           () -> {
             TableIdentifier tableIdentifier = TableIdentifier.of(icebergNS, tableName);
             IcebergRequestContext context =
-                new IcebergRequestContext(httpServletRequest(), catalogName);
+                new IcebergRequestContext(httpServletRequest(), catalogName, isCredentialVending);
 
             PlanTableScanResponse scanResponse =
                 tableOperationDispatcher.planTableScan(context, tableIdentifier, scanRequest);
+
+            if (isCredentialVending) {
+              try {
+                LoadCredentialsResponse credentialsResponse =
+                    icebergCatalogWrapperManager
+                        .getCatalogWrapper(catalogName)
+                        .getCredentialsIfEligible(tableIdentifier, true, CredentialPrivilege.READ);
+                if (!credentialsResponse.credentials().isEmpty()) {
+                  return buildScanResponseWithCredentials(scanResponse, credentialsResponse);
+                }
+              } catch (Exception e) {
+                LOG.warn(
+                    "Failed to vend credentials for scan on table {}, "
+                        + "returning scan response without credentials",
+                    tableIdentifier,
+                    e);
+              }
+            }
 
             return IcebergRESTUtils.ok(scanResponse);
           });
@@ -621,6 +652,19 @@ public class IcebergTableOperations {
               + " is illegal, Iceberg REST spec supports: [vended-credentials,remote-signing], "
               + "Gravitino Iceberg REST server supports: vended-credentials");
     }
+  }
+
+  private Response buildScanResponseWithCredentials(
+      PlanTableScanResponse scanResponse, LoadCredentialsResponse credentialsResponse) {
+    ObjectNode responseNode = icebergObjectMapper.valueToTree(scanResponse);
+    ArrayNode credArray = responseNode.putArray("storage-credentials");
+    for (Credential cred : credentialsResponse.credentials()) {
+      ObjectNode credNode = credArray.addObject();
+      credNode.put("prefix", cred.prefix());
+      ObjectNode configNode = credNode.putObject("config");
+      cred.config().forEach(configNode::put);
+    }
+    return Response.ok(responseNode, MediaType.APPLICATION_JSON).build();
   }
 
   private NameIdentifier[] toNameIdentifiers(
