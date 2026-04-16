@@ -1,3 +1,21 @@
+<!--
+  Licensed to the Apache Software Foundation (ASF) under one
+  or more contributor license agreements.  See the NOTICE file
+  distributed with this work for additional information
+  regarding copyright ownership.  The ASF licenses this file
+  to you under the Apache License, Version 2.0 (the
+  "License"); you may not use this file except in compliance
+  with the License.  You may obtain a copy of the License at
+
+   http://www.apache.org/licenses/LICENSE-2.0
+
+  Unless required by applicable law or agreed to in writing,
+  software distributed under the License is distributed on an
+  "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+  KIND, either express or implied.  See the License for the
+  specific language governing permissions and limitations
+  under the License.
+-->
 # [Iceberg REST] Supported Nested Namespace Design
 
 ## Background
@@ -49,32 +67,13 @@ Pros:
 
 - Low-impact evolution path without introducing a new metadata entity.
 - Decouples nested namespace semantics from `.` and reduces parser ambiguity.
-- Allows future separator change by configuration instead of storage migration.
 - Reuses existing metadata and authorization model to reduce implementation risk.
 
 Cons:
 
 - Requires explicit conversion rules between logical path and physical schema name.
 - Authorization matching and identifier serialization become more complex.
-- `list schema` remains flat in physical storage model.
-
-#### Option B.1: Use `/` as logical separator
-
-Examples:
-
-- `A/B/C` as logical `HierarchicalSchema` path.
-- Mapped physical schema name can still be stored as `A.B.C` (or encoded form).
-
-Pros:
-
-- Most intuitive as a path-like hierarchy.
-
-Cons:
-
-- High conflict risk with URL path routing and REST template matching.
-- Requires stricter encode/decode handling in endpoint parameters.
-
-#### Option B.2 (Recommended): Use `:` as logical separator
+#### Option B Separator (Fixed): Use `:` as logical separator
 
 Examples:
 
@@ -91,29 +90,13 @@ Cons:
 
 - Needs clear validation rule to avoid ambiguity with existing schema names containing `:`.
 
-#### Option B.3: Use `::` as logical separator
-
-Examples:
-
-- `A::B::C` as logical `HierarchicalSchema` path.
-
-Pros:
-
-- Strong visual boundary between path segments.
-- Reduces accidental split in user-entered names compared with single-character separator.
-
-Cons:
-
-- Slightly heavier user input and display.
-- Requires stricter parser and escaping rules for edge cases.
-
 ## Design
 
 ### Identifier Rules
 
 - Introduce logical identifier concept: `HierarchicalSchema`.
-- `HierarchicalSchema` uses configurable separator in logic layer (`/`, `:`, or `::`).
-- In this phase, `:` is the recommended separator to balance readability and compatibility.
+- `HierarchicalSchema` uses fixed separator `:` in logic layer.
+- `:` is mandatory in this design, not configurable.
 - Schema name can still contain `.` in physical storage to keep model stable.
 - When `:` is used as separator, segment values containing `:` must be percent-encoded.
 - `%` must also be encoded as `%25` to avoid decode ambiguity.
@@ -355,12 +338,6 @@ for (String scope : HierarchicalSchemaUtil.parentScopes("A:B:C")) {
 - Keep `NameIdentifier` external compatibility for existing dotted identifiers.
 - Add schema-level rendering/parsing guidance for logical separator and quoted schema output where ambiguity exists.
 - Keep change scope limited to schema handling in this phase to reduce regression risk for table/view/function paths.
-
-### 5) Configuration and rollout
-
-- Add a server-side config item for logical namespace separator with default `:`.
-- Keep separator choices limited to `/`, `:`, `::` in this phase.
-- Document fallback/rollback behavior by preserving physical schema mapping and existing APIs.
 
 ## Compatibility
 
