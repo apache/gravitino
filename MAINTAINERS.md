@@ -98,7 +98,7 @@ All contributions from the people listed are licensed under the Apache License v
 | Minghuang Li  | mchades             | Datastrato       |
 | Xun Liu       | xunliu              | Datastrato       |
 | Hui Yu        | diqiu50             | Datastrato       |
-| Xiaojing Fang | FANNG1              | Datastrato       |
+| Xiaojing Fang | FANNG1              | China Mobile     |
 | Qi Yu         | yuqi1129            | Datastrato       |
 | Decheng Liu   | ch3yne              | Datastrato       |
 | Saisai Shao   | jerryshao           | Datastrato       |
