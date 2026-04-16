@@ -22,6 +22,7 @@ import java.io.File;
 import java.io.IOException;
 import java.util.HashSet;
 import java.util.Properties;
+import java.util.concurrent.atomic.AtomicBoolean;
 import javax.inject.Singleton;
 import javax.servlet.Servlet;
 import org.apache.gravitino.Configs;
@@ -88,6 +89,8 @@ public class GravitinoServer extends ResourceConfig {
 
   private final LineageService lineageService;
 
+  private final AtomicBoolean isStopped = new AtomicBoolean(false);
+
   public GravitinoServer(ServerConfig config, GravitinoEnv gravitinoEnv) {
     this.serverConfig = config;
     this.server = new JettyServer();
@@ -100,7 +103,7 @@ public class GravitinoServer extends ResourceConfig {
 
     JettyServerConfig jettyServerConfig =
         JettyServerConfig.fromConfig(serverConfig, WEBSERVER_CONF_PREFIX);
-    server.initialize(jettyServerConfig, SERVER_NAME, true /* shouldEnableUI */);
+    server.initialize(jettyServerConfig, SERVER_NAME);
 
     ServerAuthenticator.getInstance().initialize(serverConfig);
 
@@ -175,9 +178,10 @@ public class GravitinoServer extends ResourceConfig {
     server.addCustomFilters(API_ANY_PATH);
     server.addFilter(new VersioningFilter(), API_ANY_PATH);
     server.addSystemFilters(API_ANY_PATH);
-
-    server.addFilter(new WebUIFilter(), "/"); // Redirect to the /ui/index html page.
-    server.addFilter(new WebUIFilter(), "/ui/*"); // Redirect to the static html file.
+    if (server.isWebUiEnabled()) {
+      server.addFilter(new WebUIFilter(), "/"); // Redirect to the /ui/index html page.
+      server.addFilter(new WebUIFilter(), "/ui/*"); // Redirect to the static html file.
+    }
   }
 
   public void start() throws Exception {
@@ -196,6 +200,13 @@ public class GravitinoServer extends ResourceConfig {
     if (lineageService != null) {
       lineageService.close();
     }
+  }
+
+  void gracefulStop() throws IOException {
+    if (!isStopped.compareAndSet(false, true)) {
+      return;
+    }
+    stop();
   }
 
   public static void main(String[] args) {
@@ -219,8 +230,8 @@ public class GravitinoServer extends ResourceConfig {
             new Thread(
                 () -> {
                   try {
-                    // Register some clean-up tasks that need to be done before shutting down
                     Thread.sleep(server.serverConfig.get(ServerConfig.SERVER_SHUTDOWN_TIMEOUT));
+                    server.gracefulStop();
                   } catch (InterruptedException e) {
                     Thread.currentThread().interrupt();
                     LOG.error("Interrupted exception:", e);
@@ -233,7 +244,7 @@ public class GravitinoServer extends ResourceConfig {
 
     LOG.info("Shutting down Gravitino Server ... ");
     try {
-      server.stop();
+      server.gracefulStop();
       LOG.info("Gravitino Server has shut down.");
     } catch (Exception e) {
       LOG.error("Error while stopping Gravitino Server", e);

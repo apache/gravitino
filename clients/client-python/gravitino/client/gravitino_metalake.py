@@ -660,7 +660,7 @@ class GravitinoMetalake(
         url = self.API_METALAKES_TAG_PATH.format(
             encode_string(self.name()), encode_string(tag_name)
         )
-        response = self.rest_client.post(
+        response = self.rest_client.put(
             url,
             json=update_req,
             error_handler=TAG_ERROR_HANDLER,
