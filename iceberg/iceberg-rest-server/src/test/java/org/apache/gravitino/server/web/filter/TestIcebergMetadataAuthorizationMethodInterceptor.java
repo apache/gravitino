@@ -41,6 +41,7 @@ import org.apache.gravitino.server.authorization.annotations.AuthorizationExpres
 import org.apache.gravitino.server.authorization.annotations.AuthorizationMetadata;
 import org.apache.gravitino.utils.NameIdentifierUtil;
 import org.apache.iceberg.catalog.Catalog;
+import org.apache.iceberg.exceptions.ForbiddenException;
 import org.apache.iceberg.rest.RESTCatalog;
 import org.apache.iceberg.rest.RESTUtil;
 import org.apache.iceberg.rest.responses.ErrorResponse;
@@ -182,6 +183,7 @@ public class TestIcebergMetadataAuthorizationMethodInterceptor {
     RESTCatalog restCatalog = Mockito.mock(RESTCatalog.class);
     Mockito.when(wrapperManager.getCatalogWrapper(TEST_CATALOG)).thenReturn(wrapper);
     Mockito.when(wrapper.getCatalog()).thenReturn(restCatalog);
+    Mockito.when(wrapper.isRESTCatalog()).thenReturn(true);
     resetContext(wrapperManager, true);
 
     Method method =
@@ -201,7 +203,19 @@ public class TestIcebergMetadataAuthorizationMethodInterceptor {
           @Override
           protected Optional<AuthorizationHandler> createAuthorizationHandler(
               Parameter[] parameters, Object[] args) {
-            throw new RuntimeException("test");
+            return Optional.of(
+                new AuthorizationHandler() {
+                  @Override
+                  public void process(Map<Entity.EntityType, NameIdentifier> nameIdentifierMap)
+                      throws ForbiddenException {
+                    throw new RuntimeException("test");
+                  }
+
+                  @Override
+                  public boolean authorizationCompleted() {
+                    return false;
+                  }
+                });
           }
         };
     Object result = interceptor.invoke(invocation);
@@ -236,7 +250,19 @@ public class TestIcebergMetadataAuthorizationMethodInterceptor {
           @Override
           protected Optional<AuthorizationHandler> createAuthorizationHandler(
               Parameter[] parameters, Object[] args) {
-            throw new RuntimeException("test");
+            return Optional.of(
+                new AuthorizationHandler() {
+                  @Override
+                  public void process(Map<Entity.EntityType, NameIdentifier> nameIdentifierMap)
+                      throws ForbiddenException {
+                    throw new RuntimeException("test");
+                  }
+
+                  @Override
+                  public boolean authorizationCompleted() {
+                    return false;
+                  }
+                });
           }
         };
     Object result = interceptor.invoke(invocation);
