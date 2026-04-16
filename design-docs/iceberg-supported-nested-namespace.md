@@ -129,7 +129,7 @@ Examples:
 ### Iceberg REST Side Behavior
 
 - **Create nested namespace**:
-  - Creating `A.B.C` will create (or ensure existence of) three schemas in Gravitino: `A`, `A.B`, and `A.B.C`.
+  - Creating `A:B:C` will create (or ensure existence of) three schemas in Gravitino: `A`, `A.B`, and `A.B.C`.
   - Set the created namespace owner as current user.
 - **Update nested namespace**:
   - Support updating namespace properties through mapped schema operations.
@@ -150,11 +150,11 @@ Examples:
     percent-encoding for transport in a query component).
 - Gravitino does not provide a dedicated `list sub-schema` API; hierarchy is expressed via
   `list schema`/`list namespaces` results.
-- Example: for schemas `A`, `B`, `A.B`, `A.B.C`, hierarchy view is `A -> A.B -> A.B.C` and `B`;
-  root listing returns `A` and `B`, and querying parent `A` returns `A.B`.
+- Example: for schemas `A`, `B`, `A:B`, `A:B:C`, hierarchy view is `A -> A:B -> A:B:C` and `B`;
+  root listing returns `A` and `B`, and querying parent `A` returns `A:B`.
 - To make nested semantics explicit, `list namespaces` should express parent-child relationships
   (hierarchical view) even when underlying storage is flat.
-- Example hierarchical view from flat schemas: `A` -> `A.B` -> `A.B.C`, and `B` as another root.
+- Example hierarchical view from flat schemas: `A` -> `A:B` -> `A:B:C`, and `B` as another root.
 - This list-level hierarchical expression is the primary semantic model for users, reducing
   ambiguity caused by one request creating multiple physical schema objects.
 - Gravitino server REST supports namespace create/update/drop operations for nested namespace
@@ -209,7 +209,7 @@ Cons:
 
 Examples:
 
-- Privilege on `A.B` applies to that specific scope.
+- Privilege on `A:B` applies to that specific scope.
 - Privilege on `A` also applies to `A:B` (or other configured child path) based on the namespace inheritance rule.
 
 ## Code Snippets (Design-Level)
@@ -349,6 +349,6 @@ for (String scope : HierarchicalSchemaUtil.parentScopes("A:B:C")) {
 
 - Unit tests for schema name parse/quote handling when name contains `.`.
 - Unit/integration tests for Iceberg REST create/update/drop nested namespace mapping.
-- Authorization tests for nested scope behavior (`A`, `A.B`, `A.B.C`).
+- Authorization tests for nested scope behavior (`A`, `A:B`, `A:B:C`).
 - Regression tests for non-nested namespace authorization behavior.
 
