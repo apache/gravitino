@@ -164,7 +164,7 @@ public class TestCatalogWrapperForREST {
             ImmutableMap.of(
                 IcebergConstants.CATALOG_BACKEND,
                 "memory",
-                IcebergConstants.CATALOG_WAREHOUSE,
+                IcebergConstants.WAREHOUSE,
                 "/tmp/warehouse"));
 
     CONSTRUCTION_IN_PROGRESS.set(true);
