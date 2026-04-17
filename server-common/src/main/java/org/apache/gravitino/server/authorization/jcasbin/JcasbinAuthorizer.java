@@ -457,6 +457,9 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
     MetadataObject metadataObject = NameIdentifierUtil.toMetadataObject(nameIdentifier, type);
     Long metadataId = MetadataIdConverter.getID(metadataObject, metalake);
     ownerRelCache.invalidate(metadataId);
+    // Owner mutations may happen after drop/recreate with the same name. Invalidate the
+    // name->id mapping as well to prevent using a stale metadataId from metadataIdCache.
+    metadataIdCache.invalidate(buildCacheKey(metalake, metadataObject));
   }
 
   @Override
