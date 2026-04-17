@@ -85,6 +85,16 @@ public interface FunctionMetaMapper {
   @SelectProvider(type = FunctionMetaSQLProviderFactory.class, method = "listFunctionPOsBySchemaId")
   List<FunctionPO> listFunctionPOsBySchemaId(@Param("schemaId") Long schemaId);
 
+  @Results({
+    @Result(property = "functionId", column = "function_id", id = true),
+    @Result(property = "functionName", column = "function_name"),
+    @Result(property = "schemaId", column = "schema_id"),
+  })
+  @SelectProvider(
+      type = FunctionMetaSQLProviderFactory.class,
+      method = "listFunctionPOsByFunctionIds")
+  List<FunctionPO> listFunctionPOsByFunctionIds(@Param("functionIds") List<Long> functionIds);
+
   @Results(
       id = "functionPOResultMap",
       value = {
@@ -130,6 +140,12 @@ public interface FunctionMetaMapper {
       type = FunctionMetaSQLProviderFactory.class,
       method = "selectFunctionMetaBySchemaIdAndName")
   FunctionPO selectFunctionMetaBySchemaIdAndName(
+      @Param("schemaId") Long schemaId, @Param("functionName") String functionName);
+
+  @SelectProvider(
+      type = FunctionMetaSQLProviderFactory.class,
+      method = "selectFunctionIdBySchemaIdAndFunctionName")
+  Long selectFunctionIdBySchemaIdAndFunctionName(
       @Param("schemaId") Long schemaId, @Param("functionName") String functionName);
 
   @UpdateProvider(

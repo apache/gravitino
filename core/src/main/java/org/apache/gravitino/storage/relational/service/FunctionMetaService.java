@@ -82,6 +82,24 @@ public class FunctionMetaService {
 
   @Monitored(
       metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME,
+      baseMetricName = "getFunctionIdBySchemaIdAndFunctionName")
+  public Long getFunctionIdBySchemaIdAndFunctionName(Long schemaId, String functionName) {
+    Long functionId =
+        SessionUtils.getWithoutCommit(
+            FunctionMetaMapper.class,
+            mapper -> mapper.selectFunctionIdBySchemaIdAndFunctionName(schemaId, functionName));
+
+    if (functionId == null) {
+      throw new NoSuchEntityException(
+          NoSuchEntityException.NO_SUCH_ENTITY_MESSAGE,
+          Entity.EntityType.FUNCTION.name().toLowerCase(Locale.ROOT),
+          functionName);
+    }
+    return functionId;
+  }
+
+  @Monitored(
+      metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME,
       baseMetricName = "insertFunction")
   public void insertFunction(FunctionEntity functionEntity, boolean overwrite) throws IOException {
     NameIdentifierUtil.checkFunction(functionEntity.nameIdentifier());
