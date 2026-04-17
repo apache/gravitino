@@ -54,7 +54,8 @@ public class AsyncQueueListener implements EventListenerPlugin {
   private final AtomicBoolean stopped = new AtomicBoolean(false);
   private final AtomicLong dropEventCounters = new AtomicLong(0);
   private final AtomicLong lastDropEventCounters = new AtomicLong(0);
-  private final AtomicReference<Instant> lastRecordDropEventTime = new AtomicReference<>(Instant.EPOCH);
+  private final AtomicReference<Instant> lastRecordDropEventTime =
+      new AtomicReference<>(Instant.EPOCH);
   private final String asyncQueueListenerName;
   private final int highWatermarkThreshold;
 
@@ -155,11 +156,7 @@ public class AsyncQueueListener implements EventListenerPlugin {
     Instant lastDropTime = lastRecordDropEventTime.get();
     if (dropEvents > 0 && Instant.now().isAfter(lastDropTime.plusSeconds(60))) {
       if (lastDropEventCounters.compareAndSet(lastDropEvents, currentDropEvents)) {
-        LOG.warn(
-            "{} drop {} events since {}",
-            asyncQueueListenerName,
-            dropEvents,
-            lastDropTime);
+        LOG.warn("{} drop {} events since {}", asyncQueueListenerName, dropEvents, lastDropTime);
         lastRecordDropEventTime.set(Instant.now());
       }
     }
