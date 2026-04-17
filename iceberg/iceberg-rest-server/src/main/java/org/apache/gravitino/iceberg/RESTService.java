@@ -104,7 +104,7 @@ public class RESTService implements GravitinoAuxiliaryService {
     configProvider.initialize(configProperties);
     String metalakeName = configProvider.getMetalakeName();
     boolean skipAuthorizationForRestBackend =
-        icebergConfig.get(IcebergConfig.ICEBERG_REST_SKIP_AUTHORIZATION_FOR_REST_BACKEND);
+        icebergConfig.get(IcebergConfig.ICEBERG_REST_DISABLE_REST_AUTHZ);
 
     Boolean enableAuth = GravitinoEnv.getInstance().config().get(Configs.ENABLE_AUTHORIZATION);
     EventBus eventBus = GravitinoEnv.getInstance().eventBus();

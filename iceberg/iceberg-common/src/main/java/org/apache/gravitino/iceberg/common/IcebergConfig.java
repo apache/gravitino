@@ -220,10 +220,10 @@ public class IcebergConfig extends Config implements OverwriteDefaultConfig {
           .stringConf()
           .createWithDefault(IcebergConstants.STATIC_ICEBERG_CATALOG_CONFIG_PROVIDER_NAME);
 
-  public static final ConfigEntry<Boolean> ICEBERG_REST_SKIP_AUTHORIZATION_FOR_REST_BACKEND =
-      new ConfigBuilder(IcebergConstants.ICEBERG_REST_SKIP_AUTHORIZATION_FOR_REST_BACKEND)
+  public static final ConfigEntry<Boolean> ICEBERG_REST_DISABLE_REST_AUTHZ =
+      new ConfigBuilder(IcebergConstants.ICEBERG_REST_DISABLE_REST_AUTHZ)
           .doc(
-              "Whether to skip authorization in IRC1 when backend catalog is a REST catalog. "
+              "Whether to disable authorization in IRC1 when backend catalog is a REST catalog. "
                   + "Set to false to enforce authorization in IRC1 before proxying to IRC2.")
           .version(ConfigConstants.VERSION_1_3_0)
           .booleanConf()
