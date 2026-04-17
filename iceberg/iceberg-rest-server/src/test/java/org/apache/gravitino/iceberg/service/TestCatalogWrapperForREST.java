@@ -24,6 +24,7 @@ import static org.mockito.Mockito.when;
 
 import com.google.common.collect.ImmutableMap;
 import java.util.Map;
+import java.util.concurrent.atomic.AtomicBoolean;
 import org.apache.gravitino.catalog.lakehouse.iceberg.IcebergConstants;
 import org.apache.gravitino.iceberg.common.IcebergConfig;
 import org.apache.iceberg.catalog.Catalog;
@@ -32,6 +33,8 @@ import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
 public class TestCatalogWrapperForREST {
+
+  private static final AtomicBoolean CONSTRUCTION_IN_PROGRESS = new AtomicBoolean(false);
 
   @Test
   void testCheckPropertiesForCompatibility() {
@@ -152,5 +155,38 @@ public class TestCatalogWrapperForREST {
     Assertions.assertThrows(
         IllegalArgumentException.class,
         () -> CatalogWrapperForREST.buildCatalogConfigToClients(config, catalog));
+  }
+
+  @Test
+  void testConstructorDoesNotLoadCatalogEagerly() {
+    IcebergConfig config =
+        new IcebergConfig(
+            ImmutableMap.of(
+                IcebergConstants.CATALOG_BACKEND,
+                "memory",
+                IcebergConstants.CATALOG_WAREHOUSE,
+                "/tmp/warehouse"));
+
+    CONSTRUCTION_IN_PROGRESS.set(true);
+    try {
+      Assertions.assertDoesNotThrow(() -> new LazyCheckCatalogWrapperForREST("test", config));
+    } finally {
+      CONSTRUCTION_IN_PROGRESS.set(false);
+    }
+  }
+
+  private static class LazyCheckCatalogWrapperForREST extends CatalogWrapperForREST {
+
+    LazyCheckCatalogWrapperForREST(String catalogName, IcebergConfig config) {
+      super(catalogName, config);
+    }
+
+    @Override
+    public Catalog getCatalog() {
+      if (CONSTRUCTION_IN_PROGRESS.get()) {
+        throw new AssertionError("Catalog should not be loaded during wrapper construction");
+      }
+      return super.getCatalog();
+    }
   }
 }
