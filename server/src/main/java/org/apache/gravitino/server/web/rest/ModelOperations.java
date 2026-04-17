@@ -180,13 +180,12 @@ public class ModelOperations {
         request.getName());
 
     try {
-      request.validate();
-      NameIdentifier modelId =
-          NameIdentifierUtil.ofModel(metalake, catalog, schema, request.getName());
-
       return Utils.doAs(
           httpRequest,
           () -> {
+            request.validate();
+            NameIdentifier modelId =
+                NameIdentifierUtil.ofModel(metalake, catalog, schema, request.getName());
             Model m =
                 modelDispatcher.registerModel(
                     modelId, request.getComment(), request.getProperties());
@@ -422,11 +421,10 @@ public class ModelOperations {
     NameIdentifier modelId = NameIdentifierUtil.ofModel(metalake, catalog, schema, model);
 
     try {
-      request.validate();
-
       return Utils.doAs(
           httpRequest,
           () -> {
+            request.validate();
             Map<String, String> tmpUris =
                 Optional.ofNullable(request.getUris()).orElse(Collections.emptyMap());
             ImmutableMap.Builder<String, String> uris =
@@ -575,7 +573,6 @@ public class ModelOperations {
         schema,
         model,
         version);
-    request.validate();
 
     try {
       NameIdentifier modelId = NameIdentifierUtil.ofModel(metalake, catalog, schema, model);
@@ -630,7 +627,6 @@ public class ModelOperations {
         schema,
         model,
         alias);
-    request.validate();
 
     try {
       NameIdentifier modelId = NameIdentifierUtil.ofModel(metalake, catalog, schema, model);

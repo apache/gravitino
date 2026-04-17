@@ -19,11 +19,14 @@
 package org.apache.gravitino.server.web;
 
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.google.common.collect.Lists;
+import java.io.IOException;
 import java.io.PrintWriter;
 import javax.servlet.http.HttpServletResponse;
 import org.apache.gravitino.Configs;
@@ -125,5 +128,33 @@ public class TestConfigServlet {
         "org.apache.gravitino.server.authentication.JwksTokenValidator");
 
     assertDoesNotThrow(() -> new ConfigServlet(serverConfig));
+  }
+
+  @Test
+  public void testConfigServletHandlesIOException() throws Exception {
+    ServerConfig serverConfig = new ServerConfig();
+    ConfigServlet configServlet = new ConfigServlet(serverConfig);
+    configServlet.init();
+    HttpServletResponse res = mock(HttpServletResponse.class);
+    PrintWriter writer = mock(PrintWriter.class);
+    when(res.getWriter()).thenReturn(writer);
+    doThrow(new IOException("Test IO error")).when(writer).write(any(String.class));
+
+    assertDoesNotThrow(() -> configServlet.doGet(null, res));
+    verify(res).setStatus(HttpServletResponse.SC_INTERNAL_SERVER_ERROR);
+    configServlet.destroy();
+  }
+
+  @Test
+  public void testConfigServletHandlesIllegalStateException() throws Exception {
+    ServerConfig serverConfig = new ServerConfig();
+    ConfigServlet configServlet = new ConfigServlet(serverConfig);
+    configServlet.init();
+    HttpServletResponse res = mock(HttpServletResponse.class);
+    when(res.getWriter()).thenThrow(new IllegalStateException("Test state error"));
+
+    assertDoesNotThrow(() -> configServlet.doGet(null, res));
+    verify(res).setStatus(HttpServletResponse.SC_INTERNAL_SERVER_ERROR);
+    configServlet.destroy();
   }
 }

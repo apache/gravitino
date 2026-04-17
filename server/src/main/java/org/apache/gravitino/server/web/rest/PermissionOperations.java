@@ -189,7 +189,7 @@ public class PermissionOperations {
           });
     } catch (Exception e) {
       return ExceptionHandlers.handleGroupPermissionOperationException(
-          OperationType.REVOKE, StringUtils.join(request.getRoleNames()), group, e);
+          OperationType.REVOKE, StringUtils.join(request.getRoleNames(), ","), group, e);
     }
   }
 
