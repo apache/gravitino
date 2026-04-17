@@ -110,14 +110,19 @@ public class TestRelationalEntityStore {
             invocation -> {
               Mockito.verify(cache, Mockito.never())
                   .invalidate(
-                      src, Entity.EntityType.TABLE, SupportsRelationOperations.Type.TAG_REL);
+                      src,
+                      Entity.EntityType.TABLE,
+                      SupportsRelationOperations.Type.TAG_METADATA_OBJECT_REL);
               Mockito.verify(cache, Mockito.never())
-                  .invalidate(dst, Entity.EntityType.TAG, SupportsRelationOperations.Type.TAG_REL);
+                  .invalidate(
+                      dst,
+                      Entity.EntityType.TAG,
+                      SupportsRelationOperations.Type.TAG_METADATA_OBJECT_REL);
               return null;
             })
         .when(backend)
         .insertRelation(
-            SupportsRelationOperations.Type.TAG_REL,
+            SupportsRelationOperations.Type.TAG_METADATA_OBJECT_REL,
             src,
             Entity.EntityType.TABLE,
             dst,
@@ -125,7 +130,7 @@ public class TestRelationalEntityStore {
             true);
 
     store.insertRelation(
-        SupportsRelationOperations.Type.TAG_REL,
+        SupportsRelationOperations.Type.TAG_METADATA_OBJECT_REL,
         src,
         Entity.EntityType.TABLE,
         dst,
@@ -136,7 +141,7 @@ public class TestRelationalEntityStore {
     inOrder
         .verify(backend)
         .insertRelation(
-            SupportsRelationOperations.Type.TAG_REL,
+            SupportsRelationOperations.Type.TAG_METADATA_OBJECT_REL,
             src,
             Entity.EntityType.TABLE,
             dst,
@@ -144,10 +149,12 @@ public class TestRelationalEntityStore {
             true);
     inOrder
         .verify(cache)
-        .invalidate(src, Entity.EntityType.TABLE, SupportsRelationOperations.Type.TAG_REL);
+        .invalidate(
+            src, Entity.EntityType.TABLE, SupportsRelationOperations.Type.TAG_METADATA_OBJECT_REL);
     inOrder
         .verify(cache)
-        .invalidate(dst, Entity.EntityType.TAG, SupportsRelationOperations.Type.TAG_REL);
+        .invalidate(
+            dst, Entity.EntityType.TAG, SupportsRelationOperations.Type.TAG_METADATA_OBJECT_REL);
   }
 
   @Test
@@ -165,27 +172,31 @@ public class TestRelationalEntityStore {
             invocation -> {
               Mockito.verify(cache, Mockito.never())
                   .invalidate(
-                      src, Entity.EntityType.TABLE, SupportsRelationOperations.Type.TAG_REL);
+                      src,
+                      Entity.EntityType.TABLE,
+                      SupportsRelationOperations.Type.TAG_METADATA_OBJECT_REL);
               Mockito.verify(cache, Mockito.never())
                   .invalidate(
-                      destToAdd, Entity.EntityType.TABLE, SupportsRelationOperations.Type.TAG_REL);
+                      destToAdd,
+                      Entity.EntityType.TABLE,
+                      SupportsRelationOperations.Type.TAG_METADATA_OBJECT_REL);
               Mockito.verify(cache, Mockito.never())
                   .invalidate(
                       destToRemove,
                       Entity.EntityType.TABLE,
-                      SupportsRelationOperations.Type.TAG_REL);
+                      SupportsRelationOperations.Type.TAG_METADATA_OBJECT_REL);
               return List.of();
             })
         .when(backend)
         .updateEntityRelations(
-            SupportsRelationOperations.Type.TAG_REL,
+            SupportsRelationOperations.Type.TAG_METADATA_OBJECT_REL,
             src,
             Entity.EntityType.TABLE,
             destEntitiesToAdd,
             destEntitiesToRemove);
 
     store.updateEntityRelations(
-        SupportsRelationOperations.Type.TAG_REL,
+        SupportsRelationOperations.Type.TAG_METADATA_OBJECT_REL,
         src,
         Entity.EntityType.TABLE,
         destEntitiesToAdd,
@@ -195,19 +206,26 @@ public class TestRelationalEntityStore {
     inOrder
         .verify(backend)
         .updateEntityRelations(
-            SupportsRelationOperations.Type.TAG_REL,
+            SupportsRelationOperations.Type.TAG_METADATA_OBJECT_REL,
             src,
             Entity.EntityType.TABLE,
             destEntitiesToAdd,
             destEntitiesToRemove);
     inOrder
         .verify(cache)
-        .invalidate(src, Entity.EntityType.TABLE, SupportsRelationOperations.Type.TAG_REL);
+        .invalidate(
+            src, Entity.EntityType.TABLE, SupportsRelationOperations.Type.TAG_METADATA_OBJECT_REL);
     inOrder
         .verify(cache)
-        .invalidate(destToAdd, Entity.EntityType.TABLE, SupportsRelationOperations.Type.TAG_REL);
+        .invalidate(
+            destToAdd,
+            Entity.EntityType.TABLE,
+            SupportsRelationOperations.Type.TAG_METADATA_OBJECT_REL);
     inOrder
         .verify(cache)
-        .invalidate(destToRemove, Entity.EntityType.TABLE, SupportsRelationOperations.Type.TAG_REL);
+        .invalidate(
+            destToRemove,
+            Entity.EntityType.TABLE,
+            SupportsRelationOperations.Type.TAG_METADATA_OBJECT_REL);
   }
 }

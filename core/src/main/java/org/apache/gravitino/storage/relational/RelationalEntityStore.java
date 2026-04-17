@@ -185,10 +185,11 @@ public class RelationalEntityStore implements EntityStore, SupportsRelationOpera
       throws IOException {
     try {
       boolean deleted = backend.delete(ident, entityType, cascade);
-      cache.invalidate(ident, entityType);
       return deleted;
     } catch (NoSuchEntityException e) {
       return false;
+    } finally {
+      cache.invalidate(ident, entityType);
     }
   }
 

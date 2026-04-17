@@ -747,7 +747,7 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
             // a background thread from overwriting it with stale data between invalidate and put.
             CatalogWrapper newWrapper = createCatalogWrapper(convertedCatalog, null);
             catalogCache.put(convertedCatalog.nameIdentifier(), newWrapper);
-            return newWrapper.catalog;
+            return newWrapper.catalog();
 
           } catch (NoSuchEntityException ne) {
             LOG.warn("Catalog {} does not exist", ident, ne);
@@ -1017,7 +1017,7 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
    * @param propsToValidate The properties to validate.
    * @return The created catalog wrapper.
    */
-  private CatalogWrapper createCatalogWrapper(
+  CatalogWrapper createCatalogWrapper(
       CatalogEntity entity, @Nullable Map<String, String> propsToValidate) {
     Map<String, String> conf = entity.getProperties();
     String provider = entity.getProvider();

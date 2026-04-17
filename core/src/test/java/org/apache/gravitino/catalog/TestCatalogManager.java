@@ -49,6 +49,7 @@ import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.Schema;
+import org.apache.gravitino.connector.BaseCatalog;
 import org.apache.gravitino.connector.capability.Capability;
 import org.apache.gravitino.connector.capability.CapabilityResult;
 import org.apache.gravitino.exceptions.CatalogAlreadyExistsException;
@@ -59,10 +60,12 @@ import org.apache.gravitino.lock.LockManager;
 import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.meta.BaseMetalake;
 import org.apache.gravitino.meta.CatalogEntity;
+import org.apache.gravitino.meta.SchemaEntity;
 import org.apache.gravitino.meta.SchemaVersion;
 import org.apache.gravitino.storage.RandomIdGenerator;
 import org.apache.gravitino.storage.memory.TestMemoryEntityStore;
 import org.apache.gravitino.storage.memory.TestMemoryEntityStore.InMemoryEntityStore;
+import org.apache.gravitino.utils.PrincipalUtils;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Assertions;
@@ -566,19 +569,8 @@ public class TestCatalogManager {
 
     CatalogManager.CatalogWrapper freshWrapper =
         Mockito.mock(CatalogManager.CatalogWrapper.class, Mockito.RETURNS_DEEP_STUBS);
-    Catalog freshCatalog = Mockito.mock(Catalog.class);
-    CatalogEntity freshEntity =
-        CatalogEntity.builder()
-            .withId(originalEntity.id())
-            .withName("cache_race_test_renamed")
-            .withNamespace(originalEntity.namespace())
-            .withType(originalEntity.getType())
-            .withProvider(originalEntity.getProvider())
-            .withComment(originalEntity.getComment())
-            .withProperties(originalEntity.getProperties())
-            .withAuditInfo(originalEntity.auditInfo())
-            .build();
-    FieldUtils.writeField(freshCatalog, "entity", freshEntity, true);
+    BaseCatalog<?> freshCatalog = Mockito.mock(BaseCatalog.class);
+    Mockito.doReturn("cache_race_test_renamed").when(freshCatalog).name();
     Mockito.doReturn(freshCatalog).when(freshWrapper).catalog();
 
     AtomicBoolean staleInserted = new AtomicBoolean(false);
@@ -589,12 +581,9 @@ public class TestCatalogManager {
                 .getCatalogCache()
                 .put(NameIdentifier.of("metalake", "cache_race_test_renamed"), staleWrapper);
           }
-          return null;
+          return freshWrapper;
         };
     Mockito.doAnswer(insertStaleWrapper)
-        .when(catalogManager)
-        .createCatalogWrapper(any(CatalogEntity.class), eq(null));
-    Mockito.doReturn(freshWrapper)
         .when(catalogManager)
         .createCatalogWrapper(any(CatalogEntity.class), eq(null));
 
@@ -608,6 +597,11 @@ public class TestCatalogManager {
             .getIfPresent(NameIdentifier.of("metalake", "cache_race_test_renamed"));
     Assertions.assertSame(freshWrapper, cachedWrapper);
     Assertions.assertNull(catalogManager.getCatalogCache().getIfPresent(ident));
+
+    // Restore real method so stub does not leak into subsequent tests.
+    Mockito.doCallRealMethod()
+        .when(catalogManager)
+        .createCatalogWrapper(any(CatalogEntity.class), eq(null));
   }
 
   @Test
