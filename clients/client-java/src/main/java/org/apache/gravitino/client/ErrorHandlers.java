@@ -22,6 +22,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.common.base.Joiner;
 import java.util.List;
 import java.util.function.Consumer;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.dto.responses.ErrorConstants;
 import org.apache.gravitino.dto.responses.ErrorResponse;
 import org.apache.gravitino.dto.responses.OAuth2ErrorResponse;
@@ -85,6 +86,7 @@ import org.apache.gravitino.exceptions.TopicAlreadyExistsException;
 import org.apache.gravitino.exceptions.UnauthorizedException;
 import org.apache.gravitino.exceptions.UnmodifiableStatisticException;
 import org.apache.gravitino.exceptions.UserAlreadyExistsException;
+import org.apache.hc.core5.http.HttpStatus;
 
 /**
  * Utility class providing error handling for REST requests and specific to Metalake errors.
@@ -311,6 +313,20 @@ public class ErrorHandlers {
       return message;
     } else {
       return String.format("%s%n%s", message, stack);
+    }
+  }
+
+  private static ErrorResponse buildStatusAwareErrorResponse(
+      int code, String message, Throwable throwable) {
+    switch (code) {
+      case HttpStatus.SC_UNAUTHORIZED:
+        return ErrorResponse.unauthorized(message, throwable);
+
+      case HttpStatus.SC_FORBIDDEN:
+        return ErrorResponse.forbidden(message, throwable);
+
+      default:
+        return ErrorResponse.unknownError(message);
     }
   }
 
@@ -1296,18 +1312,27 @@ public class ErrorHandlers {
 
     @Override
     public ErrorResponse parseResponse(int code, String json, ObjectMapper mapper) {
+      if (StringUtils.isBlank(json)) {
+        return buildStatusAwareErrorResponse(
+            code, String.format("Received HTTP %d response with empty body", code), null);
+      }
+
       try {
         return mapper.readValue(json, ErrorResponse.class);
       } catch (Exception e) {
         String errorMsg =
             String.format(
                 "Error code: %d, error message: %s, json string: %s", code, e.getMessage(), json);
-        return ErrorResponse.unknownError(errorMsg);
+        return buildStatusAwareErrorResponse(code, errorMsg, e);
       }
     }
 
     @Override
     public void accept(ErrorResponse errorResponse) {
+      if (errorResponse.getCode() == ErrorConstants.UNAUTHORIZED_CODE) {
+        throw new UnauthorizedException(
+            "%s", (Object) ("Unauthorized error: " + formatErrorMessage(errorResponse)));
+      }
       if (errorResponse.getCode() == ErrorConstants.FORBIDDEN_CODE) {
         throw new ForbiddenException("Forbidden error :%s", errorResponse.getMessage());
       }
