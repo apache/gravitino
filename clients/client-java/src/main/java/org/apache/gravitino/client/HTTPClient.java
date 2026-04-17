@@ -197,7 +197,8 @@ public class HTTPClient implements RESTClient {
         return ErrorResponse.forbidden(message, null);
 
       default:
-        return ErrorResponse.restError(message);
+        return ErrorResponse.restError(
+            String.format("Error code: %d, error message: %s", response.getCode(), message));
     }
   }
 

@@ -367,8 +367,9 @@ public class TestHTTPClient {
             () ->
                 restClient.get(
                     path, Item.class, ImmutableMap.of(), ErrorHandlers.schemaErrorHandler()));
-    Assertions.assertEquals(
-        "Unauthorized error: Received HTTP 401 response with empty body", exception.getMessage());
+    Assertions.assertTrue(exception.getMessage().contains("Unauthorized error:"));
+    Assertions.assertTrue(exception.getMessage().contains("Error code: 401"));
+    Assertions.assertTrue(exception.getMessage().contains("empty body"));
   }
 
   @Test
@@ -384,8 +385,9 @@ public class TestHTTPClient {
             () ->
                 restClient.get(
                     path, Item.class, ImmutableMap.of(), ErrorHandlers.schemaErrorHandler()));
-    Assertions.assertEquals(
-        "Unauthorized error: Received HTTP 401 response with empty body", exception.getMessage());
+    Assertions.assertTrue(exception.getMessage().contains("Unauthorized error:"));
+    Assertions.assertTrue(exception.getMessage().contains("Error code: 401"));
+    Assertions.assertTrue(exception.getMessage().contains("empty body"));
   }
 
   @Test

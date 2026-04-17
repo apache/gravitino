@@ -1313,8 +1313,11 @@ public class ErrorHandlers {
     @Override
     public ErrorResponse parseResponse(int code, String json, ObjectMapper mapper) {
       if (StringUtils.isBlank(json)) {
-        return buildStatusAwareErrorResponse(
-            code, String.format("Received HTTP %d response with empty body", code), null);
+        String errorMsg =
+            String.format(
+                "Error code: %d, error message: Received HTTP %d response with empty body",
+                code, code);
+        return buildStatusAwareErrorResponse(code, errorMsg, null);
       }
 
       try {
