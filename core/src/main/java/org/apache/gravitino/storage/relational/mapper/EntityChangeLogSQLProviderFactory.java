@@ -18,6 +18,8 @@
  */
 package org.apache.gravitino.storage.relational.mapper;
 
+import static org.apache.gravitino.storage.relational.mapper.EntityChangeLogMapper.ENTITY_CHANGE_LOG_TABLE_NAME;
+
 import com.google.common.collect.ImmutableMap;
 import java.util.Map;
 import org.apache.gravitino.storage.relational.JDBCBackend.JDBCBackendType;
@@ -48,7 +50,16 @@ public class EntityChangeLogSQLProviderFactory {
 
   static class EntityChangeLogH2Provider extends EntityChangeLogBaseSQLProvider {}
 
-  static class EntityChangeLogPostgreSQLProvider extends EntityChangeLogBaseSQLProvider {}
+  static class EntityChangeLogPostgreSQLProvider extends EntityChangeLogBaseSQLProvider {
+    @Override
+    public String pruneOldEntityChanges(@Param("before") long before) {
+      return "DELETE FROM "
+          + ENTITY_CHANGE_LOG_TABLE_NAME
+          + " WHERE id IN (SELECT id FROM "
+          + ENTITY_CHANGE_LOG_TABLE_NAME
+          + " WHERE created_at < #{before} LIMIT 1000)";
+    }
+  }
 
   public static String selectEntityChanges(
       @Param("createdAtAfter") long createdAtAfter, @Param("maxRows") int maxRows) {
