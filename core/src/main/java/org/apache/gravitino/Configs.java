@@ -58,6 +58,9 @@ public class Configs {
   public static final String ENTITY_RELATIONAL_JDBC_BACKEND_STORAGE_PATH_KEY =
       "gravitino.entity.store.relational.storagePath";
 
+  public static final String ENTITY_RELATIONAL_JDBC_BACKEND_AUTO_CREATE_SCHEMA_KEY =
+      "gravitino.entity.store.relational.autoCreateSchema";
+
   public static final Long DEFAULT_DELETE_AFTER_TIME = 604800000L; // 7 days
 
   // Config for data keep time after soft deletion, in milliseconds.
@@ -175,6 +178,16 @@ public class Configs {
           .version(ConfigConstants.VERSION_0_6_0)
           .stringConf()
           .createWithDefault(DEFAULT_RELATIONAL_JDBC_BACKEND_PATH);
+
+  public static final ConfigEntry<Boolean> ENTITY_RELATIONAL_JDBC_BACKEND_AUTO_CREATE_SCHEMA =
+      new ConfigBuilder(ENTITY_RELATIONAL_JDBC_BACKEND_AUTO_CREATE_SCHEMA_KEY)
+          .doc(
+              "Whether to auto create missing relational store tables by executing the schema script "
+                  + "under `${GRAVITINO_HOME}/scripts/{mysql,postgresql}/schema-${CURRENT_SCRIPT_VERSION}-*.sql` on startup. "
+                  + "This is useful for dev/test environments. For production, prefer managing schema upgrades explicitly.")
+          .version(ConfigConstants.VERSION_1_3_0)
+          .booleanConf()
+          .createWithDefault(false);
 
   public static final ConfigEntry<Long> CATALOG_CACHE_EVICTION_INTERVAL_MS =
       new ConfigBuilder("gravitino.catalog.cache.evictionIntervalMs")

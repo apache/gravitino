@@ -26,10 +26,18 @@ import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Lists;
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.sql.Connection;
+import java.sql.DriverManager;
+import java.sql.Statement;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.function.Function;
 import java.util.stream.Collectors;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.gravitino.Config;
 import org.apache.gravitino.Configs;
@@ -41,6 +49,7 @@ import org.apache.gravitino.Namespace;
 import org.apache.gravitino.RelationalEntity;
 import org.apache.gravitino.SupportsRelationOperations;
 import org.apache.gravitino.UnsupportedEntityTypeException;
+import org.apache.gravitino.config.ConfigConstants;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.meta.BaseMetalake;
 import org.apache.gravitino.meta.CatalogEntity;
@@ -106,8 +115,134 @@ public class JDBCBackend implements RelationalBackend {
   @Override
   public void initialize(Config config) {
     jdbcDatabase = startJDBCDatabaseIfNecessary(config);
+
+    // For external databases (MySQL/PostgreSQL), schema upgrade is typically managed by DBAs.
+    // However, in dev/test environments it's easy to run into missing table errors when the
+    // service is upgraded but the DB schema isn't. This opt-in switch auto creates missing tables
+    // by executing the current schema script which uses `CREATE TABLE IF NOT EXISTS`.
+    autoCreateSchemaIfConfigured(config);
+
     SqlSessionFactoryHelper.getInstance().init(config);
     SQLExceptionConverterFactory.initConverter(config);
+  }
+
+  private static void autoCreateSchemaIfConfigured(Config config) {
+    if (!Boolean.TRUE.equals(
+        config.get(Configs.ENTITY_RELATIONAL_JDBC_BACKEND_AUTO_CREATE_SCHEMA))) {
+      return;
+    }
+
+    String jdbcUrl = config.get(Configs.ENTITY_RELATIONAL_JDBC_BACKEND_URL);
+    JDBCBackendType jdbcType = JDBCBackendType.fromURI(jdbcUrl);
+    if (jdbcType.embedded) {
+      // Embedded H2 is already initialized via H2Database.
+      return;
+    }
+
+    String gravitinoHome = System.getenv("GRAVITINO_HOME");
+    if (StringUtils.isBlank(gravitinoHome)) {
+      LOG.warn("Skip autoCreateSchema because GRAVITINO_HOME is not set (jdbcUrl={}).", jdbcUrl);
+      return;
+    }
+
+    String scriptSubDir;
+    String scriptSuffix;
+    switch (jdbcType) {
+      case MYSQL:
+        scriptSubDir = "mysql";
+        scriptSuffix = "mysql";
+        break;
+      case POSTGRESQL:
+        scriptSubDir = "postgresql";
+        scriptSuffix = "postgresql";
+        break;
+      default:
+        LOG.warn("Skip autoCreateSchema for unsupported jdbc type {}", jdbcType);
+        return;
+    }
+
+    Path scriptPath =
+        Path.of(
+            gravitinoHome,
+            "scripts",
+            scriptSubDir,
+            "schema-" + ConfigConstants.CURRENT_SCRIPT_VERSION + "-" + scriptSuffix + ".sql");
+    if (!Files.exists(scriptPath)) {
+      LOG.warn(
+          "Skip autoCreateSchema because schema script not found at {} (jdbcUrl={}).",
+          scriptPath,
+          jdbcUrl);
+      return;
+    }
+
+    String driverClass = config.get(Configs.ENTITY_RELATIONAL_JDBC_BACKEND_DRIVER);
+    String user = config.get(Configs.ENTITY_RELATIONAL_JDBC_BACKEND_USER);
+    String password = config.get(Configs.ENTITY_RELATIONAL_JDBC_BACKEND_PASSWORD);
+
+    try {
+      Class.forName(driverClass);
+      String sql = Files.readString(scriptPath, StandardCharsets.UTF_8);
+      try (Connection conn = DriverManager.getConnection(jdbcUrl, user, password);
+          Statement stmt = conn.createStatement()) {
+        conn.setAutoCommit(false);
+        for (String statement : splitSqlStatements(sql)) {
+          String s = statement.trim();
+          if (s.isEmpty()) {
+            continue;
+          }
+          stmt.execute(s);
+        }
+        conn.commit();
+      }
+      LOG.info("Auto created missing schema objects using {} for jdbcUrl={}.", scriptPath, jdbcUrl);
+    } catch (Exception e) {
+      LOG.error("Failed to auto create schema using {} (jdbcUrl={}).", scriptPath, jdbcUrl, e);
+      throw new RuntimeException(
+          "Failed to auto create schema for relational store, please run schema/upgrade scripts manually."
+              + " Script="
+              + scriptPath,
+          e);
+    }
+  }
+
+  /**
+   * Splits a SQL script into individual statements.
+   *
+   * <p>Notes:
+   *
+   * <ul>
+   *   <li>Supports line comments starting with "--" or "#".
+   *   <li>Splits statements by the semicolon terminator at the end of a line.
+   *   <li>This is intentionally simple and targets our schema scripts (DDL), not arbitrary SQL.
+   * </ul>
+   */
+  private static List<String> splitSqlStatements(String sqlScript) {
+    List<String> statements = new ArrayList<>();
+    StringBuilder current = new StringBuilder();
+
+    for (String line : sqlScript.split("\\r?\\n")) {
+      String trimmed = line.trim();
+      if (trimmed.isEmpty() || trimmed.startsWith("--") || trimmed.startsWith("#")) {
+        continue;
+      }
+
+      current.append(line).append('\n');
+      if (trimmed.endsWith(";")) {
+        String stmt = current.toString().trim();
+        // Remove the trailing semicolon to be compatible with JDBC drivers.
+        if (stmt.endsWith(";")) {
+          stmt = stmt.substring(0, stmt.length() - 1);
+        }
+        statements.add(stmt);
+        current.setLength(0);
+      }
+    }
+
+    String remaining = current.toString().trim();
+    if (!remaining.isEmpty()) {
+      statements.add(remaining);
+    }
+    return statements;
   }
 
   @Override
