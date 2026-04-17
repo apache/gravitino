@@ -40,7 +40,6 @@ import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
 import org.apache.commons.lang3.ArrayUtils;
-import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.Catalog;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
@@ -1113,9 +1112,9 @@ public abstract class CatalogIcebergBaseIT extends BaseIT {
                   sortOrders);
             });
     Assertions.assertTrue(
-        StringUtils.contains(
-            illegalArgumentException.getMessage(),
-            "Iceberg's Distribution Mode.HASH does not support set expressions."));
+        illegalArgumentException
+            .getMessage()
+            .contains("Iceberg's Distribution Mode.HASH does not support set expressions."));
 
     distribution = Distributions.RANGE;
     // Create a data table for Distributions.hash
@@ -1158,9 +1157,9 @@ public abstract class CatalogIcebergBaseIT extends BaseIT {
                   sortOrders);
             });
     Assertions.assertTrue(
-        StringUtils.contains(
-            illegalArgumentException.getMessage(),
-            "Iceberg's Distribution Mode.RANGE not support set expressions."));
+        illegalArgumentException
+            .getMessage()
+            .contains("Iceberg's Distribution Mode.RANGE not support set expressions."));
   }
 
   @Test
