@@ -21,15 +21,21 @@ package org.apache.gravitino.storage.relational.po.auth;
 /** Step 3: role version sentinel returned by batch query. */
 public class RoleUpdatedAt {
   private final long roleId;
+  private final String roleName;
   private final long updatedAt;
 
-  public RoleUpdatedAt(long roleId, long updatedAt) {
+  public RoleUpdatedAt(long roleId, String roleName, long updatedAt) {
     this.roleId = roleId;
+    this.roleName = roleName;
     this.updatedAt = updatedAt;
   }
 
   public long getRoleId() {
     return roleId;
+  }
+
+  public String getRoleName() {
+    return roleName;
   }
 
   public long getUpdatedAt() {

@@ -338,7 +338,7 @@ public class Configs {
           .longConf()
           .createWithDefault(DEFAULT_GRAVITINO_AUTHORIZATION_METADATA_ID_CACHE_SIZE);
 
-  public static final long DEFAULT_GRAVITINO_AUTHORIZATION_CHANGE_POLL_INTERVAL_SECS = 30L;
+  public static final long DEFAULT_GRAVITINO_AUTHORIZATION_CHANGE_POLL_INTERVAL_SECS = 3L;
 
   public static final ConfigEntry<Long> GRAVITINO_AUTHORIZATION_CHANGE_POLL_INTERVAL_SECS =
       new ConfigBuilder("gravitino.authorization.jcasbin.changePollIntervalSecs")
