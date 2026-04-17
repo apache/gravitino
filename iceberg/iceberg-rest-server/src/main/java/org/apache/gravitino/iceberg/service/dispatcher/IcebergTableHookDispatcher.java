@@ -188,18 +188,8 @@ public class IcebergTableHookDispatcher implements IcebergTableOperationDispatch
     return dispatcher.planTableScan(context, tableIdentifier, scanRequest);
   }
 
-<<<<<<< HEAD
-  private void importTable(String catalogName, Namespace namespace, String tableName) {
-=======
-  @Override
-  public Optional<String> getTableMetadataLocation(
-      IcebergRequestContext context, TableIdentifier tableIdentifier) {
-    return dispatcher.getTableMetadataLocation(context, tableIdentifier);
-  }
-
   private void importTableAndSetOwner(
       IcebergRequestContext context, Namespace namespace, String tableName) {
->>>>>>> 12d878fad ([#10766] fix(iceberg): skip table import for staged creates in IcebergTableHookDispatcher (#10767))
     TableDispatcher tableDispatcher = GravitinoEnv.getInstance().tableDispatcher();
     if (tableDispatcher != null) {
       tableDispatcher.loadTable(
