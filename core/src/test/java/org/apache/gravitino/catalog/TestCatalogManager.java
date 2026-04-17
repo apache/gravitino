@@ -627,7 +627,10 @@ public class TestCatalogManager {
     entityStore.put(importedSchemaEntity);
 
     Schema importedSchema = Mockito.mock(Schema.class);
-    Mockito.doReturn(ImmutableMap.of()).when(importedSchema).properties();
+    // Non-empty properties without StringIdentifier simulate an imported schema on a backend
+    // that supports property storage (e.g., Hive, Iceberg) but did not create this schema
+    // via Gravitino.
+    Mockito.doReturn(ImmutableMap.of("owner", "external")).when(importedSchema).properties();
     CatalogManager.CatalogWrapper wrapper = Mockito.mock(CatalogManager.CatalogWrapper.class);
     Capability capability = Mockito.mock(Capability.class);
     CapabilityResult unsupportedResult = CapabilityResult.unsupported("Not managed");
