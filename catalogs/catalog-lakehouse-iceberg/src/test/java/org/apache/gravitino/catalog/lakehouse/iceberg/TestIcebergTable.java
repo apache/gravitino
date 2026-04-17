@@ -32,7 +32,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import org.apache.commons.lang3.ArrayUtils;
-import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.catalog.PropertiesMetadataHelpers;
@@ -663,18 +662,20 @@ public class TestIcebergTable {
             IllegalArgumentException.class,
             () -> icebergTable.transformDistribution(Distributions.HASH));
     Assertions.assertTrue(
-        StringUtils.contains(
-            illegalArgumentException.getMessage(),
-            "Iceberg's Distribution Mode.HASH is distributed based on partition, but the partition is empty"));
+        illegalArgumentException
+            .getMessage()
+            .contains(
+                "Iceberg's Distribution Mode.HASH is distributed based on partition, but the partition is empty"));
 
     illegalArgumentException =
         Assertions.assertThrows(
             IllegalArgumentException.class,
             () -> icebergTable.transformDistribution(Distributions.RANGE));
     Assertions.assertTrue(
-        StringUtils.contains(
-            illegalArgumentException.getMessage(),
-            "Iceberg's Distribution Mode.RANGE is distributed based on sortOrder or partition, but both are empty"));
+        illegalArgumentException
+            .getMessage()
+            .contains(
+                "Iceberg's Distribution Mode.RANGE is distributed based on sortOrder or partition, but both are empty"));
 
     IcebergTable newTable =
         IcebergTable.builder()
