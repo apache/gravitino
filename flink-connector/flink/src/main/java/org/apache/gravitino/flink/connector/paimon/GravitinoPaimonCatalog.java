@@ -61,6 +61,43 @@ public class GravitinoPaimonCatalog extends BaseCatalog {
     this.paimonCatalog = flinkCatalogFactory.createCatalog(toPaimonContext(context));
   }
 
+  /**
+   * Translates Gravitino catalog property names to their Paimon/Flink equivalents so that the
+   * underlying {@code FlinkCatalog} can be initialised correctly (e.g., {@code catalog-backend}
+   * becomes {@code metastore}).
+   */
+  private static CatalogFactory.Context toPaimonContext(CatalogFactory.Context context) {
+    Map<String, String> translatedOptions = new HashMap<>();
+    for (Map.Entry<String, String> entry : context.getOptions().entrySet()) {
+      String mappedKey =
+          PaimonPropertiesConverter.INSTANCE.transformPropertyToFlinkCatalog(entry.getKey());
+      // Fall back to the original key when no mapping exists so Paimon-native properties are not
+      // silently dropped.
+      translatedOptions.put(mappedKey != null ? mappedKey : entry.getKey(), entry.getValue());
+    }
+    return new CatalogFactory.Context() {
+      @Override
+      public String getName() {
+        return context.getName();
+      }
+
+      @Override
+      public Map<String, String> getOptions() {
+        return translatedOptions;
+      }
+
+      @Override
+      public ReadableConfig getConfiguration() {
+        return context.getConfiguration();
+      }
+
+      @Override
+      public ClassLoader getClassLoader() {
+        return context.getClassLoader();
+      }
+    };
+  }
+
   @Override
   protected AbstractCatalog realCatalog() {
     return paimonCatalog;
@@ -97,10 +134,5 @@ public class GravitinoPaimonCatalog extends BaseCatalog {
     if (!dropped && !ignoreIfNotExists) {
       throw new TableNotExistException(catalogName(), tablePath);
     }
-  }
-
-  @Override
-  public Optional<Factory> getFactory() {
-    return Optional.of(new FlinkTableFactory());
   }
 }
