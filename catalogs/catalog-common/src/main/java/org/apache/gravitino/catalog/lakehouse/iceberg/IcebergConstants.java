@@ -58,7 +58,10 @@ public class IcebergConstants {
 
   public static final String ICEBERG_ADLS_STORAGE_ACCOUNT_NAME =
       "adls.auth.shared-key.account.name";
+
   public static final String ICEBERG_ADLS_STORAGE_ACCOUNT_KEY = "adls.auth.shared-key.account.key";
+  public static final String ICEBERG_GCS_PROJECT_ID = "gcs.project-id";
+  public static final String ICEBERG_GCS_SERVICE_HOST = "gcs.service.host";
 
   // Iceberg Table properties constants
 

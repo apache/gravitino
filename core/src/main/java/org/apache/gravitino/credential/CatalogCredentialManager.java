@@ -23,6 +23,7 @@ import com.google.common.base.Preconditions;
 import java.io.Closeable;
 import java.io.IOException;
 import java.util.Map;
+import java.util.Set;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -60,6 +61,16 @@ public class CatalogCredentialManager implements Closeable {
           "There are multiple credential providers for the catalog.");
     }
     return getCredential(credentialProviders.keySet().iterator().next(), context);
+  }
+
+  /**
+   * Returns the set of credential types registered for this catalog. The keys match the values
+   * returned by each registered provider's {@code credentialType()}.
+   *
+   * @return an immutable view of the registered credential type strings
+   */
+  public Set<String> getCredentialTypes() {
+    return credentialProviders.keySet();
   }
 
   @Override

@@ -105,6 +105,8 @@ public class CatalogWrapperForREST extends IcebergCatalogWrapper {
           IcebergConstants.ICEBERG_S3_ENDPOINT,
           IcebergConstants.ICEBERG_OSS_ENDPOINT,
           IcebergConstants.ICEBERG_S3_PATH_STYLE_ACCESS,
+          IcebergConstants.ICEBERG_GCS_PROJECT_ID,
+          IcebergConstants.ICEBERG_GCS_SERVICE_HOST,
           IcebergConstants.ICEBERG_ACCESS_DELEGATION);
 
   @SuppressWarnings("deprecation")
@@ -127,6 +129,9 @@ public class CatalogWrapperForREST extends IcebergCatalogWrapper {
 
   public LoadTableResponse createTable(
       Namespace namespace, CreateTableRequest request, boolean requestCredential) {
+    if (requestCredential && StringUtils.isNotBlank(request.location())) {
+      validateCreateLocation(request.location(), catalogCredentialManager.getCredentialTypes());
+    }
     LoadTableResponse loadTableResponse;
     if (catalog instanceof RESTCatalog) {
       loadTableResponse = createTableInternal(namespace, request);
@@ -177,24 +182,29 @@ public class CatalogWrapperForREST extends IcebergCatalogWrapper {
       TableIdentifier identifier, CredentialPrivilege privilege) {
     try {
       LoadTableResponse loadTableResponse = super.loadTable(identifier);
-      Credential credential = getCredential(loadTableResponse, privilege);
-      org.apache.iceberg.rest.credentials.Credential icebergCredential =
-          new org.apache.iceberg.rest.credentials.Credential() {
-            @Override
-            public String prefix() {
-              return "";
-            }
+      List<Credential> credentials = getCredentials(loadTableResponse, privilege);
+      ImmutableLoadCredentialsResponse.Builder responseBuilder =
+          ImmutableLoadCredentialsResponse.builder();
+      for (Credential credential : credentials) {
+        org.apache.iceberg.rest.credentials.Credential icebergCredential =
+            new org.apache.iceberg.rest.credentials.Credential() {
+              @Override
+              public String prefix() {
+                return "";
+              }
 
-            @Override
-            public Map<String, String> config() {
-              // Convert Gravitino credentials to the Iceberg REST credential payload format.
-              return CredentialPropertyUtils.toIcebergProperties(credential);
-            }
+              @Override
+              public Map<String, String> config() {
+                // Convert Gravitino credentials to the Iceberg REST credential payload format.
+                return CredentialPropertyUtils.toIcebergProperties(credential);
+              }
 
-            @Override
-            public void validate() {}
-          };
-      return ImmutableLoadCredentialsResponse.builder().addCredentials(icebergCredential).build();
+              @Override
+              public void validate() {}
+            };
+        responseBuilder.addCredentials(icebergCredential);
+      }
+      return responseBuilder.build();
     } catch (ServiceUnavailableException e) {
       LOG.warn("Service unavailable when loading table credentials for table: {}", identifier, e);
       return ImmutableLoadCredentialsResponse.builder().build();
@@ -280,50 +290,106 @@ public class CatalogWrapperForREST extends IcebergCatalogWrapper {
       TableIdentifier tableIdentifier,
       LoadTableResponse loadTableResponse,
       CredentialPrivilege privilege) {
-    final Credential credential = getCredential(loadTableResponse, privilege);
+    List<Credential> credentials = getCredentials(loadTableResponse, privilege);
 
-    LOG.info(
-        "Generate credential: {} for Iceberg table: {}",
-        credential.credentialType(),
-        tableIdentifier);
+    credentials.forEach(
+        credential ->
+            LOG.info(
+                "Generate credential: {} for Iceberg table: {}",
+                credential.credentialType(),
+                tableIdentifier));
 
-    // Merge temporary credential fields as Iceberg client config entries in the load-table
-    // response.
-    Map<String, String> credentialConfig = CredentialPropertyUtils.toIcebergProperties(credential);
-    return LoadTableResponse.builder()
-        .withTableMetadata(loadTableResponse.tableMetadata())
-        .addAllConfig(loadTableResponse.config())
-        .addAllConfig(getCatalogConfigToClient())
-        .addAllConfig(credentialConfig)
-        .build();
+    LoadTableResponse.Builder builder =
+        LoadTableResponse.builder()
+            .withTableMetadata(loadTableResponse.tableMetadata())
+            .addAllConfig(loadTableResponse.config())
+            .addAllConfig(getCatalogConfigToClient());
+
+    // Merge credential fields from each credential as Iceberg client config entries.
+    for (Credential credential : credentials) {
+      builder.addAllConfig(CredentialPropertyUtils.toIcebergProperties(credential));
+    }
+
+    return builder.build();
   }
 
-  private Credential getCredential(
+  private List<Credential> getCredentials(
       LoadTableResponse loadTableResponse, CredentialPrivilege privilege) {
-    TableMetadata tableMetadata = loadTableResponse.tableMetadata();
-    String[] path =
+    return getCredentials(catalogCredentialManager, loadTableResponse.tableMetadata(), privilege);
+  }
+
+  @VisibleForTesting
+  static List<Credential> getCredentials(
+      CatalogCredentialManager credentialManager,
+      TableMetadata tableMetadata,
+      CredentialPrivilege privilege) {
+    List<String> paths =
         Stream.of(
                 tableMetadata.location(),
                 tableMetadata.property(TableProperties.WRITE_DATA_LOCATION, ""),
                 tableMetadata.property(TableProperties.WRITE_METADATA_LOCATION, ""))
             .filter(StringUtils::isNotBlank)
-            .toArray(String[]::new);
+            .collect(Collectors.toList());
+
+    if (paths.isEmpty()) {
+      throw new ServiceUnavailableException(
+          "Table has no storage location for credential generation");
+    }
+
+    // All paths for a single table must share a storage family. This is enforced at CREATE TABLE
+    // time; we re-check here defensively in case a pathological table configuration slips through.
+    Set<String> prefixes =
+        paths.stream()
+            .map(CredentialSchemeUtil::credentialTypePrefixFor)
+            .filter(Optional::isPresent)
+            .map(Optional::get)
+            .collect(Collectors.toSet());
+
+    if (prefixes.size() > 1) {
+      throw new IllegalStateException(
+          String.format(
+              "Table paths span multiple storage families %s; a single table must reside entirely"
+                  + " on one backend. Paths: %s",
+              prefixes, paths));
+    }
+    if (prefixes.isEmpty()) {
+      throw new ServiceUnavailableException(
+          "Cannot determine storage family for table paths: %s", paths);
+    }
+
+    String prefix = prefixes.iterator().next();
+    String credentialType =
+        findCredentialTypeByPrefix(credentialManager, prefix)
+            .orElseThrow(
+                () ->
+                    new ServiceUnavailableException(
+                        "No credential provider registered for storage family '%s' (paths: %s)",
+                        prefix, paths));
 
     PathBasedCredentialContext context =
         privilege == CredentialPrivilege.WRITE
             ? new PathBasedCredentialContext(
                 PrincipalUtils.getCurrentUserName(),
-                ImmutableSet.copyOf(path),
+                ImmutableSet.copyOf(paths),
                 Collections.emptySet())
             : new PathBasedCredentialContext(
                 PrincipalUtils.getCurrentUserName(),
                 Collections.emptySet(),
-                ImmutableSet.copyOf(path));
-    Credential credential = catalogCredentialManager.getCredential(context);
+                ImmutableSet.copyOf(paths));
+
+    Credential credential = credentialManager.getCredential(credentialType, context);
     if (credential == null) {
-      throw new ServiceUnavailableException("Couldn't generate credential, %s", context);
+      throw new ServiceUnavailableException(
+          "Couldn't generate credential, type: %s, context: %s", credentialType, context);
     }
-    return credential;
+    return Collections.singletonList(credential);
+  }
+
+  private static Optional<String> findCredentialTypeByPrefix(
+      CatalogCredentialManager credentialManager, String prefix) {
+    return credentialManager.getCredentialTypes().stream()
+        .filter(type -> type.equals(prefix) || type.startsWith(prefix + "-"))
+        .findFirst();
   }
 
   private boolean shouldGenerateCredential(
@@ -350,6 +416,39 @@ public class CatalogWrapperForREST extends IcebergCatalogWrapper {
     if (StringUtils.isBlank(location)) {
       throw new IllegalArgumentException(
           "Table location cannot be null or blank when requesting credentials");
+    }
+  }
+
+  /**
+   * Validates that an explicit CREATE TABLE location has a matching credential provider registered
+   * on the catalog. Fails fast at CREATE time so a table is never created that the catalog cannot
+   * vend credentials for.
+   *
+   * <p>A blank location is allowed here — it means the table will land in the default warehouse,
+   * and the existing provider on that warehouse's scheme will handle it.
+   *
+   * <p>Local and HDFS locations do not require vended credentials and are not checked.
+   */
+  @VisibleForTesting
+  static void validateCreateLocation(String location, Set<String> registeredCredentialTypes) {
+    if (StringUtils.isBlank(location) || isLocalOrHdfsLocation(location)) {
+      return;
+    }
+    Optional<String> prefix = CredentialSchemeUtil.credentialTypePrefixFor(location);
+    if (!prefix.isPresent()) {
+      throw new IllegalArgumentException(
+          String.format(
+              "CREATE TABLE location '%s' uses an unrecognized storage scheme", location));
+    }
+    boolean hasProvider =
+        registeredCredentialTypes.stream()
+            .anyMatch(type -> type.equals(prefix.get()) || type.startsWith(prefix.get() + "-"));
+    if (!hasProvider) {
+      throw new IllegalArgumentException(
+          String.format(
+              "CREATE TABLE location '%s' (storage family '%s') has no registered credential"
+                  + " provider on this catalog. Registered providers: %s",
+              location, prefix.get(), registeredCredentialTypes));
     }
   }
 

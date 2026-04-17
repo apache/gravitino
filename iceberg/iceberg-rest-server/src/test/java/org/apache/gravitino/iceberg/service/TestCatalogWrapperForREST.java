@@ -23,6 +23,7 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
 import com.google.common.collect.ImmutableMap;
+import com.google.common.collect.ImmutableSet;
 import java.util.Map;
 import org.apache.gravitino.catalog.lakehouse.iceberg.IcebergConstants;
 import org.apache.gravitino.iceberg.common.IcebergConfig;
@@ -152,5 +153,56 @@ public class TestCatalogWrapperForREST {
     Assertions.assertThrows(
         IllegalArgumentException.class,
         () -> CatalogWrapperForREST.buildCatalogConfigToClients(config, catalog));
+  }
+
+  @Test
+  void testValidateCreateLocationAcceptsBlankOrLocal() {
+    Assertions.assertDoesNotThrow(
+        () -> CatalogWrapperForREST.validateCreateLocation("", ImmutableSet.of("s3-token")));
+    Assertions.assertDoesNotThrow(
+        () -> CatalogWrapperForREST.validateCreateLocation(null, ImmutableSet.of("s3-token")));
+    Assertions.assertDoesNotThrow(
+        () ->
+            CatalogWrapperForREST.validateCreateLocation(
+                "/tmp/warehouse", ImmutableSet.of("s3-token")));
+    Assertions.assertDoesNotThrow(
+        () ->
+            CatalogWrapperForREST.validateCreateLocation(
+                "hdfs://nn/warehouse", ImmutableSet.of("s3-token")));
+  }
+
+  @Test
+  void testValidateCreateLocationAcceptsMatchingScheme() {
+    Assertions.assertDoesNotThrow(
+        () ->
+            CatalogWrapperForREST.validateCreateLocation(
+                "s3://bucket/t/", ImmutableSet.of("s3-token")));
+    Assertions.assertDoesNotThrow(
+        () ->
+            CatalogWrapperForREST.validateCreateLocation(
+                "gs://bucket/t/", ImmutableSet.of("s3-token", "gcs-token")));
+    // s3a must match s3-* providers too
+    Assertions.assertDoesNotThrow(
+        () ->
+            CatalogWrapperForREST.validateCreateLocation(
+                "s3a://bucket/t/", ImmutableSet.of("s3-secret-key")));
+  }
+
+  @Test
+  void testValidateCreateLocationRejectsUnregisteredScheme() {
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () ->
+            CatalogWrapperForREST.validateCreateLocation(
+                "gs://bucket/t/", ImmutableSet.of("s3-token")));
+  }
+
+  @Test
+  void testValidateCreateLocationRejectsUnknownScheme() {
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () ->
+            CatalogWrapperForREST.validateCreateLocation(
+                "ftp://server/path/", ImmutableSet.of("s3-token")));
   }
 }
