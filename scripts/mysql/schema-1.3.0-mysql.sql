@@ -542,7 +542,7 @@ CREATE TABLE IF NOT EXISTS `entity_change_log` (
   `id`            BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
   `metalake_name` VARCHAR(128)    NOT NULL COMMENT 'metalake name',
   `entity_type`   VARCHAR(32)     NOT NULL COMMENT 'METALAKE | CATALOG | SCHEMA | TABLE | FILESET | TOPIC | MODEL | VIEW',
-  `full_name`     VARCHAR(512)    NOT NULL COMMENT 'Dot-separated full name; for RENAME stores the OLD name',
+  `full_name`     VARCHAR(512)    NOT NULL COMMENT 'Dot-separated full name. For RENAME stores the OLD name',
   `operate_type`  VARCHAR(16)     NOT NULL COMMENT 'DROP | CREATE | ALTER',
   `created_at`    BIGINT          NOT NULL COMMENT 'timestamp of the change in millis',
   PRIMARY KEY (`id`),
