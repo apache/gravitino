@@ -171,6 +171,25 @@ public class AuthorizationExpressionConstants {
   public static final String LOAD_JOB_TEMPLATE_AUTHORIZATION_EXPRESSION =
       "METALAKE::OWNER || JOB_TEMPLATE::OWNER || ANY_USE_JOB_TEMPLATE";
 
-  public static final String REQUEST_REQUIRED_PRIVILEGES_CONTAINS_MODIFY_TABLE =
-      "REQUEST::REQUIRED_PRIVILEGES_CONTAINS_MODIFY_TABLE";
+  /**
+   * Authorization expression for dropping or moving a table (requires table ownership). Used as the
+   * secondary expression in cross-namespace rename checks.
+   */
+  public static final String CAN_DROP_TABLE =
+      """
+          ANY(OWNER, METALAKE, CATALOG) ||
+          SCHEMA_OWNER_WITH_USE_CATALOG ||
+          ANY_USE_CATALOG && ANY_USE_SCHEMA && TABLE::OWNER
+          """;
+
+  /**
+   * Authorization expression for creating a table in the destination schema. Used as the third
+   * expression in cross-namespace rename checks.
+   */
+  public static final String CAN_CREATE_ANOTHER_TABLE =
+      """
+          ANY(OWNER, METALAKE, CATALOG) ||
+          SCHEMA_OWNER_WITH_USE_CATALOG ||
+          ANY_USE_CATALOG && ANY_USE_SCHEMA && ANY_CREATE_TABLE
+          """;
 }
