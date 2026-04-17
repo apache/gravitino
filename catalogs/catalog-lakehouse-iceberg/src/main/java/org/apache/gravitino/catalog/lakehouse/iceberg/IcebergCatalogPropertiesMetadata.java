@@ -140,7 +140,14 @@ public class IcebergCatalogPropertiesMetadata extends BaseCatalogPropertiesMetad
                 "Table metadata cache TTL in minutes",
                 false /* immutable */,
                 60 /* defaultValue */,
-                false /* hidden */));
+                false /* hidden */),
+            stringOptionalPropertyEntry(
+                IcebergConstants.DATA_ACCESS,
+                "Iceberg REST data access mode. Supported values are vended-credentials and"
+                    + " remote-signing.",
+                false,
+                null,
+                false));
     HashMap<String, PropertyEntry<?>> result = Maps.newHashMap();
     result.putAll(Maps.uniqueIndex(propertyEntries, PropertyEntry::getName));
     result.putAll(KerberosConfig.KERBEROS_PROPERTY_ENTRIES);

@@ -245,9 +245,10 @@ public class FunctionOperations {
             boolean dropped = dispatcher.dropFunction(ident);
             if (!dropped) {
               LOG.warn("Cannot find to be dropped function {} under schema {}", function, schema);
+            } else {
+              LOG.info("Function dropped: {}.{}.{}.{}", metalake, catalog, schema, function);
             }
             Response response = Utils.ok(new DropResponse(dropped));
-            LOG.info("Function dropped: {}.{}.{}.{}", metalake, catalog, schema, function);
             return response;
           });
     } catch (Exception e) {

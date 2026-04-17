@@ -21,7 +21,7 @@ from dataclasses import dataclass, field
 
 from dataclasses_json import config
 
-from gravitino.dto.requests.table_update_request import TableUpdateRequest
+from gravitino.dto.requests.table_update_request import TableUpdateRequestBase
 from gravitino.rest.rest_message import RESTRequest
 from gravitino.utils.precondition import Precondition
 
@@ -30,11 +30,11 @@ from gravitino.utils.precondition import Precondition
 class TableUpdatesRequest(RESTRequest):
     """Represents a request to update a table."""
 
-    _updates: list[TableUpdateRequest] = field(
+    _updates: list[TableUpdateRequestBase] = field(
         metadata=config(field_name="updates"), default_factory=list
     )
 
-    def __init__(self, updates: list[TableUpdateRequest]) -> None:
+    def __init__(self, updates: list[TableUpdateRequestBase]) -> None:
         self._updates = updates
 
     def validate(self) -> None:

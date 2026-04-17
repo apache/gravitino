@@ -21,6 +21,9 @@ package org.apache.gravitino.iceberg.service;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.common.base.Preconditions;
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
 import java.time.Instant;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
@@ -28,8 +31,10 @@ import java.util.Arrays;
 import java.util.Enumeration;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Optional;
 import java.util.stream.Stream;
 import javax.servlet.http.HttpServletRequest;
+import javax.ws.rs.core.EntityTag;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 import javax.ws.rs.core.Response.Status;
@@ -39,13 +44,114 @@ import org.apache.gravitino.iceberg.service.authorization.IcebergRESTServerConte
 import org.apache.iceberg.catalog.Namespace;
 import org.apache.iceberg.catalog.TableIdentifier;
 import org.apache.iceberg.rest.responses.ErrorResponse;
+import org.apache.iceberg.rest.responses.LoadTableResponse;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 public class IcebergRESTUtils {
+
+  private static final Logger LOG = LoggerFactory.getLogger(IcebergRESTUtils.class);
+
+  public static final String SNAPSHOT_ALL = "all";
+
+  public static final String SNAPSHOT_REFS = "refs";
+
+  /** Snapshot modes for the Iceberg loadTable endpoint. */
+  public enum SnapshotMode {
+    ALL(SNAPSHOT_ALL),
+    REFS(SNAPSHOT_REFS);
+
+    private final String value;
+
+    SnapshotMode(String value) {
+      this.value = value;
+    }
+
+    public String getValue() {
+      return value;
+    }
+  }
 
   private IcebergRESTUtils() {}
 
   public static <T> Response ok(T t) {
     return Response.status(Response.Status.OK).entity(t).type(MediaType.APPLICATION_JSON).build();
+  }
+
+  /**
+   * Builds an OK response with the ETag header derived from the table metadata location. Uses the
+   * default snapshots value to ensure ETags from create/update/register are consistent with the
+   * default loadTable endpoint.
+   *
+   * @param loadTableResponse the table response to include in the body
+   * @return a Response with ETag header set
+   */
+  public static Response buildResponseWithETag(LoadTableResponse loadTableResponse) {
+    Optional<EntityTag> etag =
+        generateETag(
+            loadTableResponse.tableMetadata().metadataFileLocation(), SnapshotMode.ALL.getValue());
+    return buildResponseWithETag(loadTableResponse, etag);
+  }
+
+  /**
+   * Builds an OK response with the given ETag header.
+   *
+   * @param loadTableResponse the table response to include in the body
+   * @param etag the pre-computed ETag
+   * @return a Response with ETag header set if etag is present
+   */
+  public static Response buildResponseWithETag(
+      LoadTableResponse loadTableResponse, Optional<EntityTag> etag) {
+    Response.ResponseBuilder responseBuilder =
+        Response.ok(loadTableResponse, MediaType.APPLICATION_JSON_TYPE);
+    etag.ifPresent(responseBuilder::tag);
+    return responseBuilder.build();
+  }
+
+  /**
+   * Generates an ETag based on the table metadata file location. The ETag is a SHA-256 hash of the
+   * metadata location, which changes whenever the table metadata is updated. Uses the default
+   * snapshots value to ensure consistency.
+   *
+   * @param metadataLocation the metadata file location
+   * @return the generated ETag
+   */
+  public static Optional<EntityTag> generateETag(String metadataLocation) {
+    return generateETag(metadataLocation, SnapshotMode.ALL.getValue());
+  }
+
+  /**
+   * Generates an ETag based on the table metadata file location and snapshot mode. The ETag is a
+   * SHA-256 hash that incorporates both the metadata location and the snapshots parameter, ensuring
+   * distinct ETags for different representations of the same table version (e.g., snapshots=all vs
+   * snapshots=refs).
+   *
+   * @param metadataLocation the metadata file location
+   * @param snapshots the snapshots query parameter value (e.g., "all", "refs")
+   * @return the generated ETag
+   */
+  public static Optional<EntityTag> generateETag(String metadataLocation, String snapshots) {
+    if (StringUtils.isBlank(metadataLocation)) {
+      return Optional.empty();
+    }
+    try {
+      MessageDigest digest = MessageDigest.getInstance("SHA-256");
+      digest.update(metadataLocation.getBytes(StandardCharsets.UTF_8));
+      digest.update(snapshots.getBytes(StandardCharsets.UTF_8));
+      byte[] hash = digest.digest();
+      StringBuilder hexString = new StringBuilder();
+      for (byte b : hash) {
+        String hex = Integer.toHexString(0xff & b);
+        if (hex.length() == 1) {
+          hexString.append('0');
+        }
+        hexString.append(hex);
+      }
+      return Optional.of(new EntityTag(hexString.toString()));
+    } catch (NoSuchAlgorithmException e) {
+      LOG.warn("Failed to generate ETag for metadata location: {}", metadataLocation, e);
+      return Optional.empty();
+    }
   }
 
   public static Response okWithoutContent() {
@@ -71,6 +177,18 @@ public class IcebergRESTUtils {
     return Response.status(httpStatus)
         .entity(errorResponse)
         .type(MediaType.APPLICATION_JSON)
+        .build();
+  }
+
+  /**
+   * Build an Iceberg {@link ErrorResponse} for a given HTTP status code and message, without an
+   * exception. Used by the Jetty error handler for pre-JAX-RS errors.
+   */
+  public static ErrorResponse errorResponse(int httpStatus, String type, String message) {
+    return ErrorResponse.builder()
+        .responseCode(httpStatus)
+        .withType(type)
+        .withMessage(message)
         .build();
   }
 

@@ -29,6 +29,7 @@ import com.nimbusds.jwt.JWTClaimsSet;
 import com.nimbusds.jwt.SignedJWT;
 import com.nimbusds.jwt.proc.DefaultJWTClaimsVerifier;
 import com.nimbusds.jwt.proc.DefaultJWTProcessor;
+import com.nimbusds.jwt.proc.ExpiredJWTException;
 import java.net.URL;
 import java.security.Principal;
 import java.util.Collections;
@@ -42,6 +43,7 @@ import org.apache.gravitino.auth.GroupMapper;
 import org.apache.gravitino.auth.GroupMapperFactory;
 import org.apache.gravitino.auth.PrincipalMapper;
 import org.apache.gravitino.auth.PrincipalMapperFactory;
+import org.apache.gravitino.exceptions.TokenExpiredException;
 import org.apache.gravitino.exceptions.UnauthorizedException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -63,6 +65,7 @@ public class JwksTokenValidator implements OAuthTokenValidator {
   private long allowSkewSeconds;
   private PrincipalMapper principalMapper;
   private GroupMapper groupMapper;
+  private JWKSource<SecurityContext> jwkSource;
 
   @Override
   public void initialize(Config config) {
@@ -89,12 +92,17 @@ public class JwksTokenValidator implements OAuthTokenValidator {
           "JWKS URI must be configured when using JWKS-based OAuth providers");
     }
 
-    // Validate JWKS URI format
+    // Create the JWK source once at initialization. JWKSourceBuilder.create(url).build() enables
+    // rate-limiting (min 30 s between URL fetches) and caching with refresh-ahead by default:
+    //   - Cache TTL: 5 minutes (DEFAULT_CACHE_TIME_TO_LIVE)
+    //   - Refresh-ahead: 30 seconds before expiration on a background thread
+    // The Nimbus library handles key rotation transparently within these defaults.
     try {
-      new URL(jwksUri);
+      this.jwkSource = JWKSourceBuilder.create(new URL(jwksUri)).build();
     } catch (Exception e) {
-      LOG.error("Invalid JWKS URI format: {}", jwksUri);
-      throw new IllegalArgumentException("Invalid JWKS URI format: " + jwksUri, e);
+      LOG.error("Failed to create JWKS source from URI: {}", jwksUri, e);
+      throw new IllegalArgumentException(
+          "Invalid JWKS URI or failed to create JWKS source: " + jwksUri, e);
     }
   }
 
@@ -110,11 +118,11 @@ public class JwksTokenValidator implements OAuthTokenValidator {
       throw new UnauthorizedException("Service audience cannot be null or empty");
     }
 
+    SignedJWT signedJWT = null;
     try {
-      SignedJWT signedJWT = SignedJWT.parse(token);
+      signedJWT = SignedJWT.parse(token);
 
       // Set up JWKS source and processor
-      JWKSource<SecurityContext> jwkSource = createJwkSource();
       JWSAlgorithm algorithm = JWSAlgorithm.parse(signedJWT.getHeader().getAlgorithm().getName());
       JWSKeySelector<SecurityContext> keySelector =
           new JWSVerificationKeySelector<>(algorithm, jwkSource);
@@ -160,19 +168,30 @@ public class JwksTokenValidator implements OAuthTokenValidator {
       }
       return userPrincipal;
 
+    } catch (ExpiredJWTException e) {
+      throw new TokenExpiredException(e, "Authentication token is expired");
     } catch (Exception e) {
-      LOG.error("JWKS JWT validation error: {}", e.getMessage());
+      LOG.warn(
+          "JWKS JWT validation failed for principal [{}]: {}",
+          extractPrincipalForLogging(signedJWT),
+          e.getMessage());
       throw new UnauthorizedException(e, "JWKS JWT validation error");
     }
   }
 
-  /** Creates a JWK source from the configured JWKS URI. */
-  private JWKSource<SecurityContext> createJwkSource() throws Exception {
+  /**
+   * Extracts the principal from a parsed (but not yet verified) JWT for diagnostic logging. Safe to
+   * call with a null or invalid JWT.
+   */
+  String extractPrincipalForLogging(SignedJWT signedJWT) {
+    if (signedJWT == null) {
+      return "unknown";
+    }
     try {
-      return JWKSourceBuilder.create(new URL(jwksUri)).build();
-    } catch (Exception e) {
-      LOG.error("Failed to create JWKS source from URI: {}", jwksUri, e);
-      throw new Exception("Failed to create JWKS source: " + e.getMessage(), e);
+      String principal = extractPrincipal(signedJWT.getJWTClaimsSet());
+      return principal != null ? principal : "unknown";
+    } catch (Exception ex) {
+      return "unknown";
     }
   }
 

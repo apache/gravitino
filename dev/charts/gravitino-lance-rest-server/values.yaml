@@ -69,7 +69,7 @@ initScript: |
   echo "Override config."
   cp /tmp/conf/* ${GRAVITINO_HOME}/conf
   echo "Start the Gravitino Lance Rest Server"
-  /bin/bash ${GRAVITINO_HOME}/bin/gravitino-lance-rest-server.sh run
+  /bin/bash ${GRAVITINO_HOME}/bin/start-lance-rest-server.sh
 
 ## Optional volumes for logs
 volumes:
@@ -78,11 +78,9 @@ volumes:
 
 volumeMounts:
   - name: gravitino-rest-catalog-server-log
-    mountPath: /root/gravitino-lance-rest-server/logs
+    mountPath: /opt/gravitino-lance-rest-server/logs
 
 env:
-  - name: GRAVITINO_HOME
-    value: /root/gravitino-lance-rest-server
   - name: GRAVITINO_MEM
     value: "-Xms1024m -Xmx1024m -XX:MaxMetaspaceSize=512m"
 
@@ -105,13 +103,12 @@ podLabels: {}
 podSecurityContext: {}
   # fsGroup: 2000
 
-securityContext: {}
-  # capabilities:
+securityContext:
+  runAsNonRoot: true
+  runAsUser: 1000
   #   drop:
   #   - ALL
   # readOnlyRootFilesystem: true
-  # runAsNonRoot: true
-  # runAsUser: 1000
 
 service:
   name: gravitino-lance-rest-server

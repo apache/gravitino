@@ -48,6 +48,7 @@ import java.util.HashMap;
 import java.util.Map;
 import org.apache.gravitino.Config;
 import org.apache.gravitino.UserPrincipal;
+import org.apache.gravitino.exceptions.TokenExpiredException;
 import org.apache.gravitino.exceptions.UnauthorizedException;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -666,6 +667,108 @@ public class TestJwksTokenValidator {
       assertEquals("test-subject", userPrincipal.getName());
       // Expect no groups if claim is missing
       assertTrue(userPrincipal.getGroups().isEmpty());
+    }
+  }
+
+  @Test
+  public void testExtractPrincipalForLogging_nullToken() {
+    Map<String, String> config = new HashMap<>();
+    config.put("gravitino.authenticator.oauth.jwksUri", validJwksUri);
+    validator.initialize(createConfig(config));
+
+    assertEquals("unknown", validator.extractPrincipalForLogging(null));
+  }
+
+  @Test
+  public void testExtractPrincipalForLogging_withSubClaim() throws Exception {
+    Map<String, String> config = new HashMap<>();
+    config.put("gravitino.authenticator.oauth.jwksUri", validJwksUri);
+    config.put("gravitino.authenticator.oauth.principalFields", "sub");
+    validator.initialize(createConfig(config));
+
+    RSAKey rsaKey =
+        new RSAKeyGenerator(2048).keyID("test-key-id").algorithm(JWSAlgorithm.RS256).generate();
+    JWTClaimsSet claims =
+        new JWTClaimsSet.Builder()
+            .subject("alice")
+            .expirationTime(Date.from(Instant.now().plusSeconds(3600)))
+            .build();
+    SignedJWT jwt =
+        new SignedJWT(
+            new JWSHeader.Builder(JWSAlgorithm.RS256).keyID("test-key-id").build(), claims);
+    jwt.sign(new RSASSASigner(rsaKey));
+
+    assertEquals("alice", validator.extractPrincipalForLogging(jwt));
+  }
+
+  @Test
+  public void testExtractPrincipalForLogging_missingPrincipalField() throws Exception {
+    Map<String, String> config = new HashMap<>();
+    config.put("gravitino.authenticator.oauth.jwksUri", validJwksUri);
+    config.put("gravitino.authenticator.oauth.principalFields", "preferred_username");
+    validator.initialize(createConfig(config));
+
+    RSAKey rsaKey =
+        new RSAKeyGenerator(2048).keyID("test-key-id").algorithm(JWSAlgorithm.RS256).generate();
+    JWTClaimsSet claims =
+        new JWTClaimsSet.Builder()
+            .subject("alice") // only sub, no preferred_username
+            .expirationTime(Date.from(Instant.now().plusSeconds(3600)))
+            .build();
+    SignedJWT jwt =
+        new SignedJWT(
+            new JWSHeader.Builder(JWSAlgorithm.RS256).keyID("test-key-id").build(), claims);
+    jwt.sign(new RSASSASigner(rsaKey));
+
+    assertEquals("unknown", validator.extractPrincipalForLogging(jwt));
+  }
+
+  @Test
+  public void testValidateExpiredTokenThrowsTokenExpiredException() throws Exception {
+    RSAKey rsaKey =
+        new RSAKeyGenerator(2048).keyID("test-key-id").algorithm(JWSAlgorithm.RS256).generate();
+
+    // Create an expired JWT token
+    JWTClaimsSet claimsSet =
+        new JWTClaimsSet.Builder()
+            .subject("test-user")
+            .audience("test-service")
+            .issuer("https://test-issuer.com")
+            .expirationTime(Date.from(Instant.now().minusSeconds(3600)))
+            .issueTime(Date.from(Instant.now().minusSeconds(7200)))
+            .build();
+
+    SignedJWT signedJWT =
+        new SignedJWT(
+            new JWSHeader.Builder(JWSAlgorithm.RS256).keyID("test-key-id").build(), claimsSet);
+    signedJWT.sign(new RSASSASigner(rsaKey));
+
+    String tokenString = signedJWT.serialize();
+
+    try (MockedStatic<JWKSourceBuilder> mockedBuilder = mockStatic(JWKSourceBuilder.class)) {
+      @SuppressWarnings("unchecked")
+      JWKSource<SecurityContext> mockJwkSource = mock(JWKSource.class);
+      @SuppressWarnings("unchecked")
+      JWKSourceBuilder<SecurityContext> mockBuilder = mock(JWKSourceBuilder.class);
+
+      mockedBuilder.when(() -> JWKSourceBuilder.create(any(URL.class))).thenReturn(mockBuilder);
+      when(mockBuilder.build()).thenReturn(mockJwkSource);
+      when(mockJwkSource.get(any(), any())).thenReturn(Arrays.asList(rsaKey));
+
+      Map<String, String> config = new HashMap<>();
+      config.put(
+          "gravitino.authenticator.oauth.jwksUri", "https://test-jwks.com/.well-known/jwks.json");
+      config.put("gravitino.authenticator.oauth.authority", "https://test-issuer.com");
+      config.put("gravitino.authenticator.oauth.principalFields", "sub");
+      config.put("gravitino.authenticator.oauth.allowSkewSecs", "0");
+
+      validator.initialize(createConfig(config));
+
+      TokenExpiredException exception =
+          assertThrows(
+              TokenExpiredException.class,
+              () -> validator.validateToken(tokenString, "test-service"));
+      assertTrue(exception.getMessage().contains("expired"));
     }
   }
 }

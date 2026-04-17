@@ -106,6 +106,10 @@ public class TagMetaSQLProviderFactory {
     return getProvider().selectTagByTagId(tagId);
   }
 
+  public static String listTagPOsByTagIds(@Param("tagIds") List<Long> tagIds) {
+    return getProvider().listTagPOsByTagIds(tagIds);
+  }
+
   public static String batchSelectTagByIdentifier(
       @Param("metalakeName") String metalakeName, @Param("tagNames") List<String> tagNames) {
     return getProvider().batchSelectTagByIdentifier(metalakeName, tagNames);
