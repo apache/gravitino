@@ -75,17 +75,10 @@ CREATE TABLE IF NOT EXISTS `group_user_rel` (
 CREATE TABLE IF NOT EXISTS `entity_change_log` (
   `id`            BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
   `metalake_name` VARCHAR(128)    NOT NULL,
-  `entity_type`   VARCHAR(32)     NOT NULL
-      COMMENT 'METALAKE | CATALOG | SCHEMA | TABLE | FILESET | TOPIC | MODEL | VIEW',
-  `full_name`     VARCHAR(512)    NOT NULL
-      COMMENT 'Dot-separated full name of the affected entity. For RENAME, stores the
-               OLD name (the stale key to invalidate). For DROP/ALTER, the entity name.',
-  `operate_type`  VARCHAR(16)     NOT NULL
-      COMMENT 'DROP | CREATE | ALTER (ALTER covers rename and other structural changes)',
+  `entity_type`   VARCHAR(32)     NOT NULL COMMENT 'METALAKE | CATALOG | SCHEMA | TABLE | FILESET | TOPIC | MODEL | VIEW',
+  `full_name`     VARCHAR(512)    NOT NULL COMMENT 'Dot-separated full name of the affected entity. For RENAME, stores the OLD name (the stale key to invalidate). For DROP/ALTER, the entity name.',
+  `operate_type`  VARCHAR(16)     NOT NULL COMMENT 'DROP | CREATE | ALTER (ALTER covers rename and other structural changes)',
   `created_at`    BIGINT          NOT NULL,
   PRIMARY KEY (`id`),
   INDEX `idx_created_at` (`created_at`)
-) COMMENT 'Append-only log of entity structural changes.
-           One row per affected entity per operation. The entity change poller reads
-           this table to drive targeted invalidation of metadataIdCache on HA peer nodes.
-           Rows older than the retention window (default 1 h) are pruned periodically.';
+) COMMENT 'Append-only log of entity structural changes. One row per affected entity per operation. The entity change poller reads this table to drive targeted invalidation of metadataIdCache on HA peer nodes. Rows older than the retention window (default 1 h) are pruned periodically.';
