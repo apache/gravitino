@@ -99,7 +99,15 @@ licenseReport {
   renderers = arrayOf<ReportRenderer>(InventoryHtmlReportRenderer("report.html", "Backend"))
   filters = arrayOf<DependencyFilter>(LicenseBundleNormalizer())
 }
-repositories { mavenCentral() }
+repositories {
+  mavenCentral()
+  maven {
+    url = uri("https://repository.apache.org/content/repositories/orgapacheiceberg-1277/")
+    mavenContent {
+      releasesOnly()
+    }
+  }
+}
 
 allprojects {
   // Gravitino Python client project didn't need to apply the Spotless plugin
@@ -111,6 +119,12 @@ allprojects {
   repositories {
     mavenCentral()
     mavenLocal()
+    maven {
+      url = uri("https://repository.apache.org/content/repositories/orgapacheiceberg-1277/")
+      mavenContent {
+        releasesOnly()
+      }
+    }
   }
 
   plugins.withType<com.diffplug.gradle.spotless.SpotlessPlugin>().configureEach {
