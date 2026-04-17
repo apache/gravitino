@@ -360,6 +360,14 @@ The privileges `CREATE_MODEL` and `CREATE_MODEL_VERSION` are deprecated and will
 | CREATE_MODEL         | Metalake, Catalog, Schema        | Register a model, this is deprecated. Please use `REGISTER_MODEL` instead.         |
 | CREATE_MODEL_VERSION | Metalake, Catalog, Schema, Model | Link a model version, this is deprecated. Please use `LINK_MODEL_VERSION` instead. |
 
+### Function privileges
+
+| Name              | Supports Securable Object           | Operation                                                                             |
+|-------------------|-------------------------------------|---------------------------------------------------------------------------------------|
+| REGISTER_FUNCTION | Metalake, Catalog, Schema           | Register a function                                                                   |
+| EXECUTE_FUNCTION  | Metalake, Catalog, Schema, Function | View the metadata of the function and execute the function                            |
+| MODIFY_FUNCTION   | Metalake, Catalog, Schema, Function | Alter or drop the function                                                            |
+
 ### Tag privileges
 
 | Name       | Supports Securable Object | Operation                             |
@@ -1312,6 +1320,11 @@ The following table lists the required privileges for each API.
 | delete model version              | First, you should have the privilege to load the catalog and the schema. Then, you are one of the owners of the model, schema, metalake, catalog.                                                                                             |
 | alter model version               | First, you should have the privilege to load the catalog and the schema. Then, you are one of the owners of the model, schema, metalake, catalog.                                                                                             |
 | delete model version alias        | First, you should have the privilege to load the catalog and the schema. Then, you are one of the owners of the model, schema, metalake, catalog.                                                                                             |
+| register function                 | First, you should have the privilege to load the catalog and the schema. Then, you have `REGISTER_FUNCTION` on the metalake, catalog, schema or are the owner of the metalake, catalog, schema                                                |
+| alter function                    | First, you should have the privilege to load the catalog and the schema. Then, you have `MODIFY_FUNCTION` on the metalake, catalog, schema, function or are one of the owners of the metalake, catalog, schema, function                      |
+| drop function                     | First, you should have the privilege to load the catalog and the schema. Then, you have `MODIFY_FUNCTION` on the metalake, catalog, schema, function or are one of the owners of the metalake, catalog, schema, function                      |
+| list functions                    | First, you should have the privilege to load the catalog and the schema. Then the owner of the schema, catalog, metalake can see all the functions, others can see the functions which they can load                                          |
+| load function                     | First, you should have the privilege to load the catalog and the schema. Then, you are one of the owners of the function, schema, catalog, metalake or have `EXECUTE_FUNCTION` or `MODIFY_FUNCTION` on the function, schema, catalog, metalake |
 | add user                          | `MANAGE_USERS` on the metalake  or the owner of the metalake                                                                                                                                                                                  |
 | remove user                       | `MANAGE_USERS` on the metalake  or the owner of the metalake                                                                                                                                                                                  |
 | get user                          | `MANAGE_USERS` on the metalake  or the owner of the metalake or himself                                                                                                                                                                       |
