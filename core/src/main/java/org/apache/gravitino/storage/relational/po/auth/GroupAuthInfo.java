@@ -20,8 +20,11 @@ package org.apache.gravitino.storage.relational.po.auth;
 
 /** Step 1b result: one row per group the user belongs to. */
 public class GroupAuthInfo {
-  private final long groupId;
-  private final long updatedAt;
+  private long groupId;
+  private long updatedAt;
+
+  /** Required by MyBatis for result mapping. */
+  public GroupAuthInfo() {}
 
   public GroupAuthInfo(long groupId, long updatedAt) {
     this.groupId = groupId;
@@ -32,7 +35,15 @@ public class GroupAuthInfo {
     return groupId;
   }
 
+  public void setGroupId(long groupId) {
+    this.groupId = groupId;
+  }
+
   public long getUpdatedAt() {
     return updatedAt;
+  }
+
+  public void setUpdatedAt(long updatedAt) {
+    this.updatedAt = updatedAt;
   }
 }

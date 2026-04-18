@@ -20,11 +20,14 @@ package org.apache.gravitino.storage.relational.po.auth;
 
 /** Entity change poller result -- one row per entity_change_log entry. */
 public class EntityChangeRecord {
-  private final String metalakeName;
-  private final String entityType;
-  private final String fullName;
-  private final String operateType;
-  private final long createdAt;
+  private String metalakeName;
+  private String entityType;
+  private String fullName;
+  private String operateType;
+  private long createdAt;
+
+  /** Required by MyBatis for result mapping. */
+  public EntityChangeRecord() {}
 
   public EntityChangeRecord(
       String metalakeName, String entityType, String fullName, String operateType, long createdAt) {
@@ -39,19 +42,39 @@ public class EntityChangeRecord {
     return metalakeName;
   }
 
+  public void setMetalakeName(String metalakeName) {
+    this.metalakeName = metalakeName;
+  }
+
   public String getEntityType() {
     return entityType;
+  }
+
+  public void setEntityType(String entityType) {
+    this.entityType = entityType;
   }
 
   public String getFullName() {
     return fullName;
   }
 
+  public void setFullName(String fullName) {
+    this.fullName = fullName;
+  }
+
   public String getOperateType() {
     return operateType;
   }
 
+  public void setOperateType(String operateType) {
+    this.operateType = operateType;
+  }
+
   public long getCreatedAt() {
     return createdAt;
+  }
+
+  public void setCreatedAt(long createdAt) {
+    this.createdAt = createdAt;
   }
 }
