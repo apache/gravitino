@@ -153,11 +153,12 @@ public class AsyncQueueListener implements EventListenerPlugin {
     // 2. Thread B increment dropEventCounters and update lastDropEventCounters
     // 3. Thread A get lastDropEventCounters
     long dropEvents = currentDropEvents - lastDropEvents;
+    Instant now = Instant.now();
     Instant lastDropTime = lastRecordDropEventTime.get();
-    if (dropEvents > 0 && Instant.now().isAfter(lastDropTime.plusSeconds(60))) {
+    if (dropEvents > 0 && now.isAfter(lastDropTime.plusSeconds(60))) {
       if (lastDropEventCounters.compareAndSet(lastDropEvents, currentDropEvents)) {
         LOG.warn("{} drop {} events since {}", asyncQueueListenerName, dropEvents, lastDropTime);
-        lastRecordDropEventTime.set(Instant.now());
+        lastRecordDropEventTime.set(now);
       }
     }
   }
