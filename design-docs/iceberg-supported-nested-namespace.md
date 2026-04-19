@@ -140,7 +140,14 @@ Examples:
 - **Update nested namespace**:
   - Support updating namespace properties through mapped schema operations.
   - Property update is applied to the mapped target namespace scope.
-- **Drop nested namespace**: drop corresponding schema in Gravitino.
+- **Drop nested namespace**:
+  - Drop behavior follows existing schema drop semantics (`cascade` flag behavior is preserved).
+  - If `cascade=false`, drop fails when sub-namespaces/tables still exist.
+  - If `cascade=true`, drop removes the target namespace together with sub-namespaces and tables.
+  - Example:
+    - Existing: `A:B`, `A:B:C`, `A:B:C:t1`
+    - Drop `A:B` with `cascade=false` -> fail (`NonEmptySchemaException`-style behavior)
+    - Drop `A:B` with `cascade=true` -> delete `A:B`, `A:B:C`, and table `t1` under them.
 - **Rename nested namespace**: not needed because Iceberg REST does not support namespace rename.
 
 ### Gravitino Side Behavior
@@ -166,6 +173,26 @@ Examples:
 - Gravitino server REST supports namespace create/update/drop operations for nested namespace
   workflows, aligned with Iceberg REST behavior.
 - Existing schema/table APIs remain compatible with non-nested cases.
+
+Examples (Gravitino REST side):
+
+- **Create from Gravitino side**
+  - Request: `POST /metalakes/m1/catalogs/c1/schemas` with `name=A:B:C`
+  - Behavior: ensure parent chain exists (`A`, `A:B`) and then create `A:B:C`.
+- **List from Gravitino side**
+  - Request: `GET /metalakes/m1/catalogs/c1/schemas`
+  - Behavior: return top-level schemas only (first layer), for example `A`, `B`.
+  - Request: `GET /metalakes/m1/catalogs/c1/schemas?parentHierarchicalSchema=A%3AB`
+  - Behavior: return direct children of `A:B` only (next layer), for example `A:B:C`, `A:B:D`.
+- **Alter from Gravitino side**
+  - Request: `PUT /metalakes/m1/catalogs/c1/schemas/A:B:C` with updates
+    (for example set/remove properties).
+  - Behavior: update properties on target schema `A:B:C` only; parent scopes are not modified.
+- **Delete from Gravitino side**
+  - Request: `DELETE /metalakes/m1/catalogs/c1/schemas/A:B?cascade=false`
+  - Behavior: fail if `A:B` still contains child namespace/table.
+  - Request: `DELETE /metalakes/m1/catalogs/c1/schemas/A:B?cascade=true`
+  - Behavior: delete `A:B` and all descendants/tables under that subtree.
 
 ### Performance Considerations
 
