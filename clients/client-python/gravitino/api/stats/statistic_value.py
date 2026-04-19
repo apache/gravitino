@@ -17,29 +17,18 @@
 
 
 from abc import ABC, abstractmethod
-from collections.abc import Mapping
-from typing import Generic, TypeVar, Union
+from typing import Generic, TypeVar
 
 from gravitino.api.rel.types.type import Type
 
-AtomicStatisticValue = Union[bool, int, float, str]
-
-
-_StatisticValueT = TypeVar(
-    "_StatisticValueT",
-    bound=Union[
-        AtomicStatisticValue,
-        list["StatisticValue"],
-        Mapping[str, "StatisticValue"],
-    ],
-)
+_StatisticValueT = TypeVar("_StatisticValueT")
 
 
 class StatisticValue(Generic[_StatisticValueT], ABC):
     """An interface representing a statistic value.
 
     Type Parameters:
-        _StatisticValueT: The type of the statistic value.
+        The type of the statistic value.
     """
 
     @abstractmethod
@@ -47,7 +36,7 @@ class StatisticValue(Generic[_StatisticValueT], ABC):
         """Returns the value of the statistic.
 
         Returns:
-            _StatisticValueT: the value of the statistic
+            The value of the statistic
         """
 
     @abstractmethod

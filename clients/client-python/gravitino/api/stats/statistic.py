@@ -17,7 +17,7 @@
 
 
 from abc import ABC, abstractmethod
-from typing import Final
+from typing import Any, Final
 
 from gravitino.api.auditable import Auditable
 from gravitino.api.stats.statistic_value import StatisticValue
@@ -42,7 +42,7 @@ class Statistic(Auditable, ABC):
         """
 
     @abstractmethod
-    def value(self) -> StatisticValue | None:
+    def value(self) -> StatisticValue[Any] | None:
         """Get the value of the statistic.
 
         he value is optional. If the statistic is not set, the value will be empty.

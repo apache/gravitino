@@ -17,6 +17,7 @@
 
 
 from abc import ABC, abstractmethod
+from typing import Any
 
 from gravitino.api.stats.statistic import Statistic
 from gravitino.api.stats.statistic_value import StatisticValue
@@ -33,11 +34,11 @@ class SupportsStatistics(ABC):
         """Lists all statistics.
 
         Returns:
-            list[Statistic]: a list of statistics
+            A list of statistics
         """
 
     @abstractmethod
-    def update_statistics(self, statistics: dict[str, StatisticValue]) -> None:
+    def update_statistics(self, statistics: dict[str, StatisticValue[Any]]) -> None:
         """Updates statistics with the provided values.
 
         If the statistic exists, it will be updated with the new value. If the statistic does
@@ -46,8 +47,7 @@ class SupportsStatistics(ABC):
         `IllegalStatisticNameException`.
 
         Args:
-            statistics (dict[str, StatisticValue]):
-                a map of statistic names to their values
+            statistics: a map of statistic names to their values
 
         Raises:
             IllegalStatisticNameException: If the statistic name is illegal
@@ -61,7 +61,7 @@ class SupportsStatistics(ABC):
         If the statistic is unmodifiable, it will throw an `UnmodifiableStatisticException`.
 
         Args:
-            statistics (list[str]): a list of statistic names to be dropped
+            statistics: a list of statistic names to be dropped
 
         Returns:
             bool:
