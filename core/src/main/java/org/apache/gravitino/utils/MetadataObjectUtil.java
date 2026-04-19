@@ -24,8 +24,11 @@ import com.google.common.base.Joiner;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.BiMap;
 import com.google.common.collect.ImmutableBiMap;
+import java.util.Arrays;
+import java.util.Locale;
 import java.util.Optional;
 import java.util.function.Supplier;
+import java.util.stream.Collectors;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.GravitinoEnv;
@@ -62,7 +65,29 @@ public class MetadataObjectUtil {
           .put(MetadataObject.Type.VIEW, Entity.EntityType.VIEW)
           .build();
 
+  private static final String VALID_TYPES =
+      Arrays.stream(MetadataObject.Type.values()).map(Enum::name).collect(Collectors.joining(", "));
+
   private MetadataObjectUtil() {}
+
+  /**
+   * Parse a string into a {@link MetadataObject.Type}, throwing a descriptive {@link
+   * IllegalArgumentException} that lists the valid types if the input is unrecognized.
+   *
+   * @param typeName the metadata object type name (case-insensitive)
+   * @return the parsed {@link MetadataObject.Type}
+   * @throws IllegalArgumentException if the input is blank or not a valid type
+   */
+  public static MetadataObject.Type parseType(String typeName) {
+    Preconditions.checkArgument(
+        StringUtils.isNotBlank(typeName), "metadata object type cannot be blank");
+    try {
+      return MetadataObject.Type.valueOf(typeName.toUpperCase(Locale.ROOT));
+    } catch (IllegalArgumentException e) {
+      throw new IllegalArgumentException(
+          "Invalid metadata object type: " + typeName + ". Valid types are: " + VALID_TYPES, e);
+    }
+  }
 
   /**
    * Map the given {@link MetadataObject}'s type to the corresponding {@link Entity.EntityType}.
