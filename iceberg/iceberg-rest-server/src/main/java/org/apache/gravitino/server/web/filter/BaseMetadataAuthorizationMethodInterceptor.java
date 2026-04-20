@@ -103,6 +103,19 @@ public abstract class BaseMetadataAuthorizationMethodInterceptor implements Meth
     return false;
   }
 
+  protected boolean tryAlternativeAuthorization(
+      String expression,
+      Map<Entity.EntityType, NameIdentifier> nameIdentifierMap,
+      Map<String, Object> pathParams,
+      AuthorizationRequestContext requestContext) {
+    return false;
+  }
+
+  protected AuthorizationExpressionEvaluator createAuthorizationExpressionEvaluator(
+      String expression) {
+    return new AuthorizationExpressionEvaluator(expression);
+  }
+
   /**
    * Determine whether authorization is required and the rules via the authorization annotation ,
    * and obtain the metadata ID that requires authorization via the authorization annotation.
@@ -163,13 +176,18 @@ public abstract class BaseMetadataAuthorizationMethodInterceptor implements Meth
         if (!skipStandardCheck) {
           Map<String, Object> pathParams = Utils.extractPathParamsFromParameters(parameters, args);
           AuthorizationExpressionEvaluator authorizationExpressionEvaluator =
-              new AuthorizationExpressionEvaluator(expression);
+              createAuthorizationExpressionEvaluator(expression);
           boolean authorizeResult =
               authorizationExpressionEvaluator.evaluate(
                   nameIdentifierMap,
                   pathParams,
                   new AuthorizationRequestContext(),
                   Optional.empty());
+          if (!authorizeResult) {
+            authorizeResult =
+                tryAlternativeAuthorization(
+                    expression, nameIdentifierMap, pathParams, new AuthorizationRequestContext());
+          }
           if (!authorizeResult) {
             MetadataObject.Type type = expressionAnnotation.accessMetadataType();
             NameIdentifier accessMetadataName =

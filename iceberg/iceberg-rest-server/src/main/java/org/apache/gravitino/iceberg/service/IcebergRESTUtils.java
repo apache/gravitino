@@ -27,7 +27,6 @@ import java.security.NoSuchAlgorithmException;
 import java.time.Instant;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
-import java.util.Arrays;
 import java.util.Enumeration;
 import java.util.HashMap;
 import java.util.Map;
@@ -39,6 +38,8 @@ import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 import javax.ws.rs.core.Response.Status;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.gravitino.Configs;
+import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.iceberg.service.authorization.IcebergRESTServerContext;
 import org.apache.iceberg.catalog.Namespace;
@@ -55,6 +56,7 @@ public class IcebergRESTUtils {
   public static final String SNAPSHOT_ALL = "all";
 
   public static final String SNAPSHOT_REFS = "refs";
+  public static final String PHYSICAL_SCHEMA_SEPARATOR = ".";
 
   /** Snapshot modes for the Iceberg loadTable endpoint. */
   public enum SnapshotMode {
@@ -206,13 +208,11 @@ public class IcebergRESTUtils {
 
   public static NameIdentifier getGravitinoNameIdentifier(
       String metalakeName, String catalogName, TableIdentifier icebergIdentifier) {
-    Stream<String> catalogNS =
-        Stream.concat(
-            Stream.of(metalakeName, catalogName),
-            Arrays.stream(icebergIdentifier.namespace().levels()));
-    String[] catalogNSTable =
-        Stream.concat(catalogNS, Stream.of(icebergIdentifier.name())).toArray(String[]::new);
-    return NameIdentifier.of(catalogNSTable);
+    return NameIdentifier.of(
+        metalakeName,
+        catalogName,
+        toHierarchicalSchemaPath(icebergIdentifier.namespace()),
+        icebergIdentifier.name());
   }
 
   public static String getCatalogName(String rawPrefix) {
@@ -235,9 +235,53 @@ public class IcebergRESTUtils {
 
   public static NameIdentifier getGravitinoNameIdentifier(
       String metalakeName, String catalogName, Namespace namespace) {
-    Stream<String> catalogNS =
-        Stream.concat(Stream.of(metalakeName, catalogName), Arrays.stream(namespace.levels()));
-    return NameIdentifier.of(catalogNS.toArray(String[]::new));
+    return NameIdentifier.of(metalakeName, catalogName, toHierarchicalSchemaPath(namespace));
+  }
+
+  public static String toHierarchicalSchemaPath(Namespace namespace) {
+    return serializeHierarchicalPath(namespace.levels());
+  }
+
+  public static String toPhysicalSchemaPath(Namespace namespace) {
+    return String.join(PHYSICAL_SCHEMA_SEPARATOR, namespace.levels());
+  }
+
+  public static String serializeHierarchicalPath(String[] levels) {
+    return String.join(getConfiguredSchemaSeparator(), levels);
+  }
+
+  public static String[] parseHierarchicalPath(String hierarchicalPath) {
+    return hierarchicalPath.split(java.util.regex.Pattern.quote(getConfiguredSchemaSeparator()), -1);
+  }
+
+  public static String toPhysicalSchemaName(String hierarchicalPath) {
+    String configuredSeparator = getConfiguredSchemaSeparator();
+    if (PHYSICAL_SCHEMA_SEPARATOR.equals(configuredSeparator)) {
+      return hierarchicalPath;
+    }
+    return hierarchicalPath.replace(configuredSeparator, PHYSICAL_SCHEMA_SEPARATOR);
+  }
+
+  public static String toExternalSchemaName(String physicalSchemaName) {
+    String configuredSeparator = getConfiguredSchemaSeparator();
+    if (PHYSICAL_SCHEMA_SEPARATOR.equals(configuredSeparator)) {
+      return physicalSchemaName;
+    }
+    return physicalSchemaName.replace(PHYSICAL_SCHEMA_SEPARATOR, configuredSeparator);
+  }
+
+  public static Namespace toNamespace(String hierarchicalPath) {
+    if (StringUtils.isEmpty(hierarchicalPath)) {
+      return Namespace.empty();
+    }
+    return Namespace.of(parseHierarchicalPath(hierarchicalPath));
+  }
+
+  public static Namespace toNamespaceFromPhysicalSchemaName(String physicalSchemaName) {
+    if (StringUtils.isEmpty(physicalSchemaName)) {
+      return Namespace.empty();
+    }
+    return Namespace.of(physicalSchemaName.split("\\.", -1));
   }
 
   public static Map<String, String> getHttpHeaders(HttpServletRequest httpServletRequest) {
@@ -264,5 +308,21 @@ public class IcebergRESTUtils {
           rawPrefix.endsWith("/"), String.format("rawPrefix %s format is illegal", rawPrefix));
       return rawPrefix.substring(0, rawPrefix.length() - 1);
     }
+  }
+
+  private static String getConfiguredSchemaSeparator() {
+    if (GravitinoEnv.getInstance().config() == null) {
+      return Configs.NAMESPACE_SCHEMA_NAME_SEPARATOR.defaultValue();
+    }
+
+    String separator =
+        GravitinoEnv.getInstance()
+            .config()
+            .getRawString(
+                Configs.NAMESPACE_SCHEMA_NAME_SEPARATOR.key(),
+                Configs.NAMESPACE_SCHEMA_NAME_SEPARATOR.defaultValue());
+    return StringUtils.isBlank(separator)
+        ? Configs.NAMESPACE_SCHEMA_NAME_SEPARATOR.defaultValue()
+        : separator;
   }
 }

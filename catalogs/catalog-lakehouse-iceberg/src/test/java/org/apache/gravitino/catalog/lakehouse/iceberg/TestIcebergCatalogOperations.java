@@ -19,6 +19,7 @@
 package org.apache.gravitino.catalog.lakehouse.iceberg;
 
 import com.google.common.collect.ImmutableMap;
+import java.util.Arrays;
 import org.apache.gravitino.Catalog;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.exceptions.GravitinoRuntimeException;
@@ -41,5 +42,35 @@ public class TestIcebergCatalogOperations {
                     ImmutableMap.of()));
     Assertions.assertTrue(
         exception.getMessage().contains("Failed to run listNamespace on Iceberg catalog"));
+  }
+
+  @Test
+  public void testTopLevelSchemas() {
+    Assertions.assertEquals(
+        Arrays.asList("a", "b"),
+        IcebergCatalogOperations.topLevelSchemas(
+            Arrays.asList("a", "a:b", "a:b:c", "b", "b:c"), ":"));
+  }
+
+  @Test
+  public void testDirectChildSchemas() {
+    Assertions.assertEquals(
+        Arrays.asList("a:b", "a:c"),
+        IcebergCatalogOperations.directChildSchemas(
+            Arrays.asList("a", "a:b", "a:b:c", "a:c", "a:c:d"), "a", ":"));
+  }
+
+  @Test
+  public void testParentSchemas() {
+    Assertions.assertEquals(
+        Arrays.asList("a", "a:b"), IcebergCatalogOperations.parentSchemas("a:b:c", ":"));
+  }
+
+  @Test
+  public void testDescendantSchemas() {
+    Assertions.assertEquals(
+        Arrays.asList("a:b", "a:b:c", "a:b:d"),
+        IcebergCatalogOperations.descendantSchemas(
+            Arrays.asList("a", "a:b", "a:b:c", "a:b:d", "a:c"), "a", ":"));
   }
 }

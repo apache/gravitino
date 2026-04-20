@@ -26,14 +26,19 @@ import com.google.common.collect.Maps;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Comparator;
 import java.util.HashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import java.util.stream.Collectors;
 import org.apache.commons.lang3.ArrayUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.Catalog;
+import org.apache.gravitino.Configs;
+import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.SchemaChange;
@@ -90,10 +95,12 @@ public class IcebergCatalogOperations
     implements CatalogOperations, SupportsSchemas, TableCatalog, ViewCatalog {
 
   private static final String ICEBERG_TABLE_DOES_NOT_EXIST_MSG = "Iceberg table does not exist: %s";
+  private static final String PHYSICAL_SCHEMA_SEPARATOR = ".";
 
   public static final Logger LOG = LoggerFactory.getLogger(IcebergCatalogOperations.class);
 
   @VisibleForTesting IcebergCatalogWrapper icebergCatalogWrapper;
+  @VisibleForTesting String schemaNameSeparator = ".";
 
   private IcebergCatalogWrapperHelper icebergCatalogWrapperHelper;
 
@@ -128,6 +135,18 @@ public class IcebergCatalogOperations
         authenticationConfig.isKerberosAuth() && rawWrapper.getCatalog() instanceof SupportsKerberos
             ? new KerberosAwareIcebergCatalogProxy(rawWrapper).getProxy(icebergConfig)
             : rawWrapper;
+    if (GravitinoEnv.getInstance().config() != null) {
+      String configuredSeparator =
+          GravitinoEnv.getInstance()
+              .config()
+              .getRawString(
+                  Configs.NAMESPACE_SCHEMA_NAME_SEPARATOR.key(),
+                  Configs.NAMESPACE_SCHEMA_NAME_SEPARATOR.defaultValue());
+      this.schemaNameSeparator =
+          StringUtils.isBlank(configuredSeparator)
+              ? Configs.NAMESPACE_SCHEMA_NAME_SEPARATOR.defaultValue()
+              : configuredSeparator;
+    }
     this.icebergCatalogWrapperHelper =
         new IcebergCatalogWrapperHelper(icebergCatalogWrapper.getCatalog());
   }
@@ -159,9 +178,21 @@ public class IcebergCatalogOperations
           icebergCatalogWrapper
               .listNamespace(IcebergCatalogWrapperHelper.getIcebergNamespace())
               .namespaces();
+      List<String> schemaNames =
+          namespaces.stream()
+              .map(org.apache.iceberg.catalog.Namespace::toString)
+              .collect(Collectors.toList());
+      String parentSchema = namespace.length() > 2 ? toPhysicalSchemaName(namespace.level(namespace.length() - 1)) : null;
 
-      return namespaces.stream()
-          .map(icebergNamespace -> NameIdentifier.of(namespace, icebergNamespace.toString()))
+      List<String> hierarchicalSchemas =
+          StringUtils.isBlank(parentSchema)
+              ? topLevelSchemas(schemaNames, PHYSICAL_SCHEMA_SEPARATOR)
+              : directChildSchemas(schemaNames, parentSchema, PHYSICAL_SCHEMA_SEPARATOR);
+      return hierarchicalSchemas.stream()
+          .map(
+              schema ->
+                  NameIdentifier.of(
+                      namespace.level(0), namespace.level(1), toExternalSchemaName(schema)))
           .toArray(NameIdentifier[]::new);
     } catch (NoSuchNamespaceException e) {
       throw new NoSuchSchemaException(
@@ -184,10 +215,25 @@ public class IcebergCatalogOperations
       NameIdentifier ident, String comment, Map<String, String> properties)
       throws NoSuchCatalogException, SchemaAlreadyExistsException {
     try {
+      for (String parent : parentSchemas(ident.name(), schemaNameSeparator)) {
+        String parentPhysicalName = toPhysicalSchemaName(parent);
+        try {
+          icebergCatalogWrapper.createNamespace(
+              IcebergSchema.builder()
+                  .withName(parentPhysicalName)
+                  .withComment(comment)
+                  .withProperties(properties)
+                  .withAuditInfo(AuditInfo.EMPTY)
+                  .build()
+                  .toCreateRequest(IcebergCatalogWrapperHelper.getIcebergNamespace(parentPhysicalName)));
+        } catch (org.apache.iceberg.exceptions.AlreadyExistsException ignored) {
+          // Parent schema already exists, continue to create the target schema.
+        }
+      }
       String currentUser = currentUser();
       IcebergSchema createdSchema =
           IcebergSchema.builder()
-              .withName(ident.name())
+              .withName(toExternalSchemaName(toPhysicalSchemaName(ident.name())))
               .withComment(comment)
               .withProperties(properties)
               .withAuditInfo(
@@ -198,7 +244,7 @@ public class IcebergCatalogOperations
               .build();
       icebergCatalogWrapper.createNamespace(
           createdSchema.toCreateRequest(
-              IcebergCatalogWrapperHelper.getIcebergNamespace(ident.name())));
+              IcebergCatalogWrapperHelper.getIcebergNamespace(toPhysicalSchemaName(ident.name()))));
       LOG.info(
           "Created Iceberg schema (database) {} in Iceberg\ncurrentUser:{} \ncomment: {} \nmetadata: {}",
           ident.name(),
@@ -231,10 +277,10 @@ public class IcebergCatalogOperations
     try {
       GetNamespaceResponse response =
           icebergCatalogWrapper.loadNamespace(
-              IcebergCatalogWrapperHelper.getIcebergNamespace(ident.name()));
+              IcebergCatalogWrapperHelper.getIcebergNamespace(toPhysicalSchemaName(ident.name())));
       IcebergSchema icebergSchema =
           IcebergSchema.builder()
-              .withName(ident.name())
+              .withName(toExternalSchemaName(toPhysicalSchemaName(ident.name())))
               .withComment(
                   Optional.of(response)
                       .map(GetNamespaceResponse::properties)
@@ -265,7 +311,7 @@ public class IcebergCatalogOperations
     try {
       GetNamespaceResponse response =
           icebergCatalogWrapper.loadNamespace(
-              IcebergCatalogWrapperHelper.getIcebergNamespace(ident.name()));
+              IcebergCatalogWrapperHelper.getIcebergNamespace(toPhysicalSchemaName(ident.name())));
       Map<String, String> metadata = response.properties();
       List<String> removals = new ArrayList<>();
       Map<String, String> updates = new HashMap<>();
@@ -291,7 +337,7 @@ public class IcebergCatalogOperations
               .orElse(null);
       IcebergSchema icebergSchema =
           IcebergSchema.builder()
-              .withName(ident.name())
+              .withName(toExternalSchemaName(toPhysicalSchemaName(ident.name())))
               .withComment(comment)
               .withAuditInfo(AuditInfo.EMPTY)
               .withProperties(resultProperties)
@@ -300,7 +346,7 @@ public class IcebergCatalogOperations
           UpdateNamespacePropertiesRequest.builder().updateAll(updates).removeAll(removals).build();
       UpdateNamespacePropertiesResponse updateNamespacePropertiesResponse =
           icebergCatalogWrapper.updateNamespaceProperties(
-              IcebergCatalogWrapperHelper.getIcebergNamespace(ident.name()),
+              IcebergCatalogWrapperHelper.getIcebergNamespace(toPhysicalSchemaName(ident.name())),
               updateNamespacePropertiesRequest);
       LOG.info(
           "Altered Iceberg schema (database) {}. UpdateResponse:\n{}",
@@ -325,10 +371,46 @@ public class IcebergCatalogOperations
    */
   @Override
   public boolean dropSchema(NameIdentifier ident, boolean cascade) throws NonEmptySchemaException {
-    Preconditions.checkArgument(!cascade, "Iceberg does not support cascading delete operations.");
     try {
+      if (!schemaExists(ident)) {
+        LOG.warn("Iceberg schema (database) {} does not exist", ident.name());
+        return false;
+      }
+      List<String> allSchemas =
+          icebergCatalogWrapper.listNamespace(IcebergCatalogWrapperHelper.getIcebergNamespace()).namespaces().stream()
+              .map(org.apache.iceberg.catalog.Namespace::toString)
+              .collect(Collectors.toList());
+      String physicalSchemaName = toPhysicalSchemaName(ident.name());
+      List<String> descendants =
+          descendantSchemas(allSchemas, physicalSchemaName, PHYSICAL_SCHEMA_SEPARATOR);
+
+      if (!cascade && !descendants.isEmpty()) {
+        throw new NonEmptySchemaException(
+            "Iceberg schema (database) %s is not empty. Sub-schemas exist: %s",
+            ident.name(),
+            descendants);
+      }
+
+      if (cascade) {
+        List<String> schemasToDrop = new ArrayList<>(descendants);
+        schemasToDrop.sort(Comparator.comparingInt(String::length).reversed());
+        schemasToDrop.add(physicalSchemaName);
+        for (String schemaName : schemasToDrop) {
+          NameIdentifier schemaIdent =
+              NameIdentifier.of(ident.namespace().level(0), ident.namespace().level(1), schemaName);
+          Namespace schemaNamespace =
+              Namespace.of(ArrayUtils.add(schemaIdent.namespace().levels(), schemaIdent.name()));
+          for (NameIdentifier table : listTables(schemaNamespace)) {
+            dropTable(table);
+          }
+          icebergCatalogWrapper.dropNamespace(IcebergCatalogWrapperHelper.getIcebergNamespace(schemaName));
+        }
+        LOG.info("Dropped Iceberg schema (database) {} with cascade", ident.name());
+        return true;
+      }
+
       icebergCatalogWrapper.dropNamespace(
-          IcebergCatalogWrapperHelper.getIcebergNamespace(ident.name()));
+          IcebergCatalogWrapperHelper.getIcebergNamespace(physicalSchemaName));
       LOG.info("Dropped Iceberg schema (database) {}", ident.name());
       return true;
     } catch (NamespaceNotEmptyException e) {
@@ -340,6 +422,53 @@ public class IcebergCatalogOperations
     } catch (Exception e) {
       throw new RuntimeException(e);
     }
+  }
+
+  @VisibleForTesting
+  static List<String> topLevelSchemas(List<String> allSchemas, String separator) {
+    Set<String> result = new LinkedHashSet<>();
+    for (String schema : allSchemas) {
+      int idx = schema.indexOf(separator);
+      result.add(idx < 0 ? schema : schema.substring(0, idx));
+    }
+    return new ArrayList<>(result);
+  }
+
+  @VisibleForTesting
+  static List<String> directChildSchemas(List<String> allSchemas, String parent, String separator) {
+    Set<String> result = new LinkedHashSet<>();
+    int parentDepth = splitPath(parent, separator).length;
+    String prefix = parent + separator;
+    for (String schema : allSchemas) {
+      if (!schema.startsWith(prefix)) {
+        continue;
+      }
+      int depth = splitPath(schema, separator).length;
+      if (depth == parentDepth + 1) {
+        result.add(schema);
+      }
+    }
+    return new ArrayList<>(result);
+  }
+
+  @VisibleForTesting
+  static List<String> descendantSchemas(List<String> allSchemas, String parent, String separator) {
+    String prefix = parent + separator;
+    return allSchemas.stream().filter(schema -> schema.startsWith(prefix)).collect(Collectors.toList());
+  }
+
+  @VisibleForTesting
+  static List<String> parentSchemas(String schema, String separator) {
+    String[] levels = splitPath(schema, separator);
+    List<String> result = new ArrayList<>();
+    for (int i = 1; i < levels.length; i++) {
+      result.add(String.join(separator, Arrays.copyOfRange(levels, 0, i)));
+    }
+    return result;
+  }
+
+  private static String[] splitPath(String path, String separator) {
+    return path.split(java.util.regex.Pattern.quote(separator), -1);
   }
 
   /**
@@ -568,7 +697,7 @@ public class IcebergCatalogOperations
 
       LoadTableResponse loadTableResponse =
           icebergCatalogWrapper.createTable(
-              IcebergCatalogWrapperHelper.getIcebergNamespace(schemaIdent.name()),
+              IcebergCatalogWrapperHelper.getIcebergNamespace(toPhysicalSchemaName(schemaIdent.name())),
               createdTable.toCreateTableRequest());
       loadTableResponse.validate();
 
@@ -660,5 +789,25 @@ public class IcebergCatalogOperations
 
   private static String currentUser() {
     return PrincipalUtils.getCurrentUserName();
+  }
+
+  private String toPhysicalSchemaName(String schemaName) {
+    if (StringUtils.isBlank(schemaName)) {
+      return schemaName;
+    }
+    if (PHYSICAL_SCHEMA_SEPARATOR.equals(schemaNameSeparator)) {
+      return schemaName;
+    }
+    return schemaName.replace(schemaNameSeparator, PHYSICAL_SCHEMA_SEPARATOR);
+  }
+
+  private String toExternalSchemaName(String physicalSchemaName) {
+    if (StringUtils.isBlank(physicalSchemaName)) {
+      return physicalSchemaName;
+    }
+    if (PHYSICAL_SCHEMA_SEPARATOR.equals(schemaNameSeparator)) {
+      return physicalSchemaName;
+    }
+    return physicalSchemaName.replace(PHYSICAL_SCHEMA_SEPARATOR, schemaNameSeparator);
   }
 }

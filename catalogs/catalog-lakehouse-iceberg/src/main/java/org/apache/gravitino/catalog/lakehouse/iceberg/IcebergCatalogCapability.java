@@ -18,14 +18,51 @@
  */
 package org.apache.gravitino.catalog.lakehouse.iceberg;
 
+import java.util.regex.Pattern;
 import org.apache.gravitino.connector.capability.Capability;
 import org.apache.gravitino.connector.capability.CapabilityResult;
 
 public class IcebergCatalogCapability implements Capability {
+  private final String schemaNameSeparator;
+
+  public IcebergCatalogCapability() {
+    this(".");
+  }
+
+  public IcebergCatalogCapability(String schemaNameSeparator) {
+    this.schemaNameSeparator = schemaNameSeparator == null ? "." : schemaNameSeparator;
+  }
+
   @Override
   public CapabilityResult columnDefaultValue() {
     // Iceberg column default value is WIP, see
     // https://github.com/apache/iceberg/pull/4525
     return CapabilityResult.unsupported("Iceberg does not support column default value.");
+  }
+
+  @Override
+  public CapabilityResult specificationOnName(Scope scope, String name) {
+    if (scope != Scope.SCHEMA || !name.contains(schemaNameSeparator)) {
+      return Capability.super.specificationOnName(scope, name);
+    }
+
+    String[] segments = name.split(Pattern.quote(schemaNameSeparator), -1);
+    if (segments.length == 0) {
+      return CapabilityResult.unsupported(
+          String.format("The %s name '%s' is illegal.", scope, name));
+    }
+
+    for (String segment : segments) {
+      if (segment.isEmpty()) {
+        return CapabilityResult.unsupported(
+            String.format("The %s name '%s' is illegal.", scope, name));
+      }
+      CapabilityResult result = Capability.super.specificationOnName(scope, segment);
+      if (!result.supported()) {
+        return result;
+      }
+    }
+
+    return CapabilityResult.SUPPORTED;
   }
 }

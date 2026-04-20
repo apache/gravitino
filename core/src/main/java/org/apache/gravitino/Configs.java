@@ -222,6 +222,14 @@ public class Configs {
           .longConf()
           .createWithDefault(2000L);
 
+  public static final ConfigEntry<String> NAMESPACE_SCHEMA_NAME_SEPARATOR =
+      new ConfigBuilder("gravitino.namespace.schema-name-separator")
+          .doc("Schema name separator used for nested namespace semantics")
+          .version("1.3.0")
+          .stringConf()
+          .checkValue(value -> value != null && !value.trim().isEmpty(), ConfigConstants.NOT_BLANK_ERROR_MSG)
+          .createWithDefault(".");
+
   public static final ConfigEntry<Long> STORE_DELETE_AFTER_TIME =
       new ConfigBuilder(STORE_DELETE_AFTER_TIME_KEY)
           .doc(

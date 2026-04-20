@@ -20,17 +20,20 @@
 package org.apache.gravitino.server.web.filter;
 
 import java.lang.reflect.Parameter;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Optional;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.Entity.EntityType;
 import org.apache.gravitino.NameIdentifier;
+import org.apache.gravitino.authorization.AuthorizationRequestContext;
 import org.apache.gravitino.iceberg.service.IcebergRESTUtils;
 import org.apache.gravitino.iceberg.service.authorization.IcebergRESTServerContext;
 import org.apache.gravitino.server.authorization.annotations.AuthorizationMetadata;
 import org.apache.gravitino.server.authorization.annotations.IcebergAuthorizationMetadata;
 import org.apache.gravitino.server.authorization.annotations.IcebergAuthorizationMetadata.RequestType;
+import org.apache.gravitino.server.authorization.expression.AuthorizationExpressionEvaluator;
 import org.apache.gravitino.utils.NameIdentifierUtil;
 import org.apache.iceberg.catalog.Namespace;
 import org.apache.iceberg.rest.RESTUtil;
@@ -41,6 +44,9 @@ import org.apache.iceberg.rest.RESTUtil;
  */
 public class IcebergMetadataAuthorizationMethodInterceptor
     extends BaseMetadataAuthorizationMethodInterceptor {
+
+  private static final String DENY_USE_SCHEMA_EXPRESSION =
+      "ANY(DENY_USE_SCHEMA, METALAKE, CATALOG, SCHEMA)";
 
   private final String metalakeName = IcebergRESTServerContext.getInstance().metalakeName();
 
@@ -70,7 +76,7 @@ public class IcebergMetadataAuthorizationMethodInterceptor
           break;
         case SCHEMA:
           rawNamespace = RESTUtil.decodeNamespace(value);
-          schema = rawNamespace.level(rawNamespace.length() - 1);
+          schema = IcebergRESTUtils.toHierarchicalSchemaPath(rawNamespace);
           nameIdentifierMap.put(
               Entity.EntityType.SCHEMA, NameIdentifierUtil.ofSchema(metalakeName, catalog, schema));
           break;
@@ -130,5 +136,55 @@ public class IcebergMetadataAuthorizationMethodInterceptor
   @Override
   protected boolean isExceptionPropagate(Exception e) {
     return e.getClass().getName().startsWith("org.apache.iceberg.exceptions");
+  }
+
+  @Override
+  protected boolean tryAlternativeAuthorization(
+      String expression,
+      Map<EntityType, NameIdentifier> nameIdentifierMap,
+      Map<String, Object> pathParams,
+      AuthorizationRequestContext requestContext) {
+    if (!expression.contains("ANY_USE_SCHEMA")) {
+      return false;
+    }
+    NameIdentifier schemaIdent = nameIdentifierMap.get(EntityType.SCHEMA);
+    if (schemaIdent == null) {
+      return false;
+    }
+
+    String[] levels = IcebergRESTUtils.parseHierarchicalPath(schemaIdent.name());
+    if (levels.length <= 1) {
+      return false;
+    }
+    AuthorizationExpressionEvaluator denyEvaluator =
+        createAuthorizationExpressionEvaluator(DENY_USE_SCHEMA_EXPRESSION);
+    if (denyEvaluator.evaluate(inheritedContext(nameIdentifierMap, schemaIdent.name()), pathParams,
+        requestContext, Optional.empty())) {
+      return false;
+    }
+
+    AuthorizationExpressionEvaluator authorizationExpressionEvaluator =
+        createAuthorizationExpressionEvaluator(expression);
+    for (int i = levels.length - 1; i >= 1; i--) {
+      String ancestor =
+          IcebergRESTUtils.serializeHierarchicalPath(Arrays.copyOfRange(levels, 0, i));
+      Map<EntityType, NameIdentifier> inheritedContext = inheritedContext(nameIdentifierMap, ancestor);
+      if (authorizationExpressionEvaluator.evaluate(
+          inheritedContext, pathParams, requestContext, Optional.empty())) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  private Map<EntityType, NameIdentifier> inheritedContext(
+      Map<EntityType, NameIdentifier> nameIdentifierMap, String schemaName) {
+    NameIdentifier schemaIdent = nameIdentifierMap.get(EntityType.SCHEMA);
+    Map<EntityType, NameIdentifier> inheritedContext = new HashMap<>(nameIdentifierMap);
+    inheritedContext.put(
+        EntityType.SCHEMA,
+        NameIdentifierUtil.ofSchema(
+            schemaIdent.namespace().level(0), schemaIdent.namespace().level(1), schemaName));
+    return inheritedContext;
   }
 }

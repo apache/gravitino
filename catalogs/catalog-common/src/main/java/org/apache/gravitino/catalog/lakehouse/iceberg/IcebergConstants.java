@@ -42,6 +42,7 @@ public class IcebergConstants {
   public static final String WAREHOUSE = "warehouse";
   public static final String URI = "uri";
   public static final String CATALOG_BACKEND_NAME = "catalog-backend-name";
+  public static final String SCHEMA_NAME_SEPARATOR = "schema-name-separator";
 
   // IO properties
   public static final String IO_IMPL = "io-impl";

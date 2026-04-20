@@ -104,4 +104,13 @@ public class TestNameIdentifier {
     assertEquals("a", id1.toString());
     assertEquals("a.b.c", id2.toString());
   }
+
+  @Test
+  public void testSchemaNameWithColon() {
+    NameIdentifier id = NameIdentifier.of("metalake", "catalog", "team:sales");
+
+    assertEquals(Namespace.of("metalake", "catalog"), id.namespace());
+    assertEquals("team:sales", id.name());
+    assertEquals("metalake.catalog.team:sales", id.toString());
+  }
 }

@@ -161,6 +161,20 @@ public class TestNameIdentifierUtil {
             IllegalArgumentException.class,
             () -> NameIdentifierUtil.toMetadataObject(model, Entity.EntityType.MODEL_VERSION));
     assertTrue(e3.getMessage().contains("Entity type MODEL_VERSION is not supported"));
+
+    NameIdentifier nestedSchema = NameIdentifier.of("metalake1", "catalog1", "team:sales");
+    MetadataObject nestedSchemaObject =
+        MetadataObjects.parse("catalog1.team:sales", MetadataObject.Type.SCHEMA);
+    assertEquals(
+        nestedSchemaObject,
+        NameIdentifierUtil.toMetadataObject(nestedSchema, Entity.EntityType.SCHEMA));
+
+    NameIdentifier nestedTable =
+        NameIdentifier.of("metalake1", "catalog1", "team:sales", "orders");
+    MetadataObject nestedTableObject =
+        MetadataObjects.parse("catalog1.team:sales.orders", MetadataObject.Type.TABLE);
+    assertEquals(
+        nestedTableObject, NameIdentifierUtil.toMetadataObject(nestedTable, Entity.EntityType.TABLE));
   }
 
   @Test

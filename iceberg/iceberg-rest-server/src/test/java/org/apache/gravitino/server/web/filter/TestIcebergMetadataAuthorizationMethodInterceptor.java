@@ -26,12 +26,18 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.lang.reflect.Method;
 import java.lang.reflect.Parameter;
+import java.util.HashMap;
 import java.util.Map;
+import java.util.Optional;
+import java.util.Set;
+import java.util.concurrent.atomic.AtomicInteger;
 import org.apache.gravitino.Entity;
+import org.apache.gravitino.Entity.EntityType;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.iceberg.service.authorization.IcebergRESTServerContext;
 import org.apache.gravitino.iceberg.service.provider.IcebergConfigProvider;
 import org.apache.gravitino.server.authorization.annotations.AuthorizationMetadata;
+import org.apache.gravitino.server.authorization.expression.AuthorizationExpressionEvaluator;
 import org.apache.gravitino.utils.NameIdentifierUtil;
 import org.apache.iceberg.rest.RESTUtil;
 import org.junit.jupiter.api.BeforeAll;
@@ -129,6 +135,32 @@ public class TestIcebergMetadataAuthorizationMethodInterceptor {
   }
 
   @Test
+  public void testExtractTableNameIdentifierWithNestedNamespace() throws Exception {
+    IcebergMetadataAuthorizationMethodInterceptor interceptor =
+        new IcebergMetadataAuthorizationMethodInterceptor();
+
+    Method testMethod =
+        TestOperations.class.getMethod(
+            "testTableOperation", String.class, String.class, String.class);
+    Parameter[] parameters = testMethod.getParameters();
+
+    Object[] args = new Object[] {TEST_CATALOG + "/", "analytics.sales", "orders"};
+    Map<Entity.EntityType, NameIdentifier> nameIdentifierMap =
+        interceptor.extractNameIdentifierFromParameters(parameters, args);
+
+    NameIdentifier schemaId = nameIdentifierMap.get(Entity.EntityType.SCHEMA);
+    assertNotNull(schemaId);
+    assertEquals("analytics.sales", schemaId.name());
+
+    NameIdentifier tableId = nameIdentifierMap.get(Entity.EntityType.TABLE);
+    assertNotNull(tableId);
+    assertEquals(
+        NameIdentifierUtil.ofTable(TEST_METALAKE, TEST_CATALOG, "analytics.sales", "orders")
+            .toString(),
+        tableId.toString());
+  }
+
+  @Test
   public void testExtractTableNameIdentifierWithSimpleTableName() throws Exception {
     IcebergMetadataAuthorizationMethodInterceptor interceptor =
         new IcebergMetadataAuthorizationMethodInterceptor();
@@ -163,6 +195,113 @@ public class TestIcebergMetadataAuthorizationMethodInterceptor {
     // Test non-Iceberg exception
     Exception otherException = new RuntimeException("test");
     assertFalse(interceptor.isExceptionPropagate(otherException));
+  }
+
+  @Test
+  public void testTryAlternativeAuthorizationFallsBackToParentScope() {
+    TestableIcebergMetadataAuthorizationMethodInterceptor interceptor =
+        new TestableIcebergMetadataAuthorizationMethodInterceptor(
+            Set.of("analytics.sales"), Set.of());
+    Map<EntityType, NameIdentifier> nameIdentifierMap =
+        nameIdentifierMap("analytics.sales.orders");
+
+    boolean authorized =
+        interceptor.tryAlternativeAuthorization(
+            "ANY_USE_CATALOG && ANY_USE_SCHEMA",
+            nameIdentifierMap,
+            new HashMap<>(),
+            new AuthorizationRequestContext());
+
+    assertTrue(authorized);
+  }
+
+  @Test
+  public void testTryAlternativeAuthorizationRespectsDenyOnCurrentScope() {
+    TestableIcebergMetadataAuthorizationMethodInterceptor interceptor =
+        new TestableIcebergMetadataAuthorizationMethodInterceptor(
+            Set.of("analytics.sales"), Set.of("analytics.sales.orders"));
+    Map<EntityType, NameIdentifier> nameIdentifierMap =
+        nameIdentifierMap("analytics.sales.orders");
+
+    boolean authorized =
+        interceptor.tryAlternativeAuthorization(
+            "ANY_USE_CATALOG && ANY_USE_SCHEMA",
+            nameIdentifierMap,
+            new HashMap<>(),
+            new AuthorizationRequestContext());
+
+    assertFalse(authorized);
+  }
+
+  @Test
+  public void testTryAlternativeAuthorizationSkipsNonNestedSchema() {
+    AtomicInteger evaluateCalls = new AtomicInteger(0);
+    TestableIcebergMetadataAuthorizationMethodInterceptor interceptor =
+        new TestableIcebergMetadataAuthorizationMethodInterceptor(
+            Set.of("analytics"), Set.of(), evaluateCalls);
+    Map<EntityType, NameIdentifier> nameIdentifierMap = nameIdentifierMap("analytics");
+
+    boolean authorized =
+        interceptor.tryAlternativeAuthorization(
+            "ANY_USE_CATALOG && ANY_USE_SCHEMA",
+            nameIdentifierMap,
+            new HashMap<>(),
+            new AuthorizationRequestContext());
+
+    assertFalse(authorized);
+    assertEquals(0, evaluateCalls.get());
+  }
+
+  private static Map<EntityType, NameIdentifier> nameIdentifierMap(String schemaName) {
+    Map<EntityType, NameIdentifier> nameIdentifierMap = new HashMap<>();
+    nameIdentifierMap.put(EntityType.METALAKE, NameIdentifierUtil.ofMetalake(TEST_METALAKE));
+    nameIdentifierMap.put(EntityType.CATALOG, NameIdentifierUtil.ofCatalog(TEST_METALAKE, TEST_CATALOG));
+    nameIdentifierMap.put(
+        EntityType.SCHEMA, NameIdentifierUtil.ofSchema(TEST_METALAKE, TEST_CATALOG, schemaName));
+    return nameIdentifierMap;
+  }
+
+  private static class TestableIcebergMetadataAuthorizationMethodInterceptor
+      extends IcebergMetadataAuthorizationMethodInterceptor {
+
+    private static final String DENY_USE_SCHEMA_EXPRESSION =
+        "ANY(DENY_USE_SCHEMA, METALAKE, CATALOG, SCHEMA)";
+
+    private final Set<String> allowedSchemas;
+    private final Set<String> deniedSchemas;
+    private final AtomicInteger evaluateCalls;
+
+    private TestableIcebergMetadataAuthorizationMethodInterceptor(
+        Set<String> allowedSchemas, Set<String> deniedSchemas) {
+      this(allowedSchemas, deniedSchemas, new AtomicInteger(0));
+    }
+
+    private TestableIcebergMetadataAuthorizationMethodInterceptor(
+        Set<String> allowedSchemas, Set<String> deniedSchemas, AtomicInteger evaluateCalls) {
+      this.allowedSchemas = allowedSchemas;
+      this.deniedSchemas = deniedSchemas;
+      this.evaluateCalls = evaluateCalls;
+    }
+
+    @Override
+    protected AuthorizationExpressionEvaluator createAuthorizationExpressionEvaluator(
+        String expression) {
+      return new AuthorizationExpressionEvaluator("METALAKE::OWNER", null) {
+        @Override
+        public boolean evaluate(
+            Map<EntityType, NameIdentifier> metadataNames,
+            Map<String, Object> pathParams,
+            AuthorizationRequestContext requestContext,
+            Optional<String> entityType) {
+          evaluateCalls.incrementAndGet();
+          String schemaName = metadataNames.get(EntityType.SCHEMA).name();
+          if (DENY_USE_SCHEMA_EXPRESSION.equals(expression)) {
+            return deniedSchemas.contains(schemaName);
+          }
+          return allowedSchemas.contains(schemaName);
+        }
+      };
+    }
   }
 
   /** Test operations class to provide method annotations for testing. */

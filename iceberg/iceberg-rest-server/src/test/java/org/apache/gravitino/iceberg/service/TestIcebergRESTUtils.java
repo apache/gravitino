@@ -56,7 +56,21 @@ public class TestIcebergRESTUtils {
     NameIdentifier nameIdentifier =
         IcebergRESTUtils.getGravitinoNameIdentifier(metalakeName, catalogName, tableIdentifier);
     Assertions.assertEquals(
-        NameIdentifier.of(metalakeName, catalogName, "ns1", "ns2", "table"), nameIdentifier);
+        NameIdentifier.of(metalakeName, catalogName, "ns1.ns2", "table"), nameIdentifier);
+  }
+
+  @Test
+  void testHierarchicalSchemaConversion() {
+    Assertions.assertEquals(
+        "team.sales", IcebergRESTUtils.serializeHierarchicalPath(new String[] {"team", "sales"}));
+    Assertions.assertArrayEquals(
+        new String[] {"team", "sales"}, IcebergRESTUtils.parseHierarchicalPath("team.sales"));
+    Assertions.assertEquals("team.sales", IcebergRESTUtils.toPhysicalSchemaName("team.sales"));
+    Assertions.assertEquals("team.sales", IcebergRESTUtils.toPhysicalSchemaPath(org.apache.iceberg.catalog.Namespace.of("team", "sales")));
+    Assertions.assertEquals("team.sales", IcebergRESTUtils.toExternalSchemaName("team.sales"));
+    Assertions.assertEquals(
+        org.apache.iceberg.catalog.Namespace.of("team", "sales"),
+        IcebergRESTUtils.toNamespaceFromPhysicalSchemaName("team.sales"));
   }
 
   @Test

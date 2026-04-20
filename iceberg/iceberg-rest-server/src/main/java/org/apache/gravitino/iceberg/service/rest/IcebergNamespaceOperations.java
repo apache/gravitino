@@ -330,9 +330,8 @@ public class IcebergNamespaceOperations {
     NameIdentifier[] nameIdentifiers = new NameIdentifier[namespaces.size()];
     for (int i = 0; i < namespaces.size(); i++) {
       Namespace namespace = namespaces.get(i);
-      // Convert Iceberg Namespace to Gravitino NameIdentifier
-      // Namespace should have at least one level for schema name
-      String schemaName = namespace.isEmpty() ? "" : namespace.level(0);
+      String schemaName =
+          namespace.isEmpty() ? "" : IcebergRESTUtils.toHierarchicalSchemaPath(namespace);
       nameIdentifiers[i] = NameIdentifier.of(metalake, catalogName, schemaName);
     }
     return nameIdentifiers;
@@ -352,7 +351,7 @@ public class IcebergNamespaceOperations {
       if (ident.hasNamespace() && ident.namespace().levels().length >= 2) {
         // Schema name is the last level in the namespace
         String schemaName = ident.name();
-        filteredNamespaces.add(Namespace.of(schemaName));
+        filteredNamespaces.add(IcebergRESTUtils.toNamespace(schemaName));
       }
     }
     return ListNamespacesResponse.builder().addAll(filteredNamespaces).build();

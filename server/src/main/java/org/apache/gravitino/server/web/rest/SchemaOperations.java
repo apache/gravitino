@@ -57,6 +57,7 @@ import org.apache.gravitino.server.authorization.expression.AuthorizationExpress
 import org.apache.gravitino.server.web.Utils;
 import org.apache.gravitino.utils.NameIdentifierUtil;
 import org.apache.gravitino.utils.NamespaceUtil;
+import org.apache.commons.lang3.StringUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -87,13 +88,21 @@ public class SchemaOperations {
       @PathParam("metalake") @AuthorizationMetadata(type = Entity.EntityType.METALAKE)
           String metalake,
       @PathParam("catalog") @AuthorizationMetadata(type = Entity.EntityType.CATALOG)
-          String catalog) {
-    LOG.info("Received list schema request for catalog: {}.{}", metalake, catalog);
+          String catalog,
+      @QueryParam("parentSchema") String parentSchema) {
+    LOG.info(
+        "Received list schema request for catalog: {}.{}, parentSchema: {}",
+        metalake,
+        catalog,
+        parentSchema);
     try {
       return Utils.doAs(
           httpRequest,
           () -> {
-            Namespace schemaNS = NamespaceUtil.ofSchema(metalake, catalog);
+            Namespace schemaNS =
+                StringUtils.isBlank(parentSchema)
+                    ? NamespaceUtil.ofSchema(metalake, catalog)
+                    : Namespace.of(metalake, catalog, parentSchema);
             NameIdentifier[] idents = dispatcher.listSchemas(schemaNS);
             idents =
                 MetadataAuthzHelper.filterByExpression(
