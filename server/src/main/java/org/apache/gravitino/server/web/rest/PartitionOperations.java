@@ -247,21 +247,22 @@ public class PartitionOperations {
                     : dispatcher.dropPartition(tableIdent, partition);
             if (!dropped) {
               LOG.warn(
-                  "Failed to drop partition {} under table {} under schema {}",
+                  "Failed to {} partition {} under table {} under schema {}",
+                  purge ? "purge" : "drop",
                   partition,
                   table,
                   schema);
+            } else {
+              LOG.info(
+                  "Partition {} {} in table {}.{}.{}.{}",
+                  partition,
+                  purge ? "purged" : "dropped",
+                  metalake,
+                  catalog,
+                  schema,
+                  table);
             }
-            Response response = Utils.ok(new DropResponse(dropped));
-            LOG.info(
-                "Partition {} {} in table {}.{}.{}.{}",
-                partition,
-                purge ? "purged" : "dropped",
-                metalake,
-                catalog,
-                schema,
-                table);
-            return response;
+            return Utils.ok(new DropResponse(dropped));
           });
     } catch (Exception e) {
       return ExceptionHandlers.handlePartitionException(OperationType.DROP, "", table, e);
