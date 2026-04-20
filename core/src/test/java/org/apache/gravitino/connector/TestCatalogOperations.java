@@ -75,6 +75,7 @@ import org.apache.gravitino.exceptions.NonEmptySchemaException;
 import org.apache.gravitino.exceptions.SchemaAlreadyExistsException;
 import org.apache.gravitino.exceptions.TableAlreadyExistsException;
 import org.apache.gravitino.exceptions.TopicAlreadyExistsException;
+import org.apache.gravitino.exceptions.ViewAlreadyExistsException;
 import org.apache.gravitino.file.Fileset;
 import org.apache.gravitino.file.FilesetCatalog;
 import org.apache.gravitino.file.FilesetChange;
@@ -89,11 +90,13 @@ import org.apache.gravitino.model.ModelChange;
 import org.apache.gravitino.model.ModelVersion;
 import org.apache.gravitino.model.ModelVersionChange;
 import org.apache.gravitino.rel.Column;
+import org.apache.gravitino.rel.Representation;
 import org.apache.gravitino.rel.Table;
 import org.apache.gravitino.rel.TableCatalog;
 import org.apache.gravitino.rel.TableChange;
 import org.apache.gravitino.rel.View;
 import org.apache.gravitino.rel.ViewCatalog;
+import org.apache.gravitino.rel.ViewChange;
 import org.apache.gravitino.rel.expressions.distributions.Distribution;
 import org.apache.gravitino.rel.expressions.sorts.SortOrder;
 import org.apache.gravitino.rel.expressions.transforms.Transform;
@@ -304,12 +307,43 @@ public class TestCatalogOperations
 
   // ViewCatalog methods
   @Override
+  public NameIdentifier[] listViews(Namespace namespace) throws NoSuchSchemaException {
+    return views.keySet().stream()
+        .filter(ident -> ident.namespace().equals(namespace))
+        .toArray(NameIdentifier[]::new);
+  }
+
+  @Override
   public View loadView(NameIdentifier ident) throws NoSuchViewException {
     if (views.containsKey(ident)) {
       return views.get(ident);
     } else {
       throw new NoSuchViewException("View %s does not exist", ident);
     }
+  }
+
+  @Override
+  public View createView(
+      NameIdentifier ident,
+      String comment,
+      Column[] columns,
+      Representation[] representations,
+      String defaultCatalog,
+      String defaultSchema,
+      Map<String, String> properties)
+      throws NoSuchSchemaException, ViewAlreadyExistsException {
+    throw new UnsupportedOperationException("createView not implemented in test");
+  }
+
+  @Override
+  public View alterView(NameIdentifier ident, ViewChange... changes)
+      throws NoSuchViewException, IllegalArgumentException {
+    throw new UnsupportedOperationException("alterView not implemented in test");
+  }
+
+  @Override
+  public boolean dropView(NameIdentifier ident) {
+    return views.remove(ident) != null;
   }
 
   @Override
