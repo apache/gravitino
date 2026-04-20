@@ -88,16 +88,7 @@ tasks {
 }
 
 tasks.test {
-  val skipITs = project.hasProperty("skipITs")
-  if (skipITs) {
-    exclude("**/integration/test/**")
-    // Skip AWS integration tests (require real AWS credentials).
-    useJUnitPlatform {
-      excludeTags("gravitino-aws-test")
-    }
-  } else {
-    dependsOn(tasks.jar)
-  }
+  dependsOn(tasks.jar)
 }
 
 tasks.getByName("generateMetadataFileForMavenJavaPublication") {
