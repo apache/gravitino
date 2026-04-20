@@ -500,14 +500,19 @@ public class TestJobManager {
         RuntimeException.class,
         () -> jobManager.runJob(metalake, "shell_job", Collections.emptyMap()));
 
-    // Test when entity store fails
+    // Test when entity store fails, the submitted job should be cancelled
+    String rollbackExecutionId = "job_execution_id_for_rollback";
+    when(jobExecutor.submitJob(any())).thenReturn(rollbackExecutionId);
     doThrow(new IOException("Entity store error"))
         .when(entityStore)
         .put(any(JobEntity.class), anyBoolean());
+    doNothing().when(jobExecutor).cancelJob(rollbackExecutionId);
 
     Assertions.assertThrows(
         RuntimeException.class,
         () -> jobManager.runJob(metalake, "shell_job", Collections.emptyMap()));
+
+    verify(jobExecutor, times(1)).cancelJob(rollbackExecutionId);
   }
 
   @Test
