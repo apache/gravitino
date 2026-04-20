@@ -432,12 +432,47 @@ Engine Delimiter Support (Connector-facing):
 
 | Engine | User-facing namespace delimiter | Requires internal `:` input? | Notes |
 |---|---|---|---|
-| Spark connector | Iceberg-compatible representation | No | Keep Spark behavior consistent with Iceberg usage. |
-| Flink connector | Iceberg-compatible representation | No | Keep Flink behavior consistent with Iceberg usage. |
-| Trino connector | Iceberg-compatible representation | No | Keep Trino behavior consistent with Iceberg usage. |
+| Spark connector | `a.b.c` style namespace string | No | Spark side uses dotted namespace representation and connector converts to internal format. |
+| Flink connector | `a.b.c` style namespace string | No | Flink side uses dotted namespace representation and connector converts to internal format. |
+| Trino connector | `"a.b.c"` style quoted namespace string | No | Trino side uses quoted dotted namespace representation and connector converts to internal format. |
 
 All engines should keep external namespace semantics aligned with Iceberg. Internal `:` is an
 implementation detail inside Gravitino and connector translation logic.
+
+### Connector `NestedNameIdentifier` Conversion
+
+Connector side must explicitly convert namespace representation when building and parsing
+`NestedNameIdentifier`/`NameIdentifier` values:
+
+- **Input parsing (engine -> connector)**:
+  - Read namespace in engine-native/Iceberg style.
+  - Build connector logical path first, then convert to Gravitino internal schema representation.
+- **Request construction (connector -> Gravitino)**:
+  - For schema-level operations, send converted schema name in request/path/query expected by
+    Gravitino REST.
+  - For list operations, `parentSchema` must use the converted internal hierarchical schema
+    representation.
+- **Response rendering (Gravitino -> connector -> engine)**:
+  - Convert internal hierarchical schema representation back to engine-native/Iceberg style before
+    returning identifiers to Spark/Flink/Trino users.
+- **Round-trip requirement**:
+  - `engine identifier -> connector converted identifier -> server -> connector rendered identifier`
+    must be stable and lossless for nested namespace paths.
+
+Example conversion flow:
+
+- Engine input: namespace `[A, B, C]`, table `t1`
+- Connector logical identifier: `A.B.C.t1` (engine-facing)
+- Connector to Gravitino identifier: schema `A:B:C`, table `t1`
+- Gravitino response schema: `A:B:C`
+- Connector rendered back to engine: namespace `[A, B, C]`, table `t1`
+
+Trino-specific example:
+
+- Trino input namespace string: `"a.b.c"`
+- Connector converts to Gravitino internal schema: `a:b:c`
+- Gravitino returns schema: `a:b:c`
+- Connector renders back to Trino quoted style: `"a.b.c"`
 
 ## Test Plan
 
