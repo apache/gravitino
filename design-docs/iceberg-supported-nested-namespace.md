@@ -131,6 +131,31 @@ Examples:
 - Connector-facing behavior remains Iceberg-compatible and does not require users to configure or
   input this internal separator.
 
+### Delimiter Validation Strategy
+
+For configurable schema delimiters, there are two possible strategies:
+
+- **Option 1: Restrict to a limited set of delimiters**
+  - Delimiter values are validated against an allowlist (for example `:`, `.`, `/`, `_`).
+  - This reduces ambiguity and improves consistency across catalogs and engines.
+
+- **Option 2: Do not restrict the delimiter; any delimiter can be used**
+  - Delimiter value is treated as an arbitrary string from configuration.
+  - This gives maximum flexibility but may introduce cross-catalog behavior differences.
+
+These two options also lead to different behaviors when creating new tables (and auto-creating
+schema paths):
+
+- **Under Option 1**
+  - Only Iceberg path parsing can create nested schemas using the configured delimiter.
+  - Hive schema names containing the configured delimiter are rejected as invalid schema names.
+  - This keeps delimiter semantics dedicated to nested namespace interpretation.
+
+- **Under Option 2**
+  - Hive can create a non-nested schema even if the schema name contains the configured delimiter.
+  - The delimiter inside a Hive schema name is treated as plain text rather than a hierarchy marker.
+  - This allows broader compatibility for existing Hive naming patterns.
+
 ### Parsing Sequence Diagram
 
 ```mermaid
@@ -161,14 +186,7 @@ sequenceDiagram
 - **Update nested namespace**:
   - Support updating namespace properties through mapped schema operations.
   - Property update is applied to the mapped target namespace scope.
-- **Drop nested namespace**:
-  - Drop behavior follows existing schema drop semantics (`cascade` flag behavior is preserved).
-  - If `cascade=false`, drop fails when sub-namespaces/tables still exist.
-  - If `cascade=true`, drop removes the target namespace together with sub-namespaces and tables.
-  - Example:
-    - Existing: `A:B`, `A:B:C`, `A:B:C:t1`
-    - Drop `A:B` with `cascade=false` -> fail (`NonEmptySchemaException`-style behavior)
-    - Drop `A:B` with `cascade=true` -> delete `A:B`, `A:B:C`, and table `t1` under them.
+- **Drop nested namespace**: Will drop the schemas of the Gravitino 
 - **Rename nested namespace**: not needed because Iceberg REST does not support namespace rename.
 
 ### Gravitino Side Behavior
