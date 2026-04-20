@@ -54,7 +54,6 @@ import org.apache.gravitino.cache.CaffeineGravitinoCache;
 import org.apache.gravitino.cache.GravitinoCache;
 import org.apache.gravitino.exceptions.NoSuchUserException;
 import org.apache.gravitino.meta.RoleEntity;
-import org.apache.gravitino.meta.UserEntity;
 import org.apache.gravitino.server.authorization.MetadataIdConverter;
 import org.apache.gravitino.storage.relational.mapper.EntityChangeLogMapper;
 import org.apache.gravitino.storage.relational.mapper.OwnerMetaMapper;
@@ -272,12 +271,15 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
       AuthorizationRequestContext requestContext) {
     boolean result;
     try {
-      Long metadataId = resolveMetadataId(metadataObject, metalake);
-      loadOwnerPolicy(metadataId);
-      UserEntity userEntity = getUserEntity(principal.getName(), metalake);
-      Long userId = userEntity.id();
-      Optional<Optional<Long>> ownerOpt = ownerRelCache.getIfPresent(metadataId);
-      result = ownerOpt.isPresent() && Objects.equals(Optional.of(userId), ownerOpt.get());
+      Long metadataId = resolveMetadataId(metadataObject, metalake, requestContext);
+      Optional<UserAuthInfo> userInfoOpt =
+          loadUserInfo(metalake, principal.getName(), requestContext);
+      if (!userInfoOpt.isPresent()) {
+        result = false;
+      } else {
+        Optional<Long> owner = resolveOwnerId(metadataId, requestContext);
+        result = Objects.equals(Optional.of(userInfoOpt.get().getUserId()), owner);
+      }
     } catch (Exception e) {
       LOG.debug("Can not get entity id", e);
       result = false;
@@ -524,19 +526,18 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
       long userId;
       UserAuthInfo userInfo;
       try {
-        // Step 1a: lightweight query — get userId + user.updated_at (version sentinel)
-        //          This is the ONLY place getUserInfo is called per request.
-        userInfo =
-            SessionUtils.getWithoutCommit(
-                UserMetaMapper.class, m -> m.getUserInfo(metalake, username));
-        if (userInfo == null) {
+        // Step 1a: lightweight query — get userId + user.updated_at (version sentinel).
+        //          Per-request dedup: only the first authorize() call for this user hits DB.
+        Optional<UserAuthInfo> userInfoOpt = loadUserInfo(metalake, username, requestContext);
+        if (!userInfoOpt.isPresent()) {
           LOG.debug("User {} not found in metalake {}", username, metalake);
           return false;
         }
+        userInfo = userInfoOpt.get();
         userId = userInfo.getUserId();
 
         // Step 2: resolve metadata name → id via metadataIdCache (cache hit when warm)
-        metadataId = resolveMetadataId(metadataObject, metalake);
+        metadataId = resolveMetadataId(metadataObject, metalake, requestContext);
       } catch (Exception e) {
         LOG.debug("Can not get entity id", e);
         return false;
@@ -547,8 +548,10 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
 
       // Step 4: JCasbin enforce (pure in-memory)
       if (AuthConstants.OWNER.equals(privilege)) {
-        Optional<Optional<Long>> ownerOpt = ownerRelCache.getIfPresent(metadataId);
-        return ownerOpt.isPresent() && Objects.equals(Optional.of(userId), ownerOpt.get());
+        // Cold-path: resolveOwnerId loads from DB when neither the per-request nor the shared
+        // Caffeine cache has the entry, ensuring the first OWNER check doesn't spuriously deny.
+        Optional<Long> owner = resolveOwnerId(metadataId, requestContext);
+        return Objects.equals(Optional.of(userId), owner);
       }
       return enforcer.enforce(
           String.valueOf(userId),
@@ -559,18 +562,67 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
   }
 
   // ---------------------------------------------------------------------------
-  //  Metadata ID resolution with cache
+  //  Metadata ID / user info / owner resolution — two-tier (request + Caffeine)
   // ---------------------------------------------------------------------------
 
-  private Long resolveMetadataId(MetadataObject metadataObject, String metalake) {
+  /**
+   * Two-tier lookup: the per-request map in {@code requestContext} dedups calls within the same
+   * HTTP request; on a miss, we consult the long-lived Caffeine cache, and finally fall back to a
+   * DB query via {@link MetadataIdConverter}.
+   */
+  private Long resolveMetadataId(
+      MetadataObject metadataObject, String metalake, AuthorizationRequestContext requestContext) {
     String cacheKey = buildCacheKey(metalake, metadataObject);
-    Optional<Long> cached = metadataIdCache.getIfPresent(cacheKey);
-    if (cached.isPresent()) {
-      return cached.get();
-    }
-    Long id = MetadataIdConverter.getID(metadataObject, metalake);
-    metadataIdCache.put(cacheKey, id);
-    return id;
+    return requestContext.computeMetadataIdIfAbsent(
+        cacheKey,
+        k -> {
+          Optional<Long> cached = metadataIdCache.getIfPresent(k);
+          if (cached.isPresent()) {
+            return cached.get();
+          }
+          Long id = MetadataIdConverter.getID(metadataObject, metalake);
+          metadataIdCache.put(k, id);
+          return id;
+        });
+  }
+
+  /**
+   * Per-request {@link UserAuthInfo} lookup. The underlying {@code user_meta} query is issued at
+   * most once per (metalake, username) within a single request.
+   */
+  private Optional<UserAuthInfo> loadUserInfo(
+      String metalake, String username, AuthorizationRequestContext requestContext) {
+    String cacheKey = metalake + KEY_SEP + username;
+    return requestContext.computeUserInfoIfAbsent(
+        cacheKey,
+        k ->
+            Optional.ofNullable(
+                SessionUtils.getWithoutCommit(
+                    UserMetaMapper.class, m -> m.getUserInfo(metalake, username))));
+  }
+
+  /**
+   * Two-tier owner lookup: request-level dedup first, then the shared {@code ownerRelCache}, and
+   * finally a single {@code owner_meta} query. A successful DB fetch populates both tiers so
+   * subsequent {@code isOwner} calls — in this request and later ones — hit the cache.
+   */
+  private Optional<Long> resolveOwnerId(
+      Long metadataId, AuthorizationRequestContext requestContext) {
+    return requestContext.computeOwnerIfAbsent(
+        metadataId,
+        id -> {
+          Optional<Optional<Long>> cached = ownerRelCache.getIfPresent(id);
+          if (cached.isPresent()) {
+            return cached.get();
+          }
+          OwnerInfo ownerInfo =
+              SessionUtils.getWithoutCommit(
+                  OwnerMetaMapper.class, m -> m.selectOwnerByMetadataObjectId(id));
+          Optional<Long> owner =
+              ownerInfo == null ? Optional.empty() : Optional.of(ownerInfo.getOwnerId());
+          ownerRelCache.put(id, owner);
+          return owner;
+        });
   }
 
   // ---------------------------------------------------------------------------
@@ -596,7 +648,7 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
 
           // Step 3: batch version-check all role IDs, load stale ones (1 query)
           if (!userRoleIds.isEmpty()) {
-            versionCheckAndLoadRoles(metalake, userRoleIds);
+            versionCheckAndLoadRoles(metalake, userRoleIds, requestContext);
           }
         });
   }
@@ -623,7 +675,8 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
     return roleIds;
   }
 
-  private void versionCheckAndLoadRoles(String metalake, List<Long> roleIds) {
+  private void versionCheckAndLoadRoles(
+      String metalake, List<Long> roleIds, AuthorizationRequestContext requestContext) {
     // Step 3: batch fetch (roleId, roleName, updated_at) for all role IDs — 1 query
     List<Long> uniqueRoleIds = roleIds.stream().distinct().collect(Collectors.toList());
     List<RoleUpdatedAt> roleVersions =
@@ -654,7 +707,7 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
                 NameIdentifierUtil.ofRole(metalake, rv.getRoleName()),
                 Entity.EntityType.ROLE,
                 RoleEntity.class);
-        loadPolicyByRoleEntity(roleEntity);
+        loadPolicyByRoleEntity(roleEntity, requestContext);
       } catch (Exception e) {
         LOG.warn("Failed to load role policies for roleId {}", roleId, e);
         continue;
@@ -672,35 +725,16 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
   }
 
   // ---------------------------------------------------------------------------
-  //  Owner loading
-  // ---------------------------------------------------------------------------
-
-  private void loadOwnerPolicy(Long metadataId) {
-    if (ownerRelCache.getIfPresent(metadataId).isPresent()) {
-      LOG.debug("Metadata {} OWNER has been loaded.", metadataId);
-      return;
-    }
-
-    OwnerInfo ownerInfo =
-        SessionUtils.getWithoutCommit(
-            OwnerMetaMapper.class, m -> m.selectOwnerByMetadataObjectId(metadataId));
-    if (ownerInfo == null) {
-      ownerRelCache.put(metadataId, Optional.empty());
-    } else {
-      ownerRelCache.put(metadataId, Optional.of(ownerInfo.getOwnerId()));
-    }
-  }
-
-  // ---------------------------------------------------------------------------
   //  Policy loading from role entity
   // ---------------------------------------------------------------------------
 
-  private void loadPolicyByRoleEntity(RoleEntity roleEntity) {
+  private void loadPolicyByRoleEntity(
+      RoleEntity roleEntity, AuthorizationRequestContext requestContext) {
     String metalake = NameIdentifierUtil.getMetalake(roleEntity.nameIdentifier());
     List<SecurableObject> securableObjects = roleEntity.securableObjects();
 
     for (SecurableObject securableObject : securableObjects) {
-      Long securableId = resolveMetadataId(securableObject, metalake);
+      Long securableId = resolveMetadataId(securableObject, metalake, requestContext);
       for (Privilege privilege : securableObject.privileges()) {
         Privilege.Condition condition = privilege.condition();
         if (AuthConstants.DENY.equalsIgnoreCase(condition.name())) {
@@ -836,12 +870,6 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
     return type == MetadataObject.Type.METALAKE
         || type == MetadataObject.Type.CATALOG
         || type == MetadataObject.Type.SCHEMA;
-  }
-
-  private static UserEntity getUserEntity(String username, String metalake) throws IOException {
-    EntityStore entityStore = GravitinoEnv.getInstance().entityStore();
-    return entityStore.get(
-        NameIdentifierUtil.ofUser(metalake, username), Entity.EntityType.USER, UserEntity.class);
   }
 
   // ---------------------------------------------------------------------------
