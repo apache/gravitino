@@ -22,7 +22,7 @@ import java.util.HashMap;
 import java.util.Map;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
-import org.junit.jupiter.api.Tag;
+import org.junit.jupiter.api.condition.EnabledIfEnvironmentVariable;
 import software.amazon.awssdk.services.glue.GlueClient;
 import software.amazon.awssdk.services.glue.model.Column;
 import software.amazon.awssdk.services.glue.model.CreateDatabaseRequest;
@@ -40,8 +40,8 @@ import software.amazon.awssdk.services.glue.model.TableInput;
 /**
  * Runs {@link AbstractGlueTableTest} scenarios against a real AWS Glue endpoint.
  *
- * <p>This test is tagged {@code gravitino-aws-test} and is <b>skipped by default</b>. To run it,
- * set the following environment variables and pass {@code -PrunAwsTests} to Gradle:
+ * <p>This test is <b>skipped by default</b> and only runs when {@code AWS_ACCESS_KEY_ID} is set. To
+ * run it, set the following environment variables:
  *
  * <ul>
  *   <li>{@code AWS_ACCESS_KEY_ID}
@@ -54,7 +54,7 @@ import software.amazon.awssdk.services.glue.model.TableInput;
  * converts it to a {@link GlueTable}, and asserts the field mapping. The table (and schema) is
  * deleted in {@link #cleanup} regardless of test outcome.
  */
-@Tag("gravitino-aws-test")
+@EnabledIfEnvironmentVariable(named = "AWS_ACCESS_KEY_ID", matches = ".+")
 class TestAwsGlueTable extends AbstractGlueTableTest {
 
   private static GlueClient glueClient;
