@@ -208,6 +208,20 @@ As Gravitino has a separate interface for updating the comment of a table, the H
 Support for altering partitions is under development.
 :::
 
+## View
+
+### View capabilities
+
+- Supports create, load, alter, and drop for views stored in the Hive Metastore Service as `VIRTUAL_VIEW`.
+- Each view must contain exactly one SQL representation.
+- Supports the `hive`, `trino`, and `spark` dialects.
+- When loading an existing HMS view, Gravitino automatically detects whether the view uses the `hive`, `trino`, or `spark` dialect.
+- For the `hive` dialect, `defaultCatalog` and `defaultSchema` must be `null`.
+
+### View operations
+
+Refer to [Manage view metadata using Gravitino](./manage-view-metadata-using-gravitino.md) for more details.
+
 ## Hive catalog with S3 storage
 
 To create a Hive catalog with S3 storage, you can refer to the [Hive catalog with S3](./hive-catalog-with-s3.md) documentation. No special configurations are required for the Hive catalog to work with S3 storage.

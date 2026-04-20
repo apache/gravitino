@@ -377,6 +377,18 @@ The default column position is `LAST` when you add a column. If you add a non nu
 If you update a nullability column to non nullability, there may be compatibility issues.
 :::
 
+## View
+
+### View capabilities
+
+- Supports create, load, alter, and drop for views managed by the underlying Iceberg REST, JDBC, or Hive backend.
+- Supports dialects such as `trino`, `spark`, and `hive`.
+- Can preserve multiple SQL representations for the same logical view.
+
+### View operations
+
+Refer to [Manage view metadata using Gravitino](./manage-view-metadata-using-gravitino.md) for more details.
+
 ## HDFS configuration
 
 You can place `core-site.xml` and `hdfs-site.xml` in the `catalogs/lakehouse-iceberg/conf` directory to automatically load as the default HDFS configuration.
