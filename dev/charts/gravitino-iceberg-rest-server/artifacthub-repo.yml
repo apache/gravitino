@@ -1,3 +1,4 @@
+#
 # Licensed to the Apache Software Foundation (ASF) under one
 # or more contributor license agreements.  See the NOTICE file
 # distributed with this work for additional information
@@ -6,7 +7,7 @@
 # "License"); you may not use this file except in compliance
 # with the License.  You may obtain a copy of the License at
 #
-#   http://www.apache.org/licenses/LICENSE-2.0
+#  http://www.apache.org/licenses/LICENSE-2.0
 #
 # Unless required by applicable law or agreed to in writing,
 # software distributed under the License is distributed on an
@@ -14,23 +15,10 @@
 # KIND, either express or implied.  See the License for the
 # specific language governing permissions and limitations
 # under the License.
-
-from httpx import AsyncClient
-
-from mcp_server.client import CatalogOperation
-from mcp_server.client.plain.utils import (
-    encode_path_segment,
-    extract_content_from_response,
-)
-
-
-class PlainRESTClientCatalogOperation(CatalogOperation):
-    def __init__(self, metalake_name: str, rest_client: AsyncClient):
-        self.metalake_name = metalake_name
-        self.rest_client = rest_client
-
-    async def get_list_of_catalogs(self) -> str:
-        response = await self.rest_client.get(
-            f"/api/metalakes/{encode_path_segment(self.metalake_name)}/catalogs?details=true"
-        )
-        return extract_content_from_response(response, "catalogs", [])
+#
+# Artifact Hub repository metadata file
+# https://github.com/artifacthub/hub/blob/master/docs/metadata/artifacthub-repo.yml
+repositoryID: 61bb03ae-cc61-48dc-9a0a-a845411d764b
+owners:
+  - name: Apache Gravitino
+    email: dev@gravitino.apache.org
