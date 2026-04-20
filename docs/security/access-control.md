@@ -152,6 +152,7 @@ The following metadata objects support ownership:
 | Fileset              |
 | Role                 |
 | Model                |
+| Function             |
 | Tag                  |
 | JobTemplate          |
 | Job                  |
@@ -178,7 +179,7 @@ Groups can be granted roles and privileges, but they cannot be owners of securab
 
 ### Metadata Objects
 
-Metadata objects are entities managed by Gravitino, such as catalogs, schemas, tables, filesets, topics, roles, and metalakes.
+Metadata objects are entities managed by Gravitino, such as catalogs, schemas, tables, filesets, topics, models, functions, roles, and metalakes.
 
 **Naming Convention:**
 - Each metadata object has a **type** and a **name**
@@ -205,7 +206,9 @@ Metalake (top level)
         ├── Table
         ├── View
         ├── Topic
-        └── Fileset
+        ├── Fileset
+        ├── Model
+        └── Function
 ```
 
 ![object_image](../assets/security/object.png)
@@ -272,7 +275,7 @@ Gravitino provides a comprehensive set of privileges organized by the type of op
 
 | Name          | Supports Securable Object | Operation                                                                                                     |
 |---------------|---------------------------|---------------------------------------------------------------------------------------------------------------|
-| MANAGE_GRANTS | Metalake, Catalog, Schema, Table, View, Topic, Fileset, Model | Grants the ability to manage privileges on securable objects. When bound to a **Metalake**, also allows assigning and revoking roles for users and groups across the entire metalake. When bound to a **Catalog, Schema, Table, View, Topic, Fileset, or Model**, privilege management is scoped to that object and its descendants only. |
+| MANAGE_GRANTS | Metalake, Catalog, Schema, Table, View, Topic, Fileset, Model, Function | Grants the ability to manage privileges on securable objects. When bound to a **Metalake**, also allows assigning and revoking roles for users and groups across the entire metalake. When bound to a **Catalog, Schema, Table, View, Topic, Fileset, Model, or Function**, privilege management is scoped to that object and its descendants only. |
 
 ### Catalog privileges
 
