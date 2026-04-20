@@ -119,7 +119,7 @@ class MetadataObjectTagOperations(SupportsTags):
 
         response = self.rest_client.post(
             self.tag_request_path,
-            json=associate_request.to_json(),
+            json=associate_request,
             error_handler=TAG_ERROR_HANDLER,
         )
 

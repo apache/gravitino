@@ -39,7 +39,7 @@ from gravitino.utils.http_client import HTTPClient
 
 def build_schema_dto(
     name: str = "demo_schema",
-    comment: str = "This is a demo model.",
+    comment: str = "This is a demo schema.",
     properties: tp.Optional[dict[str, str]] = None,
 ) -> SchemaDTO:
     """
@@ -84,7 +84,7 @@ def build_model_dto(
         latest_version (int, optional): The latest version of the model. Defaults to 1.
 
     Returns:
-        ModelDTO: _description_
+        ModelDTO: The built model DTO.
     """
     if properties is None:
         properties = {

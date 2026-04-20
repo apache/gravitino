@@ -32,7 +32,7 @@ class TestGenericModel(unittest.TestCase):
     )
 
     def test_equal_and_hash(self) -> None:
-        genenric_model = GenericModel(
+        generic_model = GenericModel(
             build_model_dto(),
             TestGenericModel._rest_client,
             TestGenericModel._model_ident.namespace(),
@@ -44,8 +44,8 @@ class TestGenericModel(unittest.TestCase):
             Namespace.of("demo_metalake", "demo_catalog", "demo_schema"),
         )
 
-        self.assertEqual(genenric_model, generic_model2)
-        self.assertEqual(hash(genenric_model), hash(generic_model2))
+        self.assertEqual(generic_model, generic_model2)
+        self.assertEqual(hash(generic_model), hash(generic_model2))
 
     def test_extends_supports_tags_class(self) -> None:
         genenric_model = GenericModel(

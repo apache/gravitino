@@ -43,7 +43,7 @@ class GenericModel(Model, SupportsTags):
         model_object: MetadataObject = MetadataObjects.of(
             model_full_name, MetadataObject.Type.MODEL
         )
-        self._model_tag_opearions = MetadataObjectTagOperations(
+        self._model_tag_operations = MetadataObjectTagOperations(
             model_ns.level(0), model_object, rest_client
         )
 
@@ -72,15 +72,15 @@ class GenericModel(Model, SupportsTags):
         return self._model_dto.audit_info()
 
     def list_tags(self) -> list[str]:
-        return self._model_tag_opearions.list_tags()
+        return self._model_tag_operations.list_tags()
 
     def list_tags_info(self) -> list[Tag]:
-        return self._model_tag_opearions.list_tags_info()
+        return self._model_tag_operations.list_tags_info()
 
     def get_tag(self, name: str) -> Tag:
-        return self._model_tag_opearions.get_tag(name)
+        return self._model_tag_operations.get_tag(name)
 
     def associate_tags(
         self, tags_to_add: list[str], tags_to_remove: list[str]
     ) -> list[str]:
-        return self._model_tag_opearions.associate_tags(tags_to_add, tags_to_remove)
+        return self._model_tag_operations.associate_tags(tags_to_add, tags_to_remove)
