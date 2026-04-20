@@ -18,16 +18,22 @@
  */
 package org.apache.gravitino.dto.rel;
 
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonSubTypes;
 import com.fasterxml.jackson.annotation.JsonTypeInfo;
 import org.apache.gravitino.rel.Representation;
 import org.apache.gravitino.rel.SQLRepresentation;
 
-/** DTO for view representation serde. */
+/**
+ * A DTO mirroring {@link org.apache.gravitino.rel.Representation}. Representation DTOs are
+ * serialized with a {@code type} discriminator so Jackson can deserialize into the correct subtype.
+ */
+@JsonIgnoreProperties(ignoreUnknown = true)
 @JsonTypeInfo(
     use = JsonTypeInfo.Id.NAME,
-    include = JsonTypeInfo.As.PROPERTY,
+    include = JsonTypeInfo.As.EXISTING_PROPERTY,
     property = "type",
+    visible = true,
     defaultImpl = SQLRepresentationDTO.class)
 @JsonSubTypes({
   @JsonSubTypes.Type(value = SQLRepresentationDTO.class, name = Representation.TYPE_SQL)
@@ -38,23 +44,29 @@ public abstract class RepresentationDTO implements Representation {
   protected RepresentationDTO() {}
 
   /**
-   * Converts this DTO to a representation object.
+   * Validates the fields of this representation.
    *
-   * @return The representation object.
+   * @throws IllegalArgumentException If the representation is invalid.
+   */
+  public abstract void validate() throws IllegalArgumentException;
+
+  /**
+   * Converts this DTO to a {@link Representation} domain object.
+   *
+   * @return The representation domain object.
    */
   public abstract Representation toRepresentation();
 
   /**
-   * Creates a representation DTO from a representation object.
+   * Creates a {@link RepresentationDTO} from a {@link Representation} domain object.
    *
-   * @param representation The representation object.
+   * @param representation The representation domain object.
    * @return The representation DTO.
    */
   public static RepresentationDTO fromRepresentation(Representation representation) {
     if (representation instanceof SQLRepresentation) {
       return SQLRepresentationDTO.fromSQLRepresentation((SQLRepresentation) representation);
     }
-
     throw new IllegalArgumentException(
         "Unsupported representation type: " + representation.getClass().getName());
   }
