@@ -127,9 +127,12 @@ Examples:
 
 ### Separator Configuration
 
-- Internal namespace separator is configured as `:` for Gravitino hierarchical schema handling.
+- The delimiter exposed to users (API/UI/config) is configurable.
+- **Persisted schema name in `EntityStore` always uses `.` as the internal storage separator** for
+  stable storage semantics.
+- External request/response handling uses the configured delimiter and converts at API boundary.
 - Connector-facing behavior remains Iceberg-compatible and does not require users to configure or
-  input this internal separator.
+  input internal storage representation.
 
 ### Delimiter Validation Strategy
 
@@ -148,12 +151,16 @@ schema paths):
 
 - **Under Option 1**
   - Only Iceberg path parsing can create nested schemas using the configured delimiter.
+  - Before persisting to `EntityStore`, parsed namespace path is normalized to `.`-separated schema
+    names.
   - Hive schema names containing the configured delimiter are rejected as invalid schema names.
   - This keeps delimiter semantics dedicated to nested namespace interpretation.
 
 - **Under Option 2**
   - Hive can create a non-nested schema even if the schema name contains the configured delimiter.
   - The delimiter inside a Hive schema name is treated as plain text rather than a hierarchy marker.
+  - Persisted schema representation is still normalized to `.` in `EntityStore`; conversion is
+    handled only at external boundary.
   - This allows broader compatibility for existing Hive naming patterns.
 
 ### Parsing Sequence Diagram
