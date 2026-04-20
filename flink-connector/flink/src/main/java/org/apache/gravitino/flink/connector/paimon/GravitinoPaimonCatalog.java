@@ -37,12 +37,16 @@ import org.apache.gravitino.flink.connector.catalog.BaseCatalog;
 import org.apache.gravitino.rel.Table;
 import org.apache.paimon.flink.FlinkCatalogFactory;
 import org.apache.paimon.flink.FlinkTableFactory;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * The GravitinoPaimonCatalog class is an implementation of the BaseCatalog class that is used to
  * proxy the PaimonCatalog class.
  */
 public class GravitinoPaimonCatalog extends BaseCatalog {
+
+  private static final Logger LOG = LoggerFactory.getLogger(GravitinoPaimonCatalog.class);
 
   private final AbstractCatalog paimonCatalog;
 
@@ -121,6 +125,31 @@ public class GravitinoPaimonCatalog extends BaseCatalog {
               + " exists in Gravitino but not in Paimon/Hive metastore."
               + " The two stores may be out of sync.",
           e);
+    }
+  }
+
+  /**
+   * Overrides alterTable to also sync the change into {@code paimonCatalog}, which invalidates its
+   * internal table-metadata cache. Without this, {@link #toFlinkTable} delegates to {@code
+   * paimonCatalog.getTable()}, which may return stale cached metadata (e.g., the old comment) after
+   * Gravitino updates the Paimon backend through a separate catalog instance.
+   *
+   * <p>This variant is documented as comment-only, so the extra write to the Paimon Flink catalog
+   * is idempotent.
+   */
+  @Override
+  public void alterTable(ObjectPath tablePath, CatalogBaseTable newTable, boolean ignoreIfNotExists)
+      throws TableNotExistException, CatalogException {
+    super.alterTable(tablePath, newTable, ignoreIfNotExists);
+    try {
+      paimonCatalog.alterTable(tablePath, newTable, ignoreIfNotExists);
+    } catch (TableNotExistException e) {
+      if (!ignoreIfNotExists) {
+        throw e;
+      }
+    } catch (Exception e) {
+      LOG.warn(
+          "Failed to sync paimonCatalog after alterTable for {}: {}", tablePath, e.getMessage());
     }
   }
 
