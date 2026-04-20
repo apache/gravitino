@@ -95,19 +95,17 @@ Cons:
 ### Identifier Rules
 
 - Introduce logical identifier concept: `HierarchicalSchema`.
-- `HierarchicalSchema` uses fixed separator `:` in logic layer.
-- `:` is mandatory in this design, not configurable.
+- `HierarchicalSchema` uses a configurable external separator in logic/API layer.
+- The external separator comes from server configuration.
 - For Gravitino REST create/update schema APIs, `request.getName()` keeps the logical schema name
   and may contain `:` (for example `A:B` or `A:B:C`).
-- This phase does not pre-convert `request.getName()` from `:` to `.` before capability name
-  validation; capability naming rules must explicitly allow `:` for schema scope.
-- Schema name uses `:`-separated hierarchical representation in this design; `.` is not used as
-  schema separator.
-- `.` remains an Iceberg namespace hierarchy notation in external semantics only.
+- External schema name uses configured separator representation in this design.
+- Before persisting to `EntityStore`, schema path is normalized to `.`-separated physical schema
+  name.
 - Escaping strategy: no encoding/escaping is used in this phase.
-- The character `:` is reserved as hierarchy separator and is not allowed inside a single
-  namespace segment.
-- Parsing is direct split/join by `:` at API boundary.
+- The configured external separator is reserved as hierarchy separator and is not allowed inside a
+  single namespace segment.
+- Parsing is direct split/join by configured separator at API boundary.
 - Keep flat storage model and convert `HierarchicalSchema` path to physical schema name by mapping rules.
 - Identifier rendering rule:
   - Use encoded `HierarchicalSchema` path directly in schema position.
@@ -115,11 +113,14 @@ Cons:
 
 Examples:
 
-- Nested namespace `A:B` maps to logical `HierarchicalSchema` path `A:B`.
-- Nested namespace `A:B:C` maps to logical `HierarchicalSchema` path `A:B:C`.
+- Nested namespace `A:B` maps to logical `HierarchicalSchema` path `A:B` (assuming configured
+  separator is `:`).
+- Nested namespace `A:B:C` maps to logical `HierarchicalSchema` path `A:B:C` (assuming configured
+  separator is `:`).
 - Logical `HierarchicalSchema` path is then converted to physical schema name through mapping rules.
-- Namespace levels `["team", "sales"]` are serialized as `team:sales`.
-- Parsing `team:sales` returns `["team", "sales"]`.
+- Namespace levels `["team", "sales"]` are serialized using configured separator, e.g.
+  `team:sales`.
+- Parsing `team:sales` returns `["team", "sales"]` when separator is `:`.
 - Identifier rendering example:
   - `metalake.catalog.A:B.table1`
   - `metalake.catalog.team:sales.table2`
