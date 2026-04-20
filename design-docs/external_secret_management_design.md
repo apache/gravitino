@@ -52,10 +52,10 @@ Gravitino should integrate seamlessly with these existing secret management infr
 
 It's important to clarify the relationship between two similar-sounding concepts:
 
-| Component | Purpose | Layer | Changes Needed |
-|-----------|---------|-------|----------------|
-| **CredentialProvider** (existing) | Vends credentials to clients (Iceberg, Spark, etc.) for accessing cloud storage | Application layer |  None - works transparently |
-| **SecretProvider** (proposed) | Fetches secrets from external systems (AWS Secrets Manager, Vault) | Infrastructure layer |  New abstraction |
+| Component                          | Purpose                                                                              | Layer                | Changes Needed            |
+|------------------------------------|--------------------------------------------------------------------------------------|----------------------|---------------------------|
+| **CredentialProvider** (existing)  | Vends credentials to clients (Iceberg, Spark, etc.) for accessing cloud storage     | Application layer    | None - works transparently |
+| **SecretProvider** (proposed)      | Fetches secrets from external systems (AWS Secrets Manager, Vault)                  | Infrastructure layer | New abstraction           |
 
 **Key Point:** `SecretProvider` is a **prerequisite layer** that runs **before** `CredentialProvider`. It resolves secret references (`${secret:...}`) to actual values, then passes those resolved values to `CredentialProvider` implementations.
 
@@ -207,7 +207,416 @@ This hybrid approach provides **simplicity by default** while enabling **flexibi
 
 ### Core Components
 
-#### 1. SecretProvider Interface
+#### 1. SecretReference Value Object
+
+```java
+package org.apache.gravitino.secret;
+
+/**
+ * Immutable value object representing a parsed secret reference.
+ * 
+ * <p>Supports formats:
+ * - ${secret:path/to/secret}                    -> global provider, full secret
+ * - ${secret:path/to/secret#key}                -> global provider, JSON key extraction
+ * - ${secret:provider-type:path/to/secret}      -> explicit provider
+ * - ${secret:provider-type:path/to/secret#key}  -> explicit provider with key
+ * 
+ * <p>This class validates the reference format at construction time and provides
+ * structured access to the components, ensuring type safety and early error detection.
+ * 
+ * <p>After catalog creation, the reference is enriched with backend-specific metadata
+ * (ARN, version-id, etc.) for version pinning and audit trail.
+ */
+public final class SecretReference {
+  
+  private static final Pattern SECRET_PATTERN = 
+      Pattern.compile("\\$\\{secret:([^}]+)\\}");
+  
+  private static final Set<String> KNOWN_PROVIDERS = ImmutableSet.of(
+      "aws-sm", "vault", "azure-kv", "gcp-sm", "k8s");
+  
+  private final String providerType;  // null means use default provider
+  private final String secretPath;    // Path to the secret in the secret manager
+  private final String jsonKey;       // null if not extracting from JSON
+  private final String rawReference;  // Original reference for caching
+  
+  // Backend-specific metadata (ARN, version-id, timestamps, etc.)
+  private final Map<String, String> metadata;
+  
+  private SecretReference(
+      String providerType, 
+      String secretPath, 
+      String jsonKey,
+      String rawReference,
+      Map<String, String> metadata) {
+    this.providerType = providerType;
+    this.secretPath = Preconditions.checkNotNull(secretPath, "secretPath cannot be null");
+    this.jsonKey = jsonKey;
+    this.rawReference = rawReference;
+    this.metadata = metadata != null ? ImmutableMap.copyOf(metadata) : ImmutableMap.of();
+  }
+  
+  /**
+   * Parses a secret reference string (without ${secret:...} wrapper).
+   * Creates a base reference without metadata - call enrichReference() to add metadata.
+   *
+   * @param reference The reference string (e.g., "aws-sm:db/password#key")
+   * @return Parsed SecretReference without metadata
+   * @throws IllegalArgumentException if reference format is invalid
+   */
+  public static SecretReference parse(String reference) {
+    Preconditions.checkNotNull(reference, "reference cannot be null");
+    
+    // Check if explicit provider is specified: provider-type:path
+    String[] providerParts = reference.split(":", 2);
+    String providerType = null;
+    String pathAndKey;
+    
+    if (providerParts.length == 2 && isKnownProvider(providerParts[0])) {
+      // Explicit provider syntax: aws-sm:path/to/secret
+      providerType = providerParts[0];
+      pathAndKey = providerParts[1];
+    } else {
+      // Global provider syntax: path/to/secret
+      pathAndKey = reference;
+    }
+    
+    // Check for JSON key extraction: path#key
+    String[] pathParts = pathAndKey.split("#", 2);
+    String secretPath = pathParts[0];
+    String jsonKey = pathParts.length == 2 ? pathParts[1] : null;
+    
+    // Validate
+    if (secretPath.isEmpty()) {
+      throw new IllegalArgumentException(
+          "Secret path cannot be empty in reference: " + reference);
+    }
+    
+    return new SecretReference(providerType, secretPath, jsonKey, reference, null);
+  }
+  
+  /**
+   * Creates an enriched reference with metadata from the secret backend.
+   * 
+   * @param base Base reference from parse()
+   * @param metadata Backend metadata (ARN, version-id, timestamps)
+   * @return New SecretReference with metadata
+   */
+  public static SecretReference withMetadata(
+      SecretReference base,
+      Map<String, String> metadata) {
+    return new SecretReference(
+        base.providerType,
+        base.secretPath,
+        base.jsonKey,
+        base.rawReference,
+        metadata
+    );
+  }
+  
+  /**
+   * Checks if a string contains a secret reference pattern.
+   *
+   * @param value The value to check
+   * @return true if value contains ${secret:...} pattern
+   */
+  public static boolean isSecretReference(String value) {
+    return value != null && SECRET_PATTERN.matcher(value).find();
+  }
+  
+  /**
+   * Extracts the reference content from ${secret:...} wrapper.
+   *
+   * @param value The wrapped reference (e.g., "${secret:db#password}")
+   * @return The inner content (e.g., "db#password")
+   * @throws IllegalArgumentException if not a valid secret reference
+   */
+  public static String extractReference(String value) {
+    Matcher matcher = SECRET_PATTERN.matcher(value);
+    if (matcher.find()) {
+      return matcher.group(1);
+    }
+    throw new IllegalArgumentException("Not a secret reference: " + value);
+  }
+  
+  /**
+   * Parses a full secret reference including ${secret:...} wrapper.
+   *
+   * @param wrappedReference The full reference (e.g., "${secret:db#password}")
+   * @return Parsed SecretReference
+   */
+  public static SecretReference parseWrapped(String wrappedReference) {
+    String inner = extractReference(wrappedReference);
+    return parse(inner);
+  }
+  
+  private static boolean isKnownProvider(String name) {
+    return KNOWN_PROVIDERS.contains(name);
+  }
+  
+  /**
+   * Returns the explicit provider type, or null if using default provider.
+   */
+  @Nullable
+  public String getProviderType() {
+    return providerType;
+  }
+  
+  /**
+   * Returns the secret path (without JSON key suffix).
+   */
+  public String getSecretPath() {
+    return secretPath;
+  }
+  
+  /**
+   * Returns the JSON key to extract, or null if returning entire secret.
+   */
+  @Nullable
+  public String getJsonKey() {
+    return jsonKey;
+  }
+  
+  /**
+   * Returns backend-specific metadata (ARN, version-id, timestamps, etc.).
+   * Empty map if not yet enriched.
+   */
+  @Nonnull
+  public Map<String, String> getMetadata() {
+    return metadata;
+  }
+  
+  /**
+   * Returns true if this reference uses an explicit provider.
+   */
+  public boolean hasExplicitProvider() {
+    return providerType != null;
+  }
+  
+  /**
+   * Returns true if this reference requires JSON key extraction.
+   */
+  public boolean hasJsonKey() {
+    return jsonKey != null;
+  }
+  
+  /**
+   * Returns the raw reference string for caching purposes.
+   */
+  public String getRawReference() {
+    return rawReference;
+  }
+  
+  /**
+   * Builds a URN for structured storage and logging.
+   * Format: urn:gravitino-secret:<provider>:<path>
+   */
+  public String toUrn() {
+    StringBuilder urn = new StringBuilder("urn:gravitino-secret:");
+    if (providerType != null) {
+      urn.append(providerType);
+    } else {
+      urn.append("default");
+    }
+    urn.append(":").append(secretPath);
+    return urn.toString();
+  }
+  
+  /**
+   * Serializes to JSON for storage in catalog entity.
+   */
+  public Map<String, Object> toJson() {
+    Map<String, Object> json = new LinkedHashMap<>();
+    json.put("providerType", providerType != null ? providerType : "default");
+    json.put("secretPath", secretPath);
+    if (jsonKey != null) {
+      json.put("jsonKey", jsonKey);
+    }
+    if (!metadata.isEmpty()) {
+      json.put("metadata", metadata);
+    }
+    return json;
+  }
+  
+  /**
+   * Deserializes from JSON storage.
+   */
+  public static SecretReference fromJson(Map<String, Object> json) {
+    String providerType = (String) json.get("providerType");
+    String secretPath = (String) json.get("secretPath");
+    String jsonKey = (String) json.get("jsonKey");
+    
+    @SuppressWarnings("unchecked")
+    Map<String, String> metadata = (Map<String, String>) json.get("metadata");
+    
+    return new SecretReference(
+        "default".equals(providerType) ? null : providerType,
+        secretPath,
+        jsonKey,
+        null, // rawReference not stored
+        metadata
+    );
+  }
+  
+  @Override
+  public boolean equals(Object o) {
+    if (this == o) return true;
+    if (!(o instanceof SecretReference)) return false;
+    SecretReference that = (SecretReference) o;
+    return Objects.equals(rawReference, that.rawReference);
+  }
+  
+  @Override
+  public int hashCode() {
+    return Objects.hash(rawReference);
+  }
+  
+  @Override
+  public String toString() {
+    return "SecretReference{" + rawReference + "}";
+  }
+}
+```
+
+#### 2. SecretValue Value Object
+
+```java
+package org.apache.gravitino.secret;
+
+/**
+ * Immutable value object representing a resolved secret value.
+ * 
+ * <p>This class wraps the actual secret string and provides:
+ * - Protection against accidental logging (toString() returns redacted form)
+ * - Metadata about when the secret was loaded and its expiry
+ * - Support for redacted representations in API responses
+ * 
+ * <p>Security Note: Always use getValue() explicitly when you need the actual
+ * secret value. Never log or persist SecretValue.getValue() output.
+ */
+public final class SecretValue {
+  
+  private final String value;
+  private final Instant loadedAt;
+  private final Instant expiresAt;
+  private final String version;  // Optional: version/ARN from secret manager
+  
+  private SecretValue(
+      String value,
+      Instant loadedAt,
+      Instant expiresAt,
+      String version) {
+    this.value = Preconditions.checkNotNull(value, "secret value cannot be null");
+    Preconditions.checkArgument(!value.isEmpty(), "secret value cannot be empty");
+    this.loadedAt = loadedAt;
+    this.expiresAt = expiresAt;
+    this.version = version;
+  }
+  
+  /**
+   * Creates a SecretValue with metadata.
+   */
+  public static SecretValue of(
+      String value,
+      Instant loadedAt,
+      Instant expiresAt,
+      String version) {
+    return new SecretValue(value, loadedAt, expiresAt, version);
+  }
+  
+  /**
+   * Creates a SecretValue with default metadata (current time, no version).
+   */
+  public static SecretValue of(String value, Duration ttl) {
+    Instant now = Instant.now();
+    return new SecretValue(value, now, now.plus(ttl), null);
+  }
+  
+  /**
+   * Creates a SecretValue with no expiry metadata.
+   */
+  public static SecretValue of(String value) {
+    return new SecretValue(value, Instant.now(), null, null);
+  }
+  
+  /**
+   * Returns the actual secret value.
+   * 
+   * <p>SECURITY WARNING: Never log or persist this value.
+   * Only use this when you need to pass the secret to external systems
+   * (databases, cloud services, etc.).
+   */
+  public String getValue() {
+    return value;
+  }
+  
+  /**
+   * Returns when this secret was loaded from the secret manager.
+   */
+  public Instant getLoadedAt() {
+    return loadedAt;
+  }
+  
+  /**
+   * Returns when this secret expires from cache, or null if no expiry.
+   */
+  @Nullable
+  public Instant getExpiresAt() {
+    return expiresAt;
+  }
+  
+  /**
+   * Returns the secret version/ARN from the secret manager, or null if not available.
+   */
+  @Nullable
+  public String getVersion() {
+    return version;
+  }
+  
+  /**
+   * Returns true if this secret has expired.
+   */
+  public boolean isExpired() {
+    return expiresAt != null && Instant.now().isAfter(expiresAt);
+  }
+  
+  /**
+   * Returns a redacted string representation suitable for API responses.
+   * Shows reference info but masks the actual value.
+   */
+  public String toRedactedString() {
+    return "SecretValue{loadedAt=" + loadedAt + ", expiresAt=" + expiresAt + ", value=***}";
+  }
+  
+  /**
+   * Returns redacted representation to prevent accidental logging.
+   * NEVER includes the actual secret value.
+   */
+  @Override
+  public String toString() {
+    return "SecretValue{***}";
+  }
+  
+  /**
+   * Equality based on the actual secret value only.
+   * Metadata differences don't affect equality.
+   */
+  @Override
+  public boolean equals(Object o) {
+    if (this == o) return true;
+    if (!(o instanceof SecretValue)) return false;
+    SecretValue that = (SecretValue) o;
+    return Objects.equals(value, that.value);
+  }
+  
+  @Override
+  public int hashCode() {
+    return Objects.hash(value);
+  }
+}
+```
+
+#### 3. SecretProvider Interface
 
 ```java
 package org.apache.gravitino.secret;
@@ -233,13 +642,12 @@ public interface SecretProvider extends Closeable {
   /**
    * Resolves a single secret reference to its actual value.
    *
-   * @param secretReference The secret reference in provider-specific format
-   *                       e.g., "secret-name", "path/to/secret", "secret-name#key"
+   * @param secretReference The parsed secret reference
    * @return The resolved secret value, or null if not found
    * @throws SecretResolutionException if secret resolution fails
    */
   @Nullable
-  String resolveSecret(String secretReference);
+  SecretValue resolveSecret(SecretReference secretReference);
   
   /**
    * Resolves multiple secret references in batch for efficiency.
@@ -248,7 +656,7 @@ public interface SecretProvider extends Closeable {
    * @return Map of secret references to their resolved values
    * @throws SecretResolutionException if batch resolution fails
    */
-  Map<String, String> resolveSecrets(Collection<String> secretReferences);
+  Map<SecretReference, SecretValue> resolveSecrets(Collection<SecretReference> secretReferences);
   
   /**
    * Returns the provider type identifier.
@@ -258,6 +666,31 @@ public interface SecretProvider extends Closeable {
   String providerType();
   
   /**
+   * Enriches a secret reference with backend-specific metadata.
+   * 
+   * <p>Called during catalog creation to:
+   * 1. Validate the secret exists in the backend
+   * 2. Fetch metadata (ARN, version-id, creation timestamp)
+   * 3. Return enriched reference for storage
+   * 
+   * <p>The enriched reference enables:
+   * - Version pinning (prevents race conditions during secret rotation)
+   * - Audit trail (when/how the secret was referenced)
+   * - Performance (direct ARN lookup instead of name-based)
+   * 
+   * <p>Default implementation returns the reference as-is (no enrichment).
+   * Providers should override this to add backend-specific metadata.
+   * 
+   * @param secretReference Base reference from user configuration
+   * @return Enriched reference with metadata populated
+   * @throws SecretResolutionException if secret doesn't exist or validation fails
+   */
+  default SecretReference enrichReference(SecretReference secretReference) {
+    // Default: no enrichment
+    return secretReference;
+  }
+  
+  /**
    * Forces a refresh of cached secrets from the external system.
    * This is typically called on a schedule or when secrets are suspected stale.
    */
@@ -265,7 +698,7 @@ public interface SecretProvider extends Closeable {
 }
 ```
 
-#### 2. SecretReferenceResolver
+#### 4. SecretReferenceResolver
 
 Handles parsing and resolving secret references in configuration values:
 
@@ -288,9 +721,6 @@ package org.apache.gravitino.secret;
  */
 public class SecretReferenceResolver {
   
-  private static final Pattern SECRET_REFERENCE_PATTERN = 
-      Pattern.compile("\\$\\{secret:([^}]+)\\}");
-  
   private final SecretProvider defaultProvider;
   private final Map<String, SecretProvider> providerMap;
   
@@ -303,63 +733,82 @@ public class SecretReferenceResolver {
   
   /**
    * Resolves all secret references in a properties map.
+   * 
+   * <p>Secret references are resolved to their actual string values.
+   * Plain text values are passed through unchanged for backward compatibility.
    *
    * @param properties Configuration properties that may contain secret references
-   * @return New map with secret references resolved to actual values
+   * @return New map with secret references resolved to actual values (as strings)
    */
-  public Map<String, String> resolveSecrets(Map<String, String> properties);
+  public Map<String, String> resolveSecrets(Map<String, String> properties) {
+    Map<String, String> resolved = new HashMap<>();
+    
+    for (Map.Entry<String, String> entry : properties.entrySet()) {
+      String key = entry.getKey();
+      String value = entry.getValue();
+      
+      if (SecretReference.isSecretReference(value)) {
+        // Parse and resolve the secret reference
+        String innerRef = SecretReference.extractReference(value);
+        SecretReference secretRef = SecretReference.parse(innerRef);
+        SecretValue secretValue = resolveSecretReference(secretRef);
+        // Extract the actual string value for use in configuration
+        resolved.put(key, secretValue.getValue());
+      } else {
+        // Not a secret reference - pass through as-is (backward compatibility)
+        resolved.put(key, value);
+      }
+    }
+    
+    return resolved;
+  }
   
   /**
    * Checks if a value contains a secret reference.
    */
-  public boolean isSecretReference(String value);
-  
-  /**
-   * Parses secret reference and determines which provider to use.
-   * 
-   * @param secretReference The full reference (e.g., "aws-sm:db/password" or "db/password")
-   * @return ParsedReference containing provider type and secret path
-   */
-  private ParsedReference parseSecretReference(String secretReference) {
-    // Check if explicit provider is specified
-    String[] parts = secretReference.split(":", 2);
-    if (parts.length == 2 && isKnownProvider(parts[0])) {
-      // Explicit provider: ${secret:aws-sm:path/to/secret}
-      return new ParsedReference(parts[0], parts[1]);
-    }
-    // Global provider: ${secret:path/to/secret}
-    return new ParsedReference(null, secretReference);
+  public boolean isSecretReference(String value) {
+    return SecretReference.isSecretReference(value);
   }
   
   /**
    * Resolves a single secret reference to its value.
+   * 
+   * @param secretRef The parsed secret reference
+   * @return The resolved SecretValue
+   * @throws SecretResolutionException if resolution fails
    */
-  private String resolveSecretReference(ParsedReference parsed) {
-    SecretProvider provider = parsed.providerType != null
-        ? providerMap.get(parsed.providerType)
-        : defaultProvider;
+  private SecretValue resolveSecretReference(SecretReference secretRef) {
+    // Determine which provider to use
+    SecretProvider provider;
+    if (secretRef.hasExplicitProvider()) {
+      // Use explicitly specified provider
+      provider = providerMap.get(secretRef.getProviderType());
+      if (provider == null) {
+        throw new SecretResolutionException(
+            "Secret provider not configured: " + secretRef.getProviderType());
+      }
+    } else {
+      // Use default provider
+      provider = defaultProvider;
+      if (provider == null) {
+        throw new SecretResolutionException(
+            "No default secret provider configured");
+      }
+    }
     
-    if (provider == null) {
+    // Resolve the secret
+    SecretValue secretValue = provider.resolveSecret(secretRef);
+    if (secretValue == null) {
       throw new SecretResolutionException(
-          "Secret provider not configured: " + parsed.providerType);
+          "Secret not found: " + secretRef.getRawReference());
     }
     
-    return provider.resolveSecret(parsed.secretPath);
-  }
-  
-  static class ParsedReference {
-    String providerType; // null means use default
-    String secretPath;
-    
-    ParsedReference(String providerType, String secretPath) {
-      this.providerType = providerType;
-      this.secretPath = secretPath;
-    }
+    return secretValue;
   }
 }
 ```
 
-#### 3. SecretCache
+#### 5. SecretCache
 
 ```java
 package org.apache.gravitino.secret;
@@ -369,43 +818,164 @@ package org.apache.gravitino.secret;
  * 
  * <p>Provides automatic background refresh before expiration to ensure
  * continuous availability of secrets without cache misses.
+ * 
+ * <p>Cache key is the SecretReference object for efficient lookups.
+ * Values are cached as SecretValue objects with metadata.
  */
 public class SecretCache {
   
-  private final LoadingCache<String, CachedSecret> cache;
+  private static final Logger LOG = LoggerFactory.getLogger(SecretCache.class);
+  
+  private final LoadingCache<SecretReference, SecretValue> cache;
   private final SecretProvider provider;
   private final ScheduledExecutorService refreshExecutor;
+  private final Duration ttl;
+  private final Duration refreshBeforeExpiry;
   
   public SecretCache(
       SecretProvider provider, 
       Duration ttl,
       Duration refreshBeforeExpiry,
-      int maxSize);
+      int maxSize) {
+    this.provider = provider;
+    this.ttl = ttl;
+    this.refreshBeforeExpiry = refreshBeforeExpiry;
+    this.refreshExecutor = Executors.newSingleThreadScheduledExecutor(
+        new ThreadFactoryBuilder()
+            .setNameFormat("secret-cache-refresh-%d")
+            .setDaemon(true)
+            .build());
+    
+    this.cache = Caffeine.newBuilder()
+        .maximumSize(maxSize)
+        .expireAfterWrite(ttl)
+        .build(key -> loadSecret(key));
+    
+    // Schedule background refresh at 80% of TTL
+    long refreshIntervalMs = refreshBeforeExpiry.toMillis();
+    refreshExecutor.scheduleAtFixedRate(
+        this::refreshExpiringSecrets,
+        refreshIntervalMs,
+        refreshIntervalMs,
+        TimeUnit.MILLISECONDS);
+  }
   
   /**
    * Gets a secret from cache, loading from provider if necessary.
+   * 
+   * @return SecretValue, or null if secret not found
    */
-  public String get(String secretReference);
+  @Nullable
+  public SecretValue get(SecretReference secretReference) {
+    try {
+      return cache.get(secretReference);
+    } catch (Exception e) {
+      LOG.error("Failed to load secret: {}", secretReference, e);
+      return null;
+    }
+  }
   
   /**
    * Gets multiple secrets in batch.
+   * 
+   * @return Map of references to their resolved values (excludes not-found secrets)
    */
-  public Map<String, String> getAll(Collection<String> secretReferences);
+  public Map<SecretReference, SecretValue> getAll(
+      Collection<SecretReference> secretReferences) {
+    try {
+      return cache.getAll(secretReferences);
+    } catch (Exception e) {
+      LOG.error("Failed to load secrets in batch", e);
+      return Collections.emptyMap();
+    }
+  }
+  
+  /**
+   * Loads a secret from the provider (cache miss).
+   * 
+   * @return SecretValue with TTL-based expiry metadata
+   */
+  private SecretValue loadSecret(SecretReference secretRef) {
+    SecretValue secretValue = provider.resolveSecret(secretRef);
+    
+    if (secretValue == null) {
+      throw new SecretResolutionException(
+          "Secret not found: " + secretRef.getRawReference());
+    }
+    
+    // If provider didn't set expiry, use cache TTL
+    if (secretValue.getExpiresAt() == null) {
+      return SecretValue.of(
+          secretValue.getValue(),
+          secretValue.getLoadedAt(),
+          Instant.now().plus(ttl),
+          secretValue.getVersion());
+    }
+    
+    return secretValue;
+  }
   
   /**
    * Proactively refreshes secrets approaching expiration.
+   * Runs in background to prevent cache misses.
    */
-  private void refreshExpiringSecrets();
+  private void refreshExpiringSecrets() {
+    Instant now = Instant.now();
+    Instant refreshThreshold = now.plus(refreshBeforeExpiry);
+    
+    cache.asMap().forEach((ref, secretValue) -> {
+      if (secretValue.getExpiresAt() != null 
+          && secretValue.getExpiresAt().isBefore(refreshThreshold)) {
+        try {
+          LOG.debug("Proactively refreshing secret: {}", ref);
+          cache.refresh(ref);
+        } catch (Exception e) {
+          LOG.warn("Failed to refresh secret: {}", ref, e);
+          // Don't fail - old value still usable until expiry
+        }
+      }
+    });
+  }
   
-  static class CachedSecret {
-    String value;
-    Instant loadedAt;
-    Instant expiresAt;
+  /**
+   * Invalidates all cached secrets, forcing reload on next access.
+   */
+  public void invalidateAll() {
+    cache.invalidateAll();
+  }
+  
+  /**
+   * Invalidates a specific secret, forcing reload on next access.
+   */
+  public void invalidate(SecretReference secretRef) {
+    cache.invalidate(secretRef);
+  }
+  
+  /**
+   * Returns cache statistics for monitoring.
+   */
+  public CacheStats getStats() {
+    return cache.stats();
+  }
+  
+  /**
+   * Closes the cache and stops background refresh.
+   */
+  public void close() {
+    refreshExecutor.shutdown();
+    try {
+      if (!refreshExecutor.awaitTermination(5, TimeUnit.SECONDS)) {
+        refreshExecutor.shutdownNow();
+      }
+    } catch (InterruptedException e) {
+      refreshExecutor.shutdownNow();
+      Thread.currentThread().interrupt();
+    }
   }
 }
 ```
 
-#### 4. AWS Secrets Manager Provider (Reference Implementation)
+#### 6. AWS Secrets Manager Provider (Reference Implementation)
 
 ```java
 package org.apache.gravitino.secret.aws;
@@ -429,9 +999,13 @@ package org.apache.gravitino.secret.aws;
  */
 public class AwsSecretsManagerProvider implements SecretProvider {
   
+  private static final Logger LOG = LoggerFactory.getLogger(AwsSecretsManagerProvider.class);
+  private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
+  
   private SecretsManagerClient secretsManagerClient;
   private SecretCache cache;
   private String secretPathPrefix;
+  private Duration cacheTtl;
   
   @Override
   public void initialize(Map<String, String> properties) {
@@ -454,39 +1028,109 @@ public class AwsSecretsManagerProvider implements SecretProvider {
     int maxSize = Integer.parseInt(
         properties.getOrDefault("secret-provider.cache-max-size", "100"));
     
+    this.cacheTtl = Duration.ofSeconds(ttlSeconds);
     this.cache = new SecretCache(
-        this::loadSecret, 
-        Duration.ofSeconds(ttlSeconds),
+        this, 
+        cacheTtl,
         Duration.ofSeconds(ttlSeconds / 5), // Refresh at 80% of TTL
         maxSize);
   }
   
   @Override
-  public String resolveSecret(String secretReference) {
-    return cache.get(buildSecretName(secretReference));
-  }
-  
-  @Override
-  public Map<String, String> resolveSecrets(
-      Collection<String> secretReferences) {
-    return cache.getAll(
-        secretReferences.stream()
-            .map(this::buildSecretName)
-            .collect(Collectors.toList()));
-  }
-  
-  private String loadSecret(String secretName) {
+  public SecretReference enrichReference(SecretReference secretRef) {
+    String secretName = buildSecretName(secretRef);
+    
     try {
-      GetSecretValueRequest request = GetSecretValueRequest.builder()
+      // Validate secret exists and get metadata from AWS
+      DescribeSecretRequest request = DescribeSecretRequest.builder()
           .secretId(secretName)
           .build();
       
+      DescribeSecretResponse response = awsClient.describeSecret(request);
+      
+      // Get current version ID (AWSCURRENT stage)
+      String versionId = response.versionIdsToStages().entrySet().stream()
+          .filter(e -> e.getValue().contains("AWSCURRENT"))
+          .map(Map.Entry::getKey)
+          .findFirst()
+          .orElse(null);
+      
+      // Build metadata map
+      Map<String, String> metadata = new HashMap<>();
+      metadata.put("arn", response.arn());
+      if (versionId != null) {
+        metadata.put("version-id", versionId);
+      }
+      metadata.put("created-at", response.createdDate().toString());
+      metadata.put("last-accessed-at", Instant.now().toString());
+      
+      LOG.info("Enriched secret reference: {} -> ARN: {}, version: {}", 
+          secretName, response.arn(), versionId);
+      
+      // Return enriched reference
+      return SecretReference.withMetadata(secretRef, metadata);
+      
+    } catch (ResourceNotFoundException e) {
+      throw new SecretResolutionException(
+          "Secret not found in AWS Secrets Manager: " + secretName + 
+          ". Please create the secret before creating the catalog.", e);
+    } catch (SecretsManagerException e) {
+      throw new SecretResolutionException(
+          "Failed to validate secret in AWS Secrets Manager: " + secretName, e);
+    }
+  }
+  
+  @Override
+  public SecretValue resolveSecret(SecretReference secretRef) {
+    return cache.get(secretRef);
+  }
+  
+  @Override
+  public Map<SecretReference, SecretValue> resolveSecrets(
+      Collection<SecretReference> secretReferences) {
+    return cache.getAll(secretReferences);
+  }
+  
+  /**
+   * Loads a secret from AWS Secrets Manager (called by cache on miss).
+   * Package-private for testing.
+   * 
+   * @param secretRef The secret reference to load
+   * @return The resolved SecretValue with metadata
+   */
+  SecretValue loadSecret(SecretReference secretRef) {
+    String secretName = buildSecretName(secretRef);
+    
+    // Use version from metadata if available (version pinning)
+    String versionId = secretRef.getMetadata().get("version-id");
+    
+    try {
+      GetSecretValueRequest.Builder requestBuilder = GetSecretValueRequest.builder()
+          .secretId(secretName);
+      
+      if (versionId != null) {
+        requestBuilder.versionId(versionId); // Pin to specific version
+        LOG.debug("Resolving secret with pinned version: {} (version: {})", 
+            secretName, versionId);
+      } else {
+        LOG.debug("Resolving secret without version pinning: {}", secretName);
+      }
+      
       GetSecretValueResponse response = 
-          secretsManagerClient.getSecretValue(request);
+          secretsManagerClient.getSecretValue(requestBuilder.build());
       
       // Handle both string and JSON secrets
       if (response.secretString() != null) {
-        return parseSecretValue(secretReference, response.secretString());
+        String secretValue = parseSecretValue(secretRef, response.secretString());
+        
+        // Build SecretValue with metadata from AWS response
+        Instant now = Instant.now();
+        return SecretValue.of(
+            secretValue,
+            now,
+            now.plus(cacheTtl),
+            response.versionId() // AWS version ID
+        );
       } else {
         throw new SecretResolutionException(
             "Binary secrets not supported: " + secretName);
@@ -504,27 +1148,35 @@ public class AwsSecretsManagerProvider implements SecretProvider {
    * Parses secret value, supporting both plain text and JSON with key selection.
    * 
    * Examples:
-   * - "s3-credentials" -> returns entire secret string
-   * - "s3-credentials#access-key-id" -> parses JSON and returns specific key
+   * - SecretReference("s3-credentials", null) -> returns entire secret string
+   * - SecretReference("s3-credentials", "access-key-id") -> parses JSON and returns specific key
    */
-  private String parseSecretValue(String secretReference, String secretString) {
-    if (secretReference.contains("#")) {
-      String[] parts = secretReference.split("#", 2);
-      String key = parts[1];
+  private String parseSecretValue(SecretReference secretRef, String secretString) {
+    if (secretRef.hasJsonKey()) {
+      String key = secretRef.getJsonKey();
       try {
-        JsonNode jsonNode = objectMapper.readTree(secretString);
-        return jsonNode.get(key).asText();
+        JsonNode jsonNode = OBJECT_MAPPER.readTree(secretString);
+        JsonNode valueNode = jsonNode.get(key);
+        if (valueNode == null) {
+          throw new SecretResolutionException(
+              "JSON key not found in secret: " + key);
+        }
+        return valueNode.asText();
       } catch (JsonProcessingException e) {
         throw new SecretResolutionException(
-            "Failed to parse JSON secret: " + secretReference, e);
+            "Failed to parse JSON secret: " + secretRef.getRawReference(), e);
       }
     }
     return secretString;
   }
   
-  private String buildSecretName(String secretReference) {
-    String ref = secretReference.split("#")[0]; // Remove key suffix if present
-    return secretPathPrefix.isEmpty() ? ref : secretPathPrefix + ref;
+  /**
+   * Builds the full secret name for AWS Secrets Manager API.
+   * Applies the configured prefix and uses only the secret path (not the JSON key).
+   */
+  private String buildSecretName(SecretReference secretRef) {
+    String path = secretRef.getSecretPath();
+    return secretPathPrefix.isEmpty() ? path : secretPathPrefix + path;
   }
   
   @Override
@@ -542,12 +1194,14 @@ public class AwsSecretsManagerProvider implements SecretProvider {
     if (secretsManagerClient != null) {
       secretsManagerClient.close();
     }
-    cache.close();
+    if (cache != null) {
+      cache.close();
+    }
   }
 }
 ```
 
-#### 5. SecretProviderFactory
+#### 7. SecretProviderFactory
 
 ```java
 package org.apache.gravitino.secret;
@@ -673,6 +1327,317 @@ class SecretProviderManager {
     return Collections.unmodifiableMap(additionalProviders);
   }
 }
+```
+
+### Secret Reference Enrichment
+
+When a catalog is created with secret references, Gravitino **validates and enriches** the references with backend-specific metadata before storing them in the metadata store.
+
+#### Why Enrichment?
+
+1. **Early Validation**: Ensures the secret exists before catalog creation succeeds
+2. **Version Pinning**: Captures current version to prevent race conditions during secret rotation
+3. **Audit Trail**: Records when/how the secret was referenced
+4. **Performance**: Stores physical identifiers (ARN) for faster resolution
+
+#### Flow Diagram
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│ User API Request                                            │
+│ POST /api/metalakes/my_metalake/catalogs                    │
+│ {                                                           │
+│   "properties": {                                           │
+│     "jdbc-password": "${secret:aws-sm:path#password}"       │
+│   }                                                         │
+│ }                                                           │
+└─────────────────────────────────────────────────────────────┘
+                          ↓
+┌─────────────────────────────────────────────────────────────┐
+│ Step 1: Parse Reference                                     │
+│ SecretReference.parse("aws-sm:path#password")               │
+│ → providerType: "aws-sm"                                    │
+│ → secretPath: "path"                                        │
+│ → jsonKey: "password"                                       │
+│ → metadata: {} (empty)                                      │
+└─────────────────────────────────────────────────────────────┘
+                          ↓
+┌─────────────────────────────────────────────────────────────┐
+│ Step 2: Enrich with Backend Metadata                        │
+│ awsProvider.enrichReference(baseRef)                        │
+│ → Calls AWS DescribeSecret API                             │
+│ → Validates secret exists                                   │
+│ → Fetches ARN: arn:aws:...                                  │
+│ → Fetches version-id: v1-abc123                             │
+│ → Returns enriched reference                                │
+└─────────────────────────────────────────────────────────────┘
+                          ↓
+┌─────────────────────────────────────────────────────────────┐
+│ Step 3: Store in PostgreSQL                                 │
+│ secret_references: {                                        │
+│   "jdbc-password": {                                        │
+│     "providerType": "aws-sm",                               │
+│     "secretPath": "path",                                   │
+│     "jsonKey": "password",                                  │
+│     "metadata": {                                           │
+│       "arn": "arn:aws:...",                                 │
+│       "version-id": "v1-abc123",                            │
+│       "created-at": "2026-04-16T10:30:00Z"                  │
+│     }                                                       │
+│   }                                                         │
+│ }                                                           │
+└─────────────────────────────────────────────────────────────┘
+                          ↓
+┌─────────────────────────────────────────────────────────────┐
+│ Step 4: Resolve During Catalog Initialization              │
+│ awsProvider.resolveSecret(enrichedRef)                      │
+│ → Uses version-id for pinning                               │
+│ → GetSecretValue(versionId: "v1-abc123")                    │
+│ → Always gets same version (consistent!)                    │
+└─────────────────────────────────────────────────────────────┘
+```
+
+#### Code Example
+
+**Catalog Creation**:
+```java
+public class CatalogManager {
+  
+  @Inject
+  private SecretProviderManager secretProviderManager;
+  
+  public Catalog createCatalog(CreateCatalogRequest request) {
+    Map<String, String> properties = request.getProperties();
+    Map<String, SecretReference> secretReferences = new HashMap<>();
+    
+    // Process properties to extract and enrich secret references
+    for (Map.Entry<String, String> entry : properties.entrySet()) {
+      String key = entry.getKey();
+      String value = entry.getValue();
+      
+      if (SecretReference.isSecretReference(value)) {
+        // Parse: ${secret:aws-sm:gravitino/prod/postgres#password}
+        String innerRef = SecretReference.extractReference(value);
+        SecretReference baseRef = SecretReference.parse(innerRef);
+        
+        // Enrich with backend metadata (calls AWS)
+        SecretProvider provider = secretProviderManager.getProvider(
+            baseRef.getProviderType());
+        SecretReference enrichedRef = provider.enrichReference(baseRef);
+        
+        // Store enriched reference
+        secretReferences.put(key, enrichedRef);
+        
+        // Remove from public properties
+        properties.remove(key);
+      }
+    }
+    
+    // Create catalog entity with separated properties
+    CatalogEntity entity = CatalogEntity.builder()
+        .withId(idGenerator.nextId())
+        .withName(request.getName())
+        .withProperties(properties)              // Public properties
+        .withSecretReferences(secretReferences)  // Secret references with metadata
+        .build();
+    
+    // Persist to metadata store
+    store.put(entity);
+    
+    return entity;
+  }
+}
+```
+
+**Secret Resolution**:
+```java
+public class JdbcCatalog implements Catalog {
+  
+  @Inject
+  private SecretProvider secretProvider;
+  
+  @Override
+  public void initialize(Map<String, String> properties, 
+                        Map<String, SecretReference> secretReferences) {
+    String jdbcUrl = properties.get("jdbc-url");
+    String jdbcUser = properties.get("jdbc-user");
+    
+    // Resolve secret using enriched reference
+    SecretReference passwordRef = secretReferences.get("jdbc-password");
+    SecretValue secretValue = secretProvider.resolveSecret(passwordRef);
+    
+    // Extract actual password
+    String jdbcPassword = secretValue.getValue();
+    
+    // Create datasource
+    dataSource = DataSourceBuilder.create()
+        .url(jdbcUrl)
+        .username(jdbcUser)
+        .password(jdbcPassword)
+        .build();
+  }
+}
+```
+
+#### Benefits
+
+✅ **Fail Fast**: Catalog creation fails immediately if secret doesn't exist  
+✅ **Version Consistency**: Always uses same secret version (no race conditions)  
+✅ **Audit Trail**: Know exactly which secret version was used when  
+✅ **Performance**: ARN lookup faster than name-based lookup in AWS  
+✅ **Security**: Track secret access patterns for compliance  
+
+#### Error Handling
+
+**Secret doesn't exist**:
+```json
+POST /api/metalakes/my_metalake/catalogs
+→ 400 Bad Request
+
+{
+  "code": 1003,
+  "type": "SecretResolutionException",
+  "message": "Secret not found in AWS Secrets Manager: gravitino/prod/postgres. Please create the secret before creating the catalog.",
+  "stack": [...]
+}
+```
+
+**JSON key not found**:
+```json
+POST /api/metalakes/my_metalake/catalogs
+→ 400 Bad Request
+
+{
+  "code": 1003,
+  "type": "SecretResolutionException",
+  "message": "JSON key 'password' not found in secret gravitino/prod/postgres. Available keys: [username, host, port]"
+}
+```
+
+**Insufficient permissions**:
+```json
+POST /api/metalakes/my_metalake/catalogs
+→ 403 Forbidden
+
+{
+  "code": 1004,
+  "type": "SecretResolutionException",
+  "message": "Access denied to secret gravitino/prod/postgres. Ensure the IAM role has secretsmanager:GetSecretValue and secretsmanager:DescribeSecret permissions."
+}
+```
+
+### Catalog Entity Storage Structure
+
+Gravitino stores catalog entities with separate storage for public properties and secret references.
+
+#### Database Schema
+
+**PostgreSQL Table**:
+```sql
+CREATE TABLE catalog_entity (
+  catalog_id BIGINT PRIMARY KEY,
+  metalake_id BIGINT NOT NULL,
+  name VARCHAR(255) NOT NULL,
+  type VARCHAR(50) NOT NULL,
+  provider VARCHAR(100) NOT NULL,
+  comment TEXT,
+  
+  -- Public properties (non-sensitive)
+  properties JSONB NOT NULL DEFAULT '{}'::JSONB,
+  
+  -- Secret references with metadata (sensitive property keys)
+  secret_references JSONB NOT NULL DEFAULT '{}'::JSONB,
+  
+  audit_info JSONB,
+  created_at TIMESTAMP NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMP NOT NULL DEFAULT NOW(),
+  
+  UNIQUE(metalake_id, name)
+);
+
+-- Index for querying by secret provider type
+CREATE INDEX idx_catalog_secret_provider 
+ON catalog_entity USING GIN (secret_references);
+```
+
+#### Example Storage
+
+**Catalog Entity Row**:
+```sql
+SELECT catalog_id, name, properties, secret_references 
+FROM catalog_entity 
+WHERE catalog_id = 123;
+```
+
+**Result**:
+
+| Column | Value |
+|--------|-------|
+| **catalog_id** | `123` |
+| **name** | `prod-postgres` |
+| **type** | `RELATIONAL` |
+| **provider** | `jdbc-postgresql` |
+| **properties** | `{"jdbc-url": "jdbc:postgresql://db:5432/prod", "jdbc-user": "app_user"}` |
+| **secret_references** | See below ⬇️ |
+
+**`secret_references` JSONB Column**:
+```json
+{
+  "jdbc-password": {
+    "providerType": "aws-sm",
+    "secretPath": "gravitino/prod/postgres-catalog",
+    "jsonKey": "password",
+    "metadata": {
+      "arn": "arn:aws:secretsmanager:us-east-1:123456789012:secret:gravitino/prod/postgres-catalog",
+      "version-id": "v1-abc123-def456",
+      "created-at": "2026-04-15T08:30:00Z",
+      "last-accessed-at": "2026-04-16T10:30:00Z"
+    }
+  }
+}
+```
+
+#### Key Design Principles
+
+1. ✅ **Actual secret values NEVER stored in database**
+2. ✅ **Only references with metadata stored**
+3. ✅ **Public properties separate from secret references**
+4. ✅ **JSONB type enables efficient querying and indexing**
+
+#### Query Examples
+
+**Find all catalogs using AWS Secrets Manager**:
+```sql
+SELECT catalog_id, name
+FROM catalog_entity
+WHERE secret_references @> '{"jdbc-password": {"providerType": "aws-sm"}}'::jsonb;
+```
+
+**Find catalogs using a specific secret ARN**:
+```sql
+SELECT catalog_id, name,
+       secret_references->'jdbc-password'->'metadata'->>'arn' as secret_arn
+FROM catalog_entity
+WHERE secret_references->'jdbc-password'->'metadata'->>'arn' 
+      = 'arn:aws:secretsmanager:us-east-1:123456789012:secret:gravitino/prod/postgres-catalog';
+```
+
+**Find catalogs with secrets older than 90 days**:
+```sql
+SELECT catalog_id, name,
+       secret_references->'jdbc-password'->'metadata'->>'created-at' as secret_created
+FROM catalog_entity
+WHERE (secret_references->'jdbc-password'->'metadata'->>'created-at')::timestamp 
+      < NOW() - INTERVAL '90 days';
+```
+
+**Audit: When was a secret last accessed**:
+```sql
+SELECT catalog_id, name,
+       secret_references->'jdbc-password'->'metadata'->>'last-accessed-at' as last_access
+FROM catalog_entity
+WHERE secret_references ? 'jdbc-password'
+ORDER BY (secret_references->'jdbc-password'->'metadata'->>'last-accessed-at')::timestamp DESC;
 ```
 
 ### Secret Reference Syntax
