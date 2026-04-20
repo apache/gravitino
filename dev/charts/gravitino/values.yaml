@@ -131,7 +131,7 @@ entity:
   ## The JDBC password
   ##
   jdbcPassword: gravitino
-  storagePath: /root/gravitino/data/jdbc
+  storagePath: /opt/gravitino/data/jdbc
 
 ## THE CONFIGURATION FOR Gravitino SERVER
 ##
@@ -361,7 +361,7 @@ extraVolumes:
 ##
 extraVolumeMounts:
   - name: gravitino-log
-    mountPath: /root/gravitino/logs
+    mountPath: /opt/gravitino/logs
 
 ## ref: https://kubernetes.io/docs/concepts/storage/persistent-volumes/
 ## If you set enabled as "True", you need :
@@ -504,12 +504,28 @@ livenessProbe:
   initialDelaySeconds: 20
   timeoutSeconds: 5
 
+## Pod-level security context configuration
+## ref: https://kubernetes.io/docs/tasks/configure-pod-container/security-context/
+## When using persistent volumes (persistence.enabled=true), set fsGroup to match
+## the gravitino user's GID so mounted volumes are writable by the container.
+##
+podSecurityContext: {}
+  # fsGroup: 1000  # set when using PVCs so mounted volumes are writable by UID 1000
+
+## Init container security context configuration
+## Applied to all initContainers (sqlfile, init-mysql, init-postgresql).
+## Required on clusters enforcing the Kubernetes Pod Security Standard "restricted" policy.
+##
+initContainerSecurityContext:
+  runAsNonRoot: true
+  runAsUser: 1000
+
 ## Container-specific security context configuration
 ## ref: https://kubernetes.io/docs/tasks/configure-pod-container/security-context/
 ##
 containerSecurityContext:
-  runAsNonRoot: false
-  runAsUser: 0
+  runAsNonRoot: true
+  runAsUser: 1000
 
 ## Container Environment
 ##

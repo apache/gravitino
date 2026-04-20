@@ -15,6 +15,7 @@
 # specific language governing permissions and limitations
 # under the License.
 
+from mcp_server.client.plain.utils import encode_path_segment
 from mcp_server.client.topic_operation import TopicOperation
 
 
@@ -29,7 +30,9 @@ class PlainRESTClientTopicOperation(TopicOperation):
 
     async def list_of_topics(self, catalog_name: str, schema_name: str) -> str:
         response = await self.rest_client.get(
-            f"/api/metalakes/{self.metalake_name}/catalogs/{catalog_name}/schemas/{schema_name}/topics"
+            f"/api/metalakes/{encode_path_segment(self.metalake_name)}"
+            f"/catalogs/{encode_path_segment(catalog_name)}"
+            f"/schemas/{encode_path_segment(schema_name)}/topics"
         )
         return response.json().get("identifiers", [])
 
@@ -37,6 +40,9 @@ class PlainRESTClientTopicOperation(TopicOperation):
         self, catalog_name: str, schema_name: str, topic_name: str
     ) -> str:
         response = await self.rest_client.get(
-            f"/api/metalakes/{self.metalake_name}/catalogs/{catalog_name}/schemas/{schema_name}/topics/{topic_name}"
+            f"/api/metalakes/{encode_path_segment(self.metalake_name)}"
+            f"/catalogs/{encode_path_segment(catalog_name)}"
+            f"/schemas/{encode_path_segment(schema_name)}"
+            f"/topics/{encode_path_segment(topic_name)}"
         )
         return response.json().get("topic", {})
