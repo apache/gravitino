@@ -72,7 +72,7 @@ public class IcebergCatalogWrapper implements AutoCloseable {
   public static final Logger LOG = LoggerFactory.getLogger(IcebergCatalogWrapper.class);
 
   private final Object initializationLock = new Object();
-  protected volatile Catalog catalog;
+  private volatile Catalog catalog;
   private volatile SupportsNamespaces asNamespaceCatalog;
   private final IcebergCatalogBackend catalogBackend;
   private final IcebergConfig icebergConfig;

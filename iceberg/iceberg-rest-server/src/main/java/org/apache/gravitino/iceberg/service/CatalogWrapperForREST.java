@@ -92,6 +92,7 @@ public class CatalogWrapperForREST extends IcebergCatalogWrapper {
   private final CatalogCredentialManager catalogCredentialManager;
 
   private volatile Map<String, String> catalogConfigToClients;
+  private final Object catalogConfigToClientsLock = new Object();
 
   private final ScanPlanCache scanPlanCache;
 
@@ -225,7 +226,7 @@ public class CatalogWrapperForREST extends IcebergCatalogWrapper {
       return configToClients;
     }
 
-    synchronized (this) {
+    synchronized (catalogConfigToClientsLock) {
       if (catalogConfigToClients == null) {
         catalogConfigToClients = buildCatalogConfigToClients(getIcebergConfig(), getCatalog());
       }
