@@ -104,12 +104,10 @@ Cons:
 - Schema name uses `:`-separated hierarchical representation in this design; `.` is not used as
   schema separator.
 - `.` remains an Iceberg namespace hierarchy notation in external semantics only.
-- When `:` is used as separator, segment values containing `:` must be percent-encoded.
-- `%` must also be encoded as `%25` to avoid decode ambiguity.
-- Encoding/decoding order:
-  - Serialize: encode each segment first, then join with `:`.
-  - Parse: split by `:`, then decode each segment.
-- Decode is applied exactly once to avoid double-decoding issues.
+- Escaping strategy: no encoding/escaping is used in this phase.
+- The character `:` is reserved as hierarchy separator and is not allowed inside a single
+  namespace segment.
+- Parsing is direct split/join by `:` at API boundary.
 - Keep flat storage model and convert `HierarchicalSchema` path to physical schema name by mapping rules.
 - Identifier rendering rule:
   - Use encoded `HierarchicalSchema` path directly in schema position.
@@ -120,16 +118,39 @@ Examples:
 - Nested namespace `A:B` maps to logical `HierarchicalSchema` path `A:B`.
 - Nested namespace `A:B:C` maps to logical `HierarchicalSchema` path `A:B:C`.
 - Logical `HierarchicalSchema` path is then converted to physical schema name through mapping rules.
-- Namespace levels `["team:core", "sales"]` are serialized as `team%3Acore:sales`.
-- Parsing `team%3Acore:sales` returns `["team:core", "sales"]`.
+- Namespace levels `["team", "sales"]` are serialized as `team:sales`.
+- Parsing `team:sales` returns `["team", "sales"]`.
 - Identifier rendering example:
   - `metalake.catalog.A:B.table1`
-  - `metalake.catalog.team%3Acore:sales.table2`
-- In UI display, show logical path (for example `A:B:C`) for readability.
-- HTTP transport rule:
-  - Namespace values in URL/query/body must follow RFC 3986 percent-encoding when needed.
-  - Example: namespace path `team%3Acore:sales` should be URL-encoded as
-    `team%253Acore%3Asales` when put into a URL query component.
+  - `metalake.catalog.team:sales.table2`
+- In UI display and API transport, use logical path directly (for example `A:B:C`).
+
+### Separator Configuration
+
+- Internal namespace separator is configured as `:` for Gravitino hierarchical schema handling.
+- Connector-facing behavior remains Iceberg-compatible and does not require users to configure or
+  input this internal separator.
+
+### Parsing Sequence Diagram
+
+```mermaid
+sequenceDiagram
+  participant Client as Client/Connector
+  participant Config as Connector Config
+  participant API as Gravitino REST API
+  participant Mapper as HierarchicalSchema Mapper
+  participant Store as EntityStore
+
+  Client->>Config: Load namespace separator
+  Config-->>Client: separator (for example ':')
+  Client->>API: GET /schemas?parentSchema=A:B
+  API->>Mapper: Parse parentSchema by separator ':'
+  Mapper->>Store: list all schemas (no prefix index)
+  Store-->>Mapper: all schemas
+  Mapper->>Mapper: filter direct children under A:B
+  Mapper-->>API: hierarchy-aware result
+  API-->>Client: response (Iceberg-compatible namespace view)
+```
 
 
 ### Iceberg REST Side Behavior
@@ -154,13 +175,11 @@ Examples:
 
 - `list schema` should express nested hierarchy semantics for users.
 - `list schema` REST API (GET `/metalakes/{metalake}/catalogs/{catalog}/schemas`) should support an
-  optional query parameter `parentHierarchicalSchema`.
-  - When `parentHierarchicalSchema` is not provided, return only top-level schemas (first layer).
-  - When `parentHierarchicalSchema` is provided, return only the direct child schemas under the
+  optional query parameter `parentSchema`.
+  - When `parentSchema` is not provided, return only top-level schemas (first layer).
+  - When `parentSchema` is provided, return only the direct child schemas under the
     given parent (next layer), instead of the full subtree.
-  - `parentHierarchicalSchema` value follows the same logical `HierarchicalSchema` encoding
-    rules as described in `Identifier Rules` (segment percent-encoding, and then RFC 3986
-    percent-encoding for transport in a query component).
+  - `parentSchema` value follows direct `HierarchicalSchema` path format (for example `A:B`).
 - Gravitino does not provide a dedicated `list sub-schema` API; hierarchy is expressed via
   `list schema`/`list namespaces` results.
 - Example: for schemas `A`, `B`, `A:B`, `A:B:C`, hierarchy view is `A -> A:B -> A:B:C` and `B`;
@@ -182,7 +201,7 @@ Examples (Gravitino REST side):
 - **List from Gravitino side**
   - Request: `GET /metalakes/m1/catalogs/c1/schemas`
   - Behavior: return top-level schemas only (first layer), for example `A`, `B`.
-  - Request: `GET /metalakes/m1/catalogs/c1/schemas?parentHierarchicalSchema=A%3AB`
+  - Request: `GET /metalakes/m1/catalogs/c1/schemas?parentSchema=A:B`
   - Behavior: return direct children of `A:B` only (next layer), for example `A:B:C`, `A:B:D`.
 - **Alter from Gravitino side**
   - Request: `PUT /metalakes/m1/catalogs/c1/schemas/A:B:C` with updates
@@ -197,7 +216,7 @@ Examples (Gravitino REST side):
 ### Performance Considerations
 
 - Current `EntityStore` does not support prefix matching on schema names.
-- As a result, `list schema` with `parentHierarchicalSchema` cannot be implemented as an
+- As a result, `list schema` with `parentSchema` cannot be implemented as an
   efficient prefix query at storage layer. The server must list all schemas in the catalog and
   then compute the top-level / direct-children view in memory.
 - This may introduce higher-than-expected latency and load for catalogs with a large number of
@@ -275,24 +294,15 @@ The following snippets are design-level examples to clarify how `HierarchicalSch
 
 ```java
 // Example utility methods in IcebergRESTUtils (or a dedicated HierarchicalSchemaUtil)
-private static String encodeSegment(String raw) {
-  // Encode % first, then separator-related characters.
-  return raw.replace("%", "%25").replace(":", "%3A");
-}
-
-private static String decodeSegment(String encoded) {
-  // Decode exactly once; reject malformed escape sequences in real implementation.
-  return encoded.replace("%3A", ":").replace("%25", "%");
-}
-
 public static String serializeHierarchicalPath(String[] levels) {
-  // ["team:core", "sales"] -> "team%3Acore:sales"
-  return Arrays.stream(levels).map(HierarchicalSchemaUtil::encodeSegment).collect(Collectors.joining(":"));
+  // ["team", "sales"] -> "team:sales"
+  // ':' is reserved separator and not allowed inside one level.
+  return String.join(":", levels);
 }
 
 public static String[] parseHierarchicalPath(String path) {
-  // "team%3Acore:sales" -> ["team:core", "sales"]
-  return Arrays.stream(path.split(":", -1)).map(HierarchicalSchemaUtil::decodeSegment).toArray(String[]::new);
+  // "team:sales" -> ["team", "sales"]
+  return path.split(":", -1);
 }
 
 public static String toPhysicalSchemaName(String hierarchicalPath) {
@@ -384,11 +394,13 @@ for (String scope : HierarchicalSchemaUtil.parentScopes("A:B:C")) {
 - `createNamespace` should ensure parent schemas exist for each hierarchical level.
 - `updateNamespace` should support property updates for mapped namespace scope.
 - `dropNamespace` should target mapped physical schema and preserve existing non-nested behavior.
-- `listSchemas` should accept an optional query parameter `parentHierarchicalSchema`.
+- `listSchemas` should accept an optional query parameter `parentSchema`.
   - When absent, return only top-level schemas (first layer).
   - When present, return only direct children under the given parent (next layer).
 - `listNamespaces` should return hierarchy-aware semantics (or equivalent parent-child expression)
   while keeping current flat storage model.
+- Catalog implementations must support namespace lifecycle APIs (create/list/alter/drop namespace)
+  for this feature path.
 
 ### 4) Identifier compatibility
 
@@ -415,6 +427,17 @@ Rationale:
   operational tooling that already assume Iceberg namespace conventions.
 - Isolate internal representation changes inside Gravitino/connector translation boundaries, so
   future internal evolution does not force external breaking changes for engine integrations.
+
+Engine Delimiter Support (Connector-facing):
+
+| Engine | User-facing namespace delimiter | Requires internal `:` input? | Notes |
+|---|---|---|---|
+| Spark connector | Iceberg-compatible representation | No | Keep Spark behavior consistent with Iceberg usage. |
+| Flink connector | Iceberg-compatible representation | No | Keep Flink behavior consistent with Iceberg usage. |
+| Trino connector | Iceberg-compatible representation | No | Keep Trino behavior consistent with Iceberg usage. |
+
+All engines should keep external namespace semantics aligned with Iceberg. Internal `:` is an
+implementation detail inside Gravitino and connector translation logic.
 
 ## Test Plan
 
