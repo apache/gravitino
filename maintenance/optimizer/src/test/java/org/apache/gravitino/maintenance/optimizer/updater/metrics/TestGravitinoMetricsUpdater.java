@@ -160,8 +160,10 @@ class TestGravitinoMetricsUpdater {
   @Test
   void testInitializeDefaultUsesGenericJdbcRepository() throws Exception {
     GravitinoMetricsUpdater updater = new GravitinoMetricsUpdater();
-    String storagePath = "data/test-metrics-updater-default-" + System.nanoTime() + ".db";
-    String jdbcUrl = "jdbc:h2:file:./" + storagePath + ";DB_CLOSE_DELAY=-1;MODE=MYSQL";
+    String jdbcUrl =
+        "jdbc:h2:mem:test_metrics_updater_default_"
+            + System.nanoTime()
+            + ";DB_CLOSE_DELAY=-1;MODE=MYSQL";
     updater.initialize(
         new OptimizerEnv(
             new OptimizerConfig(

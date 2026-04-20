@@ -120,6 +120,7 @@ public enum TestDatabaseName {
   CLICKHOUSE_CATALOG_CLICKHOUSE_IT,
   CLICKHOUSE_AUDIT_CATALOG_CLICKHOUSE_IT,
   CLICKHOUSE_CLUSTER_CLICKHOUSE_IT,
+  CLICKHOUSE_ENGINE_IT,
 
   /** Represents the PostgreSQL database for partition statistics integration tests. */
   PG_TEST_PARTITION_STATS {

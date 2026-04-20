@@ -31,7 +31,7 @@ log4j = "2.24.3"
 lance = "0.39.0"
 lance-namespace = "0.0.20"
 delta-kernel = "3.3.0"
-jetty = "9.4.51.v20230217"
+jetty = "9.4.58.v20250814"
 jersey = "2.41"
 mockito = "4.11.0"
 airlift-json = "237"
@@ -74,7 +74,7 @@ scala-java-compat = "1.0.2"
 sqlite-jdbc = "3.42.0.0"
 testcontainers = "1.21.4"
 jwt = "0.11.1"
-nimbus-jose-jwt = "9.37.3"
+nimbus-jose-jwt = "10.9"
 jline = "3.21.0"
 okhttp3 = "4.11.0"
 opencsv = "2.3"
@@ -141,6 +141,7 @@ ql-expression = "4.0.3"
 
 [libraries]
 aspectj-aspectjrt = { group = "org.aspectj", name = "aspectjrt", version.ref = "aspectj" }
+aws-glue = { group = "software.amazon.awssdk", name = "glue", version.ref = "awssdk" }
 aws-iam = { group = "software.amazon.awssdk", name = "iam", version.ref = "awssdk" }
 aws-policy = { group = "software.amazon.awssdk", name = "iam-policy-builder", version.ref = "awssdk" }
 aws-s3 = { group = "software.amazon.awssdk", name = "s3", version.ref = "awssdk" }

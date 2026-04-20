@@ -24,6 +24,7 @@ import com.github.jk1.license.render.InventoryHtmlReportRenderer
 import com.github.jk1.license.render.ReportRenderer
 import com.github.vlsi.gradle.dsl.configureEach
 import net.ltgt.gradle.errorprone.errorprone
+import org.gradle.api.attributes.java.TargetJvmVersion
 import org.gradle.api.tasks.testing.logging.TestExceptionFormat
 import org.gradle.internal.hash.ChecksumService
 import org.gradle.internal.os.OperatingSystem
@@ -64,6 +65,8 @@ val scalaVersion: String = project.properties["scalaVersion"] as? String ?: extr
 if (scalaVersion !in listOf("2.12", "2.13")) {
   throw GradleException("Scala version $scalaVersion is not supported.")
 }
+
+val skipWeb: Boolean = (project.findProperty("skipWeb") as? String)?.toBoolean() ?: false
 
 project.extra["extraJvmArgs"] =
   listOf(
@@ -192,7 +195,7 @@ allprojects {
       param.environment("GRAVITINO_CI_TRINO_DOCKER_IMAGE", "apache/gravitino-ci:trino-0.1.6")
       param.environment("GRAVITINO_CI_RANGER_DOCKER_IMAGE", "apache/gravitino-ci:ranger-0.1.2")
       param.environment("GRAVITINO_CI_KAFKA_DOCKER_IMAGE", "apache/kafka:3.7.0")
-      param.environment("GRAVITINO_CI_LOCALSTACK_DOCKER_IMAGE", "localstack/localstack:latest")
+      param.environment("GRAVITINO_CI_LOCALSTACK_DOCKER_IMAGE", "localstack/localstack:4.14.0")
 
       // Disable Ryuk for integration tests
       // Ryuk need privileged mode, if we want to rootless or run non-privileged mode, we need to disable it.
@@ -331,39 +334,23 @@ subprojects {
     mavenLocal()
   }
 
+  val jdk8CompatibleProjectPathPrefixes = setOf(
+    ":api",
+    ":common",
+    ":catalogs:catalog-common",
+    ":catalogs:hadoop-common",
+    ":maintenance:jobs",
+    ":maintenance:optimizer-api",
+    ":maintenance:updaters",
+    ":clients",
+    ":bundles",
+    ":spark-connector",
+    ":flink-connector"
+  )
+
   fun compatibleWithJDK8(project: Project): Boolean {
-    val name = project.name.lowercase()
     val path = project.path.lowercase()
-    if (path.startsWith(":maintenance:jobs") ||
-      path.startsWith(":maintenance:optimizer-api") ||
-      path.startsWith(":maintenance:updaters") ||
-      path.startsWith(":clients:client-java") ||
-      name == "api" ||
-      name == "common" ||
-      name == "catalog-common" ||
-      name == "hadoop-common"
-    ) {
-      return true
-    }
-
-    val isReleaseRun = gradle.startParameter.taskNames.any {
-      it == "release" || it == "publish" || it == "publishToMavenLocal" || it.endsWith(":release") || it.endsWith(
-        ":publish"
-      ) || it.endsWith(":publishToMavenLocal")
-    }
-    if (!isReleaseRun) {
-      return false
-    }
-
-    if (path.startsWith(":client") ||
-      path.startsWith(":spark-connector") ||
-      path.startsWith(":flink-connector") ||
-      path.startsWith(":bundles")
-    ) {
-      return true
-    }
-
-    return false
+    return jdk8CompatibleProjectPathPrefixes.any { path.startsWith(it) }
   }
   extensions.extraProperties.set("excludePackagesForSparkConnector", ::excludePackagesForSparkConnector)
 
@@ -399,12 +386,6 @@ subprojects {
     }
   }
 
-  tasks.withType<JavaCompile>().configureEach {
-    if (compatibleWithJDK8(project)) {
-      options.release.set(8)
-    }
-  }
-
   java {
     toolchain {
       // Some JDK vendors like Homebrew installed OpenJDK 17 have problems in building trino-connector:
@@ -424,6 +405,24 @@ subprojects {
         languageVersion.set(JavaLanguageVersion.of(17))
       }
     }
+  }
+
+  if (compatibleWithJDK8(project)) {
+    // Keep published/main classes Java 8-compatible for the selected modules.
+    tasks.named<JavaCompile>("compileJava") {
+      options.release.set(8)
+    }
+
+    // Tests still need Java 17 to compile against dependencies that only publish Java 17 variants.
+    tasks.named<JavaCompile>("compileTestJava") {
+      options.release.set(17)
+    }
+
+    val targetJvmVersionAttribute = TargetJvmVersion.TARGET_JVM_VERSION_ATTRIBUTE
+    configurations.matching { it.name in setOf("testCompileClasspath", "testRuntimeClasspath") }
+      .configureEach {
+        attributes.attribute(targetJvmVersionAttribute, 17)
+      }
   }
 
   gradle.projectsEvaluated {
@@ -450,6 +449,8 @@ subprojects {
   }
 
   tasks.withType<JavaCompile>().configureEach {
+    // Keep Java compilation independent of the host's default charset.
+    options.encoding = "UTF-8"
     options.errorprone.isEnabled.set(true)
     options.errorprone.disableWarningsInGeneratedCode.set(true)
     options.errorprone.disable(
@@ -715,6 +716,9 @@ tasks.rat {
     "clients/client-python/tests/unittests/htmlcov/*",
     "clients/client-python/tests/integration/htmlcov/*",
     "clients/filesystem-fuse/Cargo.lock",
+    "dev/charts/gravitino/README.md",
+    "dev/charts/gravitino-iceberg-rest-server/README.md",
+    "dev/charts/gravitino-lance-rest-server/README.md",
     "dev/docker/**/*.xml",
     "dev/docker/**/*.conf",
     "dev/docker/kerberos-hive/kadm5.acl",
@@ -774,21 +778,24 @@ jacoco {
 tasks {
   val projectDir = layout.projectDirectory
   val outputDir = projectDir.dir("distribution")
-
   val compileDistribution by registering {
-    dependsOn(
-      "copyCatalogLibAndConfigs",
-      "copySubprojectDependencies",
-      "copySubprojectLib",
-      "copyCliLib",
-      "copyJobsLib",
-      ":authorizations:copyLibAndConfig",
-      ":iceberg:iceberg-rest-server:copyLibAndConfigs",
-      ":lance:lance-rest-server:copyLibAndConfigs",
-      ":maintenance:optimizer:copyLibAndConfigs",
-      ":web:web:build",
-      ":web-v2:web:build"
-    )
+    val dependencies =
+      mutableListOf(
+        "copyCatalogLibAndConfigs",
+        "copySubprojectDependencies",
+        "copySubprojectLib",
+        "copyCliLib",
+        "copyJobsLib",
+        ":authorizations:copyLibAndConfig",
+        ":iceberg:iceberg-rest-server:copyLibAndConfigs",
+        ":lance:lance-rest-server:copyLibAndConfigs",
+        ":maintenance:optimizer:copyLibAndConfigs"
+      )
+    if (!skipWeb) {
+      dependencies.add(":web:web:build")
+      dependencies.add(":web-v2:web:build")
+    }
+    dependsOn(dependencies)
 
     group = "gravitino distribution"
     outputs.dir(projectDir.dir("distribution/package"))
@@ -796,8 +803,14 @@ tasks {
       copy {
         from(projectDir.dir("conf")) { into("package/conf") }
         from(projectDir.dir("bin")) { into("package/bin") }
-        from(projectDir.dir("web/web/build/libs/${rootProject.name}-web-$version.war")) { into("package/web") }
-        from(projectDir.dir("web-v2/web/build/libs/${rootProject.name}-web-$version.war")) { into("package/web-v2") }
+        if (!skipWeb) {
+          from(projectDir.dir("web/web/build/libs/${rootProject.name}-web-$version.war")) {
+            into("package/web")
+          }
+          from(projectDir.dir("web-v2/web/build/libs/${rootProject.name}-web-$version.war")) {
+            into("package/web-v2")
+          }
+        }
         from(projectDir.dir("scripts")) { into("package/scripts") }
         into(outputDir)
         rename { fileName ->
@@ -817,16 +830,22 @@ tasks {
         from(projectDir.file("LICENSE.bin")) { into("package") }
         from(projectDir.file("NOTICE.bin")) { into("package") }
         from(projectDir.file("README.md")) { into("package") }
-        from(projectDir.dir("web/web/licenses")) { into("package/web/licenses") }
-        from(projectDir.dir("web/web/LICENSE.bin")) { into("package/web") }
-        from(projectDir.dir("web/web/NOTICE.bin")) { into("package/web") }
-        from(projectDir.dir("web-v2/web/licenses")) { into("package/web-v2/licenses") }
-        from(projectDir.dir("web-v2/web/LICENSE.bin")) { into("package/web-v2") }
-        from(projectDir.dir("web-v2/web/NOTICE.bin")) { into("package/web-v2") }
+        if (!skipWeb) {
+          from(projectDir.dir("web/web/licenses")) { into("package/web/licenses") }
+          from(projectDir.dir("web/web/LICENSE.bin")) { into("package/web") }
+          from(projectDir.dir("web/web/NOTICE.bin")) { into("package/web") }
+          from(projectDir.dir("web-v2/web/licenses")) { into("package/web-v2/licenses") }
+          from(projectDir.dir("web-v2/web/LICENSE.bin")) { into("package/web-v2") }
+          from(projectDir.dir("web-v2/web/NOTICE.bin")) { into("package/web-v2") }
+        }
         into(outputDir)
         rename { fileName ->
           fileName.replace(".bin", "")
         }
+      }
+
+      if (skipWeb) {
+        delete(projectDir.dir("distribution/package/web"), projectDir.dir("distribution/package/web-v2"))
       }
 
       // Create the directory 'data' for storage.
@@ -1151,6 +1170,7 @@ tasks {
   register("copyCatalogLibAndConfigs", Copy::class) {
     dependsOn(
       ":catalogs:catalog-fileset:copyLibAndConfig",
+      ":catalogs:catalog-glue:copyLibAndConfig",
       ":catalogs:catalog-hive:copyLibAndConfig",
       ":catalogs:catalog-jdbc-doris:copyLibAndConfig",
       ":catalogs:catalog-jdbc-mysql:copyLibAndConfig",
@@ -1313,21 +1333,3 @@ fun checkOrbStackStatus() {
 }
 
 printDockerCheckInfo()
-
-tasks.register("release") {
-  group = "release"
-  description = "Builds and package a release version."
-  doFirst {
-    println("Releasing project...")
-  }
-
-  // Use 'assemble' instead of 'build' to skip tests during release
-  // Tests have JDK version conflicts (some need JDK 8, some need JDK 17)
-  // and should be run separately in CI/CD with appropriate JDK configurations
-  // Only include subprojects that apply the Java plugin (exclude client-python)
-  dependsOn(
-    subprojects
-      .filter { it.name != "client-python" }
-      .map { it.tasks.named("assemble") }
-  )
-}

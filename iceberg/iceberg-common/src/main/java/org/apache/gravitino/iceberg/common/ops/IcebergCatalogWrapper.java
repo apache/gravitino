@@ -204,6 +204,23 @@ public class IcebergCatalogWrapper implements AutoCloseable {
     return loadTableResponse;
   }
 
+  /**
+   * Retrieves the metadata file location for the specified table without loading full table
+   * metadata. This is an optional fast path for catalogs that implement {@link
+   * SupportsMetadataLocation}.
+   *
+   * @param tableIdentifier the table identifier
+   * @return an Optional containing the metadata file location, or empty if the catalog doesn't
+   *     support this operation
+   */
+  public Optional<String> getTableMetadataLocation(TableIdentifier tableIdentifier) {
+    if (catalog instanceof SupportsMetadataLocation) {
+      return Optional.ofNullable(
+          ((SupportsMetadataLocation) catalog).metadataLocation(tableIdentifier));
+    }
+    return Optional.empty();
+  }
+
   public boolean tableExists(TableIdentifier tableIdentifier) {
     return catalog.tableExists(tableIdentifier);
   }

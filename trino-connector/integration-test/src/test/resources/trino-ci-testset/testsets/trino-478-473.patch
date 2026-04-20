@@ -1,27 +1,34 @@
-diff --git a/trino-connector/integration-test/src/test/resources/trino-ci-testset/testsets/hive/catalog_hive_prepare.sql b/trino-connector/integration-test/src/test/resources/trino-ci-testset/testsets/hive/catalog_hive_prepare.sql
-index 67ea924ba..b392ae230 100644
---- a/trino-connector/integration-test/src/test/resources/trino-ci-testset/testsets/hive/catalog_hive_prepare.sql
-+++ b/trino-connector/integration-test/src/test/resources/trino-ci-testset/testsets/hive/catalog_hive_prepare.sql
-@@ -2,7 +2,7 @@ call gravitino.system.create_catalog(
-     'gt_hive',
-     'hive',
-     map(
--        array['metastore.uris', 'trino.bypass.fs.hadoop.enabled'],
--        array['${hive_uri}', 'true']
-+        array['metastore.uris'],
-+        array['${hive_uri}']
-     )
- );
-\ No newline at end of file
+diff --git a/trino-connector/integration-test/src/test/resources/trino-ci-testset/testsets/hive/00008_decimal.sql b/trino-connector/integration-test/src/test/resources/trino-ci-testset/testsets/hive/00008_decimal.sql
+index 46cf682b1..4d3fcb5d2 100644
+--- a/trino-connector/integration-test/src/test/resources/trino-ci-testset/testsets/hive/00008_decimal.sql
++++ b/trino-connector/integration-test/src/test/resources/trino-ci-testset/testsets/hive/00008_decimal.sql
+@@ -26,7 +26,7 @@ SELECT val1 + val2 FROM tb03;
+ 
+ SELECT val1 * val2 FROM tb03;
+ 
+-SELECT CAST(val1 / val2 AS DECIMAL(38, 2)) FROM tb03;
++SELECT val1 / val2 FROM tb03;
+ 
+ CREATE TABLE tb04 (max_min_val DECIMAL(18, 4));
+ 
+diff --git a/trino-connector/integration-test/src/test/resources/trino-ci-testset/testsets/jdbc-mysql/00002_alter_table.txt b/trino-connector/integration-test/src/test/resources/trino-ci-testset/testsets/jdbc-mysql/00002_alter_table.txt
+index 58ca30d38..bef1b08b1 100644
+--- a/trino-connector/integration-test/src/test/resources/trino-ci-testset/testsets/jdbc-mysql/00002_alter_table.txt
++++ b/trino-connector/integration-test/src/test/resources/trino-ci-testset/testsets/jdbc-mysql/00002_alter_table.txt
+@@ -110,3 +110,4 @@ DROP TABLE
+ 
+ DROP SCHEMA
+ 
++
 diff --git a/trino-connector/integration-test/src/test/resources/trino-ci-testset/testsets/jdbc-postgresql/00004_query_pushdown.txt b/trino-connector/integration-test/src/test/resources/trino-ci-testset/testsets/jdbc-postgresql/00004_query_pushdown.txt
-index edd8257ad..c4f271add 100644
+index 156b5136f..c4f271add 100644
 --- a/trino-connector/integration-test/src/test/resources/trino-ci-testset/testsets/jdbc-postgresql/00004_query_pushdown.txt
 +++ b/trino-connector/integration-test/src/test/resources/trino-ci-testset/testsets/jdbc-postgresql/00004_query_pushdown.txt
 @@ -12,26 +12,26 @@ INSERT: 15000 rows
  
  "Trino version: %
  %
--    └─ TableScan[table = gt_postgresql:gt_db1.customer->gt_db1.customer gt_db.gt_db1.customer limit=10 columns=[custkey:bigint:int8]]
+-    └─ TableScan[table = gt_postgresql:gt_db1.customer->gt_db1.customer %gt_db1.customer limit=10 columns=[custkey:bigint:int8]]
 +    %TableScan[table = gt_postgresql:gt_db1.customer->gt_db1.customer gt_db1.customer limit=10 columns=[custkey:bigint:int8]]
             Layout: [custkey:bigint]
  %
@@ -29,39 +36,24 @@ index edd8257ad..c4f271add 100644
  
  "Trino version: %
  %
--    └─ TableScan[table = gt_postgresql:gt_db1.customer->gt_db1.customer gt_db.gt_db1.customer%constraints=%phone%LIKE%]
+-    └─ TableScan[table = gt_postgresql:gt_db1.customer->gt_db1.customer %gt_db1.customer%constraints=%phone%LIKE%]
 +    %TableScan[table = gt_postgresql:gt_db1.customer->gt_db1.customer gt_db1.customer%constraints=%phone%LIKE%]
  %
  "
  
  "Trino version: %
  %
--    └─ TableScan[table = gt_postgresql:gt_db1.orders->Query[SELECT sum(""totalprice"") AS ""_pfgnrtd_0"" FROM ""gt_db"".""gt_db1"".""orders""]%columns=[_pfgnrtd_0:decimal(38,2):decimal]]
+-    └─ TableScan[table = gt_postgresql:gt_db1.orders->Query[SELECT sum(""totalprice"") AS ""_pfgnrtd_0"" FROM %""gt_db1"".""orders""]%columns=[_pfgnrtd_0:decimal(38,2):decimal]]
 +    %TableScan[table = gt_postgresql:gt_db1.orders->Query[SELECT sum(""totalprice"") AS ""_pfgnrtd_0"" FROM ""gt_db1"".""orders""]%columns=[_pfgnrtd_0:decimal(38,2):decimal]]
  %
  "
  
  "Trino version: %
  %
--    └─ TableScan[table = gt_postgresql:gt_db1.%->Query[SELECT ""orderdate"", sum(""totalprice"") AS ""_pfgnrtd_0"" FROM ""gt_db"".""gt_db1"".""orders"" GROUP BY ""orderdate""]%sortOrder=[orderdate:date:date ASC NULLS LAST]%limit=10%columns=[orderdate:date:date, _pfgnrtd_0:decimal(38,2):decimal]]
+-    └─ TableScan[table = gt_postgresql:gt_db1.%->Query[SELECT ""orderdate"", sum(""totalprice"") AS ""_pfgnrtd_0"" FROM %""gt_db1"".""orders"" GROUP BY ""orderdate""]%sortOrder=[orderdate:date:date ASC NULLS LAST]%limit=10%columns=[orderdate:date:date, _pfgnrtd_0:decimal(38,2):decimal]]
 +    %TableScan[table = gt_postgresql:gt_db1.%->Query[SELECT ""orderdate"", sum(""totalprice"") AS ""_pfgnrtd_0"" FROM ""gt_db1"".""orders"" GROUP BY ""orderdate""]%sortOrder=[orderdate:date:date ASC NULLS LAST]%limit=10%columns=[orderdate:date:date, _pfgnrtd_0:decimal(38,2):decimal]]
  %
  "
- 
-diff --git a/trino-connector/integration-test/src/test/resources/trino-ci-testset/testsets/lakehouse-iceberg/catalog_iceberg_prepare.sql b/trino-connector/integration-test/src/test/resources/trino-ci-testset/testsets/lakehouse-iceberg/catalog_iceberg_prepare.sql
-index e310c051d..46ad6a38c 100644
---- a/trino-connector/integration-test/src/test/resources/trino-ci-testset/testsets/lakehouse-iceberg/catalog_iceberg_prepare.sql
-+++ b/trino-connector/integration-test/src/test/resources/trino-ci-testset/testsets/lakehouse-iceberg/catalog_iceberg_prepare.sql
-@@ -2,8 +2,8 @@ call gravitino.system.create_catalog(
-     'gt_iceberg',
-     'lakehouse-iceberg',
-     map(
--        array['uri', 'catalog-backend', 'warehouse', 'trino.bypass.fs.hadoop.enabled'],
--        array['${hive_uri}', 'hive', '${hdfs_uri}/user/iceberg/warehouse/TrinoQueryIT', 'true']
-+        array['uri', 'catalog-backend', 'warehouse'],
-+        array['${hive_uri}', 'hive', '${hdfs_uri}/user/iceberg/warehouse/TrinoQueryIT']
-     )
- );
  
 diff --git a/trino-connector/integration-test/src/test/resources/trino-ci-testset/testsets/tpcds/00002.sql b/trino-connector/integration-test/src/test/resources/trino-ci-testset/testsets/tpcds/00002.sql
 index 7ed8fbf18..0e797b639 100644
@@ -301,84 +293,19 @@ index 10e47d07e..72ddd155e 100644
    store_sales
  , item
 diff --git a/trino-connector/integration-test/src/test/resources/trino-ci-testset/testsets/tpch/00008.sql b/trino-connector/integration-test/src/test/resources/trino-ci-testset/testsets/tpch/00008.sql
-index 11b768749..ea3b1fa72 100644
+index 02f52dc5f..ea3b1fa72 100644
 --- a/trino-connector/integration-test/src/test/resources/trino-ci-testset/testsets/tpch/00008.sql
 +++ b/trino-connector/integration-test/src/test/resources/trino-ci-testset/testsets/tpch/00008.sql
 @@ -1,10 +1,10 @@
  SELECT
    o_year,
--  CAST((sum(CASE
+-  CAST(sum(CASE
 +  sum(CASE
        WHEN nation = 'BRAZIL'
          THEN volume
        ELSE 0
--      END) / sum(volume)) AS DECIMAL(38, 2)) AS mkt_share
+-      END) / sum(volume) AS DECIMAL(38, 4)) AS mkt_share
 +      END) / sum(volume) AS mkt_share
  FROM (
         SELECT
           extract(YEAR FROM o.orderdate)     AS o_year,
-diff --git a/trino-connector/integration-test/src/test/resources/trino-ci-testset/testsets/tpch/00008.txt b/trino-connector/integration-test/src/test/resources/trino-ci-testset/testsets/tpch/00008.txt
-index cdea0396b..8be6da155 100644
---- a/trino-connector/integration-test/src/test/resources/trino-ci-testset/testsets/tpch/00008.txt
-+++ b/trino-connector/integration-test/src/test/resources/trino-ci-testset/testsets/tpch/00008.txt
-@@ -1,2 +1,2 @@
--"1995","0.00"
--"1996","0.00"
-\ No newline at end of file
-+"1995","0.0000"
-+"1996","0.0000"
-\ No newline at end of file
-diff --git a/trino-connector/integration-test/src/test/resources/trino-ci-testset/testsets/tpch/00017.sql b/trino-connector/integration-test/src/test/resources/trino-ci-testset/testsets/tpch/00017.sql
-index d712f45bb..7150e90ec 100644
---- a/trino-connector/integration-test/src/test/resources/trino-ci-testset/testsets/tpch/00017.sql
-+++ b/trino-connector/integration-test/src/test/resources/trino-ci-testset/testsets/tpch/00017.sql
-@@ -1,5 +1,5 @@
- SELECT
--  CAST(sum(l.extendedprice)/7.0 AS DECIMAL(38, 2)) as avg_yearly
-+  sum(l.extendedprice)/7.0 as avg_yearly
- FROM
-   lineitem l,
-   part p
-diff --git a/trino-connector/integration-test/src/test/resources/trino-ci-testset/testsets/tpch/catalog_hive_prepare.sql b/trino-connector/integration-test/src/test/resources/trino-ci-testset/testsets/tpch/catalog_hive_prepare.sql
-index 2a35d4340..2fb4294af 100644
---- a/trino-connector/integration-test/src/test/resources/trino-ci-testset/testsets/tpch/catalog_hive_prepare.sql
-+++ b/trino-connector/integration-test/src/test/resources/trino-ci-testset/testsets/tpch/catalog_hive_prepare.sql
-@@ -2,8 +2,8 @@ call gravitino.system.create_catalog(
-     'gt_hive2',
-     'hive',
-     map(
--        array['metastore.uris', 'trino.bypass.fs.hadoop.enabled'],
--        array['${hive_uri}', 'true']
-+        array['metastore.uris'],
-+        array['${hive_uri}']
-     )
- );
- 
-diff --git a/trino-connector/integration-test/src/test/resources/trino-ci-testset/testsets/tpch/catalog_iceberg_prepare.sql b/trino-connector/integration-test/src/test/resources/trino-ci-testset/testsets/tpch/catalog_iceberg_prepare.sql
-index 22826aa98..a5a0669f8 100644
---- a/trino-connector/integration-test/src/test/resources/trino-ci-testset/testsets/tpch/catalog_iceberg_prepare.sql
-+++ b/trino-connector/integration-test/src/test/resources/trino-ci-testset/testsets/tpch/catalog_iceberg_prepare.sql
-@@ -2,8 +2,8 @@ call gravitino.system.create_catalog(
-     'gt_iceberg2',
-     'lakehouse-iceberg',
-     map(
--        array['uri', 'catalog-backend', 'warehouse', 'trino.bypass.fs.hadoop.enabled'],
--        array['${hive_uri}', 'hive', '${hdfs_uri}/user/iceberg/warehouse/TrinoQueryIT', 'true']
-+        array['uri', 'catalog-backend', 'warehouse'],
-+        array['${hive_uri}', 'hive', '${hdfs_uri}/user/iceberg/warehouse/TrinoQueryIT']
-     )
- );
- 
-diff --git a/trino-connector/integration-test/src/test/resources/trino-ci-testset/testsets/hive/00008_decimal.sql b/trino-connector/integration-test/src/test/resources/trino-ci-testset/testsets/hive/00008_decimal.sql
-index 46cf682b1..4d3fcb5d2 100644
---- a/trino-connector/integration-test/src/test/resources/trino-ci-testset/testsets/hive/00008_decimal.sql
-+++ b/trino-connector/integration-test/src/test/resources/trino-ci-testset/testsets/hive/00008_decimal.sql
-@@ -26,7 +26,7 @@ SELECT val1 + val2 FROM tb03;
- 
- SELECT val1 * val2 FROM tb03;
- 
--SELECT CAST(val1 / val2 AS DECIMAL(38, 2)) FROM tb03;
-+SELECT val1 / val2 FROM tb03;
- 
- CREATE TABLE tb04 (max_min_val DECIMAL(18, 4));
- 

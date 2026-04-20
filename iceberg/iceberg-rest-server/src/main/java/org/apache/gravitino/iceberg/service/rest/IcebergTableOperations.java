@@ -25,6 +25,10 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.common.annotations.VisibleForTesting;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
+import java.util.Optional;
+import java.util.Set;
+import java.util.stream.Collectors;
 import javax.inject.Inject;
 import javax.servlet.http.HttpServletRequest;
 import javax.ws.rs.Consumes;
@@ -40,6 +44,7 @@ import javax.ws.rs.PathParam;
 import javax.ws.rs.Produces;
 import javax.ws.rs.QueryParam;
 import javax.ws.rs.core.Context;
+import javax.ws.rs.core.EntityTag;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 import org.apache.commons.lang3.StringUtils;
@@ -62,6 +67,8 @@ import org.apache.gravitino.server.authorization.annotations.IcebergAuthorizatio
 import org.apache.gravitino.server.authorization.annotations.IcebergAuthorizationMetadata.RequestType;
 import org.apache.gravitino.server.authorization.expression.AuthorizationExpressionConstants;
 import org.apache.gravitino.server.web.Utils;
+import org.apache.iceberg.SnapshotRef;
+import org.apache.iceberg.TableMetadata;
 import org.apache.iceberg.catalog.Namespace;
 import org.apache.iceberg.catalog.TableIdentifier;
 import org.apache.iceberg.rest.RESTUtil;
@@ -85,6 +92,8 @@ public class IcebergTableOperations {
 
   @VisibleForTesting
   public static final String X_ICEBERG_ACCESS_DELEGATION = "X-Iceberg-Access-Delegation";
+
+  @VisibleForTesting public static final String IF_NONE_MATCH = "If-None-Match";
 
   private IcebergMetricsManager icebergMetricsManager;
 
@@ -173,7 +182,7 @@ public class IcebergTableOperations {
                 new IcebergRequestContext(httpServletRequest(), catalogName, isCredentialVending);
             LoadTableResponse loadTableResponse =
                 tableOperationDispatcher.createTable(context, icebergNS, createTableRequest);
-            return IcebergRESTUtils.ok(loadTableResponse);
+            return buildResponseWithETag(loadTableResponse);
           });
     } catch (Exception e) {
       return IcebergExceptionMapper.toRESTResponse(e);
@@ -218,7 +227,7 @@ public class IcebergTableOperations {
             TableIdentifier tableIdentifier = TableIdentifier.of(icebergNS, tableName);
             LoadTableResponse loadTableResponse =
                 tableOperationDispatcher.updateTable(context, tableIdentifier, updateTableRequest);
-            return IcebergRESTUtils.ok(loadTableResponse);
+            return buildResponseWithETag(loadTableResponse);
           });
     } catch (Exception e) {
       return IcebergExceptionMapper.toRESTResponse(e);
@@ -282,8 +291,9 @@ public class IcebergTableOperations {
           String namespace,
       @IcebergAuthorizationMetadata(type = RequestType.LOAD_TABLE) @Encoded() @PathParam("table")
           String table,
-      @DefaultValue("all") @QueryParam("snapshots") String snapshots,
-      @HeaderParam(X_ICEBERG_ACCESS_DELEGATION) String accessDelegation) {
+      @DefaultValue(IcebergRESTUtils.SNAPSHOT_ALL) @QueryParam("snapshots") String snapshots,
+      @HeaderParam(X_ICEBERG_ACCESS_DELEGATION) String accessDelegation,
+      @HeaderParam(IF_NONE_MATCH) String ifNoneMatch) {
     String catalogName = IcebergRESTUtils.getCatalogName(prefix);
     Namespace icebergNS = RESTUtil.decodeNamespace(namespace);
     String tableName = RESTUtil.decodeString(table);
@@ -296,7 +306,6 @@ public class IcebergTableOperations {
         tableName,
         accessDelegation,
         isCredentialVending);
-    // todo support snapshots
     try {
       return Utils.doAs(
           httpRequest,
@@ -304,9 +313,30 @@ public class IcebergTableOperations {
             TableIdentifier tableIdentifier = TableIdentifier.of(icebergNS, tableName);
             IcebergRequestContext context =
                 new IcebergRequestContext(httpServletRequest(), catalogName, isCredentialVending);
+
+            // Fast path: if client sent If-None-Match, try to resolve ETag without full table load
+            if (StringUtils.isNotBlank(ifNoneMatch)) {
+              Optional<String> metadataLocation =
+                  tableOperationDispatcher.getTableMetadataLocation(context, tableIdentifier);
+              if (metadataLocation.isPresent()) {
+                Optional<EntityTag> etag = generateETag(metadataLocation.get(), snapshots);
+                if (etag.isPresent() && etagMatches(ifNoneMatch, etag.get())) {
+                  return Response.notModified(etag.get()).build();
+                }
+              }
+            }
+
             LoadTableResponse loadTableResponse =
                 tableOperationDispatcher.loadTable(context, tableIdentifier);
-            return IcebergRESTUtils.ok(loadTableResponse);
+            Optional<EntityTag> etag =
+                generateETag(loadTableResponse.tableMetadata().metadataFileLocation(), snapshots);
+            if (etag.isPresent() && etagMatches(ifNoneMatch, etag.get())) {
+              return Response.notModified(etag.get()).build();
+            }
+            if (IcebergRESTUtils.SnapshotMode.REFS.getValue().equals(snapshots)) {
+              loadTableResponse = filterSnapshotsByRefs(loadTableResponse);
+            }
+            return buildResponseWithETag(loadTableResponse, etag);
           });
     } catch (Exception e) {
       return IcebergExceptionMapper.toRESTResponse(e);
@@ -506,6 +536,71 @@ public class IcebergTableOperations {
       LOG.error("Failed to plan table scan: {}", e.getMessage(), e);
       return IcebergExceptionMapper.toRESTResponse(e);
     }
+  }
+
+  /**
+   * Filters the {@link LoadTableResponse} to include only snapshots that are directly referenced by
+   * the table's refs (branches and tags). This implements the {@code snapshots=refs} query
+   * parameter behavior per the Iceberg REST specification.
+   *
+   * @param loadTableResponse the original response containing all snapshots
+   * @return a new response with only ref-referenced snapshots
+   */
+  @VisibleForTesting
+  static LoadTableResponse filterSnapshotsByRefs(LoadTableResponse loadTableResponse) {
+    TableMetadata metadata = loadTableResponse.tableMetadata();
+    Map<String, SnapshotRef> refs = metadata.refs();
+    Set<Long> referencedSnapshotIds =
+        refs.values().stream().map(SnapshotRef::snapshotId).collect(Collectors.toSet());
+    // If all snapshots are already referenced by refs, return the original response
+    if (metadata.snapshots().stream()
+        .allMatch(s -> referencedSnapshotIds.contains(s.snapshotId()))) {
+      return loadTableResponse;
+    }
+    TableMetadata filteredMetadata =
+        TableMetadata.buildFrom(metadata).suppressHistoricalSnapshots().build();
+    return LoadTableResponse.builder()
+        .withTableMetadata(filteredMetadata)
+        .addAllConfig(loadTableResponse.config())
+        .build();
+  }
+
+  private static Response buildResponseWithETag(LoadTableResponse loadTableResponse) {
+    return IcebergRESTUtils.buildResponseWithETag(loadTableResponse);
+  }
+
+  private static Response buildResponseWithETag(
+      LoadTableResponse loadTableResponse, Optional<EntityTag> etag) {
+    return IcebergRESTUtils.buildResponseWithETag(loadTableResponse, etag);
+  }
+
+  @VisibleForTesting
+  static Optional<EntityTag> generateETag(String metadataLocation) {
+    return IcebergRESTUtils.generateETag(metadataLocation);
+  }
+
+  @VisibleForTesting
+  static Optional<EntityTag> generateETag(String metadataLocation, String snapshots) {
+    return IcebergRESTUtils.generateETag(metadataLocation, snapshots);
+  }
+
+  /**
+   * Checks if the client's If-None-Match header value matches the current ETag.
+   *
+   * @param ifNoneMatch the If-None-Match header value from the client
+   * @param etag the current ETag
+   * @return true if the ETag matches (table unchanged), false otherwise
+   */
+  private static boolean etagMatches(String ifNoneMatch, EntityTag etag) {
+    if (StringUtils.isBlank(ifNoneMatch)) {
+      return false;
+    }
+    // Strip quotes if present to compare the raw value
+    String clientEtag = ifNoneMatch.trim();
+    if (clientEtag.startsWith("\"") && clientEtag.endsWith("\"")) {
+      clientEtag = clientEtag.substring(1, clientEtag.length() - 1);
+    }
+    return etag.getValue().equals(clientEtag);
   }
 
   private boolean isCredentialVending(String accessDelegation) {

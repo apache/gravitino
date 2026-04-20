@@ -31,6 +31,7 @@ jobs:
       - uses: dorny/paths-filter@de90cc6fb38fc0963ad72b210f1f284cd68cea36
         id: filter
         with:
+          list-files: shell
           filters: |
             source_changes:
               - '.github/**'
@@ -64,10 +65,39 @@ jobs:
               - spark-connector/**
             mcp_server_changes:
               - mcp-server/**
+      - name: Determine maintenance-module-only changes
+        id: maintenance_module_only
+        env:
+          SOURCE_CHANGE_FILES: ${{ steps.filter.outputs.source_changes_files }}
+        run: |
+          # Route to the maintenance-only build path only when every source
+          # change in the PR is under maintenance/. Non-source changes are
+          # already filtered out by source_changes_files.
+          source_files=()
+          if [ -n "${SOURCE_CHANGE_FILES}" ]; then
+            eval "source_files=(${SOURCE_CHANGE_FILES})"
+          fi
+
+          maintenance_module_only=false
+          if [ "${#source_files[@]}" -gt 0 ]; then
+            maintenance_module_only=true
+            for path in "${source_files[@]}"; do
+              case "$path" in
+                maintenance/*) ;;
+                *)
+                  maintenance_module_only=false
+                  break
+                  ;;
+              esac
+            done
+          fi
+
+          echo "maintenance_module_only_changes=${maintenance_module_only}" >> "${GITHUB_OUTPUT}"
     outputs:
       source_changes: ${{ steps.filter.outputs.source_changes }}
       spark_connector_changes: ${{ steps.filter.outputs.spark_connector_changes }}
       mcp_server_changes: ${{ steps.filter.outputs.mcp_server_changes }}
+      maintenance_module_only_changes: ${{ steps.maintenance_module_only.outputs.maintenance_module_only_changes }}
 
   compile-check:
     runs-on: ubuntu-latest
@@ -84,7 +114,7 @@ jobs:
 
       - name: Build with Gradle
         run: |
-          ./gradlew release -x test
+          ./gradlew assemble -PskipWeb=true
 
   # To check the spark-connector is compatible with scala2.13
   spark-connector-build:
@@ -107,12 +137,12 @@ jobs:
 
       - name: Build with Scala2.13
         run: |
-          ./gradlew :spark-connector:spark-3.3:build -PscalaVersion=2.13 -PskipITs -PskipDockerTests=false
-          ./gradlew :spark-connector:spark-3.4:build -PscalaVersion=2.13 -PskipITs -PskipDockerTests=false
-          ./gradlew :spark-connector:spark-3.5:build -PscalaVersion=2.13 -PskipITs -PskipDockerTests=false
+          ./gradlew :spark-connector:spark-3.3:build -PscalaVersion=2.13 -PskipITs -PskipDockerTests=false -PskipWeb=true
+          ./gradlew :spark-connector:spark-3.4:build -PscalaVersion=2.13 -PskipITs -PskipDockerTests=false -PskipWeb=true
+          ./gradlew :spark-connector:spark-3.5:build -PscalaVersion=2.13 -PskipITs -PskipDockerTests=false -PskipWeb=true
 
       - name: Upload unit tests report
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         if: failure()
         with:
           name: unit test report
@@ -141,7 +171,7 @@ jobs:
           cache: 'gradle'
 
       - name: Test publish to local
-        run: ./gradlew publishToMavenLocal -x test
+        run: ./gradlew publishToMavenLocal -PskipWeb=true -x test
 
       - name: Free up disk space
         run: |
@@ -153,12 +183,41 @@ jobs:
           sudo dpkg -i libssl1.1_1.1.1f-1ubuntu2_amd64.deb  
 
       - name: Build with Gradle
-        if: needs.changes.outputs.mcp_server_changes == 'true'
-        run: ./gradlew build -PskipITs -PskipDockerTests=false -x :clients:client-python:build
+        run: |
+          if [ "${{ needs.changes.outputs.maintenance_module_only_changes }}" = "true" ]; then
+            ./gradlew \
+              :maintenance:optimizer-api:build \
+              :maintenance:updaters:build \
+              :maintenance:optimizer:build \
+              :maintenance:jobs:build \
+              -PskipWeb=true \
+              -PskipITs \
+              -PskipDockerTests=false
+            exit 0
+          fi
 
-      - name: Build with Gradle (skip mcp-server tests)
-        if: needs.changes.outputs.mcp_server_changes != 'true'
-        run: ./gradlew build -PskipITs -PskipDockerTests=false -x :clients:client-python:build -x :mcp-server:build -x :mcp-server:test -x :mcp-server:pylint -x :web-v2:web:build
+          gradle_args=(
+            build
+            -PskipWeb=true
+            -PskipITs
+            -PskipDockerTests=false
+            -x :clients:client-python:build
+          )
+
+          if [ "${{ needs.changes.outputs.mcp_server_changes }}" != "true" ]; then
+            gradle_args+=(
+              -x :mcp-server:build
+              -x :mcp-server:test
+              -x :mcp-server:pylint
+              -x :web-v2:web:build
+            )
+          fi
+
+          printf './gradlew'
+          printf ' %q' "${gradle_args[@]}"
+          printf '\n'
+
+          ./gradlew "${gradle_args[@]}"
 
       - name: Fetch base branch for coverage diff
         if: github.event_name == 'pull_request'
@@ -182,7 +241,7 @@ jobs:
 
       - name: Upload Coverage Report
         if: github.event_name == 'pull_request' && steps.coverage.outputs.has_reports == 'true'
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: coverage-report
           path: |
@@ -195,11 +254,8 @@ jobs:
           echo "Total coverage ${{ steps.coverage.outputs.coverage-overall }}"
           echo "Changed Files coverage ${{ steps.coverage.outputs.coverage-changed-files }}"
 
-      - name: Release with Gradle
-        run: ./gradlew clean && ./gradlew release -x test --rerun-tasks
-
       - name: Upload unit tests report
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         if: failure()
         with:
           name: unit test report

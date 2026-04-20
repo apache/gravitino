@@ -35,16 +35,14 @@ class TableChange(ABC):
     """
 
     @staticmethod
-    def rename(new_name: str) -> "RenameTable":
+    def rename(new_name: str, new_schema_name: Optional[str] = None) -> "RenameTable":
         """Create a `TableChange` for renaming a table.
 
         Args:
             new_name: The new table name.
-
-        Returns:
-            RenameTable: A `TableChange` for the rename.
+            new_schema_name: The new schema name if cross-schema rename is requested.
         """
-        return TableChange.RenameTable(new_name)
+        return TableChange.RenameTable(new_name, new_schema_name)
 
     @staticmethod
     def update_comment(new_comment: str) -> "UpdateComment":
@@ -315,6 +313,9 @@ class TableChange(ABC):
         """A `TableChange` to rename a table."""
 
         _new_name: str = field(metadata=config(field_name="new_name"))
+        _new_schema_name: Optional[str] = field(
+            default=None, metadata=config(field_name="new_schema_name")
+        )
 
         def get_new_name(self) -> str:
             """Retrieves the new name for the table.
@@ -324,17 +325,26 @@ class TableChange(ABC):
             """
             return self._new_name
 
+        def get_new_schema_name(self) -> Optional[str]:
+            """Retrieves the new schema name for the table."""
+            return self._new_schema_name
+
         def __str__(self):
-            return f"RENAMETABLE {self._new_name}"
+            if self._new_schema_name is None:
+                return f"RENAMETABLE {self._new_name}"
+            return f"RENAMETABLE {self._new_schema_name}.{self._new_name}"
 
         def __eq__(self, value: object) -> bool:
             if not isinstance(value, TableChange.RenameTable):
                 return False
             other = cast(TableChange.RenameTable, value)
-            return self._new_name == other.get_new_name()
+            return (
+                self._new_name == other.get_new_name()
+                and self._new_schema_name == other.get_new_schema_name()
+            )
 
         def __hash__(self) -> int:
-            return hash(self._new_name)
+            return hash((self._new_name, self._new_schema_name))
 
     @final
     @dataclass(frozen=True)

@@ -43,7 +43,7 @@ jobs:
           cache: 'gradle'
 
       - name: Set up QEMU
-        uses: docker/setup-qemu-action@v3
+        uses: docker/setup-qemu-action@ce360397dd3f832beb865e1373c09c0e9f86d70a # v4.0.0
 
       - name: Check required command
         run: |
@@ -52,7 +52,7 @@ jobs:
       - name: Package Gravitino
         if: ${{ inputs.test-mode == 'deploy' }}
         run: |
-          ./gradlew compileDistribution -x test -x web-v2:web:build
+          ./gradlew compileDistribution -PskipWeb=true -x test
 
       - name: Free up disk space
         run: |
@@ -78,7 +78,7 @@ jobs:
             done
           fi
 
-          ./gradlew test -PskipTests -PtestMode=${{ inputs.test-mode }} -PjdbcBackend=${{ inputs.backend }} -PskipDockerTests=false \
+          ./gradlew test -PskipTests -PtestMode=${{ inputs.test-mode }} -PjdbcBackend=${{ inputs.backend }} -PskipDockerTests=false -PskipWeb=true \
             -x :web:web:test -x :web:integration-test:test -x :web-v2:web:test -x :web-v2:integration-test:test -x :clients:client-python:test -x :flink-connector:flink:test -x :spark-connector:spark-common:test \
             -x :spark-connector:spark-3.3:test -x :spark-connector:spark-3.4:test -x :spark-connector:spark-3.5:test \
             -x :spark-connector:spark-runtime-3.3:test -x :spark-connector:spark-runtime-3.4:test -x :spark-connector:spark-runtime-3.5:test \
@@ -88,7 +88,7 @@ jobs:
             $EXCLUDE_CONTRIB_TESTS
 
       - name: Upload integrate tests reports
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         if: ${{ (failure() && steps.integrationTest.outcome == 'failure') || contains(github.event.pull_request.labels.*.name, 'upload log') }}
         with:
           name: integrate-test-reports-${{ inputs.java-version }}-${{ inputs.test-mode }}-${{ inputs.backend }}

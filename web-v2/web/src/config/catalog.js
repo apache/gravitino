@@ -143,7 +143,7 @@ export const tableDefaultProps = {
     {
       key: 'format',
       defaultValue: 'lance',
-      disabled: true,
+      select: ['lance', 'delta'],
       description: 'The format of the table'
     }
   ]

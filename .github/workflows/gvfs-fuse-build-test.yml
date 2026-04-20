@@ -66,7 +66,7 @@ jobs:
           cache: 'gradle'
 
       - name: Set up QEMU
-        uses: docker/setup-qemu-action@v3
+        uses: docker/setup-qemu-action@ce360397dd3f832beb865e1373c09c0e9f86d70a # v4.0.0
 
       - name: Check required command
         run: |
@@ -78,8 +78,8 @@ jobs:
 
       - name: Integration test
         run: |
-          ./gradlew build -x :clients:client-python:build -x test -x web 
-          ./gradlew compileDistribution -x :clients:client-python:build -x test -x web 
+          ./gradlew build -PskipWeb=true -x :clients:client-python:build -x test -x web
+          ./gradlew compileDistribution -PskipWeb=true -x :clients:client-python:build -x test -x web
           cd clients/filesystem-fuse
           make test-s3
           make test-fuse-it
@@ -89,7 +89,7 @@ jobs:
           dev/ci/util_free_space.sh
 
       - name: Upload tests reports
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         if: ${{ (failure() && steps.integrationTest.outcome == 'failure') || contains(github.event.pull_request.labels.*.name, 'upload log') }}
         with:
           name: Gvfs-fuse integrate-test-reports-${{ matrix.java-version }}
@@ -97,4 +97,3 @@ jobs:
             clients/filesystem-fuse/target/debug/fuse.log
             distribution/package/logs/gravitino-server.out
             distribution/package/logs/gravitino-server.log
-

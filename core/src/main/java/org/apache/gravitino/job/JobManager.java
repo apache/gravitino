@@ -537,9 +537,12 @@ public class JobManager implements JobOperationDispatcher {
 
   @Override
   public void close() throws IOException {
-    jobExecutor.close();
-    statusPullExecutor.shutdownNow();
-    cleanUpExecutor.shutdownNow();
+    try {
+      jobExecutor.close();
+    } finally {
+      statusPullExecutor.shutdownNow();
+      cleanUpExecutor.shutdownNow();
+    }
   }
 
   @VisibleForTesting
