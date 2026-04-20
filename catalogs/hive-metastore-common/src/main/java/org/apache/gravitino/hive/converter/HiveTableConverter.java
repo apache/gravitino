@@ -33,6 +33,7 @@ import static org.apache.gravitino.rel.expressions.transforms.Transforms.identit
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Maps;
 import java.time.Instant;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
@@ -96,6 +97,7 @@ public class HiveTableConverter {
             .withPartitioning(partitioning)
             .withCatalogName(catalogName)
             .withDatabaseName(table.getDbName())
+            .withViewOriginalText(table.getViewOriginalText())
             .build();
     return hiveTable;
   }
@@ -105,6 +107,14 @@ public class HiveTableConverter {
     Map<String, String> properties = Maps.newHashMap(table.getParameters());
 
     Optional.ofNullable(table.getTableType()).ifPresent(t -> properties.put(TABLE_TYPE, t));
+
+    // VIRTUAL_VIEW tables may have a minimal or absent StorageDescriptor — skip SD fields.
+    if (TableType.VIRTUAL_VIEW.name().equalsIgnoreCase(table.getTableType())) {
+      // Remove the HMS-internal "tableType" key added by Gravitino; the canonical TABLE_TYPE
+      // property (key "table-type") is set above via table.getTableType().
+      properties.remove("tableType");
+      return properties;
+    }
 
     StorageDescriptor sd = table.getSd();
     properties.put(LOCATION, sd.getLocation());
@@ -135,13 +145,27 @@ public class HiveTableConverter {
         hiveTable.properties().getOrDefault(TABLE_TYPE, String.valueOf(TableType.MANAGED_TABLE));
     table.setTableType(tableType.toUpperCase());
 
-    List<FieldSchema> partitionFields =
-        hiveTable.partitionFieldNames().stream()
-            .map(fieldName -> buildPartitionKeyField(fieldName, hiveTable))
-            .collect(Collectors.toList());
-    table.setSd(buildStorageDescriptor(hiveTable, partitionFields));
+    if (TableType.VIRTUAL_VIEW.name().equalsIgnoreCase(tableType)) {
+      // Views require a minimal StorageDescriptor (HMS validates its presence).
+      StorageDescriptor sd = new StorageDescriptor();
+      sd.setCols(new ArrayList<>());
+      sd.setSerdeInfo(new SerDeInfo());
+      table.setSd(sd);
+      table.setPartitionKeys(new ArrayList<>());
+      if (hiveTable.viewOriginalText() != null) {
+        table.setViewOriginalText(hiveTable.viewOriginalText());
+        table.setViewExpandedText(hiveTable.viewOriginalText());
+      }
+    } else {
+      List<FieldSchema> partitionFields =
+          hiveTable.partitionFieldNames().stream()
+              .map(fieldName -> buildPartitionKeyField(fieldName, hiveTable))
+              .collect(Collectors.toList());
+      table.setSd(buildStorageDescriptor(hiveTable, partitionFields));
+      table.setPartitionKeys(partitionFields);
+    }
+
     table.setParameters(buildTableParameters(hiveTable));
-    table.setPartitionKeys(partitionFields);
 
     // Set AuditInfo to Hive's Table object. Hive's Table doesn't support setting last modifier
     // and last modified time, so we only set creator and create time.
@@ -255,6 +279,12 @@ public class HiveTableConverter {
       parameters.put(EXTERNAL, "TRUE");
     } else {
       parameters.put(EXTERNAL, "FALSE");
+    }
+
+    // Add the HMS-native "tableType" key so listTableNamesByFilter can find VIRTUAL_VIEWs.
+    // HMS stores table type in TBLS.TBL_TYPE but the filter queries TABLE_PARAMS key "tableType".
+    if (TableType.VIRTUAL_VIEW.name().equalsIgnoreCase(table.properties().get(TABLE_TYPE))) {
+      parameters.put("tableType", TableType.VIRTUAL_VIEW.name());
     }
 
     parameters.remove(LOCATION);

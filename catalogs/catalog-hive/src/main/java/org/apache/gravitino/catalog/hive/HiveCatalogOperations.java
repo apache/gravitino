@@ -63,17 +63,23 @@ import org.apache.gravitino.exceptions.NoSuchCatalogException;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.exceptions.NoSuchSchemaException;
 import org.apache.gravitino.exceptions.NoSuchTableException;
+import org.apache.gravitino.exceptions.NoSuchViewException;
 import org.apache.gravitino.exceptions.NonEmptySchemaException;
 import org.apache.gravitino.exceptions.SchemaAlreadyExistsException;
 import org.apache.gravitino.exceptions.TableAlreadyExistsException;
+import org.apache.gravitino.exceptions.ViewAlreadyExistsException;
 import org.apache.gravitino.hive.CachedClientPool;
 import org.apache.gravitino.hive.HiveSchema;
 import org.apache.gravitino.hive.HiveTable;
 import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.rel.Column;
+import org.apache.gravitino.rel.Representation;
 import org.apache.gravitino.rel.Table;
 import org.apache.gravitino.rel.TableCatalog;
 import org.apache.gravitino.rel.TableChange;
+import org.apache.gravitino.rel.View;
+import org.apache.gravitino.rel.ViewCatalog;
+import org.apache.gravitino.rel.ViewChange;
 import org.apache.gravitino.rel.expressions.Expression;
 import org.apache.gravitino.rel.expressions.NamedReference;
 import org.apache.gravitino.rel.expressions.distributions.Distribution;
@@ -88,7 +94,8 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /** Operations for interacting with an Apache Hive catalog in Apache Gravitino. */
-public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas, TableCatalog {
+public class HiveCatalogOperations
+    implements CatalogOperations, SupportsSchemas, TableCatalog, ViewCatalog {
 
   public static final Logger LOG = LoggerFactory.getLogger(HiveCatalogOperations.class);
 
@@ -100,6 +107,7 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
   private HasPropertyMetadata propertiesMetadata;
 
   private String catalogName;
+  private HiveViewCatalogOperations viewCatalogOperations;
 
   private boolean listAllTables = true;
   // The maximum number of tables that can be returned by the listTableNamesByFilter function.
@@ -144,6 +152,8 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
                 .catalogPropertiesMetadata()
                 .getOrDefault(conf, HiveCatalogPropertiesMetadata.DEFAULT_CATALOG);
     this.catalogName = defaultCatalog;
+    this.viewCatalogOperations =
+        new HiveViewCatalogOperations(() -> clientPool, () -> catalogName, this::schemaExists);
   }
 
   @VisibleForTesting
@@ -398,6 +408,17 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
                         catalogName, schemaIdent.name(), hudiFilter, MAX_TABLES));
         removeHudiTables(allTables, hudiTables);
       }
+
+      // Always filter out VIRTUAL_VIEW entries so they don't appear in table listings
+      String viewFilter =
+          String.format("%stableType like \"VIRTUAL_VIEW\"", HIVE_FILTER_FIELD_PARAMS);
+      List<String> views =
+          clientPool.run(
+              c ->
+                  c.listTableNamesByFilter(
+                      catalogName, schemaIdent.name(), viewFilter, MAX_TABLES));
+      allTables.removeAll(views);
+
       return allTables.stream()
           .map(tbName -> NameIdentifier.of(namespace, tbName))
           .toArray(NameIdentifier[]::new);
@@ -1007,6 +1028,119 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
 
   CachedClientPool getClientPool() {
     return clientPool;
+  }
+
+  @VisibleForTesting
+  void setViewCatalogOperations(HiveViewCatalogOperations viewCatalogOperations) {
+    this.viewCatalogOperations = viewCatalogOperations;
+  }
+
+  // ==================== ViewCatalog implementation ====================
+
+  /**
+   * Lists all views in the given schema namespace.
+   *
+   * @param namespace The namespace of the schema.
+   * @return An array of view identifiers.
+   * @throws NoSuchSchemaException If the schema does not exist.
+   */
+  @Override
+  public NameIdentifier[] listViews(Namespace namespace) throws NoSuchSchemaException {
+    return getViewCatalogOperations().listViews(namespace);
+  }
+
+  /**
+   * Loads a view from the Hive Metastore.
+   *
+   * @param ident The view identifier.
+   * @return The loaded view.
+   * @throws NoSuchViewException If the view does not exist.
+   */
+  @Override
+  public View loadView(NameIdentifier ident) throws NoSuchViewException {
+    return getViewCatalogOperations().loadView(ident);
+  }
+
+  /**
+   * Creates a view in the Hive Metastore.
+   *
+   * <p>Hive Metastore stores exactly one engine-native SQL dialect for each view. This
+   * implementation currently supports only {@code hive}.
+   *
+   * <p>TODO(design-docs/gravitino-logical-view-management.md): support {@code trino} and {@code
+   * spark} HMS view formats.
+   *
+   * @param ident The view identifier.
+   * @param comment An optional comment.
+   * @param columns The output columns of the view.
+   * @param representations The SQL representations (must contain exactly one {@code hive} dialect).
+   * @param defaultCatalog Ignored (Hive uses HMS-resolved identifiers in the original SQL text).
+   * @param defaultSchema Ignored (Hive uses HMS-resolved identifiers in the original SQL text).
+   * @param properties Additional properties stored in HMS.
+   * @return The created view.
+   * @throws NoSuchSchemaException If the schema does not exist.
+   * @throws ViewAlreadyExistsException If the view already exists.
+   */
+  @Override
+  public View createView(
+      NameIdentifier ident,
+      String comment,
+      Column[] columns,
+      Representation[] representations,
+      String defaultCatalog,
+      String defaultSchema,
+      Map<String, String> properties)
+      throws NoSuchSchemaException, ViewAlreadyExistsException {
+    return getViewCatalogOperations()
+        .createView(
+            ident, comment, columns, representations, defaultCatalog, defaultSchema, properties);
+  }
+
+  /**
+   * Alters a view in the Hive Metastore.
+   *
+   * <p>Supported changes: rename, set/remove property, and replace the view definition.
+   *
+   * @param ident The view identifier.
+   * @param changes The changes to apply.
+   * @return The updated view.
+   * @throws NoSuchViewException If the view does not exist.
+   * @throws ViewAlreadyExistsException If a rename target already exists.
+   */
+  @Override
+  public View alterView(NameIdentifier ident, ViewChange... changes)
+      throws NoSuchViewException, ViewAlreadyExistsException {
+    return getViewCatalogOperations().alterView(ident, changes);
+  }
+
+  /**
+   * Drops a view from the Hive Metastore.
+   *
+   * @param ident The view identifier.
+   * @return {@code true} if the view was dropped, {@code false} if it did not exist.
+   */
+  @Override
+  public boolean dropView(NameIdentifier ident) {
+    return getViewCatalogOperations().dropView(ident);
+  }
+
+  /**
+   * Checks whether a view with the given identifier exists.
+   *
+   * @param ident The view identifier.
+   * @return {@code true} if the view exists, {@code false} otherwise.
+   */
+  @Override
+  public boolean viewExists(NameIdentifier ident) {
+    return getViewCatalogOperations().viewExists(ident);
+  }
+
+  private HiveViewCatalogOperations getViewCatalogOperations() {
+    if (viewCatalogOperations == null) {
+      viewCatalogOperations =
+          new HiveViewCatalogOperations(() -> clientPool, () -> catalogName, this::schemaExists);
+    }
+    return viewCatalogOperations;
   }
 
   private boolean isExternalTable(NameIdentifier tableIdent) {

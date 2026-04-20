@@ -36,7 +36,9 @@ import static org.apache.gravitino.catalog.hive.HiveCatalogPropertiesMetadata.PR
 import static org.apache.gravitino.catalog.hive.TestHiveCatalog.HIVE_PROPERTIES_METADATA;
 import static org.apache.gravitino.connector.BaseCatalog.CATALOG_BYPASS_PREFIX;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.doNothing;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
@@ -55,6 +57,8 @@ import org.apache.gravitino.hive.HiveSchema;
 import org.apache.gravitino.hive.HiveTable;
 import org.apache.gravitino.hive.client.HiveClient;
 import org.apache.gravitino.rel.Column;
+import org.apache.gravitino.rel.SQLRepresentation;
+import org.apache.gravitino.rel.ViewChange;
 import org.apache.gravitino.rel.expressions.distributions.Distributions;
 import org.apache.gravitino.rel.expressions.sorts.SortOrder;
 import org.apache.gravitino.rel.expressions.transforms.Transform;
@@ -196,5 +200,185 @@ class TestHiveCatalogOperations {
 
     HiveTable createdTable = hiveTableCaptor.getValue();
     Assertions.assertEquals(0, createdTable.columns().length);
+  }
+
+  @Test
+  void testCreateViewRejectsTrinoDialect() throws Exception {
+    HiveCatalogOperations op = new HiveCatalogOperations();
+    op.initialize(Maps.newHashMap(), null, HIVE_PROPERTIES_METADATA);
+
+    CachedClientPool clientPool = mock(CachedClientPool.class);
+    HiveClient hiveClient = mock(HiveClient.class);
+    HiveSchema schema = HiveSchema.builder().withCatalogName("hive").withName("db").build();
+    when(hiveClient.getDatabase(anyString(), anyString())).thenReturn(schema);
+    when(clientPool.run(any()))
+        .thenAnswer(
+            invocation -> {
+              ClientPool.Action<?, HiveClient, ?> action = invocation.getArgument(0);
+              return action.run(hiveClient);
+            });
+    op.clientPool = clientPool;
+
+    UnsupportedOperationException exception =
+        Assertions.assertThrows(
+            UnsupportedOperationException.class,
+            () ->
+                op.createView(
+                    NameIdentifier.of("db", "v_trino"),
+                    null,
+                    new Column[0],
+                    new SQLRepresentation[] {
+                      SQLRepresentation.builder().withDialect("trino").withSql("SELECT 1").build()
+                    },
+                    null,
+                    null,
+                    Maps.newHashMap()));
+    Assertions.assertTrue(exception.getMessage().contains("supports only 'hive'"));
+  }
+
+  @Test
+  void testCreateViewRejectsSparkDialect() throws Exception {
+    HiveCatalogOperations op = new HiveCatalogOperations();
+    op.initialize(Maps.newHashMap(), null, HIVE_PROPERTIES_METADATA);
+
+    CachedClientPool clientPool = mock(CachedClientPool.class);
+    HiveClient hiveClient = mock(HiveClient.class);
+    HiveSchema schema = HiveSchema.builder().withCatalogName("hive").withName("db").build();
+    when(hiveClient.getDatabase(anyString(), anyString())).thenReturn(schema);
+    when(clientPool.run(any()))
+        .thenAnswer(
+            invocation -> {
+              ClientPool.Action<?, HiveClient, ?> action = invocation.getArgument(0);
+              return action.run(hiveClient);
+            });
+    op.clientPool = clientPool;
+
+    UnsupportedOperationException exception =
+        Assertions.assertThrows(
+            UnsupportedOperationException.class,
+            () ->
+                op.createView(
+                    NameIdentifier.of("db", "v_spark"),
+                    null,
+                    new Column[0],
+                    new SQLRepresentation[] {
+                      SQLRepresentation.builder().withDialect("spark").withSql("SELECT 1").build()
+                    },
+                    null,
+                    null,
+                    Maps.newHashMap()));
+    Assertions.assertTrue(exception.getMessage().contains("supports only 'hive'"));
+  }
+
+  @Test
+  void testLoadViewRejectsTrinoDialect() throws Exception {
+    HiveCatalogOperations op = new HiveCatalogOperations();
+    op.initialize(Maps.newHashMap(), null, HIVE_PROPERTIES_METADATA);
+
+    CachedClientPool clientPool = mock(CachedClientPool.class);
+    HiveClient hiveClient = mock(HiveClient.class);
+    when(hiveClient.getTable(anyString(), anyString(), anyString()))
+        .thenReturn(
+            HiveTable.builder()
+                .withName("v_trino")
+                .withCatalogName("hive")
+                .withDatabaseName("db")
+                .withColumns(new Column[0])
+                .withProperties(
+                    Maps.newHashMap(
+                        ImmutableMap.of(
+                            HiveConstants.TABLE_TYPE,
+                            TableType.VIRTUAL_VIEW.name(),
+                            "presto_view",
+                            "true")))
+                .withViewOriginalText("SELECT 1")
+                .build());
+    when(clientPool.run(any()))
+        .thenAnswer(
+            invocation -> {
+              ClientPool.Action<?, HiveClient, ?> action = invocation.getArgument(0);
+              return action.run(hiveClient);
+            });
+    op.clientPool = clientPool;
+
+    UnsupportedOperationException exception =
+        Assertions.assertThrows(
+            UnsupportedOperationException.class,
+            () -> op.loadView(NameIdentifier.of("db", "v_trino")));
+    Assertions.assertTrue(exception.getMessage().contains("supports only 'hive'"));
+  }
+
+  @Test
+  void testAlterViewReplaceRejectsTrinoDialect() throws Exception {
+    HiveCatalogOperations op = new HiveCatalogOperations();
+    op.initialize(Maps.newHashMap(), null, HIVE_PROPERTIES_METADATA);
+
+    CachedClientPool clientPool = mock(CachedClientPool.class);
+    HiveClient hiveClient = mock(HiveClient.class);
+    HiveTable currentTable =
+        HiveTable.builder()
+            .withName("v_hive")
+            .withCatalogName("hive")
+            .withDatabaseName("db")
+            .withColumns(new Column[0])
+            .withProperties(
+                Maps.newHashMap(
+                    ImmutableMap.of(HiveConstants.TABLE_TYPE, TableType.VIRTUAL_VIEW.name())))
+            .withViewOriginalText("SELECT 1")
+            .build();
+    when(hiveClient.getTable(anyString(), anyString(), anyString())).thenReturn(currentTable);
+    when(clientPool.run(any()))
+        .thenAnswer(
+            invocation -> {
+              ClientPool.Action<?, HiveClient, ?> action = invocation.getArgument(0);
+              return action.run(hiveClient);
+            });
+    op.clientPool = clientPool;
+
+    UnsupportedOperationException exception =
+        Assertions.assertThrows(
+            UnsupportedOperationException.class,
+            () ->
+                op.alterView(
+                    NameIdentifier.of("db", "v_hive"),
+                    ViewChange.replaceView(
+                        new Column[0],
+                        new SQLRepresentation[] {
+                          SQLRepresentation.builder()
+                              .withDialect("trino")
+                              .withSql("SELECT 2")
+                              .build()
+                        },
+                        null,
+                        null,
+                        null)));
+    Assertions.assertTrue(exception.getMessage().contains("supports only 'hive'"));
+  }
+
+  @Test
+  void testDropViewThrowsForUnexpectedException() throws Exception {
+    HiveCatalogOperations op = new HiveCatalogOperations();
+    op.initialize(Maps.newHashMap(), null, HIVE_PROPERTIES_METADATA);
+
+    CachedClientPool clientPool = mock(CachedClientPool.class);
+    HiveClient hiveClient = mock(HiveClient.class);
+    doAnswer(
+            invocation -> {
+              throw new RuntimeException("permission denied");
+            })
+        .when(hiveClient)
+        .dropTable(anyString(), anyString(), anyString(), anyBoolean(), anyBoolean());
+    when(clientPool.run(any()))
+        .thenAnswer(
+            invocation -> {
+              ClientPool.Action<?, HiveClient, ?> action = invocation.getArgument(0);
+              return action.run(hiveClient);
+            });
+    op.clientPool = clientPool;
+
+    RuntimeException exception =
+        Assertions.assertThrows(
+            RuntimeException.class, () -> op.dropView(NameIdentifier.of("db", "v1")));
+    Assertions.assertTrue(exception.getMessage().contains("Failed to drop Hive view"));
   }
 }
