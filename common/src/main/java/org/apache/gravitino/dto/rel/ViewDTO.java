@@ -24,12 +24,14 @@ import com.google.common.base.Preconditions;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.Map;
+import java.util.stream.Stream;
 import javax.annotation.Nullable;
 import lombok.EqualsAndHashCode;
 import lombok.ToString;
 import org.apache.gravitino.dto.AuditDTO;
 import org.apache.gravitino.rel.Column;
 import org.apache.gravitino.rel.Representation;
+import org.apache.gravitino.rel.SQLRepresentation;
 import org.apache.gravitino.rel.View;
 
 /** Represents a View DTO (Data Transfer Object). */
@@ -104,7 +106,23 @@ public class ViewDTO implements View {
 
   @Override
   public Representation[] representations() {
-    return representations == null ? new RepresentationDTO[0] : representations;
+    if (representations == null) {
+      return new Representation[0];
+    }
+    return Stream.of(representations)
+        .map(
+            rep -> {
+              if (rep instanceof SQLRepresentationDTO) {
+                SQLRepresentationDTO dto = (SQLRepresentationDTO) rep;
+                return (Representation)
+                    SQLRepresentation.builder()
+                        .withDialect(dto.dialect())
+                        .withSql(dto.sql())
+                        .build();
+              }
+              return (Representation) rep;
+            })
+        .toArray(Representation[]::new);
   }
 
   @Override

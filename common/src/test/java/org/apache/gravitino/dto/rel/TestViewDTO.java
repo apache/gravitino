@@ -21,8 +21,10 @@ package org.apache.gravitino.dto.rel;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import java.time.Instant;
 import java.util.Map;
+import java.util.Optional;
 import org.apache.gravitino.dto.AuditDTO;
 import org.apache.gravitino.json.JsonUtils;
+import org.apache.gravitino.rel.SQLRepresentation;
 import org.apache.gravitino.rel.types.Types;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
@@ -59,7 +61,7 @@ public class TestViewDTO {
     Assertions.assertEquals("sch", deserialized.defaultSchema());
     Assertions.assertEquals(Map.of("k", "v"), deserialized.properties());
     Assertions.assertEquals(1, deserialized.representations().length);
-    Assertions.assertInstanceOf(SQLRepresentationDTO.class, deserialized.representations()[0]);
+    Assertions.assertInstanceOf(SQLRepresentation.class, deserialized.representations()[0]);
   }
 
   @Test
@@ -126,7 +128,7 @@ public class TestViewDTO {
     Assertions.assertEquals("v_raw", dto.name());
     Assertions.assertEquals("raw comment", dto.comment());
     Assertions.assertEquals(1, dto.representations().length);
-    Assertions.assertInstanceOf(SQLRepresentationDTO.class, dto.representations()[0]);
+    Assertions.assertInstanceOf(SQLRepresentation.class, dto.representations()[0]);
     Assertions.assertEquals("cat", dto.defaultCatalog());
     Assertions.assertEquals("sch", dto.defaultSchema());
     Assertions.assertEquals("v", dto.properties().get("k"));
@@ -146,6 +148,37 @@ public class TestViewDTO {
 
     Assertions.assertNotNull(dto.columns());
     Assertions.assertEquals(0, dto.columns().length);
+  }
+
+  @Test
+  public void testSqlForWithSQLRepresentationDTO() throws JsonProcessingException {
+    ViewDTO dto =
+        ViewDTO.builder()
+            .withName("v1")
+            .withRepresentations(
+                new RepresentationDTO[] {
+                  SQLRepresentationDTO.builder().withDialect("trino").withSql("SELECT 1").build(),
+                  SQLRepresentationDTO.builder().withDialect("spark").withSql("SELECT 2").build()
+                })
+            .withAudit(audit())
+            .build();
+
+    // Serialize and deserialize to simulate client-side REST response handling
+    String json = JsonUtils.objectMapper().writeValueAsString(dto);
+    ViewDTO deserialized = JsonUtils.objectMapper().readValue(json, ViewDTO.class);
+
+    Optional<SQLRepresentation> trino = deserialized.sqlFor("trino");
+    Assertions.assertTrue(trino.isPresent());
+    Assertions.assertEquals("trino", trino.get().dialect());
+    Assertions.assertEquals("SELECT 1", trino.get().sql());
+
+    // Case-insensitive match
+    Assertions.assertTrue(deserialized.sqlFor("TRINO").isPresent());
+    Assertions.assertTrue(deserialized.sqlFor("Trino").isPresent());
+
+    // Missing dialect returns empty
+    Assertions.assertFalse(deserialized.sqlFor("hive").isPresent());
+    Assertions.assertFalse(deserialized.sqlFor(null).isPresent());
   }
 
   private AuditDTO audit() {
