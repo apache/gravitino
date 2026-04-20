@@ -133,6 +133,11 @@ public class IcebergMetadataAuthorizationMethodInterceptor
     return e.getClass().getName().startsWith("org.apache.iceberg.exceptions");
   }
 
+  /**
+   * Skip local authorization only when this server proxies requests to another Gravitino-backed
+   * Iceberg REST catalog. In that topology, the downstream REST backend performs authorization and
+   * this interceptor avoids duplicate checks.
+   */
   @Override
   protected boolean shouldSkipAuthorization(Map<EntityType, NameIdentifier> nameIdentifierMap) {
     if (!IcebergRESTServerContext.getInstance().skipAuthorizationForRestBackend()) {

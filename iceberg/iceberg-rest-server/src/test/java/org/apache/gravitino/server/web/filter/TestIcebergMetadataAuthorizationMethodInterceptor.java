@@ -231,6 +231,7 @@ public class TestIcebergMetadataAuthorizationMethodInterceptor {
     Catalog nonRestCatalog = Mockito.mock(Catalog.class);
     Mockito.when(wrapperManager.getCatalogWrapper(TEST_CATALOG)).thenReturn(wrapper);
     Mockito.when(wrapper.getCatalog()).thenReturn(nonRestCatalog);
+    Mockito.when(wrapper.isRESTCatalog()).thenReturn(false);
     resetContext(wrapperManager, true);
 
     Method method =
@@ -290,6 +291,7 @@ public class TestIcebergMetadataAuthorizationMethodInterceptor {
     RESTCatalog restCatalog = Mockito.mock(RESTCatalog.class);
     Mockito.when(wrapperManager.getCatalogWrapper(TEST_CATALOG)).thenReturn(wrapper);
     Mockito.when(wrapper.getCatalog()).thenReturn(restCatalog);
+    Mockito.when(wrapper.isRESTCatalog()).thenReturn(true);
     resetContext(wrapperManager, false);
 
     Method method =
@@ -324,6 +326,7 @@ public class TestIcebergMetadataAuthorizationMethodInterceptor {
     RESTCatalog restCatalog = Mockito.mock(RESTCatalog.class);
     Mockito.when(wrapperManager.getCatalogWrapper(TEST_CATALOG)).thenReturn(wrapper);
     Mockito.when(wrapper.getCatalog()).thenReturn(restCatalog);
+    Mockito.when(wrapper.isRESTCatalog()).thenReturn(true);
     resetContext(wrapperManager, true);
 
     Method method =
