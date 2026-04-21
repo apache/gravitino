@@ -156,6 +156,8 @@ dependencies {
     exclude("com.fasterxml.jackson.core")
     // conflict with Gravitino Jetty 9.4.x (Hive 2.x pulls Jetty 7.x via hive-common)
     exclude("org.eclipse.jetty.aggregate", "jetty-all")
+    // conflict with Hadoop 3.x from Spark (Hive 2.x pulls Hadoop 2.x via hive-common)
+    exclude("org.apache.hadoop")
   }
   testImplementation("org.scala-lang.modules:scala-collection-compat_$scalaVersion:$scalaCollectionCompatVersion")
   testImplementation("org.apache.spark:spark-catalyst_$scalaVersion:$sparkVersion")
