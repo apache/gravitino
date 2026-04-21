@@ -16,19 +16,25 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.gravitino.trino.connector.catalog;
+package org.apache.gravitino.trino.connector.security;
 
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
 import com.google.common.collect.ImmutableMap;
+import io.trino.spi.connector.ConnectorSession;
 import java.io.File;
 import java.io.IOException;
 import java.nio.file.Files;
+import org.apache.gravitino.client.GravitinoAdminClient;
 import org.apache.gravitino.trino.connector.GravitinoConfig;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
+@SuppressWarnings("deprecation")
 public class TestGravitinoAuthProvider {
 
   @Test
@@ -137,6 +143,62 @@ public class TestGravitinoAuthProvider {
                         GravitinoAuthProvider.KERBEROS_PRINCIPAL_KEY, "user@REALM.COM",
                         GravitinoAuthProvider.KERBEROS_KEYTAB_FILE_PATH_KEY,
                             keytabFile.getAbsolutePath()))));
+  }
+
+  @Test
+  public void testBuildResultContainsClient() {
+    GravitinoAdminClient client = GravitinoAuthProvider.build(buildConfig(ImmutableMap.of()));
+    assertNotNull(client);
+  }
+
+  @Test
+  public void testBuildSimpleWithoutForwardUser() {
+    GravitinoAdminClient client =
+        GravitinoAuthProvider.build(
+            buildConfig(ImmutableMap.of(GravitinoAuthProvider.AUTH_TYPE_KEY, "simple")));
+    assertNotNull(client);
+  }
+
+  @Test
+  public void testBuildForSessionSimple() {
+    GravitinoConfig config =
+        buildConfig(
+            ImmutableMap.of(
+                GravitinoAuthProvider.AUTH_TYPE_KEY, "simple",
+                GravitinoAuthProvider.FORWARD_SESSION_USER_KEY, "true"));
+
+    ConnectorSession session = mock(ConnectorSession.class);
+    when(session.getUser()).thenReturn("alice");
+
+    GravitinoAdminClient client = GravitinoAuthProvider.buildForSession(config, session);
+    assertNotNull(client);
+  }
+
+  @Test
+  public void testBuildForSessionThrowsWhenForwardUserDisabled() {
+    GravitinoConfig config =
+        buildConfig(ImmutableMap.of(GravitinoAuthProvider.AUTH_TYPE_KEY, "simple"));
+    ConnectorSession session = mock(ConnectorSession.class);
+    when(session.getUser()).thenReturn("alice");
+
+    assertThrows(
+        IllegalArgumentException.class,
+        () -> GravitinoAuthProvider.buildForSession(config, session));
+  }
+
+  @Test
+  public void testBuildForSessionThrowsForNonSimpleAuthType() {
+    GravitinoConfig config =
+        buildConfig(
+            ImmutableMap.of(
+                GravitinoAuthProvider.AUTH_TYPE_KEY, "kerberos",
+                GravitinoAuthProvider.FORWARD_SESSION_USER_KEY, "true"));
+    ConnectorSession session = mock(ConnectorSession.class);
+    when(session.getUser()).thenReturn("alice");
+
+    assertThrows(
+        UnsupportedOperationException.class,
+        () -> GravitinoAuthProvider.buildForSession(config, session));
   }
 
   private GravitinoConfig buildConfig(ImmutableMap<String, String> authConfig) {
