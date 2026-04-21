@@ -47,6 +47,7 @@ import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.TestColumn;
 import org.apache.gravitino.authorization.AccessControlManager;
+import org.apache.gravitino.authorization.OwnerDispatcher;
 import org.apache.gravitino.catalog.CatalogManager;
 import org.apache.gravitino.catalog.TestOperationDispatcher;
 import org.apache.gravitino.catalog.TestTableOperationDispatcher;
@@ -178,6 +179,42 @@ public class TestTableHookDispatcher extends TestOperationDispatcher {
           }
           schemaHookDispatcher.dropSchema(NameIdentifier.of(tableNs.levels()), true);
         });
+  }
+
+  @Test
+  public void testCreateTableSucceedsEvenIfSetOwnerFails() throws IllegalAccessException {
+    OwnerDispatcher mockOwnerDispatcher = Mockito.mock(OwnerDispatcher.class);
+    Mockito.doThrow(new RuntimeException("Set owner failed"))
+        .when(mockOwnerDispatcher)
+        .setOwner(any(), any(), any(), any());
+    FieldUtils.writeField(GravitinoEnv.getInstance(), "ownerDispatcher", mockOwnerDispatcher, true);
+
+    try {
+      Namespace tableNs = Namespace.of(metalake, catalog, "schema_owner_fail");
+      Map<String, String> props = ImmutableMap.of("k1", "v1", "k2", "v2");
+      schemaHookDispatcher.createSchema(NameIdentifier.of(tableNs.levels()), "comment", props);
+
+      NameIdentifier tableIdent = NameIdentifier.of(tableNs, "table_owner_fail");
+      Column[] columns =
+          new Column[] {
+            TestColumn.builder()
+                .withName("col1")
+                .withPosition(0)
+                .withType(Types.StringType.get())
+                .build()
+          };
+      tableHookDispatcher.createTable(
+          tableIdent,
+          columns,
+          "comment",
+          props,
+          new Transform[0],
+          Distributions.NONE,
+          new SortOrder[0],
+          new Index[0]);
+    } finally {
+      FieldUtils.writeField(GravitinoEnv.getInstance(), "ownerDispatcher", null, true);
+    }
   }
 
   @Test

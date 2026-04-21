@@ -35,6 +35,8 @@ import org.apache.gravitino.exceptions.NonEmptyEntityException;
 import org.apache.gravitino.metalake.MetalakeDispatcher;
 import org.apache.gravitino.utils.NameIdentifierUtil;
 import org.apache.gravitino.utils.PrincipalUtils;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * {@code MetalakeHookDispatcher} is a decorator for {@link MetalakeDispatcher} that not only
@@ -42,6 +44,7 @@ import org.apache.gravitino.utils.PrincipalUtils;
  * operations before or after the underlying operations.
  */
 public class MetalakeHookDispatcher implements MetalakeDispatcher {
+  private static final Logger LOG = LoggerFactory.getLogger(MetalakeHookDispatcher.class);
   private final MetalakeDispatcher dispatcher;
 
   public MetalakeHookDispatcher(MetalakeDispatcher dispatcher) {
@@ -71,14 +74,18 @@ public class MetalakeHookDispatcher implements MetalakeDispatcher {
       accessControlDispatcher.addUser(ident.name(), PrincipalUtils.getCurrentUserName());
     }
 
-    // Set the creator as owner of the metalake.
-    OwnerDispatcher ownerDispatcher = GravitinoEnv.getInstance().ownerDispatcher();
-    if (ownerDispatcher != null) {
-      ownerDispatcher.setOwner(
-          ident.name(),
-          NameIdentifierUtil.toMetadataObject(ident, Entity.EntityType.METALAKE),
-          PrincipalUtils.getCurrentUserName(),
-          Owner.Type.USER);
+    try {
+      // Set the creator as owner of the metalake.
+      OwnerDispatcher ownerDispatcher = GravitinoEnv.getInstance().ownerDispatcher();
+      if (ownerDispatcher != null) {
+        ownerDispatcher.setOwner(
+            ident.name(),
+            NameIdentifierUtil.toMetadataObject(ident, Entity.EntityType.METALAKE),
+            PrincipalUtils.getCurrentUserName(),
+            Owner.Type.USER);
+      }
+    } catch (Exception e) {
+      LOG.warn("Fail to set owner for metalake " + ident + ", metalake exists without owner", e);
     }
     return metalake;
   }

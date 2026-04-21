@@ -38,6 +38,8 @@ import org.apache.gravitino.file.Fileset;
 import org.apache.gravitino.file.FilesetChange;
 import org.apache.gravitino.utils.NameIdentifierUtil;
 import org.apache.gravitino.utils.PrincipalUtils;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * {@code FilesetHookDispatcher} is a decorator for {@link FilesetDispatcher} that not only
@@ -45,6 +47,7 @@ import org.apache.gravitino.utils.PrincipalUtils;
  * operations before or after the underlying operations.
  */
 public class FilesetHookDispatcher implements FilesetDispatcher {
+  private static final Logger LOG = LoggerFactory.getLogger(FilesetHookDispatcher.class);
   private final FilesetDispatcher dispatcher;
 
   public FilesetHookDispatcher(FilesetDispatcher dispatcher) {
@@ -80,13 +83,17 @@ public class FilesetHookDispatcher implements FilesetDispatcher {
             ident, comment, type, storageLocations, properties);
 
     // Set the creator as the owner of the fileset.
-    OwnerDispatcher ownerManager = GravitinoEnv.getInstance().ownerDispatcher();
-    if (ownerManager != null) {
-      ownerManager.setOwner(
-          ident.namespace().level(0),
-          NameIdentifierUtil.toMetadataObject(ident, Entity.EntityType.FILESET),
-          PrincipalUtils.getCurrentUserName(),
-          Owner.Type.USER);
+    try {
+      OwnerDispatcher ownerManager = GravitinoEnv.getInstance().ownerDispatcher();
+      if (ownerManager != null) {
+        ownerManager.setOwner(
+            ident.namespace().level(0),
+            NameIdentifierUtil.toMetadataObject(ident, Entity.EntityType.FILESET),
+            PrincipalUtils.getCurrentUserName(),
+            Owner.Type.USER);
+      }
+    } catch (Exception e) {
+      LOG.warn("Fail to set owner for fileset " + ident + ", fileset exists without owner", e);
     }
     return fileset;
   }

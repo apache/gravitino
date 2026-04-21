@@ -254,6 +254,25 @@ public class TestIcebergTableHookDispatcher {
   }
 
   @Test
+  public void testCreateTableSucceedsEvenIfSetOwnerFails() {
+    Namespace namespace = Namespace.of("test_schema");
+    CreateTableRequest request =
+        CreateTableRequest.builder().withName("test_table").withSchema(TABLE_SCHEMA).build();
+
+    LoadTableResponse mockResponse = mock(LoadTableResponse.class);
+    when(mockDispatcher.createTable(mockContext, namespace, request)).thenReturn(mockResponse);
+
+    doThrow(new RuntimeException("Set owner failed"))
+        .when(mockOwnerDispatcher)
+        .setOwner(any(), any(), any(), any());
+
+    LoadTableResponse result = hookDispatcher.createTable(mockContext, namespace, request);
+
+    Assertions.assertEquals(mockResponse, result);
+    verify(mockDispatcher).createTable(mockContext, namespace, request);
+  }
+
+  @Test
   public void testCreateTableSkipsImportAndOwnershipForStageCreate() {
     Namespace namespace = Namespace.of("test_schema");
     CreateTableRequest request =

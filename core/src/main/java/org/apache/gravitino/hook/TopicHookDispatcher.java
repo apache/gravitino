@@ -36,6 +36,8 @@ import org.apache.gravitino.messaging.Topic;
 import org.apache.gravitino.messaging.TopicChange;
 import org.apache.gravitino.utils.NameIdentifierUtil;
 import org.apache.gravitino.utils.PrincipalUtils;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * {@code TopicHookDispatcher} is a decorator for {@link TopicDispatcher} that not only delegates
@@ -43,6 +45,7 @@ import org.apache.gravitino.utils.PrincipalUtils;
  * or after the underlying operations.
  */
 public class TopicHookDispatcher implements TopicDispatcher {
+  private static final Logger LOG = LoggerFactory.getLogger(TopicHookDispatcher.class);
   private final TopicDispatcher dispatcher;
 
   public TopicHookDispatcher(TopicDispatcher dispatcher) {
@@ -66,13 +69,17 @@ public class TopicHookDispatcher implements TopicDispatcher {
     Topic topic = dispatcher.createTopic(ident, comment, dataLayout, properties);
 
     // Set the creator as the owner of the topic.
-    OwnerDispatcher ownerManager = GravitinoEnv.getInstance().ownerDispatcher();
-    if (ownerManager != null) {
-      ownerManager.setOwner(
-          ident.namespace().level(0),
-          NameIdentifierUtil.toMetadataObject(ident, Entity.EntityType.TOPIC),
-          PrincipalUtils.getCurrentUserName(),
-          Owner.Type.USER);
+    try {
+      OwnerDispatcher ownerManager = GravitinoEnv.getInstance().ownerDispatcher();
+      if (ownerManager != null) {
+        ownerManager.setOwner(
+            ident.namespace().level(0),
+            NameIdentifierUtil.toMetadataObject(ident, Entity.EntityType.TOPIC),
+            PrincipalUtils.getCurrentUserName(),
+            Owner.Type.USER);
+      }
+    } catch (Exception e) {
+      LOG.warn("Fail to set owner for topic " + ident + ", topic exists without owner", e);
     }
     return topic;
   }

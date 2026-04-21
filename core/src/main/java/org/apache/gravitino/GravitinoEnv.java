@@ -550,39 +550,43 @@ public class GravitinoEnv {
     this.lockManager = new LockManager(config);
 
     // Create and initialize metalake related modules, the operation chain is:
-    // MetalakeEventDispatcher -> MetalakeNormalizeDispatcher -> MetalakeHookDispatcher ->
+    // MetalakeHookDispatcher -> MetalakeNormalizeDispatcher -> MetalakeEventDispatcher ->
     // MetalakeManager
     this.metalakeManager = new MetalakeManager(entityStore, idGenerator);
-    MetalakeHookDispatcher metalakeHookDispatcher = new MetalakeHookDispatcher(metalakeManager);
+    MetalakeEventDispatcher metalakeEventDispatcher =
+        new MetalakeEventDispatcher(eventBus, metalakeManager);
     MetalakeNormalizeDispatcher metalakeNormalizeDispatcher =
-        new MetalakeNormalizeDispatcher(metalakeHookDispatcher);
-    this.metalakeDispatcher = new MetalakeEventDispatcher(eventBus, metalakeNormalizeDispatcher);
+        new MetalakeNormalizeDispatcher(metalakeEventDispatcher);
+    this.metalakeDispatcher = new MetalakeHookDispatcher(metalakeNormalizeDispatcher);
 
     // Create and initialize Catalog related modules, the operation chain is:
-    // CatalogEventDispatcher -> CatalogNormalizeDispatcher -> CatalogHookDispatcher ->
+    // CatalogHookDispatcher -> CatalogNormalizeDispatcher -> CatalogEventDispatcher ->
     // CatalogManager
     this.catalogManager = new CatalogManager(config, entityStore, idGenerator);
-    CatalogHookDispatcher catalogHookDispatcher = new CatalogHookDispatcher(catalogManager);
+    CatalogEventDispatcher catalogEventDispatcher =
+        new CatalogEventDispatcher(eventBus, catalogManager);
     CatalogNormalizeDispatcher catalogNormalizeDispatcher =
-        new CatalogNormalizeDispatcher(catalogHookDispatcher);
-    this.catalogDispatcher = new CatalogEventDispatcher(eventBus, catalogNormalizeDispatcher);
+        new CatalogNormalizeDispatcher(catalogEventDispatcher);
+    this.catalogDispatcher = new CatalogHookDispatcher(catalogNormalizeDispatcher);
 
     this.credentialOperationDispatcher =
         new CredentialOperationDispatcher(catalogManager, entityStore, idGenerator);
 
     SchemaOperationDispatcher schemaOperationDispatcher =
         new SchemaOperationDispatcher(catalogManager, entityStore, idGenerator);
-    SchemaHookDispatcher schemaHookDispatcher = new SchemaHookDispatcher(schemaOperationDispatcher);
+    SchemaEventDispatcher schemaEventDispatcher =
+        new SchemaEventDispatcher(eventBus, schemaOperationDispatcher);
     SchemaNormalizeDispatcher schemaNormalizeDispatcher =
-        new SchemaNormalizeDispatcher(schemaHookDispatcher, catalogManager);
-    this.schemaDispatcher = new SchemaEventDispatcher(eventBus, schemaNormalizeDispatcher);
+        new SchemaNormalizeDispatcher(schemaEventDispatcher, catalogManager);
+    this.schemaDispatcher = new SchemaHookDispatcher(schemaNormalizeDispatcher);
 
     TableOperationDispatcher tableOperationDispatcher =
         new TableOperationDispatcher(catalogManager, entityStore, idGenerator);
-    TableHookDispatcher tableHookDispatcher = new TableHookDispatcher(tableOperationDispatcher);
     TableNormalizeDispatcher tableNormalizeDispatcher =
-        new TableNormalizeDispatcher(tableHookDispatcher, catalogManager);
-    this.tableDispatcher = new TableEventDispatcher(eventBus, tableNormalizeDispatcher);
+        new TableNormalizeDispatcher(tableOperationDispatcher, catalogManager);
+    TableEventDispatcher tableEventDispatcher =
+        new TableEventDispatcher(eventBus, tableNormalizeDispatcher);
+    this.tableDispatcher = new TableHookDispatcher(tableEventDispatcher);
 
     // TODO: We can install hooks when we need, we only supports ownership post hook,
     //  partition doesn't have ownership, so we don't need it now.
@@ -594,37 +598,39 @@ public class GravitinoEnv {
 
     FilesetOperationDispatcher filesetOperationDispatcher =
         new FilesetOperationDispatcher(catalogManager, entityStore, idGenerator);
-    FilesetHookDispatcher filesetHookDispatcher =
-        new FilesetHookDispatcher(filesetOperationDispatcher);
     FilesetNormalizeDispatcher filesetNormalizeDispatcher =
-        new FilesetNormalizeDispatcher(filesetHookDispatcher, catalogManager);
-    this.filesetDispatcher = new FilesetEventDispatcher(eventBus, filesetNormalizeDispatcher);
+        new FilesetNormalizeDispatcher(filesetOperationDispatcher, catalogManager);
+    FilesetEventDispatcher filesetEventDispatcher =
+        new FilesetEventDispatcher(eventBus, filesetNormalizeDispatcher);
+    this.filesetDispatcher = new FilesetHookDispatcher(filesetEventDispatcher);
 
     TopicOperationDispatcher topicOperationDispatcher =
         new TopicOperationDispatcher(catalogManager, entityStore, idGenerator);
-    TopicHookDispatcher topicHookDispatcher = new TopicHookDispatcher(topicOperationDispatcher);
     TopicNormalizeDispatcher topicNormalizeDispatcher =
-        new TopicNormalizeDispatcher(topicHookDispatcher, catalogManager);
-    this.topicDispatcher = new TopicEventDispatcher(eventBus, topicNormalizeDispatcher);
+        new TopicNormalizeDispatcher(topicOperationDispatcher, catalogManager);
+    TopicEventDispatcher topicEventDispatcher =
+        new TopicEventDispatcher(eventBus, topicNormalizeDispatcher);
+    this.topicDispatcher = new TopicHookDispatcher(topicEventDispatcher);
 
     ModelOperationDispatcher modelOperationDispatcher =
         new ModelOperationDispatcher(catalogManager, entityStore, idGenerator);
-    ModelHookDispatcher modelHookDispatcher = new ModelHookDispatcher(modelOperationDispatcher);
     ModelNormalizeDispatcher modelNormalizeDispatcher =
-        new ModelNormalizeDispatcher(modelHookDispatcher, catalogManager);
-    this.modelDispatcher = new ModelEventDispatcher(eventBus, modelNormalizeDispatcher);
+        new ModelNormalizeDispatcher(modelOperationDispatcher, catalogManager);
+    ModelEventDispatcher modelEventDispatcher =
+        new ModelEventDispatcher(eventBus, modelNormalizeDispatcher);
+    this.modelDispatcher = new ModelHookDispatcher(modelEventDispatcher);
 
-    // The operation chain is:
-    // FunctionEventDispatcher -> FunctionNormalizeDispatcher -> FunctionHookDispatcher ->
+    // Create and initialize Function related modules, the operation chain is:
+    // FunctionHookDispatcher -> FunctionEventDispatcher -> FunctionNormalizeDispatcher ->
     // FunctionOperationDispatcher
     FunctionOperationDispatcher functionOperationDispatcher =
         new FunctionOperationDispatcher(
             catalogManager, schemaOperationDispatcher, entityStore, idGenerator);
-    FunctionHookDispatcher functionHookDispatcher =
-        new FunctionHookDispatcher(functionOperationDispatcher);
     FunctionNormalizeDispatcher functionNormalizeDispatcher =
-        new FunctionNormalizeDispatcher(functionHookDispatcher, catalogManager);
-    this.functionDispatcher = new FunctionEventDispatcher(eventBus, functionNormalizeDispatcher);
+        new FunctionNormalizeDispatcher(functionOperationDispatcher, catalogManager);
+    FunctionEventDispatcher functionEventDispatcher =
+        new FunctionEventDispatcher(eventBus, functionNormalizeDispatcher);
+    this.functionDispatcher = new FunctionHookDispatcher(functionEventDispatcher);
 
     // TODO: Add ViewHookDispatcher and ViewEventDispatcher when needed for view-specific hooks
     //  and event handling.
@@ -641,10 +647,9 @@ public class GravitinoEnv {
     if (enableAuthorization) {
       AccessControlManager accessControlManager =
           new AccessControlManager(entityStore, idGenerator, config);
-      AccessControlHookDispatcher accessControlHookDispatcher =
-          new AccessControlHookDispatcher(accessControlManager);
-      this.accessControlDispatcher =
-          new AccessControlEventDispatcher(eventBus, accessControlHookDispatcher);
+      AccessControlEventDispatcher accessControlEventDispatcher =
+          new AccessControlEventDispatcher(eventBus, accessControlManager);
+      this.accessControlDispatcher = new AccessControlHookDispatcher(accessControlEventDispatcher);
       OwnerDispatcher ownerManager = new OwnerManager(entityStore);
       this.ownerDispatcher = new OwnerEventManager(eventBus, ownerManager);
       this.futureGrantManager = new FutureGrantManager(entityStore, ownerManager);
@@ -659,8 +664,8 @@ public class GravitinoEnv {
 
     // Create and initialize Tag related modules
     TagManager tagManager = new TagManager(idGenerator, entityStore);
-    TagHookDispatcher tagHookDispatcher = new TagHookDispatcher(tagManager);
-    this.tagDispatcher = new TagEventDispatcher(eventBus, tagHookDispatcher);
+    TagEventDispatcher tagEventDispatcher = new TagEventDispatcher(eventBus, tagManager);
+    this.tagDispatcher = new TagHookDispatcher(tagEventDispatcher);
 
     PolicyEventDispatcher policyEventDispatcher =
         new PolicyEventDispatcher(eventBus, new PolicyManager(idGenerator, entityStore));
@@ -669,8 +674,8 @@ public class GravitinoEnv {
     JobManager jobManager = new JobManager(config, entityStore, idGenerator);
     JobTemplateValidationDispatcher validationDispatcher =
         new JobTemplateValidationDispatcher(jobManager);
-    this.jobOperationDispatcher =
-        new JobEventDispatcher(eventBus, new JobHookDispatcher(validationDispatcher));
+    JobEventDispatcher jobEventDispatcher = new JobEventDispatcher(eventBus, validationDispatcher);
+    this.jobOperationDispatcher = new JobHookDispatcher(jobEventDispatcher);
 
     // Register built-in job template event listener to automatically register templates
     // when metalakes are created

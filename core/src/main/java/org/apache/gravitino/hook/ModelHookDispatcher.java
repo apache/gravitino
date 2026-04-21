@@ -39,6 +39,8 @@ import org.apache.gravitino.model.ModelVersion;
 import org.apache.gravitino.model.ModelVersionChange;
 import org.apache.gravitino.utils.NameIdentifierUtil;
 import org.apache.gravitino.utils.PrincipalUtils;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * {@code ModelHookDispatcher} is a decorator for {@link ModelDispatcher} that not only delegates
@@ -46,6 +48,7 @@ import org.apache.gravitino.utils.PrincipalUtils;
  * or after the underlying operations.
  */
 public class ModelHookDispatcher implements ModelDispatcher {
+  private static final Logger LOG = LoggerFactory.getLogger(ModelHookDispatcher.class);
 
   private final ModelDispatcher dispatcher;
 
@@ -69,13 +72,17 @@ public class ModelHookDispatcher implements ModelDispatcher {
     Model model = dispatcher.registerModel(ident, comment, properties);
 
     // Set the creator as owner of the model.
-    OwnerDispatcher ownerManager = GravitinoEnv.getInstance().ownerDispatcher();
-    if (ownerManager != null) {
-      ownerManager.setOwner(
-          ident.namespace().level(0),
-          NameIdentifierUtil.toMetadataObject(ident, Entity.EntityType.MODEL),
-          PrincipalUtils.getCurrentUserName(),
-          Owner.Type.USER);
+    try {
+      OwnerDispatcher ownerManager = GravitinoEnv.getInstance().ownerDispatcher();
+      if (ownerManager != null) {
+        ownerManager.setOwner(
+            ident.namespace().level(0),
+            NameIdentifierUtil.toMetadataObject(ident, Entity.EntityType.MODEL),
+            PrincipalUtils.getCurrentUserName(),
+            Owner.Type.USER);
+      }
+    } catch (Exception e) {
+      LOG.warn("Fail to set owner for model " + ident + ", model exists without owner", e);
     }
     return model;
   }
@@ -157,13 +164,17 @@ public class ModelHookDispatcher implements ModelDispatcher {
     Model model = dispatcher.registerModel(ident, uris, aliases, comment, properties);
 
     // Set the creator as owner of the model.
-    OwnerDispatcher ownerManager = GravitinoEnv.getInstance().ownerDispatcher();
-    if (ownerManager != null) {
-      ownerManager.setOwner(
-          ident.name(),
-          NameIdentifierUtil.toMetadataObject(ident, Entity.EntityType.MODEL),
-          PrincipalUtils.getCurrentUserName(),
-          Owner.Type.USER);
+    try {
+      OwnerDispatcher ownerManager = GravitinoEnv.getInstance().ownerDispatcher();
+      if (ownerManager != null) {
+        ownerManager.setOwner(
+            ident.name(),
+            NameIdentifierUtil.toMetadataObject(ident, Entity.EntityType.MODEL),
+            PrincipalUtils.getCurrentUserName(),
+            Owner.Type.USER);
+      }
+    } catch (Exception e) {
+      LOG.warn("Fail to set owner for model " + ident + ", model exists without owner", e);
     }
     return model;
   }

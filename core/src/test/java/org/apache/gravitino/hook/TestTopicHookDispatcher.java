@@ -28,6 +28,7 @@ import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.authorization.AccessControlManager;
+import org.apache.gravitino.authorization.OwnerDispatcher;
 import org.apache.gravitino.catalog.CatalogManager;
 import org.apache.gravitino.catalog.TestOperationDispatcher;
 import org.apache.gravitino.catalog.TestTopicOperationDispatcher;
@@ -61,6 +62,26 @@ public class TestTopicHookDispatcher extends TestOperationDispatcher {
     Mockito.when(catalogManager.loadCatalog(any())).thenReturn(catalog);
     authorizationPlugin = Mockito.mock(AuthorizationPlugin.class);
     Mockito.when(catalog.getAuthorizationPlugin()).thenReturn(authorizationPlugin);
+  }
+
+  @Test
+  public void testCreateTopicSucceedsEvenIfSetOwnerFails() throws IllegalAccessException {
+    OwnerDispatcher mockOwnerDispatcher = Mockito.mock(OwnerDispatcher.class);
+    Mockito.doThrow(new RuntimeException("Set owner failed"))
+        .when(mockOwnerDispatcher)
+        .setOwner(any(), any(), any(), any());
+    FieldUtils.writeField(GravitinoEnv.getInstance(), "ownerDispatcher", mockOwnerDispatcher, true);
+
+    try {
+      Namespace topicNs = Namespace.of(metalake, catalog, "schema_owner_fail");
+      Map<String, String> props = ImmutableMap.of("k1", "v1", "k2", "v2");
+      schemaHookDispatcher.createSchema(NameIdentifier.of(topicNs.levels()), "comment", props);
+
+      NameIdentifier topicIdent = NameIdentifier.of(topicNs, "topic_owner_fail");
+      topicHookDispatcher.createTopic(topicIdent, "comment", null, props);
+    } finally {
+      FieldUtils.writeField(GravitinoEnv.getInstance(), "ownerDispatcher", null, true);
+    }
   }
 
   @Test

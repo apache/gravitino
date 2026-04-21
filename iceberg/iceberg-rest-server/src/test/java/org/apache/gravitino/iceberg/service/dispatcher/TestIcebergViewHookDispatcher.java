@@ -188,6 +188,41 @@ public class TestIcebergViewHookDispatcher {
   }
 
   @Test
+  public void testCreateViewSucceedsEvenIfSetOwnerFails() throws Exception {
+    Namespace namespace = Namespace.of(SCHEMA_NAME);
+    CreateViewRequest createRequest =
+        ImmutableCreateViewRequest.builder()
+            .name(VIEW_NAME)
+            .schema(VIEW_SCHEMA)
+            .viewVersion(
+                ImmutableViewVersion.builder()
+                    .versionId(1)
+                    .timestampMillis(System.currentTimeMillis())
+                    .schemaId(1)
+                    .defaultNamespace(namespace)
+                    .addRepresentations(
+                        ImmutableSQLViewRepresentation.builder()
+                            .sql("SELECT * FROM test")
+                            .dialect("spark")
+                            .build())
+                    .build())
+            .build();
+
+    LoadViewResponse mockResponse = mock(LoadViewResponse.class);
+    when(mockExecutor.createView(mockContext, namespace, createRequest)).thenReturn(mockResponse);
+
+    doThrow(new RuntimeException("Set owner failed"))
+        .when(mockOwnerDispatcher)
+        .setOwner(any(), any(), any(), any());
+
+    LoadViewResponse response = hookDispatcher.createView(mockContext, namespace, createRequest);
+
+    assertEquals(mockResponse, response);
+    verify(mockExecutor, times(1)).createView(mockContext, namespace, createRequest);
+    verify(mockViewDispatcher, times(1)).loadView(any(NameIdentifier.class));
+  }
+
+  @Test
   public void testDropViewRemovesFromEntityStore() throws Exception {
     TableIdentifier viewIdent = TableIdentifier.of(Namespace.of(SCHEMA_NAME), VIEW_NAME);
 

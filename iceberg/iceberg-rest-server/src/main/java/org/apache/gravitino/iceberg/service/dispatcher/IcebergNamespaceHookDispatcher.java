@@ -38,6 +38,8 @@ import org.apache.iceberg.rest.responses.GetNamespaceResponse;
 import org.apache.iceberg.rest.responses.ListNamespacesResponse;
 import org.apache.iceberg.rest.responses.LoadTableResponse;
 import org.apache.iceberg.rest.responses.UpdateNamespacePropertiesResponse;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * {@code IcebergSchemaHookDispatcher} is a decorator for {@link
@@ -46,6 +48,9 @@ import org.apache.iceberg.rest.responses.UpdateNamespacePropertiesResponse;
  * operations.
  */
 public class IcebergNamespaceHookDispatcher implements IcebergNamespaceOperationDispatcher {
+
+  private static final Logger LOG = LoggerFactory.getLogger(IcebergNamespaceHookDispatcher.class);
+
   private final IcebergNamespaceOperationDispatcher dispatcher;
   private final String metalake;
 
@@ -59,13 +64,20 @@ public class IcebergNamespaceHookDispatcher implements IcebergNamespaceOperation
       IcebergRequestContext context, CreateNamespaceRequest createRequest) {
     CreateNamespaceResponse response = dispatcher.createNamespace(context, createRequest);
 
-    importSchema(context.catalogName(), createRequest.namespace());
-    IcebergOwnershipUtils.setSchemaOwner(
-        metalake,
-        context.catalogName(),
-        createRequest.namespace(),
-        context.userName(),
-        GravitinoEnv.getInstance().ownerDispatcher());
+    try {
+      importSchema(context.catalogName(), createRequest.namespace());
+      IcebergOwnershipUtils.setSchemaOwner(
+          metalake,
+          context.catalogName(),
+          createRequest.namespace(),
+          context.userName(),
+          GravitinoEnv.getInstance().ownerDispatcher());
+    } catch (Exception e) {
+      LOG.warn(
+          "Fail to set owner for namespace {}, namespace exists without owner",
+          createRequest.namespace(),
+          e);
+    }
 
     return response;
   }
@@ -122,17 +134,24 @@ public class IcebergNamespaceHookDispatcher implements IcebergNamespaceOperation
       RegisterTableRequest registerTableRequest) {
     LoadTableResponse response = dispatcher.registerTable(context, namespace, registerTableRequest);
 
-    // Import the registered table into Gravitino's catalog so it exists as a metadata object
-    importTable(context.catalogName(), namespace, registerTableRequest.name());
+    try {
+      // Import the registered table into Gravitino's catalog so it exists as a metadata object
+      importTable(context.catalogName(), namespace, registerTableRequest.name());
 
-    // Set the owner of the registered table to the current user
-    IcebergOwnershipUtils.setTableOwner(
-        metalake,
-        context.catalogName(),
-        namespace,
-        registerTableRequest.name(),
-        context.userName(),
-        GravitinoEnv.getInstance().ownerDispatcher());
+      // Set the owner of the registered table to the current user
+      IcebergOwnershipUtils.setTableOwner(
+          metalake,
+          context.catalogName(),
+          namespace,
+          registerTableRequest.name(),
+          context.userName(),
+          GravitinoEnv.getInstance().ownerDispatcher());
+    } catch (Exception e) {
+      LOG.warn(
+          "Fail to set owner for registered table {}, table exists without owner",
+          registerTableRequest.name(),
+          e);
+    }
 
     return response;
   }

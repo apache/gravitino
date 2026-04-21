@@ -40,6 +40,8 @@ import org.apache.gravitino.rel.expressions.transforms.Transform;
 import org.apache.gravitino.rel.indexes.Index;
 import org.apache.gravitino.utils.NameIdentifierUtil;
 import org.apache.gravitino.utils.PrincipalUtils;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * {@code TableHookDispatcher} is a decorator for {@link TableDispatcher} that not only delegates
@@ -47,6 +49,7 @@ import org.apache.gravitino.utils.PrincipalUtils;
  * or after the underlying operations.
  */
 public class TableHookDispatcher implements TableDispatcher {
+  private static final Logger LOG = LoggerFactory.getLogger(TableHookDispatcher.class);
   private final TableDispatcher dispatcher;
 
   public TableHookDispatcher(TableDispatcher dispatcher) {
@@ -79,13 +82,17 @@ public class TableHookDispatcher implements TableDispatcher {
             ident, columns, comment, properties, partitions, distribution, sortOrders, indexes);
 
     // Set the creator as the owner of the table.
-    OwnerDispatcher ownerManager = GravitinoEnv.getInstance().ownerDispatcher();
-    if (ownerManager != null) {
-      ownerManager.setOwner(
-          ident.namespace().level(0),
-          NameIdentifierUtil.toMetadataObject(ident, Entity.EntityType.TABLE),
-          PrincipalUtils.getCurrentUserName(),
-          Owner.Type.USER);
+    try {
+      OwnerDispatcher ownerManager = GravitinoEnv.getInstance().ownerDispatcher();
+      if (ownerManager != null) {
+        ownerManager.setOwner(
+            ident.namespace().level(0),
+            NameIdentifierUtil.toMetadataObject(ident, Entity.EntityType.TABLE),
+            PrincipalUtils.getCurrentUserName(),
+            Owner.Type.USER);
+      }
+    } catch (Exception e) {
+      LOG.warn("Fail to set owner for table " + ident + ", table exists without owner", e);
     }
     return table;
   }

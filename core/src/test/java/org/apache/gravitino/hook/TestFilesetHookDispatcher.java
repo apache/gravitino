@@ -46,6 +46,7 @@ import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.authorization.AccessControlManager;
+import org.apache.gravitino.authorization.OwnerDispatcher;
 import org.apache.gravitino.catalog.CatalogManager;
 import org.apache.gravitino.catalog.TestFilesetOperationDispatcher;
 import org.apache.gravitino.catalog.TestOperationDispatcher;
@@ -83,6 +84,27 @@ public class TestFilesetHookDispatcher extends TestOperationDispatcher {
     Mockito.when(catalogManager.loadCatalog(any())).thenReturn(catalog);
     authorizationPlugin = Mockito.mock(AuthorizationPlugin.class);
     Mockito.when(catalog.getAuthorizationPlugin()).thenReturn(authorizationPlugin);
+  }
+
+  @Test
+  public void testCreateFilesetSucceedsEvenIfSetOwnerFails() throws IllegalAccessException {
+    OwnerDispatcher mockOwnerDispatcher = Mockito.mock(OwnerDispatcher.class);
+    Mockito.doThrow(new RuntimeException("Set owner failed"))
+        .when(mockOwnerDispatcher)
+        .setOwner(any(), any(), any(), any());
+    FieldUtils.writeField(GravitinoEnv.getInstance(), "ownerDispatcher", mockOwnerDispatcher, true);
+
+    try {
+      Namespace filesetNs = Namespace.of(metalake, catalog, "schema_owner_fail");
+      Map<String, String> props = ImmutableMap.of("k1", "v1", "k2", "v2");
+      schemaHookDispatcher.createSchema(NameIdentifier.of(filesetNs.levels()), "comment", props);
+
+      NameIdentifier filesetIdent = NameIdentifier.of(filesetNs, "fileset_owner_fail");
+      filesetHookDispatcher.createFileset(
+          filesetIdent, "comment", Fileset.Type.MANAGED, "fileset_owner", props);
+    } finally {
+      FieldUtils.writeField(GravitinoEnv.getInstance(), "ownerDispatcher", null, true);
+    }
   }
 
   @Test

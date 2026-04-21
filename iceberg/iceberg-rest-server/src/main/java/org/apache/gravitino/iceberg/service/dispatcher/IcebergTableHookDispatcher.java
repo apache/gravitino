@@ -44,8 +44,12 @@ import org.apache.iceberg.rest.responses.ListTablesResponse;
 import org.apache.iceberg.rest.responses.LoadCredentialsResponse;
 import org.apache.iceberg.rest.responses.LoadTableResponse;
 import org.apache.iceberg.rest.responses.PlanTableScanResponse;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 public class IcebergTableHookDispatcher implements IcebergTableOperationDispatcher {
+
+  private static final Logger LOG = LoggerFactory.getLogger(IcebergTableHookDispatcher.class);
 
   private final IcebergTableOperationDispatcher dispatcher;
   private String metalake;
@@ -197,18 +201,22 @@ public class IcebergTableHookDispatcher implements IcebergTableOperationDispatch
 
   private void importTableAndSetOwner(
       IcebergRequestContext context, Namespace namespace, String tableName) {
-    TableDispatcher tableDispatcher = GravitinoEnv.getInstance().tableDispatcher();
-    if (tableDispatcher != null) {
-      tableDispatcher.loadTable(
-          IcebergIdentifierUtils.toGravitinoTableIdentifier(
-              metalake, context.catalogName(), TableIdentifier.of(namespace, tableName)));
+    try {
+      TableDispatcher tableDispatcher = GravitinoEnv.getInstance().tableDispatcher();
+      if (tableDispatcher != null) {
+        tableDispatcher.loadTable(
+            IcebergIdentifierUtils.toGravitinoTableIdentifier(
+                metalake, context.catalogName(), TableIdentifier.of(namespace, tableName)));
+      }
+      IcebergOwnershipUtils.setTableOwner(
+          metalake,
+          context.catalogName(),
+          namespace,
+          tableName,
+          context.userName(),
+          GravitinoEnv.getInstance().ownerDispatcher());
+    } catch (Exception e) {
+      LOG.warn("Fail to set owner for table {}, table exists without owner", tableName, e);
     }
-    IcebergOwnershipUtils.setTableOwner(
-        metalake,
-        context.catalogName(),
-        namespace,
-        tableName,
-        context.userName(),
-        GravitinoEnv.getInstance().ownerDispatcher());
   }
 }

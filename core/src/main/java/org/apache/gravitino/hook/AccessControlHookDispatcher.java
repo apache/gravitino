@@ -47,6 +47,8 @@ import org.apache.gravitino.exceptions.UserAlreadyExistsException;
 import org.apache.gravitino.meta.RoleEntity;
 import org.apache.gravitino.utils.NameIdentifierUtil;
 import org.apache.gravitino.utils.PrincipalUtils;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * {@code AccessControlHookDispatcher} is a decorator for {@link AccessControlDispatcher} that not
@@ -55,6 +57,8 @@ import org.apache.gravitino.utils.PrincipalUtils;
  */
 @Slf4j
 public class AccessControlHookDispatcher implements AccessControlDispatcher {
+
+  private static final Logger LOG = LoggerFactory.getLogger(AccessControlHookDispatcher.class);
   private final AccessControlDispatcher dispatcher;
 
   public AccessControlHookDispatcher(AccessControlDispatcher dispatcher) {
@@ -162,14 +166,18 @@ public class AccessControlHookDispatcher implements AccessControlDispatcher {
     Role createdRole = dispatcher.createRole(metalake, role, properties, securableObjects);
 
     // Set the creator as the owner of role.
-    OwnerDispatcher ownerDispatcher = GravitinoEnv.getInstance().ownerDispatcher();
-    if (ownerDispatcher != null) {
-      ownerDispatcher.setOwner(
-          metalake,
-          NameIdentifierUtil.toMetadataObject(
-              AuthorizationUtils.ofRole(metalake, role), Entity.EntityType.ROLE),
-          PrincipalUtils.getCurrentUserName(),
-          Owner.Type.USER);
+    try {
+      OwnerDispatcher ownerDispatcher = GravitinoEnv.getInstance().ownerDispatcher();
+      if (ownerDispatcher != null) {
+        ownerDispatcher.setOwner(
+            metalake,
+            NameIdentifierUtil.toMetadataObject(
+                AuthorizationUtils.ofRole(metalake, role), Entity.EntityType.ROLE),
+            PrincipalUtils.getCurrentUserName(),
+            Owner.Type.USER);
+      }
+    } catch (Exception e) {
+      LOG.warn("Fail to set owner for role " + role + ", role exists without owner", e);
     }
     return createdRole;
   }

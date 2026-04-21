@@ -31,8 +31,11 @@ import org.apache.gravitino.policy.PolicyContent;
 import org.apache.gravitino.policy.PolicyDispatcher;
 import org.apache.gravitino.utils.NameIdentifierUtil;
 import org.apache.gravitino.utils.PrincipalUtils;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 public class PolicyHookDispatcher implements PolicyDispatcher {
+  private static final Logger LOG = LoggerFactory.getLogger(PolicyHookDispatcher.class);
 
   private final PolicyDispatcher dispatcher;
 
@@ -67,14 +70,18 @@ public class PolicyHookDispatcher implements PolicyDispatcher {
     PolicyEntity policy = dispatcher.createPolicy(metalake, name, type, comment, enabled, content);
 
     // Set the creator as the owner of the policy.
-    OwnerDispatcher ownerDispatcher = GravitinoEnv.getInstance().ownerDispatcher();
-    if (ownerDispatcher != null) {
-      ownerDispatcher.setOwner(
-          metalake,
-          NameIdentifierUtil.toMetadataObject(
-              NameIdentifierUtil.ofPolicy(metalake, name), Entity.EntityType.POLICY),
-          PrincipalUtils.getCurrentUserName(),
-          Owner.Type.USER);
+    try {
+      OwnerDispatcher ownerDispatcher = GravitinoEnv.getInstance().ownerDispatcher();
+      if (ownerDispatcher != null) {
+        ownerDispatcher.setOwner(
+            metalake,
+            NameIdentifierUtil.toMetadataObject(
+                NameIdentifierUtil.ofPolicy(metalake, name), Entity.EntityType.POLICY),
+            PrincipalUtils.getCurrentUserName(),
+            Owner.Type.USER);
+      }
+    } catch (Exception e) {
+      LOG.warn("Fail to set owner for policy " + name + ", policy exists without owner", e);
     }
     return policy;
   }
