@@ -25,6 +25,7 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.time.format.DateTimeParseException;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.catalog.jdbc.converter.JdbcColumnDefaultValueConverter;
 import org.apache.gravitino.catalog.jdbc.converter.JdbcTypeConverter;
 import org.apache.gravitino.rel.expressions.Expression;
@@ -50,7 +51,7 @@ public class MysqlColumnDefaultValueConverter extends JdbcColumnDefaultValueConv
     }
 
     if (isExpression) {
-      if (columnDefaultValue.startsWith(CURRENT_TIMESTAMP)) {
+      if (StringUtils.startsWithIgnoreCase(columnDefaultValue, CURRENT_TIMESTAMP)) {
         return DEFAULT_VALUE_OF_CURRENT_TIMESTAMP;
       }
       // The parsing of MySQL expressions is complex, so we are not currently undertaking the
@@ -89,7 +90,7 @@ public class MysqlColumnDefaultValueConverter extends JdbcColumnDefaultValueConv
         return Literals.timeLiteral(LocalTime.parse(columnDefaultValue, TIME_FORMATTER));
       case JdbcTypeConverter.TIMESTAMP:
       case MysqlTypeConverter.DATETIME:
-        if (columnDefaultValue.startsWith(CURRENT_TIMESTAMP)) {
+        if (StringUtils.startsWithIgnoreCase(columnDefaultValue, CURRENT_TIMESTAMP)) {
           return DEFAULT_VALUE_OF_CURRENT_TIMESTAMP;
         }
         try {
