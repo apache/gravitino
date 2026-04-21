@@ -140,6 +140,8 @@ dependencies {
     exclude("org.glassfish.jersey.core")
     exclude("org.glassfish.jersey.containers")
     exclude("org.glassfish.jersey.inject")
+    // conflict with Gravitino Jetty 9.4.x (Hive 2.x pulls Jetty 7.x via hive-common)
+    exclude("org.eclipse.jetty.aggregate", "jetty-all")
   }
   testImplementation("org.scala-lang.modules:scala-collection-compat_$scalaVersion:$scalaCollectionCompatVersion")
   testImplementation("org.apache.spark:spark-catalyst_$scalaVersion:$sparkVersion")
