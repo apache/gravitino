@@ -40,6 +40,10 @@ import org.apache.gravitino.iceberg.service.dispatcher.IcebergTableEventDispatch
 import org.apache.gravitino.iceberg.service.dispatcher.IcebergTableHookDispatcher;
 import org.apache.gravitino.iceberg.service.dispatcher.IcebergTableOperationDispatcher;
 import org.apache.gravitino.iceberg.service.dispatcher.IcebergTableOperationExecutor;
+import org.apache.gravitino.iceberg.service.dispatcher.IcebergTransactionEventDispatcher;
+import org.apache.gravitino.iceberg.service.dispatcher.IcebergTransactionHookDispatcher;
+import org.apache.gravitino.iceberg.service.dispatcher.IcebergTransactionOperationDispatcher;
+import org.apache.gravitino.iceberg.service.dispatcher.IcebergTransactionOperationExecutor;
 import org.apache.gravitino.iceberg.service.dispatcher.IcebergViewEventDispatcher;
 import org.apache.gravitino.iceberg.service.dispatcher.IcebergViewHookDispatcher;
 import org.apache.gravitino.iceberg.service.dispatcher.IcebergViewOperationDispatcher;
@@ -138,6 +142,16 @@ public class RESTService implements GravitinoAuxiliaryService {
     IcebergNamespaceEventDispatcher icebergNamespaceEventDispatcher =
         new IcebergNamespaceEventDispatcher(namespaceOperationDispatcher, eventBus, metalakeName);
 
+    IcebergTransactionOperationDispatcher icebergTransactionOperationDispatcher =
+        new IcebergTransactionOperationExecutor(icebergCatalogWrapperManager);
+    if (authorizationContext.isAuthorizationEnabled()) {
+      icebergTransactionOperationDispatcher =
+          new IcebergTransactionHookDispatcher(icebergTransactionOperationDispatcher);
+    }
+    IcebergTransactionEventDispatcher icebergTransactionEventDispatcher =
+        new IcebergTransactionEventDispatcher(
+            icebergTransactionOperationDispatcher, eventBus, metalakeName);
+
     config.register(
         new AbstractBinder() {
           @Override
@@ -153,6 +167,9 @@ public class RESTService implements GravitinoAuxiliaryService {
             bind(icebergViewEventDispatcher).to(IcebergViewOperationDispatcher.class).ranked(1);
             bind(icebergNamespaceEventDispatcher)
                 .to(IcebergNamespaceOperationDispatcher.class)
+                .ranked(1);
+            bind(icebergTransactionEventDispatcher)
+                .to(IcebergTransactionOperationDispatcher.class)
                 .ranked(1);
           }
         });

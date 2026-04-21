@@ -21,6 +21,8 @@ package org.apache.gravitino.iceberg.common.ops;
 import com.google.common.base.Preconditions;
 import java.sql.Driver;
 import java.sql.DriverManager;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
@@ -37,6 +39,9 @@ import org.apache.gravitino.utils.ClassUtils;
 import org.apache.gravitino.utils.IsolatedClassLoader;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.security.UserGroupInformation;
+import org.apache.iceberg.HasTableOperations;
+import org.apache.iceberg.MetadataUpdate;
+import org.apache.iceberg.Table;
 import org.apache.iceberg.TableMetadata;
 import org.apache.iceberg.Transaction;
 import org.apache.iceberg.catalog.Catalog;
@@ -46,6 +51,7 @@ import org.apache.iceberg.catalog.TableIdentifier;
 import org.apache.iceberg.catalog.ViewCatalog;
 import org.apache.iceberg.jdbc.JdbcCatalogWithMetadataLocationSupport;
 import org.apache.iceberg.rest.CatalogHandlers;
+import org.apache.iceberg.rest.requests.CommitTransactionRequest;
 import org.apache.iceberg.rest.requests.CreateNamespaceRequest;
 import org.apache.iceberg.rest.requests.CreateTableRequest;
 import org.apache.iceberg.rest.requests.CreateViewRequest;
@@ -298,6 +304,70 @@ public class IcebergCatalogWrapper implements AutoCloseable {
     Transaction transaction = icebergTableChange.getTransaction();
     transaction.commitTransaction();
     return loadTable(icebergTableChange.getTableIdentifier());
+  }
+
+  /**
+   * Commits multiple table updates in a best-effort atomic manner using a two-phase
+   * validate-then-commit approach:
+   *
+   * <ol>
+   *   <li>Phase 1: Load all tables and validate ALL requirements against current metadata. If any
+   *       requirement fails, the entire transaction is rejected before any commit is made.
+   *   <li>Phase 2: Apply metadata updates and commit each table. Once phase 1 succeeds, commits are
+   *       applied sequentially.
+   * </ol>
+   *
+   * <p>True cross-table atomicity (rollback of already-committed tables) depends on whether the
+   * underlying catalog backend supports it. Most Iceberg catalog backends do not provide
+   * cross-table rollback, but this two-phase approach ensures that no table is modified if any
+   * pre-condition check fails.
+   *
+   * <p>Each {@link UpdateTableRequest} in the request must include a {@link TableIdentifier}.
+   *
+   * @param commitTransactionRequest The request containing all table changes to apply.
+   */
+  public void commitTransaction(CommitTransactionRequest commitTransactionRequest) {
+    commitTransactionRequest.validate();
+    List<UpdateTableRequest> tableChanges = commitTransactionRequest.tableChanges();
+
+    // Phase 1: validate ALL requirements before committing anything
+    List<org.apache.iceberg.TableOperations> allOps = new ArrayList<>(tableChanges.size());
+    List<TableMetadata> allBase = new ArrayList<>(tableChanges.size());
+    List<TableMetadata> allUpdated = new ArrayList<>(tableChanges.size());
+
+    for (UpdateTableRequest change : tableChanges) {
+      Preconditions.checkArgument(
+          change.identifier() != null,
+          "Invalid table change in transaction: missing table identifier");
+      Table table = catalog.loadTable(change.identifier());
+      Preconditions.checkArgument(
+          table instanceof HasTableOperations,
+          "Table does not support operations required for transaction commit: %s",
+          change.identifier());
+
+      org.apache.iceberg.TableOperations ops = ((HasTableOperations) table).operations();
+      TableMetadata base = ops.current();
+
+      // Validate all requirements against the current metadata — fail fast before any commit
+      change.requirements().forEach(req -> req.validate(base));
+
+      // Build the new metadata by applying all updates
+      TableMetadata.Builder builder = TableMetadata.buildFrom(base);
+      for (MetadataUpdate update : change.updates()) {
+        update.applyTo(builder);
+      }
+      TableMetadata updated = builder.build();
+
+      allOps.add(ops);
+      allBase.add(base);
+      allUpdated.add(updated);
+    }
+
+    // Phase 2: all requirements passed — now commit each table
+    for (int i = 0; i < allOps.size(); i++) {
+      allOps.get(i).commit(allBase.get(i), allUpdated.get(i));
+      metadataCache.updateTableMetadata(tableChanges.get(i).identifier(), allUpdated.get(i));
+    }
   }
 
   public LoadViewResponse createView(Namespace namespace, CreateViewRequest request) {

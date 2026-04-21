@@ -65,6 +65,7 @@ public class IcebergConfigOperations {
           .add(Endpoint.V1_UPDATE_NAMESPACE)
           .add(Endpoint.V1_DELETE_NAMESPACE)
           .add(Endpoint.V1_NAMESPACE_EXISTS)
+          .add(Endpoint.V1_COMMIT_TRANSACTION)
           .add(Endpoint.V1_LIST_TABLES)
           .add(Endpoint.V1_LOAD_TABLE)
           .add(Endpoint.V1_CREATE_TABLE)
