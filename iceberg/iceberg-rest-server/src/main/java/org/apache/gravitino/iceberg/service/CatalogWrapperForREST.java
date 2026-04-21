@@ -128,7 +128,7 @@ public class CatalogWrapperForREST extends IcebergCatalogWrapper {
   public LoadTableResponse createTable(
       Namespace namespace, CreateTableRequest request, boolean requestCredential) {
     LoadTableResponse loadTableResponse;
-    if (getCatalog() instanceof RESTCatalog) {
+    if (isRESTCatalog()) {
       loadTableResponse = createTableInternal(namespace, request);
     } else {
       loadTableResponse = super.createTable(namespace, request);
@@ -145,7 +145,7 @@ public class CatalogWrapperForREST extends IcebergCatalogWrapper {
   public LoadTableResponse loadTable(
       TableIdentifier identifier, boolean requestCredential, CredentialPrivilege privilege) {
     LoadTableResponse loadTableResponse;
-    if (getCatalog() instanceof RESTCatalog) {
+    if (isRESTCatalog()) {
       loadTableResponse = loadTableInternal(identifier);
     } else {
       loadTableResponse = super.loadTable(identifier);
@@ -159,9 +159,8 @@ public class CatalogWrapperForREST extends IcebergCatalogWrapper {
   @Override
   public LoadTableResponse updateTable(
       TableIdentifier tableIdentifier, UpdateTableRequest updateTableRequest) {
-    Catalog loadedCatalog = getCatalog();
-    if (loadedCatalog instanceof RESTCatalog) {
-      return CatalogHandlers.updateTable(loadedCatalog, tableIdentifier, updateTableRequest);
+    if (isRESTCatalog()) {
+      return CatalogHandlers.updateTable(getCatalog(), tableIdentifier, updateTableRequest);
     } else {
       return super.updateTable(tableIdentifier, updateTableRequest);
     }
