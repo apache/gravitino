@@ -134,22 +134,31 @@ public class GravitinoPaimonCatalog extends BaseCatalog {
    * paimonCatalog.getTable()}, which may return stale cached metadata (e.g., the old comment) after
    * Gravitino updates the Paimon backend through a separate catalog instance.
    *
+   * <p>When {@code ignoreIfNotExists=true} and the table is absent in Gravitino, this method
+   * returns immediately without touching the Paimon/Hive metastore, keeping the two stores in sync.
+   *
    * <p>This variant is documented as comment-only, so the extra write to the Paimon Flink catalog
    * is idempotent.
    */
   @Override
   public void alterTable(ObjectPath tablePath, CatalogBaseTable newTable, boolean ignoreIfNotExists)
       throws TableNotExistException, CatalogException {
+    if (ignoreIfNotExists && !tableExists(tablePath)) {
+      return;
+    }
     super.alterTable(tablePath, newTable, ignoreIfNotExists);
     try {
       paimonCatalog.alterTable(tablePath, newTable, ignoreIfNotExists);
     } catch (TableNotExistException e) {
-      if (!ignoreIfNotExists) {
-        throw e;
-      }
-    } catch (Exception e) {
+      // The table existed in Gravitino (checked above) but is absent in the Paimon/Hive
+      // metastore — the two stores are out of sync. Log and swallow so the Gravitino
+      // change is not rolled back.
       LOG.warn(
-          "Failed to sync paimonCatalog after alterTable for {}: {}", tablePath, e.getMessage());
+          "Table {} was altered in Gravitino but not found in Paimon/Hive metastore."
+              + " The two stores may be out of sync.",
+          tablePath);
+    } catch (Exception e) {
+      LOG.warn("Failed to sync paimonCatalog after alterTable for {}", tablePath, e);
     }
   }
 

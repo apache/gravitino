@@ -20,6 +20,8 @@
 package org.apache.gravitino.flink.connector.paimon;
 
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyBoolean;
+import static org.mockito.Mockito.doNothing;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -247,6 +249,57 @@ public class TestGravitinoPaimonCatalog {
       // Out-of-sync state must surface as a CatalogException, not TableNotExistException,
       // because authorization already passed in Gravitino.
       Assertions.assertThrows(CatalogException.class, () -> catalog.getTable(tablePath));
+    }
+  }
+
+  // ── alterTable ────────────────────────────────────────────────────────────
+
+  @Test
+  public void testAlterTableSyncsPaimonWhenTableExists() throws Exception {
+    ObjectPath tablePath = new ObjectPath(TEST_DB, TEST_TABLE);
+    NameIdentifier identifier = NameIdentifier.of(TEST_DB, TEST_TABLE);
+    Catalog mockGravitinoCatalog = Mockito.mock(Catalog.class);
+    CatalogBaseTable existingTable = Mockito.mock(CatalogBaseTable.class);
+    CatalogBaseTable newTable = Mockito.mock(CatalogBaseTable.class);
+
+    when(existingTable.getTableKind()).thenReturn(CatalogBaseTable.TableKind.TABLE);
+    when(existingTable.getComment()).thenReturn("old comment");
+    when(newTable.getTableKind()).thenReturn(CatalogBaseTable.TableKind.TABLE);
+    when(newTable.getComment()).thenReturn("new comment");
+
+    try (MockedStatic<GravitinoCatalogManager> mgrStatic =
+        Mockito.mockStatic(GravitinoCatalogManager.class)) {
+      TableCatalog mockTableCatalog = setupGravitinoCatalogMock(mgrStatic, mockGravitinoCatalog);
+      // tableExists check in our early-return guard.
+      when(mockTableCatalog.tableExists(identifier)).thenReturn(true);
+      // super.alterTable -> getTable -> loadTable (Gravitino auth) + paimonCatalog.getTable.
+      when(mockTableCatalog.loadTable(identifier)).thenReturn(Mockito.mock(Table.class));
+      when(mockPaimonCatalog.getTable(tablePath)).thenReturn(existingTable);
+      // Gravitino alterTable should succeed.
+      doNothing().when(mockTableCatalog).alterTable(any(), any());
+
+      catalog.alterTable(tablePath, newTable, false);
+
+      // Paimon cache-invalidation sync must be called exactly once.
+      verify(mockPaimonCatalog).alterTable(tablePath, newTable, false);
+    }
+  }
+
+  @Test
+  public void testAlterTableIsNoOpWhenTableAbsentAndIgnoreIsTrue() throws Exception {
+    ObjectPath tablePath = new ObjectPath(TEST_DB, "nonExistingTable");
+    NameIdentifier identifier = NameIdentifier.of(TEST_DB, "nonExistingTable");
+    Catalog mockGravitinoCatalog = Mockito.mock(Catalog.class);
+
+    try (MockedStatic<GravitinoCatalogManager> mgrStatic =
+        Mockito.mockStatic(GravitinoCatalogManager.class)) {
+      TableCatalog mockTableCatalog = setupGravitinoCatalogMock(mgrStatic, mockGravitinoCatalog);
+      when(mockTableCatalog.tableExists(identifier)).thenReturn(false);
+
+      CatalogBaseTable newTable = Mockito.mock(CatalogBaseTable.class);
+      // Must not throw and must not touch Paimon.
+      Assertions.assertDoesNotThrow(() -> catalog.alterTable(tablePath, newTable, true));
+      verify(mockPaimonCatalog, never()).alterTable(any(), any(), anyBoolean());
     }
   }
 }
