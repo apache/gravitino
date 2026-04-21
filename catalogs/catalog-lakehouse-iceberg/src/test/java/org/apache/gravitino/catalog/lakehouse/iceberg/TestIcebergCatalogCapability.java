@@ -68,24 +68,6 @@ public class TestIcebergCatalogCapability {
   }
 
   @Test
-  public void testSchemaNameAcceptsPhysicalDotSeparator() {
-    IcebergCatalogCapability capability = new IcebergCatalogCapability(":");
-
-    CapabilityResult result =
-        capability.specificationOnName(Capability.Scope.SCHEMA, "team.sales");
-    Assertions.assertTrue(result.supported());
-  }
-
-  @Test
-  public void testSchemaNameRejectsEmptyPhysicalSegments() {
-    IcebergCatalogCapability capability = new IcebergCatalogCapability(":");
-
-    CapabilityResult result =
-        capability.specificationOnName(Capability.Scope.SCHEMA, "team..sales");
-    Assertions.assertFalse(result.supported());
-  }
-
-  @Test
   public void testFlatSchemaNameAllowed() {
     IcebergCatalogCapability capability = new IcebergCatalogCapability(":");
 

@@ -21,6 +21,7 @@ package org.apache.gravitino.catalog;
 import com.google.common.base.Preconditions;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
 import org.apache.commons.lang3.StringUtils;
 
 /**
@@ -36,7 +37,7 @@ import org.apache.commons.lang3.StringUtils;
 public final class HierarchicalSchemaUtil {
 
   /** The internal separator used in EntityStore for nested schema names. */
-  public static final String PHYSICAL_SEPARATOR = ".";
+  private static final String PHYSICAL_SEPARATOR = ".";
 
   private HierarchicalSchemaUtil() {}
 
@@ -53,9 +54,6 @@ public final class HierarchicalSchemaUtil {
   public static String logicalToPhysical(String logicalPath, String separator) {
     Preconditions.checkArgument(StringUtils.isNotBlank(logicalPath), "logicalPath must not be blank");
     Preconditions.checkArgument(StringUtils.isNotBlank(separator), "separator must not be blank");
-    if (!logicalPath.contains(separator)) {
-      return logicalPath;
-    }
     return logicalPath.replace(separator, PHYSICAL_SEPARATOR);
   }
 
@@ -72,9 +70,6 @@ public final class HierarchicalSchemaUtil {
   public static String physicalToLogical(String physicalName, String separator) {
     Preconditions.checkArgument(StringUtils.isNotBlank(physicalName), "physicalName must not be blank");
     Preconditions.checkArgument(StringUtils.isNotBlank(separator), "separator must not be blank");
-    if (!physicalName.contains(PHYSICAL_SEPARATOR)) {
-      return physicalName;
-    }
     return physicalName.replace(PHYSICAL_SEPARATOR, separator);
   }
 
@@ -90,41 +85,33 @@ public final class HierarchicalSchemaUtil {
   }
 
   /**
-   * Returns whether a schema name represents a nested physical path (contains {@code .}).
+   * Given a list of schema names and an optional parent, returns only the direct children of that
+   * parent (one level deeper). When {@code parent} is empty, returns top-level schemas (names that
+   * do not contain the separator).
    *
-   * @param physicalName the physical schema name
-   * @return {@code true} if the name contains {@code .}
-   */
-  public static boolean isPhysicalNested(String physicalName) {
-    return StringUtils.isNotBlank(physicalName) && physicalName.contains(PHYSICAL_SEPARATOR);
-  }
-
-  /**
-   * Given a list of physical schema names (using {@code .}) and a physical parent prefix, returns
-   * only the direct children of that parent (one level deeper).
+   * <p>Example: schemas {@code ["A", "A:B", "A:B:C", "B"]}, separator {@code ":"}, parent {@code
+   * Optional.of("A:B")} → {@code ["A:B:C"]}
    *
-   * <p>Example: schemas {@code ["A", "A.B", "A.B.C", "B"]}, parent {@code "A.B"} → {@code
-   * ["A.B.C"]}
-   *
-   * @param allPhysicalNames all physical schema names in the catalog
-   * @param physicalParent the physical parent schema name (or empty/null for top-level)
-   * @return direct children physical names
+   * @param allNames all schema names in the catalog
+   * @param parent the parent schema name, or {@link Optional#empty()} for top-level
+   * @param separator the separator used in the schema names
+   * @return direct children names
    */
   public static List<String> filterDirectChildren(
-      List<String> allPhysicalNames, String physicalParent) {
+      List<String> allNames, Optional<String> parent, String separator) {
     List<String> result = new ArrayList<>();
-    if (StringUtils.isBlank(physicalParent)) {
-      for (String name : allPhysicalNames) {
-        if (!name.contains(PHYSICAL_SEPARATOR)) {
+    if (!parent.isPresent()) {
+      for (String name : allNames) {
+        if (!name.contains(separator)) {
           result.add(name);
         }
       }
     } else {
-      String prefix = physicalParent + PHYSICAL_SEPARATOR;
-      for (String name : allPhysicalNames) {
+      String prefix = parent.get() + separator;
+      for (String name : allNames) {
         if (name.startsWith(prefix)) {
           String remainder = name.substring(prefix.length());
-          if (!remainder.contains(PHYSICAL_SEPARATOR)) {
+          if (!remainder.contains(separator)) {
             result.add(name);
           }
         }

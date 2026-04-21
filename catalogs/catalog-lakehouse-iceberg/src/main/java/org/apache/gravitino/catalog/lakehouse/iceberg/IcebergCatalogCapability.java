@@ -19,7 +19,6 @@
 package org.apache.gravitino.catalog.lakehouse.iceberg;
 
 import java.util.regex.Pattern;
-import org.apache.gravitino.catalog.HierarchicalSchemaUtil;
 import org.apache.gravitino.connector.capability.Capability;
 import org.apache.gravitino.connector.capability.CapabilityResult;
 
@@ -57,21 +56,14 @@ public class IcebergCatalogCapability implements Capability {
    *   <li>Regular flat schema names matching the default name pattern.
    *   <li>Logical nested schema names using the configured external separator (e.g. {@code "A:B:C"}
    *       with separator {@code ":"}), validated to have no empty segments.
-   *   <li>Physical nested schema names using {@code "."} as separator (e.g. {@code "A.B.C"}),
-   *       validated to have no empty segments.
    * </ul>
    *
    * For all other scopes, the default validation rules apply.
    */
   @Override
   public CapabilityResult specificationOnName(Scope scope, String name) {
-    if (scope == Scope.SCHEMA) {
-      if (name.contains(namespaceSeparator)) {
-        return validateSegments(name, namespaceSeparator);
-      }
-      if (name.contains(HierarchicalSchemaUtil.PHYSICAL_SEPARATOR)) {
-        return validateSegments(name, HierarchicalSchemaUtil.PHYSICAL_SEPARATOR);
-      }
+    if (scope == Scope.SCHEMA && name.contains(namespaceSeparator)) {
+      return validateSegments(name, namespaceSeparator);
     }
     return Capability.super.specificationOnName(scope, name);
   }

@@ -577,7 +577,7 @@ public class SchemaMetaService {
    * form. Otherwise the original entity is returned unchanged.
    */
   private SchemaEntity toLogicalEntity(SchemaEntity entity) {
-    if (!HierarchicalSchemaUtil.isPhysicalNested(entity.name())) {
+    if (!entity.name().contains(".")) {
       return entity;
     }
     String logicalName = toLogicalSchemaName(entity.name());

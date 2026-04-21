@@ -20,6 +20,7 @@ package org.apache.gravitino.catalog;
 
 import java.util.Arrays;
 import java.util.List;
+import java.util.Optional;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
@@ -67,17 +68,9 @@ public class TestHierarchicalSchemaUtil {
   }
 
   @Test
-  public void testIsPhysicalNested() {
-    Assertions.assertTrue(HierarchicalSchemaUtil.isPhysicalNested("A.B.C"));
-    Assertions.assertFalse(HierarchicalSchemaUtil.isPhysicalNested("flat"));
-    Assertions.assertFalse(HierarchicalSchemaUtil.isPhysicalNested(""));
-    Assertions.assertFalse(HierarchicalSchemaUtil.isPhysicalNested(null));
-  }
-
-  @Test
   public void testFilterDirectChildrenTopLevel() {
-    List<String> allNames = Arrays.asList("A", "A.B", "A.B.C", "B");
-    List<String> topLevel = HierarchicalSchemaUtil.filterDirectChildren(allNames, null);
+    List<String> allNames = Arrays.asList("A", "A:B", "A:B:C", "B");
+    List<String> topLevel = HierarchicalSchemaUtil.filterDirectChildren(allNames, Optional.empty(), ":");
     Assertions.assertEquals(2, topLevel.size());
     Assertions.assertTrue(topLevel.contains("A"));
     Assertions.assertTrue(topLevel.contains("B"));
@@ -85,28 +78,30 @@ public class TestHierarchicalSchemaUtil {
 
   @Test
   public void testFilterDirectChildrenUnderParent() {
-    List<String> allNames = Arrays.asList("A", "A.B", "A.C", "A.B.D", "B");
-    List<String> children = HierarchicalSchemaUtil.filterDirectChildren(allNames, "A");
+    List<String> allNames = Arrays.asList("A", "A:B", "A:C", "A:B:D", "B");
+    List<String> children = HierarchicalSchemaUtil.filterDirectChildren(allNames, Optional.of("A"), ":");
     Assertions.assertEquals(2, children.size());
-    Assertions.assertTrue(children.contains("A.B"));
-    Assertions.assertTrue(children.contains("A.C"));
-    Assertions.assertFalse(children.contains("A.B.D"));
+    Assertions.assertTrue(children.contains("A:B"));
+    Assertions.assertTrue(children.contains("A:C"));
+    Assertions.assertFalse(children.contains("A:B:D"));
   }
 
   @Test
   public void testFilterDirectChildrenDeepNesting() {
-    List<String> allNames = Arrays.asList("A", "A.B", "A.B.C", "A.B.D", "A.B.C.E");
-    List<String> children = HierarchicalSchemaUtil.filterDirectChildren(allNames, "A.B");
+    List<String> allNames = Arrays.asList("A", "A:B", "A:B:C", "A:B:D", "A:B:C:E");
+    List<String> children =
+        HierarchicalSchemaUtil.filterDirectChildren(allNames, Optional.of("A:B"), ":");
     Assertions.assertEquals(2, children.size());
-    Assertions.assertTrue(children.contains("A.B.C"));
-    Assertions.assertTrue(children.contains("A.B.D"));
-    Assertions.assertFalse(children.contains("A.B.C.E"));
+    Assertions.assertTrue(children.contains("A:B:C"));
+    Assertions.assertTrue(children.contains("A:B:D"));
+    Assertions.assertFalse(children.contains("A:B:C:E"));
   }
 
   @Test
   public void testFilterDirectChildrenEmptyParent() {
-    List<String> allNames = Arrays.asList("A", "B", "A.B");
-    List<String> topLevel = HierarchicalSchemaUtil.filterDirectChildren(allNames, "");
+    List<String> allNames = Arrays.asList("A", "B", "A:B");
+    List<String> topLevel =
+        HierarchicalSchemaUtil.filterDirectChildren(allNames, Optional.empty(), ":");
     Assertions.assertEquals(2, topLevel.size());
     Assertions.assertTrue(topLevel.contains("A"));
     Assertions.assertTrue(topLevel.contains("B"));

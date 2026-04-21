@@ -23,6 +23,7 @@ import com.codahale.metrics.annotation.Timed;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Optional;
 import javax.inject.Inject;
 import javax.servlet.http.HttpServletRequest;
 import javax.ws.rs.Consumes;
@@ -107,15 +108,15 @@ public class SchemaOperations {
           () -> {
             Namespace schemaNS = NamespaceUtil.ofSchema(metalake, catalog);
             NameIdentifier[] idents = dispatcher.listSchemas(schemaNS);
+            // Apply hierarchical filtering first to reduce the set before the more expensive
+            // authorization check.
+            idents = filterByParentSchema(idents, parentSchema);
             idents =
                 MetadataAuthzHelper.filterByExpression(
                     metalake,
                     AuthorizationExpressionConstants.FILTER_SCHEMA_AUTHORIZATION_EXPRESSION,
                     Entity.EntityType.SCHEMA,
                     idents);
-            // Apply hierarchical filtering: return only top-level schemas when parentSchema is
-            // absent, or direct children when parentSchema is specified.
-            idents = filterByParentSchema(idents, parentSchema);
             Response response = Utils.ok(new EntityListResponse(idents));
             LOG.info(
                 "List {} schemas in catalog {}.{} (parentSchema='{}')",
@@ -285,27 +286,12 @@ public class SchemaOperations {
       allNames.add(ident.name());
     }
 
-    // Convert logical names to physical for filtering, then convert back.
-    List<String> allPhysical = new ArrayList<>(allNames.size());
-    for (String name : allNames) {
-      allPhysical.add(HierarchicalSchemaUtil.logicalToPhysical(name, separator));
-    }
+    Optional<String> normalizedParent =
+        StringUtils.isBlank(parentSchema) ? Optional.empty() : Optional.of(parentSchema);
+    List<String> filtered = HierarchicalSchemaUtil.filterDirectChildren(allNames, normalizedParent, separator);
 
-    String physicalParent =
-        StringUtils.isBlank(parentSchema)
-            ? null
-            : HierarchicalSchemaUtil.logicalToPhysical(parentSchema, separator);
-
-    List<String> filteredPhysical =
-        HierarchicalSchemaUtil.filterDirectChildren(allPhysical, physicalParent);
-
-    // Rebuild identifiers matching the filtered physical names.
     return Arrays.stream(idents)
-        .filter(
-            ident -> {
-              String physical = HierarchicalSchemaUtil.logicalToPhysical(ident.name(), separator);
-              return filteredPhysical.contains(physical);
-            })
+        .filter(ident -> filtered.contains(ident.name()))
         .toArray(NameIdentifier[]::new);
   }
 }
