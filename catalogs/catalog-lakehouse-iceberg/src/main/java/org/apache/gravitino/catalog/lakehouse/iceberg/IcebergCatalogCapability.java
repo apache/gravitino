@@ -18,14 +18,74 @@
  */
 package org.apache.gravitino.catalog.lakehouse.iceberg;
 
+import java.util.regex.Pattern;
+import org.apache.gravitino.catalog.HierarchicalSchemaUtil;
 import org.apache.gravitino.connector.capability.Capability;
 import org.apache.gravitino.connector.capability.CapabilityResult;
 
 public class IcebergCatalogCapability implements Capability {
+
+  private final String namespaceSeparator;
+
+  /**
+   * Creates a capability with the given external namespace separator.
+   *
+   * @param namespaceSeparator the external separator used in logical schema names (e.g. {@code ":"})
+   */
+  public IcebergCatalogCapability(String namespaceSeparator) {
+    this.namespaceSeparator = namespaceSeparator;
+  }
+
+  /** Creates a capability with the default external namespace separator {@code ":"}. */
+  public IcebergCatalogCapability() {
+    this(":");
+  }
+
   @Override
   public CapabilityResult columnDefaultValue() {
     // Iceberg column default value is WIP, see
     // https://github.com/apache/iceberg/pull/4525
     return CapabilityResult.unsupported("Iceberg does not support column default value.");
+  }
+
+  /**
+   * Validates the schema name specification for Iceberg.
+   *
+   * <p>For {@link Scope#SCHEMA}, Iceberg accepts:
+   *
+   * <ul>
+   *   <li>Regular flat schema names matching the default name pattern.
+   *   <li>Logical nested schema names using the configured external separator (e.g. {@code "A:B:C"}
+   *       with separator {@code ":"}), validated to have no empty segments.
+   *   <li>Physical nested schema names using {@code "."} as separator (e.g. {@code "A.B.C"}),
+   *       validated to have no empty segments.
+   * </ul>
+   *
+   * For all other scopes, the default validation rules apply.
+   */
+  @Override
+  public CapabilityResult specificationOnName(Scope scope, String name) {
+    if (scope == Scope.SCHEMA) {
+      if (name.contains(namespaceSeparator)) {
+        return validateSegments(name, namespaceSeparator);
+      }
+      if (name.contains(HierarchicalSchemaUtil.PHYSICAL_SEPARATOR)) {
+        return validateSegments(name, HierarchicalSchemaUtil.PHYSICAL_SEPARATOR);
+      }
+    }
+    return Capability.super.specificationOnName(scope, name);
+  }
+
+  private static CapabilityResult validateSegments(String name, String separator) {
+    String[] segments = name.split(Pattern.quote(separator), -1);
+    for (String segment : segments) {
+      if (segment.isEmpty()) {
+        return CapabilityResult.unsupported(
+            String.format(
+                "The SCHEMA name '%s' contains an empty segment after splitting by '%s'.",
+                name, separator));
+      }
+    }
+    return CapabilityResult.SUPPORTED;
   }
 }

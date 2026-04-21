@@ -20,6 +20,7 @@ package org.apache.gravitino.server.web.rest;
 
 import static org.apache.gravitino.Configs.CACHE_ENABLED;
 import static org.apache.gravitino.Configs.ENABLE_AUTHORIZATION;
+import static org.apache.gravitino.Configs.SCHEMA_NAMESPACE_SEPARATOR;
 import static org.apache.gravitino.Configs.TREE_LOCK_CLEAN_INTERVAL;
 import static org.apache.gravitino.Configs.TREE_LOCK_MAX_NODE_IN_MEMORY;
 import static org.apache.gravitino.Configs.TREE_LOCK_MIN_NODE_IN_MEMORY;
@@ -94,6 +95,7 @@ public class TestSchemaOperations extends BaseOperationsTest {
     Mockito.doReturn(36000L).when(config).get(TREE_LOCK_CLEAN_INTERVAL);
     Mockito.doReturn(false).when(config).get(CACHE_ENABLED);
     Mockito.doReturn(false).when(config).get(ENABLE_AUTHORIZATION);
+    Mockito.doReturn(":").when(config).get(SCHEMA_NAMESPACE_SEPARATOR);
     FieldUtils.writeField(GravitinoEnv.getInstance(), "config", config, true);
     FieldUtils.writeField(GravitinoEnv.getInstance(), "lockManager", new LockManager(config), true);
   }
@@ -474,6 +476,59 @@ public class TestSchemaOperations extends BaseOperationsTest {
     ErrorResponse errorResp4 = resp4.readEntity(ErrorResponse.class);
     Assertions.assertEquals(ErrorConstants.INTERNAL_ERROR_CODE, errorResp4.getCode());
     Assertions.assertEquals(RuntimeException.class.getSimpleName(), errorResp4.getType());
+  }
+
+  @Test
+  public void testListSchemasWithParentSchemaFilter() {
+    // Set up schemas: top-level "A", "B" and nested "A:sales", "A:reports", "A:sales:q1"
+    NameIdentifier identA = NameIdentifier.of(metalake, catalog, "A");
+    NameIdentifier identB = NameIdentifier.of(metalake, catalog, "B");
+    NameIdentifier identASales = NameIdentifier.of(metalake, catalog, "A:sales");
+    NameIdentifier identAReports = NameIdentifier.of(metalake, catalog, "A:reports");
+    NameIdentifier identASalesQ1 = NameIdentifier.of(metalake, catalog, "A:sales:q1");
+
+    when(dispatcher.listSchemas(any()))
+        .thenReturn(new NameIdentifier[] {identA, identB, identASales, identAReports, identASalesQ1});
+
+    // No parentSchema — should return only top-level schemas
+    Response resp =
+        target("/metalakes/" + metalake + "/catalogs/" + catalog + "/schemas")
+            .request(MediaType.APPLICATION_JSON_TYPE)
+            .accept("application/vnd.gravitino.v1+json")
+            .get();
+
+    Assertions.assertEquals(Response.Status.OK.getStatusCode(), resp.getStatus());
+    EntityListResponse listResp = resp.readEntity(EntityListResponse.class);
+    Assertions.assertEquals(0, listResp.getCode());
+    NameIdentifier[] topLevel = listResp.identifiers();
+    Assertions.assertEquals(2, topLevel.length);
+
+    // parentSchema=A — should return direct children of A: A:sales, A:reports
+    Response resp2 =
+        target("/metalakes/" + metalake + "/catalogs/" + catalog + "/schemas")
+            .queryParam("parentSchema", "A")
+            .request(MediaType.APPLICATION_JSON_TYPE)
+            .accept("application/vnd.gravitino.v1+json")
+            .get();
+
+    Assertions.assertEquals(Response.Status.OK.getStatusCode(), resp2.getStatus());
+    EntityListResponse listResp2 = resp2.readEntity(EntityListResponse.class);
+    NameIdentifier[] childrenOfA = listResp2.identifiers();
+    Assertions.assertEquals(2, childrenOfA.length);
+
+    // parentSchema=A:sales — should return direct children: A:sales:q1
+    Response resp3 =
+        target("/metalakes/" + metalake + "/catalogs/" + catalog + "/schemas")
+            .queryParam("parentSchema", "A:sales")
+            .request(MediaType.APPLICATION_JSON_TYPE)
+            .accept("application/vnd.gravitino.v1+json")
+            .get();
+
+    Assertions.assertEquals(Response.Status.OK.getStatusCode(), resp3.getStatus());
+    EntityListResponse listResp3 = resp3.readEntity(EntityListResponse.class);
+    NameIdentifier[] childrenOfASales = listResp3.identifiers();
+    Assertions.assertEquals(1, childrenOfASales.length);
+    Assertions.assertEquals("A:sales:q1", childrenOfASales[0].name());
   }
 
   private static Schema mockSchema(String name, String comment, Map<String, String> properties) {

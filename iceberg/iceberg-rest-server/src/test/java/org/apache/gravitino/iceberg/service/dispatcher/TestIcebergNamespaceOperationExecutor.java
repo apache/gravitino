@@ -33,6 +33,7 @@ import org.apache.gravitino.listener.api.event.IcebergRequestContext;
 import org.apache.iceberg.catalog.Namespace;
 import org.apache.iceberg.rest.requests.CreateNamespaceRequest;
 import org.apache.iceberg.rest.responses.CreateNamespaceResponse;
+import org.apache.iceberg.rest.responses.GetNamespaceResponse;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -133,5 +134,41 @@ public class TestIcebergNamespaceOperationExecutor {
 
     String actualOwner = requestCaptor.getValue().properties().get(IcebergConstants.OWNER);
     Assertions.assertEquals(clientProvidedOwner, actualOwner);
+  }
+
+  @Test
+  public void testCreateMultiLevelNamespacePassesCorrectNamespace() {
+    String authenticatedUser = "user@example.com";
+    Namespace multiLevelNs = Namespace.of("team", "sales");
+
+    CreateNamespaceRequest originalRequest =
+        CreateNamespaceRequest.builder().withNamespace(multiLevelNs).build();
+
+    when(mockContext.userName()).thenReturn(authenticatedUser);
+    CreateNamespaceResponse mockResponse = mock(CreateNamespaceResponse.class);
+    when(mockCatalogWrapper.createNamespace(any())).thenReturn(mockResponse);
+
+    executor.createNamespace(mockContext, originalRequest);
+
+    ArgumentCaptor<CreateNamespaceRequest> requestCaptor =
+        ArgumentCaptor.forClass(CreateNamespaceRequest.class);
+    verify(mockCatalogWrapper).createNamespace(requestCaptor.capture());
+
+    CreateNamespaceRequest capturedRequest = requestCaptor.getValue();
+    Assertions.assertEquals(multiLevelNs, capturedRequest.namespace());
+    Assertions.assertEquals(
+        authenticatedUser, capturedRequest.properties().get(IcebergConstants.OWNER));
+  }
+
+  @Test
+  public void testLoadNamespaceDelegatesToCatalogWrapper() {
+    Namespace ns = Namespace.of("A", "B");
+    GetNamespaceResponse mockResponse = mock(GetNamespaceResponse.class);
+    when(mockCatalogWrapper.loadNamespace(ns)).thenReturn(mockResponse);
+
+    GetNamespaceResponse result = executor.loadNamespace(mockContext, ns);
+
+    verify(mockCatalogWrapper).loadNamespace(ns);
+    Assertions.assertEquals(mockResponse, result);
   }
 }

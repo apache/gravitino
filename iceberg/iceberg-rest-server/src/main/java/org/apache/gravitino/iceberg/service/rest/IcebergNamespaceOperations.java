@@ -330,9 +330,12 @@ public class IcebergNamespaceOperations {
     NameIdentifier[] nameIdentifiers = new NameIdentifier[namespaces.size()];
     for (int i = 0; i < namespaces.size(); i++) {
       Namespace namespace = namespaces.get(i);
-      // Convert Iceberg Namespace to Gravitino NameIdentifier
-      // Namespace should have at least one level for schema name
-      String schemaName = namespace.isEmpty() ? "" : namespace.level(0);
+      // Convert multi-level Iceberg Namespace to physical dot-separated Gravitino schema name.
+      // For example Namespace.of("A","B","C") -> "A.B.C" -> NameIdentifier(metalake,catalog,"A.B.C")
+      String schemaName =
+          namespace.isEmpty()
+              ? ""
+              : IcebergRESTUtils.icebergNamespaceToPhysicalSchemaName(namespace);
       nameIdentifiers[i] = NameIdentifier.of(metalake, catalogName, schemaName);
     }
     return nameIdentifiers;
@@ -348,11 +351,11 @@ public class IcebergNamespaceOperations {
             toNameIdentifiers(listNamespacesResponse, metalake, catalogName));
     List<Namespace> filteredNamespaces = new ArrayList<>();
     for (NameIdentifier ident : idents) {
-      // Convert back from NameIdentifier to Iceberg Namespace
+      // Convert back from NameIdentifier to multi-level Iceberg Namespace.
       if (ident.hasNamespace() && ident.namespace().levels().length >= 2) {
-        // Schema name is the last level in the namespace
-        String schemaName = ident.name();
-        filteredNamespaces.add(Namespace.of(schemaName));
+        // The schema name is stored as physical dot-separated form (e.g. "A.B.C").
+        // Convert it back to Iceberg multi-level Namespace.of("A","B","C").
+        filteredNamespaces.add(IcebergRESTUtils.physicalSchemaNameToIcebergNamespace(ident.name()));
       }
     }
     return ListNamespacesResponse.builder().addAll(filteredNamespaces).build();

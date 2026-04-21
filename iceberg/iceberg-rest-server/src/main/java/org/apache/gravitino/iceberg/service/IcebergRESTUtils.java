@@ -253,6 +253,41 @@ public class IcebergRESTUtils {
     return headers;
   }
 
+  /**
+   * Converts a Gravitino physical schema name (using {@code "."} as separator) to an Iceberg
+   * multi-level {@link Namespace}.
+   *
+   * <p>Example: {@code "A.B.C"} → {@code Namespace.of("A","B","C")}
+   *
+   * @param physicalSchemaName the physical schema name stored in Gravitino's EntityStore
+   * @return the corresponding Iceberg namespace
+   */
+  public static Namespace physicalSchemaNameToIcebergNamespace(String physicalSchemaName) {
+    if (StringUtils.isBlank(physicalSchemaName)) {
+      return Namespace.empty();
+    }
+    if (physicalSchemaName.contains(".")) {
+      return Namespace.of(physicalSchemaName.split("\\.", -1));
+    }
+    return Namespace.of(physicalSchemaName);
+  }
+
+  /**
+   * Converts an Iceberg multi-level {@link Namespace} to a Gravitino physical schema name using
+   * {@code "."} as the separator.
+   *
+   * <p>Example: {@code Namespace.of("A","B","C")} → {@code "A.B.C"}
+   *
+   * @param namespace the Iceberg namespace
+   * @return the physical schema name
+   */
+  public static String icebergNamespaceToPhysicalSchemaName(Namespace namespace) {
+    if (namespace.isEmpty()) {
+      return "";
+    }
+    return String.join(".", namespace.levels());
+  }
+
   // remove the last '/' from the prefix, for example transform 'iceberg_catalog/' to
   // 'iceberg_catalog'
   private static String normalizePrefix(String rawPrefix) {

@@ -19,6 +19,8 @@
 package org.apache.gravitino.catalog.lakehouse.iceberg;
 
 import java.util.Map;
+import org.apache.gravitino.Configs;
+import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.connector.BaseCatalog;
 import org.apache.gravitino.connector.CatalogOperations;
 import org.apache.gravitino.connector.PropertiesMetadata;
@@ -64,7 +66,9 @@ public class IcebergCatalog extends BaseCatalog<IcebergCatalog> {
 
   @Override
   public Capability newCapability() {
-    return new IcebergCatalogCapability();
+    String separator =
+        GravitinoEnv.getInstance().config().get(Configs.SCHEMA_NAMESPACE_SEPARATOR);
+    return new IcebergCatalogCapability(separator);
   }
 
   @Override

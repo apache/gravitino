@@ -26,6 +26,7 @@ import java.util.List;
 import java.util.Objects;
 import java.util.function.Function;
 import java.util.stream.Collectors;
+import org.apache.gravitino.Configs;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.Entity.EntityType;
 import org.apache.gravitino.GravitinoEnv;
@@ -33,6 +34,7 @@ import org.apache.gravitino.HasIdentifier;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
+import org.apache.gravitino.catalog.HierarchicalSchemaUtil;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.exceptions.NonEmptyEntityException;
 import org.apache.gravitino.meta.FilesetEntity;
@@ -81,10 +83,12 @@ public class SchemaMetaService {
       metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME,
       baseMetricName = "getSchemaPOByCatalogIdAndName")
   public SchemaPO getSchemaPOByCatalogIdAndName(Long catalogId, String schemaName) {
+    // Convert logical name to physical for DB lookup (e.g. "A:B:C" → "A.B.C").
+    String physicalName = toPhysicalSchemaName(schemaName);
     SchemaPO schemaPO =
         SessionUtils.getWithoutCommit(
             SchemaMetaMapper.class,
-            mapper -> mapper.selectSchemaMetaByCatalogIdAndName(catalogId, schemaName));
+            mapper -> mapper.selectSchemaMetaByCatalogIdAndName(catalogId, physicalName));
 
     if (schemaPO == null) {
       throw new NoSuchEntityException(
@@ -100,12 +104,14 @@ public class SchemaMetaService {
       baseMetricName = "getSchemaIdByMetalakeNameAndCatalogNameAndSchemaName")
   public SchemaIds getSchemaIdByMetalakeNameAndCatalogNameAndSchemaName(
       String metalakeName, String catalogName, String schemaName) {
+    // Convert logical name to physical for DB lookup.
+    String physicalName = toPhysicalSchemaName(schemaName);
     SchemaIds schemaIds =
         SessionUtils.getWithoutCommit(
             SchemaMetaMapper.class,
             mapper ->
                 mapper.selectSchemaIdByMetalakeNameAndCatalogNameAndSchemaName(
-                    metalakeName, catalogName, schemaName));
+                    metalakeName, catalogName, physicalName));
 
     if (schemaIds == null) {
       throw new NoSuchEntityException(
@@ -121,10 +127,12 @@ public class SchemaMetaService {
       metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME,
       baseMetricName = "getSchemaIdByCatalogIdAndName")
   public Long getSchemaIdByCatalogIdAndName(Long catalogId, String schemaName) {
+    // Convert logical name to physical for DB lookup.
+    String physicalName = toPhysicalSchemaName(schemaName);
     Long schemaId =
         SessionUtils.getWithoutCommit(
             SchemaMetaMapper.class,
-            mapper -> mapper.selectSchemaIdByCatalogIdAndName(catalogId, schemaName));
+            mapper -> mapper.selectSchemaIdByCatalogIdAndName(catalogId, physicalName));
 
     if (schemaId == null) {
       throw new NoSuchEntityException(
@@ -139,8 +147,9 @@ public class SchemaMetaService {
       metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME,
       baseMetricName = "getSchemaByIdentifier")
   public SchemaEntity getSchemaByIdentifier(NameIdentifier identifier) {
-    SchemaPO schemaPO = getSchemaPOByIdentifier(identifier);
-    return POConverters.fromSchemaPO(schemaPO, identifier.namespace());
+    // Use physical identifier for DB lookup; convert returned entity name back to logical.
+    SchemaPO schemaPO = getSchemaPOByIdentifier(toPhysicalIdentifier(identifier));
+    return toLogicalEntity(POConverters.fromSchemaPO(schemaPO, identifier.namespace()));
   }
 
   @Monitored(
@@ -150,7 +159,10 @@ public class SchemaMetaService {
     NamespaceUtil.checkSchema(namespace);
 
     List<SchemaPO> schemaPOs = listSchemaPOs(namespace);
-    return POConverters.fromSchemaPOs(schemaPOs, namespace);
+    // PO names are physical (e.g. "A.B.C"); convert back to logical (e.g. "A:B:C").
+    return POConverters.fromSchemaPOs(schemaPOs, namespace).stream()
+        .map(this::toLogicalEntity)
+        .collect(Collectors.toList());
   }
 
   @Monitored(
@@ -158,15 +170,17 @@ public class SchemaMetaService {
       baseMetricName = "insertSchema")
   public void insertSchema(SchemaEntity schemaEntity, boolean overwrite) throws IOException {
     try {
-      NameIdentifierUtil.checkSchema(schemaEntity.nameIdentifier());
+      // Convert the logical entity name to physical before building and storing the PO.
+      SchemaEntity physicalEntity = toPhysicalEntity(schemaEntity);
+      NameIdentifierUtil.checkSchema(physicalEntity.nameIdentifier());
 
       SchemaPO.Builder builder = SchemaPO.builder();
-      fillSchemaPOBuilderParentEntityId(builder, schemaEntity.namespace());
+      fillSchemaPOBuilderParentEntityId(builder, physicalEntity.namespace());
 
       SessionUtils.doWithCommit(
           SchemaMetaMapper.class,
           mapper -> {
-            SchemaPO po = POConverters.initializeSchemaPOWithVersion(schemaEntity, builder);
+            SchemaPO po = POConverters.initializeSchemaPOWithVersion(physicalEntity, builder);
             if (overwrite) {
               mapper.insertSchemaMetaOnDuplicateKeyUpdate(po);
             } else {
@@ -185,7 +199,8 @@ public class SchemaMetaService {
       baseMetricName = "updateSchema")
   public <E extends Entity & HasIdentifier> SchemaEntity updateSchema(
       NameIdentifier identifier, Function<E, E> updater) throws IOException {
-    SchemaPO oldSchemaPO = getSchemaPOByIdentifier(identifier);
+    // Use physical identifier for DB lookup; expose logical entity to the updater.
+    SchemaPO oldSchemaPO = getSchemaPOByIdentifier(toPhysicalIdentifier(identifier));
 
     SchemaEntity oldSchemaEntity = POConverters.fromSchemaPO(oldSchemaPO, identifier.namespace());
     SchemaEntity newEntity = (SchemaEntity) updater.apply((E) oldSchemaEntity);
@@ -195,6 +210,8 @@ public class SchemaMetaService {
         newEntity.id(),
         oldSchemaEntity.id());
 
+    // Convert the updated logical entity to physical before persisting.
+    SchemaEntity physicalNewEntity = toPhysicalEntity(newEntity);
     Integer updateResult;
     try {
       updateResult =
@@ -202,7 +219,8 @@ public class SchemaMetaService {
               SchemaMetaMapper.class,
               mapper ->
                   mapper.updateSchemaMeta(
-                      POConverters.updateSchemaPOWithVersion(oldSchemaPO, newEntity), oldSchemaPO));
+                      POConverters.updateSchemaPOWithVersion(oldSchemaPO, physicalNewEntity),
+                      oldSchemaPO));
     } catch (RuntimeException re) {
       ExceptionUtils.checkSQLException(
           re, Entity.EntityType.SCHEMA, newEntity.nameIdentifier().toString());
@@ -210,6 +228,7 @@ public class SchemaMetaService {
     }
 
     if (updateResult > 0) {
+      // Return the logical entity (as seen by callers above the EntityStore layer).
       return newEntity;
     } else {
       throw new IOException("Failed to update the entity: " + identifier);
@@ -392,11 +411,13 @@ public class SchemaMetaService {
 
   private SchemaPO getSchemaByFullQualifiedName(
       String metalakeName, String catalogName, String schemaName) {
+    // Convert logical name to physical for DB query.
+    String physicalName = toPhysicalSchemaName(schemaName);
     SchemaPO schemaPO =
         SessionUtils.getWithoutCommit(
             SchemaMetaMapper.class,
             mapper ->
-                mapper.selectSchemaByFullQualifiedName(metalakeName, catalogName, schemaName));
+                mapper.selectSchemaByFullQualifiedName(metalakeName, catalogName, physicalName));
     if (schemaPO == null) {
       throw new NoSuchEntityException(
           NoSuchEntityException.NO_SUCH_ENTITY_MESSAGE,
@@ -495,16 +516,99 @@ public class SchemaMetaService {
 
     NameIdentifier firstIdent = identifiers.get(0);
     NameIdentifier catalogIdent = NameIdentifierUtil.getCatalogIdentifier(firstIdent);
-    List<String> schemaNames =
-        identifiers.stream().map(NameIdentifier::name).collect(Collectors.toList());
+    // Convert logical schema names to physical for DB batch query.
+    List<String> physicalSchemaNames =
+        identifiers.stream()
+            .map(id -> toPhysicalSchemaName(id.name()))
+            .collect(Collectors.toList());
 
     return SessionUtils.doWithCommitAndFetchResult(
         SchemaMetaMapper.class,
         mapper -> {
           List<SchemaPO> schemaPOs =
               mapper.batchSelectSchemaByIdentifier(
-                  catalogIdent.namespace().level(0), catalogIdent.name(), schemaNames);
-          return POConverters.fromSchemaPOs(schemaPOs, firstIdent.namespace());
+                  catalogIdent.namespace().level(0), catalogIdent.name(), physicalSchemaNames);
+          // Convert physical PO names back to logical for callers.
+          return POConverters.fromSchemaPOs(schemaPOs, firstIdent.namespace()).stream()
+              .map(this::toLogicalEntity)
+              .collect(Collectors.toList());
         });
+  }
+
+  // ---------------------------------------------------------------------------
+  // Helpers: logical ↔ physical schema name conversion at the PO boundary
+  // ---------------------------------------------------------------------------
+
+  private String namespaceSeparator() {
+    return GravitinoEnv.getInstance().config().get(Configs.SCHEMA_NAMESPACE_SEPARATOR);
+  }
+
+  /**
+   * Converts a logical schema name (e.g. {@code "A:B:C"}) to the physical dot-separated form
+   * (e.g. {@code "A.B.C"}) used in the database. Non-nested names are returned unchanged.
+   */
+  private String toPhysicalSchemaName(String logicalName) {
+    return HierarchicalSchemaUtil.logicalToPhysical(logicalName, namespaceSeparator());
+  }
+
+  /**
+   * Converts a physical schema name (e.g. {@code "A.B.C"}) back to the logical separator form
+   * (e.g. {@code "A:B:C"}). Non-nested names are returned unchanged.
+   */
+  private String toLogicalSchemaName(String physicalName) {
+    return HierarchicalSchemaUtil.physicalToLogical(physicalName, namespaceSeparator());
+  }
+
+  /**
+   * Builds a new {@link NameIdentifier} with the physical schema name while keeping the original
+   * namespace unchanged.
+   */
+  private NameIdentifier toPhysicalIdentifier(NameIdentifier identifier) {
+    String physicalName = toPhysicalSchemaName(identifier.name());
+    if (physicalName.equals(identifier.name())) {
+      return identifier;
+    }
+    return NameIdentifier.of(identifier.namespace(), physicalName);
+  }
+
+  /**
+   * Returns a {@link SchemaEntity} whose {@code name()} is the logical representation. If the PO
+   * stored a physical name (contains {@code "."}), it is converted back to the logical separator
+   * form. Otherwise the original entity is returned unchanged.
+   */
+  private SchemaEntity toLogicalEntity(SchemaEntity entity) {
+    if (!HierarchicalSchemaUtil.isPhysicalNested(entity.name())) {
+      return entity;
+    }
+    String logicalName = toLogicalSchemaName(entity.name());
+    return SchemaEntity.builder()
+        .withId(entity.id())
+        .withName(logicalName)
+        .withNamespace(entity.namespace())
+        .withComment(entity.comment())
+        .withProperties(entity.properties())
+        .withAuditInfo(entity.auditInfo())
+        .build();
+  }
+
+  /**
+   * Returns a {@link SchemaEntity} whose {@code name()} is the physical representation suitable
+   * for storage. If the entity carries a logical name (contains the separator), it is converted to
+   * the physical dot-separated form. Otherwise the original entity is returned unchanged.
+   */
+  private SchemaEntity toPhysicalEntity(SchemaEntity entity) {
+    String separator = namespaceSeparator();
+    if (!HierarchicalSchemaUtil.isNested(entity.name(), separator)) {
+      return entity;
+    }
+    String physicalName = toPhysicalSchemaName(entity.name());
+    return SchemaEntity.builder()
+        .withId(entity.id())
+        .withName(physicalName)
+        .withNamespace(entity.namespace())
+        .withComment(entity.comment())
+        .withProperties(entity.properties())
+        .withAuditInfo(entity.auditInfo())
+        .build();
   }
 }

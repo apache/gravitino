@@ -20,6 +20,9 @@ package org.apache.gravitino.server.web.rest;
 
 import com.codahale.metrics.annotation.ResponseMetered;
 import com.codahale.metrics.annotation.Timed;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
 import javax.inject.Inject;
 import javax.servlet.http.HttpServletRequest;
 import javax.ws.rs.Consumes;
@@ -35,12 +38,16 @@ import javax.ws.rs.QueryParam;
 import javax.ws.rs.core.Context;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
+import org.apache.commons.lang3.StringUtils;
+import org.apache.gravitino.Configs;
 import org.apache.gravitino.Entity;
+import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.Schema;
 import org.apache.gravitino.SchemaChange;
+import org.apache.gravitino.catalog.HierarchicalSchemaUtil;
 import org.apache.gravitino.catalog.SchemaDispatcher;
 import org.apache.gravitino.dto.requests.SchemaCreateRequest;
 import org.apache.gravitino.dto.requests.SchemaUpdateRequest;
@@ -87,8 +94,13 @@ public class SchemaOperations {
       @PathParam("metalake") @AuthorizationMetadata(type = Entity.EntityType.METALAKE)
           String metalake,
       @PathParam("catalog") @AuthorizationMetadata(type = Entity.EntityType.CATALOG)
-          String catalog) {
-    LOG.info("Received list schema request for catalog: {}.{}", metalake, catalog);
+          String catalog,
+      @DefaultValue("") @QueryParam("parentSchema") String parentSchema) {
+    LOG.info(
+        "Received list schema request for catalog: {}.{}, parentSchema: {}",
+        metalake,
+        catalog,
+        parentSchema);
     try {
       return Utils.doAs(
           httpRequest,
@@ -101,8 +113,16 @@ public class SchemaOperations {
                     AuthorizationExpressionConstants.FILTER_SCHEMA_AUTHORIZATION_EXPRESSION,
                     Entity.EntityType.SCHEMA,
                     idents);
+            // Apply hierarchical filtering: return only top-level schemas when parentSchema is
+            // absent, or direct children when parentSchema is specified.
+            idents = filterByParentSchema(idents, parentSchema);
             Response response = Utils.ok(new EntityListResponse(idents));
-            LOG.info("List {} schemas in catalog {}.{}", idents.length, metalake, catalog);
+            LOG.info(
+                "List {} schemas in catalog {}.{} (parentSchema='{}')",
+                idents.length,
+                metalake,
+                catalog,
+                parentSchema);
             return response;
           });
     } catch (Exception e) {
@@ -240,5 +260,52 @@ public class SchemaOperations {
     } catch (Exception e) {
       return ExceptionHandlers.handleSchemaException(OperationType.DROP, schema, catalog, e);
     }
+  }
+
+  /**
+   * Filters the given schema identifiers by hierarchical parent scope.
+   *
+   * <ul>
+   *   <li>When {@code parentSchema} is blank, returns only top-level schemas (names without the
+   *       namespace separator).
+   *   <li>When {@code parentSchema} is provided, returns only the direct children under that
+   *       parent.
+   * </ul>
+   *
+   * <p>Schema names are expected to be in the logical format (using the configured external
+   * separator, default {@code ":"}) as returned by {@link SchemaDispatcher#listSchemas}.
+   */
+  private NameIdentifier[] filterByParentSchema(
+      NameIdentifier[] idents, String parentSchema) {
+    String separator =
+        GravitinoEnv.getInstance().config().get(Configs.SCHEMA_NAMESPACE_SEPARATOR);
+
+    List<String> allNames = new ArrayList<>(idents.length);
+    for (NameIdentifier ident : idents) {
+      allNames.add(ident.name());
+    }
+
+    // Convert logical names to physical for filtering, then convert back.
+    List<String> allPhysical = new ArrayList<>(allNames.size());
+    for (String name : allNames) {
+      allPhysical.add(HierarchicalSchemaUtil.logicalToPhysical(name, separator));
+    }
+
+    String physicalParent =
+        StringUtils.isBlank(parentSchema)
+            ? null
+            : HierarchicalSchemaUtil.logicalToPhysical(parentSchema, separator);
+
+    List<String> filteredPhysical =
+        HierarchicalSchemaUtil.filterDirectChildren(allPhysical, physicalParent);
+
+    // Rebuild identifiers matching the filtered physical names.
+    return Arrays.stream(idents)
+        .filter(
+            ident -> {
+              String physical = HierarchicalSchemaUtil.logicalToPhysical(ident.name(), separator);
+              return filteredPhysical.contains(physical);
+            })
+        .toArray(NameIdentifier[]::new);
   }
 }
