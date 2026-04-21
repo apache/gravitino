@@ -160,7 +160,7 @@ public class CatalogWrapperForREST extends IcebergCatalogWrapper {
   public LoadTableResponse updateTable(
       TableIdentifier tableIdentifier, UpdateTableRequest updateTableRequest) {
     if (isRESTCatalog()) {
-      return CatalogHandlers.updateTable(loadedCatalog, tableIdentifier, updateTableRequest);
+      return CatalogHandlers.updateTable(getCatalog(), tableIdentifier, updateTableRequest);
     } else {
       return super.updateTable(tableIdentifier, updateTableRequest);
     }
