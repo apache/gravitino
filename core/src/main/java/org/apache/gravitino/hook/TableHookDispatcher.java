@@ -92,7 +92,7 @@ public class TableHookDispatcher implements TableDispatcher {
             Owner.Type.USER);
       }
     } catch (Exception e) {
-      LOG.warn("Fail to set owner for table " + ident + ", table exists without owner", e);
+      LOG.warn("Fail to set owner for table {}, table exists without owner", ident, e);
     }
     return table;
   }

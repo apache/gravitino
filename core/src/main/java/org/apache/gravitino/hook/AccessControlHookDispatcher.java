@@ -21,7 +21,6 @@ package org.apache.gravitino.hook;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import lombok.extern.slf4j.Slf4j;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.MetadataObject;
@@ -55,7 +54,6 @@ import org.slf4j.LoggerFactory;
  * only delegates access control operations to the underlying access control dispatcher but also
  * executes some hook operations before or after the underlying operations.
  */
-@Slf4j
 public class AccessControlHookDispatcher implements AccessControlDispatcher {
 
   private static final Logger LOG = LoggerFactory.getLogger(AccessControlHookDispatcher.class);
@@ -177,7 +175,7 @@ public class AccessControlHookDispatcher implements AccessControlDispatcher {
             Owner.Type.USER);
       }
     } catch (Exception e) {
-      LOG.warn("Fail to set owner for role " + role + ", role exists without owner", e);
+      LOG.warn("Fail to set owner for role {}, role exists without owner", role, e);
     }
     return createdRole;
   }
@@ -194,7 +192,7 @@ public class AccessControlHookDispatcher implements AccessControlDispatcher {
     try {
       oldRole = getRole(metalake, role);
     } catch (NoSuchRoleException e) {
-      log.debug(e.getMessage());
+      LOG.debug(e.getMessage());
     }
     boolean resultOfDeleteRole = dispatcher.deleteRole(metalake, role);
     if (resultOfDeleteRole && oldRole != null) {

@@ -82,7 +82,7 @@ public class ModelHookDispatcher implements ModelDispatcher {
             Owner.Type.USER);
       }
     } catch (Exception e) {
-      LOG.warn("Fail to set owner for model " + ident + ", model exists without owner", e);
+      LOG.warn("Fail to set owner for model {}, model exists without owner", ident, e);
     }
     return model;
   }
@@ -174,7 +174,7 @@ public class ModelHookDispatcher implements ModelDispatcher {
             Owner.Type.USER);
       }
     } catch (Exception e) {
-      LOG.warn("Fail to set owner for model " + ident + ", model exists without owner", e);
+      LOG.warn("Fail to set owner for model {}, model exists without owner", ident, e);
     }
     return model;
   }

@@ -93,7 +93,7 @@ public class FilesetHookDispatcher implements FilesetDispatcher {
             Owner.Type.USER);
       }
     } catch (Exception e) {
-      LOG.warn("Fail to set owner for fileset " + ident + ", fileset exists without owner", e);
+      LOG.warn("Fail to set owner for fileset {}, fileset exists without owner", ident, e);
     }
     return fileset;
   }

@@ -81,7 +81,7 @@ public class PolicyHookDispatcher implements PolicyDispatcher {
             Owner.Type.USER);
       }
     } catch (Exception e) {
-      LOG.warn("Fail to set owner for policy " + name + ", policy exists without owner", e);
+      LOG.warn("Fail to set owner for policy {}, policy exists without owner", name, e);
     }
     return policy;
   }

@@ -73,7 +73,7 @@ public class SchemaHookDispatcher implements SchemaDispatcher {
             Owner.Type.USER);
       }
     } catch (Exception e) {
-      LOG.warn("Fail to set owner for schema " + ident + ", schema exists without owner", e);
+      LOG.warn("Fail to set owner for schema {}, schema exists without owner", ident, e);
     }
     return schema;
   }

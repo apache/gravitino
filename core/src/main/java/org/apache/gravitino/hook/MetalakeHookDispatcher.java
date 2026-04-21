@@ -85,7 +85,7 @@ public class MetalakeHookDispatcher implements MetalakeDispatcher {
             Owner.Type.USER);
       }
     } catch (Exception e) {
-      LOG.warn("Fail to set owner for metalake " + ident + ", metalake exists without owner", e);
+      LOG.warn("Fail to set owner for metalake {}, metalake exists without owner", ident, e);
     }
     return metalake;
   }

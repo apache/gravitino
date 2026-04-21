@@ -79,7 +79,7 @@ public class TopicHookDispatcher implements TopicDispatcher {
             Owner.Type.USER);
       }
     } catch (Exception e) {
-      LOG.warn("Fail to set owner for topic " + ident + ", topic exists without owner", e);
+      LOG.warn("Fail to set owner for topic {}, topic exists without owner", ident, e);
     }
     return topic;
   }

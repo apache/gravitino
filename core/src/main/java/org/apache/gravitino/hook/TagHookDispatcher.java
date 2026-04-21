@@ -62,7 +62,7 @@ public class TagHookDispatcher implements TagDispatcher {
       String metalake, String name, String comment, Map<String, String> properties) {
     Tag tag = dispatcher.createTag(metalake, name, comment, properties);
 
-    // Set the creator as the owner of the catalog.
+    // Set the creator as the owner of the tag.
     try {
       OwnerDispatcher ownerDispatcher = GravitinoEnv.getInstance().ownerDispatcher();
       if (ownerDispatcher != null) {
@@ -74,7 +74,7 @@ public class TagHookDispatcher implements TagDispatcher {
             Owner.Type.USER);
       }
     } catch (Exception e) {
-      LOG.warn("Fail to set owner for tag " + name + ", tag exists without owner", e);
+      LOG.warn("Fail to set owner for tag {}, tag exists without owner", name, e);
     }
 
     return tag;
