@@ -64,7 +64,7 @@ class TestGlueTableOperations {
   // -------------------------------------------------------------------------
 
   @Test
-  void testListPartitionNames_paginated() {
+  void testListPartitionNames() {
     software.amazon.awssdk.services.glue.model.Partition p1 =
         software.amazon.awssdk.services.glue.model.Partition.builder()
             .values("2024-01-01", "us")
@@ -86,7 +86,7 @@ class TestGlueTableOperations {
   }
 
   @Test
-  void testListPartitionNames_empty() {
+  void testListPartitionNamesReturnsEmptyArray() {
     when(mockClient.getPartitions(any(GetPartitionsRequest.class)))
         .thenReturn(GetPartitionsResponse.builder().partitions(List.of()).nextToken(null).build());
 
@@ -98,7 +98,7 @@ class TestGlueTableOperations {
   // -------------------------------------------------------------------------
 
   @Test
-  void testListPartitions_success() {
+  void testListPartitions() {
     software.amazon.awssdk.services.glue.model.Partition p =
         software.amazon.awssdk.services.glue.model.Partition.builder()
             .values("2024-01-01", "us")
@@ -121,7 +121,7 @@ class TestGlueTableOperations {
   // -------------------------------------------------------------------------
 
   @Test
-  void testGetPartition_success() {
+  void testGetPartition() {
     software.amazon.awssdk.services.glue.model.Partition gluePartition =
         software.amazon.awssdk.services.glue.model.Partition.builder()
             .values("2024-01-01", "us")
@@ -139,7 +139,7 @@ class TestGlueTableOperations {
   }
 
   @Test
-  void testGetPartition_notFound() {
+  void testGetPartitionNotFound() {
     when(mockClient.getPartition(any(GetPartitionRequest.class)))
         .thenThrow(EntityNotFoundException.builder().message("not found").build());
 
@@ -151,7 +151,7 @@ class TestGlueTableOperations {
   // -------------------------------------------------------------------------
 
   @Test
-  void testAddPartition_success() {
+  void testAddPartition() {
     IdentityPartition partition =
         Partitions.identity(
             "dt=2024-01-01/region=us",
@@ -172,7 +172,7 @@ class TestGlueTableOperations {
   }
 
   @Test
-  void testAddPartition_alreadyExists() {
+  void testAddPartitionAlreadyExists() {
     IdentityPartition partition =
         Partitions.identity(
             "dt=2024-01-01/region=us",
@@ -189,7 +189,7 @@ class TestGlueTableOperations {
   }
 
   @Test
-  void testAddPartition_nonIdentityRejected() {
+  void testAddPartitionRejectsNonIdentity() {
     Partition nonIdentity = mock(Partition.class);
     assertThrows(IllegalArgumentException.class, () -> ops.addPartition(nonIdentity));
   }
@@ -199,7 +199,7 @@ class TestGlueTableOperations {
   // -------------------------------------------------------------------------
 
   @Test
-  void testDropPartition_success() {
+  void testDropPartition() {
     ArgumentCaptor<DeletePartitionRequest> captor =
         ArgumentCaptor.forClass(DeletePartitionRequest.class);
 
@@ -213,7 +213,7 @@ class TestGlueTableOperations {
   }
 
   @Test
-  void testDropPartition_notFound() {
+  void testDropPartitionNotFound() {
     when(mockClient.deletePartition(any(DeletePartitionRequest.class)))
         .thenThrow(EntityNotFoundException.builder().message("not found").build());
 
@@ -221,7 +221,7 @@ class TestGlueTableOperations {
   }
 
   @Test
-  void testDropPartition_withCatalogId() {
+  void testDropPartitionWithCatalogId() {
     GlueTableOperations opsWithId =
         new GlueTableOperations(mockClient, "123456789012", "mydb", "mytable", new String[] {"dt"});
     ArgumentCaptor<DeletePartitionRequest> captor =
