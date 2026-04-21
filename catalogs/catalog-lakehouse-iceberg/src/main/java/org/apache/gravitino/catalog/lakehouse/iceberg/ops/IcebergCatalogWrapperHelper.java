@@ -286,8 +286,7 @@ public class IcebergCatalogWrapperHelper {
    *
    * <p>If the name contains the separator it is split into a multi-level namespace (e.g.
    * {@code "A:B:C"} with {@code ":"} → {@code Namespace.of("A","B","C")}). Flat names are wrapped
-   * in a single-level namespace. The physical {@code "."} separator is intentionally not handled
-   * here; schema names arriving at this method are always in logical form.
+   * in a single-level namespace.
    *
    * @param schemaName the logical schema name using the configured external separator
    * @param separator the external namespace separator configured on the server
@@ -312,7 +311,6 @@ public class IcebergCatalogWrapperHelper {
    *
    * <ul>
    *   <li>{@code Namespace.of("A","B","C")} + {@code ":"} → {@code "A:B:C"} (logical)
-   *   <li>{@code Namespace.of("A","B","C")} + {@code "."} → {@code "A.B.C"} (physical)
    * </ul>
    *
    * @param namespace the Iceberg namespace
@@ -356,18 +354,6 @@ public class IcebergCatalogWrapperHelper {
     String schemaName = levels[levels.length - 1];
     return TableIdentifier.of(
         getIcebergNamespaceFromSchemaName(schemaName, separator), nameIdentifier.name());
-  }
-
-  /**
-   * Builds an Iceberg {@link TableIdentifier} from a Gravitino {@link NameIdentifier}. Treats the
-   * schema name as physical (dot-separated). Use the separator-aware overload when schema names may
-   * be in logical format.
-   *
-   * @param nameIdentifier GravitinoNameIdentifier
-   * @return Iceberg TableIdentifier
-   */
-  public static TableIdentifier buildIcebergTableIdentifier(NameIdentifier nameIdentifier) {
-    return buildIcebergTableIdentifier(nameIdentifier, ".");
   }
 
   @VisibleForTesting

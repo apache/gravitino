@@ -515,7 +515,7 @@ public abstract class CatalogIcebergBaseIT extends BaseIT {
     // catalog load check
     org.apache.iceberg.Table table =
         icebergCatalog.loadTable(
-            IcebergCatalogWrapperHelper.buildIcebergTableIdentifier(tableIdentifier));
+            IcebergCatalogWrapperHelper.buildIcebergTableIdentifier(tableIdentifier, "."));
     Assertions.assertEquals(tableName, table.name().substring(table.name().lastIndexOf(".") + 1));
     Assertions.assertEquals(
         table_comment, table.properties().get(IcebergTable.ICEBERG_COMMENT_FIELD_NAME));
@@ -600,7 +600,7 @@ public abstract class CatalogIcebergBaseIT extends BaseIT {
 
     org.apache.iceberg.Table table =
         icebergCatalog.loadTable(
-            IcebergCatalogWrapperHelper.buildIcebergTableIdentifier(tableIdentifier));
+            IcebergCatalogWrapperHelper.buildIcebergTableIdentifier(tableIdentifier, "."));
     org.apache.iceberg.Schema icebergSchema = table.schema();
     Assertions.assertEquals("iceberg_column_1", icebergSchema.columns().get(0).name());
     Assertions.assertEquals(
