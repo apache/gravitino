@@ -6,15 +6,11 @@ on:
   push:
     branches: [ "main", "branch-*" ]
     paths-ignore:
-      - '**/*.md'
-      - '**/*.mdx'
       - 'docs/assets/**'
       - 'web-v2/**'
   pull_request:
     branches: [ "main", "branch-*" ]
     paths-ignore:
-      - '**/*.md'
-      - '**/*.mdx'
       - 'docs/assets/**'
       - 'web-v2/**'
 
