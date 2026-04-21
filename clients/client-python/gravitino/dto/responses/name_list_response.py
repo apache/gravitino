@@ -15,23 +15,29 @@
 # specific language governing permissions and limitations
 # under the License.
 
-from httpx import AsyncClient
+from __future__ import annotations
 
-from mcp_server.client import SchemaOperation
-from mcp_server.client.plain.utils import (
-    encode_path_segment,
-    extract_content_from_response,
-)
+from dataclasses import dataclass, field
+
+from dataclasses_json import config, dataclass_json
+
+from gravitino.dto.responses.base_response import BaseResponse
+from gravitino.utils.precondition import Precondition
 
 
-class PlainRESTClientSchemaOperation(SchemaOperation):
-    def __init__(self, metalake_name: str, rest_client: AsyncClient):
-        self.metalake_name = metalake_name
-        self.rest_client = rest_client
+@dataclass_json
+@dataclass
+class NameListResponse(BaseResponse):
+    """Represents a response for a list of entity names."""
 
-    async def get_list_of_schemas(self, catalog_name: str) -> str:
-        response = await self.rest_client.get(
-            f"/api/metalakes/{encode_path_segment(self.metalake_name)}"
-            f"/catalogs/{encode_path_segment(catalog_name)}/schemas"
-        )
-        return extract_content_from_response(response, "identifiers", [])
+    _names: list[str] = field(default_factory=list, metadata=config(field_name="names"))
+
+    @property
+    def names(self) -> list[str]:
+        return self._names
+
+    def validate(self):
+        Precondition.check_argument(self._names is not None, '"names" must not be null')
+
+        for role_name in self._names:
+            Precondition.check_string_not_empty(role_name, "name must not be null")

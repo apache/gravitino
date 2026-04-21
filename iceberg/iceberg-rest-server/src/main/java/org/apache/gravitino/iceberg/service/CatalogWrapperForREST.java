@@ -91,7 +91,8 @@ public class CatalogWrapperForREST extends IcebergCatalogWrapper {
 
   private final CatalogCredentialManager catalogCredentialManager;
 
-  private final Map<String, String> catalogConfigToClients;
+  private volatile Map<String, String> catalogConfigToClients;
+  private final Object catalogConfigToClientsLock = new Object();
 
   private final ScanPlanCache scanPlanCache;
 
@@ -117,7 +118,6 @@ public class CatalogWrapperForREST extends IcebergCatalogWrapper {
 
   public CatalogWrapperForREST(String catalogName, IcebergConfig config) {
     super(config);
-    this.catalogConfigToClients = buildCatalogConfigToClients(config, getCatalog());
     // To be compatible with old properties
     Map<String, String> catalogProperties =
         checkForCompatibility(config.getAllConfig(), deprecatedProperties);
@@ -160,7 +160,7 @@ public class CatalogWrapperForREST extends IcebergCatalogWrapper {
   public LoadTableResponse updateTable(
       TableIdentifier tableIdentifier, UpdateTableRequest updateTableRequest) {
     if (isRESTCatalog()) {
-      return CatalogHandlers.updateTable(catalog, tableIdentifier, updateTableRequest);
+      return CatalogHandlers.updateTable(loadedCatalog, tableIdentifier, updateTableRequest);
     } else {
       return super.updateTable(tableIdentifier, updateTableRequest);
     }
@@ -220,7 +220,17 @@ public class CatalogWrapperForREST extends IcebergCatalogWrapper {
   }
 
   public Map<String, String> getCatalogConfigToClient() {
-    return catalogConfigToClients;
+    Map<String, String> configToClients = catalogConfigToClients;
+    if (configToClients != null) {
+      return configToClients;
+    }
+
+    synchronized (catalogConfigToClientsLock) {
+      if (catalogConfigToClients == null) {
+        catalogConfigToClients = buildCatalogConfigToClients(getIcebergConfig(), getCatalog());
+      }
+      return catalogConfigToClients;
+    }
   }
 
   /**
@@ -406,7 +416,7 @@ public class CatalogWrapperForREST extends IcebergCatalogWrapper {
         scanRequest.caseSensitive());
 
     try {
-      Table table = catalog.loadTable(tableIdentifier);
+      Table table = getCatalog().loadTable(tableIdentifier);
       Optional<PlanTableScanResponse> cachedResponse =
           scanPlanCache.get(ScanPlanCacheKey.create(tableIdentifier, table, scanRequest));
       if (cachedResponse.isPresent()) {
@@ -594,8 +604,8 @@ public class CatalogWrapperForREST extends IcebergCatalogWrapper {
     int expireMinutes = config.get(IcebergConfig.SCAN_PLAN_CACHE_EXPIRE_MINUTES);
     cache.initialize(capacity, expireMinutes);
     LOG.info(
-        "Load scan plan cache for catalog: {}, impl: {}, capacity: {}, expire minutes: {}",
-        catalog.name(),
+        "Load scan plan cache, backend: {}, impl: {}, capacity: {}, expire minutes: {}",
+        config.get(IcebergConfig.CATALOG_BACKEND),
         impl,
         capacity,
         expireMinutes);
@@ -630,6 +640,7 @@ public class CatalogWrapperForREST extends IcebergCatalogWrapper {
   }
 
   private LoadTableResponse createTableInternal(Namespace namespace, CreateTableRequest request) {
+    Catalog loadedCatalog = getCatalog();
 
     request.validate();
 
@@ -639,7 +650,7 @@ public class CatalogWrapperForREST extends IcebergCatalogWrapper {
 
     TableIdentifier ident = TableIdentifier.of(namespace, request.name());
     Table table =
-        catalog
+        loadedCatalog
             .buildTable(ident, request.schema())
             .withLocation(request.location())
             .withPartitionSpec(request.spec())
@@ -664,8 +675,9 @@ public class CatalogWrapperForREST extends IcebergCatalogWrapper {
 
   private LoadTableResponse stageTableCreateInternal(
       Namespace namespace, CreateTableRequest request) {
+    Catalog loadedCatalog = getCatalog();
     TableIdentifier ident = TableIdentifier.of(namespace, request.name());
-    if (catalog.tableExists(ident)) {
+    if (loadedCatalog.tableExists(ident)) {
       throw new AlreadyExistsException("Table already exists: %s", ident);
     }
 
@@ -679,7 +691,7 @@ public class CatalogWrapperForREST extends IcebergCatalogWrapper {
       location = request.location();
     } else {
       Table table =
-          catalog
+          loadedCatalog
               .buildTable(ident, request.schema())
               .withPartitionSpec(request.spec())
               .withSortOrder(request.writeOrder())
@@ -706,7 +718,7 @@ public class CatalogWrapperForREST extends IcebergCatalogWrapper {
   }
 
   private LoadTableResponse loadTableInternal(TableIdentifier ident) {
-    Table table = catalog.loadTable(ident);
+    Table table = getCatalog().loadTable(ident);
 
     if (table instanceof BaseTable) {
       Map<String, String> properties = retrieveFileIOProperties(table.io());
