@@ -46,6 +46,7 @@ import org.apache.iceberg.catalog.TableIdentifier;
 import org.apache.iceberg.catalog.ViewCatalog;
 import org.apache.iceberg.jdbc.JdbcCatalogWithMetadataLocationSupport;
 import org.apache.iceberg.rest.CatalogHandlers;
+import org.apache.iceberg.rest.RESTCatalog;
 import org.apache.iceberg.rest.requests.CreateNamespaceRequest;
 import org.apache.iceberg.rest.requests.CreateTableRequest;
 import org.apache.iceberg.rest.requests.CreateViewRequest;
@@ -370,6 +371,10 @@ public class IcebergCatalogWrapper implements AutoCloseable {
     if (useDifferentClassLoader()) {
       closeJdbcDriverResources();
     }
+  }
+
+  public boolean isRESTCatalog() {
+    return getCatalog() instanceof RESTCatalog;
   }
 
   /**
