@@ -20,57 +20,60 @@ package org.apache.gravitino.catalog.glue.integration.test;
 
 import java.util.Map;
 import org.apache.gravitino.catalog.glue.GlueConstants;
-import org.apache.gravitino.integration.test.container.GravitinoLocalStackContainer;
+import org.apache.gravitino.integration.test.container.GravitinoMotoContainer;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.TestInstance;
 
 /**
- * Runs {@link AbstractGlueCatalogIT} scenarios against a LocalStack Glue endpoint.
+ * Runs {@link AbstractGlueCatalogIT} scenarios against a Moto server (free AWS mock).
  *
  * <p>Requires Docker. Skipped by default when the {@code gravitino-docker-test} tag is excluded.
- * Override the container image with the {@code GRAVITINO_CI_LOCALSTACK_DOCKER_IMAGE} environment
+ * Override the container image with the {@code GRAVITINO_CI_MOTO_DOCKER_IMAGE} environment
  * variable.
  */
 @Tag("gravitino-docker-test")
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
-class LocalStackGlueCatalogIT extends AbstractGlueCatalogIT {
+class MotoGlueCatalogIT extends AbstractGlueCatalogIT {
 
-  private static final String FALLBACK_IMAGE = "localstack/localstack:3";
+  private static final String FALLBACK_IMAGE = "motoserver/moto:latest";
 
-  private GravitinoLocalStackContainer localStack;
+  private GravitinoMotoContainer moto;
 
   @Override
   @BeforeAll
   void initOps() {
-    String image = GravitinoLocalStackContainer.DEFAULT_IMAGE;
+    String image = GravitinoMotoContainer.DEFAULT_IMAGE;
     if (image == null || image.isBlank()) {
       image = FALLBACK_IMAGE;
     }
-    localStack = GravitinoLocalStackContainer.builder().withImage(image).build();
-    localStack.start();
+    moto = GravitinoMotoContainer.builder().withImage(image).build();
+    moto.start();
     super.initOps();
   }
 
   @AfterAll
   void stopContainer() {
-    if (localStack != null) {
-      localStack.close();
+    if (moto != null) {
+      moto.close();
     }
   }
 
   @Override
   protected Map<String, String> catalogConfig() {
     String endpoint =
-        "http://localhost:" + localStack.getMappedPort(GravitinoLocalStackContainer.PORT);
+        "http://"
+            + moto.getContainer().getHost()
+            + ":"
+            + moto.getMappedPort(GravitinoMotoContainer.PORT);
     return Map.of(
         GlueConstants.AWS_REGION,
         "us-east-1",
         GlueConstants.AWS_ACCESS_KEY_ID,
-        "accessKey",
+        "test",
         GlueConstants.AWS_SECRET_ACCESS_KEY,
-        "secretKey",
+        "test",
         GlueConstants.AWS_GLUE_ENDPOINT,
         endpoint);
   }
