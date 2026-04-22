@@ -16,10 +16,10 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.gravitino.trino.connector.catalog;
+package org.apache.gravitino.trino.connector.security;
 
+import io.trino.spi.connector.ConnectorSession;
 import java.io.File;
-import java.util.HashMap;
 import java.util.Locale;
 import java.util.Map;
 import org.apache.commons.lang3.StringUtils;
@@ -33,45 +33,62 @@ import org.slf4j.LoggerFactory;
 
 /**
  * Builds a {@link GravitinoAdminClient} with the appropriate authentication provider based on the
- * Gravitino config.
+ * Gravitino config, and produces a per-user client for session forwarding via {@link
+ * #buildForSession(GravitinoConfig, ConnectorSession)}.
  */
-class GravitinoAuthProvider {
+public class GravitinoAuthProvider {
 
   private static final Logger LOG = LoggerFactory.getLogger(GravitinoAuthProvider.class);
 
   /** Authentication type configuration key. */
-  static final String AUTH_TYPE_KEY =
+  public static final String AUTH_TYPE_KEY =
       GravitinoClientConfiguration.GRAVITINO_CLIENT_CONFIG_PREFIX + "authType";
 
   /** Simple authentication user configuration key. */
-  static final String SIMPLE_AUTH_USER_KEY = "gravitino.user";
+  public static final String SIMPLE_AUTH_USER_KEY = "gravitino.user";
+
+  /**
+   * When set to {@code true}, the Trino session user/token is forwarded to Gravitino per-request
+   * via a per-user {@link GravitinoAdminClient} instead of the shared service client.
+   */
+  public static final String FORWARD_SESSION_USER_KEY =
+      GravitinoClientConfiguration.GRAVITINO_CLIENT_CONFIG_PREFIX + "session.forwardUser";
 
   /** OAuth2 server URI configuration key. */
-  static final String OAUTH_SERVER_URI_KEY =
+  public static final String OAUTH_SERVER_URI_KEY =
       GravitinoClientConfiguration.GRAVITINO_CLIENT_CONFIG_PREFIX + "oauth2.serverUri";
 
   /** OAuth2 credential configuration key. */
-  static final String OAUTH_CREDENTIAL_KEY =
+  public static final String OAUTH_CREDENTIAL_KEY =
       GravitinoClientConfiguration.GRAVITINO_CLIENT_CONFIG_PREFIX + "oauth2.credential";
 
   /** OAuth2 path configuration key. */
-  static final String OAUTH_PATH_KEY =
+  public static final String OAUTH_PATH_KEY =
       GravitinoClientConfiguration.GRAVITINO_CLIENT_CONFIG_PREFIX + "oauth2.path";
 
   /** OAuth2 scope configuration key. */
-  static final String OAUTH_SCOPE_KEY =
+  public static final String OAUTH_SCOPE_KEY =
       GravitinoClientConfiguration.GRAVITINO_CLIENT_CONFIG_PREFIX + "oauth2.scope";
 
   /** Kerberos principal configuration key. */
-  static final String KERBEROS_PRINCIPAL_KEY =
+  public static final String KERBEROS_PRINCIPAL_KEY =
       GravitinoClientConfiguration.GRAVITINO_CLIENT_CONFIG_PREFIX + "kerberos.principal";
 
   /** Kerberos keytab file path configuration key. */
-  static final String KERBEROS_KEYTAB_FILE_PATH_KEY =
+  public static final String KERBEROS_KEYTAB_FILE_PATH_KEY =
       GravitinoClientConfiguration.GRAVITINO_CLIENT_CONFIG_PREFIX + "kerberos.keytabFilePath";
 
+  /** Session cache maximum size configuration key. */
+  public static final String SESSION_CACHE_MAX_SIZE_KEY =
+      GravitinoClientConfiguration.GRAVITINO_CLIENT_CONFIG_PREFIX + "session.cache.maxSize";
+
+  /** Session cache expiry (seconds) configuration key. */
+  public static final String SESSION_CACHE_EXPIRE_AFTER_ACCESS_SECONDS_KEY =
+      GravitinoClientConfiguration.GRAVITINO_CLIENT_CONFIG_PREFIX
+          + "session.cache.expireAfterAccessSeconds";
+
   /** Authentication types supported by the Trino connector. */
-  enum AuthType {
+  public enum AuthType {
     SIMPLE,
     OAUTH2,
     KERBEROS,
@@ -81,30 +98,21 @@ class GravitinoAuthProvider {
   private GravitinoAuthProvider() {}
 
   /**
-   * Builds a GravitinoAdminClient from the given config, applying authentication settings found in
-   * the client config.
+   * Builds a {@link GravitinoAdminClient} from the given config, applying authentication settings
+   * found in the client config.
    *
    * @param config the Gravitino configuration containing server URI and client properties
-   * @return a configured GravitinoAdminClient
+   * @return a configured {@link GravitinoAdminClient}
    */
-  public static GravitinoAdminClient buildClient(GravitinoConfig config) {
-    Map<String, String> clientConfig = new HashMap<>(config.getClientConfig());
+  public static GravitinoAdminClient build(GravitinoConfig config) {
+    Map<String, String> clientConfig = config.getClientConfig();
     String uri = config.getURI();
     String authTypeStr = clientConfig.get(AUTH_TYPE_KEY);
 
     GravitinoAdminClient.AdminClientBuilder builder = GravitinoAdminClient.builder(uri);
 
     if (StringUtils.isNotBlank(authTypeStr)) {
-      AuthType authType;
-      try {
-        authType = AuthType.valueOf(authTypeStr.toUpperCase(Locale.ROOT));
-      } catch (IllegalArgumentException e) {
-        throw new IllegalArgumentException(
-            String.format(
-                "Invalid authentication type: %s. Valid values are: simple, oauth2, kerberos, none",
-                authTypeStr),
-            e);
-      }
+      AuthType authType = parseAuthType(authTypeStr);
 
       switch (authType) {
         case SIMPLE:
@@ -122,7 +130,85 @@ class GravitinoAuthProvider {
       }
     }
 
-    // Remove auth-specific keys before passing to withClientConfig
+    removeAuthSpecificKeys(clientConfig);
+    builder.withClientConfig(clientConfig);
+
+    return builder.build();
+  }
+
+  /**
+   * Alias for {@link #build(GravitinoConfig)}, kept for backward compatibility with existing tests.
+   *
+   * @deprecated Use {@link #build(GravitinoConfig)} directly.
+   */
+  @Deprecated
+  @SuppressWarnings("InlineMeSuggester")
+  public static GravitinoAdminClient buildClient(GravitinoConfig config) {
+    return build(config);
+  }
+
+  /**
+   * Builds a per-user {@link GravitinoAdminClient} whose credentials come from the given Trino
+   * connector session. This is the entry point for the per-user client cache when {@code
+   * forwardUser=true}.
+   *
+   * <p>Currently only {@code authType=simple} is supported: the Trino session username is used as
+   * the Gravitino simple-auth identity.
+   *
+   * @param config the Gravitino connector configuration
+   * @param session the current Trino connector session
+   * @return a new {@link GravitinoAdminClient} authenticated for the session user
+   * @throws IllegalArgumentException if forwarding is not configured or authType is missing
+   * @throws UnsupportedOperationException if the authType does not support session forwarding
+   */
+  public static GravitinoAdminClient buildForSession(
+      GravitinoConfig config, ConnectorSession session) {
+    Map<String, String> clientConfig = config.getClientConfig();
+    String uri = config.getURI();
+    String authTypeStr = clientConfig.get(AUTH_TYPE_KEY);
+    boolean forwardUser =
+        Boolean.parseBoolean(clientConfig.getOrDefault(FORWARD_SESSION_USER_KEY, "false"));
+
+    if (!forwardUser) {
+      throw new IllegalArgumentException(
+          "buildForSession called but forwardUser is not enabled in config");
+    }
+
+    if (StringUtils.isBlank(authTypeStr)) {
+      throw new IllegalArgumentException(
+          "buildForSession requires an authType to be set in config");
+    }
+
+    AuthType authType = parseAuthType(authTypeStr);
+
+    GravitinoAdminClient.AdminClientBuilder builder = GravitinoAdminClient.builder(uri);
+
+    if (authType != AuthType.SIMPLE) {
+      throw new UnsupportedOperationException(
+          "Auth type "
+              + authType
+              + " does not support session forwarding. Only simple is supported.");
+    }
+    builder.withSimpleAuth(session.getUser());
+
+    removeAuthSpecificKeys(clientConfig);
+    builder.withClientConfig(clientConfig);
+    return builder.build();
+  }
+
+  public static AuthType parseAuthType(String authTypeStr) {
+    try {
+      return AuthType.valueOf(authTypeStr.toUpperCase(Locale.ROOT));
+    } catch (IllegalArgumentException e) {
+      throw new IllegalArgumentException(
+          String.format(
+              "Invalid authentication type: %s. Valid values are: simple, oauth2, kerberos, none",
+              authTypeStr),
+          e);
+    }
+  }
+
+  private static void removeAuthSpecificKeys(Map<String, String> clientConfig) {
     clientConfig.remove(AUTH_TYPE_KEY);
     clientConfig.remove(OAUTH_SERVER_URI_KEY);
     clientConfig.remove(OAUTH_CREDENTIAL_KEY);
@@ -130,9 +216,9 @@ class GravitinoAuthProvider {
     clientConfig.remove(OAUTH_SCOPE_KEY);
     clientConfig.remove(KERBEROS_PRINCIPAL_KEY);
     clientConfig.remove(KERBEROS_KEYTAB_FILE_PATH_KEY);
-
-    builder.withClientConfig(clientConfig);
-    return builder.build();
+    clientConfig.remove(FORWARD_SESSION_USER_KEY);
+    clientConfig.remove(SESSION_CACHE_MAX_SIZE_KEY);
+    clientConfig.remove(SESSION_CACHE_EXPIRE_AFTER_ACCESS_SECONDS_KEY);
   }
 
   private static void buildSimpleAuth(
@@ -220,7 +306,6 @@ class GravitinoAuthProvider {
           KERBEROS_KEYTAB_FILE_PATH_KEY);
     }
 
-    // host is set by GravitinoAdminClient.Builder.withKerberosAuth() from the server URI
     return kerberosBuilder.build();
   }
 }

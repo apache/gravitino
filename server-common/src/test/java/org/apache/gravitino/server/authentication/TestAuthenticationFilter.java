@@ -122,4 +122,64 @@ public class TestAuthenticationFilter {
     filter.doFilter(mockRequest, mockResponse, mockChain);
     verify(mockResponse).sendError(HttpServletResponse.SC_UNAUTHORIZED, "UNAUTHORIZED");
   }
+
+  @Test
+  public void testDoFilterBypassesAuthenticationForHealthEndpoints()
+      throws ServletException, IOException {
+    // /health, /health/live, /health/ready are root-level aliases; during a Jetty forward
+    // getRequestURI() returns the original URI so the bypass must also match /health/* directly.
+    String[] healthPaths = {
+      "/health",
+      "/health/live",
+      "/health/ready",
+      "/api/health",
+      "/api/health/",
+      "/api/health/live",
+      "/api/health/ready"
+    };
+    for (String path : healthPaths) {
+      Authenticator authenticator = mock(Authenticator.class);
+      AuthenticationFilter filter = new AuthenticationFilter(Lists.newArrayList(authenticator));
+      FilterChain mockChain = mock(FilterChain.class);
+      HttpServletRequest mockRequest = mock(HttpServletRequest.class);
+      HttpServletResponse mockResponse = mock(HttpServletResponse.class);
+      when(mockRequest.getRequestURI()).thenReturn(path);
+
+      filter.doFilter(mockRequest, mockResponse, mockChain);
+
+      // Chain proceeds, no error response, and authenticator is never consulted.
+      verify(mockChain).doFilter(mockRequest, mockResponse);
+      verify(mockResponse, never()).sendError(anyInt(), anyString());
+      verify(authenticator, never()).supportsToken(any());
+    }
+  }
+
+  @Test
+  public void testDoFilterDoesNotBypassAuthenticationForNonHealthPaths()
+      throws ServletException, IOException {
+    // Regression guard against an overly broad exemption. Paths that merely contain
+    // "health" or share a prefix with "/api/health" must still be authenticated.
+    String[] nonHealthPaths = {
+      "/api/metalakes/health_metalake", "/api/healthcheck", "/api/version", "/api/metalakes"
+    };
+    for (String path : nonHealthPaths) {
+      Authenticator authenticator = mock(Authenticator.class);
+      AuthenticationFilter filter = new AuthenticationFilter(Lists.newArrayList(authenticator));
+      FilterChain mockChain = mock(FilterChain.class);
+      HttpServletRequest mockRequest = mock(HttpServletRequest.class);
+      HttpServletResponse mockResponse = mock(HttpServletResponse.class);
+      when(mockRequest.getRequestURI()).thenReturn(path);
+      when(mockRequest.getHeaders(AuthConstants.HTTP_HEADER_AUTHORIZATION))
+          .thenReturn(new Vector<>(Collections.singletonList("user")).elements());
+      when(authenticator.supportsToken(any())).thenReturn(true);
+      when(authenticator.isDataFromToken()).thenReturn(true);
+      when(authenticator.authenticateToken(any()))
+          .thenThrow(new UnauthorizedException("UNAUTHORIZED"));
+
+      filter.doFilter(mockRequest, mockResponse, mockChain);
+
+      // Auth flow ran and rejected — proves these paths are not exempted.
+      verify(mockResponse).sendError(HttpServletResponse.SC_UNAUTHORIZED, "UNAUTHORIZED");
+    }
+  }
 }
