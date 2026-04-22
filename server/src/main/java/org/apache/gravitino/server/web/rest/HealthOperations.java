@@ -72,13 +72,18 @@ public class HealthOperations extends HttpServlet {
 
   private static final AtomicInteger PROBE_THREAD_COUNTER = new AtomicInteger();
 
+  private static final int PROBE_CORE_THREADS = 1;
+  private static final int PROBE_MAX_THREADS = 4;
+  private static final long PROBE_KEEP_ALIVE_SECONDS = 60L;
+  private static final int PROBE_QUEUE_CAPACITY = 20;
+
   private static final ExecutorService HEALTH_PROBE_EXECUTOR =
       new ThreadPoolExecutor(
-          1,
-          4,
-          60L,
+          PROBE_CORE_THREADS,
+          PROBE_MAX_THREADS,
+          PROBE_KEEP_ALIVE_SECONDS,
           TimeUnit.SECONDS,
-          new LinkedBlockingQueue<>(20),
+          new LinkedBlockingQueue<>(PROBE_QUEUE_CAPACITY),
           r -> {
             Thread t = new Thread(r, "health-probe-" + PROBE_THREAD_COUNTER.incrementAndGet());
             t.setDaemon(true);
