@@ -235,3 +235,23 @@ class NoSuchFunctionException(NotFoundException):
 
 class FunctionAlreadyExistsException(AlreadyExistsException):
     """An exception thrown when a function already exists."""
+
+
+class IllegalPrivilegeException(IllegalArgumentException):
+    """An exception thrown when a privilege is invalid."""
+
+
+class IllegalMetadataObjectException(IllegalArgumentException):
+    """An exception thrown when a metadata object is invalid."""
+
+
+class NoSuchRoleException(NotFoundException):
+    """Exception thrown when a role with specified name is not existed."""
+
+
+class NoSuchMetadataObjectException(NotFoundException):
+    """Exception thrown when a metadata object with specified name doesn't exist."""
+
+
+class RoleAlreadyExistsException(AlreadyExistsException):
+    """Exception thrown when a role with specified name already exists."""

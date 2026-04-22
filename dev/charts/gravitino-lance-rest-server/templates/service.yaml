@@ -20,7 +20,7 @@
 apiVersion: v1
 kind: Service
 metadata:
-  name: {{ include "gravitino-lance-rest-server.fullname" . }}
+  name: {{ .Values.service.name }}
   labels:
     {{- include "gravitino-lance-rest-server.labels" . | nindent 4 }}
 spec:

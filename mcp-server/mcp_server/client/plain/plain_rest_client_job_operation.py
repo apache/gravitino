@@ -19,7 +19,10 @@ from httpx import AsyncClient
 
 from mcp_server.client.job_operation import JobOperation
 from mcp_server.client.plain.exception import GravitinoException
-from mcp_server.client.plain.utils import extract_content_from_response
+from mcp_server.client.plain.utils import (
+    encode_path_segment,
+    extract_content_from_response,
+)
 
 
 class PlainRESTClientJobOperation(JobOperation):
@@ -29,33 +32,36 @@ class PlainRESTClientJobOperation(JobOperation):
 
     async def get_job_by_id(self, job_id: str) -> str:
         response = await self.rest_client.get(
-            f"/api/metalakes/{self.metalake_name}/jobs/runs/{job_id}"
+            f"/api/metalakes/{encode_path_segment(self.metalake_name)}/jobs/runs/{encode_path_segment(job_id)}"
         )
         return extract_content_from_response(response, "job", {})
 
     async def list_of_jobs(self, job_template_name: str) -> str:
-        url = f"/api/metalakes/{self.metalake_name}/jobs/runs"
-        if job_template_name:
-            url += f"?jobTemplateName={job_template_name}"
-
-        response = await self.rest_client.get(url)
+        response = await self.rest_client.get(
+            f"/api/metalakes/{encode_path_segment(self.metalake_name)}/jobs/runs",
+            params=(
+                {"jobTemplateName": job_template_name}
+                if job_template_name
+                else {}
+            ),
+        )
         return extract_content_from_response(response, "jobs", [])
 
     async def get_job_template_by_name(self, name: str) -> str:
         response = await self.rest_client.get(
-            f"/api/metalakes/{self.metalake_name}/jobs/templates/{name}"
+            f"/api/metalakes/{encode_path_segment(self.metalake_name)}/jobs/templates/{encode_path_segment(name)}"
         )
         return extract_content_from_response(response, "jobTemplate", {})
 
     async def list_of_job_templates(self) -> str:
         response = await self.rest_client.get(
-            f"/api/metalakes/{self.metalake_name}/jobs/templates?details=true"
+            f"/api/metalakes/{encode_path_segment(self.metalake_name)}/jobs/templates?details=true"
         )
         return extract_content_from_response(response, "jobTemplates", [])
 
     async def run_job(self, job_template_name: str, job_config: dict) -> str:
         response = await self.rest_client.post(
-            f"/api/metalakes/{self.metalake_name}/jobs/runs",
+            f"/api/metalakes/{encode_path_segment(self.metalake_name)}/jobs/runs",
             json={
                 "jobTemplateName": job_template_name,
                 "jobConf": job_config,
@@ -65,7 +71,7 @@ class PlainRESTClientJobOperation(JobOperation):
 
     async def cancel_job(self, job_id: str) -> str:
         response = await self.rest_client.post(
-            f"/api/metalakes/{self.metalake_name}/jobs/runs/{job_id}"
+            f"/api/metalakes/{encode_path_segment(self.metalake_name)}/jobs/runs/{encode_path_segment(job_id)}"
         )
         if response.status_code != 200:
             raise GravitinoException(
