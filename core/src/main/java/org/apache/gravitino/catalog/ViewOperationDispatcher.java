@@ -18,7 +18,9 @@
  */
 package org.apache.gravitino.catalog;
 
+import static org.apache.gravitino.Entity.EntityType.VIEW;
 import static org.apache.gravitino.utils.NameIdentifierUtil.getCatalogIdentifier;
+import static org.apache.gravitino.utils.NameIdentifierUtil.getSchemaIdentifier;
 
 import java.io.IOException;
 import java.util.Map;
@@ -132,6 +134,95 @@ public class ViewOperationDispatcher extends OperationDispatcher implements View
       String defaultSchema,
       Map<String, String> properties)
       throws NoSuchSchemaException, ViewAlreadyExistsException {
+    SchemaDispatcher schemaDispatcher = GravitinoEnv.getInstance().schemaDispatcher();
+    NameIdentifier schemaIdent = NameIdentifier.of(ident.namespace().levels());
+    schemaDispatcher.loadSchema(schemaIdent);
+
+    return TreeLockUtils.doWithTreeLock(
+        schemaIdent,
+        LockType.WRITE,
+        () ->
+            internalCreateView(
+                ident,
+                comment,
+                columns,
+                representations,
+                defaultCatalog,
+                defaultSchema,
+                properties));
+  }
+
+  /**
+   * Apply the {@link ViewChange changes} to a view in the catalog.
+   *
+   * @param ident A view identifier.
+   * @param changes View changes to apply to the view.
+   * @return The updated view metadata.
+   * @throws NoSuchViewException If the view does not exist.
+   * @throws IllegalArgumentException If the change is rejected by the implementation.
+   */
+  @Override
+  public View alterView(NameIdentifier ident, ViewChange... changes)
+      throws NoSuchViewException, IllegalArgumentException {
+    NameIdentifier lockIdentifier = ident;
+    LockType lockType = LockType.READ;
+    for (ViewChange change : changes) {
+      if (change instanceof ViewChange.RenameView) {
+        lockIdentifier = getSchemaIdentifier(ident);
+        lockType = LockType.WRITE;
+        break;
+      }
+    }
+
+    return TreeLockUtils.doWithTreeLock(
+        lockIdentifier,
+        lockType,
+        () ->
+            doWithCatalog(
+                getCatalogIdentifier(ident),
+                c -> c.doWithViewOps(v -> v.alterView(ident, changes)),
+                NoSuchViewException.class,
+                IllegalArgumentException.class));
+  }
+
+  /**
+   * Drop a view from the catalog.
+   *
+   * @param ident A view identifier.
+   * @return True if the view is dropped, false if the view does not exist.
+   */
+  @Override
+  public boolean dropView(NameIdentifier ident) {
+    NameIdentifier schemaIdentifier = getSchemaIdentifier(ident);
+    return TreeLockUtils.doWithTreeLock(
+        schemaIdentifier,
+        LockType.WRITE,
+        () -> {
+          boolean droppedFromCatalog =
+              doWithCatalog(
+                  getCatalogIdentifier(ident),
+                  c -> c.doWithViewOps(v -> v.dropView(ident)),
+                  RuntimeException.class);
+
+          try {
+            store.delete(ident, VIEW);
+          } catch (NoSuchEntityException e) {
+            LOG.warn("The view to be dropped does not exist in the store: {}", ident, e);
+          } catch (Exception e) {
+            throw new RuntimeException(e);
+          }
+          return droppedFromCatalog;
+        });
+  }
+
+  private View internalCreateView(
+      NameIdentifier ident,
+      String comment,
+      Column[] columns,
+      Representation[] representations,
+      String defaultCatalog,
+      String defaultSchema,
+      Map<String, String> properties) {
     return doWithCatalog(
         getCatalogIdentifier(ident),
         c ->
@@ -147,39 +238,6 @@ public class ViewOperationDispatcher extends OperationDispatcher implements View
                         properties)),
         NoSuchSchemaException.class,
         ViewAlreadyExistsException.class);
-  }
-
-  /**
-   * Apply the {@link ViewChange changes} to a view in the catalog.
-   *
-   * @param ident A view identifier.
-   * @param changes View changes to apply to the view.
-   * @return The updated view metadata.
-   * @throws NoSuchViewException If the view does not exist.
-   * @throws IllegalArgumentException If the change is rejected by the implementation.
-   */
-  @Override
-  public View alterView(NameIdentifier ident, ViewChange... changes)
-      throws NoSuchViewException, IllegalArgumentException {
-    return doWithCatalog(
-        getCatalogIdentifier(ident),
-        c -> c.doWithViewOps(v -> v.alterView(ident, changes)),
-        NoSuchViewException.class,
-        IllegalArgumentException.class);
-  }
-
-  /**
-   * Drop a view from the catalog.
-   *
-   * @param ident A view identifier.
-   * @return True if the view is dropped, false if the view does not exist.
-   */
-  @Override
-  public boolean dropView(NameIdentifier ident) {
-    return doWithCatalog(
-        getCatalogIdentifier(ident),
-        c -> c.doWithViewOps(v -> v.dropView(ident)),
-        RuntimeException.class);
   }
 
   /**

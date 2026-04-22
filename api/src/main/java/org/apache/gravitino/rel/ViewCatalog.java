@@ -85,7 +85,7 @@ public interface ViewCatalog {
    */
   View createView(
       NameIdentifier ident,
-      String comment,
+      @Nullable String comment,
       Column[] columns,
       Representation[] representations,
       @Nullable String defaultCatalog,
