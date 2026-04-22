@@ -118,7 +118,11 @@ public class AuthorizationUtils {
 
   public static void checkCurrentUser(String metalake, String user) {
     GravitinoAuthorizer authorizer = GravitinoEnv.getInstance().gravitinoAuthorizer();
-    if (authorizer != null && !authorizer.isMetalakeUser(metalake)) {
+    // checkCurrentUser runs once per HTTP request from the interceptor, before any expression
+    // evaluation. A fresh AuthorizationRequestContext is fine here; the per-request dedup benefit
+    // is realized by the OGNL-level isMetalakeUser calls, which share context with authorize().
+    if (authorizer != null
+        && !authorizer.isMetalakeUser(metalake, new AuthorizationRequestContext())) {
       throw new ForbiddenException(
           "Current user %s doesn't exist in the metalake %s, you should add the user to the metalake first",
           user, metalake);

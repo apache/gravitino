@@ -52,7 +52,6 @@ import org.apache.gravitino.authorization.Privilege;
 import org.apache.gravitino.authorization.SecurableObject;
 import org.apache.gravitino.cache.CaffeineGravitinoCache;
 import org.apache.gravitino.cache.GravitinoCache;
-import org.apache.gravitino.exceptions.NoSuchUserException;
 import org.apache.gravitino.meta.RoleEntity;
 import org.apache.gravitino.server.authorization.MetadataIdConverter;
 import org.apache.gravitino.storage.relational.mapper.EntityChangeLogMapper;
@@ -303,19 +302,15 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
   }
 
   @Override
-  public boolean isMetalakeUser(String metalake) {
+  public boolean isMetalakeUser(String metalake, AuthorizationRequestContext requestContext) {
     String currentUserName = PrincipalUtils.getCurrentUserName();
     if (StringUtils.isBlank(currentUserName)) {
       return false;
     }
-
-    try {
-      return GravitinoEnv.getInstance().accessControlDispatcher().getUser(metalake, currentUserName)
-          != null;
-    } catch (NoSuchUserException e) {
-      LOG.warn("Can not get user {} in metalake {}", currentUserName, metalake, e);
-      return false;
-    }
+    // Reuse the per-request UserAuthInfo cache populated by authorize/isOwner. Presence of a
+    // UserAuthInfo entry for (metalake, user) already implies the user exists in that metalake,
+    // so we avoid a second accessControlDispatcher().getUser() DB round-trip per request.
+    return loadUserInfo(metalake, currentUserName, requestContext).isPresent();
   }
 
   @Override

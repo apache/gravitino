@@ -318,7 +318,7 @@ public class TestGravitinoInterceptionService {
     }
 
     @Override
-    public boolean isMetalakeUser(String metalake) {
+    public boolean isMetalakeUser(String metalake, AuthorizationRequestContext requestContext) {
       return true;
     }
 

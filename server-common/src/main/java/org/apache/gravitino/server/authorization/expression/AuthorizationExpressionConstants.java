@@ -162,7 +162,8 @@ public class AuthorizationExpressionConstants {
    * Special case: "METALAKE_USER" is used here as a unique authorization token, not a logical
    * expression like other constants. This is intentional and required for metalake-level user
    * authorization checks {@link
-   * org.apache.gravitino.authorization.GravitinoAuthorizer#isMetalakeUser(String)}.
+   * org.apache.gravitino.authorization.GravitinoAuthorizer#isMetalakeUser(String,
+   * org.apache.gravitino.authorization.AuthorizationRequestContext)}.
    */
   public static final String LOAD_METALAKE_AUTHORIZATION_EXPRESSION = "METALAKE_USER";
 
