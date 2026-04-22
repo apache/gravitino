@@ -41,10 +41,13 @@ import org.apache.gravitino.rel.Column;
 import org.apache.gravitino.rel.SupportsPartitions;
 import org.apache.gravitino.rel.Table;
 import org.apache.gravitino.rel.TableChange;
+import org.apache.gravitino.rel.expressions.NamedReference;
 import org.apache.gravitino.rel.expressions.distributions.Distributions;
 import org.apache.gravitino.rel.expressions.literals.Literal;
 import org.apache.gravitino.rel.expressions.literals.Literals;
+import org.apache.gravitino.rel.expressions.sorts.SortDirection;
 import org.apache.gravitino.rel.expressions.sorts.SortOrder;
+import org.apache.gravitino.rel.expressions.sorts.SortOrders;
 import org.apache.gravitino.rel.expressions.transforms.Transform;
 import org.apache.gravitino.rel.expressions.transforms.Transforms;
 import org.apache.gravitino.rel.indexes.Index;
@@ -395,5 +398,251 @@ abstract class AbstractGlueCatalogIT {
 
     assertTrue(sp.dropPartition("dt=2024-04-01"));
     assertFalse(sp.dropPartition("dt=2024-04-01"));
+  }
+
+  // -------------------------------------------------------------------------
+  // Hive table feature tests
+  // -------------------------------------------------------------------------
+
+  @Test
+  void testHashDistribution() {
+    String schema = newSchema();
+    ops.createSchema(schemaIdent(schema), null, Collections.emptyMap());
+
+    ops.createTable(
+        tableIdent(schema, "bucketed"),
+        hiveColumns(),
+        null,
+        hiveTableProps(),
+        new Transform[0],
+        Distributions.hash(4, NamedReference.field("id")),
+        new SortOrder[0],
+        new Index[0]);
+
+    Table loaded = ops.loadTable(tableIdent(schema, "bucketed"));
+    assertEquals(4, loaded.distribution().number());
+    assertEquals(1, loaded.distribution().expressions().length);
+    assertEquals(NamedReference.field("id"), loaded.distribution().expressions()[0]);
+  }
+
+  @Test
+  void testSortOrders() {
+    String schema = newSchema();
+    ops.createSchema(schemaIdent(schema), null, Collections.emptyMap());
+
+    ops.createTable(
+        tableIdent(schema, "sorted"),
+        hiveColumns(),
+        null,
+        hiveTableProps(),
+        new Transform[0],
+        Distributions.NONE,
+        new SortOrder[] {
+          SortOrders.ascending(NamedReference.field("id")),
+          SortOrders.descending(NamedReference.field("name"))
+        },
+        new Index[0]);
+
+    Table loaded = ops.loadTable(tableIdent(schema, "sorted"));
+    assertEquals(2, loaded.sortOrder().length);
+    assertEquals(SortDirection.ASCENDING, loaded.sortOrder()[0].direction());
+    assertEquals(NamedReference.field("id"), loaded.sortOrder()[0].expression());
+    assertEquals(SortDirection.DESCENDING, loaded.sortOrder()[1].direction());
+    assertEquals(NamedReference.field("name"), loaded.sortOrder()[1].expression());
+  }
+
+  @Test
+  void testTableComment() {
+    String schema = newSchema();
+    ops.createSchema(schemaIdent(schema), null, Collections.emptyMap());
+
+    ops.createTable(
+        tableIdent(schema, "commented"),
+        hiveColumns(),
+        "my table comment",
+        hiveTableProps(),
+        new Transform[0],
+        Distributions.NONE,
+        new SortOrder[0],
+        new Index[0]);
+
+    Table loaded = ops.loadTable(tableIdent(schema, "commented"));
+    assertEquals("my table comment", loaded.comment());
+  }
+
+  @Test
+  void testUnsupportedTransformRejected() {
+    String schema = newSchema();
+    ops.createSchema(schemaIdent(schema), null, Collections.emptyMap());
+
+    assertThrows(
+        IllegalArgumentException.class,
+        () ->
+            ops.createTable(
+                tableIdent(schema, "bad"),
+                hiveColumns(),
+                null,
+                hiveTableProps(),
+                new Transform[] {Transforms.year("dt")},
+                Distributions.NONE,
+                new SortOrder[0],
+                new Index[0]));
+  }
+
+  @Test
+  void testDecimalAndVarcharColumns() {
+    String schema = newSchema();
+    ops.createSchema(schemaIdent(schema), null, Collections.emptyMap());
+
+    Column[] cols =
+        new Column[] {
+          Column.of("price", Types.DecimalType.of(10, 2), null),
+          Column.of("label", Types.VarCharType.of(255), null),
+        };
+    ops.createTable(
+        tableIdent(schema, "typed"),
+        cols,
+        null,
+        hiveTableProps(),
+        new Transform[0],
+        Distributions.NONE,
+        new SortOrder[0],
+        new Index[0]);
+
+    Table loaded = ops.loadTable(tableIdent(schema, "typed"));
+    assertEquals(Types.DecimalType.of(10, 2), loaded.columns()[0].dataType());
+    assertEquals(Types.VarCharType.of(255), loaded.columns()[1].dataType());
+  }
+
+  @Test
+  void testComplexColumnTypes() {
+    String schema = newSchema();
+    ops.createSchema(schemaIdent(schema), null, Collections.emptyMap());
+
+    Column[] cols =
+        new Column[] {
+          Column.of("tags", Types.ExternalType.of("array<string>"), null),
+          Column.of("info", Types.ExternalType.of("struct<name:string,age:int>"), null),
+        };
+    ops.createTable(
+        tableIdent(schema, "complex"),
+        cols,
+        null,
+        hiveTableProps(),
+        new Transform[0],
+        Distributions.NONE,
+        new SortOrder[0],
+        new Index[0]);
+
+    Table loaded = ops.loadTable(tableIdent(schema, "complex"));
+    assertEquals(
+        "array<string>", ((Types.ExternalType) loaded.columns()[0].dataType()).catalogString());
+    assertEquals(
+        "struct<name:string,age:int>",
+        ((Types.ExternalType) loaded.columns()[1].dataType()).catalogString());
+  }
+
+  @Test
+  void testSerDeParameters() {
+    String schema = newSchema();
+    ops.createSchema(schemaIdent(schema), null, Collections.emptyMap());
+
+    Map<String, String> props = hiveTableProps();
+    props.put("serde.parameter.serialization.format", "1");
+    ops.createTable(
+        tableIdent(schema, "serde_tbl"),
+        hiveColumns(),
+        null,
+        props,
+        new Transform[0],
+        Distributions.NONE,
+        new SortOrder[0],
+        new Index[0]);
+
+    Table loaded = ops.loadTable(tableIdent(schema, "serde_tbl"));
+    assertEquals("1", loaded.properties().get("serde.parameter.serialization.format"));
+  }
+
+  // -------------------------------------------------------------------------
+  // Iceberg table tests (additional)
+  // -------------------------------------------------------------------------
+
+  @Test
+  void testDropIcebergTable() {
+    String schema = newSchema();
+    ops.createSchema(schemaIdent(schema), null, Collections.emptyMap());
+
+    Map<String, String> props = new HashMap<>();
+    props.put(GlueConstants.TABLE_FORMAT, "ICEBERG");
+    props.put(GlueConstants.METADATA_LOCATION, "s3://bucket/path/metadata/v1.metadata.json");
+    ops.createTable(
+        tableIdent(schema, "iceberg_drop"),
+        new Column[0],
+        null,
+        props,
+        new Transform[0],
+        Distributions.NONE,
+        new SortOrder[0],
+        new Index[0]);
+
+    assertTrue(ops.dropTable(tableIdent(schema, "iceberg_drop")));
+    assertFalse(ops.dropTable(tableIdent(schema, "iceberg_drop")));
+  }
+
+  @Test
+  void testAlterIcebergMetadata() {
+    String schema = newSchema();
+    ops.createSchema(schemaIdent(schema), null, Collections.emptyMap());
+
+    Map<String, String> props = new HashMap<>();
+    props.put(GlueConstants.TABLE_FORMAT, "ICEBERG");
+    props.put(GlueConstants.METADATA_LOCATION, "s3://bucket/path/metadata/v1.metadata.json");
+    ops.createTable(
+        tableIdent(schema, "iceberg_alter"),
+        new Column[0],
+        null,
+        props,
+        new Transform[0],
+        Distributions.NONE,
+        new SortOrder[0],
+        new Index[0]);
+
+    ops.alterTable(
+        tableIdent(schema, "iceberg_alter"),
+        TableChange.setProperty(
+            GlueConstants.METADATA_LOCATION, "s3://bucket/path/metadata/v2.metadata.json"));
+
+    Table loaded = ops.loadTable(tableIdent(schema, "iceberg_alter"));
+    assertEquals(
+        "s3://bucket/path/metadata/v2.metadata.json",
+        loaded.properties().get(GlueConstants.METADATA_LOCATION));
+  }
+
+  @Test
+  void testListTablesIncludesIceberg() {
+    String schema = newSchema();
+    ops.createSchema(schemaIdent(schema), null, Collections.emptyMap());
+
+    createHiveTable(schema, "hive_mixed");
+
+    Map<String, String> icebergProps = new HashMap<>();
+    icebergProps.put(GlueConstants.TABLE_FORMAT, "ICEBERG");
+    icebergProps.put(GlueConstants.METADATA_LOCATION, "s3://bucket/path/metadata/v1.metadata.json");
+    ops.createTable(
+        tableIdent(schema, "iceberg_mixed"),
+        new Column[0],
+        null,
+        icebergProps,
+        new Transform[0],
+        Distributions.NONE,
+        new SortOrder[0],
+        new Index[0]);
+
+    List<String> names =
+        Arrays.stream(ops.listTables(tableNs(schema)))
+            .map(NameIdentifier::name)
+            .collect(Collectors.toList());
+    assertTrue(names.contains("hive_mixed"));
+    assertTrue(names.contains("iceberg_mixed"));
   }
 }
