@@ -148,7 +148,7 @@ dependencies {
   // Hadoop 3.x runtime requirements (stripped by exclude("*") above)
   testImplementation(libs.hadoop3.shaded.guava)
   testImplementation(libs.hadoop3.shaded.protobuf)
-  testImplementation("org.apache.commons:commons-configuration2:2.8.0")
+  testImplementation(libs.commons.configuration2)
   testImplementation(libs.re2j)
   testImplementation(libs.hive2.common) {
     exclude("org.eclipse.jetty.aggregate", "jetty-all")

@@ -49,6 +49,7 @@ httpclient5 = "5.4.4"
 httpcore5 = "5.3.4"
 micrometer-core = "1.12.2"
 mockserver = "5.15.0"
+commons-configuration2 = "2.8.0"
 commons-csv = "1.12.0"
 commons-lang3 = "3.14.0"
 commons-lang = "2.6"
@@ -231,6 +232,7 @@ caffeine = { group = "com.github.ben-manes.caffeine", name = "caffeine", version
 commons-collections4 = { group = "org.apache.commons", name = "commons-collections4", version.ref = "commons-collections4" }
 commons-collections3 = { group = "commons-collections", name = "commons-collections", version.ref = "commons-collections3" }
 commons-configuration1 = { group = "commons-configuration", name = "commons-configuration", version.ref = "commons-configuration1" }
+commons-configuration2 = { group = "org.apache.commons", name = "commons-configuration2", version.ref = "commons-configuration2" }
 iceberg-aliyun = { group = "org.apache.iceberg", name = "iceberg-aliyun", version.ref = "iceberg" }
 iceberg-aws = { group = "org.apache.iceberg", name = "iceberg-aws", version.ref = "iceberg" }
 iceberg-aws-bundle = { group = "org.apache.iceberg", name = "iceberg-aws-bundle", version.ref = "iceberg" }
