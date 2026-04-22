@@ -37,8 +37,11 @@ public class HealthAliasServlet extends HttpServlet {
   @Override
   protected void doGet(HttpServletRequest req, HttpServletResponse resp)
       throws ServletException, IOException {
-    // Prepend /api to the incoming path: /health → /api/health, /health/live → /api/health/live
-    String targetPath = "/api" + req.getRequestURI();
+    // Map root-level health paths to their canonical /api/health counterparts.
+    // /health and /health.html both target the aggregate /api/health; legacy GTM
+    // standards sometimes hardcode the .html extension.
+    String uri = req.getRequestURI();
+    String targetPath = "/health.html".equals(uri) ? "/api/health" : "/api" + uri;
     RequestDispatcher dispatcher = req.getRequestDispatcher(targetPath);
     if (dispatcher == null) {
       resp.sendError(HttpServletResponse.SC_SERVICE_UNAVAILABLE, "health dispatcher unavailable");
