@@ -85,6 +85,27 @@ public final class HierarchicalSchemaUtil {
   }
 
   /**
+   * Returns all ancestor schema names of the given schema name, ordered from outermost to innermost
+   * (but excluding the name itself). Returns an empty list for top-level (non-nested) schemas.
+   *
+   * <p>Example: {@code "A:B:C"} with separator {@code ":"} → {@code ["A", "A:B"]}
+   *
+   * @param schemaName the schema name to find ancestors for
+   * @param separator the external separator
+   * @return ancestor names from outermost to innermost, or empty list if not nested
+   */
+  public static List<String> getAncestorNames(String schemaName, String separator) {
+    Preconditions.checkArgument(StringUtils.isNotBlank(schemaName), "schemaName must not be blank");
+    Preconditions.checkArgument(StringUtils.isNotBlank(separator), "separator must not be blank");
+    String[] parts = schemaName.split(java.util.regex.Pattern.quote(separator), -1);
+    List<String> ancestors = new ArrayList<>();
+    for (int i = 1; i < parts.length; i++) {
+      ancestors.add(String.join(separator, java.util.Arrays.copyOf(parts, i)));
+    }
+    return ancestors;
+  }
+
+  /**
    * Given a list of schema names and an optional parent, returns only the direct children of that
    * parent (one level deeper). When {@code parent} is empty, returns top-level schemas (names that
    * do not contain the separator).

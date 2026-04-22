@@ -106,4 +106,33 @@ public class TestHierarchicalSchemaUtil {
     Assertions.assertTrue(topLevel.contains("A"));
     Assertions.assertTrue(topLevel.contains("B"));
   }
+
+  @Test
+  public void testGetAncestorNamesTopLevel() {
+    List<String> ancestors = HierarchicalSchemaUtil.getAncestorNames("flat", ":");
+    Assertions.assertTrue(ancestors.isEmpty());
+  }
+
+  @Test
+  public void testGetAncestorNamesTwoLevels() {
+    List<String> ancestors = HierarchicalSchemaUtil.getAncestorNames("A:B", ":");
+    Assertions.assertEquals(1, ancestors.size());
+    Assertions.assertEquals("A", ancestors.get(0));
+  }
+
+  @Test
+  public void testGetAncestorNamesThreeLevels() {
+    List<String> ancestors = HierarchicalSchemaUtil.getAncestorNames("A:B:C", ":");
+    Assertions.assertEquals(2, ancestors.size());
+    Assertions.assertEquals("A", ancestors.get(0));
+    Assertions.assertEquals("A:B", ancestors.get(1));
+  }
+
+  @Test
+  public void testGetAncestorNamesCustomSeparator() {
+    List<String> ancestors = HierarchicalSchemaUtil.getAncestorNames("X/Y/Z", "/");
+    Assertions.assertEquals(2, ancestors.size());
+    Assertions.assertEquals("X", ancestors.get(0));
+    Assertions.assertEquals("X/Y", ancestors.get(1));
+  }
 }

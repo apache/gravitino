@@ -18,8 +18,11 @@
  */
 package org.apache.gravitino.hook;
 
+import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
+import org.apache.gravitino.Configs;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.NameIdentifier;
@@ -29,6 +32,7 @@ import org.apache.gravitino.SchemaChange;
 import org.apache.gravitino.authorization.AuthorizationUtils;
 import org.apache.gravitino.authorization.Owner;
 import org.apache.gravitino.authorization.OwnerDispatcher;
+import org.apache.gravitino.catalog.HierarchicalSchemaUtil;
 import org.apache.gravitino.catalog.SchemaDispatcher;
 import org.apache.gravitino.exceptions.NoSuchCatalogException;
 import org.apache.gravitino.exceptions.NoSuchSchemaException;
@@ -57,18 +61,50 @@ public class SchemaHookDispatcher implements SchemaDispatcher {
   @Override
   public Schema createSchema(NameIdentifier ident, String comment, Map<String, String> properties)
       throws NoSuchCatalogException, SchemaAlreadyExistsException {
+    List<NameIdentifier> createdParents = createMissingParents(ident);
     Schema schema = dispatcher.createSchema(ident, comment, properties);
 
-    // Set the creator as the owner of the schema.
+    String metalake = ident.namespace().level(0);
     OwnerDispatcher ownerManager = GravitinoEnv.getInstance().ownerDispatcher();
     if (ownerManager != null) {
+      String creator = PrincipalUtils.getCurrentUserName();
+      for (NameIdentifier parent : createdParents) {
+        ownerManager.setOwner(
+            metalake,
+            NameIdentifierUtil.toMetadataObject(parent, Entity.EntityType.SCHEMA),
+            creator,
+            Owner.Type.USER);
+      }
       ownerManager.setOwner(
-          ident.namespace().level(0),
+          metalake,
           NameIdentifierUtil.toMetadataObject(ident, Entity.EntityType.SCHEMA),
-          PrincipalUtils.getCurrentUserName(),
+          creator,
           Owner.Type.USER);
     }
     return schema;
+  }
+
+  /**
+   * Creates any missing ancestor schemas for the given schema identifier and returns the list of
+   * newly created parent identifiers (outermost first). Missing ancestors are created with empty
+   * comment and properties.
+   */
+  private List<NameIdentifier> createMissingParents(NameIdentifier ident) {
+    String separator =
+        GravitinoEnv.getInstance().config().get(Configs.SCHEMA_NAMESPACE_SEPARATOR);
+    List<String> ancestorNames = HierarchicalSchemaUtil.getAncestorNames(ident.name(), separator);
+    if (ancestorNames.isEmpty()) {
+      return Collections.emptyList();
+    }
+    List<NameIdentifier> created = new ArrayList<>();
+    for (String ancestorName : ancestorNames) {
+      NameIdentifier ancestorIdent = NameIdentifier.of(ident.namespace(), ancestorName);
+      if (!dispatcher.schemaExists(ancestorIdent)) {
+        dispatcher.createSchema(ancestorIdent, null, Collections.emptyMap());
+        created.add(ancestorIdent);
+      }
+    }
+    return created;
   }
 
   @Override

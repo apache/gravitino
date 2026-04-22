@@ -20,13 +20,14 @@ package org.apache.gravitino.iceberg.service.dispatcher;
 
 import java.io.IOException;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.List;
+import java.util.regex.Pattern;
 import org.apache.gravitino.Configs;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.EntityStore;
 import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.authorization.OwnerDispatcher;
+import org.apache.gravitino.catalog.HierarchicalSchemaUtil;
 import org.apache.gravitino.catalog.SchemaDispatcher;
 import org.apache.gravitino.catalog.TableDispatcher;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
@@ -62,6 +63,8 @@ public class IcebergNamespaceHookDispatcher implements IcebergNamespaceOperation
   @Override
   public CreateNamespaceResponse createNamespace(
       IcebergRequestContext context, CreateNamespaceRequest createRequest) {
+    // Collect missing ancestors BEFORE the underlying call so Iceberg auto-creates them.
+    List<Namespace> missingAncestors = getMissingAncestors(context, createRequest.namespace());
     CreateNamespaceResponse response = dispatcher.createNamespace(context, createRequest);
 
     OwnerDispatcher ownerDispatcher = GravitinoEnv.getInstance().ownerDispatcher();
@@ -85,16 +88,18 @@ public class IcebergNamespaceHookDispatcher implements IcebergNamespaceOperation
 
   /**
    * Returns all ancestor namespaces of {@code namespace} that do not currently exist in the
-   * catalog. These are candidates for auto-creation by the underlying Iceberg catalog.
+   * catalog. Uses {@link HierarchicalSchemaUtil#getAncestorNames} (the same utility as the
+   * Gravitino REST API side) so the prefix-enumeration algorithm is shared.
    *
-   * <p>For example, if {@code namespace} is {@code ["A","B","C"]} and only {@code ["A"]} already
-   * exists, this returns {@code [Namespace.of("A","B")]}.
+   * <p>For example, if {@code namespace} is {@code Namespace.of("A","B","C")} and only {@code
+   * Namespace.of("A")} already exists, this returns {@code [Namespace.of("A","B")]}.
    */
   private List<Namespace> getMissingAncestors(IcebergRequestContext context, Namespace namespace) {
-    String[] levels = namespace.levels();
+    String separator = namespaceSeparator();
+    String namespaceName = String.join(separator, namespace.levels());
     List<Namespace> missing = new ArrayList<>();
-    for (int i = 1; i < levels.length; i++) {
-      Namespace ancestor = Namespace.of(Arrays.copyOf(levels, i));
+    for (String ancestorName : HierarchicalSchemaUtil.getAncestorNames(namespaceName, separator)) {
+      Namespace ancestor = Namespace.of(ancestorName.split(Pattern.quote(separator)));
       if (!dispatcher.namespaceExists(context, ancestor)) {
         missing.add(ancestor);
       }
@@ -174,7 +179,8 @@ public class IcebergNamespaceHookDispatcher implements IcebergNamespaceOperation
     if (tableDispatcher != null) {
       tableDispatcher.loadTable(
           IcebergIdentifierUtils.toGravitinoTableIdentifier(
-              metalake, catalogName, TableIdentifier.of(namespace, tableName)));
+              metalake, catalogName, TableIdentifier.of(namespace, tableName),
+              namespaceSeparator()));
     }
   }
 
