@@ -19,7 +19,6 @@
 package org.apache.gravitino.hook;
 
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import org.apache.gravitino.Entity;
@@ -60,19 +59,23 @@ public class SchemaHookDispatcher implements SchemaDispatcher {
   @Override
   public Schema createSchema(NameIdentifier ident, String comment, Map<String, String> properties)
       throws NoSuchCatalogException, SchemaAlreadyExistsException {
-    List<NameIdentifier> createdParents = createMissingParents(ident);
+    // Collect missing parent identifiers BEFORE the underlying call; the catalog itself is
+    // responsible for auto-creating them. We only need to assign ownership afterwards.
+    List<NameIdentifier> missingParents = findMissingParents(ident);
     Schema schema = dispatcher.createSchema(ident, comment, properties);
 
     String metalake = ident.namespace().level(0);
     OwnerDispatcher ownerManager = GravitinoEnv.getInstance().ownerDispatcher();
     if (ownerManager != null) {
       String creator = PrincipalUtils.getCurrentUserName();
-      for (NameIdentifier parent : createdParents) {
-        ownerManager.setOwner(
-            metalake,
-            NameIdentifierUtil.toMetadataObject(parent, Entity.EntityType.SCHEMA),
-            creator,
-            Owner.Type.USER);
+      for (NameIdentifier parent : missingParents) {
+        if (dispatcher.schemaExists(parent)) {
+          ownerManager.setOwner(
+              metalake,
+              NameIdentifierUtil.toMetadataObject(parent, Entity.EntityType.SCHEMA),
+              creator,
+              Owner.Type.USER);
+        }
       }
       ownerManager.setOwner(
           metalake,
@@ -84,25 +87,21 @@ public class SchemaHookDispatcher implements SchemaDispatcher {
   }
 
   /**
-   * Creates any missing ancestor schemas for the given schema identifier and returns the list of
-   * newly created parent identifiers (outermost first). Missing ancestors are created with empty
-   * comment and properties.
+   * Returns ancestor schema identifiers for {@code ident} that do not currently exist. The catalog
+   * will auto-create them during {@link #createSchema}; we collect them here only so we can assign
+   * ownership after the fact.
    */
-  private List<NameIdentifier> createMissingParents(NameIdentifier ident) {
+  private List<NameIdentifier> findMissingParents(NameIdentifier ident) {
     String separator = HierarchicalSchemaUtil.namespaceSeparator();
     List<String> ancestorNames = HierarchicalSchemaUtil.getAncestorNames(ident.name(), separator);
-    if (ancestorNames.isEmpty()) {
-      return Collections.emptyList();
-    }
-    List<NameIdentifier> created = new ArrayList<>();
+    List<NameIdentifier> missing = new ArrayList<>();
     for (String ancestorName : ancestorNames) {
       NameIdentifier ancestorIdent = NameIdentifier.of(ident.namespace(), ancestorName);
       if (!dispatcher.schemaExists(ancestorIdent)) {
-        dispatcher.createSchema(ancestorIdent, null, Collections.emptyMap());
-        created.add(ancestorIdent);
+        missing.add(ancestorIdent);
       }
     }
-    return created;
+    return missing;
   }
 
   @Override

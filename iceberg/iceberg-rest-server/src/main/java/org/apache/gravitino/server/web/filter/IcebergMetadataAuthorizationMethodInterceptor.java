@@ -35,6 +35,7 @@ import org.apache.gravitino.server.authorization.annotations.IcebergAuthorizatio
 import org.apache.gravitino.utils.NameIdentifierUtil;
 import org.apache.iceberg.catalog.Namespace;
 import org.apache.iceberg.rest.RESTUtil;
+import org.apache.iceberg.rest.requests.CreateNamespaceRequest;
 
 /**
  * Through dynamic proxy, obtain the annotations on the method and parameter list to perform
@@ -50,52 +51,65 @@ public class IcebergMetadataAuthorizationMethodInterceptor
       Parameter[] parameters, Object[] args) {
     Map<Entity.EntityType, NameIdentifier> nameIdentifierMap = new HashMap<>();
     nameIdentifierMap.put(Entity.EntityType.METALAKE, NameIdentifierUtil.ofMetalake(metalakeName));
-    // get catalog & namespace from params
     String catalog = null;
     String schema = null;
     Namespace rawNamespace = null;
+    String separator = HierarchicalSchemaUtil.namespaceSeparator();
     for (int i = 0; i < parameters.length; i++) {
       Parameter parameter = parameters[i];
       AuthorizationMetadata authorizeResource =
           parameter.getAnnotation(AuthorizationMetadata.class);
-      if (authorizeResource == null) {
+      if (authorizeResource != null) {
+        Entity.EntityType type = authorizeResource.type();
+        String value = String.valueOf(args[i]);
+        switch (type) {
+          case CATALOG:
+            catalog = IcebergRESTUtils.getCatalogName(value);
+            nameIdentifierMap.put(
+                Entity.EntityType.CATALOG, NameIdentifierUtil.ofCatalog(metalakeName, catalog));
+            break;
+          case SCHEMA:
+            rawNamespace = RESTUtil.decodeNamespace(value);
+            schema = String.join(separator, rawNamespace.levels());
+            nameIdentifierMap.put(
+                Entity.EntityType.SCHEMA,
+                NameIdentifierUtil.ofSchema(metalakeName, catalog, schema));
+            break;
+          case TABLE:
+            nameIdentifierMap.put(
+                EntityType.TABLE,
+                NameIdentifierUtil.ofTable(
+                    metalakeName, catalog, schema, RESTUtil.decodeString(value)));
+            break;
+          case VIEW:
+            String decodedViewName = RESTUtil.decodeString(value);
+            nameIdentifierMap.put(
+                EntityType.VIEW,
+                NameIdentifierUtil.ofView(metalakeName, catalog, schema, decodedViewName));
+            // Also register as TABLE so ANY_SELECT_TABLE in
+            // ICEBERG_LOAD_VIEW_AUTHORIZATION_EXPRESSION
+            // matches when Spark probes viewExists(tableName) during table resolution.
+            nameIdentifierMap.put(
+                EntityType.TABLE,
+                NameIdentifierUtil.ofTable(metalakeName, catalog, schema, decodedViewName));
+            break;
+          default:
+            break;
+        }
         continue;
       }
-      Entity.EntityType type = authorizeResource.type();
-      String value = String.valueOf(args[i]);
-      switch (type) {
-        case CATALOG:
-          catalog = IcebergRESTUtils.getCatalogName(value);
-          nameIdentifierMap.put(
-              Entity.EntityType.CATALOG, NameIdentifierUtil.ofCatalog(metalakeName, catalog));
-          break;
-        case SCHEMA:
-          rawNamespace = RESTUtil.decodeNamespace(value);
-          String separator = HierarchicalSchemaUtil.namespaceSeparator();
-          schema = String.join(separator, rawNamespace.levels());
-          nameIdentifierMap.put(
-              Entity.EntityType.SCHEMA, NameIdentifierUtil.ofSchema(metalakeName, catalog, schema));
-          break;
-        case TABLE:
-          nameIdentifierMap.put(
-              EntityType.TABLE,
-              NameIdentifierUtil.ofTable(
-                  metalakeName, catalog, schema, RESTUtil.decodeString(value)));
-          break;
-        case VIEW:
-          String decodedViewName = RESTUtil.decodeString(value);
-          nameIdentifierMap.put(
-              EntityType.VIEW,
-              NameIdentifierUtil.ofView(metalakeName, catalog, schema, decodedViewName));
-          // Also register as TABLE so ANY_SELECT_TABLE in
-          // ICEBERG_LOAD_VIEW_AUTHORIZATION_EXPRESSION
-          // matches when Spark probes viewExists(tableName) during table resolution.
-          nameIdentifierMap.put(
-              EntityType.TABLE,
-              NameIdentifierUtil.ofTable(metalakeName, catalog, schema, decodedViewName));
-          break;
-        default:
-          break;
+
+      // For CREATE_NAMESPACE, inject the target namespace as SCHEMA so that the standard
+      // expression can evaluate against it. JcasbinAuthorizer's inheritance chain will skip
+      // the not-yet-existing entity and walk up to existing parents automatically.
+      IcebergAuthorizationMetadata icebergMetadata =
+          parameter.getAnnotation(IcebergAuthorizationMetadata.class);
+      if (icebergMetadata != null
+          && icebergMetadata.type() == IcebergAuthorizationMetadata.RequestType.CREATE_NAMESPACE) {
+        Namespace ns = ((CreateNamespaceRequest) args[i]).namespace();
+        String schemaName = String.join(separator, ns.levels());
+        nameIdentifierMap.put(
+            Entity.EntityType.SCHEMA, NameIdentifierUtil.ofSchema(metalakeName, catalog, schemaName));
       }
     }
     return nameIdentifierMap;
@@ -121,8 +135,6 @@ public class IcebergMetadataAuthorizationMethodInterceptor
             return Optional.of(new RenameTableAuthzHandler(parameters, args));
           case RENAME_VIEW:
             return Optional.of(new RenameViewAuthzHandler(parameters, args));
-          case CREATE_NAMESPACE:
-            return Optional.of(new CreateNamespaceAuthzHandler(parameters, args));
           default:
             break;
         }

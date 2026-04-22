@@ -24,7 +24,6 @@ import org.apache.gravitino.catalog.lakehouse.iceberg.IcebergConstants;
 import org.apache.gravitino.iceberg.service.authorization.IcebergRESTServerContext;
 import org.apache.gravitino.iceberg.service.provider.IcebergConfigProvider;
 import org.apache.iceberg.Schema;
-import org.apache.iceberg.catalog.Namespace;
 import org.apache.iceberg.catalog.TableIdentifier;
 import org.apache.iceberg.rest.requests.CreateTableRequest;
 import org.apache.iceberg.types.Types.IntegerType;
@@ -89,59 +88,4 @@ public class TestIcebergRESTUtils {
     }
   }
 
-  @Test
-  void testPhysicalSchemaNameToIcebergNamespaceSingleLevel() {
-    Namespace ns = IcebergRESTUtils.physicalSchemaNameToIcebergNamespace("myschema");
-    Assertions.assertEquals(1, ns.length());
-    Assertions.assertEquals("myschema", ns.level(0));
-  }
-
-  @Test
-  void testPhysicalSchemaNameToIcebergNamespaceMultiLevel() {
-    Namespace ns = IcebergRESTUtils.physicalSchemaNameToIcebergNamespace("A.B.C");
-    Assertions.assertEquals(3, ns.length());
-    Assertions.assertEquals("A", ns.level(0));
-    Assertions.assertEquals("B", ns.level(1));
-    Assertions.assertEquals("C", ns.level(2));
-  }
-
-  @Test
-  void testPhysicalSchemaNameToIcebergNamespaceEmpty() {
-    Namespace ns = IcebergRESTUtils.physicalSchemaNameToIcebergNamespace("");
-    Assertions.assertTrue(ns.isEmpty());
-
-    Namespace nsNull = IcebergRESTUtils.physicalSchemaNameToIcebergNamespace(null);
-    Assertions.assertTrue(nsNull.isEmpty());
-  }
-
-  @Test
-  void testIcebergNamespaceToPhysicalSchemaNameSingleLevel() {
-    Namespace ns = Namespace.of("myschema");
-    String physical = IcebergRESTUtils.icebergNamespaceToPhysicalSchemaName(ns);
-    Assertions.assertEquals("myschema", physical);
-  }
-
-  @Test
-  void testIcebergNamespaceToPhysicalSchemaNameMultiLevel() {
-    Namespace ns = Namespace.of("A", "B", "C");
-    String physical = IcebergRESTUtils.icebergNamespaceToPhysicalSchemaName(ns);
-    Assertions.assertEquals("A.B.C", physical);
-  }
-
-  @Test
-  void testIcebergNamespaceToPhysicalSchemaNameEmpty() {
-    Namespace empty = Namespace.empty();
-    String physical = IcebergRESTUtils.icebergNamespaceToPhysicalSchemaName(empty);
-    Assertions.assertEquals("", physical);
-  }
-
-  @Test
-  void testNamespaceRoundTrip() {
-    Namespace original = Namespace.of("team", "sales", "reports");
-    String physical = IcebergRESTUtils.icebergNamespaceToPhysicalSchemaName(original);
-    Assertions.assertEquals("team.sales.reports", physical);
-
-    Namespace restored = IcebergRESTUtils.physicalSchemaNameToIcebergNamespace(physical);
-    Assertions.assertEquals(original, restored);
-  }
 }

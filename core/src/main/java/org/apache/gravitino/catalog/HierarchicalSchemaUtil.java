@@ -22,6 +22,7 @@ import com.google.common.base.Preconditions;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
+import java.util.regex.Pattern;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.Configs;
 import org.apache.gravitino.GravitinoEnv;
@@ -109,7 +110,7 @@ public final class HierarchicalSchemaUtil {
   public static List<String> getAncestorNames(String schemaName, String separator) {
     Preconditions.checkArgument(StringUtils.isNotBlank(schemaName), "schemaName must not be blank");
     Preconditions.checkArgument(StringUtils.isNotBlank(separator), "separator must not be blank");
-    String[] parts = schemaName.split(java.util.regex.Pattern.quote(separator), -1);
+    String[] parts = schemaName.split(Pattern.quote(separator), -1);
     List<String> ancestors = new ArrayList<>();
     for (int i = 1; i < parts.length; i++) {
       ancestors.add(String.join(separator, java.util.Arrays.copyOf(parts, i)));

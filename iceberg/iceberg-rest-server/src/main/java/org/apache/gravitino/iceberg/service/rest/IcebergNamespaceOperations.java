@@ -41,9 +41,11 @@ import javax.ws.rs.QueryParam;
 import javax.ws.rs.core.Context;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
+import java.util.regex.Pattern;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.NameIdentifier;
+import org.apache.gravitino.catalog.HierarchicalSchemaUtil;
 import org.apache.gravitino.iceberg.service.IcebergExceptionMapper;
 import org.apache.gravitino.iceberg.service.IcebergObjectMapper;
 import org.apache.gravitino.iceberg.service.IcebergRESTUtils;
@@ -226,7 +228,7 @@ public class IcebergNamespaceOperations {
   @ResponseMetered(name = "create-namespace", absolute = true)
   @AuthorizationExpression(
       expression = "ANY(OWNER, METALAKE, CATALOG) || ANY_USE_CATALOG && ANY_CREATE_SCHEMA",
-      accessMetadataType = MetadataObject.Type.CATALOG)
+      accessMetadataType = MetadataObject.Type.SCHEMA)
   public Response createNamespace(
       @AuthorizationMetadata(type = Entity.EntityType.CATALOG) @PathParam("prefix") String prefix,
       @IcebergAuthorizationMetadata(type = IcebergAuthorizationMetadata.RequestType.CREATE_NAMESPACE)
@@ -328,16 +330,14 @@ public class IcebergNamespaceOperations {
 
   private NameIdentifier[] toNameIdentifiers(
       ListNamespacesResponse listNamespacesResponse, String metalake, String catalogName) {
+    String separator = HierarchicalSchemaUtil.namespaceSeparator();
     List<Namespace> namespaces = listNamespacesResponse.namespaces();
     NameIdentifier[] nameIdentifiers = new NameIdentifier[namespaces.size()];
     for (int i = 0; i < namespaces.size(); i++) {
       Namespace namespace = namespaces.get(i);
-      // Convert multi-level Iceberg Namespace to physical dot-separated Gravitino schema name.
-      // For example Namespace.of("A","B","C") -> "A.B.C" -> NameIdentifier(metalake,catalog,"A.B.C")
-      String schemaName =
-          namespace.isEmpty()
-              ? ""
-              : IcebergRESTUtils.icebergNamespaceToPhysicalSchemaName(namespace);
+      // Join namespace levels with the logical separator to form the Gravitino schema name,
+      // e.g. Namespace.of("A","B","C") -> "A:B:C" -> NameIdentifier(metalake, catalog, "A:B:C").
+      String schemaName = namespace.isEmpty() ? "" : String.join(separator, namespace.levels());
       nameIdentifiers[i] = NameIdentifier.of(metalake, catalogName, schemaName);
     }
     return nameIdentifiers;
@@ -345,6 +345,7 @@ public class IcebergNamespaceOperations {
 
   private ListNamespacesResponse filterListNamespacesResponse(
       ListNamespacesResponse listNamespacesResponse, String metalake, String catalogName) {
+    String separator = HierarchicalSchemaUtil.namespaceSeparator();
     NameIdentifier[] idents =
         MetadataAuthzHelper.filterByExpression(
             metalake,
@@ -353,11 +354,9 @@ public class IcebergNamespaceOperations {
             toNameIdentifiers(listNamespacesResponse, metalake, catalogName));
     List<Namespace> filteredNamespaces = new ArrayList<>();
     for (NameIdentifier ident : idents) {
-      // Convert back from NameIdentifier to multi-level Iceberg Namespace.
       if (ident.hasNamespace() && ident.namespace().levels().length >= 2) {
-        // The schema name is stored as physical dot-separated form (e.g. "A.B.C").
-        // Convert it back to Iceberg multi-level Namespace.of("A","B","C").
-        filteredNamespaces.add(IcebergRESTUtils.physicalSchemaNameToIcebergNamespace(ident.name()));
+        // Convert the logical schema name (e.g. "A:B:C") back to a multi-level Iceberg Namespace.
+        filteredNamespaces.add(Namespace.of(ident.name().split(Pattern.quote(separator), -1)));
       }
     }
     return ListNamespacesResponse.builder().addAll(filteredNamespaces).build();

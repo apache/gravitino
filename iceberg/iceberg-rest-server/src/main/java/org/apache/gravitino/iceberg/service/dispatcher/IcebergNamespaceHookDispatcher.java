@@ -67,11 +67,13 @@ public class IcebergNamespaceHookDispatcher implements IcebergNamespaceOperation
     CreateNamespaceResponse response = dispatcher.createNamespace(context, createRequest);
 
     OwnerDispatcher ownerDispatcher = GravitinoEnv.getInstance().ownerDispatcher();
-    // Set owner for every auto-created ancestor namespace.
+    // Set owner for every auto-created ancestor namespace (only if it actually exists now).
     for (Namespace ancestor : missingAncestors) {
-      importSchema(context.catalogName(), ancestor);
-      IcebergOwnershipUtils.setSchemaOwner(
-          metalake, context.catalogName(), ancestor, context.userName(), ownerDispatcher);
+      if (dispatcher.namespaceExists(context, ancestor)) {
+        importSchema(context.catalogName(), ancestor);
+        IcebergOwnershipUtils.setSchemaOwner(
+            metalake, context.catalogName(), ancestor, context.userName(), ownerDispatcher);
+      }
     }
     // Set owner for the explicitly requested namespace.
     importSchema(context.catalogName(), createRequest.namespace());
