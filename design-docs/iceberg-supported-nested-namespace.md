@@ -137,10 +137,10 @@ Examples:
 
 ### Delimiter Validation Strategy
 
-For configurable schema delimiters, there are two possible strategies:
+For configurable schema delimiters, there are two possible strategies, '.' isn't allowed:
 
 - **Option 1: Restrict to a limited set of delimiters**
-  - Delimiter values are validated against an allowlist (for example `:`, `.`, `/`, `_`).
+  - Delimiter values are validated against an allowlist (for example `:`, `/`, `_`).
   - This reduces ambiguity and improves consistency across catalogs and engines.
 
 - **Option 2: Do not restrict the delimiter; any delimiter can be used**
