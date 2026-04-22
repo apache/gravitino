@@ -18,7 +18,9 @@
  */
 package org.apache.gravitino.iceberg.service.dispatcher;
 
+import org.apache.gravitino.Configs;
 import org.apache.gravitino.Entity;
+import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.authorization.Owner;
 import org.apache.gravitino.authorization.OwnerDispatcher;
 import org.apache.gravitino.iceberg.common.utils.IcebergIdentifierUtils;
@@ -53,7 +55,8 @@ public class IcebergOwnershipUtils {
       ownerDispatcher.setOwner(
           metalake,
           NameIdentifierUtil.toMetadataObject(
-              IcebergIdentifierUtils.toGravitinoSchemaIdentifier(metalake, catalogName, namespace),
+              IcebergIdentifierUtils.toGravitinoSchemaIdentifier(
+                  metalake, catalogName, namespace, namespaceSeparator()),
               Entity.EntityType.SCHEMA),
           user,
           Owner.Type.USER);
@@ -82,7 +85,8 @@ public class IcebergOwnershipUtils {
           metalake,
           NameIdentifierUtil.toMetadataObject(
               IcebergIdentifierUtils.toGravitinoTableIdentifier(
-                  metalake, catalogName, TableIdentifier.of(namespace, tableName)),
+                  metalake, catalogName, TableIdentifier.of(namespace, tableName),
+                  namespaceSeparator()),
               Entity.EntityType.TABLE),
           user,
           Owner.Type.USER);
@@ -111,10 +115,15 @@ public class IcebergOwnershipUtils {
           metalake,
           NameIdentifierUtil.toMetadataObject(
               IcebergIdentifierUtils.toGravitinoTableIdentifier(
-                  metalake, catalogName, TableIdentifier.of(namespace, viewName)),
+                  metalake, catalogName, TableIdentifier.of(namespace, viewName),
+                  namespaceSeparator()),
               Entity.EntityType.VIEW),
           user,
           Owner.Type.USER);
     }
+  }
+
+  private static String namespaceSeparator() {
+    return GravitinoEnv.getInstance().config().get(Configs.SCHEMA_NAMESPACE_SEPARATOR);
   }
 }

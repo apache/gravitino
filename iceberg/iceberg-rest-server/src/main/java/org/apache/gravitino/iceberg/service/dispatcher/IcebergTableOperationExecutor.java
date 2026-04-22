@@ -22,7 +22,9 @@ package org.apache.gravitino.iceberg.service.dispatcher;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Optional;
+import org.apache.gravitino.Configs;
 import org.apache.gravitino.Entity;
+import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.auth.AuthConstants;
 import org.apache.gravitino.catalog.lakehouse.iceberg.IcebergConstants;
@@ -166,9 +168,10 @@ public class IcebergTableOperationExecutor implements IcebergTableOperationDispa
   private static CredentialPrivilege getCredentialPrivilege(
       IcebergRequestContext context, TableIdentifier tableIdentifier) {
     String metalake = IcebergRESTServerContext.getInstance().metalakeName();
+    String separator = GravitinoEnv.getInstance().config().get(Configs.SCHEMA_NAMESPACE_SEPARATOR);
     NameIdentifier identifier =
         IcebergIdentifierUtils.toGravitinoTableIdentifier(
-            metalake, context.catalogName(), tableIdentifier);
+            metalake, context.catalogName(), tableIdentifier, separator);
     boolean writable =
         MetadataAuthzHelper.checkAccess(
             identifier,

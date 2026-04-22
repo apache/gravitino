@@ -24,16 +24,17 @@ import org.apache.iceberg.catalog.TableIdentifier;
 
 public class IcebergIdentifierUtils {
   public static NameIdentifier toGravitinoTableIdentifier(
-      String metalake, String catalogName, TableIdentifier icebergTableIdentifier) {
-    return NameIdentifier.of(
-        metalake,
-        catalogName,
-        icebergTableIdentifier.namespace().level(0),
-        icebergTableIdentifier.name());
+      String metalake,
+      String catalogName,
+      TableIdentifier icebergTableIdentifier,
+      String separator) {
+    String schemaName = String.join(separator, icebergTableIdentifier.namespace().levels());
+    return NameIdentifier.of(metalake, catalogName, schemaName, icebergTableIdentifier.name());
   }
 
   public static NameIdentifier toGravitinoSchemaIdentifier(
-      String metalake, String catalogName, Namespace icebergNamespace) {
-    return NameIdentifier.of(metalake, catalogName, icebergNamespace.level(0));
+      String metalake, String catalogName, Namespace icebergNamespace, String separator) {
+    String schemaName = String.join(separator, icebergNamespace.levels());
+    return NameIdentifier.of(metalake, catalogName, schemaName);
   }
 }

@@ -21,6 +21,7 @@ package org.apache.gravitino.iceberg.service.dispatcher;
 import java.io.IOException;
 import java.time.Instant;
 import java.util.Optional;
+import org.apache.gravitino.Configs;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.EntityStore;
 import org.apache.gravitino.GravitinoEnv;
@@ -88,7 +89,7 @@ public class IcebergTableHookDispatcher implements IcebergTableOperationDispatch
         // Delete the entity for the dropped table.
         store.delete(
             IcebergIdentifierUtils.toGravitinoTableIdentifier(
-                metalake, context.catalogName(), tableIdentifier),
+                metalake, context.catalogName(), tableIdentifier, namespaceSeparator()),
             Entity.EntityType.TABLE);
       }
     } catch (NoSuchEntityException ignore) {
@@ -117,12 +118,13 @@ public class IcebergTableHookDispatcher implements IcebergTableOperationDispatch
   @Override
   public void renameTable(IcebergRequestContext context, RenameTableRequest renameTableRequest) {
     dispatcher.renameTable(context, renameTableRequest);
+    String separator = namespaceSeparator();
     NameIdentifier tableSource =
         IcebergIdentifierUtils.toGravitinoTableIdentifier(
-            metalake, context.catalogName(), renameTableRequest.source());
+            metalake, context.catalogName(), renameTableRequest.source(), separator);
     NameIdentifier tableDest =
         IcebergIdentifierUtils.toGravitinoTableIdentifier(
-            metalake, context.catalogName(), renameTableRequest.destination());
+            metalake, context.catalogName(), renameTableRequest.destination(), separator);
     EntityStore store = GravitinoEnv.getInstance().entityStore();
     try {
       if (store != null) {
@@ -191,7 +193,12 @@ public class IcebergTableHookDispatcher implements IcebergTableOperationDispatch
     if (tableDispatcher != null) {
       tableDispatcher.loadTable(
           IcebergIdentifierUtils.toGravitinoTableIdentifier(
-              metalake, catalogName, TableIdentifier.of(namespace, tableName)));
+              metalake, catalogName, TableIdentifier.of(namespace, tableName),
+              namespaceSeparator()));
     }
+  }
+
+  private String namespaceSeparator() {
+    return GravitinoEnv.getInstance().config().get(Configs.SCHEMA_NAMESPACE_SEPARATOR);
   }
 }

@@ -31,6 +31,8 @@ import static org.mockito.Mockito.when;
 
 import java.io.IOException;
 import org.apache.commons.lang3.reflect.FieldUtils;
+import org.apache.gravitino.Config;
+import org.apache.gravitino.Configs;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.EntityStore;
 import org.apache.gravitino.GravitinoEnv;
@@ -90,6 +92,9 @@ public class TestIcebergViewHookDispatcher {
     // Setup GravitinoEnv mock
     gravitinoEnv = GravitinoEnv.getInstance();
     try {
+      Config mockConfig = mock(Config.class);
+      when(mockConfig.get(Configs.SCHEMA_NAMESPACE_SEPARATOR)).thenReturn(":");
+      FieldUtils.writeField(gravitinoEnv, "config", mockConfig, true);
       FieldUtils.writeField(gravitinoEnv, "entityStore", mockEntityStore, true);
       FieldUtils.writeField(gravitinoEnv, "viewDispatcher", mockViewDispatcher, true);
       FieldUtils.writeField(gravitinoEnv, "ownerDispatcher", mockOwnerDispatcher, true);
@@ -104,6 +109,7 @@ public class TestIcebergViewHookDispatcher {
   public void tearDown() {
     try {
       // Clean up GravitinoEnv
+      FieldUtils.writeField(gravitinoEnv, "config", null, true);
       FieldUtils.writeField(gravitinoEnv, "entityStore", null, true);
       FieldUtils.writeField(gravitinoEnv, "viewDispatcher", null, true);
       FieldUtils.writeField(gravitinoEnv, "ownerDispatcher", null, true);
@@ -198,7 +204,7 @@ public class TestIcebergViewHookDispatcher {
 
     // Verify view was deleted from entity store
     NameIdentifier expectedIdent =
-        IcebergIdentifierUtils.toGravitinoTableIdentifier(METALAKE, CATALOG, viewIdent);
+        IcebergIdentifierUtils.toGravitinoTableIdentifier(METALAKE, CATALOG, viewIdent, ":");
     verify(mockEntityStore, times(1)).delete(eq(expectedIdent), eq(Entity.EntityType.VIEW));
   }
 
@@ -208,7 +214,7 @@ public class TestIcebergViewHookDispatcher {
 
     // Simulate entity not found in store
     NameIdentifier expectedIdent =
-        IcebergIdentifierUtils.toGravitinoTableIdentifier(METALAKE, CATALOG, viewIdent);
+        IcebergIdentifierUtils.toGravitinoTableIdentifier(METALAKE, CATALOG, viewIdent, ":");
     doThrow(new NoSuchEntityException("Entity not found"))
         .when(mockEntityStore)
         .delete(eq(expectedIdent), eq(Entity.EntityType.VIEW));
@@ -226,7 +232,7 @@ public class TestIcebergViewHookDispatcher {
 
     // Simulate IO error
     NameIdentifier expectedIdent =
-        IcebergIdentifierUtils.toGravitinoTableIdentifier(METALAKE, CATALOG, viewIdent);
+        IcebergIdentifierUtils.toGravitinoTableIdentifier(METALAKE, CATALOG, viewIdent, ":");
     doThrow(new IOException("IO error"))
         .when(mockEntityStore)
         .delete(eq(expectedIdent), eq(Entity.EntityType.VIEW));
@@ -253,7 +259,7 @@ public class TestIcebergViewHookDispatcher {
 
     // Verify entity store was updated
     NameIdentifier sourceGravitinoIdent =
-        IcebergIdentifierUtils.toGravitinoTableIdentifier(METALAKE, CATALOG, sourceIdent);
+        IcebergIdentifierUtils.toGravitinoTableIdentifier(METALAKE, CATALOG, sourceIdent, ":");
     verify(mockEntityStore, times(1))
         .update(
             eq(sourceGravitinoIdent), eq(GenericEntity.class), eq(Entity.EntityType.VIEW), any());
@@ -268,7 +274,7 @@ public class TestIcebergViewHookDispatcher {
 
     // Simulate entity not found in store
     NameIdentifier sourceGravitinoIdent =
-        IcebergIdentifierUtils.toGravitinoTableIdentifier(METALAKE, CATALOG, sourceIdent);
+        IcebergIdentifierUtils.toGravitinoTableIdentifier(METALAKE, CATALOG, sourceIdent, ":");
     when(mockEntityStore.update(
             eq(sourceGravitinoIdent), eq(GenericEntity.class), eq(Entity.EntityType.VIEW), any()))
         .thenThrow(new NoSuchEntityException("Entity not found"));
@@ -288,7 +294,7 @@ public class TestIcebergViewHookDispatcher {
 
     // Simulate IO error
     NameIdentifier sourceGravitinoIdent =
-        IcebergIdentifierUtils.toGravitinoTableIdentifier(METALAKE, CATALOG, sourceIdent);
+        IcebergIdentifierUtils.toGravitinoTableIdentifier(METALAKE, CATALOG, sourceIdent, ":");
     when(mockEntityStore.update(
             eq(sourceGravitinoIdent), eq(GenericEntity.class), eq(Entity.EntityType.VIEW), any()))
         .thenThrow(new IOException("IO error"));
