@@ -62,7 +62,6 @@ public class GlueTable extends BaseTable {
 
   @Override
   protected TableOperations newOps() {
-    // Partition operations are deferred to PR-06.
     throw new UnsupportedOperationException(
         "Partition operations are not yet supported for GlueTable");
   }

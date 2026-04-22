@@ -20,6 +20,7 @@ package org.apache.gravitino.catalog.glue;
 
 import static java.util.Locale.ROOT;
 
+import org.apache.gravitino.connector.DataTypeConverter;
 import org.apache.gravitino.rel.types.Type;
 import org.apache.gravitino.rel.types.Types;
 
@@ -30,18 +31,12 @@ import org.apache.gravitino.rel.types.Types;
  * {@code "array<string>"}). This converter handles all primitive types natively; complex and
  * unknown types fall back to {@link Types.ExternalType} to preserve the original string.
  */
-public final class GlueTypeConverter {
+public class GlueTypeConverter implements DataTypeConverter<String, String> {
 
-  private GlueTypeConverter() {}
+  public static final GlueTypeConverter CONVERTER = new GlueTypeConverter();
 
-  /**
-   * Converts a Glue/Hive type string to a Gravitino {@link Type}.
-   *
-   * @param glueType the Hive type string from {@code Column.type()} (case-insensitive)
-   * @return the corresponding Gravitino {@link Type}; unknown types become {@link
-   *     Types.ExternalType}
-   */
-  public static Type toGravitino(String glueType) {
+  @Override
+  public Type toGravitino(String glueType) {
     if (glueType == null || glueType.isEmpty()) {
       return Types.ExternalType.of("");
     }
@@ -115,14 +110,8 @@ public final class GlueTypeConverter {
     return Types.ExternalType.of(glueType);
   }
 
-  /**
-   * Converts a Gravitino {@link Type} back to a Glue/Hive type string.
-   *
-   * @param type the Gravitino type
-   * @return the Hive type string
-   * @throws IllegalArgumentException if the type has no known Glue representation
-   */
-  public static String fromGravitino(Type type) {
+  @Override
+  public String fromGravitino(Type type) {
     if (type instanceof Types.BooleanType) return "boolean";
     if (type instanceof Types.ByteType) return "tinyint";
     if (type instanceof Types.ShortType) return "smallint";

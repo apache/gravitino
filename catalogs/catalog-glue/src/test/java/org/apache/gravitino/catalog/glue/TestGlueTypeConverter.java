@@ -35,27 +35,31 @@ class TestGlueTypeConverter {
 
   @Test
   void testPrimitiveTypes() {
-    assertEquals(Types.BooleanType.get(), GlueTypeConverter.toGravitino("boolean"));
-    assertEquals(Types.ByteType.get(), GlueTypeConverter.toGravitino("tinyint"));
-    assertEquals(Types.ShortType.get(), GlueTypeConverter.toGravitino("smallint"));
-    assertEquals(Types.IntegerType.get(), GlueTypeConverter.toGravitino("int"));
-    assertEquals(Types.IntegerType.get(), GlueTypeConverter.toGravitino("integer"));
-    assertEquals(Types.LongType.get(), GlueTypeConverter.toGravitino("bigint"));
-    assertEquals(Types.FloatType.get(), GlueTypeConverter.toGravitino("float"));
-    assertEquals(Types.DoubleType.get(), GlueTypeConverter.toGravitino("double"));
-    assertEquals(Types.StringType.get(), GlueTypeConverter.toGravitino("string"));
-    assertEquals(Types.DateType.get(), GlueTypeConverter.toGravitino("date"));
-    assertEquals(Types.TimestampType.withoutTimeZone(), GlueTypeConverter.toGravitino("timestamp"));
-    assertEquals(Types.BinaryType.get(), GlueTypeConverter.toGravitino("binary"));
+    assertEquals(Types.BooleanType.get(), GlueTypeConverter.CONVERTER.toGravitino("boolean"));
+    assertEquals(Types.ByteType.get(), GlueTypeConverter.CONVERTER.toGravitino("tinyint"));
+    assertEquals(Types.ShortType.get(), GlueTypeConverter.CONVERTER.toGravitino("smallint"));
+    assertEquals(Types.IntegerType.get(), GlueTypeConverter.CONVERTER.toGravitino("int"));
+    assertEquals(Types.IntegerType.get(), GlueTypeConverter.CONVERTER.toGravitino("integer"));
+    assertEquals(Types.LongType.get(), GlueTypeConverter.CONVERTER.toGravitino("bigint"));
+    assertEquals(Types.FloatType.get(), GlueTypeConverter.CONVERTER.toGravitino("float"));
+    assertEquals(Types.DoubleType.get(), GlueTypeConverter.CONVERTER.toGravitino("double"));
+    assertEquals(Types.StringType.get(), GlueTypeConverter.CONVERTER.toGravitino("string"));
+    assertEquals(Types.DateType.get(), GlueTypeConverter.CONVERTER.toGravitino("date"));
     assertEquals(
-        Types.IntervalYearType.get(), GlueTypeConverter.toGravitino("interval_year_month"));
-    assertEquals(Types.IntervalDayType.get(), GlueTypeConverter.toGravitino("interval_day_time"));
+        Types.TimestampType.withoutTimeZone(),
+        GlueTypeConverter.CONVERTER.toGravitino("timestamp"));
+    assertEquals(Types.BinaryType.get(), GlueTypeConverter.CONVERTER.toGravitino("binary"));
+    assertEquals(
+        Types.IntervalYearType.get(),
+        GlueTypeConverter.CONVERTER.toGravitino("interval_year_month"));
+    assertEquals(
+        Types.IntervalDayType.get(), GlueTypeConverter.CONVERTER.toGravitino("interval_day_time"));
   }
 
   @Test
   void testCaseInsensitive() {
-    assertEquals(Types.LongType.get(), GlueTypeConverter.toGravitino("BIGINT"));
-    assertEquals(Types.StringType.get(), GlueTypeConverter.toGravitino("STRING"));
+    assertEquals(Types.LongType.get(), GlueTypeConverter.CONVERTER.toGravitino("BIGINT"));
+    assertEquals(Types.StringType.get(), GlueTypeConverter.CONVERTER.toGravitino("STRING"));
   }
 
   // -------------------------------------------------------------------------
@@ -64,21 +68,25 @@ class TestGlueTypeConverter {
 
   @Test
   void testCharType() {
-    assertEquals(Types.FixedCharType.of(10), GlueTypeConverter.toGravitino("char(10)"));
-    assertEquals(Types.FixedCharType.of(1), GlueTypeConverter.toGravitino("char(1)"));
+    assertEquals(Types.FixedCharType.of(10), GlueTypeConverter.CONVERTER.toGravitino("char(10)"));
+    assertEquals(Types.FixedCharType.of(1), GlueTypeConverter.CONVERTER.toGravitino("char(1)"));
   }
 
   @Test
   void testVarcharType() {
-    assertEquals(Types.VarCharType.of(255), GlueTypeConverter.toGravitino("varchar(255)"));
-    assertEquals(Types.VarCharType.of(65535), GlueTypeConverter.toGravitino("varchar(65535)"));
+    assertEquals(
+        Types.VarCharType.of(255), GlueTypeConverter.CONVERTER.toGravitino("varchar(255)"));
+    assertEquals(
+        Types.VarCharType.of(65535), GlueTypeConverter.CONVERTER.toGravitino("varchar(65535)"));
   }
 
   @Test
   void testDecimalType() {
-    assertEquals(Types.DecimalType.of(10, 2), GlueTypeConverter.toGravitino("decimal(10,2)"));
-    assertEquals(Types.DecimalType.of(38, 18), GlueTypeConverter.toGravitino("decimal(38, 18)"));
-    assertEquals(Types.DecimalType.of(5, 0), GlueTypeConverter.toGravitino("decimal(5)"));
+    assertEquals(
+        Types.DecimalType.of(10, 2), GlueTypeConverter.CONVERTER.toGravitino("decimal(10,2)"));
+    assertEquals(
+        Types.DecimalType.of(38, 18), GlueTypeConverter.CONVERTER.toGravitino("decimal(38, 18)"));
+    assertEquals(Types.DecimalType.of(5, 0), GlueTypeConverter.CONVERTER.toGravitino("decimal(5)"));
   }
 
   // -------------------------------------------------------------------------
@@ -87,28 +95,31 @@ class TestGlueTypeConverter {
 
   @Test
   void testComplexTypesBecomesExternalType() {
-    assertInstanceOf(Types.ExternalType.class, GlueTypeConverter.toGravitino("array<string>"));
-    assertInstanceOf(Types.ExternalType.class, GlueTypeConverter.toGravitino("map<string,int>"));
     assertInstanceOf(
-        Types.ExternalType.class, GlueTypeConverter.toGravitino("struct<id:bigint,name:string>"));
+        Types.ExternalType.class, GlueTypeConverter.CONVERTER.toGravitino("array<string>"));
     assertInstanceOf(
-        Types.ExternalType.class, GlueTypeConverter.toGravitino("uniontype<int,string>"));
+        Types.ExternalType.class, GlueTypeConverter.CONVERTER.toGravitino("map<string,int>"));
     assertInstanceOf(
-        Types.ExternalType.class, GlueTypeConverter.toGravitino("unknown_custom_type"));
+        Types.ExternalType.class,
+        GlueTypeConverter.CONVERTER.toGravitino("struct<id:bigint,name:string>"));
+    assertInstanceOf(
+        Types.ExternalType.class, GlueTypeConverter.CONVERTER.toGravitino("uniontype<int,string>"));
+    assertInstanceOf(
+        Types.ExternalType.class, GlueTypeConverter.CONVERTER.toGravitino("unknown_custom_type"));
   }
 
   @Test
   void testExternalTypePreservesOriginalString() {
     String rawType = "array<map<string,int>>";
-    Type type = GlueTypeConverter.toGravitino(rawType);
+    Type type = GlueTypeConverter.CONVERTER.toGravitino(rawType);
     assertInstanceOf(Types.ExternalType.class, type);
     assertEquals(rawType, ((Types.ExternalType) type).catalogString());
   }
 
   @Test
   void testNullAndEmptyInput() {
-    assertInstanceOf(Types.ExternalType.class, GlueTypeConverter.toGravitino(null));
-    assertInstanceOf(Types.ExternalType.class, GlueTypeConverter.toGravitino(""));
+    assertInstanceOf(Types.ExternalType.class, GlueTypeConverter.CONVERTER.toGravitino(null));
+    assertInstanceOf(Types.ExternalType.class, GlueTypeConverter.CONVERTER.toGravitino(""));
   }
 
   // -------------------------------------------------------------------------
@@ -134,29 +145,31 @@ class TestGlueTypeConverter {
 
   @Test
   void testRoundTripParameterised() {
-    assertEquals("char(10)", GlueTypeConverter.fromGravitino(Types.FixedCharType.of(10)));
-    assertEquals("varchar(255)", GlueTypeConverter.fromGravitino(Types.VarCharType.of(255)));
-    assertEquals("decimal(10,2)", GlueTypeConverter.fromGravitino(Types.DecimalType.of(10, 2)));
+    assertEquals("char(10)", GlueTypeConverter.CONVERTER.fromGravitino(Types.FixedCharType.of(10)));
+    assertEquals(
+        "varchar(255)", GlueTypeConverter.CONVERTER.fromGravitino(Types.VarCharType.of(255)));
+    assertEquals(
+        "decimal(10,2)", GlueTypeConverter.CONVERTER.fromGravitino(Types.DecimalType.of(10, 2)));
   }
 
   @Test
   void testFromGravitinoExternalType() {
     String raw = "array<string>";
-    assertEquals(raw, GlueTypeConverter.fromGravitino(Types.ExternalType.of(raw)));
+    assertEquals(raw, GlueTypeConverter.CONVERTER.fromGravitino(Types.ExternalType.of(raw)));
   }
 
   @Test
   void testFromGravitinoTimestampWithTimeZoneThrows() {
     assertThrows(
         IllegalArgumentException.class,
-        () -> GlueTypeConverter.fromGravitino(Types.TimestampType.withTimeZone()));
+        () -> GlueTypeConverter.CONVERTER.fromGravitino(Types.TimestampType.withTimeZone()));
   }
 
   @Test
   void testFromGravitinoUnsupportedTypeThrows() {
     assertThrows(
         IllegalArgumentException.class,
-        () -> GlueTypeConverter.fromGravitino(Types.NullType.get()));
+        () -> GlueTypeConverter.CONVERTER.fromGravitino(Types.NullType.get()));
   }
 
   // -------------------------------------------------------------------------
@@ -164,7 +177,7 @@ class TestGlueTypeConverter {
   // -------------------------------------------------------------------------
 
   private static void roundTrip(String glueType, Type gravitinoType) {
-    assertEquals(gravitinoType, GlueTypeConverter.toGravitino(glueType));
-    assertEquals(glueType, GlueTypeConverter.fromGravitino(gravitinoType));
+    assertEquals(gravitinoType, GlueTypeConverter.CONVERTER.toGravitino(glueType));
+    assertEquals(glueType, GlueTypeConverter.CONVERTER.fromGravitino(gravitinoType));
   }
 }

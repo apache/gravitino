@@ -47,7 +47,7 @@ public class GlueColumn extends BaseColumn {
   public static GlueColumn fromGlueColumn(Column glueColumn) {
     return GlueColumn.builder()
         .withName(glueColumn.name())
-        .withType(GlueTypeConverter.toGravitino(glueColumn.type()))
+        .withType(GlueTypeConverter.CONVERTER.toGravitino(glueColumn.type()))
         .withComment(glueColumn.comment())
         .withNullable(true)
         .build();
