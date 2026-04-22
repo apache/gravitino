@@ -93,7 +93,8 @@ public class GlueTypeConverter implements DataTypeConverter<String, String> {
     // char(N)
     if (lower.startsWith(CHAR + "(") && lower.endsWith(")")) {
       try {
-        int length = Integer.parseInt(lower.substring(CHAR.length() + 1, lower.length() - 1).trim());
+        int length =
+            Integer.parseInt(lower.substring(CHAR.length() + 1, lower.length() - 1).trim());
         return Types.FixedCharType.of(length);
       } catch (NumberFormatException e) {
         return Types.ExternalType.of(glueType);
