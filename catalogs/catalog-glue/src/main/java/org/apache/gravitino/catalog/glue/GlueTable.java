@@ -81,22 +81,23 @@ public class GlueTable extends BaseTable {
    * table.parameters()} and passes through as-is.
    *
    * @param glueTable the Glue Table returned by the AWS SDK
+   * @param typeConverter the type converter to use for column type mapping
    * @return a populated {@link GlueTable}
    */
-  public static GlueTable fromGlueTable(Table glueTable) {
+  public static GlueTable fromGlueTable(Table glueTable, GlueTypeConverter typeConverter) {
     StorageDescriptor sd = glueTable.storageDescriptor();
 
     // --- Columns ---
     List<Column> columns = new ArrayList<>();
     if (sd != null && sd.hasColumns()) {
       for (software.amazon.awssdk.services.glue.model.Column c : sd.columns()) {
-        columns.add(GlueColumn.fromGlueColumn(c));
+        columns.add(GlueColumn.fromGlueColumn(c, typeConverter));
       }
     }
     List<String> partitionColNames = new ArrayList<>();
     if (glueTable.hasPartitionKeys()) {
       for (software.amazon.awssdk.services.glue.model.Column pk : glueTable.partitionKeys()) {
-        columns.add(GlueColumn.fromGlueColumn(pk));
+        columns.add(GlueColumn.fromGlueColumn(pk, typeConverter));
         partitionColNames.add(pk.name());
       }
     }

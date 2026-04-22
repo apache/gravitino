@@ -33,8 +33,6 @@ import org.apache.gravitino.rel.types.Types;
  */
 public class GlueTypeConverter implements DataTypeConverter<String, String> {
 
-  public static final GlueTypeConverter CONVERTER = new GlueTypeConverter();
-
   static final String BOOLEAN = "boolean";
   static final String TINYINT = "tinyint";
   static final String SMALLINT = "smallint";
