@@ -73,6 +73,7 @@ import org.apache.gravitino.EntityAlreadyExistsException;
 import org.apache.gravitino.EntityStore;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
+import org.apache.gravitino.Schema;
 import org.apache.gravitino.StringIdentifier;
 import org.apache.gravitino.connector.BaseCatalog;
 import org.apache.gravitino.connector.CatalogOperations;
@@ -87,6 +88,7 @@ import org.apache.gravitino.exceptions.GravitinoRuntimeException;
 import org.apache.gravitino.exceptions.NoSuchCatalogException;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.exceptions.NoSuchMetalakeException;
+import org.apache.gravitino.exceptions.NoSuchSchemaException;
 import org.apache.gravitino.exceptions.NonEmptyCatalogException;
 import org.apache.gravitino.exceptions.NonEmptyEntityException;
 import org.apache.gravitino.file.FilesetCatalog;
@@ -877,9 +879,37 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
     Set<String> availableSchemaNames =
         Arrays.stream(allSchemas).map(NameIdentifier::name).collect(Collectors.toSet());
 
-    // some schemas are dropped externally, but still exist in the entity store, those schemas are
-    // invalid
-    return schemaEntities.stream().map(SchemaEntity::name).anyMatch(availableSchemaNames::contains);
+    // Some schemas are dropped externally but still exist in the entity store — those are invalid.
+    // Among schemas that exist in the underlying catalog, only those created via Gravitino carry a
+    // StringIdentifier in their external properties; imported schemas do not.
+    for (SchemaEntity schemaEntity : schemaEntities) {
+      if (!availableSchemaNames.contains(schemaEntity.name())) {
+        continue;
+      }
+
+      try {
+        Schema schema =
+            catalogWrapper.doWithSchemaOps(ops -> ops.loadSchema(schemaEntity.nameIdentifier()));
+        Map<String, String> props = schema.properties();
+        // If the backend cannot store a StringIdentifier (null or empty properties, e.g. MySQL
+        // which does not support schema comments), we cannot tell whether the schema was created
+        // by Gravitino or imported. Be conservative and treat it as user-created to avoid
+        // accidental data loss.
+        // Only skip a schema when properties are non-null, non-empty, and contain no
+        // StringIdentifier — the reliable signal that the schema was imported from an external
+        // catalog on a backend that does support identifier storage.
+        if (props == null || props.isEmpty() || StringIdentifier.fromProperties(props) != null) {
+          return true;
+        }
+      } catch (NoSuchSchemaException ex) {
+        // A race between listSchemas and loadSchema is expected; treat as non-user-created.
+        LOG.debug(
+            "Schema {} no longer exists while checking whether it is user-created",
+            schemaEntity.nameIdentifier());
+      }
+    }
+
+    return false;
   }
 
   /**
