@@ -62,4 +62,13 @@ public class TestIcebergConfig {
     Assertions.assertEquals(1000, jettyServerConfig.getHttpPort());
     Assertions.assertEquals(1001, jettyServerConfig.getHttpsPort());
   }
+
+  @Test
+  public void testDisableRestAuthzConfigKey() {
+    Map<String, String> propertiesWithNewKey =
+        ImmutableMap.of(IcebergConfig.ICEBERG_REST_DISABLE_REST_AUTHZ.getKey(), "false");
+    IcebergConfig icebergConfigWithNewKey = new IcebergConfig(propertiesWithNewKey);
+    Assertions.assertFalse(
+        icebergConfigWithNewKey.get(IcebergConfig.ICEBERG_REST_DISABLE_REST_AUTHZ));
+  }
 }

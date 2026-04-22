@@ -130,7 +130,7 @@ public class IcebergCatalogWrapperManager implements AutoCloseable {
     CatalogWrapperForREST rest = new CatalogWrapperForREST(catalogName, icebergConfig);
     AuthenticationConfig authenticationConfig =
         new AuthenticationConfig(icebergConfig.getAllConfig());
-    if (rest.getCatalog() instanceof SupportsKerberos && authenticationConfig.isKerberosAuth()) {
+    if (authenticationConfig.isKerberosAuth() && rest.getCatalog() instanceof SupportsKerberos) {
       return (CatalogWrapperForREST)
           new KerberosAwareIcebergCatalogProxy(rest).getProxy(catalogName, icebergConfig);
     }
