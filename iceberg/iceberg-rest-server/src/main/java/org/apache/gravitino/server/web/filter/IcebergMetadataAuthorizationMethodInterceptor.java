@@ -23,9 +23,12 @@ import java.lang.reflect.Parameter;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Optional;
+import org.apache.gravitino.Configs;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.Entity.EntityType;
+import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.NameIdentifier;
+import org.apache.gravitino.catalog.HierarchicalSchemaUtil;
 import org.apache.gravitino.iceberg.service.IcebergRESTUtils;
 import org.apache.gravitino.iceberg.service.authorization.IcebergRESTServerContext;
 import org.apache.gravitino.server.authorization.annotations.AuthorizationMetadata;
@@ -70,7 +73,9 @@ public class IcebergMetadataAuthorizationMethodInterceptor
           break;
         case SCHEMA:
           rawNamespace = RESTUtil.decodeNamespace(value);
-          schema = rawNamespace.level(rawNamespace.length() - 1);
+          String separator =
+              GravitinoEnv.getInstance().config().get(Configs.SCHEMA_NAMESPACE_SEPARATOR);
+          schema = String.join(separator, rawNamespace.levels());
           nameIdentifierMap.put(
               Entity.EntityType.SCHEMA, NameIdentifierUtil.ofSchema(metalakeName, catalog, schema));
           break;
@@ -119,6 +124,8 @@ public class IcebergMetadataAuthorizationMethodInterceptor
             return Optional.of(new RenameTableAuthzHandler(parameters, args));
           case RENAME_VIEW:
             return Optional.of(new RenameViewAuthzHandler(parameters, args));
+          case CREATE_NAMESPACE:
+            return Optional.of(new CreateNamespaceAuthzHandler(parameters, args));
           default:
             break;
         }

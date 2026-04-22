@@ -23,7 +23,9 @@ import java.lang.reflect.Parameter;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Optional;
+import org.apache.gravitino.Configs;
 import org.apache.gravitino.Entity.EntityType;
+import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.authorization.AuthorizationRequestContext;
 import org.apache.gravitino.server.authorization.annotations.IcebergAuthorizationMetadata;
@@ -80,7 +82,10 @@ public class RenameViewAuthzHandler implements AuthorizationHandler {
     // Extract source view information from the request and add to map
     // The source view is NOT extracted via standard @AuthorizationMetadata annotations
     // because it's embedded in the RenameTableRequest body
-    String sourceSchema = renameViewRequest.source().namespace().level(0);
+    String separator =
+        GravitinoEnv.getInstance().config().get(Configs.SCHEMA_NAMESPACE_SEPARATOR);
+    String sourceSchema =
+        String.join(separator, renameViewRequest.source().namespace().levels());
     String sourceView = renameViewRequest.source().name();
 
     nameIdentifierMap.put(
@@ -89,7 +94,8 @@ public class RenameViewAuthzHandler implements AuthorizationHandler {
         EntityType.VIEW,
         NameIdentifierUtil.ofView(metalakeName, catalog, sourceSchema, sourceView));
 
-    String destSchema = renameViewRequest.destination().namespace().level(0);
+    String destSchema =
+        String.join(separator, renameViewRequest.destination().namespace().levels());
     if (!sourceSchema.equals(destSchema)) {
       // Cross-namespace rename - perform complete authorization here
       crossNamespaceRename = true;

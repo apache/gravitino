@@ -135,4 +135,37 @@ public class TestHierarchicalSchemaUtil {
     Assertions.assertEquals("X", ancestors.get(0));
     Assertions.assertEquals("X/Y", ancestors.get(1));
   }
+
+  @Test
+  public void testAllScopesFlat() {
+    List<String> scopes = HierarchicalSchemaUtil.allScopes("A", ":");
+    Assertions.assertEquals(1, scopes.size());
+    Assertions.assertEquals("A", scopes.get(0));
+  }
+
+  @Test
+  public void testAllScopesTwoLevels() {
+    List<String> scopes = HierarchicalSchemaUtil.allScopes("A:B", ":");
+    Assertions.assertEquals(2, scopes.size());
+    Assertions.assertEquals("A:B", scopes.get(0));
+    Assertions.assertEquals("A", scopes.get(1));
+  }
+
+  @Test
+  public void testAllScopesThreeLevels() {
+    List<String> scopes = HierarchicalSchemaUtil.allScopes("A:B:C", ":");
+    Assertions.assertEquals(3, scopes.size());
+    Assertions.assertEquals("A:B:C", scopes.get(0));
+    Assertions.assertEquals("A:B", scopes.get(1));
+    Assertions.assertEquals("A", scopes.get(2));
+  }
+
+  @Test
+  public void testAllScopesCustomSeparator() {
+    List<String> scopes = HierarchicalSchemaUtil.allScopes("X/Y/Z", "/");
+    Assertions.assertEquals(3, scopes.size());
+    Assertions.assertEquals("X/Y/Z", scopes.get(0));
+    Assertions.assertEquals("X/Y", scopes.get(1));
+    Assertions.assertEquals("X", scopes.get(2));
+  }
 }

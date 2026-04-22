@@ -477,7 +477,7 @@ public class Privileges {
 
     @Override
     public boolean canBindTo(MetadataObject.Type type) {
-      return type == MetadataObject.Type.METALAKE || type == MetadataObject.Type.CATALOG;
+      return SCHEMA_SUPPORTED_TYPES.contains(type);
     }
   }
 

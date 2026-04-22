@@ -235,7 +235,7 @@ public class TestSecurableObjects {
     // Test create schema
     Assertions.assertTrue(createSchema.canBindTo(MetadataObject.Type.METALAKE));
     Assertions.assertTrue(createSchema.canBindTo(MetadataObject.Type.CATALOG));
-    Assertions.assertFalse(createSchema.canBindTo(MetadataObject.Type.SCHEMA));
+    Assertions.assertTrue(createSchema.canBindTo(MetadataObject.Type.SCHEMA));
     Assertions.assertFalse(createSchema.canBindTo(MetadataObject.Type.TABLE));
     Assertions.assertFalse(createSchema.canBindTo(MetadataObject.Type.TOPIC));
     Assertions.assertFalse(createSchema.canBindTo(MetadataObject.Type.FILESET));

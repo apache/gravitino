@@ -54,6 +54,7 @@ import org.apache.gravitino.metrics.MetricNames;
 import org.apache.gravitino.server.authorization.MetadataAuthzHelper;
 import org.apache.gravitino.server.authorization.annotations.AuthorizationExpression;
 import org.apache.gravitino.server.authorization.annotations.AuthorizationMetadata;
+import org.apache.gravitino.server.authorization.annotations.IcebergAuthorizationMetadata;
 import org.apache.gravitino.server.authorization.expression.AuthorizationExpressionConstants;
 import org.apache.gravitino.server.web.Utils;
 import org.apache.iceberg.catalog.Namespace;
@@ -228,7 +229,8 @@ public class IcebergNamespaceOperations {
       accessMetadataType = MetadataObject.Type.CATALOG)
   public Response createNamespace(
       @AuthorizationMetadata(type = Entity.EntityType.CATALOG) @PathParam("prefix") String prefix,
-      CreateNamespaceRequest createNamespaceRequest) {
+      @IcebergAuthorizationMetadata(type = IcebergAuthorizationMetadata.RequestType.CREATE_NAMESPACE)
+          CreateNamespaceRequest createNamespaceRequest) {
     String catalogName = IcebergRESTUtils.getCatalogName(prefix);
     LOG.info(
         "Create Iceberg namespace, catalog: {}, createNamespaceRequest: {}",

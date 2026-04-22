@@ -27,7 +27,9 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import java.lang.reflect.Method;
 import java.lang.reflect.Parameter;
 import java.util.Map;
+import org.apache.gravitino.Configs;
 import org.apache.gravitino.Entity;
+import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.iceberg.service.authorization.IcebergRESTServerContext;
 import org.apache.gravitino.iceberg.service.provider.IcebergConfigProvider;
@@ -37,6 +39,7 @@ import org.apache.iceberg.rest.RESTUtil;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestInstance;
+import org.mockito.MockedStatic;
 import org.mockito.Mockito;
 
 /** Test for {@link IcebergMetadataAuthorizationMethodInterceptor}. */
@@ -163,6 +166,70 @@ public class TestIcebergMetadataAuthorizationMethodInterceptor {
     // Test non-Iceberg exception
     Exception otherException = new RuntimeException("test");
     assertFalse(interceptor.isExceptionPropagate(otherException));
+  }
+
+  @Test
+  public void testExtractNestedSchemaNamespace() throws Exception {
+    IcebergMetadataAuthorizationMethodInterceptor interceptor =
+        new IcebergMetadataAuthorizationMethodInterceptor();
+
+    Method testMethod =
+        TestOperations.class.getMethod(
+            "testTableOperation", String.class, String.class, String.class);
+    Parameter[] parameters = testMethod.getParameters();
+
+    // Namespace "A/B/C" encoded using Iceberg REST convention (%1F as level separator)
+    String encodedNamespace = RESTUtil.encodeNamespace(
+        org.apache.iceberg.catalog.Namespace.of("A", "B", "C"));
+    Object[] args = new Object[] {TEST_CATALOG + "/", encodedNamespace, "my_table"};
+
+    GravitinoEnv mockEnv = Mockito.mock(GravitinoEnv.class);
+    org.apache.gravitino.Config mockConfig = Mockito.mock(org.apache.gravitino.Config.class);
+    Mockito.when(mockConfig.get(Configs.SCHEMA_NAMESPACE_SEPARATOR)).thenReturn(":");
+    Mockito.when(mockEnv.config()).thenReturn(mockConfig);
+
+    try (MockedStatic<GravitinoEnv> mockedStatic = Mockito.mockStatic(GravitinoEnv.class)) {
+      mockedStatic.when(GravitinoEnv::getInstance).thenReturn(mockEnv);
+
+      Map<Entity.EntityType, NameIdentifier> nameIdentifierMap =
+          interceptor.extractNameIdentifierFromParameters(parameters, args);
+
+      NameIdentifier schemaId = nameIdentifierMap.get(Entity.EntityType.SCHEMA);
+      assertNotNull(schemaId);
+      // Expect full logical path, not just the last level
+      assertEquals("A:B:C", schemaId.name());
+    }
+  }
+
+  @Test
+  public void testExtractFlatSchemaNamespace() throws Exception {
+    IcebergMetadataAuthorizationMethodInterceptor interceptor =
+        new IcebergMetadataAuthorizationMethodInterceptor();
+
+    Method testMethod =
+        TestOperations.class.getMethod(
+            "testTableOperation", String.class, String.class, String.class);
+    Parameter[] parameters = testMethod.getParameters();
+
+    String encodedNamespace = RESTUtil.encodeNamespace(
+        org.apache.iceberg.catalog.Namespace.of("my_schema"));
+    Object[] args = new Object[] {TEST_CATALOG + "/", encodedNamespace, "my_table"};
+
+    GravitinoEnv mockEnv = Mockito.mock(GravitinoEnv.class);
+    org.apache.gravitino.Config mockConfig = Mockito.mock(org.apache.gravitino.Config.class);
+    Mockito.when(mockConfig.get(Configs.SCHEMA_NAMESPACE_SEPARATOR)).thenReturn(":");
+    Mockito.when(mockEnv.config()).thenReturn(mockConfig);
+
+    try (MockedStatic<GravitinoEnv> mockedStatic = Mockito.mockStatic(GravitinoEnv.class)) {
+      mockedStatic.when(GravitinoEnv::getInstance).thenReturn(mockEnv);
+
+      Map<Entity.EntityType, NameIdentifier> nameIdentifierMap =
+          interceptor.extractNameIdentifierFromParameters(parameters, args);
+
+      NameIdentifier schemaId = nameIdentifierMap.get(Entity.EntityType.SCHEMA);
+      assertNotNull(schemaId);
+      assertEquals("my_schema", schemaId.name());
+    }
   }
 
   /** Test operations class to provide method annotations for testing. */

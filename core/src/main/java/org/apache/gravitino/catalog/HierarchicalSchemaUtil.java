@@ -106,6 +106,33 @@ public final class HierarchicalSchemaUtil {
   }
 
   /**
+   * Returns the schema name and all its ancestor schema names, ordered from the schema itself to
+   * the outermost ancestor. Returns a single-element list for top-level (non-nested) schemas.
+   *
+   * <p>Example: {@code "A:B:C"} with separator {@code ":"} → {@code ["A:B:C", "A:B", "A"]}
+   *
+   * <p>This is used for privilege inheritance: a privilege on an ancestor schema is inherited by
+   * all descendant schemas.
+   *
+   * @param schemaName the schema name to compute scopes for
+   * @param separator the external separator
+   * @return the schema name and all ancestor names, from most specific to outermost
+   */
+  public static List<String> allScopes(String schemaName, String separator) {
+    Preconditions.checkArgument(StringUtils.isNotBlank(schemaName), "schemaName must not be blank");
+    Preconditions.checkArgument(StringUtils.isNotBlank(separator), "separator must not be blank");
+    List<String> result = new ArrayList<>();
+    result.add(schemaName);
+    String current = schemaName;
+    while (current.contains(separator)) {
+      int lastIdx = current.lastIndexOf(separator);
+      current = current.substring(0, lastIdx);
+      result.add(current);
+    }
+    return result;
+  }
+
+  /**
    * Given a list of schema names and an optional parent, returns only the direct children of that
    * parent (one level deeper). When {@code parent} is empty, returns top-level schemas (names that
    * do not contain the separator).

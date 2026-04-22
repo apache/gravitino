@@ -32,6 +32,7 @@ public @interface IcebergAuthorizationMetadata {
     LOAD_TABLE,
     RENAME_TABLE,
     RENAME_VIEW,
+    CREATE_NAMESPACE,
   }
   /**
    * The type of the parameter to be used for authorization.
