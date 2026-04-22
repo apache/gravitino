@@ -23,9 +23,7 @@ import java.lang.reflect.Parameter;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Optional;
-import org.apache.gravitino.Configs;
 import org.apache.gravitino.Entity.EntityType;
-import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.authorization.AuthorizationRequestContext;
 import org.apache.gravitino.catalog.HierarchicalSchemaUtil;
@@ -68,8 +66,7 @@ public class CreateNamespaceAuthzHandler implements AuthorizationHandler {
     }
     String metalake = catalogId.namespace().level(0);
     String catalog = catalogId.name();
-    String separator =
-        GravitinoEnv.getInstance().config().get(Configs.SCHEMA_NAMESPACE_SEPARATOR);
+    String separator = HierarchicalSchemaUtil.namespaceSeparator();
     String fullPath = String.join(separator, namespace.levels());
 
     // For nested namespaces (e.g., "A:B:C"), check CREATE_SCHEMA on the parent ("A:B").

@@ -22,7 +22,6 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.regex.Pattern;
-import org.apache.gravitino.Configs;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.EntityStore;
 import org.apache.gravitino.GravitinoEnv;
@@ -95,7 +94,7 @@ public class IcebergNamespaceHookDispatcher implements IcebergNamespaceOperation
    * Namespace.of("A")} already exists, this returns {@code [Namespace.of("A","B")]}.
    */
   private List<Namespace> getMissingAncestors(IcebergRequestContext context, Namespace namespace) {
-    String separator = namespaceSeparator();
+    String separator = HierarchicalSchemaUtil.namespaceSeparator();
     String namespaceName = String.join(separator, namespace.levels());
     List<Namespace> missing = new ArrayList<>();
     for (String ancestorName : HierarchicalSchemaUtil.getAncestorNames(namespaceName, separator)) {
@@ -126,7 +125,7 @@ public class IcebergNamespaceHookDispatcher implements IcebergNamespaceOperation
         // Delete the entity for the dropped namespace (schema).
         store.delete(
             IcebergIdentifierUtils.toGravitinoSchemaIdentifier(
-                metalake, context.catalogName(), namespace, namespaceSeparator()),
+                metalake, context.catalogName(), namespace, HierarchicalSchemaUtil.namespaceSeparator()),
             Entity.EntityType.SCHEMA);
       }
     } catch (NoSuchEntityException ignore) {
@@ -180,7 +179,7 @@ public class IcebergNamespaceHookDispatcher implements IcebergNamespaceOperation
       tableDispatcher.loadTable(
           IcebergIdentifierUtils.toGravitinoTableIdentifier(
               metalake, catalogName, TableIdentifier.of(namespace, tableName),
-              namespaceSeparator()));
+              HierarchicalSchemaUtil.namespaceSeparator()));
     }
   }
 
@@ -189,11 +188,8 @@ public class IcebergNamespaceHookDispatcher implements IcebergNamespaceOperation
     if (schemaDispatcher != null) {
       schemaDispatcher.loadSchema(
           IcebergIdentifierUtils.toGravitinoSchemaIdentifier(
-              metalake, catalogName, namespace, namespaceSeparator()));
+              metalake, catalogName, namespace, HierarchicalSchemaUtil.namespaceSeparator()));
     }
   }
 
-  private String namespaceSeparator() {
-    return GravitinoEnv.getInstance().config().get(Configs.SCHEMA_NAMESPACE_SEPARATOR);
-  }
 }

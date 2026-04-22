@@ -34,10 +34,9 @@ import java.util.stream.Collectors;
 import org.apache.commons.lang3.ArrayUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.Catalog;
-import org.apache.gravitino.Configs;
-import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
+import org.apache.gravitino.catalog.HierarchicalSchemaUtil;
 import org.apache.gravitino.SchemaChange;
 import org.apache.gravitino.catalog.lakehouse.iceberg.ops.IcebergCatalogWrapperHelper;
 import org.apache.gravitino.connector.CatalogInfo;
@@ -162,7 +161,7 @@ public class IcebergCatalogOperations
               .listNamespace(IcebergCatalogWrapperHelper.getIcebergNamespace())
               .namespaces();
 
-      String separator = getNamespaceSeparator();
+      String separator = HierarchicalSchemaUtil.namespaceSeparator();
       return namespaces.stream()
           .map(
               icebergNamespace -> {
@@ -210,7 +209,7 @@ public class IcebergCatalogOperations
       icebergCatalogWrapper.createNamespace(
           createdSchema.toCreateRequest(
               IcebergCatalogWrapperHelper.getIcebergNamespaceFromSchemaName(
-                  ident.name(), getNamespaceSeparator())));
+                  ident.name(), HierarchicalSchemaUtil.namespaceSeparator())));
       LOG.info(
           "Created Iceberg schema (database) {} in Iceberg\ncurrentUser:{} \ncomment: {} \nmetadata: {}",
           ident.name(),
@@ -244,7 +243,7 @@ public class IcebergCatalogOperations
       GetNamespaceResponse response =
           icebergCatalogWrapper.loadNamespace(
               IcebergCatalogWrapperHelper.getIcebergNamespaceFromSchemaName(
-                  ident.name(), getNamespaceSeparator()));
+                  ident.name(), HierarchicalSchemaUtil.namespaceSeparator()));
       IcebergSchema icebergSchema =
           IcebergSchema.builder()
               .withName(ident.name())
@@ -279,7 +278,7 @@ public class IcebergCatalogOperations
       GetNamespaceResponse response =
           icebergCatalogWrapper.loadNamespace(
               IcebergCatalogWrapperHelper.getIcebergNamespaceFromSchemaName(
-                  ident.name(), getNamespaceSeparator()));
+                  ident.name(), HierarchicalSchemaUtil.namespaceSeparator()));
       Map<String, String> metadata = response.properties();
       List<String> removals = new ArrayList<>();
       Map<String, String> updates = new HashMap<>();
@@ -315,7 +314,7 @@ public class IcebergCatalogOperations
       UpdateNamespacePropertiesResponse updateNamespacePropertiesResponse =
           icebergCatalogWrapper.updateNamespaceProperties(
               IcebergCatalogWrapperHelper.getIcebergNamespaceFromSchemaName(
-                  ident.name(), getNamespaceSeparator()),
+                  ident.name(), HierarchicalSchemaUtil.namespaceSeparator()),
               updateNamespacePropertiesRequest);
       LOG.info(
           "Altered Iceberg schema (database) {}. UpdateResponse:\n{}",
@@ -344,7 +343,7 @@ public class IcebergCatalogOperations
     try {
       icebergCatalogWrapper.dropNamespace(
           IcebergCatalogWrapperHelper.getIcebergNamespaceFromSchemaName(
-              ident.name(), getNamespaceSeparator()));
+              ident.name(), HierarchicalSchemaUtil.namespaceSeparator()));
       LOG.info("Dropped Iceberg schema (database) {}", ident.name());
       return true;
     } catch (NamespaceNotEmptyException e) {
@@ -378,7 +377,7 @@ public class IcebergCatalogOperations
       ListTablesResponse listTablesResponse =
           icebergCatalogWrapper.listTable(
               IcebergCatalogWrapperHelper.getIcebergNamespaceFromSchemaName(
-                  schemaName, getNamespaceSeparator()));
+                  schemaName, HierarchicalSchemaUtil.namespaceSeparator()));
       return listTablesResponse.identifiers().stream()
           .map(
               tableIdentifier ->
@@ -403,7 +402,7 @@ public class IcebergCatalogOperations
       LoadTableResponse tableResponse =
           icebergCatalogWrapper.loadTable(
               IcebergCatalogWrapperHelper.buildIcebergTableIdentifier(
-                  tableIdent, getNamespaceSeparator()));
+                  tableIdent, HierarchicalSchemaUtil.namespaceSeparator()));
       IcebergTable icebergTable =
           IcebergTable.fromIcebergTable(tableResponse.tableMetadata(), tableIdent.name());
 
@@ -456,7 +455,7 @@ public class IcebergCatalogOperations
       // buildIcebergTableChanges builds the correct multi-level TableIdentifier.
       org.apache.iceberg.catalog.Namespace icebergNs =
           IcebergCatalogWrapperHelper.getIcebergNamespaceFromSchemaName(
-              schemaName, getNamespaceSeparator());
+              schemaName, HierarchicalSchemaUtil.namespaceSeparator());
       NameIdentifier tableIdentForIceberg =
           NameIdentifier.of(
               Namespace.of(icebergNs.levels()), tableIdent.name());
@@ -494,7 +493,7 @@ public class IcebergCatalogOperations
         destNamespace = Namespace.of(destLevels);
       }
 
-      String separator = getNamespaceSeparator();
+      String separator = HierarchicalSchemaUtil.namespaceSeparator();
       RenameTableRequest renameTableRequest =
           RenameTableRequest.builder()
               .withSource(
@@ -522,7 +521,7 @@ public class IcebergCatalogOperations
     try {
       icebergCatalogWrapper.dropTable(
           IcebergCatalogWrapperHelper.buildIcebergTableIdentifier(
-              tableIdent, getNamespaceSeparator()));
+              tableIdent, HierarchicalSchemaUtil.namespaceSeparator()));
       LOG.info("Dropped Iceberg table {}", tableIdent.name());
       return true;
     } catch (org.apache.iceberg.exceptions.NoSuchTableException e) {
@@ -600,7 +599,7 @@ public class IcebergCatalogOperations
       LoadTableResponse loadTableResponse =
           icebergCatalogWrapper.createTable(
               IcebergCatalogWrapperHelper.getIcebergNamespaceFromSchemaName(
-                  schemaIdent.name(), getNamespaceSeparator()),
+                  schemaIdent.name(), HierarchicalSchemaUtil.namespaceSeparator()),
               createdTable.toCreateTableRequest());
       loadTableResponse.validate();
 
@@ -625,7 +624,7 @@ public class IcebergCatalogOperations
       icebergCatalogWrapper.purgeTable(
           TableIdentifier.of(
               IcebergCatalogWrapperHelper.getIcebergNamespaceFromSchemaName(
-                  schema, getNamespaceSeparator()),
+                  schema, HierarchicalSchemaUtil.namespaceSeparator()),
               tableIdent.name()));
       LOG.info("Purge Iceberg table {}", tableIdent.name());
       return true;
@@ -676,7 +675,7 @@ public class IcebergCatalogOperations
       LoadViewResponse response =
           icebergCatalogWrapper.loadView(
               IcebergCatalogWrapperHelper.buildIcebergTableIdentifier(
-                  ident, getNamespaceSeparator()));
+                  ident, HierarchicalSchemaUtil.namespaceSeparator()));
 
       return IcebergView.fromLoadViewResponse(response, ident.name());
     } catch (Exception e) {
@@ -697,9 +696,5 @@ public class IcebergCatalogOperations
 
   private static String currentUser() {
     return PrincipalUtils.getCurrentUserName();
-  }
-
-  private String getNamespaceSeparator() {
-    return GravitinoEnv.getInstance().config().get(Configs.SCHEMA_NAMESPACE_SEPARATOR);
   }
 }

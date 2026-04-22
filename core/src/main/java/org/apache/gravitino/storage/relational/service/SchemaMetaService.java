@@ -539,16 +539,12 @@ public class SchemaMetaService {
   // Helpers: logical ↔ physical schema name conversion at the PO boundary
   // ---------------------------------------------------------------------------
 
-  private String namespaceSeparator() {
-    return GravitinoEnv.getInstance().config().get(Configs.SCHEMA_NAMESPACE_SEPARATOR);
-  }
-
   /**
    * Converts a logical schema name (e.g. {@code "A:B:C"}) to the physical dot-separated form
    * (e.g. {@code "A.B.C"}) used in the database. Non-nested names are returned unchanged.
    */
   private String toPhysicalSchemaName(String logicalName) {
-    return HierarchicalSchemaUtil.logicalToPhysical(logicalName, namespaceSeparator());
+    return HierarchicalSchemaUtil.logicalToPhysical(logicalName, HierarchicalSchemaUtil.namespaceSeparator());
   }
 
   /**
@@ -556,7 +552,7 @@ public class SchemaMetaService {
    * (e.g. {@code "A:B:C"}). Non-nested names are returned unchanged.
    */
   private String toLogicalSchemaName(String physicalName) {
-    return HierarchicalSchemaUtil.physicalToLogical(physicalName, namespaceSeparator());
+    return HierarchicalSchemaUtil.physicalToLogical(physicalName, HierarchicalSchemaUtil.namespaceSeparator());
   }
 
   /**
@@ -597,7 +593,7 @@ public class SchemaMetaService {
    * the physical dot-separated form. Otherwise the original entity is returned unchanged.
    */
   private SchemaEntity toPhysicalEntity(SchemaEntity entity) {
-    String separator = namespaceSeparator();
+    String separator = HierarchicalSchemaUtil.namespaceSeparator();
     if (!HierarchicalSchemaUtil.isNested(entity.name(), separator)) {
       return entity;
     }

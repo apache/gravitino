@@ -22,7 +22,6 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
-import org.apache.gravitino.Configs;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.NameIdentifier;
@@ -90,8 +89,7 @@ public class SchemaHookDispatcher implements SchemaDispatcher {
    * comment and properties.
    */
   private List<NameIdentifier> createMissingParents(NameIdentifier ident) {
-    String separator =
-        GravitinoEnv.getInstance().config().get(Configs.SCHEMA_NAMESPACE_SEPARATOR);
+    String separator = HierarchicalSchemaUtil.namespaceSeparator();
     List<String> ancestorNames = HierarchicalSchemaUtil.getAncestorNames(ident.name(), separator);
     if (ancestorNames.isEmpty()) {
       return Collections.emptyList();

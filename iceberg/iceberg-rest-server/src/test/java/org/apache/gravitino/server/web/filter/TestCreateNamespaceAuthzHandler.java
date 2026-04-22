@@ -89,8 +89,7 @@ public class TestCreateNamespaceAuthzHandler {
           public void process(Map<EntityType, NameIdentifier> nameIdentifierMap) {
             // Only run parent injection; skip performAuthorization
             Namespace ns = ((CreateNamespaceRequest) args[0]).namespace();
-            String sep =
-                GravitinoEnv.getInstance().config().get(Configs.SCHEMA_NAMESPACE_SEPARATOR);
+            String sep = org.apache.gravitino.catalog.HierarchicalSchemaUtil.namespaceSeparator();
             NameIdentifier catalogId = nameIdentifierMap.get(EntityType.CATALOG);
             String metalake = catalogId.namespace().level(0);
             String catalog = catalogId.name();

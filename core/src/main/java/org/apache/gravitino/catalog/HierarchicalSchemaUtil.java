@@ -23,6 +23,8 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.gravitino.Configs;
+import org.apache.gravitino.GravitinoEnv;
 
 /**
  * Utility class for hierarchical schema name conversions.
@@ -40,6 +42,16 @@ public final class HierarchicalSchemaUtil {
   private static final String PHYSICAL_SEPARATOR = ".";
 
   private HierarchicalSchemaUtil() {}
+
+  /**
+   * Returns the configured external namespace separator from the server configuration. All code
+   * that needs the separator should use this method instead of reading the config directly.
+   *
+   * @return the configured separator string (default {@code ":"})
+   */
+  public static String namespaceSeparator() {
+    return GravitinoEnv.getInstance().config().get(Configs.SCHEMA_NAMESPACE_SEPARATOR);
+  }
 
   /**
    * Converts a logical schema path (using the external separator) to a physical schema name (using

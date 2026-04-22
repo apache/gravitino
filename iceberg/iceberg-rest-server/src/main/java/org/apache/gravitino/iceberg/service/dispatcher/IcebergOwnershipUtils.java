@@ -18,11 +18,10 @@
  */
 package org.apache.gravitino.iceberg.service.dispatcher;
 
-import org.apache.gravitino.Configs;
 import org.apache.gravitino.Entity;
-import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.authorization.Owner;
 import org.apache.gravitino.authorization.OwnerDispatcher;
+import org.apache.gravitino.catalog.HierarchicalSchemaUtil;
 import org.apache.gravitino.iceberg.common.utils.IcebergIdentifierUtils;
 import org.apache.gravitino.utils.NameIdentifierUtil;
 import org.apache.iceberg.catalog.Namespace;
@@ -56,7 +55,7 @@ public class IcebergOwnershipUtils {
           metalake,
           NameIdentifierUtil.toMetadataObject(
               IcebergIdentifierUtils.toGravitinoSchemaIdentifier(
-                  metalake, catalogName, namespace, namespaceSeparator()),
+                  metalake, catalogName, namespace, HierarchicalSchemaUtil.namespaceSeparator()),
               Entity.EntityType.SCHEMA),
           user,
           Owner.Type.USER);
@@ -86,7 +85,7 @@ public class IcebergOwnershipUtils {
           NameIdentifierUtil.toMetadataObject(
               IcebergIdentifierUtils.toGravitinoTableIdentifier(
                   metalake, catalogName, TableIdentifier.of(namespace, tableName),
-                  namespaceSeparator()),
+                  HierarchicalSchemaUtil.namespaceSeparator()),
               Entity.EntityType.TABLE),
           user,
           Owner.Type.USER);
@@ -116,14 +115,11 @@ public class IcebergOwnershipUtils {
           NameIdentifierUtil.toMetadataObject(
               IcebergIdentifierUtils.toGravitinoTableIdentifier(
                   metalake, catalogName, TableIdentifier.of(namespace, viewName),
-                  namespaceSeparator()),
+                  HierarchicalSchemaUtil.namespaceSeparator()),
               Entity.EntityType.VIEW),
           user,
           Owner.Type.USER);
     }
   }
 
-  private static String namespaceSeparator() {
-    return GravitinoEnv.getInstance().config().get(Configs.SCHEMA_NAMESPACE_SEPARATOR);
-  }
 }

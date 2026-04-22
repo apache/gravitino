@@ -23,10 +23,8 @@ import java.lang.reflect.Parameter;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Optional;
-import org.apache.gravitino.Configs;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.Entity.EntityType;
-import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.catalog.HierarchicalSchemaUtil;
 import org.apache.gravitino.iceberg.service.IcebergRESTUtils;
@@ -73,8 +71,7 @@ public class IcebergMetadataAuthorizationMethodInterceptor
           break;
         case SCHEMA:
           rawNamespace = RESTUtil.decodeNamespace(value);
-          String separator =
-              GravitinoEnv.getInstance().config().get(Configs.SCHEMA_NAMESPACE_SEPARATOR);
+          String separator = HierarchicalSchemaUtil.namespaceSeparator();
           schema = String.join(separator, rawNamespace.levels());
           nameIdentifierMap.put(
               Entity.EntityType.SCHEMA, NameIdentifierUtil.ofSchema(metalakeName, catalog, schema));

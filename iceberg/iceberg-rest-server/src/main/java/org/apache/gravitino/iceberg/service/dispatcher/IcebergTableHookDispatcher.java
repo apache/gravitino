@@ -21,11 +21,11 @@ package org.apache.gravitino.iceberg.service.dispatcher;
 import java.io.IOException;
 import java.time.Instant;
 import java.util.Optional;
-import org.apache.gravitino.Configs;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.EntityStore;
 import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.NameIdentifier;
+import org.apache.gravitino.catalog.HierarchicalSchemaUtil;
 import org.apache.gravitino.catalog.TableDispatcher;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.iceberg.common.utils.IcebergIdentifierUtils;
@@ -89,7 +89,7 @@ public class IcebergTableHookDispatcher implements IcebergTableOperationDispatch
         // Delete the entity for the dropped table.
         store.delete(
             IcebergIdentifierUtils.toGravitinoTableIdentifier(
-                metalake, context.catalogName(), tableIdentifier, namespaceSeparator()),
+                metalake, context.catalogName(), tableIdentifier, HierarchicalSchemaUtil.namespaceSeparator()),
             Entity.EntityType.TABLE);
       }
     } catch (NoSuchEntityException ignore) {
@@ -118,7 +118,7 @@ public class IcebergTableHookDispatcher implements IcebergTableOperationDispatch
   @Override
   public void renameTable(IcebergRequestContext context, RenameTableRequest renameTableRequest) {
     dispatcher.renameTable(context, renameTableRequest);
-    String separator = namespaceSeparator();
+    String separator = HierarchicalSchemaUtil.namespaceSeparator();
     NameIdentifier tableSource =
         IcebergIdentifierUtils.toGravitinoTableIdentifier(
             metalake, context.catalogName(), renameTableRequest.source(), separator);
@@ -194,11 +194,8 @@ public class IcebergTableHookDispatcher implements IcebergTableOperationDispatch
       tableDispatcher.loadTable(
           IcebergIdentifierUtils.toGravitinoTableIdentifier(
               metalake, catalogName, TableIdentifier.of(namespace, tableName),
-              namespaceSeparator()));
+              HierarchicalSchemaUtil.namespaceSeparator()));
     }
   }
 
-  private String namespaceSeparator() {
-    return GravitinoEnv.getInstance().config().get(Configs.SCHEMA_NAMESPACE_SEPARATOR);
-  }
 }

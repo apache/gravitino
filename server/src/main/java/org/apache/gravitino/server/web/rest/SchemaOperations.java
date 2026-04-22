@@ -40,9 +40,7 @@ import javax.ws.rs.core.Context;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 import org.apache.commons.lang3.StringUtils;
-import org.apache.gravitino.Configs;
 import org.apache.gravitino.Entity;
-import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
@@ -278,8 +276,7 @@ public class SchemaOperations {
    */
   private NameIdentifier[] filterByParentSchema(
       NameIdentifier[] idents, String parentSchema) {
-    String separator =
-        GravitinoEnv.getInstance().config().get(Configs.SCHEMA_NAMESPACE_SEPARATOR);
+    String separator = HierarchicalSchemaUtil.namespaceSeparator();
 
     List<String> allNames = new ArrayList<>(idents.length);
     for (NameIdentifier ident : idents) {
