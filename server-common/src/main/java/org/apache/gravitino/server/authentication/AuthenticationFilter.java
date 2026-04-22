@@ -55,6 +55,13 @@ public class AuthenticationFilter implements Filter {
   @Override
   public void doFilter(ServletRequest request, ServletResponse response, FilterChain chain)
       throws IOException, ServletException {
+    // Health check endpoints must be reachable without credentials so that Kubernetes
+    // probes, load balancers, and global traffic managers can monitor server availability.
+    // See org.apache.gravitino.server.web.rest.HealthOperations.
+    if (isHealthCheckRequest(request)) {
+      chain.doFilter(request, response);
+      return;
+    }
     try {
       List<Authenticator> authenticators;
       if (filterAuthenticators == null || filterAuthenticators.isEmpty()) {
@@ -123,6 +130,19 @@ public class AuthenticationFilter implements Filter {
             ? HttpServletResponse.SC_UNAUTHORIZED
             : HttpServletResponse.SC_INTERNAL_SERVER_ERROR;
     response.sendError(status, exception.getMessage());
+  }
+
+  private static boolean isHealthCheckRequest(ServletRequest request) {
+    if (!(request instanceof HttpServletRequest)) {
+      return false;
+    }
+    String path = ((HttpServletRequest) request).getRequestURI();
+    if (path == null) {
+      return false;
+    }
+    return path.equals("/api/health")
+        || path.equals("/api/health/")
+        || path.startsWith("/api/health/");
   }
 
   @Override
