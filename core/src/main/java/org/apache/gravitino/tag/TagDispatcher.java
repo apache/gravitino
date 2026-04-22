@@ -21,6 +21,7 @@ package org.apache.gravitino.tag;
 import java.util.Map;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.exceptions.NoSuchTagException;
+import org.apache.gravitino.exceptions.TagAlreadyExistsException;
 
 /**
  * {@code TagDispatcher} interface provides functionalities for managing tags within a metalake. It
