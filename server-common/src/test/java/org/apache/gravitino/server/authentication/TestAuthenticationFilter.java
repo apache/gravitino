@@ -126,7 +126,17 @@ public class TestAuthenticationFilter {
   @Test
   public void testDoFilterBypassesAuthenticationForHealthEndpoints()
       throws ServletException, IOException {
-    String[] healthPaths = {"/api/health", "/api/health/", "/api/health/live", "/api/health/ready"};
+    // /health, /health/live, /health/ready are root-level aliases; during a Jetty forward
+    // getRequestURI() returns the original URI so the bypass must also match /health/* directly.
+    String[] healthPaths = {
+      "/health",
+      "/health/live",
+      "/health/ready",
+      "/api/health",
+      "/api/health/",
+      "/api/health/live",
+      "/api/health/ready"
+    };
     for (String path : healthPaths) {
       Authenticator authenticator = mock(Authenticator.class);
       AuthenticationFilter filter = new AuthenticationFilter(Lists.newArrayList(authenticator));

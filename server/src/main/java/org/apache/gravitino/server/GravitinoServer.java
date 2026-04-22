@@ -177,11 +177,9 @@ public class GravitinoServer extends ResourceConfig {
     Servlet configServlet = new ConfigServlet(serverConfig);
     server.addServlet(configServlet, "/configs");
 
-    // Root-level health aliases for enterprise GTMs that require well-known paths.
-    // These forward to the canonical /api/health endpoint.
-    Servlet healthAlias = new HealthAliasServlet();
-    server.addServlet(healthAlias, "/health");
-    server.addServlet(new HealthAliasServlet(), "/health.html");
+    // Root-level alias for enterprise GTMs that require probes at well-known root paths.
+    // Forwards /health, /health/live, /health/ready to the canonical /api/health/* endpoints.
+    server.addServlet(new HealthAliasServlet(), "/health/*");
 
     server.addCustomFilters(API_ANY_PATH);
     server.addFilter(new VersioningFilter(), API_ANY_PATH);

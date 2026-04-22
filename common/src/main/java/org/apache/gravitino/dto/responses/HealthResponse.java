@@ -18,6 +18,7 @@
  */
 package org.apache.gravitino.dto.responses;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.google.common.base.Preconditions;
 import java.util.Collections;
@@ -67,7 +68,6 @@ public class HealthResponse extends BaseResponse {
   public void validate() throws IllegalArgumentException {
     super.validate();
     Preconditions.checkArgument(status != null, "status must be non-null");
-    Preconditions.checkArgument(checks != null, "checks must be non-null");
   }
 
   /**
@@ -75,6 +75,7 @@ public class HealthResponse extends BaseResponse {
    *
    * @return true if the aggregate status is UP, false otherwise
    */
+  @JsonIgnore
   public boolean isUp() {
     return status == HealthCheckDTO.Status.UP;
   }

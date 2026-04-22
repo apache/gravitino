@@ -26,31 +26,24 @@ import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 
 /**
- * Serves root-level health check paths ({@code /health}, {@code /health.html}) by forwarding to the
- * canonical {@code /api/health} endpoint.
+ * Serves root-level health paths ({@code /health}, {@code /health/live}, {@code /health/ready}) by
+ * forwarding to the canonical {@code /api/health/*} endpoints.
  *
- * <p>These aliases exist for compatibility with enterprise global traffic managers that require
- * probes at well-known root paths. The canonical implementation remains at {@code /api/health};
- * these servlets are a thin compatibility layer.
+ * <p>This alias exists for compatibility with enterprise global traffic managers that require
+ * probes at well-known root paths. The canonical implementation remains at {@code /api/health}.
  */
 public class HealthAliasServlet extends HttpServlet {
-
-  private static final String CANONICAL_HEALTH_PATH = "/api/health";
 
   @Override
   protected void doGet(HttpServletRequest req, HttpServletResponse resp)
       throws ServletException, IOException {
-    RequestDispatcher dispatcher = req.getRequestDispatcher(CANONICAL_HEALTH_PATH);
+    // Prepend /api to the incoming path: /health → /api/health, /health/live → /api/health/live
+    String targetPath = "/api" + req.getRequestURI();
+    RequestDispatcher dispatcher = req.getRequestDispatcher(targetPath);
     if (dispatcher == null) {
       resp.sendError(HttpServletResponse.SC_SERVICE_UNAVAILABLE, "health dispatcher unavailable");
       return;
     }
     dispatcher.forward(req, resp);
-  }
-
-  @Override
-  protected void doHead(HttpServletRequest req, HttpServletResponse resp)
-      throws ServletException, IOException {
-    doGet(req, resp);
   }
 }

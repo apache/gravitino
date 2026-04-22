@@ -48,6 +48,15 @@ security:
   - BasicAuth: []
 
 paths:
+  /health:
+    $ref: "./health.yaml#/paths/~1health"
+
+  /health/live:
+    $ref: "./health.yaml#/paths/~1health~1live"
+
+  /health/ready:
+    $ref: "./health.yaml#/paths/~1health~1ready"
+
   /metalakes:
     # escape the path name by replacing `/` with `~1`
     $ref: "./metalakes.yaml#/paths/~1metalakes"

@@ -23,13 +23,17 @@ import com.codahale.metrics.annotation.Timed;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collections;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.LinkedBlockingQueue;
+import java.util.concurrent.RejectedExecutionException;
+import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
+import java.util.concurrent.atomic.AtomicInteger;
 import javax.servlet.http.HttpServlet;
 import javax.ws.rs.GET;
 import javax.ws.rs.Path;
@@ -43,6 +47,7 @@ import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.dto.HealthCheckDTO;
 import org.apache.gravitino.dto.responses.HealthResponse;
 import org.apache.gravitino.metrics.MetricNames;
+import org.apache.gravitino.server.ServerConfig;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -65,7 +70,22 @@ public class HealthOperations extends HttpServlet {
 
   private static final Logger LOG = LoggerFactory.getLogger(HealthOperations.class);
 
-  private static final long ENTITY_STORE_PROBE_TIMEOUT_MS = 2000L;
+  private static final AtomicInteger PROBE_THREAD_COUNTER = new AtomicInteger();
+
+  private static final ExecutorService HEALTH_PROBE_EXECUTOR =
+      new ThreadPoolExecutor(
+          1,
+          4,
+          60L,
+          TimeUnit.SECONDS,
+          new LinkedBlockingQueue<>(20),
+          r -> {
+            Thread t = new Thread(r, "health-probe-" + PROBE_THREAD_COUNTER.incrementAndGet());
+            t.setDaemon(true);
+            return t;
+          },
+          new ThreadPoolExecutor.AbortPolicy());
+
   private static final String HEALTH_PROBE_SENTINEL = "gravitino_health_probe";
 
   private static final String CHECK_HTTP_SERVER = "httpServer";
@@ -124,8 +144,10 @@ public class HealthOperations extends HttpServlet {
       return down(CHECK_ENTITY_STORE, "reason", "entity store not initialized");
     }
 
+    long timeoutMs = getProbeTimeoutMs();
+    CompletableFuture<Boolean> future;
     try {
-      CompletableFuture<Boolean> future =
+      future =
           CompletableFuture.supplyAsync(
               () -> {
                 try {
@@ -134,23 +156,37 @@ public class HealthOperations extends HttpServlet {
                 } catch (IOException e) {
                   throw new RuntimeException(e);
                 }
-              });
-      future.get(ENTITY_STORE_PROBE_TIMEOUT_MS, TimeUnit.MILLISECONDS);
+              },
+              HEALTH_PROBE_EXECUTOR);
+    } catch (RejectedExecutionException e) {
+      LOG.warn("Entity store probe rejected — health executor queue full");
+      return down(CHECK_ENTITY_STORE, "reason", "probe-rejected");
+    }
+
+    try {
+      future.get(timeoutMs, TimeUnit.MILLISECONDS);
       return up(CHECK_ENTITY_STORE, Collections.emptyMap());
+
     } catch (TimeoutException e) {
-      LOG.warn("Entity store probe timed out after {}ms", ENTITY_STORE_PROBE_TIMEOUT_MS);
+      future.cancel(true);
+      LOG.warn("Entity store probe timed out after {}ms", timeoutMs);
       return down(CHECK_ENTITY_STORE, "reason", "timeout");
+
+    } catch (InterruptedException e) {
+      future.cancel(true);
+      Thread.currentThread().interrupt();
+      LOG.warn("Entity store probe interrupted");
+      return down(CHECK_ENTITY_STORE, "reason", "interrupted");
+
     } catch (ExecutionException e) {
-      // Unwrap the RuntimeException we used inside supplyAsync to tunnel checked IOException.
-      Throwable cause = e.getCause();
-      if (cause instanceof RuntimeException && cause.getCause() instanceof IOException) {
+      Throwable cause = e.getCause() != null ? e.getCause() : e;
+      // Unwrap RuntimeException wrappers introduced by supplyAsync tunneling checked exceptions.
+      if (cause instanceof RuntimeException && cause.getCause() != null) {
         cause = cause.getCause();
-      }
-      if (cause == null) {
-        cause = e;
       }
       LOG.warn("Entity store probe failed: {}", cause.toString());
       return down(CHECK_ENTITY_STORE, "reason", cause.getClass().getSimpleName());
+
     } catch (Exception e) {
       LOG.warn("Entity store probe encountered unexpected error", e);
       return down(CHECK_ENTITY_STORE, "reason", e.getClass().getSimpleName());
@@ -167,14 +203,24 @@ public class HealthOperations extends HttpServlet {
     }
   }
 
+  /** Visible for testing — subclasses override to inject a custom timeout. */
+  long getProbeTimeoutMs() {
+    try {
+      return GravitinoEnv.getInstance()
+          .config()
+          .get(ServerConfig.HEALTH_ENTITY_STORE_PROBE_TIMEOUT_MS);
+    } catch (Exception e) {
+      return ServerConfig.HEALTH_ENTITY_STORE_PROBE_TIMEOUT_MS.getDefaultValue();
+    }
+  }
+
   private static HealthCheckDTO up(String name, Map<String, String> details) {
     return new HealthCheckDTO(name, HealthCheckDTO.Status.UP, details);
   }
 
   private static HealthCheckDTO down(String name, String detailKey, String detailValue) {
-    Map<String, String> details = new HashMap<>(1);
-    details.put(detailKey, detailValue);
-    return new HealthCheckDTO(name, HealthCheckDTO.Status.DOWN, details);
+    return new HealthCheckDTO(
+        name, HealthCheckDTO.Status.DOWN, Collections.singletonMap(detailKey, detailValue));
   }
 
   private static Response ok(HealthResponse body) {

@@ -1,0 +1,168 @@
+# Licensed to the Apache Software Foundation (ASF) under one
+# or more contributor license agreements.  See the NOTICE file
+# distributed with this work for additional information
+# regarding copyright ownership.  The ASF licenses this file
+# to you under the Apache License, Version 2.0 (the
+# "License"); you may not use this file except in compliance
+# with the License.  You may obtain a copy of the License at
+#
+#   http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing,
+# software distributed under the License is distributed on an
+# "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+# KIND, either express or implied.  See the License for the
+# specific language governing permissions and limitations
+# under the License.
+
+
+---
+
+paths:
+  /health:
+    get:
+      tags:
+        - health
+      summary: Aggregate health
+      operationId: aggregateHealth
+      description: >
+        Returns aggregate health status combining liveness and readiness checks.
+        Returns 200 when all checks pass; 503 when any check fails.
+        This endpoint is exempt from authentication so probes can reach it without credentials.
+      security: []
+      responses:
+        "200":
+          $ref: "#/components/responses/HealthResponse"
+        "503":
+          $ref: "#/components/responses/HealthResponse"
+        "4XX":
+          $ref: "./openapi.yaml#/components/responses/BadRequestErrorResponse"
+        "5xx":
+          $ref: "./openapi.yaml#/components/responses/ServerErrorResponse"
+
+  /health/live:
+    get:
+      tags:
+        - health
+      summary: Liveness check
+      operationId: livenessCheck
+      description: >
+        Returns 200 as long as the HTTP server thread can respond.
+        Use this for Kubernetes liveness probes to determine whether to restart a pod.
+        This endpoint is exempt from authentication so probes can reach it without credentials.
+      security: []
+      responses:
+        "200":
+          $ref: "#/components/responses/HealthResponse"
+        "4XX":
+          $ref: "./openapi.yaml#/components/responses/BadRequestErrorResponse"
+        "5xx":
+          $ref: "./openapi.yaml#/components/responses/ServerErrorResponse"
+
+  /health/ready:
+    get:
+      tags:
+        - health
+      summary: Readiness check
+      operationId: readinessCheck
+      description: >
+        Returns 200 when the entity store is reachable within the configured probe timeout.
+        Returns 503 when the entity store is unavailable or slow.
+        Use this for Kubernetes readiness probes to control traffic routing.
+        This endpoint is exempt from authentication so probes can reach it without credentials.
+      security: []
+      responses:
+        "200":
+          $ref: "#/components/responses/HealthResponse"
+        "503":
+          $ref: "#/components/responses/HealthResponse"
+        "4XX":
+          $ref: "./openapi.yaml#/components/responses/BadRequestErrorResponse"
+        "5xx":
+          $ref: "./openapi.yaml#/components/responses/ServerErrorResponse"
+
+components:
+  responses:
+    HealthResponse:
+      description: Health check result
+      content:
+        application/vnd.gravitino.v1+json:
+          schema:
+            $ref: "#/components/schemas/HealthResponse"
+          examples:
+            HealthUp:
+              $ref: "#/components/examples/HealthUp"
+            HealthDown:
+              $ref: "#/components/examples/HealthDown"
+
+  schemas:
+    HealthResponse:
+      type: object
+      required:
+        - code
+        - status
+        - checks
+      properties:
+        code:
+          type: integer
+          description: Response code, 0 for success
+          example: 0
+        status:
+          type: string
+          enum:
+            - UP
+            - DOWN
+          description: Aggregate health status
+        checks:
+          type: array
+          description: Per-component check results
+          items:
+            $ref: "#/components/schemas/HealthCheck"
+
+    HealthCheck:
+      type: object
+      required:
+        - name
+        - status
+      properties:
+        name:
+          type: string
+          description: Name of the component being checked
+          example: entityStore
+        status:
+          type: string
+          enum:
+            - UP
+            - DOWN
+          description: Status of the component
+        details:
+          type: object
+          additionalProperties:
+            type: string
+          description: Optional diagnostic details about the check result
+
+  examples:
+    HealthUp:
+      value:
+        code: 0
+        status: UP
+        checks:
+          - name: httpServer
+            status: UP
+            details: {}
+          - name: entityStore
+            status: UP
+            details: {}
+
+    HealthDown:
+      value:
+        code: 0
+        status: DOWN
+        checks:
+          - name: httpServer
+            status: UP
+            details: {}
+          - name: entityStore
+            status: DOWN
+            details:
+              reason: timeout

@@ -35,6 +35,15 @@ public class ServerConfig extends Config {
           .checkValue(value -> value > 0, ConfigConstants.POSITIVE_NUMBER_ERROR_MSG)
           .createWithDefault(3 * 1000);
 
+  public static final ConfigEntry<Long> HEALTH_ENTITY_STORE_PROBE_TIMEOUT_MS =
+      new ConfigBuilder("gravitino.server.health.entityStore.probeTimeoutMs")
+          .doc(
+              "Timeout in milliseconds for the entity-store liveness probe used by health endpoints")
+          .version(ConfigConstants.VERSION_1_3_0)
+          .longConf()
+          .checkValue(value -> value > 0, ConfigConstants.POSITIVE_NUMBER_ERROR_MSG)
+          .createWithDefault(2000L);
+
   public ServerConfig(boolean loadDefaults) {
     super(loadDefaults);
   }

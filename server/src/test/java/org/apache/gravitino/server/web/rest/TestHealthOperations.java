@@ -20,9 +20,11 @@ package org.apache.gravitino.server.web.rest;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.IOException;
+import java.util.concurrent.CountDownLatch;
 import javax.ws.rs.core.Response;
 import org.apache.gravitino.EntityStore;
 import org.apache.gravitino.dto.HealthCheckDTO;
@@ -33,10 +35,19 @@ import org.mockito.Mockito;
 public class TestHealthOperations {
 
   private HealthOperations newOps(EntityStore store) {
+    return newOps(store, 2000L);
+  }
+
+  private HealthOperations newOps(EntityStore store, long probeTimeoutMs) {
     return new HealthOperations() {
       @Override
       EntityStore getEntityStore() {
         return store;
+      }
+
+      @Override
+      long getProbeTimeoutMs() {
+        return probeTimeoutMs;
       }
     };
   }
@@ -107,5 +118,32 @@ public class TestHealthOperations {
     HealthResponse body = (HealthResponse) response.getEntity();
     assertEquals(HealthCheckDTO.Status.DOWN, body.getStatus());
     assertEquals(2, body.getChecks().size());
+  }
+
+  @Test
+  public void testReadyReturns503WhenEntityStoreTimesOut() throws IOException {
+    // Use a latch that is never released so the probe blocks indefinitely.
+    // This avoids the flakiness of a fixed sleep that could race on a loaded CI host.
+    CountDownLatch neverReleased = new CountDownLatch(1);
+    EntityStore store = Mockito.mock(EntityStore.class);
+    Mockito.when(store.exists(Mockito.any(), Mockito.any()))
+        .thenAnswer(
+            invocation -> {
+              neverReleased.await();
+              return false;
+            });
+    HealthOperations ops = newOps(store, 100L);
+    Response response = ops.ready();
+    assertEquals(503, response.getStatus());
+    HealthResponse body = (HealthResponse) response.getEntity();
+    assertEquals(HealthCheckDTO.Status.DOWN, body.getStatus());
+    assertEquals("timeout", body.getChecks().get(0).getDetails().get("reason"));
+    neverReleased.countDown();
+  }
+
+  @Test
+  public void testValidateThrowsWhenStatusIsNull() {
+    HealthResponse response = new HealthResponse();
+    assertThrows(IllegalArgumentException.class, response::validate);
   }
 }
