@@ -35,6 +35,24 @@ public class GlueTypeConverter implements DataTypeConverter<String, String> {
 
   public static final GlueTypeConverter CONVERTER = new GlueTypeConverter();
 
+  static final String BOOLEAN = "boolean";
+  static final String TINYINT = "tinyint";
+  static final String SMALLINT = "smallint";
+  static final String INT = "int";
+  static final String INTEGER = "integer";
+  static final String BIGINT = "bigint";
+  static final String FLOAT = "float";
+  static final String DOUBLE = "double";
+  static final String STRING = "string";
+  static final String DATE = "date";
+  static final String TIMESTAMP = "timestamp";
+  static final String BINARY = "binary";
+  static final String INTERVAL_YEAR_MONTH = "interval_year_month";
+  static final String INTERVAL_DAY_TIME = "interval_day_time";
+  static final String CHAR = "char";
+  static final String VARCHAR = "varchar";
+  static final String DECIMAL = "decimal";
+
   @Override
   public Type toGravitino(String glueType) {
     if (glueType == null || glueType.isEmpty()) {
@@ -43,59 +61,60 @@ public class GlueTypeConverter implements DataTypeConverter<String, String> {
     String lower = glueType.trim().toLowerCase(ROOT);
 
     switch (lower) {
-      case "boolean":
+      case BOOLEAN:
         return Types.BooleanType.get();
-      case "tinyint":
+      case TINYINT:
         return Types.ByteType.get();
-      case "smallint":
+      case SMALLINT:
         return Types.ShortType.get();
-      case "int":
-      case "integer":
+      case INT:
+      case INTEGER:
         return Types.IntegerType.get();
-      case "bigint":
+      case BIGINT:
         return Types.LongType.get();
-      case "float":
+      case FLOAT:
         return Types.FloatType.get();
-      case "double":
+      case DOUBLE:
         return Types.DoubleType.get();
-      case "string":
+      case STRING:
         return Types.StringType.get();
-      case "date":
+      case DATE:
         return Types.DateType.get();
-      case "timestamp":
+      case TIMESTAMP:
         return Types.TimestampType.withoutTimeZone();
-      case "binary":
+      case BINARY:
         return Types.BinaryType.get();
-      case "interval_year_month":
+      case INTERVAL_YEAR_MONTH:
         return Types.IntervalYearType.get();
-      case "interval_day_time":
+      case INTERVAL_DAY_TIME:
         return Types.IntervalDayType.get();
       default:
         break;
     }
 
     // char(N)
-    if (lower.startsWith("char(") && lower.endsWith(")")) {
+    if (lower.startsWith(CHAR + "(") && lower.endsWith(")")) {
       try {
-        int length = Integer.parseInt(lower.substring(5, lower.length() - 1).trim());
+        int length = Integer.parseInt(lower.substring(CHAR.length() + 1, lower.length() - 1).trim());
         return Types.FixedCharType.of(length);
       } catch (NumberFormatException e) {
         return Types.ExternalType.of(glueType);
       }
     }
     // varchar(N)
-    if (lower.startsWith("varchar(") && lower.endsWith(")")) {
+    if (lower.startsWith(VARCHAR + "(") && lower.endsWith(")")) {
       try {
-        int length = Integer.parseInt(lower.substring(8, lower.length() - 1).trim());
+        int length =
+            Integer.parseInt(lower.substring(VARCHAR.length() + 1, lower.length() - 1).trim());
         return Types.VarCharType.of(length);
       } catch (NumberFormatException e) {
         return Types.ExternalType.of(glueType);
       }
     }
     // decimal(P,S) or decimal(P, S)
-    if (lower.startsWith("decimal(") && lower.endsWith(")")) {
+    if (lower.startsWith(DECIMAL + "(") && lower.endsWith(")")) {
       try {
-        String inner = lower.substring(8, lower.length() - 1);
+        String inner = lower.substring(DECIMAL.length() + 1, lower.length() - 1);
         String[] parts = inner.split(",", 2);
         int precision = Integer.parseInt(parts[0].trim());
         int scale = parts.length > 1 ? Integer.parseInt(parts[1].trim()) : 0;
@@ -112,15 +131,15 @@ public class GlueTypeConverter implements DataTypeConverter<String, String> {
 
   @Override
   public String fromGravitino(Type type) {
-    if (type instanceof Types.BooleanType) return "boolean";
-    if (type instanceof Types.ByteType) return "tinyint";
-    if (type instanceof Types.ShortType) return "smallint";
-    if (type instanceof Types.IntegerType) return "int";
-    if (type instanceof Types.LongType) return "bigint";
-    if (type instanceof Types.FloatType) return "float";
-    if (type instanceof Types.DoubleType) return "double";
-    if (type instanceof Types.StringType) return "string";
-    if (type instanceof Types.DateType) return "date";
+    if (type instanceof Types.BooleanType) return BOOLEAN;
+    if (type instanceof Types.ByteType) return TINYINT;
+    if (type instanceof Types.ShortType) return SMALLINT;
+    if (type instanceof Types.IntegerType) return INT;
+    if (type instanceof Types.LongType) return BIGINT;
+    if (type instanceof Types.FloatType) return FLOAT;
+    if (type instanceof Types.DoubleType) return DOUBLE;
+    if (type instanceof Types.StringType) return STRING;
+    if (type instanceof Types.DateType) return DATE;
     if (type instanceof Types.TimestampType) {
       // Glue/Hive timestamps are timezoneless; see:
       // https://cwiki.apache.org/confluence/display/hive/languagemanual+types
@@ -131,20 +150,20 @@ public class GlueTypeConverter implements DataTypeConverter<String, String> {
                 + type
                 + ". Glue/Hive does not support TIMESTAMP WITH TIME ZONE.");
       }
-      return "timestamp";
+      return TIMESTAMP;
     }
-    if (type instanceof Types.BinaryType) return "binary";
-    if (type instanceof Types.IntervalYearType) return "interval_year_month";
-    if (type instanceof Types.IntervalDayType) return "interval_day_time";
+    if (type instanceof Types.BinaryType) return BINARY;
+    if (type instanceof Types.IntervalYearType) return INTERVAL_YEAR_MONTH;
+    if (type instanceof Types.IntervalDayType) return INTERVAL_DAY_TIME;
     if (type instanceof Types.FixedCharType) {
-      return "char(" + ((Types.FixedCharType) type).length() + ")";
+      return CHAR + "(" + ((Types.FixedCharType) type).length() + ")";
     }
     if (type instanceof Types.VarCharType) {
-      return "varchar(" + ((Types.VarCharType) type).length() + ")";
+      return VARCHAR + "(" + ((Types.VarCharType) type).length() + ")";
     }
     if (type instanceof Types.DecimalType) {
       Types.DecimalType d = (Types.DecimalType) type;
-      return "decimal(" + d.precision() + "," + d.scale() + ")";
+      return DECIMAL + "(" + d.precision() + "," + d.scale() + ")";
     }
     if (type instanceof Types.ExternalType) {
       return ((Types.ExternalType) type).catalogString();
