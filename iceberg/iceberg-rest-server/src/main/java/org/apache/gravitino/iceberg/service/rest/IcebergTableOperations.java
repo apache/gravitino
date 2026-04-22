@@ -23,9 +23,6 @@ import com.codahale.metrics.annotation.Timed;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.common.annotations.VisibleForTesting;
-import java.nio.charset.StandardCharsets;
-import java.security.MessageDigest;
-import java.security.NoSuchAlgorithmException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -97,9 +94,6 @@ public class IcebergTableOperations {
   public static final String X_ICEBERG_ACCESS_DELEGATION = "X-Iceberg-Access-Delegation";
 
   @VisibleForTesting public static final String IF_NONE_MATCH = "If-None-Match";
-
-  @VisibleForTesting static final String DEFAULT_SNAPSHOTS = "all";
-  @VisibleForTesting static final String SNAPSHOTS_REFS = "refs";
 
   private IcebergMetricsManager icebergMetricsManager;
 
@@ -297,7 +291,7 @@ public class IcebergTableOperations {
           String namespace,
       @IcebergAuthorizationMetadata(type = RequestType.LOAD_TABLE) @Encoded() @PathParam("table")
           String table,
-      @DefaultValue(DEFAULT_SNAPSHOTS) @QueryParam("snapshots") String snapshots,
+      @DefaultValue(IcebergRESTUtils.SNAPSHOT_ALL) @QueryParam("snapshots") String snapshots,
       @HeaderParam(X_ICEBERG_ACCESS_DELEGATION) String accessDelegation,
       @HeaderParam(IF_NONE_MATCH) String ifNoneMatch) {
     String catalogName = IcebergRESTUtils.getCatalogName(prefix);
@@ -325,21 +319,21 @@ public class IcebergTableOperations {
               Optional<String> metadataLocation =
                   tableOperationDispatcher.getTableMetadataLocation(context, tableIdentifier);
               if (metadataLocation.isPresent()) {
-                EntityTag etag = generateETag(metadataLocation.get(), snapshots);
-                if (etag != null && etagMatches(ifNoneMatch, etag)) {
-                  return Response.notModified(etag).build();
+                Optional<EntityTag> etag = generateETag(metadataLocation.get(), snapshots);
+                if (etag.isPresent() && etagMatches(ifNoneMatch, etag.get())) {
+                  return Response.notModified(etag.get()).build();
                 }
               }
             }
 
             LoadTableResponse loadTableResponse =
                 tableOperationDispatcher.loadTable(context, tableIdentifier);
-            EntityTag etag =
+            Optional<EntityTag> etag =
                 generateETag(loadTableResponse.tableMetadata().metadataFileLocation(), snapshots);
-            if (etag != null && etagMatches(ifNoneMatch, etag)) {
-              return Response.notModified(etag).build();
+            if (etag.isPresent() && etagMatches(ifNoneMatch, etag.get())) {
+              return Response.notModified(etag.get()).build();
             }
-            if (SNAPSHOTS_REFS.equals(snapshots)) {
+            if (IcebergRESTUtils.SnapshotMode.REFS.getValue().equals(snapshots)) {
               loadTableResponse = filterSnapshotsByRefs(loadTableResponse);
             }
             return buildResponseWithETag(loadTableResponse, etag);
@@ -571,84 +565,23 @@ public class IcebergTableOperations {
         .build();
   }
 
-  /**
-   * Builds an OK response with the ETag header derived from the table metadata location. Uses the
-   * default snapshots value to ensure ETags from create/update are consistent with the default
-   * loadTable endpoint.
-   *
-   * @param loadTableResponse the table response to include in the body
-   * @return a Response with ETag header set
-   */
   private static Response buildResponseWithETag(LoadTableResponse loadTableResponse) {
-    EntityTag etag =
-        generateETag(loadTableResponse.tableMetadata().metadataFileLocation(), DEFAULT_SNAPSHOTS);
-    return buildResponseWithETag(loadTableResponse, etag);
+    return IcebergRESTUtils.buildResponseWithETag(loadTableResponse);
   }
 
-  /**
-   * Builds an OK response with the given ETag header.
-   *
-   * @param loadTableResponse the table response to include in the body
-   * @param etag the pre-computed ETag, may be null
-   * @return a Response with ETag header set if etag is non-null
-   */
   private static Response buildResponseWithETag(
-      LoadTableResponse loadTableResponse, EntityTag etag) {
-    Response.ResponseBuilder responseBuilder =
-        Response.ok(loadTableResponse, MediaType.APPLICATION_JSON_TYPE);
-    if (etag != null) {
-      responseBuilder.tag(etag);
-    }
-    return responseBuilder.build();
+      LoadTableResponse loadTableResponse, Optional<EntityTag> etag) {
+    return IcebergRESTUtils.buildResponseWithETag(loadTableResponse, etag);
   }
 
-  /**
-   * Generates an ETag based on the table metadata file location. The ETag is a SHA-256 hash of the
-   * metadata location, which changes whenever the table metadata is updated.
-   *
-   * @param metadataLocation the metadata file location
-   * @return the generated ETag, or null if generation fails
-   */
   @VisibleForTesting
-  static EntityTag generateETag(String metadataLocation) {
-    return generateETag(metadataLocation, null);
+  static Optional<EntityTag> generateETag(String metadataLocation) {
+    return IcebergRESTUtils.generateETag(metadataLocation);
   }
 
-  /**
-   * Generates an ETag based on the table metadata file location and snapshot mode. The ETag is a
-   * SHA-256 hash that incorporates both the metadata location and the snapshots parameter, ensuring
-   * distinct ETags for different representations of the same table version (e.g., snapshots=all vs
-   * snapshots=refs).
-   *
-   * @param metadataLocation the metadata file location
-   * @param snapshots the snapshots query parameter value (e.g., "all", "refs"), may be null
-   * @return the generated ETag, or null if generation fails
-   */
   @VisibleForTesting
-  static EntityTag generateETag(String metadataLocation, String snapshots) {
-    if (metadataLocation == null) {
-      return null;
-    }
-    try {
-      MessageDigest digest = MessageDigest.getInstance("SHA-256");
-      digest.update(metadataLocation.getBytes(StandardCharsets.UTF_8));
-      if (snapshots != null) {
-        digest.update(snapshots.getBytes(StandardCharsets.UTF_8));
-      }
-      byte[] hash = digest.digest();
-      StringBuilder hexString = new StringBuilder();
-      for (byte b : hash) {
-        String hex = Integer.toHexString(0xff & b);
-        if (hex.length() == 1) {
-          hexString.append('0');
-        }
-        hexString.append(hex);
-      }
-      return new EntityTag(hexString.toString());
-    } catch (NoSuchAlgorithmException e) {
-      LOG.warn("Failed to generate ETag for metadata location: {}", metadataLocation, e);
-      return null;
-    }
+  static Optional<EntityTag> generateETag(String metadataLocation, String snapshots) {
+    return IcebergRESTUtils.generateETag(metadataLocation, snapshots);
   }
 
   /**

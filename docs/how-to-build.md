@@ -93,6 +93,12 @@ license: "This software is licensed under the Apache License version 2."
    ./gradlew compileDistribution
    ```
 
+   To skip compiling and packaging the Web UI artifacts, use:
+
+   ```shell
+   ./gradlew compileDistribution -PskipWebBuild=true
+   ```
+
   The `compileDistribution` command creates a `distribution` directory in the Gravitino root directory. It contains two subdirectories: `package` and `package-all`. The difference between these two subdirectories is that `package` is the **Gravitino server distribution package**, while `package-all` contains extra catalogs in `catalogs-contrib` and all contents in `package`.
   So, if you want to use catalogs in `catalogs-contrib`, you should use the distribution package in `package-all`. 
 

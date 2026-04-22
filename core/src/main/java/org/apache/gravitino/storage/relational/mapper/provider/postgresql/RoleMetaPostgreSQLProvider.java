@@ -26,7 +26,7 @@ import org.apache.ibatis.annotations.Param;
 
 public class RoleMetaPostgreSQLProvider extends RoleMetaBaseSQLProvider {
   @Override
-  public String softDeleteRoleMetaByRoleId(Long roleId) {
+  public String softDeleteRoleMetaByRoleId(@Param("roleId") Long roleId) {
     return "UPDATE "
         + ROLE_TABLE_NAME
         + " SET deleted_at = CAST(EXTRACT(EPOCH FROM CURRENT_TIMESTAMP) * 1000 AS BIGINT)"

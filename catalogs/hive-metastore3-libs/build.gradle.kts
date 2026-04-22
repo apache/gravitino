@@ -27,9 +27,11 @@ plugins {
 
 // Note: exclusion lists here are intentionally kept in sync with hive-metastore2-libs/build.gradle.kts.
 // Guava and Logback are excluded because they are provided by the Gravitino runtime classpath.
+
 dependencies {
   implementation(libs.hadoop2.common) {
     exclude(group = "ch.qos.logback")
+    exclude(group = "com.fasterxml.jackson.core")
     exclude(group = "com.github.spotbugs")
     exclude(group = "com.google.code.findbugs")
     exclude(group = "com.google.guava")
@@ -44,6 +46,7 @@ dependencies {
     exclude(group = "ant")
     exclude(group = "ch.qos.logback")
     exclude(group = "co.cask.tephra")
+    exclude(group = "com.fasterxml.jackson.core")
     exclude(group = "com.github.joshelser")
     exclude(group = "com.github.spotbugs")
     exclude(group = "com.google.code.findbugs")
