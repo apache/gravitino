@@ -46,6 +46,7 @@ import org.apache.gravitino.policy.PolicyDispatcher;
 import org.apache.gravitino.server.authentication.ServerAuthenticator;
 import org.apache.gravitino.server.authorization.GravitinoAuthorizerProvider;
 import org.apache.gravitino.server.web.ConfigServlet;
+import org.apache.gravitino.server.web.HealthAliasServlet;
 import org.apache.gravitino.server.web.HttpServerMetricsSource;
 import org.apache.gravitino.server.web.JettyServer;
 import org.apache.gravitino.server.web.JettyServerConfig;
@@ -172,6 +173,11 @@ public class GravitinoServer extends ResourceConfig {
     server.addServlet(servlet, API_ANY_PATH);
     Servlet configServlet = new ConfigServlet(serverConfig);
     server.addServlet(configServlet, "/configs");
+
+    // Root-level alias for enterprise GTMs that require probes at well-known root paths.
+    // Forwards /health, /health/live, /health/ready to the canonical /api/health/* endpoints.
+    server.addServlet(new HealthAliasServlet(), "/health/*");
+
     server.addCustomFilters(API_ANY_PATH);
     server.addFilter(new VersioningFilter(), API_ANY_PATH);
     server.addSystemFilters(API_ANY_PATH);
