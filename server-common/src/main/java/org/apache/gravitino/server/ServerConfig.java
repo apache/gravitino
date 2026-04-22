@@ -38,7 +38,7 @@ public class ServerConfig extends Config {
   public static final ConfigEntry<Long> HEALTH_ENTITY_STORE_PROBE_TIMEOUT_MS =
       new ConfigBuilder("gravitino.server.health.entityStore.probeTimeoutMs")
           .doc(
-              "Timeout in milliseconds for the entity-store liveness probe used by health endpoints")
+              "Timeout in milliseconds for the entity-store readiness probe used by /api/health/ready")
           .version(ConfigConstants.VERSION_1_3_0)
           .longConf()
           .checkValue(value -> value > 0, ConfigConstants.POSITIVE_NUMBER_ERROR_MSG)

@@ -37,7 +37,7 @@ paths:
           $ref: "#/components/responses/HealthResponse"
         "4XX":
           $ref: "./openapi.yaml#/components/responses/BadRequestErrorResponse"
-        "5xx":
+        "5XX":
           $ref: "./openapi.yaml#/components/responses/ServerErrorResponse"
 
   /health/live:
@@ -56,7 +56,7 @@ paths:
           $ref: "#/components/responses/HealthResponse"
         "4XX":
           $ref: "./openapi.yaml#/components/responses/BadRequestErrorResponse"
-        "5xx":
+        "5XX":
           $ref: "./openapi.yaml#/components/responses/ServerErrorResponse"
 
   /health/ready:
@@ -78,7 +78,7 @@ paths:
           $ref: "#/components/responses/HealthResponse"
         "4XX":
           $ref: "./openapi.yaml#/components/responses/BadRequestErrorResponse"
-        "5xx":
+        "5XX":
           $ref: "./openapi.yaml#/components/responses/ServerErrorResponse"
 
 components:

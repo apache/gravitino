@@ -19,7 +19,7 @@
 
 # THE CONFIGURATION FOR Gravitino SERVER
 gravitino.server.shutdown.timeout = 3000
-# Timeout in milliseconds for the entity-store liveness probe used by health endpoints
+# Timeout in milliseconds for the entity-store readiness probe used by /api/health/ready
 # gravitino.server.health.entityStore.probeTimeoutMs = 2000
 
 # THE CONFIGURATION FOR Gravitino WEB SERVER
