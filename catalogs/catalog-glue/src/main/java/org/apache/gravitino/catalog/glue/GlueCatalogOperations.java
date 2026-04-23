@@ -117,6 +117,8 @@ public class GlueCatalogOperations implements CatalogOperations, SupportsSchemas
   /** Nullable — when null all table formats are exposed. */
   @VisibleForTesting Set<String> tableFormatFilter;
 
+  private final GlueTypeConverter typeConverter = new GlueTypeConverter();
+
   @Override
   public void initialize(
       Map<String, String> config, CatalogInfo info, HasPropertyMetadata propertiesMetadata)
@@ -338,7 +340,8 @@ public class GlueCatalogOperations implements CatalogOperations, SupportsSchemas
     GetTableRequest.Builder req = GetTableRequest.builder().databaseName(dbName).name(ident.name());
     applyCatalogId(req::catalogId);
     try {
-      GlueTable table = GlueTable.fromGlueTable(glueClient.getTable(req.build()).table());
+      GlueTable table =
+          GlueTable.fromGlueTable(glueClient.getTable(req.build()).table(), typeConverter);
       table.initOpsContext(glueClient, catalogId, dbName);
       LOG.info("Loaded Glue table {}.{}", dbName, ident.name());
       return table;
@@ -608,10 +611,10 @@ public class GlueCatalogOperations implements CatalogOperations, SupportsSchemas
         .build();
   }
 
-  private static software.amazon.awssdk.services.glue.model.Column toGlueColumn(Column col) {
+  private software.amazon.awssdk.services.glue.model.Column toGlueColumn(Column col) {
     return software.amazon.awssdk.services.glue.model.Column.builder()
         .name(col.name())
-        .type(GlueTypeConverter.fromGravitino(col.dataType()))
+        .type(typeConverter.fromGravitino(col.dataType()))
         .comment(col.comment())
         .build();
   }
