@@ -20,6 +20,7 @@
 package org.apache.gravitino.server.web.filter;
 
 import java.lang.reflect.Parameter;
+import java.util.Arrays;
 import java.util.Map;
 import org.apache.gravitino.Entity.EntityType;
 import org.apache.gravitino.NameIdentifier;
@@ -27,6 +28,7 @@ import org.apache.gravitino.catalog.HierarchicalSchemaUtil;
 import org.apache.gravitino.server.authorization.annotations.IcebergAuthorizationMetadata;
 import org.apache.gravitino.server.web.filter.BaseMetadataAuthorizationMethodInterceptor.AuthorizationHandler;
 import org.apache.gravitino.utils.NameIdentifierUtil;
+import org.apache.iceberg.catalog.Namespace;
 import org.apache.iceberg.exceptions.ForbiddenException;
 import org.apache.iceberg.rest.requests.CreateNamespaceRequest;
 
@@ -59,14 +61,16 @@ public class CreateNamespaceAuthzHandler implements AuthorizationHandler {
     String metalake = catalogIdent.namespace().level(0);
     String catalog = catalogIdent.name();
 
+    Namespace namespace = request.namespace();
+    int levels = namespace.length();
+
     String separator = HierarchicalSchemaUtil.namespaceSeparator();
-    String fullPath = String.join(separator, request.namespace().levels());
 
     // For nested namespaces inject the parent schema so the expression evaluates against it.
     // JcasbinAuthorizer inheritance then walks A:B → A → CATALOG automatically.
     // For top-level namespaces no SCHEMA is injected; the expression uses CATALOG-level checks.
-    if (HierarchicalSchemaUtil.isNested(fullPath, separator)) {
-      String parentPath = fullPath.substring(0, fullPath.lastIndexOf(separator));
+    if (levels > 1) {
+      String parentPath = String.join(separator, Arrays.copyOf(namespace.levels(), levels - 1));
       nameIdentifierMap.put(
           EntityType.SCHEMA, NameIdentifierUtil.ofSchema(metalake, catalog, parentPath));
     }

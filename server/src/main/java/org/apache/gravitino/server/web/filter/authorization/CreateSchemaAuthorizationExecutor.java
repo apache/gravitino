@@ -18,8 +18,10 @@
 package org.apache.gravitino.server.web.filter.authorization;
 
 import java.lang.reflect.Parameter;
+import java.util.Arrays;
 import java.util.Map;
 import java.util.Optional;
+import java.util.regex.Pattern;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.catalog.HierarchicalSchemaUtil;
@@ -67,9 +69,10 @@ public class CreateSchemaAuthorizationExecutor extends CommonAuthorizerExecutor 
 
     String separator = HierarchicalSchemaUtil.namespaceSeparator();
     String schemaName = request.getName();
+    String[] levels = schemaName.split(Pattern.quote(separator), -1);
 
-    if (HierarchicalSchemaUtil.isNested(schemaName, separator)) {
-      String parentPath = schemaName.substring(0, schemaName.lastIndexOf(separator));
+    if (levels.length > 1) {
+      String parentPath = String.join(separator, Arrays.copyOf(levels, levels.length - 1));
       metadataContext.put(
           Entity.EntityType.SCHEMA, NameIdentifierUtil.ofSchema(metalake, catalog, parentPath));
     }
