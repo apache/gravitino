@@ -52,7 +52,7 @@ public class GravitinoIcebergCatalogFlink118 extends GravitinoIcebergCatalog {
 
   private static AbstractCatalog createIcebergCatalog(
       String catalogName, Map<String, String> icebergCatalogProperties) {
-    return requireAbstractCatalog(
+    return asAbstractCatalog(
         new FlinkCatalogFactory().createCatalog(catalogName, icebergCatalogProperties));
   }
 }

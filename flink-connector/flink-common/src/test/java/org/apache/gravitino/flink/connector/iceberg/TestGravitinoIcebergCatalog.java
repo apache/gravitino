@@ -33,7 +33,7 @@ class TestGravitinoIcebergCatalog {
   void testRequireAbstractCatalogAcceptsAbstractCatalog() {
     AbstractCatalog catalog = mock(AbstractCatalog.class);
 
-    assertSame(catalog, GravitinoIcebergCatalog.requireAbstractCatalog(catalog));
+    assertSame(catalog, GravitinoIcebergCatalog.asAbstractCatalog(catalog));
   }
 
   @Test
@@ -41,6 +41,6 @@ class TestGravitinoIcebergCatalog {
     Catalog catalog = mock(Catalog.class);
 
     assertThrows(
-        IllegalStateException.class, () -> GravitinoIcebergCatalog.requireAbstractCatalog(catalog));
+        IllegalStateException.class, () -> GravitinoIcebergCatalog.asAbstractCatalog(catalog));
   }
 }

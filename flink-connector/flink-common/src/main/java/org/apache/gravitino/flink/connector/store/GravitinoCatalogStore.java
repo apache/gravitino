@@ -189,8 +189,12 @@ public class GravitinoCatalogStore extends AbstractCatalogStore {
         LOG.debug(
             "Skip a {} entry that cannot be initialized.", Factory.class.getCanonicalName(), e);
       } catch (NoClassDefFoundError e) {
+        // Optional provider factories may miss their native dependencies on the current Flink
+        // classpath. Keep scanning so another matching factory can still be discovered.
         LOG.debug("NoClassDefFoundError when loading a {}.", Factory.class.getCanonicalName(), e);
       } catch (LinkageError e) {
+        // A provider compiled against another Flink/provider minor can fail linkage during
+        // ServiceLoader iteration. Treat it like an unavailable optional provider.
         LOG.debug("LinkageError when loading a {}.", Factory.class.getCanonicalName(), e);
       } catch (Exception e) {
         throw new RuntimeException("Unexpected error when trying to load service provider.", e);

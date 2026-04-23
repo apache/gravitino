@@ -48,7 +48,7 @@ public class GravitinoIcebergCatalog extends BaseCatalog {
         schemaAndTablePropertiesConverter,
         partitionConverter);
     this.icebergCatalog =
-        requireAbstractCatalog(
+        asAbstractCatalog(
             new FlinkCatalogFactory().createCatalog(catalogName, icebergCatalogProperties));
   }
 
@@ -78,7 +78,7 @@ public class GravitinoIcebergCatalog extends BaseCatalog {
     return icebergCatalog;
   }
 
-  protected static AbstractCatalog requireAbstractCatalog(Catalog catalog) {
+  protected static AbstractCatalog asAbstractCatalog(Catalog catalog) {
     Preconditions.checkState(
         catalog instanceof AbstractCatalog,
         "Expected AbstractCatalog from FlinkCatalogFactory but got %s.",

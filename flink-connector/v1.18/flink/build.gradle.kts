@@ -160,6 +160,8 @@ dependencies {
 
 tasks.test {
   dependsOn(commonProject.tasks.named("testClasses"))
+  // A test artifact dependency only adds common test classes to the classpath. Add the common
+  // test output explicitly so Gradle discovers and executes those shared tests in this variant.
   testClassesDirs = files(commonTestOutput.classesDirs, sourceSets["test"].output.classesDirs)
   classpath = files(commonTestOutput, sourceSets["test"].runtimeClasspath)
 
