@@ -357,6 +357,24 @@ public class TestTagManager {
   }
 
   @Test
+  public void testAlterTagRenameToExistingTag() {
+    tagManager.createTag(METALAKE, "tag1", null, null);
+    tagManager.createTag(METALAKE, "tag2", null, null);
+
+    TagAlreadyExistsException exception =
+        Assertions.assertThrows(
+            TagAlreadyExistsException.class,
+            () -> tagManager.alterTag(METALAKE, "tag1", TagChange.rename("tag2")));
+
+    Assertions.assertEquals(
+        "Tag with name tag2 under metalake metalake_for_tag_test already exists",
+        exception.getMessage());
+
+    Assertions.assertEquals("tag1", tagManager.getTag(METALAKE, "tag1").name());
+    Assertions.assertEquals("tag2", tagManager.getTag(METALAKE, "tag2").name());
+  }
+
+  @Test
   public void testDeleteTag() {
     tagManager.createTag(METALAKE, "tag1", null, null);
     Assertions.assertTrue(tagManager.deleteTag(METALAKE, "tag1"));
