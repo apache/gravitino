@@ -20,6 +20,12 @@ package org.apache.gravitino.catalog.glue;
 
 import static java.util.Locale.ROOT;
 
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
+import java.util.stream.Collectors;
 import org.apache.gravitino.connector.DataTypeConverter;
 import org.apache.gravitino.rel.types.Type;
 import org.apache.gravitino.rel.types.Types;
@@ -28,7 +34,7 @@ import org.apache.gravitino.rel.types.Types;
  * Converts between AWS Glue / Hive type strings and Gravitino {@link Type} objects.
  *
  * <p>Glue stores column types as Hive type strings (e.g. {@code "bigint"}, {@code "decimal(10,2)"},
- * {@code "array<string>"}). This converter handles all primitive types natively; complex and
+ * {@code "array<string>"}). This converter handles all primitive and complex types natively;
  * unknown types fall back to {@link Types.ExternalType} to preserve the original string.
  */
 public class GlueTypeConverter implements DataTypeConverter<String, String> {
@@ -50,6 +56,16 @@ public class GlueTypeConverter implements DataTypeConverter<String, String> {
   static final String CHAR = "char";
   static final String VARCHAR = "varchar";
   static final String DECIMAL = "decimal";
+  static final String ARRAY = "array";
+  static final String MAP = "map";
+  static final String STRUCT = "struct";
+  static final String UNIONTYPE = "uniontype";
+
+  // Matches name(body): char(10), varchar(255), decimal(10,2)
+  private static final Pattern PAREN_TYPE_PATTERN = Pattern.compile("(\\w+)\\(([^)]*)\\)");
+  // Matches name<body>: array<string>, map<string,int>, struct<id:bigint>
+  // Greedy (.+) correctly handles nesting: array<map<string,int>> → group(2)=map<string,int>
+  private static final Pattern ANGLE_TYPE_PATTERN = Pattern.compile("(\\w+)<(.+)>");
 
   @Override
   public Type toGravitino(String glueType) {
@@ -93,44 +109,76 @@ public class GlueTypeConverter implements DataTypeConverter<String, String> {
         break;
     }
 
-    // char(N)
-    if (lower.startsWith(CHAR + "(") && lower.endsWith(")")) {
+    // name(body) types: char(N), varchar(N), decimal(P,S)
+    Matcher m = PAREN_TYPE_PATTERN.matcher(lower);
+    if (m.matches()) {
+      String typeName = m.group(1);
+      String body = m.group(2).trim();
       try {
-        int length =
-            Integer.parseInt(lower.substring(CHAR.length() + 1, lower.length() - 1).trim());
-        return Types.FixedCharType.of(length);
+        switch (typeName) {
+          case CHAR:
+            return Types.FixedCharType.of(Integer.parseInt(body));
+          case VARCHAR:
+            return Types.VarCharType.of(Integer.parseInt(body));
+          case DECIMAL:
+            String[] ps = body.split(",", 2);
+            int precision = Integer.parseInt(ps[0].trim());
+            int scale = ps.length > 1 ? Integer.parseInt(ps[1].trim()) : 0;
+            return Types.DecimalType.of(precision, scale);
+          default:
+            return Types.ExternalType.of(glueType);
+        }
       } catch (NumberFormatException e) {
-        return Types.ExternalType.of(glueType);
-      }
-    }
-    // varchar(N)
-    if (lower.startsWith(VARCHAR + "(") && lower.endsWith(")")) {
-      try {
-        int length =
-            Integer.parseInt(lower.substring(VARCHAR.length() + 1, lower.length() - 1).trim());
-        return Types.VarCharType.of(length);
-      } catch (NumberFormatException e) {
-        return Types.ExternalType.of(glueType);
-      }
-    }
-    // decimal(P,S) or decimal(P, S)
-    if (lower.startsWith(DECIMAL + "(") && lower.endsWith(")")) {
-      try {
-        String inner = lower.substring(DECIMAL.length() + 1, lower.length() - 1);
-        String[] parts = inner.split(",", 2);
-        int precision = Integer.parseInt(parts[0].trim());
-        int scale = parts.length > 1 ? Integer.parseInt(parts[1].trim()) : 0;
-        return Types.DecimalType.of(precision, scale);
-      } catch (NumberFormatException e) {
-        return Types.ExternalType.of(glueType);
+        throw new IllegalArgumentException("Invalid Glue type: " + glueType, e);
       }
     }
 
-    // Complex types (array<...>, map<...>, struct<...>, uniontype<...>) and anything unknown
-    // are preserved as ExternalType so the original string survives the round-trip.
-    // Glue stores all column types as plain strings (not a parsed TypeInfo structure), so
-    // full recursive parsing of nested types would require reimplementing Hive's type parser.
-    // This is deferred intentionally; ExternalType keeps the original string intact.
+    // name<body> types: array<T>, map<K,V>, struct<...>, uniontype<...>
+    m = ANGLE_TYPE_PATTERN.matcher(lower);
+    if (m.matches()) {
+      String typeName = m.group(1);
+      String body = m.group(2).trim();
+      switch (typeName) {
+        case ARRAY:
+          return Types.ListType.nullable(toGravitino(body));
+        case MAP:
+          {
+            List<String> parts = splitTopLevel(body);
+            if (parts.size() == 2) {
+              return Types.MapType.valueNullable(
+                  toGravitino(parts.get(0)), toGravitino(parts.get(1)));
+            }
+            throw new IllegalArgumentException("Invalid Glue type: " + glueType);
+          }
+        case STRUCT:
+          {
+            List<String> tokens = splitTopLevel(body);
+            Types.StructType.Field[] fields = new Types.StructType.Field[tokens.size()];
+            for (int i = 0; i < tokens.size(); i++) {
+              String token = tokens.get(i);
+              int colonIdx = token.indexOf(':');
+              if (colonIdx < 0) {
+                throw new IllegalArgumentException("Invalid Glue type: " + glueType);
+              }
+              fields[i] =
+                  Types.StructType.Field.nullableField(
+                      token.substring(0, colonIdx).trim(),
+                      toGravitino(token.substring(colonIdx + 1).trim()));
+            }
+            return Types.StructType.of(fields);
+          }
+        case UNIONTYPE:
+          {
+            List<String> parts = splitTopLevel(body);
+            Type[] types = parts.stream().map(this::toGravitino).toArray(Type[]::new);
+            return Types.UnionType.of(types);
+          }
+        default:
+          return Types.ExternalType.of(glueType);
+      }
+    }
+
+    // Unknown types are preserved as ExternalType so the original string survives the round-trip.
     return Types.ExternalType.of(glueType);
   }
 
@@ -161,18 +209,65 @@ public class GlueTypeConverter implements DataTypeConverter<String, String> {
     if (type instanceof Types.IntervalYearType) return INTERVAL_YEAR_MONTH;
     if (type instanceof Types.IntervalDayType) return INTERVAL_DAY_TIME;
     if (type instanceof Types.FixedCharType) {
-      return CHAR + "(" + ((Types.FixedCharType) type).length() + ")";
+      return String.format("%s(%d)", CHAR, ((Types.FixedCharType) type).length());
     }
     if (type instanceof Types.VarCharType) {
-      return VARCHAR + "(" + ((Types.VarCharType) type).length() + ")";
+      return String.format("%s(%d)", VARCHAR, ((Types.VarCharType) type).length());
     }
     if (type instanceof Types.DecimalType) {
       Types.DecimalType d = (Types.DecimalType) type;
-      return DECIMAL + "(" + d.precision() + "," + d.scale() + ")";
+      return String.format("%s(%d,%d)", DECIMAL, d.precision(), d.scale());
+    }
+    if (type instanceof Types.ListType) {
+      return String.format("%s<%s>", ARRAY, fromGravitino(((Types.ListType) type).elementType()));
+    }
+    if (type instanceof Types.MapType) {
+      Types.MapType mapType = (Types.MapType) type;
+      return String.format(
+          "%s<%s,%s>", MAP, fromGravitino(mapType.keyType()), fromGravitino(mapType.valueType()));
+    }
+    if (type instanceof Types.StructType) {
+      String fields =
+          Arrays.stream(((Types.StructType) type).fields())
+              .map(f -> String.format("%s:%s", f.name(), fromGravitino(f.type())))
+              .collect(Collectors.joining(","));
+      return String.format("%s<%s>", STRUCT, fields);
+    }
+    if (type instanceof Types.UnionType) {
+      String types =
+          Arrays.stream(((Types.UnionType) type).types())
+              .map(this::fromGravitino)
+              .collect(Collectors.joining(","));
+      return String.format("%s<%s>", UNIONTYPE, types);
     }
     if (type instanceof Types.ExternalType) {
       return ((Types.ExternalType) type).catalogString();
     }
     throw new IllegalArgumentException("Unsupported Gravitino type for Glue: " + type);
+  }
+
+  /**
+   * Splits {@code s} on commas that are not nested inside {@code <...>} angle brackets.
+   *
+   * <p>For example, {@code "string,map<string,int>"} splits into {@code ["string",
+   * "map<string,int>"]}.
+   */
+  private static List<String> splitTopLevel(String s) {
+    List<String> parts = new ArrayList<>();
+    int depth = 0;
+    int start = 0;
+    for (int i = 0; i < s.length(); i++) {
+      char c = s.charAt(i);
+      if (c == '<') {
+        depth++;
+      } else if (c == '>') {
+        depth--;
+      } else if (c == ',' && depth == 0) {
+        parts.add(s.substring(start, i).trim());
+        start = i + 1;
+      }
+    }
+    parts.add(s.substring(start).trim());
+    return parts;
   }
 }

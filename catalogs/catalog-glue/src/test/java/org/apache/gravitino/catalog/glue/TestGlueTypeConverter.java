@@ -83,25 +83,56 @@ class TestGlueTypeConverter {
   }
 
   // -------------------------------------------------------------------------
-  // toGravitino — complex / unknown types → ExternalType
+  // toGravitino — complex types
   // -------------------------------------------------------------------------
 
   @Test
-  void testComplexTypesBecomesExternalType() {
-    assertInstanceOf(Types.ExternalType.class, CONVERTER.toGravitino("array<string>"));
-    assertInstanceOf(Types.ExternalType.class, CONVERTER.toGravitino("map<string,int>"));
-    assertInstanceOf(
-        Types.ExternalType.class, CONVERTER.toGravitino("struct<id:bigint,name:string>"));
-    assertInstanceOf(Types.ExternalType.class, CONVERTER.toGravitino("uniontype<int,string>"));
-    assertInstanceOf(Types.ExternalType.class, CONVERTER.toGravitino("unknown_custom_type"));
+  void testArrayType() {
+    assertEquals(
+        Types.ListType.nullable(Types.StringType.get()), CONVERTER.toGravitino("array<string>"));
+    assertEquals(
+        Types.ListType.nullable(Types.LongType.get()), CONVERTER.toGravitino("array<bigint>"));
   }
 
   @Test
-  void testExternalTypePreservesOriginalString() {
-    String rawType = "array<map<string,int>>";
-    Type type = CONVERTER.toGravitino(rawType);
-    assertInstanceOf(Types.ExternalType.class, type);
-    assertEquals(rawType, ((Types.ExternalType) type).catalogString());
+  void testMapType() {
+    assertEquals(
+        Types.MapType.valueNullable(Types.StringType.get(), Types.IntegerType.get()),
+        CONVERTER.toGravitino("map<string,int>"));
+  }
+
+  @Test
+  void testStructType() {
+    Types.StructType expected =
+        Types.StructType.of(
+            Types.StructType.Field.nullableField("id", Types.LongType.get()),
+            Types.StructType.Field.nullableField("name", Types.StringType.get()));
+    assertEquals(expected, CONVERTER.toGravitino("struct<id:bigint,name:string>"));
+  }
+
+  @Test
+  void testUnionType() {
+    assertEquals(
+        Types.UnionType.of(Types.IntegerType.get(), Types.StringType.get()),
+        CONVERTER.toGravitino("uniontype<int,string>"));
+  }
+
+  @Test
+  void testNestedComplexType() {
+    // array<map<string,int>>
+    Type expected =
+        Types.ListType.nullable(
+            Types.MapType.valueNullable(Types.StringType.get(), Types.IntegerType.get()));
+    assertEquals(expected, CONVERTER.toGravitino("array<map<string,int>>"));
+  }
+
+  // -------------------------------------------------------------------------
+  // toGravitino — unknown types → ExternalType
+  // -------------------------------------------------------------------------
+
+  @Test
+  void testUnknownTypeBecomesExternalType() {
+    assertInstanceOf(Types.ExternalType.class, CONVERTER.toGravitino("unknown_custom_type"));
   }
 
   @Test
@@ -112,6 +143,18 @@ class TestGlueTypeConverter {
   @Test
   void testEmptyInputBecomesExternalType() {
     assertInstanceOf(Types.ExternalType.class, CONVERTER.toGravitino(""));
+  }
+
+  @Test
+  void testInvalidKnownTypeThrows() {
+    // Malformed parameterized types should throw, not fall back to ExternalType
+    assertThrows(IllegalArgumentException.class, () -> CONVERTER.toGravitino("char(abc)"));
+    assertThrows(IllegalArgumentException.class, () -> CONVERTER.toGravitino("varchar(xyz)"));
+    assertThrows(IllegalArgumentException.class, () -> CONVERTER.toGravitino("decimal(p,s)"));
+    // Malformed complex types should throw
+    assertThrows(IllegalArgumentException.class, () -> CONVERTER.toGravitino("map<string>"));
+    assertThrows(
+        IllegalArgumentException.class, () -> CONVERTER.toGravitino("struct<no_colon_field>"));
   }
 
   // -------------------------------------------------------------------------
@@ -143,8 +186,32 @@ class TestGlueTypeConverter {
   }
 
   @Test
+  void testRoundTripComplexTypes() {
+    roundTrip("array<string>", Types.ListType.nullable(Types.StringType.get()));
+    roundTrip(
+        "map<string,int>",
+        Types.MapType.valueNullable(Types.StringType.get(), Types.IntegerType.get()));
+    roundTrip(
+        "struct<id:bigint,name:string>",
+        Types.StructType.of(
+            Types.StructType.Field.nullableField("id", Types.LongType.get()),
+            Types.StructType.Field.nullableField("name", Types.StringType.get())));
+    roundTrip(
+        "uniontype<int,string>",
+        Types.UnionType.of(Types.IntegerType.get(), Types.StringType.get()));
+  }
+
+  @Test
+  void testRoundTripNestedComplexType() {
+    roundTrip(
+        "array<map<string,int>>",
+        Types.ListType.nullable(
+            Types.MapType.valueNullable(Types.StringType.get(), Types.IntegerType.get())));
+  }
+
+  @Test
   void testFromGravitinoExternalType() {
-    String raw = "array<string>";
+    String raw = "unknown_custom_type";
     assertEquals(raw, CONVERTER.fromGravitino(Types.ExternalType.of(raw)));
   }
 
