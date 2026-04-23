@@ -144,40 +144,4 @@ public final class HierarchicalSchemaUtil {
     }
     return result;
   }
-
-  /**
-   * Given a list of schema names and an optional parent, returns only the direct children of that
-   * parent (one level deeper). When {@code parent} is empty, returns top-level schemas (names that
-   * do not contain the separator).
-   *
-   * <p>Example: schemas {@code ["A", "A:B", "A:B:C", "B"]}, separator {@code ":"}, parent {@code
-   * Optional.of("A:B")} → {@code ["A:B:C"]}
-   *
-   * @param allNames all schema names in the catalog
-   * @param parent the parent schema name, or {@link Optional#empty()} for top-level
-   * @param separator the separator used in the schema names
-   * @return direct children names
-   */
-  public static List<String> filterDirectChildren(
-      List<String> allNames, Optional<String> parent, String separator) {
-    List<String> result = new ArrayList<>();
-    if (!parent.isPresent()) {
-      for (String name : allNames) {
-        if (!name.contains(separator)) {
-          result.add(name);
-        }
-      }
-    } else {
-      String prefix = parent.get() + separator;
-      for (String name : allNames) {
-        if (name.startsWith(prefix)) {
-          String remainder = name.substring(prefix.length());
-          if (!remainder.contains(separator)) {
-            result.add(name);
-          }
-        }
-      }
-    }
-    return result;
-  }
 }
