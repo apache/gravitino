@@ -16,6 +16,7 @@
   specific language governing permissions and limitations
   under the License.
 -->
+
 # Design of Function Privilege Control in Gravitino
 
 ## Background
