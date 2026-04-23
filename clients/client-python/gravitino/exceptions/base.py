@@ -229,6 +229,14 @@ class FunctionAlreadyExistsException(AlreadyExistsException):
     """An exception thrown when a function already exists."""
 
 
+class IllegalPrivilegeException(IllegalArgumentException):
+    """An exception thrown when a privilege is invalid."""
+
+
+class IllegalMetadataObjectException(IllegalArgumentException):
+    """An exception thrown when a metadata object is invalid."""
+
+
 class NoSuchUserException(NotFoundException):
     """An exception thrown when a user is not found."""
 
@@ -238,7 +246,11 @@ class NoSuchGroupException(NotFoundException):
 
 
 class NoSuchRoleException(NotFoundException):
-    """An exception thrown when a role is not found."""
+    """Exception thrown when a role with specified name is not existed."""
+
+
+class NoSuchMetadataObjectException(NotFoundException):
+    """Exception thrown when a metadata object with specified name doesn't exist."""
 
 
 class UserAlreadyExistsException(AlreadyExistsException):
@@ -250,4 +262,4 @@ class GroupAlreadyExistsException(AlreadyExistsException):
 
 
 class RoleAlreadyExistsException(AlreadyExistsException):
-    """An exception thrown when a role already exists."""
+    """Exception thrown when a role with specified name already exists."""
