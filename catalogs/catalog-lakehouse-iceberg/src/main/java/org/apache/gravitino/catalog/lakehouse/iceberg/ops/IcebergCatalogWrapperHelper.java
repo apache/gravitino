@@ -27,10 +27,10 @@ import com.google.common.collect.Lists;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Set;
-import java.util.regex.Pattern;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.catalog.lakehouse.iceberg.converter.IcebergDataTypeConverter;
 import org.apache.gravitino.iceberg.common.ops.IcebergCatalogWrapper.IcebergTableChange;
+import org.apache.gravitino.iceberg.common.utils.IcebergIdentifierUtils;
 import org.apache.gravitino.rel.TableChange;
 import org.apache.gravitino.rel.TableChange.AddColumn;
 import org.apache.gravitino.rel.TableChange.After;
@@ -281,48 +281,8 @@ public class IcebergCatalogWrapperHelper {
     return icebergTableChange;
   }
 
-  /**
-   * Converts a logical Gravitino schema name to an Iceberg {@link Namespace} using the given
-   * external separator.
-   *
-   * <p>If the name contains the separator it is split into a multi-level namespace (e.g. {@code
-   * "A:B:C"} with {@code ":"} → {@code Namespace.of("A","B","C")}). Flat names are wrapped in a
-   * single-level namespace.
-   *
-   * @param schemaName the logical schema name using the configured external separator
-   * @param separator the external namespace separator configured on the server
-   * @return the corresponding Iceberg multi-level namespace
-   */
-  public static Namespace getIcebergNamespaceFromSchemaName(String schemaName, String separator) {
-    if (schemaName.contains(separator)) {
-      return Namespace.of(schemaName.split(Pattern.quote(separator), -1));
-    }
-    return Namespace.of(schemaName);
-  }
-
   public static Namespace getIcebergNamespace(String... level) {
     return Namespace.of(level);
-  }
-
-  /**
-   * Converts an Iceberg multi-level {@link Namespace} to a schema name string joined by the given
-   * separator.
-   *
-   * <p>Examples:
-   *
-   * <ul>
-   *   <li>{@code Namespace.of("A","B","C")} + {@code ":"} → {@code "A:B:C"} (logical)
-   * </ul>
-   *
-   * @param namespace the Iceberg namespace
-   * @param separator the separator to join levels with
-   * @return the joined schema name, or {@code ""} for an empty namespace
-   */
-  public static String icebergNamespaceToSchemaName(Namespace namespace, String separator) {
-    if (namespace.isEmpty()) {
-      return "";
-    }
-    return String.join(separator, namespace.levels());
   }
 
   /**
@@ -338,7 +298,8 @@ public class IcebergCatalogWrapperHelper {
       org.apache.gravitino.Namespace namespace, String name, String separator) {
     String[] levels = namespace.levels();
     String schemaName = levels[levels.length - 1];
-    return TableIdentifier.of(getIcebergNamespaceFromSchemaName(schemaName, separator), name);
+    return TableIdentifier.of(
+        IcebergIdentifierUtils.getIcebergNamespaceFromSchemaName(schemaName, separator), name);
   }
 
   /**
@@ -354,7 +315,8 @@ public class IcebergCatalogWrapperHelper {
     String[] levels = nameIdentifier.namespace().levels();
     String schemaName = levels[levels.length - 1];
     return TableIdentifier.of(
-        getIcebergNamespaceFromSchemaName(schemaName, separator), nameIdentifier.name());
+        IcebergIdentifierUtils.getIcebergNamespaceFromSchemaName(schemaName, separator),
+        nameIdentifier.name());
   }
 
   @VisibleForTesting

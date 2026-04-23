@@ -219,18 +219,34 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
       String metalake,
       MetadataObject metadataObject,
       AuthorizationRequestContext requestContext) {
-    Long userId;
-    boolean result;
+    boolean result = false;
+    if (metadataObject == null) {
+      return false;
+    }
+
     try {
-      Long metadataId = MetadataIdConverter.getID(metadataObject, metalake);
-      loadOwnerPolicy(metalake, metadataObject, metadataId);
       UserEntity userEntity = getUserEntity(principal.getName(), metalake);
-      userId = userEntity.id();
-      metadataId = MetadataIdConverter.getID(metadataObject, metalake);
-      result = Objects.equals(Optional.of(userId), ownerRel.getIfPresent(metadataId));
+      Long userId = userEntity.id();
+
+      if (metadataObject.type() == MetadataObject.Type.SCHEMA) {
+        for (MetadataObject scopeObject : buildSchemaInheritanceChain(metadataObject)) {
+          Long metadataId = getMetadataIdQuietly(scopeObject, metalake);
+          if (metadataId == null) {
+            continue;
+          }
+          loadOwnerPolicy(metalake, scopeObject, metadataId);
+          if (Objects.equals(Optional.of(userId), ownerRel.getIfPresent(metadataId))) {
+            result = true;
+            break;
+          }
+        }
+      } else {
+        Long metadataId = MetadataIdConverter.getID(metadataObject, metalake);
+        loadOwnerPolicy(metalake, metadataObject, metadataId);
+        result = Objects.equals(Optional.of(userId), ownerRel.getIfPresent(metadataId));
+      }
     } catch (Exception e) {
       LOG.debug("Can not get entity id", e);
-      result = false;
     }
     LOG.debug(
         "Authorization expression: {},privilege {},owner result {}\n,principal {},metalake {},metadata object {}",
@@ -423,6 +439,32 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
     }
   }
 
+  /**
+   * Builds the logical schema inheritance chain for a SCHEMA MetadataObject. For a schema named
+   * {@code "catalog.A:B:C"} this returns MetadataObjects for {@code catalog.A:B:C}, {@code
+   * catalog.A:B}, and {@code catalog.A} in that order.
+   *
+   * <p>For flat (non-nested) schemas the list contains only the original object.
+   */
+  private List<MetadataObject> buildSchemaInheritanceChain(MetadataObject schemaObject) {
+    String separator = HierarchicalSchemaUtil.namespaceSeparator();
+
+    List<MetadataObject> chain = new ArrayList<>();
+    for (String scope : HierarchicalSchemaUtil.allScopes(schemaObject.name(), separator)) {
+      chain.add(MetadataObjects.of(schemaObject.parent(), scope, MetadataObject.Type.SCHEMA));
+    }
+    return ImmutableList.copyOf(chain);
+  }
+
+  private Long getMetadataIdQuietly(MetadataObject metadataObject, String metalake) {
+    try {
+      return MetadataIdConverter.getID(metadataObject, metalake);
+    } catch (Exception e) {
+      LOG.debug("Can not get entity id for {}", metadataObject, e);
+      return null;
+    }
+  }
+
   private class InternalAuthorizer {
 
     Enforcer enforcer;
@@ -457,6 +499,11 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
       }
       loadRolePrivilege(metalake, username, userId, requestContext);
 
+      // when checking CREATE SCHEMA, the metadata object may be null, we can just
+      // skip the check
+      if (metadataObject == null) {
+        return false;
+      }
       // For SCHEMA objects with hierarchical names (e.g. "catalog.A:B:C"), walk the logical
       // parent chain so that a privilege granted on an ancestor schema is inherited by all
       // descendant schemas.
@@ -480,42 +527,6 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
         return false;
       }
       return authorizeByJcasbin(userId, metadataObject, metadataId, privilege);
-    }
-
-    /**
-     * Builds the logical schema inheritance chain for a SCHEMA MetadataObject. For a schema named
-     * {@code "catalog.A:B:C"} this returns MetadataObjects for {@code catalog.A:B:C}, {@code
-     * catalog.A:B}, and {@code catalog.A} in that order.
-     *
-     * <p>For flat (non-nested) schemas the list contains only the original object.
-     */
-    private List<MetadataObject> buildSchemaInheritanceChain(MetadataObject schemaObject) {
-      String separator = HierarchicalSchemaUtil.namespaceSeparator();
-      // MetadataObject.name() for SCHEMA is "catalog.schemaName"
-      String fullName = schemaObject.name();
-      int dotIdx = fullName.indexOf('.');
-      if (dotIdx < 0) {
-        return ImmutableList.of(schemaObject);
-      }
-      String catalogName = fullName.substring(0, dotIdx);
-      String schemaPath = fullName.substring(dotIdx + 1);
-      if (!HierarchicalSchemaUtil.isNested(schemaPath, separator)) {
-        return ImmutableList.of(schemaObject);
-      }
-      List<MetadataObject> chain = new ArrayList<>();
-      for (String scope : HierarchicalSchemaUtil.allScopes(schemaPath, separator)) {
-        chain.add(MetadataObjects.of(catalogName, scope, MetadataObject.Type.SCHEMA));
-      }
-      return ImmutableList.copyOf(chain);
-    }
-
-    private Long getMetadataIdQuietly(MetadataObject metadataObject, String metalake) {
-      try {
-        return MetadataIdConverter.getID(metadataObject, metalake);
-      } catch (Exception e) {
-        LOG.debug("Can not get entity id for {}", metadataObject, e);
-        return null;
-      }
     }
 
     private boolean authorizeByJcasbin(

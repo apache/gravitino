@@ -52,6 +52,8 @@ import org.apache.gravitino.Entity;
 import org.apache.gravitino.Entity.EntityType;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.NameIdentifier;
+import org.apache.gravitino.catalog.HierarchicalSchemaUtil;
+import org.apache.gravitino.iceberg.common.utils.IcebergIdentifierUtils;
 import org.apache.gravitino.iceberg.service.IcebergExceptionMapper;
 import org.apache.gravitino.iceberg.service.IcebergObjectMapper;
 import org.apache.gravitino.iceberg.service.IcebergRESTUtils;
@@ -631,7 +633,11 @@ public class IcebergTableOperations {
       TableIdentifier identifier = identifiers.get(i);
       nameIdentifiers[i] =
           NameIdentifier.of(
-              metalake, catalogName, identifier.namespace().level(0), identifier.name());
+              metalake,
+              catalogName,
+              IcebergIdentifierUtils.icebergNamespaceToSchemaName(
+                  identifier.namespace(), HierarchicalSchemaUtil.namespaceSeparator()),
+              identifier.name());
     }
     return nameIdentifiers;
   }
@@ -647,7 +653,10 @@ public class IcebergTableOperations {
     List<TableIdentifier> filteredIdentifiers = new ArrayList<>();
     for (NameIdentifier ident : idents) {
       filteredIdentifiers.add(
-          TableIdentifier.of(Namespace.of(ident.namespace().level(2)), ident.name()));
+          TableIdentifier.of(
+              IcebergIdentifierUtils.getIcebergNamespaceFromSchemaName(
+                  ident.namespace().level(2), HierarchicalSchemaUtil.namespaceSeparator()),
+              ident.name()));
     }
     return ListTablesResponse.builder()
         .addAll(filteredIdentifiers)

@@ -57,6 +57,7 @@ import org.apache.gravitino.iceberg.common.authentication.SupportsKerberos;
 import org.apache.gravitino.iceberg.common.ops.IcebergCatalogWrapper;
 import org.apache.gravitino.iceberg.common.ops.IcebergCatalogWrapper.IcebergTableChange;
 import org.apache.gravitino.iceberg.common.ops.KerberosAwareIcebergCatalogProxy;
+import org.apache.gravitino.iceberg.common.utils.IcebergIdentifierUtils;
 import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.rel.Column;
 import org.apache.gravitino.rel.Table;
@@ -164,7 +165,7 @@ public class IcebergCatalogOperations
         String parentPath =
             String.join(separator, Arrays.copyOfRange(namespace.levels(), 2, namespace.length()));
         icebergParent =
-            IcebergCatalogWrapperHelper.getIcebergNamespaceFromSchemaName(parentPath, separator);
+            IcebergIdentifierUtils.getIcebergNamespaceFromSchemaName(parentPath, separator);
       }
 
       List<org.apache.iceberg.catalog.Namespace> namespaces =
@@ -177,7 +178,7 @@ public class IcebergCatalogOperations
                 // Convert multi-level Iceberg namespace to logical schema name using the
                 // configured separator so upper layers receive consistent logical names.
                 String logicalName =
-                    IcebergCatalogWrapperHelper.icebergNamespaceToSchemaName(
+                    IcebergIdentifierUtils.icebergNamespaceToSchemaName(
                         icebergNamespace, separator);
                 return NameIdentifier.of(catalogNamespace, logicalName);
               })
@@ -217,7 +218,7 @@ public class IcebergCatalogOperations
               .build();
       icebergCatalogWrapper.createNamespace(
           createdSchema.toCreateRequest(
-              IcebergCatalogWrapperHelper.getIcebergNamespaceFromSchemaName(
+              IcebergIdentifierUtils.getIcebergNamespaceFromSchemaName(
                   ident.name(), HierarchicalSchemaUtil.namespaceSeparator())));
       LOG.info(
           "Created Iceberg schema (database) {} in Iceberg\ncurrentUser:{} \ncomment: {} \nmetadata: {}",
@@ -251,7 +252,7 @@ public class IcebergCatalogOperations
     try {
       GetNamespaceResponse response =
           icebergCatalogWrapper.loadNamespace(
-              IcebergCatalogWrapperHelper.getIcebergNamespaceFromSchemaName(
+              IcebergIdentifierUtils.getIcebergNamespaceFromSchemaName(
                   ident.name(), HierarchicalSchemaUtil.namespaceSeparator()));
       IcebergSchema icebergSchema =
           IcebergSchema.builder()
@@ -286,7 +287,7 @@ public class IcebergCatalogOperations
     try {
       GetNamespaceResponse response =
           icebergCatalogWrapper.loadNamespace(
-              IcebergCatalogWrapperHelper.getIcebergNamespaceFromSchemaName(
+              IcebergIdentifierUtils.getIcebergNamespaceFromSchemaName(
                   ident.name(), HierarchicalSchemaUtil.namespaceSeparator()));
       Map<String, String> metadata = response.properties();
       List<String> removals = new ArrayList<>();
@@ -322,7 +323,7 @@ public class IcebergCatalogOperations
           UpdateNamespacePropertiesRequest.builder().updateAll(updates).removeAll(removals).build();
       UpdateNamespacePropertiesResponse updateNamespacePropertiesResponse =
           icebergCatalogWrapper.updateNamespaceProperties(
-              IcebergCatalogWrapperHelper.getIcebergNamespaceFromSchemaName(
+              IcebergIdentifierUtils.getIcebergNamespaceFromSchemaName(
                   ident.name(), HierarchicalSchemaUtil.namespaceSeparator()),
               updateNamespacePropertiesRequest);
       LOG.info(
@@ -351,7 +352,7 @@ public class IcebergCatalogOperations
     Preconditions.checkArgument(!cascade, "Iceberg does not support cascading delete operations.");
     try {
       icebergCatalogWrapper.dropNamespace(
-          IcebergCatalogWrapperHelper.getIcebergNamespaceFromSchemaName(
+          IcebergIdentifierUtils.getIcebergNamespaceFromSchemaName(
               ident.name(), HierarchicalSchemaUtil.namespaceSeparator()));
       LOG.info("Dropped Iceberg schema (database) {}", ident.name());
       return true;
@@ -385,7 +386,7 @@ public class IcebergCatalogOperations
       String schemaName = nsLevels[nsLevels.length - 1];
       ListTablesResponse listTablesResponse =
           icebergCatalogWrapper.listTable(
-              IcebergCatalogWrapperHelper.getIcebergNamespaceFromSchemaName(
+              IcebergIdentifierUtils.getIcebergNamespaceFromSchemaName(
                   schemaName, HierarchicalSchemaUtil.namespaceSeparator()));
       return listTablesResponse.identifiers().stream()
           .map(
@@ -463,7 +464,7 @@ public class IcebergCatalogOperations
       // Expand the logical schema name into individual Iceberg namespace levels so that
       // buildIcebergTableChanges builds the correct multi-level TableIdentifier.
       org.apache.iceberg.catalog.Namespace icebergNs =
-          IcebergCatalogWrapperHelper.getIcebergNamespaceFromSchemaName(
+          IcebergIdentifierUtils.getIcebergNamespaceFromSchemaName(
               schemaName, HierarchicalSchemaUtil.namespaceSeparator());
       NameIdentifier tableIdentForIceberg =
           NameIdentifier.of(Namespace.of(icebergNs.levels()), tableIdent.name());
@@ -606,7 +607,7 @@ public class IcebergCatalogOperations
 
       LoadTableResponse loadTableResponse =
           icebergCatalogWrapper.createTable(
-              IcebergCatalogWrapperHelper.getIcebergNamespaceFromSchemaName(
+              IcebergIdentifierUtils.getIcebergNamespaceFromSchemaName(
                   schemaIdent.name(), HierarchicalSchemaUtil.namespaceSeparator()),
               createdTable.toCreateTableRequest());
       loadTableResponse.validate();
@@ -631,7 +632,7 @@ public class IcebergCatalogOperations
       String schema = NameIdentifier.of(tableIdent.namespace().levels()).name();
       icebergCatalogWrapper.purgeTable(
           TableIdentifier.of(
-              IcebergCatalogWrapperHelper.getIcebergNamespaceFromSchemaName(
+              IcebergIdentifierUtils.getIcebergNamespaceFromSchemaName(
                   schema, HierarchicalSchemaUtil.namespaceSeparator()),
               tableIdent.name()));
       LOG.info("Purge Iceberg table {}", tableIdent.name());

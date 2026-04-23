@@ -227,7 +227,7 @@ public class IcebergNamespaceOperations {
   @Timed(name = "create-namespace." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
   @ResponseMetered(name = "create-namespace", absolute = true)
   @AuthorizationExpression(
-      expression = "ANY(OWNER, METALAKE, CATALOG) || ANY_USE_CATALOG && ANY_CREATE_SCHEMA",
+      expression = "ANY(OWNER, METALAKE, CATALOG, SCHEMA) || ANY_USE_CATALOG && ANY_CREATE_SCHEMA",
       accessMetadataType = MetadataObject.Type.SCHEMA)
   public Response createNamespace(
       @AuthorizationMetadata(type = Entity.EntityType.CATALOG) @PathParam("prefix") String prefix,
