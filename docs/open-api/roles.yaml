@@ -214,6 +214,9 @@ components:
             - REGISTER_MODEL
             - LINK_MODEL_VERSION
             - USE_MODEL
+            - REGISTER_FUNCTION
+            - EXECUTE_FUNCTION
+            - MODIFY_FUNCTION
             - CREATE_TAG
             - APPLY_TAG
             - CREATE_POLICY
@@ -249,6 +252,7 @@ components:
             - "TOPIC"
             - "ROLE"
             - "MODEL"
+            - "FUNCTION"
             - "TAG"
             - "POLICY"
             - "JOB_TEMPLATE"
@@ -419,6 +423,7 @@ components:
           - "TOPIC"
           - "ROLE"
           - "MODEL"
+          - "FUNCTION"
           - "TAG"
           - "POLICY"
           - "JOB_TEMPLATE"
