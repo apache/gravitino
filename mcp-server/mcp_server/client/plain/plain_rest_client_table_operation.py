@@ -18,7 +18,10 @@
 from httpx import AsyncClient
 
 from mcp_server.client import TableOperation
-from mcp_server.client.plain.utils import extract_content_from_response
+from mcp_server.client.plain.utils import (
+    encode_path_segment,
+    extract_content_from_response,
+)
 
 
 class PlainRESTClientTableOperation(TableOperation):
@@ -31,7 +34,9 @@ class PlainRESTClientTableOperation(TableOperation):
         self, catalog_name: str, schema_name: str
     ) -> str:
         response = await self.rest_client.get(
-            f"/api/metalakes/{self.metalake_name}/catalogs/{catalog_name}/schemas/{schema_name}/tables"
+            f"/api/metalakes/{encode_path_segment(self.metalake_name)}"
+            f"/catalogs/{encode_path_segment(catalog_name)}"
+            f"/schemas/{encode_path_segment(schema_name)}/tables"
         )
         return extract_content_from_response(response, "identifiers", [])
 
@@ -39,6 +44,9 @@ class PlainRESTClientTableOperation(TableOperation):
         self, catalog_name: str, schema_name: str, table_name: str
     ) -> str:
         response = await self.rest_client.get(
-            f"/api/metalakes/{self.metalake_name}/catalogs/{catalog_name}/schemas/{schema_name}/tables/{table_name}"
+            f"/api/metalakes/{encode_path_segment(self.metalake_name)}"
+            f"/catalogs/{encode_path_segment(catalog_name)}"
+            f"/schemas/{encode_path_segment(schema_name)}"
+            f"/tables/{encode_path_segment(table_name)}"
         )
         return extract_content_from_response(response, "table", {})

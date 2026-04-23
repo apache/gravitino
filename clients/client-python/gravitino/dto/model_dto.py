@@ -15,7 +15,7 @@
 # specific language governing permissions and limitations
 # under the License.
 from dataclasses import dataclass, field
-from typing import Optional, Dict
+from typing import Dict, Optional
 
 from dataclasses_json import DataClassJsonMixin, config
 
@@ -34,6 +34,32 @@ class ModelDTO(Model, DataClassJsonMixin):
     )
     _latest_version: int = field(metadata=config(field_name="latestVersion"))
     _audit: AuditDTO = field(default=None, metadata=config(field_name="audit"))
+
+    def __eq__(self, value: object) -> bool:
+        if not isinstance(value, ModelDTO):
+            return False
+
+        return (
+            self._name == value._name
+            and self._comment == value._comment
+            and self._properties == value._properties
+            and self._latest_version == value._latest_version
+            and self._audit == value._audit
+        )
+
+    def __hash__(self) -> int:
+        properties_tuple = (
+            () if self._properties is None else tuple(sorted(self._properties.items()))
+        )
+        return hash(
+            (
+                self._name,
+                self._comment,
+                properties_tuple,
+                self._latest_version,
+                self._audit,
+            )
+        )
 
     def name(self) -> str:
         return self._name

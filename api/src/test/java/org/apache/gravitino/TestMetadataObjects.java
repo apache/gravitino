@@ -179,4 +179,47 @@ public class TestMetadataObjects {
         () ->
             MetadataObjects.of(Lists.newArrayList("catalog", "schema"), MetadataObject.Type.VIEW));
   }
+
+  @Test
+  public void testFunctionObject() {
+    MetadataObject functionObject =
+        MetadataObjects.of("catalog.schema", "func1", MetadataObject.Type.FUNCTION);
+    Assertions.assertEquals("catalog.schema", functionObject.parent());
+    Assertions.assertEquals("func1", functionObject.name());
+    Assertions.assertEquals(MetadataObject.Type.FUNCTION, functionObject.type());
+    Assertions.assertEquals("catalog.schema.func1", functionObject.fullName());
+
+    MetadataObject functionObject2 =
+        MetadataObjects.of(
+            Lists.newArrayList("catalog", "schema", "func2"), MetadataObject.Type.FUNCTION);
+    Assertions.assertEquals("catalog.schema", functionObject2.parent());
+    Assertions.assertEquals("func2", functionObject2.name());
+    Assertions.assertEquals(MetadataObject.Type.FUNCTION, functionObject2.type());
+    Assertions.assertEquals("catalog.schema.func2", functionObject2.fullName());
+
+    MetadataObject functionObject3 =
+        MetadataObjects.parse("catalog.schema.func3", MetadataObject.Type.FUNCTION);
+    Assertions.assertEquals("catalog.schema", functionObject3.parent());
+    Assertions.assertEquals("func3", functionObject3.name());
+    Assertions.assertEquals(MetadataObject.Type.FUNCTION, functionObject3.type());
+    Assertions.assertEquals("catalog.schema.func3", functionObject3.fullName());
+
+    // Test parent
+    MetadataObject parent = MetadataObjects.parent(functionObject);
+    Assertions.assertEquals("catalog.schema", parent.fullName());
+    Assertions.assertEquals("catalog", parent.parent());
+    Assertions.assertEquals("schema", parent.name());
+    Assertions.assertEquals(MetadataObject.Type.SCHEMA, parent.type());
+
+    // Test incomplete name
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () -> MetadataObjects.parse("func1", MetadataObject.Type.FUNCTION));
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () -> MetadataObjects.parse("catalog", MetadataObject.Type.FUNCTION));
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () -> MetadataObjects.parse("catalog.schema", MetadataObject.Type.FUNCTION));
+  }
 }
